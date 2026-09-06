@@ -125,6 +125,7 @@ body{
 .body.on{display:block}
 
 .sect{font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--color-text-dim);font-weight:600;margin:0 0 11px}
+.sect .plain{text-transform:none;letter-spacing:0;color:var(--color-text-dim);font-weight:400}
 
 /* ── SURFACE 1+2 — the source card ─────────────────────────────────────────── */
 .card{
@@ -152,6 +153,23 @@ body{
 .mark.ok{background:var(--color-success)}
 .mark.stop{background:var(--color-warning)}
 .mark.wait{background:var(--color-text-dim)}
+
+/* ⭐ THE FORK — B's one-line healthy source. Four facts, one row.
+   "Text is noise. Cut it. The purpose must survive the cut." */
+.line{
+  display:flex;align-items:center;gap:12px;padding:9px 16px;cursor:pointer;
+  background:var(--color-surface);border:1px solid var(--color-border);
+  border-radius:var(--radius-md,8px);margin-bottom:5px;transition:all .15s ease;
+}
+.line:hover{border-color:var(--color-primary-dim);background:var(--color-muted)}
+.lico{width:18px;text-align:center;opacity:.75;flex-shrink:0}
+.lname{font-size:var(--text-sm);font-weight:600;min-width:158px;flex-shrink:0}
+.lpath{
+  font-size:var(--text-xs);color:var(--color-text-dim);font-family:var(--font-mono);
+  flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.lright{display:flex;align-items:center;gap:7px;flex-shrink:0}
+.lmuted{font-size:var(--text-xs);color:var(--color-text-muted)}
 
 /* ⭐ the outcome line — "Checked 4 minutes ago · 6 files", never "scheduled" */
 .outcome{margin-top:8px;font-size:var(--text-sm);color:var(--color-text-muted);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -247,8 +265,8 @@ body{
 
 <div id="vnav">
   <span class="lbl">Sketch 233</span>
-  <button class="vtab on" id="tabA" onclick="showVariant('A')">A — the popover carries the repair</button>
-  <button class="vtab" id="tabB" onclick="showVariant('B')">B — the badge is only a door</button>
+  <button class="vtab on" id="tabA" onclick="showVariant('A')">A — every source is a full card</button>
+  <button class="vtab" id="tabB" onclick="showVariant('B')">B — healthy sources are one line</button>
 </div>
 
 <div class="variant on" id="vA"></div>
@@ -356,15 +374,17 @@ var COPY = {
   /* ── the signal ── */
   badgeTitle: function (n) { return n === 1 ? "1 source stopped reading" : n + " sources stopped reading"; },
   popTitle: "Needs attention",
-  popSeeAll: "See all sources",
   popOpenHealth: "Open Library health",
   attentionTitle: "Sources needing attention",
   attentionEmpty: "Every source is reading.",
+  goToSource: "Go to source",
+  roster: function (total, need) { return total + " connected, " + need + " need you"; },
 
   /* ── ordinary controls ── */
   syncNow: "Sync now",
   history: "History",
-  hideHistory: "Hide history"
+  hideHistory: "Hide history",
+  collapse: "Collapse"
 };
 
 /* ═══════════════════════════════════════════════════════════════════════════════
@@ -372,8 +392,10 @@ var COPY = {
    The engine facts ARE real: the six connector_watch_items states, the real
    counts dict keys (new / modified / renamed / missing / restored / errors),
    the real cause families, the real cadence floor.
-   Recorded as authored per the sketch-142 lesson: when the question is about
-   WORDING, an unreadable-but-real surface defeats the gate.
+
+   ⚠ TWELVE SOURCES, NOT FOUR, AND THE COUNT IS LOAD-BEARING. The question this
+   sketch now asks — how much a HEALTHY source should say — does not exist at
+   four rows. It exists at twelve, where two need you and ten do not.
    ═══════════════════════════════════════════════════════════════════════════════ */
 var SOURCES = [
   { id:"s1", icon:"▲", conn:"Finance Drive", system:"Google Drive",
@@ -390,11 +412,20 @@ var SOURCES = [
     every:60, state:"stopped", cause:"folder_gone",
     stoppedAgo:"11 hours ago", lastGood:"5 September, 22:10" },
 
+  { id:"s5",  icon:"▲", conn:"HR Drive",          system:"Google Drive", from:"People / Policies",      to:"HR / Policies",        every:1440, state:"ok", ago:"2 hours ago",    files:41 },
+  { id:"s6",  icon:"◆", conn:"Bids SharePoint",   system:"SharePoint",   from:"Tenders / 2026",         to:"Commercial / Bids",    every:60,   state:"ok", ago:"18 minutes ago", files:112 },
+  { id:"s7",  icon:"▲", conn:"QA Drive",          system:"Google Drive", from:"Inspections / Reports",  to:"Quality / Reports",    every:30,   state:"ok", ago:"9 minutes ago",  files:88 },
+  { id:"s8",  icon:"◆", conn:"Board SharePoint",  system:"SharePoint",   from:"Board / Minutes",        to:"Governance / Board",   every:1440, state:"ok", ago:"6 hours ago",    files:23 },
+  { id:"s9",  icon:"▲", conn:"Design Drive",      system:"Google Drive", from:"Drawings / Issued",      to:"Engineering / Issued", every:360,  state:"ok", ago:"51 minutes ago", files:307 },
+  { id:"s10", icon:"▲", conn:"Procurement Drive", system:"Google Drive", from:"Purchase Orders / Open", to:"Finance / POs",        every:60,   state:"ok", ago:"22 minutes ago", files:64 },
+  { id:"s11", icon:"◆", conn:"Site SharePoint",   system:"SharePoint",   from:"Daily Logs / Tower A",   to:"Operations / Logs",    every:30,   state:"ok", ago:"3 minutes ago",  files:19 },
+  { id:"s12", icon:"▲", conn:"Safety Drive",      system:"Google Drive", from:"HSE / Incident Reports", to:"Safety / Incidents",   every:360,  state:"ok", ago:"1 hour ago",     files:7 },
+
   { id:"s4", icon:"?", conn:"Archive (legacy)", system:"—",
     state:"degraded" }
 ];
 
-/* runs for s1 — EVERY tick has a row, including the quiet ones (D-235-07) */
+/* runs — EVERY tick has a row, including the quiet ones (D-235-07) */
 var RUNS = [
   { t:"Today 14:32",      added:3, updated:1 },
   { t:"Today 14:02",      quiet:true },
@@ -416,7 +447,8 @@ var RUNS = [
 ];
 
 var READER_OFF = false;
-var OPEN_HIST  = { A:false, B:false };
+var OPEN_HIST  = { A:null, B:null };   /* which SOURCE has its history open */
+var EXPANDED   = { A:null, B:null };   /* B only: which healthy line is opened out */
 var SHOW_QUIET = { A:false, B:false };
 var POP_OPEN   = { A:false, B:false };
 var TAB        = { A:"ingestion", B:"ingestion" };
@@ -455,7 +487,7 @@ function renderRun(r){
          '</div>';
 }
 
-function renderHistory(v){
+function renderHistory(v, sid){
   var quiet = RUNS.filter(function(r){ return r.quiet; }).length;
   var rows;
   if (SHOW_QUIET[v]) {
@@ -469,7 +501,7 @@ function renderHistory(v){
       '</div>' +
       loud.slice(1).map(renderRun).join("");
   }
-  return '<div class="hist' + (OPEN_HIST[v] ? " open" : "") + '" data-block="history">' +
+  return '<div class="hist' + (OPEN_HIST[v] === sid ? " open" : "") + '" data-block="history">' +
            '<div class="histhead">' +
              '<span class="sect" style="margin:0">Every check</span>' +
              '<button class="btn quiet" data-action="toggle-quiet" onclick="toggleQuiet(\'' + v + '\')">' +
@@ -479,9 +511,26 @@ function renderHistory(v){
          '</div>';
 }
 
+/* ⭐ THE FORK — B collapses a HEALTHY source to one line.
+   "Text is noise. Cut it. The purpose must survive the cut." A healthy source has
+   one thing to say: it read, and when. Everything else is one click away.
+   ⛔ It MUST stay openable — SC#1 is "a person opens a SOURCE and sees every run",
+   so a collapsed line that could not open would fail the requirement, not simplify it. */
+function renderLine(s, v){
+  var right = READER_OFF
+    ? '<span class="mark wait"></span><span class="lmuted">' + esc(COPY.readerOffRow) + '</span>'
+    : '<span class="mark ok"></span><span class="lmuted">' + esc(COPY.checkedAgo(s.ago, s.files)) + '</span>';
+  return '<div class="line" data-block="source-line" onclick="expand(\'' + v + '\',\'' + s.id + '\')">' +
+           '<span class="lico">' + esc(s.icon) + '</span>' +
+           '<span class="lname">' + esc(s.conn) + '</span>' +
+           '<span class="lpath">' + esc(s.to) + '</span>' +
+           '<span class="lright">' + right + '</span>' +
+         '</div>';
+}
+
 /* ── SURFACE 1+2 — the source card ─────────────────────────────────────────── */
 function renderCard(s, v){
-  /* SEED-239 — the degraded row. Named, never silently skipped. */
+  /* SEED-239 — the degraded row. Named, never silently skipped, never collapsed. */
   if (s.state === "degraded") {
     return '<div class="card degraded" data-block="source-card" data-degraded="1">' +
              '<div class="crow">' +
@@ -495,6 +544,10 @@ function renderCard(s, v){
              '</div>' +
            '</div>';
   }
+
+  /* B: a healthy source is ONE LINE until it is opened. A stopped source is
+     NEVER collapsed — being the one you see is the entire point. */
+  if (v === "B" && s.state === "ok" && EXPANDED[v] !== s.id) return renderLine(s, v);
 
   var stopped = s.state === "stopped";
   var c = stopped ? COPY.cause[s.cause] : null;
@@ -511,8 +564,8 @@ function renderCard(s, v){
     outcome = '<span class="mark ok"></span><span><b>' + esc(COPY.checkedAgo(s.ago, s.files)) + '</b></span>';
   }
 
-  /* ⭐ THE FORK. In BOTH variants the card carries the one control — B keeps it
-     as the ONLY home; A additionally offers it from the popover. */
+  /* ⛔ THE ONE HOME FOR THE ACTION, in BOTH variants. Settled by RULE rather than
+     by feel — see renderPop for why. */
   var fix = stopped
     ? '<button class="btn primary" data-action="fix" data-cause="' + s.cause + '" ' +
         'onclick="doFix(\'' + s.id + '\')">' + esc(c.action) + '</button>'
@@ -538,10 +591,15 @@ function renderCard(s, v){
            '<div class="acts">' + fix +
              '<button class="btn" data-action="sync-now" onclick="doSync(\'' + v + '\')"' +
                (READER_OFF ? " disabled" : "") + '>' + esc(COPY.syncNow) + '</button>' +
-             '<button class="btn quiet" data-action="toggle-history" onclick="toggleHist(\'' + v + '\')">' +
-               esc(OPEN_HIST[v] ? COPY.hideHistory : COPY.history) + '</button>' +
+             '<button class="btn quiet" data-action="toggle-history" onclick="toggleHist(\'' + v + '\',\'' + s.id + '\')">' +
+               esc(OPEN_HIST[v] === s.id ? COPY.hideHistory : COPY.history) +
+             '</button>' +
+             (v === "B" && s.state === "ok"
+               ? '<button class="btn quiet" data-action="collapse" onclick="expand(\'' + v + '\',null)">' +
+                   esc(COPY.collapse) + '</button>'
+               : '') +
            '</div>' +
-           (s.id === "s1" ? renderHistory(v) : "") +
+           renderHistory(v, s.id) +
          '</div>';
 }
 
@@ -549,26 +607,27 @@ function renderCard(s, v){
 function renderPop(v){
   var items = STOPPED.map(function (s) {
     var c = COPY.cause[s.cause];
-    /* ⭐ A carries the repair. B carries none — it is a door, and the fix has
-       exactly ONE home. B's absence is the counter-example, preserved. */
-    var act = (v === "A")
-      ? '<button class="btn primary" style="margin-top:8px" data-action="fix" ' +
-          'onclick="doFix(\'' + s.id + '\')">' + esc(c.action) + '</button>'
-      : '';
+    /* ⛔ NO REPAIR CONTROL HERE, IN EITHER VARIANT. The badge is a DOOR.
+       ⚠ THIS WAS THE FIRST CUT'S VARIANT AXIS AND IT WAS MEASURED UNFEELABLE:
+       A and B differed by 248 characters out of ~30,000, and the two landing
+       screens were pixel-identical — the whole fork was three buttons, two of
+       them behind a two-step interaction. The operator saw no difference and
+       was right. It is settled by RULE instead: the fix keeps ONE home, on the
+       source card — the same rule that put the history on the card and kept it
+       out of Health (D-235-17). A second repair site buys two clicks and costs
+       the rule that decided every other placement in this phase. */
     return '<div class="popitem" data-block="pop-item">' +
              '<div class="nm">' + esc(s.conn) + '</div>' +
              '<div class="why">' + esc(COPY.stopped(s.stoppedAgo)) + ' — ' + esc(c.says) + '</div>' +
-             act +
            '</div>';
   }).join("");
 
-  var foot = (v === "A")
-    ? '<button class="btn quiet" data-action="see-all" onclick="goHealth(\'A\')">' + esc(COPY.popSeeAll) + '</button>'
-    : '<button class="btn primary" data-action="open-health" onclick="goHealth(\'B\')">' + esc(COPY.popOpenHealth) + '</button>';
-
   return '<div class="pop' + (POP_OPEN[v] ? " open" : "") + '" data-block="popover">' +
            '<h4>' + esc(COPY.popTitle) + '</h4>' + items +
-           '<div class="popfoot">' + foot + '</div>' +
+           '<div class="popfoot">' +
+             '<button class="btn primary" data-action="open-health" onclick="goHealth(\'' + v + '\')">' +
+               esc(COPY.popOpenHealth) + '</button>' +
+           '</div>' +
          '</div>';
 }
 
@@ -578,18 +637,15 @@ function renderAttention(v){
     return '<div class="att"><div class="empty">' + esc(COPY.attentionEmpty) + '</div></div>';
   }
   return '<div class="att" data-block="attention-list">' + STOPPED.map(function (s) {
-    var c = COPY.cause[s.cause];
-    /* B's fix lives ONLY on the source card, so Health links THERE rather than
-       growing a second home for the action. A may repair in place. */
-    var act = (v === "A")
-      ? '<button class="btn primary" data-action="fix" onclick="doFix(\'' + s.id + '\')">' + esc(c.action) + '</button>'
-      : '<button class="btn" data-action="go-to-source" onclick="goSource(\'B\',\'' + s.id + '\')">Go to source</button>';
+    /* one home for the action: Health names what is wrong and LEADS there. */
     return '<div class="attrow" data-block="attention-row">' +
              '<span class="mark stop"></span>' +
              '<div class="g">' +
                '<div class="nm">' + esc(s.conn) + '</div>' +
                '<div class="why">' + esc(COPY.stopped(s.stoppedAgo)) + ' · ' + esc(COPY.lastGood(s.lastGood)) + '</div>' +
-             '</div>' + act +
+             '</div>' +
+             '<button class="btn" data-action="go-to-source" onclick="goSource(\'' + v + '\',\'' + s.id + '\')">' +
+               esc(COPY.goToSource) + '</button>' +
            '</div>';
   }).join("") + '</div>';
 }
@@ -601,8 +657,7 @@ function renderPage(v){
 
   return '<div class="app">' +
     '<aside class="rail">' +
-      '<div class="brand"><div class="bmark">✦</div>' +
-        '<span class="nm">Aether</span></div>' +
+      '<div class="brand"><div class="bmark">✦</div><span class="nm">Aether</span></div>' +
       '<button class="railitem" data-block="rail-item"><span class="ico">◇</span>Chat</button>' +
       '<button class="railitem" data-block="rail-item"><span class="ico">⚙</span>Workflows</button>' +
       '<div style="position:relative">' +
@@ -643,7 +698,8 @@ function renderPage(v){
 
       /* INGESTION — every source, and everything it did */
       '<div class="body' + (isIng ? " on" : "") + '" data-block="body-ingestion">' +
-        '<div class="sect">Watched sources</div>' +
+        '<div class="sect">Watched sources <span class="plain">· ' +
+          esc(COPY.roster(SOURCES.length, n)) + '</span></div>' +
         SOURCES.map(function (s) { return renderCard(s, v); }).join("") +
       '</div>' +
 
@@ -651,7 +707,7 @@ function renderPage(v){
       '<div class="body' + (!isIng ? " on" : "") + '" data-block="body-health">' +
         '<div class="hchips">' +
           '<div class="chip"><b>1,284</b>documents</div>' +
-          '<div class="chip"><b>4</b>watched sources</div>' +
+          '<div class="chip"><b>' + SOURCES.length + '</b>watched sources</div>' +
           '<div class="chip"><b>' + n + '</b>needing attention</div>' +
         '</div>' +
         '<div class="sect">' + esc(COPY.attentionTitle) + '</div>' +
@@ -661,8 +717,8 @@ function renderPage(v){
       '<div class="tryme">' +
         '<h5>Three things to try</h5>' +
         '<ol>' +
-          '<li>Click the <b>2</b> beside Library — then try to repair Legal SharePoint from where you land.</li>' +
-          '<li>Open <b>History</b> on Finance Drive and click <b>checked 14 times, no changes</b>.</li>' +
+          '<li>Switch between <b>A</b> and <b>B</b> at the top — twelve sources, two of which need you.</li>' +
+          '<li>In <b>B</b>, click any one-line source to open it, then <b>History</b> → <b>checked 14 times, no changes</b>.</li>' +
           '<li>Switch <b>Reader: on → off</b> in the toolbar, bottom right.</li>' +
         '</ol>' +
         '<div class="note">Content is an authored business scenario, deliberately not real rows — the ' +
@@ -685,11 +741,16 @@ function showVariant(v){
   document.getElementById("tabB").classList.toggle("on", v === "B");
 }
 function togglePop(v){ POP_OPEN[v] = !POP_OPEN[v]; paint(); }
-function toggleHist(v){ OPEN_HIST[v] = !OPEN_HIST[v]; paint(); }
-function toggleQuiet(v){ SHOW_QUIET[v] = !SHOW_QUIET[v]; OPEN_HIST[v] = true; paint(); }
+function expand(v, id){ EXPANDED[v] = id; if (!id) OPEN_HIST[v] = null; paint(); }
+function toggleHist(v, id){ OPEN_HIST[v] = (OPEN_HIST[v] === id ? null : id); paint(); }
+function toggleQuiet(v){ SHOW_QUIET[v] = !SHOW_QUIET[v]; paint(); }
 function goTab(v, t){ TAB[v] = t; POP_OPEN[v] = false; paint(); }
 function goHealth(v){ TAB[v] = "health"; POP_OPEN[v] = false; paint(); toast("Library ▸ Health"); }
-function goSource(v){ TAB[v] = "ingestion"; POP_OPEN[v] = false; paint(); toast("Library ▸ Ingestion"); }
+function goSource(v, id){
+  TAB[v] = "ingestion"; POP_OPEN[v] = false;
+  if (v === "B") EXPANDED[v] = id;
+  paint(); toast("Library ▸ Ingestion");
+}
 function doFix(id){
   var s = SOURCES.filter(function(x){ return x.id === id; })[0];
   toast(COPY.cause[s.cause].action + " — opening…");

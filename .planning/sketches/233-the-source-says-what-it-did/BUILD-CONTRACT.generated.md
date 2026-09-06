@@ -78,15 +78,91 @@ Every entry is a `data-block` the React build must emit under the same name.
 19. `source-card`
 20. `outcome`
 21. `stopped-sentence`
-22. `source-card`
-23. `outcome`
-24. `stopped-sentence`
-25. `source-card`
-26. `body-health`
-27. `attention-list`
-28. `attention-row`
+22. `history`
+23. `run`
+24. `quiet-fold`
+25. `run`
+26. `fail-reason`
+27. `run`
+28. `source-card`
+29. `outcome`
+30. `stopped-sentence`
+31. `history`
+32. `run`
+33. `quiet-fold`
+34. `run`
+35. `fail-reason`
+36. `run`
+37. `source-card`
+38. `outcome`
+39. `history`
+40. `run`
+41. `quiet-fold`
+42. `run`
+43. `fail-reason`
+44. `run`
+45. `source-card`
+46. `outcome`
+47. `history`
+48. `run`
+49. `quiet-fold`
+50. `run`
+51. `fail-reason`
+52. `run`
+53. `source-card`
+54. `outcome`
+55. `history`
+56. `run`
+57. `quiet-fold`
+58. `run`
+59. `fail-reason`
+60. `run`
+61. `source-card`
+62. `outcome`
+63. `history`
+64. `run`
+65. `quiet-fold`
+66. `run`
+67. `fail-reason`
+68. `run`
+69. `source-card`
+70. `outcome`
+71. `history`
+72. `run`
+73. `quiet-fold`
+74. `run`
+75. `fail-reason`
+76. `run`
+77. `source-card`
+78. `outcome`
+79. `history`
+80. `run`
+81. `quiet-fold`
+82. `run`
+83. `fail-reason`
+84. `run`
+85. `source-card`
+86. `outcome`
+87. `history`
+88. `run`
+89. `quiet-fold`
+90. `run`
+91. `fail-reason`
+92. `run`
+93. `source-card`
+94. `outcome`
+95. `history`
+96. `run`
+97. `quiet-fold`
+98. `run`
+99. `fail-reason`
+100. `run`
+101. `source-card`
+102. `body-health`
+103. `attention-list`
+104. `attention-row`
 
-Named controls: `badge` · `fix` · `see-all` · `sync-now` · `toggle-history` · `toggle-quiet` · `report-source`
+Named controls: `badge` · `open-health` · `sync-now` · `toggle-history` · `toggle-quiet` · `fix` · `report-source` · `go-to-source`
 
 ### Health tab
 
@@ -111,15 +187,91 @@ Named controls: `badge` · `fix` · `see-all` · `sync-now` · `toggle-history` 
 19. `source-card`
 20. `outcome`
 21. `stopped-sentence`
-22. `source-card`
-23. `outcome`
-24. `stopped-sentence`
-25. `source-card`
-26. `body-health`
-27. `attention-list`
-28. `attention-row`
+22. `history`
+23. `run`
+24. `quiet-fold`
+25. `run`
+26. `fail-reason`
+27. `run`
+28. `source-card`
+29. `outcome`
+30. `stopped-sentence`
+31. `history`
+32. `run`
+33. `quiet-fold`
+34. `run`
+35. `fail-reason`
+36. `run`
+37. `source-card`
+38. `outcome`
+39. `history`
+40. `run`
+41. `quiet-fold`
+42. `run`
+43. `fail-reason`
+44. `run`
+45. `source-card`
+46. `outcome`
+47. `history`
+48. `run`
+49. `quiet-fold`
+50. `run`
+51. `fail-reason`
+52. `run`
+53. `source-card`
+54. `outcome`
+55. `history`
+56. `run`
+57. `quiet-fold`
+58. `run`
+59. `fail-reason`
+60. `run`
+61. `source-card`
+62. `outcome`
+63. `history`
+64. `run`
+65. `quiet-fold`
+66. `run`
+67. `fail-reason`
+68. `run`
+69. `source-card`
+70. `outcome`
+71. `history`
+72. `run`
+73. `quiet-fold`
+74. `run`
+75. `fail-reason`
+76. `run`
+77. `source-card`
+78. `outcome`
+79. `history`
+80. `run`
+81. `quiet-fold`
+82. `run`
+83. `fail-reason`
+84. `run`
+85. `source-card`
+86. `outcome`
+87. `history`
+88. `run`
+89. `quiet-fold`
+90. `run`
+91. `fail-reason`
+92. `run`
+93. `source-card`
+94. `outcome`
+95. `history`
+96. `run`
+97. `quiet-fold`
+98. `run`
+99. `fail-reason`
+100. `run`
+101. `source-card`
+102. `body-health`
+103. `attention-list`
+104. `attention-row`
 
-Named controls: `badge` · `fix` · `see-all` · `sync-now` · `toggle-history` · `toggle-quiet` · `report-source`
+Named controls: `badge` · `open-health` · `sync-now` · `toggle-history` · `toggle-quiet` · `fix` · `report-source` · `go-to-source`
 
 ### Reader switched off
 
@@ -144,15 +296,91 @@ Named controls: `badge` · `fix` · `see-all` · `sync-now` · `toggle-history` 
 19. `source-card`
 20. `outcome`
 21. `stopped-sentence`
-22. `source-card`
-23. `outcome`
-24. `stopped-sentence`
-25. `source-card`
-26. `body-health`
-27. `attention-list`
-28. `attention-row`
+22. `history`
+23. `run`
+24. `quiet-fold`
+25. `run`
+26. `fail-reason`
+27. `run`
+28. `source-card`
+29. `outcome`
+30. `stopped-sentence`
+31. `history`
+32. `run`
+33. `quiet-fold`
+34. `run`
+35. `fail-reason`
+36. `run`
+37. `source-card`
+38. `outcome`
+39. `history`
+40. `run`
+41. `quiet-fold`
+42. `run`
+43. `fail-reason`
+44. `run`
+45. `source-card`
+46. `outcome`
+47. `history`
+48. `run`
+49. `quiet-fold`
+50. `run`
+51. `fail-reason`
+52. `run`
+53. `source-card`
+54. `outcome`
+55. `history`
+56. `run`
+57. `quiet-fold`
+58. `run`
+59. `fail-reason`
+60. `run`
+61. `source-card`
+62. `outcome`
+63. `history`
+64. `run`
+65. `quiet-fold`
+66. `run`
+67. `fail-reason`
+68. `run`
+69. `source-card`
+70. `outcome`
+71. `history`
+72. `run`
+73. `quiet-fold`
+74. `run`
+75. `fail-reason`
+76. `run`
+77. `source-card`
+78. `outcome`
+79. `history`
+80. `run`
+81. `quiet-fold`
+82. `run`
+83. `fail-reason`
+84. `run`
+85. `source-card`
+86. `outcome`
+87. `history`
+88. `run`
+89. `quiet-fold`
+90. `run`
+91. `fail-reason`
+92. `run`
+93. `source-card`
+94. `outcome`
+95. `history`
+96. `run`
+97. `quiet-fold`
+98. `run`
+99. `fail-reason`
+100. `run`
+101. `source-card`
+102. `body-health`
+103. `attention-list`
+104. `attention-row`
 
-Named controls: `badge` · `fix` · `see-all` · `sync-now` · `toggle-history` · `toggle-quiet` · `report-source`
+Named controls: `badge` · `open-health` · `sync-now` · `toggle-history` · `toggle-quiet` · `fix` · `report-source` · `go-to-source`
 
 ### Badge popover — variant A
 
@@ -177,15 +405,91 @@ Named controls: `badge` · `fix` · `see-all` · `sync-now` · `toggle-history` 
 19. `source-card`
 20. `outcome`
 21. `stopped-sentence`
-22. `source-card`
-23. `outcome`
-24. `stopped-sentence`
-25. `source-card`
-26. `body-health`
-27. `attention-list`
-28. `attention-row`
+22. `history`
+23. `run`
+24. `quiet-fold`
+25. `run`
+26. `fail-reason`
+27. `run`
+28. `source-card`
+29. `outcome`
+30. `stopped-sentence`
+31. `history`
+32. `run`
+33. `quiet-fold`
+34. `run`
+35. `fail-reason`
+36. `run`
+37. `source-card`
+38. `outcome`
+39. `history`
+40. `run`
+41. `quiet-fold`
+42. `run`
+43. `fail-reason`
+44. `run`
+45. `source-card`
+46. `outcome`
+47. `history`
+48. `run`
+49. `quiet-fold`
+50. `run`
+51. `fail-reason`
+52. `run`
+53. `source-card`
+54. `outcome`
+55. `history`
+56. `run`
+57. `quiet-fold`
+58. `run`
+59. `fail-reason`
+60. `run`
+61. `source-card`
+62. `outcome`
+63. `history`
+64. `run`
+65. `quiet-fold`
+66. `run`
+67. `fail-reason`
+68. `run`
+69. `source-card`
+70. `outcome`
+71. `history`
+72. `run`
+73. `quiet-fold`
+74. `run`
+75. `fail-reason`
+76. `run`
+77. `source-card`
+78. `outcome`
+79. `history`
+80. `run`
+81. `quiet-fold`
+82. `run`
+83. `fail-reason`
+84. `run`
+85. `source-card`
+86. `outcome`
+87. `history`
+88. `run`
+89. `quiet-fold`
+90. `run`
+91. `fail-reason`
+92. `run`
+93. `source-card`
+94. `outcome`
+95. `history`
+96. `run`
+97. `quiet-fold`
+98. `run`
+99. `fail-reason`
+100. `run`
+101. `source-card`
+102. `body-health`
+103. `attention-list`
+104. `attention-row`
 
-Named controls: `badge` · `fix` · `see-all` · `sync-now` · `toggle-history` · `toggle-quiet` · `report-source`
+Named controls: `badge` · `open-health` · `sync-now` · `toggle-history` · `toggle-quiet` · `fix` · `report-source` · `go-to-source`
 
 ### Badge popover — variant B
 
@@ -199,43 +503,62 @@ Named controls: `badge` · `fix` · `see-all` · `sync-now` · `toggle-history` 
 8. `tab-ingestion`
 9. `tab-health`
 10. `body-ingestion`
-11. `source-card`
-12. `outcome`
-13. `history`
-14. `run`
-15. `quiet-fold`
+11. `source-line`
+12. `source-card`
+13. `outcome`
+14. `stopped-sentence`
+15. `history`
 16. `run`
-17. `fail-reason`
+17. `quiet-fold`
 18. `run`
-19. `source-card`
-20. `outcome`
-21. `stopped-sentence`
-22. `source-card`
-23. `outcome`
-24. `stopped-sentence`
-25. `source-card`
-26. `body-health`
-27. `attention-list`
-28. `attention-row`
+19. `fail-reason`
+20. `run`
+21. `source-card`
+22. `outcome`
+23. `stopped-sentence`
+24. `history`
+25. `run`
+26. `quiet-fold`
+27. `run`
+28. `fail-reason`
+29. `run`
+30. `source-line`
+31. `source-card`
+32. `body-health`
+33. `attention-list`
+34. `attention-row`
 
-Named controls: `badge` · `open-health` · `sync-now` · `toggle-history` · `toggle-quiet` · `fix` · `report-source` · `go-to-source`
+Named controls: `badge` · `open-health` · `fix` · `sync-now` · `toggle-history` · `toggle-quiet` · `report-source` · `go-to-source`
 
 ### Counts that must hold
 
-- one `source-card` per watched source — **4** in this fixture, including the unreadable one
+- **A**: one `source-card` per watched source — **12**, including the unreadable one
+- **B**: **9** `source-line` + **3** `source-card` — every source accounted for exactly once
 - one `attention-row` per stopped source — **2**
-- `run` rows collapsed: **3**, expanded: **17** (fixture has 17 ticks, 14 quiet)
+- `run` rows **per open card** — collapsed: **3**, expanded: **17** (fixture has 17 ticks, 14 quiet)
 - `instance-statement` appears **exactly once**, never per row
 
 ## 3. The variant fork, as shipped
 
-| | popover carries `fix` | Health row action | card carries `fix` |
-|---|---|---|---|
-| **A** | yes | `fix` | yes |
-| **B** | no | `go-to-source` | yes |
+**How much a HEALTHY source says.** A stopped or unreadable source is identical in both.
 
-⛔ **Both variants keep the one control on the card.** The fork is about whether a SECOND
-place may repair — never about moving the first.
+| | healthy source | stopped source | visible text on landing |
+|---|---|---|---|
+| **A** | full `source-card` | full `source-card` | **6460** chars |
+| **B** | one `source-line`, opens on click | full `source-card`, never collapsed | **3230** chars |
+
+B is **50% shorter** at rest.
+
+⚠ **THE FIRST FORK WAS REFUTED AND IS RECORDED HERE RATHER THAN ERASED.** It was *where the
+fix lives* — A repairing from the popover, B routing to the card. Measured: the two variants
+differed by **248 characters out of ~30,000**, and the landing screens were **pixel-identical**.
+The operator said *"I really do not see a difference between A and B"* and was right.
+**A variant axis invisible on the screen you land on is not an axis.** The fix location was
+then settled by RULE — **one home, on the source card, in both variants** — the same rule that
+put the history on the card and kept it out of Health (`D-235-17`).
+
+⛔ So in BOTH variants: the badge popover is a **door** and carries no repair; the Health row
+says **Go to source**; the one control lives on the card.
 
 ## 4. Invariants a later edit must not break
 
@@ -247,4 +570,4 @@ place may repair — never about moving the first.
 - ⛔ the stopped mark uses `--color-warning`; `--color-danger` is never applied to a source state
 - every tick has a run row; folding quiet runs is **rendering**, never storage (`D-235-07`)
 
-_74 assertions passing at emit time._
+_82 assertions passing at emit time._

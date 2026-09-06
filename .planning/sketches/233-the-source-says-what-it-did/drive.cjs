@@ -55,7 +55,8 @@ if (!COPY) { console.log("cannot continue"); process.exit(2); }
 /* Render every screen state we need to assert. */
 const screen = (v, opts = {}) => {
   sandbox.READER_OFF = !!opts.readerOff;
-  sandbox.OPEN_HIST[v] = !!opts.history;
+  sandbox.OPEN_HIST[v] = opts.history ? (opts.history === true ? "s1" : opts.history) : null;
+  sandbox.EXPANDED[v] = opts.expand || null;
   sandbox.SHOW_QUIET[v] = !!opts.quiet;
   sandbox.POP_OPEN[v] = !!opts.pop;
   sandbox.TAB[v] = opts.tab || "ingestion";
@@ -65,6 +66,24 @@ const screen = (v, opts = {}) => {
 const blocks = (html) => [...html.matchAll(/data-block="([^"]+)"/g)].map(m => m[1]);
 const actions = (html) => [...new Set([...html.matchAll(/data-action="([^"]+)"/g)].map(m => m[1]))];
 const reset = (v) => screen(v, {});
+/* ⚠ SCOPE EVERY COUNT TO ITS REGION. Both tab bodies live in the DOM at once
+   (only .on is displayed), and every card now carries its own history — so an
+   unscoped blocks()/actions() over a whole page counts the OTHER tab's controls
+   and TWELVE cards' run rows. Three assertions passed against the wrong region
+   before this helper existed; scoping is not tidiness, it is correctness. */
+const region = (h, blk) => {
+  const i = h.indexOf('data-block="' + blk + '"');
+  if (i < 0) return '';
+  const rest = h.slice(i);
+  const nxt = rest.indexOf('data-block="body-', 1);
+  return nxt < 0 ? rest : rest.slice(0, nxt);
+};
+const firstCard = (h) => {
+  const i = h.indexOf('data-block="source-card"');
+  if (i < 0) return '';
+  const j = h.indexOf('data-block="source-card"', i + 1);
+  return j < 0 ? h.slice(i) : h.slice(i, j);
+};
 
 const A = reset("A"), B = reset("B");
 
@@ -86,15 +105,16 @@ const ING_ORDER = ["body-ingestion", "source-card", "outcome"];
 ["A", "B"].forEach((v) => {
   const b = blocks(screen(v, { tab: "ingestion" }));
   ING_ORDER.forEach((blk) => ok(`${v}: ingestion renders block "${blk}"`, b.includes(blk)));
-  ok(`${v}: ingestion renders ONE card per source (${SOURCES.length})`,
-     b.filter(x => x === "source-card").length === SOURCES.length,
-     `got ${b.filter(x => x === "source-card").length}`);
+  const cards = b.filter(x => x === "source-card").length;
+  const lines = b.filter(x => x === "source-line").length;
+  ok(`${v}: ingestion accounts for every source exactly once (${SOURCES.length}) — as a card or as a line, never neither`,
+     cards + lines === SOURCES.length, `got ${cards} cards + ${lines} lines`);
   const hb = blocks(screen(v, { tab: "health" }));
   ok(`${v}: health renders the attention list`, hb.includes("attention-list"));
   ok(`${v}: health renders one row per stopped source (2)`,
      hb.filter(x => x === "attention-row").length === 2);
   ok(`${v}: health does NOT render source cards — it carries only what is wrong`,
-     !hb.filter(x => x === "source-card").length === false || true); /* both bodies exist in DOM; see 2b */
+     !blocks(region(screen(v, { tab: "health" }), "body-health")).includes("source-card"));
 });
 
 /* 2b. ⭐ THE DIVISION THAT DECIDED EVERY PLACEMENT IN THIS PHASE:
@@ -110,21 +130,67 @@ const ING_ORDER = ["body-ingestion", "source-card", "outcome"];
      !blocks(hlthBody).includes("source-card"));
 });
 
-/* ═══ 3. ⭐ THE VARIANT FORK — where the fix lives ════════════════════════════
-   A: the popover carries the repair. B: the badge is a DOOR and the fix has ONE home.
-   B's absence is the counter-example and must be PRESERVED, never quietly fixed. */
-const popA = screen("A", { pop: true });
-const popB = screen("B", { pop: true });
-const popOnly = (h) => h.slice(h.indexOf('data-block="popover"'), h.indexOf('data-block="rail-item"', h.indexOf('data-block="popover"')));
-ok("⭐ A's popover carries the repair control", actions(popOnly(popA)).includes("fix"));
-ok("⭐ B's popover carries NO repair — it is a door", !actions(popOnly(popB)).includes("fix"));
-ok("⭐ B's popover offers the door instead", actions(popOnly(popB)).includes("open-health"));
-ok("B's Health row routes to the source rather than repairing in place",
-   actions(screen("B", { tab: "health" })).includes("go-to-source"));
-ok("A's Health row may repair in place",
-   actions(screen("A", { tab: "health" })).includes("fix"));
-ok("⛔ BOTH variants keep the one control on the CARD — the fork is about ADDING a second place, never moving the first",
-   actions(A).includes("fix") && actions(B).includes("fix"));
+/* ═══ 3. ⭐ THE VARIANT FORK — how much a HEALTHY source says ═════════════════
+   ⚠ THIS IS THE SECOND FORK, and the first is recorded rather than quietly
+   replaced. The first axis was "where the fix lives" and it was measured
+   UNFEELABLE: A and B differed by **248 characters out of ~30,000**, and the two
+   landing screens were **pixel-identical** — the entire axis was three buttons,
+   two of them behind a two-step interaction. The operator said "I really do not
+   see a difference between A and B" and was right. **A variant axis invisible on
+   the screen you land on is not an axis**, and no amount of README prose fixes
+   that. The fix location is now settled by RULE (one home, on the card).
+
+   The fork now: A renders every source as a full card. B collapses a HEALTHY
+   source to one line and opens it on click; a stopped or unreadable source is
+   never collapsed. ⭐ The assertions below exist to make the FIRST failure
+   impossible to repeat — they measure that the difference is visible AT REST. */
+const landA = screen("A", {}), landB = screen("B", {});
+const HEALTHY = SOURCES.filter(s => s.state === "ok").length;
+
+ok("⭐ A renders every source as a full card",
+   blocks(landA).filter(x => x === "source-card").length === SOURCES.length,
+   `got ${blocks(landA).filter(x => x === "source-card").length} of ${SOURCES.length}`);
+ok("⭐ B collapses every healthy source to a line",
+   blocks(landB).filter(x => x === "source-line").length === HEALTHY,
+   `got ${blocks(landB).filter(x => x === "source-line").length} of ${HEALTHY}`);
+ok("⛔ B NEVER collapses a stopped or unreadable source — being the one you see is the point",
+   blocks(landB).filter(x => x === "source-card").length === SOURCES.length - HEALTHY);
+ok("⛔ the fixture is big enough for the question to EXIST — it does not at four rows",
+   SOURCES.length >= 12 && HEALTHY >= 9);
+
+/* ⭐⭐ THE ASSERTION THE FIRST FORK COULD NOT HAVE PASSED. */
+const strip = (h) => h.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+const deltaChars = Math.abs(strip(landA).length - strip(landB).length);
+ok("⭐⭐ the fork is VISIBLE ON LANDING — the rest states differ by real text, not by 3 buttons",
+   deltaChars > 600, `only ${deltaChars} chars of visible text differ (the refuted fork managed 0)`);
+ok("⭐ B is the SHORTER page — text is noise, and the cut is measurable",
+   strip(landB).length < strip(landA).length,
+   `A ${strip(landA).length} vs B ${strip(landB).length}`);
+
+/* ⛔ THE CUT MUST NOT DESTROY THE REQUIREMENT. */
+const opened = screen("B", { expand: "s5", history: "s5" });
+ok("⛔ SC#1 SURVIVES THE CUT — a collapsed source opens into a full card with its history",
+   blocks(opened).includes("history") &&
+   blocks(opened).filter(x => x === "source-card").length === SOURCES.length - HEALTHY + 1);
+ok("a collapsed line still says the two things that matter — that it read, and when",
+   /Checked 2 hours ago · 41 files/.test(landB));
+ok("B offers a way back — an opened source can be collapsed again",
+   actions(opened).includes("collapse"));
+ok("⛔ a collapsed line is not a dead end — it is the control that opens it",
+   /data-block="source-line" onclick="expand\(/.test(landB));
+
+/* ⛔ THE FIX HAS ONE HOME IN BOTH VARIANTS — settled by rule after fork 1 failed. */
+const popOnly = (h) => h.slice(h.indexOf('data-block="popover"'), h.indexOf("popfoot"));
+ok("⛔ NEITHER popover carries a repair — the badge is a door in both",
+   !actions(popOnly(screen("A", { pop: true }))).includes("fix") &&
+   !actions(popOnly(screen("B", { pop: true }))).includes("fix"));
+ok("⛔ NEITHER Health tab repairs in place — it names what is wrong and LEADS there",
+   ["A", "B"].every(v => {
+     const a = actions(region(screen(v, { tab: "health" }), "body-health"));
+     return a.includes("go-to-source") && !a.includes("fix");
+   }));
+ok("⭐ the ONE home is the source card, in both variants",
+   actions(landA).includes("fix") && actions(landB).includes("fix"));
 
 /* ═══ 4. NAMED BUTTONS — every control the build must reproduce ═══════════════ */
 const NAMED = ["badge", "fix", "sync-now", "toggle-history", "toggle-quiet"];
@@ -202,12 +268,12 @@ ok("every tick has a run row in the fixture, quiet ones included",
 const folded = screen("A", { history: true, quiet: false });
 const shown  = screen("A", { history: true, quiet: true });
 ok("collapsed by default — quiet runs fold into one line",
-   blocks(folded).includes("quiet-fold") && /checked 14 times, no changes/.test(folded));
+   blocks(firstCard(folded)).includes("quiet-fold") && /checked 14 times, no changes/.test(folded));
 ok("expanded on demand — every tick becomes visible",
-   blocks(shown).filter(x => x === "run").length === RUNS.length,
-   `got ${blocks(shown).filter(x => x === "run").length} of ${RUNS.length}`);
+   blocks(firstCard(shown)).filter(x => x === "run").length === RUNS.length,
+   `got ${blocks(firstCard(shown)).filter(x => x === "run").length} of ${RUNS.length}`);
 ok("⛔ folding is RENDERING, not storage — the fixture is never filtered",
-   blocks(shown).filter(x => x === "run").length > blocks(folded).filter(x => x === "run").length);
+   blocks(firstCard(shown)).filter(x => x === "run").length > blocks(firstCard(folded)).filter(x => x === "run").length);
 
 /* 6d. per-file failure reasons are ACTIONABLE (SC#1's own words) */
 ok("a failed file names the FILE and what to do about it",
@@ -216,12 +282,13 @@ ok("the failure reason is attached to its run, not to the source",
    blocks(folded).includes("fail-reason"));
 
 /* ═══ 7. SEED-239 — the blast radius is ONE source, and it is NAMED ═══════════ */
-ok("⭐ the unreadable source still renders as a row", blocks(A).filter(x => x === "source-card").length === SOURCES.length);
+["A", "B"].forEach(v => ok(`${v}: ⭐ the unreadable source still renders as a row, never collapsed`,
+   /data-degraded="1"/.test(screen(v, {}))));
 ok("⭐ it says the app could not read IT, and that the others are unaffected",
    /could not be read here — the others are unaffected/.test(A));
 ok("⛔ it is NOT silently skipped — a source that vanishes from its own list is the silence LIB-10 forbids",
    /data-degraded="1"/.test(A));
-ok("⛔ one bad row does not take the page down", blocks(A).includes("body-ingestion"));
+ok("⛔ one bad row does not take the page down", blocks(A).includes("body-ingestion") && blocks(B).includes("body-ingestion"));
 
 /* ═══ 8. THE CAUSE → CONTROL MAP IS DATA, NEVER BRANCHES ══════════════════════ */
 ok("every cause carries its own named control",
@@ -326,20 +393,33 @@ if (process.argv.includes("--emit")) {
   });
   L.push("### Counts that must hold");
   L.push("");
-  L.push(`- one \`source-card\` per watched source — **${SOURCES.length}** in this fixture, including the unreadable one`);
+  L.push(`- **A**: one \`source-card\` per watched source — **${SOURCES.length}**, including the unreadable one`);
+  L.push(`- **B**: **${blocks(screen("B", {})).filter(x => x === "source-line").length}** \`source-line\` + **${blocks(screen("B", {})).filter(x => x === "source-card").length}** \`source-card\` — every source accounted for exactly once`);
   L.push(`- one \`attention-row\` per stopped source — **${screen("A", { tab: "health" }).split('data-block="attention-row"').length - 1}**`);
-  L.push(`- \`run\` rows collapsed: **${blocks(screen("A", { history: true })).filter(x => x === "run").length}**, expanded: **${blocks(screen("A", { history: true, quiet: true })).filter(x => x === "run").length}** (fixture has ${RUNS.length} ticks, ${RUNS.filter(r => r.quiet).length} quiet)`);
+  L.push(`- \`run\` rows **per open card** — collapsed: **${blocks(firstCard(screen("A", { history: true }))).filter(x => x === "run").length}**, expanded: **${blocks(firstCard(screen("A", { history: true, quiet: true }))).filter(x => x === "run").length}** (fixture has ${RUNS.length} ticks, ${RUNS.filter(r => r.quiet).length} quiet)`);
   L.push(`- \`instance-statement\` appears **exactly once**, never per row`);
   L.push("");
   L.push("## 3. The variant fork, as shipped");
   L.push("");
-  L.push("| | popover carries `fix` | Health row action | card carries `fix` |");
-  L.push("|---|---|---|---|");
-  L.push(`| **A** | ${actions(popOnly(popA)).includes("fix") ? "yes" : "no"} | \`fix\` | yes |`);
-  L.push(`| **B** | ${actions(popOnly(popB)).includes("fix") ? "yes" : "no"} | \`go-to-source\` | yes |`);
+  L.push("**How much a HEALTHY source says.** A stopped or unreadable source is identical in both.");
   L.push("");
-  L.push("⛔ **Both variants keep the one control on the card.** The fork is about whether a SECOND");
-  L.push("place may repair — never about moving the first.");
+  L.push("| | healthy source | stopped source | visible text on landing |");
+  L.push("|---|---|---|---|");
+  L.push(`| **A** | full \`source-card\` | full \`source-card\` | **${strip(screen("A", {})).length}** chars |`);
+  L.push(`| **B** | one \`source-line\`, opens on click | full \`source-card\`, never collapsed | **${strip(screen("B", {})).length}** chars |`);
+  L.push("");
+  L.push(`B is **${Math.round((1 - strip(screen("B", {})).length / strip(screen("A", {})).length) * 100)}% shorter** at rest.`);
+  L.push("");
+  L.push("⚠ **THE FIRST FORK WAS REFUTED AND IS RECORDED HERE RATHER THAN ERASED.** It was *where the");
+  L.push("fix lives* — A repairing from the popover, B routing to the card. Measured: the two variants");
+  L.push("differed by **248 characters out of ~30,000**, and the landing screens were **pixel-identical**.");
+  L.push("The operator said *\"I really do not see a difference between A and B\"* and was right.");
+  L.push("**A variant axis invisible on the screen you land on is not an axis.** The fix location was");
+  L.push("then settled by RULE — **one home, on the source card, in both variants** — the same rule that");
+  L.push("put the history on the card and kept it out of Health (`D-235-17`).");
+  L.push("");
+  L.push("⛔ So in BOTH variants: the badge popover is a **door** and carries no repair; the Health row");
+  L.push("says **Go to source**; the one control lives on the card.");
   L.push("");
   L.push("## 4. Invariants a later edit must not break");
   L.push("");
