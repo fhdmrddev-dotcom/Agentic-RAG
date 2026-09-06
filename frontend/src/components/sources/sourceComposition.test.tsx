@@ -515,6 +515,29 @@ describe("source-composition fence — §2 positive controls", () => {
 })
 
 // ══ §3 EVERY BLOCK THE SKETCH DRAWS ════════════════════════════════════════════════════
+//
+// ⭐ REPAIRED AT PLAN 11 — THIS SECTION USED `getByTestId`, A SINGLE-MATCH QUERY, AND THAT
+//   CONTRADICTED §5 OF THIS SAME FILE.
+//
+// §5 asserts that several of these block KINDS appear 9, 3, 17 and 2 times — because the
+// sketch draws them that many times. `getByTestId` THROWS on more than one match, so six
+// cases here failed with `Found multiple elements`, which is the OPPOSITE verdict from
+// `Unable to find an element`: it means the block IS built, at the contract's own count, and
+// the ASSERTION is what was wrong. The affected kinds were `sources-source-line`,
+// `sources-source-card`, `sources-outcome`, `sources-stopped-sentence`, `rail-rail-item` and
+// `health-attention-row`; plans 09 and 10 both measured this and neither could safely edit
+// the file while a sibling executor was live in it.
+//
+// ⛔ THE SURFACE WAS NOT DEFORMED TO SATISFY THE OLD QUERY. Rendering one `source-line` would
+//   have turned this section green and broken §5, the variant-B fork the operator chose, and
+//   the whole point of the 9-vs-3 fixture.
+//
+// ⚠ THE RELAXATION IS EXACTLY ONE STEP, AND NO MORE. `>= 1` still fails by NAME when a block
+//   is missing — driven RED against a planted absence before being accepted, because a fence
+//   nobody has seen fire is not a fence (that is what sketch 218 shipped). ⛔ It deliberately
+//   does NOT assert a count: §5 owns the counts, from the contract's own numbers, and
+//   duplicating them here would give two places to disagree about one design.
+//   `getAllByTestId(...).length` is the shape §4 of this file already uses.
 describe("source-composition fence — §3 every block the sketch draws", () => {
   beforeEach(primeMocks)
   afterEach(cleanup)
@@ -525,7 +548,9 @@ describe("source-composition fence — §3 every block the sketch draws", () => 
       for (const block of blocks) {
         it(`renders the \`${block.kind}\` block as [data-testid="${hook(screenName, block.kind)}"]`, async () => {
           await mountScreen(screenName)
-          expect(screen.getByTestId(hook(screenName, block.kind))).toBeInTheDocument()
+          expect(
+            screen.queryAllByTestId(hook(screenName, block.kind)).length,
+          ).toBeGreaterThanOrEqual(1)
         })
       }
     })

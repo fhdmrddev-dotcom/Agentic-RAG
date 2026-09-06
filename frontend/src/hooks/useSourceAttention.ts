@@ -55,6 +55,23 @@ export interface SourceAttention {
   pollIntervalSeconds: number
   /** True until the first response settles, success or failure. */
   loading: boolean
+  /**
+   * ⛔ HAS A VERDICT EVER ARRIVED? (Phase 235 plan 11 · T-235-39)
+   *
+   * `loading` alone cannot separate the three truths a consumer has to tell apart. After a
+   * rejected first probe `loading` is `false` and `stopped` is `[]` — byte-identical to the
+   * server saying *nothing is wrong*. A surface reading only those two would print an
+   * all-clear it never received, which is the repudiation this flag exists to stop.
+   *
+   *   loading            → we have not looked yet
+   *   !loading && !this  → we could not ask
+   *   !loading && this   → the server answered, and `stopped` is its whole answer
+   *
+   * ⚠ It stays TRUE once a verdict has landed, even if a LATER probe rejects — the hook's
+   * own rule is that a failure keeps the previous verdict, and a slightly stale answer is
+   * better than a blank one.
+   */
+  verdictKnown: boolean
   /** Re-fetch now, aborting whatever is in flight. */
   refresh: () => void
 }
@@ -107,6 +124,8 @@ export function useSourceAttention(): SourceAttention {
     readerRunning: verdict?.reader_running ?? false,
     pollIntervalSeconds,
     loading,
+    // Derived from state the hook already holds — no second `useState`, no second effect.
+    verdictKnown: verdict !== null,
     refresh,
   }
 }

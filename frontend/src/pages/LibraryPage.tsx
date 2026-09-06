@@ -136,20 +136,14 @@ function pageReducer(state: LibState, action: PageAction): LibState {
   return libraryReducer<ViewFilter, SavedView>(state, action)
 }
 
-/** ⚠ A TEMPORARY SLOT, AND IT DOES NOTHING WITH THE HANDLER YET — say so rather than let it
- *  read as a wired deep link.
+/* ⭐ THE TYPED NO-OP WRAPPER THAT LIVED HERE IS GONE (Phase 235 plan 11). Plan 08 needed a
+ *  consumer for `handleGoToSource` before `HealthTab` declared the prop, and chose a stated
+ *  no-op over a cast — a false type would have CLAIMED the prop was accepted while it was
+ *  silently dropped. `HealthTab` now declares `onGoToSource` for real, so the layer is deleted
+ *  rather than left reading like wiring it never was.
  *
- *  Phase 235 plan 11 (Wave 4) declares `onGoToSource` on `HealthTab` itself and wires it to
- *  the attention rows. This plan (wave 1) OWNS the handler but not that file, and
- *  `tsconfig.app.json` sets `noUnusedLocals`, so the handler needs a real consumer to keep
- *  `tsc --noEmit` at its measured baseline. This accepts the prop and drops it on the floor.
- *
- *  ⛔ PLAN 11 DELETES THIS and passes `onGoToSource` straight to `HealthTab`. Chosen over a
- *  `HealthTab as ...` cast, which would CLAIM the prop was accepted while it is ignored — a
- *  false type is worse than a stated no-op. */
-function HealthTabSlot(_props: { onGoToSource: (watchId: string) => void }) {
-  return <HealthTab />
-}
+ *  ⚠ Its NAME is deliberately not spelled here: a grep proving the wrapper is gone must not be
+ *  answerable by a comment (the 187-24 lesson, recorded twice already inside this phase). */
 
 // ⛔ FIVE TABS: Documents, Views, Ingestion, Indexing, Health. Built incrementally through
 // Phase 217.1 plans 03-12 — each tab body is a CHILD component with its own data fetching
@@ -227,10 +221,9 @@ export function LibraryPage({
    *  on the next tick once the tab body has mounted) rather than a second scroll shape. The
    *  100 ms is that handler's measured delay, not a new guess.
    *
-   *  ⚠ THE ANCHOR IS OWED BY PLAN 10. `WatchedFoldersSection.tsx:219` emits
-   *  `data-testid={`watch-card-${watch.id}`}` but no matching `id` attribute, so this scroll
-   *  is a NO-OP until plan 10 adds it — the tab switch works today, the scroll does not.
-   *  Stated here rather than left to be discovered. */
+   *  ✅ THE ANCHOR PLAN 08 RECORDED AS OWED HAS LANDED (plan 10). `WatchedFoldersSection`
+   *  now emits the matching `id` alongside its test hook on ONE line, so `getElementById`
+   *  resolves and the scroll half is no longer a no-op. Measured at plan 11, not assumed. */
   const handleGoToSource = (watchId: string) => {
     dispatch({ type: "SELECT_TAB", tab: "ingestion" })
     setTimeout(() => {
@@ -908,7 +901,7 @@ export function LibraryPage({
               value="health"
               className="mt-0 flex flex-1 min-h-0 min-w-0 flex-col data-[state=inactive]:hidden"
             >
-              <HealthTabSlot onGoToSource={handleGoToSource} />
+              <HealthTab onGoToSource={handleGoToSource} />
             </TabsContent>
           </div>
         </Tabs>

@@ -54,6 +54,7 @@ const {
   mockListCheckedQueries,
   mockListConnectorConnections,
   mockListWatches,
+  mockGetSourceHealth,
 } = vi.hoisted(() => ({
   mockUseDocuments: vi.fn(),
   mockUseFolders: vi.fn(),
@@ -74,6 +75,8 @@ const {
   mockListCheckedQueries: vi.fn(),
   mockListConnectorConnections: vi.fn(),
   mockListWatches: vi.fn(),
+  // Phase 235 plan 11 — hoisted so ONE case can hand the Health tab a stopped source.
+  mockGetSourceHealth: vi.fn(),
 }))
 
 vi.mock("@/lib/api", async (importOriginal) => {
@@ -113,9 +116,7 @@ vi.mock("@/lib/api/sources", () => ({
   triggerWatchSync: vi.fn(),
   purgeWatchFiles: vi.fn(),
   listSyncRuns: vi.fn().mockResolvedValue([]),
-  getSourceHealth: vi
-    .fn()
-    .mockResolvedValue({ stopped: [], reader_running: true, poll_interval_seconds: 60 }),
+  getSourceHealth: mockGetSourceHealth,
 }))
 
 vi.mock("@/hooks/useDocuments", () => ({ useDocuments: mockUseDocuments }))
@@ -233,6 +234,11 @@ beforeEach(() => {
   mockListCheckedQueries.mockResolvedValue([])
   mockListConnectorConnections.mockResolvedValue([])
   mockListWatches.mockResolvedValue([])
+  mockGetSourceHealth.mockResolvedValue({
+    stopped: [],
+    reader_running: true,
+    poll_interval_seconds: 60,
+  })
 })
 
 describe("LibraryPage — initialTab", () => {
@@ -278,6 +284,46 @@ describe("LibraryPage — initialTab", () => {
 
     await waitFor(() => expect(selectedTabName()).toBe("Documents"))
     expect(screen.getByRole("tab", { name: "Health" })).toHaveAttribute("aria-selected", "false")
+  })
+
+  /**
+   * ⭐ SURF-03's LAST HOP, EXERCISED RATHER THAN ASSUMED (Phase 235 plan 11 · D-235-17).
+   *
+   * The route is: rail badge → popover → Library Health → the source card that can fix it.
+   * Plans 08 and 09 built the first three legs; this case drives the fourth. The Health row
+   * carries NO repair — its one control is a door, and the door has to actually open.
+   *
+   * ⛔ There is no URL in any of this (SEED-185): the hop is a `SELECT_TAB` dispatch, so the
+   * assertion is on the selected tab, never on a location.
+   */
+  it("⭐ `Go to source` on a Health attention row lands on the Ingestion tab", async () => {
+    mockGetSourceHealth.mockResolvedValue({
+      stopped: [
+        {
+          watch_id: "watch-legal",
+          source_folder_name: "Contracts / Executed",
+          connection_name: "Legal SharePoint",
+          cause: "token_revoked",
+          hard: true,
+          stopped_since: new Date(Date.now() - 3 * 3_600_000).toISOString(),
+          last_good_at: null,
+        },
+      ],
+      reader_running: true,
+      poll_interval_seconds: 60,
+    })
+
+    const { LibraryPage } = await import("@/pages/LibraryPage")
+    renderPage(<LibraryPage initialTab="health" />)
+
+    // Non-vacuity: we really are on Health, and the row really did render.
+    expect(selectedTabName()).toBe("Health")
+    const goToSource = await screen.findByTestId("health-go-to-source")
+
+    fireEvent.click(goToSource)
+
+    await waitFor(() => expect(selectedTabName()).toBe("Ingestion"))
+    expect(await screen.findByTestId("ingestion-tab")).toBeInTheDocument()
   })
 
   it("still accepts `onNavigate` alongside — the new prop is additive", async () => {

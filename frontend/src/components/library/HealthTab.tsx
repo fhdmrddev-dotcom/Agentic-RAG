@@ -17,6 +17,7 @@ import { CoverageRing } from "./CoverageRing"
 import { HealthSignalChips } from "./HealthSignalChips"
 import { HealthDocumentBars } from "./HealthDocumentBars"
 import { CheckedQueriesSection } from "./CheckedQueriesSection"
+import { SourcesAttentionSection } from "./SourcesAttentionSection"
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber"
 
 const RetrievalTrendChart = lazy(() =>
@@ -67,7 +68,13 @@ function toStatTiles(overview: HealthOverview, checkedCount: number | null): Sta
   ]
 }
 
-export function HealthTab() {
+export interface HealthTabProps {
+  /** Phase 235 plan 11 — declared AND forwarded, nothing else. The handler lives at the page
+   *  boundary (`LibraryPage.handleGoToSource`), where every other cross-tab hop already does. */
+  onGoToSource?: (watchId: string) => void
+}
+
+export function HealthTab({ onGoToSource }: HealthTabProps = {}) {
   const [overview, setOverview] = useState<HealthOverview | null>(null)
   const [trend, setTrend] = useState<RetrievalTrendPoint[] | null>(null)
   const [trendDays, setTrendDays] = useState(30)
@@ -180,6 +187,14 @@ export function HealthTab() {
 
       {/* ── Checked queries table (Plan 17) ───────────────────────────── */}
       <CheckedQueriesSection onTotalChange={setCheckedCount} />
+
+      {/* ── Sources needing attention (Phase 235 plan 11 · SURF-03 / D-235-17) ──
+          ONE import, ONE prop, ONE mount, ZERO branches — G-5 honoured by
+          construction, the same argument shape `IngestionTab` records for
+          `ConnectedSourceSection`. The section fetches its own verdict through the
+          one shared hook and fails quiet, so nothing above it can be taken down by
+          a probe that did not answer. */}
+      <SourcesAttentionSection onGoToSource={onGoToSource} />
     </div>
   )
 }
