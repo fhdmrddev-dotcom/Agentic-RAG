@@ -92,6 +92,12 @@ export function ConnectedSourceSection({
               header; the folder tree is the LEFT column of the same card as the bar it feeds.
               ⚠ The shipped shape stacked three full-width blocks (select → tree → panel), which
               is what put the tree in a cramped box with the bar below the fold. */}
+          {/* ⚠ NO focus class here ON PURPOSE. The inset focus ring for form controls is a
+              GLOBAL rule in `index.css` (`:where(input, select, textarea):focus-visible`), so
+              this raw `<select>`, the destination select in `CreateWatchModal`, the two in
+              `WorkflowScheduleModal` and any select added later all align without each one
+              remembering to opt in. A per-control class here would be a SECOND mechanism
+              doing the same job — which is how the two drift apart. */}
           {!connectionId && (
             <select
               data-testid="source-connection-select"

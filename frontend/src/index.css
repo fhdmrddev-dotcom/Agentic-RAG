@@ -232,6 +232,24 @@
     outline: 2px solid hsl(var(--ring));
     outline-offset: 2px;
   }
+  /* ⚠ FORM CONTROLS DRAW THE SAME RING ON THE INSIDE EDGE, and the reason is alignment,
+     not taste. `outline-offset: 2px` above puts the ring 2px OUTSIDE the border box, so a
+     control sitting flush on a column's left edge visibly hangs past the line that every
+     card, tab strip and label in that column shares. Reported from two screenshots:
+     the Ingestion tab's connection picker, and the Watch Cloud Folder modal's destination
+     select — "it is a little beyond the edge to the left".
+
+     ⚠ SCOPED TO `input, select, textarea` ON PURPOSE. Those are the elements that live in
+     aligned columns and carry their own border to draw against. `a`, `button` and
+     `[tabindex]` KEEP the outset ring: a link has no padding to inset into, so an inset
+     outline would strike through its text.
+
+     ⛔ THE RING IS NOT WEAKENED — same 2px, same `--ring` token, same `:focus-visible`
+     (still off mouse clicks). It moves, it does not shrink. Removing it would delete a
+     keyboard user's only focus indicator, which is what A11Y-01 added it for. */
+  :where(input, select, textarea):focus-visible {
+    outline-offset: -2px;
+  }
 }
 
 /* ─── Custom Utility Classes ─── */

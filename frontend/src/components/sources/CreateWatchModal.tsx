@@ -200,10 +200,19 @@ export function CreateWatchModal({
             <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               3. Library Destination Folder
             </label>
+            {/* ⚠ `ring-inset` IS REQUIRED HERE and the GLOBAL rule does NOT reach it. This is
+                the one select in these surfaces that opts OUT of the focus floor: its own
+                `focus:outline-none` deletes the very outline `index.css` offsets inward, and a
+                Tailwind `ring` is a box-shadow drawn OUTSIDE the border box unless told
+                otherwise. So it kept hanging past the modal's left column after the global fix
+                landed — reported twice, and correctly both times.
+                ⛔ Do NOT "simplify" this by deleting `focus:outline-none focus:ring-1` to
+                inherit the floor: this control deliberately uses a 1px `--primary` ring rather
+                than the floor's 2px `--ring`, matching the modal's other controls. */}
             <select
               value={destinationFolderId || ""}
               onChange={(e) => setDestinationFolderId(e.target.value || null)}
-              className="w-full text-sm rounded-lg border border-border/70 bg-background px-3 py-2 text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+              className="w-full text-sm rounded-lg border border-border/70 bg-background px-3 py-2 text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:ring-inset"
             >
               <option value="">Root (No folder)</option>
               {folders.map((f) => (

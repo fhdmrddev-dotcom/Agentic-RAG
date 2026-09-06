@@ -45,7 +45,23 @@ import HtmlMark from "~icons/vscode-icons/file-type-html"
 import ImageMark from "~icons/vscode-icons/file-type-image"
 import JsonMark from "~icons/vscode-icons/file-type-json"
 import JsMark from "~icons/vscode-icons/file-type-js"
-import MailMark from "~icons/vscode-icons/file-type-mailing"
+// ⛔ `~icons/vscode-icons/file-type-mailing` WAS HERE AND RENDERED AS NOTHING — measured, not
+//    guessed. It resolved and drew an SVG; the SVG is a `#d2d2d2` circle with three dots (a
+//    "sending" blob, NOT an envelope), so on a pale surface it reads as a blank space and the
+//    operator reported the `.eml` icon as missing three times across one session.
+//
+// ⚠ THE TEST SUITE COULD NOT SEE THIS, AND THAT IS THE POINT. `fileTypeMark.test.tsx` asserts
+//   `markFor("msg") !== markFor("eml")` and that every extension resolves — both true of an
+//   invisible icon. 55 tests passed the whole time. A mark is a VISUAL contract and jsdom
+//   cannot check the one property that matters.
+//
+// ⚠ vscode-icons has no envelope: its only mail entries are `file-type-mailing` and
+//   `file-type-light-mailing`, the same blob in two tones. So the neutral mark comes from
+//   `lucide-react` — already a direct dependency used across this app — which is a monochrome
+//   `currentColor` stroke glyph and is therefore visible in BOTH themes by construction.
+//   This is the FIRST non-`~icons/` mark in this module; it is deliberate and confined to the
+//   one type that has no vendor logo to be accurate about.
+import { Mail as MailMark } from "lucide-react"
 import MarkdownMark from "~icons/vscode-icons/file-type-markdown"
 import OutlookMark from "~icons/vscode-icons/file-type-outlook"
 import PdfMark from "~icons/vscode-icons/file-type-pdf2"
