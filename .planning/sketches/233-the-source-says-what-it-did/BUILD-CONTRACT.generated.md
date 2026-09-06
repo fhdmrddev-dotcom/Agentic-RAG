@@ -570,4 +570,4 @@ says **Go to source**; the one control lives on the card.
 - ⛔ the stopped mark uses `--color-warning`; `--color-danger` is never applied to a source state
 - every tick has a run row; folding quiet runs is **rendering**, never storage (`D-235-07`)
 
-_82 assertions passing at emit time._
+_86 assertions passing at emit time._

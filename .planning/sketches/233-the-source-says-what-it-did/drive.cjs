@@ -192,6 +192,18 @@ ok("⛔ NEITHER Health tab repairs in place — it names what is wrong and LEADS
 ok("⭐ the ONE home is the source card, in both variants",
    actions(landA).includes("fix") && actions(landB).includes("fix"));
 
+/* ═══ 3b. ⭐ THE WINNER IS PINNED, NOT MERELY WRITTEN DOWN ══════════════════
+   B won (operator, 2026-09-06). A README frontmatter field is prose and prose does
+   not typecheck — this project's own recorded lesson. So the marker is asserted
+   here: a later edit that re-defaults the file to A, or drops the ★, fails.
+   ⛔ A IS NOT DELETED. The rejected variant is the evidence for the choice, and a
+   sketch that keeps only its winner cannot show anyone why. */
+ok("⭐ B is marked the winner in the tab bar", /id="tabB"[^>]*class="vtab on"|class="vtab on" id="tabB"/.test(HTML) || /id="tabB"[\s\S]{0,80}★ Selected/.test(HTML));
+ok("⭐ the file OPENS on the winner", /<div class="variant on" id="vB">/.test(HTML));
+ok("⛔ A is preserved and still navigable — the rejected variant is the evidence",
+   /<div class="variant" id="vA">/.test(HTML) && /id="tabA"/.test(HTML));
+ok("⛔ exactly ONE variant is marked selected", (HTML.match(/★ Selected/g) || []).length === 1);
+
 /* ═══ 4. NAMED BUTTONS — every control the build must reproduce ═══════════════ */
 const NAMED = ["badge", "fix", "sync-now", "toggle-history", "toggle-quiet"];
 NAMED.forEach((a) => ok(`named control "${a}" exists`, actions(screen("A", { history: true })).includes(a)));

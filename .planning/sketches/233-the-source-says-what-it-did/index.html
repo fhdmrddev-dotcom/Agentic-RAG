@@ -265,12 +265,15 @@ body{
 
 <div id="vnav">
   <span class="lbl">Sketch 233</span>
-  <button class="vtab on" id="tabA" onclick="showVariant('A')">A — every source is a full card</button>
-  <button class="vtab" id="tabB" onclick="showVariant('B')">B — healthy sources are one line</button>
+  <button class="vtab" id="tabA" onclick="showVariant('A')">A — every source is a full card</button>
+  <button class="vtab on" id="tabB" onclick="showVariant('B')">B — healthy sources are one line ★ Selected</button>
 </div>
 
-<div class="variant on" id="vA"></div>
-<div class="variant" id="vB"></div>
+<!-- ⭐ B is the WINNER (operator, 2026-09-06) and therefore the variant this file
+     opens on. A is preserved and navigable — the winner is highlighted, never the
+     only option, because the rejected variant is the evidence for the choice. -->
+<div class="variant" id="vA"></div>
+<div class="variant on" id="vB"></div>
 
 <div id="toast"></div>
 

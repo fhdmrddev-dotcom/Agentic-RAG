@@ -2,7 +2,7 @@
 sketch: 233
 name: the-source-says-what-it-did
 question: "With twelve sources connected and two needing you, how much should a HEALTHY source say?"
-winner: null
+winner: "B"
 tags: [phase-235, lib-10, surf-02, surf-03, seed-239, seed-248, g2-sketch-gate, notification-surface]
 ---
 
@@ -53,6 +53,16 @@ wrapper — the containing-block bug class from sketch 153), and whether the amb
 ---
 
 ## 3. Variants — how much a healthy source says
+
+> ## ★ WINNER: **B — a healthy source is one line** (operator, 2026-09-06)
+>
+> ⚠ **The winner is PINNED, not merely written here.** This frontmatter field is prose, and prose
+> does not typecheck — this project's own recorded lesson. `drive.cjs` asserts the ★ marker, that the
+> file opens on B, that exactly one variant is marked, and that **A is still present and navigable**.
+> Driven RED, a defect that re-defaults the file to A trips three of them.
+>
+> ⛔ **A is not deleted.** The rejected variant is the evidence for the choice; a sketch that keeps
+> only its winner cannot show anyone why.
 
 - **A — every source is a full card.** Name, cadence, `from → to` path, outcome line, three buttons.
   Twelve of them. Every source says everything it knows, whether or not you need any of it.
@@ -142,7 +152,7 @@ a button**. The phase's React suite must assert those same `data-block` / `data-
 **driven RED first**.
 
 ```
-node drive.cjs          # 82 assertions
+node drive.cjs          # 86 assertions
 node drive.cjs --emit   # regenerate the contract
 ```
 
