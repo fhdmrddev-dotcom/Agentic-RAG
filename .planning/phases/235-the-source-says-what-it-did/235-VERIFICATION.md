@@ -1,8 +1,10 @@
 ---
 phase: 235-the-source-says-what-it-did
 verified: 2026-09-06T00:00:00Z
-status: gaps_found
-score: 1/4 success criteria fully verified · 3/4 partial
+status: passed_with_owed_uat
+score: 3/4 success criteria verified in code · SC#3 partial (mobile reach capped, PRE-EXISTING)
+closed: 2026-09-06
+closed_by: operator decision after gap-closure round 1 + the control-wiring quick fix
 verifier: Claude (gsd-verifier) — goal-backward, adversarial
 merge_base: ef18e8552
 head: d9c15a77e
@@ -445,3 +447,52 @@ Everything else is either a small wiring defect with a one-line fix (`libraryTab
 
 _Verified: 2026-09-06_
 _Verifier: Claude (gsd-verifier) — goal-backward, adversarial. Every table cell above is backed by a file:line, a command output, or a live database query. No SUMMARY.md claim was accepted as evidence._
+
+# ⭐ CLOSE-OUT 2026-09-06 — what the gap round and the quick fix changed
+
+**Gap-closure round 1 (plans 13-17) + one quick fix landed after the verdict above was written.
+The gap entries are LEFT INTACT rather than edited, because what was found is the record; this
+section says what is now true.**
+
+| Gap | Then | Now |
+|---|---|---|
+| **SC#1** run history summed six counts into one number | BLOCKER | ✅ **CLOSED** — `235-16` ships the per-category breakdown; **verified live in the browser**: `Checked 1 hour ago · 1 added` |
+| **SC#1** `SENTENCE_FOR_FILE_FAILURE` orphaned | BLOCKER | ✅ **CLOSED** — `235-17` task 1 mounts it, scoped to CURRENT STATE with a scope note whose absence fails a test; per-run attribution deferred as `SEED-254` |
+| **SC#2** last-good silent past the 5-row window | WARNING | ✅ **CLOSED** — `235-14` adds an unbounded `last_success_by_watch`, run only when the windowed answer is `None`; `_HEALTH_RUN_WINDOW` byte-unchanged |
+| **SC#2** disabled connection → "Retry now" | WARNING | ✅ **CLOSED** — `235-13` adds `connection_disabled` as a fifth HARD cause, write-only, inferred by nothing |
+| **SC#2** ⛔ the control did not RENDER | (not in the original verdict) | ✅ **CLOSED by the quick fix** `d2e1cc244` |
+| **D-235-05** two readers per tree | FAILED | ✅ **CLOSED** — `235-15` amended the docblock to the true rule and added a 927-file inventory fence |
+| **Library stuck on Health** | FAILED | ✅ **CLOSED** — `235-15`, one-shot hand-off leaf, pinned by a REMOUNT test |
+| **SC#3** mobile reach capped at the chat view | WARNING | ⚠ **OWED, by decision** — PRE-EXISTING, `SEED-253`, needs its own sketch (G-2) and would be new capability in a closure round (G-7) |
+
+## ⚠ The control-wiring fix is the one worth remembering
+
+SC#2's *"offers one control that fixes it"* was failing **invisibly**. The cause→control map was
+correct data; `LibraryPage` forwarded `onNavigate` to `IndexingTab` only, `IngestionTab` neither
+accepted nor relayed it, and `showFix = control.action !== "reconnect" || canReconnect` therefore
+hid the button for **both HARD causes** — the ones that stop a source on the FIRST failure.
+
+⭐ **And the test that should have caught it could not.** `WatchedFoldersSection.test.tsx` mounts the
+component directly and passes the prop itself, so the gate was always satisfied there. **Measured:**
+deleting the `IngestionTab` forward turns 3 of 5 new cases red; deleting the `LibraryPage` forward
+left **all 5 GREEN** while the button vanished from the product. A `?raw` source fence now covers
+that link, driven RED against that exact deletion.
+
+## ✅ Verified LIVE in the browser (2026-09-06), not only in tests
+
+Against the real Drive watch on folder **CV** with 17 stored runs:
+`Checked 1 hour ago · 1 added` (per-category, not summed) · `checked 7 times, no changes` folding,
+expanding to all 16 · **`could not tell what was removed`** on the `listing_complete = false` runs —
+the Onyx-class lie, refused in the live UI · no rail badge for a healthy source (SC#4) ·
+`Asked · next check within 60 seconds` on Sync · `checked every 30 minutes` verbatim · zero
+occurrences of "scheduled" · Health tab: *"Sources needing attention"* → *"Every source is reading."*
+
+## ⛔ Still owed, and NOT closed by this close-out
+
+1. **Five G-4 rows never driven** — the stopped-source path (`M-1`: revoke a real Drive grant), the
+   reader-off statement, the `SEED-239` degraded row, and the mobile drawer. Every claim about a
+   BROKEN source is unit-level; **no stopped source has ever been observed in this product.**
+2. **`release_watch` swallows its INSERT.** 17 rows exist in `connector_sync_runs`, so the writer
+   demonstrably works — but no code path can distinguish "wrote a row" from "raised and was logged".
+3. **The composition fence closes at `16 failed | 33 passed` in NEITHER gate knob**, by decision.
+4. **`SEED-253`** (mobile drawer trigger outside chat) and **`SEED-254`** (per-run per-file attribution).
