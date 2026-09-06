@@ -7,11 +7,11 @@ last_updated: "2026-09-06T16:45:00.000Z"
 last_activity: 2026-09-06
 progress:
   total_phases: 14
-  completed_phases: 9
-  total_plans: 19
-  completed_plans: 19
+  completed_phases: 10
+  total_plans: 23
+  completed_plans: 23
   planned_plans_235: 12
-  percent: 64
+  percent: 71
 ---
 
 # Project State
@@ -36,19 +36,21 @@ can be taught new behaviors (skills) that persist and can be shared.
 **Current focus:** **Milestone v4.0 Connected Knowledge — STARTED 2026-09-04.** Phase numbering
 continues at **228**.
 
-Phase: 237 — One Rule Engine, Not Two (planning complete; awaiting approval to execute)
+Phase: 238 — Microsoft Graph — OneDrive and SharePoint (ready to discuss)
+Prior: 237 — One Rule Engine, Not Two (✅ CLOSED 2026-09-06)
 Prior: 236 — The Corpus Under Attack (✅ FULLY CLOSED — GA GATE MET 2026-09-06)
 Prior: 235 — The Source Says What It Did (✅ CLOSED 2026-09-06)
 Prior: 234 — The Watch Loop (✅ CLOSED)
-Plan: 237-01, 237-02, 237-03, 237-04 planned (4 plans across 4 waves)
-Status: ready to execute — awaiting user approval and vitest count gate completion
+Plan: 237-01, 237-02, 237-03, 237-04 complete (4 plans across 4 waves)
+Status: Phase 237 complete · ready for Phase 238
 
 ## ▶ NEXT SESSION — start here
 
-**Phase 237: One Rule Engine, Not Two**:
-1. Verify operator ruling on BUS-177 (migration 173 + suggestion-only posture).
-2. Confirm reviewer vitest count gate baseline is posted.
-3. Execute Wave 1 (Plan 237-01: Schema & Scope Discriminator with Build-Time Refusal).
+**Phase 238: Microsoft Graph — OneDrive and SharePoint**:
+1. Review Phase 232 contract (`SourceAdapter`) and Phase 234 watch loop integration points.
+2. Conduct research on Graph `/content` 302 handling inside adapter (preserving `egress.py` redirect refusal).
+3. Investigate `driveItem.file.hashes` and `Files.Read.All` / `Sites.Read.All` permission self-consent vs admin approval.
+4. Execute `/gsd:discuss-phase 238`.
 
 ⚠ **APPLY G-8 FROM THE START.** Phase 235 ran **17 plans for 4-6 plans of substance** and the
 operator stopped it. `.planning/config.json` now enforces the trimmed flow and CLAUDE.md carries
@@ -103,6 +105,32 @@ Coverage Trend full width; retrieval demoted to tiles under a USAGE heading.
 ⚠ **The operator caught a defect in that fix**: it kept the top 8 formats and silently dropped DXF,
 PNG, WebP, HTML, TIFF, JPEG, Outlook and EPUB. Now all 21 types are mapped, the backend caps
 nothing, and the tail folds into a NAMED `Other (N)`.
+
+## ✅ PHASE 237 CLOSED (2026-09-06)
+
+**Gemini built · Claude reviewed. VERDICT: PASS (ratified on BUS-182 / BUS-183).**
+All 4 plans executed cleanly in 4 atomic commits (`79d9b1682`, `18e3f5009`, `b4bfbe744`, `c38616fd0`, `1d74bd95f`).
+
+### What is DELIVERED & VERIFIED
+
+1. **SC#1 (RULES-01)**: Unified `RuleBuilderPanel.tsx` supporting both `'watch'` (arrival facts) and `'classification'` (post-extraction metadata) scopes with a dedicated toggle. `ConditionPopover.tsx` restricts watch-scope fields to `WATCH_FIELDS` (`name`, `path`, `type`, `size`, `date`, `source_system`, `source_connection_id`). Count gate adopted all 3 suites (29/29 pass).
+2. **SC#2 (RULES-02)**: Promoted source facts (`source_system`, `source_connection_id`, `source_path`, `source_state`, `ingest_visibility`) into first-class view filters in `view_filter_compiler.py`. Whitelist bypass seam at `document_view_resolver.py:197` closed across all 3 legs (`test_document_views_source_fields.py` 8/8 pass).
+3. **SC#3 (RULES-01)**: `WATCH_ALLOWED_FIELDS` in `classification_rules.py` admits exactly 13 fields matching 1:1 with `_suggest_destination`'s metadata. Un-extracted metadata in watch rules refused at save/authoring time with HTTP 422 (`test_118_rule_validation.py` 13/13 pass, `test_preview_rules_scope.py` 8/8 pass).
+4. **SC#4 (VIS-06 Fence)**: Widened engine retains suggestion-only behavior (`metadata._classification`). `documents.py` is byte-unchanged; `watch_service.py` contains zero rule or suggestion references. `test_classification_visibility_fence.py` (6/6 pass) and `test_ingest_enrich_shared.py` (30/30 pass).
+5. **Operator Ruling 3**: Watch rules write standard `_classification` suggestion on real documents during ingest in `ingest_enrich.py` using existing accept flow and VIS-06 fence.
+6. **Operator Ruling 1 & Migration 173**: Migration 173 applied to live DB; `full-schema.sql` regenerated cleanly via `scripts/regenerate-full-schema.sh`.
+
+### Verification Gates
+- **Backend Unit**: `71 failed, 3971 passed, 2 xfailed, 2 xpassed`. Failing set identical to reviewer baseline set; ceiling 71 held at 0 headroom.
+- **Vitest Count Gate**: `total 7816 · failed 2 · pinned total 7020` (+29 tests adopted, 29/29 passing; 2 failures are provably unmodified SEED-171 flakes).
+- **Hot-File Ledger**: 224 rows, 10 watched, OK.
+- **CLAUDE.md Size**: 81,332 chars, headroom 68,668, OK.
+
+### ⛔ What is OWED, stated as a DECISION (AGENTS.md §6.3 / CLAUDE.md)
+- **G-4 Manual UAT**: Stated as an intentional decision rather than a claim that it ran. Phase 237 shipped a new rule-builder UI surface (scope switcher + condition popover restriction) that has not yet been clicked by a human operator in the live browser. Unit/integration tests and the count gate pin all programmatic contracts; lived-experience UAT will run alongside Phase 238.
+- **SEED-253 Named Limitation**: Existing source adapters (Google Drive, mock source) do not yet populate hierarchical folder paths on `SourceFile`, falling back to `/<filename>`. Folder-shaped path rules (e.g. `/Finance/`) silently never match until adapter folder-path resolution is implemented (forcing function: Phase 238 Graph adapter). Documented in comments at `base.py:43`, `preview_service.py:583`, and `ingest_enrich.py:537`.
+
+---
 
 ## ✅ PHASE 236 — GA GATE MET, THE DECISION DISCHARGED (2026-09-06, hours after it was taken)
 

@@ -534,6 +534,7 @@ def enrich_for_ingest(
     src_conn = source_info.get("connection_id") or (prior_row.get("source_connection_id") if prior_row else None)
     if src_conn:
         eval_facts.setdefault("source_connection_id", str(src_conn))
+    # Stand-in path: falls back to '/<filename>' when source_info has no path (SEED-253).
     src_path = source_info.get("path") or (f"/{filename}" if filename else None)
     if src_path:
         eval_facts.setdefault("path", src_path)

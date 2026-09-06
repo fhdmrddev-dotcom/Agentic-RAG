@@ -3,7 +3,7 @@ seed_id: SEED-252
 title: "Metadata-driven filing — many rules contribute instead of first-match-wins, and a matched file is actually MOVED instead of merely suggested. Both are deliberate reversals of recorded decisions (D-118-3, D-118-2), not omissions."
 created: 2026-09-06
 planted_during: "2026-09-06 — operator G-4 session on Phase 234; asked for M-Files-style metadata-driven routing into folders and subfolders, and for multiple classification rules rather than one"
-status: planted
+status: deferred          # OPERATOR-DEFERRED at Phase 237 (2026-09-06) -- stays for its own phase
 surface: Agentic-RAG
 severity: medium
 category: dms / classification / automation

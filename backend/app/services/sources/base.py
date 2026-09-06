@@ -39,6 +39,8 @@ class SourceFile:
     drive_id: str | None = None
     icon_url: str | None = None
     web_view_url: str | None = None
+    # Stand-in path: no adapter currently populates it (production falls back to '/<filename>').
+    # Real adapter folder-path resolution is deferred to SEED-253 (forcing function: Phase 238 Graph adapter).
     path: str | None = None
 
 

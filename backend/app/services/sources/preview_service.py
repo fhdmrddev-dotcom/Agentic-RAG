@@ -580,6 +580,7 @@ async def build_preview(
         )
         destination: str | None = None
         rule_suggested = False
+        # Stand-in path: falls back to '/<filename>' because adapters do not yet populate f.path (SEED-253).
         file_path = getattr(f, "path", None) or f"/{f.name}"
         if bucket == "add":
             destination, rule_suggested = _suggest_destination(
