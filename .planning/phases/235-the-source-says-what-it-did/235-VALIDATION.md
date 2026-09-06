@@ -2,7 +2,7 @@
 phase: 235
 slug: the-source-says-what-it-did
 status: draft
-nyquist_compliant: false
+nyquist_compliant: true
 wave_0_complete: false
 created: 2026-09-06
 ---
@@ -187,4 +187,10 @@ close SURF-03 silently against a desktop-only surface.
       (D-235-21 — `WATCH_PROCESS_ENABLED` measured **`true`** in `backend/.env` on 2026-09-06)
 - [ ] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** plan-set coverage APPROVED 2026-09-06 by `gsd-plan-checker` — `## VERIFICATION PASSED`,
+no blockers, every V-01..V-20 row traced to an owning plan.
+
+⚠ **`nyquist_compliant: true` records that the PLAN SET covers every row — not that the tests are
+written.** `wave_0_complete` stays **false** until Wave 1 actually lands the Wave-0 files, and the
+Sign-Off boxes stay unchecked until the thing each one asserts has been MEASURED. Ticking a box
+because a plan promises it is the failure this file exists to prevent.

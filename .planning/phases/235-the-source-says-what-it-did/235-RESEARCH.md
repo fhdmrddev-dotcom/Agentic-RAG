@@ -1613,30 +1613,54 @@ both are operator-owned and both matter only at execution/UAT, not at planning.
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+> ⭐ **All five were resolved at planning (2026-09-06) and each names its owning plan.** The heading
+> carries the suffix so a later reader cannot mistake a settled question for an open one — a
+> question that reads `open` forever is the seeds-register failure mode one file over.
 
 1. **Should the backend ceiling of 71 be re-pinned to 72?**
+   ✅ **RESOLVED — owner: plan `235-12`.** Not re-pinned inside this phase; 72 is stated as the
+   measured starting point in every plan and the ceiling question is escalated to the operator
+   as a decision, never silently applied.
    - Known: measured 72 here and 72 on 234's merge base; the failures are the pre-existing rot cluster.
    - Unclear: CLAUDE.md says *"Never weaken this ceiling without explicit operator authorisation."*
    - **Recommendation:** do **not** re-pin inside this phase. State 72 as the measured starting point
      in every plan, and raise the ceiling question to the operator separately. A surface phase is
      the wrong place to move a project-wide gate.
 
-2. **Does the mobile drawer get the badge?** See A4. **Recommendation: yes, or an explicit written
+2. **Does the mobile drawer get the badge?**
+   ✅ **RESOLVED — owner: plan `235-09` Task 3. YES, it is BUILT, not deferred:** the drawer's
+   Library nav button carries the same badge (`aria-hidden`, so it cannot rename the control) and
+   the drawer-opening hamburger carries a dot so a CLOSED drawer still signals; both read the same
+   `ATTENTION_PRODUCERS` conditions — one producer, two renderers, no second fetch. The one
+   residual (`onOpenDrawer` reaches only `ChatArea`, so a mobile non-chat view has no drawer
+   trigger at all) is **pre-existing**, was not created here, and is planted as a seed with a
+   concrete `trigger_when` rather than left silent. See A4. **Recommendation: yes, or an explicit written
    deferral with a trigger.** Closing SURF-03 against a desktop-only signal is the same class of
    error as closing it against the Health tab, which D-235-01 already rejected once.
 
 3. **Is `--emit` fixed, or is §2 read as the distinct-set contract?**
+   ✅ **RESOLVED — owner: plan `235-03`. Fixed:** `--emit-json` is added using the existing
+   `region()` helper, and the region-scoped JSON is what the fence imports, so the contract is
+   never transcribed by hand.
    - **Recommendation:** fix it (C-8/C-10) — the `region()` helper already exists and it is ~20
      lines; a regenerated, region-scoped JSON is what makes the fence non-transcribed.
 
 4. **Where does `record_skipped_still_running` land?**
+   ✅ **RESOLVED — owner: plan `235-05`.** Resolved in the run-row work, so the documented status
+   and the code that writes it agree. Leaving a documented status nothing writes is how C-6
+   happened, and this phase does not repeat it.
    - Known: dead import at `watch_service.py:32`; only a unit test calls it; its status is in mig
      168's COMMENT.
    - **Recommendation:** call it (there is a real skip case when a lease is live) **or** delete it
      and its COMMENT entry. Leaving a documented status nothing writes is how C-6 happened.
 
-5. **Does the `paused` arm get a run row?** A watch paused because its connection was disabled did
+5. **Does the `paused` arm get a run row?**
+   ✅ **RESOLVED — owner: plan `235-05`. YES:** `status='paused'`, all counts zero,
+   `listing_complete = false`. D-235-07 says every tick gets a row, and a paused tick is a tick.
+
+   A watch paused because its connection was disabled did
    not *read* — but it did *tick*. **Recommendation: yes, `status='paused'`, all counts zero,
    `listing_complete = false`** — D-235-07 says every tick gets a row, and this is a tick.
 
