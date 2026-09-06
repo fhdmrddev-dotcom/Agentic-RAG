@@ -44,6 +44,17 @@ export interface ConnectorWatch {
   service_id?: string | null
   created_at?: string | null
   updated_at?: string | null
+
+  // ── Phase 235 plan 07 widens `WatchResponse` with these three. Declared OPTIONAL so every
+  //    surface that mounts today keeps compiling before the server half lands, and so the
+  //    Wave-4 surfaces have a type to compile AGAINST rather than a cast.
+  //
+  // ⚠ `next_run_at` is deliberately NOT in this block — it is PRE-EXISTING from Phase 234
+  //   (declared above at the `interval_minutes` group). Re-listing a shipped field as net-new
+  //   is how a plan talks an executor into a redundant edit; it was checked, not assumed.
+  degraded?: boolean
+  degraded_reason?: string | null
+  next_check_within_seconds?: number | null
 }
 
 export interface ConnectorWatchDetail extends ConnectorWatch {
@@ -160,4 +171,99 @@ export async function purgeWatchFiles(id: string): Promise<WatchPurgeResponse> {
     throw new ApiError(`Failed to purge files for watch ${id}: ${text}`, res.status)
   }
   return (await res.json()) as WatchPurgeResponse
+}
+
+// ══ Phase 235 (SURF-02 / SURF-03 · D-235-05 / D-235-07) ═══════════════════════════════
+//
+// ── ⛔ TWO OBLIGATIONS THIS BLOCK CREATES, STATED HERE SO NOBODY REDISCOVERS THEM ──────
+//
+//  1. EVERY `vi.mock("@/lib/api/sources", …)` FACTORY MUST DECLARE `listSyncRuns` AND
+//     `getSourceHealth`. A factory that omits an export makes the consuming suite throw at
+//     MOUNT about a missing export rather than about the thing under test — Phase 196-08's
+//     nine-suite, 249-case failure mode, verbatim. The shipped factory lives at
+//     `WatchedFoldersSection.test.tsx:20-31`; Phase 235 plan 10 owns updating it.
+//
+//  2. ⛔ THIS MODULE IS NOT IN THE `@/lib/api` BARREL (235-RESEARCH P-10). `grep 'api/sources'
+//     frontend/src/lib/api.ts` returns nothing, and consumers import `@/lib/api/sources`
+//     directly. `vi.mock("@/lib/api", …)` ALONE NEVER INTERCEPTS IT — a suite mounting a
+//     consumer must mock this path SEPARATELY, in its own `vi.mock` call.
+//
+// The two calls below are deliberately NOT added to the barrel, matching the rest of the file.
+
+/**
+ * ONE stored tick of a watch. D-235-07: **every** tick gets a row, including the quiet ones,
+ * so *"when did it last successfully READ?"* is answerable. Density is a RENDERING concern —
+ * see `components/sources/runHistoryFold.ts`, never a storage one.
+ *
+ * ⚠ `count_missing = 0` ON A RUN WHOSE `listing_complete` IS FALSE DOES NOT MEAN "nothing was
+ *   deleted". `watch_service.py:415-420` SUPPRESSES missing-transitions when the listing was
+ *   incomplete (the H-5 / SRC-06 structural guard), so that zero is by DESIGN, not by
+ *   observation. A row that renders it as an observation is a lie — carry the flag through.
+ */
+export interface SyncRun {
+  id: string
+  watch_id: string
+  started_at: string
+  finished_at: string | null
+  status: "success" | "failed" | "paused" | "running"
+  failure_cause: "token_revoked" | "folder_gone" | "unreachable" | "unknown" | null
+  last_error: string | null
+  listing_complete: boolean
+  count_new: number
+  count_modified: number
+  count_renamed: number
+  count_missing: number
+  count_restored: number
+  count_errors: number
+}
+
+/**
+ * A source the SERVER has judged to have stopped reading.
+ *
+ * ⛔ D-235-05 — the debounce threshold is applied SERVER-SIDE and this array is the whole
+ *   truth. A client that re-derives "which sources are stopped" from run rows has created a
+ *   second verdict that can disagree with the badge, the Health row and the source card.
+ */
+export interface StoppedSource {
+  watch_id: string
+  source_folder_name: string
+  connection_name: string | null
+  cause: "token_revoked" | "folder_gone" | "unreachable" | "unknown"
+  hard: boolean
+  stopped_since: string | null
+  last_good_at: string | null
+}
+
+/** The single polled verdict every source surface in Phase 235 consumes. */
+export interface SourceHealth {
+  stopped: StoppedSource[]
+  /**
+   * ⛔ The LIVE reader, not the config flag. `main.py:587-589` swallows a failed start, so
+   * `settings.watch_process_enabled` can read true while nothing is running (RESEARCH C-4).
+   */
+  reader_running: boolean
+  poll_interval_seconds: number
+}
+
+/** Every stored tick for one watch, newest first. */
+export async function listSyncRuns(watchId: string, signal?: AbortSignal): Promise<SyncRun[]> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/sources/watches/${encodeURIComponent(watchId)}/runs`, {
+    headers,
+    signal,
+  })
+  if (!res.ok) {
+    throw new ApiError(`Failed to load run history for watch ${watchId} (status ${res.status})`, res.status)
+  }
+  return (await res.json()) as SyncRun[]
+}
+
+/** The server's verdict on which sources need attention. ONE endpoint, ONE reader. */
+export async function getSourceHealth(signal?: AbortSignal): Promise<SourceHealth> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/sources/health`, { headers, signal })
+  if (!res.ok) {
+    throw new ApiError(`Failed to load source health (status ${res.status})`, res.status)
+  }
+  return (await res.json()) as SourceHealth
 }
