@@ -14,8 +14,32 @@ every later figure is compared against, and each was **re-derived**, not read fr
 | Gate | Command | Baseline |
 |---|---|---|
 | CLAUDE.md size | `node scripts/check-claude-md-size.cjs` | **OK** — 80,822 chars, 53.9% of limit, headroom 69,178 |
-| Backend unit | `pytest tests/unit -q --continue-on-collection-errors` (in `backend/`, venv) | **71 failed · 3931 passed · 2 xfailed · 2 xpassed · 0 collection errors** · 138.19s |
+| Backend unit | `pytest tests/unit -q --continue-on-collection-errors` (in `backend/`, venv) | ⚠ **CORRECTED — see below. First reading 71; TRUE baseline is 72 failed · 3930 passed · 2 xfailed · 2 xpassed · 0 collection errors** |
 | Frontend count gate | `GSD_VITEST_MAX_WORKERS=2 node scripts/vitest-count-gate.cjs` (repo root) | ⛔ **VIOLATED — `failed 1`** · total **7787** · pinned total **6991** (`+796`) |
+
+### ⚠ CORRECTION 2026-09-06 (at Phase 236 verification) — THIS FILE'S 71 WAS WRONG, AND THE ORIGINAL IS KEPT ABOVE RATHER THAN OVERWRITTEN
+
+The first reading was `71 failed / 3931 passed`, taken in the main working tree and published here
+as *"exactly the ceiling, zero headroom"*. **Re-measured at the same commit `f992f28e8`, in a
+dedicated bootstrapped worktree, it reads `72 failed / 3930 passed` in 113.94s.** Two consecutive
+runs on the phase tree also read 72 with byte-identical failure sets, so 72 is the stable figure
+and the 71 was a single lucky sample.
+
+⚠ **The consequence was real, not cosmetic:** when Phase 236's suite read 72 I first recorded the
+ceiling as BROKEN and went looking for the builder's new failure. There was none — the sets diff to
+empty in both directions. **A wrong baseline manufactures a defect in someone else's work.**
+
+⚠ **The method error that made it undiagnosable: the first run was captured with `tail -30`, so it
+preserved a COUNT and not a SET.** A count cannot be diffed and cannot attribute anything. Capture
+the complete `FAILED` list every time:
+`pytest tests/unit -q --continue-on-collection-errors 2>&1 | grep "^FAILED" | sort > <file>`
+
+⚠ **CLAUDE.md's locked ceiling of `71` therefore does not match this tree either** — that is a
+pre-existing discrepancy, not Phase 236's doing, and it needs an operator decision rather than a
+silent edit.
+
+⚠ **AGENTS.md §6.3:** this correction was written by the reviewer who published the wrong figure.
+It is self-assessed; an independent re-derivation is worth having.
 
 ### Backend note
 `71` is exactly the CLAUDE.md ceiling — **zero headroom**. Any new failure breaks the gate.

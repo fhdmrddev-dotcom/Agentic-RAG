@@ -191,3 +191,67 @@ that one is **history and should stay**, annotated as *superseded at pre-flight*
 all three are edits to a script spec, not a redesign. No re-review needed for N-3; I will verify
 N-1 and N-2 by running the finished runner myself, on a deliberately dirty tree, and confirming it
 refuses rather than restores over the top.
+
+---
+
+# RULING — SC#2 mechanism (operator, 2026-09-06) · supersedes BLOCKING 1's remedy
+
+**Option A stands, in the form it was actually described: a pytest test-harness fixture.**
+
+## Correction of record — mine
+
+BLOCKING 1 named the defect correctly and framed it wrongly. The operator was shown
+`pytest --disable-defense=<name>`, described as zero risk and never touching source, and chose it
+to keep the working tree and source files clean. **`236-02-PLAN.md` did not implement that** — it
+specified `is_defense_active()` bypass hooks wired into all eight *production* modules reading
+`os.environ`.
+
+**The description and the implementation had diverged.** I was blocking the drifted implementation,
+not the operator's decision — and I should have named the drift instead of escalating it as an
+overturned choice. My BUS-162 compounded that by describing Option A as "an env var" without
+noting the operator had been shown a pytest flag.
+
+⭐ The mechanism below satisfies **both** my objection and the operator's requirement, so nothing
+is traded off. That is what a correctly-framed disagreement should have surfaced in the first place.
+
+## The mechanism
+
+A pytest fixture / CLI option that **monkeypatches** the named defence at runtime. Zero production
+code, no source edits, tree never dirty, no kill-switch anywhere. It is also **stronger than the
+bypass branch I objected to**: neutering the constant or function *is* deletion for SC#2 purposes —
+there is no surviving `if` that can pass the test on its own.
+
+### Patchability, measured across all eight rather than assumed
+
+| Defence | Target | |
+|---|---|---|
+| `tool_dispatcher._handle_connector_chat_tool` | top-level `async def` :4348 | ✅ patch directly |
+| `chat_tools.wrap_untrusted_tool_result` | top-level `def` :71 | ✅ |
+| `service_tools._ISSUE_KEY` | module constant :1368 | ✅ |
+| `eval_runner_service.EVAL_JUDGE_RUBRIC` :178 · `_EVIDENCE_BLOCK_CAP` :206 | module constants | ✅ |
+| `harness/phase_types._emit_evidence` | top-level `def` :1139 | ✅ |
+| `harness/validator_kinds.JUDGE_RUBRIC_CORE` | module constant :135 | ✅ |
+| `embedding_service.py:331` | **inline literal in a function body** | ❌ hoist to module constant |
+| `skill_proposer_service.py:302` | **inline literal in a function body** | ❌ hoist to module constant |
+
+⛔ Do **not** solve the last two by swapping the whole enclosing prompt-builder — that is blunt
+enough to pass for the wrong reason. Hoisting is two lines per file, adds no branch, no flag and no
+kill-switch, and makes the defence more legible. Operator approved that shape explicitly.
+
+## Consequences
+
+- `scripts/mutants/*.patch` and the git-apply runner are **dropped** — and **N-1 and N-2 go with
+  them**, since both existed only to make that runner safe.
+- `236-MUTATION-REPORT.md` and its 8-row table **survive**; only the mechanism beneath changes.
+- `236-THREAT-MODEL.md` updates **again**, to name the fixture mechanism.
+- `236-DISCUSSION-LOG.md` gets a **second** superseded annotation appended to the first. The history
+  of this reversal is worth keeping intact — it is the most instructive thing in the phase.
+- ⚠ **M-4 REVIVES.** Hoisting puts `embedding_service.py` (**9 / 5 / 348 — G-5 FIRING at 5 phases,
+  no row**) and `skill_proposer_service.py` (2 / 2 / 401) back into `files_modified`. Ledger rows +
+  their `docs/HOT-FILE-LEDGER.md` sections, same commit.
+
+## The one fence I will drive at verification
+
+**Assert the fixture's patch target exists before patching.** A monkeypatch aimed at a symbol
+someone later moved silently patches nothing, the defence stays fully active, and the suite goes
+**green** — a guard that cannot fire, which is this phase's own failure mode wearing a different hat.
