@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v4.0
 milestone_name: "Connected Knowledge"
 status: in_progress
-last_updated: "2026-09-06T00:00:00.000Z"
+last_updated: "2026-09-06T12:00:00.000Z"
 last_activity: 2026-09-06
 progress:
   total_phases: 14
@@ -37,13 +37,39 @@ continues at **228**.
 
 ## Current Position
 
-Phase: 234 — The Watch Loop: The Library Reads By Itself (✅ CLOSED — verified by DRIVING) · 235 next
-Prior: 233 — The Preview (COMPLETE; ⛔ still owes 5 G-4 rows)
+Phase: 235 — The Source Says What It Did (CONTEXT captured 2026-09-06 · not yet sketched or planned)
+Prior: 234 — The Watch Loop (✅ CLOSED — verified by DRIVING)
 Plan: none in flight
-Status: between_phases
-Last activity: 2026-09-06 — Phase 234 CLOSED. The operator ran the owed G-4 row; it FAILED, the cause
-was found (a feature flag defaulting off), the flag was flipped, and a file then arrived in the
-Library with nobody uploading it. Four findings filed at their own homes, none folded in.
+Status: context_gathered
+Resume file: `.planning/phases/235-the-source-says-what-it-did/235-CONTEXT.md`
+Last activity: 2026-09-06 — Phase 235 discuss-phase. 14 questions, every recommendation accepted.
+
+⛔ **Next action is NOT plan-phase.** Two things come first, in order:
+1. **`/gsd:quick` — fix `BUG-260906-01`** (classification never runs on the queue path). Move the
+   rule block out of `ingest_document` into `ingest_enrich.py`; the test is an **agreement** test in
+   `test_ingest_enrich_shared.py`, never a second per-path test (D-235-18). The roadmap requires
+   this before 235 — a run history that cannot report "filed into X" is built around the hole.
+2. **`/gsd:sketch 235` — G-2 is MANDATORY here and was honoured, not overridden.** One sketch must
+   settle all four surfaces together: the run history (with quiet-run collapsing), the
+   stopped-reading card + its one control, the rail badge + popover, and the instance-level
+   reader-off statement (D-235-19).
+
+**The forced decision is made:** `SURF-03` is carried by **option B + A** — a general app-shell
+notification surface with **exactly one tenant** (a broken source), plus the Health-tab detail.
+Option C (email) is **deferred with a named two-part trigger recorded on `SEED-231`**, never closed.
+⚠ Registering a second producer inside 235 is scope creep and is forbidden by D-235-03.
+
+**Register routing done at this discuss-phase:** `BUG-260906-02` → folded into 235 ·
+`BUG-260906-03` → **deferred** with a named re-open trigger (D-235-06 counts from the watch loop's
+own rows, so `ingestion_jobs`' incompleteness is now observability debt, not a blocker) ·
+`BUG-260906-01` → stays open, routed to `/gsd:quick` · `SEED-239` folds in as the observable
+per-row boundary only · `SEED-248` supplies the pending-state rule.
+
+⚠ **Migration is 172, not 161.** The ROADMAP Phase 235 *detail block* is stale; its *Phase Table*
+row is correct. 234 consumed 168-171 (D-235-20).
+
+⚠ **Still owed from before, and NOT closed by any of this:** 233's five G-4 rows (run row 2 first);
+`OD-232-01` (no live shared drive browsed); 234's SC#2 / SC#3 / H-5 are **unexercised, not failed**.
 
 ### ✅ Phase 234 — CLOSED 2026-09-06 (Gemini built · Claude verified BY DRIVING)
 
