@@ -239,4 +239,14 @@ describe("§6 the hook derives NOTHING", () => {
     expect(code).not.toMatch(/consecutive/i)
     expect(code).not.toMatch(/threshold/i)
   })
+
+  it("⛔ and the RAW file carries none of the three tokens either — comments included", () => {
+    // ⚠ The plan's acceptance criterion is a grep over the UNSTRIPPED file, so the docblock
+    //   deliberately explains the prohibition without spelling the words that enforce it.
+    //   Pitfall 8: a literal inside a docblock is still a literal. Making the criterion
+    //   EXECUTABLE here means it survives the next edit rather than being a one-off grep.
+    expect(hookSource).not.toMatch(/stopped\.filter/)
+    expect(hookSource).not.toMatch(/consecutive/)
+    expect(hookSource).not.toMatch(/threshold/)
+  })
 })
