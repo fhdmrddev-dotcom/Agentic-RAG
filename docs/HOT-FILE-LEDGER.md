@@ -8120,7 +8120,7 @@ none of the six `count_*` fields, so `isQuiet` is false for all 17) rather than 
 
 ## frontend/src/components/sources/RunHistoryList.tsx
 
-**1 / 1 / 160** · no (1 phase) · the per-source run history, mounted on first expansion.
+**2 / 1 / 235** · no (1 phase) · the per-source run history, mounted on first expansion.
 
 ⚠ **IT MOUNTS BEHIND A CLICK, AND THAT IS WHY FIVE OF THE COMPOSITION FENCE'S REDS ARE A HARNESS
 FINDING.** `sourceComposition.test.tsx` §3/§4 assert `sources-history`, `sources-run`,
@@ -8129,6 +8129,46 @@ clicks `toggle-history` first and passes. **The blocks exist** — `RunHistoryLi
 pinned at this close) proves them live.
 
 ⭐ It renders the FOLD, never a re-derivation: `runHistoryFold.ts` decides what collapses.
+
+### ⭐⭐ G1a — THE GAP THAT SHIPPED THROUGH A GREEN FENCE (closed 235-16, gap-closure round 1)
+
+This file rendered `Checked {ago} · {N} files`, where `N` was a local helper's SUM of all six stored
+counts. SC#1 asks how many files were **added**, how many **skipped** and how many **failed**; a sum
+answers none of the three. It answers only *did anything happen*, which the quiet fold already says.
+That is **ROADMAP failure mode #3 word for word — *"the run history shows counts but not the reason a
+file failed, so the one action that fixes it cannot be chosen"*** — realised inside the phase written
+to prevent it. The six counts were stored, on the wire and in the props the whole time; they were
+summed on arrival. ⛔ The closure is **pure rendering** — no endpoint, no column, no fetch.
+
+⚠ **THE MORE USEFUL HALF OF THE FINDING IS HOW IT ESCAPED.** `sourceComposition.test.tsx` asserts
+that the contract's blocks are **PRESENT**, by `data-testid`. `sources-run` and `sources-fail-reason`
+were present, in the contracted counts (`runCollapsed: 3` / `runExpanded: 17`), throughout — while
+rendering the wrong content. **A presence assertion cannot see content**, so a fence that was green
+by its own definition was silent about the one thing SC#1 measures. `RunHistoryList.test.tsx` now
+carries a §7 whose every case pins rendered **TEXT**, several against the row's WHOLE string, and a
+section comment that records this reason so the next author does not re-learn it. **18 → 28 cases.**
+
+⛔ **THE ONE-NUMBER READING SURVIVES IN `WatchedFoldersSection.tsx`, DELIBERATELY.** That file keeps
+its own summing helper for the source card's COLLAPSED line (`COPY.checkedAgo`). A card summarises
+and a history itemises — two densities over one set of facts. Deleting the card's copy to *"finish
+the job"* would replace a summary with a list in the one place a list does not belong. This plan's
+diff over that file is **empty**, on purpose.
+
+⚠ **`countsOf` SPELLS THE SIX FIELDS OUT rather than indexing by a template-literal type.** A
+seventh count added to `CountKey` then fails to COMPILE, where a computed index would read
+`undefined` and print nothing — the store growing a fact the surface silently drops is the exact
+shape of the defect above.
+
+⚠ **THE SEPARATOR IS RENDERED BEFORE A BIT, NEVER AFTER ONE.** Appending is how a joined list ends
+in a dangling mark when it is short; leading makes a trailing one unreachable by construction. The
+all-zero non-quiet row (a failed check that touched nothing) is driven as its own case for exactly
+that reason. Zero-valued categories are **absent from the DOM**, never printed as `0 renamed`.
+
+⛔ **`count_missing = 0` ON AN INCOMPLETE LISTING IS STILL A REFUSAL, NOT A REASSURANCE.**
+`watch_service.py` suppresses missing-transitions when the listing did not finish, so that zero was
+written by the H-5 structural guard rather than observed. The breakdown makes the risk newly
+concrete — and the zero-filter is what disposes of it: the `missing` bit simply never renders, and
+`LISTING_INCOMPLETE_NOTE` keeps saying *could not tell what was removed* beside the bits.
 
 ---
 
