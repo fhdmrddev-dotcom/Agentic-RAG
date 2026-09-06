@@ -264,6 +264,7 @@ A, because A does not do what the requirement says.**
 - [ ] **Phase 239: Any MCP Server With Files** — a file-serving MCP server becomes a watchable source by rows, not code (SRC-04)
 - [ ] **Phase 240: Mail Is a Shape, Not a Fourth Adapter** — one message is one document, `thread_key` groups, attachments are children, and a fourteen-message thread does not answer fourteen times (SRC-05) ⚠ OWN DISCUSS-PHASE · LAST
 - [ ] **Phase 241: Recall at Corpus Scale** — filtered vector search still returns the right chunks as the corpus grows, measured repeatably on local and cloud (QUEUE-06)
+
 ### Phase Details
 
 #### Phase 228: v3.9 Closeout — The Debt Gets a Number
@@ -487,17 +488,31 @@ A, because A does not do what the requirement says.**
 **Plans**: 12 plans in 5 waves
 
 Plans:
+**Wave 1**
+
 - [ ] 235-01-PLAN.md — migration 172 + the DAL that writes and prunes the run row (wave 1)
 - [ ] 235-02-PLAN.md — the failure cause is DATA, and every cause has one sentence and one control (wave 1)
 - [ ] 235-03-PLAN.md — the composition fence, generated from the sketch and driven RED (wave 1)
 - [ ] 235-04-PLAN.md — the API client, the one verdict reader, and the quiet-run fold (wave 1)
 - [ ] 235-08-PLAN.md — an external caller can open the Library Health tab (`initialTab` threading) (wave 1)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 235-05-PLAN.md — all FOUR release seams write an honest run row (wave 2)
 - [ ] 235-06-PLAN.md — the stopped verdict, computed once, from the live reader state (wave 2)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 235-07-PLAN.md — the Sync button’s three-part honesty fix + the per-row degraded boundary (wave 3)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
 - [ ] 235-09-PLAN.md — the app-shell signal: rail badge, popover, and a mobile home (wave 4)
 - [ ] 235-10-PLAN.md — the variant-B source card, its run history, and the instance statement (wave 4)
 - [ ] 235-11-PLAN.md — the Health tab’s Sources attention section and the hop back to the card (wave 4)
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
 - [ ] 235-12-PLAN.md — adopt the fence green (both knobs), the ledger rows, and the deferral record (wave 5)
 
 **UI hint**: yes
@@ -807,8 +822,6 @@ by moving the feature.**
 consumed by nothing) and 216 (the chat wiring dead inside an `except` arm, invisible to 6,929 green
 tests). Both found by driving, neither by a suite.
 
-
-
 ## v3.8 Document Intelligence, Automations & Connectors — SHIPPED 2026-08-26
 
 **12 phases** (201-206 CORE + inserts 204.1 / 206.1 / 206.2 / 206.3 + guardrail debt 207 / 208 + 209),
@@ -880,7 +893,6 @@ Committed as gated phases (ship only if CORE lands clean and budget remains; v2.
 - [ ] **Phase 180 (STRETCH): Agent-Loop Behavior Honesty** — honor step-by-step/todo-loop, Anthropic user-facing end summary, bounded tool iterations (LOOP-01..03)
 
 ### Phase Details
-
 
 #### Phase 174: Run-State & Lifecycle Honesty
 

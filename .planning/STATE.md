@@ -10,6 +10,7 @@ progress:
   completed_phases: 6
   total_plans: 13
   completed_plans: 13
+  planned_plans_235: 12
   percent: 43
 ---
 
@@ -37,18 +38,71 @@ continues at **228**.
 
 ## Current Position
 
-Phase: 235 — The Source Says What It Did (CONTEXT captured 2026-09-06 · not yet sketched or planned)
+Phase: 235 — The Source Says What It Did (**PLANNED 2026-09-06** — 12 plans in 5 waves)
 Prior: 234 — The Watch Loop (✅ CLOSED — verified by DRIVING)
-Plan: none in flight
-Status: context_gathered
-Resume file: `.planning/phases/235-the-source-says-what-it-did/235-CONTEXT.md`
-Last activity: 2026-09-06 — quick task `260906-5qd` closed `BUG-260906-01`; sketch 233 done, winner **B**.
+Plan: none in flight — ready to execute
+Status: ready_to_execute
+Resume file: `.planning/phases/235-the-source-says-what-it-did/235-01-PLAN.md`
+Last activity: 2026-09-06 — `/gsd:plan-phase 235` ran research → patterns → plan → check end to end.
 
-✅ **Both pre-plan obligations are DISCHARGED. `/gsd:plan-phase 235` is now the next action.**
+### Phase 235 planning record (2026-09-06)
+
+| Artifact | Commit | Note |
+|---|---|---|
+| `235-RESEARCH.md` | `2cbb71a79` | 1707 L · **twelve corrections to CONTEXT.md**, three of them phase-shaping |
+| `235-VALIDATION.md` | `d7a81bc73` | V-01..V-20 + the RED-first composition-fence procedure + 5 manual G-4 rows |
+| `235-PATTERNS.md` | `8411d57f5` | 24 files classified, 21 analogs with `path:line` anchors; 3 have none |
+| `235-01..12-PLAN.md` | `85737d2f6` | 12 plans / 5 waves; `## VERIFICATION PASSED`, zero blockers |
+| checker-warning fixes | `396560e6b` | all four closed BEFORE execution, not carried |
+
+⭐ **The three research findings that changed the phase's shape** (each would have shipped a defect):
+1. **There are FOUR `release_watch` call sites, not two** — one at `watch_service.py:115` inside
+   `tick()`, **outside `sync_watch` entirely**. A plan editing only `sync_watch` loses every
+   crash-shaped failure from the history. Plan 05 takes all four.
+2. **`settings.watch_process_enabled` is NOT "the reader is running"** — `main.py:587-589` swallows a
+   failed start. The honest source is `app.state.watch_service is not None`. Reading the flag would
+   have reproduced `BUG-260906-02`'s overclaim **inside the phase whose job is to stop overclaiming**.
+3. ⛔ **An external caller CANNOT open the Library Health tab today.** SURF-03's whole route
+   (badge → popover → Health → card) was impossible; plan 08 threads a net-new `initialTab` prop
+   `App → ChatLayout → LibraryPage` on the shipped `studioSkillId` precedent, **without** a seventh
+   reducer action (a 25-case suite pins the action set at exactly six).
+
+⚠ **`NavPanel` is `hidden md:flex` — DESKTOP ONLY**, and this was the single most likely place
+`SURF-03` got closed against its own sentence a second time. **Plan 09 SOLVES it rather than
+deferring:** the drawer's Library nav button carries the same badge (`aria-hidden`, so it cannot
+rename the control) and the hamburger carries a dot so a **closed** drawer still signals — both
+reading the SAME `ATTENTION_PRODUCERS` conditions, one producer, two renderers, no second fetch.
+One residual is **planted as a seed, never glossed**: `onOpenDrawer` reaches only `ChatArea`
+(`ChatLayout.tsx:738`), so a mobile **non-chat** view has no drawer trigger at all — **pre-existing,
+not created here**.
+
+⚠ **MEASURED gate baselines — CLAUDE.md's figures for BOTH gates are stale, and the plans compare
+against these, never those:** vitest `total 7544 · failed 0 · pinned total 6814 · 227/227 pinned`;
+backend **`72 failed`, 3785 passed** — **already one over CLAUDE.md's 71 ceiling and PRE-EXISTING**
+(234 measured 72 on its merge base too). The operative rule is **no NEW failure above 72**; plan 12
+raises the 71→72 re-pin to the operator as a decision rather than applying it silently.
+
+⚠ **The decision-coverage SDK gate SKIPPED with `no trackable decisions`** — it wants literal
+`D-NN` and this phase's ids are `D-235-NN`. **Coverage was verified independently instead**: all
+21 of `D-235-01..21` appear in a plan, and LIB-10 / SURF-02 / SURF-03 appear in 7 plans each.
+A gate that skips is not a gate that passed.
+
+⚠ **ROADMAP corrected during planning:** the Phase 235 detail block said migration `161`; it now
+says **172**, with the derivation (D-235-20).
+
+⚠ **Still owed from before, and NOT closed by any of this:** 233's five G-4 rows (run row 2 first);
+`OD-232-01` (no live shared drive browsed); 234's SC#2 / SC#3 / H-5 are **unexercised, not failed**.
+
+<details>
+<summary>Superseded pre-plan block (kept, not overwritten)</summary>
+
+✅ **Both pre-plan obligations were DISCHARGED before planning.**
 1. ✅ **`BUG-260906-01` fixed** — quick task `260906-5qd`, merged at `9d9e54743`. See the Quick Tasks
    table below for the measured gates and the one obligation it left owed.
 2. ✅ **G-2 sketch done and WON** — `.planning/sketches/233-the-source-says-what-it-did/`, winner
-   **B — a healthy source is one line** (operator, 2026-09-06). All four surfaces settled together
+   **B — a healthy source is one line** (operator, 2026-09-06).
+</details>
+ All four surfaces settled together
    per `D-235-19`. ⭐ **The plan MUST be authored against
    `.planning/sketches/233-the-source-says-what-it-did/BUILD-CONTRACT.generated.md`**, not from
    CONTEXT.md alone — that generated file carries the COPY table, the cause→control map, and the
