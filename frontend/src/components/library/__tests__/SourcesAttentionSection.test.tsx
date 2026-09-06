@@ -267,7 +267,16 @@ describe("SourcesAttentionSection — §3 nothing wrong ≠ not looked yet ≠ c
     render(<HealthTab />)
 
     // The shipped sibling is still there — the section fails quiet, as its idiom requires.
-    expect(await screen.findByTestId("health-coverage-ring")).toBeInTheDocument()
+    /**
+     * ⚠ WAS `health-coverage-ring`, which no longer exists. The "found by a search" ring was
+     * REMOVED on 2026-09-06 (operator decision): it drew DEMAND on a red-to-green health scale,
+     * so a library nobody had queried rendered a red arc meaning "not needed yet".
+     *
+     * The case's PROPERTY is unchanged and is the thing that matters — a rejected probe must not
+     * take the rest of the Health tab down with it — so it now anchors on a block that is still
+     * there. Re-anchoring, not weakening: this still fails if the tab stops rendering.
+     */
+    expect(await screen.findByTestId("health-freshness-donut")).toBeInTheDocument()
     expect(await screen.findByTestId("health-attention-unknown")).toBeInTheDocument()
   })
 })

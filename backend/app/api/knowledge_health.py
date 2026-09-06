@@ -564,6 +564,11 @@ def _fetch_overview_metrics(supabase: Client, user_id: str, stale_days: int) -> 
     # "PDFs fail 30% of the time" names a thing to fix. "46 documents were found" does not.
     by_type = _fetch_outcomes_by_type(supabase, user_id)
 
+    # ── FRESHNESS TIERS — the one health signal that is genuinely THREE-valued ────
+    # A binary good/bad ring on a healthy library is a filled circle: one variable drawn as
+    # a donut. Age is a real gradient, and a stale document answers questions with old facts.
+    freshness_tiers = _fetch_freshness_tiers(supabase, user_id, stale_days)
+
     # ⛔ SCORE RE-WEIGHTED 2026-09-06 (operator decision) — `coverage` WAS 40% OF THIS SCORE,
     # AND `coverage` IS DEMAND, NOT HEALTH.
     #
@@ -611,6 +616,7 @@ def _fetch_overview_metrics(supabase: Client, user_id: str, stale_days: int) -> 
         "total_chunks": total_chunks,
         "embedded_chunks": embedded_chunks,
         "outcomes_by_type": by_type,
+        "freshness_tiers": freshness_tiers,
     }
 
 
@@ -625,6 +631,38 @@ class _ReadabilityUnknown(Exception):
     ⛔ Deliberately an exception rather than a fallback number. Every "reasonable default" here
     is a claim about the library's health that nobody measured.
     """
+
+
+def _fetch_freshness_tiers(supabase: Client, user_id: str, stale_days: int) -> dict:
+    """Documents by age band: fresh / aging / stale.
+
+    ⚠ `stale_days` is the SAME knob the stale chip already uses, so the ring and the chip can
+    never disagree — two surfaces reading one threshold, not two thresholds.
+    """
+    aging_days = max(1, stale_days // 3)  # 90 -> 30, and it moves WITH the knob
+    fresh_cut = _window_cutoff(aging_days)
+    stale_cut = _window_cutoff(stale_days)
+
+    def _count(**kw) -> int:
+        q = (
+            supabase.table("documents")
+            .select("id", count="exact")
+            .eq("user_id", user_id)
+            .eq("is_latest", True)
+        )
+        if "gte" in kw:
+            q = q.gte("created_at", kw["gte"])
+        if "lt" in kw:
+            q = q.lt("created_at", kw["lt"])
+        return q.execute().count or 0
+
+    return {
+        "fresh": _count(gte=fresh_cut),
+        "aging": _count(gte=stale_cut, lt=fresh_cut),
+        "stale": _count(lt=stale_cut),
+        "aging_days": aging_days,
+        "stale_days": stale_days,
+    }
 
 
 def _fetch_readability(supabase: Client, user_id: str) -> tuple[int, int]:
@@ -710,18 +748,35 @@ def _fetch_embedding_coverage(supabase: Client, user_id: str) -> tuple[int, int]
     return total.count or 0, embedded.count or 0
 
 
-# Presentation-friendly names for the mime types this library actually ingests. An unknown
-# type falls through to its own raw value rather than to a bucket, so a new format shows up
-# as itself instead of silently joining "Other".
+# Presentation-friendly names for EVERY format this library accepts. The list mirrors the
+# upload hint on the Ingestion tab (PDF · DOCX · PPTX · XLSX · XLS · CSV · TXT · MD · HTML ·
+# EPUB · EML · MSG · DXF · PNG · JPG · JPEG · WEBP · TIFF · BMP) — if a format can be ingested
+# it can appear here, so it needs a name.
+#
+# ⚠ An unmapped type still falls through to its own raw subtype rather than into a bucket, so
+# a NEW format shows up as itself and prompts a label rather than hiding in "Other".
 _TYPE_LABEL = {
     "application/pdf": "PDF",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "Word",
+    "application/msword": "Word",
     "application/vnd.openxmlformats-officedocument.presentationml.presentation": "PowerPoint",
+    "application/vnd.ms-powerpoint": "PowerPoint",
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "Excel",
+    "application/vnd.ms-excel": "Excel",
     "text/markdown": "Markdown",
     "text/plain": "Text",
     "text/csv": "CSV",
+    "text/html": "HTML",
     "message/rfc822": "Email",
+    "application/vnd.ms-outlook": "Outlook",
+    "application/epub+zip": "EPUB",
+    "application/dxf": "DXF",
+    "image/vnd.dxf": "DXF",
+    "image/png": "PNG",
+    "image/jpeg": "JPEG",
+    "image/webp": "WebP",
+    "image/tiff": "TIFF",
+    "image/bmp": "BMP",
 }
 
 
@@ -734,7 +789,7 @@ def _fetch_outcomes_by_type(supabase: Client, user_id: str) -> list[dict]:
     """
     res = (
         supabase.table("documents")
-        .select("mime_type, status")
+        .select("mime_type, status, chunk_count")
         .eq("user_id", user_id)
         .eq("is_latest", True)
         .execute()
@@ -743,14 +798,23 @@ def _fetch_outcomes_by_type(supabase: Client, user_id: str) -> list[dict]:
     for row in res.data or []:
         mime = row.get("mime_type") or "unknown"
         label = _TYPE_LABEL.get(mime, mime.split("/")[-1][:16])
-        b = buckets.setdefault(label, {"type": label, "completed": 0, "failed": 0})
+        b = buckets.setdefault(
+            label, {"type": label, "completed": 0, "failed": 0, "documents": 0, "chunks": 0}
+        )
+        b["documents"] += 1
+        b["chunks"] += int(row.get("chunk_count") or 0)
         if (row.get("status") or "") == "completed":
             b["completed"] += 1
         else:
             b["failed"] += 1
 
-    ordered = sorted(buckets.values(), key=lambda b: b["completed"] + b["failed"], reverse=True)
-    return ordered[:8]
+    # ⛔ NO CAP. An earlier version returned only the top 8 and SILENTLY DROPPED the tail —
+    # measured on real data: DXF, PNG, WebP, HTML, TIFF, JPEG, Outlook and EPUB (8 formats,
+    # 14 documents) vanished from both charts with nothing saying so. A format a person
+    # deliberately uploaded disappearing from "what is in my library" is the same silent
+    # omission this dashboard exists to stop. The SURFACE folds a long tail into a named
+    # "Other" bucket; the DATA stays complete.
+    return sorted(buckets.values(), key=lambda b: b["documents"], reverse=True)
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────

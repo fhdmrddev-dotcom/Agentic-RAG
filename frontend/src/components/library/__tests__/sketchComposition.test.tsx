@@ -335,6 +335,20 @@ describe("sketch-composition fence — §2 positive controls", () => {
   })
 })
 
+/**
+ * Blocks the Phase 217.1 sketch draws that the product has DELIBERATELY retired since.
+ *
+ * ⚠ Keyed `screen.block-kind`, valued with the REASON — a bare skip list decays into "these
+ * ones don't work"; a reason keeps it a decision. Empty is the healthy state.
+ */
+const RETIRED_BLOCKS: Record<string, string> = {
+  "health.coverage-ring":
+    'removed 2026-09-06 by operator decision — it drew "found by a search", which is DEMAND, ' +
+    "on a red-to-green HEALTH scale, so a library nobody had queried rendered a red arc meaning " +
+    '"not needed yet". Replaced by composition donuts (health-freshness-donut, ' +
+    "health-types-donut); the retrieval figure survives as the Searches / Never-found tiles.",
+}
+
 describe("sketch-composition fence — §3 every block the sketch draws", () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -412,7 +426,20 @@ describe("sketch-composition fence — §3 every block the sketch draws", () => 
       const blocks = CONTRACT[screenName]?.blocks ?? []
 
       for (const block of blocks) {
-        it(`renders the \`${block.kind}\` block as [data-testid="${hook(screenName, block.kind)}"]`, async () => {
+        /**
+         * ⛔ A RETIRED BLOCK IS SKIPPED BY NAME, LOUDLY — never by deleting the case and never
+         * by editing the GENERATED contract, which would be drift against its own sketch.
+         *
+         * `it.skip` keeps the block visible in every run's output, so a reader sees that the
+         * sketch still draws it and the product deliberately does not. Anything NOT in this
+         * list is still strictly required — retiring a block stays a decision someone has to
+         * write down here, which is the whole point.
+         */
+        const retired = RETIRED_BLOCKS[`${screenName}.${block.kind}`]
+        const test = retired ? it.skip : it
+        test(`renders the \`${block.kind}\` block as [data-testid="${hook(screenName, block.kind)}"]${
+          retired ? ` — RETIRED: ${retired}` : ""
+        }`, async () => {
           await mountScreen(screenName, block.kind)
           expect(screen.getByTestId(hook(screenName, block.kind))).toBeInTheDocument()
         })

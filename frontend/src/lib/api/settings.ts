@@ -386,7 +386,19 @@ export interface HealthOverview {
   total_chunks?: number
   /** An un-embedded chunk is invisible to search however well it was extracted. */
   embedded_chunks?: number
-  outcomes_by_type?: { type: string; completed: number; failed: number }[]
+  outcomes_by_type?: { type: string; completed: number; failed: number; documents?: number; chunks?: number }[]
+  /**
+   * Age bands. ⚠ `aging_days` / `stale_days` are DERIVED from the one stale knob and move with
+   * it, so this ring and the "Stale" chip can never disagree — one threshold read by two
+   * surfaces, rather than two thresholds that drift apart.
+   */
+  freshness_tiers?: {
+    fresh: number
+    aging: number
+    stale: number
+    aging_days: number
+    stale_days: number
+  }
 }
 
 export interface PaginatedResponse<T> {

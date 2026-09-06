@@ -14,7 +14,7 @@ import { ChartSkeleton } from "@/components/health/ChartSkeleton"
 import { getHealthOverview, getRetrievalTrend } from "@/lib/api"
 import type { HealthOverview, RetrievalTrendPoint } from "@/lib/api"
 import { OutcomesByTypeChart } from "./OutcomesByTypeChart"
-import { CoverageRing } from "./CoverageRing"
+import { SegmentDonut, typeColor, foldTail } from "./SegmentDonut"
 import { HealthSignalChips } from "./HealthSignalChips"
 import { HealthDocumentBars } from "./HealthDocumentBars"
 import { CheckedQueriesSection } from "./CheckedQueriesSection"
@@ -112,24 +112,48 @@ export function HealthTab({ onGoToSource }: HealthTabProps = {}) {
        * the wrong thing.
        */}
       <div className="grid grid-cols-1 lg:grid-cols-[auto_auto_1fr] gap-6 items-start">
-        <div data-testid="health-readable-ring">
-          {overview && overview.readable_documents !== undefined ? (
-            <CoverageRing
-              retrieved={overview.readable_documents}
-              total={overview.total_documents}
-              label="the agent can read"
+        {/*
+          ⭐ COMPOSITION, not a filled circle. Each of these previously drew ONE proportion, so
+          on a healthy library they were solid green rings — one variable, one colour. Here every
+          segment IS a value and colour identifies WHICH, never how good it is. The one exception
+          is `failed` on the bar, which stays red because it genuinely is a verdict.
+        */}
+        <div data-testid="health-freshness-donut">
+          {overview?.freshness_tiers ? (
+            <SegmentDonut
+              centerValue={overview.total_documents}
+              centerLabel="documents"
+              segments={[
+                { label: "fresh", value: overview.freshness_tiers.fresh, color: "#34d399" },
+                { label: "aging", value: overview.freshness_tiers.aging, color: "#fbbf24" },
+                { label: "stale", value: overview.freshness_tiers.stale, color: "#94a3b8" },
+              ]}
             />
           ) : (
             <div className="h-44 w-44 animate-pulse bg-muted/30 rounded-lg" />
           )}
         </div>
 
-        <div data-testid="health-embedded-ring">
-          {overview && overview.embedded_chunks !== undefined ? (
-            <CoverageRing
-              retrieved={overview.embedded_chunks}
-              total={overview.total_chunks ?? 0}
-              label="chunks searchable"
+        <div data-testid="health-types-donut">
+          {overview?.outcomes_by_type?.length ? (
+            <SegmentDonut
+              centerValue={overview.outcomes_by_type.length}
+              centerLabel="formats"
+              /* ⚠ The centre counts EVERY format, including any folded into "Other" — so the
+                 number and the ring cannot disagree about how many kinds of file exist. */
+              segments={foldTail(
+                overview.outcomes_by_type.map((t, i) => ({
+                  label: t.type,
+                  value: t.documents ?? t.completed + t.failed,
+                  color: typeColor(i),
+                })),
+                7,
+                (value, count) => ({
+                  label: `Other (${count})`,
+                  value,
+                  color: "#64748b",
+                }),
+              )}
             />
           ) : (
             <div className="h-44 w-44 animate-pulse bg-muted/30 rounded-lg" />
@@ -154,19 +178,14 @@ export function HealthTab({ onGoToSource }: HealthTabProps = {}) {
         <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
           Usage — what people asked for
         </h3>
-        <div className="grid grid-cols-[auto_1fr] gap-6">
-          <div data-testid="health-coverage-ring">
-            {overview ? (
-              <CoverageRing
-                retrieved={overview.retrieved_this_month}
-                total={overview.total_documents}
-                size="sm"
-              />
-            ) : (
-              <div className="h-24 w-24 animate-pulse bg-muted/30 rounded-lg" />
-            )}
-          </div>
-
+        <div>
+          {/*
+            ⛔ THE "found by a search" RING IS GONE, not moved again. It drew ONE proportion of
+            DEMAND and rendered it on a red-to-green health scale, so a library nobody queried
+            showed a red arc meaning "not needed yet". The same fact survives as the Searches
+            and Never-found tiles below, where a bare count cannot masquerade as a grade.
+            Coverage Trend now takes the full width it was always competing with the ring for.
+          */}
           <div className="min-w-0" data-testid="health-searches-chart">
           <Suspense fallback={<ChartSkeleton />}>
             {trend ? (
