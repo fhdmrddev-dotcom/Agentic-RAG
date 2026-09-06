@@ -6,6 +6,8 @@ import { ChatArea } from "@/components/chat/ChatArea"
 import { WorkspacePanel, type PanelState } from "@/components/panel/WorkspacePanel"
 import { subscribeOpenPanel } from "@/components/panel/panelOpenSignal"
 import { LibraryPage } from "@/pages/LibraryPage"
+// Phase 235-08 — the tab union from the page's own leaf, the `type StudioTab` idiom below.
+import type { LibraryTab } from "@/pages/librarySelection"
 import { SettingsPage } from "@/pages/SettingsPage"
 import { ConnectionsPage } from "@/pages/ConnectionsPage"
 import { SkillsPage } from "@/pages/SkillsPage"
@@ -98,9 +100,25 @@ interface Props {
   onReviewEvals: (skillId: string) => void
   onStudioTabChange: (tab: StudioTab) => void
   onTuneSkill: (skillId: string) => void
+  // Phase 235-08 (SURF-03 / D-235-04): the Library tab an external caller asked for, and the
+  // navigator that asks for it. App owns both (per-view state, the `studioTab` precedent
+  // above) so the Library's Health tab has a door from outside the Library at all.
+  //
+  // ⚠ BOTH ARE OPTIONAL ON PURPOSE. Four shipped suites mount `<ChatLayout {...baseProps} />`
+  // from their own prop objects; a REQUIRED prop would redden `tsc --noEmit` in files this
+  // plan does not own. Optional keeps the measured baseline and costs nothing — App always
+  // passes them.
+  //
+  // ⚠ `onOpenLibraryHealth` IS ACCEPTED AND FORWARDED TO NOTHING IN THIS PLAN. Its consumer
+  // is `NavPanel`'s badge popover, built by plan 09 in the next wave. It is declared here and
+  // NOT destructured below, so `noUnusedParameters` stays quiet and plan 09 adds exactly one
+  // name to the parameter list and one prop to the `<NavPanel>` mount. Stated rather than
+  // left to be found — an accepted prop that reaches nowhere reads as a wired feature.
+  libraryTab?: LibraryTab
+  onOpenLibraryHealth?: () => void
 }
 
-export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOperator, operatorIdentity, prefillMessage, onSetPrefillMessage, studioSkillId, studioTab, onOpenStudio, onReviewEvals, onStudioTabChange, onTuneSkill }: Props) {
+export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOperator, operatorIdentity, prefillMessage, onSetPrefillMessage, studioSkillId, studioTab, onOpenStudio, onReviewEvals, onStudioTabChange, onTuneSkill, libraryTab }: Props) {
   const {
     threads,
     selectedThread,
@@ -760,7 +778,9 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
       ) : (
         <main className="flex-1 overflow-hidden">
           {activeView === "documents" ? (
-            <LibraryPage onNavigate={onNavigate} />
+            // Phase 235-08: `undefined` on every ordinary entry, so the Library keeps its
+            // own default; set only by App's `handleOpenLibraryHealth`.
+            <LibraryPage onNavigate={onNavigate} initialTab={libraryTab} />
           ) : activeView === "skills" ? (
             <SkillsPage
               onTryInChat={handleTryInChat}
