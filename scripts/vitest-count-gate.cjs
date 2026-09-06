@@ -3220,6 +3220,10 @@ const BASELINE = {
   "RunHistoryList.test.tsx": 18,
   "WatchedFoldersSection.history.test.tsx": 17,
   "IngestionTab.readerOff.test.tsx": 5,
+  // Quick task after Phase 235: the one control must RENDER and ACT. 5 behaviour cases
+  // (IngestionTab -> WatchedFoldersSection) + 1 SOURCE FENCE for LibraryPage -> IngestionTab,
+  // which the behaviour cases are structurally blind to and which is the link that ACTUALLY broke.
+  "IngestionTab.reconnectControl.test.tsx": 6,
   "SourcesAttentionSection.test.tsx": 13,
   "NavPanel.badge.test.tsx": 14,
   "ChatLayout.badge.test.tsx": 5,
@@ -4548,6 +4552,7 @@ const TARGETS = [
   "src/components/sources/RunHistoryList.test.tsx",
   "src/components/sources/WatchedFoldersSection.history.test.tsx",
   "src/components/library/__tests__/IngestionTab.readerOff.test.tsx",
+  "src/components/library/__tests__/IngestionTab.reconnectControl.test.tsx",
   "src/components/library/__tests__/SourcesAttentionSection.test.tsx",
   "src/components/layout/__tests__/NavPanel.badge.test.tsx",
   "src/components/layout/__tests__/ChatLayout.badge.test.tsx",

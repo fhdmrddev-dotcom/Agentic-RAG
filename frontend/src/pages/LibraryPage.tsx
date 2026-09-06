@@ -887,6 +887,7 @@ export function LibraryPage({
                 folderId={selectedFolderId}
                 folderName={selectedFolderName}
                 disabled={!canUploadToFolder}
+                onNavigateToConnections={onNavigate ? () => onNavigate("connections") : undefined}
               />
             </TabsContent>
 

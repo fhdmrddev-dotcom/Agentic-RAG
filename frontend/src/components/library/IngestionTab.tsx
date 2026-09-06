@@ -111,6 +111,19 @@ export interface IngestionTabProps {
   folderName?: string | null
   /** True when the current user cannot upload to this folder (read-only / shared). */
   disabled?: boolean
+  /**
+   * Opens the Connections surface, for a stopped source whose ONE control is "Reconnect".
+   *
+   * ⛔ WITHOUT THIS PROP THE CONTROL DOES NOT RENDER AT ALL. `WatchedFoldersSection` gates on
+   * `canReconnect={Boolean(onNavigateToConnections)}` and `showFix` is
+   * `control.action !== "reconnect" || canReconnect` — so every reconnect-shaped cause
+   * (`token_revoked`, `connection_disabled`) silently loses its button. Phase 235 shipped in
+   * exactly that state: the cause→control map was correct DATA and no user could press it,
+   * which is SC#2's "offers one control that fixes it" failing invisibly.
+   *
+   * The app has NO ROUTER (`SEED-185`), so this is a callback, never a URL.
+   */
+  onNavigateToConnections?: () => void
 }
 
 export function IngestionTab({
@@ -121,6 +134,7 @@ export function IngestionTab({
   folderId,
   folderName,
   disabled,
+  onNavigateToConnections,
 }: IngestionTabProps) {
   // ── LOCAL sub-tab state — never in librarySelection's reducer ─────────────────
   const [subTab, setSubTab] = useState<string>("add-files")
@@ -251,6 +265,7 @@ export function IngestionTab({
               destinationFolderId={uploadFolderId}
               readerRunning={readerRunning}
               stoppedSources={stopped}
+              onNavigateToConnections={onNavigateToConnections}
             />
           </div>
         </TabsContent>
