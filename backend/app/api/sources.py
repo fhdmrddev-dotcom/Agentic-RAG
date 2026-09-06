@@ -1,7 +1,7 @@
 """Phase 234 (LIB-08 / SURF-01 / VIS-05) — Folder Watches & Source Sync API endpoints.
 
 Exposes CRUD and lifecycle operations on connector_watches:
-- POST /watches: Create a new scheduled watch
+- POST /watches: Create a new folder watch on a recurring cadence
 - GET /watches: List watches owned by caller/org
 - GET /watches/{watch_id}: Get watch details + tracked item mirror
 - PATCH /watches/{watch_id}: Update interval, pause/resume, destination folder
@@ -23,6 +23,7 @@ the domain owner — `GET /sources/health` belongs beside `GET /sources/watches`
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
@@ -283,16 +284,53 @@ async def delete_folder_watch(
 )
 async def trigger_watch_sync(
     watch_id: UUID,
+    request: Request,
     current_user: dict = Depends(get_current_user),
     pool=Depends(get_pg_pool),
 ):
-    """Trigger an immediate check for the watch by setting next_run_at = now()."""
+    """Ask the reader to check this watch on its next tick (BUG-260906-02 / D-235-14).
+
+    ⛔ D-235-15 — THIS ROUTE DOES NOT DO THE LISTING, AND MUST NOT. It sets `next_run_at = now()`
+    and returns; `WatchService._poll_loop` performs the read. The poke is deliberately safe
+    across multiple uvicorn workers (`claim_due_watches` holds the claim exclusivity), and an
+    inline listing here would hold a web worker for the length of a Drive listing and re-open
+    exactly the concurrency problem that claim was built to solve. The defect this route had was
+    that it OVERCLAIMED, never that it was asynchronous.
+
+    ⛔ AND IT NO LONGER PROMISES WORK NOTHING WILL DO. The reply used to describe the REQUEST —
+    the same sentence whether or not a reader existed to consume the poke. Measured on the
+    operator's machine: `next_run_at` carried a click from 27 minutes earlier, `last_run_at` was
+    `None`, and the watch had never run once. Because the button reported success, the operator
+    reasonably concluded the loop was working and the FILE was the problem.
+    """
     user_id = _as_uuid(current_user["id"])
     existing = await get_watch(pool, watch_id, user_id=user_id)
     if not existing:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Watch not found or unauthorized.",
+        )
+
+    # ⛔ THE LIVE READER, NOT THE INSTANCE'S CONFIGURATION (D-235-21). `main.py:587-589` swallows
+    # a failed start and leaves the flag reading true, so the flag is not the fact — only the
+    # object on `app.state` is. `getattr(..., None)` because a probe app (and any app whose
+    # lifespan never ran) has no such attribute at all, and a plain access would 500 the route.
+    #
+    # ⛔ T-235-26 — this runs AFTER the ownership check on purpose: a refusal that preceded the
+    # 404 would answer "does this watch id exist?" for a caller who does not own it.
+    reader_running = getattr(request.app.state, "watch_service", None) is not None
+    if not reader_running:
+        # ⛔ Nothing is written. Poking a column no process reads is the false promise itself.
+        # ⛔ T-235-22 — the subject of this sentence is this SERVER, never the caller's folder
+        # or their connection, and it never names an operator configuration key. The marked
+        # operator half of the instance statement lives in the frontend vocabulary leaf.
+        return WatchSyncResponse(
+            status="refused",
+            message=(
+                "Automatic reading is switched off on this server, so this check cannot be "
+                "asked for. The cause is this instance's configuration."
+            ),
+            reader_running=False,
         )
 
     async with pool.acquire() as con:
@@ -308,9 +346,20 @@ async def trigger_watch_sync(
             user_id,
         )
 
+    # ⚠ `asked_at` is resolved here rather than read back with a `RETURNING` clause, so the
+    # statement above stays byte-for-byte the one that shipped. It differs from the database's
+    # own `now()` by the round trip only, and the authoritative column is what `GET
+    # /sources/watches` returns — this value exists so the surface can render the pending state
+    # (D-235-16) without a second request.
+    asked_at = datetime.now(timezone.utc)
     return WatchSyncResponse(
-        status="scheduled",
-        message=f"Watch {watch_id} scheduled for immediate sync.",
+        status="asked",
+        message=(
+            f"Watch {watch_id} will be checked on the reader's next pass."
+        ),
+        next_run_at=asked_at,
+        next_check_within_seconds=settings.watch_poll_interval_seconds,
+        reader_running=True,
     )
 
 
