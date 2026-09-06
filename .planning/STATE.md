@@ -7,7 +7,7 @@ last_updated: "2026-09-06T12:00:00.000Z"
 last_activity: 2026-09-06
 progress:
   total_phases: 14
-  completed_phases: 6
+  completed_phases: 7
   total_plans: 13
   completed_plans: 13
   planned_plans_235: 12
@@ -38,10 +38,37 @@ continues at **228**.
 
 ## Current Position
 
-Phase: 235 — The Source Says What It Did (**EXECUTED 2026-09-06 · STOPPED BY OPERATOR at 16.5/17 plans**)
+Phase: 235 — The Source Says What It Did (✅ **CLOSED 2026-09-06** — 17 plans + 1 quick fix)
 Prior: 234 — The Watch Loop (✅ CLOSED — verified by DRIVING)
 Plan: none in flight
-Status: executed_gaps_remain
+Status: complete
+
+## ✅ PHASE 235 CLOSED (2026-09-06)
+
+**Closed after gap-closure round 1 (plans 13-17) and one quick fix (`d2e1cc244`).** Full record:
+`235-VERIFICATION.md` § "CLOSE-OUT". **7 of 8 gaps closed; SC#3's mobile cap stays OWED by decision.**
+
+✅ **VERIFIED LIVE IN THE BROWSER**, not only in tests — against the real Drive watch on folder
+**CV** with 17 stored runs: the per-category breakdown (`Checked 1 hour ago · 1 added`), quiet-run
+folding expanding to all 16, **`could not tell what was removed`** on incomplete-listing runs, no
+badge for a healthy source, `Asked · next check within 60 seconds`, `checked every 30 minutes`
+verbatim, zero "scheduled", and Health's *"Every source is reading."*
+
+⭐ **THE CLOSING FIX IS THE LESSON.** SC#2's *"offers one control that fixes it"* was failing
+**invisibly**: the cause→control map was correct DATA and no user could press it, because
+`LibraryPage` forwarded `onNavigate` to `IndexingTab` only. **Measured:** deleting the `IngestionTab`
+forward turns 3 of 5 new cases red; deleting the `LibraryPage` forward left **all 5 GREEN** while the
+button vanished from the product — the behaviour suite is structurally blind to the link that
+actually broke. A `?raw` source fence now covers it, driven RED against that exact deletion.
+
+⛔ **STILL OWED AND NOT CLOSED BY THIS:** **five G-4 rows never driven — no stopped source has EVER
+been observed in this product.** Every claim about a BROKEN source is unit-level. `M-1` (revoke a
+real Drive grant) settles the whole path in one drive. Also owed: `SEED-253` (mobile drawer outside
+chat), `SEED-254` (per-run per-file attribution), the composition fence at `16 failed` in neither
+gate knob, and the backend ceiling question (71→71↓42 oscillates on an unchanged tree).
+
+<details>
+<summary>Superseded stop-record (kept, not overwritten)</summary>
 
 ## ⚠ PHASE 235 STOPPED BY THE OPERATOR (2026-09-06)
 
@@ -104,6 +131,8 @@ in `lib/api/_core.ts`, `index.css`, `CreateWatchModal.tsx`, plus deleted screens
 `files_modified`.
 Resume file: `.planning/phases/235-the-source-says-what-it-did/235-01-PLAN.md`
 Last activity: 2026-09-06 — `/gsd:plan-phase 235` ran research → patterns → plan → check end to end.
+
+</details>
 
 ### Phase 235 planning record (2026-09-06)
 
