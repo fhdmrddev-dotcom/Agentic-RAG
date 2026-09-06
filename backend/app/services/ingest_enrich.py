@@ -250,8 +250,8 @@ def enrich_for_ingest(
                 metadata_dict["author"] = parsed_email.sender
             if parsed_email.date and not metadata_dict.get("date"):
                 metadata_dict["date"] = parsed_email.date
-            if not metadata_dict.get("document_type"):
-                metadata_dict["document_type"] = "email"
+            # Email MIME types are deterministically document_type='email' (EML-01 / BUG-260906-02)
+            metadata_dict["document_type"] = "email"
             if parsed_email.sender:
                 metadata_dict["email_from"] = parsed_email.sender
             if parsed_email.to:

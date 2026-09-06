@@ -121,7 +121,7 @@ All 4 plans executed cleanly in 4 atomic commits (`79d9b1682`, `18e3f5009`, `b4b
 6. **Operator Ruling 1 & Migration 173**: Migration 173 applied to live DB; `full-schema.sql` regenerated cleanly via `scripts/regenerate-full-schema.sh`.
 
 ### Verification Gates
-- **Backend Unit**: `71 failed, 3971 passed, 2 xfailed, 2 xpassed`. Failing set identical to reviewer baseline set; ceiling 71 held at 0 headroom.
+- **Backend Unit**: `71 failed, 3971 passed, 2 xfailed, 2 xpassed`. Failing set identical to reviewer baseline set; ceiling 71 held at 0 headroom. BUS-184 resolved: deterministic email `document_type='email'` restored in `ingest_enrich.py:254` to prevent live LLM extraction overrides in `test_email_ingestion.py`.
 - **Vitest Count Gate**: `total 7816 · failed 2 · pinned total 7020` (+29 tests adopted, 29/29 passing; 2 failures are provably unmodified SEED-171 flakes).
 - **Hot-File Ledger**: 224 rows, 10 watched, OK.
 - **CLAUDE.md Size**: 81,332 chars, headroom 68,668, OK.

@@ -38,6 +38,7 @@
   - Command: `backend\venv\Scripts\pytest.exe tests/unit -q --continue-on-collection-errors`
   - Result: `71 failed, 3971 passed, 2 xfailed, 2 xpassed`.
   - Failure set: **Byte-identical to reviewer's baseline set of 71** (+25 passing tests, zero new failures, 71 ceiling held).
+  - **BUS-184 Resolution**: `test_email_ingestion.py::test_ingest_email_populates_metadata_and_attachments` intermittently saw `assert final_meta["document_type"] == "email"` fail when `enrich_for_ingest` called `extract_metadata_enriched` against live OpenAI credentials (from `backend/.env`), extracting non-deterministic `document_type` values (e.g. `'notification'`, `'agreement'`). Because `ingest_enrich.py:253` previously only set `"email"` if `document_type` was absent (`if not metadata_dict.get("document_type"):`), the LLM extraction suppressed the email MIME-type override. Fixed at `ingest_enrich.py:254` by making `metadata_dict["document_type"] = "email"` unconditional for email MIME types (`message/rfc822`, `application/vnd.ms-outlook`, `application/x-msg`), honoring the deterministic EML-01 contract. Verified ceiling holds at 71 failed / 3971 passed.
 - **Vitest Count Gate**:
   - Command: `node scripts/vitest-count-gate.cjs`
   - Result: `total 7816 · failed 2 · pinned total 7020`.
