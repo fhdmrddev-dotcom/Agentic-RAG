@@ -123,15 +123,25 @@ def _relative_window(builder: str, n: int, unit: str | None) -> tuple[str | None
 # ONLY the declared built-ins). The whitelist is built-ins ∪ enabled custom defs.
 _METADATA_BUILTINS = set(DocumentMetadata.model_fields)
 
+# Phase 237 (RULES-02 / SC#2): Source facts are first-class filterable fields in views & rules
+_SOURCE_FACT_FIELDS: frozenset[str] = frozenset({
+    "source_system",
+    "source_connection_id",
+    "path",
+    "file_path",
+    "ingest_visibility",
+    "source_state",
+})
+
 
 async def _build_field_meta(user_id: str, supabase: Client) -> tuple[set[str], set[str]]:
     """Assemble the live filterable-field whitelist + the numeric custom-field set.
 
     Returns ``(whitelist, number_custom_fields)`` from ONE def fetch:
-      * ``whitelist`` — built-in metadata keys ∪ the field_keys of the caller's
-        ENABLED custom field defs (own + global). `_`-prefixed keys are excluded by
-        ``validate_fields`` itself (they can never be whitelisted — D-111-9), so they
-        are not added here regardless of any def's key.
+      * ``whitelist`` — built-in metadata keys ∪ source fact fields ∪ the field_keys
+        of the caller's ENABLED custom field defs (own + global). `_`-prefixed keys are
+        excluded by ``validate_fields`` itself (they can never be whitelisted — D-111-9),
+        so they are not added here regardless of any def's key.
       * ``number_custom_fields`` — the field_keys of the ENABLED custom defs whose
         ``field_type`` is ``number``; consumed by ``validate_operands`` to reject
         range operators on a lexically-compared custom number leg (WR-01).
@@ -141,7 +151,7 @@ async def _build_field_meta(user_id: str, supabase: Client) -> tuple[set[str], s
     number_custom = {
         d["field_key"] for d in defs if d.get("enabled") and d.get("field_type") == "number"
     }
-    return _METADATA_BUILTINS | enabled_custom, number_custom
+    return _METADATA_BUILTINS | _SOURCE_FACT_FIELDS | enabled_custom, number_custom
 
 
 async def _build_whitelist(user_id: str, supabase: Client) -> set[str]:
@@ -191,12 +201,23 @@ async def resolve_filter(
     # SQL or the .or_/.in_ grammar (SC#4 / T-114-02-03).
     fragments = view_filter_compiler.compile_filter(flt)
 
-    # Defense-in-depth: re-check the custom-leg field names are still whitelisted
-    # before they become a metadata->>'field' selector (a field deleted since save).
+    # Defense-in-depth: re-check all leg field names against whitelist or promoted columns
+    # before they become a selector (SC#2 seam closure).
+    promoted_cols = set(view_filter_compiler.PROMOTED_TYPED_COLUMNS.values())
     for frag in fragments:
-        if frag.leg == "custom" and frag.field not in whitelist:
+        if frag.leg == "typed":
+            if frag.field not in promoted_cols:
+                raise ResolveError(
+                    detail=f"filter field {frag.field!r} is no longer available",
+                )
+        elif frag.leg in ("custom", "containment"):
+            if frag.field not in whitelist:
+                raise ResolveError(
+                    detail=f"filter field {frag.field!r} is no longer available",
+                )
+        else:
             raise ResolveError(
-                detail=f"filter field {frag.field!r} is no longer available",
+                detail=f"filter leg {frag.leg!r} is not valid",
             )
 
     # Resolve folder_scope → a subtree LIST (never a set — Pitfall 1); an unreachable
@@ -228,9 +249,10 @@ async def resolve_filter(
 
         Two legs, one dispatch (R-114-A / RESEARCH §"Two-leg split"):
           * ``leg="typed"``       → the CONSTANT promoted column name
-            (`document_type_norm` / `date_typed`); builder call straight on the column.
-          * ``leg="custom"``      → a `metadata->>'field'` selector; ``field`` is a
-            WHITELISTED key (re-validated above), never raw input.
+            (`document_type_norm` / `date_typed` / `source_connection_id` / ...);
+            builder call straight on the column.
+          * ``leg="custom"``      → a `metadata->>'field'` or nested source selector;
+            ``field`` is a WHITELISTED key (re-validated above), never raw input.
           * ``leg="containment"`` → the surviving `metadata @> {field: value}` `@>`
             fast path (boolean/number eq).
 
@@ -243,9 +265,15 @@ async def resolve_filter(
                 q = q.contains("metadata", {frag.field: frag.value})
                 continue
 
-            # Column selector: a CONSTANT typed column name, or a metadata->>'key'
-            # JSON-path on a whitelisted key (the key is NOT attacker input).
-            col = frag.field if frag.leg == "typed" else f"metadata->>{frag.field}"
+            # Column selector: a CONSTANT typed column name, or a metadata selector
+            if frag.leg == "typed":
+                col = frag.field
+            elif frag.field == "source_system":
+                col = "metadata->source->>system"
+            elif frag.field in ("path", "file_path"):
+                col = "file_path"
+            else:
+                col = f"metadata->>{frag.field}"
 
             if frag.builder in ("within_next", "older_than"):
                 # Relative-date window from the SERVER CLOCK at resolve time (D-114-16).
@@ -266,11 +294,11 @@ async def resolve_filter(
                 # .or_ grammar string built from user values (T-114-02-03).
                 q = q.in_(col, frag.values or [])
             elif frag.builder == "is_empty":
-                # is_empty — absent OR ''/'[]'. The field is whitelisted (a constant
-                # here, re-validated above); the three RHS predicates are HARD-CODED
-                # literals, never user input → the .or_ grammar carries no
-                # attacker-controlled token (T-114-02-03 / D-114-12).
-                q = q.or_(f"{col}.is.null,{col}.eq.,{col}.eq.[]")
+                # is_empty — absent OR ''/'[]' on custom, or is.null on typed column
+                if frag.leg == "typed":
+                    q = q.is_(col, "null")
+                else:
+                    q = q.or_(f"{col}.is.null,{col}.eq.,{col}.eq.[]")
             else:
                 # eq / gte / lte / ilike — direct builder on the column; the value is
                 # a bound param. between carries value2 → chain a .lte upper bound.

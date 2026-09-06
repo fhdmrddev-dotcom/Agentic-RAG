@@ -133,9 +133,10 @@ def _op_is_empty(cond) -> Fragment:
     ``''``/``[]`` counts as empty (D-114-12). Carries a DISTINCT ``builder="is_empty"``
     (NOT ``"or_"``, which the resolve route reserves for ``one_of`` membership) so the
     dispatch is unambiguous: the resolve route expands it to an ``.or_(…is.null,…eq.,
-    …eq.[])`` predicate on ``metadata->>'field'`` whose three RHS tokens are HARD-CODED
-    literals (never user input — the empty test is always on the raw metadata key)."""
-    return Fragment(leg="custom", field=cond.field, builder="is_empty")
+    …eq.[])`` predicate on ``metadata->>'field'`` (or is.null on typed columns)."""
+    leg = "typed" if cond.field in PROMOTED_TYPED_COLUMNS else "custom"
+    field = PROMOTED_TYPED_COLUMNS.get(cond.field, cond.field)
+    return Fragment(leg=leg, field=field, builder="is_empty")
 
 
 # ── relative-date (carry N + unit; window math DEFERRED to resolve, D-114-16) ────
