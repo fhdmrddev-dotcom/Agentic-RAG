@@ -38,11 +38,11 @@ continues at **228**.
 
 ## Current Position
 
-Phase: 236 — The Corpus Under Attack (⏭ **NEXT — not started**)
+Phase: 236 — The Corpus Under Attack (🚧 **IN PROGRESS — discuss complete, ready for planning**)
 Prior: 235 — The Source Says What It Did (✅ **CLOSED 2026-09-06** — 17 plans + 1 quick fix + 1 health quick task)
 Prior: 234 — The Watch Loop (✅ CLOSED — verified by DRIVING)
 Plan: none in flight
-Status: ready_for_236
+Status: ready_for_planning
 
 
 ## ▶ NEXT SESSION — start here
