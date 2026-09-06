@@ -998,6 +998,73 @@ COMMENT ON COLUMN public.connector_connections.default_ingest_visibility IS 'Pha
 
 
 --
+-- Name: connector_sync_runs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.connector_sync_runs (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    org_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    watch_id uuid NOT NULL,
+    started_at timestamp with time zone DEFAULT now() NOT NULL,
+    finished_at timestamp with time zone,
+    status text NOT NULL,
+    failure_cause text,
+    last_error text,
+    listing_complete boolean DEFAULT false NOT NULL,
+    count_new integer DEFAULT 0 NOT NULL,
+    count_modified integer DEFAULT 0 NOT NULL,
+    count_renamed integer DEFAULT 0 NOT NULL,
+    count_missing integer DEFAULT 0 NOT NULL,
+    count_restored integer DEFAULT 0 NOT NULL,
+    count_errors integer DEFAULT 0 NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: TABLE connector_sync_runs; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.connector_sync_runs IS 'Phase 235 (SURF-02): One row per release of a connector watch — what a single sync tick actually did. Append-only; pruned on write to the most recent N rows per watch (WATCH_RUN_HISTORY_RETENTION).';
+
+
+--
+-- Name: COLUMN connector_sync_runs.started_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.connector_sync_runs.started_at IS 'When the tick STARTED. Recorded here because connector_watches.last_run_at is set at CLAIM time (db/watches.py claim_due_watches, before any work), so that column also means "when the tick started" and the watch row alone cannot say when a tick ended.';
+
+
+--
+-- Name: COLUMN connector_sync_runs.finished_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.connector_sync_runs.finished_at IS 'When the tick was released. NULL only if a writer omitted it; the pair (started_at, finished_at) is what makes a duration honest, which last_run_at alone cannot express.';
+
+
+--
+-- Name: COLUMN connector_sync_runs.status; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.connector_sync_runs.status IS 'Terminal outcome of the tick, mirroring the status handed to release_watch. Measured set written by production code today: success, failed, paused. Deliberately free text with NO CHECK constraint — an unanticipated value written by a background loop must never become a 500 (the same reasoning that left connector_watches.last_status unconstrained).';
+
+
+--
+-- Name: COLUMN connector_sync_runs.failure_cause; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.connector_sync_runs.failure_cause IS 'Machine-readable classification of WHY a non-success tick ended that way (e.g. token_revoked, folder_gone, unreachable, unknown). Free text with NO CHECK, for the same reason as status. NULL on a successful tick. The human sentence for a cause lives in the frontend vocabulary leaf, never here.';
+
+
+--
+-- Name: COLUMN connector_sync_runs.listing_complete; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.connector_sync_runs.listing_complete IS 'H-5 / SRC-06 provenance, and it is load-bearing. watch_service.py:415-420 SUPPRESSES missing-state transitions when the source listing did not finish exhaustively (e.g. mid-pagination error), so such a tick records count_missing = 0 by design rather than by observation. Rendering that 0 as "nothing was deleted" without this flag would be the Onyx #1161 lie one layer up. FALSE means the counts below are a floor, not a census.';
+
+
+--
 -- Name: connector_tokens; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1186,7 +1253,7 @@ COMMENT ON COLUMN public.connector_watches.leased_until IS 'Concurrency lease ex
 -- Name: COLUMN connector_watches.last_status; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON COLUMN public.connector_watches.last_status IS 'Status of the latest sync run: success, failed, running, skipped_still_running, or partial.';
+COMMENT ON COLUMN public.connector_watches.last_status IS 'Status of the latest sync run. MEASURED set actually written by production code: running (set at claim time), success, failed, paused (connection disabled). Note: "pending" is synthesised at READ time by api/sources.py and is never stored. The values partial and skipped_still_running were documented by migration 168 and are written by nothing. Free text by design — no CHECK constraint, so an unanticipated status in a background loop can never become a 500.';
 
 
 --
@@ -2780,6 +2847,14 @@ ALTER TABLE ONLY public.connector_connections
 
 
 --
+-- Name: connector_sync_runs connector_sync_runs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.connector_sync_runs
+    ADD CONSTRAINT connector_sync_runs_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: connector_tokens connector_tokens_connection_id_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3479,6 +3554,20 @@ CREATE INDEX idx_connector_connections_org_id ON public.connector_connections US
 --
 
 CREATE INDEX idx_connector_connections_org_service ON public.connector_connections USING btree (org_id, service_id);
+
+
+--
+-- Name: idx_connector_sync_runs_org_user; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_connector_sync_runs_org_user ON public.connector_sync_runs USING btree (org_id, user_id);
+
+
+--
+-- Name: idx_connector_sync_runs_watch_time; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_connector_sync_runs_watch_time ON public.connector_sync_runs USING btree (watch_id, started_at DESC);
 
 
 --
@@ -4273,6 +4362,13 @@ CREATE TRIGGER connector_connections_set_updated_at BEFORE UPDATE ON public.conn
 
 
 --
+-- Name: connector_sync_runs connector_sync_runs_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER connector_sync_runs_autofill_org_id BEFORE INSERT ON public.connector_sync_runs FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
 -- Name: connector_watch_items connector_watch_items_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -4756,6 +4852,30 @@ ALTER TABLE ONLY public.connector_connections
 
 ALTER TABLE ONLY public.connector_connections
     ADD CONSTRAINT connector_connections_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: connector_sync_runs connector_sync_runs_org_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.connector_sync_runs
+    ADD CONSTRAINT connector_sync_runs_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: connector_sync_runs connector_sync_runs_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.connector_sync_runs
+    ADD CONSTRAINT connector_sync_runs_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: connector_sync_runs connector_sync_runs_watch_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.connector_sync_runs
+    ADD CONSTRAINT connector_sync_runs_watch_id_fkey FOREIGN KEY (watch_id) REFERENCES public.connector_watches(id) ON DELETE CASCADE;
 
 
 --
@@ -6182,6 +6302,40 @@ CREATE POLICY connector_connections_select ON public.connector_connections FOR S
 --
 
 CREATE POLICY connector_connections_update ON public.connector_connections FOR UPDATE TO authenticated USING (public.current_user_has_permission(org_id, 'org:manage'::text)) WITH CHECK ((public.current_user_has_permission(org_id, 'org:manage'::text) AND (org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids))));
+
+
+--
+-- Name: connector_sync_runs; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.connector_sync_runs ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: connector_sync_runs connector_sync_runs_delete; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY connector_sync_runs_delete ON public.connector_sync_runs FOR DELETE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
+
+
+--
+-- Name: connector_sync_runs connector_sync_runs_insert; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY connector_sync_runs_insert ON public.connector_sync_runs FOR INSERT TO authenticated WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
+
+
+--
+-- Name: connector_sync_runs connector_sync_runs_select; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY connector_sync_runs_select ON public.connector_sync_runs FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
+
+
+--
+-- Name: connector_sync_runs connector_sync_runs_update; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY connector_sync_runs_update ON public.connector_sync_runs FOR UPDATE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id))) WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
