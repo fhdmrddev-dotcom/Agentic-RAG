@@ -7715,6 +7715,47 @@ but **the response describes the request, not the outcome**, and it says exactly
 **That reply is what hid the blocking finding at 234's G-4 for a day.** Fix by refusing when the
 loop is off and by reading back `last_run_at`/`last_status` — ⛔ never by syncing inline.
 
+### ⚠ Re-derived 2026-09-06 (Phase 235 plan 14, gap-closure round 1) — **5 / 1 / 677**
+
+The header triple (`2 / 0 / 356`) is **kept, not overwritten**. G-5 does not fire (1 phase).
+
+⭐ **GAP G2 CLOSED, AND THE DEFECT WAS SILENCE — NOT A LIE.** `235-VERIFICATION.md` explicitly
+REFUTED the suspected overclaim: `WatchedFoldersSection.tsx` renders `COPY.neverRead` only when
+`provenNeverRead` is true, i.e. only after the UNBOUNDED run list has been fetched and holds no
+success, and `SourcesAttentionSection.tsx` renders nothing on a null. So a long-dead source was
+never libelled as *"never read"* — **that gating is untouched by this plan and must stay**. What
+was wrong is that `last_good_at` came back `None` from the five-row window, both surfaces render
+nothing on a null, and SC#2's sentence is *"says when it last succeeded"*.
+
+⚠ **THE FIX IS SERVER-SIDE BECAUSE D-235-05 SAYS SO, not for convenience.** Both surfaces read
+this one endpoint; filling the instant here fixes both at once with **no client derivation and no
+second verdict**. A card that re-derived the instant from a run list would be a second verdict
+that can disagree with the first, and the person who finds the disagreement is a user. The
+frontend is **byte-unchanged by this plan** — it already renders whenever the field is non-null.
+
+⚠ **`_HEALTH_RUN_WINDOW` IS BYTE-IDENTICAL, AND THAT IS PINNED BY A TEST**
+(`test_the_polled_window_is_unchanged_by_the_gap_fix`). Widening it was the alternative fix and
+was rejected on measured cost: this endpoint is polled from every page by every signed-in user, so
+`per_watch` multiplies rows read on **every** poll for **every healthy** source — to answer a
+question only stopped sources ask. And a wider window is still a window: it moves the edge, it
+does not remove it. Without that pin, a later *"just make it bigger"* would satisfy every other
+case in the section.
+
+⛔ **The enrichment is guarded on `s.last_good_at is None`, so three properties hold at once:**
+zero stopped sources ⇒ the lookup is never awaited (a healthy instance pays nothing); a success
+INSIDE the window still wins and is not re-asked (one fact, one source, so the two can never be
+seen to disagree); and a genuinely-never-succeeded source keeps `None`, because the DAL omits it
+from the mapping rather than returning a `None` value. All three are asserted with a spy.
+
+⚠ **It is wrapped exactly like the connection-name query beside it (T-235c-06).** A failed lookup
+costs the sentence a date; it must never cost the endpoint the whole app shell polls. Asserted by
+raising from the lookup and checking the route still answers 200 with cause and connection name.
+
+⭐ **The shipped caveat paragraph was REWRITTEN, not left standing.** It documented this exact gap
+(*"a source that has failed more times than the window is deep reports `None`"*) and would have
+become a false statement about live behaviour the moment the fix landed — the next reader believes
+a docblock over the code. A test greps the live module source to keep it gone.
+
 ---
 
 ## frontend/src/components/sources/WatchedFoldersSection.tsx

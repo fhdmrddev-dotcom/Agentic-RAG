@@ -318,12 +318,29 @@ def _pool_with_connection_names(names: dict[str, str] | None = None):
     return pool
 
 
-def _wire_health(monkeypatch, *, watches: list[dict], runs: dict, pool) -> None:
+def _wire_health(
+    monkeypatch,
+    *,
+    watches: list[dict],
+    runs: dict,
+    pool,
+    last_success: dict | None = None,
+) -> AsyncMock:
+    """Wire the route's three data reads, and hand back the last-success SPY.
+
+    ⚠ The unbounded lookup MUST be patched here even when a case does not care about it —
+    without it a stopped row would reach a real pool through the AsyncMock and the case would
+    be measuring the double, not the route. Returning the mock is what lets a case assert it
+    was NOT called.
+    """
     monkeypatch.setattr("app.api.sources.list_watches", AsyncMock(return_value=watches))
     monkeypatch.setattr(
         "app.api.sources.recent_runs_by_watch", AsyncMock(return_value=runs)
     )
+    last_good_spy = AsyncMock(return_value=last_success or {})
+    monkeypatch.setattr("app.api.sources.last_success_by_watch", last_good_spy)
     real_app.dependency_overrides[deps.get_pg_pool] = lambda: pool
+    return last_good_spy
 
 
 # ── V-19 / D-235-21 — the reader probe is the LIVE process, not the flag ──────
@@ -510,3 +527,173 @@ def test_runs_route_returns_404_for_another_tenants_watch(monkeypatch, client):
     res = client.get(f"/sources/watches/{uuid4()}/runs", headers=_headers())
     assert res.status_code == 404
     listed.assert_not_awaited()
+
+
+# ══ Phase 235 plan 14 (gap G2) — a long-dead source SAYS when it last read ═════
+#
+# ⭐ THE DEFECT WAS SILENCE, NOT A LIE. `235-VERIFICATION.md` measured the overclaim risk
+# REFUTED: the card gates its "It has not read successfully yet" sentence on `provenNeverRead`,
+# which is only true once the UNBOUNDED run list has been fetched and holds no success — so a
+# long-dead source was never libelled. But `last_good_at` came back `None` from the five-row
+# window, and BOTH surfaces render nothing on a null, while SC#2's sentence is "says WHEN it
+# last succeeded". The answer was one click away (History) instead of on the screen.
+#
+# ⚠ THE FIX IS ON THE SERVER, and that is D-235-05, not convenience: one verdict, decided once,
+# rendered by every surface. A client that re-derived the instant from a run list would be a
+# second verdict that can disagree with the first, and the person who finds the disagreement is
+# a user.
+
+
+def _three_soft_failures() -> list[dict]:
+    """A stopped source whose window holds NO success — the G2 shape exactly."""
+    return [
+        _run("failed", minutes_ago=1, cause="unreachable"),
+        _run("failed", minutes_ago=2, cause="unreachable"),
+        _run("failed", minutes_ago=3, cause="unreachable"),
+    ]
+
+
+def test_the_polled_window_is_unchanged_by_the_gap_fix():
+    """⛔ WIDENING THE WINDOW WAS THE ALTERNATIVE FIX, AND IT WAS DELIBERATELY NOT TAKEN.
+
+    `/sources/health` is polled from every page by every signed-in user. Widening
+    `_HEALTH_RUN_WINDOW` multiplies rows read on EVERY poll for EVERY healthy source, to answer
+    a question only STOPPED sources ask. This pins that the cheap path stayed cheap — without
+    it, a later "just make the window bigger" would satisfy every other case in this section.
+    """
+    assert sources._HEALTH_RUN_WINDOW == max(5, SOFT_FAILURE_THRESHOLD + 1)
+    assert sources._HEALTH_RUN_WINDOW == 5
+
+
+def test_the_window_caveat_no_longer_claims_a_long_dead_source_is_unanswerable():
+    """The shipped docblock documented this very gap. Code that no longer has it must not
+    keep the paragraph that says it does — a stale caveat is a false statement about live
+    behaviour, and the next reader believes it over the code."""
+    import inspect
+
+    src = inspect.getsource(sources)
+    assert "reports `None`" not in src
+
+
+def test_the_unbounded_lookup_has_exactly_one_call_site():
+    """⛔ ONE fact, ONE place it is asked for. A second call site is a second policy about when
+    the window is allowed to be overridden, and the two would drift undetectably because both
+    would render. The grep-shaped acceptance criterion, as a test."""
+    import inspect
+
+    src = inspect.getsource(sources)
+    assert src.count("last_success_by_watch") == 2  # the import, and one call
+
+
+def test_health_says_when_a_source_last_read_even_from_outside_the_window(
+    monkeypatch, client
+):
+    """⭐ THE G2 CASE. Three failures fill the window, so the verdict has no success to report;
+    the unbounded lookup supplies the instant, and the row SAYS it."""
+    long_ago = BASE - timedelta(days=40)
+    _wire_health(
+        monkeypatch,
+        watches=[_watch_row()],
+        runs={WATCH_ID: _three_soft_failures()},
+        pool=_pool_with_connection_names({CONN_ID: "Team Drive"}),
+        last_success={WATCH_ID: long_ago},
+    )
+
+    res = client.get("/sources/health", headers=_headers())
+    assert res.status_code == 200, res.text
+    row = res.json()["stopped"][0]
+    assert row["watch_id"] == WATCH_ID
+    assert row["last_good_at"] is not None
+    assert row["last_good_at"].startswith(long_ago.isoformat()[:19])
+
+
+def test_health_asks_the_unbounded_lookup_only_about_the_stopped_watch(monkeypatch, client):
+    """T-235c-05 — the extra query is scoped to the rows that need it, never to the roster."""
+    other = str(uuid4())
+    spy = _wire_health(
+        monkeypatch,
+        watches=[_watch_row(), _watch_row(other, name="Legal")],
+        runs={
+            WATCH_ID: _three_soft_failures(),
+            other: [_run("success", minutes_ago=1)],
+        },
+        pool=_pool_with_connection_names({CONN_ID: "Team Drive"}),
+        last_success={WATCH_ID: BASE - timedelta(days=40)},
+    )
+
+    assert client.get("/sources/health", headers=_headers()).status_code == 200
+    spy.assert_awaited_once()
+    asked = spy.await_args[0][1]
+    assert [str(w) for w in asked] == [WATCH_ID]
+
+
+def test_health_keeps_the_windows_last_good_at_when_the_window_had_one(monkeypatch, client):
+    """⛔ NO SECOND SOURCE OF TRUTH FOR ONE FACT. A success INSIDE the window still wins, and
+    the unbounded lookup is not even asked — so the two can never be seen to disagree."""
+    inside = BASE - timedelta(minutes=4)
+    runs = _three_soft_failures() + [_run("success", minutes_ago=4)]
+    spy = _wire_health(
+        monkeypatch,
+        watches=[_watch_row()],
+        runs={WATCH_ID: runs},
+        pool=_pool_with_connection_names({CONN_ID: "Team Drive"}),
+        last_success={WATCH_ID: BASE - timedelta(days=40)},
+    )
+
+    res = client.get("/sources/health", headers=_headers())
+    row = res.json()["stopped"][0]
+    assert row["last_good_at"].startswith(inside.isoformat()[:19])
+    spy.assert_not_awaited()
+
+
+def test_health_still_reports_no_last_good_at_when_it_has_genuinely_never_succeeded(
+    monkeypatch, client
+):
+    """⛔ A `null` must keep meaning "we have no successful tick on record", so the client's
+    `provenNeverRead` arm keeps its meaning. An absent key is NOT filled with a guess."""
+    _wire_health(
+        monkeypatch,
+        watches=[_watch_row()],
+        runs={WATCH_ID: _three_soft_failures()},
+        pool=_pool_with_connection_names({CONN_ID: "Team Drive"}),
+        last_success={},
+    )
+
+    res = client.get("/sources/health", headers=_headers())
+    assert res.json()["stopped"][0]["last_good_at"] is None
+
+
+def test_health_does_not_ask_the_unbounded_lookup_when_nothing_is_stopped(monkeypatch, client):
+    """T-235c-05 — zero stopped sources is zero extra rows. A healthy instance pays nothing."""
+    spy = _wire_health(
+        monkeypatch,
+        watches=[_watch_row()],
+        runs={WATCH_ID: [_run("success", minutes_ago=1)]},
+        pool=_pool_with_connection_names(),
+    )
+
+    res = client.get("/sources/health", headers=_headers())
+    assert res.json()["stopped"] == []
+    spy.assert_not_awaited()
+
+
+def test_health_survives_a_failed_last_good_lookup(monkeypatch, client):
+    """T-235c-06 — the same fail-soft posture the connection-name query already has. A failed
+    enrichment costs a sentence a date; it must never cost the endpoint the whole shell polls."""
+    _wire_health(
+        monkeypatch,
+        watches=[_watch_row()],
+        runs={WATCH_ID: _three_soft_failures()},
+        pool=_pool_with_connection_names({CONN_ID: "Team Drive"}),
+    )
+    monkeypatch.setattr(
+        "app.api.sources.last_success_by_watch",
+        AsyncMock(side_effect=RuntimeError("pool exploded")),
+    )
+
+    res = client.get("/sources/health", headers=_headers())
+    assert res.status_code == 200, res.text
+    row = res.json()["stopped"][0]
+    assert row["cause"] == "unreachable"
+    assert row["connection_name"] == "Team Drive"
+    assert row["last_good_at"] is None
