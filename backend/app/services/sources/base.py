@@ -39,6 +39,7 @@ class SourceFile:
     drive_id: str | None = None
     icon_url: str | None = None
     web_view_url: str | None = None
+    path: str | None = None
 
 
 @dataclass

@@ -354,13 +354,14 @@ def enrich_for_ingest(
     # sync .execute() — already inside the BackgroundTask thread (this function is a
     # sync def), so D-v2.5-01 (no blocking I/O in async handlers) does NOT fire here.
     prior = (
-        supabase.table("documents").select("metadata")
+        supabase.table("documents").select("metadata, file_size, source_connection_id, created_at")
         .eq("id", document_id).maybe_single().execute()
     )
     # WR-02: defensive-copy the fetched prior blob (+ the nested _source dict we
     # read) so the SELECT result stays pristine and restored values don't share a
     # mutable reference with the prior object. Behavior unchanged; purely defensive.
-    prior_meta = dict((getattr(prior, "data", None) or {}).get("metadata") or {})
+    prior_row = getattr(prior, "data", None) or {}
+    prior_meta = dict(prior_row.get("metadata") or {})
     # ── BUG-260905-12 — A DEGRADE RESTORES WHAT WAS THERE, NOT JUST WHAT A HUMAN TYPED ────
     #
     # The `_source='user'` loop below preserves HUMAN edits across a re-extract. That was
@@ -505,7 +506,42 @@ def enrich_for_ingest(
     # `.or_(user_id.eq.{uploader},is_system_global.eq.true)` predicate (Pitfall 3, D-118-8): an
     # unscoped select would return ALL users' rules. A global rule is evaluated against
     # the uploader's OWN metadata_dict only. sync .execute() — D-v2.5-01 does NOT fire.
-    if metadata_dict:  # no metadata → nothing to match (never blocks ingest)
+    # ── Phase 237 (RULES-01 / SC#1 / Operator Ruling 3) ───────────────────────
+    # A watch rule must affect real documents at ingestion by setting the same _classification
+    # suggestion on the real document (so the user can accept it via the VIS-06 fence), rather
+    # than only tinting the preview column.
+    # We assemble an evaluation facts dict combining arrival properties (name, path, mime/type,
+    # size, source facts, date) and extracted metadata.
+    eval_facts: dict = dict(metadata_dict or {})
+    if filename:
+        eval_facts.setdefault("name", filename)
+        eval_facts.setdefault("filename", filename)
+        if "title" not in eval_facts:
+            eval_facts["title"] = filename
+    if mime_type:
+        eval_facts.setdefault("mime", mime_type)
+        eval_facts.setdefault("type", mime_type)
+        eval_facts.setdefault("mime_type", mime_type)
+    file_size = len(raw) if raw else (prior_row.get("file_size") if prior_row else None)
+    if file_size is not None:
+        eval_facts.setdefault("size", file_size)
+        eval_facts.setdefault("file_size", file_size)
+
+    source_info = (prior_meta.get("source") or {}) if isinstance(prior_meta, dict) else {}
+    src_sys = source_info.get("system") or (prior_row.get("source_system") if prior_row else None)
+    if src_sys:
+        eval_facts.setdefault("source_system", str(src_sys).lower())
+    src_conn = source_info.get("connection_id") or (prior_row.get("source_connection_id") if prior_row else None)
+    if src_conn:
+        eval_facts.setdefault("source_connection_id", str(src_conn))
+    src_path = source_info.get("path") or (f"/{filename}" if filename else None)
+    if src_path:
+        eval_facts.setdefault("path", src_path)
+        eval_facts.setdefault("source_path", src_path)
+    if "date" not in eval_facts and prior_row and prior_row.get("created_at"):
+        eval_facts["date"] = str(prior_row["created_at"])[:10]
+
+    if eval_facts:  # arrival or extracted facts present
         try:
             from app.services import classification_matcher  # noqa: PLC0415
             from app.utils.db import coerce_uid  # noqa: PLC0415
@@ -524,11 +560,13 @@ def enrich_for_ingest(
             # a malformed/over-broad result can NEVER evaluate another user's rule
             # against this uploader's metadata (the phase's highest-stakes leak site).
             rules = [r for r in rules if r.get("is_system_global") or str(r.get("user_id")) == str(user_id)]
-            whitelist = _METADATA_BUILTINS | {
+            from app.api.classification_rules import WATCH_ALLOWED_FIELDS  # noqa: PLC0415
+            whitelist = _METADATA_BUILTINS | WATCH_ALLOWED_FIELDS | {
                 d["field_key"] for d in read_enabled_field_defs(supabase, user_id)  # SYNC reader
             }
             for rule in rules:  # first-match-wins (D-118-3): ONE object, never an array
-                if classification_matcher.match_metadata(rule["match_expr"], metadata_dict, whitelist):
+                if classification_matcher.match_metadata(rule["match_expr"], eval_facts, whitelist):
+                    metadata_dict = metadata_dict or {}
                     metadata_dict["_classification"] = classification_matcher.build_suggestion(
                         rule, supabase, user_id,
                     )

@@ -840,7 +840,9 @@ CREATE TABLE public.classification_rules (
     suggest_folder_id uuid,
     is_system_global boolean DEFAULT false NOT NULL,
     enabled boolean DEFAULT true NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    rule_scope text DEFAULT 'classification'::text NOT NULL,
+    CONSTRAINT classification_rules_scope_check CHECK ((rule_scope = ANY (ARRAY['watch'::text, 'classification'::text])))
 );
 
 
@@ -849,6 +851,13 @@ CREATE TABLE public.classification_rules (
 --
 
 COMMENT ON COLUMN public.classification_rules.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v2.8; no FK until org schema exists; RLS stays user-scoped.';
+
+
+--
+-- Name: COLUMN classification_rules.rule_scope; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.classification_rules.rule_scope IS 'Evaluation scope discriminator: "watch" (evaluated on file arrival / preview) or "classification" (evaluated post-extraction).';
 
 
 --
@@ -3379,6 +3388,13 @@ ALTER TABLE ONLY public.workspace_file_versions
 --
 
 CREATE INDEX audit_log_user_created_idx ON public.audit_log USING btree (user_id, created_at DESC);
+
+
+--
+-- Name: classification_rules_scope_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX classification_rules_scope_idx ON public.classification_rules USING btree (rule_scope, enabled);
 
 
 --

@@ -36,19 +36,19 @@ can be taught new behaviors (skills) that persist and can be shared.
 **Current focus:** **Milestone v4.0 Connected Knowledge — STARTED 2026-09-04.** Phase numbering
 continues at **228**.
 
-## Current Position
-
-Phase: 236 — The Corpus Under Attack (✅ **FULLY CLOSED — GA GATE MET 2026-09-06.** SC#1 driven LIVE on all 8 providers with a really-synced payload; zero write-tool calls. Was briefly closed-on-a-decision; the decision was DISCHARGED the same day. History below.) (⚠ superseded: **CLOSED ON A DECISION, NOT ON SC#1 — 2026-09-06.** Gemini built, Claude verified by DRIVING on BUS-168. **Met:** SC#2 (8/8 mutations caught at the point of USE) and SC#3 (legible attack report). **⛔ OWED:** SC#1 and the Live UAT — and SC#1 is this phase's GA-GATE criterion, so the phase is closed by an operator decision to proceed with the live drive scheduled, NEVER by a claim that SC#1 ran. See ## ⚖ below.)
-Prior: 235 — The Source Says What It Did (✅ **CLOSED 2026-09-06** — 17 plans + 1 quick fix + 1 health quick task)
-Prior: 234 — The Watch Loop (✅ CLOSED — verified by DRIVING)
-Plan: 236-01, 236-02, 236-03 complete (100%)
-Status: complete — SC#1 and SC#10 driven live 2026-09-06; nothing owed
-
+Phase: 237 — One Rule Engine, Not Two (planning complete; awaiting approval to execute)
+Prior: 236 — The Corpus Under Attack (✅ FULLY CLOSED — GA GATE MET 2026-09-06)
+Prior: 235 — The Source Says What It Did (✅ CLOSED 2026-09-06)
+Prior: 234 — The Watch Loop (✅ CLOSED)
+Plan: 237-01, 237-02, 237-03, 237-04 planned (4 plans across 4 waves)
+Status: ready to execute — awaiting user approval and vitest count gate completion
 
 ## ▶ NEXT SESSION — start here
 
-**Phase 236 Operator Live Drive (SC#1 & Live UAT)**: Drive Google Drive (`google__send_email`) first with active Google Drive connection and live model credentials in Chat UI.
-Then **`/gsd:discuss-phase 237`** — *One Rule Engine, Not Two* (RULES-01, RULES-02, mig 173).
+**Phase 237: One Rule Engine, Not Two**:
+1. Verify operator ruling on BUS-177 (migration 173 + suggestion-only posture).
+2. Confirm reviewer vitest count gate baseline is posted.
+3. Execute Wave 1 (Plan 237-01: Schema & Scope Discriminator with Build-Time Refusal).
 
 ⚠ **APPLY G-8 FROM THE START.** Phase 235 ran **17 plans for 4-6 plans of substance** and the
 operator stopped it. `.planning/config.json` now enforces the trimmed flow and CLAUDE.md carries

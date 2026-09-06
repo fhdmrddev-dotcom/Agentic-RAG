@@ -542,7 +542,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 
 ⚠ **THE TABLE MOVED BECAUSE THE OLD MECHANISM WAS MEASURED TO FAIL.** It sat in this file, complete, for every agent to read — and `App.tsx` still had **no row for 23 phases**, `NavPanel.tsx` for 11, `config.py` for the project's entire life. **A 214-row table nobody reads end-to-end is not a scan list; it is a hope.** The gate above cannot not-notice: it fails when a phase's `files_modified` names a non-test source file with no ledger row. That is strictly stronger than the completeness rule it replaces, and it is why moving the table does not weaken G-5.
 
-**G-5-FIRING files (111 of 216) — the rows a phase is most likely to collide with.** Verdicts abbreviated; the full cell, the narrative, the named seam and the binding invariants are in the detail file, which is where a phase must read before planning.
+**G-5-FIRING files (113 of 224) — the rows a phase is most likely to collide with.** Verdicts abbreviated; the full cell, the narrative, the named seam and the binding invariants are in the detail file, which is where a phase must read before planning.
 
 | Hot file (FIRING) | commits / phases / lines | Verdict (abridged) |
 |---|---|---|
@@ -657,6 +657,8 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/layout/NavPanel.tsx` | 20 / 11 / 329 | ⚠ absent from BOTH for its ENTIRE LIFE at **11 phases** |
 | `frontend/src/App.tsx` | 31 / 23 / 351 | ⚠ absent from BOTH for its ENTIRE LIFE at **23 phases** |
 | `frontend/src/lib/nav-items.ts` | 8 / 6 / 95 | ⚠ absent at 6 phases |
+| `backend/app/api/classification_rules.py` | 3 / 3 / 226 | row added 237 at threshold. Validates rule_scope and enforces WATCH_ALLOWED_FIELDS refusal (422) for arrival watch rules. |
+| `frontend/src/components/classification/RuleBuilderPanel.tsx` | 4 / 3 / 502 | row added 237 at threshold. Adds scope selector segmented control; filters out-of-scope conditions on scope switch. |
 
 When a new phase enters discuss-phase, the orchestrator must scan PLAN.md `files_modified` against this ledger. Any match against a G-5-firing row means the discuss-phase produces a refactor recommendation as the first option, not the planned feature — and the phase reads that file's section in `docs/HOT-FILE-LEDGER.md` before planning, because that is where the named seam and the binding invariants live.
 

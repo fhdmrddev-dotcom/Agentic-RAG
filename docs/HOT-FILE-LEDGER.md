@@ -8310,6 +8310,86 @@ the GA Gate mutation drive (SC#2 / D-236-02) to verify that unisolated evaluatio
 
 ---
 
+## backend/app/api/classification_rules.py
+
+**3 / 3 / 226** · ⚠ **FIRES — EXACTLY AT THRESHOLD** (3 phases: 118, 163, 165) · classification rule CRUD & validation.
+
+Row added 237 at threshold.
+Phase 237 introduced `rule_scope` ("watch" | "classification") and validation rejecting un-extracted metadata in arrival watch rules with HTTP 422 (RULES-01 / SC#3).
+**Invariants:** Arrival watch rules (`rule_scope="watch"`) can ONLY reference `WATCH_ALLOWED_FIELDS` (`name`, `path`, `mime`, `size`, `source_system`, `source_connection_id`); any other field raises 422.
+
+---
+
+## backend/app/models/classification_rule.py
+
+**2 / 2 / 56** · no (2 phases: 118, 165) · Pydantic models for classification rules.
+
+Row added 237 below threshold.
+Phase 237 added `rule_scope: Literal["watch", "classification"] = "classification"` to `RuleCreate`, `RuleUpdate`, and `RuleResponse`.
+**Invariants:** Default scope remains `"classification"` for backwards compatibility with existing Phase 118 rules.
+
+---
+
+## backend/app/services/classification_rule_service.py
+
+**3 / 2 / 166** · no (2 phases: 118, 165) · rule persistence and evaluation service.
+
+Row added 237 below threshold.
+Phase 237 updated rule persistence to write and return `rule_scope` and respect scope filtering during evaluation.
+**Invariants:** All uploader reads remain scoped by `coerce_uid(user_id)` or `is_system_global=true`.
+
+---
+
+## backend/app/services/document_view_resolver.py
+
+**1 / 1 / 373** · no (1 phase: 115) · document view filter resolution against PostgREST.
+
+Row added 237 below threshold.
+Phase 237 closed the SC#2 whitelist bypass seam (ROADMAP named failure mode) by validating typed legs against `PROMOTED_TYPED_COLUMNS.values()`, added `_SOURCE_FACT_FIELDS` to field metadata, and resolved `source_system` nested JSON path and `path`/`file_path` column expressions.
+**Invariants:** Every filter fragment must pass field-metadata whitelist validation; no typed column escapes the whitelist.
+
+---
+
+## backend/app/services/view_filter_compiler.py
+
+**3 / 2 / 283** · no (2 phases: 113, 114) · AST compiler for saved document view filters.
+
+Row added 237 below threshold.
+Phase 237 promoted `source_connection_id`, `path`, `file_path`, `ingest_visibility`, and `source_state` into `PROMOTED_TYPED_COLUMNS`, and added case normalization for enum source fields.
+**Invariants:** Empty-check operations dispatch to `is.null` on typed columns rather than containment queries.
+
+---
+
+## frontend/src/components/classification/ClassificationRulesPage.tsx
+
+**1 / 1 / 250** · no (1 phase: 118) · classification rules management page.
+
+Row added 237 below threshold.
+Phase 237 added filter chips ("All", "When files arrive", "After extraction") and surfaced rule scope badges in the list view.
+**Invariants:** Scope filter preserves existing active filter semantics and defaults to showing all rules.
+
+---
+
+## frontend/src/components/classification/RuleBuilderPanel.tsx
+
+**4 / 3 / 502** · ⚠ **FIRES — EXACTLY AT THRESHOLD** (3 phases: 118, 155, 165) · condition builder slide-over panel.
+
+Row added 237 at threshold.
+Phase 237 unified the rule builder for arrival watch and post-extraction classification rules (RULES-01 / SC#1), adding a scope selector segmented control and pruning un-extracted conditions when switching to watch scope.
+**Invariants:** Switching scope to "watch" warns and strips invalid metadata conditions to prevent SC#3 refusal errors.
+
+---
+
+## frontend/src/components/ingestion/ConditionPopover.tsx
+
+**3 / 2 / 404** · no (2 phases: 114, 155) · filter condition field/operator selector popover.
+
+Row added 237 below threshold.
+Phase 237 added `ruleScope` support, restricting available field choices to arrival facts (`name`, `path`, `mime`, `size`, `source_system`, `source_connection_id`) when `ruleScope === "watch"`.
+**Invariants:** Non-arrival fields are completely excluded from the field selector when building arrival watch rules.
+
+---
+
 ## Rows corrected at Phase 235 — every one was STALE, and three of them by whole phases
 
 ⚠ **These rows already existed and every one of them disagreed with git.** A row that is present and
@@ -8572,3 +8652,11 @@ cells rot within days.
 | [`frontend/src/lib/libraryTabHandoff.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcliblibrarytabhandoffts) | 1 / 1 / 59 | no (1 phase) | young (235-15) — the hand-off LIFETIME rule. ⛔ An intent consumed once, never a mode; a strict leaf with zero runtime imports, so it is tested without mounting anything |
 | [`backend/app/services/embedding_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesembedding_servicepy) | 9 / 5 / 354 | ⚠ **FIRES** | ⚠ absent for entire life at 5 phases — row added 236. Hoisted METADATA_EXTRACTION_ANTI_INJECTION for monkeypatchable defense testing. |
 | [`backend/app/services/skill_proposer_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesskill_proposer_servicepy) | 2 / 2 / 407 | no (2 phases) | row added 236 below threshold on purpose. Hoisted SKILL_PROPOSER_EVIDENCE_DELIMITER for monkeypatchable defense testing. |
+| [`backend/app/api/classification_rules.py`](docs/HOT-FILE-LEDGER.md#backendappapiclassification_rulespy) | 3 / 3 / 226 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | row added 237 at threshold. Validates rule_scope and enforces WATCH_ALLOWED_FIELDS refusal (422) for arrival watch rules. |
+| [`backend/app/models/classification_rule.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsclassification_rulepy) | 2 / 2 / 56 | no (2 phases) | row added 237 below threshold. Adds rule_scope ('watch' or 'classification') to RuleCreate, RuleUpdate, RuleResponse. |
+| [`backend/app/services/classification_rule_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesclassification_rule_servicepy) | 3 / 2 / 166 | no (2 phases) | row added 237 below threshold. Persists and queries rule_scope across rule CRUD and uploader rule evaluation. |
+| [`backend/app/services/document_view_resolver.py`](docs/HOT-FILE-LEDGER.md#backendappservicesdocument_view_resolverpy) | 1 / 1 / 373 | no (1 phase) | row added 237 below threshold. Closes SC#2 bypass seam; whitelists source facts (source_system, path, etc.) for views. |
+| [`backend/app/services/view_filter_compiler.py`](docs/HOT-FILE-LEDGER.md#backendappservicesview_filter_compilerpy) | 3 / 2 / 283 | no (2 phases) | row added 237 below threshold. Adds source_connection_id, path, ingest_visibility, source_state to PROMOTED_TYPED_COLUMNS. |
+| [`frontend/src/components/classification/ClassificationRulesPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsclassificationclassificationrulespagetsx) | 1 / 1 / 250 | no (1 phase) | row added 237 below threshold. Adds scope filter chips (All, Arrival, Extracted) and displays Arrival/Extracted badges. |
+| [`frontend/src/components/classification/RuleBuilderPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsclassificationrulebuilderpaneltsx) | 4 / 3 / 502 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | row added 237 at threshold. Adds scope selector segmented control; filters out-of-scope conditions on scope switch. |
+| [`frontend/src/components/ingestion/ConditionPopover.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestionconditionpopovertsx) | 3 / 2 / 404 | no (2 phases) | row added 237 below threshold. Restricts condition field choices to WATCH_FIELDS when ruleScope === 'watch'. |

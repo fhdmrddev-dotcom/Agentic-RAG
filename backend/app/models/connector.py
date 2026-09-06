@@ -590,6 +590,7 @@ class SourcePreviewItem(_StrictBase):
     destination: str | None = None
     rule_suggested: bool = False
     web_view_url: str | None = None
+    path: str | None = None
 
 
 class SourcePreviewResponse(_StrictBase):

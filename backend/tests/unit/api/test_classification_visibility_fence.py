@@ -251,3 +251,89 @@ async def test_accept_classification_allows_move_for_manual_upload(mock_user, mo
     with patch("app.api.documents.write_audit_entry", new=AsyncMock()):
         res = await accept_classification(doc_id, force=False, current_user=mock_user, supabase=mock_supabase)
         assert res["folder_id"] == target_folder_id
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("rule_scope", ["watch", "classification"])
+async def test_widened_rule_engine_retains_vis06_classification_refusal(mock_user, mock_supabase, rule_scope):
+    """RULES-01 / VIS-06: Whether suggested by a watch rule (arrival) or classification rule (extracted),
+
+    moving a private connected document to an org-shared folder without force=True raises 403
+    classification_refusal, and only moves when force=True.
+    """
+    doc_id = str(uuid4())
+    target_folder_id = str(uuid4())
+    rule_id = str(uuid4())
+
+    doc_data = {
+        "id": doc_id,
+        "folder_id": None,
+        "source_connection_id": str(uuid4()),
+        "ingest_visibility": "private",
+        "metadata": {
+            "source": {
+                "system": "google_drive",
+                "connection_id": str(uuid4()),
+            },
+            "_classification": {
+                "status": "suggested",
+                "suggested_folder_id": target_folder_id,
+                "rule_id": rule_id,
+                "rule_scope": rule_scope,
+            }
+        },
+    }
+    folder_data = {
+        "id": target_folder_id,
+        "is_org_shared": True,
+    }
+
+    doc_query = MagicMock()
+    doc_query.select.return_value = doc_query
+    doc_query.eq.return_value = doc_query
+    doc_query.maybe_single.return_value = doc_query
+    doc_query.execute.return_value = MagicMock(data=doc_data)
+
+    folder_query = MagicMock()
+    folder_query.select.return_value = folder_query
+    folder_query.eq.return_value = folder_query
+    folder_query.or_.return_value = folder_query
+    folder_query.maybe_single.return_value = folder_query
+    folder_query.execute.return_value = MagicMock(data=folder_data)
+
+    update_query = MagicMock()
+    update_query.update.return_value = update_query
+    update_query.eq.return_value = update_query
+    updated_doc = {**doc_data, "folder_id": target_folder_id}
+    update_query.execute.return_value = MagicMock(data=[updated_doc])
+
+    def table_mock(name):
+        if name == "documents":
+            doc_q = MagicMock()
+            doc_q.select.return_value = doc_query
+            doc_q.update.return_value = update_query
+            return doc_q
+        elif name == "folders":
+            return folder_query
+        return MagicMock()
+
+    mock_supabase.table.side_effect = table_mock
+
+    # 1. Without force=True -> 403 refusal
+    with pytest.raises(HTTPException) as exc_info:
+        await accept_classification(doc_id, force=False, current_user=mock_user, supabase=mock_supabase)
+
+    assert exc_info.value.status_code == 403
+    detail = exc_info.value.detail
+    assert detail["error"] == "classification_refusal"
+    assert detail["requires_confirmation"] is True
+    assert "widens visibility" in detail["reason"]
+
+    # 2. With force=True -> success & audit log
+    with patch("app.api.documents.write_audit_entry", new=AsyncMock()) as mock_audit:
+        res = await accept_classification(doc_id, force=True, current_user=mock_user, supabase=mock_supabase)
+        assert res["folder_id"] == target_folder_id
+        mock_audit.assert_awaited_once()
+        audit_kwargs = mock_audit.call_args[1]
+        assert audit_kwargs["metadata"].get("force") is True
+

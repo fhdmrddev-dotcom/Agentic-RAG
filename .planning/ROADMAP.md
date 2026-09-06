@@ -586,7 +586,7 @@ Plans:
 **Plans**: TBD
 
 **UI hint**: yes
-**Migrations**: **162** — `162_classification_rules_scope.sql` (`rule_scope` discriminator + the `SOURCE_FIELDS` whitelist). ⚠ Shifted +2 at 231's close.
+**Migrations**: **173** — `173_classification_rules_scope.sql` (`rule_scope` discriminator + the `SOURCE_FIELDS` whitelist).
 **Flags**: Folds **`SEED-243`** and **`SEED-209`** — the deferred phase text says the folder-watch rules and the classification surface *"should be designed together rather than growing two rule engines."* ⛔ **A second AST is the anti-pattern this phase exists to prevent**: it is a **scope discriminator on the existing, well-understood `classification_matcher`**, not a new engine. ⚠ **The scope split is real and load-bearing** — a watch rule at preview time has only `name` / `mime` / `path` / `size`, while a classification rule matches extracted metadata that exists only **after** extraction; a per-scope field whitelist is what makes SC#3 possible at build time rather than at never-matches time. ⚠ **`VIS-06`'s fence must be RE-PROVEN under the widened engine** — widening the matcher is exactly the change that could quietly re-open H-4. ⚠ The shipped rule read is a **service-role** read whose sole owner gate is an in-app `.or_(user_id.eq.…,is_system_global.eq.true)` predicate with a fail-closed Python re-filter (`documents.py:2487-2501`) — widening the engine must not weaken that, and the re-filter is defence in depth, not redundancy. **G-5**: `classification_matcher.py` and `classification_rule_service.py` are young and have **no ledger rows** — add rows if either crosses three phases in this commit. **Skip research-phase**: a scope discriminator on a matcher already read at file:line.
 
 **## How we'd know this failed**

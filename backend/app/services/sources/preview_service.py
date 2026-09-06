@@ -99,6 +99,7 @@ class PreviewItem:
     #: True when a routing rule suggested `destination` rather than the chosen folder.
     rule_suggested: bool = False
     web_view_url: str | None = None
+    path: str | None = None
 
 
 @dataclass
@@ -266,6 +267,7 @@ async def walk_source_files(
     adapter: Any,
     connection: Any,
     folder_id: str | None,
+    folder_name: str | None = None,
     recursive: bool,
     page_size: int = 200,
 ) -> WalkResult:
@@ -295,7 +297,8 @@ async def walk_source_files(
     documents it believed were gone.
     """
     result = WalkResult()
-    queue: list[tuple[str | None, int]] = [(folder_id, 0)]
+    init_path = f"/{folder_name.strip('/')}" if folder_name and folder_name.strip('/') else ""
+    queue: list[tuple[str | None, str, int]] = [(folder_id, init_path, 0)]
     # ⚠ THE START FOLDER IS SEEDED, and it was NOT in the first version — a test with a
     #   sub-folder linking back to its parent re-listed the parent and double-counted its files.
     #   Seeding here is what makes `seen` a visited-set rather than a queued-set.
@@ -306,7 +309,7 @@ async def walk_source_files(
     seen_files: set[str] = set()
 
     while queue:
-        current, depth = queue.pop(0)
+        current, current_path, depth = queue.pop(0)
 
         if result.folders_visited >= MAX_FOLDERS:
             result.truncated, result.stopped_by = True, "folders"
@@ -327,6 +330,8 @@ async def walk_source_files(
                 if f.id in seen_files:
                     continue
                 seen_files.add(f.id)
+                if getattr(f, "path", None) is None:
+                    f.path = f"{current_path}/{f.name}" if current_path else f"/{f.name}"
                 result.files.append(f)
             if len(result.files) >= MAX_FILES:
                 del result.files[MAX_FILES:]
@@ -360,7 +365,8 @@ async def walk_source_files(
             if node.id in seen:
                 continue
             seen.add(node.id)
-            queue.append((node.id, depth + 1))
+            sub_path = f"{current_path}/{node.name}" if current_path else f"/{node.name}"
+            queue.append((node.id, sub_path, depth + 1))
 
     return result
 
@@ -430,11 +436,13 @@ async def _rule_destinations(
     user_id: str,
     supabase: Client,
 ) -> list[dict]:
-    """Load enabled routing rules. ⛔ A READ — no folder is minted, nothing is written."""
+    """Load enabled routing rules for watch scope. ⛔ A READ — no folder is minted, nothing is written."""
     try:
         from app.services import classification_rule_service
 
-        rules = await classification_rule_service.list_rules(user_id, supabase)
+        rules = await classification_rule_service.list_rules(
+            user_id, rule_scope="watch", supabase=supabase
+        )
         return [r for r in rules if r.get("enabled")]
     except Exception:  # noqa: BLE001 — rules NEVER block a preview (mirror the ingest degrade)
         log.warning("preview rule load failed; destinations fall back to the chosen folder", exc_info=True)
@@ -449,31 +457,58 @@ def _suggest_destination(
     supabase: Client,
     user_id: str,
     fallback: str | None,
+    mime_type: str | None = None,
+    size: int | None = None,
+    path: str | None = None,
+    source_system: str | None = None,
+    source_connection_id: str | None = None,
 ) -> tuple[str | None, bool]:
-    """Evaluate rules against the metadata the preview ACTUALLY HAS (D-233-08).
+    """Evaluate watch rules against the arrival metadata the preview ACTUALLY HAS (RULES-01 / SC#1 / SC#3).
 
-    At preview time we know a filename, a mime type and a modified date — and nothing else. A rule
-    that keys on extracted metadata (`document_type`, `topics`, `summary`) cannot fire yet, and
-    that is the honest outcome: the file lands in the chosen folder unless a rule matched on
-    something we can already see. ⛔ Nothing is minted; `build_suggestion` resolves a folder NAME.
+    At preview time we know arrival properties: filename/title, mime/type, size, modified date,
+    and source facts (source_system, source_connection_id) — and NOT extracted metadata.
+    Evaluates ONLY rules where `rule_scope == 'watch'`. Extracted metadata rules (classification scope)
+    are filtered out at query time and rejected at authoring time.
     """
     if not rules:
         return fallback, False
 
+    watch_rules = [r for r in rules if r.get("rule_scope", "watch") == "watch" and r.get("enabled", True)]
+    if not watch_rules:
+        return fallback, False
+
     try:
-        from app.api.documents import _METADATA_BUILTINS
+        from app.api.classification_rules import WATCH_ALLOWED_FIELDS
         from app.services import classification_matcher
     except Exception:  # noqa: BLE001
         return fallback, False
 
-    preview_metadata: dict[str, Any] = {"title": name}
+    preview_metadata: dict[str, Any] = {
+        "name": name,
+        "title": name,
+        "filename": name,
+    }
+    if mime_type:
+        preview_metadata["mime"] = mime_type
+        preview_metadata["type"] = mime_type
+        preview_metadata["mime_type"] = mime_type
+    if size is not None:
+        preview_metadata["size"] = size
+        preview_metadata["file_size"] = size
+    if path:
+        preview_metadata["path"] = path
+        preview_metadata["source_path"] = path
+    if source_system:
+        preview_metadata["source_system"] = str(source_system).lower()
+    if source_connection_id:
+        preview_metadata["source_connection_id"] = str(source_connection_id)
     if modified_at:
         preview_metadata["date"] = modified_at[:10]
 
-    for rule in rules:
+    for rule in watch_rules:
         try:
             if classification_matcher.match_metadata(
-                rule.get("match_expr") or {}, preview_metadata, set(_METADATA_BUILTINS)
+                rule.get("match_expr") or {}, preview_metadata, set(WATCH_ALLOWED_FIELDS)
             ):
                 suggestion = classification_matcher.build_suggestion(rule, supabase, user_id)
                 folder_name = suggestion.get("suggested_folder_name")
@@ -523,6 +558,7 @@ async def build_preview(
         adapter=adapter,
         connection=connection,
         folder_id=folder_id,
+        folder_name=folder_name,
         recursive=recursive,
         page_size=page_size,
     )
@@ -544,6 +580,7 @@ async def build_preview(
         )
         destination: str | None = None
         rule_suggested = False
+        file_path = getattr(f, "path", None) or f"/{f.name}"
         if bucket == "add":
             destination, rule_suggested = _suggest_destination(
                 rules=rules,
@@ -552,6 +589,11 @@ async def build_preview(
                 supabase=supabase,
                 user_id=user_id,
                 fallback=fallback,
+                mime_type=f.mime_type,
+                size=f.size,
+                path=file_path,
+                source_system=system,
+                source_connection_id=connection_id,
             )
         items.append(
             PreviewItem(
@@ -566,6 +608,7 @@ async def build_preview(
                 destination=destination,
                 rule_suggested=rule_suggested,
                 web_view_url=f.web_view_url,
+                path=file_path,
             )
         )
 

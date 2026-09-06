@@ -647,3 +647,56 @@ def test_classification_lives_in_one_home_not_two():
     assert any(
         not ln.lstrip().startswith(("from ", "import ")) for ln in enrich_uses
     ), "ingest_enrich.py only IMPORTS the matcher — an import is not a use"
+
+
+def test_both_paths_produce_only_suggestions_never_auto_move(_stub_extraction):
+    """RULES-01 / SC#4: Rules only ever suggest (metadata._classification), never auto-move.
+
+    Neither ingest path may ever set folder_id or execute an autonomous move; classification
+    output is strictly a suggestion with status='suggested'.
+    """
+    legacy = _via_legacy_path(_RoutingSupabase([_own_rule()]))
+    queued = _via_queue_path(_RoutingSupabase([_own_rule()]))
+
+    for path_name, res in (("legacy", legacy), ("queued", queued)):
+        cls_meta = (res.metadata or {}).get("_classification")
+        assert cls_meta is not None, f"{path_name} produced no classification"
+        assert cls_meta.get("status") == "suggested", f"{path_name} status must be 'suggested'"
+        assert "suggested_folder_id" in cls_meta, f"{path_name} missing suggested_folder_id"
+        assert cls_meta.get("rule_id") == "rule-own-1"
+
+
+def test_watch_rules_match_arrival_facts_and_produce_suggestion_on_both_paths():
+    """RULES-01 / SC#1 / Operator Ruling 3: A watch rule must affect real documents at ingestion.
+
+    A watch rule keying on arrival facts (name, mime/type, size, path, source facts) evaluates
+    at ingestion and sets `metadata._classification` suggestion on both legacy and queue paths,
+    allowing the human to accept via the VIS-06 fence, without auto-moving.
+    """
+    rule = {
+        "id": "rule-watch-1",
+        "name": "Incoming text files go to Text Archive",
+        "user_id": _OWNER,
+        "is_system_global": False,
+        "enabled": True,
+        "rule_scope": "watch",
+        "match_expr": {
+            "op": "and",
+            "conditions": [
+                {"field": "name", "op": "contains", "value": "acme"},
+                {"field": "type", "op": "eq", "value": "text/plain"},
+            ],
+        },
+        "suggest_folder_id": "f0000000-0000-0000-0000-000000000002",
+    }
+    legacy = _via_legacy_path(_RoutingSupabase([rule]))
+    queued = _via_queue_path(_RoutingSupabase([rule]))
+
+    for path_name, res in (("legacy", legacy), ("queued", queued)):
+        cls_meta = (res.metadata or {}).get("_classification")
+        assert cls_meta is not None, f"{path_name} produced no classification from watch rule"
+        assert cls_meta.get("status") == "suggested", f"{path_name} status must be 'suggested'"
+        assert cls_meta.get("suggested_folder_id") == "f0000000-0000-0000-0000-000000000002"
+        assert cls_meta.get("rule_id") == "rule-watch-1"
+
+
