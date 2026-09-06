@@ -4,12 +4,17 @@ title: A completed document can have no ingestion_jobs row, so the job table is 
 reported: 2026-09-06
 surface: Agentic-RAG
 severity: minor
-status: open
+status: deferred
 affected_areas: [backend/ingestion, connectors/sources, observability]
 folded_into: null
 verified_closed_by: null
 related_seeds: []
-re_open_trigger: null
+re_open_trigger: >
+  Phase 235's discuss-phase (2026-09-06) made the choice this report asked for deliberately:
+  D-235-06 counts runs from the watch loop's OWN connector_sync_runs rows, never from
+  ingestion_jobs. That demotes this from a blocker to an observability debt. RE-OPENS on any
+  future retry, resume, audit or cost-attribution feature built on the ingestion_jobs table,
+  or on the first report of a document that cannot be traced to how it was ingested.
 reproduces_on:
   branch: develop
   commit: da34aa8f7

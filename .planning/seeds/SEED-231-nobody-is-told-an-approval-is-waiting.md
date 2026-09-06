@@ -107,3 +107,37 @@ An excuse to weaken the checkpoint. **Auto-approving an unattended run because n
 the wrong repair** — the checkpoint is the one thing in this story that behaved correctly. The
 answer is to tell somebody, or to let an author choose that a given schedule may not contain an
 armed step, never to make the arm mean less.
+
+---
+
+## 2026-09-06 — Phase 235 built the surface this seed has been waiting for (one tenant, not this one)
+
+Phase 235's `discuss-phase` (`.planning/phases/235-the-source-says-what-it-did/235-CONTEXT.md`)
+resolved `SURF-03` — *"a broken watch reaches a person who is not already looking at the page"* —
+and deliberately built the **general** app-shell notification surface rather than a watch-specific
+badge, **registering exactly one producer**: a broken source (`D-235-03`).
+
+⚠ **This seed is NOT closed and nothing about it shipped.** What changed is that the surface it
+needs now exists, so wiring the pending-approval producer is a registration, not a new surface.
+
+- **The seam:** a shell signal that renders a list of actionable app-level conditions, fed by a
+  server-computed verdict endpoint (`D-235-05`), rendered as a badge on the nav rail with a popover
+  (`D-235-04`). ⛔ Phase 235 explicitly forbade registering a second producer inside itself — that
+  was named as scope creep, not deferred by accident.
+- **Re-open trigger for the BUILD half of this seed, unchanged:** the first milestone that schedules
+  anything customer-facing, or the second recorded instance of a pause nobody saw. **What is new is
+  that the cost of answering it has dropped from "design a notification surface" to "register a
+  producer."**
+
+### It also now carries `SURF-03`'s option-C deferral
+
+Phase 235 offered three cost-ordered homes for `SURF-03`; **option C — email on permanent failure —
+was DEFERRED, not dropped** (`D-235-02`), because there is **no system mailer** in this product (the
+SMTP path is a *user's* connection, not ours). Its named re-open trigger is recorded here because
+this file is the register:
+
+> **Option C re-opens when EITHER** a customer reports learning about a dead watch from a stale
+> answer, **OR** the product gains an app-owned mailer for any other reason — this seed's own
+> approval notifications being the likeliest cause.
+
+Two independent triggers, so it cannot be orphaned by whichever arrives first.

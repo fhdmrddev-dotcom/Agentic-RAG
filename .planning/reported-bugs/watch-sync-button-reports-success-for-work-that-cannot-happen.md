@@ -4,9 +4,9 @@ title: The watch Sync button reports "scheduled" for work nothing consumes, and 
 reported: 2026-09-06
 surface: Agentic-RAG
 severity: major
-status: open
+status: folded
 affected_areas: [backend/connectors, frontend/library, connectors/watches]
-folded_into: null
+folded_into: 235
 verified_closed_by: null
 related_seeds: [SEED-248]
 re_open_trigger: null
