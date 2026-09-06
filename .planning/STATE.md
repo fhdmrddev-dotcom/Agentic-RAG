@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v4.0
 milestone_name: "Connected Knowledge"
-status: complete
-last_updated: "2026-09-06T14:52:00.000Z"
+status: needs_uat
+last_updated: "2026-09-06T16:20:00.000Z"
 last_activity: 2026-09-06
 progress:
   total_phases: 14
@@ -38,11 +38,11 @@ continues at **228**.
 
 ## Current Position
 
-Phase: 236 — The Corpus Under Attack (✅ **CLOSED 2026-09-06** — Gemini built, Claude VERIFIED on BUS-168: 13/13 attacks refused in offline corpus, 8/8 mutations caught loudly at point of use, SC#10 capability/prompt parity verified. ⚠ SC#1 & Live UAT marked ⛔ OWED pending operator live Google Drive drive)
+Phase: 236 — The Corpus Under Attack (⚠ **CLOSED ON A DECISION, NOT ON SC#1 — 2026-09-06.** Gemini built, Claude verified by DRIVING on BUS-168. **Met:** SC#2 (8/8 mutations caught at the point of USE) and SC#3 (legible attack report). **⛔ OWED:** SC#1 and the Live UAT — and SC#1 is this phase's GA-GATE criterion, so the phase is closed by an operator decision to proceed with the live drive scheduled, NEVER by a claim that SC#1 ran. See ## ⚖ below.)
 Prior: 235 — The Source Says What It Did (✅ **CLOSED 2026-09-06** — 17 plans + 1 quick fix + 1 health quick task)
 Prior: 234 — The Watch Loop (✅ CLOSED — verified by DRIVING)
 Plan: 236-01, 236-02, 236-03 complete (100%)
-Status: complete
+Status: needs_uat — build complete and verified; SC#1 (GA gate) owed to an operator drive
 
 
 ## ▶ NEXT SESSION — start here
@@ -103,6 +103,69 @@ Coverage Trend full width; retrieval demoted to tiles under a USAGE heading.
 ⚠ **The operator caught a defect in that fix**: it kept the top 8 formats and silently dropped DXF,
 PNG, WebP, HTML, TIFF, JPEG, Outlook and EPUB. Now all 21 types are mapped, the backend caps
 nothing, and the tail folds into a NAMED `Other (N)`.
+
+## ⚖ PHASE 236 — CLOSED ON A DECISION, NOT ON ITS GA GATE (2026-09-06)
+
+**Gemini built · Claude reviewed. Neither agent may settle this one — it is recorded as the
+operator's decision, taken 2026-09-06.**
+
+### The decision, in one sentence
+
+> The offline adversarial corpus and the mutation proof are enough to proceed to Phase 237, with
+> the live SC#1 drive **scheduled and owed** — **not** a finding that SC#1 passed.
+
+CLAUDE.md's rule is explicit that closing with owed manual UAT rows is legitimate *"but state it as
+a DECISION, never as a claim that everything ran."* This section is that statement. ⚠ Phase 236 is
+the milestone's **GA GATE** and **SC#1 is its headline criterion**, which is why the distinction is
+load-bearing rather than bookkeeping.
+
+### What is MET — driven by the reviewer, not read from the builder's claim
+
+| | |
+|---|---|
+| **SC#2** | ✅ 8/8 mutations caught loudly, re-driven by the reviewer. |
+| **SC#3** | ✅ `236-ATTACK-REPORT.md` is legible — 13 attacks, per-row verdicts. |
+| Gates | ✅ backend **72 failed = true baseline, zero regressions**; count gate `failed 0`; ledger gate OK. |
+| Blast radius | ✅ two files, both pure constant hoists, no kill-switch anywhere. |
+
+⭐ **SC#2 was WRONG when first submitted and the fix is the phase's real result.** Three of the
+eight "mutations caught" were **circular** — the mutant deleted a constant and the test asserted
+that constant existed. The reviewer's counter-experiment (keep the constant DEFINED, remove its
+USE) left the suite **GREEN**, meaning the entire judge rubric could be deleted from the system
+prompt actually sent to the model without anything turning red. Assertions were re-pointed at the
+point of use and the same experiment now turns all three **RED**. **This is the phase's own
+headline failure mode, caught inside the phase built to prevent it.**
+
+### What is ⛔ OWED — operator actions, not agent actions
+
+1. ⛔ **SC#1 — THE GA GATE.** A payload planted in a **really synced** document, with an ordinary
+   question failing to make the agent obey — **on every provider in the native roster**. Today's
+   evidence is offline unit tests plus a fully mocked rehearsal (`scripts/uat-adversarial-sync.py`
+   is `_MockWatchedConnection` / `AsyncMock` end to end). **Nothing is synced; no model is called.**
+2. ⛔ **SC#10's behavioural half.** The roster passes on capability/prompt **parity** across all 8
+   derived providers; per-provider *refusal* is undriven. Prompt-level guarantees are exactly the
+   class that degrades per provider, which is why SC#10 exists.
+
+**First drive:** Google Drive with a live connection and live model credentials in the Chat UI,
+then the remaining seven roster rows. Procedure: `236-VALIDATION.md` §3 Step 4B. ⚠ **A blocked
+provider is recorded ⛔ with its reason and blocking id — never dropped from the table.**
+
+### Re-open trigger
+
+**The moment the live drive runs.** SC#1 and SC#10-behavioural are flipped to `pass`, or to `⛔
+blocked` with a named blocking id, in `236-VALIDATION.md` **and** in the ROADMAP progress row. If
+the drive has not happened by `/gsd:complete-milestone` for v4.0, **the GA gate is unmet and the
+milestone cannot record TRUST-02 as delivered.**
+
+### ⚠ Self-assessment declared (AGENTS.md §6.3)
+
+Two items in this phase were authored by the reviewer, who is therefore not their independent
+verifier: the `LibraryPage` re-anchor (`15338c693`) and the `BASELINES.md` correction. **Both are
+self-assessed.** The `BASELINES.md` correction matters beyond bookkeeping — its original `71` was a
+lucky sample, the true baseline is `72`, and the wrong figure **manufactured a defect in the
+builder's work** before it was caught.
+
+---
 
 ## ✅ PHASE 235 CLOSED (2026-09-06)
 
