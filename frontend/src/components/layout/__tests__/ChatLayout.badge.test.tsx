@@ -263,3 +263,145 @@ describe("ChatLayout attention signal — a healthy instance is silent", () => {
     expect(screen.getAllByRole("button", { name: "Library" }).length).toBeGreaterThan(0)
   })
 })
+
+// ══════════════════════════════════════════════════════════════════════════════════════════
+// ⛔ THE READER INVENTORY FENCE — Phase 235 plan 15 (gap-closure round 1 · verification G4)
+// ══════════════════════════════════════════════════════════════════════════════════════════
+/**
+ * ── WHY A SECOND GUARD, WHEN `toHaveBeenCalledTimes(1)` ALREADY EXISTS ────────────────────
+ *
+ * That case is correct and stays untouched: it proves the SHELL reads once. **It is also blind
+ * to the defect verification found**, because it never mounts the Library — and the Library's
+ * active tab body mounts a SECOND `useSourceAttention()`. `attentionConditions.ts` shipped a
+ * docblock asserting one reader per render tree while the tree carried two, and no test in the
+ * repository could see it. This is that test.
+ *
+ * ── WHAT IT PINS, AND WHY A GREP OF THE MOUNT FILES WOULD NOT HAVE DONE ──────────────────
+ *
+ * This suite's own docblock above already records that the originally-proposed grep could not
+ * fire: `ChatLayout.tsx` contains the literal ZERO times — it reads through the
+ * `ATTENTION_PRODUCERS` registry — so grepping the mount files matches nothing in a one-reader
+ * OR a two-reader world. The property that actually matters is **how many call sites exist in
+ * the whole source tree**, so this sweeps every non-test `.ts`/`.tsx` under `src/` with
+ * `import.meta.glob(…?raw)` and pins the inventory BY FILE, not merely the total. A fourth
+ * reader anywhere reddens this.
+ *
+ * ⚠ Two exclusions, both deliberate and both non-vacuity-checked below:
+ *   • `hooks/useSourceAttention.ts` — its own `export function useSourceAttention(` is the
+ *     DEFINITION, not a call site.
+ *   • test files — the hook's own suite calls it inside `renderHook` many times, which is
+ *     exactly what a hook's suite should do and says nothing about the product tree.
+ */
+describe("source-attention reader inventory — a fourth reader cannot arrive silently", () => {
+  const RAW = import.meta.glob("../../../**/*.{ts,tsx}", {
+    query: "?raw",
+    import: "default",
+    eager: true,
+  }) as Record<string, string>
+
+  /**
+   * `src/`-relative path for a glob key.
+   *
+   * ⚠ MEASURED, not assumed: Vite normalises each key to the SHORTEST relative path from the
+   * importing file, so a single pattern yields keys of DIFFERENT depths — `../ChatLayout.tsx`,
+   * `../../ui/tabs.tsx` and `../../../pages/LibraryPage.tsx` all came out of the one glob
+   * above. Stripping a fixed `../` prefix therefore collapses distinct files onto colliding
+   * names; the key has to be RESOLVED against this file's own directory.
+   */
+  const HERE = "src/components/layout/__tests__"
+  const rel = (key: string): string => {
+    const out = HERE.split("/")
+    for (const seg of key.replace(/\\/g, "/").split("/")) {
+      if (seg === "..") out.pop()
+      else if (seg !== "." && seg !== "") out.push(seg)
+    }
+    return out.join("/").replace(/^src\//, "")
+  }
+
+  const BY_PATH: Record<string, string> = Object.fromEntries(
+    Object.entries(RAW).map(([key, src]) => [rel(key), src]),
+  )
+
+  const isProductFile = (key: string) => {
+    const p = rel(key)
+    if (/\.test\.tsx?$/.test(p)) return false
+    if (p.includes("__tests__/")) return false
+    // The hook's own definition file — a declaration, never a call site.
+    if (p === "hooks/useSourceAttention.ts") return false
+    return true
+  }
+
+  /**
+   * The LINE-ANCHORED comment stripper (`renameFence.test.ts:89`). ⚠ The `^\s*` on the line
+   * comment replace is load-bearing: the unanchored variant eats live code.
+   *
+   * ⛔ IT IS NOT OPTIONAL HERE, AND THAT WAS MEASURED. The first version of this fence counted
+   * raw text and read `attentionConditions.ts` as THREE call sites — because the docblock this
+   * plan rewrote quotes `useSourceAttention()` in prose. A code measurement satisfiable (or
+   * breakable) by a comment is exactly the 187-24 lesson `App.tsx:91-101` already records.
+   */
+  const codeOf = (src: string) =>
+    src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "")
+
+  /** Call sites in one file's CODE: the identifier immediately followed by `(`. */
+  const callSites = (src: string) => (codeOf(src).match(/useSourceAttention\s*\(/g) ?? []).length
+
+  const inventory = Object.entries(RAW)
+    .filter(([key]) => isProductFile(key))
+    .map(([key, src]) => [rel(key), callSites(src)] as const)
+    .filter(([, n]) => n > 0)
+    .sort(([a], [b]) => a.localeCompare(b))
+
+  // ── SELF-GUARDS. A sweep that read nothing is green and defends nothing. ────────────────
+  it("self-guard: the glob really loaded the source tree as text, and the exclusions bite", () => {
+    expect(Object.keys(RAW).length).toBeGreaterThan(200)
+    // The resolver works at three different key depths — the property that broke first.
+    expect(BY_PATH["hooks/useSourceAttention.ts"]).toContain("export function useSourceAttention")
+    expect(BY_PATH["components/layout/ChatLayout.tsx"]).toContain("ATTENTION_PRODUCERS")
+    expect(BY_PATH["components/ui/tabs.tsx"]).toContain("TabsPrimitive")
+    // …and the exclusions really excluded something, or the arms below are vacuous.
+    expect(Object.keys(RAW).some((k) => /\.test\.tsx?$/.test(rel(k)))).toBe(true)
+    expect(inventory.map(([p]) => p)).not.toContain("hooks/useSourceAttention.ts")
+  })
+
+  it("self-guard: the stripper removes PROSE and keeps CODE — the pair that reds a broken one", () => {
+    const registry = BY_PATH["components/layout/attentionConditions.ts"]
+    // A token that exists ONLY in that file's docblock. Present raw, absent from the code.
+    expect(registry).toContain("MOUNTED SUBTREE")
+    expect(codeOf(registry)).not.toContain("MOUNTED SUBTREE")
+    // …and the stripper did not return "": the real call and the real export survive.
+    expect(codeOf(registry)).toContain("ATTENTION_PRODUCERS")
+    expect(codeOf(registry)).toContain("useSourceAttention()")
+    // ⛔ THE DEFECT THIS PAIR EXISTS FOR: the docblock quotes the hook name in prose, so a
+    // fence counting RAW text reads this file as 3 readers instead of 1.
+    expect((registry.match(/useSourceAttention\s*\(/g) ?? []).length).toBeGreaterThan(1)
+    expect(callSites(registry)).toBe(1)
+  })
+
+  it("⛔ EXACTLY THREE product call sites, and they are the three that are supposed to exist", () => {
+    expect(inventory).toEqual([
+      // The shell reader. `ChatLayout` reaches it through `ATTENTION_PRODUCERS` — which is why
+      // grepping `ChatLayout.tsx` itself finds nothing and this fence looks at the registry.
+      ["components/layout/attentionConditions.ts", 1],
+      // The Library's Ingestion tab body.
+      ["components/library/IngestionTab.tsx", 1],
+      // The Library's Health tab body — mutually exclusive with the one above, by tab.
+      ["components/library/SourcesAttentionSection.tsx", 1],
+    ])
+  })
+
+  it("`ChatLayout.tsx` reads the verdict through the registry and never calls the hook itself", () => {
+    const layout = BY_PATH["components/layout/ChatLayout.tsx"]
+    expect(layout).toBeTypeOf("string")
+    expect(callSites(layout)).toBe(0)
+    // Non-vacuity: it really is the shell, and it really does resolve the registry ONCE.
+    expect((layout.match(/ATTENTION_PRODUCERS\.flatMap/g) ?? []).length).toBe(1)
+  })
+
+  it("⚠ the two Library readers are mutually exclusive BY TAB — no `forceMount` anywhere", () => {
+    // This is what makes the live count TWO rather than three. Radix unmounts an inactive
+    // `TabsContent`; a `forceMount` on either body would mount both at once.
+    expect(BY_PATH["components/ui/tabs.tsx"]).not.toContain("forceMount")
+    expect(BY_PATH["pages/LibraryPage.tsx"]).not.toContain("forceMount")
+  })
+})

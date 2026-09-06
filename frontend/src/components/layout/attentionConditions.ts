@@ -23,15 +23,61 @@
  * *"a person who has ignored it once has not been trained to ignore it always"*, honoured by
  * having no second decider rather than by a threshold copied onto the client.
  *
- * ── ⚠ ONE READER PER RENDER TREE, AND IT IS `ChatLayout` ─────────────────────────────
+ * ── ⚠ ONE READER PER MOUNTED SUBTREE — AND THE SHIPPED TREE HAS TWO ──────────────────
  *
- * `ChatLayout` calls the registry ONCE and hands the result to three renderers (the desktop
- * rail, the mobile drawer's nav row, and the drawer-opening hamburger). ⛔ A second
- * `useSourceAttention()` call anywhere in the same tree means two polls and, eventually, two
- * disagreeing answers about the same source — which is exactly the failure D-235-05 exists to
- * prevent. `ChatLayout.badge.test.tsx` asserts the verdict fetch fires
- * `toHaveBeenCalledTimes(1)`, never `toHaveBeenCalled()`, because the second is true of both
- * worlds.
+ * ⚠ **CORRECTED at Phase 235 plan 15 (gap-closure round 1 · verification G4).** This block used
+ * to be titled *"one reader per RENDER TREE"* and to warn that a second `useSourceAttention()`
+ * call anywhere in the same tree would mean two polls and, in time, two answers that contradict
+ * each other about one source.
+ *
+ * **The shipped tree already had two readers when that was written, and they cannot contradict
+ * each other.** A docblock asserting an invariant the code breaks is worse than either fix: the
+ * next author trusts it, and goes hunting a divergence that cannot happen.
+ *
+ * ⚠ The refuted sentence is deliberately NOT reproduced verbatim here — a false claim left as a
+ * quotable string is the thing a future grep finds. It is preserved word for word in
+ * `.planning/phases/235-the-source-says-what-it-did/235-15-SUMMARY.md`, which is where a
+ * superseded claim belongs.
+ *
+ * ── WHAT IS ACTUALLY TRUE, MEASURED ──────────────────────────────────────────────────
+ *
+ *   • **The count is TWO.** `ChatLayout` resolves this registry once — the shell reader,
+ *     always mounted — and hands the result to three renderers (the desktop rail, the mobile
+ *     drawer's nav row, the drawer-opening hamburger). While the Library is open, its ACTIVE
+ *     tab body mounts a second: `library/IngestionTab.tsx` on Ingestion, or
+ *     `library/SourcesAttentionSection.tsx` on Health.
+ *   • **Never three.** Those two call sites are mutually exclusive BY TAB: `components/ui/
+ *     tabs.tsx` is bare Radix with no `forceMount`, and `LibraryPage`'s five `<TabsContent>`
+ *     carry none either, so an inactive tab body is UNMOUNTED, not hidden.
+ *   • **They cannot disagree, and that is structural, not lucky.** D-235-05 puts the
+ *     soft-failure debounce on the SERVER. Every reader passes `stopped[]` through untouched,
+ *     so two readers render one verdict. The real cost is one extra GET per poll interval
+ *     while the Library is open — a doubled RATE, never a second opinion.
+ *
+ * ── WHY THE VERDICT WAS NOT THREADED DOWN INSTEAD (measured and DECLINED, in writing) ─
+ *
+ * The shell's verdict would have to cross `App` → `ChatLayout` → `LibraryPage` → the tab body.
+ * Three of those four are G-5-firing hot files, and it would couple the Library page to the
+ * app shell — to save one poll of a small payload on the one surface the person is looking at.
+ * Declined here so the next author reads a decision rather than re-deriving it.
+ *
+ * ── ⛔ THE RE-OPEN TRIGGER — this is a deferral, not a shrug ──────────────────────────
+ *
+ * A deferral with no re-open trigger is a decision nobody can revisit, so here is this one's:
+ * hoist the verdict into a context provider (one fetch, many consumers) the moment ANY of:
+ *   1. a THIRD concurrent reader appears — i.e. two that are not mutually exclusive by tab;
+ *   2. the server-named poll interval drops far enough that a doubled rate is material;
+ *   3. any consumer needs to WRITE the verdict rather than read it (a local override, an
+ *      optimistic dismissal, a refresh that must be seen by the other reader).
+ *
+ * ── WHAT GUARDS THE COUNT, AND WHAT CANNOT ───────────────────────────────────────────
+ *
+ * `ChatLayout.badge.test.tsx` asserts the shell fetch fires `toHaveBeenCalledTimes(1)`, never
+ * `toHaveBeenCalled()` — the second is true of both worlds. ⚠ **But that case does not mount
+ * the Library, so it is blind to the second reader and could never have caught this.** The
+ * suite therefore also carries a `?raw` INVENTORY FENCE that sweeps every non-test source file
+ * for `useSourceAttention(` call sites and pins the total, so a FOURTH reader reddens a test
+ * instead of silently multiplying the poll rate again.
  */
 
 import { useMemo } from "react"
