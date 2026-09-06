@@ -78,6 +78,13 @@ const region = (h, blk) => {
   const nxt = rest.indexOf('data-block="body-', 1);
   return nxt < 0 ? rest : rest.slice(0, nxt);
 };
+/* ⭐ THE RAIL HAS ITS OWN BOUNDARY, and `region()` cannot express it. `region()` walks
+   forward to the next `data-block="body-`, which is the correct rule INSIDE the main
+   column and the wrong one for the rail: the rail is rendered BEFORE the page head, so
+   anchoring on "rail-item" would swallow the instance statement and both tab triggers
+   and hand the badge screen twelve blocks that are not its own. The rail's real edge is
+   its own `</aside>`. Same lesson as the comment above — scope, or count the wrong region. */
+const railRegion = (h) => h.slice(0, h.indexOf("</aside>"));
 const firstCard = (h) => {
   const i = h.indexOf('data-block="source-card"');
   if (i < 0) return '';
@@ -446,6 +453,129 @@ if (process.argv.includes("--emit")) {
   L.push(`_${pass} assertions passing at emit time._`);
   fs.writeFileSync(path.join(__dirname, "BUILD-CONTRACT.generated.md"), L.join("\n") + "\n");
   console.log("emitted BUILD-CONTRACT.generated.md");
+}
+
+/* ── --emit-json : the REGION-SCOPED composition contract the BUILD's suite imports ─────
+ *
+ * ⚠ WHY THIS IS A SECOND ARM RATHER THAN AN EXTENSION OF `--emit`.
+ * `--emit` calls the UNSCOPED `blocks(h)` / `actions(h)` over the whole rendered page. That
+ * is why §2's four A-variant per-screen lists are byte-identical 104-entry artifacts —
+ * including twelve `source-card`s inside the list headed "Health tab", a screen that draws
+ * none. This file's own warning beside `region()` says exactly why that is wrong:
+ *   "an unscoped blocks()/actions() over a whole page counts the OTHER tab's controls and
+ *    TWELVE cards' run rows … scoping is not tidiness, it is correctness."
+ * ⛔ THIS ARM CALLS NO BARE `blocks(h)` / `actions(h)`. Every count is taken through
+ * `region()` (or `railRegion()`, the rail's own edge — see its comment).
+ *
+ * ⛔ THE OUTPUT IS AN IN-PACKAGE COPY under `frontend/src/components/sources/__generated__/`,
+ * never a `?raw` reach back into `.planning/sketches/` — `/gsd:complete-milestone` ARCHIVES
+ * this directory, and a suite importing from here would break at milestone close. That is
+ * 217.1's rule and `sketchComposition.test.tsx:28-31` records it.
+ *
+ * ⚠ THE VARIANT EMITTED IS **B** — the operator's winner (2026-09-06). The presence of
+ * `source-line` in the output is the marker that B was emitted and not A.
+ *
+ * ⚠ THE FIXTURE'S CONNECTION NAME IS NOT PART OF THE CONTRACT. §1b's sentences read
+ * "Access to Legal SharePoint was withdrawn — …" only because the fixture's `token_revoked`
+ * source is called that. Porting them as constants would ship a fixture name to every
+ * customer (RESEARCH C-11), so every cause sentence is emitted PARAMETERISED on
+ * `{connection}` and the build's leaf is a function of the connection name.
+ */
+if (process.argv.includes("--emit-json")) {
+  const BASE = screen("B", {});
+
+  /* The three screens the build composes, each scoped to its own region.
+     ⚠ `sources` is TWO regions, deliberately: the instance statement and both tab
+     triggers sit between the rail and the ingestion body, and they belong to the sources
+     screen rather than to the rail. Concatenating two scoped slices is still scoped;
+     widening `region()` to swallow them would not be. */
+  const REGIONS = {
+    rail: railRegion(BASE),
+    sources: region(BASE, "instance-statement") + region(BASE, "body-ingestion"),
+    health: region(BASE, "body-health"),
+  };
+
+  /* first-appearance order, deduplicated — the honest distinct-kind contract (C-8). */
+  const distinct = (arr) => arr.filter((x, i) => arr.indexOf(x) === i);
+
+  /* ⚠ THE CONNECTION NAME THE SENTENCE WAS AUTHORED AGAINST, derived from the fixture
+     rather than hardcoded here — a second hardcode would be the same defect one file over. */
+  const causeConn = {};
+  SOURCES.forEach((s) => { if (s.cause && !causeConn[s.cause]) causeConn[s.cause] = s.conn; });
+  const parameterise = (s) => {
+    if (typeof s !== "string") return s;   /* ⚠ booleans stay booleans — `cause.*.hard` is
+                                              the hard/soft DATA the classifier reads, and a
+                                              stringified "true" is truthy for "false" too. */
+    let out = s;
+    Object.values(causeConn).forEach((n) => { out = out.split(n).join("{connection}"); });
+    return out;
+  };
+
+  /* Example arguments by PARAMETER NAME, so a rendered example reads like the sketch rather
+     than like an index. Unknown names fall back to 3 — an example is illustrative, never a
+     contract; the `source` field beside it is what binds. */
+  const EXAMPLE_ARG = {
+    m: 30, n: 2, ago: "4 minutes ago", files: 6, when: "2 September, 09:14",
+    within: "60 seconds", total: 12, need: 2,
+  };
+
+  /* Functions are serialised as their SOURCE plus a rendered example — a string the build
+     can read, never a claim the build must re-type. */
+  const serialise = (v) => {
+    if (typeof v === "function") {
+      const src = v.toString();
+      const params = (src.slice(src.indexOf("(") + 1, src.indexOf(")")) || "")
+        .split(",").map((p) => p.trim()).filter(Boolean);
+      let example = null;
+      try {
+        example = parameterise(v.apply(null, params.map((p) =>
+          Object.prototype.hasOwnProperty.call(EXAMPLE_ARG, p) ? EXAMPLE_ARG[p] : 3)));
+      } catch (e) { example = null; }
+      return { __fn: true, params: params, source: parameterise(src), example: example };
+    }
+    if (v && typeof v === "object") {
+      const out = {};
+      Object.keys(v).forEach((k) => { out[k] = serialise(v[k]); });
+      return out;
+    }
+    return parameterise(v);
+  };
+
+  const out = {};
+  Object.keys(REGIONS).forEach((name) => {
+    /* ⚠ NAMED `scoped`, NOT `h`. `blocks(h)` is the exact spelling of the defect this arm
+       exists to correct, and a reader greping for it must not find it here. */
+    const scoped = REGIONS[name];
+    out[name] = {
+      blocks: distinct(blocks(scoped)).map((kind) => ({ kind: kind, heading: null, atoms: [] })),
+      buttons: actions(scoped),
+    };
+  });
+
+  /* "Counts that must hold" — the ONE part of §2 that was already region-scoped and is
+     correct as emitted. Shipped as DATA so the suite asserts the sketch's numbers rather
+     than numbers a test author remembered. */
+  const cardHtml = firstCard(region(screen("B", { history: "s2" }), "body-ingestion"));
+  const cardOpen = firstCard(region(screen("B", { history: "s2", quiet: true }), "body-ingestion"));
+  out.counts = {
+    sources: SOURCES.length,
+    sourceLine: blocks(REGIONS.sources).filter((x) => x === "source-line").length,
+    sourceCard: blocks(REGIONS.sources).filter((x) => x === "source-card").length,
+    attentionRow: blocks(REGIONS.health).filter((x) => x === "attention-row").length,
+    runCollapsed: blocks(cardHtml).filter((x) => x === "run").length,
+    runExpanded: blocks(cardOpen).filter((x) => x === "run").length,
+    instanceStatement: blocks(REGIONS.sources).filter((x) => x === "instance-statement").length,
+  };
+
+  out.copy = serialise(COPY);
+
+  const dest = path.join(__dirname, "..", "..", "..",
+    "frontend", "src", "components", "sources", "__generated__");
+  fs.mkdirSync(dest, { recursive: true });
+  fs.writeFileSync(path.join(dest, "sourceComposition.json"), JSON.stringify(out, null, 2) + "\n");
+  const kinds = Object.keys(REGIONS).reduce((n, k) => n + out[k].blocks.length, 0);
+  console.log(`emitted sourceComposition.json — ${kinds} block kinds across ` +
+    `${Object.keys(REGIONS).length} regions, ${Object.keys(out.copy).length} copy keys`);
 }
 
 process.exit(fail ? 1 : 0);
