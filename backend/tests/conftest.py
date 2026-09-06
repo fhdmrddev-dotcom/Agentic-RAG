@@ -1207,7 +1207,18 @@ class FakeRedis:
 
 
 @pytest.fixture
-def fake_redis() -> FakeRedis:
-    """Fixture providing a fresh FakeRedis instance for testing."""
+def fake_oauth_redis() -> FakeRedis:
+    """A fresh OAuth-only Redis stub (``setex`` / ``get`` / ``delete``).
+
+    ⚠ **RENAMED, and the name is the whole point.** This was called ``fake_redis`` — the same
+    name as the harness fixture defined ~500 lines above at ``conftest.py:724``, which returns
+    ``_FakeRedis`` (``xadd`` / ``sadd`` / ``expire`` / ``publish`` / ``pubsub`` / ``push_message``).
+    Python rebinds on the later definition, so EVERY harness suite silently received this
+    OAuth-only stub and broke with e.g.
+    ``AttributeError: 'FakeRedis' object has no attribute 'xadds'``.
+
+    ⛔ The mandated gate could not see it: ``pytest tests/unit`` is the fence, and the breakage
+    lands in ``tests/`` one directory ABOVE it. Keep these two names distinct.
+    """
     return FakeRedis()
 

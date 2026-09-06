@@ -1514,11 +1514,12 @@ async def oauth_callback(
     from redis.exceptions import RedisError
     from app.dependencies import get_redis
     from app.services.oauth_state import OAuthStateError, take_pending_state
+    # ⚠ `verify_oauth_state`, `resolve_client_credentials` and `OAuthSigningKeyUnavailable` were
+    # imported here ONLY for the legacy HMAC fallback deleted below; they are dead on this path
+    # now. They remain exported from `oauth_service` for the cutover tests.
     from app.services.oauth_service import (
         exchange_code_for_tokens,
         fetch_account_profile,
-        resolve_client_credentials,
-        verify_oauth_state,
     )
     from app.config import settings, primary_frontend_origin
 
@@ -1556,30 +1557,35 @@ async def oauth_callback(
             status_code=307,
         )
     except OAuthStateError:
-        # In-flight legacy fallback path (SC#3):
-        # Transition fallback: delete after the first prod deploy has been live 24 h
-        if "." in state:
-            try:
-                state_data = verify_oauth_state(state)
-                logger.warning("[legacy-oauth-state-accepted] Verified in-flight signed OAuth state during deploy cutover")
-                provider = state_data["prv"]
-                connection_id = state_data["cid"]
-                code_verifier = state_data["cv"]
-                custom_client_id = state_data.get("cid_ovr")
-                custom_client_secret = state_data.get("sec_ovr")
-                client_id, client_secret = resolve_client_credentials(
-                    provider=provider,
-                    custom_client_id=custom_client_id,
-                    custom_client_secret=custom_client_secret,
-                )
-            except ValueError as exc:
-                # A-4: log length, not content
-                logger.warning("oauth callback: legacy state verification failed (len=%d): %s", len(state), exc)
-                return RedirectResponse(url=f"{frontend_url}/app?connections=1&oauth_error=invalid_or_expired_state")
-        else:
-            # A-4: log length, not content
-            logger.warning("oauth callback: invalid or expired opaque handle (len=%d)", len(state))
-            return RedirectResponse(url=f"{frontend_url}/app?connections=1&oauth_error=invalid_or_expired_state")
+        # ⛔ THE LEGACY HMAC FALLBACK IS DELETED (operator, 2026-09-07 — past its own sunset).
+        #
+        # What stood here: an `if "." in state:` arm that called `verify_oauth_state(state)` and
+        # accepted a Phase-224 HMAC-signed blob, carrying the comment *"delete after the first
+        # prod deploy has been live 24 h"*. That deploy went live 2026-09-04; nothing deleted it.
+        #
+        # Why it went NOW rather than at the next tidy-up — it was an unauthenticated forgery
+        # surface, and two independent defects had to line up for it to be safe:
+        #   1. `_get_signing_key()` ended in `or "default-oauth-state-secret"`. `jwt_secret` is
+        #      NOT a declared setting, and `secrets_encryption_key` defaults to `""` with a
+        #      key-less install being supported (D-150-01) — so on such an install the HMAC key
+        #      was A STRING PUBLISHED IN THIS REPOSITORY.
+        #   2. This route takes no JWT and has no auth dependency.
+        #   Together: any unauthenticated caller could forge state naming a victim's
+        #   `connection_id` and have their own provider tokens written onto that connector —
+        #   the exact attack `BUG-260903-02` was written to close.
+        # A third, quieter one: this arm never set `pending_org_id`, so it also short-circuited
+        # that very cross-org gate below (`if pending_org_id is not None and ...`).
+        #
+        # ⭐ Deleting the branch removes all three at once, which is why it beats patching them.
+        # `_get_signing_key` was ALSO made fail-closed in the same change — belt and braces, since
+        # `verify_oauth_state` remains importable for the cutover tests that still pin it.
+        #
+        # An in-flight legacy consent now lands here and is refused like any expired handle. That
+        # is correct: those blobs carry a 600 s TTL and the cutover is days past.
+        #
+        # A-4: log length, not content.
+        logger.warning("oauth callback: invalid or expired opaque handle (len=%d)", len(state))
+        return RedirectResponse(url=f"{frontend_url}/app?connections=1&oauth_error=invalid_or_expired_state")
 
     try:
         # ⚠ MUST BE BYTE-IDENTICAL TO THE ONE SENT ON AUTHORIZE. The provider compares them

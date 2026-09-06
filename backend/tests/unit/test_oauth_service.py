@@ -64,7 +64,7 @@ def test_oauth_state_tampering_rejected():
 
 
 @pytest.mark.asyncio
-async def test_build_authorization_url_google(fake_redis):
+async def test_build_authorization_url_google(fake_oauth_redis):
     """Constructs valid Google OAuth authorization URL with PKCE and opaque state handle (SC#1)."""
     url, state = await build_authorization_url(
         provider="google",
@@ -72,7 +72,7 @@ async def test_build_authorization_url_google(fake_redis):
         user_id="user-1",
         org_id="org-1",
         redirect_uri="http://localhost:5173/api/connectors/oauth/callback",
-        redis=fake_redis,
+        redis=fake_oauth_redis,
         custom_client_id="google-client-id.apps.googleusercontent.com",
         custom_client_secret="google-client-secret",
     )
@@ -84,11 +84,11 @@ async def test_build_authorization_url_google(fake_redis):
     assert len(state) == 43
     assert "." not in state
     assert f"state={state}" in url
-    assert f"oauth:pending:{state}" in fake_redis.store
+    assert f"oauth:pending:{state}" in fake_oauth_redis.store
 
 
 @pytest.mark.asyncio
-async def test_build_authorization_url_microsoft(fake_redis):
+async def test_build_authorization_url_microsoft(fake_oauth_redis):
     """Constructs valid Microsoft OAuth authorization URL with PKCE and opaque state handle (SC#1)."""
     url, state = await build_authorization_url(
         provider="microsoft",
@@ -96,7 +96,7 @@ async def test_build_authorization_url_microsoft(fake_redis):
         user_id="user-1",
         org_id="org-1",
         redirect_uri="http://localhost:5173/api/connectors/oauth/callback",
-        redis=fake_redis,
+        redis=fake_oauth_redis,
         custom_client_id="ms-app-guid-123",
         custom_client_secret="ms-secret",
     )
@@ -106,7 +106,7 @@ async def test_build_authorization_url_microsoft(fake_redis):
     assert len(state) == 43
     assert "." not in state
     assert f"state={state}" in url
-    assert f"oauth:pending:{state}" in fake_redis.store
+    assert f"oauth:pending:{state}" in fake_oauth_redis.store
 
 
 
