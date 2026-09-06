@@ -13,6 +13,7 @@ import { lazy, Suspense } from "react"
 import { ChartSkeleton } from "@/components/health/ChartSkeleton"
 import { getHealthOverview, getRetrievalTrend } from "@/lib/api"
 import type { HealthOverview, RetrievalTrendPoint } from "@/lib/api"
+import { OutcomesByTypeChart } from "./OutcomesByTypeChart"
 import { CoverageRing } from "./CoverageRing"
 import { HealthSignalChips } from "./HealthSignalChips"
 import { HealthDocumentBars } from "./HealthDocumentBars"
@@ -58,10 +59,17 @@ function toStatTiles(overview: HealthOverview, checkedCount: number | null): Sta
         : "coming with checked queries",
     },
     {
+      /**
+       * ⛔ THIS TILE RENDERED `health_score` UNDER A "match strength / average similarity"
+       * LABEL — two different numbers, one of them a weighted composite of four terms.
+       * It was invisible while both sat near 68%; re-weighting the score on 2026-09-06 moved
+       * it to 93% and the mismatch surfaced. `avg_confidence` IS the average similarity the
+       * description promises.
+       */
       label: "MATCH STRENGTH",
       value:
-        overview.health_score != null
-          ? `${Math.round(overview.health_score > 1 ? overview.health_score : overview.health_score * 100)}%`
+        overview.avg_confidence != null
+          ? `${Math.round(overview.avg_confidence * 100)}%`
           : "—",
       description: "average similarity of what searches returned",
     },
@@ -93,20 +101,73 @@ export function HealthTab({ onGoToSource }: HealthTabProps = {}) {
 
   return (
     <div className="flex flex-col gap-6">
-      {/* ── Ring + chart row ───────────────────────────────────────────── */}
-      <div className="grid grid-cols-[auto_1fr] gap-6">
-        <div data-testid="health-coverage-ring">
-          {overview ? (
+      {/* ── HEALTH row — what the agent can READ ────────────────────────────
+       *
+       * ⭐ These two rings and the bar answer "can the agent read it?". The old headline
+       * answered "did anyone ask for it?" — DEMAND dressed as health, which rendered a red
+       * 46/119 arc meaning "61% has not been needed yet". Retrieval moved to USAGE below.
+       *
+       * ⚠ Expect these to sit at ~100% on a well-run library. A health dashboard SHOULD be
+       * boring when the system is well; the old ring was dramatic only because it measured
+       * the wrong thing.
+       */}
+      <div className="grid grid-cols-1 lg:grid-cols-[auto_auto_1fr] gap-6 items-start">
+        <div data-testid="health-readable-ring">
+          {overview && overview.readable_documents !== undefined ? (
             <CoverageRing
-              retrieved={overview.retrieved_this_month}
+              retrieved={overview.readable_documents}
               total={overview.total_documents}
+              label="the agent can read"
             />
           ) : (
             <div className="h-44 w-44 animate-pulse bg-muted/30 rounded-lg" />
           )}
         </div>
 
-        <div className="min-w-0" data-testid="health-searches-chart">
+        <div data-testid="health-embedded-ring">
+          {overview && overview.embedded_chunks !== undefined ? (
+            <CoverageRing
+              retrieved={overview.embedded_chunks}
+              total={overview.total_chunks ?? 0}
+              label="chunks searchable"
+            />
+          ) : (
+            <div className="h-44 w-44 animate-pulse bg-muted/30 rounded-lg" />
+          )}
+        </div>
+
+        <div className="min-w-0">
+          {overview ? (
+            <OutcomesByTypeChart data={overview.outcomes_by_type ?? []} />
+          ) : (
+            <div className="ghost-border bg-card/50 rounded-lg p-4 h-44 animate-pulse" />
+          )}
+        </div>
+      </div>
+
+      {/* ── USAGE row — what people ASKED for ───────────────────────────────
+       *
+       * ⛔ This is deliberately NOT health, and it is labelled so. It is genuinely useful —
+       * it just cannot be read as a fault in the library.
+       */}
+      <div>
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+          Usage — what people asked for
+        </h3>
+        <div className="grid grid-cols-[auto_1fr] gap-6">
+          <div data-testid="health-coverage-ring">
+            {overview ? (
+              <CoverageRing
+                retrieved={overview.retrieved_this_month}
+                total={overview.total_documents}
+                size="sm"
+              />
+            ) : (
+              <div className="h-24 w-24 animate-pulse bg-muted/30 rounded-lg" />
+            )}
+          </div>
+
+          <div className="min-w-0" data-testid="health-searches-chart">
           <Suspense fallback={<ChartSkeleton />}>
             {trend ? (
               <RetrievalTrendChart data={trend} />
@@ -137,6 +198,7 @@ export function HealthTab({ onGoToSource }: HealthTabProps = {}) {
                 <AnimatedNumber value={`${Math.round(overview.high_confidence_rate * 100)}%`} /> high confidence
               </span>
             )}
+          </div>
           </div>
         </div>
       </div>

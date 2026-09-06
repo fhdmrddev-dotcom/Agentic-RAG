@@ -546,12 +546,53 @@ def _fetch_overview_metrics(supabase: Client, user_id: str, stale_days: int) -> 
     else:
         positive_rate = 0.5  # default 50% when no feedback
 
-    coverage = (retrieved_this_month / max(total_documents, 1)) * 100
+    # ── READABILITY — the one signal that is HEALTH rather than DEMAND ────────────
+    #
+    # ⭐ A document that produced ZERO chunks is one the agent literally cannot see: the
+    # extraction failed, or the file carried no text layer. That is a fault the PRODUCT owns
+    # and a person can act on. It is true regardless of whether anyone ever searched for it.
+    try:
+        readable_documents, unreadable_documents = _fetch_readability(supabase, user_id)
+    except _ReadabilityUnknown:
+        # The surface renders "—" for None. It must NEVER render a truncated scan as health.
+        readable_documents, unreadable_documents = None, None
+
+    # ── EMBEDDING COVERAGE — an un-embedded chunk is invisible to search ──────────
+    total_chunks, embedded_chunks = _fetch_embedding_coverage(supabase, user_id)
+
+    # ── OUTCOMES BY FILE TYPE — the actionable one ────────────────────────────────
+    # "PDFs fail 30% of the time" names a thing to fix. "46 documents were found" does not.
+    by_type = _fetch_outcomes_by_type(supabase, user_id)
+
+    # ⛔ SCORE RE-WEIGHTED 2026-09-06 (operator decision) — `coverage` WAS 40% OF THIS SCORE,
+    # AND `coverage` IS DEMAND, NOT HEALTH.
+    #
+    # It measured `retrieved_this_month / total_documents` — i.e. what fraction of the library
+    # a search happened to return in 30 days. So a perfectly ingested, perfectly fresh library
+    # that nobody queried scored near ZERO, and the gauge labelled "health" reported that as
+    # ill health. The visible symptom was a red 46/119 donut reading "61% of your library is
+    # broken" when it meant "61% has not been needed yet".
+    #
+    # `readability` replaces it at the same weight: the share of documents the agent can
+    # actually READ. Same shape, same range, and it can only be low for a reason the product
+    # owns. Demand is still reported — as `retrieved_this_month` / `never_retrieved_count`,
+    # under a USAGE heading — it simply no longer masquerades as health.
+    # ⚠ When readability is unknown the score drops that term rather than substituting demand
+    # again. Re-weighting the remaining three keeps the range 0-100 without inventing a value.
+    if readable_documents is None:
+        freshness_w, confidence_w, feedback_w = 0.50, 0.34, 0.16
+        readability, readability_w = 0.0, 0.0
+    else:
+        freshness_w, confidence_w, feedback_w = 0.30, 0.20, 0.10
+        readability, readability_w = (readable_documents / max(total_documents, 1)) * 100, 0.40
     freshness = ((total_documents - stale_count) / max(total_documents, 1)) * 100
     confidence = (avg_confidence / 0.70) * 100
     feedback = positive_rate * 100
     health_score = int(round(
-        coverage * 0.40 + freshness * 0.30 + min(confidence, 100) * 0.20 + feedback * 0.10
+        readability * readability_w
+        + freshness * freshness_w
+        + min(confidence, 100) * confidence_w
+        + feedback * feedback_w
     ))
 
     return {
@@ -564,7 +605,152 @@ def _fetch_overview_metrics(supabase: Client, user_id: str, stale_days: int) -> 
         "coverage_percent": coverage_percent,
         "avg_confidence": avg_confidence,
         "high_confidence_rate": high_confidence_rate,
+        # ── Health signals (added 2026-09-06) ─────────────────────────────────────
+        "readable_documents": readable_documents,
+        "unreadable_documents": unreadable_documents,
+        "total_chunks": total_chunks,
+        "embedded_chunks": embedded_chunks,
+        "outcomes_by_type": by_type,
     }
+
+
+_PAGE = 1000
+# 50 pages = 50,000 chunks. Beyond that this endpoint should be a SQL aggregate, not a scan.
+_READABILITY_MAX_PAGES = 50
+
+
+class _ReadabilityUnknown(Exception):
+    """Raised when the chunk scan could not be proven exhaustive.
+
+    ⛔ Deliberately an exception rather than a fallback number. Every "reasonable default" here
+    is a claim about the library's health that nobody measured.
+    """
+
+
+def _fetch_readability(supabase: Client, user_id: str) -> tuple[int, int]:
+    """Documents the agent can READ, versus those that produced no text at all.
+
+    ⚠ A zero-chunk document is not a slow document or an unpopular one — it is one the agent
+    cannot see. `document_chunks` is the ground truth: no chunk, no retrievable content.
+    """
+    docs = (
+        supabase.table("documents")
+        .select("id")
+        .eq("user_id", user_id)
+        .eq("is_latest", True)
+        .execute()
+    )
+    ids = {row["id"] for row in (docs.data or [])}
+    if not ids:
+        return 0, 0
+
+    # ⛔ TWO TRAPS HERE, BOTH MEASURED ON REAL DATA (2026-09-06) — DO NOT "SIMPLIFY" THIS.
+    #
+    # 1. `documents.chunk_count` LOOKS like the obvious source and is WRONG. Measured: 119 rows
+    #    carry `chunk_count > 0` while 121 actually have chunks — the denormalised counter has
+    #    drifted on 2 documents. Using it would report 4 unreadable when there are 2, which is
+    #    the same over-alarming lie this whole change exists to remove, just smaller.
+    #
+    # 2. PostgREST caps a select at ~1000 rows by DEFAULT. The first version of this function
+    #    pulled chunk rows in `in_` batches and silently hit that cap, so most documents looked
+    #    chunk-less and the ring rendered "77/119 the agent can read" against a true 121/123.
+    #    A truncated read does not look truncated — it looks like bad health.
+    #
+    # So: page explicitly, and REFUSE TO ANSWER rather than under-report if the corpus outgrows
+    # the cap. A missing number a caller can render as "—" is honest; a confidently wrong one
+    # is the defect.
+    with_text: set[str] = set()
+    page = 0
+    while page < _READABILITY_MAX_PAGES:
+        start = page * _PAGE
+        res = (
+            supabase.table("document_chunks")
+            .select("document_id")
+            .eq("user_id", user_id)
+            .range(start, start + _PAGE - 1)
+            .execute()
+        )
+        rows = res.data or []
+        for row in rows:
+            doc_id = row.get("document_id")
+            if doc_id in ids:
+                with_text.add(doc_id)
+        if len(rows) < _PAGE:
+            break
+        page += 1
+    else:
+        # Cap exhausted with a full last page — we cannot prove we saw every chunk.
+        raise _ReadabilityUnknown()
+
+    readable = len(with_text)
+    return readable, len(ids) - readable
+
+
+def _fetch_embedding_coverage(supabase: Client, user_id: str) -> tuple[int, int]:
+    """Total chunks versus chunks carrying a vector.
+
+    ⚠ An un-embedded chunk is INVISIBLE to semantic search no matter how well it was
+    extracted, so this is health and not usage. It is expected to sit at 100% — a health
+    dashboard SHOULD be boring when the system is well; the old donut was dramatic only
+    because it measured the wrong thing.
+    """
+    total = (
+        supabase.table("document_chunks")
+        .select("id", count="exact")
+        .eq("user_id", user_id)
+        .execute()
+    )
+    embedded = (
+        supabase.table("document_chunks")
+        .select("id", count="exact")
+        .eq("user_id", user_id)
+        .not_.is_("embedding", "null")
+        .execute()
+    )
+    return total.count or 0, embedded.count or 0
+
+
+# Presentation-friendly names for the mime types this library actually ingests. An unknown
+# type falls through to its own raw value rather than to a bucket, so a new format shows up
+# as itself instead of silently joining "Other".
+_TYPE_LABEL = {
+    "application/pdf": "PDF",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "Word",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation": "PowerPoint",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "Excel",
+    "text/markdown": "Markdown",
+    "text/plain": "Text",
+    "text/csv": "CSV",
+    "message/rfc822": "Email",
+}
+
+
+def _fetch_outcomes_by_type(supabase: Client, user_id: str) -> list[dict]:
+    """Per-file-type ingestion outcomes — the most ACTIONABLE signal on the page.
+
+    ⭐ "PDFs fail 30% of the time" names something to fix. "46 documents were found" does not.
+    Sorted by volume, capped at the 8 types that carry the most documents, so one long tail
+    cannot crowd out the formats that matter.
+    """
+    res = (
+        supabase.table("documents")
+        .select("mime_type, status")
+        .eq("user_id", user_id)
+        .eq("is_latest", True)
+        .execute()
+    )
+    buckets: dict[str, dict] = {}
+    for row in res.data or []:
+        mime = row.get("mime_type") or "unknown"
+        label = _TYPE_LABEL.get(mime, mime.split("/")[-1][:16])
+        b = buckets.setdefault(label, {"type": label, "completed": 0, "failed": 0})
+        if (row.get("status") or "") == "completed":
+            b["completed"] += 1
+        else:
+            b["failed"] += 1
+
+    ordered = sorted(buckets.values(), key=lambda b: b["completed"] + b["failed"], reverse=True)
+    return ordered[:8]
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
