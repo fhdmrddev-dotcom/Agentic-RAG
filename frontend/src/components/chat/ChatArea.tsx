@@ -36,9 +36,23 @@ interface Props {
   // ChatLayout ONLY while the history is collapsed; undefined otherwise, so the handle
   // renders exactly when there's a hidden column to bring back.
   onReopenHistory?: () => void
+  // ── Phase 235 plan 09 (SURF-03) ──────────────────────────────────────────────────────
+  //
+  // How many app-level conditions need a person right now. ⛔ ChatArea DERIVES NOTHING and
+  // FETCHES NOTHING: `ChatLayout` resolves the count once from the attention registry and
+  // hands it down, so the rail badge, the drawer badge and this dot can never disagree
+  // (D-235-05). `undefined` and `0` both render nothing.
+  //
+  // ⚠ G-5 POSTURE, STATED RATHER THAN ASSUMED. This file is a G-5-firing hot file
+  // (67 / 32 / 595) and this change is honoured BY CONSTRUCTION, by arithmetic rather than
+  // argument: ONE optional prop, ONE decorative element rendered at the two shipped
+  // drawer-trigger sites, ZERO new `useState`, ZERO new `useEffect`, and no branch beyond the
+  // dot's own render guard. It is the shape `IngestionTab.tsx:220-231` uses for the same
+  // claim — a mount, not a rewrite.
+  attentionCount?: number
 }
 
-export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefillMessage, onClearPrefill, onOpenDrawer, onOpenConnections, onReopenHistory }: Props) {
+export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefillMessage, onClearPrefill, onOpenDrawer, onOpenConnections, onReopenHistory, attentionCount }: Props) {
   // Plan 075.4-01 D-075.4-A1: useMessages still exposes the viewed-thread
   // values (isStreaming, fallbackNotice) for back-compat — but the composer
   // disabled prop and per-thread surfaces go through the direct selectors
@@ -438,6 +452,23 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
     </button>
   ) : null
 
+  // Phase 235 plan 09 (SURF-03): the closed-drawer signal. `NavPanel` is `hidden md:flex`, so
+  // at mobile width the rail badge does not exist — the control that OPENS the drawer is the
+  // only thing on screen that can say something needs a person. One element, defined once,
+  // mounted at the two shipped drawer-trigger sites.
+  //
+  // ⛔ `aria-hidden`: the triggers carry `aria-label="Open navigation"` and a dot must not
+  // rename them. It carries no count and no word — the drawer's own Library badge carries the
+  // number, and this one only has to be noticeable enough to make somebody open the drawer.
+  // The warning tone, never the danger one.
+  const attentionDot = (attentionCount ?? 0) > 0 ? (
+    <span
+      data-testid="drawer-trigger-dot"
+      aria-hidden="true"
+      className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full bg-warning ring-2 ring-background"
+    />
+  ) : null
+
   if (!thread) {
     return (
       <div className="flex flex-col h-full bg-background">
@@ -452,11 +483,12 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
         <div className="md:hidden px-4 py-2 flex items-center border-b border-border/30">
           <button
             type="button"
-            className="flex items-center justify-center w-11 h-11 rounded-xl text-muted-foreground hover:text-foreground hover:bg-accent/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+            className="relative flex items-center justify-center w-11 h-11 rounded-xl text-muted-foreground hover:text-foreground hover:bg-accent/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
             aria-label="Open navigation"
             onClick={onOpenDrawer}
           >
             <Menu className="w-5 h-5" />
+            {attentionDot}
           </button>
         </div>
         <div className="flex-1 flex items-center justify-center">
@@ -524,11 +556,12 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
         {/* Mobile menu trigger */}
         <button
           type="button"
-          className="md:hidden flex items-center justify-center w-11 h-11 rounded-xl text-muted-foreground hover:text-foreground hover:bg-accent/40 transition-colors shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+          className="relative md:hidden flex items-center justify-center w-11 h-11 rounded-xl text-muted-foreground hover:text-foreground hover:bg-accent/40 transition-colors shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
           aria-label="Open navigation"
           onClick={onOpenDrawer}
         >
           <Menu className="w-5 h-5" />
+          {attentionDot}
         </button>
         <h2 className="font-headline font-semibold text-sm truncate text-foreground">{thread.title}</h2>
         {thread.folder_id && (

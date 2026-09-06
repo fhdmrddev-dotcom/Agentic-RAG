@@ -1,5 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { NavPanel } from "./NavPanel"
+// Phase 235 plan 09 (SURF-03 / D-235-03 / D-235-05) — the app-shell attention registry.
+//
+// ⚠ REACHED THROUGH A NAMESPACE IMPORT ON PURPOSE. This plan's acceptance criterion is a LINE
+// count: exactly one line of this file may name the registry, because that is what makes
+// "ChatLayout is the ONE reader" a measurable property rather than a claim. A named import
+// would spend that line on the import statement and leave the real call site unmeasurable.
+import * as attentionRegistry from "./attentionConditions"
 import { ChatHistoryColumn } from "./ChatHistoryColumn"
 import { ThreadCommandPalette } from "./ThreadCommandPalette"
 import { ChatArea } from "@/components/chat/ChatArea"
@@ -109,16 +116,15 @@ interface Props {
   // plan does not own. Optional keeps the measured baseline and costs nothing — App always
   // passes them.
   //
-  // ⚠ `onOpenLibraryHealth` IS ACCEPTED AND FORWARDED TO NOTHING IN THIS PLAN. Its consumer
-  // is `NavPanel`'s badge popover, built by plan 09 in the next wave. It is declared here and
-  // NOT destructured below, so `noUnusedParameters` stays quiet and plan 09 adds exactly one
-  // name to the parameter list and one prop to the `<NavPanel>` mount. Stated rather than
-  // left to be found — an accepted prop that reaches nowhere reads as a wired feature.
+  // ⚠ PLAN 08 LEFT `onOpenLibraryHealth` DECLARED AND FORWARDED TO NOTHING, and said so
+  // rather than letting it read as a wired feature. Plan 09 WIRED IT: it is destructured
+  // below and threaded to the rail's badge popover, the mobile drawer's Library button and
+  // the drawer-opening control — three renderers, one read.
   libraryTab?: LibraryTab
   onOpenLibraryHealth?: () => void
 }
 
-export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOperator, operatorIdentity, prefillMessage, onSetPrefillMessage, studioSkillId, studioTab, onOpenStudio, onReviewEvals, onStudioTabChange, onTuneSkill, libraryTab }: Props) {
+export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOperator, operatorIdentity, prefillMessage, onSetPrefillMessage, studioSkillId, studioTab, onOpenStudio, onReviewEvals, onStudioTabChange, onTuneSkill, libraryTab, onOpenLibraryHealth }: Props) {
   const {
     threads,
     selectedThread,
@@ -516,6 +522,27 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
   // everything through, so an untouched drawer is byte-identical to before.
   const mobileFiltered = threads.filter((t) => matchesTitle(t, mobileQuery))
 
+  // ── Phase 235 plan 09 (SURF-03 · D-235-01 / D-235-03 / D-235-05 · T-235-30) ──────────
+  //
+  // ⛔ THE ONE READ. Three renderers hang off this single line — the desktop rail badge, the
+  // mobile drawer's Library button and the drawer-opening hamburger's dot. A second read
+  // anywhere in this tree would poll the verdict twice and the two answers would eventually
+  // disagree about the same source; `ChatLayout.badge.test.tsx` asserts the fetch fires
+  // `toHaveBeenCalledTimes(1)`, which is the only assertion that can tell the two worlds apart.
+  //
+  // The callback is memoised so the produced conditions are stable across renders.
+  const openLibraryHealth = useCallback(() => onOpenLibraryHealth?.(), [onOpenLibraryHealth])
+  const attentionConditions = attentionRegistry.ATTENTION_PRODUCERS.flatMap((producer) =>
+    producer.use(openLibraryHealth),
+  )
+  // ⚠ Rules of hooks hold across the loop above because the registry is a FROZEN module
+  // constant: its length cannot change between renders, so the hook call order cannot either.
+  const attentionCount = attentionConditions.length
+  // ⛔ NOTHING IS DERIVED HERE. The server applied the soft-failure debounce; an instance
+  // where one check failed and the next recovered arrives as an empty array and signals
+  // nothing (SC#4).
+  const showAttention = attentionCount > 0 && Boolean(onOpenLibraryHealth)
+
   return (
     <div className="flex h-screen bg-background">
       <NavPanel
@@ -529,6 +556,8 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
         onToggleTheme={toggleTheme}
         expanded={navExpanded}
         onToggleExpanded={toggleNavExpanded}
+        attentionConditions={attentionConditions}
+        onOpenLibraryHealth={onOpenLibraryHealth}
       />
 
       {/* Phase 156 (POLISH-01 / D-01, Wave 1): the dedicated full-height chat-history
@@ -665,6 +694,11 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
           <div className="border-t border-border/20 px-2 py-3 flex items-center justify-around">
             {navItems.map(({ view, icon: Icon, label }) => {
               const isActive = activeView === view
+              // Phase 235 plan 09 (SURF-03): the SAME signal the desktop rail carries, on the
+              // surface a phone actually has. ⛔ A rail badge alone is desktop-only, and
+              // closing SURF-03 against it would close the requirement against its own
+              // sentence — the error D-235-01 already rejected once for the Health tab.
+              const showHere = showAttention && view === "documents"
               return (
                 <button
                   key={view}
@@ -672,10 +706,24 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
                   aria-current={isActive ? "page" : undefined}
                   onClick={() => { onNavigate(view); setDrawerOpen(false) }}
                   className={cn(
-                    "flex items-center justify-center w-10 h-10 rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30",
+                    "relative flex items-center justify-center w-10 h-10 rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30",
                     !isActive && "text-muted-foreground hover:text-sidebar-foreground hover:bg-accent/40",
                   )}
                 >
+                  {/* ⛔ `aria-hidden` — the drawer button carries `aria-label={label}` exactly
+                      as `RailItem` does, so an unhidden count would rename it to "Library 2"
+                      and break every `getByRole` that names it (the six cases
+                      `IngestionTab.tsx:176-188` measured). The warning tone, never the danger
+                      one — a source state is never drawn in the danger token. */}
+                  {showHere && (
+                    <span
+                      data-testid="drawer-attention-badge"
+                      aria-hidden="true"
+                      className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-warning text-warning-foreground text-[10px] font-bold leading-[18px] text-center"
+                    >
+                      {attentionCount}
+                    </span>
+                  )}
                   {isActive ? (
                     <div className="flex items-center justify-center w-10 h-10 rounded-xl gradient-primary shadow-sm shadow-primary/20">
                       <Icon className="w-4 h-4 text-white" />
@@ -754,6 +802,10 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
               prefillMessage={prefillMessage}
               onClearPrefill={() => onSetPrefillMessage(null)}
               onOpenDrawer={() => setDrawerOpen(true)}
+              // Phase 235 plan 09 (SURF-03): a CLOSED drawer must still signal, so the
+              // control that OPENS it carries a dot. Same one read as the rail and the
+              // drawer row — a count, never a second poll.
+              attentionCount={showAttention ? attentionCount : 0}
               // The composer's Connectors flyout needs a REAL navigator: this app has no
               // router (SEED-185), so its three buttons set a URL hash nothing reads — and
               // one called an undefined `navigate` and threw ReferenceError. It goes to the
