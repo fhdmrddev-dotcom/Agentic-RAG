@@ -22,7 +22,13 @@ import userEvent from "@testing-library/user-event"
 import type { SyncRun } from "@/lib/api/sources"
 
 import { RunHistoryList } from "./RunHistoryList"
-import { COPY, sourceFailureSentence } from "./sourceHealthVocabulary"
+import {
+  COPY,
+  sourceFailureSentence,
+  CHECKED_PREFIX,
+  COUNT_ORDER,
+  WORD_FOR_COUNT,
+} from "./sourceHealthVocabulary"
 // The component's own source, read as text for the three fences below.
 import componentSource from "./RunHistoryList.tsx?raw"
 
@@ -83,6 +89,28 @@ function mount(over: Partial<Parameters<typeof RunHistoryList>[0]> = {}) {
     />,
   )
   return { ...view, onToggleExpanded }
+}
+
+/** ONE run, mounted alone, so a row's whole text is the thing under assertion. */
+function mountOne(over: Partial<SyncRun> = {}, id = "4") {
+  return render(
+    <RunHistoryList
+      runs={[makeRun(id, over)]}
+      connectionName={CONNECTION}
+      expanded={false}
+      onToggleExpanded={vi.fn()}
+      now={NOW}
+    />,
+  )
+}
+
+/**
+ * A row's rendered reading, whitespace-normalised. ⚠ Assertions below compare against this
+ * WHOLE string rather than probing for a substring: a breakdown that gained a seventh bit, or
+ * lost the instant, or grew a stray zero, has to redden something.
+ */
+function rowText(): string {
+  return (screen.getByTestId("sources-run").textContent ?? "").replace(/\s+/g, " ").trim()
 }
 
 afterEach(cleanup)
@@ -244,5 +272,120 @@ describe("§6 the fences a later edit must not break", () => {
     // The plan's acceptance grep, made executable: a quoted literal that opens with a
     // capitalised word followed by a space is a SENTENCE, and sentences live in the leaf.
     expect(componentSource).not.toMatch(/["'][A-Z][a-z]+ [^"'\n]*["']/)
+  })
+})
+
+// ── §7 WHAT THE CHECK ACTUALLY DID ────────────────────────────────────────────────────
+//
+// ⭐⭐ EVERY CASE BELOW ASSERTS CONTENT, AND THAT IS THE WHOLE LESSON OF THIS GAP.
+//
+// The gap this section closes (G1a, SC#1) shipped THROUGH a green fence. `sourceComposition`
+// asserts that the contract's blocks are PRESENT, by `data-testid` — and `sources-run` and
+// `sources-fail-reason` were both present, in the right counts, the entire time. They were
+// rendering one summed `N files` where the approved design renders a per-category breakdown.
+// A presence assertion cannot tell those two apart, so it passed on a surface that answered
+// none of the questions SC#1 names: how many were ADDED, how many were SKIPPED, how many
+// FAILED. That is ROADMAP failure mode #3, and it escaped because the only thing anybody
+// asserted was that an element existed.
+//
+// ⛔ So: a case here that only proves an element exists has not closed this gap and must not
+// be written. Each one below pins the rendered TEXT — several against the row's WHOLE string,
+// so a bit that appears, disappears or is reworded reddens rather than passes quietly.
+
+describe("§7 the per-category breakdown", () => {
+  it("⭐ a row reads as the full breakdown, whole-string — not one summed number", () => {
+    mountOne({ count_new: 3, count_modified: 1, count_missing: 2, count_errors: 1 })
+
+    expect(rowText()).toBe(
+      `${CHECKED_PREFIX("4 min ago")} · 3 added · 1 updated · 2 missing at source · 1 could not be read`,
+    )
+    // ⛔ The defect, stated as an assertion: the sum of those four is 7, and no reading of
+    //    this row may be the word for a file count next to that total.
+    expect(rowText()).not.toContain(COPY.checkedAgo("4 min ago", 7))
+  })
+
+  it("emits one element per NON-ZERO category, in the design's reading order", () => {
+    mountOne({ count_new: 3, count_modified: 1, count_missing: 2, count_errors: 1 })
+
+    expect(screen.getByTestId("sources-run-counts")).toBeInTheDocument()
+    const shown = COUNT_ORDER.filter((key) => screen.queryByTestId(`sources-run-count-${key}`))
+    expect(shown).toEqual(["new", "modified", "missing", "errors"])
+    expect(screen.getByTestId("sources-run-count-new")).toHaveTextContent(
+      `3 ${WORD_FOR_COUNT.new}`,
+    )
+    expect(screen.getByTestId("sources-run-count-errors")).toHaveTextContent(
+      `1 ${WORD_FOR_COUNT.errors}`,
+    )
+  })
+
+  it("⛔ a zero-valued category is ABSENT — never printed as a zero next to its word", () => {
+    mountOne({ count_new: 3 })
+
+    expect(rowText()).toBe(`${CHECKED_PREFIX("4 min ago")} · 3 added`)
+    for (const key of COUNT_ORDER.filter((k) => k !== "new")) {
+      expect(screen.queryByText(new RegExp(WORD_FOR_COUNT[key], "i"))).toBeNull()
+      expect(screen.queryByTestId(`sources-run-count-${key}`)).toBeNull()
+    }
+    expect(rowText()).not.toMatch(/\b0\s/)
+  })
+
+  it("the store carries six counts, so renamed and restored get their own words too", () => {
+    mountOne({ count_renamed: 2, count_restored: 1 })
+
+    expect(rowText()).toBe(`${CHECKED_PREFIX("4 min ago")} · 2 renamed · 1 restored`)
+  })
+
+  it("⛔ a non-quiet check with nothing to count prints the instant and NO dangling separator", () => {
+    // Not quiet because it failed — the counts are all zero, so the bit list is empty and a
+    // joined list with an empty tail is exactly where a trailing separator hides.
+    mountOne({ status: "failed" })
+
+    expect(screen.queryByTestId("sources-run-counts")).toBeNull()
+    expect(rowText()).toContain(CHECKED_PREFIX("4 min ago"))
+    expect(rowText()).not.toContain("·")
+  })
+
+  it("a QUIET check is untouched — it still reads no changes, and prints no bits", () => {
+    mountOne()
+
+    expect(rowText()).toBe(COPY.checkedNoChange("4 min ago"))
+    expect(screen.queryByTestId("sources-run-counts")).toBeNull()
+  })
+
+  it("⚠ an unparseable instant prints no time, and the bits still say what happened", () => {
+    mountOne({ started_at: "not-an-instant", count_new: 5 })
+
+    expect(rowText()).toBe("5 added")
+    expect(rowText()).not.toMatch(/^·/)
+  })
+
+  it("⛔ an incomplete listing keeps its note, and the breakdown sits BESIDE it", () => {
+    mountOne({ listing_complete: false, count_new: 2 })
+
+    expect(rowText()).toContain(`${CHECKED_PREFIX("4 min ago")} · 2 added`)
+    expect(screen.getByTestId("sources-listing-incomplete")).toBeInTheDocument()
+    // ⛔ RESEARCH P-2 — `count_missing = 0` here was written by the H-5 structural guard, not
+    //    observed at the source. It must never reach the screen as a reassuring zero.
+    expect(screen.queryByText(/0 missing/i)).toBeNull()
+    expect(screen.queryByTestId("sources-run-count-missing")).toBeNull()
+  })
+
+  it("the mounted sketch history reads its own ticks back, in words", () => {
+    mount()
+
+    const rows = screen.getAllByTestId("sources-run").map((r) => r.textContent ?? "")
+    expect(rows.some((t) => t.includes("12 added") && t.includes("2 missing at source"))).toBe(true)
+    expect(rows.some((t) => t.includes("3 added") && t.includes("1 updated"))).toBe(true)
+    expect(rows.some((t) => t.includes("1 could not be read"))).toBe(true)
+  })
+
+  it("⛔ the summed reading is gone from the component, and the words come from the leaf", () => {
+    // The plan's acceptance greps, made executable. The one-number helper is deleted here;
+    // the source CARD keeps its own copy on purpose, and that difference is deliberate.
+    expect(componentSource).not.toContain("filesTouched")
+    expect(componentSource).toContain("COUNT_ORDER")
+    expect(componentSource).toContain("WORD_FOR_COUNT")
+    // ⛔ No breakdown word is spelled in the component — it composes, it does not author.
+    expect(componentSource).not.toMatch(/["'](added|updated|missing at source|could not be read)["']/)
   })
 })
