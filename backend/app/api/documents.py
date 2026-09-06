@@ -2352,50 +2352,6 @@ def ingest_document(
 
         supabase.table("documents").update({"ingestion_step": "metadata"}).eq("id", document_id).execute()
 
-        # Phase 118 (CLASS-02 / D-118-2/3/4/8) — classification rule-eval pass.
-        # Runs immediately BEFORE the single persist UPDATE below (metadata_dict is final
-        # here — it is only READ for the chunk header above, never mutated). It writes ONE
-        # `_classification` SUGGESTION into metadata_dict; the existing :metadata write below
-        # carries it. It NEVER writes folder_id — the milestone anti-feature ("silent
-        # autonomous auto-filing") is structurally impossible here; the move happens ONLY on
-        # an explicit Accept (accept_classification).
-        #
-        # This is a sync def inside a BackgroundTask (NO request JWT — auth.uid() is NULL and
-        # the service-role client BYPASSES RLS). The SOLE owner-scoping gate is the in-app
-        # `.or_(user_id.eq.{uploader},is_system_global.eq.true)` predicate (Pitfall 3, D-118-8): an
-        # unscoped select would return ALL users' rules. A global rule is evaluated against
-        # the uploader's OWN metadata_dict only. sync .execute() — D-v2.5-01 does NOT fire.
-        if metadata_dict:  # no metadata → nothing to match (never blocks ingest)
-            try:
-                from app.services import classification_matcher  # noqa: PLC0415
-                from app.utils.db import coerce_uid  # noqa: PLC0415
-                rules = (
-                    supabase.table("classification_rules").select("*")
-                    # AR-118-01: coerce the interpolated uploader id (service-role read,
-                    # RLS bypassed — this app-code predicate is the SOLE owner gate).
-                    .or_(f"user_id.eq.{coerce_uid(user_id)},is_system_global.eq.true")  # D-118-8 own + global
-                    .eq("enabled", True)
-                    .order("is_system_global").order("created_at")  # owner(false) before global(true); oldest first (D-118-4)
-                    .execute()
-                ).data or []
-                # AR-118-02: fail-closed Python re-filter — the same defense-in-depth the
-                # sibling service-role own+global reads carry (read_enabled_field_defs,
-                # list_rules). `(A OR B) AND enabled` is correct today, but this guarantees
-                # a malformed/over-broad result can NEVER evaluate another user's rule
-                # against this uploader's metadata (the phase's highest-stakes leak site).
-                rules = [r for r in rules if r.get("is_system_global") or str(r.get("user_id")) == str(user_id)]
-                whitelist = _METADATA_BUILTINS | {
-                    d["field_key"] for d in read_enabled_field_defs(supabase, user_id)  # SYNC reader
-                }
-                for rule in rules:  # first-match-wins (D-118-3): ONE object, never an array
-                    if classification_matcher.match_metadata(rule["match_expr"], metadata_dict, whitelist):
-                        metadata_dict["_classification"] = classification_matcher.build_suggestion(
-                            rule, supabase, user_id,
-                        )
-                        break
-            except Exception:  # noqa: BLE001 — classification NEVER blocks ingestion (mirror the metadata degrade)
-                log.warning("classification rule-eval failed; skipping suggestion", exc_info=True)
-
         # chunk_count = TOTAL searchable rows for the document (text chunks +
         # image-description chunks inserted by multimodal_service.extract_and_store_images).
         # This write happens AFTER multimodal insert, so a count(*) is authoritative and
