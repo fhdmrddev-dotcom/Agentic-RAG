@@ -4,12 +4,18 @@ title: Classification rules never run on the queue ingest path, so no synced or 
 reported: 2026-09-06
 surface: Agentic-RAG
 severity: major
-status: open
+status: closed
 affected_areas: [backend/ingestion, classification, connectors/watches]
-folded_into: null
-verified_closed_by: null
+folded_into: quick-260906-5qd
+verified_closed_by: quick-260906-5qd (423d12a3e move, 26a93b069 agreement tests)
 related_seeds: [SEED-252]
-re_open_trigger: null
+re_open_trigger: >-
+  A live-database confirmation is OWED and was NOT performed: no watched file has been
+  observed arriving with a non-null `metadata._classification` on a real Supabase. Re-open
+  if a watch-ingested document is measured still carrying `_classification=None` while an
+  enabled matching rule exists. Also re-open if `grep -n classification_matcher` returns a
+  non-comment hit in `backend/app/api/documents.py` or `backend/app/services/ingest_splice.py`
+  — that is the step having two homes again, which is how this happened.
 reproduces_on:
   branch: develop
   commit: da34aa8f7

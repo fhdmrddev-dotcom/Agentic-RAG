@@ -42,17 +42,29 @@ Prior: 234 — The Watch Loop (✅ CLOSED — verified by DRIVING)
 Plan: none in flight
 Status: context_gathered
 Resume file: `.planning/phases/235-the-source-says-what-it-did/235-CONTEXT.md`
-Last activity: 2026-09-06 — Phase 235 discuss-phase. 14 questions, every recommendation accepted.
+Last activity: 2026-09-06 — quick task `260906-5qd` closed `BUG-260906-01`; sketch 233 done, winner **B**.
 
-⛔ **Next action is NOT plan-phase.** Two things come first, in order:
-1. **`/gsd:quick` — fix `BUG-260906-01`** (classification never runs on the queue path). Move the
-   rule block out of `ingest_document` into `ingest_enrich.py`; the test is an **agreement** test in
-   `test_ingest_enrich_shared.py`, never a second per-path test (D-235-18). The roadmap requires
-   this before 235 — a run history that cannot report "filed into X" is built around the hole.
-2. **`/gsd:sketch 235` — G-2 is MANDATORY here and was honoured, not overridden.** One sketch must
-   settle all four surfaces together: the run history (with quiet-run collapsing), the
-   stopped-reading card + its one control, the rail badge + popover, and the instance-level
-   reader-off statement (D-235-19).
+✅ **Both pre-plan obligations are DISCHARGED. `/gsd:plan-phase 235` is now the next action.**
+1. ✅ **`BUG-260906-01` fixed** — quick task `260906-5qd`, merged at `9d9e54743`. See the Quick Tasks
+   table below for the measured gates and the one obligation it left owed.
+2. ✅ **G-2 sketch done and WON** — `.planning/sketches/233-the-source-says-what-it-did/`, winner
+   **B — a healthy source is one line** (operator, 2026-09-06). All four surfaces settled together
+   per `D-235-19`. ⭐ **The plan MUST be authored against
+   `.planning/sketches/233-the-source-says-what-it-did/BUILD-CONTRACT.generated.md`**, not from
+   CONTEXT.md alone — that generated file carries the COPY table, the cause→control map, and the
+   ordered `data-block` / `data-action` composition list the React suite must reproduce, driven RED
+   first. Plans authored from CONTEXT while ignoring the sketch is the measured cause of sketch-218's
+   *"nothing at all like what we designed."*
+
+⚠ **A design decision the sketch made that CONTEXT.md did not anticipate:** the healthy source
+collapses to **one line** and opens on click (**50% less visible text at rest**, measured). SC#1 —
+*"a person opens a source and sees every run"* — is satisfied by the expansion, and the sketch
+asserts it. ⚠ **A stopped or unreadable source is NEVER collapsed.**
+
+⚠ **`D-235-04`'s fork is SETTLED, and not the way CONTEXT.md left it.** CONTEXT recorded the popover
+carrying the repair as an open variant; it was measured **unfeelable** (248 chars of ~30,000; landing
+screens pixel-identical) and is now settled by rule: **the fix has ONE home, on the source card**, in
+both variants. The badge popover is a **door**; the Health row says **Go to source**.
 
 **The forced decision is made:** `SURF-03` is carried by **option B + A** — a general app-shell
 notification surface with **exactly one tenant** (a broken source), plus the Health-tab detail.
@@ -70,6 +82,43 @@ row is correct. 234 consumed 168-171 (D-235-20).
 
 ⚠ **Still owed from before, and NOT closed by any of this:** 233's five G-4 rows (run row 2 first);
 `OD-232-01` (no live shared drive browsed); 234's SC#2 / SC#3 / H-5 are **unexercised, not failed**.
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260906-5qd | fix BUG-260906-01 — classification never ran on the queue ingest path | 2026-09-06 | `423d12a3e` + `26a93b069` (merged `9d9e54743`) | [260906-5qd-fix-bug-260906-01](./quick/260906-5qd-fix-bug-260906-01/) |
+
+⭐ **The sixth instance of the 2026-09-05 shape is closed** — two code paths serving one outcome,
+only one doing the work. The rule-evaluation block moved out of `ingest_document`
+(`documents.py`, −44 L) into `services/ingest_enrich.py` (+76 L), the single home both transports
+already call. The `coerce_uid` owner gate, the **AR-118-02 fail-closed re-filter** and first-match-wins
+(`D-118-3`) all survived intact; `enrich_for_ingest` stays sync and keyword-only.
+
+⭐ **The test is an AGREEMENT test, and both fences were driven RED before restoring.** Reverting the
+move fails with *"the legacy upload path derived no classification"* and *"documents.py evaluates
+classification rules itself — the step has two homes again"*; removing the AR-118-02 re-filter alone
+fails with `rule_id: 'rule-stranger-1'` in the output, which proves the re-filter rather than merely
+that nothing matched.
+
+⚠ **AN HONEST LIMIT, STATED RATHER THAN GLOSSED:** on the reverted tree the step is absent from
+*both* transports, so the `legacy_cls == queued_cls` **equality** assertion cannot itself fire — the
+two **presence** assertions are what go red. The equality assertion is a forward guard against
+re-splitting or threadpool divergence, not the thing that reproduces this bug.
+
+**Gates:** backend `72 failed · 3781 passed` (unmodified tree, measured first) → `71 failed · 3786
+passed`. **New failures: zero**, by `comm -13` over both normalised FAILED name-sets.
+⚠ **The 72 → 71 is NOT claimed as earned.** `test_email_ingestion.py::test_ingest_email_populates_metadata_and_attachments`
+flipped; it makes a **real live-model call** and asserts on the model's answer
+(`assert 'status update / confirmation' == 'email'`). Coin-flip, not repair — and a reminder that the
+CLAUDE.md ceiling of **71 was already stale at 72** before this work began.
+
+⛔ **OWED, NOT CLAIMED:** nobody has confirmed on the **live DB** that a watched file arrives carrying
+`_classification`. That obligation is written into `BUG-260906-01`'s `re_open_trigger`, not left in
+prose here. `graphify update .` was not run (the graph artifact belongs to the main tree, not a
+throwaway worktree).
+
+---
 
 ### ✅ Phase 234 — CLOSED 2026-09-06 (Gemini built · Claude verified BY DRIVING)
 
