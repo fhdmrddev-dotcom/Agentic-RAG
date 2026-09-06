@@ -7851,7 +7851,19 @@ here changes what `App.tsx` compiles against.
 
 ## frontend/src/lib/api/sources.ts
 
-**4 / 1 / 296** · no (1 phase) · the watch + sync-run + source-health wire client.
+**5 / 1 / 312** · no (1 phase) · the watch + sync-run + source-health wire client.
+
+⭐ **235-13 — IT HELD TWO HAND-WRITTEN COPIES OF THE CAUSE UNION, AND THE FENCE WAS BLIND TO
+BOTH.** `SyncRun.failure_cause` and `StoppedSource.cause` each spelled the four causes out.
+`sourceHealthVocabulary.test.ts`'s `?raw` fence binds the **vocabulary leaf** to
+`failure_cause.py`; **it cannot see a copy in a third file**, so when the backend gained a fifth
+cause these two fields declared the server could not send what it had just started sending — and
+the compiler agreed with the stale copy, rejecting the new value at the render. Both now
+`import type { SourceFailureCause }` from the leaf, which puts them behind the fence.
+⚠ `import type` is erased at build, and the leaf has **zero imports**, so this adds no runtime
+dependency from the API layer onto a component directory and a cycle is impossible.
+⚠ **The lesson generalises:** a union pinned by a fence is only pinned where the fence can read.
+Grep for hand-written copies before widening one.
 
 ⚠ **NOT covered by `frontend/src/lib/api.ts`'s row — that row is the BARREL.** This is the same
 correction Phase 214 had to make for `org.ts`, `knowledge.ts`, `threads.ts`, `connectors.ts` and
@@ -7967,8 +7979,36 @@ has created a second verdict that can disagree — and the person who finds the 
 
 ## frontend/src/components/sources/sourceHealthVocabulary.ts
 
-**1 / 1 / 315** · no (1 phase) · every sentence and every repair-control label the source surfaces
+**2 / 1 / 454** · no (1 phase) · every sentence and every repair-control label the source surfaces
 say. A strict leaf.
+
+⭐ **235-13 (gap-closure round 1) — THE FIFTH CAUSE, AND FIVE SIBLING EXPORTS.**
+`connection_disabled` gained a sentence and a control here in the SAME plan that widened
+`failure_cause.py`, because widening one side alone leaves the `?raw` fence red between waves.
+Three pins were re-baselined **deliberately, with the reason written beside each number**:
+`SENTENCE_FOR_CAUSE` 4 → 5, `backendCauses()` 4 → 5, and — found by running the wider suite
+rather than by reading the plan — a **third** pin at `WatchedFoldersSection.test.tsx:235`.
+
+- ⛔ **Its control is NOT "Retry now" and NOT "Reconnect".** *Turn {name} back on* — Retry cannot
+  change a connection somebody switched off, and re-authorising is not what is wrong. The
+  ACTION reuses `reconnect` (the Connections surface IS where the switch lives), so the shipped
+  "three named actions" pin stays green **by construction rather than by being loosened.**
+- ⭐ **D-235-11 was demonstrated, not asserted.** `WatchedFoldersSection.test.tsx` loops the
+  control table, so the fifth cause generated its own render case — and it **passed first time
+  against an unmodified `WatchedFoldersSection.tsx`.** The count pin was the file's only edit.
+- ⚠ **The identifier is deliberately NOT spelled in this file's docblock.** The suite pins its
+  occurrences at **three** — union, sentence table, control table — so reaching for a per-cause
+  branch reds. A literal in a comment is still a literal (the Pitfall-8 discipline the fixture
+  name already follows).
+- **Five new exports, all SIBLINGS of `COPY`, which stays pinned CLOSED at 26:** `WORD_FOR_COUNT`
+  + `COUNT_ORDER` (the six stored counts as words — four byte-identical to the sketch, and
+  `renamed`/`restored` named as OURS because the fixture exercised only four), `CHECKED_PREFIX`
+  (⛔ `COPY.checkedAgo` is **not** deleted: the card keeps the summary, the history gets the
+  breakdown), `FILE_FAILURE_HEADING` / `FILE_FAILURE_SCOPE_NOTE` (⭐ the scope note is the whole
+  reason a card may render per-file reasons at all — `connector_watch_items` carries a file's
+  CURRENT state, never a per-run attribution), and `instantPhrase` (⚠ **not `Intl`**, whose
+  output differs between runners; `null` for null / blank / unparseable, because silence beats
+  an invented instant).
 
 ⛔ **`Object.keys(COPY)` IS PINNED AT EXACTLY 26** by `sourceHealthVocabulary.test.ts:138`, and that
 pin is now blocking **four plans' worth of orphaned labels**: plan 04's `LISTING_INCOMPLETE_NOTE`,

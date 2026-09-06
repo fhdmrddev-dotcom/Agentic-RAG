@@ -70,8 +70,27 @@
  *   • `unreachable`   — a timeout, a rate limit, a 5xx. SOFT: it may recover, so the source
  *                       stops only after `SOFT_FAILURE_THRESHOLD` consecutive failures.
  *   • `unknown`       — the honest fallback. Never a guess.
+ *
+ * ⭐ THE FIFTH CAUSE, added in gap-closure round 1, is the connection being SWITCHED OFF, and
+ * it is the one member of this union that is WRITTEN ONLY. HARD: a connection somebody turned
+ * off cannot come back on the next tick. ⛔ `classifySourceFailure` below infers it from
+ * NOTHING — the backend seam that read `is_enabled` off the connection row is the only code
+ * that knows the fact, and a provider saying "disabled" about a file, an API, a scope or an
+ * account is not evidence about this connection. Offering *turn it back on* for a connection
+ * that is already on is the mirror of the defect this closes.
+ *
+ * ⚠ ITS IDENTIFIER IS DELIBERATELY NOT SPELLED IN THIS DOCBLOCK (the Pitfall-8 discipline the
+ * fixture name already follows one paragraph down). The suite counts its occurrences in this
+ * file's source and pins them at THREE — the union, the sentence table, the control table — so
+ * that reaching for a per-cause branch reds instead of waiting for a reviewer. A literal inside
+ * a comment is still a literal, and it would spend one of those three.
  */
-export type SourceFailureCause = "token_revoked" | "folder_gone" | "unreachable" | "unknown"
+export type SourceFailureCause =
+  | "token_revoked"
+  | "folder_gone"
+  | "unreachable"
+  | "connection_disabled"
+  | "unknown"
 
 /** The per-FILE failure reasons, for a file inside an otherwise healthy source. */
 export type SourceFileFailureKind = "password" | "too_big" | "unknown"
@@ -117,6 +136,12 @@ export const SENTENCE_FOR_CAUSE: Record<
   //   `failure_cause.py`. The suite pins that constant at 3 so this sentence cannot quietly
   //   become a lie if the threshold moves.
   unreachable: () => "The server did not answer the last three checks.",
+  // ⚠ The one cause a message can never produce — see the union's docblock. It names the state
+  //   and how it ends, and it does not name the switch: the person who turned the connection
+  //   off knows where the switch is, and the person who did not would be helped by a door
+  //   (the control below), never by a setting name.
+  connection_disabled: (connectionName) =>
+    `The connection to ${named(connectionName)} is switched off — reading resumes when it is switched back on.`,
   unknown: () => UNKNOWN_SOURCE_FAILURE_SENTENCE,
 }
 
@@ -136,6 +161,19 @@ export const CONTROL_FOR_CAUSE: Record<
   },
   folder_gone: { label: () => "Pick a different folder", action: "repick_folder" },
   unreachable: { label: () => "Retry now", action: "retry" },
+  // ⭐ THE ROW THIS GAP-CLOSURE ROUND EXISTS FOR. It was previously reached as `unknown`, whose
+  //   control is "Retry now" — a button that provably cannot change a connection somebody
+  //   switched off. SC#2's word is *fixes*.
+  //   ⚠ The label is NOT "Reconnect": an OAuth dance is not what is wrong, and telling a person
+  //     to re-authorise a connection they deliberately turned off is a wrong instruction.
+  //   ⚠ The ACTION deliberately REUSES `reconnect` rather than inventing a fourth. `reconnect`
+  //     is a DOOR — the Connections surface — and that is exactly where the switch lives. The
+  //     shipped "every cause carries exactly one action, drawn from the three named actions"
+  //     pin therefore stays green BY CONSTRUCTION, not by being loosened.
+  connection_disabled: {
+    label: (connectionName) => `Turn ${named(connectionName)} back on`,
+    action: "reconnect",
+  },
   unknown: { label: () => "Retry now", action: "retry" },
 }
 
@@ -312,4 +350,105 @@ export const COPY = {
   history: "History",
   hideHistory: "Hide history",
   collapse: "Collapse",
+}
+
+// ── THE PER-RUN BREAKDOWN, THE PER-FILE HEADING, AND THE ABSOLUTE INSTANT ─────────────
+//
+// ⚠ EVERY EXPORT BELOW IS A SIBLING OF `COPY`, NEVER A KEY INSIDE IT. `Object.keys(COPY)` is
+// pinned CLOSED at 26 against the sketch's own object (28 top-level keys less the two hoisted
+// tables), and that pin is a fence about the DESIGN, not a container for later additions.
+
+/** The six counts a stored tick carries. Mirrors `runHistoryFold.ts:63-81`, less the prefix. */
+export type CountKey = "new" | "modified" | "renamed" | "restored" | "missing" | "errors"
+
+/**
+ * ⭐ ONE STORED COUNT → ONE WORD. The run history renders a BREAKDOWN — *"3 added · 1 updated ·
+ * 2 missing at source · 1 could not be read"* — and not the single summed `N files` the card
+ * shows. A sum answers *"did anything happen?"*; only the breakdown answers *"what happened?"*,
+ * which is the question ROADMAP failure mode #3 says the surface was failing.
+ *
+ * ⚠ FOUR OF THESE SIX ARE THE SKETCH'S OWN WORDS, byte-identical to `index.html:478-481`:
+ * `added`, `updated`, `missing at source`, `could not be read`. The store carries SIX counts
+ * and the sketch's fixture exercised four, so `renamed` and `restored` are OURS — written as
+ * lowercase fragments in the same register, and named here rather than slipped in, because a
+ * word the design never approved should be visible as such.
+ *
+ * ⚠ They are FRAGMENTS, not sentences: the caller composes `{n} {word}`, so none of them ends
+ * in punctuation and none of them is capitalised.
+ */
+export const WORD_FOR_COUNT: Record<CountKey, string> = {
+  new: "added",
+  modified: "updated",
+  renamed: "renamed",
+  restored: "restored",
+  missing: "missing at source",
+  errors: "could not be read",
+}
+
+/**
+ * The order the bits are read in — the sketch's, not the store's. ⚠ Separate from the table on
+ * purpose: object key order is a language detail, and a render order is a design decision.
+ */
+export const COUNT_ORDER: readonly CountKey[] = [
+  "new",
+  "modified",
+  "renamed",
+  "restored",
+  "missing",
+  "errors",
+]
+
+/**
+ * *"Checked 4 minutes ago"* — the prefix `COPY.checkedAgo` bakes a summed `N files` into.
+ *
+ * ⛔ `COPY.checkedAgo` is NOT deleted and NOT reworded. The source CARD still renders the
+ * one-line summary; the run HISTORY renders this prefix plus the per-category bits. Two
+ * surfaces, two densities, one set of facts — and the 26-key pin stays undisturbed.
+ */
+export const CHECKED_PREFIX = (ago: string): string => `Checked ${ago}`
+
+/** The heading over the per-file failures inside an otherwise healthy source. */
+export const FILE_FAILURE_HEADING = "Files that could not be read"
+
+/**
+ * ⭐ THE WHOLE REASON A CARD MAY RENDER PER-FILE REASONS AT ALL. `connector_watch_items` carries
+ * each file's CURRENT state — it is not an attribution to any one check. Rendering the list
+ * under a run without this note would claim a per-run provenance the data does not have, which
+ * is precisely the overclaim this phase exists to stop making.
+ */
+export const FILE_FAILURE_SCOPE_NOTE =
+  "This is how these files stand now — not the result of one check."
+
+/** Month names, module-local. ⚠ NOT `Intl`: its output differs between runners and CI boxes. */
+const MONTH_NAMES = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+]
+
+/**
+ * An absolute instant in the BUILD-CONTRACT's shape — `"2 September, 09:14"` — in LOCAL time.
+ *
+ * ⚠ It returns `null` rather than a stand-in for null, undefined, blank and unparseable input.
+ * `relativeBand`'s own recorded rule: silence beats an invented instant. A caller that has no
+ * instant renders no instant; it never renders a guess at one.
+ */
+export function instantPhrase(at: string | null | undefined): string | null {
+  if (at === null || at === undefined) return null
+  const raw = String(at).trim()
+  if (raw.length === 0) return null
+  const d = new Date(raw)
+  if (Number.isNaN(d.getTime())) return null
+  const hh = String(d.getHours()).padStart(2, "0")
+  const mm = String(d.getMinutes()).padStart(2, "0")
+  return `${d.getDate()} ${MONTH_NAMES[d.getMonth()]}, ${hh}:${mm}`
 }
