@@ -77,9 +77,36 @@ export interface UpdateWatchPayload {
   clear_library_folder?: boolean
 }
 
+/**
+ * The `/sources/watches/{id}/sync` reply.
+ *
+ * ⭐ Phase 235 plan 07 put three more fields on the wire and 235-07-SUMMARY recorded that this
+ * interface had NOT been widened — *"a Wave-4 surface reading `res.next_check_within_seconds`
+ * will not compile until then"*. Plan 10 is that surface, so it is widened here.
+ *
+ * ⚠ `status` carries TWO new values and both are load-bearing (`BUG-260906-02`):
+ *
+ *   • `"asked"`   — a live reader exists and the next pass will pick this watch up. The
+ *                   surface says *"Asked · next check within N"*, never that work is happening.
+ *   • `"refused"` — no reader process is live. **Nothing was written.** The request was
+ *                   DECLINED, not queued, and a surface that renders it as pending is telling
+ *                   the same lie this bug is about.
+ *
+ * ⚠ `"pending"` is deliberately NOT one of them — that is `WatchResponse.last_status`'s
+ *   synthesised read-time value for a never-ticked watch, a different concept entirely.
+ *
+ * The three additions are OPTIONAL because a refusal carries neither timing field, and because
+ * a caller compiled against the pre-235 server must keep compiling.
+ */
 export interface WatchSyncResponse {
   status: string
   message: string
+  /** The instant the ask was recorded. Absent on a refusal — nothing was recorded. */
+  next_run_at?: string | null
+  /** `settings.watch_poll_interval_seconds` — the window the pending sentence names. */
+  next_check_within_seconds?: number | null
+  /** ⛔ The LIVE reader, not the config flag (D-235-21). */
+  reader_running?: boolean
 }
 
 export interface WatchPurgeResponse {

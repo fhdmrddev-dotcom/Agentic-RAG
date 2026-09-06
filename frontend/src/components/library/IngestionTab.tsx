@@ -39,7 +39,11 @@ import { reingestDocument } from "@/lib/api"
 import type { Document } from "@/types"
 import { UploadFolderPicker } from "@/components/library/ingestion/UploadFolderPicker"
 import { ConnectedSourceSection } from "@/components/sources/ConnectedSourceSection"
-import { WatchedFoldersSection } from "@/components/sources/WatchedFoldersSection"
+import {
+  SourceReaderStatement,
+  WatchedFoldersSection,
+} from "@/components/sources/WatchedFoldersSection"
+import { useSourceAttention } from "@/hooks/useSourceAttention"
 import { IngestionPauseBanner } from "@/components/ingestion/IngestionPauseBanner"
 import { IngestionBatchLane } from "@/components/ingestion/IngestionBatchLane"
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber"
@@ -154,8 +158,26 @@ export function IngestionTab({
   // The ⌥ Technical-names reveal.
   const { showTechnical } = useTechnicalNamesOptional() ?? { showTechnical: false }
 
+  // ⭐ Phase 235 (D-235-12) — THE ONE READER OF THE SERVER'S SOURCE VERDICT ON THIS TAB.
+  //
+  // Mounted here, ONCE, and threaded down. Twelve source cards each calling the hook would be
+  // twelve pollers of the same endpoint (T-235-13); one call is the whole cost. Nothing is
+  // derived from it here — `stopped` is the server's verdict, passed through untouched
+  // (D-235-05), and `readerRunning` is the LIVE reader rather than the config flag (D-235-21).
+  const { readerRunning, stopped } = useSourceAttention()
+
   return (
     <section data-testid="ingestion-tab" className="flex flex-col gap-6 overflow-y-auto">
+      <div data-testid="sources-body-ingestion" className="flex flex-col gap-6">
+        {/* ⭐ D-235-12 — THE INSTANCE-LEVEL TRUTH, STATED ONCE, ABOVE EVERY SUB-TAB.
+            The same shape as the `ConnectedSourceSection` mount below: ONE import, ONE mount,
+            ZERO branches. The component renders NOTHING when the reader is running, so a
+            person on a healthy instance sees exactly the surface they saw before.
+            ⛔ It does NOT belong on a row. The banner owns platform-wide truth; a row owns only
+            what is true of that row. Marking every watch stopped when the server's reader is
+            switched off was rejected — the rail badge would then count N broken sources when
+            nothing is wrong with any of them. */}
+        <SourceReaderStatement readerRunning={readerRunning} />
       {/* ── THE FOUR SUB-TABS ──────────────────────────────────────────────────── */}
       <Tabs value={subTab} onValueChange={setSubTab} data-testid="ingestion-subnav">
         {/* ⚠ `text-xs` on every child trigger. The `tabs.tsx` primitive defaults to `text-sm`
@@ -227,6 +249,8 @@ export function IngestionTab({
             />
             <WatchedFoldersSection
               destinationFolderId={uploadFolderId}
+              readerRunning={readerRunning}
+              stoppedSources={stopped}
             />
           </div>
         </TabsContent>
@@ -412,6 +436,7 @@ export function IngestionTab({
           </div>
         </TabsContent>
       </Tabs>
+      </div>
     </section>
   )
 }
