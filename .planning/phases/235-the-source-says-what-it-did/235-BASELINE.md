@@ -253,3 +253,132 @@ its attribute spelling does not.** Contradicting a 1500-occurrence house convent
 of one generated sentence would be the wrong trade. Every hook above is
 `data-testid="<screen>-<kind>"`, and `grep -n "data-block" sourceComposition.test.tsx` returns three
 hits, all inside the docblock that states the prohibition — none inside a `getByTestId` call.
+
+---
+
+## §7 THE GREEN ADOPTION RUN — recorded 2026-09-06 at plan `235-12`, base `c719f472d`
+
+**The red run above and this green run are a PAIR, and the pair is what makes this phase's suites
+guards rather than decorations.** A guard adopted green on a tree it never failed on has proved
+nothing about its own wiring — that is §1's whole argument, and this section is its other half.
+
+### §7.1 ⛔ THE HEADLINE, AND IT IS NOT A HAPPY ONE: the fence itself is STILL NOT ADOPTED
+
+`sourceComposition.test.tsx` is in **NEITHER knob at this phase's final commit**, exactly as §4 said
+it must not be while red — **and it is still red.** Measured at `c719f472d`, the file alone:
+
+```
+$ cd frontend && npx vitest run src/components/sources/sourceComposition.test.tsx
+ Test Files  1 failed (1)
+      Tests  16 failed | 33 passed (49)
+```
+
+**The trajectory is real progress, published so the remainder is legible rather than mysterious:**
+`37 failed / 12 passed` (§1, the plan-03 baseline) → `26 / 23` (after plans 09 + 10) → `22 / 27`
+(after plan 11 built the Health section) → **`16 / 33`** (after plan 11 repaired §3's single-match
+assertion). **Twenty-one cases turned green by BUILDING THE SURFACE the fence named** — which is the
+fence working exactly as designed.
+
+⛔ **But sixteen remain, so the phase closes with its own contract fence running in no gate at all.**
+Plan 12 considered and rejected two alternatives, and says which and why rather than leaving the
+omission to look like an oversight:
+
+| option | verdict |
+|---|---|
+| Pin it as-is with a failure allowance | ⛔ **Refused.** A gate with a failure allowance is a gate that cannot fail — literally what sketch 218 shipped and what this fence exists to prevent. |
+| Repair all 16 here, then pin | ⛔ **Refused.** Two of the sixteen need a `data-testid` added to `LibraryPage`'s shipped tab triggers — product surface, which a closeout plan may not build (G-7). And five fixture/harness repairs at a phase's FINAL commit, with no wave left to review them, would silently change what the fence measures. |
+| Pin the nine green new suites; leave the fence out; itemise every red with an owner | ✅ **Taken.** |
+
+### §7.2 The sixteen remaining reds, itemised with owners (carried from `235-11-SUMMARY.md`)
+
+| # | red cases | cause class | who owns the repair |
+|---|---|---|---|
+| 2 | §3 `sources-instance-statement` · §5 *appears exactly once* | **fence fixture** — `primeMocks` primes `getSourceHealth` with `reader_running: true`, and D-235-12 renders the statement ONLY when the reader is off. The statement IS built, proven live by `IngestionTab.readerOff.test.tsx` (5 cases, now pinned). **A one-word fixture change.** | fence fixtures |
+| 5 | §3 `sources-history` · `sources-run` · `sources-quiet-fold` · `sources-fail-reason` · §4 `sources-toggle-quiet` | **behind a click** — all five live inside `RunHistoryList`, which mounts on first expansion; §3/§4 assert at MOUNT while §5 clicks `toggle-history` first. Proven live by `RunHistoryList.test.tsx` (18 cases, now pinned). | fence harness |
+| 1 | §5 *collapsed 3 / expanded 17* | **fence fixture** — `SAMPLE_RUNS` objects carry `{id, quiet, added, updated, started_at}` and none of `status` / `listing_complete` / the six `count_*` fields, so `isQuiet` is false for all 17 and nothing folds. Proven live by `runHistoryFold.test.ts` (17 cases, now pinned). | fence fixtures |
+| 1 | §4 `sources-report-source` | **fence fixture** — the third card row is `last_status: "paused", is_active: false` with no `degraded: true`. Proven live by two cases in `WatchedFoldersSection.test.tsx` (now 27). | fence fixtures |
+| 5 | §3 `rail-badge` · `rail-popover` · `rail-pop-item` · §4 `rail-badge` · `rail-open-health` | **fence harness** — `mountScreen("rail")` mounts `<NavPanel>` with no `attentionConditions`, no `onOpenLibraryHealth` and no health mock, and plan 09's contract is that an unwired caller gets SILENCE rather than a dead control. Proven live by `NavPanel.badge.test.tsx` (14 cases, now pinned). **A three-line widen.** | fence harness |
+| 2 | §3 `sources-tab-ingestion` · `sources-tab-health` | ⛔ **NOT a fixture defect — the Library's tab triggers carry no contract hook at all.** The only group needing a change to shipped product code (two `data-testid` attributes on `LibraryPage`'s `TabsTrigger`s). | a future phase, not a closeout |
+
+**2 + 5 + 1 + 1 + 5 + 2 = 16.** Every red is accounted for; **none is a missing surface.** Fourteen
+of the sixteen are provable against a suite this plan just pinned — the strongest available evidence
+that the surfaces exist and it is the fence's own harness that has not caught up.
+
+⚠ **The exclusion is recorded in FOUR places so a grep of any one finds it:** the two comment blocks
+in `scripts/vitest-count-gate.cjs` (one per knob), `deferred-items.md` (with a concrete
+`trigger_when`), `235-12-SUMMARY.md`, and here.
+
+### §7.3 What WAS adopted — the gate's own printed `— N new` figures, never a guessed number
+
+Measured on the run made with the ten `TARGETS` lines added and the ten `BASELINE` keys still
+absent, so each figure is the gate's own reading of the file rather than a summary's recollection:
+
+| suite | gate's printed figure | knob status before | after |
+|---|---|---|---|
+| `src/components/sources/sourceHealthVocabulary.test.ts` | **42** new | neither | BOTH |
+| `src/components/sources/runHistoryFold.test.ts` | **17** new | neither | BOTH |
+| `src/components/sources/RunHistoryList.test.tsx` | **18** new | neither | BOTH |
+| `src/components/sources/WatchedFoldersSection.history.test.tsx` | **17** new | neither | BOTH |
+| `src/components/library/__tests__/IngestionTab.readerOff.test.tsx` | **5** new | neither | BOTH |
+| `src/components/library/__tests__/SourcesAttentionSection.test.tsx` | **13** new | neither | BOTH |
+| `src/components/layout/__tests__/NavPanel.badge.test.tsx` | **14** new | neither | BOTH |
+| `src/components/layout/__tests__/ChatLayout.badge.test.tsx` | **5** new | neither | BOTH |
+| `src/hooks/__tests__/useSourceAttention.test.tsx` | **13** new | neither | BOTH |
+| `src/pages/__tests__/LibraryPage.initialTab.test.tsx` | **6** new | neither | BOTH |
+| `src/components/sources/WatchedFoldersSection.test.tsx` | **6 → 27** (`+21`) | BOTH (pinned 6) | re-pinned **27** |
+
+⭐ **THE ARITHMETIC CLOSES WITH NO RESIDUAL, and that is what separates GROWTH from DRIFT.** The ten
+`— N new` figures sum to **exactly +150**, and the grand total moved **7565 → 7715**. The pinned
+total moved **6814 → 6985 = +171 = 150 + 21**, the 21 being `WatchedFoldersSection`'s re-pin. An
+unexplained `+n` is the thing to worry about; a bigger number that reconciles is the gate working.
+
+⚠ **Three suites this phase MODIFIED needed no re-pin, and that was measured rather than assumed:**
+`librarySelection.test.ts` = **25** (pinned 25), `renameFence.test.ts` = **15** (pinned 15),
+`IngestionTab.test.tsx` = **40** (pinned 40) — each byte-for-byte at its pin.
+
+### §7.4 The green run, verdict line VERBATIM
+
+```
+  total                                      6985    7715    +730
+  total 7715  ·  failed 0  ·  pinned total 6985
+count gate OK — 237/237 pinned files present, no per-file decrease, 0 failing.
+```
+
+Exit **0**. `227/227` → **`237/237`** pinned files (+10). Command, from the **repo root**:
+`GSD_VITEST_MAX_WORKERS=2 node scripts/vitest-count-gate.cjs`.
+
+⚠ **The `+730` residual is unpinned suites the gate RUNS but does not GUARD** — five of them, none
+belonging to this phase: `PromptVariableChips.test.tsx` (3), `RunHero.test.tsx` (18),
+`automationFacts.test.ts` (11), `nodeEffectBanner.test.ts` (8), `toolReadOnlyMap.test.ts` (7).
+They are named rather than left as an anonymous number, exactly as Phase 214 named its six.
+
+### §7.5 ⚠ A SEED-171 FLAKE FIRED TWICE DURING THIS ADOPTION, AND THE PROCEDURE WAS FOLLOWED
+
+The first two gate runs of this plan each read **`failed 1`**, and the third read **`failed 0`** on a
+tree whose only diff was the gate's own knobs. The failing case was captured from the gate's **own
+persisted JSON report BEFORE anything was re-run**, and it was the same case both times:
+
+```
+src/pages/WorkflowBuilderPage.canvas.test.tsx
+  > WorkflowBuilderPage 184-11 — with the flag OFF the panel receives NO rails key (D-14)
+    POSITIVE CONTROL — with the flag ON the very same read finds the key
+  AssertionError: expected 0 to be greater than 0
+```
+
+- It is **SEED-171's fifth named suite**, and this is **its own recorded signature verbatim** — the
+  same `AssertionError: expected 0 to be greater than 0` on the same POSITIVE CONTROL.
+- It is **provably unmodified by Phase 235**: `git log -1` on the file names
+  `cce6ffab6 feat(214.1-01)`, and the file appears in no Phase-235 diff.
+- ⛔ **The cap was NOT touched.** `GSD_VITEST_MAX_WORKERS=2` held on all three runs. CLAUDE.md's own
+  correction records that adjusting the cap is measured NOT to fix these failures.
+- ⚠ **Recorded as an OBSERVATION, never as proof of innocence.** One green sample of a flaky suite
+  proves nothing. What it does confirm is the CLAUDE.md consequence: *`count gate OK` is not reliably
+  reachable on demand*, so the deterministic evidence is §7.3's per-file arithmetic — never the
+  colour of any single run.
+
+### §7.6 The backend gate at this phase's close — and the ceiling question is RAISED, not re-pinned
+
+See `235-12-SUMMARY.md` §"The backend ceiling" for the verbatim tail and the `comm -13` name-set
+comparison. **The measured value is recorded there; CLAUDE.md's `71` is NOT edited by this phase.**
+Moving a project-wide gate needs explicit operator authorisation, and a surface phase is the wrong
+place to do it.
