@@ -63,6 +63,18 @@ class WatchResponse(BaseModel):
     created_at: datetime | None = None
     updated_at: datetime | None = None
 
+    # -- Phase 235 Plan 07 (SEED-239 / D-235-13 / D-235-16) ------------------------------------
+    # All THREE default, so `_mock_watch_row` and every other shipped fixture still validate.
+    #
+    #: This row could not be projected. It is still RETURNED — a source that vanishes from its
+    #: own list is the silence LIB-10 forbids — but only its identifying fields are trustworthy.
+    degraded: bool = False
+    #: A short machine-safe token, never a sentence and never the exception text. The SENTENCE
+    #: the person reads lives in the frontend vocabulary leaf; the full exception goes to the log.
+    degraded_reason: str | None = None
+    #: The reader's poll cadence, for the pending state between a Sync click and the next tick.
+    next_check_within_seconds: int | None = None
+
 
 class WatchDetailResponse(WatchResponse):
     items: list[WatchItemResponse] = []

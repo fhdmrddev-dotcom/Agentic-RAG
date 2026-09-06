@@ -72,39 +72,97 @@ def _as_uuid(val: Any) -> UUID:
     return val if isinstance(val, UUID) else UUID(str(val))
 
 
+#: The identity a degraded row falls back to when even the raw row cannot supply one. A row
+#: with no readable `id` is not droppable — dropping it is the omission this boundary exists to
+#: prevent — so it is returned under a sentinel that is obviously not a real watch.
+_UNIDENTIFIED_WATCH = UUID(int=0)
+
+
+def _degraded_watch_record(raw: Any, exc: Exception) -> dict:
+    """Project the least a caller needs to be TOLD a source could not be read.
+
+    ⛔ T-235-23 — `degraded_reason` reaches a screen, so it is a fixed token plus the exception's
+    CLASS NAME. Never `str(exc)`: a driver message routinely carries a table name, a connection
+    string or a provider URL, and none of those belong on a member's screen. The full exception
+    is logged by the caller with `logger.exception`, which is where detail belongs.
+    """
+    row = raw if isinstance(raw, dict) else {}
+
+    def _uuid_or(value: Any, fallback: UUID | None) -> UUID | None:
+        try:
+            return _as_uuid(value) if value is not None else fallback
+        except (ValueError, AttributeError, TypeError):
+            return fallback
+
+    return {
+        "id": _uuid_or(row.get("id"), _UNIDENTIFIED_WATCH),
+        "user_id": _uuid_or(row.get("user_id"), _UNIDENTIFIED_WATCH),
+        "connection_id": _uuid_or(row.get("connection_id"), _UNIDENTIFIED_WATCH),
+        "org_id": _uuid_or(row.get("org_id"), None),
+        # The NAME is what lets the surface say WHICH source could not be read, so it is read
+        # defensively rather than assumed present.
+        "source_folder_id": str(row.get("source_folder_id") or ""),
+        "source_folder_name": str(row.get("source_folder_name") or ""),
+        "degraded": True,
+        "degraded_reason": f"projection_failed:{type(exc).__name__}",
+    }
+
+
 async def _enrich_watch_rows(pool: Any, rows: list[dict]) -> list[dict]:
-    """Attach item_count, connection_name, and service_id to watch records."""
+    """Attach item_count, connection_name, and service_id to watch records.
+
+    ⛔ EVERY ROW IS PROJECTED INSIDE ITS OWN BOUNDARY (`SEED-239` / D-235-13). The callers below
+    declare `response_model=list[WatchResponse]` and FastAPI validates the WHOLE list, so a
+    single row that raises here — or that comes back in a shape the model rejects — used to be a
+    500 for every watch the caller owns. That is not hypothetical: `SEED-239` measured one
+    malformed `config` making all nine of a user's connections unreadable at once.
+
+    The failing row is returned as a NAMED degraded record, never dropped: a source that
+    vanishes from its own list is exactly the silence `LIB-10` forbids, and it is worse than an
+    error page because nothing on screen says anything is missing.
+
+    ⚠ This is the same boundary shape `connector_service.list_connections` needs when `SEED-239`
+    is fixed at its root. That fix stays with the seed; only the observable half lands here.
+    """
     if not rows or not pool:
         return rows
 
     enriched = []
     async with pool.acquire() as con:
         for r in rows:
-            record = dict(r)
-            wid = record.get("id")
-            conn_id = record.get("connection_id")
+            try:
+                record = dict(r)
+                wid = record.get("id")
+                conn_id = record.get("connection_id")
 
-            # 1. Count items
-            count = await con.fetchval(
-                "SELECT COUNT(*) FROM connector_watch_items WHERE watch_id = $1",
-                wid,
-            )
-            record["item_count"] = count or 0
-
-            # 2. Lookup connection details
-            if conn_id:
-                conn_row = await con.fetchrow(
-                    "SELECT name, service_id FROM connector_connections WHERE id = $1",
-                    conn_id,
+                # 1. Count items
+                count = await con.fetchval(
+                    "SELECT COUNT(*) FROM connector_watch_items WHERE watch_id = $1",
+                    wid,
                 )
-                if conn_row:
-                    record["connection_name"] = conn_row["name"]
-                    record["service_id"] = conn_row["service_id"]
+                record["item_count"] = count or 0
 
-            if not record.get("last_status"):
-                record["last_status"] = "pending"
+                # 2. Lookup connection details
+                if conn_id:
+                    conn_row = await con.fetchrow(
+                        "SELECT name, service_id FROM connector_connections WHERE id = $1",
+                        conn_id,
+                    )
+                    if conn_row:
+                        record["connection_name"] = conn_row["name"]
+                        record["service_id"] = conn_row["service_id"]
 
-            enriched.append(record)
+                if not record.get("last_status"):
+                    record["last_status"] = "pending"
+
+                enriched.append(record)
+            except Exception as exc:
+                # The detail goes to the LOG, the fact goes to the SCREEN.
+                logger.exception(
+                    "Could not project watch row %s; returning it degraded",
+                    r.get("id") if isinstance(r, dict) else r,
+                )
+                enriched.append(_degraded_watch_record(r, exc))
     return enriched
 
 
