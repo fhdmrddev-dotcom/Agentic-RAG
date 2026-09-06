@@ -140,3 +140,33 @@ the five — pin it in that phase's own close, at the gate's own printed figure.
 gate knob**, so it never ran in any of this plan's three gate invocations, and the gate's green
 verdict says nothing about it either way. Unchanged owner: whichever plan next touches
 `SettingsPage.tsx` or the Settings a11y contract.
+
+## 235-15 (gap-closure round 1) — three UNGATED suites are red at the base commit
+
+Measured while running plan 235-15's acceptance command
+`npx vitest run src/pages/__tests__ src/lib --maxWorkers=2` → **6 failed | 672 passed (678)**.
+
+| Suite | Failing cases | Status |
+|---|---|---|
+| `src/lib/model-info.test.ts` | 1 — `costTier` values for known models | pre-existing |
+| `src/lib/__tests__/termMap.test.tsx` | 1 — "exactly the mapped keys the contract table covers" | pre-existing |
+| `src/pages/__tests__/SettingsPage.a11y.test.tsx` | 4 — tablist roles / `aria-pressed` reveal control | pre-existing |
+
+**Why they are out of 235-15's scope, proven rather than asserted:**
+
+1. **Provably unmodified.** `git diff --numstat d790f3d6f HEAD -- <the three files>` and
+   `git diff --numstat -- <the three files>` are BOTH empty.
+2. **Structurally unreachable from this plan's diff.** The plan's only non-test source changes are
+   `App.tsx` and the brand-new leaf `lib/libraryTabHandoff.ts`. None of the three suites references
+   `App` (`grep -n "App\b\|@/App"` over all three returns nothing), and nothing but
+   `LibraryPage.initialTab.test.tsx` imports the new leaf.
+3. ⚠ **They are UNGATED, which is why the plan's `count gate OK … failed 0` baseline is consistent
+   with them being red.** None of the three appears in `vitest-count-gate.cjs`'s TARGETS or BASELINE
+   (the file's only textual match is a comment on line 3773). `src/lib` and `src/pages` are pinned
+   **per file** in this gate, not as directories — so the gate has never run these three at all.
+
+⛔ **Consequence for a future plan author:** the acceptance criterion
+*"`npx vitest run src/pages/__tests__ src/lib` — 0 failed"* was **unmeetable at plan 235-15's base
+commit** and is not a property any plan in that scope can deliver. Either the three suites are
+repaired (a phase, not a closure round) or the criterion is scoped to the explicitly-run in-scope
+suites, which are deterministic.

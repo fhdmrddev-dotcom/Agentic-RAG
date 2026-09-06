@@ -8204,6 +8204,50 @@ That is the single most important sentence about this file.
 
 ---
 
+## frontend/src/lib/libraryTabHandoff.ts
+
+**1 / 1 / 59** · no (1 phase) · **the LIFETIME of the Library-tab hand-off, as a pure function.**
+
+⭐ **IT EXISTS BECAUSE A COMMENT MADE A CLAIM AND NOTHING ENFORCED IT.** Phase 235-08 threaded an
+`initialTab` prop into `LibraryPage` so the attention popover could open the Health tab, and wrote
+beside it: *"`undefined` means 'the page decides', so the Library keeps its own default on every
+other entry into it."* `App.tsx` then set `libraryTab = "health"` and **never cleared it** —
+`grep setLibraryTab` returned exactly ONE write. Because `ChatLayout` mounts `<LibraryPage>` inside
+a ternary, the page UNMOUNTS on navigation away and re-seeds its reducer from `initialTab` at every
+mount, so **one click on the popover redefined where the whole Library opens, permanently.**
+
+⛔ **A HAND-OFF IS AN INTENT CONSUMED ONCE, NEVER A MODE.** The rule, and the reason each arm is
+shaped the way it is:
+
+| navigation | result | why |
+|---|---|---|
+| into the Library (`documents`) | KEEP the pending tab | clearing on the way IN would spend the intent before the page that consumes it had mounted, and the badge route would silently do nothing |
+| anywhere else | CLEAR it | the page it was meant for has unmounted; the intent is either honoured or abandoned, and either way it is spent |
+| nothing pending | stays `undefined` | idempotent — a spent hand-off is never resurrected |
+
+⛔ **THE CLEAR BELONGS TO THE NAVIGATOR, NOT TO A SECOND WRITER.** `handleOpenLibraryHealth` is
+byte-unchanged; `App.tsx` gained ONE `handleNavigate` that both doors (`ChatLayout`'s `onNavigate`
+and `CitationNavProvider`'s `navigate`) route through. Routing the citation door through it is a
+strict no-op today — `citationNav.tsx` only ever navigates to the Library view, the one destination
+the rule keeps the hand-off for — and it is done anyway, because **a hand-off that one navigator
+clears and another bypasses is the same defect one layer down.**
+
+⚠ **IT IS A STRICT LEAF ON PURPOSE: zero runtime imports, no React, generic in the tab type.** The
+shipped `LibraryPage.initialTab.test.tsx` case *"SEEDS the tab, never PINS it"* was correct and
+still could not see this defect, because it mounts once and the defect lives BETWEEN mounts. A rule
+that could only be exercised through a mount would inherit that blind spot. `LIBRARY_VIEW` is a
+local literal rather than an import from `App.tsx` — the `citationNav.tsx` `CitationTargetView`
+precedent, for the same reason: no import cycle through the root component.
+
+⚠ **A PRE-EXISTING LIMITATION THIS DOES NOT FIX, recorded so it is not mistaken for closed:**
+clicking the attention popover while the Library is ALREADY open changes nothing on screen, because
+`initialTab` is read by a lazy reducer initializer and there is no unmount to re-seed. That was
+equally true before this file existed (the click merely left a stale hand-off that ambushed the next
+entry). Fixing it means letting the page consume a hand-off AFTER mount — a behaviour change, not a
+gap-closure fix. See `235-15-SUMMARY.md`.
+
+---
+
 ## Rows corrected at Phase 235 — every one was STALE, and three of them by whole phases
 
 ⚠ **These rows already existed and every one of them disagreed with git.** A row that is present and

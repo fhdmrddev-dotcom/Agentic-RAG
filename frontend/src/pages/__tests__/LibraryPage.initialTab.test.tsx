@@ -29,10 +29,17 @@
  * separately, exactly as `sourceComposition.test.tsx:133-147` does.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest"
+import { useState } from "react"
 import { render, screen, fireEvent, waitFor } from "@testing-library/react"
 
 import { TooltipProvider } from "@/components/ui/tooltip"
 import type { Document, Folder } from "@/types"
+// Phase 235 plan 15 (gap-closure round 1 · G5) — the clearing rule under test, and the
+// App wiring that has to actually USE it. `?raw` is TEXT: importing App this way evaluates
+// no module, so none of this suite's mocks have to cover App's own import graph.
+import { libraryTabAfterNavigate, LIBRARY_VIEW } from "@/lib/libraryTabHandoff"
+import type { LibraryTab } from "@/pages/librarySelection"
+import appSource from "@/App.tsx?raw"
 
 const {
   mockUseDocuments,
@@ -335,5 +342,165 @@ describe("LibraryPage — initialTab", () => {
       "aria-selected",
       "true",
     )
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════════════════
+// ⭐ THE HAND-OFF IS ONE-SHOT — Phase 235 plan 15 (gap-closure round 1 · verification G5)
+// ══════════════════════════════════════════════════════════════════════════════════════════
+/**
+ * ── THE DEFECT, MEASURED RATHER THAN SUSPECTED ────────────────────────────────────────────
+ *
+ * `App.tsx` set `libraryTab = "health"` in `handleOpenLibraryHealth` and NEVER cleared it —
+ * `grep setLibraryTab frontend/src/App.tsx` returned exactly ONE write. `ChatLayout` renders
+ * `<LibraryPage>` inside a ternary, so the page UNMOUNTS on navigation away and re-seeds its
+ * reducer from `initialTab` on EVERY return. After ONE badge-popover click, every subsequent
+ * entry into the Library opened on Health — directly contradicting `App.tsx`'s own comment
+ * (*"`undefined` means 'the page decides', so the Library keeps its own default on every
+ * other entry into it"*).
+ *
+ * ── ⛔ WHY THE SHIPPED "SEEDS, NEVER PINS" CASE ABOVE COULD NOT CATCH THIS ────────────────
+ *
+ * That case mounts ONCE and clicks a tab. It proves a WITHIN-mount transition still works,
+ * which was never in doubt — the reducer was untouched. **The defect lives BETWEEN mounts**:
+ * `initialTab` is read by a LAZY reducer initializer, which runs only at mount, so a suite
+ * that never unmounts cannot observe a stale hand-off at all. The case below UNMOUNTS the
+ * page and brings it back, which is the only shape that can see it.
+ */
+
+describe("libraryTabAfterNavigate — the clearing rule, as a pure function", () => {
+  it("KEEPS the pending tab when the destination IS the Library", () => {
+    // ⛔ Non-negotiable: clearing on the way IN would clear the hand-off before the page
+    //    that consumes it ever mounted, and the badge route would silently do nothing.
+    expect(libraryTabAfterNavigate("health", LIBRARY_VIEW)).toBe("health")
+    expect(libraryTabAfterNavigate("health", "documents")).toBe("health")
+  })
+
+  it("CLEARS it on every other destination — the hand-off is an intent, never a mode", () => {
+    for (const view of [
+      "chat",
+      "skills",
+      "settings",
+      "workflows",
+      "classification-rules",
+      "connections",
+      "skill-studio",
+      "control-room",
+      "org-admin",
+      "workflow-run",
+    ]) {
+      expect(libraryTabAfterNavigate("health", view)).toBeUndefined()
+    }
+  })
+
+  it("is idempotent — an empty hand-off is never resurrected", () => {
+    expect(libraryTabAfterNavigate(undefined, "documents")).toBeUndefined()
+    expect(libraryTabAfterNavigate(undefined, "chat")).toBeUndefined()
+  })
+
+  it("carries ANY tab — the rule is about the hand-off, not about Health", () => {
+    expect(libraryTabAfterNavigate("ingestion", "documents")).toBe("ingestion")
+    expect(libraryTabAfterNavigate("ingestion", "chat")).toBeUndefined()
+  })
+})
+
+describe("LibraryPage — the hand-off survives ONE entry and no more", () => {
+  it("⭐ REMOUNTS on the page's OWN default after the Health hand-off was used once", async () => {
+    const { LibraryPage } = await import("@/pages/LibraryPage")
+
+    /** The shape `App.tsx` now ships: ONE writer (the badge route) and ONE navigator that
+     *  applies the clearing rule. Reverting the navigator to the bare view setter — which is
+     *  exactly what shipped — makes step 3 below read "Health" and this case red. */
+    function AppHandoffHarness() {
+      const [view, setView] = useState<"chat" | "documents">("chat")
+      const [pendingTab, setPendingTab] = useState<LibraryTab | undefined>(undefined)
+      const navigate = (next: "chat" | "documents") => {
+        setView(next)
+        setPendingTab((pending) => libraryTabAfterNavigate(pending, next))
+      }
+      const openLibraryHealth = () => {
+        setPendingTab("health")
+        setView("documents")
+      }
+      return (
+        <div>
+          <button onClick={openLibraryHealth}>open-health</button>
+          <button onClick={() => navigate("chat")}>go-chat</button>
+          <button onClick={() => navigate("documents")}>go-library</button>
+          {view === "documents" ? (
+            <LibraryPage initialTab={pendingTab} />
+          ) : (
+            <div data-testid="not-the-library" />
+          )}
+        </div>
+      )
+    }
+
+    renderPage(<AppHandoffHarness />)
+
+    // 1 · NON-VACUITY. The badge route really does land on Health, or steps 2-3 prove nothing.
+    fireEvent.click(screen.getByText("open-health"))
+    await waitFor(() => expect(selectedTabName()).toBe("Health"))
+
+    // 2 · Navigate AWAY, and prove the page really UNMOUNTED. `ChatLayout`'s ternary is not a
+    //     hidden div — if the tablist were merely hidden, step 3 would test nothing.
+    fireEvent.click(screen.getByText("go-chat"))
+    await waitFor(() => expect(screen.queryAllByRole("tab")).toHaveLength(0))
+    expect(screen.getByTestId("not-the-library")).toBeInTheDocument()
+
+    // 3 · …and BACK. ⛔ THE ASSERTION THE OLD WIRING FAILS: it re-seeded from a `libraryTab`
+    //     that was still "health", so the Library opened on Health on this entry and forever.
+    fireEvent.click(screen.getByText("go-library"))
+    await waitFor(() => expect(selectedTabName()).toBe("Documents"))
+    expect(screen.getByRole("tab", { name: "Health" })).toHaveAttribute("aria-selected", "false")
+
+    // 4 · …and the door still WORKS a second time. A clear that also broke the hand-off would
+    //     pass step 3 while un-shipping SURF-03's route entirely — this is the non-vacuity
+    //     that separates "cleared" from "broken".
+    //
+    //     ⚠ IT LEAVES THE LIBRARY FIRST, AND THAT IS NOT INCIDENTAL. Clicking the popover
+    //     while the Library is ALREADY open changes nothing on screen — `initialTab` is read
+    //     by a lazy reducer initializer, so with no unmount there is no re-seed. That is a
+    //     PRE-EXISTING limitation of SURF-03's route (measured at plan 15, unchanged by it:
+    //     before this plan the same click did nothing visible either, and merely left a stale
+    //     hand-off that ambushed the NEXT entry). Fixing it means giving the page a way to
+    //     consume a hand-off after mount, which is a behaviour change this closure round is
+    //     not entitled to make — recorded in `235-15-SUMMARY.md` instead of built here.
+    fireEvent.click(screen.getByText("go-chat"))
+    await waitFor(() => expect(screen.queryAllByRole("tab")).toHaveLength(0))
+    fireEvent.click(screen.getByText("open-health"))
+    await waitFor(() => expect(selectedTabName()).toBe("Health"))
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════════════════
+// THE APP-LEVEL WIRING — pinned as TEXT, because the rule existing is not the rule being USED
+// ══════════════════════════════════════════════════════════════════════════════════════════
+describe("App.tsx — the clearing rule is wired, not merely available", () => {
+  const APP = appSource.replace(/\r\n/g, "\n")
+  /** The LINE-ANCHORED comment stripper (`renameFence.test.ts:89`). ⚠ The `^\s*` is
+   *  load-bearing: the unanchored variant eats live code and turns every absence arm green. */
+  const APP_CODE = APP.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "")
+
+  it("self-guard: the ?raw import is the real file AND the stripper did not eat it", () => {
+    expect(APP.length).toBeGreaterThan(4000)
+    expect(APP_CODE).toContain("handleOpenLibraryHealth")
+    // The stripper non-vacuity pair: a token that exists ONLY in prose. A `codeOf` returning
+    // "" would make every `not.toContain` below pass; this pair is what reds when it does.
+    expect(APP).toContain("NO TWELFTH")
+    expect(APP_CODE).not.toContain("NO TWELFTH")
+  })
+
+  it("imports and USES the clearing rule", () => {
+    expect(APP_CODE).toContain("libraryTabAfterNavigate")
+  })
+
+  it("⛔ the ChatLayout mount no longer hands over the RAW view setter as its navigator", () => {
+    expect(APP_CODE).not.toContain("onNavigate={setActiveView}")
+  })
+
+  it("has TWO real `setLibraryTab` calls — the write, and the clear", () => {
+    const writes = APP_CODE.match(/setLibraryTab\s*\(/g) ?? []
+    expect(writes.length).toBeGreaterThanOrEqual(2)
   })
 })
