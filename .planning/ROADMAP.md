@@ -485,7 +485,7 @@ A, because A does not do what the requirement says.**
   3. A person who has not opened the sources screen **finds out that a watch is broken** — the signal reaches them where they already are in the product (SURF-03).
   4. That signal does **not** fire for a healthy source, and does not fire for a single transient failure the next check recovered from — a person who ignores it once has not been trained to ignore it always (SURF-03, LIB-10).
 
-**Plans**: 12 plans in 5 waves — **all 12 executed** (verified against `235-NN-PLAN.md` on disk, 12 files, and against twelve `235-NN-SUMMARY.md`).
+**Plans**: 12 plans in 5 waves, plus 5 gap-closure plans in 2 waves (round 1) — **all 12 executed** (verified against `235-NN-PLAN.md` on disk, 12 files, and against twelve `235-NN-SUMMARY.md`).
 
 ⚠ **The `**Migrations**` line below reads `172` and was NOT stale at execution.** `235-12-PLAN.md` expected to find `161` there and correct it; the correction had already been made at planning time (D-235-20), and this is recorded because *verifying a discharge rather than assuming it* is the same rule D-235-18 turns on. The Phase Table row and this detail block agree.
 
@@ -516,6 +516,14 @@ Plans:
 **Wave 5** *(blocked on Wave 4 completion)*
 
 - [x] 235-12-PLAN.md — adopt the fence green (both knobs), the ledger rows, and the deferral record (wave 5)
+
+**Gap-closure round 1** *(planned 2026-09-06 from `235-VERIFICATION.md` — G-7 checked and CLEAR: 12 plans, 0 prior gap-closure rounds. Five plans, two waves. ⚠ SC#3's mobile reach is deliberately NOT planned here: `SEED-253` is pre-existing, needs its own sketch under G-2, and building it inside a closure round is the new-capability move G-7 forbids.)*
+
+- [ ] 235-13-PLAN.md — a switched-off connection is a named cause, and the vocabulary gains every word this round renders (wave 1)
+- [ ] 235-14-PLAN.md — the last-good instant outlives the five-row verdict window, decided on the server (wave 1)
+- [ ] 235-15-PLAN.md — the Health hand-off is one-shot, and the reader-count docblock says what is true (wave 1)
+- [ ] 235-16-PLAN.md — ⭐ the BLOCKER: a run row renders the per-category breakdown, not one summed number (wave 2)
+- [ ] 235-17-PLAN.md — which files could not be read and why, the last-good instant on screen, and the one control wired (wave 2)
 
 **UI hint**: yes
 **Migrations**: **172** — `172_connector_sync_runs.sql` (per-source run history: counts, errors, listing completeness). ⚠ **CORRECTED at planning (D-235-20): this detail block read `161` and was STALE; the Phase Table row already said 172.** Phase 234 consumed 168-171 and `supabase/migrations/` ends at `171_reserved.sql`, so 172 is the next monotonic number — gaps are never backfilled.
