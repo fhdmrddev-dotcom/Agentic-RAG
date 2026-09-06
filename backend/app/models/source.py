@@ -77,3 +77,86 @@ class WatchPurgeResponse(BaseModel):
     status: str
     purged_count: int
     message: str
+
+
+# ══ Phase 235 (SURF-02 / SURF-03 · D-235-05 / D-235-07 / D-235-12 / D-235-21) ═════════════
+#
+# ⚠ APPENDED, NEVER INTERLEAVED. Plan 07 widens `WatchResponse` and `WatchSyncResponse` above
+#   in the same wave; these three classes sit at the end of the file so the two plans cannot
+#   collide on a line. Field names are character-for-character the contract already declared
+#   in `frontend/src/lib/api/sources.ts` — a rename here is a silent `undefined` there, because
+#   a TS interface over `res.json()` is an assertion, not a check.
+
+
+class SyncRunResponse(BaseModel):
+    """ONE stored tick of a watch — `connector_sync_runs`, 1:1.
+
+    D-235-07: **every** tick gets a row, including the quiet ones, so *"when did it last
+    successfully READ?"* is answerable rather than inferred from a `last_status` that only
+    ever remembers the most recent thing that happened.
+
+    ⚠ `count_missing = 0` ON A RUN WHOSE `listing_complete` IS FALSE DOES NOT MEAN "nothing
+    was deleted". The watch loop SUPPRESSES missing-transitions when the listing was
+    incomplete (the H-5 / SRC-06 structural guard), so that zero is by DESIGN, not by
+    observation. `listing_complete` travels with the counts precisely so a renderer can tell
+    the two apart; dropping it would make the row a confident lie.
+    """
+
+    id: UUID
+    org_id: UUID | None = None
+    user_id: UUID | None = None
+    watch_id: UUID
+    started_at: datetime
+    finished_at: datetime | None = None
+    status: str
+    failure_cause: str | None = None
+    last_error: str | None = None
+    listing_complete: bool = False
+    count_new: int = 0
+    count_modified: int = 0
+    count_renamed: int = 0
+    count_missing: int = 0
+    count_restored: int = 0
+    count_errors: int = 0
+    created_at: datetime | None = None
+
+
+class StoppedSourceResponse(BaseModel):
+    """A source the SERVER has judged to have stopped reading.
+
+    ⛔ D-235-05 — the debounce threshold is applied server-side and this list is the whole
+    truth. There is deliberately no `consecutive_failures` field: exposing the count would
+    invite a client to re-apply the rule, which is how the badge, the Health row and the
+    source card come to disagree.
+
+    ⚠ A watch with no run rows at all never appears here. That is `has not read yet`, not
+    `stopped` — a different sentence, owned by the surface.
+    """
+
+    watch_id: UUID
+    source_folder_name: str
+    connection_name: str | None = None
+    cause: str
+    #: Whether the cause is one the next check cannot recover from (D-235-10). It changes the
+    #: SENTENCE and the offered control, never the verdict — the verdict already accounted
+    #: for it when it decided to stop on failure 1 rather than 3.
+    hard: bool = False
+    stopped_since: datetime | None = None
+    last_good_at: datetime | None = None
+
+
+class SourceHealthResponse(BaseModel):
+    """The single polled verdict every Phase 235 source surface consumes."""
+
+    stopped: list[StoppedSourceResponse] = []
+    #: ⛔ D-235-21 — the LIVE reader process, never `settings.watch_process_enabled`. See the
+    #: comment at the route: a failed start is swallowed, so the flag can read true while
+    #: nothing is running.
+    #:
+    #: ⚠ D-235-12 — this is an INSTANCE-level fact stated ONCE. When it is False the per-watch
+    #: rows stay honest (*"waiting — the reader is off"*) and `stopped` does not fill up with
+    #: N identical red states: nothing is wrong with any individual source.
+    reader_running: bool = False
+    #: How often the server intends to check. Declared here so the surfaces can say *"next
+    #: check within …"* without a second knob that could drift from the daemon's real cadence.
+    poll_interval_seconds: int = 60
