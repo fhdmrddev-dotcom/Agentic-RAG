@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v4.0
 milestone_name: "Connected Knowledge"
-status: ready_for_review
-last_updated: "2026-09-06T12:55:00.000Z"
+status: complete
+last_updated: "2026-09-06T14:52:00.000Z"
 last_activity: 2026-09-06
 progress:
   total_phases: 14
-  completed_phases: 8
-  total_plans: 16
-  completed_plans: 16
+  completed_phases: 9
+  total_plans: 19
+  completed_plans: 19
   planned_plans_235: 12
-  percent: 57
+  percent: 64
 ---
 
 # Project State
@@ -38,16 +38,17 @@ continues at **228**.
 
 ## Current Position
 
-Phase: 236 — The Corpus Under Attack (✅ **COMPLETED 2026-09-06 — Waves 1, 2, & 3 complete, ready for Reviewer verification**)
+Phase: 236 — The Corpus Under Attack (✅ **CLOSED 2026-09-06** — Gemini built, Claude VERIFIED on BUS-168: 13/13 attacks refused in offline corpus, 8/8 mutations caught loudly at point of use, SC#10 capability/prompt parity verified. ⚠ SC#1 & Live UAT marked ⛔ OWED pending operator live Google Drive drive)
 Prior: 235 — The Source Says What It Did (✅ **CLOSED 2026-09-06** — 17 plans + 1 quick fix + 1 health quick task)
 Prior: 234 — The Watch Loop (✅ CLOSED — verified by DRIVING)
 Plan: 236-01, 236-02, 236-03 complete (100%)
-Status: ready_for_review
+Status: complete
 
 
 ## ▶ NEXT SESSION — start here
 
-**Reviewer post-phase verification of Phase 236** (Claude Code), then **`/gsd:discuss-phase 237`** — *One Rule Engine, Not Two* (RULES-01, RULES-02, mig 173).
+**Phase 236 Operator Live Drive (SC#1 & Live UAT)**: Drive Google Drive (`google__send_email`) first with active Google Drive connection and live model credentials in Chat UI.
+Then **`/gsd:discuss-phase 237`** — *One Rule Engine, Not Two* (RULES-01, RULES-02, mig 173).
 
 ⚠ **APPLY G-8 FROM THE START.** Phase 235 ran **17 plans for 4-6 plans of substance** and the
 operator stopped it. `.planning/config.json` now enforces the trimmed flow and CLAUDE.md carries

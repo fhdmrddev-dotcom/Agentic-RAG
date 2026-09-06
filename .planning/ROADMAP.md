@@ -258,7 +258,7 @@ A, because A does not do what the requirement says.**
 - [x] **Phase 233: The Preview — See It Before It Lands** — four honestly-labelled buckets, two-tier identity, rules evaluated with nothing written, and nothing ingested until a person confirms (PREV-01/02/03, LIB-09) ⚠ G-2 SKETCH MANDATORY — **DISCHARGED**: sketches 229 (winner C) + 230 (winner A), both operator-locked 2026-09-05
 - [x] **Phase 234: The Watch Loop — The Library Reads By Itself** — a mapped folder read on the shipped scheduler, a lifecycle diff that can never delete on an incomplete listing, a disconnect that freezes, and a synced document that cannot make the agent act (LIB-08, SRC-06, QUEUE-03, VIS-03/04/05/06, TRUST-03, SURF-01) ⭐ RETIRES THE CLAUDE.md RULE, SAME COMMIT · ⚠ THREAT MODEL MANDATORY
 - [ ] **Phase 235: The Source Says What It Did** — per-source run history with counts and errors, a stopped source that says when and offers the fix, and a signal that reaches someone who is not on the page (LIB-10, SURF-02, SURF-03) ⚠ SURF-03's home is an OPEN DECISION · G-2 SKETCH
-- [ ] **Phase 236: The Corpus Under Attack** — an adversarial corpus that fails when a defence is removed, driven on the full native roster, with the payload planted in a real synced document (TRUST-02)
+- [x] **Phase 236: The Corpus Under Attack** — an adversarial corpus that fails when a defence is removed, driven on the full native roster, with the payload planted in a real synced document (TRUST-02) *(Offline corpus & 8/8 mutations verified; SC#1 & Live UAT owed to live operator drive)*
 - [ ] **Phase 237: One Rule Engine, Not Two** — one AST and one matcher discriminated by scope, with source facts as first-class filterable fields (RULES-01, RULES-02)
 - [ ] **Phase 238: Microsoft Graph — OneDrive and SharePoint** — a Graph folder watched exactly like a Drive folder, with the 302 dance sealed inside the adapter (SRC-03) ⭐ THE CONTRACT'S TEST
 - [ ] **Phase 239: Any MCP Server With Files** — a file-serving MCP server becomes a watchable source by rows, not code (SRC-04)
@@ -798,8 +798,8 @@ found at the v3.7 close.
 | 232. The Source Contract + Google Drive | 4/4 | ✅ Complete — Gemini built, Claude REVIEWED by driving. ⚠ `OD-232-01` live-Drive drive OWED | 2026-09-05 |
 | 233. The Preview — See It Before It Lands | 2/2 | ✅ Complete — Claude built AND verified (Gemini out, operator direction). ⚠ **G-4 lived-experience UAT is OWED** — 5 rows, run row 2 first | 2026-09-05 |
 | 234. The Watch Loop — The Library Reads By Itself | 5/5 | ✅ **CLOSED — Gemini built, Claude VERIFIED BY DRIVING.** ⭐ A file arrived by itself: `last_status=success`, items 0→6. SC#4 held across two ingest paths (0 dupes, 0 re-embeds). ⛔ It did NOT work at first — `watch_process_enabled` ships `False`, so the watch had **never run once**; fixed with `WATCH_PROCESS_ENABLED=true`. 4 findings filed, none folded in: `BUG-260906-01` (classification never runs on the queue path — **fix before 235**), `-02`, `-03`, `SEED-252`. ⛔ SC#2/SC#3/H-5 unexercised, not failed | 2026-09-06 |
-| 235. The Source Says What It Did | 0/? | Not started | — |
-| 236. The Corpus Under Attack | 0/? | Not started | — |
+| 235. The Source Says What It Did | 17/17 | ✅ **CLOSED 2026-09-06** — Claude built, Gemini reviewed. 17 plans + 1 quick fix + 1 health task | 2026-09-06 |
+| 236. The Corpus Under Attack | 3/3 | ✅ **CLOSED 2026-09-06** — Gemini built, Claude VERIFIED on BUS-168. 13/13 attacks refused in offline corpus, 8/8 mutations caught loudly at point of use, SC#10 parity verified. ⚠ **SC#1 & Live UAT OWED to operator live drive** (drive Google Drive first with live credentials & watched sync) | 2026-09-06 |
 | 237. One Rule Engine, Not Two | 0/? | Not started | — |
 | 238. Microsoft Graph — OneDrive and SharePoint | 0/? | Not started | — |
 | 239. Any MCP Server With Files | 0/? | Not started | — |
