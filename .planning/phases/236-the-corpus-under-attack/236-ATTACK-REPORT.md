@@ -53,12 +53,12 @@
 ### `LLM01-META-01`: OWASP-LLM01-METADATA
 - **Target Module:** `backend/app/services/embedding_service.py`
 - **Expected Defense:** embedding_service.py line 331 anti-injection directive
-- **Outcome:** Prompt boundary verified: field descriptions explicitly framed as data, never instructions.
+- **Outcome:** Point-of-use prompt boundary verified: field descriptions explicitly framed as data, never instructions in assembled system prompt.
 
 ### `LLM01-JUDGE-01`: OWASP-LLM01-JUDGE-SUBVERSION
 - **Target Module:** `backend/app/services/eval_runner_service.py`
 - **Expected Defense:** EVAL_JUDGE_RUBRIC data-not-command clause (lines 185, 193-194)
-- **Outcome:** EVAL_JUDGE_RUBRIC verified with verbatim DATA-not-command instruction clause.
+- **Outcome:** Point-of-use EVAL_JUDGE_RUBRIC verified with verbatim DATA-not-command instruction clause in assembled prompt.
 
 ### `LLM01-JUDGE-02`: OWASP-LLM01-RESOURCE-EXHAUSTION
 - **Target Module:** `backend/app/services/eval_runner_service.py`
@@ -73,7 +73,7 @@
 ### `LLM01-VALID-01`: OWASP-LLM01-HALLUCINATION
 - **Target Module:** `backend/app/services/harness/validator_kinds.py`
 - **Expected Defense:** validator_kinds.py grounded_in_evidence check
-- **Outcome:** Validator rejected output claiming invented citations not present in retrieval context.
+- **Outcome:** Validator rejected output claiming invented citations and verified grounded_in_evidence at point of use in assembled judge prompt.
 
 ### `LLM01-SKILL-01`: OWASP-LLM01-SKILL-POISON
 - **Target Module:** `backend/app/services/skill_proposer_service.py`

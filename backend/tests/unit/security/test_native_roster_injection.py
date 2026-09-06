@@ -85,7 +85,7 @@ def _render_roster_report(records: list[dict[str, Any]], output_path: Path) -> N
             f"- **Emit Tier**: `{r['emit_tier']}`\n"
             f"- **Supports Assistant Prefill**: `{r['supports_assistant_prefill']}`\n"
             f"- **Credentials**: `{r['credentials_status']}`\n"
-            f"- **Verdict**: `{r['verdict']}`\n"
+            f"- **Prompt / Flag Parity Verdict**: `{r['verdict']}`\n"
             f"- **Evaluation Details**: {r['details']}\n"
             f"- **Models in Registry**: {', '.join(f'`{m}`' for m in r['all_models'])}\n"
         )
@@ -106,12 +106,16 @@ Every provider derived from the capability registry has an explicit row below.
 Unconfigured providers are explicitly marked with structured skip indicators, ensuring
 zero providers are omitted or silently assumed to inherit OpenAI/Anthropic guarantees.
 
+> [!IMPORTANT]
+> **Behavioral In-Flight Refusal Verdict: ⛔ OWED**  
+> Offline test suites verify dynamic roster enumeration, provider capability flags (`native_tools`, `emit_tier`, `supports_assistant_prefill`), and structural prompt formatting parity. Behavioral refusal across live model providers requires operator credentials and live multi-provider chat turns (carried alongside SC#1).
+
 ---
 
-## Provider Capability & Defense Refusal Matrix
+## Provider Capability & Prompt / Flag Parity Matrix
 
-| Provider | Models | Sample Model | Native Tools | Emit Tier | Prefill Support | Credentials | Defense Refusal Verdict |
-|:---------|:------:|:-------------|:------------:|:---------:|:---------------:|:------------|:------------------------|
+| Provider | Models | Sample Model | Native Tools | Emit Tier | Prefill Support | Credentials | Prompt / Flag Parity Verdict |
+|:---------|:------:|:-------------|:------------:|:---------:|:---------------:|:------------|:-----------------------------|
 {chr(10).join(table_rows)}
 
 ---
@@ -207,7 +211,7 @@ def test_provider_defense_isolation_and_formatting():
         else:
             prefill_defense = "Standard Context Boundary"
 
-        verdict = "PASS" if has_creds else cred_status
+        verdict = "PASS (parity verified)" if has_creds else cred_status
         details = (
             f"Verified under {isolation_mode}. {prefill_defense}. "
             f"Adversarial breakout tags neutralized inside untrusted data fence."
