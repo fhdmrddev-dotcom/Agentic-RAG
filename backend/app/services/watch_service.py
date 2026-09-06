@@ -26,10 +26,22 @@ from supabase import Client
 
 from app.config import Settings, settings as default_settings
 from app.db.ingestion_jobs import insert_ingestion_job
+# ⚠ THE `skipped_still_running` WRITER IN `db/watches.py` IS DELIBERATELY NOT IMPORTED HERE —
+# Phase 235 plan 05 resolved RESEARCH Open Question 4 by DELETING the dead import rather than
+# wiring it up. (Its exact symbol is kept out of this file on purpose, so that a grep for the
+# dead writer over the production tree returns a clean absence rather than this note.)
+# The reason is structural, not tidiness: `claim_due_watches` filters on
+# `leased_until IS NULL OR leased_until < now()` and takes `FOR UPDATE SKIP LOCKED`, so a
+# still-leased watch is skipped INSIDE SQL and never reaches this module at all — there is
+# no point in the service that holds the id of a watch it skipped. Calling it would also be
+# actively wrong: it OVERWRITES `last_status` to `skipped_still_running`, clobbering the
+# `running` status of a watch another worker is legitimately mid-flight on, and it writes NO
+# `connector_sync_runs` row — a status with no history behind it, which is the exact class of
+# claim this phase exists to end. Migration 172's COMMENT already records the value as
+# written by nothing; deleting the import makes that permanently true.
 from app.db.watches import (
     claim_due_watches,
     get_watch_items,
-    record_skipped_still_running,
     release_watch,
     update_item_state,
     upsert_watch_item,
@@ -37,8 +49,37 @@ from app.db.watches import (
 from app.dependencies import get_supabase
 from app.services.ingest_splice import MintResult, async_mint_document_row
 from app.services.sources.base import SourceAdapter, SourceListing, SourceRegistry
+from app.services.sources.failure_cause import classify_failure_cause
 
 logger = logging.getLogger(__name__)
+
+
+def _zero_counts() -> dict[str, int]:
+    """The six flat count keys, all zero.
+
+    ⚠ ONE home for the key set. `connector_sync_runs` has a named integer column per key
+    (migration 172), so a key added here without a column silently drops on the floor —
+    which is why the shape is minted in a single place rather than typed out per seam.
+    """
+    return {"new": 0, "modified": 0, "renamed": 0, "missing": 0, "restored": 0, "errors": 0}
+
+
+def _opt_uuid(val: Any) -> UUID | None:
+    """Coerce a claimed-row ownership column to a UUID, or None if it is absent/unusable.
+
+    ⚠ This must NEVER raise. It feeds `release_watch`'s ownership columns, and `release_watch`
+    is a best-effort writer on the release path of a sync that may already have failed —
+    a malformed id must degrade to the DAL's own `COALESCE(..., w.user_id)` fallback, never
+    turn a completed sync into a crash.
+    """
+    if val is None:
+        return None
+    if isinstance(val, UUID):
+        return val
+    try:
+        return UUID(str(val))
+    except (ValueError, AttributeError, TypeError):
+        return None
 
 
 class WatchService:
@@ -106,18 +147,40 @@ class WatchService:
 
         for watch in claimed:
             watch_id = UUID(str(watch["id"]))
+            # ⛔ SEAM 1 of 4 (SURF-02 / T-235-15). This arm is OUTSIDE `sync_watch`, and it is
+            # the one that catches every CRASH-shaped failure — the failures a person most
+            # needs to see in a history. `started_at` is captured HERE rather than read off
+            # the watch row, because `claim_due_watches` sets `last_run_at = now()` at CLAIM
+            # time (RESEARCH §2.5), which is not when this tick began doing work.
+            started_at = datetime.now(timezone.utc)
             # SEED-239: Error isolation per watch — one failing watch never crashes the tick
             try:
                 await self.sync_watch(watch)
                 processed += 1
             except Exception as exc:
                 logger.exception("Watch %s failed during sync: %s", watch_id, exc)
-                await release_watch(self.pool, watch_id, status="failed", error=str(exc))
+                await release_watch(
+                    self.pool,
+                    watch_id,
+                    status="failed",
+                    error=str(exc),
+                    # A crash read nothing it could count, and nothing it could complete.
+                    counts=None,
+                    listing_complete=False,
+                    failure_cause=classify_failure_cause(str(exc)),
+                    started_at=started_at,
+                    user_id=_opt_uuid(watch.get("user_id")),
+                    org_id=_opt_uuid(watch.get("org_id")),
+                )
 
         return processed
 
     async def sync_watch(self, watch: dict) -> dict[str, Any]:
         """Perform one complete directory sync pass for a single claimed watch."""
+        # ⚠ When THIS tick began. NOT `watch["last_run_at"]`, which `claim_due_watches` set to
+        # now() at claim time (RESEARCH §2.5) — reading that back would make every run row's
+        # duration read as zero.
+        started_at = datetime.now(timezone.utc)
         watch_id = UUID(str(watch["id"]))
         conn_id = str(watch["connection_id"])
         user_id = str(watch["user_id"])
@@ -140,7 +203,24 @@ class WatchService:
             raise ValueError(f"Connection {conn_id} not found")
 
         if not conn.get("is_enabled", True):
-            await release_watch(self.pool, watch_id, status="paused", error="Connection is disabled")
+            # ⛔ SEAM 2 of 4 (D-235-07). A paused tick DID NOT READ — but it DID TICK, and
+            # every tick gets a row. That is exactly what makes "when did this source last
+            # successfully read?" answerable as a different question from "when did it last
+            # change anything?", which is the confusion that let a dead watch look fine.
+            # counts are EXPLICITLY zero rather than None: nothing was read, and zero is the
+            # honest observation, not an absence of one.
+            await release_watch(
+                self.pool,
+                watch_id,
+                status="paused",
+                error="Connection is disabled",
+                counts=_zero_counts(),
+                listing_complete=False,
+                failure_cause=None,
+                started_at=started_at,
+                user_id=_opt_uuid(watch.get("user_id")),
+                org_id=_opt_uuid(watch.get("org_id")),
+            )
             return {"status": "paused", "reason": "Connection disabled"}
 
         default_ingest_visibility = conn.get("default_ingest_visibility") or "private"
@@ -189,10 +269,21 @@ class WatchService:
         except Exception as list_exc:
             listing.complete = False
             listing.error = str(list_exc)
+            # ⚠ THE SUBSTRING TEST BELOW STILL DECIDES CONTROL FLOW, AND IS DELIBERATELY
+            # UNCHANGED. It is the VIS-04 routing rule — which items get transitioned to
+            # `unauthorized` — and narrowing or widening it here would silently change item
+            # state for reasons that have nothing to do with history. What it NO LONGER does
+            # is CLASSIFY: the cause recorded in the run row comes from
+            # `classify_failure_cause`, and the raw string survives only as evidence.
             err_str = str(list_exc).lower()
             if "403" in err_str or "permission" in err_str or "unauthorized" in err_str:
                 # VIS-04: Authorization revoked at source
-                await self._handle_unauthorized_watch(watch, list_exc)
+                await self._handle_unauthorized_watch(
+                    watch,
+                    list_exc,
+                    started_at=started_at,
+                    cause=classify_failure_cause(str(list_exc)),
+                )
                 return {"status": "unauthorized", "error": str(list_exc)}
             raise list_exc
 
@@ -200,7 +291,7 @@ class WatchService:
         existing_items = await get_watch_items(self.pool, watch_id)
         items_by_ext_id = {it["external_id"]: it for it in existing_items}
 
-        counts = {"new": 0, "modified": 0, "renamed": 0, "missing": 0, "restored": 0, "errors": 0}
+        counts = _zero_counts()
         seen_ext_ids: set[str] = set()
 
         # 5. Process present items from source listing
@@ -431,15 +522,48 @@ class WatchService:
                     )
 
         # 7. Release watch upon successful sync
-        await release_watch(self.pool, watch_id, status="success")
+        # ⛔ SEAM 3 of 4 — the happy path, and the discard this whole plan exists to stop:
+        # `counts` was computed above and thrown away one line below, so `sync_watch`'s
+        # return value died in `tick()` at `processed += 1`.
+        #
+        # ⭐ `listing_complete` IS PASSED FROM `listing.complete`, NEVER LEFT AT ITS DEFAULT
+        # (T-235-16). The H-5 block immediately above SUPPRESSES missing-state transitions
+        # when the listing did not finish exhaustively, so such a tick records
+        # `count_missing = 0` BY DESIGN rather than by observation. The flag is the only
+        # thing that stops that zero being read as "nothing was deleted" — and defaulting it
+        # would render a COMPLETE listing as incomplete, which is its own lie.
+        await release_watch(
+            self.pool,
+            watch_id,
+            status="success",
+            error=None,
+            counts=counts,
+            listing_complete=listing.complete,
+            failure_cause=None,
+            started_at=started_at,
+            user_id=_opt_uuid(watch.get("user_id")),
+            org_id=_opt_uuid(watch.get("org_id")),
+        )
         logger.info(
             "Watch %s sync complete: %d new, %d modified, %d renamed, %d missing, %d restored, %d errors",
             watch_id, counts["new"], counts["modified"], counts["renamed"], counts["missing"], counts["restored"], counts["errors"],
         )
         return {"status": "success", "counts": counts}
 
-    async def _handle_unauthorized_watch(self, watch: dict, exc: Exception) -> None:
-        """Handle 403 / permission revoked at external source (VIS-04)."""
+    async def _handle_unauthorized_watch(
+        self,
+        watch: dict,
+        exc: Exception,
+        *,
+        started_at: datetime | None = None,
+        cause: str | None = None,
+    ) -> None:
+        """Handle 403 / permission revoked at external source (VIS-04).
+
+        `cause` is supplied by the caller, which has already asked `classify_failure_cause`.
+        It is not re-derived here: one exception must not be classified twice, or the row and
+        the routing could disagree about the same failure.
+        """
         watch_id = UUID(str(watch["id"]))
         supabase = self._get_supabase()
         existing_items = await get_watch_items(self.pool, watch_id)
@@ -455,4 +579,21 @@ class WatchService:
                         .execute()
                     )
 
-        await release_watch(self.pool, watch_id, status="failed", error=f"Source access unauthorized: {exc}")
+        # ⛔ SEAM 4 of 4 — the only arm carrying token_revoked / folder_gone evidence.
+        # ⚠ The cause is classified from the RAW exception text, not from the
+        # "Source access unauthorized: …" wrapper written into `error` — a wrapper that
+        # itself contains the word "unauthorized" would make every failure here look like a
+        # revoked token, including a folder that was simply deleted.
+        await release_watch(
+            self.pool,
+            watch_id,
+            status="failed",
+            error=f"Source access unauthorized: {exc}",
+            # The listing threw mid-flight: nothing was counted, nothing completed.
+            counts=None,
+            listing_complete=False,
+            failure_cause=cause if cause is not None else classify_failure_cause(str(exc)),
+            started_at=started_at,
+            user_id=_opt_uuid(watch.get("user_id")),
+            org_id=_opt_uuid(watch.get("org_id")),
+        )
