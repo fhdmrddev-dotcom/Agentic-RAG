@@ -209,6 +209,15 @@ class WatchService:
             # change anything?", which is the confusion that let a dead watch look fine.
             # counts are EXPLICITLY zero rather than None: nothing was read, and zero is the
             # honest observation, not an absence of one.
+            #
+            # ⛔ AND THE CAUSE IS NAMED **HERE AND NOWHERE ELSE** (plan 13, gap-closure round 1).
+            # This arm is the only code in the system that KNOWS the connection is off — it just
+            # read `is_enabled` off the connection row two lines up. `classify_failure_cause` is
+            # deliberately given no matcher and no status row for it, because a provider message
+            # containing the word "disabled" is not evidence that somebody switched this
+            # connection off. Writing `failure_cause=None` here is what made a deliberately
+            # paused source read as "It stopped, and no reason was recorded." with a Retry
+            # button that cannot help.
             await release_watch(
                 self.pool,
                 watch_id,
@@ -216,7 +225,7 @@ class WatchService:
                 error="Connection is disabled",
                 counts=_zero_counts(),
                 listing_complete=False,
-                failure_cause=None,
+                failure_cause="connection_disabled",
                 started_at=started_at,
                 user_id=_opt_uuid(watch.get("user_id")),
                 org_id=_opt_uuid(watch.get("org_id")),

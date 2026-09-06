@@ -220,6 +220,13 @@ def test_last_good_at_is_none_when_nothing_ever_succeeded():
 
 
 def test_paused_counts_toward_the_streak_but_classifies_as_unknown():
+    """⚠ THE LEGACY-ROW CASE, and it stays TRUE and stays GREEN.
+
+    A paused row stored BEFORE Phase 235 plan 13 carries no `failure_cause` at all, so three of
+    them still resolve to `unknown` — soft, three cadences. This is not the defect; it is the
+    honest reading of a row that recorded nothing. What plan 13 changed is what NEW rows carry
+    (see the case directly below), not how an old one is read.
+    """
     runs = [
         _run("paused", minutes_ago=1),
         _run("paused", minutes_ago=61),
@@ -228,6 +235,36 @@ def test_paused_counts_toward_the_streak_but_classifies_as_unknown():
     v = verdict_for_runs(runs)
     assert v.stopped is True
     assert v.cause == "unknown"
+    assert v.hard is False
+
+
+def test_one_paused_row_naming_connection_disabled_is_enough():
+    """⭐ THE GAP G3 CASE. ONE paused tick that names its cause stops the source immediately.
+
+    ⛔ `health_verdict.py` is NOT EDITED for this to be true — the streak logic was already
+    correct; the defect was the missing cause. This test imports the module unchanged and the
+    verdict follows from `HARD_CAUSES` gaining a row. If someone later reaches for a branch in
+    the verdict for this cause, this test would still pass and `test_failure_cause.py`'s
+    partition would be the thing that reds — which is the intended division of labour.
+    """
+    runs = [_run("paused", minutes_ago=1, cause="connection_disabled")]
+    v = verdict_for_runs(runs)
+    assert v.stopped is True
+    assert v.cause == "connection_disabled"
+    assert v.hard is True
+    assert v.never_read is False
+
+
+def test_a_recovered_connection_ends_the_disabled_streak():
+    """Switching the connection back on is a success row, and a success row resets the streak."""
+    runs = [
+        _run("success", minutes_ago=1),
+        _run("paused", minutes_ago=61, cause="connection_disabled"),
+        _run("paused", minutes_ago=121, cause="connection_disabled"),
+    ]
+    v = verdict_for_runs(runs)
+    assert v.stopped is False
+    assert v.cause is None
     assert v.hard is False
 
 

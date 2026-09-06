@@ -7610,9 +7610,17 @@ for external folder watching rather than widening `workflow_schedules`.
 
 ## backend/app/services/watch_service.py
 
-**2 / 1 / 458** · young (Phase 234) · ⚠ **absent from this ledger and from CLAUDE.md's scan list
+**4 / 2 / 608** · young (Phase 234) · ⚠ **absent from this ledger and from CLAUDE.md's scan list
 until 2026-09-06** — through its own phase's build, review and close. It is the engine of the
 milestone's crux phase, and G-5 could not have fired on it at any count.
+
+⭐ **235-13 (gap-closure round 1) — SEAM 2 IS THE ONE WRITER OF `connection_disabled`.** The
+connection-disabled arm changed `failure_cause=None` to the named cause and nothing else: same
+status, same zero counts, same `listing_complete=False`. It is the only code that KNOWS the
+connection is off, so the cause is written here and **inferred by nothing** — `failure_cause.py`
+deliberately carries no matcher and no status row for it. `test_watch_sync_runs.py` asserts the
+literal appears in this whole file **exactly once**, on a `failure_cause=` keyword, because a second
+writer would be a second place deciding a fact only one of them read.
 
 The background poller: `claim_due_watches` → paginate a `SourceListing` → diff against
 `connector_watch_items` → mint + enqueue. **Invariants it carries:**
@@ -7843,7 +7851,19 @@ here changes what `App.tsx` compiles against.
 
 ## frontend/src/lib/api/sources.ts
 
-**4 / 1 / 296** · no (1 phase) · the watch + sync-run + source-health wire client.
+**5 / 1 / 312** · no (1 phase) · the watch + sync-run + source-health wire client.
+
+⭐ **235-13 — IT HELD TWO HAND-WRITTEN COPIES OF THE CAUSE UNION, AND THE FENCE WAS BLIND TO
+BOTH.** `SyncRun.failure_cause` and `StoppedSource.cause` each spelled the four causes out.
+`sourceHealthVocabulary.test.ts`'s `?raw` fence binds the **vocabulary leaf** to
+`failure_cause.py`; **it cannot see a copy in a third file**, so when the backend gained a fifth
+cause these two fields declared the server could not send what it had just started sending — and
+the compiler agreed with the stale copy, rejecting the new value at the render. Both now
+`import type { SourceFailureCause }` from the leaf, which puts them behind the fence.
+⚠ `import type` is erased at build, and the leaf has **zero imports**, so this adds no runtime
+dependency from the API layer onto a component directory and a cycle is impossible.
+⚠ **The lesson generalises:** a union pinned by a fence is only pinned where the fence can read.
+Grep for hand-written copies before widening one.
 
 ⚠ **NOT covered by `frontend/src/lib/api.ts`'s row — that row is the BARREL.** This is the same
 correction Phase 214 had to make for `org.ts`, `knowledge.ts`, `threads.ts`, `connectors.ts` and
@@ -7889,7 +7909,30 @@ that fix; it verified the discharge** (D-235-18), which is a different claim and
 
 ## backend/app/services/sources/failure_cause.py
 
-**1 / 1 / 169** · no (1 phase) · **THE ONE CLASSIFIER of why a source stopped.**
+**2 / 1 / 196** · no (1 phase) · **THE ONE CLASSIFIER of why a source stopped.**
+
+⭐ **235-13 (gap-closure round 1) added a FIFTH cause, and it is the one member of the union that
+is WRITTEN ONLY.** `connection_disabled` says the connection this source reads through was switched
+off. Two facts bind it, both asserted over this file's live source:
+
+- ⛔ **It is HARD.** A connection somebody switched off cannot come back on the next tick, so the
+  source stops on failure ONE. The soft threshold would keep it silently un-updated for three
+  cadences — 18 hours at the 6-hour cadence — for no gain. Recorded as a DECISION: if it proves
+  noisy, the change is removing one member from `HARD_CAUSES`, and **no branch moves.**
+- ⛔ **`classify_failure_cause` has NO matcher and NO status row for it.** It is written by exactly
+  one seam — the connection-disabled arm of `watch_service.sync_watch`, the only code that KNOWS the
+  connection is off because it just read `is_enabled`. A provider saying "disabled" about a file, an
+  API, a scope or an account is not evidence about this connection, and inferring it would offer
+  *turn it back on* for a connection that is already on. `test_failure_cause.py` drives **seven
+  tempting strings and ten status codes** against that rule and reads the live source to prove
+  neither `_STATUS_CAUSE` nor `_MATCHERS` names it (T-235c-01).
+
+⚠ **The defect it closes was an ABSENCE, not a wrong branch.** Seam 2 wrote `failure_cause=None`
+every paused tick; `health_verdict.py` counts every non-`success` status toward the streak
+(correctly), so after three ticks the source read `stopped` / `unknown` — *"It stopped, and no
+reason was recorded."* with a **Retry now** button that cannot change a deliberately-off connection.
+⛔ **`health_verdict.py` was NOT edited to fix it** (`git diff --numstat` empty): the streak logic
+was already right, and the fix was a table row on each side of the wire.
 
 ⭐ **The defect it closes, stated by the file itself:** `watch_service.py`'s only failure
 classification was a substring sniff (`"403" in err_str or "permission" in err_str …`) whose output
@@ -7936,8 +7979,36 @@ has created a second verdict that can disagree — and the person who finds the 
 
 ## frontend/src/components/sources/sourceHealthVocabulary.ts
 
-**1 / 1 / 315** · no (1 phase) · every sentence and every repair-control label the source surfaces
+**2 / 1 / 454** · no (1 phase) · every sentence and every repair-control label the source surfaces
 say. A strict leaf.
+
+⭐ **235-13 (gap-closure round 1) — THE FIFTH CAUSE, AND FIVE SIBLING EXPORTS.**
+`connection_disabled` gained a sentence and a control here in the SAME plan that widened
+`failure_cause.py`, because widening one side alone leaves the `?raw` fence red between waves.
+Three pins were re-baselined **deliberately, with the reason written beside each number**:
+`SENTENCE_FOR_CAUSE` 4 → 5, `backendCauses()` 4 → 5, and — found by running the wider suite
+rather than by reading the plan — a **third** pin at `WatchedFoldersSection.test.tsx:235`.
+
+- ⛔ **Its control is NOT "Retry now" and NOT "Reconnect".** *Turn {name} back on* — Retry cannot
+  change a connection somebody switched off, and re-authorising is not what is wrong. The
+  ACTION reuses `reconnect` (the Connections surface IS where the switch lives), so the shipped
+  "three named actions" pin stays green **by construction rather than by being loosened.**
+- ⭐ **D-235-11 was demonstrated, not asserted.** `WatchedFoldersSection.test.tsx` loops the
+  control table, so the fifth cause generated its own render case — and it **passed first time
+  against an unmodified `WatchedFoldersSection.tsx`.** The count pin was the file's only edit.
+- ⚠ **The identifier is deliberately NOT spelled in this file's docblock.** The suite pins its
+  occurrences at **three** — union, sentence table, control table — so reaching for a per-cause
+  branch reds. A literal in a comment is still a literal (the Pitfall-8 discipline the fixture
+  name already follows).
+- **Five new exports, all SIBLINGS of `COPY`, which stays pinned CLOSED at 26:** `WORD_FOR_COUNT`
+  + `COUNT_ORDER` (the six stored counts as words — four byte-identical to the sketch, and
+  `renamed`/`restored` named as OURS because the fixture exercised only four), `CHECKED_PREFIX`
+  (⛔ `COPY.checkedAgo` is **not** deleted: the card keeps the summary, the history gets the
+  breakdown), `FILE_FAILURE_HEADING` / `FILE_FAILURE_SCOPE_NOTE` (⭐ the scope note is the whole
+  reason a card may render per-file reasons at all — `connector_watch_items` carries a file's
+  CURRENT state, never a per-run attribution), and `instantPhrase` (⚠ **not `Intl`**, whose
+  output differs between runners; `null` for null / blank / unparseable, because silence beats
+  an invented instant).
 
 ⛔ **`Object.keys(COPY)` IS PINNED AT EXACTLY 26** by `sourceHealthVocabulary.test.ts:138`, and that
 pin is now blocking **four plans' worth of orphaned labels**: plan 04's `LISTING_INCOMPLETE_NOTE`,

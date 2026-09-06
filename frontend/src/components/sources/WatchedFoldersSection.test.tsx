@@ -231,8 +231,15 @@ describe("WatchedFoldersSection", () => {
      */
     const CAUSES = Object.keys(CONTROL_FOR_CAUSE) as SourceFailureCause[]
 
-    it("the table it loops over is non-empty and carries all four causes", () => {
-      expect(CAUSES).toHaveLength(4)
+    it("the table it loops over is non-empty and carries all five causes", () => {
+      // ⚠ RE-BASELINED 4 → 5 (plan 13, gap-closure round 1) — a THIRD non-vacuity pin on the
+      //   cause union, found by running the wider suite rather than by reading the plan's file
+      //   list, which named only the two pins in `sourceHealthVocabulary.test.ts`.
+      // ⭐ AND THE RE-BASELINE IS THE ONLY EDIT THIS FILE NEEDED. The generated case for the
+      //   fifth cause PASSED FIRST TIME against an unmodified `WatchedFoldersSection.tsx` —
+      //   which is D-235-11 ("the map is DATA, never a branch in the card") demonstrated at the
+      //   render level rather than asserted, and is worth more than the count itself.
+      expect(CAUSES).toHaveLength(5)
     })
 
     for (const cause of CAUSES) {

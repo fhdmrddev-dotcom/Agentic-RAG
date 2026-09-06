@@ -4,6 +4,22 @@
 
 import { API_BASE, ApiError, getAuthHeaders } from "./_core"
 
+/**
+ * ⭐ THE CAUSE UNION IS SINGLE-SOURCED (plan 13, gap-closure round 1). It used to be spelled
+ * out TWICE more in this file — once on `SyncRun.failure_cause`, once on `StoppedSource.cause`
+ * — so `failure_cause.py` gaining a fifth cause left the wire types declaring the backend
+ * could not send what it had just started sending, and the compiler agreed with the stale copy.
+ *
+ * ⛔ The `?raw` fence in `sourceHealthVocabulary.test.ts` binds THAT module to the Python union.
+ * It cannot see a hand-written copy, so a copy is drift the fence is structurally blind to.
+ * Importing the type is what puts these two fields behind the fence.
+ *
+ * ⚠ `import type` is erased at build time, so this adds NO runtime dependency from the API
+ * layer onto a component directory, and the vocabulary leaf has zero imports of its own — a
+ * cycle through it is impossible by construction.
+ */
+import type { SourceFailureCause } from "@/components/sources/sourceHealthVocabulary"
+
 export interface ConnectorWatchItem {
   id: string
   watch_id: string
@@ -233,7 +249,7 @@ export interface SyncRun {
   started_at: string
   finished_at: string | null
   status: "success" | "failed" | "paused" | "running"
-  failure_cause: "token_revoked" | "folder_gone" | "unreachable" | "unknown" | null
+  failure_cause: SourceFailureCause | null
   last_error: string | null
   listing_complete: boolean
   count_new: number
@@ -255,7 +271,7 @@ export interface StoppedSource {
   watch_id: string
   source_folder_name: string
   connection_name: string | null
-  cause: "token_revoked" | "folder_gone" | "unreachable" | "unknown"
+  cause: SourceFailureCause
   hard: boolean
   stopped_since: string | null
   last_good_at: string | null
