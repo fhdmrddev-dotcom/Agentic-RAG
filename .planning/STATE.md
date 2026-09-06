@@ -38,10 +38,70 @@ continues at **228**.
 
 ## Current Position
 
-Phase: 235 — The Source Says What It Did (**PLANNED 2026-09-06** — 12 plans in 5 waves)
+Phase: 235 — The Source Says What It Did (**EXECUTED 2026-09-06 · STOPPED BY OPERATOR at 16.5/17 plans**)
 Prior: 234 — The Watch Loop (✅ CLOSED — verified by DRIVING)
-Plan: none in flight — ready to execute
-Status: ready_to_execute
+Plan: none in flight
+Status: executed_gaps_remain
+
+## ⚠ PHASE 235 STOPPED BY THE OPERATOR (2026-09-06)
+
+**The operator halted the run at plan 17 of 17**, on the judgement that **17 plans was not
+proportionate to the deliverable** — and that judgement is recorded here as CORRECT, not as a
+constraint worked around. The feature is roughly **4-6 plans of substance**; the rest was ceremony.
+`feedback_efficiency_calibration.md` already said *"ONE PLAN PER PHASE — ceremony scales with plan
+count, not risk"*, and the 12-plan split ignored it at planning time.
+
+**Shipped and merged (16.5 of 17 plans):** migration 172 + the run-row writer at all four
+`release_watch` seams · the cause classifier as data (5 causes) · the composition fence (RED, then
+16/33) · the API client + polled verdict reader + quiet-run fold · `initialTab` threading · the
+stopped verdict from the LIVE reader state · `/sync` honesty + the per-row degraded boundary · the
+rail badge + popover + mobile drawer badge · variant-B source card + history + reader-off statement
+· the Health attention section · gate adoption + 17 new ledger rows · gap round: the fifth cause,
+the unbounded last-good read, the one-shot Library hand-off, the per-category run breakdown, and
+`SENTENCE_FOR_FILE_FAILURE` finally mounted.
+
+**⛔ NOT DONE — plan 235-17 stopped after task 1 of 3.** Its remaining tasks were:
+1. **Wire `onNavigate` through `LibraryPage → IngestionTab → WatchedFoldersSection`** so the
+   stopped-source control RENDERS AND ACTS. ⚠ **Verification measured this control ABSENT in the
+   live tree — including for `token_revoked`.** So SC#2's *"offers one control that fixes it"* is
+   **still not satisfied on screen**, for any cause.
+2. **Render the last-good instant** that plan 235-14 made available unbounded, with a zero-import
+   `instantPhrase` at the CALLERS (both surfaces hand `COPY.lastGood` a RELATIVE band, so fixing
+   G2 without this would ship *"Last read successfully on 3 weeks ago"*).
+3. `SEED-254` (per-run per-file attribution) was not planted.
+
+### Success criteria as they actually stand
+
+| | Criterion | Verdict |
+|---|---|---|
+| SC#1 | every run, counts added/skipped/failed, the reason for each failure | **CLOSED** — 235-16 shipped the per-category breakdown; 235-17 task 1 mounted the per-file reasons (scoped to current state, not per-run) |
+| SC#2 | says it stopped · when it last succeeded · ONE control that fixes it | ⚠ **PARTIAL** — says it stopped ✅; the control is DATA and correct per cause ✅; **but the control does not RENDER (owed task 1) and the last-good instant does not display (owed task 2)** |
+| SC#3 | reaches a person not on the sources screen | ⚠ **PARTIAL** — desktop rail + mobile drawer badge both shipped; capped at the chat view on mobile (`SEED-253`, PRE-EXISTING). Live behaviour **unexercised** |
+| SC#4 | does not fire for healthy, nor for one transient failure | ✅ **VERIFIED** (algorithm + 108 green cases) |
+
+⚠ **Six G-4 lived-experience rows are OWED and none has been driven.** `M-1` — revoke a real Drive
+grant — would settle the entire stopped-source path in one drive.
+
+⚠ **The backend ceiling question is OPEN and is the operator's.** Measured this phase: **71 twice
+and 72 twice on an UNCHANGED tree**, with the sole difference an unmodified `test_email_ingestion.py`
+case. The finding is not *"make it 72"* — it is that **a zero-headroom gate on a non-deterministic
+measurement fails for reasons no plan controls.** Recommendation on the table: pin by NAME-SET
+(`comm -13`) rather than by count.
+
+⚠ **`sourceComposition.test.tsx` closes at `16 failed | 33 passed` and is in NEITHER gate knob**, by
+deliberate decision — pinning a red suite would turn the shared gate red, and pinning it with an
+allowance would make a gate that cannot fail. All 16 reds are itemised with owners; **14 are provable
+against a suite plan 12 pinned, and none is a missing surface.**
+
+⭐ **The lesson worth keeping from this phase:** the composition fence asserts block PRESENCE by
+`data-testid`. `sources-run` and `sources-fail-reason` were present the whole time while rendering
+the wrong content — so a green fence coexisted with ROADMAP failure mode #3. **Presence assertions
+cannot see content drift.** Every gap-round suite now asserts CONTENT, with a comment saying why.
+
+⚠ **A concurrent editor was active in the working tree during this run** (auth-token-refresh work
+in `lib/api/_core.ts`, `index.css`, `CreateWatchModal.tsx`, plus deleted screenshots — mtimes
+10:49-11:14). **Not touched by this phase.** Worktrees never saw it; no file overlapped any plan's
+`files_modified`.
 Resume file: `.planning/phases/235-the-source-says-what-it-did/235-01-PLAN.md`
 Last activity: 2026-09-06 — `/gsd:plan-phase 235` ran research → patterns → plan → check end to end.
 
