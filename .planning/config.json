@@ -2,9 +2,9 @@
   "workflow": {
     "_auto_chain_active": false,
     "research": true,
-    "plan_check": false,
+    "plan_check": true,
     "verifier": true,
-    "pattern_mapper": false,
+    "pattern_mapper": true,
     "nyquist_validation": false,
     "ui_phase": true,
     "ui_safety_gate": true,
