@@ -6006,6 +6006,19 @@ which is pure and testable and currently interleaved with six handlers. A
 `api/connector_errors.py` leaf makes the ordering invariant above assertable in one place
 instead of at each call site.
 
+⭐ **PHASE 239 DID NOT TOUCH THIS FILE, AND THAT IS THE FINDING RATHER THAN AN OMISSION.**
+Re-derived at `239-02` (2026-09-08): **`39 commits / 18 phases / 2051 L`** — `CLAUDE.md`'s
+abridged cell reads `33 / 16 / 1879`, five phases and 172 lines stale. `239-CONTEXT.md` lists
+*"`GET /connectors/source-families` publishes `mcp`"* (D-239-04) as work; it was not work.
+`list_source_families` derives its answer from `SourceRegistry.list_supported_services()`, so
+`239-01` registering `McpSourceAdapter` was sufficient and the route was never edited. Measured:
+`['custom_mcp', 'google', 'google_workspace', 'mcp', 'microsoft', 'microsoft_graph']`.
+`test_238_source_families_route.py`'s own claim — *"a newly registered family appears with no
+route change"* — landing for real, one phase later, on a family the route has never heard of.
+**The plan's predicted triple `39 / 18 / 2060` had the line count wrong for a file it also
+predicted would change and which did not.** ⚠ `_NEVER_OFFERED_SOURCE_FAMILIES` is still
+`{"mock_source"}` and was confirmed to be the intended exclusion set.
+
 ---
 
 ## `backend/app/services/connector_service.py`
@@ -6013,6 +6026,18 @@ instead of at each call site.
 **Re-derived at `211-05`'s own commit (2026-08-27): `7 commits / 3 phases / 1149 L` · ⚠ G-5
 FIRES, EXACTLY AT THRESHOLD, and it crossed in the commit that added this row.**
 Phases: `190` · `206` · `211`.
+
+⚠ **RE-DERIVED AGAIN AT `239-02` (2026-09-08): `23 commits / 9 phases / 1821 L` — the row above
+was stale by SIX phases and 672 lines, and `CLAUDE.md`'s abridged cell read `21 / 7 / 1601`.**
+Phases: `190` · `206` · `211` · `213` · `215` · `221` · `222` · `231` · `239`. ⚠ The `239-02`
+PLAN.md predicted `22 / 8 / 1630` and every one of the three figures was wrong — which is why the
+triple is derived in the commit that lands it rather than copied from a plan.
+
+**Phase 239's change (D-239-02).** `infer_source_tools` + `reject_unoffered_source_tools`, and
+`discover_connection_tools` now writes `config["source_tools"]` in the SAME update as the tool
+cache. The two invariants a future editor is bound by are listed below with the older ones:
+**inference runs on the MCP arm and nowhere else**, and **a binding a person chose is never
+overwritten**.
 
 ⚠ **IT HAD NO ROW AND A DEAD ANCHOR** — see this phase's headline above. The `###` heading at
 `:4424` (*"Phase 206, honoured by construction"*) is kept where it is; this `##` section is what
@@ -6036,6 +6061,25 @@ ONE refresh path serves both reachable shapes and a stale action list self-heals
 - ⚠ **THE SECOND GATE IS NOT REDUNDANT.** The storage layer is asked to scope, and the row it
   returns is CHECKED to have obeyed. That term is what survives a future fetch seam whose SQL
   drops the `org_id` predicate.
+- ⛔ **`infer_source_tools` RUNS ON THE MCP ARM OF `discover_connection_tools` AND NOWHERE ELSE**
+  (Phase 239). `services/sources/base.CONFIG_PROTOCOL_MARKERS` resolves ANY connection whose
+  config carries a non-empty `source_tools` to `McpSourceAdapter` — so writing the key from the
+  capability arm would hand a first-party Slack row to the MCP adapter because a static descriptor
+  happened to be named `read_file`, and the adapter would then call a tool over a `server_url`
+  that does not exist. Pinned by
+  `test_a_capability_connection_is_never_given_a_source_binding`.
+- ⚠ **A BINDING SOMEBODY CHOSE IS NEVER OVERWRITTEN, AND THE CONFIG IS MERGED, NOT REPLACED.**
+  Refresh is a one-click control; silently re-pointing a hand-mapped server on every press is the
+  named failure mode. The write is ONE update carrying both columns, and it spreads the existing
+  config — dropping `custom_client_id` here would log an OAuth-registered MCP connection out on
+  its next refresh (Phase 222's key, one field over in the same model).
+- ⛔ **NO TOOL NAME IS EVER A CONDITIONAL.** `_LIST_TOOL_NAMES` / `_READ_TOOL_NAMES` are a
+  preference ORDER over names servers happen to use, in one place. The order is load-bearing: a
+  server may offer two listers, wire order is arbitrary, and a binding that took the first match
+  would flip between two discoveries and silently re-point a watched source.
+- ⛔ **NOTHING READS `annotations` OR `readOnlyHint`.** A server-advertised hint is informational
+  (Phase 239's out-of-scope rule); a detector that trusted `readOnlyHint: true` on `delete_file`
+  would bind a destructive tool as the reader. Mutation is judged from the tool's own NAME.
 - ⚠ **THE CREDENTIAL-LESS RELAXATION IS SCOPED TO THE TWO CREDENTIAL-LESS SHAPES AND NOWHERE
   ELSE.** A CAPABILITY connection with no secret is still `ConnectorNotFound`, unchanged: an SMTP
   host, a Jira instance and a Slack workspace each REQUIRE a credential, so a row without one is
@@ -6264,6 +6308,26 @@ Phases touched: 190, 206.1, 211, 212.
 
 **Disposition: honoured by construction (212).** Extended to support `presetServiceId` for preselecting service identity on creation, interactive pre-save discovery probe (`probeMcpServer`), and per-tool grant toggling with persistence. All 144 unit tests green in `ConnectionFormPanel.test.tsx`.
 
+⚠ **RE-DERIVED AT `239-02` (2026-09-08): `23 commits / 10 phases / 2512 L`** — the row above was
+stale by six phases and 502 lines, and `CLAUDE.md`'s abridged cell read `17 / 7 / 2376`.
+Phases: `190` · `206` · `206.1` · `211` · `212` · `213` · `221` · `222` · `231` · `239`.
+⚠ The `239-02` PLAN.md predicted `22 / 9 / 2445`; all three were wrong.
+
+**Disposition: honoured by construction (239).** One new block — the file-source binding editor
+(`data-testid="connection-source-tools"`), two `<select>`s over `probeResult`.
+
+- ⛔ **IT IS GATED ON `capability === "mcp"`, AND THAT IS A FENCE, NOT A LAYOUT CHOICE.** Offering
+  it on a capability row would let a person write `source_tools` onto a Slack connection, which
+  `CONFIG_PROTOCOL_MARKERS` then resolves to `McpSourceAdapter`. Pinned, with a positive control.
+- ⚠ **IT IS DELIBERATELY NOT A `connection-field`.** §3b binds a per-shape field COUNT
+  (`FIELD_COUNTS`) so an extra destination field cannot appear unnoticed; this is a binding editor
+  over a list the server supplied, and counting it there would make the two contracts disagree.
+- ⚠ **THE OPTIONS ARE THE SERVER'S OWN NAMES AND NOTHING ELSE** (TM-239-05, client half). The
+  backend refuses an unoffered name anyway (`reject_unoffered_source_tools`).
+- ⚠ **A SECOND SURFACE NOW NAMES THE SAME TOOLS.** Two assertions in
+  `ConnectionFormPanel.test.tsx` used a bare `getByText(toolName)` and became ambiguous; both were
+  scoped to `connection-discovered-tools`, which is what they always meant.
+
 ---
 
 ## `frontend/src/components/settings/connectionsCopy.ts`
@@ -6281,6 +6345,32 @@ Phases touched: 190, 206.1, 206.2, 212.
 Phases touched: 190, 206.1, 211, 212.
 
 **Disposition: no seam proposed.** Vocabulary module doing one thing many times. Added `custom_mcp` and `mcp` mappings to `SERVICE_TO_SHAPE`.
+
+⚠ **RE-DERIVED AT `239-02` (2026-09-08): `15 commits / 8 phases / 1216 L`** — `CLAUDE.md`'s
+abridged cell read `7 / 5 / 968`. Phases: `190` · `206` · `206.1` · `211` · `212` · `213` ·
+`222` · `239`. ⚠ **The file is NOT in `239-02-PLAN.md`'s `files_modified` and was modified
+anyway, deliberately** — see the invariant below; the panel could not carry the binding without
+it, and the alternative was a second copy of `configFromDraft`'s contract inside the component.
+
+**Phase 239's change.** `SOURCE_TOOLS_*` copy, `sourceToolUnsetLabel`, `sourceToolsFromDraft`,
+three flat draft fields, and the two ends that make them survive a round trip.
+
+- ⭐ **THE WIPE, AND IT WAS REAL BEFORE THIS.** `configFromDraft` rebuilds the config object and
+  `update_connection` writes that column WHOLE — so a draft that did not carry the binding
+  DELETED an auto-detected file source every time somebody edited the connection's NAME, with a
+  200 and no receipt. Driven RED (`expected undefined to deeply equal { list_tool: 'ls', … }`)
+  before the fields existed. **`root_path` is carried for the same reason though nothing edits
+  it**: a key this function forgets is a key the next rename removes.
+- ⚠ **AN ABSENT BINDING HYDRATES TO EMPTY STRINGS, NEVER TO THE ADAPTER'S DEFAULTS.** Seeding
+  `list_directory` would turn *"nobody has bound this"* into *"somebody chose the reference
+  server's names"* on the next save — a claim the person never made, and it would make an unbound
+  row indistinguishable from a bound one.
+- ⚠ **`sourceToolsFromDraft` RETURNS `undefined`, NEVER `{}`.** `CONFIG_PROTOCOL_MARKERS` keys off
+  a NON-EMPTY `source_tools`; `McpConfig`'s own docstring records the same distinction.
+- ⚠ **`SOURCE_TOOLS_DEFAULT_LIST` / `_READ` ARE A SECOND COPY OF `mcp_source.py`'s CONSTANTS.**
+  The panel tells a person what happens if they leave a slot empty; only the Python decides what
+  actually happens. `ConnectionFormPanel.sourceTools.test.tsx` reads that module through `?raw`
+  and compares, so the drift cannot ship silently.
 
 ---
 
@@ -7004,6 +7094,13 @@ copying that would set twenty-two grants in one click on the one axis the rule f
 ### `frontend/src/lib/api/org.ts`
 
 **Triple at Phase 221's open (2026-08-31): `6 / 4 / 562` — ⚠ G-5 FIRES (4 phases).**
+
+⚠ **RE-DERIVED AT `239-02` (2026-09-08): `10 commits / 8 phases / 618 L`** — phases `207` · `209`
+· `211` · `213` · `221` · `222` · `231` · `239`. Not in `239-02-PLAN.md`'s `files_modified`;
+modified anyway, because `McpConnectionConfig` had NOT been mirrored when `McpConfig` gained
+`source_tools` in `239-01`. **That is the exact drift the `custom_client_id` field one line up
+records happening to itself** — *"THIS MIRROR WAS MISSED WHEN THE SERVER MODEL GAINED THE
+FIELD"* — so the field is added here in the phase that first needs it, with the same warning.
 
 ⚠ **ABSENT FOR ITS ENTIRE LIFE, AND NOT COVERED BY `lib/api.ts`'s ROW — that row is the BARREL.**
 The Phase 207 split created twelve domain modules and gave rows to none of them; `knowledge.ts`,

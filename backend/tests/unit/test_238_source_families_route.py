@@ -41,6 +41,33 @@ def test_the_shipped_families_are_published(router_client):
     assert families == sorted(families), "sorted, so a client can render it without re-sorting"
 
 
+def test_the_mcp_protocol_families_are_published(router_client):
+    """⭐ D-239-04, VERIFIED RATHER THAN IMPLEMENTED — and that is this test's whole point.
+
+    Phase 239's CONTEXT lists *"`GET /connectors/source-families` publishes `mcp`"* as work.
+    It was not work: this route derives its answer from `SourceRegistry.list_supported_services()`,
+    so `239-01` registering `McpSourceAdapter` was sufficient and **`api/connectors.py` was
+    never touched by this phase**. That is the file above's own claim — *"a newly registered
+    family appears with no route change"* — landing for real, one phase after it was written,
+    on a family the route has genuinely never heard of.
+
+    ⚠ So this is a PIN, not a discovery, and it must be able to fail. It was driven RED by
+    planting `"mcp"` into `_NEVER_OFFERED_SOURCE_FAMILIES` in the shipped file, and the file
+    was restored md5-identical afterwards.
+
+    ⚠ BOTH KEYS MATTER AND THEY ARE NOT INTERCHANGEABLE. `custom_mcp` is the `service_id` a
+    person types for a server they connected themselves; `mcp` is the PROTOCOL, and it is what
+    `isSourceCapable(conn, families)` pairs with `auth_type === "mcp"` for a connection whose
+    `service_id` is whatever its author felt like calling it.
+    """
+    families = router_client.get("/connectors/source-families").json()["families"]
+    assert "mcp" in families, (
+        "D-239-04: an MCP connection must be offerable as a source — the client pairs this "
+        "family with auth_type == 'mcp' for servers whose service_id nobody can predict"
+    )
+    assert "custom_mcp" in families
+
+
 def test_the_mock_family_is_never_offered(router_client):
     """⚠ It was excluded BY ACCIDENT until now — the client's `includes("google")` predicate
     happened not to match `mock_source`. Publishing the registry removes that accident, so the

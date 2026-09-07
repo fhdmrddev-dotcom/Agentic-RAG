@@ -424,6 +424,22 @@ export interface McpConnectionConfig {
    *  A wire type that has drifted from its model does not fail — it just refuses to describe
    *  reality. */
   custom_client_id?: string | null
+  /** Phase 239 (D-239-01) — WHICH TOOLS ON THIS SERVER READ FILES, as data.
+   *
+   *  ⭐ THE BINDING IS A ROW, NOT A BRANCH. MCP file servers do not agree on names
+   *  (`list_directory` / `list_files` / `ls`, `read_file` / `cat`), and the whole claim of
+   *  this phase is that connecting a SECOND, differently-worded server is a row in this
+   *  column and no product change at all. `McpSourceAdapter` reads these keys and falls back
+   *  to the `@modelcontextprotocol/server-filesystem` defaults PER KEY; nothing else in the
+   *  codebase knows any tool name.
+   *
+   *  ⚠ MIRRORED THE SAME DAY THE SERVER MODEL GAINED IT, which is the thing the field above
+   *  records NOT happening: `custom_client_id` drifted from `McpConfig` for a whole phase and
+   *  the gap is what left a test unable to state a fixture the backend accepts.
+   *
+   *  ⚠ NAMES ONLY (TM-239-06). `config` is SELECT-granted to every member of the org
+   *  (migration 150) — a URL, a token or a credential must never be routed through here. */
+  source_tools?: Record<string, string> | null
 }
 
 export type ConnectorConnectionConfig =
