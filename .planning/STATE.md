@@ -1335,6 +1335,41 @@ Cleared at the v4.0 start. The v3.9 overrides (including the Phase 225 `AGENTS.m
 reassignment) are preserved verbatim in `.planning/milestones/v3.9-STATE-at-close.md` →
 *Guardrail overrides*. Record every new override here, per the CLAUDE.md orchestrator protocol.
 
+### OV-239-01 — Phase 239 runs with NO agent reviewer (operator, 2026-09-07)
+
+**The rule set aside:** `AGENTS.md` §6.3 (whoever builds does not verify) together with §3.1's
+carve-out (*"`discuss-phase` is where design direction is set, so it belongs to whoever holds the
+phase. **The reviewer does not run it**, or the review becomes self-assessment before a line is
+written."*).
+
+**What is happening instead:** **gemini runs `discuss-phase` and authors the PLAN.md set; claude
+executes them.** Gemini has therefore set the design and is a **co-builder**, not a reviewer — so
+Phase 239 has **no agent reviewer at all**.
+
+**The operator's reason, in the operator's terms:** Gemini's Kota quota is nearly exhausted, and
+the operator is spending what remains on design rather than on verification.
+
+**Raised and reaffirmed.** Claude proposed the alternative (Gemini spends its last quota on the
+review; claude runs discuss-phase per §3.1's carve-out) and the operator declined it and restated
+the direction. Recorded as a decision, not as an oversight — which is the whole point of this
+section.
+
+**The consequence, stated so it cannot be discovered later:** `/code-review ultra`, which **only the
+operator can launch**, is Phase 239's **only independent gate**. §3.1 already names it *"the real
+gate"* on credential and egress phases, with the mechanical pass as *"the cheap screen in front of
+it"* — on 239 there is no cheap screen. ⚠ And by §3.1's own test **239 is critical on four arms**
+(outbound egress; credentials; the permission model — the ROADMAP's own *"a hint from an untrusted
+server may never WIDEN a permission"*; and a table-shape migration).
+
+**Baselines are unaffected and are NOT self-measured:** claude captured them at `25c650231` on an
+untouched tree **while it still held the reviewer seat**, before any 239 source edit
+(`BUS-191`). ⚠ The vitest count gate was **RED at that baseline** — 1 failing test in
+`src/pages/WorkflowBuilderPage.session.test.tsx`, a SEED-171 flaky suite, provably unmodified — so
+a red gate at this phase's close is not automatically the phase's.
+
+**Bus trail:** `BUS-188`/`189` (gemini builds) → `BUS-192`/`193`/`194` (seats swapped) →
+`BUS-195` (lane correction: gemini discusses + plans, claude executes).
+
 ## Accumulated Context
 
 Cleared at the v4.0 start. The decision log lives in `.planning/PROJECT.md` (`## Key Decisions`);
