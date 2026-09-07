@@ -1982,3 +1982,135 @@ describe("the Popular strip knows what is already connected", () => {
     expect(within(card!).queryByTestId("connections-popular-configured")).toBeNull()
   })
 })
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// 19 · Phase 239 (D-239-08 / BUG-260907-01) — THE ROW THAT WORKS AND SAYS IT DOES NOT
+//
+// ⚠ EVERY CASE HERE ASSERTS THE RENDERED WORD, never the presence of a block. Phase 235
+// shipped a defect underneath a green fence that checked a `data-testid` existed while the
+// content drifted — and on this surface the WORDS ARE THE DELIVERABLE. `⚠ Not usable` on a
+// connection that browsed six real folders the same session is the entire bug.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+/** What `GET /connectors/source-families` publishes at Phase 239 — measured in
+ *  `239-02-SUMMARY.md` §F-1, not invented here. */
+const SOURCE_FAMILIES = [
+  "custom_mcp",
+  "google",
+  "google_workspace",
+  "mcp",
+  "microsoft",
+  "microsoft_graph",
+]
+
+/** The live row from the bug report: OAuth completed, check returned ok, ZERO action tools,
+ *  and `browse()` returned six real folders in the same session. */
+const ONEDRIVE_ROW: ConnectorConnection = makeConnection({
+  id: "conn-onedrive",
+  name: "Microsoft 365",
+  service_id: "microsoft",
+  capability: null,
+  auth_type: "oauth_byo",
+  status: "active",
+  config: {},
+  discovered_tools: [],
+  last_check_verdict: "ok",
+})
+
+/** An MCP file server: `service_id` is whatever the person setting it up typed, so the row
+ *  resolves by TRANSPORT on the server and cannot resolve by name on the client. */
+const MCP_FILES_ROW: ConnectorConnection = makeConnection({
+  id: "conn-mcp-files",
+  name: "Acme files",
+  service_id: "mcp.acme.internal",
+  capability: null,
+  auth_type: "mcp",
+  status: "active",
+  mcp_server_url: "https://mcp.acme.internal/mcp",
+  config: {},
+  discovered_tools: [],
+  last_check_verdict: "ok",
+})
+
+const stateWordFor = (name: string) =>
+  within(
+    screen.getAllByTestId("connections-row").find((r) => r.textContent?.includes(name))!,
+  ).getByTestId("connections-row-state").textContent
+
+describe("§19 · a source-only connection reads `✓ Ready as source` (BUG-260907-01)", () => {
+  it("⭐ THE BUG: the OneDrive row says Ready as source, and NEVER says Not usable", () => {
+    renderTab({ connections: [ONEDRIVE_ROW], sourceFamilies: SOURCE_FAMILIES })
+    expect(stateWordFor("Microsoft 365")).toBe("✓ Ready as source")
+    expect(screen.queryByText("⚠ Not usable")).toBeNull()
+  })
+
+  it("⭐ an MCP file server with no action tools says it too — resolved by transport", () => {
+    renderTab({ connections: [MCP_FILES_ROW], sourceFamilies: SOURCE_FAMILIES })
+    expect(stateWordFor("Acme files")).toBe("✓ Ready as source")
+  })
+
+  it("⛔ TM-239-07 — with the families list UNKNOWN the row keeps its old, honest word", () => {
+    // The default. A green manufactured out of a pending fetch is the false positive this
+    // threat names, and it would appear on EVERY row for the first paint of the page.
+    renderTab({ connections: [ONEDRIVE_ROW] })
+    expect(stateWordFor("Microsoft 365")).toBe("⚠ Not usable")
+    expect(screen.queryByText("✓ Ready as source")).toBeNull()
+  })
+
+  it("⛔ TM-239-07 — a REVOKED source-capable row says Revoked, never Ready as source", () => {
+    renderTab({
+      connections: [makeConnection({ ...ONEDRIVE_ROW, status: "revoked" })],
+      sourceFamilies: SOURCE_FAMILIES,
+    })
+    expect(stateWordFor("Microsoft 365")).toBe("⚠ Revoked")
+  })
+
+  it("⛔ TM-239-07 — a DISABLED source-capable row says Disabled", () => {
+    renderTab({
+      connections: [makeConnection({ ...ONEDRIVE_ROW, is_enabled: false })],
+      sourceFamilies: SOURCE_FAMILIES,
+    })
+    expect(stateWordFor("Microsoft 365")).toBe("⏻ Disabled")
+  })
+
+  it("⛔ the three capability rows in the same table are untouched by the new input", () => {
+    // Rendered TOGETHER with a source row, because the containment claim is about one table
+    // holding both kinds — which is exactly the screen the bug was reported from.
+    renderTab({
+      connections: [...THREE_ROWS, ONEDRIVE_ROW],
+      sourceFamilies: SOURCE_FAMILIES,
+    })
+    expect(stateWordFor("Ops mailbox")).toBe("✓ Ready")
+    expect(stateWordFor("Northwind Jira")).toBe("◌ Not checked")
+    expect(stateWordFor("#ops-alerts")).toBe("✕ Credential failed")
+    expect(stateWordFor("Microsoft 365")).toBe("✓ Ready as source")
+  })
+
+  it("the state carries a GLYPH and a WORD, and the dot is the success tone (case 2)", () => {
+    // §14's greyscale rule: colour is reinforcement, the word is the carrier. `source_only`
+    // is a GOOD state, so its dot must not read as the warning `bg-warning` that `unusable`
+    // takes — a person scanning the column by colour would still see a problem row.
+    renderTab({ connections: [ONEDRIVE_ROW], sourceFamilies: SOURCE_FAMILIES })
+    const chip = screen.getByTestId("connections-row-state")
+    expect(chip.textContent).toContain("✓")
+    expect(chip.textContent).toContain("Ready as source")
+    expect(chip.querySelector("span")?.className).toContain("bg-success")
+    expect(chip.querySelector("span")?.className).not.toContain("bg-warning")
+  })
+
+  it("the CONTAINER fetches the families and fails CLOSED when the read fails", () => {
+    // The cases above prove the VIEW renders the word when told. None can see whether the
+    // container ever asks — the identical gap `onCheck` has its own source fence for.
+    expect(connectionsTabSource).toMatch(/listSourceFamilies\(\)/)
+    expect(connectionsTabSource).toMatch(/sourceFamilies=\{sourceFamilies\}/)
+    // ⚠ THE FAILURE ARM IS THE SECURITY-BEARING HALF. A `.catch` that left a stale list, or
+    // one that set `[]` — which reads as "the server published nothing" rather than "we were
+    // not told" — is the difference between a row that stays honest and a table that guesses.
+    const effect = connectionsTabSource.slice(
+      connectionsTabSource.indexOf("listSourceFamilies()"),
+    )
+    expect(effect.slice(0, 400)).toContain("setSourceFamilies(null)")
+    // NON-VACUITY CONTROL — a `?raw` import resolving to "" would satisfy all three above.
+    expect(connectionsTabSource.length).toBeGreaterThan(1000)
+  })
+})
