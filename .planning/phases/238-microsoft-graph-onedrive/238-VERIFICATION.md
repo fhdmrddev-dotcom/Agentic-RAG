@@ -192,13 +192,13 @@ the key fails rather than passing quietly.
 | M-4 | Preview a OneDrive folder → the same four buckets | ✅ **PASS, LIVE (operator).** Browsed and previewed through the product, then imported: `BAckend - Unicorn commands README.pdf` reached `status=completed`. ⚠ It is also the document that exposed **Defect 3** — it came through this door with `path=None`. |
 | M-5 | Files are read through the two-step download | ✅ **PASS, LIVE — and it is the row that found both defects.** After fixing: `Antigravity.lnk`, **1395 bytes**, head `4c 00 00 00 01 14 02 00` (the Windows shell-link magic), **size matches the listing exactly**. Two calls, `graph_read` then `graph_download`, against the real CDN host. |
 | M-6 | A watch runs on schedule and brings in a new file | ✅ **PASS, LIVE.** A real watch on OneDrive `/Attachments`, every 15 min, `is_active=True`. Two runs, both `status=success`, **`listing_complete=True`** (H-5's fail-closed flag genuinely true, not defaulted), `count_new=1`, `count_errors=0`. The document arrived at `status=completed` carrying `path=/Attachments/Practical_Project_Management_Guide_Recreated.docx`. |
-| M-7 | Delete at source → the Library document is NOT deleted | ⛔ **OWED.** ⚠ And the standing Phase 235 gap holds: **no stopped source has ever been observed in this product, for any family.** |
-| M-8 | Disconnect → watching freezes, nothing is deleted | ⛔ **OWED.** |
+| M-7 | Delete at source → the Library document is NOT deleted | ✅ **PASS, LIVE — and it closes a gap carried since Phase 235.** The operator deleted the watched file from OneDrive; the next run reported *"1 missing at source"* and the document **still exists**: `status=completed`, `source_state='missing_at_source'`, `path` intact. ⭐ Not a default: across the whole corpus the histogram is `None: 126` / `missing_at_source: 1` — exactly the file that was deleted. **Deletion at source does not delete; it records.** |
+| M-8 | Disconnect → watching freezes, nothing is deleted | ⛔ **OWED, and now needs a setup step.** The Microsoft watch was deleted after M-7, so there is no live watch to freeze — driving M-8 means creating one again first. The connection itself is untouched (`status=active`, `is_enabled=True`). |
 | M-9 | A `path contains '/Finance/'` rule fires for a file that IS in that folder | ⚠ **HALF PASS, and stronger than before.** The fact is now real **in the database**, not only in the adapter: a watched document carries `metadata.source.path = /Attachments/Practical_Project_Management_Guide_Recreated.docx`. ⛔ The *rule* was still not created, so end-to-end matching remains owed — and it must be re-driven through the **manual import** door too, since that arm was broken until Defect 3 was fixed. |
 | **S-1** | Browse a SharePoint document library | ⛔ **BLOCKED — `SEED-256`.** No M365 work/school tenant; a personal account has no `/sites/` to address. ⚠ The live drive CONFIRMS the account kind: `check()` returned `drive_type: personal`. |
 | **S-2** | `Sites.Read.All` self-consent vs admin approval in an enterprise tenant | ⛔ **BLOCKED — `SEED-256`.** Unresolved and un-softened. |
 
-**7 rows driven (6 full pass, 1 half) · 2 owed (M-7, M-8) · 2 blocked (S-1, S-2) · 0 claimed.**
+**8 rows driven (7 full pass, 1 half) · 1 owed (M-8) · 2 blocked (S-1, S-2) · 0 claimed.**
 
 ⚠ **Dedup verified rather than assumed.** Two watch runs each reported `count_new=1`, which looks
 like a re-import. It is not: the two documents carry **distinct `external_id`s**, a
@@ -207,9 +207,17 @@ like a re-import. It is not: the two documents carry **distinct `external_id`s**
 claim: the run-count bookkeeping is slightly odd (one document predates both runs), which matters
 only if those counters are ever used for reporting.
 
-⛔ **M-7 and M-8 remain the honest gap, and it is the same one Phase 235 recorded:** deletion and
-disconnect behaviour has **never been observed for any source family in this product**. Driving
-M-7 needs a file deleted at the source; M-8 needs a live integration disabled. Neither was done.
+⭐ **M-7 CLOSED A GAP THIS PROJECT HAS CARRIED SINCE PHASE 235** — *"no stopped source has ever
+been observed in this product"* — and it closed it on the Graph family, one phase after the
+family existed. **Only M-8 remains of that pair.**
+
+⚠ **AN OBSERVATION FROM M-7, RECORDED BECAUSE IT CUTS AGAINST PHASE 235'S OWN GOAL.** Deleting the
+watch **cascade-deleted its entire run history**: the `connector_sync_runs` rows that recorded the
+missing-at-source detection, and every `connector_watch_items` row, are gone. The evidence for
+M-7 survives only because `documents.source_state` lives on the DOCUMENT rather than on the watch.
+Phase 235 exists to make a source *say what it did*; a watch removal currently erases what it
+said. **Not filed as a defect — the cascade may well be intended** — but it is a decision someone
+should take deliberately rather than inherit.
 
 ⚠ **`Files.Read.All` self-consented on a personal account with no admin prompt** — D-238-04's
 prediction, now measured rather than inferred.
