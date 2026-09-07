@@ -4,9 +4,9 @@ title: A working OneDrive source connection reads "⚠ Not usable" — the row v
 reported: 2026-09-07
 surface: Agentic-RAG
 severity: major
-status: open
+status: folded
 affected_areas: [frontend/settings, connections, sources, honesty]
-folded_into: null
+folded_into: 239
 verified_closed_by: null
 related_seeds: []
 re_open_trigger: null
