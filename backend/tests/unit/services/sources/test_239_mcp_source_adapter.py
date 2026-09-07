@@ -721,3 +721,127 @@ def _hint_comparisons(source: str) -> list[tuple[int, str]]:
                 if operand.value.strip().lower() in _HINT_KEYS:
                     findings.append((getattr(node, "lineno", 0), operand.value))
     return findings
+
+
+# ── G. protocol-level resolution (D-239-03) ──────────────────────────────────────────────
+
+
+class TestProtocolResolution:
+    """⭐ MCP IS A PROTOCOL, NOT A VENDOR, AND THAT DISTINCTION IS THE WHOLE MECHANISM.
+
+    Google Drive and OneDrive resolve by `service_id` because each is one service with one
+    name. An MCP server has no such name — `service_id` is whatever the person typed, and the
+    next person will type something else. Resolving on *"the row speaks MCP"* is what lets an
+    arbitrary server work with no registration, and it is why `test_boundary_fence.py` stays
+    100% green: `mcp` is a transport, exactly as `https` is.
+    """
+
+    def test_the_registry_publishes_the_protocol(self):
+        from app.services.sources.base import SourceRegistry
+
+        assert "mcp" in SourceRegistry.list_supported_services()
+        assert SourceRegistry.is_source_supported("mcp") is True
+
+    def test_both_registered_keys_resolve(self):
+        from app.services.sources.adapters.mcp_source import McpSourceAdapter
+        from app.services.sources.base import SourceRegistry
+
+        for key in ("mcp", "custom_mcp"):
+            assert isinstance(SourceRegistry.get_adapter(key), McpSourceAdapter), key
+
+    def test_a_server_NOBODY_REGISTERED_resolves_by_its_auth_type(self):
+        """⭐ THE ROW THAT PROVES THE CLAIM. `wibble_files_v2` is not in the registry, is not
+        in this codebase, and never will be — and it resolves, because the row says `mcp`."""
+        from app.services.sources.adapters.mcp_source import McpSourceAdapter
+        from app.services.sources.base import SourceRegistry
+
+        adapter = SourceRegistry.get_adapter(
+            {"id": "c1", "service_id": "wibble_files_v2", "auth_type": "mcp"}
+        )
+        assert isinstance(adapter, McpSourceAdapter)
+
+    def test_a_row_predating_auth_type_resolves_by_its_BINDING(self):
+        """A connection carrying a file binding is, by construction, a file source. This arm
+        covers a row written before `auth_type` was set on it."""
+        from app.services.sources.adapters.mcp_source import McpSourceAdapter
+        from app.services.sources.base import SourceRegistry
+
+        adapter = SourceRegistry.get_adapter({
+            "id": "c2",
+            "service_id": "something_bespoke",
+            "config": {"source_tools": {"list_tool": "ls", "read_tool": "cat"}},
+        })
+        assert isinstance(adapter, McpSourceAdapter)
+
+    def test_a_pydantic_config_is_read_the_same_way_as_a_dict(self):
+        """`api/connectors.py` hands a `ConnectorConnectionResponse`, whose `config` is a
+        MODEL. A resolution that only understood dicts would work in `watch_service` and fail
+        on every browse — two paths, one rule."""
+        from app.models.connector import ConnectorConnectionResponse
+        from app.services.sources.adapters.mcp_source import McpSourceAdapter
+        from app.services.sources.base import SourceRegistry
+
+        row = ConnectorConnectionResponse.model_validate({
+            "id": "c3",
+            "org_id": "org-1",
+            "name": "Filesystem",
+            "service_id": "totally_unknown",
+            "auth_type": "mcp",
+            "mcp_server_url": SERVER,
+            "config": {"source_tools": {"list_tool": "ls"}},
+        })
+        assert isinstance(SourceRegistry.get_adapter(row), McpSourceAdapter)
+
+    def test_an_exact_service_id_still_wins(self):
+        """⚠ The protocol arm is a FALLBACK. A first-party family that also carried an MCP-ish
+        marker must keep its own adapter, or this becomes a hijack."""
+        from app.services.sources.adapters.google_drive import GoogleDriveSourceAdapter
+        from app.services.sources.base import SourceRegistry
+
+        adapter = SourceRegistry.get_adapter(
+            {"id": "c4", "service_id": "google", "auth_type": "mcp"}
+        )
+        assert isinstance(adapter, GoogleDriveSourceAdapter)
+
+    def test_an_ordinary_unregistered_row_still_resolves_to_NOTHING(self):
+        """⚠ THE NEGATIVE HALF. A fallback that answers for everything is not a fallback — it
+        is `watch_service`'s deleted Drive default, which read a Microsoft connection with the
+        Google adapter and looked like a working sync."""
+        from app.services.sources.base import SourceRegistry
+
+        assert SourceRegistry.get_adapter(
+            {"id": "c5", "service_id": "unknown_provider", "auth_type": "static_key"}
+        ) is None
+        assert SourceRegistry.get_adapter("unknown_provider") is None
+
+    def test_a_disabled_MCP_row_is_refused_BEFORE_the_protocol_arm(self):
+        """⚠ ORDER MATTERS. A new resolution arm placed above the `is_enabled` gate would
+        re-open BUG-260907-03 for exactly the family being added."""
+        from app.services.sources.base import SourceConnectionDisabled, SourceRegistry
+
+        with pytest.raises(SourceConnectionDisabled):
+            SourceRegistry.get_adapter(
+                {"id": "c6", "service_id": "wibble", "auth_type": "mcp", "is_enabled": False}
+            )
+
+    def test_the_protocol_map_is_DATA_and_not_a_branch(self):
+        """`base.py`'s own note over the deleted `_ensure_registered` asks for exactly this:
+        *"make the routing DATA (a dict keyed by service_id) rather than control flow"*.
+        Adding a second protocol must be a row in one of these two dicts."""
+        from app.services.sources import base
+
+        assert isinstance(base.PROTOCOL_ADAPTERS, dict)
+        assert base.PROTOCOL_ADAPTERS["mcp"] == "mcp"
+        assert base.CONFIG_PROTOCOL_MARKERS["source_tools"] == "mcp"
+
+    def test_the_eager_import_is_what_registers_it(self):
+        """⚠ A decorator only fires on import. `sources/__init__.py` importing every adapter
+        eagerly is why `_ensure_registered`'s lazy provider-keyed import could be deleted — so
+        an adapter left out of that list is unregistered and unresolvable, and `watch_service`
+        raises `NotImplementedError` for a perfectly good connection."""
+        import importlib
+
+        pkg = importlib.import_module("app.services.sources")
+        assert getattr(pkg, "mcp_source", None) is not None, (
+            "mcp_source is not eagerly imported by app/services/sources/__init__.py"
+        )

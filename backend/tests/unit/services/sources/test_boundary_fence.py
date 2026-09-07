@@ -143,11 +143,32 @@ def test_the_exemptions_are_exemptions_and_not_holes():
 def test_every_adapter_implements_the_contract():
     """The other half of the boundary: below `adapters/`, everything IS a SourceAdapter."""
     from app.services.sources.adapters.google_drive import GoogleDriveSourceAdapter
+    from app.services.sources.adapters.mcp_source import McpSourceAdapter
     from app.services.sources.adapters.microsoft_graph import MicrosoftGraphSourceAdapter
     from app.services.sources.adapters.mock_source import MockSourceAdapter
     from app.services.sources.base import SourceAdapter
 
-    for adapter_cls in (MockSourceAdapter, GoogleDriveSourceAdapter, MicrosoftGraphSourceAdapter):
+    for adapter_cls in (
+        MockSourceAdapter,
+        GoogleDriveSourceAdapter,
+        MicrosoftGraphSourceAdapter,
+        # Phase 239. ⭐ The FOURTH family, and the first that is not a single named service —
+        # it is a protocol, so one adapter serves every server anyone ever points it at.
+        McpSourceAdapter,
+    ):
+        assert issubclass(adapter_cls, SourceAdapter), adapter_cls
+
+
+def test_every_registered_adapter_is_covered_by_the_list_above():
+    """⚠ THE HALF THAT CANNOT BE FORGOTTEN. The list above is hand-maintained, so an adapter
+    added and not listed is silently unasserted — the same gap as a hot file with no ledger row,
+    one directory over. This derives the set from the REGISTRY instead of from a reader."""
+    import app.services.sources  # noqa: F401 — the eager import IS what populates the registry
+    from app.services.sources.base import SourceAdapter, SourceRegistry
+
+    registered = {cls for cls in SourceRegistry._adapters.values()}
+    assert registered, "the registry is empty — the eager import list is not running"
+    for adapter_cls in registered:
         assert issubclass(adapter_cls, SourceAdapter), adapter_cls
 
 
