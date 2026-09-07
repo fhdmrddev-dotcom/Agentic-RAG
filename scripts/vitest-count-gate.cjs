@@ -3233,6 +3233,12 @@ const BASELINE = {
   "ChatLayout.badge.test.tsx": 5,
   "useSourceAttention.test.tsx": 13,
   "LibraryPage.initialTab.test.tsx": 6,
+  // Phase 238 (D-238-08). 6 cases; the load-bearing one is "refuses a service_id that LOOKS
+  // like a source but was never registered" — the guess this replaced said TRUE for both of
+  // its fixtures. ⚠ In BOTH knobs on purpose: Phase 214 measured that TARGETS decides what
+  // RUNS and BASELINE decides what is GUARDED, and a suite can sit on the wrong side of
+  // exactly one of them for a whole phase without anyone noticing.
+  "sourceCapability.test.ts": 6,
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -4566,6 +4572,11 @@ const TARGETS = [
   "src/components/classification/ClassificationRulesPage.test.tsx",
   "src/components/classification/ClassificationSection.test.tsx",
   "src/components/classification/RuleBuilderPanel.test.tsx",
+  // ── Phase 238 (SRC-03 / D-238-08) — the predicate that replaced a string guess ─────────
+  // ⚠ ITS OWN LINE, because `src/components/sources` is STILL not a directory entry here —
+  // the same fact Phase 233 recorded and Phase 235 re-recorded. A suite dropped into that
+  // folder runs in no gate unless it is named.
+  "src/components/sources/__tests__/sourceCapability.test.ts",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")

@@ -438,6 +438,7 @@ export {
   browseSourceFolders,
   previewSource,
   confirmSourcePreview,
+  listSourceFamilies,
 } from "./api/connectors"
 export type {
   ConnectorCheckBucket,

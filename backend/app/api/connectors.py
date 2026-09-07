@@ -587,6 +587,20 @@ async def delete_connection(
 #: which is an EMPTY list, never six cheerful `ready`s.
 _AVAILABILITY_PROBES_BY_SERVICE = frozenset({"google"})
 
+#: The host a person is told we reached, per service. DATA, not a branch (D-238-09.3): this
+#: line used to read `host="googleapis.com" if service_id == "google" else ""`, which put a
+#: vendor literal in a comparison above `services/sources/adapters/` and gave every non-Google
+#: OAuth connection a blank "reached ___" line. A dict answers "which hosts does a check name?"
+#: with one grep; an if-ladder answers it with a reading.
+#: ⚠ It is DISPLAY ONLY. The real destination fence is `egress.ALLOWED_HOST_SUFFIXES`, and a
+#: service missing from here reaches exactly what it always did.
+_CHECK_HOST_BY_SERVICE: dict[str, str] = {
+    "google": "googleapis.com",
+    "google_workspace": "googleapis.com",
+    "microsoft": "graph.microsoft.com",
+    "microsoft_graph": "graph.microsoft.com",
+}
+
 
 async def _check_oauth_connection(
     *,
@@ -676,7 +690,7 @@ async def _check_oauth_connection(
         ok=ok,
         verdict=verdict,
         identity=identity,
-        host="googleapis.com" if (service_id or "") == "google" else "",
+        host=_CHECK_HOST_BY_SERVICE.get((service_id or "").strip().lower(), ""),
         port=None,
         checked_at=settled.last_checked_at,
         bucket=bucket,
@@ -1883,6 +1897,53 @@ async def confirm_source_preview(
         preview_said_added=result.preview_said_added,
         actually_added=result.actually_added,
     )
+
+
+#: Registered source families that must never be OFFERED to a person, whatever the registry
+#: holds. `mock_source` exists so the conformance suite can prove a family is data; it serves
+#: canned bytes and would be a live-looking option in a production dropdown.
+#:
+#: ⚠ MEASURED 2026-09-07: Phase 232's D-232-03 recorded a `VITE_ENABLE_MOCK_SOURCES` / dev-mode
+#: gate for this, and `grep -rn "mock_source" frontend/src` finds it in TESTS ONLY — no such
+#: gate shipped. It never mattered while the client's own predicate was `includes("google")`,
+#: which excluded the mock by accident. Publishing the registry removes that accident, so the
+#: exclusion is made explicit here, on the server, where it cannot be widened by a UI edit.
+_NEVER_OFFERED_SOURCE_FAMILIES = frozenset({"mock_source"})
+
+
+@router.get(
+    "/source-families",
+    summary="Which source families have a registered adapter (SRC-03 / D-238-08)",
+)
+async def list_source_families(
+    user: dict = Depends(get_current_user),
+):
+    """Publish `SourceRegistry`'s keys so the client stops guessing which connections can browse.
+
+    ⭐ WHY THIS ROUTE EXISTS, in `ConnectedSourceSection.tsx`'s own words before Phase 238:
+
+        *"The server's SourceRegistry is the authority and there is no endpoint that publishes
+        its list, so this filter is the client's honest approximation of it... When a second
+        family lands (Microsoft Graph, Phase 238), this predicate is the thing to widen, and
+        widening it by guess is how a dead option appears in a dropdown."*
+
+    Two copies of `id.includes("google") || includes("workspace") || includes("drive")` decided
+    which connections could be browsed and watched. Adding `|| includes("microsoft")` would have
+    satisfied this phase and left Phase 239's MCP family needing the same edit again — the
+    milestone's *"adding a source is rows, not code"* constraint, falsified on the frontend.
+
+    ⛔ It is a CAPABILITY list, not a connection list: it says which families the server can
+    read, never which connections a caller may see. Connection visibility stays with
+    `/connections`, org-scoped, unchanged.
+    """
+    from app.services.sources.base import SourceRegistry
+
+    return {
+        "families": sorted(
+            f for f in SourceRegistry.list_supported_services()
+            if f not in _NEVER_OFFERED_SOURCE_FAMILIES
+        )
+    }
 
 
 @router.get(

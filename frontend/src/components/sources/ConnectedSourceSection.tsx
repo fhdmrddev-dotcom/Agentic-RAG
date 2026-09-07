@@ -18,18 +18,28 @@
  *
  * ── WHICH CONNECTIONS APPEAR ─────────────────────────────────────────────────────────────
  *
- * Only ones a source adapter is registered for. The server's `SourceRegistry` is the authority
- * and there is no endpoint that publishes its list, so this filter is the client's honest
- * approximation of it — and it is deliberately NARROW: a connection that is offered and then
- * cannot browse is worse than one that is not offered. ⚠ When a second family lands (Microsoft
+ * Only ones a source adapter is registered for — and as of Phase 238 the server SAYS SO
+ * rather than the client guessing.
+ *
+ * ⚠ WHAT USED TO BE HERE, AND WHY IT IS GONE. This block previously read: *"The server's
+ * SourceRegistry is the authority and there is no endpoint that publishes its list, so this
+ * filter is the client's honest approximation of it... When a second family lands (Microsoft
  * Graph, Phase 238), this predicate is the thing to widen, and widening it by guess is how a dead
- * option appears in a dropdown.
+ * option appears in a dropdown."* The second family landed. **The predicate was not
+ * widened** — `GET /connectors/source-families` publishes `SourceRegistry`'s keys and
+ * `isSourceCapable` reads them, so Phase 239's MCP file family will appear here with no
+ * change to this file. Adding `|| includes("microsoft")` would have shipped SRC-03 and
+ * falsified the milestone's *"rows, not code"* constraint in the same commit.
+ *
+ * The predicate still fails CLOSED while the list is unknown — that half of the old note was
+ * right and is preserved in `sourceCapability.ts`.
  */
 import { useEffect, useMemo, useState } from "react"
 import { Loader2, Plug } from "lucide-react"
 
-import { listConnectorConnections } from "@/lib/api"
+import { listConnectorConnections, listSourceFamilies } from "@/lib/api"
 import type { ConnectorConnection } from "@/lib/api/org"
+import { isSourceCapable } from "./sourceCapability"
 import { SourceFolderPicker, type SelectedFolder } from "./SourceFolderPicker"
 import { SourcePreviewPanel } from "./SourcePreviewPanel"
 
@@ -37,13 +47,6 @@ export interface ConnectedSourceSectionProps {
   /** The Library folder the person chose in the sibling upload picker. `null` = root. */
   destinationFolderId?: string | null
   destinationFolderName?: string | null
-}
-
-/** ⚠ Narrow on purpose — see the module docblock. Widened when an adapter is registered. */
-function isSourceCapable(c: ConnectorConnection): boolean {
-  const id = (c.service_id || "").toLowerCase()
-  if (c.status === "revoked" || c.status === "error") return false
-  return id.includes("google") || id.includes("workspace") || id.includes("drive")
 }
 
 export function ConnectedSourceSection({
@@ -56,11 +59,15 @@ export function ConnectedSourceSection({
 
   useEffect(() => {
     let cancelled = false
-    listConnectorConnections()
-      .then((rows) => {
-        if (!cancelled) setConnections(rows.filter(isSourceCapable))
+    // Both, together: a connection list without the families list cannot be filtered honestly,
+    // and `isSourceCapable` fails closed on `null` rather than briefly offering everything.
+    Promise.all([listConnectorConnections(), listSourceFamilies()])
+      .then(([rows, families]) => {
+        if (!cancelled) setConnections(rows.filter((c) => isSourceCapable(c, families)))
       })
       .catch(() => {
+        // Renders nothing at all (see below) — an empty picker that explains itself is still
+        // a control somebody has to read past.
         if (!cancelled) setConnections([])
       })
     return () => {

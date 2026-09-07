@@ -15,10 +15,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { listConnectorConnections } from "@/lib/api"
+import { listConnectorConnections, listSourceFamilies } from "@/lib/api"
 import type { ConnectorConnection } from "@/lib/api/org"
 import { createWatch, type ConnectorWatch } from "@/lib/api/sources"
 import { useFolders } from "@/hooks/useFolders"
+import { isSourceCapable } from "./sourceCapability"
 import { SourceFolderPicker, type SelectedFolder } from "./SourceFolderPicker"
 import { cn } from "@/lib/utils"
 
@@ -36,12 +37,6 @@ const CADENCE_OPTIONS = [
   { label: "6 hours", value: 360 },
   { label: "24 hours", value: 1440 },
 ]
-
-function isSourceCapable(c: ConnectorConnection): boolean {
-  const id = (c.service_id || "").toLowerCase()
-  if (c.status === "revoked" || c.status === "error") return false
-  return id.includes("google") || id.includes("workspace") || id.includes("drive")
-}
 
 export function CreateWatchModal({
   open,
@@ -68,9 +63,12 @@ export function CreateWatchModal({
     }
 
     setLoadingConnections(true)
-    listConnectorConnections()
-      .then((rows) => {
-        const capable = rows.filter(isSourceCapable)
+    // Phase 238 (D-238-08): both together. The families list is the server's SourceRegistry,
+    // and `isSourceCapable` fails CLOSED on `null` rather than briefly offering every
+    // connection while the answer is still in flight.
+    Promise.all([listConnectorConnections(), listSourceFamilies()])
+      .then(([rows, families]) => {
+        const capable = rows.filter((c) => isSourceCapable(c, families))
         setConnections(capable)
         if (capable.length > 0 && !selectedConnectionId) {
           setSelectedConnectionId(capable[0].id)

@@ -699,3 +699,20 @@ export async function confirmSourcePreview(
 ): Promise<SourceConfirmResponse> {
   return postPreview<SourceConfirmResponse>(connectionId, "preview/confirm", body, "Failed to import from the source folder")
 }
+
+/**
+ * Phase 238 (D-238-08): which source families the SERVER has an adapter registered for.
+ *
+ * ⛔ A CAPABILITY list, not a connection list — it says what the server can read, never which
+ * connections this caller may see. Pair it with `isSourceCapable` from
+ * `components/sources/sourceCapability`, which fails CLOSED while this has not resolved.
+ */
+export async function listSourceFamilies(): Promise<string[]> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/connectors/source-families`, { headers })
+  if (!res.ok) {
+    throw new ApiError("Failed to load source families", res.status)
+  }
+  const body = (await res.json()) as { families?: string[] }
+  return body.families ?? []
+}
