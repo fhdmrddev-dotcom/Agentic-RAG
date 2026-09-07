@@ -217,6 +217,39 @@ class McpConfig(_StrictBase):
     #: minted by the server itself under RFC 7591 dynamic client registration.
     custom_client_id: str | None = None
 
+    #: Phase 239 (D-239-01) — WHICH TOOLS ON THIS SERVER READ FILES, as DATA.
+    #:
+    #: ``{"list_tool": "list_directory", "read_tool": "read_file"}``
+    #:
+    #: ⭐ THE BINDING IS A ROW, NOT A BRANCH. MCP file servers do not agree on names —
+    #: ``list_directory`` / ``list_files`` / ``ls``, ``read_file`` / ``cat`` — and the whole
+    #: claim of this phase is that connecting a SECOND, differently-worded server is a row in
+    #: this column and no product change at all. The moment a tool name reaches a conditional
+    #: above ``services/sources/adapters/``, that claim is false. ``McpSourceAdapter`` reads
+    #: these two keys and falls back to the ``@modelcontextprotocol/server-filesystem``
+    #: defaults; nothing else in the codebase knows any tool name.
+    #:
+    #: ⚠ IT IS DECLARED HERE BECAUSE OMITTING IT IS AN ORG-WIDE OUTAGE, NOT A LOCAL ONE — the
+    #: defect Phase 222 shipped into the live database one key over (see this class's opening
+    #: note, and ``SEED-239``). Every model here is ``extra='forbid'``, so an undeclared key
+    #: makes the row match NO member of the ``ConnectorConfig`` union; ``_to_response``
+    #: validates rows INSIDE a list comprehension, so ONE source-bound connection would make
+    #: **every connection in the org** unreadable — 503, and a page reading *"Nothing is
+    #: wrong with them — this page could not read them."* Driven RED before the field existed
+    #: (``tests/unit/test_239_mcp_config_source_tools.py``): ``extra_forbidden`` on
+    #: ``source_tools``, and the whole-list case with it.
+    #:
+    #: ⚠ ``None`` and ``{}`` ARE DIFFERENT. Absent means nobody bound this connection to a
+    #: file surface; empty means somebody looked and named nothing. The adapter's defaults
+    #: apply per-KEY, so a row carrying only ``read_tool`` still gets the default lister.
+    #:
+    #: ⛔ ``dict[str, str]`` IS A CONSTRAINT, not a shape note. These values are interpolated
+    #: into a JSON-RPC ``params.name`` by ``mcp_client.call_tool``; a nested object here would
+    #: reach the transport before anything could refuse it. It is a NAME, never a credential
+    #: and never a payload — ``config`` is readable by every member of the org (migration
+    #: 150), which is why ``custom_client_secret`` is refused two fields up.
+    source_tools: dict[str, str] | None = None
+
 
 AuthType = Literal["static_key", "oauth_byo", "mcp"]
 ConnectionStatus = Literal["active", "revoked", "error"]
