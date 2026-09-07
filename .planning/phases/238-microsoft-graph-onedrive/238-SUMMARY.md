@@ -5,7 +5,15 @@
 verifying its own phase. Everything here is a self-verification and is labelled as one.
 
 **Commits:** `409af705f` (238-01) · `c74883928` (238-02) · 238-03 below.
-**Plans:** 3 (G-8 target is 3-5).
+**Plans:** 3 (G-8 target is 3-5). Per-plan detail: `238-01-SUMMARY.md` · `238-02-SUMMARY.md` ·
+`238-03-SUMMARY.md`. Pre-phase measurements: `BASELINE.md`.
+
+⚠ **Those four files were written at the phase CLOSE, not during the work.** All three plans were
+executed INLINE rather than dispatched to `gsd-executor` agents, and it is the executor that
+writes a per-plan summary — so none existed until they were reconstructed from the commits, the
+test output and the recorded measurements. Said plainly because a summary written afterwards can
+be back-fitted to the outcome; every figure in them is checkable against its named commit, and
+each one carries a section on **what that plan got wrong** and where it was fixed.
 
 ---
 
