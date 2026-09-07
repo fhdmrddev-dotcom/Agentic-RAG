@@ -36,8 +36,43 @@ can be taught new behaviors (skills) that persist and can be shared.
 **Current focus:** **Milestone v4.0 Connected Knowledge — STARTED 2026-09-04.** Phase numbering
 continues at **228**.
 
-Phase: 239 — Any MCP Server With Files (Plans authored, ready for execution)
+Phase: 239 — Any MCP Server With Files (⚠ **BUILT 2026-09-08, UNREVIEWED — SC#2 UNMET, G-4 UAT OWED**)
 Prior: 238 — Microsoft Graph — OneDrive (✅ BUILT & DRIVEN 2026-09-07)
+
+### Phase 239 — what is true, and what is NOT
+
+Three plans, three waves, merged at `31cdaabc1`. Gemini ran discuss-phase and authored the plans;
+claude executed. **That is `OV-239-01`: the phase has NO agent reviewer**, so `/code-review ultra`
+— operator-only — is its single independent gate.
+
+**Measured, not claimed.** Backend `71 failed / 4113 passed / 2 xfailed / 2 xpassed`, failing SET
+diffed against the untouched-tree baseline at `25c650231`: **identical, zero new**, still exactly at
+the ceiling with zero headroom. Ledger gate OK (231 rows). CLAUDE.md size gate OK. G-7 clear.
+⚠ The count gate was **RED at baseline and stayed red all phase** — every named file provably
+byte-unchanged, four of them SEED-171's set, and a re-run in isolation produced a *different* five.
+
+⭐ **The finding: wave 3 caught a FALSE GREEN in its own plan.** The plan specified
+`Boolean(c.mcp_server_url)` as the source-capability test — a client-side guess at something only the
+server knows. Shipped rows carry an MCP URL with `auth_type: "static_key"` and no `source_tools`,
+and the server resolves **no adapter** for them, so it would have printed **"✓ Ready as source" on a
+connection that cannot browse** — the exact dishonesty `BUG-260907-01` was filed about,
+reintroduced while fixing it. Now a test, driven RED against the defect planted in the shipped file.
+
+**Named rather than silently fixed:** the Phase 221 over-claim is ALREADY LIVE on this family (an MCP
+row with zero tools already read "✓ Ready"); a third arm still over-claims (`static_key`, no adapter,
+checked ok); and `docs/HOT-FILE-LEDGER.md` carries **77 sections for 231 rows** — the same-commit
+sync rule is followed by nobody, waves 1 and 2 included.
+
+**OWED before this phase closes — it is NOT closed:**
+1. ⛔ **SC#2 is unmet.** "Adding a source added rows, not code" is proven **in test only** (the
+   `ls`/`cat` vocabulary exists nowhere as code). It closes on someone connecting a **real second
+   MCP file server**, not on the fixture.
+2. ⛔ **G-4 live UAT row** covering the headline verdict, F-6's discovery receipt, and the
+   over-claiming arm. `BUG-260907-01` stays `folded`, **not `closed`**, until it runs.
+3. ⚠ **A product limit needing an operator decision:** `mcp_client.MAX_MCP_BODY_BYTES` is 2 MB on the
+   whole response and base64 inflates 4/3, so **an MCP file source cannot import a file over ~1.5 MB**.
+   TM-239-03's 25 MB ceiling can never fire. Not a defect — a limit that will surface as a UAT
+   surprise rather than a legible error.
 Prior: 237 — One Rule Engine, Not Two (✅ CLOSED 2026-09-06)
 Prior: 236 — The Corpus Under Attack (✅ FULLY CLOSED — GA GATE MET 2026-09-06)
 Prior: 235 — The Source Says What It Did (✅ CLOSED 2026-09-06)
