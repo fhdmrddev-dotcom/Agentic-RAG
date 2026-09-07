@@ -91,7 +91,7 @@ adapter under a Microsoft token.
 
 | Gate | Result |
 |---|---|
-| Backend `pytest tests/unit -q --continue-on-collection-errors` | **71 failed, 4010 passed, 2 xfailed, 2 xpassed, 0 collection errors** — at the CLAUDE.md ceiling. Diffed against the baseline's **full 71-name set** with `comm -13`: **zero new names**. `+39` newly passing. |
+| Backend `pytest tests/unit -q --continue-on-collection-errors` | **71 failed, 4015 passed, 2 xfailed, 2 xpassed, 0 collection errors** — at the CLAUDE.md ceiling. Diffed against the baseline's **full 71-name set** with `comm -13`: **zero new names**. `+44` newly passing. Re-run on the FINAL tree, after 238-03. |
 | `tests/unit/services/sources` | **118 passed** (94 before the phase) |
 | `tests/unit/test_190_egress.py` | **77 passed**, including the extra-key wiring assertion |
 | `tsc -p tsconfig.app.json --noEmit` | **66** — exactly the 232 baseline |

@@ -145,7 +145,7 @@ server-side, where a UI edit cannot widen it.
 
 | Gate | Before | After | Verdict |
 |---|---|---|---|
-| Backend `tests/unit` | `71 failed, 3971 passed, 2 xfailed, 2 xpassed, 0 collection errors` | `71 failed, 4010 passed, 2 xfailed, 2 xpassed` | **HOLDS.** The full 71-name failing SET was captured and diffed with `comm -13`: **identical**, zero new names. `+39` newly passing. |
+| Backend `tests/unit` | `71 failed, 3971 passed, 2 xfailed, 2 xpassed, 0 collection errors` | `71 failed, 4015 passed, 2 xfailed, 2 xpassed` | **HOLDS.** The full 71-name failing SET was captured and diffed with `comm -13`: **identical**, zero new names. `+44` newly passing. ⚠ Re-run on the FINAL tree (after 238-03), not only after 238-02 — an intermediate figure in a close doc is the rot this project keeps recording. |
 | `tsc -p tsconfig.app.json --noEmit` | 66 | **66** | at baseline |
 | vitest count gate | `count gate OK — 241/241 · total 7816 · failed 0 · pinned 7020` | `count gate OK — 242/242 · total 7822 · failed 0 · pinned 7026` | **+6, exactly the new suite.** No per-file decrease, 0 failing |
 
