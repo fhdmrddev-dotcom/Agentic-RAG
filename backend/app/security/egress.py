@@ -314,7 +314,18 @@ ALLOWED_HOST_SUFFIXES: dict[str, tuple[str, ...]] = {
     # `Authorization` header — Microsoft: *"You don't need to include an Authorization header
     # when you access the download URL"* — so a redirect to an unexpected host cannot leak our
     # OAuth token even before the pin refuses it.
-    "graph_download": ("1drv.com", "sharepoint.com"),
+    # ⚠⚠ THREE SUFFIXES, AND THE THIRD WAS FOUND BY A LIVE DRIVE REFUSING (2026-09-07).
+    # Microsoft's own reference prints `Location: https://b0mpua-by3301.files.1drv.com/...`,
+    # so this list shipped as `1drv.com` + `sharepoint.com`. A real personal OneDrive
+    # actually served the preauthenticated URL from **my.microsoftpersonalcontent.com**, and
+    # this allow-list refused it — correctly, loudly, naming the host. Personal OneDrive
+    # content has moved off 1drv.com and the docs have not caught up.
+    #
+    # ⭐ THE REFUSAL IS THE FEATURE. The URL is SERVER-SUPPLIED, so an over-broad list is the
+    # actual risk here; a too-narrow one costs a clear error naming exactly what to add.
+    # 1drv.com is KEPT rather than replaced — it is still what the documentation describes
+    # and may still serve some accounts; sharepoint.com is what OneDrive for Business uses.
+    "graph_download": ("1drv.com", "sharepoint.com", "microsoftpersonalcontent.com"),
 }
 
 _HOST_MATCH: dict[str, str] = {

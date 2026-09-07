@@ -162,7 +162,11 @@ def graph_adapter(monkeypatch: pytest.MonkeyPatch) -> MicrosoftGraphSourceAdapte
                 body=b"%PDF-1.7 Mock Graph Binary Content",
             )
 
-        if "/me/drive/items/item-g-1" in url and "$select" in params:
+        # ⚠ Matches on the ABSENCE of $select, because that is what Graph requires: any
+        # projection suppresses @microsoft.graph.downloadUrl (measured live 2026-09-07,
+        # contradicting the docs). A fake that accepted either form would have hidden the
+        # defect a second time.
+        if "/me/drive/items/item-g-1" in url and "$select" not in params:
             return PinnedResponse(
                 status_code=200,
                 headers={"content-type": "application/json"},

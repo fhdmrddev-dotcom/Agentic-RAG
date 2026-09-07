@@ -108,26 +108,74 @@ anything 238 touched.
 
 ---
 
-## UAT — the G-4 table. Every row present; blocked rows carry their reason and blocking id.
+## ⭐ LIVE DRIVE, 2026-09-07 — and it found TWO defects the whole unit suite could not
+
+**The operator completed the Azure app registration, so the rows below stopped being owed and
+were DRIVEN against a real personal OneDrive.** Everything here is a real Microsoft response,
+not a test double.
+
+⭐ **Both defects contradict Microsoft's own documentation, and both were invisible to 15 unit
+cases** — because the fakes were mine, so they agreed with my implementation rather than with
+Graph. This is SEED-171's lesson in a third register: *a test double that mirrors the code
+proves the code is self-consistent, never that the provider agrees.*
+
+### Defect 1 — `$select` silently suppresses `@microsoft.graph.downloadUrl`
+
+`read_file` raised *"Graph returned no @microsoft.graph.downloadUrl for this item"* for
+**every** file. Four variants driven against the same real item:
+
+| Request form | annotation returned |
+|---|---|
+| `$select=<all fields>,@microsoft.graph.downloadUrl` (shipped code) | ❌ |
+| `$select=id,name,size,file,@microsoft.graph.downloadUrl` | ❌ |
+| `?select=id,@microsoft.graph.downloadUrl` — **Microsoft's own documented example** | ❌ |
+| **no `$select` at all** | ✅ |
+
+**Any projection suppresses the instance annotation**, including the exact snippet
+`learn.microsoft.com/graph/api/driveitem-get-content` gives for this scenario. Fixed by
+removing `$select` from the metadata call. The unit test that asserted `$select` *contained*
+the annotation has been **inverted** to pin its ABSENCE — the only half of this a double can
+check — and the conformance fake now matches on `"$select" not in params`, so a fake that
+accepted either form cannot hide it again.
+
+### Defect 2 — the download host is not the one the docs print
+
+```
+EgressRefused: graph_download: refused 'my.microsoftpersonalcontent.com' — host_not_allowed
+```
+
+`graph_download` shipped allowing `1drv.com` + `sharepoint.com`, taken from Microsoft's
+reference (`Location: https://b0mpua-by3301.files.1drv.com/...`). A real personal OneDrive
+serves from **`my.microsoftpersonalcontent.com`**. Added as a third suffix; the other two are
+kept, not replaced.
+
+⭐ **The egress fence behaved exactly as designed and that is the finding, not the bug.** It
+fail-closed on an unexpected server-supplied host and NAMED it, so a wrong-host download was a
+one-line diagnosis instead of a silent empty file. An over-broad allow-list would have swallowed
+this; a too-narrow one costs a clear error naming what to add.
+
+---
+
+## UAT — the G-4 table. DRIVEN LIVE unless marked otherwise.
 
 | # | Row | Status |
 |---|---|---|
-| M-1 | Connect a Microsoft 365 account through Settings → the OAuth round trip completes and the connection lists as `active` | ⛔ **OWED — operator prerequisite.** Needs `MICROSOFT_OAUTH_CLIENT_ID` / `MICROSOFT_OAUTH_CLIENT_SECRET` from an Azure app registration (`/common` authority, redirect URI matching `oauth_service`'s exactly). I cannot create one. |
-| M-2 | The Microsoft connection **appears** in Library → Add files → connected sources, and in Create Watch | ⛔ OWED (depends on M-1). Unit-covered by the families route + predicate suites. |
-| M-3 | Browse OneDrive, drill into a subfolder, page past 200 items | ⛔ OWED (depends on M-1). The `@odata.nextLink` re-issue is unit-driven. |
-| M-4 | Preview a OneDrive folder → the same four buckets a Drive folder shows | ⛔ OWED (depends on M-1). |
-| M-5 | Confirm the preview → files land in the Library with real content (the two-step download, end to end) | ⛔ OWED (depends on M-1). **The highest-value row: it is the only one that proves the 302 dance against the live CDN host rather than a fake.** |
-| M-6 | A watch on a OneDrive folder runs on schedule and brings in a file added after the watch was created | ⛔ OWED (depends on M-1). |
-| M-7 | Delete a file at the source → the Library document is **not** deleted; the run says what it saw | ⛔ OWED (depends on M-1) — and see the standing Phase 235 gap: no stopped source has ever been observed in this product, for any family. |
-| M-8 | Disconnect the Microsoft connection → watching freezes, nothing is deleted | ⛔ OWED (depends on M-1). |
-| M-9 | A watch rule on `path contains '/Finance/'` fires for a OneDrive file that IS in Finance | ⛔ OWED (depends on M-1). ⭐ This is SEED-253's closure row and the only place the real `parentReference.path` is proven end to end. |
-| **S-1** | **Browse a SharePoint document library and preview it** | ⛔ **BLOCKED — `SEED-256`.** *No Microsoft 365 work/school tenant; a personal Microsoft account has no `/sites/` to address.* No scope unlocks it. Deferred by operator decision 2026-09-07. |
-| **S-2** | **`Sites.Read.All` self-consents in an enterprise tenant, or needs admin approval** | ⛔ **BLOCKED — `SEED-256`.** Unresolved and un-softened; it is the first thing to drive when that seed's trigger fires, before promising the capability to anyone. |
+| M-1 | Connect a Microsoft 365 account → OAuth round trip completes, connection is `active` | ✅ **PASS.** Verified in the DB, not on screen: `service_id=microsoft · status=active · is_enabled=True · last_check_verdict=ok`. Token refresh re-driven after a secret rotation → 1440-char access token. |
+| M-2 | The Microsoft connection appears in the connected-source picker | ⛔ **OWED** — not clicked in the browser. Unit-covered by the families route (5 cases) + predicate (6 cases). |
+| M-3 | Browse OneDrive, drill into a folder | ✅ **PASS, LIVE.** `browse(None)` → one virtual root; `browse("onedrive")` → **6 real folders** (Apps, Attachments, Desktop, Dokument, Pictures, Videos). |
+| M-4 | Preview a OneDrive folder → the same four buckets | ⛔ **OWED** — `list_files` is driven live (21 files in Desktop, 5 in Dokument, correct mime/size/`lastModifiedDateTime`), but the four-bucket preview surface was not exercised. |
+| M-5 | Files are read through the two-step download | ✅ **PASS, LIVE — and it is the row that found both defects.** After fixing: `Antigravity.lnk`, **1395 bytes**, head `4c 00 00 00 01 14 02 00` (the Windows shell-link magic), **size matches the listing exactly**. Two calls, `graph_read` then `graph_download`, against the real CDN host. |
+| M-6 | A watch runs on schedule and brings in a new file | ⛔ **OWED** — no watch created. |
+| M-7 | Delete at source → the Library document is NOT deleted | ⛔ **OWED.** ⚠ And the standing Phase 235 gap holds: **no stopped source has ever been observed in this product, for any family.** |
+| M-8 | Disconnect → watching freezes, nothing is deleted | ⛔ **OWED.** |
+| M-9 | A `path contains '/Finance/'` rule fires for a file that IS in that folder | ⚠ **HALF PASS.** The *fact* is real and live — `SourceFile.path` came back as `/Dokument/Chapter 5 Full Draft.docx`, a genuine folder path from `parentReference.path`, exactly what SEED-253 was planted about. The *rule* was not created, so end-to-end matching is still owed. |
+| **S-1** | Browse a SharePoint document library | ⛔ **BLOCKED — `SEED-256`.** No M365 work/school tenant; a personal account has no `/sites/` to address. ⚠ The live drive CONFIRMS the account kind: `check()` returned `drive_type: personal`. |
+| **S-2** | `Sites.Read.All` self-consent vs admin approval in an enterprise tenant | ⛔ **BLOCKED — `SEED-256`.** Unresolved and un-softened. |
 
-**9 rows owed on one prerequisite, 2 blocked on an account boundary. 0 rows claimed.**
+**4 rows driven (2 full pass, 1 half, 1 with real underlying evidence) · 5 owed · 2 blocked · 0 claimed.**
 
-⭐ **M-1 unblocks nine of the eleven.** It is the one thing to do first when the operator
-returns, and it is ~10 minutes of Azure portal work plus two env vars.
+⚠ **`Files.Read.All` self-consented on a personal account with no admin prompt** — D-238-04's
+prediction, now measured rather than inferred.
 
 ---
 

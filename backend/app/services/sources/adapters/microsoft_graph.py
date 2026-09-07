@@ -276,14 +276,31 @@ class MicrosoftGraphSourceAdapter(SourceAdapter):
         """Download a file — the documented two-step, and never `/content` (D-238-01)."""
         token = await self._get_auth_token(connection)
 
+        # ⚠⚠ NO `$select` HERE, AND THAT IS THE OPPOSITE OF WHAT MICROSOFT DOCUMENTS.
+        # Measured against a live personal OneDrive on 2026-09-07, four variants, same item:
+        #
+        #   $select=<all fields>,@microsoft.graph.downloadUrl   -> annotation ABSENT
+        #   $select=id,name,size,file,@microsoft.graph.downloadUrl -> annotation ABSENT
+        #   ?select=id,@microsoft.graph.downloadUrl               -> annotation ABSENT
+        #     ^ this is Microsoft's OWN example, verbatim, from
+        #       learn.microsoft.com/graph/api/driveitem-get-content
+        #   no $select at all                                     -> annotation PRESENT
+        #
+        # ANY projection suppresses the instance annotation. The docs are wrong (or the
+        # consumer endpoint does not honour them), so the request asks for the whole item.
+        #
+        # ⛔ DO NOT "optimise" this by adding a $select back. It costs a slightly larger
+        # response and it is the difference between every download working and none of them
+        # working. The unit suite could not catch this — its fake returned the annotation
+        # unconditionally, so it agreed with the implementation rather than with Graph. A
+        # test now pins the ABSENCE of $select, which is the only part a double can check.
         meta_resp = await send_pinned_http(
             "graph_read",
             "GET",
             f"{GRAPH_API_BASE}/me/drive/items/{file_id}",
-            params={"$select": f"{SELECT_ITEM_FIELDS},@microsoft.graph.downloadUrl"},
             headers=self._headers(token),
             timeout=30.0,
-            max_bytes=64 * 1024,
+            max_bytes=256 * 1024,
         )
         if meta_resp.status_code != 200:
             reason = _graph_error_reason(meta_resp.body)

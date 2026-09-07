@@ -166,7 +166,24 @@ old figures, never over them; **a growing number is the gate working.**
 
 ## What is NOT done, named rather than omitted
 
-1. ⛔ **Every live UAT row is OWED.** `MICROSOFT_OAUTH_CLIENT_ID` / `MICROSOFT_OAUTH_CLIENT_SECRET`
+1. ⚠ **SUPERSEDED THE SAME DAY — THE LIVE ROWS WERE DRIVEN, AND THEY FOUND TWO DEFECTS.**
+   The operator completed the Azure app registration hours after this was written, so **M-1,
+   M-3 and M-5 PASS live against a real personal OneDrive**. Driving them exposed two defects
+   that **all 15 unit cases missed, and both contradict Microsoft's own documentation**:
+   (a) any `$select` silently suppresses `@microsoft.graph.downloadUrl`, including the docs'
+   own example — so **every** download failed; (b) the real download host is
+   `my.microsoftpersonalcontent.com`, not the `files.1drv.com` the reference prints, and the
+   `graph_download` allow-list refused it. Both fixed. Corrected UAT table and full evidence in
+   `238-VERIFICATION.md`.
+   ⭐ **Why the unit suite could not see either is the durable lesson: the fakes were mine, so
+   they agreed with my implementation rather than with Graph.** The test that asserted
+   `$select` *contained* the annotation has been inverted to pin its ABSENCE.
+   ⭐ **And the egress fence is vindicated rather than embarrassed** — it fail-closed on an
+   unexpected server-supplied host and NAMED it, turning a would-be silent empty download into
+   a one-line diagnosis.
+   The original claim is kept below rather than overwritten: it was true when written, and the
+   correction is the finding.
+   ~~⛔ **Every live UAT row is OWED.**~~ `MICROSOFT_OAUTH_CLIENT_ID` / `MICROSOFT_OAUTH_CLIENT_SECRET`
    need an Azure app registration, which is an operator action I cannot perform and the
    operator was away. **SC#1 and SC#2 are proven only at unit level.** The rows are enumerated
    in `238-VERIFICATION.md`; none is claimed.

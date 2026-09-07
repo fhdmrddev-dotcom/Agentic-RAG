@@ -250,11 +250,28 @@ async def test_read_file_is_a_two_step_and_never_touches_content(adapter, monkey
 
 
 @pytest.mark.asyncio
-async def test_the_metadata_call_selects_the_download_url(adapter, monkeypatch):
+async def test_the_metadata_call_sends_NO_select(adapter, monkeypatch):
+    """⭐ THE REGRESSION FROM THE LIVE DRIVE (2026-09-07). This test used to assert the
+    OPPOSITE — that `$select` CONTAINED `@microsoft.graph.downloadUrl`, which is what
+    Microsoft's own documentation shows. Driven against a real personal OneDrive, four
+    variants of the same request on the same item:
+
+        $select=<all fields>,@microsoft.graph.downloadUrl      -> annotation ABSENT
+        $select=id,name,size,file,@microsoft.graph.downloadUrl -> annotation ABSENT
+        ?select=id,@microsoft.graph.downloadUrl                -> annotation ABSENT  (the docs' own example)
+        no $select at all                                      -> annotation PRESENT
+
+    So EVERY projection suppresses it and every download failed. ⚠ The old unit suite could
+    not see this because the fake returned the annotation unconditionally — it agreed with
+    the implementation instead of with Graph. Absence of `$select` is the one part of this
+    a test double CAN check, so that is what is pinned."""
     rec = _install(monkeypatch, _download_handler)
     await adapter.read_file(CONN, "ITEM1")
-    select = (rec.calls[0][3].get("params") or {}).get("$select", "")
-    assert "@microsoft.graph.downloadUrl" in select
+    params = rec.calls[0][3].get("params") or {}
+    assert "$select" not in params, (
+        "a $select on the metadata call suppresses @microsoft.graph.downloadUrl and breaks "
+        "every download — measured live, contradicting the Graph docs"
+    )
 
 
 @pytest.mark.asyncio
