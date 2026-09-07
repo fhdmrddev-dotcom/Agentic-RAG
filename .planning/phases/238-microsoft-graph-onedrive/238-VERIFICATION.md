@@ -55,9 +55,28 @@ adapter, so a Graph source inherits them by being an adapter.
 by the Drive adapter — which was the one way "a person cannot tell which family they are
 watching" could have been true for the wrong reason.
 
-⛔ **Still true, carried from Phase 235 item #1: NO STOPPED SOURCE HAS EVER BEEN OBSERVED IN
-THIS PRODUCT.** Every claim about a broken source, for any family, is unit-level. This phase
-does not change that and does not pretend to.
+⚠ **CORRECTION — THE PARAGRAPH ABOVE IS HALF WRONG, AND THE ORIGINAL IS KEPT RATHER THAN
+OVERWRITTEN BECAUSE THE WAY IT WAS WRONG IS THE FINDING.** *"PASS by construction"* was asserted
+for **disconnect-freezes** on the reasoning that `watch_service` resolves its adapter through the
+registry and never asks which family it got. That reasoning is correct **and covers only the
+scheduled loop.** The interactive half was never checked.
+
+Driven at M-8, on a connection with `is_enabled=False`: **`browse()` minted a fresh OAuth token
+and returned 6 real OneDrive folders.** `grep is_enabled` finds **one** check in the entire
+codebase — `watch_service.py:205` — and **zero** in `api/connectors.py` or anywhere under
+`services/sources/`. Browse, preview and import all keep reading. Filed as `BUG-260907-03`.
+
+⭐ **AND SC#3 AS WRITTEN STILL PASSES, WHICH IS THE UNCOMFORTABLE PART.** The criterion asks that
+a Graph source behave *identically* to a Drive source. It does — **both are unguarded**, because
+the hole is in the shared path and predates this phase. A satisfied criterion sat directly on top
+of a real defect, and only driving the row separated them. *"Behaves identically"* is a claim
+about parity, never about correctness.
+
+⛔ **Still true, carried from Phase 235 item #1 (now HALF discharged): a stopped source had never
+been observed in this product.** ⭐ **M-7 closed that half** — a deleted file produced
+`source_state='missing_at_source'` on a surviving document, the first such observation for any
+family. Disconnect behaviour is the half that remains, and it is now known to be wrong rather
+than merely unobserved.
 
 ### SC#4 — if the phase was not small, that is a finding
 
@@ -193,12 +212,21 @@ the key fails rather than passing quietly.
 | M-5 | Files are read through the two-step download | ✅ **PASS, LIVE — and it is the row that found both defects.** After fixing: `Antigravity.lnk`, **1395 bytes**, head `4c 00 00 00 01 14 02 00` (the Windows shell-link magic), **size matches the listing exactly**. Two calls, `graph_read` then `graph_download`, against the real CDN host. |
 | M-6 | A watch runs on schedule and brings in a new file | ✅ **PASS, LIVE.** A real watch on OneDrive `/Attachments`, every 15 min, `is_active=True`. Two runs, both `status=success`, **`listing_complete=True`** (H-5's fail-closed flag genuinely true, not defaulted), `count_new=1`, `count_errors=0`. The document arrived at `status=completed` carrying `path=/Attachments/Practical_Project_Management_Guide_Recreated.docx`. |
 | M-7 | Delete at source → the Library document is NOT deleted | ✅ **PASS, LIVE — and it closes a gap carried since Phase 235.** The operator deleted the watched file from OneDrive; the next run reported *"1 missing at source"* and the document **still exists**: `status=completed`, `source_state='missing_at_source'`, `path` intact. ⭐ Not a default: across the whole corpus the histogram is `None: 126` / `missing_at_source: 1` — exactly the file that was deleted. **Deletion at source does not delete; it records.** |
-| M-8 | Disconnect → watching freezes, nothing is deleted | ⛔ **OWED, and now needs a setup step.** The Microsoft watch was deleted after M-7, so there is no live watch to freeze — driving M-8 means creating one again first. The connection itself is untouched (`status=active`, `is_enabled=True`). |
+| M-8 | Disconnect → watching freezes, nothing is deleted | ⚠ **HALF PASS — and the failing half is a DEFECT, `BUG-260907-03`.** *Nothing is deleted*: ✅ all three documents survive, including the `missing_at_source` one. *Watching freezes*: ✅ for the scheduled loop (`watch_service.py:205`). ⛔ **But the connection does not stop READING.** Driven at `is_enabled=False`: `browse()` minted a fresh OAuth token and returned 6 real OneDrive folders from `graph.microsoft.com`. Browse, preview and import are all unguarded. **Not Graph-specific — Google Drive has the same hole since Phase 232.** |
 | M-9 | A `path contains '/Finance/'` rule fires for a file that IS in that folder | ⚠ **HALF PASS, and stronger than before.** The fact is now real **in the database**, not only in the adapter: a watched document carries `metadata.source.path = /Attachments/Practical_Project_Management_Guide_Recreated.docx`. ⛔ The *rule* was still not created, so end-to-end matching remains owed — and it must be re-driven through the **manual import** door too, since that arm was broken until Defect 3 was fixed. |
 | **S-1** | Browse a SharePoint document library | ⛔ **BLOCKED — `SEED-256`.** No M365 work/school tenant; a personal account has no `/sites/` to address. ⚠ The live drive CONFIRMS the account kind: `check()` returned `drive_type: personal`. |
 | **S-2** | `Sites.Read.All` self-consent vs admin approval in an enterprise tenant | ⛔ **BLOCKED — `SEED-256`.** Unresolved and un-softened. |
 
-**8 rows driven (7 full pass, 1 half) · 1 owed (M-8) · 2 blocked (S-1, S-2) · 0 claimed.**
+**9 rows driven (7 full pass, 2 half) · 0 owed · 2 blocked (S-1, S-2) · 0 claimed.**
+
+⭐ **EVERY DRIVEABLE ROW HAS NOW BEEN DRIVEN.** Only the two SharePoint rows remain, blocked on an
+account boundary (`SEED-256`) rather than on effort.
+
+⚠ **FOUR defects were found by driving and NONE by the unit suite** — the `$select` suppression,
+the download host, the second `metadata.source` writer, and now the unguarded disable. Three of
+the four contradict either Microsoft's documentation or this phase's own written verdict. **The
+common cause is stated plainly because it is the argument for the review that is still owed: the
+test doubles were mine, so they agreed with my implementation rather than with reality.**
 
 ⚠ **Dedup verified rather than assumed.** Two watch runs each reported `count_new=1`, which looks
 like a re-import. It is not: the two documents carry **distinct `external_id`s**, a
