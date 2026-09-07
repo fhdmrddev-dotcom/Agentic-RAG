@@ -203,6 +203,8 @@ __all__ = [
     "McpDiscoverResponse",
 ]
 
+from app.services.sources.base import SourceConnectionDisabled  # noqa: E402
+
 router = APIRouter(prefix="/connectors", tags=["connectors"])
 
 # The ONE machine-readable reason code this router emits. It is deliberately NOT a member of
@@ -212,6 +214,28 @@ router = APIRouter(prefix="/connectors", tags=["connectors"])
 # `aria-describedby` → "Disabled because no encryption key is configured."). Keeping the two
 # code spaces separate is what stops a platform problem from being worded as a host problem.
 CIPHER_UNAVAILABLE_REASON = "no_encryption_key"
+
+# ── BUG-260907-03 · a DISABLED connection reads nothing ──────────────────────────────────
+# 409 CONFLICT, chosen and stated: the request is well-formed and the caller is entitled to it,
+# but the resource is in a state that forbids it — and the person can fix that themselves by
+# re-enabling. Not 404 (the connection exists and hiding it would be a lie), not 403 (this is
+# not about permission), not 503 (nothing is broken).
+#
+# ⚠ It is raised by `SourceRegistry.get_adapter`, so this covers browse, preview, confirm and
+# import through ONE handler rather than five try/excepts — the same reason the guard itself
+# lives in the registry. A route added tomorrow inherits it.
+CONNECTION_DISABLED_REASON = "connection_disabled"
+
+
+def _disabled_connection_response(exc: Exception) -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail={
+            "reason_code": CONNECTION_DISABLED_REASON,
+            "message": str(exc),
+        },
+    )
+
 
 # 503, not 500 and not 400: the request was well-formed and the caller did nothing wrong —
 # the INSTANCE cannot store a tenant credential safely (D-11's fail-CLOSED inversion). The
@@ -1729,6 +1753,9 @@ async def list_connection_files(
     try:
         res = await browse_connection_files(conn, query=query, page_token=page_token, page_size=page_size)
         return res
+    # ⚠ BEFORE the broad handler below — see the note on the preview route (BUG-260907-03).
+    except SourceConnectionDisabled as exc:
+        raise _disabled_connection_response(exc) from None
     except Exception as exc:
         logger.error("Failed to list files from connection %s: %s", connection_id, exc)
         raise HTTPException(
@@ -1769,6 +1796,12 @@ async def import_connection_file(
             background_tasks=background_tasks,
             supabase=supabase,
         )
+    # ⚠ BEFORE the broad handler below, which turns anything it catches into a 502 "the
+    # provider returned an error". A disabled connection is not a provider error, and wording
+    # it that way is how a control that failed to stop something reads as Microsoft's fault
+    # (BUG-260907-03).
+    except SourceConnectionDisabled as exc:
+        raise _disabled_connection_response(exc) from None
     except Exception as exc:
         logger.error("Failed to fetch file %s from connection %s: %s", file_id, connection_id, exc)
         raise HTTPException(
@@ -1819,6 +1852,12 @@ async def preview_source_folder(
             destination_folder_name=body.destination_folder_name,
             recursive=body.recursive,
         )
+    # ⚠ BEFORE the broad handler below, which turns anything it catches into a 502 "the
+    # provider returned an error". A disabled connection is not a provider error, and wording
+    # it that way is how a control that failed to stop something reads as Microsoft's fault
+    # (BUG-260907-03).
+    except SourceConnectionDisabled as exc:
+        raise _disabled_connection_response(exc) from None
     except Exception as exc:
         logger.error("Failed to preview connection %s: %s", connection_id, exc)
         raise HTTPException(
@@ -1883,6 +1922,12 @@ async def confirm_source_preview(
             recursive=body.recursive,
             only_external_ids=body.only_external_ids,
         )
+    # ⚠ BEFORE the broad handler below, which turns anything it catches into a 502 "the
+    # provider returned an error". A disabled connection is not a provider error, and wording
+    # it that way is how a control that failed to stop something reads as Microsoft's fault
+    # (BUG-260907-03).
+    except SourceConnectionDisabled as exc:
+        raise _disabled_connection_response(exc) from None
     except Exception as exc:
         logger.error("Failed to confirm preview for connection %s: %s", connection_id, exc)
         raise HTTPException(
@@ -1959,7 +2004,7 @@ async def browse_connection_hierarchy(
     supabase: Client = Depends(get_user_supabase_client),
 ):
     """Phase 232 (SRC-02): Hierarchical browse for connected source drives and folders."""
-    from app.services.sources.base import SourceRegistry
+    from app.services.sources.base import SourceConnectionDisabled, SourceRegistry
 
     conn = await connector_service.get_connection(
         connection_id=str(connection_id),
@@ -1969,7 +2014,14 @@ async def browse_connection_hierarchy(
     if not conn:
         raise _NOT_FOUND
 
-    adapter = SourceRegistry.get_adapter(conn)
+    # ⚠ OUTSIDE the try/except below ON PURPOSE. That block turns anything it catches into a
+    # 502 "the provider returned an error", and a disabled connection is not a provider error —
+    # wording it that way is how a control that failed to stop something reads as the provider's
+    # fault (BUG-260907-03).
+    try:
+        adapter = SourceRegistry.get_adapter(conn)
+    except SourceConnectionDisabled as exc:
+        raise _disabled_connection_response(exc) from None
     if not adapter:
         return {"items": [], "next_page_token": None}
 

@@ -4,10 +4,10 @@ title: Disabling a connection stops the scheduled watch and NOTHING else — bro
 reported: 2026-09-07
 surface: Agentic-RAG
 severity: major
-status: open
+status: closed
 affected_areas: [backend/api/connectors, backend/services/sources, connections, sources, security, egress]
 folded_into: null
-verified_closed_by: null
+verified_closed_by: "238"  # fixed and driven the same day, both directions
 related_seeds: []
 re_open_trigger: null
 reproduces_on:
@@ -106,20 +106,68 @@ five separate route edits that the sixth route will forget.
 
 `Agentic-RAG` — our routes, our source contract, our control.
 
+## ✅ RESOLVED 2026-09-07, the same day, and DRIVEN BOTH DIRECTIONS
+
+Fixed at the choke point rather than in the routes, exactly as suggested above.
+
+**`SourceRegistry.get_adapter(connection)` now raises `SourceConnectionDisabled`** when the
+connection it is handed carries `is_enabled is False`. That one site covers browse, list, read,
+check — and every caller nobody has written yet, which is the whole reason it is not five route
+edits.
+
+**Live proof, on the same connection row, both directions:**
+
+```
+is_enabled = False  ->  REFUSED · reason_code=connection_disabled · no network call made
+is_enabled = True   ->  browse returned 6 folders
+                        ['Apps','Attachments','Desktop','Dokument','Pictures','Videos']
+```
+
+The second line is the half that matters as much as the first: the guard stops the read
+**without** breaking the working case.
+
+### The decisions taken, stated rather than left implicit
+
+- **Absent `is_enabled` means ENABLED.** Every existing caller and fixture omits the key, so
+  defaulting to refused would have turned a security fix into an outage. This is the same
+  reading `watch_service.py` already used; it is now stated once in the registry instead of
+  once per caller.
+- **The watch loop keeps PAUSING, not raising.** It checks `is_enabled` *before* resolving an
+  adapter, so it never reaches the refusal — and a test now pins that ordering, because
+  reversing it would convert a legible "this source is paused because you disabled it" into an
+  exception, which is the opposite of what Phase 235 exists for.
+- **HTTP 409 Conflict**, chosen and written down: the request is well-formed and the caller is
+  entitled to it, but the resource is in a state that forbids it and the person can fix that
+  themselves. Not 404 (the connection exists; hiding it would be a lie), not 403 (this is not
+  about permission), not 503 (nothing is broken).
+- **The refusal is raised OUTSIDE each route's broad `except Exception`**, which turns anything
+  it catches into *"the provider returned an error"*. A control that failed to stop something
+  must not read as Microsoft's fault.
+- **`check()` — the credential probe — is deliberately NOT blocked.** It does not go through
+  `SourceRegistry`; it uses the OAuth refresh path. Someone should be able to verify a disabled
+  connection before deciding to re-enable it.
+
+### Tests
+
+`backend/tests/unit/services/sources/test_238_disabled_connection_refuses.py` — 10 cases,
+written RED before the fix, including a **positive control** (the guard fires on the exact input
+it exists for), the three non-regressions (enabled / key-absent / bare-string), and a structural
+check that no production caller bypasses the choke point by reaching into `_adapters` directly.
+
 ## Suggested routing
 
-- **Fold into in-flight phase:** n/a — Phase 238 is committed, and this is a shared-path defect
-  older than it.
-- **Defer to future phase / milestone:** **Phase 239** touches `SourceRegistry` resolution
-  directly and is the natural home. ⚠ It should not slip past that: this is a credential still
-  being used after consent was withdrawn.
-- **Plant as seed:** n/a — concrete, small, and has an obvious single-point fix.
-- **External — note only:** no
+- **Fixed directly, 2026-09-07** — see above. No phase needed.
+- ⚠ **The UI half is NOT fixed and is not this bug.** The Connections page still labels a
+  source-only connection *"Not usable"* (`BUG-260907-01`), and nothing yet tells a person that
+  a disabled connection will refuse a browse — they will now see a 409 where they used to see
+  folders. Wording that refusal on the surface belongs with `BUG-260907-01` at Phase 239.
 
 ## Workarounds
 
-To genuinely stop a connection reading, **delete it** rather than disabling it. (Deleting the
-connection also removes its watches; Library documents already ingested are unaffected.)
+~~To genuinely stop a connection reading, **delete it** rather than disabling it.~~ **No longer
+needed — Disable now genuinely stops reads.** Kept struck through rather than removed, because
+anyone who followed this advice between the report and the fix deleted connections they could
+have kept.
 
 ## Reference / evidence links
 

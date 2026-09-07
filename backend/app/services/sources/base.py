@@ -121,6 +121,48 @@ class SourceAdapter(ABC):
         """Verify that connection credentials, scopes, and endpoints are reachable."""
 
 
+class SourceConnectionDisabled(Exception):
+    """A source operation was attempted on a connection the operator has switched OFF.
+
+    ── ⛔ THE DEFECT THIS EXISTS TO CLOSE (BUG-260907-03, driven live 2026-09-07) ────────────
+
+    *Disable* stopped the scheduled watch loop and **nothing else**. Driven against a real
+    personal OneDrive at ``is_enabled = False``, ``browse()`` minted a fresh OAuth token from
+    the stored refresh token and returned six real folders from ``graph.microsoft.com``.
+    Browse, preview and import were all unguarded — so a person who switched a connection off
+    still had their credential used against the provider, and new documents could still enter
+    the Library through it.
+
+    ``grep -rn is_enabled`` found exactly **one** check in the codebase — ``watch_service.py``,
+    which pauses the loop — and **none** in ``api/connectors.py`` or under ``services/sources/``.
+
+    ⛔ **It was never Graph-specific.** The unguarded code is the shared source path; Google
+    Drive had the identical hole from Phase 232. Phase 238 surfaced it only because the
+    disconnect row was driven for the first time — and the success criterion it sat under
+    (*"behaves identically to Drive"*) was **satisfied the whole time**, because both families
+    were equally wrong.
+
+    ── ⭐ WHY THE CHECK LIVES IN THE REGISTRY AND NOT IN THE ROUTES ──────────────────────────
+
+    Four production callers resolve an adapter, and the obvious fix — an ``is_enabled`` check in
+    each — is the fix that fails on the fifth. Every source operation already funnels through
+    ``SourceRegistry.get_adapter(connection)``, so refusing there covers browse, list, read and
+    check, **and every caller nobody has written yet**.
+
+    ⚠ ``reason_code`` reuses ``connection_disabled`` from ``services/sources/failure_cause.py``
+    rather than inventing a second vocabulary, so one surface can word this one way.
+    """
+
+    reason_code = "connection_disabled"
+
+    def __init__(self, connection_id: str | None = None) -> None:
+        self.connection_id = connection_id
+        super().__init__(
+            "This connection is disabled, so nothing was read from it. Enable it to use this "
+            "source again."
+        )
+
+
 T = TypeVar("T", bound=type[SourceAdapter])
 
 
@@ -166,8 +208,27 @@ class SourceRegistry:
             return None
 
         if isinstance(connection_or_service_id, str):
+            # A bare id carries no connection context, so there is nothing to judge. This arm is
+            # used by `watch_service` and by several suites; it stays permissive on purpose.
             service_id = connection_or_service_id.strip().lower()
         else:
+            # ⛔ BUG-260907-03 — THE ONE PLACE A DISABLED CONNECTION IS REFUSED. See
+            # `SourceConnectionDisabled` above for what was measured and why it lives here
+            # rather than in each route.
+            #
+            # ⚠ ABSENT means "nobody said it was off", NOT "off". Every existing caller and
+            # fixture omits the key, and defaulting to refused would turn a security fix into an
+            # outage. Same reading `watch_service` already uses (`conn.get("is_enabled", True)`),
+            # stated once here instead of once per caller.
+            if isinstance(connection_or_service_id, dict):
+                enabled = connection_or_service_id.get("is_enabled", True)
+                conn_id = connection_or_service_id.get("id")
+            else:
+                enabled = getattr(connection_or_service_id, "is_enabled", True)
+                conn_id = getattr(connection_or_service_id, "id", None)
+            if enabled is False:
+                raise SourceConnectionDisabled(str(conn_id) if conn_id else None)
+
             service_id = getattr(connection_or_service_id, "service_id", "") or (
                 connection_or_service_id.get("service_id", "")
                 if isinstance(connection_or_service_id, dict)
