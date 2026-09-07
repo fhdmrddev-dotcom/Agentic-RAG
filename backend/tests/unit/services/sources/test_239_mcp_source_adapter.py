@@ -126,6 +126,29 @@ def adapter():
     return McpSourceAdapter()
 
 
+@pytest.fixture(autouse=True)
+def no_database(monkeypatch: pytest.MonkeyPatch):
+    """⚠ THIS FIXTURE EXISTS BECAUSE A REAL SOCKET ESCAPED, and the escape was the adapter
+    behaving CORRECTLY. `conn()` carries an `id` and an `org_id` exactly as every production
+    caller does, so the adapter went to `connector_service.resolve_connection` for the
+    credential and the suite hit Supabase — `[Errno 11001] getaddrinfo failed`.
+
+    The default stub answers what an UNAUTHENTICATED MCP server's row answers: no secret. The
+    one test that cares about the credential path installs its own.
+    """
+
+    class _NoCredential:
+        secret = None
+        auth_scheme = "auto"
+
+    async def _resolve(connection_id: str, org_id: str, **_: Any):
+        return _NoCredential()
+
+    monkeypatch.setattr(
+        "app.services.connector_service.resolve_connection", _resolve, raising=True
+    )
+
+
 @pytest.fixture
 def patch_mcp(monkeypatch: pytest.MonkeyPatch):
     """Swap the adapter's `mcp_client` for a recorder and hand it back."""
@@ -570,27 +593,49 @@ class TestSecurityBoundary:
         *"your credential is wrong"* and sends somebody to re-authorize — `mcp_client`'s own
         recorded lesson, one layer up."""
         fake = patch_mcp(FakeMcp(listing=json_listing([])))
+        seen: list[tuple[str, str]] = []
 
         class _Resolved:
             secret = "tok-abc"
             auth_scheme = "bearer"
-            mcp_server_url = SERVER
-            config = {"source_tools": {"list_tool": "ls"}}
 
         async def _resolve(connection_id: str, org_id: str, **_: Any):
-            assert (connection_id, org_id) == ("conn-mcp-1", "org-1")
+            seen.append((connection_id, org_id))
             return _Resolved()
 
         monkeypatch.setattr(
             "app.services.connector_service.resolve_connection", _resolve, raising=True
         )
-        await adapter.list_files(conn(), folder_id="docs")
+        await adapter.list_files(conn(config={"source_tools": {"list_tool": "ls"}}), "docs")
 
+        assert seen == [("conn-mcp-1", "org-1")], "the lookup is org-scoped, never by id alone"
         assert fake.calls[0]["secret"] == "tok-abc"
-        assert fake.calls[0]["auth_scheme"] == "bearer"
-        assert fake.calls[0]["tool_name"] == "ls", (
-            "the resolver's config is authoritative — it is the row the RUN will use"
+        assert fake.calls[0]["auth_scheme"] == "bearer", (
+            "an explicitly resolved scheme must reach the transport — mcp_client's `auto` "
+            "guess base64s a colon-bearing OAuth token into Basic and collects 401"
         )
+        assert fake.calls[0]["tool_name"] == "ls", (
+            "the binding comes from the row the CALLER already fetched org-scoped"
+        )
+
+    @pytest.mark.asyncio
+    async def test_an_already_resolved_connection_is_not_re_read(
+        self, adapter, patch_mcp, monkeypatch: pytest.MonkeyPatch
+    ):
+        """⚠ Presence, not truthiness. A `ResolvedConnection` for an UNAUTHENTICATED server
+        legitimately carries `secret = None`; treating that as "not resolved yet" would send
+        it back to the database on every call, for exactly the rows with nothing to find."""
+        fake = patch_mcp(FakeMcp(listing=json_listing([])))
+
+        async def _boom(*_: Any, **__: Any):
+            raise AssertionError("a resolved connection must not be re-read")
+
+        monkeypatch.setattr(
+            "app.services.connector_service.resolve_connection", _boom, raising=True
+        )
+        await adapter.list_files(conn(secret=None, auth_scheme="bearer"), folder_id="docs")
+        assert fake.calls[0]["secret"] is None
+        assert fake.calls[0]["auth_scheme"] == "bearer"
 
     @pytest.mark.asyncio
     async def test_a_connection_with_no_server_url_is_refused_by_name(self, adapter, patch_mcp):
