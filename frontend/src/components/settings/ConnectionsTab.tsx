@@ -96,6 +96,7 @@ import {
   getEffectiveFeatures,
   listConnectorConnections,
   listPublishedWorkflows,
+  listSourceFamilies,
   checkConnectorConnection,
   createConnectorConnection,
   deleteConnectorConnection,
@@ -109,6 +110,7 @@ import type {
   ConnectorConnectionUpdate,
 } from "@/lib/api"
 import { blockedApplicationCount } from "@/components/settings/applicationAvailability"
+import { isSourceCapable } from "@/components/sources/sourceCapability"
 import { ConnectionFormPanel } from "@/components/settings/ConnectionFormPanel"
 import {
   CATALOG_SERVICES,
@@ -211,6 +213,10 @@ function useIsMobile(): boolean {
 /** The state chip's tone. Colour is REINFORCEMENT — the word beside it is the carrier. */
 const STATE_TONE: Record<ConnectionStateKind, string> = {
   ready: "text-success",
+  // Phase 239 (D-239-08) — a GOOD state, and it takes the good tone. Leaving it on the
+  // warning tone would keep the row scanning as a problem in the colour column while the
+  // word said otherwise, which is half the defect fixed and half of it left in place.
+  source_only: "text-success",
   // Phase 221 (D-221-12) — both are "connected, and it will not do what you expect", so
   // both take the warning tone. ⚠ Neither takes `destructive`: nothing has FAILED here,
   // and spending the red on a row that is merely undiscovered devalues it on rows that
@@ -269,6 +275,14 @@ export interface ConnectionsTabViewProps {
    *  not a blocked one, exactly as AR-03 requires for the tool count. Making it survive a
    *  reload is a column and a migration, and should be decided on its own. */
   blockedByConnection?: Record<string, number>
+  /** Phase 239 (D-239-08 / BUG-260907-01) — the source families the SERVER publishes
+   *  (`GET /connectors/source-families`), or `null` while unknown.
+   *
+   *  ⚠ FAIL-CLOSED DEFAULT, AND IT IS TM-239-07. `null` means *"we have not been told"* —
+   *  the fetch is in flight, or it failed — and every row then keeps the word it had before
+   *  this phase. A default that ASSUMED capability would print a green claim on the first
+   *  paint of every page load, on rows that may not browse at all. */
+  sourceFamilies?: string[] | null
 }
 
 type DisplayItem =
@@ -290,6 +304,7 @@ export function ConnectionsTabView({
   now,
   panel,
   blockedByConnection,
+  sourceFamilies = null,
 }: ConnectionsTabViewProps) {
   const [query, setQuery] = useState("")
   const [filterState, setFilterState] = useState<ConnectionFilterState>(null)
@@ -685,6 +700,7 @@ export function ConnectionsTabView({
                             now={now}
                             dense={dense}
                             blockedApplications={blockedByConnection?.[item.connection.id]}
+                            sourceFamilies={sourceFamilies}
                           />
                         ) : (
                           <CatalogServiceRow
@@ -716,6 +732,7 @@ export function ConnectionsTabView({
                             now={now}
                             dense={dense}
                             blockedApplications={blockedByConnection?.[item.connection.id]}
+                            sourceFamilies={sourceFamilies}
                           />
                         ) : (
                           <CatalogServiceRow
@@ -745,6 +762,7 @@ export function ConnectionsTabView({
                       now={now}
                       dense={dense}
                       blockedApplications={blockedByConnection?.[item.connection.id]}
+                      sourceFamilies={sourceFamilies}
                     />
                   ) : (
                     <CatalogServiceRow
@@ -991,6 +1009,7 @@ function ConnectionRow({
   now,
   dense = false,
   blockedApplications,
+  sourceFamilies = null,
 }: {
   connection: ConnectorConnection
   usedBy: number
@@ -1005,13 +1024,24 @@ function ConnectionRow({
    *  session. `undefined` means nobody looked, which reads as 0 rather than as "none are
    *  blocked" — an unmeasured application is not a working one. See `connectionStateOf`. */
   blockedApplications?: number
+  /** Phase 239 (D-239-08) — the SERVER's registered source families, or `null` while
+   *  unknown. Passed down rather than fetched here: one read per page, and a row that has
+   *  not been told stays on the word it had before this phase (TM-239-07). */
+  sourceFamilies?: string[] | null
 }) {
   const [confirm, setConfirm] = useState<ConfirmKind>(null)
   const [busy, setBusy] = useState(false)
   const [failed, setFailed] = useState(false)
   const [receipt, setReceipt] = useState<string | null>(null)
 
-  const state = connectionStateOf(connection, blockedApplications)
+  // Phase 239 (D-239-08 / BUG-260907-01) — the fourth input the verdict was missing. It is
+  // the SERVER's answer (published families + the row's declared transport), never a guess
+  // made on this surface; `isSourceCapable` fails closed on a `null` list.
+  const state = connectionStateOf(
+    connection,
+    blockedApplications,
+    isSourceCapable(connection, sourceFamilies),
+  )
   const facts = destinationFactsOf(connection)
   const isSlack = connection.capability === "post_message"
   const isMcp = Boolean(connection.mcp_server_url)
@@ -1259,7 +1289,10 @@ function ConnectionRow({
               <span
                 className={cn(
                   "h-1.5 w-1.5 rounded-full flex-none",
-                  state === "ready"
+                  // Phase 239 (D-239-08) — `source_only` is a GOOD state and takes the good
+                  // dot. Left on `bg-warning` the column would still scan as a problem row
+                  // while the word said otherwise: half the defect fixed, half left standing.
+                  state === "ready" || state === "source_only"
                     ? "bg-success"
                     : state === "disabled"
                       ? "bg-muted-foreground"
@@ -1384,6 +1417,8 @@ export function ConnectionsTab() {
   const [reloadNonce, setReloadNonce] = useState(0)
   const [usageCounts, setUsageCounts] = useState<Record<string, number>>({})
   const [liveConnectorsOn, setLiveConnectorsOn] = useState<boolean>(false)
+  /** `null` until the server answers — see the effect below and TM-239-07. */
+  const [sourceFamilies, setSourceFamilies] = useState<string[] | null>(null)
 
   const reload = useCallback(() => setReloadNonce((n) => n + 1), [])
 
@@ -1414,6 +1449,27 @@ export function ConnectionsTab() {
       })
       .catch(() => {
         if (!cancelled) setUsageCounts({})
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [requestKey])
+
+  // Phase 239 (D-239-08 / BUG-260907-01) — the source families the SERVER registered.
+  //
+  // ⚠ ON `requestKey`, beside the connections read, so the two facts a row's verdict is
+  // built from arrive from the same generation. ⚠ AND THE FAILURE ARM SETS `null`, NOT
+  // `[]`: an empty array says *"the server publishes no source families"* and would let a
+  // failed fetch assert something; `null` says *"we were not told"*, which is the only
+  // honest reading and the one `isSourceCapable` fails closed on (TM-239-07).
+  useEffect(() => {
+    let cancelled = false
+    listSourceFamilies()
+      .then((families) => {
+        if (!cancelled) setSourceFamilies(families)
+      })
+      .catch(() => {
+        if (!cancelled) setSourceFamilies(null)
       })
     return () => {
       cancelled = true
@@ -1537,6 +1593,7 @@ export function ConnectionsTab() {
       readFailed={read.kind === "error"}
       usageCounts={usageCounts}
       blockedByConnection={blockedByConnection}
+      sourceFamilies={sourceFamilies}
       isOrgAdmin={isOrgAdmin}
       liveConnectorsOn={liveConnectorsOn}
       onDelete={handleDelete}
