@@ -166,6 +166,71 @@ class SourceConnectionDisabled(Exception):
 T = TypeVar("T", bound=type[SourceAdapter])
 
 
+#: Phase 239 (D-239-03) — TRANSPORT PROTOCOL -> the registry key its adapter registered under.
+#:
+#: ⭐ WHY THIS EXISTS AT ALL, AND WHY IT IS A DICT. Drive and OneDrive resolve by `service_id`
+#: because each is one service with one name. **An MCP server has no such name** — `service_id`
+#: is whatever the person setting it up typed, and the next person will type something else. A
+#: registry keyed only on exact ids can therefore never resolve an arbitrary MCP server, and the
+#: milestone's binding constraint (*a source is DATA, not code*) would be false at the last step:
+#: connecting a new server would mean registering a new key, which is a code change.
+#:
+#: ⛔ IT IS A DICT AND NOT AN `elif` BY DIRECT INSTRUCTION FROM THIS MODULE'S OWN HISTORY. The
+#: note above the deleted `_ensure_registered` says it in as many words — *"make the routing DATA
+#: (a dict keyed by service_id) rather than control flow"* — after a provider-keyed branch sat
+#: inside the contract module for two phases. A second protocol is a ROW here; the moment it is a
+#: branch, this file has repeated its own recorded mistake.
+#:
+#: ⚠ `mcp` IS A TRANSPORT, NOT A VENDOR, which is why `test_boundary_fence.py` stays green with
+#: it here. It is a first-class member of `AuthType` alongside `static_key` and `oauth_byo` — the
+#: same category of word as `https`, not the same category as `onedrive`.
+PROTOCOL_ADAPTERS: dict[str, str] = {"mcp": "mcp"}
+
+#: A `config` KEY that proves the row speaks a protocol, for rows written before `auth_type`
+#: carried it. Also data, for the same reason. ⚠ A marker must be a key only ONE protocol can
+#: write — `source_tools` is declared on `McpConfig` and nowhere else — or this table starts
+#: guessing, and a wrong adapter reading a real connection is `watch_service`'s deleted Drive
+#: fallback all over again: a wrong-source sync that looks like a working one.
+CONFIG_PROTOCOL_MARKERS: dict[str, str] = {"source_tools": "mcp"}
+
+
+def _connection_config(connection: Any) -> dict[str, Any]:
+    """`config` as a plain mapping, whatever shape the caller had.
+
+    `watch_service` hands a raw DB dict and `api/connectors.py` a `ConnectorConnectionResponse`
+    whose `config` is a pydantic MODEL. Reading only dicts here would resolve every watch and
+    no browse — one rule applied on one path out of two, which is indistinguishable from the
+    rule being absent for anyone using the other.
+    """
+    config = (
+        connection.get("config")
+        if isinstance(connection, dict)
+        else getattr(connection, "config", None)
+    )
+    if isinstance(config, dict):
+        return config
+    dump = getattr(config, "model_dump", None)
+    return dump() if callable(dump) else {}
+
+
+def _protocol_of(connection: Any) -> str | None:
+    """Which transport this row speaks, or `None` — by DECLARATION, never by name-matching."""
+    auth_type = (
+        connection.get("auth_type")
+        if isinstance(connection, dict)
+        else getattr(connection, "auth_type", None)
+    )
+    protocol = str(auth_type or "").strip().lower()
+    if protocol in PROTOCOL_ADAPTERS:
+        return protocol
+
+    config = _connection_config(connection)
+    for marker, marked_protocol in CONFIG_PROTOCOL_MARKERS.items():
+        if config.get(marker):
+            return marked_protocol
+    return None
+
+
 class SourceRegistry:
     """Registry for source family adapters, keyed by service_id."""
 
@@ -207,6 +272,8 @@ class SourceRegistry:
         if not connection_or_service_id:
             return None
 
+        protocol: str | None = None
+
         if isinstance(connection_or_service_id, str):
             # A bare id carries no connection context, so there is nothing to judge. This arm is
             # used by `watch_service` and by several suites; it stays permissive on purpose.
@@ -236,12 +303,23 @@ class SourceRegistry:
             )
             service_id = str(service_id).strip().lower()
 
+            # Phase 239 (D-239-03). Read here, USED only after the exact lookup below misses,
+            # and deliberately below the `is_enabled` gate: a resolution arm placed above it
+            # would re-open BUG-260907-03 for exactly the family being added.
+            protocol = _protocol_of(connection_or_service_id)
+
         # An EXACT key lookup, and nothing else. Aliases are declared where aliases belong —
         # `@SourceRegistry.register("google_workspace")` sits on the adapter beside
         # `@SourceRegistry.register("google")`, so `google_workspace` resolves here by being
         # registered rather than by being pattern-matched. An unregistered id returns None,
         # which is the honest answer and the one every caller already handles.
         adapter_cls = cls._adapters.get(service_id)
+
+        # …and only then, the TRANSPORT the row declared. ⚠ STRICTLY A FALLBACK: an exact
+        # `service_id` always wins, so a first-party family that also carried a protocol marker
+        # keeps its own adapter instead of being hijacked by a generic one.
+        if adapter_cls is None and protocol:
+            adapter_cls = cls._adapters.get(PROTOCOL_ADAPTERS[protocol])
 
         if adapter_cls:
             return adapter_cls()

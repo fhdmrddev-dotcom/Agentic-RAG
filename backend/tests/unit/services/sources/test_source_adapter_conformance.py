@@ -5,6 +5,7 @@ GoogleDriveSourceAdapter in Plan 232-02, Microsoft Graph in Phase 238, MCP in Ph
 conforms to identical protocol invariants and DTO contracts.
 """
 
+import base64
 import json as jsonlib
 from unittest.mock import AsyncMock
 
@@ -228,6 +229,87 @@ def graph_adapter(monkeypatch: pytest.MonkeyPatch) -> MicrosoftGraphSourceAdapte
         _mock_send_pinned_http,
     )
     return MicrosoftGraphSourceAdapter()
+
+
+#: Phase 239 — the connection row an MCP file source actually is. ⚠ The binding names `ls` and
+#: `cat`, which are NOT the adapter's defaults and appear nowhere in this codebase as code. A
+#: fixture using `list_directory`/`read_file` would agree with the implementation instead of
+#: with the claim, and would pass even if the binding were ignored entirely.
+MCP_CONNECTION = {
+    "id": "conn-mcp",
+    "org_id": "org-1",
+    "name": "Filesystem",
+    "service_id": "some_unregistered_mcp_server",
+    "auth_type": "mcp",
+    "mcp_server_url": "https://files.example.com/mcp",
+    "config": {"source_tools": {"list_tool": "ls", "read_tool": "cat"}},
+    # A `ResolvedConnection`-shaped row: `secret` PRESENT and None, meaning an unauthenticated
+    # server. Its presence is what keeps the adapter from going to the database for a
+    # credential — see `_carries_a_credential`.
+    "secret": None,
+}
+
+
+@pytest.fixture
+def mcp_adapter(monkeypatch: pytest.MonkeyPatch):
+    """Phase 239 — the FOURTH family, and the first that is a PROTOCOL rather than a service.
+
+    It joins this suite by registering a fixture and nothing else, exactly as Graph did in
+    Phase 238. Had `SourceAdapter` needed a new method, a new argument or a new DTO to express
+    "any MCP server", that would have been the SC#4 finding rather than a passing suite.
+
+    ⚠ The fake speaks the WIRE, not the adapter: `list_directory` answers the reference
+    filesystem server's line format and `read_file` answers MCP content blocks, so the parsing
+    under test is the parsing that ships.
+    """
+    from app.services.sources.adapters.mcp_source import McpSourceAdapter
+
+    async def _call_tool(server_url, tool_name, arguments, secret=None, auth_scheme="auto"):
+        # THE INVARIANT THAT IS ONLY TRUE FOR THIS FAMILY, ASSERTED INSIDE ITS OWN FAKE and
+        # never as a branch in a shared test body — the rule Phase 238 set here.
+        assert server_url == MCP_CONNECTION["mcp_server_url"]
+        assert tool_name in ("ls", "cat"), (
+            f"the adapter invoked {tool_name!r} — the bound names are the ROW's, not its own"
+        )
+        path = arguments["path"]
+
+        if tool_name == "cat":
+            return {
+                "text": "",
+                "content": [{
+                    "type": "resource",
+                    "resource": {
+                        "uri": f"file:///{path}",
+                        "mimeType": "application/pdf",
+                        "blob": base64.b64encode(b"%PDF-1.7 Mock MCP Content").decode("ascii"),
+                    },
+                }],
+                "isError": False,
+                "raw": {},
+            }
+
+        if path in ("", "docs"):
+            body = "[DIR] reports\n[FILE] Design.pdf (2048 bytes)\n"
+        else:
+            body = "[DIR] archive\n"
+        return {
+            "text": body,
+            "content": [{"type": "text", "text": body}],
+            "isError": False,
+            "raw": {},
+        }
+
+    async def _list_tools(server_url, secret=None, timeout=15.0, auth_scheme="auto"):
+        return [{"name": "ls"}, {"name": "cat"}, {"name": "write_file"}]
+
+    class _FakeMcpClient:
+        call_tool = staticmethod(_call_tool)
+        list_tools = staticmethod(_list_tools)
+
+    monkeypatch.setattr(
+        "app.services.sources.adapters.mcp_source.mcp_client", _FakeMcpClient
+    )
+    return McpSourceAdapter()
 
 
 class TestMockSourceAdapterConformance:
@@ -458,6 +540,87 @@ class TestMicrosoftGraphAdapterConformance:
         assert health.details.get("email") == "test@example.com"
 
 
+class TestMcpSourceAdapterConformance:
+    """Universal conformance suite for McpSourceAdapter (Phase 239 / SRC-04).
+
+    Every method below is the Drive/Graph/Mock assertion with a different fixture — and this
+    time against a family that is not a service at all. The contract expressed a whole PROTOCOL
+    without changing.
+    """
+
+    @pytest.mark.asyncio
+    async def test_browse_root_returns_virtual_roots(self, mcp_adapter: SourceAdapter):
+        page = await mcp_adapter.browse(connection=MCP_CONNECTION)
+        assert isinstance(page, BrowsePage)
+        assert [n.id for n in page.items] == ["virtual_root"]
+        for node in page.items:
+            assert isinstance(node, SourceNode)
+            assert node.kind == "folder"
+            assert node.has_children is True
+            # The contract's own requirement, and the reason the root is not `""`.
+            assert isinstance(node.id, str) and len(node.id) > 0
+
+    @pytest.mark.asyncio
+    async def test_browse_children_sets_parent_id(self, mcp_adapter: SourceAdapter):
+        page = await mcp_adapter.browse(connection=MCP_CONNECTION, folder_id="docs")
+        assert isinstance(page, BrowsePage)
+        assert len(page.items) > 0
+        for node in page.items:
+            assert node.parent_id == "docs"
+        assert [n.name for n in page.items] == ["reports"]
+
+    @pytest.mark.asyncio
+    async def test_browse_pagination(self, mcp_adapter: SourceAdapter):
+        """⚠ THIS FAMILY'S HONEST ANSWER DIFFERS, AND SAYING SO IS THE POINT.
+
+        Drive and Graph both assert `page1.next_page_token is not None`. MCP's `list_directory`
+        is ATOMIC — the spec defines no cursor for it — so `None` is the contract-conformant
+        answer (`next_page_token: str | None`), and minting a token would make
+        `watch_service`'s loop re-issue a call returning the same page forever. What is
+        asserted instead is that a token handed back is not silently honoured as one."""
+        page1 = await mcp_adapter.browse(connection=MCP_CONNECTION, folder_id="docs")
+        assert page1.next_page_token is None
+
+        page2 = await mcp_adapter.browse(
+            connection=MCP_CONNECTION, folder_id="docs", page_token="pretend-cursor"
+        )
+        assert [n.id for n in page2.items] == [n.id for n in page1.items]
+        assert page2.next_page_token is None
+
+    @pytest.mark.asyncio
+    async def test_list_files_returns_file_page(self, mcp_adapter: SourceAdapter):
+        files_page = await mcp_adapter.list_files(
+            connection=MCP_CONNECTION, folder_id="docs"
+        )
+        assert isinstance(files_page, FilePage)
+        assert len(files_page.files) == 1, "a [DIR] entry is not a file"
+        f = files_page.files[0]
+        assert isinstance(f, SourceFile)
+        assert f.id == "docs/Design.pdf"
+        assert f.name == "Design.pdf"
+        assert f.mime_type == "application/pdf"
+        assert f.size == 2048
+        # D-239-06: the server stated no time, so the version is derived from what DOES move.
+        assert f.modified_at == "size:2048"
+
+    @pytest.mark.asyncio
+    async def test_read_file_returns_content_tuple(self, mcp_adapter: SourceAdapter):
+        filename, raw_bytes, mime_type = await mcp_adapter.read_file(
+            connection=MCP_CONNECTION, file_id="docs/spec.pdf"
+        )
+        assert isinstance(filename, str) and filename == "spec.pdf"
+        assert isinstance(raw_bytes, bytes) and len(raw_bytes) > 0
+        assert isinstance(mime_type, str) and mime_type == "application/pdf"
+
+    @pytest.mark.asyncio
+    async def test_check_health_probe(self, mcp_adapter: SourceAdapter):
+        health = await mcp_adapter.check(connection=MCP_CONNECTION)
+        assert isinstance(health, SourceHealth)
+        assert health.ok is True
+        assert health.error is None
+        assert health.details.get("tools_count") == 3
+
+
 class TestSourceFilePathIsNeverFabricated:
     """SEED-253 (D-238-07), asserted across EVERY adapter rather than for one of them.
 
@@ -486,6 +649,15 @@ class TestSourceFilePathIsNeverFabricated:
                 "an adapter-populated path names a FOLDER; '/name.ext' is the fabrication "
                 "SEED-253 was planted about"
             )
+
+    @pytest.mark.asyncio
+    @pytest.mark.asyncio
+    async def test_mcp_path_is_the_real_folder(self, mcp_adapter: SourceAdapter):
+        """This family addresses files BY path, so it always has a real one — and it is the
+        FOLDER path plus the name, never the `/<filename>` stand-in SEED-253 was planted
+        about."""
+        page = await mcp_adapter.list_files(connection=MCP_CONNECTION, folder_id="docs")
+        assert page.files[0].path == "docs/Design.pdf"
 
     @pytest.mark.asyncio
     async def test_drive_path_is_none_not_fabricated(self, google_adapter: SourceAdapter):
@@ -533,6 +705,24 @@ class TestRegistryResolution:
         adapter_conn = SourceRegistry.get_adapter({"service_id": "microsoft"})
         assert isinstance(adapter_conn, MicrosoftGraphSourceAdapter)
         assert SourceRegistry.is_source_supported("microsoft") is True
+
+    def test_mcp_source_resolution(self):
+        """Phase 239 — registration for the two keys, and PROTOCOL for everything else.
+
+        ⭐ The third assertion is the phase: a `service_id` nobody registered, that is not in
+        this codebase and never will be, resolves — because the ROW says it speaks MCP."""
+        from app.services.sources.adapters.mcp_source import McpSourceAdapter
+
+        for key in ("mcp", "custom_mcp"):
+            adapter = SourceRegistry.get_adapter(key)
+            assert adapter is not None, key
+            assert isinstance(adapter, McpSourceAdapter)
+
+        assert isinstance(
+            SourceRegistry.get_adapter({"service_id": "nobody_registered_this", "auth_type": "mcp"}),
+            McpSourceAdapter,
+        )
+        assert SourceRegistry.is_source_supported("mcp") is True
 
     def test_unknown_provider_resolution(self):
         assert SourceRegistry.get_adapter("unknown_provider") is None
