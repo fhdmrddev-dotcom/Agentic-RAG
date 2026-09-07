@@ -35,13 +35,32 @@
  * availability probe lands the same row starts reading `Partly ready` with no change here.
  */
 
-export type RowVerdict = "ready" | "partly" | "unusable" | "undiscovered"
+export type RowVerdict = "ready" | "partly" | "unusable" | "undiscovered" | "source-only"
 
 export interface RowVerdictInput {
   /** How many actions this connection advertises. */
   toolCount: number
   /** How many of its applications cannot currently run. Plan 02 fills this. */
   blockedApplicationCount: number
+  /**
+   * Phase 239 (D-239-08 / BUG-260907-01) — can this connection be BROWSED as a file source?
+   *
+   * ⭐ **THE INPUT SET WENT INCOMPLETE; THE LOGIC NEVER WENT WRONG.** Everything this file
+   * says above is still true about ACTIONS. What changed underneath it is that Phase 238
+   * shipped `SourceAdapter`s — a connection can now have zero actions and still browse,
+   * preview and be watched. The live OneDrive row read `⚠ Not usable` on the first screen
+   * after its OAuth round trip while `browse()` returned six real folders and `read_file()`
+   * returned 1395 correct bytes the same session.
+   *
+   * ⚠ **NOT A GUESS MADE HERE.** It is the server's answer, resolved by
+   * `sourceCapability.isSourceCapable` from `GET /connectors/source-families` plus the
+   * row's own declared protocol — the same two doors `services/sources/base.py` uses.
+   *
+   * ⚠ **DEFAULT `false`, AND THAT DIRECTION IS TM-239-07.** The families list arrives over
+   * the network; a default of `true` would turn every loading render into a green claim.
+   * A caller that has not been told says nothing, and nothing reads as *not capable*.
+   */
+  isSourceCapable?: boolean
   /**
    * Has a discovery/check actually run against this connection?
    *
@@ -62,8 +81,19 @@ export function connectionRowVerdict({
   toolCount,
   blockedApplicationCount,
   discoveryHasRun = false,
+  isSourceCapable = false,
 }: RowVerdictInput): RowVerdict {
-  if (toolCount <= 0) return discoveryHasRun ? "unusable" : "undiscovered"
+  if (toolCount <= 0) {
+    // ⚠ **ABOVE the `discoveryHasRun` split, and that placement is the decision.** AR-03
+    // forbids reading an ABSENCE as success — but this is not an absence. `✓ Ready` asserts
+    // that actions exist, which an empty discovery cannot evidence; `✓ Ready as source`
+    // asserts that an ADAPTER is registered for this family and the credential is not
+    // revoked or errored. Both are facts we HOLD (the server's published registry, and the
+    // row's own status), so the claim is measured rather than assumed — which is exactly
+    // what separates it from the defect this file was written to close.
+    if (isSourceCapable) return "source-only"
+    return discoveryHasRun ? "unusable" : "undiscovered"
+  }
   if (blockedApplicationCount > 0) return "partly"
   return "ready"
 }
