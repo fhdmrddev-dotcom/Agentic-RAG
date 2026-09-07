@@ -12,6 +12,7 @@ import pytest
 
 from app.security.egress import PinnedResponse
 from app.services.sources.adapters.google_drive import GoogleDriveSourceAdapter
+from app.services.sources.adapters.microsoft_graph import MicrosoftGraphSourceAdapter
 from app.services.sources.adapters.mock_source import MockSourceAdapter
 from app.services.sources.base import (
     BrowsePage,
@@ -133,6 +134,96 @@ def google_adapter(monkeypatch: pytest.MonkeyPatch) -> GoogleDriveSourceAdapter:
         _mock_send_pinned_http,
     )
     return GoogleDriveSourceAdapter()
+
+
+GRAPH_DOWNLOAD_URL = "https://b0mpua-by3301.files.1drv.com/y23vmagconformance"
+
+
+@pytest.fixture
+def graph_adapter(monkeypatch: pytest.MonkeyPatch) -> MicrosoftGraphSourceAdapter:
+    """Phase 238 — the THIRD family, added to this suite by registering a fixture and nothing
+    else. If a new adapter had needed a new invariant, that would have been the SC#4 finding."""
+    monkeypatch.setattr(
+        "app.services.sources.adapters.microsoft_graph.get_fresh_access_token",
+        AsyncMock(return_value="mock_graph_token"),
+    )
+
+    async def _mock_send_pinned_http(capability: str, method: str, url: str, **kwargs):
+        # THE INVARIANT THAT IS ONLY TRUE FOR THIS FAMILY, ASSERTED WHERE IT BELONGS — inside
+        # the adapter's own fake, never as a branch in a shared test body.
+        assert capability in ("graph_read", "graph_download")
+        assert not url.endswith("/content"), "/content answers 302; the adapter must not call it"
+        params = kwargs.get("params") or {}
+
+        if capability == "graph_download":
+            return PinnedResponse(
+                status_code=200,
+                headers={"content-type": "application/pdf"},
+                body=b"%PDF-1.7 Mock Graph Binary Content",
+            )
+
+        if "/me/drive/items/item-g-1" in url and "$select" in params:
+            return PinnedResponse(
+                status_code=200,
+                headers={"content-type": "application/json"},
+                body=jsonlib.dumps({
+                    "id": "item-g-1",
+                    "name": "spec.pdf",
+                    "size": 1024,
+                    "file": {"mimeType": "application/pdf"},
+                    "@microsoft.graph.downloadUrl": GRAPH_DOWNLOAD_URL,
+                }).encode("utf-8"),
+            )
+
+        if url.endswith("/me/drive"):
+            return PinnedResponse(
+                status_code=200,
+                headers={"content-type": "application/json"},
+                body=jsonlib.dumps({
+                    "id": "drive-g",
+                    "driveType": "personal",
+                    "owner": {"user": {"displayName": "Test User", "email": "test@example.com"}},
+                }).encode("utf-8"),
+            )
+
+        # /children — page 1 carries a nextLink, page 2 (re-issued as that URL) does not.
+        if "$skiptoken" in url:
+            return PinnedResponse(
+                status_code=200,
+                headers={"content-type": "application/json"},
+                body=jsonlib.dumps({"value": [
+                    {"id": "folder-g-2", "name": "Archive", "folder": {"childCount": 0},
+                     "parentReference": {"path": "/drive/root:/Finance"}},
+                ]}).encode("utf-8"),
+            )
+
+        return PinnedResponse(
+            status_code=200,
+            headers={"content-type": "application/json"},
+            body=jsonlib.dumps({
+                "value": [
+                    {"id": "folder-g-1", "name": "Finance", "folder": {"childCount": 2},
+                     "parentReference": {"path": "/drive/root:"}},
+                    {
+                        "id": "item-g-1",
+                        "name": "Design.pdf",
+                        "size": 2048,
+                        "lastModifiedDateTime": "2026-09-01T12:00:00Z",
+                        "webUrl": "https://onedrive.live.com/redir?resid=item-g-1",
+                        "file": {"mimeType": "application/pdf"},
+                        "parentReference": {"path": "/drive/root:/Finance"},
+                    },
+                ],
+                "@odata.nextLink":
+                    "https://graph.microsoft.com/v1.0/me/drive/items/folder-g-1/children?$skiptoken=X",
+            }).encode("utf-8"),
+        )
+
+    monkeypatch.setattr(
+        "app.services.sources.adapters.microsoft_graph.send_pinned_http",
+        _mock_send_pinned_http,
+    )
+    return MicrosoftGraphSourceAdapter()
 
 
 class TestMockSourceAdapterConformance:
@@ -285,6 +376,124 @@ class TestGoogleDriveAdapterConformance:
         assert health.details.get("email") == "test@example.com"
 
 
+class TestMicrosoftGraphAdapterConformance:
+    """Universal conformance suite for MicrosoftGraphSourceAdapter (Phase 238 / SRC-03).
+
+    Every method below is the Drive/Mock assertion with a different fixture. That is the point:
+    the third family passes the SAME invariants, so `SourceAdapter` expressed it.
+    """
+
+    @pytest.mark.asyncio
+    async def test_browse_root_returns_virtual_roots(self, graph_adapter: SourceAdapter):
+        page = await graph_adapter.browse(connection={"id": "conn-ms", "service_id": "microsoft"})
+        assert isinstance(page, BrowsePage)
+        assert [n.id for n in page.items] == ["onedrive"]
+        for node in page.items:
+            assert isinstance(node, SourceNode)
+            assert node.kind == "folder"
+            assert node.has_children is True
+
+    @pytest.mark.asyncio
+    async def test_browse_children_sets_parent_id(self, graph_adapter: SourceAdapter):
+        page = await graph_adapter.browse(
+            connection={"id": "conn-ms", "service_id": "microsoft"},
+            folder_id="onedrive",
+        )
+        assert isinstance(page, BrowsePage)
+        assert len(page.items) > 0
+        for node in page.items:
+            assert node.parent_id == "onedrive"
+
+    @pytest.mark.asyncio
+    async def test_browse_pagination(self, graph_adapter: SourceAdapter):
+        page1 = await graph_adapter.browse(
+            connection={"id": "conn-ms", "service_id": "microsoft"},
+            folder_id="onedrive",
+        )
+        assert page1.next_page_token is not None
+
+        page2 = await graph_adapter.browse(
+            connection={"id": "conn-ms", "service_id": "microsoft"},
+            folder_id="onedrive",
+            page_token=page1.next_page_token,
+        )
+        assert len(page2.items) > 0
+        assert page2.next_page_token is None
+
+    @pytest.mark.asyncio
+    async def test_list_files_returns_file_page(self, graph_adapter: SourceAdapter):
+        files_page = await graph_adapter.list_files(
+            connection={"id": "conn-ms", "service_id": "microsoft"},
+            folder_id="folder-g-1",
+        )
+        assert isinstance(files_page, FilePage)
+        assert len(files_page.files) == 1
+        f = files_page.files[0]
+        assert isinstance(f, SourceFile)
+        assert f.id == "item-g-1"
+        assert f.name == "Design.pdf"
+        assert f.mime_type == "application/pdf"
+        assert f.size == 2048
+
+    @pytest.mark.asyncio
+    async def test_read_file_returns_content_tuple(self, graph_adapter: SourceAdapter):
+        filename, raw_bytes, mime_type = await graph_adapter.read_file(
+            connection={"id": "conn-ms", "service_id": "microsoft"},
+            file_id="item-g-1",
+        )
+        assert isinstance(filename, str) and filename == "spec.pdf"
+        assert isinstance(raw_bytes, bytes) and len(raw_bytes) > 0
+        assert isinstance(mime_type, str) and mime_type == "application/pdf"
+
+    @pytest.mark.asyncio
+    async def test_check_health_probe(self, graph_adapter: SourceAdapter):
+        health = await graph_adapter.check(connection={"id": "conn-ms", "service_id": "microsoft"})
+        assert isinstance(health, SourceHealth)
+        assert health.ok is True
+        assert health.error is None
+        assert health.details.get("email") == "test@example.com"
+
+
+class TestSourceFilePathIsNeverFabricated:
+    """SEED-253 (D-238-07), asserted across EVERY adapter rather than for one of them.
+
+    The seed's defect was not "path is missing" — it was that a MISSING path was replaced by
+    `/<filename>`, so a folder-shaped rule matched the filename and a dead rule looked alive.
+    The contract-level invariant is therefore: `path` is None, or it is a path. It is never a
+    bare filename dressed up as one.
+    """
+
+    @pytest.mark.asyncio
+    async def test_graph_path_is_the_real_folder(self, graph_adapter: SourceAdapter):
+        page = await graph_adapter.list_files(
+            connection={"id": "conn-ms", "service_id": "microsoft"},
+            folder_id="folder-g-1",
+        )
+        assert page.files[0].path == "/Finance/Design.pdf"
+
+    @pytest.mark.asyncio
+    async def test_mock_path_is_populated_by_the_adapter(self, mock_adapter: SourceAdapter):
+        page = await mock_adapter.list_files(
+            connection={"id": "conn-1", "service_id": "mock_source"},
+            folder_id="folder-eng",
+        )
+        for f in page.files:
+            assert f.path and f.path.startswith("/") and f.path.count("/") >= 2, (
+                "an adapter-populated path names a FOLDER; '/name.ext' is the fabrication "
+                "SEED-253 was planted about"
+            )
+
+    @pytest.mark.asyncio
+    async def test_drive_path_is_none_not_fabricated(self, google_adapter: SourceAdapter):
+        """Drive has NO path in `files.list` and SEED-253 stays open for it. None is the honest
+        answer; `preview_service`'s walk supplies a breadcrumb where it can."""
+        page = await google_adapter.list_files(
+            connection={"id": "conn-google", "service_id": "google"},
+            folder_id="folder-123",
+        )
+        assert page.files[0].path is None
+
+
 class TestRegistryResolution:
     """Tests for SourceRegistry provider resolution and alias support."""
 
@@ -309,6 +518,17 @@ class TestRegistryResolution:
         adapter_conn = SourceRegistry.get_adapter({"service_id": "google"})
         assert adapter_conn is not None
         assert isinstance(adapter_conn, GoogleDriveSourceAdapter)
+
+    def test_microsoft_source_resolution(self):
+        """Phase 238 — registration, not a branch. Both keys are decorators on the adapter."""
+        for key in ("microsoft", "microsoft_graph"):
+            adapter = SourceRegistry.get_adapter(key)
+            assert adapter is not None, key
+            assert isinstance(adapter, MicrosoftGraphSourceAdapter)
+
+        adapter_conn = SourceRegistry.get_adapter({"service_id": "microsoft"})
+        assert isinstance(adapter_conn, MicrosoftGraphSourceAdapter)
+        assert SourceRegistry.is_source_supported("microsoft") is True
 
     def test_unknown_provider_resolution(self):
         assert SourceRegistry.get_adapter("unknown_provider") is None

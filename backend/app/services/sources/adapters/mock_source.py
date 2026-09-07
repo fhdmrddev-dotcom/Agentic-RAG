@@ -3,6 +3,10 @@
 In-memory implementation of SourceAdapter that provides deterministic folder trees,
 pagination tokens, and file payloads for testing and conformance verification.
 Proves that a source family is data and registration, requiring no code outside this file.
+
+Phase 238 (D-238-07 / SEED-253): every file here carries a REAL folder `path`. The fake is
+the only adapter that can be made to state the contract unconditionally, so it is where the
+"a path names a folder, never a filename" invariant is anchored.
 """
 
 from __future__ import annotations
@@ -67,6 +71,7 @@ class MockSourceAdapter(SourceAdapter):
                     mime_type="application/pdf",
                     size=1024,
                     modified_at="2026-09-01T12:00:00Z",
+                    path="/Engineering/architecture.pdf",
                 ),
                 SourceFile(
                     id="file-eng-2",
@@ -74,6 +79,7 @@ class MockSourceAdapter(SourceAdapter):
                     mime_type="text/plain",
                     size=256,
                     modified_at="2026-09-02T12:00:00Z",
+                    path="/Engineering/readme.txt",
                 ),
             ],
             "folder-prod": [
@@ -83,6 +89,7 @@ class MockSourceAdapter(SourceAdapter):
                     mime_type="application/pdf",
                     size=2048,
                     modified_at="2026-09-03T12:00:00Z",
+                    path="/Product/roadmap.pdf",
                 ),
             ],
             "folder-ops": [
@@ -93,6 +100,7 @@ class MockSourceAdapter(SourceAdapter):
                     size=512,
                     modified_at="2026-09-04T12:00:00Z",
                     drive_id="drive-team",
+                    path="/Team Operations/Q3 Runbooks/playbook.txt",
                 ),
             ],
         }

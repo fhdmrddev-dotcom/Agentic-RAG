@@ -286,6 +286,35 @@ ALLOWED_HOST_SUFFIXES: dict[str, tuple[str, ...]] = {
     "docs_write": ("googleapis.com",),
     "calendar_write": ("googleapis.com",),
     "contacts_write": ("googleapis.com",),
+    # ── Phase 238 (D-238-01 / D-238-02) · MICROSOFT GRAPH, AND WHY IT IS **TWO** KEYS ────────
+    # `graph_read` is the ordinary service key, exactly like `drive_read`: an OAuth-token call
+    # to one host. `graph_download` exists because Graph's download is a REDIRECT and this
+    # module refuses redirects BY DESIGN.
+    #
+    # `GET /me/drive/items/{id}/content` answers **302 Found** with a `Location` on a
+    # DIFFERENT host — Microsoft's own reference prints
+    # `Location: https://b0mpua-by3301.files.1drv.com/...`. `send_pinned_http` sets
+    # `follow_redirects=False` explicitly and raises the `redirected` reason code, so that call
+    # can never succeed here, and it MUST NOT be made to succeed by relaxing the binder.
+    # The documented remedy is a two-step, and it lives entirely inside the Graph adapter:
+    #   1. `?$select=...,@microsoft.graph.downloadUrl`  under `graph_read`
+    #   2. `GET <that url>`                             under `graph_download`
+    # ⛔ The SOURCE CONTRACT never learns about any of this. A `follow_redirects` flag on
+    # `SourceAdapter` would be Phase 238 failing its own SC#4.
+    "graph_read": ("graph.microsoft.com",),
+    # ⚠ TWO SUFFIXES, AND THE SECOND ONE IS NOT PADDING. Personal OneDrive serves its
+    # preauthenticated URLs from `*.files.1drv.com`; OneDrive **for Business** serves them from
+    # `<tenant>.sharepoint.com`. Pinning only `1drv.com` would pass on the one account this was
+    # developed against and refuse every business account — a fence that holds exactly where
+    # somebody tested and nowhere else.
+    #
+    # ⚠ THE DESTINATION IS SERVER-SUPPLIED. Unlike every other entry here, the URL comes back
+    # from Graph rather than from our code or an operator, so it is semi-trusted input and this
+    # suffix pin is its only fence. Both suffixes are Microsoft-owned. The call carries NO
+    # `Authorization` header — Microsoft: *"You don't need to include an Authorization header
+    # when you access the download URL"* — so a redirect to an unexpected host cannot leak our
+    # OAuth token even before the pin refuses it.
+    "graph_download": ("1drv.com", "sharepoint.com"),
 }
 
 _HOST_MATCH: dict[str, str] = {
@@ -304,6 +333,8 @@ _HOST_MATCH: dict[str, str] = {
     "docs_write": _SUFFIX,
     "calendar_write": _SUFFIX,
     "contacts_write": _SUFFIX,
+    "graph_read": _SUFFIX,
+    "graph_download": _SUFFIX,
 }
 
 # D-07 step 1. TLS is STATED, never assumed: a destination with no scheme is refused, so a
@@ -324,6 +355,8 @@ _TLS_SCHEMES: dict[str, frozenset[str]] = {
     "docs_write": frozenset({"https"}),
     "calendar_write": frozenset({"https"}),
     "contacts_write": frozenset({"https"}),
+    "graph_read": frozenset({"https"}),
+    "graph_download": frozenset({"https"}),
 }
 
 _DEFAULT_PORTS: dict[str, int] = {
