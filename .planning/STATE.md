@@ -42,7 +42,7 @@ Prior: 236 — The Corpus Under Attack (✅ FULLY CLOSED — GA GATE MET 2026-09
 Prior: 235 — The Source Says What It Did (✅ CLOSED 2026-09-06)
 Prior: 234 — The Watch Loop (✅ CLOSED)
 Plan: 238-01, 238-02, 238-03 complete (3 plans, G-8 target 3-5)
-Status: Phase 238 BUILT and UNREVIEWED · `BUS-185` open to operator
+Status: Phase 238 BUILT · M-1/M-3/M-5 DRIVEN LIVE (2 defects found+fixed) · REVIEW still OWED · `BUS-185` open to operator
 Gates at close: backend `71 failed / 4015 passed` (failing NAME SET identical to baseline by `comm -13`) · vitest `count gate OK — 242/242 · 7822 · failed 0` · tsc 66
 
 ## ▶ NEXT SESSION — start here
