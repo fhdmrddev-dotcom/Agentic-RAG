@@ -64,9 +64,15 @@ checked ok); and `docs/HOT-FILE-LEDGER.md` carries **77 sections for 231 rows** 
 sync rule is followed by nobody, waves 1 and 2 included.
 
 **OWED before this phase closes — it is NOT closed:**
-1. ⛔ **SC#2 is unmet.** "Adding a source added rows, not code" is proven **in test only** (the
-   `ls`/`cat` vocabulary exists nowhere as code). It closes on someone connecting a **real second
-   MCP file server**, not on the fixture.
+1. ⛔ **SC#2 is unmet, and it CANNOT BE DRIVEN ON THIS MACHINE — see `SEED-257`.** "Adding a source
+   added rows, not code" is proven **in test only** (the `ls`/`cat` vocabulary exists nowhere as
+   code). It closes on a **real second MCP file server** — and measured 2026-09-08: `mcp_client.py`
+   is **HTTP/SSE only, no stdio**, while `egress.py` refuses `http://` and loopback **with no
+   carve-out, deliberately**. So the reference server (`@modelcontextprotocol/server-filesystem`,
+   stdio) is unreachable by transport, and bridging it locally lands on loopback and is refused.
+   **A public HTTPS MCP file server is required and none is currently named.** ⚠ Not a defect in
+   either file — the egress refusal is the load-bearing security property here, and its own comment
+   names the localhost carve-out as "the production hole".
 2. ⛔ **G-4 live UAT row** covering the headline verdict, F-6's discovery receipt, and the
    over-claiming arm. `BUG-260907-01` stays `folded`, **not `closed`**, until it runs.
 3. ⚠ **A product limit needing an operator decision:** `mcp_client.MAX_MCP_BODY_BYTES` is 2 MB on the
