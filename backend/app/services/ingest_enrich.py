@@ -534,8 +534,16 @@ def enrich_for_ingest(
     src_conn = source_info.get("connection_id") or (prior_row.get("source_connection_id") if prior_row else None)
     if src_conn:
         eval_facts.setdefault("source_connection_id", str(src_conn))
-    # Stand-in path: falls back to '/<filename>' when source_info has no path (SEED-253).
-    src_path = source_info.get("path") or (f"/{filename}" if filename else None)
+    # ⚠ THIS USED TO FALL BACK TO `/<filename>` AND THAT FABRICATION WAS THE DEFECT (SEED-253,
+    # closed here as D-238-07.3). A person picks `path` from a seven-item dropdown, writes
+    # `path contains '/Finance/'`, saves it with a 200 — and gets silence forever, because the
+    # value being matched was the FILENAME wearing a leading slash. `path contains 'Rates'`
+    # then matched, which is worse than not matching at all: the rule looked alive.
+    #
+    # Absent is now absent. A folder-shaped rule against an unknown path does not match, and
+    # `watch_service` supplies the real one wherever the adapter knows it (Graph returns
+    # `parentReference.path`; Drive does not, so SEED-253 stays open, narrowed, for Drive).
+    src_path = source_info.get("path")
     if src_path:
         eval_facts.setdefault("path", src_path)
         eval_facts.setdefault("source_path", src_path)

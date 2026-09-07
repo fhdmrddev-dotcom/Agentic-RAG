@@ -261,13 +261,13 @@ async def fetch_cloud_file(
     file_id: str,
 ) -> tuple[str, bytes, str]:
     """Download a single file from connected source (legacy shim)."""
+    # ⚠ A FOURTH PROVIDER LEAK, AND THE ONE NOBODY HAD SPOTTED — found by the rewritten
+    # boundary fence on its FIRST run (Phase 238 / D-238-09). It fell back to the Drive
+    # adapter when `"google" in service_name.lower()`, and `service_name` is the connection's
+    # DISPLAY NAME: a Microsoft connection a person had typed "Google migration" into would
+    # have been read by the Google Drive adapter, with an OAuth token minted for Microsoft.
+    # Deleted. The NotImplementedError below is the honest answer, and it was already there.
     adapter = SourceRegistry.get_adapter(connection)
-    if not adapter:
-        service_name = getattr(connection, "service_name", "") or (
-            connection.get("service_name", "") if isinstance(connection, dict) else ""
-        )
-        if "google" in service_name.lower():
-            adapter = SourceRegistry.get_adapter("google")
 
     if not adapter:
         service_id = getattr(connection, "service_id", "") or (

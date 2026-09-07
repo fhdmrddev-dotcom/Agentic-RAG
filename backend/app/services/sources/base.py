@@ -140,18 +140,24 @@ class SourceRegistry:
 
         return decorator
 
-    @classmethod
-    def _ensure_registered(cls, service_id: str) -> None:
-        if "google" in service_id or "workspace" in service_id:
-            try:
-                import app.services.sources.adapters.google_drive  # noqa: F401
-            except Exception:
-                pass
-        elif "mock" in service_id:
-            try:
-                import app.services.sources.adapters.mock_source  # noqa: F401
-            except Exception:
-                pass
+    # ⚠ `_ensure_registered` USED TO LIVE HERE AND WAS DELETED IN PHASE 238 (D-238-09.1).
+    #
+    # It lazily imported an adapter module chosen by `"google" in service_id` /
+    # `"mock" in service_id` — provider branching **inside the contract**, in the one module
+    # whose whole claim is that a source family is DATA. It was also redundant:
+    # `app/services/sources/__init__.py` imports every adapter eagerly, so by the time any
+    # caller can reach this class the registry is already populated.
+    #
+    # It is recorded rather than quietly removed because it is Phase 238's SC#4 finding. Adding
+    # Microsoft Graph would have meant adding a third `elif` here — which is exactly the
+    # "adding a source family is a code change" outcome the milestone's binding constraint
+    # forbids, hiding in the file that forbids it. The boundary fence could not have caught it
+    # either: the shipped test refused the literals `onedrive|sharepoint|dropbox|box` and
+    # explicitly permitted `google`, so it would have flagged the SECOND offender while the
+    # FIRST sat three lines away. Both are fixed together.
+    #
+    # ⛔ Do not reintroduce a lazy import keyed on a provider name. If a future adapter must be
+    # optional (a heavy dependency, say), make the IMPORT LIST data — never the lookup.
 
     @classmethod
     def get_adapter(cls, connection_or_service_id: Any) -> SourceAdapter | None:
@@ -169,14 +175,12 @@ class SourceRegistry:
             )
             service_id = str(service_id).strip().lower()
 
-        cls._ensure_registered(service_id)
-
-        # Direct match or canonical alias match
+        # An EXACT key lookup, and nothing else. Aliases are declared where aliases belong —
+        # `@SourceRegistry.register("google_workspace")` sits on the adapter beside
+        # `@SourceRegistry.register("google")`, so `google_workspace` resolves here by being
+        # registered rather than by being pattern-matched. An unregistered id returns None,
+        # which is the honest answer and the one every caller already handles.
         adapter_cls = cls._adapters.get(service_id)
-        if not adapter_cls:
-            # Handle standard aliases (e.g. google_workspace -> google)
-            if "google" in service_id or "workspace" in service_id:
-                adapter_cls = cls._adapters.get("google") or cls._adapters.get("google_workspace")
 
         if adapter_cls:
             return adapter_cls()
@@ -185,12 +189,7 @@ class SourceRegistry:
     @classmethod
     def is_source_supported(cls, service_id: str) -> bool:
         """Check if an adapter is registered for the service_id."""
-        normalized = service_id.strip().lower()
-        if normalized in cls._adapters:
-            return True
-        if "google" in normalized or "workspace" in normalized:
-            return "google" in cls._adapters or "google_workspace" in cls._adapters
-        return False
+        return service_id.strip().lower() in cls._adapters
 
     @classmethod
     def list_supported_services(cls) -> list[str]:

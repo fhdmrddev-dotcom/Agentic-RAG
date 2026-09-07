@@ -235,11 +235,12 @@ class WatchService:
         default_ingest_visibility = conn.get("default_ingest_visibility") or "private"
 
         # 2. Resolve adapter
+        # ⚠ A `"google" in service_id` FALLBACK USED TO SIT HERE AND WAS DELETED IN PHASE 238
+        # (D-238-09.2). When no adapter resolved it reached for the Drive one, so a Microsoft
+        # Graph connection whose adapter had failed to register would have been SILENTLY READ
+        # BY THE DRIVE ADAPTER — a wrong-source sync that looks like a working one. The
+        # NotImplementedError below is the honest answer and was always two lines away.
         adapter: SourceAdapter | None = SourceRegistry.get_adapter(conn)
-        if not adapter:
-            service_id = conn.get("service_id", "")
-            if "google" in str(service_id).lower():
-                adapter = SourceRegistry.get_adapter("google")
         if not adapter:
             raise NotImplementedError(f"No source adapter available for connection {conn_id} (service_id={conn.get('service_id')})")
 
@@ -319,6 +320,13 @@ class WatchService:
                             "system": (conn.get("service_id") or "connector").strip().lower(),
                             "external_id": str(item.id),
                             "version": str(item.modified_at or ""),
+                            # SEED-253 / D-238-07.4 — the `path` key was ABSENT here, which
+                            # made `ingest_enrich`'s path arm dead code and left every watched
+                            # document with a fabricated `/<filename>`. `None` is written as
+                            # None on purpose: "we do not know this file's folder" and "this
+                            # file is at the root" are different facts, and a rule must not be
+                            # able to match the difference away.
+                            "path": item.path,
                         }
                     }
 

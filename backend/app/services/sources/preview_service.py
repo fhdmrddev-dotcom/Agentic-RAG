@@ -580,7 +580,15 @@ async def build_preview(
         )
         destination: str | None = None
         rule_suggested = False
-        # Stand-in path: falls back to '/<filename>' because adapters do not yet populate f.path (SEED-253).
+        # ⚠ CORRECTED 2026-09-07 (Phase 238) — the old comment here said *"adapters do not yet
+        # populate f.path"*, and SEED-253 says production *always* substitutes `/<filename>`.
+        # Measured: BOTH are now too broad. `_walk_folder` above sets `f.path` from the
+        # traversal breadcrumb (`:333-334`) before this line ever runs, and the Graph adapter
+        # sets a real `parentReference.path`. So this `or` is the last resort for a listing
+        # that had neither — a flat, unnamed folder — and it is kept, deliberately, because a
+        # preview ROW is a thing a person is looking at and a blank path column is not the
+        # honest signal here. ⛔ The arm that WAS dangerous — the same fabrication reaching a
+        # RULE — was removed at its own site in `ingest_enrich.py`.
         file_path = getattr(f, "path", None) or f"/{f.name}"
         if bucket == "add":
             destination, rule_suggested = _suggest_destination(
