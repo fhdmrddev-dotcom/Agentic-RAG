@@ -528,7 +528,6 @@ class McpSourceAdapter(SourceAdapter):
         page_token: str | None = None,
         query: str | None = None,
         page_size: int = 30,
-        # noqa: ARG002 — see the note on `page_size` below.
     ) -> FilePage:
         """List the files in one folder.
 
