@@ -36,13 +36,13 @@ can be taught new behaviors (skills) that persist and can be shared.
 **Current focus:** **Milestone v4.0 Connected Knowledge — STARTED 2026-09-04.** Phase numbering
 continues at **228**.
 
-Phase: 239 — Any MCP Server With Files (Context captured, ready for planning)
+Phase: 239 — Any MCP Server With Files (Plans authored, ready for execution)
 Prior: 238 — Microsoft Graph — OneDrive (✅ BUILT & DRIVEN 2026-09-07)
 Prior: 237 — One Rule Engine, Not Two (✅ CLOSED 2026-09-06)
 Prior: 236 — The Corpus Under Attack (✅ FULLY CLOSED — GA GATE MET 2026-09-06)
 Prior: 235 — The Source Says What It Did (✅ CLOSED 2026-09-06)
-Plan: Phase 239 in planning (G-8 target 3-5 plans)
-Status: Phase 239 context captured · 4 gray areas locked in 239-CONTEXT.md · BUG-260907-01 folded
+Plan: Phase 239 planned (3 plans across 3 waves: 239-01, 239-02, 239-03)
+Status: Phase 239 plans authored · Ready for Claude execution · BUG-260907-01 folded into 239-03
 Gates at baseline (25c650231): backend `71 failed / 4026 passed` (ceiling 71, zero headroom) · vitest `total 7822 · pinned 7026` · tsc clean (0 errors)
 
 ## ▶ NEXT SESSION — start here

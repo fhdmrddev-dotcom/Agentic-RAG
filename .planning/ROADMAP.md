@@ -668,7 +668,7 @@ Full derivation in `238-SUMMARY.md`.)
   2. Adding that source **added rows, not code** — a person can add a second, different MCP file server afterwards with no change to the product at all (SRC-04).
   3. It previews, syncs, and behaves under deletion, disconnect and visibility exactly as Drive does (SRC-04).
 
-**Plans**: TBD
+**Plans**: 3 plans (3 waves: 239-01, 239-02, 239-03)
 
 **UI hint**: yes
 **Migrations**: **163** reserved (⚠ shifted +2 at 231's close) — the per-connection tool binding stored as **data on the watch row** (skip the number if it fits on an existing column).
@@ -831,7 +831,7 @@ found at the v3.7 close.
 | 236. The Corpus Under Attack | 3/3 | ✅ **CLOSED 2026-09-06** — Gemini built, Claude VERIFIED on BUS-168. 13/13 attacks refused in offline corpus, 8/8 mutations caught loudly at point of use, SC#10 parity verified. ⚠ **SC#1 & Live UAT OWED to operator live drive** (drive Google Drive first with live credentials & watched sync) | 2026-09-06 |
 | 237. One Rule Engine, Not Two | 4/4 | ✅ **CLOSED 2026-09-06** — Gemini built, Claude VERIFIED on BUS-182/BUS-183. Unified rule builder with scope switcher, source facts as view filters, arrival facts matched at preview & ingest, suggestion-only retained under VIS-06 fence, migration 173 live. ⚠ **G-4 Manual UAT OWED by decision** (rule builder surface not manually clicked) | 2026-09-06 |
 | 238. Microsoft Graph — OneDrive | 3/3 | ✅ **BUILT 2026-09-07 — Claude built alone, unattended, on operator instruction. ⛔ REVIEW OWED (AGENTS.md §6.3: the builder must not verify).** SC#4 answered with a FINDING: the adapter cost `base.py` **0 lines** and is **352 L vs Drive's 399**, but **four provider branches already sat above `adapters/`** and the fence meant to catch them EXEMPTED `google` while refusing `onedrive`. Rewritten fence found a **fourth leak nobody had spotted** — `import_service` fell back to the Drive adapter on the connection's DISPLAY NAME. Driven RED, file restored md5-identical. Both ROADMAP research flags retired: `file.hashes` is irrelevant (`modified_at` is the version key), `Files.Read.All` already ships. SEED-253 partially discharged (Graph populates `path`; Drive still cannot). ⛔ **ALL 9 LIVE UAT ROWS OWED on ONE operator prerequisite — an Azure app registration (`MICROSOFT_OAUTH_CLIENT_ID/SECRET`); run M-1 first, it unblocks the other 8.** ⛔ SharePoint rows S-1/S-2 BLOCKED on `SEED-256` (no work/school tenant) | 2026-09-07 |
-| 239. Any MCP Server With Files | 0/? | Not started | — |
+| 239. Any MCP Server With Files | 0/3 | Planned (Gemini planned, Claude executes) | — |
 | 240. Mail Is a Shape, Not a Fourth Adapter | 0/? | Not started | — |
 | 241. Recall at Corpus Scale | 0/? | Not started | — |
 
