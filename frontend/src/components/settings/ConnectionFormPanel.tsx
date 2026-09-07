@@ -92,6 +92,7 @@ import {
   ConnectorApiError,
   createOAuthAuthorizeUrl,
   discoverConnectorTools,
+  getConnectorConnection,
   probeMcpServer,
   updateConnectorGrants,
 } from "@/lib/api"
@@ -738,7 +739,39 @@ export function ConnectionFormPanel({
       // unchanged `mode:id` key, so the refreshed `connection` prop arriving from the
       // reload does NOT re-seed `probeResult` — the person keeps looking at exactly what
       // they just discovered, and the NEXT open reads the fresh copy.
-      if (savedRow) onDiscovered?.()
+      if (savedRow) {
+        onDiscovered?.()
+        // ── Phase 239 plan 03 (F-6) — THE RECEIPT AUTO-DETECTION NEVER HAD ──────────────
+        //
+        // ⭐ `discover_connection_tools` writes `config["source_tools"]` in the SAME UPDATE
+        // as `discovered_tools`, so by the time this line runs the binding exists in the
+        // database. The route returns only the TOOL LIST, and the sentence directly above
+        // is exactly why the refreshed `connection` prop cannot supply it either. So a
+        // person pressed a button, the app detected their file surface correctly, stored
+        // it, and told them "Not set" — a screen denying something that is true, which is
+        // the same defect class as this plan's own headline (BUG-260907-01).
+        //
+        // ⛔ EMPTY SLOTS ONLY, AND THAT GUARD IS THE WHOLE CORRECTNESS. A local value the
+        // person just chose has never reached the server; overwriting it from the stored
+        // row would silently edit what they were in the middle of doing.
+        //
+        // ⚠ FAILURE IS SILENT ON PURPOSE. The discovery itself succeeded and its tools are
+        // already on screen; a worded error here would report a failure of something the
+        // person never asked for, and blanking the panel would lose the result they did.
+        await getConnectorConnection(savedRow)
+          .then((fresh) => {
+            const bound = (fresh.config ?? {}) as { source_tools?: Record<string, string> }
+            const tools = bound.source_tools
+            if (!tools) return
+            setDraft((current) => ({
+              ...current,
+              sourceListTool: current.sourceListTool || (tools.list_tool ?? ""),
+              sourceReadTool: current.sourceReadTool || (tools.read_tool ?? ""),
+              sourceRootPath: current.sourceRootPath || (tools.root_path ?? ""),
+            }))
+          })
+          .catch(() => {})
+      }
     } catch (err) {
       // WARNING: the fallback said "Failed to discover tools from MCP server", and this handler
       // now serves three shapes - two of which contact no MCP server and one of which contacts
