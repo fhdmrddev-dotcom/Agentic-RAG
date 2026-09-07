@@ -36,32 +36,83 @@ can be taught new behaviors (skills) that persist and can be shared.
 **Current focus:** **Milestone v4.0 Connected Knowledge — STARTED 2026-09-04.** Phase numbering
 continues at **228**.
 
-Phase: 238 — Microsoft Graph — OneDrive and SharePoint (ready to discuss)
+Phase: 238 — Microsoft Graph — OneDrive (⚠ BUILT 2026-09-07, REVIEW OWED)
 Prior: 237 — One Rule Engine, Not Two (✅ CLOSED 2026-09-06)
 Prior: 236 — The Corpus Under Attack (✅ FULLY CLOSED — GA GATE MET 2026-09-06)
 Prior: 235 — The Source Says What It Did (✅ CLOSED 2026-09-06)
 Prior: 234 — The Watch Loop (✅ CLOSED)
-Plan: 237-01, 237-02, 237-03, 237-04 complete (4 plans across 4 waves)
-Status: Phase 237 complete · ready for Phase 238
+Plan: 238-01, 238-02, 238-03 complete (3 plans, G-8 target 3-5)
+Status: Phase 238 BUILT and UNREVIEWED · `BUS-185` open to operator
 
 ## ▶ NEXT SESSION — start here
 
-**Phase 238: Microsoft Graph — OneDrive and SharePoint**:
-1. Review Phase 232 contract (`SourceAdapter`) and Phase 234 watch loop integration points.
-2. Conduct research on Graph `/content` 302 handling inside adapter (preserving `egress.py` redirect refusal).
-3. Investigate `driveItem.file.hashes` and `Files.Read.All` / `Sites.Read.All` permission self-consent vs admin approval.
-4. Execute `/gsd:discuss-phase 238`.
+### ⛔ TWO THINGS ARE OWED ON PHASE 238, AND NEITHER IS A CODE CHANGE
+
+**1. A REVIEW. I BUILT IT, SO I MAY NOT VERIFY IT.** The operator directed an unattended
+end-to-end run on 2026-09-07 and I did all three plans, so `238-VERIFICATION.md` is a
+**self-verification and says so in its own first paragraph**. AGENTS.md §6.3 wants a reviewer who
+did not shape the build — **Gemini**. The two highest-value targets, because they are the two
+places a self-verification is weakest:
+   - **Drive the rewritten boundary fence RED yourself.** I planted `if "google" in service_id`
+     in `base.py`, saw it fail by name at line 201, and restored the file md5-identical
+     (`186c606c5cf3cb02ed42d2f34990248d`). *A guard nobody else has seen fire is still one
+     person's word.*
+   - **The two-step Graph download.** It is asserted against a fake `send_pinned_http`. The fake
+     is mine, so it agrees with my adapter by construction.
+
+**2. ONE AZURE APP REGISTRATION UNBLOCKS NINE UAT ROWS.** Every live row is **OWED, not failed**,
+and all nine wait on the same prerequisite: `MICROSOFT_OAUTH_CLIENT_ID` /
+`MICROSOFT_OAUTH_CLIENT_SECRET` (a `/common`-authority app whose redirect URI matches
+`oauth_service`'s exactly), then two lines in `backend/.env`. **Run `M-1` first — it unblocks
+M-2..M-9.** ⭐ **`M-5` is the row that matters most**: it is the only one that proves the 302
+download dance against the live `*.files.1drv.com` host rather than against my own fake.
+Full table: `238-VERIFICATION.md`.
+
+⛔ **SharePoint rows `S-1` / `S-2` are BLOCKED, not owed** — `SEED-256`, no Microsoft 365
+work/school tenant. A personal account has no `/sites/` to address and no scope changes that.
+
+### ⭐ What Phase 238 actually found — read this before Phase 239
+
+SC#4 asked whether Phase 232's contract was real. **The adapter half: yes, emphatically.**
+`base.py` **byte-unchanged**, adapter **352 L vs Drive's 399**, zero new contract parameters,
+zero migrations. Graph's `@odata.nextLink` is a **full URL** where Drive's cursor is an opaque
+token, and `next_page_token: str | None` swallowed both with no contract change — the single
+best piece of evidence that the cursor was designed right.
+
+**The resolution half: no.** Four provider branches were **already** sitting above `adapters/`,
+and Phase 232's boundary fence had been written so it could not find them — it refused
+`onedrive|sharepoint|dropbox|box` in `base.py` and **explicitly permitted `google`**, while
+`_ensure_registered` branched on `"google" in service_id` three lines away in that same file.
+
+⭐ **The rewritten fence found a FOURTH leak on its first run that nobody had spotted:**
+`import_service.fetch_cloud_file` fell back to the Drive adapter when `"google"` appeared in the
+connection's **DISPLAY NAME** — a Microsoft connection someone had typed *"Google migration"*
+into would have been read by the Google Drive adapter holding a Microsoft token.
+
+**The finding, stated the way SC#4 wants it:** the contract expressed the **adapter** and did not
+express **resolution**. It could not say *"there is no adapter for this connection"*, so three
+separate call sites each invented an answer. **Phase 239 should expect the adapter to be cheap
+and should watch for the same shape** — a caller guessing when the registry returns `None`.
+
+### Both ROADMAP research flags are RETIRED rather than answered
+
+- **`driveItem.file.hashes` is irrelevant to this design.** Nothing in this product reads a file
+  hash; `modified_at` is the version key at every comparison site. The flag was raised against a
+  design the contract does not use.
+- **`Files.Read.All` already ships and self-consents on a personal MSA.** ⛔ That says **nothing**
+  about `Sites.Read.All` in an enterprise tenant, which travels with `SEED-256` un-softened and
+  is the first thing to drive when that seed's trigger fires — before promising the capability
+  to any customer.
+
+⚠ **`SEED-253` is PARTIAL, not closed**, and its own claim is corrected in place: production did
+**not** *always* fabricate `/<filename>` — the preview walk built a real breadcrumb; only the
+watch→ingest path fabricated. Graph now populates a real `path`; **Drive still cannot**.
 
 ⚠ **APPLY G-8 FROM THE START.** Phase 235 ran **17 plans for 4-6 plans of substance** and the
-operator stopped it. `.planning/config.json` now enforces the trimmed flow and CLAUDE.md carries
-G-8; the reasoning and the measured cost table are in `docs/PLANNING-PROPORTION.md`. **Target 3-5
-plans.** Above 6, justify it in CONTEXT.md by naming what genuinely cannot share a worktree.
+operator stopped it. Phase 238 ran **3**. `docs/PLANNING-PROPORTION.md` carries the cost table.
 
-⭐ **AND THE SECOND LEVER, WHICH IS BIGGER THAN THE AGENT ROSTER:** executors ran the FULL gates
-themselves — ~7 min per backend run, ~6 min per vitest gate, one plan ran the backend suite three
-times. That was **~3.5 h across 16 executors**. **Tell every executor: targeted suites per task,
-FULL gates once per WAVE (the orchestrator runs them).** CLAUDE.md's sampling rule already says so
-and it simply was not in the prompts.
+⭐ **AND THE SECOND LEVER:** executors running FULL gates themselves cost **~3.5 h across 16
+executors** in Phase 235. **Targeted suites per task; FULL gates once per WAVE.**
 
 ### ⛔ Owed from 235, carried forward — NOT closed
 

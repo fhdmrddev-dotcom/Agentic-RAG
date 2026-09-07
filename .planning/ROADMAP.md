@@ -636,7 +636,12 @@ Plans:
   3. Everything Phase 234 promised behaves **identically** for a Graph source: deletion does not delete, disconnect freezes, visibility is the connection's, an incomplete listing marks nothing missing. A person cannot tell from the behaviour which family they are watching (SRC-01's real test, observed through SRC-03).
   4. If this phase was **not small**, that is recorded as a finding against Phase 232's contract — naming the specific thing the contract could not express — rather than absorbed quietly into the adapter.
 
-**Plans**: TBD
+**Plans**: 3 — `238-01` the Graph adapter + two egress keys · `238-02` the four provider leaks
+and a fence that could actually fire · `238-03` the server publishes its source registry.
+(G-8 target 3-5. ⭐ SC#4's answer is that the ADAPTER was small — `base.py` byte-unchanged,
+352 L against Drive's 399 — and the RESOLUTION around it was not: four provider branches were
+already above `adapters/`, and the boundary fence exempted the only vendor that had leaked.
+Full derivation in `238-SUMMARY.md`.)
 
 **UI hint**: yes
 **Migrations**: none expected.
@@ -825,7 +830,7 @@ found at the v3.7 close.
 | 235. The Source Says What It Did | 17/17 | ✅ **CLOSED 2026-09-06** — Claude built, Gemini reviewed. 17 plans + 1 quick fix + 1 health task | 2026-09-06 |
 | 236. The Corpus Under Attack | 3/3 | ✅ **CLOSED 2026-09-06** — Gemini built, Claude VERIFIED on BUS-168. 13/13 attacks refused in offline corpus, 8/8 mutations caught loudly at point of use, SC#10 parity verified. ⚠ **SC#1 & Live UAT OWED to operator live drive** (drive Google Drive first with live credentials & watched sync) | 2026-09-06 |
 | 237. One Rule Engine, Not Two | 4/4 | ✅ **CLOSED 2026-09-06** — Gemini built, Claude VERIFIED on BUS-182/BUS-183. Unified rule builder with scope switcher, source facts as view filters, arrival facts matched at preview & ingest, suggestion-only retained under VIS-06 fence, migration 173 live. ⚠ **G-4 Manual UAT OWED by decision** (rule builder surface not manually clicked) | 2026-09-06 |
-| 238. Microsoft Graph — OneDrive and SharePoint | 0/? | Not started | — |
+| 238. Microsoft Graph — OneDrive | 3/3 | ✅ **BUILT 2026-09-07 — Claude built alone, unattended, on operator instruction. ⛔ REVIEW OWED (AGENTS.md §6.3: the builder must not verify).** SC#4 answered with a FINDING: the adapter cost `base.py` **0 lines** and is **352 L vs Drive's 399**, but **four provider branches already sat above `adapters/`** and the fence meant to catch them EXEMPTED `google` while refusing `onedrive`. Rewritten fence found a **fourth leak nobody had spotted** — `import_service` fell back to the Drive adapter on the connection's DISPLAY NAME. Driven RED, file restored md5-identical. Both ROADMAP research flags retired: `file.hashes` is irrelevant (`modified_at` is the version key), `Files.Read.All` already ships. SEED-253 partially discharged (Graph populates `path`; Drive still cannot). ⛔ **ALL 9 LIVE UAT ROWS OWED on ONE operator prerequisite — an Azure app registration (`MICROSOFT_OAUTH_CLIENT_ID/SECRET`); run M-1 first, it unblocks the other 8.** ⛔ SharePoint rows S-1/S-2 BLOCKED on `SEED-256` (no work/school tenant) | 2026-09-07 |
 | 239. Any MCP Server With Files | 0/? | Not started | — |
 | 240. Mail Is a Shape, Not a Fourth Adapter | 0/? | Not started | — |
 | 241. Recall at Corpus Scale | 0/? | Not started | — |

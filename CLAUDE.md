@@ -272,6 +272,42 @@ fresh worktree false-failed every plan:
    `__tests__/`, so the gate had been RUNNING it and GUARDING nothing. **TARGETS decides what runs;
    BASELINE decides what is guarded, and a suite can sit on the wrong side of exactly one of them.**
 
+   ---
+
+   ### ⚠ CORRECTION 2026-09-07 (Phase 238) — THE SIXTH ROT, AND IT TOOK TEN DAYS. Every prior set of figures is preserved above, never overwritten.
+
+   Re-derived on a quiet tree with no sibling agent, from the **repo root**, verdict line read
+   **verbatim**, before the phase's first edit:
+
+   ```
+     total 7816  ·  failed 0  ·  pinned total 7020
+   count gate OK — 241/241 pinned files present, no per-file decrease, 0 failing.
+   ```
+
+   | | correction of 2026-08-28 said | **measured 2026-09-07** |
+   |---|---|---|
+   | grand total | 6355 | **7816** |
+   | pinned total | 5266 | **7020** |
+   | pinned files | 120/120 | **241/241** |
+
+   ⚠ **The pinned-file count DOUBLED — `120` → `241` — and that is the most useful number here.**
+   The five earlier rots were mostly new cases inside already-pinned files; this one is mostly
+   **adoption**, which is the desirable direction and must not be read as drift. Phase 238's own
+   close re-measured `7822 · 0 failed · 7026 · 242/242` — `+6`, exactly the one suite it added.
+
+   **A growing number is still the gate WORKING.** Its contract is *no per-file DECREASE* and
+   *zero failing*, never a fixed grand total. Re-derive rather than doubt it:
+   `GSD_VITEST_MAX_WORKERS=2 node scripts/vitest-count-gate.cjs`, from the repo root.
+
+   ⚠ **THE CAP WAS NEITHER ADJUSTED NOR NEEDED, for the third consecutive close** — `2`,
+   `failed 0` on both invocations. ⚠ And a standing red that is NOT a cap problem and NOT this
+   phase's: **`src/components/sources/sourceComposition.test.tsx` sits at `16 failed | 33 passed`
+   in NEITHER knob, by a Phase 235 decision** — pinning a red suite turns the shared gate red,
+   and pinning it with an allowance makes a gate that cannot fail. It is invisible to the verdict
+   line above, which is exactly why it is named here.
+
+   ---
+
    ⚠ **THE CAP WAS NEITHER ADJUSTED NOR NEEDED, for the second consecutive close.** It held at `2`,
    `failed 0` on every invocation, and **none of SEED-171's five cap-independent flaky suites went red
    — although three of them (`WorkflowsPage.test.tsx`, `WorkflowBuilderPage.canvas.test.tsx`,

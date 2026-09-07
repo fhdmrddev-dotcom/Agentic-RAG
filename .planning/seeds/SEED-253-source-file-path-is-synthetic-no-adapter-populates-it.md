@@ -3,7 +3,7 @@ seed_id: SEED-253
 title: A watch rule can filter on `path`, but no adapter populates it — production always substitutes `/<filename>`, so folder-shaped path rules silently never match
 created: 2026-09-06
 planted_during: Phase 237 reviewer re-review (claude, REVIEWER — did not build this phase)
-status: planted
+status: partial   # ⚠ Phase 238 took OPTION 1 for Graph. Drive is STILL unpopulated.
 priority: medium
 surface: Agentic-RAG
 relates_to:
@@ -22,6 +22,13 @@ trigger_when: >
   subfolder watch ships, making a file's folder location meaningful rather than constant;
   (c) any user-reported bug of the shape "my path rule does nothing"; (d) any phase that
   touches `SourceFile` or `preview_service._suggest_destination`.
+
+  ⚠ NARROWED 2026-09-07 AT PHASE 238's CLOSE. Arms (a) and (d) have FIRED and are discharged
+  for Graph; what remains open is DRIVE ONLY. The live trigger is now: (i) Google Drive's own
+  `path` becomes cheaply available (a `parents` walk or a cached folder map in the lister), or
+  (ii) a recursive / subfolder watch ships, making a Drive file's folder location meaningful
+  rather than constant, or (iii) any user-reported bug of the shape "my path rule does nothing"
+  on a DRIVE source.
 ---
 
 `Phase 237` made source facts first-class filterable fields and added `path` to both the
@@ -83,3 +90,53 @@ drift into the first one:
 promises folder location and silently carries a filename, with green tests over it. If
 neither option is taken now, the fallback needs a comment at BOTH substitution sites and on
 `SourceFile.path` saying it is a stand-in and naming this seed.
+
+---
+
+## ⚠ PARTIALLY DISCHARGED AT PHASE 238 (2026-09-07) — and the seed's own claim is CORRECTED
+
+**Option 1 was taken, for Microsoft Graph.** `MicrosoftGraphSourceAdapter` sets `SourceFile.path`
+from `parentReference.path` (Graph returns it free, in the same payload, which is exactly why
+this seed's trigger was widened to *any* Graph adapter). `MockSourceAdapter` now carries real
+paths too, so the conformance suite can assert the invariant across families rather than for one
+of them.
+
+**The fabrication is gone from the arm that mattered.** `ingest_enrich.py` no longer substitutes
+`/<filename>`, and `watch_service.py` now writes the real `path` into `metadata.source` — a key
+that was **absent**, which is why that arm was dead code and why the substitution was reached at
+all. `test_238_source_path_honesty.py` drives the seed's own three lines as cases, including the
+fabricated value, preserved as a regression rather than as a paragraph.
+
+### ⚠ THE CORRECTION — this seed overstates its own defect, measured rather than assumed
+
+> *"production always substitutes `/<filename>`"*
+
+**That is true of the watch → ingest path and FALSE of the preview path.**
+`preview_service._walk_folder:333-334` sets `f.path` from the traversal breadcrumb
+(`f"{current_path}/{f.name}"`, seeded from `folder_name`) **before** the
+`or f"/{f.name}"` at `:584` is ever reached. So a previewed file inside a sub-folder already
+carried a real relative path, and only a flat listing with no folder name fell through.
+
+The correction is recorded rather than the seed rewritten, because the seed being **partly**
+right is what determined the fix: the substitution was removed where a fabricated value reached
+a **RULE**, and deliberately kept where it reaches a **preview row a person is looking at**, in
+which position a blank path column is the less honest signal. Both sites now carry a comment
+saying which they are.
+
+### What is still open, and it is only this
+
+⛔ **Google Drive still has no `path`.** `files.list` does not return one, and assembling it
+needs a `parents` walk or a cached folder map — real cost, and out of Phase 238's scope by
+decision (`238-CONTEXT.md`, Out of scope). A Drive-watched file therefore has **no** `path` fact,
+and a folder-shaped rule against it now **declines** instead of matching a fabricated filename.
+
+⭐ **That is a strictly better failure than the one this seed was planted about** — a rule that
+does nothing and is *visibly* doing nothing, rather than one that looks alive while matching the
+wrong field. But it is not the feature, and the row stays open until Drive can answer.
+
+⚠ **The end-to-end row is OWED, not passed.** `238-VERIFICATION.md` M-9 (*a `path contains
+'/Finance/'` rule fires for a OneDrive file that IS in Finance*) is blocked behind the same
+Azure app registration every other live Phase 238 row is blocked behind. Until it runs, the
+Graph half is proven at unit level only — which is precisely the gap this seed's own closing
+paragraph warns about: *"a test that pins a value proves the value is handled, never that
+anything produces it."*
