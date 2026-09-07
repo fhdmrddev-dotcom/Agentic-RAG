@@ -8394,8 +8394,14 @@ Phase 237 added `ruleScope` support, restricting available field choices to arri
 
 ## backend/app/services/sources/adapters/mcp_source.py
 
-**1 / 1 / 644** · no (1 phase: 239) · the MCP file-source adapter — the FOURTH source family,
+**2 / 1 / 643** · no (1 phase: 239) · the MCP file-source adapter — the FOURTH source family,
 and the first that is a **protocol** rather than a named service.
+
+⚠ **THIS ROW WAS WRITTEN `1 / 1 / 644` AND WAS WRONG WITHIN THE SAME PLAN** — a later commit in
+the same wave removed one line, and the row was not re-derived. Caught by the plan's own
+self-check, and recorded rather than silently corrected, because it is this ledger's single most
+repeated finding in miniature: **a triple written at a close goes stale on the next commit that
+touches the file, sometimes within the hour.** Re-derive; never copy forward.
 
 ⭐ **THE POINT OF THE FILE IS WHAT IS NOT IN IT.** MCP file servers disagree about names —
 `list_directory` / `list_files` / `ls`, `read_file` / `cat` / `get_file_contents`. The obvious
@@ -8862,4 +8868,4 @@ cells rot within days.
 | [`backend/app/services/sources/adapters/mock_source.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesadaptersmock_sourcepy) | 2 / 1 / 177 | no (1 phase) | ⚠ absent for its entire life — row added 238. It is where the SEED-253 invariant is ANCHORED: a `path` names a folder, never a filename |
 | [`backend/app/services/sources/__init__.py`](docs/HOT-FILE-LEDGER.md#backendappservicessources__init__py) | 5 / 3 / 40 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ row was STALE at `2 / 1 / 26` and read `no (1 phase)`. The ONE eager-import site — an adapter absent here is unregistered, so the list is load-bearing |
 | [`frontend/src/components/sources/sourceCapability.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcessourcecapabilityts) | 0 / 0 / 38 | no (new) | young (238) — the ONE answer to *can this connection be browsed?*, replacing two copies of an `includes("google")` guess. ⛔ Fails CLOSED on `null`: unknown is not permission |
-| [`backend/app/services/sources/adapters/mcp_source.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesadaptersmcp_sourcepy) | 1 / 1 / 644 | no (1 phase) | young (239) — the FOURTH family and the first that is a PROTOCOL. ⛔ Tool names are a ROW (`config["source_tools"]`), never a branch. Opens no socket; all egress via `mcp_client` |
+| [`backend/app/services/sources/adapters/mcp_source.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesadaptersmcp_sourcepy) | 2 / 1 / 643 | no (1 phase) | young (239) — the FOURTH family and the first that is a PROTOCOL. ⛔ Tool names are a ROW (`config["source_tools"]`), never a branch. Opens no socket; all egress via `mcp_client` |
