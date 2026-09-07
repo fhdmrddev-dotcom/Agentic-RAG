@@ -1716,7 +1716,7 @@ const BASELINE = {
   // and the resulting wall-clock cost starved six neighbours past the 5 s default. Switching
   // to `userEvent.setup({ delay: null })` cleared all eight. A slow new suite inside this
   // gate is not merely slow — it reds files it never touches.
-  "ConnectionsTab.test.tsx": 36,
+  "ConnectionsTab.test.tsx": 102,
   // ── 206.1-01 (item 3, CONN-02 / SC#3) — the per-service mark map's own suite. ──
   // The number is THIS SCRIPT'S OWN `actual` column across TWO AGREEING RUNS on 2026-08-25
   // (both printed `connectionMark.test.tsx — 39 new`, total 5511, failed 0) — never a hand
@@ -2861,7 +2861,7 @@ const BASELINE = {
   // Plan 02 (2026-09-01): 14 -> 19. `partly` was UNREACHABLE BY CONSTRUCTION until this
   // plan — `blockedApplicationCount` was the literal 0 — so these five cases had nothing
   // to assert before it. Read from the gate's own printed column, not counted by hand.
-  "connectionRowVerdict.test.ts": 22,
+  "connectionRowVerdict.test.ts": 37,
   // ── Added in Phase 221 plan 02, in the SAME COMMIT that creates the files ───────────
   // ⚠ BOTH KNOBS, TOGETHER. Every suite found orphaned in the last week was orphaned
   // because one knob was edited and the other was not; `src/components/settings/` entries
@@ -3238,7 +3238,20 @@ const BASELINE = {
   // its fixtures. ⚠ In BOTH knobs on purpose: Phase 214 measured that TARGETS decides what
   // RUNS and BASELINE decides what is GUARDED, and a suite can sit on the wrong side of
   // exactly one of them for a whole phase without anyone noticing.
-  "sourceCapability.test.ts": 6,
+  "sourceCapability.test.ts": 12,
+  // ── Phase 239 (239-03) — F-7, THE OWED ENTRIES, TAKEN BY THE LAST WAVE ───────────────
+  //
+  // ⚠ `239-02` shipped a FOURTEEN-CASE suite and the gate's grand total moved by EXACTLY
+  // ZERO — `7822 · pinned 7026`, character-for-character what Phase 238's close recorded.
+  // That is what proved it: `src/components/settings` is NOT a directory entry in TARGETS
+  // (its settings suites are listed one file at a time), so the gate never ran the file and
+  // a future edit could have deleted all fourteen cases with the gate still green.
+  //
+  // ⚠ Wave 2 deliberately did not take this edit — two parallel waves editing one shared
+  // hot file is a merge conflict for no gain — and named it as owed at the phase close.
+  // This is that close. BOTH knobs, for the reason the entry above states.
+  "ConnectionFormPanel.sourceTools.test.tsx": 14,
+  "ConnectionFormPanel.refreshReceipt.test.tsx": 4,
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -4496,6 +4509,13 @@ const TARGETS = [
   "src/components/settings/__tests__/connectionFormCopy.mcp.test.ts",
   "src/components/settings/McpAuthDoor.test.tsx",
   "src/components/settings/McpAuthDoor.byo.test.tsx",
+  // ── Phase 239 (239-03) — F-7, the two suites that were in NEITHER knob ───────────────
+  // FILE-LEVEL, not the bare `src/components/settings/__tests__` directory, verbatim the
+  // reasoning every neighbour on this path already records. See the matching BASELINE
+  // entries for what proved they were ungated: a 14-case suite that moved the grand total
+  // by zero.
+  "src/components/settings/__tests__/ConnectionFormPanel.sourceTools.test.tsx",
+  "src/components/settings/__tests__/ConnectionFormPanel.refreshReceipt.test.tsx",
   "src/components/ui/__tests__/scrollAreaViewportWidth.test.tsx",
   // ── BUG-260904-02 — see the matching BASELINE entry. `src/__tests__/hooks` is reached by no
   // ── directory entry in this file, so this suite needed BOTH knobs. ───────────────────
