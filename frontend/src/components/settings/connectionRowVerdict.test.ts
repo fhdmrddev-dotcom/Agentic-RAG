@@ -9,13 +9,27 @@ import { describe, expect, it } from "vitest"
 
 import type { ConnectorConnection } from "@/lib/api"
 import { connectionRowVerdict } from "./connectionRowVerdict"
+import { isSourceCapable } from "@/components/sources/sourceCapability"
 import {
   CONNECTION_STATE_PARTLY,
   CONNECTION_STATE_PARTLY_COUNTED,
+  CONNECTION_STATE_SOURCE_ONLY,
   CONNECTION_STATE_UNUSABLE,
   CONNECTION_STATE_WORDS,
   connectionStateOf,
 } from "./connectionsCopy"
+
+/** The families `GET /connectors/source-families` publishes at Phase 239, measured in
+ *  `239-02-SUMMARY.md` §F-1 rather than invented here. `mock_source` is excluded by the
+ *  route; `mcp` is the PROTOCOL key and `custom_mcp` the by-URL service id. */
+const FAMILIES = [
+  "custom_mcp",
+  "google",
+  "google_workspace",
+  "mcp",
+  "microsoft",
+  "microsoft_graph",
+]
 
 describe("connectionRowVerdict", () => {
   it("a connection with actions and nothing blocked is ready", () => {
@@ -55,6 +69,70 @@ describe("connectionRowVerdict", () => {
     expect(
       connectionRowVerdict({ toolCount: -1, blockedApplicationCount: 0, discoveryHasRun: true }),
     ).toBe("unusable")
+  })
+
+  // ── Phase 239 (D-239-08 / BUG-260907-01) — zero ACTIONS is not zero USES ─────────────
+  //
+  // ⚠ The input set went incomplete rather than the logic going wrong. Everything above is
+  // still right about ACTIONS; Phase 238 created a class of connection that has none and
+  // works — a file SOURCE. `isSourceCapable` is the fourth input, and it is the SERVER's
+  // answer (`GET /connectors/source-families` + the row's declared protocol), never a guess
+  // made here.
+
+  it("⭐ zero actions AND source-capable is `source-only` — the OneDrive row, BUG-260907-01", () => {
+    // Measured on the live row the bug reports: `service_id=microsoft · status=active ·
+    // is_enabled=True · last_check_verdict=ok · discovered_tools=[]`, while `browse()`
+    // returned 6 real folders and `read_file()` returned 1395 correct bytes.
+    expect(
+      connectionRowVerdict({
+        toolCount: 0,
+        blockedApplicationCount: 0,
+        discoveryHasRun: true,
+        isSourceCapable: true,
+      }),
+    ).toBe("source-only")
+  })
+
+  it("...and it holds BEFORE any check has run — the first screen after the OAuth round trip", () => {
+    // ⚠ This is deliberately NOT the AR-03 case, and the difference is what it CLAIMS. `✓
+    // Ready` asserts actions exist, which an empty discovery cannot evidence. `✓ Ready as
+    // source` asserts an ADAPTER exists for this family and the credential is not revoked —
+    // two facts we hold from the registry and the row, not an absence read as success.
+    expect(
+      connectionRowVerdict({ toolCount: 0, blockedApplicationCount: 0, isSourceCapable: true }),
+    ).toBe("source-only")
+  })
+
+  it("⛔ NOT source-capable keeps today's split exactly — nothing else moves", () => {
+    expect(
+      connectionRowVerdict({
+        toolCount: 0,
+        blockedApplicationCount: 0,
+        discoveryHasRun: true,
+        isSourceCapable: false,
+      }),
+    ).toBe("unusable")
+    expect(
+      connectionRowVerdict({ toolCount: 0, blockedApplicationCount: 0, isSourceCapable: false }),
+    ).toBe("undiscovered")
+  })
+
+  it("⛔ an ABSENT `isSourceCapable` reads as NOT capable — the fail-closed default", () => {
+    // TM-239-07. The families list arrives over the network; while it is unknown every
+    // caller passes nothing, and a default of `true` would make the loading state a green
+    // claim on every row in the table.
+    expect(
+      connectionRowVerdict({ toolCount: 0, blockedApplicationCount: 0, discoveryHasRun: true }),
+    ).toBe("unusable")
+  })
+
+  it("⛔ source capability NEVER upgrades or downgrades a row that HAS actions", () => {
+    expect(
+      connectionRowVerdict({ toolCount: 5, blockedApplicationCount: 0, isSourceCapable: true }),
+    ).toBe("ready")
+    expect(
+      connectionRowVerdict({ toolCount: 5, blockedApplicationCount: 3, isSourceCapable: true }),
+    ).toBe("partly")
   })
 })
 
@@ -210,8 +288,143 @@ describe("connectionStateOf — D-221-12 in the shipped resolver", () => {
   })
 
   it("every state kind has a word — the closed union stays covered", () => {
-    for (const kind of ["ready", "partly", "unusable", "not_checked", "failed", "disabled", "revoked"] as const) {
+    for (const kind of [
+      "ready",
+      "source_only",
+      "partly",
+      "unusable",
+      "not_checked",
+      "failed",
+      "disabled",
+      "revoked",
+    ] as const) {
       expect(CONNECTION_STATE_WORDS[kind]).toBeTruthy()
     }
+  })
+
+  // ═══════════════════════════════════════════════════════════════════════════════════
+  // Phase 239 (D-239-08 / BUG-260907-01) — the row that works and says it does not
+  //
+  // ⚠ EVERY CASE BELOW COMPOSES THE REAL `isSourceCapable` OVER THE REAL FAMILIES LIST
+  // rather than passing a hand-picked boolean. The defect is a MISSING INPUT, so a suite
+  // that supplies the input by hand tests the half that was never broken.
+  // ═══════════════════════════════════════════════════════════════════════════════════
+
+  const capable = (c: ConnectorConnection, families: string[] | null = FAMILIES) =>
+    connectionStateOf(c, undefined, isSourceCapable(c, families))
+
+  it("⭐ THE BUG: the live OneDrive row reads `✓ Ready as source`, not `⚠ Not usable`", () => {
+    const row = connection({
+      service_id: "microsoft",
+      name: "Microsoft 365",
+      auth_type: "oauth_byo",
+      status: "active",
+      discovered_tools: [],
+      last_check_verdict: "ok",
+    })
+    // Before this phase: `unusable`. The connection browsed 6 folders the same session.
+    expect(capable(row)).toBe("source_only")
+    expect(CONNECTION_STATE_WORDS[capable(row)]).toBe("✓ Ready as source")
+    expect(CONNECTION_STATE_WORDS[capable(row)]).not.toBe(CONNECTION_STATE_UNUSABLE)
+  })
+
+  it("⭐ the word is the deliverable, and it is asserted by character identity", () => {
+    // Phase 235's lesson: a presence assertion cannot see content drift, and the WORDS on
+    // this row are what the bug is about.
+    expect(CONNECTION_STATE_SOURCE_ONLY).toBe("✓ Ready as source")
+    expect(CONNECTION_STATE_WORDS.source_only).toBe(CONNECTION_STATE_SOURCE_ONLY)
+  })
+
+  it("⭐ an MCP file server resolves by PROTOCOL — its service_id is whatever someone typed", () => {
+    // The server resolves this row through `PROTOCOL_ADAPTERS` (`base.py`), because an MCP
+    // server has no canonical name. A client keyed only on `service_id` would call a working
+    // file source unusable for the whole of Phase 239.
+    const row = connection({
+      service_id: "mcp.acme.internal",
+      name: "Acme files",
+      auth_type: "mcp",
+      mcp_server_url: "https://mcp.acme.internal/mcp",
+      status: "active",
+      discovered_tools: [],
+      last_check_verdict: "ok",
+    })
+    expect(capable(row)).toBe("source_only")
+  })
+
+  it("⛔ TM-239-07 — a REVOKED source-capable row says revoked, never `Ready as source`", () => {
+    const row = connection({ service_id: "microsoft", status: "revoked", discovered_tools: [] })
+    expect(capable(row)).toBe("revoked")
+  })
+
+  it("⛔ TM-239-07 — a DISABLED source-capable row says disabled", () => {
+    const row = connection({
+      service_id: "microsoft",
+      is_enabled: false,
+      last_check_verdict: "ok",
+      discovered_tools: [],
+    })
+    expect(capable(row)).toBe("disabled")
+  })
+
+  it("⛔ TM-239-07 — an ERRORED source-capable row never claims it", () => {
+    const row = connection({
+      service_id: "microsoft",
+      status: "error",
+      last_check_verdict: "ok",
+      discovered_tools: [],
+    })
+    expect(capable(row)).not.toBe("source_only")
+  })
+
+  it("⛔ TM-239-07 — while the families list is UNKNOWN the row keeps its old, honest word", () => {
+    // `null` is "we have not been told". A green manufactured out of a pending fetch is the
+    // exact false positive this threat names.
+    const row = connection({
+      service_id: "microsoft",
+      last_check_verdict: "ok",
+      discovered_tools: [],
+    })
+    expect(capable(row, null)).toBe("unusable")
+  })
+
+  it("⛔ a service_id the server never registered NEVER claims `Ready as source`", () => {
+    // ⚠ It reads `✓ Ready` today, from the generic `last_check_verdict === "ok"` fallback,
+    // and that is a SEPARATE over-claim on the static_key arm that Phase 221 closed only for
+    // `oauth_byo`. Out of scope here and reported rather than silently widened — what this
+    // case guards is that the NEW word cannot be reached by a row with no adapter.
+    const row = connection({
+      service_id: "dropbox_drive",
+      auth_type: "static_key",
+      last_check_verdict: "ok",
+      discovered_tools: [],
+    })
+    expect(isSourceCapable(row, FAMILIES)).toBe(false)
+    expect(capable(row)).not.toBe("source_only")
+  })
+
+  it("⛔ the three CAPABILITY rows are untouched when the real predicate is composed", () => {
+    // The regression three byte-for-byte row pins caught in Phase 221, re-driven through the
+    // new input: none of these families is registered as a source, so none can reach the new
+    // arm at any tool count.
+    for (const service of ["smtp", "slack", "jira"]) {
+      const row = connection({
+        service_id: service,
+        auth_type: "static_key",
+        capability: "send_email",
+        last_check_verdict: "ok",
+        discovered_tools: [],
+      })
+      expect(isSourceCapable(row, FAMILIES)).toBe(false)
+      expect(capable(row)).toBe("ready")
+    }
+  })
+
+  it("⛔ a source-capable row WITH actions still reads `✓ Ready` — not demoted", () => {
+    const row = connection({
+      service_id: "google_workspace",
+      last_check_verdict: "ok",
+      discovered_tools: [{ name: "search_files" }],
+    })
+    expect(capable(row)).toBe("ready")
   })
 })

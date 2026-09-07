@@ -553,7 +553,18 @@ export interface ConnectorConnection {
    * The server does not return it: it lives encrypted in `oauth_client_secret_ciphertext`
    * (migration 150), ungranted to `authenticated`, precisely so it cannot be read back.
    */
-  auth_type?: "static_key" | "oauth_byo" | null
+  /**
+   * ⚠ **`"mcp"` WAS MISSING HERE AND THE SERVER HAS SENT IT SINCE PHASE 239 —
+   * the THIRD instance of this exact drift in this one file** (Phase 215's five OAuth
+   * fields, then `custom_client_id`, now this). `AuthType` in
+   * `backend/app/models/connector.py` reads `Literal["static_key", "oauth_byo", "mcp"]`,
+   * and `services/sources/base.py` resolves a row's SOURCE ADAPTER from it —
+   * `PROTOCOL_ADAPTERS = {"mcp": "mcp"}`. A client union that cannot spell the value makes
+   * `auth_type === "mcp"` a `tsc` error rather than a check, so the one comparison that
+   * decides whether an MCP server is browsable could not be written at all. **A wire type
+   * that has drifted from its model does not fail — it just refuses to describe reality.**
+   */
+  auth_type?: "static_key" | "oauth_byo" | "mcp" | null
   status?: "active" | "revoked" | "error" | null
   error_message?: string | null
   account_email?: string | null

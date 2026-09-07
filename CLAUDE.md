@@ -650,21 +650,24 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/useTemplateFirstDraft.ts` | 6 / 3 / 673 | honoured by construction (**214**) |
 | `frontend/src/components/workflows/RunSpine.tsx` | 5 / 3 / 426 | honoured by construction (**214**) |
 | `frontend/src/components/workflows/RunTranscript.tsx` | 7 / 3 / 652 | ⚠ **FIRES on a component with NO MOUNT in the product** |
-| `frontend/src/components/settings/ConnectionsTab.tsx` | 23 / 8 / 1578 | ⚠ the row was STALE at `17 / 7 / 1477`. honoured by construction (**22 |
-| `frontend/src/components/settings/ConnectionFormPanel.tsx` | 17 / 7 / 2376 | ⚠ the row was STALE at `9 / 5 / 2009`. honoured by construction (212 / |
-| `frontend/src/lib/api/org.ts` | 6 / 4 / 562 | ⚠ absent for its ENTIRE LIFE at **4 phases** |
-| `frontend/src/components/settings/connectionsCopy.ts` | 13 / 7 / 737 | no seam proposed |
-| `frontend/src/components/settings/connectionFormCopy.ts` | 7 / 5 / 968 | no seam proposed |
+| `frontend/src/components/settings/ConnectionsTab.tsx` | 25 / 9 / 1635 | ⚠ the row was STALE at `17 / 7 / 1477`. honoured by construction (**22 |
+| `frontend/src/components/settings/ConnectionFormPanel.tsx` | 24 / 10 / 2545 | ⚠ the row was STALE at `9 / 5 / 2009`. honoured by construction (212 / |
+| `frontend/src/lib/api/org.ts` | 11 / 8 / 629 | ⚠ absent for its ENTIRE LIFE at 4 phases; row then STALE at `6 / 4 / 562`. ⚠ **THIRD wire-type drift in this ONE file** (239: `auth_type: "mcp"`) |
+| `frontend/src/components/settings/connectionsCopy.ts` | 15 / 8 / 784 | no seam proposed. honoured by construction (**239**): one word, one union member, one arm — and the arm cannot reach a capability row |
+| `frontend/src/components/settings/connectionFormCopy.ts` | 15 / 8 / 1216 | no seam proposed |
 | `frontend/src/pages/SettingsPage.tsx` | 38 / 21 / 1500 | ✅ **the 212-close re-open trigger has now FIRED** (SEED-227 names it) |
 | `frontend/src/components/settings/ModelPillRow.tsx` | 4 / 3 / 141 | ⚠ absent for its entire life |
 | `frontend/src/components/workflows/phaseVocabulary.ts` | 16 / 6 / 990 | honoured by construction (206.2) |
 | `frontend/src/components/workflows/ConnectionPicker.tsx` | 7 / 5 / 888 | honoured by construction (206.2 / **214**) |
 | `frontend/src/components/workflows/ExternalActionSection.tsx` | 8 / 5 / 179 | honoured by construction (206.2 / **214**) |
 | `frontend/src/components/workflows/McpToolPicker.tsx` | 5 / 5 / 601 | honoured by construction (211 / **214**) |
-| `backend/app/models/connector.py` | 18 / 10 / 676 | ⚠ the row was STALE at `12 / 6 / 471`. honoured by construction (**233 |
-| `backend/app/api/connectors.py` | 33 / 16 / 1879 | ⚠ **extraction still OWED and the file GREW again** (1757→1879 at 233: |
-| `backend/app/security/egress.py` | 10 / 3 / 938 | honoured by construction (232): Google Drive read/export pins; docstri |
-| `backend/app/services/connector_service.py` | 21 / 7 / 1601 | ⚠ the row was STALE at `7 / 3 / 1149` |
+| `backend/app/models/connector.py` | 22 / 13 / 732 | ⚠ the row was STALE at `12 / 6 / 471`. honoured by construction (**233 |
+| `backend/app/api/connectors.py` | 39 / 18 / 2051 | ⚠ **extraction still OWED and the file GREW again** (1757→1879 at 233: |
+| `backend/app/security/egress.py` | 13 / 5 / 982 | honoured by construction (232): Google Drive read/export pins; docstri |
+| `backend/app/services/connector_service.py` | 23 / 9 / 1821 | ⚠ the row was STALE at `7 / 3 / 1149`, then at `21 / 7 / 1601`. honoured by construction (**239**): detection writes `source_tools` on the MCP arm ONLY |
+| `backend/app/services/sources/base.py` | 9 / 5 / 336 | ⚠ **absent while FIRING at 5 phases — row added 239-03.** honoured by construction (239): protocol resolution stayed DATA (two dicts), never a branch |
+| `backend/app/services/sources/__init__.py` | 5 / 3 / 40 | ⚠ **absent while FIRING — row added 239-03.** The ONE eager-import site: an adapter missing from this list is unregistered, so the list is load-bearing |
+| `backend/app/services/mcp_client.py` | 7 / 5 / 480 | ⚠ **FIRING since 222 while its row read `no (2 phases)` — a row present and WRONG stops the audit.** Row added 239-03. Sanitizer needed no widening in either 239 wave |
 | `backend/app/models/message.py` | 17 / 10 / 124 | ⚠ absent from BOTH for its ENTIRE LIFE at **8 phases** |
 | `backend/app/models/user_settings.py` | 46 / 30 / 1352 | ⚠ absent from BOTH for its ENTIRE LIFE at **30 phases** |
 | `backend/app/services/harness/reachability.py` | 4 / 4 / 463 | ⚠ absent from BOTH for its ENTIRE LIFE at **4 phases** |
@@ -672,7 +675,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/WorkflowScheduleModal.tsx` | 3 / 3 / 601 | ⚠ absent for its entire life; it crossed the threshold in 214-09 on a  |
 | `frontend/src/components/workflows/nodePresentation.ts` | 8 / 7 / 221 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
 | `frontend/src/lib/api/threads.ts` | 7 / 3 / 1683 | young (207 split, 214) |
-| `frontend/src/lib/api/connectors.ts` | 12 / 7 / 690 | honoured by construction (**233**) |
+| `frontend/src/lib/api/connectors.ts` | 16 / 10 / 718 | honoured by construction (**233**) |
 | `frontend/src/lib/api/workflows.ts` | 4 / 4 / 1081 | ⚠ absent until 214; the 207 split created it with NO row. **`lib/api.t |
 | `frontend/src/lib/connectionMark.tsx` | 7 / 4 / 313 | ✅ **the move IS the seam, and it was TAKEN (214-08)** |
 | `frontend/src/components/ingestion/DocumentList.tsx` | 24 / 13 / 294 | ✅ **seam TAKEN (217.1-05)** |

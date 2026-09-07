@@ -8723,6 +8723,116 @@ still OWED and is now ten phases older than the cell claimed.**
 
 ---
 
+## `frontend/src/components/settings/connectionRowVerdict.ts`
+
+`2 / 2 / 99` at Phase 239-03 — **not firing (2 phases), and the row exists because ABSENCE, not
+count, is what the gate catches.** `node scripts/check-hot-file-ledger.cjs` FAILED on this path at
+Phase 239's base: it had no row, so G-5 could never have fired on it at any count, ever. This is
+`App.tsx`'s 23-phase failure caught at two.
+
+⭐ **THE FINDING THIS FILE NOW CARRIES: its INPUT SET went incomplete; its LOGIC never went wrong.**
+Every word in its Phase 221 docblock is still correct about ACTIONS — an `oauth_byo` row with zero
+tools is not `✓ Ready`, and `discoveryHasRun` still separates *"we looked and found nothing"* from
+*"nobody looked"*. What changed underneath it is that Phase 238 shipped `SourceAdapter`s, creating a
+class of connection with **no actions that works**. The live OneDrive row read `⚠ Not usable` on the
+first screen after its OAuth round trip while `browse()` returned six real folders and `read_file()`
+returned 1395 correct bytes the same session (`BUG-260907-01`).
+
+**The invariants that now bind this file:**
+
+- `source-only` is returned **ABOVE** the `discoveryHasRun` split, and that placement is a decision
+  rather than an oversight. AR-03 forbids reading an ABSENCE as success — this is not one. `✓ Ready`
+  asserts that actions exist, which an empty discovery cannot evidence; `✓ Ready as source` asserts
+  that an ADAPTER is registered for this family and the credential is not revoked or errored, and
+  both are facts we HOLD (the server's published registry, and the row's own status).
+- `isSourceCapable` **defaults `false`** (TM-239-07). The families list arrives over the network; a
+  default of `true` would turn every loading render into a green claim on every row in the table.
+- The zero-action arms are still checked FIRST, and a source-capable row with actions is still
+  `ready` / `partly` — capability never upgrades or downgrades a row that has tools.
+
+**Named seam: none.** 99 lines, one exported function, one union. A fourth input is not a second
+concern; a fifth would be.
+
+## `frontend/src/components/sources/sourceCapability.ts`
+
+`2 / 2 / 98` at Phase 239-03 (row was STALE at `0 / 0 / 38`) — **not firing.**
+
+⭐ **PHASE 239 ADDED THE SERVER'S SECOND DOOR, WHICH THIS PREDICATE NEVER HAD.**
+`services/sources/base.py` resolves an adapter TWICE: an exact `service_id`, and failing that the
+TRANSPORT the row declared (`PROTOCOL_ADAPTERS`, `auth_type: "mcp"`, or a non-empty
+`config["source_tools"]` marker). That second door exists because **an MCP server has no canonical
+name** — `service_id` is whatever the person setting it up typed. A client keyed only on the exact
+id therefore calls a working MCP file source `⚠ Not usable` and never offers it in the Library, for
+every server anyone ever connects.
+
+⛔ **THIS IS NOT THE STRING GUESS THE FILE'S HEADER REFUSES, and the difference is testable.** The
+guess matched SUBSTRINGS of a vendor name and decided by itself. This reads the row's own
+DECLARATION and still requires the SERVER to have published that protocol as a family — remove `mcp`
+from `GET /connectors/source-families` and every protocol case goes false with no edit here.
+
+⛔ **`mcp_server_url` IS DELIBERATELY NOT CONSULTED, and the plan for 239-03 asked for it.** Shipped
+rows carry an MCP URL with `auth_type: "static_key"` and no `source_tools`; `_protocol_of` returns
+`None` for every one of them, so the server resolves NO adapter. Admitting them here would print
+`✓ Ready as source` on a row that cannot browse and put a dead option in the Library picker — a false
+green, which TM-239-07 names as worse than the bug being fixed. **The pin was driven RED against the
+plan's own proposed arm, planted in this file and restored md5-identical.**
+
+⛔ **TWO DICTS, NOT AN `||` CHAIN**, mirroring `PROTOCOL_ADAPTERS` / `CONFIG_PROTOCOL_MARKERS` by
+`base.py`'s own recorded instruction (*"make the routing DATA … rather than control flow"*).
+⚠ **SAME-COMMIT SYNC:** a protocol added on the server and not here is a source the Library silently
+refuses to show.
+
+## §239-03 — the honesty fix, across the four files that already had rows
+
+**`frontend/src/components/settings/connectionsCopy.ts`** — one new word,
+`CONNECTION_STATE_SOURCE_ONLY = "✓ Ready as source"`, one new union member, and one new arm.
+⛔ It is NOT `✓ Ready`: that word claims actions this row does not have, and re-using it would
+reintroduce exactly the defect `CONNECTION_STATE_UNUSABLE` was created to close. ⭐ **The arm is
+added in TWO places and both are load-bearing.** Inside the `oauth_byo && active` branch it fixes
+the reported OneDrive row; below that branch it reaches an **MCP file server, which is never
+`oauth_byo`** and which the Phase 221 branch structurally could not see — without it a working MCP
+file source with zero action tools reads `✓ Ready` from the generic `last_check_verdict === "ok"`
+fallback, the Microsoft-365 over-claim alive on the family this phase adds. ⛔ **It cannot reach a
+capability row**: `slack` / `smtp` / `jira` are not registered source families, so `isSourceCapable`
+is false for them at any tool count and the three byte-for-byte row pins stay green. That
+containment is a test that composes the REAL predicate over the REAL families list, not a
+hand-picked boolean. ⚠ **A separate over-claim was FOUND AND LEFT:** a `dropbox_drive` static_key row
+with zero tools and `last_check_verdict: "ok"` reads `✓ Ready` today, from the same generic fallback
+Phase 221 closed only for `oauth_byo`. Out of scope for `BUG-260907-01` and reported rather than
+silently widened; the case here pins only that it can never claim the NEW word.
+
+**`frontend/src/components/settings/ConnectionsTab.tsx`** — `sourceFamilies?: string[] | null` on
+the view, defaulting `null`, threaded to `ConnectionRow` at all three mount sites; the container
+reads `listSourceFamilies()` on `requestKey`, beside the connections read, so the two facts a
+verdict is built from arrive from the same generation. ⚠ **The `.catch` sets `null`, never `[]`** —
+an empty array asserts *"the server publishes no source families"* and would let a failed fetch
+assert something, while `null` says *"we were not told"*. ⭐ **The three byte-for-byte WIDE row pins
+are untouched BECAUSE of the fail-closed default**: they render without the prop, so the new input
+cannot move them. `source_only` takes `text-success` and the success dot — a warning colour beside a
+good word is half the defect left standing.
+
+**`frontend/src/components/settings/ConnectionFormPanel.tsx`** — one handler, `handleDiscoverTools`,
+closing **F-6** from `239-02-SUMMARY.md`. Wave 2's detection works: the server writes
+`config["source_tools"]` in the same UPDATE as `discovered_tools`. But the discover route returns
+only the TOOL LIST, and the seeding effect early-returns on an unchanged `mode:id` key — its own
+shipped comment says so — so **the binding landed in the database and both dropdowns kept reading
+"Not set" until the panel was closed and reopened.** Nothing was lost; the feedback was. The handler
+now re-reads the saved row and seeds the three source draft fields. ⛔ **EMPTY SLOTS ONLY:** a local
+value the person just chose has never reached the server, and overwriting it would be the wipe
+`239-02` closed, in a new costume. ⚠ **The re-read failing is SILENT on purpose** — the discovery
+itself succeeded and its tools are on screen; a worded error would report a failure of something
+nobody asked for, and blanking the panel would lose the result they did ask for.
+
+**`frontend/src/lib/api/org.ts`** — `auth_type` gains `"mcp"`. ⚠ **THE THIRD WIRE-TYPE DRIFT IN THIS
+ONE FILE** (Phase 215's five OAuth fields, then `custom_client_id`, now this). The backend's
+`AuthType` has read `Literal["static_key", "oauth_byo", "mcp"]` since Phase 239, and
+`services/sources/base.py` resolves a row's SOURCE ADAPTER from it. A client union that cannot spell
+the value makes `auth_type === "mcp"` a `tsc` error rather than a check, so the one comparison that
+decides whether an MCP server is browsable could not be written at all. **A wire type that has
+drifted from its model does not fail — it just refuses to describe reality.**
+
+---
+
 ## Scan list — THE AUTHORITATIVE ROW SET
 
 > **Moved here from `CLAUDE.md` on 2026-09-06.** That file now carries the G-5 rule, the re-derive
@@ -8840,14 +8950,14 @@ cells rot within days.
 | [`frontend/src/components/workflows/library/runFacts.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryrunfactsts) | 4 / 1 / 260 | no (1 phase) | young (192.2) |
 | [`frontend/src/components/workflows/library/relativeChanged.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryrelativechangedts) | 2 / 2 / 137 | no (2 phases) | young (192.1, 192.2) |
 | [`frontend/src/main.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcmaintsx) | 3 / 1 / 10 | no (1 phase) | young (192.2) |
-| [`frontend/src/components/settings/ConnectionsTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectionstabtsx) | 23 / 8 / 1578 | ⚠ **FIRES** | ⚠ the row was STALE at `17 / 7 / 1477`. honoured by construction (**221-02**) — one state map + one prop through three mount sites |
-| [`frontend/src/components/settings/ConnectionFormPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectionformpaneltsx) | 17 / 7 / 2376 | ⚠ **FIRES** | ⚠ the row was STALE at `9 / 5 / 2009`. honoured by construction (212 / **221**) — 221-01 adds ONE prop at the one mount site |
+| [`frontend/src/components/settings/ConnectionsTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectionstabtsx) | 25 / 9 / 1635 | ⚠ **FIRES** | ⚠ row STALE TWICE (`17 / 7 / 1477`, then `23 / 8 / 1578`). honoured by construction (221-02 / **239-03**) — one prop through three mount sites, twice over. See §239-03 |
+| [`frontend/src/components/settings/ConnectionFormPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectionformpaneltsx) | 24 / 10 / 2545 | ⚠ **FIRES** | ⚠ row STALE TWICE (`9 / 5 / 2009`, then `17 / 7 / 2376`). honoured by construction (212 / 221 / **239-03**) — 239-03 changes ONE handler, `handleDiscoverTools` (F-6). See §239-03 |
 | [`frontend/src/components/settings/ConnectionGrantsList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectiongrantslisttsx) | 5 / 2 / 259 | no (2 phases) | 344 → 222 (221-01) → **259**. The availability slot is a CHILD it forwards, not markup it owns |
-| [`frontend/src/lib/api/org.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiorgts) | 6 / 4 / 562 | ⚠ **FIRES** | ⚠ absent for its ENTIRE LIFE at **4 phases** — row added 221. **NOT covered by `lib/api.ts`'s row: that row is the BARREL** |
+| [`frontend/src/lib/api/org.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiorgts) | 11 / 8 / 629 | ⚠ **FIRES** | ⚠ absent for its ENTIRE LIFE at **4 phases** — row added 221, then STALE at `6 / 4 / 562`. **NOT covered by `lib/api.ts`: that row is the BARREL.** ⚠ THIRD wire-type drift here. See §239-03 |
 | [`backend/app/services/connectors/service_tools.py`](docs/HOT-FILE-LEDGER.md#backendappservicesconnectorsservice_toolspy) | 11 / 1 / 2018 | no (1 phase) | row added 221. Re-derived 232: 2018 L; internal Google Drive tools delegate to sources adapter |
 | [`backend/app/services/connectors/grants.py`](docs/HOT-FILE-LEDGER.md#backendappservicesconnectorsgrantspy) | 1 / 1 / 92 | no (1 phase) | ⚠ absent — row added 221. It is THE grant-time gate: 92 L deciding every connector call |
-| [`frontend/src/components/settings/connectionsCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectionscopyts) | 13 / 7 / 737 | ⚠ **FIRES** | no seam proposed — a vocabulary doing one thing many times is the right shape |
-| [`frontend/src/components/settings/connectionFormCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectionformcopyts) | 7 / 5 / 968 | ⚠ **FIRES** | no seam proposed — the same verdict as its sibling |
+| [`frontend/src/components/settings/connectionsCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectionscopyts) | 15 / 8 / 784 | ⚠ **FIRES** | no seam proposed — a vocabulary doing one thing many times is the right shape. ⚠ row was STALE at `13 / 7 / 737`. honoured by construction (**239-03**): one word, one union member. See §239-03 |
+| [`frontend/src/components/settings/connectionFormCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectionformcopyts) | 15 / 8 / 1216 | ⚠ **FIRES** | no seam proposed — the same verdict as its sibling |
 | [`frontend/src/pages/SettingsPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagessettingspagetsx) | 38 / 21 / 1500 | ⚠ **FIRES** | ✅ **the 212-close re-open trigger has now FIRED** (SEED-227 names it) — honoured by construction: one SectionCard added beside Retrieval, no branch touched |
 | [`frontend/src/components/settings/ModelPillRow.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsmodelpillrowtsx) | 4 / 3 / 141 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent for its entire life — row added 2026-08-27 at 212's close, same D-22 pair as `SettingsPage.tsx` |
 | [`frontend/src/components/settings/servicesCatalog.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsservicescatalogts) | 2 / 1 / 211 | no (1 phase) | young (212) — the presentation lookup migration 127's `service_id` COMMENT names |
@@ -8861,8 +8971,8 @@ cells rot within days.
 | [`frontend/src/components/workflows/McpToolPicker.reachability.test.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsmcptoolpickerreachabilitytesttsx) | 1 / 1 / 316 | no (1 phase) | young (206.2) |
 | [`backend/app/models/connector.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsconnectorpy) | 22 / 13 / 732 | ⚠ **FIRES** | ⚠ row was STALE at `18 / 10 / 676`. honoured by construction (**239**) — `source_tools` added to `McpConfig`; omitting it is the SEED-239 org-wide outage, not a local one |
 | [`backend/app/services/mcp_client.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmcp_clientpy) | 7 / 5 / 480 | ⚠ **FIRES** | ⚠ row was STALE at `4 / 2 / 407` and said `no (2 phases)` — present and WRONG, so it answered the auditor. Byte-unchanged by 239; the sanitizer allow-list did not need widening |
-| [`backend/app/api/connectors.py`](docs/HOT-FILE-LEDGER.md#backendappapiconnectorspy) | 33 / 16 / 1879 | ⚠ **FIRES** | ⚠ **extraction still OWED and the file GREW again** (1757→1879 at 233: two preview routes). The named seam is unchanged |
-| [`backend/app/security/egress.py`](docs/HOT-FILE-LEDGER.md#backendappsecurityegresspy) | 10 / 3 / 938 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | honoured by construction (232): Google Drive read/export pins; docstrings updated to source contract |
+| [`backend/app/api/connectors.py`](docs/HOT-FILE-LEDGER.md#backendappapiconnectorspy) | 39 / 18 / 2051 | ⚠ **FIRES** | ⚠ **extraction still OWED and the file GREW again** (1757→1879 at 233: two preview routes). The named seam is unchanged |
+| [`backend/app/security/egress.py`](docs/HOT-FILE-LEDGER.md#backendappsecurityegresspy) | 13 / 5 / 982 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | honoured by construction (232): Google Drive read/export pins; docstrings updated to source contract |
 | [`backend/app/services/google/availability.py`](docs/HOT-FILE-LEDGER.md#backendappservicesgoogleavailabilitypy) | 0 / 0 / 277 | no (new) | young (221-02) — the per-application probe. ⚠ It imports `_http`'s parser and writes NO second one |
 | [`backend/app/services/google/writes.py`](docs/HOT-FILE-LEDGER.md#backendappservicesgooglewritespy) | 2 / 1 / 625 | no (1 phase) | ⚠ absent for its entire life — row added 221-02, which found `create_event` REFUSING every naive local time |
 | [`frontend/src/components/settings/applicationAvailability.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsapplicationavailabilityts) | 0 / 0 / 152 | no (new) | young (221-02) — server decides the STATE, this decides the WORDS. It classifies nothing |
@@ -8895,7 +9005,7 @@ cells rot within days.
 | [`frontend/src/components/workflows/stepIdentityVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsstepidentityvocabularyts) | 1 / 1 / 206 | no (1 phase) | young (214-11) — ⚠ its six PAUSE sentences are consumed by NOTHING (`SEED-219`) |
 | [`frontend/src/lib/api/knowledge.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiknowledgets) | 2 / 2 / 803 | no (2 phases) | young (207 split, 214) — ⚠ **NOT covered by `lib/api.ts`'s row: that row is the BARREL** |
 | [`frontend/src/lib/api/threads.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapithreadsts) | 7 / 3 / 1683 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | young (207 split, 214) — ⚠ **NOT covered by `lib/api.ts`'s row: that row is the BARREL** |
-| [`frontend/src/lib/api/connectors.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiconnectorsts) | 12 / 7 / 690 | ⚠ **FIRES** | honoured by construction (**233**) — two functions over one shared `postPreview` helper. **`lib/api.ts`'s row is the BARREL, not this module** |
+| [`frontend/src/lib/api/connectors.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiconnectorsts) | 16 / 10 / 718 | ⚠ **FIRES** | honoured by construction (**233**) — two functions over one shared `postPreview` helper. **`lib/api.ts`'s row is the BARREL, not this module** |
 | [`frontend/src/lib/api/workflows.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiworkflowsts) | 4 / 4 / 1081 | ⚠ **FIRES** | ⚠ absent until 214; the 207 split created it with NO row. **`lib/api.ts`'s row is the BARREL, not these modules.** 214.1: docblock only, zero behaviour |
 | [`frontend/src/lib/connectionMark.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclibconnectionmarktsx) | 7 / 4 / 313 | ⚠ **FIRES** | ✅ **the move IS the seam, and it was TAKEN (214-08)** — `settings/` → `lib/`; four run + canvas surfaces now import ONE map |
 | [`frontend/src/components/ingestion/DocumentList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestiondocumentlisttsx) | 24 / 13 / 294 | ⚠ **FIRES** | ✅ **seam TAKEN (217.1-05)** — `DocumentRow.tsx` extracted with the sketch's five affordances (−315 L). ⚠ 7-column order still load-bearing: `LibraryPage` sheds cols 3–5 by `nth-child` |
@@ -8964,5 +9074,6 @@ cells rot within days.
 | [`backend/app/services/sources/adapters/microsoft_graph.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesadaptersmicrosoft_graphpy) | 0 / 0 / 352 | no (new) | young (238) — **352 L against `google_drive.py`'s 399**, the SC#4 yardstick. ⛔ The 302 dance is sealed in here: never `/content`, two egress keys, no Authorization on the download |
 | [`backend/app/services/sources/adapters/mock_source.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesadaptersmock_sourcepy) | 2 / 1 / 177 | no (1 phase) | ⚠ absent for its entire life — row added 238. It is where the SEED-253 invariant is ANCHORED: a `path` names a folder, never a filename |
 | [`backend/app/services/sources/__init__.py`](docs/HOT-FILE-LEDGER.md#backendappservicessources__init__py) | 5 / 3 / 40 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ row was STALE at `2 / 1 / 26` and read `no (1 phase)`. The ONE eager-import site — an adapter absent here is unregistered, so the list is load-bearing |
-| [`frontend/src/components/sources/sourceCapability.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcessourcecapabilityts) | 0 / 0 / 38 | no (new) | young (238) — the ONE answer to *can this connection be browsed?*, replacing two copies of an `includes("google")` guess. ⛔ Fails CLOSED on `null`: unknown is not permission |
+| [`frontend/src/components/sources/sourceCapability.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcessourcecapabilityts) | 2 / 2 / 98 | no (2 phases) | ⚠ row was STALE at `0 / 0 / 38`. young (238 / **239**) — the ONE answer to *can this connection be browsed?*. ⛔ Fails CLOSED on `null`: unknown is not permission. See §239-03 |
 | [`backend/app/services/sources/adapters/mcp_source.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesadaptersmcp_sourcepy) | 2 / 1 / 643 | no (1 phase) | young (239) — the FOURTH family and the first that is a PROTOCOL. ⛔ Tool names are a ROW (`config["source_tools"]`), never a branch. Opens no socket; all egress via `mcp_client` |
+| [`frontend/src/components/settings/connectionRowVerdict.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectionrowverdictts) | 2 / 2 / 99 | no (2 phases) | ⚠ **absent for its entire life — row added 239-03, and the ledger gate FAILED on it at this phase's base.** young (221 / 239). The row's verdict, DERIVED never stored. See §239-03 |
