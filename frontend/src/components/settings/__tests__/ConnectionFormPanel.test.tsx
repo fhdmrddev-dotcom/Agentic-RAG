@@ -3037,8 +3037,13 @@ describe("Phase 212 · interactive discovery in MCP mode (D-4 / D-5)", () => {
       expect(screen.getByTestId("connection-discovered-tools")).toBeInTheDocument()
     })
     expect(screen.getByPlaceholderText(GRANTS_COPY.SEARCH_PLACEHOLDER(2))).toBeInTheDocument()
-    expect(screen.getByText("github_search")).toBeInTheDocument()
-    expect(screen.getByText("github_issue")).toBeInTheDocument()
+    // ⚠ SCOPED TO THE GRANTS BLOCK (Phase 239). A bare `getByText` was ambiguous from the
+    // moment a SECOND surface started naming the same tools: the file-source binding picker
+    // renders each discovered name as an `<option>`, so `github_search` now matches twice.
+    // The assertion always meant *"the grants list names it"*; it now says so.
+    const discovered = within(screen.getByTestId("connection-discovered-tools"))
+    expect(discovered.getByText("github_search")).toBeInTheDocument()
+    expect(discovered.getByText("github_issue")).toBeInTheDocument()
     expect(mockProbe).toHaveBeenCalledWith({
       mcp_server_url: "https://mcp.github.com/v1",
       secret: undefined,
@@ -3068,7 +3073,10 @@ describe("Phase 212 · interactive discovery in MCP mode (D-4 / D-5)", () => {
     expect(mockDiscover).toHaveBeenCalledWith("conn_github_123")
     expect(mockProbe).not.toHaveBeenCalled()
     expect(screen.getByPlaceholderText(GRANTS_COPY.SEARCH_PLACEHOLDER(2))).toBeInTheDocument()
-    expect(screen.getByText("add_issue_comment")).toBeInTheDocument()
+    // Scoped for the reason given in the create-mode case above.
+    expect(
+      within(screen.getByTestId("connection-discovered-tools")).getByText("add_issue_comment"),
+    ).toBeInTheDocument()
   })
 
   it("⭐ D-4 — a TYPED secret does NOT send an existing row back to the probe: a saved row always reports on what is STORED", async () => {
