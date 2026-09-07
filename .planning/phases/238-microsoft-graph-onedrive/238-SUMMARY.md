@@ -175,6 +175,13 @@ old figures, never over them; **a growing number is the gate working.**
    `my.microsoftpersonalcontent.com`, not the `files.1drv.com` the reference prints, and the
    `graph_download` allow-list refused it. Both fixed. Corrected UAT table and full evidence in
    `238-VERIFICATION.md`.
+   ⚠ **A THIRD defect followed once the product-level rows ran:** `metadata.source` has **two**
+   writers — the watch loop and the manual import door — and D-238-07.4 fixed only the first. So
+   every HAND-IMPORTED document had no `path` while watched ones did, which is SEED-253's
+   original defect alive on the door most people actually use. Two OneDrive files landing four
+   minutes apart through two doors is what exposed it. ⭐ **Fixing one writer of a fact reads
+   exactly like fixing the fact**, and every per-writer test passed throughout — so the new fence
+   asserts over the SET of writers rather than one of them.
    ⭐ **Why the unit suite could not see either is the durable lesson: the fakes were mine, so
    they agreed with my implementation rather than with Graph.** The test that asserted
    `$select` *contained* the annotation has been inverted to pin its ABSENCE.

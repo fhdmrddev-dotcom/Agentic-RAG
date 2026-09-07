@@ -721,6 +721,11 @@ async def confirm_preview(
                 folder_id=destination_folder_id,
                 external_id=item.external_id,
                 source_version=item.modified_at,
+                # SEED-253 / D-238-07.4 — the preview already resolved this file's real folder
+                # path (adapter-supplied, or the walk's breadcrumb). Handing it to the importer
+                # is what makes a folder-shaped rule work for a hand-imported document, not
+                # only for a watched one.
+                source_path=item.path,
                 source_system=system,
             )
         except Exception as exc:  # noqa: BLE001 — a refusal is NAMED, never a silent drop

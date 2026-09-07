@@ -77,6 +77,32 @@ def test_ingest_enrich_no_longer_fabricates_a_path():
     )
 
 
+def test_EVERY_writer_of_metadata_source_carries_the_path_key():
+    """⭐ THE TEST THAT WOULD HAVE CAUGHT THE 2026-09-07 LIVE MISS.
+
+    `metadata.source` has TWO writers — `watch_service` (the scheduled loop) and
+    `import_service.import_single_file` (the door a person clicks in Library -> Add files).
+    Phase 238 added the `path` key to the first and missed the second, so two OneDrive files
+    landed in the same Library minutes apart and only the watched one carried a folder path.
+    A folder-shaped rule silently never matched anything imported by hand.
+
+    ⚠ The miss was invisible to every per-writer test, because each writer did what its own
+    test asked. **The claim that needs pinning is about the SET of writers**, which is why this
+    asserts over a list rather than in two separate cases — adding a third writer without its
+    `path` key fails here."""
+    writers = {
+        "app/services/watch_service.py": '"path": item.path,',
+        "app/services/sources/import_service.py": '"path": source_path,',
+    }
+    for rel, needle in writers.items():
+        src = (BACKEND / rel).read_text(encoding="utf-8")
+        assert '"external_id"' in src, f"{rel} is no longer a metadata.source writer — update this test"
+        assert needle in src, (
+            f"{rel} writes metadata.source WITHOUT a path key. Both writers must carry it, or "
+            "a document's folder is known through one door and unknown through the other."
+        )
+
+
 def test_watch_service_writes_the_path_key_into_metadata_source():
     """⚠ The key was ABSENT, which made `ingest_enrich`'s path arm dead code: the fix at one
     end only works because the other end now supplies the fact."""

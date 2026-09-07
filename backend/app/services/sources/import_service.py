@@ -177,6 +177,7 @@ async def import_single_file(
     external_id: str | None = None,
     source_version: str | None = None,
     source_system: str | None = None,
+    source_path: str | None = None,
 ) -> dict[str, Any]:
     """Download a single file from a connected source and mint it into Library.
 
@@ -216,6 +217,20 @@ async def import_single_file(
                 "system": (source_system or "").strip().lower() or None,
                 "external_id": str(external_id),
                 "version": source_version,
+                # ⚠ `path` WAS MISSING HERE AND THE OMISSION WAS FOUND BY A LIVE DRIVE
+                # (2026-09-07, SEED-253 / D-238-07.4). Phase 238 added this key to
+                # `watch_service`'s writer and MISSED THIS ONE — so two OneDrive files landed
+                # in the same Library minutes apart, and only the watched one carried a folder
+                # path. The manual import door is the one a person actually clicks, so a
+                # folder-shaped rule silently never matched anything imported by hand.
+                #
+                # ⭐ THE SHAPE OF THE MISS IS THE LESSON: there are TWO writers of
+                # `metadata.source`, and fixing one reads exactly like fixing the fact. Grep
+                # for the sibling writer before believing a metadata fix is complete.
+                #
+                # `None` stays `None` — Drive supplies no path, and an absent path must not be
+                # fabricated into a filename (the whole of SEED-253).
+                "path": source_path,
             }
         }
 

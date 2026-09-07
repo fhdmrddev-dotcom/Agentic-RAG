@@ -154,6 +154,32 @@ fail-closed on an unexpected server-supplied host and NAMED it, so a wrong-host 
 one-line diagnosis instead of a silent empty file. An over-broad allow-list would have swallowed
 this; a too-narrow one costs a clear error naming what to add.
 
+### Defect 3 — only ONE of the two `metadata.source` writers got the `path` key
+
+Found by two OneDrive files landing in the same Library four minutes apart through **different
+doors**, and only one carrying a folder path:
+
+```
+17:46  BAckend - Unicorn commands README.pdf        path = None                       <- manual import
+17:50  Practical_Project_Management_Guide.docx      path = /Attachments/Practical…    <- watch loop
+```
+
+`metadata.source` has **two** writers: `watch_service` (the scheduled loop) and
+`import_service.import_single_file` (the door a person clicks in *Library → Add files*). Phase
+238's D-238-07.4 added `path` to the first and **missed the second**, so every hand-imported
+document had no folder fact and a folder-shaped rule silently never matched it — SEED-253's
+original defect, alive on the path most people actually use.
+
+⭐ **The shape of the miss is the lesson, not the miss:** fixing one writer of a fact reads
+exactly like fixing the fact. Every per-writer test passed, because each writer did what its own
+test asked. The new fence therefore asserts over the **set** of writers
+(`test_EVERY_writer_of_metadata_source_carries_the_path_key`), so a third writer added without
+the key fails rather than passing quietly.
+
+`source_path` is now threaded `preview → import_single_file → metadata.source`.
+
+---
+
 ---
 
 ## UAT — the G-4 table. DRIVEN LIVE unless marked otherwise.
@@ -161,18 +187,29 @@ this; a too-narrow one costs a clear error naming what to add.
 | # | Row | Status |
 |---|---|---|
 | M-1 | Connect a Microsoft 365 account → OAuth round trip completes, connection is `active` | ✅ **PASS.** Verified in the DB, not on screen: `service_id=microsoft · status=active · is_enabled=True · last_check_verdict=ok`. Token refresh re-driven after a secret rotation → 1440-char access token. |
-| M-2 | The Microsoft connection appears in the connected-source picker | ⛔ **OWED** — not clicked in the browser. Unit-covered by the families route (5 cases) + predicate (6 cases). |
+| M-2 | The Microsoft connection appears in the connected-source picker | ✅ **PASS, LIVE (operator).** ⭐ The row that validates 238-03: it appears because the server published `SourceRegistry`, not because a string was widened. The predicate never learned the word "microsoft" — so Phase 239's MCP family will appear with **no frontend change**. |
 | M-3 | Browse OneDrive, drill into a folder | ✅ **PASS, LIVE.** `browse(None)` → one virtual root; `browse("onedrive")` → **6 real folders** (Apps, Attachments, Desktop, Dokument, Pictures, Videos). |
-| M-4 | Preview a OneDrive folder → the same four buckets | ⛔ **OWED** — `list_files` is driven live (21 files in Desktop, 5 in Dokument, correct mime/size/`lastModifiedDateTime`), but the four-bucket preview surface was not exercised. |
+| M-4 | Preview a OneDrive folder → the same four buckets | ✅ **PASS, LIVE (operator).** Browsed and previewed through the product, then imported: `BAckend - Unicorn commands README.pdf` reached `status=completed`. ⚠ It is also the document that exposed **Defect 3** — it came through this door with `path=None`. |
 | M-5 | Files are read through the two-step download | ✅ **PASS, LIVE — and it is the row that found both defects.** After fixing: `Antigravity.lnk`, **1395 bytes**, head `4c 00 00 00 01 14 02 00` (the Windows shell-link magic), **size matches the listing exactly**. Two calls, `graph_read` then `graph_download`, against the real CDN host. |
-| M-6 | A watch runs on schedule and brings in a new file | ⛔ **OWED** — no watch created. |
+| M-6 | A watch runs on schedule and brings in a new file | ✅ **PASS, LIVE.** A real watch on OneDrive `/Attachments`, every 15 min, `is_active=True`. Two runs, both `status=success`, **`listing_complete=True`** (H-5's fail-closed flag genuinely true, not defaulted), `count_new=1`, `count_errors=0`. The document arrived at `status=completed` carrying `path=/Attachments/Practical_Project_Management_Guide_Recreated.docx`. |
 | M-7 | Delete at source → the Library document is NOT deleted | ⛔ **OWED.** ⚠ And the standing Phase 235 gap holds: **no stopped source has ever been observed in this product, for any family.** |
 | M-8 | Disconnect → watching freezes, nothing is deleted | ⛔ **OWED.** |
-| M-9 | A `path contains '/Finance/'` rule fires for a file that IS in that folder | ⚠ **HALF PASS.** The *fact* is real and live — `SourceFile.path` came back as `/Dokument/Chapter 5 Full Draft.docx`, a genuine folder path from `parentReference.path`, exactly what SEED-253 was planted about. The *rule* was not created, so end-to-end matching is still owed. |
+| M-9 | A `path contains '/Finance/'` rule fires for a file that IS in that folder | ⚠ **HALF PASS, and stronger than before.** The fact is now real **in the database**, not only in the adapter: a watched document carries `metadata.source.path = /Attachments/Practical_Project_Management_Guide_Recreated.docx`. ⛔ The *rule* was still not created, so end-to-end matching remains owed — and it must be re-driven through the **manual import** door too, since that arm was broken until Defect 3 was fixed. |
 | **S-1** | Browse a SharePoint document library | ⛔ **BLOCKED — `SEED-256`.** No M365 work/school tenant; a personal account has no `/sites/` to address. ⚠ The live drive CONFIRMS the account kind: `check()` returned `drive_type: personal`. |
 | **S-2** | `Sites.Read.All` self-consent vs admin approval in an enterprise tenant | ⛔ **BLOCKED — `SEED-256`.** Unresolved and un-softened. |
 
-**4 rows driven (2 full pass, 1 half, 1 with real underlying evidence) · 5 owed · 2 blocked · 0 claimed.**
+**7 rows driven (6 full pass, 1 half) · 2 owed (M-7, M-8) · 2 blocked (S-1, S-2) · 0 claimed.**
+
+⚠ **Dedup verified rather than assumed.** Two watch runs each reported `count_new=1`, which looks
+like a re-import. It is not: the two documents carry **distinct `external_id`s**, a
+`group by external_id having count(*) > 1` returns **no rows**, and both items sit `present` in
+`connector_watch_items` with the correct `source_version`. ⚠ Recorded as an observation, not a
+claim: the run-count bookkeeping is slightly odd (one document predates both runs), which matters
+only if those counters are ever used for reporting.
+
+⛔ **M-7 and M-8 remain the honest gap, and it is the same one Phase 235 recorded:** deletion and
+disconnect behaviour has **never been observed for any source family in this product**. Driving
+M-7 needs a file deleted at the source; M-8 needs a live integration disabled. Neither was done.
 
 ⚠ **`Files.Read.All` self-consented on a personal account with no admin prompt** — D-238-04's
 prediction, now measured rather than inferred.
