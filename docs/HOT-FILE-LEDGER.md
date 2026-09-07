@@ -8390,6 +8390,203 @@ Phase 237 added `ruleScope` support, restricting available field choices to arri
 
 ---
 
+# Phase 239 — "Any MCP server with files" (2026-09-07)
+
+## backend/app/services/sources/adapters/mcp_source.py
+
+**1 / 1 / 644** · no (1 phase: 239) · the MCP file-source adapter — the FOURTH source family,
+and the first that is a **protocol** rather than a named service.
+
+⭐ **THE POINT OF THE FILE IS WHAT IS NOT IN IT.** MCP file servers disagree about names —
+`list_directory` / `list_files` / `ls`, `read_file` / `cat` / `get_file_contents`. The obvious
+implementation is a table of known servers and an `elif` per dialect, and that is exactly the
+outcome the milestone's binding constraint forbids: it makes *connecting a new server* a code
+change, a review, a deploy. So the vocabulary is a ROW — `config["source_tools"]`, three
+optional string keys (`list_tool`, `read_tool`, `root_path`) validated by `McpConfig` — read
+here with the filesystem-server defaults as **per-key** fallbacks. A row naming only its reader
+keeps the default lister; a half-configured connection that silently stops browsing is worse
+than one that never started.
+
+⚠ **THE TEST SUITE PARAMETRIZES A VOCABULARY THIS REPOSITORY DOES NOT CONTAIN** (`ls`/`cat`), and
+so does the conformance fixture. A suite exercising only `list_directory`/`read_file` would
+agree with the implementation instead of with the claim, and would pass even if the binding
+were ignored outright.
+
+**Invariants — every one of them a thing that has gone wrong somewhere before:**
+
+- ⛔ **No socket of its own.** All egress funnels through `mcp_client`, which enforces
+  `validate_mcp_destination`, pins the resolved IP against DNS rebinding while keeping the TLS
+  SNI hostname, refuses redirects and disables proxy env (TM-239-01). A structural fence refuses
+  the imports (`httpx`, `requests`, `urllib`, `aiohttp`, `socket`, `egress`) that would allow it.
+- ⛔ **A server-advertised hint decides nothing** (TM-239-02). `readOnlyHint` and `annotations`
+  are authored by the REMOTE end; they may be shown to a person, never used to widen a permission
+  or skip a confirmation. Fenced structurally, because a behavioural test can only check the
+  hints somebody thought to send.
+- ⛔ **`isError` is a FIELD on a 200, not an exception.** Ignoring it makes a listing error an
+  EMPTY listing — which is what the H-5 deletion guard consumes — and makes a read error the
+  sentence *"Error: permission denied"* minted as a document, embedded, and later answered out
+  of the knowledge base as though the file had said it.
+- ⛔ **Empty content is refused, never returned as `b""`.** A zero-byte file is legal and an
+  unreadable file is not, and the two must not look alike: a silent `b""` is minted as an empty
+  document and reads as a successful sync forever after.
+- ⚠ **`MAX_FILE_BYTES` (25 MB, matching Drive and Graph) is measured on the DECODED payload**,
+  because base64 inflates by 4/3 — a check on the encoded string would refuse a legal payload and,
+  in the direction that matters, admit one a third over.
+- ⚠ **THE 25 MB CEILING IS NOT THE BINDING CONSTRAINT AND SAYING SO IS THE HONEST PART.**
+  `mcp_client.MAX_MCP_BODY_BYTES` is **2 MB** on the whole JSON-RPC response, so a file over
+  roughly **1.5 MB** is refused upstream and this ceiling cannot fire on this transport as
+  configured. A ceiling nobody can reach is not a ceiling; whoever raises the client cap must
+  find this note.
+- ⚠ **`next_page_token` is always `None`, deliberately.** `list_directory` is ATOMIC — the MCP
+  spec defines no cursor for it — so `None` is the contract-conformant answer, and minting a
+  token would make `watch_service`'s loop re-issue a call returning the same page forever.
+  `page_size` is consequently ADVISORY: slicing an atomic listing client-side would trade H-5's
+  real completeness guarantee for a cosmetic one.
+- ⚠ **`virtual_root`, never `""`.** The conformance suite requires a non-empty `SourceNode.id`,
+  and an empty root id makes `browse(root)` indistinguishable from `browse(None)` — a picker
+  walking down from what it was handed would loop forever. The sentinel is shared with
+  `microsoft_graph.py` so a client that handles one virtual root handles this one.
+
+⭐ **D-239-06 — the version key, and where the derivation STOPS.** `watch_service`'s modification
+branch is `if item_mod and existing_ver and item_mod != existing_ver`, so an empty version means
+a file is never seen to change, silently, forever. When a server states no timestamp the version
+falls back to `size:{n}` — derived from something that actually moves when the file does. ⛔ It
+stops there. The tempting third arm is a hash of the PATH: deterministic, looks exactly like a
+version, and NEVER CHANGES — so it would report "unchanged" for every future edit while appearing
+to work. That is SEED-253's fabrication failure one column over, and it is worse than absence
+because absence is legible.
+
+⭐ **BOTH STRUCTURAL FENCES WERE DRIVEN RED AGAINST DEFECTS PLANTED IN THIS FILE**, not merely
+against test strings, and the file was restored md5-identical (`f70f9308…`): a planted
+`import httpx` and a planted `config.get("annotations").get("readOnlyHint")` branch, each named
+by line number. A guard nobody has seen fire is not a guard.
+
+**Named seam for the next refactor:** the parser (`_parse_listing`, `_entry_from_item`,
+`_decode_content` and the `_DIR_WORDS` / `_TIME_KEYS` / `_NAME_KEYS` / `_PATH_KEYS` tables) is a
+pure wire-format module with no I/O and no connection knowledge. If a second protocol adapter
+arrives, that is the half to lift — not the contract methods.
+
+---
+
+## backend/app/services/sources/base.py
+
+**9 / 5 / 336** · ⚠ **FIRES** (239, 238, 237, 234, 232) · the source contract and registry.
+
+⚠ **THE ROW WAS STALE AT `6 / 3 / 198` and this file had no detail section at all** — it carried
+a row from Phase 238 and never got the same-commit half. Both are repaired here.
+
+⚠ **PHASE 238's HEADLINE CLAIM ABOUT THIS FILE IS NOW SPENT, and it is recorded rather than
+overwritten.** The 238 row read *"⭐ BYTE-UNCHANGED by 238's adapter, which is SC#4's single
+strongest evidence"* — a genuine and well-earned result. Phase 239 changed it. **That is not a
+regression of 238's finding; it is the boundary of it.** A third *service* needed no contract
+change; a first *protocol* did, because a registry keyed only on exact `service_id` can never
+resolve a server whose id is whatever the person setting it up happened to type.
+
+⭐ **WHAT WAS ADDED IS DATA, WHICH IS THE ONLY REASON IT IS ACCEPTABLE HERE.**
+`PROTOCOL_ADAPTERS: dict[str, str]` and `CONFIG_PROTOCOL_MARKERS: dict[str, str]`, plus
+`_protocol_of()` reading them. This is precisely what this module's own note over the deleted
+`_ensure_registered` asked for, verbatim: *"make the routing DATA (a dict keyed by service_id)
+rather than control flow."* A second protocol is a ROW in one of two dicts. The moment it becomes
+an `elif`, this file has repeated the mistake it documents.
+
+**Invariants:**
+
+- ⚠ **The protocol arm is STRICTLY a fallback, below the exact `service_id` lookup.** A
+  first-party family that also carried a protocol marker must keep its own adapter, or this is a
+  hijack. Pinned by `test_an_exact_service_id_still_wins`.
+- ⚠ **It sits BELOW the `is_enabled` gate.** A resolution arm placed above it would re-open
+  BUG-260907-03 for exactly the family being added. Pinned by
+  `test_a_disabled_MCP_row_is_refused_BEFORE_the_protocol_arm`.
+- ⚠ **It still returns `None` for an unregistered non-protocol row.** A fallback that answers for
+  everything is not a fallback — it is `watch_service`'s deleted Drive default, which read a
+  Microsoft connection with the Google adapter and looked like a working sync.
+- ⚠ **A config marker must be a key only ONE protocol can write.** `source_tools` is declared on
+  `McpConfig` and nowhere else. A shared marker turns this table into a guess.
+- ⚠ **`config` is read as dict OR pydantic model.** `watch_service` hands a raw DB dict and
+  `api/connectors.py` a `ConnectorConnectionResponse` whose `config` is a MODEL; reading only
+  dicts would resolve every watch and no browse — one rule applied on one path out of two, which
+  is indistinguishable from the rule being absent for anyone using the other.
+- ✅ **`test_boundary_fence.py` stays 100% green (9/9).** `mcp` is a TRANSPORT — a first-class
+  member of `AuthType` beside `static_key` and `oauth_byo`, the same category of word as `https`,
+  not the same category as `onedrive`.
+
+---
+
+## backend/app/services/sources/__init__.py
+
+**5 / 3 / 40** · ⚠ **FIRES — EXACTLY AT THRESHOLD** (239, 238, 232) · the eager-import site.
+
+⚠ **THE ROW WAS STALE AT `2 / 1 / 26` AND SAID `no (1 phase)`** — a row that is present and wrong
+answers the auditor and stops the audit. It crossed the G-5 threshold at Phase 239 and the old
+row could not have said so.
+
+⚠ **THIS IMPORT LIST IS LOAD-BEARING, NOT TIDINESS.** `@SourceRegistry.register` only fires when
+its module is imported, and this eager list is exactly what let Phase 238 delete
+`_ensure_registered`'s lazy, provider-keyed import from inside the contract. An adapter left out
+here is unregistered and therefore unresolvable — `watch_service` raises `NotImplementedError`
+for a perfectly good connection and `api/connectors.py` answers an empty browse. Pinned by
+`test_the_eager_import_is_what_registers_it`, and by a boundary-fence check that derives the
+adapter set from the REGISTRY rather than from a hand-maintained list.
+
+---
+
+## backend/app/models/connector.py — Phase 239
+
+**22 / 13 / 732** · ⚠ **FIRES** · ⚠ row was STALE at `18 / 10 / 676`.
+
+Honoured by construction: `McpConfig` gained one field, `source_tools: dict[str, str] | None`.
+
+⛔ **OMITTING IT WOULD HAVE BEEN AN ORG-WIDE OUTAGE, NOT A LOCAL ONE — the identical defect
+Phase 222 shipped into the live database, one key over.** Every config model here is
+`extra='forbid'`, so a row carrying an undeclared key matches NO member of the `ConnectorConfig`
+union; `_to_response` validates rows INSIDE a list comprehension, so ONE source-bound connection
+makes **every connection in the org** unreadable — 503, and a page reading *"Nothing is wrong
+with them — this page could not read them."* (SEED-239 / TM-239-04.)
+
+**Driven RED before the field existed**, and the whole-list case with it, not just the leaf:
+`extra_forbidden` on `source_tools`. Phase 222's own note records that a leaf-only test stayed
+green through the entire live outage, because it was the UNION resolution that raised.
+
+**Invariants:**
+
+- ⚠ **`None` and `{}` are different.** Absent means nobody bound this connection to a file
+  surface; empty means somebody looked and named nothing. The adapter's fallbacks apply per KEY.
+- ⛔ **`dict[str, str]` is a constraint, not a shape note.** These values are interpolated into a
+  JSON-RPC `params.name` by `mcp_client.call_tool`; a nested object would reach the transport
+  before anything could refuse it.
+- ⛔ **Widening for a tool NAME did not reopen the secret hole.** `config` is readable by every
+  member of the org (migration 150 measured it), which is why `custom_client_secret` is still
+  refused two fields up. Pinned by
+  `test_widening_for_source_tools_did_not_reopen_the_secret_hole`.
+
+---
+
+## backend/app/services/mcp_client.py — Phase 239
+
+**7 / 5 / 480** · ⚠ **FIRES** (222, 212, 211, 209, 206).
+
+⚠ **THE ROW READ `4 / 2 / 407` AND `no (2 phases)` — present, WRONG, and wrong in the direction
+that stops an audit.** It claimed the guardrail did not fire on a file that has been over the
+threshold since Phase 222. This is the same class as CLAUDE.md's *"no MCP client exists in the
+backend today"*, which was false for thirteen days: the file, the seed and the prose are three
+registers and only one of them was ever updated.
+
+✅ **BYTE-UNCHANGED BY PHASE 239, and that is a finding rather than an absence of work.** The
+whole MCP source adapter — browse, list, read and check, against arbitrary servers with arbitrary
+tool vocabularies — was built on `call_tool` and `list_tools` **exactly as they already were**.
+In particular the `tools/list` sanitizer allow-list (D-211-09) **did not need widening**: the
+source adapter reads tool NAMES to verify a binding, and names are already forwarded. The
+phase's out-of-scope rule (*widen the allow-list if needed, never remove it or raw-spread it*)
+was therefore never exercised.
+
+⛔ **It remains the ONLY egress path for MCP**, and `mcp_source.py` carries a structural fence
+refusing the imports that would let it open a socket of its own.
+
+⚠ **Its 2 MB `MAX_MCP_BODY_BYTES` is the REAL file-size ceiling for MCP sources**, well below
+`mcp_source.MAX_FILE_BYTES` (25 MB). Anyone raising it must read that adapter's note.
+
+---
+
 ## Rows corrected at Phase 235 — every one was STALE, and three of them by whole phases
 
 ⚠ **These rows already existed and every one of them disagreed with git.** A row that is present and
@@ -8559,8 +8756,8 @@ cells rot within days.
 | [`frontend/src/components/workflows/McpToolPicker.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsmcptoolpickertsx) | 5 / 5 / 601 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | honoured by construction (211 / **214**) — net **−44 L** |
 | [`frontend/src/components/workflows/externalShapeVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsexternalshapevocabularyts) | 2 / 1 / 109 | no (1 phase) | young (206.2) |
 | [`frontend/src/components/workflows/McpToolPicker.reachability.test.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsmcptoolpickerreachabilitytesttsx) | 1 / 1 / 316 | no (1 phase) | young (206.2) |
-| [`backend/app/models/connector.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsconnectorpy) | 18 / 10 / 676 | ⚠ **FIRES** | ⚠ the row was STALE at `12 / 6 / 471`. honoured by construction (**233**) — five preview models added at the end; `bucket`/`outcome` are `Literal`s, so a fifth is a ValidationError |
-| [`backend/app/services/mcp_client.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmcp_clientpy) | 4 / 2 / 407 | no (2 phases) | young (211, 212) |
+| [`backend/app/models/connector.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsconnectorpy) | 22 / 13 / 732 | ⚠ **FIRES** | ⚠ row was STALE at `18 / 10 / 676`. honoured by construction (**239**) — `source_tools` added to `McpConfig`; omitting it is the SEED-239 org-wide outage, not a local one |
+| [`backend/app/services/mcp_client.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmcp_clientpy) | 7 / 5 / 480 | ⚠ **FIRES** | ⚠ row was STALE at `4 / 2 / 407` and said `no (2 phases)` — present and WRONG, so it answered the auditor. Byte-unchanged by 239; the sanitizer allow-list did not need widening |
 | [`backend/app/api/connectors.py`](docs/HOT-FILE-LEDGER.md#backendappapiconnectorspy) | 33 / 16 / 1879 | ⚠ **FIRES** | ⚠ **extraction still OWED and the file GREW again** (1757→1879 at 233: two preview routes). The named seam is unchanged |
 | [`backend/app/security/egress.py`](docs/HOT-FILE-LEDGER.md#backendappsecurityegresspy) | 10 / 3 / 938 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | honoured by construction (232): Google Drive read/export pins; docstrings updated to source contract |
 | [`backend/app/services/google/availability.py`](docs/HOT-FILE-LEDGER.md#backendappservicesgoogleavailabilitypy) | 0 / 0 / 277 | no (new) | young (221-02) — the per-application probe. ⚠ It imports `_http`'s parser and writes NO second one |
@@ -8660,8 +8857,9 @@ cells rot within days.
 | [`frontend/src/components/classification/ClassificationRulesPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsclassificationclassificationrulespagetsx) | 1 / 1 / 250 | no (1 phase) | row added 237 below threshold. Adds scope filter chips (All, Arrival, Extracted) and displays Arrival/Extracted badges. |
 | [`frontend/src/components/classification/RuleBuilderPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsclassificationrulebuilderpaneltsx) | 4 / 3 / 502 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | row added 237 at threshold. Adds scope selector segmented control; filters out-of-scope conditions on scope switch. |
 | [`frontend/src/components/ingestion/ConditionPopover.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestionconditionpopovertsx) | 3 / 2 / 404 | no (2 phases) | row added 237 below threshold. Restricts condition field choices to WATCH_FIELDS when ruleScope === 'watch'. |
-| [`backend/app/services/sources/base.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesbasepy) | 6 / 3 / 198 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent for its ENTIRE LIFE — row added 238. ⭐ **BYTE-UNCHANGED by 238's adapter**, which is SC#4's single strongest evidence. `_ensure_registered`'s provider branching DELETED here |
+| [`backend/app/services/sources/base.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesbasepy) | 9 / 5 / 336 | ⚠ **FIRES** | ⚠ row was STALE at `6 / 3 / 198`. 238's byte-unchanged claim is now SPENT: 239 added protocol resolution here. Routing stayed DATA (two dicts), never a branch |
 | [`backend/app/services/sources/adapters/microsoft_graph.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesadaptersmicrosoft_graphpy) | 0 / 0 / 352 | no (new) | young (238) — **352 L against `google_drive.py`'s 399**, the SC#4 yardstick. ⛔ The 302 dance is sealed in here: never `/content`, two egress keys, no Authorization on the download |
 | [`backend/app/services/sources/adapters/mock_source.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesadaptersmock_sourcepy) | 2 / 1 / 177 | no (1 phase) | ⚠ absent for its entire life — row added 238. It is where the SEED-253 invariant is ANCHORED: a `path` names a folder, never a filename |
-| [`backend/app/services/sources/__init__.py`](docs/HOT-FILE-LEDGER.md#backendappservicessources__init__py) | 2 / 1 / 26 | no (1 phase) | ⚠ absent for its entire life — row added 238. It is the ONE eager-import site; that is why `SourceRegistry` needs no lazy provider branch at all |
+| [`backend/app/services/sources/__init__.py`](docs/HOT-FILE-LEDGER.md#backendappservicessources__init__py) | 5 / 3 / 40 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ row was STALE at `2 / 1 / 26` and read `no (1 phase)`. The ONE eager-import site — an adapter absent here is unregistered, so the list is load-bearing |
 | [`frontend/src/components/sources/sourceCapability.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcessourcecapabilityts) | 0 / 0 / 38 | no (new) | young (238) — the ONE answer to *can this connection be browsed?*, replacing two copies of an `includes("google")` guess. ⛔ Fails CLOSED on `null`: unknown is not permission |
+| [`backend/app/services/sources/adapters/mcp_source.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesadaptersmcp_sourcepy) | 1 / 1 / 644 | no (1 phase) | young (239) — the FOURTH family and the first that is a PROTOCOL. ⛔ Tool names are a ROW (`config["source_tools"]`), never a branch. Opens no socket; all egress via `mcp_client` |
