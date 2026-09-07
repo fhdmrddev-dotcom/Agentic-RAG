@@ -178,6 +178,13 @@ import {
   SERVICE_PLACEHOLDER,
   SERVICE_SAVE_DISABLED_REASON,
   SERVICE_SUGGESTIONS,
+  SOURCE_TOOLS_DEFAULT_LIST,
+  SOURCE_TOOLS_DEFAULT_READ,
+  SOURCE_TOOLS_HEADING,
+  SOURCE_TOOLS_HELP,
+  SOURCE_TOOLS_LIST_LABEL,
+  SOURCE_TOOLS_READ_LABEL,
+  sourceToolUnsetLabel,
   configFromDraft,
   draftIsSavable,
   destinationFooterOf,
@@ -1632,6 +1639,93 @@ export function ConnectionFormPanel({
               grantsArePersisted={grantsArePersisted}
               connectionName={draft.name || draft.serviceId}
             />
+          </div>
+        )}
+
+        {/* ── Phase 239 (D-239-02) — WHICH TOOLS ON THIS SERVER READ FILES ───────────────
+             ⭐ Discovery guesses this, and a guess a person cannot see is a guess they
+             cannot correct. This is the only place `config["source_tools"]` is legible.
+
+             ⛔ `capability === "mcp"` IS A FENCE, NOT A LAYOUT CHOICE.
+             `sources/base.CONFIG_PROTOCOL_MARKERS` resolves ANY connection whose config
+             carries a non-empty `source_tools` to `McpSourceAdapter` — so offering this on a
+             Slack row would let a person hand a first-party connection to the MCP adapter,
+             which would then try to call a tool over a server URL that does not exist.
+
+             ⚠ The options are the SERVER'S OWN NAMES (TM-239-05, client half). Nothing here
+             invents a name; a value not in `probeResult` cannot be selected, and the backend
+             refuses one anyway (`reject_unoffered_source_tools`).
+
+             ⚠ NOT a `connection-field` — see `SOURCE_TOOLS_HEADING`'s note in the copy
+             module. §3b counts destination fields, and this is a binding editor. */}
+        {capability === "mcp" && probeResult && probeResult.length > 0 && (
+          <div
+            data-testid="connection-source-tools"
+            className="mb-3.5 rounded-lg border border-border bg-card/60 p-3"
+          >
+            <p className="text-xs font-semibold text-foreground">{SOURCE_TOOLS_HEADING}</p>
+            <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+              {SOURCE_TOOLS_HELP}
+            </p>
+            {(
+              [
+                {
+                  label: SOURCE_TOOLS_LIST_LABEL,
+                  slot: "list" as const,
+                  value: draft.sourceListTool,
+                  fallback: SOURCE_TOOLS_DEFAULT_LIST,
+                },
+                {
+                  label: SOURCE_TOOLS_READ_LABEL,
+                  slot: "read" as const,
+                  value: draft.sourceReadTool,
+                  fallback: SOURCE_TOOLS_DEFAULT_READ,
+                },
+              ]
+            ).map(({ label, slot, value, fallback }) => {
+              const controlId = `${fieldId}-source-${slot}`
+              return (
+                <div key={slot} className="mt-2.5">
+                  <label
+                    htmlFor={controlId}
+                    className="mb-1 block text-[11px] font-medium text-foreground"
+                  >
+                    {label}
+                  </label>
+                  {readOnly ? (
+                    // A control that could never do anything is REMOVED, not `disabled` —
+                    // the shipped 185 rule this panel already follows for every other field.
+                    <div
+                      id={controlId}
+                      data-testid="connection-field-static"
+                      className="font-mono text-[11px] text-muted-foreground"
+                    >
+                      {value || sourceToolUnsetLabel(fallback)}
+                    </div>
+                  ) : (
+                    <select
+                      id={controlId}
+                      value={value}
+                      onChange={(e) =>
+                        set(
+                          slot === "list"
+                            ? { sourceListTool: e.target.value }
+                            : { sourceReadTool: e.target.value },
+                        )
+                      }
+                      className="w-full rounded-md border border-border bg-card px-2 py-1.5 text-[13px] text-foreground focus:border-primary focus:outline-none"
+                    >
+                      <option value="">{sourceToolUnsetLabel(fallback)}</option>
+                      {probeResult.map((tool) => (
+                        <option key={tool.name} value={tool.name}>
+                          {tool.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              )
+            })}
           </div>
         )}
 

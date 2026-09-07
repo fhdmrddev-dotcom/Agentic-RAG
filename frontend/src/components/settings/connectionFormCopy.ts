@@ -443,6 +443,67 @@ export const MCP_SAVE_DISABLED_REASON =
  *  binds exactly one: the Name. There is no credential field, because an identified row with
  *  no reachable path has nothing to authenticate with until OAuth lands in Phase 215, and a
  *  password box offered for a credential that cannot yet be used is a lie the DOM holds. */
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// Phase 239 (D-239-01 / D-239-02) — the file-source binding, worded
+// ═══════════════════════════════════════════════════════════════════════════════════════
+//
+// ⭐ WHY IT IS VISIBLE AT ALL. Discovery guesses which tools list a directory and read a
+// file, and a guess a person cannot see is a guess they cannot correct. This section is the
+// only place the binding stored in `config["source_tools"]` becomes legible.
+//
+// ⚠ IT IS NOT A `connection-field`, DELIBERATELY. §3b binds a field COUNT per shape
+// (`FIELD_COUNTS` below) precisely so an extra destination field cannot appear unnoticed;
+// this is a binding editor over a list the server supplied, not a destination fact, and
+// counting it there would make the two contracts disagree about what a field is.
+
+export const SOURCE_TOOLS_HEADING = "File source mapping"
+
+/** ⚠ It says OPTIONAL and it says AUTOMATIC, in that order, because the honest reading is
+ *  "you probably do not need to touch this, and here is what happens if you do not". */
+export const SOURCE_TOOLS_HELP =
+  "If this server exposes files, name the tool that lists a folder and the tool that reads " +
+  "a file. Filled in automatically when actions are refreshed — change it here if the guess " +
+  "is wrong, or if this server words things its own way."
+
+export const SOURCE_TOOLS_LIST_LABEL = "Directory listing tool"
+export const SOURCE_TOOLS_READ_LABEL = "File content tool"
+
+/** ⚠ TWO COPIES OF ONE FACT, AND THE OTHER ONE IS AUTHORITATIVE. These mirror
+ *  `mcp_source.py`'s `DEFAULT_LIST_TOOL` / `DEFAULT_READ_TOOL`, which decide what actually
+ *  happens when a slot is left empty. `ConnectionFormPanel.sourceTools.test.tsx` reads that
+ *  module through `?raw` and compares, so the drift cannot ship silently. */
+export const SOURCE_TOOLS_DEFAULT_LIST = "list_directory"
+export const SOURCE_TOOLS_DEFAULT_READ = "read_file"
+
+/** The empty option. It names the CONSEQUENCE rather than the absence — "(None)" would leave
+ *  a person believing nothing will be called, when in fact the adapter falls back per key. */
+export function sourceToolUnsetLabel(fallback: string): string {
+  return `Not set — the adapter will try ${fallback}`
+}
+
+/** The binding a draft expresses, or `undefined` when it expresses none.
+ *
+ * ⚠ `undefined`, NEVER `{}`. `sources/base.CONFIG_PROTOCOL_MARKERS` resolves any connection
+ * carrying a NON-EMPTY `source_tools` to `McpSourceAdapter`, and `McpConfig` records the same
+ * distinction in its own docstring: absent means nobody bound this connection to a file
+ * surface; empty means somebody looked and named nothing.
+ *
+ * ⚠ `root_path` IS CARRIED THOUGH NOTHING EDITS IT. The panel rebuilds `config` whole and the
+ * API writes that column whole, so a key this function forgot would be DELETED by a rename.
+ * That is not hypothetical — it is what `ConnectionFormPanel.sourceTools.test.tsx`'s "THE
+ * WIPE" case measured, red, before this existed.
+ */
+export function sourceToolsFromDraft(draft: ConnectionDraft): Record<string, string> | undefined {
+  const bound: Record<string, string> = {}
+  const list = (draft.sourceListTool ?? "").trim()
+  const read = (draft.sourceReadTool ?? "").trim()
+  const root = (draft.sourceRootPath ?? "").trim()
+  if (list) bound.list_tool = list
+  if (read) bound.read_tool = read
+  if (root) bound.root_path = root
+  return Object.keys(bound).length > 0 ? bound : undefined
+}
+
 export const FIELD_COUNTS: Record<ConnectionShape, number> = {
   send_email: 4,
   create_ticket: 5,
@@ -516,6 +577,14 @@ export interface ConnectionDraft {
   /** mcp (206.1) — the whole destination, as typed. Flat and all-string like every other
    *  field, so the 🔒 footer derives it during render rather than holding a parsed copy. */
   mcpServerUrl: string
+  /** mcp (Phase 239) — the file-source binding, FLAT AND ALL-STRING like every other field
+   *  on this draft, rather than a nested object. Empty means unbound; `sourceToolsFromDraft`
+   *  is the one place that turns the three into `config["source_tools"]`.
+   *
+   *  ⚠ `sourceRootPath` has no control and is carried anyway — see `sourceToolsFromDraft`. */
+  sourceListTool: string
+  sourceReadTool: string
+  sourceRootPath: string
   /** Write-only, at this boundary and nowhere else. Never populated from a read. */
   secret: string
   /** Phase 215 (OAUTH-01..04) OAuth fields */
@@ -539,6 +608,9 @@ export const EMPTY_DRAFT: ConnectionDraft = {
   accountEmail: "",
   channel: "",
   mcpServerUrl: "",
+  sourceListTool: "",
+  sourceReadTool: "",
+  sourceRootPath: "",
   secret: "",
   authType: "static_key",
   customClientId: "",
@@ -555,6 +627,16 @@ export function draftFromConnection(connection: ConnectorConnection): Connection
   const config = connection.config as unknown as Record<string, unknown>
   const text = (key: string): string =>
     typeof config[key] === "string" ? (config[key] as string) : ""
+  // Phase 239 — the stored binding, read back so a save carries it rather than deleting it.
+  // ⚠ AN ABSENT BINDING HYDRATES TO EMPTY, NEVER TO THE DEFAULTS. Seeding `list_directory`
+  // here would turn *"nobody has bound this"* into *"somebody chose the reference server's
+  // names"* on the next save — a claim the person never made.
+  const storedTools = config.source_tools
+  const boundTool = (key: string): string =>
+    storedTools && typeof storedTools === "object" && !Array.isArray(storedTools)
+      && typeof (storedTools as Record<string, unknown>)[key] === "string"
+      ? ((storedTools as Record<string, string>)[key])
+      : ""
   return {
     ...EMPTY_DRAFT,
     capability: connection.auth_type === "oauth_byo"
@@ -562,6 +644,9 @@ export function draftFromConnection(connection: ConnectorConnection): Connection
       : (connection.mcp_server_url ? "mcp" : (connection.capability ?? EMPTY_DRAFT.capability)),
     serviceId: connection.service_id,
     mcpServerUrl: connection.mcp_server_url ?? "",
+    sourceListTool: boundTool("list_tool"),
+    sourceReadTool: boundTool("read_tool"),
+    sourceRootPath: boundTool("root_path"),
     name: connection.name,
     host: text("host"),
     port: typeof config.port === "number" ? String(config.port) : "",
@@ -629,10 +714,16 @@ export function mcpHostOf(rawUrl: string): string {
  * its own terms rather than to another kind's config.
  */
 export function configFromDraft(draft: ConnectionDraft): ConnectorConnectionConfig {
-  // ⚠ FIRST, and by its own condition. `McpConfig` is `extra="forbid"` with exactly ONE field,
-  // so this object's KEY SET is the contract — a second key is a 422 no client type can see.
+  // ⚠ FIRST, and by its own condition. `McpConfig` is `extra="forbid"`, so this object's KEY
+  // SET is the contract — a key the model does not declare is a 422 no client type can see.
+  //
+  // ⚠ PHASE 239 ADDS EXACTLY ONE OPTIONAL KEY, AND ONLY WHEN IT IS BOUND. `source_tools` was
+  // declared on `McpConfig` by 239-01 for precisely this reason (SEED-239: an undeclared key
+  // makes the row match NO member of the union, and `_to_response` validates rows inside a
+  // list comprehension, so ONE bad row makes every connection in the org unreadable).
   if (draft.capability === "mcp") {
-    return { headers: {} }
+    const sourceTools = sourceToolsFromDraft(draft)
+    return sourceTools ? { headers: {}, source_tools: sourceTools } : { headers: {} }
   }
   // ⚠ PHASE 211 — THE SERVICE ARM NAMES ITS OWN CONDITION, exactly like its four siblings,
   // rather than leaning on the neutral terminal below. The two produce the same object today;
