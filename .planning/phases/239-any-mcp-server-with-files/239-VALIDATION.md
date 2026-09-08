@@ -108,3 +108,64 @@ because it was never held.**
    round. **Until it ships, no MCP source can be pointed at a real folder through the product** — which
    independently blocks SC#2.
 4. ⚠ **`MAX_MCP_BODY_BYTES`** caps MCP file import at ~1.5 MB; an operator decision, still open.
+
+---
+
+# SC#2 — DRIVEN 2026-09-08 against a real second server. **PARTLY MET. NOT met.**
+
+**Server 2: GitHub MCP** (`api.githubcopilot.com`), already connected and authenticated. Bound
+**entirely through the UI**: `list_tool = get_file_contents`, `read_tool = get_file_contents`,
+root `fhdmrddev-dotcom/Agentic-RAG`.
+
+⭐ **THE ZERO-CODE CLAIM IS PROVEN, and it was proven the strict way**: `git rev-parse HEAD` read
+`91e8cc4ba` **before and after**, `git log <base>..HEAD -- backend frontend` returned **0**, and
+`git status --porcelain` was **empty** throughout.
+
+## What worked — with no code at all
+
+- The binding saved and persisted as data on the connection row.
+- **GitHub appeared in the Library's "From a connected source" picker**, where it had never been —
+  it previously offered only Google Workspace and Microsoft 365.
+- `GET /connectors/connections/{id}/browse` **fired and returned `200`**.
+- ⭐ **And the reverse held too**: clearing the binding removed GitHub from the picker again, still
+  with zero code. **The rows control the family in BOTH directions**, which is a stronger result
+  than the criterion asked for.
+
+## What did not — and this is SC#2's actual answer
+
+**The listing came back EMPTY**: *"GitHub · 0 documents · 0 chunks · 0 jobs · 0 folders"*, `Add 0`.
+
+Verified in both directions rather than inferred:
+
+- `mcp_source.py:822` sends `{"path": folder_path}`; `:956` sends `{"path": file_id}` — **a lone
+  `path`, always**.
+- GitHub MCP's `get_file_contents` requires **`owner` + `repo` + `path`**, three separate arguments.
+  Confirmed by invoking that same tool directly against that same server.
+
+⭐ **So the contract carries tool NAMES as data and tool ARGUMENT SHAPES as code.** The first half is
+genuinely proven — `list_directory` vs `ls` vs `get_file_contents` really is a row. The second half
+was never exercised by anything, because `SEED-257` records that no MCP file server could be driven
+locally at all.
+
+⚠ **Recorded as a finding AGAINST Phase 232's contract, which is what ROADMAP 239 instructs**:
+*"naming the specific thing the contract could not express."* **The specific thing is a tool's
+argument shape.** Full analysis and four unranked options: **`SEED-259`**.
+
+## ⛔ The separate, more urgent half
+
+**It failed as `HTTP 200` with an empty listing, not as an error** — review finding `HI-03`'s
+fail-open shape, reproduced on a different path after `HI-03` itself was fixed. An empty-but-complete
+listing is exactly what the **`H-5` deletion guard** consumes: on a watched folder, *"the source
+returns nothing"* is indistinguishable from *"everything was deleted"*.
+
+⚠ **Nothing was lost** — this was a browse, no watch was created, and the binding has been reverted
+so the operator's environment is as it was found. But **a misbound server that reads as empty is one
+`Add Watched Folder` away from being a deletion signal**, and that should be treated as more urgent
+than the shortfall itself.
+
+## Verdict
+
+⛔ **SC#2 is NOT met**, and it should not be marked met on the picker evidence alone. It is
+**partly** met — decisively so on "rows, not code" for registration, resolution and surfacing, and
+**not** met on "a second, different MCP file server works". `SEED-259` is the ruling the criterion
+now waits on, and it is an operator decision, not a build task.
