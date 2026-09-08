@@ -36,7 +36,19 @@ can be taught new behaviors (skills) that persist and can be shared.
 **Current focus:** **Milestone v4.0 Connected Knowledge — STARTED 2026-09-04.** Phase numbering
 continues at **228**.
 
-Phase: 239 — Any MCP Server With Files (⚠ **BUILT, NOT CLOSED — SC#2 UNMET, blocked on a CREDENTIAL**)
+Phase: 239 — Any MCP Server With Files (✅ **SC#1-3 MET 2026-09-09** — closeable; a short owed list below)
+
+⭐ **SC#2 MET, and the zero-code claim is proven by HASH, not asserted.** `HEAD` read `b918c408e`
+before AND after; `git log <base>..HEAD -- backend frontend` = **0**; source tree clean. GitHub MCP
+was bound as the second file server entirely through the UI — a vocabulary sharing nothing with the
+reference server, needing **three arguments where the contract sends one**. `browse` 200 (7 folders),
+recursion 200, `POST /preview` 200 with honest buckets. `D-239-06`'s size fallback fired as designed.
+Record: `239-VALIDATION.md`.
+
+⚠ **STILL OWED (small, and named rather than absorbed):** deletion / disconnect / visibility parity
+with Drive was NOT driven, and no watch was created (that ingests real files). The cross-worker
+`BUG-260902-06` fix is proven by a spawned-interpreter test but **not in the shipped
+`WORKER_COUNT=2` arrangement** — this dev backend runs ONE worker.
 
 ### 2026-09-09 — what shipped after the build, and why the phase still cannot close
 
