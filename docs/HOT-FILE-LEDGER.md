@@ -4764,7 +4764,38 @@ Hot service-role database module shared across routes and background engines.
 
 ---
 
-### `backend/app/services/connector_service.py` — Phase 206, honoured by construction
+### `backend/app/services/connector_service.py`
+
+⚠ **RE-DERIVED AT THE 239 GAP-CLOSURE ROUND 1 (2026-09-08): `24 / 9 / 1749`** — the row read
+`21 / 7 / 1601`. Phases: `190` · `206` · `211` · `213` · `215` · `221` · `222` · `231` · `239`.
+
+⭐ **THIS ROUND TOOK CODE OUT OF THIS FILE, WHICH IS THE RARE RIGHT DIRECTION FOR IT.** The MCP
+tool vocabulary — `_LIST_TOOL_NAMES`, `_READ_TOOL_NAMES`, `_MUTATION_WORDS`, `_DIR_WORDS` and
+the whole of `infer_source_tools` — moved down into `sources/adapters/mcp_source.py`, which is
+the file whose docstring had claimed exclusive ownership of it all along (ME-05). What is left
+here is a delegation, and `test_boundary_fence.py` now fences this module by name.
+
+⛔ **CR-01 — the write boundary checked EXISTENCE, never SAFETY.** `reject_unoffered_source_tools`
+calls itself *"the door a hand-crafted PATCH comes through"* and accepted
+`{"read_tool": "delete_file"}` because `delete_file` really is on the server; `check()` then
+reported **ok** for the same reason, and `watch_service` called it on every tracked file on
+every cycle, unattended, behind a green health probe. Destructiveness is now refused
+**unconditionally** — a name that says `delete` needs no server list to be refusable — while
+the existence half stays conditional, because a connection bound before its first discovery has
+nothing to compare against and refusing there would fire on the honest case and not the
+dishonest one.
+
+⚠ **AND THE CREATE PATH NEVER CALLED THE BOUNDARY AT ALL** — a gap the review did not name.
+`reject_unoffered_source_tools` was wired to the PATCH door alone, so a POST carrying the same
+config created the row unexamined.
+
+⚠ **THE ASYMMETRY IS DELIBERATE AND IS STATED IN THE DOCSTRING.** The detector one module over
+uses an ALLOW-LIST of shapes because it binds with nobody watching; the boundary uses a
+DENY-LIST because a person chose the value and the product's headline claim is *any* MCP
+server. The residual risk — a destructive tool whose name carries no mutation word, bound by
+hand — is named rather than hidden.
+
+## `backend/app/services/connector_service.py` — Phase 206, honoured by construction
 
 **Measured 2026-08-25: `15 commits / 6 phases / 1000+ L`**.
 
@@ -6386,6 +6417,16 @@ Phases touched: 206.1, 212.
 **⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `4 / 2 / 217` → `7 / 4 / 313`.** ⚠ **Its path changed in 214-08 and a row whose path no longer exists is invisible to the audit scan.** Re-keyed here, section moved with it, in the same commit. Re-derived with `git log --follow`: `4 / 2 / 217` → **`7 / 4 / 313`**. Phase buckets gain `214`.
 
 ## `backend/app/models/connector.py`
+
+⚠ **RE-DERIVED AT THE 239 GAP-CLOSURE ROUND 1 (2026-09-08): `23 / 13 / 751`.** Honoured by
+construction — `McpConfig.source_tools` gained the length bounds it never had (ME-07: a
+500-character key and a 5,000-character value were both accepted, driven), while `ServiceId`
+two hundred lines up has carried `max_length=64` since it was written, with the stated reason
+that untrusted input reaching a text column gets a ceiling *"like every other constrained type
+in this file"*. ⛔ **`root_path`'s CONTENT stays unvalidated as a STATED exemption**: it is sent
+verbatim to the remote server, so path authorization belongs to the process that owns the
+filesystem, and a traversal rule invented here would be a rule about a directory layout this
+app cannot see. A silent exemption is indistinguishable from a gap — which is what ME-07 found.
 
 ⚠ **RE-DERIVED 2026-09-05 (Phase 233): `18 / 10 / 676`** — the row read `12 / 6 / 471`, **stale by 6
 commits and 4 phases**. Honoured by construction: five preview models appended at the end, none of
@@ -8491,8 +8532,52 @@ Phase 237 added `ruleScope` support, restricting available field choices to arri
 
 ## backend/app/services/sources/adapters/mcp_source.py
 
-**2 / 1 / 643** · no (1 phase: 239) · the MCP file-source adapter — the FOURTH source family,
-and the first that is a **protocol** rather than a named service.
+**⚠ RE-DERIVED AT THE 239 GAP-CLOSURE ROUND 1 (2026-09-08): `6 / 1 / 1022`** — recorded beside
+the previous value, never over it. The row read `2 / 1 / 643`; **+379 lines, and almost all of
+it arrived by MOVING rather than by adding.**
+
+**Phase 239's code review made this file bigger on purpose (ME-05).** Its own docstring claimed
+*"nothing anywhere else in the codebase knows any tool name"* and that was FALSE on the day it
+was written: `connector_service.py` held `("list_directory", "list_dir", "list_files", "ls",
+"browse")` in a membership test, and `test_boundary_fence.py` structurally could not see it —
+that module was not in `FENCED_MODULES` and the fence's literal set held vendor names only.
+**Both doors were shut, so the claim was enforced by nothing.** The vocabulary, the mutation
+predicate and `infer_source_tools` all moved here; `connector_service` delegates and holds no
+tool literal; and the fence gained `TOOL_LITERALS` + `TOOL_FENCED_MODULES`, driven RED by
+planting the leak into the shipped file. ⭐ **The claim is now true by CONSTRUCTION, which is a
+different thing from being asserted more firmly.**
+
+Also in that round, and each one recorded here because each was a shipped behaviour:
+
+- ⛔ **HI-03 — `_parse_listing` was a FAIL-OPEN inside the guard that exists to fail closed.**
+  It caught the `isError` FIELD only, so `"permission denied"` with `isError: false` returned
+  `[]`; `list_files` always answers `next_page_token=None`, so `watch_service` stamps
+  `complete = True` on the first pass, and **complete-with-zero-files is exactly what the H-5
+  deletion guard consumes.** Two silences are now distinguished: *"there is nothing here"*
+  stays complete, *"I did not understand this"* raises.
+- ⚠ **ME-03 — the code contradicted the comment three lines above it.** A 0-byte file arrived
+  as `b""` and was raised as an error, under a comment saying the two must not look alike. The
+  test is now *"was there a content block?"*, not *"are the bytes empty?"*.
+- ⚠ **ME-02 — modification detection was silently OFF FOREVER on the reference server.**
+  `list_directory` answers `[FILE] name` with no size and no time, so `_version` is `None`, so
+  `watch_service`'s modification branch can never run. `list_directory_with_sizes` is now first
+  in the preference order.
+- ⚠ **ME-01 — a tool set to `deny` was still callable.** An ABSENT grant is deliberately NOT a
+  deny on this surface, unlike `phase_types.py` GATE 6; the asymmetry is now implemented and
+  written down, because it was neither.
+- ⚠ **LO-06 — the sentinel lived in the same namespace as real data.** `VIRTUAL_ROOT_ID` is
+  `mcp:root`, which `_join` cannot produce. **Not** `\x00virtual_root`: a NUL reaching
+  `connector_watches.source_folder_id` is a Postgres `22P05`, the defect v3.7 UAT caught in a
+  `.msg` subject line.
+- ⚠ **HI-04 IS NAMED, NOT REFUSED, AND THE DISTINCTION IS THE FINDING.** Verified: `root_path`
+  is always `""`, because nothing can set it. Suspected: that `""` is what servers refuse.
+  `SEED-257` says MCP sources cannot be driven locally at all, and two shipped tests assert the
+  opposite claim. Refusing would pick one unverified belief over another. **The UI control is
+  still OWED and is a frontend change.**
+
+**Superseded (the value at the phase's close):** `2 / 1 / 643` · no (1 phase: 239) · the MCP
+file-source adapter — the FOURTH source family, and the first that is a **protocol** rather
+than a named service.
 
 ⚠ **THIS ROW WAS WRITTEN `1 / 1 / 644` AND WAS WRONG WITHIN THE SAME PLAN** — a later commit in
 the same wave removed one line, and the row was not re-derived. Caught by the plan's own
@@ -8969,16 +9054,16 @@ cells rot within days.
 | [`frontend/src/components/workflows/McpToolPicker.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsmcptoolpickertsx) | 5 / 5 / 601 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | honoured by construction (211 / **214**) — net **−44 L** |
 | [`frontend/src/components/workflows/externalShapeVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsexternalshapevocabularyts) | 2 / 1 / 109 | no (1 phase) | young (206.2) |
 | [`frontend/src/components/workflows/McpToolPicker.reachability.test.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsmcptoolpickerreachabilitytesttsx) | 1 / 1 / 316 | no (1 phase) | young (206.2) |
-| [`backend/app/models/connector.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsconnectorpy) | 22 / 13 / 732 | ⚠ **FIRES** | ⚠ row was STALE at `18 / 10 / 676`. honoured by construction (**239**) — `source_tools` added to `McpConfig`; omitting it is the SEED-239 org-wide outage, not a local one |
+| [`backend/app/models/connector.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsconnectorpy) | 23 / 13 / 751 | ⚠ **FIRES** | honoured by construction (**239 gap-closure**) — `source_tools` bounded 64/512 (ME-07); `root_path`'s CONTENT is a STATED exemption, since path authorization belongs to the remote server |
 | [`backend/app/services/mcp_client.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmcp_clientpy) | 7 / 5 / 480 | ⚠ **FIRES** | ⚠ row was STALE at `4 / 2 / 407` and said `no (2 phases)` — present and WRONG, so it answered the auditor. Byte-unchanged by 239; the sanitizer allow-list did not need widening |
-| [`backend/app/api/connectors.py`](docs/HOT-FILE-LEDGER.md#backendappapiconnectorspy) | 39 / 18 / 2051 | ⚠ **FIRES** | ⚠ **extraction still OWED and the file GREW again** (1757→1879 at 233: two preview routes). The named seam is unchanged |
+| [`backend/app/api/connectors.py`](docs/HOT-FILE-LEDGER.md#backendappapiconnectorspy) | 40 / 19 / 2071 | ⚠ **FIRES** | ⚠ **extraction still OWED and the file GREW AGAIN** (2051→2071 at the 239 gap-closure: `_provider_said`, LO-05). The named seam is unchanged |
 | [`backend/app/security/egress.py`](docs/HOT-FILE-LEDGER.md#backendappsecurityegresspy) | 13 / 5 / 982 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | honoured by construction (232): Google Drive read/export pins; docstrings updated to source contract |
 | [`backend/app/services/google/availability.py`](docs/HOT-FILE-LEDGER.md#backendappservicesgoogleavailabilitypy) | 0 / 0 / 277 | no (new) | young (221-02) — the per-application probe. ⚠ It imports `_http`'s parser and writes NO second one |
 | [`backend/app/services/google/writes.py`](docs/HOT-FILE-LEDGER.md#backendappservicesgooglewritespy) | 2 / 1 / 625 | no (1 phase) | ⚠ absent for its entire life — row added 221-02, which found `create_event` REFUSING every naive local time |
 | [`frontend/src/components/settings/applicationAvailability.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsapplicationavailabilityts) | 0 / 0 / 152 | no (new) | young (221-02) — server decides the STATE, this decides the WORDS. It classifies nothing |
 | [`frontend/src/components/settings/AvailabilityLine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsavailabilitylinetsx) | 0 / 0 / 74 | no (new) | young (221-02) — a `ready` application renders `null`, never an empty element |
 | [`frontend/src/components/settings/grantsVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsgrantsvocabularyts) | 3 / 2 / 115 | no (2 phases) | ⚠ absent for its entire life — row added 221-02. There is deliberately NO `READY` string in it |
-| [`backend/app/services/connector_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesconnector_servicepy) | 21 / 7 / 1601 | ⚠ **FIRES** | ⚠ the row was STALE at `7 / 3 / 1149` — +9 commits, +2 phases, +312 L unrecorded. honoured by construction (211 / **221**) |
+| [`backend/app/services/connector_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesconnector_servicepy) | 24 / 9 / 1749 | ⚠ **FIRES** | ⚠ row was STALE at `21 / 7 / 1601`. 239 gap-closure REMOVED the tool vocabulary (ME-05) and added the destructive-binding refusal (CR-01) |
 | [`backend/app/models/message.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsmessagepy) | 17 / 10 / 124 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **8 phases** — row added 214; honoured by construction (214-16) |
 | [`backend/app/models/user_settings.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsuser_settingspy) | 46 / 30 / 1352 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **30 phases** — row added 214; honoured by construction (214-14) |
 | [`backend/app/services/connectors/args.py`](docs/HOT-FILE-LEDGER.md#backendappservicesconnectorsargspy) | 2 / 1 / 474 | no (1 phase) | young (214-01) — the shared argument leaf: resolution, satisfiability, and ONE schema accessor |
@@ -9075,5 +9160,5 @@ cells rot within days.
 | [`backend/app/services/sources/adapters/mock_source.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesadaptersmock_sourcepy) | 2 / 1 / 177 | no (1 phase) | ⚠ absent for its entire life — row added 238. It is where the SEED-253 invariant is ANCHORED: a `path` names a folder, never a filename |
 | [`backend/app/services/sources/__init__.py`](docs/HOT-FILE-LEDGER.md#backendappservicessources__init__py) | 5 / 3 / 40 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ row was STALE at `2 / 1 / 26` and read `no (1 phase)`. The ONE eager-import site — an adapter absent here is unregistered, so the list is load-bearing |
 | [`frontend/src/components/sources/sourceCapability.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcessourcecapabilityts) | 2 / 2 / 98 | no (2 phases) | ⚠ row was STALE at `0 / 0 / 38`. young (238 / **239**) — the ONE answer to *can this connection be browsed?*. ⛔ Fails CLOSED on `null`: unknown is not permission. See §239-03 |
-| [`backend/app/services/sources/adapters/mcp_source.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesadaptersmcp_sourcepy) | 2 / 1 / 643 | no (1 phase) | young (239) — the FOURTH family and the first that is a PROTOCOL. ⛔ Tool names are a ROW (`config["source_tools"]`), never a branch. Opens no socket; all egress via `mcp_client` |
+| [`backend/app/services/sources/adapters/mcp_source.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesadaptersmcp_sourcepy) | 6 / 1 / 1022 | no (1 phase) | ⚠ row was STALE at `2 / 1 / 643` — **+379 L in the gap-closure round**, which is where the whole tool VOCABULARY moved (ME-05). Tool names are a ROW and now provably nowhere else |
 | [`frontend/src/components/settings/connectionRowVerdict.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectionrowverdictts) | 2 / 2 / 99 | no (2 phases) | ⚠ **absent for its entire life — row added 239-03, and the ledger gate FAILED on it at this phase's base.** young (221 / 239). The row's verdict, DERIVED never stored. See §239-03 |
