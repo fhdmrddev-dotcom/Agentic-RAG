@@ -60,20 +60,28 @@ shown to a person; they may never widen a permission or skip a confirmation. Tha
 structurally — a behavioural test can only check the hints somebody thought to send, whereas
 the fence refuses the *shape*, with a positive control.
 
-── ⚠ THE 25 MB CEILING IS REAL CODE AND IS NOT THE BINDING CONSTRAINT ───────────────────────
+── ⚠ THE FILE CEILING IS AN OPERATOR SETTING, AND IT IS THE BINDING CONSTRAINT ──────────────
 
-`MAX_FILE_BYTES` matches `google_drive.py` and `microsoft_graph.py` so the three families
-refuse at the same size (TM-239-03).
+The ceiling matches `google_drive.py` and `microsoft_graph.py` so the three families refuse at
+the same size (TM-239-03) — and since SEED-258 that sameness is **identity, not maintenance**:
+all three call `source_max_file_bytes()`, which reads `app_settings.source_max_file_size_mb`.
+⚠ ~~It used to be three module constants that agreed by coincidence of careful authorship~~,
+which is a property that survives exactly as long as everyone remembers it. A fourth source
+family is where that luck would have run out; there is now nothing for it to copy.
 
 ⚠ ~~But on THIS transport the real limit is upstream and much lower: `mcp_client.MAX_MCP_BODY_BYTES`
 is **2 MB** … so a file over roughly **1.5 MB** is refused by the client before this ceiling can be
 reached.~~ **RESOLVED 2026-09-08, and the original is struck through rather than deleted because the
 note did its job.** It ended *"somebody raising the client's cap must find this note"* — somebody did.
-`MAX_MCP_BODY_BYTES` is now **34 MB** (25 MB × 4/3 + envelope headroom), so **this ceiling is the one
-users actually meet** and the refusal comes from here, in words, instead of as a transport error.
-⛔ The two constants are now pinned IN RELATION, not independently, by
+The envelope cap is now **derived** from the file ceiling (`mcp_client.mcp_max_body_bytes()` =
+ceiling × 4/3 + envelope headroom), so **this ceiling is the one users actually meet** and the
+refusal comes from here, in words, instead of as a transport error.
+⛔ The two are pinned IN RELATION, not independently, by
 `tests/unit/services/sources/test_239_body_cap_admits_the_file_ceiling.py` — each was individually
 defensible, which is exactly why pinning them separately would never have caught the disagreement.
+⚠ And that relation is now asserted **across the whole configured range** (floor / default / hard
+maximum), because a configurable pair can be jointly wrong at one end and fine at the other — a
+relation test pinned to a single number is what missed this the first time.
 """
 
 from __future__ import annotations
@@ -88,6 +96,7 @@ import dataclasses
 from dataclasses import dataclass
 from typing import Any
 
+from app.models.user_settings import source_max_file_bytes
 from app.services import mcp_client
 from app.services.sources.base import (
     BrowsePage,
@@ -99,9 +108,11 @@ from app.services.sources.base import (
     SourceRegistry,
 )
 
-#: The same ceiling `google_drive.py` and `microsoft_graph.py` use. See the module note above
-#: for why the transport refuses long before this does.
-MAX_FILE_BYTES = 25 * 1024 * 1024
+# ── ⚠ SEED-258: ~~`MAX_FILE_BYTES = 25 * 1024 * 1024`~~ — REMOVED, along with the two
+#    private copies in `google_drive.py` and `microsoft_graph.py`. The ceiling is ONE
+#    operator setting (`app_settings.source_max_file_size_mb`), read at each use through
+#    `source_max_file_bytes()`; `mcp_client`'s envelope cap is DERIVED from it rather than
+#    declared beside it. ⛔ Do not reintroduce a module constant here.
 
 #: `@modelcontextprotocol/server-filesystem`'s vocabulary, so the reference server works with
 #: zero configuration. These are FALLBACKS for absent keys, applied per key — a row naming only
@@ -987,9 +998,10 @@ def _b64(value: str) -> bytes:
 
 
 def _guard(chunks: list[bytes]) -> None:
-    if sum(len(c) for c in chunks) > MAX_FILE_BYTES:
+    ceiling = source_max_file_bytes()
+    if sum(len(c) for c in chunks) > ceiling:
         raise ValueError(
-            f"This file is too large to import — it exceeds the {MAX_FILE_BYTES} byte ceiling."
+            f"This file is too large to import — it exceeds the {ceiling} byte ceiling."
         )
 
 

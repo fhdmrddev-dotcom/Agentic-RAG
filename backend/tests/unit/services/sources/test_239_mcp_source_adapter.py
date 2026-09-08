@@ -495,10 +495,13 @@ class TestReadFile:
     async def test_a_payload_over_the_ceiling_is_REFUSED(self, adapter, patch_mcp):
         """TM-239-03. The ceiling is checked on the DECODED payload, matching
         `google_drive.py` and `microsoft_graph.py`."""
-        from app.services.sources.adapters.mcp_source import MAX_FILE_BYTES
+        # SEED-258: the ceiling is a SETTING now, so read it rather than re-typing 25 MB.
+        # The unconfigured/default resolution is still exactly the shipped 25 MB.
+        from app.models.user_settings import source_max_file_bytes
 
-        assert MAX_FILE_BYTES == 25 * 1024 * 1024
-        patch_mcp(FakeMcp(read=text_result("A" * (MAX_FILE_BYTES + 1))))
+        ceiling = source_max_file_bytes()
+        assert ceiling == 25 * 1024 * 1024
+        patch_mcp(FakeMcp(read=text_result("A" * (ceiling + 1))))
         with pytest.raises(ValueError, match="too large|exceed"):
             await adapter.read_file(conn(), "docs/huge.txt")
 
@@ -506,13 +509,14 @@ class TestReadFile:
     async def test_the_ceiling_is_measured_AFTER_base64_decoding(self, adapter, patch_mcp):
         """⚠ Base64 INFLATES by 4/3, so a check on the encoded string would refuse a payload
         that is legal once decoded — and, worse, would pass a decoded payload 33% over."""
-        from app.services.sources.adapters.mcp_source import MAX_FILE_BYTES
+        from app.models.user_settings import source_max_file_bytes
 
+        ceiling = source_max_file_bytes()
         patch_mcp(FakeMcp(read={
             "text": "",
             "content": [{"type": "resource", "resource": {
                 "mimeType": "application/octet-stream",
-                "blob": base64.b64encode(b"B" * (MAX_FILE_BYTES + 1)).decode("ascii"),
+                "blob": base64.b64encode(b"B" * (ceiling + 1)).decode("ascii"),
             }}],
             "isError": False,
             "raw": {},

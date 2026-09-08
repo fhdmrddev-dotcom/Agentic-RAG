@@ -13,6 +13,7 @@ import logging
 from typing import Any
 from uuid import UUID
 
+from app.models.user_settings import source_max_file_bytes
 from app.security.egress import send_pinned_http
 from app.services.oauth_refresh_service import get_fresh_access_token
 from app.services.sources.base import (
@@ -28,7 +29,14 @@ from app.services.sources.base import (
 logger = logging.getLogger(__name__)
 
 GOOGLE_DRIVE_API_BASE = "https://www.googleapis.com/drive/v3"
-MAX_FILE_BYTES = 25 * 1024 * 1024  # 25 MB matching application upload ceiling
+
+# ── ⚠ SEED-258: ~~`MAX_FILE_BYTES = 25 * 1024 * 1024  # 25 MB matching application upload
+#    ceiling`~~ — REMOVED, and its comment was FALSE. Measured 2026-09-08, `documents.py`
+#    refuses a hand-uploaded file at 50 MB, so this never "matched" anything; it was one of
+#    three private copies that agreed only by coincidence of careful authorship, while a
+#    fourth number (`mcp_client`'s envelope cap) disagreed with all three in production.
+#    The ceiling is now ONE operator setting read through `source_max_file_bytes()`.
+#    ⛔ Do not reintroduce a module constant here — that is the defect, not a convenience.
 
 
 def _google_error_reason(body: bytes | str | None) -> str:
@@ -299,7 +307,7 @@ class GoogleDriveSourceAdapter(SourceAdapter):
                 params={"mimeType": "application/pdf"},
                 headers=headers,
                 timeout=30.0,
-                max_bytes=MAX_FILE_BYTES,
+                max_bytes=source_max_file_bytes(),
             )
             if export_resp.status_code != 200:
                 reason = _google_error_reason(export_resp.body)
@@ -314,7 +322,7 @@ class GoogleDriveSourceAdapter(SourceAdapter):
             params={"alt": "media", "supportsAllDrives": "true"},
             headers=headers,
             timeout=30.0,
-            max_bytes=MAX_FILE_BYTES,
+            max_bytes=source_max_file_bytes(),
         )
         if dl_resp.status_code != 200:
             reason = _google_error_reason(dl_resp.body)

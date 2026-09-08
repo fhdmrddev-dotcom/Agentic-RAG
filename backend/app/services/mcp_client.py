@@ -31,12 +31,47 @@ DEFAULT_DISCOVERY_TIMEOUT = 15.0
 # inflated 4/3. At 2 MB it silently capped imports at ~1.5 MB while
 # `mcp_source.MAX_FILE_BYTES` claimed 25 MB, so the adapter's ceiling COULD NEVER FIRE and a
 # 3 MB PDF failed with a transport error instead of a plain refusal. Raised 2026-09-08 to
-# 25 MB × 4/3 + envelope headroom, so `MAX_FILE_BYTES` is the limit users actually meet and
-# MCP matches `google_drive.py` / `microsoft_graph.py`.
-# ⛔ The two constants are pinned IN RELATION by
-#    tests/unit/services/sources/test_239_body_cap_admits_the_file_ceiling.py — raising the
-#    file ceiling forces this up. Nothing licenses raising THIS one on its own.
-MAX_MCP_BODY_BYTES = 34 * 1024 * 1024
+# 25 MB × 4/3 + envelope headroom.
+#
+# ── ⚠ SEED-258: ~~`MAX_MCP_BODY_BYTES = 34 * 1024 * 1024`~~ IS NOW DERIVED, NOT DECLARED ────
+#
+# The struck-through constant is kept above in prose because the note it carried did its job:
+# it warned that the two numbers were a RELATION, and the relation is now the only thing
+# authored. ⛔ THERE IS NO ENVELOPE SETTING. An operator sets ONE number — the file ceiling,
+# `app_settings.source_max_file_size_mb` — and this cap follows it. Exposing both would
+# re-create the exact disagreement this whole mechanism exists because of.
+#
+# The derivation is one-way: the file ceiling forces this UP, and nothing can raise this on
+# its own. Pinned across the CONFIGURED RANGE (floor / default / hard maximum), not at one
+# value, by tests/unit/services/sources/test_239_body_cap_admits_the_file_ceiling.py.
+
+#: base64 turns 3 bytes into 4. The file arrives inside the envelope already encoded.
+_BASE64_INFLATION_NUM = 4
+_BASE64_INFLATION_DEN = 3
+
+#: JSON-RPC scaffolding around the payload: the envelope, `result`/`content` nesting, the
+#: mime type, the uri, and whatever else a server we do not control puts beside the blob.
+#: ⚠ A NAMED NUMBER WITH A REASON, replacing the rounding artefact inside the old `34 MB`
+#: (25 × 4/3 = 33.33, so the shipped headroom was an unexplained ~683 KB).
+_MCP_ENVELOPE_HEADROOM_BYTES = 1024 * 1024
+
+
+def mcp_max_body_bytes() -> int:
+    """Return the JSON-RPC response cap, derived from the operator's file ceiling.
+
+    ⛔ Never called at import time — the ceiling is a live setting and a module-level read
+    would freeze whatever the DB happened to hold when the process booted.
+
+    `source_max_file_bytes()` is itself defensive (it falls back rather than raising), so this
+    inherits the never-crash-a-source-read guarantee without repeating the try/except.
+    """
+    from app.models.user_settings import source_max_file_bytes
+
+    ceiling = source_max_file_bytes()
+    return (
+        -(-ceiling * _BASE64_INFLATION_NUM // _BASE64_INFLATION_DEN)  # ceil, integer-only
+        + _MCP_ENVELOPE_HEADROOM_BYTES
+    )
 
 #: Sent in the ``initialize`` handshake. A server may negotiate DOWN from this; it is a
 #: statement of what we speak, not a demand.
@@ -203,9 +238,10 @@ class McpClient:
                 f"MCP server at {server_url} returned redirect {response.status_code} (redirects forbidden by egress security policy)"
             )
 
-        if len(response.content) > MAX_MCP_BODY_BYTES:
+        body_cap = mcp_max_body_bytes()
+        if len(response.content) > body_cap:
             raise McpClientError(
-                f"Response from MCP server at {server_url} exceeded byte cap ({MAX_MCP_BODY_BYTES} bytes)"
+                f"Response from MCP server at {server_url} exceeded byte cap ({body_cap} bytes)"
             )
 
         if response.status_code >= 400:
