@@ -303,6 +303,30 @@ async def test_publish_is_fail_soft_when_redis_raises(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_publish_is_BOUNDED_when_redis_hangs(monkeypatch):
+    """UNIT / FAIL-SOFT. A hung Redis must not stall the WRITE REQUEST behind it.
+
+    ⚠ MEASURED, NOT ASSUMED. Driven against a real dead port (127.0.0.1:6399), the first
+    implementation returned 0 correctly — but took **2.05s** doing it, because redis-py
+    retries under its own connect timeout. "Never raises" is not the whole contract: a
+    settings write is a user request, and 2s of dead air on every save while Redis is down
+    is a second bug wearing the first one's clothes. The publish is bounded.
+    """
+    from app.services import settings_broadcast as sb
+
+    class _Hang:
+        async def publish(self, *a, **k):
+            await asyncio.sleep(30)   # a Redis that accepts and never answers
+            return 1
+
+    monkeypatch.setattr(sb, "_redis_for_publish", lambda: _Hang())
+    started = time.monotonic()
+    assert await sb.publish_cache_invalidation(sb.SCOPE_APP_SETTINGS) == 0
+    elapsed = time.monotonic() - started
+    assert elapsed < 3.0, f"publish blocked the write path for {elapsed:.2f}s"
+
+
+@pytest.mark.asyncio
 async def test_settings_read_still_works_with_redis_unreachable(monkeypatch, stub_pool):
     """UNIT / FAIL-SOFT. With Redis unreachable the TTL path is EXACTLY today's behaviour."""
     import app.models.user_settings as us

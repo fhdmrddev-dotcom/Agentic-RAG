@@ -54,6 +54,14 @@ SCOPE_ALL = "all"
 
 _KNOWN_SCOPES = frozenset({SCOPE_APP_SETTINGS, SCOPE_MODEL_OVERRIDES, SCOPE_ALL})
 
+# ⚠ MEASURED, NOT GUESSED. Driven against a real dead port (127.0.0.1:6399), an unbounded
+# publish returned 0 correctly — and took **2.05s** doing it, because redis-py retries under
+# its own connect timeout. "Never raises" is not the whole contract here: this call sits
+# inside `save_app_settings`, i.e. on a user's WRITE REQUEST, so unbounded dead air while
+# Redis is down would be a second bug wearing the first one's clothes. A missed broadcast
+# already degrades to the 30s TTL, so waiting longer buys nothing.
+_PUBLISH_TIMEOUT_SECONDS = 1.0
+
 
 def build_payload(scope: str) -> str:
     """The published JSON. ``origin_pid`` is DIAGNOSTIC ONLY — deliberately not filtered on.
@@ -88,8 +96,17 @@ async def publish_cache_invalidation(scope: str) -> int:
         return 0
     try:
         redis = _redis_for_publish()
-        count = await redis.publish(CHANNEL, build_payload(scope))
+        count = await asyncio.wait_for(
+            redis.publish(CHANNEL, build_payload(scope)),
+            timeout=_PUBLISH_TIMEOUT_SECONDS,
+        )
         return int(count or 0)
+    except asyncio.TimeoutError:
+        logger.warning(
+            "settings_broadcast: publish for scope=%s exceeded %.1fs and was abandoned; "
+            "siblings fall back to the 30s TTL", scope, _PUBLISH_TIMEOUT_SECONDS,
+        )
+        return 0
     except Exception:  # noqa: BLE001 — a Redis blip must never fail the write
         logger.warning(
             "settings_broadcast: publish failed for scope=%s; siblings fall back to the "
