@@ -87,15 +87,20 @@ class TestGoogleDriveBrowsing:
     @pytest.mark.asyncio
     async def test_virtual_root_browsing(self, adapter: GoogleDriveSourceAdapter):
         # browse at None or virtual_root requires no network call
+        # ⚠ UPDATED IN PHASE 240, DELIBERATELY. This assertion read `== 2` and the roots
+        #   genuinely became THREE: mail is a third virtual root on this same connection
+        #   (D-240-01), because the Gmail mailbox IS the Google connection. The pin is not
+        #   being bent to fit a change of behaviour it was meant to catch — the change is the
+        #   feature, and the pin is rewritten STRONGER than it was: an ordered id list instead
+        #   of a count, so adding a fourth root fails by NAME rather than by arithmetic.
         page1 = await adapter.browse({"id": "conn-1"}, folder_id=None)
         assert isinstance(page1, BrowsePage)
-        assert len(page1.items) == 2
-        assert [i.id for i in page1.items] == ["my_drive", "shared_drives"]
-        assert [i.name for i in page1.items] == ["My Drive", "Shared Drives"]
+        assert [i.id for i in page1.items] == ["my_drive", "shared_drives", "mailbox_root"]
+        assert [i.name for i in page1.items] == ["My Drive", "Shared Drives", "Mail"]
         assert all(i.kind == "folder" for i in page1.items)
 
         page2 = await adapter.browse({"id": "conn-1"}, folder_id="virtual_root")
-        assert len(page2.items) == 2
+        assert [i.id for i in page2.items] == ["my_drive", "shared_drives", "mailbox_root"]
 
     @pytest.mark.asyncio
     async def test_shared_drives_listing(self, adapter: GoogleDriveSourceAdapter, monkeypatch: pytest.MonkeyPatch):

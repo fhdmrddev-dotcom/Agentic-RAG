@@ -34,6 +34,12 @@ FENCED_MODULES = (
     "app/services/sources/preview_service.py",
     "app/services/sources/import_service.py",
     "app/services/watch_service.py",
+    # Phase 240 (D-240-03). `sources/mail/mailbox.py` is the PROVIDER-INDEPENDENT half of the
+    # mail shape, and "provider-independent" is a claim worth exactly as much as the thing that
+    # can refute it. Fencing it here makes the claim mechanical: a Google literal in that file
+    # fails this test by name. ⚠ `sources/mail/gmail.py` is deliberately NOT fenced — it is the
+    # provider half, the same category as a module under `adapters/`.
+    "app/services/sources/mail/mailbox.py",
 )
 
 #: Provider identities. Lower-cased; matched as whole strings and as substrings of a compared

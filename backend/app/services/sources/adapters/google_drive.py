@@ -25,6 +25,13 @@ from app.services.sources.base import (
     SourceNode,
     SourceRegistry,
 )
+# Phase 240 (D-240-01 / D-240-03) — MAIL IS A SHAPE THIS ADAPTER CARRIES, NOT A FOURTH ADAPTER.
+# The Gmail mailbox IS this connection: one row, one token, one consent, one place to revoke
+# (`oauth_service.py`, BUS-037 §B). `SourceRegistry` resolves one adapter per connection, so a
+# second registered adapter would have meant a second `connector_connections` row and a second
+# consent screen — undoing a decision the operator already made. Everything mail-specific lives
+# under `services/sources/mail/`; the three call sites below only DELEGATE.
+from app.services.sources import mail
 
 logger = logging.getLogger(__name__)
 
@@ -108,11 +115,21 @@ class GoogleDriveSourceAdapter(SourceAdapter):
                         kind="folder",
                         has_children=True,
                     ),
+                    # Phase 240 — the third virtual root, returned with the other two and,
+                    # like them, WITHOUT a network call.
+                    mail.mail_root_node(),
                 ],
                 next_page_token=None,
             )
 
         token = await self._get_auth_token(connection)
+
+        if mail.is_mail_folder(folder_id):
+            if folder_id == mail.MAIL_ROOT_ID:
+                return BrowsePage(items=await mail.gmail.list_labels(token), next_page_token=None)
+            # A label has no sub-labels in this model: Gmail's hierarchy is flat and the
+            # separator in `Parent/Child` is a display convention, not a tree.
+            return BrowsePage(items=[], next_page_token=None)
         headers = {"Authorization": f"Bearer {token}", "Accept": "application/json"}
 
         # Shared Drives root: enumerate all accessible shared drives via /drives
@@ -210,6 +227,20 @@ class GoogleDriveSourceAdapter(SourceAdapter):
             return FilePage(files=[], next_page_token=None)
 
         token = await self._get_auth_token(connection)
+
+        if mail.is_mail_folder(folder_id):
+            # The mail root itself holds no messages — labels do.
+            if folder_id == mail.MAIL_ROOT_ID:
+                return FilePage(files=[], next_page_token=None)
+            label_id = mail.strip_folder_prefix(folder_id or "")
+            return await mail.gmail.list_messages(
+                token,
+                label_id=label_id,
+                label_name=label_id,
+                page_token=page_token,
+                page_size=mail.MAIL_PAGE_SIZE,
+            )
+
         headers = {"Authorization": f"Bearer {token}", "Accept": "application/json"}
 
         q_parts = ["trashed = false", "mimeType != 'application/vnd.google-apps.folder'"]
@@ -274,6 +305,10 @@ class GoogleDriveSourceAdapter(SourceAdapter):
     ) -> tuple[str, bytes, str]:
         """Download file content, exporting Google Docs/Sheets to PDF."""
         token = await self._get_auth_token(connection)
+
+        if mail.is_mail_file(file_id):
+            return await mail.gmail.read_message(token, mail.strip_file_prefix(file_id))
+
         headers = {"Authorization": f"Bearer {token}"}
 
         # 1. Fetch metadata

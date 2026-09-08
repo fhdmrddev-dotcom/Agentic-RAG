@@ -397,9 +397,11 @@ class TestGoogleDriveAdapterConformance:
     async def test_browse_root_returns_virtual_roots(self, google_adapter: SourceAdapter):
         page = await google_adapter.browse(connection={"id": "conn-google", "service_id": "google"})
         assert isinstance(page, BrowsePage)
-        assert len(page.items) == 2
+        # ⚠ Phase 240 — the count assertion is gone and the SET assertion below now carries the
+        #   whole weight. `mailbox_root` is the mail shape riding this connection (D-240-01); a
+        #   set comparison fails by name on any future addition, which a count never did.
         ids = {n.id for n in page.items}
-        assert ids == {"my_drive", "shared_drives"}
+        assert ids == {"my_drive", "shared_drives", "mailbox_root"}
         for node in page.items:
             assert isinstance(node, SourceNode)
             assert node.kind == "folder"
@@ -776,6 +778,109 @@ class _Family(NamedTuple):
     file_id: str
 
 
+# ── Phase 240 (SRC-05) — the MAIL SHAPE joins the shared contract ──────────────────────────
+#
+# ⭐ NOTE WHAT IS *NOT* HERE: no new adapter class, and no new row in the registry. This family
+#   reuses `GoogleDriveSourceAdapter` with a second FIXTURE and mail-namespaced ids, because
+#   mail is a shape a family carries rather than a family of its own (D-240-01). The asymmetry
+#   is the evidence: every other entry below names a distinct class.
+#
+# ⚠ It still runs every universal invariant. A shape that skipped the shared contract would be
+#   a source path nobody's future invariant reaches — which is exactly what
+#   `test_every_registered_adapter_is_covered_by_the_SHARED_contract` exists to prevent one
+#   level up.
+@pytest.fixture
+def mail_google_adapter(monkeypatch: pytest.MonkeyPatch) -> GoogleDriveSourceAdapter:
+    monkeypatch.setattr(
+        "app.services.sources.adapters.google_drive.get_fresh_access_token",
+        AsyncMock(return_value="mock_access_token"),
+    )
+
+    async def _mock_send_pinned_http(capability: str, method: str, url: str, **kwargs):
+        assert capability == "gmail_read", f"a mail call used {capability!r}"
+        params = kwargs.get("params", {}) or {}
+
+        if url.endswith("/labels"):
+            return PinnedResponse(
+                status_code=200,
+                headers={"content-type": "application/json"},
+                body=jsonlib.dumps({
+                    "labels": [
+                        {"id": "INBOX", "name": "INBOX", "type": "system"},
+                        {"id": "Label_7", "name": "Suppliers", "type": "user"},
+                    ]
+                }).encode("utf-8"),
+            )
+
+        if url.endswith("/messages"):
+            return PinnedResponse(
+                status_code=200,
+                headers={"content-type": "application/json"},
+                body=jsonlib.dumps({
+                    "messages": [{"id": "m-1", "threadId": "t-1"}],
+                    "resultSizeEstimate": 1,
+                }).encode("utf-8"),
+            )
+
+        if params.get("format") == "metadata":
+            return PinnedResponse(
+                status_code=200,
+                headers={"content-type": "application/json"},
+                body=jsonlib.dumps({
+                    "id": "m-1",
+                    "threadId": "t-1",
+                    "internalDate": "1757239200000",
+                    "sizeEstimate": 2048,
+                    "payload": {"headers": [{"name": "Subject", "value": "Contract renewal"}]},
+                }).encode("utf-8"),
+            )
+
+        if params.get("format") == "raw":
+            import base64 as _b64
+            crlf = "\r\n"
+            eml = crlf.join([
+                "Subject: Contract renewal",
+                "From: supplier@example.com",
+                "Message-ID: <renewal-1@example.com>",
+                "",
+                "The renewal date is 1 March.",
+                "",
+            ]).encode("ascii")
+            return PinnedResponse(
+                status_code=200,
+                headers={"content-type": "application/json"},
+                body=jsonlib.dumps({
+                    "id": "m-1",
+                    "raw": _b64.urlsafe_b64encode(eml).decode("ascii").rstrip("="),
+                }).encode("utf-8"),
+            )
+
+        # `check()` still probes Drive's /about — the connection's health is the CONNECTION's,
+        # not the mailbox's, and mail deliberately does not fork that.
+        if "/about" in url:
+            return PinnedResponse(
+                status_code=200,
+                headers={"content-type": "application/json"},
+                body=jsonlib.dumps({
+                    "user": {"displayName": "Test User", "emailAddress": "test@example.com"}
+                }).encode("utf-8"),
+            )
+
+        raise AssertionError(f"unexpected mail-family call: {method} {url}")
+
+    async def _dispatch(capability: str, method: str, url: str, **kwargs):
+        if capability == "drive_read":
+            # The health probe is the one Drive call this family makes.
+            return await _mock_send_pinned_http("gmail_read", method, url, **kwargs)
+        return await _mock_send_pinned_http(capability, method, url, **kwargs)
+
+    monkeypatch.setattr(
+        "app.services.sources.adapters.google_drive.send_pinned_http", _dispatch
+    )
+    monkeypatch.setattr("app.services.sources.mail.gmail.send_pinned_http", _dispatch)
+    return GoogleDriveSourceAdapter()
+
+
 CONTRACT_FAMILIES: dict[str, _Family] = {
     "mock": _Family(
         MockSourceAdapter, "mock_adapter",
@@ -792,6 +897,11 @@ CONTRACT_FAMILIES: dict[str, _Family] = {
     "mcp": _Family(
         _McpSourceAdapterForContract, "mcp_adapter",
         MCP_CONNECTION, "docs", "docs/spec.pdf",
+    ),
+    # Phase 240 — the mail shape, on the adapter that already owns the connection.
+    "mail_gmail": _Family(
+        GoogleDriveSourceAdapter, "mail_google_adapter",
+        {"id": "conn-google", "service_id": "google"}, "mailbox:INBOX", "mailmsg:m-1",
     ),
 }
 

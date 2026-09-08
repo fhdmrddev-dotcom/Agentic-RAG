@@ -9572,13 +9572,119 @@ cells rot within days.
 | [`frontend/src/components/classification/RuleBuilderPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsclassificationrulebuilderpaneltsx) | 4 / 3 / 502 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | row added 237 at threshold. Adds scope selector segmented control; filters out-of-scope conditions on scope switch. |
 | [`frontend/src/components/ingestion/ConditionPopover.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestionconditionpopovertsx) | 3 / 2 / 404 | no (2 phases) | row added 237 below threshold. Restricts condition field choices to WATCH_FIELDS when ruleScope === 'watch'. |
 | [`backend/app/services/sources/base.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesbasepy) | 9 / 5 / 336 | ⚠ **FIRES** | ⚠ row was STALE at `6 / 3 / 198`. 238's byte-unchanged claim is now SPENT: 239 added protocol resolution here. Routing stayed DATA (two dicts), never a branch |
-| [`backend/app/services/sources/adapters/google_drive.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesadaptersgoogle_drivepy) | 3 / 2 / 407 | no (2 phases) | ⚠ **absent for its ENTIRE LIFE — row added 239-09, and the ledger gate FAILED on it.** Its `MAX_FILE_BYTES` comment was measurably FALSE. See §239-09 |
+| [`backend/app/services/sources/adapters/google_drive.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesadaptersgoogle_drivepy) | 3 / 2 / 442 | no (2 phases — **crosses to 3 with 240**) | ⚠ row was STALE at `3 / 2 / 407`. honoured by construction (**240**): mail is a THIRD VIRTUAL ROOT, +35/-0 lines, all delegation. Named seam: `mail/` |
+| [`backend/app/services/sources/mail/mailbox.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesmailmailboxpy) | 0 / 0 / 147 | no (new) | young (240) — the PROVIDER-INDEPENDENT half of the mail shape. ⭐ Fenced in `test_boundary_fence.py`, so “knows nothing about Google” is mechanical, not a promise |
+| [`backend/app/services/sources/mail/gmail.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesmailgmailpy) | 0 / 0 / 292 | no (new) | young (240) — the Gmail half. ⛔ `gmail_read`, never `drive_read`; reads only. Deliberately NOT fenced: it is the provider half |
+| [`backend/app/services/sources/mail/__init__.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesmail__init__py) | 0 / 0 / 44 | no (new) | young (240) — re-exports only. ⛔ Must never import an adapter: `sources/__init__.py` imports adapters eagerly, so the reverse edge is a cycle |
 | [`backend/app/services/sources/adapters/microsoft_graph.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesadaptersmicrosoft_graphpy) | 3 / 2 / 376 | no (2 phases) | ⚠ row was STALE at `0 / 0 / 352`. ⛔ The 302 dance is still sealed in here. SEED-258 removed its private `MAX_FILE_BYTES`; the ceiling is one setting now |
 | [`backend/app/services/sources/adapters/mock_source.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesadaptersmock_sourcepy) | 2 / 1 / 177 | no (1 phase) | ⚠ absent for its entire life — row added 238. It is where the SEED-253 invariant is ANCHORED: a `path` names a folder, never a filename |
 | [`backend/app/services/sources/__init__.py`](docs/HOT-FILE-LEDGER.md#backendappservicessources__init__py) | 5 / 3 / 40 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ row was STALE at `2 / 1 / 26` and read `no (1 phase)`. The ONE eager-import site — an adapter absent here is unregistered, so the list is load-bearing |
 | [`frontend/src/components/sources/sourceCapability.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcessourcecapabilityts) | 3 / 2 / 138 | no (2 phases) | ⚠ row STALE TWICE (`0 / 0 / 38`, `2 / 2 / 98`). young (238 / **239**). ⛔ Fails CLOSED on `null`, and on a DEFAULT service id since 239-05. See §239-05 |
 | [`backend/app/services/sources/adapters/mcp_source.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesadaptersmcp_sourcepy) | 9 / 1 / 1271 | no (1 phase) | ⚠ STALE at every close so far (`2/1/643` → `6/1/1022` → `8/1/1259`). SEED-258 removed its `MAX_FILE_BYTES`; `_guard` reads the operator setting at each use |
 | [`frontend/src/components/settings/connectionRowVerdict.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectionrowverdictts) | 2 / 2 / 99 | no (2 phases) | ⚠ **absent for its entire life — row added 239-03, and the ledger gate FAILED on it at this phase's base.** young (221 / 239). The row's verdict, DERIVED never stored. See §239-03 |
+
+
+---
+
+## backend/app/services/sources/mail/mailbox.py
+
+**Derived 2026-09-09 (Phase 240):** `0 / 0 / 147`. New in this phase.
+
+**What it is.** The provider-independent half of the mail shape: the third virtual root, the two
+id namespaces (`mailbox:` for folders, `mailmsg:` for messages), the Subject-to-filename rule, and
+the message-to-`SourceFile` mapping.
+
+**Why it exists at all, and why it is not inside the adapter.** Phase 240's title is a claim —
+*mail is a shape, not a fourth adapter* — and a shape is only a shape if the part that is not
+Gmail can be pointed at something that is not Gmail. Microsoft Graph mail (`SEED-260`) is meant to
+be a second module beside `gmail.py` plus the same three delegation lines. Had this logic lived
+inline in `google_drive.py`, the second family would have had nowhere to land and the claim would
+have been unfalsifiable.
+
+⭐ **The claim is MECHANICAL, not a promise.** This file is listed in `test_boundary_fence.py`'s
+`FENCED_MODULES`, so a Google literal here fails a test by name. `sources/base.py`'s own comments
+record provider branching being removed from the contract module **twice** — the second time it
+sat three lines from the guard meant to catch it. A fence that covers the file at the moment it is
+written is the only kind that would have helped.
+
+**Binding invariants.**
+- ⛔ **No Google import, ever.** Enforced by the boundary fence.
+- ⛔ **Two prefixes, never one.** `is_mail_folder` and `is_mail_file` must stay decidable
+  separately; one shared prefix makes them ambiguous at exactly the call site where guessing wrong
+  reads a message id as a label.
+- ⚠ **`message_filename` routes through `sanitize_attachment_filename`.** A Subject is text a
+  stranger chose. This Library has already paid for treating one as safe: a NUL byte inside a
+  `.msg` subject produced a Postgres `22P05` during v3.7 UAT that 5,438 green tests missed.
+- ⚠ **`MAIL_PAGE_SIZE = 25`, and it is smaller than Drive's 30 on purpose.** Google's reference
+  states `users.messages.list` returns *"only an `id` and a `threadId`"*, so a page costs N+1
+  requests. The number matches `service_tools.py`'s `search_email` cap rather than inventing a
+  second one.
+- ⭐ **`path` is a REAL breadcrumb** (`/<label>`), not the fabricated `/<filename>` SEED-253
+  recorded. Mail closes that seed's gap on arrival, because a message's folder IS its label.
+
+**Named seam for the next phase.** None yet. The seam this file IS — the provider/shape split —
+gets its first real test when a second mailbox family arrives; if `mailbox.py` has to change to
+accommodate Graph mail, the split was drawn in the wrong place and that is the finding.
+
+---
+
+## backend/app/services/sources/mail/gmail.py
+
+**Derived 2026-09-09 (Phase 240):** `0 / 0 / 292`. New in this phase.
+
+**What it is.** Three Gmail reads — `users.labels.list`, `users.messages.list` (+ one
+`messages.get?format=metadata` per result), and `messages.get?format=raw` — plus a health probe.
+
+**Provider-docs-first, applied.** Each of these decided a line of code and each is quoted in the
+module docstring with its URL, per CLAUDE.md's rule:
+- `format=RAW` returns *"the entire email message in an RFC 2822 formatted and base64url encoded
+  string"* → the bytes this module yields are the bytes `parse_eml_bytes` already reads. **One
+  parser, two doors.**
+- `users.messages.list` returns *"only an `id` and a `threadId`"* → the listing is unavoidably
+  N+1, which is why the page size is 25 rather than 30.
+- `internalDate` is *"more reliable than the `Date` header"* → it, not `Date`, is the version key.
+  A message is immutable, so a watch pass never re-reads one it has seen.
+
+**Binding invariants.**
+- ⛔ **`gmail_read`, never `drive_read`.** Both resolve to `googleapis.com`, so the pin alone
+  cannot tell them apart. The KEY is what an audit greps, and it is what makes *"a Drive tool
+  cannot reach Gmail"* a checkable statement. `service_tools.py` records the same rule for the
+  chat-time tools; `test_240_mail_shape.py` asserts it on every call.
+- ⛔ **Reads only.** `gmail.compose` sits on this very token (Phase 221 step 2). No endpoint that
+  mutates a mailbox may appear here: no outbound capability exists before its approval model does.
+- ⚠ **base64url padding must be restored.** Google strips it; without the restore, roughly two
+  thirds of messages raise `binascii.Error` — a failure that reads as a corrupt mailbox rather
+  than as a decoder bug.
+- ⚠ **A metadata read that fails RAISES, and that is deliberate.** Swallowing it would produce a
+  short-but-"successful" listing, and an empty-yet-complete listing is what the `H-5` deletion
+  guard consumes. Phase 239 recorded exactly that shape (`200` + empty) as the more urgent half of
+  its own defect. Raising lets `watch_service` mark the listing incomplete and suppress
+  missing-state transitions, which is the fail-closed behaviour the guard was built for.
+- ⚠ **A 403 says what it means.** `oauth_service.py` states that *"an EXISTING connection does not
+  widen itself"*, so a token minted before the mail scope answers 403. `_scope_hint` turns that
+  into a sentence telling the person to reconnect once, rather than a bare HTTP code that sends
+  them hunting a bug that is really a consent.
+
+**Named seam for the next phase.** `_gmail_error_reason` duplicates the shape of
+`google_drive._google_error_reason`. If a third such copy appears, extract one
+`_google_api_error_reason` helper — but not before, because the two currently differ only by
+which log line they feed.
+
+---
+
+## backend/app/services/sources/mail/__init__.py
+
+**Derived 2026-09-09 (Phase 240):** `0 / 0 / 44`. New in this phase.
+
+**What it is.** A re-export surface, and one structural rule.
+
+⛔ **It must never import an adapter.** `app/services/sources/__init__.py` imports every adapter
+eagerly — that eager list is what populates `SourceRegistry`, and its own ledger row records that
+*"an adapter absent here is unregistered, so the list is load-bearing"*. An adapter imports this
+package; an import back the other way is a cycle that would break registration for **every**
+source family, not just mail. The failure would present as "no sources at all", which is a long
+way from where the edge was added.
+
 
 ---
 
