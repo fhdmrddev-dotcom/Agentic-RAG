@@ -9142,6 +9142,94 @@ whose `files_modified` names this file.
 
 ---
 
+## §239-08 — `ConnectionFormPanel.tsx` · THE NAMED SEAM IS TAKEN, AND ONLY THAT SEAM
+
+**Re-derived 2026-09-08 (plan `239-08`), AFTER the extraction commit:
+`28 commits / 10 phases / 2477 lines`** (the row read `27 / 10 / 2807`). Phases unchanged at
+`190 · 206 · 206.1 · 211 · 212 · 213 · 221 · 222 · 231 · 239`.
+⚠ **The re-open trigger written at 239-07 — *"the next phase whose `files_modified` names this
+file"* — FIRED, and the obligation was discharged instead of deferred a fifth time.** The row had
+been STALE AT FOUR CONSECUTIVE CLOSES; it is now derived from git rather than predicted, because
+`239-02` recorded a plan predicting `22 / 9 / 2445` and getting **all three** wrong.
+
+**Disposition: NAMED SEAM TAKEN. `SourceToolsCard.tsx`, `2807 → 2477` (−330).**
+
+⭐ **IT IS A MOVE, AND THAT IS ASSERTED RATHER THAN CLAIMED.** The 298 non-blank JSX lines in the
+new file are **byte-identical to their origin after stripping leading whitespace** — mechanically
+compared, not eyeballed. The panel's whole diff is **three hunks**: one import added, the
+now-unused `SOURCE_*` copy imports removed, and the 332-line block replaced by a 20-line call site.
+
+⛔ **THE WIDER SEAM REMAINS OWED AND MUST NOT BE READ AS DISCHARGED.** This ledger names a broader
+extraction — every per-shape field block → `ConnectionShapeFields.tsx`. **That is untouched.** This
+card was taken first because it is the unit that actually grew the file (~330 lines across
+`239-01..07`) and it is self-contained; taking it SHRINKS the `mcp` block, so the wider seam gets
+easier rather than competing with this one.
+
+⛔ **NO STATE MOVED, WHICH IS WHAT MAKES IT SAFE.** `probeResult` is still a `useState` in the
+panel. The card reads `probeResult` and `draft` and writes only through `set` — the coupling
+`239-07` measured, unchanged.
+
+⚠ **THE FENCES WERE THE REAL RISK, AND ONE OF THEM WENT RED ON THE FIRST RUN — WHICH IS THE
+FINDING.** `ConnectionFormPanel.argumentMapping.test.tsx` scans `panelSource` for vendor-name
+literals and pins a positive control on `connection-source-args`. **An extraction is a silent
+fence-weakening event:** `not.toContain(x)` keeps passing once `x` moves next door, and reads
+exactly like a fence still doing its job. Here the POSITIVE CONTROL caught it — the negative scan
+alone would have gone quietly vacuous. Both were re-pointed: the negative scan now runs over
+`cardSource` **as well as** `panelSource`, and the panel's own scan is kept non-vacuous by
+`expect(panelSource).toContain("<SourceToolsCard")`.
+
+⭐ **THE `mcp` FENCE BECAME STRICTLY STRONGER.** It was a condition at the panel's single call
+site; it is now a guard clause the component owns, so a second caller cannot forget it. The
+behavioural half is unchanged and still driven by the shipped
+`⛔ never offers the binding on a capability connection` case, which was confirmed to go RED when
+the guard was removed.
+
+⚠ **ALL FOUR NEW FENCES WERE DRIVEN RED AGAINST PLANTED DEFECTS and the card restored
+md5-identical** (`7cc09bbc5eca4d7d2e2a9ed666a296d6`) — a guard nobody has seen fire is not a guard.
+⚠ **The first copy-fence plant did NOT fire, and that was the PLANT's fault, not the fence's:** an
+invented sentence is not the constant's value. Re-planted with the literal `"File source mapping"`
+it went red immediately. Recorded because a plant that fails to fire is indistinguishable from a
+dead fence unless you check which of the two you are looking at.
+
+---
+
+## `frontend/src/components/settings/SourceToolsCard.tsx`
+
+**Derived 2026-09-08 (plan `239-08`), at creation: `1 commit / 1 phase / 403 lines` ·
+no (1 phase)** — young. Phases touched: `239`.
+
+**Disposition: young — created by the 239-08 G-5 extraction, not by new feature work.** It is the
+file-source binding card (`data-testid="connection-source-tools"`) moved verbatim out of
+`ConnectionFormPanel.tsx`. **Its 403 lines are not 403 new lines**; 298 of them are the panel's own
+JSX at a different indentation, and the rest are the docblock, the imports and the prop type.
+
+**The invariants it inherited, all of them asserted over THIS file and not only over the panel's:**
+
+- ⛔ **THE `capability === "mcp"` FENCE, NOW A GUARD CLAUSE.**
+  `sources/base.CONFIG_PROTOCOL_MARKERS` resolves ANY connection whose config carries a non-empty
+  `source_tools` to `McpSourceAdapter`, so offering this on a Slack row would hand a first-party
+  connection to the MCP adapter. Owning the condition is stronger than trusting a call site.
+- ⚠ **`capability` IS THE PANEL'S LOCAL, DERIVED FROM `connection.mcp_server_url` — NEVER
+  `draft.capability`.** `ConnectionFormPanel.sourceTools.test.tsx` records that distinction as a
+  measured fact; only the SAVE path consults the draft. The prop is passed, never re-derived here.
+- ⛔ **IT AUTHORS NO SENTENCE OF ITS OWN.** Every user-visible string is an imported identifier
+  from `connectionFormCopy`. Asserted by a `?raw` fence over this source, added in the same commit
+  that created the file — not left to the panel's fence, which cannot see this file at all.
+- ⛔ **ZERO `title=`.** The panel's measured-`0` rule; a reason is DOM text or it does not exist.
+- ⚠ **THE `PhaseFormPanel` IMPORT FENCE IS IMPORT-SCOPED HERE TOO, THOUGH A BARE GREP WOULD PASS
+  TODAY.** This file's docblock does not name `PhaseFormPanel`, so the weaker whole-file form would
+  currently be green — and would go red the day someone explains the lineage in a comment. That is
+  the **187-24 trap**, recorded as having fired eleven times on this codebase; writing the weak
+  form because it passes today is how it fires a twelfth.
+- ⚠ **IT IS DELIBERATELY NOT A `connection-field`.** §3b binds a per-shape field COUNT
+  (`FIELD_COUNTS`); this is a binding editor over a list the server supplied, and counting it there
+  would make the two contracts disagree. Unchanged by the move.
+
+**No seam proposed** — it is one card doing one thing, and it exists precisely to stop being part
+of something larger.
+
+---
+
 ## Scan list — THE AUTHORITATIVE ROW SET
 
 > **Moved here from `CLAUDE.md` on 2026-09-06.** That file now carries the G-5 rule, the re-derive
@@ -9260,7 +9348,8 @@ cells rot within days.
 | [`frontend/src/components/workflows/library/relativeChanged.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryrelativechangedts) | 2 / 2 / 137 | no (2 phases) | young (192.1, 192.2) |
 | [`frontend/src/main.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcmaintsx) | 3 / 1 / 10 | no (1 phase) | young (192.2) |
 | [`frontend/src/components/settings/ConnectionsTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectionstabtsx) | 25 / 9 / 1635 | ⚠ **FIRES** | ⚠ row STALE TWICE (`17 / 7 / 1477`, then `23 / 8 / 1578`). honoured by construction (221-02 / **239-03**) — one prop through three mount sites, twice over. See §239-03 |
-| [`frontend/src/components/settings/ConnectionFormPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectionformpaneltsx) | 27 / 10 / 2807 | ⚠ **FIRES** | ⚠ row STALE FOUR TIMES (`9 / 5 / 2009` … `25 / 10 / 2577`). honoured by construction (**239-07**) — one derived block appended; ⛔ extraction OWED, seam named. See §239-07 |
+| [`frontend/src/components/settings/ConnectionFormPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectionformpaneltsx) | 28 / 10 / 2477 | ⚠ **FIRES** | ⭐ **NAMED SEAM TAKEN (239-08)** — `SourceToolsCard.tsx` extracted, `2807 → 2477`, a pure move. ⛔ the WIDER `ConnectionShapeFields.tsx` seam stays OWED. See §239-08 |
+| [`frontend/src/components/settings/SourceToolsCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingssourcetoolscardtsx) | 1 / 1 / 403 | no (1 phase) | young — created by the 239-08 extraction. Carries the `mcp` fence as a guard clause, and inherits the panel's copy / zero-`title=` fences. See §239-08 |
 | [`frontend/src/components/settings/ConnectionGrantsList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectiongrantslisttsx) | 5 / 2 / 259 | no (2 phases) | 344 → 222 (221-01) → **259**. The availability slot is a CHILD it forwards, not markup it owns |
 | [`frontend/src/lib/api/org.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiorgts) | 11 / 8 / 629 | ⚠ **FIRES** | ⚠ absent for its ENTIRE LIFE at **4 phases** — row added 221, then STALE at `6 / 4 / 562`. **NOT covered by `lib/api.ts`: that row is the BARREL.** ⚠ THIRD wire-type drift here. See §239-03 |
 | [`backend/app/services/connectors/service_tools.py`](docs/HOT-FILE-LEDGER.md#backendappservicesconnectorsservice_toolspy) | 11 / 1 / 2018 | no (1 phase) | row added 221. Re-derived 232: 2018 L; internal Google Drive tools delegate to sources adapter |
