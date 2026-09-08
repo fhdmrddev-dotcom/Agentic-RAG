@@ -179,6 +179,13 @@ import {
   SERVICE_PLACEHOLDER,
   SERVICE_SAVE_DISABLED_REASON,
   SERVICE_SUGGESTIONS,
+  SOURCE_ARGS_HEADING,
+  SOURCE_ARGS_HELP,
+  SOURCE_ARGS_NONE_NEEDED,
+  SOURCE_ARGS_UNDESCRIBED,
+  SOURCE_ARG_VALUE_MAX,
+  SOURCE_PATH_ARG_HELP,
+  SOURCE_PATH_ARG_LABEL,
   SOURCE_TOOLS_DEFAULT_LIST,
   SOURCE_TOOLS_DEFAULT_READ,
   SOURCE_TOOLS_HEADING,
@@ -187,6 +194,11 @@ import {
   SOURCE_TOOLS_READ_LABEL,
   SOURCE_TOOLS_ROOT_LABEL,
   SOURCE_TOOLS_ROOT_HELP,
+  sourceArgRowNote,
+  sourceArgsIncompleteNote,
+  sourceArgsUnstorableNote,
+  sourceArgumentModel,
+  sourcePathArgUnsetLabel,
   sourceToolUnsetLabel,
   sourceToolsWithheldNote,
   looksLikeSourceToolMutation,
@@ -1831,6 +1843,181 @@ export function ConnectionFormPanel({
                   <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
                     {SOURCE_TOOLS_ROOT_HELP}
                   </p>
+                </div>
+              )
+            })()}
+
+            {/* ── SEED-259 — WHICH ARGUMENTS THIS SERVER NEEDS ──────────────────────────
+                 ⭐ THE HALF THAT WAS CODE. Phase 239 made a tool's NAME a row and left its
+                 ARGUMENT SHAPE in the adapter, which always sent a lone `path`. Driven live,
+                 a server whose reader takes three arguments answered `HTTP 200` with an EMPTY
+                 LISTING — and an empty-but-complete listing is exactly what the `H-5` deletion
+                 guard consumes. `239-06` made the shape a row and made the underspecified call
+                 a REFUSAL BY NAME; this block is the only place a person can supply it.
+
+                 ⛔ NO SERVER IS NAMED AND NO ARGUMENT IS DEFAULTED. Every row below is derived
+                 from the server's own `inputSchema`, already discovered and already stored. A
+                 second server needs rows here, never a branch — which is the whole ruling.
+
+                 ⚠ THE STORED VALUE IS ALWAYS RENDERED, in both controls. A control that shows
+                 blank over a stored value turns "open the panel and press Save" into a silent
+                 wipe (HI-02), and `configFromDraft` rewrites this column WHOLE. */}
+            {(() => {
+              const args = sourceArgumentModel(probeResult, draft)
+              const pathId = `${fieldId}-source-path-arg`
+              // ⛔ THE STORED VALUE IS OFFERED EVEN WHEN THE SCHEMA DOES NOT DECLARE IT. A
+              // `<select>` whose value is absent from its options renders as UNSELECTED.
+              const stored = draft.sourcePathArg.trim()
+              const pathOptions = stored && !args.declared.includes(stored)
+                ? [...args.declared, stored]
+                : args.declared
+              return (
+                <div
+                  data-testid="connection-source-args"
+                  className="mt-3 border-t border-border/60 pt-2.5"
+                >
+                  <p className="text-[11px] font-semibold text-foreground">
+                    {SOURCE_ARGS_HEADING}
+                  </p>
+                  <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+                    {SOURCE_ARGS_HELP}
+                  </p>
+
+                  <div className="mt-2.5">
+                    <label
+                      htmlFor={pathId}
+                      className="mb-1 block text-[11px] font-medium text-foreground"
+                    >
+                      {SOURCE_PATH_ARG_LABEL}
+                    </label>
+                    {readOnly ? (
+                      <div
+                        id={pathId}
+                        data-testid="connection-field-static"
+                        className="font-mono text-[11px] text-muted-foreground"
+                      >
+                        {draft.sourcePathArg || sourcePathArgUnsetLabel()}
+                      </div>
+                    ) : args.declared.length > 0 ? (
+                      // ⚠ THE BRANCH IS ON WHAT THE SERVER DECLARED, NOT ON HOW MANY OPTIONS
+                      // WOULD RESULT. A stored value is always ADDED to the options — but it
+                      // must never be the thing that manufactures a picker, or a server that
+                      // published no schema would offer a one-option `<select>` containing the
+                      // person's own previous answer and nothing else: a control that looks
+                      // like a choice and is a dead end.
+                      // ⭐ THE PRODUCT ALREADY KNOWS THESE NAMES, so it offers them. Asking a
+                      // person to retype one is how a typo pins every read to one fixed place.
+                      <select
+                        id={pathId}
+                        value={draft.sourcePathArg}
+                        onChange={(e) => set({ sourcePathArg: e.target.value })}
+                        className="w-full rounded-md border border-border bg-card px-2 py-1.5 text-[13px] text-foreground focus:border-primary focus:outline-none"
+                      >
+                        <option value="">{sourcePathArgUnsetLabel()}</option>
+                        {pathOptions.map((name) => (
+                          <option key={name} value={name}>
+                            {name}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      // ⚠ FREE TEXT ONLY WHERE NOTHING IS KNOWABLE — a `<select>` with one
+                      // option would TRAP a person on a server that published no schema. The
+                      // control follows the evidence rather than the other way round.
+                      <input
+                        id={pathId}
+                        type="text"
+                        value={draft.sourcePathArg}
+                        onChange={(e) => set({ sourcePathArg: e.target.value })}
+                        maxLength={SOURCE_ARG_VALUE_MAX}
+                        spellCheck={false}
+                        className="w-full rounded-md border border-border bg-card px-2 py-1.5 font-mono text-[13px] text-foreground focus:border-primary focus:outline-none"
+                      />
+                    )}
+                    <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+                      {SOURCE_PATH_ARG_HELP}
+                    </p>
+                  </div>
+
+                  {args.rows.map((row, index) => {
+                    const rowId = `${fieldId}-source-arg-${index}`
+                    return (
+                      <div
+                        key={row.name}
+                        data-testid="connection-source-arg-row"
+                        className="mt-2.5"
+                      >
+                        <label
+                          htmlFor={rowId}
+                          className="mb-1 block text-[11px] font-medium text-foreground"
+                        >
+                          {/* The server's own name, VERBATIM — never prettified. A renamed
+                              argument is a different argument. */}
+                          <span data-testid="connection-source-arg-name" className="font-mono">
+                            {row.name}
+                          </span>
+                        </label>
+                        {readOnly ? (
+                          <div
+                            id={rowId}
+                            data-testid="connection-field-static"
+                            className="font-mono text-[11px] text-muted-foreground"
+                          >
+                            {row.value || "—"}
+                          </div>
+                        ) : (
+                          <input
+                            id={rowId}
+                            type="text"
+                            value={row.value}
+                            onChange={(e) =>
+                              set({
+                                // ⛔ A NEW OBJECT EVERY TIME. `EMPTY_DRAFT` is spread, not
+                                // deep-cloned, so mutating in place would edit the shared
+                                // default and leak this mapping into the next form opened.
+                                sourceStaticArgs: {
+                                  ...draft.sourceStaticArgs,
+                                  [row.name]: e.target.value,
+                                },
+                              })
+                            }
+                            maxLength={SOURCE_ARG_VALUE_MAX}
+                            spellCheck={false}
+                            className="w-full rounded-md border border-border bg-card px-2 py-1.5 font-mono text-[13px] text-foreground focus:border-primary focus:outline-none"
+                          />
+                        )}
+                        <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+                          {sourceArgRowNote(row.required)}
+                        </p>
+                      </div>
+                    )
+                  })}
+
+                  {/* ⚠ TWO DIFFERENT FACTS. "asks for nothing else" is about the SERVER;
+                      "has not said" is about what we hold. Only one of them is ever true. */}
+                  {args.rows.length === 0 && args.unstorable.length === 0 && (
+                    <p className="mt-2 text-[11px] leading-snug text-muted-foreground">
+                      {args.described ? SOURCE_ARGS_NONE_NEEDED : SOURCE_ARGS_UNDESCRIBED}
+                    </p>
+                  )}
+
+                  {args.missing.length > 0 && (
+                    <p
+                      data-testid="connection-source-args-incomplete"
+                      className="mt-2 text-[11px] leading-snug text-amber-700 dark:text-amber-300"
+                    >
+                      {sourceArgsIncompleteNote(args.missing)}
+                    </p>
+                  )}
+
+                  {args.unstorable.length > 0 && (
+                    <p
+                      data-testid="connection-source-args-unstorable"
+                      className="mt-2 text-[11px] leading-snug text-muted-foreground"
+                    >
+                      {sourceArgsUnstorableNote(args.unstorable)}
+                    </p>
+                  )}
                 </div>
               )
             })()}
