@@ -713,7 +713,9 @@ CREATE TABLE public.app_settings (
     supabase_management_token text,
     vision_model text,
     vision_max_pages integer DEFAULT 50,
-    CONSTRAINT app_settings_extraction_table_engine_pdf_check CHECK ((extraction_table_engine_pdf = ANY (ARRAY['camelot'::text, 'pdfplumber'::text])))
+    source_max_file_size_mb integer DEFAULT 25,
+    CONSTRAINT app_settings_extraction_table_engine_pdf_check CHECK ((extraction_table_engine_pdf = ANY (ARRAY['camelot'::text, 'pdfplumber'::text]))),
+    CONSTRAINT app_settings_source_max_file_size_mb_bounds CHECK (((source_max_file_size_mb IS NULL) OR ((source_max_file_size_mb >= 1) AND (source_max_file_size_mb <= 50))))
 );
 
 
@@ -750,6 +752,13 @@ COMMENT ON COLUMN public.app_settings.vision_model IS 'Model used to transcribe 
 --
 
 COMMENT ON COLUMN public.app_settings.vision_max_pages IS 'Hard ceiling on pages transcribed per document. A document with more pages is transcribed up to this number and the shortfall is recorded in documents.metadata._vision.truncated AND stated in every chunk header, so a partial transcription can never read as complete.';
+
+
+--
+-- Name: COLUMN app_settings.source_max_file_size_mb; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.app_settings.source_max_file_size_mb IS 'SEED-258. The largest file any connected source (Google Drive, Microsoft Graph, any MCP file surface) will import, in MB. Read through source_max_file_bytes(); the MCP JSON-RPC envelope cap is DERIVED from this (x 4/3 for base64, plus 1 MB headroom) and is never a second setting. Bounded 1..50: 0 would stop every source importing while each sync still reported success, and 50 MB is the application''s own manual-upload ceiling. Raising it costs memory — the whole response is buffered per in-flight request from a server we do not control. NULL reads as the shipped 25 MB.';
 
 
 --
