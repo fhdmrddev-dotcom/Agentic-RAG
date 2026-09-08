@@ -94,13 +94,28 @@ MAX_FILE_BYTES = 25 * 1024 * 1024
 DEFAULT_LIST_TOOL = "list_directory"
 DEFAULT_READ_TOOL = "read_file"
 
-#: The label the picker shows before anything has been fetched. Shared with
-#: `microsoft_graph.py` so a client that already handles one virtual root handles this one.
+#: The label the picker shows before anything has been fetched.
 #:
 #: ⛔ NOT `""`. The contract's conformance suite requires a non-empty `SourceNode.id`, and an
 #: empty root id makes `browse(root)` indistinguishable from `browse(None)` — a picker walking
 #: down from what it was handed would loop forever.
-VIRTUAL_ROOT_ID = "virtual_root"
+#:
+#: ⚠ AND NOT `"virtual_root"` EITHER, WHICH IS WHAT IT WAS (review LO-06). Every id this
+#: adapter emits is a PATH on the remote server, so the sentinel lived in the same namespace
+#: as real data: a server whose root contained a directory literally called `virtual_root`
+#: had it silently rewritten to `root_path` on browse — the folder the person clicked and a
+#: different folder entirely were the same string. `mcp:root` cannot be produced by `_join`,
+#: which only ever concatenates a folder path and an entry name.
+#:
+#: ⚠ NOT `"\x00virtual_root"`, which the review offered as the alternative: a NUL byte in a
+#: value that reaches `connector_watches.source_folder_id` is a Postgres `22P05`, which is
+#: the defect v3.7's UAT caught in a `.msg` subject line. A sentinel must survive the column
+#: it is stored in.
+#:
+#: ⚠ NO MIGRATION IS OWED. `SEED-257` records that MCP sources could not be driven locally at
+#: all, and this family has never shipped past `develop`, so no row can carry the old value.
+#: Had one existed, the old string would have to stay in `VIRTUAL_ROOT_IDS` as a legacy arm.
+VIRTUAL_ROOT_ID = "mcp:root"
 VIRTUAL_ROOT_IDS = (None, "", VIRTUAL_ROOT_ID)
 
 #: `[DIR] name` / `[FILE] name (1234 bytes)` — the shape `list_directory` actually answers in.
@@ -573,10 +588,13 @@ def _parse_listing(result: dict[str, Any], folder_path: str) -> list[_Entry]:
 
     entries = _structured_entries(payload)
     if entries is not None:
+        # ⭐ AN EXPLICIT EMPTY CONTAINER IS AN ANSWER. `{"entries": []}` or `[]` is the server
+        # SAYING there is nothing here, which is legitimately a complete, empty listing.
         return [_entry_from_item(item, folder_path) for item in entries]
 
+    lines = [line for line in text.splitlines() if line.strip()]
     parsed: list[_Entry] = []
-    for line in text.splitlines():
+    for line in lines:
         hit = _parse_line(line)
         if not hit:
             continue
@@ -589,6 +607,32 @@ def _parse_listing(result: dict[str, Any], folder_path: str) -> list[_Entry]:
                 size=size,
                 modified_at=_version(None, size),
             )
+        )
+
+    # ⛔ HI-03 — THE FAIL-OPEN IN A GUARD WHOSE ENTIRE PURPOSE IS TO FAIL CLOSED.
+    #
+    # `McpToolResultError`'s own docstring calls this "the worst defect available on this
+    # path: a listing error becomes an EMPTY listing (which is what the H-5 deletion guard
+    # consumes)" — and then this parser caught only the `isError` FIELD. Anything else the
+    # parser did not recognise fell through both doors and returned `[]`. Driven::
+    #
+    #     _parse_listing({"isError": False, "text": "permission denied"}, "/docs")  ->  []
+    #
+    # `list_files` always answers `next_page_token=None`, so `watch_service` stamps
+    # `listing.complete = True` on the first pass. An unparsed refusal therefore produces the
+    # exact state H-5 exists to refuse — **complete, and zero files** — and the next tick
+    # marks every tracked item `missing`, stamps `source_state` on every document minted from
+    # that folder, and REPORTS SUCCESS.
+    #
+    # ⚠ THE DISTINCTION IS BETWEEN TWO SILENCES: "the server said there is nothing here" and
+    # "I did not understand the answer". Only the first may be complete. An empty body is
+    # still a legitimately empty folder; a body with content that yielded no entries is not.
+    if lines and not parsed:
+        raise McpToolResultError(
+            "The server answered this listing in a shape this app does not understand, so "
+            "nothing was read. Refused rather than reported as an empty folder: an empty "
+            "listing is what the deletion guard consumes, and it would mark every file in "
+            f"this folder as missing. The server said: {text[:200]!r}"
         )
     return parsed
 
@@ -649,16 +693,27 @@ def _error_text(result: dict[str, Any]) -> str:
     return text[:300]
 
 
-def _decode_content(result: dict[str, Any]) -> tuple[bytes, str | None]:
-    """D-239-07 — the payload and the MIME type the SERVER stated, or `None` for "it did not".
+def _decode_content(result: dict[str, Any]) -> tuple[bytes, str | None, bool]:
+    """D-239-07 — the payload, the MIME type the SERVER stated, and WHETHER IT SENT ANYTHING.
 
     ⚠ Size is checked on the DECODED bytes. Base64 inflates by 4/3, so a check on the encoded
     string would refuse a legal payload and — the direction that matters — admit one a third
     over the ceiling.
+
+    ⭐ THE THIRD RETURN VALUE IS ME-03, AND IT IS THE DIFFERENCE BETWEEN TWO ZEROES.
+    `read_file` used to raise on `not payload`, three lines under a comment stating that *"an
+    empty file is legal; an UNREADABLE file arriving as b'' is not, and the two must not look
+    alike"* — the comment named the requirement and the code collapsed both into the error
+    arm. An MCP `read_file` on a 0-byte file answers
+    `content: [{"type": "text", "text": ""}]`, which decodes to `b""`, so a watched folder
+    holding one empty `.md` placeholder raised for that item on EVERY cycle, forever, for a
+    file that was exactly what it appeared to be. `saw_a_block` says whether the server sent
+    a content block at all, which is the fact the two cases actually differ on.
     """
     blocks = result.get("content")
     chunks: list[bytes] = []
     stated_mime: str | None = None
+    saw_a_block = False
 
     if isinstance(blocks, list):
         for block in blocks:
@@ -666,17 +721,20 @@ def _decode_content(result: dict[str, Any]) -> tuple[bytes, str | None]:
                 continue
             kind = str(block.get("type") or "")
             if kind == "text":
+                saw_a_block = True
                 chunks.append(str(block.get("text") or "").encode("utf-8"))
             elif kind == "resource":
                 resource = block.get("resource")
                 if not isinstance(resource, dict):
                     continue
+                saw_a_block = True
                 stated_mime = stated_mime or _first_str(resource, ("mimeType", "mime_type"))
                 if isinstance(resource.get("blob"), str):
                     chunks.append(_b64(resource["blob"]))
                 elif isinstance(resource.get("text"), str):
                     chunks.append(resource["text"].encode("utf-8"))
             elif kind in ("image", "audio") and isinstance(block.get("data"), str):
+                saw_a_block = True
                 stated_mime = stated_mime or _first_str(block, ("mimeType", "mime_type"))
                 chunks.append(_b64(block["data"]))
             _guard(chunks)
@@ -684,10 +742,11 @@ def _decode_content(result: dict[str, Any]) -> tuple[bytes, str | None]:
     if not chunks:
         text = str(result.get("text") or "")
         if text:
+            saw_a_block = True
             chunks.append(text.encode("utf-8"))
             _guard(chunks)
 
-    return b"".join(chunks), stated_mime
+    return b"".join(chunks), stated_mime, saw_a_block
 
 
 def _b64(value: str) -> bytes:
@@ -718,7 +777,32 @@ class McpSourceAdapter(SourceAdapter):
             secret=binding.secret,
             auth_scheme=binding.auth_scheme,
         )
-        return _parse_listing(result, folder_path)
+        try:
+            return _parse_listing(result, folder_path)
+        except McpToolResultError as exc:
+            # ⚠ HI-04, AS A DIAGNOSIS RATHER THAN AS A VERDICT — and the distinction is
+            # deliberate, because only half of that finding is verified.
+            #
+            # VERIFIED: `root_path` defaults to `""`, `infer_source_tools` never produces it,
+            # and the Settings panel renders NO CONTROL for it — so the virtual root always
+            # resolves to `{"path": ""}` and the only way to set one is a hand-crafted PATCH.
+            # SUSPECTED: that `""` is what the server refuses. `SEED-257` records that MCP
+            # sources cannot be driven locally at all, so nobody has seen the answer, and two
+            # shipped tests assert the opposite claim — that an empty path addresses the
+            # server's own default root. Refusing the empty root outright would pick one
+            # unverified belief over another AND break every server that is rooted at `""`.
+            #
+            # So the empty path is NAMED at the moment it plausibly caused a failure, and
+            # nothing is refused on a guess. ⛔ THE UI CONTROL IS STILL OWED — see
+            # `239-04-SUMMARY.md`; it is a frontend change and it belongs to nobody's scope yet.
+            if not folder_path:
+                raise McpToolResultError(
+                    f"{exc} — and the path sent was EMPTY, because this connection has no "
+                    "root folder set. Most MCP file servers scope reads to an allow-list of "
+                    "absolute directories and refuse an empty path. The root folder is "
+                    "`source_tools.root_path` on the connection."
+                ) from exc
+            raise
 
     # ── the contract ─────────────────────────────────────────────────────────────────────
 
@@ -729,9 +813,18 @@ class McpSourceAdapter(SourceAdapter):
         page_token: str | None = None,
     ) -> BrowsePage:
         """Browse the server's folder tree."""
+        # ⚠ LO-02 — THE BINDING IS RESOLVED FIRST, EVEN THOUGH THE ROOT IS A CONSTANT.
+        # This used to return the root before any validation, so a row with no
+        # `mcp_server_url` (or a malformed `source_tools`) rendered a folder named after the
+        # connection and failed only on the NEXT click — the failure was attributed to the
+        # folder rather than to the row. Resolving costs no round trip to the SERVER; it
+        # validates the row and, at most, re-reads it when the caller handed in an object
+        # that carries no credential.
+        binding = await _resolve_binding(connection)
+
         if folder_id in (None, ""):
-            # No round trip: the root is a label, and spending a call to learn a constant is
-            # how a picker feels slow before it has done anything.
+            # No round trip to the server: the root is a label, and spending a call to learn
+            # a constant is how a picker feels slow before it has done anything.
             binding_name = str(_attr(connection, "name", "") or "Files")
             return BrowsePage(
                 items=[SourceNode(
@@ -740,7 +833,6 @@ class McpSourceAdapter(SourceAdapter):
                 next_page_token=None,
             )
 
-        binding = await _resolve_binding(connection)
         entries = await self._list(binding, folder_id)
         return BrowsePage(
             items=[
@@ -826,15 +918,22 @@ class McpSourceAdapter(SourceAdapter):
                 _error_text(result) or "The server refused to read this file."
             )
 
-        payload, stated_mime = _decode_content(result)
+        payload, stated_mime, saw_a_block = _decode_content(result)
         filename = posixpath.basename(str(file_id).replace("\\", "/").rstrip("/")) or str(file_id)
 
-        if not payload:
+        if not saw_a_block:
             # ⚠ An empty file is legal; an UNREADABLE file arriving as `b""` is not, and the
             # two must not look alike — a silent `b""` is minted as an empty document and
             # reads as a successful sync forever after.
+            #
+            # ⭐ ME-03: the test is now "did the server send a content block?", not "are the
+            # bytes empty?". A 0-byte file sends a block whose text is `""`; a server that
+            # answered nothing at all sends no block. The comment above stated exactly this
+            # requirement while the code three lines under it collapsed both into the error.
             raise McpToolResultError(
-                f"The server returned no content for {filename!r}, so nothing was imported."
+                f"The server returned no content blocks for {filename!r}, so nothing was "
+                f"imported. (A 0-byte file is not this case — that arrives as an empty "
+                f"content block and is imported as the empty file it is.)"
             )
 
         return filename, payload, stated_mime or _mime_for(filename, from_text=True)

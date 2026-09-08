@@ -550,9 +550,19 @@ class TestMcpSourceAdapterConformance:
 
     @pytest.mark.asyncio
     async def test_browse_root_returns_virtual_roots(self, mcp_adapter: SourceAdapter):
+        from app.services.sources.adapters.mcp_source import VIRTUAL_ROOT_ID
+
         page = await mcp_adapter.browse(connection=MCP_CONNECTION)
         assert isinstance(page, BrowsePage)
-        assert [n.id for n in page.items] == ["virtual_root"]
+        # ⚠ The SENTINEL, not a literal. It stopped being `"virtual_root"` at the Phase 239
+        # review (LO-06): every other id this adapter emits is a real path on the remote
+        # server, so a sentinel living in that same namespace collided with a real folder of
+        # that name. What matters to the CONTRACT is that the root id is non-empty and round
+        # trips — which is what is asserted, and it is a stronger claim than the literal was.
+        assert [n.id for n in page.items] == [VIRTUAL_ROOT_ID]
+        assert VIRTUAL_ROOT_ID not in ("", "virtual_root"), (
+            "the sentinel must not be spelled like a path a server could return"
+        )
         for node in page.items:
             assert isinstance(node, SourceNode)
             assert node.kind == "folder"

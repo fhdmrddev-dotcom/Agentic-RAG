@@ -34,6 +34,7 @@ from app.services.sources.base import (
     SourceNode,
     SourceRegistry,
 )
+from app.services.sources.adapters.mcp_source import VIRTUAL_ROOT_ID
 
 SERVER = "https://files.example.com/mcp"
 
@@ -845,3 +846,221 @@ class TestProtocolResolution:
         assert getattr(pkg, "mcp_source", None) is not None, (
             "mcp_source is not eagerly imported by app/services/sources/__init__.py"
         )
+
+
+# ── H. Phase 239 review, gap-closure round 1 ─────────────────────────────────────────────
+
+
+class TestAnUnparsedListingIsNeverReportedAsAnEmptyOne:
+    """⛔ HI-03 — THE FAIL-OPEN IN A GUARD WHOSE WHOLE PURPOSE IS TO FAIL CLOSED.
+
+    `McpToolResultError`'s docstring names this as *"the worst defect available on this
+    path"*, and then `_parse_listing` caught only the `isError` FIELD. Everything else the
+    parser did not recognise fell through both doors and returned `[]` — and because
+    `list_files` always answers `next_page_token=None`, `watch_service` stamps
+    `listing.complete = True` on the first pass. **Complete, and zero files** is precisely the
+    state the H-5 deletion guard exists to refuse: every tracked item goes `missing`, every
+    document minted from that folder gets a `source_state`, and the run reports success.
+    """
+
+    def test_a_prose_refusal_with_isError_false_is_NOT_an_empty_folder(self):
+        from app.services.sources.adapters.mcp_source import (
+            McpToolResultError,
+            _parse_listing,
+        )
+
+        with pytest.raises(McpToolResultError, match="does not understand"):
+            _parse_listing({"isError": False, "text": "permission denied"}, "/docs")
+
+    def test_an_unrecognised_JSON_shape_is_NOT_an_empty_folder(self):
+        from app.services.sources.adapters.mcp_source import (
+            McpToolResultError,
+            _parse_listing,
+        )
+
+        with pytest.raises(McpToolResultError, match="does not understand"):
+            _parse_listing(
+                {"isError": False, "text": '{"status":"denied","reason":"no access to /docs"}'},
+                "/docs",
+            )
+
+    def test_a_GENUINELY_empty_folder_is_still_empty_and_still_complete(self):
+        """⭐ THE CONTROL THAT KEEPS THE FIX FROM BEING A DIFFERENT FAIL-CLOSED BUG. The
+        distinction is between two silences — *"the server said there is nothing here"* and
+        *"I did not understand the answer"* — and only the first may be complete."""
+        from app.services.sources.adapters.mcp_source import _parse_listing
+
+        assert _parse_listing({"isError": False, "text": ""}, "/docs") == []
+        assert _parse_listing({"isError": False, "text": "   \n\n  "}, "/docs") == []
+        assert _parse_listing({"isError": False, "text": "[]"}, "/docs") == []
+        assert _parse_listing({"isError": False, "text": '{"entries": []}'}, "/docs") == []
+
+    def test_a_PARTIALLY_understood_listing_is_kept_rather_than_refused(self):
+        """A trailing `Total: 1 file` summary line must not throw away the file above it."""
+        from app.services.sources.adapters.mcp_source import _parse_listing
+
+        entries = _parse_listing(
+            {"isError": False, "text": "[FILE] a.txt (10 bytes)\nTotal: 1 file\n"}, "/docs"
+        )
+        assert [e.name for e in entries] == ["a.txt"]
+
+    @pytest.mark.asyncio
+    async def test_the_unparsed_listing_reaches_the_CALLER_rather_than_the_watch_loop(
+        self, adapter, patch_mcp
+    ):
+        """The unit above proves the parser; this proves nothing swallows it on the way out —
+        which is the half that actually protects the deletion guard."""
+        from app.services.sources.adapters.mcp_source import McpToolResultError
+
+        patch_mcp(FakeMcp(listing=text_result("permission denied")))
+        with pytest.raises(McpToolResultError):
+            await adapter.list_files(conn(config={"source_tools": {"root_path": "/srv"}}),
+                                     folder_id="docs")
+
+
+class TestAnEmptyFileIsAFileAndNotAnError:
+    """⚠ ME-03 — the code contradicted the comment three lines above it.
+
+    That comment says *"an empty file is legal; an UNREADABLE file arriving as b'' is not, and
+    the two must not look alike"*. The code then collapsed both into the error arm, so a
+    watched folder holding one empty `.md` placeholder raised for that item on every cycle,
+    forever, for a file that was exactly what it appeared to be.
+    """
+
+    @pytest.mark.asyncio
+    async def test_a_zero_byte_file_is_imported_as_the_empty_file_it_is(
+        self, adapter, patch_mcp
+    ):
+        patch_mcp(FakeMcp(read=text_result("")))
+        filename, payload, mime = await adapter.read_file(conn(), "docs/placeholder.md")
+        assert filename == "placeholder.md"
+        assert payload == b""
+        assert mime == "text/markdown"
+
+    @pytest.mark.asyncio
+    async def test_a_server_that_sent_NO_CONTENT_BLOCK_is_still_refused(
+        self, adapter, patch_mcp
+    ):
+        """⭐ THE CONTROL. The fix must not make an unreadable file look like an empty one —
+        that is the same collapse in the other direction, and it is the one that mints a
+        silent `b""` as a document and reads as a successful sync forever after."""
+        from app.services.sources.adapters.mcp_source import McpToolResultError
+
+        patch_mcp(FakeMcp(read={"text": "", "content": [], "isError": False, "raw": {}}))
+        with pytest.raises(McpToolResultError, match="no content blocks"):
+            await adapter.read_file(conn(), "docs/ghost.md")
+
+
+class TestTheRootIsNotAPathAServerCanReturn:
+    """⚠ LO-06 — the sentinel used to live in the same namespace as real data."""
+
+    def test_the_sentinel_cannot_be_produced_by_joining_a_folder_and_a_name(self):
+        from app.services.sources.adapters.mcp_source import VIRTUAL_ROOT_ID, _join
+
+        assert _join("", VIRTUAL_ROOT_ID) != VIRTUAL_ROOT_ID or ":" in VIRTUAL_ROOT_ID
+        assert ":" in VIRTUAL_ROOT_ID, (
+            "the sentinel must carry a character `_join` never introduces, or a server whose "
+            "root holds a folder of that name has it silently rewritten to root_path"
+        )
+        assert "\x00" not in VIRTUAL_ROOT_ID, (
+            "a NUL reaches connector_watches.source_folder_id and is a Postgres 22P05 — the "
+            "defect v3.7 UAT caught in a .msg subject line"
+        )
+
+    @pytest.mark.asyncio
+    async def test_a_real_folder_called_virtual_root_is_addressed_as_itself(
+        self, adapter, patch_mcp
+    ):
+        """The defect, driven end to end — AND AT THE EMPTY ROOT, WHICH IS THE ONLY PLACE IT
+        IS REACHABLE. That is the whole reason LO-06 and HI-04 are the same story: `_join`
+        only yields the bare name `virtual_root` when the folder path is `""`, and HI-04
+        establishes that the folder path is ALWAYS `""` today, because nothing can set a root.
+
+        ⚠ This case was written first with `root_path="/srv"` and it PASSED against the old
+        sentinel — the id was `/srv/virtual_root` either way, so it proved nothing. A test
+        that cannot fail on the defect is not evidence of the fix.
+
+        Under the old sentinel: the folder's id was the literal `virtual_root`, `wire_path`
+        matched it against `VIRTUAL_ROOT_IDS`, and clicking the folder listed `root_path`
+        instead — the folder shown and the folder read were different folders.
+        """
+        fake = patch_mcp(FakeMcp(listing=json_listing([
+            {"name": "virtual_root", "type": "directory"},
+        ])))
+        c = conn()  # no root_path — the state every MCP row is in today (HI-04)
+        page = await adapter.browse(c, folder_id=VIRTUAL_ROOT_ID)
+        assert [n.id for n in page.items] == ["virtual_root"]
+
+        await adapter.browse(c, folder_id=page.items[0].id)
+        assert fake.calls[-1]["arguments"]["path"] == "virtual_root", (
+            "the sentinel swallowed a real folder: this browse listed the root instead"
+        )
+
+
+class TestTheRootIsValidatedBeforeItIsOffered:
+    """⚠ LO-02 — `browse(None)` minted a plausible root before the binding was validated, so a
+    row with no `mcp_server_url` rendered a folder named after the connection and failed only
+    on the next click. The failure then reads as *"that folder is broken"* rather than
+    *"this connection is not configured"*."""
+
+    @pytest.mark.asyncio
+    async def test_a_row_with_no_server_url_does_not_mint_a_root(self, adapter, patch_mcp):
+        fake = patch_mcp(FakeMcp())
+        with pytest.raises(ValueError, match="mcp_server_url|server to read from"):
+            await adapter.browse(conn(mcp_server_url=None), folder_id=None)
+        assert fake.calls == [], "still no round trip — the refusal is local"
+
+    @pytest.mark.asyncio
+    async def test_a_row_with_a_malformed_binding_does_not_mint_a_root(self, adapter, patch_mcp):
+        patch_mcp(FakeMcp())
+        with pytest.raises(ValueError, match="source_tools"):
+            await adapter.browse(conn(config={"source_tools": "read_file"}), folder_id=None)
+
+    @pytest.mark.asyncio
+    async def test_a_valid_row_still_costs_no_round_trip_to_the_server(self, adapter, patch_mcp):
+        fake = patch_mcp(FakeMcp())
+        page = await adapter.browse(conn(), folder_id=None)
+        assert fake.calls == [], "browsing the root must not contact the server"
+        assert len(page.items) == 1
+
+
+class TestTheEmptyRootIsNamedWhenItPlausiblyCausedTheFailure:
+    """⚠ HI-04, AND ONLY THE VERIFIED HALF OF IT.
+
+    VERIFIED: `root_path` defaults to `""`, `infer_source_tools` never produces it, and
+    Settings renders no control for it — so the virtual root always resolves to `path: ""`
+    and the only way to set one is a hand-crafted PATCH.
+    SUSPECTED: that `""` is what a server refuses. `SEED-257` records that MCP sources cannot
+    be driven locally at all, and two shipped tests in this file assert the opposite claim.
+    So the empty path is NAMED when a listing fails, and nothing is refused on a guess.
+    ⛔ The Settings control is still owed and is a frontend change — see `239-04-SUMMARY.md`.
+    """
+
+    @pytest.mark.asyncio
+    async def test_a_failed_listing_at_an_empty_root_names_the_empty_root(
+        self, adapter, patch_mcp
+    ):
+        from app.services.sources.adapters.mcp_source import McpToolResultError
+
+        patch_mcp(FakeMcp(listing={
+            "text": "Access denied - path outside allowed directories",
+            "content": [], "isError": True, "raw": {},
+        }))
+        with pytest.raises(McpToolResultError, match="no root folder set"):
+            await adapter.list_files(conn(), folder_id=None)
+
+    @pytest.mark.asyncio
+    async def test_a_failed_listing_at_a_REAL_root_does_not_blame_the_root(
+        self, adapter, patch_mcp
+    ):
+        """⭐ The control: a configured root must not be accused of being absent."""
+        from app.services.sources.adapters.mcp_source import McpToolResultError
+
+        patch_mcp(FakeMcp(listing={
+            "text": "Access denied", "content": [], "isError": True, "raw": {},
+        }))
+        with pytest.raises(McpToolResultError) as caught:
+            await adapter.list_files(
+                conn(config={"source_tools": {"root_path": "/srv"}}), folder_id=None
+            )
+        assert "no root folder set" not in str(caught.value)
