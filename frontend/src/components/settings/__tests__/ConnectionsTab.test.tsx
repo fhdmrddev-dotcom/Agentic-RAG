@@ -2073,6 +2073,55 @@ describe("§19 · a source-only connection reads `✓ Ready as source` (BUG-2609
     expect(stateWordFor("Microsoft 365")).toBe("⏻ Disabled")
   })
 
+  // ── gap-closure round 1 (HI-01) — THE THIRD OVER-CLAIMING ARM, ON SCREEN ─────────────
+  //
+  // ⭐ WHY THIS ROW AND NOT `MCP_FILES_ROW` ABOVE. That fixture's `service_id` is
+  // `mcp.acme.internal`, which the product never writes; it reaches the verdict through the
+  // TRANSPORT door and is a true positive. The row below is the one the product ACTUALLY
+  // creates — `McpAuthDoor` defaults `service_id` to `custom_mcp` — and `custom_mcp` is also
+  // a published family, so the exact-id arm answered `true` before consulting any evidence.
+  //
+  // ⚠ THE WORD IS THE DELIVERABLE. `✓ Ready as source` printed on a server nobody has ever
+  // contacted is the whole defect, so this asserts the rendered STRING, not that a state chip
+  // exists — Phase 235's finding, applied to the surface that reported it.
+
+  /** A Linear MCP URL pasted into *Custom MCP Server*: never contacted, no tools, no binding.
+   *  Every field is what the shipped create path writes. */
+  const UNPROVEN_CUSTOM_MCP_ROW: ConnectorConnection = makeConnection({
+    id: "conn-linear-mcp",
+    name: "Linear",
+    service_id: "custom_mcp",
+    capability: null,
+    auth_type: "static_key",
+    status: "active",
+    mcp_server_url: "https://mcp.linear.app/mcp",
+    config: {},
+    discovered_tools: [],
+    last_check_verdict: "not_checked",
+  })
+
+  it("⛔ HI-01 — a never-contacted `custom_mcp` row does NOT print `✓ Ready as source`", () => {
+    renderTab({ connections: [UNPROVEN_CUSTOM_MCP_ROW], sourceFamilies: SOURCE_FAMILIES })
+    expect(stateWordFor("Linear")).toBe("◌ Not checked")
+    expect(screen.queryByText("✓ Ready as source")).toBeNull()
+  })
+
+  it("⭐ …and the SAME `custom_mcp` id DOES print it once the row carries a binding", () => {
+    // The containment half. A deny-list on the NAME would silence every real MCP file source
+    // the product ships; what changed is that the claim must now be EVIDENCED.
+    renderTab({
+      connections: [
+        makeConnection({
+          ...UNPROVEN_CUSTOM_MCP_ROW,
+          name: "Team files",
+          config: { source_tools: { list_tool: "ls", read_tool: "cat" } },
+        }),
+      ],
+      sourceFamilies: SOURCE_FAMILIES,
+    })
+    expect(stateWordFor("Team files")).toBe("✓ Ready as source")
+  })
+
   it("⛔ the three capability rows in the same table are untouched by the new input", () => {
     // Rendered TOGETHER with a source row, because the containment claim is about one table
     // holding both kinds — which is exactly the screen the bug was reported from.

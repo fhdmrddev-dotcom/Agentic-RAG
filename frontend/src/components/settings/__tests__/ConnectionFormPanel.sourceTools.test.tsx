@@ -30,6 +30,8 @@ import {
   SOURCE_TOOLS_DEFAULT_LIST,
   SOURCE_TOOLS_DEFAULT_READ,
   sourceToolUnsetLabel,
+  sourceToolsWithheldNote,
+  SOURCE_TOOL_MUTATION_WORDS,
   configFromDraft,
   draftFromConnection,
   EMPTY_DRAFT,
@@ -39,6 +41,9 @@ import {
 // stops the two copies of `list_directory` drifting: the panel tells a person what will
 // happen if they leave a slot empty, and only the Python decides what actually happens.
 import mcpSourceSource from "../../../../../backend/app/services/sources/adapters/mcp_source.py?raw"
+// …and the SERVICE's own source, for the mutation-word list the picker must not drift from.
+// The server decides what is REFUSED at the boundary; this module decides what is OFFERED.
+import connectorServiceSource from "../../../../../backend/app/services/connector_service.py?raw"
 import type { ConnectorConnection, McpDiscoveredTool } from "@/lib/api"
 
 const noop = () => {}
@@ -160,6 +165,122 @@ describe("Phase 239 — the file source mapping a person can see and correct", (
         ["execute_command", "list_directory", "read_file"],
       )
     }
+  })
+
+  // ── 2b · Phase 239 gap-closure round 1 (CR-01, UI half) — A DESTRUCTIVE TOOL IS NOT A
+  //         FILE READER, AND MUST NOT BE OFFERED AS ONE ──────────────────────────────────
+  //
+  // ⭐ WHAT THIS COSTS IF IT IS WRONG. The label says *"File content tool"*, the dropdown was
+  // an unordered dump of the server's entire tool list, and `delete_file` sat in it. A person
+  // with `org:manage` mis-clicking one row down binds it; `McpSourceAdapter.check()` reports
+  // **ok** (the tool exists); and `watch_service` then calls `read_file(conn, item.id)` — i.e.
+  // `tools/call {"name": "delete_file"}` — on every new and every modified file, unattended,
+  // on every cycle. Data loss on the connected server behind a green health probe.
+  //
+  // ⚠ THE JSX COMMENT ASSERTED THE BACKEND WAS THE BACKSTOP AND THAT WAS FALSE FOR THIS
+  // CLASS. `reject_unoffered_source_tools` checked only that the name was OFFERED, never that
+  // it was safe. That half is the backend's to close; this is the surface that proposed it,
+  // and a UI that offers a destructive tool under a reading label is its own defect.
+
+  /** A filesystem-ish server: real readers, and the destructive neighbours a mis-click away. */
+  const DESTRUCTIVE: McpDiscoveredTool[] = [
+    { name: "list_directory", description: "List a directory." },
+    { name: "read_file", description: "Read a file." },
+    { name: "delete_file", description: "Delete a file at the given path." },
+    { name: "write_file", description: "Write content to a file." },
+    { name: "move_file", description: "Move a file." },
+  ]
+
+  const optionsFor = (label: string) => {
+    const section = screen.getByTestId("connection-source-tools")
+    const select = within(section).getByLabelText(label) as HTMLSelectElement
+    return Array.from(select.options).map((o) => o.value).filter(Boolean)
+  }
+
+  it("⛔ CR-01 — a destructive tool is NEVER offered under `File content tool`", () => {
+    renderEdit({ connection: mcpConnection({ discovered_tools: DESTRUCTIVE }) })
+    for (const label of [SOURCE_TOOLS_LIST_LABEL, SOURCE_TOOLS_READ_LABEL]) {
+      const offered = optionsFor(label)
+      expect(offered).toEqual(["list_directory", "read_file"])
+      expect(offered).not.toContain("delete_file")
+      expect(offered).not.toContain("write_file")
+      expect(offered).not.toContain("move_file")
+    }
+  })
+
+  it("⚠ …and the withholding is STATED on screen, never silent", () => {
+    // A person who came looking for a tool they can see in the actions list must be told why
+    // it is absent here. An unexplained absence is read as a bug in the discovery, and the
+    // repair a person then reaches for is a hand-crafted PATCH — the one door with no guard.
+    renderEdit({ connection: mcpConnection({ discovered_tools: DESTRUCTIVE }) })
+    const section = screen.getByTestId("connection-source-tools")
+    expect(section.textContent).toContain(sourceToolsWithheldNote(3))
+  })
+
+  it("⚠ nothing is withheld when nothing is destructive — the note is ABSENT, not empty", () => {
+    renderEdit()
+    const section = screen.getByTestId("connection-source-tools")
+    expect(section.textContent).not.toContain("not offered here")
+  })
+
+  it("⛔ a binding ALREADY stored on a mutating tool stays VISIBLE — opening cannot rewrite it", async () => {
+    // ⚠ THE TRAP IN THE OBVIOUS FIX. A `<select>` whose value is not among its options renders
+    // as unselected, so a filter alone would make merely OPENING the panel and pressing Save
+    // silently re-point a stored binding — the exact wipe class HI-02 is about, introduced by
+    // its own remedy. So the stored value is always offered, and a person can SEE what is
+    // bound and change it. The refusal to store it belongs at the backend boundary.
+    const user = userEvent.setup({ delay: null })
+    const { onUpdate } = renderEdit({
+      connection: mcpConnection({
+        discovered_tools: DESTRUCTIVE,
+        config: { source_tools: { list_tool: "list_directory", read_tool: "delete_file" } },
+      } as Partial<ConnectorConnection>),
+    })
+    const section = screen.getByTestId("connection-source-tools")
+    const reader = within(section).getByLabelText(SOURCE_TOOLS_READ_LABEL) as HTMLSelectElement
+
+    expect(optionsFor(SOURCE_TOOLS_READ_LABEL)).toContain("delete_file")
+    expect(reader.value).toBe("delete_file")
+
+    await save(user)
+    expect((await savedConfig(onUpdate)).source_tools).toEqual({
+      list_tool: "list_directory",
+      read_tool: "delete_file",
+    })
+  })
+
+  it("⛔ WHOLE TOKENS, NEVER SUBSTRINGS — `list_assets` and `read_dataset` stay offered", () => {
+    // ⚠ ME-04, avoided rather than mirrored. The server-side `_looks_like_a_mutation` matches
+    // SUBSTRINGS, so `set` ⊂ `assets` and `put` ⊂ `input` silently remove legitimate readers.
+    // Doing that here would empty the picker for a server whose tools are named its own way —
+    // which is the failure this whole surface exists to prevent.
+    renderEdit({
+      connection: mcpConnection({
+        discovered_tools: [
+          { name: "list_assets" }, { name: "read_dataset" }, { name: "input_file" },
+          { name: "delete_asset" },
+        ] as McpDiscoveredTool[],
+      } as Partial<ConnectorConnection>),
+    })
+    const offered = optionsFor(SOURCE_TOOLS_READ_LABEL)
+    expect(offered).toEqual(["list_assets", "read_dataset", "input_file"])
+    expect(offered).not.toContain("delete_asset")
+  })
+
+  it("⚠ SAME-COMMIT SYNC — the withheld words are the SERVER'S list, read out of its source", () => {
+    // Two copies of one judgement. The server's `_MUTATION_WORDS` decides what is refused at
+    // the boundary; this one decides what is offered. They must not drift, and a comment
+    // saying so is what already failed once on this surface.
+    const block = connectorServiceSource.match(
+      /_MUTATION_WORDS: tuple\[str, \.\.\.\] = \(([^)]*)\)/,
+    )
+    expect(block).not.toBeNull()
+    const serverWords = [...block![1].matchAll(/"([a-z]+)"/g)].map((m) => m[1]).sort()
+    // NON-VACUITY CONTROL — an empty `?raw` or a failed match would satisfy an equality of
+    // two empty arrays.
+    expect(serverWords).toContain("delete")
+    expect(serverWords.length).toBeGreaterThanOrEqual(15)
+    expect([...SOURCE_TOOL_MUTATION_WORDS].sort()).toEqual(serverWords)
   })
 
   it("names the fallback the ADAPTER will really use, pinned against its own source", () => {
@@ -317,5 +438,106 @@ describe("Phase 239 — the file source mapping a person can see and correct", (
     expect(draft.sourceListTool).toBe("")
     expect(draft.sourceReadTool).toBe("")
     expect(draft.sourceRootPath).toBe("")
+  })
+
+  // ── 6 · Phase 239 gap-closure round 1 (HI-02) — THE SAME WIPE, ON THE OTHER ARM ──────
+  //
+  // ⭐ EVERY CASE IN §3 ABOVE USED `auth_type: "mcp"`, AND THAT IS WHY THE WIPE SURVIVED.
+  // `store_oauth_tokens` sets `auth_type = "oauth_byo"` on the row after an MCP OAuth round
+  // trip, and `draftFromConnection` maps that to `capability: "oauth"` BEFORE it looks at
+  // `mcp_server_url`. `configFromDraft`'s oauth arm never called `sourceToolsFromDraft`, so
+  // every save on an MCP server connected by OAuth — the flow the *Custom MCP Server* door
+  // pushes you into whenever the server advertises OAuth — dropped the binding. `config` is
+  // a WHOLE-COLUMN replace, so a rename deleted a working file source with a 200.
+  //
+  // ⚠ THIS FILE'S OWN HEADER NAMED THE RULE THE ARM BREAKS. "THE WIPE" is §3's starred case.
+  // The mechanism was understood, fixed on one arm, and left standing on the other.
+
+  /** The same server, connected by OAuth instead of a static key. Everything else is equal
+   *  to `mcpConnection()`, so a diff between the two cases is the auth arm and nothing else. */
+  function oauthMcpConnection(overrides: Partial<ConnectorConnection> = {}): ConnectorConnection {
+    return mcpConnection({
+      id: "conn-mcp-oauth",
+      name: "OAuth file server",
+      auth_type: "oauth_byo",
+      ...overrides,
+    } as Partial<ConnectorConnection>)
+  }
+
+  it("⭐ HI-02 THE OAUTH WIPE — an MCP-over-OAuth binding survives a plain rename", async () => {
+    const user = userEvent.setup({ delay: null })
+    const { onUpdate } = renderEdit({
+      connection: oauthMcpConnection({
+        config: { source_tools: { list_tool: "ls", read_tool: "cat", root_path: "/srv/docs" } },
+        discovered_tools: [{ name: "ls" }, { name: "cat" }] as McpDiscoveredTool[],
+      } as Partial<ConnectorConnection>),
+    })
+
+    const nameField = screen.getByDisplayValue("OAuth file server")
+    await user.clear(nameField)
+    await user.type(nameField, "OAuth file server (EU)")
+    await save(user)
+
+    expect((await savedConfig(onUpdate)).source_tools).toEqual({
+      list_tool: "ls",
+      read_tool: "cat",
+      root_path: "/srv/docs",
+    })
+  })
+
+  it("⭐ HI-02 — and a binding CHOSEN in the picker on an OAuth row is actually saved", async () => {
+    // ⚠ THE HALF THAT MAKES IT UNRECOVERABLE. The review reasoned the picker was HIDDEN for
+    // these rows; it is not (see the case below). It renders, a person can select in it, and
+    // the selection was then discarded on save — so the one repair available in the UI
+    // silently did nothing, which is worse than an absent control.
+    const user = userEvent.setup({ delay: null })
+    const { onUpdate } = renderEdit({ connection: oauthMcpConnection() })
+    const section = screen.getByTestId("connection-source-tools")
+
+    await user.selectOptions(
+      within(section).getByLabelText(SOURCE_TOOLS_LIST_LABEL), "list_directory",
+    )
+    await user.selectOptions(
+      within(section).getByLabelText(SOURCE_TOOLS_READ_LABEL), "read_file",
+    )
+    await save(user)
+
+    expect((await savedConfig(onUpdate)).source_tools).toEqual({
+      list_tool: "list_directory",
+      read_tool: "read_file",
+    })
+  })
+
+  it("⚠ the picker DOES render on an MCP-over-OAuth row — the panel reads the ROW, not the draft", () => {
+    // Recorded as a fact rather than assumed: `ConnectionFormPanel`'s local `capability` is
+    // derived from `connection.mcp_server_url`, not from `draft.capability`, so the card is
+    // visible here. Only the SAVE path consults `draft.capability`. If a later change moves
+    // the render gate onto the draft, this case fails and names the regression.
+    renderEdit({ connection: oauthMcpConnection() })
+    expect(screen.getByTestId("connection-source-tools")).toBeInTheDocument()
+  })
+
+  it("⛔ a NON-MCP oauth row still sends no `source_tools` — the arm did not widen", () => {
+    // The containment claim. A Google/Microsoft `oauth_byo` row has no binding to carry, and
+    // `OAuthConnectionConfig` does not declare the key; adding it unconditionally would be a
+    // 422 for every first-party OAuth connection in the org.
+    expect(
+      configFromDraft({ ...EMPTY_DRAFT, capability: "oauth", customClientId: "abc.apps" }),
+    ).toEqual({ custom_client_id: "abc.apps" })
+  })
+
+  it("⛔ …and an oauth arm that IS bound keeps its client id alongside the binding", () => {
+    expect(
+      configFromDraft({
+        ...EMPTY_DRAFT,
+        capability: "oauth",
+        customClientId: "abc.apps",
+        sourceListTool: "ls",
+        sourceReadTool: "cat",
+      }),
+    ).toEqual({
+      custom_client_id: "abc.apps",
+      source_tools: { list_tool: "ls", read_tool: "cat" },
+    })
   })
 })

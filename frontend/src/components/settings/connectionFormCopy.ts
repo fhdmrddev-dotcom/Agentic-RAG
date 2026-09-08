@@ -468,6 +468,65 @@ export const SOURCE_TOOLS_HELP =
 export const SOURCE_TOOLS_LIST_LABEL = "Directory listing tool"
 export const SOURCE_TOOLS_READ_LABEL = "File content tool"
 
+/**
+ * Phase 239 gap-closure round 1 (CR-01, UI half) — WORDS THAT SAY A TOOL CHANGES SOMETHING.
+ *
+ * ⭐ **THE PICKER WAS AN UNORDERED DUMP OF THE SERVER'S ENTIRE TOOL LIST, AND `delete_file`
+ * SAT IN IT UNDER THE LABEL *"File content tool"*.** A mis-click one row down binds it;
+ * `McpSourceAdapter.check()` then reports **ok**, because the tool exists on the server; and
+ * `watch_service` calls the bound reader on every new and every modified file, unattended, on
+ * every cycle. That is data loss on the connected server behind a green health probe.
+ *
+ * ⚠ **THE JSX ASSERTED THE BACKEND WAS THE BACKSTOP AND THAT WAS FALSE FOR THIS CLASS.**
+ * `reject_unoffered_source_tools` checked only that the name was one the server OFFERED, never
+ * that it was safe. Closing the boundary is the server's job; not proposing a destructive tool
+ * as a *reader* is this surface's, and both halves are wanted.
+ *
+ * ⚠ **SAME-COMMIT SYNC WITH `connector_service._MUTATION_WORDS`**, which is the same judgement
+ * pointed at the write boundary. `ConnectionFormPanel.sourceTools.test.tsx` parses that tuple
+ * out of the Python through `?raw` and requires this array to equal it — because the version
+ * of this rule that was only a comment is what let the dump ship.
+ *
+ * ⛔ **IT IS A DENY-LIST AND THEREFORE INCOMPLETE, WHICH IS STATED RATHER THAN HIDDEN.** The
+ * review's CR-02 names `purge`, `drop`, `clear`, `destroy`, `trash`, `empty`, `exec` and `rm`
+ * as absent; `execute_command` is still offered here today. This narrows a real, reachable
+ * mis-click — it does not make the surface safe against a hostile server, and the thing that
+ * would is an allow-list of shapes at the boundary.
+ */
+export const SOURCE_TOOL_MUTATION_WORDS: readonly string[] = [
+  "write", "create", "delete", "remove", "rename", "move", "copy", "upload", "put",
+  "append", "edit", "update", "mkdir", "unlink", "send", "post", "patch", "set",
+]
+
+/**
+ * Does this tool's NAME say it changes something?
+ *
+ * ⛔ **WHOLE TOKENS, NEVER SUBSTRINGS — and that is a deliberate DIVERGENCE from the server's
+ * `_looks_like_a_mutation`, not an oversight.** That one uses `word in name`, so `set` ⊂
+ * `assets` and `put` ⊂ `input` make `list_assets`, `get_asset`, `read_dataset` and
+ * `input_file` all read as mutations (review ME-04, driven). On the boundary an over-catch
+ * merely refuses a write; HERE it would REMOVE the only readers a server offers and leave a
+ * person with an empty picker and a 502 — the exact failure this whole surface exists to
+ * prevent. The word SET is shared and fenced; the matching rule is the safer one on each side.
+ */
+export function looksLikeSourceToolMutation(name: string): boolean {
+  const tokens = new Set(name.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean))
+  return SOURCE_TOOL_MUTATION_WORDS.some((word) => tokens.has(word))
+}
+
+/** Said on screen when the picker withheld something, so an absence is never unexplained.
+ *
+ * ⚠ A PERSON CAN SEE THESE TOOLS IN THE ACTIONS LIST. Withholding them here without a word
+ * reads as a bug in discovery, and the repair somebody then reaches for is a hand-crafted
+ * PATCH — the one door onto this column with no picker in front of it. */
+export function sourceToolsWithheldNote(count: number): string {
+  const s = count === 1 ? "" : "s"
+  const verb = count === 1 ? "changes" : "change"
+  return `${count} tool${s} whose name says ${count === 1 ? "it " : "they "}${verb} something ` +
+    `${count === 1 ? "is" : "are"} not offered here — whatever is bound is called on every ` +
+    `file, unattended, on every check.`
+}
+
 /** ⚠ TWO COPIES OF ONE FACT, AND THE OTHER ONE IS AUTHORITATIVE. These mirror
  *  `mcp_source.py`'s `DEFAULT_LIST_TOOL` / `DEFAULT_READ_TOOL`, which decide what actually
  *  happens when a slot is left empty. `ConnectionFormPanel.sourceTools.test.tsx` reads that
@@ -770,6 +829,24 @@ export function configFromDraft(draft: ConnectionDraft): ConnectorConnectionConf
     // `oauth_client_secret_ciphertext` (migration 150). That is also what makes Connect
     // work a second time: nothing used to persist it, so reopening a saved connection and
     // pressing Connect asked for the id and secret again.
+
+    // ⚠ PHASE 239 GAP-CLOSURE (HI-02) — THE BINDING IS CARRIED HERE TOO, AND THE REASON IS
+    // THAT THIS ARM SEES MCP ROWS. `store_oauth_tokens` sets `auth_type = "oauth_byo"` after
+    // an MCP OAuth round trip, and `draftFromConnection` maps that to `capability: "oauth"`
+    // ABOVE its `mcp_server_url` test — so an MCP server connected by OAuth arrives here,
+    // not on the `mcp` arm forty lines up. `update_connection` replaces `config` WHOLE, so
+    // omitting the key DELETED a working file source on a rename, with a 200 and no receipt.
+    // That is the identical class as this module's `sourceToolsFromDraft` note, on the arm
+    // it did not fix.
+    //
+    // ⛔ CONDITIONAL, NEVER UNCONDITIONAL. A first-party Google/Microsoft `oauth_byo` row has
+    // no binding, and `sourceToolsFromDraft` returns `undefined` for it — which matters
+    // because `OAuthConnectionConfig` is `extra="forbid"` and declares no `source_tools`, so
+    // an always-present key would 422 every non-MCP OAuth connection in the org. A row that
+    // IS bound composes `{custom_client_id?, source_tools}`, whose key set `McpConfig`
+    // accepts — the same union member the `mcp` arm targets.
+    const sourceTools = sourceToolsFromDraft(draft)
+    if (sourceTools) oauthConfig.source_tools = sourceTools
     return oauthConfig
   }
 
