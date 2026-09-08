@@ -318,4 +318,105 @@ describe("Phase 239 — the file source mapping a person can see and correct", (
     expect(draft.sourceReadTool).toBe("")
     expect(draft.sourceRootPath).toBe("")
   })
+
+  // ── 6 · Phase 239 gap-closure round 1 (HI-02) — THE SAME WIPE, ON THE OTHER ARM ──────
+  //
+  // ⭐ EVERY CASE IN §3 ABOVE USED `auth_type: "mcp"`, AND THAT IS WHY THE WIPE SURVIVED.
+  // `store_oauth_tokens` sets `auth_type = "oauth_byo"` on the row after an MCP OAuth round
+  // trip, and `draftFromConnection` maps that to `capability: "oauth"` BEFORE it looks at
+  // `mcp_server_url`. `configFromDraft`'s oauth arm never called `sourceToolsFromDraft`, so
+  // every save on an MCP server connected by OAuth — the flow the *Custom MCP Server* door
+  // pushes you into whenever the server advertises OAuth — dropped the binding. `config` is
+  // a WHOLE-COLUMN replace, so a rename deleted a working file source with a 200.
+  //
+  // ⚠ THIS FILE'S OWN HEADER NAMED THE RULE THE ARM BREAKS. "THE WIPE" is §3's starred case.
+  // The mechanism was understood, fixed on one arm, and left standing on the other.
+
+  /** The same server, connected by OAuth instead of a static key. Everything else is equal
+   *  to `mcpConnection()`, so a diff between the two cases is the auth arm and nothing else. */
+  function oauthMcpConnection(overrides: Partial<ConnectorConnection> = {}): ConnectorConnection {
+    return mcpConnection({
+      id: "conn-mcp-oauth",
+      name: "OAuth file server",
+      auth_type: "oauth_byo",
+      ...overrides,
+    } as Partial<ConnectorConnection>)
+  }
+
+  it("⭐ HI-02 THE OAUTH WIPE — an MCP-over-OAuth binding survives a plain rename", async () => {
+    const user = userEvent.setup({ delay: null })
+    const { onUpdate } = renderEdit({
+      connection: oauthMcpConnection({
+        config: { source_tools: { list_tool: "ls", read_tool: "cat", root_path: "/srv/docs" } },
+        discovered_tools: [{ name: "ls" }, { name: "cat" }] as McpDiscoveredTool[],
+      } as Partial<ConnectorConnection>),
+    })
+
+    const nameField = screen.getByDisplayValue("OAuth file server")
+    await user.clear(nameField)
+    await user.type(nameField, "OAuth file server (EU)")
+    await save(user)
+
+    expect((await savedConfig(onUpdate)).source_tools).toEqual({
+      list_tool: "ls",
+      read_tool: "cat",
+      root_path: "/srv/docs",
+    })
+  })
+
+  it("⭐ HI-02 — and a binding CHOSEN in the picker on an OAuth row is actually saved", async () => {
+    // ⚠ THE HALF THAT MAKES IT UNRECOVERABLE. The review reasoned the picker was HIDDEN for
+    // these rows; it is not (see the case below). It renders, a person can select in it, and
+    // the selection was then discarded on save — so the one repair available in the UI
+    // silently did nothing, which is worse than an absent control.
+    const user = userEvent.setup({ delay: null })
+    const { onUpdate } = renderEdit({ connection: oauthMcpConnection() })
+    const section = screen.getByTestId("connection-source-tools")
+
+    await user.selectOptions(
+      within(section).getByLabelText(SOURCE_TOOLS_LIST_LABEL), "list_directory",
+    )
+    await user.selectOptions(
+      within(section).getByLabelText(SOURCE_TOOLS_READ_LABEL), "read_file",
+    )
+    await save(user)
+
+    expect((await savedConfig(onUpdate)).source_tools).toEqual({
+      list_tool: "list_directory",
+      read_tool: "read_file",
+    })
+  })
+
+  it("⚠ the picker DOES render on an MCP-over-OAuth row — the panel reads the ROW, not the draft", () => {
+    // Recorded as a fact rather than assumed: `ConnectionFormPanel`'s local `capability` is
+    // derived from `connection.mcp_server_url`, not from `draft.capability`, so the card is
+    // visible here. Only the SAVE path consults `draft.capability`. If a later change moves
+    // the render gate onto the draft, this case fails and names the regression.
+    renderEdit({ connection: oauthMcpConnection() })
+    expect(screen.getByTestId("connection-source-tools")).toBeInTheDocument()
+  })
+
+  it("⛔ a NON-MCP oauth row still sends no `source_tools` — the arm did not widen", () => {
+    // The containment claim. A Google/Microsoft `oauth_byo` row has no binding to carry, and
+    // `OAuthConnectionConfig` does not declare the key; adding it unconditionally would be a
+    // 422 for every first-party OAuth connection in the org.
+    expect(
+      configFromDraft({ ...EMPTY_DRAFT, capability: "oauth", customClientId: "abc.apps" }),
+    ).toEqual({ custom_client_id: "abc.apps" })
+  })
+
+  it("⛔ …and an oauth arm that IS bound keeps its client id alongside the binding", () => {
+    expect(
+      configFromDraft({
+        ...EMPTY_DRAFT,
+        capability: "oauth",
+        customClientId: "abc.apps",
+        sourceListTool: "ls",
+        sourceReadTool: "cat",
+      }),
+    ).toEqual({
+      custom_client_id: "abc.apps",
+      source_tools: { list_tool: "ls", read_tool: "cat" },
+    })
+  })
 })
