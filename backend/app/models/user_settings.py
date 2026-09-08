@@ -392,6 +392,65 @@ async def refresh_settings_cache() -> None:
         invalidate_settings_cache()
 
 
+async def broadcast_settings_change() -> None:
+    """Re-warm THIS worker, then tell every OTHER worker to do the same (BUG-260902-06).
+
+    ``refresh_settings_cache()`` above fixes the WRITING worker and says so — "NOT a
+    cross-process fix". Under the ``WORKER_COUNT=2`` default the sibling keeps serving its own
+    module-global cache until its own 30s TTL lapses, so whether a change is visible is a coin
+    flip on which worker serves the next read. This is the other half: one Redis PUBLISH,
+    picked up by each worker's ``SettingsCacheSubscriber``, which calls
+    ``refresh_settings_cache()`` locally.
+
+    NEVER RAISES. The write is the contract. A dead Redis degrades to exactly the pre-existing
+    behaviour (the TTL) — it must never turn a successful write into an error.
+    """
+    await refresh_settings_cache()
+    try:
+        from app.services.settings_broadcast import (  # lazy — avoid an import cycle
+            SCOPE_APP_SETTINGS,
+            publish_cache_invalidation,
+        )
+        await publish_cache_invalidation(SCOPE_APP_SETTINGS)
+    except Exception:  # noqa: BLE001 — belt and braces; the publisher is fail-soft too
+        logger.warning(
+            "broadcast_settings_change: cross-worker publish failed; siblings fall back "
+            "to their TTL", exc_info=True,
+        )
+
+
+async def broadcast_model_overrides_change() -> None:
+    """The model-registry twin of ``broadcast_settings_change`` (BUG-260902-06).
+
+    ⚠ Call this on model-registry WRITES only. The two ``invalidate_model_overrides_cache()``
+    calls in ``admin.py`` that force a FRESH read before a guard (WR-03) are reads, not writes,
+    and must NOT broadcast — publishing there would make every worker re-read the DB because
+    one worker wanted to check something.
+
+    NEVER RAISES.
+    """
+    invalidate_model_overrides_cache()
+    try:
+        await _load_model_overrides()
+        await load_all_model_overrides()
+    except Exception:  # noqa: BLE001
+        logger.warning(
+            "broadcast_model_overrides_change: local re-warm failed; this worker falls back "
+            "to its TTL", exc_info=True,
+        )
+    try:
+        from app.services.settings_broadcast import (  # lazy — avoid an import cycle
+            SCOPE_MODEL_OVERRIDES,
+            publish_cache_invalidation,
+        )
+        await publish_cache_invalidation(SCOPE_MODEL_OVERRIDES)
+    except Exception:  # noqa: BLE001
+        logger.warning(
+            "broadcast_model_overrides_change: cross-worker publish failed; siblings fall "
+            "back to their TTL", exc_info=True,
+        )
+
+
 async def ensure_settings_fresh() -> None:
     """Bound the SYNC reader's staleness to ``_SETTINGS_CACHE_TTL`` on THIS worker.
 
@@ -532,7 +591,12 @@ async def save_app_settings(updates: dict[str, Any]) -> bool:
         # reader used by tool_dispatcher / documents / extraction_service / feature_audience)
         # never checks the timestamp, so an invalidate-only call leaves it serving the
         # pre-write row until an unrelated async read happens along.
-        await refresh_settings_cache()
+        #
+        # BUG-260902-06: and BROADCAST, because refresh_settings_cache() is explicitly "NOT a
+        # cross-process fix" — with WORKER_COUNT=2 the sibling worker served the pre-write row
+        # for up to 30s. This is the single seam every app_settings write passes through, so
+        # covering it here covers SEED-258's source_max_file_size_mb ceiling too.
+        await broadcast_settings_change()
         return True
     except Exception:
         logger.warning(

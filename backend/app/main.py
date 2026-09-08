@@ -590,7 +590,46 @@ async def lifespan(app_instance):
             _watch_service = None
     app_instance.state.watch_service = _watch_service
 
+    # BUG-260902-06 — the cross-worker settings/model-registry cache invalidator.
+    #
+    # ⚠ IT RUNS IN EVERY WORKER ON PURPOSE, and unlike the scheduler above that is the whole
+    # point: the defect is that `_settings_cache` / `_model_overrides_cache` /
+    # `_all_model_overrides_cache` are MODULE globals — per PROCESS — behind a 30s TTL, while
+    # WORKER_COUNT=2 is the default. A write invalidated the writing worker and nowhere else,
+    # so whether a change was visible was a coin flip on which worker served the next read.
+    # Each worker subscribes to one channel and RE-WARMS on receipt (re-warm, never merely
+    # invalidate — `load_app_settings()` is SYNC and never checks the timestamp).
+    #
+    # FAIL SOFT, deliberately unconditional: no kill switch, because a box with no Redis
+    # already degrades to exactly the pre-existing TTL behaviour. `start()` returns
+    # immediately (startup is never blocked on Redis) and the loop reconnects forever without
+    # propagating. Skipped only in setup mode, like every other background service here.
+    _settings_subscriber = None
+    if not _setup_mode:
+        try:
+            from app.dependencies import get_redis
+            from app.services.settings_broadcast import SettingsCacheSubscriber
+
+            _settings_subscriber = SettingsCacheSubscriber(redis=get_redis())
+            _settings_subscriber.start()
+            logger.info("Settings cache subscriber started (cross-worker invalidation)")
+        except Exception:
+            logger.exception(
+                "Settings cache subscriber failed to start (app continues on the 30s TTL)"
+            )
+            _settings_subscriber = None
+    app_instance.state.settings_cache_subscriber = _settings_subscriber
+
     yield
+
+    # BUG-260902-06 — stop the settings cache subscriber. Best-effort with its own deadline
+    # inside `stop()`, so a half-dead Redis socket cannot wedge shutdown.
+    try:
+        _sub = getattr(app_instance.state, "settings_cache_subscriber", None)
+        if _sub is not None:
+            await _sub.stop()
+    except Exception:
+        logger.exception("Settings cache subscriber stop failed at lifespan shutdown")
 
     # Phase 204 (SCHED-01) — stop the scheduler FIRST among the shutdown steps that
     # touch runs. It is the only component that STARTS new work; leaving it ticking
