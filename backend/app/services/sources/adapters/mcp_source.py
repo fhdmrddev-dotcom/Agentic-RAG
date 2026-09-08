@@ -13,9 +13,24 @@ is precisely the outcome this milestone's binding constraint forbids, because it
 
 So the vocabulary is a **ROW**: `connector_connections.config["source_tools"]`, three optional
 string keys (`list_tool`, `read_tool`, `root_path`), validated by `McpConfig`. This module
-reads them and falls back to the filesystem-server defaults **per key**. Nothing anywhere else
-in the codebase knows any tool name, and `SourceRegistry` resolves this adapter by PROTOCOL
-(`auth_type == "mcp"`, or the presence of a binding) rather than by vendor.
+reads them and falls back to the filesystem-server defaults **per key**, and `SourceRegistry`
+resolves this adapter by PROTOCOL (`auth_type == "mcp"`, or the presence of a binding) rather
+than by vendor.
+
+⚠ **THIS PARAGRAPH USED TO CLAIM "nothing anywhere else in the codebase knows any tool name"
+AND THAT WAS FALSE ON THE DAY IT WAS WRITTEN** (Phase 239 review, ME-05).
+`connector_service.py` held `("list_directory", "list_dir", "list_files", "ls", "browse")` and
+a matching reader tuple in a membership test, far above `adapters/`, for the whole of the
+phase that wrote this sentence. Worse, `test_boundary_fence.py` could not have found it: that
+module was not in `FENCED_MODULES` and the fence's literal set held vendor names only. **The
+claim was enforced by nothing, so it was decoration.**
+
+⭐ It is now TRUE BY CONSTRUCTION, which is a different thing from being asserted more firmly.
+The vocabulary and the detector both moved into this file (see "THE TOOL VOCABULARY" below);
+`connector_service.infer_source_tools` is a delegation holding no literal; and
+`test_boundary_fence.py` gained `TOOL_LITERALS` + `TOOL_FENCED_MODULES`, driven RED by
+planting `if name in ("list_directory", "ls")` into the shipped `connector_service.py` and
+watching the fence name the line, then restoring the file md5-identical.
 
 ⛔ **If you find yourself adding a server name, a tool name or a dialect check to a conditional
 — here or, far worse, above `adapters/` — the claim is already false.** The parametrized rows
