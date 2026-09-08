@@ -11,11 +11,20 @@ obvious implementation is a small table of known servers and an `elif` per diale
 is precisely the outcome this milestone's binding constraint forbids, because it makes
 *connecting a new server* a code change, a review, a deploy.
 
-So the vocabulary is a **ROW**: `connector_connections.config["source_tools"]`, three optional
-string keys (`list_tool`, `read_tool`, `root_path`), validated by `McpConfig`. This module
-reads them and falls back to the filesystem-server defaults **per key**, and `SourceRegistry`
-resolves this adapter by PROTOCOL (`auth_type == "mcp"`, or the presence of a binding) rather
-than by vendor.
+So the vocabulary is a **ROW**: `connector_connections.config["source_tools"]`, optional string
+keys validated by `McpConfig`. This module reads them and falls back to the filesystem-server
+defaults **per key**, and `SourceRegistry` resolves this adapter by PROTOCOL
+(`auth_type == "mcp"`, or the presence of a binding) rather than by vendor.
+
+⚠ **THIS USED TO SAY "three optional string keys (`list_tool`, `read_tool`, `root_path`)" AND
+THE NUMBER WAS THE PROBLEM, NOT THE LIST.** SC#2 was driven live against a second real server
+on 2026-09-08 and the binding took zero code — and then **listed nothing, with HTTP 200**,
+because those three keys carry tool NAMES and a tool's ARGUMENT SHAPE was still code: a lone
+`{"path": …}`, always, against a reader requiring `owner` + `repo` + `path`. `SEED-259` is the
+finding; the operator ruled that the mapping is a row too. Two more key families now exist —
+`arg_path` and `arg_static.<name>` (see `PATH_ARG_KEY` below) — and a bound tool whose own
+`inputSchema` requires arguments this connection cannot supply is **refused by name rather
+than answered with an empty listing**.
 
 ⚠ **THIS PARAGRAPH USED TO CLAIM "nothing anywhere else in the codebase knows any tool name"
 AND THAT WAS FALSE ON THE DAY IT WAS WRITTEN** (Phase 239 review, ME-05).
@@ -75,6 +84,7 @@ import json as jsonlib
 import mimetypes
 import posixpath
 import re
+import dataclasses
 from dataclasses import dataclass
 from typing import Any
 
@@ -99,6 +109,37 @@ MAX_FILE_BYTES = 25 * 1024 * 1024
 #: stops browsing is worse than one that never started.
 DEFAULT_LIST_TOOL = "list_directory"
 DEFAULT_READ_TOOL = "read_file"
+
+#: SEED-259 — WHICH ARGUMENT CARRIES THE PATH, and STATIC VALUES FOR THE REST, as DATA.
+#:
+#: ⭐ Phase 239 proved tool NAMES are a row and never proved the same of tool ARGUMENT SHAPES,
+#: because `SEED-257` records that no MCP file server could be driven locally at all. Driven
+#: live against a second real server on 2026-09-08, the shortfall was immediate: this adapter
+#: sent a lone `{"path": …}` while that server's reader requires THREE separate arguments, so
+#: the listing came back **empty, with HTTP 200**. The operator's ruling on `SEED-259` is that
+#: the mapping is a row too.
+#:
+#: ⛔ FLAT PREFIXED KEYS INSIDE THE EXISTING `source_tools` DICT — no nested field, no
+#: `McpConfig` shape change, no migration. `SEED-239` is why: every config model is
+#: `extra='forbid'` and `_to_response` validates rows INSIDE a list comprehension, so one row
+#: matching no member of the `ConnectorConfig` union makes **every connection in the org**
+#: unreadable. Riding the declared `dict[str, str]` also inherits its ME-07 ceilings (64-char
+#: key, 512-char value) instead of adding a surface with none.
+#:
+#:     {"list_tool": "get_file_contents", "read_tool": "get_file_contents",
+#:      "arg_path": "path", "arg_static.owner": "…", "arg_static.repo": "…"}
+#:
+#: ⚠ THE TWO PREFIXES ARE DELIBERATELY DISJOINT. `arg_path` names the argument that carries
+#: the path; `arg_static.<name>` supplies a fixed value for `<name>`. A single namespace
+#: (`arg_path` meaning both *"the path argument is called path"* and *"the argument `path`
+#: is fixed"*) is one typo away from pinning every browse to one directory.
+PATH_ARG_KEY = "arg_path"
+STATIC_ARG_PREFIX = "arg_static."
+
+#: The argument name this adapter has always sent, kept as the default so every row that
+#: exists today is byte-for-byte unaffected — absence means the default, PER KEY, exactly as
+#: it does for `list_tool` and `read_tool`.
+DEFAULT_PATH_ARG = "path"
 
 #: The label the picker shows before anything has been fetched.
 #:
@@ -271,6 +312,74 @@ def _schema_params(input_schema: Any) -> set[str]:
     return {str(key).lower() for key in properties}
 
 
+def _required_params(input_schema: Any) -> frozenset[str]:
+    """The arguments a tool declares MANDATORY — `inputSchema.required`, exactly as sent.
+
+    ⚠ NOT LOWER-CASED, unlike `_schema_params` two functions up, and the difference is
+    load-bearing rather than an inconsistency. That one lower-cases because it does *token*
+    matching against English words; these strings are compared against argument names a person
+    configured and are then sent as JSON object KEYS, where `Owner` and `owner` are two
+    different arguments and folding them would supply neither.
+
+    ⚠ An ABSENT `required` is legal JSON Schema and means *"nothing is mandatory"*. Reading it
+    as *"everything in `properties` is"* would refuse servers that ask for nothing at all.
+
+    ⚠ Never raises, for `_schema_params`'s reason: this reads a REMOTE server's answer.
+    """
+    if not isinstance(input_schema, dict):
+        return frozenset()
+    required = input_schema.get("required")
+    if not isinstance(required, (list, tuple, set, frozenset)):
+        return frozenset()
+    return frozenset(
+        item.strip() for item in required if isinstance(item, str) and item.strip()
+    )
+
+
+def _required_by_tool(discovered: Any) -> dict[str, frozenset[str]]:
+    """`{tool name: the arguments it says are mandatory}` over a `discovered_tools` list.
+
+    ⚠ A tool ABSENT from the result is different from a tool mapping to an empty set: the
+    first is *"nobody has asked this server"*, the second is *"it asks for nothing"*. Only the
+    second is a statement about the server, and `_missing_arguments` treats them alike ONLY
+    because neither is evidence of a missing argument — see `McpSourceAdapter.check`, which is
+    what covers the first case against the live server.
+    """
+    out: dict[str, frozenset[str]] = {}
+    for item in discovered or []:
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("name") or "").strip()
+        if name:
+            out[name] = _required_params(item.get("inputSchema"))
+    return out
+
+
+def _missing_arguments(
+    path_arg: str, static_args: dict[str, str], required: frozenset[str]
+) -> list[str]:
+    """The mandatory arguments this binding cannot supply. Sorted, so the message is stable."""
+    return sorted(required - (set(static_args) | {path_arg}))
+
+
+def _underspecified(tool: str, role: str, missing: list[str], path_arg: str) -> str:
+    """⛔ SEED-259's SAFETY HALF, IN ONE SPELLING — used by the call path and by `check`.
+
+    A single wording for both, because the failure being described is one failure: two
+    wordings drift, and the drift lands on whichever surface is read less often.
+    """
+    return (
+        f"This connection is bound to {tool!r} as its {role}, and the server says {tool!r} "
+        f"requires " + ", ".join(repr(name) for name in missing) + f", which this connection "
+        f"does not supply. Refused rather than called: the call would come back with nothing, "
+        f"and an EMPTY LISTING is exactly what the deletion guard consumes — a misbound source "
+        f"is indistinguishable from a folder whose every file was deleted. Map them on the "
+        f"connection: `source_tools[{PATH_ARG_KEY!r}]` names the argument that carries the "
+        f"path (currently {path_arg!r}), and `source_tools['{STATIC_ARG_PREFIX}<name>']` gives "
+        f"a fixed value for each of the others."
+    )
+
+
 def infer_source_tools(tools: list[dict[str, Any]] | None) -> dict[str, str] | None:
     """Which of these tools LIST a directory and READ a file? Returns names, never behaviour.
 
@@ -384,6 +493,50 @@ class _Binding:
     read_tool: str
     root_path: str
 
+    #: SEED-259. Both default to the shape this adapter has always sent, so a row written
+    #: before either key existed produces a byte-identical call.
+    path_arg: str = DEFAULT_PATH_ARG
+    static_args: dict[str, str] = dataclasses.field(default_factory=dict)
+
+    #: `{tool name: mandatory arguments}` from `discovered_tools` — the server's OWN schema,
+    #: already discovered and already stored (`mcp_client.list_tools` sanitises `inputSchema`
+    #: into that column), so the safety half needs no new data anywhere.
+    required_args: dict[str, frozenset[str]] = dataclasses.field(default_factory=dict)
+
+    def arguments(self, path_value: str) -> dict[str, Any]:
+        """The `params.arguments` object for a call addressing `path_value`.
+
+        ⛔ THE PATH IS WRITTEN LAST AND ALWAYS WINS. A static named the same thing as the path
+        argument would otherwise pin every browse and every read to one fixed location — a
+        COMPLETE listing of the wrong directory, which on a watched folder is the `H-5`
+        deletion signal wearing a success. Refusing the collision at the write boundary was
+        the alternative; deciding it here makes the outcome the same on rows written before
+        that boundary existed.
+        """
+        args: dict[str, Any] = dict(self.static_args)
+        args[self.path_arg] = path_value
+        return args
+
+    def refuse_if_underspecified(self, tool: str, role: str) -> None:
+        """⛔ SEED-259 — PRE-FLIGHT, so nothing is sent that can come back empty.
+
+        ⚠ Checked PER ROLE, never per connection: a row with a working lister and a broken
+        reader must still BROWSE, or the failure is attributed to the wrong half of the
+        binding and somebody goes looking at their credentials.
+
+        ⚠ A tool with no discovered schema is NOT refused, and that asymmetry is stated rather
+        than assumed. It is the same one `connector_service.reject_unoffered_source_tools`
+        already reasons about: *"a connection bound before its first discovery has nothing to
+        compare to, and refusing there would make it impossible to configure a server before
+        contacting it"* — a fence that fires on the honest case and not the dishonest one.
+        What covers that residue is `check`, which reads the server LIVE.
+        """
+        missing = _missing_arguments(
+            self.path_arg, self.static_args, self.required_args.get(tool) or frozenset()
+        )
+        if missing:
+            raise ValueError(_underspecified(tool, role, missing, self.path_arg))
+
     def wire_path(self, folder_id: str | None) -> str:
         """The path this server understands for `folder_id`.
 
@@ -436,6 +589,28 @@ def _carries_a_credential(connection: Any) -> bool:
     return hasattr(connection, "secret")
 
 
+def _static_args(source_tools: dict[str, Any]) -> dict[str, str]:
+    """SEED-259 — `{"arg_static.owner": "acme"}` -> `{"owner": "acme"}`.
+
+    ⚠ AN EMPTY VALUE IS KEPT, and that is not an oversight. `""` is a value somebody typed and
+    some servers legitimately want one; dropping it would re-create the very missing argument
+    this phase refuses, except silently — the key IS present, so `refuse_if_underspecified`
+    would have nothing to say.
+
+    ⚠ `None` becomes `""` rather than the string `"None"`. `McpConfig` types this dict as
+    `dict[str, str]`, but a row written before that field existed reaches here unvalidated,
+    and `str(None)` is a four-character argument value that no server means.
+    """
+    out: dict[str, str] = {}
+    for key, value in source_tools.items():
+        if not isinstance(key, str) or not key.startswith(STATIC_ARG_PREFIX):
+            continue
+        name = key[len(STATIC_ARG_PREFIX):].strip()
+        if name:
+            out[name] = "" if value is None else str(value)
+    return out
+
+
 async def _resolve_binding(connection: Any) -> _Binding:
     """Resolve the destination, the credential and the tool binding for one operation.
 
@@ -458,6 +633,10 @@ async def _resolve_binding(connection: Any) -> _Binding:
     secret: str | None = _attr(connection, "secret")
     auth_scheme = _attr(connection, "auth_scheme", "auto") or "auto"
     grants = _attr(connection, "tool_grants", None)
+    # SEED-259 — the schema half. Read from the connection the caller already fetched, for
+    # `_resolve_binding`'s own stated reason: re-reading the row here would be the same row
+    # fetched twice and would move the org-scoping decision out of the caller.
+    discovered = _attr(connection, "discovered_tools", None)
 
     if not _carries_a_credential(connection):
         conn_id = _attr(connection, "id") or _attr(connection, "connection_id")
@@ -475,6 +654,8 @@ async def _resolve_binding(connection: Any) -> _Binding:
             auth_scheme = getattr(resolved, "auth_scheme", "auto") or "auto"
             if grants is None:
                 grants = getattr(resolved, "tool_grants", None)
+            if discovered is None:
+                discovered = getattr(resolved, "discovered_tools", None)
 
     if not server_url:
         raise ValueError(
@@ -495,6 +676,9 @@ async def _resolve_binding(connection: Any) -> _Binding:
         list_tool=str(tools.get("list_tool") or DEFAULT_LIST_TOOL),
         read_tool=str(tools.get("read_tool") or DEFAULT_READ_TOOL),
         root_path=str(tools.get("root_path") or ""),
+        path_arg=str(tools.get(PATH_ARG_KEY) or "").strip() or DEFAULT_PATH_ARG,
+        static_args=_static_args(tools),
+        required_args=_required_by_tool(discovered),
     )
     _refuse_denied_tools(binding, grants)
     return binding
@@ -816,10 +1000,14 @@ class McpSourceAdapter(SourceAdapter):
 
     async def _list(self, binding: _Binding, folder_id: str | None) -> list[_Entry]:
         folder_path = binding.wire_path(folder_id)
+        # ⛔ SEED-259 — BEFORE the call, not after it. A listing that goes out underspecified
+        # and comes back empty is `HI-03`'s fail-open on a different path, and an
+        # empty-but-complete listing is what the `H-5` deletion guard consumes.
+        binding.refuse_if_underspecified(binding.list_tool, "list_tool")
         result = await mcp_client.call_tool(
             binding.server_url,
             binding.list_tool,
-            {"path": folder_path},
+            binding.arguments(folder_path),
             secret=binding.secret,
             auth_scheme=binding.auth_scheme,
         )
@@ -950,10 +1138,13 @@ class McpSourceAdapter(SourceAdapter):
     ) -> tuple[str, bytes, str]:
         """Read one file. Returns `(filename, content_bytes, mime_type)`."""
         binding = await _resolve_binding(connection)
+        # ⛔ SEED-259, the reader's half. A read that comes back with nothing is minted as an
+        # empty document, embedded, and answered out of the knowledge base as the file.
+        binding.refuse_if_underspecified(binding.read_tool, "read_tool")
         result = await mcp_client.call_tool(
             binding.server_url,
             binding.read_tool,
-            {"path": file_id},
+            binding.arguments(str(file_id)),
             secret=binding.secret,
             auth_scheme=binding.auth_scheme,
         )
@@ -1016,6 +1207,46 @@ class McpSourceAdapter(SourceAdapter):
                     ),
                     details={"tools_count": len(available), "missing_tools": missing},
                 )
+
+            # ⛔ SEED-259 — A TOOL THAT EXISTS AND CANNOT BE CALLED IS ALSO A MISBINDING, and
+            # this probe used to report `ok` for it. It is read from the LIVE `tools/list`
+            # rather than from `discovered_tools`, deliberately: the cached column is what the
+            # call path has, and this is the one place with the server's current answer — so
+            # it also covers the row that was bound before anyone discovered anything, which
+            # `refuse_if_underspecified` explicitly does not.
+            required_by_tool = _required_by_tool(tools)
+            roles_by_tool: dict[str, list[str]] = {}
+            for role, tool_name in (
+                ("list_tool", binding.list_tool), ("read_tool", binding.read_tool)
+            ):
+                roles_by_tool.setdefault(tool_name, []).append(role)
+            underspecified = [
+                (tool_name, roles, _missing_arguments(
+                    binding.path_arg,
+                    binding.static_args,
+                    required_by_tool.get(tool_name) or frozenset(),
+                ))
+                for tool_name, roles in roles_by_tool.items()
+            ]
+            underspecified = [item for item in underspecified if item[2]]
+            if underspecified:
+                return SourceHealth(
+                    ok=False,
+                    error=" ".join(
+                        _underspecified(
+                            tool_name, " and ".join(roles), missing_args, binding.path_arg
+                        )
+                        for tool_name, roles, missing_args in underspecified
+                    ),
+                    details={
+                        "tools_count": len(available),
+                        "unsupplied_arguments": {
+                            tool_name: missing_args
+                            for tool_name, _roles, missing_args in underspecified
+                        },
+                    },
+                )
+
             return SourceHealth(
                 ok=True,
                 details={

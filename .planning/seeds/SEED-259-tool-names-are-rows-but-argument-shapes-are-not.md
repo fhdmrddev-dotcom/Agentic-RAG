@@ -116,5 +116,47 @@ it:
 ⛔ **Option 3 is explicitly REJECTED by this ruling** — the claim is not being narrowed. SRC-04 keeps
 its wording, and SC#2 stays open until a second server actually lists and reads.
 
-**Not yet scheduled at the time of writing.** Sequencing, plan count and whether this is an insert
-phase or folded into a later SRC phase are the next decisions.
+~~**Not yet scheduled at the time of writing.** Sequencing, plan count and whether this is an insert
+phase or folded into a later SRC phase are the next decisions.~~
+
+---
+
+## ⭐ BACKEND BUILT 2026-09-08 — `239-06`. **Both halves. SC#2 still NOT met.**
+
+Full evidence: **`.planning/phases/239-any-mcp-server-with-files/239-06-SUMMARY.md`**.
+
+- **Option 1 (safety) SHIPPED and it went in first**, as the ruling requires. A bound tool whose
+  `inputSchema` declares required arguments the connection cannot supply is **refused by name,
+  pre-flight, sending nothing** — on browse, on list, on read, and `check()` reports it too,
+  against the **live** `tools/list` rather than the cached column. Driven off the server's own
+  schema, so it holds for a vocabulary that appears nowhere in this repository.
+- **Option 2 (mapping) SHIPPED as rows**: `arg_path` names the argument carrying the path,
+  `arg_static.<name>` supplies a fixed value for each other required argument — **flat prefixed
+  keys inside the existing `source_tools` dict**. No `McpConfig` field, no nested member, no
+  migration, so `SEED-239`'s org-wide-outage shape stays off the table.
+- ⛔ **No vendor arm anywhere.** `test_boundary_fence.py` was driven RED by planting
+  `if key in ("get_file_contents", "list_directory")` into the shipped `connector_service.py` and
+  restored md5-identical. The write boundary exempts the two new key families **by ALLOW-LIST** —
+  an unknown key is still read as a tool name and still refused.
+
+### ⛔ Why this seed is NOT `shipped`, and what it now waits on
+
+**Its own ruling says SC#2 stays open until a second server actually lists and reads, and that
+has not happened.** Two things stand between here and there, both named rather than assumed:
+
+1. **The mapping has no UI.** Backend only, by scope. `arg_path` / `arg_static.*` can be set only
+   through `PATCH /connectors/connections/{id}` — the same gap `HI-04` records for `root_path`.
+   Until a frontend pass ships, **the capability is unreachable through the product.**
+2. **Nothing was driven against the live server.** Every claim is from unit drives with a
+   recording double. The end state (`get_file_contents` + `owner`/`repo` → a real listing) is a
+   UAT row owed by somebody holding the credential.
+
+⚠ **And one honest limit on the safety half**: it fires where a schema is KNOWN. A connection
+that has never discovered anything, or a bound tool absent from a non-empty cache, is not refused
+at call time — `check()` covers that against the live server. Same asymmetry
+`reject_unoffered_source_tools` already carries, for the same reason (refusing there fires on the
+honest case and not the dishonest one), pinned by a test so a future change to it is visible.
+
+**`re_open_trigger` (replaces the original `trigger_when` for what remains):** the frontend pass
+that gives `arg_path` / `arg_static.*` a control, OR the first live drive of a second MCP file
+server — whichever comes first. Either one is where SC#2 is scored.

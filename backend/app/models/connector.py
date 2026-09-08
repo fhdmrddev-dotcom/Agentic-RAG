@@ -221,6 +221,27 @@ class McpConfig(_StrictBase):
     #:
     #: ``{"list_tool": "list_directory", "read_tool": "read_file"}``
     #:
+    #: ⭐ AND, SINCE ``SEED-259``, WHICH ARGUMENTS THOSE TOOLS TAKE — because tool NAMES were
+    #: rows while tool ARGUMENT SHAPES were still code, and a second real server bound with
+    #: zero code then listed **nothing, with HTTP 200**::
+    #:
+    #:     {"list_tool": "get_file_contents", "read_tool": "get_file_contents",
+    #:      "arg_path": "path", "arg_static.owner": "…", "arg_static.repo": "…"}
+    #:
+    #: ``arg_path`` names the argument that carries the path (default ``"path"``);
+    #: ``arg_static.<name>`` supplies a fixed value for one of the server's other required
+    #: arguments. ⛔ **FLAT PREFIXED KEYS IN THIS SAME DICT, and that is the point rather than
+    #: a shortcut**: a nested member would re-enter ``SEED-239``'s territory, where ONE
+    #: malformed ``config`` row matches no member of the ``ConnectorConfig`` union and makes
+    #: **every connection in the org** unreadable. Riding the declared shape also inherits the
+    #: ME-07 ceilings below instead of adding a surface with none, and needs no migration.
+    #:
+    #: ⚠ The ``dict[str, str]`` constraint stated further down is what MAKES this safe: an
+    #: ``arg_static.*`` value reaches ``params.arguments``, never ``params.name``, so it can
+    #: carry no tool call. ``connector_service.reject_unoffered_source_tools`` exempts exactly
+    #: these two key families from the tool-name checks, by ALLOW-LIST — every other key is
+    #: still read as a tool name and still refused.
+    #:
     #: ⭐ THE BINDING IS A ROW, NOT A BRANCH. MCP file servers do not agree on names —
     #: ``list_directory`` / ``list_files`` / ``ls``, ``read_file`` / ``cat`` — and the whole
     #: claim of this phase is that connecting a SECOND, differently-worded server is a row in
