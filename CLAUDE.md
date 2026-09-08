@@ -661,10 +661,10 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/ConnectionPicker.tsx` | 7 / 5 / 888 | honoured by construction (206.2 / **214**) |
 | `frontend/src/components/workflows/ExternalActionSection.tsx` | 8 / 5 / 179 | honoured by construction (206.2 / **214**) |
 | `frontend/src/components/workflows/McpToolPicker.tsx` | 5 / 5 / 601 | honoured by construction (211 / **214**) |
-| `backend/app/models/connector.py` | 23 / 13 / 751 | ⚠ the row was STALE at `12 / 6 / 471`. honoured by construction (**233 |
+| `backend/app/models/connector.py` | 24 / 13 / 772 | honoured by construction (**239-06 / SEED-259**): the argument mapping rides the declared `dict[str,str]` as flat prefixed keys — no new field, no shape change, no migration |
 | `backend/app/api/connectors.py` | 40 / 19 / 2071 | ⚠ **extraction still OWED and the file GREW again** (1757→1879 at 233: |
 | `backend/app/security/egress.py` | 13 / 5 / 982 | honoured by construction (232): Google Drive read/export pins; docstri |
-| `backend/app/services/connector_service.py` | 24 / 9 / 1749 | ⚠ 239 gap-closure SHRANK it: the MCP tool vocabulary moved down to `mcp_source.py` (ME-05), and the write boundary now refuses a DESTRUCTIVE binding, not just an unoffered one (CR-01) |
+| `backend/app/services/connector_service.py` | 25 / 9 / 1772 | honoured by construction (**239-06**): the write boundary knows a mapping KEY from a tool name by ALLOW-LIST — an unknown key is still read as a tool name and still refused |
 | `backend/app/services/sources/base.py` | 9 / 5 / 336 | ⚠ **absent while FIRING at 5 phases — row added 239-03.** honoured by construction (239): protocol resolution stayed DATA (two dicts), never a branch |
 | `backend/app/services/sources/__init__.py` | 5 / 3 / 40 | ⚠ **absent while FIRING — row added 239-03.** The ONE eager-import site: an adapter missing from this list is unregistered, so the list is load-bearing |
 | `backend/app/services/mcp_client.py` | 7 / 5 / 480 | ⚠ **FIRING since 222 while its row read `no (2 phases)` — a row present and WRONG stops the audit.** Row added 239-03. Sanitizer needed no widening in either 239 wave |

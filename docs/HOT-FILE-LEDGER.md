@@ -4766,6 +4766,27 @@ Hot service-role database module shared across routes and background engines.
 
 ### `backend/app/services/connector_service.py`
 
+#### ⚠ RE-DERIVED AT `239-06` (SEED-259, 2026-09-08): **`25 / 9 / 1772`**
+
+Honoured by construction. `reject_unoffered_source_tools` — the function whose own docstring
+calls itself *"the door a hand-crafted PATCH comes through"* — had to learn that `SEED-259`'s new
+`source_tools` keys are argument names and values rather than tool names, and it learned it as an
+**ALLOW-LIST**: `root_path`, `arg_path` and `arg_static.*` are exempt, and **every other key is
+still read as a tool name** and still runs both the destructiveness and the offered checks.
+
+⛔ **WRITTEN THE OTHER WAY ROUND — *"check the keys I recognise"* — `{"sneaky": "delete_file"}`
+would sail through as a role nobody knows.** That inversion is the whole of the change's risk, so
+it carries its own case (`test_an_UNKNOWN_key_is_still_read_as_a_tool_name_and_still_refused`)
+plus one for a key that merely *starts like* the prefix (`argosy_tool`).
+
+⚠ **THE VENDOR/TOOL FENCE WAS DRIVEN RED AGAINST THIS FILE, not assumed.** Planting
+`if key in ("get_file_contents", "list_directory")` into the shipped code made
+`test_boundary_fence.py` name both literals at `line 474`; restored **md5-identical**
+(`801fd66ddc243fd8d8e3a5aa7ac7f440`). The two new constants are imported from `mcp_source.py`,
+so no tool-name literal was added here.
+
+---
+
 ⚠ **RE-DERIVED AT THE 239 GAP-CLOSURE ROUND 1 (2026-09-08): `24 / 9 / 1749`** — the row read
 `21 / 7 / 1601`. Phases: `190` · `206` · `211` · `213` · `215` · `221` · `222` · `231` · `239`.
 
@@ -8532,6 +8553,49 @@ Phase 237 added `ruleScope` support, restricting available field choices to arri
 
 ## backend/app/services/sources/adapters/mcp_source.py
 
+### ⚠ RE-DERIVED AT `239-06` (SEED-259, 2026-09-08): **`8 / 1 / 1259`**
+
+Recorded beside the previous values, never over them. This row has now been STALE at **every**
+close it has had — `2 / 1 / 643` → `6 / 1 / 1022` → `8 / 1 / 1259` — which is the ledger's own
+repeated finding reproducing on the newest file in it. It still does NOT fire G-5 (one phase).
+
+**What `239-06` changed, and why the file grew again.** Phase 239 proved tool NAMES are a row.
+It never proved the same of tool ARGUMENT SHAPES, because `SEED-257` records that no MCP file
+server could be driven locally at all — so the claim went untested until SC#2 was driven live
+against a second real server on 2026-09-08. Binding took **zero code**, and the listing came
+back **empty, with HTTP 200**: this adapter sent a lone `{"path": …}` while that server's reader
+requires `owner` + `repo` + `path`. `SEED-259` is the finding; the operator ruled the mapping is
+a row too, with the safety half shipping alongside and first.
+
+- ⛔ **THE SAFETY HALF IS THE URGENT ONE AND IT IS INDEPENDENT OF THE FEATURE.** A bound tool
+  whose own `inputSchema` declares required arguments this connection cannot supply is now
+  **refused by name, pre-flight**, sending nothing. The empty listing was `HI-03`'s fail-open
+  shape reproduced on a different path *after* `HI-03` was fixed, and an empty-but-complete
+  listing is exactly what the `H-5` deletion guard consumes — on a watched folder, *"the source
+  returns nothing"* and *"everything was deleted"* are the same bytes. It is driven off the
+  server's OWN schema rather than off any list of servers, so it holds for a server misbound for
+  reasons nobody predicted.
+- **The mapping**: `arg_path` names the argument carrying the path (default `path`);
+  `arg_static.<name>` supplies a fixed value for each other required argument. Flat prefixed
+  keys inside the existing `source_tools` dict — see `models/connector.py`'s section for why a
+  nested member was refused.
+- ⚠ **THE ASYMMETRY IS STATED, NOT ASSUMED.** A tool with NO discovered schema is not refused;
+  that is `reject_unoffered_source_tools`'s existing reasoning (*"a connection bound before its
+  first discovery has nothing to compare to"*) applied one module over. What covers the residue
+  is `check()`, which reads the LIVE `tools/list` — and which used to report `ok` for a tool that
+  exists and cannot be called.
+- ⛔ **`arguments()` WRITES THE PATH LAST AND IT ALWAYS WINS.** A static named the same thing as
+  the path argument would pin every browse to one fixed location — a COMPLETE listing of the
+  wrong directory, which is the `H-5` signal wearing a success.
+
+⚠ **THE VENDOR FENCE HELD AND WAS DRIVEN, NOT ASSUMED.** No server, vendor or tool name entered a
+conditional. `test_boundary_fence.py` was driven RED by planting
+`if key in ("get_file_contents", "list_directory")` into the shipped `connector_service.py`; it
+named both literals at `line 474`, and the file was restored **md5-identical**
+(`801fd66ddc243fd8d8e3a5aa7ac7f440`).
+
+---
+
 **⚠ RE-DERIVED AT THE 239 GAP-CLOSURE ROUND 1 (2026-09-08): `6 / 1 / 1022`** — recorded beside
 the previous value, never over it. The row read `2 / 1 / 643`; **+379 lines, and almost all of
 it arrived by MOVING rather than by adding.**
@@ -8719,6 +8783,29 @@ adapter set from the REGISTRY rather than from a hand-maintained list.
 ---
 
 ## backend/app/models/connector.py — Phase 239
+
+### ⚠ RE-DERIVED AT `239-06` (SEED-259, 2026-09-08): **`24 / 13 / 772`**
+
+Honoured by construction, and the construction IS the decision: `SEED-259`'s argument mapping
+added **no field, no nested member and no migration**. It rides the `source_tools`
+`dict[str, str]` that already exists, as flat prefixed keys — `arg_path` and
+`arg_static.<name>`.
+
+⛔ **A NESTED MEMBER WAS THE OBVIOUS DESIGN AND IT WAS REFUSED FOR A MEASURED REASON.** This
+model's own note records the Phase 222 defect one key over: every config model is
+`extra='forbid'`, `_to_response` validates rows INSIDE a list comprehension, so ONE row matching
+no member of the `ConnectorConfig` union makes **every connection in the org** unreadable — 503,
+on a page that can only say *"nothing is wrong with them"*. Riding the declared shape also
+inherits the ME-07 ceilings (64-char key / 512-char value) instead of adding a surface with none.
+
+⚠ **AND THE `dict[str, str]` CONSTRAINT IS WHAT MAKES THE MAPPING SAFE, rather than merely
+convenient.** An `arg_static.*` value reaches `params.arguments`; it can never reach
+`params.name`, so it carries no tool call — asserted in
+`test_259_argument_shapes_are_rows_too.py`, not reasoned about. The write boundary
+(`reject_unoffered_source_tools`) exempts exactly these two key families **by allow-list**, so a
+key nobody declared is still read as a tool name and still refused.
+
+---
 
 **22 / 13 / 732** · ⚠ **FIRES** · ⚠ row was STALE at `18 / 10 / 676`.
 
@@ -9139,7 +9226,7 @@ cells rot within days.
 | [`frontend/src/components/workflows/McpToolPicker.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsmcptoolpickertsx) | 5 / 5 / 601 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | honoured by construction (211 / **214**) — net **−44 L** |
 | [`frontend/src/components/workflows/externalShapeVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsexternalshapevocabularyts) | 2 / 1 / 109 | no (1 phase) | young (206.2) |
 | [`frontend/src/components/workflows/McpToolPicker.reachability.test.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsmcptoolpickerreachabilitytesttsx) | 1 / 1 / 316 | no (1 phase) | young (206.2) |
-| [`backend/app/models/connector.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsconnectorpy) | 23 / 13 / 751 | ⚠ **FIRES** | honoured by construction (**239 gap-closure**) — `source_tools` bounded 64/512 (ME-07); `root_path`'s CONTENT is a STATED exemption, since path authorization belongs to the remote server |
+| [`backend/app/models/connector.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsconnectorpy) | 24 / 13 / 772 | ⚠ **FIRES** | honoured by construction (**239-06 / SEED-259**): the argument mapping rides the declared `dict[str,str]` as flat prefixed keys — no new field, no shape change, no migration |
 | [`backend/app/services/mcp_client.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmcp_clientpy) | 7 / 5 / 480 | ⚠ **FIRES** | ⚠ row was STALE at `4 / 2 / 407` and said `no (2 phases)` — present and WRONG, so it answered the auditor. Byte-unchanged by 239; the sanitizer allow-list did not need widening |
 | [`backend/app/api/connectors.py`](docs/HOT-FILE-LEDGER.md#backendappapiconnectorspy) | 40 / 19 / 2071 | ⚠ **FIRES** | ⚠ **extraction still OWED and the file GREW AGAIN** (2051→2071 at the 239 gap-closure: `_provider_said`, LO-05). The named seam is unchanged |
 | [`backend/app/security/egress.py`](docs/HOT-FILE-LEDGER.md#backendappsecurityegresspy) | 13 / 5 / 982 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | honoured by construction (232): Google Drive read/export pins; docstrings updated to source contract |
@@ -9148,7 +9235,7 @@ cells rot within days.
 | [`frontend/src/components/settings/applicationAvailability.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsapplicationavailabilityts) | 0 / 0 / 152 | no (new) | young (221-02) — server decides the STATE, this decides the WORDS. It classifies nothing |
 | [`frontend/src/components/settings/AvailabilityLine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsavailabilitylinetsx) | 0 / 0 / 74 | no (new) | young (221-02) — a `ready` application renders `null`, never an empty element |
 | [`frontend/src/components/settings/grantsVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsgrantsvocabularyts) | 3 / 2 / 115 | no (2 phases) | ⚠ absent for its entire life — row added 221-02. There is deliberately NO `READY` string in it |
-| [`backend/app/services/connector_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesconnector_servicepy) | 24 / 9 / 1749 | ⚠ **FIRES** | ⚠ row was STALE at `21 / 7 / 1601`. 239 gap-closure REMOVED the tool vocabulary (ME-05) and added the destructive-binding refusal (CR-01) |
+| [`backend/app/services/connector_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesconnector_servicepy) | 25 / 9 / 1772 | ⚠ **FIRES** | honoured by construction (**239-06**): the write boundary knows a mapping KEY from a tool name by ALLOW-LIST — an unknown key is still read as a tool name and still refused |
 | [`backend/app/models/message.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsmessagepy) | 17 / 10 / 124 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **8 phases** — row added 214; honoured by construction (214-16) |
 | [`backend/app/models/user_settings.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsuser_settingspy) | 46 / 30 / 1352 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **30 phases** — row added 214; honoured by construction (214-14) |
 | [`backend/app/services/connectors/args.py`](docs/HOT-FILE-LEDGER.md#backendappservicesconnectorsargspy) | 2 / 1 / 474 | no (1 phase) | young (214-01) — the shared argument leaf: resolution, satisfiability, and ONE schema accessor |
@@ -9245,5 +9332,5 @@ cells rot within days.
 | [`backend/app/services/sources/adapters/mock_source.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesadaptersmock_sourcepy) | 2 / 1 / 177 | no (1 phase) | ⚠ absent for its entire life — row added 238. It is where the SEED-253 invariant is ANCHORED: a `path` names a folder, never a filename |
 | [`backend/app/services/sources/__init__.py`](docs/HOT-FILE-LEDGER.md#backendappservicessources__init__py) | 5 / 3 / 40 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ row was STALE at `2 / 1 / 26` and read `no (1 phase)`. The ONE eager-import site — an adapter absent here is unregistered, so the list is load-bearing |
 | [`frontend/src/components/sources/sourceCapability.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcessourcecapabilityts) | 3 / 2 / 138 | no (2 phases) | ⚠ row STALE TWICE (`0 / 0 / 38`, `2 / 2 / 98`). young (238 / **239**). ⛔ Fails CLOSED on `null`, and on a DEFAULT service id since 239-05. See §239-05 |
-| [`backend/app/services/sources/adapters/mcp_source.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesadaptersmcp_sourcepy) | 6 / 1 / 1022 | no (1 phase) | ⚠ row was STALE at `2 / 1 / 643` — **+379 L in the gap-closure round**, which is where the whole tool VOCABULARY moved (ME-05). Tool names are a ROW and now provably nowhere else |
+| [`backend/app/services/sources/adapters/mcp_source.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesadaptersmcp_sourcepy) | 8 / 1 / 1259 | no (1 phase) | ⚠ STALE at every close so far (`2/1/643` → `6/1/1022` → this). 239-06 made ARGUMENT SHAPES rows too, and refuses a call it cannot satisfy rather than answering empty |
 | [`frontend/src/components/settings/connectionRowVerdict.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectionrowverdictts) | 2 / 2 / 99 | no (2 phases) | ⚠ **absent for its entire life — row added 239-03, and the ledger gate FAILED on it at this phase's base.** young (221 / 239). The row's verdict, DERIVED never stored. See §239-03 |
