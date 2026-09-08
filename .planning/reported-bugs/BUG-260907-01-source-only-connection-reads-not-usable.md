@@ -4,10 +4,10 @@ title: A working OneDrive source connection reads "⚠ Not usable" — the row v
 reported: 2026-09-07
 surface: Agentic-RAG
 severity: major
-status: folded
+status: closed
 affected_areas: [frontend/settings, connections, sources, honesty]
 folded_into: 239
-verified_closed_by: null
+verified_closed_by: "239"   # driven live 2026-09-08 at 5356bcaf3 — see 239-VALIDATION.md rows 1 and 3
 related_seeds: []
 re_open_trigger: null
 reproduces_on:
@@ -121,3 +121,34 @@ offer the connection regardless of this label.
 - `.planning/phases/238-microsoft-graph-onedrive/238-VERIFICATION.md` — the live drive proving
   the connection works
 - Commit `7370fe543`
+
+---
+
+## ✅ CLOSED 2026-09-08 — driven live, not inferred
+
+Verified in the running app at `5356bcaf3` (Chrome MCP, Settings → Connections). **Microsoft 365 — the
+connection this report was filed against — reads `✓ Ready as source`.** It read `⚠ Not usable` before
+Phase 239.
+
+⚠ **Closed on DISCRIMINATION, not on the words appearing.** A verdict that printed the new label
+everywhere would be a worse bug than the one reported. Read verbatim, same page, same moment:
+
+| Row | Shape | Verdict |
+|---|---|---|
+| Microsoft 365 | source-capable, 0 action tools | **`✓ Ready as source`** |
+| DeepWiki | MCP, 3 action tools, no `source_tools` | `✓ Ready` — not "as source" |
+| Jira – KAN | bad credential | `✕ Credential failed` |
+| Linear · Figma · Sentry | never contacted | `Not connected` |
+
+And while this same connection was still `⏻ Disabled`, it did **not** claim readiness — so both sides
+of the status gate are evidenced, not just the happy one.
+
+⚠ **The fix as originally PLANNED would not have closed this report.** Phase 239's plan specified
+`Boolean(mcp_server_url)` as the capability test — a client-side guess at something only the server
+knows, which would have printed `✓ Ready as source` on rows that resolve no adapter. The executor
+caught it; a later code review then found a third over-claiming arm (`HI-01`) still live. **Both are
+fixed and both were re-driven here** — see `239-VALIDATION.md` row 3.
+
+**Not claimed by this closure:** F-6 (the discovery receipt) is UNVERIFIED, and `BUG-260908-02` — a
+*disabled* connection still offered in the Library source picker — was found by this same UAT and is
+a separate, open defect.
