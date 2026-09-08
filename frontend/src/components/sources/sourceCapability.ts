@@ -53,13 +53,46 @@ const PROTOCOL_FAMILIES: Record<string, string> = { mcp: "mcp" }
  */
 const CONFIG_PROTOCOL_MARKERS: Record<string, string> = { source_tools: "mcp" }
 
+/**
+ * Phase 239 gap-closure round 1 (HI-01) — SERVICE IDS THAT NAME A TRANSPORT, NOT A VENDOR.
+ *
+ * ⭐ **`custom_mcp` IS THE DEFAULT `service_id` FOR EVERY BY-URL MCP CONNECTION *AND* A
+ * FAMILY THE SERVER REGISTERS, AND THAT COLLISION WAS THE DEFECT.** `McpAuthDoor` composes
+ * `service_id: draft.serviceId.trim() || "custom_mcp"`, and `mcp_source.py` carries
+ * `@SourceRegistry.register("custom_mcp")` beside `@SourceRegistry.register("mcp")` — so
+ * `GET /connectors/source-families` publishes `custom_mcp`, the exact-id arm below matched
+ * it, and **every** row created through that door was called a source before one byte of
+ * evidence was read. A Linear MCP server nobody had ever contacted printed
+ * `✓ Ready as source` and appeared in `CreateWatchModal`, which is TM-239-07 exactly.
+ *
+ * ⛔ **THE NARROWING IS THE ID, NEVER THE ROW.** A `custom_mcp` row that DECLARED the
+ * transport (`auth_type: "mcp"`) or carries a `source_tools` binding is still a source —
+ * it just has to reach that verdict through the evidence doors below rather than inherit it
+ * from a word. Refusing the name outright would silence every MCP file source the product
+ * ships, which is the over-correction `connectionRowVerdict`'s header records shipping once.
+ *
+ * ⚠ SAME-COMMIT SYNC, AND IT IS EXECUTABLE NOW. `sourceCapability.test.ts` reads every
+ * `@SourceRegistry.register("…")` out of `mcp_source.py` through `?raw` and requires each to
+ * appear as a key here — because the version of this rule that was only a comment is what
+ * let `custom_mcp` through.
+ */
+export const PROTOCOL_SERVICE_IDS: Record<string, string> = { mcp: "mcp", custom_mcp: "mcp" }
+
 /** Which transport this row speaks, or `null` — by DECLARATION, never by name-matching.
  *
- * ⛔ `mcp_server_url` IS DELIBERATELY NOT CONSULTED. The server does not read it either:
- * shipped rows carry an MCP URL with `auth_type: "static_key"` and no `source_tools`, and
- * `_protocol_of` returns `None` for every one of them. Admitting them here would print
- * `✓ Ready as source` on a row that resolves no adapter and cannot browse — TM-239-07's
- * false green, and a dead control in the Library picker.
+ * ⛔ `mcp_server_url` IS DELIBERATELY NOT CONSULTED, and the reason is narrower than this
+ * comment used to claim. It said the server *"resolves no adapter for them"*, and that was
+ * **refuted by driving the shipped registry** (review LO-01, re-driven at this fix):
+ *
+ *     {service_id: "custom_mcp", auth_type: "static_key", config: {}}
+ *       _protocol_of  -> None
+ *       get_adapter   -> <McpSourceAdapter>      ⛔ resolved by the EXACT-KEY arm
+ *
+ * So `_protocol_of` returning `None` is true, and the conclusion drawn from it was not.
+ * This client is deliberately STRICTER than that arm: a URL somebody pasted is a
+ * destination, not a statement that the server has files. Admitting it would print
+ * `✓ Ready as source` on a row whose first browse is a 502 — a dead control in the Library
+ * picker, which is the thing the `/source-families` route exists to end.
  */
 function protocolOf(c: ConnectorConnection): string | null {
   const declared = String(c.auth_type ?? "").trim().toLowerCase()
@@ -88,11 +121,18 @@ export function isSourceCapable(
   // dead control a person clicks and blames themselves for, the second is a list that has not
   // finished loading. `null` is "we have not been told", never "allow everything".
   if (families === null) return false
-  if (families.includes((c.service_id || "").toLowerCase())) return true
 
-  // …and only then the TRANSPORT, exactly as the server orders it: an exact `service_id`
-  // always wins, so a first-party family that also carried a protocol marker keeps its own
-  // adapter instead of being resolved by a generic one.
+  // The exact `service_id`, exactly as the server orders it — EXCEPT when that id is a
+  // TRANSPORT WORD rather than a vendor. ⛔ HI-01: `custom_mcp` is the default id for every
+  // by-URL MCP connection, so inheriting capability from it asserts a file surface for a row
+  // nobody has contacted. A transport-named row must PROVE it below; a vendor-named one is
+  // still a family the adapter knows by name and needs no declaration.
+  const id = (c.service_id || "").toLowerCase()
+  if (!(id in PROTOCOL_SERVICE_IDS) && families.includes(id)) return true
+
+  // …and only then the TRANSPORT the row DECLARED. A first-party family that also carried a
+  // protocol marker kept its own adapter above, so this arm can only widen to rows that
+  // said something about themselves: `auth_type: "mcp"`, or a non-empty `source_tools`.
   const protocol = protocolOf(c)
   return protocol !== null && families.includes(protocol)
 }
