@@ -302,7 +302,9 @@ fresh worktree false-failed every plan:
 
    ⚠ **THE CAP WAS NEITHER ADJUSTED NOR NEEDED, for the third consecutive close** — `2`,
    `failed 0` on both invocations. ⚠ And a standing red that is NOT a cap problem and NOT this
-   phase's: **`src/components/sources/sourceComposition.test.tsx` sits at `16 failed | 33 passed`
+   phase's: **`src/components/sources/sourceComposition.test.tsx` sits at ~~`16 failed | 33 passed`~~
+   **`18 failed | 31 passed`** (re-measured 2026-09-08; the original is struck through, not
+   deleted — a standing-red figure that ROTS is how an inherited red gets mistaken for a new one)
    in NEITHER knob, by a Phase 235 decision** — pinning a red suite turns the shared gate red,
    and pinning it with an allowance makes a gate that cannot fail. It is invisible to the verdict
    line above, which is exactly why it is named here.
@@ -359,7 +361,18 @@ fresh worktree false-failed every plan:
    > one of SEED-171's three**, record it as an observation and move on. ⚠ **One green sample of a
    > flaky suite is NOT proof of innocence** — say "provably unmodified", never "fine".
 
-   ⚠ **A CONSEQUENCE FOR PLANNING, not just for triage:** `count gate OK` is **not reliably reachable
+   ⚠ **THE FRONTEND TYPECHECK GATE IS VACUOUS AS USUALLY RUN — measured 2026-09-08 (Phase 239-08).**
+`frontend/tsconfig.json` is `{"files": [], "references": [...]}`, a solution-style config, so
+**`npx tsc --noEmit` type-checks ZERO files and exits 0 no matter what is broken.** It was quoted as
+evidence repeatedly across Phase 239 and proved nothing; it reported green over a change carrying
+**24 real `TS6133` errors**. ⛔ **Use `npx tsc -p tsconfig.app.json --noEmit`**, and measure a
+**set diff** — the app config reports **67 errors at base**, so "zero errors" is not a reachable
+criterion here and a plan that writes one has written a criterion that cannot pass.
+⚠ This project already knew: the v3.3 close recorded *"`tsc -b` != `--noEmit`"*. **A fact in a
+register nobody re-reads is the same as no fact** — which is this file's own recurring finding, now
+paid for a second time.
+
+⚠ **A CONSEQUENCE FOR PLANNING, not just for triage:** `count gate OK` is **not reliably reachable
    on demand**, so a plan whose acceptance criterion is *"the gate is green"* has written a criterion
    that can fail for reasons no plan controls. Pair it with the per-file deltas and the explicitly-run
    in-scope suites, which are deterministic.
