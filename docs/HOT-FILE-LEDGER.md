@@ -9090,6 +9090,58 @@ source fence cannot see whether the filtered list reaches the screen. The render
 
 ---
 
+### §239-07 — `SEED-259`'s argument mapping gets a control (frontend only)
+
+**`frontend/src/components/settings/connectionFormCopy.ts`** — `19 / 8 / 1631`, re-derived
+(row was STALE at `17 / 8 / 1293`; **stale at two consecutive closes now**).
+⭐ **THE SEAM 239-05 NAMED WAS RIDDEN RATHER THAN RE-OPENED.** That round found that
+`configFromDraft`'s ARM SET is the hazard — the `mcp` arm carried the binding and the `oauth` arm
+silently deleted it, so a rename destroyed a working file source with a 200. This round adds two
+NEW keys to the same column and puts **every one of them inside `sourceToolsFromDraft`**, which
+both arms already call. A key added there cannot be present on one arm and absent on the other,
+which is the only property that makes HI-02 unrepeatable rather than merely fixed.
+⛔ **AN EMPTY ROW IS OMITTED, AND THAT IS A DELIBERATE DIVERGENCE FROM THE ADAPTER.**
+`mcp_source._static_args` KEEPS an empty value, because through the API it is a value somebody
+typed. Here every derived row STARTS empty — so writing them would put an `arg_static.*` key on the
+connection for every argument nobody supplied, and `refuse_if_underspecified` would then have
+**nothing to say, because the key IS present**. Opening the panel and pressing Save would have
+disabled 239-06's refusal for the whole connection at once: the fail-open shape the seed exists to
+close, re-entered through its own remedy.
+⚠ **`sourceStaticArgs` IS THE ONE NON-FLAT FIELD ON `ConnectionDraft`, and the exception is forced.**
+The flat rule exists so the 🔒 footer can be built from parts during render; this field feeds no
+footer, and its key set belongs to the REMOTE SERVER — a named field per argument is exactly the
+"code, not rows" shape `SEED-259` was ruled against. It is built with `Object.defineProperty`,
+because a plain `out["__proto__"] = v` sets the object's PROTOTYPE instead of creating a key, so the
+one argument name most likely to be hostile would vanish from the draft and be deleted on save.
+⚠ **STILL OWED, unchanged from 239-05 and not fixed here:** the `oauth` arm drops `headers` and the
+`mcp` arm drops `custom_client_id`.
+
+**`frontend/src/components/settings/ConnectionFormPanel.tsx`** — `27 / 10 / 2807`, re-derived
+(row was STALE at `25 / 10 / 2577`; **it has now been stale at four consecutive closes**, which is
+this ledger's own repeated finding reproducing on the same file for the fourth time).
+⭐ **THE CONTROL FOLLOWS THE EVIDENCE, WHICH IS THE OPPOSITE CHOICE TO HI-04 ONE FIELD UP AND FOR
+THE SAME REASON.** The root folder is free text because a server publishes its TOOLS, never its
+FOLDERS. The path ARGUMENT is a picker because a server *does* publish its argument names — they are
+already in `discovered_tools[].inputSchema` and already stored. Asking a person to retype one is how
+a typo pins every read to one fixed place, which is a COMPLETE listing of the wrong folder: `H-5`'s
+deletion signal wearing a success.
+⛔ **THE BRANCH IS ON WHAT THE SERVER DECLARED, NEVER ON HOW MANY OPTIONS WOULD RESULT — and that
+distinction was driven, not reasoned.** The first implementation branched on the option COUNT after
+the stored value had been merged in, so a server that published no schema offered a one-option
+`<select>` containing the person's own previous answer: a control that looks like a choice and is a
+dead end. The suite caught it; the test was not edited to accommodate it.
+⭐ **THE STORED VALUE IS ALWAYS RENDERED, in both controls** — the same rule 239-05 recorded for the
+tool picker, on two new controls. A `<select>` whose value is absent from its options renders
+UNSELECTED, and a row omitted from the screen is a row omitted from the draft.
+⚠ **G-5 FIRES AT TEN PHASES AND THE EXTRACTION IS OWED, NOT DISCHARGED.** This file is now **2807
+lines** and the source-binding card alone is ~330 of them. The named seam is that whole card: it
+reads `probeResult` and `draft`, writes only through `set`, and has no other coupling to the panel —
+it is extractable as `SourceBindingCard` with no state to move. **It was not taken here** because
+this plan is frontend-surfacing inside an in-flight phase; the re-open trigger is the next phase
+whose `files_modified` names this file.
+
+---
+
 ## Scan list — THE AUTHORITATIVE ROW SET
 
 > **Moved here from `CLAUDE.md` on 2026-09-06.** That file now carries the G-5 rule, the re-derive
@@ -9208,13 +9260,13 @@ cells rot within days.
 | [`frontend/src/components/workflows/library/relativeChanged.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryrelativechangedts) | 2 / 2 / 137 | no (2 phases) | young (192.1, 192.2) |
 | [`frontend/src/main.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcmaintsx) | 3 / 1 / 10 | no (1 phase) | young (192.2) |
 | [`frontend/src/components/settings/ConnectionsTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectionstabtsx) | 25 / 9 / 1635 | ⚠ **FIRES** | ⚠ row STALE TWICE (`17 / 7 / 1477`, then `23 / 8 / 1578`). honoured by construction (221-02 / **239-03**) — one prop through three mount sites, twice over. See §239-03 |
-| [`frontend/src/components/settings/ConnectionFormPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectionformpaneltsx) | 25 / 10 / 2577 | ⚠ **FIRES** | ⚠ row STALE THREE TIMES (`9 / 5 / 2009`, `17 / 7 / 2376`, `24 / 10 / 2545`). honoured by construction (212 / 221 / 239-03 / **239-05**) — 239-05 filters ONE option list. See §239-05 |
+| [`frontend/src/components/settings/ConnectionFormPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectionformpaneltsx) | 27 / 10 / 2807 | ⚠ **FIRES** | ⚠ row STALE FOUR TIMES (`9 / 5 / 2009` … `25 / 10 / 2577`). honoured by construction (**239-07**) — one derived block appended; ⛔ extraction OWED, seam named. See §239-07 |
 | [`frontend/src/components/settings/ConnectionGrantsList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectiongrantslisttsx) | 5 / 2 / 259 | no (2 phases) | 344 → 222 (221-01) → **259**. The availability slot is a CHILD it forwards, not markup it owns |
 | [`frontend/src/lib/api/org.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiorgts) | 11 / 8 / 629 | ⚠ **FIRES** | ⚠ absent for its ENTIRE LIFE at **4 phases** — row added 221, then STALE at `6 / 4 / 562`. **NOT covered by `lib/api.ts`: that row is the BARREL.** ⚠ THIRD wire-type drift here. See §239-03 |
 | [`backend/app/services/connectors/service_tools.py`](docs/HOT-FILE-LEDGER.md#backendappservicesconnectorsservice_toolspy) | 11 / 1 / 2018 | no (1 phase) | row added 221. Re-derived 232: 2018 L; internal Google Drive tools delegate to sources adapter |
 | [`backend/app/services/connectors/grants.py`](docs/HOT-FILE-LEDGER.md#backendappservicesconnectorsgrantspy) | 1 / 1 / 92 | no (1 phase) | ⚠ absent — row added 221. It is THE grant-time gate: 92 L deciding every connector call |
 | [`frontend/src/components/settings/connectionsCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectionscopyts) | 15 / 8 / 784 | ⚠ **FIRES** | no seam proposed — a vocabulary doing one thing many times is the right shape. ⚠ row was STALE at `13 / 7 / 737`. honoured by construction (**239-03**): one word, one union member. See §239-03 |
-| [`frontend/src/components/settings/connectionFormCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectionformcopyts) | 17 / 8 / 1293 | ⚠ **FIRES** | ⚠ row was STALE at `15 / 8 / 1216`. ⛔ 239-05 found `configFromDraft`'s ARM SET is the seam: one arm carried a key and its sibling silently deleted it. See §239-05 |
+| [`frontend/src/components/settings/connectionFormCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectionformcopyts) | 19 / 8 / 1631 | ⚠ **FIRES** | ⚠ row STALE TWICE (`15 / 8 / 1216`, `17 / 8 / 1293`). ⛔ 239-05 named the seam — `configFromDraft`'s ARM SET; 239-07 RODE it: one serializer both arms call. See §239-07 |
 | [`frontend/src/pages/SettingsPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagessettingspagetsx) | 38 / 21 / 1500 | ⚠ **FIRES** | ✅ **the 212-close re-open trigger has now FIRED** (SEED-227 names it) — honoured by construction: one SectionCard added beside Retrieval, no branch touched |
 | [`frontend/src/components/settings/ModelPillRow.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsmodelpillrowtsx) | 4 / 3 / 141 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent for its entire life — row added 2026-08-27 at 212's close, same D-22 pair as `SettingsPage.tsx` |
 | [`frontend/src/components/settings/servicesCatalog.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsservicescatalogts) | 2 / 1 / 211 | no (1 phase) | young (212) — the presentation lookup migration 127's `service_id` COMMENT names |

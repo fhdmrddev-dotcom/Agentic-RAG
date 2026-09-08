@@ -157,6 +157,37 @@ at call time — `check()` covers that against the live server. Same asymmetry
 `reject_unoffered_source_tools` already carries, for the same reason (refusing there fires on the
 honest case and not the dishonest one), pinned by a test so a future change to it is visible.
 
-**`re_open_trigger` (replaces the original `trigger_when` for what remains):** the frontend pass
-that gives `arg_path` / `arg_static.*` a control, OR the first live drive of a second MCP file
+**`re_open_trigger` (replaces the original `trigger_when` for what remains):** ~~the frontend pass
+that gives `arg_path` / `arg_static.*` a control, OR~~ the first live drive of a second MCP file
 server — whichever comes first. Either one is where SC#2 is scored.
+
+---
+
+## ⭐ FRONTEND BUILT 2026-09-08 — `239-07`. **The first half of that trigger has FIRED.**
+
+Full evidence: **`.planning/phases/239-any-mcp-server-with-files/239-07-SUMMARY.md`**.
+
+The *File source mapping* card now carries the mapping, so **item 1 of `239-06`'s "what I did NOT
+do" is closed**: `arg_path` and `arg_static.*` are no longer API-only, and a person can set them
+without hand-crafting a `PATCH`.
+
+- **`arg_path` is a PICKER over the server's own declared argument names**, not a text box — the
+  names are already in `discovered_tools[].inputSchema` and already stored. It degrades to free
+  text only where the server published no schema, because a one-option `<select>` is a dead end.
+- **One row per required argument the path does not carry**, derived from that same schema. A
+  stored static the server no longer asks for still renders, because the column is rewritten
+  WHOLE and a row off the screen is a row deleted on the next save.
+- **`239-06`'s refusal is said BEFORE somebody hits it**, naming every unfilled argument.
+- ⛔ **An unfilled row is OMITTED rather than written empty.** A deliberate divergence from
+  `_static_args`, which keeps `""`: every derived row starts empty here, so writing them would
+  make the key PRESENT for every argument nobody supplied and leave `refuse_if_underspecified`
+  with nothing to say — opening the panel would have disabled the safety half in one press.
+- ⛔ **No vendor name and no argument default**, fenced by a `?raw` scan of both shipped files
+  and by a fixture vocabulary that appears nowhere else in this repository.
+
+### ⛔ Why this seed is STILL NOT `shipped`
+
+**Its own ruling says SC#2 stays open until a second server actually lists and reads, and that has
+still not happened.** Item 2 of `239-06`'s list is untouched: nothing has been driven against a
+live server. The remaining trigger is that drive, and it is a UAT row owed by somebody holding the
+credential.
