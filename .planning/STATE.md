@@ -7,7 +7,7 @@ last_updated: "2026-09-07T19:14:00.000Z"
 last_activity: 2026-09-07
 progress:
   total_phases: 14
-  completed_phases: 10
+  completed_phases: 11
   total_plans: 26
   completed_plans: 26
   planned_plans_235: 12
@@ -36,7 +36,8 @@ can be taught new behaviors (skills) that persist and can be shared.
 **Current focus:** **Milestone v4.0 Connected Knowledge — STARTED 2026-09-04.** Phase numbering
 continues at **228**.
 
-Phase: 239 — Any MCP Server With Files (✅ **SC#1-3 MET 2026-09-09** — closeable; a short owed list below)
+Phase: 240 — Mail Is a Shape, Not a Fourth Adapter (NOT STARTED)
+Prior: 239 — Any MCP Server With Files (✅ **CLOSED 2026-09-09**)
 
 ⭐ **SC#2 MET, and the zero-code claim is proven by HASH, not asserted.** `HEAD` read `b918c408e`
 before AND after; `git log <base>..HEAD -- backend frontend` = **0**; source tree clean. GitHub MCP
@@ -72,7 +73,18 @@ Recorded as owed rather than claimed.
 ⭐ The UAT found `BUG-260909-01`: the DB CHECK correctly refuses an out-of-range ceiling, but
 `save_app_settings` swallows the violation and returns as if it succeeded. Not user-reachable
 (the API refuses first, with a worded 400) — a latent backstop that fails silently.
-Prior: 238 — Microsoft Graph — OneDrive (✅ BUILT & DRIVEN 2026-09-07)
+
+⛔ **CARRIED FORWARD PAST THE CLOSE — owed, not absorbed:** deletion / disconnect / visibility
+parity with Drive was never driven on an MCP source, and no watch was created (that ingests real
+files into the operator's Library). The cross-worker `BUG-260902-06` fix is proven by a
+spawned-interpreter test, **not in the shipped `WORKER_COUNT=2` arrangement**. Five reported bugs
+opened during this phase remain open: `BUG-260908-01/02/03`, `BUG-260909-01`, and `BUG-260902-06`
+(fixed, awaiting the two-worker confirmation). Three seeds planted: `SEED-257`, `SEED-258`
+(⚠ its 16 unreachable fields and 57 unverdicted constants are UNTOUCHED), `SEED-259` (answered).
+⛔ The wider `ConnectionShapeFields.tsx` G-5 seam remains OWED — `ConnectionFormPanel.tsx` still
+fires at 10 phases.
+
+Earlier: 238 — Microsoft Graph — OneDrive (✅ BUILT & DRIVEN 2026-09-07)
 
 ### Phase 239 — what is true, and what is NOT
 
