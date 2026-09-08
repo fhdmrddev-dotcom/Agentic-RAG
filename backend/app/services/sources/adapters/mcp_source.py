@@ -92,13 +92,238 @@ VIRTUAL_ROOT_IDS = (None, "", VIRTUAL_ROOT_ID)
 _LINE = re.compile(r"^\s*\[(?P<kind>DIR|FILE)\]\s+(?P<name>.+?)\s*$", re.IGNORECASE)
 _SIZE_SUFFIX = re.compile(r"^(?P<name>.*?)\s*\((?P<size>[\d,_]+)\s*bytes?\)$", re.IGNORECASE)
 
-#: Every spelling of "this entry is a directory" seen across the servers surveyed in
-#: 239-RESEARCH. ⚠ This is a DATA table about a WIRE FORMAT, not a table of servers: it names
-#: no vendor and grows by one string, never by one branch.
-_DIR_WORDS = frozenset({"dir", "directory", "folder"})
+#: Every spelling of "this entry is a directory" — both as a wire-format `type` value and as
+#: a word inside a tool's NAME. ⚠ This is a DATA table about a WIRE FORMAT, not a table of
+#: servers: it names no vendor and grows by one string, never by one branch.
+#:
+#: ⚠ ONE SPELLING, BECAUSE THERE WERE TWO (review LO-04). `connector_service.py` carried
+#: `("directory", "directories", "folder", "folders")` under this same name while this set
+#: read `{"dir", "directory", "folder"}` — same name, same concept, different membership, so
+#: `type: "folders"` was a directory to one reader and a file to the other. This is the union
+#: of the two, and it is now the only one.
+_DIR_WORDS = frozenset({"dir", "dirs", "directory", "directories", "folder", "folders"})
 _TIME_KEYS = ("modified_at", "modifiedAt", "modified", "mtime", "lastModified", "last_modified")
 _NAME_KEYS = ("name", "filename", "basename")
 _PATH_KEYS = ("path", "uri", "full_path", "fullPath")
+
+
+# ── ⭐ THE TOOL VOCABULARY, AND WHY EVERY TOOL NAME IN THIS PRODUCT LIVES IN THIS ONE FILE ─
+#
+# ⚠ **THIS MODULE'S OPENING CLAIM — "nothing anywhere else in the codebase knows any tool
+# name" — WAS FALSE ON THE DAY IT WAS WRITTEN** (Phase 239 review, ME-05).
+# `connector_service.py` held `("list_directory", "list_dir", "list_files", "ls", "browse")`
+# in a membership test, far ABOVE `services/sources/adapters/`, and `test_boundary_fence.py`
+# structurally could not see it: that module was not in `FENCED_MODULES`, and the fence's
+# literal set held vendor names only — never a tool name. An invariant enforced by nothing is
+# a hope with a docstring.
+#
+# ⭐ SO THE VOCABULARY MOVED HERE RATHER THAN THE SENTENCE BEING SOFTENED. Detection IS
+# vocabulary, and vocabulary is what this file is; `connector_service.infer_source_tools` is
+# now a delegation that holds no tool literal at all. `test_boundary_fence.py` gained a
+# `TOOL_LITERALS` scan across every source-path module above `adapters/`, with a positive
+# control, so the next name to leak upward fails by line number instead of by review.
+
+
+#: Lister names, IN PREFERENCE ORDER. The order is the point: a server may offer two, wire
+#: order is arbitrary, and a binding that took the first match would flip between two
+#: discoveries of the same server and silently re-point a watched source.
+#:
+#: ⚠ `list_directory_with_sizes` IS FIRST, AND THAT ORDERING IS THE WHOLE OF ME-02.
+#: `list_directory` answers `[FILE] name` — no size, no timestamp — so `_version` returns
+#: `None` for every entry, so `watch_service`'s `if item_mod and existing_ver and …` branch
+#: can NEVER run: the folder ingests once and then reports `checked · 0 changes` forever while
+#: its files are edited daily. The reference server offers BOTH tools; preferring the one that
+#: states sizes is what makes modification detection possible at all on this family.
+_LIST_TOOL_NAMES: tuple[str, ...] = (
+    "list_directory_with_sizes",
+    "list_directory",
+    "list_dir",
+    "list_files",
+    "ls",
+    "browse",
+)
+
+#: Reader names, IN PREFERENCE ORDER.
+_READ_TOOL_NAMES: tuple[str, ...] = (
+    "read_file", "get_file_contents", "view_file", "cat", "read",
+)
+
+#: ⛔ A tool whose NAME says it CHANGES something is never a candidate for either role — and
+#: is refused at the write boundary too (`connector_service.reject_unoffered_source_tools`),
+#: which is the half that was missing. The one mistake on this surface that is not merely
+#: wrong but destructive is binding `write_file` or `delete_file` as the READER: it accepts
+#: `path`, and `watch_service` calls the reader on every file in the folder, unattended, on
+#: every cycle.
+#:
+#: ⚠ MATCHED AS WHOLE TOKENS, NEVER AS SUBSTRINGS (review ME-04). The substring form was
+#: measured to refuse `list_assets` (`set` ⊂ `assets`), `get_asset`, `read_dataset`,
+#: `input_file` (`put` ⊂ `input`) and `output_list` — so a server whose lister is
+#: `list_assets` and whose reader is `read_dataset` got NO binding at all, silently fell back
+#: to defaults that server does not have, and answered 502 with nothing naming the cause.
+_MUTATION_WORDS: frozenset[str] = frozenset({
+    "write", "overwrite", "create", "delete", "remove", "rename", "move", "copy",
+    "upload", "put", "append", "edit", "update", "modify", "mkdir", "rmdir", "rm",
+    "unlink", "send", "post", "patch", "set", "save", "insert", "purge", "drop",
+    "clear", "destroy", "trash", "truncate", "exec", "execute", "kill", "revoke",
+})
+
+_CAMEL_BOUNDARY = re.compile(r"(?<=[a-z0-9])(?=[A-Z])")
+_NOT_ALNUM = re.compile(r"[^a-z0-9]+")
+
+
+def _tokens(name: str) -> frozenset[str]:
+    """`readFile`, `read_file` and `read-file` all -> `{"read", "file"}`.
+
+    ⚠ camelCase is split BEFORE lower-casing, or `readFile` collapses to the single token
+    `readfile` and every whole-token rule below silently stops applying to half the servers
+    in existence — including, for `deleteFile`, the destructive half.
+    """
+    spaced = _CAMEL_BOUNDARY.sub(" ", str(name))
+    return frozenset(t for t in _NOT_ALNUM.split(spaced.lower()) if t)
+
+
+def looks_like_a_mutation(name: str) -> bool:
+    """Whether this tool's own NAME says it changes something.
+
+    ⭐ THE NAME — not the description, not the annotations. It is the part a server cannot
+    make safe by decorating it, and it is the exact string that reaches `params.name` on the
+    wire. Public because the write boundary in `connector_service` needs it: a guard that
+    lives only in the auto-detector is not a boundary (review CR-01).
+    """
+    return bool(_tokens(name) & _MUTATION_WORDS)
+
+
+#: Parameter names that mean "somewhere on a file surface".
+_PATH_PARAMS: frozenset[str] = frozenset(
+    {"path", "directory", "dir", "dir_path", "folder", "folder_path", "file_path", "filepath"}
+)
+
+#: ⛔ Parameter names that mean "here is the new content". A tool that ACCEPTS content
+#: WRITES it, whatever it calls itself — a SHAPE signal, which is the kind a server cannot
+#: author its way around the way it can author a description.
+_WRITE_PARAMS: frozenset[str] = frozenset(
+    {"content", "contents", "data", "body", "payload", "text", "bytes",
+     "source", "destination", "dest", "new_path", "newpath", "target"}
+)
+
+_LIST_WORDS: frozenset[str] = frozenset(
+    {"list", "ls", "enumerate", "browse", "contents", "entries", "walk", "index"}
+)
+_READ_WORDS: frozenset[str] = frozenset(
+    {"read", "fetch", "get", "cat", "contents", "download", "retrieve", "view", "open", "load"}
+)
+_FILE_WORDS: frozenset[str] = frozenset(
+    {"file", "files", "document", "documents", "doc", "docs"}
+)
+
+#: The rank given to a tool matched by SHAPE rather than by name — below every known name, so
+#: a server offering both `read_file` and something shape-matched still binds the known one.
+_SCHEMA_RANK: int = len(_LIST_TOOL_NAMES) + len(_READ_TOOL_NAMES) + 1
+
+
+def _schema_params(input_schema: Any) -> set[str]:
+    """The parameter names a tool declares — total over every malformed shape a server sends.
+
+    ⚠ Never raises. This runs inside discovery, and a server that answers oddly must not turn
+    a refresh into a 502 — `discover_tools`'s blanket handler would call it a bad gateway.
+    """
+    if not isinstance(input_schema, dict):
+        return set()
+    properties = input_schema.get("properties")
+    if not isinstance(properties, dict):
+        return set()
+    return {str(key).lower() for key in properties}
+
+
+def infer_source_tools(tools: list[dict[str, Any]] | None) -> dict[str, str] | None:
+    """Which of these tools LIST a directory and READ a file? Returns names, never behaviour.
+
+    ── ⛔ WHY `description` IS NOT READ, WHICH IS THE WHOLE OF CR-02 ──────────────────
+
+    This function used to build its haystack from ``f"{name} {description}"``.
+    ``description`` is authored by the REMOTE SERVER — exactly as ``annotations`` and
+    ``readOnlyHint`` are, and those are refused *structurally* by a fence in this same file
+    (TM-239-02). The same trust class, one module over, unfenced. Driven against the shipped
+    code before this change::
+
+        {"name": "purge_documents",
+         "description": "Retrieve the contents of a file at the given path.",
+         "inputSchema": {"properties": {"path": {…}}}}
+            ->  {"read_tool": "purge_documents"}
+
+    One press of **Refresh actions** wrote that onto the row, and every later preview, import
+    and watch cycle then invoked ``purge_documents`` on every file the same server listed.
+    **The server chose which of its own tools this application runs, unattended, with a
+    sentence.** So the detector now judges the NAME and the SCHEMA SHAPE and nothing else:
+    the name because it is the string that actually reaches ``params.name``, the schema
+    because a tool that accepts ``content`` writes it whatever it says about itself.
+
+    Two doors, and the second is what makes a server nobody has met usable on day one:
+
+      1. **By name** — `list_directory` / `ls`, `read_file` / `cat`. Exact and ranked.
+      2. **By shape** — an unrecognised name that takes a path-ish parameter, accepts NO
+         content parameter, and whose OWN NAME says it lists a directory or reads a file.
+         An ALLOW-LIST of shapes rather than a deny-list of words: a name this app cannot
+         recognise binds NOTHING and falls to the operator's picker in Settings, which is
+         the designed escape hatch and is fail-closed.
+
+    ⛔ EVERY VALUE RETURNED IS A NAME THAT WAS HANDED IN (TM-239-05). These are interpolated
+    into a JSON-RPC ``params.name`` by ``mcp_client.call_tool``; a name this function invented
+    would reach the transport with nothing in between.
+
+    ⚠ ``None``, NOT ``{}``, when nothing is found — and the difference is load-bearing.
+    ``sources.base.CONFIG_PROTOCOL_MARKERS`` resolves any connection carrying a non-empty
+    ``source_tools`` to ``McpSourceAdapter``, so an empty mapping would declare an intent
+    nobody expressed. ``McpConfig.source_tools`` records the same distinction: absent means
+    nobody bound this connection to a file surface; empty means somebody looked and named
+    nothing.
+
+    ⚠ A HALF-DETECTION IS RETURNED, not discarded. The adapter's defaults apply PER KEY, so a
+    row carrying only ``read_tool`` still gets the default lister. A key nobody detected is
+    ABSENT rather than an empty string, which would be a tool name the server does not have.
+    """
+    candidates: list[tuple[str, set[str], frozenset[str]]] = []
+    for item in tools or []:
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("name") or "").strip()
+        if not name or looks_like_a_mutation(name):
+            continue
+        candidates.append((name, _schema_params(item.get("inputSchema")), _tokens(name)))
+
+    def _is_a_listing(tokens: frozenset[str]) -> bool:
+        return bool(tokens & _DIR_WORDS) and bool(tokens & _LIST_WORDS)
+
+    def _is_a_read(tokens: frozenset[str]) -> bool:
+        # ⚠ A reader must NOT advertise directories. `enumerate_folder_contents` says
+        # "contents" and would otherwise match both roles; the directory word is what
+        # separates the tool that walks a folder from the one that opens a document.
+        if tokens & _DIR_WORDS:
+            return False
+        return bool(tokens & _READ_WORDS) and bool(tokens & _FILE_WORDS)
+
+    def _best(pool, known: tuple[str, ...], shape_test) -> str | None:
+        scored: list[tuple[int, str]] = []
+        for name, params, tokens in pool:
+            lowered = name.lower()
+            if lowered in known:
+                scored.append((known.index(lowered), name))
+            elif params & _PATH_PARAMS and not (params & _WRITE_PARAMS) and shape_test(tokens):
+                scored.append((_SCHEMA_RANK, name))
+        # The name is the tie-break, so two shape-matched tools resolve identically whatever
+        # order the server listed them in.
+        return min(scored, key=lambda pair: (pair[0], pair[1]))[1] if scored else None
+
+    list_tool = _best(candidates, _LIST_TOOL_NAMES, _is_a_listing)
+    remaining = [c for c in candidates if c[0] != list_tool]
+    read_tool = _best(remaining, _READ_TOOL_NAMES, _is_a_read)
+
+    inferred = {
+        key: value
+        for key, value in (("list_tool", list_tool), ("read_tool", read_tool))
+        if value
+    }
+    return inferred or None
 
 
 class McpToolResultError(ValueError):

@@ -389,140 +389,29 @@ def _sanitize_tool_grants(tool_grants: dict) -> dict[str, str]:
 # Phase 239 (D-239-02) — WHICH TOOLS ON A SERVER READ FILES, detected once and stored as DATA
 # ═══════════════════════════════════════════════════════════════════════════════════════════
 #
-# ⭐ THE CLAIM THIS SERVES is the milestone's: adding a source is ROWS, NOT CODE. What is
-# detected here is written into `connector_connections.config["source_tools"]` and read back by
-# `McpSourceAdapter` alone. **No name below is a branch.** They are a preference ORDER over
-# names servers happen to use, in one place, and a server that shares none of them is still
-# bound — by its schema, and failing that, by hand in Settings.
-#
-# ⛔ NOTHING HERE READS `annotations` OR `readOnlyHint`. A server-advertised hint is
-# informational (Phase 239's out-of-scope rule); a detector that trusted `readOnlyHint: true`
-# on `delete_file` would bind a destructive tool as the reader. Mutation is judged from the
-# tool's own NAME, which is the part a server cannot make safe by decorating it.
-
-#: Lister names, IN PREFERENCE ORDER. The order is the point: a server may offer two, wire
-#: order is arbitrary, and a binding that took the first match would flip between two
-#: discoveries of the same server and silently re-point a watched source.
-_LIST_TOOL_NAMES: tuple[str, ...] = (
-    "list_directory", "list_dir", "list_files", "ls", "browse",
-)
-
-#: Reader names, IN PREFERENCE ORDER.
-_READ_TOOL_NAMES: tuple[str, ...] = (
-    "read_file", "get_file_contents", "view_file", "cat", "read",
-)
-
-#: ⛔ A tool whose NAME says it changes something is never a candidate for either role. The one
-#: mistake on this surface that is not merely wrong but destructive is binding `write_file` as
-#: the reader — it accepts `path`, its description mentions files, and the adapter would call
-#: it on every ingest.
-_MUTATION_WORDS: tuple[str, ...] = (
-    "write", "create", "delete", "remove", "rename", "move", "copy", "upload", "put",
-    "append", "edit", "update", "mkdir", "unlink", "send", "post", "patch", "set",
-)
-
-#: Parameter names that mean "somewhere on a file surface".
-_PATH_PARAMS: frozenset[str] = frozenset(
-    {"path", "directory", "dir", "dir_path", "folder", "folder_path", "file_path", "filepath"}
-)
-
-_DIR_WORDS: tuple[str, ...] = ("directory", "directories", "folder", "folders")
-_LIST_WORDS: tuple[str, ...] = ("list", "enumerate", "browse", "contents", "entries")
-_READ_WORDS: tuple[str, ...] = ("read", "fetch", "get", "cat", "contents", "download", "retrieve")
-_FILE_WORDS: tuple[str, ...] = ("file", "document")
-
-#: The rank given to a tool matched by SCHEMA rather than by name — below every known name, so
-#: a server offering both `read_file` and something schema-shaped still binds the known one.
-_SCHEMA_RANK: int = len(_LIST_TOOL_NAMES) + len(_READ_TOOL_NAMES) + 1
-
-
-def _schema_params(input_schema: Any) -> set[str]:
-    """The parameter names a tool declares — total over every malformed shape a server can send.
-
-    ⚠ Never raises. This runs inside discovery, and a server that answers oddly must not turn a
-    refresh into a 502 — `discover_tools`'s blanket handler would call it a bad gateway.
-    """
-    if not isinstance(input_schema, dict):
-        return set()
-    properties = input_schema.get("properties")
-    if not isinstance(properties, dict):
-        return set()
-    return {str(key).lower() for key in properties}
-
-
-def _looks_like_a_mutation(name: str) -> bool:
-    return any(word in name.lower() for word in _MUTATION_WORDS)
+# ⛔ **THERE IS NO TOOL NAME IN THIS MODULE, AND THAT ABSENCE IS THE POINT** (review ME-05).
+# This block used to hold `("list_directory", "list_dir", "list_files", "ls", "browse")` and a
+# matching reader tuple in a membership test — while `mcp_source.py`'s own docstring claimed
+# *"nothing anywhere else in the codebase knows any tool name"*, and `test_boundary_fence.py`
+# could not see the contradiction, because this file was not in `FENCED_MODULES` and the fence
+# knew vendor names only. The vocabulary now lives in `sources/adapters/mcp_source.py`, which
+# is where the claim always said it lived; what remains here is a delegation, and the fence
+# covers this module by name with a `TOOL_LITERALS` scan and a positive control.
 
 
 def infer_source_tools(tools: list[dict[str, Any]] | None) -> dict[str, str] | None:
-    """Which of these tools LIST a directory and READ a file? Returns names, never behaviour.
+    """Delegates to the adapter that owns the vocabulary — `mcp_source.infer_source_tools`.
 
-    Two doors, and the second is what makes a server nobody has met usable on day one:
+    Kept as a name on this module because discovery, not the adapter, is what invokes it, and
+    because every caller and every test already reaches for it here.
 
-      1. **By name** — `list_directory` / `ls`, `read_file` / `cat`. Exact and ranked; the
-         schema is not consulted, so a server that documents nothing is still bound.
-      2. **By schema** — an unrecognised name that takes a path-ish parameter and whose own
-         wording says it lists a directory or reads a file's contents.
-
-    ⛔ EVERY VALUE RETURNED IS A NAME THAT WAS HANDED IN (TM-239-05). These are interpolated
-    into a JSON-RPC ``params.name`` by ``mcp_client.call_tool``; a name this function invented
-    would reach the transport with nothing in between.
-
-    ⚠ ``None``, NOT ``{}``, when nothing is found — and the difference is load-bearing.
-    ``sources.base.CONFIG_PROTOCOL_MARKERS`` resolves any connection carrying a non-empty
-    ``source_tools`` to ``McpSourceAdapter``, so an empty mapping would declare an intent
-    nobody expressed. ``McpConfig.source_tools`` records the same distinction: absent means
-    nobody bound this connection to a file surface; empty means somebody looked and named
-    nothing.
-
-    ⚠ A HALF-DETECTION IS RETURNED, not discarded. The adapter's defaults apply PER KEY, so a
-    row carrying only ``read_tool`` still gets the default lister. A key nobody detected is
-    ABSENT rather than an empty string, which would be a tool name the server does not have.
+    ⚠ Function-local import, for the reason `create_connection` states about `descriptors.py`:
+    the adapter package reaches `SourceRegistry`, and the source fence keeps that out of the
+    cold import graph until a connection is actually used.
     """
-    candidates: list[tuple[str, set[str], str]] = []
-    for item in tools or []:
-        if not isinstance(item, dict):
-            continue
-        name = str(item.get("name") or "").strip()
-        if not name or _looks_like_a_mutation(name):
-            continue
-        description = item.get("description")
-        haystack = f"{name} {description if isinstance(description, str) else ''}".lower()
-        candidates.append((name, _schema_params(item.get("inputSchema")), haystack))
+    from app.services.sources.adapters.mcp_source import infer_source_tools as _infer
 
-    def _is_a_listing(haystack: str) -> bool:
-        return any(w in haystack for w in _DIR_WORDS) and any(w in haystack for w in _LIST_WORDS)
-
-    def _is_a_read(haystack: str) -> bool:
-        # ⚠ A reader must NOT advertise directories. `enumerate_folder_contents` says
-        # "contents" and "file" and would otherwise match both roles; the directory word is
-        # what separates the tool that walks a folder from the one that opens a document.
-        if any(w in haystack for w in _DIR_WORDS):
-            return False
-        return any(w in haystack for w in _READ_WORDS) and any(w in haystack for w in _FILE_WORDS)
-
-    def _best(pool, known: tuple[str, ...], schema_test) -> str | None:
-        scored: list[tuple[int, str]] = []
-        for name, params, haystack in pool:
-            lowered = name.lower()
-            if lowered in known:
-                scored.append((known.index(lowered), name))
-            elif params & _PATH_PARAMS and schema_test(haystack):
-                scored.append((_SCHEMA_RANK, name))
-        # The name is the tie-break, so two schema-matched tools resolve identically whatever
-        # order the server listed them in.
-        return min(scored, key=lambda pair: (pair[0], pair[1]))[1] if scored else None
-
-    list_tool = _best(candidates, _LIST_TOOL_NAMES, _is_a_listing)
-    remaining = [c for c in candidates if c[0] != list_tool]
-    read_tool = _best(remaining, _READ_TOOL_NAMES, _is_a_read)
-
-    inferred = {
-        key: value
-        for key, value in (("list_tool", list_tool), ("read_tool", read_tool))
-        if value
-    }
-    return inferred or None
+    return _infer(tools)
 
 
 def reject_unoffered_source_tools(
@@ -534,25 +423,55 @@ def reject_unoffered_source_tools(
     them, but neither is a boundary: ``PATCH /connectors/connections/{id}`` accepts a whole
     ``config``, and these values are interpolated into a JSON-RPC ``params.name``.
 
-    ⚠ IT FIRES ONLY AGAINST A ROW THAT HAS A DISCOVERED LIST. A connection bound before its
-    first discovery has nothing to check against, and refusing there would make it impossible
-    to configure a server before contacting it — a fence that fires on the honest case and not
-    the dishonest one. The remaining gap is covered at the point of USE:
-    ``McpSourceAdapter.check`` verifies the bound tools exist on the server and names the
-    missing one.
+    ── ⛔ TWO CHECKS, AND ONLY ONE OF THEM IS CONDITIONAL (review CR-01) ─────────────
+
+    **DESTRUCTIVENESS is checked always.** Before this fix the boundary asked only whether a
+    tool EXISTS on the server, never whether it is safe — so ``{"read_tool": "delete_file"}``
+    was ACCEPTED (driven), ``McpSourceAdapter.check`` then reported **ok** because the tool
+    does exist, and ``watch_service`` called ``delete_file`` on every tracked file on every
+    cycle, unattended, with a green health probe throughout. A name that says it deletes is
+    refusable with no server list at all, so it is refused with no server list at all.
+
+    **EXISTENCE is checked only when there is a discovered list to check against.** A
+    connection bound before its first discovery has nothing to compare to, and refusing there
+    would make it impossible to configure a server before contacting it — a fence that fires
+    on the honest case and not the dishonest one. That remaining gap is covered at the point
+    of USE: ``McpSourceAdapter.check`` verifies the bound tools exist and names the missing one.
+
+    ⚠ **THE DESTRUCTIVENESS CHECK IS A DENY-LIST AND THAT IS A DELIBERATE ASYMMETRY.** The
+    auto-detector one module over uses an ALLOW-LIST of shapes, because it binds with nobody
+    watching. Here a person chose the value, and this product's headline claim is *any* MCP
+    server — so refusing every vocabulary this app does not recognise would refuse the servers
+    the phase exists to support. The residual risk is named rather than hidden: a destructive
+    tool whose name contains no word in ``_MUTATION_WORDS`` can still be bound by hand.
 
     Raises ``ValueError`` — mapped to a 422 by the router, per the WR-02 convention.
     """
-    if not discovered_tools:
-        return
+    from app.services.sources.adapters.mcp_source import looks_like_a_mutation
+
     source_tools = config.get("source_tools") if isinstance(config, dict) else None
     if not isinstance(source_tools, dict) or not source_tools:
+        return
+
+    for key, value in source_tools.items():
+        # `root_path` is a PATH on the server, not a tool name — it names nothing to call.
+        if key == "root_path" or not value:
+            continue
+        if looks_like_a_mutation(str(value)):
+            raise ValueError(
+                f"source_tools.{key} names {str(value)!r}, whose own name says it CHANGES "
+                f"something. Refused rather than stored: a source tool is invoked UNATTENDED "
+                f"by the watch loop, on every file in the watched folder, on every cycle. A "
+                f"reader that deletes is not a misconfiguration — it is data loss behind a "
+                f"green health probe."
+            )
+
+    if not discovered_tools:
         return
     offered = {
         str(t.get("name")) for t in discovered_tools if isinstance(t, dict) and t.get("name")
     }
     for key, value in source_tools.items():
-        # `root_path` is a PATH on the server, not a tool name — it names nothing to call.
         if key == "root_path" or not value:
             continue
         if str(value) not in offered:
@@ -1075,6 +994,15 @@ async def create_connection(
         ciphertext = encrypt_secret(payload.secret, cipher)
 
     config_data = payload.config.model_dump(mode="json", exclude_none=True) if hasattr(payload.config, "model_dump") else (payload.config or {})
+
+    # ⛔ THE WRITE BOUNDARY, ON CREATE AS WELL AS ON UPDATE — and its absence here was a gap
+    # nobody had named. `reject_unoffered_source_tools` calls itself *"the door a hand-crafted
+    # PATCH comes through"*, and it was wired to the PATCH door alone: a POST carrying
+    # `config: {"source_tools": {"read_tool": "delete_file"}}` created the row unexamined, and
+    # the very next watch tick called `delete_file` on every file in the folder. There are no
+    # `discovered_tools` yet at create time, so the existence half is a no-op here by design;
+    # the DESTRUCTIVENESS half is not, and it is the half that matters.
+    reject_unoffered_source_tools(config_data, None)
 
     # Phase 211 — the static action descriptor, WRITTEN AT CREATE TIME.
     #

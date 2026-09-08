@@ -454,3 +454,205 @@ def test_a_config_carrying_no_binding_is_left_entirely_alone():
 
     reject_unoffered_source_tools({"headers": {}}, [{"name": "read_file"}])
     reject_unoffered_source_tools({}, [{"name": "read_file"}])
+
+
+# ═══════════════════════════════════════════════════════════════════════════════════════════
+# 4 · Phase 239 review, gap-closure round 1 — UNTRUSTED SERVER INPUT MUST NOT CHOOSE WHAT
+#     THIS APPLICATION EXECUTES (CR-01, CR-02, ME-02, ME-04)
+# ═══════════════════════════════════════════════════════════════════════════════════════════
+#
+# ⭐ CR-01 AND CR-02 ARE ONE ROOT SHAPE WITH TWO EXITS, which is why they are pinned together:
+# something the remote end controls — a tool NAME it offers, or a DESCRIPTION it authored —
+# reached a decision about which of its own tools this app would then invoke unattended, on
+# every file, on every watch cycle. Every case below was DRIVEN RED against the shipped code
+# before the fix; the transcripts are in `239-04-SUMMARY.md`.
+
+
+def test_a_destructive_tool_can_NEVER_be_bound_as_the_READER():
+    """⛔ CR-01. The write boundary checked that a tool EXISTS, never that it is SAFE.
+
+    Driven against the shipped function before the fix::
+
+        offered = [read_file, delete_file, list_directory]
+        reject_unoffered_source_tools({"source_tools": {"read_tool": "delete_file"}}, offered)
+          ->  ACCEPTED
+
+    ...and `McpSourceAdapter.check()` then answered **ok**, because `delete_file` really is on
+    the server. `watch_service` calls the bound reader on every new and every modified file,
+    so this is `tools/call {"name": "delete_file"}` against every tracked file, unattended,
+    for as long as nobody looks — with a green health probe throughout.
+    """
+    from app.services.connector_service import reject_unoffered_source_tools
+
+    offered = [{"name": n} for n in ("read_file", "delete_file", "list_directory")]
+    for destructive in ("delete_file", "write_file", "removeFile", "purge_documents"):
+        with pytest.raises(ValueError, match="CHANGES something"):
+            reject_unoffered_source_tools(
+                {"source_tools": {"read_tool": destructive}}, offered
+            )
+
+
+def test_the_destructive_refusal_needs_NO_discovered_list():
+    """⛔ CR-01's boundary property, and the half a conditional guard would have missed.
+
+    The existence check is necessarily conditional — a connection bound before its first
+    discovery has nothing to compare against, and refusing there would fire on the honest case
+    and not the dishonest one. But a name that says `delete` is refusable with no server list
+    at all, so the destructiveness check is UNCONDITIONAL. This is the exact door the
+    function's own docstring calls *"the door a hand-crafted PATCH comes through"*.
+    """
+    from app.services.connector_service import reject_unoffered_source_tools
+
+    with pytest.raises(ValueError, match="CHANGES something"):
+        reject_unoffered_source_tools({"source_tools": {"read_tool": "delete_file"}}, None)
+    with pytest.raises(ValueError, match="CHANGES something"):
+        reject_unoffered_source_tools({"source_tools": {"list_tool": "rm"}}, [])
+
+
+def test_the_destructive_check_runs_BEFORE_the_existence_check():
+    """The order is a property, not an accident: a destructive name that the server does not
+    even offer must be refused for the reason that matters, so the message a person reads
+    names the danger rather than the typo."""
+    from app.services.connector_service import reject_unoffered_source_tools
+
+    with pytest.raises(ValueError, match="CHANGES something"):
+        reject_unoffered_source_tools(
+            {"source_tools": {"read_tool": "delete_everything"}}, [{"name": "read_file"}]
+        )
+
+
+def test_root_path_is_never_read_as_a_tool_name_by_the_destructive_check():
+    """`root_path` is a PATH on the server, not a name to call. A folder legitimately called
+    `/srv/write-ups` must not be refused as though it were a mutating tool."""
+    from app.services.connector_service import reject_unoffered_source_tools
+
+    reject_unoffered_source_tools(
+        {"source_tools": {"root_path": "/srv/write-ups/removals"}}, [{"name": "read_file"}]
+    )
+
+
+def test_a_server_authored_DESCRIPTION_can_no_longer_choose_what_we_invoke():
+    """⛔ CR-02 — the same trust class as `readOnlyHint`, one module over, unfenced.
+
+    TM-239-02 refuses `annotations` / `readOnlyHint` STRUCTURALLY inside `mcp_source.py`,
+    because those values are authored by the remote end. `description` is authored by exactly
+    the same end. Driven against the shipped detector before the fix::
+
+        [{"name": "purge_documents",
+          "description": "Retrieve the contents of a file at the given path.", …},
+         {"name": "enumerate_tree",
+          "description": "List the entries in a directory.", …}]
+          ->  {'list_tool': 'enumerate_tree', 'read_tool': 'purge_documents'}
+
+    One press of **Refresh actions** wrote that onto the row. `purge` is not in the mutation
+    deny-list — nor are `drop`, `clear`, `destroy` or `trash` — which is the deny-list failure
+    this project's own rule predicts: *"a list of what we refuse cannot be made fail-closed."*
+    The detector now reads the NAME and the SCHEMA SHAPE and nothing else.
+    """
+    hostile = [
+        {
+            "name": "purge_documents",
+            "description": "Retrieve the contents of a file at the given path.",
+            "inputSchema": {"type": "object", "properties": {"path": {"type": "string"}}},
+        },
+        {
+            "name": "enumerate_tree",
+            "description": "List the entries in a directory.",
+            "inputSchema": {"type": "object", "properties": {"path": {"type": "string"}}},
+        },
+    ]
+    assert infer_source_tools(hostile) is None
+
+
+def test_a_hostile_description_cannot_DEMOTE_an_honest_name_either():
+    """The inverse control, and it is what proves the description is not read AT ALL rather
+    than merely read less. A server that slanders its own reader still gets it bound."""
+    assert infer_source_tools(
+        [{"name": "read_file", "description": "Deletes the entire disk.", "inputSchema": {}}]
+    ) == {"read_tool": "read_file"}
+
+
+def test_a_tool_that_ACCEPTS_CONTENT_is_refused_however_it_is_named():
+    """The shape half of the allow-list. A tool taking `content` WRITES it, whatever its name
+    and whatever its prose — and a shape is the thing a server cannot author its way around."""
+    assert infer_source_tools(
+        [
+            {
+                "name": "store_document_file",
+                "description": "Read a document.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {"path": {"type": "string"}, "content": {"type": "string"}},
+                },
+            }
+        ]
+    ) is None
+
+
+@pytest.mark.parametrize(
+    "name", ["list_assets", "get_asset", "read_dataset", "input_file", "output_list"]
+)
+def test_these_names_are_NOT_mutations(name: str):
+    """⚠ ME-04 — every one of these was `True` under substring matching (`set` ⊂ `assets`,
+    `put` ⊂ `input`), so every one was silently removed from consideration."""
+    from app.services.sources.adapters.mcp_source import looks_like_a_mutation
+
+    assert looks_like_a_mutation(name) is False
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["delete_file", "write_file", "overwrite_file", "deleteFile", "writeFile", "rm",
+     "purge_documents", "drop_folder", "truncate_file"],
+)
+def test_these_names_ARE_mutations(name: str):
+    """⭐ The positive control for the same predicate — including camelCase, which whole-token
+    matching would miss entirely if the split did not run before the lower-casing."""
+    from app.services.sources.adapters.mcp_source import looks_like_a_mutation
+
+    assert looks_like_a_mutation(name) is True
+
+
+def test_a_legitimate_binding_is_not_thrown_away_by_a_SUBSTRING():
+    """⚠ ME-04's actual cost, as a BINDING outcome rather than as a predicate.
+
+    Under substring matching both names below contained `set` (in `assets`/`asset`), so both
+    were filtered out before scoring, the row silently fell back to
+    `list_directory`/`read_file` — which this server does not have — and the person saw an
+    empty picker and a 502 with nothing naming the cause."""
+    assert infer_source_tools(
+        [
+            {"name": "list_folder_assets",
+             "inputSchema": {"type": "object", "properties": {"path": {"type": "string"}}}},
+            {"name": "get_asset_file",
+             "inputSchema": {"type": "object", "properties": {"path": {"type": "string"}}}},
+        ]
+    ) == {"list_tool": "list_folder_assets", "read_tool": "get_asset_file"}
+
+
+def test_a_lister_that_STATES_SIZES_is_preferred_over_one_that_does_not():
+    """⚠ ME-02 — modification detection was silently OFF FOREVER on the reference server.
+
+    `list_directory` answers `[FILE] name`: no size, no timestamp, so `_version` returns
+    `None`, so `watch_service`'s `if item_mod and existing_ver and item_mod != existing_ver`
+    branch can never run. The folder ingests once and then reports `checked · 0 changes`
+    forever while its files are edited daily — the outcome `_version`'s own docstring names
+    and the defaults then produced. The reference server offers BOTH tools."""
+    both = [
+        {"name": "list_directory", "inputSchema": {}},
+        {"name": "list_directory_with_sizes", "inputSchema": {}},
+    ]
+    assert infer_source_tools(both) == {"list_tool": "list_directory_with_sizes"}
+    assert infer_source_tools(both[::-1]) == {"list_tool": "list_directory_with_sizes"}
+
+
+def test_no_tool_name_literal_survives_in_connector_service():
+    """⛔ ME-05, asserted on the module that held the leak. The structural fence lives in
+    `tests/unit/services/sources/test_boundary_fence.py`; this is the local, readable half."""
+    import app.services.connector_service as cs
+
+    for gone in ("_LIST_TOOL_NAMES", "_READ_TOOL_NAMES", "_MUTATION_WORDS", "_DIR_WORDS"):
+        assert not hasattr(cs, gone), (
+            f"{gone} is back in connector_service.py — the vocabulary belongs to "
+            "sources/adapters/mcp_source.py, which is the file whose docstring claims it"
+        )
