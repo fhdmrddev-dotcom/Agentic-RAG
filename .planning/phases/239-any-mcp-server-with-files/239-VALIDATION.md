@@ -169,3 +169,58 @@ than the shortfall itself.
 **partly** met — decisively so on "rows, not code" for registration, resolution and surfacing, and
 **not** met on "a second, different MCP file server works". `SEED-259` is the ruling the criterion
 now waits on, and it is an operator decision, not a build task.
+
+---
+
+# SC#2 — RE-DRIVEN 2026-09-08 after `SEED-259`'s option 2 shipped
+
+Tree `f57cf35dc`. Same second server (**GitHub MCP**), same method, now with argument mapping.
+
+## ⭐ The UI derived the whole mapping from the server's own schema
+
+Binding `list_tool`/`read_tool` to `get_file_contents` **changed the form in front of me**:
+
+- `Argument that carries the path` turned from a free-text box into a **picker**, offering
+  `fields · owner · path · ref · repo · sha` — **GitHub's actual `get_file_contents` arguments**,
+  read from its published `inputSchema`.
+- **Two rows appeared, labelled `owner` and `repo`** — exactly the other required arguments.
+
+⛔ **No vendor name is involved anywhere.** The product had never heard of GitHub; it read the
+server's schema and asked for what that schema requires. **That is "rows, not code" doing the thing
+it claims.**
+
+Also on screen, unprompted: *"10 tools whose name says they change something are not offered here —
+whatever is bound is called on every file, unattended, on every check."*
+
+## ⭐ THE FAIL-OPEN IS CLOSED, and this is the headline
+
+**Same connection, same folder, before and after:**
+
+| | Result |
+|---|---|
+| Before (`0926df45e`) | **`200` + empty listing** — `0 documents · 0 chunks · 0 folders` |
+| After (`f57cf35dc`) | **`502`** — *"The provider said: MCP server responded with HTTP 401: unauthorized: AuthenticateToken authentication failed"* |
+
+⭐ **A silent empty listing became a named error carrying the provider's own words.** That is review
+finding `HI-03`'s exact class — and an empty-but-complete listing is what the **`H-5` deletion
+guard** consumes, so the old behaviour was one `Add Watched Folder` away from reading as *"everything
+was deleted"*. **Demonstrated in the running product, not in a fixture.**
+
+## Where SC#2 actually stands
+
+- ✅ **Zero code, again** — the entire mapping was set through the UI.
+- ✅ **The call is constructed and dispatched** with the mapped arguments; it reached the server and
+  got a real HTTP response. Before this work the same binding produced nothing at all.
+- ⛔ **The listing still did not come back — but the reason has MOVED, and that is the point.** It is
+  no longer *"the contract cannot express this server's argument shape"*. It is now
+  **`HTTP 401` — the connection has no usable credential for the MCP endpoint**; the Connections page
+  shows its Credential as `—`. **That is an operator credential matter, not a defect and not a
+  contract limit.**
+
+⚠ **SC#2 is therefore STILL NOT MET, and must not be marked met on this evidence.** What changed is
+that the *blocking reason* is now a credential rather than a design gap. **The final row is: bind a
+second MCP file server whose credential actually authenticates, and see a real listing.** That row is
+owed and it needs a working credential nobody has supplied yet.
+
+⚠ The GitHub connection was **reverted to its prior unbound state** after this drive; the operator's
+environment is as it was found.
