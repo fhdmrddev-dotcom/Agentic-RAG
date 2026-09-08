@@ -5,10 +5,10 @@ reported: 2026-09-02
 surface: Agentic-RAG
 severity: major
 status: open
-affected_areas: [backend/settings, model-registry, caching, multi-worker]
+affected_areas: [backend/settings, model-registry, caching, multi-worker, app_settings, control-room, SEED-258]
 folded_into: null
 verified_closed_by: null
-related_seeds: []
+related_seeds: [SEED-258]
 re_open_trigger: null
 reproduces_on:
   branch: develop
@@ -105,3 +105,38 @@ arrangement customers actually run.
   cache entirely).
 - ⚠ **Check every other consumer of `_SETTINGS_CACHE_TTL` before choosing** — the fix should be
   made once at the cache, not once per screen that notices.
+
+---
+
+## ⚠ WIDENED 2026-09-09 — this is not the model registry, it is EVERY app setting
+
+Measured while shipping `SEED-258`'s first knob. The report above names
+`_all_model_overrides_cache` (`user_settings.py:526`). **The same shape sits one screen up and
+governs the whole settings surface:**
+
+```
+user_settings.py:297   _settings_cache: dict[str, Any] | None = None      # module global -> PER PROCESS
+user_settings.py:298   _settings_cache_time: float = 0.0
+user_settings.py:299   _SETTINGS_CACHE_TTL: float = 30.0
+```
+
+`load_app_settings()` returns that cache whenever it is under 30 s old. So **every value in
+`app_settings` has the same coin-flip**, not just model overrides — with `WORKER_COUNT=2`, whether a
+change is visible depends on which worker serves the next read.
+
+⭐ **Demonstrated on brand-new code the same day.** `SEED-258` shipped
+`app_settings.source_max_file_size_mb` — the largest file any connected source may import — read
+through `source_max_file_bytes()` → `load_app_settings()`. **An operator who lowers that ceiling and
+watches a sync still admit a large file has hit this bug, not a broken ceiling**, and nothing on
+screen will say so.
+
+⚠ **This raises the severity in EFFECT without changing the field.** The original report is about a
+model appearing late, which is annoying. The same mechanism now sits under a **safety-shaped** knob —
+a memory bound on untrusted remote input — where "the setting did not take" reads as "the guard does
+not work". ⛔ It also silently degrades `BUG-260908-03`: an operator disabling a model in the registry
+sees it linger in the picker for the same reason.
+
+**Consequence for the fix:** a repair scoped to the model-override cache **closes one of two module
+globals with the identical defect** and leaves the wider one live. Whatever invalidation mechanism is
+chosen — pub/sub, a version column, a shorter TTL, a shared store — it must cover `_settings_cache`
+too, or `SEED-258`'s entire class ships onto a cache that lies for thirty seconds at a time.
