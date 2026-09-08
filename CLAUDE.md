@@ -651,7 +651,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/RunSpine.tsx` | 5 / 3 / 426 | honoured by construction (**214**) |
 | `frontend/src/components/workflows/RunTranscript.tsx` | 7 / 3 / 652 | ⚠ **FIRES on a component with NO MOUNT in the product** |
 | `frontend/src/components/settings/ConnectionsTab.tsx` | 25 / 9 / 1635 | ⚠ the row was STALE at `17 / 7 / 1477`. honoured by construction (**22 |
-| `frontend/src/components/settings/ConnectionFormPanel.tsx` | 27 / 10 / 2807 | ⚠ STALE at FOUR consecutive closes. honoured by construction (**239-07**); ⛔ extraction OWED, seam named |
+| `frontend/src/components/settings/ConnectionFormPanel.tsx` | 28 / 10 / 2477 | ⭐ **NAMED SEAM TAKEN (239-08)** — `SourceToolsCard.tsx` extracted, `2807 → 2477`, a pure move. ⛔ the WIDER `ConnectionShapeFields.tsx` seam stays OWED |
 | `frontend/src/lib/api/org.ts` | 11 / 8 / 629 | ⚠ absent for its ENTIRE LIFE at 4 phases; row then STALE at `6 / 4 / 562`. ⚠ **THIRD wire-type drift in this ONE file** (239: `auth_type: "mcp"`) |
 | `frontend/src/components/settings/connectionsCopy.ts` | 15 / 8 / 784 | no seam proposed. honoured by construction (**239**): one word, one union member, one arm — and the arm cannot reach a capability row |
 | `frontend/src/components/settings/connectionFormCopy.ts` | 19 / 8 / 1631 | ⛔ 239-05 named the seam: `configFromDraft`'s arm set. 239-07 RODE it — one serializer both arms call |

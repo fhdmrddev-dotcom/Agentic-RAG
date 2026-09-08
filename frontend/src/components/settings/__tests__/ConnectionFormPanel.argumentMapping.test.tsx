@@ -59,8 +59,14 @@ import {
 // fence the DOM cannot express. The panel tells a person which key carries their answer; only
 // `mcp_source.py` decides which key is actually read.
 import mcpSourceSource from "../../../../../backend/app/services/sources/adapters/mcp_source.py?raw"
-// …and the two SHIPPED FRONTEND files, for §5's negative scan.
+// …and the SHIPPED FRONTEND files, for §5's negative scan.
+// ⚠ 239-08 — THE THIRD ENTRY IS THE WHOLE POINT OF THIS COMMENT. The card was EXTRACTED out
+// of `ConnectionFormPanel.tsx` into `SourceToolsCard.tsx`, and a fence that scans only the
+// panel would have kept passing over source that no longer contains the thing it forbids —
+// green, vacuous, and weaker than the day it was written. The negative scan below runs over
+// EVERY file the card's markup can live in, so moving code between them cannot buy silence.
 import panelSource from "../ConnectionFormPanel.tsx?raw"
+import cardSource from "../SourceToolsCard.tsx?raw"
 import copySource from "../connectionFormCopy.ts?raw"
 import type { ConnectorConnection, McpDiscoveredTool } from "@/lib/api"
 
@@ -573,12 +579,21 @@ describe("Phase 239 / SEED-259 — the argument mapping a person can set", () =>
     const forbidden = ['"owner"', '"repo"', '"branch"', "'owner'", "'repo'", "arg_static.owner"]
     for (const needle of forbidden) {
       expect(panelSource).not.toContain(needle)
+      expect(cardSource).not.toContain(needle)
       expect(copySource).not.toContain(needle)
     }
     // NON-VACUITY: the same scan DOES find the generic key family, so the sources really were
     // read and really do carry this feature.
     expect(copySource).toContain(SOURCE_ARG_STATIC_PREFIX)
-    expect(panelSource).toContain("connection-source-args")
+    // ⚠ 239-08 — THE POSITIVE CONTROL FOLLOWS THE MARKUP. `connection-source-args` used to be
+    // spelled in the panel; the extraction moved it to `SourceToolsCard.tsx`, so asserting it
+    // over the panel would now be FALSE and asserting it nowhere would make the negative scan
+    // above unfalsifiable. It is asserted where the id actually lives.
+    expect(cardSource).toContain("connection-source-args")
+    // …and the PANEL's own scan is kept non-vacuous by the thing that replaced the markup: the
+    // panel must still MOUNT the card. Without this, `panelSource` could resolve to "" and
+    // every `not.toContain` above it would pass for free.
+    expect(panelSource).toContain("<SourceToolsCard")
   })
 
   // ── 6 · THE PURE DERIVATIONS, DRIVEN DIRECTLY ───────────────────────────────────────
