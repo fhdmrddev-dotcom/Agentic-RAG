@@ -185,6 +185,8 @@ import {
   SOURCE_TOOLS_HELP,
   SOURCE_TOOLS_LIST_LABEL,
   SOURCE_TOOLS_READ_LABEL,
+  SOURCE_TOOLS_ROOT_LABEL,
+  SOURCE_TOOLS_ROOT_HELP,
   sourceToolUnsetLabel,
   sourceToolsWithheldNote,
   looksLikeSourceToolMutation,
@@ -1791,6 +1793,47 @@ export function ConnectionFormPanel({
                 </div>
               )
             })}
+            {/* ⛔ HI-04 — A FREE-TEXT PATH, NOT A PICKER, and that is not laziness: the server
+                publishes its TOOLS, never its FOLDERS, so there is no list to offer. This is
+                the one field on this card the product genuinely cannot guess.
+                ⚠ It renders the STORED value, for HI-02's reason one field over: a control that
+                shows blank over a stored value makes opening the panel and pressing Save a
+                silent wipe. */}
+            {(() => {
+              const rootId = `${fieldId}-source-root`
+              return (
+                <div className="mt-2.5">
+                  <label
+                    htmlFor={rootId}
+                    className="mb-1 block text-[11px] font-medium text-foreground"
+                  >
+                    {SOURCE_TOOLS_ROOT_LABEL}
+                  </label>
+                  {readOnly ? (
+                    <div
+                      id={rootId}
+                      data-testid="connection-field-static"
+                      className="font-mono text-[11px] text-muted-foreground"
+                    >
+                      {draft.sourceRootPath || "—"}
+                    </div>
+                  ) : (
+                    <input
+                      id={rootId}
+                      type="text"
+                      value={draft.sourceRootPath}
+                      onChange={(e) => set({ sourceRootPath: e.target.value })}
+                      placeholder="/srv/docs"
+                      spellCheck={false}
+                      className="w-full rounded-md border border-border bg-card px-2 py-1.5 font-mono text-[13px] text-foreground focus:border-primary focus:outline-none"
+                    />
+                  )}
+                  <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+                    {SOURCE_TOOLS_ROOT_HELP}
+                  </p>
+                </div>
+              )
+            })()}
           </div>
         )}
 

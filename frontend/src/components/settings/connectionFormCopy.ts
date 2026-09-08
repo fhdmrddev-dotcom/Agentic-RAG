@@ -469,6 +469,29 @@ export const SOURCE_TOOLS_LIST_LABEL = "Directory listing tool"
 export const SOURCE_TOOLS_READ_LABEL = "File content tool"
 
 /**
+ * HI-04 — THE FIELD THAT DID NOT EXIST, and whose absence made every other part of this card
+ * unusable in practice.
+ *
+ * ⚠ `sourceRootPath` was a real draft field, `sourceToolsFromDraft` already bound it to
+ * `root_path`, and the panel already seeded it from `tools.root_path`. **Only the input was
+ * missing**, so `root_path` was permanently `""` and `browse()` sent `{"path": ""}` to the
+ * bound lister on every call. The note two hundred lines below this one said so verbatim —
+ * *"`sourceRootPath` has no control and is carried anyway"* — for the whole of Phase 239.
+ *
+ * ⛔ Until this shipped, no MCP source could be pointed at a real folder through the product,
+ * which is why Phase 239's SC#2 could not close. Added 2026-09-08.
+ */
+export const SOURCE_TOOLS_ROOT_LABEL = "Root folder on the server"
+
+/** ⚠ Says what happens if it is BLANK, because blank was the shipped state for a whole phase
+ *  and produced a 502 with nothing naming the empty path. The adapter now refuses by name;
+ *  this is the same sentence, said before the failure instead of after it. */
+export const SOURCE_TOOLS_ROOT_HELP =
+  "The folder this connection reads from, as the server names it — for example /srv/docs. " +
+  "Leave it blank only if the server serves its files from the root it was started with; " +
+  "many do not, and a blank root is refused rather than guessed."
+
+/**
  * Phase 239 gap-closure round 1 (CR-01, UI half) — WORDS THAT SAY A TOOL CHANGES SOMETHING.
  *
  * ⭐ **THE PICKER WAS AN UNORDERED DUMP OF THE SERVER'S ENTIRE TOOL LIST, AND `delete_file`
@@ -493,9 +516,26 @@ export const SOURCE_TOOLS_READ_LABEL = "File content tool"
  * mis-click — it does not make the surface safe against a hostile server, and the thing that
  * would is an allow-list of shapes at the boundary.
  */
+/**
+ * ⚠ RE-SYNCED 2026-09-08, AND THE DRIFT IS THE FINDING. This list had **18** words while the
+ * server's `_MUTATION_WORDS` had **34** — the backend gap-closure round widened it, and this
+ * copy was authored against the shorter one in a parallel round that could not see it.
+ *
+ * ⭐ **NEITHER ROUND COULD HAVE CAUGHT THIS AND BOTH WERE GREEN.** The fence that pins the two
+ * lists together lives in a frontend suite: the backend round never runs it, and the frontend
+ * round ran against a base predating the widening. It failed only once both were MERGED — the
+ * Phase 204 join shape, on a security-adjacent list.
+ *
+ * The consequence while it was drifted: the picker still OFFERED `execute_command`, `drop_*`,
+ * `destroy_*` and `kill_*` under the label *"File content tool"*. The boundary refused them, so
+ * nothing was lost — but CR-01's UI half is precisely "do not offer a destructive tool as a
+ * reader", and it was partially re-opened by the merge.
+ */
 export const SOURCE_TOOL_MUTATION_WORDS: readonly string[] = [
-  "write", "create", "delete", "remove", "rename", "move", "copy", "upload", "put",
-  "append", "edit", "update", "mkdir", "unlink", "send", "post", "patch", "set",
+  "write", "overwrite", "create", "delete", "remove", "rename", "move", "copy",
+  "upload", "put", "append", "edit", "update", "modify", "mkdir", "rmdir", "rm",
+  "unlink", "send", "post", "patch", "set", "save", "insert", "purge", "drop",
+  "clear", "destroy", "trash", "truncate", "exec", "execute", "kill", "revoke",
 ]
 
 /**
@@ -640,7 +680,10 @@ export interface ConnectionDraft {
    *  on this draft, rather than a nested object. Empty means unbound; `sourceToolsFromDraft`
    *  is the one place that turns the three into `config["source_tools"]`.
    *
-   *  ⚠ `sourceRootPath` has no control and is carried anyway — see `sourceToolsFromDraft`. */
+   *  ⚠ ~~`sourceRootPath` has no control and is carried anyway~~ — RESOLVED 2026-09-08: the
+   *  control exists (`SOURCE_TOOLS_ROOT_LABEL`). The note is struck through rather than deleted
+   *  because it described the defect accurately for a whole phase and nobody acted on it — a
+   *  comment is not a guard. See `sourceToolsFromDraft`. */
   sourceListTool: string
   sourceReadTool: string
   sourceRootPath: string

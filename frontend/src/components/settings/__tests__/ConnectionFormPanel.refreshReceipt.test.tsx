@@ -134,14 +134,19 @@ describe("F-6 · a discovery shows the binding it just detected", () => {
   it("⛔ a binding the PERSON chose is never overwritten by the refresh", async () => {
     // The unsaved local choice the server has never seen. Seeding over it would be the
     // 239-02 wipe in a new costume: a silent edit of what they were in the middle of doing.
+    // ⚠ The chosen value is `ls`, not `rm`. This case used to pick `rm` — which the picker
+    // now correctly refuses to OFFER (CR-01, after the word list was re-synced to the
+    // server's 34 on 2026-09-08). The case is about a HUMAN CHOICE surviving a refresh; it
+    // was never about `rm`, and asserting on an unofferable value would have quietly turned
+    // it into a test of the withholding instead.
     renderEdit(discoveredButUnboundConnection())
-    await userEvent.selectOptions(listSelect(), "rm")
-    expect(listSelect().value).toBe("rm")
+    await userEvent.selectOptions(listSelect(), "ls")
+    expect(listSelect().value).toBe("ls")
 
     await clickDiscover()
     await waitFor(() => expect(readSelect().value).toBe("cat"))
     // …the slot they filled is untouched, while the EMPTY one still gets its receipt.
-    expect(listSelect().value).toBe("rm")
+    expect(listSelect().value).toBe("ls")
   })
 
   it("⛔ a failed re-read changes nothing and never blanks what is on screen", async () => {
@@ -150,7 +155,12 @@ describe("F-6 · a discovery shows the binding it just detected", () => {
     await clickDiscover()
     // The tools still arrived, so the options are there; the binding simply stays unset —
     // exactly the behaviour before this fix, which is the honest degrade.
-    await waitFor(() => expect(listSelect().options.length).toBe(DISCOVERED.length + 1))
+    // ⚠ NOT `DISCOVERED.length + 1`. `rm` is withheld — CR-01: a destructive tool is never
+    // offered as a file reader, and `rm` deleting a file is the whole danger. The old
+    // assertion counted it as offered, which was true and WRONG until the word list was
+    // re-synced to the server's 34 on 2026-09-08 (`rm` was absent from the frontend's 18).
+    const OFFERED = DISCOVERED.filter((t) => t.name !== "rm").length
+    await waitFor(() => expect(listSelect().options.length).toBe(OFFERED + 1))
     expect(listSelect().value).toBe("")
   })
 })

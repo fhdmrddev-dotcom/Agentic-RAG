@@ -27,6 +27,7 @@ import {
   SOURCE_TOOLS_HELP,
   SOURCE_TOOLS_LIST_LABEL,
   SOURCE_TOOLS_READ_LABEL,
+  SOURCE_TOOLS_ROOT_LABEL,
   SOURCE_TOOLS_DEFAULT_LIST,
   SOURCE_TOOLS_DEFAULT_READ,
   sourceToolUnsetLabel,
@@ -119,6 +120,44 @@ describe("Phase 239 — the file source mapping a person can see and correct", (
     expect(within(section).getByLabelText(SOURCE_TOOLS_READ_LABEL)).toBeInTheDocument()
   })
 
+  it("⛔ HI-04 — the ROOT FOLDER has a control, because without one no source can be pointed anywhere", () => {
+    // ⚠ THE DEFECT THIS GUARDS WAS INVISIBLE TO GREP. `sourceRootPath` was a real draft field,
+    // `sourceToolsFromDraft` already bound it to `root_path`, and the panel already seeded it
+    // from `tools.root_path` — every part existed EXCEPT the input. So `root_path` was
+    // permanently `""` and `browse()` sent `{"path": ""}` to the bound lister on every call,
+    // while the plumbing looked healthy from any direction except the screen.
+    // `connectionFormCopy.ts` carried the note verbatim for a whole phase: "`sourceRootPath`
+    // has no control and is carried anyway". A comment is not a guard; this is.
+    renderEdit()
+    expect(screen.getByLabelText(SOURCE_TOOLS_ROOT_LABEL)).toBeInTheDocument()
+  })
+
+  it("⚠ …and it CARRIES a stored root rather than rendering blank over it", () => {
+    // HI-02's lesson, one field over: a control that shows blank over a stored value turns
+    // "open the panel and press Save" into a silent wipe. Asserted on the VALUE, not presence.
+    renderEdit({
+      connection: mcpConnection({
+        config: {
+          source_tools: {
+            list_tool: "list_directory",
+            read_tool: "read_file",
+            root_path: "/already/set",
+          },
+        },
+      } as never),
+    })
+    expect(
+      (screen.getByLabelText(SOURCE_TOOLS_ROOT_LABEL) as HTMLInputElement).value,
+    ).toBe("/already/set")
+  })
+
+  it("⚠ the root is FREE TEXT, not a picker — the server publishes tools, never folders", () => {
+    // Recorded as an assertion because the shape is a decision, not an accident: there is no
+    // list of folders to offer, so a `<select>` here would be a lie about what is knowable.
+    renderEdit()
+    expect((screen.getByLabelText(SOURCE_TOOLS_ROOT_LABEL) as HTMLElement).tagName).toBe("INPUT")
+  })
+
   it("shows nothing at all before a single tool has been discovered", () => {
     // POSITIVE CONTROL FIRST. Without it this case is vacuously green on a tree where the
     // section does not exist at all — which is exactly what it measured at RED.
@@ -161,9 +200,11 @@ describe("Phase 239 — the file source mapping a person can see and correct", (
     for (const label of [SOURCE_TOOLS_LIST_LABEL, SOURCE_TOOLS_READ_LABEL]) {
       const select = within(section).getByLabelText(label) as HTMLSelectElement
       const offered = Array.from(select.options).map((o) => o.value)
-      expect(offered.filter(Boolean).sort()).toEqual(
-        ["execute_command", "list_directory", "read_file"],
-      )
+      // ⚠ `execute_command` is REPORTED by the fixture server and correctly NOT offered — the
+      // word list widened 2026-09-08 to match the server's 34 (see SOURCE_TOOL_MUTATION_WORDS).
+      // This case asserts nothing UNREPORTED ever appears; it never claimed everything reported
+      // does. CR-01's own case below owns the withholding.
+      expect(offered.filter(Boolean).sort()).toEqual(["list_directory", "read_file"])
     }
   })
 
@@ -218,7 +259,21 @@ describe("Phase 239 — the file source mapping a person can see and correct", (
   })
 
   it("⚠ nothing is withheld when nothing is destructive — the note is ABSENT, not empty", () => {
-    renderEdit()
+    // ⚠ PREMISE REPAIRED 2026-09-08. This case rendered the DEFAULT fixture, which contains
+    // `execute_command` — so from the moment the word list widened to the server's 34 it was
+    // asserting "nothing was withheld" on a server that HAS something to withhold. A negative
+    // control whose premise is false cannot fail for the right reason: the identical defect
+    // review finding HI-01 had, where its own negative test used a `service_id` the product
+    // never writes. It now renders a server that is genuinely all-readers.
+    renderEdit({
+      connection: mcpConnection({
+        discovered_tools: [
+          { name: "list_directory", description: "List a directory." },
+          { name: "read_file", description: "Read a file." },
+          { name: "search_files", description: "Search for files." },
+        ],
+      } as never),
+    })
     const section = screen.getByTestId("connection-source-tools")
     expect(section.textContent).not.toContain("not offered here")
   })
@@ -271,8 +326,19 @@ describe("Phase 239 — the file source mapping a person can see and correct", (
     // Two copies of one judgement. The server's `_MUTATION_WORDS` decides what is refused at
     // the boundary; this one decides what is offered. They must not drift, and a comment
     // saying so is what already failed once on this surface.
-    const block = connectorServiceSource.match(
-      /_MUTATION_WORDS: tuple\[str, \.\.\.\] = \(([^)]*)\)/,
+    //
+    // ⚠ REPAIRED 2026-09-08, AND THE REASON IS THE POINT. This matcher read
+    // `connector_service.py` for a `tuple[str, ...]`. Phase 239's gap-closure round moved the
+    // whole tool vocabulary down into `mcp_source.py` (ME-05) and re-typed it as a
+    // `frozenset` — so the regex matched nothing and `block` was `null`.
+    // ⭐ **THE SUITE WAS GREEN IN ITS OWN ROUND AND THIS BROKE ONLY AT THE MERGE**: the
+    // backend round could not run it (frontend-only file), the frontend round ran against a
+    // base that predated the move. Each side individually correct, the JOIN dead — the exact
+    // Phase 204 shape. It was caught because the non-vacuity control below refuses a null
+    // match; without that, a moved constant would have made this fence pass on two empty sets
+    // forever.
+    const block = mcpSourceSource.match(
+      /_MUTATION_WORDS: frozenset\[str\] = frozenset\(\{([^}]*)\}\)/,
     )
     expect(block).not.toBeNull()
     const serverWords = [...block![1].matchAll(/"([a-z]+)"/g)].map((m) => m[1]).sort()
