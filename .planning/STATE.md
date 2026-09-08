@@ -36,7 +36,30 @@ can be taught new behaviors (skills) that persist and can be shared.
 **Current focus:** **Milestone v4.0 Connected Knowledge — STARTED 2026-09-04.** Phase numbering
 continues at **228**.
 
-Phase: 239 — Any MCP Server With Files (⚠ **BUILT 2026-09-08, UNREVIEWED — SC#2 UNMET, G-4 UAT OWED**)
+Phase: 239 — Any MCP Server With Files (⚠ **BUILT, NOT CLOSED — SC#2 UNMET, blocked on a CREDENTIAL**)
+
+### 2026-09-09 — what shipped after the build, and why the phase still cannot close
+
+Beyond the three build waves: a code review (19 findings, 2 Critical) fixed across two rounds;
+`SEED-259`'s **argument mapping as data** with its UI; the **owed G-5 extraction**
+(`ConnectionFormPanel.tsx` 2807 → 2477, `SourceToolsCard.tsx` carved out); `SEED-258`'s first
+knob (`app_settings.source_max_file_size_mb`, migration **174 applied locally**, schema
+regenerated); and **`BUG-260902-06` fixed** — settings writes now reach every worker by Redis
+pub/sub with a re-warm, covering `_settings_cache` AND both model-override caches.
+
+⛔ **SC#2 remains UNMET and the blocker has MOVED twice — that movement is the record.** First it
+was *"the contract cannot express this server's argument shape"* (`SEED-259`, now built). Now it
+is **`HTTP 401` — no connected MCP server has a working credential for its file surface.** That
+is an operator matter, not a design gap. **The phase closes when a second MCP file server
+actually lists and reads.**
+
+⚠ **UAT driven 2026-09-09, and one row could NOT be driven here:** the backend runs **ONE**
+worker in this dev arrangement (one PID on :8000, `PUBSUB NUMSUB` = 1), so the cross-worker fix
+is **proven by a spawned-interpreter test and NOT in the shipped `WORKER_COUNT=2` arrangement**.
+Recorded as owed rather than claimed.
+⭐ The UAT found `BUG-260909-01`: the DB CHECK correctly refuses an out-of-range ceiling, but
+`save_app_settings` swallows the violation and returns as if it succeeded. Not user-reachable
+(the API refuses first, with a worded 400) — a latent backstop that fails silently.
 Prior: 238 — Microsoft Graph — OneDrive (✅ BUILT & DRIVEN 2026-09-07)
 
 ### Phase 239 — what is true, and what is NOT
