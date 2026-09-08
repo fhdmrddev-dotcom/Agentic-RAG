@@ -3,7 +3,7 @@ seed_id: SEED-259
 title: SC#2 driven on a real second MCP server — tool NAMES are rows, but tool ARGUMENT SHAPES are not, and a server whose reader needs three arguments returns an empty listing with HTTP 200
 created: 2026-09-08
 planted_during: Phase 239 SC#2, driven live against GitHub MCP as the second file server
-status: planted
+status: answered  # OPERATOR RULED 2026-09-08 — OPTION 2 (argument mapping as data), with OPTION 1 shipping alongside as the safety half
 priority: high
 surface: Agentic-RAG
 relates_to:
@@ -91,3 +91,30 @@ deletion signal. **This half should be treated as more urgent than the shortfall
 - A per-vendor branch appears above `adapters/` — the exact fence Phase 239 exists to hold.
 - The empty-listing path is left returning 200 while a watch can be created on it.
 - A third server is connected and this is rediscovered from scratch.
+
+---
+
+## ✅ ANSWERED 2026-09-08 — operator ruled: **OPTION 2, argument mapping as data**
+
+The operator chose **option 2**: store per-connection which discovered argument takes the path, plus
+static values for the server's other required arguments (`owner`, `repo`, …). ⭐ **This keeps the
+"rows, not code" fence intact** — a mapping table is rows; `if server == "github"` is not. It is the
+only option that makes SC#2 *true* rather than narrowing what SC#2 claims.
+
+⚠ **OPTION 1 SHIPS ALONGSIDE, AND FIRST — raised by claude at the ruling and not overridden.**
+Option 2 makes a CORRECTLY-bound server work. It does nothing for a MISbound one, which still
+returns `200` + an empty listing and still feeds the `H-5` deletion guard. **The two options answer
+different questions**, and the safety one must not be left open on the assumption the feature covers
+it:
+
+- **Option 1 (safety):** when a bound tool's `inputSchema` declares required arguments the adapter
+  cannot supply, **refuse by name** instead of returning an empty listing. The schema is already
+  discovered and already stored, so this needs no new data. ⛔ It must also hold for a server
+  misbound for reasons nobody predicted — which is the whole point of a fail-closed default.
+- **Option 2 (capability):** the mapping itself.
+
+⛔ **Option 3 is explicitly REJECTED by this ruling** — the claim is not being narrowed. SRC-04 keeps
+its wording, and SC#2 stays open until a second server actually lists and reads.
+
+**Not yet scheduled at the time of writing.** Sequencing, plan count and whether this is an insert
+phase or folded into a later SRC phase are the next decisions.
