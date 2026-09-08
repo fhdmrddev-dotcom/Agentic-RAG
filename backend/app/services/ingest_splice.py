@@ -724,6 +724,46 @@ async def splice_document(
         except Exception as img_err:
             log.warning("Image extraction warning for %s: %s", document_id, img_err)
 
+    # 4c-bis. Email attachments — Phase 240 (SRC-05 SC#2 / D-240-08)
+    #
+    # ⛔ THE FOURTH TWO-PATHS DISAGREEMENT, AND THE ONE A WATCHED MAILBOX WOULD HAVE RUN THROUGH.
+    #    This step existed ONLY in `ingest_document`, so a `.eml` arriving down this path became a
+    #    message document with no attachment children and no `attached_to` links — SC#2 false,
+    #    with every existing test green because they all exercise the legacy path.
+    #
+    # ⚠ IT RUNS AFTER CHUNKING, NOT BEFORE. The parent message must be a complete, searchable
+    #   document before children are hung off it; a child minted against a parent that then fails
+    #   would be an orphan pointing at a failed row.
+    #
+    # ⚠ `run_in_threadpool` IS LOAD-BEARING, not style — the same rule this file's BUG-260905-06
+    #   comment records. The loop does blocking `supabase-py` I/O and calls the SYNC
+    #   `ingest_document`; calling it inline from this async worker would stall the event loop for
+    #   every attachment (D-v2.5-01, and BUG-260905-14 in this very file).
+    #
+    # ⚠ Its failure is a warning, never an exception: an attachment problem must not fail the
+    #   message that carried it. The function itself never raises.
+    if raw and mime_type:
+        try:
+            from app.services.email_attachments import ingest_email_attachments  # noqa: PLC0415
+
+            manifest = await run_in_threadpool(
+                lambda: ingest_email_attachments(
+                    raw=raw,
+                    mime_type=mime_type,
+                    document_id=document_id,
+                    user_id=user_id,
+                    supabase=supabase,
+                )
+            )
+            if manifest:
+                merged = dict(enriched.metadata or {})
+                merged["attachments"] = manifest
+                await _db(lambda: supabase.table("documents").update(
+                    {"metadata": merged}
+                ).eq("id", document_id).execute())
+        except Exception as att_err:
+            log.warning("Email attachment warning for %s: %s", document_id, att_err)
+
     # 4d. Finalize & Authoritative Recount
     try:
         count_resp = (

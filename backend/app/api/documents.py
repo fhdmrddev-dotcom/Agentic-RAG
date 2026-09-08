@@ -29,6 +29,7 @@ from app.models.document import (
 from app.models.user_settings import load_app_settings
 from app.services.audit_service import write_audit_entry
 from app.services.embedding_service import chunk_text, embed_chunks, extract_metadata, read_enabled_field_defs
+from app.services.email_attachments import ingest_email_attachments
 from app.services.ingest_enrich import enrich_for_ingest
 from app.services.extraction_service import ExtractedDocument
 from app.utils.db import aexec
@@ -2215,121 +2216,20 @@ def ingest_document(
                 extracted_doc=extracted_doc,
             )
 
-        # Phase 203 (EML-02) / Phase 229 (TRUST-01, SC#3, G-2): Email attachment extraction & isolated cascade
-        if mime_type in ("message/rfc822", "application/vnd.ms-outlook", "application/x-msg"):
-            try:
-                from app.services.email_extraction_service import parse_eml_bytes, parse_msg_bytes  # noqa: PLC0415
-                from app.services.ingest_splice import mint_document_row  # noqa: PLC0415
-
-                parsed_email = parse_eml_bytes(raw) if mime_type == "message/rfc822" else parse_msg_bytes(raw)
-                attachment_manifest = []
-
-                for att in parsed_email.attachments:
-                    if not att.raw or not att.filename:
-                        continue
-
-                    att_doc_id: str | None = None
-                    try:
-                        att_ext = "." + att.filename.rsplit(".", 1)[-1].lower() if "." in att.filename else ""
-                        att_mime = att.content_type
-                        if att_mime in _UNRELIABLE_MIME_TYPES and att_ext in _EXT_MIME_OVERRIDES:
-                            att_mime = _EXT_MIME_OVERRIDES[att_ext]
-
-                        if att_mime not in ALLOWED_MIME_TYPES:
-                            attachment_manifest.append({
-                                "filename": att.filename,
-                                "status": "skipped",
-                                "error": f"MIME type {att_mime} not allowed",
-                            })
-                            continue
-
-                        # Mint row with on_conflict="link" (G-2):
-                        # Handles exact duplicate attachment or concurrent ingest collision without failing
-                        mint_result = mint_document_row(
-                            raw=att.raw,
-                            filename=att.filename,
-                            mime_type=att_mime,
-                            user_id=user_id,
-                            supabase=supabase,
-                            folder_id=None,
-                            on_conflict="link",
-                        )
-                        att_doc = mint_result.document
-                        att_doc_id = att_doc["id"]
-
-                        # Link relationship ('attached_to')
-                        try:
-                            supabase.table("document_relationships").insert({
-                                "user_id": user_id,
-                                "source_doc_id": att_doc_id,
-                                "target_doc_id": document_id,
-                                "rel_type": "attached_to",
-                            }).execute()
-                        except Exception as rel_err:
-                            log.warning("Failed to link attachment %s -> %s: %s", att_doc_id, document_id, rel_err)
-
-                        if mint_result.is_duplicate:
-                            attachment_manifest.append({
-                                "filename": att.filename,
-                                "status": "linked",
-                                "document_id": att_doc_id,
-                                "is_duplicate": True,
-                            })
-                            continue
-
-                        # New document: upload to storage
-                        supabase.storage.from_("documents").upload(
-                            path=mint_result.storage_path,
-                            file=att.raw,
-                            file_options={"content-type": att_mime},
-                        )
-
-                        # Extract and ingest child document
-                        att_text = extract_text(att.raw, att_mime)
-                        ingest_document(
-                            document_id=att_doc_id,
-                            text=att_text,
-                            user_id=user_id,
-                            supabase=supabase,
-                            raw=att.raw,
-                            mime_type=att_mime,
-                            filename=att.filename,
-                            engine_override="legacy",
-                        )
-                        attachment_manifest.append({
-                            "filename": att.filename,
-                            "status": "completed",
-                            "document_id": att_doc_id,
-                        })
-
-                    except Exception as att_err:
-                        log.warning(
-                            "Email attachment '%s' processing failed for parent %s: %s",
-                            att.filename,
-                            document_id,
-                            att_err,
-                        )
-                        if att_doc_id:
-                            try:
-                                supabase.table("documents").update({
-                                    "status": "failed",
-                                    "ingestion_step": "failed",
-                                    "error_message": str(att_err)[:250],
-                                }).eq("id", att_doc_id).execute()
-                            except Exception:
-                                pass
-                        attachment_manifest.append({
-                            "filename": att.filename,
-                            "status": "failed",
-                            "error": str(att_err)[:250],
-                        })
-
-                if attachment_manifest:
-                    metadata_dict = metadata_dict or {}
-                    metadata_dict["attachments"] = attachment_manifest
-
-            except Exception as att_exc:
-                log.warning("Email attachment extraction loop warning for %s: %s", document_id, att_exc)
+        # Phase 240 (D-240-08) — THE LOOP MOVED OUT, and that is the point rather than tidiness.
+        # It lived HERE and nowhere else, so the queue path — which is what a watch and /upload
+        # actually run — ingested messages and dropped every attachment. One function, both
+        # callers. See `services/email_attachments.py` for the full account.
+        attachment_manifest = ingest_email_attachments(
+            raw=raw,
+            mime_type=mime_type,
+            document_id=document_id,
+            user_id=user_id,
+            supabase=supabase,
+        )
+        if attachment_manifest:
+            metadata_dict = metadata_dict or {}
+            metadata_dict["attachments"] = attachment_manifest
 
         # Phase 071 D-071-08 — telemetry write (happy path).
         # Telemetry INSERT failure must NOT block document ingest completion (T-071-02-07).

@@ -1,0 +1,226 @@
+"""Phase 240 (SRC-05 SC#2 / D-240-08) — the email-attachment child loop, in ONE home.
+
+⛔ **THE DEFECT THIS MODULE CLOSES.** This loop lived only in `app/api/documents.py`, inside the
+legacy `ingest_document`. **Watches and `/upload` both run the QUEUE path** (`ingest_splice`), and
+`grep -n "rfc822\\|attachment"` over that file returned one docstring line and no code. A watched
+mailbox would therefore have ingested every message and **none of their attachments** — SC#2 false
+with the whole suite green, because the existing tests exercise the legacy path.
+
+⚠ **THIS WAS THE FOURTH RECORDED DISAGREEMENT BETWEEN THE TWO INGEST PATHS.** `ingest_splice.py`'s
+own comments narrate the first three — BUG-260905-06 (the metadata step), the empty-chunk refusal,
+and the Phase 234 provenance carry. Each was found by someone going looking, and each was fixed
+the same way: **one function, both callers, never a copy.** That is what this module is.
+
+⭐ **IT IS A MOVE, NOT A REWRITE.** `test_240_attachments_both_paths.py`'s legacy pin was written
+and passing BEFORE the extraction and must keep passing after. If it ever has to be edited to stay
+green, the move changed behaviour and the edit is the failure — the things a tidy-up would quietly
+lose are `sanitize_attachment_filename`, the `ALLOWED_MIME_TYPES` refusal, and the
+relationship-insert-ABOVE-the-early-return that keeps a shared attachment linked to both parents.
+
+## Two deliberate deltas from the legacy code, both named
+
+1. **`depth`** (TM-240-09). A `.eml` attached to a `.eml` would recurse. The legacy loop was never
+   reachable from a watch, so nested mail could only arrive by hand; making the loop run on the
+   queue path opens it to a mailbox where an attacker chooses the attachment. **New exposure, new
+   guard, same commit.**
+2. **`org_id` / `ingest_visibility` pass-through.** The queue path carries them and the legacy path
+   does not. Minting a child without them would place it outside its connection's visibility
+   scope — a `VIS-*` regression on the very path Phase 231 built. Both default to `None`, so the
+   legacy call stays byte-equivalent.
+"""
+
+from __future__ import annotations
+
+import logging
+from typing import Any
+
+from app.services.email_extraction_service import parse_eml_bytes, parse_msg_bytes
+from app.services.ingest_splice import mint_document_row
+
+log = logging.getLogger(__name__)
+
+#: How deep a message-inside-a-message chain may go. 1 means: a message's attachments become
+#: documents, and a message that ARRIVED as an attachment does not spawn a third level.
+MAX_MAIL_NESTING_DEPTH = 1
+
+MAIL_MIME_TYPES = ("message/rfc822", "application/vnd.ms-outlook", "application/x-msg")
+
+
+def ingest_email_attachments(
+    *,
+    raw: bytes,
+    mime_type: str,
+    document_id: str,
+    user_id: str,
+    supabase: Any,
+    folder_id: str | None = None,
+    org_id: str | None = None,
+    ingest_visibility: str | None = None,
+    depth: int = 0,
+) -> list[dict] | None:
+    """Mint each attachment as its own document, linked to the message it arrived on.
+
+    Returns the attachment manifest, or `None` when this is not a mail document (or when the
+    nesting cap refuses to go deeper).
+
+    ⚠ **It never raises.** A failure here degrades to a warning and a manifest entry, exactly as
+    the legacy loop did: an attachment problem must not fail the message that carried it.
+    """
+    if mime_type not in MAIL_MIME_TYPES:
+        return None
+    if depth >= MAX_MAIL_NESTING_DEPTH:
+        # TM-240-09 — a message that arrived AS an attachment does not open its own.
+        log.info(
+            "email attachment nesting cap reached at depth %d for %s — not recursing",
+            depth,
+            document_id,
+        )
+        return None
+
+    # Imported inside the function for the same reason the legacy code did: `ingest_document`
+    # lives in the API module, and a module-level import would make this service depend on the
+    # router package at import time.
+    # ⚠ `app.api.documents` is imported HERE and not at module level, and it is the only one
+    #   that has to be: that module now imports THIS one, so a top-level import either way is a
+    #   cycle. `mint_document_row` and the parsers are hoisted to module scope precisely so a
+    #   test can patch them by name — a function-local import is unpatchable from outside, which
+    #   is a testability cost worth paying only where a cycle forces it.
+    from app.api.documents import (  # noqa: PLC0415
+        ALLOWED_MIME_TYPES,
+        _EXT_MIME_OVERRIDES,
+        _UNRELIABLE_MIME_TYPES,
+        extract_text,
+        ingest_document,
+    )
+
+    try:
+        parsed_email = (
+            parse_eml_bytes(raw) if mime_type == "message/rfc822" else parse_msg_bytes(raw)
+        )
+        attachment_manifest: list[dict] = []
+
+        for att in parsed_email.attachments:
+            if not att.raw or not att.filename:
+                continue
+
+            att_doc_id: str | None = None
+            try:
+                att_ext = (
+                    "." + att.filename.rsplit(".", 1)[-1].lower()
+                    if "." in att.filename
+                    else ""
+                )
+                att_mime = att.content_type
+                if att_mime in _UNRELIABLE_MIME_TYPES and att_ext in _EXT_MIME_OVERRIDES:
+                    att_mime = _EXT_MIME_OVERRIDES[att_ext]
+
+                if att_mime not in ALLOWED_MIME_TYPES:
+                    # ⚠ RECORDED, NOT DROPPED. "We would not ingest this" and "there was nothing
+                    #   here" are different facts, and the manifest is the only place a person can
+                    #   learn which one happened.
+                    attachment_manifest.append({
+                        "filename": att.filename,
+                        "status": "skipped",
+                        "error": f"MIME type {att_mime} not allowed",
+                    })
+                    continue
+
+                # Mint row with on_conflict="link" (G-2):
+                # Handles exact duplicate attachment or concurrent ingest collision without failing
+                mint_result = mint_document_row(
+                    raw=att.raw,
+                    filename=att.filename,
+                    mime_type=att_mime,
+                    user_id=user_id,
+                    supabase=supabase,
+                    folder_id=folder_id,
+                    org_id=org_id,
+                    ingest_visibility=ingest_visibility,
+                    on_conflict="link",
+                )
+                att_doc = mint_result.document
+                att_doc_id = att_doc["id"]
+
+                # ⛔ THIS INSERT SITS ABOVE THE `is_duplicate` EARLY-RETURN, AND THAT ORDER IS
+                #    LOAD-BEARING. ROADMAP 240 names the failure it prevents: *"two different
+                #    emails carrying the same attachment collide on documents_dedup_idx and one is
+                #    silently swallowed."* A duplicate mints no second document — it must still
+                #    gain a second `attached_to` row, or the second message loses its attachment.
+                #    Driven RED by moving this below the return.
+                try:
+                    supabase.table("document_relationships").insert({
+                        "user_id": user_id,
+                        "source_doc_id": att_doc_id,
+                        "target_doc_id": document_id,
+                        "rel_type": "attached_to",
+                    }).execute()
+                except Exception as rel_err:
+                    log.warning(
+                        "Failed to link attachment %s -> %s: %s", att_doc_id, document_id, rel_err
+                    )
+
+                if mint_result.is_duplicate:
+                    # Duplicate in folder: link into the manifest, but do NOT upload bytes and do
+                    # NOT re-ingest.
+                    attachment_manifest.append({
+                        "filename": att.filename,
+                        "status": "linked",
+                        "document_id": att_doc_id,
+                        "is_duplicate": True,
+                    })
+                    continue
+
+                # New document: upload to storage
+                supabase.storage.from_("documents").upload(
+                    path=mint_result.storage_path,
+                    file=att.raw,
+                    file_options={"content-type": att_mime},
+                )
+
+                # Extract and ingest child document
+                att_text = extract_text(att.raw, att_mime)
+                ingest_document(
+                    document_id=att_doc_id,
+                    text=att_text,
+                    user_id=user_id,
+                    supabase=supabase,
+                    raw=att.raw,
+                    mime_type=att_mime,
+                    filename=att.filename,
+                    engine_override="legacy",
+                )
+                attachment_manifest.append({
+                    "filename": att.filename,
+                    "status": "completed",
+                    "document_id": att_doc_id,
+                })
+
+            except Exception as att_err:
+                log.warning(
+                    "Email attachment '%s' processing failed for parent %s: %s",
+                    att.filename,
+                    document_id,
+                    att_err,
+                )
+                if att_doc_id:
+                    try:
+                        supabase.table("documents").update({
+                            "status": "failed",
+                            "ingestion_step": "failed",
+                            "error_message": str(att_err)[:250],
+                        }).eq("id", att_doc_id).execute()
+                    except Exception:
+                        pass
+                attachment_manifest.append({
+                    "filename": att.filename,
+                    "status": "failed",
+                    "error": str(att_err)[:250],
+                })
+
+        return attachment_manifest or None
+
+    except Exception as att_exc:
+        log.warning(
+            "Email attachment extraction loop warning for %s: %s", document_id, att_exc
+        )
+        return None

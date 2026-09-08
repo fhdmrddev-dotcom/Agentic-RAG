@@ -9390,7 +9390,7 @@ cells rot within days.
 | [`backend/app/api/admin.py`](docs/HOT-FILE-LEDGER.md#backendappapiadminpy) | 33 / 13 / 1740 | ⚠ **FIRES** | ⚠ row was STALE at `32 / 12 / 1733`. honoured by construction (**BUG-260902-06**): two write seams swap invalidate for broadcast; the two WR-03 READ seams deliberately unchanged |
 | [`backend/app/api/settings.py`](docs/HOT-FILE-LEDGER.md#backendappapisettingspy) | 34 / 18 / 738 | ⚠ **FIRES** | ⚠ row was STALE at `30 / 16 / 639`. honoured by construction (**SEED-258**): the same four seams SEED-227 used; the refusal states the COST, not just the range |
 | [`backend/app/services/multimodal_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmultimodal_servicepy) | 14 / 7 / 984 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** — row added SEED-227, which is also where its silent truncation was found |
-| [`backend/app/api/documents.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentspy) | 85 / 33 / 2442 | ⚠ **FIRES** | ✅ **DISCHARGED (229)**, and **240-03 discharges further** — the email-attachment loop moves out to `services/email_attachments.py`. 240-02 adds one conditional column write |
+| [`backend/app/api/documents.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentspy) | 85 / 33 / 2342 | ⚠ **FIRES** | ✅ **DISCHARGED AGAIN (240-03)** — the email-attachment loop extracted to `services/email_attachments.py`, `-100 L` net. Row was `85 / 33 / 2437` |
 | [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 167 / 38 / 4786 | ⚠ **FIRES** | ⚠ row was STALE at `159 / 36 / 4687`. honoured by construction (**235**) — 10 TARGETS lines + 10 BASELINE pins + 1 re-pin, NO logic/threshold change |
 | [`backend/app/services/eval_runner_service.py`](docs/HOT-FILE-LEDGER.md#backendappserviceseval_runner_servicepy) | 12 / 7 / 959 | ⚠ **FIRES** | ⚠ absent at 7 phases (added 196) |
 | [`frontend/src/components/panel/PhaseCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasecardtsx) | 16 / 10 / 755 | ⚠ **FIRES** | honoured by construction (200 / **214**) — the failure sentinel NARROWED to both-sources-empty |
@@ -9551,7 +9551,8 @@ cells rot within days.
 | [`frontend/src/lib/api/sources.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapisourcests) | 5 / 1 / 312 | no (1 phase) | ⚠ **NOT covered by `lib/api.ts`'s row: that row is the BARREL.** ⛔ 235-13: it held TWO hand-written copies of the cause union the `?raw` fence is blind to; both now import the type |
 | [`backend/app/models/source.py`](docs/HOT-FILE-LEDGER.md#backendappmodelssourcepy) | 5 / 1 / 196 | no (1 phase) | ⚠ absent — row added 235 (+117 L). `cause`/`status` are `Literal`s, so an unknown value is a ValidationError, never a string that renders |
 | [`backend/app/services/ingest_enrich.py`](docs/HOT-FILE-LEDGER.md#backendappservicesingest_enrichpy) | 7 / 2 / 623 | no (2 phases) | ⚠ absent for its entire life — row added 235. ⚠ its `0 phases` is real: all three commits are DATED QUICK TASKS. `BUG-260906-01` closed here by `260906-5qd` |
-| [`backend/app/services/ingest_splice.py`](docs/HOT-FILE-LEDGER.md#backendappservicesingest_splicepy) | 11 / 4 / 787 | ⚠ **FIRES** | ⚠ **absent for its ENTIRE LIFE — row added 240.** ⭐ Phase 229's own G-5 DISCHARGE created it, so the extraction moved code OUT of the guardrail's sight |
+| [`backend/app/services/ingest_splice.py`](docs/HOT-FILE-LEDGER.md#backendappservicesingest_splicepy) | 11 / 4 / 827 | ⚠ **FIRES** | ⚠ **absent for its ENTIRE LIFE — row added 240.** ⭐ Phase 229's own G-5 DISCHARGE created it, so the extraction moved code OUT of the guardrail's sight |
+| [`backend/app/services/email_attachments.py`](docs/HOT-FILE-LEDGER.md#backendappservicesemail_attachmentspy) | 0 / 0 / 226 | no (new) | young (240) — the shared email-attachment child loop. ⛔ Closed the FOURTH two-paths disagreement: a watched mailbox ingested messages and zero attachments |
 | [`backend/app/services/email_extraction_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesemail_extraction_servicepy) | 4 / 1 / 511 | no (1 phase) | ⚠ **absent for its ENTIRE LIFE — row added 240.** Home of `parse_eml_bytes`, `strip_quoted_replies` and now `thread_key_for`. ⛔ Subject is never a thread input |
 | [`backend/app/services/sources/failure_cause.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesfailure_causepy) | 2 / 1 / 196 | no (1 phase) | young (235) — **THE ONE classifier of why a source stopped.** ⛔ 235-13: `connection_disabled` is WRITTEN by one seam and inferred by NOTHING — no matcher, no status row |
 | [`backend/app/services/sources/health_verdict.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourceshealth_verdictpy) | 1 / 1 / 149 | no (1 phase) | young (235) — the ONE stopped/not decision. ⭐ DERIVED from run history, never a counter column. Zero rows ≠ zero failures |
@@ -9631,6 +9632,61 @@ rather than grow a copy of one.
 path in four recorded places, and the divergence is discovered rather than prevented. The
 extraction worth taking is a single ordered pipeline both paths execute — at which point "did this
 path run step N" stops being a question a comment answers.
+
+
+---
+
+## backend/app/services/email_attachments.py
+
+**Derived 2026-09-09 (Phase 240):** `0 / 0 / 226`. New in this phase, by extraction from
+`backend/app/api/documents.py` (`-100 L` net there: `+15 / -115`).
+
+⛔ **WHY IT EXISTS — THE FOURTH TWO-PATHS DISAGREEMENT, MEASURED BEFORE PLANNING STARTED.**
+`grep -n "rfc822\|attachment" backend/app/services/ingest_splice.py` returned **one docstring
+line and no code**. The loop that mints an attachment as a child document and writes the
+`attached_to` relationship lived only inside the legacy `ingest_document`, and **watches and
+`/upload` both run the queue path**. So a watched mailbox would have ingested every message and
+**none of their attachments** — SC#2 false, with the entire suite green, because every existing
+attachment test exercises the legacy path.
+
+⚠ **`ingest_splice.py`'s own comments narrate the first three**: BUG-260905-06 (the metadata step
+was never written into the queue loop), the empty-chunk refusal (*"a document that produced NO
+searchable content reported success"*), and the Phase 234 provenance carry. **Four occurrences of
+one failure mode is a structural signal, not four mistakes** — see the named seam in that file's
+own section.
+
+**How the extraction was proved to be a MOVE rather than a rewrite.**
+`test_240_attachments_both_paths.py`'s legacy pin was written and **passing before** the
+extraction, and passes unchanged after. ⛔ If it ever has to be edited to stay green, the move
+changed behaviour and the edit is the failure — the things a tidy-up would quietly lose are
+`sanitize_attachment_filename`, the `ALLOWED_MIME_TYPES` refusal, and the insert order below.
+
+**Binding invariants.**
+- ⛔ **The `document_relationships` insert sits ABOVE the `is_duplicate` early-return.** ROADMAP
+  240 names the failure this prevents: *"two different emails carrying the same attachment collide
+  on `documents_dedup_idx` and one is silently swallowed."* A duplicate mints no second document
+  and must still gain a second `attached_to` row. ⭐ Driven RED by moving the insert below the
+  return — the second link vanished and the test failed by name.
+- ⛔ **`depth` refuses recursion above 1** (TM-240-09). A `.eml` inside a `.eml` would recurse.
+  This is a NEW exposure created by running the loop on the watch path, and it is guarded in the
+  same commit that creates it.
+- ⚠ **`org_id` / `ingest_visibility` are passed through.** The queue path carries them; minting a
+  child without them would place it outside its connection's visibility scope — a `VIS-*`
+  regression on the very path Phase 231 built.
+- ⚠ **A refused MIME produces a `skipped` manifest entry, never silence.** "We would not ingest
+  this" and "there was nothing here" are different facts, and the manifest is the only place a
+  person can learn which one happened.
+- ⚠ **It never raises.** An attachment failure degrades to a warning plus a manifest entry: a
+  problem with an attachment must not fail the message that carried it.
+- ⚠ **Only `app.api.documents` is imported function-locally**, because that module imports this
+  one and a top-level import either way is a cycle. `mint_document_row` and the parsers are hoisted
+  to module scope deliberately — a function-local import cannot be patched from outside, and that
+  testability cost is worth paying only where a cycle forces it.
+
+**Named seam for the next phase.** None here. The seam worth taking is one level up, in
+`ingest_splice.py`: a single ordered pipeline both paths execute, so *"did this path run step N"*
+stops being a question a comment answers.
+
 
 ---
 
