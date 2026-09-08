@@ -224,3 +224,67 @@ owed and it needs a working credential nobody has supplied yet.
 
 ⚠ The GitHub connection was **reverted to its prior unbound state** after this drive; the operator's
 environment is as it was found.
+
+---
+
+# ⭐ SC#2 — **MET**, driven 2026-09-09 against a real second MCP file server
+
+Tree `b918c408e`. Operator supplied a GitHub PAT; everything else was set through the UI.
+
+## The zero-code claim, proven the strict way
+
+`git rev-parse HEAD` read **`b918c408e` before AND after**; `git log <base>..HEAD -- backend frontend`
+returned **0**; `git status --porcelain -- backend frontend` was **empty**. **No code was written,
+edited or committed between server one and server two.**
+
+## What was driven
+
+**Server 2: GitHub MCP** (`api.githubcopilot.com`) against the public repo
+`modelcontextprotocol/servers`, root `src`. Bound entirely as rows: `list_tool` / `read_tool` =
+`get_file_contents`, `arg_path` = `path`, statics `owner` / `repo`.
+
+⭐ **Its file vocabulary has NOTHING in common with the reference server's.** Not `list_directory`,
+not `read_file`, and it needs **three arguments where the contract sends one** — which is exactly the
+gap `SEED-259` opened and `239-06`/`239-07` closed.
+
+| Step | Result |
+|---|---|
+| `browse(mcp:root)` | **`200`** — 7 real folders: `src/everything · src/fetch · src/filesystem · src/git · src/memory · src/sequentialthinking · src/time` |
+| `browse(src/time)` — recursion | **`200`** — `src/time/src`, `src/time/test` |
+| `POST /preview` | **`200`** — real files with buckets, reasons, sizes |
+
+⭐ **The preview is the strongest single piece of evidence**, because it is Phase 233's four-bucket
+machinery running on a family nobody wrote a line of code for, and it stayed HONEST:
+
+> *"No extension and no declared type. The source will not say what this is, so we cannot tell
+> whether it is readable until we open it."*
+
+⭐ And `modified_at: "size:5"` — **`D-239-06`'s deterministic size fallback firing exactly as
+designed**, because GitHub's listing carries no timestamp. A decision made at planning time, first
+exercised here by a server chosen months later.
+
+## The credential detour, recorded because it is the useful part
+
+1. **`HTTP 401`** before the PAT — no credential.
+2. **`HTTP 404`** with the PAT, against `fhdmrddev-dotcom/Agentic-RAG`. **Not a contract failure:**
+   the operator's PAT belongs to `fhdmrd` and the repo to `fhdmrddev-dotcom`, so GitHub correctly
+   reported it as not found. Re-pointed at a **public** repo to isolate credential scope from the
+   contract — and the contract worked.
+
+⚠ **Every one of the three responses was a NAMED error carrying the provider's own words**, never
+the `200`-plus-empty that this phase's earlier drive produced. The fail-open closed by `239-06` stayed
+closed under three different real failures.
+
+## Verdict
+
+✅ **SC#2 MET.** *"Adding that source added rows, not code — a person can add a second, different MCP
+file server afterwards with no change to the product at all."* **Driven, with the zero-code claim
+proven by commit hash rather than asserted.**
+
+✅ **SC#3 substantially met** — it browses, recurses and previews with the same machinery as Drive.
+⚠ **NOT driven: deletion, disconnect and visibility behaviour**, and no watch was created (that would
+ingest real files into the operator's Library). Those rows remain owed and are named rather than
+absorbed.
+
+⚠ The GitHub connection was **reverted to unbound** afterwards; the operator's environment is as it
+was found.
