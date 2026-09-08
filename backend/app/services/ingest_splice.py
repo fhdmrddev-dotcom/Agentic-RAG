@@ -631,10 +631,21 @@ async def splice_document(
     text = enriched.text
     context_header = enriched.context_header
 
-    if enriched.metadata is not None:
+    # Phase 240 (D-240-07) — `thread_key` rides the SAME write as the metadata it was derived
+    # alongside, on BOTH paths. ⚠ A separate write would be a fifth chance for the two paths to
+    # disagree, and this file's own comments already narrate three occasions where a step existed
+    # on one path and not the other. `test_240_thread_key_is_read.py` asserts the agreement.
+    if enriched.metadata is not None or enriched.thread_key is not None:
         try:
             await _db(lambda: supabase.table("documents").update(
-                {"metadata": enriched.metadata}
+                {
+                    **({"metadata": enriched.metadata} if enriched.metadata is not None else {}),
+                    **(
+                        {"thread_key": enriched.thread_key}
+                        if enriched.thread_key is not None
+                        else {}
+                    ),
+                }
             ).eq("id", document_id).execute())
         except Exception as meta_err:
             # Best-effort, exactly as the legacy path treats it: a metadata write must never

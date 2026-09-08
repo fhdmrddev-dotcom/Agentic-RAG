@@ -9390,7 +9390,7 @@ cells rot within days.
 | [`backend/app/api/admin.py`](docs/HOT-FILE-LEDGER.md#backendappapiadminpy) | 33 / 13 / 1740 | ⚠ **FIRES** | ⚠ row was STALE at `32 / 12 / 1733`. honoured by construction (**BUG-260902-06**): two write seams swap invalidate for broadcast; the two WR-03 READ seams deliberately unchanged |
 | [`backend/app/api/settings.py`](docs/HOT-FILE-LEDGER.md#backendappapisettingspy) | 34 / 18 / 738 | ⚠ **FIRES** | ⚠ row was STALE at `30 / 16 / 639`. honoured by construction (**SEED-258**): the same four seams SEED-227 used; the refusal states the COST, not just the range |
 | [`backend/app/services/multimodal_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmultimodal_servicepy) | 14 / 7 / 984 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** — row added SEED-227, which is also where its silent truncation was found |
-| [`backend/app/api/documents.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentspy) | 85 / 33 / 2437 | ⚠ **FIRES** | ✅ **DISCHARGED (229)** — ingest_splice.py extracted. ⚠ row was STALE at `75 / 32 / 2408`; 235 removed 44 L, adding nothing |
+| [`backend/app/api/documents.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentspy) | 85 / 33 / 2442 | ⚠ **FIRES** | ✅ **DISCHARGED (229)**, and **240-03 discharges further** — the email-attachment loop moves out to `services/email_attachments.py`. 240-02 adds one conditional column write |
 | [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 167 / 38 / 4786 | ⚠ **FIRES** | ⚠ row was STALE at `159 / 36 / 4687`. honoured by construction (**235**) — 10 TARGETS lines + 10 BASELINE pins + 1 re-pin, NO logic/threshold change |
 | [`backend/app/services/eval_runner_service.py`](docs/HOT-FILE-LEDGER.md#backendappserviceseval_runner_servicepy) | 12 / 7 / 959 | ⚠ **FIRES** | ⚠ absent at 7 phases (added 196) |
 | [`frontend/src/components/panel/PhaseCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasecardtsx) | 16 / 10 / 755 | ⚠ **FIRES** | honoured by construction (200 / **214**) — the failure sentinel NARROWED to both-sources-empty |
@@ -9550,7 +9550,9 @@ cells rot within days.
 | [`frontend/src/pages/librarySelection.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcpageslibraryselectionts) | 2 / 2 / 312 | no (2 phases) | ⚠ absent for its entire life — row added 235, which did NOT modify it but made `App.tsx` import `LibraryTab` from it rather than re-declare it |
 | [`frontend/src/lib/api/sources.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapisourcests) | 5 / 1 / 312 | no (1 phase) | ⚠ **NOT covered by `lib/api.ts`'s row: that row is the BARREL.** ⛔ 235-13: it held TWO hand-written copies of the cause union the `?raw` fence is blind to; both now import the type |
 | [`backend/app/models/source.py`](docs/HOT-FILE-LEDGER.md#backendappmodelssourcepy) | 5 / 1 / 196 | no (1 phase) | ⚠ absent — row added 235 (+117 L). `cause`/`status` are `Literal`s, so an unknown value is a ValidationError, never a string that renders |
-| [`backend/app/services/ingest_enrich.py`](docs/HOT-FILE-LEDGER.md#backendappservicesingest_enrichpy) | 3 / 0 / 553 | no (0 phases) | ⚠ absent for its entire life — row added 235. ⚠ its `0 phases` is real: all three commits are DATED QUICK TASKS. `BUG-260906-01` closed here by `260906-5qd` |
+| [`backend/app/services/ingest_enrich.py`](docs/HOT-FILE-LEDGER.md#backendappservicesingest_enrichpy) | 7 / 2 / 623 | no (2 phases) | ⚠ absent for its entire life — row added 235. ⚠ its `0 phases` is real: all three commits are DATED QUICK TASKS. `BUG-260906-01` closed here by `260906-5qd` |
+| [`backend/app/services/ingest_splice.py`](docs/HOT-FILE-LEDGER.md#backendappservicesingest_splicepy) | 11 / 4 / 787 | ⚠ **FIRES** | ⚠ **absent for its ENTIRE LIFE — row added 240.** ⭐ Phase 229's own G-5 DISCHARGE created it, so the extraction moved code OUT of the guardrail's sight |
+| [`backend/app/services/email_extraction_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesemail_extraction_servicepy) | 4 / 1 / 511 | no (1 phase) | ⚠ **absent for its ENTIRE LIFE — row added 240.** Home of `parse_eml_bytes`, `strip_quoted_replies` and now `thread_key_for`. ⛔ Subject is never a thread input |
 | [`backend/app/services/sources/failure_cause.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesfailure_causepy) | 2 / 1 / 196 | no (1 phase) | young (235) — **THE ONE classifier of why a source stopped.** ⛔ 235-13: `connection_disabled` is WRITTEN by one seam and inferred by NOTHING — no matcher, no status row |
 | [`backend/app/services/sources/health_verdict.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourceshealth_verdictpy) | 1 / 1 / 149 | no (1 phase) | young (235) — the ONE stopped/not decision. ⭐ DERIVED from run history, never a counter column. Zero rows ≠ zero failures |
 | [`frontend/src/components/sources/sourceHealthVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcessourcehealthvocabularyts) | 2 / 1 / 454 | no (1 phase) | young (235) — ⛔ `Object.keys(COPY)` PINNED at 26, still: 235-13's five new exports are SIBLINGS of it. The cause union is now single-sourced — `lib/api/sources.ts` imports it |
@@ -9566,8 +9568,8 @@ cells rot within days.
 | [`backend/app/api/classification_rules.py`](docs/HOT-FILE-LEDGER.md#backendappapiclassification_rulespy) | 3 / 3 / 226 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | row added 237 at threshold. Validates rule_scope and enforces WATCH_ALLOWED_FIELDS refusal (422) for arrival watch rules. |
 | [`backend/app/models/classification_rule.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsclassification_rulepy) | 2 / 2 / 56 | no (2 phases) | row added 237 below threshold. Adds rule_scope ('watch' or 'classification') to RuleCreate, RuleUpdate, RuleResponse. |
 | [`backend/app/services/classification_rule_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesclassification_rule_servicepy) | 3 / 2 / 166 | no (2 phases) | row added 237 below threshold. Persists and queries rule_scope across rule CRUD and uploader rule evaluation. |
-| [`backend/app/services/document_view_resolver.py`](docs/HOT-FILE-LEDGER.md#backendappservicesdocument_view_resolverpy) | 1 / 1 / 373 | no (1 phase) | row added 237 below threshold. Closes SC#2 bypass seam; whitelists source facts (source_system, path, etc.) for views. |
-| [`backend/app/services/view_filter_compiler.py`](docs/HOT-FILE-LEDGER.md#backendappservicesview_filter_compilerpy) | 3 / 2 / 283 | no (2 phases) | row added 237 below threshold. Adds source_connection_id, path, ingest_visibility, source_state to PROMOTED_TYPED_COLUMNS. |
+| [`backend/app/services/document_view_resolver.py`](docs/HOT-FILE-LEDGER.md#backendappservicesdocument_view_resolverpy) | 2 / 2 / 379 | no (2 phases) | ⚠ row was STALE at `1 / 1 / 373`. honoured by construction (**240**): `thread_key` added to the whitelist AND to the compiler — a promotion touches three places |
+| [`backend/app/services/view_filter_compiler.py`](docs/HOT-FILE-LEDGER.md#backendappservicesview_filter_compilerpy) | 4 / 3 / 288 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ row was STALE at `3 / 2 / 283`. honoured by construction (**240**): one row in `PROMOTED_TYPED_COLUMNS`, no new leg, no new operator |
 | [`frontend/src/components/classification/ClassificationRulesPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsclassificationclassificationrulespagetsx) | 1 / 1 / 250 | no (1 phase) | row added 237 below threshold. Adds scope filter chips (All, Arrival, Extracted) and displays Arrival/Extracted badges. |
 | [`frontend/src/components/classification/RuleBuilderPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsclassificationrulebuilderpaneltsx) | 4 / 3 / 502 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | row added 237 at threshold. Adds scope selector segmented control; filters out-of-scope conditions on scope switch. |
 | [`frontend/src/components/ingestion/ConditionPopover.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestionconditionpopovertsx) | 3 / 2 / 404 | no (2 phases) | row added 237 below threshold. Restricts condition field choices to WATCH_FIELDS when ruleScope === 'watch'. |
@@ -9582,6 +9584,92 @@ cells rot within days.
 | [`frontend/src/components/sources/sourceCapability.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcessourcecapabilityts) | 3 / 2 / 138 | no (2 phases) | ⚠ row STALE TWICE (`0 / 0 / 38`, `2 / 2 / 98`). young (238 / **239**). ⛔ Fails CLOSED on `null`, and on a DEFAULT service id since 239-05. See §239-05 |
 | [`backend/app/services/sources/adapters/mcp_source.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesadaptersmcp_sourcepy) | 9 / 1 / 1271 | no (1 phase) | ⚠ STALE at every close so far (`2/1/643` → `6/1/1022` → `8/1/1259`). SEED-258 removed its `MAX_FILE_BYTES`; `_guard` reads the operator setting at each use |
 | [`frontend/src/components/settings/connectionRowVerdict.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectionrowverdictts) | 2 / 2 / 99 | no (2 phases) | ⚠ **absent for its entire life — row added 239-03, and the ledger gate FAILED on it at this phase's base.** young (221 / 239). The row's verdict, DERIVED never stored. See §239-03 |
+
+
+
+---
+
+## backend/app/services/ingest_splice.py
+
+**Derived 2026-09-09 (Phase 240):** `11 commits / 4 phases / 787 L`. ⚠ **FIRES G-5, and had no
+row until this phase.**
+
+⭐ **THE ROW BEING ABSENT IS A FINDING, NOT PAPERWORK.** This file exists *because* Phase 229
+discharged G-5 on `backend/app/api/documents.py` by extracting `mint_document_row()` and
+`splice_document()` into it. **The extraction created a new hot file that inherited no ledger
+row** — so the discharge moved the code out of the guardrail's sight, and G-5 could never have
+fired here at any commit count. The ledger mentions this path four times (in `documents.py`'s
+own section, as the *destination* of that extraction), which is exactly how it reads as covered
+while being invisible.
+
+⚠ **The same shape is already recorded one file over**: `frontend/src/lib/api/workflows.ts`'s row
+says *"the 207 split created it with NO row"*. Two independent splits, two orphaned children.
+**A refactor that discharges G-5 must add a row for what it creates, in the same commit.**
+
+**What it is.** The queue half of the two ingest paths: given a `job_id`, `splice_document` stops
+delegating to `ingest_document` and runs its own chunk/embed loop.
+
+**The invariant that governs every change here.** ⛔ **The two paths must agree, and they have
+disagreed four times.** This file's own comments narrate three of them — BUG-260905-06 (the
+metadata step was never written into this loop, so every upload after the Phase 230 cutover
+landed with no title, date, type or chunk context header), the empty-chunk refusal (`ingest_document`
+has always refused a document that produced no searchable content; this path fell through to
+`completed` with `chunk_count=0`), and the Phase 234 provenance carry. **Phase 240 found the
+fourth**: the email-attachment child loop lives only in `documents.py`, so a watched mailbox would
+have ingested messages and zero attachments (see `240-03`).
+
+**Why they keep diverging, stated plainly:** every step added to the legacy path is a step someone
+must remember to add here, and nothing structural notices when they do not. The only defence that
+has worked is a test that asserts the AGREEMENT rather than each path separately —
+`test_ingest_enrich_shared.py` and `test_240_thread_key_is_read.py`.
+
+**Phase 240's verdict: honoured by construction.** 240-02 adds one conditional column write beside
+the metadata write it already makes; 240-03 makes this file CALL a shared attachment function
+rather than grow a copy of one.
+
+**Named seam for the next phase.** The queue path's STEP LIST. It has now diverged from the legacy
+path in four recorded places, and the divergence is discovered rather than prevented. The
+extraction worth taking is a single ordered pipeline both paths execute — at which point "did this
+path run step N" stops being a question a comment answers.
+
+---
+
+## backend/app/services/email_extraction_service.py
+
+**Derived 2026-09-09 (Phase 240):** `4 commits / 1 phase / 511 L`. ⚠ **Absent from the ledger for
+its entire life; row added 240.** Below the G-5 threshold, but an absent row means G-5 can never
+fire here at any count — and `scripts/check-hot-file-ledger.cjs` fails a phase that names a source
+file with no row, which is how this one was caught.
+
+**What it is.** The one mail parser: `parse_eml_bytes`, `parse_msg_bytes`,
+`strip_quoted_replies`, `sanitize_attachment_filename`, `format_email_text_for_retrieval`, and —
+new in Phase 240 — `thread_key_for`.
+
+**Binding invariants.**
+- ⭐ **One parser, and now two doors.** Gmail's `format=RAW` yields the same RFC-822 bytes a
+  hand-uploaded `.eml` carries, so a watched mailbox lands on `parse_eml_bytes` unchanged. That is
+  what makes mail a shape rather than a fourth adapter; a second parser would have refuted it.
+- ⛔ **`thread_key_for` never reads Subject.** "Re: Budget" collides across unrelated
+  conversations and across people, and a wrong grouping puts one person's mail inside another's
+  answer with nothing on screen saying so. Order is `References[0]` → `In-Reply-To` →
+  `Message-ID` → `None`.
+- ⚠ **`None` is a real answer.** "Not mail" and "mail whose client wrote no Message-ID" are
+  different facts; a sentinel would fuse them, which is the mistake `metadata.source.path` already
+  paid for at `D-238-07.4`.
+- ⚠ **Every derived value is bounded and scrubbed before it can reach Postgres.** A `Message-ID`
+  is attacker-length as well as attacker-content, so `thread_key_for` truncates at 512 characters
+  and drops control characters. This Library has already paid for the opposite: a NUL byte inside
+  a `.msg` subject produced a `22P05` during v3.7 UAT that 5,438 green tests missed.
+- ⚠ **`strip_quoted_replies` carries a correction in its own body** — a `>`-prefixed line is
+  DROPPED, never a `break`. The `break` both over-stripped (one quoted sentence discarded the rest
+  of the email) and under-stripped (a quoted FIRST line emptied the result, and the empty-result
+  fallback then returned the whole unstripped body). It is the defence SC#1 rests on, and
+  `test_240_quoted_paragraph_appears_once.py` drives it RED to prove it is load-bearing.
+
+**Named seam for the next phase.** None. At 511 lines with one phase of history the file is
+coherent; the thing to watch is the REPLY-HEADER PATTERN SET, which is finite and dialect-specific.
+A dialect it does not know is a dialect whose quote trail survives into the chunks — measured
+per dialect in `240-03`.
 
 
 ---

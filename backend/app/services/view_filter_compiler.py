@@ -73,6 +73,12 @@ PROMOTED_TYPED_COLUMNS: dict[str, str] = {
     "source_state": "source_state",
     "path": "file_path",
     "file_path": "file_path",
+    # Phase 240 (SRC-05 / D-240-07) — the conversation key is a TYPED column, not a metadata
+    # probe. ⚠ The distinction is not cosmetic: `documents_thread_key_idx` is only reachable
+    # from the typed leg. A `metadata->>` custom leg returns the same rows and scans the table —
+    # the right answer with the wrong plan, invisible until the corpus is large, which is
+    # precisely the class of defect Phase 241 exists to measure.
+    "thread_key": "thread_key",
 }
 
 # Fields stored lowercase at write path or matched case-insensitively. For these we

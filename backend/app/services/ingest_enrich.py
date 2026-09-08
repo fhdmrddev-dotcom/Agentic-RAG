@@ -57,6 +57,14 @@ class EnrichedIngest:
     context_header: str
     #: Set when a model read the text off pixels; None when it came from a real text layer.
     vision: dict | None
+    #: Phase 240 (D-3 / D-240-07) — the conversation this mail document belongs to.
+    #:
+    #: ⚠ A COLUMN, NOT A METADATA KEY, and the distinction is the whole point. `email_message_id`,
+    #:   `email_in_reply_to` and `email_references` have been written into `metadata` since Phase
+    #:   203 and are read back by NOTHING — the fate ROADMAP 240 predicts for this field by name.
+    #:   A typed column can carry an index and a view filter; a metadata key could not.
+    #: None for every document that is not mail, and for mail whose client wrote no usable header.
+    thread_key: str | None = None
 
 
 def enrich_for_ingest(
@@ -238,10 +246,18 @@ def enrich_for_ingest(
         metadata = extract_metadata(text)  # UNTOUCHED legacy path (byte-identical)
         metadata_dict = metadata.model_dump(exclude_none=True) if metadata else None
 
+    # Phase 240 — None for everything that is not mail. Declared before the branch so the return
+    # below cannot depend on whether the branch ran.
+    thread_key: str | None = None
+
     # Phase 203 (EML-01): Merge deterministic email header metadata
     if mime_type in ("message/rfc822", "application/vnd.ms-outlook", "application/x-msg"):
         try:
-            from app.services.email_extraction_service import parse_eml_bytes, parse_msg_bytes  # noqa: PLC0415
+            from app.services.email_extraction_service import (  # noqa: PLC0415
+                parse_eml_bytes,
+                parse_msg_bytes,
+                thread_key_for,
+            )
             parsed_email = parse_eml_bytes(raw) if mime_type == "message/rfc822" else parse_msg_bytes(raw)
             metadata_dict = metadata_dict or {}
             if parsed_email.subject and not metadata_dict.get("title"):
@@ -264,6 +280,12 @@ def enrich_for_ingest(
                 metadata_dict["email_in_reply_to"] = parsed_email.in_reply_to
             if parsed_email.references:
                 metadata_dict["email_references"] = parsed_email.references
+            # Phase 240 (SRC-05 / D-3) — the one place the conversation key is derived. It is
+            # computed HERE, from headers already in hand, rather than supplied by an adapter:
+            # that is what lets a manually uploaded .eml, a Gmail-synced message and a future
+            # Graph-synced one land on the same key, and what keeps `sources/base.py` free of a
+            # thread field (D-240-05).
+            thread_key = thread_key_for(parsed_email)
         except Exception as em_exc:
             log.warning("Email metadata extraction warning for %s: %s", document_id, em_exc)
 
@@ -597,4 +619,5 @@ def enrich_for_ingest(
         metadata=metadata_dict,
         context_header=context_header,
         vision=vision_provenance,
+        thread_key=thread_key,
     )

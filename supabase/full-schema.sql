@@ -1467,6 +1467,7 @@ CREATE TABLE public.documents (
     source_connection_id uuid,
     ingest_visibility text DEFAULT 'private'::text NOT NULL,
     source_state text,
+    thread_key text,
     CONSTRAINT documents_ingest_visibility_check CHECK ((ingest_visibility = ANY (ARRAY['private'::text, 'org'::text, 'dept'::text]))),
     CONSTRAINT documents_source_state_check CHECK (((source_state IS NULL) OR (source_state = ANY (ARRAY['live'::text, 'missing_at_source'::text, 'unauthorized_at_source'::text, 'source_disconnected'::text])))),
     CONSTRAINT documents_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'processing'::text, 'completed'::text, 'failed'::text])))
@@ -1499,6 +1500,13 @@ COMMENT ON COLUMN public.documents.ingest_visibility IS 'Phase 231 (VIS-01): who
 --
 
 COMMENT ON COLUMN public.documents.source_state IS 'Phase 234 (VIS-03 / VIS-04 / VIS-05): External source lifecycle state. live = synced and present · missing_at_source = deleted/moved externally (retained in Library, VIS-03) · unauthorized_at_source = unshared/revoked (VIS-04) · source_disconnected = connection disconnected (VIS-05). NULL for manually uploaded documents.';
+
+
+--
+-- Name: COLUMN documents.thread_key; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.documents.thread_key IS 'Phase 240 (D-3): the conversation a mail document belongs to, derived from its own RFC 5322 headers (References[0] -> In-Reply-To -> Message-ID), normalised and capped at 512 chars. NULL means "not mail" or "mail with no usable headers" — deliberately not distinguished by a sentinel. Never derived from Subject.';
 
 
 --
@@ -3481,6 +3489,13 @@ CREATE INDEX documents_latest_idx ON public.documents USING btree (user_id, file
 --
 
 CREATE INDEX documents_metadata_gin_idx ON public.documents USING gin (metadata);
+
+
+--
+-- Name: documents_thread_key_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX documents_thread_key_idx ON public.documents USING btree (user_id, thread_key) WHERE (thread_key IS NOT NULL);
 
 
 --

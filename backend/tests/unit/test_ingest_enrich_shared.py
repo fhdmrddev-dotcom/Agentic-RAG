@@ -87,8 +87,18 @@ def test_the_queue_path_writes_the_metadata_it_derives():
     """Deriving metadata and not persisting it is the same outcome as never deriving it."""
     src = _source(_SPLICE)
     assert "enriched.metadata" in src
-    assert re.search(r'update\(\s*\n?\s*\{\s*"metadata":\s*enriched\.metadata', src), (
+    # ⚠ RE-EXPRESSED IN PHASE 240, AND DELIBERATELY NOT WEAKENED. The original regex demanded
+    #   that `"metadata": enriched.metadata` be the FIRST key of the update literal. Phase 240
+    #   splices `thread_key` into the same write with `**`, so the key is no longer first — the
+    #   SHAPE changed and the PROPERTY did not. This version asserts the property directly: the
+    #   payload of an `update(` in this file binds the metadata key to the derived value.
+    #   ⛔ It was re-driven RED against the original defect (the whole `if enriched.metadata`
+    #   block deleted) and failed by name, exactly as the regex did.
+    assert re.search(r'"metadata":\s*enriched\.metadata', src), (
         "the queue path derives metadata but never writes it to the documents row"
+    )
+    assert re.search(r'supabase\.table\("documents"\)\.update\(', src), (
+        "the queue path has no documents update at all"
     )
 
 
@@ -119,8 +129,14 @@ def test_the_queue_path_embeds_the_header_but_stores_the_raw_chunk():
 
 
 def test_enrichment_returns_every_field_the_chunk_stage_needs():
+    """⚠ Phase 240 added `thread_key`. The set is UPDATED, never loosened to a subset check.
+
+    An exact set is what makes a REMOVED field fail here as loudly as an added one — and a
+    removed field is the direction that silently drops a step from an ingest path, which is the
+    whole reason this file exists.
+    """
     fields = set(EnrichedIngest.__dataclass_fields__)
-    assert fields == {"text", "metadata", "context_header", "vision"}
+    assert fields == {"text", "metadata", "context_header", "vision", "thread_key"}
 
 
 def test_enrichment_is_sync_so_callers_must_thread_it():
@@ -288,7 +304,19 @@ def test_both_paths_refuse_to_write_a_null_metadata():
     legacy arm unguarded would have re-opened the same two-paths-disagree gap that
     BUG-260905-06 closed — in the opposite direction, and as silent data loss.
     """
-    assert "if enriched.metadata is not None:" in _source(_SPLICE)
+    # ⚠ RE-EXPRESSED IN PHASE 240 (see above). The queue path's condition widened to
+    #   `if enriched.metadata is not None or enriched.thread_key is not None:` because a mail
+    #   document can have a thread key and no metadata. The GUARD is unchanged — the metadata
+    #   key is still spliced conditionally and a None still never reaches the row — so the
+    #   assertion now names the guard rather than one spelling of it.
+    splice = _source(_SPLICE)
+    assert "enriched.metadata is not None" in splice, (
+        "the queue path no longer guards against writing a null metadata over an existing one"
+    )
+    assert re.search(
+        r'\{"metadata": enriched\.metadata\} if enriched\.metadata is not None else \{\}',
+        splice,
+    ), "the queue path writes metadata unconditionally — a None would clear an existing row"
     assert "if metadata_dict is not None else {}" in _source(_DOCUMENTS)
 
 

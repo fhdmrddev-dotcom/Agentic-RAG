@@ -2136,6 +2136,8 @@ def ingest_document(
         )
         text = enriched.text
         metadata_dict = enriched.metadata
+        # Phase 240 (D-240-07) — the SAME value the queue path writes, from the SAME derivation.
+        thread_key = enriched.thread_key
         supabase.table("documents").update({"ingestion_step": "chunking"}).eq("id", document_id).execute()
         chunks = chunk_text(text)
         if not chunks:
@@ -2411,6 +2413,9 @@ def ingest_document(
             # Phase 071 D-071-08 — populate extractor lineage column for new ingests.
             "extractor": engine_used,
             **({"metadata": metadata_dict} if metadata_dict is not None else {}),
+            # Phase 240 — spliced with `**` for the same reason the metadata key is: the dict
+            # must stay INLINE so `renameFence.test.ts`'s extractor can still see this write.
+            **({"thread_key": thread_key} if thread_key is not None else {}),
         }).eq("id", document_id).execute()
 
     except Exception as e:

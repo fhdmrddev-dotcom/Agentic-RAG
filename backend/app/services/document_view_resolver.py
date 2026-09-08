@@ -131,6 +131,13 @@ _SOURCE_FACT_FIELDS: frozenset[str] = frozenset({
     "file_path",
     "ingest_visibility",
     "source_state",
+    # Phase 240 (SRC-05 / D-240-07). ⛔ ADDED HERE AS WELL AS TO THE COMPILER, ON PURPOSE.
+    # Phase 237 had to close a whitelist BYPASS at this file's defense-in-depth re-check after
+    # promoting the source facts: a compiler-only change leaves `validate_fields` rejecting at
+    # SAVE time a field the resolver is perfectly willing to select at READ time. A promotion
+    # touches THREE places — PROMOTED_TYPED_COLUMNS, this whitelist, and the re-check below —
+    # and the re-check reads PROMOTED_TYPED_COLUMNS.values(), so it follows automatically.
+    "thread_key",
 })
 
 
