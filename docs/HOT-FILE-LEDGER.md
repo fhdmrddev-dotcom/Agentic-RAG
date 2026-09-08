@@ -6572,6 +6572,105 @@ actually modifies this file still owes the refactor recommendation G-5 asks for.
 **Seam, un-taken:** the file is the Settings shell that mounts every tab (`ConnectionsTab`,
 `ModelRegistryTab`, the model pickers). The obvious cut is tab registration out of the page.
 
+**⚠ RE-DERIVED 2026-09-08 (SEED-258 / `239-10`): `43 commits / 22 phases / 1647 lines`** — the row
+above read `38 / 21 / 1500` and was stale by **5 commits and a phase**. Recorded beside the old
+figures, never over them.
+
+**What `239-10` did:** mounted `SourceFileCeilingCard` on the Integrations tab, plus the four lines
+every knob on this page needs — a `useState`, a read in `hydrate`, a key on the save payload, and the
+mount. **Honoured by construction:** no branch, no effect, no fetch, and — a step further than
+SEED-227's card, which was authored inline — **the card and its copy live in their own files**, so
+the shell grew by a mount rather than by a card. ⛔ **The named seam above (tab registration out of
+the page) is NOT taken and remains OWED.**
+
+⚠ **THE BOUNDS ARE `null` UNTIL SERVED, AND THE `null` IS LOAD-BEARING.** Seeding
+`sourceCeilingFloor` / `sourceCeilingMax` with `1` and `50` would have put a private copy of the
+ceiling in this file — **the fourth**, after the three `239-09` deleted from `google_drive.py`,
+`microsoft_graph.py` and `mcp_source.py`, and the precise defect SEED-258 was planted about. There is
+no honest cold value for a bound the server has not stated, so the card mounts only once it has.
+
+⚠ **`handleTabChange` PERSISTS THE ACTIVE TAB TO `localStorage`** (`settings_active_tab`, `:590`).
+Measured at `239-10` when a test case's premise — *"the page opens on tab 0"* — failed: jsdom keeps
+`localStorage` for a whole file, so a case mounts on whichever tab an earlier case opened. **Real
+product behaviour, not leakage.** Any suite asserting tab-scoped absence must clear it first.
+
+## frontend/src/components/settings/SourceFileCeilingCard.tsx
+
+**Created by `239-10` (SEED-258). `1 / 1 / 117`.** ⚠ A row minted in the commit that CREATES a file
+reads its creation triple forever unless re-derived — `microsoft_graph.py` sat at `0 / 0` for exactly
+this reason, and that is **indistinguishable from an unmeasured row**.
+
+The surface half of `239-09`'s backend. That plan's own summary named this as the outstanding debt:
+*"SEED-258's headline requirement — the on-screen copy stating the value, that it applies to every
+connected source, and what raising it costs — is therefore NOT met yet."*
+
+**Invariants this file carries:**
+
+- ⛔ **It owns no number.** Both bounds are props from `GET /settings`. `api/settings.py:79` states
+  the rule: *"a form carrying its own copy of `50` is a fourth private constant, which is the defect
+  this replaced."*
+- ⛔ **It owns no sentence.** Every user-visible string is an imported identifier from
+  `sourceCeilingCopy` — the `ConnectionFormPanel` / `SourceToolsCard` rule, inherited.
+- ⛔ **`min` / `max` are affordance, NOT enforcement, and NOTHING CLAMPS.** SEED-258 names *"Bounds
+  are enforced only in the React form"* as a way of answering this badly. A value the server will
+  refuse travels there and returns as its own 400 detail, which `SettingsPage`'s banner renders
+  verbatim. **Adding a clamp here would hide a refusal the operator should read** — and the refusal
+  is the only place the cost sentence is authoritative.
+- ⚠ **HI-02: the STORED value is always rendered.** A control that showed blank over a stored value
+  would make *"open the page and press Save"* a silent wipe.
+- ⛔ **ONE editable number, forever.** The MCP envelope cap is derived server-side; a backend test
+  asserts no `*_body_bytes` / `*_envelope` field can exist. The card *explains* that the transport
+  limit follows this number — **explaining is not exposing**, and a case pins that the explanation
+  is not dropped in an over-zealous reading of the one-knob rule.
+
+**No seam proposed** — 117 lines, one control, one card.
+
+## frontend/src/components/settings/sourceCeilingCopy.ts
+
+**Created by `239-10` (SEED-258). `1 / 1 / 109`.** The words for the ceiling — and on this surface
+**the words ARE the deliverable**, not chrome around a number. The operator's ask was verbatim
+*"with information on it and recommendations"*, and SEED-258's "answered badly" list names the bare
+field: *"A knob is exposed with no statement of what raising it costs — the original defect, now
+clickable."*
+
+⚠ **ONE NUMBER LIVES HERE AND IT IS PINNED ACROSS LANGUAGES.** `SOURCE_CEILING_RECOMMENDED_MB = 25`
+is advice rather than an enforcement boundary, and the server does not serve it — so it is exactly
+the kind of cross-file relation this seed exists because of. `__tests__/sourceCeilingCopy.test.ts`
+reads `backend/app/models/user_settings.py` via `?raw` and asserts it equals
+`SOURCE_MAX_FILE_SIZE_MB_DEFAULT`. ⭐ **`google_drive.py` asserted a relation in a comment for its
+entire life and the sentence was never true** — that is the whole argument for a test over a comment.
+
+⚠ **THE BOUNDS ARE DELIBERATELY NOT HERE.** `sourceCeilingBounds(floor, ceiling)` takes them as
+arguments, and a negative case proves it: handed `3, 44` the sentence must not contain `50`. A copy
+function that ignored its arguments would pass the positive case by accident.
+
+⚠ **THE SOURCE NAMES ARE THE PRODUCT'S, NOT THE ADAPTERS'.** Migration 174 says *"Google Drive,
+Microsoft Graph, any MCP file surface"* — module names. An operator never reads *"Microsoft Graph"*
+anywhere in this app; `servicesCatalog.ts:100` calls that connection **Microsoft 365**, with OneDrive
+and SharePoint as its file surfaces. The migration's **reasoning** is echoed; its **vocabulary** is
+not. A future edit that "corrects" the copy back to the module names would make the sentence accurate
+about code and wrong about what the operator can see.
+
+## frontend/src/lib/api/skills.ts
+
+**Row added by `239-10`. `4 / 2 / 715`** — does not fire G-5 at 2 phases, but it had **no row for its
+entire life**, so G-5 was ABSENT on it at any count.
+
+⚠ **THE FIFTH 207-SPLIT MODULE FOUND WITHOUT A ROW**, after `threads.ts`, `workflows.ts`,
+`connectors.ts` and `org.ts`. The split created seven modules and the ledger inherited rows for none
+of them; each has been added one phase at a time, by the phase that happened to touch it. **`lib/api.ts`'s
+row is the BARREL and covers none of these.**
+
+⚠ **ITS NAME IS A TRAP.** `skills.ts` holds **`FullAppSettings` and `SettingsUpdate`** — the entire
+settings wire contract — alongside the skill types. A phase looking for the settings types will not
+grep for a file called `skills`, and a phase auditing "which files did the settings change touch"
+will miss it. Recorded rather than renamed: the rename is a real seam, but it is `lib/api.ts`'s
+import surface and belongs in a refactor, not in a knob's plan.
+
+`239-10` added three fields to `FullAppSettings` (`source_max_file_size_mb` + its served
+`_floor` / `_ceiling`) and one optional to `SettingsUpdate`. ⛔ **There is no `_floor` / `_ceiling`
+on the update type and there must never be: the bounds are the SERVER's, read-only on the response.**
+
 ## frontend/src/components/settings/ModelPillRow.tsx
 
 **Added 2026-08-27, same pass, same reason.** Measured **4 commits / 3 phases / 141 lines** — fires
@@ -9356,7 +9455,9 @@ cells rot within days.
 | [`backend/app/services/connectors/grants.py`](docs/HOT-FILE-LEDGER.md#backendappservicesconnectorsgrantspy) | 1 / 1 / 92 | no (1 phase) | ⚠ absent — row added 221. It is THE grant-time gate: 92 L deciding every connector call |
 | [`frontend/src/components/settings/connectionsCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectionscopyts) | 15 / 8 / 784 | ⚠ **FIRES** | no seam proposed — a vocabulary doing one thing many times is the right shape. ⚠ row was STALE at `13 / 7 / 737`. honoured by construction (**239-03**): one word, one union member. See §239-03 |
 | [`frontend/src/components/settings/connectionFormCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectionformcopyts) | 19 / 8 / 1631 | ⚠ **FIRES** | ⚠ row STALE TWICE (`15 / 8 / 1216`, `17 / 8 / 1293`). ⛔ 239-05 named the seam — `configFromDraft`'s ARM SET; 239-07 RODE it: one serializer both arms call. See §239-07 |
-| [`frontend/src/pages/SettingsPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagessettingspagetsx) | 38 / 21 / 1500 | ⚠ **FIRES** | ✅ **the 212-close re-open trigger has now FIRED** (SEED-227 names it) — honoured by construction: one SectionCard added beside Retrieval, no branch touched |
+| [`frontend/src/pages/SettingsPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagessettingspagetsx) | 43 / 22 / 1647 | ⚠ **FIRES** | ⚠ row was STALE at `38 / 21 / 1500`. honoured by construction (**239-10**) — one card MOUNTED, not authored; the tab-registration seam stays OWED |
+| [`frontend/src/components/settings/SourceFileCeilingCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingssourcefileceilingcardtsx) | 1 / 1 / 117 | no (1 phase) | young (239-10) — ⚠ a row minted at creation reads `1 / 1` forever unless RE-DERIVED. Owns no number and no sentence |
+| [`frontend/src/components/settings/sourceCeilingCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingssourceceilingcopyts) | 1 / 1 / 109 | no (1 phase) | young (239-10) — the ONE number it owns (recommendation) is pinned to `user_settings.py` by a `?raw` test; the bounds are SERVED |
 | [`frontend/src/components/settings/ModelPillRow.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsmodelpillrowtsx) | 4 / 3 / 141 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent for its entire life — row added 2026-08-27 at 212's close, same D-22 pair as `SettingsPage.tsx` |
 | [`frontend/src/components/settings/servicesCatalog.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsservicescatalogts) | 2 / 1 / 211 | no (1 phase) | young (212) — the presentation lookup migration 127's `service_id` COMMENT names |
 | [`frontend/src/components/settings/catalogCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingscatalogcopyts) | 1 / 1 / 22 | no (1 phase) | young (212) |
@@ -9404,6 +9505,7 @@ cells rot within days.
 | [`frontend/src/lib/api/knowledge.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiknowledgets) | 2 / 2 / 803 | no (2 phases) | young (207 split, 214) — ⚠ **NOT covered by `lib/api.ts`'s row: that row is the BARREL** |
 | [`frontend/src/lib/api/threads.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapithreadsts) | 7 / 3 / 1683 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | young (207 split, 214) — ⚠ **NOT covered by `lib/api.ts`'s row: that row is the BARREL** |
 | [`frontend/src/lib/api/connectors.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiconnectorsts) | 16 / 10 / 718 | ⚠ **FIRES** | honoured by construction (**233**) — two functions over one shared `postPreview` helper. **`lib/api.ts`'s row is the BARREL, not this module** |
+| [`frontend/src/lib/api/skills.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiskillsts) | 4 / 2 / 715 | no (2 phases) | ⚠ **absent for its ENTIRE LIFE — row added 239-10**, the fifth 207-split module found with none. Holds `FullAppSettings`, not skills. **`lib/api.ts`'s row is the BARREL** |
 | [`frontend/src/lib/api/workflows.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiworkflowsts) | 4 / 4 / 1081 | ⚠ **FIRES** | ⚠ absent until 214; the 207 split created it with NO row. **`lib/api.ts`'s row is the BARREL, not these modules.** 214.1: docblock only, zero behaviour |
 | [`frontend/src/lib/connectionMark.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclibconnectionmarktsx) | 7 / 4 / 313 | ⚠ **FIRES** | ✅ **the move IS the seam, and it was TAKEN (214-08)** — `settings/` → `lib/`; four run + canvas surfaces now import ONE map |
 | [`frontend/src/components/ingestion/DocumentList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestiondocumentlisttsx) | 24 / 13 / 294 | ⚠ **FIRES** | ✅ **seam TAKEN (217.1-05)** — `DocumentRow.tsx` extracted with the sketch's five affordances (−315 L). ⚠ 7-column order still load-bearing: `LibraryPage` sheds cols 3–5 by `nth-child` |
