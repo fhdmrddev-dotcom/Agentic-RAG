@@ -35,6 +35,9 @@ import {
 import { ReembedConfirmModal } from "@/components/settings/ReembedConfirmModal"
 import { ReembedStatusCard } from "@/components/settings/ReembedStatusCard"
 import { EngineHealthCard } from "@/components/settings/EngineHealthCard"
+// SEED-258 — the source file ceiling. The card owns the copy; this page owns the wire.
+import { SourceFileCeilingCard } from "@/components/settings/SourceFileCeilingCard"
+import { SOURCE_CEILING_RECOMMENDED_MB } from "@/components/settings/sourceCeilingCopy"
 import { JudgeModelPicker } from "@/components/settings/JudgeModelPicker"
 // Phase 167 (VIS-02 / D-167-04 / SEED-116) — the per-user default-model picker. Lives
 // in the personal-preferences home (this Settings surface, NOT the operator Control Room):
@@ -635,6 +638,16 @@ export function SettingsPage() {
   // SEED-226 — empty means "use the active chat model". It is NOT a missing value.
   const [visionModel, setVisionModel] = useState("")
   const [visionMaxPages, setVisionMaxPages] = useState(50)
+  // SEED-258 — the source file ceiling, plus the bounds the SERVER states.
+  //
+  // ⛔ THE BOUNDS START `null`, AND THE `null` IS THE POINT. Seeding them with 1 and 50
+  // would put a private copy of the ceiling in this file — the fourth one, after the three
+  // 239-09 deleted from google_drive.py, microsoft_graph.py and mcp_source.py. There is no
+  // honest cold value for a bound we have not been told, so the card mounts only once the
+  // response carries them (it always does; `loading` gates this whole page on that fetch).
+  const [sourceMaxFileSizeMb, setSourceMaxFileSizeMb] = useState(SOURCE_CEILING_RECOMMENDED_MB)
+  const [sourceCeilingFloor, setSourceCeilingFloor] = useState<number | null>(null)
+  const [sourceCeilingMax, setSourceCeilingMax] = useState<number | null>(null)
   const [retrievalTopK, setRetrievalTopK] = useState(5)
   const [retrievalThreshold, setRetrievalThreshold] = useState(0.3)
   const [hybridEnabled, setHybridEnabled] = useState(true)
@@ -709,6 +722,14 @@ export function SettingsPage() {
     setMaxVisionCalls(data.multimodal_max_vision_calls)
     setVisionModel(data.vision_model ?? "")
     setVisionMaxPages(data.vision_max_pages ?? 50)
+    // SEED-258. ⚠ HI-02: the STORED value is always rendered. `??` covers only a backend
+    // that predates the field entirely — never a stored value, which would make "open the
+    // page and press Save" a silent wipe. Migration 174 being authored-but-not-applied is
+    // NOT that case: the column is absent, `_val()` returns the default, and the server
+    // still sends 25.
+    setSourceMaxFileSizeMb(data.source_max_file_size_mb ?? SOURCE_CEILING_RECOMMENDED_MB)
+    setSourceCeilingFloor(data.source_max_file_size_mb_floor ?? null)
+    setSourceCeilingMax(data.source_max_file_size_mb_ceiling ?? null)
     setRetrievalTopK(data.retrieval_top_k)
     setRetrievalThreshold(data.retrieval_match_threshold)
     setHybridEnabled(data.hybrid_search_enabled)
@@ -868,6 +889,11 @@ export function SettingsPage() {
         web_search_max_results: webSearchMaxResults,
         web_search_enabled: webSearchEnabled,
         sandbox_enabled: sandboxEnabled,
+        // SEED-258. ⛔ Sent RAW — no clamp, no min/max correction. The API is the boundary
+        // and its 400 carries the one sentence that says what raising the ceiling costs;
+        // `updateSettings` rethrows that detail and the banner above renders it verbatim.
+        // Silently fixing the number here would hide a refusal the operator should read.
+        source_max_file_size_mb: sourceMaxFileSizeMb,
       }
       const updated = await updateSettings(body)
       hydrate(updated)
@@ -1536,6 +1562,42 @@ export function SettingsPage() {
                   <Toggle checked={sandboxEnabled} onChange={setSandboxEnabled} label={sandboxEnabled ? "On" : "Off"} />
                 </FieldRow>
               </SectionCard>
+
+              {/* ── SEED-258 — the source file ceiling ────────────────────────────────────
+                  ⚠ WHY THIS TAB AND NOT ANOTHER, because the seed insists a knob's HOME is
+                  a recorded decision rather than a placement:
+
+                  · SCOPE. It writes `app_settings`, the global operator singleton, and
+                    GET/PUT /settings both carry `require_visible("model_management")` —
+                    the same gate that already decides whether this tab exists at all. The
+                    knob is operator-scope BY CONSTRUCTION here, not by a check bolted on.
+                  · SUBJECT. This tab is already where the app's dealings with outside
+                    services live (Tavily, the sandbox). "How large a file we will accept
+                    from a server we do not control" is that family.
+                  · PRECEDENT. `multimodal_max_vision_calls` — SEED-227, the other bounded
+                    `app_settings` number — is a card on this page, and SEED-258 names it
+                    as the shape to follow rather than invent.
+
+                  ⛔ NOT `ConnectionsPage`, though connected sources live there: that page
+                  is UNGOVERNED BY DESIGN ("a connection is a per-user asset, like a
+                  thread") and deliberately calls neither settings endpoint. A global DoS
+                  guard on a per-user page is the `user_settings` mistake wearing a
+                  different hat — SEED-258: *"A DoS guard a user can raise for themselves
+                  is not a guard."*
+
+                  ⛔ NOT the Control Room: it reads settings but writes config only through
+                  `setFlag`, so this would have been a second write path to one singleton.
+
+                  The bounds guard is not defensive noise — it is the `null` from the state
+                  block above, which exists so this file owns no copy of the ceiling. */}
+              {sourceCeilingFloor !== null && sourceCeilingMax !== null && (
+                <SourceFileCeilingCard
+                  value={sourceMaxFileSizeMb}
+                  floor={sourceCeilingFloor}
+                  ceiling={sourceCeilingMax}
+                  onChange={setSourceMaxFileSizeMb}
+                />
+              )}
 
               {/* Save Integrations button */}
               <div className="flex justify-end">

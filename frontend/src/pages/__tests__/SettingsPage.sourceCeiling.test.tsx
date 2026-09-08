@@ -120,6 +120,12 @@ async function openIntegrations() {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  // ⚠ MEASURED, NOT PRECAUTIONARY. `handleTabChange` persists the selection
+  // (`localStorage.setItem("settings_active_tab", …)`, SettingsPage.tsx:590), and jsdom
+  // keeps localStorage for the whole file — so the case AFTER any case that opens a tab
+  // mounts already on it. That is real product behaviour, not leakage; without this line
+  // a later case reads a page state an earlier case chose.
+  localStorage.clear()
   mockGetSettings.mockResolvedValue(mkSettings())
   mockUpdateSettings.mockResolvedValue(mkSettings())
   mockGetReembedProgress.mockResolvedValue(null)
@@ -147,14 +153,32 @@ describe("SettingsPage — the source ceiling has ONE home, and it is Integratio
       .toBeInTheDocument()
   })
 
-  it("is NOT also on the AI Model tab — one home, never split across two", async () => {
-    // The brief: "Pick one, state the reason, and do not split it across both." A control
-    // that appeared in two places would be two homes for one setting.
+  it("appears EXACTLY ONCE, inside the Integrations panel — one home, never two", async () => {
+    /**
+     * The brief: *"Pick one, state the reason, and do not split it across both."*
+     *
+     * ⚠ THIS CASE ORIGINALLY ASSERTED "absent from the AI Model tab" AND ITS PREMISE WAS
+     * FALSE — recorded rather than quietly rewritten, because the premise is the finding.
+     * It assumed the page opens on tab 0, but `handleTabChange` persists the selection to
+     * localStorage, so after any earlier case opened Integrations this one mounted there
+     * too. It failed loudly instead of passing vacuously, which is the only reason the
+     * behaviour was noticed at all.
+     *
+     * The rewrite asserts the property that was actually wanted and is stronger than the
+     * original: ONE occurrence in the whole page, and it sits in the Integrations panel.
+     * "Absent from tab 0" would still have permitted a second copy on tab 1.
+     */
     renderSettings()
-    await screen.findByRole("tab", { name: /integrations/i })
+    await openIntegrations()
 
-    // The page opens on tab 0 (AI Model); Radix has not mounted the Integrations panel.
-    expect(screen.queryByText(/largest file a connected source may import/i)).toBeNull()
+    const hits = await screen.findAllByText(/largest file a connected source may import/i)
+    expect(hits).toHaveLength(1)
+
+    const panel = hits[0].closest('[role="tabpanel"]')
+    expect(panel).not.toBeNull()
+    // The panel is the one the Integrations tab labels — not merely "a" panel.
+    const integrationsTab = screen.getByRole("tab", { name: /integrations/i })
+    expect(panel).toHaveAttribute("aria-labelledby", integrationsTab.id)
   })
 
   it("hydrates the STORED value, not a default", async () => {
