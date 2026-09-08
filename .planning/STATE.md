@@ -96,10 +96,20 @@ sync rule is followed by nobody, waves 1 and 2 included.
    G-7 (a new input is a phase, not a closure round), and it was not in the backend round's brief
    either. **Until it ships, no MCP source can be pointed at a real folder through the product**,
    which independently blocks SC#2.
-3. ⚠ **A product limit needing an operator decision:** `mcp_client.MAX_MCP_BODY_BYTES` is 2 MB on the
-   whole response and base64 inflates 4/3, so **an MCP file source cannot import a file over ~1.5 MB**.
-   TM-239-03's 25 MB ceiling can never fire. Not a defect — a limit that will surface as a UAT
-   surprise rather than a legible error.
+3. ✅ **RESOLVED 2026-09-08 by operator decision (`526759c58`).** `mcp_client.MAX_MCP_BODY_BYTES` was
+   2 MB on the whole response with base64 inflating 4/3, so an MCP file source could not import a file
+   over **~1.5 MB** and TM-239-03's 25 MB ceiling could never fire. **Raised to 34 MB** (25 MB × 4/3 +
+   envelope headroom); MCP now matches `google_drive.py` and `microsoft_graph.py`.
+   ⭐ **The durable part is not the number.** Both constants were INDIVIDUALLY DEFENSIBLE — 2 MB is a
+   sane DoS guard on an untrusted server, 25 MB is the app's upload ceiling. **What was wrong was the
+   RELATION, and a relation has no home in a file of constants.** They are now pinned in relation by
+   `test_239_body_cap_admits_the_file_ceiling.py`, driven RED first, so raising the file ceiling forces
+   the envelope up and nothing licenses raising the envelope alone.
+   ⚠ The old docstring ended *"somebody raising the client's cap must find this note"* — somebody did.
+   It is struck through, not deleted, because the note working IS the finding.
+   → **`SEED-258`** carries the follow-on the operator asked for: these ceilings belong in Settings with
+   their reason and a recommendation, bounded server-side, ONE knob with the envelope derived. Not built
+   here — G-7 forbids a closure round adding user-facing capability.
 Prior: 237 — One Rule Engine, Not Two (✅ CLOSED 2026-09-06)
 Prior: 236 — The Corpus Under Attack (✅ FULLY CLOSED — GA GATE MET 2026-09-06)
 Prior: 235 — The Source Says What It Did (✅ CLOSED 2026-09-06)
