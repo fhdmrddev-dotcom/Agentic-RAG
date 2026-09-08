@@ -770,6 +770,24 @@ export function configFromDraft(draft: ConnectionDraft): ConnectorConnectionConf
     // `oauth_client_secret_ciphertext` (migration 150). That is also what makes Connect
     // work a second time: nothing used to persist it, so reopening a saved connection and
     // pressing Connect asked for the id and secret again.
+
+    // ⚠ PHASE 239 GAP-CLOSURE (HI-02) — THE BINDING IS CARRIED HERE TOO, AND THE REASON IS
+    // THAT THIS ARM SEES MCP ROWS. `store_oauth_tokens` sets `auth_type = "oauth_byo"` after
+    // an MCP OAuth round trip, and `draftFromConnection` maps that to `capability: "oauth"`
+    // ABOVE its `mcp_server_url` test — so an MCP server connected by OAuth arrives here,
+    // not on the `mcp` arm forty lines up. `update_connection` replaces `config` WHOLE, so
+    // omitting the key DELETED a working file source on a rename, with a 200 and no receipt.
+    // That is the identical class as this module's `sourceToolsFromDraft` note, on the arm
+    // it did not fix.
+    //
+    // ⛔ CONDITIONAL, NEVER UNCONDITIONAL. A first-party Google/Microsoft `oauth_byo` row has
+    // no binding, and `sourceToolsFromDraft` returns `undefined` for it — which matters
+    // because `OAuthConnectionConfig` is `extra="forbid"` and declares no `source_tools`, so
+    // an always-present key would 422 every non-MCP OAuth connection in the org. A row that
+    // IS bound composes `{custom_client_id?, source_tools}`, whose key set `McpConfig`
+    // accepts — the same union member the `mcp` arm targets.
+    const sourceTools = sourceToolsFromDraft(draft)
+    if (sourceTools) oauthConfig.source_tools = sourceTools
     return oauthConfig
   }
 
