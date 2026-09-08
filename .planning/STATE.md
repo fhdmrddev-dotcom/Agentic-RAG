@@ -1425,6 +1425,26 @@ Cleared at the v4.0 start. The v3.9 overrides (including the Phase 225 `AGENTS.m
 reassignment) are preserved verbatim in `.planning/milestones/v3.9-STATE-at-close.md` →
 *Guardrail overrides*. Record every new override here, per the CLAUDE.md orchestrator protocol.
 
+### OV-SOLO-01 — 2026-09-08/09 run SOLO, no agent reviewer at all (operator)
+
+**The rule set aside:** `AGENTS.md` §3 / §6.3 — the two-agent separation itself. Gemini's Kota quota
+is exhausted, so for **2026-09-08 and 2026-09-09** the bus is parked and claude works alone.
+
+**Consequence, stated rather than discovered later:** every phase built in this window has **no
+independent reviewer**. `/code-review ultra` is operator-only and unaffordable; a code-review subagent
+that claude dispatches is claude's own work checking itself. ⚠ **That is weaker and must be labelled
+as such in any verdict it produces** — though it is not worthless: on Phase 239 exactly that
+arrangement returned **19 findings including 2 Criticals**, one of which (a destructive tool bindable
+as the file *reader*, then called by the watch loop on every file, unattended) would otherwise have
+shipped.
+
+**What does NOT lapse:** decisions still go to the operator, never self-settled. Baselines are still
+captured before source work. RED-first still holds. The mechanical gates — backend ceiling, count
+gate, ledger, CLAUDE.md size — are unaffected by who is at the keyboard and remain the honest floor.
+
+**Re-arm trigger:** Gemini's quota returns, or 2026-09-10, whichever is first. ⚠ `BUS-171`'s
+operator-queue triage is **parked, not dropped**.
+
 ### OV-239-01 — Phase 239 runs with NO agent reviewer (operator, 2026-09-07)
 
 **The rule set aside:** `AGENTS.md` §6.3 (whoever builds does not verify) together with §3.1's
