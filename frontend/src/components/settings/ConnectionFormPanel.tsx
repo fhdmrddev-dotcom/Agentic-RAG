@@ -186,6 +186,8 @@ import {
   SOURCE_TOOLS_LIST_LABEL,
   SOURCE_TOOLS_READ_LABEL,
   sourceToolUnsetLabel,
+  sourceToolsWithheldNote,
+  looksLikeSourceToolMutation,
   configFromDraft,
   draftIsSavable,
   destinationFooterOf,
@@ -1686,8 +1688,16 @@ export function ConnectionFormPanel({
              which would then try to call a tool over a server URL that does not exist.
 
              ⚠ The options are the SERVER'S OWN NAMES (TM-239-05, client half). Nothing here
-             invents a name; a value not in `probeResult` cannot be selected, and the backend
-             refuses one anyway (`reject_unoffered_source_tools`).
+             invents a name.
+
+             ⛔ …BUT NOT ALL OF THEM, AND THE COMMENT THAT USED TO SIT HERE WAS WRONG. It said
+             "the backend refuses one anyway (`reject_unoffered_source_tools`)" — that function
+             checks only that the name is one the server OFFERED, never that it is safe, so
+             `delete_file` was selectable under the label *"File content tool"* and the watch
+             loop would have called it on every file, unattended, on every cycle (review
+             CR-01). `sourceToolOptions` withholds names that say they CHANGE something, and
+             says how many it withheld. The boundary refusal is the server's half; not
+             PROPOSING a destructive tool as a reader is this one's.
 
              ⚠ NOT a `connection-field` — see `SOURCE_TOOLS_HEADING`'s note in the copy
              module. §3b counts destination fields, and this is a binding editor. */}
@@ -1700,6 +1710,18 @@ export function ConnectionFormPanel({
             <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
               {SOURCE_TOOLS_HELP}
             </p>
+            {/* ⚠ ABSENT WHEN NOTHING WAS WITHHELD, never a zero-count sentence. The count is
+                over the DISCOVERED list, so it is the same on both slots and is said once. */}
+            {probeResult.filter((t) => looksLikeSourceToolMutation(t.name)).length > 0 && (
+              <p
+                data-testid="connection-source-tools-withheld"
+                className="mt-1.5 text-[11px] leading-snug text-muted-foreground"
+              >
+                {sourceToolsWithheldNote(
+                  probeResult.filter((t) => looksLikeSourceToolMutation(t.name)).length,
+                )}
+              </p>
+            )}
             {(
               [
                 {
@@ -1717,6 +1739,16 @@ export function ConnectionFormPanel({
               ]
             ).map(({ label, slot, value, fallback }) => {
               const controlId = `${fieldId}-source-${slot}`
+              // ⛔ THE STORED VALUE IS ALWAYS OFFERED, EVEN WHEN IT WOULD BE WITHHELD, and
+              // that is not a loophole — it is what stops the filter becoming a WIPE. A
+              // `<select>` whose value is absent from its options renders as unselected, so
+              // merely OPENING this panel and pressing Save would silently re-point a stored
+              // binding: HI-02's defect, re-introduced by HI-02's neighbour's remedy. A person
+              // sees what is actually bound and can change it; refusing to STORE it is the
+              // boundary's job, where a refusal can be worded.
+              const options = probeResult
+                .map((tool) => tool.name)
+                .filter((name) => !looksLikeSourceToolMutation(name) || name === value)
               return (
                 <div key={slot} className="mt-2.5">
                   <label
@@ -1749,9 +1781,9 @@ export function ConnectionFormPanel({
                       className="w-full rounded-md border border-border bg-card px-2 py-1.5 text-[13px] text-foreground focus:border-primary focus:outline-none"
                     >
                       <option value="">{sourceToolUnsetLabel(fallback)}</option>
-                      {probeResult.map((tool) => (
-                        <option key={tool.name} value={tool.name}>
-                          {tool.name}
+                      {options.map((name) => (
+                        <option key={name} value={name}>
+                          {name}
                         </option>
                       ))}
                     </select>
