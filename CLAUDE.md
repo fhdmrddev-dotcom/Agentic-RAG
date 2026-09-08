@@ -640,9 +640,9 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/panel/FilesSection.tsx` | 8 / 5 / 334 | honoured by construction (195) |
 | `frontend/src/lib/api.ts` | 187 / 110 / 422 | ✅ **SPLIT TAKEN (207)** |
 | `frontend/src/types/index.ts` | 78 / 60 / 1331 | no seam proposed |
-| `backend/app/main.py` | 79 / 45 / 876 | honoured by construction (204 / **230**) |
+| `backend/app/main.py` | 82 / 59 / 950 | ⚠ row was STALE by **FOURTEEN PHASES**. honoured by construction (**BUG-260902-06**) |
 | `backend/app/config.py` | 82 / 47 / 1489 | ⚠ row was STALE by **TEN PHASES** at `78 / 37 / 1428`. honoured by con |
-| `backend/app/api/admin.py` | 32 / 12 / 1733 | ⚠ absent at 12 phases (added 196) |
+| `backend/app/api/admin.py` | 33 / 13 / 1740 | ⚠ row was STALE. honoured by construction (**BUG-260902-06**): 2 write seams broadcast; the 2 WR-03 READ seams deliberately do not |
 | `backend/app/api/settings.py` | 34 / 18 / 738 | ⚠ row was STALE at `30 / 16 / 639`. honoured by construction (**SEED-258**): the refusal states the COST, not just the range |
 | `backend/app/services/multimodal_service.py` | 14 / 7 / 984 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
 | `backend/app/api/documents.py` | 85 / 33 / 2437 | ✅ **DISCHARGED (229)** |
@@ -682,7 +682,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/sources/__init__.py` | 5 / 3 / 40 | ⚠ **absent while FIRING — row added 239-03.** The ONE eager-import site: an adapter missing from this list is unregistered, so the list is load-bearing |
 | `backend/app/services/mcp_client.py` | 9 / 6 / 526 | ⚠ row STALE TWICE (`4/2/407` reading `no`, then `7/5/480`) — a row present and WRONG stops the audit. **SEED-258: the body cap is DERIVED; no envelope knob exists to disagree** |
 | `backend/app/models/message.py` | 17 / 10 / 124 | ⚠ absent from BOTH for its ENTIRE LIFE at **8 phases** |
-| `backend/app/models/user_settings.py` | 48 / 31 / 1460 | ⚠ row was STALE at `46 / 30 / 1352`. honoured by construction (**SEED-258**): one field + one never-raise accessor on the existing pattern |
+| `backend/app/models/user_settings.py` | 49 / 31 / 1524 | ⚠ row STALE for the THIRD close running. honoured by construction (**BUG-260902-06**): two broadcast_* verbs beside refresh/invalidate; no reader signature changed |
 | `backend/app/services/harness/reachability.py` | 4 / 4 / 463 | ⚠ absent from BOTH for its ENTIRE LIFE at **4 phases** |
 | `backend/app/services/workflow_kickoff.py` | 8 / 6 / 554 | ⚠ absent for its ENTIRE LIFE at **6 phases** |
 | `frontend/src/components/workflows/WorkflowScheduleModal.tsx` | 3 / 3 / 601 | ⚠ absent for its entire life; it crossed the threshold in 214-09 on a  |

@@ -9385,9 +9385,9 @@ cells rot within days.
 | [`frontend/src/components/panel/FilesSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelfilessectiontsx) | 8 / 5 / 334 | **FIRES** | honoured by construction (195) |
 | [`frontend/src/lib/api.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapits) | 187 / 110 / 422 | ⚠ **FIRES** | ✅ **SPLIT TAKEN (207)** — this path is the re-export BARREL. ⚠ **its 12 domain MODULES had no rows of their own until 214** |
 | [`frontend/src/types/index.ts`](docs/HOT-FILE-LEDGER.md#frontendsrctypesindexts) | 78 / 60 / 1331 | ⚠ **FIRES** | no seam proposed — a barrel of wire types; ⚠ absent until 196, at 56 phases (214) |
-| [`backend/app/main.py`](docs/HOT-FILE-LEDGER.md#backendappmainpy) | 79 / 45 / 876 | ⚠ **FIRES** | honoured by construction (204 / **230**) — lifespan queue daemon start/stop added beside scheduler |
+| [`backend/app/main.py`](docs/HOT-FILE-LEDGER.md#backendappmainpy) | 82 / 59 / 950 | ⚠ **FIRES** | ⚠ row was STALE by **FOURTEEN PHASES** at `79 / 45 / 876`. honoured by construction (**BUG-260902-06**): one more start/stop pair beside the scheduler |
 | [`backend/app/config.py`](docs/HOT-FILE-LEDGER.md#backendappconfigpy) | 82 / 47 / 1489 | ⚠ **FIRES** | ⚠ row was STALE by **TEN PHASES** at `78 / 37 / 1428`. honoured by construction (230 / **235**) — 4 watch/health knobs; MODEL_CAPABILITIES-out seam stays OWED |
-| [`backend/app/api/admin.py`](docs/HOT-FILE-LEDGER.md#backendappapiadminpy) | 32 / 12 / 1733 | ⚠ **FIRES** | ⚠ absent at 12 phases (added 196) |
+| [`backend/app/api/admin.py`](docs/HOT-FILE-LEDGER.md#backendappapiadminpy) | 33 / 13 / 1740 | ⚠ **FIRES** | ⚠ row was STALE at `32 / 12 / 1733`. honoured by construction (**BUG-260902-06**): two write seams swap invalidate for broadcast; the two WR-03 READ seams deliberately unchanged |
 | [`backend/app/api/settings.py`](docs/HOT-FILE-LEDGER.md#backendappapisettingspy) | 34 / 18 / 738 | ⚠ **FIRES** | ⚠ row was STALE at `30 / 16 / 639`. honoured by construction (**SEED-258**): the same four seams SEED-227 used; the refusal states the COST, not just the range |
 | [`backend/app/services/multimodal_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmultimodal_servicepy) | 14 / 7 / 984 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** — row added SEED-227, which is also where its silent truncation was found |
 | [`backend/app/api/documents.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentspy) | 85 / 33 / 2437 | ⚠ **FIRES** | ✅ **DISCHARGED (229)** — ingest_splice.py extracted. ⚠ row was STALE at `75 / 32 / 2408`; 235 removed 44 L, adding nothing |
@@ -9479,7 +9479,8 @@ cells rot within days.
 | [`frontend/src/components/settings/grantsVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsgrantsvocabularyts) | 3 / 2 / 115 | no (2 phases) | ⚠ absent for its entire life — row added 221-02. There is deliberately NO `READY` string in it |
 | [`backend/app/services/connector_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesconnector_servicepy) | 25 / 9 / 1772 | ⚠ **FIRES** | honoured by construction (**239-06**): the write boundary knows a mapping KEY from a tool name by ALLOW-LIST — an unknown key is still read as a tool name and still refused |
 | [`backend/app/models/message.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsmessagepy) | 17 / 10 / 124 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **8 phases** — row added 214; honoured by construction (214-16) |
-| [`backend/app/models/user_settings.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsuser_settingspy) | 48 / 31 / 1460 | ⚠ **FIRES** | ⚠ row was STALE at `46 / 30 / 1352`. honoured by construction (**SEED-258**): one field + one never-raise accessor on the `tool_args_progress_emit_boundary_bytes()` pattern |
+| [`backend/app/models/user_settings.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsuser_settingspy) | 49 / 31 / 1524 | ⚠ **FIRES** | ⚠ row STALE for the THIRD close running. honoured by construction (**BUG-260902-06**): two broadcast_* verbs beside the existing refresh/invalidate pair — no reader signature changed |
+| [`backend/app/services/settings_broadcast.py`](docs/HOT-FILE-LEDGER.md#backendappservicessettings_broadcastpy) | 1 / 1 / 228 | no (1 phase) | young (**BUG-260902-06**) — the cross-worker cache-invalidation leaf: one channel, one payload builder, one re-warm dispatcher, one subscriber |
 | [`backend/app/services/connectors/args.py`](docs/HOT-FILE-LEDGER.md#backendappservicesconnectorsargspy) | 2 / 1 / 474 | no (1 phase) | young (214-01) — the shared argument leaf: resolution, satisfiability, and ONE schema accessor |
 | [`backend/app/services/harness/reachability.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessreachabilitypy) | 4 / 4 / 463 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **4 phases** — row added 214; it is the home of this phase's safety-gate predicate |
 | [`backend/app/services/workflow_kickoff.py`](docs/HOT-FILE-LEDGER.md#backendappservicesworkflow_kickoffpy) | 8 / 6 / 554 | ⚠ **FIRES** | ⚠ absent for its ENTIRE LIFE at **6 phases** — and 214-16 records that this invisibility is WHY the `ctx.inputs` mirror went unowned |
@@ -9777,3 +9778,83 @@ that is currently accurate is not a mechanism.**
 ⛔ **The 302 dance is untouched and still sealed in here:** never `/content`, two egress keys, and
 **no `Authorization` header on the pre-authenticated download URL**. SEED-258 changed a number's
 home and nothing about this file's egress posture.
+
+---
+
+## backend/app/services/settings_broadcast.py — `239-11` (BUG-260902-06)
+
+**Triple at this close (2026-09-09): `1 / 1 / 228` — G-5: no (1 phase).** New file. The
+cross-worker cache-invalidation leaf.
+
+**Why it is a new file rather than more `user_settings.py`.** That file already **FIRES G-5 at 31
+phases** and its row has now been stale at three consecutive closes. The invalidation mechanism —
+channel constant, payload builder, re-warm dispatcher, subscriber task — is a self-contained
+concern with no reader on the hot path, so it takes the leaf. `user_settings.py` gained only two
+short verbs (`broadcast_settings_change`, `broadcast_model_overrides_change`) that sit **beside**
+the existing `refresh_settings_cache` / `invalidate_*` pair and change **no** reader signature.
+
+**The binding invariants, in the order they are easiest to break:**
+
+1. ⛔ **RE-WARM, NEVER MERELY INVALIDATE.** `invalidate_settings_cache()` says in its own
+   docstring that it is *"only half a contract"*: it expires the timestamp the **async** reader
+   checks and deliberately does **not** clear `_settings_cache`, because the **sync** reader
+   `load_app_settings()` never checks a timestamp and would otherwise degrade to Pydantic
+   DEFAULTS for every column. A subscriber that invalidated only would leave the non-writing
+   worker serving the pre-write row indefinitely — the exact Phase 184 UAT failure that created
+   `refresh_settings_cache()` in the first place. **Driven RED**: replacing the re-warm with
+   `invalidate_settings_cache()` fails both the unit fence and the cross-process test.
+2. ⛔ **`load_app_settings()` STAYS SYNC AND DOES NO I/O.** It cannot await Redis. That constraint
+   is *why* this is push-based rather than a shared cache. Nothing here touches its signature.
+3. ⛔ **BOTH model-override caches, not one.** `_model_overrides_cache` (enabled-only, hot path)
+   and `_all_model_overrides_cache` (all rows, registry editor) have the identical defect;
+   repairing one is the named failure mode of this bug.
+4. ⛔ **FAIL SOFT EVERYWHERE.** `publish_cache_invalidation` returns `0` and never raises; the
+   subscriber loop reconnects forever and never propagates; `apply_cache_invalidation` swallows.
+   With Redis down the system is byte-for-byte today's 30 s TTL behaviour.
+5. **`origin_pid` is DIAGNOSTIC ONLY.** It is deliberately **not** filtered on — pids are reused
+   across container restarts, so a collision would silently drop a real invalidation, whereas the
+   re-warm is idempotent and one redundant re-read is the cheaper failure.
+
+**The named seam, if this ever grows.** A second channel. It has ONE channel on purpose so the
+subscriber count stays at one per worker and a new scope needs no lifespan change; the moment a
+scope needs different delivery semantics (ordering, replay, at-least-once), that is a Redis
+**Stream**, not a second pub/sub channel — pub/sub has no durability and a missed message here is
+survivable only because the TTL is the floor.
+
+## backend/app/main.py — `239-11` (BUG-260902-06)
+
+**Triple re-derived at this close (2026-09-09): `82 / 59 / 950`.** ⚠ **The row was STALE by
+FOURTEEN PHASES** at `79 / 45 / 876` — a row that is present and wrong answers the auditor and
+stops the audit, which is this ledger's own recurring finding, paid again.
+
+**Honoured by construction.** One more start/stop pair in the lifespan, in the shape the four
+services above it already use: constructed after `_watch_service`, `start()` returns immediately,
+parked on `app_instance.state.settings_cache_subscriber`, stopped as the first step after `yield`.
+It is **deliberately unconditional** (no kill switch, unlike the scheduler/queue/watch trio): a box
+with no Redis already degrades to the pre-existing TTL, so a flag would only add a way to turn the
+fix off silently. Skipped in `_setup_mode` like everything else there.
+
+⚠ **A FENCE OVER THIS FILE FAILED TO FIRE AND WAS STRENGTHENED IN THE SAME PHASE.** The first
+version asserted `"SettingsCacheSubscriber" in src`; planting the real defect — the constructor
+replaced by `None` — left it **green**, because the `import` line satisfied the substring. It now
+asserts the CONSTRUCTION, the `.start()` after it, the `app.state` parking and the `.stop()` after
+`yield`. **Presence assertions cannot see content drift** — the project already knew this and it
+cost a plant to re-learn.
+
+## backend/app/api/admin.py — `239-11` (BUG-260902-06)
+
+**Triple re-derived at this close (2026-09-09): `33 / 13 / 1740`** (row was stale at
+`32 / 12 / 1733`).
+
+**Honoured by construction.** Two call sites swap `invalidate_model_overrides_cache()` for
+`await broadcast_model_overrides_change()` — the model **add** path (`model.added`) and the
+capability/enabled **set** path (`model.capability.set`). Those are the only two writers to
+`model_capabilities_overrides` in the codebase.
+
+⛔ **THE TWO OTHER `invalidate_*` CALLS IN THIS FILE ARE DELIBERATELY UNCHANGED, and that
+distinction is load-bearing.** `admin.py`'s disable-guard (`invalidate_settings_cache()` +
+`_load_settings_from_db()`) and its lock-guard (`invalidate_model_overrides_cache()` +
+`load_all_model_overrides()`) are **WR-03 READ-freshness** forcing, not writes — they exist so a
+guard cannot pass on a stale cache. Broadcasting there would make every worker re-read the DB
+because one worker wanted to check something. A future edit that "makes them consistent" with the
+write seams would be a regression, not a tidy-up.
