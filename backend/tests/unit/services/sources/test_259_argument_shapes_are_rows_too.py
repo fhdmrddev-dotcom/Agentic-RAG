@@ -366,10 +366,20 @@ class TestARefusalIsNeverAnEmptyListing:
         self, adapter, patch_mcp
     ):
         """⚠ The cache is what the pre-flight has; the probe has the truth. A row whose cache
-        says one argument while the server now requires three must fail the PROBE."""
+        says one argument while the server now requires three must fail the PROBE.
+
+        ⚠ BOTH ROLES ARE BOUND HERE ON PURPOSE. Leaving `read_tool` at its default made this
+        test fail on the FIRST draft — against the pre-existing "this server does not offer
+        `read_file`" arm, which fired correctly and first. Recorded rather than quietly fixed:
+        the earlier check is the more specific one and must keep winning."""
         patch_mcp(ArgRecorder(tools=[READER_NEEDING_THREE]))
         connection = conn(
-            config={"source_tools": {"list_tool": "get_file_contents"}},
+            config={
+                "source_tools": {
+                    "list_tool": "get_file_contents",
+                    "read_tool": "get_file_contents",
+                }
+            },
             discovered_tools=[
                 tool("get_file_contents", params=("path",), required=("path",))
             ],

@@ -447,15 +447,38 @@ def reject_unoffered_source_tools(
 
     Raises ``ValueError`` — mapped to a 422 by the router, per the WR-02 convention.
     """
-    from app.services.sources.adapters.mcp_source import looks_like_a_mutation
+    from app.services.sources.adapters.mcp_source import (
+        PATH_ARG_KEY,
+        STATIC_ARG_PREFIX,
+        looks_like_a_mutation,
+    )
+
+    def _names_a_tool(key: Any) -> bool:
+        """⛔ AN ALLOW-LIST OF THE KEYS THAT ARE *NOT* TOOL NAMES — never a deny-list.
+
+        Every other key in this dict is treated as naming a tool and is checked, so a key
+        nobody declared (`{"sneaky": "delete_file"}`) still falls through to both checks
+        below. Written the other way round — *"check the keys I recognise"* — this function
+        would wave through anything wearing an unfamiliar name, which is precisely the door
+        its own docstring calls *"the door a hand-crafted PATCH comes through"*.
+
+        `root_path` is a PATH on the server. SEED-259's `arg_path` is an ARGUMENT NAME and
+        `arg_static.<name>` is an ARGUMENT VALUE; both reach `params.arguments`, never
+        `params.name`, so neither can invoke anything — asserted in
+        `test_259_argument_shapes_are_rows_too.py`, not merely reasoned about here. A static
+        value that happens to spell a destructive tool is therefore left alone: refusing it
+        would refuse a repository legitimately called `delete-me`.
+        """
+        if not isinstance(key, str):
+            return True
+        return key not in ("root_path", PATH_ARG_KEY) and not key.startswith(STATIC_ARG_PREFIX)
 
     source_tools = config.get("source_tools") if isinstance(config, dict) else None
     if not isinstance(source_tools, dict) or not source_tools:
         return
 
     for key, value in source_tools.items():
-        # `root_path` is a PATH on the server, not a tool name — it names nothing to call.
-        if key == "root_path" or not value:
+        if not _names_a_tool(key) or not value:
             continue
         if looks_like_a_mutation(str(value)):
             raise ValueError(
@@ -472,7 +495,7 @@ def reject_unoffered_source_tools(
         str(t.get("name")) for t in discovered_tools if isinstance(t, dict) and t.get("name")
     }
     for key, value in source_tools.items():
-        if key == "root_path" or not value:
+        if not _names_a_tool(key) or not value:
             continue
         if str(value) not in offered:
             raise ValueError(
