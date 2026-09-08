@@ -21,6 +21,10 @@ import mcpSourceSource from "../../../../../backend/app/services/sources/adapter
 // The CREATE path's own source, for the same reason: the default `service_id` is a literal
 // in a `||` fallback there, and a fixture that does not match it tests a row nobody has.
 import mcpAuthDoorSource from "@/components/settings/McpAuthDoor.tsx?raw"
+// The two Library surfaces HI-01 put a dead control into. Neither has a test suite of its
+// own, so this file is the only place anything executable can say they ask this predicate.
+import createWatchModalSource from "../CreateWatchModal.tsx?raw"
+import connectedSourceSectionSource from "../ConnectedSourceSection.tsx?raw"
 
 const conn = (over: Partial<ConnectorConnection> = {}): ConnectorConnection =>
   ({
@@ -221,6 +225,26 @@ describe("isSourceCapable", () => {
     expect(registered.length).toBeGreaterThanOrEqual(2)
     for (const id of registered) {
       expect(Object.keys(PROTOCOL_SERVICE_IDS)).toContain(id)
+    }
+  })
+
+  it("⚠ BOTH LIBRARY CONSUMERS STILL ROUTE THROUGH THIS PREDICATE, and carry no guess of their own", () => {
+    // ⛔ NEITHER `CreateWatchModal.tsx` NOR `ConnectedSourceSection.tsx` HAS A TEST SUITE —
+    // measured at this gap-closure round, and recorded rather than quietly worked around.
+    // HI-01 put a never-contacted MCP server in the Library's watch picker, and NOTHING on
+    // that surface could have caught it: the only executable statement about it is that it
+    // asks this function. So that is what this case pins, in the file that owns the answer.
+    //
+    // ⚠ IT IS A SOURCE FENCE AND THAT IS A WEAKER THING THAN A RENDER. It cannot see whether
+    // the filtered list reaches the screen. Building the render harness for two untested
+    // components is a phase-sized piece of work, not a closure round (G-7), so it is named as
+    // owed in `239-05-SUMMARY.md` instead of half-done here.
+    for (const source of [createWatchModalSource, connectedSourceSectionSource]) {
+      // NON-VACUITY CONTROL — an empty `?raw` would satisfy the negative assertions below.
+      expect(source.length).toBeGreaterThan(1000)
+      expect(source).toContain("isSourceCapable(c, families)")
+      // The string guess Phase 238 replaced, and the tempting "just widen it" repair.
+      expect(source).not.toMatch(/includes\("google"\)|includes\("workspace"\)|includes\("drive"\)/)
     }
   })
 
