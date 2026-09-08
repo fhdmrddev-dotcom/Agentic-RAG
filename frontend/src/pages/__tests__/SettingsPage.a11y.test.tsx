@@ -85,6 +85,11 @@ function mkSettings(overrides: Partial<FullAppSettings> = {}): FullAppSettings {
     // the API defaulting them away and hiding a field it forgot to build.
     vision_model: "",
     vision_max_pages: 50,
+    // SEED-258 — same rule as the two lines above: the response requires them, so the
+    // fixture states them rather than letting a default hide a field.
+    source_max_file_size_mb: 25,
+    source_max_file_size_mb_floor: 1,
+    source_max_file_size_mb_ceiling: 50,
     retrieval_top_k: 10,
     retrieval_match_threshold: 0.3,
     hybrid_search_enabled: true,

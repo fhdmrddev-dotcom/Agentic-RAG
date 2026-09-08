@@ -94,6 +94,34 @@ the constant and pinned the relation; that is the gap-sized part, and it is done
 
 ---
 
+# ✅ PARTIALLY ANSWERED 2026-09-08 — the FIRST INSTANCE is complete; the CLASS is not
+
+⚠ **`status:` STAYS `planted`, deliberately.** The widening below makes this a class, and one
+knob shipping does not discharge a class. Recorded here rather than left silent, so the next
+reader neither rebuilds this knob nor mistakes it for the whole seed.
+
+| | Where | State |
+|---|---|---|
+| Backend — one `app_settings` knob, bounds server-side, envelope DERIVED, migration 174 | `239-09` | ✅ shipped |
+| Frontend — the control, on screen, with its cost / recommendation / bounds | `239-10` | ✅ shipped |
+| Migration 174 applied to any DB | — | ⛔ **owed — operator pastes it.** Fail-soft until then: the column is absent, `_val()` returns the shipped 25, and the UI renders it correctly |
+| Inventory A — the **16 unreachable settings fields**, incl. the 8-field extraction-engine bank | — | ⛔ **untouched** |
+| Inventory B — a **verdict per hardcoded constant** across the 58 | — | ⛔ **untouched.** One was promoted (`MAX_FILE_BYTES` ×3 + `MAX_MCP_BODY_BYTES`); **57 have no recorded verdict**, which is this seed's own named failure mode |
+
+⭐ **What the first instance establishes as the pattern, so instance #2 is a row and not a
+re-architecture:** the bounds are **SERVED on the read contract** (`*_floor` / `*_ceiling`) so no
+form ever owns a copy; the refusal body carries the **cost sentence**, so the API is both the
+boundary and the explanation; the copy lives in **its own module** with the one advisory number
+**pinned across languages by a `?raw` test**; and the control's **home is a recorded decision**
+(Settings → Integrations, chosen on scope — `app_settings` is operator-scope and that tab is
+already `model_management`-gated; `ConnectionsPage` rejected as ungoverned-by-design, the Control
+Room as a second write path to one singleton).
+
+⚠ **The reachability half was worth more than the number half, exactly as this seed predicted.**
+`239-09` shipped every byte of the backend and its own summary conceded the headline requirement
+was still unmet — *"the seed is not dischargeable until the frontend lands."* **A setting nobody
+can see is the constant again.**
+
 # ⭐ WIDENED 2026-09-08 — operator: this is a CLASS, not a knob
 
 **Operator's words:** *"what I meant by settings is every configuration — this includes also the

@@ -109,6 +109,13 @@ function mkSettings(overrides: Partial<FullAppSettings> = {}): FullAppSettings {
     // the API defaulting them away and hiding a field it forgot to build.
     vision_model: "",
     vision_max_pages: 50,
+    // SEED-258 — the source file ceiling and the bounds the server states. Carried here
+    // for the same reason the two lines above are: a fixture that defaulted them away
+    // would hide a field the API forgot to build. The card's own behaviour is asserted in
+    // `__tests__/SettingsPage.sourceCeiling.test.tsx`, so these are the shipped values.
+    source_max_file_size_mb: 25,
+    source_max_file_size_mb_floor: 1,
+    source_max_file_size_mb_ceiling: 50,
     retrieval_top_k: 10,
     retrieval_match_threshold: 0.3,
     hybrid_search_enabled: true,
