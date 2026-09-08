@@ -7,6 +7,7 @@ conforms to identical protocol invariants and DTO contracts.
 
 import base64
 import json as jsonlib
+from typing import Any, NamedTuple
 from unittest.mock import AsyncMock
 
 import pytest
@@ -14,6 +15,9 @@ import pytest
 from app.security.egress import PinnedResponse
 from app.services.sources.adapters.google_drive import GoogleDriveSourceAdapter
 from app.services.sources.adapters.microsoft_graph import MicrosoftGraphSourceAdapter
+from app.services.sources.adapters.mcp_source import (
+    McpSourceAdapter as _McpSourceAdapterForContract,
+)
 from app.services.sources.adapters.mock_source import MockSourceAdapter
 from app.services.sources.base import (
     BrowsePage,
@@ -550,9 +554,19 @@ class TestMcpSourceAdapterConformance:
 
     @pytest.mark.asyncio
     async def test_browse_root_returns_virtual_roots(self, mcp_adapter: SourceAdapter):
+        from app.services.sources.adapters.mcp_source import VIRTUAL_ROOT_ID
+
         page = await mcp_adapter.browse(connection=MCP_CONNECTION)
         assert isinstance(page, BrowsePage)
-        assert [n.id for n in page.items] == ["virtual_root"]
+        # ⚠ The SENTINEL, not a literal. It stopped being `"virtual_root"` at the Phase 239
+        # review (LO-06): every other id this adapter emits is a real path on the remote
+        # server, so a sentinel living in that same namespace collided with a real folder of
+        # that name. What matters to the CONTRACT is that the root id is non-empty and round
+        # trips — which is what is asserted, and it is a stronger claim than the literal was.
+        assert [n.id for n in page.items] == [VIRTUAL_ROOT_ID]
+        assert VIRTUAL_ROOT_ID not in ("", "virtual_root"), (
+            "the sentinel must not be spelled like a path a server could return"
+        )
         for node in page.items:
             assert isinstance(node, SourceNode)
             assert node.kind == "folder"
@@ -651,7 +665,6 @@ class TestSourceFilePathIsNeverFabricated:
             )
 
     @pytest.mark.asyncio
-    @pytest.mark.asyncio
     async def test_mcp_path_is_the_real_folder(self, mcp_adapter: SourceAdapter):
         """This family addresses files BY path, so it always has a real one — and it is the
         FOLDER path plus the name, never the `/<filename>` stand-in SEED-253 was planted
@@ -729,3 +742,152 @@ class TestRegistryResolution:
         assert SourceRegistry.is_source_supported("unknown_provider") is False
         assert SourceRegistry.is_source_supported("google") is True
         assert SourceRegistry.is_source_supported("mock_source") is True
+
+
+# ═══════════════════════════════════════════════════════════════════════════════════════════
+# THE SHARED CONTRACT — ONE BODY, EVERY FAMILY (review LO-03)
+# ═══════════════════════════════════════════════════════════════════════════════════════════
+#
+# ⚠ **THE FOUR CLASSES ABOVE ARE FOUR COPIES OF THE SAME ASSERTIONS**, and that is the defect
+# LO-03 named: `TestMcpSourceAdapterConformance` joined as a private class, so a contract
+# invariant added for the other three families would not apply to MCP — silently. It is the
+# same shape as "a list a reader maintains by hand", which is exactly what
+# `test_every_registered_adapter_is_covered_by_the_list_above` was written to close one file
+# over, and it recurred here in the very next phase.
+#
+# ⭐ SO THE INVARIANTS THAT ARE GENUINELY UNIVERSAL LIVE IN ONE BODY, PARAMETRIZED, AND THE
+# FAMILY LIST IS CHECKED AGAINST THE REGISTRY rather than against a reader. Adding a fifth
+# family now fails HERE until it is listed, instead of passing quietly with three quarters of
+# the contract unasserted.
+#
+# ⚠ THE PER-FAMILY CLASSES STAY, and deleting them would lose real coverage: Drive answers TWO
+# virtual roots and MCP answers one, Drive's `path` is honestly `None` and MCP's is a real
+# path, MCP's pagination answer is `None` where Drive's is a cursor. Those are FAMILY facts,
+# and a shared body can only hold the facts that are the CONTRACT's.
+
+
+class _Family(NamedTuple):
+    """One family's coordinates in the shared contract body."""
+
+    adapter_cls: type
+    fixture: str
+    connection: Any
+    list_folder: str
+    file_id: str
+
+
+CONTRACT_FAMILIES: dict[str, _Family] = {
+    "mock": _Family(
+        MockSourceAdapter, "mock_adapter",
+        {"id": "conn-1", "service_id": "mock_source"}, "folder-eng", "file-eng-1",
+    ),
+    "google_drive": _Family(
+        GoogleDriveSourceAdapter, "google_adapter",
+        {"id": "conn-google", "service_id": "google"}, "folder-123", "file-g-1",
+    ),
+    "microsoft_graph": _Family(
+        MicrosoftGraphSourceAdapter, "graph_adapter",
+        {"id": "conn-ms", "service_id": "microsoft"}, "folder-g-1", "item-g-1",
+    ),
+    "mcp": _Family(
+        _McpSourceAdapterForContract, "mcp_adapter",
+        MCP_CONNECTION, "docs", "docs/spec.pdf",
+    ),
+}
+
+_FAMILY_IDS = sorted(CONTRACT_FAMILIES)
+
+
+def _adapter_for(family: str, request: pytest.FixtureRequest) -> SourceAdapter:
+    return request.getfixturevalue(CONTRACT_FAMILIES[family].fixture)
+
+
+def test_every_registered_adapter_is_covered_by_the_SHARED_contract():
+    """⛔ THE HALF THAT CANNOT BE FORGOTTEN, and the reason this section exists.
+
+    `CONTRACT_FAMILIES` is hand-maintained, so it is derived-checked against the REGISTRY —
+    a fifth family that registers itself and is not listed here fails by name, rather than
+    joining the suite as a private class nobody's new invariant reaches."""
+    import app.services.sources  # noqa: F401 — the eager import IS what populates the registry
+
+    registered = {cls for cls in SourceRegistry._adapters.values()}
+    assert registered, "the registry is empty — the eager import list is not running"
+    covered = {f.adapter_cls for f in CONTRACT_FAMILIES.values()}
+    missing = registered - covered
+    assert not missing, (
+        f"registered adapters with no row in CONTRACT_FAMILIES: "
+        f"{sorted(c.__name__ for c in missing)} — add a fixture and a row, or the shared "
+        "contract silently does not apply to them"
+    )
+
+
+@pytest.mark.parametrize("family", _FAMILY_IDS)
+@pytest.mark.asyncio
+async def test_CONTRACT_browse_root_answers_a_valid_BrowsePage(
+    family: str, request: pytest.FixtureRequest
+):
+    adapter = _adapter_for(family, request)
+    page = await adapter.browse(connection=CONTRACT_FAMILIES[family].connection)
+    assert isinstance(page, BrowsePage)
+    assert page.items, "every family must offer somewhere to start"
+    for node in page.items:
+        assert isinstance(node, SourceNode)
+        assert isinstance(node.id, str) and node.id.strip(), (
+            "an empty root id makes browse(root) indistinguishable from browse(None) — a "
+            "picker walking down from what it was handed would loop forever"
+        )
+        assert isinstance(node.name, str) and node.name.strip()
+        assert node.kind in ("folder", "drive")
+
+
+@pytest.mark.parametrize("family", _FAMILY_IDS)
+@pytest.mark.asyncio
+async def test_CONTRACT_list_files_answers_a_valid_FilePage(
+    family: str, request: pytest.FixtureRequest
+):
+    spec = CONTRACT_FAMILIES[family]
+    adapter = _adapter_for(family, request)
+    page = await adapter.list_files(connection=spec.connection, folder_id=spec.list_folder)
+    assert isinstance(page, FilePage)
+    assert page.files, f"{family} listed no files for {spec.list_folder!r}"
+    for f in page.files:
+        assert isinstance(f, SourceFile)
+        assert isinstance(f.id, str) and f.id.strip()
+        assert isinstance(f.name, str) and f.name.strip()
+        assert isinstance(f.mime_type, str) and "/" in f.mime_type
+        assert f.size is None or f.size >= 0
+        # SEED-253 (D-238-07), as a CONTRACT invariant rather than four separate cases: the
+        # seed's defect was not a missing path, it was a MISSING path replaced by
+        # `/<filename>`, so a folder-shaped rule matched a filename and a dead rule looked
+        # alive. `path` is None, or it is a path — never a bare name dressed up as one.
+        assert f.path is None or f.path != f"/{f.name}", (
+            f"{family} fabricated a path from a filename — the SEED-253 shape"
+        )
+
+
+@pytest.mark.parametrize("family", _FAMILY_IDS)
+@pytest.mark.asyncio
+async def test_CONTRACT_read_file_answers_the_content_tuple(
+    family: str, request: pytest.FixtureRequest
+):
+    spec = CONTRACT_FAMILIES[family]
+    adapter = _adapter_for(family, request)
+    filename, raw, mime = await adapter.read_file(
+        connection=spec.connection, file_id=spec.file_id
+    )
+    assert isinstance(filename, str) and filename.strip()
+    assert isinstance(raw, bytes) and len(raw) > 0
+    assert isinstance(mime, str) and "/" in mime
+
+
+@pytest.mark.parametrize("family", _FAMILY_IDS)
+@pytest.mark.asyncio
+async def test_CONTRACT_check_answers_a_SourceHealth(
+    family: str, request: pytest.FixtureRequest
+):
+    adapter = _adapter_for(family, request)
+    health = await adapter.check(connection=CONTRACT_FAMILIES[family].connection)
+    assert isinstance(health, SourceHealth)
+    assert health.ok is True
+    assert health.error is None
+    assert isinstance(health.details, dict) and health.details

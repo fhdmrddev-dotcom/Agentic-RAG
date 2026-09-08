@@ -68,6 +68,127 @@ ALLOWED_LITERAL_SUBSTRINGS = (
 ALLOWED_EXACT_LITERALS = ("drive",)
 
 
+#: ⛔ TOOL NAMES — Phase 239's load-bearing claim, which was enforced by NOTHING until the
+#: gap-closure round (review ME-05). `mcp_source.py:19` states *"nothing anywhere else in the
+#: codebase knows any tool name"*; `connector_service.py` held
+#: `("list_directory", "list_dir", "list_files", "ls", "browse")` in a membership test the
+#: whole time, and this file structurally could not see it — `connector_service.py` was not in
+#: `FENCED_MODULES`, and `PROVIDER_LITERALS` contains no tool name, so BOTH doors were shut.
+#:
+#: The vocabulary now lives in `sources/adapters/mcp_source.py` and this set is what keeps it
+#: there. Matched as substrings, like the provider set, because `"read_file_v2"` is the same
+#: leak wearing a suffix.
+TOOL_LITERAL_SUBSTRINGS = (
+    "list_directory",
+    "list_dir",
+    "list_files",
+    "read_file",
+    "get_file_contents",
+    "view_file",
+)
+
+#: ⚠ Bare words that are tool names ONLY when they are the WHOLE literal. `"read"` and
+#: `"browse"` are deliberately ABSENT rather than forgotten: they are ordinary English that
+#: appears in scopes, verbs and modes across these modules, and a fence with false positives
+#: is a fence that gets deleted. `ls` and `cat` are safe because nothing else spells them.
+TOOL_LITERAL_EXACT = ("ls", "cat")
+
+#: Every module that must not know a tool name — the source path above `adapters/`, PLUS the
+#: three that actually handle an MCP binding. `connector_service.py` is here because it is
+#: where the leak was; `models/connector.py` and `api/connectors.py` are here because they are
+#: the write boundary and the router for the same column, and an absent module is an
+#: unfenced one (the failure this whole file exists to make impossible).
+TOOL_FENCED_MODULES = FENCED_MODULES + (
+    "app/services/connector_service.py",
+    "app/models/connector.py",
+    "app/api/connectors.py",
+)
+
+#: Method calls whose FIRST ARGUMENT decides something. ⚠ ME-06: the fence used to see
+#: `ast.Compare` and nothing else, so `service_id.startswith("google")`, `ADAPTERS["google"]`
+#: and `match service_id: case "google":` all passed it silently — while the sibling hint
+#: fence in the same phase (`test_239_mcp_source_adapter._hint_comparisons`) already handled
+#: `Subscript` and `.get(...)`. The stronger shape existed in the same diff and was not applied
+#: here, which is why this one is written from that shape rather than beside it.
+_DECIDING_METHODS = ("get", "startswith", "endswith", "removeprefix", "removesuffix")
+
+
+def _deciding_operands(node: ast.AST) -> list[ast.expr]:
+    """Every expression this node uses to DECIDE something.
+
+    Deliberately not "every string literal": a docstring naming Google is documentation, and a
+    fence that refuses documentation gets weakened until it refuses nothing.
+    """
+    if isinstance(node, ast.Compare):
+        return [node.left, *node.comparators]
+    if isinstance(node, ast.Subscript):
+        return [node.slice]
+    if (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr in _DECIDING_METHODS
+    ):
+        return list(node.args[:1])
+    if isinstance(node, ast.MatchValue):
+        return [node.value]
+    return []
+
+
+def _flatten(operands: list[ast.expr]) -> list[ast.expr]:
+    """Expand container literals, because `x in ("a", "b")` is ONE operand and TWO identities.
+
+    ⚠ THIS ARM WAS FOUND BY THIS FILE'S OWN POSITIVE CONTROL, which is the entire argument for
+    writing one. The widened walker was already an improvement on `ast.Compare`-only — and it
+    still returned `[]` for `if name in ("list_directory", "ls")`, because the comparator of an
+    `in` test against a tuple is an `ast.Tuple`, not an `ast.Constant`. That is not an exotic
+    shape: it is the single most idiomatic way in Python to write the membership test both of
+    these fences exist to refuse, and BOTH fences were blind to it for the whole of Phase 232,
+    238 and 239. A control that only confirms what you already believe is decoration.
+    """
+    out: list[ast.expr] = []
+    for operand in operands:
+        if isinstance(operand, (ast.Tuple, ast.List, ast.Set)):
+            out.extend(operand.elts)
+        else:
+            out.append(operand)
+    return out
+
+
+def _literals_in_decisions(
+    source: str,
+    *,
+    substrings: tuple[str, ...],
+    exact: tuple[str, ...] = (),
+    allowed_substrings: tuple[str, ...] = (),
+    allowed_exact: tuple[str, ...] = (),
+) -> list[tuple[int, str, str]]:
+    """`(lineno, the literal, what it matched)` for every identity reaching a decision."""
+
+    def _offending(value: str) -> str | None:
+        low = value.strip().lower()
+        if not low:
+            return None
+        if any(allowed in low for allowed in allowed_substrings):
+            return None
+        if low in allowed_exact:
+            return None
+        if low in exact:
+            return low
+        for literal in substrings:
+            if low == literal or literal in low:
+                return literal
+        return None
+
+    findings: list[tuple[int, str, str]] = []
+    for node in ast.walk(ast.parse(source)):
+        for operand in _flatten(_deciding_operands(node)):
+            if isinstance(operand, ast.Constant) and isinstance(operand.value, str):
+                hit = _offending(operand.value)
+                if hit:
+                    findings.append((getattr(node, "lineno", 0), operand.value, hit))
+    return findings
+
+
 def _offending_literal(value: str) -> str | None:
     """Return the provider literal `value` carries, or None."""
     low = value.strip().lower()
@@ -84,23 +205,21 @@ def _offending_literal(value: str) -> str | None:
 
 
 def _scan(source: str) -> list[tuple[int, str, str]]:
-    """Every provider literal used in a COMPARISON or a MEMBERSHIP TEST.
+    """Every provider literal that DECIDES something — see `_deciding_operands` for which
+    shapes count, and ME-06 for the three that used to be invisible."""
+    return _literals_in_decisions(
+        source,
+        substrings=PROVIDER_LITERALS,
+        allowed_substrings=ALLOWED_LITERAL_SUBSTRINGS,
+        allowed_exact=ALLOWED_EXACT_LITERALS,
+    )
 
-    Deliberately not "every string literal": a docstring naming Google is documentation, and a
-    fence that refuses documentation gets weakened until it refuses nothing. What is refused is
-    a provider identity reaching `==`, `!=`, `in` or `not in` — the shapes that branch.
-    """
-    findings: list[tuple[int, str, str]] = []
-    for node in ast.walk(ast.parse(source)):
-        if not isinstance(node, ast.Compare):
-            continue
-        operands = [node.left, *node.comparators]
-        for operand in operands:
-            if isinstance(operand, ast.Constant) and isinstance(operand.value, str):
-                hit = _offending_literal(operand.value)
-                if hit:
-                    findings.append((node.lineno, operand.value, hit))
-    return findings
+
+def _scan_tool_names(source: str) -> list[tuple[int, str, str]]:
+    """Every MCP tool name that DECIDES something, anywhere above `adapters/`."""
+    return _literals_in_decisions(
+        source, substrings=TOOL_LITERAL_SUBSTRINGS, exact=TOOL_LITERAL_EXACT
+    )
 
 
 @pytest.mark.parametrize("relative", FENCED_MODULES)
@@ -119,6 +238,27 @@ def test_no_provider_identity_branches_above_the_adapter_package(relative: str):
     )
 
 
+@pytest.mark.parametrize("relative", TOOL_FENCED_MODULES)
+def test_no_MCP_TOOL_NAME_decides_anything_above_the_adapter_package(relative: str):
+    """⛔ ME-05 — the phase's load-bearing claim, finally enforced rather than asserted.
+
+    `mcp_source.py`'s docstring says *"nothing anywhere else in the codebase knows any tool
+    name"*. That was FALSE the day it was written: `connector_service.py` carried the lister
+    and reader tuples in a membership test. Nothing could see it — that module was unfenced
+    and this file knew vendor names only. Adding a server is a ROW; the moment a tool name
+    reaches a conditional up here, it is a code change, a review and a deploy again."""
+    path = BACKEND / relative
+    assert path.exists(), f"{relative} is in TOOL_FENCED_MODULES but does not exist"
+
+    findings = _scan_tool_names(path.read_text(encoding="utf-8"))
+    assert not findings, (
+        f"{relative} decides something using an MCP tool name:\n"
+        + "\n".join(f"  line {ln}: {lit!r} (matches {hit!r})" for ln, lit, hit in findings)
+        + "\n\nThe vocabulary belongs to services/sources/adapters/mcp_source.py, which is "
+        "the file whose docstring claims it. Connecting a new server must stay a ROW."
+    )
+
+
 def test_the_fence_can_actually_fire():
     """⭐ THE POSITIVE CONTROL. Without it, every assertion above is *"we found nothing"*, which
     is indistinguishable from *"we looked for nothing"* — the exact failure the Phase 232 fence
@@ -130,6 +270,51 @@ def test_the_fence_can_actually_fire():
 
     also = 'x = 1 if provider == "onedrive" else 2\n'
     assert _scan(also), "the fence misses an equality comparison"
+
+
+def test_the_fence_fires_on_the_THREE_SHAPES_IT_USED_TO_MISS():
+    """⭐ ME-06's positive control. Every plant below is a real branch on a vendor identity and
+    every one of them passed the `ast.Compare`-only walker in silence — which means the green
+    this file printed for four modules was green about one shape out of four."""
+    assert _scan('if service_id.startswith("google"):\n    pass\n'), (
+        "a .startswith() branch on a vendor is invisible to the fence"
+    )
+    assert _scan('if service_id.endswith("onedrive"):\n    pass\n')
+    assert _scan('ADAPTERS = {}\nx = ADAPTERS["google"]\n'), (
+        "a dict keyed by vendor identity is routing, and it is a Subscript, not a Compare"
+    )
+    assert _scan('cfg = {}\nx = cfg.get("microsoft_graph")\n')
+    assert _scan(
+        'def f(service_id):\n'
+        '    match service_id:\n'
+        '        case "onedrive":\n'
+        '            return 1\n'
+    ), "a match/case on a vendor is the same branch with newer syntax"
+    assert _scan('if service_id in ("google", "dropbox"):\n    pass\n'), (
+        "⚠ THE SHAPE THIS FILE'S OWN CONTROL CAUGHT. `x in (\"a\", \"b\")` is the most "
+        "idiomatic membership test in Python and BOTH fences were blind to it — the "
+        "comparator is an ast.Tuple, and only its ELEMENTS are Constants"
+    )
+
+
+def test_the_TOOL_fence_can_actually_fire():
+    """⭐ ME-05's positive control, and it is the one that matters: the fence this replaces
+    could not have failed on the leak that was actually present."""
+    planted = 'def f(name):\n    if name in ("list_directory", "ls"):\n        return 1\n'
+    findings = _scan_tool_names(planted)
+    assert findings, "the tool fence cannot detect the leak it exists to detect"
+    assert {hit for _, _, hit in findings} == {"list_directory", "ls"}
+
+    assert _scan_tool_names('if tool == "read_file": pass\n')
+    assert _scan_tool_names('x = TOOLS["get_file_contents"]\n')
+    assert _scan_tool_names('if name.startswith("read_file"): pass\n')
+    # ⚠ THE EXACT ARM IS EXACT. A capability called `catalog` is not the `cat` tool, and a
+    # fence that says it is gets deleted within a week.
+    assert _scan_tool_names('if kind == "catalog": pass\n') == []
+    assert _scan_tool_names('if verb == "read": pass\n') == [], (
+        "`read` is ordinary English in these modules — see TOOL_LITERAL_EXACT for why it is "
+        "deliberately absent rather than forgotten"
+    )
 
 
 def test_the_exemptions_are_exemptions_and_not_holes():

@@ -849,3 +849,46 @@ def test_discover_refuses_a_service_only_row_by_name_never_as_a_bad_gateway(
     assert detail["reason_code"] == "nothing_to_discover_yet", detail
     # ⚠ The row NEVER had an mcp_server_url, so naming one would be a lie about its shape.
     assert "mcp_server_url" not in res.text, res.text
+
+
+# ── Phase 239 review, gap-closure round 1 — LO-05 ────────────────────────────────────────
+
+
+class TestProviderErrorTextIsBoundedAndAttributed:
+    """⚠ LO-05 — server-authored error text was reflected verbatim into an API response.
+
+    `api/connectors.py`'s browse handler interpolated the whole exception into
+    `detail=f"Source provider browse returned an error: {exc}"`. `mcp_source._error_text`
+    truncates its OWN `isError` text to 300 chars, but every other exception reaching that
+    handler was unbounded, and control characters could reach a surface a person reads as
+    ours. Not XSS in React — an untrusted string shaping a sentence it does not own.
+    """
+
+    def test_a_long_provider_message_is_bounded(self):
+        from app.api.connectors import _provider_said
+
+        said = _provider_said(RuntimeError("x" * 5000))
+        assert len(said) <= 301, "an unbounded remote string reaches the client"
+        assert said.endswith("\u2026")
+
+    def test_control_characters_are_removed_not_escaped(self):
+        from app.api.connectors import _provider_said
+
+        said = _provider_said(RuntimeError("denied\r\n\x1b[31mFATAL\x1b[0m\tby policy"))
+        assert "\r" not in said and "\n" not in said and "\t" not in said
+        assert "denied" in said and "by policy" in said
+
+    def test_an_empty_provider_message_still_says_something(self):
+        from app.api.connectors import _provider_said
+
+        assert _provider_said(RuntimeError("")) == "nothing"
+
+    def test_the_apps_own_sentence_is_fixed_and_the_providers_is_attributed(self):
+        """The two halves must not be mistakable for one another — that is the whole fix."""
+        import inspect
+
+        from app.api import connectors
+
+        source = inspect.getsource(connectors)
+        assert '"Source provider browse returned an error. The provider said: "' in source
+        assert 'detail=f"Source provider browse returned an error: {exc}"' not in source
