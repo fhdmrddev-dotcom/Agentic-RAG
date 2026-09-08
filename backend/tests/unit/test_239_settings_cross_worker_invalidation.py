@@ -377,13 +377,29 @@ def test_lifespan_starts_and_stops_the_subscriber():
 
     A subscriber nobody starts is the same as no fix. Source-level because starting the real
     lifespan here would boot the whole app.
+
+    ⚠ THE FIRST VERSION OF THIS FENCE DID NOT FIRE, and the weaker version is described here
+    rather than quietly replaced. It asserted ``"SettingsCacheSubscriber" in src``. Planting
+    the real defect — replacing the constructor call with ``None`` — left the fence GREEN,
+    because the ``import`` line still contained the name. A presence assertion cannot see
+    content drift. It now asserts the CONSTRUCTION and the ``.start()``, which is the
+    behaviour, and the plant fires.
     """
     src = (BACKEND_DIR / "app" / "main.py").read_text(encoding="utf-8")
-    assert "SettingsCacheSubscriber" in src, "lifespan never starts the subscriber"
-    assert "settings_cache_subscriber" in src, "subscriber not parked on app.state"
-    head, _, tail = src.partition("\n    yield\n")
-    assert "SettingsCacheSubscriber" in head, "subscriber started AFTER yield"
+    head, sep, tail = src.partition("\n    yield\n")
+    assert sep, "main.py lifespan has no `yield` — cannot locate startup vs shutdown"
+
+    # Startup half: the subscriber is CONSTRUCTED and STARTED before yield.
+    assert "SettingsCacheSubscriber(" in head, "lifespan never constructs the subscriber"
+    ctor_at = head.index("SettingsCacheSubscriber(")
+    assert ".start()" in head[ctor_at:], "the subscriber is constructed but never started"
+    assert "app_instance.state.settings_cache_subscriber" in head, (
+        "subscriber not parked on app.state (shutdown could not reach it)"
+    )
+
+    # Shutdown half: it is stopped after yield.
     assert "settings_cache_subscriber" in tail, "subscriber never stopped at shutdown"
+    assert ".stop()" in tail, "shutdown never awaits the subscriber's stop()"
 
 
 def test_write_seams_publish():
