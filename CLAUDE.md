@@ -651,10 +651,10 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/RunSpine.tsx` | 5 / 3 / 426 | honoured by construction (**214**) |
 | `frontend/src/components/workflows/RunTranscript.tsx` | 7 / 3 / 652 | ⚠ **FIRES on a component with NO MOUNT in the product** |
 | `frontend/src/components/settings/ConnectionsTab.tsx` | 25 / 9 / 1635 | ⚠ the row was STALE at `17 / 7 / 1477`. honoured by construction (**22 |
-| `frontend/src/components/settings/ConnectionFormPanel.tsx` | 24 / 10 / 2545 | ⚠ the row was STALE at `9 / 5 / 2009`. honoured by construction (212 / |
+| `frontend/src/components/settings/ConnectionFormPanel.tsx` | 25 / 10 / 2577 | ⚠ STALE at three consecutive closes. honoured by construction (**239-05**) |
 | `frontend/src/lib/api/org.ts` | 11 / 8 / 629 | ⚠ absent for its ENTIRE LIFE at 4 phases; row then STALE at `6 / 4 / 562`. ⚠ **THIRD wire-type drift in this ONE file** (239: `auth_type: "mcp"`) |
 | `frontend/src/components/settings/connectionsCopy.ts` | 15 / 8 / 784 | no seam proposed. honoured by construction (**239**): one word, one union member, one arm — and the arm cannot reach a capability row |
-| `frontend/src/components/settings/connectionFormCopy.ts` | 15 / 8 / 1216 | no seam proposed |
+| `frontend/src/components/settings/connectionFormCopy.ts` | 17 / 8 / 1293 | ⛔ 239-05 NAMED the seam: `configFromDraft`'s arm set. See §239-05 |
 | `frontend/src/pages/SettingsPage.tsx` | 38 / 21 / 1500 | ✅ **the 212-close re-open trigger has now FIRED** (SEED-227 names it) |
 | `frontend/src/components/settings/ModelPillRow.tsx` | 4 / 3 / 141 | ⚠ absent for its entire life |
 | `frontend/src/components/workflows/phaseVocabulary.ts` | 16 / 6 / 990 | honoured by construction (206.2) |
