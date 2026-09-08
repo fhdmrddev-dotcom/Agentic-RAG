@@ -43,6 +43,10 @@ def _fake_settings(**overrides):
         # a getattr default here would hide a field the API forgot to build.
         vision_model="",
         vision_max_pages=50,
+        # SEED-258, present for the same reason the two above are: the response genuinely
+        # REQUIRES it. The bounds beside it in the response are code constants, not settings,
+        # so they are deliberately NOT stubbed here — a stubbable bound is a settable bound.
+        source_max_file_size_mb=25,
         retrieval_top_k=10,
         retrieval_match_threshold=0.3,
         hybrid_search_enabled=True,

@@ -9289,7 +9289,7 @@ cells rot within days.
 | [`backend/app/main.py`](docs/HOT-FILE-LEDGER.md#backendappmainpy) | 79 / 45 / 876 | ⚠ **FIRES** | honoured by construction (204 / **230**) — lifespan queue daemon start/stop added beside scheduler |
 | [`backend/app/config.py`](docs/HOT-FILE-LEDGER.md#backendappconfigpy) | 82 / 47 / 1489 | ⚠ **FIRES** | ⚠ row was STALE by **TEN PHASES** at `78 / 37 / 1428`. honoured by construction (230 / **235**) — 4 watch/health knobs; MODEL_CAPABILITIES-out seam stays OWED |
 | [`backend/app/api/admin.py`](docs/HOT-FILE-LEDGER.md#backendappapiadminpy) | 32 / 12 / 1733 | ⚠ **FIRES** | ⚠ absent at 12 phases (added 196) |
-| [`backend/app/api/settings.py`](docs/HOT-FILE-LEDGER.md#backendappapisettingspy) | 30 / 16 / 639 | ⚠ **FIRES** | honoured by construction (**SEED-227**) — one knob added at the four seams `rerank_enabled` already uses; ⚠ absent at 16 phases (added 196) |
+| [`backend/app/api/settings.py`](docs/HOT-FILE-LEDGER.md#backendappapisettingspy) | 34 / 18 / 738 | ⚠ **FIRES** | ⚠ row was STALE at `30 / 16 / 639`. honoured by construction (**SEED-258**): the same four seams SEED-227 used; the refusal states the COST, not just the range |
 | [`backend/app/services/multimodal_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmultimodal_servicepy) | 14 / 7 / 984 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** — row added SEED-227, which is also where its silent truncation was found |
 | [`backend/app/api/documents.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentspy) | 85 / 33 / 2437 | ⚠ **FIRES** | ✅ **DISCHARGED (229)** — ingest_splice.py extracted. ⚠ row was STALE at `75 / 32 / 2408`; 235 removed 44 L, adding nothing |
 | [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 167 / 38 / 4786 | ⚠ **FIRES** | ⚠ row was STALE at `159 / 36 / 4687`. honoured by construction (**235**) — 10 TARGETS lines + 10 BASELINE pins + 1 re-pin, NO logic/threshold change |
@@ -9368,7 +9368,7 @@ cells rot within days.
 | [`frontend/src/components/workflows/externalShapeVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsexternalshapevocabularyts) | 2 / 1 / 109 | no (1 phase) | young (206.2) |
 | [`frontend/src/components/workflows/McpToolPicker.reachability.test.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsmcptoolpickerreachabilitytesttsx) | 1 / 1 / 316 | no (1 phase) | young (206.2) |
 | [`backend/app/models/connector.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsconnectorpy) | 24 / 13 / 772 | ⚠ **FIRES** | honoured by construction (**239-06 / SEED-259**): the argument mapping rides the declared `dict[str,str]` as flat prefixed keys — no new field, no shape change, no migration |
-| [`backend/app/services/mcp_client.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmcp_clientpy) | 7 / 5 / 480 | ⚠ **FIRES** | ⚠ row was STALE at `4 / 2 / 407` and said `no (2 phases)` — present and WRONG, so it answered the auditor. Byte-unchanged by 239; the sanitizer allow-list did not need widening |
+| [`backend/app/services/mcp_client.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmcp_clientpy) | 9 / 6 / 526 | ⚠ **FIRES** | ⚠ row STALE TWICE (`4/2/407` reading `no`, then `7/5/480`). honoured by construction (**SEED-258**): the body cap is DERIVED, so no envelope knob exists to disagree |
 | [`backend/app/api/connectors.py`](docs/HOT-FILE-LEDGER.md#backendappapiconnectorspy) | 40 / 19 / 2071 | ⚠ **FIRES** | ⚠ **extraction still OWED and the file GREW AGAIN** (2051→2071 at the 239 gap-closure: `_provider_said`, LO-05). The named seam is unchanged |
 | [`backend/app/security/egress.py`](docs/HOT-FILE-LEDGER.md#backendappsecurityegresspy) | 13 / 5 / 982 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | honoured by construction (232): Google Drive read/export pins; docstrings updated to source contract |
 | [`backend/app/services/google/availability.py`](docs/HOT-FILE-LEDGER.md#backendappservicesgoogleavailabilitypy) | 0 / 0 / 277 | no (new) | young (221-02) — the per-application probe. ⚠ It imports `_http`'s parser and writes NO second one |
@@ -9378,7 +9378,7 @@ cells rot within days.
 | [`frontend/src/components/settings/grantsVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsgrantsvocabularyts) | 3 / 2 / 115 | no (2 phases) | ⚠ absent for its entire life — row added 221-02. There is deliberately NO `READY` string in it |
 | [`backend/app/services/connector_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesconnector_servicepy) | 25 / 9 / 1772 | ⚠ **FIRES** | honoured by construction (**239-06**): the write boundary knows a mapping KEY from a tool name by ALLOW-LIST — an unknown key is still read as a tool name and still refused |
 | [`backend/app/models/message.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsmessagepy) | 17 / 10 / 124 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **8 phases** — row added 214; honoured by construction (214-16) |
-| [`backend/app/models/user_settings.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsuser_settingspy) | 46 / 30 / 1352 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **30 phases** — row added 214; honoured by construction (214-14) |
+| [`backend/app/models/user_settings.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsuser_settingspy) | 48 / 31 / 1460 | ⚠ **FIRES** | ⚠ row was STALE at `46 / 30 / 1352`. honoured by construction (**SEED-258**): one field + one never-raise accessor on the `tool_args_progress_emit_boundary_bytes()` pattern |
 | [`backend/app/services/connectors/args.py`](docs/HOT-FILE-LEDGER.md#backendappservicesconnectorsargspy) | 2 / 1 / 474 | no (1 phase) | young (214-01) — the shared argument leaf: resolution, satisfiability, and ONE schema accessor |
 | [`backend/app/services/harness/reachability.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessreachabilitypy) | 4 / 4 / 463 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **4 phases** — row added 214; it is the home of this phase's safety-gate predicate |
 | [`backend/app/services/workflow_kickoff.py`](docs/HOT-FILE-LEDGER.md#backendappservicesworkflow_kickoffpy) | 8 / 6 / 554 | ⚠ **FIRES** | ⚠ absent for its ENTIRE LIFE at **6 phases** — and 214-16 records that this invisibility is WHY the `ctx.inputs` mirror went unowned |
@@ -9469,9 +9469,209 @@ cells rot within days.
 | [`frontend/src/components/classification/RuleBuilderPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsclassificationrulebuilderpaneltsx) | 4 / 3 / 502 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | row added 237 at threshold. Adds scope selector segmented control; filters out-of-scope conditions on scope switch. |
 | [`frontend/src/components/ingestion/ConditionPopover.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestionconditionpopovertsx) | 3 / 2 / 404 | no (2 phases) | row added 237 below threshold. Restricts condition field choices to WATCH_FIELDS when ruleScope === 'watch'. |
 | [`backend/app/services/sources/base.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesbasepy) | 9 / 5 / 336 | ⚠ **FIRES** | ⚠ row was STALE at `6 / 3 / 198`. 238's byte-unchanged claim is now SPENT: 239 added protocol resolution here. Routing stayed DATA (two dicts), never a branch |
-| [`backend/app/services/sources/adapters/microsoft_graph.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesadaptersmicrosoft_graphpy) | 0 / 0 / 352 | no (new) | young (238) — **352 L against `google_drive.py`'s 399**, the SC#4 yardstick. ⛔ The 302 dance is sealed in here: never `/content`, two egress keys, no Authorization on the download |
+| [`backend/app/services/sources/adapters/google_drive.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesadaptersgoogle_drivepy) | 3 / 2 / 407 | no (2 phases) | ⚠ **absent for its ENTIRE LIFE — row added 239-09, and the ledger gate FAILED on it.** Its `MAX_FILE_BYTES` comment was measurably FALSE. See §239-09 |
+| [`backend/app/services/sources/adapters/microsoft_graph.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesadaptersmicrosoft_graphpy) | 3 / 2 / 376 | no (2 phases) | ⚠ row was STALE at `0 / 0 / 352`. ⛔ The 302 dance is still sealed in here. SEED-258 removed its private `MAX_FILE_BYTES`; the ceiling is one setting now |
 | [`backend/app/services/sources/adapters/mock_source.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesadaptersmock_sourcepy) | 2 / 1 / 177 | no (1 phase) | ⚠ absent for its entire life — row added 238. It is where the SEED-253 invariant is ANCHORED: a `path` names a folder, never a filename |
 | [`backend/app/services/sources/__init__.py`](docs/HOT-FILE-LEDGER.md#backendappservicessources__init__py) | 5 / 3 / 40 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ row was STALE at `2 / 1 / 26` and read `no (1 phase)`. The ONE eager-import site — an adapter absent here is unregistered, so the list is load-bearing |
 | [`frontend/src/components/sources/sourceCapability.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcessourcecapabilityts) | 3 / 2 / 138 | no (2 phases) | ⚠ row STALE TWICE (`0 / 0 / 38`, `2 / 2 / 98`). young (238 / **239**). ⛔ Fails CLOSED on `null`, and on a DEFAULT service id since 239-05. See §239-05 |
-| [`backend/app/services/sources/adapters/mcp_source.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesadaptersmcp_sourcepy) | 8 / 1 / 1259 | no (1 phase) | ⚠ STALE at every close so far (`2/1/643` → `6/1/1022` → this). 239-06 made ARGUMENT SHAPES rows too, and refuses a call it cannot satisfy rather than answering empty |
+| [`backend/app/services/sources/adapters/mcp_source.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesadaptersmcp_sourcepy) | 9 / 1 / 1271 | no (1 phase) | ⚠ STALE at every close so far (`2/1/643` → `6/1/1022` → `8/1/1259`). SEED-258 removed its `MAX_FILE_BYTES`; `_guard` reads the operator setting at each use |
 | [`frontend/src/components/settings/connectionRowVerdict.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectionrowverdictts) | 2 / 2 / 99 | no (2 phases) | ⚠ **absent for its entire life — row added 239-03, and the ledger gate FAILED on it at this phase's base.** young (221 / 239). The row's verdict, DERIVED never stored. See §239-03 |
+
+---
+
+## backend/app/services/sources/adapters/google_drive.py
+
+### ⚠ ROW ADDED AT `239-09` (SEED-258, 2026-09-08) — **absent for its ENTIRE LIFE**, and the gate caught it
+
+Triple re-derived, never guessed: **`3 / 2 / 407`** (commits `232-02`, `232-03`, `239-09`; phase
+buckets `232` and `239`). It does **NOT** fire G-5 — two phases, one under the threshold — but a
+row is owed the moment a phase names it in `files_modified`, and this is the first phase that did.
+
+⚠ **`node scripts/check-hot-file-ledger.cjs` FAILED on it**, unprompted:
+`[no-row] backend/app/services/sources/adapters/google_drive.py`. This is the mechanism working
+exactly as the 2026-08-25 split intended — the old mechanism was *"read a 214-row table"*, and it
+demonstrably let `App.tsx` run 23 phases unwatched. **The file that was invisible here is the
+ORIGINAL source adapter, the one every later family was written to match.**
+
+### ⭐ The finding: this file's own comment was FALSE, and nothing could tell anyone
+
+For its entire life line 31 read:
+
+```python
+MAX_FILE_BYTES = 25 * 1024 * 1024  # 25 MB matching application upload ceiling
+```
+
+**Measured 2026-09-08: `app/api/documents.py` refuses a hand-uploaded file at 50 MB.** The comment
+never matched anything. It is not a careless comment — it is the *class* of claim this ledger keeps
+finding: **a RELATION between two numbers, asserted in prose, in one of the two files.** Nothing
+executable connected them, so the drift was free.
+
+⚠ Worse, the comment was *load-bearing by imitation*: `microsoft_graph.py` copied the value with
+`# the same ceiling google_drive.py uses`, and `mcp_source.py` copied it again. Three files agreed
+**by coincidence of careful authorship** — a property that survives exactly as long as everyone
+remembers it — while a **fourth** number, `mcp_client.MAX_MCP_BODY_BYTES`, drifted away from all
+three and capped MCP imports at ~1.5 MB against a stated 25 MB.
+
+### What `239-09` changed here
+
+The constant is **gone**, not moved. Both `max_bytes=` call sites (the Docs/Sheets PDF export and
+the binary download) now call `source_max_file_bytes()`, which reads
+`app_settings.source_max_file_size_mb`. **Sameness across the three families is now IDENTITY rather
+than maintenance**, and there is nothing left for a fourth family to copy.
+
+The relation is pinned by an **AST fence**, not a string scan:
+`tests/unit/services/sources/test_239_body_cap_admits_the_file_ceiling.py` refuses a module-level
+`MAX_FILE_BYTES` *binding* in any adapter and requires each adapter to **call** the accessor — an
+import alone is not a read. A string scan would have fired on the struck-through prose note this
+phase left in each file, and would then have had to be softened, which is how a fence stops meaning
+anything.
+
+### Invariants this file carries into the next phase
+
+- ⛔ **Do not reintroduce a module-level size constant here.** That is the defect, not a convenience.
+- The two `send_pinned_http` egress keys (`drive_read`, `drive_export`) and the `_google_error_reason`
+  discipline — never reflect the raw error body, which echoes the user's search query `q` — are
+  untouched by SEED-258 and remain this file's real security surface.
+- **Named seam, not yet owed:** at 2 phases nothing is due. If a third phase lands here, the natural
+  split is the browse/enumerate half from the read/export half, which already share almost nothing
+  but the auth-token helper.
+
+---
+
+## backend/app/models/user_settings.py — `239-09` (SEED-258)
+
+### ⚠ RE-DERIVED: **`48 / 31 / 1460`** — the row was STALE at `46 / 30 / 1352`
+
+Recorded beside the previous value, never over it. **FIRES G-5 at 31 phases.** The row was added at
+214 after this file had been absent from the ledger *for its entire life at 30 phases*; one phase
+later it was already stale, which is the ledger's standing finding reproducing again.
+
+### Honoured by construction
+
+`239-09` added **one field and one accessor**, both at seams this file already had:
+
+- `source_max_file_size_mb: int = 25` sits beside `multimodal_max_b64_bytes_kb` — the **exact**
+  precedent for a numeric byte knob (`user_settings.py:198`), read through `_val(row, key, None,
+  default)` with `env_attr=None` because CLAUDE.md reserves env vars for secrets and infra.
+- `source_max_file_bytes()` is a copy of the **shape** of `tool_args_progress_emit_boundary_bytes()`:
+  read `load_app_settings()`, catch **everything**, fall back to a hardcoded value rather than raise.
+  ⚠ The reasoning transfers exactly — a streaming hot path must not crash on a settings read, and
+  **neither must a source read**. A cold cache mid-sync must not turn every connected source into an
+  error.
+
+### The invariant this file now carries
+
+⛔ **The ceiling is `app_settings`, never `user_settings`.** It bounds how much memory ONE in-flight
+request buffers from a remote server we do not control — **a DoS guard a user can raise for
+themselves is not a guard.** This is fenced structurally in
+`tests/unit/services/sources/test_258_the_ceiling_is_operator_scope.py`, including the strongest
+form: `source_max_file_bytes()` **takes no parameters at all**, so there is no per-caller input to
+give it even if a future author wanted one.
+
+⛔ **Bounds clamp on the READ as well as the write.** The API refuses an out-of-range `PATCH`; this
+accessor also clamps, because a row can get out of range another way (a hand edit in the SQL editor,
+a value stored before the bound existed). A clamp is silent and a refusal can speak, so both exist
+and neither is redundant.
+
+### Named seam (unchanged, still owed)
+
+At 1,460 lines this file is a settings **model**, a settings **loader**, a settings **writer** and a
+growing shelf of runtime accessors. The accessors (`tool_args_progress_emit_boundary_bytes`,
+`document_management_enabled`, `feature_audience`, `resolve_sub_agent_model`, and now
+`source_max_file_bytes`) are the obvious extraction — they share the never-raise discipline and
+nothing else with the loader.
+
+---
+
+## backend/app/services/mcp_client.py — `239-09` (SEED-258)
+
+### ⚠ RE-DERIVED: **`9 / 6 / 526`** — the row has now been STALE TWICE
+
+`4 / 2 / 407` (reading `no (2 phases)` — **present and WRONG, which stops an audit dead**) →
+`7 / 5 / 480` → **`9 / 6 / 526`**. **FIRES G-5 at 6 phases.**
+
+### ⭐ The change is a DELETION of a number, which is the point
+
+`MAX_MCP_BODY_BYTES = 34 * 1024 * 1024` is gone. In its place:
+
+```python
+def mcp_max_body_bytes() -> int:
+    ceiling = source_max_file_bytes()
+    return -(-ceiling * 4 // 3) + _MCP_ENVELOPE_HEADROOM_BYTES
+```
+
+⛔ **There is no envelope setting, and there must never be one.** The seed names this as its first
+failure mode: *"Two fields appear (file size and envelope size) — the original defect, now
+user-operable."* The derivation is **one-way**: raising the file ceiling forces this up, and nothing
+can raise this alone. A test asserts no `*_body_bytes` / `*_envelope` field exists on
+`UserEffectiveSettings` at all.
+
+⚠ **The `1 MB` headroom is a NAMED number replacing a rounding artefact.** The old `34 MB` was
+`25 × 4/3 = 33.33 MB` rounded up — an unexplained ~683 KB. Deriving honestly moves the value at the
+25 MB default from `35,651,584` to `36,001,110` bytes: **+349,526 bytes, +0.98%.** That is a
+deliberate, recorded widening of a DoS guard, taken because the alternative was to reverse-engineer
+a constant that preserved a rounding artefact — encoding the very anti-pattern this replaces.
+
+⚠ **Never read at import time.** The ceiling is a live setting; a module-level read would freeze
+whatever the DB held when the process booted, and with `WORKER_COUNT=2` two workers could freeze
+different values.
+
+### The invariant that did not change
+
+This is still **a DoS guard on an untrusted remote server**, not a nuisance number. The relation
+test asserts a **lower bound only** — the file ceiling forces the envelope up; nothing licenses
+raising the envelope on its own.
+
+---
+
+## backend/app/api/settings.py — `239-09` (SEED-258)
+
+### ⚠ RE-DERIVED: **`34 / 18 / 738`** — the row was STALE at `30 / 16 / 639`
+
+**FIRES G-5 at 18 phases.** Honoured by construction: the knob was added at the **same four seams**
+`rerank_enabled` and SEED-227's `multimodal_max_vision_calls` already use — request model, response
+model, response construction, and a bounded write branch. No new pattern, no new seam.
+
+### ⭐ The refusal states the COST, not just the range
+
+⚠ **This is the part a bare `400` would miss, and it is the whole seed.** SEED-258's own failure
+list ends: *"The setting ships with no explanation of the cost, which leaves the operator exactly as
+blind as the constant did — **the problem was never the number**."*
+
+So the refusal names the tradeoff: the whole response is buffered per in-flight request from a
+server we do not control, file content arrives base64-encoded at 4/3 its size, and 50 MB is the
+app's own manual-upload limit. A test asserts the word *memory* is in the message, which is a
+deliberately crude proxy for "this sentence explains itself" — and a crude executable proxy beats an
+eloquent unexecuted intention.
+
+### The invariant this file now carries
+
+⚠ **THE API IS THE BOUNDARY, NOT THE FORM.** A React number input with `min`/`max` is a convenience
+for a person who is not attacking anything. A `PATCH` carrying `999999999` is refused here, driven
+RED before the branch existed.
+
+⛔ **`GET` serves the bounds alongside the value** (`source_max_file_size_mb_floor` / `_ceiling`), so
+the form can state them without owning a copy. **A form carrying its own `50` would be a fourth
+private constant** — precisely the shape SEED-258 removed from three files.
+
+---
+
+## backend/app/services/sources/adapters/microsoft_graph.py — `239-09` (SEED-258)
+
+### ⚠ RE-DERIVED: **`3 / 2 / 376`** — the row was STALE at `0 / 0 / 352`
+
+Does **not** fire G-5 (2 phases). ⚠ The previous cell read `0 / 0 / 352`, which is what a row minted
+in the commit that CREATES a file reads forever unless somebody re-derives it — a `0 / 0` row is
+indistinguishable from an unmeasured one.
+
+### What changed, and what deliberately did not
+
+`MAX_FILE_BYTES` is gone; the single `max_bytes=` call site on the download reads
+`source_max_file_bytes()`. ⚠ **Its comment — `# the same ceiling google_drive.py uses` — was TRUE,
+and that is exactly the problem.** It was true because somebody kept it true by hand, across three
+files, while a fourth number in `mcp_client` drifted away from all of them unnoticed. **A comment
+that is currently accurate is not a mechanism.**
+
+⛔ **The 302 dance is untouched and still sealed in here:** never `/content`, two egress keys, and
+**no `Authorization` header on the pre-authenticated download URL**. SEED-258 changed a number's
+home and nothing about this file's egress posture.

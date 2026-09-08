@@ -39,6 +39,7 @@ import logging
 import re
 from typing import Any
 
+from app.models.user_settings import source_max_file_bytes
 from app.security.egress import send_pinned_http
 from app.services.oauth_refresh_service import get_fresh_access_token
 from app.services.sources.base import (
@@ -54,7 +55,13 @@ from app.services.sources.base import (
 logger = logging.getLogger(__name__)
 
 GRAPH_API_BASE = "https://graph.microsoft.com/v1.0"
-MAX_FILE_BYTES = 25 * 1024 * 1024  # the same ceiling google_drive.py uses
+
+# ── ⚠ SEED-258: ~~`MAX_FILE_BYTES = 25 * 1024 * 1024  # the same ceiling google_drive.py
+#    uses`~~ — REMOVED. That comment was TRUE and that is exactly the problem: it was true
+#    because somebody kept it true by hand, across three files, while a fourth number in
+#    `mcp_client` drifted away from all of them unnoticed. Sameness is now IDENTITY — one
+#    operator setting, read through `source_max_file_bytes()`.
+#    ⛔ Do not reintroduce a module constant here — that is the defect, not a convenience.
 
 #: One `$select` for both listing calls. `parentReference` is what makes `SourceFile.path` a
 #: real folder path instead of the `/<filename>` stand-in SEED-253 was planted about, and
@@ -328,7 +335,7 @@ class MicrosoftGraphSourceAdapter(SourceAdapter):
             download_url,
             headers={"Accept": "*/*"},
             timeout=60.0,
-            max_bytes=MAX_FILE_BYTES,
+            max_bytes=source_max_file_bytes(),
         )
         if dl_resp.status_code != 200:
             raise ValueError(f"Failed to download file content: HTTP {dl_resp.status_code}")

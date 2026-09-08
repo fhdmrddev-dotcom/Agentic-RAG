@@ -7,6 +7,8 @@ from app.dependencies import get_current_user, get_supabase, require_visible
 from app.models.user_settings import (
     KEY_PLACEHOLDER,
     KNOWN_PROVIDERS,
+    SOURCE_MAX_FILE_SIZE_MB_CEILING,
+    SOURCE_MAX_FILE_SIZE_MB_FLOOR,
     load_app_settings,
     load_app_settings_async,
     save_app_settings,
@@ -73,6 +75,12 @@ class FullSettingsResponse(BaseModel):
     # supposed to reach the active chat model was dead code. Empty => active chat model.
     vision_model: str
     vision_max_pages: int
+    # SEED-258 — the source file ceiling, plus the bounds the UI must state rather than
+    # re-type. ⛔ The bounds are SERVED, never hardcoded in the form: a form carrying its own
+    # copy of `50` is a fourth private constant, which is the defect this replaced.
+    source_max_file_size_mb: int
+    source_max_file_size_mb_floor: int
+    source_max_file_size_mb_ceiling: int
     # Retrieval
     retrieval_top_k: int
     retrieval_match_threshold: float
@@ -173,6 +181,9 @@ class SettingsUpdate(BaseModel):
     multimodal_max_vision_calls: int | None = None
     vision_model: str | None = None          # SEED-226; "" clears it back to the chat model
     vision_max_pages: int | None = None
+    # SEED-258 — the source file ceiling. ONE knob; the MCP envelope cap is DERIVED from it
+    # server-side and is deliberately NOT a field here.
+    source_max_file_size_mb: int | None = None
     # Retrieval
     retrieval_top_k: int | None = None
     retrieval_match_threshold: float | None = None
@@ -251,6 +262,10 @@ async def _build_response(s=None) -> FullSettingsResponse:
         multimodal_max_vision_calls=s.multimodal_max_vision_calls,
         vision_model=s.vision_model,
         vision_max_pages=s.vision_max_pages,
+        # SEED-258. The bounds ride along so the form can state them without owning them.
+        source_max_file_size_mb=s.source_max_file_size_mb,
+        source_max_file_size_mb_floor=SOURCE_MAX_FILE_SIZE_MB_FLOOR,
+        source_max_file_size_mb_ceiling=SOURCE_MAX_FILE_SIZE_MB_CEILING,
         retrieval_top_k=s.retrieval_top_k,
         retrieval_match_threshold=s.retrieval_match_threshold,
         hybrid_search_enabled=s.hybrid_search_enabled,
@@ -458,6 +473,39 @@ async def update_settings(
                 ),
             )
         updates["vision_max_pages"] = body.vision_max_pages
+
+    # SEED-258 — the file ceiling every connected source refuses at.
+    #
+    # ⚠ THE API IS THE BOUNDARY, NOT THE FORM. A number input with min/max is a convenience
+    #   for someone who is not attacking anything; a PATCH carrying 999999999 has to be
+    #   refused here or the bound does not exist. The read clamps too (defence in depth), but
+    #   a clamp is silent and a refusal can say why.
+    #
+    # ⚠ AND THE SENTENCE CARRIES THE COST, not just the range. The whole point of SEED-258 is
+    #   that nobody could see what the ceiling was OR why; a bare "must be between 1 and 50"
+    #   would leave the operator exactly as blind as the constant did. Raising it means more
+    #   memory buffered per in-flight request from a server we do not control — MCP carries
+    #   file bytes INSIDE the JSON-RPC envelope, base64-inflated 4/3.
+    if body.source_max_file_size_mb is not None:
+        if not (
+            SOURCE_MAX_FILE_SIZE_MB_FLOOR
+            <= body.source_max_file_size_mb
+            <= SOURCE_MAX_FILE_SIZE_MB_CEILING
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"The largest file a connected source may import must be between "
+                    f"{SOURCE_MAX_FILE_SIZE_MB_FLOOR} and {SOURCE_MAX_FILE_SIZE_MB_CEILING} MB. "
+                    f"0 would stop every source importing while each sync still reported "
+                    f"success. Raising it costs memory: the whole response is held in memory "
+                    f"per in-flight request from a server we do not control, and file content "
+                    f"arrives base64-encoded at 4/3 its size. "
+                    f"{SOURCE_MAX_FILE_SIZE_MB_CEILING} MB is the app's own upload limit, so a "
+                    f"connected source can never admit a file you could not upload by hand."
+                ),
+            )
+        updates["source_max_file_size_mb"] = body.source_max_file_size_mb
 
     if body.retrieval_top_k is not None:
         updates["retrieval_top_k"] = body.retrieval_top_k

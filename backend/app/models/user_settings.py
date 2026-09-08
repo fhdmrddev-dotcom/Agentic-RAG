@@ -197,6 +197,24 @@ class UserEffectiveSettings(BaseModel):
     multimodal_max_vision_calls: int = 100
     multimodal_max_b64_bytes_kb: int = 4096
 
+    # SEED-258 (migration 174) — the source file ceiling is a SETTING, not three constants.
+    #
+    # ⚠ WHY THIS EXISTS. `MAX_FILE_BYTES` was duplicated across `google_drive.py`,
+    #   `microsoft_graph.py` and `mcp_source.py` and agreed in all three only by coincidence
+    #   of careful authorship — while `mcp_client.MAX_MCP_BODY_BYTES` disagreed with all of
+    #   them, capping MCP imports at ~1.5 MB against a stated 25 MB. Each number was
+    #   individually defensible; the RELATION between them was wrong, and a relation has no
+    #   home in a file of constants.
+    #
+    # ⛔ ONE knob — the FILE ceiling, the number a person thinks in. The MCP envelope cap is
+    #   DERIVED from it (`mcp_client.mcp_max_body_bytes()`), never a second field: exposing
+    #   both would re-create the exact disagreement this exists because of.
+    #
+    # ⛔ app_settings, NOT user_settings. A DoS guard a user can raise for themselves is not a
+    #   guard — it bounds how much memory ONE in-flight request buffers from a remote server
+    #   we do not control. Read it through `source_max_file_bytes()` below, never directly.
+    source_max_file_size_mb: int = 25
+
     # SEED-226 (migration 166) — the vision model is a SETTING, not a constant.
     #
     # ⚠ EMPTY IS THE ONLY CORRECT DEFAULT, and the previous non-empty one was a live bug:
@@ -893,6 +911,14 @@ def _build_settings_from_row(row: dict) -> UserEffectiveSettings:
         multimodal_max_vision_calls=int(_val(row, "multimodal_max_vision_calls", None, 100)),
         multimodal_max_b64_bytes_kb=int(_val(row, "multimodal_max_b64_bytes_kb", None, 4096)),
 
+        # SEED-258 (migration 174) — env_attr=None: app_settings-only, no env fallback
+        # (CLAUDE.md "env vars are for secrets and infra only"). A missing column — the
+        # migration is authored-but-not-applied until an operator pastes it — reads as the
+        # shipped 25 MB, so nothing changes size until the column exists AND is set.
+        source_max_file_size_mb=int(
+            _val(row, "source_max_file_size_mb", None, SOURCE_MAX_FILE_SIZE_MB_DEFAULT)
+        ),
+
         # SEED-226 (migration 166). ⚠ `env_attr="vision_model"` is kept ONLY so an operator
         # who already set the env var is not silently switched; `config.py`'s default is now
         # "" so the chain really does reach `llm_model`. DB > env > active chat model.
@@ -1113,6 +1139,70 @@ def tool_args_progress_emit_boundary_bytes() -> int:
     if value is None or value <= 0:
         return _FALLBACK_TOOL_ARGS_EMIT_BOUNDARY_BYTES
     return int(value)
+
+
+# ── SEED-258 -- the source file ceiling, and the ONLY place its number lives ──
+
+#: The floor. Below 1 MB essentially nothing imports, so a value under this is not a
+#: narrower policy — it is ingestion switched off while every sync still reports success.
+SOURCE_MAX_FILE_SIZE_MB_FLOOR = 1
+
+#: The shipped value, unchanged by SEED-258. This phase moves the number's HOME, not the
+#: number. Also the never-raise fallback: `google_drive.py`, `microsoft_graph.py` and
+#: `mcp_source.py` each hardcoded exactly this before the setting existed.
+SOURCE_MAX_FILE_SIZE_MB_DEFAULT = 25
+
+#: ⛔ THE HARD MAXIMUM, and it is not arbitrary. `app/api/documents.py` refuses a
+#: hand-uploaded file over 50 MB, so a CONNECTED source may never admit a file the app
+#: would refuse from a person's own disk. The cost of raising the setting toward this is
+#: real and belongs on screen: an MCP response is buffered whole in memory, base64-inflated
+#: 4/3, so 50 MB means ~68 MB held per in-flight request from a server we do not control.
+#: ⚠ `google_drive.py` claimed for its entire life that 25 MB "match[ed] application upload
+#: ceiling"; measured 2026-09-08 that ceiling was 50 MB and the comment was simply false.
+#: The relation is pinned by a test now instead of restated in a comment.
+SOURCE_MAX_FILE_SIZE_MB_CEILING = 50
+
+_BYTES_PER_MB = 1024 * 1024
+
+
+def source_max_file_bytes() -> int:
+    """Return the operator-configured ceiling, in bytes, for a file from ANY source family.
+
+    The single source of truth. Google Drive, Microsoft Graph and every MCP file surface
+    read this rather than each holding a copy — which is what made the three copies agree
+    only by luck, and what made a fourth family the place that luck would run out.
+
+    Defensive, exactly like `tool_args_progress_emit_boundary_bytes()` above: if
+    `load_app_settings()` fails for ANY reason (cold cache, DB blip, missing column), this
+    returns the shipped 25 MB instead of raising. ⚠ A SOURCE READ MUST NEVER CRASH BECAUSE
+    A SETTINGS READ FAILED — a cold cache mid-sync must not turn every connected source
+    into an error.
+
+    Bounds are enforced HERE as well as at the API boundary. The write refuses an
+    out-of-range PATCH; this read clamps a row that got out of range some other way (hand
+    edit in the SQL editor, a value stored before the bound existed). Defence in depth: the
+    guard must never be exceedable, whatever is in the column.
+
+    Returns:
+        Positive int bytes, always within
+        [FLOOR, CEILING] MB.
+    """
+    try:
+        value = load_app_settings().source_max_file_size_mb
+    except Exception:  # noqa: BLE001 -- defensive: NEVER raise from a source read.
+        logger.warning(
+            "source_max_file_bytes(): load_app_settings() raised; falling back to the "
+            "shipped %d MB ceiling",
+            SOURCE_MAX_FILE_SIZE_MB_DEFAULT,
+        )
+        return SOURCE_MAX_FILE_SIZE_MB_DEFAULT * _BYTES_PER_MB
+
+    # None / 0 / negative is "nothing usable stored", never "refuse every file".
+    if value is None or int(value) <= 0:
+        return SOURCE_MAX_FILE_SIZE_MB_DEFAULT * _BYTES_PER_MB
+
+    mb = min(max(int(value), SOURCE_MAX_FILE_SIZE_MB_FLOOR), SOURCE_MAX_FILE_SIZE_MB_CEILING)
+    return mb * _BYTES_PER_MB
 
 
 def document_management_enabled() -> bool:
