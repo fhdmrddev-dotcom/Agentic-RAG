@@ -26,7 +26,17 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_MCP_TIMEOUT = 30.0
 DEFAULT_DISCOVERY_TIMEOUT = 15.0
-MAX_MCP_BODY_BYTES = 2 * 1024 * 1024  # 2MB response limit
+# ⚠ THIS IS A DoS GUARD ON AN UNTRUSTED REMOTE SERVER, and it is also the REAL file-size
+# ceiling for MCP sources — MCP carries file content INSIDE the JSON-RPC envelope, base64
+# inflated 4/3. At 2 MB it silently capped imports at ~1.5 MB while
+# `mcp_source.MAX_FILE_BYTES` claimed 25 MB, so the adapter's ceiling COULD NEVER FIRE and a
+# 3 MB PDF failed with a transport error instead of a plain refusal. Raised 2026-09-08 to
+# 25 MB × 4/3 + envelope headroom, so `MAX_FILE_BYTES` is the limit users actually meet and
+# MCP matches `google_drive.py` / `microsoft_graph.py`.
+# ⛔ The two constants are pinned IN RELATION by
+#    tests/unit/services/sources/test_239_body_cap_admits_the_file_ceiling.py — raising the
+#    file ceiling forces this up. Nothing licenses raising THIS one on its own.
+MAX_MCP_BODY_BYTES = 34 * 1024 * 1024
 
 #: Sent in the ``initialize`` handshake. A server may negotiate DOWN from this; it is a
 #: statement of what we speak, not a demand.

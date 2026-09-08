@@ -54,11 +54,17 @@ the fence refuses the *shape*, with a positive control.
 ── ⚠ THE 25 MB CEILING IS REAL CODE AND IS NOT THE BINDING CONSTRAINT ───────────────────────
 
 `MAX_FILE_BYTES` matches `google_drive.py` and `microsoft_graph.py` so the three families
-refuse at the same size (TM-239-03). But on THIS transport the real limit is upstream and much
-lower: `mcp_client.MAX_MCP_BODY_BYTES` is **2 MB**, applied to the whole JSON-RPC response, and
-base64 inflates a payload by 4/3 — so a file over roughly **1.5 MB** is refused by the client
-before this ceiling can be reached. Recorded rather than quietly relied upon: a ceiling nobody
-can reach is not a ceiling, and somebody raising the client's cap must find this note.
+refuse at the same size (TM-239-03).
+
+⚠ ~~But on THIS transport the real limit is upstream and much lower: `mcp_client.MAX_MCP_BODY_BYTES`
+is **2 MB** … so a file over roughly **1.5 MB** is refused by the client before this ceiling can be
+reached.~~ **RESOLVED 2026-09-08, and the original is struck through rather than deleted because the
+note did its job.** It ended *"somebody raising the client's cap must find this note"* — somebody did.
+`MAX_MCP_BODY_BYTES` is now **34 MB** (25 MB × 4/3 + envelope headroom), so **this ceiling is the one
+users actually meet** and the refusal comes from here, in words, instead of as a transport error.
+⛔ The two constants are now pinned IN RELATION, not independently, by
+`tests/unit/services/sources/test_239_body_cap_admits_the_file_ceiling.py` — each was individually
+defensible, which is exactly why pinning them separately would never have caught the disagreement.
 """
 
 from __future__ import annotations
