@@ -1064,3 +1064,70 @@ class TestTheEmptyRootIsNamedWhenItPlausiblyCausedTheFailure:
                 conn(config={"source_tools": {"root_path": "/srv"}}), folder_id=None
             )
         assert "no root folder set" not in str(caught.value)
+
+
+
+class TestAToolSetToDenyIsNotCallableAsTheSourceReader:
+    """⛔ ME-01 — the source path invoked MCP tools with no consultation of `tool_grants`.
+
+    `mcp_source` calls `mcp_client.call_tool` directly; the approval posture lives in
+    `tool_dispatcher`, above the AGENT path only. So an operator could set
+    `read_file: "deny"` — a deliberate, recorded refusal — and the watch loop went on calling
+    `read_file` on every file in the folder. A grant that reads as configured and grants
+    nothing is the state `_sanitize_tool_grants` raises to prevent one column over.
+    """
+
+    @pytest.mark.asyncio
+    async def test_a_denied_READER_is_refused_before_a_byte_leaves(self, adapter, patch_mcp):
+        fake = patch_mcp(FakeMcp())
+        c = conn(
+            config={"source_tools": {"read_tool": "cat"}},
+            tool_grants={"cat": "deny"},
+        )
+        with pytest.raises(ValueError, match="set to 'deny'"):
+            await adapter.read_file(c, "docs/a.txt")
+        assert fake.calls == [], "the refusal must precede the transport, not follow it"
+
+    @pytest.mark.asyncio
+    async def test_a_denied_LISTER_is_refused_too(self, adapter, patch_mcp):
+        fake = patch_mcp(FakeMcp(listing=json_listing([])))
+        c = conn(
+            config={"source_tools": {"list_tool": "ls", "root_path": "/srv"}},
+            tool_grants={"ls": "deny"},
+        )
+        with pytest.raises(ValueError, match="set to 'deny'"):
+            await adapter.list_files(c, folder_id="/srv")
+        assert fake.calls == []
+
+    @pytest.mark.asyncio
+    async def test_ask_and_allow_are_NOT_a_refusal(self, adapter, patch_mcp):
+        """⭐ The control. Only an explicit `deny` refuses — `ask` is a posture for the agent's
+        interactive path and would make an unattended watch loop unrunnable."""
+        patch_mcp(FakeMcp(read=text_result("hello")))
+        for posture in ("ask", "allow"):
+            c = conn(
+                config={"source_tools": {"read_tool": "cat"}},
+                tool_grants={"cat": posture},
+            )
+            name, payload, _ = await adapter.read_file(c, "docs/a.txt")
+            assert payload == b"hello", posture
+
+    @pytest.mark.asyncio
+    async def test_a_row_with_NO_grants_at_all_still_reads(self, adapter, patch_mcp):
+        """⚠ THE ASYMMETRY, PINNED. `phase_types.py` GATE 6 denies a tool with no grant; this
+        surface does not, and the difference is deliberate — every MCP row that exists today
+        carries no grants, so deny-by-default here would break every working source rather
+        than close a hole. If this test ever has to change, the posture changed with it."""
+        patch_mcp(FakeMcp(read=text_result("hello")))
+        _, payload, _ = await adapter.read_file(conn(), "docs/a.txt")
+        assert payload == b"hello"
+
+    @pytest.mark.asyncio
+    async def test_a_grant_on_a_DIFFERENT_tool_denies_nothing(self, adapter, patch_mcp):
+        patch_mcp(FakeMcp(read=text_result("hello")))
+        c = conn(
+            config={"source_tools": {"read_tool": "cat"}},
+            tool_grants={"delete_file": "deny"},
+        )
+        _, payload, _ = await adapter.read_file(c, "docs/a.txt")
+        assert payload == b"hello"

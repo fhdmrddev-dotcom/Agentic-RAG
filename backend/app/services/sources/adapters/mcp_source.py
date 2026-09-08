@@ -451,6 +451,7 @@ async def _resolve_binding(connection: Any) -> _Binding:
     config = _config_dict(connection)
     secret: str | None = _attr(connection, "secret")
     auth_scheme = _attr(connection, "auth_scheme", "auto") or "auto"
+    grants = _attr(connection, "tool_grants", None)
 
     if not _carries_a_credential(connection):
         conn_id = _attr(connection, "id") or _attr(connection, "connection_id")
@@ -466,6 +467,8 @@ async def _resolve_binding(connection: Any) -> _Binding:
             )
             secret = resolved.secret
             auth_scheme = getattr(resolved, "auth_scheme", "auto") or "auto"
+            if grants is None:
+                grants = getattr(resolved, "tool_grants", None)
 
     if not server_url:
         raise ValueError(
@@ -479,7 +482,7 @@ async def _resolve_binding(connection: Any) -> _Binding:
         # wrong". `McpConfig` refuses the shape on write; this covers a row written before it.
         raise ValueError("This connection's source_tools binding is not a set of tool names.")
 
-    return _Binding(
+    binding = _Binding(
         server_url=str(server_url),
         secret=secret,
         auth_scheme=str(auth_scheme),
@@ -487,6 +490,43 @@ async def _resolve_binding(connection: Any) -> _Binding:
         read_tool=str(tools.get("read_tool") or DEFAULT_READ_TOOL),
         root_path=str(tools.get("root_path") or ""),
     )
+    _refuse_denied_tools(binding, grants)
+    return binding
+
+
+def _refuse_denied_tools(binding: _Binding, tool_grants: Any) -> None:
+    """⛔ ME-01 — A TOOL SET TO `deny` WAS STILL CALLABLE AS THE SOURCE READER.
+
+    The source path calls `mcp_client.call_tool` directly; the approval posture lives in
+    `tool_dispatcher`, which sits above the AGENT path only. So an operator could set
+    `tool_grants = {"read_file": "deny"}` — a deliberate, recorded refusal — and the watch
+    loop would go on calling `read_file` on every file in the folder. A grant that reads as
+    configured and grants nothing is exactly the state `_sanitize_tool_grants` raises to
+    prevent one column over.
+
+    ── ⚠ AN ABSENT KEY IS NOT A DENY HERE, AND THE ASYMMETRY IS STATED RATHER THAN ASSUMED ──
+
+    `phase_types.py` GATE 6 denies a tool with no grant, because an agent asking to run
+    something nobody authorised should be refused. A SOURCE binding is the opposite shape: it
+    was chosen by a person in Settings (or detected and shown to them), it reads and never
+    writes, and every MCP row that exists today carries no grants at all — so deny-by-default
+    here would silently break every working source rather than close a hole. **What is honoured
+    is an EXPLICIT deny**, which is the only thing a person ever actually expressed.
+
+    This is a real difference in posture between two surfaces that share a column, and the
+    review was right that it was neither implemented nor written down. It is now both.
+    """
+    if not isinstance(tool_grants, dict):
+        return
+    for role, tool in (("list_tool", binding.list_tool), ("read_tool", binding.read_tool)):
+        posture = tool_grants.get(tool)
+        if isinstance(posture, str) and posture.strip().lower() == "deny":
+            raise ValueError(
+                f"This connection is bound to {tool!r} as its {role}, and {tool!r} is set to "
+                f"'deny' on this connection. Refused rather than called: a denial that the "
+                f"source path ignored would read as configured and grant nothing. Either "
+                f"change the grant, or bind a different tool in Settings."
+            )
 
 
 # ── parsing what a server said ───────────────────────────────────────────────────────────

@@ -406,6 +406,17 @@ def _check_destination(capability: str, config: dict) -> tuple[str, int | None]:
 
 
 # ── reads: org-wide (U-02), and NOT feature-gated (see the header) ───────────────────────
+def _provider_said(exc: Exception) -> str:
+    """A remote-authored message, bounded and stripped, for a client-facing error (LO-05).
+
+    ⚠ Control characters are removed rather than escaped: this lands in a JSON `detail` that
+    a client renders as a sentence, and a raw `\r` or an ANSI escape in the middle of it is
+    an untrusted string shaping a surface it does not own.
+    """
+    text = " ".join(str(exc).split())
+    return (text[:300] + "…") if len(text) > 300 else (text or "nothing")
+
+
 @router.get("/connections", response_model=list[ConnectorConnectionResponse])
 async def list_connections(
     capability: str | None = Query(
@@ -2044,8 +2055,17 @@ async def browse_connection_hierarchy(
         }
     except Exception as exc:
         logger.error("Failed to browse hierarchy for connection %s: %s", connection_id, exc)
+        # ⚠ LO-05 — THE TAIL OF THIS STRING IS AUTHORED BY THE REMOTE SERVER.
+        # `mcp_source._error_text` truncates its own `isError` text to 300 chars, but every
+        # OTHER exception reaching here interpolates unbounded, and control characters can
+        # reach a client surface. Not XSS in React, but an untrusted string in a message a
+        # person reads as ours — so the app's sentence is fixed, the server's is bounded and
+        # explicitly attributed, and neither can be mistaken for the other.
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Source provider browse returned an error: {exc}",
+            detail=(
+                "Source provider browse returned an error. The provider said: "
+                + _provider_said(exc)
+            ),
         )
 

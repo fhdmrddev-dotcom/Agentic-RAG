@@ -122,3 +122,48 @@ def test_ONE_source_bound_row_does_not_take_the_whole_org_down():
     ]
     parsed = [ConnectorConnectionResponse.model_validate(r) for r in rows]
     assert [p.name for p in parsed] == ["Slack", "Notion", "Filesystem"]
+
+
+
+# ── Phase 239 review, gap-closure round 1 — ME-07 ────────────────────────────────────────
+
+
+def test_source_tools_keys_and_values_are_BOUNDED():
+    """⚠ ME-07 — `ServiceId` two hundred lines up carries `max_length=64` with the stated
+    reason that *"it is NEW UNTRUSTED INPUT reaching a text column, so it gets a ceiling like
+    every other constrained type in this file"*. This field, newer and reaching the same
+    column, had none. Driven before the fix: a 500-char key and a 5,000-char value were both
+    accepted."""
+    import pydantic
+
+    from app.models.connector import McpConfig
+
+    with pytest.raises(pydantic.ValidationError, match="at most 64"):
+        McpConfig(source_tools={"a" * 65: "read_file"})
+    with pytest.raises(pydantic.ValidationError, match="at most 512"):
+        McpConfig(source_tools={"read_tool": "b" * 513})
+
+    # …and the ordinary shape is untouched.
+    assert McpConfig(source_tools={"read_tool": "read_file"}).source_tools == {
+        "read_tool": "read_file"
+    }
+
+
+def test_root_path_content_stays_deliberately_unvalidated_and_SAYS_SO():
+    """⛔ THE EXEMPTION, PINNED AS AN EXEMPTION. `root_path` is sent verbatim to the remote
+    server, so path authorization belongs to the process that owns that filesystem — a
+    traversal rule invented here would be a rule about a directory layout this app cannot
+    see. What is owed is the LENGTH bound and a written decision, and this asserts both
+    exist rather than asserting a rule nobody should write."""
+    import inspect
+
+    from app.models.connector import McpConfig
+
+    assert McpConfig(source_tools={"root_path": "../../../etc"}).source_tools == {
+        "root_path": "../../../etc"
+    }
+    source = inspect.getsource(McpConfig)
+    assert "DELIBERATELY UNVALIDATED" in source, (
+        "the exemption must be STATED where the field is declared — a silent exemption is "
+        "indistinguishable from a gap, which is what ME-07 found"
+    )

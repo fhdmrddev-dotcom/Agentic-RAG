@@ -248,7 +248,26 @@ class McpConfig(_StrictBase):
     #: reach the transport before anything could refuse it. It is a NAME, never a credential
     #: and never a payload — ``config`` is readable by every member of the org (migration
     #: 150), which is why ``custom_client_secret`` is refused two fields up.
-    source_tools: dict[str, str] | None = None
+    #:
+    #: ⚠ AND IT IS BOUNDED, because it was not (review ME-07). ``ServiceId`` two hundred lines
+    #: up carries ``max_length=64`` with the stated reason that *"it is NEW UNTRUSTED INPUT
+    #: reaching a text column, so it gets a ceiling like every other constrained type in this
+    #: file"* — and this field, which is newer and reaches the same column, had none at all.
+    #: A 500-character key and a 5,000-character value were both accepted, driven.
+    #: 64 for the key (it is one of three known role names); 512 for the value (a tool name
+    #: needs a fraction of that, and ``root_path`` shares the ceiling).
+    #:
+    #: ⛔ ``root_path``'s CONTENT IS DELIBERATELY UNVALIDATED, and that is an exemption rather
+    #: than an oversight. It is sent verbatim as ``{"path": …}`` to the remote server, so
+    #: ``../../../etc`` is bounded by THAT server's own sandbox — path authorization on a
+    #: remote file surface belongs to the process that owns the filesystem, and a traversal
+    #: rule invented here would be a rule about a directory layout this app cannot see. What
+    #: this app owes is the LENGTH bound above and the statement you are reading; it is
+    #: recorded so the next reader finds a decision rather than a gap.
+    source_tools: dict[
+        Annotated[str, Field(max_length=64)],
+        Annotated[str, Field(max_length=512)],
+    ] | None = None
 
 
 AuthType = Literal["static_key", "oauth_byo", "mcp"]
