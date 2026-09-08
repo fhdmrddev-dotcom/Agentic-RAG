@@ -73,8 +73,29 @@ sync rule is followed by nobody, waves 1 and 2 included.
    **A public HTTPS MCP file server is required and none is currently named.** ⚠ Not a defect in
    either file — the egress refusal is the load-bearing security property here, and its own comment
    names the localhost carve-out as "the production hole".
-2. ⛔ **G-4 live UAT row** covering the headline verdict, F-6's discovery receipt, and the
-   over-claiming arm. `BUG-260907-01` stays `folded`, **not `closed`**, until it runs.
+2. ⚠ **G-4 UAT DRIVEN 2026-09-08 — 2 of 3 rows PASS, 1 INCONCLUSIVE.** Record: `239-VALIDATION.md`.
+   **Row 1 PASS** — Microsoft 365 reads `✓ Ready as source`; closed on DISCRIMINATION (five distinct
+   verdicts across five shapes), not on the words appearing, and the `⏻ Disabled` arm was evidenced
+   before the operator enabled it. **Row 3 PASS on two surfaces** — the negative control holds in
+   Connections AND in the Library picker, which is where `HI-01` lived. **`BUG-260907-01` is CLOSED**
+   (`verified_closed_by: 239`). ⛔ **Row 2 (F-6, the discovery receipt) is INCONCLUSIVE, NOT a pass** —
+   discovery succeeded and correctly bound nothing, because DeepWiki serves wiki topics rather than
+   files, so there was nothing to seed. **F-6 remains UNVERIFIED in the product.**
+   ⭐ Unplanned, the same row **confirmed `CR-02` live**: a tool described as *"View documentation about
+   a GitHub repository"* steered no binding — the detector judged the name and declined.
+   ⚠ **The UAT found a defect no test could have**: `BUG-260908-02` — a **DISABLED** connection is still
+   offered in the Library's source picker. Same shape as `HI-01`, different defect (capability vs
+   **status**). Both reached that surface through the same hole: **`ConnectedSourceSection` and
+   `CreateWatchModal` have NO test suite at all.**
+2b. ⛔ **A CORRECTION TO THIS PHASE'S OWN RECORD, kept rather than overwritten.** This session earlier
+   proposed **DeepWiki as SC#2's second MCP file server**. That was WRONG, and it was wrong for the
+   reason this project keeps re-learning: it read tool NAMES instead of what they do. DeepWiki's
+   surface is wiki topics, not files. **SC#2 still needs a genuine public HTTPS MCP FILE server and
+   none is named** — see `SEED-257`.
+2c. ⛔ **`HI-04`'s root-path UI control is in NOBODY's scope** — the frontend round refused it under
+   G-7 (a new input is a phase, not a closure round), and it was not in the backend round's brief
+   either. **Until it ships, no MCP source can be pointed at a real folder through the product**,
+   which independently blocks SC#2.
 3. ⚠ **A product limit needing an operator decision:** `mcp_client.MAX_MCP_BODY_BYTES` is 2 MB on the
    whole response and base64 inflates 4/3, so **an MCP file source cannot import a file over ~1.5 MB**.
    TM-239-03's 25 MB ceiling can never fire. Not a defect — a limit that will surface as a UAT
