@@ -64,7 +64,27 @@ checked ok); and `docs/HOT-FILE-LEDGER.md` carries **77 sections for 231 rows** 
 sync rule is followed by nobody, waves 1 and 2 included.
 
 **OWED before this phase closes — it is NOT closed:**
-1. ⛔ **SC#2 is unmet, and it CANNOT BE DRIVEN ON THIS MACHINE — see `SEED-257`.** "Adding a source
+1. ⛔ **SC#2 DRIVEN 2026-09-08 against a real second server — PARTLY MET, and therefore NOT MET.**
+   **GitHub MCP** was bound as the second file server **entirely through the UI**, and the zero-code
+   claim was proven the strict way: `HEAD` read `91e8cc4ba` **before and after**, `git log
+   <base>..HEAD -- backend frontend` returned **0**, tree clean throughout. **GitHub appeared in the
+   Library's source picker** where it had never been, and `/browse` returned **200**. ⭐ Clearing the
+   binding removed it again — **the rows control the family in BOTH directions**, a stronger result
+   than the criterion asked for.
+   ⛔ **But the listing came back EMPTY.** `mcp_source.py:822`/`:956` send a lone `{"path": ...}`;
+   GitHub's `get_file_contents` requires **`owner` + `repo` + `path`**. ⭐ **The contract carries tool
+   NAMES as data and tool ARGUMENT SHAPES as code** — the first half is genuinely proven, the second
+   was never exercised by anything (`SEED-257`: no MCP file server could be driven locally at all).
+   Recorded as a finding **against Phase 232's contract**, as ROADMAP 239 instructs, naming the
+   specific inexpressible thing. Analysis + four unranked options: **`SEED-259`**, and the ruling is
+   an OPERATOR decision, not a build task.
+   ⛔ **The separate and more urgent half:** it failed as **`200` + empty**, not as an error — review
+   finding `HI-03`'s fail-open shape on a different path, *after* `HI-03` was fixed. An
+   empty-but-complete listing is what the **`H-5` deletion guard consumes**. Nothing was lost (a
+   browse, no watch, binding reverted, operator's environment restored) — but **a misbound server
+   that reads as empty is one `Add Watched Folder` away from being a deletion signal.**
+   ~~SC#2 is unmet, and it CANNOT BE DRIVEN ON THIS MACHINE — see `SEED-257`.~~ (superseded: it WAS
+   driven, using an already-connected server rather than a local one.) "Adding a source
    added rows, not code" is proven **in test only** (the `ls`/`cat` vocabulary exists nowhere as
    code). It closes on a **real second MCP file server** — and measured 2026-09-08: `mcp_client.py`
    is **HTTP/SSE only, no stdio**, while `egress.py` refuses `http://` and loopback **with no
