@@ -348,3 +348,30 @@ still reads `success`.
 ⭐ **The one genuinely good piece of news from the drive:** the operator's manual ingest of a mail
 label WORKED, and `thread_key` is populated on real mail in their Library. The shape, the parser
 and the column are right. What is wrong is the traversal cost, and that is one decision away.
+
+---
+
+## ✅ CONFIRMED BY THE OPERATOR 2026-09-09 — the product marks render
+
+The Gmail and Drive marks now draw on the Watched Folders rows, confirmed on screen by the
+operator. `da95d3658` closed it.
+
+⚠ **RECORDED BECAUSE OF HOW IT WAS FOUND, NOT BECAUSE IT WORKS.** I declared this feature done
+twice while it was drawing a neutral plug:
+
+1. First I blamed **stale HMR** and told the operator to hard-refresh. That was a guess, and it
+   was wrong.
+2. Then I read the source, saw `"google-gmail"` sitting in a marks table, and concluded the code
+   was right. It was not: `connectionMark` has **two** lookup tables in one module — one keyed by
+   CAPABILITY (`gmail_read`), one by SERVICE ID (`google-gmail`) — and I passed the service id to
+   the capability arm, which answers `unknown`.
+
+**A single render test resolved it in one run** (`VIA capability gmail_read: unknown` /
+`VIA service_id google-gmail: google-gmail`), after two rounds of reasoning had not.
+
+⭐ **The transferable lesson, and it is this phase's second instance of it:** when a value is
+correct and the SCREEN is wrong, the defect is in a hop nobody tested. The original suite asserted
+the key this module RETURNS; it never asserted that the key RESOLVES to a mark. It now pins the
+end of the chain — a returned key must resolve to a real mark and never to the neutral plug.
+
+⚠ Both times the operator found it by looking, after I had said it was fixed.
