@@ -597,6 +597,22 @@ export interface FullAppSettings {
   vector_search_weight: number
   keyword_search_weight: number
   rrf_k: number
+  /**
+   * Phase 241 (QUEUE-06 / D-09) — how many candidate vectors the index walks before the
+   * search's filters are applied (`hnsw.ef_search`), and whether it keeps scanning until
+   * enough results survive them (`hnsw.iterative_scan`).
+   */
+  hnsw_ef_search: number
+  hnsw_iterative_scan: string
+  /**
+   * ⛔ THE BOUNDS AND THE ENUM MEMBERS ARE SERVED, for the same reason
+   * `source_max_file_size_mb_floor` is: a form carrying its own copy of `1000`, or its own
+   * list of the three pgvector modes, is a second private constant that drifts from the
+   * database's CHECK with nothing to notice. Read them; never re-type them in a component.
+   */
+  hnsw_ef_search_floor: number
+  hnsw_ef_search_ceiling: number
+  hnsw_iterative_scan_values: string[]
   web_search_enabled: boolean
   web_search_has_api_key: boolean
   web_search_max_results: number
@@ -699,6 +715,13 @@ export interface SettingsUpdate {
   vector_search_weight?: number
   keyword_search_weight?: number
   rrf_k?: number
+  /**
+   * Phase 241 (QUEUE-06 / D-09). ⛔ No `_floor` / `_ceiling` / `_values` here and there must
+   * never be: the bounds are the SERVER's, read-only on the response. An out-of-range value
+   * is refused with a 400 whose body says what a bigger search breadth COSTS.
+   */
+  hnsw_ef_search?: number
+  hnsw_iterative_scan?: string
   tavily_api_key?: string
   web_search_max_results?: number
   sandbox_enabled?: boolean

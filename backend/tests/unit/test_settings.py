@@ -54,6 +54,13 @@ def _fake_settings(**overrides):
         vector_search_weight=0.7,
         keyword_search_weight=0.3,
         rrf_k=60,
+        # Phase 241 (QUEUE-06 / D-09), present for the same reason SEED-226 / SEED-258 are: the
+        # response genuinely REQUIRES them, and a `getattr` default here would hide a field the
+        # API forgot to build. The bounds beside them in the response (floor / ceiling / the
+        # three enum members) are code constants, not settings, so they are deliberately NOT
+        # stubbed — a stubbable bound is a settable bound.
+        hnsw_ef_search=40,
+        hnsw_iterative_scan="off",
         web_search_enabled=False,
         tavily_api_key="",
         web_search_max_results=5,

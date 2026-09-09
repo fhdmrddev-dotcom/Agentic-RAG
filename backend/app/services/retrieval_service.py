@@ -11,6 +11,7 @@ from app.config import settings
 from app.dependencies import get_user_pg_connection
 from app.services.openai_service import embed_texts
 from app.services.rerank_service import rerank
+from app.services.retrieval_tuning import apply_hnsw_session_knobs
 from app.utils.db import aexec
 
 if TYPE_CHECKING:
@@ -34,7 +35,13 @@ def _vector_literal(embedding: list[float]) -> str:
     return "[" + ",".join(repr(float(x)) for x in embedding) + "]"
 
 
-async def _call_as_user(user_id: str, fn_sql: str, *args) -> list[dict]:
+async def _call_as_user(
+    user_id: str,
+    fn_sql: str,
+    *args,
+    hnsw_ef_search: int | None = None,
+    hnsw_iterative_scan: str | None = None,
+) -> list[dict]:
     """Run a retrieval RPC (or any SELECT) over the Phase-163 asyncpg user-context (D-164-02).
 
     Opens ``get_user_pg_connection(None, {"id": user_id})`` — the uid-synthesized
@@ -46,8 +53,27 @@ async def _call_as_user(user_id: str, fn_sql: str, *args) -> list[dict]:
     stay str-keyed exactly like the PostgREST JSON, keeping ``_rrf_fuse`` / enrich lookups
     byte-compatible). Fail-closed: on a service-role/owner connection ``auth.uid()`` is NULL
     → empty org set → 0 rows.
+
+    Phase 241 (QUEUE-06 / D-10 / D-11) — the two optional HNSW knobs ride the transaction this
+    context manager ALREADY opens, so the COMMIT that already happens auto-reverts every
+    ``SET LOCAL`` and a scan budget cannot leak to the next borrower of the pooled connection.
+    No new plumbing; absent both knobs this function is byte-identical to the shipped one.
+
+    ⛔ **G-5 — READ THIS BEFORE ADDING ANYTHING ELSE HERE.** This file's extraction has been
+    **OWED since Phase 231** and this landing does NOT discharge it. It is the SECOND milestone
+    landing, permitted because the ROADMAP forbids a *third* without proposing the extraction
+    first — so a THIRD must propose that extraction before it adds behaviour. The knob LOGIC
+    (validation, the `set_config` statements, the degrade-not-fail arms, the hardcoded memory
+    companions) deliberately lives in ``app/services/retrieval_tuning.py`` precisely so this
+    file's delta stays a call and its arguments. Do not move it back, and do not edit the ledger
+    row to say the obligation was met: ``docs/HOT-FILE-LEDGER.md`` still reads
+    *extraction still OWED*.
     """
     async with get_user_pg_connection(None, {"id": user_id}) as conn:
+        if hnsw_ef_search is not None or hnsw_iterative_scan is not None:
+            await apply_hnsw_session_knobs(
+                conn, ef_search=hnsw_ef_search, iterative_scan=hnsw_iterative_scan
+            )
         rows = await conn.fetch(fn_sql, *args)
     return [dict(r) for r in rows]
 
@@ -94,6 +120,13 @@ async def _vector_search(
         metadata_filter if metadata_filter else None,
         folder_ids if folder_ids else None,
         current_model,
+        # Phase 241 (D-09 / D-11) — the ONLY caller that passes these: HNSW is the vector
+        # index, so `_keyword_search` below deliberately carries nothing. Resolved in the
+        # shipped `user_settings.x if user_settings else settings.x` idiom used at :365-372.
+        hnsw_ef_search=(user_settings.hnsw_ef_search if user_settings else settings.hnsw_ef_search),
+        hnsw_iterative_scan=(
+            user_settings.hnsw_iterative_scan if user_settings else settings.hnsw_iterative_scan
+        ),
     )
 
 

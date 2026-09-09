@@ -932,6 +932,23 @@ class Settings(BaseSettings):
     keyword_search_weight: float = 1.0
     rrf_k: int = 60  # RRF constant (standard: 60)
 
+    # Phase 241 (QUEUE-06 / D-09) — the HNSW scan knobs. ⛔ THESE TWO ARE THE MINIMAL
+    # HARDCODED DEFAULTS, NOT THE CONTROL: the operator's choice lives in
+    # `app_settings.hnsw_ef_search` / `.hnsw_iterative_scan` (migration 176) and reaches
+    # here only as `_val`'s fallback when no value is stored. Both values below are the
+    # LIVE pgvector server defaults measured 2026-09-10 (pgvector 0.8.0 / PG 17.6), which is
+    # what makes an unapplied migration 176 a no-op rather than a silent behaviour change.
+    hnsw_ef_search: int = 40
+    hnsw_iterative_scan: str = "off"  # off | strict_order | relaxed_order
+
+    # ⛔ HARDCODED-ONLY, DELIBERATELY — D-09 / threat T-241-16. These matter ONLY once
+    # iterative scan is on, and a wrong value is a MEMORY FOOTGUN rather than a tuning
+    # choice with a safe bounded control: `scan_mem_multiplier` multiplies work_mem for the
+    # scan, and `max_scan_tuples` bounds how far it will keep going. They are reachable from
+    # no settings column, no request field and no UI control — only from this file.
+    hnsw_max_scan_tuples: int = 20000
+    hnsw_scan_mem_multiplier: float = 1.0
+
     # Reranking (disabled by default — requires Cohere API key or local model)
     rerank_enabled: bool = False
     rerank_provider: str = "api"  # "api" (Cohere) or "local" (sentence-transformers)

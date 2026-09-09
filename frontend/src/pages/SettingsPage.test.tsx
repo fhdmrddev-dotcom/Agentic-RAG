@@ -15,6 +15,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, screen, within, waitFor, cleanup } from "@testing-library/react"
+import userEvent from "@testing-library/user-event"
 import type { FullAppSettings } from "@/lib/api"
 import { EffectiveFeaturesProvider } from "@/providers/EffectiveFeaturesProvider"
 
@@ -123,6 +124,16 @@ function mkSettings(overrides: Partial<FullAppSettings> = {}): FullAppSettings {
     vector_search_weight: 1,
     keyword_search_weight: 1,
     rrf_k: 60,
+    // Phase 241 (QUEUE-06 / D-09) — the two HNSW knobs and the bounds the server states.
+    // ⚠ NON-DEFAULT SERVED BOUNDS ON PURPOSE. With 10/1000 every assertion below would also
+    // pass against a page that ignored the response and rendered hardcoded numbers — the
+    // `sourceCeiling` suite's own lesson, applied. 17/823 can only reach the screen through
+    // the settings contract.
+    hnsw_ef_search: 40,
+    hnsw_iterative_scan: "off",
+    hnsw_ef_search_floor: 17,
+    hnsw_ef_search_ceiling: 823,
+    hnsw_iterative_scan_values: ["off", "strict_order", "relaxed_order"],
     web_search_enabled: false,
     web_search_has_api_key: false,
     web_search_max_results: 5,
@@ -315,5 +326,159 @@ describe("a member reaching Settings, and the retired Connections tab", () => {
       "aria-selected",
       "true",
     )
+  })
+})
+
+/**
+ * Phase 241 (QUEUE-06 / D-09) — the two HNSW knobs on the shipped Retrieval card.
+ *
+ * ⚠ EVERY CASE HERE ASSERTS RENDERED CONTENT, NEVER PRESENCE. Phase 235's finding, verbatim:
+ * *"a green fence coexisted with the shipped defect, because it asserted block PRESENCE by
+ * `data-testid` while the content drifted."* A `getByTestId("hnsw-row")` would pass against a
+ * row rendering the wrong bounds, the wrong modes, or nothing at all.
+ */
+describe("SettingsPage — search breadth and iterative scan (241 / D-09)", () => {
+  /**
+   * Radix unmounts inactive panels, so opening the tab is a precondition, not decoration.
+   *
+   * ⚠ THE TAB IS CALLED "Search", NOT "Search & Retrieval" — measured, after this suite first
+   * asserted the latter and failed on nine cases at once. `usePlainLabel` resolves
+   * `settings.tab.retrieval` and the provider defaults OFF, so the PLAIN word ships and
+   * "Search & Retrieval" is the ⌥ Technical-names reveal. The phase's own plan, its CONTEXT and
+   * `CLAUDE.md` all name the tab by its technical label; the product does not.
+   */
+  async function openRetrieval() {
+    const tab = await screen.findByRole("tab", { name: /^search$/i })
+    await userEvent.click(tab)
+    return tab
+  }
+
+  it("the fixture's own premise: getSettings serves the five 241 fields", async () => {
+    // ⚠ If the mock ever stops carrying these, every case below asserts against defaults.
+    const s = await mockGetSettings()
+    expect(s.hnsw_ef_search).toBe(40)
+    expect(s.hnsw_ef_search_floor).toBe(17)
+    expect(s.hnsw_ef_search_ceiling).toBe(823)
+    expect(s.hnsw_iterative_scan_values).toEqual(["off", "strict_order", "relaxed_order"])
+  })
+
+  it("⛔ the breadth input takes its min/max from the SERVED bounds, owning no copy", async () => {
+    // ⭐ THE CASE THAT IS THE REQUIREMENT. The mock serves 17/823 — numbers that appear nowhere
+    // in the component, in `config.py` or in migration 176 — so they can only be on screen if
+    // the form read them off the settings response.
+    renderSettings()
+    await openRetrieval()
+
+    const input = await screen.findByLabelText("Search breadth")
+    expect(input).toHaveAttribute("min", "17")
+    expect(input).toHaveAttribute("max", "823")
+  })
+
+  it("hydrates the STORED breadth rather than a hardcoded default", async () => {
+    mockGetSettings.mockResolvedValue(mkSettings({ hnsw_ef_search: 512 }))
+    renderSettings()
+    await openRetrieval()
+
+    const input = await screen.findByLabelText("Search breadth")
+    await waitFor(() => expect(input).toHaveValue(512))
+  })
+
+  it("states the served bounds on screen, beside the number", async () => {
+    renderSettings()
+    await openRetrieval()
+
+    await screen.findByLabelText("Search breadth")
+    const text = document.body.textContent ?? ""
+    expect(text).toContain("17")
+    expect(text).toContain("823")
+  })
+
+  it("says what a bigger breadth COSTS, matching the API's worded refusal", async () => {
+    // A bare number input fails this. The backend 400 names the same cost; the two must agree,
+    // or the operator learns the tradeoff only by being refused.
+    renderSettings()
+    await openRetrieval()
+
+    await screen.findByLabelText("Search breadth")
+    const text = document.body.textContent ?? ""
+    expect(text).toMatch(/candidate/i)
+    expect(text).toMatch(/memory/i)
+    expect(text).toMatch(/slower|faster/i)
+  })
+
+  it("⛔ renders THREE options by pgvector value — a boolean would drop one", async () => {
+    renderSettings()
+    await openRetrieval()
+
+    const picker = (await screen.findByLabelText("Keep scanning")) as HTMLSelectElement
+    expect(picker.tagName).toBe("SELECT")
+    const values = within(picker)
+      .getAllByRole("option")
+      .map((o) => (o as HTMLOptionElement).value)
+    expect(values).toEqual(["off", "strict_order", "relaxed_order"])
+  })
+
+  it("renders the options the SERVER lists, not a list of its own", async () => {
+    // The strongest form of the "owns no copy" property: serve a different set and watch the
+    // picker follow it. An unmapped mode falls back to its raw value rather than vanishing.
+    mockGetSettings.mockResolvedValue(
+      mkSettings({ hnsw_iterative_scan_values: ["off", "some_future_mode"] }),
+    )
+    renderSettings()
+    await openRetrieval()
+
+    const picker = (await screen.findByLabelText("Keep scanning")) as HTMLSelectElement
+    await waitFor(() => {
+      const values = within(picker)
+        .getAllByRole("option")
+        .map((o) => (o as HTMLOptionElement).value)
+      expect(values).toEqual(["off", "some_future_mode"])
+    })
+    expect(within(picker).getByText("some_future_mode")).toBeInTheDocument()
+  })
+
+  it("both knobs are visible while hybrid search is OFF — they govern the vector scan", async () => {
+    // ⚠ MEASURED FROM THE CODE, not assumed: `search_documents` calls `_vector_search` on the
+    // vector-only path too, so a control hidden behind the hybrid toggle would be a control
+    // still in effect and out of sight.
+    mockGetSettings.mockResolvedValue(mkSettings({ hybrid_search_enabled: false }))
+    renderSettings()
+    await openRetrieval()
+
+    expect(await screen.findByLabelText("Search breadth")).toBeInTheDocument()
+    expect(screen.getByLabelText("Keep scanning")).toBeInTheDocument()
+    // And the hybrid-only row really is gone, so this is not a vacuous pass.
+    expect(screen.queryByText(/RRF-K constant/i)).toBeNull()
+  })
+
+  it("Save Search Settings carries both keys on the payload the tab already sends", async () => {
+    renderSettings()
+    await openRetrieval()
+
+    const picker = await screen.findByLabelText("Keep scanning")
+    await userEvent.selectOptions(picker, "relaxed_order")
+    await userEvent.click(screen.getByRole("button", { name: /save search settings/i }))
+
+    await waitFor(() => expect(mockUpdateSettings).toHaveBeenCalled())
+    const body = mockUpdateSettings.mock.calls[0][0]
+    expect(body).toHaveProperty("hnsw_ef_search", 40)
+    expect(body).toHaveProperty("hnsw_iterative_scan", "relaxed_order")
+  })
+
+  it("⛔ surfaces the SERVER's refusal verbatim rather than clamping it away", async () => {
+    const REFUSAL =
+      "Search breadth must be between 17 and 823. It is how many candidate vectors the index " +
+      "walks before your filters are applied."
+    mockUpdateSettings.mockRejectedValueOnce(new Error(REFUSAL))
+
+    renderSettings()
+    await openRetrieval()
+
+    await screen.findByLabelText("Search breadth")
+    await userEvent.click(screen.getByRole("button", { name: /save search settings/i }))
+
+    expect(
+      await screen.findByText(new RegExp("must be between 17 and 823", "i")),
+    ).toBeInTheDocument()
   })
 })
