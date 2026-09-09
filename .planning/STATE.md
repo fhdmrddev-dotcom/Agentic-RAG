@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v4.0
 milestone_name: "Connected Knowledge"
 status: complete
-last_updated: "2026-09-07T19:14:00.000Z"
-last_activity: 2026-09-07
+last_updated: "2026-09-09T04:00:00.000Z"
+last_activity: 2026-09-09
 progress:
   total_phases: 14
-  completed_phases: 11
-  total_plans: 26
-  completed_plans: 26
+  completed_phases: 13
+  total_plans: 30
+  completed_plans: 30
   planned_plans_235: 12
-  percent: 71
+  percent: 86
 ---
 
 # Project State
@@ -36,7 +36,121 @@ can be taught new behaviors (skills) that persist and can be shared.
 **Current focus:** **Milestone v4.0 Connected Knowledge — STARTED 2026-09-04.** Phase numbering
 continues at **228**.
 
-Phase: 240 — Mail Is a Shape, Not a Fourth Adapter (NOT STARTED)
+Phase: 241 — Recall at Corpus Scale (NOT STARTED)
+Prior: 240 — Mail Is a Shape, Not a Fourth Adapter (✅ **BUILT 2026-09-09 — ⛔ REVIEW OWED**)
+
+## ▶ PHASE 240 — BUILT ALONE, UNATTENDED. START HERE.
+
+⚠ **THE OPERATOR TOLD ME GEMINI IS UNAVAILABLE** (2026-09-09) and directed an unattended
+end-to-end run: discuss → plan → execute → verify, with everything needing a person batched to
+the end. I did all four plans and wrote `240-VERIFICATION.md`, so **it is a self-verification and
+says so in its own first paragraph**. AGENTS.md §6.3 wants a reviewer who did not shape the build.
+**Two phases now owe one: 238 and 240.** `/code-review ultra` is operator-triggered and billed — I
+cannot launch it, so it is proposed, never claimed. This is `OV-240-01`.
+
+### ⭐ The claim, and the hash that supports it
+
+`sources/base.py` closes **BYTE-IDENTICAL** — `3b3d8770a6c9309f0635503d155dd8f7` before and after,
+`git diff --numstat` prints nothing. No fourth adapter, no registry key, and the whole delegation
+cost `google_drive.py` **+35 / −0 lines** (~20 of them comment). Mail is a **third virtual root**
+on the connection that already owns the mailbox: `SourceRegistry` resolves ONE adapter per
+connection, and the Gmail mailbox IS the Google connection (one row, one token, one consent, one
+place to revoke). The contract fence was driven RED three ways and `base.py` restored by md5.
+
+⚠ **The registry-key fence's FIRST planted defect did not fire** — I planted a `PROTOCOL_ADAPTERS`
+row, which is not a registry key. The test was right and the plant was wrong. Recorded because
+*"I drove it red"* means nothing unless the plant was the thing the fence claims to catch.
+
+### ⭐ WHAT THE PHASE FOUND — SC#2 WAS FALSE BEFORE IT STARTED
+
+`grep -n "rfc822|attachment" backend/app/services/ingest_splice.py` returned **one docstring line
+and no code**. The email-attachment child loop lived **only** in `api/documents.py`'s legacy
+`ingest_document`. **Watches and `/upload` both run the queue path.** A watched mailbox would have
+ingested fourteen messages and **zero attachments**, with the entire suite green, because every
+existing attachment test exercises the legacy path.
+
+⚠ **The FOURTH recorded disagreement between these two paths** — `ingest_splice.py`'s own comments
+narrate three (BUG-260905-06, the empty-chunk refusal, the Phase 234 provenance carry). Fixed the
+way the others were: one function (`services/email_attachments.py`), both callers,
+`documents.py` **+15 / −115**. ⭐ Proven a MOVE: the legacy pin passed before and after, unchanged.
+
+⭐ **ROADMAP 240's named dedup failure does NOT happen** — the relationship insert sits ABOVE the
+`is_duplicate` early-return, so a shared attachment links to both parents. **Driven RED by moving
+it below.**
+
+### ⭐ SC#1 was MEASURED, not assumed — and it holds
+
+A 14-message thread where every reply quotes message 1's paragraph: **1 of 14** documents carry it
+after `strip_quoted_replies`, across the **gmail**, **outlook** and **original-message** dialects.
+Neutralising the defence returns **14**, and the test asserts that too.
+⛔ **`retrieval_service.py` untouched** — it fires G-5 at 10 phases with an extraction owed since
+231, and ROADMAP 241 says a third landing must propose it first. The measurement being green is
+why no retrieval change was needed.
+
+### ⛔ SC#4 IS INHERITED, NOT DRIVEN
+
+`watch_service.py` closes **byte-unchanged** (`00de61cf57a7b96f0654f02416977bcd`), so mail rides
+the generic loop and the four Phase-234 promises apply by construction. **No mail watch has ever
+run.** Recorded as owed, not claimed.
+
+### Gates
+
+Backend **`71 failed / 4331 passed`**, failing **NAME SET** diffed with `comm -13` against the base
+at `50f66ec39`: **identical, zero new**, `+71` passing. Count gate **`OK — total 7914 · pinned
+7149 · 247/247 · 0 failing`** ⚠ *(it was RED at this phase's baseline on a tree whose frontend diff
+was EMPTY)*. `tsc -p tsconfig.app.json` 67 errors, **zero new**. Ledger gate **OK**. CLAUDE.md size
+OK. G-7 clear. G-8: 4 plans.
+
+⚠ **My first tsc baseline keyed on `file(line,col)`, so a 3-line barrel edit made two untouched
+errors read as NEW.** Compare `file + code + message`. My method was wrong and would have
+manufactured a finding.
+
+### ⭐ THREE OF MY OWN DEFECTS WERE CAUGHT BY EXISTING FENCES, NOT BY ME
+
+1. **`CR01.reset.test.tsx`** — `setConvoTotal` missing from the `doc.id` reset block; a collapsed
+   `PanelSection` never remounts, so a badge from document A would persist on document B.
+2. **`DocumentDetailPanel.a11y.test.tsx`** — an earlier draft mounted the section TWICE (once
+   inside a `hidden` div) so the panel could learn the total before showing it. The loading state
+   is `role="status"` and that suite asserts none exists before a PATCH. **Two mounts to avoid one
+   empty accordion was the wrong trade.**
+3. **My own positive control** — the picker fixture used `display_name` where the component reads
+   `name`, so every NEGATIVE assertion was passing vacuously.
+
+⚠ And one fence of mine was **blind on its first writing**: it asserted `'"user_id"' in body`, and
+deleting the actual `.eq("user_id", owner_id)` left it GREEN because a neighbouring line contained
+the string. **A fence a neighbouring line can satisfy is not a fence.**
+
+### ⭐ LEDGER FINDING — TWO ORPHANED CHILDREN OF TWO G-5 DISCHARGES
+
+`ingest_splice.py` FIRES at 4 phases and had **no row** — Phase 229's own G-5 discharge created it,
+so the extraction moved the code **out of the guardrail's sight**. `frontend/src/lib/api/documents.ts`
+had none either, from the Phase 207 split, whose sibling `api/workflows.ts` already records *"the
+207 split created it with NO row."* Two independent instances: **a refactor that discharges G-5
+must add rows for what it creates, in the same commit.**
+
+### ⛔ OWED — batched for the operator, as instructed. Nothing here is a failure.
+
+1. **G-4 UAT — 5 rows, none driven. Run `M-1` first; it unblocks M-2 and M-3.**
+   `M-1` watch a real Gmail label · `M-2` a watched message's attachment becomes its own document
+   · `M-3` search a long thread, get ONE hit · `M-4` disable the connection (⚠ disables a live
+   integration) · `M-5` delete a message at the source (⚠ destructive at the source).
+   ⚠ **The Google connection may need ONE reconnect**: `gmail.readonly` joined `default_scopes` on
+   2026-08-31 and a token minted before that answers `403`. The error now says so in words.
+2. **SC#4 is inherited, not driven** — `M-4` and `M-5` settle it.
+3. **The independent review** AGENTS.md §6.3 requires, for **238 AND 240**.
+4. **`SEED-260`** — Graph mail, deferred with a named trigger. Needs `Mail.Read` (a re-consent) and
+   an Azure app registration that does not exist. ⛔ Declined deliberately: **absent code is
+   honest; untestable code that looks tested is not.**
+5. **`SEED-171` gained a SEVENTH suite** — `LibraryPage.test.tsx` read 7, then 1, then 0 failing
+   across three runs on an EMPTY frontend diff. **The cap was not touched**, per that seed's own
+   instruction. Provably unmodified, never "fine".
+6. ⚠ **`sourceComposition.test.tsx` measures `16 failed / 33 passed` WITH and WITHOUT this phase** —
+   untouched inherited red. CLAUDE.md records it at `18 / 31` (2026-09-08). **A standing-red figure
+   that rots is how an inherited red gets mistaken for a new one.**
+
+**Closed:** `BUG-260908-02`, with the **first test suites either picker component has ever had** —
+the root cause the report itself names. Re-planting the bug reds 6 of the 10 new cases.
+
 Prior: 239 — Any MCP Server With Files (✅ **CLOSED 2026-09-09**)
 
 ⭐ **SC#2 MET, and the zero-code claim is proven by HASH, not asserted.** `HEAD` read `b918c408e`

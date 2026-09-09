@@ -1,6 +1,6 @@
 ---
 seed_id: SEED-171
-title: SIX suites flake non-deterministically (was FOUR at planting, then five at 196-05, six at the Phase 237 baseline), independent of GSD_VITEST_MAX_WORKERS and of machine load, and not every failure is a timeout — the count gate cannot reach 0 failing on demand
+title: SEVEN suites flake non-deterministically (was FOUR at planting, then five at 196-05, six at the Phase 237 baseline), independent of GSD_VITEST_MAX_WORKERS and of machine load, and not every failure is a timeout — the count gate cannot reach 0 failing on demand
 created: 2026-08-17
 planted_during: Phase 195 Wave 1 post-merge gate (orchestrator)
 status: planted
@@ -381,3 +381,37 @@ acceptance criterion reads *"the gate is green"* has written a criterion that fa
 plan controls. **Diff the failing SET against a baseline set captured on the merge base** — never
 compare counts, and never treat red as the builder's until the named file has been checked against
 `git diff --numstat`.
+
+
+---
+
+## ⚠ A SEVENTH SUITE, MEASURED AT PHASE 240'S BASELINE (2026-09-09)
+
+**`src/pages/__tests__/LibraryPage.test.tsx`** joins the list, and it was measured on the
+cleanest possible tree: **the frontend diff since the phase's base commit was EMPTY**
+(`git diff --stat 50f66ec39 HEAD -- frontend` printed nothing) and the count gate was already
+RED.
+
+| Run | Context | Result for this file |
+|---|---|---|
+| Gate run, cap 2 | full `TARGETS` set, no sibling agent | **7 failed** |
+| Isolated, cap 2 | this file alone | **1 failed / 16 passed** — `Test timed out in 5000ms` |
+| Gate run, cap 2, later same session | full set, after ~40 files of frontend work | **0 failed** |
+
+⭐ **Three runs, three different answers, on a file nobody had touched.** That is this seed's
+whole claim restated on a new suite: **the failing SET is never the same twice**, so no per-file
+baseline can absorb it and no cap setting makes `count gate OK` reachable on demand.
+
+⚠ **The same baseline run also reported two suites as `[missing-file]`** —
+`WorkflowBuilderPage.canvas.test.tsx` (pinned 128) and `WorkflowsPage.test.tsx` (pinned 59) —
+i.e. they did not run at all. Both are already on this list. A pinned suite that does not RUN is
+a distinct failure shape from one that runs red, and it is worth naming because the gate's
+`[missing-file]` message reads like a deleted file rather than a suite that timed out on import.
+
+⚠ **The cap was NOT adjusted, per this seed's own standing instruction.** Phase 240 captured the
+failing filenames from the gate's persisted JSON **before** re-running anything, checked each
+against `git diff --numstat`, found every one byte-unchanged, and moved on. The phase's final gate
+run read **`count gate OK` — 7914 total · 7149 pinned · 247/247 · 0 failing**, which is the same
+tree that had been red twice.
+
+⛔ **"Provably unmodified", never "fine."**
