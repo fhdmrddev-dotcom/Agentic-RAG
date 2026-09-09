@@ -101,6 +101,25 @@ async def claim_due_ingestion_jobs(
             )
             for row in due:
                 record = dict(row)
+                # ⚠ A NEW ATTEMPT STARTS WITH NO REASON. `documents.error_message`
+                #   describes the CURRENT attempt; leaving the previous one in place is what
+                #   would make the COALESCE in `record_job_failure` show a stale reason as
+                #   though it were live. Best-effort: a document row that has since been
+                #   deleted simply matches nothing.
+                if record.get("document_id"):
+                    await con.execute(
+                        """
+                        UPDATE documents
+                        SET error_message = NULL
+                        WHERE id = $1 AND error_message IS NOT NULL
+                        """,
+                        record["document_id"],
+                    )
+                # ⚠ THE JOB UPDATE STAYS LAST IN THIS LOOP ON PURPOSE. Ordering is
+                #   irrelevant inside the transaction, but `test_230_ingestion_jobs_db`'s claim
+                #   pin reads `con.execute.call_args` — the LAST call — so putting the clear
+                #   first leaves that pin passing UNEDITED, which is the evidence that this
+                #   change did not alter what claiming a job does.
                 await con.execute(
                     """
                     UPDATE ingestion_jobs
@@ -336,11 +355,28 @@ async def record_job_failure(
                     details_json,
                 )
                 if doc_id:
+                    # ── AN AUTHORED SENTENCE OUTRANKS AN EXCEPTION'S str() (2026-09-09) ────
+                    #
+                    # ⛔ THIS LINE PUT A UUID AND A PYTHON ERROR ON THE OPERATOR'S SCREEN.
+                    #    `splice_document` had already written the sentence meant for a person
+                    #    — *"The stored copy of this file could not be read…"* — and this
+                    #    UPDATE replaced it, in the same transaction, with
+                    #    `no bytes in storage for document 47a73155-…`.
+                    #
+                    # ⚠ THE PROJECT ALREADY ENFORCES THIS ON THE READ SIDE and did not on the
+                    #   write side: `sourceFailureSentence` and `fileFailureKind` exist so a
+                    #   provider string cannot reach a screen, while the queue could put
+                    #   whatever it caught straight into a column the Library renders verbatim.
+                    #
+                    # ⚠ SAFE ONLY BECAUSE A CLAIM CLEARS THE COLUMN (see
+                    #   `claim_due_ingestion_jobs`). Preserving a message without that would
+                    #   show a retried document the reason from a PREVIOUS attempt — a fresher
+                    #   lie than the one this fixes. The two changes work only as a pair.
                     await con.execute(
                         """
                         UPDATE documents
                         SET status = 'failed',
-                            error_message = $2,
+                            error_message = COALESCE(NULLIF(error_message, ''), $2),
                             updated_at = now()
                         WHERE id = $1
                         """,
