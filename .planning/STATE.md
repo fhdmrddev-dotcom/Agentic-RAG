@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
 milestone: v4.0
-milestone_name: "Connected Knowledge"
-status: complete
-last_updated: "2026-09-10T00:00:00.000Z"
-last_activity: 2026-09-10
+milestone_name: Connected Knowledge
+status: executing
+last_updated: "2026-09-09T21:54:32.064Z"
+last_activity: 2026-09-09
 progress:
-  total_phases: 14
-  completed_phases: 13
-  total_plans: 30
-  completed_plans: 30
-  planned_plans_235: 12
-  percent: 86
+  total_phases: 21
+  completed_phases: 10
+  total_plans: 62
+  completed_plans: 66
+  percent: 48
 ---
 
 # Project State
@@ -98,12 +97,15 @@ numeric-looking claim is a hypothesis. Recorded in `BUG-260910-02` with its inpu
 - **`BUG-260910-02`** — the 7 open build-review warnings (G-7 triage: none Critical, all criteria
   met). ⭐ **WR-07 and WR-09 get worse with time** — both are already wrong for Phase 238's
   shipped Graph family.
+
 - **`BUG-260909-03..07`** — 5 UAT findings. `-04` is the one to read: *"nothing happened"* while
   the sync had worked in 19 ms.
+
 - **`SEED-261`** (an attachment failure reaches no surface), **`SEED-262`** (the child rides
   beside the queue, not on it — **six two-paths disagreements, three found in one day**),
   **`SEED-263`** (forwards duplicate; stripping them would be worse), **`SEED-264`** (a deleted
   message now stays present — M-5's marking deliberately withdrawn).
+
 - ⛔ **Phase 238 still owes its review outright**, and BUS-171 is four days old.
 
 ## ▶ PHASE 240 — BUILT ALONE, UNATTENDED. START HERE.
@@ -176,10 +178,12 @@ manufactured a finding.
 
 1. **`CR01.reset.test.tsx`** — `setConvoTotal` missing from the `doc.id` reset block; a collapsed
    `PanelSection` never remounts, so a badge from document A would persist on document B.
+
 2. **`DocumentDetailPanel.a11y.test.tsx`** — an earlier draft mounted the section TWICE (once
    inside a `hidden` div) so the panel could learn the total before showing it. The loading state
    is `role="status"` and that suite asserts none exists before a PATCH. **Two mounts to avoid one
    empty accordion was the wrong trade.**
+
 3. **My own positive control** — the picker fixture used `display_name` where the component reads
    `name`, so every NEGATIVE assertion was passing vacuously.
 
@@ -203,14 +207,17 @@ must add rows for what it creates, in the same commit.**
    integration) · `M-5` delete a message at the source (⚠ destructive at the source).
    ⚠ **The Google connection may need ONE reconnect**: `gmail.readonly` joined `default_scopes` on
    2026-08-31 and a token minted before that answers `403`. The error now says so in words.
+
 2. **SC#4 is inherited, not driven** — `M-4` and `M-5` settle it.
 3. **The independent review** AGENTS.md §6.3 requires, for **238 AND 240**.
 4. **`SEED-260`** — Graph mail, deferred with a named trigger. Needs `Mail.Read` (a re-consent) and
    an Azure app registration that does not exist. ⛔ Declined deliberately: **absent code is
    honest; untestable code that looks tested is not.**
+
 5. **`SEED-171` gained a SEVENTH suite** — `LibraryPage.test.tsx` read 7, then 1, then 0 failing
    across three runs on an EMPTY frontend diff. **The cap was not touched**, per that seed's own
    instruction. Provably unmodified, never "fine".
+
 6. ⚠ **`sourceComposition.test.tsx` measures `16 failed / 33 passed` WITH and WITHOUT this phase** —
    untouched inherited red. CLAUDE.md records it at `18 / 31` (2026-09-08). **A standing-red figure
    that rots is how an inherited red gets mistaken for a new one.**
@@ -292,6 +299,7 @@ checked ok); and `docs/HOT-FILE-LEDGER.md` carries **77 sections for 231 rows** 
 sync rule is followed by nobody, waves 1 and 2 included.
 
 **OWED before this phase closes — it is NOT closed:**
+
 1. ⛔ **SC#2 DRIVEN 2026-09-08 against a real second server — PARTLY MET, and therefore NOT MET.**
    **GitHub MCP** was bound as the second file server **entirely through the UI**, and the zero-code
    claim was proven the strict way: `HEAD` read `91e8cc4ba` **before and after**, `git log
@@ -321,6 +329,7 @@ sync rule is followed by nobody, waves 1 and 2 included.
    **A public HTTPS MCP file server is required and none is currently named.** ⚠ Not a defect in
    either file — the egress refusal is the load-bearing security property here, and its own comment
    names the localhost carve-out as "the production hole".
+
 2. ⚠ **G-4 UAT DRIVEN 2026-09-08 — 2 of 3 rows PASS, 1 INCONCLUSIVE.** Record: `239-VALIDATION.md`.
    **Row 1 PASS** — Microsoft 365 reads `✓ Ready as source`; closed on DISCRIMINATION (five distinct
    verdicts across five shapes), not on the words appearing, and the `⏻ Disabled` arm was evidenced
@@ -344,6 +353,7 @@ sync rule is followed by nobody, waves 1 and 2 included.
    G-7 (a new input is a phase, not a closure round), and it was not in the backend round's brief
    either. **Until it ships, no MCP source can be pointed at a real folder through the product**,
    which independently blocks SC#2.
+
 3. ✅ **RESOLVED 2026-09-08 by operator decision (`526759c58`).** `mcp_client.MAX_MCP_BODY_BYTES` was
    2 MB on the whole response with base64 inflating 4/3, so an MCP file source could not import a file
    over **~1.5 MB** and TM-239-03's 25 MB ceiling could never fire. **Raised to 34 MB** (25 MB × 4/3 +
@@ -362,7 +372,7 @@ Prior: 237 — One Rule Engine, Not Two (✅ CLOSED 2026-09-06)
 Prior: 236 — The Corpus Under Attack (✅ FULLY CLOSED — GA GATE MET 2026-09-06)
 Prior: 235 — The Source Says What It Did (✅ CLOSED 2026-09-06)
 Plan: Phase 239 planned (3 plans across 3 waves: 239-01, 239-02, 239-03)
-Status: Phase 239 plans authored · Ready for Claude execution · BUG-260907-01 folded into 239-03
+Status: Ready to execute
 Gates at baseline (25c650231): backend `71 failed / 4026 passed` (ceiling 71, zero headroom) · vitest `total 7822 · pinned 7026` · tsc clean (0 errors)
 
 ## ▶ NEXT SESSION — start here
@@ -374,10 +384,12 @@ end-to-end run on 2026-09-07 and I did all three plans, so `238-VERIFICATION.md`
 **self-verification and says so in its own first paragraph**. AGENTS.md §6.3 wants a reviewer who
 did not shape the build — **Gemini**. The two highest-value targets, because they are the two
 places a self-verification is weakest:
+
    - **Drive the rewritten boundary fence RED yourself.** I planted `if "google" in service_id`
      in `base.py`, saw it fail by name at line 201, and restored the file md5-identical
      (`186c606c5cf3cb02ed42d2f34990248d`). *A guard nobody else has seen fire is still one
      person's word.*
+
    - **The two-step Graph download.** It is asserted against a fake `send_pinned_http`. The fake
      is mine, so it agrees with my adapter by construction.
 
@@ -420,6 +432,7 @@ and should watch for the same shape** — a caller guessing when the registry re
 - **`driveItem.file.hashes` is irrelevant to this design.** Nothing in this product reads a file
   hash; `modified_at` is the version key at every comparison site. The flag was raised against a
   design the contract does not use.
+
 - **`Files.Read.All` already ships and self-consents on a personal MSA.** ⛔ That says **nothing**
   about `Sites.Read.All` in an enterprise tenant, which travels with `SEED-256` un-softened and
   is the first thing to drive when that seed's trigger fires — before promising the capability
@@ -441,16 +454,20 @@ executors** in Phase 235. **Targeted suites per task; FULL gates once per WAVE.*
    claim about a broken source is unit-level, including the control wired at the very end. **`M-1`
    — revoke a real Drive grant — settles the whole path in one drive** and needs the operator,
    because it disables a live integration.
+
 2. **`SEED-253`** — mobile has no drawer trigger outside the chat view (PRE-EXISTING; needs its own
    sketch, so it was correctly refused inside a closure round).
+
 3. **`SEED-254`** — per-run per-file attribution; `connector_watch_items` holds one state per item.
 4. **`sourceComposition.test.tsx` closes at `16 failed | 33 passed` and is in NEITHER gate knob**, by
    decision — pinning a red suite turns the shared gate red; pinning it with an allowance makes a
    gate that cannot fail. All 16 are itemised with owners; **14 are provable against a pinned suite
    and none is a missing surface.**
+
 5. **The backend ceiling.** Measured **71 twice and 72 twice on an UNCHANGED tree**. The finding is
    not "make it 72" — **a zero-headroom gate on a non-deterministic measurement fails for reasons no
    plan controls.** Recommendation on the table: pin by NAME-SET (`comm -13`), not by count.
+
 6. **No tests for the three new health aggregates** (`_fetch_readability`, `_fetch_embedding_coverage`,
    `_fetch_outcomes_by_type`). Verified live in the browser, not pinned. ⚠ `_fetch_readability`
    carries **two measured traps** in comments — `chunk_count` drifts, and PostgREST caps at 1000 —
@@ -493,12 +510,14 @@ All 4 plans executed cleanly in 4 atomic commits (`79d9b1682`, `18e3f5009`, `b4b
 6. **Operator Ruling 1 & Migration 173**: Migration 173 applied to live DB; `full-schema.sql` regenerated cleanly via `scripts/regenerate-full-schema.sh`.
 
 ### Verification Gates
+
 - **Backend Unit**: `71 failed, 3971 passed, 2 xfailed, 2 xpassed`. Failing set identical to reviewer baseline set; ceiling 71 held at 0 headroom. BUS-184 resolved: deterministic email `document_type='email'` restored in `ingest_enrich.py:254` to prevent live LLM extraction overrides in `test_email_ingestion.py`.
 - **Vitest Count Gate**: `total 7816 · failed 2 · pinned total 7020` (+29 tests adopted, 29/29 passing; 2 failures are provably unmodified SEED-171 flakes).
 - **Hot-File Ledger**: 224 rows, 10 watched, OK.
 - **CLAUDE.md Size**: 81,332 chars, headroom 68,668, OK.
 
 ### ⛔ What is OWED, stated as a DECISION (AGENTS.md §6.3 / CLAUDE.md)
+
 - **G-4 Manual UAT**: Stated as an intentional decision rather than a claim that it ran. Phase 237 shipped a new rule-builder UI surface (scope switcher + condition popover restriction) that has not yet been clicked by a human operator in the live browser. Unit/integration tests and the count gate pin all programmatic contracts; lived-experience UAT will run alongside Phase 238.
 - **SEED-253 Named Limitation**: Existing source adapters (Google Drive, mock source) do not yet populate hierarchical folder paths on `SourceFile`, falling back to `/<filename>`. Folder-shaped path rules (e.g. `/Finance/`) silently never match until adapter folder-path resolution is implemented (forcing function: Phase 238 Graph adapter). Documented in comments at `base.py:43`, `preview_service.py:583`, and `ingest_enrich.py:537`.
 
@@ -575,6 +594,7 @@ headline failure mode, caught inside the phase built to prevent it.**
    question failing to make the agent obey — **on every provider in the native roster**. Today's
    evidence is offline unit tests plus a fully mocked rehearsal (`scripts/uat-adversarial-sync.py`
    is `_MockWatchedConnection` / `AsyncMock` end to end). **Nothing is synced; no model is called.**
+
 2. ⛔ **SC#10's behavioural half.** The roster passes on capability/prompt **parity** across all 8
    derived providers; per-provider *refusal* is undriven. Prompt-level guarantees are exactly the
    class that degrades per provider, which is why SC#10 exists.
@@ -645,13 +665,16 @@ the unbounded last-good read, the one-shot Library hand-off, the per-category ru
 `SENTENCE_FOR_FILE_FAILURE` finally mounted.
 
 **⛔ NOT DONE — plan 235-17 stopped after task 1 of 3.** Its remaining tasks were:
+
 1. **Wire `onNavigate` through `LibraryPage → IngestionTab → WatchedFoldersSection`** so the
    stopped-source control RENDERS AND ACTS. ⚠ **Verification measured this control ABSENT in the
    live tree — including for `token_revoked`.** So SC#2's *"offers one control that fixes it"* is
    **still not satisfied on screen**, for any cause.
+
 2. **Render the last-good instant** that plan 235-14 made available unbounded, with a zero-import
    `instantPhrase` at the CALLERS (both surfaces hand `COPY.lastGood` a RELATIVE band, so fixing
    G2 without this would ship *"Last read successfully on 3 weeks ago"*).
+
 3. `SEED-254` (per-run per-file attribution) was not planted.
 
 ### Success criteria as they actually stand
@@ -687,7 +710,7 @@ in `lib/api/_core.ts`, `index.css`, `CreateWatchModal.tsx`, plus deleted screens
 10:49-11:14). **Not touched by this phase.** Worktrees never saw it; no file overlapped any plan's
 `files_modified`.
 Resume file: `.planning/phases/235-the-source-says-what-it-did/235-01-PLAN.md`
-Last activity: 2026-09-06 — `/gsd:plan-phase 235` ran research → patterns → plan → check end to end.
+Last activity: 2026-09-09
 
 </details>
 
@@ -702,12 +725,15 @@ Last activity: 2026-09-06 — `/gsd:plan-phase 235` ran research → patterns �
 | checker-warning fixes | `396560e6b` | all four closed BEFORE execution, not carried |
 
 ⭐ **The three research findings that changed the phase's shape** (each would have shipped a defect):
+
 1. **There are FOUR `release_watch` call sites, not two** — one at `watch_service.py:115` inside
    `tick()`, **outside `sync_watch` entirely**. A plan editing only `sync_watch` loses every
    crash-shaped failure from the history. Plan 05 takes all four.
+
 2. **`settings.watch_process_enabled` is NOT "the reader is running"** — `main.py:587-589` swallows a
    failed start. The honest source is `app.state.watch_service is not None`. Reading the flag would
    have reproduced `BUG-260906-02`'s overclaim **inside the phase whose job is to stop overclaiming**.
+
 3. ⛔ **An external caller CANNOT open the Library Health tab today.** SURF-03's whole route
    (badge → popover → Health → card) was impossible; plan 08 threads a net-new `initialTab` prop
    `App → ChatLayout → LibraryPage` on the shipped `studioSkillId` precedent, **without** a seventh
@@ -743,8 +769,10 @@ says **172**, with the derivation (D-235-20).
 <summary>Superseded pre-plan block (kept, not overwritten)</summary>
 
 ✅ **Both pre-plan obligations were DISCHARGED before planning.**
+
 1. ✅ **`BUG-260906-01` fixed** — quick task `260906-5qd`, merged at `9d9e54743`. See the Quick Tasks
    table below for the measured gates and the one obligation it left owed.
+
 2. ✅ **G-2 sketch done and WON** — `.planning/sketches/233-the-source-says-what-it-did/`, winner
    **B — a healthy source is one line** (operator, 2026-09-06).
 </details>
@@ -851,13 +879,17 @@ assumed from the default.**
 
 **Four findings carried out, none a 234 defect** (folding them in would be a G-7 closure round adding
 capability):
+
 - **`BUG-260906-01`** (major) — classification rules never run on the **queue** ingest path, so no
   watched/synced file can ever be filed. ⚠ **Fifth instance of the 2026-09-05 shape**: two paths, one
   outcome, one doing the work. **Fix before 235.**
+
 - **`BUG-260906-02`** (major) — the Sync button reports `"scheduled"` for work nothing consumes, and
   says the same thing with the loop off. **This is the defect that hid the blocking one.** → Phase 235 SC#2.
+
 - **`BUG-260906-03`** (minor) — 2 of 5 documents are `completed` with chunks and **no `ingestion_jobs`
   row**; the job table is not a record of what was ingested. → Phase 235 SC#1 must choose what a run counts.
+
 - **`SEED-252`** — metadata-driven filing: many rules contributing (reversing D-118-3's `break`) and
   actually moving the file (reversing D-118-2). Recommendation recorded: a **per-rule
   `action` (`suggest`|`file`)** defaulting to `suggest`, rather than flipping D-118-2 wholesale.
@@ -909,17 +941,20 @@ uncommitted work once. **One of us belongs in a worktree.**
 Built by Gemini under pairing protocol (`AGENTS.md §3`). Role separation strictly preserved. All 5 plans committed and documented (`234-01-PLAN.md` through `234-05-PLAN.md` + summaries).
 
 ⭐ **Wave 1 (234-01): DB Layer & Migrations 168-171 Landed**
+
 - Schema migrations `168_connector_watches.sql`, `169_connector_watch_items.sql`, `170_documents_source_state.sql`, and `171_reserved.sql` committed and live.
 - DB models and DAL functions in `backend/app/db/watches.py` (6/6 tests passing in `tests/unit/db/test_watches_db.py`).
 - Full schema sync maintained without schema drift.
 
 ⭐ **Wave 2 (234-02): WatchService Engine & Lifecycle Diff**
+
 - `backend/app/services/watch_service.py` implemented reading on the scheduler cadence with per-watch and per-item error isolation (`SEED-239`).
 - **H-5 Completeness Guard**: `SourceListing.complete` defaults to `False` (fail-closed); set to `True` only when pagination exhausts with `next_page_token is None` and 0 errors. A non-complete listing strictly forbids marking files missing (Onyx #1161 guard).
 - Storage upload occurs before job enqueue (preventing empty document ingestion). File rename/move/re-share without duplicates (`SC#4`).
 - Tests: 10/10 green across `test_watch_service.py` and `test_watch_diff_completeness.py`.
 
 ⭐ **Wave 3 (234-03): Security Fences & CLAUDE.md Standing Rule Retired**
+
 - **H-4 / VIS-06 Classification Fence**: Strict visibility fence at `documents.py:1892` (`accept_classification`) and `documents.py:2325` (rule evaluation) preventing private-to-org-shared widening unless `force=True`.
 - **TRUST-03 Trifecta Guard**: Anti-injection fence in `backend/app/services/tool_dispatcher.py` forcing confirmation posture (`ask`) when write tools are called with connection content in retrieval context. Preserved `agent_loop.py` byte-identically (zero SC#10 triggers).
 - **VIS-05 Disconnect Freeze**: Connector deletion/token revocation freezes watches and retains documents safely without deletion.
@@ -927,12 +962,14 @@ Built by Gemini under pairing protocol (`AGENTS.md §3`). Role separation strict
 - Tests: 12/12 green across `test_classification_visibility_fence.py`, `test_tool_dispatcher_trifecta_fence.py`, and `test_disconnect_freeze.py`.
 
 ⭐ **Wave 4 (234-04): Sources API & Wire Endpoints**
+
 - FastAPI endpoints for watches in `backend/app/api/sources.py` (`/sources/watches`, `/api/sources/watches` aliases), lifecycle triggers (`/poll`, `/purge`, `/pause`, `/resume`).
 - Wire models in `backend/app/schemas/source.py`.
 - Frontend API client in `frontend/src/lib/api/sources.ts`.
 - Tests: 10/10 green in `tests/unit/api/test_sources_watches_api.py`.
 
 ⭐ **Wave 5 (234-05): Frontend Watched Folders Surface**
+
 - UI surface in `frontend/src/components/sources/WatchedFoldersSection.tsx` and `CreateWatchModal.tsx`.
 - Mounted cleanly in `frontend/src/components/library/IngestionTab.tsx` beside `ConnectedSourceSection`, pre-empting G-1 risk by leaving `ConnectionFormPanel.tsx` and `ConnectionsTab.tsx` 100% untouched.
 - Strict invariant copy: `checked every ${watch.interval_minutes} minutes` (`SURF-01`).
@@ -940,6 +977,7 @@ Built by Gemini under pairing protocol (`AGENTS.md §3`). Role separation strict
 - Tests: 64/64 frontend vitest tests green across `SourceFolderPicker`, `previewVocabulary`, `WatchedFoldersSection`, and `SourcePreviewPanel`.
 
 ⭐ **Gates & Integrity**:
+
 - Backend unit tests: 38/38 Phase 234 tests green (0 failed, 0 errors, within the locked 71 ceiling).
 - Frontend vitest tests: 64/64 green.
 - Deploy drift gate (`scripts/check-deploy-drift.sh`): PASS (0 drift across `.env.example`, `deploy/onebox.env.example`, `docker-compose.prod.yml`, and `docs/OPERATOR.md`).
@@ -1019,6 +1057,7 @@ criterion whose failure is invisible from the screen. Rows in `233-VERIFICATION.
 **Verdict: PASS, all criteria met.** SC#1 and SC#4 driven against a real killed process and proven.
 
 ⭐ **SC#1 RE-DRIVEN after defect fixes — PASS**:
+
 - Clean slate test (77 completed docs, 0 jobs), 20 files uploaded, uvicorn tree hard-killed mid-batch with job in `status='processing'`.
 - Job sat past 300s lease, was reclaimed by new worker, and completed cleanly.
 - Stage transition across reclaim: `tables_embedded` → `chunks_embedded` (resumed from chunk offset 450 rather than restarting from 0).
@@ -1029,9 +1068,11 @@ criterion whose failure is invisible from the screen. Rows in `233-VERIFICATION.
 `230-VERIFICATION.md` never claimed it was.** The correction is kept visible rather than silently
 applied, because *a verdict cell disagreeing with its own evidence cell* is the exact Phase 228
 finding this project has now hit twice.
+
 - **Defect A (jsonb string scalar)**: ✅ **VERIFIED.** `($n::text)::jsonb` plus a self-healing `CASE`.
   `jsonb_typeof = object` across all 14 jobs; the reclaimed job carried `{chunk_offset: 450}`, so
   **SC#4 checkpointed resumption is functional for the first time.**
+
 - **Defect B (document failure status sync)**: ✅ **VERIFIED BY DRIVING (2026-09-05).** It was
   recorded here as *implemented, not exercised* — zero jobs failed in the SC#1 re-drive, so the
   path had never been observed running. **The re-open trigger was then executed rather than left
@@ -1049,19 +1090,13 @@ ever advance. **Mint-then-enqueue is not atomic.** It does **not** block SC#1 �
 completed.** Its natural home is the same transaction boundary Defect B's fix established.
 
 ⭐ **Pre-flight and Review closures**:
+
 - Pre-flight G-1 closed: `run_stale_sweep()` in lifespan boot and periodic tick loop.
 - Blocking 1 closed: `segmentState()` in `IngestionStrip.tsx` gained `case 'paused'` arm.
 - Blocking 2 closed: UI duplication removed in `IngestionBatchLane.tsx`.
 - Correction 1: `tsc -p tsconfig.app.json` at exact 66 baseline.
 - Correction 2: Global concurrency bound via `pg_advisory_xact_lock(4230230)`.
 - All 5 test suites pass (33/33).
-
-
-
-
-
-
-
 
 ### ✅ Phase 231 — Connection-Scoped Visibility CLOSED (2026-09-05)
 
@@ -1086,12 +1121,14 @@ branch **fails CLOSED on activation** by inserting a real `dept_members` row.
    Connections page** — the `connector_connections` column-grant trap firing for the **second** time
    in this repo (migration 118 was the first, granting SELECT column by column). It has a memory
    entry and it still cost a broken page.
+
 2. ⚠ **A ledger cell written mid-phase was falsified by the same phase's own later commit.** The cell
    claimed `retrieval_service.py` byte-unchanged by 231; `46b046c5e` then modified it (+65/-3) for
    TRUST-04. **The reviewer caught it, not the builder.** Corrected to **18 / 10 / 423** in both
    `CLAUDE.md` and `docs/HOT-FILE-LEDGER.md` at `b10a7262d`. ⭐ **The rule: write the ledger note
    LAST, or re-derive at the phase's final commit.** ⚠ Its **G-5 extraction stays OWED** — 241 is the
    second landing this milestone; a third must propose the extraction first.
+
 3. ⚠ **Three ROADMAP flags were NOT discharged here, and none is a defect** — each is scope that
    belongs elsewhere: **Pitfall 3** (one `audit_log` row per connection-sourced retrieval hit) has no
    sync to attach to yet, and its own flag says retrofitting makes the first months permanently
@@ -1153,6 +1190,7 @@ builder session had gone idle. Both figures re-derived at HEAD, never copied:
    `30 / 14 / 1708` → **`32 / 15 / 1757`**; **the G-5 extraction stays OWED.**
    ⭐⭐ **This is Phase 231's OWN recorded finding repeating one phase later** — *write the ledger note
    LAST, or re-derive at the phase's final commit.* **A cell reading `✅ DISCHARGED` stops the next audit.**
+
 2. **`frontend/src/lib/api/connectors.ts` had NO ledger row**, despite being a `232-04` must-have. Added
    at **`11 / 6 / 594`** — absent for its entire life at six phases. ⚠ The plan quoted `10 / 5 / 552`,
    **already stale when it shipped**.
@@ -1263,6 +1301,7 @@ that looks like a decision.
   **Consequence: the vitest count gate cannot reach green**, so every phase since has closed against a
   gate that was already failing. ⚠ Root cause of the miss: *"frontend untouched, so the gate cannot be
   affected"* is **unsound here** — that suite imports `backend/app/api/documents.py?raw`.
+
 - **`BUS-117` — the backend unit baseline is NOT deterministic.** Measured 71 and 72 on byte-identical
   trees, by **two independent agents**. The unstable test is
   `test_cross_worker_cancellation.py::test_a_late_producer_finalize_may_not_write_failed_over_a_cancel`,
@@ -1278,10 +1317,12 @@ Found by the operator driving Phase 229's one visible change. **Three facts, all
 
 1. **Cloud import lives in the CHAT composer only** (`MessageInput.tsx:363-379` →
    `ConnectedFilePickerModal` at `:633`). There is **no cloud-import entry point in the Library**.
+
 2. **It writes to the Library ROOT and cannot do otherwise** — `connectors.py:1703-1709` calls
    `async_mint_document_row(...)` with **no `folder_id`** and **no `org_id`**, and the modal has **no
    folder picker**. ⚠ **NOT a Phase 229 regression:** 229 preserved the call's existing shape, and before
    229 the route failed outright with `PGRST204`. **229 is what made this reachable enough to notice.**
+
 3. **Chat has NO local-file upload at all** — zero hits for `type="file"` / `Paperclip` / `onDrop` /
    `uploadDocument` in `MessageInput.tsx`. The upload button exists only in the Library
    (`LibraryPage.tsx:555`). **The two doors are exactly inverted.**
@@ -1338,21 +1379,23 @@ column and the recursive `folder_is_org_shared()` function are **two definitions
 resolving that too — adding a department dimension on top of an unresolved org-shared predicate would
 compound it.
 
-
-
 ### Phase 230 — preconditions VERIFIED before briefing (2026-09-05, Claude)
 
 Measured so the plan set does not re-derive them:
 
 - **Migration `153` is FREE** — highest existing is `152_audit_log_connector_action_types…`. Gaps at
   130-139 / 142-149 must NEVER be backfilled.
+
 - **The claim pattern to copy EXISTS and is running** — `backend/app/db/schedules.py:307` uses
   `FOR UPDATE SKIP LOCKED` in an explicit transaction (documented at `:271`). Copy the shape for a second
   table with a different claim key. **No broker, no new process.**
+
 - **`backend/app/services/circuit_breaker.py` EXISTS** — `CircuitBreaker` (`:86`),
   `CircuitBreakerTrippedError` (`:63`). `QUEUE-05` trips this; do not write a second breaker.
+
 - ⛔ **`embed_texts` really does send everything in ONE request** — `openai_service.py:2129` passes
   `input=texts` with no chunking at all. `SEED-197` confirmed by reading. That is `QUEUE-04`'s subject.
+
 - ✅ **Clean baseline for restart-survival testing:** **77 completed** documents and **ZERO** in
   `pending` / `processing` / `extracting` / `failed`. **Any stuck row after this phase is genuinely its own.**
 
@@ -1361,9 +1404,11 @@ Measured so the plan set does not re-derive them:
 **Verdict: PASS, no corrections owed.** All seven pre-flight gaps closed as asked.
 
 ⭐ **The two that mattered were proven at RUNTIME:**
+
 - **SC#1** — `mint_document_row` called against the real DB **INSERTED** the row PostgREST used to refuse
   with `PGRST204`: `file_path` set, `status='pending'`, `content_hash` written, `version_number=1`,
   `is_latest=True`. **The connector import is genuinely fixed.**
+
 - **G-2** — same bytes minted twice, the second inside the still-`pending` window with
   `on_conflict="link"`, returned `is_duplicate=True` **and the same row id** — the exact race that
   previously raised 409 and recorded the attachment as *failed*. Probe rows cleaned up.
@@ -1386,11 +1431,13 @@ identical to `/upload`'s 11 keys · G-5 four chunk sites audited · G-6 email ro
 (`75 / 32 / 2408`), CLAUDE.md + `docs/HOT-FILE-LEDGER.md` in the SAME commit (`ba3010ffc`).
 
 ⚠ **Two observations, neither a defect, neither needing action:**
+
 1. **Two writers of `is_latest` disagree on scope.** `mint_document_row` retires siblings by
    `(user_id, filename)` — USER-scoped, correctly matching the old upload path. The **restore-version**
    endpoint (`documents.py:882-892`) retires by `(user_id, filename, folder_id)` — FOLDER-scoped. Both
    **predate 229 and neither was changed by it.** Recorded so it is not re-derived: *restoring* a version
    and *uploading* a version disagree about what a sibling is.
+
 2. The `-127 lines from 2535` delta in `229-VERIFICATION.md` measures against the **stale** ledger cell;
    the true prior figure was **2562**, so the real reduction is **154**. The current `2408` is correct and
    independently confirmed — only the delta's baseline is off.
@@ -1433,6 +1480,7 @@ reconcile instead gained an `else if (state.cap_paused)` branch at `ChatArea.tsx
    (`independent_verifier_absent_for`) and the evidence cell both say operator-blocked; only the verdict
    cell and the headline `5/5` disagree. This is exactly what pre-flight **G-4** warned about. Score is
    **4 passed / 1 blocked**, and the credits trigger stands.
+
 2. ✅ **FIXED — the gate row now reads `0 failing (single sample)`** with a SEED-171 note naming the reviewer's three failures and their byte-unchanged evidence (`228-VERIFICATION.md:201,206,210`). The original claim was `0 failing` as a property. Reviewer re-ran on the same tree:
    **`failed 3`, total 7434** — same total, same pins. Filenames taken from the gate's persisted JSON
    **before** any re-run: `WorkflowBuilderPage.session.test.tsx` (`AssertionError: expected 1 to be +0`
@@ -1458,17 +1506,22 @@ instrument for a Deep pause.
 - ⚠ **The requirement count is 38, not the 34 quoted at intake** (33 feature + 5 DEBT). `REQUIREMENTS.md`
   Traceability is filled and mechanically verified: **38 rows, 0 duplicates, 0 orphans**. A coverage check
   run against the wrong denominator is exactly how `LIB-08/09/10` survived a milestone living only in a heading.
+
 - ⭐ **Phase 234 retires the CLAUDE.md manual-upload-only rule IN THE SAME COMMIT** (`SEED-142`), and carries a
   **MANDATORY threat model**. **Phase 231 also carries a MANDATORY threat model.**
+
 - ⚠ **`DEBT-04`** (`app.<domain>`, `SEED-242`) is gated on an operator production push and **MAY BE DRIVEN OUT
   OF ORDER** — record it against 228 wherever it lands, never re-scope it.
+
 - ⚠ **`SURF-03` has no home surface in this product.** Decision owed at 235's discuss-phase; recommendation is
   app-shell signal + Health-tab row. **Closing it against the Health tab alone does NOT satisfy it** — that is
   still a page you have to open.
+
 - ⚠ **Ledger row OWED for `backend/app/services/scheduler_service.py`** (measures **5/2/399**, no row today) in
   234's commit — `LIB-08` binds the whole watch loop to it, so G-5 cannot fire on it at any count.
   **G-5 extraction OWED on `retrieval_service.py`** (fires at 231 *and* 241; a third landing must propose the
   extraction first).
+
 - ⚠ **G-5 triples were re-derived from git at roadmapping and 8 of 12 had DRIFTED** — e.g. `documents.py`
   measured `73/30/2562` against a cell reading `72/30/2535`. Re-derive, never read the cell.
 
@@ -1478,13 +1531,16 @@ instrument for a Deep pause.
 
 - The predicate takes a scope that today resolves to **`mine | org`**; the **`dept` branch is written
   and defaults to org-wide** until `dept_members` has rows.
+
 - **Nothing changes behaviourally.** No new access level ships, no UI, no third state a user can see.
 - ⭐ **Why now:** a second scope added *after* the predicate is set is a **re-ingest, not a migration**
   — the operator's own recorded reason, and the same logic `SEED-210` applies to source ACLs. Cheap
   this week, expensive the first time a real tenant asks for *"Finance can see this, Legal cannot."*
+
 - ⚠ **The fence:** *inert* means inert. 231 must not ship a department **UI**, a department **grant
   path**, or any behaviour that differs from today's two levels. If a plan finds itself building
   `dept_members` management, that is a different phase and it has not been scoped.
+
 - ⚠ 231 still owns resolving the `folders.is_org_shared` **column** vs `folder_is_org_shared()`
   **function** collision (G-1 at Phase 229 pre-flight) — a department dimension layered on an
   unresolved org-shared predicate compounds two ambiguities into one.
@@ -1521,18 +1577,23 @@ safely and at a customer's scale.
   with Drive / Graph / MCP / mail as **thin adapters**. If each source family grows its own ingest
   path, this is four milestones wearing one name. (The v3.9 lesson — *adding a service adds rows,
   not code* — applied inbound.)
+
 - ⚠ **THIS MILESTONE RETIRES A STANDING `CLAUDE.md` RULE.** *"Ingestion is manual file upload only
   — no connectors or automated pipelines"* is marked *dated, not permanent*, and must change **in
   the same commit** as the first sync connector (`SEED-142`). ⭐ **That same commit retires the
   reason ownership-based RLS was adequate** — until now every document was deliberately placed by a
   person who could already read it. `SEED-210` records that the rule was load-bearing for security
   in a way its own wording never claimed.
+
 - ⚠ **Threat model MANDATORY** on the sync phase — untrusted external content enters the corpus the
   agent answers from, plus a new credential scope.
+
 - ⚠ **The screen says "checked every N minutes"** — never *"instantly"* or *"on change"*. No delta
   cursor, no webhook. When one lands, the sentence changes in the same commit.
+
 - ⚠ **A file removed at the source is NOT removed from the Library** unless explicitly asked for. A
   revoked share must never silently delete knowledge the agent depends on.
+
 - ⚠ **Write and delete grants are OFF by default** — inherit Phase 213's approval model, invent nothing.
 - ✅ **`LIB-08` / `LIB-09` / `LIB-10` ARE NOW IN `REQUIREMENTS.md`** (done 2026-09-04) — they had never
   existed outside a roadmap heading, and a requirement that lives only in a heading is invisible to every
@@ -1581,13 +1642,17 @@ Full narrative: `.planning/milestones/v3.9-STATE-at-close.md`. Condensed so noth
   eight-row cross-provider roster, the other three SC#10 axes, and **eight G-4 operator drives**.
   Phase 217: **16 UAT rows**. Phase 225: `/code-review ultra review-base-225`, skipped on credits —
   **re-open trigger: credits available before the v3.9 production push.**
+
 - **Three requirements are narrower than their wording:** `CAT-05` (the cloud half of
   Add-a-connection was never verified), `GRANT-03` (the pause names the tool and arguments but never
   the service), `CHAT-06` (the armed connector set is stored nowhere; F5 silently disarms it).
+
 - ⚠ **`SEED-242` armed** — the product moves to `app.<domain>` at the next production push; seven
   steps across Vercel / Coolify / Supabase Auth / CORS. **Verify on a preview before promoting.**
+
 - ⚠ **25 reported bugs open on `surface: Agentic-RAG`** (`STATE.md` said 23 at the close; re-counted
   2026-09-04). Six are probably ONE root cause in the resume path — see the table below.
+
 - ✅ **The backend unit baseline WAS re-derived, and the claim recorded here was WRONG — kept, not
   overwritten.** This bullet asserted *"reads **95 failed / 3394 passed / 2 errors**; the `71` quoted
   all through v3.9 was measured over a different set."* **Measured 2026-09-04 at Phase 228 pre-flight**
