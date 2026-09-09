@@ -23,6 +23,8 @@ from supabase import Client
 if TYPE_CHECKING:
     from app.services.extraction_service import ExtractedDocument
 
+from app.services.transient_errors import is_transient
+
 log = logging.getLogger(__name__)
 
 
@@ -384,6 +386,33 @@ async def splice_document(
                 raw = supabase.storage.from_("documents").download(storage_path)
             except Exception as dl_exc:
                 log.warning("Storage download failed for %s (%s): %s", document_id, storage_path, dl_exc)
+                # ── A FAILED READ IS NOT AN EMPTY FILE (2026-09-09) ──────────────────────
+                #
+                # ⛔ SWALLOWING THIS COST A WATCHED EMAIL ITS DOCUMENT, and the report was a
+                #    lie: `no bytes in storage for document 47a73155…` while 145,843 bytes sat
+                #    in the bucket, uploaded 22 seconds earlier with a matching `file_size`.
+                #    The read had timed out — the same 20-second stall measured in
+                #    `email_attachments.py`, on a download instead of an upload.
+                #
+                # ⚠ FROM THE `raw = b""` LINE ONWARD THE TWO CASES WERE INDISTINGUISHABLE, and
+                #   they need OPPOSITE handling: an empty object is terminal and must be
+                #   refused; an unreadable one is transient and must be tried again.
+                #
+                # ⛔ AND THE REWRITE DISABLED THE RETRY THAT EXISTED. By the time the guard
+                #    below raised `RuntimeError("no bytes in storage …")`, the word `timeout`
+                #    was gone, so `ingestion_queue_service`'s classifier judged it PERMANENT:
+                #    `retry_count = 1` against `max_retries = 3`, and the job was failed for
+                #    good. The retry was there and could not fire.
+                #
+                # ⚠ ONLY WHEN THERE IS A JOB TO RETRY IT. Without a job nothing would catch a
+                #   re-raise, so that path keeps its previous behaviour exactly and falls
+                #   through to the refusal below. ⛔ `job_id`, NOT `job_uuid` — the parsed uuid
+                #   is not bound until further down, and reading it here is an
+                #   `UnboundLocalError` INSIDE an except block, which replaces the real cause
+                #   with a variable-name error. The refusal guard below uses `job_id` for the
+                #   same reason.
+                if job_id and is_transient(dl_exc):
+                    raise
                 raw = b""
         else:
             raw = b""
