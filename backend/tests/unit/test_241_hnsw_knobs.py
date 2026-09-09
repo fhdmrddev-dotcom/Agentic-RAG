@@ -481,8 +481,13 @@ def test_the_landing_on_the_hot_file_is_a_call_and_its_arguments():
     the thing that should have been extracted: the LOGIC lives in ``retrieval_tuning.py``, and
     what lands here is a signature, a guard, a call and two argument expressions.
 
-    Measured at 241-03: 8 non-comment lines. The cap is 12 — room for a reformat, never for a
-    second responsibility.
+    ⚠ MEASURED, NOT PREDICTED — and the prediction was wrong, which is why the number is
+    recorded here rather than reasoned about. 241-03 first wrote *"8"* from counting the edit it
+    intended; the shipped landing measures **11** (the `_vector_search` argument expression wraps
+    across three lines, and one docstring line names the module). The cap is **12**: one line of
+    slack, which is deliberately tight. Driven RED against a real plant — threading the knobs
+    through `_keyword_search` as well took it to 13 and this case failed by name alongside
+    `test_keyword_search_carries_no_hnsw_argument`.
     """
     lines = _hnsw_lines_in_retrieval_service()
     assert lines, (
