@@ -34,6 +34,9 @@ from app.services.sources.base import SourceConnectionDisabled, SourceRegistry
 
 CONN = {"id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", "service_id": "google", "is_enabled": True}
 
+#: A label id as `browse()` now hands it out — anchored at the moment it was offered (D-240-20).
+ANCHORED_INBOX = "mailbox:INBOX:after:1788900000"
+
 
 def _json(payload: dict[str, Any], status: int = 200) -> PinnedResponse:
     return PinnedResponse(
@@ -146,7 +149,8 @@ async def test_browse_mail_root_lists_labels_as_folders(
     rec = _install(monkeypatch, handler)
     page = await adapter.browse(CONN, folder_id="mailbox_root")
 
-    assert [n.id for n in page.items] == ["mailbox:INBOX", "mailbox:Label_9"]
+    assert [n.id.split(":after:")[0] for n in page.items] == ["mailbox:INBOX", "mailbox:Label_9"]
+    assert all(":after:" in n.id for n in page.items), "a label was offered with no start anchor"
     assert [n.name for n in page.items] == ["INBOX", "Suppliers"]
     assert all(n.kind == "folder" for n in page.items)
     assert rec.capabilities == ["gmail_read"]
@@ -219,7 +223,7 @@ async def test_list_files_maps_messages_to_source_files(
     }
     rec = _install(monkeypatch, _listing_handler([{"id": "m1", "threadId": "t1"}], meta))
 
-    page = await adapter.list_files(CONN, folder_id="mailbox:INBOX")
+    page = await adapter.list_files(CONN, folder_id=ANCHORED_INBOX)
 
     assert len(page.files) == 1
     f = page.files[0]
@@ -241,7 +245,7 @@ async def test_list_files_uses_the_mail_page_size_of_25(
 ) -> None:
     """D-240-12 — listing is N+1, so mail pages smaller than Drive does. Stated, not incidental."""
     rec = _install(monkeypatch, _listing_handler([], {}))
-    await adapter.list_files(CONN, folder_id="mailbox:INBOX")
+    await adapter.list_files(CONN, folder_id=ANCHORED_INBOX)
     assert rec.params(0).get("maxResults") == "25"
 
 
@@ -259,7 +263,7 @@ async def test_list_files_carries_the_page_token_through(
         }
     }
     _install(monkeypatch, _listing_handler([{"id": "m1"}], meta, next_token="PAGE2"))
-    page = await adapter.list_files(CONN, folder_id="mailbox:INBOX")
+    page = await adapter.list_files(CONN, folder_id=ANCHORED_INBOX)
     assert page.next_page_token == "PAGE2"
 
 
@@ -276,7 +280,7 @@ async def test_an_empty_subject_never_becomes_an_empty_name(
         }
     }
     _install(monkeypatch, _listing_handler([{"id": "m1"}], meta))
-    page = await adapter.list_files(CONN, folder_id="mailbox:INBOX")
+    page = await adapter.list_files(CONN, folder_id=ANCHORED_INBOX)
     assert page.files[0].name == "(no subject).eml"
 
 
@@ -299,7 +303,7 @@ async def test_a_hostile_subject_is_sanitised(
         }
     }
     _install(monkeypatch, _listing_handler([{"id": "m1"}], meta))
-    page = await adapter.list_files(CONN, folder_id="mailbox:INBOX")
+    page = await adapter.list_files(CONN, folder_id=ANCHORED_INBOX)
 
     name = page.files[0].name
     assert "\x00" not in name
@@ -398,7 +402,7 @@ async def test_no_mail_call_carries_the_drive_egress_key(
     would have destroyed that the moment a second scope was added.
     """
     rec = _install(monkeypatch, _listing_handler([], {}))
-    await adapter.list_files(CONN, folder_id="mailbox:INBOX")
+    await adapter.list_files(CONN, folder_id=ANCHORED_INBOX)
     assert "drive_read" not in rec.capabilities
 
 
@@ -444,7 +448,7 @@ async def test_a_page_costs_a_BOUNDED_number_of_requests(
     }
     rec = _install(monkeypatch, _listing_handler(messages, meta))
 
-    page = await adapter.list_files(CONN, folder_id="mailbox:INBOX")
+    page = await adapter.list_files(CONN, folder_id=ANCHORED_INBOX)
 
     assert len(page.files) == 25
     assert len(rec.calls) <= 3, (
@@ -483,7 +487,7 @@ async def test_a_rate_limited_member_is_retried_not_fatal(
     monkeypatch.setattr("app.services.sources.mail.gmail._BATCH_BACKOFF_SECONDS", 0)
     _install(monkeypatch, handler)
 
-    page = await adapter.list_files(CONN, folder_id="mailbox:INBOX")
+    page = await adapter.list_files(CONN, folder_id=ANCHORED_INBOX)
 
     assert [f.name for f in page.files] == ["Fine.eml", "Late.eml"], (
         "a 429 on one member of a batch lost that message instead of re-reading it"
@@ -515,4 +519,52 @@ async def test_the_listing_still_fails_closed_when_one_message_is_unreadable(
 
     _install(monkeypatch, handler)
     with pytest.raises(ValueError):
+        await adapter.list_files(CONN, folder_id=ANCHORED_INBOX)
+
+
+# ── the anchor (D-240-20, operator ruling 2026-09-09 — option A) ────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_the_listing_asks_gmail_only_for_mail_after_the_anchor(
+    adapter: GoogleDriveSourceAdapter, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """⭐ THE FIX FOR THE DEFECT THE OPERATOR FOUND: a watch reads forward, not backward.
+
+    Their INBOX holds **at least 30,000 messages**; an exhaustive listing runs ~100 minutes
+    against a 600 s lease, so the watch restarted from page 1 forever and ingested nothing.
+    Anchoring makes the set start empty and only GROW.
+
+    ⚠ SECONDS, not a calendar date — Google's filtering guide warns a bare date is read as
+    *"midnight on that date in the PST timezone"*.
+    """
+    rec = _install(monkeypatch, _listing_handler([], {}))
+    await adapter.list_files(CONN, folder_id="mailbox:INBOX:after:1788900000")
+    assert rec.params(0).get("q") == "after:1788900000"
+
+
+@pytest.mark.asyncio
+async def test_an_unanchored_mail_folder_is_REFUSED_not_silently_widened(
+    adapter: GoogleDriveSourceAdapter, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """⛔ EVERY ALTERNATIVE DEFAULT IS WORSE THAN A REFUSAL, and both were considered.
+
+    No filter re-creates the 30,000-message treadmill. A rolling window (say "last 30 days")
+    lets messages age OUT of a listing that still reports itself COMPLETE — and `watch_service`
+    reads an item missing from a complete listing as **deleted at source**. A worded refusal
+    costs one re-created watch; the alternatives cost silent wrong state on real documents.
+    """
+    _install(monkeypatch, _listing_handler([], {}))
+    with pytest.raises(ValueError) as exc:
         await adapter.list_files(CONN, folder_id="mailbox:INBOX")
+    assert "start date" in str(exc.value).lower()
+
+
+def test_the_anchor_survives_a_round_trip_and_does_not_leak_into_the_label() -> None:
+    """The label id Gmail is asked for must be the LABEL, never the label plus an anchor."""
+    from app.services.sources.mail import mailbox
+
+    fid = mailbox.anchored_label_id("Label_9", 1788900000)
+    assert mailbox.strip_folder_prefix(fid) == "Label_9"
+    assert mailbox.folder_anchor(fid) == 1788900000
+    assert mailbox.folder_anchor("mailbox:INBOX") is None

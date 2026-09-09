@@ -901,7 +901,7 @@ CONTRACT_FAMILIES: dict[str, _Family] = {
     # Phase 240 — the mail shape, on the adapter that already owns the connection.
     "mail_gmail": _Family(
         GoogleDriveSourceAdapter, "mail_google_adapter",
-        {"id": "conn-google", "service_id": "google"}, "mailbox:INBOX", "mailmsg:m-1",
+        {"id": "conn-google", "service_id": "google"}, "mailbox:INBOX:after:1788900000", "mailmsg:m-1",
     ),
 }
 

@@ -45,6 +45,26 @@ MAIL_ROOT_NAME = "Mail"
 FOLDER_PREFIX = "mailbox:"
 FILE_PREFIX = "mailmsg:"
 
+#: Separates a label from the moment a watch on it started caring (D-240-20, operator ruling
+#: 2026-09-09, option A).
+#:
+#: ⛔ WHY THE ANCHOR IS IN THE ID AND NOT A PARAMETER. `watch_service`'s listing loop is
+#:    EXHAUSTIVE — correct for a bounded folder, and fatal for a mailbox. Measured on the
+#:    operator's own account: the INBOX holds **at least 30,000 messages**, an exhaustive listing
+#:    runs **~100 minutes**, and the watch lease is **600 s**. The watch was therefore re-claimed
+#:    and restarted from page 1 every ten minutes, forever, ingesting nothing.
+#:
+#: ⭐ **"INBOX" and "INBOX since Tuesday" are different ADDRESSES**, so the anchor belongs in the
+#:    address. That keeps the fix DATA: no new contract parameter, no change to `sources/base.py`,
+#:    and no change to the shared watch loop that the Drive family depends on.
+#:
+#: ⛔ AND IT IS AN ANCHOR, NOT A ROLLING WINDOW. A rolling "last 30 days" would let messages age
+#:    OUT of the listing, and `watch_service` reads an item that has vanished from a COMPLETE
+#:    listing as deleted-at-source. An anchor is fixed at watch-creation, so the set only ever
+#:    GROWS and nothing can age out of it — which is the whole reason option A was chosen over
+#:    capping by count.
+ANCHOR_SEP = ":after:"
+
 #: Every message is handed to the pipeline as RFC-822 bytes, which is what makes it land on the
 #: SAME ``parse_eml_bytes`` a hand-uploaded ``.eml`` lands on. One parser, two doors.
 MAIL_MIME = "message/rfc822"
@@ -75,8 +95,29 @@ def is_mail_file(file_id: str | None) -> bool:
 
 
 def strip_folder_prefix(folder_id: str) -> str:
-    """The provider's own label id, with the namespace removed."""
-    return folder_id[len(FOLDER_PREFIX):] if folder_id.startswith(FOLDER_PREFIX) else folder_id
+    """The provider's own label id, with the namespace AND any anchor removed."""
+    raw = folder_id[len(FOLDER_PREFIX):] if folder_id.startswith(FOLDER_PREFIX) else folder_id
+    return raw.split(ANCHOR_SEP, 1)[0]
+
+
+def folder_anchor(folder_id: str) -> int | None:
+    """The epoch-seconds anchor carried by this folder id, or `None` if it carries none.
+
+    ⚠ EPOCH SECONDS, NOT A DATE, ON GOOGLE'S OWN ADVICE. Its filtering guide warns that *"all
+    dates used in the search query are interpreted as midnight on that date in the PST
+    timezone"* and says to *"pass the value in seconds instead"* for accuracy elsewhere. A
+    calendar date would silently shift a watch's start by up to a day depending on where the
+    operator is.
+    """
+    if ANCHOR_SEP not in (folder_id or ""):
+        return None
+    raw = folder_id.split(ANCHOR_SEP, 1)[1].strip()
+    return int(raw) if raw.isdigit() else None
+
+
+def anchored_label_id(label_id: str, anchor_epoch_seconds: int) -> str:
+    """`mailbox:<label>:after:<epoch>` — the address of "this label, from this moment on"."""
+    return f"{FOLDER_PREFIX}{label_id}{ANCHOR_SEP}{int(anchor_epoch_seconds)}"
 
 
 def strip_file_prefix(file_id: str) -> str:
@@ -94,10 +135,16 @@ def mail_root_node() -> SourceNode:
     return SourceNode(id=MAIL_ROOT_ID, name=MAIL_ROOT_NAME, kind="folder", has_children=True)
 
 
-def label_to_node(label_id: str, label_name: str) -> SourceNode:
-    """A mail label, wearing the shape of a folder."""
+def label_to_node(label_id: str, label_name: str, anchor_epoch_seconds: int) -> SourceNode:
+    """A mail label, wearing the shape of a folder, anchored at the moment it was offered.
+
+    ⚠ THE ANCHOR IS STAMPED HERE, AT BROWSE TIME, AND FROZEN BY WHOEVER PICKS IT. A watch stores
+    the id it was given, so the moment a person chose the label becomes the moment the watch
+    starts caring — and it never moves again. The preview inherits the same id, so what the
+    preview shows is exactly what the watch will bring in.
+    """
     return SourceNode(
-        id=f"{FOLDER_PREFIX}{label_id}",
+        id=anchored_label_id(label_id, anchor_epoch_seconds),
         name=label_name or label_id,
         kind="folder",
         has_children=False,

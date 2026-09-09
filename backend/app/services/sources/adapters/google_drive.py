@@ -239,6 +239,9 @@ class GoogleDriveSourceAdapter(SourceAdapter):
                 label_name=label_id,
                 page_token=page_token,
                 page_size=mail.MAIL_PAGE_SIZE,
+                # The anchor rides in the folder id (D-240-20). A watch stores the id it was
+                # given, so this is the moment the person picked the label — frozen, never rolling.
+                after_epoch_seconds=mail.mailbox.folder_anchor(folder_id or ""),
             )
 
         headers = {"Authorization": f"Bearer {token}", "Accept": "application/json"}

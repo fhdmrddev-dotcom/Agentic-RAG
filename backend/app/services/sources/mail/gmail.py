@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import time
 import json as jsonlib
 import logging
 from typing import Any
@@ -176,8 +177,12 @@ async def list_labels(token: str) -> list[SourceNode]:
         is_user = 1 if str(lbl.get("type", "")).lower() == "user" else 0
         return (is_user, str(lbl.get("name") or lbl["id"]).lower())
 
+    # ⚠ ONE anchor for the whole listing, taken once, so every label offered in the same browse
+    #   carries the same moment. Taking it per-label would give two labels picked in one sitting
+    #   two different start times for no reason a person could see.
+    anchor = int(time.time())
     return [
-        mailbox.label_to_node(str(lbl["id"]), str(lbl.get("name") or lbl["id"]))
+        mailbox.label_to_node(str(lbl["id"]), str(lbl.get("name") or lbl["id"]), anchor)
         for lbl in sorted(labels, key=sort_key)
     ]
 
@@ -342,6 +347,7 @@ async def list_messages(
     label_name: str | None = None,
     page_token: str | None = None,
     page_size: int = mailbox.MAIL_PAGE_SIZE,
+    after_epoch_seconds: int | None = None,
 ) -> FilePage:
     """One page of messages in a label, as files.
 
@@ -350,11 +356,27 @@ async def list_messages(
     alternative was naming each row by its message id, which would have made Phase 233's honest
     preview labels a column of hex.
     """
+    if after_epoch_seconds is None:
+        # ⛔ REFUSED, NOT DEFAULTED, AND THE REFUSAL IS THE SAFE ANSWER. Every alternative default
+        #   is worse: no filter re-creates the 30,000-message treadmill that made this watch
+        #   ingest nothing for hours, and a rolling window (say "last 30 days") lets messages age
+        #   OUT of a COMPLETE listing — which `watch_service` reads as deleted-at-source. A
+        #   worded refusal costs one re-created watch; the alternatives cost silent wrong state.
+        raise ValueError(
+            "This mail folder has no start date, so listing it would try to read the entire "
+            "mailbox. Remove this watch and add it again — mail folders picked from now on "
+            "carry the moment you chose them."
+        )
+
     params: dict[str, str] = {"maxResults": str(page_size)}
     if label_id:
         params["labelIds"] = label_id
     if page_token:
         params["pageToken"] = page_token
+    # Gmail's own search syntax. ⚠ SECONDS, not a calendar date — Google's filtering guide warns
+    # that a bare date is read as *"midnight on that date in the PST timezone"* and says to pass
+    # seconds for accuracy anywhere else.
+    params["q"] = f"after:{int(after_epoch_seconds)}"
 
     resp = await send_pinned_http(
         EGRESS_KEY,
