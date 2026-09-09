@@ -73,9 +73,27 @@ export function EmbeddingModelCard({
               type="button"
               data-testid="change-model"
               onClick={() => {
+                // ⛔ SELECT THE TAB FIRST — WITHOUT THIS THE DEEP-LINK LANDS NOWHERE.
+                //    Found by the operator, 2026-09-10: *"I click embedding model it is taking
+                //    me to the settings but I do not see the embedding model configuration."*
+                //
+                //    BOTH the embedding picker and the re-embed card live in Settings'
+                //    `TabsContent value="1"`. Radix unmounts inactive tab content, so opening
+                //    Settings on any other tab means `getElementById` finds nothing, `?.`
+                //    swallows it, and the person lands on whichever tab they last used with no
+                //    embedding configuration on screen at all.
+                //
+                // ⚠ `settings_active_tab` IS the seam: `SettingsPage` reads it in a lazy
+                //   `useState` initialiser, so writing it before navigating is what the page
+                //   picks up on mount.
+                //
+                // ⚠ THE COMMENT BELOW USED TO CLAIM THIS WAS *"the same shape
+                //   LibraryPage.tsx:585-597 already uses"*. It was not: that one dispatches
+                //   SELECT_TAB and THEN scrolls. This copied the scroll and dropped the select.
+                localStorage.setItem("settings_active_tab", "1")
                 onNavigate?.("settings")
-                // Scroll the Settings re-embed card into view — the same shape
-                // LibraryPage.tsx:585-597 already uses for its deep-link.
+                // Now scroll the re-embed card into view — the second half of LibraryPage's
+                // shape, which only works once its tab is the mounted one.
                 setTimeout(() => {
                   document
                     .getElementById("reembed-status-card")
