@@ -2889,6 +2889,7 @@ const BASELINE = {
   "CreateWatchModal.test.tsx": 5,
   "DocumentConversationSection.test.tsx": 8,
   "watchProductMark.test.ts": 4,
+  "navItemsUnknownIsNotDenied.test.ts": 4,
 
   // ══════════════════════════════════════════════════════════════════════════════
   // Added at Phase 214's CLOSE (plan `214-15`), collected here AFTER every file
@@ -4620,6 +4621,7 @@ const TARGETS = [
   "src/components/metadata/DocumentConversationSection.test.tsx",
   // ⚠ Named, not a directory: `src/components/sources` is STILL not a TARGETS directory entry.
   "src/components/sources/watchProductMark.test.ts",
+  "src/lib/__tests__/navItemsUnknownIsNotDenied.test.ts",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
