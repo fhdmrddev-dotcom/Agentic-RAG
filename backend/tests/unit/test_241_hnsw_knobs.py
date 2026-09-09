@@ -250,3 +250,329 @@ def test_an_absent_field_is_not_a_write():
     body = settings_api.SettingsUpdate()
     assert body.hnsw_ef_search is None
     assert body.hnsw_iterative_scan is None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Task 2 — the SET LOCAL seam: retrieval_tuning.py, and the landing on the hot file
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# ⛔ `backend/app/services/retrieval_service.py` FIRES G-5 at 18 / 10 / 423 and its extraction
+#    has been OWED since Phase 231. D-11 takes a DELIBERATE SECOND landing on it, which is why
+#    the helper lives in a NEW module: the hot file's whole delta is a call and its arguments.
+#    Nothing below may be read as a discharge — the ledger row still says *extraction still OWED*.
+
+import asyncpg  # noqa: E402
+
+import app.services.retrieval_service as rs  # noqa: E402
+
+
+def _tuning():
+    """Import the module under test LAZILY, deliberately.
+
+    Before ``retrieval_tuning.py`` exists a module-level import would make the whole file one
+    collection error — and a collection error is an ABSENCE, not evidence. Imported here, the
+    RED run names every case it breaks.
+    """
+    import app.services.retrieval_tuning as rt
+
+    return rt
+
+
+class _RecordingConn:
+    """A connection that records every ``(sql, args)`` it is handed. No database.
+
+    ``raise_on`` makes ONE knob's statement fail the way an older pgvector would, so the
+    "degrade the tuning, never the search" arm is driven rather than asserted about.
+    """
+
+    def __init__(self, raise_on: str | None = None, exc: type[BaseException] | None = None):
+        self.calls: list[tuple[str, tuple]] = []
+        self._raise_on = raise_on
+        self._exc = exc or asyncpg.exceptions.UndefinedObjectError
+
+    async def execute(self, sql: str, *args):
+        self.calls.append((sql, args))
+        if self._raise_on and self._raise_on in sql:
+            raise self._exc(f"unrecognized configuration parameter {self._raise_on!r}")
+        return "SELECT 1"
+
+    async def fetch(self, sql: str, *args):
+        self.calls.append((sql, args))
+        return []
+
+
+def _names(conn: _RecordingConn) -> list[str]:
+    """The GUC each recorded statement targets — read out of the statement's LITERAL, which is
+    only possible because the name is a literal. That is the invariant, read back."""
+    return [sql.split("'")[1] for sql, _ in conn.calls if "set_config" in sql]
+
+
+async def test_the_guc_name_is_a_literal_and_only_the_value_is_bound():
+    """⛔ T-241-14 — THE INJECTION SHAPE, and this module's one binding invariant.
+
+    A Postgres session parameter cannot take a bind parameter for its NAME, so the only safe
+    form is ``SELECT set_config('<literal>', $1, true)``. If a caller's string could reach the
+    statement TEXT, an operator-settable field would be an injection vector into a ``SET``.
+    """
+    rt = _tuning()
+    conn = _RecordingConn()
+    await rt.apply_hnsw_session_knobs(conn, ef_search=200, iterative_scan="relaxed_order")
+
+    assert conn.calls, "no statement was issued at all"
+    for sql, args in conn.calls:
+        assert "set_config" in sql
+        assert "$1" in sql, f"the value is not a bind parameter: {sql!r}"
+        for value in args:
+            assert str(value) not in sql, (
+                f"a caller value {value!r} was interpolated into the statement text: {sql!r}"
+            )
+
+    assert "hnsw.ef_search" in _names(conn)
+    assert "hnsw.iterative_scan" in _names(conn)
+
+
+def test_the_module_never_builds_a_SET_statement_by_concatenation():
+    """A SOURCE fence beside the behavioural one above, because a behavioural test can only see
+    the call shapes somebody thought to drive. Comments are stripped first, so the prose
+    explaining the rule cannot satisfy the rule."""
+    rt = _tuning()
+    body = "\n".join(
+        line for line in inspect.getsource(rt).splitlines() if not line.strip().startswith("#")
+    )
+    assert 'f"SET' not in body and "f'SET" not in body, (
+        "an f-string SET statement appeared in retrieval_tuning.py — the GUC name must be a "
+        "hardcoded literal and only the VALUE may be bound (T-241-14)"
+    )
+    assert '"SET LOCAL " +' not in body and "'SET LOCAL ' +" not in body
+    assert "set_config" in body, (
+        "POSITIVE CONTROL FAILED — the scan cannot find set_config in retrieval_tuning.py, so "
+        "both assertions above would pass vacuously."
+    )
+
+
+async def test_every_knob_is_applied_LOCAL_to_the_transaction():
+    """⛔ D-10 / T-241-15 — the property the whole remedy's safety rests on.
+
+    ``get_user_pg_connection`` opens ``async with conn.transaction()`` and its own docstring
+    states *"the COMMIT at context exit auto-reverts every SET LOCAL"*. That is what stops a
+    knob leaking to the NEXT borrower of the pooled connection. ``set_config``'s third argument
+    is what makes it local — assert the ARGUMENT, never a comment, so a future refactor to
+    ``false`` turns this red instead of leaking silently.
+    """
+    rt = _tuning()
+    conn = _RecordingConn()
+    await rt.apply_hnsw_session_knobs(conn, ef_search=200, iterative_scan="strict_order")
+
+    assert conn.calls
+    for sql, _args in conn.calls:
+        assert "true" in sql.split(",")[-1], (
+            f"set_config's is_local argument is not true — the knob would OUTLIVE the "
+            f"transaction and leak to the next pool borrower: {sql!r}"
+        )
+
+
+async def test_a_knob_the_server_does_not_know_degrades_the_TUNING_not_the_SEARCH():
+    """⚠ NOT DEFENSIVE DECORATION. ``hnsw.iterative_scan`` DOES NOT EXIST below pgvector 0.8 and
+    cloud parity is UNVERIFIED (D-14). An unrecognised parameter must cost the tuning and
+    nothing else — so ``ef_search`` is still applied, in either order of failure.
+    """
+    rt = _tuning()
+    conn = _RecordingConn(raise_on="hnsw.iterative_scan")
+    await rt.apply_hnsw_session_knobs(conn, ef_search=200, iterative_scan="relaxed_order")
+    assert "hnsw.ef_search" in _names(conn), (
+        "the ef_search knob was skipped because a DIFFERENT knob failed — each is applied in "
+        "its own try, or one old GUC disables the remedy entirely"
+    )
+
+    conn2 = _RecordingConn(raise_on="hnsw.ef_search")
+    await rt.apply_hnsw_session_knobs(conn2, ef_search=200, iterative_scan="relaxed_order")
+    assert "hnsw.iterative_scan" in _names(conn2)
+
+
+async def test_an_invalid_parameter_value_is_swallowed_too():
+    """``InvalidParameterValueError`` is the other shape an unusable knob arrives in — a value
+    the server will not accept for a parameter it DOES know."""
+    rt = _tuning()
+    conn = _RecordingConn(
+        raise_on="hnsw.iterative_scan", exc=asyncpg.exceptions.InvalidParameterValueError
+    )
+    await rt.apply_hnsw_session_knobs(conn, ef_search=200, iterative_scan="relaxed_order")
+    assert "hnsw.ef_search" in _names(conn)
+
+
+async def test_the_default_configuration_issues_NO_statements():
+    """⭐ THE CHOICE, PINNED RATHER THAN LEFT TO BE DISCOVERED.
+
+    When the effective values ARE the pgvector server defaults (40 / "off") there is nothing to
+    change: ``SET LOCAL`` reverts at COMMIT, so every transaction starts at the server's own
+    configuration. Issuing the statements anyway would cost two extra round trips on EVERY
+    search to assert what is already true — and, worse, would silently OVERRIDE a server whose
+    ``postgresql.conf`` had been tuned away from 40 by somebody who meant it.
+
+    So: nothing stored => this code touches nothing. That is the same fail-soft claim
+    ``test_an_empty_row_reads_the_live_server_configuration`` makes one layer up, and THIS is
+    the layer where it is actually true.
+    """
+    rt = _tuning()
+    conn = _RecordingConn()
+    await rt.apply_hnsw_session_knobs(conn, ef_search=40, iterative_scan="off")
+    assert conn.calls == [], (
+        "the default configuration issued statements — a no-op setting must cost no round trips "
+        "and must never override a server tuned by hand"
+    )
+
+    conn2 = _RecordingConn()
+    await rt.apply_hnsw_session_knobs(conn2, ef_search=None, iterative_scan=None)
+    assert conn2.calls == []
+
+
+async def test_the_memory_companions_ride_only_when_iterative_scan_is_ON():
+    """D-09 / T-241-16. Read from ``config.py`` — never from a row, never from a request — and
+    they mean nothing while iterative scan is off."""
+    rt = _tuning()
+    off = _RecordingConn()
+    await rt.apply_hnsw_session_knobs(off, ef_search=200, iterative_scan="off")
+    assert "hnsw.max_scan_tuples" not in _names(off)
+    assert "hnsw.scan_mem_multiplier" not in _names(off)
+
+    on = _RecordingConn()
+    await rt.apply_hnsw_session_knobs(on, ef_search=200, iterative_scan="relaxed_order")
+    by_name = {sql.split("'")[1]: args for sql, args in on.calls}
+    assert by_name["hnsw.max_scan_tuples"][0] == str(env_settings.hnsw_max_scan_tuples)
+    assert by_name["hnsw.scan_mem_multiplier"][0] == str(env_settings.hnsw_scan_mem_multiplier)
+
+
+async def test_a_mode_outside_the_enum_never_reaches_the_database():
+    """Validated against the three-member tuple BEFORE it is bound. The API refuses one on the
+    way IN; this is the second door, because the value is also read back out of a database
+    column a hand-edit could have written."""
+    rt = _tuning()
+    conn = _RecordingConn()
+    await rt.apply_hnsw_session_knobs(conn, ef_search=None, iterative_scan="'; DROP TABLE x --")
+    assert "hnsw.iterative_scan" not in _names(conn)
+
+
+async def test_ef_search_is_coerced_through_int_before_it_is_bound():
+    """Belt and braces beside the bind parameter: what travels is a plain integer's text, never
+    whatever object a caller happened to hold."""
+    rt = _tuning()
+    conn = _RecordingConn()
+    await rt.apply_hnsw_session_knobs(conn, ef_search="200", iterative_scan=None)
+    matching = [(s, a) for s, a in conn.calls if "hnsw.ef_search" in s]
+    assert len(matching) == 1
+    assert matching[0][1] == ("200",)
+
+
+# ── The landing on the G-5 hot file ──────────────────────────────────────────
+
+def _hnsw_lines_in_retrieval_service() -> list[str]:
+    return [
+        line.strip()
+        for line in inspect.getsource(rs).splitlines()
+        if ("hnsw" in line.lower() or "retrieval_tuning" in line)
+        and not line.strip().startswith("#")
+    ]
+
+
+def test_the_landing_on_the_hot_file_is_a_call_and_its_arguments():
+    """⛔ D-11 / G-5. ``retrieval_service.py``'s extraction has been OWED since Phase 231 and
+    this is the SECOND milestone landing on it; the ROADMAP says a THIRD must propose the
+    extraction before adding behaviour. The cap exists so the delta cannot quietly grow into
+    the thing that should have been extracted: the LOGIC lives in ``retrieval_tuning.py``, and
+    what lands here is a signature, a guard, a call and two argument expressions.
+
+    Measured at 241-03: 8 non-comment lines. The cap is 12 — room for a reformat, never for a
+    second responsibility.
+    """
+    lines = _hnsw_lines_in_retrieval_service()
+    assert lines, (
+        "POSITIVE CONTROL FAILED — no hnsw / retrieval_tuning line found in "
+        "retrieval_service.py, so the cap below would pass vacuously."
+    )
+    assert len(lines) <= 12, (
+        f"the D-11 landing has grown to {len(lines)} non-comment lines:\n"
+        + "\n".join(lines)
+        + "\n⛔ G-5: put the logic in retrieval_tuning.py. This file's extraction is still OWED."
+    )
+
+
+def test_keyword_search_carries_no_hnsw_argument():
+    """HNSW is irrelevant to ``keyword_search_chunks`` — it is a tsquery, not a vector scan.
+    Threading the knobs through it would spend the cost with none of the benefit, and would
+    make the seam look like a general-purpose one."""
+    src = inspect.getsource(rs._keyword_search)
+    assert "keyword_search_chunks" in src, (
+        "POSITIVE CONTROL FAILED — this is not the function the fence thinks it is."
+    )
+    assert "hnsw" not in src.lower()
+
+
+def test_the_G5_sentence_is_written_into_the_hot_file_itself():
+    """⛔ A future reader must not be able to mistake this landing for a discharge — and the
+    place they will be reading is the FILE, not this test and not a SUMMARY."""
+    src = inspect.getsource(rs).lower()
+    assert "owed" in src and "g-5" in src, (
+        "the G-5 sentence is missing from retrieval_service.py: the second landing must say, "
+        "in the file, that the extraction is still owed and that a third must propose it first"
+    )
+
+
+async def test_vector_search_passes_the_resolved_knobs_and_keyword_search_does_not(monkeypatch):
+    """The wiring, driven end to end with no database: ``_vector_search`` resolves the two
+    values off ``user_settings`` (in the shipped ``x = user_settings.x if user_settings else
+    settings.x`` idiom) and hands them to ``_call_as_user``; ``_keyword_search`` hands nothing.
+    """
+    seen: list[dict] = []
+
+    async def _fake_call_as_user(user_id, fn_sql, *args, **kwargs):
+        seen.append({"sql": fn_sql, "kwargs": kwargs})
+        return []
+
+    monkeypatch.setattr(rs, "_call_as_user", _fake_call_as_user)
+    monkeypatch.setattr(rs, "embed_texts", lambda *a, **k: [[0.1, 0.2, 0.3]])
+
+    s = _build_settings_from_row({"hnsw_ef_search": 400, "hnsw_iterative_scan": "strict_order"})
+    await rs._vector_search("q", "u1", MagicMock(), None, 5, 0.3, s)
+    assert seen[-1]["kwargs"] == {"hnsw_ef_search": 400, "hnsw_iterative_scan": "strict_order"}
+
+    await rs._keyword_search("q", "u1", MagicMock(), None, 5)
+    assert seen[-1]["kwargs"] == {}
+
+
+async def test_call_as_user_applies_the_knobs_INSIDE_the_existing_transaction(monkeypatch):
+    """⛔ D-10, and the whole point: NO NEW PLUMBING. The knobs ride the transaction
+    ``get_user_pg_connection`` already opens, so the COMMIT that already happens reverts them.
+
+    Driven by asserting the ORDER — the knobs are applied on the same connection, before the
+    fetch, inside the one context manager — and by asserting that a call with neither knob
+    resolved is byte-identical to the shipped one.
+    """
+    from contextlib import asynccontextmanager
+
+    conn = _RecordingConn()
+
+    @asynccontextmanager
+    async def _fake_conn(request, current_user):
+        yield conn
+
+    monkeypatch.setattr(rs, "get_user_pg_connection", _fake_conn)
+    await rs._call_as_user(
+        "u1", "SELECT 1", hnsw_ef_search=400, hnsw_iterative_scan="strict_order"
+    )
+
+    kinds = ["knob" if "set_config" in sql else "query" for sql, _ in conn.calls]
+    assert kinds.count("query") == 1
+    assert kinds.index("query") == len(kinds) - 1, (
+        "the knobs were applied AFTER the query (or not on this connection) — they must be set "
+        "before the scan they are meant to widen"
+    )
+
+    plain = _RecordingConn()
+
+    @asynccontextmanager
+    async def _fake_plain(request, current_user):
+        yield plain
+
+    monkeypatch.setattr(rs, "get_user_pg_connection", _fake_plain)
+    await rs._call_as_user("u1", "SELECT 1")
+    assert [s for s, _ in plain.calls] == ["SELECT 1"]
