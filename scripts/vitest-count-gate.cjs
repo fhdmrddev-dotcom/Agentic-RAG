@@ -2888,7 +2888,7 @@ const BASELINE = {
   "ConnectedSourceSection.test.tsx": 5,
   "CreateWatchModal.test.tsx": 5,
   "DocumentConversationSection.test.tsx": 8,
-  "watchProductMark.test.ts": 4,
+  "watchProductMark.test.ts": 7,
   "navItemsUnknownIsNotDenied.test.ts": 4,
 
   // ══════════════════════════════════════════════════════════════════════════════

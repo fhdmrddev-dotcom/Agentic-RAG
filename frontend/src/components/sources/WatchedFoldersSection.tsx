@@ -786,7 +786,7 @@ function WatchRow({
           >
             <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
             {productMarkKey && (
-              <ConnectionMarkGlyph shape={{ capability: productMarkKey }} size="row" />
+              <ConnectionMarkGlyph shape={{ service_id: productMarkKey }} size="row" />
             )}
             <span className="font-medium text-sm text-foreground">{watch.source_folder_name}</span>
             {statePill}
@@ -814,7 +814,7 @@ function WatchRow({
                   </button>
                 )}
                 {productMarkKey && (
-                  <ConnectionMarkGlyph shape={{ capability: productMarkKey }} size="row" />
+                  <ConnectionMarkGlyph shape={{ service_id: productMarkKey }} size="row" />
                 )}
                 <span className="font-semibold text-sm text-foreground">
                   {watch.source_folder_name}

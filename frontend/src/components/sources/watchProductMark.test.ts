@@ -39,3 +39,37 @@ describe("watchProductMarkKey", () => {
     expect(watchProductMarkKey("mailbox:Label_9", "google_workspace")).toBe("google-gmail")
   })
 })
+
+// ── the half that reading the source did NOT catch ──────────────────────────────────────────
+//
+// ⛔ THE KEY MUST ACTUALLY RESOLVE TO A MARK, AND THE FIRST VERSION OF THIS FEATURE DID NOT.
+// `watchProductMarkKey` returned `"google-gmail"` correctly and the row still drew the neutral
+// plug, because the glyph was handed `{ capability: key }` — and `connectionMark`'s capability
+// arm keys on capability names (`gmail_read`), while `"google-gmail"` is a SERVICE id. Both
+// tables live in the same module and both contain google-shaped strings, so reading the source
+// was not enough: `connectionMark({capability:"google-gmail"})` answers `unknown`.
+//
+// ⚠ The operator found it by looking at the screen after I had told them it was fixed. This test
+// is the thing that should have caught it, and it asserts the END of the chain rather than the
+// middle: a key this module returns must resolve to a REAL mark, never the neutral plug.
+import { connectionMark } from "@/lib/connectionMark"
+
+describe("the key this module returns actually resolves to a product mark", () => {
+  it("a mail watch resolves to the Gmail mark, not the neutral plug", () => {
+    const key = watchProductMarkKey("mailbox:INBOX:after:1788900000", "google")
+    expect(connectionMark({ service_id: key }).key).toBe("google-gmail")
+  })
+
+  it("a Drive watch resolves to the Drive mark, not the neutral plug", () => {
+    const key = watchProductMarkKey("1CVGai6ItBA8", "google")
+    expect(connectionMark({ service_id: key }).key).toBe("google-drive")
+  })
+
+  it("neither resolves to the neutral 'unknown' mark", () => {
+    // The assertion that would have failed on the shipped-and-wrong version.
+    for (const folder of ["mailbox:INBOX", "some-drive-folder"]) {
+      const key = watchProductMarkKey(folder, "google")
+      expect(connectionMark({ service_id: key }).key).not.toBe("unknown")
+    }
+  })
+})
