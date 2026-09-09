@@ -48,6 +48,7 @@ import {
   CHECKED_PREFIX,
   COPY,
   COUNT_ORDER,
+  RUN_PARTIAL_LABEL,
   WORD_FOR_COUNT,
   sourceFailureSentence,
 } from "./sourceHealthVocabulary"
@@ -240,7 +241,17 @@ export function RunHistoryList({
               <span
                 data-testid="sources-run-partial"
                 className="ml-2 inline-flex items-center gap-1 text-xs text-warning"
+                title={RUN_PARTIAL_LABEL}
+                role="img"
+                aria-label={RUN_PARTIAL_LABEL}
               >
+                {/* ⚠ AN UNLABELLED GLYPH SAYS NOTHING TO ASSISTIVE TECH (IN-04), so the mark
+                    carries an accessible NAME — not a second announcement, since the `errors`
+                    count bit beside it already states the fact in words.
+                    ⛔ `aria-label`, NOT AN `sr-only` TEXT CHILD, and a test caught the
+                    difference: visually-hidden text is still `textContent`, so the sr-only
+                    version broke the whole-string row pin that reads a row as one sentence.
+                    A name that is not text is what this needs. */}
                 <AlertTriangle className="h-3 w-3" aria-hidden="true" />
               </span>
             )}

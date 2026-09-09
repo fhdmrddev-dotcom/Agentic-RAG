@@ -720,10 +720,24 @@ describe("WatchedFoldersSection", () => {
       // ⭐ The licence for this surface to exist. If a later edit removes the note but keeps
       //   the list, THIS reds — the rendered case above proves it is drawn, and this proves
       //   the two cannot be separated by an edit that only touches markup.
-      expect(watchedFoldersSource).toContain("sources-file-failures") // non-vacuity
-      expect(watchedFoldersSource).toMatch(
-        /sources-file-failures[\s\S]{0,2600}?FILE_FAILURE_SCOPE_NOTE/,
-      )
+      // ⛔ RESTORED TO A TIGHT WINDOW, AND THE RELAXATION IS THE FINDING (code review WR-08).
+      //    The disclosure commit widened this 800 → 2600 — a 3.25× relaxation of the only
+      //    structural guarantee that the scope note lives INSIDE the failures block — in the
+      //    same diff whose new docstring says "if any of them had had to be WEAKENED, that
+      //    would have been the failure." It had been, by me, in that commit.
+      // ⭐ The window did not need to grow: almost all of the new distance was COMMENT PROSE,
+      //    which the fence never stripped. Stripping comments first (the shape
+      //    `RunHistoryList.test.tsx` already uses) restores a bound near the original AND
+      //    makes it stronger than before, because a comment can no longer pad the gap.
+      const code = watchedFoldersSource
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/^\s*\/\/.*$/gm, "")
+      expect(code).toContain("sources-file-failures") // non-vacuity
+      // ⚠ 1300, MEASURED — not guessed and not flattering. The comment-stripped distance is
+      //   1249 characters of genuine JSX (the disclosure button), against 1679 raw. So the
+      //   real relaxation this commit needed was ~1300, and 2600 was twice what the change
+      //   actually cost. The bound is now the code, and a comment can no longer pad it.
+      expect(code).toMatch(/sources-file-failures[\s\S]{0,1300}?FILE_FAILURE_SCOPE_NOTE/)
     })
 
     it("⛔ no per-file row is built with raw HTML", () => {

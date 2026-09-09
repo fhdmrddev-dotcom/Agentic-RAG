@@ -35,7 +35,7 @@ from app.db.ingestion_jobs import (
     update_job_progress,
 )
 from app.services.circuit_breaker import CircuitBreaker
-from app.services.transient_errors import TRANSIENT_TELLS, is_transient as _is_transient  # noqa: F401
+from app.services.transient_errors import is_transient as _is_transient
 
 logger = logging.getLogger(__name__)
 

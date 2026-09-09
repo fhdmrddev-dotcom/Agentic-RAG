@@ -80,16 +80,20 @@ def _with_transient_retry(step: str, fn: Callable[[], Any]) -> Any:
     session of log archaeology.
     """
     last: BaseException | None = None
-    for attempt in range(1, _UPLOAD_ATTEMPTS + 1):
+    # ⚠ `max(1, …)` so a misconfigured constant can never make this raise for an operation it
+    #   never attempted (IN-02) — a failure report about work that did not happen is worse
+    #   than no retry at all.
+    attempts = max(1, _UPLOAD_ATTEMPTS)
+    for attempt in range(1, attempts + 1):
         try:
             return fn()
         except Exception as exc:
             last = exc
-            if not is_transient(exc) or attempt == _UPLOAD_ATTEMPTS:
+            if not is_transient(exc) or attempt == attempts:
                 break
             log.warning(
                 "attachment %s failed transiently (attempt %d/%d): %s — retrying",
-                step, attempt, _UPLOAD_ATTEMPTS, exc,
+                step, attempt, attempts, exc,
             )
             time.sleep(_RETRY_SLEEP)
     raise AttachmentStepError(step, last) from last
@@ -113,7 +117,7 @@ class AttachmentStepError(Exception):
 _PLACEMENT_COLUMNS = "folder_id, org_id, source_connection_id, ingest_visibility"
 
 
-def _inherited_placement(supabase: Any, document_id: str) -> dict[str, Any]:
+def _inherited_placement(supabase: Any, document_id: str, user_id: str) -> dict[str, Any]:
     """Read the message's own placement, so its attachments land beside it.
 
     ⛔ **FOUND BY DRIVING THE REAL WATCH (2026-09-09, UAT row M-2), NOT BY READING.** The
@@ -145,33 +149,103 @@ def _inherited_placement(supabase: Any, document_id: str) -> dict[str, Any]:
             supabase.table("documents")
             .select(_PLACEMENT_COLUMNS)
             .eq("id", document_id)
+            # ⛔ OWNER-SCOPED, NOT JUST ROW-SCOPED (code review WR-05). On the queue path this
+            #    is the SERVICE-ROLE client, so RLS does not backstop the read — and of the
+            #    four columns copied onto the child, `mint_document_row` re-validates only
+            #    `folder_id`. `org_id`, `source_connection_id` and `ingest_visibility` go
+            #    through unchecked.
+            # ⚠ It was not exploitable when found: both call sites pass an id that was
+            #   ownership-checked upstream. That is the reason to add the line now rather than
+            #   the reason not to — one new caller makes it a cross-tenant tagging primitive.
+            .eq("user_id", user_id)
             .maybe_single()
             .execute()
         )
-        row = getattr(resp, "data", None)
-        return row if isinstance(row, dict) else {}
     except Exception as exc:
-        log.warning("Could not read placement of message %s: %s", document_id, exc)
+        # ⛔ ERROR, NOT WARNING (code review WR-02). A FAILED read is not "no placement": every
+        #    attachment on this message is then minted with no folder and no connection — the
+        #    M-2 defect, permanently, because nothing re-runs the placement. It deserves the
+        #    level that gets noticed.
+        # ⚠ The stall this phase measured was OUR OWN SCHEDULING, and a starved thread times
+        #   out a PostgREST select exactly as readily as a storage PUT.
+        log.error(
+            "Placement read FAILED for message %s (%s) — its attachments will be minted with "
+            "no folder and no connection", document_id, exc,
+        )
         return {}
 
+    row = getattr(resp, "data", None)
+    if row is None:
+        # A hand-uploaded `.eml`: nothing to inherit, and nothing invented on its behalf.
+        return {}
+    if not isinstance(row, dict):
+        # ⚠ THIS ARM USED TO BE COMPLETELY SILENT. PostgREST returns a one-element LIST without
+        #   `maybe_single`, so a client-shape change would have degraded every attachment's
+        #   placement with no log line at all.
+        log.error(
+            "Unexpected placement shape for message %s: %r — treating as no placement",
+            document_id, type(row),
+        )
+        return {}
+    return row
 
 
-def _extract_attachment_text(raw: bytes, mime_type: str) -> str:
-    """Route PDF and DOCX to the extraction service; everything else to `extract_text`.
 
-    ⚠ This is `splice_document`'s branch, spelled the same way on purpose. A DIFFERENT rule
-    here would be a seventh disagreement rather than the fix for the sixth.
+#: The extraction wall clock, matching `ingest_splice.splice_document`'s own constant.
+#: ⚠ Duplicated as a NUMBER rather than imported, because importing `ingest_splice` from here
+#:   is the cycle this module already dodges for `mint_document_row`. If one moves, both move.
+_EXTRACT_WALL_CLOCK_S = 130.0
+
+
+def _extract_attachment_text(
+    raw: bytes, mime_type: str, wall_clock_s: float = _EXTRACT_WALL_CLOCK_S
+) -> str:
+    """Route PDF and DOCX to the extraction service, BOUNDED; everything else to `extract_text`.
+
+    ⛔ THE BOUND WAS MISSING AND THE DOCSTRING CLAIMED OTHERWISE (code review WR-04). This said
+       it was `splice_document`'s branch *"spelled the same way on purpose"* while that path
+       wraps the composer in `asyncio.wait_for(..., timeout=wall_clock_s)` and this one had no
+       timeout at all. **A claim of sameness is not sameness.**
+
+    ⚠ THE FAILURE IT OPENS is the same attacker as CR-01: a PDF bomb attached to a message in a
+      watched mailbox extracts for as long as the engine wants, holding a threadpool worker
+      until the ingestion job blows its 300 s lease; `reclaim_stale_ingestion_claims` returns
+      the job to `pending` and the same unbounded extraction runs again, up to `max_retries`.
+
+    ⚠ A `ThreadPoolExecutor`, not `asyncio.wait_for` — this function is SYNC (it runs inside
+      `run_in_threadpool`), so there is no event loop here to await on.
     """
+    from concurrent.futures import ThreadPoolExecutor  # noqa: PLC0415
+
     from app.api.documents import extract_text  # noqa: PLC0415
     from app.services.extraction_service import (  # noqa: PLC0415
         DOCX_MIME,
         PDF_MIME,
-        extract_composable,
     )
+    from app.services import extraction_service  # noqa: PLC0415
 
     if mime_type not in (PDF_MIME, DOCX_MIME):
         return extract_text(raw, mime_type)
-    return extract_composable(raw, mime_type).text or ""
+
+    # ⚠ Resolved through the MODULE so a test can patch `extraction_service.extract_composable`
+    #   by name; a from-import would bind the original and make the bound untestable.
+    #
+    # ⛔ NO `with` BLOCK, AND THE TEST IS WHY. `ThreadPoolExecutor.__exit__` calls
+    #    `shutdown(wait=True)`, so the first version raised on time and then BLOCKED for the
+    #    full extraction anyway — a bound that changed who waits and freed nothing. Measured:
+    #    the timeout fired at 0.5 s and the call still took 30.0 s.
+    #
+    # ⚠ `shutdown(wait=False)` returns immediately and the runaway thread is ORPHANED, not
+    #   killed — Python cannot kill a thread. That is a real and deliberate trade: the harm
+    #   WR-04 names is the ingestion job holding its 300 s lease and being reclaimed into a
+    #   retry loop, and returning promptly is what stops that. One leaked thread finishing its
+    #   work and exiting is strictly better than a job that never completes.
+    pool = ThreadPoolExecutor(max_workers=1)
+    try:
+        future = pool.submit(extraction_service.extract_composable, raw, mime_type)
+        return future.result(timeout=wall_clock_s).text or ""
+    finally:
+        pool.shutdown(wait=False, cancel_futures=True)
 
 
 def ingest_email_attachments(
@@ -214,27 +288,37 @@ def ingest_email_attachments(
     #   cycle. `mint_document_row` and the parsers are hoisted to module scope precisely so a
     #   test can patch them by name — a function-local import is unpatchable from outside, which
     #   is a testability cost worth paying only where a cycle forces it.
+    # ⚠ `extract_text` is deliberately NOT here any more (IN-01): after the PDF/DOCX routing
+    #   change its only call site is `_extract_attachment_text`, which imports it itself.
     from app.api.documents import (  # noqa: PLC0415
         ALLOWED_MIME_TYPES,
         _EXT_MIME_OVERRIDES,
         _UNRELIABLE_MIME_TYPES,
-        extract_text,
         ingest_document,
     )
 
     # ⭐ INHERITANCE IS THE DEFAULT, NOT A LAW — an explicit argument still wins, so a caller
     #   that knows better than the parent row keeps saying so. Resolved once, above the loop:
     #   every attachment on one message shares one message's placement.
-    inherited = _inherited_placement(supabase, document_id)
+    inherited = _inherited_placement(supabase, document_id, user_id)
     folder_id = folder_id if folder_id is not None else inherited.get("folder_id")
     org_id = org_id if org_id is not None else inherited.get("org_id")
     # ⛔ THE PAIR TRAVELS TOGETHER OR NOT AT ALL. `mint_document_row` writes visibility only
     #   beside a connection id, so resolving one without the other re-creates the exact silent
     #   drop this change exists to close.
-    if source_connection_id is None:
+    # ⛔ ATOMIC IN BOTH DIRECTIONS (code review WR-03). The old rule was one-way: a caller
+    #    passing `ingest_visibility="org"` with no connection got its visibility paired with the
+    #    PARENT's connection, so a child could be org-visible on a connection whose parent row
+    #    is private. That is the ONLY construction here that can widen a child beyond the
+    #    message it came from — and it contradicted the comment right above it.
+    if source_connection_id is None and ingest_visibility is None:
         source_connection_id = inherited.get("source_connection_id")
-        if ingest_visibility is None:
-            ingest_visibility = inherited.get("ingest_visibility")
+        ingest_visibility = inherited.get("ingest_visibility")
+    elif source_connection_id is None:
+        # ⚠ An explicit visibility with no explicit connection cannot be honoured: pairing it
+        #   with the parent's connection claims a scope the caller never asked the parent for.
+        #   Dropping it is the safe direction — `mint_document_row` then writes neither.
+        ingest_visibility = None
 
     try:
         parsed_email = (

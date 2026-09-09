@@ -468,6 +468,14 @@ export const CHECKED_PREFIX = (ago: string): string => `Checked ${ago}`
 export const FILE_FAILURE_SUMMARY = (n: number): string =>
   n === 1 ? "1 file could not be read" : `${n} files could not be read`
 
+/**
+ * The accessible name for the mark on a check that finished with files it could not read.
+ *
+ * ⚠ It NAMES the mark and does not restate the count — the `errors` bit beside it already
+ * says how many, in words, and announcing the number twice is worse than not marking it.
+ */
+export const RUN_PARTIAL_LABEL = "finished with files it could not read"
+
 /** The heading over the per-file failures inside an otherwise healthy source. */
 export const FILE_FAILURE_HEADING = "Files that could not be read"
 

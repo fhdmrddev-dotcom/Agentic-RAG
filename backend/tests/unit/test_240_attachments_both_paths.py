@@ -605,17 +605,34 @@ def test_a_terminal_error_is_not_retried():
     assert calls["n"] == 1, "a permanent error was retried as though it were a stall"
 
 
-def test_both_paths_agree_on_what_transient_MEANS():
-    """⛔ The queue and the attachment loop must not drift on the word.
+def test_the_queue_classifies_a_read_timeout_as_transient():
+    """⛔ THE BEHAVIOUR, not a re-export (code review WR-06).
 
-    ⚠ A COPY is how these two paths have now disagreed five times. This asserts they read the
-    same list, so a term added to one is a term added to both.
+    ⚠ THE FIRST VERSION OF THIS TEST WAS SATISFIABLE WITHOUT THE BEHAVIOUR IT NAMED. It
+    asserted `queue_mod.TRANSIENT_TELLS is TRANSIENT_TELLS` — an import that production never
+    reads, kept alive by a `# noqa: F401`. Re-inlining the tuple inside the queue's own handler
+    would have left it green, which is exactly the drift it claimed to prevent.
+
+    ⭐ `"Read timed out"` is the term that NEVER matched: the tuple carried `"timeout"`, and
+    `"timeout" in "timed out"` is False. This is the assertion that would have caught it.
     """
-    from app.services.transient_errors import TRANSIENT_TELLS
     from app.services import ingestion_queue_service as queue_mod
 
-    assert queue_mod.TRANSIENT_TELLS is TRANSIENT_TELLS, (
-        "the queue keeps its own private copy of the transient-error terms"
+    assert queue_mod._is_transient("Read timed out") is True
+    assert queue_mod._is_transient("503 Service Unavailable") is True
+    assert queue_mod._is_transient("Bucket not found") is False
+
+
+def test_the_queue_keeps_no_private_copy_of_the_transient_terms():
+    """⚠ A COPY is how these two paths have now disagreed six times. A source fence, because
+    the drift being guarded against is a future edit re-inlining the list."""
+    from pathlib import Path as _Path
+
+    from app.services import ingestion_queue_service as queue_mod
+
+    src = _code(_Path(queue_mod.__file__))
+    assert '"reset by peer"' not in src, (
+        "the queue re-inlined the transient-error terms instead of reading the shared module"
     )
 
 
@@ -761,4 +778,174 @@ def test_the_legacy_caller_passes_the_depth_it_was_given():
     assert "depth=" in call, (
         "documents.py still calls the attachment loop without threading its depth, so the "
         "recursion guard resets on every hop"
+    )
+
+
+# ── 7. the placement read is owner-scoped (code review WR-05, 2026-09-09) ────────────────────
+#
+# ⛔ THE READ SCOPED ON ROW ID ALONE, against the SERVICE-ROLE client on the queue path — so RLS
+#    does not backstop it. Of the four columns copied onto the child, `mint_document_row`
+#    re-validates exactly ONE (`folder_id`, ownership-checked). `org_id`,
+#    `source_connection_id` and `ingest_visibility` are written unvalidated.
+#
+# ⚠ NOT CURRENTLY EXPLOITABLE, and that is the reason to fix it now rather than an excuse not
+#   to: both call sites happen to pass a document id that was ownership-checked upstream. One
+#   new caller passing an id from elsewhere turns this into a cross-tenant tagging primitive —
+#   a child stamped with another org's `org_id`, connection and `ingest_visibility='org'`.
+#   `user_id` is already in scope at the call site, so the guard costs one line.
+
+
+def test_the_placement_read_is_scoped_to_the_owner_not_just_the_row_id():
+    """⭐ Asserts the FILTER, because the danger is a row this user does not own."""
+    from app.services import email_attachments as mod
+
+    supabase, builder = _mock_supabase()
+    builder.execute.return_value = MagicMock(
+        data={"folder_id": "f", "org_id": "o", "source_connection_id": "c",
+              "ingest_visibility": "org"},
+        count=1,
+    )
+
+    with patch("app.services.email_attachments.mint_document_row") as mint, patch(
+        "app.api.documents.extract_text", return_value="col1,col2"
+    ), patch("app.api.documents.ingest_document"):
+        mint.return_value = MagicMock(
+            document={"id": "att-doc-1"}, is_duplicate=False,
+            storage_path="p", version_number=1,
+        )
+        mod.ingest_email_attachments(
+            raw=_eml_with_attachments(),
+            mime_type="message/rfc822",
+            document_id="email-doc-1",
+            user_id="user-1",
+            supabase=supabase,
+        )
+
+    eq_filters = [c.args for c in builder.eq.call_args_list]
+    assert ("id", "email-doc-1") in eq_filters, "the placement read no longer happens at all"
+    assert ("user_id", "user-1") in eq_filters, (
+        "the placement read is scoped on row id alone against a service-role client — a child "
+        "can inherit org_id / source_connection_id / ingest_visibility from a row its owner "
+        "does not own, and mint_document_row re-validates only folder_id"
+    )
+
+
+# ── 8. the remaining code-review warnings (WR-02 / WR-03 / WR-04, 2026-09-09) ────────────────
+
+
+def test_an_explicit_visibility_never_rides_the_parents_connection():
+    """⛔ WR-03 — THE ONE CONSTRUCTION THAT CAN WIDEN A CHILD BEYOND ITS MESSAGE.
+
+    The pairing rule was enforced in ONE direction: a caller passing `ingest_visibility="org"`
+    with no connection got the caller's visibility paired with the PARENT's connection, so a
+    child could be org-visible on a connection whose parent row is private. That contradicts
+    the comment sitting directly above it — *"THE PAIR TRAVELS TOGETHER OR NOT AT ALL"*.
+
+    ⚠ No caller does this today. The function is module-public and its next caller will.
+    """
+    from app.services import email_attachments as mod
+
+    supabase, builder = _mock_supabase()
+    builder.execute.return_value = MagicMock(
+        data={"folder_id": "f", "org_id": "o", "source_connection_id": "parent-conn",
+              "ingest_visibility": "private"},
+        count=1,
+    )
+
+    with patch("app.services.email_attachments.mint_document_row") as mint, patch(
+        "app.api.documents.extract_text", return_value="col1,col2"
+    ), patch("app.api.documents.ingest_document"):
+        mint.return_value = MagicMock(
+            document={"id": "att-doc-1"}, is_duplicate=False,
+            storage_path="p", version_number=1,
+        )
+        mod.ingest_email_attachments(
+            raw=_eml_with_attachments(),
+            mime_type="message/rfc822",
+            document_id="email-doc-1",
+            user_id="user-1",
+            supabase=supabase,
+            ingest_visibility="org",          # explicit visibility, NO explicit connection
+        )
+
+    kwargs = mint.call_args.kwargs
+    assert not (
+        kwargs.get("source_connection_id") == "parent-conn"
+        and kwargs.get("ingest_visibility") == "org"
+    ), (
+        "the caller's visibility was paired with the PARENT's connection — a child made more "
+        "visible than the message it arrived on"
+    )
+
+
+def test_a_failed_placement_read_is_logged_as_an_error_not_a_warning(caplog):
+    """⛔ WR-02 — three outcomes collapsed into `{}`, one of them SILENTLY.
+
+    A failed read is not "no placement": every attachment on that message is then minted with
+    no folder and no connection — the M-2 defect, permanently, because nothing re-runs it.
+    """
+    import logging
+    from app.services import email_attachments as mod
+
+    supabase, builder = _mock_supabase()
+    builder.execute.side_effect = RuntimeError("PostgREST 503")
+
+    with caplog.at_level(logging.ERROR, logger=mod.log.name):
+        placement = mod._inherited_placement(supabase, "email-doc-1", "user-1")
+
+    assert placement == {}
+    assert any(r.levelno >= logging.ERROR for r in caplog.records), (
+        "a failed placement read is recorded at WARNING or not at all, so every attachment on "
+        "that message lands outside the folder tree with nothing loud enough to notice"
+    )
+
+
+def test_an_unexpected_placement_shape_is_not_silent(caplog):
+    """⚠ The third outcome — a list instead of a dict — logged NOTHING at all."""
+    import logging
+    from app.services import email_attachments as mod
+
+    supabase, builder = _mock_supabase()
+    builder.execute.return_value = MagicMock(data=[{"folder_id": "f"}], count=1)
+
+    with caplog.at_level(logging.ERROR, logger=mod.log.name):
+        placement = mod._inherited_placement(supabase, "email-doc-1", "user-1")
+
+    assert placement == {}
+    assert any(r.levelno >= logging.ERROR for r in caplog.records), (
+        "an unexpected placement shape was discarded in complete silence"
+    )
+
+
+def test_attachment_extraction_is_bounded_by_a_wall_clock():
+    """⛔ WR-04 — an attacker-supplied PDF bomb held a threadpool worker with no bound.
+
+    `splice_document` wraps the composer in `asyncio.wait_for(..., timeout=wall_clock_s)`; this
+    call had no timeout at all, so extraction ran as long as the engine wanted, blew the job's
+    lease, was reclaimed to `pending`, and ran again — up to `max_retries`.
+
+    ⚠ The docstring claimed the branch was *"spelled the same way on purpose"*. It was not.
+    """
+    import time as _time
+    from app.services import email_attachments as mod
+
+    pdf_bytes = b"%PDF-1.7\n\xe2\xe3\xcf\xd3 slow"
+
+    def _never_returns(*_a, **_kw):
+        _time.sleep(30)
+
+    with patch("app.services.extraction_service.extract_composable", _never_returns):
+        started = _time.perf_counter()
+        # ⚠ NOT `pytest.raises(Exception)` — THAT VERSION PASSED VACUOUSLY. With no
+        #   `wall_clock_s` parameter the call raises TypeError instantly, which is an Exception
+        #   and takes under 10 s, so the test went green against the very code it was written
+        #   to fail. The raised type must be the TIMEOUT, and the review's WR-06/WR-07 are
+        #   about exactly this class of mistake.
+        with pytest.raises(TimeoutError):
+            mod._extract_attachment_text(pdf_bytes, "application/pdf", wall_clock_s=0.5)
+        elapsed = _time.perf_counter() - started
+
+    assert elapsed < 10, (
+        f"extraction ran {elapsed:.1f}s against a 0.5s bound — it is unbounded, so a PDF bomb "
+        f"holds a threadpool worker until the ingestion job loses its lease"
     )
