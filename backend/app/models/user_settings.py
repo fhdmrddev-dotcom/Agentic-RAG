@@ -147,6 +147,13 @@ class UserEffectiveSettings(BaseModel):
     vector_search_weight: float
     keyword_search_weight: float
     rrf_k: int
+    # Phase 241 (QUEUE-06 / D-09, migration 176) — the two HNSW scan knobs, applied per
+    # request with `SET LOCAL` inside the transaction `get_user_pg_connection` already
+    # opens. ⛔ Their two memory companions (`hnsw_max_scan_tuples`,
+    # `hnsw_scan_mem_multiplier`) are deliberately absent from this model: they stay
+    # hardcoded in `config.py` because a wrong value is a memory footgun (T-241-16).
+    hnsw_ef_search: int = 40
+    hnsw_iterative_scan: str = "off"
 
     # Web search
     tavily_api_key: str
@@ -940,6 +947,14 @@ def _build_settings_from_row(row: dict) -> UserEffectiveSettings:
         keyword_search_weight=float(_val(row, "keyword_search_weight", "keyword_search_weight", 1.0)),
         rrf_k=int(_val(row, "rrf_k", "rrf_k", 60)),
 
+        # Phase 241 (QUEUE-06 / D-09, migration 176). ⚠ env_attr is NOT None here, unlike the
+        # app-only switches below: these two have a REAL `config.py` fallback and that fallback
+        # is the "minimal hardcoded value" D-09 names. A missing column — the state until an
+        # operator pastes 176 in 241-04 — therefore reads 40 / "off", which IS the live pgvector
+        # server configuration, so applying this plan changes no search until somebody chooses to.
+        hnsw_ef_search=int(_val(row, "hnsw_ef_search", "hnsw_ef_search", 40)),
+        hnsw_iterative_scan=str(_val(row, "hnsw_iterative_scan", "hnsw_iterative_scan", "off")),
+
         tavily_api_key=str(_val(row, "tavily_api_key", "tavily_api_key", "")),
         web_search_max_results=int(_val(row, "web_search_max_results", None, 5)),
         web_search_enabled=_val_bool(row, "web_search_enabled", None, bool(env_settings.tavily_api_key)),
@@ -1227,6 +1242,28 @@ SOURCE_MAX_FILE_SIZE_MB_DEFAULT = 25
 SOURCE_MAX_FILE_SIZE_MB_CEILING = 50
 
 _BYTES_PER_MB = 1024 * 1024
+
+
+# ── Phase 241 -- the HNSW knob bounds, and the ONLY place their numbers live ──
+#
+# ⛔ THE BOUNDS ARE SERVED TO THE UI, NEVER RE-TYPED IN IT. `GET /settings` carries
+# `hnsw_ef_search_floor` / `_ceiling` / `hnsw_iterative_scan_values` for exactly the reason
+# `api/settings.py:79` gives for SEED-258: *"a form carrying its own copy of 50 is a fourth
+# private constant, which is the defect this replaced."*
+
+#: ⛔ pgvector's OWN maximum for `hnsw.ef_search`. Not a policy choice — a value above this is
+#: rejected by the database itself, so refusing it here turns a Postgres error into a sentence.
+HNSW_EF_SEARCH_CEILING = 1000
+
+#: The floor, chosen to sit BELOW the server default of 40 so a deliberately smaller (faster,
+#: shallower) value stays reachable and measurable. 0 would be a scan that walks nothing while
+#: every search still reported success — the same silent-off shape SEED-258's floor guards.
+HNSW_EF_SEARCH_FLOOR = 10
+
+#: ⛔ THREE MEMBERS, AND A BOOLEAN WOULD SILENTLY LOSE ONE. `strict_order` keeps exact distance
+#: ordering while it keeps scanning; `relaxed_order` trades ordering for speed. They are
+#: different modes, not two spellings of "on". pgvector 0.8+; the GUC does not exist below it.
+HNSW_ITERATIVE_SCAN_VALUES = ("off", "strict_order", "relaxed_order")
 
 
 def source_max_file_bytes() -> int:
