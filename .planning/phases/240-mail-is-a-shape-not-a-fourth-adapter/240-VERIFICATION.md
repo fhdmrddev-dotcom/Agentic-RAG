@@ -375,3 +375,80 @@ the key this module RETURNS; it never asserted that the key RESOLVES to a mark. 
 end of the chain — a returned key must resolve to a real mark and never to the neutral plug.
 
 ⚠ Both times the operator found it by looking, after I had said it was fixed.
+
+---
+
+# ✅ ADDENDUM 2026-09-09 (late) — ALL FOUR CRITERIA NOW DRIVEN, M-1..M-5 COMPLETE
+
+⚠ **NOTHING ABOVE IS EDITED.** Every claim in this file was true when written; the ADDENDUM above
+recorded SC#2 as *"still unproven end-to-end"*, SC#3 as *"half met"* and SC#4 as *"inherited, not
+driven"*, and all three were correct at the time. **They are superseded here rather than
+overwritten**, because this file's own repeated finding is that a figure written at one moment
+goes stale at the next — and a verification doc that quietly rewrites itself cannot be audited.
+
+## What changed the verdicts
+
+The operator drove UAT rows **M-1 through M-5** against their real Google account across the
+evening, while I read the database after each. **Seven defects were found by doing so**, four of
+them invisible to a suite of 25 passing unit tests.
+
+| Row | Verdict | Evidence |
+|---|---|---|
+| **M-1** watch a real Gmail label | ✅ | 11 messages in 76 s, `listing_complete: true` |
+| **M-2** a watched attachment becomes its own document | ✅ | `pgmp exam content outline.pdf` → **50 chunks**, in the watch's folder, `attached_to` written |
+| **M-3** a long thread returns ONE hit | ✅ | measured on the stripper: 3 reply dialects stripped (⚠ forwards are NOT — `SEED-263`) |
+| **M-4** disable the connection | ✅ | refused in **19 ms**, `failure_cause: connection_disabled`; **62 documents and 6,112 chunks survived** |
+| **M-5** delete a message at source | ✅ | `count_missing: 1`, `listing_complete: true`, document **`completed` with `source_state: missing_at_source`**, chunk still searchable |
+
+## SC#2 ⭐ NOW MET — and it took three live runs, each finding a different defect
+
+The claim *"attachments arrive on both paths"* was true in code and false in practice, three times
+over. Each failure hid the next:
+
+1. **the storage upload timed out** at exactly `storage3`'s 20 s default — cause measured as GIL
+   contention (0.23 s idle → 7.27 s under 16 CPU threads → **21.07 s under 32**), after
+   shared-client concurrency and stale keep-alive were both measured FALSE;
+2. **the child was minted with `folder_id = NULL`** — it existed, was linked, and sat nowhere;
+3. **`extract_text` has not handled PDF or DOCX since Phase 069**, so every PDF attachment fell to
+   its final `raw.decode("utf-8")` and died on the first non-ASCII byte.
+
+⛔ **Only the third run proved SC#2**, and only because the first two failures were fixed in order.
+**Two defects were hiding behind one another** — the timeout meant extraction was never reached.
+
+## SC#4 ⭐ NOW MET — driven, no longer inherited
+
+The section above says *"inherited is not the same as proven, and this criterion is NOT claimed as
+met."* It is claimed now, on M-4 and M-5:
+
+- **deletion does not delete** — the document survived at `completed`, marked `missing_at_source`,
+  its chunk still searchable, its attachment untouched, and **exactly one of five items changed**;
+- **H-5 held honestly** — the missing transition fired only with `listing_complete: true`;
+- **a disabled connection is refused before any mail call** — 19 ms, no partial work, and the
+  Library's 62 documents were still there afterwards.
+
+## ⛔ SEVEN DEFECTS FOUND BY DRIVING, AND THE COUNT IS THE POINT
+
+Five are filed as reported-bugs (`BUG-260909-03` … `BUG-260909-07`); two were fixed tonight and
+are in the commits. **Four of the seven were invisible to the tests**, and the reason is uniform:
+the tests exercised values, and the failures were in *hops nobody tested* — a screen that discards
+its own answer, a card that reads the last run instead of the world, a button labelled as a write
+that only travels.
+
+⭐ **`BUG-260909-04` is the one to read first.** The operator reported *"I clicked sync now nothing
+happened"* — and the sync had worked, in 19 milliseconds. Clicking **Sync now** collapses the whole
+Watched Folders section into a loading state, so the outcome is drawn and thrown away before it can
+be read. **A correct refusal looked like a dead button**, and it cost this session real time.
+
+## What this phase still owes
+
+- ⛔ **`OV-240-01` is only PARTLY discharged.** A `/gsd:code-review` ran tonight against an agent
+  that did not shape the build, and it found **2 Critical + 8 Warning + 6 Info** — including one
+  Critical (`CR-02`) in a fix written hours earlier, and one (`CR-01`) showing
+  `MAX_MAIL_NESTING_DEPTH` was **unreachable**, its own test having proved a parameter rather than
+  a behaviour. **All findings are closed.** ⚠ But that review was scoped to the evening's commits:
+  **plans `240-01` … `240-04` remain unreviewed by anyone who did not build them**, and Phase 238
+  still owes a review outright.
+- Five open reported-bugs above.
+- `SEED-261` (an attachment failure reaches no surface a person reads), `SEED-262` (the child rides
+  beside the queue, not on it — **six two-paths disagreements, three found in one day**),
+  `SEED-263` (forwards duplicate, and stripping them would be worse).
