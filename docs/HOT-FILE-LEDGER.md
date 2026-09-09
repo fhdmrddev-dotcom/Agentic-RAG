@@ -7006,6 +7006,60 @@ both 231 and 241).
 
 ⚠ It is also the surface `BUG-260815-05` (folded into Phase 210) touches: the retrieval path **misreports embedding-provider failure**. A Health tab built before that lands would show *"0 searches"* during an outage — inheriting the exact lie it exists to prevent. **That is a sequencing constraint on the document stream, not a defect in it.**
 
+
+---
+
+### `backend/app/services/recall_eval.py`
+
+**Triple derived 2026-09-10 (Phase 241, at PLANNING time): `1 / 1 / 67` — G-5: no (1 phase).**
+
+⚠ **IT HAD NO ROW AT ALL, for its entire life.** Added here because it was ABSENT, not because it is
+new — the same failure `config.py` suffered for the project's whole life. Phase 241's plan `241-01`
+rewrites it, and a `backend/app/` file with no row is permanently invisible to its own guardrail.
+
+⛔ **IT SHIPPED A MEASUREMENT THAT COULD NOT FAIL, AND THAT IS THE ONLY THING WORTH KNOWING ABOUT IT.**
+Measured 2026-09-10 (241-CONTEXT F-1): its sibling `scripts/measure-recall.py` never touches the vector
+path (it runs `content ILIKE`), scores every un-found target `rank = 1` under the comment
+*"Standard ground truth baseline"*, and on a DB failure prints a hardcoded `mock_ranks` benchmark and
+**returns 0**. Run live against the real 159-document corpus it printed **MRR 1.000**.
+
+⭐ **`compute_metrics` (`:57-77`) is CORRECT and is kept verbatim** — it already treats `None` as a miss
+and is genuinely unit-tested. **The defect was entirely in what fed it.** That distinction is the reason
+Phase 241 rewrites this file rather than deleting it.
+
+⚠ **`EVAL_PROBES` was duplicated VERBATIM across this file and `scripts/measure-recall.py`** — two
+copies of a ground-truth set is drift waiting to happen. Phase 241 (`D-01`) gives it ONE home here and
+makes the script import it.
+
+⚠ **Its test lives in `backend/tests/eval/`, which `pytest tests/unit` does NOT collect** — so
+`assert count == 77` sat RED against 159 live documents, invisible to the canonical gate. Any guard on
+this file belongs in `backend/tests/unit/`.
+
+
+---
+
+### `backend/app/services/retrieval_tuning.py`
+
+**New at Phase 241 (`241-03`): `0 / 0 / new` — G-5: no (new).**
+
+⭐ **IT EXISTS SO THAT THE LANDING ON `retrieval_service.py` STAYS THREE LINES.** `D-11` takes a
+deliberate SECOND milestone landing on a file whose extraction has been **OWED since Phase 231**, and
+the ROADMAP's standing note says a THIRD must propose the extraction first. Putting the
+`SET LOCAL hnsw.*` helper in its own module keeps the hot file's delta to a call and its arguments.
+
+⛔ **THIS IS NOT THE OWED EXTRACTION AND MUST NEVER BE READ AS ONE.** `retrieval_service.py`'s
+G-5 obligation is unchanged by Phase 241. The row for that file still reads *extraction still OWED*.
+
+⚠ **THE ROW IS ADDED AT PLANNING TIME, DELIBERATELY.** Phase 229's own G-5 discharge created
+`ingest_splice.py` with no ledger row, moving code OUT of the guardrail's sight; the Phase 207
+`lib/api.ts` split did the same twice. A module created by a phase gets its row in the same commit.
+
+⚠ **Its one binding invariant:** the GUC NAME is a hardcoded literal inside the SQL text and only the
+VALUE is a bind parameter (`SELECT set_config('hnsw.ef_search', $1, true)`), so no user-supplied string
+can ever reach a `SET` statement. And each GUC is applied INDEPENDENTLY inside its own `try`, because
+`hnsw.iterative_scan` does not exist below pgvector 0.8 — an unrecognised parameter must degrade the
+tuning, never the search.
+
 ---
 
 ### `frontend/src/components/metadata/DocumentDetailPanel.tsx`
@@ -9512,6 +9566,8 @@ cells rot within days.
 | [`frontend/src/components/ingestion/DocumentList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestiondocumentlisttsx) | 24 / 13 / 294 | ⚠ **FIRES** | ✅ **seam TAKEN (217.1-05)** — `DocumentRow.tsx` extracted with the sketch's five affordances (−315 L). ⚠ 7-column order still load-bearing: `LibraryPage` sheds cols 3–5 by `nth-child` |
 | [`frontend/src/pages/LibraryPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpageslibrarypagetsx) | 44 / 14 / 922 | ⚠ **FIRES** | ⚠ row was STALE at `40 / 12 / 825`. honoured by construction (**235**) — one tab prop, one cross-tab hop. ⚠ re-derive with `git log --follow`, else it reads `1` |
 | [`backend/app/services/retrieval_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrievalservicepy) | 18 / 10 / 423 | ⚠ **FIRES** | ⚠ my own cell said *byte-unchanged* and my LATER commit falsified it (reviewer catch). TRUST-04 threaded provenance through it. ⚠ extraction still OWED (`SEED-224`) |
+| [`backend/app/services/recall_eval.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrecallevalpy) | 1 / 1 / 67 | no (1 phase) | ⚠ **absent for its ENTIRE LIFE — row added at 241 planning time.** `compute_metrics` is correct; everything that FED it was structurally unable to fail (241 F-1) |
+| [`backend/app/services/retrieval_tuning.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrievaltuningpy) | 0 / 0 / new | no (new) | young (241) — the HNSW session knobs live HERE so `retrieval_service.py`'s D-11 landing stays ~3 lines. ⛔ its extraction is still OWED |
 | [`frontend/src/components/metadata/DocumentDetailPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsmetadatadocumentdetailpaneltsx) | 12 / 7 / 596 | ⚠ **FIRES** | honoured by construction (**240**): ONE child section mounted, gated on metadata, no shell change. ⚠ CR-01's fence caught a missing reset before it shipped |
 | [`frontend/src/components/metadata/DocumentConversationSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsmetadatadocumentconversationsectiontsx) | 0 / 0 / 155 | no (new) | young (240) — the read that makes `thread_key` visible. ⛔ Bounded height + a worded truncation, because BUG-260908-01 is the same panel unbounded |
 | [`frontend/src/lib/api/documents.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapidocumentsts) | 2 / 2 / 389 | no (2 phases) | ⚠ **absent for its ENTIRE LIFE — row added 240.** ⭐ The Phase 207 `lib/api.ts` split created it with no row, exactly as its sibling `api/workflows.ts` records |
