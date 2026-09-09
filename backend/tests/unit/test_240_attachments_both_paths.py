@@ -675,3 +675,90 @@ def test_a_pdf_attachment_goes_to_the_pdf_extractor_not_the_utf8_fallback():
         f"PDF since Phase 069 and its final branch is a bare raw.decode('utf-8')"
     )
     composable.assert_called_once()
+
+
+# ── 6. the nesting cap actually FIRES (code review CR-01 / WR-07, 2026-09-09) ────────────────
+#
+# ⛔ THE GUARD WAS UNREACHABLE AND ITS TEST DID NOT NOTICE. `MAX_MAIL_NESTING_DEPTH` is only
+#    enforced against the `depth` a CALLER passes — and the only real recursion path is
+#    `ingest_email_attachments` → `api.documents.ingest_document` → `documents.py:2295`, which
+#    called the loop back with the DEFAULT `depth=0`. `ingest_document` had no `depth`
+#    parameter to thread, so the counter reset on every hop and a `.eml` inside a `.eml` inside
+#    a `.eml` recursed without bound — from an unauthenticated inbound email into a watched
+#    mailbox, minting documents and buying embeddings at every level (TM-240-09).
+#
+# ⚠ `test_a_message_attached_to_a_message_does_not_recurse` passed `depth=1` BY HAND and mocked
+#   the one function that recurses. It proved the PARAMETER and never the BEHAVIOUR. Both tests
+#   below exist because that distinction is what let a security guard ship inert.
+
+
+def test_the_loop_threads_its_depth_into_the_child_ingest():
+    """⭐ THE MISSING LINK. Without this the cap resets on every hop and can never fire."""
+    from app.services import email_attachments as mod
+
+    supabase, _ = _mock_supabase()
+
+    inner = EmailMessage()
+    inner["Subject"] = "inner"
+    inner["From"] = "a@corp.com"
+    inner["To"] = "b@corp.com"
+    inner["Message-ID"] = "<inner@corp.com>"
+    inner.set_content("inner body")
+
+    outer = EmailMessage()
+    outer["Subject"] = "outer"
+    outer["From"] = "a@corp.com"
+    outer["To"] = "b@corp.com"
+    outer["Date"] = "Mon, 07 Sep 2026 09:00:00 +0000"
+    outer["Message-ID"] = "<outer@corp.com>"
+    outer.set_content("see attached message")
+    # ⛔ THE CARRIER IS THE REVIEW'S OWN VECTOR, and it had to be — a part declared
+    #    `message/rfc822` never reaches this loop at all, because `get_content()` hands back an
+    #    EmailMessage rather than bytes and `parse_eml_bytes` drops it. The path that DOES
+    #    reach it is a `.eml` announced as `application/octet-stream`, which
+    #    `_UNRELIABLE_MIME_TYPES` + `_EXT_MIME_OVERRIDES` promote back to mail by EXTENSION.
+    # ⚠ So the reachable nesting vector is the one an attacker controls by naming the file,
+    #   which is exactly why the guard has to hold rather than be assumed unreachable.
+    outer.add_attachment(
+        inner.as_bytes(),
+        maintype="application",
+        subtype="octet-stream",
+        filename="inner.eml",
+    )
+
+    with patch("app.services.email_attachments.mint_document_row") as mint, patch(
+        "app.api.documents.extract_text", return_value="inner body"
+    ), patch("app.api.documents.ingest_document") as ingest:
+        mint.return_value = MagicMock(
+            document={"id": "att-doc-1"}, is_duplicate=False,
+            storage_path="p", version_number=1,
+        )
+        mod.ingest_email_attachments(
+            raw=outer.as_bytes(),
+            mime_type="message/rfc822",
+            document_id="email-doc-1",
+            user_id="user-1",
+            supabase=supabase,
+        )
+
+    assert ingest.called, "the nested message was never ingested at all"
+    kwargs = ingest.call_args.kwargs
+    assert kwargs.get("attachment_depth") == 1, (
+        "the child ingest was handed no depth, so `documents.py`'s call back into this loop "
+        "restarts at 0 and MAX_MAIL_NESTING_DEPTH can never fire — unbounded recursion on "
+        "attacker-supplied nested mail (TM-240-09)"
+    )
+
+
+def test_the_legacy_caller_passes_the_depth_it_was_given():
+    """⛔ The other half of the link — and a SOURCE fence, because the call is in the API module.
+
+    ⚠ Asserts the ARGUMENT, not the mention: a comment naming `attachment_depth` must not
+    satisfy it. `_code` strips comment-only lines for exactly this reason.
+    """
+    src = _code(_DOCUMENTS)
+    call = src.split("ingest_email_attachments(")[1][:400]
+    assert "depth=" in call, (
+        "documents.py still calls the attachment loop without threading its depth, so the "
+        "recursion guard resets on every hop"
+    )

@@ -320,10 +320,18 @@ def ingest_email_attachments(
                 #    reaches the same answer. The upload is the network hop the stall hit.
                 _with_transient_retry(
                     "upload",
+                    # ⛔ `upsert` IS WHAT MAKES THE RETRY SAFE (code review CR-02). The stall
+                    #    this retry exists for is a CLIENT-side deadline — measured at 21.07 s
+                    #    on a call the server completed fine — so the object can already be
+                    #    there when attempt 2 fires. Without upsert that attempt is refused as
+                    #    a duplicate, the refusal carries no transient tell, and the retry
+                    #    LOSES the attachment it was added to save, with a worse reason.
+                    # ⚠ `watch_service` already passes it at both of its upload sites; this one
+                    #   did not, which is the same copy-drift this module exists to stop.
                     lambda: supabase.storage.from_("documents").upload(
                         path=mint_result.storage_path,
                         file=att.raw,
-                        file_options={"content-type": att_mime},
+                        file_options={"content-type": att_mime, "upsert": "true"},
                     ),
                 )
 
@@ -345,6 +353,9 @@ def ingest_email_attachments(
                 #   honest fix for the whole family is to put the child on the ingestion queue
                 #   so it inherits ONE pipeline instead of a parallel one — SEED-262.
                 att_text = _extract_attachment_text(att.raw, att_mime)
+                # ⚠ `depth + 1` IS THE HALF THAT WAS MISSING. The child's own ingest calls
+                #   this loop again from `documents.py`; without carrying the count the guard
+                #   above sees 0 forever (CR-01).
                 ingest_document(
                     document_id=att_doc_id,
                     text=att_text,
@@ -354,6 +365,7 @@ def ingest_email_attachments(
                     mime_type=att_mime,
                     filename=att.filename,
                     engine_override="legacy",
+                    attachment_depth=depth + 1,
                 )
                 attachment_manifest.append({
                     "filename": att.filename,

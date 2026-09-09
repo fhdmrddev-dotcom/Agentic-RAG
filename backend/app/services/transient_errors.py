@@ -18,6 +18,9 @@ flag — is a change to make on purpose, with its own driving test.
 
 from __future__ import annotations
 
+import asyncio
+import socket
+
 #: Substrings that mark a failure as worth retrying. Moved here verbatim from the queue.
 TRANSIENT_TELLS: tuple[str, ...] = (
     "timeout",
@@ -28,6 +31,33 @@ TRANSIENT_TELLS: tuple[str, ...] = (
     "connection",
     "reset by peer",
 )
+
+
+#: Exception TYPES that are transient whatever they say — and most of them say nothing.
+#:
+#: ⛔ MEASURED 2026-09-09: `TimeoutError()`, `asyncio.TimeoutError()`, `socket.timeout()`,
+#:    `httpx.ReadTimeout("")`, `httpx.ConnectTimeout("")` and `httpx.PoolTimeout("")` ALL
+#:    stringify to the empty string. A rule that reads words judges every one of them permanent
+#:    — the exact opposite of the truth, on the failure this module exists for.
+#:
+#: ⚠ In Python 3.11+ `asyncio.TimeoutError` and `socket.timeout` ARE `TimeoutError`, so the one
+#:   entry covers all three; they are named in the test rather than here so the equivalence is
+#:   asserted instead of assumed.
+_TRANSIENT_TYPES: tuple[type[BaseException], ...] = (
+    TimeoutError,
+    asyncio.TimeoutError,
+    socket.timeout,
+    ConnectionError,  # covers ConnectionReset/Aborted/Refused
+)
+
+#: httpx is imported lazily: this module is imported by the ingestion queue, and a hard
+#: dependency on an HTTP client for a classifier would be the wrong coupling.
+def _is_httpx_transient(exc: BaseException) -> bool:
+    try:
+        import httpx  # noqa: PLC0415
+    except Exception:  # pragma: no cover — httpx is installed, this is belt and braces
+        return False
+    return isinstance(exc, (httpx.TimeoutException, httpx.NetworkError, httpx.RemoteProtocolError))
 
 
 def is_transient(exc: BaseException | str) -> bool:
@@ -47,4 +77,9 @@ def is_transient(exc: BaseException | str) -> bool:
     effect: a read timeout now backs off and tries again instead of failing a document
     permanently on one stall.
     """
+    if isinstance(exc, BaseException):
+        # ⭐ THE TYPE IS THE FACT; THE MESSAGE IS ONLY A HINT. Type first, because a wordless
+        #    timeout is the commonest case and the words are the unreliable half.
+        if isinstance(exc, _TRANSIENT_TYPES) or _is_httpx_transient(exc):
+            return True
     return any(term in str(exc).lower() for term in TRANSIENT_TELLS)

@@ -2139,6 +2139,7 @@ def ingest_document(
     engine_override: str | None = None,
     extracted_doc: "ExtractedDocument | None" = None,
     extract_duration_ms: int = 0,
+    attachment_depth: int = 0,
 ) -> None:
     import logging, traceback
     log = logging.getLogger(__name__)
@@ -2292,12 +2293,20 @@ def ingest_document(
         # It lived HERE and nowhere else, so the queue path — which is what a watch and /upload
         # actually run — ingested messages and dropped every attachment. One function, both
         # callers. See `services/email_attachments.py` for the full account.
+        # ⛔ `depth` IS LOAD-BEARING AND WAS MISSING, WHICH MADE TM-240-09's GUARD INERT.
+        #    This is the ONLY real recursion path — the loop mints a `.eml` child and ingests
+        #    it through here, which lands back on this very line. Passing the default `0`
+        #    restarted the counter on every hop, so `MAX_MAIL_NESTING_DEPTH` could never fire
+        #    and attacker-supplied nested mail recursed without bound.
+        # ⚠ Found by code review 2026-09-09 (CR-01), NOT by the guard's own test, which passed
+        #   `depth=1` by hand and so proved the parameter rather than the behaviour.
         attachment_manifest = ingest_email_attachments(
             raw=raw,
             mime_type=mime_type,
             document_id=document_id,
             user_id=user_id,
             supabase=supabase,
+            depth=attachment_depth,
         )
         if attachment_manifest:
             metadata_dict = metadata_dict or {}
