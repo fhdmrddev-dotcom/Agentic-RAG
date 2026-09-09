@@ -34,6 +34,7 @@ capability exists before its approval model does.
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import json as jsonlib
 import logging
@@ -60,6 +61,53 @@ METADATA_HEADERS = ("Subject", "Date", "Message-Id")
 _LABEL_LIST_MAX_BYTES = 256 * 1024
 _MESSAGE_LIST_MAX_BYTES = 256 * 1024
 _MESSAGE_META_MAX_BYTES = 64 * 1024
+
+#: How many per-message metadata reads may be in flight at once.
+#:
+#: ⛔ THIS NUMBER EXISTS BECAUSE THE SEQUENTIAL VERSION WAS MEASURED BROKEN ON A REAL MAILBOX,
+#:    not because concurrency is nice to have. Google forces an N+1 — `users.messages.list`
+#:    returns *"only an `id` and a `threadId`"* — so a page of 25 costs 26 requests. Issued one
+#:    after another that measured **23.4 seconds per page** against the operator's own Gmail, and
+#:    `watch_service`'s H-5 listing loop is EXHAUSTIVE: a 201-message inbox meant **~3.5 minutes
+#:    of listing before a single message could be ingested.** The operator clicked *Sync now* and
+#:    saw nothing happen, which is exactly what that looks like from outside.
+#:
+#: ⚠ THE COST HAD BEEN SIZED FOR THE WRONG CALLER. A preview reads ONE page, where 23 s is
+#:   survivable; a watch reads EVERY page. Drive returns 100 files WITH their metadata in a single
+#:   request, so the shared listing loop was built around a cost model mail does not share.
+#:
+#: ⚠ BOUNDED, not unlimited. Gmail's per-user budget is 250 quota units/second and
+#:   `messages.get` costs 5, so 8 in flight stays an order of magnitude inside it. Unbounded
+#:   `gather` over a large label would turn a slow listing into a rate-limited one.
+_METADATA_CONCURRENCY = 8
+
+#: Gmail's BATCH endpoint. One HTTP request carries many sub-requests.
+#:
+#: ⛔ THIS IS THE FIX FOR A DEFECT MEASURED ON THE OPERATOR'S OWN INBOX, and the numbers are the
+#:    argument. Google forces an N+1 (`messages.list` returns *"only an `id` and a `threadId`"*),
+#:    so a page of 25 cost 26 requests: **~13 s per page even with 8 requests in flight**. The
+#:    inbox paginated past **375 messages with no end**, and `watch_service`'s H-5 listing loop is
+#:    EXHAUSTIVE with `max_pages = 200` — so a full listing would have run **~43 minutes** while
+#:    the watch lease is **600 s**. The watch was therefore re-claimed and RESTARTED FROM PAGE 1
+#:    every ten minutes, forever, ingesting nothing. From outside: *"I clicked Sync now and
+#:    nothing happened."*
+#:
+#: ⚠ CONCURRENCY WAS NOT ENOUGH, AND THAT WAS MEASURED TOO — 8 / 16 / 25 in flight gave
+#:   14.2 / 13.2 / 11.8 s per page. The cost is per-request (each pinned call resolves and
+#:   handshakes its own connection), so the only real remedy is FEWER REQUESTS.
+#:
+#: ⭐ Batching makes a page cost 2 requests instead of 26 without giving anything up: the listing
+#:   stays exhaustive, `SourceListing.complete` keeps its meaning, and the preview keeps REAL
+#:   SUBJECTS — which Phase 233 exists to protect. The alternative considered and rejected was
+#:   dropping per-message metadata and naming rows by message id, which would have reduced that
+#:   phase's honest labels to a column of hex.
+GMAIL_BATCH_URL = "https://gmail.googleapis.com/batch/gmail/v1"
+
+#: Sub-requests per batch. Google documents 100 as the ceiling and recommends staying below it.
+_BATCH_SIZE = 50
+_BATCH_MAX_BYTES = 4 * 1024 * 1024
+_BATCH_RETRIES = 4
+_BATCH_BACKOFF_SECONDS = 2.0
 
 
 def _headers(token: str) -> dict[str, str]:
@@ -141,6 +189,152 @@ def _subject_of(meta: dict[str, Any]) -> str | None:
     return None
 
 
+def _build_batch_body(ids: list[str], boundary: str) -> bytes:
+    """A `multipart/mixed` body of `application/http` sub-requests, one per message."""
+    parts: list[str] = []
+    for i, msg_id in enumerate(ids):
+        query = "format=metadata&" + "&".join(
+            f"metadataHeaders={h}" for h in METADATA_HEADERS
+        )
+        parts.append(
+            f"--{boundary}\r\n"
+            "Content-Type: application/http\r\n"
+            f"Content-ID: <item-{i}>\r\n\r\n"
+            f"GET /gmail/v1/users/me/messages/{msg_id}?{query}\r\n\r\n"
+        )
+    parts.append(f"--{boundary}--\r\n")
+    return "".join(parts).encode("utf-8")
+
+
+def _parse_batch_response(body: bytes, content_type: str) -> list[tuple[int, dict[str, Any]]]:
+    """Each sub-response as `(status_code, parsed_json)`, in the order Google returned them.
+
+    ⚠ Parsed with the stdlib `email` package rather than by hand, because a batch response IS a
+    MIME document and this codebase already trusts that parser with untrusted mail.
+    """
+    import email as _email  # noqa: PLC0415
+    import email.policy  # noqa: PLC0415
+
+    raw = b"Content-Type: " + content_type.encode("ascii", "replace") + b"\r\n\r\n" + body
+    outer = _email.message_from_bytes(raw, policy=_email.policy.default)
+
+    results: list[tuple[int, dict[str, Any]]] = []
+    for part in outer.iter_parts() if outer.is_multipart() else []:
+        payload = part.get_payload(decode=True)
+        if payload is None:
+            text = part.get_payload()
+            payload = text.encode("utf-8", "replace") if isinstance(text, str) else b""
+        # A sub-response is a raw HTTP response: status line, headers, blank line, body.
+        head, _, sub_body = payload.partition(b"\r\n\r\n")
+        status = 0
+        first_line = head.split(b"\r\n", 1)[0].decode("latin-1", "replace")
+        bits = first_line.split()
+        if len(bits) >= 2 and bits[1].isdigit():
+            status = int(bits[1])
+        try:
+            parsed = jsonlib.loads(sub_body) if sub_body.strip() else {}
+        except Exception:  # noqa: BLE001
+            parsed = {}
+        results.append((status, parsed if isinstance(parsed, dict) else {}))
+    return results
+
+
+async def _fetch_metadata_batched(token: str, ids: list[str]) -> dict[str, dict[str, Any]]:
+    """Subject / date / size for many messages, in as few requests as possible.
+
+    ⛔ FAILS CLOSED, exactly as the per-message path did. A sub-request that did not answer 200
+    raises, so `watch_service` marks the listing incomplete and suppresses missing-state
+    transitions. An empty-but-"complete" listing is what the `H-5` deletion guard consumes, and
+    Phase 239 recorded that shape as the more urgent half of its own defect.
+    """
+    out: dict[str, dict[str, Any]] = {}
+    for start in range(0, len(ids), _BATCH_SIZE):
+        chunk = ids[start : start + _BATCH_SIZE]
+        boundary = "batch_agentic_rag_240"
+
+        # ⚠ 429 IS EXPECTED HERE AND IS NOT AN ERROR CONDITION — it was hit on the very first
+        #   live batch run, because batching turns a slow trickle of requests into a burst.
+        #   Gmail's per-user budget is 250 quota units/second and `messages.get` costs 5, so a
+        #   50-message batch spends 250 in one go. Backing off is part of using the endpoint
+        #   correctly, not a workaround. ⛔ Bounded: after the last attempt it RAISES, so the
+        #   listing is marked incomplete and no deletion signal is ever derived from a short read.
+        resp = None
+        for attempt in range(_BATCH_RETRIES):
+            resp = await send_pinned_http(
+                EGRESS_KEY,
+                "POST",
+                GMAIL_BATCH_URL,
+                content=_build_batch_body(chunk, boundary),
+                headers={
+                    "Authorization": f"Bearer {token}",
+                    "Content-Type": f"multipart/mixed; boundary={boundary}",
+                },
+                timeout=60.0,
+                max_bytes=_BATCH_MAX_BYTES,
+            )
+            if resp.status_code != 429:
+                break
+            delay = _BATCH_BACKOFF_SECONDS * (2 ** attempt)
+            logger.warning(
+                "Gmail batch rate-limited (429); retrying in %.1fs (attempt %d/%d)",
+                delay, attempt + 1, _BATCH_RETRIES,
+            )
+            await asyncio.sleep(delay)
+
+        if resp is None or resp.status_code != 200:
+            code = resp.status_code if resp is not None else 0
+            reason = _gmail_error_reason(resp.body if resp is not None else None)
+            raise ValueError(f"Failed to read message metadata: HTTP {code}{reason}")
+
+        content_type = ""
+        for k, v in (resp.headers or {}).items():
+            if k.lower() == "content-type":
+                content_type = v
+                break
+
+        subs = _parse_batch_response(resp.body, content_type)
+        if len(subs) != len(chunk):
+            raise ValueError(
+                f"Gmail batch returned {len(subs)} responses for {len(chunk)} messages"
+            )
+        # ⚠ A SUB-RESPONSE CAN BE 429 WHILE THE ENVELOPE IS 200 — that is exactly what the first
+        #   live run returned, and treating it as a hard failure would make a busy mailbox
+        #   permanently unreadable. Rate-limited members are retried once, serially and slowly,
+        #   rather than failing the page.
+        retry_ids: list[str] = []
+        for msg_id, (status, meta) in zip(chunk, subs):
+            if status == 429:
+                retry_ids.append(msg_id)
+                continue
+            if status != 200:
+                raise ValueError(f"Failed to read message metadata: HTTP {status}")
+            out[msg_id] = meta
+
+        if retry_ids:
+            logger.warning(
+                "Gmail batch: %d of %d sub-requests were rate-limited; re-reading them slowly",
+                len(retry_ids), len(chunk),
+            )
+            await asyncio.sleep(_BATCH_BACKOFF_SECONDS)
+            for msg_id in retry_ids:
+                meta_resp = await send_pinned_http(
+                    EGRESS_KEY,
+                    "GET",
+                    f"{GMAIL_API_BASE}/messages/{msg_id}",
+                    params={"format": "metadata", "metadataHeaders": list(METADATA_HEADERS)},
+                    headers=_headers(token),
+                    timeout=15.0,
+                    max_bytes=_MESSAGE_META_MAX_BYTES,
+                )
+                if meta_resp.status_code != 200:
+                    reason = _gmail_error_reason(meta_resp.body)
+                    raise ValueError(
+                        f"Failed to read message metadata: HTTP {meta_resp.status_code}{reason}"
+                    )
+                out[msg_id] = jsonlib.loads(meta_resp.body)
+    return out
+
+
 async def list_messages(
     token: str,
     *,
@@ -180,43 +374,82 @@ async def list_messages(
         )
 
     data = jsonlib.loads(resp.body)
-    files = []
-    for stub in data.get("messages", []) or []:
-        msg_id = (stub or {}).get("id")
-        if not msg_id:
-            continue
-        meta_resp = await send_pinned_http(
-            EGRESS_KEY,
-            "GET",
-            f"{GMAIL_API_BASE}/messages/{msg_id}",
-            params={
-                "format": "metadata",
-                "metadataHeaders": list(METADATA_HEADERS),
-            },
-            headers=_headers(token),
-            timeout=15.0,
-            max_bytes=_MESSAGE_META_MAX_BYTES,
+    ids = [
+        str((stub or {}).get("id"))
+        for stub in (data.get("messages") or [])
+        if (stub or {}).get("id")
+    ]
+
+    if not ids:
+        return FilePage(files=[], next_page_token=data.get("nextPageToken"))
+
+    # ⭐ ONE REQUEST FOR THE WHOLE PAGE. See GMAIL_BATCH_URL for the measurements that forced it.
+    # ⚠ The per-message path below is kept as a FALLBACK and is not dead code: if Google ever
+    #   answers the batch endpoint with something this parser cannot read, a slow listing is a
+    #   better outcome than no listing. A batch sub-request that returns non-200 still RAISES —
+    #   only a malformed BATCH ENVELOPE degrades.
+    try:
+        metas = await _fetch_metadata_batched(token, ids)
+        return FilePage(
+            files=[
+                mailbox.message_to_file(
+                    message_id=str((metas.get(mid) or {}).get("id") or mid),
+                    subject=_subject_of(metas.get(mid) or {}),
+                    internal_date=(metas.get(mid) or {}).get("internalDate"),
+                    size=(metas.get(mid) or {}).get("sizeEstimate"),
+                    label_name=label_name or label_id or None,
+                )
+                for mid in ids
+            ],
+            next_page_token=data.get("nextPageToken"),
         )
+    except ValueError:
+        raise
+    except Exception as batch_exc:  # noqa: BLE001
+        logger.warning(
+            "Gmail batch metadata read failed (%s) — falling back to per-message reads",
+            batch_exc,
+        )
+
+    semaphore = asyncio.Semaphore(_METADATA_CONCURRENCY)
+
+    async def _one(msg_id: str):
+        async with semaphore:
+            meta_resp = await send_pinned_http(
+                EGRESS_KEY,
+                "GET",
+                f"{GMAIL_API_BASE}/messages/{msg_id}",
+                params={
+                    "format": "metadata",
+                    "metadataHeaders": list(METADATA_HEADERS),
+                },
+                headers=_headers(token),
+                timeout=15.0,
+                max_bytes=_MESSAGE_META_MAX_BYTES,
+            )
         if meta_resp.status_code != 200:
-            # ⚠ ONE UNREADABLE MESSAGE MUST NOT EMPTY A LISTING. `SourceListing.complete` fails
-            #   closed on an exception, and an empty-but-"complete" listing is what the H-5
-            #   deletion guard consumes — Phase 239 recorded exactly that shape as the more
-            #   urgent half of its own defect. Raising here is the honest move: the watch loop
-            #   marks the listing incomplete and suppresses missing-state transitions.
+            # ⚠ ONE UNREADABLE MESSAGE MUST NOT EMPTY A LISTING, AND CONCURRENCY DOES NOT COST
+            #   THAT PROPERTY. `SourceListing.complete` fails closed on an exception, and an
+            #   empty-but-"complete" listing is what the H-5 deletion guard consumes — Phase 239
+            #   recorded exactly that shape as the more urgent half of its own defect. Raising
+            #   here still propagates out of the `gather` below, so the watch loop marks the
+            #   listing incomplete and suppresses missing-state transitions.
             reason = _gmail_error_reason(meta_resp.body)
             raise ValueError(
                 f"Failed to read message metadata: HTTP {meta_resp.status_code}{reason}"
             )
         meta = jsonlib.loads(meta_resp.body)
-        files.append(
-            mailbox.message_to_file(
-                message_id=str(meta.get("id") or msg_id),
-                subject=_subject_of(meta),
-                internal_date=meta.get("internalDate"),
-                size=meta.get("sizeEstimate"),
-                label_name=label_name or label_id or None,
-            )
+        return mailbox.message_to_file(
+            message_id=str(meta.get("id") or msg_id),
+            subject=_subject_of(meta),
+            internal_date=meta.get("internalDate"),
+            size=meta.get("sizeEstimate"),
+            label_name=label_name or label_id or None,
         )
+
+    # ⚠ `gather` PRESERVES INPUT ORDER, which is what keeps the page in Gmail's own recency
+    #   order. Collecting completions as they finish would reorder the preview for no reason.
+    files = list(await asyncio.gather(*(_one(msg_id) for msg_id in ids))) if ids else []
 
     return FilePage(files=files, next_page_token=data.get("nextPageToken"))
 

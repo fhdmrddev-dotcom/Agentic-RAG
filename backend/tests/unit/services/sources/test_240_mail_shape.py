@@ -155,13 +155,47 @@ async def test_browse_mail_root_lists_labels_as_folders(
 # ── listing ────────────────────────────────────────────────────────────────────────────────
 
 
+def _batch_response(metas: list[dict[str, Any]], statuses: list[int] | None = None):
+    """A Gmail `multipart/mixed` batch response, built the way Google actually sends one.
+
+    ⚠ Assembled from the documented wire shape rather than from what the parser happens to
+    accept — `application/http` sub-parts, each a full HTTP response with its own status line.
+    """
+    boundary = "batch_reply_boundary"
+    statuses = statuses or [200] * len(metas)
+    chunks = []
+    for status, meta in zip(statuses, metas):
+        body = jsonlib.dumps(meta)
+        chunks.append(
+            f"--{boundary}\r\n"
+            "Content-Type: application/http\r\n\r\n"
+            f"HTTP/1.1 {status} OK\r\n"
+            "Content-Type: application/json\r\n\r\n"
+            f"{body}\r\n"
+        )
+    chunks.append(f"--{boundary}--\r\n")
+    return PinnedResponse(
+        status_code=200,
+        headers={"content-type": f"multipart/mixed; boundary={boundary}"},
+        body="".join(chunks).encode("utf-8"),
+    )
+
+
 def _listing_handler(messages: list[dict], meta: dict[str, dict], next_token: str | None = None):
+    """Answers BOTH the list call and the batch metadata call.
+
+    ⚠ The per-message GET arm is kept because the adapter still has that fallback path, and a
+    fake that could not answer it would make the fallback untestable.
+    """
     def handler(capability, method, url, kwargs):
         if url.endswith("/messages"):
             payload: dict[str, Any] = {"messages": messages, "resultSizeEstimate": len(messages)}
             if next_token:
                 payload["nextPageToken"] = next_token
             return _json(payload)
+        if "/batch/" in url:
+            ordered = [meta[m["id"]] for m in messages if m.get("id")]
+            return _batch_response(ordered)
         msg_id = url.rsplit("/", 1)[-1]
         return _json(meta[msg_id])
 
@@ -195,9 +229,9 @@ async def test_list_files_maps_messages_to_source_files(
     assert f.size == 4821
     assert f.modified_at == "1757239200000"
     assert f.path == "/INBOX"
-    # The listing call asked for INBOX and for the METADATA format on the follow-up (D-240-12).
+    # The listing asked for INBOX, and the metadata came back in ONE batched follow-up.
     assert rec.params(0).get("labelIds") == "INBOX"
-    assert rec.params(1).get("format") == "metadata"
+    assert "/batch/" in rec.urls[1], f"metadata was not batched: {rec.urls[1]}"
     assert set(rec.capabilities) == {"gmail_read"}
 
 
@@ -376,3 +410,109 @@ def test_a_disabled_connection_refuses_before_any_mail_call() -> None:
     """
     with pytest.raises(SourceConnectionDisabled):
         SourceRegistry.get_adapter({"service_id": "google", "is_enabled": False})
+
+
+# ── the listing cost, measured on the operator's real mailbox ───────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_a_page_costs_a_BOUNDED_number_of_requests(
+    adapter: GoogleDriveSourceAdapter, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """⛔ THE DEFECT THIS PINS WAS FOUND ON THE OPERATOR'S OWN INBOX, NOT IN REVIEW.
+
+    Google forces an N+1: `users.messages.list` returns *"only an `id` and a `threadId`"*, so a
+    page of 25 cost **26 requests**. Measured live that was **~13 s per page even with 8
+    requests in flight** (8 / 16 / 25 concurrent gave 14.2 / 13.2 / 11.8 s — concurrency was not
+    the remedy, because the cost is per-request). The inbox paginated past **375 messages with no
+    end**, `watch_service`'s H-5 loop is EXHAUSTIVE at `max_pages = 200`, and the watch lease is
+    **600 s** — so the watch restarted from page 1 every ten minutes forever and ingested
+    nothing.
+
+    ⭐ **The assertion is the COUNT, because the count is the defect.** A page must not cost a
+    request per message, however elegantly those requests are issued.
+    """
+    messages = [{"id": f"m-{i}"} for i in range(25)]
+    meta = {
+        f"m-{i}": {
+            "id": f"m-{i}",
+            "internalDate": "1757239200000",
+            "sizeEstimate": 100,
+            "payload": {"headers": [{"name": "Subject", "value": f"S{i}"}]},
+        }
+        for i in range(25)
+    }
+    rec = _install(monkeypatch, _listing_handler(messages, meta))
+
+    page = await adapter.list_files(CONN, folder_id="mailbox:INBOX")
+
+    assert len(page.files) == 25
+    assert len(rec.calls) <= 3, (
+        f"a 25-message page cost {len(rec.calls)} requests. One list + one batch is the "
+        f"contract; a request per message is the defect that made a real mailbox unwatchable."
+    )
+    assert page.files[7].name == "S7.eml", "batched metadata was mapped to the wrong message"
+
+
+@pytest.mark.asyncio
+async def test_a_rate_limited_member_is_retried_not_fatal(
+    adapter: GoogleDriveSourceAdapter, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """⚠ 429 ARRIVED ON THE VERY FIRST LIVE BATCH RUN, and it is not an error condition.
+
+    Batching turns a slow trickle into a burst: Gmail allows 250 quota units/second and
+    `messages.get` costs 5, so a 50-message batch spends the whole budget at once. A
+    rate-limited SUB-RESPONSE inside a 200 envelope must not fail the page, or a busy mailbox
+    becomes permanently unreadable.
+    """
+    messages = [{"id": "ok"}, {"id": "slow"}]
+    meta = {
+        "ok": {"id": "ok", "internalDate": "1", "sizeEstimate": 1,
+               "payload": {"headers": [{"name": "Subject", "value": "Fine"}]}},
+        "slow": {"id": "slow", "internalDate": "2", "sizeEstimate": 2,
+                 "payload": {"headers": [{"name": "Subject", "value": "Late"}]}},
+    }
+
+    def handler(capability, method, url, kwargs):
+        if url.endswith("/messages"):
+            return _json({"messages": messages})
+        if "/batch/" in url:
+            return _batch_response([meta["ok"], {}], statuses=[200, 429])
+        return _json(meta[url.rsplit("/", 1)[-1]])
+
+    monkeypatch.setattr("app.services.sources.mail.gmail._BATCH_BACKOFF_SECONDS", 0)
+    _install(monkeypatch, handler)
+
+    page = await adapter.list_files(CONN, folder_id="mailbox:INBOX")
+
+    assert [f.name for f in page.files] == ["Fine.eml", "Late.eml"], (
+        "a 429 on one member of a batch lost that message instead of re-reading it"
+    )
+
+
+@pytest.mark.asyncio
+async def test_the_listing_still_fails_closed_when_one_message_is_unreadable(
+    adapter: GoogleDriveSourceAdapter, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """⛔ CONCURRENCY MUST NOT COST THE FAIL-CLOSED PROPERTY.
+
+    A short-but-"successful" listing is what the `H-5` deletion guard consumes, and Phase 239
+    recorded `200` + empty as the more urgent half of its own defect. One unreadable message
+    still raises, so `watch_service` marks the listing incomplete and suppresses missing-state
+    transitions.
+    """
+    def handler(capability, method, url, kwargs):
+        if url.endswith("/messages"):
+            return _json({"messages": [{"id": "ok"}, {"id": "bad"}]})
+        if url.endswith("/bad"):
+            return _json({"error": {"status": "PERMISSION_DENIED"}}, status=403)
+        return _json({
+            "id": "ok",
+            "internalDate": "1757239200000",
+            "sizeEstimate": 10,
+            "payload": {"headers": [{"name": "Subject", "value": "S"}]},
+        })
+
+    _install(monkeypatch, handler)
+    with pytest.raises(ValueError):
+        await adapter.list_files(CONN, folder_id="mailbox:INBOX")

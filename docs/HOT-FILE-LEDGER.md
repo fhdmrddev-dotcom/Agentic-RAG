@@ -9579,7 +9579,7 @@ cells rot within days.
 | [`backend/app/services/sources/base.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesbasepy) | 9 / 5 / 336 | ⚠ **FIRES** | ⚠ row was STALE at `6 / 3 / 198`. 238's byte-unchanged claim is now SPENT: 239 added protocol resolution here. Routing stayed DATA (two dicts), never a branch |
 | [`backend/app/services/sources/adapters/google_drive.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesadaptersgoogle_drivepy) | 3 / 2 / 442 | no (2 phases — **crosses to 3 with 240**) | ⚠ row was STALE at `3 / 2 / 407`. honoured by construction (**240**): mail is a THIRD VIRTUAL ROOT, +35/-0 lines, all delegation. Named seam: `mail/` |
 | [`backend/app/services/sources/mail/mailbox.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesmailmailboxpy) | 0 / 0 / 147 | no (new) | young (240) — the PROVIDER-INDEPENDENT half of the mail shape. ⭐ Fenced in `test_boundary_fence.py`, so “knows nothing about Google” is mechanical, not a promise |
-| [`backend/app/services/sources/mail/gmail.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesmailgmailpy) | 0 / 0 / 292 | no (new) | young (240) — the Gmail half. ⛔ `gmail_read`, never `drive_read`; reads only. Deliberately NOT fenced: it is the provider half |
+| [`backend/app/services/sources/mail/gmail.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesmailgmailpy) | 0 / 0 / 526 | no (new) | young (240) — the Gmail half. ⛔ `gmail_read`, never `drive_read`; reads only. ⚠ Metadata is BATCHED after a live measurement (see §)  |
 | [`backend/app/services/sources/mail/__init__.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesmail__init__py) | 0 / 0 / 44 | no (new) | young (240) — re-exports only. ⛔ Must never import an adapter: `sources/__init__.py` imports adapters eagerly, so the reverse edge is a cycle |
 | [`backend/app/services/sources/adapters/microsoft_graph.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesadaptersmicrosoft_graphpy) | 3 / 2 / 376 | no (2 phases) | ⚠ row was STALE at `0 / 0 / 352`. ⛔ The 302 dance is still sealed in here. SEED-258 removed its private `MAX_FILE_BYTES`; the ceiling is one setting now |
 | [`backend/app/services/sources/adapters/mock_source.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesadaptersmock_sourcepy) | 2 / 1 / 177 | no (1 phase) | ⚠ absent for its entire life — row added 238. It is where the SEED-253 invariant is ANCHORED: a `path` names a folder, never a filename |
@@ -9874,6 +9874,37 @@ module docstring with its URL, per CLAUDE.md's rule:
   widen itself"*, so a token minted before the mail scope answers 403. `_scope_hint` turns that
   into a sentence telling the person to reconnect once, rather than a bare HTTP code that sends
   them hunting a bug that is really a consent.
+
+### ⚠ CORRECTION 2026-09-09, SAME DAY — THE LISTING COST WAS MEASURED WRONG, ON A REAL MAILBOX
+
+The original design fetched per-message metadata one request at a time and sized that cost against
+a PREVIEW, which reads one page. **`watch_service`'s H-5 listing loop is EXHAUSTIVE.** Measured on
+the operator's own Gmail:
+
+| | per-message, sequential | 8 concurrent | 16 | 25 | **batched** |
+|---|---|---|---|---|---|
+| one 25-message page | **23.4 s** | 14.2 s | 13.2 s | 11.8 s | **~5 s** |
+| 375 messages (15 pages) | 194 s | — | — | — | **78 s** |
+
+⭐ **Concurrency was NOT the remedy and the measurement said so** — 8→25 in flight moved a page
+from 14.2 s to 11.8 s, because the cost is per-request (each pinned call resolves and handshakes
+its own connection). **Fewer requests was the only lever**, so metadata now goes through Gmail's
+`batch/gmail/v1` endpoint: a page costs 2 requests instead of 26, and `test_240_mail_shape.py`
+pins the COUNT (`<= 3` per page) rather than the mechanism.
+
+⚠ **429 arrived on the first live batch run and is expected, not exceptional**: batching turns a
+trickle into a burst, and a 50-message batch spends Gmail's entire 250-unit/second budget at once.
+A rate-limited SUB-response inside a 200 envelope is re-read slowly rather than failing the page —
+otherwise a busy mailbox is permanently unreadable. ⛔ Fail-closed is preserved throughout: after
+the bounded retries it RAISES, so the listing is incomplete and no deletion signal is derived.
+
+⛔ **AND THE FIX IS NOT SUFFICIENT, WHICH IS THE REAL FINDING.** The operator's INBOX measured
+**at least 30,000 messages**. At ~5 s per 25-message page that is **~100 minutes** of listing, and
+the watch lease is **600 s** — so the watch was re-claimed and restarted from page 1 every ten
+minutes, forever, ingesting nothing. **A mailbox is not a folder**: the exhaustive-completeness
+contract fits a bounded folder and does not fit an unbounded stream. Bounding it is a PRODUCT
+decision (how much of a mailbox does "watch" mean?) and is owed to the operator; the watch is
+paused rather than looping. See `240-VERIFICATION.md`.
 
 **Named seam for the next phase.** `_gmail_error_reason` duplicates the shape of
 `google_drive._google_error_reason`. If a third such copy appears, extract one
