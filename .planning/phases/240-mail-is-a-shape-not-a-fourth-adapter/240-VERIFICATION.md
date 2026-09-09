@@ -253,3 +253,98 @@ component has ever had** — which is the root cause the report itself names. Re
 reds **6 of the 10 new cases**, including one nobody had reported: `CreateWatchModal` pre-selects
 `capable[0]`, so a switched-off connection would have been chosen FOR the person the instant the
 modal opened. ⚠ The server-side refusal stays — a UI filter is not a security control.
+
+---
+
+# ⛔ ADDENDUM 2026-09-09 — THE OPERATOR DROVE IT, AND SC#3's WATCH HALF IS REFUTED
+
+The operator ran the UAT while I was unattended and reported: browsing worked, **manual ingest of
+a mail label worked**, and a watch on a label **synced nothing**. I drove it and the report is
+correct. This addendum supersedes nothing above except the tone of §"SC#4 inherited": the problem
+turns out to be upstream of SC#4.
+
+## What was measured, in order
+
+| Step | Finding |
+|---|---|
+| The watch row | correct — `source_folder_id = mailbox:INBOX`, `is_active`, claimed and re-claimed by the loop |
+| `connector_sync_runs` for it | **zero rows**, ever |
+| `connector_watch_items` | **0**, after 7+ minutes of `last_status = running` |
+| The adapter, driven directly against the live account | ✅ **25 real messages with real subjects** |
+| `WatchService.sync_watch()` run in-process | **still running at 360 s**, 0 items |
+| Pagination, measured | 15 pages × 25 = 375 messages in **194 s**, still `next_page_token` |
+| The INBOX's true size | ⛔ **at least 30,000 messages** |
+
+## The root cause, stated plainly
+
+**A mailbox is not a folder, and I made it wear a folder's contract.**
+
+`watch_service`'s H-5 listing loop is EXHAUSTIVE by design — correct for a bounded folder, where
+Drive returns 100 files *with their metadata* in one request. Gmail returns **25 ids** per request
+and then charges **one request per message** for the subject. So:
+
+- a 25-message page cost **23.4 s**;
+- an exhaustive listing of a 30,000-message inbox is **~100 minutes**, and `max_pages = 200` caps
+  it at 5,000 messages ≈ 17 minutes;
+- **the watch lease is 600 s.**
+
+So the watch was claimed, ground through the listing, lost its lease, was re-claimed, and
+**restarted from page 1 — forever, ingesting nothing.** From outside: *"I clicked Sync now and
+nothing happened."* Exactly what the operator saw.
+
+⚠ **This was invisible to every test I wrote**, because each one lists a handful of messages. The
+cost model was never the thing under test — and the phase's own SC#4 evidence (`watch_service.py`
+byte-unchanged) is precisely what let a mismatch hide: *nothing changed, so nothing looked wrong.*
+
+## What I fixed, and what it did not fix
+
+⭐ **Metadata now goes through Gmail's `batch/gmail/v1`** — a page costs **2 requests instead of
+26**. Measured: **375 messages 194 s → 78 s**, real subjects preserved. The test now pins the
+REQUEST COUNT (`<= 3` per page), not the mechanism, because the count is the defect.
+
+⚠ **Concurrency was tried first and MEASURED INSUFFICIENT** — 8 / 16 / 25 requests in flight gave
+14.2 / 13.2 / 11.8 s per page, because the cost is per-request (each pinned call resolves and
+handshakes its own connection). Recorded because it is the obvious fix and it is the wrong one.
+
+⚠ **429 arrived on the very first live batch run** and is expected: a 50-message batch spends
+Gmail's entire 250-unit/second budget at once. Rate-limited members are re-read slowly; after
+bounded retries the call still RAISES, so fail-closed is preserved and no deletion signal is ever
+derived from a short read.
+
+⛔ **IT IS STILL NOT ENOUGH.** ~5 s/page × 1,200 pages ≈ **100 minutes** against a **600 s** lease.
+Batching bought 2.5× where roughly 10× was needed, and no amount of tuning closes that.
+
+## What I did NOT decide, and why it is yours
+
+**How much of a mailbox does "watch this label" mean?** Nobody wants a 30,000-message archive in
+their knowledge base for ticking a box, and I will not choose that for you. The options, with the
+consequence that decides between them:
+
+| | Option | Consequence |
+|---|---|---|
+| **A** | **Anchor to the watch's creation date** (`q=after:<created>`) — only mail arriving from now on | ⭐ My recommendation. The set only GROWS, so nothing ever ages out of the window and the exhaustive-completeness contract stays honest. Matches what "start watching" normally means. |
+| **B** | Cap at the N most recent messages | ⛔ Older mail ages OUT of the window and would look deleted-at-source. Only safe if the listing also reports itself incomplete, which suppresses the whole deletion signal. |
+| **C** | Let it run for hours across many leases | Needs resumable listing and a much longer lease. Real work, and it imports 30,000 emails nobody asked for. |
+
+⚠ **B and C both touch `watch_service.py`**, which fires G-5 and is currently the evidence for SC#4.
+**A does not** — it is a query the mail adapter adds for itself.
+
+## State I left behind
+
+⛔ **The mail watch is PAUSED** (`is_active = false`, `last_status = 'paused'`, with the reason in
+`last_error`). It was burning Gmail quota in an infinite restart loop with you away. **Re-enable
+with `is_active = true` once the decision above is made.** Your **Drive watch was not touched** and
+still reads `success`.
+
+## What this changes about the phase's claims
+
+- **SC#1** ✅ unchanged — measured, and independent of the watch.
+- **SC#2** ✅ the code is right and the fourth two-paths disagreement is genuinely closed, but it is
+  **still unproven end-to-end**, because no watch has ever delivered a message.
+- **SC#3** ⚠ **half met.** `thread_key` is real in production — two of the operator's manually
+  ingested emails carry one — and the Conversation section reads it. The *watch* half is unproven.
+- **SC#4** ⛔ unchanged and now clearly blocked behind the decision above.
+
+⭐ **The one genuinely good piece of news from the drive:** the operator's manual ingest of a mail
+label WORKED, and `thread_key` is populated on real mail in their Library. The shape, the parser
+and the column are right. What is wrong is the traversal cost, and that is one decision away.
