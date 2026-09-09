@@ -97,6 +97,9 @@ export {
   listDocumentTables,
   listDocumentImages,
   listDocumentQueries,
+  // Phase 240 (SRC-05 SC#3) — the conversation read. Same rule as the five above: a symbol
+  // missing from this barrel typechecks perfectly and is invisible to every consumer.
+  fetchDocumentConversation,
 } from "./api/documents"
 
 // ── skills ─────────────────────────────────────────────────────────

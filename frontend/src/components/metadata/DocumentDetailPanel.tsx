@@ -29,6 +29,7 @@ import { X, ShieldCheck } from "lucide-react"
 import { Sheet, SheetContent } from "@/components/ui/sheet"
 import { PanelSection } from "@/components/panel/PanelSection"
 import { RelationshipsSection } from "@/components/relationships/RelationshipsSection"
+import { DocumentConversationSection } from "./DocumentConversationSection"
 import { ClassificationSection } from "@/components/classification/ClassificationSection"
 import { DocumentContentSection } from "./DocumentContentSection"
 import { DocumentChunksSection } from "./DocumentChunksSection"
@@ -133,9 +134,20 @@ export interface DocumentDetailPanelProps {
   /** Reconcile after an edit — Realtime is best-effort (D-v2.5-03), so the parent
    *  re-fetches documents. Optional in tests. */
   onReconcile?: () => void
+  /** Phase 240 (SRC-05 SC#3) — open a sibling message of the same conversation in this
+   *  panel. OPTIONAL, and its absence is honest rather than broken: when the parent does
+   *  not supply it the conversation rows render as a read-only list of what the thread
+   *  contains, which is still the thing SC#3 asks for. A row that looked clickable and did
+   *  nothing would be worse than a row that does not. */
+  onOpenDocument?: (id: string) => void
 }
 
-export function DocumentDetailPanel({ doc, onClose, onReconcile }: DocumentDetailPanelProps) {
+export function DocumentDetailPanel({
+  doc,
+  onClose,
+  onReconcile,
+  onOpenDocument,
+}: DocumentDetailPanelProps) {
   const isMobile = useIsMobile()
   const [customDefs, setCustomDefs] = useState<MetadataFieldDef[]>([])
   // Per-field transient save/error receipts keyed by field_key.
@@ -144,6 +156,13 @@ export function DocumentDetailPanel({ doc, onClose, onReconcile }: DocumentDetai
   // The Relationships section owns its own fetch; it lifts its loaded total up so the
   // PanelSection can show a count badge (null = not yet loaded → no badge).
   const [relTotal, setRelTotal] = useState<number | null>(null)
+  // Phase 240 — lifted by DocumentConversationSection; decides whether the section shows.
+  const [convoTotal, setConvoTotal] = useState<number | null>(null)
+  // Phase 240 — "is this mail?", answered from metadata the panel already holds. `document_type`
+  // is written deterministically for every mail MIME (`ingest_enrich`, EML-01 / BUG-260906-02),
+  // and `email_message_id` covers a row whose type was overwritten by an editor.
+  const isMailDocument =
+    doc.metadata?.document_type === "email" || !!doc.metadata?.email_message_id
   // The Classification section reads metadata._classification (no own fetch); it lifts
   // its pending-suggestion count up (1 when a "suggested" exists, else 0).
   const [classCount, setClassCount] = useState<number | null>(null)
@@ -186,6 +205,10 @@ export function DocumentDetailPanel({ doc, onClose, onReconcile }: DocumentDetai
   // docId change).
   useEffect(() => {
     setRelTotal(null)
+    // ⚠ Phase 240 — CR-01's fence CAUGHT this one before it shipped, which is the fence doing
+    //   exactly its job. Omitting it left a conversation badge from document A on document B,
+    //   because a collapsed PanelSection never remounts to correct itself.
+    setConvoTotal(null)
     setClassCount(null)
     setContentLines(null)
     setChunkTotal(null)
@@ -398,6 +421,35 @@ export function DocumentDetailPanel({ doc, onClose, onReconcile }: DocumentDetai
         <PanelSection title="Found by" count={queryTotal ?? undefined} defaultOpen={false}>
           <DocumentQueriesSection docId={doc.id} onTotalChange={setQueryTotal} />
         </PanelSection>
+
+        {/* Conversation (Phase 240 SRC-05 SC#3) — mail siblings sharing this document's
+            `thread_key`. It sits ABOVE Relationships on purpose: a conversation is the
+            document's own context, while Relationships are links to OTHER documents.
+
+            ⚠ GATED ON THE DOCUMENT LOOKING LIKE MAIL, and the gate reads metadata this panel
+            ALREADY has — no fetch decides whether a section exists. A PDF gains no accordion
+            row, and nothing is requested to discover that.
+
+            ⛔ NOT `defaultOpen`, and that is the entire lazy mechanism rather than a taste
+            call. `PanelSection.tsx:94` renders children only when open, so a section that
+            fetches in a bare `useEffect` costs nothing until the accordion is clicked — the
+            same rule the Text and Chunks mounts below already depend on.
+
+            ⚠ AN EARLIER DRAFT MOUNTED THIS TWICE — once visibly and once inside a `hidden`
+            div, so the total could be learned before deciding whether to show the section.
+            It REGRESSED `DocumentDetailPanel.a11y.test.tsx`: the always-mounted loading state
+            is `role="status"`, and the suite asserts no status receipt exists before a PATCH.
+            Two mounts to avoid one empty accordion was the wrong trade, and the shipped
+            Relationships pattern already had the answer. */}
+        {isMailDocument && (
+          <PanelSection title="Conversation" count={convoTotal ?? undefined} defaultOpen={false}>
+            <DocumentConversationSection
+              docId={doc.id}
+              onTotalChange={setConvoTotal}
+              onOpenDocument={onOpenDocument}
+            />
+          </PanelSection>
+        )}
 
         {/* Relationships (Phase 117 REL-02) — the section owns its own fetch +
             re-fetch (D-117-9); it lifts the loaded total up for the count badge. */}

@@ -118,6 +118,34 @@ class DocumentChunkRow(BaseModel):
     embedding_dimensions: int | None = None
 
 
+class ConversationMessage(BaseModel):
+    """One message of a mail conversation, as the detail panel needs to render it.
+
+    Phase 240 (SRC-05 SC#3). Carries everything a row needs so the panel makes ONE request for a
+    conversation rather than one per sibling — the shape `listDocumentChunks` already set.
+    """
+
+    id: UUID
+    title: str | None = None
+    date: str | None = None
+    sender: str | None = None
+    #: True for the document the panel currently has open. ⚠ The open message is MARKED, not
+    #: hidden: a person reading a fourteen-message thread needs to see where they are in it.
+    is_open: bool = False
+
+
+class ConversationResponse(BaseModel):
+    """A conversation, and an honest statement about whether it is all of one."""
+
+    messages: list[ConversationMessage] = []
+    #: Total siblings sharing the key, INCLUDING any beyond the cap.
+    total: int = 0
+    #: ⛔ True when `messages` is a slice. A cap that is not reported is the same lie as no cap —
+    #: PostgREST truncates at 1000 by default and says nothing, which is the trap
+    #: `knowledge_health._fetch_readability` records in its own comments.
+    truncated: bool = False
+
+
 class DocumentTableRow(BaseModel):
     id: UUID
     page: int | None = None

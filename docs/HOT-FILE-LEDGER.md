@@ -9390,8 +9390,8 @@ cells rot within days.
 | [`backend/app/api/admin.py`](docs/HOT-FILE-LEDGER.md#backendappapiadminpy) | 33 / 13 / 1740 | ⚠ **FIRES** | ⚠ row was STALE at `32 / 12 / 1733`. honoured by construction (**BUG-260902-06**): two write seams swap invalidate for broadcast; the two WR-03 READ seams deliberately unchanged |
 | [`backend/app/api/settings.py`](docs/HOT-FILE-LEDGER.md#backendappapisettingspy) | 34 / 18 / 738 | ⚠ **FIRES** | ⚠ row was STALE at `30 / 16 / 639`. honoured by construction (**SEED-258**): the same four seams SEED-227 used; the refusal states the COST, not just the range |
 | [`backend/app/services/multimodal_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmultimodal_servicepy) | 14 / 7 / 984 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** — row added SEED-227, which is also where its silent truncation was found |
-| [`backend/app/api/documents.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentspy) | 85 / 33 / 2342 | ⚠ **FIRES** | ✅ **DISCHARGED AGAIN (240-03)** — the email-attachment loop extracted to `services/email_attachments.py`, `-100 L` net. Row was `85 / 33 / 2437` |
-| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 167 / 38 / 4786 | ⚠ **FIRES** | ⚠ row was STALE at `159 / 36 / 4687`. honoured by construction (**235**) — 10 TARGETS lines + 10 BASELINE pins + 1 re-pin, NO logic/threshold change |
+| [`backend/app/api/documents.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentspy) | 87 / 34 / 2414 | ⚠ **FIRES** | ✅ **DISCHARGED AGAIN (240-03)** — the email-attachment loop extracted to `services/email_attachments.py`. 240-04 adds the conversation read |
+| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 171 / 41 / 4850 | ⚠ **FIRES** | ⚠ row was STALE at `167 / 38 / 4786`. honoured by construction (**240**): three suites into BOTH knobs; verdict `7914 · 7149 · 247/247` |
 | [`backend/app/services/eval_runner_service.py`](docs/HOT-FILE-LEDGER.md#backendappserviceseval_runner_servicepy) | 12 / 7 / 959 | ⚠ **FIRES** | ⚠ absent at 7 phases (added 196) |
 | [`frontend/src/components/panel/PhaseCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasecardtsx) | 16 / 10 / 755 | ⚠ **FIRES** | honoured by construction (200 / **214**) — the failure sentinel NARROWED to both-sources-empty |
 | [`frontend/src/components/panel/PhaseTimeline.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasetimelinetsx) | 9 / 7 / 385 | ⚠ **FIRES** | honoured by construction (**214**) — it mounts the shared identity; ⚠ absent from BOTH until 200 |
@@ -9512,7 +9512,9 @@ cells rot within days.
 | [`frontend/src/components/ingestion/DocumentList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestiondocumentlisttsx) | 24 / 13 / 294 | ⚠ **FIRES** | ✅ **seam TAKEN (217.1-05)** — `DocumentRow.tsx` extracted with the sketch's five affordances (−315 L). ⚠ 7-column order still load-bearing: `LibraryPage` sheds cols 3–5 by `nth-child` |
 | [`frontend/src/pages/LibraryPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpageslibrarypagetsx) | 44 / 14 / 922 | ⚠ **FIRES** | ⚠ row was STALE at `40 / 12 / 825`. honoured by construction (**235**) — one tab prop, one cross-tab hop. ⚠ re-derive with `git log --follow`, else it reads `1` |
 | [`backend/app/services/retrieval_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrievalservicepy) | 18 / 10 / 423 | ⚠ **FIRES** | ⚠ my own cell said *byte-unchanged* and my LATER commit falsified it (reviewer catch). TRUST-04 threaded provenance through it. ⚠ extraction still OWED (`SEED-224`) |
-| [`frontend/src/components/metadata/DocumentDetailPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsmetadatadocumentdetailpaneltsx) | 9 / 6 / 496 | ⚠ **FIRES** | ⚠ **the row was STALE at `6 / 5 / 405`.** honoured by construction (217-10 / 217-11) — five lazy sections as CHILDREN. ⚠ CROSS-SURFACE: 217 lands on CHAT too |
+| [`frontend/src/components/metadata/DocumentDetailPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsmetadatadocumentdetailpaneltsx) | 12 / 7 / 596 | ⚠ **FIRES** | honoured by construction (**240**): ONE child section mounted, gated on metadata, no shell change. ⚠ CR-01's fence caught a missing reset before it shipped |
+| [`frontend/src/components/metadata/DocumentConversationSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsmetadatadocumentconversationsectiontsx) | 0 / 0 / 155 | no (new) | young (240) — the read that makes `thread_key` visible. ⛔ Bounded height + a worded truncation, because BUG-260908-01 is the same panel unbounded |
+| [`frontend/src/lib/api/documents.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapidocumentsts) | 2 / 2 / 389 | no (2 phases) | ⚠ **absent for its ENTIRE LIFE — row added 240.** ⭐ The Phase 207 `lib/api.ts` split created it with no row, exactly as its sibling `api/workflows.ts` records |
 | [`frontend/src/hooks/useDocuments.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusedocumentsts) | 8 / 3 / 120 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent at 3 phases. Realtime is a hint, not truth — it reconciles by fetch (D-v2.5-03), and `table_count`/`image_count`/`chunk_count` are server-side |
 | [`frontend/src/pages/KnowledgeHealthPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesknowledgehealthpagetsx) | 12 / 6 / **DELETED** | ⚠ **FIRES** | **RETIRED (217.1-14)** — the Library's Health tab absorbed it; `ChatLayout`'s fallback replaced by `UnknownViewFallback` (`:871`). ⚠ absent for its ENTIRE LIFE |
 | [`backend/app/api/knowledge_health.py`](docs/HOT-FILE-LEDGER.md#backendappapiknowledgehealthpy) | 11 / 6 / 737 | ⚠ **FIRES** | honoured by construction (**217.1-11**) — adds `could_not_search`; `retrieval_count` byte-unchanged. ⚠ absent at **6 phases**. Audit-analytics from `audit_log`. Service-role by exception |
@@ -9529,7 +9531,7 @@ cells rot within days.
 | [`backend/app/services/sources/import_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesimport_servicepy) | 3 / 3 / 277 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ row was STALE at `2/2/172`. 238 deleted a FOURTH provider leak found by the rewritten fence: it fell back to the Drive adapter on the DISPLAY NAME |
 | [`frontend/src/components/sources/SourcePreviewPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcessourcepreviewpaneltsx) | 1 / 1 / 453 | no (1 phase) | young (233) — 229-C at rest, 230-A on confirm. ⛔ Four sections, no removal control; collapse hides FILES, never the count |
 | [`frontend/src/components/sources/previewVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcespreviewvocabularyts) | 1 / 1 / 98 | no (1 phase) | young (233) — a strict leaf, zero imports. ⛔ No hash claim; the `here` qualifier is POSITIVE, not merely an absent overclaim |
-| [`frontend/src/components/sources/ConnectedSourceSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcesconnectedsourcesectiontsx) | 1 / 1 / 131 | no (1 phase) | young (233) — the door that finally MOUNTS `SourceFolderPicker`. Renders `null` when no source-capable connection exists |
+| [`frontend/src/components/sources/ConnectedSourceSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcesconnectedsourcesectiontsx) | 4 / 3 / 165 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | honoured by construction (**240**): byte-unchanged; the `is_enabled` refusal went into `sourceCapability.ts`. ⭐ Its owed seam WAS a test suite, supplied here |
 | [`frontend/src/components/library/IngestionTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibraryingestiontabtsx) | 17 / 6 / 512 | ⚠ **FIRES** | ⚠ row was STALE at `13 / 4 / 456` — +2 phases. honoured by construction (233 / **235**) — the reader-off instance statement, ZERO branches |
 | [`frontend/src/components/ingestion/__tests__/IngestionStrip.test.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestion__tests__ingestionstriptesttsx) | 3 / 3 / 516 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent; row added 233, which repaired the INHERITED red `229-03` caused. Pin was UNDER-set 25 vs 30 → 31 |
 | [`backend/app/services/extractors/aspects/vision_text.py`](docs/HOT-FILE-LEDGER.md#backendappservicesextractorsaspectsvision_textpy) | 1 / 0 / 367 | no (0 phases) | young (`SEED-226`) — the vision-as-OCR leaf. ⛔ It writes nothing and adds NO dependency; a transcription is stamped `advisory` so it can never pass as a parsed text layer |
@@ -9542,7 +9544,7 @@ cells rot within days.
 | [`backend/app/db/watches.py`](docs/HOT-FILE-LEDGER.md#backendappdbwatchespy) | 2 / 2 / 696 | no (2 phases) | ⚠ row was STALE at `1/1/439`. 235 added the sync-run store + prune; 235-14 adds `last_success_by_watch`, the ONLY UNBOUNDED read. ⛔ the prune's bound is proven against FIXTURES only, never live rows |
 | [`backend/app/api/sources.py`](docs/HOT-FILE-LEDGER.md#backendappapisourcespy) | 5 / 1 / 677 | no (1 phase) | ⚠ row was STALE at `2/0/356`. ✅ 235 fixed `/sync`: REFUSES when the LIVE reader is absent (`BUG-260906-02`). 235-14 closes G2 — polled window UNCHANGED, last-good filled unbounded for stopped only |
 | [`frontend/src/components/sources/WatchedFoldersSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourceswatchedfolderssectiontsx) | 4 / 1 / 935 | no (1 phase) | ⚠ row STALE at `2 / 0 / 393` — **it MORE THAN DOUBLED**. 235 paid the owed outcome line. ⭐ seam named NOW, not at threshold: extract `WatchedSourceCard` |
-| [`frontend/src/components/sources/CreateWatchModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcescreatewatchmodaltsx) | 2 / 0 / 276 | no (0 phases) | young (234) — it DOES carry a destination-folder picker (defaults Root). The operator's "where do files land?" is discoverability, not an absent control |
+| [`frontend/src/components/sources/CreateWatchModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcescreatewatchmodaltsx) | 4 / 1 / 283 | no (1 phase) | honoured by construction (**240**): byte-unchanged. ⛔ Its auto-select of `capable[0]` is why BUG-260908-02 mattered most here |
 | [`frontend/src/components/layout/NavPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutnavpaneltsx) | 20 / 11 / 329 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **11 phases** — row added 235. honoured by construction: 2 optional props, 0 `useState`. Unwired ⇒ silence |
 | [`frontend/src/App.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcapptsx) | 31 / 23 / 351 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **23 phases** — row added 235. honoured by construction: one navigator, the shape `handleOpenStudio` already had |
 | [`frontend/src/lib/nav-items.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibnav-itemsts) | 8 / 6 / 95 | ⚠ **FIRES** | ⚠ absent at 6 phases — row added 235, which CONSIDERED it and deliberately left it alone: no twelfth `ActiveView` member; the Library already has one |
@@ -9582,7 +9584,7 @@ cells rot within days.
 | [`backend/app/services/sources/adapters/microsoft_graph.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesadaptersmicrosoft_graphpy) | 3 / 2 / 376 | no (2 phases) | ⚠ row was STALE at `0 / 0 / 352`. ⛔ The 302 dance is still sealed in here. SEED-258 removed its private `MAX_FILE_BYTES`; the ceiling is one setting now |
 | [`backend/app/services/sources/adapters/mock_source.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesadaptersmock_sourcepy) | 2 / 1 / 177 | no (1 phase) | ⚠ absent for its entire life — row added 238. It is where the SEED-253 invariant is ANCHORED: a `path` names a folder, never a filename |
 | [`backend/app/services/sources/__init__.py`](docs/HOT-FILE-LEDGER.md#backendappservicessources__init__py) | 5 / 3 / 40 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ row was STALE at `2 / 1 / 26` and read `no (1 phase)`. The ONE eager-import site — an adapter absent here is unregistered, so the list is load-bearing |
-| [`frontend/src/components/sources/sourceCapability.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcessourcecapabilityts) | 3 / 2 / 138 | no (2 phases) | ⚠ row STALE TWICE (`0 / 0 / 38`, `2 / 2 / 98`). young (238 / **239**). ⛔ Fails CLOSED on `null`, and on a DEFAULT service id since 239-05. See §239-05 |
+| [`frontend/src/components/sources/sourceCapability.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcessourcecapabilityts) | 3 / 2 / 160 | no (2 phases) | ⚠ row STALE THREE TIMES (`0/0/38`, `2/2/98`, `3/2/138`). **240**: the `is_enabled` refusal lands HERE, one predicate for both surfaces (BUG-260908-02) |
 | [`backend/app/services/sources/adapters/mcp_source.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesadaptersmcp_sourcepy) | 9 / 1 / 1271 | no (1 phase) | ⚠ STALE at every close so far (`2/1/643` → `6/1/1022` → `8/1/1259`). SEED-258 removed its `MAX_FILE_BYTES`; `_guard` reads the operator setting at each use |
 | [`frontend/src/components/settings/connectionRowVerdict.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectionrowverdictts) | 2 / 2 / 99 | no (2 phases) | ⚠ **absent for its entire life — row added 239-03, and the ledger gate FAILED on it at this phase's base.** young (221 / 239). The row's verdict, DERIVED never stored. See §239-03 |
 
@@ -9632,6 +9634,70 @@ rather than grow a copy of one.
 path in four recorded places, and the divergence is discovered rather than prevented. The
 extraction worth taking is a single ordered pipeline both paths execute — at which point "did this
 path run step N" stops being a question a comment answers.
+
+
+
+---
+
+## frontend/src/components/metadata/DocumentConversationSection.tsx
+
+**Derived 2026-09-09 (Phase 240):** `0 / 0 / 155`. New in this phase.
+
+**What it is.** One `PanelSection` child inside the shipped Phase 112 detail panel, listing the
+other messages that share this document's `thread_key`.
+
+⭐ **WHY IT EXISTS AT ALL.** ROADMAP 240 predicts this column's fate by name — *"stored and read
+by nothing — the exact fate `message_id` / `in_reply_to` / `references` already suffered here"* —
+and those three headers really are parsed, written into `metadata`, and read back by nothing.
+`thread_key` gets **two** readers in this phase: a view filter, and this. Between them the column
+is answered rather than merely added.
+
+**Binding invariants.**
+- ⛔ **Bounded height, and a truncation that says so.** `BUG-260908-01` is a LIVE report about
+  this exact panel: an unbounded section *"buries every section below it"*. The server caps at
+  200 (`CONVERSATION_SIBLING_CAP`) and reports `truncated`; this list additionally scrolls inside
+  `max-h-72`. A test asserts both the class and the sentence.
+- ⚠ **The open message is MARKED, never hidden.** A list that silently omits the message you are
+  looking at is a list you cannot orient yourself in.
+- ⚠ **Honest states: loading ≠ empty ≠ error.** An error that renders as "no messages" tells a
+  person their thread has one message when it may have fourteen.
+- ⛔ **Its suite asserts rendered CONTENT, never `data-testid` presence.** Phase 235's lesson,
+  and the words here — a sender, a subject, "this message", the truncation sentence — ARE the
+  deliverable.
+
+⚠ **AN EARLIER DRAFT MOUNTED THIS TWICE** — once visibly and once inside a `hidden` div, so the
+panel could learn the total before deciding whether to show the section. It **regressed
+`DocumentDetailPanel.a11y.test.tsx`**: the always-mounted loading state is `role="status"` and
+that suite asserts no status receipt exists before a PATCH. The shipped Relationships pattern
+already had the answer — one mount, not `defaultOpen`, so `PanelSection` renders nothing until
+opened. Recorded because *two mounts to avoid one empty accordion* is a trade that will look
+reasonable again.
+
+**Named seam for the next phase.** None. If a second grouping ever needs the same shell, the
+seam is the row list, not the fetch.
+
+---
+
+## frontend/src/lib/api/documents.ts
+
+**Derived 2026-09-09 (Phase 240):** `2 / 2 / 389`. ⚠ **Absent from the ledger for its entire
+life; row added 240.**
+
+⭐ **THE ABSENCE IS THE FINDING, AND IT IS SYSTEMATIC RATHER THAN AN OVERSIGHT.** This file was
+created by the Phase 207 split of `lib/api.ts` — and its sibling `frontend/src/lib/api/workflows.ts`
+already carries a row recording exactly the same thing: *"the 207 split created it with NO row."*
+**One split, at least two orphaned children.** The same shape as `ingest_splice.py`, which Phase
+229's own G-5 discharge created and left unregistered. **A refactor that discharges G-5 must add
+rows for what it creates, in the same commit** — otherwise the discharge moves code out of the
+guardrail's sight, which is the opposite of what it claims to do.
+
+**Binding invariant.** ⛔ **Every export here must also appear in `lib/api.ts`'s barrel.** A
+symbol exported from this module and forgotten in the barrel typechecks perfectly and is invisible
+to every consumer, because everything outside `lib/` imports `@/lib/api` (D-207-06).
+`apiBarrel.test.ts` guards it mechanically — Phase 240's `fetchDocumentConversation` was added to
+both in the same edit.
+
+**Named seam for the next phase.** None at 389 lines.
 
 
 ---

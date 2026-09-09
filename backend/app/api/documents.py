@@ -26,6 +26,7 @@ from app.models.document import (
     DocumentResponse,
     DocumentTableRow,
 )
+from app.models.document import ConversationMessage, ConversationResponse  # Phase 240
 from app.models.user_settings import load_app_settings
 from app.services.audit_service import write_audit_entry
 from app.services.embedding_service import chunk_text, embed_chunks, extract_metadata, read_enabled_field_defs
@@ -982,6 +983,77 @@ async def list_document_chunks(
         .order("chunk_index")
     )
     return res.data or []
+
+
+#: Phase 240 (TM-240-14). How many siblings one conversation read returns.
+#:
+#: ⚠ NOT A ROUND NUMBER PICKED FOR COMFORT. A mailing-list archive can share one `thread_key`
+#:   across thousands of messages, and PostgREST truncates at 1000 BY DEFAULT while saying
+#:   nothing — the trap `knowledge_health._fetch_readability` already records in its own comments.
+#:   An explicit cap that REPORTS itself is the difference between a bounded answer and a silent
+#:   slice; the panel renders "showing the first N of M" from the flag below.
+CONVERSATION_SIBLING_CAP = 200
+
+
+@router.get("/{document_id}/conversation", response_model=ConversationResponse)
+async def get_document_conversation(
+    document_id: str,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_user_supabase_client),
+):
+    """The other messages of this document's mail conversation, oldest first.
+
+    ⛔ **IT TAKES A DOCUMENT ID AND NEVER A `thread_key`, AND THAT IS THE SECURITY DESIGN.**
+    A `thread_key` is derived from a `Message-ID`, which is chosen by whoever SENT the mail — so
+    anyone who can email this user can choose one. A route that accepted a key as a parameter
+    would hand an outsider a lookup handle. Instead the open document is resolved first, under
+    the caller's own auth, and the siblings are read scoped to that document's own owner.
+
+    ⚠ **An absent `thread_key` is a normal, empty, 200 answer.** Almost every document in the
+    Library is not mail; treating that as a 404 would put an error state on every PDF.
+    """
+    parent = await _assert_document_visible(document_id, current_user["id"], supabase)
+
+    row = await aexec(
+        supabase.table("documents")
+        .select("thread_key")
+        .eq("id", document_id)
+        .maybe_single()
+    )
+    thread_key = (getattr(row, "data", None) or {}).get("thread_key")
+    if not thread_key:
+        return ConversationResponse(messages=[], total=0, truncated=False)
+
+    owner_id = parent.get("user_id") or current_user["id"]
+    res = await aexec(
+        supabase.table("documents")
+        .select("id, filename, metadata, created_at", count="exact")
+        .eq("user_id", owner_id)
+        .eq("thread_key", thread_key)
+        .order("created_at")
+        .limit(CONVERSATION_SIBLING_CAP)
+    )
+    rows = res.data or []
+    total = res.count if getattr(res, "count", None) is not None else len(rows)
+
+    messages: list[ConversationMessage] = []
+    for r in rows:
+        meta = r.get("metadata") or {}
+        messages.append(
+            ConversationMessage(
+                id=r["id"],
+                title=meta.get("title") or r.get("filename"),
+                date=meta.get("date") or r.get("created_at"),
+                sender=meta.get("email_from") or meta.get("author"),
+                is_open=str(r["id"]) == str(document_id),
+            )
+        )
+
+    return ConversationResponse(
+        messages=messages,
+        total=total,
+        truncated=total > len(messages),
+    )
 
 
 # ⚠ THE RLS ASYMMETRY BELOW IS CORRECT BEHAVIOUR, NOT A DEFECT — encode it, do not "fix" it.

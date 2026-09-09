@@ -4,10 +4,10 @@ title: A DISABLED connection is still offered in the Library's "From a connected
 reported: 2026-09-08
 surface: Agentic-RAG
 severity: major
-status: open
+status: closed
 affected_areas: [frontend/library, frontend/ingestion, ConnectedSourceSection, CreateWatchModal, connections, sources, UX/honesty]
-folded_into: null
-verified_closed_by: null
+folded_into: 240
+verified_closed_by: 240
 related_seeds: []
 re_open_trigger: null
 reproduces_on:
@@ -104,3 +104,29 @@ cannot regress, because it was never held.**
   not as a side effect — the absence of any suite is the reason two separate defects reached this
   surface unseen.
 - **Plant as seed:** n/a — observed defect with a concrete repro, not a deferred idea.
+
+
+---
+
+## CLOSED by Phase 240 (`240-04`, 2026-09-09)
+
+**Fixed in `frontend/src/components/sources/sourceCapability.ts`** — one predicate, both
+surfaces, because that module exists to be the single answer to *"can this connection be
+browsed?"* and a check written twice is a check that will be written once next time.
+`BUG-260907-03` made the identical argument on the server: the refusal went into the registry,
+not into four routes.
+
+**The root cause this report named is closed too.** It said plainly that
+`ConnectedSourceSection` and `CreateWatchModal` *"have NO test suite at all"*. Both now have
+one — **their first** — with 5 cases each.
+
+**Evidence, and it is a RED drive rather than a green run.** With the `is_enabled` check
+commented out, **6 of the 10 new cases fail by name** across both suites; restored, 29/29 pass.
+Among the six is `auto-selects the first offered connection, and never a disabled one` — the
+subtle half nobody had reported: `CreateWatchModal` pre-selects `capable[0]`, so a switched-off
+connection would have been chosen FOR the person the instant the modal opened, skipping the
+picker step entirely.
+
+⚠ **The server-side refusal STAYS.** A UI filter is not a security control; removing
+`SourceConnectionDisabled` as "now redundant" would leave the whole property resting on a
+dropdown.

@@ -116,6 +116,28 @@ export function isSourceCapable(
   families: string[] | null,
 ): boolean {
   if (c.status === "revoked" || c.status === "error") return false
+
+  // ⛔ BUG-260908-02 (Phase 240 / D-240-19) — A DISABLED CONNECTION IS NOT A SOURCE.
+  //
+  // The operator's OFF switch stopped the scheduled watch loop and, after Phase 239, was
+  // refused server-side at `SourceRegistry.get_adapter` (`SourceConnectionDisabled`) — and was
+  // enforced NOWHERE on the surface that STARTS an ingest. So a person who switched a
+  // connection off was still offered it in the Library's "From a connected source" picker and
+  // in "Add watched folder", and only found out at the refusal.
+  //
+  // ⚠ IT LIVES IN THIS PREDICATE, NOT IN THE TWO COMPONENTS, for the reason this module was
+  //   created: both surfaces already ask ONE question here, and a check written twice is a
+  //   check that will be written once next time. `BUG-260907-03` made the same argument on the
+  //   server — the refusal went into the registry, not into four routes.
+  //
+  // ⚠ ABSENT MEANS "NOBODY SAID IT WAS OFF", NOT "OFF". Older rows and every existing fixture
+  //   omit the key; defaulting to refused would empty the picker for people whose connections
+  //   are fine. Same reading the server uses (`conn.get("is_enabled", True)`).
+  //
+  // ⛔ THIS IS THE SURFACE HALF ONLY. The server-side refusal STAYS — a UI filter is not a
+  //   security control, and removing the backend guard as "redundant" would leave the whole
+  //   thing resting on a dropdown.
+  if (c.is_enabled === false) return false
   // ⚠ FAIL CLOSED WHILE UNKNOWN, and that direction is deliberate. A connection that is
   // offered and then cannot browse is worse than one that is not offered yet: the first is a
   // dead control a person clicks and blames themselves for, the second is a list that has not

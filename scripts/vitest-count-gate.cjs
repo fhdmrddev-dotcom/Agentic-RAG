@@ -2882,6 +2882,13 @@ const BASELINE = {
   // to delete without anyone noticing.
   "DocumentDetailPanel.images.test.tsx": 3,
 
+  // ── Phase 240 (SRC-05 / D-240-19) — pinned at the counts measured at this phase's close.
+  // ⚠ Captured from a GREEN run, never while red, and matched 1:1 with the TARGETS entries
+  // added at the end of this file. A file in TARGETS and not here RUNS and guards nothing.
+  "ConnectedSourceSection.test.tsx": 5,
+  "CreateWatchModal.test.tsx": 5,
+  "DocumentConversationSection.test.tsx": 8,
+
   // ══════════════════════════════════════════════════════════════════════════════
   // Added at Phase 214's CLOSE (plan `214-15`), collected here AFTER every file
   // exists — a `BASELINE` key naming a path that does not yet exist makes this gate
@@ -4597,6 +4604,19 @@ const TARGETS = [
   // the same fact Phase 233 recorded and Phase 235 re-recorded. A suite dropped into that
   // folder runs in no gate unless it is named.
   "src/components/sources/__tests__/sourceCapability.test.ts",
+  // ── Phase 240 (SRC-05 / D-240-19) ──────────────────────────────────────────────────────
+  // ⚠ NAMED FILES, for the fact three phases in a row have now recorded on this exact path:
+  // `src/components/sources` is STILL not a directory entry, so a suite dropped into that
+  // folder runs in NO gate unless it is named here. `src/components/metadata` is likewise
+  // covered only file-by-file.
+  //
+  // ⛔ The first two are the FIRST SUITES EITHER COMPONENT HAS EVER HAD, and that absence is
+  // the root cause `BUG-260908-02` names in its own report. Both knobs, deliberately: Phase
+  // 214 measured a suite being RUN by a directory entry while guarded by nothing, because
+  // TARGETS decides what runs and BASELINE decides what is guarded.
+  "src/components/sources/__tests__/ConnectedSourceSection.test.tsx",
+  "src/components/sources/__tests__/CreateWatchModal.test.tsx",
+  "src/components/metadata/DocumentConversationSection.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")

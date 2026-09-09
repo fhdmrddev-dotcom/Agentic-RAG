@@ -1345,3 +1345,25 @@ export interface AskUserAnswerBody {
   response_text: string
   choice_index: number | null
 }
+
+/** Phase 240 (SRC-05 SC#3) — one message of a mail conversation, as the detail panel
+ *  renders it. Carries everything a row needs so the panel makes ONE request for a whole
+ *  conversation rather than one per sibling. */
+export interface ConversationMessage {
+  id: string
+  title: string | null
+  date: string | null
+  sender: string | null
+  /** The document currently open. It is MARKED, never hidden: a person reading a
+   *  fourteen-message thread needs to see where they are in it. */
+  is_open: boolean
+}
+
+/** Phase 240 — a conversation, and an honest statement about whether it is all of one.
+ *  `truncated` exists because a capped list that does not say so is the same lie as an
+ *  uncapped one that PostgREST silently sliced at 1000. */
+export interface ConversationResponse {
+  messages: ConversationMessage[]
+  total: number
+  truncated: boolean
+}
