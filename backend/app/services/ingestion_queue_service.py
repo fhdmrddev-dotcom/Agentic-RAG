@@ -35,6 +35,7 @@ from app.db.ingestion_jobs import (
     update_job_progress,
 )
 from app.services.circuit_breaker import CircuitBreaker
+from app.services.transient_errors import TRANSIENT_TELLS, is_transient as _is_transient  # noqa: F401
 
 logger = logging.getLogger(__name__)
 
@@ -266,10 +267,13 @@ class IngestionQueueService:
             # Transient vs terminal determination
             err_str = str(exc)
             # Transient: timeouts, 5xx, network resets
-            is_transient = any(
-                term in err_str.lower()
-                for term in ("timeout", "503", "502", "504", "connection", "reset by peer")
-            )
+            # ⛔ MOVED, NOT REWRITTEN (Phase 240, 2026-09-09) — `services/transient_errors.py`.
+            #    The attachment loop needed the same judgement, and a second spelling of it is
+            #    how these paths have already disagreed five times.
+            # ⚠ THE MOVE ALSO REPAIRED IT. The tuple carried "timeout" while a socket read
+            #    timeout says "timed out", so this check has never fired on the commonest
+            #    transient failure there is. See that module's docstring.
+            is_transient = _is_transient(err_str)
             retry_count = job.get("retry_count", 0)
             backoff_delay = min(60.0, float(2**retry_count) + 1.0)
 

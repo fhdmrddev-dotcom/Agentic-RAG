@@ -477,3 +477,143 @@ def test_an_explicit_placement_argument_beats_the_inherited_one():
         )
 
     assert mint.call_args.kwargs["folder_id"] == "folder-explicit"
+
+
+# ── 4. a transient storage stall does not cost the attachment (2026-09-09) ───────────────────
+#
+# ⛔ THE FAILURE, AND WHAT IT ACTUALLY WAS. The operator's UAT attachment failed with the bare
+#    word `timed out` and no bytes in storage. `storage3.constants.DEFAULT_TIMEOUT` is 20, and
+#    the gap between the relationship insert and the failure was 20.010 s to the millisecond.
+#
+# ⭐ THE CAUSE WAS MEASURED, AFTER TWO WRONG GUESSES WERE MEASURED FALSE FIRST. Concurrency on a
+#    shared client: refuted (12 parallel uploads, max 0.17 s). A stale keep-alive connection:
+#    refuted (idle 30 s / 75 s / 120 s, then 0.03 s). What DOES reproduce it is GIL contention —
+#    the identical upload takes 0.23 s idle, 7.27 s under 16 CPU-bound threads and 21.07 s under
+#    32, past the ceiling. The backend log agrees: 15.8 seconds with NO line at all in a process
+#    that was otherwise logging constantly, which is what a starved logging thread looks like.
+#
+# ⚠ SO THE TIMEOUT WAS NOT MEASURING THE SERVER. It was measuring our own scheduling, during an
+#   ingest that runs PDF extraction and image work on threads. A wall-clock deadline on a local
+#   call is not a health signal under that load.
+#
+# ⛔ AND THE REASON IT WAS FATAL IS A FIFTH TWO-PATHS DISAGREEMENT. The queue path classifies a
+#   timeout as TRANSIENT and retries it (`ingestion_queue_service`); an attachment child is minted
+#   and ingested OUTSIDE the queue, so it inherited no retry at all. One transient stall, one
+#   permanently failed document.
+
+
+def test_a_transient_upload_stall_is_retried_rather_than_losing_the_attachment():
+    """⭐ The isolated upload costs 0.03 s, so a retry is nearly free when things are healthy."""
+    from app.services import email_attachments as mod
+
+    supabase, _ = _mock_supabase()
+    calls = {"n": 0}
+
+    def flaky_upload(**_kw):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise TimeoutError("timed out")
+        return MagicMock()
+
+    supabase.storage.from_.return_value.upload.side_effect = flaky_upload
+
+    with patch("app.services.email_attachments.mint_document_row") as mint, patch(
+        "app.api.documents.extract_text", return_value="col1,col2"
+    ), patch("app.api.documents.ingest_document"), patch.object(mod, "_RETRY_SLEEP", 0):
+        mint.return_value = MagicMock(
+            document={"id": "att-doc-1"}, is_duplicate=False,
+            storage_path="p", version_number=1,
+        )
+        manifest = mod.ingest_email_attachments(
+            raw=_eml_with_attachments(),
+            mime_type="message/rfc822",
+            document_id="email-doc-1",
+            user_id="user-1",
+            supabase=supabase,
+        )
+
+    by_name = {e["filename"]: e for e in manifest}
+    assert by_name["contract.csv"]["status"] == "completed", (
+        "one transient stall still cost the attachment — the queue path retries a timeout and "
+        "this path, which runs outside the queue, inherited no retry at all"
+    )
+    assert calls["n"] == 2, "the upload was not retried"
+
+
+def test_a_persistent_failure_still_fails_and_names_the_STEP_it_failed_at():
+    """⛔ `timed out` alone cost a log-archaeology session. The record must say WHICH step.
+
+    ⚠ Retrying must not become swallowing: after the bounded attempts the attachment is still
+    recorded FAILED, in both the manifest and the child document.
+    """
+    from app.services import email_attachments as mod
+
+    supabase, _ = _mock_supabase()
+    supabase.storage.from_.return_value.upload.side_effect = TimeoutError("timed out")
+
+    with patch("app.services.email_attachments.mint_document_row") as mint, patch(
+        "app.api.documents.extract_text", return_value="col1,col2"
+    ), patch("app.api.documents.ingest_document"), patch.object(mod, "_RETRY_SLEEP", 0):
+        mint.return_value = MagicMock(
+            document={"id": "att-doc-1"}, is_duplicate=False,
+            storage_path="p", version_number=1,
+        )
+        manifest = mod.ingest_email_attachments(
+            raw=_eml_with_attachments(),
+            mime_type="message/rfc822",
+            document_id="email-doc-1",
+            user_id="user-1",
+            supabase=supabase,
+        )
+
+    entry = {e["filename"]: e for e in manifest}["contract.csv"]
+    assert entry["status"] == "failed"
+    assert "upload" in entry["error"], (
+        f"the recorded reason {entry['error']!r} still does not say which step failed"
+    )
+    assert "timed out" in entry["error"], "the underlying message was dropped"
+
+
+def test_a_terminal_error_is_not_retried():
+    """⚠ A refusal is not a stall. Retrying a permanent error wastes time and hides the reason."""
+    from app.services import email_attachments as mod
+
+    supabase, _ = _mock_supabase()
+    calls = {"n": 0}
+
+    def always_400(**_kw):
+        calls["n"] += 1
+        raise ValueError("Bucket not found")
+
+    supabase.storage.from_.return_value.upload.side_effect = always_400
+
+    with patch("app.services.email_attachments.mint_document_row") as mint, patch(
+        "app.api.documents.extract_text", return_value="col1,col2"
+    ), patch("app.api.documents.ingest_document"), patch.object(mod, "_RETRY_SLEEP", 0):
+        mint.return_value = MagicMock(
+            document={"id": "att-doc-1"}, is_duplicate=False,
+            storage_path="p", version_number=1,
+        )
+        mod.ingest_email_attachments(
+            raw=_eml_with_attachments(),
+            mime_type="message/rfc822",
+            document_id="email-doc-1",
+            user_id="user-1",
+            supabase=supabase,
+        )
+
+    assert calls["n"] == 1, "a permanent error was retried as though it were a stall"
+
+
+def test_both_paths_agree_on_what_transient_MEANS():
+    """⛔ The queue and the attachment loop must not drift on the word.
+
+    ⚠ A COPY is how these two paths have now disagreed five times. This asserts they read the
+    same list, so a term added to one is a term added to both.
+    """
+    from app.services.transient_errors import TRANSIENT_TELLS
+    from app.services import ingestion_queue_service as queue_mod
+
+    assert queue_mod.TRANSIENT_TELLS is TRANSIENT_TELLS, (
+        "the queue keeps its own private copy of the transient-error terms"
+    )

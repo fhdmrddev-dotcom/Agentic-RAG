@@ -32,10 +32,12 @@ relationship-insert-ABOVE-the-early-return that keeps a shared attachment linked
 from __future__ import annotations
 
 import logging
-from typing import Any
+import time
+from typing import Any, Callable
 
 from app.services.email_extraction_service import parse_eml_bytes, parse_msg_bytes
 from app.services.ingest_splice import mint_document_row
+from app.services.transient_errors import is_transient
 
 log = logging.getLogger(__name__)
 
@@ -44,6 +46,68 @@ log = logging.getLogger(__name__)
 MAX_MAIL_NESTING_DEPTH = 1
 
 MAIL_MIME_TYPES = ("message/rfc822", "application/vnd.ms-outlook", "application/x-msg")
+
+#: Attempts for a step that failed TRANSIENTLY — the first try plus two more.
+#: ⚠ Small on purpose. The measured healthy cost of the step this guards is 0.03-0.56 s, so
+#:   retrying is nearly free; the failure it rescues is a scheduling stall, not a sick server.
+_UPLOAD_ATTEMPTS = 3
+
+#: Seconds between attempts. Patched to 0 by the suite — a test must not sleep for real.
+_RETRY_SLEEP = 1.0
+
+
+def _with_transient_retry(step: str, fn: Callable[[], Any]) -> Any:
+    """Run `fn`, retrying only a TRANSIENT failure, and name the step on the way out.
+
+    ⛔ **THE FAILURE THIS EXISTS FOR, MEASURED 2026-09-09.** An attachment upload raised the bare
+    word `timed out` after exactly 20.010 s — `storage3.constants.DEFAULT_TIMEOUT` — and the
+    attachment was lost. Two hypotheses were measured FALSE before the real one was found:
+    concurrency on the shared client (12 parallel uploads, max 0.17 s) and a stale keep-alive
+    connection (idle 30 / 75 / 120 s, then 0.03 s). What reproduces it is **GIL contention**:
+    the identical upload takes 0.23 s idle, **7.27 s under 16 CPU-bound threads and 21.07 s
+    under 32**. The backend log agrees — 15.8 seconds with no line at all, in a process that was
+    otherwise logging constantly.
+
+    ⚠ **So the deadline was measuring OUR OWN SCHEDULING, not the server**, during an ingest that
+    runs PDF and image extraction on threads.
+
+    ⛔ **AND THE REASON ONE STALL WAS FATAL IS A FIFTH TWO-PATHS DISAGREEMENT.** The queue
+    classifies a timeout as transient and retries it; an attachment child is minted and ingested
+    OUTSIDE the queue and inherited no retry at all.
+
+    ⚠ **RETRYING IS NOT SWALLOWING.** After the attempts the error is re-raised, so the caller
+    still records the attachment FAILED — with the step named, because `timed out` alone cost a
+    session of log archaeology.
+    """
+    last: BaseException | None = None
+    for attempt in range(1, _UPLOAD_ATTEMPTS + 1):
+        try:
+            return fn()
+        except Exception as exc:
+            last = exc
+            if not is_transient(exc) or attempt == _UPLOAD_ATTEMPTS:
+                break
+            log.warning(
+                "attachment %s failed transiently (attempt %d/%d): %s — retrying",
+                step, attempt, _UPLOAD_ATTEMPTS, exc,
+            )
+            time.sleep(_RETRY_SLEEP)
+    raise AttachmentStepError(step, last) from last
+
+
+class AttachmentStepError(Exception):
+    """Carries WHICH step failed alongside the original message.
+
+    ⚠ The step is the half that was missing. `timed out` names a symptom and no location; the
+    manifest entry and the child document both store this string, so the next occurrence is one
+    read rather than a walk through the backend log.
+    """
+
+    def __init__(self, step: str, cause: BaseException | None) -> None:
+        self.step = step
+        self.cause = cause
+        super().__init__(f"{step}: {cause}")
+
 
 #: The parent-message columns an attachment inherits. Placement and scope only — never content.
 _PLACEMENT_COLUMNS = "folder_id, org_id, source_connection_id, ingest_visibility"
@@ -233,10 +297,16 @@ def ingest_email_attachments(
                     continue
 
                 # New document: upload to storage
-                supabase.storage.from_("documents").upload(
-                    path=mint_result.storage_path,
-                    file=att.raw,
-                    file_options={"content-type": att_mime},
+                # ⛔ THE ONE STEP THAT IS RETRIED, and only this one. Extraction and ingest are
+                #    CPU work on local bytes; a retry there repeats the same computation and
+                #    reaches the same answer. The upload is the network hop the stall hit.
+                _with_transient_retry(
+                    "upload",
+                    lambda: supabase.storage.from_("documents").upload(
+                        path=mint_result.storage_path,
+                        file=att.raw,
+                        file_options={"content-type": att_mime},
+                    ),
                 )
 
                 # Extract and ingest child document
