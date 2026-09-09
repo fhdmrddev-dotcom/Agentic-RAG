@@ -37,7 +37,49 @@ can be taught new behaviors (skills) that persist and can be shared.
 continues at **228**.
 
 Phase: 241 — Recall at Corpus Scale (NOT STARTED)
-Prior: 240 — Mail Is a Shape, Not a Fourth Adapter (✅ **BUILT 2026-09-09 — ⛔ REVIEW OWED**)
+Prior: 240 — Mail Is a Shape, Not a Fourth Adapter (✅ **COMPLETE 2026-09-10 — reviewed, UAT driven**)
+
+## ✅ PHASE 240 — CLOSED 2026-09-10. Read the debt below before calling it clean.
+
+**All four success criteria MET, and M-1..M-5 all driven** on the operator's real Google account.
+`OV-240-01` is **DISCHARGED**: two independent `/gsd:code-review` passes ran — one over the
+original four plans, one over the evening's fixes — by an agent that did not shape the build.
+
+| | Verdict |
+|---|---|
+| SC#1 an answer cites the message once | ✅ measured, 3 reply dialects |
+| SC#2 attachments on both ingest paths | ✅ **proven live** — 50 chunks, right folder, linked |
+| SC#3 `thread_key` groups a conversation | ✅ both halves, real mail |
+| SC#4 Phase 234's promises hold for mail | ✅ **driven** — M-4 refused in 19 ms, M-5 kept the document |
+
+### ⛔ WHAT IT TAUGHT, WHICH IS WORTH MORE THAN WHAT IT SHIPPED
+
+**Nine defects were found by DRIVING and by REVIEW; four were invisible to 25 passing tests.**
+The tests verified values; the failures lived in *hops nobody tested* — a screen that discards its
+own answer, a card reading the last run instead of the world, a button labelled as a write that
+only travels, a deep-link that opens the wrong tab. ⭐ **Presence assertions cannot see behaviour**,
+and this phase paid for that lesson four separate times in one session.
+
+⚠ **SC#2 took THREE live runs, each finding a defect hiding behind the last** — a 20 s storage
+stall (GIL contention, measured 0.23 s → 21.07 s under load), a child minted with `folder_id
+NULL`, and `extract_text` never having handled PDF since Phase 069.
+
+⚠ **A CRITICAL FROM THE BUILD REVIEW WAS REFUTED BY MEASUREMENT** — CR-01's claimed ReDoS
+predicted 36.8 s where the shipped function measures **0.001 s**, and 5 MB in 0.040 s. An agent's
+numeric-looking claim is a hypothesis. Recorded in `BUG-260910-02` with its inputs.
+
+### Debt carried out of 240 — routed, not hidden
+
+- **`BUG-260910-02`** — the 7 open build-review warnings (G-7 triage: none Critical, all criteria
+  met). ⭐ **WR-07 and WR-09 get worse with time** — both are already wrong for Phase 238's
+  shipped Graph family.
+- **`BUG-260909-03..07`** — 5 UAT findings. `-04` is the one to read: *"nothing happened"* while
+  the sync had worked in 19 ms.
+- **`SEED-261`** (an attachment failure reaches no surface), **`SEED-262`** (the child rides
+  beside the queue, not on it — **six two-paths disagreements, three found in one day**),
+  **`SEED-263`** (forwards duplicate; stripping them would be worse), **`SEED-264`** (a deleted
+  message now stays present — M-5's marking deliberately withdrawn).
+- ⛔ **Phase 238 still owes its review outright**, and BUS-171 is four days old.
 
 ## ▶ PHASE 240 — BUILT ALONE, UNATTENDED. START HERE.
 
