@@ -134,6 +134,39 @@ describe("NavPanel badge — renders at both rail widths", () => {
     }
   })
 
+  it("anchors to the row's CORNER collapsed and to its CENTRE expanded", () => {
+    /**
+     * ⛔ THE OPERATOR SAW IT AND THE EXISTING TESTS COULD NOT (2026-09-09): *"the tag on the
+     * library in the navigation menu is not center aligned"*. Both tests above render the
+     * badge at both widths and assert it EXISTS — presence, which cannot see position. It
+     * carried `-top-1 -right-1` in both modes: correct on the 40×40 collapsed icon, and
+     * floating above the text baseline on the full-width expanded row.
+     *
+     * ⚠ THIS ASSERTS CLASSES, AND THAT IS A REAL LIMIT worth stating rather than hiding:
+     * jsdom performs no layout, so no test here can prove where the badge actually LANDS.
+     * What it can prove is that the two modes are given different anchors — which is the
+     * thing that was missing. The screen is the other half, and the operator is the one who
+     * found it.
+     */
+    const { unmount } = renderRail({
+      expanded: false,
+      attentionConditions: conditions(1),
+      onOpenLibraryHealth: vi.fn(),
+    })
+    expect(screen.getByTestId("rail-badge").className).toContain("-top-1")
+    unmount()
+
+    renderRail({
+      expanded: true,
+      attentionConditions: conditions(1),
+      onOpenLibraryHealth: vi.fn(),
+    })
+    const expandedBadge = screen.getByTestId("rail-badge").className
+    expect(expandedBadge).toContain("top-1/2")
+    expect(expandedBadge).toContain("-translate-y-1/2")
+    expect(expandedBadge).not.toContain("-top-1")
+  })
+
   it("keeps the Library control's accessible name — the badge is aria-hidden (IngestionTab's six broken cases)", () => {
     for (const expanded of [false, true]) {
       const { unmount } = renderRail({

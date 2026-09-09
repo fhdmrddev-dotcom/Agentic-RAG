@@ -174,11 +174,26 @@ export function NavPanel({
   // because a grep for it is one of this plan's acceptance measurements and a comment that
   // repeats a literal makes a code measurement satisfiable by prose (the 235-08 / 187-24
   // lesson, recorded twice in this phase now).
+  // ⛔ THE BADGE ANCHORS DIFFERENTLY IN THE TWO RAIL WIDTHS, and one position cannot serve
+  //    both (operator, 2026-09-09: *"the tag on the library in the navigation menu is not
+  //    center aligned"*).
+  //
+  //    COLLAPSED the row is a 40×40 icon button, so `-top-1 -right-1` is the ordinary
+  //    notification-dot corner and reads correctly. EXPANDED the row is a full-width 40px-tall
+  //    strip with the label beside the icon — the same corner throws the badge to the far
+  //    top-right, floating above the text baseline instead of sitting on it.
+  //
+  // ⚠ So it is CENTRED VERTICALLY when expanded and left as a corner mark when collapsed.
+  //   `top-1/2 -translate-y-1/2` centres against the row rather than guessing an offset, which
+  //   keeps holding if the row height ever changes.
   const attentionBadge = showAttention ? (
     <span
       data-testid="rail-badge"
       aria-hidden="true"
-      className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-warning text-warning-foreground text-[10px] font-bold leading-[18px] text-center"
+      className={cn(
+        "absolute min-w-[18px] h-[18px] px-1 rounded-full bg-warning text-warning-foreground text-[10px] font-bold leading-[18px] text-center",
+        expanded ? "right-3 top-1/2 -translate-y-1/2" : "-top-1 -right-1",
+      )}
     >
       {attention.length}
     </span>
