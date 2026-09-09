@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v4.0
 milestone_name: "Connected Knowledge"
 status: complete
-last_updated: "2026-09-09T04:00:00.000Z"
-last_activity: 2026-09-09
+last_updated: "2026-09-10T00:00:00.000Z"
+last_activity: 2026-09-10
 progress:
   total_phases: 14
   completed_phases: 13
@@ -36,7 +36,32 @@ can be taught new behaviors (skills) that persist and can be shared.
 **Current focus:** **Milestone v4.0 Connected Knowledge — STARTED 2026-09-04.** Phase numbering
 continues at **228**.
 
-Phase: 241 — Recall at Corpus Scale (NOT STARTED)
+Phase: 241 — Recall at Corpus Scale (**CONTEXT GATHERED 2026-09-10** — ready to plan)
+Resume file: `.planning/phases/241-recall-at-corpus-scale/241-CONTEXT.md`
+
+> ⛔ **241's PREMISE WAS REFUTED AT DISCUSS TIME. Read 241-CONTEXT.md F-1 before planning.**
+> ROADMAP says *"its harness ships at Phase 230"* and that 241 owns *"the tuning and the verdict"*.
+> **The Phase 230 harness cannot report a failure.** `scripts/measure-recall.py` runs `content
+> ILIKE` — never the vector path — and scores every miss `rank = 1`; run live on the real corpus
+> it prints **MRR 1.000**. On a DB failure it prints a hardcoded synthetic benchmark and exits 0.
+> `test_retrieval_recall_baseline.py` asserts against a literal `simulated_ranks` list, and its
+> `assert count == 77` is **RED** against 159 actual documents — invisible to the canonical gate,
+> because `tests/eval` is not `tests/unit`. **There is no baseline. 241 builds the measurement too.**
+>
+> ⚠ **Two ROADMAP Flags for 241 are measured STALE** — the SEED-224 hook was already discharged at
+> Phase 217.1 (per-hit similarity DOES reach `citations[]` and `audit_log`), and the G-5 triple is
+> `18 / 10 / 423`, not `17 / 9 / 362`. Both corrected in CONTEXT.md (F-7, F-8), originals kept.
+>
+> **Operator direction 2026-09-10:** solo — no bus, no Gemini, Claude executes end to end, and the
+> review is recorded as a **SELF-verification**, never as an independent §6.3 review. The remedy
+> ships as a **product capability**: `hnsw.ef_search` + `hnsw.iterative_scan` as user settings in
+> the existing Settings → Retrieval card, minimal hardcoded defaults, migration **176** (reserved).
+>
+> **Measured at 241's start, 2026-09-10:** backend baseline `71 failed / 4374 passed / 2 xfailed /
+> 2 xpassed` (at the ceiling, zero headroom) · local pgvector **0.8.0**, PostgreSQL **17.6** ·
+> `hnsw.ef_search = 40`, `hnsw.iterative_scan = off` · corpus **159 docs / 7,953 chunks / 3 orgs**
+> · `document_chunks` 155 MB + 68 MB HNSW index. ⛔ **Cloud pgvector parity is UNVERIFIED and gates
+> `iterative_scan` as the remedy.**
 Prior: 240 — Mail Is a Shape, Not a Fourth Adapter (✅ **COMPLETE 2026-09-10 — reviewed, UAT driven**)
 
 ## ✅ PHASE 240 — CLOSED 2026-09-10. Read the debt below before calling it clean.
