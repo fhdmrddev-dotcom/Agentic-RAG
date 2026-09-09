@@ -40,6 +40,7 @@ drive needs each honesty property to fail *by its own name and for its own reaso
 
 from __future__ import annotations
 
+import ast
 import importlib.util
 import re
 from pathlib import Path
@@ -292,26 +293,72 @@ def test_d_cli_refusal_does_not_leak_the_password(capsys):
 # Case E — the one-home arm (D-01)
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _imported_names_from(path: Path, module: str) -> set[str]:
+    """Names the file imports from ``module``, read from its AST.
+
+    ⚠ **This was a line-anchored regex until it fired on the CLI's parenthesised import block,
+    which is the house idiom.** A fence that reads formatting instead of meaning fails in both
+    directions: it goes red on a correct multi-line import, and it would go green on the string
+    ``EVAL_PROBES`` appearing in a comment beside an ``import`` keyword. The AST cannot be fooled
+    by either, so it asserts the FACT D-01 actually claims — the CLI *imports* the probe set.
+    """
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    names: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.module == module:
+            names.update(alias.name for alias in node.names)
+    return names
+
+
+def _module_level_assignments(path: Path) -> set[str]:
+    """Every name assigned at module scope, read from the AST."""
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    assigned: set[str] = set()
+    for node in tree.body:
+        if isinstance(node, ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Name):
+                    assigned.add(target.id)
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+            assigned.add(node.target.id)
+    return assigned
+
+
+def test_e_ast_helpers_positive_control(tmp_path: Path):
+    """A fence with no positive control is a fence that can pass vacuously."""
+    sample = tmp_path / "sample.py"
+    sample.write_text(
+        "from app.services.recall_eval import (\n"
+        "    EVAL_PROBES,\n"
+        "    compute_metrics,\n"
+        ")\n"
+        "OWN_COPY = [1]\n",
+        encoding="utf-8",
+    )
+
+    assert _imported_names_from(sample, "app.services.recall_eval") == {
+        "EVAL_PROBES",
+        "compute_metrics",
+    }
+    assert _module_level_assignments(sample) == {"OWN_COPY"}
+
+
 def test_e_cli_imports_eval_probes_rather_than_redefining_them():
     """D-01: ``EVAL_PROBES`` has exactly ONE definition site and the CLI imports it."""
-    text = _MEASURE_CLI.read_text(encoding="utf-8")
-    code = _code_lines(_MEASURE_CLI)
-
-    assert "EVAL_PROBES = [" not in text, (
+    assert "EVAL_PROBES" not in _module_level_assignments(_MEASURE_CLI), (
         "scripts/measure-recall.py owns a second EVAL_PROBES copy — that is drift by construction"
     )
-    assert "EVAL_PROBES = (" not in text
-
-    on_an_import_line = any(
-        "EVAL_PROBES" in line and re.match(r"^[ \t]*(from|import)\b", line)
-        for line in code
+    assert "EVAL_PROBES" in _imported_names_from(_MEASURE_CLI, "app.services.recall_eval"), (
+        "the CLI must IMPORT EVAL_PROBES from app.services.recall_eval"
     )
-    assert on_an_import_line, "the CLI must IMPORT EVAL_PROBES from app.services.recall_eval"
 
 
 def test_e_cli_imports_from_the_one_home():
-    from_the_home = re.compile(r"^[ \t]*from[ \t]+app\.services\.recall_eval[ \t]+import\b", re.M)
-    assert from_the_home.search(_MEASURE_CLI.read_text(encoding="utf-8"))
+    """The CLI's numbers come from the harness module, not from a second implementation."""
+    assert _imported_names_from(_MEASURE_CLI, "app.services.recall_eval"), (
+        "the CLI imports nothing from app.services.recall_eval — it owns measurement logic again"
+    )
+    assert "run_measurement" in _imported_names_from(_MEASURE_CLI, "app.services.recall_eval")
 
 
 def test_e_no_hardcoded_dsn_in_either_file():
