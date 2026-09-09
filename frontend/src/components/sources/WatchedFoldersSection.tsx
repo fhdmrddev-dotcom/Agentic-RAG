@@ -104,6 +104,7 @@ import {
   CONTROL_FOR_CAUSE,
   COPY,
   FILE_FAILURE_HEADING,
+  FILE_FAILURE_SUMMARY,
   FILE_FAILURE_MORE,
   FILE_FAILURE_SCOPE_NOTE,
   SENTENCE_FOR_CAUSE,
@@ -646,6 +647,11 @@ function WatchRow({
   /** The stored per-file rows. `null` until asked; `[]` is an answer, not a pending state. */
   const [items, setItems] = useState<ConnectorWatchItem[] | null>(null)
   /**
+   * ⭐ The per-file reasons are DISCLOSED, not led with (operator, 2026-09-09 — UAT row M-2).
+   * Collapsed by default: the row owes a count, and the reasons owe a click.
+   */
+  const [failuresOpen, setFailuresOpen] = useState(false)
+  /**
    * ⚠ A REF, NOT STATE, AND THAT WAS DRIVEN RED BEFORE IT WAS BELIEVED. As `useState` it is an
    * effect DEPENDENCY, so setting it immediately re-ran the effect, whose cleanup cancelled the
    * in-flight fetch it had just started — every card asked, every answer was discarded, and the
@@ -986,6 +992,28 @@ function WatchRow({
               data-testid="sources-file-failures"
               className="space-y-1.5 border-t border-border/50 pt-2 text-xs"
             >
+              {/* ⭐ THE COUNT LEADS; THE REASONS ARE ONE CLICK AWAY. The operator asked for
+                    exactly this on 2026-09-09 after the list opened the section during UAT:
+                    *"we can just put like two files failed ... and if I clicked I should see
+                    the reason"*. ⚠ The warning register and nothing above it — a source state
+                    never escalates further (BUILD-CONTRACT §4). */}
+              <button
+                type="button"
+                data-testid="sources-file-failure-summary"
+                aria-expanded={failuresOpen}
+                onClick={() => setFailuresOpen((v) => !v)}
+                className="flex w-full items-center gap-1.5 text-left text-warning hover:opacity-80"
+              >
+                <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                <span className="font-medium">{FILE_FAILURE_SUMMARY(failingItems.length)}</span>
+                {failuresOpen ? (
+                  <ChevronDown className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                ) : (
+                  <ChevronRight className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                )}
+              </button>
+              {failuresOpen && (
+                <>
               <p className="font-medium text-foreground">{FILE_FAILURE_HEADING}</p>
               <p
                 data-testid="sources-file-failure-scope"
@@ -1018,6 +1046,8 @@ function WatchRow({
                 >
                   {FILE_FAILURE_MORE(failingItems.length - FILE_FAILURES_SHOWN)}
                 </p>
+              )}
+                </>
               )}
             </div>
           )}

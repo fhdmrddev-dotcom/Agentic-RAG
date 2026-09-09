@@ -163,6 +163,15 @@ export function RunHistoryList({
         const run = row.run
         const ago = relativeBand(run.started_at, now)
         const failed = run.status !== "success"
+        /* ⭐ A RUN THAT SUCCEEDED WITH FILES IT COULD NOT READ IS NOT A CLEAN RUN, and until
+           2026-09-09 this history drew it as one. Measured on the operator's own Gmail watch:
+           `status = 'success'`, `listing_complete = true`, `count_errors = 2` — the check DID
+           complete, so `failed` is correctly false, and two files still did not arrive.
+           ⛔ IT GETS THE REGISTER, NOT A SENTENCE. `run.last_error` is null on such a row, so
+           calling `sourceFailureSentence` here would print the unknown-failure prose about a
+           run that did not fail — inventing a reason is the defect, not the fix. The `errors`
+           bit already says how many; this only makes the eye stop. */
+        const partial = !failed && run.count_errors > 0
         /* ⚠ THE FOLD'S OWN PREDICATE, re-asked per row — never a second rule. An expanded
            history still has to say a tick changed nothing, and an incomplete listing is not
            quiet HERE for the reason it is not quiet THERE. */
@@ -199,8 +208,17 @@ export function RunHistoryList({
                         Emphasis is weight and the ordinary text tone — a category that failed
                         is at most the warning register, and a source state never escalates
                         beyond it (BUILD-CONTRACT §4). */}
-                    <span data-testid={`sources-run-count-${bit.key}`}>
-                      <span className="font-medium text-foreground">{bit.n}</span>{" "}
+                    <span
+                      data-testid={`sources-run-count-${bit.key}`}
+                      className={bit.key === "errors" ? "text-warning" : undefined}
+                    >
+                      <span
+                        className={
+                          bit.key === "errors" ? "font-medium" : "font-medium text-foreground"
+                        }
+                      >
+                        {bit.n}
+                      </span>{" "}
                       {WORD_FOR_COUNT[bit.key]}
                     </span>
                   </Fragment>
@@ -215,6 +233,15 @@ export function RunHistoryList({
               >
                 <EyeOff className="h-3 w-3" aria-hidden="true" />
                 {LISTING_INCOMPLETE_NOTE}
+              </span>
+            )}
+
+            {partial && (
+              <span
+                data-testid="sources-run-partial"
+                className="ml-2 inline-flex items-center gap-1 text-xs text-warning"
+              >
+                <AlertTriangle className="h-3 w-3" aria-hidden="true" />
               </span>
             )}
 

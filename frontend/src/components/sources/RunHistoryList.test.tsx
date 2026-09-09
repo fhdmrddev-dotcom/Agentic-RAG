@@ -345,6 +345,31 @@ describe("§7 the per-category breakdown", () => {
     expect(rowText()).not.toContain("·")
   })
 
+  it("⭐ a SUCCESSFUL check that could not read some files is not drawn as a clean one", () => {
+    /**
+     * ⛔ MEASURED ON THE OPERATOR'S OWN GMAIL WATCH, 2026-09-09. The run row read
+     * `status = 'success'`, `listing_complete = true`, `count_errors = 2` — and this history
+     * drew it exactly like a run where nothing went wrong, because `failed` was
+     * `run.status !== "success"` and nothing else asked about the errors.
+     *
+     * ⚠ THE CHECK REALLY DID SUCCEED, so `failed` stays false and no failure sentence appears.
+     * What was missing is the REGISTER: two files did not arrive and the eye slid past it.
+     */
+    mountOne({ status: "success", count_new: 3, count_errors: 2 })
+
+    expect(screen.getByTestId("sources-run-partial")).toBeInTheDocument()
+    expect(screen.getByTestId("sources-run-count-errors")).toHaveTextContent("2")
+    // ⛔ NO INVENTED REASON. `last_error` is null on such a row, so a sentence here would be
+    //    the unknown-failure prose attached to a run that did not fail.
+    expect(screen.queryByTestId("sources-fail-reason")).toBeNull()
+  })
+
+  it("⚠ a clean check gets no partial mark — the marker must not be always-on", () => {
+    mountOne({ status: "success", count_new: 3, count_errors: 0 })
+
+    expect(screen.queryByTestId("sources-run-partial")).toBeNull()
+  })
+
   it("a QUIET check is untouched — it still reads no changes, and prints no bits", () => {
     mountOne()
 

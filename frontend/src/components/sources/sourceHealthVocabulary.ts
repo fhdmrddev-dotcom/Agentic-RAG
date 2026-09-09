@@ -453,6 +453,21 @@ export const COUNT_ORDER: readonly CountKey[] = [
  */
 export const CHECKED_PREFIX = (ago: string): string => `Checked ${ago}`
 
+/**
+ * ⭐ THE COMPACT LINE THE ROW LEADS WITH (operator, 2026-09-09, during UAT row M-2).
+ *
+ * ⛔ THE ROW USED TO OPEN WITH THE WHOLE LIST — heading, scope note and a sentence per file —
+ * inside a section a person opens to see whether a watch is healthy. The operator's words:
+ * *"in the watch folder menu we can just put like two files failed"*. A count is what a
+ * summary owes; the reasons are what a DISCLOSURE owes.
+ *
+ * ⚠ It counts and says nothing else. The reasons stay one click away and keep their scope
+ * note, because `connector_watch_items` still cannot attribute a file's state to any one
+ * check — collapsing the list does not earn a claim the data never supported (`SEED-254`).
+ */
+export const FILE_FAILURE_SUMMARY = (n: number): string =>
+  n === 1 ? "1 file could not be read" : `${n} files could not be read`
+
 /** The heading over the per-file failures inside an otherwise healthy source. */
 export const FILE_FAILURE_HEADING = "Files that could not be read"
 
