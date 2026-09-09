@@ -225,3 +225,64 @@ async def test_unauthorized_source_transitions_items_to_unauthorized(mock_pool, 
         # Document source_state marked unauthorized_at_source
         mock_supabase.table("documents").update.assert_called_with({"source_state": "unauthorized_at_source"})
         mock_release.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_a_listing_that_cannot_prove_deletion_suppresses_missing_transitions(
+    mock_pool, mock_supabase, mock_adapter
+):
+    """⛔ CODE REVIEW WR-03 — ARCHIVING AN EMAIL MARKED ITS DOCUMENT `missing_at_source`.
+
+    A watch's unit of identity is *the message inside a label*. Gmail's **Archive** button — the
+    single most common action in a mailbox — removes the `INBOX` label, so the message vanishes
+    from an otherwise COMPLETE listing and the deletion arm fires. The person is told a Library
+    document is missing at source because they tidied their inbox.
+
+    ⚠ For Drive, *"the file left the folder"* really is *"it left the folder"*. For mail it is
+    day-to-day triage, and the two cannot be told apart from a label listing alone.
+
+    ⭐ THE FIX IS DATA, NOT A BRANCH. `SourceListing.deletions_detectable` defaults True, so every
+    existing adapter is unchanged; the mail listing sets it False and `watch_service` suppresses
+    the transition beside the H-5 completeness guard it already honours. **A provider `if` above
+    `adapters/` would have been the seventh two-paths disagreement.**
+
+    ⚠ THE COST IS NAMED, NOT HIDDEN: a message genuinely deleted at source now stays marked
+    present. That is the SAFE direction — this product's promise is that deletion at source never
+    deletes your knowledge — but it withdraws the marking half that UAT row M-5 observed, and
+    `SEED-264` carries the sharper rule that would restore it.
+    """
+    watch_id, doc_id, item_id = uuid4(), uuid4(), uuid4()
+    watch_record = {
+        "id": watch_id,
+        "connection_id": uuid4(),
+        "user_id": uuid4(),
+        "source_folder_id": "mailbox:INBOX:after:1788900000",
+    }
+    tracked_item = {
+        "id": item_id,
+        "external_id": "mailmsg:archived-one",
+        "name": "Invoice.eml",
+        "source_version": "111",
+        "document_id": doc_id,
+        "state": "present",
+    }
+
+    # The message was ARCHIVED: gone from this label's listing, and the listing is COMPLETE.
+    page = FilePage(files=[], next_page_token=None)
+    page.deletions_detectable = False
+    mock_adapter.list_files.return_value = page
+
+    with patch("app.services.watch_service.get_watch_items", new=AsyncMock(return_value=[tracked_item])), \
+         patch("app.services.watch_service.update_item_state", new=AsyncMock()) as mock_update_state, \
+         patch("app.services.watch_service.release_watch", new=AsyncMock()), \
+         patch("app.services.sources.base.SourceRegistry.get_adapter", return_value=mock_adapter):
+
+        svc = WatchService(pool=mock_pool, supabase=mock_supabase)
+        res = await svc.sync_watch(watch_record)
+
+    assert res["status"] == "success"
+    assert res["counts"]["missing"] == 0, (
+        "an archived email was counted as missing at source — the most ordinary action in a "
+        "mailbox reported as data disappearing"
+    )
+    mock_update_state.assert_not_awaited()

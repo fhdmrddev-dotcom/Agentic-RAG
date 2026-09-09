@@ -211,8 +211,19 @@ def _build_batch_body(ids: list[str], boundary: str) -> bytes:
     return "".join(parts).encode("utf-8")
 
 
-def _parse_batch_response(body: bytes, content_type: str) -> list[tuple[int, dict[str, Any]]]:
-    """Each sub-response as `(status_code, parsed_json)`, in the order Google returned them.
+def _parse_batch_response(
+    body: bytes, content_type: str
+) -> list[tuple[int | None, int, dict[str, Any]]]:
+    """Each sub-response as `(request_index, status_code, parsed_json)`.
+
+    ⛔ **THE INDEX IS THE POINT (code review WR-01).** This used to return a bare positional list
+    and the caller `zip`ped it against the request chunk — while `_build_batch_body` was writing
+    `Content-ID: <item-N>` for every sub-request and this function threw it away. **Google's
+    batch documentation does not guarantee response order**; it tells clients to correlate on
+    `Content-ID`. Emitting a correlation handle and never reading it is the tell.
+
+    ⚠ `request_index` is `None` when the header is missing or unparseable, so the caller can fall
+    back to position rather than fail a page over a shape this parser has not seen.
 
     ⚠ Parsed with the stdlib `email` package rather than by hand, because a batch response IS a
     MIME document and this codebase already trusts that parser with untrusted mail.
@@ -223,8 +234,12 @@ def _parse_batch_response(body: bytes, content_type: str) -> list[tuple[int, dic
     raw = b"Content-Type: " + content_type.encode("ascii", "replace") + b"\r\n\r\n" + body
     outer = _email.message_from_bytes(raw, policy=_email.policy.default)
 
-    results: list[tuple[int, dict[str, Any]]] = []
+    results: list[tuple[int | None, int, dict[str, Any]]] = []
     for part in outer.iter_parts() if outer.is_multipart() else []:
+        # Google echoes the request's `<item-N>` back as `<response-item-N>`; take the trailing
+        # integer of whichever shape arrives, and `None` when there is no readable one.
+        cid_tail = (part.get("Content-ID") or "").strip().strip("<>").rsplit("-", 1)[-1]
+        req_index = int(cid_tail) if cid_tail.isdigit() else None
         payload = part.get_payload(decode=True)
         if payload is None:
             text = part.get_payload()
@@ -240,7 +255,7 @@ def _parse_batch_response(body: bytes, content_type: str) -> list[tuple[int, dic
             parsed = jsonlib.loads(sub_body) if sub_body.strip() else {}
         except Exception:  # noqa: BLE001
             parsed = {}
-        results.append((status, parsed if isinstance(parsed, dict) else {}))
+        results.append((req_index, status, parsed if isinstance(parsed, dict) else {}))
     return results
 
 
@@ -306,8 +321,26 @@ async def _fetch_metadata_batched(token: str, ids: list[str]) -> dict[str, dict[
         #   live run returned, and treating it as a hard failure would make a busy mailbox
         #   permanently unreadable. Rate-limited members are retried once, serially and slowly,
         #   rather than failing the page.
+        # ⛔ PAIR BY `Content-ID`, NOT BY POSITION (code review WR-01). When every sub-response
+        #    carries a distinct, in-range index, that index decides which request it answers.
+        #    Positional pairing is kept ONLY for a response with no readable indices at all, so a
+        #    wire shape this parser has not seen degrades to the previous behaviour rather than
+        #    failing a page.
+        # ⚠ A PARTIAL OR REPEATED SET IS A REFUSAL, not a guess: pairing half by id and half by
+        #   position is how the wrong message would silently take another's metadata.
+        indices = [idx for idx, _s, _m in subs]
+        if any(i is not None for i in indices):
+            if sorted(i for i in indices if i is not None) != list(range(len(chunk))):
+                raise ValueError(
+                    f"Gmail batch Content-IDs did not cover {len(chunk)} requests exactly: "
+                    f"{indices!r}"
+                )
+            paired = [(chunk[idx], status, meta) for idx, status, meta in subs]
+        else:
+            paired = [(mid, status, meta) for mid, (_i, status, meta) in zip(chunk, subs)]
+
         retry_ids: list[str] = []
-        for msg_id, (status, meta) in zip(chunk, subs):
+        for msg_id, status, meta in paired:
             if status == 429:
                 retry_ids.append(msg_id)
                 continue
@@ -403,7 +436,11 @@ async def list_messages(
     ]
 
     if not ids:
-        return FilePage(files=[], next_page_token=data.get("nextPageToken"))
+        return FilePage(
+            files=[],
+            next_page_token=data.get("nextPageToken"),
+            deletions_detectable=False,
+        )
 
     # ⭐ ONE REQUEST FOR THE WHOLE PAGE. See GMAIL_BATCH_URL for the measurements that forced it.
     # ⚠ The per-message path below is kept as a FALLBACK and is not dead code: if Google ever
@@ -424,6 +461,10 @@ async def list_messages(
                 for mid in ids
             ],
             next_page_token=data.get("nextPageToken"),
+            # ⛔ THE SAME DECLARATION AS THE FALLBACK PATH BELOW, and it has to be on BOTH —
+            #    this is the branch that actually runs, so marking only the other one would
+            #    have left the defect live while looking fixed.
+            deletions_detectable=False,
         )
     except ValueError:
         raise
@@ -473,7 +514,13 @@ async def list_messages(
     #   order. Collecting completions as they finish would reorder the preview for no reason.
     files = list(await asyncio.gather(*(_one(msg_id) for msg_id in ids))) if ids else []
 
-    return FilePage(files=files, next_page_token=data.get("nextPageToken"))
+    # ⛔ LEAVING A LABEL IS NOT DELETION (code review WR-03). Gmail's Archive button removes
+    #    `INBOX`, so an archived message drops out of this listing exactly like a deleted one.
+    #    Declaring it here — rather than branching in `watch_service` — is what keeps one rule
+    #    for every family. `SEED-264` carries the sharper version that could tell them apart.
+    return FilePage(
+        files=files, next_page_token=data.get("nextPageToken"), deletions_detectable=False
+    )
 
 
 def _decode_raw(raw_b64url: str) -> bytes:

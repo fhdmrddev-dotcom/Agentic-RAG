@@ -58,6 +58,9 @@ class FilePage:
 
     files: list[SourceFile] = field(default_factory=list)
     next_page_token: str | None = None
+    #: Carried up into `SourceListing.deletions_detectable` by the traversal loop. Default True
+    #: so every existing adapter is untouched; a family that cannot prove deletion says so here.
+    deletions_detectable: bool = True
 
 
 @dataclass
@@ -67,6 +70,26 @@ class SourceListing:
     files: list[SourceFile] = field(default_factory=list)
     complete: bool = False  # Fails closed. ONLY True when loop completes with next_page_token IS None and 0 errors.
     error: str | None = None
+    #: Whether absence from THIS listing is evidence a thing was deleted at source.
+    #:
+    #: ⛔ ADDED AFTER PHASE 240's CODE REVIEW (WR-03), and it is a real contract change — this
+    #:    file's byte-identical hash was that phase's headline evidence, so the change is
+    #:    recorded rather than slipped in.
+    #:
+    #: ⚠ `complete` AND THIS ARE DIFFERENT QUESTIONS. `complete` asks *"did I see everything?"*;
+    #:   this asks *"does not-seeing-it mean it is gone?"* A listing can be perfectly complete
+    #:   and still prove nothing about deletion — when a family's folders are LABELS rather than
+    #:   containers, a thing leaving one is filing, not removal, and the two are indistinguishable
+    #:   from the listing alone.
+    #:
+    #: ⚠ DEFAULT True so every existing adapter keeps its behaviour untouched. A family opts OUT
+    #:   by saying so in its own listing — never by a provider branch in `watch_service`, which
+    #:   is the shape that has already produced six two-paths disagreements in this codebase.
+    #:
+    #: ⚠ THE CONCRETE CASE THAT FORCED IT IS DELIBERATELY NOT NAMED HERE. `test_240_contract_
+    #:   unchanged` forbids provider vocabulary in this module and FIRED on the first draft of
+    #:   this very comment — correctly. The example lives with the adapter that needs it.
+    deletions_detectable: bool = True
 
 
 @dataclass

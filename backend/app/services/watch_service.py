@@ -246,6 +246,7 @@ class WatchService:
 
         # 3. Paged listing loop producing a SourceListing
         listing = SourceListing(files=[], complete=False)
+        deletions_detectable = True
         page_token: str | None = None
         seen_tokens: set[str] = set()
         max_pages = 200
@@ -272,6 +273,12 @@ class WatchService:
                     page_token=page_token,
                 )
                 listing.files.extend(file_page.files)
+                # ⚠ ONE "no" IS ENOUGH. If any page says absence cannot prove deletion, the whole
+                #   listing cannot either — the property is about the SOURCE's semantics, not
+                #   about one page's luck.
+                deletions_detectable = deletions_detectable and getattr(
+                    file_page, "deletions_detectable", True
+                )
                 page_token = file_page.next_page_token
                 if not page_token:
                     listing.complete = True
@@ -296,6 +303,10 @@ class WatchService:
                 )
                 return {"status": "unauthorized", "error": str(list_exc)}
             raise list_exc
+
+        # ⚠ CARRIED UP AFTER THE WHOLE TRAVERSAL, not inside it — the property belongs to the
+        #   finished listing, and setting it mid-except would have skipped the success path.
+        listing.deletions_detectable = deletions_detectable
 
         # 4. Load tracked items from DB
         existing_items = await get_watch_items(self.pool, watch_id)
@@ -520,7 +531,22 @@ class WatchService:
         # ── STRUCTURAL ASSERTION (H-5 / SRC-06) ───────────────────────────────────────
         # Onyx #1161 guard: If the listing did NOT complete exhaustively (e.g. mid-pagination error),
         # missing state transitions are STRICTLY FORBIDDEN.
-        if not listing.complete:
+        # ── ⛔ ABSENCE IS NOT ALWAYS EVIDENCE (code review WR-03) ─────────────────────
+        #    Gmail's Archive button removes the `INBOX` label, so an archived message leaves a
+        #    COMPLETE listing exactly the way a deleted one does. Firing the deletion arm told
+        #    the person their Library document was missing at source because they tidied their
+        #    inbox. `complete` cannot answer this: it asks *"did I see everything?"*, and this
+        #    asks *"does not-seeing-it mean it is gone?"*
+        # ⚠ The flag comes from the LISTING, so this stays one rule for every family and never
+        #   becomes a provider `if` in the shared loop.
+        if not listing.deletions_detectable:
+            if deleted_candidates:
+                logger.info(
+                    "Watch %s: %d item(s) absent from a listing that cannot prove deletion — "
+                    "leaving them present (WR-03)",
+                    watch_id, len(deleted_candidates),
+                )
+        elif not listing.complete:
             if deleted_candidates:
                 logger.warning(
                     "Watch %s listing incomplete; suppressing missing state transitions for %d item(s) (H-5)",

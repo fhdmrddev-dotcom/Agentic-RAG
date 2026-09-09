@@ -57,8 +57,21 @@ EXPECTED_FIELDS: dict[type, set[str]] = {
         "path",
     },
     BrowsePage: {"items", "next_page_token"},
-    FilePage: {"files", "next_page_token"},
-    SourceListing: {"files", "complete", "error"},
+    # ⚠ WIDENED DELIBERATELY, 2026-09-10, by the procedure this fence's own message prescribes:
+    #   *"If a field is genuinely needed, edit EXPECTED_FIELDS deliberately and record why."*
+    #
+    # ⛔ `deletions_detectable` closes code-review WR-03: a family whose folders are LABELS
+    #    rather than containers cannot treat absence from a listing as proof of deletion, and
+    #    the watch loop was marking documents `missing_at_source` for ordinary filing. The
+    #    alternative was a provider `if` inside `watch_service` — the shape that has produced
+    #    six two-paths disagreements in this codebase — so the answer is DATA on the contract.
+    #
+    # ⭐ IT DOES NOT WEAKEN THE PHASE'S CLAIM. Phase 240's claim is that MAIL cost the contract
+    #    nothing, and this field names no provider and no shape: `test_base_module_mentions_no_
+    #    mail_vocabulary` still passes, and it FIRED on the first draft of the field's own
+    #    comment, which is how the Gmail example ended up in `gmail.py` where it belongs.
+    FilePage: {"files", "next_page_token", "deletions_detectable"},
+    SourceListing: {"files", "complete", "error", "deletions_detectable"},
     SourceHealth: {"ok", "error", "details"},
 }
 

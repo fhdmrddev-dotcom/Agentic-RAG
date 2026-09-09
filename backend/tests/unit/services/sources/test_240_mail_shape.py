@@ -159,7 +159,11 @@ async def test_browse_mail_root_lists_labels_as_folders(
 # ── listing ────────────────────────────────────────────────────────────────────────────────
 
 
-def _batch_response(metas: list[dict[str, Any]], statuses: list[int] | None = None):
+def _batch_response(
+    metas: list[dict[str, Any]],
+    statuses: list[int] | None = None,
+    order: list[int] | None = None,
+):
     """A Gmail `multipart/mixed` batch response, built the way Google actually sends one.
 
     ⚠ Assembled from the documented wire shape rather than from what the parser happens to
@@ -168,11 +172,17 @@ def _batch_response(metas: list[dict[str, Any]], statuses: list[int] | None = No
     boundary = "batch_reply_boundary"
     statuses = statuses or [200] * len(metas)
     chunks = []
-    for status, meta in zip(statuses, metas):
+    # ⚠ `Content-ID` IS PART OF THE WIRE SHAPE, and this helper omitted it — which is why no
+    #   test could see that the parser threw the header away. Google echoes the request's id
+    #   back as `<response-item-N>`. `order` lets a test return the parts in a DIFFERENT order
+    #   than they were asked for: what the documentation permits, and what the code assumed away.
+    order = order if order is not None else list(range(len(metas)))
+    for pos, (status, meta) in enumerate(zip(statuses, metas)):
         body = jsonlib.dumps(meta)
         chunks.append(
             f"--{boundary}\r\n"
-            "Content-Type: application/http\r\n\r\n"
+            "Content-Type: application/http\r\n"
+            f"Content-ID: <response-item-{order[pos]}>\r\n\r\n"
             f"HTTP/1.1 {status} OK\r\n"
             "Content-Type: application/json\r\n\r\n"
             f"{body}\r\n"
@@ -568,3 +578,65 @@ def test_the_anchor_survives_a_round_trip_and_does_not_leak_into_the_label() -> 
     assert mailbox.strip_folder_prefix(fid) == "Label_9"
     assert mailbox.folder_anchor(fid) == 1788900000
     assert mailbox.folder_anchor("mailbox:INBOX") is None
+
+
+@pytest.mark.asyncio
+async def test_a_reordered_batch_is_matched_by_content_id_not_by_position(
+    adapter: GoogleDriveSourceAdapter, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """⛔ CODE REVIEW WR-01 — the request WROTE a correlation id and the parser DROPPED it.
+
+    `_build_batch_body` emits `Content-ID: <item-N>` for every sub-request and
+    `_parse_batch_response` discarded it, returning a bare positional list that `zip(chunk, subs)`
+    then trusted. **Google's batch documentation does not guarantee response order** — it directs
+    clients to correlate on `Content-ID`. Writing a key and never reading it is the tell.
+
+    ⚠ MOSTLY SELF-CORRECTING, WHICH IS WHY IT SURVIVED: id, subject, date and size all come from
+    the SAME `meta` dict, so a permutation of two 200s lands the right facts on the right message
+    anyway. **The 429 arm is where it bites.** If `subs[i]` is a 429 for message X while
+    `chunk[i]` is message Y, then Y is queued for the slow re-read and **X's successful 200 is
+    thrown away**. X is then missing from `metas` and falls back to `subject=None`,
+    `internal_date=None` — the Library row is named `(no subject).eml` with `source_version = ""`.
+
+    ⛔ AND IT NEVER HEALS. `watch_service.py`'s modified check is
+    `if item_mod and existing_ver and item_mod != existing_ver`; an empty `existing_ver` makes it
+    permanently false, and a mail message is immutable, so nothing will ever re-read it. A
+    permanent wrong name from one transient rate-limit.
+
+    This drives the exact shape: two messages, responses returned REVERSED, the second one 429.
+    """
+    messages = [{"id": "alpha"}, {"id": "beta"}]
+    meta = {
+        "alpha": {"id": "alpha", "internalDate": "111", "sizeEstimate": 10,
+                  "payload": {"headers": [{"name": "Subject", "value": "Alpha"}]}},
+        "beta": {"id": "beta", "internalDate": "222", "sizeEstimate": 20,
+                 "payload": {"headers": [{"name": "Subject", "value": "Beta"}]}},
+    }
+
+    def handler(capability, method, url, kwargs):
+        if url.endswith("/messages"):
+            return _json({"messages": messages})
+        if "/batch/" in url:
+            # Returned in REVERSE order: part 0 answers request 1 (beta, 429), part 1 answers
+            # request 0 (alpha, 200). Positional matching reads this exactly backwards.
+            return _batch_response([{}, meta["alpha"]], statuses=[429, 200], order=[1, 0])
+        return _json(meta[url.rsplit("/", 1)[-1]])
+
+    monkeypatch.setattr("app.services.sources.mail.gmail._BATCH_BACKOFF_SECONDS", 0)
+    _install(monkeypatch, handler)
+
+    page = await adapter.list_files(CONN, folder_id=ANCHORED_INBOX)
+    # `SourceFile.id` carries the mail prefix; key on the trailing message id.
+    by_id = {f.id.rsplit(":", 1)[-1]: f for f in page.files}
+
+    assert by_id["alpha"].name == "Alpha.eml", (
+        f"alpha's successful 200 was discarded and it landed as {by_id['alpha'].name!r} — "
+        f"positional matching handed alpha's response to beta"
+    )
+    # ⚠ `modified_at` IS the version watch_service compares on. Empty here is the permanent
+    #   half of the defect: `if item_mod and existing_ver and ...` can never fire again.
+    assert by_id["alpha"].modified_at == "111", (
+        f"alpha's version is {by_id['alpha'].modified_at!r} — an empty one makes "
+        f"watch_service's modified check permanently false, so it never re-reads"
+    )
+    assert by_id["beta"].name == "Beta.eml", "the rate-limited message was not re-read"
