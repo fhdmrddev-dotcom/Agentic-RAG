@@ -45,6 +45,52 @@ MAX_MAIL_NESTING_DEPTH = 1
 
 MAIL_MIME_TYPES = ("message/rfc822", "application/vnd.ms-outlook", "application/x-msg")
 
+#: The parent-message columns an attachment inherits. Placement and scope only — never content.
+_PLACEMENT_COLUMNS = "folder_id, org_id, source_connection_id, ingest_visibility"
+
+
+def _inherited_placement(supabase: Any, document_id: str) -> dict[str, Any]:
+    """Read the message's own placement, so its attachments land beside it.
+
+    ⛔ **FOUND BY DRIVING THE REAL WATCH (2026-09-09, UAT row M-2), NOT BY READING.** The
+    operator emailed themselves a PDF. The watch minted it as its own document and wrote the
+    `attached_to` link — and the child arrived with `folder_id = NULL` and
+    `source_connection_id = NULL`. It existed, it was linked, and it sat nowhere a person looks.
+
+    ⚠ **THE FOLDER HALF IS NOT A PHASE 240 REGRESSION.** `5f8a54702` shows the legacy loop
+    passing `folder_id=None` EXPLICITLY, so the extraction preserved it faithfully. What changed
+    is that a watched mailbox now produces attachments at all — which is what made a
+    long-standing behaviour visible for the first time. Recorded because "the code I just moved
+    is wrong" and "the code I just moved newly EXPOSES something" are different findings.
+
+    ⛔ **THE VISIBILITY HALF WAS A REAL GAP IN THIS MODULE.** `mint_document_row` writes
+    `ingest_visibility` ONLY alongside `source_connection_id` — *"the pair is written together or
+    not at all"* — and this module accepted `ingest_visibility` with no way to pass a connection.
+    Every visibility it forwarded was silently discarded by the function it was handed to, so the
+    parameter its own docstring introduced to prevent a VIS-* regression could not do it.
+
+    ⚠ **IT RESOLVES HERE AND NOT IN EITHER CALLER, deliberately.** Two callers resolving the same
+    four columns is how the two ingest paths disagreed four times already. One home, both callers.
+
+    ⚠ **It never raises and never invents.** An unreadable or absent parent yields `{}`, and the
+    caller's own defaults stand — a hand-uploaded `.eml` has no connection and no folder, and its
+    attachment must still arrive with nothing made up on its behalf.
+    """
+    try:
+        resp = (
+            supabase.table("documents")
+            .select(_PLACEMENT_COLUMNS)
+            .eq("id", document_id)
+            .maybe_single()
+            .execute()
+        )
+        row = getattr(resp, "data", None)
+        return row if isinstance(row, dict) else {}
+    except Exception as exc:
+        log.warning("Could not read placement of message %s: %s", document_id, exc)
+        return {}
+
+
 
 def ingest_email_attachments(
     *,
@@ -56,6 +102,7 @@ def ingest_email_attachments(
     folder_id: str | None = None,
     org_id: str | None = None,
     ingest_visibility: str | None = None,
+    source_connection_id: str | None = None,
     depth: int = 0,
 ) -> list[dict] | None:
     """Mint each attachment as its own document, linked to the message it arrived on.
@@ -92,6 +139,20 @@ def ingest_email_attachments(
         extract_text,
         ingest_document,
     )
+
+    # ⭐ INHERITANCE IS THE DEFAULT, NOT A LAW — an explicit argument still wins, so a caller
+    #   that knows better than the parent row keeps saying so. Resolved once, above the loop:
+    #   every attachment on one message shares one message's placement.
+    inherited = _inherited_placement(supabase, document_id)
+    folder_id = folder_id if folder_id is not None else inherited.get("folder_id")
+    org_id = org_id if org_id is not None else inherited.get("org_id")
+    # ⛔ THE PAIR TRAVELS TOGETHER OR NOT AT ALL. `mint_document_row` writes visibility only
+    #   beside a connection id, so resolving one without the other re-creates the exact silent
+    #   drop this change exists to close.
+    if source_connection_id is None:
+        source_connection_id = inherited.get("source_connection_id")
+        if ingest_visibility is None:
+            ingest_visibility = inherited.get("ingest_visibility")
 
     try:
         parsed_email = (
@@ -136,6 +197,7 @@ def ingest_email_attachments(
                     folder_id=folder_id,
                     org_id=org_id,
                     ingest_visibility=ingest_visibility,
+                    source_connection_id=source_connection_id,
                     on_conflict="link",
                 )
                 att_doc = mint_result.document

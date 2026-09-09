@@ -322,3 +322,158 @@ def test_the_legacy_path_still_links_attachments_after_the_extraction():
     ]
     assert updates, "the legacy path stopped writing metadata"
     assert updates[-1]["metadata"]["document_type"] == "email"
+
+
+# ── 3. the attachment inherits the message's placement (2026-09-09, UAT row M-2) ────────────
+#
+# ⛔ FOUND BY DRIVING THE REAL WATCH, NOT BY READING. The operator emailed themselves a PDF; the
+#    watch minted it as its own document and linked it — and the child landed with
+#    `folder_id = NULL` and `source_connection_id = NULL`, so it existed nowhere a person looks
+#    and outside the connection-visibility model entirely.
+#
+# ⚠ THE FOLDER HALF IS NOT A PHASE 240 REGRESSION, and saying so matters. `5f8a54702` shows the
+#   legacy loop passing `folder_id=None` EXPLICITLY, so the extraction preserved the behaviour
+#   faithfully. What Phase 240 changed is that a watched mailbox now produces attachments at all,
+#   which is what made a long-standing behaviour visible for the first time.
+#
+# ⛔ THE VISIBILITY HALF IS A REAL GAP IN THIS PHASE'S OWN CODE. `mint_document_row` writes
+#   `ingest_visibility` ONLY alongside `source_connection_id` — *"the pair is written together or
+#   not at all"* — and this module accepted `ingest_visibility` while having no way to pass a
+#   connection id. The parameter its docstring introduced to prevent a VIS-* regression was
+#   therefore inert: silently dropped by the function it was handed to.
+
+
+def _placement_supabase(placement: dict | None) -> MagicMock:
+    """A supabase whose `documents` select answers with the parent's placement row."""
+    supabase, builder = _mock_supabase()
+    builder.execute.return_value = MagicMock(data=placement, count=1)
+    return supabase
+
+
+def test_an_attachment_inherits_the_folder_its_message_lives_in():
+    """⭐ M-2's real finding: the child was minted with no folder at all.
+
+    A person who watches a mail label and gets an attachment expects to find it beside the
+    message. `folder_id = NULL` is not "the root" — it is outside the folder tree.
+    """
+    from app.services.email_attachments import ingest_email_attachments
+
+    supabase = _placement_supabase({
+        "folder_id": "folder-9",
+        "org_id": "org-1",
+        "source_connection_id": "conn-7",
+        "ingest_visibility": "org",
+    })
+    with patch("app.services.email_attachments.mint_document_row") as mint, patch(
+        "app.api.documents.extract_text", return_value="col1,col2"
+    ), patch("app.api.documents.ingest_document"):
+        mint.return_value = MagicMock(
+            document={"id": "att-doc-1"}, is_duplicate=False,
+            storage_path="p", version_number=1,
+        )
+        ingest_email_attachments(
+            raw=_eml_with_attachments(),
+            mime_type="message/rfc822",
+            document_id="email-doc-1",
+            user_id="user-1",
+            supabase=supabase,
+        )
+
+    assert mint.call_args is not None, "no attachment was minted at all"
+    kwargs = mint.call_args.kwargs
+    assert kwargs["folder_id"] == "folder-9", (
+        "the attachment was minted outside its message's folder — this is what the operator "
+        "saw on 2026-09-09: a child document that exists and sits nowhere"
+    )
+
+
+def test_the_connection_and_its_visibility_travel_together_onto_the_child():
+    """⛔ The pair, or neither. `mint_document_row` DROPS visibility without a connection id.
+
+    Driven against the shipped code: this module had no `source_connection_id` parameter, so
+    every `ingest_visibility` it forwarded was discarded by the function it was handed to.
+    """
+    from app.services.email_attachments import ingest_email_attachments
+
+    supabase = _placement_supabase({
+        "folder_id": "folder-9",
+        "org_id": "org-1",
+        "source_connection_id": "conn-7",
+        "ingest_visibility": "org",
+    })
+    with patch("app.services.email_attachments.mint_document_row") as mint, patch(
+        "app.api.documents.extract_text", return_value="col1,col2"
+    ), patch("app.api.documents.ingest_document"):
+        mint.return_value = MagicMock(
+            document={"id": "att-doc-1"}, is_duplicate=False,
+            storage_path="p", version_number=1,
+        )
+        ingest_email_attachments(
+            raw=_eml_with_attachments(),
+            mime_type="message/rfc822",
+            document_id="email-doc-1",
+            user_id="user-1",
+            supabase=supabase,
+        )
+
+    kwargs = mint.call_args.kwargs
+    assert kwargs.get("source_connection_id") == "conn-7", (
+        "the child carries no connection, so the visibility beside it is dropped by "
+        "mint_document_row and the attachment sits outside the connection's scope"
+    )
+    assert kwargs.get("ingest_visibility") == "org"
+    assert kwargs.get("org_id") == "org-1"
+
+
+def test_a_message_with_no_placement_still_mints_its_attachment():
+    """⚠ The inheritance must never become a REQUIREMENT. A hand-uploaded `.eml` has no
+    connection and no folder, and its attachment must still arrive — with nothing invented."""
+    from app.services.email_attachments import ingest_email_attachments
+
+    supabase = _placement_supabase(None)
+    with patch("app.services.email_attachments.mint_document_row") as mint, patch(
+        "app.api.documents.extract_text", return_value="col1,col2"
+    ), patch("app.api.documents.ingest_document"):
+        mint.return_value = MagicMock(
+            document={"id": "att-doc-1"}, is_duplicate=False,
+            storage_path="p", version_number=1,
+        )
+        manifest = ingest_email_attachments(
+            raw=_eml_with_attachments(),
+            mime_type="message/rfc822",
+            document_id="email-doc-1",
+            user_id="user-1",
+            supabase=supabase,
+        )
+
+    assert manifest and manifest[0]["status"] == "completed"
+    kwargs = mint.call_args.kwargs
+    assert kwargs["folder_id"] is None
+    assert kwargs.get("source_connection_id") is None
+
+
+def test_an_explicit_placement_argument_beats_the_inherited_one():
+    """The caller stays able to say where a child belongs; inheritance is the DEFAULT, not a law."""
+    from app.services.email_attachments import ingest_email_attachments
+
+    supabase = _placement_supabase({
+        "folder_id": "folder-9", "org_id": "org-1",
+        "source_connection_id": "conn-7", "ingest_visibility": "org",
+    })
+    with patch("app.services.email_attachments.mint_document_row") as mint, patch(
+        "app.api.documents.extract_text", return_value="col1,col2"
+    ), patch("app.api.documents.ingest_document"):
+        mint.return_value = MagicMock(
+            document={"id": "att-doc-1"}, is_duplicate=False,
+            storage_path="p", version_number=1,
+        )
+        ingest_email_attachments(
+            raw=_eml_with_attachments(),
+            mime_type="message/rfc822",
+            document_id="email-doc-1",
+            user_id="user-1",
+            supabase=supabase,
+            folder_id="folder-explicit",
+        )
+
+    assert mint.call_args.kwargs["folder_id"] == "folder-explicit"
