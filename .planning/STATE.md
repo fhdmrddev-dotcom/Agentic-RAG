@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v4.0
 milestone_name: Connected Knowledge
 status: executing
-last_updated: "2026-09-09T21:54:32.064Z"
+last_updated: "2026-09-09T21:57:21.185Z"
 last_activity: 2026-09-09
 progress:
   total_phases: 21
@@ -33,7 +33,7 @@ See: `.planning/PROJECT.md` (updated 2026-09-04)
 can be taught new behaviors (skills) that persist and can be shared.
 
 **Current focus:** **Milestone v4.0 Connected Knowledge — STARTED 2026-09-04.** Phase numbering
-continues at **228**.
+continues at **228**. **Phase 241 — recall-at-corpus-scale is EXECUTING.**
 
 Phase: 241 — Recall at Corpus Scale (**CONTEXT GATHERED 2026-09-10** — ready to plan)
 Resume file: `.planning/phases/241-recall-at-corpus-scale/241-CONTEXT.md`
@@ -372,7 +372,7 @@ Prior: 237 — One Rule Engine, Not Two (✅ CLOSED 2026-09-06)
 Prior: 236 — The Corpus Under Attack (✅ FULLY CLOSED — GA GATE MET 2026-09-06)
 Prior: 235 — The Source Says What It Did (✅ CLOSED 2026-09-06)
 Plan: Phase 239 planned (3 plans across 3 waves: 239-01, 239-02, 239-03)
-Status: Ready to execute
+Status: Executing Phase 241
 Gates at baseline (25c650231): backend `71 failed / 4026 passed` (ceiling 71, zero headroom) · vitest `total 7822 · pinned 7026` · tsc clean (0 errors)
 
 ## ▶ NEXT SESSION — start here
