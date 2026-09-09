@@ -1489,7 +1489,10 @@ const BASELINE = {
   // deleted without the gate noticing — the gate only fails on a decrease BELOW the pin.
   // Its test file is byte-unchanged by this commit (last touched 2026-08-30, 217.1-18), so
   // re-baselining it here would bury someone else's drift inside a nav refactor.
-  "SettingsPage.test.tsx": 13,
+  // 241-03: 13 -> 23. The +10 are the two HNSW knobs on the shipped Retrieval card (QUEUE-06 /
+  // D-09), all asserting rendered CONTENT rather than presence — the served bounds reaching the
+  // input's min/max, the three pgvector modes by VALUE, and both keys on the save payload.
+  "SettingsPage.test.tsx": 23,
   // ── 188-12: the fifteen files that RAN inside TARGETS with NO pin at all. ──
   // Inherited from Phases 183-187, none authored by this phase. They are pinned here because
   // the reason to leave a suite unpinned ("it postdates the pin, its count is free to grow")
@@ -4699,15 +4702,62 @@ function runVitest() {
     args.push(`--maxWorkers=${process.env.GSD_VITEST_MAX_WORKERS}`)
   }
 
+  // ⛔ THE WINDOWS COMMAND-LENGTH LIMIT — measured 2026-09-10 (Phase 241-03), and it was
+  //    ALREADY BROKEN at that phase's base commit, by nothing that phase changed.
+  //
+  //    `shell: true` routes the spawn through `cmd.exe /d /s /c "…"`, whose TOTAL command line
+  //    is capped. TARGETS has grown past 150 entries, so the composed line measured **8,078
+  //    characters** and cmd refused the whole thing with:
+  //
+  //        The syntax of the command is incorrect.
+  //
+  //    — no JSON report, exit 255, and `fatal()` below correctly called it a HARNESS error
+  //    rather than a gate failure. Reproduced on two consecutive runs on an untouched tree. A
+  //    controlled probe pinned the boundary between 8,100 (accepted) and 8,150 (refused):
+  //
+  //        for (const n of [7900, 8000, 8050, 8100, 8150])
+  //          spawnSync('node', ['-e','process.exit(0)', 'x'.repeat(n-20)], {shell:true})
+  //        // => 0, 0, 0, 0, 1
+  //
+  // ⛔ THE FIX IS TO STOP GOING THROUGH cmd.exe — NOT TO SHORTEN `TARGETS`. Trimming the scan
+  //    list to fit a shell limit would silently un-run suites, which is the precise failure the
+  //    TARGETS/BASELINE two-knob rule exists to prevent: *"a suite can sit on the wrong side of
+  //    exactly one of them"*. A gate that quietly stops running files is worse than one that
+  //    refuses to start, because only the second one tells anybody.
+  //
+  //    Spawning the resolved vitest entry with `process.execPath` and `shell: false` hands the
+  //    argv to CreateProcess directly (32,767-char ceiling) and passes each target as its own
+  //    argument, so neither quoting nor length applies. It runs the SAME file `npx` resolved:
+  //    `frontend/node_modules/vitest/vitest.mjs`. `require.resolve("vitest/vitest.mjs")` does
+  //    NOT work — the package's `exports` map blocks the deep path (ERR_PACKAGE_PATH_NOT_EXPORTED)
+  //    — so resolve `package.json` (which every modern package exports) and join the `bin` entry.
+  let vitestEntry
+  try {
+    const pkgPath = require.resolve("vitest/package.json", { paths: [FRONTEND_DIR] })
+    vitestEntry = path.join(path.dirname(pkgPath), "vitest.mjs")
+  } catch {
+    vitestEntry = path.join(FRONTEND_DIR, "node_modules", "vitest", "vitest.mjs")
+  }
+  if (!fs.existsSync(vitestEntry)) {
+    fatal(
+      `could not find the vitest entry at ${vitestEntry}.\n` +
+        `       In a worktree this usually means bootstrap-worktree.sh has not run.`,
+    )
+  }
+
+  // `args[0]` is the literal "vitest" the npx form needed; the direct form supplies the path.
+  const spawnArgs = [vitestEntry, ...args.slice(1)]
+
   console.log(`running: npx ${args.join(" ")}`)
+  console.log(`   via: ${path.basename(process.execPath)} ${vitestEntry} (no shell — see above)`)
   console.log(`   cwd: ${FRONTEND_DIR}`)
   console.log(`report: ${outFile}`)
   console.log("")
 
-  const res = spawnSync("npx", args, {
+  const res = spawnSync(process.execPath, spawnArgs, {
     cwd: FRONTEND_DIR,
     stdio: ["ignore", "inherit", "inherit"],
-    shell: true,
+    shell: false,
     env: { ...process.env, CI: "1" },
   })
 

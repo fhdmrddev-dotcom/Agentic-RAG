@@ -374,6 +374,40 @@ Failing set, taken from the gate's **own persisted JSON report** BEFORE anything
 ⚠ Per this seed's own standing rule, that is recorded as **provably unmodified**, NOT as "fine" —
 one green sample of a flaky suite is not proof of innocence.
 
+### ⭐ REPRODUCED EXACTLY — 2026-09-10 (Phase 241, plan `241-03`)
+
+The sighting above was a single observation. It is now a **reproduction**, and the value of this
+entry changes accordingly: three cases, three signatures, **identical to the table above**, four
+days later, on a different base and by a different plan.
+
+```
+  total 7940  ·  failed 3  ·  pinned total 7170
+FAIL  [failing-tests] 3 test(s) failed — the gate requires 0.
+```
+
+| File | Test | Signature |
+|---|---|---|
+| `src/pages/WorkflowBuilderPage.canvas.test.tsx` | canvas door — flag ON (D-183-01) | `Error: STACK_TRACE_ERROR` |
+| `src/components/library/__tests__/sketchComposition.test.tsx` | §2 positive control — "the mount harness works" | `Error: STACK_TRACE_ERROR` |
+| `src/components/library/__tests__/sketchComposition.test.tsx` | §2 positive control — "the four shipped tab triggers render" | `TestingLibraryElementError: Found multiple elements with the role "tab" and name "Documents"` |
+
+Filenames taken from the gate's **own persisted JSON BEFORE anything was re-run**, as this seed
+requires. Both files are **provably unmodified by `241-03`**: neither appears in
+`git status --short` nor in `git diff --numstat <merge-base> HEAD`, whose entire frontend surface
+is `SettingsPage.tsx`, `SettingsPage.test.tsx`, `SettingsPage.a11y.test.tsx` and a types-only edit
+to `lib/api/skills.ts`. Neither failing suite imports any of them.
+
+- **In isolation, together: `200 passed | 1 skipped (201)`.** Recorded as *provably unmodified*,
+  never as "fine".
+- **The very same gate had read `failed 0` ~20 minutes earlier** on this same worktree, before the
+  frontend edits, and read `failed 0` again on the re-run after them. So on this tree the gate
+  produced **green, red, green** across three runs at `GSD_VITEST_MAX_WORKERS=2`. **The cap was
+  never touched.**
+- ⚠ **The duplicate-`role="tab"`-named-"Documents" error recurring verbatim strengthens the
+  strongest lead this seed has**: it is not slowness, it is DOM left over from a sibling test in
+  the same worker. Two independent occurrences of the *same* leaked accessible name is a cleanup
+  /isolation defect with a reproducible fingerprint — not a timeout.
+
 ### The consequence for any phase planning against this
 
 **`count gate OK` was NOT reachable on this tree with zero source changes.** So a phase whose

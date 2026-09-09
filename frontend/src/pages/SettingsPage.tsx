@@ -80,6 +80,21 @@ const PROVIDER_META: Record<string, { label: string; defaultBase: string; keyLab
 
 // ── Small reusable components ─────────────────────────────────────────────────
 
+/**
+ * Phase 241 (QUEUE-06 / D-09) — plain words for pgvector's three `hnsw.iterative_scan` modes.
+ *
+ * ⛔ THIS IS NOT A SECOND COPY OF THE ENUM AND MUST NOT BECOME ONE. The option VALUES rendered
+ * in the picker come from `hnsw_iterative_scan_values`, which the API SERVES; this map only
+ * supplies display text, and a mode with no entry falls back to its raw value. So a server that
+ * grows a fourth mode still renders a working control — it just shows the technical name until
+ * somebody writes a plain one.
+ */
+const ITERATIVE_SCAN_LABELS: Record<string, string> = {
+  off: "Off",
+  strict_order: "On — exact order",
+  relaxed_order: "On — faster",
+}
+
 function FieldRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-4 py-2.5">
@@ -103,8 +118,11 @@ function TextInput({ value, onChange, placeholder, type = "text" }: {
   )
 }
 
-function NumberInput({ value, onChange, min, max, step }: {
+function NumberInput({ value, onChange, min, max, step, ariaLabel }: {
   value: number; onChange: (v: number) => void; min?: number; max?: number; step?: number
+  /** Phase 241 — optional, additive: `FieldRow`'s <Label> carries no htmlFor, so a control
+   *  that wants to be reachable by its name needs to say its own. Existing callers unchanged. */
+  ariaLabel?: string
 }) {
   return (
     <Input
@@ -114,6 +132,7 @@ function NumberInput({ value, onChange, min, max, step }: {
       min={min}
       max={max}
       step={step}
+      aria-label={ariaLabel}
       className="h-8 text-sm font-mono bg-muted/30 ghost-border"
     />
   )
@@ -655,6 +674,15 @@ export function SettingsPage() {
   const [vectorWeight, setVectorWeight] = useState(1.0)
   const [keywordWeight, setKeywordWeight] = useState(1.0)
   const [rrfK, setRrfK] = useState(60)
+  // Phase 241 (QUEUE-06 / D-09) — search breadth and iterative scan. ⛔ The BOUNDS are served
+  // by `GET /settings` and start as null, exactly like the source ceiling above: there is no
+  // honest cold value for a bound the server has not stated yet, and typing 10/1000 here would
+  // make the form a second private copy of numbers migration 176's CHECK also carries.
+  const [hnswEfSearch, setHnswEfSearch] = useState(40)
+  const [hnswIterativeScan, setHnswIterativeScan] = useState("off")
+  const [hnswEfSearchFloor, setHnswEfSearchFloor] = useState<number | null>(null)
+  const [hnswEfSearchCeiling, setHnswEfSearchCeiling] = useState<number | null>(null)
+  const [hnswIterativeScanValues, setHnswIterativeScanValues] = useState<string[]>([])
 
   // Web search
   const [tavilyApiKey, setTavilyApiKey] = useState("")
@@ -737,6 +765,16 @@ export function SettingsPage() {
     setVectorWeight(data.vector_search_weight)
     setKeywordWeight(data.keyword_search_weight)
     setRrfK(data.rrf_k)
+    // Phase 241. ⚠ HI-02, the same rule the source ceiling above states: the STORED value is
+    // always rendered, and `??` covers only a backend predating the field entirely — never a
+    // stored value, which would make "open the page and press Save" a silent reset. Migration
+    // 176 being authored-but-not-applied is NOT that case: the column is absent, `_val()`
+    // returns the config default, and the server still sends 40 / "off".
+    setHnswEfSearch(data.hnsw_ef_search ?? 40)
+    setHnswIterativeScan(data.hnsw_iterative_scan ?? "off")
+    setHnswEfSearchFloor(data.hnsw_ef_search_floor ?? null)
+    setHnswEfSearchCeiling(data.hnsw_ef_search_ceiling ?? null)
+    setHnswIterativeScanValues(data.hnsw_iterative_scan_values ?? [])
     setTavilyApiKey(data.web_search_has_api_key ? KEY_PLACEHOLDER : "")
     setWebSearchMaxResults(data.web_search_max_results)
     setWebSearchEnabled(data.web_search_enabled)
@@ -857,6 +895,9 @@ export function SettingsPage() {
       vector_search_weight: vectorWeight,
       keyword_search_weight: keywordWeight,
       rrf_k: rrfK,
+      // Phase 241 (QUEUE-06 / D-09) — the two knobs ride the payload this tab already sends.
+      hnsw_ef_search: hnswEfSearch,
+      hnsw_iterative_scan: hnswIterativeScan,
     }
 
     // Phase 111.1 D-02/D-03 — confirm-on-save gate. ONLY fire when the embedding
@@ -1514,6 +1555,56 @@ export function SettingsPage() {
                     </FieldRow>
                   </>
                 )}
+
+                {/* Phase 241 (QUEUE-06 / D-09) — the two HNSW index knobs.
+                    ⚠ DELIBERATELY OUTSIDE the `hybridEnabled` block above. They govern the
+                    VECTOR scan, which runs on the vector-only path too (`search_documents`
+                    calls `_vector_search` in both arms), so hiding them behind the hybrid
+                    toggle would hide a control that is still in effect.
+                    ⛔ The bounds are SERVED, never typed here — see `hnswEfSearchFloor`. */}
+                <FieldRow label="Search breadth">
+                  <NumberInput
+                    value={hnswEfSearch}
+                    onChange={setHnswEfSearch}
+                    min={hnswEfSearchFloor ?? undefined}
+                    max={hnswEfSearchCeiling ?? undefined}
+                    ariaLabel="Search breadth"
+                  />
+                </FieldRow>
+                <p className="text-xs text-muted-foreground -mt-1 mb-2">
+                  How many candidate passages the index looks at before your filters are
+                  applied. A bigger number walks more candidate vectors per search — slower
+                  answers and more memory. A smaller one is faster, but a search narrowed to a
+                  small part of your library can come back with fewer results than it asked
+                  for.
+                  {hnswEfSearchFloor !== null && hnswEfSearchCeiling !== null && (
+                    <> {" "}Allowed: {hnswEfSearchFloor}&ndash;{hnswEfSearchCeiling}.</>
+                  )}
+                </p>
+
+                {/* ⛔ A SELECT, NEVER A TOGGLE. `strict_order` and `relaxed_order` are two
+                    genuinely different modes; a boolean would silently drop one of them. */}
+                <FieldRow label="Keep scanning">
+                  <select
+                    value={hnswIterativeScan}
+                    onChange={(e) => setHnswIterativeScan(e.target.value)}
+                    aria-label="Keep scanning"
+                    className="h-8 w-full text-sm rounded-md bg-muted/30 ghost-border px-2 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  >
+                    {hnswIterativeScanValues.map((mode) => (
+                      <option key={mode} value={mode}>
+                        {ITERATIVE_SCAN_LABELS[mode] ?? mode}
+                      </option>
+                    ))}
+                  </select>
+                </FieldRow>
+                <p className="text-xs text-muted-foreground -mt-1">
+                  When on, the index keeps looking until enough passages survive your filters
+                  instead of stopping early with a short list. It costs more work and more
+                  memory on every search. Exact order keeps the closest matches first; faster
+                  may reorder them. Older databases do not have this setting, and searches
+                  keep working there without it.
+                </p>
               </SectionCard>
 
               {/* Save Search Settings button */}

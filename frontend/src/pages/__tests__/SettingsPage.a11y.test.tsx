@@ -97,6 +97,13 @@ function mkSettings(overrides: Partial<FullAppSettings> = {}): FullAppSettings {
     vector_search_weight: 1,
     keyword_search_weight: 1,
     rrf_k: 60,
+    // Phase 241 (QUEUE-06 / D-09) — same rule as SEED-258 above: the response requires them,
+    // so the fixture states them rather than letting a default hide a field the API forgot.
+    hnsw_ef_search: 40,
+    hnsw_iterative_scan: "off",
+    hnsw_ef_search_floor: 10,
+    hnsw_ef_search_ceiling: 1000,
+    hnsw_iterative_scan_values: ["off", "strict_order", "relaxed_order"],
     web_search_enabled: false,
     web_search_has_api_key: false,
     web_search_max_results: 5,
