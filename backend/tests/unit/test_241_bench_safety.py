@@ -141,6 +141,9 @@ def test_a_database_merely_containing_recall_bench_is_refused(database: str) -> 
 
 _DESTRUCTIVE = re.compile(r"\b(?:DROP|CREATE)\s+DATABASE\b", re.IGNORECASE)
 _GUARD_CALL = re.compile(r"\bassert_bench_target\s*\(")
+# ⚠ `def assert_bench_target(` matches _GUARD_CALL, so the guard's OWN definition line
+# would otherwise satisfy the fence for anything written inside the guard itself.
+_DEF_LINE = re.compile(r"^\s*(?:async\s+)?def\s")
 
 
 def _source_lines_without_comments() -> list[str]:
@@ -184,7 +187,7 @@ def test_every_destructive_statement_sits_in_a_function_guarded_above_it() -> No
         # innermost enclosing function
         fn = min(enclosing, key=lambda f: (f.end_lineno or f.lineno) - f.lineno)
         guarded = any(
-            _GUARD_CALL.search(lines[i - 1])
+            _GUARD_CALL.search(lines[i - 1]) and not _DEF_LINE.match(lines[i - 1])
             for i in range(fn.lineno, lineno)
         )
         if not guarded:
