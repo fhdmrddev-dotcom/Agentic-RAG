@@ -617,3 +617,61 @@ def test_both_paths_agree_on_what_transient_MEANS():
     assert queue_mod.TRANSIENT_TELLS is TRANSIENT_TELLS, (
         "the queue keeps its own private copy of the transient-error terms"
     )
+
+
+# ── 5. a PDF attachment is extracted by the PDF extractor (2026-09-09) ───────────────────────
+#
+# ⛔ THE SIXTH TWO-PATHS DISAGREEMENT, AND IT MADE EVERY PDF ATTACHMENT FAIL — ON BOTH PATHS,
+#    FOR AS LONG AS THE LOOP HAS EXISTED. `extract_text`'s own docstring says it is for
+#    *"non-PDF/non-DOCX MIME types"*: since Phase 069 those two flow through
+#    `extraction_service`. A PDF handed to it falls past every branch to the final
+#    `raw.decode("utf-8")` and dies on the first non-ASCII byte of the file body.
+#
+# ⚠ MEASURED, on the operator's real Gmail watch: `'utf-8' codec can't decode byte 0xe2 in
+#   position 10: invalid continuation byte` — position 10 is just past `%PDF-1.x\n`.
+#
+# ⚠ IT WAS INVISIBLE UNTIL TODAY. `splice_document` gets this right (`if mime_type not in
+#   (_PDF, _DOCX)`), so nothing upstream ever noticed; and the first live run of this loop hit
+#   the storage timeout and never REACHED extraction. One defect hid behind another.
+
+
+def test_a_pdf_attachment_goes_to_the_pdf_extractor_not_the_utf8_fallback():
+    """⛔ Driven against the shipped code with the real failure: a bare `raw.decode("utf-8")`."""
+    from app.services import email_attachments as mod
+
+    supabase, _ = _mock_supabase()
+    pdf_bytes = b"%PDF-1.7\n\xe2\xe3\xcf\xd3 binary body"
+
+    msg = EmailMessage()
+    msg["Subject"] = "Contract"
+    msg["From"] = "legal@corp.com"
+    msg["To"] = "am@corp.com"
+    msg["Date"] = "Mon, 07 Sep 2026 09:00:00 +0000"
+    msg["Message-ID"] = "<pdf-1@corp.com>"
+    msg.set_content("See attached.")
+    msg.add_attachment(pdf_bytes, maintype="application", subtype="pdf", filename="contract.pdf")
+
+    with patch("app.services.email_attachments.mint_document_row") as mint, patch(
+        "app.api.documents.ingest_document"
+    ), patch(
+        "app.services.extraction_service.extract_composable"
+    ) as composable:
+        mint.return_value = MagicMock(
+            document={"id": "att-doc-1"}, is_duplicate=False,
+            storage_path="p", version_number=1,
+        )
+        composable.return_value = MagicMock(text="CONTRACT TEXT", extractor_name="pymupdf")
+        manifest = mod.ingest_email_attachments(
+            raw=msg.as_bytes(),
+            mime_type="message/rfc822",
+            document_id="email-doc-1",
+            user_id="user-1",
+            supabase=supabase,
+        )
+
+    entry = {e["filename"]: e for e in manifest}["contract.pdf"]
+    assert entry["status"] == "completed", (
+        f"the PDF attachment failed: {entry.get('error')!r} — `extract_text` has not handled "
+        f"PDF since Phase 069 and its final branch is a bare raw.decode('utf-8')"
+    )
+    composable.assert_called_once()

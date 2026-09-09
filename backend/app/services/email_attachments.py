@@ -156,6 +156,24 @@ def _inherited_placement(supabase: Any, document_id: str) -> dict[str, Any]:
 
 
 
+def _extract_attachment_text(raw: bytes, mime_type: str) -> str:
+    """Route PDF and DOCX to the extraction service; everything else to `extract_text`.
+
+    ⚠ This is `splice_document`'s branch, spelled the same way on purpose. A DIFFERENT rule
+    here would be a seventh disagreement rather than the fix for the sixth.
+    """
+    from app.api.documents import extract_text  # noqa: PLC0415
+    from app.services.extraction_service import (  # noqa: PLC0415
+        DOCX_MIME,
+        PDF_MIME,
+        extract_composable,
+    )
+
+    if mime_type not in (PDF_MIME, DOCX_MIME):
+        return extract_text(raw, mime_type)
+    return extract_composable(raw, mime_type).text or ""
+
+
 def ingest_email_attachments(
     *,
     raw: bytes,
@@ -310,7 +328,23 @@ def ingest_email_attachments(
                 )
 
                 # Extract and ingest child document
-                att_text = extract_text(att.raw, att_mime)
+                #
+                # ⛔ THE SIXTH TWO-PATHS DISAGREEMENT, AND IT FAILED EVERY PDF AND DOCX
+                #    ATTACHMENT EVER SENT. `extract_text`'s own docstring says it handles
+                #    *"non-PDF/non-DOCX MIME types"* — since Phase 069 those two go through
+                #    `extraction_service`. A PDF handed to it falls past every branch to a bare
+                #    `raw.decode("utf-8")` and dies on the first non-ASCII byte of the body:
+                #    `'utf-8' codec can't decode byte 0xe2 in position 10`, measured on the
+                #    operator's real Gmail watch on 2026-09-09.
+                #
+                # ⚠ IT WAS INVISIBLE BECAUSE ANOTHER DEFECT SAT IN FRONT OF IT. The first live
+                #   run of this loop hit the storage timeout and never REACHED extraction; and
+                #   `splice_document` has always branched correctly, so nothing upstream noticed.
+                #
+                # ⚠ THE BRANCH IS `splice_document`'s, deliberately spelled the same way. The
+                #   honest fix for the whole family is to put the child on the ingestion queue
+                #   so it inherits ONE pipeline instead of a parallel one — SEED-262.
+                att_text = _extract_attachment_text(att.raw, att_mime)
                 ingest_document(
                     document_id=att_doc_id,
                     text=att_text,
