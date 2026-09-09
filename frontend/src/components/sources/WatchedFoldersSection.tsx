@@ -114,6 +114,8 @@ import {
   type SourceFailureCause,
 } from "./sourceHealthVocabulary"
 import { cn } from "@/lib/utils"
+import { ConnectionMarkGlyph } from "@/lib/connectionMark"
+import { watchProductMarkKey } from "./watchProductMark"
 
 /**
  * ⭐ D-235-12 — THE INSTANCE-LEVEL TRUTH, SAID ONCE.
@@ -660,6 +662,9 @@ function WatchRow({
 
   // ⚠ A degraded row's `connection_name`, `item_count`, `last_run_at` and `last_status` are
   //   MODEL DEFAULTS, not measurements (plan 07). Nothing below renders one of them as fact.
+  // Phase 240 — the product this folder belongs to, read from the folder's ADDRESS.
+  // ⚠ Gmail and Drive share one connection here, so `service_id` cannot tell them apart.
+  const productMarkKey = watchProductMarkKey(watch.source_folder_id, watch.service_id)
   const connectionName = watch.connection_name ?? ""
   const connectionLabel = connectionName.trim() || "the connection"
   // ⛔ T-235-12 / T-235-33 — the raw column reaches the vocabulary leaf and NOTHING ELSE. Both
@@ -780,6 +785,9 @@ function WatchRow({
             className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-left"
           >
             <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+            {productMarkKey && (
+              <ConnectionMarkGlyph shape={{ capability: productMarkKey }} size="row" />
+            )}
             <span className="font-medium text-sm text-foreground">{watch.source_folder_name}</span>
             {statePill}
             {outcomeLine}
@@ -804,6 +812,9 @@ function WatchRow({
                   >
                     <ChevronDown className="h-3.5 w-3.5" />
                   </button>
+                )}
+                {productMarkKey && (
+                  <ConnectionMarkGlyph shape={{ capability: productMarkKey }} size="row" />
                 )}
                 <span className="font-semibold text-sm text-foreground">
                   {watch.source_folder_name}

@@ -9544,6 +9544,7 @@ cells rot within days.
 | [`backend/app/db/watches.py`](docs/HOT-FILE-LEDGER.md#backendappdbwatchespy) | 2 / 2 / 696 | no (2 phases) | ⚠ row was STALE at `1/1/439`. 235 added the sync-run store + prune; 235-14 adds `last_success_by_watch`, the ONLY UNBOUNDED read. ⛔ the prune's bound is proven against FIXTURES only, never live rows |
 | [`backend/app/api/sources.py`](docs/HOT-FILE-LEDGER.md#backendappapisourcespy) | 5 / 1 / 677 | no (1 phase) | ⚠ row was STALE at `2/0/356`. ✅ 235 fixed `/sync`: REFUSES when the LIVE reader is absent (`BUG-260906-02`). 235-14 closes G2 — polled window UNCHANGED, last-good filled unbounded for stopped only |
 | [`frontend/src/components/sources/WatchedFoldersSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourceswatchedfolderssectiontsx) | 4 / 1 / 935 | no (1 phase) | ⚠ row STALE at `2 / 0 / 393` — **it MORE THAN DOUBLED**. 235 paid the owed outcome line. ⭐ seam named NOW, not at threshold: extract `WatchedSourceCard` |
+| [`frontend/src/components/sources/watchProductMark.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourceswatchproductmarkts) | 0 / 0 / 38 | no (new) | young (240) — which PRODUCT a watched folder came from, read from its ADDRESS. ⛔ Never from `service_id`: Gmail and Drive share one connection |
 | [`frontend/src/components/sources/CreateWatchModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcescreatewatchmodaltsx) | 4 / 1 / 283 | no (1 phase) | honoured by construction (**240**): byte-unchanged. ⛔ Its auto-select of `capable[0]` is why BUG-260908-02 mattered most here |
 | [`frontend/src/components/layout/NavPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutnavpaneltsx) | 20 / 11 / 329 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **11 phases** — row added 235. honoured by construction: 2 optional props, 0 `useState`. Unwired ⇒ silence |
 | [`frontend/src/App.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcapptsx) | 31 / 23 / 351 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **23 phases** — row added 235. honoured by construction: one navigator, the shape `handleOpenStudio` already had |
@@ -9635,6 +9636,44 @@ path in four recorded places, and the divergence is discovered rather than preve
 extraction worth taking is a single ordered pipeline both paths execute — at which point "did this
 path run step N" stops being a question a comment answers.
 
+
+
+
+---
+
+## frontend/src/components/sources/watchProductMark.ts
+
+**Derived 2026-09-09 (Phase 240):** `0 / 0 / 38`. New in this phase.
+
+**What it is.** One function: which product a watched folder belongs to, so its row can wear that
+product's mark.
+
+⛔ **WHY IT DOES NOT READ `service_id`, AND WHY THAT IS THE WHOLE POINT.** Gmail and Drive are the
+**same connection** in this product — one Google row, one token, one consent, one place to revoke
+(`oauth_service.py`, BUS-037 §B). So `service_id` is `"google"` for both, and a row keyed on it
+draws the SAME icon on a mail watch and a Drive watch. That is exactly the ambiguity the operator
+reported after Phase 240 shipped mail.
+
+⭐ **The folder ID already answers it with certainty**: a mail folder is addressed
+`mailbox:<label>`, a Drive folder is not. **Read the address, never the vendor name.**
+
+⚠ **THIS PROJECT HAS PAID FOR THE ALTERNATIVE.** Phase 238's rewritten boundary fence found that
+`import_service.fetch_cloud_file` fell back to the Drive adapter when `"google"` appeared in a
+connection's **DISPLAY NAME** — so a Microsoft connection someone had typed *"Google migration"*
+into would have been read by the Google Drive adapter holding a Microsoft token. Deriving identity
+from prose is the bug; deriving it from a structural address is not.
+
+**Binding invariants.**
+- ⛔ **Return `null` rather than borrow a mark.** `connectionMark.tsx` records the rule in its own
+  words: borrowing Gmail's mark for another vendor's mail is the ROADMAP's own named mistake. No
+  mark is honest; a wrong mark is not.
+- ⚠ The marks themselves stay SINGLE-SOURCE from the installed icon packs. This module returns a
+  KEY into `connectionMark.tsx`'s table and draws nothing itself, so the icon convention has one
+  home.
+
+**Named seam for the next phase.** When a second mail family lands (`SEED-260`, Graph mail), this
+function gains one row — `microsoft` + a `mailbox:` address → `microsoft-outlook` — and nothing
+else changes. If it needs a branch instead of a row, the shape was drawn wrong.
 
 
 ---

@@ -2888,6 +2888,7 @@ const BASELINE = {
   "ConnectedSourceSection.test.tsx": 5,
   "CreateWatchModal.test.tsx": 5,
   "DocumentConversationSection.test.tsx": 8,
+  "watchProductMark.test.ts": 4,
 
   // ══════════════════════════════════════════════════════════════════════════════
   // Added at Phase 214's CLOSE (plan `214-15`), collected here AFTER every file
@@ -4617,6 +4618,8 @@ const TARGETS = [
   "src/components/sources/__tests__/ConnectedSourceSection.test.tsx",
   "src/components/sources/__tests__/CreateWatchModal.test.tsx",
   "src/components/metadata/DocumentConversationSection.test.tsx",
+  // ⚠ Named, not a directory: `src/components/sources` is STILL not a TARGETS directory entry.
+  "src/components/sources/watchProductMark.test.ts",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
