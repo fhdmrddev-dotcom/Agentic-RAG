@@ -215,6 +215,16 @@ DO $$ BEGIN
     CREATE PUBLICATION supabase_realtime;
   END IF;
 END $$;
+
+-- ⚠ MEASURED, not assumed (241-02 Task 3). Without these grants the bench builds
+-- perfectly and then answers `42501 permission denied for schema auth` on the FIRST
+-- query issued as `authenticated` -- which is every query the harness will make, since
+-- RLS policy expressions evaluate `auth.uid()` as the CALLING role. Real Supabase ships
+-- these grants on its own `auth` schema; a stub that omits them is not faithful.
+GRANT USAGE ON SCHEMA auth TO anon, authenticated, service_role;
+GRANT SELECT ON auth.users TO authenticated, service_role;
+GRANT USAGE ON SCHEMA storage TO anon, authenticated, service_role;
+GRANT SELECT ON storage.buckets, storage.objects TO authenticated, service_role;
 """
 
 # full-schema.sql installs `on_auth_user_created`, which provisions a personal org for
@@ -528,15 +538,29 @@ def format_vector(values: Sequence[float]) -> str:
 
 
 def perturb(vector: Sequence[float], sigma: float, rng: random.Random) -> list[float]:
-    """A real embedding + per-dimension Gaussian noise, L2-renormalised.
+    """A real embedding + Gaussian noise at ``sigma`` × its norm, L2-renormalised.
 
     ⛔ This is the whole reason no provider is called. Uniform random vectors would make
     HNSW recall unrepresentative — there would be no cluster geometry for the graph to
     reflect — while a real embedding nudged by noise keeps the geometry and costs
     nothing. ``random.gauss`` is deliberate: numpy is not a declared dependency of this
     project and is imported nowhere under ``backend/app``.
+
+    ⚠ ``sigma`` is a NOISE-TO-SIGNAL RATIO, not a per-dimension standard deviation, and
+    that distinction was measured rather than reasoned about. An embedding is unit-norm
+    over 1536 dimensions, so a typical component is ~1/√1536 ≈ 0.026; a per-dimension
+    σ = 0.15 therefore adds noise with ~5.9× the norm of the signal and produces
+    near-random vectors. Measured at that setting: the nearest non-self neighbour sat at
+    **0.17** similarity — below ``match_document_chunks``'s 0.3 threshold — so every
+    probe returned nothing and the bench measured a threshold, not a recall curve.
+    Scaling by ‖v‖/√d makes cos(v, perturbed) ≈ 1/√(1+σ²): σ = 0.15 → ≈ 0.989.
     """
-    noisy = [v + rng.gauss(0.0, sigma) for v in vector]
+    dimensions = len(vector)
+    if dimensions == 0:
+        return list(vector)
+    signal_norm = math.sqrt(sum(v * v for v in vector))
+    per_dimension = sigma * (signal_norm or 1.0) / math.sqrt(dimensions)
+    noisy = [v + rng.gauss(0.0, per_dimension) for v in vector]
     norm = math.sqrt(sum(v * v for v in noisy))
     if norm == 0.0:
         return list(vector)
@@ -820,7 +844,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="comma-separated tenant chunk shares of the WHOLE corpus",
     )
     parser.add_argument(
-        "--sigma", type=float, default=0.15, help="perturbation noise sigma"
+        "--sigma",
+        type=float,
+        default=0.15,
+        help="perturbation noise-to-signal NORM RATIO (not a per-dimension sigma)",
     )
     parser.add_argument(
         "--seed", type=int, default=241, help="fixed by default so two builds compare"
