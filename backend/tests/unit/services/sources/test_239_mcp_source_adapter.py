@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import ast
 import base64
+import importlib
 import json as jsonlib
 from pathlib import Path
 from typing import Any
@@ -704,11 +705,80 @@ class TestSecurityBoundary:
         # …and it does not fire on an ordinary listing key.
         assert _hint_comparisons('if k == "modified_at": pass\n') == []
 
+    def test_that_the_fence_can_fire_on_the_CR_02_SHAPE_SPECIFICALLY(self):
+        """⭐ THE POSITIVE CONTROL FOR `description`, PLANTED AS THE DEFECT ACTUALLY LOOKED.
+
+        ⛔ Not a paraphrase — this is the shipped code CR-02 was written against, restored
+        verbatim from `fe6da7122^`::
+
+            haystack = f"{name} {description}".lower()
+
+        with `description` fetched one line above it. The fix removed that read and explained
+        itself in a docstring, and a docstring is not a guard: the whole of SEED-270 is that
+        this project keeps enforcing invariants with prose and then shipping their violation
+        green. So the fence must SEE the read, and this control is the proof that it does.
+
+        ⚠ The `f"{name} {description}"` line itself is INVISIBLE to an AST fence — inside an
+        f-string `description` is a `Name`, not a string constant. What is visible, and what
+        is therefore the thing asserted, is the FETCH: `item.get("description")`,
+        `item["description"]`, `k == "description"`. That is the entry point — a server-authored
+        field cannot decide anything without first being read out of the server's own dict —
+        so catching the fetch catches the class, and catching it is enough.
+        """
+        planted_get = (
+            'def infer(item):\n'
+            '    name = str(item.get("name") or "")\n'
+            '    description = str(item.get("description") or "")\n'
+            '    haystack = f"{name} {description}".lower()\n'
+            '    return haystack\n'
+        )
+        assert _hint_comparisons(planted_get), (
+            "the hint fence cannot see a server-authored `description` being read — which is "
+            "exactly the field CR-02 let a hostile server choose our reader with"
+        )
+        assert _hint_comparisons('x = item["description"]\n')
+        assert _hint_comparisons('if key == "description": pass\n')
+        # ⚠ …and it still does not fire on a field the SERVER does not author. `filename`
+        #   comes off a listing entry the same way `description` comes off a tool, so a fence
+        #   that caught both would be catching "reads a dict", not "trusts the other end".
+        assert _hint_comparisons('if k == "filename": pass\n') == []
+
+    def test_NEITHER_MODULE_lets_a_server_authored_field_decide(self):
+        """⛔ CR-02's own last paragraph, which the fix did not carry out.
+
+        The review asked for the fence to *"cover `connector_service.infer_source_tools`, so
+        `description` gains the same structural treatment `annotations` has"*. The fix moved
+        the detector into `mcp_source.py` instead — a real improvement (ME-05), and it means
+        the scanned file now holds the detector. But `description` was never added to the key
+        set, so the fence still could not see the defect if it came back, in EITHER module.
+
+        ⚠ BOTH MODULES ARE SCANNED, and the second one is the point rather than a belt-and-
+        braces flourish: `connector_service.py` is where the defect actually lived, it is where
+        discovery still runs (`discover_connection_tools` writes `config["source_tools"]`), and
+        a fence that scans only the file the code was moved INTO would go green if it moved
+        back out. Neither module reads a hint key today — verified before this fence was
+        written, so it is not asserting an accident.
+        """
+        for module_name in _HINT_FENCED_MODULES:
+            mod = importlib.import_module(module_name)
+            findings = _hint_comparisons(Path(mod.__file__).read_text(encoding="utf-8"))
+            assert not findings, (
+                f"{module_name} branches on a field the REMOTE SERVER authors: "
+                + ", ".join(f"line {ln}: {lit!r}" for ln, lit in findings)
+            )
+
 
 #: Keys a REMOTE MCP server controls. Matched in comparisons, membership tests and
 #: subscripts, because `tool["annotations"]["readOnlyHint"]` reaching an `if` is the shape
 #: TM-239-02 forbids and none of those is a `Compare` node.
 _HINT_KEYS = ("readonlyhint", "annotations", "destructivehint", "idempotenthint", "openworldhint")
+
+#: The modules in which a server-authored field may not decide anything. Two, not one — see
+#: `test_NEITHER_MODULE_lets_a_server_authored_field_decide` for why the second is load-bearing.
+_HINT_FENCED_MODULES: tuple[str, ...] = (
+    "app.services.sources.adapters.mcp_source",
+    "app.services.connector_service",
+)
 
 
 def _hint_comparisons(source: str) -> list[tuple[int, str]]:
