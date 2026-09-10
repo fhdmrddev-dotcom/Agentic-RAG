@@ -452,6 +452,105 @@ async def test_a_mode_outside_the_enum_never_reaches_the_database():
     assert "hnsw.iterative_scan" not in _names(conn)
 
 
+# -- WR-05 (241-REVIEW): the second door exists for iterative_scan, not for ef_search ----
+#
+# The module validates `iterative_scan` a SECOND time at the apply boundary and writes the
+# reason out: *"this value is also READ BACK OUT of a database column that a hand-edit in the
+# SQL editor could have written."* Every word of that applied to `ef_search` too, and
+# `ef_search` had only `int()` -- `HNSW_EF_SEARCH_FLOOR` / `_CEILING` were not even imported
+# here.
+#
+# AND THERE IS A ROUTE PAST BOTH OTHER DOORS. `config.py` declares `hnsw_ef_search: int = 40`
+# on a `BaseSettings`, so `HNSW_EF_SEARCH=250000` in `backend/.env` is read by `_val`'s env
+# link whenever the column is NULL -- the state of every row until an operator sets a value.
+# That number has seen neither the API's 400 nor migration 176's CHECK.
+#
+# The observable cost is a WARNING logged on EVERY SINGLE SEARCH, forever, with the tuning
+# silently inert -- `_set_local` swallows `InvalidParameterValueError` by design, which is
+# right for "this server is too old" and wrong for "nobody chose this number".
+
+
+async def test_an_ef_search_outside_the_bounds_never_reaches_the_database():
+    """The second door for `ef_search`, symmetric with the one `iterative_scan` already had."""
+    rt = _tuning()
+    for bad in (250_000, 1001, 9, 0, -1):
+        conn = _RecordingConn()
+        await rt.apply_hnsw_session_knobs(conn, ef_search=bad, iterative_scan=None)
+        assert "hnsw.ef_search" not in _names(conn), (
+            f"ef_search={bad!r} was issued to the server; it is outside "
+            f"{us.HNSW_EF_SEARCH_FLOOR}..{us.HNSW_EF_SEARCH_CEILING} and nobody could have "
+            "chosen it through the API"
+        )
+
+
+async def test_an_out_of_range_ef_search_does_not_cost_the_OTHER_knob():
+    """Degrade the TUNING, never the SEARCH -- and per knob, exactly as an unknown GUC does.
+
+    An unusable `ef_search` is the same class of event as a `hnsw.iterative_scan` an old server
+    does not know: it costs the knob it names and nothing else. This is deliberately NOT the
+    early `return` the review's suggested patch sketched, because that arm would let one
+    rejected number silently discard a mode the operator did choose.
+    """
+    rt = _tuning()
+    conn = _RecordingConn()
+    await rt.apply_hnsw_session_knobs(conn, ef_search=250_000, iterative_scan="relaxed_order")
+    assert "hnsw.ef_search" not in _names(conn)
+    assert "hnsw.iterative_scan" in _names(conn), (
+        "a rejected ef_search took the iterative_scan mode down with it"
+    )
+
+
+@pytest.mark.parametrize("ok", [10, 200, 1000])
+async def test_the_apply_boundary_bounds_are_INCLUSIVE(ok):
+    """POSITIVE CONTROL. A clamp that refuses everything would satisfy the case above.
+
+    The two boundaries are the ones the API serves to the form and accepts on the way in; a
+    value an operator may legitimately save must not be discarded on the way out.
+    """
+    rt = _tuning()
+    conn = _RecordingConn()
+    await rt.apply_hnsw_session_knobs(conn, ef_search=ok, iterative_scan=None)
+    assert _names(conn) == ["hnsw.ef_search"], (
+        f"ef_search={ok} is inside the API's own bounds but was not applied"
+    )
+
+
+def test_the_apply_boundary_reads_THE_bounds_rather_than_re_typing_them():
+    """SEED-258's shape: one home for the numbers.
+
+    A re-typed copy here would drift from the ones the API refuses on and the UI renders, and
+    the drift would be invisible -- the knob would simply stop working at some value nobody
+    could name.
+    """
+    rt = _tuning()
+    assert rt.HNSW_EF_SEARCH_FLOOR is us.HNSW_EF_SEARCH_FLOOR
+    assert rt.HNSW_EF_SEARCH_CEILING is us.HNSW_EF_SEARCH_CEILING
+
+
+async def test_the_config_env_route_is_bounded_too(monkeypatch):
+    """WR-05's actual failure scenario, driven end to end rather than described.
+
+    An operator (or a copied `.env.example`) carries `HNSW_EF_SEARCH=250000`. No column is set,
+    so `_val` returns the env field, the settings object carries it, and `_vector_search` hands
+    it straight to the apply boundary. Neither the API nor the CHECK constraint was ever
+    consulted, because neither was ever on this path.
+    """
+    monkeypatch.setattr(env_settings, "hnsw_ef_search", 250_000)
+    s = _build_settings_from_row({})
+    assert s.hnsw_ef_search == 250_000, (
+        "the env route no longer reaches the settings object -- re-derive this case rather "
+        "than deleting it"
+    )
+
+    rt = _tuning()
+    conn = _RecordingConn()
+    await rt.apply_hnsw_session_knobs(conn, ef_search=s.hnsw_ef_search, iterative_scan=None)
+    assert "hnsw.ef_search" not in _names(conn), (
+        "a value that reached the settings object only through backend/.env was issued to "
+        "the server; it passed neither the API 400 nor migration 176's CHECK"
+    )
+
+
 async def test_ef_search_is_coerced_through_int_before_it_is_bound():
     """Belt and braces beside the bind parameter: what travels is a plain integer's text, never
     whatever object a caller happened to hold."""
