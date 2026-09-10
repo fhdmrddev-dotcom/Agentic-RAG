@@ -771,7 +771,29 @@ class TestSecurityBoundary:
 #: Keys a REMOTE MCP server controls. Matched in comparisons, membership tests and
 #: subscripts, because `tool["annotations"]["readOnlyHint"]` reaching an `if` is the shape
 #: TM-239-02 forbids and none of those is a `Compare` node.
-_HINT_KEYS = ("readonlyhint", "annotations", "destructivehint", "idempotenthint", "openworldhint")
+#:
+#: ⛔ `description` IS ONE OF THEM, AND ITS ABSENCE HERE WAS CR-02 (added 239-12). It is not
+#: an MCP *hint* — it is a free-text sentence — and that is precisely why it was trusted while
+#: `annotations` was fenced: the same trust class wearing a friendlier name. A server wrote
+#: *"Retrieve the contents of a file at the given path."* on a tool called `purge_documents`
+#: and this app bound it as the READER, then invoked it unattended on every file in the folder.
+#: `readOnlyHint` never got to do anything that bad.
+#:
+#: ⚠ THE COST OF LISTING IT IS REAL AND IS ACCEPTED: neither fenced module may now read
+#: `description` even to CARRY it to a human — `_hint_comparisons` cannot tell a display from
+#: a decision. `annotations` has always carried that same cost here. If a future phase needs
+#: to show a person what a server said about its own tool, it does that ABOVE these two
+#: modules (the discovery cache already holds the raw list), or it adds a named exemption with
+#: its reason in this file. An exemption that is argued is auditable; a key that was never
+#: listed is not.
+_HINT_KEYS = (
+    "readonlyhint",
+    "annotations",
+    "destructivehint",
+    "idempotenthint",
+    "openworldhint",
+    "description",
+)
 
 #: The modules in which a server-authored field may not decide anything. Two, not one — see
 #: `test_NEITHER_MODULE_lets_a_server_authored_field_decide` for why the second is load-bearing.
