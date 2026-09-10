@@ -523,11 +523,27 @@ async def _apply_hnsw_knobs(
     A GUC value cannot be a bind parameter, so both are interpolated — and both are therefore
     constrained first: ``ef_search`` through ``int()`` and a range, ``iterative_scan`` through a
     closed allow-list. An unknown value refuses (T-241-02).
+
+    ⛔ THAT SENTENCE USED TO BE FALSE OF THIS FUNCTION (241-REVIEW WR-08). ``validate_knobs``
+    was called only by :func:`run_measurement`, while :func:`measure_layer1` and
+    :func:`measure_layer2` are PUBLIC, take ``iterative_scan: str | None`` and passed it
+    straight through -- so::
+
+        measure_layer1(conn, ..., iterative_scan="'; DROP TABLE public.documents --")
+
+    executed ``SET LOCAL hnsw.iterative_scan = ''; DROP TABLE public.documents --'``
+    verbatim, on a connection carrying ``SET LOCAL ROLE authenticated``. Measured through the
+    public entry point, not supposed.
+
+    The fix is to validate WHERE THE INTERPOLATION HAPPENS, which is also what makes the
+    docstring true. ``validate_knobs`` is idempotent, so ``run_measurement`` -- which already
+    validates before it gets here -- is unchanged by it.
     """
-    if ef_search is not None:
-        await conn.execute(f"SET LOCAL hnsw.ef_search = {int(ef_search)}")
-    if iterative_scan is not None:
-        await conn.execute(f"SET LOCAL hnsw.iterative_scan = '{iterative_scan}'")
+    checked_ef, checked_scan = validate_knobs(ef_search, iterative_scan)
+    if checked_ef is not None:
+        await conn.execute(f"SET LOCAL hnsw.ef_search = {checked_ef}")
+    if checked_scan is not None:
+        await conn.execute(f"SET LOCAL hnsw.iterative_scan = '{checked_scan}'")
 
 
 def validate_knobs(ef_search: Any, iterative_scan: Any) -> tuple[int | None, str | None]:
@@ -568,7 +584,9 @@ async def _match(
     """One call to the shipped RPC. Every filter value is a BIND PARAMETER (T-241-02).
 
     No f-string ever builds a ``WHERE`` clause here; the only interpolated text in this module is
-    the two allow-listed GUC values in :func:`_apply_hnsw_knobs`.
+    the two allow-listed GUC values in :func:`_apply_hnsw_knobs` -- and that function performs
+    the allow-listing itself, so this is a claim about the MODULE and not about one caller of it
+    (241-REVIEW WR-08).
     """
     return await conn.fetch(
         _MATCH_SQL,
