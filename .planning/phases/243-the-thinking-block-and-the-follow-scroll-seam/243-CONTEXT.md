@@ -252,6 +252,148 @@ continues.** No independent §6.3 reviewer exists.
 - Mechanical evidence — a driven fence, a byte-identical file, a measured count — is **not**
   weakened by solo running. **Judgement calls are.** Say which is which.
 
+### D-243-13 — ⚠⚠ `"Thought for N seconds"` HAS NO HONEST SOURCE TODAY. Do not ship the sketch's number.
+
+**Found by the pattern-mapper and then verified in both files, 2026-09-11.** This is the phase's
+one genuine design gap, and it would ship as a fabricated value if nobody named it.
+
+**The sketch computes the number from the character count:**
+
+```js
+// sketches/234-the-thinking-block/index.html:338
+const secs = Math.max(1, Math.round(chars / 180));
+```
+
+⛔ **That is a demo affordance so the mockup has a plausible label at every Scale setting — it is
+NOT a design decision, and a plan that ports it ships a number derived from string length and
+presented as a duration.** That is the same sin as the `count` the fold control already forbids
+(*"reasoning has no countable unit and inventing one would be fabricated precision"*), one unit over.
+
+**And there is no real source to swap in.** Measured:
+
+- `messages.reasoning_content` is the only reasoning column — **no `reasoning_started_at` /
+  `reasoning_completed_at` anywhere** in the model.
+- `RunCard`'s elapsed machinery (`RunCard.tsx:143-198`, ~55 lines) measures **the whole run** —
+  `runStartMs` → `completedAt` — which **includes every tool call**. Labelling that "thought for" is
+  wrong by construction on any tool-bearing turn, which is the majority shape.
+
+⭐ **The precedent for the right answer is already in this very file, and it was paid for by a
+shipped bug.** `RunCard.tsx:181-186`:
+
+> *terminal + no completedAt + no frozenEnd → **NO duration (the honesty rule)***
+
+with `wasStreamingRef` distinguishing a run we actually watched from a reloaded one, because
+capturing `Date.now()` against a stale `created_at` is *"the `BUG-260606-02` **1440m** lie"*.
+
+**So the decision, and it is a decision rather than an option list:**
+
+1. **Measure it client-side, live.** Stamp a start on the **first** `onReasoningDelta` and an end
+   when reasoning stops (the first content delta, or `onDone`). The provider already carries
+   closure state for exactly this kind of thing — `let currentIteration = 0`,
+   `StreamsProvider.tsx:410`.
+2. ⛔ **When it is not honestly known, show NO duration** — the label falls back to the shipped
+   `"Thinking"` / `"Thought"`. **A reloaded or DB-loaded message has no measured reasoning span and
+   must not invent one.** That is `RunCard`'s own `hasElapsed` gate, applied to a second value.
+3. ⛔ **No migration.** Persisting the span is a schema change and this phase declares none. If a
+   plan concludes the label is worthless without persistence, that is a **finding to state**, not a
+   migration to slip in — plant a seed and ship the honest fallback.
+
+⚠ **The consequence for criterion 1 is concrete:** the sketch is the acceptance bar for *shape*,
+and on this one value the shipped surface will **deliberately differ from it** — a historical
+message will read `"Thinking"` where the mockup reads `"Thought for 6 seconds"`. **Say so in
+VERIFICATION.md.** An undeclared difference from the bar is drift; a declared one with a reason is
+a decision.
+
+### D-243-14 — ⚠ The RunCard mount is `MessageItem.tsx:359-361`, NOT `:425`
+
+Both sketches and the requirements table above cite `MessageItem.tsx:425` as the tool-gated RunCard
+mount. **Measured at HEAD it is not.** `:425` is the **`StreamingNarration`** branch inside the
+content block; the RunCard mount is:
+
+```tsx
+// MessageItem.tsx:359-361
+{message.tool_calls && message.tool_calls.length > 0 && (
+  <RunCard message={message} isStreaming={isStreaming} />
+)}
+```
+
+⭐ **Every conclusion drawn from the wrong line still holds**, because the two sites share the same
+predicate (`tool_calls.length > 0`) — which is exactly why the error survived three documents. **But
+a plan that edits `:425` intending to change the RunCard mount edits the wrong construct**, and the
+two want opposite treatment: `:359-361` is where `ThinkingBlock` mounts **unconditionally**
+(D-243-01), while `:425` is where CHAT-05's answer must stop being routed into the fold (D-243-06).
+
+⚠ Recorded rather than silently corrected upstream: the sketch READMEs keep their text, and this is
+the correction beside it.
+
+### D-243-15 — The coalescing choice is PRODUCER-side, and the reason is D-243-04
+
+Two shipped mechanisms exist and they sit at different layers. The pattern-mapper measured both:
+
+| | `makeThrottle` on the delta callbacks (**producer**) | `useDeferredValue` in `ThinkingBlock` (**consumer**) |
+|---|---|---|
+| fold repaint cadence | coalesced ✅ | coalesced ✅ |
+| `setMessages` frequency | **reduced** | unchanged |
+| `MessageList.tsx:141-176` run frequency (`messages` is in its dep array) | **reduced** ✅ | **unchanged** ❌ |
+| satisfies CHAT-02 | yes | yes |
+| satisfies **D-243-04**'s *"one line of code"* linkage to CHAT-03 | **yes** | **no** |
+
+⇒ **Only the producer-side throttle has the property D-243-04 is written about.** A consumer-side
+`useDeferredValue` would calm the fold and leave the scroll effect running per token — closing
+CHAT-02's flicker criterion while touching CHAT-03 not at all, which is precisely the *"fixed one
+and re-broke the other"* failure the ROADMAP names. **Choose the producer side, and say why.**
+
+⚠ `useDeferredValue` is nonetheless the project's one shipped in-render coalescer
+(`components/chat/tool-bodies/ShikiCode.tsx:109`, Phase 075.9 T4) — cite it if a consumer-side
+assist is added *on top of* the producer throttle, never *instead of* it. `useTransition` and
+`startTransition` occur **zero** times in `frontend/src`; there is no rAF-batching precedent.
+
+⛔ **TWO TRAPS, both measured, both fatal if missed:**
+
+1. **`makeThrottle` is LAST-WRITE-WINS, not accumulate** (`lib/throttle.ts:19,28` — `lastArgs =
+   args` discards the previous call). The accumulation currently lives *inside* the `setMessages`
+   updater (`m.content + delta`). **Wrapping `onDelta` in `makeThrottle` naively DROPS TOKENS.**
+   The shape is a closure accumulator flushed *through* the throttle, with `.flush()` at the
+   terminal edges (`onDone`, `onTerminal`) — mirroring the cache writer's own flush discipline.
+2. **`makeThrottle` has no leading edge** (`throttle.ts:8-9`), so the first token's paint is delayed
+   by up to `waitMs`. At the cache writer's 500 ms that is a visible half-second of nothing before
+   a reply starts. **Pick the window deliberately and state the number.**
+
+### D-243-16 — The extraction has NO safety net, and the 227 template is how it gets one
+
+⛔ **Zero tests assert the thinking block.** `grep -rn "thinking-trigger|thinking-row"` across every
+suite → **0 matches**. Reasoning is not one of `RunCard.characterization.test.tsx`'s eight
+characterized states. ⛔ **Zero tests assert the scroll effect's behaviour** either —
+`MessageList.test.tsx:61-65` stubs `scrollIntoView` to a **no-op**, so nothing in the tree can see
+how many times the effect scrolls or with which `behavior`.
+
+⇒ *"the extraction changed no pixel"* is currently an **assertion, not a measurement**.
+
+⭐ **Phase 227 already solved this on this exact file** and its template is the instruction:
+characterization cases written against the **unmoved** `RunCard` first, then the code moves and the
+cases must still pass. **Write the net before the move, not after.**
+
+⚠ And D-243-05's RED drive has a precise target: the re-arm condition at
+`hooks/useFollowScroll.ts:196-201`, with `useFollowScroll.test.ts:191-227` as the case shape to
+**extend** — never a new mechanism.
+
+### D-243-17 — Gate-knob shapes, measured
+
+- `BASELINE` — `scripts/vitest-count-gate.cjs:122`, keyed by **bare filename** (unique tree-wide).
+- `TARGETS` — `:3637`, keyed by **frontend-relative path**.
+- ⚠ **`src/components/chat` has NO directory entry** — all 21 chat entries are file-level, so a new
+  suite is invisible to both knobs until it is added to each **by hand**.
+- ⛔ **`src/providers` is in NEITHER knob** — **every `StreamsProvider` suite is currently ungated.**
+  A plan touching `StreamsProvider` and relying on an existing suite to catch a regression is
+  relying on a suite the gate does not run.
+
+### D-243-18 — The gate is RED at the base commit
+
+See `243-BASELINE.md`. `total 7940 · failed 2 · pinned total 7170`, both failures inherited and in
+`library/__tests__/sketchComposition.test.tsx`. ⛔ **`count gate OK` is NOT a reachable acceptance
+criterion here.** Criteria are written as a **set diff** against that file plus the explicitly-run
+in-scope suites.
+
 ## Non-goals — explicit scope fences
 
 | Not in this phase | Why |
