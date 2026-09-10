@@ -4,9 +4,9 @@ title: Scrolling up during a tool call snaps you back to the bottom — the smoo
 reported: 2026-08-23
 surface: Agentic-RAG
 severity: major
-status: open
+status: folded
 affected_areas: [frontend/streaming, frontend/chat, UX/scroll]
-folded_into: null
+folded_into: "243"        # CHAT-03, at /gsd:plan-phase 243, 2026-09-11
 verified_closed_by: null
 related_seeds: [SEED-008]
 re_open_trigger: null
@@ -102,3 +102,30 @@ A user who wants to read back must stop the run or wait for the tool to leave `p
 - `frontend/src/hooks/useFollowScroll.ts:66-86` — the guard and the re-arm branch
 - `frontend/src/components/chat/MessageList.tsx:113-149` — the auto-follow effect, both branches
 - Phase 095 Plan 04 (D-03) — the machine this defect defeats
+
+---
+
+## ⚠⚠ CORRECTION 2026-09-11 — THE ROOT CAUSE NAMED ABOVE NO LONGER EXISTS. The original is kept verbatim, never overwritten.
+
+Routed into **Phase 243 (CHAT-03)** at `/gsd:plan-phase 243`. Before planning, `hooks/useFollowScroll.ts`
+was opened at HEAD (`96adfd668`) rather than read off this report — and **every line this report blames
+has already been replaced**, by the `BUG-260904-02` work at Phase 228, **twelve days after this report
+was filed**:
+
+| This report says | Measured at HEAD 2026-09-11 |
+|---|---|
+| `beginProgrammaticScroll()` "clears it on the **next animation frame**" | ⛔ **Gone.** `PROGRAMMATIC_SCROLL_SETTLE_MS = 900` — the window lasts until the animation settles |
+| every late smooth-scroll event "passes the `isProgrammaticScrollRef` check" | ⛔ **Gone.** There are now **two** clocks: `programmaticUntilRef` (cancellable, gates the RELEASE) and `hardProgrammaticUntilRef` (**uncancellable**, gates the RE-ARM) |
+| those events "land in the **re-arm** branch: `setIsPinned(true)`" | A re-arm now additionally requires a **real user gesture** inside `USER_GESTURE_WINDOW_MS = 1500` — `noteUserGesture`, fed by wheel / touch / pointer / key, with direction |
+| the re-armed pin "re-enables the auto-follow effect" | The effect gates on `isPinnedNow()` (the **ref**, not the state), so it cannot fire on a stale `true` |
+
+⚠ **This does NOT mean the defect is gone** — it means **this report's explanation of it is.** The
+report's own header already warned it was *"Confirmed by reading, not yet by driving the browser."*
+It stayed `status: open` for nineteen days while the code underneath it changed, which is the
+project's recurring finding: **a register only knows the register below it, and the code is the bottom.**
+
+⛔ **Phase 243 may not "fix" CHAT-03 against this report.** Its first task is a TDD RED drive
+establishing what still reproduces at HEAD. If nothing does, CHAT-03 closes as *already-fixed-by-228*
+and this file is closed with the discharging commit named — **and that is a legitimate outcome, not
+a failure.** See `243-CONTEXT.md` → **D-243-05** for the candidate residual that must be checked
+rather than assumed (a ~600 ms window between the 900 ms hard clock and the 1500 ms gesture window).

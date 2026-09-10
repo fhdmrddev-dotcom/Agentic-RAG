@@ -6,7 +6,7 @@ surface: Agentic-RAG
 severity: minor                    # FIXED 2026-07-07 (same day) — scoped content reconcile at clean Deep terminal
 status: folded                    # folded_into 176 (2026-07-22) — extend reconcile to nav/mount path + live-verify; see 176-CONTEXT.md D-07/D-08
 affected_areas: [frontend/chat-ui, frontend/streaming]
-folded_into: "176"
+folded_into: "176, 243"   # residual #2 (the nav/mount path) routed to 243 / CHAT-05 at /gsd:plan-phase 243, 2026-09-11
 verified_closed_by: null
 related_seeds: [SEED-094]
 re_open_trigger: null
@@ -84,3 +84,21 @@ clean terminal → asserts content resolves to the persisted answer (fails pre-f
 - DB evidence: persisted assistant content = clean final answer for well-behaved
   runs (msg `d463ad62`), stray interim line for the GLM run (msg `c3bba996`).
 - Introduced by: `6df7f8a2` (StreamingNarration fold). Related: SEED-094.
+
+---
+
+## Residual #2 routed to Phase 243 (CHAT-05) — 2026-09-11
+
+Phase 176 shipped the **send-path** half of the reconcile. Residual #2 — *a run that finished while
+the operator was on another page, watched after navigation* — **still relies on a reload**, and it is
+now `CHAT-05` in Phase 243.
+
+⭐ **Sketch 234 found its cause while drawing something else, and it is not the reconcile.** The
+answer *is* already streaming: `StreamsProvider.tsx:415` appends `content: m.content + delta` per
+token. But on a tool-bearing run `MessageItem.tsx:425` routes that content into `StreamingNarration`
+— the folded italic gist — so it is written **inside the fold** and only surfaces when the run-end
+reconcile swaps in the persisted text. **That makes `CHAT-01` and `CHAT-05` one defect, not two.**
+
+⚠ Phase 243 must verify the **mount / navigation** path specifically, not only a live send — the
+send path is exactly the half that already shipped, so a live-send check would pass while the
+residual stands.
