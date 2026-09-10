@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v4.0
 milestone_name: Connected Knowledge
 status: executing
-last_updated: "2026-09-09T21:57:21.185Z"
-last_activity: 2026-09-09
+last_updated: "2026-09-10T05:20:00.000Z"
+last_activity: 2026-09-10
 progress:
   total_phases: 21
-  completed_phases: 10
-  total_plans: 62
-  completed_plans: 66
-  percent: 48
+  completed_phases: 11
+  total_plans: 66
+  completed_plans: 70
+  percent: 52
 ---
 
 # Project State
@@ -35,33 +35,113 @@ can be taught new behaviors (skills) that persist and can be shared.
 **Current focus:** **Milestone v4.0 Connected Knowledge — STARTED 2026-09-04.** Phase numbering
 continues at **228**. **Phase 241 — recall-at-corpus-scale is EXECUTING.**
 
-Phase: 241 — Recall at Corpus Scale (**CONTEXT GATHERED 2026-09-10** — ready to plan)
-Resume file: `.planning/phases/241-recall-at-corpus-scale/241-CONTEXT.md`
+Phase: 241 — Recall at Corpus Scale (✅ **BUILT AND MEASURED 2026-09-10 — SELF-VERIFIED, no independent reviewer**)
+Resume file: `.planning/phases/241-recall-at-corpus-scale/241-VALIDATION.md`
 
-> ⛔ **241's PREMISE WAS REFUTED AT DISCUSS TIME. Read 241-CONTEXT.md F-1 before planning.**
-> ROADMAP says *"its harness ships at Phase 230"* and that 241 owns *"the tuning and the verdict"*.
-> **The Phase 230 harness cannot report a failure.** `scripts/measure-recall.py` runs `content
-> ILIKE` — never the vector path — and scores every miss `rank = 1`; run live on the real corpus
-> it prints **MRR 1.000**. On a DB failure it prints a hardcoded synthetic benchmark and exits 0.
-> `test_retrieval_recall_baseline.py` asserts against a literal `simulated_ranks` list, and its
-> `assert count == 77` is **RED** against 159 actual documents — invisible to the canonical gate,
-> because `tests/eval` is not `tests/unit`. **There is no baseline. 241 builds the measurement too.**
+> ## ✅ PHASE 241 — ALL FOUR PLANS SHIPPED. The defect was real, and it is now measured.
 >
-> ⚠ **Two ROADMAP Flags for 241 are measured STALE** — the SEED-224 hook was already discharged at
-> Phase 217.1 (per-hit similarity DOES reach `citations[]` and `audit_log`), and the G-5 triple is
-> `18 / 10 / 423`, not `17 / 9 / 362`. Both corrected in CONTEXT.md (F-7, F-8), originals kept.
+> **The premise was refuted at discuss time and that held all the way through:** there was no
+> Phase 230 baseline. `scripts/measure-recall.py` ran `content ILIKE`, never touched the vector
+> path, scored every miss `rank = 1` and printed **`MRR 1.000`** on the live corpus. 241 built the
+> measurement, built the subject, shipped the remedy and took the verdict.
 >
-> **Operator direction 2026-09-10:** solo — no bus, no Gemini, Claude executes end to end, and the
-> review is recorded as a **SELF-verification**, never as an independent §6.3 review. The remedy
-> ships as a **product capability**: `hnsw.ef_search` + `hnsw.iterative_scan` as user settings in
-> the existing Settings → Retrieval card, minimal hardcoded defaults, migration **176** (reserved).
+> ### The headline, measured on a 100,000-chunk bench (`k = 20`, 25 query vectors, seed 241)
 >
-> **Measured at 241's start, 2026-09-10:** backend baseline `71 failed / 4374 passed / 2 xfailed /
-> 2 xpassed` (at the ceiling, zero headroom) · local pgvector **0.8.0**, PostgreSQL **17.6** ·
-> `hnsw.ef_search = 40`, `hnsw.iterative_scan = off` · corpus **159 docs / 7,953 chunks / 3 orgs**
-> · `document_chunks` 155 MB + 68 MB HNSW index. ⛔ **Cloud pgvector parity is UNVERIFIED and gates
-> `iterative_scan` as the remedy.**
+> | Tenant share | `recall@20` at the shipped `ef_search = 40` | under-fill | at `ef_search = 200` |
+> |---|---|---|---|
+> | 0.2% | **0.040** | **0.960** | **1.000** |
+> | 2% | **0.068** | **0.932** | **1.000** |
+> | 20% | **0.360** | **0.588** | **1.000** |
+>
+> The ten evaluation probes score **`Hit@1 0.78`** at 7,959 chunks and **`0.44`** at 100,000 —
+> three named documents silently stop being found, with no error and a *faster* response.
+> `ef_search = 200` restores **0.78** exactly. **Even a tenant owning a fifth of the corpus loses
+> ~64% of the right answers on the shipped defaults.**
+>
+> ### Success criteria
+>
+> | | Verdict |
+> |---|---|
+> | SC#1 the same questions still work at scale | ⛔ **FAILED as shipped**, ✅ **met at `ef_search = 200`** — before/after on record |
+> | SC#2 a narrowed search returns what is there | 🟡 **HONESTLY-PARTIAL** — three reachable axes at `recall 1.000` in all 63 shape-runs; **connection-by-id and saved View DO NOT EXIST** and were deliberately not built (`SEED-265`) |
+> | SC#3 a reproducible number on local and cloud | ✅ **local**; 🟡 **cloud** — parity VERIFIED LIVE, the recall run ⛔ BLOCKED on a DSN |
+>
+> ### ⚠ Four measured surprises, none of them predicted by the plan
+>
+> 1. **The planned cloud parity test was REFUTED before it was believed.** A NULL
+>    `current_setting('hnsw.iterative_scan', true)` does **not** mean pgvector < 0.8 — the GUCs
+>    register on first extension use, proven against the LOCAL server of known version 0.8.0. The
+>    first cloud probe returned NULLs; read through the plan's rule it would have **withdrawn a
+>    working remedy from a fully capable server**. Cloud is at **exact parity: pgvector 0.8.0 /
+>    PG 17.6 / ef_search 40 / iterative_scan off**. See `241-PARITY-PROBE-CORRECTION.md`.
+> 2. **`iterative_scan` alone is NOT the remedy** — 0.494 / 0.564 / 0.684 at the shipped
+>    `ef_search`, leaving 11-13 of 25 query vectors under-filled. This **reverses `SEED-076` §3's
+>    lever ordering**: `ef_search` is the lever, `iterative_scan` is the companion.
+> 3. **The curve is NOT monotone. `ef_search = 1000` is reproducibly WORSE than 400** (1.000 →
+>    0.926), bimodally — 23 of 25 vectors perfect, two returning 1-2 rows of 20, same two indices
+>    on a full re-run. Unexplained, recorded rather than smoothed. ⛔ *"Set it as high as it
+>    goes"* is measurably wrong advice; **200** is what the evidence supports.
+> 4. **Adding a filter makes this product's search MORE accurate.** At the shipped configuration
+>    the 20% tenant's *unnarrowed* query returns 4-17 of 20 while its own `folder` / `metadata` /
+>    `source.system` subsets return 20/20. A superset returning fewer rows than its subset is
+>    impossible under one plan — the planner drops the HNSW index once a selective predicate is
+>    present. **The dangerous query is the broad one.**
+>
+> ### ⚠ Two defects in `supabase/full-schema.sql`, found by RUNNING it
+>
+> - It is `pg_dump --no-privileges` and `pg_default_acl` is **per-database**, so a plain Postgres
+>   database built from it has **no table ACLs**. The bench applied green, passed every schema
+>   check, and refused the first read with `42501 permission denied for table documents`.
+> - **`full-schema.sql:33` is `SET row_security = off;`** — a SESSION setting that survives the
+>   apply, leaving the applying connection with RLS disabled for everything it does afterwards.
+>
+> Both fixed in the bench builder, with a build-time guard that reads as `authenticated` and was
+> driven RED first. ⚠ Neither affects a **Supabase** one-paste bootstrap, which already carries
+> those privileges.
+>
+> ### ⛔ OWED — decisions, not omissions
+>
+> 1. **Cloud migration 176 at the next operator-triggered deploy.** Until then cloud has no
+>    `hnsw_ef_search` / `hnsw_iterative_scan` columns and the knobs cannot be changed in production.
+> 2. **The cloud AS-IS recall number + the D-15 proof the knobs change cloud behaviour** — blocked
+>    on a read-capable cloud DSN, which was never supplied to the executor. Must reuse the same
+>    `--probe-cache` file (md5 `5be60f80415a6a74b054e832653d5f48`).
+> 3. **An independent §6.3 review.** Claude planned, built and verified (D-17). **241 joins 238 and
+>    240 in this queue.**
+> 4. **`retrieval_service.py`'s G-5 extraction** — owed since 231, `19 / 11 / 456` re-derived at the
+>    close. 241 is the deliberate SECOND landing, capped at 11 lines by a fence driven RED at 13.
+>    **A third must propose the extraction FIRST.**
+> 5. **The `ef_search = 1000` non-monotonicity** — reproducible and unexplained.
+>
+> ### Gates at the close
+>
+> - **Backend:** `71 failed · 4452 passed · 2 xfailed · 2 xpassed · 0 collection errors` — the
+>   ceiling exactly, zero headroom, unchanged from the post-Wave-1 reading. No failure in any file
+>   this phase touched. (The 12 `^ERROR` lines are captured app logs; the summary carries no
+>   `errors` term.)
+> - **Ledger:** `ledger gate OK` — 249 scan-list rows. **Re-derived LAST** (D-11).
+> - **CLAUDE.md size:** `87114 chars · 58.1% of limit` — OK.
+> - **G-7:** `G-7 clear` — 4 plans, 0 gap-closure rounds.
+> - **Vitest count gate:** ⛔ **RED — `total 7940 · failed 3 · pinned total 7170`, exit 1.** The
+>   totals are **identical** to the Wave-1 post-merge reading and **no per-file decrease** fired.
+>   The three failures are `WorkflowBuilderPage.canvas.test.tsx` and two in
+>   `sketchComposition.test.tsx` — **the same three cases with the same three signatures as
+>   `241-03`'s red run and SEED-171's 2026-09-06 sighting.** This plan's entire diff is
+>   `scripts/build-recall-bench.py` + `supabase/full-schema.sql`; `git diff --numstat <base> HEAD
+>   -- frontend/` is **empty**. ⭐ Recorded as **provably unmodified**, never as "fine".
+>
+> ### Corpus provenance — and one number that moved
+>
+> Start: **159 documents / 7,955 chunks**. End: **160 / 7,959**. ⚠ **The delta was NOT the bench**
+> — it is one `.eml` message, 4 chunks, created `2026-09-10T04:00:56Z` by the product's own mail
+> path, inside the working window. The bench opened the source with server-enforced
+> `default_transaction_read_only = on` and each build's own before/after were equal. **A live dev
+> database is not a frozen object; the property that matters — the bench never wrote to it —
+> holds.** Bench torn down; `recall_bench` absent from `pg_database`.
+
 Prior: 240 — Mail Is a Shape, Not a Fourth Adapter (✅ **COMPLETE 2026-09-10 — reviewed, UAT driven**)
+
+**v4.0 status: 11 of 14 phases complete.** Remaining: **235** (The Source Says What It Did) and **238** (Microsoft Graph — built, unreviewed). 241 was the milestone's last planned phase and it is done.
 
 ## ✅ PHASE 240 — CLOSED 2026-09-10. Read the debt below before calling it clean.
 

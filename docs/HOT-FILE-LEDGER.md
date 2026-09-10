@@ -2073,7 +2073,7 @@ carries the verdict — ****the HOTTEST file in the repository** — ⚠ RE-DECL
 
 ### `backend/app/config.py`
 
-**Re-derived 2026-08-18 (plan `196-09`): `71 commits / 42 phases / 1285 L`** · six-digit dated quick-task
+**Re-derived 2026-08-18 (plan `196-09`): `71 commits / 42 phases / 1285 L`** ⚠ **RE-DERIVED at Phase 241's close (2026-09-10): `83 / 48 / 1506`.** Honoured by construction at 241: four hardcoded retrieval defaults added (`hnsw_ef_search=40`, `hnsw_iterative_scan='off'`, and the two memory companions `hnsw_max_scan_tuples`/`hnsw_scan_mem_multiplier`, which are deliberately NOT settings — a wrong value there is a memory footgun, not a tuning choice). No reader signature changed. ⛔ The `MODEL_CAPABILITIES` seam stays **OWED**. · six-digit dated quick-task
 buckets: **checked, none exist** · **G-5 FIRES** (42 phases vs threshold 3) — **the second-hottest file
 measured anywhere in this project, and it was structurally invisible to its own guardrail for the project's
 entire life.**
@@ -2351,7 +2351,7 @@ carries the verdict — **⚠ absent at 12 phases (added 196)** — and this is 
 
 ### `backend/app/api/settings.py`
 
-**Re-derived 2026-08-18 (plan `196-09`): `30 commits / 16 phases / 616 L`** · six-digit dated quick-task
+**Re-derived 2026-08-18 (plan `196-09`): `30 commits / 16 phases / 616 L`** ⚠ **RE-DERIVED at Phase 241's close (2026-09-10): `35 / 19 / 814`.** Honoured by construction at 241: both hnsw knobs on GET + PATCH, with the floor / ceiling / the three enum members **SERVED** rather than re-typed in the form, and a 400 that names the COST and not merely the range (SEED-258). · six-digit dated quick-task
 buckets: **checked, none exist** · **G-5 FIRES** (16 phases vs threshold 3) — absent from this ledger until now.
 
 **What Phase 196 did:** `196-07` added `disabled_models` to the `GET /settings/providers` response — one
@@ -6711,7 +6711,7 @@ On every chat send. Invisible to its own guardrail since the project began — t
 
 ### `backend/app/models/user_settings.py`
 
-**Triple at Phase 214's close (2026-08-28): `46 / 30 / 1352` — G-5: ⚠ **FIRES**.** ⚠ absent from BOTH for its ENTIRE LIFE at **30 phases** — row added 214; honoured by construction (214-14)
+**Triple at Phase 214's close (2026-08-28): `46 / 30 / 1352` — G-5: ⚠ **FIRES**.** ⚠ **RE-DERIVED at Phase 241's close (2026-09-10, `241-04`): `50 / 32 / 1561`** — the FOURTH consecutive close to find this row stale. Honoured by construction at 241: two model fields, two `_val` calls, and the `HNSW_EF_SEARCH_FLOOR/_CEILING` + `HNSW_ITERATIVE_SCAN_VALUES` constants in the SEED-258 home, re-exported by `api/settings.py` so a service never imports an API module. ⚠ absent from BOTH for its ENTIRE LIFE at **30 phases** — row added 214; honoured by construction (214-14)
 
 **The largest absence this ledger has recorded after `api.ts`.** 30 phases, 1352 lines, and `grep -c` in CLAUDE.md returned 0. 214-14 read the governed-feature defaults here and flipped `visual_workflow_canvas` to `everyone` at its COLD default while `live_connectors` stayed `off`.
 
@@ -6979,6 +6979,32 @@ in** — it was outside 233's blast radius. ⚠ The thing to eyeball on any widt
 
 **Triple re-derived 2026-08-28: `17 / 9 / 362` — G-5: ⚠ FIRES.** ⚠ Absent for its entire life at nine phases.
 
+⚠ **RE-DERIVED AT PHASE 241's CLOSE (2026-09-10, plan `241-04`, deliberately LAST): `19 / 11 / 456`.**
+Every earlier figure in this section is kept rather than overwritten — this is now the THIRD
+recorded drift on one row (`17/9/362` → `18/10/423` → **`19/11/456`**), and the row's own lesson is
+what predicted it: *a cell written MID-PHASE is a claim about a moving file.* 241-03 landed on this
+file and 241-04 re-derived the triple only after every other step, which is why this figure is the
+one to trust.
+
+⛔ **THE EXTRACTION IS STILL OWED, AND PHASE 241 IS THE SECOND LANDING — NOT A DISCHARGE.** Owed
+since Phase 231. `D-11` took this landing deliberately, with the cost named in advance: a
+migration-baked function-level `SET hnsw.ef_search` would have needed **zero** Python, but could
+never be changed from the UI, which is exactly what the operator asked for. So the landing was paid
+and then **capped** — the knob logic lives in the new `backend/app/services/retrieval_tuning.py` and
+this file's delta is a signature, a guard, a call and two argument expressions: **11 non-comment
+lines**, held by a fence that was driven RED at 13.
+
+⭐ **The obligation is written INTO THE FILE ITSELF, not only here**, because a ledger row is read by
+an auditor and a source file is read by the next author:
+
+> ⛔ **G-5 — READ THIS BEFORE ADDING ANYTHING ELSE HERE.** This file's extraction has been **OWED
+> since Phase 231** and this landing does NOT discharge it. It is the SECOND milestone landing,
+> permitted because the ROADMAP forbids a *third* without proposing the extraction first — so a
+> THIRD must propose that extraction before it adds behaviour.
+
+**A third landing must propose the extraction FIRST.** Do not edit this row to say the obligation
+was met.
+
 ⚠ **CORRECTION 2026-09-05 — THE PARAGRAPH BELOW WAS TRUE WHEN WRITTEN AND MY OWN NEXT COMMIT MADE
 IT FALSE. It is kept rather than overwritten, because the way it went stale is the finding.** At
 `11e7fd86c` this file genuinely was byte-unchanged by Phase 231 and the triple genuinely was
@@ -7013,6 +7039,21 @@ both 231 and 241).
 
 **Triple derived 2026-09-10 (Phase 241, at PLANNING time): `1 / 1 / 67` — G-5: no (1 phase).**
 
+⚠ **RE-DERIVED AT PHASE 241's CLOSE (2026-09-10, `241-04`): `2 / 2 / 978` — G-5: no (2 phases).**
+The planning-time figure `1 / 1 / 67` is kept above; the file grew **14x** inside one phase, which is
+what a rewrite-in-place looks like in a triple.
+
+⭐ **IT NOW HAS THE PROPERTY IT LACKED: it can report a failure.** Driven live for the first time at
+`241-04`, against the operator's real corpus, it returned **`Hit@1 0.78 · MRR 0.778`** with two
+honest misses and one target reported ABSENT and **excluded** from the metric — where its
+predecessor was structurally incapable of printing anything but `MRR 1.000`. It also **refused** for
+real during the same plan: pointed at a bench whose tables were unreadable as `authenticated`, it
+printed a refusal naming the host, wrote **no** report and exited non-zero.
+
+⚠ **Its binding invariant, and the one to preserve:** *could not measure* and *measured, and it was
+fine* must never share an exit code. `RecallUnmeasurable` raises; no function in the module returns
+metrics on an error path.
+
 ⚠ **IT HAD NO ROW AT ALL, for its entire life.** Added here because it was ABSENT, not because it is
 new — the same failure `config.py` suffered for the project's whole life. Phase 241's plan `241-01`
 rewrites it, and a `backend/app/` file with no row is permanently invisible to its own guardrail.
@@ -7041,6 +7082,19 @@ this file belongs in `backend/tests/unit/`.
 ### `backend/app/services/retrieval_tuning.py`
 
 **New at Phase 241 (`241-03`): `0 / 0 / new` — G-5: no (new).**
+
+⚠ **RE-DERIVED AT PHASE 241's CLOSE (2026-09-10, `241-04`): `1 / 1 / 161`.**
+
+⭐ **Its two knobs were MEASURED at `241-04`, and the measurement changed the advice.**
+`hnsw.ef_search` is the primary lever — `200` restores `recall@20 = 1.000` at every tenant
+selectivity measured (0.2% / 2% / 20%) against a shipped `40` that scores `0.040 / 0.068 / 0.360`.
+`hnsw.iterative_scan = relaxed_order` **alone** reaches only `0.494 / 0.564 / 0.684`, so it is the
+companion, not the remedy — the reverse of `SEED-076` §3's ordering.
+
+⛔ **DO NOT ADVISE RAISING `ef_search` TO ITS MAXIMUM.** `1000` measured *reproducibly worse* than
+`400` (recall 1.000 → 0.926), bimodally: 23 of 25 query vectors perfect and two returning 1-2 rows
+of 20, with the same two vector indices on a full re-run. Unexplained, and recorded rather than
+smoothed.
 
 ⭐ **IT EXISTS SO THAT THE LANDING ON `retrieval_service.py` STAYS THREE LINES.** `D-11` takes a
 deliberate SECOND milestone landing on a file whose extraction has been **OWED since Phase 231**, and
@@ -9440,9 +9494,9 @@ cells rot within days.
 | [`frontend/src/lib/api.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapits) | 187 / 110 / 422 | ⚠ **FIRES** | ✅ **SPLIT TAKEN (207)** — this path is the re-export BARREL. ⚠ **its 12 domain MODULES had no rows of their own until 214** |
 | [`frontend/src/types/index.ts`](docs/HOT-FILE-LEDGER.md#frontendsrctypesindexts) | 78 / 60 / 1331 | ⚠ **FIRES** | no seam proposed — a barrel of wire types; ⚠ absent until 196, at 56 phases (214) |
 | [`backend/app/main.py`](docs/HOT-FILE-LEDGER.md#backendappmainpy) | 82 / 59 / 950 | ⚠ **FIRES** | ⚠ row was STALE by **FOURTEEN PHASES** at `79 / 45 / 876`. honoured by construction (**BUG-260902-06**): one more start/stop pair beside the scheduler |
-| [`backend/app/config.py`](docs/HOT-FILE-LEDGER.md#backendappconfigpy) | 82 / 47 / 1489 | ⚠ **FIRES** | ⚠ row was STALE by **TEN PHASES** at `78 / 37 / 1428`. honoured by construction (230 / **235**) — 4 watch/health knobs; MODEL_CAPABILITIES-out seam stays OWED |
+| [`backend/app/config.py`](docs/HOT-FILE-LEDGER.md#backendappconfigpy) | 83 / 48 / 1506 | ⚠ **FIRES** | ⚠ STALE AGAIN at `82 / 47 / 1489` — the ELEVENTH phase to find this row wrong. honoured by construction (**241**): four hnsw defaults, no reader changed; MODEL_CAPABILITIES-out seam stays OWED |
 | [`backend/app/api/admin.py`](docs/HOT-FILE-LEDGER.md#backendappapiadminpy) | 33 / 13 / 1740 | ⚠ **FIRES** | ⚠ row was STALE at `32 / 12 / 1733`. honoured by construction (**BUG-260902-06**): two write seams swap invalidate for broadcast; the two WR-03 READ seams deliberately unchanged |
-| [`backend/app/api/settings.py`](docs/HOT-FILE-LEDGER.md#backendappapisettingspy) | 34 / 18 / 738 | ⚠ **FIRES** | ⚠ row was STALE at `30 / 16 / 639`. honoured by construction (**SEED-258**): the same four seams SEED-227 used; the refusal states the COST, not just the range |
+| [`backend/app/api/settings.py`](docs/HOT-FILE-LEDGER.md#backendappapisettingspy) | 35 / 19 / 814 | ⚠ **FIRES** | ⚠ STALE AGAIN at `34 / 18 / 738`. honoured by construction (**241-03**): the same four seams; bounds SERVED not re-typed, and the 400 names the COST |
 | [`backend/app/services/multimodal_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmultimodal_servicepy) | 14 / 7 / 984 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** — row added SEED-227, which is also where its silent truncation was found |
 | [`backend/app/api/documents.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentspy) | 87 / 34 / 2414 | ⚠ **FIRES** | ✅ **DISCHARGED AGAIN (240-03)** — the email-attachment loop extracted to `services/email_attachments.py`. 240-04 adds the conversation read |
 | [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 171 / 41 / 4850 | ⚠ **FIRES** | ⚠ row was STALE at `167 / 38 / 4786`. honoured by construction (**240**): three suites into BOTH knobs; verdict `7914 · 7149 · 247/247` |
@@ -9509,7 +9563,7 @@ cells rot within days.
 | [`backend/app/services/connectors/grants.py`](docs/HOT-FILE-LEDGER.md#backendappservicesconnectorsgrantspy) | 1 / 1 / 92 | no (1 phase) | ⚠ absent — row added 221. It is THE grant-time gate: 92 L deciding every connector call |
 | [`frontend/src/components/settings/connectionsCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectionscopyts) | 15 / 8 / 784 | ⚠ **FIRES** | no seam proposed — a vocabulary doing one thing many times is the right shape. ⚠ row was STALE at `13 / 7 / 737`. honoured by construction (**239-03**): one word, one union member. See §239-03 |
 | [`frontend/src/components/settings/connectionFormCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectionformcopyts) | 19 / 8 / 1631 | ⚠ **FIRES** | ⚠ row STALE TWICE (`15 / 8 / 1216`, `17 / 8 / 1293`). ⛔ 239-05 named the seam — `configFromDraft`'s ARM SET; 239-07 RODE it: one serializer both arms call. See §239-07 |
-| [`frontend/src/pages/SettingsPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagessettingspagetsx) | 43 / 22 / 1647 | ⚠ **FIRES** | ⚠ row was STALE at `38 / 21 / 1500`. honoured by construction (**239-10**) — one card MOUNTED, not authored; the tab-registration seam stays OWED |
+| [`frontend/src/pages/SettingsPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagessettingspagetsx) | 44 / 23 / 1738 | ⚠ **FIRES** | ⚠ STALE AGAIN at `43 / 22 / 1647`. honoured by construction (**241-03**) — two FieldRows on a SHIPPED card; the tab-registration seam stays OWED |
 | [`frontend/src/components/settings/SourceFileCeilingCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingssourcefileceilingcardtsx) | 1 / 1 / 117 | no (1 phase) | young (239-10) — ⚠ a row minted at creation reads `1 / 1` forever unless RE-DERIVED. Owns no number and no sentence |
 | [`frontend/src/components/settings/sourceCeilingCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingssourceceilingcopyts) | 1 / 1 / 109 | no (1 phase) | young (239-10) — the ONE number it owns (recommendation) is pinned to `user_settings.py` by a `?raw` test; the bounds are SERVED |
 | [`frontend/src/components/settings/ModelPillRow.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsmodelpillrowtsx) | 4 / 3 / 141 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent for its entire life — row added 2026-08-27 at 212's close, same D-22 pair as `SettingsPage.tsx` |
@@ -9533,7 +9587,7 @@ cells rot within days.
 | [`frontend/src/components/settings/grantsVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsgrantsvocabularyts) | 3 / 2 / 115 | no (2 phases) | ⚠ absent for its entire life — row added 221-02. There is deliberately NO `READY` string in it |
 | [`backend/app/services/connector_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesconnector_servicepy) | 25 / 9 / 1772 | ⚠ **FIRES** | honoured by construction (**239-06**): the write boundary knows a mapping KEY from a tool name by ALLOW-LIST — an unknown key is still read as a tool name and still refused |
 | [`backend/app/models/message.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsmessagepy) | 17 / 10 / 124 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **8 phases** — row added 214; honoured by construction (214-16) |
-| [`backend/app/models/user_settings.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsuser_settingspy) | 49 / 31 / 1524 | ⚠ **FIRES** | ⚠ row STALE for the THIRD close running. honoured by construction (**BUG-260902-06**): two broadcast_* verbs beside the existing refresh/invalidate pair — no reader signature changed |
+| [`backend/app/models/user_settings.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsuser_settingspy) | 50 / 32 / 1561 | ⚠ **FIRES** | ⚠ STALE for the FOURTH close running at `49 / 31 / 1524`. honoured by construction (**241-03**): two `_val` calls + the bounds constants in the SEED-258 home |
 | [`backend/app/services/settings_broadcast.py`](docs/HOT-FILE-LEDGER.md#backendappservicessettings_broadcastpy) | 1 / 1 / 228 | no (1 phase) | young (**BUG-260902-06**) — the cross-worker cache-invalidation leaf: one channel, one payload builder, one re-warm dispatcher, one subscriber |
 | [`backend/app/services/connectors/args.py`](docs/HOT-FILE-LEDGER.md#backendappservicesconnectorsargspy) | 2 / 1 / 474 | no (1 phase) | young (214-01) — the shared argument leaf: resolution, satisfiability, and ONE schema accessor |
 | [`backend/app/services/harness/reachability.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessreachabilitypy) | 4 / 4 / 463 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **4 phases** — row added 214; it is the home of this phase's safety-gate predicate |
@@ -9565,9 +9619,10 @@ cells rot within days.
 | [`frontend/src/lib/connectionMark.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclibconnectionmarktsx) | 7 / 4 / 313 | ⚠ **FIRES** | ✅ **the move IS the seam, and it was TAKEN (214-08)** — `settings/` → `lib/`; four run + canvas surfaces now import ONE map |
 | [`frontend/src/components/ingestion/DocumentList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestiondocumentlisttsx) | 24 / 13 / 294 | ⚠ **FIRES** | ✅ **seam TAKEN (217.1-05)** — `DocumentRow.tsx` extracted with the sketch's five affordances (−315 L). ⚠ 7-column order still load-bearing: `LibraryPage` sheds cols 3–5 by `nth-child` |
 | [`frontend/src/pages/LibraryPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpageslibrarypagetsx) | 44 / 14 / 922 | ⚠ **FIRES** | ⚠ row was STALE at `40 / 12 / 825`. honoured by construction (**235**) — one tab prop, one cross-tab hop. ⚠ re-derive with `git log --follow`, else it reads `1` |
-| [`backend/app/services/retrieval_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrievalservicepy) | 18 / 10 / 423 | ⚠ **FIRES** | ⚠ my own cell said *byte-unchanged* and my LATER commit falsified it (reviewer catch). TRUST-04 threaded provenance through it. ⚠ extraction still OWED (`SEED-224`) |
-| [`backend/app/services/recall_eval.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrecallevalpy) | 1 / 1 / 67 | no (1 phase) | ⚠ **absent for its ENTIRE LIFE — row added at 241 planning time.** `compute_metrics` is correct; everything that FED it was structurally unable to fail (241 F-1) |
-| [`backend/app/services/retrieval_tuning.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrievaltuningpy) | 0 / 0 / new | no (new) | young (241) — the HNSW session knobs live HERE so `retrieval_service.py`'s D-11 landing stays ~3 lines. ⛔ its extraction is still OWED |
+| [`backend/app/services/retrieval_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrievalservicepy) | 19 / 11 / 456 | ⚠ **FIRES** | ⛔ **extraction still OWED** (`SEED-224`, since 231) — 241 is the SECOND landing, capped at 11 lines by a fence; a THIRD must propose the extraction FIRST |
+| [`backend/app/services/recall_eval.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrecallevalpy) | 2 / 2 / 978 | no (2 phases) | rewritten in place at 241 (`1 / 1 / 67` → here). ⭐ driven LIVE at 241-04: it reported `Hit@1 0.78` AND refused a bench it could not read — both arms real |
+| [`scripts/build-recall-bench.py`](docs/HOT-FILE-LEDGER.md#scriptsbuild-recall-benchpy) | 4 / 1 / 1088 | no (1 phase) | ⚠ row ADDED at 241-04 — the only `DROP DATABASE` in the repo. Guard + constant-interpolation + AST fence, all driven RED. It built GREEN and unreadable; assert the READ |
+| [`backend/app/services/retrieval_tuning.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrievaltuningpy) | 1 / 1 / 161 | no (1 phase) | young (241). ⛔ `ef_search` is the lever (200 → recall 1.000); `iterative_scan` alone reaches only 0.494-0.684. NEVER advise the 1000 maximum — measured WORSE than 400 |
 | [`frontend/src/components/metadata/DocumentDetailPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsmetadatadocumentdetailpaneltsx) | 12 / 7 / 596 | ⚠ **FIRES** | honoured by construction (**240**): ONE child section mounted, gated on metadata, no shell change. ⚠ CR-01's fence caught a missing reset before it shipped |
 | [`frontend/src/components/metadata/DocumentConversationSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsmetadatadocumentconversationsectiontsx) | 0 / 0 / 155 | no (new) | young (240) — the read that makes `thread_key` visible. ⛔ Bounded height + a worded truncation, because BUG-260908-01 is the same panel unbounded |
 | [`frontend/src/lib/api/documents.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapidocumentsts) | 2 / 2 / 389 | no (2 phases) | ⚠ **absent for its ENTIRE LIFE — row added 240.** ⭐ The Phase 207 `lib/api.ts` split created it with no row, exactly as its sibling `api/workflows.ts` records |
@@ -10300,3 +10355,55 @@ distinction is load-bearing.** `admin.py`'s disable-guard (`invalidate_settings_
 guard cannot pass on a stale cache. Broadcasting there would make every worker re-read the DB
 because one worker wanted to check something. A future edit that "makes them consistent" with the
 write seams would be a regression, not a tidy-up.
+
+
+---
+
+### `scripts/build-recall-bench.py`
+
+**New at Phase 241 (`241-02`), triple re-derived at the phase's close (2026-09-10, `241-04`):
+`4 / 1 / 1088` — G-5: no (1 phase).**
+
+⚠ **ROW ADDED BECAUSE IT WAS ABSENT, and because it is an instrument rather than a script.** It
+builds the throwaway `recall_bench` database that Phase 241's whole verdict rests on, and it is the
+only thing in this repository that issues `DROP DATABASE` / `CREATE DATABASE`.
+
+⛔ **Its invariants are the reason it may exist at all, and they are enforced three ways rather than
+described.** Every destructive statement interpolates a module CONSTANT (never a flag-parsed name);
+`assert_bench_target(...)` runs before each one and refuses anything that is not a loopback
+`recall_bench` **by equality, not by substring** (`recall_bench_prod` and `prod_recall_bench_live`
+are refused, driven RED); and an **AST source fence** fails any destructive statement sitting in a
+function with no guard call above it — also driven RED, against a planted unguarded
+`DROP DATABASE somebody_elses_db`. The operator's real database is opened with server-enforced
+`default_transaction_read_only = on`.
+
+⚠ **Two defects found by RUNNING `supabase/full-schema.sql` through it, both at `241-04`, and both
+about the ARTIFACT rather than about this file:**
+
+1. **The artifact carries no privileges.** It is `pg_dump --no-privileges`, and `pg_default_acl` is
+   **per-database**, so a fresh database built from it has `relacl = NULL` on every table. The 100k
+   bench reported every schema check green and then refused the harness's first read with
+   `42501 permission denied for table documents`. The prelude now installs the real database's own
+   default privileges — read back from `pg_default_acl`, not invented — **before** the apply, so
+   every table acquires them at CREATE time exactly as production does. ⚠ This says nothing bad
+   about the artifact as a one-paste **Supabase** bootstrap: a real Supabase project already carries
+   those default privileges. It is a finding about building a **plain** Postgres database from it.
+2. **`full-schema.sql:33` is `SET row_security = off;`.** pg_dump emits it, it is a SESSION setting,
+   and it survives the apply — leaving the applying connection with RLS **disabled** for everything
+   it does afterwards. Restored explicitly after the apply rather than worked around.
+
+⭐ **A build-time guard now reads all four harness tables AS `authenticated` with `row_security` ON,
+and it was driven RED against the genuinely ungranted bench before the fix.** The lesson is the
+row's whole point: **this builder reported perfectly green while producing a database nobody could
+read.** Schema-presence checks cannot see a privilege hole; assert the READ.
+
+⚠ **`--sigma` is a noise-to-signal NORM ratio, NOT a per-dimension sigma**, and the distinction is
+written into the function's docstring because getting it wrong once made every probe return zero
+rows for every tenant *including the 38% filler* — and **that last clause is the tell**: selectivity
+starvation cannot zero out the fattest tenant. If a run shows all-tenants-zero, suspect the vectors,
+not the index.
+
+⛔ **Its hand-rolled `auth.uid()` stub exists ONLY inside `recall_bench`** and must never be copied
+into `supabase/migrations/` nor into `full-schema.sql` — production's is Supabase Auth's own, and a
+hand-rolled one would be an authentication bypass on the 156 call sites that ask it who the caller
+is.

@@ -641,9 +641,9 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/lib/api.ts` | 187 / 110 / 422 | ✅ **SPLIT TAKEN (207)** |
 | `frontend/src/types/index.ts` | 78 / 60 / 1331 | no seam proposed |
 | `backend/app/main.py` | 82 / 59 / 950 | ⚠ row was STALE by **FOURTEEN PHASES**. honoured by construction (**BUG-260902-06**) |
-| `backend/app/config.py` | 82 / 47 / 1489 | ⚠ row was STALE by **TEN PHASES** at `78 / 37 / 1428`. honoured by con |
+| `backend/app/config.py` | 83 / 48 / 1506 | ⚠ STALE AGAIN at `82/47/1489` — the ELEVENTH. honoured by construction (**241**): 4 hnsw defaults, no reader changed. `MODEL_CAPABILITIES` seam still OWED |
 | `backend/app/api/admin.py` | 33 / 13 / 1740 | ⚠ row was STALE. honoured by construction (**BUG-260902-06**): 2 write seams broadcast; the 2 WR-03 READ seams deliberately do not |
-| `backend/app/api/settings.py` | 34 / 18 / 738 | ⚠ row was STALE at `30 / 16 / 639`. honoured by construction (**SEED-258**): the refusal states the COST, not just the range |
+| `backend/app/api/settings.py` | 35 / 19 / 814 | ⚠ STALE AGAIN at `34/18/738`. honoured by construction (**241-03**): bounds SERVED not re-typed; the 400 names the COST |
 | `backend/app/services/multimodal_service.py` | 14 / 7 / 984 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
 | `backend/app/api/documents.py` | 85 / 33 / 2437 | ✅ **DISCHARGED (229)** |
 | `scripts/vitest-count-gate.cjs` | 167 / 38 / 4786 | ⚠ row was STALE at `159 / 36 / 4687`. honoured by construction (**235* |
@@ -668,7 +668,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/lib/api/org.ts` | 11 / 8 / 629 | ⚠ absent for its ENTIRE LIFE at 4 phases; row then STALE at `6 / 4 / 562`. ⚠ **THIRD wire-type drift in this ONE file** (239: `auth_type: "mcp"`) |
 | `frontend/src/components/settings/connectionsCopy.ts` | 15 / 8 / 784 | no seam proposed. honoured by construction (**239**): one word, one union member, one arm — and the arm cannot reach a capability row |
 | `frontend/src/components/settings/connectionFormCopy.ts` | 19 / 8 / 1631 | ⛔ 239-05 named the seam: `configFromDraft`'s arm set. 239-07 RODE it — one serializer both arms call |
-| `frontend/src/pages/SettingsPage.tsx` | 43 / 22 / 1647 | ⚠ STALE at `38 / 21 / 1500`. honoured by construction (**239-10**): a card MOUNTED, not authored — tab seam OWED |
+| `frontend/src/pages/SettingsPage.tsx` | 44 / 23 / 1738 | ⚠ STALE AGAIN at `43/22/1647`. honoured by construction (**241-03**): two FieldRows on a SHIPPED card. tab seam still OWED |
 | `frontend/src/components/settings/ModelPillRow.tsx` | 4 / 3 / 141 | ⚠ absent for its entire life |
 | `frontend/src/components/workflows/phaseVocabulary.ts` | 16 / 6 / 990 | honoured by construction (206.2) |
 | `frontend/src/components/workflows/ConnectionPicker.tsx` | 7 / 5 / 888 | honoured by construction (206.2 / **214**) |
@@ -682,7 +682,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/sources/__init__.py` | 5 / 3 / 40 | ⚠ **absent while FIRING — row added 239-03.** The ONE eager-import site: an adapter missing from this list is unregistered, so the list is load-bearing |
 | `backend/app/services/mcp_client.py` | 9 / 6 / 526 | ⚠ row STALE TWICE (`4/2/407` reading `no`, then `7/5/480`) — a row present and WRONG stops the audit. **SEED-258: the body cap is DERIVED; no envelope knob exists to disagree** |
 | `backend/app/models/message.py` | 17 / 10 / 124 | ⚠ absent from BOTH for its ENTIRE LIFE at **8 phases** |
-| `backend/app/models/user_settings.py` | 49 / 31 / 1524 | ⚠ row STALE for the THIRD close running. honoured by construction (**BUG-260902-06**): two broadcast_* verbs beside refresh/invalidate; no reader signature changed |
+| `backend/app/models/user_settings.py` | 50 / 32 / 1561 | ⚠ STALE for the FOURTH close running at `49/31/1524`. honoured by construction (**241-03**): two `_val` calls + the bounds constants in the SEED-258 home |
 | `backend/app/services/harness/reachability.py` | 4 / 4 / 463 | ⚠ absent from BOTH for its ENTIRE LIFE at **4 phases** |
 | `backend/app/services/workflow_kickoff.py` | 8 / 6 / 554 | ⚠ absent for its ENTIRE LIFE at **6 phases** |
 | `frontend/src/components/workflows/WorkflowScheduleModal.tsx` | 3 / 3 / 601 | ⚠ absent for its entire life; it crossed the threshold in 214-09 on a  |
@@ -693,7 +693,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/lib/connectionMark.tsx` | 7 / 4 / 313 | ✅ **the move IS the seam, and it was TAKEN (214-08)** |
 | `frontend/src/components/ingestion/DocumentList.tsx` | 24 / 13 / 294 | ✅ **seam TAKEN (217.1-05)** |
 | `frontend/src/pages/LibraryPage.tsx` | 44 / 14 / 922 | ⚠ row was STALE at `40 / 12 / 825`. honoured by construction (**235**) |
-| `backend/app/services/retrieval_service.py` | 18 / 10 / 423 | ⚠ my own cell said *byte-unchanged* and my LATER commit falsified it ( |
+| `backend/app/services/retrieval_service.py` | 19 / 11 / 456 | ⛔ **extraction still OWED (SEED-224, since 231).** 241 is the SECOND landing, 11 lines; a THIRD must propose the extraction FIRST |
 | `frontend/src/components/metadata/DocumentDetailPanel.tsx` | 9 / 6 / 496 | ⚠ **the row was STALE at `6 / 5 / 405`.** honoured by construction (21 |
 | `frontend/src/hooks/useDocuments.ts` | 8 / 3 / 120 | ⚠ absent at 3 phases. Realtime is a hint, not truth |
 | `frontend/src/pages/KnowledgeHealthPage.tsx` | 12 / 6 / **DELETED** | **RETIRED (217.1-14)** |
