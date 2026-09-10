@@ -41,7 +41,8 @@ drop and create statements against a local Postgres cluster that also holds the
 operator's live Supabase development data -- 159 documents and 7,953 chunks that no
 migration, no backup and no fixture can restore. Two independent properties keep that
 safe: ``assert_bench_target`` runs before every one of them (database name EQUAL to
-``recall_bench``, never a substring; host loopback), and the statements themselves
+``recall_bench``, never a substring; exactly ONE host, and it must be loopback; the port
+must be the local Supabase one; no query string), and the statements themselves
 interpolate the ``BENCH_DB_NAME`` constant rather than any name parsed from a flag.
 The source database is opened READ ONLY at the server, so a stray write there fails at
 the server rather than by convention.
@@ -82,6 +83,16 @@ BENCH_DB_NAME = "recall_bench"
 LOOPBACK_HOSTS = frozenset({"127.0.0.1", "::1", "localhost"})
 _ACCEPTED_SCHEMES = frozenset({"postgres", "postgresql"})
 
+#: The local Supabase Postgres port, which is where BOTH shipped default DSNs point and the
+#: only place this bench is ever built. Deliberately ONE value rather than a range: a bench
+#: on another port is a decision somebody should have to make by editing this line.
+#:
+#: ⚠ SAY WHAT THIS DOES NOT DO. A port cannot prove a cluster is local -- an SSH tunnel bound
+#:   to 54322 forwards a remote cluster onto loopback and passes every check in this file.
+#:   What it removes is every port the operator never meant to use, which is the difference
+#:   between a typo reaching an irreversible drop and a typo being refused (WR-01).
+ALLOWED_PORTS = frozenset({54322})
+
 
 class BenchTargetRefused(RuntimeError):
     """The requested target is not a loopback ``recall_bench`` database."""
@@ -97,6 +108,27 @@ def assert_bench_target(dsn: str) -> None:
 
     Raises ``BenchTargetRefused`` naming the offending host or database, so the refusal
     is readable in a terminal without re-reading this file.
+
+    ⛔ WR-01 (241-REVIEW) -- WHY THIS FUNCTION REFUSES SHAPES RATHER THAN INSPECTING THEM.
+    ``urllib.parse`` and ``asyncpg`` do not agree about what a DSN means, and the guard used
+    to trust the former about a string handed to the latter. Measured against the installed
+    asyncpg 0.31.0::
+
+        dsn = "postgresql://postgres:postgres@localhost:54322,prod.example.com:5432/recall_bench"
+        urllib.parse.urlparse(dsn).hostname  ->  'localhost'
+        asyncpg connect addresses            ->  [('localhost', 54322), ('prod.example.com', 5432)]
+
+    asyncpg splits the netloc on ``,`` and FAILS OVER to the later addresses. So that DSN
+    passed this guard -- ``localhost`` is loopback, the database is ``recall_bench`` -- and
+    ``maintenance_dsn`` carried the whole list through to the guarded, irreversible
+    database-level drop below. On a machine where local Docker
+    is down (CLAUDE.md's Windows port-reservation trap makes that ordinary, and a container
+    can report ``Up (healthy)`` while its port accepts nothing) the failover is the path the
+    drop actually takes.
+
+    The lesson is not "parse host lists properly". It is that a guard whose job is to be
+    STRUCTURALLY INCAPABLE of reaching a non-local database must refuse every DSN shape it
+    cannot reason about, rather than reason about one interpretation of it.
     """
     parsed = urllib.parse.urlparse(dsn)
 
@@ -104,6 +136,30 @@ def assert_bench_target(dsn: str) -> None:
         raise BenchTargetRefused(
             f"refusing target {dsn!r}: scheme {parsed.scheme!r} is not a postgres URL "
             "(a keyword or unix-socket DSN cannot be proven loopback)"
+        )
+
+    # ⛔ THE HOST LIST ARM, AND IT MUST RUN FIRST. `urlparse(...).port` RAISES ValueError on
+    #    a multi-host netloc ("Port could not be cast to integer value as
+    #    '54322,prod.example.com:5432'"), so no later arm may read `.port` before this one has
+    #    refused. `rpartition("@")` splits on the LAST `@`, which is the userinfo separator.
+    hostspec = parsed.netloc.rpartition("@")[2]
+    if "," in hostspec:
+        raise BenchTargetRefused(
+            f"refusing target {dsn!r}: {hostspec!r} is a comma-separated host LIST, which "
+            "cannot be proven loopback -- asyncpg fails over to the later hosts and "
+            "urlparse().hostname never reports them. Name exactly one loopback host."
+        )
+
+    # ⛔ THE QUERY-STRING ARM. ⚠ MEASURED INERT on asyncpg 0.31.0 -- `?host=` / `?port=` /
+    #    `?dbname=` are ignored when the netloc already supplies that value -- and refused
+    #    anyway, because a keyword this guard does not model is exactly a shape it cannot
+    #    reason about. Nothing legitimate needs one: this is a loopback connection to a
+    #    throwaway database on the local Docker Postgres.
+    if parsed.query:
+        raise BenchTargetRefused(
+            f"refusing target {dsn!r}: query parameters ({parsed.query!r}) can carry "
+            "host= / hostaddr= / port= / dbname= overrides that redirect the connection "
+            "past this guard. Drop the query string."
         )
 
     host = parsed.hostname
@@ -117,6 +173,24 @@ def assert_bench_target(dsn: str) -> None:
             f"refusing host {host!r}: the recall bench is LOCAL-ONLY and this host is "
             f"not loopback (allowed: {sorted(LOOPBACK_HOSTS)}). The right database "
             "name on the wrong cluster is still the wrong cluster."
+        )
+
+    # ⛔ THE PORT ARM. The host-list arm above has already refused every netloc on which
+    #    `.port` raises, so this read is safe -- but it is wrapped anyway, because an
+    #    unparseable port is another shape the guard cannot reason about and "cannot parse"
+    #    must never fall through to "accepted".
+    try:
+        port = parsed.port
+    except ValueError as exc:
+        raise BenchTargetRefused(
+            f"refusing target {dsn!r}: the port could not be parsed ({exc})"
+        ) from exc
+    if port not in ALLOWED_PORTS:
+        raise BenchTargetRefused(
+            f"refusing port {port!r}: the recall bench is built only on the local Supabase "
+            f"Postgres (allowed: {sorted(ALLOWED_PORTS)}). A DSN with no port means libpq's "
+            "5432, which is not where local Supabase listens. Loopback alone is not enough: "
+            "an SSH tunnel on another port forwards a remote cluster onto 127.0.0.1."
         )
 
     database = parsed.path.lstrip("/")
