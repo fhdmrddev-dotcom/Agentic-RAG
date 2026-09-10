@@ -72,3 +72,44 @@ extension is not installed at all, which is a different and larger finding.
 Task 1's acceptance must read the VERSION, not the NULL. Task 3's D-14 verdict —
 *"if cloud is below 0.8 the verdict says `ef_search` alone carries production"* — stands
 unchanged as a rule; what changes is the evidence that is allowed to trigger it.
+
+---
+
+## ✅ RESOLVED 2026-09-10 — cloud is at EXACT parity, and the refuted probe would have hidden it
+
+The corrected single-statement probe was run by the operator against CLOUD and returned:
+
+```json
+{
+  "pgvector": "0.8.0",
+  "postgres": "PostgreSQL 17.6 on x86_64-pc-linux-gnu, compiled by gcc (GCC) 15.2.0, 64-bit",
+  "forces_guc_registration": 1,
+  "ef_search": "40",
+  "iterative_scan": "off"
+}
+```
+
+| | Local (measured 241 start) | **Cloud (measured here)** |
+|---|---|---|
+| pgvector | 0.8.0 | **0.8.0** |
+| PostgreSQL | 17.6 | **17.6** |
+| `hnsw.ef_search` | 40 | **40** |
+| `hnsw.iterative_scan` | off | **off** |
+
+**D-14's gate is SATISFIED.** `hnsw.iterative_scan` exists on the production server, so the
+phase may claim it as the remedy. The ROADMAP's fallback verdict — *"if cloud is below 0.8 the
+verdict says `ef_search` alone carries production"* — does NOT fire.
+
+⭐ **This is why the refutation mattered, and it is the whole lesson.** The original probe
+returned `{ "ef_search": null, "iterative_scan": null }` on a server that is, in fact, byte-for-byte
+at the same version as local. Read through the plan's stated rule, that NULL meant *"cloud is below
+0.8, withdraw the remedy"*. **The remedy would have been withdrawn from a server that fully
+supports it**, and `241-VALIDATION.md` would have recorded a hardware limitation that does not
+exist — an unfalsifiable claim, since nobody re-runs a verdict.
+
+The cost of catching it was one query against a server of a KNOWN version. That control was
+available the entire time.
+
+⚠ **Carry this into the verdict.** `forces_guc_registration: 1` is not decoration — it is the
+evidence that the two `current_setting` values in the same row were read AFTER the extension
+loaded. A future re-run that drops the `<=>` term gets NULLs again and means nothing by it.
