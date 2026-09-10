@@ -105,6 +105,69 @@ const REASONING_LONG = Array.from(
 const RAW = (s: string) => s
 
 /**
+ * The SOURCE SWEEP (used by 10 and 12), added by 243-02. The `import.meta.glob` form is the
+ * one `WorkspacePanel.test.tsx:1137-1141` already uses - eager, `?raw`, un-stripped by Vite.
+ * It is deliberately a GLOB rather than a per-file `?raw` import: a glob whose file does not
+ * exist yet simply has no key, so the fence reads "expected 0 to be 1" instead of the whole
+ * suite dying at module resolution.
+ * The Vite plugin requires a STATIC literal here; a shared `const` is rejected.
+ */
+const CHAT_TSX = import.meta.glob<string>("../**/*.tsx", {
+  eager: true,
+  query: "?raw",
+  import: "default",
+})
+
+/** Production source only - a fence that swept its own test files would red on itself. */
+const CHAT_SRC: Record<string, string> = Object.fromEntries(
+  Object.entries(CHAT_TSX).filter(
+    ([path]) => !path.includes("__tests__") && !/\.test\.tsx?$/.test(path),
+  ),
+)
+
+/**
+ * COMMENTS ARE STRIPPED BEFORE ANY COUNT - a fence a comment can satisfy is not a fence.
+ * Phase 194.1 tripped its own `chat` sweep twice on docblocks that merely explained the rule
+ * they were breaking. (The line-comment arm keeps a preceding non-colon char so a `https`
+ * URL inside a string is not mistaken for a line comment.)
+ */
+function stripComments(src: string): string {
+  return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1")
+}
+
+/** The stripped source of one chat file, by basename. Throws loudly if it is not swept. */
+function chatSource(basename: string): string {
+  const hit = Object.entries(CHAT_SRC).find(([path]) => path.endsWith("/" + basename))
+  if (!hit) {
+    throw new Error(
+      basename + " is not in the chat sweep - " + Object.keys(CHAT_SRC).length + " files seen",
+    )
+  }
+  return stripComments(hit[1])
+}
+
+/**
+ * THE NEEDLE, AND ITS NARROWING IS THE WHOLE POINT. This matches a JSX CHILD interpolation
+ * of the reasoning value - a component RENDERING the reasoning body. It deliberately does
+ * NOT match:
+ *   - a prop being PASSED, `reasoningContent={message.reasoningContent}` (that brace is
+ *     preceded by `=`, which is why the leading `[^=]` is load-bearing, not decoration), or
+ *   - a guard READING it, `!message.reasoningContent`, which state 2 still needs.
+ * Written bare as /reasoningContent/ the fence would count three files and mean nothing.
+ */
+const RENDERS_REASONING = /(^|[^=])\{\s*(?:message\.)?reasoningContent\s*\}/
+
+/** The one JSX element that mounts `tag`, comments stripped, asserted to be unique. */
+function soleMountExpression(src: string, tag: string): string {
+  const occurrences = src.split("<" + tag).length - 1
+  expect(occurrences).toBe(1)
+  const at = src.indexOf("<" + tag)
+  const end = src.indexOf("/>", at)
+  expect(end).toBeGreaterThan(at)
+  return src.slice(at, end + 2)
+}
+
+/**
  * ⚠ THE EXACT COPY, AND A LOOSE REGEX WILL NOT DO — MEASURED, on this suite's first run.
  * `/planning next step/` matched the RUN HEADER's own `planning next step…` (a separate
  * string, with a typographic ellipsis, from the card's status-verb helper), so §6b's
@@ -272,7 +335,15 @@ describe("Phase 243 — the thinking block, characterized against the UNMOVED co
         isPlanning: true,
         reasoningContent: REASONING_MEDIAN,
       })
-      renderWithTooltip(<RunCard message={msg} isStreaming />)
+      // ⚠ THE MOUNT CHANGED AT 243-02, AND ONLY THE MOUNT. `<RunCard>` no longer renders
+      //   state 1 at all — it left for `ThinkingBlock`, mounted a level up — so this case's
+      //   POSITIVE CONTROL could no longer be observed on the card alone. Rendering through
+      //   `MessageItem` puts BOTH surfaces on one page, which is what the exclusion is
+      //   actually about now, and it is STRICTLY STRONGER than the card-only form: the card
+      //   is still mounted (this fixture is tool-bearing and streaming), so the two absences
+      //   below are still measured against the card's own rendered body.
+      //   ⛔ The two absence assertions are BYTE-UNCHANGED. Only the render line moved.
+      renderWithTooltip(<MessageItem message={msg} isStreaming />)
       expect(screen.queryByText(PLANNING_COPY)).toBeNull()
       expect(screen.queryByTestId("thinking-row")).toBeNull()
       // Positive control — state 1 took the branch, so the absence above is a measured
@@ -335,47 +406,186 @@ describe("Phase 243 — the thinking block, characterized against the UNMOVED co
     expect(screen.queryByText(/^Thinking$/)).toBeNull()
   })
 
-  // ── §8 — ⚠ DECLARED DEFECT (CHAT-04). This case asserts what is WRONG today. ──
-  it("§8 — ⚠ DECLARED DEFECT (CHAT-04): a reasoning-bearing reply with ZERO tool calls renders no reasoning anywhere", () => {
-    // ⛔ NEVER READ THIS AS DESIRED BEHAVIOUR. Measured for D-243-03: 105 of 340
-    //    reasoning-bearing rows — 31% — called no tool at all, and their reasoning is
-    //    INVISIBLE in the product, because the only renderer of `reasoningContent` in the
-    //    codebase sits inside a card `MessageItem` mounts only for a tool-bearing turn.
-    //    243-02 INVERTS this case: once the block mounts from `MessageItem` and self-guards
-    //    on its own content, this fixture renders the reasoning and this expectation flips.
+  // ── §8 — ⭐ INVERTED BY 243-02 (CHAT-04). At 243-01 this was a DECLARED DEFECT. ──
+  it("§8 — CHAT-04 CLOSED (inverted here, by plan 243-02): a reasoning-bearing reply with ZERO tool calls renders its thinking", () => {
+    // ⭐ THIS CASE ASSERTED THE OPPOSITE AT 243-01, AND THE INVERSION IS THE DELIVERABLE.
+    //    Its 243-01 form asserted that the trigger and the prose were BOTH ABSENT: measured
+    //    for D-243-03, 105 of 340 reasoning-bearing rows — 31% — called no tool at all, and
+    //    their reasoning was INVISIBLE in the product, because the only renderer of
+    //    `reasoningContent` in the codebase sat inside a card `MessageItem` mounts only for
+    //    a tool-bearing turn. 243-02 moved that renderer OUT of the card and mounts it with
+    //    no tool test anywhere, so the same fixture now draws.
+    // ⛔ A later plan that reds this line has re-hidden 31% of the product's reasoning.
     // ⭐ The fixture is §1's, with ONE difference — an EMPTY `tool_calls`. That is what makes
     //    this a measurement of the tool-conditionality rather than of two unrelated fixtures.
     renderWithTooltip(
       <MessageItem message={makeMessage({ reasoningContent: REASONING_MEDIAN, tool_calls: [] })} />,
     )
-    // Positive control: the reply itself renders, so this is a message on the page with its
-    // reasoning missing — not an empty render.
+    // Positive control: the reply itself renders, so this is a message on the page WITH its
+    // reasoning — not an empty render that would satisfy any assertion.
     expect(screen.getByText("Assistant response text")).toBeInTheDocument()
-    expect(screen.queryByTestId("thinking-trigger")).toBeNull()
-    expect(screen.queryByText(REASONING_MEDIAN, { normalizer: RAW })).toBeNull()
+    // No run card mounts on a zero-tool turn (unchanged — D-09 still holds), so the fold is
+    // reached in ONE click rather than two. This is the shape that never had a trigger.
     expect(screen.queryByTestId("run-card-collapsed")).toBeNull()
+    expect(triggerText()).toBe("Thinking")
+    // Closed by default here too — §1b's contract, now on the shape that never had one.
+    expect(screen.queryByText(REASONING_MEDIAN, { normalizer: RAW })).toBeNull()
+    fireEvent.click(screen.getByTestId("thinking-trigger"))
+    expect(screen.getByText(REASONING_MEDIAN, { normalizer: RAW }).textContent).toBe(REASONING_MEDIAN)
   })
 
-  // ── §9 — ⚠ DECLARED DEFECT. This case asserts what is WRONG today. ──
-  it("§9 — ⚠ DECLARED DEFECT: on a settled run the reasoning sits behind TWO folds — no thinking trigger exists until the run row is opened", () => {
-    // ⛔ NEVER READ THIS AS DESIRED BEHAVIOUR. `expanded = isStreamingNow || !hasTools ||
-    //    userExpanded`, and a settled tool-bearing turn has none of the three — so the whole
-    //    block, trigger included, is not rendered at all. The reader must open the run row and
-    //    THEN the thinking fold to reach reasoning that has already finished streaming.
-    //    243-02 INVERTS this: the block mounts from `MessageItem`, OUTSIDE the card's
-    //    `expanded` gate entirely, so one of the two folds disappears. That is what turns
-    //    "the extraction removed a fold" from a side effect into a measured improvement.
+  // ── §9 — ⭐ INVERTED BY 243-02. At 243-01 this was a DECLARED DEFECT. ──
+  it("§9 — INVERTED here, by plan 243-02: a settled run’s reasoning is ONE fold away — the trigger exists BEFORE the run row is opened", () => {
+    // ⭐ THIS CASE ASSERTED THE OPPOSITE AT 243-01, AND THE INVERSION IS THE DELIVERABLE.
+    //    `expanded = isStreamingNow || !hasTools || userExpanded`, and a settled tool-bearing
+    //    turn has none of the three — so the whole block, trigger included, used not to be
+    //    rendered at all until the reader opened the run row, putting finished reasoning
+    //    behind TWO folds. 243-02 mounts the block from `MessageItem`, OUTSIDE the card’s
+    //    `expanded` gate entirely, so one of the two folds is gone.
+    // ⛔ A later plan that reds this line has put the second fold back.
     renderWithTooltip(<MessageItem message={makeMessage({ reasoningContent: REASONING_MEDIAN })} />)
-    // Before the run row is opened: the row exists, and the thinking block does not.
+    // The collapsed run row is STILL there — the card’s own fold is untouched by this
+    // phase, and its presence is the positive control that this is the settled shape.
     expect(screen.getByTestId("run-card-collapsed").textContent).toBeTruthy()
-    expect(screen.queryByTestId("thinking-trigger")).toBeNull()
+    // …and the thinking trigger is already on the page beside it. THIS LINE IS THE INVERSION:
+    // at 243-01 it read `expect(screen.queryByTestId("thinking-trigger")).toBeNull()`.
+    expect(triggerText()).toBe("Thinking")
     expect(screen.queryByText(REASONING_MEDIAN, { normalizer: RAW })).toBeNull()
-    // After: fold one is open, fold two is still closed.
+    // ⚠ THE RUN-ROW CLICK STAYS, DELIBERATELY. It is no longer NECESSARY to reach the
+    //    trigger, but a case that opens the run row and then asserts must STILL pass — that
+    //    is precisely the forward-compatibility 243-01 designed `expandSettledRun()` for, and
+    //    deleting it here would delete the evidence that the claim was true.
     expandSettledRun()
     expect(triggerText()).toBe("Thinking")
     expect(screen.queryByText(REASONING_MEDIAN, { normalizer: RAW })).toBeNull()
-    // And only the second click reaches the words.
+    // And ONE click on the fold reaches the words (it took two at 243-01).
     fireEvent.click(screen.getByTestId("thinking-trigger"))
+    expect(screen.getByText(REASONING_MEDIAN, { normalizer: RAW }).textContent).toBe(REASONING_MEDIAN)
+  })
+
+  // =================================================================================
+  // 10-13 - ADDED BY 243-02. These describe the MOVE itself, not the shipped block.
+  // =================================================================================
+
+  describe("§10 — exactly ONE renderer of the reasoning body, mechanically (D-243-01)", () => {
+    it("§10a — the sweep is non-empty and can SEE the three files this plan touched", () => {
+      // An absence/uniqueness assertion over zero files is vacuously true. A count is not
+      // enough either - the sweep must prove it sees the files that matter, BY NAME.
+      expect(Object.keys(CHAT_SRC).length).toBeGreaterThan(10)
+      for (const name of ["ThinkingBlock.tsx", "RunCard.tsx", "MessageItem.tsx"]) {
+        expect(Object.keys(CHAT_SRC).some((path) => path.endsWith("/" + name))).toBe(true)
+      }
+    })
+
+    it("§10b — the needle DISCRIMINATES: it matches a render, and not a prop pass or prose", () => {
+      // The positive control. Without it, 10c could pass because the needle matches nothing.
+      expect('<div className="px-3">{reasoningContent}</div>').toMatch(RENDERS_REASONING)
+      expect("        {message.reasoningContent}").toMatch(RENDERS_REASONING)
+      // ...and the three innocent shapes that must NOT count as a second renderer:
+      expect("<ThinkingBlock reasoningContent={message.reasoningContent} isStreaming />").not.toMatch(
+        RENDERS_REASONING,
+      )
+      expect("if (!message.reasoningContent && isStreamingNow) return null").not.toMatch(
+        RENDERS_REASONING,
+      )
+      expect("the block renders message.reasoningContent verbatim as text children").not.toMatch(
+        RENDERS_REASONING,
+      )
+    })
+
+    it("§10c — exactly one production file in components/chat renders it, and it is ThinkingBlock.tsx", () => {
+      // D-243-01 / sketch 235 winner B, as a MEASUREMENT rather than a claim. Before this
+      // plan the one renderer was RunCard.tsx; after it, it is ThinkingBlock.tsx. What may
+      // never be true is TWO - that is the drift T-243-02-03 exists to stop.
+      const renderers = Object.keys(CHAT_SRC).filter((path) =>
+        RENDERS_REASONING.test(stripComments(CHAT_SRC[path])),
+      )
+      expect(renderers).toHaveLength(1)
+      expect(renderers[0].endsWith("/ThinkingBlock.tsx")).toBe(true)
+    })
+  })
+
+  it("§11 — ORDER ON SCREEN (D-243-01): thinking precedes the tool rows AND the answer — the order in time", () => {
+    const { container } = renderWithTooltip(
+      <MessageItem
+        message={makeMessage({ runStatus: "streaming", reasoningContent: REASONING_MEDIAN })}
+        isStreaming
+      />,
+    )
+    const nodes = Array.from(container.querySelectorAll<HTMLElement>("*"))
+    const indexOfTestId = (id: string) =>
+      nodes.findIndex((n) => n.getAttribute("data-testid") === id)
+
+    const thinkingAt = indexOfTestId("thinking-trigger")
+    expect(thinkingAt).toBeGreaterThan(-1)
+
+    // The first tool row. Positive control: the anchor must actually be on the page, or the
+    // comparison below would be a claim about nothing.
+    const firstToolRowAt = nodes.findIndex((n) => {
+      const id = n.getAttribute("data-testid")
+      return id === "step-node" || id === "tool-result-summary" || id === "tc-active"
+    })
+    expect(firstToolRowAt).toBeGreaterThan(-1)
+
+    // The answer body - a streaming tool-bearing turn routes content through
+    // StreamingNarration (MessageItem.tsx:425), which is a DIFFERENT construct from this
+    // block and is deliberately left alone here (D-243-14; 243-05 owns it).
+    const bodyAt = indexOfTestId("streaming-narration")
+    expect(bodyAt).toBeGreaterThan(-1)
+
+    expect(thinkingAt).toBeLessThan(firstToolRowAt)
+    expect(thinkingAt).toBeLessThan(bodyAt)
+    // Stated the other way too, on the DOM's own relation rather than on an index, so a
+    // future container restructure cannot make the indices agree by accident.
+    const thinking = nodes[thinkingAt]
+    expect(
+      thinking.compareDocumentPosition(nodes[firstToolRowAt]) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+    expect(
+      thinking.compareDocumentPosition(nodes[bodyAt]) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+  })
+
+  it("§12 — NO SECOND GATE: the mount carries no tool test and no key, and the block never spells tool_calls", () => {
+    // D-243-01: "the tool-conditionality disappears BY CONSTRUCTION". A tool test on the
+    // mount would restore the defect 8 just closed, in a form that reads as tidiness. A
+    // `key=` would close an open fold on every temp-id to DB-id reconcile (13). Both are
+    // cheap to write and invisible in review - hence a fence.
+    const mount = soleMountExpression(chatSource("MessageItem.tsx"), "ThinkingBlock")
+    expect(mount).toContain("<ThinkingBlock")
+    expect(mount).not.toContain("tool_calls")
+    expect(mount).not.toContain("key=")
+    // And the block itself cannot be conditioned on tools even internally.
+    expect(chatSource("ThinkingBlock.tsx")).not.toContain("tool_calls")
+    // T-243-02-01: provider-authored reasoning renders as React TEXT CHILDREN ONLY.
+    expect(chatSource("ThinkingBlock.tsx")).not.toContain("dangerouslySetInnerHTML")
+  })
+
+  it("§13 — the fold SURVIVES the temp-id to DB-id reconcile — the remount semantics, DECIDED here", () => {
+    // 243-PATTERNS F.8 flagged this as a thing 243-02 must DECIDE rather than inherit.
+    // `RunCard` holds `thinkingOpen` today and is not re-keyed, so an open fold survives the
+    // reconcile; `MessageList.tsx:220` keys a run-bearing assistant row by `runId`, which is
+    // STABLE across the id swap. THE DECISION: no `key` on the mount, so the behaviour is
+    // CARRIED ACROSS the move rather than changed by it. `key={message.id}` is the cheap
+    // answer and it would close an open fold on every reconcile - a behaviour change
+    // smuggled in as tidiness. Case 12 fences the key; this case fences the BEHAVIOUR, so
+    // the two cannot drift apart.
+    const before = makeMessage({
+      id: "temp-abc",
+      runId: "run-1",
+      runStatus: "streaming",
+      reasoningContent: REASONING_MEDIAN,
+    })
+    const { rerender } = renderWithTooltip(<MessageItem message={before} isStreaming />)
+    fireEvent.click(screen.getByTestId("thinking-trigger"))
+    expect(screen.getByText(REASONING_MEDIAN, { normalizer: RAW }).textContent).toBe(REASONING_MEDIAN)
+
+    // The reconcile: the SAME run, now carrying its persisted DB id.
+    rerender(
+      <TooltipProvider>
+        <MessageItem message={{ ...before, id: "msg-db-1" }} isStreaming />
+      </TooltipProvider>,
+    )
     expect(screen.getByText(REASONING_MEDIAN, { normalizer: RAW }).textContent).toBe(REASONING_MEDIAN)
   })
 })

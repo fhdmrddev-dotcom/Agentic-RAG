@@ -16,6 +16,7 @@ import { useWorkflowLockForThread, usePhases } from "@/providers/StreamsProvider
 // keyed, additive — mirrors panelOpenSignal).
 import { requestProducerResubscribe } from "@/providers/producerResubscribeSignal"
 import { RunCard, RunTerminalStatus } from "./RunCard"
+import { ThinkingBlock } from "./ThinkingBlock"
 import { UserBubble } from "./UserMessageBubble"
 // BUG-260904-01: the inline Continue card below calls `continueRun`, and this import had gone
 // missing — the click threw `ReferenceError`, the surrounding catch logged it, and the button
@@ -355,6 +356,24 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
             (message.tool_calls?.length ?? 0) === 0 &&
             !allToolsDone
           }
+        />
+        {/* Phase 243 Plan 02 (CHAT-01 / CHAT-04 / D-243-01 — sketch 235 winner B) — THE ONE
+            REASONING RENDERER, mounted for BOTH message shapes.
+            ⛔ UNCONDITIONAL BY CONSTRUCTION, AND THAT IS THE WHOLE FIX. It used to live
+            inside `RunCard`, which mounts only on a turn that called a tool — so the 31% of
+            reasoning-bearing turns that call none had their reasoning drawn NOWHERE
+            (measured: 105 of 340 rows, D-243-03). The block self-guards on its own content,
+            so this site tests nothing. ⛔ Do not add a tool condition here; that would
+            restore the defect in a form that reads as tidiness. Fenced on source by
+            `ThinkingBlock.characterization.test.tsx` §12.
+            ⛔ NO `key` EITHER, and it is a DECISION rather than an omission (243-PATTERNS
+            §F.8): `key={message.id}` would close an open fold on every temp-id → DB-id
+            reconcile. Fenced by §12 on source and by §13 on behaviour.
+            ⚠ ORDER IS THE ORDER IN TIME — above the run card's tool rows and above the
+            answer. A sibling of WorkingBadge and RunCard, in the style those two use. */}
+        <ThinkingBlock
+          reasoningContent={message.reasoningContent}
+          isStreaming={isMessageStreaming}
         />
         {message.tool_calls && message.tool_calls.length > 0 && (
           <RunCard message={message} isStreaming={isStreaming} />

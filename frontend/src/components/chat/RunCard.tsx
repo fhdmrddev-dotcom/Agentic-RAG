@@ -6,7 +6,6 @@ import type { Message, ToolCall } from "@/types"
 import { ToolCallPanel } from "./ToolCallPanel"
 import { RunStatusStrip } from "./RunStatusStrip"
 import { outerBannerLabel, toolLabel } from "@/lib/toolMeta"
-import { FoldTrigger } from "./FoldTrigger"
 // ── Phase 214-11 Task 2 (STEP-04 / D-214-16 / D-214-14) — THE ONE STEP-IDENTITY ELEMENT.
 //
 // ⚠ THE SHAPE THIS SURFACE HANDS IN IS DELIBERATELY EMPTY, AND THAT IS THE HONEST ANSWER
@@ -29,7 +28,6 @@ import { FoldTrigger } from "./FoldTrigger"
 import { StepIdentity } from "@/components/workflows/StepIdentity"
 import { unifiedStepCount } from "@/lib/stepCount"
 import { categorizeError } from "@/lib/errorCategories"
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 
 interface RunCardProps {
   message: Message
@@ -87,8 +85,6 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
   // on every render. Reset on message.id change so DB-reload remounts get
   // the default-collapsed historical view.
   const [userExpanded, setUserExpanded] = useState(false)
-  // Phase 076.2 D-01: collapsible Thinking block state — collapsed by default.
-  const [thinkingOpen, setThinkingOpen] = useState(false)
   // Reset user-toggle when message identity changes (e.g., temp-id → DB-id
   // swap on first persistence reconcile). Pattern matches the pre-fix
   // RunCard's setExpanded(false) effect; setState-in-effect is intentional.
@@ -470,40 +466,25 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
           false for terminal+tools turns until user clicks to expand). */}
       {expanded && (
         <div className="p-3">
-          {/* Phase 076.2 D-01: Collapsible Thinking block for DeepSeek reasoning content.
-              Three rendering states:
-              1. reasoningContent present (streaming or completed): collapsible block
-              2. Streaming + isPlanning + no reasoningContent yet: placeholder shimmer
-              3. Neither: nothing rendered */}
-          {message.reasoningContent ? (
-            <Collapsible open={thinkingOpen} onOpenChange={setThinkingOpen} className="mb-2">
-              <CollapsibleTrigger asChild>
-                {/* Phase 224-05 (BUG-260902-07, second half): the SHARED FoldTrigger — the
-                    same element CitationList mounts. This trigger carried the identical
-                    buried-control defect (text-xs, muted/80, a bare 12px chevron, no
-                    surface) and is fixed ONCE for both rather than twice similarly.
-                    ⚠ NO `count`: reasoning has no countable unit and inventing one would be
-                    fabricated precision. ⚠ The DEFAULT is untouched — `useState(false)`
-                    above is correct and flipping it would be a regression dressed as
-                    consistency (224-PREFLIGHT §3.2). */}
-                <button
-                  data-testid="thinking-trigger"
-                  aria-expanded={thinkingOpen}
-                  className="px-3 py-1.5 text-left"
-                >
-                  <FoldTrigger
-                    open={thinkingOpen}
-                    label={isStreamingNow ? "Thinking..." : "Thinking"}
-                  />
-                </button>
-              </CollapsibleTrigger>
-              <CollapsibleContent className="data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0">
-                <div className="px-3 py-2 text-xs text-muted-foreground whitespace-pre-wrap font-mono leading-relaxed max-h-64 overflow-y-auto border-l-2 border-muted-foreground/20 ml-3">
-                  {message.reasoningContent}
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
-          ) : isStreamingNow && message.isPlanning ? (
+          {/* Phase 076.2 D-01 — STATE 2 OF THREE, AND THE ONLY ONE STILL HERE.
+              ⚠ THE OTHER TWO LEFT IN Phase 243 Plan 02, AND THE SPLIT IS RECORDED RATHER
+              THAN SILENT. The original contract read:
+                1. reasoningContent present (streaming or completed): collapsible block
+                2. Streaming + isPlanning + no reasoningContent yet: placeholder shimmer
+                3. Neither: nothing rendered
+              States 1 and 3 are now `ThinkingBlock.tsx`, mounted from `MessageItem` for
+              BOTH message shapes (D-243-01 / sketch 235 winner B) — because this card is
+              mounted only on a turn that called a tool, and 31% of reasoning-bearing turns
+              call none, so their reasoning was drawn nowhere.
+              ⭐ STATE 2 STAYED ON PURPOSE, and the reason is measured: `elapsedLabel` comes
+              from 55 lines of card-internal derivation above (`:143-198`) reading three
+              fields of the whole message. This is a planning-GAP placeholder on a live run,
+              not a reasoning renderer — it draws only when reasoning is ABSENT — so leaving
+              it here creates no second renderer and costs no prop widening.
+              ⚠ The `!message.reasoningContent` guard is what used to be the ternary's first
+              arm. It is written out explicitly so the mutual exclusion §6b pins survives BY
+              CONSTRUCTION rather than by the shape of a chain that no longer exists. */}
+          {!message.reasoningContent && isStreamingNow && message.isPlanning && (
             <div
               data-testid="thinking-row"
               className="px-3 py-1.5 text-xs italic text-muted-foreground/80 flex items-center gap-2"
@@ -519,7 +500,7 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
                 </span>
               )}
             </div>
-          ) : null}
+          )}
           <ToolCallPanel
             toolCalls={message.tool_calls ?? []}
             subAgent={message.sub_agent}
