@@ -4,10 +4,10 @@ title: Settings → Connections shows no "Add connection" button on cloud (local
 reported: 2026-08-10
 surface: Agentic-RAG
 severity: medium
-status: folded
+status: closed
 affected_areas: [settings/connections, deployment/cloud-parity, admin/feature-visibility]
 folded_into: "212"
-verified_closed_by: null
+verified_closed_by: "2026-09-04 — operator-driven on https://superrag.cloud after the v3.9 push: Slack connected (checked just now, Ready) and Google Workspace OAuth connected (Ready)"
 related_seeds: [SEED-144, SEED-145, SEED-146]
 re_open_trigger: "⚠ FOLDED INTO 212 AND SHIPPED, BUT THE CLOUD HALF WAS NEVER VERIFIED — that is why
   status stays `folded` and `verified_closed_by` stays null. Phase 212 shipped the catalog, the
@@ -17,7 +17,54 @@ re_open_trigger: "⚠ FOLDED INTO 212 AND SHIPPED, BUT THE CLOUD HALF WAS NEVER 
   and nothing in Phase 212 was driven there. The write affordance sits behind TWO conjuncts —
   `isOrgAdmin && liveConnectorsOn` (ConnectionsTab.tsx) — and only the second was exercised.
   FLIP TO `closed` ONLY AFTER: a cloud install shows the Add affordance and a Popular service
-  connects there. Until then this is shipped-but-unverified on the exact surface it was filed
+  connects there.
+
+  ⭐ **HALF ONE IS NOW DRIVEN — 2026-09-04, ON CLOUD, AT THE v3.9 PRODUCTION PUSH.**
+  Immediately after `826ca7022` deployed, the reviewer drove `https://superrag.cloud/app` →
+  Connections in a real browser on the operator's own logged-in session. **The catalog renders 13
+  services with the Popular row (Slack / GitHub / Notion), the All / Connected / Not connected
+  filter, and `+ Add a connection` is PRESENT** — so both conjuncts of
+  `isOrgAdmin && liveConnectorsOn` are satisfied on a cloud install, which is the exact thing this
+  report said had never been exercised. Clicking it OPENS the form, which asks *which service*
+  first and refuses honestly (*'sends to nothing yet — fill the fields above'* /
+  *'Save is off until this connection has a name and names a service'*). Nothing was saved.
+  ✅ Also observed on the same screen: the pre-existing **Gmail (test)** row reads
+  `✓ Ready · checked 8d ago · Used by 1 step` — an EXISTING row that migration 127 backfilled
+  `service_id` onto, rendering correctly. That is independent evidence 127 worked on real data.
+
+  ⚠ **STATUS STAYS `folded` AND `verified_closed_by` STAYS NULL, DELIBERATELY.** This report's own
+  bar is TWO things, and only one was driven: *a Popular service has NOT been connected on cloud.*
+  Closing on half the evidence is the exact habit this register exists to prevent.
+  **NARROWED re-open trigger — flip to `closed` when:** a Popular service (Slack, GitHub or Notion)
+  completes a real connect on `superrag.cloud` and reaches `Ready`. Everything else it asked for
+  is now evidenced.
+
+  ### ✅ CLOSED 2026-09-04 — THE SECOND HALF WAS DRIVEN TOO, BY THE OPERATOR, ON CLOUD
+
+  Within the hour, the operator connected **Slack** and **Google Workspace** on
+  `https://superrag.cloud` themselves and reported it working; the reviewer captured the state
+  immediately after:
+
+  | row | evidence on cloud |
+  |---|---|
+  | **Slack** | `slack.com/api · #C0BNK1QCF8F` `fixed` · **`checked just now`** · ● ✓ Ready. The Popular strip flipped from `Connect` to **"1 connection / Manage"** |
+  | **Google Workspace** | `OAuth connected` · ● ✓ Ready · account `fhdmrd@gmail.com` · default posture **Ask first** |
+  | Gmail (test) | ✓ Ready · `checked 8d ago` · used by 1 step |
+
+  **Both conjuncts of this report's own bar are now satisfied** — the Add affordance renders on a
+  cloud install AND a Popular service completed a real connect there, with a live credential check.
+  `isOrgAdmin && liveConnectorsOn` both hold on cloud, which is the pair this report was filed about.
+
+  ⭐ **The Google half also proves the OAuth chain end to end on production**: the reviewer registered
+  `https://api.superrag.cloud/connectors/oauth/callback` as a second redirect URI on the `Agentic RAG`
+  client (`877112366454-1se0oiff…`, project `gen-lang-client-0884630674`) alongside the untouched
+  localhost entry, and the connect completed against it. `BACKEND_PUBLIC_URL` was set to
+  `https://api.superrag.cloud` in the same session — without it the flow returns to localhost.
+
+  ⚠ **Recorded rather than smoothed:** the operator performed the connects; the reviewer registered the
+  redirect URI and observed the result. **Nothing here proves a Slack SEND or a Drive READ** — only that
+  the connections exist, hold credentials, and report Ready. A first outbound call on cloud is still
+  undriven. Until then this is shipped-but-unverified on the exact surface it was filed
   against. Re-open immediately if a cloud user still sees no Add button after 212 deploys."
 reproduces_on:
   branch: production

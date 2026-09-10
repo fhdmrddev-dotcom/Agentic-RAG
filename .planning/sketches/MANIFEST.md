@@ -2507,3 +2507,248 @@ machinery.
 decision cannot be rendered back into the transcript at the quality `SeamCard` already reaches for
 `ask_user` — a hole on reload, or machinery beyond a new `SeamKind`. **Decide it at plan-phase, before
 the dock is built.**
+
+---
+
+### Phase 233 session — the preview, and what it costs to look (2026-09-05)
+
+⚠ **`.planning/sketches/` holds 227 and 228; this MANIFEST does not.** Grepped at this session's start:
+zero rows for `227-the-paused-queue-and-its-refusal` or `228-who-will-see-what-this-brings-in`. Recorded
+rather than backfilled — 228's winner is locked in its own README (**B + A**, operator, 2026-09-05) and can
+be transcribed by whoever owns it; 227's is unknown to this session and **guessing it would be worse than
+the gap**. Same failure the seeds register has: a winner that lives only in a folder is invisible to the index.
+
+**G-2 is MANDATORY for Phase 233** — the ROADMAP says so in the phase's own flags, and *"the four bucket
+labels are the deliverable, not decoration"*. Both sketches are therefore acceptance bars, not explorations.
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 229 | the-four-buckets | How do four buckets read so the fourth one's uncertainty is FELT, not filed away? | ✅ **C · the proportional spine** (operator, 2026-09-05) — recommendation had been A + C's bar | phase-233, prev-01, lib-09, preview, animation, g-2, acceptance-bar |
+| 230 | nothing-has-been-written-yet | When the buckets are a bar, what does the confirm look like — and where does a NAMED refusal live once prose is off the screen? | ✅ **A · the bar dissolves** (operator, 2026-09-05), + **C's zero-line** as its footer · ⛔ B fails SC#5 | phase-233, prev-02, prev-03, lib-09, dry-run, refusal, two-tier-identity, g-2 |
+
+### The axis both sketches were decided on
+
+⭐ **Not "which is prettiest" — "which state can this surface be left in".** Sketch 229's SC#1 says a person
+*sees four lists*; the question that separates three good-looking layouts is whether any interaction produces
+a **three-bucket screen**. Variant B's filter chips do, in one click, and that state survives a screenshot and
+a handover — so B is rejected **on the criterion, not on taste**, and is kept in the file as the visible
+counter-example rather than deleted. This is the same reading that decided sketch 228: a clause worded
+*"there is no path where it is absent"* can only be met **by construction, never by audit**.
+
+### Motion had to earn its place, and the test was stated before it was written
+
+Both sketches animate, and the bar was: **remove the animation and the surface must still be honest; remove
+the thing the animation carries and it must not be.**
+
+- **229** — files fly from the scanner head into a lane, one at a time. **Three lanes settle; the fourth does
+  not.** It keeps a hatched ground and a breathing count, so you *watch the preview decline to guess*.
+- **230** — the four unknowns resolve **one at a time** after the confirm, each landing in the Library or in a
+  **named refusal**. `outcome` has exactly three values and there is deliberately no fourth, because
+  *"silently in neither"* is the failure SC#5 names.
+
+### ⭐ The four bucket labels, and the claim that must never come back
+
+| Bucket | Label (verbatim) | The qualifier that travels with it |
+|---|---|---|
+| 1 | **Will be added** | destination per file, incl. any rule-suggested folder |
+| 2 | **Already here** | *matched by source file, not by content* — **never** a hash claim |
+| 3 | **Type not supported** | we can't read this kind of file; nothing is imported |
+| 4 | **Can't tell without reading it** | each row names *why* we can't tell |
+
+⛔ **`PROJECT.md`'s "a `content_hash` lookup, not a guess" is FALSE for a list-only pass** and must not be
+reinstated in the copy. `documents.py:620` hashes raw **bytes** (needing the download the preview exists to
+avoid); Google Drive publishes **no** hash for native Docs/Sheets/Slides; Microsoft Graph guarantees only
+`quickXorHash` and populates hashes **after** download. **Tier 1 at preview time is
+`(source_system, external_id, source_version)` compared for equality; Tier 2 `sha256` still runs at splice** —
+and 230 shows one file resolving exactly that way, which is the honest end of a Tier 1 *"we can't tell"*.
+
+### Both sketches are DRIVEN, and one guard was proven broken before it was trusted
+
+`node drive.cjs` in each folder — **52 and 38 assertions**, extracted from the running sketch rather than from
+a copy of it. 230's harness **cross-checks 229's fixture**, so the preview and the confirm cannot come to
+disagree about the same folder (a ROADMAP failure mode in its own words).
+
+⚠ **Eight defects were planted and driven RED — and the FIRST ONE DID NOT FIRE.** 229's "already here must
+not overclaim a hash" check searched the whole document, so rewriting variant A's copy to *"matched by content
+hash"* still passed: the phrase survived in variant C and in the footnotes, and the sub-region regex silently
+matched nothing at all. **The guard was region-scoped, given a "region was found" assertion, and re-driven
+RED.** It is recorded rather than quietly fixed, because *a guard that cannot fail on the defect it names is
+decoration* — and this one was written by the same session that wrote the thing it was guarding.
+Both `index.html` files restored **md5-identical** after every plant.
+
+### What 230 hands forward rather than settling
+
+**Variant B (the Library tree with dashed "would add" ghost rows and `41 → 44` projected counts) is DEFERRED,
+not rejected.** SC#3 is worded at the **row** grain — *"where **each file** would land"* — and 229's rows
+already carry that. B answers a different, real question (*what happens to my Library?*) and is the natural
+shape for **Phase 234's folder mapping**. Carry it forward; do not re-derive it.
+
+**One rule survives from it regardless:** a projected row must be **visibly not a row** — dashed border, a
+*would* verb, and counts rendered as a transition (`41 → 44`) never as a new total. Same principle as the
+185 canvas seal: *a projection that renders like a fact is a lie with good typography.*
+
+### ⚠ BOTH SKETCHES WERE REBUILT THE SAME SESSION — the operator's critique, and why the fix was structural
+
+> *"for 230 it is too dense and it includes a lot of text that's very messy and very polluted"* … then, after
+> 229's winner was recorded: *"and even 229 includes a lot of text and noise"*.
+
+**The critique was correct, and the defect was mine in a specific way: I put the reasoning ON THE SCREEN.**
+Four consequence paragraphs in the confirm, a three-column notes block under every variant, three variants
+stacked on one scrolling page, and every refusal reason printed at rest. A sketch whose argument is written
+across the mock is no longer showing the design — it is arguing for it, on top of it.
+
+**The fix was structural, not a trim:**
+
+| Was | Now |
+|---|---|
+| 3 variants stacked on one page | **one at a time behind tabs**, winner first and marked |
+| notes columns beside every variant | a **`notes` toggle, OFF by default** |
+| full reasons printed on every row | a **3-4 word fragment**, full sentence **on hover** |
+| verbatim SC blockquotes + long footers | a 4-row table in the README; nothing on the screen |
+| 229 ~740 lines / 230 ~700 | **229 · 499 · 230 · 513** |
+
+⭐ **And the guards were extended to hold it there.** `drive.cjs` now asserts *annotations are off by
+default*, *only one variant is on screen at a time*, and *reasons are delivered by hover rather than
+rendered at rest* — driven RED against a planted `.note{display:block}`. **Density is now a regression that
+fails a check**, not a matter of taste that drifts back next session.
+
+⚠ **230's variants were REPLACED, not re-labelled.** Once 229's winner was C, the confirm had to compose
+with a **bar**, so the receipt-and-resolution shape was rebuilt as *"the bar dissolves"* — the hatched
+segment shrinking file-by-file into `added` / `already here` / a new red `refused`. The old destination-tree
+variant is **deferred to Phase 234**, carrying one rule with it: a projected row must be **visibly not a
+row** — dashed, a *would* verb, counts as `41 → 44` never as a new total.
+
+⚠ **B is kept in 230 as the OPPOSITE failure.** Four dots that flip colour are maximally lean and **fail
+SC#5**: a refusal that is only a colour is a count, not a named refusal. **Density is not the only way to
+fail this screen** — and a sketch session that had just been told "too dense" needed that counter-example
+on the record.
+
+### ⭐ THE ONE MEASURE — 1152px, and the ruling that was already made and never propagated
+
+> Operator, 2026-09-05: *"why the width is reduced — where this page will be … we should unify the width
+> of all"*.
+
+**The sketches' 880/900px was the SKETCH PAGE's container, not a product decision** — said plainly rather
+than defended. But the question exposed two measured facts worth more than the fix:
+
+**1. `SourceFolderPicker.tsx` — shipped at `232-04` — is MOUNTED NOWHERE.** `grep -rl SourceFolderPicker
+frontend/src` returns the component and its own test and nothing else. **Phase 233 must give it a home**, and
+the recommendation is the Library's **Ingestion tab** (where `IngestionTab` already hosts upload, and where
+Phase 234's watch loop lands) — **not a sixth tab**. A phase that ships a picker with no mount site is how a
+capability becomes invisible to everything except its own suite.
+
+**2. The operator's own prior width ruling is sitting in the code, un-propagated.** `SettingsPage.tsx:930-950`
+carries a comment dated **2026-08-28** quoting *the same complaint* — *"why did we make it narrow… we have to
+maintain consistency in all the pages"* — which adopted `max-w-6xl` for Settings **and stopped there**.
+Re-derived 2026-09-05:
+
+| Page | Container | px |
+|---|---|---|
+| `SettingsPage.tsx:950` | `max-w-6xl w-full mx-auto` | **1152** |
+| `ConnectionsPage.tsx` | `max-w-6xl` | **1152** |
+| `WorkflowsPage.tsx:1238` | `max-w-[1200px] mx-auto` | 1200 |
+| `WorkflowBuilderPage.tsx:2053` | `max-w-[640px]` | 640 |
+| **`LibraryPage.tsx:641`** | `p-8` — **no max-width** | **unconstrained** |
+| `GovernancePage` · `SkillsPage` | none | unconstrained |
+
+⭐ **DECISION: `max-w-6xl` = 1152px is THE measure.** Chosen because the app **already uses it twice** and it
+was the operator's own adoption — **taking a precedent rather than inventing a fifth number**, which is the
+identical reasoning the 2026-08-28 comment used, and the reason the count is four widths and not five.
+
+- Both sketches declare a single `--measure:1152px` token and consume `var(--measure)`. **`drive.cjs` pins it
+  in BOTH files and asserts they agree with each other** — driven RED against a drift back to 880px and
+  against a re-introduced literal.
+- ⚠ **`LibraryPage` is the actual inconsistency, and it is unconstrained TODAY.** Applying `max-w-6xl` there
+  is a one-line change; **the thing to eyeball is the Documents tab**, which pairs a folder rail with a
+  seven-column table whose column order is load-bearing (`LibraryPage` sheds columns 3-5 by `nth-child`).
+- ⚠ `WorkflowsPage`'s `1200` is 48px off the same measure. **Named, not silently folded in** — outside this
+  phase's blast radius, and a fifth number appearing by accident is exactly what this entry exists to stop.
+
+⭐ **Both G-2 sketches are now LOCKED: 229 → C, 230 → A.** Phase 233 has its acceptance bar.
+
+---
+
+## 231 · The space budget and the honest confirm — ✅ **LOCKED → A**
+
+**Phase 233.1 · G-2 · variants 3 (+ a measured "today") · 59 assertions**
+
+Raised by the operator while **driving the shipped preview**, which is the only reason either
+question exists. Two of them, on one surface.
+
+### ⚠ CORRECTION TO THE 229/230 ENTRY ABOVE — THE 1152 MEASURE WAS REVERTED
+
+The entry above records *"⭐ DECISION: `max-w-6xl` = 1152px is THE measure"* and says applying it to
+`LibraryPage` is a one-line change. **Phase 233 shipped exactly that, and the operator reverted it
+the same day** — *"why is it not full-width like other pages"*. The original entry is kept unedited
+rather than rewritten, because **the reasoning failed in an instructive way: it derived a
+whole-app rule from TWO pages and never checked the rest.**
+
+Re-measured across every page:
+
+| Page | Width | Shape |
+|---|---|---|
+| Settings · Connections | `max-w-6xl` (1152) | **forms** |
+| Workflows | `max-w-[1200px]` | cards |
+| Skills · Chat | **none — full width** | **data** |
+| Library | **none — full width** | **data** |
+
+⭐ **The convention is not one number. It is: form-shaped pages are constrained, data-dense pages
+are full width.** `231/drive.cjs` asserts that this sketch declares **no width token at all**, so
+the reverted decision cannot creep back in through a mockup.
+
+### ⭐ The deciding clause — and it did not exist when 230 was drawn
+
+> **After you confirm and navigate away, what does the surface say when you come back?**
+
+**230-A won on a dissolve that assumed confirm did the work synchronously. It no longer does.**
+`BUG-260905-04` routed connector imports onto the durable queue (5 concurrent), so `added` changed
+meaning from *"in the Library and searchable"* to *"accepted into a queue"* — and the shipped
+reconciliation line still says `preview said 12 → 12 added` while those twelve are `pending`. **An
+honesty defect introduced by a correct fix**, which is why the sketch had to re-answer the question
+rather than repaint the drawing.
+
+⚠ **The three terminal outcomes are UNCHANGED** — `added` · `here` · `refused`, because SC#5 depends
+on there being no fourth destination. What the queue adds is a **journey**: *Waiting → Reading →
+**Readable***. ⭐ *Readable*, not *added* — **added is what the system did; readable is what the
+person gets.**
+
+### The space arithmetic
+
+**~212px before one functional pixel, and 48% of that band empty.** Title + sub-line (62) ·
+breadcrumb (38) · primary tabs (56) · **second** tab strip (56). Three findings from
+`LibraryPage.tsx:656-690`: the breadcrumb is **pure duplication** (the sidebar says *Library*, the
+tab says *Documents*); the parent and child tab strips **stack**; and the hero dropzone claims a
+full band for one action while the folder rail scrolls in a cramped column.
+
+### The variants
+
+| | Variant | Deciding clause |
+|---|---|---|
+| **A** | one bar, one strip — title + tabs + a live **queue pill** in 46px | ✅ passes — the pill is on the shell |
+| **B** | the rail owns the tabs — most space reclaimed | ⛔ **fails** — no home for the queue |
+| **C** | the queue is chrome — the bar migrates into a shell strip | ✅ passes, with room to spare |
+
+⭐ **LOCKED 2026-09-05 (operator): A.** The recommendation was A+C and is preserved below rather than overwritten. ⚠ **C's strip is not built, so its job falls to the pill — which must therefore live ABOVE the route, not merely look like it does.**
+
+**Superseded recommendation: A's header with C's strip** — they compose. A decides where the page spends its
+pixels; C decides what happens when work outlives the panel. A's pill is the resting state, C's
+strip is what it expands into while a run is live: **one object at two sizes, not two designs.**
+⚠ B's space win is real and should be harvested separately — it just cannot be the only change.
+
+**Five defects planted, five fired**; `index.html` restored md5-identical.
+
+---
+
+## Session 2026-09-06 — Phase 234: The Watch Loop and Its Sentence (Sketch 232)
+
+**G-2 sketch gate for Phase 234.** `ROADMAP.md` flags Phase 234 with `⚠ G-2 SKETCH (SURF-01's sentence + the watch-config screen)`.
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 232 | the-watch-loop-and-its-sentence | How does an autonomous background watch loop present itself to a user — its cadence, its status, its failures, and its boundaries — without ever misleading someone into expecting instant sync, and without destroying knowledge when a remote file disappears? | **A — Ingestion Tab Home + Exact Cadence Sentence + Named Reconnect** ★ | phase-234, surf-01, lib-08, vis-03, vis-05, d-4, watch-loop, g2-sketch-gate |
+| 233 | the-source-says-what-it-did | With twelve sources connected and two needing you, how much should a HEALTHY source say? | ✅ **B — a healthy source is one line** ★ (operator, 2026-09-06) · **50% less visible text** at rest. ⚠ The FIRST fork (where the fix lives) was REFUTED: 248 chars differed out of 30,000, landing screens pixel-identical | phase-235, lib-10, surf-02, surf-03, seed-239, seed-248, g2-sketch-gate, notification-surface |
+
+- **SURF-01 Cadence Sentence**: Exact copy *"checked every N minutes"*, strictly forbidding *"instantly"* or *"on change"*.
+- **SC#3 Lifecycle Actions**: Warning banner for disconnected source with *"Reconnect {connection_name}"* action offered by name, plus *"Purge missing files"* action.
+- **G-1 Pre-emption**: Mounted inside the Library Ingestion surface, leaving `ConnectionFormPanel.tsx` and `ConnectionsTab.tsx` completely untouched.
+

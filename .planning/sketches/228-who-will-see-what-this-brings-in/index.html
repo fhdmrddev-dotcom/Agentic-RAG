@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>228 · Who will see what this brings in</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Manrope:wght@600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --color-bg:hsl(216 45% 4%); --color-bg-elev1:hsl(220 40% 5%); --color-surface:hsl(220 30% 7%);
+  --color-surface-hi:hsl(220 30% 8%); --color-muted:hsl(220 30% 11%); --color-accent:hsl(220 25% 14%);
+  --color-text:hsl(226 60% 97%); --color-text-muted:hsl(220 16% 65%); --color-text-dim:hsl(220 16% 45%);
+  --color-border:hsl(220 20% 16%); --color-border-soft:hsl(220 20% 16% / .5);
+  --color-primary:hsl(239 100% 82%); --color-primary-strong:hsl(239 84% 67%);
+  --color-primary-dim:hsl(239 100% 82% / .15); --color-primary-glow:hsl(239 100% 82% / .35);
+  --color-violet:hsl(258 90% 66%);
+  --color-success:hsl(142 71% 45%); --color-success-dim:hsl(142 71% 45% / .15);
+  --color-warning:hsl(38 92% 60%); --color-warning-dim:hsl(38 92% 60% / .15);
+  --color-danger:hsl(0 72% 51%); --color-danger-dim:hsl(0 72% 51% / .15);
+  --color-indigo:hsl(243 75% 68%);
+  --font-sans:'Inter',ui-sans-serif,system-ui,sans-serif;
+  --font-headline:'Manrope','Inter',sans-serif;
+  --font-mono:'JetBrains Mono',ui-monospace,monospace;
+  --radius-sm:6px; --radius-md:10px; --radius-lg:14px; --radius-xl:20px; --radius-full:9999px;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--color-bg);color:var(--color-text);font-family:var(--font-sans);font-size:.9rem;line-height:1.55;
+  background-image:radial-gradient(900px 500px at 12% -10%, hsl(239 100% 82% / .05), transparent 60%);
+  background-attachment:fixed;padding:32px 24px 80px}
+h1,h2,h3{font-family:var(--font-headline);margin:0}
+.wrap{max-width:1180px;margin:0 auto}
+.page-head{margin-bottom:28px;padding-bottom:20px;border-bottom:1px solid var(--color-border)}
+.page-head h1{font-size:1.5rem;letter-spacing:-.02em}
+.page-head p{color:var(--color-text-muted);margin:8px 0 0;max-width:78ch}
+.crit{margin-top:14px;padding:12px 14px;border-left:2px solid var(--color-primary-strong);
+  background:var(--color-primary-dim);border-radius:0 var(--radius-md) var(--radius-md) 0;
+  font-size:.85rem;color:var(--color-text-muted);max-width:88ch}
+.crit b{color:var(--color-text)}
+
+.variants{display:flex;flex-direction:column;gap:34px;margin-top:34px}
+.variant{border:1px solid var(--color-border);border-radius:var(--radius-lg);background:var(--color-bg-elev1);overflow:hidden}
+.vhead{display:flex;align-items:baseline;gap:12px;padding:16px 20px;border-bottom:1px solid var(--color-border);background:var(--color-surface)}
+.vtag{font-family:var(--font-mono);font-size:.72rem;padding:3px 8px;border-radius:var(--radius-full);
+  background:var(--color-accent);color:var(--color-text-muted);letter-spacing:.04em}
+.vhead h2{font-size:1.02rem}
+.vhead .sub{color:var(--color-text-dim);font-size:.82rem;margin-left:auto;text-align:right;max-width:44ch}
+.vbody{padding:24px 20px;display:grid;grid-template-columns:1fr 300px;gap:24px;align-items:start}
+@media(max-width:900px){.vbody{grid-template-columns:1fr}}
+
+/* ---- the connection panel mock ---- */
+.panel{border:1px solid var(--color-border);border-radius:var(--radius-lg);background:var(--color-surface);overflow:hidden}
+.panel-head{display:flex;align-items:center;gap:11px;padding:15px 18px;border-bottom:1px solid var(--color-border)}
+.svc{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;flex:none;
+  background:linear-gradient(145deg,hsl(220 30% 13%),hsl(220 30% 9%));border:1px solid var(--color-border);font-size:1rem}
+.panel-head .nm{font-weight:600;font-size:.94rem}
+.panel-head .acct{color:var(--color-text-dim);font-size:.78rem;font-family:var(--font-mono)}
+.panel-body{padding:18px}
+.field{margin-bottom:18px}
+.field:last-child{margin-bottom:0}
+.label{display:block;font-size:.79rem;font-weight:600;color:var(--color-text-muted);margin-bottom:8px;
+  text-transform:uppercase;letter-spacing:.05em}
+select,input[type=text]{width:100%;background:var(--color-bg-elev1);border:1px solid var(--color-border);
+  color:var(--color-text);padding:9px 11px;border-radius:var(--radius-md);font-family:var(--font-sans);font-size:.87rem}
+select:focus,input:focus{outline:2px solid var(--color-primary-strong);outline-offset:1px}
+
+/* ---- A: the always-on scope footer ---- */
+.scope-foot{margin-top:9px;display:flex;gap:9px;align-items:flex-start;padding:11px 12px;
+  border:1px solid var(--color-border);border-radius:var(--radius-md);background:var(--color-bg-elev1)}
+.scope-foot .lockmark{flex:none;font-size:.9rem;line-height:1.4}
+.scope-foot .txt{font-size:.845rem;color:var(--color-text);line-height:1.5}
+.scope-foot .txt .who{font-weight:600}
+.scope-foot .meta{display:block;margin-top:5px;font-family:var(--font-mono);font-size:.72rem;color:var(--color-text-dim)}
+.scope-foot.is-org{border-color:hsl(38 92% 60% / .4);background:var(--color-warning-dim)}
+.scope-foot.is-org .who{color:var(--color-warning)}
+
+/* ---- B: audience rows ---- */
+.aud{display:flex;flex-direction:column;gap:8px}
+.aud-row{display:flex;gap:11px;align-items:flex-start;padding:12px 13px;border:1px solid var(--color-border);
+  border-radius:var(--radius-md);background:var(--color-bg-elev1);cursor:pointer;transition:border-color .14s,background .14s}
+.aud-row:hover{border-color:var(--color-accent)}
+.aud-row.sel{border-color:var(--color-primary-strong);background:var(--color-primary-dim)}
+.aud-row.sel.warn{border-color:hsl(38 92% 60% / .55);background:var(--color-warning-dim)}
+.radio{flex:none;width:15px;height:15px;border-radius:50%;border:1.5px solid var(--color-text-dim);margin-top:2px;
+  display:grid;place-items:center}
+.aud-row.sel .radio{border-color:var(--color-primary)}
+.aud-row.sel .radio::after{content:'';width:7px;height:7px;border-radius:50%;background:var(--color-primary)}
+.aud-row.sel.warn .radio{border-color:var(--color-warning)}
+.aud-row.sel.warn .radio::after{background:var(--color-warning)}
+.aud-txt .t{font-weight:600;font-size:.88rem}
+.aud-txt .c{font-size:.815rem;color:var(--color-text-muted);margin-top:3px;line-height:1.45}
+.aud-row.sel.warn .aud-txt .t{color:var(--color-warning)}
+
+/* ---- C: the pre-sync gate ---- */
+.gate{border:1px solid hsl(38 92% 60% / .4);border-radius:var(--radius-lg);background:var(--color-surface);overflow:hidden}
+.gate-rail{height:2px;background:linear-gradient(90deg,var(--color-warning),transparent)}
+.gate-in{padding:18px}
+.gate-in h3{font-size:1rem;margin-bottom:6px}
+.gate-in .lede{color:var(--color-text-muted);font-size:.85rem;margin:0 0 15px}
+.facts{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--color-border);
+  border:1px solid var(--color-border);border-radius:var(--radius-md);overflow:hidden;margin-bottom:15px}
+.fact{background:var(--color-bg-elev1);padding:11px 12px}
+.fact .k{font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-dim)}
+.fact .v{font-size:.87rem;font-weight:600;margin-top:3px}
+.fact .v.w{color:var(--color-warning)}
+.gate-sentence{padding:12px 13px;border-left:2px solid var(--color-warning);background:var(--color-warning-dim);
+  border-radius:0 var(--radius-md) var(--radius-md) 0;font-size:.87rem;margin-bottom:15px}
+.btnrow{display:flex;gap:9px}
+.btn{padding:8px 15px;border-radius:var(--radius-md);font-size:.85rem;font-weight:600;cursor:pointer;
+  border:1px solid var(--color-border);background:var(--color-accent);color:var(--color-text);font-family:var(--font-sans)}
+.btn.primary{background:var(--color-primary-strong);border-color:var(--color-primary-strong);color:hsl(220 45% 6%)}
+
+/* ---- notes column ---- */
+.notes{font-size:.82rem;color:var(--color-text-muted);display:flex;flex-direction:column;gap:14px}
+.note{border-left:2px solid var(--color-border);padding-left:12px}
+.note.good{border-color:var(--color-success)}
+.note.bad{border-color:var(--color-danger)}
+.note.warn{border-color:var(--color-warning)}
+.note .h{font-weight:600;color:var(--color-text);font-size:.79rem;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
+.note code{font-family:var(--font-mono);font-size:.76rem;background:var(--color-muted);padding:1px 5px;border-radius:4px}
+
+.foot{margin-top:44px;padding-top:22px;border-top:1px solid var(--color-border);color:var(--color-text-dim);font-size:.82rem}
+.foot h3{font-size:.92rem;color:var(--color-text);margin-bottom:10px}
+.foot ul{margin:0;padding-left:20px;line-height:1.7}
+.foot code{font-family:var(--font-mono);font-size:.76rem;background:var(--color-muted);padding:1px 5px;border-radius:4px}
+.kbd{font-family:var(--font-mono);font-size:.72rem;border:1px solid var(--color-border);border-bottom-width:2px;
+  padding:1px 5px;border-radius:4px;background:var(--color-muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="page-head">
+  <h1>228 · Who will see what this brings in</h1>
+  <p>Phase 231 · <code>VIS-02</code>. A connection is about to start placing documents into the knowledge base that
+  <em>nobody chose to upload</em>. The sentence naming who can then read them is the deliverable — not decoration
+  around it.</p>
+  <div class="crit">
+    <b>SC#1, verbatim:</b> “A person setting up a connection reads <b>one plain sentence</b> saying who will be able to
+    see everything it brings in — before it brings anything in. <b>There is no configuration path where that sentence
+    is absent.</b>”<br>
+    → The deciding axis is therefore <b>coverage</b>, not eloquence. A variant that reads beautifully on the happy path
+    but can be skipped loses.
+  </div>
+</div>
+
+<div class="variants">
+
+  <!-- ============ A ============ -->
+  <div class="variant">
+    <div class="vhead">
+      <span class="vtag">A</span>
+      <h2>The always-on scope footer</h2>
+      <span class="sub">The 024 pattern: you can never pick a scope without reading who it means.</span>
+    </div>
+    <div class="vbody">
+      <div class="panel">
+        <div class="panel-head">
+          <div class="svc">▲</div>
+          <div>
+            <div class="nm">Google Drive</div>
+            <div class="acct">fhdmrd@gmail.com</div>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div class="field">
+            <label class="label" for="a-folder">Folder to watch</label>
+            <select id="a-folder">
+              <option>Engineering / Specs</option>
+              <option>Contracts 2026</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="label" for="a-scope">Who can see what this brings in</label>
+            <select id="a-scope">
+              <option>Only me</option>
+              <option>Everyone in Acme Corp</option>
+            </select>
+            <div class="scope-foot">
+              <span class="lockmark">🔒</span>
+              <span class="txt">
+                Documents this connection brings in will be visible to <span class="who">you only</span>.
+                Nobody else in Acme Corp will see them in the Library, in search, or in an answer the agent gives.
+                <span class="meta">ingest_visibility = private · 4 enforcement sites</span>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="notes">
+        <div class="note good"><div class="h">Why it wins on the criterion</div>
+          The sentence is <em>bound to the control</em>, not to a step. Every path that can set a scope renders the
+          footer by construction, because the footer <em>is</em> part of the scope field — there is no path to check.</div>
+        <div class="note good"><div class="h">Precedent</div>
+          Sketch 024's always-on <code>🔒</code> endpoint footer, adopted for exactly this reason: “you can never pick a
+          model without seeing where it runs.”</div>
+        <div class="note warn"><div class="h">Cost</div>
+          It is quiet. A person clicking through fast may not <em>read</em> it — coverage is guaranteed, attention is not.
+          That is the gap C exists to close.</div>
+        <div class="note"><div class="h">Widening reads louder</div>
+          Selecting “Everyone in Acme Corp” turns the footer amber and names the audience — see B's second row for the
+          copy. Colour is reinforcement, never the only carrier.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ B ============ -->
+  <div class="variant">
+    <div class="vhead">
+      <span class="vtag">B</span>
+      <h2>The sentence <em>is</em> the option</h2>
+      <span class="sub">069-A audience rows: each choice states its own consequence.</span>
+    </div>
+    <div class="vbody">
+      <div class="panel">
+        <div class="panel-head">
+          <div class="svc">▲</div>
+          <div>
+            <div class="nm">Google Drive</div>
+            <div class="acct">fhdmrd@gmail.com</div>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div class="field">
+            <label class="label">Who can see what this brings in</label>
+            <div class="aud">
+              <div class="aud-row sel">
+                <span class="radio"></span>
+                <span class="aud-txt">
+                  <span class="t">Only me</span>
+                  <span class="c">Nobody else in Acme Corp will see these documents in the Library, in search, or in an
+                  answer the agent gives.</span>
+                </span>
+              </div>
+              <div class="aud-row warn">
+                <span class="radio"></span>
+                <span class="aud-txt">
+                  <span class="t">Everyone in Acme Corp</span>
+                  <span class="c">All 26 people in Acme Corp will be able to read these documents and the agent will
+                  quote them in answers — including to people who cannot open the original in Google&nbsp;Drive.</span>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="notes">
+        <div class="note good"><div class="h">The strongest copy</div>
+          There is no separate sentence to go missing, because the sentence <em>is</em> the label. You cannot choose
+          without reading the consequence of the thing you are choosing.</div>
+        <div class="note good"><div class="h">It names the real hazard</div>
+          “…including to people who cannot open the original in Google Drive” is <b>Pitfall 2</b> stated on screen: the
+          connecting user must not silently become a gateway. A footer can omit this; a row that <em>is</em> the choice
+          cannot.</div>
+        <div class="note warn"><div class="h">Cost</div>
+          It only covers surfaces that render this control. A settings screen that edits a connection <em>without</em>
+          re-showing the audience picker has no sentence — the coverage hole A closes structurally.</div>
+        <div class="note"><div class="h">D-5, honestly</div>
+          There is <b>no department row</b>, on purpose. The stored value is enum-shaped
+          (<code>private | org | dept</code>) and the resolver has a <code>dept</code> branch, but a scope nobody can
+          grant must not be offered. <i>Inert means invisible.</i></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ C ============ -->
+  <div class="variant">
+    <div class="vhead">
+      <span class="vtag">C</span>
+      <h2>The pre-sync gate</h2>
+      <span class="sub">The sentence as a moment: nothing has been brought in yet.</span>
+    </div>
+    <div class="vbody">
+      <div class="gate">
+        <div class="gate-rail"></div>
+        <div class="gate-in">
+          <h3>Before anything comes in</h3>
+          <p class="lede">This connection has not placed any documents yet. It will start after you confirm.</p>
+          <div class="facts">
+            <div class="fact"><div class="k">Source</div><div class="v">Drive · Engineering / Specs</div></div>
+            <div class="fact"><div class="k">Will bring in</div><div class="v">148 files</div></div>
+            <div class="fact"><div class="k">Checked</div><div class="v">every 15 minutes</div></div>
+            <div class="fact"><div class="k">Visible to</div><div class="v w">Everyone in Acme Corp</div></div>
+          </div>
+          <div class="gate-sentence">
+            All <b>26 people in Acme Corp</b> will be able to read these 148 documents, and the agent will quote them in
+            answers — including to people who cannot open the originals in Google&nbsp;Drive.
+          </div>
+          <div class="btnrow">
+            <button class="btn primary">Start bringing these in</button>
+            <button class="btn">Change who can see them</button>
+          </div>
+        </div>
+      </div>
+      <div class="notes">
+        <div class="note good"><div class="h">It earns attention</div>
+          A and B guarantee the sentence is <em>present</em>; only C guarantees a moment where it is the <em>only</em>
+          thing to read. It is also the only variant that can state the real count — <b>148 files</b> — because by then
+          the preview has run.</div>
+        <div class="note good"><div class="h">Weight, not friction</div>
+          Sketch 025's rule. No type-to-confirm: this is reversible (narrowing later is one setting) so the guard is a
+          clear consequence, not an obstacle course.</div>
+        <div class="note bad"><div class="h">Alone, it FAILS the criterion</div>
+          A gate fires on <em>first sync</em>. Editing a connection's scope afterwards is a configuration path with no
+          gate and therefore no sentence — precisely the “configuration path where that sentence is absent” SC#1
+          forbids.</div>
+        <div class="note"><div class="h">Reads on the Phase 233 preview</div>
+          C shares a surface with the preview phase. If it is built, the two must be one screen, not two.</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="foot">
+  <h3>What I think, and what the operator must decide</h3>
+  <ul>
+    <li><b>Recommendation: B as the control, A as the guarantee — they are not rivals.</b> B writes the copy (the
+      sentence <em>is</em> the option, and it names the gateway hazard); A is the rule that the copy appears on
+      <em>every</em> path, including the edit-later screens B does not reach. Together they satisfy the “no configuration
+      path where the sentence is absent” clause by construction rather than by audit.</li>
+    <li><b>C is the open question.</b> It is the only variant that earns attention and the only one that can name a real
+      file count — but it duplicates the <b>Phase 233</b> preview surface. Building it here risks two screens that say
+      the same thing. <i>Recommend deferring C to 233 and letting the preview carry the moment.</i></li>
+    <li><b>The department row is deliberately absent</b> (D-5). The stored value is enum-shaped
+      <code>private | org | dept</code> and the resolver carries a <code>dept</code> branch, but no UI offers it. This is
+      069-A's extensible-audience contract applied inbound: <b>never booleans, one swappable resolver</b>.</li>
+    <li><b>Copy is not settled.</b> “Everyone in Acme Corp” vs “All 26 people in Acme Corp” — the count is more honest
+      and more alarming. Both are drawn above; the operator picks.</li>
+    <li><b>Not drawn, and owed:</b> the <em>revoked</em> state. When a connection is disconnected, D-4 says its documents
+      freeze rather than vanish — that sentence has no home yet on this surface.</li>
+  </ul>
+</div>
+
+</div>
+</body>
+</html>

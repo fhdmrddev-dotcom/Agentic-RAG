@@ -81,6 +81,15 @@ function mkSettings(overrides: Partial<FullAppSettings> = {}): FullAppSettings {
     rerank_top_n: 5,
     rerank_has_api_key: false,
     multimodal_max_vision_calls: 100,
+    // SEED-226 — required by the response, so the fixture carries them rather than
+    // the API defaulting them away and hiding a field it forgot to build.
+    vision_model: "",
+    vision_max_pages: 50,
+    // SEED-258 — same rule as the two lines above: the response requires them, so the
+    // fixture states them rather than letting a default hide a field.
+    source_max_file_size_mb: 25,
+    source_max_file_size_mb_floor: 1,
+    source_max_file_size_mb_ceiling: 50,
     retrieval_top_k: 10,
     retrieval_match_threshold: 0.3,
     hybrid_search_enabled: true,
@@ -88,6 +97,13 @@ function mkSettings(overrides: Partial<FullAppSettings> = {}): FullAppSettings {
     vector_search_weight: 1,
     keyword_search_weight: 1,
     rrf_k: 60,
+    // Phase 241 (QUEUE-06 / D-09) — same rule as SEED-258 above: the response requires them,
+    // so the fixture states them rather than letting a default hide a field the API forgot.
+    hnsw_ef_search: 40,
+    hnsw_iterative_scan: "off",
+    hnsw_ef_search_floor: 10,
+    hnsw_ef_search_ceiling: 1000,
+    hnsw_iterative_scan_values: ["off", "strict_order", "relaxed_order"],
     web_search_enabled: false,
     web_search_has_api_key: false,
     web_search_max_results: 5,

@@ -1,6 +1,6 @@
 ---
 seed_id: SEED-171
-title: FOUR suites flake non-deterministically, independent of GSD_VITEST_MAX_WORKERS and of machine load, and not every failure is a timeout — the count gate cannot reach 0 failing on demand
+title: SEVEN suites flake non-deterministically (was FOUR at planting, then five at 196-05, six at the Phase 237 baseline), independent of GSD_VITEST_MAX_WORKERS and of machine load, and not every failure is a timeout — the count gate cannot reach 0 failing on demand
 created: 2026-08-17
 planted_during: Phase 195 Wave 1 post-merge gate (orchestrator)
 status: planted
@@ -331,3 +331,121 @@ been checked against that phase's real diff. Here the check took one `git diff -
 backend **70 failed** = baseline exactly, 13 in-scope unit tests green, and the live audit suite
 **5 passed / 0 skipped**.
 
+
+---
+
+## 2026-09-06 — A SIXTH SUITE, AND THE FIRST ONE OUTSIDE THE WORKFLOWS FAMILY
+
+Recorded by claude as **REVIEWER** while capturing the Phase 237 baseline **before any build work**
+(base `0798d25ea724aa642779cda352fd65b2ccd42313`, `git diff --numstat HEAD -- frontend/` **EMPTY**).
+This is a baseline observation, not a phase finding — which is exactly why it is trustworthy: no one
+had changed anything.
+
+`GSD_VITEST_MAX_WORKERS=2 node scripts/vitest-count-gate.cjs` from the repo root:
+
+```
+  total 7787  ·  failed 3  ·  pinned total 6991
+FAIL  [failing-tests] 3 test(s) failed — the gate requires 0.
+```
+
+Failing set, taken from the gate's **own persisted JSON report** BEFORE anything was re-run:
+
+| File | Test | Signature |
+|---|---|---|
+| `src/pages/WorkflowBuilderPage.canvas.test.tsx` | canvas door — flag ON (D-183-01) | `STACK_TRACE_ERROR` |
+| `src/components/library/__tests__/sketchComposition.test.tsx` | §2 positive control — "the mount harness works" | `STACK_TRACE_ERROR` |
+| `src/components/library/__tests__/sketchComposition.test.tsx` | §2 positive control — "the four shipped tab triggers render" | `TestingLibraryElementError: Found multiple elements with the role "tab" and name "Documents"` |
+
+**`WorkflowBuilderPage.canvas.test.tsx` is already in this seed's set.** The new one is
+**`src/components/library/__tests__/sketchComposition.test.tsx`**, and it is notable on three counts:
+
+1. **It is the first named suite outside `workflows`/`pages`** — the family is wider than the seed's
+   title claims. The title still says FOUR; the set is now **six**.
+2. **Its second failure is a hard assertion, not a timeout** — `TestingLibraryElementError`,
+   duplicate `role="tab"` named "Documents". This is the third independent data point that
+   `STACK_TRACE_ERROR` is **not** a reliable tell for "not a real defect", and the first where the
+   error text points at **DOM left over from a sibling test in the same worker** rather than at
+   slowness. That is a cleanup/isolation smell, and it is the most actionable lead this seed has.
+3. **Both failures are the suite's own POSITIVE CONTROLS** — the same shape as `196-05`. A suite
+   whose positive control fails is asserting that its harness does not work, which is never a
+   product claim.
+
+**Re-run in isolation: `46 passed | 1 skipped (47)` — clean, and the pin (`"sketchComposition.test.tsx": 47`) is intact.**
+⚠ Per this seed's own standing rule, that is recorded as **provably unmodified**, NOT as "fine" —
+one green sample of a flaky suite is not proof of innocence.
+
+### ⭐ REPRODUCED EXACTLY — 2026-09-10 (Phase 241, plan `241-03`)
+
+The sighting above was a single observation. It is now a **reproduction**, and the value of this
+entry changes accordingly: three cases, three signatures, **identical to the table above**, four
+days later, on a different base and by a different plan.
+
+```
+  total 7940  ·  failed 3  ·  pinned total 7170
+FAIL  [failing-tests] 3 test(s) failed — the gate requires 0.
+```
+
+| File | Test | Signature |
+|---|---|---|
+| `src/pages/WorkflowBuilderPage.canvas.test.tsx` | canvas door — flag ON (D-183-01) | `Error: STACK_TRACE_ERROR` |
+| `src/components/library/__tests__/sketchComposition.test.tsx` | §2 positive control — "the mount harness works" | `Error: STACK_TRACE_ERROR` |
+| `src/components/library/__tests__/sketchComposition.test.tsx` | §2 positive control — "the four shipped tab triggers render" | `TestingLibraryElementError: Found multiple elements with the role "tab" and name "Documents"` |
+
+Filenames taken from the gate's **own persisted JSON BEFORE anything was re-run**, as this seed
+requires. Both files are **provably unmodified by `241-03`**: neither appears in
+`git status --short` nor in `git diff --numstat <merge-base> HEAD`, whose entire frontend surface
+is `SettingsPage.tsx`, `SettingsPage.test.tsx`, `SettingsPage.a11y.test.tsx` and a types-only edit
+to `lib/api/skills.ts`. Neither failing suite imports any of them.
+
+- **In isolation, together: `200 passed | 1 skipped (201)`.** Recorded as *provably unmodified*,
+  never as "fine".
+- **The very same gate had read `failed 0` ~20 minutes earlier** on this same worktree, before the
+  frontend edits, and read `failed 0` again on the re-run after them. So on this tree the gate
+  produced **green, red, green** across three runs at `GSD_VITEST_MAX_WORKERS=2`. **The cap was
+  never touched.**
+- ⚠ **The duplicate-`role="tab"`-named-"Documents" error recurring verbatim strengthens the
+  strongest lead this seed has**: it is not slowness, it is DOM left over from a sibling test in
+  the same worker. Two independent occurrences of the *same* leaked accessible name is a cleanup
+  /isolation defect with a reproducible fingerprint — not a timeout.
+
+### The consequence for any phase planning against this
+
+**`count gate OK` was NOT reachable on this tree with zero source changes.** So a phase whose
+acceptance criterion reads *"the gate is green"* has written a criterion that fails for reasons no
+plan controls. **Diff the failing SET against a baseline set captured on the merge base** — never
+compare counts, and never treat red as the builder's until the named file has been checked against
+`git diff --numstat`.
+
+
+---
+
+## ⚠ A SEVENTH SUITE, MEASURED AT PHASE 240'S BASELINE (2026-09-09)
+
+**`src/pages/__tests__/LibraryPage.test.tsx`** joins the list, and it was measured on the
+cleanest possible tree: **the frontend diff since the phase's base commit was EMPTY**
+(`git diff --stat 50f66ec39 HEAD -- frontend` printed nothing) and the count gate was already
+RED.
+
+| Run | Context | Result for this file |
+|---|---|---|
+| Gate run, cap 2 | full `TARGETS` set, no sibling agent | **7 failed** |
+| Isolated, cap 2 | this file alone | **1 failed / 16 passed** — `Test timed out in 5000ms` |
+| Gate run, cap 2, later same session | full set, after ~40 files of frontend work | **0 failed** |
+
+⭐ **Three runs, three different answers, on a file nobody had touched.** That is this seed's
+whole claim restated on a new suite: **the failing SET is never the same twice**, so no per-file
+baseline can absorb it and no cap setting makes `count gate OK` reachable on demand.
+
+⚠ **The same baseline run also reported two suites as `[missing-file]`** —
+`WorkflowBuilderPage.canvas.test.tsx` (pinned 128) and `WorkflowsPage.test.tsx` (pinned 59) —
+i.e. they did not run at all. Both are already on this list. A pinned suite that does not RUN is
+a distinct failure shape from one that runs red, and it is worth naming because the gate's
+`[missing-file]` message reads like a deleted file rather than a suite that timed out on import.
+
+⚠ **The cap was NOT adjusted, per this seed's own standing instruction.** Phase 240 captured the
+failing filenames from the gate's persisted JSON **before** re-running anything, checked each
+against `git diff --numstat`, found every one byte-unchanged, and moved on. The phase's final gate
+run read **`count gate OK` — 7914 total · 7149 pinned · 247/247 · 0 failing**, which is the same
+tree that had been red twice.
+
+⛔ **"Provably unmodified", never "fine."**

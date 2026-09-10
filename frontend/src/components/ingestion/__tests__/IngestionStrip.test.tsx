@@ -40,10 +40,26 @@ import documentsPySource from "../../../../../backend/app/api/documents.py?raw"
 
 // ── EXTRACTION ────────────────────────────────────────────────────────────────────────
 
-/** Every `"ingestion_step": "<name>"` write, in SOURCE ORDER, deduped PRESERVING ORDER. */
+/**
+ * ⚠ THE SECOND NON-STAGE WRITE, and it arrived AFTER this fence was written.
+ *
+ * `documents.py` writes `"ingestion_step": "failed"` — a TERMINAL MARKER, not a pipeline stage.
+ * It is not in `INGESTION_STAGES` and never will be: the strip draws the six things a document
+ * passes THROUGH, and "failed" is where a document stops. It was introduced by `7cca8f50a`
+ * (`229-03`, the email-attachment splice cascade), which turned this fence red — the fence was
+ * doing its job, and what it caught was a real drift in what the backend writes.
+ *
+ * ⚠ It cannot be excluded by CONSTRUCTION the way the `None` reset is: `failed` is a quoted
+ * lowercase value, structurally identical to a stage. So the exclusion is NAMED — and, exactly
+ * like the `None` case, a positive control below asserts the marker really IS present in the
+ * source, so this exclusion is doing work rather than describing an absence.
+ */
+const TERMINAL_MARKERS = new Set(["failed"])
+
+/** Every `"ingestion_step": "<name>"` STAGE write, in SOURCE ORDER, deduped PRESERVING ORDER. */
 function backendStepsInWriteOrder(): string[] {
   const all = [...documentsPySource.matchAll(/"ingestion_step":\s*"([a-z_]+)"/g)].map((m) => m[1])
-  return [...new Set(all)]
+  return [...new Set(all)].filter((s) => !TERMINAL_MARKERS.has(s))
 }
 
 const STAGE_KEYS = INGESTION_STAGES.map((s) => s.key)
@@ -111,6 +127,16 @@ describe("the ORDERED fence over documents.py's live source", () => {
     // ⛔ Do not soften this to a set/sorted comparison. The sketch's A5b did exactly that and was
     // structurally blind to the reorder this assertion exists to catch.
     expect(STAGE_KEYS).toEqual(backendStepsInWriteOrder())
+  })
+
+  it("the terminal 'failed' marker really is written, so its NAMED exclusion is doing work", () => {
+    // Positive control for TERMINAL_MARKERS — mirrors the `None` control below. Without this,
+    // the filter could quietly be excluding a value that no longer exists and the fence would
+    // be one drift weaker than it reads.
+    expect(documentsPySource).toMatch(/"ingestion_step":\s*"failed"/)
+    expect(backendStepsInWriteOrder()).not.toContain("failed")
+    // …and it is not a stage the strip draws.
+    expect(STAGE_KEYS).not.toContain("failed")
   })
 
   it("the reingest reset's legitimate null write is excluded BY CONSTRUCTION, not by an allow-list", () => {

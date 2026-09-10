@@ -1,7 +1,18 @@
 ---
 seed_id: SEED-076
 title: Filtered-vector-search recall + pgvector index strategy at corpus scale (filtered-HNSW recall collapse)
-status: planted
+status: partially-shipped     # ⚠ NOT `closed`. Levers 1-3 and 5-adjacent shipped at Phase 241; lever 4 stays deferred with a NEW trigger below.
+folded_into: 241
+answered: 2026-09-10
+answered_by: "Phase 241 (QUEUE-06) — .planning/phases/241-recall-at-corpus-scale/241-VALIDATION.md"
+re_open_trigger_after_241: >
+  Lever 4 (per-tenant partial indexes / table partitioning) re-opens ONLY when a measured install
+  shows `hnsw.ef_search` + `hnsw.iterative_scan` insufficient at its own tenant skew, or when a
+  corpus materially larger than the 100,000 chunks Phase 241 measured is benched and the curve no
+  longer reaches recall@k = 1.000. ⛔ It did NOT fire at 241: `ef_search = 200` reached 1.000 at
+  every measured selectivity (0.2% / 2% / 20%). Re-run `scripts/measure-recall.py` before
+  proposing partitioning — the seed's own §1 says every lever is chosen against the curve, never
+  against an estimate, and that instruction is now backed by a tool.
 planted: 2026-06-10
 phase_origin: "Phase 101 plan-phase — future-milestone alignment sweep 2026-06-10 (workflow wf_13ed5033)"
 category: scale / performance — RAG retrieval core; an index-and-recall correctness seam on the shared document_chunks table, NOT a new feature
@@ -190,3 +201,78 @@ investigation: future-milestone alignment sweep, workflow `wf_13ed5033`
 
 ---
 *Planted 2026-06-10 during the Phase 101 plan-phase future-milestone alignment sweep. Surfaced by the Scale & Performance hunter as the single most product-shaping non-sandbox scale risk: `match_document_chunks` runs the tenant/metadata filter inside the same query as the approximate HNSW `ORDER BY ... LIMIT`, so on a large shared table where each user/org owns a small fraction, filtered recall silently collapses. The index itself is sound; the gap is `ef_search` tuning / iterative scan / per-tenant index strategy + a recall test harness. Invisible in single-user dev (one user IS the table), it is a HARD prereq the v3.2 RLS rewrite must validate and the path SEED-005 makes primary.*
+
+---
+
+## ✅ ANSWERED 2026-09-10 — Phase 241 (QUEUE-06). Where each of the four levers went.
+
+⚠ **`status:` is `partially-shipped`, NOT `closed`, and the distinction is load-bearing.** Three of
+this seed's levers shipped; one is still deferred and now carries a **measured** re-open trigger
+instead of a predicted one. Full verdict, with every number citing its JSON report:
+`.planning/phases/241-recall-at-corpus-scale/241-VALIDATION.md`.
+
+### ⭐ The seed's central prediction was CORRECT, and it is now measured rather than argued
+
+> *"on a large shared table where each user/org owns a small fraction, filtered recall silently
+> collapses"*
+
+Measured on a 100,000-chunk bench, `k = 20`, 25 query vectors, seed 241, at the shipped
+`hnsw.ef_search = 40`:
+
+| Tenant share of corpus | `recall@20` | `underfill` |
+|---|---|---|
+| 0.2% | **0.040** | **0.960** |
+| 2% | **0.068** | **0.932** |
+| 20% | **0.360** | **0.588** |
+
+**Even a tenant owning a fifth of the corpus loses ~64% of the right answers.** The user-facing
+symptom was measured too: the ten evaluation probes score `Hit@1 0.78` at 7,959 chunks and
+**`0.44`** at 100,000 — three named documents stop being found, silently, with a *faster* response.
+
+### Lever-by-lever
+
+| # | Lever | Disposition at Phase 241 |
+|---|---|---|
+| 1 | **Recall test harness first** | ✅ **SHIPPED.** `backend/app/services/recall_eval.py` + `scripts/measure-recall.py` — two layers (mechanical `recall@k`/`underfill` vs a forced-exact arm; semantic probes scored honestly), `--dsn`-driven so one command serves local and cloud, and it **exits non-zero and writes no report** when it cannot honestly measure. ⚠ The harness that existed before this (Phase 230) ran `content ILIKE`, never touched the vector path, scored every miss `rank = 1` and printed **`MRR 1.000`** — it was replaced in place, not extended. |
+| 2 | **`ef_search` tuning + selectivity awareness** | ✅ **SHIPPED as a PRODUCT SETTING**, not a constant: `app_settings.hnsw_ef_search` (migration 176, bounded 10..1000), applied per request with `SET LOCAL` inside the transaction `get_user_pg_connection` already opens, surfaced on the Settings → Retrieval card. **It is the primary lever and it is cheap:** `ef_search = 200` reaches `recall@20 = 1.000` at all three selectivities. |
+| 3 | **Iterative scan (pgvector 0.8+)** | ✅ **SHIPPED as a setting** (`app_settings.hnsw_iterative_scan`: `off` / `strict_order` / `relaxed_order`), applied in its own `try` so an older server degrades the *tuning* and never the *search*. **Cloud pgvector parity was VERIFIED LIVE before it was claimed** — cloud is **0.8.0 / PG 17.6**, exact parity with local, so it is available in production. ⚠⚠ **BUT SEE THE CORRECTION BELOW — this seed's ordering of levers 2 and 3 is REFUTED.** |
+| 4 | **Partial / per-tenant index vs partitioning** | ⛔ **STILL DEFERRED, and its trigger did NOT fire.** This seed's own §1 says every lever is chosen against the curve; the curve now exists and shows levers 2+3 sufficient at the measured skew. The new, measured re-open trigger is in this file's frontmatter. |
+| 5 | **The v3.2 RLS-rewrite validation gate** | ➖ **Moot as written** — that rewrite shipped long ago. What this lever actually asked for (a harness that can validate recall against the *current* predicate) is lever 1, and it is now built. `match_document_chunks`'s **seven** predicates were measured, not assumed. |
+| 6 | **Published retrieval-sizing requirement (SEED-003)** | 🟡 **Partially served.** `241-VALIDATION.md` publishes the measured per-chunk storage basis (**≈16.6 KB heap + ≈8.0 KB HNSW ≈ 24.6 KB/chunk**) and the selectivity→recall curve. It does **not** publish a per-tier matrix; that stays SEED-003's. |
+
+### ⚠⚠ THIS SEED'S LEVER ORDERING IS REFUTED BY MEASUREMENT — and the original text is left above rather than edited
+
+§3 calls iterative scan *"the purpose-built pgvector answer to filtered recall"*, which reads as
+*the* remedy with `ef_search` as the cheap warm-up. **Measured, that is backwards.** At the shipped
+`ef_search = 40`, `iterative_scan = relaxed_order` **alone** lifts recall to only:
+
+| Tenant share | `relaxed_order` alone | `ef_search = 200` alone |
+|---|---|---|
+| 0.2% | 0.494 (13 of 25 query vectors still under-filled) | **1.000** |
+| 2% | 0.564 (12 of 25) | **1.000** |
+| 20% | 0.684 (11 of 25) | **1.000** |
+
+**`ef_search` is the lever; `iterative_scan` is the companion.** A phase that had bet on iterative
+scan as *the* fix would have shipped an insufficient remedy onto a fully capable server.
+⚠ The ceiling is *probably* `hnsw.max_scan_tuples = 20000` / `hnsw.scan_mem_multiplier = 1.0`,
+which are hardcoded in `config.py` by design (a wrong value there is a memory footgun, not a tuning
+choice) and were **not varied** — that is a hypothesis, not a measurement.
+
+### ⚠ A second measured surprise: the curve is NOT monotone
+
+`ef_search = 1000` (pgvector's maximum) is **reproducibly worse** than `400`: recall 1.000 → 0.926
+at the 0.2% and 2% tenants. It is **bimodal** — 23 of 25 query vectors perfect, two returning 1 and
+2 rows out of 20 — and a full re-run reproduced the *same two vector indices* exactly. No mechanism
+is claimed. ⛔ **"Set it as high as it goes" is measurably wrong advice for this index. `200` is
+what the evidence supports.**
+
+### ⚠ And a third: adding a filter makes this product's search MORE accurate, not less
+
+At the shipped configuration the **unnarrowed** query is the one that truncates. The three
+reachable filter shapes (`folder`, `metadata @>`, `source.system` by nested jsonb containment)
+score `recall@20 = 1.000` at **every** configuration including `ef_search = 40`, while the
+same tenant's unfiltered-beyond-the-seven-predicates query scores 0.360. A superset returning fewer
+rows than its own subset is impossible under one execution plan, so the narrowed shapes are not on
+the HNSW path at all — the planner drops the index once a selective predicate is present. **The
+dangerous query is the broad one**, which is the reverse of the intuition this seed was written
+against.

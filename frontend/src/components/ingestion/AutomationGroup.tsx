@@ -239,6 +239,17 @@ export function AutomationGroup({
 
               {/* The 037-A condition → folder summary line (mono, under the row). */}
               <div className="ml-8 -mt-0.5 mb-1 flex items-center gap-1.5 px-2 text-[11px] text-muted-foreground">
+                <span
+                  data-testid="rule-scope-badge"
+                  className={cn(
+                    "inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium shrink-0",
+                    rule.rule_scope === "watch"
+                      ? "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20"
+                      : "bg-indigo-500/10 text-indigo-400 border border-indigo-500/20",
+                  )}
+                >
+                  {rule.rule_scope === "watch" ? "Arrival" : "Extracted"}
+                </span>
                 <code className="font-mono truncate">{summarize(rule)}</code>
                 <span aria-hidden="true">→</span>
                 <span className="inline-flex items-center gap-0.5 shrink-0">

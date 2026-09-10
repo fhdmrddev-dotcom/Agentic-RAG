@@ -14,7 +14,7 @@ from tests.conftest import FakeRedis
 
 
 @pytest.mark.asyncio
-async def test_save_and_take_pending_state(fake_redis: FakeRedis):
+async def test_save_and_take_pending_state(fake_oauth_redis: FakeRedis):
     """Save pending state parks record with 600s TTL; take retrieves and deletes it."""
     state = PendingOAuthState(
         code_verifier="test-verifier-abcdef1234567890",
@@ -29,19 +29,19 @@ async def test_save_and_take_pending_state(fake_redis: FakeRedis):
         token_endpoint="https://oauth2.googleapis.com/token",
     )
 
-    handle = await save_pending_state(fake_redis, state)
+    handle = await save_pending_state(fake_oauth_redis, state)
     assert len(handle) == 43
     assert "." not in handle
 
     # A-5: Pin 600s TTL via ONE setex
-    assert len(fake_redis.setex_calls) == 1
-    key, ttl = fake_redis.setex_calls[0]
+    assert len(fake_oauth_redis.setex_calls) == 1
+    key, ttl = fake_oauth_redis.setex_calls[0]
     assert key == f"oauth:pending:{handle}"
     assert ttl == 600
     assert ttl == PENDING_TTL_SECONDS
 
     # Take the state
-    retrieved = await take_pending_state(fake_redis, handle, expected_flow="provider")
+    retrieved = await take_pending_state(fake_oauth_redis, handle, expected_flow="provider")
     assert retrieved.code_verifier == state.code_verifier
     assert retrieved.client_id == state.client_id
     assert retrieved.client_secret == state.client_secret
@@ -54,12 +54,12 @@ async def test_save_and_take_pending_state(fake_redis: FakeRedis):
     assert retrieved.token_endpoint == state.token_endpoint
 
     # Verify single-use delete
-    assert key in fake_redis.deleted
-    assert key not in fake_redis.store
+    assert key in fake_oauth_redis.deleted
+    assert key not in fake_oauth_redis.store
 
 
 @pytest.mark.asyncio
-async def test_single_use_replay_fails(fake_redis: FakeRedis):
+async def test_single_use_replay_fails(fake_oauth_redis: FakeRedis):
     """Second take of the same handle fails closed (SC#4 replay defense)."""
     state = PendingOAuthState(
         code_verifier="test-verifier",
@@ -72,26 +72,26 @@ async def test_single_use_replay_fails(fake_redis: FakeRedis):
         flow="provider",
     )
 
-    handle = await save_pending_state(fake_redis, state)
+    handle = await save_pending_state(fake_oauth_redis, state)
 
     # First take succeeds
-    first = await take_pending_state(fake_redis, handle)
+    first = await take_pending_state(fake_oauth_redis, handle)
     assert first.client_id == "client-id"
 
     # Second take raises OAuthStateError
     with pytest.raises(OAuthStateError, match="already been used or has expired"):
-        await take_pending_state(fake_redis, handle)
+        await take_pending_state(fake_oauth_redis, handle)
 
 
 @pytest.mark.asyncio
-async def test_expired_or_missing_handle_fails(fake_redis: FakeRedis):
+async def test_expired_or_missing_handle_fails(fake_oauth_redis: FakeRedis):
     """Unknown or expired handle raises OAuthStateError."""
     with pytest.raises(OAuthStateError, match="already been used or has expired"):
-        await take_pending_state(fake_redis, "non-existent-handle")
+        await take_pending_state(fake_oauth_redis, "non-existent-handle")
 
 
 @pytest.mark.asyncio
-async def test_opaque_handle_entropy_contains_no_secrets(fake_redis: FakeRedis):
+async def test_opaque_handle_entropy_contains_no_secrets(fake_oauth_redis: FakeRedis):
     """SC#1: Handle is raw random entropy and contains zero secret material."""
     secret = "SUPER_SECRET_CLIENT_SECRET_VAL_9999"
     verifier = "VERIFIER_SECRET_RANDOM_123456789"
@@ -106,7 +106,7 @@ async def test_opaque_handle_entropy_contains_no_secrets(fake_redis: FakeRedis):
         flow="provider",
     )
 
-    handle = await save_pending_state(fake_redis, state)
+    handle = await save_pending_state(fake_oauth_redis, state)
     assert secret not in handle
     assert verifier not in handle
     assert "." not in handle
@@ -116,7 +116,7 @@ async def test_opaque_handle_entropy_contains_no_secrets(fake_redis: FakeRedis):
 
 
 @pytest.mark.asyncio
-async def test_legacy_mcp_key_fallback(fake_redis: FakeRedis):
+async def test_legacy_mcp_key_fallback(fake_oauth_redis: FakeRedis):
     """Transition fallback: in-flight MCP consents stored under mcp_oauth:pending: are found and deleted."""
     handle = "legacy-in-flight-mcp-handle-12345"
     legacy_key = f"mcp_oauth:pending:{handle}"
@@ -131,19 +131,19 @@ async def test_legacy_mcp_key_fallback(fake_redis: FakeRedis):
         "server_url": "https://mcp.example.com",
         "token_endpoint": "https://mcp.example.com/token",
     }
-    fake_redis.store[legacy_key] = json.dumps(legacy_payload)
+    fake_oauth_redis.store[legacy_key] = json.dumps(legacy_payload)
 
     # Calling take_pending_state resolves the fallback key
-    retrieved = await take_pending_state(fake_redis, handle, expected_flow="mcp")
+    retrieved = await take_pending_state(fake_oauth_redis, handle, expected_flow="mcp")
     assert retrieved.flow == "mcp"
     assert retrieved.code_verifier == "legacy-verifier"
     assert retrieved.server_url == "https://mcp.example.com"
-    assert legacy_key in fake_redis.deleted
-    assert legacy_key not in fake_redis.store
+    assert legacy_key in fake_oauth_redis.deleted
+    assert legacy_key not in fake_oauth_redis.store
 
 
 @pytest.mark.asyncio
-async def test_b3_flow_mismatch_provider_handle_at_mcp_taker_rejected_and_burned(fake_redis: FakeRedis):
+async def test_b3_flow_mismatch_provider_handle_at_mcp_taker_rejected_and_burned(fake_oauth_redis: FakeRedis):
     """B-3: A handle minted for provider flow cannot be redeemed at the MCP callback."""
     state = PendingOAuthState(
         code_verifier="v",
@@ -156,23 +156,23 @@ async def test_b3_flow_mismatch_provider_handle_at_mcp_taker_rejected_and_burned
         flow="provider",
         provider="google",
     )
-    handle = await save_pending_state(fake_redis, state)
+    handle = await save_pending_state(fake_oauth_redis, state)
     key = f"oauth:pending:{handle}"
 
     with pytest.raises(OAuthStateError, match="OAuth state flow mismatch: expected mcp, got provider"):
-        await take_pending_state(fake_redis, handle, expected_flow="mcp")
+        await take_pending_state(fake_oauth_redis, handle, expected_flow="mcp")
 
     # The handle is burned on retrieval
-    assert key in fake_redis.deleted
-    assert key not in fake_redis.store
+    assert key in fake_oauth_redis.deleted
+    assert key not in fake_oauth_redis.store
 
     # Subsequent read confirms handle is gone
     with pytest.raises(OAuthStateError, match="already been used or has expired"):
-        await take_pending_state(fake_redis, handle)
+        await take_pending_state(fake_oauth_redis, handle)
 
 
 @pytest.mark.asyncio
-async def test_b3_flow_mismatch_mcp_handle_at_provider_taker_rejected_and_burned(fake_redis: FakeRedis):
+async def test_b3_flow_mismatch_mcp_handle_at_provider_taker_rejected_and_burned(fake_oauth_redis: FakeRedis):
     """B-3: A handle minted for MCP flow cannot be redeemed at the provider callback."""
     state = PendingOAuthState(
         code_verifier="v",
@@ -185,12 +185,12 @@ async def test_b3_flow_mismatch_mcp_handle_at_provider_taker_rejected_and_burned
         flow="mcp",
         server_url="https://mcp.example.com",
     )
-    handle = await save_pending_state(fake_redis, state)
+    handle = await save_pending_state(fake_oauth_redis, state)
     key = f"oauth:pending:{handle}"
 
     with pytest.raises(OAuthStateError, match="OAuth state flow mismatch: expected provider, got mcp"):
-        await take_pending_state(fake_redis, handle, expected_flow="provider")
+        await take_pending_state(fake_oauth_redis, handle, expected_flow="provider")
 
     # The handle is burned
-    assert key in fake_redis.deleted
-    assert key not in fake_redis.store
+    assert key in fake_oauth_redis.deleted
+    assert key not in fake_oauth_redis.store

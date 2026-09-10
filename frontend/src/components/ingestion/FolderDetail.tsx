@@ -1,4 +1,5 @@
 import { Globe, FileText, FolderIcon, Calendar, HardDrive } from "lucide-react"
+import { AnimatedNumber } from "@/components/ui/AnimatedNumber"
 import type { Folder, Document } from "@/types"
 
 interface FolderDetailProps {
@@ -37,7 +38,7 @@ export function FolderDetail({ folder, documents, subfolderCount }: FolderDetail
       )}
       <span className="inline-flex items-center gap-1">
         <FileText className="h-3.5 w-3.5" />
-        {docCount} {docCount === 1 ? "document" : "documents"}
+        <AnimatedNumber value={docCount} /> {docCount === 1 ? "document" : "documents"}
       </span>
       <span className="inline-flex items-center gap-1">
         <HardDrive className="h-3.5 w-3.5" />
@@ -46,7 +47,7 @@ export function FolderDetail({ folder, documents, subfolderCount }: FolderDetail
       {subfolderCount > 0 && (
         <span className="inline-flex items-center gap-1">
           <FolderIcon className="h-3.5 w-3.5" />
-          {subfolderCount} {subfolderCount === 1 ? "subfolder" : "subfolders"}
+          <AnimatedNumber value={subfolderCount} /> {subfolderCount === 1 ? "subfolder" : "subfolders"}
         </span>
       )}
       <span className="inline-flex items-center gap-1">

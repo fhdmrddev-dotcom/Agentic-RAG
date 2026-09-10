@@ -252,18 +252,122 @@ async def _is_banned(user_id: str) -> bool:
         return False  # fail-OPEN — re-enforced on the next successful read
 
 
+#: token-fingerprint -> last-logged monotonic time. Bounded by eviction below.
+_rejected_log_at: dict[str, float] = {}
+_REJECTED_LOG_INTERVAL_S = 60.0
+
+
+def _log_rejected_token_once(token: str, exc: Exception) -> None:
+    """One WARNING per rejected token per minute: who it belongs to and why it failed.
+
+    Decodes the JWT payload WITHOUT verifying it — GoTrue has already refused this token,
+    so the claims are read purely to name the session in the log. Never raises.
+    """
+    import base64  # noqa: PLC0415
+    import hashlib  # noqa: PLC0415
+    import time  # noqa: PLC0415
+
+    try:
+        fp = hashlib.sha256(token.encode()).hexdigest()[:12]
+        now = time.monotonic()
+        if now - _rejected_log_at.get(fp, -1e9) < _REJECTED_LOG_INTERVAL_S:
+            return
+        if len(_rejected_log_at) > 256:
+            _rejected_log_at.clear()
+        _rejected_log_at[fp] = now
+
+        sub = exp_state = "?"
+        try:
+            payload_b64 = token.split(".")[1]
+            payload = json.loads(base64.urlsafe_b64decode(payload_b64 + "=" * (-len(payload_b64) % 4)))
+            sub = str(payload.get("sub", "?"))[:8]
+            exp = payload.get("exp")
+            if isinstance(exp, (int, float)):
+                delta = int(exp - time.time())
+                exp_state = f"expired {-delta}s ago" if delta < 0 else f"valid for {delta}s"
+        except Exception:  # noqa: BLE001 — a malformed token is itself the finding
+            exp_state = "unparseable"
+
+        logger.warning(
+            "auth rejected token fp=%s sub=%s… exp=%s reason=%s — a client is retrying a dead "
+            "session; identify which open tab/session holds it (repeats suppressed 60s)",
+            fp, sub, exp_state, str(exc)[:120],
+        )
+    except Exception:  # noqa: BLE001 — diagnostics must never affect the response
+        pass
+
+
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
     supabase: Client = Depends(get_supabase),
 ) -> dict:
     token = credentials.credentials
+
+    # ── BUG-260906-02 — EVERY AUTHED REQUEST PAID A BLOCKING ROUND-TRIP, AND EVERY FAILURE
+    #    MODE CAME BACK AS "expired token" ────────────────────────────────────────────────
+    #
+    # ⛔ WHAT WAS HERE:  `response = supabase.auth.get_user(token)` inside a bare
+    #    `except Exception: raise HTTPException(401, "Invalid or expired token")`.
+    #
+    #    TWO defects in four lines, and they compounded:
+    #
+    #    1. `supabase.auth.get_user` is the SYNCHRONOUS supabase-py client called directly in
+    #       an `async def` dependency — it BLOCKED THE EVENT LOOP on every authenticated
+    #       request, with no caching. ⚠ The docblock ~20 lines below this one already states
+    #       the rule ("run_in_threadpool still wraps the blocking supabase-py calls at every
+    #       call site (D-v2.5-01)") — the seam it describes obeyed it; this function did not.
+    #
+    #    2. The bare `except Exception` folded a TIMEOUT, a refused connection, a rate-limit
+    #       and a genuinely bad token into ONE answer: 401 "Invalid or expired token". So a
+    #       slow or throttled auth service reported itself as a credentials problem.
+    #
+    # ⚠ MEASURED FROM THE OPERATOR'S LOG, and this is what the two defects look like together:
+    #       GET /connectors/connections 401 · GET /sources/watches 401 · GET /sources/health 401
+    #    repeating across CONCURRENT requests with no user action, then recovering to 200
+    #    unaided. The token was fine throughout — the auth service was merely slow under the
+    #    burst, and every request that piled up behind the blocked loop timed out into a 401.
+    #
+    # ⛔ A TRANSPORT FAILURE IS NOT AN AUTH FAILURE. 401 tells the client "your credentials are
+    #    bad", which invites it to discard a perfectly good session and re-authenticate. 503
+    #    says "I could not check" — the honest answer, and still FAIL-CLOSED: no access is
+    #    granted on either path.
+    #
+    # ⚠ THIS IS THE CONTAINED FIX, NOT THE RIGHT ONE. Supabase JWTs are signed and can be
+    #    verified LOCALLY with the project secret — no network call per request at all. That
+    #    removes this entire failure class and is the change to make deliberately, because it
+    #    touches every authenticated route in the app.
     try:
-        response = supabase.auth.get_user(token)
-        if response.user is None:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
-        identity = {"id": response.user.id, "email": response.user.email}
-    except Exception:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
+        response = await run_in_threadpool(supabase.auth.get_user, token)
+    except HTTPException:
+        raise
+    except Exception as exc:  # noqa: BLE001 — classified below, never blanket-401'd
+        upstream = getattr(exc, "status", None)
+        unreachable = isinstance(exc, httpx.HTTPError) or (
+            isinstance(upstream, int) and upstream >= 500
+        )
+        if unreachable:
+            logger.warning("auth service unreachable while validating a token: %s", exc)
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Could not verify your session right now — please retry.",
+            ) from exc
+        # ── BUG-260906-04 — SAY WHICH SESSION IS DEAD, AND WHY, ONCE ─────────────────────
+        # ⛔ ~100 consecutive 401s from ONE client (a single contiguous source-port block)
+        #    while a DIFFERENT client on the same box answered 200 the whole time. The log
+        #    said "401 Unauthorized" a hundred times and never once said whose token or why.
+        #    The operator had "other open sessions" — a stale tab, or an automated UAT
+        #    driver — and there was no way to tell which one was flooding.
+        # ⚠ Claims are decoded WITHOUT verification, for the LOG ONLY: GoTrue already
+        #    rejected this token, so nothing here grants anything. Rate-limited per token so
+        #    a hammering client produces ONE line a minute, not one per request.
+        _log_rejected_token_once(token, exc)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token"
+        ) from exc
+
+    if response.user is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+    identity = {"id": response.user.id, "email": response.user.email}
     # Phase 148 (ADMIN-03 / T-148-02) — app-layer ban check. AFTER the token validates
     # and OUTSIDE the auth try/except above (so this 403 is NOT folded into the 401).
     # Closes the ~1h stateless-JWT window: a banned user's live token stays valid until

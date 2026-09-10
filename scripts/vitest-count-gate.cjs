@@ -122,10 +122,14 @@ const path = require("node:path")
 const BASELINE = {
   "Seam.test.tsx": 8,
   "TodosSection.test.tsx": 12,
-  "CitationList.test.tsx": 11,
+  "CitationList.test.tsx": 15,
   "RunCard.test.tsx": 29,
   "RunCard.timer.test.tsx": 7,
   "ChatArea.approval.test.tsx": 3,
+  // ── Phase 237 (RULES-01 / SC#1 / SC#3) — Classification rules & arrival watch builder suites ──
+  "ClassificationRulesPage.test.tsx": 8,
+  "ClassificationSection.test.tsx": 13,
+  "RuleBuilderPanel.test.tsx": 8,
   // ── 196-05 (AUTH-04 / D-04 … D-15) — THREE NEW FILES, each pinned in the SAME COMMIT ──
   // ── that creates it, because a `BASELINE` key naming a path that does not yet exist ──
   // ── makes this gate ERROR (exit 2) rather than fail. ──────────────────────────────────
@@ -1485,7 +1489,10 @@ const BASELINE = {
   // deleted without the gate noticing — the gate only fails on a decrease BELOW the pin.
   // Its test file is byte-unchanged by this commit (last touched 2026-08-30, 217.1-18), so
   // re-baselining it here would bury someone else's drift inside a nav refactor.
-  "SettingsPage.test.tsx": 13,
+  // 241-03: 13 -> 23. The +10 are the two HNSW knobs on the shipped Retrieval card (QUEUE-06 /
+  // D-09), all asserting rendered CONTENT rather than presence — the served bounds reaching the
+  // input's min/max, the three pgvector modes by VALUE, and both keys on the save payload.
+  "SettingsPage.test.tsx": 23,
   // ── 188-12: the fifteen files that RAN inside TARGETS with NO pin at all. ──
   // Inherited from Phases 183-187, none authored by this phase. They are pinned here because
   // the reason to leave a suite unpinned ("it postdates the pin, its count is free to grow")
@@ -1712,7 +1719,7 @@ const BASELINE = {
   // and the resulting wall-clock cost starved six neighbours past the 5 s default. Switching
   // to `userEvent.setup({ delay: null })` cleared all eight. A slow new suite inside this
   // gate is not merely slow — it reds files it never touches.
-  "ConnectionsTab.test.tsx": 36,
+  "ConnectionsTab.test.tsx": 102,
   // ── 206.1-01 (item 3, CONN-02 / SC#3) — the per-service mark map's own suite. ──
   // The number is THIS SCRIPT'S OWN `actual` column across TWO AGREEING RUNS on 2026-08-25
   // (both printed `connectionMark.test.tsx — 39 new`, total 5511, failed 0) — never a hand
@@ -1810,6 +1817,10 @@ const BASELINE = {
   // but never the whole word "failed" that §14 names — THE TEST was wrong, and it now
   // asserts the stem.
   "ConnectionFormPanel.test.tsx": 63,
+  // Pinned 2026-09-05 at the gate's OWN printed `— N new` figure, never a hand count of
+  // `it(`. Guards the destructive/non-destructive split in the re-embed confirm gate; see
+  // the TARGETS entry for why this suite needed both knobs.
+  "ReembedConfirmModal.test.tsx": 7,
   // 184.1 pinned NOTHING here on purpose ("it postdates the 424 pin, so it reports as `new`
   // and its own count is free to grow"). Four phases later it is still the ONLY guard on the
   // flag-off Builder header — D-181-01's byte-identity promise — and it has stopped growing.
@@ -2835,6 +2846,7 @@ const BASELINE = {
   "apiBarrel.test.ts": 5,
   // ── Added in Phase 213 (213-05 / GATE-1) — per-tool grants list invariants ──
   "ConnectionGrantsList.test.tsx": 8,
+  "ingestVisibility.test.tsx": 16,
   // ── Added in Phase 221 (221-01 / T7), every value read from THIS script's own printed
   // ── `— N new` column in the same run that adopted them. Not booked ahead: an unpinned
   // ── file is not lightly guarded, it is UNGUARDED — its count can fall to 1 and the gate
@@ -2852,7 +2864,7 @@ const BASELINE = {
   // Plan 02 (2026-09-01): 14 -> 19. `partly` was UNREACHABLE BY CONSTRUCTION until this
   // plan — `blockedApplicationCount` was the literal 0 — so these five cases had nothing
   // to assert before it. Read from the gate's own printed column, not counted by hand.
-  "connectionRowVerdict.test.ts": 22,
+  "connectionRowVerdict.test.ts": 37,
   // ── Added in Phase 221 plan 02, in the SAME COMMIT that creates the files ───────────
   // ⚠ BOTH KNOBS, TOGETHER. Every suite found orphaned in the last week was orphaned
   // because one knob was edited and the other was not; `src/components/settings/` entries
@@ -2872,6 +2884,15 @@ const BASELINE = {
   // `_images` is stamped only on truncation — and an absence assertion is the easiest kind
   // to delete without anyone noticing.
   "DocumentDetailPanel.images.test.tsx": 3,
+
+  // ── Phase 240 (SRC-05 / D-240-19) — pinned at the counts measured at this phase's close.
+  // ⚠ Captured from a GREEN run, never while red, and matched 1:1 with the TARGETS entries
+  // added at the end of this file. A file in TARGETS and not here RUNS and guards nothing.
+  "ConnectedSourceSection.test.tsx": 5,
+  "CreateWatchModal.test.tsx": 5,
+  "DocumentConversationSection.test.tsx": 8,
+  "watchProductMark.test.ts": 7,
+  "navItemsUnknownIsNotDenied.test.ts": 4,
 
   // ══════════════════════════════════════════════════════════════════════════════
   // Added at Phase 214's CLOSE (plan `214-15`), collected here AFTER every file
@@ -3033,8 +3054,16 @@ const BASELINE = {
   // Phase 114 move-to-folder row action), so BOTH are pinned and NEITHER is excluded — an
   // undocumented exclusion is how a suite becomes invisible.
   "renameFence.test.ts": 15,
-  "acceptFormats.test.ts": 19,
-  "IngestionStrip.test.tsx": 25,
+  // 19 → 20 at the format-list widening: the negative arm inverted to a presence arm, plus a
+  // new case proving the list is still a SUBSET (one server mime deliberately unlisted).
+  "acceptFormats.test.ts": 20,
+  // ⚠ RE-PINNED 25 → 31 at Phase 233. It was UNDER-pinned by five before this phase touched it
+  // (the gate's contract is no per-file DECREASE, so an under-pin is silent), and 233 repaired
+  // an INHERITED red in it: `229-03` added `"ingestion_step": "failed"` to `documents.py`, which
+  // is a terminal marker rather than a pipeline stage, and the ORDERED source fence counted it.
+  // The fence was doing its job; what it caught was a real drift. +1 case is 233's own positive
+  // control for the now-NAMED exclusion.
+  "IngestionStrip.test.tsx": 31,
   "DetailSections.lazy.test.tsx": 14,
   "CR01.reset.test.tsx": 2,
   "DetailSections.tables.test.tsx": 15,
@@ -3081,8 +3110,8 @@ const BASELINE = {
   // (TARGETS decides what RUNS) and a pin here (BASELINE decides what is GUARDED). The three
   // trailing orphans close 217's deferred-§3 re-open trigger.
   "sketchComposition.test.tsx": 47,
-  "ingestionFailureCopy.test.ts": 22,
-  "IngestionTab.test.tsx": 38,
+  "ingestionFailureCopy.test.ts": 25,
+  "IngestionTab.test.tsx": 40,
   "pipelineGroups.test.ts": 7,
   "LibraryStatTiles.test.tsx": 13,
   "viewRulePhrase.test.ts": 4,
@@ -3142,6 +3171,99 @@ const BASELINE = {
   "MessageList.test.tsx": 30,
   "MessageList.dedup.test.tsx": 7,
   "MessageList.runline.baseline.test.tsx": 8,
+  // ── Phase 228 (228-02 / DEBT-02) — Retry turn & cap_paused reconcile suites ──
+  "MessageItem.retry.test.tsx": 4,
+  "MessageItem.capPaused.test.tsx": 5,
+  // ── Phase 228 (228-03 / DEBT-04) — Vercel subdomain routing suite ──
+  "vercelRouting.test.ts": 6,
+  // ── Phase 232 (232-04 / SRC-02) — Source folder picker suite ──
+  "SourceFolderPicker.test.tsx": 7,
+  // ── Phase 233 (233-02 / PREV-01…03 / LIB-09) — THE PREVIEW. Two suites, and BOTH knobs ──
+  // ── are set in the SAME COMMIT that creates them, because a BASELINE key naming a path ──
+  // ── that does not yet exist makes this gate ERROR (exit 2) rather than fail. ───────────
+  //
+  // ⚠ Neither file is covered by an existing TARGETS entry: `src/components/sources` is NOT a
+  // directory entry — `SourceFolderPicker.test.tsx` is pinned by an explicit PATH above, and a
+  // path entry recurses into nothing. So both suites needed a TARGETS line of their own, and
+  // that was CHECKED against the array rather than assumed. This is Phase 214's finding
+  // (`WorkflowScheduleModal.test.tsx` ran for phases while guarding nothing) in the one place
+  // where forgetting it would leave the milestone's differentiator unguarded.
+  //
+  // ⭐ These two carry the honesty invariants of the operator-locked sketches 229 + 230: the
+  // four verbatim labels, the no-content-identity claim, the four sections with no removal
+  // control, collapse-hides-files-not-counts, the four-zero receipt, and a NAMED refusal. Four
+  // defects were planted against them and each fired (4 / 1 / 1 / 4 assertions), with both
+  // source files restored md5-identical.
+  // 12 → 17 at the recursion fix: the scanned-depth and budget-stop sentences.
+  // 17 → 21 at sketch 231-A: the honest-confirm vocabulary (Accepted ≠ Readable) and the
+  // three-terminal-outcomes fence.
+  "previewVocabulary.test.ts": 21,
+  // ── Sketch 231-A (operator-locked 2026-09-05) — the Library's one header row. ──────────
+  // ⚠ BOTH knobs, same commit, AND THE CHECK MATTERED: this comment first read
+  // "`src/components/library` IS a directory entry so the file already runs". **It is not.**
+  // That directory's suites are listed one PATH at a time in TARGETS, and a path entry
+  // recurses into nothing — so without its own TARGETS line this file would never have been
+  // EXECUTED, and a BASELINE key naming an unexecuted file makes this gate ERROR (exit 2)
+  // rather than fail. Phase 214's `WorkflowScheduleModal` finding, avoided by looking.
+  "LibraryHeaderBar.test.tsx": 9,
+  // 22 → 30: per-file selection (operator: "how can I select individual files") and the
+  // two-column body that puts the folder tree inside the card it feeds.
+  "SourcePreviewPanel.test.tsx": 30,
+  // ── Phase 234 (234-05 / LIB-08 / SURF-01 / VIS-05) — Watched folders surface ──
+  // 6 → 27 at Phase 235: the card gained the outcome line, the stopped sentence, the
+  // degraded/report row and the history disclosure, each with its own case (235-10).
+  "WatchedFoldersSection.test.tsx": 27,
+  // ══ Phase 235 (235-12 / SURF-02 / SURF-03 / LIB-10) — "the source says what it did" ════
+  //
+  // ⚠ EVERY NUMBER BELOW IS THE GATE'S OWN PRINTED `— N new` FIGURE at this commit, read
+  // off the run made with the TARGETS lines added and these keys still absent. None is
+  // copied from a plan summary and none is guessed: the ten `— N new` figures sum to
+  // EXACTLY +150 and the grand total moved 7565 → 7715, which is the arithmetic that
+  // separates growth from drift (Phase 192.2's rule — an unexplained `+n` is the thing to
+  // worry about, never a bigger number).
+  //
+  // BOTH knobs are set in the SAME COMMIT as the TARGETS lines above. See that block for
+  // why (`exit 2`, not `fail`) and for the checked-not-assumed finding that none of
+  // `src/components/sources`, `src/components/library`, `src/components/layout` or
+  // `src/hooks` is a directory entry.
+  //
+  // ⛔ `sourceComposition.test.tsx` — the phase's design-contract fence — IS IN NEITHER
+  // KNOB, DELIBERATELY, BECAUSE IT IS RED (16 failed / 33 passed of 49). Full reasoning in
+  // the TARGETS block. This is stated in both places because a reader who greps one knob
+  // must not conclude the omission was an oversight.
+  "sourceHealthVocabulary.test.ts": 42,
+  "runHistoryFold.test.ts": 17,
+  "RunHistoryList.test.tsx": 18,
+  "WatchedFoldersSection.history.test.tsx": 17,
+  "IngestionTab.readerOff.test.tsx": 5,
+  // Quick task after Phase 235: the one control must RENDER and ACT. 5 behaviour cases
+  // (IngestionTab -> WatchedFoldersSection) + 1 SOURCE FENCE for LibraryPage -> IngestionTab,
+  // which the behaviour cases are structurally blind to and which is the link that ACTUALLY broke.
+  "IngestionTab.reconnectControl.test.tsx": 6,
+  "SourcesAttentionSection.test.tsx": 13,
+  "NavPanel.badge.test.tsx": 14,
+  "ChatLayout.badge.test.tsx": 5,
+  "useSourceAttention.test.tsx": 13,
+  "LibraryPage.initialTab.test.tsx": 6,
+  // Phase 238 (D-238-08). 6 cases; the load-bearing one is "refuses a service_id that LOOKS
+  // like a source but was never registered" — the guess this replaced said TRUE for both of
+  // its fixtures. ⚠ In BOTH knobs on purpose: Phase 214 measured that TARGETS decides what
+  // RUNS and BASELINE decides what is GUARDED, and a suite can sit on the wrong side of
+  // exactly one of them for a whole phase without anyone noticing.
+  "sourceCapability.test.ts": 12,
+  // ── Phase 239 (239-03) — F-7, THE OWED ENTRIES, TAKEN BY THE LAST WAVE ───────────────
+  //
+  // ⚠ `239-02` shipped a FOURTEEN-CASE suite and the gate's grand total moved by EXACTLY
+  // ZERO — `7822 · pinned 7026`, character-for-character what Phase 238's close recorded.
+  // That is what proved it: `src/components/settings` is NOT a directory entry in TARGETS
+  // (its settings suites are listed one file at a time), so the gate never ran the file and
+  // a future edit could have deleted all fourteen cases with the gate still green.
+  //
+  // ⚠ Wave 2 deliberately did not take this edit — two parallel waves editing one shared
+  // hot file is a merge conflict for no gain — and named it as owed at the phase close.
+  // This is that close. BOTH knobs, for the reason the entry above states.
+  "ConnectionFormPanel.sourceTools.test.tsx": 14,
+  "ConnectionFormPanel.refreshReceipt.test.tsx": 4,
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -3786,6 +3908,18 @@ const TARGETS = [
   // the gate ERROR (exit 2) rather than fail, so it can only land in the commit that creates
   // the file — never before, never after.
   "src/components/settings/__tests__/ConnectionFormPanel.test.tsx",
+  // ── Added 2026-09-05 with `ReembedConfirmModal.test.tsx` — the SAME two-knob reason the
+  //    entries above give: every `src/components/settings/` entry here is FILE-LEVEL, so a
+  //    new file in that directory is invisible to the gate until it is named. TARGETS decides
+  //    what RUNS; BASELINE decides what is GUARDED, and this suite needed both.
+  //
+  //    What it guards is worth stating, because it is not ordinary coverage: until this
+  //    commit the re-embed confirm modal rendered "Resumable & non-destructive" for a
+  //    DIMENSIONS change, which is the one case where every vector is destroyed up front by
+  //    resize_embedding_column. The four destructive cases were driven RED against the
+  //    pre-fix component (4 failed / 3 passed) and the component restored before commit — a
+  //    guard nobody has seen fire is not a guard.
+  "src/components/settings/__tests__/ReembedConfirmModal.test.tsx",
   // ── Added in 206.1-01 (item 3, the per-service mark map) — the THIRD entry on
   //    `src/components/settings/`, for the identical reason the two above give: those two
   //    are FILE-LEVEL, so a THIRD file in that directory is still invisible to the gate.
@@ -4231,6 +4365,11 @@ const TARGETS = [
   // `src/components/settings/` entries here are FILE-LEVEL by deliberate choice, so
   // every new file under it is invisible until somebody types its name.
   "src/components/settings/__tests__/ConnectionFormPanel.oauth.test.tsx",
+  // ── Added in Phase 231 (VIS-02) — the "who will see this" sentence ──────────
+  // FILE-LEVEL, matching this directory's standing convention (the bare directory
+  // is deliberately not adopted). Added in the SAME COMMIT that creates the file,
+  // and to BOTH knobs — `src/components/settings/` is reached by nothing above.
+  "src/components/settings/__tests__/ingestVisibility.test.tsx",
   "src/components/settings/toolGroups.test.ts",
   "src/components/settings/ConnectionGrantsList.grouping.test.tsx",
   "src/components/settings/connectionRowVerdict.test.ts",
@@ -4356,6 +4495,7 @@ const TARGETS = [
   // rule: TARGETS decides what RUNS, BASELINE decides what is GUARDED). The three
   // DocumentStatusBadge / FilterBar entries close 217's deferred-§3 re-open trigger. Pins
   // were captured by 217.1-18 at the gate's own printed `-- N new`, never while red.
+  "src/components/library/__tests__/LibraryHeaderBar.test.tsx",
   "src/components/library/__tests__/sketchComposition.test.tsx",
   "src/components/library/__tests__/ingestionFailureCopy.test.ts",
   "src/components/library/__tests__/IngestionTab.test.tsx",
@@ -4381,6 +4521,13 @@ const TARGETS = [
   "src/components/settings/__tests__/connectionFormCopy.mcp.test.ts",
   "src/components/settings/McpAuthDoor.test.tsx",
   "src/components/settings/McpAuthDoor.byo.test.tsx",
+  // ── Phase 239 (239-03) — F-7, the two suites that were in NEITHER knob ───────────────
+  // FILE-LEVEL, not the bare `src/components/settings/__tests__` directory, verbatim the
+  // reasoning every neighbour on this path already records. See the matching BASELINE
+  // entries for what proved they were ungated: a 14-case suite that moved the grand total
+  // by zero.
+  "src/components/settings/__tests__/ConnectionFormPanel.sourceTools.test.tsx",
+  "src/components/settings/__tests__/ConnectionFormPanel.refreshReceipt.test.tsx",
   "src/components/ui/__tests__/scrollAreaViewportWidth.test.tsx",
   // ── BUG-260904-02 — see the matching BASELINE entry. `src/__tests__/hooks` is reached by no
   // ── directory entry in this file, so this suite needed BOTH knobs. ───────────────────
@@ -4406,6 +4553,78 @@ const TARGETS = [
   "src/__tests__/components/chat/MessageList.test.tsx",
   "src/__tests__/components/chat/MessageList.dedup.test.tsx",
   "src/__tests__/components/chat/MessageList.runline.baseline.test.tsx",
+  // ── Phase 228 (228-02 / DEBT-02) — Retry turn & cap_paused reconcile suites ──
+  "src/components/chat/__tests__/MessageItem.retry.test.tsx",
+  "src/components/chat/__tests__/MessageItem.capPaused.test.tsx",
+  // ── Phase 228 (228-03 / DEBT-04) — Vercel subdomain routing suite ──
+  "src/__tests__/routing/vercelRouting.test.ts",
+  // ── Phase 232 (232-04 / SRC-02) — Source folder picker suite ──
+  "src/components/sources/SourceFolderPicker.test.tsx",
+  // ── Phase 233 (233-02) — the preview's two suites. See the BASELINE block for why each ──
+  // ── needs its own line: `src/components/sources` is not a directory entry here. ────────
+  "src/components/sources/previewVocabulary.test.ts",
+  "src/components/sources/SourcePreviewPanel.test.tsx",
+  // ── Phase 234 (234-05) — watched folders surface ──
+  "src/components/sources/WatchedFoldersSection.test.tsx",
+  // ══ Phase 235 (235-12 / SURF-02 / SURF-03 / LIB-10) — "the source says what it did" ════
+  //
+  // NINE suites, and BOTH knobs are set in the SAME COMMIT that adopts them, for the reason
+  // Phase 233's BASELINE block records: a `BASELINE` key naming a path this array does not
+  // RUN makes the gate ERROR (exit 2) rather than fail.
+  //
+  // ⚠ EVERY ONE OF THESE NEEDS ITS OWN PATH LINE, AND THAT WAS CHECKED AGAINST THE ARRAY
+  // RATHER THAN ASSUMED. `src/components/sources`, `src/components/library`,
+  // `src/components/layout` and `src/hooks` are NONE of them directory entries — this whole
+  // array contains exactly TWO directory entries (`src/landing` and
+  // `src/components/workflows`), and a path entry recurses into nothing. Phase 214's
+  // `WorkflowScheduleModal.test.tsx` finding (it RAN for phases while guarding nothing) is
+  // the inverse of this one, and both come from not looking.
+  //
+  // ⛔ THE TENTH SUITE OF THIS PHASE IS DELIBERATELY ABSENT FROM BOTH KNOBS AND IT IS THE
+  // MOST IMPORTANT ONE: `src/components/sources/sourceComposition.test.tsx`, the phase's
+  // whole design-contract fence, is RED (16 failed / 33 passed of 49) at this commit. The
+  // gate's contract is *zero failing, forever*; pinning a red suite would redden the shared
+  // gate for the entire repository, and adopting it with an allowance would make it a gate
+  // that cannot fail — which is exactly what sketch 218 shipped and what this fence exists
+  // to stop. All 16 reds are itemised with owners in `235-11-SUMMARY.md` and carried forward
+  // in `235-12-SUMMARY.md` + `deferred-items.md`. **The fence RUNS in no gate today. That is
+  // recorded loudly rather than hidden behind a green verdict line.**
+  "src/components/sources/sourceHealthVocabulary.test.ts",
+  "src/components/sources/runHistoryFold.test.ts",
+  "src/components/sources/RunHistoryList.test.tsx",
+  "src/components/sources/WatchedFoldersSection.history.test.tsx",
+  "src/components/library/__tests__/IngestionTab.readerOff.test.tsx",
+  "src/components/library/__tests__/IngestionTab.reconnectControl.test.tsx",
+  "src/components/library/__tests__/SourcesAttentionSection.test.tsx",
+  "src/components/layout/__tests__/NavPanel.badge.test.tsx",
+  "src/components/layout/__tests__/ChatLayout.badge.test.tsx",
+  "src/hooks/__tests__/useSourceAttention.test.tsx",
+  "src/pages/__tests__/LibraryPage.initialTab.test.tsx",
+  // ── Phase 237 (RULES-01 / SC#1 / SC#3) — Classification rules & arrival watch builder suites ──
+  "src/components/classification/ClassificationRulesPage.test.tsx",
+  "src/components/classification/ClassificationSection.test.tsx",
+  "src/components/classification/RuleBuilderPanel.test.tsx",
+  // ── Phase 238 (SRC-03 / D-238-08) — the predicate that replaced a string guess ─────────
+  // ⚠ ITS OWN LINE, because `src/components/sources` is STILL not a directory entry here —
+  // the same fact Phase 233 recorded and Phase 235 re-recorded. A suite dropped into that
+  // folder runs in no gate unless it is named.
+  "src/components/sources/__tests__/sourceCapability.test.ts",
+  // ── Phase 240 (SRC-05 / D-240-19) ──────────────────────────────────────────────────────
+  // ⚠ NAMED FILES, for the fact three phases in a row have now recorded on this exact path:
+  // `src/components/sources` is STILL not a directory entry, so a suite dropped into that
+  // folder runs in NO gate unless it is named here. `src/components/metadata` is likewise
+  // covered only file-by-file.
+  //
+  // ⛔ The first two are the FIRST SUITES EITHER COMPONENT HAS EVER HAD, and that absence is
+  // the root cause `BUG-260908-02` names in its own report. Both knobs, deliberately: Phase
+  // 214 measured a suite being RUN by a directory entry while guarded by nothing, because
+  // TARGETS decides what runs and BASELINE decides what is guarded.
+  "src/components/sources/__tests__/ConnectedSourceSection.test.tsx",
+  "src/components/sources/__tests__/CreateWatchModal.test.tsx",
+  "src/components/metadata/DocumentConversationSection.test.tsx",
+  // ⚠ Named, not a directory: `src/components/sources` is STILL not a TARGETS directory entry.
+  "src/components/sources/watchProductMark.test.ts",
+  "src/lib/__tests__/navItemsUnknownIsNotDenied.test.ts",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
@@ -4483,15 +4702,62 @@ function runVitest() {
     args.push(`--maxWorkers=${process.env.GSD_VITEST_MAX_WORKERS}`)
   }
 
+  // ⛔ THE WINDOWS COMMAND-LENGTH LIMIT — measured 2026-09-10 (Phase 241-03), and it was
+  //    ALREADY BROKEN at that phase's base commit, by nothing that phase changed.
+  //
+  //    `shell: true` routes the spawn through `cmd.exe /d /s /c "…"`, whose TOTAL command line
+  //    is capped. TARGETS has grown past 150 entries, so the composed line measured **8,078
+  //    characters** and cmd refused the whole thing with:
+  //
+  //        The syntax of the command is incorrect.
+  //
+  //    — no JSON report, exit 255, and `fatal()` below correctly called it a HARNESS error
+  //    rather than a gate failure. Reproduced on two consecutive runs on an untouched tree. A
+  //    controlled probe pinned the boundary between 8,100 (accepted) and 8,150 (refused):
+  //
+  //        for (const n of [7900, 8000, 8050, 8100, 8150])
+  //          spawnSync('node', ['-e','process.exit(0)', 'x'.repeat(n-20)], {shell:true})
+  //        // => 0, 0, 0, 0, 1
+  //
+  // ⛔ THE FIX IS TO STOP GOING THROUGH cmd.exe — NOT TO SHORTEN `TARGETS`. Trimming the scan
+  //    list to fit a shell limit would silently un-run suites, which is the precise failure the
+  //    TARGETS/BASELINE two-knob rule exists to prevent: *"a suite can sit on the wrong side of
+  //    exactly one of them"*. A gate that quietly stops running files is worse than one that
+  //    refuses to start, because only the second one tells anybody.
+  //
+  //    Spawning the resolved vitest entry with `process.execPath` and `shell: false` hands the
+  //    argv to CreateProcess directly (32,767-char ceiling) and passes each target as its own
+  //    argument, so neither quoting nor length applies. It runs the SAME file `npx` resolved:
+  //    `frontend/node_modules/vitest/vitest.mjs`. `require.resolve("vitest/vitest.mjs")` does
+  //    NOT work — the package's `exports` map blocks the deep path (ERR_PACKAGE_PATH_NOT_EXPORTED)
+  //    — so resolve `package.json` (which every modern package exports) and join the `bin` entry.
+  let vitestEntry
+  try {
+    const pkgPath = require.resolve("vitest/package.json", { paths: [FRONTEND_DIR] })
+    vitestEntry = path.join(path.dirname(pkgPath), "vitest.mjs")
+  } catch {
+    vitestEntry = path.join(FRONTEND_DIR, "node_modules", "vitest", "vitest.mjs")
+  }
+  if (!fs.existsSync(vitestEntry)) {
+    fatal(
+      `could not find the vitest entry at ${vitestEntry}.\n` +
+        `       In a worktree this usually means bootstrap-worktree.sh has not run.`,
+    )
+  }
+
+  // `args[0]` is the literal "vitest" the npx form needed; the direct form supplies the path.
+  const spawnArgs = [vitestEntry, ...args.slice(1)]
+
   console.log(`running: npx ${args.join(" ")}`)
+  console.log(`   via: ${path.basename(process.execPath)} ${vitestEntry} (no shell — see above)`)
   console.log(`   cwd: ${FRONTEND_DIR}`)
   console.log(`report: ${outFile}`)
   console.log("")
 
-  const res = spawnSync("npx", args, {
+  const res = spawnSync(process.execPath, spawnArgs, {
     cwd: FRONTEND_DIR,
     stdio: ["ignore", "inherit", "inherit"],
-    shell: true,
+    shell: false,
     env: { ...process.env, CI: "1" },
   })
 

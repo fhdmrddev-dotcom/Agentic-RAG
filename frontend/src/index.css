@@ -232,6 +232,24 @@
     outline: 2px solid hsl(var(--ring));
     outline-offset: 2px;
   }
+  /* ⚠ FORM CONTROLS DRAW THE SAME RING ON THE INSIDE EDGE, and the reason is alignment,
+     not taste. `outline-offset: 2px` above puts the ring 2px OUTSIDE the border box, so a
+     control sitting flush on a column's left edge visibly hangs past the line that every
+     card, tab strip and label in that column shares. Reported from two screenshots:
+     the Ingestion tab's connection picker, and the Watch Cloud Folder modal's destination
+     select — "it is a little beyond the edge to the left".
+
+     ⚠ SCOPED TO `input, select, textarea` ON PURPOSE. Those are the elements that live in
+     aligned columns and carry their own border to draw against. `a`, `button` and
+     `[tabindex]` KEEP the outset ring: a link has no padding to inset into, so an inset
+     outline would strike through its text.
+
+     ⛔ THE RING IS NOT WEAKENED — same 2px, same `--ring` token, same `:focus-visible`
+     (still off mouse clicks). It moves, it does not shrink. Removing it would delete a
+     keyboard user's only focus indicator, which is what A11Y-01 added it for. */
+  :where(input, select, textarea):focus-visible {
+    outline-offset: -2px;
+  }
 }
 
 /* ─── Custom Utility Classes ─── */
@@ -915,3 +933,157 @@
     animation: none;
   }
 }
+
+/* ── Phase 230 — Sketch 227 Variant B (The Batch Lane & Refusal) ────────── */
+@keyframes laneRise {
+  0%, 100% {
+    transform: scaleY(1);
+  }
+  50% {
+    transform: scaleY(calc(1 + 0.22 * var(--energy, 1)));
+  }
+}
+
+@keyframes dotBounce {
+  0%, 60%, 100% {
+    transform: translateY(0);
+    opacity: 0.45;
+  }
+  30% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+
+@keyframes brandPulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.55;
+    transform: scale(0.82);
+  }
+}
+
+@keyframes fadeSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes comet {
+  0% {
+    left: -80px;
+  }
+  100% {
+    left: 100%;
+  }
+}
+
+.animate-laneRise {
+  animation: laneRise 1.1s ease-in-out infinite;
+  transform-origin: bottom;
+}
+
+.animate-dotBounce {
+  animation: dotBounce 1.4s ease-in-out infinite;
+}
+
+.animate-brandPulse {
+  animation: brandPulse 1.5s ease-in-out infinite;
+}
+
+.animate-fadeSlideUp {
+  animation: fadeSlideUp 0.34s ease-out both;
+}
+
+.animate-comet {
+  animation: comet 1.7s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-laneRise,
+  .animate-dotBounce,
+  .animate-brandPulse,
+  .animate-fadeSlideUp,
+  .animate-comet {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* ─── 2026 Dashboard Visual Enhancements: Cards, Charts & Micro-animations ─── */
+@keyframes chartFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes floatSlow {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+.animate-chartFadeIn {
+  animation: chartFadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-floatSlow {
+  animation: floatSlow 3.5s ease-in-out infinite;
+}
+
+/* ⚠ `pulseGlow` and `.animate-pulseGlow` are NOT redefined here. They already exist
+   above (the box-shadow halo) and are consumed by CHAT — StepRow.tsx:229 and
+   ToolCallDetails.tsx:151, the live tool-call indicators, documented as run-frame
+   vocabulary in RunCard.tsx:54. A second definition here silently overrode them
+   (CSS later-wins), turning a halo that costs no layout space into an opacity+scale
+   throb on the agent's live execution surface. Kept OUT deliberately. The
+   reduced-motion block below still names the class, which is a real improvement —
+   the original was never gated, though this file's own comments say all motion is.
+   ⭐ Before adding any utility class here, grep first:
+       grep -n "@keyframes <name>" frontend/src/index.css
+       grep -rn "animate-<name>" frontend/src                                      */
+
+.card-interactive {
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.card-interactive:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px -6px rgba(0, 0, 0, 0.12), 0 4px 12px -2px rgba(0, 0, 0, 0.08);
+  border-color: hsl(var(--border) / 0.8);
+}
+
+.dark .card-interactive:hover {
+  box-shadow: 0 12px 30px -6px rgba(0, 0, 0, 0.4), 0 0 20px -4px hsl(var(--primary) / 0.08);
+  border-color: hsl(var(--primary) / 0.3);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-chartFadeIn,
+  .animate-floatSlow,
+  .animate-pulseGlow,
+  .card-interactive {
+    animation: none !important;
+    transform: none !important;
+    transition: none !important;
+  }
+}
+

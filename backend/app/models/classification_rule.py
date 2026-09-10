@@ -20,6 +20,7 @@ NOTE (IN-03 — the 112 CR-01 / 113 IN-03 lesson): a ``RuleResponse`` carries NO
 from doc rows.
 """
 
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -31,6 +32,7 @@ class RuleCreate(BaseModel):
     name: str
     match_expr: ViewFilter  # the closed filter AST — unknown ops 422 at parse (Pitfall 5)
     suggest_folder_id: UUID | None = None
+    rule_scope: Literal["watch", "classification"] = "classification"
 
 
 class RuleUpdate(BaseModel):
@@ -39,6 +41,7 @@ class RuleUpdate(BaseModel):
     match_expr: ViewFilter | None = None
     suggest_folder_id: UUID | None = None
     enabled: bool | None = None
+    rule_scope: Literal["watch", "classification"] | None = None
 
 
 class RuleResponse(BaseModel):
@@ -49,3 +52,4 @@ class RuleResponse(BaseModel):
     suggest_folder_id: UUID | None = None
     is_system_global: bool = False
     enabled: bool = True
+    rule_scope: str = "classification"

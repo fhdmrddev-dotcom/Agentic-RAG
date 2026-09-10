@@ -19,7 +19,6 @@ from starlette.concurrency import run_in_threadpool
 
 from app.security.egress import EgressRefused, PinnedDestination
 from app.services.mcp_client import (
-    MAX_MCP_BODY_BYTES,
     McpClient,
     McpClientError,
     McpProtocolError,
@@ -97,10 +96,16 @@ async def test_mcp_pinned_ip_rewrites_transport_and_preserves_host(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_mcp_response_byte_cap_exceeded_raises_cleanly():
-    """A response exceeding MAX_MCP_BODY_BYTES raises McpClientError."""
+    """A response exceeding the derived body cap raises McpClientError.
+
+    SEED-258: the cap is no longer a constant — it is derived from the operator's file
+    ceiling (`mcp_max_body_bytes()`), so this reads the live value instead of a literal.
+    """
+    from app.services.mcp_client import mcp_max_body_bytes
+
     client = McpClient()
 
-    large_content = b"X" * (MAX_MCP_BODY_BYTES + 1024)
+    large_content = b"X" * (mcp_max_body_bytes() + 1024)
     mock_resp = httpx.Response(
         200,
         content=large_content,

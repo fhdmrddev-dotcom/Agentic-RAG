@@ -526,6 +526,7 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
             isPlanning={message.isPlanning}
             iterationCount={panelIterationCount}
             activatedSkills={message.activatedSkills}
+            isStreaming={isStreamingNow}
           />
           {/* Phase 075.8 Task 5 (sketch 001 D4 — Next-up footer).
               While the run is streaming AND there's a forward-look signal

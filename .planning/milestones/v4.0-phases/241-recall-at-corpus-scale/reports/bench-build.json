@@ -1,0 +1,118 @@
+{
+  "bench_database": "recall_bench",
+  "seed": 241,
+  "sigma": 0.15,
+  "requested_chunks": 100000,
+  "requested_skew": [
+    0.002,
+    0.02,
+    0.2
+  ],
+  "tenant_plan": [
+    {
+      "label": "skew_0.002",
+      "requested_share": 0.002,
+      "chunks": 200
+    },
+    {
+      "label": "skew_0.02",
+      "requested_share": 0.02,
+      "chunks": 2000
+    },
+    {
+      "label": "skew_0.2",
+      "requested_share": 0.2,
+      "chunks": 20000
+    },
+    {
+      "label": "filler",
+      "requested_share": 0.69841,
+      "chunks": 69841
+    }
+  ],
+  "copied_verbatim": {
+    "auth.users": 26,
+    "public.organizations": 28,
+    "public.org_members": 27,
+    "public.folders": 23,
+    "public.connector_connections": 10,
+    "public.documents": 160,
+    "public.document_chunks": 7959
+  },
+  "schema": {
+    "routines_present": [
+      "match_document_chunks",
+      "keyword_search_chunks",
+      "connection_doc_is_visible"
+    ],
+    "hnsw_indexdef": "CREATE INDEX document_chunks_embedding_idx ON public.document_chunks USING hnsw (embedding public.vector_cosine_ops) WITH (m='16', ef_construction='64')",
+    "readable_as_authenticated": [
+      "documents",
+      "document_chunks",
+      "folders",
+      "connector_connections"
+    ]
+  },
+  "sizes": {
+    "document_chunks_bytes": 1695793152,
+    "document_chunks_mb": 1617.2,
+    "hnsw_index_bytes": 818987008,
+    "hnsw_index_mb": 781.0,
+    "chunk_count": 100000,
+    "document_count": 3842
+  },
+  "achieved_tenant_shares": [
+    {
+      "org": "phase-2171-leak-A-e7b32524-304b-4b02-9d9e-a97f8ba51c34@test.local's Organization",
+      "chunks": 1,
+      "achieved_share": 1e-05
+    },
+    {
+      "org": "phase-2171-leak-B-fc89399e-ec8f-4faa-adb2-9c95217d673a@test.local's Organization",
+      "chunks": 1,
+      "achieved_share": 1e-05
+    },
+    {
+      "org": "bench-skew_0.002",
+      "chunks": 200,
+      "achieved_share": 0.002
+    },
+    {
+      "org": "bench-skew_0.02",
+      "chunks": 2000,
+      "achieved_share": 0.02
+    },
+    {
+      "org": "fhdmrd@gmail.com's Organization",
+      "chunks": 7957,
+      "achieved_share": 0.07957
+    },
+    {
+      "org": "bench-skew_0.2",
+      "chunks": 20000,
+      "achieved_share": 0.2
+    },
+    {
+      "org": "bench-filler",
+      "chunks": 69841,
+      "achieved_share": 0.69841
+    }
+  ],
+  "stage_seconds": {
+    "create_database": 0.095,
+    "apply_full_schema": 0.208,
+    "copy_real_corpus": 5.02,
+    "synthesize": 187.843,
+    "build_hnsw_index": 46.731
+  },
+  "source_corpus_before": {
+    "documents": 160,
+    "chunks": 7959
+  },
+  "source_corpus_after": {
+    "documents": 160,
+    "chunks": 7959
+  },
+  "source_default_transaction_read_only": "on",
+  "provider_calls": 0
+}

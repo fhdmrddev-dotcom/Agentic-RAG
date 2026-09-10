@@ -156,7 +156,9 @@ function history(root) {
  */
 function ledgerRows(text) {
   const lines = text.split('\n');
-  const start = lines.findIndex((l) => l.startsWith('| File | commits'));
+  // ⚠ EXACT match. docs/HOT-FILE-LEDGER.md carries three tables starting "| File | commits";
+  // a prefix match binds to a 2-row one and reports a clean check it never performed.
+  const start = lines.findIndex((l) => l.trim() === '| File | commits / phases / lines | G-5 | Disposition |');
   if (start === -1) return [];
   const rows = [];
   for (let i = start + 2; i < lines.length && lines[i].startsWith('|'); i++) {
@@ -221,9 +223,19 @@ function main() {
   const over = results.filter((r) => r.status === 'OVER');
   const warn = results.filter((r) => r.status === 'WARN');
 
-  // The structural guard runs over every CLAUDE.md; only one carries the ledger.
+  // The structural guard follows the TABLE, not the filename.
+  //
+  // 2026-09-06: the 214-row scan list MOVED out of CLAUDE.md (it was 52,325 chars --
+  // 44% of that file) into docs/HOT-FILE-LEDGER.md, and the completeness guarantee moved
+  // with it from "an agent reads a long table" to scripts/check-hot-file-ledger.cjs, which
+  // fails when a phase's files_modified names a source file with no row. CLAUDE.md keeps a
+  // FIRING-ONLY shortlist under a DIFFERENT header ("| Hot file (FIRING) |") precisely so it
+  // is not parsed as the scan list. These per-cell rules -- 200-char cap, no duplicate row,
+  // 6 cells -- still bind, they simply bind where the table actually lives now.
+  const LEDGER_FILES = [path.join(root, 'docs', 'HOT-FILE-LEDGER.md')];
   const structural = [];
-  for (const file of files) {
+  for (const file of files.concat(LEDGER_FILES)) {
+    if (!fs.existsSync(file)) continue;
     const rel = path.relative(root, file).split(path.sep).join('/');
     const f = ledgerFindings(fs.readFileSync(file, 'utf8'));
     if (f.rows === 0) continue;

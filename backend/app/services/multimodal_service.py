@@ -411,6 +411,10 @@ def embed_and_store_table_chunks(
         pass
 
     embeddings = embed_texts(all_table_chunks, user_settings=app_settings)
+    if len(embeddings) != len(all_table_chunks):
+        raise ValueError(
+            f"Mismatched table embedding count: expected {len(all_table_chunks)}, got {len(embeddings)}"
+        )
     _tbl_embedding_model = (
         getattr(app_settings, "embedding_model", None) or "text-embedding-3-small"
     )
@@ -677,12 +681,28 @@ def describe_image(b64_png: str, app_settings: "UserEffectiveSettings", client=N
     from openai import OpenAI
 
     if client is None:
-        client = OpenAI(
-            api_key=app_settings.llm_api_key,
-            base_url=app_settings.llm_base_url or None,
+        # ⚠ The vision model may not belong to the active chat provider — see
+        #   `vision_text.credentials_for_vision`. Building this client from `llm_api_key`
+        #   directly sent gpt-4o to DeepSeek's endpoint with DeepSeek's key.
+        from app.services.extractors.aspects.vision_text import (  # noqa: PLC0415
+            credentials_for_vision,
         )
-    from app.config import settings as env_settings
-    vision_model = env_settings.vision_model or app_settings.llm_model
+        _creds = credentials_for_vision(app_settings)
+        client = OpenAI(
+            api_key=_creds.llm_api_key,
+            base_url=_creds.llm_base_url or None,
+        )
+    # SEED-226: ONE resolver, shared with the transcription path. The expression that used to
+    # live here (`env_settings.vision_model or app_settings.llm_model`) could never reach its
+    # right-hand side, because config.py pinned a non-empty default.
+    from app.services.extractors.aspects.vision_text import resolve_vision_model  # noqa: PLC0415
+    vision_model = resolve_vision_model(app_settings)
+    # ⚠ None means: nothing configured, and the active chat model is not known to accept
+    #   images. A caption is worth less than a transcription, but a caption INVENTED by a
+    #   model that never saw the picture is worth less than nothing — it is stored beside the
+    #   image and read back as description. Return "" and let the empty-description path run.
+    if not vision_model:
+        return ""
     resp = client.chat.completions.create(
         model=vision_model,
         messages=[{
@@ -796,9 +816,17 @@ def extract_and_store_images(
             return
 
         from openai import OpenAI  # noqa: PLC0415
+        # ⚠ THE SHARED CLIENT MUST CARRY THE VISION PROVIDER'S CREDENTIALS TOO. This is the
+        #   connection-reuse client every image in the document goes through, so building it
+        #   from the CHAT provider's key silently mis-credentials the whole loop — see
+        #   `vision_text.credentials_for_vision`.
+        from app.services.extractors.aspects.vision_text import (  # noqa: PLC0415
+            credentials_for_vision,
+        )
+        _vision_creds = credentials_for_vision(app_settings)
         openai_client = OpenAI(
-            api_key=app_settings.llm_api_key,
-            base_url=app_settings.llm_base_url or None,
+            api_key=_vision_creds.llm_api_key,
+            base_url=_vision_creds.llm_base_url or None,
         )
 
         # SEED-227 — the cap TRUNCATES, and until now it did so in total silence: a
@@ -810,6 +838,23 @@ def extract_and_store_images(
             _record_image_truncation(supabase, document_id, len(image_dicts), cap)
 
         rows: list[dict] = []
+        # ⚠ SAY IT ONCE, LOUDLY, BEFORE THE LOOP — a per-image `debug` cannot carry this.
+        #   MEASURED on the operator's library 2026-09-05: `document_images` held 293 rows and
+        #   EVERY ONE had an empty description. The rows are stored either way (D-072-03, so
+        #   `/reextract` can refill them later), and that design is right — but it means the
+        #   difference between "the model saw these and had nothing to say" and "no model ever
+        #   looked at them" is invisible in the data. Only this line can tell them apart.
+        from app.services.extractors.aspects.vision_text import (  # noqa: PLC0415
+            resolve_vision_model,
+        )
+        if not resolve_vision_model(app_settings):
+            log.warning(
+                "no vision model configured — storing %d image(s) from %s with EMPTY "
+                "descriptions; they are searchable only after a vision model is set in "
+                "Settings and the document is re-extracted",
+                min(len(image_dicts), cap), document_id,
+            )
+
         for img in image_dicts[:cap]:
             # Secondary size guard — extraction helpers filter too, but mocks bypass them in tests
             if img.get("width", 0) < 50 or img.get("height", 0) < 50:
@@ -886,6 +931,10 @@ def extract_and_store_images(
             if descriptions:
                 texts = [d[1] for d in descriptions]
                 embeddings = embed_texts(texts, user_settings=app_settings)
+                if len(embeddings) != len(texts):
+                    raise ValueError(
+                        f"Mismatched image embedding count: expected {len(texts)}, got {len(embeddings)}"
+                    )
                 # D-10 parity with the text-chunk path (documents.py): tag image
                 # chunks with the embedding model + dims they were produced under.
                 # Without this they land with embedding_model=NULL, which (a) strands

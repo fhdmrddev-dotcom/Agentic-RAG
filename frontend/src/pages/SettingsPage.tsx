@@ -35,6 +35,9 @@ import {
 import { ReembedConfirmModal } from "@/components/settings/ReembedConfirmModal"
 import { ReembedStatusCard } from "@/components/settings/ReembedStatusCard"
 import { EngineHealthCard } from "@/components/settings/EngineHealthCard"
+// SEED-258 — the source file ceiling. The card owns the copy; this page owns the wire.
+import { SourceFileCeilingCard } from "@/components/settings/SourceFileCeilingCard"
+import { SOURCE_CEILING_RECOMMENDED_MB } from "@/components/settings/sourceCeilingCopy"
 import { JudgeModelPicker } from "@/components/settings/JudgeModelPicker"
 // Phase 167 (VIS-02 / D-167-04 / SEED-116) — the per-user default-model picker. Lives
 // in the personal-preferences home (this Settings surface, NOT the operator Control Room):
@@ -77,6 +80,21 @@ const PROVIDER_META: Record<string, { label: string; defaultBase: string; keyLab
 
 // ── Small reusable components ─────────────────────────────────────────────────
 
+/**
+ * Phase 241 (QUEUE-06 / D-09) — plain words for pgvector's three `hnsw.iterative_scan` modes.
+ *
+ * ⛔ THIS IS NOT A SECOND COPY OF THE ENUM AND MUST NOT BECOME ONE. The option VALUES rendered
+ * in the picker come from `hnsw_iterative_scan_values`, which the API SERVES; this map only
+ * supplies display text, and a mode with no entry falls back to its raw value. So a server that
+ * grows a fourth mode still renders a working control — it just shows the technical name until
+ * somebody writes a plain one.
+ */
+const ITERATIVE_SCAN_LABELS: Record<string, string> = {
+  off: "Off",
+  strict_order: "On — exact order",
+  relaxed_order: "On — faster",
+}
+
 function FieldRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-4 py-2.5">
@@ -100,8 +118,11 @@ function TextInput({ value, onChange, placeholder, type = "text" }: {
   )
 }
 
-function NumberInput({ value, onChange, min, max, step }: {
+function NumberInput({ value, onChange, min, max, step, ariaLabel }: {
   value: number; onChange: (v: number) => void; min?: number; max?: number; step?: number
+  /** Phase 241 — optional, additive: `FieldRow`'s <Label> carries no htmlFor, so a control
+   *  that wants to be reachable by its name needs to say its own. Existing callers unchanged. */
+  ariaLabel?: string
 }) {
   return (
     <Input
@@ -111,6 +132,7 @@ function NumberInput({ value, onChange, min, max, step }: {
       min={min}
       max={max}
       step={step}
+      aria-label={ariaLabel}
       className="h-8 text-sm font-mono bg-muted/30 ghost-border"
     />
   )
@@ -614,6 +636,12 @@ export function SettingsPage() {
   // PUT when the embedding model OR dims changed; only Confirm commits the save.
   const [reembedModalOpen, setReembedModalOpen] = useState(false)
   const [reembedChunkCount, setReembedChunkCount] = useState<number | null>(null)
+  // A DIMENSIONS change and a MODEL-only change are different acts, and the gate must
+  // say which one is happening: only the dims change runs resize_embedding_column, which
+  // NULLs every vector up front. Lifted to state because the gate renders outside the
+  // save handler that computes it.
+  const [reembedDimsChanged, setReembedDimsChanged] = useState(false)
+  const [reembedPrevDims, setReembedPrevDims] = useState<number | null>(null)
   const [pendingSearchSave, setPendingSearchSave] = useState<SettingsUpdate | null>(null)
 
   // Reranking
@@ -626,6 +654,19 @@ export function SettingsPage() {
   // Retrieval
   // SEED-227 — mirrors migration 044's default so a cold load matches the server.
   const [maxVisionCalls, setMaxVisionCalls] = useState(100)
+  // SEED-226 — empty means "use the active chat model". It is NOT a missing value.
+  const [visionModel, setVisionModel] = useState("")
+  const [visionMaxPages, setVisionMaxPages] = useState(50)
+  // SEED-258 — the source file ceiling, plus the bounds the SERVER states.
+  //
+  // ⛔ THE BOUNDS START `null`, AND THE `null` IS THE POINT. Seeding them with 1 and 50
+  // would put a private copy of the ceiling in this file — the fourth one, after the three
+  // 239-09 deleted from google_drive.py, microsoft_graph.py and mcp_source.py. There is no
+  // honest cold value for a bound we have not been told, so the card mounts only once the
+  // response carries them (it always does; `loading` gates this whole page on that fetch).
+  const [sourceMaxFileSizeMb, setSourceMaxFileSizeMb] = useState(SOURCE_CEILING_RECOMMENDED_MB)
+  const [sourceCeilingFloor, setSourceCeilingFloor] = useState<number | null>(null)
+  const [sourceCeilingMax, setSourceCeilingMax] = useState<number | null>(null)
   const [retrievalTopK, setRetrievalTopK] = useState(5)
   const [retrievalThreshold, setRetrievalThreshold] = useState(0.3)
   const [hybridEnabled, setHybridEnabled] = useState(true)
@@ -633,6 +674,15 @@ export function SettingsPage() {
   const [vectorWeight, setVectorWeight] = useState(1.0)
   const [keywordWeight, setKeywordWeight] = useState(1.0)
   const [rrfK, setRrfK] = useState(60)
+  // Phase 241 (QUEUE-06 / D-09) — search breadth and iterative scan. ⛔ The BOUNDS are served
+  // by `GET /settings` and start as null, exactly like the source ceiling above: there is no
+  // honest cold value for a bound the server has not stated yet, and typing 10/1000 here would
+  // make the form a second private copy of numbers migration 176's CHECK also carries.
+  const [hnswEfSearch, setHnswEfSearch] = useState(40)
+  const [hnswIterativeScan, setHnswIterativeScan] = useState("off")
+  const [hnswEfSearchFloor, setHnswEfSearchFloor] = useState<number | null>(null)
+  const [hnswEfSearchCeiling, setHnswEfSearchCeiling] = useState<number | null>(null)
+  const [hnswIterativeScanValues, setHnswIterativeScanValues] = useState<string[]>([])
 
   // Web search
   const [tavilyApiKey, setTavilyApiKey] = useState("")
@@ -698,6 +748,16 @@ export function SettingsPage() {
     setRerankTopN(data.rerank_top_n)
     setRerankApiKey(data.rerank_has_api_key ? KEY_PLACEHOLDER : "")
     setMaxVisionCalls(data.multimodal_max_vision_calls)
+    setVisionModel(data.vision_model ?? "")
+    setVisionMaxPages(data.vision_max_pages ?? 50)
+    // SEED-258. ⚠ HI-02: the STORED value is always rendered. `??` covers only a backend
+    // that predates the field entirely — never a stored value, which would make "open the
+    // page and press Save" a silent wipe. Migration 174 being authored-but-not-applied is
+    // NOT that case: the column is absent, `_val()` returns the default, and the server
+    // still sends 25.
+    setSourceMaxFileSizeMb(data.source_max_file_size_mb ?? SOURCE_CEILING_RECOMMENDED_MB)
+    setSourceCeilingFloor(data.source_max_file_size_mb_floor ?? null)
+    setSourceCeilingMax(data.source_max_file_size_mb_ceiling ?? null)
     setRetrievalTopK(data.retrieval_top_k)
     setRetrievalThreshold(data.retrieval_match_threshold)
     setHybridEnabled(data.hybrid_search_enabled)
@@ -705,6 +765,16 @@ export function SettingsPage() {
     setVectorWeight(data.vector_search_weight)
     setKeywordWeight(data.keyword_search_weight)
     setRrfK(data.rrf_k)
+    // Phase 241. ⚠ HI-02, the same rule the source ceiling above states: the STORED value is
+    // always rendered, and `??` covers only a backend predating the field entirely — never a
+    // stored value, which would make "open the page and press Save" a silent reset. Migration
+    // 176 being authored-but-not-applied is NOT that case: the column is absent, `_val()`
+    // returns the config default, and the server still sends 40 / "off".
+    setHnswEfSearch(data.hnsw_ef_search ?? 40)
+    setHnswIterativeScan(data.hnsw_iterative_scan ?? "off")
+    setHnswEfSearchFloor(data.hnsw_ef_search_floor ?? null)
+    setHnswEfSearchCeiling(data.hnsw_ef_search_ceiling ?? null)
+    setHnswIterativeScanValues(data.hnsw_iterative_scan_values ?? [])
     setTavilyApiKey(data.web_search_has_api_key ? KEY_PLACEHOLDER : "")
     setWebSearchMaxResults(data.web_search_max_results)
     setWebSearchEnabled(data.web_search_enabled)
@@ -816,6 +886,8 @@ export function SettingsPage() {
       rerank_model: rerankModel,
       rerank_top_n: rerankTopN,
       multimodal_max_vision_calls: maxVisionCalls,
+      vision_model: visionModel,
+      vision_max_pages: visionMaxPages,
       retrieval_top_k: retrievalTopK,
       retrieval_match_threshold: retrievalThreshold,
       hybrid_search_enabled: hybridEnabled,
@@ -823,6 +895,9 @@ export function SettingsPage() {
       vector_search_weight: vectorWeight,
       keyword_search_weight: keywordWeight,
       rrf_k: rrfK,
+      // Phase 241 (QUEUE-06 / D-09) — the two knobs ride the payload this tab already sends.
+      hnsw_ef_search: hnswEfSearch,
+      hnsw_iterative_scan: hnswIterativeScan,
     }
 
     // Phase 111.1 D-02/D-03 — confirm-on-save gate. ONLY fire when the embedding
@@ -832,6 +907,8 @@ export function SettingsPage() {
     if (modelChanged || dimsChanged) {
       setPendingSearchSave(body)
       setReembedChunkCount(null)
+      setReembedDimsChanged(dimsChanged)
+      setReembedPrevDims(s ? s.embedding_dimensions : null)
       setReembedModalOpen(true)
       // Pull the LIVE chunk count for the gate's "how many chunks" fact (the
       // current-model total — what will go stale + re-embed). Best-effort.
@@ -853,6 +930,11 @@ export function SettingsPage() {
         web_search_max_results: webSearchMaxResults,
         web_search_enabled: webSearchEnabled,
         sandbox_enabled: sandboxEnabled,
+        // SEED-258. ⛔ Sent RAW — no clamp, no min/max correction. The API is the boundary
+        // and its 400 carries the one sentence that says what raising the ceiling costs;
+        // `updateSettings` rethrows that detail and the banner above renders it verbatim.
+        // Silently fixing the number here would hide a refusal the operator should read.
+        source_max_file_size_mb: sourceMaxFileSizeMb,
       }
       const updated = await updateSettings(body)
       hydrate(updated)
@@ -917,6 +999,8 @@ export function SettingsPage() {
         chunkCount={reembedChunkCount}
         targetModel={embeddingModel}
         targetDims={embeddingDimensions}
+        dimsChanged={reembedDimsChanged}
+        currentDims={reembedPrevDims}
         busy={savingSearch}
         onCancel={() => {
           setReembedModalOpen(false)
@@ -1410,12 +1494,37 @@ export function SettingsPage() {
 
               {/* Images SectionCard — SEED-227. The description carries the CONSEQUENCE,
                   because a bare number is what this setting already was in the database. */}
+              {/* ⚠ THE DESCRIPTION USED TO END "and the document says so on its detail panel",
+                  and that was FALSE — measured 2026-09-05. The cap writes `metadata._images`,
+                  a grep for it across `frontend/src` returns nothing, and DocumentDetailPanel
+                  ignores `_`-prefixed keys by contract. The claim is removed rather than
+                  softened; a settings description that promises a surface which does not exist
+                  is the same defect as an error message naming a capability we lack. */}
               <SectionCard
-                title="Images in documents"
-                description="How many images are read per document. Anything past this limit is not read, and the document says so on its detail panel."
+                title="Images, scans and drawings"
+                description="How documents that are pictures rather than text get read. A scanned or drawn page is transcribed by a vision model; anything past these limits is not read."
               >
                 <FieldRow label="Images read per document">
                   <NumberInput value={maxVisionCalls} onChange={setMaxVisionCalls} min={1} max={1000} />
+                </FieldRow>
+
+                {/* ⚠ A TRUNCATED DOCUMENT DOES ANNOUNCE ITSELF, and unlike the image cap above
+                    that claim is true: the shortfall is written into EVERY chunk header, so an
+                    answer drawn from any part of the document carries its own limit. */}
+                <FieldRow label="Scanned pages read per document">
+                  <NumberInput value={visionMaxPages} onChange={setVisionMaxPages} min={1} max={500} />
+                </FieldRow>
+
+                {/* SEED-226 — this was a constant in `config.py` (`gpt-4o-mini`) and the
+                    fallback meant to reach the active chat model was unreachable, so every
+                    install made vision calls to OpenAI whatever provider it was configured
+                    for. Empty is the correct, meaningful default. */}
+                <FieldRow label="Vision model">
+                  <TextInput
+                    value={visionModel}
+                    onChange={setVisionModel}
+                    placeholder="Leave empty to use your chat model"
+                  />
                 </FieldRow>
               </SectionCard>
 
@@ -1446,6 +1555,69 @@ export function SettingsPage() {
                     </FieldRow>
                   </>
                 )}
+
+                {/* Phase 241 (QUEUE-06 / D-09) — the two HNSW index knobs.
+                    ⚠ DELIBERATELY OUTSIDE the `hybridEnabled` block above. They govern the
+                    VECTOR scan, which runs on the vector-only path too (`search_documents`
+                    calls `_vector_search` in both arms), so hiding them behind the hybrid
+                    toggle would hide a control that is still in effect.
+                    ⛔ The bounds are SERVED, never typed here — see `hnswEfSearchFloor`. */}
+                <FieldRow label="Search breadth">
+                  <NumberInput
+                    value={hnswEfSearch}
+                    onChange={setHnswEfSearch}
+                    min={hnswEfSearchFloor ?? undefined}
+                    max={hnswEfSearchCeiling ?? undefined}
+                    ariaLabel="Search breadth"
+                  />
+                </FieldRow>
+                <p className="text-xs text-muted-foreground -mt-1 mb-2">
+                  How many candidate passages the index looks at before your filters are
+                  applied. A bigger number walks more candidate vectors per search — slower
+                  answers and more memory. A smaller one is faster, but a search narrowed to a
+                  small part of your library can come back with fewer results than it asked
+                  for.
+                  {hnswEfSearchFloor !== null && hnswEfSearchCeiling !== null && (
+                    <> {" "}Allowed: {hnswEfSearchFloor}&ndash;{hnswEfSearchCeiling}.</>
+                  )}
+                  {/* Phase 241 — the RECOMMENDATION, stated as EVIDENCE rather than as a blanket
+                      prescription. Measured on a 100,000-passage bench at three tenant sizes
+                      (241-VALIDATION.md): 200 reached full recall at every one, and 1000 was
+                      REPRODUCIBLY WORSE than 400 — so "set it as high as it goes" is measurably
+                      wrong here, and the ceiling is not the goal. Say what was measured, not
+                      what the operator ought to want. */}
+                  {" "}
+                  <span className="font-medium text-foreground">
+                    200 is a good starting point
+                  </span>
+                  {" "}&mdash; on our 100,000-passage test library it returned every result that
+                  should have been found, for small and large teams alike. Higher is not better:
+                  1000 measured worse than 400.
+                </p>
+
+                {/* ⛔ A SELECT, NEVER A TOGGLE. `strict_order` and `relaxed_order` are two
+                    genuinely different modes; a boolean would silently drop one of them. */}
+                <FieldRow label="Keep scanning">
+                  <select
+                    value={hnswIterativeScan}
+                    onChange={(e) => setHnswIterativeScan(e.target.value)}
+                    aria-label="Keep scanning"
+                    className="h-8 w-full text-sm rounded-md bg-muted/30 ghost-border px-2 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  >
+                    {hnswIterativeScanValues.map((mode) => (
+                      <option key={mode} value={mode}>
+                        {ITERATIVE_SCAN_LABELS[mode] ?? mode}
+                      </option>
+                    ))}
+                  </select>
+                </FieldRow>
+                <p className="text-xs text-muted-foreground -mt-1">
+                  When on, the index keeps looking until enough passages survive your filters
+                  instead of stopping early with a short list. It costs more work and more
+                  memory on every search. Exact order keeps the closest matches first; faster
+                  may reorder them. Older databases do not have this setting, and searches
+                  keep working there without it.
+                </p>
               </SectionCard>
 
               {/* Save Search Settings button */}
@@ -1494,6 +1666,42 @@ export function SettingsPage() {
                   <Toggle checked={sandboxEnabled} onChange={setSandboxEnabled} label={sandboxEnabled ? "On" : "Off"} />
                 </FieldRow>
               </SectionCard>
+
+              {/* ── SEED-258 — the source file ceiling ────────────────────────────────────
+                  ⚠ WHY THIS TAB AND NOT ANOTHER, because the seed insists a knob's HOME is
+                  a recorded decision rather than a placement:
+
+                  · SCOPE. It writes `app_settings`, the global operator singleton, and
+                    GET/PUT /settings both carry `require_visible("model_management")` —
+                    the same gate that already decides whether this tab exists at all. The
+                    knob is operator-scope BY CONSTRUCTION here, not by a check bolted on.
+                  · SUBJECT. This tab is already where the app's dealings with outside
+                    services live (Tavily, the sandbox). "How large a file we will accept
+                    from a server we do not control" is that family.
+                  · PRECEDENT. `multimodal_max_vision_calls` — SEED-227, the other bounded
+                    `app_settings` number — is a card on this page, and SEED-258 names it
+                    as the shape to follow rather than invent.
+
+                  ⛔ NOT `ConnectionsPage`, though connected sources live there: that page
+                  is UNGOVERNED BY DESIGN ("a connection is a per-user asset, like a
+                  thread") and deliberately calls neither settings endpoint. A global DoS
+                  guard on a per-user page is the `user_settings` mistake wearing a
+                  different hat — SEED-258: *"A DoS guard a user can raise for themselves
+                  is not a guard."*
+
+                  ⛔ NOT the Control Room: it reads settings but writes config only through
+                  `setFlag`, so this would have been a second write path to one singleton.
+
+                  The bounds guard is not defensive noise — it is the `null` from the state
+                  block above, which exists so this file owns no copy of the ceiling. */}
+              {sourceCeilingFloor !== null && sourceCeilingMax !== null && (
+                <SourceFileCeilingCard
+                  value={sourceMaxFileSizeMb}
+                  floor={sourceCeilingFloor}
+                  ceiling={sourceCeilingMax}
+                  onChange={setSourceMaxFileSizeMb}
+                />
+              )}
 
               {/* Save Integrations button */}
               <div className="flex justify-end">

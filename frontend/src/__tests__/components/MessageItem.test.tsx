@@ -211,8 +211,8 @@ describe("Phase 068.5 — pulse class gating on runStatus", () => {
         onResume={() => {}}
       />,
     )
-    // Resume button is rendered for failed runs (L-068.5-04 / Phase 063/066 gate)
-    expect(screen.getByRole("button", { name: /resume/i })).toBeInTheDocument()
+    // Retry turn button is rendered for failed runs (BUG-260818-01 / L-068.5-04 / Phase 063/066 gate)
+    expect(screen.getByRole("button", { name: /retry turn/i })).toBeInTheDocument()
     // Pulse class is NOT applied (mutual exclusivity is structural)
     const botIcon = screen.getByTestId("assistant-bot-icon")
     expect(botIcon.className).not.toContain("animate-brandPulse")

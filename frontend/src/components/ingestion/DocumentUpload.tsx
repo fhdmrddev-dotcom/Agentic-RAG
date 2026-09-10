@@ -47,7 +47,7 @@ interface BatchResult {
  * no `onUploadProgress` and no `XMLHttpRequest` anywhere on this path — so bytes-sent is not
  * observable and any percentage would be invented. The honest status is the one that ships:
  * *"Uploading N files…"* while in flight, then the `Promise.allSettled` batch result
- * (`uploaded` / `already up to date` / one line per error). That batching and its reporting
+ * (`uploaded` / `already in your Library` / one line per error). That batching and its reporting
  * are UNCHANGED by this plan.
  *
  * ── Phase 217.1 plan 03 (D-217.1-05) — the hero variant ───────────────────────────────
@@ -127,12 +127,17 @@ export function DocumentUpload({
               : `${targetLabel} · drop files here or click to browse`
           }
           className={cn(
-            "w-full rounded-xl border border-dashed px-8 py-10 text-center transition-colors",
+            // ⭐ SKETCH 231-A — ONE LINE, NOT A BAND. This was `px-8 py-10` with a stacked
+            //    column inside, which spent a full screen band on one action and pushed the
+            //    connected-source panel below the fold. The operator named it twice: "this drop
+            //    file section is very big while it should… allow other functional parts to be
+            //    more usable". Same affordances, one row.
+            "w-full rounded-xl border border-dashed px-4 py-2.5 text-left transition-all duration-200",
             disabled
               ? "cursor-not-allowed border-muted-foreground/25 text-muted-foreground/60"
               : dragging
-                ? "cursor-copy border-primary bg-primary/10"
-                : "cursor-pointer border-border bg-card/40 hover:border-primary/50 hover:bg-accent/40",
+                ? "cursor-copy border-primary bg-primary/10 shadow-[0_0_30px_rgba(99,102,241,0.15)] ring-2 ring-primary/20 scale-[1.01]"
+                : "cursor-pointer border-border/70 bg-gradient-to-b from-card/80 to-card/40 backdrop-blur-sm hover:border-primary/50 hover:bg-card/90 hover:shadow-md",
             uploading && "cursor-default opacity-70",
           )}
         >
@@ -157,19 +162,41 @@ export function DocumentUpload({
               </span>
             </>
           ) : (
-            <div className="flex flex-col items-center gap-2">
-              <Cloud className="h-8 w-8 text-primary/70" aria-hidden="true" />
-              <span className="text-base font-medium text-foreground">Drop files here</span>
-              <span className="text-sm text-muted-foreground">or</span>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+              <Cloud className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+              <span className="text-sm font-medium text-foreground">Drop files here</span>
+              <span className="text-xs text-muted-foreground">or</span>
               <span
-                className="inline-flex items-center rounded-md bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+                className="inline-flex items-center rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground transition-all hover:bg-primary/90 active:scale-95"
                 data-testid="choose-files-button"
               >
                 Choose files
               </span>
               {/* The formats are PRINTED from the same constant that feeds `accept` below —
-                  never a hand-written list (D-217-18). */}
-              <span className="text-xs text-muted-foreground">
+                  never a hand-written list (D-217-18). ⚠ Pushed right rather than dropped: the
+                  sentence is a contract with `acceptedFormats.ts`, not decoration.
+
+                  ⛔ `flex-1 min-w-0` IS LOAD-BEARING — WITHOUT IT THIS ROW VISIBLY SHAKES.
+                  Reported by the operator as the dropzone "shaking to the left and right".
+                  MEASURED in the live page by sweeping the container from 1220px to 620px:
+
+                    ml-auto truncate            -> row heights {24, 47}, ellipsis only at 670px
+                    flex-nowrap + min-w-0       -> row heights {24, 40, 60}   (worse)
+                    flex-1 min-w-0 (this)       -> row heights {24}          ✅ constant
+
+                  `truncate` alone cannot shrink a flex item, and in a `flex-wrap` row the
+                  item WRAPS instead — taking the dropzone from 24px to 47px tall. That height
+                  change toggles the page's vertical scrollbar, the scrollbar changes the
+                  viewport width by ~15px, and the width change flips the wrap back: a
+                  feedback loop that reads as horizontal jitter.
+
+                  ⚠ IT WAS LATENT UNTIL THE LIST GREW. The wrap boundary sits at ~950px of
+                  dropzone width; adding the six image formats (13 -> 19 entries, SEED-226)
+                  pushed the sentence long enough to cross it at ordinary window sizes. */}
+              <span
+                className="ml-auto min-w-0 flex-1 truncate text-right text-[11px] text-muted-foreground"
+                title={formatsSentence()}
+              >
                 {formatsSentence()}
               </span>
             </div>
@@ -179,10 +206,17 @@ export function DocumentUpload({
         {result && !uploading && (
           <div className="text-center">
             {(result.uploaded > 0 || result.duplicates > 0) && (
-              <p className="text-xs text-muted-foreground">
+              <p
+                className={
+                  result.uploaded === 0
+                    ? "text-xs font-medium text-foreground"
+                    : "text-xs text-muted-foreground"
+                }
+              >
                 {[
                   result.uploaded > 0 && `${result.uploaded} uploaded`,
-                  result.duplicates > 0 && `${result.duplicates} already up to date`,
+                  result.duplicates > 0 &&
+                    `${result.duplicates} already in your Library — nothing to upload`,
                 ]
                   .filter(Boolean)
                   .join(" · ")}
@@ -227,12 +261,12 @@ export function DocumentUpload({
           // A BAND, not a hero panel (see the docblock's height arithmetic). Full width so
           // it is the first thing the eye lands on, ~82px tall so the list below it does not
           // move — which is the objection the corner button was created to answer.
-          "w-full rounded-xl border border-dashed px-6 py-5 text-center transition-colors",
+          "w-full rounded-xl border border-dashed px-6 py-5 text-center transition-all duration-200 shadow-sm",
           disabled
             ? "cursor-not-allowed border-muted-foreground/25 text-muted-foreground/60"
             : dragging
-              ? "cursor-copy border-primary bg-primary/10"
-              : "cursor-pointer border-border bg-card/40 hover:border-primary/50 hover:bg-accent/40",
+              ? "cursor-copy border-primary bg-primary/10 shadow-[0_0_24px_rgba(99,102,241,0.15)] ring-2 ring-primary/20"
+              : "cursor-pointer border-border/70 bg-gradient-to-b from-card/80 to-card/40 backdrop-blur-sm hover:border-primary/50 hover:bg-card/90 hover:shadow-md",
           uploading && "cursor-default opacity-70",
         )}
       >
@@ -260,7 +294,9 @@ export function DocumentUpload({
         ) : (
           <>
             <span className="flex items-center justify-center gap-2 text-sm font-medium text-foreground">
-              <Upload className="h-4 w-4 shrink-0" aria-hidden="true" />
+              <div className="w-5 h-5 rounded-md bg-primary/10 flex items-center justify-center text-primary">
+                <Upload className="h-3 w-3 shrink-0" aria-hidden="true" />
+              </div>
               <span>Drop files here, or choose them</span>
             </span>
             {/* The formats are PRINTED from the same constant that feeds `accept` below —
@@ -276,10 +312,17 @@ export function DocumentUpload({
       {result && !uploading && (
         <div className="text-center">
           {(result.uploaded > 0 || result.duplicates > 0) && (
-            <p className="text-xs text-muted-foreground">
+            <p
+              className={
+                result.uploaded === 0
+                  ? "text-xs font-medium text-foreground"
+                  : "text-xs text-muted-foreground"
+              }
+            >
               {[
                 result.uploaded > 0 && `${result.uploaded} uploaded`,
-                result.duplicates > 0 && `${result.duplicates} already up to date`,
+                result.duplicates > 0 &&
+                  `${result.duplicates} already in your Library — nothing to upload`,
               ]
                 .filter(Boolean)
                 .join(" · ")}

@@ -48,7 +48,18 @@ const rules: ClassificationRule[] = [
     id: "rule-1",
     user_id: "user-1",
     name: "Acme Invoices",
+    rule_scope: "classification",
     match_expr: { op: "and", conditions: [{ field: "document_type", op: "eq", value: "invoice" }] },
+    suggest_folder_id: "folder-fin",
+    is_system_global: false,
+    enabled: true,
+  },
+  {
+    id: "rule-2",
+    user_id: "user-1",
+    name: "Incoming PDFs",
+    rule_scope: "watch",
+    match_expr: { op: "and", conditions: [{ field: "type", op: "eq", value: "application/pdf" }] },
     suggest_folder_id: "folder-fin",
     is_system_global: false,
     enabled: true,
@@ -126,5 +137,33 @@ describe("ClassificationRulesPage", () => {
     await user.click(await screen.findByText("Edit rule"))
     expect(await screen.findByText(/edit rule/i)).toBeInTheDocument()
     expect((screen.getByLabelText(/rule name/i) as HTMLInputElement).value).toBe("Acme Invoices")
+  })
+
+  it("renders scope badges for rules", async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByText("Acme Invoices")).toBeInTheDocument())
+    expect(screen.getByText("Extracted")).toBeInTheDocument()
+    expect(screen.getByText("Arrival")).toBeInTheDocument()
+  })
+
+  it("filters rules by scope chip", async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByText("Acme Invoices")).toBeInTheDocument())
+    expect(screen.getByText("Incoming PDFs")).toBeInTheDocument()
+
+    // Click 'Arrival' filter
+    fireEvent.click(screen.getByRole("button", { name: /arrival \(1\)/i }))
+    expect(screen.queryByText("Acme Invoices")).not.toBeInTheDocument()
+    expect(screen.getByText("Incoming PDFs")).toBeInTheDocument()
+
+    // Click 'Extracted' filter
+    fireEvent.click(screen.getByRole("button", { name: /extracted \(1\)/i }))
+    expect(screen.getByText("Acme Invoices")).toBeInTheDocument()
+    expect(screen.queryByText("Incoming PDFs")).not.toBeInTheDocument()
+
+    // Click 'All' filter
+    fireEvent.click(screen.getByRole("button", { name: /all \(2\)/i }))
+    expect(screen.getByText("Acme Invoices")).toBeInTheDocument()
+    expect(screen.getByText("Incoming PDFs")).toBeInTheDocument()
   })
 })

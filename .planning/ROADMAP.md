@@ -23,6 +23,64 @@
 - ✅ **v3.7 Workflow Product Completion** — Phases **192-200.3** (shipped 2026-08-24). 17 phases (CORE 192-198 + inserts 192.1, 192.2, 193.1, 193.2, 194.1, 199, 200, 200.1, 200.2, 200.3), 147 plans, 20/20 requirements satisfied. Full archive in `.planning/v3.7-MILESTONE-AUDIT.md`.
 - ✅ **v3.8 Document Intelligence, Automations & Connectors** — Phases **201-209** (shipped 2026-08-26, git tag `v3.8`). 12 phases, 17 plans, migrations 124-126, 3 days. **11/11 requirements delivered.** Structured tables and email became first-class ingestion; workflows run unattended on a schedule with a brake that really stops work; a run can read its own prior run; and a workflow reaches any official MCP server with per-tool consent and **zero per-vendor adapter code**. ⚠ Closed `gaps_closed_partial` — three requirements are narrower than their wording and are carried with re-open triggers ([`audit`](milestones/v3.8-MILESTONE-AUDIT.md)).
 - ✅ **v3.9 Connections: Any Service, Any Tool** — Phases **210-227** (shipped 2026-09-04, git tag `v3.9`). 16 phases (210-217 CORE + inserts 214.1 / 217.1 + 220-227; **218 absorbed** into 217.1; **219 deferred**), **111 plans**, migrations **127-129 / 140-141 / 150-152**, 9 days. **34/39 requirements delivered · 3 partial · 2 shipped-but-never-driven.** A connection became `{service identity, auth, discovered tools, per-tool grants}` — so adding a service adds **rows, not code**: Notion connects by OAuth with no developer console and returns **41 tools for zero lines of tool code**, and six Google applications sit under one token with **11/11 live writes**. Per-tool grants, an approval moment that stops a real run, an audit receipt per outbound call, connections usable by name in chat, and the Library as one home for documents. ⚠ **Phase 219 DEFERRED to the Connected Knowledge milestone** with `LIB-08/09/10` and `SEED-209/210/211/212` — its SC#1 *“watched on a schedule”* IS this milestone's own binding security re-open trigger ([`audit`](milestones/v3.9-MILESTONE-AUDIT.md)).
+- ✅ **v4.0 Connected Knowledge** — Phases **228-241** (shipped 2026-09-10, git tag `v4.0`). 14 phases, **62 plans**, migrations **153-156 / 166-176**, 6 days. **33/38 requirements delivered · 5 ⛔ not ticked** (`SRC-03` Azure-blocked · `QUEUE-06` remedy shipped but the DEFAULT is unchanged · `SURF-03` home still an open decision · `DEBT-03` ultra ruled out · `DEBT-04` gated on a production push). The knowledge base stopped depending on somebody remembering to upload: a source is connected **once**, previewed before it brings anything in, and then watched on the **shipped** scheduler. Four families as thin adapters over ONE contract — Google Drive · OneDrive/SharePoint via Graph · **any** MCP file server · mail — with **239 proving zero-code by HASH** against GitHub MCP and **240 proving mail is a SHAPE, not a fourth adapter** (`sources/base.py` byte-identical). Connection-scoped visibility at all four RLS sites, a durable queue with cap/retry/resume, and the anti-injection discipline **actually attacked** (13/13 refused · 8/8 mutations caught · live drive refused by 8/8 native providers). ⚠ **241 measured a REAL recall defect at customer scale** — `recall@20` **0.040** at the shipped `ef_search = 40`, a **cliff not a slope**. ⛔ **238, 240 and 241 closed WITHOUT an independent §6.3 review**; two UAT sets owed on credentials ([`audit`](milestones/v4.0-MILESTONE-AUDIT.md)).
+
+---
+
+## v4.0 Connected Knowledge — SHIPPED 2026-09-10
+
+**14 phases** (228-241, no inserts), **62 plans**, migrations **153-156 / 166-176** (15 files; **157-165 unused**, 171 reserved), 6 days, git tag `v4.0`.
+**33 ✅ delivered · 5 ⛔ not ticked, of 38 requirements.**
+Full detail: [`milestones/v4.0-ROADMAP.md`](milestones/v4.0-ROADMAP.md) ·
+requirements: [`milestones/v4.0-REQUIREMENTS.md`](milestones/v4.0-REQUIREMENTS.md) ·
+audit: [`milestones/v4.0-MILESTONE-AUDIT.md`](milestones/v4.0-MILESTONE-AUDIT.md) ·
+state at close: [`milestones/v4.0-STATE-at-close.md`](milestones/v4.0-STATE-at-close.md) ·
+phases: `milestones/v4.0-phases/`
+
+⭐ **The premise came true: a source is connected once and then read by itself.** Four families —
+Google Drive, OneDrive/SharePoint via Microsoft Graph, **any** MCP file server, and mail — sit on
+ONE `browse / list / read / check` contract. The contract was then *tested* rather than asserted:
+**239 bound GitHub MCP as a second file server entirely through the UI, proven zero-code by HASH**
+(HEAD identical before and after), and **240 proved mail is a SHAPE, not a fourth adapter** —
+`sources/base.py` byte-identical, no registry key, delegation `+35/-0`.
+
+⭐ **Connection-scoped visibility is enforced in RLS at all four sites**, provenance rides every row
+from the first write, a disconnect **freezes** rather than deletes, and a `missing` verdict may be
+written only from a listing whose final page asserted completeness (`H-5`) — so an incomplete
+listing can never delete a customer's documents.
+
+⭐ **The anti-injection discipline was ACTUALLY ATTACKED, and it held.** 13/13 taxonomy attacks
+refused offline, **8/8 mutations caught loudly at the point of use**, and the live drive planted the
+payload in a really-synced Drive document: **all 8 native-roster providers refused it with zero
+write-tool invocations**, three surfacing the injection to the user unprompted.
+
+⚠ **THE MILESTONE'S SHARPEST FINDING IS A DEFECT IT FOUND IN ITSELF.** Phase 241 measured filtered
+vector recall at customer scale and it was **REAL**: at the shipped `hnsw.ef_search = 40`, a tenant
+owning 0.2% of a 100,000-chunk corpus scores `recall@20` **0.040**, and three named documents
+silently stop being found. `ef_search = 200` restores **1.000**. ⛔ **The knobs ship as operator
+settings but the DEFAULT is unchanged, so `QUEUE-06` is NOT ticked** — out of the box the
+requirement is still not met. ⚠ The degradation is a **cliff, not a slope** (the "control" rows ran
+on a SEQ SCAN), so an install can cross it with **no deploy and no setting change**.
+
+⚠ **THE PREMISE OF PHASE 241 WAS REFUTED BEFORE IT STARTED, AND THAT IS THE LESSON.** There was no
+Phase 230 baseline: `scripts/measure-recall.py` ran `content ILIKE`, never touched the vector path,
+scored every miss `rank = 1` and printed **`MRR 1.000`** on the live corpus. **A harness that cannot
+report a failure had been reporting success.**
+
+⛔ **THREE PHASES CLOSED WITHOUT AN INDEPENDENT §6.3 REVIEW — 238, 240, 241.** Gemini has been
+unavailable since 2026-09-09 and `/code-review ultra` is ruled out on cost, so their verdicts are
+the builder's own. **A self-verification is not a review, and this milestone contains three.**
+
+⛔ **TWO UAT SETS ARE OWED AND CREDENTIAL-BLOCKED, not skipped** — 238's nine live rows need one
+Azure app registration; 241's row 5 needs a read-capable cloud DSN. ⚠⚠ **241's row 5 has a
+DEADLINE: it dies the moment migration 176 reaches cloud.** ⛔ **Cloud is 15 migrations behind**
+(`153-156`, `166-176`); v4.0 has not deployed.
+
+⭐ **The method failure worth carrying forward, committed three times in one hour by the audit
+written to catch it:** a file listing is not a review; a review is a claim ABOUT code; a summary is a
+claim about a moment. **Each register only knows the one below it, and the code is the bottom.**
+Two Phase-239 CRITICALs were escalated as live and open when they had been fixed two days earlier,
+in an ancestor of the auditing commit. **Drive it, or do not report it.**
 
 ---
 
@@ -53,8 +111,6 @@ by moving the feature.**
 213 (the approval moment: Gate 5.5 fell through on `ask`, so the whole ask/refusal vocabulary was
 consumed by nothing) and 216 (the chat wiring dead inside an `except` arm, invisible to 6,929 green
 tests). Both found by driving, neither by a suite.
-
-
 
 ## v3.8 Document Intelligence, Automations & Connectors — SHIPPED 2026-08-26
 
@@ -127,7 +183,6 @@ Committed as gated phases (ship only if CORE lands clean and budget remains; v2.
 - [ ] **Phase 180 (STRETCH): Agent-Loop Behavior Honesty** — honor step-by-step/todo-loop, Anthropic user-facing end summary, bounded tool iterations (LOOP-01..03)
 
 ### Phase Details
-
 
 #### Phase 174: Run-State & Lifecycle Honesty
 

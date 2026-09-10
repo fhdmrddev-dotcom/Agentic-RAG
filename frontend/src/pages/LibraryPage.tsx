@@ -20,10 +20,17 @@ import { ViewsTab } from "@/components/library/ViewsTab"
 import { IngestionTab } from "@/components/library/IngestionTab"
 import { IndexingTab } from "@/components/library/IndexingTab"
 import { HealthTab } from "@/components/library/HealthTab"
+import { LibraryHeaderBar } from "@/components/library/LibraryHeaderBar"
 import { LibraryStatTiles } from "@/components/library/LibraryStatTiles"
-import { LibraryBreadcrumb } from "@/components/library/LibraryBreadcrumb"
+// ⚠ `LibraryBreadcrumb` IS NO LONGER IMPORTED — sketch 231-A deleted the breadcrumb, and this
+//   comment is the record rather than a silent removal. The component and its three cases in
+//   `LibraryStatTiles.test.tsx` still exist and still pass, so it is now MOUNTED NOWHERE: the
+//   exact shape `SourceFolderPicker` was in for a whole phase before anyone noticed.
+//   ⛔ Do not "clean it up" without deciding: deleting it also deletes pinned cases, which the
+//   count gate reads as a DECREASE. Either re-pin in the same commit, or leave it and say so.
 import { DocumentsPager } from "@/components/library/DocumentsPager"
 import { ReembedSearchPointer } from "@/components/settings/ReembedStatusCard"
+import { AnimatedNumber } from "@/components/ui/AnimatedNumber"
 import { useDocuments } from "@/hooks/useDocuments"
 import { useFolders } from "@/hooks/useFolders"
 import { useAuth } from "@/hooks/useAuth"
@@ -97,6 +104,13 @@ const TAB_LABELS: Record<LibraryTab, string> = {
   health: "Health",
 }
 
+/** Sketch 231-A — the ordered pairs the header's segmented control renders.
+ *  ⛔ DERIVED from `TAB_LABELS`, never re-typed: a sixth tab must appear in ONE place, and
+ *  `D-217-15` already treats a sixth key as a schema change. */
+const LIBRARY_TABS = (Object.keys(TAB_LABELS) as LibraryTab[]).map(
+  (k) => [k, TAB_LABELS[k]] as const,
+)
+
 // ── The page's own reducer ────────────────────────────────────────────────────────────
 //
 // ⭐ ONE SOURCE OF SELECTION TRUTH (D-217-12 / SC#5). `libraryReducer` (plan 05) owns every
@@ -121,6 +135,15 @@ function pageReducer(state: LibState, action: PageAction): LibState {
   }
   return libraryReducer<ViewFilter, SavedView>(state, action)
 }
+
+/* ⭐ THE TYPED NO-OP WRAPPER THAT LIVED HERE IS GONE (Phase 235 plan 11). Plan 08 needed a
+ *  consumer for `handleGoToSource` before `HealthTab` declared the prop, and chose a stated
+ *  no-op over a cast — a false type would have CLAIMED the prop was accepted while it was
+ *  silently dropped. `HealthTab` now declares `onGoToSource` for real, so the layer is deleted
+ *  rather than left reading like wiring it never was.
+ *
+ *  ⚠ Its NAME is deliberately not spelled here: a grep proving the wrapper is gone must not be
+ *  answerable by a comment (the 187-24 lesson, recorded twice already inside this phase). */
 
 // ⛔ FIVE TABS: Documents, Views, Ingestion, Indexing, Health. Built incrementally through
 // Phase 217.1 plans 03-12 — each tab body is a CHILD component with its own data fetching
@@ -152,7 +175,25 @@ function useIsWide(): boolean {
   return isWide
 }
 
-export function LibraryPage({ onNavigate }: { onNavigate?: (view: ActiveView) => void } = {}) {
+/** Phase 235-08 (SURF-03 / D-235-04) — the tab a CALLER outside the Library asked for.
+ *
+ *  ⛔ IT SEEDS THE INITIAL STATE AND NOTHING ELSE. The reducer stays the one source of
+ *  selection truth: after mount, every transition is a `SELECT_TAB` exactly as before, so a
+ *  caller cannot pin a tab the person is then stuck on (fenced by
+ *  `LibraryPage.initialTab.test.tsx`'s last case).
+ *
+ *  ⛔ AND IT IS COMPOSED HERE, NOT IN THE LEAF. `librarySelection.ts` gains NO seventh
+ *  action — its 25-case suite asserts the action set is exactly six, and `SET_FOLDER_SHEET`
+ *  (see `pageReducer`'s docblock above) is the shipped precedent for a page-level need met
+ *  at this boundary. `initialLibraryState` is typed `LibraryState<never, never>`, so a
+ *  spread that replaces `selection` stays assignable to `LibState` with no cast.
+ *
+ *  ⚠ There is no URL in any of this. This app has no router (`SEED-185`) — navigation is a
+ *  `useState<ActiveView>` switch in `App.tsx`, and this prop is the only door into a tab. */
+export function LibraryPage({
+  onNavigate,
+  initialTab,
+}: { onNavigate?: (view: ActiveView) => void; initialTab?: LibraryTab } = {}) {
   const { user } = useAuth()
   const { documents, uploading, uploadingCount, upload, deleteDoc, loadDocuments } = useDocuments()
   const { folders, createFolder, renameFolder, deleteFolder, toggleOrgShared } = useFolders()
@@ -160,8 +201,54 @@ export function LibraryPage({ onNavigate }: { onNavigate?: (view: ActiveView) =>
   // ⭐ ONE reducer replaces `selectedFolderId`, `selectedViewId`, `editingView`, `filter` and
   // `folderSheetOpen` — five React state hooks and the five handlers that had to keep them
   // consistent by hand. The tab is PART of the selection, never a variable beside it.
-  const [lib, dispatch] = useReducer(pageReducer, initialLibraryState)
+  // ⭐ THE INITIAL TAB IS COMPOSED HERE, AND THROUGH THE LEAF'S OWN TRANSITION. The lazy
+  // initializer runs `SELECT_TAB` once against the shipped opening state, so the seeded
+  // state is one the reducer could genuinely have reached — no arm shape is re-derived at
+  // this boundary (the `LibrarySelection` arms are mutually exclusive by construction, and
+  // `selectionForTab` is module-private on purpose). ⛔ NO seventh action: the leaf is
+  // byte-unchanged, exactly as `SET_FOLDER_SHEET`'s docblock above requires.
+  const [lib, dispatch] = useReducer(pageReducer, initialLibraryState, (opening) =>
+    initialTab ? pageReducer(opening, { type: "SELECT_TAB", tab: initialTab }) : opening,
+  )
   const tab = lib.selection.tab
+
+  /** Phase 235-08 (D-235-17) — the Health tab's route BACK to the source card.
+   *
+   *  Health owns only what is WRONG; Ingestion owns everything a source did. So a Health row
+   *  does not restate the source — it hands the person to the card that already says it.
+   *
+   *  ⚠ SAME IDIOM AS `ReembedSearchPointer`'s `onViewProgress` below (dispatch, then scroll
+   *  on the next tick once the tab body has mounted) rather than a second scroll shape. The
+   *  100 ms is that handler's measured delay, not a new guess.
+   *
+   *  ✅ THE ANCHOR PLAN 08 RECORDED AS OWED HAS LANDED (plan 10). `WatchedFoldersSection`
+   *  now emits the matching `id` alongside its test hook on ONE line, so `getElementById`
+   *  resolves and the scroll half is no longer a no-op. Measured at plan 11, not assumed. */
+  const handleGoToSource = (watchId: string) => {
+    dispatch({ type: "SELECT_TAB", tab: "ingestion" })
+    setTimeout(() => {
+      document
+        .getElementById(`watch-card-${watchId}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" })
+    }, 100)
+  }
+
+  /** Sketch 231-A — what the header pill and the `In progress` badge both read.
+   *
+   *  ⛔ IT FETCHES NOTHING. These are documents the page already holds, counted — the same rule
+   *  `IngestionTab` carries ("every document it renders is one the page already holds"). A second
+   *  poll for a number that is already in memory is how two surfaces come to disagree about it.
+   *
+   *  ⚠ `paused` is counted as in-flight ON PURPOSE. A rate-limited document has not finished and
+   *  has not failed; calling it idle would be the same class of lie as calling a queued file
+   *  "added", which is the defect this whole change exists to fix. */
+  const inFlightCount = useMemo(
+    () =>
+      documents.filter(
+        (d) => d.status === "pending" || d.status === "processing" || d.status === "paused",
+      ).length,
+    [documents],
+  )
   const selectedFolderId = activeFolderId(lib)
   const selectedViewId = activeViewId(lib)
   const editingView = lib.editingView
@@ -570,7 +657,7 @@ export function LibraryPage({ onNavigate }: { onNavigate?: (view: ActiveView) =>
           <>
             <h2 className="text-lg font-semibold leading-tight">Root</h2>
             <p className="text-sm text-muted-foreground mt-0.5">
-              Documents not assigned to a folder · {rootDocumentCount}{" "}
+              Documents not assigned to a folder · <AnimatedNumber value={rootDocumentCount} />{" "}
               {rootDocumentCount === 1 ? "document" : "documents"}
             </p>
           </>
@@ -637,25 +724,45 @@ export function LibraryPage({ onNavigate }: { onNavigate?: (view: ActiveView) =>
 
   return (
     <TooltipProvider>
+      {/* ⛔ THIS PAGE IS DELIBERATELY FULL-WIDTH. DO NOT PUT A `max-w-*` BACK ON IT.
+          ⚠ D-233-07 DID exactly that — `max-w-6xl` (1152px) — and it was WRONG, reverted the same
+          day on the operator's *"why is it not full-width like other pages"*. The reasoning that
+          produced it is kept here rather than deleted, because the error is instructive: it
+          derived "one measure for the whole app" from TWO pages and never checked the rest.
+          Re-measured across every page:
+            Settings · Connections  max-w-6xl (1152)   ← FORMS
+            Workflows               max-w-[1200px]     ← cards
+            Skills · Chat           none, FULL WIDTH   ← data
+            Library                 none, FULL WIDTH   ← data
+          The convention is not one number. It is **form-shaped pages are constrained,
+          data-dense pages are full width** — and this page is a folder rail beside a
+          seven-column table whose columns 3-5 already shed by `nth-child` under pressure.
+          Narrowing it spends the width that table needs. */}
       <div className="flex flex-col h-full overflow-y-auto p-8">
-        {/* ⛔ THE HOOK FOLLOWS THE ACTIVE TAB (217.1-18): the pagehead is ONE shared shell
-            element, and the contract names it per-screen (`<screen>-pagehead`). Dynamic so
-            `views-pagehead`/`health-pagehead` resolve when that tab is active. */}
-        <div className="mb-6" data-testid={`${tab}-pagehead`}>
-          <h1 className="text-2xl font-headline font-bold text-foreground">Library</h1>
-          <p className="text-muted-foreground mt-1.5 text-sm">
-            What the agent can read, and how well it reads it.
-          </p>
-        </div>
+        {/* ⭐ SKETCH 231 VARIANT A, LOCKED BY THE OPERATOR 2026-09-05 — ONE HEADER ROW.
+            ⛔ THE HOOK STILL FOLLOWS THE ACTIVE TAB (217.1-18): `<screen>-pagehead` is a shared
+            shell contract named per-screen, so it stays on the row that replaced the block.
 
-        {/* Phase 217.1-06 — Library › <folder> › <tab> breadcrumb, composed from the
-            already-shipped FolderBreadcrumb. Additive; never replaces the heading. */}
-        <div className="mb-4">
-          <LibraryBreadcrumb
-            folders={folders}
-            selectedFolderId={selectedFolderId}
-            onSelectFolder={handleSelectFolder}
-            tabLabel={TAB_LABELS[tab]}
+            212px → ~46px. ⚠ The sub-line is NOT removed — it moved INTO the row. It is a
+            guarded contract (`renameFence.test.ts` reads it from this file to prove the
+            Documents→Library rename landed), and it was only expensive as its own block.
+            What was removed and why:
+              · the BREADCRUMB — it read `Library › Documents` while the sidebar already said
+                Library and the tab already said Documents. Pure duplication. Its one real job
+                (folder context) is done by the folder rail two inches below.
+            ⚠ The four CHILD tabs are untouched and stay inside their own tab bodies. Folding the
+            parent strip into one row is a space saving; swallowing its children is a lost surface,
+            and the operator caught the sketch making exactly that mistake. */}
+        <div data-testid={`${tab}-pagehead`}>
+          <LibraryHeaderBar
+            tab={tab}
+            tabs={LIBRARY_TABS}
+            subtitle="What the agent can read, and how well it reads it."
+            onSelectTab={(next) => dispatch({ type: "SELECT_TAB", tab: next as LibraryTab })}
+            inFlight={inFlightCount}
+            totalDocuments={documents.length}
+            onOpenQueue={() => dispatch({ type: "SELECT_TAB", tab: "ingestion" })}
+            listTestId={`${tab}-tabslist`}
           />
         </div>
 
@@ -684,15 +791,13 @@ export function LibraryPage({ onNavigate }: { onNavigate?: (view: ActiveView) =>
           onValueChange={(next) => dispatch({ type: "SELECT_TAB", tab: next as LibraryTab })}
           className="flex flex-col flex-1 min-h-0"
         >
-          {/* ⛔ FIVE TRIGGERS. Written out rather than mapped so the set is
-              countable by eye and by grep. */}
-          <TabsList className="self-start mb-4" data-testid={`${tab}-tabslist`}>
-            <TabsTrigger value="documents">Documents</TabsTrigger>
-            <TabsTrigger value="views">Views</TabsTrigger>
-            <TabsTrigger value="ingestion">Ingestion</TabsTrigger>
-            <TabsTrigger value="indexing">Indexing</TabsTrigger>
-            <TabsTrigger value="health">Health</TabsTrigger>
-          </TabsList>
+          {/* ⛔ THE FIVE TRIGGERS LIVE IN `LibraryHeaderBar` NOW (sketch 231-A), and there is
+              exactly ONE of them. The first cut kept a hidden `TabsList` here "to preserve the
+              `<screen>-tabslist` hook" — which put a SECOND element with role="tab" and the same
+              accessible name into the tree and broke 41 cases with
+              `getMultipleElementsFoundError`. ⚠ **A hidden duplicate of an interactive control is
+              not a preserved contract, it is a second control.** The hook rides on the visible
+              segmented control via `listTestId`. */}
 
           <div className="flex flex-row gap-6 flex-1 min-h-0">
             {/* Left panel: Folders + Views — desktop only. Below 768px it would eat
@@ -782,6 +887,7 @@ export function LibraryPage({ onNavigate }: { onNavigate?: (view: ActiveView) =>
                 folderId={selectedFolderId}
                 folderName={selectedFolderName}
                 disabled={!canUploadToFolder}
+                onNavigateToConnections={onNavigate ? () => onNavigate("connections") : undefined}
               />
             </TabsContent>
 
@@ -796,7 +902,7 @@ export function LibraryPage({ onNavigate }: { onNavigate?: (view: ActiveView) =>
               value="health"
               className="mt-0 flex flex-1 min-h-0 min-w-0 flex-col data-[state=inactive]:hidden"
             >
-              <HealthTab />
+              <HealthTab onGoToSource={handleGoToSource} />
             </TabsContent>
           </div>
         </Tabs>

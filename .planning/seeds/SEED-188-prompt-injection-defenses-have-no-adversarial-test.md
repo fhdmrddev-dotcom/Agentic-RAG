@@ -3,7 +3,8 @@ seed_id: SEED-188
 title: Four modules carry a written anti-prompt-injection discipline and NOTHING tries to break it — every "injection" test in the backend suite is SQL/SSTI/fault injection, so the defense that guards the agent's untrusted-content channels is asserted in prose and verified by nobody
 created: 2026-08-19
 planted_during: Phase 200 execution — audit of the GitHub Top-100 ranking (`promptfoo`, 24k stars, MIT) prompted a check of whether we already test what it tests. We do not.
-status: planted
+status: in_progress
+folded_into: 236
 priority: high
 surface: Agentic-RAG
 relates_to:

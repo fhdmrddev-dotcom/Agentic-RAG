@@ -6,6 +6,11 @@ import { AuthPage } from "./pages/AuthPage"
 import { AcceptInvitePage } from "./pages/AcceptInvitePage"
 import { ChatLayout } from "./components/layout/ChatLayout"
 import type { StudioTab } from "./pages/SkillStudioPage"
+// Phase 235-08 (SURF-03): the Library's own tab union, so the payload below is typed by the
+// SAME source the page reads rather than by a second string literal beside it.
+import type { LibraryTab } from "./pages/librarySelection"
+// Phase 235 plan 15 (gap-closure round 1): the hand-off's LIFETIME rule, as a strict leaf.
+import { libraryTabAfterNavigate } from "@/lib/libraryTabHandoff"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { StreamsProvider } from "@/providers/StreamsProvider"
 // Phase 166 (D-166-07): the org-context spine mounts OUTSIDE StreamsProvider so an
@@ -156,6 +161,40 @@ function App() {
   // callers land in Studio · Triggering — no standalone Tuner surface remains.
   const handleTuneSkill = (skillId: string) => handleOpenStudio(skillId, "triggering")
 
+  // Phase 235-08 (SURF-03 / D-235-04 / T-235-27): the Library's tab, held HERE beside
+  // `activeView` and set by ONE navigator — the exact shape of `handleOpenStudio` above.
+  //
+  // ⛔ NO TWELFTH `ActiveView` MEMBER. The Library already has one, and the comment above
+  // the union records that a member is not reachability. What was missing was never a view:
+  // `LibraryPage`'s only prop was `onNavigate`, so the Health TAB had no external door at
+  // all, and SURF-03's route (rail badge → popover → Health → source card) was impossible.
+  //
+  // ⛔ AND NO URL. This app has no router (`SEED-185`), so assigning the browser's location
+  // here would be a full page reload onto a path that renders the chat home. ⚠ THAT API IS
+  // DELIBERATELY NOT SPELLED IN THIS COMMENT: the acceptance criterion greps this file for
+  // it, and prose that names it would make a code measurement satisfiable by a comment (the
+  // 187-24 lesson, which `App.tsx:91-101` above already records once). `undefined` means
+  // "the page decides", so the Library keeps its own default on every other entry into it.
+  const [libraryTab, setLibraryTab] = useState<LibraryTab | undefined>(undefined)
+  const handleOpenLibraryHealth = () => {
+    setLibraryTab("health")
+    setActiveView("documents")
+  }
+  // ⛔ Phase 235 plan 15 (gap-closure round 1 · verification G5) — AND IT IS ONE-SHOT.
+  //
+  // The line above was the ONLY write to `libraryTab` when 235-08 shipped, and the comment
+  // above it claimed a behaviour nothing enforced: `LibraryPage` is mounted inside a ternary
+  // in `ChatLayout`, so it UNMOUNTS on navigation away and re-seeds its reducer from
+  // `initialTab` at every mount. After ONE click on the attention popover, every subsequent
+  // entry into the Library opened on Health — the claim two paragraphs up, falsified by the
+  // code beneath it. The clear belongs to the NAVIGATOR, not to a second writer: the hand-off
+  // survives the trip INTO the Library and is spent by the next navigation anywhere else
+  // (`libraryTabAfterNavigate` owns that rule and is tested without mounting anything).
+  const handleNavigate = (next: ActiveView) => {
+    setActiveView(next)
+    setLibraryTab((pending) => libraryTabAfterNavigate(pending, next))
+  }
+
   // Phase 146 (ADMIN-01 / D-07): one probe per authenticated session, keyed to
   // the signed-in user id (WR-01 — NOT App mount). isOperator gates the shield
   // (render-only); identity feeds the Control Room band. Keying to user?.id
@@ -297,11 +336,18 @@ function App() {
               one-shot pending intent). `navigate` is the real view switcher; opening
               a cited doc pre-selects it through IngestionPage's EXISTING owner/RLS-
               scoped DocumentDetailPanel fetch — no new unscoped document_id fetch. */}
-          <CitationNavProvider navigate={setActiveView}>
+          {/* Phase 235 plan 15: this door routes through the SAME navigator, deliberately.
+              It is a DIFFERENT intent (open a cited document), but a hand-off that one
+              navigator clears and another bypasses is the exact defect class being closed
+              here. Today it is a strict no-op — `citationNav.tsx` only ever navigates to the
+              Library view, which is the one destination the rule KEEPS the hand-off for — so
+              this changes no behaviour now and clears correctly if a citation ever leads
+              somewhere else. */}
+          <CitationNavProvider navigate={handleNavigate}>
             <ChatLayout
               onSignOut={signOut}
               activeView={activeView}
-              onNavigate={setActiveView}
+              onNavigate={handleNavigate}
               navItems={navItems}
               isOperator={isOperator}
               operatorIdentity={operatorIdentity}
@@ -313,6 +359,8 @@ function App() {
               onReviewEvals={handleReviewEvals}
               onStudioTabChange={handleStudioTabChange}
               onTuneSkill={handleTuneSkill}
+              libraryTab={libraryTab}
+              onOpenLibraryHealth={handleOpenLibraryHealth}
             />
           </CitationNavProvider>
           </EffectiveFeaturesProvider>

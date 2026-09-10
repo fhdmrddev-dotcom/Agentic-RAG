@@ -1240,7 +1240,7 @@ async def get_thread_workflow(
         # Look at the thread's latest cap_paused `runs` row (Deep-run Continue case).
         deep_row = await _rls_fetchrow(
             """
-            SELECT status, continues_used
+            SELECT run_id, status, continues_used
             FROM runs
             WHERE thread_id = $1 AND status = 'cap_paused'
             ORDER BY started_at DESC
@@ -1251,6 +1251,8 @@ async def get_thread_workflow(
         if deep_row is not None:
             cap_paused = True
             continues_used = deep_row["continues_used"] or 0
+            if latest_producer_run_id is None and deep_row["run_id"] is not None:
+                latest_producer_run_id = deep_row["run_id"]
 
     # Phase 098-UAT run-honesty fix (B) — surface the run's DURABLE per-phase status
     # array so the frontend reconcile floor can rebuild an HONEST timeline on

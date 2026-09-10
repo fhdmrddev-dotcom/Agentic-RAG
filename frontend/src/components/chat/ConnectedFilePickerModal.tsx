@@ -50,7 +50,8 @@ export function ConnectedFilePickerModal({
         c.service_id.includes("drive") ||
         c.service_id.includes("onedrive") ||
         c.service_id.includes("dropbox") ||
-        c.service_id.includes("box")),
+        c.service_id.includes("box") ||
+        c.service_id.includes("mock")),
   )
 
   const [selectedConnId, setSelectedConnId] = useState<string>(cloudConns[0]?.id ?? "")

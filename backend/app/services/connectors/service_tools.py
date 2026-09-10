@@ -338,8 +338,8 @@ SERVICE_TOOL_SPECS: dict[str, list[dict[str, Any]]] = {
     # token that expires. So `capability` below is the EGRESS KEY only — `drive_read`, whose
     # single allowed host is googleapis.com — and never a row identity. Nothing writes it.
     #
-    # ⚠ BOTH ARE READS, AND BOTH ARE BACKED BY CODE THAT ALREADY SHIPPED. `cloud_storage`
-    # implements exactly these two operations for the file picker (ATTACH-01); advertising
+    # ⚠ BOTH ARE READS, AND BOTH ARE BACKED BY CODE THAT ALREADY SHIPPED. The Google Drive
+    # source adapter implements exactly these two operations for the file picker (ATTACH-01 / SRC-01); advertising
     # anything else would put a row on a grant list that no code can perform.
     #
     # ⚠ NO WRITE TOOL, DELIBERATELY. Creating or editing a Drive file is a different scope,
@@ -474,7 +474,7 @@ SERVICE_TOOL_SPECS: dict[str, list[dict[str, Any]]] = {
         # -- Round 1: Sheets / Docs / Calendar / Contacts (2026-08-31) -------------
         # WARNING: the operator asked why a product with dozens of actions was
         # advertising two. The honest answer was that two was never a product
-        # decision - Drive's pair is exactly what `cloud_storage` already implemented
+        # decision - Drive's pair is exactly what the Google Drive source adapter already implemented
         # for the composer file picker, and Gmail's pair was read-only because the
         # write-approval gate was unproven. The gate was PROVEN the same day (a real
         # chat turn chained search -> read with a separate approval pause on each),
@@ -1674,7 +1674,7 @@ async def _drive_call(
 ) -> dict:
     """One Google Drive read, through the code the file picker already uses.
 
-    ⚠ IT CALLS `cloud_storage`, IT DOES NOT REIMPLEMENT DRIVE. That module owns the token
+    ⚠ IT CALLS `google_drive` source adapter, IT DOES NOT REIMPLEMENT DRIVE. That module owns the token
     refresh, the export-a-Google-Doc arm and the field projection, and a second
     implementation here would drift from the picker the operator can see.
     """
@@ -1682,11 +1682,11 @@ async def _drive_call(
         raise ServiceToolError(
             f"{spec['name']} needs the connection it belongs to and none was supplied"
         )
-    from app.services import cloud_storage
+    from app.services.sources.adapters import google_drive
 
     try:
         if spec["name"] == "search_files":
-            result = await cloud_storage._list_google_drive_files(
+            result = await google_drive._list_google_drive_files(
                 connection_id,
                 query=(str(args["query"]) if args.get("query") else None),
                 page_size=_coerce_int(args, "limit", 30, 1, 100),
@@ -1719,7 +1719,7 @@ async def _drive_call(
                 ),
             }
 
-        filename, content, mime_type = await cloud_storage._fetch_google_drive_file(
+        filename, content, mime_type = await google_drive._fetch_google_drive_file(
             connection_id, str(args["file_id"]).strip()
         )
         # ⚠ BYTES ARE NOT AN ANSWER TO A MODEL. A PDF or a spreadsheet export decodes to

@@ -1,0 +1,518 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>230 · Nothing has been written yet</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Manrope:wght@600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:hsl(216 45% 4%); --elev:hsl(220 40% 5%); --surf:hsl(220 30% 7%);
+  --muted:hsl(220 30% 11%); --accent:hsl(220 25% 14%);
+  --tx:hsl(226 60% 97%); --tx2:hsl(220 16% 65%); --tx3:hsl(220 16% 45%);
+  --bd:hsl(220 20% 16%); --bd2:hsl(220 20% 16% / .5);
+  --pri:hsl(239 100% 82%); --pri2:hsl(239 84% 67%); --pridim:hsl(239 100% 82% / .15);
+  --vio:hsl(258 90% 66%);
+  --ok:hsl(142 71% 45%); --okdim:hsl(142 71% 45% / .13);
+  --wa:hsl(38 92% 60%); --wadim:hsl(38 92% 60% / .13);
+  --da:hsl(0 72% 51%); --dadim:hsl(0 72% 51% / .13);
+  --sl:hsl(220 14% 46%);
+  --fs:'Inter',ui-sans-serif,system-ui,sans-serif;
+  --fh:'Manrope','Inter',sans-serif;
+  --fm:'JetBrains Mono',ui-monospace,monospace;
+  --r1:6px; --r2:10px; --r3:14px; --rf:9999px;
+  /* THE ONE MEASURE - Tailwind max-w-6xl. Already used by SettingsPage.tsx:950 and
+     ConnectionsPage; adopted here rather than inventing a fifth number. Operator
+     direction 2026-09-05: "we should unify the width of all". */
+  --measure:1152px;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:var(--fs);font-size:.9rem;line-height:1.5}
+h1{font-family:var(--fh);margin:0}
+
+.top{position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:14px;
+  padding:10px 20px;background:hsl(216 45% 4% / .92);backdrop-filter:blur(8px);border-bottom:1px solid var(--bd)}
+.top .id{font-family:var(--fm);font-size:.75rem;color:var(--tx3);letter-spacing:.03em}
+.top h1{font-size:.94rem;font-weight:600}
+.tabs{margin-left:auto;display:flex;gap:5px}
+.tab{padding:5px 12px;border-radius:var(--rf);border:1px solid var(--bd);background:transparent;color:var(--tx2);
+  font-family:var(--fs);font-size:.79rem;cursor:pointer;transition:.15s}
+.tab:hover{border-color:var(--tx3);color:var(--tx)}
+.tab.on{background:var(--accent);border-color:var(--tx3);color:var(--tx)}
+.tab.win.on{background:var(--okdim);border-color:hsl(142 71% 45% / .5);color:var(--ok)}
+.ntoggle{padding:5px 11px;border-radius:var(--rf);border:1px solid var(--bd);background:transparent;
+  color:var(--tx3);font-size:.75rem;cursor:pointer;font-family:var(--fs)}
+.ntoggle.on{color:var(--pri);border-color:hsl(239 84% 67% / .5)}
+
+.stage{max-width:var(--measure);margin:0 auto;padding:34px 20px 90px}
+.v{display:none} .v.on{display:block;animation:in .25s both}
+@keyframes in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+.p{border:1px solid var(--bd);border-radius:var(--r3);background:var(--surf);overflow:hidden}
+.ph{display:flex;align-items:center;gap:11px;padding:13px 15px;border-bottom:1px solid var(--bd);background:var(--elev)}
+.svc{width:27px;height:27px;border-radius:7px;display:grid;place-items:center;flex:none;font-size:.85rem;
+  background:linear-gradient(145deg,hsl(220 30% 13%),hsl(220 30% 9%));border:1px solid var(--bd)}
+.ph .nm{font-weight:600;font-size:.89rem}
+.ph .pa{color:var(--tx3);font-size:.75rem;font-family:var(--fm)}
+.ph .rt{margin-left:auto;font-family:var(--fm);font-size:.73rem;color:var(--tx3)}
+.ico{background:none;border:0;color:var(--tx3);cursor:pointer;padding:3px 6px;border-radius:var(--r1);font-size:.8rem}
+.ico:hover{background:var(--muted);color:var(--tx)}
+
+/* the bar — 229-C's object, reused */
+.body{padding:15px}
+.bar{display:flex;height:30px;border-radius:var(--r2);overflow:hidden;border:1px solid var(--bd);background:var(--muted)}
+.sg{height:100%;transition:width .55s cubic-bezier(.3,.9,.3,1);display:grid;place-items:center;
+  font-family:var(--fm);font-size:.71rem;overflow:hidden}
+.sg.add{background:hsl(142 71% 45% / .3);color:var(--ok);box-shadow:inset 0 -2px 0 var(--ok)}
+.sg.here{background:hsl(239 84% 67% / .28);color:var(--pri);box-shadow:inset 0 -2px 0 var(--pri2)}
+.sg.uns{background:hsl(220 14% 46% / .28);color:var(--tx2);box-shadow:inset 0 -2px 0 var(--sl)}
+.sg.ref{background:hsl(0 72% 51% / .28);color:var(--da);box-shadow:inset 0 -2px 0 var(--da);width:0}
+.sg.unk{color:var(--wa);box-shadow:inset 0 -2px 0 var(--wa);
+  background:repeating-linear-gradient(135deg,hsl(38 92% 60% / .34) 0 7px,hsl(38 92% 60% / .1) 7px 14px);
+  background-size:19.8px 100%;animation:hatch 1.4s linear infinite}
+@keyframes hatch{from{background-position:0 0}to{background-position:19.8px 0}}
+
+.lg{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:12px}
+@media(max-width:640px){.lg{grid-template-columns:repeat(3,1fr)}}
+.lgi{border-top:2px solid var(--bd);padding-top:8px;transition:opacity .3s}
+.lgi.add{border-color:var(--ok)} .lgi.here{border-color:var(--pri2)}
+.lgi.uns{border-color:var(--sl)} .lgi.unk{border-color:var(--wa)} .lgi.ref{border-color:var(--da)}
+.lgi .n{font-family:var(--fh);font-size:1.3rem;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+.lgi.add .n{color:var(--ok)} .lgi.here .n{color:var(--pri)}
+.lgi.uns .n{color:var(--sl)} .lgi.unk .n{color:var(--wa)} .lgi.ref .n{color:var(--da)}
+.lgi .l{font-size:.755rem;margin-top:5px;line-height:1.3}
+.lgi .q{font-size:.68rem;color:var(--tx3);margin-top:3px}
+.lgi.ref{opacity:0}
+.lgi.ref.live{opacity:1}
+.n.bump{animation:bump .4s ease}
+@keyframes bump{0%{transform:scale(1)}40%{transform:scale(1.3)}100%{transform:scale(1)}}
+
+/* the four unknowns resolving */
+.rz{margin-top:16px;display:none;flex-direction:column;gap:4px}
+.rz.on{display:flex}
+.rzh{font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:var(--wa);font-weight:600;margin-bottom:3px}
+.r{display:flex;gap:9px;align-items:center;padding:6px 9px;border-radius:var(--r1);font-size:.775rem;
+  border:1px solid var(--bd);background:var(--elev);transition:.3s}
+.r .st{flex:none;width:15px;text-align:center;font-family:var(--fm);font-size:.72rem;color:var(--tx3)}
+.ex{flex:none;font-family:var(--fm);font-size:.6rem;padding:1px 5px;border-radius:3px;
+  background:var(--muted);color:var(--tx3);min-width:46px;text-align:center}
+.r .fn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.r .out{font-family:var(--fm);font-size:.69rem;flex:none;max-width:44%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.r.busy{border-color:hsl(38 92% 60% / .45)} .r.busy .st{color:var(--wa);animation:sp 1s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.r.added{border-color:hsl(142 71% 45% / .4);background:var(--okdim)} .r.added .st,.r.added .out{color:var(--ok)}
+.r.here{border-color:hsl(239 84% 67% / .4);background:var(--pridim)} .r.here .st,.r.here .out{color:var(--pri)}
+.r.refused{border-color:hsl(0 72% 51% / .4);background:var(--dadim)} .r.refused .st,.r.refused .out{color:var(--da)}
+.r.refused .out{cursor:help;border-bottom:1px dotted hsl(0 72% 51% / .5)}
+
+.done{margin-top:13px;padding:9px 12px;border-radius:var(--r2);border:1px solid hsl(142 71% 45% / .3);
+  background:var(--okdim);font-family:var(--fm);font-size:.75rem;color:var(--ok);display:none}
+.done.on{display:block;animation:in .3s both}
+
+/* footer */
+.pf{display:flex;align-items:center;gap:12px;padding:11px 15px;border-top:1px solid var(--bd);background:var(--elev);flex-wrap:wrap}
+.zw{font-family:var(--fm);font-size:.73rem;color:var(--ok);transition:color .3s}
+.zw.hot{color:var(--wa)}
+.pf .ac{margin-left:auto;display:flex;gap:7px}
+.btn{padding:6px 13px;border-radius:var(--r2);font-size:.8rem;font-weight:600;cursor:pointer;
+  border:1px solid var(--bd);background:var(--accent);color:var(--tx);font-family:var(--fs);transition:.15s}
+.btn:hover{background:var(--muted);border-color:var(--tx3)}
+.btn.pri{background:var(--pri2);border-color:var(--pri2);color:hsl(220 45% 6%)}
+.btn.pri:hover{background:var(--pri)}
+.btn.gh{background:transparent}
+.btn.sm{padding:4px 9px;font-size:.73rem;font-weight:500}
+.btn:disabled{opacity:.35;cursor:not-allowed}
+
+/* B: the strip */
+.strip{display:flex;align-items:center;gap:9px;padding:10px 14px;flex-wrap:wrap}
+.pill{display:inline-flex;gap:6px;align-items:center;font-size:.745rem;padding:3px 9px;border-radius:var(--rf);
+  border:1px solid var(--bd);color:var(--tx2)}
+.pill b{font-family:var(--fm);font-size:.78rem;color:var(--tx)}
+.pill.add{border-color:hsl(142 71% 45% / .45)} .pill.add b{color:var(--ok)}
+.pill.here{border-color:hsl(239 84% 67% / .45)} .pill.here b{color:var(--pri)}
+.pill.uns{border-color:hsl(220 14% 46% / .45)} .pill.uns b{color:var(--sl)}
+.pill.unk{border-color:hsl(38 92% 60% / .45)} .pill.unk b{color:var(--wa)}
+.pill.ref{border-color:hsl(0 72% 51% / .45)} .pill.ref b{color:var(--da)}
+.dots{display:flex;gap:5px;margin-left:4px}
+.dt{width:9px;height:9px;border-radius:50%;border:1px solid hsl(38 92% 60% / .6);transition:.3s}
+.dt.added{background:var(--ok);border-color:var(--ok)}
+.dt.here{background:var(--pri);border-color:var(--pri)}
+.dt.refused{background:var(--da);border-color:var(--da)}
+
+/* C: the drawer */
+.dw{border-top:1px solid var(--bd);background:var(--elev);max-height:0;overflow:hidden;transition:max-height .4s ease}
+.dw.on{max-height:300px}
+.dwi{padding:13px 15px}
+.dwi .h{font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:var(--wa);font-weight:600;margin-bottom:8px}
+
+/* ledger (folded into every footer as ONE line; expanded only here) */
+.ldg{margin-top:12px;border:1px solid var(--bd);border-radius:var(--r2);background:var(--elev);display:none}
+.ldg.on{display:block}
+.ldgr{display:flex;gap:12px;align-items:center;padding:9px 12px;flex-wrap:wrap}
+.ldgr + .ldgr{border-top:1px solid var(--bd)}
+.k{font-size:.69rem;text-transform:uppercase;letter-spacing:.05em;color:var(--tx3);width:74px;flex:none}
+.log{font-family:var(--fm);font-size:.7rem;color:var(--tx2);max-height:74px;overflow:auto;flex:1;min-width:0;
+  display:flex;flex-direction:column;gap:2px}
+.log div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;animation:in .2s both}
+.log .vb{color:var(--pri)}
+
+/* notes — OFF by default */
+.note{display:none;margin-top:16px;border-left:2px solid var(--bd);padding:2px 0 2px 13px;
+  font-size:.795rem;color:var(--tx2);max-width:80ch}
+.note.good{border-color:var(--ok)} .note.bad{border-color:var(--da)} .note.warn{border-color:var(--wa)}
+body.notes .note{display:block;animation:in .25s both}
+.note b{color:var(--tx)}
+.note + .note{margin-top:9px}
+code{font-family:var(--fm);font-size:.76rem;background:var(--muted);padding:1px 4px;border-radius:3px}
+.tip{position:fixed;z-index:950;max-width:330px;padding:8px 11px;border-radius:var(--r2);
+  border:1px solid hsl(0 72% 51% / .4);background:hsl(220 30% 8%);font-size:.755rem;color:var(--tx2);
+  box-shadow:0 8px 26px hsl(216 45% 2% / .8);pointer-events:none;opacity:0;transition:opacity .15s}
+.tip.on{opacity:1}
+#tst{position:fixed;bottom:18px;left:50%;transform:translateX(-50%) translateY(18px);z-index:960;
+  background:hsl(220 30% 8%);border:1px solid var(--bd);padding:8px 15px;border-radius:10px;
+  font-family:var(--fm);font-size:.77rem;opacity:0;transition:.24s;pointer-events:none}
+</style>
+</head>
+<body>
+
+<div class="top">
+  <span class="id">230</span>
+  <h1>Nothing has been written yet</h1>
+  <div class="tabs">
+    <button class="tab win on" data-v="A" onclick="show('A')">A &starf;</button>
+    <button class="tab" data-v="B" onclick="show('B')">B</button>
+    <button class="tab" data-v="C" onclick="show('C')">C</button>
+  </div>
+  <button class="ntoggle" onclick="document.body.classList.toggle('notes');this.classList.toggle('on')">notes</button>
+</div>
+
+<div class="stage">
+
+<!-- ── A · the bar dissolves ── -->
+<section class="v on" id="vA">
+  <div class="p">
+    <div class="ph">
+      <div class="svc">&#9650;</div>
+      <div><div class="nm">Rate Sheets 2026</div><div class="pa">My Drive / Operations</div></div>
+      <span class="rt">26 files</span>
+      <button class="ico" onclick="A.reset()" title="reset">&#8635;</button>
+    </div>
+    <div class="body">
+      <div class="bar">
+        <div class="sg add" id="A-sg-add" style="width:46.2%"><span>12</span></div>
+        <div class="sg here" id="A-sg-here" style="width:23.1%"><span>6</span></div>
+        <div class="sg uns" id="A-sg-uns" style="width:15.4%"><span>4</span></div>
+        <div class="sg ref" id="A-sg-ref"><span id="A-sg-refn"></span></div>
+        <div class="sg unk" id="A-sg-unk" style="width:15.4%"><span id="A-sg-unkn">4</span></div>
+      </div>
+      <div class="lg">
+        <div class="lgi add"><div class="n" id="A-n-add">12</div><div class="l">Will be added</div></div>
+        <div class="lgi here"><div class="n" id="A-n-here">6</div><div class="l">Already here</div><div class="q">by source file, not content</div></div>
+        <div class="lgi uns"><div class="n" id="A-n-uns">4</div><div class="l">Type not supported</div></div>
+        <div class="lgi unk"><div class="n" id="A-n-unk">4</div><div class="l">Can&rsquo;t tell without reading it</div></div>
+        <div class="lgi ref" id="A-lgi-ref"><div class="n" id="A-n-ref">0</div><div class="l">Refused</div><div class="q">reason on each row</div></div>
+      </div>
+
+      <div class="rz" id="A-rz">
+        <div class="rzh">Reading the 4 we couldn&rsquo;t tell about</div>
+      </div>
+      <div class="done" id="A-done">26 accounted &middot; 0 unaccounted &nbsp;&mdash;&nbsp; preview said 12 &rarr; 12 added</div>
+    </div>
+    <div class="pf">
+      <span class="zw" id="A-zw">0 documents &middot; 0 chunks &middot; 0 jobs &middot; 0 folders</span>
+      <div class="ac">
+        <button class="btn gh" id="A-cancel" onclick="toast('Closed. 0 documents · 0 chunks · 0 jobs · 0 folders written.')">Cancel</button>
+        <button class="btn pri" id="A-go" onclick="A.go()">Add 12 &middot; read 4</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="note good"><b>The bar dissolves.</b> Confirm and the hatched segment shrinks file by file as each unknown is
+    actually opened &mdash; its width moving into <em>added</em>, <em>already here</em>, or a new red <em>refused</em>
+    segment. No second screen, no new object: the thing you were reading becomes the thing you are watching.</div>
+  <div class="note good"><b>SC#5 is structural.</b> <code>outcome</code> has exactly three values &mdash; <code>added</code>,
+    <code>here</code>, <code>refused</code>. There is deliberately no fourth, so &ldquo;silently in neither&rdquo; is
+    unrepresentable. <code>drive.cjs</code> asserts it.</div>
+  <div class="note warn"><b>Row 3 is tier 2 doing its job.</b> The Google Doc exported and its <code>sha256</code> matched a
+    document already in the Library &mdash; so it was not imported again and <b>not embedded again</b>. Tier 1 could not have
+    known: Drive publishes no hash for native Docs. The preview said &ldquo;can&rsquo;t tell&rdquo; and it was right.</div>
+  <div class="note"><b>Refusal reasons are on hover, not on screen.</b> The row says <em>no text layer</em>; the full
+    sentence is one hover away. Named, not printed.</div>
+</section>
+
+<!-- ── B · the strip ── -->
+<section class="v" id="vB">
+  <div class="p">
+    <div class="ph">
+      <div class="svc">&#9650;</div>
+      <div><div class="nm">Rate Sheets 2026</div><div class="pa">My Drive / Operations</div></div>
+      <span class="rt">26 files</span>
+      <button class="ico" onclick="B.reset()" title="reset">&#8635;</button>
+    </div>
+    <div class="strip" id="B-strip">
+      <span class="pill add"><b id="B-add">12</b> add</span>
+      <span class="pill here"><b id="B-here">6</b> here</span>
+      <span class="pill uns"><b id="B-uns">4</b> unsupported</span>
+      <span class="pill unk"><b id="B-unk">4</b> unread</span>
+      <span class="pill ref" id="B-refpill" style="display:none"><b id="B-ref">0</b> refused</span>
+      <span class="dots" id="B-dots"></span>
+    </div>
+    <div class="pf">
+      <span class="zw" id="B-zw">0 documents &middot; 0 chunks &middot; 0 jobs</span>
+      <div class="ac">
+        <button class="btn gh" onclick="toast('Closed. 0 documents · 0 chunks · 0 jobs · 0 folders written.')">Cancel</button>
+        <button class="btn pri" onclick="B.go()">Add 12</button>
+      </div>
+    </div>
+  </div>
+  <div class="note bad"><b>Too spare &mdash; and it fails SC#5.</b> The four dots flip colour, so you can see <em>that</em> two
+    were refused. There is nowhere for <em>why</em>. A refusal that is only a colour is a count, and SC#5 requires a
+    <b>named</b> refusal. Density is not the only failure mode; this is the other one.</div>
+</section>
+
+<!-- ── C · the drawer ── -->
+<section class="v" id="vC">
+  <div class="p">
+    <div class="ph">
+      <div class="svc">&#9650;</div>
+      <div><div class="nm">Rate Sheets 2026</div><div class="pa">My Drive / Operations</div></div>
+      <span class="rt">26 files</span>
+      <button class="ico" onclick="C.reset()" title="reset">&#8635;</button>
+    </div>
+    <div class="body">
+      <div class="bar">
+        <div class="sg add" style="width:46.2%"><span>12</span></div>
+        <div class="sg here" style="width:23.1%"><span>6</span></div>
+        <div class="sg uns" style="width:15.4%"><span>4</span></div>
+        <div class="sg unk" style="width:15.4%"><span>4</span></div>
+      </div>
+      <div class="ldg on" id="C-ldg">
+        <div class="ldgr">
+          <span class="k">has read</span>
+          <div class="log" id="C-log">
+            <div><span class="vb">GET</span> /connections/{id}/browse &nbsp;root</div>
+            <div><span class="vb">GET</span> /connections/{id}/browse &nbsp;folderId=1x9…Kq</div>
+          </div>
+        </div>
+        <div class="ldgr">
+          <span class="k">has written</span>
+          <span class="zw" id="C-zw">0 documents &middot; 0 chunks &middot; 0 jobs &middot; 0 folders &middot; 0 bytes</span>
+          <span style="margin-left:auto;font-family:var(--fm);font-size:.7rem;color:var(--ok)" id="C-still"></span>
+        </div>
+        <div class="ldgr">
+          <span class="k">try it</span>
+          <button class="btn sm" onclick="C.poke('browse')">open subfolder</button>
+          <button class="btn sm" onclick="C.poke('page')">next page</button>
+          <button class="btn sm" onclick="C.poke('rules')">re-run rules</button>
+        </div>
+      </div>
+    </div>
+    <div class="dw" id="C-dw"><div class="dwi">
+      <div class="h">The 4 we couldn&rsquo;t tell about</div>
+      <div id="C-rows" style="display:flex;flex-direction:column;gap:4px"></div>
+    </div></div>
+    <div class="pf">
+      <span class="zw" id="C-zw2">nothing written</span>
+      <div class="ac">
+        <button class="btn gh" onclick="C.cancel()">Cancel</button>
+        <button class="btn pri" onclick="C.go()">Add 12 &middot; read 4</button>
+      </div>
+    </div>
+  </div>
+  <div class="note good"><b>The ledger, and the trap it catches.</b> Press <em>re-run rules</em>: evaluating a routing rule is
+    a <b>read</b> &mdash; the engine answers &ldquo;where would this land&rdquo; without minting a folder. That is what
+    <code>PREV-03</code> requires and exactly what a naive build gets wrong by creating the destination folder up front.</div>
+  <div class="note warn"><b>Ship the one line, not the panel.</b> <code>0 documents &middot; 0 chunks &middot; 0 jobs &middot;
+    0 folders</code> belongs in every preview footer. The expanded read/write ledger is worth building once, behind a
+    disclosure &mdash; it is the only place a future accidental write becomes visible.</div>
+  <div class="note"><b>The drawer is A&rsquo;s resolution, relocated.</b> Same four rows, same three outcomes &mdash; but it
+    hides the bar behind it, which is the object the operator selected in 229. That is why A wins here.</div>
+</section>
+
+</div>
+
+<div class="tip" id="tip"></div>
+<div id="tst"></div>
+
+<script>
+/* the four the preview could not tell about, and how each ends.
+   outcome ∈ added | here | refused — there is deliberately NO fourth value. */
+var RESOLVE=[
+ {n:"NOTES",e:"—",step:"reading 1.2 KB",outcome:"added",out:"→ /Operations",
+  full:"UTF-8 plain text, 340 words. Added to /Operations."},
+ {n:"scan_2026-03-11.pdf",e:"PDF",step:"reading 14.2 MB",outcome:"refused",out:"no text layer",
+  full:"No text layer — image-only PDF. Not imported. OCR is not enabled for this source."},
+ {n:"Q3 Pricing Review",e:"GDOC",step:"exporting",outcome:"here",out:"sha256 already here",
+  full:"Exported; sha256 matches a document already in the Library. Not imported again, not embedded again."},
+ {n:"→ Regional Rates",e:"LINK",step:"following shortcut",outcome:"refused",out:"drive out of reach",
+  full:"Target is in a Shared Drive this connection cannot reach. Not imported."}
+];
+var BASE={add:12,here:6,uns:4,unk:4}, TOTAL=26, ADDED=12;
+var MK={added:"+",here:"=",refused:"✕",busy:"◜"};
+
+function toast(m){var t=document.getElementById("tst");t.textContent=m;t.style.opacity="1";
+  t.style.transform="translateX(-50%) translateY(0)";clearTimeout(t._h);
+  t._h=setTimeout(function(){t.style.opacity="0";t.style.transform="translateX(-50%) translateY(18px)"},2800)}
+function show(v){
+  ["A","B","C"].forEach(function(x){document.getElementById("v"+x).classList.toggle("on",x===v)});
+  document.querySelectorAll(".tab").forEach(function(t){t.classList.toggle("on",t.getAttribute("data-v")===v)});
+}
+var tip=document.getElementById("tip");
+document.addEventListener("mouseover",function(e){
+  var el=e.target.closest?e.target.closest("[data-full]"):null; if(!el)return;
+  tip.textContent=el.getAttribute("data-full"); tip.classList.add("on");
+  var r=el.getBoundingClientRect();
+  tip.style.left=Math.min(r.left,window.innerWidth-345)+"px"; tip.style.top=(r.bottom+7)+"px";
+});
+document.addEventListener("mouseout",function(e){
+  if(e.target.closest&&e.target.closest("[data-full]")) tip.classList.remove("on")});
+
+function rrow(r){
+  var d=document.createElement("div"); d.className="r";
+  d.innerHTML='<span class="st">·</span><span class="ex">'+r.e+'</span><span class="fn">'+r.n+
+    '</span><span class="out">queued</span>';
+  return d;
+}
+function bump(el){el.classList.remove("bump");void el.offsetWidth;el.classList.add("bump")}
+
+/* ── A · the bar dissolves ── */
+var A={T:[],running:false,
+go:function(){
+  if(this.running)return; this.running=true;
+  var self=this, live={add:BASE.add,here:BASE.here,uns:BASE.uns,unk:BASE.unk,ref:0};
+  document.getElementById("A-go").disabled=true;
+  document.getElementById("A-lgi-ref").classList.add("live");
+  var rz=document.getElementById("A-rz"); rz.classList.add("on");
+  var zw=document.getElementById("A-zw"); zw.classList.add("hot");
+  zw.textContent="writing…";
+
+  var els=RESOLVE.map(function(r){var e=rrow(r);rz.appendChild(e);return e});
+  RESOLVE.forEach(function(r,i){
+    var t0=500+i*1300;
+    self.T.push(setTimeout(function(){
+      els[i].className="r busy"; els[i].querySelector(".st").textContent=MK.busy;
+      els[i].querySelector(".out").textContent=r.step+"…";
+    },t0));
+    self.T.push(setTimeout(function(){
+      els[i].className="r "+r.outcome;
+      els[i].querySelector(".st").textContent=MK[r.outcome];
+      var o=els[i].querySelector(".out");
+      o.textContent=r.out; o.setAttribute("data-full",r.full);
+      /* the hatched width moves into its real outcome */
+      live.unk--; live[r.outcome==="added"?"add":r.outcome==="here"?"here":"ref"]++;
+      ["add","here","uns","ref","unk"].forEach(function(b){
+        document.getElementById("A-sg-"+b).style.width=((live[b]/TOTAL)*100)+"%";
+      });
+      document.getElementById("A-sg-unkn").textContent=live.unk||"";
+      document.getElementById("A-sg-refn").textContent=live.ref||"";
+      var n={add:"A-n-add",here:"A-n-here",ref:"A-n-ref"}[r.outcome==="added"?"add":r.outcome==="here"?"here":"ref"];
+      document.getElementById(n).textContent=live[r.outcome==="added"?"add":r.outcome==="here"?"here":"ref"];
+      bump(document.getElementById(n));
+      document.getElementById("A-n-unk").textContent=live.unk;
+    },t0+950));
+  });
+  this.T.push(setTimeout(function(){
+    document.getElementById("A-done").classList.add("on");
+    zw.classList.remove("hot");
+    zw.textContent="13 documents · 418 chunks · 13 jobs · 0 new folders";
+  },500+RESOLVE.length*1300+400));
+},
+reset:function(){
+  this.T.forEach(clearTimeout); this.T=[]; this.running=false;
+  document.getElementById("A-go").disabled=false;
+  document.getElementById("A-rz").classList.remove("on");
+  document.getElementById("A-rz").innerHTML='<div class="rzh">Reading the 4 we couldn’t tell about</div>';
+  document.getElementById("A-done").classList.remove("on");
+  document.getElementById("A-lgi-ref").classList.remove("live");
+  var w={add:46.2,here:23.1,uns:15.4,ref:0,unk:15.4};
+  Object.keys(w).forEach(function(b){document.getElementById("A-sg-"+b).style.width=w[b]+"%"});
+  document.getElementById("A-sg-unkn").textContent="4";
+  document.getElementById("A-sg-refn").textContent="";
+  document.getElementById("A-n-add").textContent="12"; document.getElementById("A-n-here").textContent="6";
+  document.getElementById("A-n-unk").textContent="4";  document.getElementById("A-n-ref").textContent="0";
+  var zw=document.getElementById("A-zw"); zw.classList.remove("hot");
+  zw.innerHTML="0 documents &middot; 0 chunks &middot; 0 jobs &middot; 0 folders";
+}};
+
+/* ── B · the strip ── */
+var B={T:[],
+go:function(){
+  var self=this, dots=document.getElementById("B-dots"); dots.innerHTML="";
+  var els=RESOLVE.map(function(){var d=document.createElement("span");d.className="dt";dots.appendChild(d);return d});
+  document.getElementById("B-refpill").style.display="inline-flex";
+  var live={add:12,here:6,ref:0};
+  RESOLVE.forEach(function(r,i){
+    self.T.push(setTimeout(function(){
+      els[i].classList.add(r.outcome);
+      if(r.outcome==="added")live.add++; else if(r.outcome==="here")live.here++; else live.ref++;
+      document.getElementById("B-add").textContent=live.add;
+      document.getElementById("B-here").textContent=live.here;
+      document.getElementById("B-ref").textContent=live.ref;
+      document.getElementById("B-unk").textContent=RESOLVE.length-(i+1);
+    },400+i*900));
+  });
+  this.T.push(setTimeout(function(){
+    document.getElementById("B-zw").innerHTML="13 documents &middot; 418 chunks &middot; 13 jobs";
+  },400+RESOLVE.length*900));
+},
+reset:function(){
+  this.T.forEach(clearTimeout); this.T=[];
+  document.getElementById("B-dots").innerHTML="";
+  document.getElementById("B-refpill").style.display="none";
+  document.getElementById("B-add").textContent="12"; document.getElementById("B-here").textContent="6";
+  document.getElementById("B-unk").textContent="4";  document.getElementById("B-ref").textContent="0";
+  document.getElementById("B-zw").innerHTML="0 documents &middot; 0 chunks &middot; 0 jobs";
+}};
+
+/* ── C · the drawer + the ledger ── */
+var C={T:[],reads:2,
+poke:function(k){
+  var L={browse:["GET","/connections/{id}/browse","folderId=1kR…9Zt"],
+         page:["GET","/connections/{id}/browse","pageToken=CAE…"],
+         rules:["EVAL","routing_rules (in memory)","dry_run=True · 0 folders minted"]}[k];
+  var log=document.getElementById("C-log"), d=document.createElement("div");
+  d.innerHTML='<span class="vb">'+L[0]+'</span> '+L[1]+' &nbsp;'+L[2];
+  log.appendChild(d); log.scrollTop=log.scrollHeight;
+  this.reads++;
+  document.getElementById("C-still").textContent="still 0 ✓ ("+this.reads+" reads)";
+},
+cancel:function(){
+  toast("Closed. 0 documents · 0 chunks · 0 jobs · 0 folders written.");
+  document.getElementById("C-still").textContent="closed at 0 ✓";
+},
+go:function(){
+  var self=this, host=document.getElementById("C-rows"); host.innerHTML="";
+  document.getElementById("C-dw").classList.add("on");
+  var els=RESOLVE.map(function(r){var e=rrow(r);host.appendChild(e);return e});
+  RESOLVE.forEach(function(r,i){
+    var t0=350+i*1150;
+    self.T.push(setTimeout(function(){
+      els[i].className="r busy"; els[i].querySelector(".st").textContent=MK.busy;
+      els[i].querySelector(".out").textContent=r.step+"…";
+    },t0));
+    self.T.push(setTimeout(function(){
+      els[i].className="r "+r.outcome; els[i].querySelector(".st").textContent=MK[r.outcome];
+      var o=els[i].querySelector(".out"); o.textContent=r.out; o.setAttribute("data-full",r.full);
+    },t0+850));
+  });
+  this.T.push(setTimeout(function(){
+    document.getElementById("C-zw").innerHTML="13 documents &middot; 418 chunks &middot; 13 jobs &middot; 0 folders &middot; 26.4 MB";
+    document.getElementById("C-zw2").textContent="26 accounted · 0 unaccounted";
+  },350+RESOLVE.length*1150+300));
+},
+reset:function(){
+  this.T.forEach(clearTimeout); this.T=[]; this.reads=2;
+  document.getElementById("C-dw").classList.remove("on");
+  document.getElementById("C-rows").innerHTML="";
+  document.getElementById("C-still").textContent="";
+  document.getElementById("C-zw").innerHTML="0 documents &middot; 0 chunks &middot; 0 jobs &middot; 0 folders &middot; 0 bytes";
+  document.getElementById("C-zw2").textContent="nothing written";
+  document.getElementById("C-log").innerHTML=
+    '<div><span class="vb">GET</span> /connections/{id}/browse &nbsp;root</div>'+
+    '<div><span class="vb">GET</span> /connections/{id}/browse &nbsp;folderId=1x9…Kq</div>';
+}};
+</script>
+</body>
+</html>

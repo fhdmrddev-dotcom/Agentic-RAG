@@ -107,6 +107,26 @@ export function RuleBuilderPanel({
   // Which chip is being edited (index), "new" while composing, or null (closed).
   const [editing, setEditing] = useState<number | "new" | null>(null)
 
+  // ── Rule scope: arrival (watch) vs extracted (classification) (RULES-01 / SC#1) ──
+  const [ruleScope, setRuleScope] = useState<"watch" | "classification">(
+    rule?.rule_scope ?? "classification",
+  )
+
+  const handleScopeChange = (newScope: "watch" | "classification") => {
+    if (newScope === ruleScope) return
+    if (newScope === "watch") {
+      const allowed = new Set([
+        "name", "filename", "title", "path", "source_path", "mime", "type", "mime_type",
+        "size", "file_size", "source_system", "source_connection_id", "date"
+      ])
+      const validConditions = filter.conditions.filter((c) => allowed.has(c.field))
+      if (validConditions.length !== filter.conditions.length) {
+        setFilter({ op: "and", conditions: validConditions })
+      }
+    }
+    setRuleScope(newScope)
+  }
+
   // ── 📁 folder action (the ONLY action — D-118-1, no tag radio) ───────────────
   const [folderId, setFolderId] = useState<string>(rule?.suggest_folder_id ?? "")
 
@@ -188,19 +208,16 @@ export function RuleBuilderPanel({
     try {
       let saved: ClassificationRule
       if (rule) {
-        // EDIT mode: PATCH the same owned rule in place. The body carries the
-        // editable fields; the enabled toggle rides this path too but is owned by
-        // the row, not the builder, so we leave `enabled` untouched here.
+        // EDIT mode: PATCH the same owned rule in place.
         saved = await updateRule(rule.id, {
           name: name.trim(),
           match_expr: matchExpr,
           suggest_folder_id: suggestFolder,
+          rule_scope: ruleScope,
         })
       } else {
-        // CREATE mode: the body is (name, match_expr, suggest_folder_id) ONLY — it
-        // NEVER carries is_system_global (the server hard-sets it false; the scope
-        // toggle is an authoring affordance, not a create-body flag — T-118-06-01).
-        saved = await createRule(name.trim(), matchExpr, suggestFolder)
+        // CREATE mode: carries (name, match_expr, suggest_folder_id, rule_scope).
+        saved = await createRule(name.trim(), matchExpr, suggestFolder, ruleScope)
       }
       onSaved(saved)
     } catch {
@@ -231,6 +248,49 @@ export function RuleBuilderPanel({
           <X className="h-4 w-4" />
         </button>
       </div>
+
+      {/* When to evaluate — Scope selector (RULES-01 / SC#1) */}
+      <fieldset className="space-y-1.5">
+        <legend className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          When to evaluate
+        </legend>
+        <div className="grid grid-cols-2 gap-2 rounded-lg border border-border bg-card p-1">
+          <button
+            type="button"
+            role="radio"
+            aria-checked={ruleScope === "watch"}
+            onClick={() => handleScopeChange("watch")}
+            className={cn(
+              "flex flex-col items-start rounded-md p-2 text-left transition-colors",
+              ruleScope === "watch"
+                ? "bg-primary/10 text-primary border border-primary/30"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted/40"
+            )}
+          >
+            <span className="text-xs font-semibold">When files arrive (Watch)</span>
+            <span className="text-[10px] text-muted-foreground mt-0.5 leading-snug">
+              Matches arrival properties: name, path, type, size, source
+            </span>
+          </button>
+          <button
+            type="button"
+            role="radio"
+            aria-checked={ruleScope === "classification"}
+            onClick={() => handleScopeChange("classification")}
+            className={cn(
+              "flex flex-col items-start rounded-md p-2 text-left transition-colors",
+              ruleScope === "classification"
+                ? "bg-primary/10 text-primary border border-primary/30"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted/40"
+            )}
+          >
+            <span className="text-xs font-semibold">After extraction (Classification)</span>
+            <span className="text-[10px] text-muted-foreground mt-0.5 leading-snug">
+              Matches extracted metadata: document type, topics, custom fields
+            </span>
+          </button>
+        </div>
+      </fieldset>
 
       {/* Rule name */}
       <label className="block space-y-1.5">
@@ -291,6 +351,7 @@ export function RuleBuilderPanel({
             <div className="absolute left-0 top-full z-20 mt-2">
               <ConditionPopover
                 customFields={customFields}
+                ruleScope={ruleScope}
                 initial={editingCondition}
                 onApply={applyCondition}
                 onCancel={() => setEditing(null)}

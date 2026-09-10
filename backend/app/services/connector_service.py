@@ -260,6 +260,8 @@ class ResolvedConnection:
     #: mints another colon-bearing token and fails identically.
     auth_scheme: str = "auto"
     default_approval_posture: str = "ask"
+    #: Phase 231 (VIS-02) — who may read what this connection brings in. Narrow by default.
+    default_ingest_visibility: str = "private"
     tool_grants: dict[str, str] = field(default_factory=dict)
     discovered_tools: list[dict] = field(default_factory=list)
 
@@ -383,6 +385,126 @@ def _sanitize_tool_grants(tool_grants: dict) -> dict[str, str]:
     return clean
 
 
+# ═══════════════════════════════════════════════════════════════════════════════════════════
+# Phase 239 (D-239-02) — WHICH TOOLS ON A SERVER READ FILES, detected once and stored as DATA
+# ═══════════════════════════════════════════════════════════════════════════════════════════
+#
+# ⛔ **THERE IS NO TOOL NAME IN THIS MODULE, AND THAT ABSENCE IS THE POINT** (review ME-05).
+# This block used to hold `("list_directory", "list_dir", "list_files", "ls", "browse")` and a
+# matching reader tuple in a membership test — while `mcp_source.py`'s own docstring claimed
+# *"nothing anywhere else in the codebase knows any tool name"*, and `test_boundary_fence.py`
+# could not see the contradiction, because this file was not in `FENCED_MODULES` and the fence
+# knew vendor names only. The vocabulary now lives in `sources/adapters/mcp_source.py`, which
+# is where the claim always said it lived; what remains here is a delegation, and the fence
+# covers this module by name with a `TOOL_LITERALS` scan and a positive control.
+
+
+def infer_source_tools(tools: list[dict[str, Any]] | None) -> dict[str, str] | None:
+    """Delegates to the adapter that owns the vocabulary — `mcp_source.infer_source_tools`.
+
+    Kept as a name on this module because discovery, not the adapter, is what invokes it, and
+    because every caller and every test already reaches for it here.
+
+    ⚠ Function-local import, for the reason `create_connection` states about `descriptors.py`:
+    the adapter package reaches `SourceRegistry`, and the source fence keeps that out of the
+    cold import graph until a connection is actually used.
+    """
+    from app.services.sources.adapters.mcp_source import infer_source_tools as _infer
+
+    return _infer(tools)
+
+
+def reject_unoffered_source_tools(
+    config: Any, discovered_tools: list[dict[str, Any]] | None
+) -> None:
+    """⛔ TM-239-05 AT THE WRITE BOUNDARY — the door a hand-crafted PATCH comes through.
+
+    The picker only ever offers discovered names and ``infer_source_tools`` only ever returns
+    them, but neither is a boundary: ``PATCH /connectors/connections/{id}`` accepts a whole
+    ``config``, and these values are interpolated into a JSON-RPC ``params.name``.
+
+    ── ⛔ TWO CHECKS, AND ONLY ONE OF THEM IS CONDITIONAL (review CR-01) ─────────────
+
+    **DESTRUCTIVENESS is checked always.** Before this fix the boundary asked only whether a
+    tool EXISTS on the server, never whether it is safe — so ``{"read_tool": "delete_file"}``
+    was ACCEPTED (driven), ``McpSourceAdapter.check`` then reported **ok** because the tool
+    does exist, and ``watch_service`` called ``delete_file`` on every tracked file on every
+    cycle, unattended, with a green health probe throughout. A name that says it deletes is
+    refusable with no server list at all, so it is refused with no server list at all.
+
+    **EXISTENCE is checked only when there is a discovered list to check against.** A
+    connection bound before its first discovery has nothing to compare to, and refusing there
+    would make it impossible to configure a server before contacting it — a fence that fires
+    on the honest case and not the dishonest one. That remaining gap is covered at the point
+    of USE: ``McpSourceAdapter.check`` verifies the bound tools exist and names the missing one.
+
+    ⚠ **THE DESTRUCTIVENESS CHECK IS A DENY-LIST AND THAT IS A DELIBERATE ASYMMETRY.** The
+    auto-detector one module over uses an ALLOW-LIST of shapes, because it binds with nobody
+    watching. Here a person chose the value, and this product's headline claim is *any* MCP
+    server — so refusing every vocabulary this app does not recognise would refuse the servers
+    the phase exists to support. The residual risk is named rather than hidden: a destructive
+    tool whose name contains no word in ``_MUTATION_WORDS`` can still be bound by hand.
+
+    Raises ``ValueError`` — mapped to a 422 by the router, per the WR-02 convention.
+    """
+    from app.services.sources.adapters.mcp_source import (
+        PATH_ARG_KEY,
+        STATIC_ARG_PREFIX,
+        looks_like_a_mutation,
+    )
+
+    def _names_a_tool(key: Any) -> bool:
+        """⛔ AN ALLOW-LIST OF THE KEYS THAT ARE *NOT* TOOL NAMES — never a deny-list.
+
+        Every other key in this dict is treated as naming a tool and is checked, so a key
+        nobody declared (`{"sneaky": "delete_file"}`) still falls through to both checks
+        below. Written the other way round — *"check the keys I recognise"* — this function
+        would wave through anything wearing an unfamiliar name, which is precisely the door
+        its own docstring calls *"the door a hand-crafted PATCH comes through"*.
+
+        `root_path` is a PATH on the server. SEED-259's `arg_path` is an ARGUMENT NAME and
+        `arg_static.<name>` is an ARGUMENT VALUE; both reach `params.arguments`, never
+        `params.name`, so neither can invoke anything — asserted in
+        `test_259_argument_shapes_are_rows_too.py`, not merely reasoned about here. A static
+        value that happens to spell a destructive tool is therefore left alone: refusing it
+        would refuse a repository legitimately called `delete-me`.
+        """
+        if not isinstance(key, str):
+            return True
+        return key not in ("root_path", PATH_ARG_KEY) and not key.startswith(STATIC_ARG_PREFIX)
+
+    source_tools = config.get("source_tools") if isinstance(config, dict) else None
+    if not isinstance(source_tools, dict) or not source_tools:
+        return
+
+    for key, value in source_tools.items():
+        if not _names_a_tool(key) or not value:
+            continue
+        if looks_like_a_mutation(str(value)):
+            raise ValueError(
+                f"source_tools.{key} names {str(value)!r}, whose own name says it CHANGES "
+                f"something. Refused rather than stored: a source tool is invoked UNATTENDED "
+                f"by the watch loop, on every file in the watched folder, on every cycle. A "
+                f"reader that deletes is not a misconfiguration — it is data loss behind a "
+                f"green health probe."
+            )
+
+    if not discovered_tools:
+        return
+    offered = {
+        str(t.get("name")) for t in discovered_tools if isinstance(t, dict) and t.get("name")
+    }
+    for key, value in source_tools.items():
+        if not _names_a_tool(key) or not value:
+            continue
+        if str(value) not in offered:
+            raise ValueError(
+                f"source_tools.{key} names {value!r}, which this server does not offer. "
+                f"Refused rather than stored: the value is interpolated into a JSON-RPC "
+                f"tools/call by name. Offered: {sorted(offered)}."
+            )
+
+
 def _client(supabase: Client | None) -> Client:
     return supabase if supabase is not None else get_supabase()
 
@@ -432,6 +554,10 @@ def _to_response(row: dict) -> ConnectorConnectionResponse:
         d["config"] = {}
     if d.get("default_approval_posture") is None:
         d["default_approval_posture"] = "ask"
+    # ⚠ Fail CLOSED on a missing value: a row written before migration 155, or by any path that
+    #   did not set it, reads as private. The open end must never be reachable by omission.
+    if d.get("default_ingest_visibility") is None:
+        d["default_ingest_visibility"] = "private"
     cfg = d.get("config")
     if isinstance(cfg, dict):
         if not d.get("account_email") and cfg.get("account_email"):
@@ -740,6 +866,7 @@ async def resolve_connection(
             secret_ciphertext=None,
             mcp_server_url=row.get("mcp_server_url"),
             default_approval_posture=str(row.get("default_approval_posture") or "ask"),
+            default_ingest_visibility=str(row.get("default_ingest_visibility") or "private"),
             tool_grants=dict(row.get("tool_grants") or {}),
             discovered_tools=list(row.get("discovered_tools") or []),
         )
@@ -848,6 +975,7 @@ async def resolve_connection(
         mcp_server_url=row.get("mcp_server_url"),
         auth_scheme=resolved_scheme,
         default_approval_posture=str(row.get("default_approval_posture") or "ask"),
+        default_ingest_visibility=str(row.get("default_ingest_visibility") or "private"),
         tool_grants=dict(row.get("tool_grants") or {}),
         discovered_tools=list(row.get("discovered_tools") or []),
     )
@@ -890,6 +1018,15 @@ async def create_connection(
 
     config_data = payload.config.model_dump(mode="json", exclude_none=True) if hasattr(payload.config, "model_dump") else (payload.config or {})
 
+    # ⛔ THE WRITE BOUNDARY, ON CREATE AS WELL AS ON UPDATE — and its absence here was a gap
+    # nobody had named. `reject_unoffered_source_tools` calls itself *"the door a hand-crafted
+    # PATCH comes through"*, and it was wired to the PATCH door alone: a POST carrying
+    # `config: {"source_tools": {"read_tool": "delete_file"}}` created the row unexamined, and
+    # the very next watch tick called `delete_file` on every file in the folder. There are no
+    # `discovered_tools` yet at create time, so the existence half is a no-op here by design;
+    # the DESTRUCTIVENESS half is not, and it is the half that matters.
+    reject_unoffered_source_tools(config_data, None)
+
     # Phase 211 — the static action descriptor, WRITTEN AT CREATE TIME.
     #
     # ⭐ This is what makes SC#2's *"a connection presents as a service with a named action"*
@@ -929,6 +1066,7 @@ async def create_connection(
         "last_check_verdict": "not_checked",
         "mcp_server_url": payload.mcp_server_url,
         "default_approval_posture": getattr(payload, "default_approval_posture", "ask") or "ask",
+        "default_ingest_visibility": getattr(payload, "default_ingest_visibility", "private") or "private",
         "tool_grants": _sanitize_tool_grants(payload.tool_grants) if payload.tool_grants else {},
         # ⚠ `tool_grants` above is UNTOUCHED by the descriptor. A descriptor ADVERTISES an
         # action; it does not GRANT one. The executor's gate reads `tool_grants` alone and a
@@ -1061,6 +1199,11 @@ async def update_connection(
         if current.get("capability"):
             _reject_config_capability_mismatch(str(current["capability"]), payload.config)
         changes["config"] = payload.config.model_dump(mode="json", exclude_none=True) if hasattr(payload.config, "model_dump") else payload.config
+        # ⛔ Phase 239 (TM-239-05) — and it runs BEFORE the write for the reason
+        # `_sanitize_tool_grants` states about its own refusal: the config write is a
+        # whole-column REPLACE, so a refusal arriving afterwards would already have discarded
+        # whatever binding the row carried.
+        reject_unoffered_source_tools(changes["config"], current.get("discovered_tools"))
 
     if "is_enabled" in submitted and payload.is_enabled is not None:
         changes["is_enabled"] = payload.is_enabled
@@ -1070,6 +1213,9 @@ async def update_connection(
 
     if "default_approval_posture" in submitted and payload.default_approval_posture is not None:
         changes["default_approval_posture"] = payload.default_approval_posture
+
+    if "default_ingest_visibility" in submitted and payload.default_ingest_visibility is not None:
+        changes["default_ingest_visibility"] = payload.default_ingest_visibility
 
     if "tool_grants" in submitted and payload.tool_grants is not None:
         changes["tool_grants"] = _sanitize_tool_grants(payload.tool_grants)
@@ -1160,6 +1306,9 @@ async def discover_connection_tools(
     grant one, and the executor's gate denies on a missing grant key by design.
     """
     resolved = await resolve_connection(connection_id, org_id=org_id)
+    #: Phase 239 (D-239-02) — the file binding this refresh detected, if any. Written in the
+    #: SAME update as the tool cache below, never in a second round trip.
+    detected_source_tools: dict[str, str] | None = None
 
     if resolved.mcp_server_url:
         from app.services import mcp_client
@@ -1169,6 +1318,18 @@ async def discover_connection_tools(
             # The resolver knows where this credential came from; the transport cannot.
             auth_scheme=resolved.auth_scheme,
         )
+        # ⚠ THE MCP ARM AND NOWHERE ELSE, and that is a fence rather than a convenience.
+        # `sources.base.CONFIG_PROTOCOL_MARKERS` resolves ANY connection whose config carries a
+        # non-empty `source_tools` to `McpSourceAdapter` — so writing the key from the
+        # capability arm below would hand a first-party Slack row to the MCP adapter because a
+        # static descriptor happened to be called `read_file`, and the adapter would then try
+        # to call a tool over a server URL that does not exist.
+        #
+        # ⚠ AND A BINDING SOMEBODY CHOSE IS NEVER OVERWRITTEN. Refresh is a one-click control;
+        # silently re-pointing a hand-mapped server on every press is the plan's own named
+        # failure mode.
+        if not (resolved.config or {}).get("source_tools"):
+            detected_source_tools = infer_source_tools(tools)
     elif resolved.capability:
         # ⚠ Function-local import, for the reason `create_connection` states: `descriptors.py`
         # reaches the adapter registry, and the source fence keeps that out of the cold import
@@ -1205,17 +1366,27 @@ async def discover_connection_tools(
     # exactly these words; the sibling `update_connection_grants` uses it, and this one did
     # not. A write here that omits it is refused, not silently wrong — which is the good
     # half — but it is refused every single time.
+    changes: dict[str, Any] = {"discovered_tools": tools}
+    if detected_source_tools:
+        # ⚠ ONE UPDATE, TWO COLUMNS. A second round trip would be a second chance to fail
+        # halfway and leave a cached tool list with no binding beside it.
+        #
+        # ⚠ THE WHOLE CONFIG IS REWRITTEN, so it is merged rather than replaced: dropping
+        # `custom_client_id` here would log an OAuth-registered MCP connection out on its next
+        # refresh (Phase 222's key, one field over in the same model).
+        changes["config"] = {**(resolved.config or {}), "source_tools": detected_source_tools}
     await aexec(
         _project(
             client.table(_TABLE)
-            .update({"discovered_tools": tools})
+            .update(changes)
             .eq("id", str(connection_id))
             .eq("org_id", str(org_id))
         )
     )
     logger.info(
-        "connector_service: discovered and cached %d tool(s) for connection %s",
+        "connector_service: discovered and cached %d tool(s) for connection %s%s",
         len(tools), connection_id,
+        f" (file surface bound: {sorted(detected_source_tools)})" if detected_source_tools else "",
     )
     return tools
 

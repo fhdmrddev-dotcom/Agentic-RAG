@@ -144,9 +144,24 @@ export const CONNECTION_STATE_PARTLY = "⚠ Partly ready"
 export const CONNECTION_STATE_PARTLY_COUNTED = (n: number) =>
   `${CONNECTION_STATE_PARTLY} · ${n} need${n === 1 ? "s" : ""} attention`
 
+/** Phase 239 (D-239-08 / BUG-260907-01) — a connection that has no ACTIONS and works.
+ *
+ * ⚠ **THIS WORD EXISTS BECAUSE `⚠ Not usable` WAS A LIE ON A REAL ROW — the same sentence
+ * `CONNECTION_STATE_UNUSABLE` carries about `✓ Ready`, one phase later and pointed the
+ * other way.** Measured 2026-09-07, immediately after the OneDrive OAuth round trip:
+ * Microsoft 365 read `⚠ Not usable` while `check()` returned `ok`, `browse()` returned six
+ * real folders and `read_file()` returned 1395 correct bytes. The verdict counted action
+ * tools, and Phase 238 had just created a class of connection that has none and works.
+ *
+ * ⛔ It is NOT `✓ Ready`: that word claims actions this row does not have, and re-using it
+ * would reintroduce exactly the defect `CONNECTION_STATE_UNUSABLE` was created to close.
+ * It names what the connection CAN do — browse, preview and be watched by the Library. */
+export const CONNECTION_STATE_SOURCE_ONLY = "✓ Ready as source"
+
 /** The states this surface can render, as a closed union. */
 export type ConnectionStateKind =
   | "ready"
+  | "source_only"
   | "partly"
   | "unusable"
   | "not_checked"
@@ -158,6 +173,7 @@ export type ConnectionStateKind =
  *  four literals it might later disagree with. */
 export const CONNECTION_STATE_WORDS: Record<ConnectionStateKind, string> = {
   ready: CONNECTION_STATE_READY,
+  source_only: CONNECTION_STATE_SOURCE_ONLY,
   partly: CONNECTION_STATE_PARTLY,
   unusable: CONNECTION_STATE_UNUSABLE,
   not_checked: CONNECTION_STATE_NOT_CHECKED,
@@ -211,21 +227,35 @@ export function connectionStateOf(
    *  and inventing `Partly ready` from no evidence would be the same error as `Ready` from
    *  no evidence, pointed the other way. */
   blockedApplications?: number,
+  /** Phase 239 (D-239-08 / BUG-260907-01) — can the Library browse this connection?
+   *
+   *  ⚠ PASSED IN, NEVER COMPUTED HERE, because the answer belongs to the server: it is
+   *  `sourceCapability.isSourceCapable(connection, families)` over
+   *  `GET /connectors/source-families`. This module deriving it would be the string guess
+   *  that predicate was built to delete, moved one file over.
+   *
+   *  ⚠ OPTIONAL AND FAIL-CLOSED (TM-239-07). Absent means *"we have not been told"* — the
+   *  families list is still in flight, or the caller never asked — and a row must keep its
+   *  old, honest word rather than manufacture a green out of a pending fetch. */
+  isSourceCapable?: boolean,
 ): ConnectionStateKind {
   if (!connection.is_enabled) return "disabled"
   if (connection.status === "revoked") return "revoked"
 
+  const verdict = connectionRowVerdict({
+    toolCount: connection.discovered_tools?.length ?? 0,
+    // Plan 02 supplies this from the per-application availability probe, via the Check
+    // action. `undefined` — nobody has checked in this session — still reads as 0, by
+    // absence of evidence and never by an assumption that everything works.
+    blockedApplicationCount: blockedApplications ?? 0,
+    // ⚠ `last_check_verdict` is the ONLY record that anything ever looked. `"ok"` with
+    // zero actions is a measurement; `"not_checked"` with zero actions is an absence.
+    discoveryHasRun: connection.last_check_verdict === "ok",
+    isSourceCapable: isSourceCapable === true,
+  })
+
   if (connection.auth_type === "oauth_byo" && connection.status === "active") {
-    const verdict = connectionRowVerdict({
-      toolCount: connection.discovered_tools?.length ?? 0,
-      // Plan 02 supplies this from the per-application availability probe, via the Check
-      // action. `undefined` — nobody has checked in this session — still reads as 0, by
-      // absence of evidence and never by an assumption that everything works.
-      blockedApplicationCount: blockedApplications ?? 0,
-      // ⚠ `last_check_verdict` is the ONLY record that anything ever looked. `"ok"` with
-      // zero actions is a measurement; `"not_checked"` with zero actions is an absence.
-      discoveryHasRun: connection.last_check_verdict === "ok",
-    })
+    if (verdict === "source-only") return "source_only"
     if (verdict === "unusable") return "unusable"
     if (verdict === "partly") return "partly"
     // `undiscovered` falls THROUGH to `not_checked` at the bottom — AR-03's word. What it
@@ -233,6 +263,23 @@ export function connectionStateOf(
     if (verdict === "ready") return "ready"
   }
   if (connection.last_check_verdict === "failed") return "failed"
+
+  // ── Phase 239 (D-239-08) — the SAME reading for a row that is not `oauth_byo` ──────────
+  //
+  // ⭐ AN MCP FILE SERVER IS NEVER `oauth_byo`, SO THE ARM ABOVE CANNOT SEE IT. Its
+  // `service_id` is whatever the person setting it up typed, and the server resolves it by
+  // TRANSPORT (`PROTOCOL_ADAPTERS` in `services/sources/base.py`). Without this line a
+  // working MCP file source with no action tools reads `✓ Ready` from the generic fallback
+  // below — the Microsoft-365 over-claim, alive on the family this phase adds.
+  //
+  // ⛔ IT CANNOT REACH A CAPABILITY ROW. `slack` / `smtp` / `jira` are not registered source
+  // families, so `isSourceCapable` is false for them at any tool count and they keep the
+  // `✓ Ready` the three byte-for-byte row pins assert. That containment is a test.
+  //
+  // ⚠ BELOW `failed`, on purpose: a credential that failed says something more specific
+  // than a capability that exists.
+  if (verdict === "source-only") return "source_only"
+
   if (connection.last_check_verdict === "ok") return "ready"
 
   if (

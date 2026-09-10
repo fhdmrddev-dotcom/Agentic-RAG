@@ -71,7 +71,6 @@ import {
   getMessages,
   postMessage,
   subscribeToRun,
-  getActiveRuns,
   getSnapshot,
   cancelRun,
   getThreadTodos,
@@ -990,7 +989,7 @@ export function makeStreamCallbacks(opts: {
     onTaskDone: (subRunId, status, summary) =>
       useStreamsStore
         .getState()
-        .actions.updateTaskStatusForThread(threadId, subRunId, status, summary),
+        .actions.updateTaskStatusForThread(threadId, subRunId, status, summary ?? ""),
     // Phase 092 (CONT-01 / D-07 — SC#3): live cap_paused SSE → set the OWNING
     // thread's lock to capPaused so the inline Continue card appears out-of-band
     // (the durable carrier row is filtered from /messages — BUG-260528-01).
@@ -2064,6 +2063,18 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                       wf.latest_producer_run_id,
                     )
                   }
+                } else if (wf.cap_paused) {
+                  const runId = (wf.active_workflow_run_id || wf.latest_producer_run_id || "") as string
+                  if (runId) {
+                    actions.setWorkflowLockForThread(threadId, {
+                      runId,
+                      mode: "harness",
+                      capPaused: true,
+                      continuesRemaining: wf.continues_remaining,
+                    })
+                  } else {
+                    actions.clearWorkflowLockForThread(threadId)
+                  }
                 } else {
                   // Stale / terminal / Deep → unlock (honors the F2 self-heal).
                   actions.clearWorkflowLockForThread(threadId)
@@ -2797,7 +2808,11 @@ export function StreamsProvider({ children }: PropsWithChildren) {
             }
             await useStreamsStore
               .getState()
-              .actions.sendMessage(threadId, userMsg.content, { surfaceId })
+              .actions.sendMessage(threadId, userMsg.content, {
+                surfaceId,
+                model: failedMessage.model,
+                provider: failedMessage.provider,
+              })
           } finally {
             resumeInFlightRef.current = false
           }

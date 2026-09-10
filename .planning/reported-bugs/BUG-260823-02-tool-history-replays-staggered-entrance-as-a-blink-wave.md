@@ -4,10 +4,10 @@ title: Opening a tool call's history blinks and washes top-to-bottom — an inde
 reported: 2026-08-23
 surface: Agentic-RAG
 severity: minor
-status: open
+status: closed
 affected_areas: [frontend/chat, UX/motion, a11y]
-folded_into: null
-verified_closed_by: null
+folded_into: "228"
+verified_closed_by: "228"
 related_seeds: [SEED-008]
 re_open_trigger: null
 reproduces_on:

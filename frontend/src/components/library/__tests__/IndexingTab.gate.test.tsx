@@ -113,3 +113,35 @@ describe("IndexingTab — T-217.1-02 the VANISH gate (WR-02 close)", () => {
     expect(kickReembed).not.toHaveBeenCalled()
   })
 })
+
+// ══ WHAT THE BUTTON DOES, not merely that it exists ═══════════════════════════════════
+//
+// ⛔ THE OPERATOR FOUND THIS (2026-09-10): *"I click embedding model it is taking me to the
+//    settings but I do not see in the settings the embedding model configuration."*
+//
+// ⚠ THE THREE TESTS ABOVE ARE WHY IT SHIPPED. All three assert `change-model` is PRESENT or
+//   ABSENT and none asserts what it DOES — the same presence-vs-behaviour gap this project has
+//   now paid for repeatedly. The button navigated to Settings and never selected the tab that
+//   holds the picker, so `getElementById("reembed-status-card")` found nothing (Radix unmounts
+//   inactive tab content), `?.` swallowed it, and the person landed on whichever tab they last
+//   used with no embedding configuration anywhere on screen.
+//
+// ⭐ `LibraryPage`'s own deep-link gets this right — it dispatches `SELECT_TAB` and THEN scrolls.
+//   This card's comment claims it uses *"the exact shape LibraryPage.tsx:585-597 already uses"*;
+//   it copied the scroll half and dropped the select half.
+describe("IndexingTab — Change model lands on the tab that actually holds the picker", () => {
+  it("selects the Embeddings tab before navigating, not just the page", async () => {
+    featuresModelManagement = true
+    localStorage.setItem("settings_active_tab", "3") // a person last used General
+    const onNavigate = vi.fn()
+
+    render(<IndexingTab onNavigate={onNavigate} />)
+    await screen.findByText("Embedding model")
+    screen.getByTestId("change-model").click()
+
+    expect(onNavigate).toHaveBeenCalledWith("settings")
+    // ⚠ "1" is the tab whose TabsContent holds BOTH the embedding picker and the re-embed
+    //   card. Without this the deep-link opens Settings on tab "3" and shows neither.
+    expect(localStorage.getItem("settings_active_tab")).toBe("1")
+  })
+})

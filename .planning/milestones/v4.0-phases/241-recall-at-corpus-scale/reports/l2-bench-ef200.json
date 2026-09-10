@@ -1,0 +1,117 @@
+{
+  "dsn": {
+    "host": "127.0.0.1",
+    "port": 54322,
+    "database": "recall_bench"
+  },
+  "user_id": "d8a54002-6a29-4b88-b918-cff2aa4a06d5",
+  "k": 20,
+  "match_threshold": 0.3,
+  "embedding_model": "text-embedding-3-small",
+  "requested": {
+    "ef_search": 200,
+    "iterative_scan": null
+  },
+  "layer1": null,
+  "layer2": {
+    "k": 20,
+    "probes": [
+      {
+        "query": "Northwind quarterly business review September 2026",
+        "target_filename": "northwind-qbr-notes-sept-2026.md",
+        "target_document_id": "650e0845-aab2-4c91-9fab-05bcbccee1c9",
+        "chunk_hits": 20,
+        "rank": 1
+      },
+      {
+        "query": "commercial contract renewal Northwind pricing terms",
+        "target_filename": "northwind-commercials-renewal.md",
+        "target_document_id": "1ef08790-c1bb-44c1-b5ad-1e3156c21926",
+        "chunk_hits": 20,
+        "rank": 1
+      },
+      {
+        "query": "UAE Credit Reports BNPL buy now pay later and micro loan",
+        "target_filename": "Update UAE Credit Reports now include BNPL and micro-loan information.eml",
+        "target_document_id": "e9a7c4fd-757d-4421-b4ed-d1d768506dbf",
+        "chunk_hits": 20,
+        "rank": 1
+      },
+      {
+        "query": "Project risks, mitigations and probability impact log",
+        "target_filename": "risk-log.md",
+        "target_document_id": "2d289b08-3e1a-47cf-8d21-1ffee2b41e7b",
+        "chunk_hits": 20,
+        "rank": 1
+      },
+      {
+        "query": "Triangulation research methodology with visuals",
+        "target_filename": "Triangulation_Research_Complete_with_Visuals.docx",
+        "target_document_id": "976111f2-a96c-4093-804c-418a26f8eefb",
+        "chunk_hits": 20,
+        "rank": 1
+      },
+      {
+        "query": "metrics decisions knowledge base document 3",
+        "target_filename": "kb_doc3_metrics_decisions.md",
+        "target_document_id": "c3ce390e-4e77-4228-80f3-3dc4445b3819",
+        "chunk_hits": 20,
+        "rank": null
+      },
+      {
+        "query": "uat111 axisa minimax integration testing",
+        "target_filename": "uat111_axisa_minimax.md",
+        "target_document_id": "cc4a732d-bbf1-4bf5-919b-92437b072833",
+        "chunk_hits": 20,
+        "rank": null
+      },
+      {
+        "query": "uat111 axisa zhipu provider evaluation",
+        "target_filename": "uat111_axisa_zhipu.md",
+        "target_document_id": "00dc2c25-1ee6-4b1f-8505-c719c483ff87",
+        "chunk_hits": 20,
+        "rank": 1
+      },
+      {
+        "query": "supplier rate card and master rate sheet takeoff",
+        "target_filename": "sample_master_rate_sheet.xlsx",
+        "target_document_id": "168f6d22-8ab0-4139-ad12-ef2e08014cf9",
+        "chunk_hits": 20,
+        "rank": 1
+      },
+      {
+        "query": "board pack presentation 2026 Q3 agenda and governance",
+        "target_filename": "2026 Q3 board pack.pdf",
+        "target_document_id": null,
+        "chunk_hits": 20,
+        "rank": null,
+        "excluded": "target document is not in this database"
+      }
+    ],
+    "target_missing": [
+      "2026 Q3 board pack.pdf"
+    ],
+    "scored_probes": 9,
+    "metrics": {
+      "hit_at_1": 0.7778,
+      "hit_at_3": 0.7778,
+      "hit_at_5": 0.7778,
+      "mrr": 0.7778
+    },
+    "elapsed_seconds": 5.75
+  },
+  "server": {
+    "postgresql_version": "17.6",
+    "pgvector_version": "0.8.0",
+    "hnsw_ef_search": null,
+    "hnsw_iterative_scan": null
+  },
+  "corpus": {
+    "documents_visible": 156,
+    "documents_latest": 150,
+    "chunks_visible": 7957
+  },
+  "elapsed_seconds": 5.812,
+  "label": "l2-bench-ef200",
+  "measured_at": "2026-09-10T04:53:02.188403+00:00"
+}

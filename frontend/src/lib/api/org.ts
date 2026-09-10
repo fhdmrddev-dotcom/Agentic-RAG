@@ -424,6 +424,22 @@ export interface McpConnectionConfig {
    *  A wire type that has drifted from its model does not fail — it just refuses to describe
    *  reality. */
   custom_client_id?: string | null
+  /** Phase 239 (D-239-01) — WHICH TOOLS ON THIS SERVER READ FILES, as data.
+   *
+   *  ⭐ THE BINDING IS A ROW, NOT A BRANCH. MCP file servers do not agree on names
+   *  (`list_directory` / `list_files` / `ls`, `read_file` / `cat`), and the whole claim of
+   *  this phase is that connecting a SECOND, differently-worded server is a row in this
+   *  column and no product change at all. `McpSourceAdapter` reads these keys and falls back
+   *  to the `@modelcontextprotocol/server-filesystem` defaults PER KEY; nothing else in the
+   *  codebase knows any tool name.
+   *
+   *  ⚠ MIRRORED THE SAME DAY THE SERVER MODEL GAINED IT, which is the thing the field above
+   *  records NOT happening: `custom_client_id` drifted from `McpConfig` for a whole phase and
+   *  the gap is what left a test unable to state a fixture the backend accepts.
+   *
+   *  ⚠ NAMES ONLY (TM-239-06). `config` is SELECT-granted to every member of the org
+   *  (migration 150) — a URL, a token or a credential must never be routed through here. */
+  source_tools?: Record<string, string> | null
 }
 
 export type ConnectorConnectionConfig =
@@ -510,6 +526,12 @@ export interface McpDiscoveredTool {
  *  connection is still listed and still bindable. */
 export type ToolGrantPosture = "allow" | "ask" | "deny"
 
+/** Phase 231 (VIS-01 / VIS-02 / D-5) — who may read what a connection brings in.
+ *  Enum-shaped and NEVER a boolean: 069-A's extensible-audience contract, applied inbound.
+ *  ⚠ `"dept"` is INERT by operator decision D-5 — the value exists and the SQL resolver carries
+ *    a branch for it, but NO UI offers it. A scope nobody can grant must not be offered. */
+export type IngestVisibility = "private" | "org" | "dept"
+
 export interface ConnectorConnection {
   id: string
   org_id: string
@@ -531,7 +553,18 @@ export interface ConnectorConnection {
    * The server does not return it: it lives encrypted in `oauth_client_secret_ciphertext`
    * (migration 150), ungranted to `authenticated`, precisely so it cannot be read back.
    */
-  auth_type?: "static_key" | "oauth_byo" | null
+  /**
+   * ⚠ **`"mcp"` WAS MISSING HERE AND THE SERVER HAS SENT IT SINCE PHASE 239 —
+   * the THIRD instance of this exact drift in this one file** (Phase 215's five OAuth
+   * fields, then `custom_client_id`, now this). `AuthType` in
+   * `backend/app/models/connector.py` reads `Literal["static_key", "oauth_byo", "mcp"]`,
+   * and `services/sources/base.py` resolves a row's SOURCE ADAPTER from it —
+   * `PROTOCOL_ADAPTERS = {"mcp": "mcp"}`. A client union that cannot spell the value makes
+   * `auth_type === "mcp"` a `tsc` error rather than a check, so the one comparison that
+   * decides whether an MCP server is browsable could not be written at all. **A wire type
+   * that has drifted from its model does not fail — it just refuses to describe reality.**
+   */
+  auth_type?: "static_key" | "oauth_byo" | "mcp" | null
   status?: "active" | "revoked" | "error" | null
   error_message?: string | null
   account_email?: string | null
@@ -539,6 +572,7 @@ export interface ConnectorConnection {
   is_enabled: boolean
   mcp_server_url?: string | null
   default_approval_posture?: ToolGrantPosture
+  default_ingest_visibility?: IngestVisibility
   tool_grants?: Record<string, ToolGrantPosture | boolean>
   discovered_tools?: McpDiscoveredTool[]
   last_checked_at?: string | null
@@ -564,6 +598,7 @@ export interface ConnectorConnectionCreate {
   config?: ConnectorConnectionConfig
   mcp_server_url?: string | null
   default_approval_posture?: ToolGrantPosture
+  default_ingest_visibility?: IngestVisibility
   tool_grants?: Record<string, ToolGrantPosture>
   /** Write-only plaintext, at this boundary and nowhere else. Encrypted before it touches
    *  the database and never rendered back to any browser once saved (UI-SPEC §3d). */
@@ -580,6 +615,7 @@ export interface ConnectorConnectionUpdate {
   is_enabled?: boolean
   mcp_server_url?: string | null
   default_approval_posture?: ToolGrantPosture
+  default_ingest_visibility?: IngestVisibility
   tool_grants?: Record<string, ToolGrantPosture>
   discovered_tools?: McpDiscoveredTool[]
 }

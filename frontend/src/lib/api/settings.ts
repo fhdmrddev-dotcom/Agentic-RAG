@@ -370,6 +370,35 @@ export interface HealthOverview {
   low_confidence_queries_count: number
   coverage_percent: number
   avg_confidence: number
+  /**
+   * ── Health signals, added 2026-09-06 ──────────────────────────────────────────
+   *
+   * ⚠ Everything ABOVE this line except `stale_count` is USAGE — what a search happened to
+   * return. These are HEALTH: true or false regardless of whether anyone queried anything.
+   * `health_score` was re-weighted the same day to use `readable_documents` in place of
+   * retrieval coverage, which had been 40% of it.
+   *
+   * Optional so a frontend built against an older backend still compiles and renders.
+   */
+  readable_documents?: number
+  /** Documents that produced ZERO chunks — the agent literally cannot see these. */
+  unreadable_documents?: number
+  total_chunks?: number
+  /** An un-embedded chunk is invisible to search however well it was extracted. */
+  embedded_chunks?: number
+  outcomes_by_type?: { type: string; completed: number; failed: number; documents?: number; chunks?: number }[]
+  /**
+   * Age bands. ⚠ `aging_days` / `stale_days` are DERIVED from the one stale knob and move with
+   * it, so this ring and the "Stale" chip can never disagree — one threshold read by two
+   * surfaces, rather than two thresholds that drift apart.
+   */
+  freshness_tiers?: {
+    fresh: number
+    aging: number
+    stale: number
+    aging_days: number
+    stale_days: number
+  }
 }
 
 export interface PaginatedResponse<T> {

@@ -3,7 +3,7 @@ seed_id: SEED-177
 title: MCP connections both ways — user-level "just connect" integrations usable in chat AND workflows, plus the open-source leverage around them. Breadth is now asked for; re-open trigger #3 has fired.
 created: 2026-08-18
 planted_during: Operator direction, after a live test of n8n's MCP server and a scoping conversation about competitor connector breadth (Beam, Glean)
-status: planted
+status: partially-answered  # trigger #2 ANSWERED by Phase 206 (2026-08-25); triggers #1 and #4 have NOT fired
 priority: high
 relates_to:
   - SEED-013 (External Integrations — public API, MCP server, webhooks) — the INBOUND twin; "expose us" is its second consumer mode
@@ -21,6 +21,41 @@ trigger_when:
 ---
 
 # SEED-177 — connect, and be connected
+
+## ⚠ STATUS FLIP 2026-09-07 — trigger #2 answered, the seed is NOT discharged
+
+Flipped `planted` → `partially-answered` on operator instruction, at the honest granularity
+rather than at the seed level, because **this seed has two halves and only the outbound one
+has been touched.**
+
+**ANSWERED — trigger #2**, verbatim: *"Anyone proposes adding an MCP client to backend/app —
+retire the `test_189_no_egress` fence DELIBERATELY, never trip it by surprise."*
+
+- `backend/app/services/mcp_client.py` exists: **480 lines / 7 commits / 5 phases**, added at
+  `a1aa25c48` (**Phase 206, 2026-08-25**).
+- The fence was retired **exactly as this trigger demanded** — `test_189_no_egress.py`'s Case A
+  source fence carries a written `D-206-07` retirement note in the test body, and it is **not**
+  in the 71-failure backend baseline. ⭐ **The trigger did its job.** What failed was the
+  paperwork: CLAUDE.md line 40 still read *"No MCP client exists in the backend today"* for
+  **thirteen days** (corrected `a7284fcd7`), and this seed still read `planted`.
+- Partially also **trigger #3** (*"a user asks to pull from Slack / Jira / Monday / ClickUp /
+  email / OneDrive"*) — Drive landed at Phase 234, OneDrive/SharePoint at Phase 238.
+
+**STILL LIVE — the "be connected" half, which is the operator direction this seed was planted
+for.** The 2026-08-18 direction quoted below asks to *"expose our app as MCP"* **and** to call
+out to others. Only the calling-out half exists.
+
+- **Trigger #1 has NOT fired.** Measured 2026-09-07: `.planning/ROADMAP.md` contains **no phase
+  for SEED-013 / Open Platform** — inbound MCP-server exposure is unscheduled, exactly as it was
+  when this seed was planted.
+- **Trigger #4 has NOT fired** — the *"OAuth is the hard part, once per vendor"* correction stands
+  unconsumed.
+- ⚠ **Phase 239 is NOT this seed.** It makes a file-serving MCP server a *watchable source*
+  (SRC-04) — more of the outbound half. It does not expose this app to anyone.
+
+**Re-open is therefore automatic, not conditional:** triggers #1 and #4 are unchanged and still
+armed. Do not read `partially-answered` as `closed`.
+
 
 ## The direction (operator, 2026-08-18)
 

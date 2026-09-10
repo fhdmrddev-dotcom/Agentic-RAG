@@ -97,6 +97,9 @@ export {
   listDocumentTables,
   listDocumentImages,
   listDocumentQueries,
+  // Phase 240 (SRC-05 SC#3) — the conversation read. Same rule as the five above: a symbol
+  // missing from this barrel typechecks perfectly and is invisible to every consumer.
+  fetchDocumentConversation,
 } from "./api/documents"
 
 // ── skills ─────────────────────────────────────────────────────────
@@ -414,6 +417,7 @@ export type {
   ConnectorConnectionCreate,
   ConnectorConnectionUpdate,
   ToolGrantPosture,
+  IngestVisibility,
 } from "./api/org"
 
 // ── connectors ─────────────────────────────────────────────────────────
@@ -434,6 +438,10 @@ export {
   importCloudFile,
   probeMcpAuth,
   createMcpOAuthAuthorizeUrl,
+  browseSourceFolders,
+  previewSource,
+  confirmSourcePreview,
+  listSourceFamilies,
 } from "./api/connectors"
 export type {
   ConnectorCheckBucket,
@@ -450,6 +458,15 @@ export type {
   McpAuthKind,
   McpProbeAuthResponse,
   McpOAuthAuthorizeResponse,
+  SourceNode,
+  SourceBrowseResponse,
+  PreviewBucket,
+  PreviewOutcome,
+  SourcePreviewItem,
+  SourcePreviewResponse,
+  SourcePreviewRequest,
+  SourceConfirmOutcome,
+  SourceConfirmResponse,
 } from "./api/connectors"
 
 export { submitToolApproval } from "./api/threads"

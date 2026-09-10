@@ -52,7 +52,7 @@ def clean_dependency_overrides():
 
 
 @pytest.mark.asyncio
-async def test_sc1_authorize_url_contains_no_secrets(fake_redis: FakeRedis):
+async def test_sc1_authorize_url_contains_no_secrets(fake_oauth_redis: FakeRedis):
     """SC#1: Authorize URL state is an opaque handle and leaks zero credentials or verifiers."""
     secret = "SUPER_SECRET_CLIENT_SECRET_9876543210"
     client_id = "custom-client-id-123.apps.googleusercontent.com"
@@ -63,7 +63,7 @@ async def test_sc1_authorize_url_contains_no_secrets(fake_redis: FakeRedis):
         user_id="user-200",
         org_id="org-300",
         redirect_uri="http://localhost:5173/app?connections=1",
-        redis=fake_redis,
+        redis=fake_oauth_redis,
         custom_client_id=client_id,
         custom_client_secret=secret,
     )
@@ -104,8 +104,26 @@ def test_sc2_shared_state_engine_convergence():
 
 
 @pytest.mark.asyncio
-async def test_sc3_in_flight_legacy_hmac_state_accepted(client: TestClient, fake_redis: FakeRedis):
-    """SC#3: A consent started before deploy (carrying legacy HMAC-signed state) succeeds after deploy."""
+async def test_legacy_hmac_state_is_now_REFUSED_not_accepted(client: TestClient, fake_oauth_redis: FakeRedis):
+    """The legacy HMAC fallback is DELETED (operator, 2026-09-07) — legacy state is now REFUSED.
+
+    ⚠ **THIS TEST WAS INVERTED, NOT DELETED, AND THE INVERSION IS THE POINT.** It was
+    ``test_sc3_in_flight_legacy_hmac_state_accepted`` and it asserted the opposite: that a
+    pre-deploy consent carrying HMAC-signed state still completed. That was the correct contract
+    for the 24-hour cutover window Phase 225 announced. **That window closed** — the deploy went
+    live 2026-09-04 and the branch carried its own ``delete after ... 24 h`` comment.
+
+    Why the branch had to go rather than be patched: ``_get_signing_key()`` ended in
+    ``or "default-oauth-state-secret"``, ``jwt_secret`` is not a declared setting, and
+    ``secrets_encryption_key`` defaults to ``""`` on a supported key-less install — so the HMAC
+    key was **a string published in this repository**, on a route that takes no JWT. Anyone could
+    forge state naming a victim's ``connection_id``. The branch also never set ``pending_org_id``,
+    so it silently short-circuited the very cross-org gate ``BUG-260903-02`` added.
+
+    A deleted branch with no test is an invitation to restore it. This test is the fence:
+    **legacy state must reach the same refusal as any expired handle, and must NOT reach the
+    token exchange.**
+    """
     legacy_state = generate_oauth_state(
         connection_id="conn-legacy-1",
         user_id="user-1",
@@ -125,7 +143,7 @@ async def test_sc3_in_flight_legacy_hmac_state_accepted(client: TestClient, fake
     }
     mock_profile = {"email": "user@example.com", "name": "Legacy User"}
 
-    with patch("app.dependencies.get_redis", return_value=fake_redis), \
+    with patch("app.dependencies.get_redis", return_value=fake_oauth_redis), \
          patch("app.services.oauth_service.exchange_code_for_tokens", new_callable=AsyncMock) as mock_exchange, \
          patch("app.services.oauth_service.fetch_account_profile", new_callable=AsyncMock) as mock_prof, \
          patch("app.dependencies.get_supabase") as mock_sb:
@@ -143,12 +161,20 @@ async def test_sc3_in_flight_legacy_hmac_state_accepted(client: TestClient, fake
         assert res.status_code in (302, 307)
         location = res.headers["location"]
         assert location.startswith("http://localhost:5173/app?connections=1")
-        assert "oauth_connected=1" in location
-        assert mock_exchange.called
-        assert mock_exchange.call_args[1]["code_verifier"] == "test-legacy-verifier-12345"
+
+        # Refused exactly like an expired opaque handle — same code path, no special case.
+        assert "oauth_error=invalid_or_expired_state" in location
+        assert "oauth_connected=1" not in location
+
+        # ⛔ THE LOAD-BEARING ASSERTION. A redirect that merely *looks* like a refusal while the
+        # exchange still ran would leave tokens written behind a visible error — the failure shape
+        # this whole phase exists to prevent. The forged state must never reach the provider.
+        assert not mock_exchange.called
+        # (The old test asserted the forwarded `code_verifier` here. There is no call to inspect
+        #  any more — that assertion only made sense while the branch existed.)
 
 
-def test_sc3_negative_tampered_legacy_state_rejected(client: TestClient, fake_redis: FakeRedis):
+def test_sc3_negative_tampered_legacy_state_rejected(client: TestClient, fake_oauth_redis: FakeRedis):
     """A-5: Tampered legacy state fails HMAC verification and redirects to /app with invalid_or_expired_state."""
     legacy_state = generate_oauth_state(
         connection_id="conn-1",
@@ -159,7 +185,7 @@ def test_sc3_negative_tampered_legacy_state_rejected(client: TestClient, fake_re
     payload_b64, sig = legacy_state.split(".", 1)
     tampered_state = f"{payload_b64}.tampered_signature_12345"
 
-    with patch("app.dependencies.get_redis", return_value=fake_redis):
+    with patch("app.dependencies.get_redis", return_value=fake_oauth_redis):
         res = client.get(f"/connectors/oauth/callback?code=mock-code&state={tampered_state}")
         assert res.status_code in (302, 307)
         location = res.headers["location"]
@@ -168,7 +194,7 @@ def test_sc3_negative_tampered_legacy_state_rejected(client: TestClient, fake_re
 
 
 @pytest.mark.asyncio
-async def test_sc4_single_use_replay_and_unknown_handle_rejected(client: TestClient, fake_redis: FakeRedis):
+async def test_sc4_single_use_replay_and_unknown_handle_rejected(client: TestClient, fake_oauth_redis: FakeRedis):
     """SC#4: First take consumes handle; replayed redirect or unknown handle fails closed."""
     state = PendingOAuthState(
         code_verifier="verifier-456",
@@ -181,7 +207,7 @@ async def test_sc4_single_use_replay_and_unknown_handle_rejected(client: TestCli
         flow="provider",
         provider="google",
     )
-    handle = await save_pending_state(fake_redis, state)
+    handle = await save_pending_state(fake_oauth_redis, state)
 
     mock_tokens = {
         "access_token": "acc-1",
@@ -190,7 +216,7 @@ async def test_sc4_single_use_replay_and_unknown_handle_rejected(client: TestCli
     }
     mock_profile = {"email": "test@example.com"}
 
-    with patch("app.dependencies.get_redis", return_value=fake_redis), \
+    with patch("app.dependencies.get_redis", return_value=fake_oauth_redis), \
          patch("app.services.oauth_service.exchange_code_for_tokens", new_callable=AsyncMock) as mock_exchange, \
          patch("app.services.oauth_service.fetch_account_profile", new_callable=AsyncMock) as mock_prof, \
          patch("app.dependencies.get_supabase") as mock_sb:

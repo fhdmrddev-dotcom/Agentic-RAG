@@ -1,326 +1,473 @@
 # Pitfalls Research
 
-**Domain:** Adding a drag-and-drop / no-code visual authoring canvas + non-technical run observability + external connectors ON TOP of an existing governed, multi-tenant harness workflow engine (v3.6 Visual / No-Code Workflow Studio)
-**Researched:** 2026-07-24
-**Confidence:** HIGH on the governance / round-trip / revert / connector pitfalls (grounded in the actual `WorkflowDefinition` model, `lint_workflow`, `publish_service`, and the org/RLS + secrets code); MEDIUM on competitor-specific patterns and React-Flow scale thresholds (WebSearch-verified, not measured in this repo).
+**Domain:** Adding **scheduled, permission-aware, multi-source ingestion** (Google Drive · OneDrive/SharePoint · MCP file surface · mailbox) to an **existing, production, manual-upload-only** enterprise RAG platform with an ownership/org-scoped RLS model, a shipped outbound connector platform (OAuth + MCP + per-tool grants + approval checkpoint + audit receipts), and a shipped workflow scheduler.
+**Milestone:** v4.0 Connected Knowledge · **Researched:** 2026-09-04
+**Confidence:** **HIGH** on the repo-grounded pitfalls (read from `backend/app/api/documents.py`, `backend/app/db/schedules.py`, `backend/app/services/scheduler_service.py`, `supabase/full-schema.sql` on this date) · **HIGH** on the disclosed security incidents (named CVEs / vendor advisories / researcher writeups) · **MEDIUM** on provider-API sync edge cases (official docs + vendor Q&A, not reproduced here) · **LOW / marked inline** where a claim is inference rather than a documented case.
 
-> **Framing.** This milestone is *not* building a workflow engine — the engine (locked ordered phases, per-phase `available_tools` whitelist, closed-registry validation gates, the 8-stage publish gauntlet with the `llm_judge` hard-wall, per-version immutable definitions) already exists and is trusted. The whole risk surface is the **new layer**: a visual editor that produces the *same* `WorkflowDefinition` JSON, a run view for people who can't read the developer timeline, a feature flag that must revert to *exactly today*, and connectors that reach outside the box. Every pitfall below is about that seam, not about generic React/FastAPI hygiene.
+> **Framing — read this before using the list.** This milestone is not building a RAG pipeline. Chunking, embedding, pgvector retrieval, versioning, classification rules, folders, views, relationships, RLS, the scheduler, OAuth, MCP, per-tool grants and the approval checkpoint **all already exist and are trusted**. The entire risk surface is the **seam**: a second door into a corpus that has only ever had one door, opened by a machine instead of a person, on a clock, from sources this system does not own.
+>
+> ⭐ **The single most important sentence in this document** is `SEED-210`'s, and it is repeated here because every pitfall below inherits from it: *until now, every document in the corpus was deliberately placed by a person who could already read it — which is what made ownership-based RLS sound.* **The commit that retires the manual-upload-only rule retires that guarantee.** Pitfalls 1–5 are all downstream of that one fact.
+>
+> ⚠ **The permission model is DECIDED and is NOT re-litigated here.** Connection-scoped visibility (`SEED-210` Option 3) is the shipped v1. What follows is **how that decision bites**, so each bite can be fenced explicitly rather than discovered by a customer.
+
+## Phase-slot legend
+
+Phase numbers for this milestone are not assigned yet (numbering resumes at **228**, and **228 is the v3.9 closeout** per `PROJECT.md`). Every pitfall below names a **slot**, and the roadmapper maps slots → numbers. `ARCH` = must be decided in the phase that writes the first line of schema; `HARD` = hardening, can follow the build.
+
+| Slot | Working name | Kind | Why it exists as a separate slot |
+|---|---|---|---|
+| `P-CONTRACT` | The source contract + **one ingest door** | **ARCH** | `list → read → hash → splice` as data, not code; and the retrofit of the existing upload path onto it |
+| `P-PERM` | Inbound permission envelope | **ARCH** | connection-scoped visibility, its schema, and the fences below |
+| `P-QUEUE` | Durable ingestion job queue | **ARCH** | `SEED-077` — nothing survives a restart today |
+| `P-WATCH` | The watch loop, preview, source-health surface | build | binds to the **shipped** scheduler; owns the honest sentences |
+| `P-LIFECYCLE` | Deletion / revocation / retention / disconnect policy | **ARCH decision, build in-phase** | `SEED-210`'s undecided row + `SEED-072` |
+| `P-UNTRUSTED` | Threat model + adversarial corpus | **ARCH fence + HARD suite** | `SEED-188`; the fence is architectural, the corpus is hardening |
+| `P-RULES` | One rule engine (watch routing × classification) | build | `SEED-209` / `SEED-243` |
+| `P-MAIL` | Mailbox as a **shape** | build, **last** | the known shape-risk stated at intake |
+| `P-SCALE` | Recall + corpus-scale hardening | **HARD** | `SEED-076`, `SEED-048`, `SEED-197` |
 
 ---
 
 ## Critical Pitfalls
 
-### Pitfall 1: The canvas becomes a second, drift-prone rule engine (governance fork)
+### Pitfall 1: Connection-scoped visibility is silently widened by *folder placement* — and the rules engine is the thing that widens it
 
 **What goes wrong:**
-The natural way to give a business user "live in-canvas validation" ("you can't connect these two nodes", "this phase needs an approval before it can publish") is to re-implement the rules in TypeScript on the client so the UI can grey out invalid moves instantly. Within one or two phases the client rules and the server's real gate (`lint_workflow` + the `WorkflowDefinition` strict model + the publish gauntlet) drift. The canvas then either (a) blocks a flow the server would happily accept (frustrating), or worse (b) *permits* a flow the server rejects only at publish — so the "can't draw an invalid workflow" promise is a lie, and a business user hits a wall of developer-jargon gauntlet errors after 20 minutes of drawing.
+The decision is "everything from one connection inherits ONE visibility." But in this codebase **visibility is not a property of a document — it is a property of the folder the document lands in.** Measured in `supabase/full-schema.sql:5452`, the SELECT policy on `public.documents` is:
 
-**Why it happens:**
-Round-trip latency. Developers want instant feedback on the canvas, the real validators are Python (`reachability.py`, `publish_service.py`, `workflow_authoring._check_grounding_fidelity`), and calling the server on every node drag feels heavy. So they port "just the easy rules" to the client and it snowballs.
+```
+(org_id IN current_user_org_ids()) AND ( auth.uid() = user_id
+                                         OR (folder_id IS NOT NULL AND folder_is_org_shared(folder_id)) )
+```
 
-**How to avoid:**
-- **One source of structural truth, reused — never re-authored.** `lint_workflow()` (`backend/app/services/harness/reachability.py`) is already a *pure, I/O-free* function returning typed `LintError`s (orphan / unsatisfiable-skip / no-terminal / bad-index / input-unsatisfied). Expose it behind a stateless `POST /workflows/validate` (draft-in → `LintError[]` + the `WorkflowDefinition.model_validate` result out). The canvas calls THAT — debounced (~300–500ms) — and renders the errors on the offending nodes. The client owns *presentation* of errors, never their *definition*.
-- **Whitelist / grounding checks stay server-side too.** The `available_tools` per-phase whitelist, the folder-scope ⊆ project-subtree assertion, and skill_ref membership already live server-side in `_check_grounding_fidelity` (T-103-02-03, "KB content can never whitelist itself"). The node config panel must offer tools/skills/folders from a **server-provided grounding bundle** (the same one NL authoring assembles in `_assemble_grounding`), not a client-hardcoded list — otherwise a business user can type a tool name the whitelist would reject.
-- **Distinguish the three validation tiers and surface all three in-canvas, but compute all three on the server:** (1) *shape* = `WorkflowDefinition.model_validate` (`extra="forbid"`), (2) *structure* = `lint_workflow`, (3) *publishability* = the gauntlet's cheap pre-run stages (business_requirement present, no unvalidatable interactive phase). Only the golden-run + judge stages stay publish-time (they cost a real LLM run).
-- **The canvas can only emit the closed vocabulary.** Nodes map to the 6 `phase_type` literals and the 9 `ValidatorSpec.kind` literals — both LOCKED sets. The palette is generated FROM those literals, so a new node type is impossible to draw unless the model gains a member.
+So a synced document placed into an **org-shared folder** is readable by every member of the org, regardless of what the connection's stated visibility said. And `SEED-209`'s binding rule — connector documents must route through the classification splice — means a **rule can move a document into a folder**, i.e. the routing engine is an access-control surface wearing the costume of a filing cabinet. A rule reading *"anything from the DMT SharePoint library → Programme Docs"* is, in this schema, also an authorization grant.
 
-**Warning signs:**
-- A `validate`-like function appears in `frontend/src/` that enumerates phase types or tool names.
-- The canvas shows a node as "valid" but publish returns a `lint`-stage or `definition_invalid` block.
-- Grounding lists (tools/folders/skills) are imported from a frontend constant instead of fetched.
+**Why it happens:** The two subsystems were designed under different assumptions. Folder sharing (v3.4) assumed a human chose to share a folder they owned. Classification rules (Phase 118) assumed placement was a filing convenience with a human Accept step. Neither assumed a machine placing ten thousand documents an hour.
 
-**Phase to address:** In-Canvas Governance phase (the shared-validator endpoint), landed *before* any node vocabulary or free editing. This is the load-bearing phase of the milestone.
+**How to avoid (concrete):**
+1. Make visibility a **stored fact on the document, sourced from the connection** (e.g. `documents.source_connection_id` plus a visibility derived at insert), and make the SELECT policy read **the narrower of** folder-derived and connection-derived visibility. Never the union.
+2. **Refuse the widening move rather than silently performing it:** a classification rule whose target folder is org-shared must not apply to a document whose connection visibility is private — it produces a *suggestion the human must accept* (Phase 118 already ships exactly this concept: a `_classification` suggestion plus an explicit Accept), never an auto-move.
+3. State it in the UI at connect time, in the same sentence as the visibility: *"Files from this connection are visible to you only. Filing rules cannot make them visible to more people."*
+
+**Warning signs:** a synced document appears in another user's search results; a `classification.apply` audit row whose target folder is org-shared and whose document has a `source_connection_id`; the phrase "we'll just reuse folder sharing" in a plan.
+
+**Phase to address:** `P-PERM` (**ARCH** — a schema + policy decision), with the refusal in `P-RULES`.
 
 ---
 
-### Pitfall 2: The flag-off state is not byte-identical to today (the revert gate is a lie) — HARD GATE #1
+### Pitfall 2: "Connection-scoped" answers *who may read the corpus* and not *whose corpus this is* — the connecting user becomes an unintentional gateway
 
 **What goes wrong:**
-Operator HARD requirement #1 is: flip the flag → land on *exactly* today's behavior, as a **tested** acceptance gate. The common failure is a flag that hides the new *UI* but leaves behind non-revertible residue: a schema migration that's `NOT NULL` or changes an existing column, a new required field on `WorkflowDefinition` that makes old published rows fail `model_validate`, a route that's always mounted, or an accidental edit to the two existing authoring doors ("Describe & run" / "Author & govern") or to `PhaseTimeline`/`PhaseCard`/the run surface. Now "flag off" is a *different* system than v3.5, and the revert is unsafe precisely when you need it (something broke).
+Under Option 3, everything a connection ingests inherits the **connecting user's** visibility. The connecting user is typically an admin or a power user, and their Drive/SharePoint access is usually the *widest* in the org. The result is the inverse of the Copilot problem rather than a fix for it: instead of over-broad retrieval, you get **an index built from one privileged person's view of the world, then answered on that person's behalf** — including in unattended, scheduled workflow runs launched under their `user_id` (`scheduler_service.launch_scheduled_run` explicitly stamps runs with the schedule owner, which is correct for isolation and is exactly what makes this concentration possible).
 
-**Why it happens:**
-Feature flags are treated as a UI-visibility toggle, not a system-state contract. Migrations feel unrelated to "the flag". And the existing surfaces (`WorkflowBuilderPage`, `PhaseSpineGraph`, `PhaseTimeline`) are shared code — a "small improvement" while you're in there silently changes the flag-off baseline.
+This is the documented Microsoft failure mode with the polarity flipped. Copilot returns only what the *asking* user can already open, and organisations still found that catastrophic — Concentric AI's figure of ~16% of business-critical data being overshared, ~802,000 exposed files per organisation, is the number the whole "prepare SharePoint before you enable Copilot" industry grew around ([Microsoft's own guidance](https://learn.microsoft.com/en-us/sharepoint/sharepoint-copilot-best-practices), [Petri](https://petri.com/copilot-didnt-overshare-your-data-your-permissions-did/)). ⚠ **Under connection-scoped visibility we do not even have Copilot's protection**, because retrieval is not re-checked against the asking user's source-side rights at all.
+
+**Why it happens:** Option 3 is chosen (correctly) to cap the access-control surface. The failure is not in the choice; it is in not *naming* the resulting concentration, and in letting the connecting user be an org admin by default.
 
 **How to avoid:**
-- **Additive-only, nullable-only schema — the model already proves the pattern.** Every field added to `WorkflowDefinition` since v2.9 (`project_folder_id`, `inputs`, `assets`, `business_requirement`, `category`) is `X | None = ...` specifically so "old JSONB rows `model_validate()` to defaults" (the zero-migration lock comment in `harness.py`). New canvas metadata (node positions, layout) MUST follow the identical additive-optional rule, and must NEVER be a field the *engine* reads. If a migration isn't a pure additive nullable column, it does not ship in this milestone.
-- **Flag-gate at every layer, not just the render.** The flag lives in `app_settings` (the established pattern — `tool_dispatcher` reads `getattr(load_app_settings(), flag_attr)`; MODEL-02 `llm_model_locked` is the precedent). New routes (`/workflows/validate`, canvas save, connector CRUD) must 404/refuse when off (the `require_operator` byte-identical-404 pattern from Phase 146 is the model). The composer/nav entry point hides. The engine path is untouched either way.
-- **Make revert a real test, not a claim.** Author a `test_revert_byte_identical` gate: with the flag OFF, (1) the two existing authoring doors render and function identically to a captured v3.5 baseline, (2) an existing published workflow still runs and produces the same deliverable, (3) `GET /workflows` and the run surface return the same shapes, (4) the new routes 404. This is the milestone's acceptance gate — it runs in CI and is re-run live at milestone close.
-- **Treat the existing doors + run surface as frozen contracts.** Any diff to `WorkflowBuilderPage`, `PhaseSpineGraph`, `PhaseTimeline`, `PhaseCard`, or the run surface must be *additive behind the flag* (a new prop defaulting to today's behavior), never a rewrite. G-5 hot-file audit at discuss-phase catches this.
+- Record the **connecting principal** on every ingested row and show it in the Library (`Synced by Alice from Finance Drive`) — provenance as a first-class field is already `SEED-209`'s ask.
+- **Cap the blast radius at connect time**, not at query time: the preview (already in scope) must state *how many files* and *from which folder tree*, and a connection must be scoped to a folder/site/label — never "the whole drive" — in v1.
+- Make the org-shared case an **explicit, separate act**: connecting is private-by-default; making a connection's corpus org-visible is a second, audited decision with a named consequence sentence.
+- Write the migration path to `SEED-211` (metadata-derived permissions) into the schema **now** — a nullable `source_principals jsonb` column that nothing reads yet costs nothing and turns the later model into a backfill instead of a re-ingest.
 
-**Warning signs:**
-- A migration in this milestone is anything other than `ADD COLUMN ... NULL` / a new table.
-- The revert story is described in prose ("just turn it off") but no test asserts it.
-- A PR touches `PhaseTimeline.tsx` or the run surface without a flag guard.
-- Old published workflows 500 or 422 on load after a definition-model change.
+**Warning signs:** the connect flow has no folder picker; the preview says "12,431 files" and offers only OK; a security questionnaire asks "whose permissions decide what the assistant can quote?" and the answer needs a paragraph.
 
-**Phase to address:** Revert Foundation phase — the FIRST phase of the milestone. The flag, the layered gating, and the `test_revert_byte_identical` gate ship before any canvas work, so every subsequent phase inherits a proven off-switch.
+**Phase to address:** `P-PERM` (**ARCH**).
 
 ---
 
-### Pitfall 3: Lossy / corrupting canvas↔definition round-trip (layout data poisons the immutable definition)
+### Pitfall 3: Retrieval leaks *substance* without leaking *identity* — so the ordinary audit ("who opened this file?") cannot detect the disclosure
 
 **What goes wrong:**
-The canvas needs per-node x/y positions, zoom, edge waypoints, collapsed/expanded UI state. The tempting shortcut is to stuff that layout blob *into* the `WorkflowDefinition` JSONB (it's already JSON, it's right there). Two failures follow: (1) `extra="forbid"` on `_StrictBase` **rejects** unknown keys, so either the save 422s or someone relaxes `extra` and blows the injection guard (T-090-01); (2) if layout is co-mingled, then a pure cosmetic drag (moving a node 3px) mutates the *definition* → creates a new version → triggers the golden-run gauntlet, and the immutability/version story becomes meaningless. The inverse loss also happens: importing a definition authored by NL or the existing doors (which have NO layout) into the canvas produces overlapping nodes at 0,0 because there's no layout to round-trip.
+`SEED-210` states it exactly: a synthesised answer quotes a document's contents, cites it, and never had to open the file. Every incident-response tool an enterprise owns is built around **file access events**. A RAG answer produces none. So under connection-scoped visibility the failure mode is not "user X opened file Y" — it is "user X received three paragraphs of file Y's content, and the source system logged nothing." After the fact, detection is impossible unless *we* logged it.
 
-**Why it happens:**
-"It's all JSON" conflates two things with opposite lifecycles: the **governed definition** (validated, versioned, immutable-on-publish, engine-consumed) and **presentation layout** (cosmetic, per-user, freely mutable, never engine-read). React-Flow's own `toObject()` returns nodes+edges+viewport as one blob, which nudges you toward storing it whole.
+This is the property that made EchoLeak (CVE-2025-32711, CVSS 9.3) so severe — it exfiltrated through the model's own natural-language channel, where "traditional defenses like antivirus, firewalls, or static file scanning" do not apply ([Aim Security via HackTheBox](https://www.hackthebox.com/blog/cve-2025-32711-echoleak-copilot-vulnerability); [arXiv 2509.10540](https://arxiv.org/html/2509.10540v1)).
 
 **How to avoid:**
-- **Two columns, never one.** Definition stays in `workflow_definitions.definition` (untouched, engine-owned). Layout goes in a *separate* additive nullable column or side table (`workflow_layouts`, keyed by definition id + optionally user id) that the engine never reads and `lint_workflow` never sees. A layout write does not bump the definition version.
-- **The definition is the source of truth for graph *topology*; layout only positions it.** Nodes/edges the canvas shows are *derived from* `phases[]` + the `phase_index` sequential edges + parsed `skip_to_phase:<slug>` edges (exactly the edge set `reachability.py` already builds — reuse that adjacency logic so the canvas and the linter agree on what an edge IS). Deleting a canvas edge maps to editing a `skip_to_phase` disposition or a phase; it can never create a topology the linter doesn't understand.
-- **Deterministic auto-layout for definitions with no saved layout** (NL-seeded drafts, the existing doors, imported starters). A layout algorithm (e.g. dagre/elk vertical spine, mirroring today's `PhaseSpineGraph`) runs when `workflow_layouts` has no row — so every definition opens cleanly in the canvas whether or not it was born there.
-- **Round-trip test as a gate:** `definition → canvas model → definition` must be byte-identical on the definition half for every one of the 4 canonical seed shapes + the PM pack. Layout round-trips separately and is allowed to be absent.
+- **Log the retrieval set, not just the answer.** Every `search_documents` hit that resolves to a document with a `source_connection_id` writes an `audit_log` row: asking user, document id, connection id, similarity. This is the inbound analogue of the shipped outbound audit receipt, and the project already owns the receipt vocabulary and the immutable INSERT-only `audit_log` table (D-10).
+- Make that ledger **queryable by document**, so *"who has been answered from this file?"* is one query — the question a customer asks on the day a share turns out to have been wrong.
+- ⚠ Do **not** rely on citations for this. Citations are a UI affordance the model participates in; the audit row must be written by the retrieval service, below the model.
 
-**Warning signs:**
-- `extra="forbid"` is relaxed on any harness model, or a `position`/`x`/`y`/`layout` key appears inside `definition`.
-- Moving a node creates a new `workflow_definitions` version or re-arms the publish gauntlet.
-- Opening an NL-authored or starter workflow in the canvas shows stacked nodes at the origin.
+**Warning signs:** the only record of a synced document being used is a chat transcript; nobody can answer "which users have seen content from connection C" without reading messages.
 
-**Phase to address:** Canvas↔Definition Round-Trip phase (the serialization contract + auto-layout), immediately after the Revert Foundation and alongside/just-before In-Canvas Governance.
+**Phase to address:** `P-PERM` (**ARCH** — the row must exist from the first sync; retrofitting means the first months are permanently unauditable).
 
 ---
 
-### Pitfall 4: Dishonest run observability — "done" when a gate failed, or nodes mapped to the wrong events
+### Pitfall 4: The corpus becomes attacker-influenced, and this app already holds the whole lethal trifecta in one session
 
 **What goes wrong:**
-The non-technical run view is meant to show "which node is active, inputs/outputs, gate pass/fail" in plain language. The failure modes: (a) the friendly view collapses a `gate_failed` / `run_failed` into a green "done" checkmark because it only listens for `phase_completed`; (b) it maps a `phase_transition` or a sub-agent's events onto the wrong node (the harness fans out `llm_batch_agents` and spawns sub-agents — those emit on a *producer* stream, keyed differently from the workflow `run_id`); (c) on browser reconnect it replays a stale Realtime snapshot and shows a run as "still on step 2" when it actually failed at step 4 minutes ago. For a business user who *trusts* the pretty view, a dishonest "done" is worse than a raw log — they ship a broken deliverable believing a gate passed.
+The moment a shared drive or a mailbox feeds the index, **anyone who can drop a file in that drive, or send mail to that mailbox, can write into the agent's context.** Combine that with the shipped v3.9 capability set and the configuration is Simon Willison's [lethal trifecta](https://simonwillison.net/2025/Jun/16/the-lethal-trifecta/) exactly: **private data** (the KB, plus every other connected service) + **untrusted content** (the synced corpus) + **external communication** (`send_email` / `create_ticket` / `post_message` and any granted MCP write tool). Willison's conclusion is the operative one: *"we still don't know how to 100% reliably prevent this"* — the only sound mitigation is to remove one leg.
 
-**Why it happens:**
-The engine's event vocabulary is honest and specific (`phase_started`, `phase_transition`, `phase_completed`, `gate_passed`, `gate_failed`, `run_failed`, plus `delta`/`sources`/`citations`), and it deliberately **never emits `phase_completed` for a failed emit phase** (WR-01). But a "simplified" UI that only subscribes to the happy-path events *loses the failure signal by omission*. And Realtime is a best-effort hint (D-v2.5-03), so a naive UI that trusts the last pushed event lies on reconnect.
+This is not theoretical, and the incident list is now specific:
 
-**How to avoid:**
-- **Model the friendly node state as a total function over the FULL event set, not a happy-path subset.** Each node is exactly one of `pending / active / passed / failed / skipped / waiting-for-you`. A node is `passed` ONLY on `phase_completed`; `gate_failed` → `failed`; `run_failed` → the active node `failed` and downstream `skipped`; `llm_human_input` pause → `waiting-for-you`. No event → stays `pending`. Never infer success from absence.
-- **Reconcile on (re)connect — the standing rule.** D-v2.5-03: Realtime is a hint, the fetch is truth. On mount/reconnect, fetch the authoritative run+phase state (the `run:{run_id}` Redis Stream supports replay-and-tail per run_id, Phase 061+) and rebuild node states from that, THEN attach the live tail. The run surface already does this — the friendly view must not invent a new, hint-trusting path.
-- **Map events by keying, correctly, once.** Sub-agent / batch-fan-out events ride the producer stream; the friendly view subscribes to the workflow `run_id` phase events and shows aggregate progress ("Reviewing 5 documents…"), NOT individual sub-agent chatter mis-attributed to a node. Build the node↔event map in ONE place with a test per event type.
-- **Honesty over prettiness is a design contract, not a nicety.** Reuse the run-honesty lessons already banked (174 run-state honesty, 095 never-vanishes run-status strip). A failed gate must be *visibly* failed in plain language ("The approval step didn't pass — here's why"), with a reveal to the raw named-failures for whoever wants them.
+| Incident | Shape | Why it maps to us |
+|---|---|---|
+| [EchoLeak / CVE-2025-32711](https://www.hackthebox.com/blog/cve-2025-32711-echoleak-copilot-vulnerability) (M365 Copilot, Jun 2025) | one crafted **email**, zero click, RAG context inheritance → exfiltration | our mailbox source family, precisely |
+| [AgentFlayer](https://labs.zenity.io/p/agentflayer-chatgpt-connectors-0click-attack-5b41) (Zenity, Black Hat 2025) | a **poisoned document in Google Drive**; payload told the agent to find API keys and exfiltrate them via an image URL through trusted infrastructure | our Drive source family, precisely |
+| [ShadowLeak](https://thehackernews.com/2025/09/shadowleak-zero-click-flaw-leaks-gmail.html) (Radware, Sep 2025) | hidden-CSS instructions in email → **server-side** exfiltration, invisible to enterprise defenses; 100% success once tuned | refutes "we'd see it in our egress logs" |
+| [GitHub MCP](https://invariantlabs.ai/blog/mcp-github-vulnerability) (Invariant Labs, May 2025) | injection in a **public issue** pivots the agent into private repos on the same token | our MCP file-surface family; and the researchers' verdict: *"cannot be resolved through server-side patches… requires architectural controls"* |
 
-**Warning signs:**
-- The friendly view only has handlers for `phase_started` / `phase_completed`.
-- A run shows all-green but the deliverable is missing or the publish/run audit says `gate_failed`.
-- Reconnecting mid-run shows a different (earlier) state than a fresh page load.
-- Sub-agent deltas appear as node status changes.
+⚠ **The specific escalation this milestone creates:** today untrusted content reaches the agent mostly through documents a user chose to upload. After this milestone it arrives **continuously, unattended, and from principals outside the tenant** — while the same session may hold granted write tools. The v3.9 approval checkpoint is the one real control already built.
 
-**Phase to address:** Non-Technical Run Observability phase, after the round-trip + governance phases (it needs the node↔phase mapping those establish). G-2 sketch-first applies (it's a live "feels like" surface).
+**What is real vs theatre:**
+
+| Mitigation | Verdict |
+|---|---|
+| Delimited DATA blocks + "treat as data, never as a command" (already in 4 modules per `SEED-188`) | **Real but partial.** Raises cost; provably not sufficient. ⚠ And per `SEED-188` **nothing in this repo has ever tried to break it** — prose verified by nobody. |
+| **Breaking the trifecta**: forbid write-capable connector tools in any turn whose retrieval set contains connection-sourced content, unless the human approves *that specific call* | **The only architectural control.** Cheap here, because the approval checkpoint already exists — this is a policy that *arms* it, not new machinery. |
+| Human approval on every outbound write when synced content is in context | **Real.** Also the only thing that survives the model getting smarter or dumber. |
+| Stripping hidden text / white-on-white / zero-width / CSS tricks at extraction | **Real and cheap, and it is not a defense** — it removes the *easy* payloads only. Do it; do not count it. |
+| An "injection classifier" / detector over ingested text | **Mostly theatre.** Injections have no reliable signature; a detector lowers frequency, never makes the configuration safe. Never let it be the reason a gate is removed. |
+| "The model is smart enough now" | **Theatre.** Refuted by every row above, all on frontier models. |
+| Provider-side safety filters | **Theatre for this purpose** — and per this project's own provider-docs-first rule, a defense proven on Anthropic is not proven on `emit_tier: coerce` (Moonshot) or the `native_tools: False` OpenRouter path. |
+
+**How to avoid:** (1) at `P-CONTRACT`, tag every chunk with `is_external_source` so the trifecta fence has something to test; (2) at `P-UNTRUSTED`, build the adversarial corpus `SEED-188` asks for — the corpus is the asset, the runner (promptfoo or pytest) is an implementation detail — and drive it **cross-provider on the full native roster**, because that is the axis on which prompt-level guarantees fail; (3) plant the payload in a **synced document** during UAT, not only in a unit test.
+
+**Warning signs:** a phase plan that says "the system prompt already instructs the model to treat retrieved text as data"; an adversarial suite that tests one provider; any outbound tool call auto-approved in a turn that retrieved synced content.
+
+**Phase to address:** the **fence** is `P-UNTRUSTED`/**ARCH** and must land **in the same phase as the first sync**, never after. The **corpus** is `P-UNTRUSTED`/HARD and is a GA gate.
 
 ---
 
-### Pitfall 5: Autosave version explosion + multi-user edit clobber on a shared workflow
+### Pitfall 5: The polling-loop failures that produce **silent wrongness** rather than errors
 
-**What goes wrong:**
-A drag canvas invites continuous autosave. If every autosave writes a new `workflow_definitions` row/version, the version table explodes and the immutability semantics blur (which version is "the" draft?). Separately, v3.4 shipped org-shared workflows — two people in the same org can now open the *same* workflow. With last-write-wins PATCH (the current `updateWorkflowDraft` model, single-author), user B's save silently overwrites user A's edits, or an in-flight publish golden-run reads a half-saved draft.
+The classification below is the deliverable; the ranking is *silence*, not severity. A loud failure has a support ticket; a silent one has a customer who quietly stops trusting the answers.
 
-**Why it happens:**
-The existing Builder is single-author, describe-first, save-on-edit — it was never designed for continuous autosave or concurrent editors. The org-shared scope (`is_org_shared`) is new underneath it. `publish_definition` already had to add a `status='draft'` WHERE-guard to survive a concurrent double-publish race (WR-03) — that same class of race now applies to *editing*.
+| Failure | Silent? | What actually happens here | Warning sign | Prevention |
+|---|---|---|---|---|
+| **Pagination cursor shifts under you** | ⚠ **SILENT — worst in class** | Google's own tracker carries an open case where Drive returns **an empty page with a non-null `nextPageToken`** on shared drives, intermittently ([issuetracker 406305173](https://issuetracker.google.com/issues/406305173)). A naive `while token: if not page.files: break` **silently skips the rest of the drive** | the preview's file count differs run to run for an unchanged folder | never treat an empty page as the end — only a **missing** `nextPageToken` ends a listing; assert this run's count against the previous run and surface a drop |
+| **Delta / history token invalidation** | ⚠ **SILENT if mishandled** | Graph returns `410 Gone / resyncRequired` with **no published TTL** for driveItems ([MS Q&A](https://learn.microsoft.com/en-us/answers/questions/5856875/microsoft-graph-delta-api-clarification-on-delta-t)); Gmail `historyId` expires (days → ~30) and `history.list` answers **404** ([Google sync guide](https://developers.google.com/workspace/gmail/api/guides/sync)). Swallowing either means "no changes" forever | a source shows "last checked 3 minutes ago" and has ingested nothing for weeks | ⭐ **This milestone's cursorless design is a genuine advantage — keep it.** `PROJECT.md` binds the UI to *"checked every N minutes"* with no delta cursor: full list + `content_hash` diff is **self-healing by construction**. When a cursor is added later, a 410/404 must force a full list, and the fallback must be **counted and surfaced**, never logged |
+| **Overlapping runs of the same schedule** | ⚠ **SILENT, and it is live today** | `claim_due_schedules` (`backend/app/db/schedules.py:263`) is rigorous about *duplicate firing* — `FOR UPDATE SKIP LOCKED` + in-transaction `next_run_at` advance — but there is **no in-flight check**. A poll that takes longer than its interval is claimed again on the next tick and a second sync of the same source runs concurrently | two ingestion jobs for the same file id; duplicate rows or `23505` storms | add a **per-source lease** (`sync_state.leased_until`) checked in the same claim transaction; the second tick records `skipped_still_running` **as a visible fact**, never as nothing |
+| **A poll slower than its interval** | ⚠ SILENT | the first sync of a 10k-file drive against a 15-minute schedule | `last_run_at` and `next_run_at` converging; queue depth rising monotonically | the lease above, plus an honest source state (*still importing — 2,140 of 12,431*) |
+| **Missed window / downtime** | **not silent, and correctly handled** | `compute_next_run_at` computes from *now* with no catch-up, so the missed tick is skipped. ⭐ With a cursorless full list this is **harmless** — the next poll finds everything | — | keep the full-list design; if a cursor lands, this row flips to SILENT |
+| **Clock / timezone drift** | mostly loud | `models/schedule.py` resolves IANA zones via `zoneinfo` and normalises to UTC; an unadvanceable cadence **deactivates** the row with `last_status='cadence_error'` rather than looping forever | a source silently `is_active=false` | ⚠ the row is deactivated **and nobody is told** — the source-health surface must render `cadence_error` as a source that stopped, with the one action that fixes it |
+| **Partial failure retried from the start** | ⚠ SILENT + expensive | no durable job today (`SEED-077`): a 9,000-of-10,000 failure restarts at zero, re-embedding 9,000 files at full token price | embedding spend spikes with no new documents | per-file job granularity in `P-QUEUE`; the `content_hash` short-circuit makes a restart cheap **only if the hash check runs before the embed** |
+| **429 / rate limits** | loud at the API, ⚠ **silent to the user** | `BUG-260815-05` already recorded the shape: an embedding-provider 429 surfaced as *"your documents returned nothing"* | files stuck `pending` / `processing` | `Retry-After`-aware backoff + dead-letter (`SEED-077` step 4); a document that exhausted its retries must be **visible and re-queueable**, never stuck |
+| **Token expiry mid-run** | loud if unhandled, ⚠ silent if caught-and-continued | Gmail/Graph access tokens expire hourly; a long first sync will cross it | a sync that always completes ~60 min of work | refresh **inside** the loop (the v3.9 refresh path exists); a refresh failure **aborts and marks the source**, never skips files |
+| **Duplicate ingestion** | ⚠ SILENT **today, by construction** | see Pitfall 9 — the dedup lives in the HTTP handler, not in the ingest function | duplicates visible only to the user | one splice (Pitfall 9) |
+| **A source that has stopped reading** | ⚠ SILENT unless built | revoked OAuth grant, deleted folder, or `SEED-239`'s single malformed `config` row taking the whole connections list to 503 | "why is the assistant answering with old information?" | this is `LIB-10` and it is a **first-class requirement**, not telemetry: what stopped, when, and the one action |
 
-**How to avoid:**
-- **Draft edits mutate ONE draft row in place; versions are minted only at publish.** The model already works this way — `publish_definition` flips draft→published and returns the new version; a Tweak forks a fresh v(N+1) *draft*. Autosave PATCHes the single draft row (debounced), it does NOT create versions. Layout autosave is even cheaper (separate table, Pitfall 3).
-- **Optimistic concurrency on the draft row.** Add a `revision`/`updated_at` token; a PATCH carries the token it read and the server rejects a stale write (409 → the client reloads and re-applies). This is the edit-time analog of the WR-03 publish guard. For v3.6, "second editor gets a soft lock / read-only + a 'someone's editing' banner" is an acceptable first cut; silent clobber is not.
-- **Never publish a dirty draft.** The publish path must snapshot/read the persisted draft, and the golden run must not race an in-flight autosave (reuse the draft-status guard).
-
-**Warning signs:**
-- `workflow_definitions` row count grows on every keystroke/drag.
-- Two testers editing one org-shared workflow lose each other's changes.
-- A publish golden-run occasionally validates a definition that doesn't match what the author sees.
-
-**Phase to address:** Concurrency & Autosave phase (draft-in-place + optimistic token + soft lock), bundled with or immediately after the Round-Trip phase. Its UAT MUST include a parallel-thread / two-editor row (the SC#10 parallel axis is exactly this class of bug).
-
----
-
-### Pitfall 6: SSRF, credential leakage, and cross-tenant credential bleed from user-wired connectors — HARD REQ #3
-
-**What goes wrong:**
-The moment a business user can type a URL (webhook target, "call this API", email/JIRA endpoint) or wire a connector, four classic no-code holes open: (1) **SSRF** — the user (or an attacker who compromised a low-priv account) points a connector at `http://169.254.169.254/…` (cloud metadata), `http://localhost:8000` (our own backend), or an internal service, and the *server* fetches it with server credentials; (2) **credential leakage in run logs / the friendly run view** — an OAuth token or API key echoed into a `delta`/output and shown to the user or persisted in `harness_audit`; (3) **cross-tenant credential bleed** — a connector credential stored without org scoping, so an org-shared workflow run resolves *another org's* token; (4) **data exfil** — a business user wires an untrusted external endpoint and the workflow POSTs the org's KB contents to it. n8n shipped a real CVE where SSRF protection *only applied when a credential was attached* — the exact "we half-protected it" trap.
-
-**Why it happens:**
-Connectors are the app's first outbound-to-arbitrary-URL surface (today ingestion is manual upload only, "no connectors or automated pipelines" — CLAUDE.md). All prior egress is to known providers via the gateway. The threat model for *user-supplied destinations* is brand new, and the multi-tenant + secrets-at-rest machinery (org RLS, Fernet `enc:v1:`) exists but was built for provider keys, not per-connector per-org credentials.
-
-**How to avoid:**
-- **Answer the own-framework-vs-Open-Platform question FIRST, on security grounds.** SEED-013 already frames connectors (REST API + MCP + service accounts + webhooks) with a security posture (per-consumer rate-limit, org-aware permissions as a hard B2B prerequisite, "a service account that can read another org's KB is a customer-loss event"). Building a *second, bespoke* connector framework in the canvas milestone means threat-modeling egress twice and drifting from SEED-013's substrate. **Recommendation for the roadmap: v3.6 ships connectors as a thin, tightly-scoped MVP on the SEED-013/MCP substrate (or defers deep connectors to sequence with Open Platform), NOT a from-scratch canvas-owned connector engine.** Let research/requirements make the call explicitly — but the default should minimize the net-new egress surface.
-- **Egress allow-list + SSRF guard on EVERY outbound fetch, unconditionally.** Resolve the target host, block RFC-1918 / link-local / loopback / metadata IPs, block redirects to them, enforce an operator-managed allow-list of destination domains per org. The guard applies whether or not a credential is attached (the n8n CVE lesson). No user-supplied URL is fetched raw.
-- **Credentials are org-scoped, encrypted, and resolved server-side by reference.** Reuse the Phase-150 Fernet `enc:v1:` at-rest pattern and the org RLS (`workflow_definitions.org_id`, `get_service_role_supabase` *refuses* to construct without an explicit org — that discipline extends to connector credential reads). A phase references a credential by id; the token is injected at execution, never stored in the definition JSONB and never returned to the client.
-- **Secrets never touch logs, audit, or the friendly run view.** A redaction pass on `delta`/output/`harness_audit` metadata; the DeepSeek DSML-leak guard is the precedent for "strip provider-shaped junk before it reaches the user" — a connector-secret redactor is the same shape at the egress boundary.
-- **Rate-limit + abuse controls per org/connector** (Redis token bucket — SEED-013 already specifies this) so one workflow can't hammer JIRA/email into a ban or run up a bill.
-
-**Warning signs:**
-- Any code path does `requests.get(user_supplied_url)` / `httpx` to a host not on an allow-list.
-- A connector credential row has no `org_id`, or is readable by another org in a leak test.
-- A token appears in a log line, an audit metadata blob, or the run view.
-- SSRF protection is conditional on "if credential attached".
-
-**Phase to address:** External Connectors phase — sequenced LAST in the milestone (or split out to Open Platform), each connector-touching phase gets a mandatory `/gsd:secure-phase` SECURITY.md with `threats_open: 0` (the established bar for trust-boundary phases: 146–150/153/154/158/159). Cross-tenant isolation gets a dedicated leak test (the SEED-124/125 org-leak precedent).
+**Phase to address:** the lease and the honest states are `P-WATCH`; the queue/retry/dead-letter is `P-QUEUE` (**ARCH**); the pagination and token rules belong in the **adapter contract** at `P-CONTRACT`, so all four adapters inherit them (see Pitfall 12).
 
 ---
 
-### Pitfall 7: A canvas that's still too technical — or so dumbed-down it can't express a real process (adoption failure)
+### Pitfall 6: First-sync stampede — the enterprise buyer's first action is the one the system has never survived
 
 **What goes wrong:**
-Two opposite misses, both fatal to the "Legal/HR/Finance user draws their own process" goal. (a) **Jargon leak:** the nodes say `llm_agent`, `available_tools`, `skip_to_phase`, `citations_required`, `folder_scope`, `emitter: render_template` — the business user bounces because it reads like the developer's `WorkflowDefinition`, not their process. (b) **Over-simplification:** the vocabulary is so reduced ("Do a thing" → "Get a result") that it can't express branching on a gate, an approval step, a batch-over-documents fan-out, or a template-fill deliverable — so real processes can't be built and users fall back to asking a developer, defeating the milestone.
+`SEED-077` states it flatly: ingestion is an in-process FastAPI `BackgroundTask` per upload (`documents.py:497-498`) with **no durable queue, no concurrency cap, no retry, no resume, no cross-worker coordination**. Under manual upload that is a rare annoyance. Under "connect the Finance drive," one click becomes thousands of concurrent pipelines competing for the same threadpool, the same extraction subprocesses, and a **single OpenAI embeddings endpoint** (`SEED-048` — hardwired, no fallback, no `try/except`).
 
-**Why it happens:**
-The 6 phase types + 9 validator kinds are an *engineering* ontology. Mapping them to business verbs ("Find documents", "Ask the AI", "Get approval", "Produce a report") is real product work that's easy to under-invest in ("we'll just relabel the enum"). Over-simplification happens when the vocabulary is designed from the *simplest* demo, not from the actual PM/Legal/HR processes the engine already runs.
+Compounding, measured in this repo: `embed_texts` passes the **entire** chunk list into one `embeddings.create(input=texts)` call with no batching (`SEED-197`), against a provider cap of 2048 inputs; and `embed_and_store_table_chunks` pairs results with `zip(...)`, which — if a provider ever returned fewer embeddings than inputs — would **drop the surplus chunks with no error and mark the document fully ingested**. That pairing is `SEED-197`'s named latent failure, and a one-line `len()` assertion closes it.
+
+Cost is the other half. Industry write-ups put a 1M-document backfill at roughly **$4,400** of embeddings and, at OpenAI's default TPM limits, ~**87 days** of wall clock ([Barnacle Labs](https://medium.com/barnacle-labs/embeddings-in-production-or-how-nothing-scales-like-youd-expect-it-to-part-1-costs-to-embed-a82482765215)); the recurring lesson is that **a backfill has none of the governors online traffic has** ([TianPan](https://tianpan.co/blog/2026/07/06/the-backfill-that-re-ran-your-entire-ai-bill)). A "re-sync everything" button is a five-figure surprise wearing a friendly label.
 
 **How to avoid:**
-- **Build the business-verb ↔ phase-type map as a first-class, tested artifact, extending existing work.** v3.3 LANG-01 shipped a plain-language layer behind an advanced reveal; SEED-085 is the user-vs-admin terminology split; Phase 124 shipped the workflow "soul" + strict/loose doors. The node vocabulary is the *next* layer on those, not a fresh invention. Every business verb maps deterministically to a phase config; the reveal ("Technical names" ⌥, the Phase 146–148 two-audience pattern) shows the underlying type for whoever wants it.
-- **Validate expressiveness against the REAL shipped workflows.** The PM flagship pack (charter/status-report/risk-register), the curated Starter Library, and the 4 canonical seed shapes must ALL be drawable and readable in the business vocabulary. If a starter can't be expressed, the vocabulary is too thin — that's the acceptance bar, not a hand-picked toy.
-- **AI-seeds, human-refines (both, not either/or).** NL authoring (SEED-051, realized in 103) seeds a draft canvas the user then edits. This hides the hardest part (choosing phase types + wiring) behind plain English, then lets the user adjust visually — the best-of-both the operator asked for. Guard the seam: the AI-seeded draft must pass the SAME server validation as a hand-drawn one (no privileged path).
-- **Sketch-first (G-2) with operator-defined "I'd recognize failure here" scenarios** (G-4) on the canvas, node config, and vocabulary — a real Legal/HR/Finance process is the lived-experience UAT, not a wire-format check.
+- `P-QUEUE` **before** `P-WATCH` reaches anyone real: persist the job before returning, a consumer with a **global + per-user cap**, retry with `Retry-After` backoff, a dead-letter, and resume-on-restart. `SEED-077` names the cheapest first cut (reuse the Redis run-buffer substrate) and it is the right one.
+- Batch inside `embed_texts` (512/request) **in the service, not at call sites**, so every caller inherits it; assert `len(embeddings) == len(texts)` before any `zip`.
+- Embedding **provider fallback** (`SEED-048`) — the multi-provider picker shipped in Phase 111.1; the ingest path must actually use it rather than the hardwired client.
+- **Show cost before spending it.** The preview already splits *will be added / already here / unsupported* — add an estimate (files, chunks, approximate tokens) to the *will be added* arm. That turns the most expensive irreversible action in the product into an informed one.
+- **Never offer an unbounded "re-sync all"** without a typed confirmation naming the file count.
 
-**Warning signs:**
-- A node label or config field shows a raw enum literal (`llm_agent`, `skip_to_phase`) with no plain-language layer.
-- A shipped starter/PM-pack workflow cannot be reconstructed in the canvas.
-- Users in UAT ask "what's a phase / a gate / a whitelist?"
-- The only workflows demoable are 3-node happy paths.
+**Warning signs:** a preview screen with a count but no size; embedding spend moving without new documents; documents stuck `processing` after a deploy; both `WORKER_COUNT=2` workers saturated during a sync.
 
-**Phase to address:** Business Vocabulary + AI-Seeded Canvas phase (after governance + round-trip are solid, so the vocabulary sits on a validated model). G-2 sketch-first is mandatory here.
+**Phase to address:** `P-QUEUE` (**ARCH**); preview economics in `P-WATCH`.
+
+---
+
+### Pitfall 7: pgvector recall degrades as the corpus grows — and this milestone is what makes the corpus grow
+
+**What goes wrong:**
+`SEED-076` is precise: `match_document_chunks` applies the tenant and metadata predicates **inside the same query as the approximate HNSW scan**, with `hnsw.ef_search` at its default of 40 and no per-tenant or partial index. With approximate indexes the filter is applied **after** the fixed candidate batch: if a predicate matches 10% of rows, a default `ef_search=40` yields ~4 surviving rows, and the `LIMIT` is silently under-filled ([ClickHouse](https://clickhouse.com/resources/engineering/scale-vector-search-postgres), [Nile](https://www.thenile.dev/blog/pgvector-080)). The user experience is *"the answer is in a document and the agent didn't find it."* No error, ever.
+
+⚠ **This milestone is the trigger, and it fires twice.** It multiplies corpus size *and* it adds new filter axes — `source_connection_id`, connection visibility, provenance fields — which makes filtered search the **default** retrieval path rather than an occasional one.
+
+**How to avoid:**
+- Adopt **pgvector 0.8 iterative scan** (`SET LOCAL hnsw.iterative_scan = strict_order`, tune `hnsw.max_scan_tuples`, default 20,000). This is the purpose-built fix and it did not exist when `SEED-076` was planted. **Verify the deployed pgvector version first** — local Supabase and cloud Supabase can differ, which is exactly the cloud-parity drift class this project already tracks.
+- Failing that, set `hnsw.ef_search` proportional to filter selectivity.
+- **Build the recall harness before the corpus arrives**, not after: a synthetic multi-connection corpus and a measured recall number. There is no recall test at any scale today, so there will be no way to tell whether a customer complaint is recall or relevance.
+- Instrument the **under-fill signal**: a filtered search returning fewer than `match_count` rows is a measurable event — log it and expose it in Library Health (the Health tab landed in Phase 217.1).
+
+**Warning signs:** searches returning fewer than the requested chunk count; grounding quality falling as the KB grows; "it used to find that."
+
+**Phase to address:** `P-SCALE` (**HARD**) — but the **harness** must exist before the first bulk sync or there is no baseline. Recommend the harness in `P-QUEUE` and the tuning in `P-SCALE`.
+
+---
+
+### Pitfall 8: Lifecycle — ignoring source events is a disclosure; honouring them aggressively is data loss. Both are somebody's shipped default.
+
+**What goes wrong, in both directions:**
+
+*Ignored:* `SEED-210` Problem 2 — a file is deleted, unshared, moved to a restricted library, and **nothing happens**: the row, chunks and embeddings keep answering. A share revoked six months ago still serving answers is the same disclosure as Pitfall 1, with the added property that **nobody is looking for it any more.** The industry's own framing is that entitlements should be synced *more often* than content, because they change more often and matter more ([Truto](https://truto.one/blog/how-to-maintain-document-level-rbac-in-enterprise-rag-pipelines/), [Microsoft ISE](https://devblogs.microsoft.com/ise/sharepoint-doc-level-access/)).
+
+*Honoured too aggressively:* `PROJECT.md` already binds the correct default — *a file removed at the source is NOT removed from the Library unless explicitly asked for* — because a revoked share must never silently delete knowledge the agent depends on. The subtler failure worth naming: **a source-side reorganisation looks exactly like a mass deletion.** Someone moves a SharePoint library, or the OAuth scope narrows, and a naive "not in the listing ⇒ gone" rule purges thousands of documents in one tick. ⚠ Under a cursorless full-list design **a single failed page of pagination is indistinguishable from "these files no longer exist"** — which is why Pitfall 5's first row is a data-loss bug, not merely a completeness bug.
+
+**How to avoid:**
+- **Absence is never an action.** A file missing from a listing sets `source_state = 'not_seen_since <ts>'`. Only an explicit confirmed user action, or *N* consecutive **verified-complete** listings, may escalate.
+- **Separate three verbs and never conflate them:** `retire from retrieval` (stop answering, keep the row — the safe default, and the existing `is_latest=false` mechanism already does exactly this), `soft-delete` (hidden, restorable), `purge` (row + chunks + embeddings + storage object). Only `purge` is irreversible, and only a human may reach it.
+- **Answer the disconnect row explicitly** — `SEED-210` calls it the one undecided policy question and `SEED-072` is its compliance sibling. **Recommendation (an opinion, offered because silence is the failing option):** *on disconnect, FREEZE by default* — retrieval stops immediately (that is the moment a user most expects their data to stop being used), rows and chunks are retained for a stated window (30 days), and the UI offers **Purge now** and **Reconnect to resume** as two named buttons. Freeze is reversible, satisfies the expectation, and does not destroy knowledge on an accidental disconnect. Whatever is chosen, **the sentence belongs on the disconnect confirmation**, not in a doc.
+- ⚠ **Purge must be complete or it is worse than nothing:** `documents` + `document_chunks` + `document_images` + `document_tables` + `document_relationships` + the Storage object. A purge that leaves chunks behind leaves an index answering from a document nobody can find. And `audit_log`/`harness_audit` are deliberately immutable (D-09/D-10), so the erasure-vs-audit tension (`SEED-072`) must be answered here rather than discovered at a GDPR request.
+
+**Warning signs:** a sync run whose delete count is a large fraction of the corpus; any code path where "not in listing" leads directly to `DELETE`; a disconnect dialog with no consequence sentence; a purge that does not enumerate every child table.
+
+**Phase to address:** `P-LIFECYCLE` (**ARCH decision at scoping, built in-phase**). The `source_state` column is `P-PERM` / `P-CONTRACT` schema.
+
+---
+
+### Pitfall 9: The retrofit — the existing upload path already has **two doors**, and only one of them dedups
+
+**What goes wrong (measured in this repo, 2026-09-04 — the highest-confidence pitfall in this document):**
+
+The manual-upload path's protections are **not in the ingest function. They are in the HTTP handler.**
+
+- `upload_document` (`backend/app/api/documents.py:547`) computes `content_hash` at **`:620`**, runs the folder-scoped dedup SELECT at **`:624-640`**, and does the filename→`version_number` bump with the `is_latest=false` cascade at **`:643-663`**.
+- `ingest_document` (`:2030`) — the function a sync adapter would naturally reuse — contains the classification splice (`:2469`), the multimodal extraction and the metadata write, **but none of the dedup or versioning.**
+- ⚠ **The precedent already exists in-tree.** The Phase 203 email-attachment cascade inside `ingest_document` (`:2405-2417`) inserts a `documents` row with a computed `content_hash` and **no dedup check at all** — a second ingest door that skips the first door's protection. The whole cascade is wrapped in `except Exception: log.warning(...)` (`:2443`), so a failure part-way through **abandons the remaining attachments with a warning line and no user-visible signal**.
+- The real backstop is a **database** unique index: `documents_dedup_idx ON (user_id, content_hash, COALESCE(folder_id, '000…')) WHERE status <> 'failed'` (`full-schema.sql:3021`). ⚠ *Inference, not measured:* two different emails carrying the identical attachment would collide in that index (both `folder_id IS NULL`), raise inside the unguarded insert, and be swallowed by the broad handler — **losing the remaining attachments silently.** One test reproduces or refutes this; it is worth writing either way.
+
+**Why it happens:** every protection was added at the door that existed. Nobody wrote them at the door that did not.
+
+**How to avoid:**
+- **`P-CONTRACT` is a refactor phase before it is a feature phase.** Extract `hash → dedup → version → splice` out of `upload_document` into a service (`ingestion_splice.py`) that **both** the HTTP handler and every adapter call. `documents.py` is 2,535 lines and a G-5-firing hot file that had no ledger row until 217.1 — this extraction is owed anyway.
+- Make the contract's dedup key an explicit decision, because the upload key does not transfer. Upload dedups on `(user_id, content_hash, folder_id)`. A synced file also needs a **source identity** — `(connection_id, external_id)` — because the same file renamed at the source is *the same document*, and two different source files with identical bytes are *not necessarily* one document. `SEED-209`'s identity key is this decision.
+- **Prove the two doors agree** with a test that pushes the same bytes through both paths and asserts identical rows. That test is the only mechanically enforceable version of the "one ingest splice" rule.
+
+**Warning signs:** a sync adapter that calls `supabase.table("documents").insert(...)` directly; a plan whose `files_modified` adds ingestion logic to a new module without touching `documents.py`; duplicates appearing only for synced sources; `23505` in the logs.
+
+**Phase to address:** `P-CONTRACT` (**ARCH**, and a **prerequisite**, not a parallel task).
+
+---
+
+### Pitfall 10: Guarantees that hold at the door people watch and not at the door the volume comes through
+
+**What goes wrong:** `SEED-209` names it exactly — *"a guarantee that covers the door people watch and not the door the volume comes through."* Concretely, everything below currently lives inside `upload_document`, or inside `ingest_document`'s upload-shaped assumptions, and each is invisible-if-skipped, because the documents *do* appear, merely un-processed:
+
+| Guarantee | Where it lives | What "skipped" looks like |
+|---|---|---|
+| Classification rule eval | `ingest_document:2469` | documents arrive **unclassified**; rules "work" for 40 manual uploads and not for 40,000 synced ones |
+| Custom-metadata extraction + per-field confidence | the metadata pass in `ingest_document` | ConfidenceChips absent on exactly the documents nobody reviewed |
+| MIME allow-list + `_EXT_MIME_OVERRIDES` for lying senders | handler + attachment cascade (**two copies already**) | a **third** copy for sync = three notions of "a file we accept" |
+| 50 MB body limit / attachment count caps | `upload_document` + `email_extraction_service` | unbounded memory on a large source file — see below |
+| Folder-ownership check | `upload_document:603-618` | a sync writing into a folder the connection owner does not own |
+| Storage-upload-failure ⇒ no row | attachment cascade `:2392-2404` | rows whose `file_path` points at nothing, indistinguishable from real ones until read |
+
+**Unbounded memory deserves its own line.** `content_hash = hashlib.sha256(raw)` needs the **whole file in memory**, and extraction does too. A user's Drive contains a 2 GB video and a 400 MB PST their laptop never opened. Manual upload is bounded by a human's patience and a 50 MB check; a sync is bounded by nothing.
+
+**How to avoid:** the same extraction as Pitfall 9 — one splice, one MIME policy, one size policy, one folder check — plus a **size/type refusal in the lister, before the download**, so an oversized file becomes a *"type not supported / too large"* row in the preview (an arm the preview already has) instead of an OOM in a worker. Stream-hash where the adapter can. ⚠ Prefer the **provider's own** checksum/`modifiedTime` for the *has it changed?* test, and compute `content_hash` only for files that will actually be ingested.
+
+**Warning signs:** synced documents with empty metadata; a rules surface whose match count is implausibly low; worker RSS spikes during sync; classification rules that "don't seem to do anything."
+
+**Phase to address:** `P-CONTRACT` (**ARCH**) for the splice; the preview's refusal arm in `P-WATCH`; rule semantics in `P-RULES`.
+
+---
+
+### Pitfall 11: Email is a second **shape**, and the mistake shows up as *dedup and retrieval poisoning*, not as a broken adapter
+
+**What goes wrong:** `PROJECT.md` already flags this at intake, so the useful contribution is **how it manifests**. The adapter will work. The corpus will be wrong.
+
+1. **No stable document boundary.** Is a document a message, a thread, or a thread-so-far? Choose *message* and the answer to "what did we agree with the vendor?" is scattered over 14 rows. Choose *thread* and the document **changes every time someone replies** — its `content_hash` changes, so it re-embeds, so its version number climbs forever, and a versioning model built for *a person uploading v2 of a contract* becomes noise.
+2. **Quoted-reply duplication poisons dedup and retrieval.** A 14-message thread contains message 1 fourteen times. Hash dedup never fires (each body differs by the accreted quote block); the index holds fourteen near-identical chunks; retrieval returns the same paragraph fourteen times and crowds out everything else. The standard advice is exactly this — **strip signatures and quoted chains before embedding** ([Nylas](https://cli.nylas.com/guides/rag-over-email)). ⭐ **This app already has the tool**: `email_extraction_service` was built in Phase 203 to strip quoted reply/forwarding chains. So the pitfall is not *building* it — it is **failing to route the sync path through it** (Pitfall 9 again).
+3. **The dedup facts exist and are read by nothing.** The v3.8 audit already recorded that *email thread dedup is stored and read by nothing*, and `email_extraction_service` parses `message_id` (`:281`, `:377`) which is never used as an identity key. ⚠ A synced mailbox is the first path on which that becomes a live defect rather than dead data. `Message-ID` / `In-Reply-To` / `References` are the correct thread identity and they are already parsed.
+4. **Attachments-as-children multiply everything.** The cascade exists (a `documents` row + an `attached_to` relationship) with caps of 50 attachments / 25 MB. A 20,000-message mailbox carries a long attachment tail, each one its own document, extraction and embedding job — **and the same attachment appears in every message of the thread.**
+5. **Signature/footer noise** — confidentiality boilerplate is the single most-repeated text in any corpus and will win the similarity search for "confidential."
+6. **The permission shape does not match.** A mailbox has no ACL to flatten; its content is one person's private correspondence. Connection-scoped visibility maps *better* here than for Drive — but a mailbox connected by an admin and then made org-visible is a far worse disclosure than a drive, because nobody ever "shared" any of it.
+
+**How to avoid:** ⭐ **Do not ship mail as the fourth adapter in the same phase as the three file adapters.** Ship Drive / OneDrive / MCP-file on the file shape, prove the contract holds across three, **then** take mail as its own phase with its own boundary decision. Recommended v1 boundary (an opinion): **the thread is the document, the newest message is the version, quoted chains and signatures are stripped before hashing and embedding, the `Message-ID` set is the identity, attachments are children deduped by their own `content_hash`.** And re-read `SEED-212` before writing it — transcripts are the same class of problem, and one boundary decision made for both is worth more than two.
+
+**Warning signs:** the same paragraph returned three times in one retrieval set; email documents whose `version_number` climbs weekly; a plan that lists mail alongside Drive as "one more adapter."
+
+**Phase to address:** `P-MAIL` — **last**, and explicitly a shape decision, not an adapter task.
+
+---
+
+### Pitfall 12: "Four adapters" becomes "four codebases" — and the mechanism is the *exception*, never the design
+
+**What goes wrong:** Everyone starts with the right abstraction. It dies one reasonable exception at a time. Graph needs a delta token, so a `cursor` field appears. Drive shared-drive listing needs `includeItemsFromAllDrives`, so an options bag appears. Mail has no path, so `path` becomes optional. MCP servers vary, so a `capabilities` probe appears. Six months later the "generic contract" is a dataclass every adapter ignores, and the *scheduler* has four branches on `provider`. `PROJECT.md`'s constraint is the right one — *"if each source family grows its own ingest path, this is four milestones wearing one name"* — but a constraint stated in prose is precisely what this project has repeatedly measured as unenforceable.
+
+**What forces it to hold (concrete, in rough order of power):**
+1. **A third implementation, early.** Two adapters can share an interface by coincidence. Build **MCP-file second, not last** — it is the most alien of the three file sources, and it is what proves the contract rather than the pair.
+2. **The adapter returns data, never behaviour.** `list() -> Iterable[SourceItem]` where `SourceItem` is `{external_id, name, path, size, mime, remote_checksum, modified_at, parent_id}`, and `read(external_id) -> bytes`. **Everything else — hashing, dedup, versioning, classification, chunking, embedding, retry, the queue, the audit row — lives once, above the adapter.** This is the same verdict the v3.9 outbound side already reached (a connection is data: identity + auth + discovered tools + grants).
+3. **The generic layer owns pagination, backoff and token refresh** (see Pitfall 5). If each adapter implements its own retry, one adapter's 429 handling is right and three are wrong, and you will not know which.
+4. **A grep-able fence in CI:** no `provider ==` / `isinstance(adapter, …)` branch outside `adapters/`. This project already ships bespoke gate scripts (`check-deploy-drift.sh`, `check-gap-closure-rounds.cjs`, `check-claude-md-size.cjs`); one more is cheap and is the only thing that fires in the turn the exception is authored.
+5. **One conformance suite parameterised over every adapter**, including a fake. A new source family that cannot pass it is not a new source family.
+6. **Adding a source should add rows, not code.** Where an adapter needs configuration (scopes, roots, page size), it is a **row** — v3.9's shipped verdict, applied inbound.
+
+**Warning signs:** the third adapter's PR modifies files in the shared layer; `if provider ==` anywhere outside `adapters/`; an adapter importing `supabase` or `embedding_service`; the contract dataclass growing optional fields whose only consumer is one adapter.
+
+**Phase to address:** `P-CONTRACT` (**ARCH**) — and the fence must be committed **with the second adapter**, not after the fourth.
+
+---
+
+### Pitfall 13: `SEED-239`'s blast radius, applied to a background watcher
+
+**What goes wrong:** `list_connections` validates each row inside a list comprehension against an `extra='forbid'` union, so **one malformed `config` key answers 503 for every connection in the org** — measured live on 2026-09-01 (nine connections, one bad key, whole page dead). A watcher amplifies that from a page failure into a **silent ingestion outage**: every source stops reading, and the only symptom is stale answers. It is likeliest exactly when a migration is applied in one environment and not the other — the cloud-parity state this project already tracks as its #1 deploy gotcha.
+
+**How to avoid:** validate per row; a bad row degrades to an honest single-row error and **must not read as "this connection is fine."** In the watcher, a source that cannot be loaded is a source that has **stopped**, surfaced through the same `LIB-10` state as a revoked token.
+
+**Warning signs:** "Could not load connections" while individual connections are demonstrably fine; a sync that stops across all sources simultaneously after a deploy.
+
+**Phase to address:** `P-WATCH` (fold `SEED-239`), or `P-CONTRACT` if the watcher reads connections directly.
 
 ---
 
 ## Technical Debt Patterns
 
-Shortcuts that seem reasonable but create long-term problems.
-
 | Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
-|----------|-------------------|----------------|-----------------|
-| Port validation rules to client TS for instant canvas feedback | Snappy UX, no round-trip | Drifts from `lint_workflow`/gauntlet; "can't draw invalid" becomes false; publish-wall of jargon | **Never** for rule *definition*. Client may cache/render server-computed errors only. |
-| Store node layout inside `WorkflowDefinition` JSONB | One blob, one save | 422s on `extra="forbid"` or forces relaxing the injection guard; cosmetic drags mint versions/re-arm gauntlet | **Never.** Separate layout column/table, engine never reads it. |
-| Autosave = new definition version | Simple undo/history | Version explosion; immutability semantics blur; publish reads dirty draft | **Never.** PATCH one draft row; version only at publish. |
-| Friendly run view listens only to happy-path events | Simplest UI | Shows "done" on `gate_failed`/`run_failed`; business user ships broken deliverable | **Never.** Total function over the full event set. |
-| Build a bespoke canvas-owned connector framework | Ships in-milestone, no cross-team seq | Two egress threat models to maintain; drifts from SEED-013/MCP substrate; double the SSRF/credential surface | Only if research explicitly rejects the Open-Platform substrate AND scope is a tightly-guarded MVP. |
-| Trust Realtime's last pushed event for run state | No fetch on reconnect | Stale "still running" after a failure (D-v2.5-03 violation) | **Never.** Reconcile-on-fetch, then tail. |
-| Relax `extra="forbid"` to accept canvas metadata | Fewer 422s during dev | Re-opens T-090-01 injection guard on the engine's input | **Never.** Keep new fields additive-nullable + typed. |
-| Undo/redo as ad-hoc client state snapshots | Quick to build | Diverges from the persisted draft; undo "un-saves" server state incorrectly; corrupts round-trip | Only if undo operates on the same canvas→definition model that's persisted; test undo→save→reload. |
-
----
+|---|---|---|---|
+| Sync writes `documents` rows directly instead of through the shared splice | ships the first adapter in a day | classification, metadata, MIME policy, size caps and dedup silently do not apply to 99% of the corpus; unfixable without a re-ingest | **never** — this is the milestone's binding rule (`SEED-209`) |
+| Visibility inferred from folder placement (today's behaviour) | zero schema change | rules become an authorization surface (Pitfall 1); disclosure with no audit trail | **never** for connection-sourced documents |
+| Deferring the durable queue "until we see load" | one phase saved | the load event *is* the customer's first day; work is lost on restart with no resume | **never** for the sync path. Acceptable to leave the *manual upload* path on `BackgroundTask` **only if** it delegates to the same queue |
+| Per-adapter retry/backoff | each adapter ships independently | four retry policies, three of them wrong, no single place to fix a 429 | only inside `adapters/` for **provider-specific error mapping**, never for the policy |
+| No `source_principals` column because Option 3 does not need it | smaller schema | `SEED-211` becomes a re-ingest instead of a backfill | **never** — a nullable unread column is free insurance |
+| Prompt-level anti-injection with no adversarial test | already written, feels done | `SEED-188` exactly: a defense with no counterfactual, degrading silently across model and provider upgrades | acceptable **only** while write tools are fenced out of turns containing external content |
+| "Not in the source listing ⇒ delete" | keeps the Library tidy | one bad pagination page destroys a corpus (Pitfalls 5, 8) | **never** |
+| Treating mail as the fourth adapter | one phase instead of two | corpus poisoned by quoted duplication; version churn; dedup that can never fire | **never** — split the phase |
+| Unbounded "Re-sync everything" button | trivially implemented; users ask for it | full-price re-embedding of the whole corpus, unbounded and uncapped | only behind a typed confirmation showing file + token count |
+| Sync worker running as a service identity | simpler credentials | a sync that retrieves and writes across tenants | **never** — stamp the connection owner, as `launch_scheduled_run` already does for runs |
 
 ## Integration Gotchas
 
-Common mistakes when connecting to external services (the connector track).
-
 | Integration | Common Mistake | Correct Approach |
-|-------------|----------------|------------------|
-| User-supplied webhook / API URL | Fetch it server-side raw; SSRF to metadata/internal (n8n CVE: guarded only when credential attached) | Unconditional SSRF guard + per-org destination allow-list; block RFC-1918/link-local/loopback/redirects; fetch nothing off-list. |
-| Email / JIRA / OAuth tokens | Store in the definition or a global credential table; return to client | Org-scoped credential store, Fernet `enc:v1:` at rest (Phase-150 pattern); reference by id; inject at execution; never in JSONB/client. |
-| Cross-org shared workflow with a connector | Resolve credential without org scoping → cross-tenant bleed | Resolve credentials via the org-requiring service-role path (`get_service_role_supabase` refuses without org); dedicated cross-org leak test. |
-| Outbound run logs / audit | Token echoed into `delta`/output/`harness_audit` metadata | Redaction pass at the egress boundary (DeepSeek-DSML-strip precedent); secrets never logged/audited/shown. |
-| Rate limits / provider bans | Unbounded connector calls per run | Redis token-bucket per org/connector (SEED-013 spec); operator-tunable defaults. |
-| MCP as the connector substrate | Assume MCP spec is stable | Pin the MCP spec version; plan a deprecation cycle (SEED-013 risk note). |
-| Blocking connector I/O in an async handler | `httpx`/`requests` on the event loop → stalls all workers | Wrap blocking connector calls in `run_in_threadpool` (D-v2.5-01) or use an async client end-to-end. |
-
----
+|---|---|---|
+| **Google Drive** | treating an empty page as end-of-list | only a **missing** `nextPageToken` ends a listing — Drive intermittently returns an empty page with a non-null token on shared drives ([issuetracker 406305173](https://issuetracker.google.com/issues/406305173)) |
+| **Google Drive** | listing "my drive" and missing shared drives | `includeItemsFromAllDrives` + `supportsAllDrives`; treat each shared drive as its own connection scope |
+| **Google Drive** | trying to `read` a native Doc/Sheet/Slide | native types have **no bytes** — they must be *exported* to a MIME type, and the export has no stable checksum, so `modifiedTime`/`version` is the change signal, not the hash |
+| **Microsoft Graph** | assuming a delta token has a TTL you can rely on | there is **no published TTL** for driveItems; `410 resyncRequired` is a **normal recovery path**, not an exception — full resync, and stagger schedules to avoid synchronised token refresh ([MS Q&A](https://learn.microsoft.com/en-us/answers/questions/5856875/microsoft-graph-delta-api-clarification-on-delta-t)) |
+| **Microsoft Graph** | one connection = one tenant | a SharePoint *site*, a *drive* and a *list* are different delta surfaces with different behaviour; scope a connection to one |
+| **Gmail** | storing `historyId` and never handling its expiry | `history.list` answers **404** when the id is too old (typically days, up to ~30) → fall back to full sync; **both** code paths are mandatory ([Google](https://developers.google.com/workspace/gmail/api/guides/sync)) |
+| **Gmail / Graph mail** | hourly access-token expiry mid-run | refresh **inside** the sync loop; a refresh failure aborts and marks the source rather than skipping messages |
+| **MCP file surface** | trusting tool descriptions and returned content as instructions | MCP content is untrusted by definition (Pitfall 4, GitHub-MCP class); a file surface is `list`/`read` **only** — never grant a write tool to the watcher's credential |
+| **MCP** | assuming every server exposes the same file semantics | probe capabilities once at connect, store the result as a **row**, and refuse a source whose surface does not satisfy the contract — with a stated reason |
+| **All four** | per-adapter 429 handling | one `Retry-After`-aware policy in the generic layer; adapters only map provider errors into the shared taxonomy |
+| **Embeddings provider** | one unbatched request per document | batch at 512 inside `embed_texts`; assert `len(embeddings) == len(texts)` before any `zip` (`SEED-197`) |
+| **Supabase / pgvector** | assuming local and cloud carry the same pgvector version | verify before relying on `hnsw.iterative_scan`; the local↔cloud parity checklist exists and this is a new line on it |
 
 ## Performance Traps
 
-Patterns that work at small scale but fail as usage grows.
-
-| Trap | Symptoms | Prevention | When It Breaks |
-|------|----------|------------|----------------|
-| Non-memoized React-Flow nodes/edges | Whole canvas re-renders on any state change or single-node drag; drag jank | `React.memo` custom nodes, `useCallback` handlers, node/edge components declared outside parent; only the moved node + its edges re-render | Noticeable ~50 nodes; painful 100–200 |
-| Validate-on-every-drag round-trips | Server hammered; laggy feedback | Debounce (~300–500ms) the `POST /workflows/validate`; validate on settle, not per pixel | Any real-time drag with server validation |
-| Heavy node CSS (shadows/gradients/animations) | Slow paint at scale | Keep node styles lean; reserve glassmorphic/animated flourishes for idle, not during drag | 100+ nodes |
-| Loading full definition + layout + grounding eagerly | Slow canvas open on large workflows | Load definition first (renders spine), fetch grounding/layout async; auto-layout when absent | Large definitions / many folders/skills in grounding |
-| Multi-tenant fan-out (org-shared workflows list) | N+1 or unindexed org queries; slow Workflows page per org | Indexed `org_id` reads (RLS already scopes); paginate; the SEED-013 per-consumer concern applies | Many orgs × many workflows |
-| Golden-run gauntlet on cosmetic edits | Real LLM run fires on a node move | Layout writes bypass versioning entirely (Pitfall 3); gauntlet only on explicit publish | Any autosave that touches the definition |
-
----
+| Trap | Symptoms | Prevention | When it breaks |
+|---|---|---|---|
+| First-sync stampede | all workers saturated; uploads queue behind a sync; documents stuck `pending` | durable queue + global/per-user concurrency cap (`SEED-077`) | **the first real customer connection** — a few thousand files |
+| Unbatched `embed_texts` | provider 400 mentioning an input/array limit | batch at 512 inside the service | > 2048 chunks in one document — a large spreadsheet reaches it (`SEED-197`) |
+| Embedding SPOF | a provider 429 surfaces as *"your documents returned nothing"* (`BUG-260815-05`) | fallback provider + backoff + dead-letter (`SEED-048`) | any provider incident during a bulk sync |
+| Filtered-HNSW recall collapse | fewer than `match_count` chunks returned; "the answer is in a doc and it didn't find it" | `hnsw.iterative_scan` / `ef_search`; a recall harness with a baseline | when any one connection owns a small fraction of `document_chunks` — i.e. **on success** |
+| Whole-file-in-memory hashing + extraction | worker RSS spikes; an OOM kill mid-sync loses all in-flight work | size/type refusal in the **lister**, before download; stream where possible | a single 500 MB file in a watched folder |
+| Overlapping schedule runs | duplicate jobs; `23505` storms; doubled spend | per-source lease in the claim transaction | when a sync exceeds its interval — i.e. **on the first sync** |
+| Attachment fan-out from mail | document count 5–10× the message count | dedup attachments by `content_hash` across the mailbox; cap per thread | a 20k-message mailbox |
+| Re-embedding on every poll | steady embedding spend against a static corpus | change-detect on the **provider's** checksum/`modifiedTime` first; hash only candidates | immediately, and silently — it looks like normal usage |
 
 ## Security Mistakes
 
-Domain-specific security issues beyond general web security.
-
 | Mistake | Risk | Prevention |
-|---------|------|------------|
-| Client-side-only whitelist / gate enforcement | Business user (or attacker) submits a definition bypassing tool whitelist / grounding | ALL enforcement server-side (`_check_grounding_fidelity`, `lint_workflow`, gauntlet); canvas can only *display* server verdicts. |
-| New routes not flag-gated | Canvas/connector endpoints reachable with flag off → un-reverted attack surface | Byte-identical-404 gate on every new route (Phase-146 `require_operator` pattern). |
-| Connector SSRF (guarded only with credential) | Metadata theft, internal enumeration, RCE (n8n CVE class) | Unconditional SSRF guard + allow-list on every outbound fetch. |
-| Cross-org credential / KB bleed via shared workflow | Customer-loss event (SEED-013); org A reads org B's tokens/KB | Org-scoped everything; `get_service_role_supabase` requires org; leak test per connector (SEED-124/125 precedent). |
-| Secret leakage in run view / audit / logs | Token exfil to the user or persisted | Redaction at egress; secrets referenced-not-embedded; never in `definition` JSONB. |
-| Relaxing `extra="forbid"` for canvas keys | Re-opens injection into the engine's typed input (T-090-01) | Keep strict; canvas metadata lives outside the definition model. |
-| AI-seeded draft on a privileged path | NL seed skips the grounding/lint gate a hand-drawn one passes | AI-seeded and hand-drawn drafts pass the IDENTICAL server validation. |
-
----
+|---|---|---|
+| Placing synced documents in an org-shared folder | org-wide disclosure of content only the connecting user could read | narrower-of-two visibility; refuse widening moves (Pitfall 1) |
+| No retrieval audit for connection-sourced documents | the disclosure is undetectable and unprovable after the fact | an `audit_log` row per retrieval hit on a `source_connection_id` document (Pitfall 3) |
+| Write-capable connector tools live in a session that retrieved external content | the lethal trifecta; the EchoLeak / AgentFlayer / ShadowLeak / GitHub-MCP class | fence: external content in the retrieval set ⇒ writes require the shipped per-call approval |
+| Trusting the written anti-injection discipline | `SEED-188` — a defense with no counterfactual, unproven cross-provider | adversarial corpus, driven on the full native roster, planted **in a synced document** |
+| Not stripping hidden text / white-on-white / zero-width at extraction | the exact payload vehicle in ShadowLeak and AgentFlayer | strip at extraction; treat as hygiene, **never** as the control |
+| Source deletion/revocation ignored | a revoked share still answering months later, unwatched | `source_state`; retire-from-retrieval on confirmed revocation |
+| Connection disconnected, data retained silently | the moment a user most expects their data to stop being used | freeze-by-default + a stated sentence + Purge now (Pitfall 8) |
+| Partial purge | an index answering from a document nobody can find | enumerate every child table + Storage; test it |
+| Ingesting a source with no DLP pass | `SEED-079` — PII flows verbatim into chunks, prompts, third-party providers and LangSmith traces (**tracing is on by default**) | at minimum, make the trace/egress exposure an explicit documented decision for connection-sourced content **before** the first sync |
+| Service-role / system identity for the sync worker | a sync running as "the system" retrieves and writes across tenants | stamp every ingest with the connection owner, exactly as `launch_scheduled_run` stamps runs |
 
 ## UX Pitfalls
 
-Common user experience mistakes in this domain.
-
-| Pitfall | User Impact | Better Approach |
-|---------|-------------|-----------------|
-| Jargon leak (`llm_agent`, `skip_to_phase`, `folder_scope`) | Business user bounces; "this isn't for me" | Business-verb vocabulary + ⌥ Technical-names reveal (LANG-01 / SEED-085 / two-audience pattern). |
-| Over-simplified vocabulary | Can't express approval/branch/fan-out/template-fill; users fall back to devs | Validate expressiveness against PM pack + Starter Library + 4 seed shapes as the bar. |
-| Dishonest "done" on a failed gate | Ships a broken deliverable trusting the green check | Plain-language failure state ("The approval step didn't pass — here's why") + raw reveal. |
-| Publish-wall after 20 min of drawing | Frustration; wasted work | Live in-canvas validation (server-computed) surfaces errors on nodes as you build. |
-| Silent clobber on shared-workflow co-edit | Lost work, distrust | Soft lock / optimistic token + "someone's editing" banner. |
-| Overlapping nodes at origin on import | Looks broken on first open | Deterministic auto-layout when no saved layout (NL/starter/existing-door definitions). |
-| Overwhelming the run view with sub-agent chatter | Cognitive overload | Aggregate progress per node ("Reviewing 5 documents…"), raw detail behind a reveal. |
-
----
+| Pitfall | User impact | Better approach |
+|---|---|---|
+| Saying "instantly" or "on change" | a user believes a file appears when saved; it appears up to N minutes later, and they conclude the product is broken | ⚠ **already binding:** *"checked every N minutes"*, and the sentence changes in the same commit a webhook lands |
+| A silent source | stale answers delivered with full confidence — the worst failure a knowledge product has | `LIB-10`: what stopped, when, and the one action that fixes it |
+| A preview that is only a count | the most expensive irreversible action in the product is taken blind | the three-way split (**already in scope**) plus a size/token estimate on the *will be added* arm |
+| Visibility explained in a settings doc | nobody reads it; the security review finds it | one sentence at connect time, in the flow, next to the button |
+| Progress shown as a spinner | a 4-hour first sync looks hung | *"2,140 of 12,431 — about 40 minutes left"*. ⚠ Note `DocumentUpload.tsx` reports **no byte progress** (`onUploadProgress` absent), so per-file percentage is unknowable — count files, not bytes |
+| Sync failures visible only in logs | the user learns from a wrong answer | a per-source failure count with the failing files nameable and re-queueable (the dead-letter as a **surface**) |
+| Disconnect with no consequence sentence | data silently retained, or silently destroyed; either is a complaint | name the outcome on the confirm and offer the alternative |
+| Duplicates visible in the Library | trust collapses instantly and permanently | the *already here* arm of the preview is the user-facing proof that dedup works — make it a real `content_hash` lookup, as specified |
 
 ## "Looks Done But Isn't" Checklist
 
-Things that appear complete but are missing critical pieces.
-
-- [ ] **Feature flag:** UI hides when off — but verify NO non-nullable migration, all new routes 404, both existing doors + run surface byte-identical, old published workflows still run. `test_revert_byte_identical` green.
-- [ ] **In-canvas validation:** shows errors — but verify it calls the server `lint_workflow`/`model_validate`, not a client re-implementation; a canvas-"valid" workflow actually publishes.
-- [ ] **Round-trip:** canvas opens a workflow — but verify `definition → canvas → definition` is byte-identical (definition half), layout is in a separate store, and a node move does NOT mint a version.
-- [ ] **Run view:** shows progress — but verify `gate_failed`/`run_failed` render as *failed* (not omitted), reconnect reconciles-on-fetch (not stale hint), sub-agent events aren't mis-mapped to nodes.
-- [ ] **Vocabulary:** nodes have friendly labels — but verify every PM-pack + Starter workflow is drawable/readable, and a Technical-names reveal exists.
-- [ ] **Connectors:** email/JIRA works in a demo — but verify SSRF guard fires unconditionally, credentials are org-scoped + encrypted + never logged, cross-org leak test passes, rate-limit exists.
-- [ ] **Concurrency:** autosave works solo — but verify two editors on one org-shared workflow don't clobber, and publish can't read a dirty draft.
-- [ ] **Perf:** smooth at 10 nodes — but verify memoization holds at 100–200 nodes and validate-on-drag is debounced.
-
----
+- [ ] **Sync ingestion:** often missing the classification splice — verify a synced document carries a `_classification` suggestion and custom-metadata confidence, not just text
+- [ ] **Dedup:** often only in the HTTP handler — verify the same bytes through the upload door and the sync door produce **one** row, by test
+- [ ] **Versioning:** often untested for the source-side rename — verify a rename at source does not create a second document, and an edit at source does not create a hundred
+- [ ] **Connection-scoped visibility:** often enforced in the API and not in RLS — verify a **direct** Postgres query as another user cannot read a connection's documents
+- [ ] **Rules routing:** often can widen visibility — verify a rule targeting an org-shared folder does **not** auto-move a private-connection document
+- [ ] **The watch loop:** often has no overlap guard — verify two ticks 1s apart with a slow source produce **one** sync
+- [ ] **Pagination:** often stops on an empty page — verify the lister continues while a `nextPageToken` exists
+- [ ] **Restart resume:** often untested — verify a worker kill mid-sync leaves zero documents stuck `processing` after restart
+- [ ] **Token refresh:** often only tested at request time — verify a refresh **during** a long sync
+- [ ] **Deletion:** often propagates — verify a file removed at source does **not** delete the Library row, and *does* change `source_state`
+- [ ] **Disconnect:** often does nothing — verify retrieval stops immediately and the UI said it would
+- [ ] **Purge:** often partial — verify `document_chunks`, `document_images`, `document_tables`, `document_relationships` and the Storage object are all gone
+- [ ] **Prompt injection:** often "handled" by a system-prompt sentence — verify a planted payload in a **synced** document fails to trigger a write tool, on **every** provider in the roster
+- [ ] **Audit:** often covers writes only — verify a retrieval hit on a connection-sourced document produces an `audit_log` row
+- [ ] **Email:** often ingests quoted chains — verify a 10-message thread produces one document without ten copies of message 1
+- [ ] **The abstraction:** often already broken — verify no `provider ==` branch exists outside `adapters/`, and that the conformance suite runs against all four
 
 ## Recovery Strategies
 
-When pitfalls occur despite prevention, how to recover.
-
-| Pitfall | Recovery Cost | Recovery Steps |
-|---------|---------------|----------------|
-| Flag-off not byte-identical (bad migration shipped) | HIGH | If the migration is additive-nullable it's usually harmless; if it changed/NOT-NULLed a column, forward-fix with a compensating additive migration (never a `db reset`); add the missing `test_revert_byte_identical` and re-baseline. |
-| Client validation drifted from server | MEDIUM | Delete the client rules; route the canvas to the server `validate` endpoint; add a "canvas-valid ⟺ publishable" contract test. |
-| Layout co-mingled into definition | MEDIUM | Migration to split layout into its own column/table; strip layout keys from existing `definition` JSONB; restore `extra="forbid"` if it was relaxed. |
-| Dishonest run view shipped | MEDIUM | Rebuild node-state as a total function over all events; add a per-event-type mapping test; force reconcile-on-fetch. |
-| Version explosion from autosave | MEDIUM | Migration to collapse draft history to one row per draft; switch autosave to in-place PATCH; version only at publish. |
-| Connector SSRF / credential leak found | HIGH | Kill-switch the connector capability (operator kill-switch grid exists, Phase 146–148); add the SSRF guard + org-scoping + redaction; rotate any exposed credentials; leak test before re-enable. |
-| Cross-org credential bleed | HIGH (trust) | Immediate kill-switch; audit which orgs were exposed; org-scope the credential store; notify per the operator audit trail. |
-
----
+| Pitfall | Recovery cost | Recovery steps |
+|---|---|---|
+| Synced documents flattened into an over-broad visibility | **HIGH** | retire the connection's documents from retrieval immediately (one predicate — which is why the column must exist); query the retrieval audit for who was answered from them; disclose; re-scope; only then re-enable |
+| Sync bypassed the ingest splice | **HIGH — a re-ingest, not a migration** (`SEED-210`'s own warning) | route the splice; re-run classification + metadata over affected rows; **the embeddings survive** if chunking did not change — the one thing that keeps this from being catastrophic |
+| Duplicates in the corpus | MEDIUM | group by `(user_id, content_hash)`, keep the oldest, retire the rest via `is_latest=false` (never delete — a relationship or a citation may point at it) |
+| Prompt-injection incident with a write tool | **HIGH** | revoke the connection's grants; the shipped outbound audit receipts give the full list of what was sent and where; disable auto-approval globally (the kill-switch grid exists); *then* build the corpus |
+| Source deletions silently propagated (data loss) | MEDIUM→HIGH | recoverable only if `purge` was never reached — which is why the three verbs are separate and only a human may purge |
+| Embedding cost blowout | LOW (money) / MEDIUM (trust) | cap first, explain second; a per-connection spend counter next to the file count prevents the repeat |
+| Recall degradation discovered late | MEDIUM | enable iterative scan / raise `ef_search` — a config change, not a re-index — **but only if a baseline exists**, which is why the harness is a prerequisite |
+| Four codebases | **HIGHEST of all — it is a milestone, not a fix** | the only cheap moment is before the second adapter merges |
 
 ## Pitfall-to-Phase Mapping
 
-How roadmap phases should address these pitfalls. (Phase *topics*, not final numbers — the roadmapper assigns numbers; ordering rationale is load-bearing.)
+| # | Pitfall | Slot | Kind | Verification that prevention worked |
+|---|---|---|---|---|
+| 1 | Folder placement widens connection visibility | `P-PERM` + `P-RULES` | **ARCH** | direct-SQL test as a second user; a rule targeting a shared folder produces a suggestion, not a move |
+| 2 | Connecting user becomes a gateway | `P-PERM` | **ARCH** | connect flow requires a scope; preview states count + tree; `source_principals` column exists |
+| 3 | Retrieval leaks substance with no audit | `P-PERM` | **ARCH** | one `audit_log` row per connection-sourced retrieval hit; "who saw content from C" is one query |
+| 4 | Lethal trifecta / indirect injection | `P-UNTRUSTED` (fence **ARCH**, corpus HARD) | both | a planted payload in a synced document fails to trigger a write tool, on the full native roster |
+| 5 | Silent polling failures | `P-WATCH` + `P-CONTRACT` + `P-QUEUE` | ARCH + build | two-ticks-one-sync test; empty-page-continues test; forced token-expiry test; a visible `skipped_still_running` |
+| 6 | First-sync stampede + cost | `P-QUEUE` (**ARCH**), preview in `P-WATCH` | **ARCH** | kill a worker mid-sync → zero stuck documents; the cap observed under a 5k-file synthetic; the preview shows an estimate |
+| 7 | pgvector recall at scale | harness in `P-QUEUE`, tuning in `P-SCALE` | HARD | measured recall on a synthetic multi-connection corpus, before and after |
+| 8 | Lifecycle: ignored vs over-honoured | `P-LIFECYCLE` | **ARCH decision** | absence never deletes; disconnect freezes and says so; purge enumerated and tested |
+| 9 | Two ingest doors / dedup in the handler | `P-CONTRACT` | **ARCH, prerequisite** | same bytes through both doors ⇒ identical rows, by test |
+| 10 | Guarantees at the watched door only | `P-CONTRACT` + `P-RULES` | **ARCH** | a synced doc carries classification + metadata + MIME/size policy identically to an uploaded one |
+| 11 | Email is a shape | `P-MAIL` (**last**) | build | a 10-message thread ⇒ one document, no quoted duplication, stable identity across replies |
+| 12 | Four adapters ⇒ four codebases | `P-CONTRACT`, fence with adapter #2 | **ARCH** | CI fence: no `provider ==` outside `adapters/`; conformance suite green for all four + a fake |
+| 13 | `SEED-239` blast radius on a watcher | `P-WATCH` | build | one malformed config row degrades one source, not all sources |
 
-| Pitfall | Prevention Phase (topic + order) | Verification |
-|---------|----------------------------------|--------------|
-| 2. Non-byte-identical revert (HARD GATE #1) | **P1 — Revert Foundation** (FIRST) | `test_revert_byte_identical` green in CI + live at close; all new routes 404 with flag off; no non-nullable migration in the milestone. |
-| 3. Lossy/corrupting round-trip | **P2 — Canvas↔Definition Round-Trip** | `definition→canvas→definition` byte-identical (4 seeds + PM pack); layout in separate store; node move mints no version. |
-| 1. Governance fork / drift-prone rules | **P3 — In-Canvas Governance** (shared validator endpoint) | Canvas-"valid" ⟺ server-publishable contract test; grounding lists server-provided; `extra="forbid"` intact. |
-| 5. Autosave version explosion + co-edit clobber | **P4 — Concurrency & Autosave** | Two-editor parallel UAT row (SC#10 parallel axis); version count flat under autosave; publish can't read dirty draft. |
-| 7. Too-technical / too-simple vocabulary (adoption) | **P5 — Business Vocabulary + AI-Seeded Canvas** (G-2 sketch-first) | Every PM-pack/Starter drawable+readable; Technical-names reveal; AI-seed uses identical validation. |
-| 4. Dishonest run observability | **P6 — Non-Technical Run Observability** (G-2 sketch-first) | Full-event-set node-state test; reconnect reconciles-on-fetch; failed gate visibly failed; SC#10 cross-provider run rows. |
-| 6. SSRF / credential / cross-tenant connector | **P7 — External Connectors** (LAST or deferred to Open Platform) | `secure-phase` SECURITY.md `threats_open:0`; unconditional SSRF guard; org-scoped encrypted credentials; cross-org leak test. |
-| Perf traps (React-Flow scale, multi-tenant fan-out) | Woven into **P2/P6** + a **P8 — Scale Hardening** pass if needed | 100–200-node canvas stays responsive; validate-on-drag debounced; org-list reads indexed. |
+### Recommended ordering consequence for the roadmapper
 
-**Ordering rationale:** The revert gate (P1) must exist before anything else so every later phase is built on a proven off-switch (HARD gate #1). The round-trip contract (P2) and the shared-validator governance endpoint (P3) are the load-bearing foundation the vocabulary (P5) and run view (P6) sit on — build them before the "feels like" surfaces. Connectors (P7) carry the highest new security surface and the own-framework-vs-Open-Platform decision, so they come last (or split to the Open Platform track), each fully `secure-phase`'d. This ordering keeps the engine's governance rails *expressed visually and enforced server-side* at every step, honoring the D-14 red line: no new runtime, Deep byte-identical, harness flag-gated.
-
----
+`P-CONTRACT` and `P-PERM` are **both** prerequisites and both are schema-bearing; they should be **one wave, not sequential**, because the visibility column and the splice extraction touch the same rows. `P-QUEUE` must precede any adapter reaching a real customer. `P-WATCH` is the first *user-visible* phase and should ship with **exactly one** adapter. The **second** adapter is where the abstraction fence is committed. **`P-MAIL` is last and is a shape phase.** `P-UNTRUSTED`'s fence rides with the first sync; its corpus is a GA gate. `P-SCALE` follows real corpus growth, but its **harness** ships early.
 
 ## Sources
 
-- **Codebase (HIGH — authoritative for this app):**
-  - `backend/app/models/harness.py` — `WorkflowDefinition` strict model (`extra="forbid"`, D-07), 6 discriminated `phase_type`s, per-phase `available_tools` whitelist, `ValidatorSpec` (9 kinds), additive-nullable extension pattern, structural `model_validator`s.
-  - `backend/app/services/harness/reachability.py` — `lint_workflow` pure structural gate (orphan / unsatisfiable-skip / no-terminal / bad-index / input-unsatisfied) + the edge-set construction to reuse in-canvas.
-  - `backend/app/services/harness/publish_service.py` — the multi-stage publish gauntlet, the `llm_judge` hard-wall, honest structured blocks, WR-01/WR-03/WR-04 honesty guards.
-  - `backend/app/services/workflow_authoring.py` — `_check_grounding_fidelity` (server-side whitelist/folder/skill grounding; "KB can't whitelist itself"), NL-seed path.
-  - `backend/app/services/harness_engine.py` — the run-event vocabulary (`phase_started`/`phase_transition`/`phase_completed`/`gate_passed`/`gate_failed`/`run_failed`) + WRITE-before-EMIT (D-v2.5-03) + never-`phase_completed`-on-failed-emit (WR-01).
-  - `frontend/src/pages/WorkflowBuilderPage.tsx`, `PhaseSpineGraph`, `PhaseTimeline`/`PhaseCard` — the existing (single-author, describe-first, read-only-spine) surfaces to extend, not fork.
-  - `CLAUDE.md` / `.planning/PROJECT.md` — D-14 red line, Realtime-is-a-hint (D-v2.5-03), org RLS + `get_service_role_supabase` org-requirement, Fernet `enc:v1:` secrets (Phase 150), operator kill-switches (146–148), `app_settings` flag pattern, "no connectors" today.
-  - `.planning/seeds/SEED-123` (anchor — ease↔governance heart problem + 3 HARD gates), `SEED-013` (connector substrate, org-aware permissions as B2B prerequisite, SSRF/rate-limit/metering risks).
-- **External (MEDIUM — WebSearch-verified, current):**
-  - React Flow performance guidance — [reactflow.dev/learn/advanced-use/performance](https://reactflow.dev/learn/advanced-use/performance), [Synergy Codes optimization guide](https://www.synergycodes.com/blog/guide-to-optimize-react-flow-project-performance), [xyflow discussion #4975](https://github.com/xyflow/xyflow/discussions/4975).
-  - n8n SSRF (guarded only when credential attached) + multi-tenant credential isolation — [n8n issue #28218](https://github.com/n8n-io/n8n/issues/28218), [Six n8n CVEs / Upwind](https://www.upwind.io/feed/six-n8n-cves-one-day-workflow-security), [Wednesday Solutions multi-tenant n8n](https://www.wednesday.is/writing-articles/building-multi-tenant-n8n-workflows-for-agency-clients), [Reco secure n8n](https://www.reco.ai/hub/secure-n8n-workflows).
-  - Competitor governance reconciliation (Glean agent access policies / alignment checks / human oversight by risk tier / audit logging; Beam allowed-actions + tool-access + escalation paths) — [Glean agent governance](https://www.glean.com/product/agent-governance), [Glean guardrail decisions](https://www.glean.com/blog/7-essential-guardrail-decisions-for-deploying-enterprise-ai-agents-successfully), [Beam platform](https://beam.ai/platform).
+**Disclosed incidents (HIGH confidence — named CVEs / vendor advisories / researcher writeups):**
+- [EchoLeak CVE-2025-32711 — HackTheBox analysis](https://www.hackthebox.com/blog/cve-2025-32711-echoleak-copilot-vulnerability) · [arXiv 2509.10540](https://arxiv.org/html/2509.10540v1) · [Sentra](https://sentra.io/blog/copilot-echoleak-prompt-injection)
+- [AgentFlayer — Zenity Labs, Black Hat 2025](https://labs.zenity.io/p/agentflayer-chatgpt-connectors-0click-attack-5b41) · [CSO Online](https://www.csoonline.com/article/4036868/black-hat-researchers-demonstrate-zero-click-prompt-injection-attacks-in-popular-ai-agents.html)
+- [ShadowLeak — Radware, via The Hacker News](https://thehackernews.com/2025/09/shadowleak-zero-click-flaw-leaks-gmail.html) · [Infosecurity Magazine](https://www.infosecurity-magazine.com/news/vulnerability-chatgpt-agent-gmail/)
+- [GitHub MCP exfiltration — Invariant Labs](https://invariantlabs.ai/blog/mcp-github-vulnerability) · [devclass](https://www.devclass.com/ai-ml/2025/05/27/researchers-warn-of-prompt-injection-vulnerability-in-github-mcp-with-no-obvious-fix/1623458)
+- [The lethal trifecta — Simon Willison](https://simonwillison.net/2025/Jun/16/the-lethal-trifecta/)
+
+**Permission-aware indexing / oversharing (HIGH on Microsoft's own guidance; MEDIUM on vendor-blog figures):**
+- [Microsoft 365 Copilot best practices with SharePoint](https://learn.microsoft.com/en-us/sharepoint/sharepoint-copilot-best-practices) · [Restricted SharePoint Search](https://learn.microsoft.com/en-us/sharepoint/restricted-sharepoint-search) — ⚠ **the cost of the best-documented mitigation, stated by its own vendor: max 100 sites, explicitly temporary, new enablement blocked from 2026-07-31 and retiring 2027-01-31**, replaced by per-site Restricted Content Discovery
+- [Mitigate oversharing — Microsoft Community Hub](https://techcommunity.microsoft.com/blog/microsoft365copilotblog/mitigate-oversharing-to-govern-microsoft-365-copilot-and-agents/4448744) · [Petri: "Copilot didn't overshare your data. Your permissions did."](https://petri.com/copilot-didnt-overshare-your-data-your-permissions-did/)
+- [Propagating SharePoint document permissions to AI Search and RAG pipelines — Microsoft ISE](https://devblogs.microsoft.com/ise/sharepoint-doc-level-access/) · [Document-level RBAC for RAG pipelines — Truto](https://truto.one/blog/how-to-maintain-document-level-rbac-in-enterprise-rag-pipelines/) (MEDIUM — vendor blog, but its "sync entitlements more often than content" and "re-check at query time" patterns are corroborated by the Microsoft ISE post)
+
+**Provider sync semantics (HIGH — official docs / official Q&A):**
+- [Google: Synchronize clients with Gmail](https://developers.google.com/workspace/gmail/api/guides/sync) · [Drive: manage changes](https://developers.google.com/workspace/drive/api/guides/manage-changes) · [Drive issue 406305173 — empty page with a non-null `nextPageToken` on shared drives](https://issuetracker.google.com/issues/406305173)
+- [Microsoft Graph delta query overview](https://learn.microsoft.com/en-us/graph/delta-query-overview) · [MS Q&A: delta token expiration and 410 resyncRequired](https://learn.microsoft.com/en-us/answers/questions/5856875/microsoft-graph-delta-api-clarification-on-delta-t)
+
+**Scale (MEDIUM — engineering write-ups, corroborated across sources):**
+- [pgvector 0.8 iterative scans — Nile](https://www.thenile.dev/blog/pgvector-080) · [Scaling vector search in Postgres — ClickHouse](https://clickhouse.com/resources/engineering/scale-vector-search-postgres)
+- [Embeddings in production: costs to embed — Barnacle Labs](https://medium.com/barnacle-labs/embeddings-in-production-or-how-nothing-scales-like-youd-expect-it-to-part-1-costs-to-embed-a82482765215) · [The backfill that re-ran your entire AI bill](https://tianpan.co/blog/2026/07/06/the-backfill-that-re-ran-your-entire-ai-bill)
+- [RAG over email — Nylas](https://cli.nylas.com/guides/rag-over-email) (MEDIUM — vendor guide; the strip-signatures-and-quoted-chains advice is standard practice, not a measured result)
+
+**This repository (HIGHEST confidence — read on 2026-09-04):**
+- `backend/app/api/documents.py` — `upload_document:547`, `content_hash:620`, dedup `:624-640`, versioning `:643-663`, `_upload_pipeline:239`, `ingest_document:2030`, attachment cascade `:2405-2443`, classification splice `:2469`
+- `supabase/full-schema.sql` — documents SELECT policy `:5452`, `documents_dedup_idx:3021`, `documents_completed_hash_unique_idx:3014`
+- `backend/app/db/schedules.py:263` (`claim_due_schedules`), `backend/app/models/schedule.py` (`compute_next_run_at`), `backend/app/services/scheduler_service.py`
+- `backend/app/services/email_extraction_service.py` — quoted-chain stripping, `message_id:281/377`, attachment caps
+- Seeds: `SEED-210` `SEED-209` `SEED-211` `SEED-188` `SEED-077` `SEED-076` `SEED-197` `SEED-048` `SEED-079` `SEED-072` `SEED-239` `SEED-142` · `PROJECT.md` (v4.0 scope + binding constraints) · `STATE.md` · `CLAUDE.md`
+
+**Explicitly marked as inference rather than documented cases:** the identical-attachment unique-index collision in Pitfall 9 (derivable from the index definition plus the unguarded insert; one test settles it); the `P-MAIL` v1 boundary recommendation in Pitfall 11; the freeze-on-disconnect recommendation in Pitfall 8. Each is offered as an opinion because `SEED-210`'s own rule applies — *a legitimate v1 is fine; silence is not.*
 
 ---
-*Pitfalls research for: Visual / No-Code Workflow Studio on a governed multi-tenant harness engine (v3.6)*
-*Researched: 2026-07-24*
+*Pitfalls research for: scheduled multi-source ingestion retrofitted onto an existing production RAG platform (v4.0 Connected Knowledge)*
+*Researched: 2026-09-04*

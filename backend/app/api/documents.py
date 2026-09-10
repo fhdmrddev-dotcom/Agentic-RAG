@@ -26,9 +26,12 @@ from app.models.document import (
     DocumentResponse,
     DocumentTableRow,
 )
+from app.models.document import ConversationMessage, ConversationResponse  # Phase 240
 from app.models.user_settings import load_app_settings
 from app.services.audit_service import write_audit_entry
 from app.services.embedding_service import chunk_text, embed_chunks, extract_metadata, read_enabled_field_defs
+from app.services.email_attachments import ingest_email_attachments
+from app.services.ingest_enrich import enrich_for_ingest
 from app.services.extraction_service import ExtractedDocument
 from app.utils.db import aexec
 from app.utils.folder_utils import get_globally_visible_folder_ids
@@ -98,6 +101,20 @@ class MetadataUpdateRequest(BaseModel):
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
+#: Image types the upload gate accepts and `extract_text` sends to vision transcription.
+#: ⚠ Kept as its own named set so the routing test and the gate read the SAME list — a
+#: second hand-typed copy is how a format gets a door with no sign on it, or a sign with no
+#: door. `image/gif` is included (Pillow reads frame 1) but is not advertised by the
+#: frontend: an animation transcribes as its first frame, which is honest but rarely useful.
+IMAGE_MIME_TYPES = frozenset({
+    "image/png",
+    "image/jpeg",
+    "image/webp",
+    "image/tiff",
+    "image/bmp",
+    "image/gif",
+})
+
 ALLOWED_MIME_TYPES = {
     "text/plain",
     "text/markdown",
@@ -116,6 +133,16 @@ ALLOWED_MIME_TYPES = {
     "application/dxf",
     "image/vnd.dxf",
     "application/x-dxf",
+    # ── SEED-226 / 233-UAT item 8 — images become searchable documents.
+    #
+    # ⚠ Until now an uploaded `.png` was refused at this gate, so the vision machinery that
+    #   already describes images pulled OUT of a PDF could never be reached by an image
+    #   uploaded on its own. These entries are the door; `extract_text` routes them into
+    #   `vision_text.transcribe_pages`, which TRANSCRIBES rather than captions.
+    #
+    # ⛔ `image/vnd.dxf` is NOT an image and is handled by the DXF branch above it — the DXF
+    #   arm is checked FIRST in `extract_text` for exactly that reason.
+    *IMAGE_MIME_TYPES,
 }
 
 # Extension → canonical MIME type for formats browsers misreport
@@ -128,6 +155,16 @@ _EXT_MIME_OVERRIDES: dict[str, str] = {
     ".eml":  "message/rfc822",
     ".msg":  "application/vnd.ms-outlook",
     ".dxf":  "application/dxf",
+    # Images. ⚠ `.jpg` is the one browsers most often announce as octet-stream from a
+    # drag-and-drop, and `.tif`/`.tiff` are reported inconsistently across platforms.
+    ".png":  "image/png",
+    ".jpg":  "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".webp": "image/webp",
+    ".tif":  "image/tiff",
+    ".tiff": "image/tiff",
+    ".bmp":  "image/bmp",
+    ".gif":  "image/gif",
     # ⚠ BUG-260825-01 — `.docx` and `.pdf` WERE ABSENT, AND THAT IS THE OBSERVED SPLIT.
     #   Measured 2026-08-25 against the real endpoint: a `.docx` announced as
     #   `application/octet-stream`, `application/zip`, `application/msword` or with NO
@@ -156,6 +193,21 @@ _UNRELIABLE_MIME_TYPES: tuple[str, ...] = (
 #: Formats whose "no text" case has a CONCRETE cause a person can act on. Anything not
 #: listed here falls through to the generic sentence, which is deliberately vague because
 #: for those formats we genuinely do not know why the extractor came back empty.
+#: One sentence, six mimes — written once so the six image rows below cannot drift apart.
+_IMAGE_EMPTY_TEXT = (
+    "This image was read, but no text could be found in it. It is still stored, and it can "
+    "still be opened — there is just nothing written on it to search."
+)
+
+#: ⚠ THE COUNTERPART TO `_IMAGE_EMPTY_TEXT`, AND THE DISTINCTION IS THE WHOLE POINT.
+#: "read, found nothing" and "never looked at" are different facts about a file, and only one
+#: of them is the person's to fix. Saying the first when the second is true is the lie that
+#: five of the operator's images told on 2026-09-05 — see `vision_text.resolve_vision_model`.
+_IMAGE_NO_VISION_MODEL = (
+    "No vision model is set, so this image was not read. Nothing was stored about its "
+    "contents. Choose a vision model in Settings, then upload it again."
+)
+
 _EMPTY_TEXT_MESSAGES: dict[str, str] = {
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
         "This spreadsheet is empty — none of its sheets contain any data. "
@@ -166,15 +218,35 @@ _EMPTY_TEXT_MESSAGES: dict[str, str] = {
     "text/csv":
         "This CSV has no rows — only a header, or nothing at all. "
         "Add rows and upload it again.",
+    # ⭐ REWRITTEN 2026-09-05 (SEED-226 L1). The old sentence ended with a promise that this
+    #   file needed OCR before it could be searched — naming a capability the product did not
+    #   have, which is what SEED-226 was planted on. Vision transcription now RUNS on this
+    #   case before the document is ever declared empty, so reaching this message means the
+    #   transcription was attempted and yielded nothing either.
+    #
+    # ⛔ NO DOUBLE QUOTES IN THIS BLOCK, and that is a real constraint rather than a style
+    #   preference: `ingestionFailureCopy.test.ts` extracts every string literal inside this
+    #   dict to prove each sentence survives `classifyIngestionError` unchanged, and its
+    #   walker cannot tell a quoted phrase in a COMMENT from a value. A quoted aside here
+    #   reds that fence — measured, 2026-09-05.
     "application/pdf":
-        "No text could be read from this PDF. It is most likely a scan or a set of "
-        "images, which needs OCR before it can be searched.",
+        "No text could be read from this PDF. It looks like a scan or a drawing, and "
+        "reading it as an image produced nothing legible either.",
     "message/rfc822":
         "This email has no readable message body.",
     "application/vnd.ms-outlook":
         "This email has no readable message body.",
     "application/x-msg":
         "This email has no readable message body.",
+    # SEED-226 / 233-UAT item 8. An image reaching here was readable as an image and simply
+    # had no text on it — a photograph of a landscape, say. That is not a failure of the
+    # importer and the sentence should not imply one.
+    "image/png": _IMAGE_EMPTY_TEXT,
+    "image/jpeg": _IMAGE_EMPTY_TEXT,
+    "image/webp": _IMAGE_EMPTY_TEXT,
+    "image/tiff": _IMAGE_EMPTY_TEXT,
+    "image/bmp": _IMAGE_EMPTY_TEXT,
+    "image/gif": _IMAGE_EMPTY_TEXT,
 }
 
 #: The fallback. Kept WORD-FOR-WORD as it shipped, so the generic case is unchanged.
@@ -236,7 +308,7 @@ def _write_extraction_run_row(
         )
 
 
-def _upload_pipeline(
+async def _upload_pipeline(
     document_id: str,
     raw: bytes,
     mime_type: str,
@@ -246,112 +318,18 @@ def _upload_pipeline(
     supabase: Client,
     engines_dict: dict[str, str] | None = None,
 ) -> None:
-    """Phase 071.2 D-071.2-05 — runs in BackgroundTask after /upload (or
-    /reingest) returns 201/200.
+    """Phase 229 (TRUST-01) — delegates to unified splice_document pipeline."""
+    from app.services.ingest_splice import splice_document  # noqa: PLC0415
 
-    Steps:
-      1. Storage upload (sync supabase call; ok inside BackgroundTask task body —
-         not an async handler, so supabase-py runs on the BackgroundTask thread
-         pool without blocking the event loop). Skipped if `storage_path` is
-         empty / None (reingest path — file already in storage).
-      2. Layer 2 wall-clock-wrapped extract via the per-aspect composer
-         (`extract_composable`, Phase 071.2 D-071.2-01..04). When
-         `engines_dict` is None, the composer reads defaults from
-         `app_settings.extraction_*_engine_*`.
-      3. Call existing ingest_document(document_id, text, user_id, supabase, raw,
-         mime_type, filename, None, extracted_doc, extract_duration_ms) — keep
-         signature byte-identical (Pitfall 2 — 071.1 tests stay green).
-      4. On any unhandled exception: UPDATE documents SET status='failed',
-         error_message=<short summary> (T-071.2-01-01 mitigation — don't echo
-         supabase-py internals into error_message).
-    """
-    from app.services.extraction_service import extract_composable, get_extractor  # noqa: PLC0415
-
-    # Step 1 — storage upload (only on the /upload path; /reingest path passes
-    # an empty `storage_path` to signal "file already in storage, skip upload").
-    if storage_path:
-        try:
-            supabase.storage.from_("documents").upload(
-                path=storage_path,
-                file=raw,
-                file_options={"content-type": mime_type},
-            )
-        except Exception:
-            # Storage upload failure doesn't block ingestion — same swallow shape
-            # as the pre-071.2 inline call site at documents.py:330-331.
-            pass
-
-    # Step 2 — extract via the per-aspect composer with a wall-clock fail-safe.
-    # Phase 071.3 Plan 04 (D-071.3-09): Docling auto-fallback path removed
-    # entirely — non-timeout exceptions fail loud (status='failed' +
-    # error_message); D-071-11 visibility intent preserved.
-    extract_start = time.perf_counter()
-    extracted_doc: ExtractedDocument | None = None
-    engine_used: str | None = None
-    text: str = ""
-
-    # Wall-clock fail-safe for the per-aspect composer. Post-Docling-rip
-    # (Phase 071.3 Plan 04 D-071.3-09), the only remaining heavy engines are
-    # camelot tables + pymupdf fence subprocess; 130s upper bound matches the
-    # legacy Layer 2 ceiling so behavior is unchanged for non-Docling stalls.
-    wall_clock_s = 130.0
-
-    try:
-        # Phase 071.2 D-071.2-01..04 — route PDF/DOCX through the per-aspect
-        # composer. Non-PDF/non-DOCX MIMEs still flow through the legacy
-        # `extract_text` helper (composer is PDF/DOCX-only).
-        from app.services.extraction_service import PDF_MIME as _PDF, DOCX_MIME as _DOCX  # noqa: PLC0415
-        if mime_type not in (_PDF, _DOCX):
-            text = extract_text(raw, mime_type)
-        else:
-            # We are inside a BackgroundTask thread (not an async handler), so
-            # asyncio.wait_for is not directly usable. Use a small asyncio.run
-            # bridge so the Layer 2 wall-clock pattern still applies. Mirrors
-            # the /reextract Layer 2 shape (071.1 SP-2) but in sync context.
-            # NOTE: extract_composable is sync; running inside BackgroundTask
-            # thread, so no run_in_threadpool needed (test_071_1_threadpool_sweep
-            # exempts _upload_pipeline because it's a sync def).
-            async def _run_with_timeout() -> ExtractedDocument:
-                from starlette.concurrency import run_in_threadpool  # noqa: PLC0415
-                return await asyncio.wait_for(
-                    run_in_threadpool(extract_composable, raw, mime_type, engines_dict),
-                    timeout=wall_clock_s,
-                )
-
-            extracted_doc = asyncio.run(_run_with_timeout())
-            text = extracted_doc.text
-            engine_used = extracted_doc.extractor_name or None
-    except Exception as exc:
-        # Step 4 — surface a user-safe failure on the documents row + log full
-        # detail server-side (T-071.2-01-01 mitigation).
-        log.warning(
-            "upload_pipeline failed for %s: %s",
-            document_id,
-            exc,
-        )
-        try:
-            supabase.table("documents").update({
-                "status": "failed",
-                "error_message": str(exc)[:500],
-            }).eq("id", document_id).execute()
-        except Exception:
-            pass  # don't double-fault on telemetry write failure
-        return
-
-    extract_duration_ms = int((time.perf_counter() - extract_start) * 1000)
-
-    # Step 3 — hand off to the existing ingest_document (signature byte-identical).
-    ingest_document(
-        document_id,
-        text,
-        user_id,
-        supabase,
-        raw,
-        mime_type,
-        filename,
-        engine_used,        # engine_override — extractor_name from composer or None for default
-        extracted_doc,
-        extract_duration_ms,
+    await splice_document(
+        document_id=document_id,
+        raw=raw,
+        mime_type=mime_type,
+        filename=filename,
+        user_id=user_id,
+        storage_path=storage_path,
+        supabase=supabase,
+        engines_dict=engines_dict,
     )
 
 
@@ -521,6 +499,35 @@ def extract_text(raw: bytes, mime_type: str) -> str:
         except Exception as exc:
             return f"CAD Drawing (unparsed DXF: {exc})"
 
+    # ── SEED-226 / 233-UAT item 8 — an uploaded image IS its text.
+    #
+    # ⚠ THIS ARM MUST STAY BELOW THE DXF ARM. `image/vnd.dxf` is one of the three mimes
+    #   Windows reports for an AutoCAD drawing; it is a CAD file wearing an `image/*` label,
+    #   and sending it to a vision model would transcribe nothing while the real parser sat
+    #   one branch away.
+    #
+    # ⚠ It returns "" rather than raising when the model yields nothing, so the caller's
+    #   normal empty-text path runs and `_IMAGE_EMPTY_TEXT` explains it.
+    if mime_type in IMAGE_MIME_TYPES:
+        from app.services.extractors.aspects import vision_text  # noqa: PLC0415
+        try:
+            page = vision_text.image_to_png_b64(raw)
+        except ValueError:
+            # Bytes that are not a readable image at all. Say so as the document's text so
+            # the failure is legible in the UI rather than an empty chunk list.
+            return ""
+        # load_app_settings is sync/cache-only — the same call the ingest path makes.
+        _image_settings = load_app_settings()
+        # ⚠ "no text was found" and "nothing looked at it" are DIFFERENT FACTS and this is the
+        #   only place that can still tell them apart. Below, both arrive as "" and collapse
+        #   into `_IMAGE_EMPTY_TEXT` — which says the image was READ, and would be a lie.
+        #   A plain ValueError is the right shape: `splice_document` catches any exception from
+        #   here and writes it verbatim into `error_message` with status `failed`, so the
+        #   sentence below is what the person actually reads on the row.
+        if not vision_text.resolve_vision_model(_image_settings):
+            raise ValueError(_IMAGE_NO_VISION_MODEL)
+        return vision_text.transcribe_pages([page], "scan", _image_settings)
+
     # plain text, markdown — decode as UTF-8
     decoded = raw.decode("utf-8")
 
@@ -598,139 +605,132 @@ async def upload_document(
             detail="File is empty",
         )
 
-    # Validate folder ownership: only the folder owner may upload into it.
-    # Phase 071.2 D-071.2-06: wrap sync supabase call in run_in_threadpool
-    # (mirrors /reextract 618-626 lambda-wrap shape).
-    if folder_id:
-        folder_check = await run_in_threadpool(
-            lambda: supabase.table("folders")
-            .select("id, user_id")
-            .eq("id", folder_id)
-            .maybe_single()
-            .execute()
-        )
-        if not folder_check.data:
-            raise HTTPException(status_code=404, detail="Folder not found")
-        if folder_check.data["user_id"] != current_user["id"]:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Cannot upload to a folder you do not own",
-            )
+    # Phase 229 (TRUST-01) — unified minting via async_mint_document_row
+    from app.services.ingest_splice import async_mint_document_row  # noqa: PLC0415
 
-    content_hash = hashlib.sha256(raw).hexdigest()
-
-    # Case 1: exact duplicate already completed (is_latest=True) in the same folder — skip re-ingestion
-    # Dedup only matches the current latest version; stale versions do not short-circuit upload.
-    # Duplicate check is folder-scoped: same file in different folders creates separate entries.
-    dedup_query = (
-        supabase.table("documents")
-        .select("*")
-        .eq("user_id", current_user["id"])
-        .eq("content_hash", content_hash)
-        .eq("status", "completed")
-        .eq("is_latest", True)
+    mint_result = await async_mint_document_row(
+        raw=raw,
+        filename=filename,
+        mime_type=mime_type,
+        user_id=current_user["id"],
+        supabase=supabase,
+        folder_id=folder_id,
     )
-    if folder_id:
-        dedup_query = dedup_query.eq("folder_id", folder_id)
-    else:
-        dedup_query = dedup_query.is_("folder_id", "null")
-    # Phase 071.2 D-071.2-06: wrap dedup .execute() in run_in_threadpool.
-    existing = await run_in_threadpool(lambda: dedup_query.limit(1).execute())
-    if existing.data:
+    doc = mint_result.document
+
+    if mint_result.is_duplicate:
         response.status_code = status.HTTP_200_OK
-        return existing.data[0]
+        return doc
 
-    # Case 2: same filename → create new version instead of deleting stale document.
-    # Old files are retained in storage for future restore (Phase 29).
-    # Phase 071.2 D-071.2-06: wrap existing-versions SELECT in run_in_threadpool.
-    existing_versions = await run_in_threadpool(
-        lambda: supabase.table("documents")
-        .select("id, version_number")
-        .eq("user_id", current_user["id"])
-        .eq("filename", file.filename)
-        .order("version_number", desc=True)
-        .limit(1)
-        .execute()
-    )
-    if existing_versions.data:
-        next_version = existing_versions.data[0]["version_number"] + 1
-        # Retire all previous versions from retrieval (user-scoped, not folder-scoped).
-        # Phase 071.2 D-071.2-06: wrap is_latest=False UPDATE cascade in run_in_threadpool.
-        await run_in_threadpool(
-            lambda: supabase.table("documents")
-            .update({"is_latest": False})
-            .eq("user_id", current_user["id"])
-            .eq("filename", file.filename)
-            .execute()
-        )
-    else:
-        next_version = 1
-
-    # Phase 071.2 D-071.2-05 — instant-201 BackgroundTask refactor.
-    # INSERT documents row with status='pending' FIRST so Supabase Realtime broadcasts
-    # the new row to the frontend immediately. Extract + chunk + multimodal moved into
-    # `_upload_pipeline` BackgroundTask (closes "/upload blocks 1-120s before 201" UX
-    # defect surfaced during Phase 072 discuss-phase setup).
-    document_id = str(uuid4())
-    storage_path = f"{current_user['id']}/{document_id}/{file.filename}"
-
-    doc_data = {
-        "id": document_id,
-        "user_id": current_user["id"],
-        "filename": file.filename,
-        "file_path": storage_path,
-        "file_size": len(raw),
-        "mime_type": mime_type,
-        "status": "pending",
-        "content_hash": content_hash,
-        "folder_id": folder_id,
-        "version_number": next_version,
-        "is_latest": True,
-    }
-    # Phase 078 CQ-DEDUP-01 D-078-04: catch unique-violation race at INSERT time.
-    # The fast-path SELECT above handles the common case; this catches the narrow
-    # race window where two concurrent uploads pass the SELECT simultaneously.
+    # Phase 230 (QUEUE-01 / H-3): Cut over /documents/upload to durable ingestion_jobs
+    # 1. Store raw uploaded bytes durably in Supabase Storage immediately
     try:
-        result = await run_in_threadpool(
-            lambda: supabase.table("documents").insert(doc_data).execute()
+        service_supabase.storage.from_("documents").upload(
+            path=mint_result.storage_path,
+            file=raw,
+            file_options={"content-type": mime_type},
         )
-        doc = result.data[0]
-    except Exception as exc:
-        # Detect PostgreSQL unique_violation (code 23505) from the partial index.
-        # supabase-py surfaces this as an APIError whose message contains "23505".
-        exc_str = str(exc)
-        if "23505" in exc_str:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="File already exists in this folder",
-            )
-        raise
+    except Exception as up_exc:
+        # ── BUG-260905-08 — NO BYTES MEANS NO DOCUMENT. STOP HERE. ──────────────────────
+        #
+        # ⛔ THIS USED TO LOG A WARNING AND CARRY ON, and the result was a document row that
+        #    reported `completed` while its file did not exist. MEASURED on the operator's
+        #    library: `Screenshot 2026-05-29 042925.png` uploaded at 19:56, reached
+        #    `status=completed` with `chunk_count=0`, an EMPTY `error_message`, and a 404 from
+        #    storage on its own `file_path`. It looks like a successful upload on the shelf and
+        #    is unusable by everything downstream — re-ingest, preview, download, and the
+        #    SEED-226 vision pass all need the bytes this step was supposed to keep.
+        #
+        # ⚠ ENQUEUEING AFTER THIS FAILS IS WORSE THAN NOT ENQUEUEING. The worker fetches the
+        #   file from storage; with nothing there it produces an empty document that still
+        #   completes. A visible refusal is the only outcome a person can act on.
+        log.error(
+            "Storage upload during /upload FAILED for %s (%s): %s — marking the document "
+            "failed rather than ingesting a file that does not exist",
+            doc["id"],
+            mint_result.storage_path,
+            up_exc,
+        )
+        try:
+            service_supabase.table("documents").update({
+                "status": "failed",
+                "ingestion_step": "failed",
+                "error_message": (
+                    "This file could not be stored, so nothing was read from it. "
+                    "Please try uploading it again."
+                ),
+            }).eq("id", doc["id"]).execute()
+        except Exception:  # noqa: BLE001 — the refusal write must not double-fault
+            log.exception("could not mark %s failed after a storage failure", doc["id"])
+        response.status_code = status.HTTP_201_CREATED
+        return {**doc, "status": "failed"}
 
-    # Phase 071.2 D-071.2-05 — schedule heavy work as BackgroundTask. The handler
-    # returns 201 within ~1s; _upload_pipeline does storage upload + Layer 2
-    # wall-clock-wrapped extract + ingest_document inside the BackgroundTask
-    # thread (not the async handler), so the event loop stays unblocked.
-    # Phase 071.2 D-071.2-03 — parse `?engines=` hint (admin-disable aware).
-    engines_dict = _parse_engines_hint(engines)
-    background_tasks.add_task(
-        _upload_pipeline,
-        doc["id"],
-        raw,
-        mime_type,
-        file.filename,
-        current_user["id"],
-        storage_path,
-        service_supabase,   # D-05: detached pipeline stays service-role (pdf_extraction_runs INSERT)
-        engines_dict,
-    )
+    # 2. Enqueue durable job into ingestion_jobs
+    from app.db.ingestion_jobs import insert_ingestion_job  # noqa: PLC0415
+    from uuid import UUID  # noqa: PLC0415
+    from app.config import settings  # noqa: PLC0415
+
+    raw_user_id = current_user.get("id")
+    raw_org_id = current_user.get("org_id")
+    user_uuid = UUID(str(raw_user_id)) if raw_user_id else None
+    org_uuid = UUID(str(raw_org_id)) if raw_org_id else None
+    doc_uuid = UUID(str(doc["id"]))
+
+    try:
+        from app.dependencies import get_pg_pool  # noqa: PLC0415
+        pool = await get_pg_pool()
+        if user_uuid is not None:
+            await insert_ingestion_job(
+                pool,
+                document_id=doc_uuid,
+                user_id=user_uuid,
+                org_id=org_uuid,
+            )
+        else:
+            raise ValueError("user_uuid is None")
+    except Exception as q_exc:
+        log.warning(
+            "Asyncpg enqueue failed for %s (%s); inserting via service_supabase",
+            doc["id"],
+            q_exc,
+        )
+        try:
+            service_supabase.table("ingestion_jobs").insert({
+                "document_id": str(doc_uuid),
+                "user_id": str(user_uuid) if user_uuid else str(raw_user_id),
+                "org_id": str(org_uuid) if org_uuid else None,
+                "status": "pending",
+                "stage": "pending",
+                "progress": {},
+                "max_retries": 3,
+            }).execute()
+        except Exception as sb_exc:
+            log.error("Failed to insert ingestion_job via supabase: %s", sb_exc)
+
+    # 3. Fallback to BackgroundTask ONLY if ingest_worker_enabled is explicitly False
+    if not getattr(settings, "ingest_worker_enabled", True):
+        engines_dict = _parse_engines_hint(engines)
+        background_tasks.add_task(
+            _upload_pipeline,
+            doc["id"],
+            raw,
+            mime_type,
+            filename,
+            current_user["id"],
+            mint_result.storage_path,
+            service_supabase,
+            engines_dict,
+        )
+
     background_tasks.add_task(
         write_audit_entry,
         user_id=current_user["id"],
         action_type="document.upload",
         metadata={"document_id": doc["id"], "filename": doc["filename"], "folder_id": folder_id},
-        supabase=service_supabase,   # D-05: detached audit writer stays service-role
+        supabase=service_supabase,
     )
 
+    response.status_code = status.HTTP_201_CREATED
     return doc
 
 
@@ -983,6 +983,77 @@ async def list_document_chunks(
         .order("chunk_index")
     )
     return res.data or []
+
+
+#: Phase 240 (TM-240-14). How many siblings one conversation read returns.
+#:
+#: ⚠ NOT A ROUND NUMBER PICKED FOR COMFORT. A mailing-list archive can share one `thread_key`
+#:   across thousands of messages, and PostgREST truncates at 1000 BY DEFAULT while saying
+#:   nothing — the trap `knowledge_health._fetch_readability` already records in its own comments.
+#:   An explicit cap that REPORTS itself is the difference between a bounded answer and a silent
+#:   slice; the panel renders "showing the first N of M" from the flag below.
+CONVERSATION_SIBLING_CAP = 200
+
+
+@router.get("/{document_id}/conversation", response_model=ConversationResponse)
+async def get_document_conversation(
+    document_id: str,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_user_supabase_client),
+):
+    """The other messages of this document's mail conversation, oldest first.
+
+    ⛔ **IT TAKES A DOCUMENT ID AND NEVER A `thread_key`, AND THAT IS THE SECURITY DESIGN.**
+    A `thread_key` is derived from a `Message-ID`, which is chosen by whoever SENT the mail — so
+    anyone who can email this user can choose one. A route that accepted a key as a parameter
+    would hand an outsider a lookup handle. Instead the open document is resolved first, under
+    the caller's own auth, and the siblings are read scoped to that document's own owner.
+
+    ⚠ **An absent `thread_key` is a normal, empty, 200 answer.** Almost every document in the
+    Library is not mail; treating that as a 404 would put an error state on every PDF.
+    """
+    parent = await _assert_document_visible(document_id, current_user["id"], supabase)
+
+    row = await aexec(
+        supabase.table("documents")
+        .select("thread_key")
+        .eq("id", document_id)
+        .maybe_single()
+    )
+    thread_key = (getattr(row, "data", None) or {}).get("thread_key")
+    if not thread_key:
+        return ConversationResponse(messages=[], total=0, truncated=False)
+
+    owner_id = parent.get("user_id") or current_user["id"]
+    res = await aexec(
+        supabase.table("documents")
+        .select("id, filename, metadata, created_at", count="exact")
+        .eq("user_id", owner_id)
+        .eq("thread_key", thread_key)
+        .order("created_at")
+        .limit(CONVERSATION_SIBLING_CAP)
+    )
+    rows = res.data or []
+    total = res.count if getattr(res, "count", None) is not None else len(rows)
+
+    messages: list[ConversationMessage] = []
+    for r in rows:
+        meta = r.get("metadata") or {}
+        messages.append(
+            ConversationMessage(
+                id=r["id"],
+                title=meta.get("title") or r.get("filename"),
+                date=meta.get("date") or r.get("created_at"),
+                sender=meta.get("email_from") or meta.get("author"),
+                is_open=str(r["id"]) == str(document_id),
+            )
+        )
+
+    return ConversationResponse(
+        messages=messages,
+        total=total,
+        truncated=total > len(messages),
+    )
 
 
 # ⚠ THE RLS ASYMMETRY BELOW IS CORRECT BEHAVIOUR, NOT A DEFECT — encode it, do not "fix" it.
@@ -1893,6 +1964,7 @@ async def update_document_metadata(
 @router.patch("/{document_id}/classification/accept", response_model=DocumentResponse)
 async def accept_classification(
     document_id: str,
+    force: bool = False,
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_user_supabase_client),
 ):
@@ -1906,6 +1978,10 @@ async def accept_classification(
     (never the forbidden status) on a non-owner / absent / no-active-suggestion miss (no
     existence leak).
 
+    Phase 234 H-4 / VIS-06 fence:
+    If a document originated from a private connection, moving it into an org-shared folder
+    widens visibility beyond its private connection scope. Refuses with 403 unless force=True.
+
     Undo needs NO endpoint — the frontend reverses via the EXISTING PATCH
     /documents/{id}/move with the stamped prior_folder_id. Every `.execute()` is
     threadpool-wrapped (D-v2.5-01 — this is an async handler; follow update_document_metadata,
@@ -1915,7 +1991,7 @@ async def accept_classification(
     try:
         doc = await run_in_threadpool(
             lambda: supabase.table("documents")
-            .select("folder_id, metadata")
+            .select("folder_id, metadata, ingest_visibility, source_connection_id")
             .eq("id", document_id)
             .eq("user_id", current_user["id"])
             .maybe_single()
@@ -1940,7 +2016,7 @@ async def accept_classification(
     try:
         folder = await run_in_threadpool(
             lambda: supabase.table("folders")
-            .select("id")
+            .select("id, is_org_shared")
             .eq("id", str(target))
             .or_(f"user_id.eq.{caller_uid},is_org_shared.eq.true")
             .maybe_single()
@@ -1950,6 +2026,28 @@ async def accept_classification(
         raise HTTPException(status_code=404, detail="Folder not found")
     if not folder or not getattr(folder, "data", None):
         raise HTTPException(status_code=404, detail="Folder not found")
+
+    # ── H-4 / VIS-06: Classification Access Fence ─────────────────────────────
+    # If a document originated from a private connection, moving it into an org-shared folder
+    # widens visibility beyond its private connection scope. Refuse unless force=True.
+    if (
+        doc.data.get("source_connection_id")
+        and doc.data.get("ingest_visibility") == "private"
+        and folder.data.get("is_org_shared") is True
+    ):
+        if not force:
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "error": "classification_refusal",
+                    "reason": "Moving this connection-sourced document to an org-shared folder widens visibility beyond its private connection scope. Explicit human confirmation required.",
+                    "requires_confirmation": True,
+                },
+            )
+        log.info(
+            "User %s forced visibility-widening move of connection document %s to org-shared folder %s (H-4 override)",
+            current_user["id"], document_id, target,
+        )
 
     # 4. Record the prior folder (Undo, D-118-6), mark accepted, ONE owner-scoped UPDATE
     #    writing folder_id + the marked metadata (the move + the suggestion stamp together).
@@ -1969,15 +2067,18 @@ async def accept_classification(
     # 5. Audit ONLY after the move succeeds (never optimistic). classification.apply is
     #    LIVE in VALID_ACTION_TYPES — write_audit_entry swallows errors so the live
     #    round-trip is the verification.
+    audit_meta = {
+        "document_id": document_id,
+        "rule_id": sugg.get("rule_id"),
+        "from_folder": prior_folder,
+        "to_folder": str(target),
+    }
+    if force:
+        audit_meta["force"] = True
     await write_audit_entry(
         user_id=current_user["id"],
         action_type="classification.apply",
-        metadata={
-            "document_id": document_id,
-            "rule_id": sugg.get("rule_id"),
-            "from_folder": prior_folder,
-            "to_folder": str(target),
-        },
+        metadata=audit_meta,
         supabase=supabase,
     )
     return result.data[0]
@@ -2038,6 +2139,7 @@ def ingest_document(
     engine_override: str | None = None,
     extracted_doc: "ExtractedDocument | None" = None,
     extract_duration_ms: int = 0,
+    attachment_depth: int = 0,
 ) -> None:
     import logging, traceback
     log = logging.getLogger(__name__)
@@ -2087,192 +2189,29 @@ def ingest_document(
         # handler, so D-v2.5-01 does NOT fire (it's hoisted, not newly introduced).
         app_settings = load_app_settings()
 
-        # Extract metadata FIRST so we can use it to enrich chunk embeddings.
-        # This is best-effort — failures are logged but never block ingestion.
+        # ── BUG-260905-06 — ONE ENRICHMENT STEP, SHARED WITH THE QUEUE ──────────────────
         #
-        # Phase 111 (D-111-2/8) — branch on metadata_enrichment_mode:
-        #   - 'enriched' (default; any non-'legacy' value fails safe to enriched):
-        #       cross-provider forced_emit through extract_metadata_enriched, with a
-        #       runtime create_model schema (built-ins + user custom fields), a
-        #       head+tail window sample (NOT content[:3000]), and a nested per-field
-        #       `_confidence` map attached AFTER the dump.
-        #   - 'legacy': the untouched OpenAI json_object extract_metadata path runs
-        #       byte-identical (the reversibility path).
-        # Three graceful-degradation layers are preserved: (1) extract_metadata_enriched's
-        # own except→None [Plan 02], (2) the call-site except below → emitted=None, and
-        # (3) the outer try/except backstop at the function bottom. A None metadata_dict
-        # is fine — the doc still reaches status=completed and flat `@>` filters still match.
-        mode = app_settings.metadata_enrichment_mode
-        if mode != "legacy":  # default-on 'enriched'; any non-'legacy' value fails safe to enriched
-            from app.config import get_model_capability  # noqa: PLC0415
-            from app.services.embedding_service import (  # noqa: PLC0415
-                attach_confidence,
-                build_metadata_model,
-                extract_metadata_enriched,
-                read_enabled_field_defs,
-                resolve_extraction_model,
-                sample_for_extraction,
-            )
-
-            # verify-work 111.1: the WHOLE enriched setup is inside the degrade try now.
-            # build_metadata_model() raises ValueError on an unknown/typo'd custom
-            # field_type (reachable only via a direct DB write — the CRUD API hard-validates
-            # field_type), and resolve/read/sample can also fail; previously those sat
-            # OUTSIDE the try so a metadata-config problem hard-FAILED the whole ingest
-            # (status=failed, no chunks). The "metadata failure never breaks ingestion"
-            # contract (D-111-8) requires ANY enriched failure to degrade to metadata=None.
-            metadata_dict = None
-            try:
-                model = resolve_extraction_model(app_settings.extraction_model)  # env gpt-4o fallback
-                # D-09 #1 (BUG-260616-01 / EMBED-01 data-egress cure): prefer the stored
-                # explicit `extraction_provider`. When the operator pinned a provider in
-                # Settings (e.g. `lmstudio`/`ollama`), trust it and SKIP name-inference
-                # entirely — a slashed local id (`google/gemma-3-4b`) can no longer be
-                # mis-inferred to `openrouter` and ship document text to the cloud.
-                # Name-inference stays ONLY as the last-resort legacy fallback for pre-111.1
-                # rows that never set `extraction_provider` (D-08 back-compat — byte-identical).
-                provider = (getattr(app_settings, "extraction_provider", "") or "").strip().lower() \
-                    or (get_model_capability(model) or {}).get("provider")
-                defs = read_enabled_field_defs(supabase, user_id)  # Plan-02 explicit-scoped, fail-closed read
-                DynModel = build_metadata_model(defs)
-                emit_tool = {
-                    "type": "function",
-                    "function": {
-                        "name": "emit_document_metadata",
-                        "description": (
-                            "Emit structured metadata for this document with a per-field "
-                            "0-1 confidence."
-                        ),
-                        "parameters": DynModel.model_json_schema(),
-                    },
-                }
-                sampled = sample_for_extraction(text, app_settings.extraction_window_cap)
-                result = asyncio.run(extract_metadata_enriched(
-                    sampled=sampled,
-                    model=model,
-                    provider=provider,
-                    schema_model=DynModel,
-                    emit_tool=emit_tool,
-                    user_settings=app_settings,
-                ))
-                emitted = result.get("emitted")
-                if not emitted:
-                    # Never let a metadata extraction silently yield None — surface the
-                    # forced-emit failure reason (model_failed_to_emit vs provider_error)
-                    # plus the resolved model/provider so the cause is diagnosable.
-                    log.warning(
-                        "metadata extraction produced no emission "
-                        "(model=%s provider=%s failure=%s) -> metadata=None",
-                        model, provider, result.get("failure"),
-                    )
-                # D-111-3 (WR-01 fix): use the dedicated helper, which POPS the public
-                # `confidence` field out of the dump and renames it to the nested
-                # `_confidence` key. Hand-rolling `metadata_dict["_confidence"] = ...`
-                # left the flat `confidence` key in the dump (the populated-dict default
-                # survives exclude_none), polluting the `metadata @>` containment filter.
-                metadata_dict = attach_confidence(emitted.model_dump(exclude_none=True)) if emitted else None
-            except Exception:  # noqa: BLE001 — degrade layer 2: ANY enriched failure → metadata=None; doc still completes (D-111-8)
-                log.warning("enriched metadata extraction failed; degrading to None", exc_info=True)
-                metadata_dict = None
-        else:
-            metadata = extract_metadata(text)  # UNTOUCHED legacy path (byte-identical)
-            metadata_dict = metadata.model_dump(exclude_none=True) if metadata else None
-
-        # Phase 203 (EML-01): Merge deterministic email header metadata
-        if mime_type in ("message/rfc822", "application/vnd.ms-outlook", "application/x-msg"):
-            try:
-                from app.services.email_extraction_service import parse_eml_bytes, parse_msg_bytes  # noqa: PLC0415
-                parsed_email = parse_eml_bytes(raw) if mime_type == "message/rfc822" else parse_msg_bytes(raw)
-                metadata_dict = metadata_dict or {}
-                if parsed_email.subject and not metadata_dict.get("title"):
-                    metadata_dict["title"] = parsed_email.subject
-                if parsed_email.sender and not metadata_dict.get("author"):
-                    metadata_dict["author"] = parsed_email.sender
-                if parsed_email.date and not metadata_dict.get("date"):
-                    metadata_dict["date"] = parsed_email.date
-                if not metadata_dict.get("document_type"):
-                    metadata_dict["document_type"] = "email"
-                if parsed_email.sender:
-                    metadata_dict["email_from"] = parsed_email.sender
-                if parsed_email.to:
-                    metadata_dict["email_to"] = parsed_email.to
-                if parsed_email.cc:
-                    metadata_dict["email_cc"] = parsed_email.cc
-                if parsed_email.message_id:
-                    metadata_dict["email_message_id"] = parsed_email.message_id
-                if parsed_email.in_reply_to:
-                    metadata_dict["email_in_reply_to"] = parsed_email.in_reply_to
-                if parsed_email.references:
-                    metadata_dict["email_references"] = parsed_email.references
-            except Exception as em_exc:
-                log.warning("Email metadata extraction warning for %s: %s", document_id, em_exc)
-
-        # Phase 220 (TAKEOFF-01): DXF Takeoff extraction for CAD drawings
-        if (
-            mime_type in ("application/dxf", "image/vnd.dxf", "application/x-dxf")
-            or (filename and filename.lower().endswith(".dxf"))
-        ):
-            try:
-                from app.services.extractors.aspects.dxf import extract_dxf_takeoff  # noqa: PLC0415
-                takeoff_payload = extract_dxf_takeoff(raw, filename=filename)
-                metadata_dict = metadata_dict or {}
-                metadata_dict["_takeoff"] = takeoff_payload
-                if not metadata_dict.get("document_type"):
-                    metadata_dict["document_type"] = "cad_drawing"
-            except Exception as dxf_exc:
-                log.warning("DXF takeoff extraction warning for %s: %s", document_id, dxf_exc)
-
-        # Normalize case-sensitive filter fields for consistent retrieval.
-        # D-111-9: lowercase ONLY document_type + language; _confidence is nested and
-        # is NEVER touched here, and is NEVER promoted to a flat filter field.
-        if metadata_dict:
-            if metadata_dict.get("document_type"):
-                metadata_dict["document_type"] = metadata_dict["document_type"].lower()
-            if metadata_dict.get("language"):
-                metadata_dict["language"] = metadata_dict["language"].lower()
-
-        # Phase 112 D-03 (META-05) — re-extract precedence merge guard.
-        # Preserve any field a human marked _source='user' (via PATCH /documents/{id}/metadata,
-        # Plan 01) across re-extraction, so a later extraction never silently destroys an edit.
-        #
-        # Pitfall 1 (single write site): this guard MUST live here at the SINGLE
-        # ingest_document metadata-write site — NOT in a re-extract wrapper — so ALL THREE
-        # re-extract entry points inherit it: /upload + /reingest (-> _upload_pipeline ->
-        # ingest_document) and /reextract (-> background_tasks.add_task(ingest_document)).
-        # A wrapper-placed guard would pass a /reextract-only test while still destroying
-        # edits on /upload + /reingest. The guard reads the PRIOR doc's _source map (there
-        # is no request-scoped `body` in this function's scope — Pitfall 1 is self-enforced).
-        #
-        # Pitfall 2 (degrade): enriched extraction can degrade to metadata_dict=None; we
-        # promote None -> {} BEFORE the user-field loop so a degrade-with-prior-user-fields
-        # yields {user fields + _source}, never None (a degrade must NOT wipe a human edit).
-        #
-        # sync .execute() — already inside the BackgroundTask thread (this function is a
-        # sync def), so D-v2.5-01 (no blocking I/O in async handlers) does NOT fire here.
-        prior = (
-            supabase.table("documents").select("metadata")
-            .eq("id", document_id).maybe_single().execute()
+        # ⛔ THIS BLOCK USED TO LIVE INLINE HERE, AND THAT IS EXACTLY WHY IT WENT MISSING.
+        #   Phase 230's durable queue does not call this function at all — `splice_document`
+        #   returns early into its own chunk/embed loop when it has a `job_id` — so every
+        #   uploaded document since that cutover reached `completed` with no metadata, no
+        #   chunk header and no vision transcription. Moving the logic to
+        #   `services/ingest_enrich.py` is what makes both paths run the same code rather
+        #   than two copies that drift.
+        enriched = enrich_for_ingest(
+            document_id=document_id,
+            text=text,
+            raw=raw,
+            mime_type=mime_type,
+            filename=filename,
+            user_id=user_id,
+            supabase=supabase,
+            app_settings=app_settings,
         )
-        # WR-02: defensive-copy the fetched prior blob (+ the nested _source dict we
-        # read) so the SELECT result stays pristine and restored values don't share a
-        # mutable reference with the prior object. Behavior unchanged; purely defensive.
-        prior_meta = dict((getattr(prior, "data", None) or {}).get("metadata") or {})
-        user_fields = dict(prior_meta.get("_source") or {})  # {field: "user"}
-        if user_fields:
-            metadata_dict = metadata_dict or {}  # Pitfall 2: degrade None -> {} before the loop
-            preserved_source = metadata_dict.setdefault("_source", {})
-            for fld, src in user_fields.items():
-                if src != "user":
-                    continue
-                if fld in prior_meta:
-                    metadata_dict[fld] = prior_meta[fld]  # restore the human value
-                else:
-                    metadata_dict.pop(fld, None)          # human cleared it -> keep it cleared
-                preserved_source[fld] = "user"            # keep the marker
-                # a human override has no model score -> drop any fresh _confidence for it
-                if isinstance(metadata_dict.get("_confidence"), dict):
-                    metadata_dict["_confidence"].pop(fld, None)
-
+        text = enriched.text
+        metadata_dict = enriched.metadata
+        # Phase 240 (D-240-07) — the SAME value the queue path writes, from the SAME derivation.
+        thread_key = enriched.thread_key
         supabase.table("documents").update({"ingestion_step": "chunking"}).eq("id", document_id).execute()
         chunks = chunk_text(text)
         if not chunks:
@@ -2283,20 +2222,7 @@ def ingest_document(
             }).eq("id", document_id).execute()
             return
 
-        # Build a context header prepended to each chunk before embedding.
-        # The header makes filename, title, date, and document type visible in the
-        # vector space so queries like "amount paid on 17 Jan" can match a receipt
-        # whose date appears only in the filename — not in its text content.
-        # We embed the enriched text but store the raw chunk for clean display.
-        header_parts = [f"Document: {filename}"] if filename else []
-        if metadata_dict:
-            if metadata_dict.get("title"):
-                header_parts.append(f"Title: {metadata_dict['title']}")
-            if metadata_dict.get("date"):
-                header_parts.append(f"Date: {metadata_dict['date']}")
-            if metadata_dict.get("document_type"):
-                header_parts.append(f"Type: {metadata_dict['document_type']}")
-        context_header = f"[{' | '.join(header_parts)}]\n" if header_parts else ""
+        context_header = enriched.context_header
 
         texts_to_embed = [context_header + chunk for chunk in chunks] if context_header else chunks
 
@@ -2363,85 +2289,28 @@ def ingest_document(
                 extracted_doc=extracted_doc,
             )
 
-        # Phase 203 (EML-02): Email attachment extraction & document relationships linking
-        if mime_type in ("message/rfc822", "application/vnd.ms-outlook", "application/x-msg"):
-            try:
-                import hashlib  # noqa: PLC0415
-                from app.services.email_extraction_service import parse_eml_bytes, parse_msg_bytes  # noqa: PLC0415
-                parsed_email = parse_eml_bytes(raw) if mime_type == "message/rfc822" else parse_msg_bytes(raw)
-                # 203 HARDENING — the parser now bounds the LIST (count + per-part size) and returns
-                # names already reduced to a safe leaf, so this loop inherits both guarantees rather
-                # than re-deriving them. See `email_extraction_service.sanitize_attachment_filename`.
-                for att in parsed_email.attachments:
-                    if not att.raw or not att.filename:
-                        continue
-                    att_doc_id = str(uuid4())
-                    att_ext = "." + att.filename.rsplit(".", 1)[-1].lower() if "." in att.filename else ""
-                    att_mime = att.content_type
-                    # Same notion of "the sender did not really know" as the upload door above —
-                    # kept on ONE tuple so the two cannot drift into disagreeing about a file.
-                    if att_mime in _UNRELIABLE_MIME_TYPES and att_ext in _EXT_MIME_OVERRIDES:
-                        att_mime = _EXT_MIME_OVERRIDES[att_ext]
-
-                    if att_mime in ALLOWED_MIME_TYPES:
-                        att_storage_path = f"{user_id}/{att_doc_id}/{att.filename}"
-                        # ⚠ A FAILED UPLOAD MUST NOT LEAVE A ROW. This was `except Exception: pass`,
-                        #   which inserted the `documents` row anyway — a record whose `file_path`
-                        #   points at an object that was never written, indistinguishable from a real
-                        #   one until something tries to read it.
-                        try:
-                            supabase.storage.from_("documents").upload(
-                                path=att_storage_path,
-                                file=att.raw,
-                                file_options={"content-type": att_mime},
-                            )
-                        except Exception as up_exc:
-                            log.warning(
-                                "Attachment upload failed for %s (parent %s): %s — no document row written",
-                                att_storage_path, document_id, up_exc,
-                            )
-                            continue
-
-                        att_doc_data = {
-                            "id": att_doc_id,
-                            "user_id": user_id,
-                            "filename": att.filename,
-                            "file_path": att_storage_path,
-                            "file_size": len(att.raw),
-                            "mime_type": att_mime,
-                            "status": "pending",
-                            "content_hash": hashlib.sha256(att.raw).hexdigest(),
-                            "version_number": 1,
-                            "is_latest": True,
-                        }
-                        supabase.table("documents").insert(att_doc_data).execute()
-
-                        try:
-                            supabase.table("document_relationships").insert({
-                                "user_id": user_id,
-                                "source_doc_id": att_doc_id,
-                                "target_doc_id": document_id,
-                                "rel_type": "attached_to",
-                            }).execute()
-                        except Exception as rel_err:
-                            log.warning("Failed to link attachment %s -> %s: %s", att_doc_id, document_id, rel_err)
-
-                        try:
-                            att_text = extract_text(att.raw, att_mime)
-                            ingest_document(
-                                document_id=att_doc_id,
-                                text=att_text,
-                                user_id=user_id,
-                                supabase=supabase,
-                                raw=att.raw,
-                                mime_type=att_mime,
-                                filename=att.filename,
-                                engine_override="legacy",
-                            )
-                        except Exception as att_ing_err:
-                            log.warning("Failed to ingest attachment document %s: %s", att_doc_id, att_ing_err)
-            except Exception as att_exc:
-                log.warning("Email attachment extraction loop warning for %s: %s", document_id, att_exc)
+        # Phase 240 (D-240-08) — THE LOOP MOVED OUT, and that is the point rather than tidiness.
+        # It lived HERE and nowhere else, so the queue path — which is what a watch and /upload
+        # actually run — ingested messages and dropped every attachment. One function, both
+        # callers. See `services/email_attachments.py` for the full account.
+        # ⛔ `depth` IS LOAD-BEARING AND WAS MISSING, WHICH MADE TM-240-09's GUARD INERT.
+        #    This is the ONLY real recursion path — the loop mints a `.eml` child and ingests
+        #    it through here, which lands back on this very line. Passing the default `0`
+        #    restarted the counter on every hop, so `MAX_MAIL_NESTING_DEPTH` could never fire
+        #    and attacker-supplied nested mail recursed without bound.
+        # ⚠ Found by code review 2026-09-09 (CR-01), NOT by the guard's own test, which passed
+        #   `depth=1` by hand and so proved the parameter rather than the behaviour.
+        attachment_manifest = ingest_email_attachments(
+            raw=raw,
+            mime_type=mime_type,
+            document_id=document_id,
+            user_id=user_id,
+            supabase=supabase,
+            depth=attachment_depth,
+        )
+        if attachment_manifest:
+            metadata_dict = metadata_dict or {}
+            metadata_dict["attachments"] = attachment_manifest
 
         # Phase 071 D-071-08 — telemetry write (happy path).
         # Telemetry INSERT failure must NOT block document ingest completion (T-071-02-07).
@@ -2466,50 +2335,6 @@ def ingest_document(
 
         supabase.table("documents").update({"ingestion_step": "metadata"}).eq("id", document_id).execute()
 
-        # Phase 118 (CLASS-02 / D-118-2/3/4/8) — classification rule-eval pass.
-        # Runs immediately BEFORE the single persist UPDATE below (metadata_dict is final
-        # here — it is only READ for the chunk header above, never mutated). It writes ONE
-        # `_classification` SUGGESTION into metadata_dict; the existing :metadata write below
-        # carries it. It NEVER writes folder_id — the milestone anti-feature ("silent
-        # autonomous auto-filing") is structurally impossible here; the move happens ONLY on
-        # an explicit Accept (accept_classification).
-        #
-        # This is a sync def inside a BackgroundTask (NO request JWT — auth.uid() is NULL and
-        # the service-role client BYPASSES RLS). The SOLE owner-scoping gate is the in-app
-        # `.or_(user_id.eq.{uploader},is_system_global.eq.true)` predicate (Pitfall 3, D-118-8): an
-        # unscoped select would return ALL users' rules. A global rule is evaluated against
-        # the uploader's OWN metadata_dict only. sync .execute() — D-v2.5-01 does NOT fire.
-        if metadata_dict:  # no metadata → nothing to match (never blocks ingest)
-            try:
-                from app.services import classification_matcher  # noqa: PLC0415
-                from app.utils.db import coerce_uid  # noqa: PLC0415
-                rules = (
-                    supabase.table("classification_rules").select("*")
-                    # AR-118-01: coerce the interpolated uploader id (service-role read,
-                    # RLS bypassed — this app-code predicate is the SOLE owner gate).
-                    .or_(f"user_id.eq.{coerce_uid(user_id)},is_system_global.eq.true")  # D-118-8 own + global
-                    .eq("enabled", True)
-                    .order("is_system_global").order("created_at")  # owner(false) before global(true); oldest first (D-118-4)
-                    .execute()
-                ).data or []
-                # AR-118-02: fail-closed Python re-filter — the same defense-in-depth the
-                # sibling service-role own+global reads carry (read_enabled_field_defs,
-                # list_rules). `(A OR B) AND enabled` is correct today, but this guarantees
-                # a malformed/over-broad result can NEVER evaluate another user's rule
-                # against this uploader's metadata (the phase's highest-stakes leak site).
-                rules = [r for r in rules if r.get("is_system_global") or str(r.get("user_id")) == str(user_id)]
-                whitelist = _METADATA_BUILTINS | {
-                    d["field_key"] for d in read_enabled_field_defs(supabase, user_id)  # SYNC reader
-                }
-                for rule in rules:  # first-match-wins (D-118-3): ONE object, never an array
-                    if classification_matcher.match_metadata(rule["match_expr"], metadata_dict, whitelist):
-                        metadata_dict["_classification"] = classification_matcher.build_suggestion(
-                            rule, supabase, user_id,
-                        )
-                        break
-            except Exception:  # noqa: BLE001 — classification NEVER blocks ingestion (mirror the metadata degrade)
-                log.warning("classification rule-eval failed; skipping suggestion", exc_info=True)
-
         # chunk_count = TOTAL searchable rows for the document (text chunks +
         # image-description chunks inserted by multimodal_service.extract_and_store_images).
         # This write happens AFTER multimodal insert, so a count(*) is authoritative and
@@ -2529,13 +2354,49 @@ def ingest_document(
             log.warning("chunk_count total recount failed; using text-chunk count", exc_info=True)
             _total_chunk_count = len(chunks)
 
+        # ── BUG-260905-07 — A FAILED EXTRACTION MUST NOT DESTROY A GOOD ONE ──────────────
+        #
+        # ⛔ THIS WRITE USED TO PASS `"metadata": metadata_dict` UNCONDITIONALLY, AND THAT IS
+        #    DATA LOSS ON RE-INGEST. Enrichment degrades to None on ANY failure — a provider
+        #    error, a timeout, a model that would not emit — and every one of those is
+        #    swallowed by design (D-111-8: "a metadata failure never breaks ingestion").
+        #    Writing that None over an existing row turned a transient provider blip into the
+        #    permanent erasure of a title, date, type and every custom field the document had.
+        #
+        # ⚠ OBSERVED BY THE OPERATOR, not by a test: re-ingesting a document that HAD metadata
+        #   left it with none. The degradation contract says a metadata failure must not break
+        #   the ingestion; it never said it may delete what was already there.
+        #
+        # ⚠ THE QUEUE PATH ALREADY GOT THIS RIGHT (`if enriched.metadata is not None`), so
+        #   leaving this arm unguarded would have re-opened the same two-paths-disagree gap
+        #   BUG-260905-06 was just closed to end — in the opposite direction.
+        #
+        # ⚠ A DELIBERATE CLEAR STILL WORKS. `PATCH /documents/{id}/metadata` writes the field
+        #   directly and is unaffected; this guard only stops an ingest from clearing it as a
+        #   side effect of failing.
+        # ⚠ THE DICT STAYS INLINE, AND THAT IS A CONSTRAINT RATHER THAN A STYLE CHOICE.
+        #   `renameFence.test.ts` extracts every status-bearing payload in this file with
+        #   `/supabase\.table\("documents"\)\s*\.update\(\{/` and asserts no terminal write
+        #   nulls `ingestion_step`. Hoisting this payload into a variable made the ONE
+        #   `completed` write invisible to it — the fence went red on a refactor that changed
+        #   no behaviour, which is the fence working. The conditional key is therefore spliced
+        #   with `**`, keeping the literal where the extractor can see it.
+        if metadata_dict is None:
+            log.warning(
+                "document %s completed with no metadata derived — KEEPING any existing "
+                "metadata rather than clearing it",
+                document_id,
+            )
         supabase.table("documents").update({
             "status": "completed",
             "chunk_count": _total_chunk_count,
-            "metadata": metadata_dict,
             "full_markdown": text,
             # Phase 071 D-071-08 — populate extractor lineage column for new ingests.
             "extractor": engine_used,
+            **({"metadata": metadata_dict} if metadata_dict is not None else {}),
+            # Phase 240 — spliced with `**` for the same reason the metadata key is: the dict
+            # must stay INLINE so `renameFence.test.ts`'s extractor can still see this write.
+            **({"thread_key": thread_key} if thread_key is not None else {}),
         }).eq("id", document_id).execute()
 
     except Exception as e:

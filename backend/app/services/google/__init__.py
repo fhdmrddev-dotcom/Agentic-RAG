@@ -1,8 +1,7 @@
 """Read-only Google surfaces, all on ONE `connector_connections` row.
 
-Gmail · Sheets · Docs · Calendar · Contacts. Drive stays in `services/cloud_storage.py`
-because it is also the composer file picker's module — a shared consumer this package
-does not have, and a move with its own blast radius. That is a decision, not an oversight.
+Gmail · Sheets · Docs · Calendar · Contacts. Drive belongs to `services/sources/adapters/google_drive.py`
+under the unified SourceAdapter contract (Phase 232 / SRC-01 / SRC-02).
 
 ⚠ EVERY SURFACE HAS ITS OWN EGRESS KEY, AND THEY ALL RESOLVE TO googleapis.com. The key
 therefore buys no HOST separation — it buys that a spec DECLARES exactly one key, so a

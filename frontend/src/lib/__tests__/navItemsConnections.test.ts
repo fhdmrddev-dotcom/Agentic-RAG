@@ -21,7 +21,18 @@ import { NAV_ITEMS, visibleNavItems } from "@/lib/nav-items"
 import type { EffectiveFeatures } from "@/lib/api"
 
 /** The map's fail-closed shape: every governed feature hidden (a member, or a blip). */
-const MEMBER: EffectiveFeatures = {} as EffectiveFeatures
+// ⚠ CORRECTED 2026-09-09. This read `{} as EffectiveFeatures`, and that fixture ENCODED THE BUG
+// the operator later hit: an empty object is "we have not been told yet", NOT "this member is
+// denied". `GET /features` builds its answer with a dict comprehension over EVERY governed
+// feature (`api/features.py:61-78`), so a real member receives every key with an explicit
+// boolean — `{}` only ever means loading, or a failed fetch.
+//
+// Standing in for a member with an empty object made `visibleNavItems` look correct while it was
+// silently treating "unknown" as "denied", which is why a refresh sometimes lost Workflows,
+// Settings and Control Room. The fixture now says what it means: explicitly DENIED.
+const MEMBER: EffectiveFeatures = Object.fromEntries(
+  NAV_ITEMS.filter((i) => i.feature).map((i) => [i.feature as string, false]),
+) as EffectiveFeatures
 
 describe("connections reachability for a non-operator", () => {
   it("leaves a connections door standing when every governed feature is hidden", () => {

@@ -318,8 +318,8 @@ export function DocumentRow({
       <tr
         data-selected={selectedDocId === doc.id || undefined}
         className={cn(
-          "border-b last:border-0 hover:bg-muted/20 transition-colors",
-          selectedDocId === doc.id && "bg-primary/5",
+          "group border-b border-border/40 last:border-0 hover:bg-muted/30 transition-colors duration-150",
+          selectedDocId === doc.id && "bg-primary/10 hover:bg-primary/15",
         )}
       >
         <td className="px-2 py-3">
@@ -395,7 +395,7 @@ export function DocumentRow({
           ) : doc.status === "failed" ? (
             // The failure sentence — the SAME mapper Wave 1 built, imported, not re-implemented.
             <span data-testid="row-failure-sentence" className="text-xs text-destructive">
-              {classifyIngestionError(doc.error_message)}
+              {classifyIngestionError(doc.error_message, doc.filename)}
             </span>
           ) : (
             <DocumentStatusBadge status={doc.status} ingestionStep={doc.ingestion_step} />
@@ -409,7 +409,7 @@ export function DocumentRow({
                   variant="ghost"
                   size="sm"
                   onClick={() => onReingest(doc.id)}
-                  disabled={reingesting || doc.status === "pending" || doc.status === "processing"}
+                  disabled={reingesting || doc.status === "pending" || doc.status === "processing" || doc.status === "paused"}
                   className="h-7 w-7 p-0 text-muted-foreground hover:text-primary"
                   aria-label="Re-ingest document"
                 >

@@ -152,7 +152,7 @@ describe("MessageItem — deliverable-aware Resume gate (Phase 095.1 D-07)", () 
   const onResume = vi.fn()
 
   function queryResume() {
-    return screen.queryByRole("button", { name: /resume/i })
+    return screen.queryByRole("button", { name: /retry turn/i })
   }
 
   it("failed run WITH deliverables → NO Resume button (the BUG-260518-01 case)", () => {

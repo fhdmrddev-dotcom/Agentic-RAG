@@ -28,6 +28,8 @@ services:
         VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
         VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api}
+        VITE_DEMO_URL: ${VITE_DEMO_URL:-}
+        VITE_APP_URL: ${VITE_APP_URL:-}
     restart: unless-stopped
     ports:
       - "8080:80"           # published ingress — the ONLY required entry point
@@ -70,6 +72,36 @@ services:
       SCHEDULER_PROCESS_ENABLED: ${SCHEDULER_PROCESS_ENABLED:-false}
       SCHEDULER_POLL_INTERVAL_SECONDS: ${SCHEDULER_POLL_INTERVAL_SECONDS:-60}
       SCHEDULER_MAX_CLAIMS_PER_TICK: ${SCHEDULER_MAX_CLAIMS_PER_TICK:-10}
+      # Phase 230 (QUEUE-01 / QUEUE-05) — the durable ingestion queue daemon. Also read from
+      # env_file above; listed here to self-document the knobs. Lifespan task inside the backend,
+      # bounds concurrent embeddings, and handles provider outages cleanly.
+      #
+      # ⚠ UNLIKE THE SCHEDULER ABOVE, THIS ONE IS CPU-BOUND, AND THAT CHANGES THE ADVICE.
+      #   The scheduler comment says "NOT a separate compose service ON PURPOSE" — true for
+      #   it, because it only *starts* work. Ingestion PERFORMS work: camelot parses every
+      #   page of every PDF, and CPython's GIL means that does not run in parallel with
+      #   request handling inside the same process. Under load, ingesting freezes the API.
+      #
+      #   To separate them, add a second service off THIS SAME IMAGE — no new build, no code
+      #   change; the queue is safe at any process count (database-level claims, reclaimed
+      #   leases):
+      #
+      #     backend:                      INGEST_WORKER_ENABLED: "false"
+      #     ingest-worker:
+      #       <<: *backend-service-def    INGEST_WORKER_ENABLED: "true"
+      #       ports: []                   # serves nothing; no port, no healthcheck route
+      #
+      #   Left as a documented option rather than shipped as a second service, because on a
+      #   one-box install a single process is simpler and the contention only matters once
+      #   somebody is waiting on a request.
+      INGEST_WORKER_ENABLED: ${INGEST_WORKER_ENABLED:-true}
+      INGEST_MAX_CONCURRENT_JOBS: ${INGEST_MAX_CONCURRENT_JOBS:-3}
+      INGEST_POLL_INTERVAL_SECONDS: ${INGEST_POLL_INTERVAL_SECONDS:-2.0}
+      INGEST_LEASE_TIMEOUT_SECONDS: ${INGEST_LEASE_TIMEOUT_SECONDS:-300}
+      # Phase 234 (LIB-08 / QUEUE-03) — the background connector watch loop. Also read from
+      # env_file above; listed here to self-document the knobs.
+      WATCH_PROCESS_ENABLED: ${WATCH_PROCESS_ENABLED:-false}
+      WATCH_POLL_INTERVAL_SECONDS: ${WATCH_POLL_INTERVAL_SECONDS:-60}
     depends_on:
       redis:
         condition: service_healthy

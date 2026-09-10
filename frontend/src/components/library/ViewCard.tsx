@@ -51,6 +51,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { deleteView } from "@/lib/api"
 import { ruleInWords } from "@/components/ingestion/viewRuleWords"
+import { AnimatedNumber } from "@/components/ui/AnimatedNumber"
 import type { SavedView } from "@/types"
 
 export interface ViewCardProps {
@@ -205,7 +206,7 @@ export function ViewCard({
             zeroMatch ? "text-amber-400" : "text-foreground",
           ].join(" ")}
         >
-          {total ?? "…"}
+          {total == null ? "…" : <AnimatedNumber value={total} />}
         </span>
       </div>
 
@@ -226,9 +227,9 @@ export function ViewCard({
           ) : view.is_system_global ? (
             "Built in · shared with everyone"
           ) : total === null ? (
-            `${corpusCount} documents`
+            <><AnimatedNumber value={corpusCount} /> documents</>
           ) : (
-            `${total} of ${corpusCount} documents`
+            <><AnimatedNumber value={total} /> of <AnimatedNumber value={corpusCount} /> documents</>
           )}
         </span>
         <span className="relative inline-flex items-center">

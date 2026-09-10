@@ -932,6 +932,23 @@ class Settings(BaseSettings):
     keyword_search_weight: float = 1.0
     rrf_k: int = 60  # RRF constant (standard: 60)
 
+    # Phase 241 (QUEUE-06 / D-09) — the HNSW scan knobs. ⛔ THESE TWO ARE THE MINIMAL
+    # HARDCODED DEFAULTS, NOT THE CONTROL: the operator's choice lives in
+    # `app_settings.hnsw_ef_search` / `.hnsw_iterative_scan` (migration 176) and reaches
+    # here only as `_val`'s fallback when no value is stored. Both values below are the
+    # LIVE pgvector server defaults measured 2026-09-10 (pgvector 0.8.0 / PG 17.6), which is
+    # what makes an unapplied migration 176 a no-op rather than a silent behaviour change.
+    hnsw_ef_search: int = 40
+    hnsw_iterative_scan: str = "off"  # off | strict_order | relaxed_order
+
+    # ⛔ HARDCODED-ONLY, DELIBERATELY — D-09 / threat T-241-16. These matter ONLY once
+    # iterative scan is on, and a wrong value is a MEMORY FOOTGUN rather than a tuning
+    # choice with a safe bounded control: `scan_mem_multiplier` multiplies work_mem for the
+    # scan, and `max_scan_tuples` bounds how far it will keep going. They are reachable from
+    # no settings column, no request field and no UI control — only from this file.
+    hnsw_max_scan_tuples: int = 20000
+    hnsw_scan_mem_multiplier: float = 1.0
+
     # Reranking (disabled by default — requires Cohere API key or local model)
     rerank_enabled: bool = False
     rerank_provider: str = "api"  # "api" (Cohere) or "local" (sentence-transformers)
@@ -1071,9 +1088,20 @@ class Settings(BaseSettings):
     # Overrides _MODEL_OUTPUT_DEFAULTS for the listed models.
     model_output_limits: str = ""
 
-    # Vision model for image description during ingestion (must support vision)
-    # Defaults to gpt-4o-mini — override with VISION_MODEL=<model-id> in .env
-    vision_model: str = "gpt-4o-mini"
+    # Vision model for image description + transcription during ingestion (must support vision).
+    #
+    # ⚠ DEFAULT CHANGED "gpt-4o-mini" -> "" 2026-09-05 (SEED-226), AND THE OLD DEFAULT WAS A LIVE
+    #   BUG, not merely a stale name. Both call sites resolve
+    #       env_settings.vision_model or app_settings.llm_model
+    #   so a NON-EMPTY default here made the second half unreachable: every vision call this
+    #   product has ever made went to gpt-4o-mini regardless of the operator's configured
+    #   provider — including deployments with no OpenAI key at all, where it simply failed.
+    #
+    # ⚠ THE REAL HOME IS NOW `app_settings.vision_model` (migration 166), per CLAUDE.md's
+    #   "settings live in user_settings/app_settings; env vars are for secrets and infra only".
+    #   This env var survives ONLY as an override for an operator who already set it.
+    #   Empty => the DB setting, then the active chat model. Never a pinned model name.
+    vision_model: str = ""
 
     # Sub-agent settings
     sub_agent_model: str = ""
@@ -1145,6 +1173,69 @@ class Settings(BaseSettings):
     # Per-tick claim ceiling — the backpressure knob. Without it, an install that was
     # offline over a weekend wakes up and launches every overdue schedule at once.
     scheduler_max_claims_per_tick: int = 10
+
+    # ── Phase 230 (QUEUE-01 / QUEUE-05 / D-05) — the durable ingestion queue daemon ────
+    # Worker enabled by default for restart survival and asynchronous upload processing.
+    #
+    # ⚠ BUG-260905-16 — THIS IS THE KNOB THAT SEPARATES INGESTION FROM THE API, AND ON A BOX
+    #   WITH USERS IT SHOULD BE `false` ON THE API PROCESSES.
+    #
+    #   Document extraction is CPU-BOUND PYTHON — camelot parses every page of every PDF,
+    #   embedding batches marshal large payloads. Threads do not make CPU work parallel in
+    #   CPython: the GIL is held, so while a document ingests, the API process's event loop is
+    #   starved and every unrelated request (chat, threads, folders) crawls behind it.
+    #
+    # ⚠ MEASURED BY THE OPERATOR, not inferred: with `WORKER_COUNT=2` and
+    #   `ingest_max_concurrent_jobs=3`, importing a Google Drive folder made the whole app
+    #   unresponsive — "if I wanted to ingest something that should not stop the back end, I
+    #   can navigate to chat, I can do anything". Up to SIX concurrent CPU-heavy jobs were
+    #   competing with request handling inside the same processes.
+    #
+    # ⛔ MOVING THE BLOCKING DB CALLS OFF THE LOOP (BUG-260905-14) DID NOT FIX THIS AND WAS
+    #   NEVER GOING TO. That removed the *I/O* stalls; this is *CPU* contention, and the only
+    #   real remedy is a different process. The queue was already built for it — claims are
+    #   database-level (`FOR UPDATE SKIP LOCKED`), leases are reclaimed after
+    #   `ingest_lease_timeout_seconds`, so N processes are safe with zero coordination.
+    #
+    #   The deployment shape:
+    #     API processes     INGEST_WORKER_ENABLED=false   ← serves requests, never ingests
+    #     one worker process INGEST_WORKER_ENABLED=true   ← ingests, serves nothing
+    #
+    #   The default stays `true` so a single-process dev box and the one-box deploy keep
+    #   working with no configuration at all. Splitting is an operator decision about scale,
+    #   not a behaviour change — see `docs/OPERATOR.md` and `docker-compose.prod.yml`.
+    ingest_worker_enabled: bool = True
+    # Concurrency limit per worker process (asyncio.Semaphore). Bounds concurrent
+    # document extractions and embeddings to prevent provider rate-limit saturation.
+    ingest_max_concurrent_jobs: int = 3
+    # Worker poller tick interval.
+    ingest_poll_interval_seconds: float = 2.0
+    # Lease timeout for in-flight jobs. If a worker dies/restarts, jobs held longer than
+    # this duration are reclaimed by reclaim_stale_ingestion_claims (G-1 / SC#1).
+    ingest_lease_timeout_seconds: int = 300
+
+    # ── Phase 234 (LIB-08 / QUEUE-03) — the background connector watch loop ─────────────
+    # OFF BY DEFAULT, matching scheduler_process_enabled: makes outbound cloud provider calls
+    # autonomously, so it must be explicitly enabled by the operator.
+    watch_process_enabled: bool = False
+    # Poll interval in seconds for the watch loop (default 60s).
+    watch_poll_interval_seconds: int = 60
+    # Lease duration in seconds for in-flight watch passes (default 600s).
+    watch_lease_seconds: int = 600
+    # Phase 235 (SURF-02 / D-235-08) — bound on per-watch run history, pruned on write.
+    # `connector_sync_runs` gains one row per release of a watch, so an hourly watch
+    # writes ~24 rows a day forever. The bound is applied in the SAME statement as the
+    # insert: there is no sweeper to forget to run and no unbounded-growth path.
+    #
+    # ⚠ It lives HERE rather than in `app_settings` deliberately, and the tension is
+    # named rather than hidden: CLAUDE.md says settings live in the DB and env vars are
+    # for secrets and infra. This is an operational bound on a background daemon — in
+    # the same block as that daemon's other two bounds — and putting it in `app_settings`
+    # would mean the watch loop reads a DB setting on every tick. When retention becomes
+    # a governed POLICY (a retention promise made to a customer) rather than a daemon
+    # bound, it moves to `app_settings` — recorded as SEED-250.
+    watch_run_history_retention: int = 200
+
 
     @model_validator(mode="after")
     def _validate_run_stale_sweep_bounds(self) -> "Settings":
@@ -1404,5 +1495,12 @@ def primary_frontend_origin() -> str:
     alternates that exist for CORS. Never use this for CORS — that must keep the full list.
     """
     raw = getattr(settings, "frontend_url", "") or "http://localhost:5173"
-    first = next((part.strip() for part in raw.split(",") if part.strip()), "")
-    return (first or "http://localhost:5173").rstrip("/")
+    parts = [part.strip().rstrip("/") for part in raw.split(",") if part.strip()]
+    if not parts:
+        return "http://localhost:5173"
+    # If an app subdomain origin exists (e.g. https://app.superrag.cloud), prefer it as the canonical
+    # product home for redirects, else fall back to the first configured origin (SEED-242 / DEBT-04).
+    app_origin = next((p for p in parts if "://app." in p), None)
+    if app_origin:
+        return app_origin
+    return parts[0]

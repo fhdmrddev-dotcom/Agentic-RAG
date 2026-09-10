@@ -1,0 +1,856 @@
+"""The One Ingest Splice — unified minting and background ingestion pipeline.
+
+Phase 229 (TRUST-01):
+Every document row created in this product is minted by mint_document_row,
+ensuring identical row schema, deduplication, versioning, and canonical storage path
+across all ingress doors (/upload, connectors, email attachments).
+"""
+
+from __future__ import annotations
+
+import asyncio
+from dataclasses import dataclass
+import hashlib
+import logging
+import time
+from typing import TYPE_CHECKING, Literal
+from uuid import uuid4
+
+from fastapi import HTTPException, status
+from starlette.concurrency import run_in_threadpool
+from supabase import Client
+
+if TYPE_CHECKING:
+    from app.services.extraction_service import ExtractedDocument
+
+from app.services.transient_errors import is_transient
+
+log = logging.getLogger(__name__)
+
+
+async def _db(call):
+    """Run one blocking `supabase-py` call off the event loop.
+
+    ⛔ BUG-260905-14 — WITHOUT THIS, INGESTING A DOCUMENT FROZE THE WHOLE BACKEND.
+      `splice_document` is `async def`, and `supabase-py` is SYNCHRONOUS HTTP. Every bare
+      `.execute()` in this module therefore stopped the event loop for a full network
+      round-trip, and one of them runs PER CHUNK BATCH — so a 400-chunk document stalled the
+      server dozens of times while it ingested.
+
+    ⚠ REPORTED AS A UI BUG, NOT A PERFORMANCE ONE, WHICH IS WHY IT SURVIVED SO LONG: the
+      operator observed that clicking **Accept** on a classification suggestion "does nothing
+      until the full ingestion of other documents finishes". The endpoint was never broken —
+      the request was queued behind these writes. Any symptom of the form *"the UI is dead
+      while something ingests"* is this.
+
+    ⚠ IT IS A RULE, NOT A JUDGEMENT CALL. `CLAUDE.md` D-v2.5-01: *"Do not run blocking I/O
+      (e.g. supabase-py calls) directly inside async handlers — wrap with run_in_threadpool."*
+      The heavy work in this file was already threadpooled correctly — extraction, embedding,
+      enrichment, image description. Only the database writes BETWEEN those steps were not,
+      which is precisely why the omission looked deliberate.
+
+    ⚠ THE CALL IS PASSED AS A LAMBDA so the `supabase.table("documents").update({` literal
+      stays intact at each site. Source-reading fences match on that exact shape, and hoisting
+      a payload into a variable is what made one of them go red on a no-behaviour refactor.
+    """
+    return await run_in_threadpool(call)
+
+
+@dataclass(frozen=True)
+class MintResult:
+    document: dict
+    is_duplicate: bool
+    storage_path: str
+    version_number: int
+
+
+#: Characters Supabase Storage refuses in an object key. ⚠ DERIVED FROM A REAL 400, not from the
+#: docs: `Cambridge IELTS 14 with Answers GT [www.luckyielts.com].pdf` produced
+#:     StorageApiError {'statusCode': 400, 'error': 'InvalidKey',
+#:                      'message': 'Invalid key: <user>/<doc>/Cambridge ... [www.luckyielts.com].pdf'}
+#: Square brackets are the ones that bit; the rest are the shell/URL-hostile set that would bite
+#: next. Kept deliberately SMALL — this is a key sanitiser, not a filename policy.
+_STORAGE_UNSAFE = '[]{}#%^`"\'<>|\\?*\r\n\t'
+
+
+def _storage_safe(name: str) -> str:
+    """Make a filename usable as a Supabase Storage object key, without renaming the document.
+
+    ⚠ BUG-260905-06 — THE FAILURE THIS FIXES WAS INVISIBLE, AND THAT IS THE POINT. The upload
+    raised `InvalidKey`, but `/upload` and `splice_document` BOTH swallow storage-upload errors
+    (a `log.warning` and a `log.debug` respectively, deliberately, so a storage hiccup does not
+    lose an ingest). The document therefore sailed on to extraction with **no bytes ever
+    stored**, and later failed with an EMPTY `error_message` — which is what two of the six
+    failures in the operator's Drive import actually were. **The blank message was the tell:**
+    every honest failure path in this pipeline names a cause.
+
+    ⚠ `documents.filename` is NOT touched. The person sees the file they uploaded; only the
+    storage KEY is sanitised. A sanitiser that renamed the document would fix the 400 by
+    lying about what the file is called.
+
+    ⚠ NON-ASCII IS REPLACED TOO, AND THE ASCII SET ALONE WAS NOT ENOUGH — MEASURED.
+      `Application – Deputy Manager, PMO _ Aster Digital Health (Dubai).msg` failed on the
+      operator's library 2026-09-05. The character that broke it is a single **U+2013 EN DASH**
+      copied out of an email subject; every other character in the name is ordinary. The set
+      above is ASCII-only, so the dash passed straight through into the object key and Storage
+      refused it — and because the refusal arrives as a failed upload, the file looked like a
+      broken `.msg` rather than a filename this sanitiser did not cover. It is not about `.msg`
+      at all: a curly quote, an accent, an em dash or any Arabic character would do the same.
+
+    ⚠ COLLISIONS ARE STRUCTURALLY IMPOSSIBLE, which is why blunt replacement is safe here: the
+      key is `{user_id}/{document_id}/{filename}` and `document_id` is a fresh uuid, so two
+      files that sanitise to the same name still land on different keys. A name that is ENTIRELY
+      non-ASCII degrades to underscores — ugly, and still correct, because `documents.filename`
+      keeps the real name and every reader derives the key from the `file_path` column.
+
+    ⚠ It is applied HERE, at the single minting site, so `file_path` is written sanitised ONCE
+    and every later reader (`splice_document`'s download, the queue worker, re-extract) derives
+    the same key from the column rather than recomputing it. Sanitising at the upload call
+    instead would have produced a key that no download could reproduce.
+    """
+    cleaned = "".join(
+        "_" if (ch in _STORAGE_UNSAFE or not (32 <= ord(ch) <= 126)) else ch
+        for ch in (name or "")
+    )
+    cleaned = cleaned.strip() or "file"
+    # Collapse runs of the replacement so `[www.x.com]` does not become `__www.x.com__`.
+    while "__" in cleaned:
+        cleaned = cleaned.replace("__", "_")
+    return cleaned
+
+
+def mint_document_row(
+    *,
+    raw: bytes,
+    filename: str,
+    mime_type: str,
+    user_id: str,
+    supabase: Client,
+    folder_id: str | None = None,
+    metadata: dict | None = None,
+    org_id: str | None = None,
+    on_conflict: Literal["raise", "link"] = "raise",
+    source_connection_id: str | None = None,
+    ingest_visibility: str | None = None,
+) -> MintResult:
+    """Synchronously validates, dedupes, versions, and mints a single document row.
+
+    Strictly preserves upload-path semantics:
+    1. Folder ownership: folder_id must exist and belong to user_id (403 on mismatch).
+    2. Hashing: SHA-256 of raw bytes.
+    3. Deduplication: folder-scoped check for status='completed' AND is_latest=True.
+       If match found, returns MintResult(is_duplicate=True) without inserting.
+    4. Versioning: user-scoped by filename. If prior versions exist, retires them
+       (is_latest=False) and increments version_number.
+    5. Storage path: canonical f"{user_id}/{document_id}/{filename}".
+    6. Row creation: inserts status='pending', omitting created_at/updated_at to
+       preserve Postgres column clock defaults.
+    7. Unique index collision (23505 on documents_dedup_idx):
+       - on_conflict="raise": raises HTTP 409 Conflict.
+       - on_conflict="link": re-queries the non-failed document and returns it as
+         is_duplicate=True.
+    """
+    # 1. Folder ownership validation (G-1: owner-only parity with documents.py:610-617)
+    if folder_id:
+        folder_check = (
+            supabase.table("folders")
+            .select("id, user_id")
+            .eq("id", folder_id)
+            .maybe_single()
+            .execute()
+        )
+        if not folder_check.data:
+            raise HTTPException(status_code=404, detail="Folder not found")
+        if folder_check.data["user_id"] != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Cannot upload to a folder you do not own",
+            )
+
+    # 2. Content hashing
+    content_hash = hashlib.sha256(raw).hexdigest()
+
+    # 3. Deduplication — SCOPED TO MATCH THE CONSTRAINT THAT ACTUALLY FIRES.
+    #
+    # ⚠ BUG-260905-02. This check used to be FOLDER-scoped and to require `is_latest = True`.
+    #   The unique index it is supposed to anticipate is neither:
+    #
+    #     documents_completed_hash_unique_idx
+    #       ON documents (user_id, content_hash)
+    #       WHERE content_hash IS NOT NULL AND status = 'completed'
+    #
+    #   So re-uploading a file you already had, into a DIFFERENT folder, passed this check,
+    #   ran the whole extraction and embedding pipeline, and then died at the completion write
+    #   with a raw 23505 — after all the work was paid for, and leaving the row `failed` when
+    #   nothing had actually gone wrong. Measured on a real bulk ingest: `Train-the-Trainer.pptx`
+    #   completed in folder e400e289 on 2026-09-01, re-uploaded to the root on 09-05, failed.
+    #
+    # ⚠ A CHECK THAT IS NARROWER THAN ITS CONSTRAINT DOES NOT PREVENT THE ERROR, IT ONLY DELAYS
+    #   IT. The two predicates below are now the index's predicate, verbatim.
+    #
+    # ⚠ DELIBERATE BEHAVIOUR CHANGE: the same bytes uploaded to a second folder are now reported
+    #   as a duplicate instead of appearing to succeed and then failing. The database already
+    #   forbade the second copy — this only moves the refusal to where a person can act on it.
+    dedup_query = (
+        supabase.table("documents")
+        .select("*")
+        .eq("user_id", user_id)
+        .eq("content_hash", content_hash)
+        .eq("status", "completed")
+    )
+
+    existing = dedup_query.limit(1).execute()
+    if existing.data:
+        existing_doc = existing.data[0]
+        return MintResult(
+            document=existing_doc,
+            is_duplicate=True,
+            storage_path=existing_doc.get("file_path", ""),
+            version_number=existing_doc.get("version_number", 1),
+        )
+
+    # 4. Versioning (user-scoped, filename matching)
+    existing_versions = (
+        supabase.table("documents")
+        .select("id, version_number")
+        .eq("user_id", user_id)
+        .eq("filename", filename)
+        .order("version_number", desc=True)
+        .limit(1)
+        .execute()
+    )
+    if existing_versions.data:
+        next_version = existing_versions.data[0]["version_number"] + 1
+        supabase.table("documents").update({"is_latest": False}).eq("user_id", user_id).eq("filename", filename).execute()
+    else:
+        next_version = 1
+
+    # 5. Insert new documents row with status='pending'
+    document_id = str(uuid4())
+    storage_path = f"{user_id}/{document_id}/{_storage_safe(filename)}"
+
+    doc_data: dict = {
+        "id": document_id,
+        "user_id": user_id,
+        "filename": filename,
+        "file_path": storage_path,
+        "file_size": len(raw),
+        "mime_type": mime_type,
+        "status": "pending",
+        "content_hash": content_hash,
+        "folder_id": folder_id,
+        "version_number": next_version,
+        "is_latest": True,
+    }
+    if metadata:
+        doc_data["metadata"] = metadata
+    if org_id:
+        doc_data["org_id"] = org_id
+
+    # Phase 231 (VIS-01 / TRUST-04) — provenance and the scope the connection's owner chose.
+    # ⚠ BOTH keys are omitted entirely for a person's upload, so /upload's minted dict stays
+    #   field-for-field what Phase 229's verification pinned. The column default ('private')
+    #   covers the omitted case, and the SQL predicate ignores visibility outright when
+    #   source_connection_id IS NULL — so a hand-uploaded row is untouched by this phase.
+    # ⚠ Visibility is only meaningful WITH a connection. Accepting one without the other would
+    #   mint a row claiming a scope nothing enforces, so the pair is written together or not
+    #   at all.
+    if source_connection_id:
+        doc_data["source_connection_id"] = source_connection_id
+        doc_data["ingest_visibility"] = ingest_visibility or "private"
+
+    try:
+        result = supabase.table("documents").insert(doc_data).execute()
+        doc = result.data[0]
+        return MintResult(
+            document=doc,
+            is_duplicate=False,
+            storage_path=storage_path,
+            version_number=next_version,
+        )
+    except Exception as exc:
+        exc_str = str(exc)
+        if "23505" in exc_str:
+            if on_conflict == "link":
+                # G-2: Attachment collision or concurrent ingest race.
+                # documents_dedup_idx is UNIQUE WHERE status <> 'failed'.
+                link_query = (
+                    supabase.table("documents")
+                    .select("*")
+                    .eq("user_id", user_id)
+                    .eq("content_hash", content_hash)
+                    .neq("status", "failed")
+                )
+                if folder_id:
+                    link_query = link_query.eq("folder_id", folder_id)
+                else:
+                    link_query = link_query.is_("folder_id", "null")
+                link_match = link_query.order("created_at", desc=True).limit(1).execute()
+                if link_match.data:
+                    linked_doc = link_match.data[0]
+                    return MintResult(
+                        document=linked_doc,
+                        is_duplicate=True,
+                        storage_path=linked_doc.get("file_path", ""),
+                        version_number=linked_doc.get("version_number", 1),
+                    )
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="File already exists in this folder",
+            ) from exc
+        raise
+
+
+async def async_mint_document_row(
+    *,
+    raw: bytes,
+    filename: str,
+    mime_type: str,
+    user_id: str,
+    supabase: Client,
+    folder_id: str | None = None,
+    metadata: dict | None = None,
+    org_id: str | None = None,
+    on_conflict: Literal["raise", "link"] = "raise",
+    source_connection_id: str | None = None,
+    ingest_visibility: str | None = None,
+) -> MintResult:
+    """Asynchronous wrapper for mint_document_row using run_in_threadpool."""
+    return await run_in_threadpool(
+        lambda: mint_document_row(
+            raw=raw,
+            filename=filename,
+            mime_type=mime_type,
+            user_id=user_id,
+            supabase=supabase,
+            folder_id=folder_id,
+            metadata=metadata,
+            org_id=org_id,
+            on_conflict=on_conflict,
+            source_connection_id=source_connection_id,
+            ingest_visibility=ingest_visibility,
+        )
+    )
+
+
+async def splice_document(
+    *,
+    document_id: str,
+    raw: bytes | None = None,
+    mime_type: str | None = None,
+    filename: str | None = None,
+    user_id: str | None = None,
+    storage_path: str | None = None,
+    supabase: Client | None = None,
+    engines_dict: dict[str, str] | None = None,
+    job_id: str | Any | None = None,
+    initial_progress: dict[str, Any] | None = None,
+    progress: dict[str, Any] | None = None,
+    pool: Any | None = None,
+) -> None:
+    """Executes the post-minting extraction, embedding, and chunking pipeline.
+
+    Phase 230 (QUEUE-01 / QUEUE-04 / SC#1 / SC#4):
+    - Supports durable queue execution with checkpointed resumption (progress.chunk_offset).
+    - When job_id is provided, updates ingestion_jobs.progress after each chunk batch and stage.
+    - Resumes chunk embedding from progress.chunk_offset without re-embedding prior chunks.
+    - If stage == "tables_embedded", skips table extraction and embedding.
+    - Authoritative recount of document_chunks on completion.
+    """
+    from datetime import datetime, timezone  # noqa: PLC0415
+    from uuid import UUID  # noqa: PLC0415
+
+    if supabase is None:
+        from app.dependencies import get_supabase  # noqa: PLC0415
+        supabase = get_supabase()
+
+    # Resolve document row if metadata fields missing
+    doc: dict[str, Any] = {}
+    if not (filename and mime_type and user_id and storage_path):
+        try:
+            res = supabase.table("documents").select("*").eq("id", document_id).maybe_single().execute()
+            doc = res.data or {}
+        except Exception as e:
+            log.warning("Could not fetch document %s row: %s", document_id, e)
+        filename = filename or doc.get("filename", "")
+        mime_type = mime_type or doc.get("mime_type", "")
+        user_id = user_id or doc.get("user_id", "")
+        storage_path = storage_path or doc.get("file_path", "")
+
+    # Resolve raw bytes if missing
+    _expected_bytes_from_storage = False
+    if raw is None or len(raw) == 0:
+        if storage_path:
+            _expected_bytes_from_storage = True
+            try:
+                raw = supabase.storage.from_("documents").download(storage_path)
+            except Exception as dl_exc:
+                log.warning("Storage download failed for %s (%s): %s", document_id, storage_path, dl_exc)
+                # ── A FAILED READ IS NOT AN EMPTY FILE (2026-09-09) ──────────────────────
+                #
+                # ⛔ SWALLOWING THIS COST A WATCHED EMAIL ITS DOCUMENT, and the report was a
+                #    lie: `no bytes in storage for document 47a73155…` while 145,843 bytes sat
+                #    in the bucket, uploaded 22 seconds earlier with a matching `file_size`.
+                #    The read had timed out — the same 20-second stall measured in
+                #    `email_attachments.py`, on a download instead of an upload.
+                #
+                # ⚠ FROM THE `raw = b""` LINE ONWARD THE TWO CASES WERE INDISTINGUISHABLE, and
+                #   they need OPPOSITE handling: an empty object is terminal and must be
+                #   refused; an unreadable one is transient and must be tried again.
+                #
+                # ⛔ AND THE REWRITE DISABLED THE RETRY THAT EXISTED. By the time the guard
+                #    below raised `RuntimeError("no bytes in storage …")`, the word `timeout`
+                #    was gone, so `ingestion_queue_service`'s classifier judged it PERMANENT:
+                #    `retry_count = 1` against `max_retries = 3`, and the job was failed for
+                #    good. The retry was there and could not fire.
+                #
+                # ⚠ ONLY WHEN THERE IS A JOB TO RETRY IT. Without a job nothing would catch a
+                #   re-raise, so that path keeps its previous behaviour exactly and falls
+                #   through to the refusal below. ⛔ `job_id`, NOT `job_uuid` — the parsed uuid
+                #   is not bound until further down, and reading it here is an
+                #   `UnboundLocalError` INSIDE an except block, which replaces the real cause
+                #   with a variable-name error. The refusal guard below uses `job_id` for the
+                #   same reason.
+                if job_id and is_transient(dl_exc):
+                    raise
+                raw = b""
+        else:
+            raw = b""
+
+    # ── BUG-260905-08 (second half) — NO BYTES MEANS NO DOCUMENT, ON THIS PATH TOO ───────
+    #
+    # ⛔ THE FIX AT THE `/upload` DOOR WAS ONLY HALF THE FIX, and this is the half Phase 234
+    #    runs through. `/upload` now refuses when the storage PUT fails; nothing refused when
+    #    the later GET came back empty. A document whose row exists and whose bytes do not
+    #    then flowed straight on: extraction of `b""` yields no text, no text yields no chunks,
+    #    and this path had no empty guard — so it reached `completed` with `chunk_count=0` and
+    #    an EMPTY `error_message`. Measured on the operator's library
+    #    (`Screenshot 2026-05-29 042925.png`), and it is the exact shape a watch loop produces
+    #    at scale: the watch mints rows for files NOBODY uploaded, so a mint that forgets the
+    #    upload makes every watched file an empty document that reports success.
+    #
+    # ⚠ ONLY WHEN STORAGE WAS THE SOURCE. A caller that legitimately passes `raw=b""` — the
+    #   backfill tool does, deliberately, because the bytes live in storage and it only wants
+    #   metadata re-derived — must not be failed by this. The flag is set on the branch that
+    #   actually went to storage and came back with nothing.
+    if _expected_bytes_from_storage and not raw:
+        log.error(
+            "document %s has a storage_path (%s) but no bytes — refusing rather than "
+            "ingesting an empty document that reports success",
+            document_id, storage_path,
+        )
+        try:
+            await _db(lambda: supabase.table("documents").update({
+                "status": "failed",
+                "ingestion_step": "failed",
+                "error_message": (
+                    "The stored copy of this file could not be read, so nothing was "
+                    "extracted from it. Please upload it again."
+                ),
+            }).eq("id", document_id).execute())
+        except Exception:  # noqa: BLE001 — the refusal write must not double-fault
+            log.exception("could not mark %s failed after missing bytes", document_id)
+        if job_id:
+            raise RuntimeError(f"no bytes in storage for document {document_id}")
+        return
+
+    # Step 1: Storage upload (if raw & storage_path provided and not already uploaded)
+    if storage_path and raw:
+        try:
+            supabase.storage.from_("documents").upload(
+                path=storage_path,
+                file=raw,
+                file_options={"content-type": mime_type},
+            )
+        except Exception as up_exc:
+            log.debug(
+                "Storage upload non-blocking notice for %s (%s): %s",
+                document_id,
+                storage_path,
+                up_exc,
+            )
+
+    prog = progress or initial_progress or {}
+    if isinstance(prog, list):
+        # Defensive against malformed array: find last dict or empty dict
+        dict_items = [x for x in prog if isinstance(x, dict)]
+        prog = dict_items[-1] if dict_items else {}
+    elif isinstance(prog, str):
+        import json  # noqa: PLC0415
+        try:
+            parsed = json.loads(prog)
+            prog = parsed if isinstance(parsed, dict) else {}
+        except Exception:
+            prog = {}
+    elif not isinstance(prog, dict):
+        prog = {}
+
+    chunk_offset = int(prog.get("chunk_offset", 0))
+    stage = prog.get("stage")
+    job_uuid = UUID(str(job_id)) if job_id else None
+
+    # Step 2: Extraction with status progression and wall-clock fail-safe
+    extract_start = time.perf_counter()
+    extracted_doc: ExtractedDocument | None = None
+    engine_used: str | None = None
+    text: str = ""
+    wall_clock_s = 130.0
+
+    try:
+        await _db(lambda: supabase.table("documents").update({
+            "status": "processing",
+            "ingestion_step": "extracting",
+        }).eq("id", document_id).execute())
+    except Exception:
+        pass
+
+    if pool and job_uuid and not stage:
+        try:
+            from app.db.ingestion_jobs import update_job_progress  # noqa: PLC0415
+            await update_job_progress(pool, job_uuid, stage="extracting", progress_patch={"chunk_offset": chunk_offset})
+        except Exception as p_exc:
+            log.warning("Failed updating progress to extracting: %s", p_exc)
+
+    # Re-use already extracted full_markdown if available
+    if not text and doc.get("full_markdown"):
+        text = doc["full_markdown"]
+
+    if not text:
+        try:
+            from app.services.extraction_service import (  # noqa: PLC0415
+                DOCX_MIME as _DOCX,
+                PDF_MIME as _PDF,
+                extract_composable,
+            )
+            from app.api.documents import extract_text  # noqa: PLC0415
+
+            if mime_type not in (_PDF, _DOCX):
+                text = extract_text(raw, mime_type)
+            else:
+                async def _run_with_timeout() -> ExtractedDocument:
+                    return await asyncio.wait_for(
+                        run_in_threadpool(extract_composable, raw, mime_type, engines_dict),
+                        timeout=wall_clock_s,
+                    )
+
+                extracted_doc = await _run_with_timeout()
+                text = extracted_doc.text
+                engine_used = extracted_doc.extractor_name or None
+        except Exception as exc:
+            log.warning("splice_document extraction failed for %s: %s", document_id, exc)
+            try:
+                await _db(lambda: supabase.table("documents").update({
+                    "status": "failed",
+                    "ingestion_step": "failed",
+                    "error_message": str(exc)[:500],
+                }).eq("id", document_id).execute())
+            except Exception:
+                pass
+            if job_uuid:
+                raise exc
+            return
+
+    extract_duration_ms = int((time.perf_counter() - extract_start) * 1000)
+
+    # Step 3: When job_id is not provided, delegate directly to legacy ingest_document
+    #
+    # ⛔ BUG-260905-13 — `run_in_threadpool` IS LOAD-BEARING HERE, AND ITS ABSENCE COST EVERY
+    #   NON-QUEUE INGEST ITS METADATA. `splice_document` is `async def` and runs in the event
+    #   loop; `ingest_document` is a SYNC function that calls `enrich_for_ingest`, which calls
+    #   `asyncio.run(extract_metadata_enriched(...))`. Calling it inline therefore invokes
+    #   `asyncio.run()` from inside a running loop, which raises immediately — and the
+    #   enrichment's own broad `except` degrades that to `metadata_dict = None`. The document
+    #   completes, nothing is red, and it simply has no metadata.
+    #
+    # ⚠ THE TELL IS IN THE BACKEND LOG, and the operator's paste is what identified it:
+    #     ingest_enrich.py:236: RuntimeWarning: coroutine 'extract_metadata_enriched'
+    #                           was never awaited
+    #       metadata_dict = None
+    #   "never awaited" means the coroutine object was built and `asyncio.run` threw before
+    #   running it. That warning IS the signature of this bug.
+    #
+    # ⚠ IT EXPLAINS WHY THE FAILURE LOOKED RANDOM: documents that went through the QUEUE
+    #   (`job_id` set) reached the `run_in_threadpool` call ~60 lines below and kept all seven
+    #   metadata fields; documents that came through `/upload` or `/reingest` with no job took
+    #   THIS branch and got none. Same file, same request, two different answers.
+    #
+    # ⚠ THE RULE WAS ALREADY WRITTEN DOWN — see the `run_in_threadpool IS LOAD-BEARING`
+    #   comment on the enrichment call below, and D-v2.5-01 (no blocking I/O in async
+    #   handlers). This call site simply never applied it, and it also blocked the whole event
+    #   loop for the duration of an ingest.
+    if not job_uuid:
+        from app.api.documents import ingest_document  # noqa: PLC0415
+
+        await run_in_threadpool(
+            ingest_document,
+            document_id=document_id,
+            text=text,
+            user_id=user_id,
+            supabase=supabase,
+            raw=raw,
+            mime_type=mime_type,
+            filename=filename,
+            engine_override=engine_used,
+            extracted_doc=extracted_doc,
+            extract_duration_ms=extract_duration_ms,
+        )
+        return
+
+    from app.services.text_sanitize import scrub_text  # noqa: PLC0415
+    from app.services.embedding_service import chunk_text, embed_chunks  # noqa: PLC0415
+    from app.models.user_settings import load_app_settings  # noqa: PLC0415
+    from app.db.ingestion_jobs import update_job_progress  # noqa: PLC0415
+
+    # 4a. Multi-modal table extraction (skip if tables_embedded / chunks_embedded)
+    if raw and mime_type:
+        if stage in ("tables_embedded", "chunks_embedded"):
+            log.info("Document %s: skipping table extraction (already at stage=%s)", document_id, stage)
+        else:
+            try:
+                await _db(lambda: supabase.table("documents").update({"ingestion_step": "extracting_tables"}).eq("id", document_id).execute())
+                from app.services.multimodal_service import extract_and_store_tables  # noqa: PLC0415
+                await run_in_threadpool(
+                    extract_and_store_tables,
+                    raw, mime_type, document_id, user_id, supabase,
+                    extracted_doc=extracted_doc,
+                )
+                if pool and job_uuid:
+                    await update_job_progress(
+                        pool, job_uuid, stage="tables_embedded", progress_patch={"chunk_offset": chunk_offset}
+                    )
+            except Exception as tbl_err:
+                log.warning("Table extraction warning for %s: %s", document_id, tbl_err)
+
+    app_settings = load_app_settings()
+
+    # ── BUG-260905-06 — THE STEP THIS PATH NEVER RAN ────────────────────────────────────
+    #
+    # ⛔ EVERY UPLOAD SINCE THE PHASE 230 CUTOVER LANDED WITHOUT METADATA. With a `job_id`
+    #    this function stops delegating to `ingest_document` and runs the loop below
+    #    instead — and the loop was written without the enrichment step. Measured:
+    #    `grep "extract_metadata\|metadata_dict\|context_header"` over this file returned
+    #    NOTHING. `/upload` enqueues a job by default, so the metadata-bearing path had no
+    #    traffic at all.
+    #
+    #    What was lost, per document: title / date / author / document_type / custom fields;
+    #    the `[Document: … | Title: … | Date: …]` header prepended to every chunk before
+    #    embedding; SEED-226 vision transcription for scans, drawings and images; and the
+    #    `_source` user-edit guard plus `metadata.source` provenance carry that Phase 233
+    #    added at what it called "the single metadata-write site all three re-extract entry
+    #    points funnel through". They funnelled through it. This path did not.
+    #
+    # ⚠ `run_in_threadpool` IS LOAD-BEARING, not decoration. `enrich_for_ingest` calls
+    #   `asyncio.run` internally and does blocking Supabase I/O; awaiting it here, or
+    #   calling it inline, would raise inside a running loop and its own broad `except`
+    #   would degrade that to `metadata=None` — reintroducing this exact bug in a form that
+    #   looks like a working call.
+    from app.services.ingest_enrich import enrich_for_ingest  # noqa: PLC0415
+
+    enriched = await run_in_threadpool(
+        enrich_for_ingest,
+        document_id=document_id,
+        text=text,
+        raw=raw,
+        mime_type=mime_type,
+        filename=filename,
+        user_id=user_id,
+        supabase=supabase,
+        app_settings=app_settings,
+    )
+    text = enriched.text
+    context_header = enriched.context_header
+
+    # Phase 240 (D-240-07) — `thread_key` rides the SAME write as the metadata it was derived
+    # alongside, on BOTH paths. ⚠ A separate write would be a fifth chance for the two paths to
+    # disagree, and this file's own comments already narrate three occasions where a step existed
+    # on one path and not the other. `test_240_thread_key_is_read.py` asserts the agreement.
+    if enriched.metadata is not None or enriched.thread_key is not None:
+        try:
+            await _db(lambda: supabase.table("documents").update(
+                {
+                    **({"metadata": enriched.metadata} if enriched.metadata is not None else {}),
+                    **(
+                        {"thread_key": enriched.thread_key}
+                        if enriched.thread_key is not None
+                        else {}
+                    ),
+                }
+            ).eq("id", document_id).execute())
+        except Exception as meta_err:
+            # Best-effort, exactly as the legacy path treats it: a metadata write must never
+            # fail an ingestion that has already produced text (D-111-8).
+            log.warning("Metadata write warning for %s: %s", document_id, meta_err)
+
+    # 4b. Chunking and Checkpointed Embedding
+    clean_text = scrub_text(text)
+    chunks = chunk_text(clean_text)
+    total_chunks = len(chunks)
+    _chunk_embedding_model = app_settings.embedding_model or "text-embedding-3-small"
+    _chunk_embedding_dimensions = getattr(app_settings, "embedding_dimensions", None)
+
+    try:
+        await _db(lambda: supabase.table("documents").update({"ingestion_step": "embedding"}).eq("id", document_id).execute())
+    except Exception:
+        pass
+
+    BATCH_SIZE = 50
+    # SC#4: Resume from chunk_offset without re-embedding prior chunks
+    for batch_start in range(chunk_offset, total_chunks, BATCH_SIZE):
+        batch_chunks = chunks[batch_start : batch_start + BATCH_SIZE]
+        if not batch_chunks:
+            continue
+
+        # Embed batch (transparent batcher in embed_texts handles <= 200k tokens / 512 chunks)
+        # ⚠ THE HEADER IS EMBEDDED, THE RAW CHUNK IS STORED — the same split the legacy path
+        #   makes. It is what lets "amount paid on 17 Jan" match a receipt whose date exists
+        #   only in its filename, and it is what carries a truncated document's own
+        #   INCOMPLETE notice into every one of its chunks.
+        texts_to_embed = (
+            [context_header + c for c in batch_chunks] if context_header else batch_chunks
+        )
+        embeddings = await run_in_threadpool(
+            embed_chunks,
+            texts_to_embed,
+            model=_chunk_embedding_model,
+            user_settings=app_settings,
+        )
+
+        now_iso = datetime.now(timezone.utc).isoformat()
+        chunk_rows = [
+            {
+                "document_id": document_id,
+                "user_id": user_id,
+                "content": c,
+                "chunk_index": batch_start + i,
+                "embedding": emb,
+                "embedding_model": _chunk_embedding_model,
+                "embedding_dimensions": _chunk_embedding_dimensions,
+                "embedded_at": now_iso,
+            }
+            for i, (c, emb) in enumerate(zip(batch_chunks, embeddings))
+        ]
+        await _db(lambda: supabase.table("document_chunks").insert(chunk_rows).execute())
+
+        current_offset = batch_start + len(batch_chunks)
+        if pool and job_uuid:
+            await update_job_progress(
+                pool,
+                job_uuid,
+                stage="chunks_embedded",
+                progress_patch={"chunk_offset": current_offset},
+            )
+
+    # 4c. Multi-modal image extraction
+    if raw and mime_type:
+        try:
+            await _db(lambda: supabase.table("documents").update({"ingestion_step": "extracting_images"}).eq("id", document_id).execute())
+            from app.services.multimodal_service import extract_and_store_images  # noqa: PLC0415
+            await run_in_threadpool(
+                extract_and_store_images,
+                raw, mime_type, document_id, user_id, supabase, app_settings,
+                extracted_doc=extracted_doc,
+            )
+        except Exception as img_err:
+            log.warning("Image extraction warning for %s: %s", document_id, img_err)
+
+    # 4c-bis. Email attachments — Phase 240 (SRC-05 SC#2 / D-240-08)
+    #
+    # ⛔ THE FOURTH TWO-PATHS DISAGREEMENT, AND THE ONE A WATCHED MAILBOX WOULD HAVE RUN THROUGH.
+    #    This step existed ONLY in `ingest_document`, so a `.eml` arriving down this path became a
+    #    message document with no attachment children and no `attached_to` links — SC#2 false,
+    #    with every existing test green because they all exercise the legacy path.
+    #
+    # ⚠ IT RUNS AFTER CHUNKING, NOT BEFORE. The parent message must be a complete, searchable
+    #   document before children are hung off it; a child minted against a parent that then fails
+    #   would be an orphan pointing at a failed row.
+    #
+    # ⚠ `run_in_threadpool` IS LOAD-BEARING, not style — the same rule this file's BUG-260905-06
+    #   comment records. The loop does blocking `supabase-py` I/O and calls the SYNC
+    #   `ingest_document`; calling it inline from this async worker would stall the event loop for
+    #   every attachment (D-v2.5-01, and BUG-260905-14 in this very file).
+    #
+    # ⚠ Its failure is a warning, never an exception: an attachment problem must not fail the
+    #   message that carried it. The function itself never raises.
+    if raw and mime_type:
+        try:
+            from app.services.email_attachments import ingest_email_attachments  # noqa: PLC0415
+
+            manifest = await run_in_threadpool(
+                lambda: ingest_email_attachments(
+                    raw=raw,
+                    mime_type=mime_type,
+                    document_id=document_id,
+                    user_id=user_id,
+                    supabase=supabase,
+                )
+            )
+            if manifest:
+                merged = dict(enriched.metadata or {})
+                merged["attachments"] = manifest
+                await _db(lambda: supabase.table("documents").update(
+                    {"metadata": merged}
+                ).eq("id", document_id).execute())
+        except Exception as att_err:
+            log.warning("Email attachment warning for %s: %s", document_id, att_err)
+
+    # 4d. Finalize & Authoritative Recount
+    try:
+        count_resp = (
+            await _db(lambda: supabase.table("document_chunks")
+            .select("id", count="exact", head=True)
+            .eq("document_id", document_id)
+            .execute())
+        )
+        total_recounted = count_resp.count if count_resp.count is not None else total_chunks
+    except Exception:
+        total_recounted = total_chunks
+
+    # ── THE THIRD TWO-PATHS DISAGREEMENT, AND THE ONE PHASE 234 RUNS THROUGH ────────────
+    #
+    # ⛔ `ingest_document` HAS ALWAYS REFUSED HERE AND THIS PATH NEVER DID. documents.py:2093
+    #    reads `if not chunks: status='failed', error_message=empty_text_message(mime_type)`.
+    #    The queue path fell straight through to `completed`, so a document that produced NO
+    #    searchable content reported success with `chunk_count=0` and nothing to explain it.
+    #    A person cannot tell that from a document that worked.
+    #
+    # ⚠ IT USES THE AUTHORITATIVE RECOUNT, not the in-memory `chunks` list, so a RESUMED job
+    #   is judged on what is actually in `document_chunks` rather than on what this invocation
+    #   happened to embed. A job resuming at `chunks_embedded` has an empty batch loop and a
+    #   non-zero row count; failing it on the local list would destroy a good document.
+    #
+    # ⚠ SAME SENTENCE AS THE LEGACY PATH, from the same function. Two paths that refuse for the
+    #   same reason must say the same thing, or the wording becomes the tell for which code
+    #   ran — which is the class of divergence this whole seam was built to end.
+    if total_recounted == 0:
+        from app.api.documents import empty_text_message  # noqa: PLC0415
+
+        log.warning(
+            "document %s produced no chunks — failing rather than completing empty",
+            document_id,
+        )
+        await _db(lambda: supabase.table("documents").update({
+            "status": "failed",
+            "ingestion_step": "failed",
+            "error_message": empty_text_message(mime_type),
+            "full_markdown": text,
+        }).eq("id", document_id).execute())
+        if pool and job_uuid:
+            await update_job_progress(
+                pool, job_uuid, stage="failed", progress_patch={"chunk_offset": 0},
+            )
+        return
+
+    await _db(lambda: supabase.table("documents").update({
+        "status": "completed",
+        "chunk_count": total_recounted,
+        "full_markdown": text,
+        "extractor": engine_used or "legacy",
+    }).eq("id", document_id).execute())
+
+    if pool and job_uuid:
+        await update_job_progress(
+            pool,
+            job_uuid,
+            stage="completed",
+            progress_patch={"chunk_offset": total_chunks},
+        )

@@ -87,10 +87,12 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 import { Check, Loader2, X } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+import { IngestVisibilityField, IngestVisibilityFooter } from "./IngestVisibilityField"
 import {
   ConnectorApiError,
   createOAuthAuthorizeUrl,
   discoverConnectorTools,
+  getConnectorConnection,
   probeMcpServer,
   updateConnectorGrants,
 } from "@/lib/api"
@@ -103,10 +105,12 @@ import type {
   McpDiscoveredTool,
   OAuthProvider,
   ToolGrantPosture,
+  IngestVisibility,
 } from "@/lib/api"
 import { getServiceCatalogEntry } from "@/components/settings/servicesCatalog"
 import { ConnectionGrantsList } from "@/components/settings/ConnectionGrantsList"
 import { McpAuthDoor } from "@/components/settings/McpAuthDoor"
+import { SourceToolsCard } from "@/components/settings/SourceToolsCard"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import {
   EMPTY_DRAFT,
@@ -176,6 +180,10 @@ import {
   SERVICE_PLACEHOLDER,
   SERVICE_SAVE_DISABLED_REASON,
   SERVICE_SUGGESTIONS,
+  // ⚠ THE `SOURCE_*` COPY MOVED WITH THE CARD AT 239-08, IT WAS NOT DELETED. Every one of
+  //    those identifiers is now imported by `SourceToolsCard.tsx`, which is where the strings
+  //    they name are rendered. Leaving them imported here would have left this panel able to
+  //    author a source-binding sentence again with no fence noticing.
   configFromDraft,
   draftIsSavable,
   destinationFooterOf,
@@ -581,6 +589,9 @@ export function ConnectionFormPanel({
   const [probeResult, setProbeResult] = useState<McpDiscoveredTool[] | null>(null)
   const [probeError, setProbeError] = useState<string | null>(null)
   const [defaultPosture, setDefaultPosture] = useState<ToolGrantPosture>("ask")
+  // Phase 231 (VIS-02). Seeds to the NARROW end so a form that fails to load a value can
+  // only ever propose the closed one.
+  const [ingestVisibility, setIngestVisibility] = useState<IngestVisibility>("private")
   const [toolGrants, setToolGrants] = useState<Record<string, ToolGrantPosture | boolean>>({})
 
   /** WRITES are possible only for an org admin on a platform whose switch is on — both
@@ -609,6 +620,7 @@ export function ConnectionFormPanel({
     if (mode === "edit" && connection) {
       setDraft(draftFromConnection(connection))
       setDefaultPosture(connection.default_approval_posture ?? "ask")
+      setIngestVisibility(connection.default_ingest_visibility ?? "private")
       setToolGrants(connection.tool_grants ?? {})
       // ⚠ The baseline the save path diffs against — see `grantsChanged`. Captured HERE,
       // beside the seeding it mirrors, so the two can never drift apart.
@@ -725,7 +737,39 @@ export function ConnectionFormPanel({
       // unchanged `mode:id` key, so the refreshed `connection` prop arriving from the
       // reload does NOT re-seed `probeResult` — the person keeps looking at exactly what
       // they just discovered, and the NEXT open reads the fresh copy.
-      if (savedRow) onDiscovered?.()
+      if (savedRow) {
+        onDiscovered?.()
+        // ── Phase 239 plan 03 (F-6) — THE RECEIPT AUTO-DETECTION NEVER HAD ──────────────
+        //
+        // ⭐ `discover_connection_tools` writes `config["source_tools"]` in the SAME UPDATE
+        // as `discovered_tools`, so by the time this line runs the binding exists in the
+        // database. The route returns only the TOOL LIST, and the sentence directly above
+        // is exactly why the refreshed `connection` prop cannot supply it either. So a
+        // person pressed a button, the app detected their file surface correctly, stored
+        // it, and told them "Not set" — a screen denying something that is true, which is
+        // the same defect class as this plan's own headline (BUG-260907-01).
+        //
+        // ⛔ EMPTY SLOTS ONLY, AND THAT GUARD IS THE WHOLE CORRECTNESS. A local value the
+        // person just chose has never reached the server; overwriting it from the stored
+        // row would silently edit what they were in the middle of doing.
+        //
+        // ⚠ FAILURE IS SILENT ON PURPOSE. The discovery itself succeeded and its tools are
+        // already on screen; a worded error here would report a failure of something the
+        // person never asked for, and blanking the panel would lose the result they did.
+        await getConnectorConnection(savedRow)
+          .then((fresh) => {
+            const bound = (fresh.config ?? {}) as { source_tools?: Record<string, string> }
+            const tools = bound.source_tools
+            if (!tools) return
+            setDraft((current) => ({
+              ...current,
+              sourceListTool: current.sourceListTool || (tools.list_tool ?? ""),
+              sourceReadTool: current.sourceReadTool || (tools.read_tool ?? ""),
+              sourceRootPath: current.sourceRootPath || (tools.root_path ?? ""),
+            }))
+          })
+          .catch(() => {})
+      }
     } catch (err) {
       // WARNING: the fallback said "Failed to discover tools from MCP server", and this handler
       // now serves three shapes - two of which contact no MCP server and one of which contacts
@@ -973,6 +1017,10 @@ export function ConnectionFormPanel({
           config: configFromDraft(draft),
         }
 
+        // ⚠ Set for EVERY capability, never inside a branch — VIS-02 forbids a configuration
+        //   path that omits the scope, and a per-branch assignment is how one gets omitted.
+        body.default_ingest_visibility = ingestVisibility
+
         if (draft.capability === "mcp") {
           body.mcp_server_url = draft.mcpServerUrl.trim()
           body.default_approval_posture = defaultPosture
@@ -1005,6 +1053,7 @@ export function ConnectionFormPanel({
           name: draft.name.trim(),
           config: configFromDraft(draft),
           default_approval_posture: defaultPosture,
+          default_ingest_visibility: ingestVisibility,
         }
         if (draft.capability === "mcp") body.mcp_server_url = draft.mcpServerUrl.trim()
         if (draft.capability === "oauth") body.auth_type = "oauth_byo"
@@ -1624,6 +1673,27 @@ export function ConnectionFormPanel({
           </div>
         )}
 
+        {/* ── Phase 239 (D-239-02) — WHICH TOOLS ON THIS SERVER READ FILES ───────────────
+             ⭐ EXTRACTED AT 239-08 — the OWED G-5 seam, taken as a MOVE. `SourceToolsCard`
+             carries the `capability === "mcp"` fence argument, the TM-239-05 option rule and
+             the withheld-mutation rule in its own docblock, and the fence itself is now a
+             GUARD CLAUSE INSIDE the card rather than a condition at this one call site.
+
+             ⚠ `capability` passed here is the PANEL's local, derived from
+             `connection.mcp_server_url` and NOT from `draft.capability`. That distinction is
+             load-bearing in edit mode and is recorded as a fact in the card's suite.
+
+             ⚠ NO STATE MOVED. `probeResult` is still this panel's `useState`; the card reads
+             it and `draft`, and writes only through `set`. */}
+        <SourceToolsCard
+          capability={capability}
+          probeResult={probeResult}
+          draft={draft}
+          set={set}
+          fieldId={fieldId}
+          readOnly={readOnly}
+        />
+
         {capability === "post_message" && (
           <Field
             label={FIELD_SLACK_CHANNEL_LABEL}
@@ -2237,6 +2307,37 @@ export function ConnectionFormPanel({
             {SERVICE_SAVE_DISABLED_REASON}
           </p>
         )}
+
+        {/* ── Phase 231 · VIS-02 — sketch 228 variant B ─────────────────────────────────
+            ⚠ MOUNTED UNCONDITIONALLY, outside every capability branch. SC#1 is a COVERAGE
+            claim — "there is no configuration path where that sentence is absent" — so a
+            per-capability mount would ship the exact hole the criterion forbids.
+            ⚠ memberCount is null: this panel does not know the roster size and a fabricated
+            count is worse than an honest "everyone in <org>". */}
+        <div className="mb-3.5" data-testid="connection-ingest-visibility">
+          {/* ⭐ THIS IS WHY THE SKETCH LOCKED B *AND* A, AND THEY ARE NOT REDUNDANT.
+              A read-only viewer must still read the sentence — SC#1 admits no configuration
+              path without it — but this panel's rule is that a write affordance is ABSENT, not
+              disabled, when the viewer cannot write (U-02, and the kill-switch OFF state).
+              So: B is the control, A is the read-only rendering of the same fact. Rendering B
+              disabled here would have failed the panel's own convention; rendering nothing
+              would have failed VIS-02. */}
+          {readOnly ? (
+            <IngestVisibilityFooter
+              visibility={ingestVisibility}
+              orgName={orgName?.trim() || ORG_SHARED_FALLBACK_NAME}
+              memberCount={null}
+            />
+          ) : (
+            <IngestVisibilityField
+              value={ingestVisibility}
+              onChange={setIngestVisibility}
+              orgName={orgName?.trim() || ORG_SHARED_FALLBACK_NAME}
+              memberCount={null}
+              isExisting={mode === "edit"}
+            />
+          )}
+        </div>
 
         <div className="mt-3 flex items-center justify-end gap-2">
           {saveRefusal?.kind === "generic" && (

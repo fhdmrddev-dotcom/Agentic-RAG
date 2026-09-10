@@ -5,13 +5,19 @@ from supabase import Client
 from app.config import MODEL_CAPABILITIES, _infer_provider_for
 from app.dependencies import get_current_user, get_supabase, require_visible
 from app.models.user_settings import (
+    HNSW_EF_SEARCH_CEILING,
+    HNSW_EF_SEARCH_FLOOR,
+    HNSW_ITERATIVE_SCAN_VALUES,
     KEY_PLACEHOLDER,
     KNOWN_PROVIDERS,
+    SOURCE_MAX_FILE_SIZE_MB_CEILING,
+    SOURCE_MAX_FILE_SIZE_MB_FLOOR,
     load_app_settings,
     load_app_settings_async,
     save_app_settings,
     resolve_sub_agent_model,
 )
+from app.services.retrieval_tuning import app_settings_has_hnsw_columns
 from app.services.audit_service import write_audit_entry
 from app.services.reembed_service import start_reembed
 from app.services.skill_tuner_service import resolve_skill_builder_model
@@ -69,6 +75,16 @@ class FullSettingsResponse(BaseModel):
     # It had a DB column, a loader and a live reader in multimodal_service, and NO route
     # to any surface: `api:0 ui:0` when measured 2026-08-28.
     multimodal_max_vision_calls: int
+    # SEED-226 — the vision model was a HARDCODED CONSTANT and the fallback that was
+    # supposed to reach the active chat model was dead code. Empty => active chat model.
+    vision_model: str
+    vision_max_pages: int
+    # SEED-258 — the source file ceiling, plus the bounds the UI must state rather than
+    # re-type. ⛔ The bounds are SERVED, never hardcoded in the form: a form carrying its own
+    # copy of `50` is a fourth private constant, which is the defect this replaced.
+    source_max_file_size_mb: int
+    source_max_file_size_mb_floor: int
+    source_max_file_size_mb_ceiling: int
     # Retrieval
     retrieval_top_k: int
     retrieval_match_threshold: float
@@ -77,6 +93,15 @@ class FullSettingsResponse(BaseModel):
     vector_search_weight: float
     keyword_search_weight: float
     rrf_k: int
+    # Phase 241 (QUEUE-06 / D-09) — the two HNSW scan knobs, plus the bounds and the enum
+    # members the UI must STATE rather than re-type. ⛔ Same rule as SEED-258 above: a form
+    # carrying its own copy of `1000`, or its own list of the three modes, is a second private
+    # constant that can drift from the database's CHECK without anything noticing.
+    hnsw_ef_search: int
+    hnsw_iterative_scan: str
+    hnsw_ef_search_floor: int
+    hnsw_ef_search_ceiling: int
+    hnsw_iterative_scan_values: list[str]
     # Web search
     web_search_enabled: bool
     web_search_has_api_key: bool
@@ -167,6 +192,11 @@ class SettingsUpdate(BaseModel):
     rerank_top_n: int | None = None
     # Multimodal (SEED-227)
     multimodal_max_vision_calls: int | None = None
+    vision_model: str | None = None          # SEED-226; "" clears it back to the chat model
+    vision_max_pages: int | None = None
+    # SEED-258 — the source file ceiling. ONE knob; the MCP envelope cap is DERIVED from it
+    # server-side and is deliberately NOT a field here.
+    source_max_file_size_mb: int | None = None
     # Retrieval
     retrieval_top_k: int | None = None
     retrieval_match_threshold: float | None = None
@@ -175,6 +205,12 @@ class SettingsUpdate(BaseModel):
     vector_search_weight: float | None = None
     keyword_search_weight: float | None = None
     rrf_k: int | None = None
+    # Phase 241 (QUEUE-06 / D-09) — the two HNSW scan knobs. ⛔ There is no `_floor` /
+    # `_ceiling` here and there must never be: the bounds are the SERVER's, read-only on the
+    # response. ⛔ Nor are `hnsw_max_scan_tuples` / `hnsw_scan_mem_multiplier` here — they are
+    # hardcoded in config.py because a wrong value is a memory footgun (T-241-16).
+    hnsw_ef_search: int | None = None
+    hnsw_iterative_scan: str | None = None
     # Web search
     tavily_api_key: str | None = None      # "***" = keep; "" = clear; real = save
     web_search_max_results: int | None = None
@@ -243,6 +279,12 @@ async def _build_response(s=None) -> FullSettingsResponse:
         rerank_top_n=s.rerank_top_n,
         rerank_has_api_key=bool(s.rerank_api_key),
         multimodal_max_vision_calls=s.multimodal_max_vision_calls,
+        vision_model=s.vision_model,
+        vision_max_pages=s.vision_max_pages,
+        # SEED-258. The bounds ride along so the form can state them without owning them.
+        source_max_file_size_mb=s.source_max_file_size_mb,
+        source_max_file_size_mb_floor=SOURCE_MAX_FILE_SIZE_MB_FLOOR,
+        source_max_file_size_mb_ceiling=SOURCE_MAX_FILE_SIZE_MB_CEILING,
         retrieval_top_k=s.retrieval_top_k,
         retrieval_match_threshold=s.retrieval_match_threshold,
         hybrid_search_enabled=s.hybrid_search_enabled,
@@ -250,6 +292,12 @@ async def _build_response(s=None) -> FullSettingsResponse:
         vector_search_weight=s.vector_search_weight,
         keyword_search_weight=s.keyword_search_weight,
         rrf_k=s.rrf_k,
+        # Phase 241 — the knobs, and the bounds that ride along so the form owns no copy.
+        hnsw_ef_search=s.hnsw_ef_search,
+        hnsw_iterative_scan=s.hnsw_iterative_scan,
+        hnsw_ef_search_floor=HNSW_EF_SEARCH_FLOOR,
+        hnsw_ef_search_ceiling=HNSW_EF_SEARCH_CEILING,
+        hnsw_iterative_scan_values=list(HNSW_ITERATIVE_SCAN_VALUES),
         web_search_enabled=s.web_search_enabled,
         web_search_has_api_key=bool(s.tavily_api_key),
         web_search_max_results=s.web_search_max_results,
@@ -426,6 +474,64 @@ async def update_settings(
             )
         updates["multimodal_max_vision_calls"] = body.multimodal_max_vision_calls
 
+    # SEED-226 — the vision model, and the per-document page ceiling on transcription.
+    #
+    # ⚠ EMPTY IS A REAL, MEANINGFUL VALUE HERE and is stored as such: it means "use the active
+    #   chat model", which is by definition one the operator has credentials for. That is the
+    #   whole point of the fix — the previous behaviour pinned `gpt-4o-mini` in code, so an
+    #   install with no OpenAI key made vision calls it could never complete.
+    if body.vision_model is not None:
+        updates["vision_model"] = body.vision_model.strip()
+
+    # ⚠ BOUNDED ON WRITE for the same reason as the cap above, but the failure is worse: this
+    #   one silently SHORTENS documents. 0 would transcribe nothing while every ingestion still
+    #   reported success, and an unbounded value turns one 1,000-page scan into 1,000 paid
+    #   calls. A truncated document does say so in every chunk header — but a refusal here is
+    #   cheaper than a library full of 5% documents.
+    if body.vision_max_pages is not None:
+        if not 1 <= body.vision_max_pages <= 500:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Pages read per document must be between 1 and 500. "
+                    "0 would silently stop every scanned page from being read."
+                ),
+            )
+        updates["vision_max_pages"] = body.vision_max_pages
+
+    # SEED-258 — the file ceiling every connected source refuses at.
+    #
+    # ⚠ THE API IS THE BOUNDARY, NOT THE FORM. A number input with min/max is a convenience
+    #   for someone who is not attacking anything; a PATCH carrying 999999999 has to be
+    #   refused here or the bound does not exist. The read clamps too (defence in depth), but
+    #   a clamp is silent and a refusal can say why.
+    #
+    # ⚠ AND THE SENTENCE CARRIES THE COST, not just the range. The whole point of SEED-258 is
+    #   that nobody could see what the ceiling was OR why; a bare "must be between 1 and 50"
+    #   would leave the operator exactly as blind as the constant did. Raising it means more
+    #   memory buffered per in-flight request from a server we do not control — MCP carries
+    #   file bytes INSIDE the JSON-RPC envelope, base64-inflated 4/3.
+    if body.source_max_file_size_mb is not None:
+        if not (
+            SOURCE_MAX_FILE_SIZE_MB_FLOOR
+            <= body.source_max_file_size_mb
+            <= SOURCE_MAX_FILE_SIZE_MB_CEILING
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"The largest file a connected source may import must be between "
+                    f"{SOURCE_MAX_FILE_SIZE_MB_FLOOR} and {SOURCE_MAX_FILE_SIZE_MB_CEILING} MB. "
+                    f"0 would stop every source importing while each sync still reported "
+                    f"success. Raising it costs memory: the whole response is held in memory "
+                    f"per in-flight request from a server we do not control, and file content "
+                    f"arrives base64-encoded at 4/3 its size. "
+                    f"{SOURCE_MAX_FILE_SIZE_MB_CEILING} MB is the app's own upload limit, so a "
+                    f"connected source can never admit a file you could not upload by hand."
+                ),
+            )
+        updates["source_max_file_size_mb"] = body.source_max_file_size_mb
+
     if body.retrieval_top_k is not None:
         updates["retrieval_top_k"] = body.retrieval_top_k
     if body.retrieval_match_threshold is not None:
@@ -440,6 +546,97 @@ async def update_settings(
         updates["keyword_search_weight"] = body.keyword_search_weight
     if body.rrf_k is not None:
         updates["rrf_k"] = body.rrf_k
+
+    # Phase 241 (QUEUE-06 / D-09) — search breadth, bounded here because HERE is the boundary.
+    #
+    # ⚠ THE API REFUSAL IS THE LOAD-BEARING ARM AND THE CHECK CONSTRAINT IS THE BACKSTOP —
+    #   which is the opposite of the usual reading, and it is measured rather than assumed:
+    #   `BUG-260909-01` records that `save_app_settings` SWALLOWS a CHECK violation and returns
+    #   as if the write had succeeded. A bound enforced only in migration 176 would therefore be
+    #   a bound nobody is ever told about.
+    #
+    # ⚠ AND THE SENTENCE CARRIES THE COST, not just the range — SEED-258's shape, which this
+    #   file's ledger row records as its binding property. `hnsw.ef_search` is how many
+    #   candidate vectors the index walks BEFORE the search's filters are applied; a bare
+    #   "must be between 10 and 1000" tells an operator nothing about what they are buying.
+    # CR-01 (Phase 241 review) -- THE COLUMN GATE, and it must precede BOTH assignments.
+    #   `save_app_settings` composes ONE `UPDATE app_settings SET col=$1, ...` over every key
+    #   in `updates`, so on a database where migration 176 has not been applied a single
+    #   absent column raises `UndefinedColumnError`, which is caught, reported as False, and
+    #   turned into a 500 below -- taking the WHOLE Search tab with it (reranker, embedding
+    #   model, retrieval threshold, rrf_k), not just these two knobs. Cloud has not had 176
+    #   applied, so without this gate the next deploy ships a 500.
+    #
+    #   The frontend sends both keys UNCONDITIONALLY (SettingsPage.tsx), so "the operator did
+    #   not touch them" is indistinguishable here from "the operator set them" unless we
+    #   compare against what is stored. Hence: silently drop an UNCHANGED value (nothing was
+    #   asked for), and REFUSE a CHANGED one with a worded 409 naming the migration -- never
+    #   accept a change and discard it, which is Phase 240's "screen that discards its own
+    #   answer".
+    if not await app_settings_has_hnsw_columns():
+        _stored = await load_app_settings_async()
+        _asked = [
+            name
+            for name, sent, stored in (
+                ("hnsw_ef_search", body.hnsw_ef_search, _stored.hnsw_ef_search),
+                ("hnsw_iterative_scan", body.hnsw_iterative_scan, _stored.hnsw_iterative_scan),
+            )
+            if sent is not None and sent != stored
+        ]
+        if _asked:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "Search breadth and keep-scanning cannot be saved on this database yet: "
+                    "migration 176 has not been applied here, so the two columns that store "
+                    "them do not exist. Every other setting on this tab saves normally. Apply "
+                    "supabase/migrations/176_app_settings_hnsw_knobs.sql in the SQL editor "
+                    "(never db push / db reset), then set these again. Until then searches "
+                    "keep working and simply use the built-in defaults."
+                ),
+            )
+        body.hnsw_ef_search = None
+        body.hnsw_iterative_scan = None
+
+    if body.hnsw_ef_search is not None:
+        if not HNSW_EF_SEARCH_FLOOR <= body.hnsw_ef_search <= HNSW_EF_SEARCH_CEILING:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Search breadth must be between {HNSW_EF_SEARCH_FLOOR} and "
+                    f"{HNSW_EF_SEARCH_CEILING}. It is how many candidate vectors the index "
+                    f"walks before your filters are applied, so raising it costs time and "
+                    f"memory on every single search — a bigger number means more candidate "
+                    f"vectors walked per query and slower answers. Lowering it makes searches "
+                    f"faster but can return fewer results than asked for when a filter matches "
+                    f"only a small part of the library. {HNSW_EF_SEARCH_CEILING} is the "
+                    f"database's own maximum; below {HNSW_EF_SEARCH_FLOOR} the scan walks so "
+                    f"little that filtered searches would come back near-empty while still "
+                    f"reporting success."
+                ),
+            )
+        updates["hnsw_ef_search"] = body.hnsw_ef_search
+
+    # ⛔ A FREE-TEXT MODE REACHES A POSTGRES SESSION PARAMETER. Validated against the
+    #   three-member tuple BEFORE it is ever stored, and `retrieval_tuning.py` validates it
+    #   again before binding it — the value is a bind parameter there, never interpolated, but
+    #   an unknown mode would still make every search log a warning for no reason (T-241-14).
+    if body.hnsw_iterative_scan is not None:
+        if body.hnsw_iterative_scan not in HNSW_ITERATIVE_SCAN_VALUES:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Iterative scan must be one of "
+                    + ", ".join(HNSW_ITERATIVE_SCAN_VALUES)
+                    + ". Turning it on lets the index keep scanning until enough results "
+                    "survive your filters instead of returning a short list — which costs "
+                    "more work per search, and more memory. 'strict_order' keeps results in "
+                    "exact relevance order; 'relaxed_order' is faster but may reorder them. "
+                    "⚠ Databases older than pgvector 0.8 do not have this setting at all; on "
+                    "those, searches keep working and this control simply has no effect."
+                ),
+            )
+        updates["hnsw_iterative_scan"] = body.hnsw_iterative_scan
 
     if body.tavily_api_key is not None:
         updates["tavily_api_key"] = body.tavily_api_key

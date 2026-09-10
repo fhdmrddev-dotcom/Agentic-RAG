@@ -4,10 +4,10 @@ title: Resume drops the thread's selected model and silently falls back to the s
 reported: 2026-08-18
 surface: Agentic-RAG
 severity: major
-status: open
+status: closed
 affected_areas: [frontend/chat, frontend/streaming, provider-routing, model-selection]
-folded_into: null
-verified_closed_by: null
+folded_into: "228"
+verified_closed_by: "228"
 related_seeds: [SEED-135, SEED-178]
 re_open_trigger: null
 reproduces_on:

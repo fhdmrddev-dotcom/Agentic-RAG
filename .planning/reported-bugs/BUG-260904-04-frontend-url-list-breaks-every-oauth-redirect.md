@@ -7,7 +7,7 @@ severity: blocking
 status: closed
 affected_areas: [connectors/oauth, deployment/cloud-parity, org/invites]
 folded_into: null
-verified_closed_by: "2026-09-04 — hotfixed to production; the live Location header was re-read and carries a single origin"
+verified_closed_by: "2026-09-04 — hotfixed to production (19b50abac); live Location header carries a single origin, CORS still admits both, and the operator then connected NOTION (mcp.notion.com, OAuth connected, Ready) — the RFC 7591 path that had never once succeeded"
 related_seeds: [SEED-185]
 re_open_trigger: "A FIFTH site interpolating settings.frontend_url into a URL without primary_frontend_origin(). The guard covers the resolver, NOT its call sites — a new raw read is invisible to it."
 ---
@@ -71,3 +71,20 @@ All four sites call it. **CORS deliberately keeps the full list**; only redirect
 
 ⚠ **The guard covers the RESOLVER, not its call sites.** A fifth site reading
 `settings.frontend_url` raw would be invisible to it — hence the re-open trigger above.
+
+## ✅ CONFIRMED BY THE THING THAT COULD NOT BE DONE BEFORE — 2026-09-04
+
+After the hotfix the operator retried Notion and it connected:
+**`Notion · mcp.notion.com · OAuth connected · ● ✓ Ready`**, Popular strip reading *"1 connection /
+Manage"*, alongside Google Workspace and Slack.
+
+⭐ **Notion is the strongest possible confirmation, and not merely one more green row.** It is the
+**RFC 7591 dynamic-registration** service — the one whose whole appeal is needing nothing from a
+developer console — and it therefore exercises `/connectors/mcp/oauth/callback`, the branch this fix
+touched that curl could only prove in its *error* arm. **This project had been unable to connect Notion
+since Phase 212** (403 `restricted_resource`), through 215's OAuth and 222's four-server drive.
+It connects now.
+
+⚠ **Still true and not closed by this:** no Notion tool has been CALLED. The connection exists, holds a
+credential and reports Ready — a first outbound call on cloud remains undriven, for every service.
+

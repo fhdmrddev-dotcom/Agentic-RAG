@@ -217,6 +217,79 @@ class McpConfig(_StrictBase):
     #: minted by the server itself under RFC 7591 dynamic client registration.
     custom_client_id: str | None = None
 
+    #: Phase 239 (D-239-01) — WHICH TOOLS ON THIS SERVER READ FILES, as DATA.
+    #:
+    #: ``{"list_tool": "list_directory", "read_tool": "read_file"}``
+    #:
+    #: ⭐ AND, SINCE ``SEED-259``, WHICH ARGUMENTS THOSE TOOLS TAKE — because tool NAMES were
+    #: rows while tool ARGUMENT SHAPES were still code, and a second real server bound with
+    #: zero code then listed **nothing, with HTTP 200**::
+    #:
+    #:     {"list_tool": "get_file_contents", "read_tool": "get_file_contents",
+    #:      "arg_path": "path", "arg_static.owner": "…", "arg_static.repo": "…"}
+    #:
+    #: ``arg_path`` names the argument that carries the path (default ``"path"``);
+    #: ``arg_static.<name>`` supplies a fixed value for one of the server's other required
+    #: arguments. ⛔ **FLAT PREFIXED KEYS IN THIS SAME DICT, and that is the point rather than
+    #: a shortcut**: a nested member would re-enter ``SEED-239``'s territory, where ONE
+    #: malformed ``config`` row matches no member of the ``ConnectorConfig`` union and makes
+    #: **every connection in the org** unreadable. Riding the declared shape also inherits the
+    #: ME-07 ceilings below instead of adding a surface with none, and needs no migration.
+    #:
+    #: ⚠ The ``dict[str, str]`` constraint stated further down is what MAKES this safe: an
+    #: ``arg_static.*`` value reaches ``params.arguments``, never ``params.name``, so it can
+    #: carry no tool call. ``connector_service.reject_unoffered_source_tools`` exempts exactly
+    #: these two key families from the tool-name checks, by ALLOW-LIST — every other key is
+    #: still read as a tool name and still refused.
+    #:
+    #: ⭐ THE BINDING IS A ROW, NOT A BRANCH. MCP file servers do not agree on names —
+    #: ``list_directory`` / ``list_files`` / ``ls``, ``read_file`` / ``cat`` — and the whole
+    #: claim of this phase is that connecting a SECOND, differently-worded server is a row in
+    #: this column and no product change at all. The moment a tool name reaches a conditional
+    #: above ``services/sources/adapters/``, that claim is false. ``McpSourceAdapter`` reads
+    #: these two keys and falls back to the ``@modelcontextprotocol/server-filesystem``
+    #: defaults; nothing else in the codebase knows any tool name.
+    #:
+    #: ⚠ IT IS DECLARED HERE BECAUSE OMITTING IT IS AN ORG-WIDE OUTAGE, NOT A LOCAL ONE — the
+    #: defect Phase 222 shipped into the live database one key over (see this class's opening
+    #: note, and ``SEED-239``). Every model here is ``extra='forbid'``, so an undeclared key
+    #: makes the row match NO member of the ``ConnectorConfig`` union; ``_to_response``
+    #: validates rows INSIDE a list comprehension, so ONE source-bound connection would make
+    #: **every connection in the org** unreadable — 503, and a page reading *"Nothing is
+    #: wrong with them — this page could not read them."* Driven RED before the field existed
+    #: (``tests/unit/test_239_mcp_config_source_tools.py``): ``extra_forbidden`` on
+    #: ``source_tools``, and the whole-list case with it.
+    #:
+    #: ⚠ ``None`` and ``{}`` ARE DIFFERENT. Absent means nobody bound this connection to a
+    #: file surface; empty means somebody looked and named nothing. The adapter's defaults
+    #: apply per-KEY, so a row carrying only ``read_tool`` still gets the default lister.
+    #:
+    #: ⛔ ``dict[str, str]`` IS A CONSTRAINT, not a shape note. These values are interpolated
+    #: into a JSON-RPC ``params.name`` by ``mcp_client.call_tool``; a nested object here would
+    #: reach the transport before anything could refuse it. It is a NAME, never a credential
+    #: and never a payload — ``config`` is readable by every member of the org (migration
+    #: 150), which is why ``custom_client_secret`` is refused two fields up.
+    #:
+    #: ⚠ AND IT IS BOUNDED, because it was not (review ME-07). ``ServiceId`` two hundred lines
+    #: up carries ``max_length=64`` with the stated reason that *"it is NEW UNTRUSTED INPUT
+    #: reaching a text column, so it gets a ceiling like every other constrained type in this
+    #: file"* — and this field, which is newer and reaches the same column, had none at all.
+    #: A 500-character key and a 5,000-character value were both accepted, driven.
+    #: 64 for the key (it is one of three known role names); 512 for the value (a tool name
+    #: needs a fraction of that, and ``root_path`` shares the ceiling).
+    #:
+    #: ⛔ ``root_path``'s CONTENT IS DELIBERATELY UNVALIDATED, and that is an exemption rather
+    #: than an oversight. It is sent verbatim as ``{"path": …}`` to the remote server, so
+    #: ``../../../etc`` is bounded by THAT server's own sandbox — path authorization on a
+    #: remote file surface belongs to the process that owns the filesystem, and a traversal
+    #: rule invented here would be a rule about a directory layout this app cannot see. What
+    #: this app owes is the LENGTH bound above and the statement you are reading; it is
+    #: recorded so the next reader finds a decision rather than a gap.
+    source_tools: dict[
+        Annotated[str, Field(max_length=64)],
+        Annotated[str, Field(max_length=512)],
+    ] | None = None
+
 
 AuthType = Literal["static_key", "oauth_byo", "mcp"]
 ConnectionStatus = Literal["active", "revoked", "error"]
@@ -292,6 +365,13 @@ def _reject_config_capability_mismatch(capability: str | None, config: object) -
 
 ToolGrantPosture = Literal["allow", "ask", "deny"]
 
+# Phase 231 (VIS-01 / VIS-02 / D-5) — who may read what a connection brings in.
+# Enum-shaped and NEVER a boolean: 069-A's extensible-audience contract, applied inbound. A
+# boolean here is what turns adding a third scope into a re-ingest instead of a migration.
+# ⚠ "dept" is INERT by operator decision D-5 — the value exists and the SQL resolver carries a
+#   branch for it, but NO UI offers it. A scope nobody can grant must not be offered.
+IngestVisibility = Literal["private", "org", "dept"]
+
 
 # ── the CRUD trio ────────────────────────────────────────────────────────────────────────
 class ConnectorConnectionCreate(_StrictBase):
@@ -308,6 +388,10 @@ class ConnectorConnectionCreate(_StrictBase):
     error_message: str | None = None
     capability: ConnectorCapability | None = None
     service_id: ServiceId
+    # Defaults to the NARROW end. A creation path that forgets to ask produces a closed
+    # connection, never an open one (VIS-02's "no configuration path" clause, defended in the
+    # model rather than trusted to every caller).
+    default_ingest_visibility: IngestVisibility = "private"
     name: NonEmpty
     config: ConnectorConfig = Field(default_factory=McpConfig)
     mcp_server_url: str | None = None
@@ -349,6 +433,7 @@ class ConnectorConnectionUpdate(_StrictBase):
     is_enabled: bool | None = None
     mcp_server_url: str | None = None
     default_approval_posture: ToolGrantPosture | None = None
+    default_ingest_visibility: IngestVisibility | None = None
     tool_grants: dict[str, ToolGrantPosture] | None = None
     discovered_tools: list[dict[str, Any]] | None = None
     auth_type: AuthType | None = None
@@ -413,6 +498,8 @@ class ConnectorConnectionResponse(_StrictBase):
     config: ConnectorConfig = Field(default_factory=McpConfig)
     mcp_server_url: str | None = None
     default_approval_posture: ToolGrantPosture = "ask"
+    #: Phase 231 (VIS-02) — the UI cannot render the sentence for a value it cannot read.
+    default_ingest_visibility: IngestVisibility = "private"
     tool_grants: dict[str, ToolGrantPosture] = Field(default_factory=dict)
     discovered_tools: list[dict[str, Any]] = Field(default_factory=list)
     is_enabled: bool = True
@@ -549,6 +636,106 @@ class McpOAuthStartResponse(_StrictBase):
     authorization_host: str | None = None
 
 
+# ── Phase 233 (PREV-01 / PREV-02 / PREV-03 / LIB-09) — the preview wire ────────────────────
+#
+# ⭐ The four bucket names and the three outcome names are `Literal`s, not free strings. That is
+#   what makes SC#1's *"four lists"* and SC#5's *"never silently in neither"* structural rather
+#   than a convention: a fifth bucket or a fourth outcome is a `ValidationError` at the boundary,
+#   in a diff a reviewer reads, and not a surprise a user finds.
+
+
+class SourcePreviewItem(_StrictBase):
+    """One source file and the one verdict the preview is willing to state about it."""
+
+    external_id: str
+    name: str
+    mime_type: str
+    #: ⛔ Exactly four. There is no fifth and no way to remove one (D-233-04).
+    bucket: Literal["add", "here", "uns", "unk"]
+    #: 3-4 words — what the row shows at rest.
+    fragment: str
+    #: The full sentence, delivered behind the row. A bucket labelled "can't tell" whose rows
+    #: never say why is a shrug, so this is carried for every non-`add` verdict.
+    reason: str = ""
+    size: int | None = None
+    modified_at: str | None = None
+    #: SC#3 — where this file would land, resolved BEFORE any row exists.
+    destination: str | None = None
+    rule_suggested: bool = False
+    web_view_url: str | None = None
+    path: str | None = None
+
+
+class SourcePreviewResponse(_StrictBase):
+    """What bringing this folder in would do. ⛔ Producing it writes nothing."""
+
+    folder_id: str | None = None
+    folder_name: str | None = None
+    items: list[SourcePreviewItem] = Field(default_factory=list)
+    #: Four keys, always. The surface renders the bar from these and they sum to `total`.
+    counts: dict[str, int] = Field(default_factory=dict)
+    total: int = 0
+    #: ⚠ True when the listing did not finish. A partial listing may never be presented as a
+    #: complete picture.
+    truncated: bool = False
+    #: WHICH budget stopped the walk — depth / folders / files / pages / unreadable.
+    stopped_by: str | None = None
+    #: How many folders were read. 1 = the chosen folder had no sub-folders.
+    folders_scanned: int = 1
+    #: Whether sub-folders were walked. ⛔ The screen must not imply a depth it did not go to.
+    recursive: bool = True
+    #: ⭐ The zero-write receipt the footer prints verbatim.
+    wrote: dict[str, int] = Field(default_factory=dict)
+
+
+class SourceConfirmOutcome(_StrictBase):
+    """What actually happened to one file — one of exactly three things (D-233-05)."""
+
+    external_id: str
+    name: str
+    outcome: Literal["added", "here", "refused"]
+    #: ⛔ A refusal that is only a colour is a COUNT. SC#5 requires a NAMED one.
+    reason: str | None = None
+    document_id: str | None = None
+
+
+class SourceConfirmResponse(_StrictBase):
+    """The SC#4 receipt: the files that arrived are the files the preview named."""
+
+    outcomes: list[SourceConfirmOutcome] = Field(default_factory=list)
+    accounted: int = 0
+    #: Must be 0. Anything else means a file ended in none of the three outcomes.
+    unaccounted: int = 0
+    preview_said_added: int = 0
+    actually_added: int = 0
+
+
+class SourcePreviewRequest(_StrictBase):
+    """Which source folder to look at, and where its files would land."""
+
+    folder_id: str | None = None
+    folder_name: str | None = None
+    #: The Library folder the person chose. `None` = root.
+    destination_folder_id: str | None = None
+    destination_folder_name: str | None = None
+    #: Walk sub-folders. Defaults TRUE — Phase 233 shipped one level deep while the adapter
+    #: contract advertised a `recursive` flag nothing read, so a person previewing a folder with
+    #: sub-folders saw less than they had selected.
+    recursive: bool = True
+    #: ⭐ Import only these files (the per-file checkboxes). ⛔ `None` means "everything the
+    #: preview showed"; an EMPTY LIST means "nothing". They are deliberately different values,
+    #: and a falsy check that collapsed them would turn "none" into "all" — the worst direction
+    #: for a mistake in an import.
+    #:
+    #: ⚠ This field was WRITTEN ONCE AND SILENTLY LOST. A string-replace against a docstring that
+    #: had been reflowed matched nothing, and because the edit carried no assertion the miss went
+    #: unnoticed until the operator hit
+    #: `'SourcePreviewRequest' object has no attribute 'only_external_ids'` at runtime.
+    #: `_StrictBase` is `extra='forbid'`, so the CLIENT's field was rejected at the wall while the
+    #: HANDLER read an attribute that did not exist — the model did its job and the edit did not.
+    only_external_ids: list[str] | None = None
+
+
 __all__ = [
     "ConnectorCapability",
     "ServiceId",
@@ -576,5 +763,10 @@ __all__ = [
     "McpProbeAuthResponse",
     "McpOAuthStartRequest",
     "McpOAuthStartResponse",
+    "SourcePreviewItem",
+    "SourcePreviewRequest",
+    "SourcePreviewResponse",
+    "SourceConfirmOutcome",
+    "SourceConfirmResponse",
 ]
 

@@ -10,6 +10,7 @@
 import { useEffect, useState } from "react"
 import { HealthDocumentRow } from "@/components/health/HealthDocumentRow"
 import { getStaleDocs } from "@/lib/api"
+import { AnimatedNumber } from "@/components/ui/AnimatedNumber"
 
 interface DocumentHealthItem {
   document_id: string
@@ -20,7 +21,7 @@ interface DocumentHealthItem {
 
 function StaleChip() {
   return (
-    <span className="text-xs px-2 py-0.5 rounded-full bg-amber-400/10 text-amber-400 tabular-nums shrink-0">
+    <span className="text-xs px-2 py-0.5 rounded-full bg-amber-400/10 text-amber-400 border border-amber-400/20 tabular-nums shrink-0 font-medium">
       stale
     </span>
   )
@@ -28,13 +29,13 @@ function StaleChip() {
 
 function Legend() {
   return (
-    <div className="flex items-center gap-4 text-xs text-muted-foreground mb-3">
+    <div className="flex items-center gap-4 text-xs text-muted-foreground mb-3 font-medium">
       <span className="flex items-center gap-1.5">
-        <span className="inline-block w-2 h-2 rounded-full bg-emerald-400/60" />
+        <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.5)]" />
         ready
       </span>
       <span className="flex items-center gap-1.5">
-        <span className="inline-block w-2 h-2 rounded-full bg-amber-400/60" />
+        <span className="inline-block w-2 h-2 rounded-full bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.5)]" />
         stale — added more than 90 days ago
       </span>
     </div>
@@ -72,7 +73,7 @@ export function HealthDocumentBars() {
 
   if (loading) {
     return (
-      <div className="ghost-border bg-card/50 rounded-lg p-4 space-y-3">
+      <div className="rounded-xl border border-border/50 bg-card/40 backdrop-blur-sm p-4 space-y-3 shadow-sm">
         <div className="animate-pulse bg-muted/30 h-4 w-48 rounded" />
         <div className="space-y-2">
           {Array.from({ length: 3 }).map((_, i) => (
@@ -87,11 +88,12 @@ export function HealthDocumentBars() {
   const staleItems = items.filter((d) => d.status === "stale")
 
   return (
-    <div className="ghost-border bg-card/50 rounded-lg p-4" data-testid="health-document-bars">
+    <div className="relative overflow-hidden rounded-xl border border-border/50 bg-card/40 backdrop-blur-sm p-5 shadow-sm" data-testid="health-document-bars">
+      <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
       <div className="flex items-center justify-between mb-2">
         <h3 className="text-base font-headline font-bold">Document status</h3>
         <span className="text-xs text-muted-foreground tabular-nums">
-          {total} {total === 1 ? "document" : "documents"}
+          <AnimatedNumber value={total} /> {total === 1 ? "document" : "documents"}
         </span>
       </div>
       <Legend />

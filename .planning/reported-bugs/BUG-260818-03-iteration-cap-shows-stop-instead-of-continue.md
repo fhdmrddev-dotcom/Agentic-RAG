@@ -4,10 +4,10 @@ title: At the 15-iteration cap the chat shows a stop instead of the Continue aff
 reported: 2026-08-18
 surface: Agentic-RAG
 severity: major
-status: open
+status: closed
 affected_areas: [frontend/chat, backend/agent-loop, chat/run-lifecycle, streaming]
-folded_into: null
-verified_closed_by: null
+folded_into: "228"
+verified_closed_by: "228"
 related_seeds: [SEED-180]
 re_open_trigger: null
 reproduces_on:

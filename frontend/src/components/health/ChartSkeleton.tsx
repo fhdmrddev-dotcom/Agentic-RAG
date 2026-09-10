@@ -2,7 +2,7 @@
 
 export function ChartSkeleton() {
   return (
-    <div className="ghost-border bg-card/50 rounded-lg p-4 space-y-3 h-64">
+    <div className="rounded-xl border border-border/50 bg-card/40 backdrop-blur-sm p-4 space-y-3 h-64 shadow-sm">
       <div className="animate-pulse bg-muted/30 h-4 w-56 rounded" />
       {Array.from({ length: 5 }).map((_, i) => (
         <div key={i} className="flex items-center gap-3">

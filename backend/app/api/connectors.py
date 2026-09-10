@@ -117,6 +117,7 @@ No `supabase-py` call is made in this module. Every DB touch happens inside
 """
 
 import logging
+from dataclasses import asdict
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from fastapi.responses import RedirectResponse
@@ -159,6 +160,11 @@ from app.models.connector import (
     OAuthAuthorizeResponse,
     OAuthProvider,
     OAuthTokenResponse,
+    SourceConfirmOutcome,
+    SourceConfirmResponse,
+    SourcePreviewItem,
+    SourcePreviewRequest,
+    SourcePreviewResponse,
     ToolGrantPosture,
 )
 from app.services.audit_service import write_audit_entry
@@ -197,7 +203,14 @@ __all__ = [
     "McpDiscoverResponse",
 ]
 
+from app.services.sources.base import SourceConnectionDisabled  # noqa: E402
+
 router = APIRouter(prefix="/connectors", tags=["connectors"])
+
+#: Fields of `preview_service.PreviewItem` that exist for the SERVER and never reach the wire.
+#: ⛔ `source_path` is the only value that may be persisted into `metadata.source.path`, and it
+#: is read from the server's own re-run of `build_preview` — never from a client (238 CR-01).
+_PREVIEW_ITEM_SERVER_ONLY = frozenset({"source_path"})
 
 # The ONE machine-readable reason code this router emits. It is deliberately NOT a member of
 # `egress.REFUSAL_REASONS` — that frozenset is a CLOSED six-row table about DESTINATIONS
@@ -206,6 +219,28 @@ router = APIRouter(prefix="/connectors", tags=["connectors"])
 # `aria-describedby` → "Disabled because no encryption key is configured."). Keeping the two
 # code spaces separate is what stops a platform problem from being worded as a host problem.
 CIPHER_UNAVAILABLE_REASON = "no_encryption_key"
+
+# ── BUG-260907-03 · a DISABLED connection reads nothing ──────────────────────────────────
+# 409 CONFLICT, chosen and stated: the request is well-formed and the caller is entitled to it,
+# but the resource is in a state that forbids it — and the person can fix that themselves by
+# re-enabling. Not 404 (the connection exists and hiding it would be a lie), not 403 (this is
+# not about permission), not 503 (nothing is broken).
+#
+# ⚠ It is raised by `SourceRegistry.get_adapter`, so this covers browse, preview, confirm and
+# import through ONE handler rather than five try/excepts — the same reason the guard itself
+# lives in the registry. A route added tomorrow inherits it.
+CONNECTION_DISABLED_REASON = "connection_disabled"
+
+
+def _disabled_connection_response(exc: Exception) -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail={
+            "reason_code": CONNECTION_DISABLED_REASON,
+            "message": str(exc),
+        },
+    )
+
 
 # 503, not 500 and not 400: the request was well-formed and the caller did nothing wrong —
 # the INSTANCE cannot store a tenant credential safely (D-11's fail-CLOSED inversion). The
@@ -376,6 +411,17 @@ def _check_destination(capability: str, config: dict) -> tuple[str, int | None]:
 
 
 # ── reads: org-wide (U-02), and NOT feature-gated (see the header) ───────────────────────
+def _provider_said(exc: Exception) -> str:
+    """A remote-authored message, bounded and stripped, for a client-facing error (LO-05).
+
+    ⚠ Control characters are removed rather than escaped: this lands in a JSON `detail` that
+    a client renders as a sentence, and a raw `\r` or an ANSI escape in the middle of it is
+    an untrusted string shaping a surface it does not own.
+    """
+    text = " ".join(str(exc).split())
+    return (text[:300] + "…") if len(text) > 300 else (text or "nothing")
+
+
 @router.get("/connections", response_model=list[ConnectorConnectionResponse])
 async def list_connections(
     capability: str | None = Query(
@@ -520,7 +566,54 @@ async def delete_connection(
 
     Org-scoped at the delete itself (never by id alone), against migration 116's existing
     DELETE policy. A miss is the same generic 404 every other route returns.
+
+    Phase 234 VIS-05 / D-4 Disconnect Freeze Policy:
+    When a connection is disconnected / deleted:
+    - All watches on the connection are deactivated (is_active = false).
+    - All documents from this connection are marked source_state='source_disconnected',
+      excluding them from match RPC queries while retaining them in the Library (VIS-03).
     """
+    from uuid import UUID  # noqa: PLC0415
+    from starlette.concurrency import run_in_threadpool  # noqa: PLC0415
+
+    # 1. Org-scoped check: verify connection exists and belongs to caller's active org
+    conn_res = await run_in_threadpool(
+        lambda: supabase.table("connector_connections")
+        .select("id")
+        .eq("id", connection_id)
+        .eq("org_id", active_org)
+        .maybe_single()
+        .execute()
+    )
+    if not conn_res or not conn_res.data:
+        raise _NOT_FOUND
+
+    # 2. VIS-05 / D-4: Disconnect freeze policy
+    # Deactivate all watches on this connection
+    try:
+        from app.dependencies import get_pg_pool  # noqa: PLC0415
+        pool = await get_pg_pool()
+        if pool:
+            async with pool.acquire() as con:
+                await con.execute(
+                    "UPDATE connector_watches SET is_active = false, updated_at = now() WHERE connection_id = $1::uuid",
+                    UUID(str(connection_id)),
+                )
+    except Exception as pool_err:
+        logger.warning("Failed to deactivate watches for connection %s: %s", connection_id, pool_err)
+
+    # Freeze documents: source_state = 'source_disconnected' (retained in Library, VIS-03 / D-4)
+    try:
+        await run_in_threadpool(
+            lambda: supabase.table("documents")
+            .update({"source_state": "source_disconnected"})
+            .eq("source_connection_id", connection_id)
+            .execute()
+        )
+    except Exception as doc_err:
+        logger.warning("Failed to mark documents source_disconnected for connection %s: %s", connection_id, doc_err)
+
+    # 3. Delete connection record
     removed = await connector_service.delete_connection(
         connection_id, org_id=active_org, supabase=supabase
     )
@@ -533,6 +626,20 @@ async def delete_connection(
 #: applications nobody can probe, and its check reports availability for none of them —
 #: which is an EMPTY list, never six cheerful `ready`s.
 _AVAILABILITY_PROBES_BY_SERVICE = frozenset({"google"})
+
+#: The host a person is told we reached, per service. DATA, not a branch (D-238-09.3): this
+#: line used to read `host="googleapis.com" if service_id == "google" else ""`, which put a
+#: vendor literal in a comparison above `services/sources/adapters/` and gave every non-Google
+#: OAuth connection a blank "reached ___" line. A dict answers "which hosts does a check name?"
+#: with one grep; an if-ladder answers it with a reading.
+#: ⚠ It is DISPLAY ONLY. The real destination fence is `egress.ALLOWED_HOST_SUFFIXES`, and a
+#: service missing from here reaches exactly what it always did.
+_CHECK_HOST_BY_SERVICE: dict[str, str] = {
+    "google": "googleapis.com",
+    "google_workspace": "googleapis.com",
+    "microsoft": "graph.microsoft.com",
+    "microsoft_graph": "graph.microsoft.com",
+}
 
 
 async def _check_oauth_connection(
@@ -623,7 +730,7 @@ async def _check_oauth_connection(
         ok=ok,
         verdict=verdict,
         identity=identity,
-        host="googleapis.com" if (service_id or "") == "google" else "",
+        host=_CHECK_HOST_BY_SERVICE.get((service_id or "").strip().lower(), ""),
         port=None,
         checked_at=settled.last_checked_at,
         bucket=bucket,
@@ -1267,6 +1374,7 @@ async def mcp_oauth_callback(
     an authenticated `require_org_manage` request, and `state` is a single-use random handle
     that resolves to that record. Nothing here trusts a value the caller supplied.
     """
+    from redis.exceptions import RedisError
     from app.dependencies import get_redis
     from app.services.mcp_oauth import McpOAuthError, complete_authorization
     from app.config import settings, primary_frontend_origin
@@ -1286,7 +1394,14 @@ async def mcp_oauth_callback(
         )
 
     try:
-        tokens, pending = await complete_authorization(get_redis(), handle=state, code=code)
+        redis_client = get_redis()
+        tokens, pending = await complete_authorization(redis_client, handle=state, code=code)
+    except (RedisError, ConnectionError, TimeoutError, OSError) as exc:
+        logger.error("mcp oauth: redis outage during authorization: %s", exc)
+        return RedirectResponse(
+            url=f"{frontend_url}/app?connections=1&oauth_error=redis_unavailable",
+            status_code=307,
+        )
     except (McpOAuthError, EgressRefused) as exc:
         logger.warning("mcp oauth: could not complete the connection: %s", exc)
         return RedirectResponse(url=f"{frontend_url}/app?connections=1&oauth_error=exchange_failed")
@@ -1450,13 +1565,15 @@ async def oauth_callback(
     error_description: str = Query(None),
 ) -> RedirectResponse:
     """Phase 215 (OAUTH-02) — Verify signed state, exchange code for tokens, encrypt, and redirect to settings."""
+    from redis.exceptions import RedisError
     from app.dependencies import get_redis
     from app.services.oauth_state import OAuthStateError, take_pending_state
+    # ⚠ `verify_oauth_state`, `resolve_client_credentials` and `OAuthSigningKeyUnavailable` were
+    # imported here ONLY for the legacy HMAC fallback deleted below; they are dead on this path
+    # now. They remain exported from `oauth_service` for the cutover tests.
     from app.services.oauth_service import (
         exchange_code_for_tokens,
         fetch_account_profile,
-        resolve_client_credentials,
-        verify_oauth_state,
     )
     from app.config import settings, primary_frontend_origin
 
@@ -1479,38 +1596,50 @@ async def oauth_callback(
     pending_org_id: str | None = None
 
     try:
-        pending = await take_pending_state(get_redis(), state, expected_flow="provider")
+        redis_client = get_redis()
+        pending = await take_pending_state(redis_client, state, expected_flow="provider")
         provider = pending.provider
         connection_id = pending.connection_id
         code_verifier = pending.code_verifier
         client_id = pending.client_id
         client_secret = pending.client_secret
         pending_org_id = pending.org_id
+    except (RedisError, ConnectionError, TimeoutError, OSError) as exc:
+        logger.error("oauth callback: redis outage during state lookup: %s", exc)
+        return RedirectResponse(
+            url=f"{frontend_url}/app?connections=1&oauth_error=redis_unavailable",
+            status_code=307,
+        )
     except OAuthStateError:
-        # In-flight legacy fallback path (SC#3):
-        # Transition fallback: delete after the first prod deploy has been live 24 h
-        if "." in state:
-            try:
-                state_data = verify_oauth_state(state)
-                logger.warning("[legacy-oauth-state-accepted] Verified in-flight signed OAuth state during deploy cutover")
-                provider = state_data["prv"]
-                connection_id = state_data["cid"]
-                code_verifier = state_data["cv"]
-                custom_client_id = state_data.get("cid_ovr")
-                custom_client_secret = state_data.get("sec_ovr")
-                client_id, client_secret = resolve_client_credentials(
-                    provider=provider,
-                    custom_client_id=custom_client_id,
-                    custom_client_secret=custom_client_secret,
-                )
-            except ValueError as exc:
-                # A-4: log length, not content
-                logger.warning("oauth callback: legacy state verification failed (len=%d): %s", len(state), exc)
-                return RedirectResponse(url=f"{frontend_url}/app?connections=1&oauth_error=invalid_or_expired_state")
-        else:
-            # A-4: log length, not content
-            logger.warning("oauth callback: invalid or expired opaque handle (len=%d)", len(state))
-            return RedirectResponse(url=f"{frontend_url}/app?connections=1&oauth_error=invalid_or_expired_state")
+        # ⛔ THE LEGACY HMAC FALLBACK IS DELETED (operator, 2026-09-07 — past its own sunset).
+        #
+        # What stood here: an `if "." in state:` arm that called `verify_oauth_state(state)` and
+        # accepted a Phase-224 HMAC-signed blob, carrying the comment *"delete after the first
+        # prod deploy has been live 24 h"*. That deploy went live 2026-09-04; nothing deleted it.
+        #
+        # Why it went NOW rather than at the next tidy-up — it was an unauthenticated forgery
+        # surface, and two independent defects had to line up for it to be safe:
+        #   1. `_get_signing_key()` ended in `or "default-oauth-state-secret"`. `jwt_secret` is
+        #      NOT a declared setting, and `secrets_encryption_key` defaults to `""` with a
+        #      key-less install being supported (D-150-01) — so on such an install the HMAC key
+        #      was A STRING PUBLISHED IN THIS REPOSITORY.
+        #   2. This route takes no JWT and has no auth dependency.
+        #   Together: any unauthenticated caller could forge state naming a victim's
+        #   `connection_id` and have their own provider tokens written onto that connector —
+        #   the exact attack `BUG-260903-02` was written to close.
+        # A third, quieter one: this arm never set `pending_org_id`, so it also short-circuited
+        # that very cross-org gate below (`if pending_org_id is not None and ...`).
+        #
+        # ⭐ Deleting the branch removes all three at once, which is why it beats patching them.
+        # `_get_signing_key` was ALSO made fail-closed in the same change — belt and braces, since
+        # `verify_oauth_state` remains importable for the cutover tests that still pin it.
+        #
+        # An in-flight legacy consent now lands here and is refused like any expired handle. That
+        # is correct: those blobs carry a 600 s TTL and the cutover is days past.
+        #
+        # A-4: log length, not content.
+        logger.warning("oauth callback: invalid or expired opaque handle (len=%d)", len(state))
+        return RedirectResponse(url=f"{frontend_url}/app?connections=1&oauth_error=invalid_or_expired_state")
 
     try:
         # ⚠ MUST BE BYTE-IDENTICAL TO THE ONE SENT ON AUTHORIZE. The provider compares them
@@ -1626,8 +1755,8 @@ async def list_connection_files(
     user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_user_supabase_client),
 ):
-    """Phase 216 (ATTACH-01 / D-216-09): Browse files in cloud storage."""
-    from app.services.cloud_storage import list_cloud_files
+    """Phase 216 / Phase 232 (ATTACH-01 / SRC-01): Browse files in cloud storage."""
+    from app.services.sources.import_service import browse_connection_files
 
     conn = await connector_service.get_connection(
         connection_id=str(connection_id),
@@ -1638,8 +1767,11 @@ async def list_connection_files(
         raise _NOT_FOUND
 
     try:
-        res = await list_cloud_files(conn, query=query, page_token=page_token, page_size=page_size)
+        res = await browse_connection_files(conn, query=query, page_token=page_token, page_size=page_size)
         return res
+    # ⚠ BEFORE the broad handler below — see the note on the preview route (BUG-260907-03).
+    except SourceConnectionDisabled as exc:
+        raise _disabled_connection_response(exc) from None
     except Exception as exc:
         logger.error("Failed to list files from connection %s: %s", connection_id, exc)
         raise HTTPException(
@@ -1660,11 +1792,8 @@ async def import_connection_file(
     user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_user_supabase_client),
 ):
-    """Phase 216 (ATTACH-01 / D-216-09): User-initiated single file import."""
-    from uuid import uuid4
-    from app.services.cloud_storage import fetch_cloud_file
-    from app.api.documents import _upload_pipeline
-    from app.dependencies import get_supabase
+    """Phase 216 / Phase 232 (ATTACH-01 / SRC-01): User-initiated single file import."""
+    from app.services.sources.import_service import import_single_file
 
     conn = await connector_service.get_connection(
         connection_id=str(connection_id),
@@ -1675,7 +1804,20 @@ async def import_connection_file(
         raise _NOT_FOUND
 
     try:
-        filename, raw_bytes, mime_type = await fetch_cloud_file(conn, file_id)
+        return await import_single_file(
+            connection=conn,
+            file_id=file_id,
+            user_id=user["id"],
+            active_org=str(active_org),
+            background_tasks=background_tasks,
+            supabase=supabase,
+        )
+    # ⚠ BEFORE the broad handler below, which turns anything it catches into a 502 "the
+    # provider returned an error". A disabled connection is not a provider error, and wording
+    # it that way is how a control that failed to stop something reads as Microsoft's fault
+    # (BUG-260907-03).
+    except SourceConnectionDisabled as exc:
+        raise _disabled_connection_response(exc) from None
     except Exception as exc:
         logger.error("Failed to fetch file %s from connection %s: %s", file_id, connection_id, exc)
         raise HTTPException(
@@ -1683,45 +1825,267 @@ async def import_connection_file(
             detail=f"Failed to download cloud file: {exc}",
         )
 
-    doc_id = str(uuid4())
-    storage_path = f"{user['id']}/{doc_id}/{filename}"
 
-    # Create document row in database
-    doc_row = {
-        "id": doc_id,
-        "user_id": user["id"],
-        "filename": filename,
-        "mime_type": mime_type,
-        "file_size": len(raw_bytes),
-        "status": "processing",
-        "storage_path": storage_path,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "updated_at": datetime.now(timezone.utc).isoformat(),
-    }
+@router.post(
+    "/connections/{connection_id}/preview",
+    response_model=SourcePreviewResponse,
+    summary="See exactly what bringing a source folder in would do (PREV-01 / PREV-03)",
+)
+async def preview_source_folder(
+    connection_id: str,
+    body: SourcePreviewRequest,
+    active_org: str = Depends(get_active_org_id),
+    user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_user_supabase_client),
+) -> SourcePreviewResponse:
+    """Phase 233 (PREV-01 / PREV-03 / LIB-09): the read-only half of the diff pass.
 
-    await aexec(supabase.table("documents").insert(doc_row))
+    ⛔ **THIS ROUTE WRITES NOTHING** — no document row, no chunk, no ingestion job, no folder, and
+    no audit entry that reads like an import. Its `wrote` field is four literal zeros and the
+    surface prints that sentence in its footer, so *"nothing has been written yet"* is a receipt
+    rather than a promise.
 
-    # Ingest in background
-    srv_supabase = get_supabase()
-    background_tasks.add_task(
-        _upload_pipeline,
-        document_id=doc_id,
-        raw=raw_bytes,
-        mime_type=mime_type,
-        filename=filename,
-        user_id=user["id"],
-        storage_path=storage_path,
-        supabase=srv_supabase,
+    ⚠ It is a `POST` because it takes a body, not because it changes anything. The writing door is
+    `/preview/confirm`, and it is a different route on purpose.
+    """
+    from app.services.sources import preview_service
+
+    conn = await connector_service.get_connection(
+        connection_id=str(connection_id),
+        org_id=str(active_org),
+        supabase=supabase,
+    )
+    if not conn:
+        raise _NOT_FOUND
+
+    try:
+        preview = await preview_service.build_preview(
+            connection=conn,
+            folder_id=body.folder_id,
+            folder_name=body.folder_name,
+            user_id=user["id"],
+            supabase=supabase,
+            destination_folder_name=body.destination_folder_name,
+            recursive=body.recursive,
+        )
+    # ⚠ BEFORE the broad handler below, which turns anything it catches into a 502 "the
+    # provider returned an error". A disabled connection is not a provider error, and wording
+    # it that way is how a control that failed to stop something reads as Microsoft's fault
+    # (BUG-260907-03).
+    except SourceConnectionDisabled as exc:
+        raise _disabled_connection_response(exc) from None
+    except Exception as exc:
+        logger.error("Failed to preview connection %s: %s", connection_id, exc)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Source provider returned an error while listing: {exc}",
+        )
+
+    return SourcePreviewResponse(
+        folder_id=preview.folder_id,
+        folder_name=preview.folder_name,
+        # ⛔ `source_path` IS SERVER-ONLY AND IS DROPPED HERE ON PURPOSE (238 CR-01).
+        #
+        # It is the value that may be persisted into `metadata.source.path`, where a
+        # classification rule reads it. Putting it on the wire would invite the next confirm
+        # door to accept it back from a client — which is the caller-controlled-provenance half
+        # of CR-01 re-opened by a different route. The confirm endpoint re-runs `build_preview`
+        # server-side and reads `item.source_path` from THAT, never from a request body.
+        #
+        # ⚠ `SourcePreviewItem` is `extra="forbid"`, so this filter is load-bearing rather than
+        #   tidy: without it the whole preview endpoint 500s.
+        items=[
+            SourcePreviewItem(
+                **{k: v for k, v in asdict(i).items() if k not in _PREVIEW_ITEM_SERVER_ONLY}
+            )
+            for i in preview.items
+        ],
+        counts=preview.counts,
+        total=preview.total,
+        truncated=preview.truncated,
+        stopped_by=preview.stopped_by,
+        folders_scanned=preview.folders_scanned,
+        recursive=preview.recursive,
+        wrote=preview.wrote,
     )
 
+
+@router.post(
+    "/connections/{connection_id}/preview/confirm",
+    response_model=SourceConfirmResponse,
+    summary="Bring in exactly what the preview said would be brought in (PREV-02 / LIB-09)",
+)
+async def confirm_source_preview(
+    connection_id: str,
+    body: SourcePreviewRequest,
+    background_tasks: BackgroundTasks,
+    active_org: str = Depends(get_active_org_id),
+    user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_user_supabase_client),
+) -> SourceConfirmResponse:
+    """Phase 233 (PREV-02 / LIB-09 / SC#4 / SC#5): the only door in this pair that writes.
+
+    ⭐ It re-runs the SAME classifier the preview ran, so the counts a person confirmed against and
+    the counts that happen cannot come from two code paths that drift. Every file ends at exactly
+    one of `added` / `here` / `refused`, and a refusal carries its **cause by name**.
+    """
+    from app.services.sources import preview_service
+
+    conn = await connector_service.get_connection(
+        connection_id=str(connection_id),
+        org_id=str(active_org),
+        supabase=supabase,
+    )
+    if not conn:
+        raise _NOT_FOUND
+
+    try:
+        result = await preview_service.confirm_preview(
+            connection=conn,
+            folder_id=body.folder_id,
+            folder_name=body.folder_name,
+            user_id=user["id"],
+            active_org=str(active_org),
+            supabase=supabase,
+            background_tasks=background_tasks,
+            destination_folder_id=body.destination_folder_id,
+            destination_folder_name=body.destination_folder_name,
+            recursive=body.recursive,
+            only_external_ids=body.only_external_ids,
+        )
+    # ⚠ BEFORE the broad handler below, which turns anything it catches into a 502 "the
+    # provider returned an error". A disabled connection is not a provider error, and wording
+    # it that way is how a control that failed to stop something reads as Microsoft's fault
+    # (BUG-260907-03).
+    except SourceConnectionDisabled as exc:
+        raise _disabled_connection_response(exc) from None
+    except Exception as exc:
+        logger.error("Failed to confirm preview for connection %s: %s", connection_id, exc)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Source provider returned an error while importing: {exc}",
+        )
+
+    return SourceConfirmResponse(
+        outcomes=[SourceConfirmOutcome(**asdict(o)) for o in result.outcomes],
+        accounted=result.accounted,
+        unaccounted=result.unaccounted,
+        preview_said_added=result.preview_said_added,
+        actually_added=result.actually_added,
+    )
+
+
+#: Registered source families that must never be OFFERED to a person, whatever the registry
+#: holds. `mock_source` exists so the conformance suite can prove a family is data; it serves
+#: canned bytes and would be a live-looking option in a production dropdown.
+#:
+#: ⚠ MEASURED 2026-09-07: Phase 232's D-232-03 recorded a `VITE_ENABLE_MOCK_SOURCES` / dev-mode
+#: gate for this, and `grep -rn "mock_source" frontend/src` finds it in TESTS ONLY — no such
+#: gate shipped. It never mattered while the client's own predicate was `includes("google")`,
+#: which excluded the mock by accident. Publishing the registry removes that accident, so the
+#: exclusion is made explicit here, on the server, where it cannot be widened by a UI edit.
+_NEVER_OFFERED_SOURCE_FAMILIES = frozenset({"mock_source"})
+
+
+@router.get(
+    "/source-families",
+    summary="Which source families have a registered adapter (SRC-03 / D-238-08)",
+)
+async def list_source_families(
+    user: dict = Depends(get_current_user),
+):
+    """Publish `SourceRegistry`'s keys so the client stops guessing which connections can browse.
+
+    ⭐ WHY THIS ROUTE EXISTS, in `ConnectedSourceSection.tsx`'s own words before Phase 238:
+
+        *"The server's SourceRegistry is the authority and there is no endpoint that publishes
+        its list, so this filter is the client's honest approximation of it... When a second
+        family lands (Microsoft Graph, Phase 238), this predicate is the thing to widen, and
+        widening it by guess is how a dead option appears in a dropdown."*
+
+    Two copies of `id.includes("google") || includes("workspace") || includes("drive")` decided
+    which connections could be browsed and watched. Adding `|| includes("microsoft")` would have
+    satisfied this phase and left Phase 239's MCP family needing the same edit again — the
+    milestone's *"adding a source is rows, not code"* constraint, falsified on the frontend.
+
+    ⛔ It is a CAPABILITY list, not a connection list: it says which families the server can
+    read, never which connections a caller may see. Connection visibility stays with
+    `/connections`, org-scoped, unchanged.
+    """
+    from app.services.sources.base import SourceRegistry
+
     return {
-        "id": doc_id,
-        "filename": filename,
-        "mime_type": mime_type,
-        "file_size": len(raw_bytes),
-        "status": "processing",
+        "families": sorted(
+            f for f in SourceRegistry.list_supported_services()
+            if f not in _NEVER_OFFERED_SOURCE_FAMILIES
+        )
     }
 
 
+@router.get(
+    "/connections/{connection_id}/browse",
+    summary="Browse folder hierarchy in connected cloud source (SRC-02)",
+)
+async def browse_connection_hierarchy(
+    connection_id: str,
+    folder_id: str | None = None,
+    page_token: str | None = None,
+    active_org: str = Depends(get_active_org_id),
+    user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_user_supabase_client),
+):
+    """Phase 232 (SRC-02): Hierarchical browse for connected source drives and folders."""
+    from app.services.sources.base import SourceConnectionDisabled, SourceRegistry
 
+    conn = await connector_service.get_connection(
+        connection_id=str(connection_id),
+        org_id=str(active_org),
+        supabase=supabase,
+    )
+    if not conn:
+        raise _NOT_FOUND
+
+    # ⚠ OUTSIDE the try/except below ON PURPOSE. That block turns anything it catches into a
+    # 502 "the provider returned an error", and a disabled connection is not a provider error —
+    # wording it that way is how a control that failed to stop something reads as the provider's
+    # fault (BUG-260907-03).
+    try:
+        adapter = SourceRegistry.get_adapter(conn)
+    except SourceConnectionDisabled as exc:
+        raise _disabled_connection_response(exc) from None
+    if not adapter:
+        return {"items": [], "next_page_token": None}
+
+    try:
+        page = await adapter.browse(conn, folder_id=folder_id, page_token=page_token)
+        items = [
+            {
+                "id": node.id,
+                "name": node.name,
+                "kind": node.kind,
+                "drive_id": node.drive_id,
+                "parent_id": node.parent_id,
+                "has_children": node.has_children,
+            }
+            for node in page.items
+        ]
+        return {
+            "items": items,
+            "next_page_token": page.next_page_token,
+        }
+    except Exception as exc:
+        logger.error("Failed to browse hierarchy for connection %s: %s", connection_id, exc)
+        # ⚠ LO-05 — THE TAIL OF THIS STRING IS AUTHORED BY THE REMOTE SERVER.
+        # `mcp_source._error_text` truncates its own `isError` text to 300 chars, but every
+        # OTHER exception reaching here interpolates unbounded, and control characters can
+        # reach a client surface. Not XSS in React, but an untrusted string in a message a
+        # person reads as ours — so the app's sentence is fixed, the server's is bounded and
+        # explicitly attributed, and neither can be mistaken for the other.
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=(
+                "Source provider browse returned an error. The provider said: "
+                + _provider_said(exc)
+            ),
+        )
 

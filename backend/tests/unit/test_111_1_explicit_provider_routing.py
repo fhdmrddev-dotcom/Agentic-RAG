@@ -89,8 +89,12 @@ def test_documents_py_resolution_block_prefers_extraction_provider():
     before falling back to inference (must_haves artifact contains-check)."""
     import inspect
 
-    from app.api import documents
+    # ⚠ RE-POINTED 2026-09-05 (BUG-260905-06). The block this fence guards MOVED out of
+    #   `documents.py` into `services/ingest_enrich.py`, because the durable queue never
+    #   called `documents.py` at all and so never ran it. The seam is unchanged; only its
+    #   home is. Following the code is correct — deleting the fence would not be.
+    from app.services import ingest_enrich
 
-    src = inspect.getsource(documents)
+    src = inspect.getsource(ingest_enrich)
     assert "extraction_provider" in src, \
-        "documents.py extraction routing must prefer stored extraction_provider"
+        "the shared enrichment must prefer stored extraction_provider over inference"

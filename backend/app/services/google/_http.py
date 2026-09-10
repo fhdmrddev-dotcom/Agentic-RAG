@@ -1,7 +1,7 @@
 """The one HTTP shape every Google read in this package uses.
 
 ── ⚠ WHY THIS EXISTS (2026-08-31) ─────────────────────────────────────────────────────
-`cloud_storage.py` and the first cut of `gmail_read.py` each carried their own copy of
+The earlier single-file fetcher and the first cut of `gmail_read.py` each carried their own copy of
 the same three things: mint a token from the connection id, call the binder, and turn a
 non-200 into a sentence. Two copies is a coincidence; **five would have been a rule
 nobody wrote down**, and the enum-only error projection is the kind of rule that rots
@@ -9,10 +9,8 @@ quietly when it is spelled once per module. Round 1 adds Sheets, Docs, Calendar,
 Contacts and three more Gmail reads — so the shape is extracted BEFORE the fifth copy,
 not after it.
 
-`cloud_storage.py` deliberately keeps its own copy for now: it is the file picker's
-module as well as the connector's, it is on the ledger, and moving it is a separate
-change with its own blast radius. That is a decision, not an oversight —
-`docs/HOT-FILE-LEDGER.md` records the seam.
+`services/sources/adapters/google_drive.py` implements the unified SourceAdapter contract
+for Drive, preserving the enum-only error reporting and egress pinning.
 
 ── THE BODY NEVER TRAVELS; THE ENUM HALF DOES ─────────────────────────────────────────
 A Google error body echoes the request — for Drive and Gmail that is the `q` parameter,
@@ -30,7 +28,7 @@ Drive API. `accessNotConfigured` is the word that makes that answer impossible t
 ── EVERY CALL GOES THROUGH THE BINDER ─────────────────────────────────────────────────
 `send_pinned_http` under the CALLER'S key: scheme check, host allow-list, DNS pin,
 redirect refusal, response cap. This package constructs no client of its own — the
-mistake `cloud_storage` shipped with (a raw `httpx.AsyncClient`, validated by nothing) is
+mistake early cloud storage code shipped with (a raw `httpx.AsyncClient`, validated by nothing) is
 the reason that rule is written down.
 
 ⚠ THE KEY IS THE CALLER'S, NOT THIS MODULE'S. Sheets, Docs, Calendar, Gmail, Contacts and

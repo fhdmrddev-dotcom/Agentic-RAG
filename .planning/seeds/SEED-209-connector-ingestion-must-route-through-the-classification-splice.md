@@ -1,7 +1,9 @@
 ---
 id: SEED-209
 title: Connector-ingested documents must enter through the SAME classification splice as an upload, and source facts must become first-class filterable fields
-status: planted
+status: folded            # FOLDED into Phase 237 (2026-09-06) -- RULES-01, RULES-02
+folded_into: Phase 237 (One Rule Engine, Not Two — RULES-01, RULES-02)
+closed_at: 2026-09-06
 planted: 2026-08-26
 planted_by: Operator, 2026-08-26 — "we have to think about how to ingest once this connection is established. for example, if a file is uploaded into onedrive, where it will be stored? this should be similar to document management system like m-files which we already define the rules, classes and structure"
 surface: Agentic-RAG

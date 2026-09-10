@@ -4,12 +4,12 @@ title: runAnswer selection rule picks llm_emit status line over substantive answ
 reported: 2026-08-23
 surface: Agentic-RAG
 severity: minor
-status: open
+status: deferred
 affected_areas: [frontend/workflows]
 folded_into: null
 verified_closed_by: null
 related_seeds: [SEED-191]
-re_open_trigger: "⚠ REVIEWED AT /gsd:discuss-phase 214 (2026-08-28) AND NOT FOLDED — recorded so the consideration is not repeated as a discovery. Phase 214 touches the run surfaces for step IDENTITY (service mark + action name, SC#4) and step FAILURE (SC#5), and touches `RunTranscript` / `RunStepList` / `RunSpine` / `PhaseCard`. It does NOT touch runAnswer selection, which is a different rule on the same files. `status` stays `open`. See 214-CONTEXT.md <deferred>. ── ORIGINAL ── The next phase touching the run surface's answer selection, or an operator report of the wrong-answer hero on another workflow."
+re_open_trigger: "Trigger: Investigated during harness output formatting sweep in Phase 234"
 reproduces_on:
   branch: develop
   commit: 4adf13ae

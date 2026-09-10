@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sketch 233 — The Source Says What It Did</title>
+<link rel="stylesheet" href="../themes/default.css">
+<style>
+/* ─────────────────────────────────────────────────────────────────────────────
+   Sketch 233 — Phase 235 · LIB-10 / SURF-02 / SURF-03
+   Layout is FLEX COLUMN, never position:fixed bars with hardcoded offsets
+   (the 079/080 lesson — fixed bars put content behind the header).
+   ───────────────────────────────────────────────────────────────────────────── */
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:var(--color-bg);color:var(--color-text);
+  font-family:var(--font-sans);font-size:var(--text-base);
+  display:flex;flex-direction:column;
+}
+
+/* variant switcher — a normal flex child, not a fixed bar */
+#vnav{
+  display:flex;gap:6px;align-items:center;flex-shrink:0;
+  padding:8px 14px;background:var(--color-bg-elev1);
+  border-bottom:1px solid var(--color-border);
+}
+#vnav .lbl{font-size:var(--text-xs);color:var(--color-text-dim);margin-right:6px;letter-spacing:.04em;text-transform:uppercase}
+.vtab{
+  font:inherit;font-size:var(--text-sm);cursor:pointer;
+  background:transparent;color:var(--color-text-muted);
+  border:1px solid var(--color-border);border-radius:var(--radius-full,999px);
+  padding:5px 13px;transition:all .15s ease;
+}
+.vtab:hover{color:var(--color-text);border-color:var(--color-primary-dim);background:var(--color-muted)}
+.vtab.on{background:var(--color-primary-dim);color:var(--color-primary);border-color:var(--color-primary-glow)}
+
+.variant{flex:1;display:none;min-height:0}
+.variant.on{display:flex}
+
+/* ── app frame ─────────────────────────────────────────────────────────────── */
+.app{flex:1;display:flex;min-height:0;width:100%}
+
+/* nav rail — 210px expanded, matching NavPanel's expanded track */
+.rail{
+  width:210px;flex-shrink:0;background:var(--color-bg-elev1);
+  border-right:1px solid var(--color-border-soft);
+  padding:12px 8px;display:flex;flex-direction:column;gap:2px;
+}
+.brand{display:flex;align-items:center;gap:9px;padding:4px 6px 14px}
+.brand .bmark{width:28px;height:28px;border-radius:9px;background:linear-gradient(135deg,var(--color-primary-strong),var(--color-accent-violet));display:grid;place-items:center;font-size:14px}
+.brand .nm{font-family:var(--font-headline);font-weight:600;font-size:var(--text-sm)}
+
+.railitem{
+  position:relative;display:flex;align-items:center;gap:10px;
+  padding:8px 10px;border-radius:var(--radius-md,8px);
+  color:var(--color-text-muted);font-size:var(--text-sm);cursor:pointer;
+  border:none;background:transparent;font-family:inherit;width:100%;text-align:left;
+  transition:all .15s ease;
+}
+.railitem:hover{background:var(--color-accent);color:var(--color-text)}
+.railitem.active{background:var(--color-primary-dim);color:var(--color-primary)}
+.railitem .ico{width:16px;text-align:center;opacity:.9;flex-shrink:0}
+
+/* ⭐ THE BADGE. Quiet and certain: amber, never red; a count, never an alarm word. */
+.badge{
+  margin-left:auto;min-width:18px;height:18px;padding:0 5px;
+  display:grid;place-items:center;border-radius:999px;
+  background:var(--color-warning-dim);color:var(--color-warning);
+  border:1px solid var(--color-warning);
+  font-size:10px;font-weight:700;line-height:1;
+}
+.badge.hide{display:none}
+
+/* the popover the badge opens */
+.pop{
+  position:absolute;left:calc(100% + 10px);top:-6px;z-index:40;width:340px;
+  background:var(--color-surface-hi);border:1px solid var(--color-border);
+  border-radius:var(--radius-lg,12px);box-shadow:0 18px 40px rgba(0,0,0,.55);
+  padding:12px;display:none;
+}
+.pop.open{display:block}
+.pop h4{font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-dim);font-weight:600;margin-bottom:9px}
+.popitem{padding:9px 0;border-top:1px solid var(--color-border-soft)}
+.popitem:first-of-type{border-top:none}
+.popitem .nm{font-size:var(--text-sm);font-weight:600}
+.popitem .why{font-size:var(--text-xs);color:var(--color-text-muted);margin-top:3px;line-height:1.5}
+.popfoot{margin-top:10px;padding-top:9px;border-top:1px solid var(--color-border-soft)}
+
+/* ── main column ───────────────────────────────────────────────────────────── */
+.main{flex:1;min-width:0;display:flex;flex-direction:column;overflow:auto}
+.phead{padding:20px 26px 0}
+.ptitle{font-family:var(--font-headline);font-size:var(--text-2xl,1.5rem);font-weight:650;letter-spacing:-.01em}
+.psub{color:var(--color-text-muted);font-size:var(--text-sm);margin-top:3px}
+
+/* ⭐ SURFACE 4 — the instance-level statement. ONE line, shown ONCE.
+   The banner owns platform-wide truth; the row owns only what is true of that row. */
+.instance{
+  margin:16px 26px 0;padding:11px 14px;display:flex;gap:11px;align-items:flex-start;
+  background:var(--color-muted);border:1px solid var(--color-border);
+  border-left:2px solid var(--color-warning);border-radius:var(--radius-md,8px);
+}
+.instance .ico{color:var(--color-warning);flex-shrink:0;line-height:1.5}
+.instance .txt{font-size:var(--text-sm);line-height:1.55}
+.instance .op{
+  display:block;margin-top:5px;font-size:var(--text-xs);color:var(--color-text-dim);
+  font-family:var(--font-mono);
+}
+.instance.hide{display:none}
+
+.tabs{display:flex;gap:2px;padding:16px 26px 0;border-bottom:1px solid var(--color-border-soft);margin-top:6px}
+.tab{
+  font:inherit;font-size:var(--text-sm);background:transparent;border:none;cursor:pointer;
+  color:var(--color-text-muted);padding:8px 13px;border-bottom:2px solid transparent;
+  margin-bottom:-1px;transition:all .15s ease;
+}
+.tab:hover{color:var(--color-text)}
+.tab.on{color:var(--color-primary);border-bottom-color:var(--color-primary)}
+.tab .cnt{
+  display:inline-grid;place-items:center;min-width:16px;height:16px;padding:0 4px;margin-left:6px;
+  border-radius:999px;background:var(--color-warning-dim);color:var(--color-warning);
+  font-size:10px;font-weight:700;
+}
+.body{padding:22px 26px 60px;display:none}
+.body.on{display:block}
+
+.sect{font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--color-text-dim);font-weight:600;margin:0 0 11px}
+.sect .plain{text-transform:none;letter-spacing:0;color:var(--color-text-dim);font-weight:400}
+
+/* ── SURFACE 1+2 — the source card ─────────────────────────────────────────── */
+.card{
+  background:var(--color-surface);border:1px solid var(--color-border);
+  border-radius:var(--radius-lg,12px);margin-bottom:12px;overflow:hidden;
+  transition:border-color .15s ease;
+}
+.card.stopped{border-color:var(--color-warning);border-left-width:2px}
+.card.degraded{border-style:dashed;opacity:.85}
+.crow{display:flex;align-items:flex-start;gap:13px;padding:14px 16px}
+.logo{
+  width:32px;height:32px;border-radius:9px;flex-shrink:0;display:grid;place-items:center;
+  background:var(--color-accent);font-size:14px;
+}
+.cmain{flex:1;min-width:0}
+.cname{font-size:var(--text-md,1rem);font-weight:600;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.path{
+  font-size:var(--text-xs);color:var(--color-text-muted);margin-top:4px;
+  font-family:var(--font-mono);display:flex;align-items:center;gap:7px;flex-wrap:wrap;
+}
+.arrow{color:var(--color-text-dim)}
+
+/* the mark. NOT a word — a shape. The heading already says what section this is. */
+.mark{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.mark.ok{background:var(--color-success)}
+.mark.stop{background:var(--color-warning)}
+.mark.wait{background:var(--color-text-dim)}
+
+/* ⭐ THE FORK — B's one-line healthy source. Four facts, one row.
+   "Text is noise. Cut it. The purpose must survive the cut." */
+.line{
+  display:flex;align-items:center;gap:12px;padding:9px 16px;cursor:pointer;
+  background:var(--color-surface);border:1px solid var(--color-border);
+  border-radius:var(--radius-md,8px);margin-bottom:5px;transition:all .15s ease;
+}
+.line:hover{border-color:var(--color-primary-dim);background:var(--color-muted)}
+.lico{width:18px;text-align:center;opacity:.75;flex-shrink:0}
+.lname{font-size:var(--text-sm);font-weight:600;min-width:158px;flex-shrink:0}
+.lpath{
+  font-size:var(--text-xs);color:var(--color-text-dim);font-family:var(--font-mono);
+  flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.lright{display:flex;align-items:center;gap:7px;flex-shrink:0}
+.lmuted{font-size:var(--text-xs);color:var(--color-text-muted)}
+
+/* ⭐ the outcome line — "Checked 4 minutes ago · 6 files", never "scheduled" */
+.outcome{margin-top:8px;font-size:var(--text-sm);color:var(--color-text-muted);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.outcome b{color:var(--color-text);font-weight:600}
+.cadence{font-size:var(--text-xs);color:var(--color-text-dim)}
+.dot{color:var(--color-text-dim)}
+
+/* the stopped sentence — plain, no severity word, no exclamation */
+.stopline{
+  margin:0 16px 14px;padding:11px 13px;border-radius:var(--radius-md,8px);
+  background:var(--color-warning-dim);font-size:var(--text-sm);line-height:1.55;
+}
+.stopline .when{color:var(--color-text-muted);display:block;margin-top:3px;font-size:var(--text-xs)}
+
+.acts{display:flex;gap:7px;align-items:center;flex-wrap:wrap;padding:0 16px 14px}
+.btn{
+  font:inherit;font-size:var(--text-sm);cursor:pointer;padding:6px 13px;
+  border-radius:var(--radius-md,8px);border:1px solid var(--color-border);
+  background:var(--color-accent);color:var(--color-text);transition:all .15s ease;
+}
+.btn:hover{border-color:var(--color-primary-dim);background:var(--color-muted)}
+.btn.primary{background:var(--color-primary-dim);color:var(--color-primary);border-color:var(--color-primary-glow)}
+.btn.primary:hover{background:var(--color-primary-glow)}
+.btn.quiet{background:transparent;border-color:transparent;color:var(--color-text-muted);padding:6px 8px}
+.btn.quiet:hover{color:var(--color-text);background:var(--color-accent)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+
+/* ── SURFACE 1 — the run history ───────────────────────────────────────────── */
+.hist{border-top:1px solid var(--color-border-soft);display:none}
+.hist.open{display:block}
+.histhead{display:flex;align-items:center;justify-content:space-between;padding:10px 16px 6px}
+.run{
+  display:flex;align-items:baseline;gap:12px;padding:7px 16px;font-size:var(--text-sm);
+  border-top:1px solid var(--color-border-soft);
+}
+.run:first-of-type{border-top:none}
+.run .t{width:132px;flex-shrink:0;color:var(--color-text-muted);font-size:var(--text-xs);font-family:var(--font-mono)}
+.run .c{flex:1;min-width:0}
+.run .quietrun{color:var(--color-text-dim)}
+.run.fold{color:var(--color-text-dim);font-size:var(--text-xs);font-style:italic}
+.run.fold .c{cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px}
+.n{color:var(--color-text);font-weight:600}
+.failnote{
+  margin-top:5px;font-size:var(--text-xs);color:var(--color-text-muted);line-height:1.55;
+  padding-left:11px;border-left:2px solid var(--color-warning);
+}
+
+/* ── SURFACE 3b — Health tab attention list ────────────────────────────────── */
+.att{background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-lg,12px);overflow:hidden}
+.attrow{display:flex;align-items:center;gap:12px;padding:13px 16px;border-top:1px solid var(--color-border-soft)}
+.attrow:first-of-type{border-top:none}
+.attrow .g{flex:1;min-width:0}
+.attrow .nm{font-size:var(--text-sm);font-weight:600}
+.attrow .why{font-size:var(--text-xs);color:var(--color-text-muted);margin-top:3px}
+.empty{padding:26px;text-align:center;color:var(--color-text-dim);font-size:var(--text-sm)}
+
+.hchips{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:20px}
+.chip{
+  padding:7px 12px;border-radius:var(--radius-md,8px);background:var(--color-surface);
+  border:1px solid var(--color-border);font-size:var(--text-xs);color:var(--color-text-muted);
+}
+.chip b{color:var(--color-text);font-size:var(--text-sm);margin-right:5px}
+
+/* three-things card */
+.tryme{
+  margin:0 26px 20px;padding:13px 15px;background:var(--color-surface);
+  border:1px dashed var(--color-border);border-radius:var(--radius-md,8px);
+}
+.tryme h5{font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-dim);margin-bottom:7px}
+.tryme ol{margin-left:17px;font-size:var(--text-sm);color:var(--color-text-muted);line-height:1.75}
+.note{font-size:var(--text-xs);color:var(--color-text-dim);margin-top:9px;line-height:1.6}
+
+/* toast */
+#toast{
+  position:fixed;bottom:56px;left:50%;transform:translateX(-50%) translateY(14px);
+  background:var(--color-surface-hi);border:1px solid var(--color-border);
+  padding:9px 16px;border-radius:999px;font-size:var(--text-sm);
+  opacity:0;pointer-events:none;transition:all .22s ease;z-index:9999;
+}
+#toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+
+#sketch-tools{
+  position:fixed;bottom:12px;right:12px;z-index:9999;font-family:system-ui;font-size:12px;
+  background:rgba(0,0,0,.72);color:#fff;padding:7px 11px;border-radius:8px;opacity:.4;
+  transition:opacity .2s;display:flex;gap:8px;align-items:center;
+}
+#sketch-tools select,#sketch-tools button{
+  font-size:11px;background:#222;color:#fff;border:1px solid #444;border-radius:5px;padding:3px 7px;cursor:pointer;
+}
+</style>
+</head>
+<body>
+
+<div id="vnav">
+  <span class="lbl">Sketch 233</span>
+  <button class="vtab" id="tabA" onclick="showVariant('A')">A — every source is a full card</button>
+  <button class="vtab on" id="tabB" onclick="showVariant('B')">B — healthy sources are one line ★ Selected</button>
+</div>
+
+<!-- ⭐ B is the WINNER (operator, 2026-09-06) and therefore the variant this file
+     opens on. A is preserved and navigable — the winner is highlighted, never the
+     only option, because the rejected variant is the evidence for the choice. -->
+<div class="variant" id="vA"></div>
+<div class="variant on" id="vB"></div>
+
+<div id="toast"></div>
+
+<div id="sketch-tools"
+     onmouseenter="this.style.opacity='1'" onmouseleave="this.style.opacity='0.4'">
+  <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'">
+    <option value="default">Deep Midnight</option>
+  </select>
+  <button onclick="setReader(!READER_OFF)" id="readerBtn">Reader: on</button>
+  <button onclick="setPending()">Click Sync</button>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════════════════
+   COPY — every sentence this sketch says, in one object.
+   Mirrors the shipped `ingestionErrorVocabulary.ts` shape. The build ports THIS
+   OBJECT and imports it; it does not hunt strings through JSX.
+
+   THE FIVE BINDING RULES (inherited verbatim from ingestionErrorVocabulary.ts):
+     1. A sentence is PRESENTATION, never a rule. Nothing branches on the text.
+     2. NO SEVERITY WORD. The row is already under a heading that says something
+        is wrong; a second word of alarm buys nothing and costs trust.
+     3. NO EXCLAMATION.
+     4. NO MECHANISM. Name what is TRUE OF THE SOURCE and what to DO — never what
+        the code experienced.
+     5. The dash is an EM DASH (U+2014).
+
+   ⚠ RULE 4 HAS EXACTLY ONE DELIBERATE EXCEPTION, and it is marked: the
+   OPERATOR half of READER_OFF names the setting. That is not the mechanism
+   leaking — for an operator the setting name IS the action. The MEMBER half
+   names no mechanism at all. Two audiences, two sentences, one condition.
+   ═══════════════════════════════════════════════════════════════════════════════ */
+var COPY = {
+  /* ── cadence — PINNED BY PHASE 234 (SURF-01). Do not reword. ── */
+  cadence: function (m) { return "checked every " + m + " minutes"; },
+
+  /* ── the outcome line. Replaces the word "scheduled", which described the
+        request rather than the outcome (BUG-260906-02). ── */
+  checkedAgo: function (ago, files) { return "Checked " + ago + " · " + files + " files"; },
+  checkedNoChange: function (ago) { return "Checked " + ago + " · no changes"; },
+
+  /* ── the pending state. It says what was ASKED, never that work is happening. ── */
+  asked: function (within) { return "Asked · next check within " + within; },
+
+  /* ── stopped. Says THAT it stopped, and WHEN it last succeeded. ── */
+  stopped: function (ago) { return "Stopped reading " + ago; },
+  lastGood: function (when) { return "Last read successfully on " + when; },
+  neverRead: "It has not read successfully yet.",
+
+  /* ── cause → sentence → the ONE control. TABLE-DRIVEN DATA, never branches
+        in the card. A new adapter adds a row here, not an `if`. ── */
+  cause: {
+    token_revoked: {
+      says: "Access to Legal SharePoint was withdrawn — the connection needs to be authorised again.",
+      action: "Reconnect Legal SharePoint",
+      hard: true
+    },
+    folder_gone: {
+      says: "The watched folder is no longer shared with this connection.",
+      action: "Pick a different folder",
+      hard: true
+    },
+    unreachable: {
+      says: "The server did not answer the last three checks.",
+      action: "Retry now",
+      hard: false
+    },
+    unknown: {
+      /* the honest fallback — it never invents a cause */
+      says: "It stopped, and no reason was recorded.",
+      action: "Retry now",
+      hard: false
+    }
+  },
+
+  /* ── per-file failure reasons. Same rules; names the FILE's state, not the
+        extractor's experience. ── */
+  fileFail: {
+    password: "The file is password-protected — remove the password and it will be read on the next check.",
+    too_big: "The file is larger than this library accepts — split it, or raise the limit in Settings.",
+    unknown: "It stopped, and no reason was recorded."
+  },
+
+  /* ── quiet runs collapse. Density is RENDERING, never storage — every tick has
+        a row (D-235-07); the surface is what folds them. ── */
+  quietFold: function (n) { return "checked " + n + " times, no changes"; },
+  showEvery: "Show every check",
+  hideQuiet: "Hide quiet checks",
+
+  /* ── SEED-239 — a per-row boundary and a NAMED degraded row. A source that
+        vanishes from its own list is the silence LIB-10 forbids. ── */
+  degraded: "This source could not be read here — the others are unaffected.",
+  degradedAction: "Report this source",
+
+  /* ── the instance-level condition. Said ONCE, never repeated per row.
+        The banner owns platform-wide truth; the row owns only its own. ── */
+  readerOffMember: "Automatic reading is switched off on this server. Watches are saved, and they will resume when it is switched back on.",
+  readerOffOperator: "WATCH_PROCESS_ENABLED",
+  readerOffRow: "Waiting — the reader is off",
+
+  /* ── the signal ── */
+  badgeTitle: function (n) { return n === 1 ? "1 source stopped reading" : n + " sources stopped reading"; },
+  popTitle: "Needs attention",
+  popOpenHealth: "Open Library health",
+  attentionTitle: "Sources needing attention",
+  attentionEmpty: "Every source is reading.",
+  goToSource: "Go to source",
+  roster: function (total, need) { return total + " connected, " + need + " need you"; },
+
+  /* ── ordinary controls ── */
+  syncNow: "Sync now",
+  history: "History",
+  hideHistory: "Hide history",
+  collapse: "Collapse"
+};
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   FIXTURE — an authored business scenario, DELIBERATELY not real rows.
+   The engine facts ARE real: the six connector_watch_items states, the real
+   counts dict keys (new / modified / renamed / missing / restored / errors),
+   the real cause families, the real cadence floor.
+
+   ⚠ TWELVE SOURCES, NOT FOUR, AND THE COUNT IS LOAD-BEARING. The question this
+   sketch now asks — how much a HEALTHY source should say — does not exist at
+   four rows. It exists at twelve, where two need you and ten do not.
+   ═══════════════════════════════════════════════════════════════════════════════ */
+var SOURCES = [
+  { id:"s1", icon:"▲", conn:"Finance Drive", system:"Google Drive",
+    from:"Suppliers / Invoices 2026", to:"Finance / Invoices",
+    every:30, state:"ok", ago:"4 minutes ago", files:6 },
+
+  { id:"s2", icon:"◆", conn:"Legal SharePoint", system:"SharePoint",
+    from:"Contracts / Executed", to:"Legal / Contracts",
+    every:360, state:"stopped", cause:"token_revoked",
+    stoppedAgo:"3 days ago", lastGood:"2 September, 09:14" },
+
+  { id:"s3", icon:"▲", conn:"Ops Drive", system:"Google Drive",
+    from:"Site Photos / Tower B", to:"Operations / Site",
+    every:60, state:"stopped", cause:"folder_gone",
+    stoppedAgo:"11 hours ago", lastGood:"5 September, 22:10" },
+
+  { id:"s5",  icon:"▲", conn:"HR Drive",          system:"Google Drive", from:"People / Policies",      to:"HR / Policies",        every:1440, state:"ok", ago:"2 hours ago",    files:41 },
+  { id:"s6",  icon:"◆", conn:"Bids SharePoint",   system:"SharePoint",   from:"Tenders / 2026",         to:"Commercial / Bids",    every:60,   state:"ok", ago:"18 minutes ago", files:112 },
+  { id:"s7",  icon:"▲", conn:"QA Drive",          system:"Google Drive", from:"Inspections / Reports",  to:"Quality / Reports",    every:30,   state:"ok", ago:"9 minutes ago",  files:88 },
+  { id:"s8",  icon:"◆", conn:"Board SharePoint",  system:"SharePoint",   from:"Board / Minutes",        to:"Governance / Board",   every:1440, state:"ok", ago:"6 hours ago",    files:23 },
+  { id:"s9",  icon:"▲", conn:"Design Drive",      system:"Google Drive", from:"Drawings / Issued",      to:"Engineering / Issued", every:360,  state:"ok", ago:"51 minutes ago", files:307 },
+  { id:"s10", icon:"▲", conn:"Procurement Drive", system:"Google Drive", from:"Purchase Orders / Open", to:"Finance / POs",        every:60,   state:"ok", ago:"22 minutes ago", files:64 },
+  { id:"s11", icon:"◆", conn:"Site SharePoint",   system:"SharePoint",   from:"Daily Logs / Tower A",   to:"Operations / Logs",    every:30,   state:"ok", ago:"3 minutes ago",  files:19 },
+  { id:"s12", icon:"▲", conn:"Safety Drive",      system:"Google Drive", from:"HSE / Incident Reports", to:"Safety / Incidents",   every:360,  state:"ok", ago:"1 hour ago",     files:7 },
+
+  { id:"s4", icon:"?", conn:"Archive (legacy)", system:"—",
+    state:"degraded" }
+];
+
+/* runs — EVERY tick has a row, including the quiet ones (D-235-07) */
+var RUNS = [
+  { t:"Today 14:32",      added:3, updated:1 },
+  { t:"Today 14:02",      quiet:true },
+  { t:"Today 13:32",      quiet:true },
+  { t:"Today 13:02",      quiet:true },
+  { t:"Today 12:32",      quiet:true },
+  { t:"Today 12:02",      quiet:true },
+  { t:"Today 11:32",      quiet:true },
+  { t:"Today 11:02",      quiet:true },
+  { t:"Today 10:32",      quiet:true },
+  { t:"Today 10:02",      quiet:true },
+  { t:"Today 09:32",      quiet:true },
+  { t:"Today 09:02",      quiet:true },
+  { t:"Today 08:32",      quiet:true },
+  { t:"Today 08:02",      quiet:true },
+  { t:"Today 07:32",      quiet:true },
+  { t:"Yesterday 09:14",  added:1, failed:1, failKind:"password", failName:"Invoice_8841.pdf" },
+  { t:"Yesterday 08:44",  added:12, removed:2 }
+];
+
+var READER_OFF = false;
+var OPEN_HIST  = { A:null, B:null };   /* which SOURCE has its history open */
+var EXPANDED   = { A:null, B:null };   /* B only: which healthy line is opened out */
+var SHOW_QUIET = { A:false, B:false };
+var POP_OPEN   = { A:false, B:false };
+var TAB        = { A:"ingestion", B:"ingestion" };
+var PENDING    = { A:false, B:false };
+
+var STOPPED = SOURCES.filter(function (s) { return s.state === "stopped"; });
+
+/* ── helpers ───────────────────────────────────────────────────────────────── */
+function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+function toast(msg){
+  var t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("on");
+  clearTimeout(window._tt); window._tt = setTimeout(function(){ t.classList.remove("on"); }, 2100);
+}
+
+/* ── SURFACE 1 — the run history ───────────────────────────────────────────── */
+function renderRun(r){
+  if (r.quiet) {
+    return '<div class="run" data-block="run" data-quiet="1">' +
+             '<span class="t">' + esc(r.t) + '</span>' +
+             '<span class="c quietrun">no changes</span>' +
+           '</div>';
+  }
+  var bits = [];
+  if (r.added)   bits.push('<span class="n">' + r.added   + '</span> added');
+  if (r.updated) bits.push('<span class="n">' + r.updated + '</span> updated');
+  if (r.removed) bits.push('<span class="n">' + r.removed + '</span> missing at source');
+  if (r.failed)  bits.push('<span class="n">' + r.failed  + '</span> could not be read');
+  var note = r.failed
+    ? '<div class="failnote" data-block="fail-reason"><b>' + esc(r.failName) + '</b> — ' +
+      esc(COPY.fileFail[r.failKind] || COPY.fileFail.unknown) + '</div>'
+    : '';
+  return '<div class="run" data-block="run">' +
+           '<span class="t">' + esc(r.t) + '</span>' +
+           '<span class="c">' + bits.join(' <span class="dot">·</span> ') + note + '</span>' +
+         '</div>';
+}
+
+function renderHistory(v, sid){
+  var quiet = RUNS.filter(function(r){ return r.quiet; }).length;
+  var rows;
+  if (SHOW_QUIET[v]) {
+    rows = RUNS.map(renderRun).join("");
+  } else {
+    var loud = RUNS.filter(function(r){ return !r.quiet; });
+    rows = renderRun(loud[0]) +
+      '<div class="run fold" data-block="quiet-fold">' +
+        '<span class="t"></span>' +
+        '<span class="c" onclick="toggleQuiet(\'' + v + '\')">' + esc(COPY.quietFold(quiet)) + '</span>' +
+      '</div>' +
+      loud.slice(1).map(renderRun).join("");
+  }
+  return '<div class="hist' + (OPEN_HIST[v] === sid ? " open" : "") + '" data-block="history">' +
+           '<div class="histhead">' +
+             '<span class="sect" style="margin:0">Every check</span>' +
+             '<button class="btn quiet" data-action="toggle-quiet" onclick="toggleQuiet(\'' + v + '\')">' +
+               esc(SHOW_QUIET[v] ? COPY.hideQuiet : COPY.showEvery) +
+             '</button>' +
+           '</div>' + rows +
+         '</div>';
+}
+
+/* ⭐ THE FORK — B collapses a HEALTHY source to one line.
+   "Text is noise. Cut it. The purpose must survive the cut." A healthy source has
+   one thing to say: it read, and when. Everything else is one click away.
+   ⛔ It MUST stay openable — SC#1 is "a person opens a SOURCE and sees every run",
+   so a collapsed line that could not open would fail the requirement, not simplify it. */
+function renderLine(s, v){
+  var right = READER_OFF
+    ? '<span class="mark wait"></span><span class="lmuted">' + esc(COPY.readerOffRow) + '</span>'
+    : '<span class="mark ok"></span><span class="lmuted">' + esc(COPY.checkedAgo(s.ago, s.files)) + '</span>';
+  return '<div class="line" data-block="source-line" onclick="expand(\'' + v + '\',\'' + s.id + '\')">' +
+           '<span class="lico">' + esc(s.icon) + '</span>' +
+           '<span class="lname">' + esc(s.conn) + '</span>' +
+           '<span class="lpath">' + esc(s.to) + '</span>' +
+           '<span class="lright">' + right + '</span>' +
+         '</div>';
+}
+
+/* ── SURFACE 1+2 — the source card ─────────────────────────────────────────── */
+function renderCard(s, v){
+  /* SEED-239 — the degraded row. Named, never silently skipped, never collapsed. */
+  if (s.state === "degraded") {
+    return '<div class="card degraded" data-block="source-card" data-degraded="1">' +
+             '<div class="crow">' +
+               '<div class="logo">?</div>' +
+               '<div class="cmain">' +
+                 '<div class="cname">' + esc(s.conn) + '</div>' +
+                 '<div class="outcome">' + esc(COPY.degraded) + '</div>' +
+               '</div>' +
+               '<button class="btn quiet" data-action="report-source" onclick="toast(\'Reported.\')">' +
+                 esc(COPY.degradedAction) + '</button>' +
+             '</div>' +
+           '</div>';
+  }
+
+  /* B: a healthy source is ONE LINE until it is opened. A stopped source is
+     NEVER collapsed — being the one you see is the entire point. */
+  if (v === "B" && s.state === "ok" && EXPANDED[v] !== s.id) return renderLine(s, v);
+
+  var stopped = s.state === "stopped";
+  var c = stopped ? COPY.cause[s.cause] : null;
+
+  /* the outcome line — what it DID, never what was requested */
+  var outcome;
+  if (READER_OFF) {
+    outcome = '<span class="mark wait"></span><span>' + esc(COPY.readerOffRow) + '</span>';
+  } else if (stopped) {
+    outcome = '<span class="mark stop"></span><span>' + esc(COPY.stopped(s.stoppedAgo)) + '</span>';
+  } else if (PENDING[v]) {
+    outcome = '<span class="mark wait"></span><span>' + esc(COPY.asked("60 seconds")) + '</span>';
+  } else {
+    outcome = '<span class="mark ok"></span><span><b>' + esc(COPY.checkedAgo(s.ago, s.files)) + '</b></span>';
+  }
+
+  /* ⛔ THE ONE HOME FOR THE ACTION, in BOTH variants. Settled by RULE rather than
+     by feel — see renderPop for why. */
+  var fix = stopped
+    ? '<button class="btn primary" data-action="fix" data-cause="' + s.cause + '" ' +
+        'onclick="doFix(\'' + s.id + '\')">' + esc(c.action) + '</button>'
+    : '';
+
+  return '<div class="card' + (stopped ? " stopped" : "") + '" data-block="source-card" id="card-' + v + '-' + s.id + '">' +
+           '<div class="crow">' +
+             '<div class="logo">' + esc(s.icon) + '</div>' +
+             '<div class="cmain">' +
+               '<div class="cname">' + esc(s.conn) +
+                 '<span class="cadence">' + esc(COPY.cadence(s.every)) + '</span>' +
+               '</div>' +
+               '<div class="path">' + esc(s.from) +
+                 '<span class="arrow">→</span>' + esc(s.to) + '</div>' +
+               '<div class="outcome" data-block="outcome">' + outcome + '</div>' +
+             '</div>' +
+           '</div>' +
+           (stopped
+             ? '<div class="stopline" data-block="stopped-sentence">' + esc(c.says) +
+                 '<span class="when">' + esc(COPY.lastGood(s.lastGood)) + '</span>' +
+               '</div>'
+             : '') +
+           '<div class="acts">' + fix +
+             '<button class="btn" data-action="sync-now" onclick="doSync(\'' + v + '\')"' +
+               (READER_OFF ? " disabled" : "") + '>' + esc(COPY.syncNow) + '</button>' +
+             '<button class="btn quiet" data-action="toggle-history" onclick="toggleHist(\'' + v + '\',\'' + s.id + '\')">' +
+               esc(OPEN_HIST[v] === s.id ? COPY.hideHistory : COPY.history) +
+             '</button>' +
+             (v === "B" && s.state === "ok"
+               ? '<button class="btn quiet" data-action="collapse" onclick="expand(\'' + v + '\',null)">' +
+                   esc(COPY.collapse) + '</button>'
+               : '') +
+           '</div>' +
+           renderHistory(v, s.id) +
+         '</div>';
+}
+
+/* ── SURFACE 3 — the badge popover ─────────────────────────────────────────── */
+function renderPop(v){
+  var items = STOPPED.map(function (s) {
+    var c = COPY.cause[s.cause];
+    /* ⛔ NO REPAIR CONTROL HERE, IN EITHER VARIANT. The badge is a DOOR.
+       ⚠ THIS WAS THE FIRST CUT'S VARIANT AXIS AND IT WAS MEASURED UNFEELABLE:
+       A and B differed by 248 characters out of ~30,000, and the two landing
+       screens were pixel-identical — the whole fork was three buttons, two of
+       them behind a two-step interaction. The operator saw no difference and
+       was right. It is settled by RULE instead: the fix keeps ONE home, on the
+       source card — the same rule that put the history on the card and kept it
+       out of Health (D-235-17). A second repair site buys two clicks and costs
+       the rule that decided every other placement in this phase. */
+    return '<div class="popitem" data-block="pop-item">' +
+             '<div class="nm">' + esc(s.conn) + '</div>' +
+             '<div class="why">' + esc(COPY.stopped(s.stoppedAgo)) + ' — ' + esc(c.says) + '</div>' +
+           '</div>';
+  }).join("");
+
+  return '<div class="pop' + (POP_OPEN[v] ? " open" : "") + '" data-block="popover">' +
+           '<h4>' + esc(COPY.popTitle) + '</h4>' + items +
+           '<div class="popfoot">' +
+             '<button class="btn primary" data-action="open-health" onclick="goHealth(\'' + v + '\')">' +
+               esc(COPY.popOpenHealth) + '</button>' +
+           '</div>' +
+         '</div>';
+}
+
+/* ── SURFACE 3b — Health tab attention list ────────────────────────────────── */
+function renderAttention(v){
+  if (!STOPPED.length) {
+    return '<div class="att"><div class="empty">' + esc(COPY.attentionEmpty) + '</div></div>';
+  }
+  return '<div class="att" data-block="attention-list">' + STOPPED.map(function (s) {
+    /* one home for the action: Health names what is wrong and LEADS there. */
+    return '<div class="attrow" data-block="attention-row">' +
+             '<span class="mark stop"></span>' +
+             '<div class="g">' +
+               '<div class="nm">' + esc(s.conn) + '</div>' +
+               '<div class="why">' + esc(COPY.stopped(s.stoppedAgo)) + ' · ' + esc(COPY.lastGood(s.lastGood)) + '</div>' +
+             '</div>' +
+             '<button class="btn" data-action="go-to-source" onclick="goSource(\'' + v + '\',\'' + s.id + '\')">' +
+               esc(COPY.goToSource) + '</button>' +
+           '</div>';
+  }).join("") + '</div>';
+}
+
+/* ── the page ──────────────────────────────────────────────────────────────── */
+function renderPage(v){
+  var n = STOPPED.length;
+  var isIng = TAB[v] === "ingestion";
+
+  return '<div class="app">' +
+    '<aside class="rail">' +
+      '<div class="brand"><div class="bmark">✦</div><span class="nm">Aether</span></div>' +
+      '<button class="railitem" data-block="rail-item"><span class="ico">◇</span>Chat</button>' +
+      '<button class="railitem" data-block="rail-item"><span class="ico">⚙</span>Workflows</button>' +
+      '<div style="position:relative">' +
+        '<button class="railitem active" data-block="rail-item-library" data-action="badge" ' +
+          'title="' + esc(COPY.badgeTitle(n)) + '" onclick="togglePop(\'' + v + '\')">' +
+          '<span class="ico">▤</span>Library' +
+          '<span class="badge' + (n ? "" : " hide") + '" data-block="badge">' + n + '</span>' +
+        '</button>' + renderPop(v) +
+      '</div>' +
+      '<button class="railitem" data-block="rail-item"><span class="ico">✧</span>Classification</button>' +
+      '<button class="railitem" data-block="rail-item"><span class="ico">⚡</span>Connections</button>' +
+    '</aside>' +
+
+    '<div class="main">' +
+      '<div class="phead">' +
+        '<div class="ptitle">Library</div>' +
+        '<div class="psub">Everything the agent can read.</div>' +
+      '</div>' +
+
+      /* SURFACE 4 — said ONCE, never per row */
+      '<div class="instance' + (READER_OFF ? "" : " hide") + '" data-block="instance-statement">' +
+        '<span class="ico">◑</span>' +
+        '<div class="txt">' + esc(COPY.readerOffMember) +
+          '<span class="op">Operators: set ' + esc(COPY.readerOffOperator) + ' to switch it back on.</span>' +
+        '</div>' +
+      '</div>' +
+
+      '<div class="tabs">' +
+        '<button class="tab" onclick="goTab(\'' + v + '\',\'documents\')">Documents</button>' +
+        '<button class="tab" onclick="goTab(\'' + v + '\',\'views\')">Views</button>' +
+        '<button class="tab' + (isIng ? " on" : "") + '" data-block="tab-ingestion" ' +
+          'onclick="goTab(\'' + v + '\',\'ingestion\')">Ingestion</button>' +
+        '<button class="tab" onclick="goTab(\'' + v + '\',\'indexing\')">Indexing</button>' +
+        '<button class="tab' + (!isIng ? " on" : "") + '" data-block="tab-health" ' +
+          'onclick="goTab(\'' + v + '\',\'health\')">Health' +
+          (n ? '<span class="cnt">' + n + '</span>' : '') + '</button>' +
+      '</div>' +
+
+      /* INGESTION — every source, and everything it did */
+      '<div class="body' + (isIng ? " on" : "") + '" data-block="body-ingestion">' +
+        '<div class="sect">Watched sources <span class="plain">· ' +
+          esc(COPY.roster(SOURCES.length, n)) + '</span></div>' +
+        SOURCES.map(function (s) { return renderCard(s, v); }).join("") +
+      '</div>' +
+
+      /* HEALTH — only what is wrong */
+      '<div class="body' + (!isIng ? " on" : "") + '" data-block="body-health">' +
+        '<div class="hchips">' +
+          '<div class="chip"><b>1,284</b>documents</div>' +
+          '<div class="chip"><b>' + SOURCES.length + '</b>watched sources</div>' +
+          '<div class="chip"><b>' + n + '</b>needing attention</div>' +
+        '</div>' +
+        '<div class="sect">' + esc(COPY.attentionTitle) + '</div>' +
+        renderAttention(v) +
+      '</div>' +
+
+      '<div class="tryme">' +
+        '<h5>Three things to try</h5>' +
+        '<ol>' +
+          '<li>Switch between <b>A</b> and <b>B</b> at the top — twelve sources, two of which need you.</li>' +
+          '<li>In <b>B</b>, click any one-line source to open it, then <b>History</b> → <b>checked 14 times, no changes</b>.</li>' +
+          '<li>Switch <b>Reader: on → off</b> in the toolbar, bottom right.</li>' +
+        '</ol>' +
+        '<div class="note">Content is an authored business scenario, deliberately not real rows — the ' +
+          'question here is wording and loudness. The engine facts are real: the six item states, the ' +
+          'counts dict, the cause families, the 5-minute cadence floor.</div>' +
+      '</div>' +
+    '</div>' +
+  '</div>';
+}
+
+/* ── behaviour ─────────────────────────────────────────────────────────────── */
+function paint(){
+  document.getElementById("vA").innerHTML = renderPage("A");
+  document.getElementById("vB").innerHTML = renderPage("B");
+}
+function showVariant(v){
+  document.getElementById("vA").classList.toggle("on", v === "A");
+  document.getElementById("vB").classList.toggle("on", v === "B");
+  document.getElementById("tabA").classList.toggle("on", v === "A");
+  document.getElementById("tabB").classList.toggle("on", v === "B");
+}
+function togglePop(v){ POP_OPEN[v] = !POP_OPEN[v]; paint(); }
+function expand(v, id){ EXPANDED[v] = id; if (!id) OPEN_HIST[v] = null; paint(); }
+function toggleHist(v, id){ OPEN_HIST[v] = (OPEN_HIST[v] === id ? null : id); paint(); }
+function toggleQuiet(v){ SHOW_QUIET[v] = !SHOW_QUIET[v]; paint(); }
+function goTab(v, t){ TAB[v] = t; POP_OPEN[v] = false; paint(); }
+function goHealth(v){ TAB[v] = "health"; POP_OPEN[v] = false; paint(); toast("Library ▸ Health"); }
+function goSource(v, id){
+  TAB[v] = "ingestion"; POP_OPEN[v] = false;
+  if (v === "B") EXPANDED[v] = id;
+  paint(); toast("Library ▸ Ingestion");
+}
+function doFix(id){
+  var s = SOURCES.filter(function(x){ return x.id === id; })[0];
+  toast(COPY.cause[s.cause].action + " — opening…");
+}
+function doSync(v){
+  if (READER_OFF) { toast("The reader is off — nothing would read this."); return; }
+  PENDING[v] = true; paint();
+  setTimeout(function(){ PENDING[v] = false; paint(); }, 2600);
+}
+function setPending(){
+  var v = document.getElementById("vA").classList.contains("on") ? "A" : "B";
+  doSync(v);
+}
+function setReader(off){
+  READER_OFF = off;
+  document.getElementById("readerBtn").textContent = "Reader: " + (off ? "off" : "on");
+  paint();
+}
+paint();
+</script>
+</body>
+</html>

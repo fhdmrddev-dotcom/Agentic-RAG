@@ -15,6 +15,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { resolveView } from "@/lib/api"
 import { ViewCard } from "./ViewCard"
+import { AnimatedNumber } from "@/components/ui/AnimatedNumber"
 import type { SavedView } from "@/types"
 
 export interface ViewCardGridProps {
@@ -80,9 +81,13 @@ export function ViewCardGrid({
     <div data-testid="views-vgrid" className="flex flex-col gap-3">
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">
-          {views.length === 0
-            ? "Filter the documents and save the filter to keep it here."
-            : `${views.length} saved ${views.length === 1 ? "filter" : "filters"}.`}
+          {views.length === 0 ? (
+            "Filter the documents and save the filter to keep it here."
+          ) : (
+            <>
+              <AnimatedNumber value={views.length} /> saved {views.length === 1 ? "filter" : "filters"}.
+            </>
+          )}
         </p>
         <button
           type="button"

@@ -300,8 +300,59 @@ def extract_composable(
     image_fn = images_registry[eng["images"]]
     equation_fn = aspects.EQUATION_ENGINES[eng["equations"]]
 
-    # Text — failures raise (matches D-069-04 semantics for text).
-    text, full_markdown = text_fn(raw, mime)
+    # ── Text — the configured engine, then any OTHER registered engine ────────────────────
+    #
+    # D-069-04 says a text failure is fatal where a table/image failure is swallowed, and that
+    # is still true: if EVERY engine fails, this raises exactly as it always did. What changed
+    # is that one engine's bug no longer condemns a document a sibling engine can read fine.
+    #
+    # ⚠ BUG-260905-05, and it was MEASURED rather than guessed. Three real PDFs failed ingest
+    #   with `IndexError: list index out of range`, thrown from inside pypdf itself:
+    #
+    #     pypdf/_cmap.py:427  in build_font_width_map
+    #       second = w[1].get_object()
+    #     IndexError: list index out of range
+    #
+    #   — a malformed `/W` font-width array in the file, not anything wrong with our call. The
+    #   same three bytes through the other registered engine:
+    #
+    #     FMrad_Similarity_report.pdf     legacy=FAIL(IndexError) | pymupdf=OK(50775 chars)
+    #     FMrad_AI_writing_report.pdf     legacy=FAIL(IndexError) | pymupdf=OK(49128 chars)
+    #     Paperpal Plagiarism Check.pdf   legacy=FAIL(IndexError) | pymupdf=OK(48308 chars)
+    #
+    #   So the document was never unreadable. It was readable by the engine we did not try.
+    #
+    # ⚠ THE FALLBACK IS ORDERED AND THE CONFIGURED ENGINE ALWAYS GOES FIRST — this must never
+    #   become "pick whichever works", because the operator's choice of extractor is a setting
+    #   with quality consequences, not a hint. A fallback that silently reorders would make the
+    #   setting unobservable.
+    #
+    # ⚠ `extractor_name` below reports the engine that ACTUALLY produced the text, so a
+    #   document read by the fallback is distinguishable from one read by the default. A
+    #   fallback nobody can see in the lineage column is a fallback nobody can audit.
+    _text_order = [eng["text"]] + [n for n in aspects.TEXT_ENGINES if n != eng["text"]]
+    text = full_markdown = None
+    _text_errors: list[str] = []
+    for _engine_name in _text_order:
+        try:
+            text, full_markdown = aspects.TEXT_ENGINES[_engine_name](raw, mime)
+            if _engine_name != eng["text"]:
+                log.warning(
+                    "extract_composable: text engine %r failed (%s); recovered with %r",
+                    eng["text"],
+                    _text_errors[0] if _text_errors else "?",
+                    _engine_name,
+                )
+                eng["text"] = _engine_name  # lineage reports what actually read the bytes
+            break
+        except Exception as exc:  # noqa: BLE001
+            _text_errors.append(f"{_engine_name}: {type(exc).__name__}: {exc}")
+    else:
+        # Every engine failed. Fatal, exactly as before — but the message now names each one,
+        # so "this PDF cannot be read" is a claim with evidence behind it.
+        raise RuntimeError(
+            "No text engine could read this file — " + " · ".join(_text_errors)
+        )
 
     # Tables — silent-swallow + error field (D-069-04).
     tables: list = []

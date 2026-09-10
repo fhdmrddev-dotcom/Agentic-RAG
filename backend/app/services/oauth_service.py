@@ -124,9 +124,40 @@ OAUTH_PROVIDERS: dict[OAuthProvider, dict[str, Any]] = {
 }
 
 
+class OAuthSigningKeyUnavailable(RuntimeError):
+    """No signing key is configured, so legacy HMAC state cannot be trusted.
+
+    Raised rather than returning a fallback constant — see ``_get_signing_key``.
+    """
+
+
 def _get_signing_key() -> bytes:
-    """Get secret key used for HMAC signing of OAuth state."""
-    raw = (getattr(settings, "jwt_secret", "") or getattr(settings, "secrets_encryption_key", "") or "default-oauth-state-secret").strip()
+    """Get the secret key used for HMAC signing of legacy OAuth state.
+
+    ⛔ **FAILS CLOSED. There is deliberately no default.** This function used to end in
+    ``or "default-oauth-state-secret"``, and that fallback was reachable on a real install:
+    ``jwt_secret`` is **not a declared setting** (grep ``config.py`` — it does not exist), so
+    ``getattr(settings, "jwt_secret", "")`` is ALWAYS ``""``; ``secrets_encryption_key``
+    defaults to ``""`` (``config.py:1017``) and a key-less install is a supported mode
+    (D-150-01). Both arms therefore collapsed to a **string published in this repository**.
+
+    Why that was critical rather than untidy: ``GET /connectors/oauth/callback`` takes no JWT
+    and has no auth dependency, and the legacy branch (``connectors.py``) accepts any state
+    containing a ``"."``. With a public signing key an unauthenticated caller could FORGE a
+    valid state naming a victim's ``connection_id`` and have their own provider tokens written
+    onto that victim's connector — the exact attack ``BUG-260903-02`` was written to close.
+
+    Raising here makes ``verify_oauth_state`` fail on a key-less install, so the legacy branch
+    refuses instead of trusting a forgery. The opaque-handle path (Phase 225,
+    ``oauth_state.save_pending_state``) does not use this function at all and is unaffected.
+    """
+    raw = (getattr(settings, "jwt_secret", "") or getattr(settings, "secrets_encryption_key", "")).strip()
+    if not raw:
+        raise OAuthSigningKeyUnavailable(
+            "No OAuth state signing key is configured (SECRETS_ENCRYPTION_KEY is unset). "
+            "Legacy HMAC state cannot be verified; re-start the connection to use the "
+            "opaque-handle flow."
+        )
     return raw.split(",")[0].encode()
 
 

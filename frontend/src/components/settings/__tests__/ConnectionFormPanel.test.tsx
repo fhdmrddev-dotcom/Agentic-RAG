@@ -46,6 +46,12 @@ import { ConnectionsTabView } from "../ConnectionsTab"
 // The panel's SOURCE via Vite's `?raw` loader — the shipped house idiom for a fence the
 // rendered DOM cannot express (`ConnectionPicker.test.tsx:31`, `ConnectionsTab.test.tsx:47`).
 import panelSource from "../ConnectionFormPanel?raw"
+// ⚠ 239-08 — THE EXTRACTED CARD'S SOURCE, for the SAME fences. Every rule below that scans
+//    `panelSource` was written when the source-binding markup lived in the panel; after the
+//    extraction, a string that moves into `SourceToolsCard.tsx` would satisfy those fences by
+//    ABSENCE while the invariant they protect had quietly left their scope. §26 re-applies
+//    them over the new file so the boundary cannot be used to launder a violation.
+import cardSource from "../SourceToolsCard?raw"
 // ── 190-18: the BACKEND's own source, through the same `?raw` loader, and deliberately NOT
 //    through `node:fs`. `PublishGauntlet.test.tsx:34-46` records the measured reason:
 //    `tsconfig.app.json` sets `types: ["vite/client"]` and nothing else on purpose, so three
@@ -2520,9 +2526,16 @@ describe("206.1 · the create body — the KEY SET the server accepts (D-206.1-0
     // own types cannot see, and a subset match would pass straight through it.
     // ⚠ `service_id` is REQUIRED on every shape since 211-02 — the model and migration 127's
     // `connector_connections_has_a_service_identity` agree exactly.
+      // ⚠ Phase 231 (VIS-02) — `default_ingest_visibility` joined this key set
+      //   DELIBERATELY. The connection carries the scope its owner chose, and it is sent
+      //   on EVERY create path because VIS-02 admits no configuration path that omits it.
+      //   The key is accepted: `ConnectorConnectionCreate` gained the field in the same
+      //   phase, so this is contract GROWTH, not the 422 this guard exists to catch —
+      //   which it still catches for any key the server has not been taught.
     expect(Object.keys(body).sort()).toEqual([
       "config",
       "default_approval_posture",
+      "default_ingest_visibility",
       "mcp_server_url",
       "name",
       "service_id",
@@ -2549,6 +2562,7 @@ describe("206.1 · the create body — the KEY SET the server accepts (D-206.1-0
     expect(Object.keys(withSecret).sort()).toEqual([
       "config",
       "default_approval_posture",
+      "default_ingest_visibility",
       "mcp_server_url",
       "name",
       "secret",
@@ -2594,7 +2608,14 @@ describe("206.1 · the create body — the KEY SET the server accepts (D-206.1-0
     await waitFor(() => expect(onCreate).toHaveBeenCalledTimes(1))
 
     const body = onCreate.mock.calls[0][0] as Record<string, unknown>
-    expect(Object.keys(body).sort()).toEqual(["config", "name", "service_id"])
+    // ⚠ Phase 231 — the scope travels even on the service nobody here has heard of. A path
+    //   that omits it would be a configuration path with no chosen visibility (VIS-02).
+    expect(Object.keys(body).sort()).toEqual([
+      "config",
+      "default_ingest_visibility",
+      "name",
+      "service_id",
+    ])
     expect(body.service_id).toBe("my_custom_wiki")
     // ⚠ KEY ABSENCE, never a value comparison — `capability: null` is a PRESENT value and a
     // different thing from absence, and only absence is what the server's shape arm reads.
@@ -2826,6 +2847,7 @@ describe("206.1 · the EDIT path renders the MCP shape (D-206.1-22 — a live de
     expect(Object.keys(body as Record<string, unknown>).sort()).toEqual([
       "config",
       "default_approval_posture",
+      "default_ingest_visibility",
       "mcp_server_url",
       "name",
     ])
@@ -2996,6 +3018,88 @@ describe("206.1 · the two shipped SOURCE fences still hold over the widened pan
   })
 })
 
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// 26 · ⭐ 239-08 — THE INHERITED FENCES, RE-APPLIED ACROSS THE EXTRACTION BOUNDARY
+//
+// The G-5 extraction moved the file-source binding card out of `ConnectionFormPanel.tsx`
+// into `SourceToolsCard.tsx`. Every source fence above scans ONE file, and each was written
+// when that file was the only place the markup could be. ⚠ AN EXTRACTION IS THEREFORE A
+// SILENT FENCE-WEAKENING EVENT: `expect(panelSource).not.toContain(x)` keeps passing once
+// `x` moves next door, and reads exactly like a fence that is still doing its job.
+//
+// Nothing above is edited — an assertion's MEANING must survive a refactor untouched. These
+// are the same rules, stated again over the new file, so the boundary buys no silence.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+describe("239-08 · the extracted card inherits the panel's source fences", () => {
+  it("⭐ the CARD authors no sentence of its own either — every MCP string is imported", () => {
+    for (const sentence of [
+      FORM_COPY.SERVICE_CUSTOM_ENDPOINT_LABEL,
+      FORM_COPY.SERVICE_LABEL,
+      FORM_COPY.SERVICE_HELP,
+      FORM_COPY.SERVICE_LOCKED_NOTE,
+      FORM_COPY.FIELD_MCP_URL_LABEL,
+      FORM_COPY.FIELD_MCP_URL_HELP,
+      FORM_COPY.FIELD_MCP_SECRET_LABEL,
+      FORM_COPY.FIELD_MCP_SECRET_OPTIONAL_NOTE,
+      FORM_COPY.MCP_SAVE_DISABLED_REASON,
+      FORM_COPY.FIELD_MCP_URL_PLACEHOLDER,
+      // …and the card's OWN copy, which is the half a panel-only fence could never see.
+      FORM_COPY.SOURCE_TOOLS_HEADING,
+      FORM_COPY.SOURCE_TOOLS_HELP,
+      FORM_COPY.SOURCE_TOOLS_LIST_LABEL,
+      FORM_COPY.SOURCE_TOOLS_READ_LABEL,
+      FORM_COPY.SOURCE_TOOLS_ROOT_LABEL,
+      FORM_COPY.SOURCE_TOOLS_ROOT_HELP,
+      FORM_COPY.SOURCE_ARGS_HEADING,
+      FORM_COPY.SOURCE_ARGS_HELP,
+      FORM_COPY.SOURCE_ARGS_NONE_NEEDED,
+      FORM_COPY.SOURCE_ARGS_UNDESCRIBED,
+      FORM_COPY.SOURCE_PATH_ARG_LABEL,
+      FORM_COPY.SOURCE_PATH_ARG_HELP,
+    ]) {
+      expect(cardSource).not.toContain(sentence)
+    }
+    // POSITIVE CONTROL — the fence can see a string in THIS source at all, so an empty `?raw`
+    // import cannot make the whole loop above pass for free.
+    expect(cardSource).toContain("connection-source-tools")
+    // …and it really does reach its copy by IDENTIFIER, which is the mechanism being asserted.
+    expect(cardSource).toContain('from "@/components/settings/connectionFormCopy"')
+  })
+
+  it("⭐ the CARD spells no tooltip attribute — a reason is DOM text or it does not exist", () => {
+    // The panel's measured-`0` rule, inherited. Satisfiable over the whole source (unlike the
+    // `PhaseFormPanel` fence below), and measured 0 on the card at the moment it was created.
+    expect(cardSource).not.toContain("title=")
+  })
+
+  it("⭐ the CARD imports NOTHING from `PhaseFormPanel` — IMPORT-SCOPED, per the 187-24 trap", () => {
+    // ⚠ IMPORT-SCOPED EVEN THOUGH A BARE GREP WOULD PASS TODAY. The panel's docblock names
+    // `PhaseFormPanel` eight times, which is what makes a whole-file grep unsatisfiable there;
+    // this file's docblock happens not to. Writing the WEAKER form here because it currently
+    // passes is how the trap fires the twelfth time — the day someone explains the lineage in
+    // a comment, a bare grep goes red on the prose that FORBIDS the import.
+    const importLines = cardSource
+      .split("\n")
+      .filter((line) => /^\s*import\b/.test(line) || /^\s*}\s*from\s+["']/.test(line))
+      .join("\n")
+    expect(importLines).not.toContain("PhaseFormPanel")
+    // Positive control: the filter can see an import path in this source at all.
+    expect(importLines).toContain("connectionFormCopy")
+  })
+
+  it("⛔ the `mcp` sentinel fence travels WITH the card — it is a guard clause, not a call site", () => {
+    // The condition used to sit at the panel's single call site. It now lives inside the
+    // component, which is strictly stronger: a SECOND caller cannot forget it. Asserted on the
+    // source because the DOM cannot show where a condition is written — the behavioural half
+    // (no card on a `post_message` row) is driven in `ConnectionFormPanel.sourceTools.test.tsx`.
+    expect(cardSource).toContain('capability !== "mcp"')
+    // …and the panel really does delegate rather than keeping a second copy of the markup.
+    expect(panelSource).toContain("<SourceToolsCard")
+    expect(panelSource).not.toContain('data-testid="connection-source-tools"')
+  })
+})
+
 describe("Phase 212 · interactive discovery in MCP mode (D-4 / D-5)", () => {
   it("probes MCP server and renders discovered tools list with auto-populated name in create mode", async () => {
     const user = userEvent.setup({ delay: null })
@@ -3021,8 +3125,13 @@ describe("Phase 212 · interactive discovery in MCP mode (D-4 / D-5)", () => {
       expect(screen.getByTestId("connection-discovered-tools")).toBeInTheDocument()
     })
     expect(screen.getByPlaceholderText(GRANTS_COPY.SEARCH_PLACEHOLDER(2))).toBeInTheDocument()
-    expect(screen.getByText("github_search")).toBeInTheDocument()
-    expect(screen.getByText("github_issue")).toBeInTheDocument()
+    // ⚠ SCOPED TO THE GRANTS BLOCK (Phase 239). A bare `getByText` was ambiguous from the
+    // moment a SECOND surface started naming the same tools: the file-source binding picker
+    // renders each discovered name as an `<option>`, so `github_search` now matches twice.
+    // The assertion always meant *"the grants list names it"*; it now says so.
+    const discovered = within(screen.getByTestId("connection-discovered-tools"))
+    expect(discovered.getByText("github_search")).toBeInTheDocument()
+    expect(discovered.getByText("github_issue")).toBeInTheDocument()
     expect(mockProbe).toHaveBeenCalledWith({
       mcp_server_url: "https://mcp.github.com/v1",
       secret: undefined,
@@ -3052,7 +3161,10 @@ describe("Phase 212 · interactive discovery in MCP mode (D-4 / D-5)", () => {
     expect(mockDiscover).toHaveBeenCalledWith("conn_github_123")
     expect(mockProbe).not.toHaveBeenCalled()
     expect(screen.getByPlaceholderText(GRANTS_COPY.SEARCH_PLACEHOLDER(2))).toBeInTheDocument()
-    expect(screen.getByText("add_issue_comment")).toBeInTheDocument()
+    // Scoped for the reason given in the create-mode case above.
+    expect(
+      within(screen.getByTestId("connection-discovered-tools")).getByText("add_issue_comment"),
+    ).toBeInTheDocument()
   })
 
   it("⭐ D-4 — a TYPED secret does NOT send an existing row back to the probe: a saved row always reports on what is STORED", async () => {

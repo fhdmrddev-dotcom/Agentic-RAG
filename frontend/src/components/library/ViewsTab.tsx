@@ -21,6 +21,7 @@
  * renders arrives as a prop from the page's reducer.
  */
 import { ViewCardGrid } from "./ViewCardGrid"
+import { AnimatedNumber } from "@/components/ui/AnimatedNumber"
 import type { SavedView } from "@/types"
 
 export interface ViewsTabProps {
@@ -56,9 +57,13 @@ export function ViewsTab({
       <div>
         <h2 className="text-lg font-semibold leading-tight">Saved views</h2>
         <p className="mt-0.5 text-sm text-muted-foreground">
-          {views.length === 0
-            ? "Filter the documents and save the filter to keep it here."
-            : `${views.length} saved ${views.length === 1 ? "filter" : "filters"}. Pick one to see what it matches.`}
+          {views.length === 0 ? (
+            "Filter the documents and save the filter to keep it here."
+          ) : (
+            <>
+              <AnimatedNumber value={views.length} /> saved {views.length === 1 ? "filter" : "filters"}. Pick one to see what it matches.
+            </>
+          )}
         </p>
       </div>
 

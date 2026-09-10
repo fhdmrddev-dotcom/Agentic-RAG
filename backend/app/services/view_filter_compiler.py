@@ -62,20 +62,34 @@ __all__ = [
 
 
 # ── leg-selection field sets (R-114-A / Pitfall 3) ─────────────────────────────
-# The TWO hot fields promoted to typed, btree-indexed GENERATED-STORED columns in
-# migration 074 (R-114-B). The compiler maps these built-in field names to their
-# typed column name; the resolve route's ``_apply`` reads ``Fragment.field`` as a
-# CONSTANT column name (never user input) on the indexed fast path.
+# The hot fields promoted to typed columns in Postgres (R-114-B / Phase 237 RULES-02).
+# The compiler maps these field names to their typed column name; the resolve route's
+# ``_apply`` reads ``Fragment.field`` as a CONSTANT column name on the indexed fast path.
 PROMOTED_TYPED_COLUMNS: dict[str, str] = {
     "document_type": "document_type_norm",
     "date": "date_typed",
+    "source_connection_id": "source_connection_id",
+    "ingest_visibility": "ingest_visibility",
+    "source_state": "source_state",
+    "path": "file_path",
+    "file_path": "file_path",
+    # Phase 240 (SRC-05 / D-240-07) — the conversation key is a TYPED column, not a metadata
+    # probe. ⚠ The distinction is not cosmetic: `documents_thread_key_idx` is only reachable
+    # from the typed leg. A `metadata->>` custom leg returns the same rows and scans the table —
+    # the right answer with the wrong plan, invisible until the corpus is large, which is
+    # precisely the class of defect Phase 241 exists to measure.
+    "thread_key": "thread_key",
 }
 
-# Fields ALREADY stored lowercase at every write path (ingest documents.py:1575-1582,
-# manual edit :1422-1426, extraction prompt embedding_service.py:147). For these we
-# just LOWERCASE THE QUERY VALUE and use ``.eq`` (indexed for document_type via its
-# typed column) — NOT ``ilike``, which would defeat the index (Pitfall 3).
-NORMALIZED_LOWER_FIELDS: frozenset[str] = frozenset({"document_type", "language"})
+# Fields stored lowercase at write path or matched case-insensitively. For these we
+# just LOWERCASE THE QUERY VALUE and use ``.eq`` — NOT ``ilike``, preserving indexes.
+NORMALIZED_LOWER_FIELDS: frozenset[str] = frozenset({
+    "document_type",
+    "language",
+    "source_system",
+    "ingest_visibility",
+    "source_state",
+})
 
 # Genuinely un-normalized free-text fields → case-insensitive ``ilike`` on BOTH
 # sides (D-114-10). These are the only fields that warrant ILIKE for ``eq``.
@@ -89,7 +103,8 @@ class Fragment:
 
     ``leg`` picks which ``_apply`` leg consumes it:
       * ``"typed"``       — a promoted indexed column (``document_type_norm`` /
-        ``date_typed``); ``field`` is the CONSTANT typed column name.
+        ``date_typed`` / ``source_connection_id`` / ...); ``field`` is the CONSTANT
+        typed column name.
       * ``"custom"``      — a ``metadata->>'field'`` access; ``field`` is the
         WHITELISTED original field name (re-validated at resolve, never raw input).
       * ``"containment"`` — the surviving ``metadata @> {field: value}`` ``@>``
@@ -136,22 +151,18 @@ def register_operator(op: str) -> Callable[[Callable[..., object]], Callable[...
 def _op_eq(cond) -> Fragment:
     """``eq`` — case-insensitive equality (D-114-10), leg chosen by field kind.
 
-    * promoted ``document_type`` → typed leg on ``document_type_norm`` with a
-      LOWERCASED value (indexed, exact, case-insensitive because both sides are
-      lowercase — Pitfall 3).
-    * ``language`` (already lowercase) → custom leg, ``.eq`` with a lowercased value.
-    * free-text (``title``/``author``/``summary``) → custom leg, ``.ilike`` for
-      case-insensitive exact (no wildcards).
-    * boolean/number/anything else custom → the ``@>`` containment fast path
-      SURVIVES (case-sensitive exact is correct there).
-
-    The VALUE is a bound literal in every leg — never interpolated (SC#4).
+    * promoted typed columns → typed leg on the promoted column (e.g.
+      document_type_norm, source_connection_id, ingest_visibility, source_state, file_path).
+    * normalized lower fields (e.g. language, source_system) → custom leg, ``.eq`` with lowercased value.
+    * free-text (title/author/summary) → custom leg, ``.ilike`` for case-insensitive exact.
+    * boolean/number/anything else custom → the ``@>`` containment fast path.
     """
     field, value = cond.field, cond.value
-    if field == "document_type":
-        return Fragment(leg="typed", field=PROMOTED_TYPED_COLUMNS[field], builder="eq",
-                        value=_lower(value))
-    if field == "language":
+    if field in PROMOTED_TYPED_COLUMNS:
+        target_col = PROMOTED_TYPED_COLUMNS[field]
+        val = _lower(value) if field in NORMALIZED_LOWER_FIELDS else value
+        return Fragment(leg="typed", field=target_col, builder="eq", value=val)
+    if field in NORMALIZED_LOWER_FIELDS:
         return Fragment(leg="custom", field=field, builder="eq", value=_lower(value))
     if field in FREE_TEXT_FIELDS:
         return Fragment(leg="custom", field=field, builder="ilike", value=value)

@@ -43,35 +43,81 @@ from app.services.document_view_resolver import _build_field_meta
 
 # Re-exported so the live integration tests (test_118_rule_crud.py) can construct
 # request bodies as `classification_rules.RuleCreate(...)` / `.RuleUpdate(...)`.
-__all__ = ["router", "RuleCreate", "RuleUpdate", "RuleResponse"]
+__all__ = ["router", "RuleCreate", "RuleUpdate", "RuleResponse", "WATCH_ALLOWED_FIELDS"]
 
 router = APIRouter(prefix="/classification-rules", tags=["classification-rules"])
 
+# Fields available on file arrival / preview (RULES-01 / SC#1 / SC#3).
+# Extracted metadata (document_type, topics, summary, author, custom defs) is NOT
+# yet available at arrival time and is rejected at build time for watch rules.
+WATCH_ALLOWED_FIELDS: frozenset[str] = frozenset({
+    "name",
+    "filename",
+    "title",
+    "path",
+    "source_path",
+    "mime",
+    "type",
+    "mime_type",
+    "size",
+    "file_size",
+    "source_system",
+    "source_connection_id",
+    "date",
+})
 
-async def _validate_match_expr(match_expr, current_user: dict, supabase: Client) -> None:
-    """Validate the AST fields + operands against the live whitelist (→ 422 on a bad field).
 
-    Reuses the SAME two validators the document-views router runs at create+update:
-      * ``validate_fields`` rejects a ``_``-prefixed / unknown filter field;
-      * ``validate_operands`` rejects an empty ``one_of`` / missing ``between`` bound /
-        a range op on a custom number field / a missing scalar.
-    A ``ValueError`` from either maps to a uniform 422.
+async def _validate_match_expr(
+    match_expr,
+    current_user: dict,
+    supabase: Client,
+    rule_scope: str = "classification",
+) -> None:
+    """Validate the AST fields + operands against the scope-appropriate whitelist (→ 422 on a bad field).
+
+    For ``rule_scope == 'watch'`` (SC#3):
+      Enforces ``WATCH_ALLOWED_FIELDS`` strictly. Any condition naming an extracted
+      metadata field (e.g. document_type, topics, summary, author, language, or custom fields)
+      is refused at build time with 422 Unprocessable Entity and an explicit reason.
+
+    For ``rule_scope == 'classification'``:
+      Enforces the live metadata whitelist (built-ins ∪ enabled custom defs ∪ source facts).
+
+    Operand validation (``validate_operands``) runs for both scopes.
     """
-    whitelist, number_fields = await _build_field_meta(current_user["id"], supabase)
     try:
-        view_filter_compiler.validate_fields(match_expr, whitelist)
-        view_filter_compiler.validate_operands(match_expr, number_fields)
+        if rule_scope == "watch":
+            for c in match_expr.conditions:
+                if c.field.startswith("_"):
+                    raise ValueError(f"field {c.field!r} is not filterable (reserved prefix)")
+                if c.field not in WATCH_ALLOWED_FIELDS:
+                    raise ValueError(
+                        f"field {c.field!r} is not available for watch rules: watch rules "
+                        "evaluate on file arrival before extraction. Extracted metadata like "
+                        f"{c.field!r} can only be used in classification rules."
+                    )
+            view_filter_compiler.validate_operands(match_expr, set())
+        else:
+            whitelist, number_fields = await _build_field_meta(current_user["id"], supabase)
+            view_filter_compiler.validate_fields(match_expr, whitelist | WATCH_ALLOWED_FIELDS)
+            view_filter_compiler.validate_operands(match_expr, number_fields)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
 
 
 @router.get("", response_model=list[RuleResponse])
 async def list_rules(
+    rule_scope: str | None = None,
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_user_supabase_client),
 ):
-    """List the caller's own rules plus global ones (deduped, ordered by name)."""
-    rows = await classification_rule_service.list_rules(current_user["id"], supabase=supabase)
+    """List the caller's own rules plus global ones (deduped, ordered by name).
+
+    Optionally filters by ``rule_scope`` ('watch' | 'classification').
+    """
+    rows = await classification_rule_service.list_rules(
+        current_user["id"], rule_scope=rule_scope, supabase=supabase
+    )
     return [RuleResponse(**r) for r in rows]
 
 
@@ -83,13 +129,12 @@ async def create_rule(
 ):
     """Create an owner-private classification rule + write a classification.rule.create audit row.
 
-    Validates every `match_expr` AST field + operand against the live whitelist BEFORE
-    the write (→ 422 on an unknown/`_`-prefixed field). The service hard-sets
+    Validates every `match_expr` AST field + operand against the scope whitelist BEFORE
+    the write (→ 422 on an unknown/out-of-scope field). The service hard-sets
     `is_system_global=False` + `enabled=True` (T-118-02-01); the body never supplies them.
     """
-    # 1. Field-whitelist + operand validation at SAVE → 422 on a bad/`_`-field or a
-    #    malformed operand.
-    await _validate_match_expr(body.match_expr, current_user, supabase)
+    # 1. Field-whitelist + operand validation at SAVE → 422 on an out-of-scope field (SC#3).
+    await _validate_match_expr(body.match_expr, current_user, supabase, rule_scope=body.rule_scope)
 
     # 2. Persist (service hard-sets is_system_global=False + enabled=True; match_expr stored
     #    as the validated AST dict via model_dump()).
@@ -98,6 +143,7 @@ async def create_rule(
         name=body.name,
         match_expr=body.match_expr.model_dump(),
         suggest_folder_id=body.suggest_folder_id,
+        rule_scope=body.rule_scope,
         supabase=supabase,
     )
 
@@ -107,7 +153,7 @@ async def create_rule(
     await write_audit_entry(
         user_id=current_user["id"],
         action_type="classification.rule.create",
-        metadata={"rule_id": created["id"], "name": body.name},
+        metadata={"rule_id": created["id"], "name": body.name, "rule_scope": body.rule_scope},
         supabase=supabase,
     )
     return RuleResponse(**created)
@@ -122,8 +168,8 @@ async def update_rule(
 ):
     """Update an owned rule (404 on a cross-user miss, never the forbidden status).
 
-    The `enabled` toggle rides this path. If `match_expr` is present, re-run the
-    whitelist + operand validation before the write.
+    The `enabled` toggle rides this path. If `match_expr` or `rule_scope` is present,
+    re-run the scope whitelist + operand validation before the write.
     """
     data = body.model_dump(exclude_none=True)
     if not data:
@@ -140,11 +186,17 @@ async def update_rule(
     if existing is None or str(existing.get("user_id")) != str(current_user["id"]):
         raise HTTPException(status_code=404, detail="Rule not found")  # NEVER the forbidden status — no existence leak
 
-    # Re-validate the AST fields + operands if the update carries a new match_expr.
+    target_scope = body.rule_scope or existing.get("rule_scope") or "classification"
+
+    # Re-validate the AST fields + operands if the update carries a new match_expr or new rule_scope.
     if body.match_expr is not None:
-        await _validate_match_expr(body.match_expr, current_user, supabase)
+        await _validate_match_expr(body.match_expr, current_user, supabase, rule_scope=target_scope)
         # Store the validated AST as a plain dict (jsonb), not the Pydantic model.
         data["match_expr"] = body.match_expr.model_dump()
+    elif body.rule_scope is not None and body.rule_scope != existing.get("rule_scope"):
+        from app.models.document_view import ViewFilter
+        flt = ViewFilter.model_validate(existing.get("match_expr") or {})
+        await _validate_match_expr(flt, current_user, supabase, rule_scope=target_scope)
 
     # suggest_folder_id (a UUID) must serialize to str for the column.
     if body.suggest_folder_id is not None:

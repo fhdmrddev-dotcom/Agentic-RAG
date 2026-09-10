@@ -94,7 +94,9 @@ def test_ingest_callsite_uses_attach_confidence_not_handrolled():
     """
     from pathlib import Path
 
-    src = Path(__file__).resolve().parents[2] / "app" / "api" / "documents.py"
+    # ⚠ RE-POINTED 2026-09-05 (BUG-260905-06): the enriched branch moved to the shared
+    #   enrichment module so BOTH ingest paths run it. Same seam, new home.
+    src = Path(__file__).resolve().parents[2] / "app" / "services" / "ingest_enrich.py"
     text = src.read_text(encoding="utf-8")
 
     assert "attach_confidence(" in text, (

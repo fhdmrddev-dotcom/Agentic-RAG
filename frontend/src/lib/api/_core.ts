@@ -67,6 +67,31 @@ export class ApiError extends Error {
         new CustomEvent(FEATURE_FORBIDDEN_EVENT, { detail: { message, status } }),
       )
     }
+    // ── BUG-260906-03 — A 401 WAS TREATED AS TRANSIENT AND RETRIED FOREVER ──────────────
+    //
+    // ⛔ MEASURED FROM A FRESH BACKEND START: ~100 consecutive
+    //      GET /connectors/connections 401 · GET /sources/watches 401 · GET /sources/health 401
+    //    from ONE client, with no user action. Three surfaces poll, each caught its own 401,
+    //    each retried on its own clock, and NOTHING anywhere concluded "this session is over".
+    //
+    // ⚠ IT IS THE RETRY LOOP THAT IS THE DEFECT, whatever the underlying reason. An expired
+    //   refresh token, a Supabase restart that rotated the JWT secret, a revoked session —
+    //   all of them are TERMINAL for the current session, and none of them get better by
+    //   asking again 200 times. Marking the session rejected here turns a flood into ONE
+    //   failure and one clear next action.
+    //
+    // ⚠ THIS IS A LATCH, NOT A LOGOUT. `_freshAccessToken` reacts by forcing exactly one
+    //   refresh; if that SUCCEEDS the latch clears and the app carries on with no user-
+    //   visible interruption. Only a refresh that also fails stops the requests. So a
+    //   spurious single 401 costs one refresh, never a sign-out.
+    if (status === 401) {
+      _sessionRejected = true
+      if (typeof window !== "undefined") {
+        // Literal rather than an exported constant ON PURPOSE: this module is mocked BY
+        // PATH and `196-08` measured 249 red tests from a single added export.
+        window.dispatchEvent(new CustomEvent("agentic:session-rejected", { detail: { status } }))
+      }
+    }
   }
 }
 
@@ -130,9 +155,102 @@ export function setActiveOrgId(orgId: string | null): void {
   _activeOrgId = orgId
 }
 
-export async function getAuthHeaders(): Promise<HeadersInit> {
+// ─────────────────────────────────────────────────────────────────────────────
+// BUG-260906-01 — THE 401 BURST AT TOKEN EXPIRY, AND WHY IT ARRIVED IN SIXES
+//
+// ⛔ OBSERVED IN THE BACKEND LOG, dozens of consecutive lines:
+//      GET /sources/watches      401 Unauthorized
+//      GET /sources/health       401 Unauthorized
+//      GET /connectors/connections 401 Unauthorized
+//    …repeating, then recovering to 200 on its own.
+//
+// ⚠ THE 401s PROVE A TOKEN WAS SENT. `getAuthHeaders` THROWS when there is no session, so
+//   an unauthenticated request is never issued at all. A 401 therefore means the JWT was
+//   present and EXPIRED — the Supabase access token is short-lived (≈1h) and
+//   `getSession()` hands back the STALE token during the refresh window.
+//
+// ⚠ IT ARRIVED AS A BURST BECAUSE EVERY SURFACE ASKS INDEPENDENTLY. Three or more pollers
+//   each called `getAuthHeaders()`, each received the same dead token, each got a 401, and
+//   each retried on its own schedule straight back into the same wall. Nothing coordinated
+//   them and nothing backed off.
+//
+// The fix is at the TOKEN, not at the fetch:
+//
+//   1. REFRESH BEFORE USE, not after failure. A token inside `_EXPIRY_SKEW_SECONDS` of
+//      expiry is refreshed proactively, so the request is never sent with a dead JWT. This
+//      removes the 401 rather than recovering from it.
+//   2. ONE refresh for N callers. `_refreshInFlight` de-duplicates concurrent refreshes, so
+//      six simultaneous pollers cause ONE `refreshSession()` and all six then use its
+//      result. Without this the fix would replace a burst of 401s with a burst of refreshes.
+//
+// ⚠ DELIBERATELY NOT A SHARED `authedFetch` WRAPPER, and that is a constraint of this file
+//   rather than a preference: this module is mocked BY PATH across the suite, and `196-08`
+//   measured **249 red tests from a single added export**. A retry wrapper would need a new
+//   export plus a rewrite of every call site. Fixing the token resolution changes behaviour
+//   for every caller while adding NO new export and touching no call site.
+//
+// ⚠ FAILURE STAYS IDENTICAL. A refresh that fails degrades to whatever session still exists,
+//   and the `"Not authenticated"` throw is byte-identical to before — callers and their
+//   tests see the same error. This makes the common case correct without inventing a new
+//   failure mode.
+
+/** Refresh a token this close to expiry (seconds). One minute comfortably covers a slow
+ *  round-trip without refreshing on every call. */
+const _EXPIRY_SKEW_SECONDS = 60
+
+/** The single in-flight refresh, shared by every concurrent caller. Null when idle. */
+let _refreshInFlight: Promise<string | null> | null = null
+
+/** Set by the `ApiError` 401 arm: the server rejected the token we are holding. Cleared by
+ *  the next successful refresh. See BUG-260906-03 — this is what ends the retry flood. */
+let _sessionRejected = false
+
+/** The access token, refreshed first if it is expired or about to be. Module-private —
+ *  adding an export here is what `196-08` measured at 249 red tests. */
+async function _freshAccessToken(): Promise<string | undefined> {
   const { data } = await supabase.auth.getSession()
-  const token = data.session?.access_token
+  const session = data.session
+  if (!session?.access_token) return undefined
+
+  const expiresAt = session.expires_at // seconds since epoch, may be undefined
+  const stale =
+    typeof expiresAt === "number" &&
+    expiresAt - Math.floor(Date.now() / 1000) <= _EXPIRY_SKEW_SECONDS
+
+  // ⚠ `_sessionRejected` forces the refresh even when the clock says the token is fine —
+  //   because the SERVER has already said it is not. A token can be within its `exp` and
+  //   still be dead: a Supabase restart rotates the JWT secret, a session can be revoked.
+  //   Trusting `expires_at` alone is what let the 401 flood run unchecked.
+  if (!stale && !_sessionRejected) return session.access_token
+
+  if (!_refreshInFlight) {
+    _refreshInFlight = supabase.auth
+      .refreshSession()
+      .then(({ data: refreshed }) => {
+        const next = refreshed.session?.access_token ?? null
+        if (next) _sessionRejected = false // a live session again — the latch lifts
+        return next
+      })
+      .catch(() => null)
+      .finally(() => {
+        _refreshInFlight = null
+      })
+  }
+
+  const refreshedToken = await _refreshInFlight
+  if (refreshedToken) return refreshedToken
+
+  // ⛔ THE REFRESH FAILED. Returning the held token here is what produced the flood: every
+  //   poller sent a token already known to be dead, got a 401, and came straight back.
+  //   ⚠ Only refuse when we have POSITIVE evidence the token is unusable — it is past its
+  //     expiry, or the server has already rejected it. A transient refresh blip on a token
+  //     that still looks valid falls through and is sent, exactly as before.
+  if (stale || _sessionRejected) return undefined
+  return session.access_token
+}
+
+export async function getAuthHeaders(): Promise<HeadersInit> {
+  const token = await _freshAccessToken()
   if (!token) throw new Error("Not authenticated")
   const orgId = getActiveOrgId()
   return {
@@ -144,8 +262,7 @@ export async function getAuthHeaders(): Promise<HeadersInit> {
 }
 
 export async function getAuthToken(): Promise<string> {
-  const { data } = await supabase.auth.getSession()
-  const token = data.session?.access_token
+  const token = await _freshAccessToken()
   if (!token) throw new Error("Not authenticated")
   return token
 }

@@ -397,7 +397,7 @@ async def test_an_empty_drive_search_says_it_ran_rather_than_returning_a_bare_li
         return {"files": [], "next_page_token": None}
 
     monkeypatch.setattr(
-        "app.services.cloud_storage._list_google_drive_files", _empty, raising=True
+        "app.services.sources.adapters.google_drive._list_google_drive_files", _empty, raising=True
     )
     out = await execute_service_tool(
         "google", "search_files", {"limit": 5},
@@ -416,7 +416,7 @@ async def test_a_NON_empty_drive_search_carries_no_note(monkeypatch):
         return {"files": [{"id": "f1", "name": "Q3.pdf"}], "next_page_token": None}
 
     monkeypatch.setattr(
-        "app.services.cloud_storage._list_google_drive_files", _one, raising=True
+        "app.services.sources.adapters.google_drive._list_google_drive_files", _one, raising=True
     )
     out = await execute_service_tool(
         "google", "search_files", {}, secret="", config={}, connection_id="c-1",
