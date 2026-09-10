@@ -3,7 +3,13 @@
     "langsmith": {
       "type": "stdio",
       "command": "backend/venv/Scripts/python.exe",
-      "args": ["scripts/launch-langsmith-mcp.py"]
+      "args": [
+        "scripts/launch-langsmith-mcp.py"
+      ]
+    },
+    "supabase": {
+      "type": "http",
+      "url": "https://mcp.supabase.com/mcp?project_ref=esnfauggawekgbvkqkyf&read_only=true&features=docs%2Cdatabase%2Cdebugging"
     }
   }
 }
