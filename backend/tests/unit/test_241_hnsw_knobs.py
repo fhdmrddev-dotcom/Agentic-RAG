@@ -173,6 +173,50 @@ def _patch(**kwargs):
     )
 
 
+@pytest.fixture(autouse=True)
+def _no_database(monkeypatch):
+    """⚠ RESTORES THIS FILE'S OWN STATED PROPERTY: *"EVERY CASE HERE RUNS WITHOUT A DATABASE."*
+
+    CR-01 put a live column probe (`app_settings_has_hnsw_columns`) at the top of
+    `update_settings`, ahead of the two bounds. It fails CLOSED, which is right for production
+    and wrong here: on a database without migration 176 the refusal cases below would meet a
+    409 about the migration instead of the 400 they are about, and the whole file's verdict
+    would depend on whether somebody had pasted a migration. Stubbed TRUE so these cases test
+    the bound. CR-01's own behaviour has its own file
+    (`test_241_cr01_settings_write_without_migration.py`) and is not weakened by this.
+    """
+    async def _columns_exist() -> bool:
+        return True
+
+    monkeypatch.setattr(settings_api, "app_settings_has_hnsw_columns", _columns_exist)
+
+
+def _capture_the_write(monkeypatch) -> dict:
+    """Make ``update_settings`` writable without a database, and hand back what it wrote.
+
+    Returns the dict `save_app_settings` is called with — which is the thing an accept-side
+    case has to look at. "Did not raise" is only half of accepted; the other half is that the
+    value reached the write, and a handler that silently dropped a key would satisfy the first
+    half perfectly (Phase 240's "screen that discards its own answer").
+    """
+    saved: dict = {}
+
+    async def _save(updates):
+        saved.update(updates)
+        return True
+
+    async def _load():
+        return _build_settings_from_row({})
+
+    async def _response(*_a, **_kw):
+        return "response-not-under-test"
+
+    monkeypatch.setattr(settings_api, "save_app_settings", _save)
+    monkeypatch.setattr(settings_api, "load_app_settings_async", _load)
+    monkeypatch.setattr(settings_api, "_build_response", _response)
+    return saved
+
+
 @pytest.mark.parametrize(
     "bad",
     [
@@ -242,9 +286,24 @@ def test_the_enum_has_THREE_members_not_a_boolean():
 
 
 @pytest.mark.parametrize("ok", [10, 40, 200, 1000])
-def test_the_api_accepts_both_boundaries_and_the_shipped_default(ok):
-    """An off-by-one here silently narrows what an operator may choose and nothing would say so."""
-    assert settings_api.SettingsUpdate(hnsw_ef_search=ok).hnsw_ef_search == ok
+def test_the_api_accepts_both_boundaries_and_the_shipped_default(ok, monkeypatch):
+    """An off-by-one here silently narrows what an operator may choose and nothing would say so.
+
+    ⛔ THIS CASE USED TO CONSTRUCT A PYDANTIC MODEL AND READ THE FIELD BACK (241-REVIEW WR-07).
+    The bound is `if not FLOOR <= body.hnsw_ef_search <= CEILING` inside `update_settings`;
+    `SettingsUpdate(...)` never sees it. Tightening the comparison to `<` left all four
+    parameters GREEN while an operator entering 1000 was refused by a message saying 1000 is
+    allowed, against an `<input min="10" max="1000">` that accepts it. Measured: with `<`
+    planted, the old form stayed 4 passed and this form goes 2 failed (10 and 1000).
+
+    Both halves are asserted, because they are different claims: the request was not refused,
+    AND the value reached the write rather than being quietly dropped.
+    """
+    saved = _capture_the_write(monkeypatch)
+    _patch(hnsw_ef_search=ok)                       # must NOT raise
+    assert saved["hnsw_ef_search"] == ok, (
+        f"the API accepted hnsw_ef_search={ok} and then did not write it: {saved!r}"
+    )
 
 
 # -- WR-07 (241-REVIEW): a fence that cannot fail for the reason its docstring gives -----
