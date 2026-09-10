@@ -225,6 +225,34 @@ GRANT USAGE ON SCHEMA auth TO anon, authenticated, service_role;
 GRANT SELECT ON auth.users TO authenticated, service_role;
 GRANT USAGE ON SCHEMA storage TO anon, authenticated, service_role;
 GRANT SELECT ON storage.buckets, storage.objects TO authenticated, service_role;
+
+-- ⚠ MEASURED at 241-04, and it is the SECOND grant hole in this stub for the same
+-- structural reason. `supabase/full-schema.sql` is produced by `pg_dump --no-privileges`
+-- (scripts/regenerate-full-schema.sh), so it carries NO table ACLs at all, and default
+-- privileges live in `pg_default_acl` which is PER-DATABASE and therefore absent from a
+-- brand-new `recall_bench`. Result measured on the 100k build: the bench applied green,
+-- reported every RPC present, and then refused the harness's FIRST read with
+--   `42501 permission denied for table documents`
+-- because `public.documents.relacl` was NULL where the real database reads
+--   {postgres=arwdDxtm/postgres,anon=…,authenticated=…,service_role=…}.
+--
+-- These four statements are the REAL database's own `pg_default_acl` rows, read back
+-- verbatim from the operator's local Supabase rather than invented here. They run in the
+-- prelude — BEFORE the apply — precisely so every table the artifact creates acquires them
+-- at CREATE time, which is the same mechanism production uses.
+--
+-- ⛔ This does NOT weaken the measurement. `authenticated` is neither superuser nor table
+-- owner, `document_chunks` / `documents` carry `ENABLE ROW LEVEL SECURITY` with their
+-- policies intact (measured on the bench: rowsecurity=true, 4 policies on `documents`),
+-- and a GRANT has never bypassed RLS. Without them the harness cannot read as the caller
+-- at all, which is not a stricter measurement — it is no measurement.
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT ALL ON TABLES TO postgres, anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT ALL ON SEQUENCES TO postgres, anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT ALL ON FUNCTIONS TO postgres, anon, authenticated, service_role;
+GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
 """
 
 # full-schema.sql installs `on_auth_user_created`, which provisions a personal org for
@@ -400,6 +428,13 @@ async def apply_full_schema(conn, schema_path: pathlib.Path) -> None:
             f"full-schema.sql failed to apply{where} -- {type(exc).__name__}: {exc}"
         ) from exc
     await conn.execute(DROP_SIGNUP_TRIGGER_SQL)
+    # ⚠ MEASURED at 241-04. `full-schema.sql:33` is `SET row_security = off;` -- pg_dump
+    # emits it and it is a SESSION setting, so it survives the apply and every later
+    # statement this connection issues runs with RLS DISABLED. Harmless for a one-paste
+    # deploy (the paste session ends); a live trap for a program that applies the artifact
+    # and then keeps working on the same connection. Restored to the server default here
+    # rather than worked around, so nothing downstream inherits an RLS-off session.
+    await conn.execute("SET row_security = on")
 
 
 async def assert_bench_schema_is_real(conn) -> dict[str, Any]:
@@ -430,7 +465,49 @@ async def assert_bench_schema_is_real(conn) -> dict[str, Any]:
     for expected in ("m='16'", "ef_construction='64'"):
         if expected not in normalised:
             raise RuntimeError(f"{HNSW_INDEX_NAME} does not carry {expected}: {indexdef}")
-    return {"routines_present": list(REQUIRED_ROUTINES), "hnsw_indexdef": indexdef}
+
+    # ⚠ ADDED at 241-04, because the 100k build reported EVERY check above green and was
+    # still unusable. A bench nobody can read as `authenticated` is not a stricter bench;
+    # it is a bench that fails at the harness with a message about the harness. The check
+    # is a real read AS the real role, inside a transaction that is rolled back, so it
+    # measures the privilege rather than asserting about a catalog row.
+    readable = await _assert_readable_as_authenticated(conn)
+
+    return {
+        "routines_present": list(REQUIRED_ROUTINES),
+        "hnsw_indexdef": indexdef,
+        "readable_as_authenticated": readable,
+    }
+
+
+async def _assert_readable_as_authenticated(conn) -> list[str]:
+    """`authenticated` can SELECT the tables the harness reads directly.
+
+    `full-schema.sql` is `pg_dump --no-privileges`, so it carries no ACLs; PRELUDE_SQL
+    installs the real database's own default privileges to compensate. This asserts that
+    compensation actually took, at BUILD time.
+    """
+    tables = ("documents", "document_chunks", "folders", "connector_connections")
+    async with conn.transaction():
+        # Self-defending: `full-schema.sql:33` leaves `row_security = off` on whatever
+        # session applied it, and a non-owner query against an RLS table then refuses with
+        # `query would be affected by row-level security policy`. That refusal is about the
+        # SESSION, not the privilege, and reading it as a grant failure sends the next
+        # reader to the wrong fix -- so this asserts the privilege with RLS explicitly ON.
+        await conn.execute("SET LOCAL row_security = on")
+        await conn.execute("SET LOCAL ROLE authenticated")
+        for table in tables:
+            try:
+                await conn.fetchval(f"SELECT count(*) FROM public.{table}")
+            except Exception as exc:  # noqa: BLE001 - re-raised with the cause named
+                raise RuntimeError(
+                    f"the bench is unreadable as `authenticated`: public.{table} refused "
+                    f"({type(exc).__name__}: {exc}). full-schema.sql carries no ACLs "
+                    "(pg_dump --no-privileges) and pg_default_acl is per-database -- see "
+                    "PRELUDE_SQL's default-privileges block."
+                ) from exc
+        await conn.execute("RESET ROLE")
+    return list(tables)
 
 
 # ── verbatim copy of the real corpus ──────────────────────────────────────────
