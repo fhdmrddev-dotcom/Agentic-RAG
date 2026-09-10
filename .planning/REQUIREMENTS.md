@@ -41,6 +41,21 @@ register knows only the register below it; the code is the bottom.
 >
 > ⭐ **This milestone's own method rule paid for itself on day one:** *a register knows only the
 > register below it, and the code is the bottom.*
+>
+> ### ⛔ SECOND PASS 2026-09-11 — CLOUD ITSELF WAS READ, and it closes three of the four
+>
+> The corrections above were driven against **git**. At `/gsd:discuss-phase 242` the **Supabase MCP**
+> was authenticated (read-only OAuth) and production was queried directly — the read path the phase
+> was written as *blocked on*. ⭐ **The DSN blocker does not exist.**
+>
+> | | Measured against CLOUD |
+> |---|---|
+> | **SHIP-01** | `multimodal_max_vision_calls = 100` — in range. **The Search tab saves fine in production.** The defect was local-only and the local data fix already cleared it. What remains is preventive: a CHECK constraint and a changed-fields-only payload |
+> | **SHIP-03** | ✅ **17 structural checks PASS** — `153-156, 166..176` all present. ⚠ TWO FALSE ALARMS: `156` read FAIL because `information_schema.column_privileges` only shows grants visible to the connecting role; `pg_attribute.attacl` shows `authenticated=arw, service_role=arw`, migration 156's exact set — **the script is wrong, not the database**. `176`'s FAIL is its designed inversion |
+> | **SHIP-04** | ✅ confirmed against the database, not only against git |
+> | **`RECALL-01`** | ⚠ **NOT live in production.** `hnsw_ef_search` is NULL, but cloud is **2,068 chunks · 47 docs · 1 owner · 1 org** — the cliff needs a small tenant fraction of a large corpus, and this is single-tenant at 50× smaller. **Scale-ahead work; stays in Phase 246.** Re-open at a second tenant or ~20k chunks |
+>
+> Full record: `.planning/phases/242-ship-it-and-prove-what-already-shipped/242-CONTEXT.md`.
 
 - [ ] **SHIP-01**: An operator can save the Settings → Search tab. Today every save returns HTTP 400
       because a **stored** `multimodal_max_vision_calls` of `1001` sits outside the bound the API
