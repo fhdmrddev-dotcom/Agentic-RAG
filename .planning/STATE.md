@@ -40,9 +40,9 @@ surface the operator uses daily. Phase numbering continues at **242**.
 
 ## Current Position
 
-Phase: 242 — Ship It — and Prove What Already Shipped (not started)
-Plan: —
-Status: Roadmapped — awaiting `/gsd:discuss-phase 242`
+Phase: 242 — Ship It (in discussion, separate session) · **243 — The Thinking Block and the Follow-Scroll Seam (PLANNED, ready to execute)**
+Plan: 243 — 5 plans, 5 serial waves (243-01 … 243-05)
+Status: **243 planned and plan-checked.** ⚠ `/gsd:discuss-phase 243` was NOT run — CONTEXT.md is synthesized from the ROADMAP, the two operator-approved sketches and code measured at HEAD, and says so in its own frontmatter. **G-2 is DISCHARGED** (sketches 234 V1 “Thin rule” and 235 B “bare line”, operator 2026-09-11). Two plan-check rounds: 6 blockers + 1 self-inflicted follow-on, all closed. ⚠ **The frontend count gate is RED at base** (2 inherited failures, `library/__tests__/sketchComposition.test.tsx`) — see `243-BASELINE.md`; no plan may use `count gate OK` as a criterion.
 Progress: 0 / 5 phases · 0 / 19 requirements · `[░░░░░░░░░░] 0%`
 Last activity: 2026-09-11 — ROADMAP written, 5 phases (242-246), 19/19 requirements mapped
 
