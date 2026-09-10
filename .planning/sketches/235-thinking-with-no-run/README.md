@@ -83,10 +83,13 @@ open it twice.
 
 ## ✅ WINNER — B, "bare line in the message body" (operator, 2026-09-11)
 
-**Confirmed without building the variants**, because sketch **234** answered this question on its
-way past. 234's winning V1 mounts the thinking fold **directly in the message body** — no container,
-no run frame — which is exactly variant B. Building three placements to re-derive an answer already
-on screen would have been ceremony.
+**Confirmed without a comparison round**, because sketch **234** answered this question on its way
+past. 234's winning V1 mounts the thinking fold **directly in the message body** — no container, no
+run frame — which is exactly variant B. Running a separate compare on three placements to re-derive
+an answer already on screen would have been ceremony.
+
+The three variants **are** built and viewable in `index.html` (all four tabs, both message shapes,
+the compare toggle). They were not walked through one by one; B was recognised from 234.
 
 ### What B binds
 
@@ -110,6 +113,6 @@ broken. One relearned position, in exchange for one component instead of two.
   live streaming** and needs a second surface. The Phase 095 build-once inventory rule forbids that,
   and 234's replay makes the live case non-negotiable.
 
-⚠ **The variants were never built.** This README's *How to View* and *What to Look For* sections
-describe an `index.html` that does not exist — kept as the record of the question and the reasoning,
-not as a viewing guide. **Sketch 234's `index.html` is the G-2 acceptance bar for Phase 243.**
+⚠ **Sketch 234's `index.html` is the G-2 acceptance bar for Phase 243**, not this one. This sketch's
+file stands as the record of the placement question and the rejected foils — open it to re-feel A and
+C if the seam is ever reopened.
