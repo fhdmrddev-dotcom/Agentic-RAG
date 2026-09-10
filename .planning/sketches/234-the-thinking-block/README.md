@@ -2,10 +2,10 @@
 sketch: 234
 name: the-thinking-block
 question: "What does a model's reasoning look like at rest, mid-stream, and expanded?"
-winner: null
+winner: "V1 — Thin rule (Stitch-led, operator 2026-09-11)"
 tags: [chat, streaming, reasoning, phase-243, chat-01, chat-02]
 phase: 243
-requirements: [CHAT-01, CHAT-02]
+requirements: [CHAT-01, CHAT-02, CHAT-05]
 ---
 
 # Sketch 234: The Thinking Block
@@ -82,3 +82,55 @@ one that wins**, and the toolbar's **Scale** control exists to make you check bo
   deliberately; it is what the corpus actually contains.
 - `lib/throttle.ts` already exists and is wired only to the cache writer. CHAT-02 is a wiring
   change, not a new mechanism.
+
+---
+
+## ✅ WINNER — V1 "Thin rule" (operator, 2026-09-11)
+
+Chosen from a **Google Stitch** pass, per the standing method: Stitch gives direction, this sketch
+re-expresses it against components that ship, and **this sketch is the G-2 acceptance bar** — never
+the Stitch HTML, which renders zero shipped components (the `SEED-155` failure).
+
+Stitch source kept in [`stitch/`](stitch/): the first pass plus all three variants, screenshots and
+HTML. **The rejected two are kept, and why matters:**
+
+| | | Rejected because |
+|---|---|---|
+| **V2** Segmented | mono labels per block — `problem-framing`, `raft-semantics` | **The labels are ours, not the model's.** Printing the derivation is forbidden by the standing mindset rule |
+| **V3** Beats | four one-line bullets | Shortest, but it **discards the model's actual words** and shows a summary in their place |
+
+V1 wins because it **adds nothing and invents nothing** — the model's own prose, made readable.
+
+## Operator constraints, applied
+
+1. **The tool container does not change.** Reproduced unchanged in the sketch and marked
+   `⛨ unchanged — operator constraint`. Nothing here restyles, re-orders or re-labels a tool row.
+2. **The final answer must stream.** It does, below the settled thinking line, with a caret at the
+   live edge. ⚠ **Root cause found while building:** the answer *is* already streaming —
+   `StreamsProvider.tsx:415` appends `content: m.content + delta` per token — but on a tool-bearing
+   run `MessageItem.tsx:425` routes that content into `StreamingNarration` (the folded italic gist),
+   so it is written **inside the fold** and only appears when the run-end reconcile swaps in the
+   persisted text. **That makes CHAT-01 and CHAT-05 one defect, not two**, and adds CHAT-05 to this
+   sketch's scope.
+
+## What V1 actually changes — the whole diff
+
+| | |
+|---|---|
+| **Fold control** | **Unchanged component.** `FoldTrigger.tsx` is already shared with `CitationList` (Phase 224-05). Only its `label` prop moves: `"Thinking"` → `"Thought for N seconds"`. ⚠ Still **no `count`** — the component's own comment forbids inventing one for reasoning |
+| **Body** | `RunCard.tsx:501` drops four classes — `font-mono`, `whitespace-pre-wrap`, `max-h-64`, `overflow-y-auto` — and `text-xs` → `text-sm`. `border-l-2` and `ml-3` stay |
+| **Long reasoning** | clamp + "Show all of it", reusing the **shipped sketch-050 pattern**, not a second mechanism. Below ~700 chars the control removes itself rather than sitting inert |
+| **Answer** | renders live below the settled thinking line instead of inside `StreamingNarration` |
+| **Tool rows** | untouched |
+
+## The acceptance criterion
+
+Press **▶ Replay the stream**. Three things must be true *simultaneously* in one reply:
+
+1. The fold control **does not churn** while reasoning streams — CHAT-02's coalesced cadence.
+   Today every token repaints it *and* fires a smooth `scrollIntoView` (`MessageList.tsx:171`).
+2. It **settles to "Thought for N seconds" and goes quiet** — CHAT-01.
+3. The **answer keeps writing underneath it**, caret at the edge — CHAT-05.
+
+Then switch **Scale** to `max 33,713` and confirm the tail is still readable, and to `median 198`
+and confirm a short block looks finished rather than truncated.
