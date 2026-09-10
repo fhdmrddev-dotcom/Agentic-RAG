@@ -7595,8 +7595,14 @@ Phases touched: 221, 222, 232.
 
 ### `backend/app/services/sources/preview_service.py`
 
-**1 / 1 / 549 — young (Phase 233).** The milestone's differentiator, and the one classifier the
-whole preview rests on.
+**8 / 4 / 826 — FIRES (233, 233.1, 237, 238).** The milestone's differentiator, and the one
+classifier the whole preview rests on.
+
+⚠ **THIS ROW HAS NOW BEEN STALE TWICE, and the second staleness was LOAD-BEARING rather than
+cosmetic.** It read `1 / 1 / 549` (repaired to `5 / 3 / 772` at 238, itself already behind), and its
+disposition said ***"238: comment-only"*** — which is how a phase that added
+`source_path=item.path` at `confirm_preview` and re-opened SEED-253 by a new route was recorded as
+having touched nothing. **A row that is present and WRONG answers the auditor and stops the audit.**
 
 ⭐ **THE PREVIEW *IS* THE DIFF PASS.** `confirm_preview` calls `build_preview` rather than deriving
 anything a second time. A preview built as its own code path is guaranteed to eventually disagree
@@ -7626,8 +7632,35 @@ divergence from the ingest verdict is found by a user."*
   another's preview claim *"already here"* about a file it never placed.
 - ⚠ **An unreadable index returns an empty map and claims nothing is here.** Fail toward honesty: a
   preview that cannot read the Library must not fabricate an *"already here"*.
+- ⛔ **`PreviewItem.path` IS DISPLAY. `PreviewItem.source_path` IS THE ONLY VALUE THAT MAY BE
+  PERSISTED, and it is the adapter's answer or `None`** (238 CR-01, fixed at `238-04`). The walk
+  assembles a breadcrumb from the REQUEST's `folder_name` plus the folder names `browse()` returned;
+  that string is a rendering, not provenance. It reaches `metadata.source.path`, which
+  `ingest_enrich` reads into a classification RULE — so persisting it made
+  `path contains '/Finance/'` False for a file that IS in Finance while `path contains 'Rates'`
+  matched the FILENAME, **and let a client POSTing `{"folder_name": "Finance"}` decide a stored
+  provenance fact for every document it imported.**
+- ⛔ **`walk_source_files` MUST NOT MUTATE `SourceFile.path`.** It did, at `:333-334`, and that one
+  write is why the defect could not be fixed downstream: by the time `build_preview` ran,
+  `getattr(f, "path", None)` was already the fabrication, so the "read the honest value" fix the
+  review proposed would have changed nothing (measured, not reasoned about). The breadcrumb lives in
+  `WalkResult.display_paths`, keyed by file id, so a reader must **ask for the display value by
+  name** and cannot receive it by accident. ⭐ This is also what makes the TWO writers of
+  `metadata.source` agree: `watch_service` writes the raw `item.path` off the adapter listing, and
+  the preview/import door now writes the same raw value.
+- ⚠ **`source_path` is SERVER-ONLY and is dropped at the API boundary**
+  (`connectors.py::_PREVIEW_ITEM_SERVER_ONLY`). Putting it on the wire would invite a confirm door
+  to accept it back from a client — the caller-controlled-provenance half of CR-01 by another route.
+  `SourcePreviewItem` is `extra="forbid"`, so that filter is load-bearing, not tidy.
+- ⚠ **`_suggest_destination` still receives the DISPLAY breadcrumb, deliberately and knowingly.**
+  Its output (`PreviewItem.destination`) is advisory only — `confirm_preview` imports into the
+  request's `destination_folder_id`, never into `item.destination` — and
+  `test_preview_rules_scope.py::test_build_preview_populates_path_and_applies_watch_rule` PINS the
+  caller-seeded behaviour (`folder_name="Reports"` → a `path contains 'Reports'` rule matches).
+  Changing it is a behaviour change with an existing green test over it, so it is a triage decision
+  rather than part of CR-01. **Whoever revisits it should start from that test.**
 
-**No seam proposed at 1 phase.** ⚠ **The thing to watch is the classifier's arm count.** Every new
+**No seam proposed at 4 phases.** ⚠ **The thing to watch is the classifier's arm count.** Every new
 source family (Graph at 238, MCP at 239) will want an arm, and eight ordered arms is already the
 limit of what reads as one rule. The seam when it comes is **per-family verdict tables consulted by
 one ordered walk**, never a second classifier — the whole design claim of this file is that there is
@@ -9578,7 +9611,7 @@ cells rot within days.
 | [`frontend/src/components/workflows/McpToolPicker.reachability.test.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsmcptoolpickerreachabilitytesttsx) | 1 / 1 / 316 | no (1 phase) | young (206.2) |
 | [`backend/app/models/connector.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsconnectorpy) | 24 / 13 / 772 | ⚠ **FIRES** | honoured by construction (**239-06 / SEED-259**): the argument mapping rides the declared `dict[str,str]` as flat prefixed keys — no new field, no shape change, no migration |
 | [`backend/app/services/mcp_client.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmcp_clientpy) | 9 / 6 / 526 | ⚠ **FIRES** | ⚠ row STALE TWICE (`4/2/407` reading `no`, then `7/5/480`). honoured by construction (**SEED-258**): the body cap is DERIVED, so no envelope knob exists to disagree |
-| [`backend/app/api/connectors.py`](docs/HOT-FILE-LEDGER.md#backendappapiconnectorspy) | 40 / 19 / 2071 | ⚠ **FIRES** | ⚠ **extraction still OWED and the file GREW AGAIN** (2051→2071 at the 239 gap-closure: `_provider_said`, LO-05). The named seam is unchanged |
+| [`backend/app/api/connectors.py`](docs/HOT-FILE-LEDGER.md#backendappapiconnectorspy) | 41 / 19 / 2091 | ⚠ **FIRES** | ⚠ **extraction still OWED and the file GREW AGAIN** (2051→2071 at the 239 gap-closure: `_provider_said`, LO-05). The named seam is unchanged |
 | [`backend/app/security/egress.py`](docs/HOT-FILE-LEDGER.md#backendappsecurityegresspy) | 13 / 5 / 982 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | honoured by construction (232): Google Drive read/export pins; docstrings updated to source contract |
 | [`backend/app/services/google/availability.py`](docs/HOT-FILE-LEDGER.md#backendappservicesgoogleavailabilitypy) | 0 / 0 / 277 | no (new) | young (221-02) — the per-application probe. ⚠ It imports `_http`'s parser and writes NO second one |
 | [`backend/app/services/google/writes.py`](docs/HOT-FILE-LEDGER.md#backendappservicesgooglewritespy) | 2 / 1 / 625 | no (1 phase) | ⚠ absent for its entire life — row added 221-02, which found `create_event` REFUSING every naive local time |
@@ -9638,7 +9671,7 @@ cells rot within days.
 | [`frontend/src/components/ui/tabs.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsuitabstsx) | 3 / 3 / 78 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent for its ENTIRE LIFE — it crossed the threshold in 217-06's OWN commit. A SHARED primitive: Library, Settings and Library Health are its three mounts |
 | [`frontend/src/components/panel/CsvTablePreview.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelcsvtablepreviewtsx) | 3 / 3 / 134 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent for its ENTIRE LIFE — crossed the threshold in 217-11's own commit. ✅ `DataTableView` EXTRACTED out of it (−67 L) at an UNCHANGED suite count |
 | [`frontend/src/components/workflows/verdictModel.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsverdictmodelts) | 6 / 3 / 355 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent for its ENTIRE LIFE — row added `BUG-260828-09`. ⭐ Its `structural_gate` docblock PREDICTED this bug and named the fix 11 days early; marked false, never overwritten |
-| [`backend/app/services/sources/preview_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcespreview_servicepy) | 5 / 3 / 772 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ row was STALE at `1/1/549`. 238: comment-only. ⭐ Its `_walk_folder` breadcrumb REFUTES half of SEED-253 — the preview path never fabricated |
+| [`backend/app/services/sources/preview_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcespreview_servicepy) | 8 / 4 / 826 | ⚠ **FIRES** | ⚠ row STALE TWICE and the 2nd said “238: comment-only” — 238 re-opened SEED-253 here (CR-01). 238-04: the walk no longer mutates `SourceFile.path`; display ≠ stored |
 | [`backend/app/services/sources/import_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesimport_servicepy) | 3 / 3 / 277 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ row was STALE at `2/2/172`. 238 deleted a FOURTH provider leak found by the rewritten fence: it fell back to the Drive adapter on the DISPLAY NAME |
 | [`frontend/src/components/sources/SourcePreviewPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcessourcepreviewpaneltsx) | 1 / 1 / 453 | no (1 phase) | young (233) — 229-C at rest, 230-A on confirm. ⛔ Four sections, no removal control; collapse hides FILES, never the count |
 | [`frontend/src/components/sources/previewVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcespreviewvocabularyts) | 1 / 1 / 98 | no (1 phase) | young (233) — a strict leaf, zero imports. ⛔ No hash claim; the `here` qualifier is POSITIVE, not merely an absent overclaim |
