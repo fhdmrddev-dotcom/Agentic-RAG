@@ -126,8 +126,17 @@ the ROADMAP's own warning about criterion-writing, now concrete.
 
 **Write acceptance criteria as a SET DIFF against this file instead:**
 
-1. The failing set is **exactly these two, and no others**. A third failure is this phase's, until
-   proven otherwise by the same JSON-first procedure.
+1. The failing set is a **SUBSET of the two named above** — those two, one of them, or **none**. A
+   failure NOT in that set is this phase's, until proven otherwise by the same JSON-first procedure.
+   ⚠⚠ **"Exactly these two" was the original wording and it is WRONG — corrected 2026-09-11 at
+   243-01's close, by measurement.** That plan ran the full gate twice and read **`failed 0` both
+   times**: `total 7957 · failed 0 · pinned total 7187 · count gate OK — 250/250`, on a tree whose
+   only change was an added test file. **The two inherited failures did not reproduce at all.** A
+   criterion demanding they BE there would have failed a clean run — the mirror image of the
+   unreachable-green criterion this file exists to prevent. ⭐ That is `SEED-171`'s whole claim
+   restated: *the failing set is never the same twice*, so the criterion must be a subset relation,
+   never an equality. ⚠ And one green sample is **not** a fix — the inherited pair stands, and a
+   later run that shows them again is the flake, not a regression.
 2. **No per-file DECREASE** on any pinned file (that is the gate's real contract).
 3. The **explicitly-run in-scope suites** are green — those are deterministic and are what a plan
    actually owns. For this phase that means, at minimum:
