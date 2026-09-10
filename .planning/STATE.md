@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v4.1
 milestone_name: "Ship It & Feel It"
 status: roadmapped
-last_updated: "2026-09-11T00:00:00.000Z"
+last_updated: "2026-09-11T03:30:00.000Z"
 last_activity: 2026-09-11
 progress:
   total_phases: 5
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_plans: 5
+  completed_plans: 1
   percent: 0
 requirements:
   total: 19
@@ -40,11 +40,11 @@ surface the operator uses daily. Phase numbering continues at **242**.
 
 ## Current Position
 
-Phase: 242 — Ship It (in discussion, separate session) · **243 — The Thinking Block and the Follow-Scroll Seam (PLANNED, ready to execute)**
-Plan: 243 — 5 plans, 5 serial waves (243-01 … 243-05)
-Status: **243 planned and plan-checked.** ⚠ `/gsd:discuss-phase 243` was NOT run — CONTEXT.md is synthesized from the ROADMAP, the two operator-approved sketches and code measured at HEAD, and says so in its own frontmatter. **G-2 is DISCHARGED** (sketches 234 V1 “Thin rule” and 235 B “bare line”, operator 2026-09-11). Two plan-check rounds: 6 blockers + 1 self-inflicted follow-on, all closed. ⚠ **The frontend count gate is RED at base** (2 inherited failures, `library/__tests__/sketchComposition.test.tsx`) — see `243-BASELINE.md`; no plan may use `count gate OK` as a criterion.
+Phase: 242 — Ship It (in discussion, separate session) · **243 — The Thinking Block and the Follow-Scroll Seam (IN EXECUTION — 1 / 5 plans done)**
+Plan: 243 — 5 plans, 5 serial waves (243-01 … 243-05). **243-01 DONE** (wave 1) → next: 243-02
+Status: **243-01 EXECUTED** — the thinking block's pre-extraction net (17 cases, `a17955cc3`) + both gate knobs (`f9bd3ccc7`). Driven RED against two planted defects; `RunCard.tsx` restored md5-identical (`2cac66602c974161bf2fd3725dbd9a6f`). ⚠ **The base's 2 inherited `sketchComposition` failures did NOT reproduce** — both full gate runs read `failed 0`, `count gate OK`, pinned total 7170 → 7187 (+17, this suite alone), 249 → 250 pinned files. That is ONE GREEN SAMPLE of a `SEED-171` flake, not a fix; `243-BASELINE.md` stands and no plan may still use `count gate OK` as a criterion. ⚠ `/gsd:discuss-phase 243` was NOT run — CONTEXT.md is synthesized and says so. **G-2 is DISCHARGED** (sketches 234 V1 / 235 B, operator 2026-09-11).
 Progress: 0 / 5 phases · 0 / 19 requirements · `[░░░░░░░░░░] 0%`
-Last activity: 2026-09-11 — ROADMAP written, 5 phases (242-246), 19/19 requirements mapped
+Last activity: 2026-09-11 — 243-01 executed (wave 1 of 5): the characterization net exists before anything moves
 
 **Phases:** 242 Ship It · 243 Thinking block + follow-scroll seam (⚠ sketch first) ·
 244 Chat shell + composer · 245 The verification debt · 246 The recall cliff.

@@ -155,10 +155,10 @@ Filled by the roadmapper 2026-09-11. **Every REQ-ID above maps to exactly one ph
 | SHIP-02 | 242 — Ship It | Pending — ⚠ **its second arm is ALREADY SATISFIED**, retired in writing at `dbd63864b`; the drive is unreproducible |
 | SHIP-03 | 242 — Ship It | Pending — ⚠ claimed done by the deploy record, **unverified against cloud** |
 | SHIP-04 | 242 — Ship It | Pending — ⚠ **the push already landed** at `1f313670b` (2026-09-10); what is owed is the verification |
-| CHAT-01 | 243 — Thinking block + follow-scroll seam | Pending — ⚠ G-2 sketch owed before planning |
+| CHAT-01 | 243 — Thinking block + follow-scroll seam | Pending — G-2 sketch DONE (234 V1 / 235 B). 243-01 shipped the pre-extraction net (17 cases); the requirement itself lands in 243-02/243-04 |
 | CHAT-02 | 243 — Thinking block + follow-scroll seam | Pending |
 | CHAT-03 | 243 — Thinking block + follow-scroll seam | Pending — ⭐ **one mechanism with CHAT-02; may not be split** |
-| CHAT-04 | 243 — Thinking block + follow-scroll seam | Pending |
+| CHAT-04 | 243 — Thinking block + follow-scroll seam | Pending — 243-01 PINNED the defect as a declared-defect case (§8); 243-02 inverts it |
 | CHAT-05 | 243 — Thinking block + follow-scroll seam | Pending |
 | SHELL-01 | 244 — Chat shell + composer | Pending |
 | SHELL-02 | 244 — Chat shell + composer | Pending |

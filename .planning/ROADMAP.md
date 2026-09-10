@@ -181,7 +181,7 @@ Stated here rather than discovered at execution. **A phase that can be blocked o
 **Plans**: 5 plans, in 5 waves — **fully serial, and the reason is measured, not a preference.**
 
 Plans:
-- [ ] 243-01-PLAN.md — the safety net: characterization cases for the thinking block written against the UNMOVED `RunCard`, driven RED against two planted defects, registered in both gate knobs (CHAT-01 guard, CHAT-04 declared-defect case)
+- [x] 243-01-PLAN.md — ✅ **DONE 2026-09-11** (`a17955cc3`, `f9bd3ccc7` — 17 cases, both knobs, 2 plants driven RED) — the safety net: characterization cases for the thinking block written against the UNMOVED `RunCard`, driven RED against two planted defects, registered in both gate knobs (CHAT-01 guard, CHAT-04 declared-defect case)
 - [ ] 243-02-PLAN.md — the seam: `ThinkingBlock` extracted from `RunCard` and mounted from `MessageItem` for BOTH message shapes; the tool-conditionality disappears by construction; `RunCard.tsx`'s G-5 discharge (CHAT-01 structure, CHAT-04)
 - [ ] 243-03-PLAN.md — the cadence and the scroll, together per `D-v4.1-02`: a RED drive at HEAD first, then producer-side coalescing on the delta callbacks, then CHAT-03 fixed or discharged as already-fixed-by-228 (CHAT-02 + CHAT-03)
 - [ ] 243-04-PLAN.md — V1's thin rule: four classes out, `text-sm`, real paragraphs, the self-removing clamp, and a duration that is measured or absent — never derived from character count (CHAT-01 appearance)
