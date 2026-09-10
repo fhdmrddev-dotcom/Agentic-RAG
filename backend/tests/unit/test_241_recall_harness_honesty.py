@@ -408,3 +408,151 @@ def test_f_compute_metrics_all_misses_is_zero_not_one():
     assert metrics["hit_at_1"] == 0.0
     assert metrics["hit_at_5"] == 0.0
     assert metrics["mrr"] == 0.0
+
+
+# -----------------------------------------------------------------------------
+# Case G -- the interpolated GUC value is constrained WHERE IT IS INTERPOLATED (WR-08)
+# -----------------------------------------------------------------------------
+#
+# `_apply_hnsw_knobs` splices `iterative_scan` into `SET LOCAL hnsw.iterative_scan = '<...>'`
+# with no escaping, on a connection carrying `SET LOCAL ROLE authenticated`, and its docstring
+# says both values are "constrained first ... `iterative_scan` through a closed allow-list. An
+# unknown value refuses (T-241-02)."
+#
+# NEITHER CONSTRAINT WAS IN THAT FUNCTION. `int()` was applied inline, so `ef_search` was
+# genuinely safe -- but the allow-list lived in `validate_knobs`, a separate function that only
+# `run_measurement` calls. `measure_layer1` and `measure_layer2` are PUBLIC, take
+# `iterative_scan: str | None`, and passed it straight through. `_match`'s docstring makes the
+# same claim one register wider: *"the only interpolated text in this module is the two
+# allow-listed GUC values"* -- true of one caller, not of the module.
+#
+# This is the class of finding this project asks for by name: a claim in prose the code does
+# not have. The remedy is to make the prose true, which is also the cheapest correct fix --
+# `validate_knobs` is idempotent, so `run_measurement` keeps working unchanged.
+
+_HOSTILE_SCAN = "'; DROP TABLE public.documents --"
+
+
+class _RecordingConn:
+    """Records every statement it is handed and touches no database."""
+
+    def __init__(self):
+        self.statements: list[str] = []
+
+    async def execute(self, sql: str, *args):
+        self.statements.append(sql)
+        return "SET"
+
+    async def fetch(self, sql: str, *args):
+        self.statements.append(sql)
+        return []
+
+    async def fetchval(self, sql: str, *args):
+        self.statements.append(sql)
+        return None
+
+
+def _none_shape():
+    from app.services.recall_eval import FILTER_SHAPES
+
+    return next(s for s in FILTER_SHAPES if s.name == "none")
+
+
+async def test_g_the_interpolating_function_refuses_a_mode_outside_the_allow_list():
+    """The check belongs where the splice happens, not in one of its callers."""
+    from app.services.recall_eval import RecallUnmeasurable, _apply_hnsw_knobs
+
+    conn = _RecordingConn()
+    with pytest.raises(RecallUnmeasurable):
+        await _apply_hnsw_knobs(conn, ef_search=None, iterative_scan=_HOSTILE_SCAN)
+    assert not any("DROP TABLE" in s for s in conn.statements), conn.statements
+
+
+async def test_g_measure_layer1_is_public_and_refuses_it_too():
+    """`measure_layer1` is public and documented; calling it directly is a reasonable thing
+    for a later plan, a test or a notebook to do. Its docstring said that could not execute."""
+    from app.services.recall_eval import RecallUnmeasurable, measure_layer1
+
+    conn = _RecordingConn()
+    with pytest.raises(RecallUnmeasurable):
+        await measure_layer1(
+            conn,
+            filter_shape=_none_shape(),
+            query_vectors=["[0.0,0.0]"],
+            user_id="00000000-0000-0000-0000-000000000000",
+            iterative_scan=_HOSTILE_SCAN,
+        )
+    assert not any("DROP TABLE" in s for s in conn.statements), conn.statements
+
+
+async def test_g_measure_layer2_is_public_and_refuses_it_too():
+    from app.services.recall_eval import RecallUnmeasurable, measure_layer2
+
+    conn = _RecordingConn()
+    with pytest.raises(RecallUnmeasurable):
+        await measure_layer2(
+            conn,
+            probes=[{"query": "q", "target_filename": "a.pdf"}],
+            query_vectors=["[0.0,0.0]"],
+            user_id="00000000-0000-0000-0000-000000000000",
+            iterative_scan=_HOSTILE_SCAN,
+        )
+    assert not any("DROP TABLE" in s for s in conn.statements), conn.statements
+
+
+async def test_g_the_ef_search_range_travels_with_the_allow_list():
+    """`int()` made `ef_search` injection-safe but not RANGE-checked at this boundary either.
+
+    `validate_knobs` carries both constraints, so moving the call moves both -- and an
+    out-of-range breadth on the public entry point now refuses rather than being handed to the
+    server as an argument nobody chose.
+    """
+    from app.services.recall_eval import RecallUnmeasurable, measure_layer1
+
+    conn = _RecordingConn()
+    with pytest.raises(RecallUnmeasurable):
+        await measure_layer1(
+            conn,
+            filter_shape=_none_shape(),
+            query_vectors=["[0.0,0.0]"],
+            user_id="00000000-0000-0000-0000-000000000000",
+            ef_search=10**9,
+        )
+
+
+async def test_g_a_legitimate_pair_still_rides():
+    """POSITIVE CONTROL. A validator that refused everything would satisfy all four cases."""
+    from app.services.recall_eval import _apply_hnsw_knobs
+
+    conn = _RecordingConn()
+    await _apply_hnsw_knobs(conn, ef_search=200, iterative_scan="relaxed_order")
+    assert any("hnsw.ef_search = 200" in s for s in conn.statements), conn.statements
+    assert any(
+        "hnsw.iterative_scan = 'relaxed_order'" in s for s in conn.statements
+    ), conn.statements
+
+
+def test_g_the_docstring_claim_is_made_true_in_the_function_that_makes_it():
+    """A SOURCE fence beside the behavioural ones, because the finding was a PROSE claim.
+
+    A behavioural case can only see the arguments somebody thought to drive; this reads the
+    AST and asserts the constraint is inside `_apply_hnsw_knobs` itself, which is the exact
+    property its docstring asserts and the exact property it lacked.
+    """
+    tree = ast.parse(_RECALL_EVAL.read_text(encoding="utf-8"))
+    fn = next(
+        n
+        for n in ast.walk(tree)
+        if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and n.name == "_apply_hnsw_knobs"
+    )
+    calls = {
+        getattr(c.func, "id", None) or getattr(c.func, "attr", None)
+        for c in ast.walk(fn)
+        if isinstance(c, ast.Call)
+    }
+    assert "validate_knobs" in calls, (
+        "_apply_hnsw_knobs interpolates a GUC value into SQL and its docstring claims an "
+        "allow-list, but it does not call the validator -- the check lives in a caller that "
+        "the public measure_layer1 / measure_layer2 entry points do not go through"
+    )
