@@ -17,6 +17,7 @@ from app.models.user_settings import (
     save_app_settings,
     resolve_sub_agent_model,
 )
+from app.services.retrieval_tuning import app_settings_has_hnsw_columns
 from app.services.audit_service import write_audit_entry
 from app.services.reembed_service import start_reembed
 from app.services.skill_tuner_service import resolve_skill_builder_model
@@ -558,6 +559,45 @@ async def update_settings(
     #   file's ledger row records as its binding property. `hnsw.ef_search` is how many
     #   candidate vectors the index walks BEFORE the search's filters are applied; a bare
     #   "must be between 10 and 1000" tells an operator nothing about what they are buying.
+    # CR-01 (Phase 241 review) -- THE COLUMN GATE, and it must precede BOTH assignments.
+    #   `save_app_settings` composes ONE `UPDATE app_settings SET col=$1, ...` over every key
+    #   in `updates`, so on a database where migration 176 has not been applied a single
+    #   absent column raises `UndefinedColumnError`, which is caught, reported as False, and
+    #   turned into a 500 below -- taking the WHOLE Search tab with it (reranker, embedding
+    #   model, retrieval threshold, rrf_k), not just these two knobs. Cloud has not had 176
+    #   applied, so without this gate the next deploy ships a 500.
+    #
+    #   The frontend sends both keys UNCONDITIONALLY (SettingsPage.tsx), so "the operator did
+    #   not touch them" is indistinguishable here from "the operator set them" unless we
+    #   compare against what is stored. Hence: silently drop an UNCHANGED value (nothing was
+    #   asked for), and REFUSE a CHANGED one with a worded 409 naming the migration -- never
+    #   accept a change and discard it, which is Phase 240's "screen that discards its own
+    #   answer".
+    if not await app_settings_has_hnsw_columns():
+        _stored = await load_app_settings_async()
+        _asked = [
+            name
+            for name, sent, stored in (
+                ("hnsw_ef_search", body.hnsw_ef_search, _stored.hnsw_ef_search),
+                ("hnsw_iterative_scan", body.hnsw_iterative_scan, _stored.hnsw_iterative_scan),
+            )
+            if sent is not None and sent != stored
+        ]
+        if _asked:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "Search breadth and keep-scanning cannot be saved on this database yet: "
+                    "migration 176 has not been applied here, so the two columns that store "
+                    "them do not exist. Every other setting on this tab saves normally. Apply "
+                    "supabase/migrations/176_app_settings_hnsw_knobs.sql in the SQL editor "
+                    "(never db push / db reset), then set these again. Until then searches "
+                    "keep working and simply use the built-in defaults."
+                ),
+            )
+        body.hnsw_ef_search = None
+        body.hnsw_iterative_scan = None
+
     if body.hnsw_ef_search is not None:
         if not HNSW_EF_SEARCH_FLOOR <= body.hnsw_ef_search <= HNSW_EF_SEARCH_CEILING:
             raise HTTPException(

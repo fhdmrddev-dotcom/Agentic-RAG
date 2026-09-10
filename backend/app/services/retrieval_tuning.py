@@ -159,3 +159,85 @@ async def apply_hnsw_session_knobs(
         str(settings.hnsw_scan_mem_multiplier),
         guc="hnsw.scan_mem_multiplier",
     )
+
+
+# ---------------------------------------------------------------------------
+# The WRITE-side gate (Phase 241 CR-01)
+# ---------------------------------------------------------------------------
+#
+# ⛔ WHY THIS EXISTS, AND WHY THE READ-SIDE FAIL-SOFT WAS NOT ENOUGH.
+#
+# Migration 176's header, `241-03-SUMMARY.md` and a `_build_settings_from_row({})` test all
+# claim that the migration being authored-but-not-applied "changes NOTHING". **Every one of
+# those claims is about READS**, and on reads they are true: `_build_settings_from_row` uses
+# `.get()`, so an absent column reads as the `config.py` default.
+#
+# The WRITE half had no such guard, and it is not fail-soft at all. `save_app_settings`
+# composes ONE `UPDATE app_settings SET col=$1, …` over every key in `updates`, so a single
+# absent column raises `UndefinedColumnError` and takes **the entire Search tab** down with
+# it — the reranker, the embedding model, the retrieval threshold and `rrf_k` included.
+# Cloud has not had 176 applied, so without this gate the next deploy ships a 500.
+#
+# ⭐ This is the module's own standing rule — *degrade the TUNING, never the SEARCH* —
+# applied to the write boundary, where it was missing.
+#
+# ⚠ FAIL-CLOSED. A probe that cannot answer returns False. Returning True on an error would
+# restore exactly the 500 this gate exists to prevent, on precisely the databases (unreachable,
+# mid-migration) most likely to be in a bad state.
+
+_HNSW_COLUMNS = ("hnsw_ef_search", "hnsw_iterative_scan")
+_hnsw_columns_present: bool | None = None
+
+
+async def _fetch_hnsw_columns() -> list[str]:
+    """Return whichever of the two knob columns `app_settings` actually has.
+
+    Split out from the cache so a test can substitute it without a database.
+    """
+    from app.dependencies import get_pg_pool
+
+    pool = await get_pg_pool()
+    rows = await pool.fetch(
+        "SELECT column_name FROM information_schema.columns "
+        "WHERE table_schema = 'public' AND table_name = 'app_settings' "
+        "AND column_name = ANY($1::text[])",
+        list(_HNSW_COLUMNS),
+    )
+    return [r["column_name"] for r in rows]
+
+
+def reset_hnsw_column_cache() -> None:
+    """Forget the probe result.
+
+    Called by tests, and after an operator applies 176 to a running install (the alternative
+    is telling them to restart the API to save a setting).
+    """
+    global _hnsw_columns_present
+    _hnsw_columns_present = None
+
+
+async def app_settings_has_hnsw_columns() -> bool:
+    """True only when BOTH knob columns exist, so the two keys may join the UPDATE.
+
+    ⚠ BOTH, not either. A half-applied migration still 500s the same single-statement UPDATE,
+    so there is nothing to gain by guessing at a partial state.
+
+    Cached: this sits on the settings-save path and the answer changes at most once in the
+    life of a database. `reset_hnsw_column_cache()` clears it.
+    """
+    global _hnsw_columns_present
+    if _hnsw_columns_present is not None:
+        return _hnsw_columns_present
+    try:
+        found = await _fetch_hnsw_columns()
+        _hnsw_columns_present = all(c in found for c in _HNSW_COLUMNS)
+    except Exception:
+        # Fail CLOSED — see the module note above. Deliberately not cached: a transient pool
+        # failure must not pin this False for the process's lifetime.
+        logger.warning(
+            "could not probe app_settings for the HNSW knob columns; treating them as absent "
+            "so a settings save cannot fail on a missing column (Phase 241 CR-01)",
+            exc_info=True,
+        )
+        return False
+    return _hnsw_columns_present
