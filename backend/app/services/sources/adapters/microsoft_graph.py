@@ -166,7 +166,39 @@ class MicrosoftGraphSourceAdapter(SourceAdapter):
         `base.py` did not have to learn a second cursor shape.
         """
         params: dict[str, str] | None = None
-        if page_token and page_token.startswith(f"{GRAPH_API_BASE}/"):
+        if page_token is not None:
+            # ⛔ BUG-260910-04 / 238-REVIEW WR-02 — REFUSE AN UNRECOGNISED CURSOR. NEVER GUESS.
+            #
+            #   This branch used to fall through to the page-1 `params` below when the prefix
+            #   did not match, with no `else: raise`. An uppercase host, a `beta` base, or a
+            #   Drive-shaped opaque token arriving here therefore **silently restarted the
+            #   listing at page 1**, and BOTH downstream readings of that are silent:
+            #     · `walk_source_files` re-reads page 1 to `MAX_PAGES_PER_FOLDER` and reports
+            #       `truncated=True, stopped_by="pages"` — "this folder is too big" about a
+            #       folder that is not;
+            #     · `watch_service` trips its `seen_tokens` cycle detector and sets
+            #       `listing.complete = False` (so deletions correctly fail CLOSED) — **but the
+            #       run still reports `success`.** A watched folder larger than one page stops
+            #       importing at ~200 files, forever, while the UI says the sync worked.
+            #
+            # ⭐ WHY REFUSING IS THE SAFE SIDE, and this is the whole argument: `graph_read`'s
+            #   suffix pin validates the host on the way OUT, so re-issuing an unexpected cursor
+            #   cannot reach a foreign host — egress would refuse it loudly. Restarting reaches
+            #   the RIGHT host and returns the WRONG data, which is the failure with no alarm.
+            #   Given a choice between a loud wrong-host refusal and a silent wrong-data
+            #   success, take the noise.
+            #
+            # ⚠ Case-insensitive on purpose: the host is case-insensitive per RFC 3986 §3.2.2,
+            #   so an uppercase host is a LEGAL variation Graph may emit and must not be a
+            #   refusal. The path segment after it is not, hence comparing the whole prefix.
+            if not page_token.lower().startswith(f"{GRAPH_API_BASE.lower()}/"):
+                raise ValueError(
+                    f"Refusing to re-issue an unrecognised pagination cursor for {what}: "
+                    f"{page_token[:60]!r}"
+                    f"{'...' if len(page_token) > 60 else ''}. It does not begin with "
+                    f"{GRAPH_API_BASE}/, and silently restarting the listing would return "
+                    "page 1 as though it were the next page."
+                )
             url = page_token
         else:
             params = {"$select": SELECT_ITEM_FIELDS, "$top": str(max(1, min(page_size, 200)))}

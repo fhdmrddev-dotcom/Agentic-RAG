@@ -95,10 +95,6 @@ def _install(monkeypatch, handler):
     "cursor,why",
     [
         (
-            "https://GRAPH.microsoft.com/v1.0/me/drive/items/F1/children?$skiptoken=Z",
-            "an uppercase host is a legal URI variation and Graph may emit one",
-        ),
-        (
             "https://graph.microsoft.com/beta/me/drive/items/F1/children?$skiptoken=Z",
             "a beta base is a plausible future nextLink shape",
         ),
@@ -153,6 +149,40 @@ async def test_the_refusal_names_the_cursor_without_dumping_the_whole_token(
 
 
 # ── the positive controls — these MUST be green both before and after the fix ────────────
+
+
+@pytest.mark.asyncio
+async def test_an_UPPERCASE_host_is_ACCEPTED_because_the_host_is_case_insensitive(
+    adapter, monkeypatch
+):
+    """⚠ THIS CASE MOVED. It was first written as a REFUSAL and that was WRONG.
+
+    RFC 3986 §3.2.2 makes the host case-insensitive, so `GRAPH.microsoft.com` is a legal
+    variation Graph may emit for the same resource. Refusing it would be over-strict and
+    would break a valid response.
+
+    ⭐ And it is SAFE to accept, measured rather than assumed: `egress.py:383` normalises with
+    `host.lower().rstrip(".")` before the suffix match, so an uppercase host resolves to the
+    same pinned destination. The cursor still cannot reach a foreign host.
+
+    ⛔ The refusal exists to stop a SILENT RESTART, not to police URL spelling. Recorded here
+    rather than quietly deleted because "the test was wrong" is a claim that needs its
+    reasoning attached — see [[SEED-270]].
+    """
+    cursor = "https://GRAPH.microsoft.com/v1.0/me/drive/items/F1/children?$skiptoken=Z"
+    rec = _install(
+        monkeypatch,
+        lambda c, m, u, k: _json({"value": [{"id": "F9", "name": "Page two", "folder": {}}]}),
+    )
+
+    page = await adapter.browse(CONN, folder_id="F1", page_token=cursor)
+
+    assert rec.urls == [cursor], (
+        "an uppercase host is the same resource and must be re-issued verbatim, "
+        f"not refused and not rewritten; issued {rec.urls!r}"
+    )
+    assert [n.id for n in page.items] == ["F9"], "it must return page TWO, not page 1"
+
 
 
 @pytest.mark.asyncio
