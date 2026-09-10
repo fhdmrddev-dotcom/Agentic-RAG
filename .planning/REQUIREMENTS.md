@@ -170,7 +170,7 @@ denominator is exactly how `LIB-08/09/10` survived an entire milestone living on
 | QUEUE-03 | 234 | Pending | ⚠ **Not 230** — it is a watch lease; nothing to overlap until a watch exists |
 | QUEUE-04 | 230 | Pending | The 300,000-token-per-request ceiling is the one a naive batcher misses |
 | QUEUE-05 | 230 | Pending | D-2 — same-vector-space fallback only; closes ⛔ `BUG-260815-05` |
-| QUEUE-06 | 241 | Pending | Harness ships at **230**; tuning and verdict here |
+| QUEUE-06 | 241 | **Partial — measured, remedy SHIPPED, default UNCHANGED** | ⛔ 241 measured that it does NOT hold at the shipped `hnsw.ef_search = 40`: a tenant owning 0.2% of a 100k-chunk corpus scored recall@20 **0.040**, and three named documents silently stopped being found. `ef_search = 200` restores it to 1.000 / Hit@1 0.78. The two knobs ship as operator settings, but **the DEFAULT is unchanged**, so out of the box the requirement is still not met — an operator must turn the knob. ⚠ Cloud has no columns until migration 176 is applied there. ⚠ The old note "Harness ships at **230**" was REFUTED at 241 discuss time (241-CONTEXT F-1): the 230 harness could not report a failure and printed MRR 1.000 on the real corpus. See `241-VALIDATION.md` + `241-VERDICT-CORRECTION-PLAN-PATH.md`. |
 | TRUST-01 | 229 | Pending | ⚠ **H-2** — precedes every adapter; fixes D-5's two shipped defects |
 | TRUST-02 | 236 | Pending | GA gate; ⚠ full 8-row native roster |
 | TRUST-03 | 234 | Pending | Pitfall 4's trifecta fence — same phase as the first sync, never after |
