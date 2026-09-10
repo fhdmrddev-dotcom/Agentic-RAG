@@ -55,7 +55,7 @@ Resume file: `.planning/phases/241-recall-at-corpus-scale/241-VALIDATION.md`
 > ⛔ **OWED, and stated as decisions rather than absorbed:**
 > 1. **6 human UAT rows** — `241-HUMAN-UAT.md`. ⚠ **Row 5 must run on CLOUD BEFORE migration 176
 >    is applied there**, or it becomes unreproducible forever.
-> 2. **Cloud migration 176** at the next operator-triggered deploy.
+> 2. **Cloud migration 176** at the next operator-triggered deploy — ⚠ **and it is ONE OF FIFTEEN.** Measured 2026-09-10: cloud is still on v3.9, so `153,154,155,156,166..176` are all pending. Run `bash scripts/pending-cloud-migrations.sh` and apply the printed set in NUMERIC ORDER, once each. **Operator decision 2026-09-10: these are applied immediately BEFORE the next push, not now.**
 > 3. **The cloud AS-IS recall number** — blocked on a read-capable cloud DSN. Parity itself is
 >    VERIFIED (pgvector **0.8.0** / PG **17.6**, exact parity with local), so `iterative_scan`
 >    **may** be claimed as the remedy.
