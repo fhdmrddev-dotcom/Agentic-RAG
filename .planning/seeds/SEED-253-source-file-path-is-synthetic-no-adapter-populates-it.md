@@ -120,8 +120,26 @@ carried a real relative path, and only a flat listing with no folder name fell t
 The correction is recorded rather than the seed rewritten, because the seed being **partly**
 right is what determined the fix: the substitution was removed where a fabricated value reached
 a **RULE**, and deliberately kept where it reaches a **preview row a person is looking at**, in
-which position a blank path column is the less honest signal. Both sites now carry a comment
-saying which they are.
+which position a blank path column is the less honest signal. ~~Both sites now carry a comment
+saying which they are.~~
+
+> ⛔ **THAT LAST SENTENCE WAS FALSE, AND IS STRUCK THROUGH RATHER THAN DELETED BECAUSE THE
+> CLAIM ITSELF IS THE FINDING.** Corrected 2026-09-10 by Phase 238's independent review
+> (`238-REVIEW.md` CR-01). **There were THREE sites, not two.** The same commit that removed
+> the fabrication from `ingest_enrich.py` ADDED a third — `confirm_preview` →
+> `import_single_file` → `metadata.source.path` — and that third one is a **RULE site, not a
+> row site**, so it is precisely the kind this seed says must not exist.
+>
+> ⭐ **A discharge note that counts the sites is only as good as the count.** This one was
+> written in the same commit that created the site it failed to count, and it then read as
+> reassurance for thirteen days. The defect shipped, was reachable by unvalidated client
+> input (`folder_name`), and made a dead classification rule look alive.
+>
+> **Fixed 238-04** (`9d1d34641`): `walk_source_files` no longer mutates `SourceFile.path`;
+> the display breadcrumb moved to `WalkResult.display_paths`, and only the adapter's own
+> answer — or `None` — may be persisted. The preview row still shows `/<filename>`, which
+> was always the correct half. Guarded by a fence asserting the stored VALUE `is None`,
+> not the key's presence — see [[SEED-270]] for why that distinction is the whole story.
 
 ### What is still open, and it is only this
 
