@@ -2894,6 +2894,23 @@ const BASELINE = {
   "watchProductMark.test.ts": 7,
   "navItemsUnknownIsNotDenied.test.ts": 4,
 
+  // ── Phase 243 (243-01 / CHAT-01 / CHAT-04 / D-243-16) — the thinking block's
+  // ── PRE-EXTRACTION characterization net. Pinned in the SAME COMMIT that creates the file
+  // ── and its TARGETS line, because a BASELINE key naming a path that does not yet exist
+  // ── makes this gate ERROR (exit 2) rather than fail.
+  //
+  // ⚠ 17 was READ FROM THIS SCRIPT'S OWN `actual` COLUMN on the run that first executed the
+  // file (printed as `— 17 new`), never hand-counted from `it(` literals and never taken from
+  // a planning document — the plan that authored this suite quotes no number for that reason.
+  //
+  // What is UNGUARDED without this entry: the thinking block's three states have NO other
+  // test anywhere in this tree — `thinking-trigger` and `thinking-row` were asserted by
+  // nothing at all before this file existed. 243-02 MOVES that block out of RunCard and
+  // mounts it from MessageItem; this pin is what stops the move from silently deleting the
+  // cases that certify it. Two of the seventeen pin DEFECTS on purpose (the tool-gated
+  // reasoning of CHAT-04, and the two folds a settled run puts in front of it) — a lowering
+  // here would most cheaply be achieved by dropping exactly those.
+  "ThinkingBlock.characterization.test.tsx": 17,
   // ══════════════════════════════════════════════════════════════════════════════
   // Added at Phase 214's CLOSE (plan `214-15`), collected here AFTER every file
   // exists — a `BASELINE` key naming a path that does not yet exist makes this gate
@@ -4625,6 +4642,13 @@ const TARGETS = [
   // ⚠ Named, not a directory: `src/components/sources` is STILL not a TARGETS directory entry.
   "src/components/sources/watchProductMark.test.ts",
   "src/lib/__tests__/navItemsUnknownIsNotDenied.test.ts",
+  // ── Phase 243 (243-01 / CHAT-01 / CHAT-04 / D-243-16) — the thinking block's ────────────
+  // ── PRE-EXTRACTION characterization net. ────────────────────────────────────────────────
+  // FILE-LEVEL, deliberately NOT the bare directory `src/components/chat/__tests__` — the
+  // same reasoning this script already records beside its 21 other chat entries. There is no
+  // `src/components/chat` directory entry anywhere here, so a suite dropped into that folder
+  // runs in NO gate until it is named. TARGETS decides what RUNS, BASELINE what is GUARDED.
+  "src/components/chat/__tests__/ThinkingBlock.characterization.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
