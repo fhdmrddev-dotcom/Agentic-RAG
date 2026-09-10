@@ -31,12 +31,16 @@ open .planning/sketches/234-the-thinking-block/index.html
 
 ## Variants
 
+⚠ **REBUILT 2026-09-11.** The first pass offered three self-authored variants — A Prose · B Timeline ·
+C Always-inline — and the operator's verdict was *"I do not see a difference between"* them, which was
+correct: at the median 198 characters they were three containers around the same sentence. That pass
+is superseded by a **Google Stitch** exploration; its three variants and the reasoning for the two
+rejected ones are recorded under **WINNER** below.
+
+The file now carries two frames:
+
 - **Today (shipped)** — the current render, for comparison. Not a variant; the thing being replaced.
-- **A: Prose** — the calm line opens into readable prose in the body font on a quiet left rule.
-  Long reasoning clamps with a fade + "Show all of it", reusing the sketch-050 long-prompt pattern.
-- **B: Timeline** — the calm line opens into beats on a spine (the 008-D / 052-A grammar), with
-  **pivots** — the model changing its mind — marked amber.
-- **C: Always inline** — no fold at all. Reasoning renders in a dimmer register above the answer.
+- **V1 — Thin rule ★** — the winner, re-expressed against the components that ship.
 
 ## The grounding — real data, measured not assumed
 
@@ -59,18 +63,7 @@ one that wins**, and the toolbar's **Scale** control exists to make you check bo
 
 ## What to Look For
 
-1. **Switch Scale to `max 33,713` on every variant.** This is the 045 real-scale lesson. A and B
-   degrade differently; C degrades worst (the answer leaves the screen). Do not pick at the median.
-2. **Press ▶ Replay the stream.** Watch the **resting line**, not the text. It shows drifting dots
-   and does not churn — that is CHAT-02's coalesced cadence made visible. The shipped bug is that
-   every token repaints the message *and* fires a scroll; if the line flickers, the fix failed.
-3. **Variant B's honesty note.** The beats are a **client-side heuristic** over a plain string — no
-   provider emits structured reasoning steps. Decide whether invented structure is worth it, knowing
-   a mis-split is a surface that lies about how the model thought.
-4. **Variant A at the median.** The clamp control disappears entirely below ~700 chars rather than
-   sitting inert. Check that a short reasoning block looks finished, not truncated.
-5. **The answer's prominence in C.** Reasoning is dimmer than the answer by design. Is the contrast
-   enough at a glance, or does the eye land on the thinking first?
+See **The acceptance criterion** at the foot of this file — the checks that survived the rebuild.
 
 ## Notes for whoever builds the winner
 
