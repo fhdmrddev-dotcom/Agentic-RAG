@@ -171,3 +171,49 @@ files. The phase's first plan builds the reusable container + copy registry from
   lesson, and the exact way Phase 235 shipped a defect behind a green fence.
 - **Tier 3 count is a budget, not an outcome.** If a wave proposes more than one or two animated
   diagrams, that is a signal the tiering was applied too generously.
+
+---
+
+# ✅ DESIGN DIRECTION LOCKED BY THE OPERATOR — 2026-09-10
+
+**A's container + C's diagram.** Chosen from the four Stitch screens, against the app's real
+"Deep Space Minimalist" system.
+
+### The container — INLINE EXPANSION (variant A)
+
+Clicking the `(i)` expands the explanation **directly beneath its own row**, pushing lower rows
+down. ⭐ **Chosen for PROXIMITY**: you are explaining a control the operator may change *while
+reading*, so the control and its explanation must stay physically joined. The modal (B) hides the
+field you are asking about; a side panel puts it across the screen.
+
+⚠ **The layout jump is the known cost, and it is fixed by animating the height open** — the
+movement becomes the affordance rather than a glitch. ⛔ Height only, once, on open.
+
+### The diagram — THE SHORTFALL GAP BAR (variant C)
+
+ONE continuous horizontal bar, not a three-stage pipeline:
+
+```
+[####|/////////////////////////////////]
+ ^5 survive     ^35 filtered out
+         ^target: 20   <-- the GAP
+```
+
+⭐ **Chosen because it shows the SHORTFALL, and the shortfall is the thing the operator acts on.**
+The pipeline shows the *mechanism* — how the 40 became 5 — which is a teaching aid. The bar shows
+*that you asked for 20 and the bar stops at 5*, which is a reason to move a slider. `target: 20`
+sitting past where the indigo ends is the entire bug in one mark.
+
+### What B is reserved for
+
+**Not discarded.** The centred modal renders the diagram at its most legible and is the right
+container **if a future surface needs to explain a whole subsystem** rather than one control —
+grounding/governance is the likely candidate. ⛔ It is too much ceremony for a row-level `(i)`.
+
+### Binding for the build
+
+- The four Stitch screens are the acceptance reference: project `16478354618829749955`.
+- ⛔ **The invented product chrome in the base screen is NOT part of the design** — no "Axiom
+  Engine", no cluster/deploy bar, no fake telemetry footer. The app has a plain left sidebar.
+- Copy is already written and must be REUSED, not rewritten — it is in `SettingsPage.tsx` today
+  and in this seed's Tier table.
