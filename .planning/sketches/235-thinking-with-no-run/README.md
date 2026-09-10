@@ -2,7 +2,7 @@
 sketch: 235
 name: thinking-with-no-run
 question: "Where does reasoning live on a reply that called no tools — when there is no RunCard to put it in?"
-winner: null
+winner: "B — bare line in the message body (operator, 2026-09-11)"
 tags: [chat, reasoning, placement, phase-243, chat-04]
 phase: 243
 requirements: [CHAT-04]
@@ -78,3 +78,38 @@ open it twice.
   Supabase — a real zero-tool sample, chosen because it is the shape this sketch is about.
 - Whatever wins here must agree with sketch **234**'s winner: 234 decides what the expanded surface
   contains, 235 decides where it hangs. They are one component in two questions.
+
+---
+
+## ✅ WINNER — B, "bare line in the message body" (operator, 2026-09-11)
+
+**Confirmed without building the variants**, because sketch **234** answered this question on its
+way past. 234's winning V1 mounts the thinking fold **directly in the message body** — no container,
+no run frame — which is exactly variant B. Building three placements to re-derive an answer already
+on screen would have been ceremony.
+
+### What B binds
+
+| | |
+|---|---|
+| **Placement** | the fold sits in the message body for BOTH message shapes — tool-bearing and tool-free |
+| **Renderers afterwards** | **one.** `ThinkingBlock` comes out of `RunCard` and mounts in `MessageItem` |
+| **Tool-conditionality** | **disappears by construction**, not via a second branch. Today `MessageItem.tsx:425` gates the run path on `tool_calls.length > 0` and `RunCard.tsx:478-502` is the only renderer of `reasoningContent` — so 31% of reasoning-bearing messages (105 of 340, measured) have nowhere to draw it |
+| **Order on screen** | thinking sits **above** the tool rows and the answer, matching the order in time |
+
+### The cost, accepted
+
+It relocates the thinking control on tool-bearing messages — a change to a surface that is not
+broken. One relearned position, in exchange for one component instead of two.
+
+### Rejected
+
+- **A (minimal frame)** — a bordered container holding one line is chrome around nothing, drawn on
+  31% of reasoning messages.
+- **C (in the footer)** — a footer under an unwritten answer has nowhere to sit, so it **cannot show
+  live streaming** and needs a second surface. The Phase 095 build-once inventory rule forbids that,
+  and 234's replay makes the live case non-negotiable.
+
+⚠ **The variants were never built.** This README's *How to View* and *What to Look For* sections
+describe an `index.html` that does not exist — kept as the record of the question and the reasoning,
+not as a viewing guide. **Sketch 234's `index.html` is the G-2 acceptance bar for Phase 243.**
