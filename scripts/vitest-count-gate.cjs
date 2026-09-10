@@ -2910,7 +2910,17 @@ const BASELINE = {
   // cases that certify it. Two of the seventeen pin DEFECTS on purpose (the tool-gated
   // reasoning of CHAT-04, and the two folds a settled run puts in front of it) — a lowering
   // here would most cheaply be achieved by dropping exactly those.
-  "ThinkingBlock.characterization.test.tsx": 17,
+  //
+  // RAISED 17 -> 23 at Phase 243 plan `243-02`, and the number was READ FROM THE GATE'S OWN
+  // `actual` column (`ThinkingBlock.characterization.test.tsx  17  23  +6`), never counted by
+  // hand. The +6 is fully attributed: 10a/10b/10c (the one-renderer source fence and its
+  // positive control), 11 (DOM order), 12 (the no-second-gate fence) and 13 (the fold
+  // survives the temp-id -> DB-id reconcile, which is where the remount semantics were
+  // DECIDED). The two defect cases named above did NOT go away when the defects were fixed:
+  // 8 and 9 were INVERTED IN PLACE and still assert, now on the correct side. That is the
+  // distinction this pin exists to make — a fixed defect keeps its case, a dropped one does
+  // not, and only the count can tell them apart.
+  "ThinkingBlock.characterization.test.tsx": 23,
   // ══════════════════════════════════════════════════════════════════════════════
   // Added at Phase 214's CLOSE (plan `214-15`), collected here AFTER every file
   // exists — a `BASELINE` key naming a path that does not yet exist makes this gate
