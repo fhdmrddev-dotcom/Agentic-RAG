@@ -5,6 +5,7 @@ created: 2026-09-10
 planted_during: Phase 241 — operator direction, 2026-09-10
 status: planted
 priority: high
+scope: app-wide (137 files / 363 blocks measured) — NOT a Settings-only change
 surface: Agentic-RAG
 severity: minor      # Nothing is broken. This is a UX-quality and readability problem across many surfaces.
 folded_into: null
@@ -97,3 +98,76 @@ the paragraph left the form — assert the CONTENT moved, which is this project'
 
 Related: [[feedback_stitch_plus_sketch_is_the_design_method]], [[SEED-258]] (a refusal states the
 COST, not just the range — the copy shape this seed preserves), [[SEED-268]].
+
+---
+
+# ⚠ SCOPE RE-MEASURED 2026-09-10 — IT IS THE WHOLE APP, AND SETTINGS IS 5% OF IT
+
+The original measurement above counted `SettingsPage.tsx` only. **Operator direction the same day:
+*"not only this one thing but everything that needs clarification"*.** Re-measured across
+`frontend/src`:
+
+| | Measured |
+|---|---|
+| Files containing inline explanatory text | **137** |
+| Total `text-xs/sm text-muted-foreground` blocks | **363** |
+| `SettingsPage.tsx`'s share | **19 — about 5%** |
+
+Top concentrations after Settings: `ModelDiscoveryPanel` (10) · `WatchedFoldersSection` (9) ·
+`SkillEvalSection` (9) · `UsersAndAccess` (9) · `AuditTab` (9) · `ProviderPicker` (8) ·
+`SkillTunerPage` (7) · `SsoTab` (7) · `IngestionTab` (7).
+
+⛔ **This is a SYSTEM plus a migration, not a screen.** A phase that "does SEED-269" by rebuilding
+the Retrieval card has done 2% of it. **G-8 caps a phase at 3-5 plans**, so this must be sequenced:
+the pattern and its copy registry ship FIRST and prove themselves on one surface; adoption then
+runs surface by surface, each wave measurable by the block count in the files it touched.
+
+# ⛔ THE TRIAGE RULE — because 363 blocks are NOT 363 bugs
+
+**Most of that text is fine where it is.** Blanket-replacing all of it would be a different, equally
+bad failure: an app where you must click to learn anything. Four tiers, and the tier decides the
+treatment:
+
+| Tier | What it is | Treatment |
+|---|---|---|
+| **0 — Caption** | One short line that IS the label's meaning (*"Scope this conversation to a specific folder"*) | ⛔ **LEAVE IT INLINE.** It is not noise; it is the label finishing its sentence |
+| **1 — Choice** | One or two sentences on what to pick | Move behind the `(i)`. Plain popup. **No diagram, no animation** |
+| **2 — Trade-off** | Has a real COST the operator is buying (`SEED-258`'s shape) | Popup with the two-column cost table + a recommendation carrying its evidence |
+| **3 — Mechanism** | A behaviour that CANNOT be explained in a sentence | Popup with a diagram, **animated ONCE on open** |
+
+⭐ **ANIMATION IS RATIONED, AND THAT IS THE WHOLE POINT.** The operator asked for it *"when
+needed... but we make it beautiful instead of getting noise"*. A motion on every one of 363 blocks
+is the same disease with better production values. **Tier 3 is expected to be a handful of concepts
+app-wide** — search breadth is one; grounding/governance, the publish gauntlet's judge wall, and
+connection-scoped visibility are the other likely candidates. ⛔ **Never loop.** Play once on open,
+settle, stop. A looping animation inside a form is noise by construction.
+
+# The design is DONE and approved-in-principle — Stitch, 2026-09-10
+
+Google Stitch, project `16478354618829749955`, against the app's real **"Deep Space Minimalist"**
+design system (`assets/1a1900c0084a4f84aa3e040fef4c55df`). One worked example (search breadth) in
+four treatments:
+
+| | Screen | Verdict |
+|---|---|---|
+| Base | `Retrieval Settings & Inspector` | side panel + 3-stage pipeline. Invented product chrome — discard the chrome, keep the idea |
+| **A** | `Search Settings - Inline Expansion` | ⭐ **the recommended container** — explanation opens inside the card under its own row; control and explanation physically joined |
+| B | `Search Settings - Centered Modal` | most legible diagram, but hides the field you are asking about. Reserve for a future full "explain this" surface |
+| **C** | `Search Settings - Shortfall Gap Bar` | ⭐ **the recommended diagram** — one bar, survivors in indigo, `35 filtered out` hatched, and a `target: 20` marker so the shortfall reads as a visible GAP |
+
+⭐ **The recommendation is A's container with C's diagram**: proximity from A, and C's bar because it
+shows the *shortfall* (the thing you act on) rather than the *mechanism*. A's layout jump is fixed
+by animating the height open — the movement becomes the affordance instead of a glitch.
+
+⚠ **These are ONE example rendered four ways.** They settle the pattern; they do not settle the 137
+files. The phase's first plan builds the reusable container + copy registry from them.
+
+# The acceptance bar, restated for app-wide scope
+
+- **Count blocks before and after IN THE FILES THE WAVE TOUCHED**, and show nothing was DELETED —
+  only moved or deliberately kept as Tier 0.
+- ⛔ **Assert the CONTENT moved, never that an `(i)` exists.** A presence assertion that an icon
+  renders proves nothing about whether the paragraph left the form — this project's own standing
+  lesson, and the exact way Phase 235 shipped a defect behind a green fence.
+- **Tier 3 count is a budget, not an outcome.** If a wave proposes more than one or two animated
+  diagrams, that is a signal the tiering was applied too generously.
