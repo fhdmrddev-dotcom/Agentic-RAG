@@ -4,7 +4,7 @@ title: The OneDrive/Graph adapter silently stops importing past one page, inject
 reported: 2026-09-10
 surface: Agentic-RAG
 severity: major
-status: open   # WR-02 FIXED 2026-09-10 (45b4fb9dc); WR-01 and WR-03 remain
+status: open   # ALL THREE FIXED 2026-09-10 (45b4fb9dc, db7a083a2). Open only for the LIVE re-drive named below.
 affected_areas: [backend/connectors, backend/ingestion, RAG/classification]
 folded_into: null
 verified_closed_by: null
@@ -124,3 +124,53 @@ would have passed and the RED would have looked like six real defects. [[SEED-27
   ids passed through as folder paths. ⭐ **Now cheaper to fix than when this was filed:** CR-01
   made `None` a legitimate honest answer for an unknown path, so WR-03 can return `None` rather
   than inventing a decoded string.
+
+---
+
+# ✅ WR-01 AND WR-03 FIXED 2026-09-10 — `db7a083a2`. All three are now closed in code.
+
+**WR-01** — the term is percent-encoded with `quote(safe="")`, so `?`, `#`, `&`, `/`, `(` and `)`
+can no longer reach URL syntax. The OData `''` doubling stays FIRST; it is a different escape
+layer and dropping it would break a literal apostrophe.
+
+⚠ **THE ENDPOINT SHAPE WAS KEPT DELIBERATELY, against the review's suggested fix.** The review
+proposed moving the term into a query parameter. Graph documents OneDrive search as an OData
+**function** (`/me/drive/root/search(q=…)`), so that would change the contract with a live API
+this change cannot drive. **Encoding closes the injection completely and is verifiable offline;
+changing the endpoint is not.** Given a fix that is provable now and a fix that needs a live
+account to be sure of, take the provable one.
+
+**WR-03** — `parentReference.path` is decoded so it matches the decoded filename it is
+concatenated with, and a path with no `root:` marker now returns **None** rather than presenting
+`/drives/b!abc/items/01XYZ` as a folder. ⭐ That second half was free: CR-01 had already made
+`None` the honest answer for an unknown path.
+
+Gate held at the **71** ceiling, `4504 → 4515` passed; sources suite `335 → 346`.
+
+## ⚠ THREE OF MY OWN ASSERTIONS WERE OVER-STRICT, AND THAT IS THE FINDING
+
+In fixing these I wrote three assertions that would have failed a CORRECT implementation:
+
+| # | I asserted | Why it was wrong |
+|---|---|---|
+| 1 | an uppercase host must be REFUSED | the host is case-insensitive (RFC 3986) and `egress.py:383` lowercases before matching — it is a legal variation |
+| 2 | the term must travel in `params` | that pins an IMPLEMENTATION, not the property; it would have forbidden the safer encoding fix |
+| 3 | `".." not in issued` | `.` is unreserved so `..` survives encoding legitimately; with every `/` as `%2F` it is inert and cannot form a segment |
+
+⭐ **All three are the SEED-270 disease from the opposite side.** That seed is about fences too
+LOOSE to catch a defect; these were too TIGHT to admit a fix. **The shared root is the same:
+asserting a SHAPE that resembles the property instead of the property itself.** A byte sequence
+that looks dangerous is not the same as a structural character that IS dangerous.
+
+**Each was caught by running it, and each is recorded in the test body with its reasoning rather
+than silently relaxed** — a loosened assertion with no explanation is indistinguishable from a
+fence being quietly weakened to go green.
+
+## ⛔ STILL OWED — one live re-drive, and it is the property the doubles cannot check
+
+WR-03 is fixed against doubles. **Drive a real OneDrive folder whose name contains a SPACE**
+(e.g. `Team Docs`) and confirm the stored `metadata.source.path` reads `/Team Docs/…` and that a
+`path contains '/Team Docs/'` rule matches. ⚠ The original UAT drove only `/Attachments` with an
+underscored filename — no space, so no percent-encoding, so the defect could not appear. **This
+row is the reason it shipped**, and it belongs with `238-VERIFICATION.md` M-9 behind the same
+Azure app registration.
