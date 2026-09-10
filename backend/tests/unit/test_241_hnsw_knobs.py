@@ -19,8 +19,10 @@ Task 2's cases (the ``SET LOCAL`` seam) live in the second half of this file.
 
 from __future__ import annotations
 
+import ast
 import asyncio
 import inspect
+import pathlib
 import re
 from unittest.mock import MagicMock
 
@@ -243,6 +245,73 @@ def test_the_enum_has_THREE_members_not_a_boolean():
 def test_the_api_accepts_both_boundaries_and_the_shipped_default(ok):
     """An off-by-one here silently narrows what an operator may choose and nothing would say so."""
     assert settings_api.SettingsUpdate(hnsw_ef_search=ok).hnsw_ef_search == ok
+
+
+# -- WR-07 (241-REVIEW): a fence that cannot fail for the reason its docstring gives -----
+#
+# `test_the_api_accepts_both_boundaries_and_the_shipped_default` constructed a Pydantic model
+# and read the field back. The bound it claims to guard lives in `update_settings`, and that
+# function was never called -- so tightening
+#
+#     if not FLOOR <= body.hnsw_ef_search <= CEILING      ->      if not FLOOR < ... < CEILING
+#
+# leaves all four of its parameters GREEN while an operator entering 1000 is refused by a
+# message that says 1000 is allowed, against an `<input min="10" max="1000">` that accepts it.
+#
+# The vacuity is a CLASS, not one case: the file's own `_patch()` helper is the tool that
+# reaches the boundary, and eight lines above it the refusal cases use it. So the guard below
+# is written over the class rather than over the one case -- a re-written case that later drifts
+# back to round-tripping a model would fail here on the day it is written, not at the next review.
+
+
+def _api_cases_that_never_reach_the_handler() -> list[str]:
+    """Cases named for what THE API does that never call ``_patch`` (i.e. ``update_settings``).
+
+    Read from this file's own AST. A name is deliberately part of the contract: a case called
+    ``test_the_api_...`` is making a claim about the request boundary, and the only way to make
+    that claim true is to cross it.
+    """
+    tree = ast.parse(pathlib.Path(__file__).read_text(encoding="utf-8"))
+    offenders: list[str] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        if not node.name.startswith("test_the_api_"):
+            continue
+        calls = {
+            getattr(c.func, "id", None) or getattr(c.func, "attr", None)
+            for c in ast.walk(node)
+            if isinstance(c, ast.Call)
+        }
+        if "_patch" not in calls:
+            offenders.append(node.name)
+    return offenders
+
+
+def test_the_ast_helper_has_a_positive_control():
+    """A fence with no positive control can pass vacuously -- which is the very finding here."""
+    tree = ast.parse(pathlib.Path(__file__).read_text(encoding="utf-8"))
+    names = {
+        n.name
+        for n in ast.walk(tree)
+        if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and n.name.startswith("test_the_api_")
+    }
+    assert len(names) >= 3, f"the scan found almost no api cases to check: {sorted(names)}"
+    assert "test_the_api_refuses_an_ef_search_outside_the_bounds" in names
+    assert "test_the_api_refuses_an_ef_search_outside_the_bounds" not in (
+        _api_cases_that_never_reach_the_handler()
+    ), "the helper cannot see `_patch` even where it is plainly called -- it is broken"
+
+
+def test_every_api_case_actually_crosses_the_request_boundary():
+    """The bound lives in ``update_settings``; a case that never calls it guards nothing."""
+    offenders = _api_cases_that_never_reach_the_handler()
+    assert not offenders, (
+        "these cases are named for what the API does but never call update_settings, so the "
+        "bound they claim to guard could be changed without any of them failing: "
+        + ", ".join(offenders)
+    )
 
 
 def test_an_absent_field_is_not_a_write():
