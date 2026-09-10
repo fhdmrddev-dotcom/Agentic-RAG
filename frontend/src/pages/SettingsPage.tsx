@@ -1580,6 +1580,19 @@ export function SettingsPage() {
                   {hnswEfSearchFloor !== null && hnswEfSearchCeiling !== null && (
                     <> {" "}Allowed: {hnswEfSearchFloor}&ndash;{hnswEfSearchCeiling}.</>
                   )}
+                  {/* Phase 241 — the RECOMMENDATION, stated as EVIDENCE rather than as a blanket
+                      prescription. Measured on a 100,000-passage bench at three tenant sizes
+                      (241-VALIDATION.md): 200 reached full recall at every one, and 1000 was
+                      REPRODUCIBLY WORSE than 400 — so "set it as high as it goes" is measurably
+                      wrong here, and the ceiling is not the goal. Say what was measured, not
+                      what the operator ought to want. */}
+                  {" "}
+                  <span className="font-medium text-foreground">
+                    200 is a good starting point
+                  </span>
+                  {" "}&mdash; on our 100,000-passage test library it returned every result that
+                  should have been found, for small and large teams alike. Higher is not better:
+                  1000 measured worse than 400.
                 </p>
 
                 {/* ⛔ A SELECT, NEVER A TOGGLE. `strict_order` and `relaxed_order` are two
