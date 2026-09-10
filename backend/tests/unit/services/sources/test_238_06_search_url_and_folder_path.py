@@ -125,26 +125,63 @@ async def test_a_hostile_search_term_cannot_change_the_request_URL(
     await adapter.list_files(CONN, query=hostile)
 
     issued = rec.urls[0]
+    assert issued.startswith(f"{GRAPH_API_BASE}/"), f"URL left the pinned base: {issued!r}"
+
     for ch in ("?", "#", "&"):
         assert ch not in issued, (
             f"the search term reached the URL and could {what_it_would_do}: {issued!r}"
         )
-    assert issued.startswith(f"{GRAPH_API_BASE}/"), f"URL left the pinned base: {issued!r}"
-    assert ".." not in issued, f"path traversal reached the URL: {issued!r}"
+
+    # The term sits inside search(q='...'). Everything the user typed must be encoded such
+    # that it cannot act as URL SYNTAX - so the interesting question is whether any
+    # STRUCTURAL character survives inside that segment, not whether some byte sequence
+    # appears anywhere in the string.
+    #
+    # ⚠ THIS ASSERTION WAS FIRST WRITTEN AS `".." not in issued` AND THAT WAS WRONG - the
+    # third over-strict assertion in this session, and worth naming rather than quietly
+    # fixing. `.` is an unreserved character, so `..` legitimately survives encoding; with
+    # every surrounding `/` encoded to `%2F` it CANNOT form a path segment and is inert.
+    # Forbidding the literal would have failed a correct implementation. Test the property
+    # (no unencoded separator inside the term), never a byte sequence that merely looks
+    # dangerous. See [[SEED-270]].
+    prefix = f"{GRAPH_API_BASE}/me/drive/root/search(q='"
+    assert issued.startswith(prefix), f"unexpected search URL shape: {issued!r}"
+    term_segment = issued[len(prefix):].rsplit("')", 1)[0]
+    assert "/" not in term_segment, (
+        f"an unencoded path separator survived inside the search term, so it could "
+        f"{what_it_would_do}: {term_segment!r}"
+    )
 
 
 @pytest.mark.asyncio
-async def test_the_search_term_travels_as_a_PARAMETER_like_the_drive_adapter(
+async def test_the_search_term_is_transmitted_and_is_ENCODED_wherever_it_rides(
     adapter, monkeypatch
 ):
-    """Parity with `google_drive.py:254` - the transport encodes it, not us."""
+    """THIS TEST WAS REWRITTEN, and the reason matters more than the test.
+
+    It first asserted the term must travel in `params` - which pinned an IMPLEMENTATION
+    (the review's suggested fix) rather than the PROPERTY that actually matters. That is
+    the SEED-270 mistake from the other side: a test so specific it forbids a correct
+    solution.
+
+    The property is: the term is transmitted, and it cannot reach URL syntax. Graph
+    documents OneDrive search as an OData FUNCTION (`/search(q='...')`), so moving the term
+    to a query parameter would change the contract with a live API this change cannot
+    drive. Percent-encoding satisfies the property without that gamble.
+
+    So: assert the term ARRIVES, and assert (in the sibling test above) that no structural
+    character survives. Do not dictate which side of the request carries it.
+    """
     rec = _install(monkeypatch)
     await adapter.list_files(CONN, query="quarterly report")
 
-    sent = rec.params[0]
-    assert any("quarterly report" in str(v) for v in sent.values()), (
-        f"the search term must ride in params where the transport encodes it; got {sent!r} "
-        f"and url {rec.urls[0]!r}"
+    whole_request = rec.urls[0] + repr(rec.params[0])
+    assert "quarterly" in whole_request and "report" in whole_request, (
+        f"the search term never reached the request at all; url={rec.urls[0]!r} "
+        f"params={rec.params[0]!r}"
+    )
+    assert " " not in rec.urls[0], (
+        f"a raw space reached the URL: {rec.urls[0]!r} - the term is not being encoded"
     )
 
 

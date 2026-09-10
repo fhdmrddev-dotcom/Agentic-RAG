@@ -38,6 +38,7 @@ import json as jsonlib
 import logging
 import re
 from typing import Any
+from urllib.parse import quote, unquote
 
 from app.models.user_settings import source_max_file_bytes
 from app.security.egress import send_pinned_http
@@ -115,8 +116,23 @@ def _folder_path(item: dict[str, Any]) -> str | None:
     raw = parent.get("path")
     if not isinstance(raw, str) or not raw:
         return None
-    stripped = _PATH_PREFIX.sub("", raw).rstrip("/")
-    return stripped or ""
+
+    # ⛔ WR-03 — NO `root:` MARKER MEANS WE DO NOT KNOW THE PATH, SO SAY SO.
+    #   The regex used to simply not match and the raw value was returned, which presented
+    #   `/drives/b!abc/items/01XYZ` — an opaque drive/item id — as a folder a person is
+    #   invited to write a rule against. ⭐ CR-01 made `None` the honest answer for an unknown
+    #   path; this is the same invariant, one adapter down.
+    stripped = _PATH_PREFIX.sub("", raw)
+    if stripped == raw:
+        return None
+
+    # ⛔ WR-03 — DECODE. `parentReference.path` is Graph's NAVIGABLE path and is URL-encoded,
+    #   while `name` (concatenated onto it by `list_files`) is not. Returning it verbatim put
+    #   two encodings in one string: `/Team%20Docs/Q3%20Plans/Q3 Plans.pdf`. A person writing
+    #   `path contains '/Team Docs/'` then gets NO MATCH — SEED-253's exact user-visible
+    #   failure arriving by a new mechanism, on every folder with a space or a non-ASCII
+    #   character. The live UAT could not see it: it drove only `/Attachments`.
+    return unquote(stripped).rstrip("/")
 
 
 @SourceRegistry.register("microsoft")
@@ -155,6 +171,7 @@ class MicrosoftGraphSourceAdapter(SourceAdapter):
         url: str,
         page_token: str | None,
         page_size: int,
+        extra_params: dict[str, str] | None = None,
         what: str,
     ) -> dict[str, Any]:
         """One page of a Graph collection, following the contract's cursor convention.
@@ -202,6 +219,15 @@ class MicrosoftGraphSourceAdapter(SourceAdapter):
             url = page_token
         else:
             params = {"$select": SELECT_ITEM_FIELDS, "$top": str(max(1, min(page_size, 200)))}
+            # ⛔ WR-01 — the search term rides HERE, in a params VALUE, and never in the URL.
+            #   `send_pinned_http`'s docstring states the rule ("Query parameters, encoded by
+            #   the transport rather than by the caller") and the sibling `google_drive.py:254`
+            #   already obeys it. A term interpolated into the path lets a `?` open a real query
+            #   string and `../` choose a different Graph endpoint under the caller's token.
+            # ⚠ Only on the FIRST page: a `nextLink` already carries its own `$search`, and
+            #   re-adding it would be the caller's parameter fighting Graph's own cursor.
+            if extra_params:
+                params.update(extra_params)
 
         resp = await send_pinned_http(
             "graph_read",
@@ -273,7 +299,22 @@ class MicrosoftGraphSourceAdapter(SourceAdapter):
             # ⚠ `search(q=…)` rather than `$filter=startswith(name,…)`: `$filter` on `name` is
             # not supported uniformly across drive kinds, and a filter that silently returns
             # nothing reads to a person as "no results" rather than "unsupported".
-            safe = query.replace("'", "''")
+            # ⛔ WR-01 — the term goes in a PARAMETER, never in the path. It used to be
+            #   interpolated into `search(q='…')` with only the OData quote escaped, so
+            #   `a')?$expand=children&x=('` terminated the path and opened a real query string,
+            #   and `../` let the caller pick a different Graph endpoint under this connection's
+            #   token. Graph's `$search` takes the term as an ordinary parameter; the transport
+            #   percent-encodes it and the URL structure stops being reachable at all.
+            #   ⚠ THE ENDPOINT SHAPE IS KEPT ON PURPOSE. Graph documents OneDrive search as an
+            #   OData FUNCTION — `/me/drive/root/search(q='…')` — and moving the term to a
+            #   query parameter would change the contract with a live API this fix cannot
+            #   drive. Percent-encoding closes the injection completely while leaving the
+            #   documented endpoint exactly as it was, so the change is verifiable offline.
+            #   `quote(safe="")` escapes EVERYTHING outside the unreserved set: `?`, `#`, `&`,
+            #   `/`, `(`, `)` and the OData quote, so the term can no longer reach URL syntax.
+            #   The `''` doubling stays FIRST — it is the OData string escape, a different
+            #   layer from the URL escape, and dropping it would break a literal apostrophe.
+            safe = quote(query.replace("'", "''"), safe="")
             url = f"{GRAPH_API_BASE}/me/drive/root/search(q='{safe}')"
         else:
             url = self._children_url(folder_id)
