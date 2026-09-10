@@ -1,6 +1,8 @@
 ---
 id: SEED-042
-status: dormant
+status: folded          # folded_into v4.1 (SHELL-04) at /gsd:new-milestone 2026-09-11
+folded_into: "v4.1"
+
 planted: 2026-05-31
 planted_during: v2.8 (Harness Engine & Workflow Mode — surfaced during Phase 090 operator-testing-notes triage)
 trigger_when: Operator wants to attach a non-KB file to a single chat/task (e.g. a skill template, a one-off doc) WITHOUT it landing in the knowledge base, OR wants to dictate a prompt by voice

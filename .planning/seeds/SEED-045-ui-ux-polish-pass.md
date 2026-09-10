@@ -1,6 +1,8 @@
 ---
 id: SEED-045
-status: dormant
+status: folded          # folded_into v4.1 (SHELL-01) at /gsd:new-milestone 2026-09-11
+folded_into: "v4.1"
+
 planted: 2026-05-31
 planted_during: v2.8 (Harness Engine & Workflow Mode — surfaced during Phase 090 operator-testing-notes triage)
 trigger_when: A dedicated UI/UX polish milestone is scoped (v2.4 "Stability, Polish & UX Fixes" precedent), typically after v2.8 harness ships; OR any specific nav/chat-list usability item is reported

@@ -1,7 +1,8 @@
 ---
 id: SEED-049
 title: E2E Playwright suite revival — tests can't drive the current composer/streaming UI (075.x/087/088 drift)
-status: planted
+status: deferred        # ⚠ TRIGGER FIRED at v4.1 scoping 2026-09-11 (CHAT-01..05 IS "a chat-surface / streaming / RunCard phase") and was DEFERRED BY DECISION, not oversight: reviving a rotted E2E suite is a phase of its own. Re-open at the first chat phase that cannot be verified without it.
+fired_not_folded: "v4.1"
 planted: 2026-06-02
 planted_by: orchestrator (092.5-06 close — E2E de-rot follow-up)
 trigger_when: any phase that wants the Playwright E2E backstop to gate (esp. a chat-surface / streaming / RunCard / workspace phase), OR before a milestone close that claims E2E coverage, OR when CI frontend-tests.yml is turned on for real

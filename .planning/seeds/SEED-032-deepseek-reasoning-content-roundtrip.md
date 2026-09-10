@@ -1,7 +1,9 @@
 ---
 id: SEED-032
 title: DeepSeek full integration — thinking mode + real-time UI parity
-status: planted
+status: folded          # folded_into v4.1 (CHAT-01) at /gsd:new-milestone 2026-09-11
+folded_into: "v4.1"
+
 planted: 2026-05-26
 trigger_when: "Next milestone planning OR user requests DeepSeek thinking mode OR DeepSeek deprecates non-thinking mode"
 surface: Agentic-RAG

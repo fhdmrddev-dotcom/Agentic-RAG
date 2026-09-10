@@ -1,7 +1,9 @@
 ---
 seed_id: SEED-029
 title: "Continue" button on iteration-cap stop — user-confirmed escape valve to resume agent loop with a fresh budget (Claude.ai-style)
-status: planted
+status: folded          # folded_into v4.1 (SHELL-02) at /gsd:new-milestone 2026-09-11
+folded_into: "v4.1"
+
 planted: 2026-05-23
 phase_origin: 075.4 context-gathering (operator question about Claude.ai's tool-call-limit Continue affordance)
 related_seeds: [SEED-012, SEED-026]
