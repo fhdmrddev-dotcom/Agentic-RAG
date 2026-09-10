@@ -2752,3 +2752,27 @@ strip is what it expands into while a run is live: **one object at two sizes, no
 - **SC#3 Lifecycle Actions**: Warning banner for disconnected source with *"Reconnect {connection_name}"* action offered by name, plus *"Purge missing files"* action.
 - **G-1 Pre-emption**: Mounted inside the Library Ingestion surface, leaving `ConnectionFormPanel.tsx` and `ConnectionsTab.tsx` completely untouched.
 
+
+---
+
+## Phase 243 — The Thinking Block and the Follow-Scroll Seam (v4.1, 2026-09-11)
+
+**G-2 sketch gate for Phase 243.** `ROADMAP.md` flags Phase 243 `⚠⚠ G-2 SKETCH MANDATORY before /gsd:plan-phase` — live UI, "feels like", an explicit Claude.ai gold-standard comparison. **The operator-approved mockup is the acceptance bar.**
+
+⭐ **Scope was CUT at decomposition, on evidence: three of the phase's five CHAT requirements need no sketch.**
+
+| Req | Already decided | Verdict |
+|---|---|---|
+| **CHAT-03** follow-scroll | **Sketch 015-C, D-03** — *"follow the live edge; **release** the instant the user scrolls up; **re-arm** at the bottom"* | The design is LOCKED and the shipped code drifted from it (`MessageList.tsx:171` re-arms on a smooth scroll). A fix to match an approved design, not a design question |
+| **CHAT-02** delta cadence | Invisible by nature — a coalescing change | Nothing to look at; shown *inside* 234 via ▶ Replay the stream rather than sketched separately |
+| **CHAT-05** narration fold resolve | `BUG-260707-03`'s send-path reconcile shipped at Phase 176 | A reconcile bug on the mount path |
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 234 | the-thinking-block | What does a model's reasoning look like at rest, mid-stream, and expanded? | _pending_ | phase-243, chat-01, chat-02, reasoning, streaming, g2-sketch-gate |
+| 235 | thinking-with-no-run | Where does reasoning live on a reply that called no tools — when there is no RunCard to put it in? | _pending_ | phase-243, chat-04, placement, component-seam, g2-sketch-gate |
+
+- **Real corpus, not fixtures** (queried from local Supabase 2026-09-11): **340** messages carry reasoning · **105 (31%)** called zero tools and are invisible today · median **198** chars, mean **1,053**, max **33,713**. The **170× median-to-max spread is the design tension**, and 234's Scale control exists so no variant is judged at the median alone (the 045 real-scale lesson).
+- **CHAT-04 is a placement question, not a gate flip** — measured: `RunCard.tsx:478-502` is the ONLY renderer of `reasoningContent` in the codebase, so a pure-text reply has no home for it rather than a hidden one.
+- **235's winner sets Phase 243's component seam** — A and B end with one reasoning renderer, C ends with two (it cannot show live streaming, which the Phase 095 build-once inventory rule forbids).
+- ⚠ **`RunCard.tsx` newly fires G-5** — re-derived from git 2026-09-11 as **27 commits / 13 phases**, against a stale ledger cell of `26/12/728`.
