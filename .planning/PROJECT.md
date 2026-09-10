@@ -2,13 +2,26 @@
 
 ## What This Is
 
-A RAG-based AI agent platform where users organize documents into nested folders and interact with a customizable AI agent. The agent remembers preferences across threads, extracts tables and images from documents, shows confidence and citations, runs code in a sandbox, and can be taught new skills that persist. As of v2.7 the agent also keeps a per-thread workspace of versioned files, manages a todo list, can spawn sub-agents, and can pause to ask the user a question — all surfaced live in a collapsible right-side workspace panel. As of v2.8 the agent can also run inside a deterministic, locked workflow (Harness Mode) — ordered phases the model cannot escape, with per-phase tool whitelists, validation gates, and a live phase timeline — alongside today's free-form Deep Mode chat. The Deep Midnight visual design delivers a glassmorphic, mobile-responsive experience with knowledge health dashboards and user feedback loops. As of v3.0, documents are a first-class, metadata-driven surface: user-defined custom metadata with per-field confidence, metadata-driven saved views ("virtual folders"), typed document relationships, suggest-then-confirm auto-classification, a light governance-health view, and configurable multi-provider embeddings.
+A RAG-based AI agent platform where users organize documents into nested folders and interact with a customizable AI agent. The agent remembers preferences across threads, extracts tables and images from documents, shows confidence and citations, runs code in a sandbox, and can be taught new skills that persist. As of v2.7 the agent also keeps a per-thread workspace of versioned files, manages a todo list, can spawn sub-agents, and can pause to ask the user a question — all surfaced live in a collapsible right-side workspace panel. As of v2.8 the agent can also run inside a deterministic, locked workflow (Harness Mode) — ordered phases the model cannot escape, with per-phase tool whitelists, validation gates, and a live phase timeline — alongside today's free-form Deep Mode chat. The Deep Midnight visual design delivers a glassmorphic, mobile-responsive experience with knowledge health dashboards and user feedback loops. As of v3.0, documents are a first-class, metadata-driven surface: user-defined custom metadata with per-field confidence, metadata-driven saved views ("virtual folders"), typed document relationships, suggest-then-confirm auto-classification, a light governance-health view, and configurable multi-provider embeddings. As of v3.9 a **connection** is `{service identity, auth, discovered tools, per-tool grants}`, so adding a service adds rows rather than code. As of v4.0 the knowledge base **reads itself**: a source — Google Drive, OneDrive/SharePoint via Microsoft Graph, any MCP file server, or a mailbox — is connected once, previewed before it brings anything in, and then watched on the shipped scheduler, with one visibility per connection enforced in RLS and provenance riding every row.
 
 ## Core Value
 
 The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
 
-## Current Milestone: v4.0 Connected Knowledge
+## Last Shipped: v4.0 Connected Knowledge (2026-09-10)
+
+> ✅ **SHIPPED 2026-09-10, git tag `v4.0`.** 14 phases (228-241, no inserts), 62 plans, 571 commits,
+> 6 days. **33/38 requirements delivered · 5 ⛔ not ticked.** Migrations 153-156 / 166-176.
+> Archive: [`milestones/v4.0-ROADMAP.md`](milestones/v4.0-ROADMAP.md) · requirements:
+> [`milestones/v4.0-REQUIREMENTS.md`](milestones/v4.0-REQUIREMENTS.md) · audit:
+> [`milestones/v4.0-MILESTONE-AUDIT.md`](milestones/v4.0-MILESTONE-AUDIT.md).
+>
+> ⛔ **238, 240 and 241 closed WITHOUT an independent §6.3 review** — Gemini unavailable since
+> 2026-09-09, `/code-review ultra` ruled out on cost. Their verdicts are the builder's own.
+> ⛔ **Two UAT sets owed on credentials** (238: an Azure app registration · 241 row 5: a cloud DSN,
+> ⚠ **and row 5 dies the moment migration 176 reaches cloud**). ⛔ **Cloud is 15 migrations behind.**
+>
+> The scoping text below is preserved as written at the milestone's open.
 
 **Goal:** The knowledge base stops depending on somebody remembering to upload — a person connects a
 source **once**, sees exactly what it would bring in **before** it brings anything, and the Library
@@ -362,9 +375,18 @@ been scheduled.** This milestone schedules them.
 
 ## Current State
 
-**Shipped:** **v3.9 Connections: Any Service, Any Tool** — 2026-09-04 (16 phases, **111 plans**, 695 commits, 9 days; git tag `v3.9`). A connection became `{service identity, auth, discovered tools, per-tool grants}`, so **adding a service adds rows, not code** — Notion connects by OAuth with no developer console and returns 41 tools for zero lines of tool code; six Google applications sit under one token with 11/11 live writes. Per-tool grants, an approval moment that stops a real run, an audit receipt per outbound call, connections usable by name in chat, and the Library as one home for documents. 34/39 requirements delivered, 3 partial, 2 shipped-but-never-driven. Migrations 127-129 / 140-141 / 150-152.
+**Shipped:** **v4.0 Connected Knowledge** — 2026-09-10 (14 phases, **62 plans**, 571 commits, 6 days; git tag `v4.0`). Four source families as thin adapters over ONE `browse / list / read / check` contract, and the contract was **tested rather than asserted** — 239 bound GitHub MCP through the UI alone, proven zero-code **by hash**, and 240 proved mail is a **shape, not a fourth adapter** (`sources/base.py` byte-identical). A file arrived by itself on the shipped scheduler; connection-scoped visibility is enforced at all four RLS sites; the anti-injection discipline was **actually attacked** (13/13 refused · 8/8 mutations caught · live drive refused by 8/8 native providers). ⚠ **241 measured a REAL recall defect at customer scale** — `recall@20` **0.040** at the shipped `ef_search = 40`, a **cliff not a slope** — and the remedy shipped as an operator setting with **the default unchanged**, which is why `QUEUE-06` is not ticked. 33/38 requirements delivered. Migrations 153-156 / 166-176. ⛔ **238, 240 and 241 have no independent §6.3 review.**
+
+**Prior:** **v3.9 Connections: Any Service, Any Tool** — 2026-09-04 (16 phases, **111 plans**, 695 commits, 9 days; git tag `v3.9`). A connection became `{service identity, auth, discovered tools, per-tool grants}`, so **adding a service adds rows, not code** — Notion connects by OAuth with no developer console and returns 41 tools for zero lines of tool code; six Google applications sit under one token with 11/11 live writes. Per-tool grants, an approval moment that stops a real run, an audit receipt per outbound call, connections usable by name in chat, and the Library as one home for documents. 34/39 requirements delivered, 3 partial, 2 shipped-but-never-driven. Migrations 127-129 / 140-141 / 150-152.
+
+**Current:** **no milestone active** — v4.0 closed 2026-09-10. Next: `/gsd:new-milestone`. ⚠ **Before scoping anything, three things are owed and none of them is new work on a feature:** (1) the **161 planted seeds** of 275 — CLAUDE.md's sweep rule says every `trigger_when` is read at `/gsd:new-milestone`, and at 161 that is a phase of work, not a step in a command; (2) the **two credential-blocked UAT sets**, one of which (241 row 5) **expires the moment migration 176 reaches cloud**; (3) an **independent review for 238, 240 and 241**, which cannot happen while no independent reviewer exists — that constraint is itself a scoping input, not a footnote.
+
+<details>
+<summary>Superseded Current entry (v4.0 open, 2026-09-04 — preserved)</summary>
 
 **Current:** **milestone v4.0 Connected Knowledge — STARTED 2026-09-04.** Phase numbering continues at **228**. The knowledge base stops depending on somebody remembering to upload: a source is connected once, previewed before it brings anything, and then watched on the shipped scheduler. Four source families (Google Drive · OneDrive/SharePoint · any MCP file surface · email) as **thin adapters over ONE `list → read → hash → splice` contract** — a watched source must be data, not code. ⭐ **The `SEED-210` permission fork is answered: connection-scoped visibility, stated plainly in the UI**; the M-Files metadata-derived model (`SEED-211`) is decided and recorded with a migration path, not built. ⚠ This milestone **retires the standing manual-upload-only `CLAUDE.md` rule in the same commit as the first sync connector** — and that same commit retires the reason ownership-based RLS was adequate. 18 seeds folded; `SEED-212` (transcripts) deferred with its trigger intact.
+
+</details>
 
 ⚠ **Armed for the next production push:** `SEED-242` moves the product to `app.<domain>` (seven steps across Vercel / Coolify / Supabase Auth / CORS — verify on a preview before promoting), and `/code-review ultra review-base-225` is owed on the OAuth state rework, skipped at Phase 225 only because credits were exhausted.
 
@@ -737,9 +759,49 @@ All 20 v3.3 requirements delivered (16 CORE + 4 STRETCH).
 - ⚠ `CHAT-06` — the armed connector set is stored nowhere and does not survive a reload (`BUG-260902-03`)
 - ⛔ `CONN-10` / `CONN-11` — code shipped, structurally undrivable on this install (0 schedule rows; the door gates on published provenance)
 
+### Validated (v4.0 — Connected Knowledge)
+
+- ✓ A folder from a connected source is mapped to a Library folder and checked on the **shipped** scheduler — LIB-08, v4.0 (Phase 234, driven: a file arrived by itself, `last_status=success`, items 0→6)
+- ✓ Before the first import a person sees what it **would** add, and nothing is ingested until they confirm — LIB-09, v4.0 (Phase 233)
+- ✓ A source that has stopped reading says so, says when, and offers the one action that fixes it — LIB-10, v4.0 (Phase 235)
+- ✓ Every source family implements ONE `browse / list / read / check` contract; a family adds an adapter, not a pipeline — SRC-01, v4.0 (Phase 232, **measured** at 238 and 239)
+- ✓ A person watches a **Google Drive** folder, with no new OAuth scope — SRC-02, v4.0 (Phase 232)
+- ✓ A person watches a folder exposed by **any** connected MCP server — SRC-04, v4.0 (Phase 239; driven against GitHub MCP, **zero-code proven by hash**)
+- ✓ A person watches a **mailbox**: one message is one document, `thread_key` groups, attachments are children — SRC-05, v4.0 (Phase 240, `sources/base.py` byte-identical)
+- ✓ A `missing` verdict may be written **only** from a listing whose final page asserted completeness — SRC-06, v4.0 (Phase 234, `H-5`, fail-closed)
+- ✓ The preview shows four honestly-labelled buckets over a two-tier identity, and **writes nothing** — PREV-01 / PREV-02 / PREV-03, v4.0 (Phase 233)
+- ✓ One visibility per connection, enforced in **RLS at all four sites**, stated plainly on screen — VIS-01 / VIS-02, v4.0 (Phase 231)
+- ✓ A file removed at the source is not removed from the Library; every remaining lifecycle event has a defined outcome; a disconnect **freezes** rather than deletes; a visibility-widening rule produces a **suggestion requiring human accept** — VIS-03 / VIS-04 / VIS-05 / VIS-06, v4.0 (Phase 234, driven)
+- ✓ Ingestion runs through a durable queue with cap, retry and resume — proven on `/upload` **first** — QUEUE-01 / QUEUE-02, v4.0 (Phase 230)
+- ✓ Two runs of the same watched source never overlap — QUEUE-03, v4.0 (Phase 234, a watch lease)
+- ✓ Embedding calls batch inside real provider limits (including the 300,000-token-per-request ceiling), and a failure retries, fails over **same-vector-space**, then names itself — QUEUE-04 / QUEUE-05, v4.0 (Phase 230)
+- ✓ There is **ONE ingest splice** — every producer mints the same row from the same bytes — TRUST-01, v4.0 (Phase 229, G-5 discharge on `documents.py`)
+- ✓ The anti-injection discipline is **actually attacked** by a corpus that fails when a defence is removed — TRUST-02, v4.0 (Phase 236; 13/13 refused · 8/8 mutations caught · live drive refused by 8/8 native providers)
+- ✓ Write-capable connector tools are fenced out of turns whose retrieval set contains connection-sourced content — TRUST-03, v4.0 (Phase 234, same phase as the first sync)
+- ✓ A document carries whether it was machine-placed and from which connection, visible at retrieval and citation time — TRUST-04, v4.0 (Phase 231)
+- ✓ Watch-routing and classification rules share ONE AST and ONE matcher discriminated by scope, with source facts as first-class filterable fields — RULES-01 / RULES-02, v4.0 (Phase 237)
+- ✓ The screen says **"checked every N minutes"**, never "instantly" — SURF-01, v4.0 (Phase 234)
+- ✓ A person can see what a sync actually did — a per-source run history with counts and errors — SURF-02, v4.0 (Phase 235)
+- ✓ v3.9's owed verification driven or explicitly re-deferred; the resume-path bug cluster triaged together; the backend baseline honestly re-derived so it can gate again — DEBT-01 / DEBT-02 / DEBT-05, v4.0 (Phase 228)
+
+⛔ **NOT validated — five requirements, named rather than rounded up:**
+
+- ⛔ `SRC-03` — Microsoft Graph ships **structurally**; all nine live UAT rows are blocked on one Azure app registration (SharePoint separately on `SEED-256`)
+- ⛔ `QUEUE-06` — the defect was measured and the remedy shipped, but **the DEFAULT is unchanged**, so out of the box the requirement is still not met; cloud has no columns until migration 176 lands
+- ⛔ `SURF-03` — a broken watch reaching someone not on the page: its **home is still an open scoping decision**; the Health tab alone does not satisfy it
+- ⛔ `DEBT-03` — `/code-review ultra review-base-225`, ruled out by the operator on cost
+- ⛔ `DEBT-04` — `app.<domain>`, gated on a production push (`SEED-242`)
+
 ### Active (current milestone)
 
+*v4.0 Connected Knowledge SHIPPED (2026-09-10; git tag `v4.0`). **No milestone active.** Next: `/gsd:new-milestone`. ⚠ **Carried into scoping, and the first two are not features:** the **161 planted seeds** whose `trigger_when` the sweep rule says must each be read (at 161 that sweep is a phase, not a step); the **two credential-blocked UAT sets** — 238's nine Azure rows and 241's row 5, which **expires the moment migration 176 reaches cloud**; **three phases owing an independent §6.3 review** (238, 240, 241) with no independent reviewer in existence; **15 cloud migrations pending** before the next push; `SEED-242` still armed for `app.<domain>`; **34 open reported bugs**; `retrieval_service.py`'s G-5 extraction, owed since 231, where a **third** landing must propose the extraction first; and `SURF-03`'s open scoping decision, which is a product question rather than a build.*
+
+<details>
+<summary>Superseded Active note (v3.9-era, preserved)</summary>
+
 *v3.9 Connections: Any Service, Any Tool SHIPPED (2026-09-04; git tag `v3.9`). **No milestone active.** Next: `/gsd:new-milestone` — the sequenced next slot is **Connected Knowledge**, carrying deferred **Phase 219**, `LIB-08/09/10` and `SEED-209/210/211/212` as one unit, because 219's* "watched on a schedule" *IS the security seeds' own re-open trigger. ⚠ `LIB-08/09/10` have never existed outside a roadmap heading and must be written into that milestone's `REQUIREMENTS.md`. Also carried: the five owed-verification sets (210's four undriven SC, 211's UAT + schema regen, 214's eight-row cross-provider roster and eight G-4 drives, 217's 16 UAT rows, `/code-review ultra review-base-225`); `SEED-242` armed for the next production push; 23 open reported bugs, six of which are probably one root cause in the resume path; 14 dormant seeds; and one honest re-derivation owed on the backend unit baseline before it can gate anything.*
+
+</details>
 
 <details>
 <summary>Superseded Active note (v3.6-era, preserved)</summary>
@@ -882,6 +944,14 @@ All 20 v3.3 requirements delivered (16 CORE + 4 STRETCH).
 | **D-v3.0-GEMINI-SCHEMA**: agent-tool schemas avoid anyOf/oneOf AND multi-type `type:[...]` arrays | google-genai 400s on both; no-anyOf is necessary-but-not-sufficient for Gemini | ✓ Good — found live in 115 UAT (a multi-type array broke all Gemini Deep tool use); fixed + locked |
 | **D-v3.0-EMBED-SPOF**: embeddings become provider-configurable (retire the OpenAI-only SPOF) | an OpenAI quota outage previously broke document search for ALL providers (SEED-048) | ✓ Good — Phase 111.1; provider picker + guarded RLS-scoped re-embed; closes SEED-048 |
 | **D-v3.0-PER-PHASE-RIGOR**: substitute per-phase verify+secure+validate for a formal milestone audit | every v3.0 phase already cleared all three gates with live evidence; a formal audit adds ceremony without new signal (v2.9 precedent) | ✓ Good — 11/11 phases three-gate clear; 37 open artifacts triaged zero CORE blockers at close |
+| **D-v4.0-CONTRACT**: four source families are thin adapters over ONE `browse / list / read / check` contract | a watched source must be **data, not code** — and the claim was tested twice by hash rather than asserted: 239 bound a server whose vocabulary shares nothing with the reference, 240 added mail with `sources/base.py` byte-identical | ✓ Good |
+| **D-v4.0-VISIBILITY**: one visibility per **connection**, enforced in RLS at all four sites (`SEED-210` Option 3) | ownership-based RLS was only ever adequate because ingestion was manual; the commit that retires the manual-upload-only rule retires that reason too | ✓ Good |
+| **D-v4.0-H5**: a `missing` verdict may be written only from a listing whose final page asserted completeness | fail-closed by construction — an incomplete listing can never delete a customer's documents, and no amount of care substitutes for the structural guarantee | ✓ Good |
+| **D-v4.0-QUEUE-FIRST**: the durable queue's correctness is proven on the existing `/upload` route **before** any connector uses it | a queue debugged through a connector is two unknowns at once | ✓ Good |
+| **D-v4.0-ATTACK**: the anti-injection discipline is verified by **mutation** — remove a defence and the suite must fail | an attack suite that passes with the defence deleted proves nothing; this is the only property that makes one worth keeping | ✓ Good |
+| **D-v4.0-EF-DEFAULT**: `hnsw.ef_search` ships as an operator setting with the **default unchanged** | the remedy is measured and available, but changing a retrieval default across every install on one phase's evidence is a bigger claim than the evidence supports — ⚠ the cost is that `QUEUE-06` is honestly **not met out of the box** | — Pending |
+| **D-v4.0-SELF-VERIFY**: 238, 240 and 241 closed on the builder's own verdict | no independent reviewer existed (Gemini unavailable, `/code-review ultra` ruled out on cost) and the operator directed the builds to proceed — recorded as a **decision**, never as a claim that they were reviewed | ⚠️ Revisit |
+| **D-v4.0-DRIVE-IT**: a claim about the product is closed by **driving the product**, never by reading a register | measured three times in one hour: a file listing is not a review, a review is a claim ABOUT code, a summary is a claim about a moment — two CRITICALs were escalated as live when they had been fixed two days earlier in an ancestor of the auditing commit | ✓ Good |
 
 ## Constraints
 
@@ -948,4 +1018,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-09-04 — **milestone v4.0 Connected Knowledge STARTED** via /gsd:new-milestone. Scope set by operator at intake: `SEED-210` Option 3 (connection-scoped visibility) ships and `SEED-211`'s M-Files fork is decided-not-built; all four source families in; `SEED-212` transcripts out with trigger intact; v3.9's owed verification gets its own closeout phase rather than a `STATE.md` bullet. 18 seeds folded. Phase numbering continues at **228**. ⚠ `LIB-08/09/10` must be written into `REQUIREMENTS.md` — they have never existed outside a roadmap heading. Prior entry: 2026-09-04 when v3.9 completed.*
+*Last updated: 2026-09-10 — **milestone v4.0 Connected Knowledge COMPLETED** via /gsd:complete-milestone (git tag `v4.0`; 14 phases, 62 plans, 33/38 requirements, 5 named ⛔ not-ticked). Carried: two credential-blocked UAT sets (241 row 5 **expires when migration 176 reaches cloud**), three phases owing an independent §6.3 review, 15 pending cloud migrations, 161 planted seeds and 34 open reported bugs. Prior entry: 2026-09-04 — **milestone v4.0 STARTED** via /gsd:new-milestone. Scope set by operator at intake: `SEED-210` Option 3 (connection-scoped visibility) ships and `SEED-211`'s M-Files fork is decided-not-built; all four source families in; `SEED-212` transcripts out with trigger intact; v3.9's owed verification gets its own closeout phase rather than a `STATE.md` bullet. 18 seeds folded. Phase numbering continues at **228**. ⚠ `LIB-08/09/10` must be written into `REQUIREMENTS.md` — they have never existed outside a roadmap heading. Prior entry: 2026-09-04 when v3.9 completed.*

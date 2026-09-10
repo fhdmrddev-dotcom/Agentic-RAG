@@ -764,6 +764,103 @@ landing page.
 
 ---
 
+## Milestone: v4.0 — Connected Knowledge
+
+**Shipped:** 2026-09-10 (git tag `v4.0`)
+**Phases:** 14 (228-241, **no inserts**) | **Plans:** 62 | **Commits:** 571 | **Days:** 6
+
+### What Was Built
+
+The knowledge base stopped depending on somebody remembering to upload. Four source families —
+Google Drive, OneDrive/SharePoint via Microsoft Graph, **any** MCP file server, and mail — as thin
+adapters over ONE `browse / list / read / check` contract; connection-scoped visibility enforced in
+RLS at all four sites with provenance riding every row; a durable ingestion queue with cap, retry
+and resume; a preview that writes nothing; one rule engine discriminated by scope; an adversarial
+corpus that actually attacks the anti-injection discipline; and a recall harness that finally
+measures the vector path.
+
+### What Worked
+
+- **⭐ Proving a claim by HASH rather than by prose, twice.** The zero-code claim for MCP (239) was
+  settled by `git log <base>..HEAD -- backend frontend` = 0 with HEAD identical before and after;
+  the mail-is-a-shape claim (240) by `sources/base.py` being byte-identical. **Neither could be
+  argued with, and neither cost a paragraph of persuasion.** This is now the project's cheapest
+  form of evidence for a structural claim.
+- **Testing the contract against a hostile example rather than a friendly one.** 239 bound GitHub
+  MCP — a server whose vocabulary shares nothing with the reference and which needs three arguments
+  where the contract sends one. A contract validated only against the adapter it was designed for
+  has been validated against nothing.
+- **Mutation as the property that makes an attack suite worth keeping** (236). 8/8 mutations caught
+  at the point of use: remove a defence and the suite fails. A green attack suite that stays green
+  with the defence deleted proves only that it runs.
+- **Proving the queue on `/upload` before any connector touched it** (230) — one unknown at a time.
+- **`H-5` as structure, not care.** A `missing` verdict may be written only from a listing whose
+  final page asserted completeness. **Fail-closed by construction beats any amount of diligence**,
+  and it is the guard standing between an API hiccup and a customer's deleted documents.
+- **No inserted phases at all** — the first milestone since v3.5. The roadmap held.
+
+### What Was Inefficient
+
+- **⛔ The audit committed the same method failure three times in one hour, and it was the audit
+  written to catch that failure.** It asked *"is a VERIFICATION file present?"* and never opened
+  the review that was there; the correction opened the review and escalated its two CRITICALs to
+  *"open, data loss"* and never opened the code — they had been fixed two days earlier, in an
+  ancestor of the auditing commit. **Each register only knows the one below it, and the code is
+  the bottom.**
+- **⛔ Phase 235 ran 17 plans for ~4-6 plans of substance** and was stopped by the operator, which
+  is what ratified **G-8**. Overhead is **per plan** and dwarfs every agent toggle.
+- **⚠ `REQUIREMENTS.md` was stale from day one for the FOURTH consecutive milestone** — all 38 rows
+  read `Pending` while every phase was shipped and verified. **The cause is not human forgetfulness:**
+  `execute-phase.md:1619` claims `gsd-sdk query phase.complete` maintains the traceability table and
+  it demonstrably does not. **A tool that claims work it does not perform is worse than one that
+  claims nothing, because the claim is what stopped anyone checking.**
+- **⚠ Phase 234's watch had never run once** — `watch_process_enabled` ships `False`, and every gate
+  was green over a feature that had never executed. Found by driving.
+- **⚠ 241's premise had to be refuted before the phase could start.** The Phase 230 "baseline" ran
+  `content ILIKE`, never touched the vector path, scored every miss `rank = 1` and printed
+  `MRR 1.000` on the live corpus. **A harness that could not report a failure had been reporting
+  success** — for a whole milestone.
+- **⚠ Two plans shipped with no SUMMARY.md** (`232-04`, `235-17`). In git, absent from the record.
+
+### Patterns Established
+
+- **Prove a structural claim by hash.** Byte-identical file, identical HEAD, empty path-scoped log.
+- **Attack suites are validated by mutation, never by passing.**
+- **Fail-closed structural guards over procedural care** (`H-5`, the column gate behind `CR-01`).
+- **A second landing on a G-5-firing file is deliberate and declared; a third must propose the
+  extraction first** (`retrieval_service.py`).
+- **⭐ Drive it, or do not report it.** A file listing is not a review; a review is a claim ABOUT
+  code; a summary is a claim about a moment.
+
+### Key Lessons
+
+1. **⭐ A review is a CLAIM about code, not the code.** Two Phase-239 CRITICALs were escalated as
+   live and open when they had been fixed two days earlier. Reading an artifact that says *"broken"*
+   is not measuring the thing, exactly as reading a filename is not reading the artifact.
+2. **⭐ Every "authored-but-not-applied changes nothing" claim Phase 241 made was a claim about
+   READS — and all of them were true. The WRITE half was never checked, and that is where the
+   shipped HTTP 500 lived**, invisible to 4,400+ passing tests. When a change adds columns, ask what
+   writes them, not only what reads them.
+3. **A measured remedy does not automatically become a default.** `QUEUE-06` ships honestly unticked
+   because changing a retrieval default across every install on one phase's evidence is a bigger
+   claim than the evidence supports.
+4. **A degradation can be a CLIFF rather than a slope.** The recall "control" rows ran on a SEQ SCAN,
+   so the before/after differed in corpus size *and* execution plan — an install can cross the cliff
+   with no deploy and no setting change.
+5. **A self-verification must be labelled as one, every time.** Three phases closed without an
+   independent reviewer; recording that as a decision is the only thing that keeps it from being
+   read later as a review.
+
+### Cost Observations
+
+- **62 plans across 14 phases = 4.4 plans/phase** — the lowest since v3.8, and the first milestone
+  run under **G-8**'s 3-5 plan target. Phase 235's 17 plans is the outlier that produced the rule.
+- **~10 plans/day over 6 days**, with worktree parallelism enabled throughout.
+- **⛔ Zero independent review cost, and it is not a saving.** Gemini was unavailable from 2026-09-09
+  and `/code-review ultra` was ruled out on cost, so 238, 240 and 241 have no independent gate. The
+  cheap self-dispatched review is what caught 239's two Criticals and 241's shipped HTTP 500 — it is
+  worth its cost, and it is still not a review.
+
 ## Cross-Milestone Trends
 
 | Milestone | Phases | Plans | Avg Plans/Phase | Timeline |
@@ -789,12 +886,19 @@ landing page.
 | v3.7 Workflow Product Completion | 17 | 145 | 8.5 | 15 days |
 | v3.8 Document Intelligence, Automations & Connectors | 12 | 17 | 1.4 | 3 days |
 | **v3.9 Connections: Any Service, Any Tool** | **16** | **111** | **6.9** | **9 days** |
+| **v4.0 Connected Knowledge** | **14** | **62** | **4.4** | **6 days** |
 
 > ⚠ The v3.4 and v3.5 rows were **missing** from this table and were added at the v3.6 close —
 > both milestones shipped without a trends row. **v3.6 is the project's largest milestone by plan
 > count (151, +59% over v3.3's 95) and by plans-per-phase (11.6, +71% over the prior high).** Read
 > that alongside the note above: the whole of it ran **serially**, because worktree parallelism was
 > not enabled until the milestone was already over.
+
+> ⭐ **v4.0 is the first milestone run under G-8** (ratified mid-milestone when the operator stopped
+> Phase 235 at 17 plans for 4-6 plans of substance). **4.4 plans/phase is the lowest since v3.8**,
+> against a 6.9 prior milestone and an 11.6 all-time high — and it shipped 14 phases with **zero
+> inserts**, the first time since v3.5. ⛔ **Its trends row was added AT the close rather than after
+> it**, which is the first time that has happened in six milestones.
 
 > ⚠ **The v3.7 and v3.8 rows were also missing and were added at the v3.9 close** — the same omission
 > the note above records for v3.4 and v3.5, repeated for two more milestones. **Four of the last six
