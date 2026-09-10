@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v4.0
 milestone_name: Connected Knowledge
 status: executing
-last_updated: "2026-09-10T05:20:00.000Z"
+last_updated: "2026-09-10T00:00:00.000Z"
 last_activity: 2026-09-10
 progress:
   total_phases: 21
@@ -33,10 +33,43 @@ See: `.planning/PROJECT.md` (updated 2026-09-04)
 can be taught new behaviors (skills) that persist and can be shared.
 
 **Current focus:** **Milestone v4.0 Connected Knowledge — STARTED 2026-09-04.** Phase numbering
-continues at **228**. **Phase 241 — recall-at-corpus-scale is EXECUTING.**
+continues at **228**. **Phase 241 is BUILT, REVIEWED and SELF-VERIFIED — status `human_needed`,
+six owed UAT rows.** v4.0 phases 228-241 are now all accounted for.
 
-Phase: 241 — Recall at Corpus Scale (✅ **BUILT AND MEASURED 2026-09-10 — SELF-VERIFIED, no independent reviewer**)
+Phase: 241 — Recall at Corpus Scale (✅ **BUILT, REVIEWED, SELF-VERIFIED 2026-09-10 — status
+`human_needed`; no independent §6.3 reviewer exists for it**)
 Resume file: `.planning/phases/241-recall-at-corpus-scale/241-VALIDATION.md`
+
+> ## ⛔ READ THESE THREE BEFORE QUOTING 241 — the verdict alone is not the whole record
+>
+> | File | Why it changes what the verdict means |
+> |---|---|
+> | `241-VALIDATION.md` | The verdict. SC#1 met AFTER the remedy, SC#2 honestly-partial, SC#3 local-met / cloud-partial |
+> | `241-VERDICT-CORRECTION-PLAN-PATH.md` | ⚠ The "control — real database" rows ran on a **SEQ SCAN**. `document_chunks_embedding_idx` has `idx_scan = 0` for that database's entire life, at **68 MB**. So the before/after differs in corpus size **AND execution plan** — the degradation is a **CLIFF, not a slope**, and an install can cross it with no deploy and no setting change. Also records **WR-02 as OPEN** |
+> | `241-REVIEW.md` + `241-05-SUMMARY.md` | **CR-01 was a SHIPPED HTTP 500** — the Search tab sent both new keys into one `UPDATE`, so wherever migration 176 is unapplied (**cloud today**) the reranker, embedding model, threshold and `rrf_k` could none of them be saved. Confirmed by measurement, fixed. Four more warnings fixed |
+>
+> ⭐ **The lesson worth carrying:** every "authored-but-not-applied changes NOTHING" claim this
+> phase made was a claim about **READS**, and all of them were true. **The write half was never
+> checked, and that is where the 500 lived** — invisible to 4,400+ passing tests.
+>
+> ⛔ **OWED, and stated as decisions rather than absorbed:**
+> 1. **6 human UAT rows** — `241-HUMAN-UAT.md`. ⚠ **Row 5 must run on CLOUD BEFORE migration 176
+>    is applied there**, or it becomes unreproducible forever.
+> 2. **Cloud migration 176** at the next operator-triggered deploy.
+> 3. **The cloud AS-IS recall number** — blocked on a read-capable cloud DSN. Parity itself is
+>    VERIFIED (pgvector **0.8.0** / PG **17.6**, exact parity with local), so `iterative_scan`
+>    **may** be claimed as the remedy.
+> 4. **An independent §6.3 review** — **241 joins 238 and 240** in this queue.
+> 5. **`retrieval_service.py`'s G-5 extraction**, owed since 231. 241 was the deliberate SECOND
+>    landing (11 non-comment lines, fence driven RED at 13); **a third must propose the
+>    extraction first.**
+> 6. **`SEED-266/267/268`** — the `full-schema.sql` ACL + `row_security` findings, the harness's
+>    unproven exact arm, and the Settings screen that can show a breadth not in effect.
+>
+> **Gates at close:** backend **`71 failed / 4491 passed`** — the ceiling exactly, and the failing
+> **SET** diffed identical in both directions, not merely an equal count. Count gate RED on 3-4
+> provably-unmodified SEED-171 flakes. Ledger / CLAUDE.md-size / G-7 all clear.
+
 
 > ## ✅ PHASE 241 — ALL FOUR PLANS SHIPPED. The defect was real, and it is now measured.
 >
