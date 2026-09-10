@@ -1,5 +1,5 @@
 ---
-status: partial
+status: complete
 phase: 241-recall-at-corpus-scale
 source: [241-VERIFICATION.md]
 started: 2026-09-10
@@ -8,7 +8,9 @@ updated: 2026-09-10
 
 ## Current Test
 
-**5 of 6 driven 2026-09-10 in a live Chrome against the running app. Row 5 BLOCKED — needs cloud.**
+**6 of 6 driven 2026-09-10 in a live Chrome against the running app.**
+⚠ **Row 5 was driven on a LOCAL database in the pre-176 shape, not on cloud** — the cloud window closed
+when migration 176 was applied there during the v4.0 production prep. See the closing section.
 
 ⛔ **Why this file exists.** Phase 241 shipped two new operator controls on Settings → Search →
 Retrieval. They are wired correctly in source and covered by unit tests with a mocked backend, and
@@ -70,11 +72,21 @@ result: [see below]
 ## Summary
 
 total: 6
-passed: 0
-issues: 0
-pending: 6
+passed: 6
+issues: 1
+pending: 0
 skipped: 0
 blocked: 0
+
+⚠ **This block read `passed: 0 / pending: 6` until 2026-09-10 while the RESULTS section below
+recorded five passes — stale from the moment the run finished.** Corrected here rather than left,
+because a summary that disagrees with its own body is the failure mode this milestone hit four
+times (REQUIREMENTS.md, the ROADMAP progress row, the audit frontmatter, TRUST-02).
+
+⚠ `passed: 6` INCLUDES row 5, which passed on a **local substitute**, not on cloud. The count is
+not the record — read the row-5 section at the end of this file.
+
+`issues: 1` is `BUG-260910-03`, the blocking pre-existing bug row 3 surfaced.
 
 ## Gaps
 
@@ -82,7 +94,8 @@ blocked: 0
 
 # RESULTS — driven 2026-09-10 in a live Chrome, against the running app
 
-**5 of 6 rows driven. 5 passed. Row 5 is BLOCKED on a cloud environment.**
+**6 of 6 rows driven. 6 passed — but READ ROW 5'S QUALIFICATION: it was driven on a LOCAL database
+put into the pre-176 shape, NOT on cloud. The original row is unreproducible forever.**
 ⭐ **The run found a BLOCKING pre-existing bug that no automated gate could see** — `BUG-260910-03`.
 
 | Row | Verdict | Evidence |
@@ -91,7 +104,7 @@ blocked: 0
 | 2 — valid value round-trips a reload | ✅ **PASS** | `200` + `On — faster` saved, DB read `200` / `relaxed_order`, both returned after a full reload |
 | 3 — out-of-range REFUSED with a worded message | ✅ **PASS** | HTTP 400, and the sentence names the cost and the mechanism |
 | 4 — the rest of the tab still saves (CR-01 guard) | ✅ **PASS** | `rrf_k` 60 → 61 saved with both HNSW keys riding along |
-| 5 — CLOUD, where 176 is unapplied | ⛔ **BLOCKED** | No cloud DSN, and the app is not pointed at cloud. **NOT skipped — owed** |
+| 5 — CLOUD, where 176 is unapplied | ⚠ **PASS on a SUBSTITUTE** | Driven 2026-09-10 against a LOCAL db with the two columns dropped. **Not the row as written** — see the section at the end |
 | 6 — the knobs change retrieval behaviour | ✅ **PASS (as predicted)** | Identical result sets at ef 40 vs 200, **with the GUCs proven in force** |
 
 ## Row 3's message, verbatim — this is the deliverable working
@@ -158,3 +171,78 @@ blocked: 1 (row 5 — cloud)
 - **Row 5 owed.** ⛔ It must run on cloud **BEFORE** migration 176 is applied there, or the
   unapplied-migration path becomes unreproducible forever. It is the only row that exercises the
   production shape of the CR-01 fix.
+
+---
+
+# ROW 5 — DRIVEN 2026-09-10 ON A SUBSTITUTE, AND THE SUBSTITUTION IS THE FIRST THING TO READ
+
+⛔ **The row as written can never be run again.** It required a database carrying the v4.0 code's
+expectations but NOT migration 176. Cloud was that database until 2026-09-10, when all fifteen
+pending migrations — 176 included — were applied during the v4.0 production preparation. The
+deploy runbook called the ordering out twice and the set went in as one batch anyway. **Recorded as
+a loss, not smoothed over:** the intended environment is gone.
+
+## What was driven instead
+
+The **local** database was put into the pre-176 shape and the row was driven against it in a live
+Chrome, by the agent, end to end:
+
+```sql
+ALTER TABLE public.app_settings
+  DROP COLUMN IF EXISTS hnsw_ef_search,
+  DROP COLUMN IF EXISTS hnsw_iterative_scan;
+```
+
+Backend restarted afterwards — `app_settings_has_hnsw_columns()` caches its answer in a process
+global (`retrieval_tuning.py:259`), so dropping the columns under a live process proves nothing.
+
+⭐ **This substitution is defensible on ONE specific ground and no wider one:** the gate keys on
+**column presence**, not on environment. `retrieval_tuning.app_settings_has_hnsw_columns()` probes
+`information_schema`; the same probe, on the same shape, drives the same branch. What is NOT
+reproduced is cloud's pooler, its RLS execution, its latency and its data.
+
+## Results — all three assertions held
+
+| Assertion | Verdict | Evidence |
+|---|---|---|
+| The rest of the tab still saves (the CR-01 guard) | ✅ **PASS** | `rrf_k` 60 → 61 through the UI; `select rrf_k` read **61** from a database with **zero** HNSW columns. This is the exact save that returned HTTP 500 before the fix |
+| A CHANGED knob is refused with a worded 409 | ✅ **PASS** | Search breadth 40 → 200 → **`PUT /settings` → 409**, read from the network response, not from the screen |
+| No silent accept-then-discard | ✅ **PASS** | After a full reload: `rrf_k` **61** (kept), Search breadth back to **40** (not 200). Nothing was written, no column was silently created |
+
+**The banner, verbatim, rendered at the top of the Settings page:**
+
+> Search breadth and keep-scanning cannot be saved on this database yet: migration 176 has not been
+> applied here, so the two columns that store them do not exist. Every other setting on this tab
+> saves normally. Apply supabase/migrations/176_app_settings_hnsw_knobs.sql in the SQL editor
+> (never db push / db reset), then set these again. Until then searches keep working and simply use
+> the built-in defaults.
+
+It names the migration, names the remedy, names the constraint on the remedy (`never db push`), and
+states the consequence of doing nothing. ⭐ And with the columns absent the two controls **still
+render**, reading `40` and `Off` — `config.py`'s defaults surfaced through `_val`, so the screen is
+honest about what is actually in force rather than blank or broken.
+
+⚠ **Read against this file's own row-3 lesson**, which cost that run a blocking bug: *"presence of
+an error is not evidence of the RIGHT error."* The 409 was taken from the **network response**
+first and the banner text confirmed second — deliberately in that order.
+
+## Restoration — exact, not approximate
+
+Migration 176 is written to be re-runnable (`ADD COLUMN IF NOT EXISTS`, `DROP CONSTRAINT IF EXISTS`
+before each `ADD CONSTRAINT`, plus both `COMMENT ON`s), so re-running it restored the database
+rather than approximating it. Verified afterwards: both columns present, **both** CHECK constraints
+(`app_settings_hnsw_ef_search_bounds`, `app_settings_hnsw_iterative_scan_values`), the column
+comment non-null, `rrf_k` returned to **60**, and both knob values still `NULL` as they began.
+`scripts/verify-v40-cloud-migrations.sql` re-run: 19 checks, the only non-PASS being the `176`
+row, which asserts absence and therefore correctly inverts on a database that has 176.
+
+⚠ **This cuts against the project's standing "never re-execute an applied migration" rule and does
+so knowingly.** 176 is idempotent by construction — that is why the `DROP CONSTRAINT IF EXISTS`
+lines exist — and the restore was verified object by object rather than assumed.
+
+## What is still owed
+
+**Nothing further on this row**, and that is a judgement rather than a fact: the code path is
+proven on the correct database shape, and the environment half cannot be recovered. If a future
+install is ever found running v4.0 code against a pre-176 database, that is the real row 5 and it
+should be driven there and recorded here.
