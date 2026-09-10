@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: none
-milestone_name: "between milestones — v4.0 closed 2026-09-10"
-status: milestone_complete
-last_updated: "2026-09-10T14:00:00.000Z"
-last_activity: 2026-09-10
+milestone: v4.1
+milestone_name: "Ship It & Feel It"
+status: planning
+last_updated: "2026-09-11T00:00:00.000Z"
+last_activity: 2026-09-11
 progress:
-  total_phases: 14
-  completed_phases: 14
-  total_plans: 62
-  completed_plans: 62
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -31,9 +31,37 @@ See: `.planning/PROJECT.md` (updated 2026-09-10)
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviors (skills) that persist and can be shared.
 
-**Current focus:** **No milestone active.** v4.0 Connected Knowledge **SHIPPED 2026-09-10** (git tag
-`v4.0`; 14 phases 228-241, 62 plans, 571 commits, 6 days; 33/38 requirements). Next:
-`/gsd:new-milestone`. Phase numbering continues at **242**.
+**Current focus:** **v4.1 Ship It & Feel It** — started 2026-09-11, a deliberate CONSOLIDATION
+milestone (not v5.0: it opens no new capability axis). Ship v4.0 to production, then fix the chat
+surface the operator uses daily. Phase numbering continues at **242**.
+
+## Current Position
+
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-09-11 — Milestone v4.1 started
+
+⚠ **Order is FORCED at the front of this milestone and cannot be re-sequenced for convenience:**
+`BUG-260910-03` (blocking, Settings→Search unsaveable) → **241 UAT row 5 on CLOUD** → migrations
+`153-156, 166-176` in numeric order → production push. Row 5 proves an arm that becomes
+**unreproducible forever** once migration 176 reaches cloud.
+
+⚠ **`OV-SOLO-01` was RULED ON at this milestone's scoping (2026-09-11, operator), not left to
+lapse.** Solo running continues. The substitute for the independent gate: the dispatched
+code-review subagent is **MANDATORY** on any phase touching a trust boundary, and every phase closed
+under it reads **"self-verified"** in its own VERIFICATION.md — never "reviewed".
+
+⚠ **`SURF-03` was RULED ON at the same moment** — its home is the **app shell**, landing in the
+chat-shell phase. It is no longer an open scoping question.
+
+---
+
+## Carried into v4.1 from the v4.0 close
+
+The nine sections below were written at the v4.0 close. **They are the input to this milestone, not
+history** — items 1, 2, 3, 4, 5 and 6 are now scoped into v4.1 phases; items 7, 8 and 9 remain live
+constraints on how it is built.
 
 ---
 

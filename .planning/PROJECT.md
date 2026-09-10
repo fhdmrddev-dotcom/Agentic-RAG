@@ -8,6 +8,96 @@ A RAG-based AI agent platform where users organize documents into nested folders
 
 The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
 
+---
+
+## Current Milestone: v4.1 Ship It & Feel It
+
+**Started:** 2026-09-11. Phase numbering continues at **242**.
+
+**Goal:** v4.0 stops being code that exists and becomes a product in production — and the surface the
+operator actually touches every day stops feeling busier than the bar it is aimed at.
+
+⭐ **This is a CONSOLIDATION milestone, and the version number says so.** It is deliberately **v4.1,
+not v5.0**: it opens no new capability axis. v5.0 is reserved for the next real one (Open Platform /
+inbound — `SEED-013` / `SEED-195`, already named as its own milestone). Precedent: **v3.5 UX
+Consolidation & Chat Polish**, 4 phases between two capability milestones, which worked.
+
+**The reason it comes now rather than a capability milestone:**
+
+1. ⛔ **v4.0 has never deployed.** Cloud is **15 migrations behind** (`153-156`, `166-176`). Building
+   a new capability axis on top of undeployed, unreviewed machinery compounds risk instead of
+   retiring it.
+2. ⛔ **Chat carries 14 open bugs** — the largest single coherent cluster in the reported-bugs
+   register, on the product's primary surface.
+3. ⛔ **A `severity: blocking` bug reported 2026-09-10 makes Settings → Search unsaveable**
+   (`BUG-260910-03`), which means the `QUEUE-06` recall remedy shipped by Phase 241 is **currently
+   unreachable by an operator**. A cliff that cannot be climbed away from is worse than a cliff.
+
+**Target features:**
+
+- **Ship v4.0** — clear the blocking Settings→Search save, drive 241's **expiring** UAT row 5 on
+  cloud *before* migration 176 lands there (after it, the arm it proves is unreproducible forever),
+  apply the 15 migrations in numeric order, push to production with the parity checklist.
+- **The thinking block** — reasoning renders as a calm, structured surface instead of a flat
+  `whitespace-pre-wrap` blob repainted once per token, and it appears on pure-text replies too, not
+  only tool-bearing turns.
+- **The follow-scroll seam** — scrolling up during a tool call leaves you where you scrolled.
+- **The chat shell** — chat scrolls inside chat (not the whole page), a cap-paused run leaves you a
+  usable composer, approvals render in the thread, and a local file can be attached to a message.
+- **The v4.0 verification debt** — 238's 9 credential-blocked rows and 233's 5 G-4 rows driven or
+  explicitly retired with a reason; every phase closed without an independent review says so in its
+  own record.
+- **The recall cliff** — `QUEUE-06` honestly met out of the box, and the Settings screen made unable
+  to display a search breadth that is not in effect.
+
+**Decisions taken at scoping (2026-09-11, operator):**
+- ⭐ **`OV-SOLO-01` continues: solo running, with a named substitute for the independent gate.** The
+  dispatched code-review subagent becomes **mandatory** on any phase touching a trust boundary, and
+  every phase closed under it must read **"self-verified"** in its own VERIFICATION.md, never
+  "reviewed". It is not an independent gate. It is also **not worthless** — on Phase 239 exactly that
+  arrangement returned 19 findings including 2 Criticals, one being a destructive tool bindable as
+  the file *reader* and then called by the watch loop on every file, unattended.
+  `/code-review ultra` stays ruled out on cost.
+- ⭐ **`SURF-03`'s home is the app shell, not the Health tab.** It lands in the chat-shell phase,
+  where the shell is already open. Closing it against the Health tab alone was already recorded as
+  insufficient; this ends that as an open scoping question.
+- **The blocking Settings→Search bug moves ahead of the production push**, so it is not deployed.
+- **Register debt is worked, not swept.** The v4.0 close listed 161 planted seeds and 34 open bugs;
+  this milestone folds the six seeds whose triggers are already true rather than re-deferring them.
+
+**Binding constraints (not aspirations):**
+- ⚠ **G-2 fires on the chat phases** — live UI, "feels like", a stated gold-standard comparison.
+  `/gsd:sketch` before `/gsd:plan-phase`, and the operator-approved mockup is the acceptance bar.
+- ⚠ **Order is forced at the front:** blocking-bug fix → 241 row 5 on cloud → migrations → push.
+  Row 5 dies the moment migration 176 reaches cloud, so it cannot be re-sequenced for convenience.
+- ⚠ **The chat files are hot but no longer un-enterable** — Phase 227 discharged G-5 on
+  `MessageItem.tsx` and `ToolCallPanel.tsx`. `StreamsProvider.tsx` and `MessageList.tsx` still carry
+  their rows; read `docs/HOT-FILE-LEDGER.md` before planning either.
+- ⚠ **A bug report is a CLAIM about code, not the code.** `BUG-260718-02`'s part B was already fixed
+  and the report still read `open` — found by opening `MessageItem.tsx:470`, not by reading the
+  register. Drive every inherited claim before planning against it.
+- ⚠ **`retrieval_service.py`'s G-5 extraction, owed since 231, is at its THIRD landing** if the
+  recall phase touches it — the extraction must be proposed FIRST.
+
+**Seeds folded (6):** `045` (UI/UX polish umbrella — its trigger is *"a dedicated UI/UX polish
+milestone is scoped"*) · `029` (Continue-on-cap — the fix for `BUG-260904-05`, not a separate idea) ·
+`032` (reasoning real-time UI parity) · `042` (ephemeral file attach — half of `BUG-260905-01`) ·
+`268` (a shown breadth that is not in effect) · `049` (E2E revival — its trigger names *"a
+chat-surface / streaming / RunCard phase"* verbatim).
+
+**Deferred with triggers intact:** `SEED-013` / `SEED-195` (Open Platform — **this is v5.0**) ·
+`SEED-211`'s BUILD (metadata-derived permissions) · `SEED-224` (document-space redesign) ·
+`SEED-265` / `266` / `267` (the v4.0 recall-harness residue) · `SEED-004` (org / department /
+role multi-tenancy — ⚠ department access has been owed since Phase 231).
+
+**Known shape-risk, stated at scoping rather than discovered later:** **a consolidation milestone has
+no natural stopping point.** Every register it opens contains more than it can close, and the failure
+mode is Phase 235's — 17 plans for 4-6 plans of substance. **G-8 is the governor here more than on any
+capability milestone:** 3-5 plans per phase, and a bug that is ≤ 1 file / ≤ 10 lines is `/gsd:fast`
+under G-3, never a plan.
+
+---
+
 ## Last Shipped: v4.0 Connected Knowledge (2026-09-10)
 
 > ✅ **SHIPPED 2026-09-10, git tag `v4.0`.** 14 phases (228-241, no inserts), 62 plans, 571 commits,
