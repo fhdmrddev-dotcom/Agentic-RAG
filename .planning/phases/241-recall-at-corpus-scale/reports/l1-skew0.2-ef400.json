@@ -1,0 +1,784 @@
+{
+  "dsn": {
+    "host": "127.0.0.1",
+    "port": 54322,
+    "database": "recall_bench"
+  },
+  "user_id": "a0136ccf-2612-422a-b6d2-f458b1eeb58c",
+  "k": 20,
+  "match_threshold": 0.3,
+  "embedding_model": "text-embedding-3-small",
+  "requested": {
+    "ef_search": 400,
+    "iterative_scan": null
+  },
+  "layer1": {
+    "query_vector_sample": 25,
+    "query_vector_seed": "241",
+    "shapes": [
+      {
+        "shape": "none",
+        "description": "baseline \u2014 metadata_filter and p_folder_ids both NULL",
+        "k": 20,
+        "query_vectors": 25,
+        "scored_vectors": 25,
+        "recall_at_k": 1.0,
+        "underfill": 0.0,
+        "per_vector": [
+          {
+            "index": 0,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 1,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 2,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 3,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 4,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 5,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 6,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 7,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 8,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 9,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 10,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 11,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 12,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 13,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 14,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 15,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 16,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 17,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 18,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 19,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 20,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 21,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 22,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 23,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 24,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          }
+        ],
+        "elapsed_seconds": 62.781
+      },
+      {
+        "shape": "folder",
+        "description": "p_folder_ids bound to one real folder id",
+        "k": 20,
+        "query_vectors": 25,
+        "scored_vectors": 25,
+        "recall_at_k": 1.0,
+        "underfill": 0.0,
+        "per_vector": [
+          {
+            "index": 0,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 1,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 2,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 3,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 4,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 5,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 6,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 7,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 8,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 9,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 10,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 11,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 12,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 13,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 14,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 15,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 16,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 17,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 18,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 19,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 20,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 21,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 22,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 23,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 24,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          }
+        ],
+        "elapsed_seconds": 24.625
+      },
+      {
+        "shape": "metadata",
+        "description": "metadata @> {document_type: <a live value>}",
+        "k": 20,
+        "query_vectors": 25,
+        "scored_vectors": 25,
+        "recall_at_k": 1.0,
+        "underfill": 0.0,
+        "per_vector": [
+          {
+            "index": 0,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 1,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 2,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 3,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 4,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 5,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 6,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 7,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 8,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 9,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 10,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 11,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 12,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 13,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 14,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 15,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 16,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 17,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 18,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 19,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 20,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 21,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 22,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 23,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 24,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          }
+        ],
+        "elapsed_seconds": 30.75
+      },
+      {
+        "shape": "source_system",
+        "description": "metadata @> {source: {system: <a live value>}} \u2014 nested jsonb containment",
+        "k": 20,
+        "query_vectors": 25,
+        "scored_vectors": 25,
+        "recall_at_k": 1.0,
+        "underfill": 0.0,
+        "per_vector": [
+          {
+            "index": 0,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 1,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 2,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 3,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 4,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 5,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 6,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 7,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 8,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 9,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 10,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 11,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 12,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 13,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 14,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 15,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 16,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 17,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 18,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 19,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 20,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 21,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 22,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 23,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 24,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          }
+        ],
+        "elapsed_seconds": 31.266
+      }
+    ]
+  },
+  "layer2": null,
+  "server": {
+    "postgresql_version": "17.6",
+    "pgvector_version": "0.8.0",
+    "hnsw_ef_search": null,
+    "hnsw_iterative_scan": null
+  },
+  "corpus": {
+    "documents_visible": 800,
+    "documents_latest": 760,
+    "chunks_visible": 20000
+  },
+  "elapsed_seconds": 150.703,
+  "label": "l1-skew0.2-ef400",
+  "measured_at": "2026-09-10T04:45:49.526540+00:00"
+}
