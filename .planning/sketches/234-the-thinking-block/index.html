@@ -214,6 +214,9 @@ body{
         <div class="toolrow"><span class="ok">✓</span><span class="nm">fetch_document_file</span><span class="sep">·</span><span class="res">2025-1042S.pdf</span></div>
         <div class="toolrow"><span class="ok">✓</span><span class="nm">execute_code</span><span class="sep">·</span><span class="res">withholding_sum.py</span></div>
       </div>
+      <!-- ⚠ Drawn OPEN here only to show what the body looks like. Today's real
+           default is also FOLDED (`RunCard.tsx:91` useState(false)) — the fold
+           default is not what V1 changes; the body and the streaming state are. -->
       <div class="think open" data-think="today">
         <button class="foldbtn" data-line="today"><span class="fold-trigger"><span class="chev">▶</span><span>Thinking</span></span></button>
         <div class="think-panel"><div class="today-reasoning" data-slot="today"></div></div>
@@ -269,6 +272,7 @@ body{
       <tr><td><b>The body</b></td><td><code>RunCard.tsx:501</code> loses four classes: <span class="del">font-mono</span> <span class="del">whitespace-pre-wrap</span> <span class="del">max-h-64</span> <span class="del">overflow-y-auto</span>, and <code>text-xs</code> → <span class="add">text-sm</span>. The <code>border-l-2</code> rule and <code>ml-3</code> stay. That is the whole visual change.</td></tr>
       <tr><td><b>The answer</b></td><td>Renders <b>live, below the finished thinking line</b>, with a caret at the edge. Today it is trapped inside <code>StreamingNarration</code> until the run ends.</td></tr>
       <tr><td><b>The tool rows</b></td><td><b>Untouched.</b> Not restyled, not re-ordered, not re-labelled.</td></tr>
+      <tr><td><b>The fold default</b></td><td><b>Unchanged, and deliberately so — folded, at rest AND while streaming.</b> The shipped default is already <code>useState(false)</code> (<code>RunCard.tsx:91</code>), and <code>FoldTrigger.tsx</code>'s own comment protects it: flipping it <i>"would be a regression dressed as consistency"</i>. ⚠ Auto-expanding during the stream would have flipped it in effect — so it does not. Reasoning accumulates <b>behind a closed fold</b>; the line says the model is thinking and nothing more. Open it mid-stream and the text keeps arriving underneath.</td></tr>
     </table>
     <div class="hd">Press ▶ Replay the stream — this is the criterion</div>
     Watch three things at once: the <b>fold control does not churn</b> while reasoning streams (that is CHAT-02's coalesced cadence — today every token repaints it); the thinking line <b>settles to "Thought for N seconds" and goes quiet</b>; and the answer <b>keeps writing underneath it</b>. Those three coexisting in one reply is the acceptance bar.
@@ -384,8 +388,16 @@ document.getElementById("streamBtn").addEventListener("click", () => {
   const av    = document.querySelector('[data-av="v1"]');
   const more  = document.querySelector('[data-more="v1"]');
 
+  /* ⚠ FOLDED BY DEFAULT — including WHILE STREAMING (operator, 2026-09-11).
+     The reasoning accumulates behind a closed fold; the line says it is
+     thinking and nothing more. Opening it mid-stream is the user's choice,
+     and if they do, the text below keeps arriving. This matches the shipped
+     default (`RunCard.tsx:91` useState(false)) which FoldTrigger.tsx's own
+     comment protects: flipping it "would be a regression dressed as
+     consistency". Auto-expanding on stream would have flipped it in effect. */
   av.classList.add("live");
-  think.classList.add("open", "live");
+  think.classList.remove("open");          // stays folded — never auto-opens
+  think.classList.add("live");
   lbl.innerHTML = 'Thinking<span class="dots"><i></i><i></i><i></i></span>';
   slot.classList.remove("clamped"); more.style.display = "none";
   slot.innerHTML = ""; ans.innerHTML = "";

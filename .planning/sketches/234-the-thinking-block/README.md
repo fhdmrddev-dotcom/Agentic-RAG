@@ -115,6 +115,7 @@ V1 wins because it **adds nothing and invents nothing** — the model's own pros
 | **Long reasoning** | clamp + "Show all of it", reusing the **shipped sketch-050 pattern**, not a second mechanism. Below ~700 chars the control removes itself rather than sitting inert |
 | **Answer** | renders live below the settled thinking line instead of inside `StreamingNarration` |
 | **Tool rows** | untouched |
+| **Fold default** | **unchanged — folded, at rest AND while streaming** (operator, 2026-09-11). Shipped default is already `useState(false)` (`RunCard.tsx:91`), and `FoldTrigger.tsx`'s comment protects it: flipping it *"would be a regression dressed as consistency"*. ⚠ Auto-expanding during the stream would have flipped it in effect — so it does not |
 
 ## The acceptance criterion
 
@@ -123,6 +124,8 @@ Press **▶ Replay the stream**. Three things must be true *simultaneously* in o
 1. The fold control **does not churn** while reasoning streams — CHAT-02's coalesced cadence.
    Today every token repaints it *and* fires a smooth `scrollIntoView` (`MessageList.tsx:171`).
 2. It **settles to "Thought for N seconds" and goes quiet** — CHAT-01.
+   ⚠ And it **stays folded throughout** — reasoning accumulates behind a closed fold. Open it
+   mid-stream and the text keeps arriving underneath; that is the user's choice, never the default.
 3. The **answer keeps writing underneath it**, caret at the edge — CHAT-05.
 
 Then switch **Scale** to `max 33,713` and confirm the tail is still readable, and to `median 198`
