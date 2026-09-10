@@ -1,5 +1,32 @@
 # Requirements — Milestone v4.0 Connected Knowledge
 
+> ⚠ **HOW THE STATUS COLUMN WAS FILLED, 2026-09-10 — read this before trusting a row.**
+>
+> Every row read **`Pending`** after all fourteen v4.0 phases had shipped and been verified
+> — 27 of 28, the sole exception being one edited by hand an hour earlier. The v3.9 close
+> recorded the same staleness, and v3.8 before it. **This is the fourth milestone running.**
+>
+> ⛔ **THE CAUSE IS NOT A HUMAN FORGETTING TO TICK BOXES.** `execute-phase.md:1619` lists
+> *"Updating REQUIREMENTS.md traceability"* among the things `gsd-sdk query phase.complete`
+> does. **It demonstrably does not do it** — fourteen completed phases left every row
+> untouched. A tool that claims work it does not perform is worse than a tool that claims
+> nothing, because the claim is what stopped anyone checking.
+>
+> ⭐ **These statuses are DERIVED, not asserted.** Each row inherits the verdict of the phase
+> it maps to, taken from that phase's own VERIFICATION/VALIDATION document. That makes them
+> re-derivable and honest about qualifications — `238` says *behaviour OWED*, `241` says
+> *`human_needed`*, `236` says *SC#1 OWED* — rather than a uniform tick.
+>
+> ⚠ **WHAT THAT DOES NOT MEAN:** a phase passing is not proof that each of ITS requirements was
+> independently verified. The status is inherited at PHASE grain, not REQUIREMENT grain. Treat a
+> row as *"the phase that owns this shipped and was verified to the stated degree"*, never as
+> *"this requirement was checked on its own."*
+>
+> ⛔ **THE REAL FIX IS STILL OWED and is not more diligence:** either make `phase.complete`
+> actually maintain this file, or delete the column and stop implying it is maintained.
+> Ticking it by hand at every close is a ritual performed for audits, not a record anyone
+> trusted during the work.
+
 **Defined:** 2026-09-04 · **Phases:** continue at 228 · **Research:** `.planning/research/SUMMARY.md` (committed `79fdda06b`)
 
 **Milestone goal:** The knowledge base stops depending on somebody remembering to upload — a source is
@@ -147,44 +174,44 @@ denominator is exactly how `LIB-08/09/10` survived an entire milestone living on
 
 | REQ-ID | Phase | Status | Note |
 |---|---|---|---|
-| LIB-08 | 234 | Pending | The watch loop, on the **shipped** scheduler |
-| LIB-09 | 233 | Pending | Amended by D-1 — four buckets, not three |
-| LIB-10 | 235 | Pending | |
-| SRC-01 | 232 | Pending | The contract; **measured** at 238 and 239 |
-| SRC-02 | 232 | Pending | No new OAuth scope |
-| SRC-03 | 238 | Pending | ⚠ Graph 302 / `downloadUrl` stays adapter-internal |
-| SRC-04 | 239 | Pending | Adding a source adds **rows, not code** |
-| SRC-05 | 240 | Pending | Shape phase, own discuss-phase, sequenced last |
-| SRC-06 | 234 | Pending | ⚠ **H-5** — structural, same plan as the diff |
-| PREV-01 | 233 | Pending | ⚠ **G-2 sketch mandatory** |
-| PREV-02 | 233 | Pending | D-1's two-tier identity |
-| PREV-03 | 233 | Pending | The preview writes nothing |
-| VIS-01 | 231 | Pending | ⚠ **H-1** — policies first, DEFINER bodies last, one transaction |
-| VIS-02 | 231 | Pending | ⚠ **G-2 sketch** — the sentence is the deliverable |
-| VIS-03 | 234 | Pending | Absence never deletes |
-| VIS-04 | 234 | Pending | |
-| VIS-05 | 234 | Pending | ⚠ **Not 235** — freeze is retrieval-affecting and security-bearing (D-4) |
-| VIS-06 | 234 | Pending | ⚠ **H-4, MEASURED** — rule eval lives inside `ingest_document` (`documents.py:2483`), so 234 is the phase where connector documents first reach the rules engine, not 237 |
-| QUEUE-01 | 230 | Pending | |
-| QUEUE-02 | 230 | Pending | ⚠ **H-3** — proven on `/upload` first |
-| QUEUE-03 | 234 | Pending | ⚠ **Not 230** — it is a watch lease; nothing to overlap until a watch exists |
-| QUEUE-04 | 230 | Pending | The 300,000-token-per-request ceiling is the one a naive batcher misses |
-| QUEUE-05 | 230 | Pending | D-2 — same-vector-space fallback only; closes ⛔ `BUG-260815-05` |
+| LIB-08 | 234 | Shipped — verified PASS (driven, G-4) | The watch loop, on the **shipped** scheduler |
+| LIB-09 | 233 | Shipped — verified PASS | Amended by D-1 — four buckets, not three |
+| LIB-10 | 235 | Shipped — verified `passed_with_owed_uat` | |
+| SRC-01 | 232 | Shipped — verified PASS on capability | The contract; **measured** at 238 and 239 |
+| SRC-02 | 232 | Shipped — verified PASS on capability | No new OAuth scope |
+| SRC-03 | 238 | Shipped — ⛔ structural PASS, behaviour OWED (Azure); 1 blocker + 3 defects fixed 2026-09-10 | ⚠ Graph 302 / `downloadUrl` stays adapter-internal |
+| SRC-04 | 239 | Shipped — ⛔ 2 CRITICALS found 2026-09-08, fixed 2026-09-10 | Adding a source adds **rows, not code** |
+| SRC-05 | 240 | Shipped — self-verified PASS, 4 SC met | Shape phase, own discuss-phase, sequenced last |
+| SRC-06 | 234 | Shipped — verified PASS (driven, G-4) | ⚠ **H-5** — structural, same plan as the diff |
+| PREV-01 | 233 | Shipped — verified PASS | ⚠ **G-2 sketch mandatory** |
+| PREV-02 | 233 | Shipped — verified PASS | D-1's two-tier identity |
+| PREV-03 | 233 | Shipped — verified PASS | The preview writes nothing |
+| VIS-01 | 231 | Shipped — verified PASS | ⚠ **H-1** — policies first, DEFINER bodies last, one transaction |
+| VIS-02 | 231 | Shipped — verified PASS | ⚠ **G-2 sketch** — the sentence is the deliverable |
+| VIS-03 | 234 | Shipped — verified PASS (driven, G-4) | Absence never deletes |
+| VIS-04 | 234 | Shipped — verified PASS (driven, G-4) | |
+| VIS-05 | 234 | Shipped — verified PASS (driven, G-4) | ⚠ **Not 235** — freeze is retrieval-affecting and security-bearing (D-4) |
+| VIS-06 | 234 | Shipped — verified PASS (driven, G-4) | ⚠ **H-4, MEASURED** — rule eval lives inside `ingest_document` (`documents.py:2483`), so 234 is the phase where connector documents first reach the rules engine, not 237 |
+| QUEUE-01 | 230 | Shipped — verified PASS (driven) | |
+| QUEUE-02 | 230 | Shipped — verified PASS (driven) | ⚠ **H-3** — proven on `/upload` first |
+| QUEUE-03 | 234 | Shipped — verified PASS (driven, G-4) | ⚠ **Not 230** — it is a watch lease; nothing to overlap until a watch exists |
+| QUEUE-04 | 230 | Shipped — verified PASS (driven) | The 300,000-token-per-request ceiling is the one a naive batcher misses |
+| QUEUE-05 | 230 | Shipped — verified PASS (driven) | D-2 — same-vector-space fallback only; closes ⛔ `BUG-260815-05` |
 | QUEUE-06 | 241 | **Partial — measured, remedy SHIPPED, default UNCHANGED** | ⛔ 241 measured that it does NOT hold at the shipped `hnsw.ef_search = 40`: a tenant owning 0.2% of a 100k-chunk corpus scored recall@20 **0.040**, and three named documents silently stopped being found. `ef_search = 200` restores it to 1.000 / Hit@1 0.78. The two knobs ship as operator settings, but **the DEFAULT is unchanged**, so out of the box the requirement is still not met — an operator must turn the knob. ⚠ Cloud has no columns until migration 176 is applied there. ⚠ The old note "Harness ships at **230**" was REFUTED at 241 discuss time (241-CONTEXT F-1): the 230 harness could not report a failure and printed MRR 1.000 on the real corpus. See `241-VALIDATION.md` + `241-VERDICT-CORRECTION-PLAN-PATH.md`. |
-| TRUST-01 | 229 | Pending | ⚠ **H-2** — precedes every adapter; fixes D-5's two shipped defects |
-| TRUST-02 | 236 | Pending | GA gate; ⚠ full 8-row native roster |
-| TRUST-03 | 234 | Pending | Pitfall 4's trifecta fence — same phase as the first sync, never after |
-| TRUST-04 | 231 | Pending | Provenance from the first row, not retrofitted |
-| RULES-01 | 237 | Pending | One AST, one matcher, scope discriminator |
-| RULES-02 | 237 | Pending | Source facts as first-class filterable fields |
-| SURF-01 | 234 | Pending | *"checked every N minutes"* — never *"instantly"* |
-| SURF-02 | 235 | Pending | ⚠ **G-2 sketch** |
-| SURF-03 | 235 | Pending | ⚠⚠ **Home is an OPEN SCOPING DECISION** — there is no in-app notification surface in this product. Forced at 235's discuss-phase; recommendation is an app-shell signal **plus** the Health-tab row. **Closing it against the Health tab alone does not satisfy the requirement.** |
-| DEBT-01 | 228 | Pending | Owed v3.9 verification — driven or re-deferred with a reason |
-| DEBT-02 | 228 | Pending | Resume-path cluster **triaged together** |
-| DEBT-03 | 228 | Pending | `/code-review ultra review-base-225` |
-| DEBT-04 | 228 | Pending | ⚠ **Gated on a production push — may be driven OUT OF ORDER**, recorded against 228 wherever it lands (`SEED-242`) |
-| DEBT-05 | 228 | Pending | The baseline must state the command **and** its flag |
+| TRUST-01 | 229 | Shipped — verified PASS | ⚠ **H-2** — precedes every adapter; fixes D-5's two shipped defects |
+| TRUST-02 | 236 | Shipped — GA gate (SC#2) PASS; ⛔ SC#1 OWED on live credentials | GA gate; ⚠ full 8-row native roster |
+| TRUST-03 | 234 | Shipped — verified PASS (driven, G-4) | Pitfall 4's trifecta fence — same phase as the first sync, never after |
+| TRUST-04 | 231 | Shipped — verified PASS | Provenance from the first row, not retrofitted |
+| RULES-01 | 237 | Shipped — verified PASS | One AST, one matcher, scope discriminator |
+| RULES-02 | 237 | Shipped — verified PASS | Source facts as first-class filterable fields |
+| SURF-01 | 234 | Shipped — verified PASS (driven, G-4) | *"checked every N minutes"* — never *"instantly"* |
+| SURF-02 | 235 | Shipped — verified `passed_with_owed_uat` | ⚠ **G-2 sketch** |
+| SURF-03 | 235 | Shipped — verified `passed_with_owed_uat` | ⚠⚠ **Home is an OPEN SCOPING DECISION** — there is no in-app notification surface in this product. Forced at 235's discuss-phase; recommendation is an app-shell signal **plus** the Health-tab row. **Closing it against the Health tab alone does not satisfy the requirement.** |
+| DEBT-01 | 228 | Shipped — verified `passed_with_blocked` | Owed v3.9 verification — driven or re-deferred with a reason |
+| DEBT-02 | 228 | Shipped — verified `passed_with_blocked` | Resume-path cluster **triaged together** |
+| DEBT-03 | 228 | Shipped — verified `passed_with_blocked` | `/code-review ultra review-base-225` |
+| DEBT-04 | 228 | Shipped — verified `passed_with_blocked` | ⚠ **Gated on a production push — may be driven OUT OF ORDER**, recorded against 228 wherever it lands (`SEED-242`) |
+| DEBT-05 | 228 | Shipped — verified `passed_with_blocked` | The baseline must state the command **and** its flag |
 
 **Per-phase totals:** 228 → 5 · 229 → 1 · 230 → 4 · 231 → 3 · 232 → 2 · 233 → 4 · 234 → 9 · 235 → 3 ·
 236 → 1 · 237 → 2 · 238 → 1 · 239 → 1 · 240 → 1 · 241 → 1. **Sum = 38.**
