@@ -109,6 +109,31 @@ swap in without a migration this phase declares none of (D-243-13).
 
 ⇒ **L-6 passes with that one difference declared.** Any OTHER difference is drift.
 
+### ⚠⚠ SECOND DECLARED DIFFERENCE — criterion 1's words *"structured timeline"* are PRE-SKETCH LANGUAGE, and the operator rejected exactly that
+
+The ROADMAP criterion reads: *"expanding it gives a **structured timeline** rather than a flat wall."*
+**That wording predates the sketch it defers to**, and the sketch settled the question the other way.
+
+Sketch 234's record (`README.md` §*Variants*, §*WINNER*), operator 2026-09-11:
+
+| | Verdict |
+|---|---|
+| first pass — *A Prose · **B Timeline** · C Always-inline* | **superseded** — *"I do not see a difference between"* them; at the median 198 chars they were three containers around one sentence |
+| Stitch **V2 Segmented** (mono labels per block — `problem-framing`, `raft-semantics`) | ⛔ **REJECTED** — *"The labels are ours, not the model's"*; printing the derivation is forbidden by the standing mindset rule |
+| Stitch **V3 Beats** (four one-line bullets) | ⛔ **REJECTED** — shortest, but it *"discards the model's actual words"* |
+| **V1 Thin rule** | ⭐ **WINS — it *"adds nothing and invents nothing"*: the model's own prose, made readable** |
+
+⇒ **V1's paragraph structure IS the "structure" criterion 1 asks for** — real `<p>` elements
+(`index.html:332`, `ps.map(p => <p>)`) plus the clamp, replacing today's single
+`whitespace-pre-wrap font-mono` blob. **A literal timeline — per-block labels, beats, a step rail —
+is an explicit operator rejection and must NOT be built.**
+
+⛔ **A verifier scoring criterion 1 against the phrase *"structured timeline"* rather than against
+`index.html` scores it wrong.** The file is the bar; the ROADMAP sentence is the question that led
+to it. Carry this paragraph into `243-VERIFICATION.md` verbatim — the same treatment D-243-13 gets,
+and for the same reason: **a declared difference from the bar is a decision, an undeclared one is
+drift.**
+
 ---
 
 ## Rows added by this phase's plans — newly checkable, and named

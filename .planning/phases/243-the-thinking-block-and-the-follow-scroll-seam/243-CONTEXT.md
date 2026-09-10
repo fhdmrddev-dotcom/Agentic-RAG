@@ -394,6 +394,24 @@ See `243-BASELINE.md`. `total 7940 · failed 2 · pinned total 7170`, both failu
 criterion here.** Criteria are written as a **set diff** against that file plus the explicitly-run
 in-scope suites.
 
+### D-243-19 — ⚠ THREE base SHAs are in play. Quote the right one.
+
+| | SHA | What it is |
+|---|---|---|
+| `243-BASELINE.md`'s gate measurement | `96adfd668` | the tree the `failed 2` was measured on |
+| the plans' file:line triage | `149360176` | CONTEXT + PATTERNS committed |
+| **the execution base** | **the phase's first plan commit** | what an executor's worktree asserts |
+
+**Harmless in effect — verified, not assumed: `96adfd668..HEAD` touches `.planning/` only**, so no
+frontend line number and no gate figure has moved. ⚠ **But a SUMMARY that quotes the wrong one turns
+a correct measurement into an unverifiable claim**, which is this milestone's own recurring finding.
+State which SHA a figure was measured on, every time.
+
+⚠ **A sibling session is committing to `develop` concurrently** (Phase 242 — e.g. `e424fd5d1`
+*"fix(security): report anon write access to production app_settings"*). Those commits are
+backend/docs and do not move this phase's frontend baseline, **but an executor must assert its own
+base SHA rather than assume `develop`'s tip is what it planned against.**
+
 ## Non-goals — explicit scope fences
 
 | Not in this phase | Why |
