@@ -5,6 +5,17 @@
 
 ---
 
+> ⚠ **READ `241-VERDICT-CORRECTION-PLAN-PATH.md` ALONGSIDE THIS DOCUMENT.** A post-verdict
+> measurement found that the "control — real database" rows below were executed on a
+> **sequential scan**, not on the HNSW index: `document_chunks_embedding_idx` has `idx_scan = 0`
+> for the life of that database. The before/after therefore differs in corpus size **and** in
+> execution plan. The finding is not overturned — it is sharpened, because the degradation is a
+> **plan-change cliff rather than a slope** — but the two rows must not be described as differing
+> only in size. That file also records `241-REVIEW.md` **WR-02 as OPEN**: the per-shape
+> `recall_at_k = 1.000` readings in SC#2 are not yet proven, because the test that would prove
+> them is blind on a corpus this size.
+
+
 ## ⛔ THIS IS A SELF-VERIFICATION, NOT AN INDEPENDENT REVIEW
 
 **Claude planned this phase, built all four plans, and measured the result. Claude is also the
