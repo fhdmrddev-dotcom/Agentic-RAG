@@ -11,6 +11,7 @@ from app.config import settings
 from app.dependencies import get_user_pg_connection
 from app.services.openai_service import embed_texts
 from app.services.rerank_service import rerank
+from app.services.retrieval_tuning import apply_hnsw_session_knobs
 from app.utils.db import aexec
 
 if TYPE_CHECKING:
@@ -34,7 +35,13 @@ def _vector_literal(embedding: list[float]) -> str:
     return "[" + ",".join(repr(float(x)) for x in embedding) + "]"
 
 
-async def _call_as_user(user_id: str, fn_sql: str, *args) -> list[dict]:
+async def _call_as_user(
+    user_id: str,
+    fn_sql: str,
+    *args,
+    hnsw_ef_search: int | None = None,
+    hnsw_iterative_scan: str | None = None,
+) -> list[dict]:
     """Run a retrieval RPC (or any SELECT) over the Phase-163 asyncpg user-context (D-164-02).
 
     Opens ``get_user_pg_connection(None, {"id": user_id})`` — the uid-synthesized
@@ -46,8 +53,27 @@ async def _call_as_user(user_id: str, fn_sql: str, *args) -> list[dict]:
     stay str-keyed exactly like the PostgREST JSON, keeping ``_rrf_fuse`` / enrich lookups
     byte-compatible). Fail-closed: on a service-role/owner connection ``auth.uid()`` is NULL
     → empty org set → 0 rows.
+
+    Phase 241 (QUEUE-06 / D-10 / D-11) — the two optional HNSW knobs ride the transaction this
+    context manager ALREADY opens, so the COMMIT that already happens auto-reverts every
+    ``SET LOCAL`` and a scan budget cannot leak to the next borrower of the pooled connection.
+    No new plumbing; absent both knobs this function is byte-identical to the shipped one.
+
+    ⛔ **G-5 — READ THIS BEFORE ADDING ANYTHING ELSE HERE.** This file's extraction has been
+    **OWED since Phase 231** and this landing does NOT discharge it. It is the SECOND milestone
+    landing, permitted because the ROADMAP forbids a *third* without proposing the extraction
+    first — so a THIRD must propose that extraction before it adds behaviour. The knob LOGIC
+    (validation, the `set_config` statements, the degrade-not-fail arms, the hardcoded memory
+    companions) deliberately lives in ``app/services/retrieval_tuning.py`` precisely so this
+    file's delta stays a call and its arguments. Do not move it back, and do not edit the ledger
+    row to say the obligation was met: ``docs/HOT-FILE-LEDGER.md`` still reads
+    *extraction still OWED*.
     """
     async with get_user_pg_connection(None, {"id": user_id}) as conn:
+        if hnsw_ef_search is not None or hnsw_iterative_scan is not None:
+            await apply_hnsw_session_knobs(
+                conn, ef_search=hnsw_ef_search, iterative_scan=hnsw_iterative_scan
+            )
         rows = await conn.fetch(fn_sql, *args)
     return [dict(r) for r in rows]
 
@@ -94,6 +120,13 @@ async def _vector_search(
         metadata_filter if metadata_filter else None,
         folder_ids if folder_ids else None,
         current_model,
+        # Phase 241 (D-09 / D-11) — the ONLY caller that passes these: HNSW is the vector
+        # index, so `_keyword_search` below deliberately carries nothing. Resolved in the
+        # shipped `user_settings.x if user_settings else settings.x` idiom used at :365-372.
+        hnsw_ef_search=(user_settings.hnsw_ef_search if user_settings else settings.hnsw_ef_search),
+        hnsw_iterative_scan=(
+            user_settings.hnsw_iterative_scan if user_settings else settings.hnsw_iterative_scan
+        ),
     )
 
 
@@ -158,10 +191,33 @@ async def _enrich_with_filenames(rows: list[dict], supabase: Client) -> list[dic
     doc_ids = list({row["document_id"] for row in rows})
     docs_result = await aexec(
         supabase.table("documents")
-        .select("id, filename, metadata, version_number, folder_id")
+        # Phase 231 TRUST-04 — `source_connection_id` joins the same additive projection
+        # `folder_id` uses. It is the fact that distinguishes machine-placed knowledge from
+        # knowledge somebody chose to upload, and a citation cannot carry what the read omits.
+        .select("id, filename, metadata, version_number, folder_id, source_connection_id")
         .in_("id", doc_ids)
     )
     doc_map = {doc["id"]: doc for doc in (docs_result.data or [])}
+
+    # Phase 231 TRUST-04 — resolve connection NAMES, not ids: "placed by Google Drive" is the
+    # fact a reader can act on; a uuid is not.
+    # ⚠ ONE extra query, and ONLY when a hit actually came from a connection. In a corpus with
+    #   no connections — every corpus today — this costs nothing and the shape is unchanged.
+    # ⚠ A name that cannot be resolved (deleted connection, or one this reader may not see) is
+    #   left as None and the surface says "a connection" rather than inventing one. D-4 sets
+    #   source_connection_id to NULL on delete, so an unresolved id is a real state, not an error.
+    conn_ids = list({
+        doc.get("source_connection_id")
+        for doc in doc_map.values()
+        if doc.get("source_connection_id")
+    })
+    conn_names: dict[str, str] = {}
+    if conn_ids:
+        conn_result = await aexec(
+            supabase.table("connector_connections").select("id, name").in_("id", conn_ids)
+        )
+        conn_names = {c["id"]: c.get("name") or "" for c in (conn_result.data or [])}
+
     enriched = []
     for row in rows:
         doc = doc_map.get(row["document_id"], {})
@@ -175,6 +231,10 @@ async def _enrich_with_filenames(rows: list[dict], supabase: Client) -> list[dic
             # Phase 098 GOV-01 — additive folder_id for the post-query ⊆ scope clip
             # (Deep-inert: Deep consumers never read it; the return shape is unchanged).
             "folder_id": doc.get("folder_id"),
+            # Phase 231 TRUST-04 — provenance travels with the hit, so the citation built
+            # downstream carries the same fact the Library shows.
+            "source_connection_id": doc.get("source_connection_id"),
+            "source_connection_name": conn_names.get(doc.get("source_connection_id") or ""),
         }
         if doc.get("metadata"):
             entry["metadata"] = doc["metadata"]
@@ -254,9 +314,24 @@ async def fetch_full_document(document_id: str, user_id: str, supabase: Client) 
     raw content, so either path produces clean text — but `full_markdown` avoids
     any repeated context headers if the chunk storage format ever changes.
     """
+    # Phase 231 TRUST-04 — `source_connection_id` must be SELECTED here or the citation this
+    # function feeds carries a key that is always None: a field written and never readable, which
+    # is the same shape as Phase 230's `claimed_at` before its sweeper existed.
+    #
+    # ⚠ FINDING, DELIBERATELY NOT ACTED ON IN THIS PHASE — this read is OWNER-SCOPED
+    #   (`.eq("user_id", user_id)`), so it is a FIFTH retrieval path and it does NOT honour the
+    #   connection-scoped predicate the four sites now share. Consequence: a second org member
+    #   can find an org-visible connection document through search, but `analyze_document` on it
+    #   returns nothing.
+    #   ✅ It fails CLOSED — narrower than the new rule, never wider — which is why it is a
+    #      usability gap and not a leak, and why widening it is not urgent.
+    #   ⛔ It is NOT widened here on purpose: the four sites moved together inside ONE transaction
+    #      precisely so no fifth definition of "who may read this" could drift from them. Adding a
+    #      fifth in Python, in a different commit, is the exact hazard H-1 is written against.
+    #      Routed to the reviewer as a decision, not silently taken.
     doc_result = await aexec(
         supabase.table("documents")
-        .select("id, filename, metadata, version_number, full_markdown")
+        .select("id, filename, metadata, version_number, full_markdown, source_connection_id")
         .eq("id", document_id)
         .eq("user_id", user_id)
         .single()
@@ -278,11 +353,30 @@ async def fetch_full_document(document_id: str, user_id: str, supabase: Client) 
         )
         full_text = "\n\n".join(c["content"] for c in (chunks_result.data or []))
 
+    # Phase 231 TRUST-04 — resolve the connection's NAME here too, so the full-document citation
+    # says the same thing as a search-hit citation. ⚠ ONE query, and only when this document
+    # actually came from a connection.
+    source_connection_id = doc.get("source_connection_id")
+    source_connection_name = None
+    if source_connection_id:
+        conn_result = await aexec(
+            supabase.table("connector_connections")
+            .select("id, name")
+            .eq("id", source_connection_id)
+            .limit(1)
+        )
+        rows = conn_result.data or []
+        # An unresolved name stays None — the surface then says "a connection" rather than
+        # inventing one. D-4 nulls the id on delete, so this is a real state, not an error.
+        source_connection_name = (rows[0].get("name") if rows else None) or None
+
     return {
         "document_id": doc["id"],
         "filename": doc["filename"],
         "metadata": doc.get("metadata"),
         "content": full_text,
+        "source_connection_id": source_connection_id,
+        "source_connection_name": source_connection_name,
     }
 
 

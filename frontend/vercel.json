@@ -1,7 +1,92 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "vite build",
+  "redirects": [
+    {
+      "source": "/app",
+      "has": [
+        {
+          "type": "host",
+          "value": "(?<host>^(?!app\\.).*)"
+        }
+      ],
+      "destination": "https://app.:host/app",
+      "permanent": true
+    },
+    {
+      "source": "/app/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "(?<host>^(?!app\\.).*)"
+        }
+      ],
+      "destination": "https://app.:host/app/$1",
+      "permanent": true
+    },
+    {
+      "source": "/setup",
+      "has": [
+        {
+          "type": "host",
+          "value": "(?<host>^(?!app\\.).*)"
+        }
+      ],
+      "destination": "https://app.:host/setup",
+      "permanent": true
+    },
+    {
+      "source": "/setup/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "(?<host>^(?!app\\.).*)"
+        }
+      ],
+      "destination": "https://app.:host/setup/$1",
+      "permanent": true
+    },
+    {
+      "source": "/invite",
+      "has": [
+        {
+          "type": "host",
+          "value": "(?<host>^(?!app\\.).*)"
+        }
+      ],
+      "destination": "https://app.:host/invite",
+      "permanent": true
+    },
+    {
+      "source": "/invite/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "(?<host>^(?!app\\.).*)"
+        }
+      ],
+      "destination": "https://app.:host/invite/$1",
+      "permanent": true
+    }
+  ],
   "rewrites": [
-    { "source": "/(.*)", "destination": "/app.html" }
+    {
+      "source": "/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "app\\.(.*)"
+        }
+      ],
+      "destination": "/app.html"
+    },
+    {
+      "source": "/app",
+      "destination": "/app.html"
+    },
+    {
+      "source": "/app/(.*)",
+      "destination": "/app.html"
+    }
   ]
 }

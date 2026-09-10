@@ -1,8 +1,9 @@
 ---
 id: SEED-226
 title: Engineering-drawing ingestion — the app already TELLS the user a PDF needs OCR, and then has no OCR to run
-status: planted
+status: partially-shipped
 planted: 2026-08-28
+shipped_layers: "L1 (OCR-substitute) + L2 (full-page drawing vision) 2026-09-05 · L3 (DXF takeoff) Phase 220"
 planted_by: Claude, 2026-08-28, operator direction — "we need to support this business case and similar business cases"
 surface: Agentic-RAG
 severity: major
@@ -389,3 +390,69 @@ probe REFUSES to convert lengths when a file declares `0` (unitless) rather than
 - Where does per-page cost surface? OCR and full-page vision are **per page**, and a drawing set
   is many pages. The cap in SEED-227 is the control; the *estimate* is a separate UX question.
 - How does a BOQ derived from L2 render its uncertainty, so no one prices a project off a guess?
+
+---
+
+## ✅ SHIPPED 2026-09-05 — L1 AND L2, AS ONE MECHANISM (commit `b4595f201`)
+
+**L3 was already done** — `aspects/dxf.py` shipped at Phase 220 (TAKEOFF-01) with `ezdxf>=1.3.0`
+a committed dependency, exactly as this seed's *"recommended sequencing change: it should be
+FIRST"* asked. This commit closes L1 and L2, and the open question *"which OCR engine"* is
+answered **none of them**.
+
+⭐ **THE VISION LLM IS THE OCR ENGINE, AND NO NEW DEPENDENCY WAS ADDED.** This seed listed three
+candidates — Tesseract, a cloud document-AI endpoint, or a vision LLM — and noted we already had
+the client and the routing. That third option turned out to need no infrastructure at all:
+`multimodal_service.describe_image` had been sending images to a vision model since Phase 35. What
+was missing was never a model. It was a **transcription prompt** (`describe` vs `transcribe` is the
+whole difference) and a **route into it** for an image that arrives on its own.
+
+**What shipped** — `backend/app/services/extractors/aspects/vision_text.py`, one mechanism, three uses:
+
+| | Case | Route |
+|---|---|---|
+| **new** | an uploaded `.png` / `.jpg` / `.webp` / `.tiff` / `.bmp` | `ALLOWED_MIME_TYPES` → `extract_text` image branch |
+| **L1** | a scanned PDF with no text layer | `classify_pdf_deficit` → `scan` → render 200 DPI → transcribe |
+| **L2** | a vector CAD drawing | `classify_pdf_deficit` → `drawing` → render whole page → drawing prompt |
+
+⚠ **THE `drawing` ARM IS THE ONE THAT MATTERED, and this seed said so before it was built:** *"this
+case will look SUCCESSFUL to every gate we own… it is the more dangerous of the two, precisely
+because nothing refuses."* The classifier fires on **thin text beside dense geometry**, tuned on
+this seed's own measurement of the operator's real floor plan (252 chars / 2,799 ops on one page),
+not on a benchmark.
+
+⚠ **A DRAWING'S TRANSCRIPTION IS APPENDED, NOT SUBSTITUTED.** Its text layer is poor but not false
+— the room names really are on the drawing — so it is kept and the transcription added. A scan has
+nothing to keep, so there the transcription replaces.
+
+⭐ **THE PROMISE THIS SEED WAS PLANTED ON IS GONE, AND FENCED.** The `application/pdf` empty-text
+sentence no longer names OCR, and `test_no_empty_text_message_promises_ocr` makes it unable to come
+back. ⚠ The unit test that guarded those sentences had been **accepting the word `"OCR"` as an
+explanation** — a marker list that rewards naming a capability the product lacks is complicit in the
+defect it exists to catch. The promise left the message and the word left the list in one commit.
+
+⚠ **EVERYTHING THIS PRODUCES IS ADVISORY AND SAYS SO.** `metadata._vision` carries
+`{engine: "vision", kind, pages_transcribed, advisory: true, detected: {...}}`. This seed's own
+verdict table is why: transcription **infers**, DXF **reads**. A transcription that cannot be told
+apart from a parsed text layer is this seed's failure one level up.
+
+### ⛔ WHAT IS STILL OPEN — this seed stays `partially-shipped`, not `closed`
+
+1. **L2.5 — vector-geometry takeoff straight from the PDF.** The measurement above found
+   `page.get_drawings()` returns 2,822 real line segments with coordinates. **Nothing reads them
+   yet.** Cheaper than L2 and more reliable, missing only *scale*.
+2. **DWG.** `ezdxf` reads DXF, not DWG; the operator's `AC1021` file still needs an external
+   conversion step. Nothing in this repo opens it.
+3. ⚠ **THE MATCHING STEP — where this business case is actually won or lost.** The L3 spike's own
+   wrong answer (`GYPSUM BOARD` → a *ceiling* rate line, a 65% overprice with correct arithmetic
+   and a valid item code) is unaddressed by anything shipped here. The design rule stands and is
+   unbuilt: **a token matching more than one rate line is AMBIGUOUS and escalates to a human.**
+4. **Phantom tables.** pdfplumber reported **four** tables in one small floor plan's geometry.
+   Drawing geometry is still polluting the index; this commit adds text beside it, and removes none.
+5. **Per-page cost has no estimate surface.** The budget reuses `multimodal_max_vision_calls`
+   (SEED-227's knob, still surfaced in no frontend file) plus a hard cap of 50 pages. A person
+   uploading a 40-sheet issue package is told nothing about what it will cost.
+
+**Re-open trigger for the remainder:** any BOQ/takeoff request against a PDF-only drawing set (needs
+L2.5), any `.dwg` upload (needs conversion), or any attempt to price a transcription automatically
+(needs the ambiguity escalation).

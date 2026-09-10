@@ -536,7 +536,100 @@ async def lifespan(app_instance):
             _scheduler = None
     app_instance.state.workflow_scheduler = _scheduler
 
+    # Phase 230 (QUEUE-01 / QUEUE-05 / D-05) — the durable ingestion queue daemon.
+    # Runs in every worker with concurrency bounding and stale claim recovery (G-1).
+    _ingestion_queue = None
+    if not _setup_mode and getattr(settings, "ingest_worker_enabled", True):
+        try:
+            from app.services.ingestion_queue_service import IngestionQueueService
+            from app.dependencies import get_supabase
+
+            _pg_pool = await get_pg_pool()
+            _ingestion_queue = IngestionQueueService(
+                pool=_pg_pool,
+                supabase_factory=get_supabase,
+                max_concurrent_jobs=settings.ingest_max_concurrent_jobs,
+                poll_interval_seconds=settings.ingest_poll_interval_seconds,
+                lease_timeout_seconds=settings.ingest_lease_timeout_seconds,
+            )
+            # Boot-time sweep to rescue in-flight jobs stranded across restarts (G-1 / SC#1)
+            await _ingestion_queue.run_stale_sweep()
+            _ingestion_queue.start()
+            logger.info(
+                "Ingestion queue service started (max concurrent %d, poll every %.1fs)",
+                settings.ingest_max_concurrent_jobs,
+                settings.ingest_poll_interval_seconds,
+            )
+        except Exception:
+            logger.exception("Ingestion queue service failed to start (app continues)")
+            _ingestion_queue = None
+    app_instance.state.ingestion_queue_service = _ingestion_queue
+
+    # Phase 234 (LIB-08 / QUEUE-03) — the background connector watch loop.
+    # Off by default, safe across multiple uvicorn workers with database-level claim exclusivity.
+    _watch_service = None
+    if not _setup_mode and getattr(settings, "watch_process_enabled", False):
+        try:
+            from app.services.watch_service import WatchService
+            from app.dependencies import get_supabase
+
+            _pg_pool = await get_pg_pool()
+            _watch_service = WatchService(
+                pool=_pg_pool,
+                settings=settings,
+                supabase=get_supabase(),
+            )
+            _watch_service.start()
+            logger.info(
+                "Watch service started (poll every %ds, lease %ds)",
+                settings.watch_poll_interval_seconds,
+                settings.watch_lease_seconds,
+            )
+        except Exception:
+            logger.exception("Watch service failed to start (app continues)")
+            _watch_service = None
+    app_instance.state.watch_service = _watch_service
+
+    # BUG-260902-06 — the cross-worker settings/model-registry cache invalidator.
+    #
+    # ⚠ IT RUNS IN EVERY WORKER ON PURPOSE, and unlike the scheduler above that is the whole
+    # point: the defect is that `_settings_cache` / `_model_overrides_cache` /
+    # `_all_model_overrides_cache` are MODULE globals — per PROCESS — behind a 30s TTL, while
+    # WORKER_COUNT=2 is the default. A write invalidated the writing worker and nowhere else,
+    # so whether a change was visible was a coin flip on which worker served the next read.
+    # Each worker subscribes to one channel and RE-WARMS on receipt (re-warm, never merely
+    # invalidate — `load_app_settings()` is SYNC and never checks the timestamp).
+    #
+    # FAIL SOFT, deliberately unconditional: no kill switch, because a box with no Redis
+    # already degrades to exactly the pre-existing TTL behaviour. `start()` returns
+    # immediately (startup is never blocked on Redis) and the loop reconnects forever without
+    # propagating. Skipped only in setup mode, like every other background service here.
+    _settings_subscriber = None
+    if not _setup_mode:
+        try:
+            from app.dependencies import get_redis
+            from app.services.settings_broadcast import SettingsCacheSubscriber
+
+            _settings_subscriber = SettingsCacheSubscriber(redis=get_redis())
+            _settings_subscriber.start()
+            logger.info("Settings cache subscriber started (cross-worker invalidation)")
+        except Exception:
+            logger.exception(
+                "Settings cache subscriber failed to start (app continues on the 30s TTL)"
+            )
+            _settings_subscriber = None
+    app_instance.state.settings_cache_subscriber = _settings_subscriber
+
     yield
+
+    # BUG-260902-06 — stop the settings cache subscriber. Best-effort with its own deadline
+    # inside `stop()`, so a half-dead Redis socket cannot wedge shutdown.
+    try:
+        _sub = getattr(app_instance.state, "settings_cache_subscriber", None)
+        if _sub is not None:
+            await _sub.stop()
+    except Exception:
+        logger.exception("Settings cache subscriber stop failed at lifespan shutdown")
 
     # Phase 204 (SCHED-01) — stop the scheduler FIRST among the shutdown steps that
     # touch runs. It is the only component that STARTS new work; leaving it ticking
@@ -549,6 +642,22 @@ async def lifespan(app_instance):
             await _sched.stop()
     except Exception:  # noqa: BLE001
         logger.exception("Workflow scheduler stop failed at lifespan shutdown")
+
+    # Phase 230 — stop the ingestion queue worker before cancelling in-flight tasks
+    try:
+        _iq = getattr(app_instance.state, "ingestion_queue_service", None)
+        if _iq is not None:
+            await _iq.stop()
+    except Exception:  # noqa: BLE001
+        logger.exception("Ingestion queue service stop failed at lifespan shutdown")
+
+    # Phase 234 — stop the watch service
+    try:
+        _ws = getattr(app_instance.state, "watch_service", None)
+        if _ws is not None:
+            _ws.stop()
+    except Exception:  # noqa: BLE001
+        logger.exception("Watch service stop failed at lifespan shutdown")
 
     # 096-09 (UAT Test 2 restart-resumability fix): mark the process as shutting
     # down as the FIRST shutdown step — before the ask_user sentinel broadcast and
@@ -748,7 +857,7 @@ async def list_models():
     return {"models": models, "default": settings.llm_model}
 
 
-from app.api import threads, runs, documents, settings as settings_api, folders, kb, skills, audit, knowledge_health, feedback, sandbox_outputs, workspace, admin, panel, workflows, workflow_runs, metadata_fields, document_views, document_relationships, classification_rules, document_governance, skill_tuner, skill_test_cases, evals, features, setup as setup_api, org, me_preferences, connectors, model_registry, schedules, document_queries, library, checked_queries, takeoff  # noqa: E402
+from app.api import threads, runs, documents, settings as settings_api, folders, kb, skills, audit, knowledge_health, feedback, sandbox_outputs, workspace, admin, panel, workflows, workflow_runs, metadata_fields, document_views, document_relationships, classification_rules, document_governance, skill_tuner, skill_test_cases, evals, features, setup as setup_api, org, me_preferences, connectors, model_registry, schedules, document_queries, library, checked_queries, takeoff, sources  # noqa: E402
 
 app.include_router(threads.router)
 app.include_router(runs.router)
@@ -788,6 +897,8 @@ app.include_router(library.router)  # Phase 217.1 (BE-2 / D-217.1-27) — GET /l
 app.include_router(checked_queries.router)  # Phase 217.1 (BE-6 / D-217.1) — checked-queries CRUD + check trigger. Private assertion about the caller's corpus; 108 Shape A RLS, no org-wide read branch.
 app.include_router(takeoff.router)  # Phase 220 (TAKEOFF-02/03) — CAD takeoff extraction & rate sheet BOQ matching. Shares the /documents prefix with api/documents.py.
 app.include_router(schedules.workflow_router)  # Phase 204 SCHED-01 — the workflow-anchored half (/workflows/{id}/schedules: create + list). Shares the /workflows prefix with api/workflows.py; no path collides. Registered AFTER workflows.router so the older, more specific routes keep their precedence
+app.include_router(sources.router)  # Phase 234 (LIB-08 / SURF-01 / VIS-05) — folder watches & source sync (/sources)
+app.include_router(sources.router, prefix="/api")  # Phase 234 alias (/api/sources)
 # Phase 182 (D-182-04): the TEMPORARY Phase-181 "/canvas/ping" canary router was RETIRED here.
 # The real require_canvas-gated routes (POST /workflows/validate + GET /workflows/grounding-bundle,
 # mounted on workflows.router above) now carry the byte-identical 404-when-off gate, so the

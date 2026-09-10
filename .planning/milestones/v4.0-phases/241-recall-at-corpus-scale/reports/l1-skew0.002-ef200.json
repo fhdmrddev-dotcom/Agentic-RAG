@@ -1,0 +1,784 @@
+{
+  "dsn": {
+    "host": "127.0.0.1",
+    "port": 54322,
+    "database": "recall_bench"
+  },
+  "user_id": "5aa65229-1a8d-4c50-80d3-cac588a43616",
+  "k": 20,
+  "match_threshold": 0.3,
+  "embedding_model": "text-embedding-3-small",
+  "requested": {
+    "ef_search": 200,
+    "iterative_scan": null
+  },
+  "layer1": {
+    "query_vector_sample": 25,
+    "query_vector_seed": "241",
+    "shapes": [
+      {
+        "shape": "none",
+        "description": "baseline \u2014 metadata_filter and p_folder_ids both NULL",
+        "k": 20,
+        "query_vectors": 25,
+        "scored_vectors": 25,
+        "recall_at_k": 1.0,
+        "underfill": 0.0,
+        "per_vector": [
+          {
+            "index": 0,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 1,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 2,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 3,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 4,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 5,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 6,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 7,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 8,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 9,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 10,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 11,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 12,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 13,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 14,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 15,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 16,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 17,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 18,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 19,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 20,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 21,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 22,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 23,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 24,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          }
+        ],
+        "elapsed_seconds": 67.187
+      },
+      {
+        "shape": "folder",
+        "description": "p_folder_ids bound to one real folder id",
+        "k": 20,
+        "query_vectors": 25,
+        "scored_vectors": 25,
+        "recall_at_k": 1.0,
+        "underfill": 0.054,
+        "per_vector": [
+          {
+            "index": 0,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 1,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 2,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 3,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 4,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 5,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 6,
+            "exact_size": 8,
+            "ann_size": 8,
+            "underfill": 0.6,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 7,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 8,
+            "exact_size": 5,
+            "ann_size": 5,
+            "underfill": 0.75,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 9,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 10,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 11,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 12,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 13,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 14,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 15,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 16,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 17,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 18,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 19,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 20,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 21,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 22,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 23,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 24,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          }
+        ],
+        "elapsed_seconds": 22.938
+      },
+      {
+        "shape": "metadata",
+        "description": "metadata @> {document_type: <a live value>}",
+        "k": 20,
+        "query_vectors": 25,
+        "scored_vectors": 25,
+        "recall_at_k": 1.0,
+        "underfill": 0.056,
+        "per_vector": [
+          {
+            "index": 0,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 1,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 2,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 3,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 4,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 5,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 6,
+            "exact_size": 5,
+            "ann_size": 5,
+            "underfill": 0.75,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 7,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 8,
+            "exact_size": 9,
+            "ann_size": 9,
+            "underfill": 0.55,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 9,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 10,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 11,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 12,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 13,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 14,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 15,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 16,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 17,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 18,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 19,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 20,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 21,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 22,
+            "exact_size": 18,
+            "ann_size": 18,
+            "underfill": 0.1,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 23,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 24,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          }
+        ],
+        "elapsed_seconds": 29.172
+      },
+      {
+        "shape": "source_system",
+        "description": "metadata @> {source: {system: <a live value>}} \u2014 nested jsonb containment",
+        "k": 20,
+        "query_vectors": 25,
+        "scored_vectors": 25,
+        "recall_at_k": 1.0,
+        "underfill": 0.116,
+        "per_vector": [
+          {
+            "index": 0,
+            "exact_size": 17,
+            "ann_size": 17,
+            "underfill": 0.15,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 1,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 2,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 3,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 4,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 5,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 6,
+            "exact_size": 3,
+            "ann_size": 3,
+            "underfill": 0.85,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 7,
+            "exact_size": 19,
+            "ann_size": 19,
+            "underfill": 0.05,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 8,
+            "exact_size": 1,
+            "ann_size": 1,
+            "underfill": 0.95,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 9,
+            "exact_size": 16,
+            "ann_size": 16,
+            "underfill": 0.2,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 10,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 11,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 12,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 13,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 14,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 15,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 16,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 17,
+            "exact_size": 16,
+            "ann_size": 16,
+            "underfill": 0.2,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 18,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 19,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 20,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 21,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 22,
+            "exact_size": 10,
+            "ann_size": 10,
+            "underfill": 0.5,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 23,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          },
+          {
+            "index": 24,
+            "exact_size": 20,
+            "ann_size": 20,
+            "underfill": 0.0,
+            "recall_at_k": 1.0
+          }
+        ],
+        "elapsed_seconds": 28.484
+      }
+    ]
+  },
+  "layer2": null,
+  "server": {
+    "postgresql_version": "17.6",
+    "pgvector_version": "0.8.0",
+    "hnsw_ef_search": null,
+    "hnsw_iterative_scan": null
+  },
+  "corpus": {
+    "documents_visible": 8,
+    "documents_latest": 7,
+    "chunks_visible": 200
+  },
+  "elapsed_seconds": 147.875,
+  "label": "l1-skew0.002-ef200",
+  "measured_at": "2026-09-10T04:14:28.347207+00:00"
+}

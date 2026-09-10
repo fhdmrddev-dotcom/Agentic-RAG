@@ -1,0 +1,257 @@
+{
+  "rail": {
+    "blocks": [
+      {
+        "kind": "rail-item",
+        "heading": null,
+        "atoms": []
+      },
+      {
+        "kind": "rail-item-library",
+        "heading": null,
+        "atoms": []
+      },
+      {
+        "kind": "badge",
+        "heading": null,
+        "atoms": []
+      },
+      {
+        "kind": "popover",
+        "heading": null,
+        "atoms": []
+      },
+      {
+        "kind": "pop-item",
+        "heading": null,
+        "atoms": []
+      }
+    ],
+    "buttons": [
+      "badge",
+      "open-health"
+    ]
+  },
+  "sources": {
+    "blocks": [
+      {
+        "kind": "instance-statement",
+        "heading": null,
+        "atoms": []
+      },
+      {
+        "kind": "tab-ingestion",
+        "heading": null,
+        "atoms": []
+      },
+      {
+        "kind": "tab-health",
+        "heading": null,
+        "atoms": []
+      },
+      {
+        "kind": "body-ingestion",
+        "heading": null,
+        "atoms": []
+      },
+      {
+        "kind": "source-line",
+        "heading": null,
+        "atoms": []
+      },
+      {
+        "kind": "source-card",
+        "heading": null,
+        "atoms": []
+      },
+      {
+        "kind": "outcome",
+        "heading": null,
+        "atoms": []
+      },
+      {
+        "kind": "stopped-sentence",
+        "heading": null,
+        "atoms": []
+      },
+      {
+        "kind": "history",
+        "heading": null,
+        "atoms": []
+      },
+      {
+        "kind": "run",
+        "heading": null,
+        "atoms": []
+      },
+      {
+        "kind": "quiet-fold",
+        "heading": null,
+        "atoms": []
+      },
+      {
+        "kind": "fail-reason",
+        "heading": null,
+        "atoms": []
+      }
+    ],
+    "buttons": [
+      "fix",
+      "sync-now",
+      "toggle-history",
+      "toggle-quiet",
+      "report-source"
+    ]
+  },
+  "health": {
+    "blocks": [
+      {
+        "kind": "body-health",
+        "heading": null,
+        "atoms": []
+      },
+      {
+        "kind": "attention-list",
+        "heading": null,
+        "atoms": []
+      },
+      {
+        "kind": "attention-row",
+        "heading": null,
+        "atoms": []
+      }
+    ],
+    "buttons": [
+      "go-to-source"
+    ]
+  },
+  "counts": {
+    "sources": 12,
+    "sourceLine": 9,
+    "sourceCard": 3,
+    "attentionRow": 2,
+    "runCollapsed": 3,
+    "runExpanded": 17,
+    "instanceStatement": 1
+  },
+  "copy": {
+    "cadence": {
+      "__fn": true,
+      "params": [
+        "m"
+      ],
+      "source": "function (m) { return \"checked every \" + m + \" minutes\"; }",
+      "example": "checked every 30 minutes"
+    },
+    "checkedAgo": {
+      "__fn": true,
+      "params": [
+        "ago",
+        "files"
+      ],
+      "source": "function (ago, files) { return \"Checked \" + ago + \" · \" + files + \" files\"; }",
+      "example": "Checked 4 minutes ago · 6 files"
+    },
+    "checkedNoChange": {
+      "__fn": true,
+      "params": [
+        "ago"
+      ],
+      "source": "function (ago) { return \"Checked \" + ago + \" · no changes\"; }",
+      "example": "Checked 4 minutes ago · no changes"
+    },
+    "asked": {
+      "__fn": true,
+      "params": [
+        "within"
+      ],
+      "source": "function (within) { return \"Asked · next check within \" + within; }",
+      "example": "Asked · next check within 60 seconds"
+    },
+    "stopped": {
+      "__fn": true,
+      "params": [
+        "ago"
+      ],
+      "source": "function (ago) { return \"Stopped reading \" + ago; }",
+      "example": "Stopped reading 4 minutes ago"
+    },
+    "lastGood": {
+      "__fn": true,
+      "params": [
+        "when"
+      ],
+      "source": "function (when) { return \"Last read successfully on \" + when; }",
+      "example": "Last read successfully on 2 September, 09:14"
+    },
+    "neverRead": "It has not read successfully yet.",
+    "cause": {
+      "token_revoked": {
+        "says": "Access to {connection} was withdrawn — the connection needs to be authorised again.",
+        "action": "Reconnect {connection}",
+        "hard": true
+      },
+      "folder_gone": {
+        "says": "The watched folder is no longer shared with this connection.",
+        "action": "Pick a different folder",
+        "hard": true
+      },
+      "unreachable": {
+        "says": "The server did not answer the last three checks.",
+        "action": "Retry now",
+        "hard": false
+      },
+      "unknown": {
+        "says": "It stopped, and no reason was recorded.",
+        "action": "Retry now",
+        "hard": false
+      }
+    },
+    "fileFail": {
+      "password": "The file is password-protected — remove the password and it will be read on the next check.",
+      "too_big": "The file is larger than this library accepts — split it, or raise the limit in Settings.",
+      "unknown": "It stopped, and no reason was recorded."
+    },
+    "quietFold": {
+      "__fn": true,
+      "params": [
+        "n"
+      ],
+      "source": "function (n) { return \"checked \" + n + \" times, no changes\"; }",
+      "example": "checked 2 times, no changes"
+    },
+    "showEvery": "Show every check",
+    "hideQuiet": "Hide quiet checks",
+    "degraded": "This source could not be read here — the others are unaffected.",
+    "degradedAction": "Report this source",
+    "readerOffMember": "Automatic reading is switched off on this server. Watches are saved, and they will resume when it is switched back on.",
+    "readerOffOperator": "WATCH_PROCESS_ENABLED",
+    "readerOffRow": "Waiting — the reader is off",
+    "badgeTitle": {
+      "__fn": true,
+      "params": [
+        "n"
+      ],
+      "source": "function (n) { return n === 1 ? \"1 source stopped reading\" : n + \" sources stopped reading\"; }",
+      "example": "2 sources stopped reading"
+    },
+    "popTitle": "Needs attention",
+    "popOpenHealth": "Open Library health",
+    "attentionTitle": "Sources needing attention",
+    "attentionEmpty": "Every source is reading.",
+    "goToSource": "Go to source",
+    "roster": {
+      "__fn": true,
+      "params": [
+        "total",
+        "need"
+      ],
+      "source": "function (total, need) { return total + \" connected, \" + need + \" need you\"; }",
+      "example": "12 connected, 2 need you"
+    },
+    "syncNow": "Sync now",
+    "history": "History",
+    "hideHistory": "Hide history",
+    "collapse": "Collapse"
+  }
+}

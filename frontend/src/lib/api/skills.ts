@@ -574,6 +574,22 @@ export interface FullAppSettings {
   rerank_has_api_key: boolean
   /** SEED-227 — per-document ceiling on images read by the vision model. */
   multimodal_max_vision_calls: number
+  /** SEED-226. Empty means "use the active chat model" — never a pinned name. */
+  vision_model: string
+  vision_max_pages: number
+  /**
+   * SEED-258 — the largest file ANY connected source (Google Drive, Microsoft Graph, any
+   * MCP file surface) will import, in MB. ONE knob: the MCP JSON-RPC envelope cap is
+   * DERIVED from it server-side and is never a second field.
+   */
+  source_max_file_size_mb: number
+  /**
+   * ⛔ THE BOUNDS ARE SERVED, and that is deliberate. `api/settings.py:79`: *"a form
+   * carrying its own copy of `50` is a fourth private constant, which is the defect this
+   * replaced."* Read them; never re-type them in a component.
+   */
+  source_max_file_size_mb_floor: number
+  source_max_file_size_mb_ceiling: number
   retrieval_top_k: number
   retrieval_match_threshold: number
   hybrid_search_enabled: boolean
@@ -581,6 +597,22 @@ export interface FullAppSettings {
   vector_search_weight: number
   keyword_search_weight: number
   rrf_k: number
+  /**
+   * Phase 241 (QUEUE-06 / D-09) — how many candidate vectors the index walks before the
+   * search's filters are applied (`hnsw.ef_search`), and whether it keeps scanning until
+   * enough results survive them (`hnsw.iterative_scan`).
+   */
+  hnsw_ef_search: number
+  hnsw_iterative_scan: string
+  /**
+   * ⛔ THE BOUNDS AND THE ENUM MEMBERS ARE SERVED, for the same reason
+   * `source_max_file_size_mb_floor` is: a form carrying its own copy of `1000`, or its own
+   * list of the three pgvector modes, is a second private constant that drifts from the
+   * database's CHECK with nothing to notice. Read them; never re-type them in a component.
+   */
+  hnsw_ef_search_floor: number
+  hnsw_ef_search_ceiling: number
+  hnsw_iterative_scan_values: string[]
   web_search_enabled: boolean
   web_search_has_api_key: boolean
   web_search_max_results: number
@@ -668,6 +700,14 @@ export interface SettingsUpdate {
   rerank_model?: string
   rerank_top_n?: number
   multimodal_max_vision_calls?: number
+  vision_model?: string
+  vision_max_pages?: number
+  /**
+   * SEED-258. ⛔ There is no `_floor` / `_ceiling` here and there must never be: the bounds
+   * are the SERVER's, read-only on the response. An out-of-range value is refused with a
+   * 400 whose body says what raising the ceiling costs — the form does not clamp it away.
+   */
+  source_max_file_size_mb?: number
   retrieval_top_k?: number
   retrieval_match_threshold?: number
   hybrid_search_enabled?: boolean
@@ -675,6 +715,13 @@ export interface SettingsUpdate {
   vector_search_weight?: number
   keyword_search_weight?: number
   rrf_k?: number
+  /**
+   * Phase 241 (QUEUE-06 / D-09). ⛔ No `_floor` / `_ceiling` / `_values` here and there must
+   * never be: the bounds are the SERVER's, read-only on the response. An out-of-range value
+   * is refused with a 400 whose body says what a bigger search breadth COSTS.
+   */
+  hnsw_ef_search?: number
+  hnsw_iterative_scan?: string
   tavily_api_key?: string
   web_search_max_results?: number
   sandbox_enabled?: boolean

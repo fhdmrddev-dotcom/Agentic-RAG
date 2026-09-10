@@ -15,6 +15,7 @@ answered_clauses:
 priority: high
 relates_to:
   - SEED-144 (provider-shaped connections + OAuth) — the SHAPE dimension of this umbrella
+  - SEED-246 (grow the service catalog, OAuth-family-first, legacy shapes kept) — the CATALOG dimension of this umbrella, which this file named as untouched and nothing owned until 2026-09-04
   - SEED-145 (connections are platform assets, usable from chat) — the SURFACE dimension
   - SEED-142 (connected-drive auto-ingest — OneDrive / SharePoint / Google Drive) — the INGEST consumer; it is a READ integration, which is precisely the class this app has none of
   - SEED-013 (External Integrations — public API, MCP server, webhooks, service accounts) — the INBOUND twin (others calling us)

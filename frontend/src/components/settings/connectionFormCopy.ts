@@ -37,6 +37,7 @@ import type {
   ConnectorConnection,
   ConnectorConnectionConfig,
   McpAuthKind,
+  McpDiscoveredTool,
 } from "@/lib/api"
 // ⚠ THE TREE'S ONE OWN-GUARD SPELLING, imported rather than re-declared. `SERVICE_TO_SHAPE`
 // is a plain object literal read with a free-text key that arrives from a person's keystrokes
@@ -443,6 +444,420 @@ export const MCP_SAVE_DISABLED_REASON =
  *  binds exactly one: the Name. There is no credential field, because an identified row with
  *  no reachable path has nothing to authenticate with until OAuth lands in Phase 215, and a
  *  password box offered for a credential that cannot yet be used is a lie the DOM holds. */
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// Phase 239 (D-239-01 / D-239-02) — the file-source binding, worded
+// ═══════════════════════════════════════════════════════════════════════════════════════
+//
+// ⭐ WHY IT IS VISIBLE AT ALL. Discovery guesses which tools list a directory and read a
+// file, and a guess a person cannot see is a guess they cannot correct. This section is the
+// only place the binding stored in `config["source_tools"]` becomes legible.
+//
+// ⚠ IT IS NOT A `connection-field`, DELIBERATELY. §3b binds a field COUNT per shape
+// (`FIELD_COUNTS` below) precisely so an extra destination field cannot appear unnoticed;
+// this is a binding editor over a list the server supplied, not a destination fact, and
+// counting it there would make the two contracts disagree about what a field is.
+
+export const SOURCE_TOOLS_HEADING = "File source mapping"
+
+/** ⚠ It says OPTIONAL and it says AUTOMATIC, in that order, because the honest reading is
+ *  "you probably do not need to touch this, and here is what happens if you do not". */
+export const SOURCE_TOOLS_HELP =
+  "If this server exposes files, name the tool that lists a folder and the tool that reads " +
+  "a file. Filled in automatically when actions are refreshed — change it here if the guess " +
+  "is wrong, or if this server words things its own way."
+
+export const SOURCE_TOOLS_LIST_LABEL = "Directory listing tool"
+export const SOURCE_TOOLS_READ_LABEL = "File content tool"
+
+/**
+ * HI-04 — THE FIELD THAT DID NOT EXIST, and whose absence made every other part of this card
+ * unusable in practice.
+ *
+ * ⚠ `sourceRootPath` was a real draft field, `sourceToolsFromDraft` already bound it to
+ * `root_path`, and the panel already seeded it from `tools.root_path`. **Only the input was
+ * missing**, so `root_path` was permanently `""` and `browse()` sent `{"path": ""}` to the
+ * bound lister on every call. The note two hundred lines below this one said so verbatim —
+ * *"`sourceRootPath` has no control and is carried anyway"* — for the whole of Phase 239.
+ *
+ * ⛔ Until this shipped, no MCP source could be pointed at a real folder through the product,
+ * which is why Phase 239's SC#2 could not close. Added 2026-09-08.
+ */
+export const SOURCE_TOOLS_ROOT_LABEL = "Root folder on the server"
+
+/** ⚠ Says what happens if it is BLANK, because blank was the shipped state for a whole phase
+ *  and produced a 502 with nothing naming the empty path. The adapter now refuses by name;
+ *  this is the same sentence, said before the failure instead of after it. */
+export const SOURCE_TOOLS_ROOT_HELP =
+  "The folder this connection reads from, as the server names it — for example /srv/docs. " +
+  "Leave it blank only if the server serves its files from the root it was started with; " +
+  "many do not, and a blank root is refused rather than guessed."
+
+/**
+ * Phase 239 gap-closure round 1 (CR-01, UI half) — WORDS THAT SAY A TOOL CHANGES SOMETHING.
+ *
+ * ⭐ **THE PICKER WAS AN UNORDERED DUMP OF THE SERVER'S ENTIRE TOOL LIST, AND `delete_file`
+ * SAT IN IT UNDER THE LABEL *"File content tool"*.** A mis-click one row down binds it;
+ * `McpSourceAdapter.check()` then reports **ok**, because the tool exists on the server; and
+ * `watch_service` calls the bound reader on every new and every modified file, unattended, on
+ * every cycle. That is data loss on the connected server behind a green health probe.
+ *
+ * ⚠ **THE JSX ASSERTED THE BACKEND WAS THE BACKSTOP AND THAT WAS FALSE FOR THIS CLASS.**
+ * `reject_unoffered_source_tools` checked only that the name was one the server OFFERED, never
+ * that it was safe. Closing the boundary is the server's job; not proposing a destructive tool
+ * as a *reader* is this surface's, and both halves are wanted.
+ *
+ * ⚠ **SAME-COMMIT SYNC WITH `connector_service._MUTATION_WORDS`**, which is the same judgement
+ * pointed at the write boundary. `ConnectionFormPanel.sourceTools.test.tsx` parses that tuple
+ * out of the Python through `?raw` and requires this array to equal it — because the version
+ * of this rule that was only a comment is what let the dump ship.
+ *
+ * ⛔ **IT IS A DENY-LIST AND THEREFORE INCOMPLETE, WHICH IS STATED RATHER THAN HIDDEN.** The
+ * review's CR-02 names `purge`, `drop`, `clear`, `destroy`, `trash`, `empty`, `exec` and `rm`
+ * as absent; `execute_command` is still offered here today. This narrows a real, reachable
+ * mis-click — it does not make the surface safe against a hostile server, and the thing that
+ * would is an allow-list of shapes at the boundary.
+ */
+/**
+ * ⚠ RE-SYNCED 2026-09-08, AND THE DRIFT IS THE FINDING. This list had **18** words while the
+ * server's `_MUTATION_WORDS` had **34** — the backend gap-closure round widened it, and this
+ * copy was authored against the shorter one in a parallel round that could not see it.
+ *
+ * ⭐ **NEITHER ROUND COULD HAVE CAUGHT THIS AND BOTH WERE GREEN.** The fence that pins the two
+ * lists together lives in a frontend suite: the backend round never runs it, and the frontend
+ * round ran against a base predating the widening. It failed only once both were MERGED — the
+ * Phase 204 join shape, on a security-adjacent list.
+ *
+ * The consequence while it was drifted: the picker still OFFERED `execute_command`, `drop_*`,
+ * `destroy_*` and `kill_*` under the label *"File content tool"*. The boundary refused them, so
+ * nothing was lost — but CR-01's UI half is precisely "do not offer a destructive tool as a
+ * reader", and it was partially re-opened by the merge.
+ */
+export const SOURCE_TOOL_MUTATION_WORDS: readonly string[] = [
+  "write", "overwrite", "create", "delete", "remove", "rename", "move", "copy",
+  "upload", "put", "append", "edit", "update", "modify", "mkdir", "rmdir", "rm",
+  "unlink", "send", "post", "patch", "set", "save", "insert", "purge", "drop",
+  "clear", "destroy", "trash", "truncate", "exec", "execute", "kill", "revoke",
+]
+
+/**
+ * Does this tool's NAME say it changes something?
+ *
+ * ⛔ **WHOLE TOKENS, NEVER SUBSTRINGS — and that is a deliberate DIVERGENCE from the server's
+ * `_looks_like_a_mutation`, not an oversight.** That one uses `word in name`, so `set` ⊂
+ * `assets` and `put` ⊂ `input` make `list_assets`, `get_asset`, `read_dataset` and
+ * `input_file` all read as mutations (review ME-04, driven). On the boundary an over-catch
+ * merely refuses a write; HERE it would REMOVE the only readers a server offers and leave a
+ * person with an empty picker and a 502 — the exact failure this whole surface exists to
+ * prevent. The word SET is shared and fenced; the matching rule is the safer one on each side.
+ */
+export function looksLikeSourceToolMutation(name: string): boolean {
+  const tokens = new Set(name.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean))
+  return SOURCE_TOOL_MUTATION_WORDS.some((word) => tokens.has(word))
+}
+
+/** Said on screen when the picker withheld something, so an absence is never unexplained.
+ *
+ * ⚠ A PERSON CAN SEE THESE TOOLS IN THE ACTIONS LIST. Withholding them here without a word
+ * reads as a bug in discovery, and the repair somebody then reaches for is a hand-crafted
+ * PATCH — the one door onto this column with no picker in front of it. */
+export function sourceToolsWithheldNote(count: number): string {
+  const s = count === 1 ? "" : "s"
+  const verb = count === 1 ? "changes" : "change"
+  return `${count} tool${s} whose name says ${count === 1 ? "it " : "they "}${verb} something ` +
+    `${count === 1 ? "is" : "are"} not offered here — whatever is bound is called on every ` +
+    `file, unattended, on every check.`
+}
+
+/** ⚠ TWO COPIES OF ONE FACT, AND THE OTHER ONE IS AUTHORITATIVE. These mirror
+ *  `mcp_source.py`'s `DEFAULT_LIST_TOOL` / `DEFAULT_READ_TOOL`, which decide what actually
+ *  happens when a slot is left empty. `ConnectionFormPanel.sourceTools.test.tsx` reads that
+ *  module through `?raw` and compares, so the drift cannot ship silently. */
+export const SOURCE_TOOLS_DEFAULT_LIST = "list_directory"
+export const SOURCE_TOOLS_DEFAULT_READ = "read_file"
+
+/** The empty option. It names the CONSEQUENCE rather than the absence — "(None)" would leave
+ *  a person believing nothing will be called, when in fact the adapter falls back per key. */
+export function sourceToolUnsetLabel(fallback: string): string {
+  return `Not set — the adapter will try ${fallback}`
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// 3d · SEED-259 — THE ARGUMENT MAPPING (the client half of what `239-06` made a row)
+// ═══════════════════════════════════════════════════════════════════════════════════════
+//
+// ⭐ WHAT THIS EXISTS FOR. Phase 239 proved that a tool's NAME is a row: `list_directory` vs
+// `ls` vs anything a server calls its own lister. `SEED-259` was driven live and found the
+// other half was still CODE — the adapter always sent a lone `path`, so a server whose reader
+// takes three arguments answered `HTTP 200` with an EMPTY LISTING. `239-06` made the shape a
+// row too. This section is the only place a person can set it; until it shipped, the keys
+// below could be written only by hand-crafting a `PATCH` body.
+//
+// ⛔ NO SERVER IS NAMED HERE, AND NO ARGUMENT IS DEFAULTED. Every row is derived from the
+// server's OWN `inputSchema`, which is already discovered and already stored. The moment an
+// argument name reaches a literal in this module, connecting the NEXT server stops being a
+// row and becomes a code change — which is the exact claim `SEED-259` was ruled on.
+
+/** The key that names WHICH argument carries the path. Mirrors `mcp_source.PATH_ARG_KEY`. */
+export const SOURCE_ARG_PATH_KEY = "arg_path"
+
+/** The prefix for a fixed value. Mirrors `mcp_source.STATIC_ARG_PREFIX`.
+ *
+ *  ⛔ THE TWO NAMESPACES ARE DISJOINT ON PURPOSE and must stay that way. Collapsed into one
+ *  prefix, `arg_path` would read as *"a fixed value for the argument called `path`"* the
+ *  instant a server names its path argument something else — and that misreading pins every
+ *  browse to one fixed directory, which is a COMPLETE listing of the wrong folder. On a
+ *  watched folder that is the `H-5` deletion signal wearing a success. */
+export const SOURCE_ARG_STATIC_PREFIX = "arg_static."
+
+/** What the adapter sends the path as when nothing names it. Mirrors `DEFAULT_PATH_ARG`. */
+export const SOURCE_ARG_DEFAULT_PATH = "path"
+
+/** `McpConfig.source_tools` is `dict[Annotated[str, max_length=64], Annotated[str,
+ *  max_length=512]]` (review ME-07). A control with no ceiling composes a body the model
+ *  refuses, and that 422 arrives wearing the generic *"Couldn't save that"*. */
+export const SOURCE_ARG_KEY_MAX = 64
+export const SOURCE_ARG_VALUE_MAX = 512
+
+export const SOURCE_ARGS_HEADING = "Arguments this server needs"
+
+/** ⚠ It says where the rows CAME FROM, because a row a person did not ask for and cannot
+ *  explain reads as a bug in the product rather than as a fact about their server. */
+export const SOURCE_ARGS_HELP =
+  "Some servers want more than a path before they will answer. Every row below is read from " +
+  "this server's own description of the two tools above — nothing is guessed for you, and " +
+  "nothing is filled in."
+
+export const SOURCE_PATH_ARG_LABEL = "Argument that carries the path"
+
+/** ⚠ Says what happens if it is left alone AND what happens if it is set wrong, in that
+ *  order — the second is the dangerous one and it does not announce itself. */
+export const SOURCE_PATH_ARG_HELP =
+  "The folder or file being read is sent as this argument. Leave it unset and it is sent as " +
+  `${SOURCE_ARG_DEFAULT_PATH}, which is what most servers call it. Name the wrong one and ` +
+  "every read addresses the same fixed place — a complete listing of the wrong folder, which " +
+  "arrives looking like a success."
+
+/** The empty option. It names the CONSEQUENCE rather than the absence, exactly as
+ *  `sourceToolUnsetLabel` does one control up. */
+export function sourcePathArgUnsetLabel(): string {
+  return `Not set — the path is sent as ${SOURCE_ARG_DEFAULT_PATH}`
+}
+
+/** ⚠ TWO DIFFERENT FACTS, AND ONLY ONE OF THEM IS KNOWABLE. *"This server asks for nothing
+ *  else"* is a statement about the server; *"this server has not said"* is a statement about
+ *  what we hold. Saying the first when the second is true is the empty-listing lie in prose —
+ *  the same class as the `200` this whole seed exists to stop. */
+export const SOURCE_ARGS_NONE_NEEDED =
+  "The bound tools ask for nothing beyond the path, so there is nothing to map here."
+
+export const SOURCE_ARGS_UNDESCRIBED =
+  "This server has not described what these tools take, so no rows can be derived. Refresh " +
+  "actions first — that description is what makes these rows appear, and without it a missing " +
+  "argument is only discovered when a call comes back empty."
+
+/** Why one row is on screen. ⚠ An unexplained row and an unexplained absence are the same
+ *  defect pointed two ways; this card already pays that cost for withheld tools. */
+export function sourceArgRowNote(required: boolean): string {
+  return required
+    ? "the server says this one is required"
+    : "the server does not ask for this one — kept, so saving cannot drop it"
+}
+
+/**
+ * ⛔ THE REFUSAL, SAID BEFORE SOMEBODY HITS IT.
+ *
+ * `239-06` made an underspecified binding a refusal BY NAME instead of an empty listing, and
+ * this is the same sentence said on the card that causes it rather than in a 502 an hour
+ * later — the shape `SOURCE_TOOLS_ROOT_HELP` already uses for a blank root.
+ *
+ * ⚠ It NAMES the arguments. "Some arguments are missing" sends a person back to a schema they
+ * cannot see; the adapter's own message names them and so does this.
+ */
+export function sourceArgsIncompleteNote(names: readonly string[]): string {
+  const one = names.length === 1
+  return (
+    `${names.join(", ")} ${one ? "has" : "have"} no value yet, so this connection is refused ` +
+    "BY NAME rather than called. That is deliberate: a call missing an argument comes back " +
+    "with nothing, and an empty listing is indistinguishable from a folder whose every file " +
+    "was deleted."
+  )
+}
+
+/** ⚠ A NAMED ABSENCE, NEVER A SILENT ONE. A derived name whose `arg_static.` key would break
+ *  the 64-character ceiling cannot be stored at all, so it gets no box — a box would collect
+ *  an answer the save then drops, which is the silent wipe wearing a helpful face. */
+export function sourceArgsUnstorableNote(names: readonly string[]): string {
+  const one = names.length === 1
+  return (
+    `${names.join(", ")} cannot be stored on this connection: with the ` +
+    `${SOURCE_ARG_STATIC_PREFIX} prefix ${one ? "its key is" : "their keys are"} longer than ` +
+    `${SOURCE_ARG_KEY_MAX} characters, which the connection record refuses. ` +
+    `${one ? "It is" : "They are"} named here rather than given a box that would quietly ` +
+    "drop the answer."
+  )
+}
+
+/** One argument the person supplies a fixed value for. */
+export interface SourceArgumentRow {
+  /** The server's own name for it. Rendered VERBATIM; never prettified, never invented. */
+  name: string
+  value: string
+  required: boolean
+}
+
+export interface SourceArgumentModel {
+  /** Every argument name the bound tools DECLARE — the options for the path control. */
+  declared: string[]
+  /** Did either bound tool publish a schema at all? Distinguishes *"asks for nothing"* from
+   *  *"has not said"*, which the card must never conflate. */
+  described: boolean
+  rows: SourceArgumentRow[]
+  /** Required arguments with no value yet — exactly what the adapter will refuse by name. */
+  missing: string[]
+  /** Derived names too long to store. See `sourceArgsUnstorableNote`. */
+  unstorable: string[]
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
+
+/** `inputSchema.required`, defensively. ⚠ An ABSENT `required` is legal JSON Schema and means
+ *  *"nothing is mandatory"*; reading it as *"everything in `properties` is"* would invent rows
+ *  for a server that asked for none. Mirrors `mcp_source._required_params`. */
+const requiredNamesOf = (schema: Record<string, unknown>): string[] =>
+  Array.isArray(schema.required)
+    ? schema.required
+        .filter((name): name is string => typeof name === "string")
+        .map((name) => name.trim())
+        .filter(Boolean)
+    : []
+
+/**
+ * The argument rows one draft needs, derived from the server's own schema and nothing else.
+ *
+ * ⚠ IT READS THE **EFFECTIVE** TOOLS, not the bound ones. `_resolve_binding` does
+ * `tools.get("list_tool") or DEFAULT_LIST_TOOL`, so an empty slot is not *"no tool"* — it is
+ * the reference server's name, and a model that treated it as nothing would show no rows for
+ * a connection that will really be called.
+ *
+ * ⚠ A STORED STATIC IS ALWAYS A ROW, even when the server no longer asks for it. `config` is
+ * rewritten WHOLE on every save, so a row this function omits is a binding the next rename
+ * DELETES — HI-02's mechanism, on a new key family.
+ *
+ * ⚠ READS GO THROUGH `own()`. These names come from a REMOTE server's schema, so
+ * `constructor` and `__proto__` are reachable keys; `TABLE[key] ?? ""` does not fire its
+ * fallback for an inherited member and hands back a function instead (T-211-15a).
+ */
+export function sourceArgumentModel(
+  discovered: readonly McpDiscoveredTool[] | null | undefined,
+  draft: ConnectionDraft,
+): SourceArgumentModel {
+  const effective = [
+    (draft.sourceListTool ?? "").trim() || SOURCE_TOOLS_DEFAULT_LIST,
+    (draft.sourceReadTool ?? "").trim() || SOURCE_TOOLS_DEFAULT_READ,
+  ]
+  const declared = new Set<string>()
+  const required = new Set<string>()
+  let described = false
+
+  for (const tool of discovered ?? []) {
+    if (!tool || !effective.includes(tool.name)) continue
+    const schema = tool.inputSchema
+    if (!isRecord(schema)) continue
+    described = true
+    if (isRecord(schema.properties)) {
+      for (const key of Object.keys(schema.properties)) {
+        if (key.trim()) declared.add(key.trim())
+      }
+    }
+    for (const name of requiredNamesOf(schema)) {
+      required.add(name)
+      declared.add(name)
+    }
+  }
+
+  const pathArg = (draft.sourcePathArg ?? "").trim() || SOURCE_ARG_DEFAULT_PATH
+  const stored = draft.sourceStaticArgs ?? {}
+  // ⛔ THE PATH ARGUMENT IS NEVER A STATIC ROW. It is supplied by the address on every call —
+  // `_missing_arguments` subtracts `{path_arg}` for exactly this reason — and offering a box
+  // for it would invite the collision the two disjoint namespaces exist to prevent.
+  const needed = [...required].filter((name) => name !== pathArg).sort()
+  // …but a static ALREADY STORED under that name still renders, dead though it is. The
+  // adapter writes the path LAST so it always wins; hiding the row would delete it on the
+  // next save, and a person cannot remove what they cannot see.
+  const extra = Object.keys(stored).filter((name) => !needed.includes(name)).sort()
+
+  const names = [...needed, ...extra]
+  const storable = (name: string) =>
+    (SOURCE_ARG_STATIC_PREFIX + name).length <= SOURCE_ARG_KEY_MAX
+
+  const rows: SourceArgumentRow[] = names.filter(storable).map((name) => ({
+    name,
+    value: own(stored, name) ?? "",
+    required: required.has(name) && name !== pathArg,
+  }))
+
+  return {
+    declared: [...declared].sort(),
+    described,
+    rows,
+    missing: rows.filter((row) => row.required && row.value.trim() === "").map((row) => row.name),
+    unstorable: names.filter((name) => !storable(name)),
+  }
+}
+
+/** The binding a draft expresses, or `undefined` when it expresses none.
+ *
+ * ⚠ `undefined`, NEVER `{}`. `sources/base.CONFIG_PROTOCOL_MARKERS` resolves any connection
+ * carrying a NON-EMPTY `source_tools` to `McpSourceAdapter`, and `McpConfig` records the same
+ * distinction in its own docstring: absent means nobody bound this connection to a file
+ * surface; empty means somebody looked and named nothing.
+ *
+ * ⚠ `root_path` IS CARRIED THOUGH NOTHING EDITS IT. The panel rebuilds `config` whole and the
+ * API writes that column whole, so a key this function forgot would be DELETED by a rename.
+ * That is not hypothetical — it is what `ConnectionFormPanel.sourceTools.test.tsx`'s "THE
+ * WIPE" case measured, red, before this existed.
+ */
+export function sourceToolsFromDraft(draft: ConnectionDraft): Record<string, string> | undefined {
+  const bound: Record<string, string> = {}
+  const list = (draft.sourceListTool ?? "").trim()
+  const read = (draft.sourceReadTool ?? "").trim()
+  const root = (draft.sourceRootPath ?? "").trim()
+  if (list) bound.list_tool = list
+  if (read) bound.read_tool = read
+  if (root) bound.root_path = root
+
+  // ── SEED-259 — the argument mapping, carried by the same one function ────────────────
+  //
+  // ⚠ IT LIVES HERE AND NOWHERE ELSE, WHICH IS WHAT MAKES IT SURVIVE EVERY ARM. HI-02 was
+  // live specifically on the `configFromDraft` arm nobody fixed: the `mcp` arm carried the
+  // binding and the `oauth` arm — where an MCP server connected by OAuth actually lands —
+  // did not, so a rename deleted a working file source with a 200 and no receipt. Both arms
+  // call THIS function, so a key added here cannot be present on one and absent on the other.
+  const pathArg = (draft.sourcePathArg ?? "").trim()
+  if (pathArg) bound[SOURCE_ARG_PATH_KEY] = pathArg
+
+  for (const [rawName, rawValue] of Object.entries(draft.sourceStaticArgs ?? {})) {
+    const name = rawName.trim()
+    const value = typeof rawValue === "string" ? rawValue.trim() : ""
+    // ⛔ AN EMPTY ROW IS OMITTED, AND THIS IS A DELIBERATE DIVERGENCE FROM THE ADAPTER.
+    // `mcp_source._static_args` KEEPS an empty value, because through the API it is a value
+    // somebody typed. Here every derived row STARTS empty — so writing them would put an
+    // `arg_static.*` key on the connection for every argument nobody supplied, and
+    // `refuse_if_underspecified` would then have nothing to say, because the key IS present.
+    // Merely opening this panel and pressing Save would disable the refusal for the whole
+    // connection at once, which is the fail-open shape this entire seed exists to close.
+    if (!name || !value) continue
+    const key = SOURCE_ARG_STATIC_PREFIX + name
+    // Unstorable by the 64-char ceiling. The card renders no box for these and NAMES them
+    // (`sourceArgsUnstorableNote`), so nothing a person typed is being dropped here.
+    if (key.length > SOURCE_ARG_KEY_MAX) continue
+    bound[key] = value
+  }
+
+  return Object.keys(bound).length > 0 ? bound : undefined
+}
+
 export const FIELD_COUNTS: Record<ConnectionShape, number> = {
   send_email: 4,
   create_ticket: 5,
@@ -516,6 +931,33 @@ export interface ConnectionDraft {
   /** mcp (206.1) — the whole destination, as typed. Flat and all-string like every other
    *  field, so the 🔒 footer derives it during render rather than holding a parsed copy. */
   mcpServerUrl: string
+  /** mcp (Phase 239) — the file-source binding, FLAT AND ALL-STRING like every other field
+   *  on this draft, rather than a nested object. Empty means unbound; `sourceToolsFromDraft`
+   *  is the one place that turns the three into `config["source_tools"]`.
+   *
+   *  ⚠ ~~`sourceRootPath` has no control and is carried anyway~~ — RESOLVED 2026-09-08: the
+   *  control exists (`SOURCE_TOOLS_ROOT_LABEL`). The note is struck through rather than deleted
+   *  because it described the defect accurately for a whole phase and nobody acted on it — a
+   *  comment is not a guard. See `sourceToolsFromDraft`. */
+  sourceListTool: string
+  sourceReadTool: string
+  sourceRootPath: string
+  /** mcp (`SEED-259`) — WHICH argument carries the path. Empty means unset, and unset means
+   *  the adapter sends `path`; it is never seeded to that default, for the reason
+   *  `draftFromConnection` states about the tool slots — a default is not a choice. */
+  sourcePathArg: string
+  /** mcp (`SEED-259`) — a fixed value per required argument, keyed by the SERVER'S OWN name.
+   *
+   *  ⚠ THE ONE FIELD ON THIS DRAFT THAT IS NOT A FLAT STRING, and the exception is forced
+   *  rather than chosen. The flat rule exists so the 🔒 footer can be built from PARTS during
+   *  render (`ProviderPicker.footerParts`); this field feeds no footer, and its key set is the
+   *  remote SERVER'S, so there is no fixed field to flatten it into. A named field per
+   *  argument is precisely the "code, not rows" shape `SEED-259` was ruled against.
+   *
+   *  ⛔ NEVER MUTATED IN PLACE. `EMPTY_DRAFT` is spread, not cloned deeply, so every write is
+   *  `{ ...draft.sourceStaticArgs, [name]: value }` — a mutation would edit `EMPTY_DRAFT`
+   *  itself and leak one connection's mapping into the next form that opened. */
+  sourceStaticArgs: Record<string, string>
   /** Write-only, at this boundary and nowhere else. Never populated from a read. */
   secret: string
   /** Phase 215 (OAUTH-01..04) OAuth fields */
@@ -539,6 +981,11 @@ export const EMPTY_DRAFT: ConnectionDraft = {
   accountEmail: "",
   channel: "",
   mcpServerUrl: "",
+  sourceListTool: "",
+  sourceReadTool: "",
+  sourceRootPath: "",
+  sourcePathArg: "",
+  sourceStaticArgs: {},
   secret: "",
   authType: "static_key",
   customClientId: "",
@@ -555,6 +1002,36 @@ export function draftFromConnection(connection: ConnectorConnection): Connection
   const config = connection.config as unknown as Record<string, unknown>
   const text = (key: string): string =>
     typeof config[key] === "string" ? (config[key] as string) : ""
+  // Phase 239 — the stored binding, read back so a save carries it rather than deleting it.
+  // ⚠ AN ABSENT BINDING HYDRATES TO EMPTY, NEVER TO THE DEFAULTS. Seeding `list_directory`
+  // here would turn *"nobody has bound this"* into *"somebody chose the reference server's
+  // names"* on the next save — a claim the person never made.
+  const storedTools = config.source_tools
+  const boundTool = (key: string): string =>
+    storedTools && typeof storedTools === "object" && !Array.isArray(storedTools)
+      && typeof (storedTools as Record<string, unknown>)[key] === "string"
+      ? ((storedTools as Record<string, string>)[key])
+      : ""
+  // SEED-259 — every `arg_static.<name>` on the row becomes a row on the card.
+  //
+  // ⚠ BUILT WITH `defineProperty`, NOT `out[name] = value`, and that is not ceremony: these
+  // names come from a REMOTE server's schema, and a plain assignment to `__proto__` sets the
+  // object's PROTOTYPE instead of creating a key — so the one argument name most likely to be
+  // hostile would silently vanish from the draft and be deleted on the next save.
+  const staticArgs: Record<string, string> = {}
+  if (storedTools && typeof storedTools === "object" && !Array.isArray(storedTools)) {
+    for (const [key, value] of Object.entries(storedTools as Record<string, unknown>)) {
+      if (!key.startsWith(SOURCE_ARG_STATIC_PREFIX)) continue
+      const name = key.slice(SOURCE_ARG_STATIC_PREFIX.length).trim()
+      if (!name) continue
+      Object.defineProperty(staticArgs, name, {
+        value: typeof value === "string" ? value : "",
+        enumerable: true,
+        writable: true,
+        configurable: true,
+      })
+    }
+  }
   return {
     ...EMPTY_DRAFT,
     capability: connection.auth_type === "oauth_byo"
@@ -562,6 +1039,11 @@ export function draftFromConnection(connection: ConnectorConnection): Connection
       : (connection.mcp_server_url ? "mcp" : (connection.capability ?? EMPTY_DRAFT.capability)),
     serviceId: connection.service_id,
     mcpServerUrl: connection.mcp_server_url ?? "",
+    sourceListTool: boundTool("list_tool"),
+    sourceReadTool: boundTool("read_tool"),
+    sourceRootPath: boundTool("root_path"),
+    sourcePathArg: boundTool(SOURCE_ARG_PATH_KEY),
+    sourceStaticArgs: staticArgs,
     name: connection.name,
     host: text("host"),
     port: typeof config.port === "number" ? String(config.port) : "",
@@ -629,10 +1111,16 @@ export function mcpHostOf(rawUrl: string): string {
  * its own terms rather than to another kind's config.
  */
 export function configFromDraft(draft: ConnectionDraft): ConnectorConnectionConfig {
-  // ⚠ FIRST, and by its own condition. `McpConfig` is `extra="forbid"` with exactly ONE field,
-  // so this object's KEY SET is the contract — a second key is a 422 no client type can see.
+  // ⚠ FIRST, and by its own condition. `McpConfig` is `extra="forbid"`, so this object's KEY
+  // SET is the contract — a key the model does not declare is a 422 no client type can see.
+  //
+  // ⚠ PHASE 239 ADDS EXACTLY ONE OPTIONAL KEY, AND ONLY WHEN IT IS BOUND. `source_tools` was
+  // declared on `McpConfig` by 239-01 for precisely this reason (SEED-239: an undeclared key
+  // makes the row match NO member of the union, and `_to_response` validates rows inside a
+  // list comprehension, so ONE bad row makes every connection in the org unreadable).
   if (draft.capability === "mcp") {
-    return { headers: {} }
+    const sourceTools = sourceToolsFromDraft(draft)
+    return sourceTools ? { headers: {}, source_tools: sourceTools } : { headers: {} }
   }
   // ⚠ PHASE 211 — THE SERVICE ARM NAMES ITS OWN CONDITION, exactly like its four siblings,
   // rather than leaning on the neutral terminal below. The two produce the same object today;
@@ -679,6 +1167,24 @@ export function configFromDraft(draft: ConnectionDraft): ConnectorConnectionConf
     // `oauth_client_secret_ciphertext` (migration 150). That is also what makes Connect
     // work a second time: nothing used to persist it, so reopening a saved connection and
     // pressing Connect asked for the id and secret again.
+
+    // ⚠ PHASE 239 GAP-CLOSURE (HI-02) — THE BINDING IS CARRIED HERE TOO, AND THE REASON IS
+    // THAT THIS ARM SEES MCP ROWS. `store_oauth_tokens` sets `auth_type = "oauth_byo"` after
+    // an MCP OAuth round trip, and `draftFromConnection` maps that to `capability: "oauth"`
+    // ABOVE its `mcp_server_url` test — so an MCP server connected by OAuth arrives here,
+    // not on the `mcp` arm forty lines up. `update_connection` replaces `config` WHOLE, so
+    // omitting the key DELETED a working file source on a rename, with a 200 and no receipt.
+    // That is the identical class as this module's `sourceToolsFromDraft` note, on the arm
+    // it did not fix.
+    //
+    // ⛔ CONDITIONAL, NEVER UNCONDITIONAL. A first-party Google/Microsoft `oauth_byo` row has
+    // no binding, and `sourceToolsFromDraft` returns `undefined` for it — which matters
+    // because `OAuthConnectionConfig` is `extra="forbid"` and declares no `source_tools`, so
+    // an always-present key would 422 every non-MCP OAuth connection in the org. A row that
+    // IS bound composes `{custom_client_id?, source_tools}`, whose key set `McpConfig`
+    // accepts — the same union member the `mcp` arm targets.
+    const sourceTools = sourceToolsFromDraft(draft)
+    if (sourceTools) oauthConfig.source_tools = sourceTools
     return oauthConfig
   }
 

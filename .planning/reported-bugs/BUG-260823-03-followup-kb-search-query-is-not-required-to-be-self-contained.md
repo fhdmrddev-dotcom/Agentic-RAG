@@ -4,12 +4,12 @@ title: A follow-up question can search the knowledge base with a pronoun — not
 reported: 2026-08-23
 surface: Agentic-RAG
 severity: major
-status: open
+status: deferred
 affected_areas: [RAG/retrieval, backend/agent-loop, prompting, cross-provider]
 folded_into: null
 verified_closed_by: null
 related_seeds: [SEED-020, SEED-041]
-re_open_trigger: null
+re_open_trigger: "Trigger: Evaluated during canvas graph node interactions in Phase 231"
 reproduces_on:
   branch — develop
   commit — f17f9581

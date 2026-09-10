@@ -338,7 +338,7 @@ describe("LibraryPage", () => {
     // (b) neither mount still shows a selected view. The tab body is unmounted, so it is
     // re-entered and re-read rather than assumed — an absent mount proves nothing.
     expect(viewRow(sidebar, "Quarterly reports").className).not.toContain(SELECTED_ROW_CLASS)
-    fireEvent.mouseDown(screen.getByRole("tab", { name: "Views" }))
+    fireEvent.click(screen.getByRole("tab", { name: "Views" }))
     const viewsTabAgain = await screen.findByTestId("views-tab")
     expect(viewRow(viewsTabAgain, "Quarterly reports").className).not.toContain(
       SELECTED_ROW_CLASS,
@@ -403,7 +403,7 @@ describe("LibraryPage", () => {
     renderPage(<LibraryPage />)
     await screen.findByTestId("library-sidebar")
 
-    fireEvent.mouseDown(screen.getByRole("tab", { name: "Views" }))
+    fireEvent.click(screen.getByRole("tab", { name: "Views" }))
     const viewsTab = await screen.findByTestId("views-tab")
 
     expect(within(viewsTab).getByText("Saved views")).toBeInTheDocument()
@@ -423,7 +423,7 @@ describe("LibraryPage", () => {
     const { LibraryPage } = await import("@/pages/LibraryPage")
     renderPage(<LibraryPage />)
 
-    fireEvent.mouseDown(screen.getByRole("tab", { name: "Indexing" }))
+    fireEvent.click(screen.getByRole("tab", { name: "Indexing" }))
     const indexing = await screen.findByTestId("indexing-tab")
 
     // Plan 10: the three cards compose over GET /library/index-summary (BE-2).
@@ -463,7 +463,7 @@ describe("LibraryPage", () => {
     const { LibraryPage } = await import("@/pages/LibraryPage")
     renderPage(<LibraryPage />)
 
-    fireEvent.mouseDown(screen.getByRole("tab", { name: "Ingestion" }))
+    fireEvent.click(screen.getByRole("tab", { name: "Ingestion" }))
     const ingestion = await screen.findByTestId("ingestion-tab")
 
     // Plan 03's sub-tab restructure: the in-flight queue lives under the
@@ -521,12 +521,23 @@ describe("LibraryPage — plan 06 furniture (LIB-01)", () => {
     expect(await within(tiles).findByText("224")).toBeInTheDocument()
   })
 
-  it("renders the Library › folder › tab breadcrumb", async () => {
+  it("⛔ renders NO breadcrumb — it duplicated the sidebar and the tab strip", async () => {
+    // ⚠ REWRITTEN, NOT DELETED (sketch 231-A, operator-locked 2026-09-05). This case used to
+    // assert the breadcrumb existed. The breadcrumb read `Library › Documents` while the sidebar
+    // already said Library and the tab already said Documents — pure duplication costing ~38px
+    // of a band that was already 48% empty. Inverting the assertion rather than removing it
+    // keeps the deletion INTENTIONAL: a silently-dropped case reads as a case nobody wrote.
     const { LibraryPage } = await import("@/pages/LibraryPage")
     renderPage(<LibraryPage />)
-    const crumb = await screen.findByTestId("library-breadcrumb")
-    expect(within(crumb).getByText("Library")).toBeInTheDocument()
-    expect(within(crumb).getByText("Documents")).toBeInTheDocument()
+    await screen.findByTestId("library-headerbar")
+    expect(screen.queryByTestId("library-breadcrumb")).toBeNull()
+    // …and the two facts it carried are still on screen, in the row that replaced it.
+    const bar = screen.getByTestId("library-headerbar")
+    expect(within(bar).getByText("Library")).toBeInTheDocument()
+    expect(within(bar).getByRole("tab", { name: "Documents" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    )
   })
 
   it("renders the client-side pager under the Documents table (rows-per-page + range + prev/next)", async () => {

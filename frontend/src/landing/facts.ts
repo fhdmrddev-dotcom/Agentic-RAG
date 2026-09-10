@@ -76,18 +76,33 @@ export const LOCAL_RUNTIMES: readonly LocalRuntimeFact[] = Object.freeze([
  * The 11 ingest formats: 8 dropzone formats from acceptedFormats.ts plus 3 server-side
  * override extensions (.msg, .eml, .dxf from backend/app/api/documents.py:128-130).
  */
+// ⚠ RE-SYNCED 2026-09-05. This list had been drifted since 233.1 — the dropzone gained XLS
+// and HTML and this file was never updated, so `check-landing-drift.cjs` was already red
+// before the images below were added. Both halves are corrected together.
+//
+// ⚠ THE GUARD'S DOUBLE-COUNT WAS FIXED IN THE SAME COMMIT, and it mattered:
+// `FilesSection.tsx` renders one chip per entry with `key={fmt}`, so the `MSG · EML · DXF`
+// the guard was demanding twice would have printed twice, under duplicate React keys.
 export const INGEST_FORMATS: readonly string[] = Object.freeze([
   "PDF",
   "DOCX",
   "PPTX",
   "XLSX",
+  "XLS",
   "CSV",
   "TXT",
   "MD",
+  "HTML",
   "EPUB",
-  "MSG",
   "EML",
+  "MSG",
   "DXF",
+  "PNG",
+  "JPG",
+  "JPEG",
+  "WEBP",
+  "TIFF",
+  "BMP",
 ])
 
 /**

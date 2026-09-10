@@ -29,7 +29,7 @@ from app.services.connector_service import (
 
 
 @pytest.mark.asyncio
-async def test_oauth_full_authorization_and_token_storage_lifecycle(fake_redis):
+async def test_oauth_full_authorization_and_token_storage_lifecycle(fake_oauth_redis):
     """Simulates full OAuth authorization, PKCE validation, token exchange, and encrypted storage."""
     connection_id = "conn-int-101"
     user_id = "user-int-101"
@@ -44,7 +44,7 @@ async def test_oauth_full_authorization_and_token_storage_lifecycle(fake_redis):
             user_id=user_id,
             org_id=org_id,
             redirect_uri=redirect_uri,
-            redis=fake_redis,
+            redis=fake_oauth_redis,
         )
 
     assert "https://accounts.google.com/o/oauth2/v2/auth" in auth_url
@@ -54,7 +54,7 @@ async def test_oauth_full_authorization_and_token_storage_lifecycle(fake_redis):
     assert "." not in state_token
 
     # Step 2: Callback state verification via server-side pending state retrieval
-    pending_state = await take_pending_state(fake_redis, state_token, expected_flow="provider")
+    pending_state = await take_pending_state(fake_oauth_redis, state_token, expected_flow="provider")
     assert pending_state.connection_id == connection_id
     assert pending_state.user_id == user_id
     assert len(pending_state.code_verifier) > 10

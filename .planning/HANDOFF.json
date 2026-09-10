@@ -1,0 +1,49 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-09-05T06:46:33.307Z",
+  "phase": "231",
+  "phase_name": "Connection-Scoped Visibility",
+  "phase_dir": ".planning/phases/231-connection-scoped-visibility",
+  "plan": null,
+  "task": null,
+  "total_tasks": 6,
+  "status": "paused",
+  "role_note": "RECIPROCAL REVIEW is now the protocol (operator-ratified 2026-09-05). Roles ALTERNATE per phase. On 231 Claude BUILT and Gemini REVIEWED — the inverse of 228/229/230. Arm a pairing with `/pair <phase> <builder>` or `bash scripts/arm-pair.sh`. Next phase (232) should name its builder explicitly.",
+  "completed_tasks": [
+    {"id": 1, "name": "Phase 230 verified by driving — SC#1 re-driven PASS after two blocking defects were found and fixed", "status": "done", "commit": "4585378d8"},
+    {"id": 2, "name": "Phase 230 CLOSED — Defect B driven (forced permanent failure), SC#2/SC#3 recorded as OWED DRIVES with a deadline", "status": "done", "commit": "12339e3e6"},
+    {"id": 3, "name": "Sketch 228 (VIS-02 'who will see this') — 3 variants, locked B+A by operator, C deferred to 233", "status": "done", "commit": "3166a0d29"},
+    {"id": 4, "name": "Phase 231 BUILT: migrations 154+155, four-site widening behind one resolver, VIS-02 surface, TRUST-04 citations + detail panel, mandatory threat model", "status": "done", "commit": "e36eb637a"},
+    {"id": 5, "name": "Phase 231 REVIEWED by Gemini — verdict PASS (driven independently), one advisory finding", "status": "done", "commit": "ac91c729d"},
+    {"id": 6, "name": "Two operator-found bulk-ingest bugs fixed + the reviewer's ledger catch corrected", "status": "done", "commit": "b10a7262d"}
+  ],
+  "remaining_tasks": [
+    {"id": 7, "name": "Phase 231 formal close — update ROADMAP/STATE position to complete, write SUMMARY files", "status": "not_started", "owner": "either"},
+    {"id": 8, "name": "Phase 232 — The Source Contract + Google Drive. NAME THE BUILDER FIRST (roles alternate)", "status": "not_started", "owner": "tbd"},
+    {"id": 9, "name": "Owed drives against 230: SC#2 (several hundred files) and SC#3 (live 429 -> named refusal -> auto-resume). Deadline: before v4.0 closes", "status": "not_started", "owner": "claude"}
+  ],
+  "blockers": [
+    {"description": "BUS-117 — the backend unit baseline is NOT deterministic. Measured 71 AND 72 on byte-identical trees by TWO independent agents. CLAUDE.md pins the ceiling at `failed <= 71` with explicitly zero headroom, so a clean tree can fail the gate and a phase can be blamed for a flake it did not cause.", "type": "human_action", "workaround": "Unstable test is tests/unit/test_cross_worker_cancellation.py::test_a_late_producer_finalize_may_not_write_failed_over_a_cancel — passes 28/28 in isolation, fails only in the full suite via an unraisable 'coroutine handle_query_tables was never awaited' attributed at GC time. Fix the flake OR restate the ceiling as 72. CLAUDE.md forbids weakening it without operator authorisation."},
+    {"description": "BUS-114 — the IngestionStrip ordered fence has been RED since before Phase 229, so the vitest count gate CANNOT reach green for anyone. documents.py has 7 distinct ingestion_step writes; the fence asserts exactly 6.", "type": "human_action", "workaround": "Needs routing to a phase or a /gsd:fast. Root cause of the long miss: 'frontend untouched so the gate cannot be affected' is UNSOUND here — that suite imports backend/app/api/documents.py?raw."},
+    {"description": "THE BUS CAN BE BYPASSED. Gemini delivered the 231 review as a COMMIT (ac91c729d), not a bus item, so Claude's monitor never fired and the operator had to relay it. The watcher polls agent-bus.sh, not git log.", "type": "technical", "workaround": "Either require the reviewer to always post to the bus, or extend scripts/agent-bus-watch.sh to also notice `docs(NNN): reviewer` commits. Until then a review can land silently."}
+  ],
+  "human_actions_pending": [
+    {"action": "Decide BUS-117 — fix the flake or restate the backend ceiling as 72", "context": "Two agents have independently measured a clean tree failing the gate", "blocking": false},
+    {"action": "Decide BUS-114 — route the inherited IngestionStrip fence", "context": "The count gate cannot reach green until it is fixed", "blocking": false},
+    {"action": "Re-upload facilitator-guide.docx from its source", "context": "The file is genuinely broken — 18,910 bytes, named .docx, not a zip. Detection was always correct; only the advice was wrong and is now fixed.", "blocking": false},
+    {"action": "Restart the backend and re-arm the bus watcher in the new session", "context": "Both were this session's background processes and die with it. `/pair 231 claude` re-arms the watcher.", "blocking": false}
+  ],
+  "decisions": [
+    {"decision": "RECIPROCAL REVIEW — roles alternate per phase so the pair runs without the operator", "rationale": "Operator instruction. Not a new rule: AGENTS.md 3.1 already required it and the practice had ossified into 'Gemini always builds'. 231 is Claude-built by the ratified criticality test (permission model + table-shape migration + can-fail-open).", "phase": "protocol"},
+    {"decision": "D-5 — the department dimension is present but INERT", "rationale": "A second scope added after the predicate is set is a re-ingest, not a migration. Implemented as DERIVED (NOT EXISTS dept_members) so it fails CLOSED on activation rather than silently over-sharing. Driven both ways by both agents.", "phase": "231"},
+    {"decision": "Sketch 228 locked B+A; C deferred to Phase 233", "rationale": "SC#1 is a COVERAGE claim, so B (the sentence IS the option) writes the copy and A (the always-on footer) is the rule it appears everywhere B does not reach — including read-only screens, where A is what renders instead of a disabled control.", "phase": "231"},
+    {"decision": "TM-231-07 — fetch_full_document is a FIFTH retrieval path and was deliberately NOT widened", "rationale": "It is owner-scoped so it fails CLOSED — a usability gap, not a leak. Widening it in Python outside the one transaction the four sites moved in is the exact H-1 drift. Reviewer independently judged this CORRECT.", "phase": "231"},
+    {"decision": "Phase 230 closed with SC#2 and SC#3 as OWED DRIVES rather than held open", "rationale": "Operator decision. Recorded with a deadline (before v4.0 closes) and a re-open trigger, because this project's history is that owed UAT rows survive whole milestones unrun.", "phase": "230"}
+  ],
+  "uncommitted_files": [
+    "graphify-out/converted/sample_master_rate_sheet_4ff79713.md (PRE-EXISTING, untracked, not this session)",
+    "screenshots/Screenshot 2026-09-02 225151.png (PRE-EXISTING, untracked, not this session)"
+  ],
+  "next_action": "Close Phase 231 formally (ROADMAP + STATE position to complete, SUMMARY files), then name the builder for Phase 232 — roles ALTERNATE, so 232 is Gemini-built / Claude-reviewed unless it trips an AGENTS.md 3.1 criticality trigger.",
+  "context_notes": "The working method that earned its keep this session: DRIVE, do not read. Every consequential finding came from running something — the SC#1 failure (two blocking defects nothing else caught), Defect B's verification, the jsonb string-scalar corruption, the five-way-wrong reconstruction of two SECURITY DEFINER bodies from a filtered grep, and the two bulk-ingest bugs. Gates that were green the whole time never surfaced any of them. Second pattern worth carrying: str.replace anchored to a line PAIR matched the first of three classes sharing that pair — twice — producing a duplicated field and 23 new failures. Anchor edits to class/function bodies, not to line pairs. Third: a ledger cell written MID-PHASE is a claim about a moving file; my own later commit falsified my own note and the REVIEWER caught it, which is precisely what reciprocal review is for."
+}

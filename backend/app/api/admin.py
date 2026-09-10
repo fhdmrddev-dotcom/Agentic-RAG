@@ -47,6 +47,7 @@ from app.dependencies import (
     require_operator,
 )
 from app.models.user_settings import (
+    broadcast_model_overrides_change,
     invalidate_model_overrides_cache,
     save_app_settings,
     set_feature_visibility,
@@ -1304,7 +1305,11 @@ async def add_model_by_id(
             detail="Could not persist the new model — it was not added.",
         )
 
-    invalidate_model_overrides_cache()  # SC#1: the DB-only row is served on the next request
+    # BUG-260902-06: broadcast, not just invalidate. The local invalidator reaches THIS
+    # process only; with WORKER_COUNT=2 the operator's next GET had a coin-flip chance of
+    # landing on a worker still serving a 30s-stale registry ("sometimes it is added but
+    # not directly"). broadcast_* re-warms here AND publishes to the siblings.
+    await broadcast_model_overrides_change()  # SC#1: the DB-only row is served on the next request
     request.state.audit_action = "model.added"
     request.state.audit_label = f"Added {model_id} ({body.provider})"
     return {"ok": True, "model_id": model_id, "provider": body.provider, "enabled": False}
@@ -1486,7 +1491,9 @@ async def set_model_capability(
             detail="Could not persist the capability change — it was not changed.",
         )
 
-    invalidate_model_overrides_cache()  # SC#1: edit visible on the next request
+    # BUG-260902-06: broadcast across workers (see the add path above) — a capability or
+    # enabled flip written on one worker was invisible to the other for up to 30s.
+    await broadcast_model_overrides_change()  # SC#1: edit visible on the next request
     request.state.audit_action = "model.capability.set"
     request.state.audit_label = f"Changed capabilities for {model_id}"
     return {"ok": True, "model_id": model_id, "changed": present_cols}

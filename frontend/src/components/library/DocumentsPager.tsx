@@ -9,7 +9,7 @@
  * Extends `PaginationControls.tsx`'s prev/next/page-count logic with ONE new affordance:
  * a `Rows per page` `Select` (default 25).
  */
-import { useState } from "react"
+import {  } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Select,
@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { ChevronLeft, ChevronRight } from "lucide-react"
+import { AnimatedNumber } from "@/components/ui/AnimatedNumber"
 
 /** PostgREST's default max-rows ceiling — above this the loaded list is suspect. */
 const ROW_CAP = 1000
@@ -71,7 +72,7 @@ export function DocumentsPager({ total, offset, limit, onChange }: Props) {
       </div>
 
       <span className="tabular-nums">
-        {start}–{end} of {capped ? `${total}+` : total}
+        <AnimatedNumber value={start} />–<AnimatedNumber value={end} /> of {capped ? <><AnimatedNumber value={total} />+</> : <AnimatedNumber value={total} />}
       </span>
 
       <div className="flex items-center gap-1">
@@ -99,7 +100,7 @@ export function DocumentsPager({ total, offset, limit, onChange }: Props) {
 
       {capped && (
         <span className="w-full text-center text-muted-foreground/70">
-          The list may be larger than shown — the library has {total}+ rows.
+          The list may be larger than shown — the library has <AnimatedNumber value={total} />+ rows.
         </span>
       )}
     </div>

@@ -116,6 +116,14 @@ export interface Citation {
   similarity: number | null
   is_full_doc: boolean
   version_number?: number
+  /** Phase 231 TRUST-04 — the connection that PLACED this document, absent when a person
+   *  uploaded it. ABSENCE IS THE SIGNAL: an unmarked citation is knowledge somebody chose to
+   *  put here, which is the common case and should stay unadorned (the 074-A rule). */
+  source_connection_id?: string | null
+  /** The connection's name, when it still resolves. `null` with an id present is a real state —
+   *  a deleted connection nulls the id (D-4), and a name may simply not be readable. The
+   *  surface then says "a connection" rather than inventing one. */
+  source_connection_name?: string | null
 }
 
 export interface ConfidenceResult {
@@ -463,6 +471,8 @@ export interface ClassificationRule {
   id: string
   user_id?: string | null
   name: string
+  /** Phase 237 (RULES-01): rule_scope discriminator — 'watch' evaluates on arrival, 'classification' post-extraction. */
+  rule_scope?: "watch" | "classification"
   match_expr: ViewFilter
   suggest_folder_id: string | null
   /** Phase 165 (MIG-02): is_global→is_system_global — DISPLAY-ONLY platform-seed
@@ -510,7 +520,10 @@ export interface Document {
   file_path: string
   file_size: number
   mime_type: string
-  status: "pending" | "processing" | "completed" | "failed"
+  status: "pending" | "processing" | "completed" | "failed" | "paused"
+  /** Phase 231 TRUST-04 — the connection that PLACED this document; absent when a person
+   *  uploaded it. ABSENCE IS THE SIGNAL, so the common case stays unadorned. */
+  source_connection_id?: string | null
   error_message: string | null
   /** Phase 56 D-10/D-11 · corrected Phase 217 (D-217-09/D-217-23): the granular sub-status the
    *  ingestion pipeline last entered. SIX steps, not four — in the order `backend/app/api/documents.py`
@@ -1331,4 +1344,26 @@ export interface AskUserAnswerBody {
   tool_call_id: string
   response_text: string
   choice_index: number | null
+}
+
+/** Phase 240 (SRC-05 SC#3) — one message of a mail conversation, as the detail panel
+ *  renders it. Carries everything a row needs so the panel makes ONE request for a whole
+ *  conversation rather than one per sibling. */
+export interface ConversationMessage {
+  id: string
+  title: string | null
+  date: string | null
+  sender: string | null
+  /** The document currently open. It is MARKED, never hidden: a person reading a
+   *  fourteen-message thread needs to see where they are in it. */
+  is_open: boolean
+}
+
+/** Phase 240 — a conversation, and an honest statement about whether it is all of one.
+ *  `truncated` exists because a capped list that does not say so is the same lie as an
+ *  uncapped one that PostgREST silently sliced at 1000. */
+export interface ConversationResponse {
+  messages: ConversationMessage[]
+  total: number
+  truncated: boolean
 }

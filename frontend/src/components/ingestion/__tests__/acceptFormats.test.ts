@@ -70,9 +70,33 @@ const codeOf = (src: string): string =>
  * The terminator is a line-anchored closing brace so the match stops at the end of the set
  * literal rather than running on into the next dict in the file.
  */
+/**
+ * The server's real accept set.
+ *
+ * ⚠ IT IS TWO LITERALS, NOT ONE, AND THIS FENCE FOUND THAT ITSELF. `ALLOWED_MIME_TYPES`
+ * splats a named `IMAGE_MIME_TYPES` frozenset into itself (`*IMAGE_MIME_TYPES`) so the image
+ * types have ONE home shared with `extract_text`'s routing branch. A regex reading only the
+ * outer literal sees the splat as no members at all — so the six image mimes looked absent,
+ * and the subset assertion below went red the moment they were advertised. That is the fence
+ * behaving correctly on a real change in shape; the fix is to resolve the splat, never to
+ * loosen the assertion.
+ *
+ * ⛔ THE SPLAT IS RESOLVED, NOT ASSUMED. If `IMAGE_MIME_TYPES` is ever renamed or inlined,
+ * the non-vacuity test below still guards the total, and `imageMimeTypes()` returning []
+ * would shrink the set rather than silently widen it — the safe direction.
+ */
+function imageMimeTypes(): string[] {
+  const m = /IMAGE_MIME_TYPES\s*=\s*frozenset\(\{([\s\S]*?)\}\)/.exec(documentsPySource)
+  return m === null ? [] : quoted(m[1])
+}
+
 function serverAllowedMimeTypes(): string[] {
   const m = /ALLOWED_MIME_TYPES\s*=\s*\{([\s\S]*?)\r?\n\}/.exec(documentsPySource)
-  return m === null ? [] : quoted(m[1])
+  if (m === null) return []
+  const direct = quoted(m[1])
+  // Only expand the splat the outer literal actually performs.
+  const splatted = /\*IMAGE_MIME_TYPES/.test(m[1]) ? imageMimeTypes() : []
+  return [...direct, ...splatted]
 }
 
 // ══════════════════════════════════════════════════════════════════════════════════════
@@ -174,41 +198,59 @@ describe("one list, three consumers", () => {
 })
 
 // ══════════════════════════════════════════════════════════════════════════════════════
-// 3 · THE NEGATIVE ARM — the two formats the sketch's own fence caught
+// 3 · THE FIVE FORMATS THAT HAD A DOOR AND NO SIGN
+// ══════════════════════════════════════════════════════════════════════════════════════
+//
+// ⚠ THIS SECTION USED TO ASSERT THE OPPOSITE, AND THE INVERSION IS THE POINT.
+//
+// It was a NEGATIVE arm — `.msg` and `.eml` must NOT be advertised — written when an older
+// dropzone offered formats the input then refused. But its own second case recorded, in as many
+// words, that **the server's silence was not the reason: it allows them.** The dropzone was
+// deliberately narrower, and `acceptedFormats.ts`'s docblock said exactly what that meant:
+// *"offering them is a product decision that belongs to a phase, not a constant."*
+//
+// ⭐ The operator made that decision on 2026-09-05 — *"the supported file format list is not
+// updated"* — so the arm flips from absence to PRESENCE. The measurement underneath never
+// changed; only the product call did. Kept as an inversion rather than a deletion so the history
+// reads correctly: this was never a bug being fixed, it was a fence outliving its condition.
 // ══════════════════════════════════════════════════════════════════════════════════════
 
-describe("⛔ the formats an older dropzone advertised and the input refuses", () => {
+describe("⭐ the formats the server accepted while the dropzone stayed silent", () => {
   // Needles assembled at runtime so this file's prose cannot satisfy the checks.
   const OUTLOOK = "." + "msg"
   const EMAIL = "." + "eml"
 
-  it("neither appears in extensions, labels or the accept attribute", () => {
-    // Non-vacuity for an ABSENCE arm: the lists really do have contents to be absent from.
-    expect(ACCEPTED_FORMATS.extensions.length).toBeGreaterThan(1)
-
-    expect(ACCEPTED_FORMATS.extensions).not.toContain(OUTLOOK)
-    expect(ACCEPTED_FORMATS.extensions).not.toContain(EMAIL)
-    expect(ACCEPTED_FORMATS.displayLabels).not.toContain(OUTLOOK.slice(1).toUpperCase())
-    expect(ACCEPTED_FORMATS.displayLabels).not.toContain(EMAIL.slice(1).toUpperCase())
+  it("both are advertised now — extension, label and accept attribute", () => {
+    expect(ACCEPTED_FORMATS.extensions).toContain(OUTLOOK)
+    expect(ACCEPTED_FORMATS.extensions).toContain(EMAIL)
+    expect(ACCEPTED_FORMATS.displayLabels).toContain(OUTLOOK.slice(1).toUpperCase())
+    expect(ACCEPTED_FORMATS.displayLabels).toContain(EMAIL.slice(1).toUpperCase())
 
     const attr = acceptAttribute()
-    expect(attr.length).toBeGreaterThan(50) // the string is real before we assert on absence
-    expect(attr).not.toContain(OUTLOOK)
-    expect(attr).not.toContain(EMAIL)
-    expect(formatsSentence()).not.toContain(OUTLOOK.slice(1).toUpperCase())
+    expect(attr.length).toBeGreaterThan(50)
+    expect(attr).toContain(OUTLOOK)
+    expect(attr).toContain(EMAIL)
   })
 
-  it("⚠ and the SERVER's silence is not the reason — it allows them", () => {
-    // Measured 2026-08-29 and recorded so a future editor does not "reconcile" the two in
-    // the wrong direction. The server's set is WIDER; the dropzone is deliberately narrower,
-    // which is exactly what the subset fence permits and equality would have forbidden.
+  it("⚠ and the SERVER really does allow them — the claim above rests on this", () => {
+    // Unchanged from the negative arm. It was the caveat; it is now the justification.
     const server = new Set(serverAllowedMimeTypes())
     expect(server.size).toBeGreaterThanOrEqual(8) // non-vacuity before the claim
     expect(server.has("message/rfc" + "822")).toBe(true)
   })
+
+  it("⛔ the list is still a SUBSET — widening is not the same as equality", () => {
+    // The direction is load-bearing twice over (see the module docblock): `accept` is not a
+    // security control, and this constant may only ever make the client STRICTER than the gate.
+    const server = new Set(serverAllowedMimeTypes())
+    for (const m of ACCEPTED_FORMATS.mimeTypes) expect(server.has(m)).toBe(true)
+    expect(ACCEPTED_FORMATS.mimeTypes.length).toBeLessThan(server.size + 1)
+    // …and one server mime is deliberately still unlisted, so "subset" is not an accident.
+    expect(server.has("application/csv")).toBe(true)
+    expect(ACCEPTED_FORMATS.mimeTypes).not.toContain("application/csv")
+  })
 })
 
-// ══════════════════════════════════════════════════════════════════════════════════════
 // 4 · THE KEY LINK — the consumer really reads the constant, and prints no percentage
 // ══════════════════════════════════════════════════════════════════════════════════════
 
@@ -264,7 +306,53 @@ describe("the consumer reads the constant, and invents no progress", () => {
 
   it("the shipped batch honesty is untouched", () => {
     expect(uploadCode).toContain("Promise.allSettled")
-    expect(uploadCode).toContain("already up to date")
+    expect(uploadCode).toContain("already in your Library")
     expect(uploadCode).toContain("text-xs text-destructive")
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════════════
+// ⛔ THE ROW MUST NOT CHANGE HEIGHT — the operator saw the dropzone SHAKING
+// ══════════════════════════════════════════════════════════════════════════════════════
+//
+// Reported as the dropzone "shaking to the left and right". MEASURED in the live page by
+// sweeping the dropzone container from 1220px down to 620px and recording the row height:
+//
+//   ml-auto truncate          -> heights {24, 47}      ← wraps, so the row grows 23px
+//   flex-nowrap + min-w-0     -> heights {24, 40, 60}  ← worse
+//   ml-auto min-w-0 flex-1    -> heights {24}          ← constant, shipped
+//
+// `truncate` CANNOT shrink a flex item on its own, and inside a `flex-wrap` row the item
+// WRAPS instead. That height change toggles the page's vertical scrollbar, the scrollbar
+// changes the viewport width by ~15px, and the width change flips the wrap back — a feedback
+// loop that reads as horizontal jitter.
+//
+// ⚠ IT WAS LATENT UNTIL THE LIST GREW. The wrap boundary is ~950px of dropzone width; the six
+//   image formats (13 -> 19 entries, SEED-226) made the sentence long enough to cross it at
+//   ordinary window sizes. So this fence guards a CONSEQUENCE of this very module growing —
+//   the next format added walks straight back into it.
+//
+// ⛔ jsdom has no layout engine: `getBoundingClientRect` is all zeros, so the height flip
+//   itself is UNTESTABLE here. This asserts the classes that were measured to prevent it,
+//   and says so rather than implying it proved the geometry.
+describe("⛔ the formats line shrinks instead of wrapping (no layout shake)", () => {
+  const formatsSpan = /<span\s+className="([^"]*truncate[^"]*)"\s*\n?\s*title=\{formatsSentence\(\)\}/
+
+  it("the truncating formats span was found in the source", () => {
+    // Non-vacuity: a regex that stops matching would make every claim below free.
+    expect(formatsSpan.test(uploadCode)).toBe(true)
+  })
+
+  it("it can actually shrink — `min-w-0` and `flex-1`, not `truncate` alone", () => {
+    const cls = uploadCode.match(formatsSpan)![1]
+    expect(cls).toContain("min-w-0")
+    expect(cls).toContain("flex-1")
+    expect(cls).toContain("truncate")
+  })
+
+  it("the full list stays reachable when it ellipsizes", () => {
+    // Truncation hides formats; the title attribute is what keeps the sentence a contract
+    // rather than a decoration that silently drops half of what the server accepts.
+    expect(uploadCode).toMatch(/title=\{formatsSentence\(\)\}/)
   })
 })

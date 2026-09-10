@@ -200,7 +200,7 @@ async def test_a_genuinely_absent_connection_still_says_not_connected(monkeypatc
 # The Google error reason — the enum half travels, the message half never does
 # ══════════════════════════════════════════════════════════════════════════════════════
 def test_google_error_reason_carries_the_enums_and_not_the_message():
-    from app.services.cloud_storage import _google_error_reason
+    from app.services.sources.adapters.google_drive import _google_error_reason
 
     body = json.dumps({
         "error": {
@@ -220,7 +220,7 @@ def test_google_error_reason_carries_the_enums_and_not_the_message():
 
 
 def test_google_error_reason_never_raises_on_junk():
-    from app.services.cloud_storage import _google_error_reason
+    from app.services.sources.adapters.google_drive import _google_error_reason
 
     for junk in (None, b"", b"not json", b"[]", b'{"error": "a string"}', b'{"error":{}}'):
         assert _google_error_reason(junk) == ""
@@ -228,7 +228,7 @@ def test_google_error_reason_never_raises_on_junk():
 
 def test_google_error_reason_drops_a_non_enum_reason():
     """Defence in depth: only alphanumeric enum tokens travel, never free text."""
-    from app.services.cloud_storage import _google_error_reason
+    from app.services.sources.adapters.google_drive import _google_error_reason
 
     body = json.dumps({
         "error": {"status": "PERMISSION DENIED because of 'my secret query'",

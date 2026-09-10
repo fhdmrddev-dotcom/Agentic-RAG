@@ -1,4 +1,5 @@
 import { FileText, TrendingUp, AlertTriangle, PackageOpen } from "lucide-react"
+import { AnimatedNumber } from "@/components/ui/AnimatedNumber"
 
 interface Props {
   totalDocuments: number
@@ -59,14 +60,17 @@ export function HealthStatBar({ totalDocuments, retrievedCount, flaggedCount, un
         return (
           <div
             key={card.label}
-            className="ghost-border bg-card/50 rounded-lg p-4 flex flex-col gap-2"
+            className="card-interactive relative overflow-hidden rounded-xl border border-border/50 bg-card/40 backdrop-blur-sm p-4 flex flex-col gap-2 shadow-sm"
           >
+            <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium text-muted-foreground">{card.label}</span>
-              <Icon className={`h-3.5 w-3.5 shrink-0 ${card.iconClass}`} />
+              <div className="p-1.5 rounded-md bg-muted/30 border border-border/30">
+                <Icon className={`h-3.5 w-3.5 shrink-0 ${card.iconClass}`} />
+              </div>
             </div>
-            <span className={`text-3xl font-bold font-headline tabular-nums leading-none ${card.valueClass}`}>
-              {card.value}
+            <span className={`text-3xl font-bold font-headline tabular-nums leading-none tracking-tight ${card.valueClass}`}>
+              <AnimatedNumber value={card.value} />
             </span>
             <span className="text-xs text-muted-foreground">{card.description}</span>
           </div>

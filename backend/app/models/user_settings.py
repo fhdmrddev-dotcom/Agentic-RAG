@@ -147,6 +147,13 @@ class UserEffectiveSettings(BaseModel):
     vector_search_weight: float
     keyword_search_weight: float
     rrf_k: int
+    # Phase 241 (QUEUE-06 / D-09, migration 176) — the two HNSW scan knobs, applied per
+    # request with `SET LOCAL` inside the transaction `get_user_pg_connection` already
+    # opens. ⛔ Their two memory companions (`hnsw_max_scan_tuples`,
+    # `hnsw_scan_mem_multiplier`) are deliberately absent from this model: they stay
+    # hardcoded in `config.py` because a wrong value is a memory footgun (T-241-16).
+    hnsw_ef_search: int = 40
+    hnsw_iterative_scan: str = "off"
 
     # Web search
     tavily_api_key: str
@@ -196,6 +203,36 @@ class UserEffectiveSettings(BaseModel):
     # Multimodal limits (Phase 071 migration 044; Phase 072 RAG-MM-LIFT-01 USES these)
     multimodal_max_vision_calls: int = 100
     multimodal_max_b64_bytes_kb: int = 4096
+
+    # SEED-258 (migration 174) — the source file ceiling is a SETTING, not three constants.
+    #
+    # ⚠ WHY THIS EXISTS. `MAX_FILE_BYTES` was duplicated across `google_drive.py`,
+    #   `microsoft_graph.py` and `mcp_source.py` and agreed in all three only by coincidence
+    #   of careful authorship — while `mcp_client.MAX_MCP_BODY_BYTES` disagreed with all of
+    #   them, capping MCP imports at ~1.5 MB against a stated 25 MB. Each number was
+    #   individually defensible; the RELATION between them was wrong, and a relation has no
+    #   home in a file of constants.
+    #
+    # ⛔ ONE knob — the FILE ceiling, the number a person thinks in. The MCP envelope cap is
+    #   DERIVED from it (`mcp_client.mcp_max_body_bytes()`), never a second field: exposing
+    #   both would re-create the exact disagreement this exists because of.
+    #
+    # ⛔ app_settings, NOT user_settings. A DoS guard a user can raise for themselves is not a
+    #   guard — it bounds how much memory ONE in-flight request buffers from a remote server
+    #   we do not control. Read it through `source_max_file_bytes()` below, never directly.
+    source_max_file_size_mb: int = 25
+
+    # SEED-226 (migration 166) — the vision model is a SETTING, not a constant.
+    #
+    # ⚠ EMPTY IS THE ONLY CORRECT DEFAULT, and the previous non-empty one was a live bug:
+    #   `config.py` pinned `vision_model = "gpt-4o-mini"`, so the resolution
+    #   `env_settings.vision_model or app_settings.llm_model` COULD NEVER FALL THROUGH.
+    #   The llm_model half was dead code and every vision call in this product went to
+    #   gpt-4o-mini whatever provider the operator had configured. Same shape as
+    #   `extraction_model` above: unset => the active chat model.
+    vision_model: str = ""
+    #: Hard ceiling on pages transcribed per document. Exceeding it is RECORDED, never silent.
+    vision_max_pages: int = 50
 
     # Phase 075.10 (migration 049): tool_args_progress SSE emission cadence.
     chat_tool_args_progress_emit_boundary_bytes: int = 256
@@ -362,6 +399,65 @@ async def refresh_settings_cache() -> None:
         invalidate_settings_cache()
 
 
+async def broadcast_settings_change() -> None:
+    """Re-warm THIS worker, then tell every OTHER worker to do the same (BUG-260902-06).
+
+    ``refresh_settings_cache()`` above fixes the WRITING worker and says so — "NOT a
+    cross-process fix". Under the ``WORKER_COUNT=2`` default the sibling keeps serving its own
+    module-global cache until its own 30s TTL lapses, so whether a change is visible is a coin
+    flip on which worker serves the next read. This is the other half: one Redis PUBLISH,
+    picked up by each worker's ``SettingsCacheSubscriber``, which calls
+    ``refresh_settings_cache()`` locally.
+
+    NEVER RAISES. The write is the contract. A dead Redis degrades to exactly the pre-existing
+    behaviour (the TTL) — it must never turn a successful write into an error.
+    """
+    await refresh_settings_cache()
+    try:
+        from app.services.settings_broadcast import (  # lazy — avoid an import cycle
+            SCOPE_APP_SETTINGS,
+            publish_cache_invalidation,
+        )
+        await publish_cache_invalidation(SCOPE_APP_SETTINGS)
+    except Exception:  # noqa: BLE001 — belt and braces; the publisher is fail-soft too
+        logger.warning(
+            "broadcast_settings_change: cross-worker publish failed; siblings fall back "
+            "to their TTL", exc_info=True,
+        )
+
+
+async def broadcast_model_overrides_change() -> None:
+    """The model-registry twin of ``broadcast_settings_change`` (BUG-260902-06).
+
+    ⚠ Call this on model-registry WRITES only. The two ``invalidate_model_overrides_cache()``
+    calls in ``admin.py`` that force a FRESH read before a guard (WR-03) are reads, not writes,
+    and must NOT broadcast — publishing there would make every worker re-read the DB because
+    one worker wanted to check something.
+
+    NEVER RAISES.
+    """
+    invalidate_model_overrides_cache()
+    try:
+        await _load_model_overrides()
+        await load_all_model_overrides()
+    except Exception:  # noqa: BLE001
+        logger.warning(
+            "broadcast_model_overrides_change: local re-warm failed; this worker falls back "
+            "to its TTL", exc_info=True,
+        )
+    try:
+        from app.services.settings_broadcast import (  # lazy — avoid an import cycle
+            SCOPE_MODEL_OVERRIDES,
+            publish_cache_invalidation,
+        )
+        await publish_cache_invalidation(SCOPE_MODEL_OVERRIDES)
+    except Exception:  # noqa: BLE001
+        logger.warning(
+            "broadcast_model_overrides_change: cross-worker publish failed; siblings fall "
+            "back to their TTL", exc_info=True,
+        )
+
+
 async def ensure_settings_fresh() -> None:
     """Bound the SYNC reader's staleness to ``_SETTINGS_CACHE_TTL`` on THIS worker.
 
@@ -502,7 +598,12 @@ async def save_app_settings(updates: dict[str, Any]) -> bool:
         # reader used by tool_dispatcher / documents / extraction_service / feature_audience)
         # never checks the timestamp, so an invalidate-only call leaves it serving the
         # pre-write row until an unrelated async read happens along.
-        await refresh_settings_cache()
+        #
+        # BUG-260902-06: and BROADCAST, because refresh_settings_cache() is explicitly "NOT a
+        # cross-process fix" — with WORKER_COUNT=2 the sibling worker served the pre-write row
+        # for up to 30s. This is the single seam every app_settings write passes through, so
+        # covering it here covers SEED-258's source_max_file_size_mb ceiling too.
+        await broadcast_settings_change()
         return True
     except Exception:
         logger.warning(
@@ -846,6 +947,14 @@ def _build_settings_from_row(row: dict) -> UserEffectiveSettings:
         keyword_search_weight=float(_val(row, "keyword_search_weight", "keyword_search_weight", 1.0)),
         rrf_k=int(_val(row, "rrf_k", "rrf_k", 60)),
 
+        # Phase 241 (QUEUE-06 / D-09, migration 176). ⚠ env_attr is NOT None here, unlike the
+        # app-only switches below: these two have a REAL `config.py` fallback and that fallback
+        # is the "minimal hardcoded value" D-09 names. A missing column — the state until an
+        # operator pastes 176 in 241-04 — therefore reads 40 / "off", which IS the live pgvector
+        # server configuration, so applying this plan changes no search until somebody chooses to.
+        hnsw_ef_search=int(_val(row, "hnsw_ef_search", "hnsw_ef_search", 40)),
+        hnsw_iterative_scan=str(_val(row, "hnsw_iterative_scan", "hnsw_iterative_scan", "off")),
+
         tavily_api_key=str(_val(row, "tavily_api_key", "tavily_api_key", "")),
         web_search_max_results=int(_val(row, "web_search_max_results", None, 5)),
         web_search_enabled=_val_bool(row, "web_search_enabled", None, bool(env_settings.tavily_api_key)),
@@ -880,6 +989,20 @@ def _build_settings_from_row(row: dict) -> UserEffectiveSettings:
 
         multimodal_max_vision_calls=int(_val(row, "multimodal_max_vision_calls", None, 100)),
         multimodal_max_b64_bytes_kb=int(_val(row, "multimodal_max_b64_bytes_kb", None, 4096)),
+
+        # SEED-258 (migration 174) — env_attr=None: app_settings-only, no env fallback
+        # (CLAUDE.md "env vars are for secrets and infra only"). A missing column — the
+        # migration is authored-but-not-applied until an operator pastes it — reads as the
+        # shipped 25 MB, so nothing changes size until the column exists AND is set.
+        source_max_file_size_mb=int(
+            _val(row, "source_max_file_size_mb", None, SOURCE_MAX_FILE_SIZE_MB_DEFAULT)
+        ),
+
+        # SEED-226 (migration 166). ⚠ `env_attr="vision_model"` is kept ONLY so an operator
+        # who already set the env var is not silently switched; `config.py`'s default is now
+        # "" so the chain really does reach `llm_model`. DB > env > active chat model.
+        vision_model=str(_val(row, "vision_model", "vision_model", "")),
+        vision_max_pages=int(_val(row, "vision_max_pages", None, 50)),
 
         chat_tool_args_progress_emit_boundary_bytes=int(
             _val(row, "chat_tool_args_progress_emit_boundary_bytes", None, 256)
@@ -1095,6 +1218,92 @@ def tool_args_progress_emit_boundary_bytes() -> int:
     if value is None or value <= 0:
         return _FALLBACK_TOOL_ARGS_EMIT_BOUNDARY_BYTES
     return int(value)
+
+
+# ── SEED-258 -- the source file ceiling, and the ONLY place its number lives ──
+
+#: The floor. Below 1 MB essentially nothing imports, so a value under this is not a
+#: narrower policy — it is ingestion switched off while every sync still reports success.
+SOURCE_MAX_FILE_SIZE_MB_FLOOR = 1
+
+#: The shipped value, unchanged by SEED-258. This phase moves the number's HOME, not the
+#: number. Also the never-raise fallback: `google_drive.py`, `microsoft_graph.py` and
+#: `mcp_source.py` each hardcoded exactly this before the setting existed.
+SOURCE_MAX_FILE_SIZE_MB_DEFAULT = 25
+
+#: ⛔ THE HARD MAXIMUM, and it is not arbitrary. `app/api/documents.py` refuses a
+#: hand-uploaded file over 50 MB, so a CONNECTED source may never admit a file the app
+#: would refuse from a person's own disk. The cost of raising the setting toward this is
+#: real and belongs on screen: an MCP response is buffered whole in memory, base64-inflated
+#: 4/3, so 50 MB means ~68 MB held per in-flight request from a server we do not control.
+#: ⚠ `google_drive.py` claimed for its entire life that 25 MB "match[ed] application upload
+#: ceiling"; measured 2026-09-08 that ceiling was 50 MB and the comment was simply false.
+#: The relation is pinned by a test now instead of restated in a comment.
+SOURCE_MAX_FILE_SIZE_MB_CEILING = 50
+
+_BYTES_PER_MB = 1024 * 1024
+
+
+# ── Phase 241 -- the HNSW knob bounds, and the ONLY place their numbers live ──
+#
+# ⛔ THE BOUNDS ARE SERVED TO THE UI, NEVER RE-TYPED IN IT. `GET /settings` carries
+# `hnsw_ef_search_floor` / `_ceiling` / `hnsw_iterative_scan_values` for exactly the reason
+# `api/settings.py:79` gives for SEED-258: *"a form carrying its own copy of 50 is a fourth
+# private constant, which is the defect this replaced."*
+
+#: ⛔ pgvector's OWN maximum for `hnsw.ef_search`. Not a policy choice — a value above this is
+#: rejected by the database itself, so refusing it here turns a Postgres error into a sentence.
+HNSW_EF_SEARCH_CEILING = 1000
+
+#: The floor, chosen to sit BELOW the server default of 40 so a deliberately smaller (faster,
+#: shallower) value stays reachable and measurable. 0 would be a scan that walks nothing while
+#: every search still reported success — the same silent-off shape SEED-258's floor guards.
+HNSW_EF_SEARCH_FLOOR = 10
+
+#: ⛔ THREE MEMBERS, AND A BOOLEAN WOULD SILENTLY LOSE ONE. `strict_order` keeps exact distance
+#: ordering while it keeps scanning; `relaxed_order` trades ordering for speed. They are
+#: different modes, not two spellings of "on". pgvector 0.8+; the GUC does not exist below it.
+HNSW_ITERATIVE_SCAN_VALUES = ("off", "strict_order", "relaxed_order")
+
+
+def source_max_file_bytes() -> int:
+    """Return the operator-configured ceiling, in bytes, for a file from ANY source family.
+
+    The single source of truth. Google Drive, Microsoft Graph and every MCP file surface
+    read this rather than each holding a copy — which is what made the three copies agree
+    only by luck, and what made a fourth family the place that luck would run out.
+
+    Defensive, exactly like `tool_args_progress_emit_boundary_bytes()` above: if
+    `load_app_settings()` fails for ANY reason (cold cache, DB blip, missing column), this
+    returns the shipped 25 MB instead of raising. ⚠ A SOURCE READ MUST NEVER CRASH BECAUSE
+    A SETTINGS READ FAILED — a cold cache mid-sync must not turn every connected source
+    into an error.
+
+    Bounds are enforced HERE as well as at the API boundary. The write refuses an
+    out-of-range PATCH; this read clamps a row that got out of range some other way (hand
+    edit in the SQL editor, a value stored before the bound existed). Defence in depth: the
+    guard must never be exceedable, whatever is in the column.
+
+    Returns:
+        Positive int bytes, always within
+        [FLOOR, CEILING] MB.
+    """
+    try:
+        value = load_app_settings().source_max_file_size_mb
+    except Exception:  # noqa: BLE001 -- defensive: NEVER raise from a source read.
+        logger.warning(
+            "source_max_file_bytes(): load_app_settings() raised; falling back to the "
+            "shipped %d MB ceiling",
+            SOURCE_MAX_FILE_SIZE_MB_DEFAULT,
+        )
+        return SOURCE_MAX_FILE_SIZE_MB_DEFAULT * _BYTES_PER_MB
+
+    # None / 0 / negative is "nothing usable stored", never "refuse every file".
+    if value is None or int(value) <= 0:
+        return SOURCE_MAX_FILE_SIZE_MB_DEFAULT * _BYTES_PER_MB
+
+    mb = min(max(int(value), SOURCE_MAX_FILE_SIZE_MB_FLOOR), SOURCE_MAX_FILE_SIZE_MB_CEILING)
+    return mb * _BYTES_PER_MB
 
 
 def document_management_enabled() -> bool:

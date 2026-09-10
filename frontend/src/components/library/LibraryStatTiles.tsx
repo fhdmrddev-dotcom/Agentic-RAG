@@ -14,6 +14,7 @@
  */
 import { useEffect, useState } from "react"
 import { getReembedProgress, getHealthOverview } from "@/lib/api"
+import { AnimatedNumber } from "@/components/ui/AnimatedNumber"
 import type { Document } from "@/types"
 
 const UNKNOWN = "Not known yet"
@@ -45,14 +46,22 @@ function Tile({
 }: {
   label: string
   value: string
-  description: string
+  description: React.ReactNode
 }) {
   return (
-    <div className="flex min-w-0 flex-1 flex-col gap-1 rounded-xl bg-card/50 ghost-border px-4 py-3">
-      <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-        {label}
+    <div className="group relative flex min-w-0 flex-1 flex-col gap-1 rounded-xl border border-border/50 bg-gradient-to-b from-card/80 to-card/40 backdrop-blur-sm p-4 shadow-sm card-interactive overflow-hidden">
+      {/* Subtle top accent gradient */}
+      <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-primary/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+      
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          {label}
+        </span>
+        <span className="w-1.5 h-1.5 rounded-full bg-primary/40 group-hover:bg-primary transition-colors duration-200" />
+      </div>
+      <span className="font-mono text-2xl font-bold text-foreground tabular-nums tracking-tight mt-0.5">
+        <AnimatedNumber value={value} />
       </span>
-      <span className="font-mono text-2xl font-bold text-foreground tabular-nums">{value}</span>
       <span className="text-xs text-muted-foreground">{description}</span>
     </div>
   )
@@ -83,7 +92,7 @@ export function LibraryStatTiles({ documents }: { documents: Document[] }) {
       <Tile
         label="Chunks"
         value={chunkSum.toLocaleString()}
-        description={`across ${docCount} document${docCount === 1 ? "" : "s"}`}
+        description={<>across <AnimatedNumber value={docCount} /> document{docCount === 1 ? "" : "s"}</>}
       />
       <Tile
         label="Vectors"

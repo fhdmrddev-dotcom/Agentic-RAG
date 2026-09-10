@@ -179,6 +179,9 @@ class ToolContext:
     # touching the live skills row. Same additive-default-off discipline as
     # phase_whitelist / workflow_run_id / skill_snapshot above.
     skill_instructions_override: dict[str, str] | None = None
+    # Phase 234 TRUST-03: Run-scoped tracking flag indicating external connection-sourced
+    # knowledge was retrieved in this run's context (disarms write tools without explicit confirmation).
+    has_connection_retrieval: bool = False
 
 
 @dataclass
@@ -823,9 +826,21 @@ async def _handle_search_documents(args: dict, ctx: ToolContext) -> ToolResult:
                     "similarity": hit.get("similarity"),
                     "is_full_doc": False,
                     "version_number": hit.get("version_number", 1),
+                    # Phase 231 TRUST-04 — a reader can tell machine-placed knowledge from
+                    # knowledge somebody chose to upload. Both keys travel: the name is what
+                    # gets rendered, the id is what survives a rename.
+                    "source_connection_id": hit.get("source_connection_id"),
+                    "source_connection_name": hit.get("source_connection_name"),
                 })
         if avg_sim > 0.0:
             similarity_score = avg_sim
+
+    # Phase 234 TRUST-03: Track if any returned citation came from an external connection
+    if any(bool(c.get("source_connection_id")) for c in citations):
+        try:
+            ctx.has_connection_retrieval = True
+        except Exception:
+            pass
 
     # Audit: fire-and-forget inside async generator (AUDIT-02)
     _audit_doc_ids = list({
@@ -1157,6 +1172,11 @@ async def _handle_analyze_document(args: dict, ctx: ToolContext) -> ToolResult:
         "similarity": None,
         "is_full_doc": True,
         "version_number": doc.get("version_number", 1),
+        # Phase 231 TRUST-04 — the SAME two keys as the search-hit citation above. A citation
+        # shape that carries provenance on one path and not the other is how a reader learns to
+        # distrust the mark rather than the document.
+        "source_connection_id": doc.get("source_connection_id"),
+        "source_connection_name": doc.get("source_connection_name"),
     }]
 
     await ctx.emit(ctx.redis, ctx.run_id, 'sub_agent_start', filename=doc['filename'], task=args['task'])
@@ -4435,6 +4455,22 @@ async def _handle_connector_chat_tool(
     posture = resolve_effective_posture(
         matched_conn, action_tool_name, application=_application, is_write=_is_write
     )
+
+    # ── TRUST-03: Trifecta Anti-Injection Fence ───────────────────────────────
+    # If this is a mutating / write tool and connection-sourced knowledge was retrieved
+    # into prompt context, disarm automated execution and force human approval ('ask').
+    # Prevents untrusted external content (e.g. prompt injection in a watched document)
+    # from triggering unauthorized outbound write actions without explicit operator consent.
+    has_conn_in_context = getattr(ctx, "has_connection_retrieval", False)
+    if not has_conn_in_context:
+        for cit in getattr(ctx, "citations", []) or []:
+            if isinstance(cit, dict) and (cit.get("source_connection_id") or cit.get("source_state")):
+                has_conn_in_context = True
+                break
+
+    if _is_write and has_conn_in_context and posture != "deny":
+        posture = "ask"
+
     if posture == "deny":
         _record_connector_audit("policy_denial", "Denied by tool posture policy")
         return ToolResult(

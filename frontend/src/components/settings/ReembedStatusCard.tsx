@@ -230,23 +230,55 @@ export function ReembedStatusCard({ id }: { id?: string }) {
 export function ReembedSearchPointer({ onViewProgress }: { onViewProgress?: () => void }) {
   const [progress, setProgress] = useState<ReembedProgress | null>(null)
 
-  useEffect(() => {
-    let cancelled = false
-    const fetchOnce = async () => {
-      try {
-        const p = await getReembedProgress()
-        if (!cancelled) setProgress(p)
-      } catch {
-        /* transient — leave the pointer hidden on a failed fetch */
-      }
-    }
-    void fetchOnce()
-    const t = setInterval(() => void fetchOnce(), RUNNING_POLL_MS)
-    return () => {
-      cancelled = true
-      clearInterval(t)
+  const fetchOnce = useCallback(async () => {
+    try {
+      const p = await getReembedProgress()
+      setProgress(p)
+    } catch {
+      /* transient — leave the pointer hidden on a failed fetch */
     }
   }, [])
+
+  // ⛔ BUG-260905-15 — THIS POLLED FOREVER ON AN IDLE PAGE, and its own sibling twenty lines
+  //   above shows what it should always have been. The interval used to be UNCONDITIONAL:
+  //
+  //       void fetchOnce()
+  //       const t = setInterval(() => void fetchOnce(), RUNNING_POLL_MS)   // no status gate
+  //
+  //   `ReembedStatusCard` gates the identical poll on `status !== "running"`. This one did
+  //   not, so every Library page open anywhere hit `/settings/reembed-progress` every 4s for
+  //   as long as it stayed open — forever, with no re-embed running and nobody touching the
+  //   app. Reported by the operator while idly waiting for a Drive folder to list.
+  //
+  // ⚠ EACH TICK IS TWO LOG LINES, NOT ONE — CORS sends an `OPTIONS` preflight before every
+  //   `GET`. With `LibraryStatTiles` reading the same endpoint the two interleave, which is
+  //   why a 4s poll reads as "the same line every 2 seconds" in the backend log.
+  //
+  // ⚠ THE FIX IS NOT A SLOWER IDLE POLL. This pointer must still notice a re-embed STARTED
+  //   ELSEWHERE (the person kicks it in Settings, then comes back to the Library). Focus is
+  //   strictly better than any interval for that: it catches the return INSTANTLY, where even
+  //   a 60s poll lags up to a minute and still costs a request a minute all night.
+  //   It is the shape D-v2.5-03 already prescribes — reconcile by fetch on (re)connect.
+  useEffect(() => {
+    void fetchOnce()
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void fetchOnce()
+    }
+    document.addEventListener("visibilitychange", onVisible)
+    window.addEventListener("focus", onVisible)
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible)
+      window.removeEventListener("focus", onVisible)
+    }
+  }, [fetchOnce])
+
+  // ⚠ The ONLY interval, and it exists only while a job is actually running — so the count in
+  //   a visible pointer still ticks live. An idle page issues NO repeat requests at all.
+  useEffect(() => {
+    if (progress?.status !== "running") return
+    const t = setInterval(() => void fetchOnce(), RUNNING_POLL_MS)
+    return () => clearInterval(t)
+  }, [progress?.status, fetchOnce])
 
   // Only visible while there's still a recall dip (running OR partial/failed with
   // chunks remaining). Auto-hides on completion / idle.

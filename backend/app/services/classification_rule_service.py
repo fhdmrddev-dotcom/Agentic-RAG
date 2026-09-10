@@ -59,6 +59,7 @@ async def create_rule(
     name: str,
     match_expr: dict,
     suggest_folder_id=None,
+    rule_scope: str = "classification",
     supabase: Client | None = None,
 ) -> dict:
     """Insert a classification rule owned by ``user_id`` — never global.
@@ -68,7 +69,7 @@ async def create_rule(
     ``is_system_global=False`` and ``enabled=True`` are HARD-SET in the inserted payload and
     NEVER read from any caller field (T-118-02-01; RLS WITH CHECK forces is_system_global too
     — defense-in-depth). ``suggest_folder_id`` is stored as ``str(...)`` (a UUID) or
-    None.
+    None. ``rule_scope`` defaults to 'classification' ('watch' | 'classification').
     """
     client = _client(supabase)
     payload = {
@@ -76,6 +77,7 @@ async def create_rule(
         "name": name,
         "match_expr": match_expr,  # validated AST jsonb (already passed validate_fields)
         "suggest_folder_id": str(suggest_folder_id) if suggest_folder_id else None,
+        "rule_scope": rule_scope or "classification",
         "is_system_global": False,  # HARD-SET — never from the caller (T-118-02-01)
         "enabled": True,  # HARD-SET — a new rule is on; the toggle rides update_rule
     }
@@ -83,18 +85,25 @@ async def create_rule(
     return result.data[0]
 
 
-async def list_rules(user_id, supabase: Client | None = None) -> list[dict]:
+async def list_rules(
+    user_id,
+    rule_scope: str | None = None,
+    supabase: Client | None = None,
+) -> list[dict]:
     """Return the caller's own rules plus global ones, deduped by id, ordered by name.
 
     Mirrors the view / field-def / skills list shape (own + global via OR predicate).
+    Optionally filters by ``rule_scope`` ('watch' | 'classification').
     """
     client = _client(supabase)
-    result = await aexec(
+    query = (
         client.table(_TABLE)
         .select("*")
         .or_(f"user_id.eq.{_uid(user_id)},is_system_global.eq.true")
-        .order("name")
     )
+    if rule_scope:
+        query = query.eq("rule_scope", rule_scope)
+    result = await aexec(query.order("name"))
     seen: set = set()
     out: list[dict] = []
     for row in result.data or []:

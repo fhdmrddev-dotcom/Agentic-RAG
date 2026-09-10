@@ -39,6 +39,14 @@ def _fake_settings(**overrides):
         rerank_top_n=5,
         rerank_api_key="",
         multimodal_max_vision_calls=100,
+        # SEED-226. Present in the stub because the response genuinely REQUIRES them —
+        # a getattr default here would hide a field the API forgot to build.
+        vision_model="",
+        vision_max_pages=50,
+        # SEED-258, present for the same reason the two above are: the response genuinely
+        # REQUIRES it. The bounds beside it in the response are code constants, not settings,
+        # so they are deliberately NOT stubbed here — a stubbable bound is a settable bound.
+        source_max_file_size_mb=25,
         retrieval_top_k=10,
         retrieval_match_threshold=0.3,
         hybrid_search_enabled=True,
@@ -46,6 +54,13 @@ def _fake_settings(**overrides):
         vector_search_weight=0.7,
         keyword_search_weight=0.3,
         rrf_k=60,
+        # Phase 241 (QUEUE-06 / D-09), present for the same reason SEED-226 / SEED-258 are: the
+        # response genuinely REQUIRES them, and a `getattr` default here would hide a field the
+        # API forgot to build. The bounds beside them in the response (floor / ceiling / the
+        # three enum members) are code constants, not settings, so they are deliberately NOT
+        # stubbed — a stubbable bound is a settable bound.
+        hnsw_ef_search=40,
+        hnsw_iterative_scan="off",
         web_search_enabled=False,
         tavily_api_key="",
         web_search_max_results=5,
@@ -290,3 +305,57 @@ def test_vision_call_ceiling_accepts_its_boundaries(ok):
     from app.api.settings import SettingsUpdate
 
     assert SettingsUpdate(multimodal_max_vision_calls=ok).multimodal_max_vision_calls == ok
+
+
+# ---------------------------------------------------------------------------
+# SEED-226: the vision MODEL reaches the product, and the page ceiling bounds it
+#
+# ⛔ The model was a CONSTANT in `config.py` (`gpt-4o-mini`), and the expression meant to
+# fall back to the operator's active chat model could never run — a non-empty default made
+# its left side always truthy. Every vision call this product ever made went to one vendor's
+# model regardless of configuration, including installs holding no key for it.
+# ---------------------------------------------------------------------------
+
+def test_vision_model_is_readable_and_writable():
+    """The knob round-trips: out through the response, in through the update."""
+    from app.api.settings import SettingsUpdate, _build_response
+    import asyncio
+
+    resp = asyncio.run(_build_response(_fake_settings(vision_model="my-vlm", vision_max_pages=120)))
+    assert resp.vision_model == "my-vlm"
+    assert resp.vision_max_pages == 120
+
+    assert SettingsUpdate(vision_model="my-vlm").vision_model == "my-vlm"
+    # ⚠ EMPTY IS A REAL VALUE, not "unchanged": it means "use the active chat model", which
+    # is the only default that cannot pin a vendor the operator has no credentials for.
+    assert SettingsUpdate(vision_model="").vision_model == ""
+    # Omitted stays None so a partial PATCH never rewrites it to a default.
+    assert SettingsUpdate().vision_model is None
+
+
+@pytest.mark.parametrize("bad", [0, -1, 501, 10_000])
+def test_page_ceiling_refuses_values_that_would_silently_shorten_documents(bad):
+    """⚠ The refusal is the FEATURE. 0 transcribes nothing while every ingestion still reports
+    success, and an unbounded value turns one 1,000-page scan into 1,000 paid calls."""
+    import asyncio
+    from fastapi import HTTPException
+    from unittest.mock import MagicMock
+    from app.api.settings import SettingsUpdate, update_settings
+
+    with pytest.raises(HTTPException) as exc:
+        asyncio.run(update_settings(
+            body=SettingsUpdate(vision_max_pages=bad),
+            background_tasks=MagicMock(),
+            current_user={"id": "u-seed226", "email": "t@example.com"},
+            supabase=MagicMock(),
+        ))
+    assert exc.value.status_code == 400
+    assert "between 1 and 500" in str(exc.value.detail)
+
+
+@pytest.mark.parametrize("ok", [1, 50, 500])
+def test_page_ceiling_accepts_its_boundaries(ok):
+    """Both ends are INSIDE the range — an off-by-one silently narrows the operator's choice."""
+    from app.api.settings import SettingsUpdate
+
+    assert SettingsUpdate(vision_max_pages=ok).vision_max_pages == ok

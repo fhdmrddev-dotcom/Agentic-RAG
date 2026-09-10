@@ -22,9 +22,13 @@ RUN npm install -g npm@11.4.0
 ARG VITE_SUPABASE_URL
 ARG VITE_SUPABASE_ANON_KEY
 ARG VITE_API_BASE_URL=/api
+ARG VITE_DEMO_URL=""
+ARG VITE_APP_URL=""
 ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL \
     VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY \
-    VITE_API_BASE_URL=$VITE_API_BASE_URL
+    VITE_API_BASE_URL=$VITE_API_BASE_URL \
+    VITE_DEMO_URL=$VITE_DEMO_URL \
+    VITE_APP_URL=$VITE_APP_URL
 
 # Install deps. `npm ci` demands a perfectly-synced lockfile, but the committed
 # package-lock.json has drifted from package.json (a transitive dep-range bump — e.g.

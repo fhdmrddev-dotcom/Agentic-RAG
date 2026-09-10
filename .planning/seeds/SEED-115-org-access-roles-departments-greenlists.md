@@ -75,3 +75,16 @@ PROJECT.md constraint: multi-tenancy sits at v3.4 (one-way door) — "nothing in
 the RLS rewrite harder; ship `org_id` stub columns where cheap, never schema shapes that
 fight it." Inventing an in-app role/group system now, before the org/tenancy architecture
 (isolated vs co-tenant, auth/billing) is decided, would be exactly such a shape.
+
+## Operator Expansion (2026-09-05, Phase 229 discuss-phase)
+
+During Phase 229 discuss-phase, the operator specified the comprehensive mental model for organization-level document access:
+
+1. **Dual-Tier Storage Model:**
+   - **Personal Storage by default:** Each user has their own isolated storage with their own documents that only they can view or query.
+   - **Selective Sharing:** The user has full agency to choose which documents or folders to share with specific groups of users (e.g., HR, Finance, Engineering) or with the entire organization.
+2. **Centralized User Access & Governance Console:**
+   - Centralized administrative visibility: Org administrators/operators require a central view to inspect which documents exist across the organization, who owns them, which user groups hold access, and audit/revoke sharing permissions.
+3. **Phase 229 Forward-Compatibility Lock:**
+   - The One Ingest Splice (`mint_document_row` in `backend/app/services/ingest_splice.py`) accepts optional `org_id` and arbitrary `metadata` envelopes, and validates folder access using owner-OR-org-shared checks, guaranteeing that document minting never hardcodes single-user isolation or creates barriers to group-level sharing.
+

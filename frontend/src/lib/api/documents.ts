@@ -16,6 +16,7 @@ import type {
   DocumentContentResponse,
   DocumentImageRow,
   DocumentQueryRow,
+  ConversationResponse,
   DocumentTableRow,
   Folder,
   WorkspaceFile,
@@ -340,6 +341,20 @@ export async function listDocumentChunks(id: string): Promise<DocumentChunkRow[]
   const res = await fetch(`${API_BASE}/documents/${id}/chunks`, { headers })
   if (!res.ok) throw new Error("Failed to load document chunks")
   return res.json() as Promise<DocumentChunkRow[]>
+}
+
+/** GET /documents/{id}/conversation — the other messages of this document's mail thread,
+ *  oldest first.
+ *
+ *  ⚠ It takes a DOCUMENT id and never a `thread_key`. A thread key is derived from a
+ *  `Message-ID`, which is chosen by whoever sent the mail — so a route accepting one would
+ *  be a lookup handle an outsider gets to pick (TM-240-13). A document with no thread key
+ *  answers 200 with an empty list; that is the ordinary case for almost every document. */
+export async function fetchDocumentConversation(id: string): Promise<ConversationResponse> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/documents/${id}/conversation`, { headers })
+  if (!res.ok) throw new Error("Failed to load conversation")
+  return res.json() as Promise<ConversationResponse>
 }
 
 /** GET /documents/{id}/tables — the extracted tables, in `table_index` order.

@@ -91,5 +91,28 @@ export const NAV_ITEMS: readonly NavItem[] = [
  * API is the security authority; this just avoids dead nav.
  */
 export function visibleNavItems(features: EffectiveFeatures): readonly NavItem[] {
-  return NAV_ITEMS.filter((item) => !item.feature || features[item.feature] === true)
+  // ⛔ HIDE ONLY WHAT IS *KNOWN* TO BE DENIED. `=== true` WAS WRONG, AND THE OPERATOR HIT IT.
+  //
+  // Reported 2026-09-09: *"sometimes when I refresh, settings and control room does not load"*,
+  // with a screenshot showing a rail carrying Chat / Library / Classification / Connections /
+  // Skills and NO Workflows, Settings or Control Room — then all of them present on the next
+  // render.
+  //
+  // `App.tsx` already computes `featuresLoading` and this filter never saw it, so while the
+  // effective-features fetch was in flight (or after it FAILED) every governed key read
+  // `undefined`, `undefined === true` is false, and every governed door vanished. **"We have not
+  // been told yet" was rendered as "you are not allowed."** A transient network failure was
+  // therefore indistinguishable from a permission decision — the same unknown-vs-denied confusion
+  // `sourceCapability.ts` and `SourceRegistry` each carry a comment about.
+  //
+  // ⚠ THE DIRECTION IS DELIBERATE, AND IT IS THE OPPOSITE OF `sourceCapability.ts`'s. That
+  // predicate fails CLOSED because offering a source that cannot be read is a dead control a
+  // person blames themselves for. This one fails OPEN because **the API is the wall** — this
+  // module's own header says so: *"Render-only; the API is the wall."* Every governed route
+  // enforces its own `require_visible`, so an optimistic door costs at worst one honest refusal,
+  // while a hidden door costs a person their Settings page for no reason they can see.
+  //
+  // ⚠ A KNOWN `false` STILL HIDES, so the dead-click avoidance these entries were tagged for is
+  // untouched: only `undefined` — unknown, loading, or failed — now shows.
+  return NAV_ITEMS.filter((item) => !item.feature || features[item.feature] !== false)
 }

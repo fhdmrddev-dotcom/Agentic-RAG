@@ -118,6 +118,13 @@ export function segmentState(
       if (current < 0) return "not-reached"
       return index < current ? "done" : "not-reached"
     }
+
+    case "paused": {
+      // A paused document reached prior stages; the held stage and later stages are pending (no active pulse).
+      const current = stageIndex(doc.ingestion_step)
+      if (current < 0) return "pending"
+      return index < current ? "done" : "pending"
+    }
   }
 }
 

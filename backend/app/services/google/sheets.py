@@ -1,7 +1,7 @@
 """Read a Google Sheet as CELLS.
 
 ── ⚠ THIS EXISTS BECAUSE `read_file` ON A SHEET RETURNS A PDF ─────────────────────────
-`cloud_storage._fetch_google_drive_file` exports a Google-native Sheet to PDF before
+`GoogleDriveSourceAdapter.read_file` exports a Google-native Sheet to PDF before
 downloading it, so the connector's Drive `read_file` hands the model a binary it then
 refuses to decode. For an app whose agent runs pandas in a sandbox that is close to
 useless: **the single highest-value gap on the Google surface** (operator, 2026-08-31).

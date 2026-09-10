@@ -228,3 +228,43 @@ describe("the pass-through recognises documents.py's LIVE human sentences", () =
     }
   })
 })
+
+// ══════════════════════════════════════════════════════════════════════════════════════
+// SEED-226 · THE IMAGE SENTENCE, WHICH THE DICT WALK ABOVE CANNOT SEE
+// ══════════════════════════════════════════════════════════════════════════════════════
+//
+// ⚠ THE SIX IMAGE MIMES SHARE ONE `_IMAGE_EMPTY_TEXT` CONSTANT rather than repeating the
+//   same sentence six times. That is the right shape — six copies rot independently — but it
+//   costs coverage: the walk above extracts VALUES from the dict literal, and an identifier
+//   is not a literal, so those six rows contribute nothing to it. Without this block the
+//   product's newest user-facing sentence would be the only one no fence reads.
+describe("SEED-226 — the image empty-text sentence is fenced like every other", () => {
+  const imageSentence = (): string => {
+    const m = documentsPySource.match(/_IMAGE_EMPTY_TEXT\s*=\s*\(([\s\S]*?)\)/)
+    if (m === null) return ""
+    return Array.from(m[1].matchAll(/"([^"]+)"/g))
+      .map((x) => x[1])
+      .join("")
+  }
+
+  it("⚠ NON-VACUITY — the constant was actually found in the live backend source", () => {
+    // A regex that matched nothing yields "", and "" would satisfy nothing meaningfully
+    // while looking green. This is the assertion that reds if the constant is renamed.
+    expect(imageSentence().length).toBeGreaterThan(40)
+  })
+
+  it("is human-written and passes through the classifier unchanged", () => {
+    const sentence = imageSentence()
+    expect(looksHumanWritten(sentence)).toBe(true)
+    expect(classifyIngestionError(sentence)).toBe(sentence)
+  })
+
+  it("does not imply a broken importer — the file was read, it simply had no text", () => {
+    const sentence = imageSentence().toLowerCase()
+    expect(sentence).toContain("no text")
+    expect(sentence).toContain("still stored")
+    for (const severity of ["error", "failed", "failure", "broken", "fatal", "critical"]) {
+      expect(sentence).not.toContain(severity)
+    }
+  })
+})

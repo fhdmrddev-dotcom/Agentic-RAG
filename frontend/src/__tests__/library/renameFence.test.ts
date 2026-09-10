@@ -66,6 +66,11 @@ import appSource from "@/App.tsx?raw"
 import layoutSource from "@/components/layout/ChatLayout.tsx?raw"
 import navSource from "@/lib/nav-items.ts?raw"
 import pageSource from "@/pages/LibraryPage.tsx?raw"
+// ⚠ ADDED at sketch 231-A. The page's `<h1>` and its subtitle moved into the header row this
+//   component owns. The fence follows the CONTENT, not the file it used to live in — a rename
+//   fence that stops finding the name because the name MOVED would report a rename regression
+//   that never happened, which is worse than not having the fence.
+import headerBarSource from "@/components/library/LibraryHeaderBar.tsx?raw"
 // The cross-language `?raw` over a backend `.py` is the shipped idiom in this repository
 // (`argumentModel.test.ts:29-32`). From `src/__tests__/library/` the relative depth to the
 // repo root is identical: four levels.
@@ -165,8 +170,16 @@ describe("renameFence · what the Documents→Library rename must not touch", ()
     // The rename is only real if the branch that renders the surface moved with it. A stale
     // import would not typecheck; a stale BRANCH would render the positional fallback and
     // look like a missing page rather than a missing edit.
+    // ⚠ RELAXED AT 235-08, AND ONLY AT THE END. The pattern used to require the mount to be
+    // spelled `<LibraryPage onNavigate={onNavigate} />` — a CLOSED prop list — so adding
+    // `initialTab={libraryTab}` (SURF-03: the Health tab had no external door at all) turned
+    // this case red for a reason that has nothing to do with the Documents→Library rename
+    // this fence is about. What the fence actually guards is the KEY LINK: the branch on
+    // `activeView === "documents"` renders `LibraryPage`, adjacently. That is preserved
+    // verbatim, including the 120-character proximity window; only the trailing ` />` is
+    // dropped, so the mount may carry props without this fence claiming to own its signature.
     expect(
-      /activeView === "documents" \?[\s\S]{0,120}<LibraryPage onNavigate=\{onNavigate\} \/>/.test(
+      /activeView === "documents" \?[\s\S]{0,120}<LibraryPage onNavigate=\{onNavigate\}/.test(
         LAYOUT,
       ),
     ).toBe(true)
@@ -174,7 +187,7 @@ describe("renameFence · what the Documents→Library rename must not touch", ()
   })
 
   it("the page subtitle is the contract's sentence, and the one it replaced is gone", () => {
-    expect(PAGE).toContain("What the agent can read, and how well it reads it.")
+    expect(PAGE + headerBarSource).toContain("What the agent can read, and how well it reads it.")
     expect(PAGE).not.toContain("Upload documents to give the AI context for your conversations.")
   })
 
@@ -190,8 +203,11 @@ describe("renameFence · what the Documents→Library rename must not touch", ()
   })
 
   it("the rename itself DID land — this fence is not guarding a no-op", () => {
-    expect(PAGE).toContain(">Library</h1>")
-    expect(PAGE).not.toContain(">Documents</h1>")
+    // The heading lives in `LibraryHeaderBar` since sketch 231-A; both files are checked so the
+    // fence cannot pass vacuously if it moves again.
+    expect(headerBarSource.length).toBeGreaterThan(1500)
+    expect(PAGE + headerBarSource).toMatch(/Library\s*<\/h1>/)
+    expect(PAGE + headerBarSource).not.toContain(">Documents</h1>")
     expect(LAYOUT).toContain('from "@/pages/LibraryPage"')
   })
 })

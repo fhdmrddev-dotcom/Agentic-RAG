@@ -25,6 +25,7 @@
  * ⛔ NO SECOND STATUS VOCABULARY. Every stage word comes from `TERM_MAP`.
  */
 import React, { useState } from "react"
+import { cn } from "@/lib/utils"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { IngestionStrip } from "@/components/ingestion/IngestionStrip"
 import { DocumentUpload } from "@/components/ingestion/DocumentUpload"
@@ -37,6 +38,15 @@ import { formatBytes } from "@/lib/formatBytes"
 import { reingestDocument } from "@/lib/api"
 import type { Document } from "@/types"
 import { UploadFolderPicker } from "@/components/library/ingestion/UploadFolderPicker"
+import { ConnectedSourceSection } from "@/components/sources/ConnectedSourceSection"
+import {
+  SourceReaderStatement,
+  WatchedFoldersSection,
+} from "@/components/sources/WatchedFoldersSection"
+import { useSourceAttention } from "@/hooks/useSourceAttention"
+import { IngestionPauseBanner } from "@/components/ingestion/IngestionPauseBanner"
+import { IngestionBatchLane } from "@/components/ingestion/IngestionBatchLane"
+import { AnimatedNumber } from "@/components/ui/AnimatedNumber"
 import {
   cardForStage,
   PIPELINE_CARDS,
@@ -52,15 +62,32 @@ function PipelineCard({
   cardId: PipelineCardId
   count: number
 }) {
+  const isPopulated = count > 0
   return (
     <div
       data-stage-card={cardId}
-      className="flex min-w-0 flex-1 flex-col gap-1 rounded-xl bg-card/50 ghost-border px-3 py-2.5"
+      className={cn(
+        "group relative flex min-w-0 flex-1 flex-col gap-1 rounded-xl border p-3 shadow-sm card-interactive overflow-hidden transition-all duration-200",
+        isPopulated
+          ? "border-primary/40 bg-gradient-to-b from-primary/10 to-card/50 shadow-primary/5"
+          : "border-border/50 bg-gradient-to-b from-card/80 to-card/40 backdrop-blur-sm",
+      )}
     >
-      <span className="truncate text-xs font-medium text-foreground">
-        {CARD_LABEL[cardId]}
+      {/* Subtle top accent line for active cards */}
+      {isPopulated && (
+        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-primary to-transparent" />
+      )}
+      <div className="flex items-center justify-between gap-1">
+        <span className="truncate text-xs font-medium text-foreground">
+          {CARD_LABEL[cardId]}
+        </span>
+        {isPopulated && (
+          <span className="inline-block h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+        )}
+      </div>
+      <span className={cn("font-mono text-lg font-bold tabular-nums", isPopulated ? "text-primary" : "text-foreground")}>
+        <AnimatedNumber value={count} />
       </span>
-      <span className="font-mono text-lg font-bold text-foreground">{count}</span>
       <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
         {count === 1 ? "file here now" : "files here now"}
       </span>
@@ -84,6 +111,19 @@ export interface IngestionTabProps {
   folderName?: string | null
   /** True when the current user cannot upload to this folder (read-only / shared). */
   disabled?: boolean
+  /**
+   * Opens the Connections surface, for a stopped source whose ONE control is "Reconnect".
+   *
+   * ⛔ WITHOUT THIS PROP THE CONTROL DOES NOT RENDER AT ALL. `WatchedFoldersSection` gates on
+   * `canReconnect={Boolean(onNavigateToConnections)}` and `showFix` is
+   * `control.action !== "reconnect" || canReconnect` — so every reconnect-shaped cause
+   * (`token_revoked`, `connection_disabled`) silently loses its button. Phase 235 shipped in
+   * exactly that state: the cause→control map was correct DATA and no user could press it,
+   * which is SC#2's "offers one control that fixes it" failing invisibly.
+   *
+   * The app has NO ROUTER (`SEED-185`), so this is a callback, never a URL.
+   */
+  onNavigateToConnections?: () => void
 }
 
 export function IngestionTab({
@@ -94,6 +134,7 @@ export function IngestionTab({
   folderId,
   folderName,
   disabled,
+  onNavigateToConnections,
 }: IngestionTabProps) {
   // ── LOCAL sub-tab state — never in librarySelection's reducer ─────────────────
   const [subTab, setSubTab] = useState<string>("add-files")
@@ -114,19 +155,75 @@ export function IngestionTab({
 
   // Completed + failed for the History tab.
   const historyDocs = documents.filter((d) => d.status === "completed" || d.status === "failed")
-  const inFlight = documents.filter((d) => d.status === "pending" || d.status === "processing")
+  const inFlight = documents.filter((d) => d.status === "pending" || d.status === "processing" || d.status === "paused")
+  const completedDocs = documents.filter((d) => d.status === "completed")
   const failed = documents.filter((d) => d.status === "failed")
+
+  const totalBatchCount = inFlight.length + completedDocs.length
+  const pausedDoc = inFlight.find(
+    (d) =>
+      d.status === "paused" ||
+      d.error_message?.toLowerCase().includes("rate limit") ||
+      d.error_message?.toLowerCase().includes("429") ||
+      d.error_message?.toLowerCase().includes("quota")
+  )
+  const isPaused = Boolean(pausedDoc)
 
   // The ⌥ Technical-names reveal.
   const { showTechnical } = useTechnicalNamesOptional() ?? { showTechnical: false }
 
+  // ⭐ Phase 235 (D-235-12) — THE ONE READER OF THE SERVER'S SOURCE VERDICT ON THIS TAB.
+  //
+  // Mounted here, ONCE, and threaded down. Twelve source cards each calling the hook would be
+  // twelve pollers of the same endpoint (T-235-13); one call is the whole cost. Nothing is
+  // derived from it here — `stopped` is the server's verdict, passed through untouched
+  // (D-235-05), and `readerRunning` is the LIVE reader rather than the config flag (D-235-21).
+  const { readerRunning, stopped } = useSourceAttention()
+
   return (
     <section data-testid="ingestion-tab" className="flex flex-col gap-6 overflow-y-auto">
+      <div data-testid="sources-body-ingestion" className="flex flex-col gap-6">
+        {/* ⭐ D-235-12 — THE INSTANCE-LEVEL TRUTH, STATED ONCE, ABOVE EVERY SUB-TAB.
+            The same shape as the `ConnectedSourceSection` mount below: ONE import, ONE mount,
+            ZERO branches. The component renders NOTHING when the reader is running, so a
+            person on a healthy instance sees exactly the surface they saw before.
+            ⛔ It does NOT belong on a row. The banner owns platform-wide truth; a row owns only
+            what is true of that row. Marking every watch stopped when the server's reader is
+            switched off was rejected — the rail badge would then count N broken sources when
+            nothing is wrong with any of them. */}
+        <SourceReaderStatement readerRunning={readerRunning} />
       {/* ── THE FOUR SUB-TABS ──────────────────────────────────────────────────── */}
       <Tabs value={subTab} onValueChange={setSubTab} data-testid="ingestion-subnav">
-        <TabsList className="mb-4">
+        {/* ⚠ `text-xs` on every child trigger. The `tabs.tsx` primitive defaults to `text-sm`
+            (14px) while sketch 231-A's PARENT tabs are `text-xs` (12px) — so the children were
+            rendering LARGER than their parents, which reads as an inverted hierarchy and is what
+            the operator saw. The sketch has the child marginally smaller than the parent
+            (.76rem vs .79rem); this matches that direction with the two sizes the app has. */}
+        <TabsList className="mb-4 [&>button]:text-xs [&>button]:px-2.5 [&>button]:py-1">
           <TabsTrigger value="add-files">Add files</TabsTrigger>
-          <TabsTrigger value="in-progress">In progress</TabsTrigger>
+          {/* ⭐ Sketch 231-A — the live count badge. The header pill and this badge are the SAME
+              FACT AT TWO SCALES, derived from the same `inFlight` predicate, so they cannot
+              disagree: the pill says a run is happening, the tab says how much is left, and the
+              pill's click lands here. ⛔ A control that lights up and goes nowhere is what the
+              sketch's own variant C had to fix. */}
+          <TabsTrigger value="in-progress" data-testid="subtab-in-progress">
+            In progress
+            {inFlight.length > 0 && (
+              <span
+                data-testid="in-progress-badge"
+                /* ⛔ aria-hidden, and that is deliberate rather than lazy. Without it the tab's
+                   ACCESSIBLE NAME becomes "In progress 3" and every `getByRole("tab", {name:
+                   "In progress"})` breaks — six cases did, measured. The count is not lost to a
+                   screen reader: the In-progress body states it in words ("N files"). A badge
+                   may decorate a control's name; it may not RENAME it. */
+                aria-hidden="true"
+                className="ml-1.5 inline-flex items-center gap-1 rounded-full bg-sky-500/15 px-1.5 text-[10px] tabular-nums text-sky-400"
+              >
+                <span className="h-1 w-1 rounded-full bg-sky-400 animate-pulse" />
+                {inFlight.length}
+              </span>
+            )}
+          </TabsTrigger>
           <TabsTrigger value="needs-attention">Needs attention</TabsTrigger>
           <TabsTrigger value="history">History</TabsTrigger>
         </TabsList>
@@ -156,11 +253,39 @@ export function IngestionTab({
                 selectedFolderId={uploadFolderId}
               />
             </div>
+            {/* Phase 233 (D-233-06) — the connected-source door. ONE child element: the section
+                owns the connection picker, the source folder tree and the preview, so this tab
+                gains a mount and no branch. It renders NOTHING when no source-capable connection
+                exists, so a person with no connections sees exactly the surface they saw before. */}
+            <ConnectedSourceSection
+              destinationFolderId={uploadFolderId}
+              destinationFolderName={uploadFolderName}
+            />
+            <WatchedFoldersSection
+              destinationFolderId={uploadFolderId}
+              readerRunning={readerRunning}
+              stoppedSources={stopped}
+              onNavigateToConnections={onNavigateToConnections}
+            />
           </div>
         </TabsContent>
 
         {/* ── IN PROGRESS — the pipeline row + queue table ──────────────── */}
         <TabsContent value="in-progress" data-testid="ingestion-subtab-in-progress">
+          {/* ── Refusal Banner (SC#3, closes BUG-260815-05) — sits at top of sub-tab ─────── */}
+          {isPaused && (
+            <div className="mb-5">
+              <IngestionPauseBanner
+                provider="OpenAI"
+                statusCode={429}
+                statusText="insufficient_quota"
+                verbatimError={pausedDoc?.error_message || undefined}
+                completedCount={completedDocs.length}
+                totalCount={totalBatchCount > 0 ? totalBatchCount : 340}
+              />
+            </div>
+          )}
+
           <div>
             <h2 className="text-lg font-semibold leading-tight">Where every file is right now</h2>
             <p className="mt-0.5 text-sm text-muted-foreground">
@@ -181,13 +306,24 @@ export function IngestionTab({
             </div>
           </div>
 
+          {/* ── THE BATCH LANE (Sketch 227 Variant B winner) ──────────────── */}
+          {inFlight.length > 0 && (
+            <div className="mt-6" data-testid="ingestion-batch-lane-wrapper">
+              <IngestionBatchLane
+                totalFiles={totalBatchCount > 0 ? totalBatchCount : inFlight.length}
+                completedFiles={completedDocs.length}
+                isPaused={isPaused}
+              />
+            </div>
+          )}
+
           {/* ── THE QUEUE TABLE ──────────────────────────────────────────────────── */}
           <div className="mt-6" data-testid="ingestion-queue">
             <h2 className="text-lg font-semibold leading-tight">
               The queue{" "}
               {inFlight.length > 0 && (
                 <span className="text-sm font-normal text-muted-foreground">
-                  ({inFlight.length} {inFlight.length === 1 ? "file" : "files"})
+                  (<AnimatedNumber value={inFlight.length} /> {inFlight.length === 1 ? "file" : "files"})
                 </span>
               )}
             </h2>
@@ -315,6 +451,7 @@ export function IngestionTab({
           </div>
         </TabsContent>
       </Tabs>
+      </div>
     </section>
   )
 }
@@ -348,7 +485,7 @@ function NeedsAttentionRow({
 
   const reason = showTechnical
     ? (doc.error_message ?? "It stopped, and no reason was recorded.")
-    : classifyIngestionError(doc.error_message)
+    : classifyIngestionError(doc.error_message, doc.filename)
 
   return (
     <li

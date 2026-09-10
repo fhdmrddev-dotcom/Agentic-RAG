@@ -9,7 +9,6 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { reingestDocument } from "@/lib/api"
-import { cn } from "@/lib/utils"
 import { MoveToFolderDialog } from "@/components/health/MoveToFolderDialog"
 import { DocumentRow, hasVersions } from "./DocumentRow"
 import type { Document, Folder } from "@/types"
@@ -139,10 +138,10 @@ export function DocumentList({
 
   return (
     <>
-      <div className="overflow-x-auto rounded-lg border">
+      <div className="overflow-x-auto rounded-xl border border-border/50 bg-card/40 backdrop-blur-sm shadow-sm transition-all duration-200">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b bg-muted/50">
+            <tr className="border-b border-border/50 bg-muted/40">
               <th className="px-2 py-3 w-8" />
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">Filename</th>
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">Type</th>
@@ -194,7 +193,9 @@ export function DocumentList({
               {deleteTarget && hasVersions(deleteTarget) ? (
                 <>
                   This document has {deleteTarget.version_number} versions.{" "}
-                  <span className="font-medium text-foreground">Delete v{deleteTarget.version_number}</span>{" "}
+                  <span className="font-medium text-foreground">
+                    Delete v{deleteTarget.version_number}
+                  </span>{" "}
                   to promote v{(deleteTarget.version_number ?? 1) - 1} as current, or delete all versions permanently.
                 </>
               ) : (
@@ -237,7 +238,7 @@ export function DocumentList({
                       Deleting...
                     </>
                   ) : (
-                    `Delete v${deleteTarget.version_number}`
+                    <>Delete v{deleteTarget.version_number}</>
                   )}
                 </Button>
                 <Button

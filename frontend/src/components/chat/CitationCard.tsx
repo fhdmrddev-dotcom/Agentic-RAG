@@ -123,6 +123,23 @@ export function CitationCard({ citation, n, flashContainer }: Props) {
               ? ` (v${citation.version_number})`
               : ""}
           </span>
+          {/* Phase 231 TRUST-04 — machine-placed knowledge says so; knowledge somebody chose to
+              upload stays unadorned. ABSENCE IS THE SIGNAL, so this renders for connection-placed
+              documents ONLY — marking every citation would make the mark meaningless.
+              ⚠ Falls back to "a connection" rather than inventing a name: an id whose name does
+                not resolve is a real state (deleted, or not readable), not an error. */}
+          {citation.source_connection_id ? (
+            <span
+              data-testid="citation-source-connection"
+              className="shrink-0 inline-flex items-center gap-1 text-muted-foreground"
+              title={undefined}
+            >
+              <span aria-hidden="true">·</span>
+              <span className="truncate">
+                via {citation.source_connection_name || "a connection"}
+              </span>
+            </span>
+          ) : null}
           {/* Location — reuse the existing is_full_doc branch (D-09/D-10): a full-doc
               row shows "· Full document" with NO chunk index and NO similarity score;
               a chunk row shows "· Chunk N · {similarity}". */}

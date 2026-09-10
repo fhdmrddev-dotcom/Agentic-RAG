@@ -45,7 +45,7 @@ describe("Landing Page Facts (SEED-241 / D-226-04 / F-2)", () => {
   it("exports authoritative counts measured at HEAD", () => {
     expect(MODEL_PROVIDERS).toHaveLength(8)
     expect(LOCAL_RUNTIMES).toHaveLength(2)
-    expect(INGEST_FORMATS).toHaveLength(11)
+    expect(INGEST_FORMATS).toHaveLength(19)
     expect(EXTRACT_CAPABILITIES).toHaveLength(7)
     expect(PRODUCE_FORMATS).toHaveLength(9)
     expect(GAUNTLET_STAGES).toHaveLength(10)

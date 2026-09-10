@@ -78,6 +78,11 @@ vi.mock("@/providers/TechnicalNamesProvider", async (importOriginal) => {
   }
 })
 
+import { formatsSentence } from "@/components/ingestion/acceptedFormats"
+
+/** Escape a literal for use inside a RegExp — the formats sentence contains `·` and `.`. */
+const escapeRegExp = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+
 import { IngestionTab } from "../IngestionTab"
 import { acceptAttribute } from "@/components/ingestion/acceptedFormats"
 import { PIPELINE_CARDS, CARD_LABEL, cardForStage } from "../ingestion/pipelineGroups"
@@ -233,7 +238,12 @@ describe("IngestionTab — Add files renders the hero dropzone (D-217.1-05)", ()
     // The hero variant renders "or" as a separator
     expect(screen.getByText("or")).toBeInTheDocument()
     // The hero variant renders the formats line from formatsSentence()
-    expect(screen.getByText(/PDF · DOCX · PPTX · XLSX · CSV · TXT · MD · EPUB/)).toBeInTheDocument()
+    // ⚠ DERIVED, NOT TRANSCRIBED. This line used to hard-code the eight-format sentence, so
+    //    widening the list (operator, 2026-09-05) broke a test that was asserting a CONSTANT
+    //    rather than a BEHAVIOUR — the exact drift `acceptedFormats.ts` exists to prevent, in a
+    //    test written to protect it. The claim is that the dropzone PRINTS the shared list;
+    //    which formats are in that list is `acceptFormats.test.ts`'s business, not this file's.
+    expect(screen.getByText(new RegExp(escapeRegExp(formatsSentence())))).toBeInTheDocument()
   })
 
   it("the hidden file input still carries the computed accept attribute", () => {
@@ -322,8 +332,25 @@ describe("IngestionTab — the Needs attention row (D-217.1-21)", () => {
   it("renders the plain sentence (not the raw error)", async () => {
     await renderNeedsAttention({ documents: [doc({ status: "failed", error_message: "BadZipFile: not a zip" })] })
     const reason = screen.getByTestId("failure-reason")
-    expect(reason.textContent).toContain("not the kind of spreadsheet")
+    // ⚠ BUG-260905-03 — this used to assert "not the kind of spreadsheet". That copy was WRONG:
+    //   every OOXML format is a zip, so the sentence fired on .docx and .pptx too and told the
+    //   owner of a broken Word file to save it as .csv. The sentence is now format-agnostic
+    //   unless the filename says otherwise (see notAZipSentence).
+    expect(reason.textContent).toContain("not the format its name suggests")
     expect(reason.textContent).not.toContain("BadZipFile")
+    // The wrong advice must not come back.
+    expect(reason.textContent).not.toContain("spreadsheet")
+  })
+
+  it("⭐ BUG-260905-03 — a broken .docx is told to save it as a Word document, never a spreadsheet", async () => {
+    await renderNeedsAttention({
+      documents: [
+        doc({ status: "failed", filename: "facilitator-guide.docx", error_message: "File is not a zip file" }),
+      ],
+    })
+    const reason = screen.getByTestId("failure-reason")
+    expect(reason.textContent).toContain("Word document")
+    expect(reason.textContent).not.toContain(".csv")
   })
 
   it("renders the file size", async () => {
@@ -515,7 +542,21 @@ describe("IngestionTab — the queue table (D-217.1-07)", () => {
     const user = userEvent.setup()
     renderPlain({ documents: [doc({ id: "q1", status: "pending" }), doc({ id: "q2", status: "processing" })] })
     await user.click(screen.getByRole("tab", { name: "In progress" }))
-    expect(screen.getByText(/2 files/)).toBeInTheDocument()
+    expect(screen.getByText("(2 files)")).toBeInTheDocument()
+    expect(screen.getByTestId("ingestion-batch-lane")).toBeInTheDocument()
+  })
+
+  it("renders IngestionPauseBanner at top of In progress when document is paused on 429", async () => {
+    const user = userEvent.setup()
+    renderPlain({
+      documents: [
+        doc({ id: "p1", status: "paused" as any, error_message: "Rate limit reached (429)" }),
+        doc({ id: "p2", status: "completed" }),
+      ],
+    })
+    await user.click(screen.getByRole("tab", { name: "In progress" }))
+    expect(screen.getByTestId("ingestion-pause-banner")).toBeInTheDocument()
+    expect(screen.getByTestId("ingestion-batch-lane")).toBeInTheDocument()
   })
 })
 

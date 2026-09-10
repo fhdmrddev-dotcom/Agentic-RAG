@@ -4,10 +4,10 @@ title: Resume replays the original prompt verbatim instead of continuing from wh
 reported: 2026-08-18
 surface: Agentic-RAG
 severity: major
-status: open
+status: closed
 affected_areas: [frontend/chat, frontend/streaming, backend/agent-loop, chat/run-lifecycle]
-folded_into: null
-verified_closed_by: null
+folded_into: "228"
+verified_closed_by: "228"
 related_seeds: [SEED-180]
 re_open_trigger: null
 reproduces_on:

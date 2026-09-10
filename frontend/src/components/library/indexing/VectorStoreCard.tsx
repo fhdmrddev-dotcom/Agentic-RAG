@@ -8,18 +8,21 @@
  * ⛔ HONESTY: an unknown value reads `UNKNOWN`, never `0`. `Last indexed` is
  * `max(embedded_at)` (BE-1) — a `never` (null) reads `never`, never a fabricated time.
  */
+import type React from "react"
 import type { IndexSummary } from "@/lib/api"
+import { Database } from "lucide-react"
+import { AnimatedNumber } from "@/components/ui/AnimatedNumber"
 
 const UNKNOWN = "Not known yet"
 
-function Fact({ label, value, loading }: { label: string; value?: string; loading?: boolean }) {
+function Fact({ label, value, loading }: { label: string; value?: React.ReactNode; loading?: boolean }) {
   return (
-    <div className="flex items-baseline justify-between gap-4 py-1.5">
-      <span className="text-xs uppercase tracking-wide text-muted-foreground">{label}</span>
+    <div className="flex items-baseline justify-between gap-4 py-2 px-1 rounded-md hover:bg-muted/30 transition-colors duration-150">
+      <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</span>
       {loading ? (
         <div className="h-4 w-16 animate-pulse bg-muted/30 rounded" />
       ) : (
-        <span className="min-w-0 truncate font-mono text-sm text-foreground" title={value}>
+        <span className="min-w-0 truncate font-mono text-sm font-medium text-foreground" title={typeof value === "string" ? value : undefined}>
           {value ?? UNKNOWN}
         </span>
       )}
@@ -35,14 +38,30 @@ export function VectorStoreCard({ summary }: { summary: IndexSummary | null }) {
   const lastIndexed = summary?.last_indexed
 
   return (
-    <div className="rounded-xl bg-card/50 ghost-border px-4 py-3">
-      <h3 className="text-sm font-semibold leading-tight">Vector store</h3>
-      <div className="mt-1">
-        <Fact label="Vectors" value={vectors == null ? undefined : vectors.toLocaleString()} loading={loading} />
-        <Fact label="Chunks indexed" value={chunks == null ? undefined : chunks.toLocaleString()} loading={loading} />
+    <div className="group relative rounded-xl border border-border/50 bg-gradient-to-b from-card/80 to-card/40 backdrop-blur-sm p-4 shadow-sm card-interactive overflow-hidden">
+      {/* Subtle top accent gradient */}
+      <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-primary/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+
+      <div className="flex items-center gap-2 mb-2">
+        <div className="w-6 h-6 rounded-md bg-primary/10 flex items-center justify-center text-primary">
+          <Database className="h-3.5 w-3.5" />
+        </div>
+        <h3 className="text-sm font-semibold leading-tight text-foreground">Vector store</h3>
+      </div>
+      <div className="mt-1 divide-y divide-border/20">
+        <Fact
+          label="Vectors"
+          value={vectors == null ? undefined : <AnimatedNumber value={vectors.toLocaleString()} />}
+          loading={loading}
+        />
+        <Fact
+          label="Chunks indexed"
+          value={chunks == null ? undefined : <AnimatedNumber value={chunks.toLocaleString()} />}
+          loading={loading}
+        />
         <Fact
           label="Documents with no vectors"
-          value={noVectors == null ? undefined : noVectors.toLocaleString()}
+          value={noVectors == null ? undefined : <AnimatedNumber value={noVectors.toLocaleString()} />}
           loading={loading}
         />
         <Fact

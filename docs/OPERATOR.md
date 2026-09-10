@@ -125,6 +125,43 @@ Then edit `./.env` and fill in:
   `SCHEDULER_MAX_CLAIMS_PER_TICK` (default `10`) is backpressure — it stops a box that was
   offline over a weekend from launching every overdue schedule at once. Each schedule carries
   its own per-run token and duration ceilings, set in the app when the schedule is created.
+- **Durable Ingestion Queue (Phase 230, QUEUE-01 / QUEUE-05)** — `INGEST_WORKER_ENABLED`
+  ships **`true`** by default. Runs in each uvicorn worker process to process document ingestion
+  asynchronously with concurrency bounding, restart recovery, and provider outage resilience.
+  `INGEST_MAX_CONCURRENT_JOBS` (default `3`) is the semaphore size bounding concurrent embeddings
+  per worker; `INGEST_POLL_INTERVAL_SECONDS` (default `2.0`) is the polling frequency for due jobs;
+  `INGEST_LEASE_TIMEOUT_SECONDS` (default `300`) is the lease timeout used by the stale-claim
+  sweeper to rescue in-flight jobs stranded if a worker crashes or restarts (SC#1).
+
+  ⚠ **Once you have real users, set `INGEST_WORKER_ENABLED=false` on the API processes and run
+  one separate process with it `true`.** Document extraction is **CPU-bound Python** — camelot
+  parses every page of every PDF — and CPython's GIL means that work does *not* run in parallel
+  with request handling inside the same process. While a document ingests, that process's event
+  loop is starved and every unrelated request (chat, threads, folders) queues behind it.
+
+  **Measured, not theorised:** at `WORKER_COUNT=2` with `INGEST_MAX_CONCURRENT_JOBS=3`, importing
+  a single Google Drive folder made the whole app unresponsive — up to six CPU-heavy jobs
+  competing with request handling in the same processes.
+
+  | process | `INGEST_WORKER_ENABLED` | role |
+  |---|---|---|
+  | API (`backend`) | `false` | serves requests, never ingests |
+  | one worker, same image | `true` | ingests, serves nothing |
+
+  It needs **no leader election and no coordination at any process count** — claims are a
+  database transaction (`FOR UPDATE SKIP LOCKED`) and stale leases are reclaimed after
+  `INGEST_LEASE_TIMEOUT_SECONDS`, the same guarantee the scheduler relies on. See the worked
+  compose snippet in `docker-compose.prod.yml` beside this variable.
+
+  ⛔ **Do not split a single-box install.** One process that both serves and ingests is simpler,
+  and the contention only matters when somebody else is waiting on a request. The default stays
+  `true` everywhere for exactly that reason.
+- **Connector Watch Loop (Phase 234, LIB-08 / QUEUE-03)** — `WATCH_PROCESS_ENABLED`
+  ships **`false`** by default. Set it to `true` to enable automated background polling of
+  watched source folders (Google Drive, etc.). Safe across multiple uvicorn workers via database
+  transaction claiming (`FOR UPDATE SKIP LOCKED`). `WATCH_POLL_INTERVAL_SECONDS` (default `60`)
+  controls how frequently the worker checks for due watches; `WATCH_LEASE_SECONDS` (default `600`)
+  is the lease timeout for in-flight folder sync passes.
 - **`VITE_*`** (bottom of the file) — the browser-facing Supabase URL + anon key. For a real
   deploy these equal `SUPABASE_URL` / `SUPABASE_ANON_KEY`. **These are baked at build time** —
   if you change one later you must rebuild the frontend (`--build`); a plain `up` won't pick
@@ -437,6 +474,35 @@ Pick an embedding model whose output dimension matches `EMBEDDING_DIMENSIONS` (e
 768, MiniLM = 384). The **full sealed air-gapped runbook** — self-hosted Supabase Docker stack
 + end-to-end local-GPU wiring + no-internet install — is **deferred** until a real on-prem /
 air-gapped buyer exists to validate it. This section is the pointer; nothing is thrown away.
+
+---
+
+## Production Subdomain Routing (`app.<domain>`) — SEED-242 / DEBT-04
+
+For cloud production serving the marketing landing page at `https://<domain>` and the application SPA at `https://app.<domain>`, follow these 7 cutover steps:
+
+1. **Host-scoped Routing (`frontend/vercel.json`):**
+   - Host match `app.*` rewrites all paths `/(.*)` to `/app.html`.
+   - Root domain 308-redirects `/app`, `/setup`, and `/invite` to `https://app.:host/...`.
+   - Filesystem precedence preserves `/` serving `index.html` (landing page) on the root domain.
+2. **Vercel Build Environment (Landing):**
+   - Set `VITE_APP_URL=https://app.<domain>` so "Sign in" and "Get Started" CTAs direct users to the application subdomain.
+3. **Coolify / Backend Runtime Environment:**
+   - Set `FRONTEND_URL=https://app.<domain>,https://<domain>`.
+   - `primary_frontend_origin()` prefers `https://app.<domain>` for server-side redirects (OAuth callbacks, emails) while permitting both origins for CORS.
+4. **Cloud Supabase Auth Configuration:**
+   - In Supabase Dashboard → Authentication → URL Configuration:
+     - Update **Site URL** to `https://app.<domain>`.
+     - Add `https://app.<domain>/**` and `https://<domain>/**` to **Redirect URLs**.
+5. **CORS & Redirect Verification:**
+   - Ensure backend `FRONTEND_URL` comma-separated list contains both origins.
+6. **Deploy Parity Check:**
+   - Run `bash scripts/check-deploy-drift.sh` to confirm zero deployment artifact drift.
+7. **Pre-Promotion Preview Verification Checklist:**
+   - [ ] Root `https://<preview-domain>/` serves landing page (HTTP 200, `index.html`).
+   - [ ] Root `https://<preview-domain>/app` issues HTTP 308 redirect to `https://app.<domain>/app`.
+   - [ ] Subdomain `https://app.<domain>/` mounts application SPA with `div id="root"`.
+   - [ ] OAuth connect flow returns to `https://app.<domain>/app?connections=1&oauth_connected=1` and displays connected service.
 
 ---
 

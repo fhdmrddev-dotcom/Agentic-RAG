@@ -13,6 +13,10 @@ import type { ActiveView } from "@/App"
 // 069-A) — NOT the raw NAV_ITEMS const — so a non-operator's rail hides the same
 // governed features the mobile drawer does. Render-only; the API is the wall.
 import type { NavItem } from "@/lib/nav-items"
+// Phase 235 plan 09 (SURF-03): the badge's words and its popover. ⚠ The TYPE only — the
+// registry that produces the conditions is read by `ChatLayout`, never here.
+import type { AttentionCondition } from "./attentionConditions"
+import { AttentionPopover } from "./AttentionPopover"
 
 // Phase 156 (POLISH-01 / D-01, D-07, Wave 1): NavPanel is a PERMANENT icon rail —
 // logo → New Chat (+) → nav icons → footer icons. The old collapsible w-64↔w-16 column
@@ -52,6 +56,17 @@ interface Props {
   // owned + persisted so this component stays pure; false = the default 58px icon rail.
   expanded: boolean
   onToggleExpanded: () => void
+  // ── Phase 235 plan 09 (SURF-03 / D-235-01 / D-235-04) ────────────────────────────────
+  //
+  // The app-shell attention signal. ⛔ THIS COMPONENT IS A RENDERER, NOT A READER: the
+  // conditions arrive as a PROP, resolved ONCE by `ChatLayout` from the producer registry.
+  // A second read here would poll the verdict twice per render tree and the two answers
+  // would eventually disagree about the same source — the exact failure D-235-05 exists to
+  // prevent. `attentionConditions.ts` is deliberately NOT imported by this file.
+  attentionConditions?: readonly AttentionCondition[]
+  // The one door the popover opens. ⚠ When it is absent NOTHING renders — no badge and no
+  // popover — so a caller that has not wired it gets silence rather than a dead control.
+  onOpenLibraryHealth?: () => void
 }
 
 // One rail control, two renderings. Collapsed → a 40px icon square wrapped in a
@@ -65,6 +80,8 @@ function RailItem({
   active,
   onClick,
   className,
+  badge,
+  testId,
 }: {
   expanded: boolean
   icon: LucideIcon
@@ -72,20 +89,39 @@ function RailItem({
   active?: boolean
   onClick: () => void
   className?: string
+  // Phase 235 plan 09 (SURF-03 / D-235-04): a GENERIC decoration slot. This component does
+  // not know what a badge MEANS, exactly as it does not know what `className` means — the
+  // caller decides the tone and the content, and there is no branch here on either. That is
+  // the shape the `className` prop above already established; a per-tenant `attentionCount`
+  // prop would have put the shell's vocabulary inside a presentational rail control.
+  //
+  // ⛔ WHATEVER GOES IN HERE MUST BE `aria-hidden`. The button below carries
+  // `aria-label={label}`, and a visible descendant text node RENAMES the control:
+  // `IngestionTab.tsx:176-188` records the measurement — six `getByRole` cases broke when a
+  // tab's accessible name became "In progress 3". A badge may decorate a control's name; it
+  // may not rename it.
+  badge?: React.ReactNode
+  // The composition hook (screen prefix `rail`). Defaulted, so every rail control carries one
+  // and the Library item can carry its own distinct kind.
+  testId?: string
 }) {
   const button = (
     <button
       onClick={onClick}
       aria-label={label}
       aria-current={active ? "page" : undefined}
+      data-testid={testId ?? "rail-rail-item"}
       className={cn(
-        "flex items-center h-10 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30",
+        // `relative` is load-bearing: it is what an absolutely-positioned badge anchors to,
+        // and it must hold at the 40px collapsed size as well as the full-width expanded row.
+        "relative flex items-center h-10 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30",
         expanded ? "w-full justify-start gap-3 px-3" : "w-10 justify-center",
         className,
       )}
     >
       <Icon className="w-5 h-5 shrink-0" />
       {expanded && <span className="text-sm font-medium truncate">{label}</span>}
+      {badge}
     </button>
   )
   if (expanded) return button
@@ -108,12 +144,60 @@ export function NavPanel({
   onToggleTheme,
   expanded,
   onToggleExpanded,
+  attentionConditions,
+  onOpenLibraryHealth,
 }: Props) {
   const isControlRoom = activeView === "control-room"
   const isOrgAdmin = activeView === "org-admin"
   // Phase 166 (ADMIN-01 / D-166-05): the render-only org-manage flag from OrgProvider.
   // useOrgOptional is non-throwing → null (canManage=false) where no provider is mounted.
   const canManage = useOrgOptional()?.canManage ?? false
+
+  // ── Phase 235 plan 09 (SURF-03 / D-235-04) — the app-shell signal, resolved once here ──
+  //
+  // ⛔ NOTHING IS DERIVED. `attentionConditions` already carries the SERVER's verdict, with
+  // the soft-failure debounce applied server-side (D-235-05). A healthy instance, and an
+  // instance where one check failed and the next recovered, both arrive as an EMPTY array —
+  // so both render nothing, and SC#4's *"a person who has ignored it once has not been
+  // trained to ignore it always"* is honoured by having no second decider at all.
+  const attention = attentionConditions ?? []
+  // The navigator is what makes the signal actionable; without it there is nothing to open,
+  // so a badge would be a control that does nothing. Silence is the honest answer.
+  const showAttention = attention.length > 0 && Boolean(onOpenLibraryHealth)
+  // ⚠ The count is the non-colour carrier and the sentence lives on the trigger's accessible
+  // name — the design skill's word-badge rule (*the WORD carries the meaning; tone is
+  // decoration*). No glyph is invented here: §4 records that inventing one teaches a
+  // vocabulary the product does not have.
+  // ⛔ THE WARNING TOKEN, NEVER THE DANGER ONE — sketch 233 §9 forbids the danger tone on a
+  // source state, and the composition fence found a live violation of exactly that rule
+  // elsewhere in this phase. ⚠ The forbidden token is named here in WORDS rather than spelled,
+  // because a grep for it is one of this plan's acceptance measurements and a comment that
+  // repeats a literal makes a code measurement satisfiable by prose (the 235-08 / 187-24
+  // lesson, recorded twice in this phase now).
+  // ⛔ THE BADGE ANCHORS DIFFERENTLY IN THE TWO RAIL WIDTHS, and one position cannot serve
+  //    both (operator, 2026-09-09: *"the tag on the library in the navigation menu is not
+  //    center aligned"*).
+  //
+  //    COLLAPSED the row is a 40×40 icon button, so `-top-1 -right-1` is the ordinary
+  //    notification-dot corner and reads correctly. EXPANDED the row is a full-width 40px-tall
+  //    strip with the label beside the icon — the same corner throws the badge to the far
+  //    top-right, floating above the text baseline instead of sitting on it.
+  //
+  // ⚠ So it is CENTRED VERTICALLY when expanded and left as a corner mark when collapsed.
+  //   `top-1/2 -translate-y-1/2` centres against the row rather than guessing an offset, which
+  //   keeps holding if the row height ever changes.
+  const attentionBadge = showAttention ? (
+    <span
+      data-testid="rail-badge"
+      aria-hidden="true"
+      className={cn(
+        "absolute min-w-[18px] h-[18px] px-1 rounded-full bg-warning text-warning-foreground text-[10px] font-bold leading-[18px] text-center",
+        expanded ? "right-3 top-1/2 -translate-y-1/2" : "-top-1 -right-1",
+      )}
+    >
+      {attention.length}
+    </span>
+  ) : undefined
 
   return (
     <div
@@ -160,21 +244,44 @@ export function NavPanel({
           className="text-primary bg-primary/10 hover:bg-primary/20"
         />
 
-        {navItems.map(({ view, icon, label }) => (
-          <RailItem
-            key={view}
-            expanded={expanded}
-            icon={icon}
-            label={label}
-            active={activeView === view}
-            onClick={() => onNavigate(view)}
-            className={
-              activeView === view
-                ? "bg-primary/15 text-primary"
-                : "text-muted-foreground hover:text-sidebar-foreground hover:bg-accent/40"
-            }
-          />
-        ))}
+        {navItems.map(({ view, icon, label }) => {
+          // ⭐ The Library's `ActiveView` value is `"documents"`, not `"library"` — the page
+          //    was renamed, the union member was not (`renameFence.test.ts` guards that).
+          const isLibrary = view === "documents"
+          const item = (
+            <RailItem
+              key={view}
+              expanded={expanded}
+              icon={icon}
+              label={label}
+              active={activeView === view}
+              onClick={() => onNavigate(view)}
+              testId={isLibrary ? "rail-rail-item-library" : "rail-rail-item"}
+              badge={isLibrary ? attentionBadge : undefined}
+              className={
+                activeView === view
+                  ? "bg-primary/15 text-primary"
+                  : "text-muted-foreground hover:text-sidebar-foreground hover:bg-accent/40"
+              }
+            />
+          )
+          if (!isLibrary) return item
+          // The popover anchors to the rail item, so the item gets a positioned wrapper. The
+          // trigger is a SIBLING of the rail button rather than a child of it — a nested
+          // button is invalid markup, and a trigger wrapped around the rail item would make
+          // every Library click open a panel instead of going to the Library.
+          return (
+            <div key={view} className="relative">
+              {item}
+              {showAttention && onOpenLibraryHealth && (
+                <AttentionPopover
+                  conditions={attention}
+                  onOpenLibraryHealth={onOpenLibraryHealth}
+                />
+              )}
+            </div>
+          )
+        })}
       </div>
 
       {/* Footer: the org + operator shields, then the merged ProfileMenu identity anchor.

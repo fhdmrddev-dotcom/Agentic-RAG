@@ -22,6 +22,7 @@ import {
   deleteCheckedQuery,
   type CheckedQueryRow,
 } from "@/lib/api"
+import { AnimatedNumber } from "@/components/ui/AnimatedNumber"
 
 export interface CheckedQueriesSectionProps {
   /** Lift the live count so the parent's stat tile can show it (one fetch, two consumers). */
@@ -44,9 +45,20 @@ export function rankChangeSentence(row: CheckedQueryRow): string | null {
 }
 
 function RankCell({ row }: { row: CheckedQueryRow }) {
-  const sentence = rankChangeSentence(row)
-  if (sentence === null) return <span className="text-muted-foreground">—</span>
-  return <span className="tabular-nums">{sentence}</span>
+  if (row.checked_at === null) return <span className="text-muted-foreground">—</span>
+  if (row.last_rank === null) return <span className="tabular-nums">not ranked</span>
+  if (row.previous_rank === null) {
+    return (
+      <span className="tabular-nums">
+        ranked <AnimatedNumber value={row.last_rank} />
+      </span>
+    )
+  }
+  return (
+    <span className="tabular-nums">
+      was <AnimatedNumber value={row.previous_rank} />, now <AnimatedNumber value={row.last_rank} />
+    </span>
+  )
 }
 
 function VerdictBadge({ row }: { row: CheckedQueryRow }) {

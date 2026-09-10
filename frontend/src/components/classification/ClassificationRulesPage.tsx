@@ -23,6 +23,7 @@ import { AutomationGroup } from "../ingestion/AutomationGroup"
 import { RuleBuilderPanel } from "./RuleBuilderPanel"
 import { listRules, listFolders, listMetadataFields } from "@/lib/api"
 import type { ClassificationRule, Folder, MetadataFieldDef } from "@/types"
+import { cn } from "@/lib/utils"
 
 type LoadState = "loading" | "ready" | "error"
 
@@ -55,6 +56,12 @@ export function ClassificationRulesPage() {
   const [folders, setFolders] = useState<Folder[]>([])
   const [customFields, setCustomFields] = useState<MetadataFieldDef[]>([])
   const [builder, setBuilder] = useState<BuilderState>(null)
+  const [scopeFilter, setScopeFilter] = useState<"all" | "watch" | "classification">("all")
+
+  const filteredRules = useMemo(() => {
+    if (scopeFilter === "all") return rules
+    return rules.filter((r) => (r.rule_scope ?? "classification") === scopeFilter)
+  }, [rules, scopeFilter])
 
   const loadRules = useCallback(async () => {
     setState("loading")
@@ -170,13 +177,54 @@ export function ClassificationRulesPage() {
           )}
 
           {state === "ready" && (
-            <AutomationGroup
-              rules={rules}
-              onEditRule={handleEditRule}
-              onToggled={handleToggled}
-              onDeleted={handleDeleted}
-              folderNames={folderNames}
-            />
+            <>
+              <div className="flex items-center gap-1.5 mb-3 px-1">
+                <button
+                  type="button"
+                  onClick={() => setScopeFilter("all")}
+                  className={cn(
+                    "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                    scopeFilter === "all"
+                      ? "bg-primary text-primary-foreground font-semibold"
+                      : "bg-muted/50 text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  All ({rules.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setScopeFilter("watch")}
+                  className={cn(
+                    "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                    scopeFilter === "watch"
+                      ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/40 font-semibold"
+                      : "bg-muted/50 text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  Arrival ({rules.filter((r) => r.rule_scope === "watch").length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setScopeFilter("classification")}
+                  className={cn(
+                    "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                    scopeFilter === "classification"
+                      ? "bg-indigo-500/20 text-indigo-400 border border-indigo-500/40 font-semibold"
+                      : "bg-muted/50 text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  Extracted ({rules.filter((r) => (r.rule_scope ?? "classification") === "classification").length})
+                </button>
+              </div>
+
+              <AutomationGroup
+                rules={filteredRules}
+                onEditRule={handleEditRule}
+                onToggled={handleToggled}
+                onDeleted={handleDeleted}
+                folderNames={folderNames}
+              />
+            </>
           )}
         </div>
 

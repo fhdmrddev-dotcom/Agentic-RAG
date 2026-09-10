@@ -420,6 +420,77 @@ def parse_msg_bytes(raw: bytes) -> ParsedEmail:
         msg.close()
 
 
+#: A Message-ID is chosen by whoever sent the mail, so it is attacker-LENGTH as well as
+#: attacker-content (TM-240-07). Bounded at the derivation rather than at the column, because a
+#: column-level truncation would silently split one conversation into two.
+MAX_THREAD_KEY_CHARS = 512
+
+#: Characters a header may legally contain but a stored key must not. ⚠ Not paranoia: during v3.7
+#: UAT a NUL byte inside a `.msg` subject produced a Postgres `22P05` that 5,438 green tests missed.
+_CONTROL_CHARS = "".join(chr(c) for c in range(0x20)) + chr(0x7F)
+
+
+def _normalise_msgid(value: str | None) -> str | None:
+    """One RFC 5322 message identifier, reduced to a comparable key.
+
+    Angle brackets, surrounding whitespace and case are all things two clients disagree about
+    while meaning the same message — so all three are normalised away. Anything left that a
+    database should never see is dropped.
+    """
+    if not value:
+        return None
+    text = str(value).strip()
+    # A `References` header is a LIST; the caller splits it, but a stray one arriving here should
+    # not silently become a key made of several ids joined by spaces.
+    text = text.split()[0] if text.split() else ""
+    text = text.strip("<>").strip()
+    text = text.translate({ord(c): None for c in _CONTROL_CHARS})
+    text = text.lower()[:MAX_THREAD_KEY_CHARS]
+    return text or None
+
+
+def thread_key_for(parsed: ParsedEmail) -> str | None:
+    """The conversation this message belongs to, derived from the message itself (D-3, D-240-05).
+
+    Order: the FIRST entry of ``References`` (the thread root) -> ``In-Reply-To`` -> the message's
+    own ``Message-ID`` -> ``None``.
+
+    ── WHY THE HEADERS AND NOT THE PROVIDER'S OWN THREAD ID ────────────────────────────────────
+
+    Gmail hands out a ``threadId`` and Microsoft Graph a ``conversationId``, and either would have
+    been easier to read. Both were rejected, for one reason: **D-3 calls this a retrieval-grouping
+    column, not a provider id.** A provider thread id is meaningless outside that provider and
+    outside that account, so it could never group a manually uploaded ``.eml`` with its synced
+    twin — and manual upload is where essentially all mail in this Library is today. Header
+    derivation is also the only rule that keeps the SOURCE CONTRACT untouched: no thread id has to
+    travel through ``SourceFile``, which is what lets ``sources/base.py`` close byte-identical.
+
+    ⭐ Google's own reference argues the same way. Its ``threadId`` description states that adding
+    a message to a thread requires *"the `References` and `In-Reply-To` headers … in compliance
+    with RFC 2822"* — Gmail derives its thread from exactly the headers read here.
+
+    ── THE KNOWN WEAKNESS, RECORDED RATHER THAN HIDDEN ─────────────────────────────────────────
+
+    A client that omits ``References`` breaks the chain, and its message becomes a thread of one.
+    That is a **visible** degradation — a singleton conversation a person can see and query —
+    never a wrong grouping. The failure DIRECTION is what makes this acceptable: a wrong grouping
+    would put one conversation's mail inside another's answer with nothing on screen saying so.
+    If a real mailbox shows this biting, the provider thread id becomes a documented fallback in a
+    later phase — never a silent one here.
+
+    ⛔ **Subject is NEVER an input.** "Re: Budget" collides across unrelated conversations and
+    across people.
+    """
+    if parsed.references:
+        root = _normalise_msgid(parsed.references[0])
+        if root:
+            return root
+    parent = _normalise_msgid(parsed.in_reply_to)
+    if parent:
+        return parent
+    return _normalise_msgid(parsed.message_id)
+
+
 def format_email_text_for_retrieval(parsed: ParsedEmail) -> str:
     """Format an email into clean, structured Markdown text for document_chunks embedding."""
     lines: list[str] = []
