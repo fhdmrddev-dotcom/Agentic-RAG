@@ -714,7 +714,11 @@ CREATE TABLE public.app_settings (
     vision_model text,
     vision_max_pages integer DEFAULT 50,
     source_max_file_size_mb integer DEFAULT 25,
+    hnsw_ef_search integer,
+    hnsw_iterative_scan text,
     CONSTRAINT app_settings_extraction_table_engine_pdf_check CHECK ((extraction_table_engine_pdf = ANY (ARRAY['camelot'::text, 'pdfplumber'::text]))),
+    CONSTRAINT app_settings_hnsw_ef_search_bounds CHECK (((hnsw_ef_search IS NULL) OR ((hnsw_ef_search >= 10) AND (hnsw_ef_search <= 1000)))),
+    CONSTRAINT app_settings_hnsw_iterative_scan_values CHECK (((hnsw_iterative_scan IS NULL) OR (hnsw_iterative_scan = ANY (ARRAY['off'::text, 'strict_order'::text, 'relaxed_order'::text])))),
     CONSTRAINT app_settings_source_max_file_size_mb_bounds CHECK (((source_max_file_size_mb IS NULL) OR ((source_max_file_size_mb >= 1) AND (source_max_file_size_mb <= 50))))
 );
 
@@ -759,6 +763,20 @@ COMMENT ON COLUMN public.app_settings.vision_max_pages IS 'Hard ceiling on pages
 --
 
 COMMENT ON COLUMN public.app_settings.source_max_file_size_mb IS 'SEED-258. The largest file any connected source (Google Drive, Microsoft Graph, any MCP file surface) will import, in MB. Read through source_max_file_bytes(); the MCP JSON-RPC envelope cap is DERIVED from this (x 4/3 for base64, plus 1 MB headroom) and is never a second setting. Bounded 1..50: 0 would stop every source importing while each sync still reported success, and 50 MB is the application''s own manual-upload ceiling. Raising it costs memory — the whole response is buffered per in-flight request from a server we do not control. NULL reads as the shipped 25 MB.';
+
+
+--
+-- Name: COLUMN app_settings.hnsw_ef_search; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.app_settings.hnsw_ef_search IS 'Phase 241 / SEED-076. How many candidate vectors the HNSW index walks before the search''s filters are applied — pgvector''s hnsw.ef_search, applied per request with SET LOCAL inside the transaction get_user_pg_connection already opens (so it auto-reverts at COMMIT and can never leak to the next borrower of the pooled connection). The shipped server default is 40; every search in this product is a FILTERED search, so 40 global candidates can collapse to far fewer surviving rows for a tenant that owns a small share of the corpus. Bounded 10..1000: 1000 is pgvector''s own maximum and 10 is below the server default so a smaller, faster value stays reachable. Raising it walks more vectors per query — slower searches and more memory. NULL reads as config.py''s 40.';
+
+
+--
+-- Name: COLUMN app_settings.hnsw_iterative_scan; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.app_settings.hnsw_iterative_scan IS 'Phase 241 / SEED-076. pgvector''s hnsw.iterative_scan: off | strict_order | relaxed_order. When on, the index KEEPS scanning until enough rows survive the query''s filters instead of returning a short list — the direct remedy for filtered-search under-fill. THREE values, not a boolean: strict_order preserves exact distance ordering, relaxed_order trades ordering for speed, and a boolean column would silently lose one of them. ⚠ This GUC DOES NOT EXIST below pgvector 0.8, so the application applies it in its own try and degrades the TUNING, never the SEARCH, on an older server. Its two memory companions (hnsw.max_scan_tuples, hnsw.scan_mem_multiplier) are deliberately NOT settings — they are hardcoded in config.py because a wrong value there is a memory footgun. NULL reads as config.py''s ''off''.';
 
 
 --
