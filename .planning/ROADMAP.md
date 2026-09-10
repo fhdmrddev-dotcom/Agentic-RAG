@@ -24,6 +24,333 @@
 - ✅ **v3.8 Document Intelligence, Automations & Connectors** — Phases **201-209** (shipped 2026-08-26, git tag `v3.8`). 12 phases, 17 plans, migrations 124-126, 3 days. **11/11 requirements delivered.** Structured tables and email became first-class ingestion; workflows run unattended on a schedule with a brake that really stops work; a run can read its own prior run; and a workflow reaches any official MCP server with per-tool consent and **zero per-vendor adapter code**. ⚠ Closed `gaps_closed_partial` — three requirements are narrower than their wording and are carried with re-open triggers ([`audit`](milestones/v3.8-MILESTONE-AUDIT.md)).
 - ✅ **v3.9 Connections: Any Service, Any Tool** — Phases **210-227** (shipped 2026-09-04, git tag `v3.9`). 16 phases (210-217 CORE + inserts 214.1 / 217.1 + 220-227; **218 absorbed** into 217.1; **219 deferred**), **111 plans**, migrations **127-129 / 140-141 / 150-152**, 9 days. **34/39 requirements delivered · 3 partial · 2 shipped-but-never-driven.** A connection became `{service identity, auth, discovered tools, per-tool grants}` — so adding a service adds **rows, not code**: Notion connects by OAuth with no developer console and returns **41 tools for zero lines of tool code**, and six Google applications sit under one token with **11/11 live writes**. Per-tool grants, an approval moment that stops a real run, an audit receipt per outbound call, connections usable by name in chat, and the Library as one home for documents. ⚠ **Phase 219 DEFERRED to the Connected Knowledge milestone** with `LIB-08/09/10` and `SEED-209/210/211/212` — its SC#1 *“watched on a schedule”* IS this milestone's own binding security re-open trigger ([`audit`](milestones/v3.9-MILESTONE-AUDIT.md)).
 - ✅ **v4.0 Connected Knowledge** — Phases **228-241** (shipped 2026-09-10, git tag `v4.0`). 14 phases, **62 plans**, migrations **153-156 / 166-176**, 6 days. **33/38 requirements delivered · 5 ⛔ not ticked** (`SRC-03` Azure-blocked · `QUEUE-06` remedy shipped but the DEFAULT is unchanged · `SURF-03` home still an open decision · `DEBT-03` ultra ruled out · `DEBT-04` gated on a production push). The knowledge base stopped depending on somebody remembering to upload: a source is connected **once**, previewed before it brings anything in, and then watched on the **shipped** scheduler. Four families as thin adapters over ONE contract — Google Drive · OneDrive/SharePoint via Graph · **any** MCP file server · mail — with **239 proving zero-code by HASH** against GitHub MCP and **240 proving mail is a SHAPE, not a fourth adapter** (`sources/base.py` byte-identical). Connection-scoped visibility at all four RLS sites, a durable queue with cap/retry/resume, and the anti-injection discipline **actually attacked** (13/13 refused · 8/8 mutations caught · live drive refused by 8/8 native providers). ⚠ **241 measured a REAL recall defect at customer scale** — `recall@20` **0.040** at the shipped `ef_search = 40`, a **cliff not a slope**. ⛔ **238, 240 and 241 closed WITHOUT an independent §6.3 review**; two UAT sets owed on credentials ([`audit`](milestones/v4.0-MILESTONE-AUDIT.md)).
+- 🚧 **v4.1 Ship It & Feel It** — Phases **242-246** (opened 2026-09-11). A deliberate **CONSOLIDATION** milestone: no new capability axis, **19 requirements**, every one of them closing something already in a register. v4.0 becomes a product that is provably running in production, and the chat surface the operator touches every day stops feeling busier than the bar it is aimed at. ⚠ **Opened on a stale premise that this roadmap CORRECTS by measurement** — the v4.0 production push already landed at `1f313670b` (2026-09-10) and 241's expiring UAT row 5 is already spent; see the corrections block below.
+
+---
+
+## v4.1 Ship It & Feel It — ACTIVE (opened 2026-09-11)
+
+**5 phases · 242-246 · 19 requirements · migration reserved 177.**
+Requirements: [`REQUIREMENTS.md`](REQUIREMENTS.md) · project: [`PROJECT.md`](PROJECT.md) · state: [`STATE.md`](STATE.md).
+**No `research/SUMMARY.md` exists for this milestone, by decision** — every requirement names an existing file, line or register entry, so there is no external unknown to research. Do not go looking for one.
+
+**Goal:** v4.0 stops being code that exists and becomes a product a person can prove is running — and the surface the operator actually touches every day stops feeling busier than the bar it is aimed at.
+
+⭐ **Why five phases and not more.** The requirement set clusters on four genuinely different surfaces (the ship path · the streaming/render seam · the chat shell · the retrieval default) plus one register-honesty item that is not a build at all. Nothing here argues for splitting further, and **splitting the chat work would be actively wrong** — see `D-v4.1-02`. **G-8 is the governor on this milestone more than on any capability milestone**: a consolidation milestone has no natural stopping point, and Phase 235's 17 plans for 4-6 plans of substance is the named failure mode. Target **3-5 plans per phase**; a fix that is ≤ 1 file / ≤ 10 lines with no schema or API surface is **`/gsd:fast` under G-3 and must not become a plan**.
+
+---
+
+### ⚠ Corrections measured at HEAD on 2026-09-11 — this roadmap is built on these, not on the intake prose
+
+Every claim below was **driven against the repository**, not read from a register. Both readings are published: the original is preserved, never overwritten, because *how* a claim went stale within one day is the finding.
+
+**1. ⛔ THE REQUIREMENT COUNT IS 19, NOT 17.** `PROJECT.md`, the intake brief and the commit message `c1a395abf` (*"17 REQ-IDs, 5 categories"*) all say **17**. Counted from `REQUIREMENTS.md` at HEAD: **SHIP 4 · CHAT 5 · SHELL 5 · DEBT 3 · RECALL 2 = 19.** The coverage map below maps **19/19**. ⚠ This is the **identical** defect v4.0's roadmap opened with (*"the requirement count is 38, not 34"*) — **a coverage check run against the wrong denominator is how a requirement survives an entire milestone unnoticed**, and it has now happened on two consecutive milestones.
+
+**2. ⛔ `SHIP-04` HAS ALREADY HAPPENED. The v4.0 production push landed 2026-09-10.** Measured with `git log`:
+
+```
+e65610ac2  2026-09-10  Merge master into production — app subdomain root serves the application
+1f313670b  2026-09-10  Merge master into production — deploy v4.0 Connected Knowledge
+```
+
+`production` is at `e65610ac2`, and `git log --oneline production..develop` returns **2 commits — both of them v4.1 planning docs**. ⛔ **`STATE.md` and `REQUIREMENTS.md` both still say *"v4.0 has never deployed"* and *"cloud is 15 migrations behind"*.** Those sentences were true when written at the v4.0 close and became false **later the same day**. `SHIP-04` is therefore not a push to schedule — it is a **deployed state to verify**, plus `SEED-242`'s `app.<domain>` half, whose routing fix also already landed (`f63a8ebcc`).
+
+**3. ⛔ `SHIP-02` IS ALREADY SPENT, AND ITS LOSS IS ALREADY WRITTEN DOWN.** `241-HUMAN-UAT.md` reads `status: complete`, **6 of 6 driven**, and its closing section states verbatim: *"The row as written can never be run again… Cloud was that database until 2026-09-10, when all fifteen pending migrations — 176 included — were applied during the v4.0 production preparation. The deploy runbook called the ordering out twice and the set went in as one batch anyway."* Row 5 was driven **on a local substitute** (`ALTER TABLE … DROP COLUMN`, backend restarted because `app_settings_has_hnsw_columns()` caches in a process global), all three assertions passed, and the substitution is defended on **one** narrow ground: the gate keys on **column presence**, not on environment. ⭐ **`SHIP-02`'s second arm — *"or explicitly retired with a written reason"* — is therefore ALREADY SATISFIED**, at commit `dbd63864b`. What this phase owes is not a drive; it is to stop carrying it as owed work.
+
+⚠ **The forced ordering in the intake — row 5 → migrations → push — was RESOLVED BY EVENTS, in the wrong order.** The rule stands as written for any future expiring row; what is corrected is the belief that this particular window is still open. **A roadmap that plans an unreproducible drive is a roadmap that cannot close.**
+
+**4. ⛔ `SHIP-01` IS GENUINELY OPEN — but only its structural half, and the register understates it.** Driven at HEAD: `backend/app/api/settings.py:466-467` still enforces `1 <= multimodal_max_vision_calls <= 1000`; `SettingsPage.tsx:888` still puts the field in the **Search tab's** payload unconditionally (read at `:880-901`); `grep` over `supabase/migrations/*.sql` still returns **no CHECK constraint** on the column. The local data fix `1001 → 1000` **was applied and deliberately left in place** (`241-HUMAN-UAT.md`, *"State restored"*), so the bug **no longer reproduces on the operator's local install** — the surface the report names. ⚠⚠ **What is UNMEASURED is the value cloud holds**, and cloud is what production serves from. **If the production row is out of range, the Search tab is unsaveable in production right now and nobody has looked.** That is the first thing Phase 242 measures.
+
+**5. `RECALL-02`'s home is `retrieval_tuning.py`, NOT `retrieval_service.py`.** `SEED-268` names `_SERVER_DEFAULT_EF_SEARCH = 40` and the `if resolved_ef != _SERVER_DEFAULT_EF_SEARCH:` no-op shortcut in **`backend/app/services/retrieval_tuning.py`**. This matters for `D-v4.1-05`: **`RECALL-02` alone does not land on `retrieval_service.py` and does not trip its third G-5 landing.** `RECALL-01` might.
+
+**6. ⚠ `BUG-260718-02`'s part B is fixed while its report reads `open`, and the report now says so in its own frontmatter** (`status: open   # ⚠ PART B IS ALREADY FIXED`). It is cited here as the milestone's method rule, not as a task: **every line number in `REQUIREMENTS.md` is a claim about code from a report written weeks ago. Open the file before planning against it.** Each of `RunCard.tsx:501`, `StreamsProvider.tsx:421-425`, `MessageList.tsx:164-176` and `MessageItem.tsx:437-439` was opened while writing this roadmap and **all four are live as described** — but that is a reading taken today, and it expires.
+
+**7. Hot-file ledger triples RE-DERIVED from git on 2026-09-11**, per CLAUDE.md's own instruction not to trust a cell (`--follow`, six-digit dated-quick-task buckets subtracted):
+
+| File | ledger cell | **re-derived 2026-09-11** | drift |
+|---|---|---|---|
+| `frontend/src/providers/StreamsProvider.tsx` | 85 / 34 / 4144 | **88 / 35 / 4189** | +3 commits, **+1 phase** |
+| `frontend/src/components/chat/MessageList.tsx` | 19 / 8 / 267 | **20 / 8 / 292** | +1 commit, +25 L |
+| `frontend/src/components/chat/MessageItem.tsx` | 62 / 33 / 702 | **66 / 32 / 707** | +4 commits |
+| `frontend/src/components/chat/RunCard.tsx` | 26 / 12 / 728 | **27 / 13 / 729** | **+1 phase — it FIRES now** |
+| `frontend/src/components/layout/ChatLayout.tsx` | 49 / 25 / 997 | **49 / 25 / 997** | none |
+| `frontend/src/components/chat/MessageInput.tsx` | 29 / 14 / 643 | **29 / 14 / 643** | none |
+| `frontend/src/components/panel/PendingAskCard.tsx` | 13 / 7 / 736 | **14 / 7 / 765** | +1 commit, +29 L |
+| `frontend/src/pages/SettingsPage.tsx` | 44 / 23 / 1738 | **45 / 23 / 1751** | +1 commit |
+| `backend/app/api/settings.py` | 35 / 19 / 814 | **36 / 19 / 854** | +1 commit, +40 L |
+| `backend/app/models/user_settings.py` | 50 / 32 / 1561 | **50 / 32 / 1561** | none |
+| `backend/app/services/retrieval_service.py` | 19 / 11 / 456 | **19 / 11 / 456** | none — the cell is correct |
+| `backend/app/api/documents.py` | 85 / 33 / 2437 | **89 / 34 / 2423** | +4 commits, **+1 phase** |
+
+⚠ **`backend/app/services/retrieval_tuning.py` has NO LEDGER ROW** and `RECALL-02` lands on it. **A row is owed in Phase 246's commit**, per the same-commit sync rule — the identical gap `scheduler_service.py` had at Phase 234.
+
+---
+
+### The sequencing constraints — what is forced, and what is no longer
+
+| Constraint | Status |
+|---|---|
+| `SHIP-01` before the production push, so the blocking bug is not deployed | ⛔ **OVERTAKEN BY EVENTS.** The push landed 2026-09-10 with the structural bug still in the code. The remedy is now *forward*: fix it and promote it, rather than gate a push that already happened |
+| `SHIP-02` (row 5 on cloud) **before** migration 176 reaches cloud | ⛔ **EXPIRED, and recorded as a loss** — 176 went in as part of one 15-migration batch. Retired in writing at `dbd63864b`. **Not re-plannable** |
+| `SHIP-03` migrations `153-156, 166-176` in numeric order, once each, via the SQL editor | ⚠ **CLAIMED DONE by the deploy record, UNVERIFIED by measurement.** Phase 242 runs `scripts/verify-v40-cloud-migrations.sql` **against cloud** and records the verdict |
+| **`RECALL-01` depends on `SHIP-01`** | ⭐ **STANDS, unchanged.** `hnsw_ef_search` is set on the tab that cannot save. **Phase 246 comes after Phase 242, and its plans may not assume the tab works** — they assert it, on the database they are measuring |
+| **`CHAT-02` and `CHAT-03` share a phase** | ⭐ **STANDS, and is binding.** `MessageList.tsx:164-176` is ONE mechanism: the `messages`-dependent effect that re-runs per token AND the `behavior: "smooth"` branch at `:171`. Splitting them fixes one bug and re-breaks the other |
+| **G-2 fires on Phase 243** | ⭐ **STANDS.** `/gsd:sketch` runs **before** `/gsd:plan-phase 243`. The operator-approved mockup **is** the acceptance bar |
+| **`retrieval_service.py`'s G-5 extraction, owed since 231** | ⭐ **STANDS.** 241 was the deliberate second landing (11 non-comment lines, fence driven RED at 13). **Phase 246 proposes the extraction FIRST** |
+
+---
+
+### ⚠ Two phases can be blocked on something that is not engineering
+
+Stated here rather than discovered at execution. **A phase that can be blocked on a credential says so, and says what is still deliverable without it** — it never silently assumes the credential arrives.
+
+| Phase | Blocked on | Still deliverable without it |
+|---|---|---|
+| **242** | a **read-capable cloud DSN** (the same blocker that killed 241's row 5) | SC#2 and SC#3 land entirely locally — the CHECK-constraint migration, the changed-fields-only payload, and the worded refusal. Only SC#1 and SC#4 need the DSN |
+| **245** | **one Azure app registration** (`MICROSOFT_OAUTH_CLIENT_ID` / `_SECRET`) — ⚠ **run row M-1 first, it unblocks the other 8** | `DEBT-02` (233's five G-4 rows) and `DEBT-03` (the honesty sweep) in full, plus `DEBT-01`'s **retirement** arm. SharePoint rows S-1 / S-2 sit separately on `SEED-256` and may be retired on that ground alone |
+
+---
+
+### Phase Table
+
+| Phase | Name | Goal | Requirements | SC# | Migrations | Flags |
+|-------|------|------|--------------|-----|-----------|-------|
+| 242 | Ship It — and Prove What Already Shipped | An operator can save the settings that control search, on the database production actually serves from, and every SHIP claim in the register has been replaced by a measurement | SHIP-01, SHIP-02, SHIP-03, SHIP-04 | 5 | **177** `177_app_settings_vision_calls_bound.sql` | ⚠⚠ **THE INTAKE PREMISE IS STALE — read the corrections block first.** The push already landed (`1f313670b`); row 5 is already spent and retired in writing (`dbd63864b`). **G-5**: `settings.py` (**36/19/854**), `SettingsPage.tsx` (**45/23/1751**), `user_settings.py` (**50/32/1561**) — all three FIRE, all honoured by construction. ⚠ **A new bound on an existing settings column is a MIGRATION, not just an API change.** ⚠ **Blocked on a read-capable cloud DSN for 2 of 5 SC.** `check-deploy-drift.sh` gates. UI hint (the Settings tab + the refusal) |
+| 243 | The Thinking Block and the Follow-Scroll Seam | A reasoning stream reads as a calm, structured surface, and scrolling up during a tool call leaves you where you scrolled | CHAT-01, CHAT-02, CHAT-03, CHAT-04, CHAT-05 | 5 | none expected | ⚠⚠ **G-2 SKETCH MANDATORY before `/gsd:plan-phase`** — live UI, "feels like", an explicit Claude.ai gold-standard comparison. **The operator-approved mockup is the acceptance bar.** ⭐ **`CHAT-02` + `CHAT-03` are ONE mechanism and may not be split** (`D-v4.1-02`). **G-5**: `StreamsProvider.tsx` (**88/35/4189**) and `MessageList.tsx` (**20/8/292**) carry live rows; `RunCard.tsx` (**27/13/729**) **newly fires**; `MessageItem.tsx` (**66/32/707**) was **DISCHARGED at 227** — do not re-hollow it. ⚠ **`SEED-049`'s trigger has FIRED** (it names *"a chat-surface / streaming / RunCard phase"* verbatim) and is deferred **by decision** — re-open at the first criterion here that cannot be verified without E2E. ⛔ No streaming-architecture rewrite: D-14's red line holds. UI hint |
+| 244 | The Chat Shell and the Composer | The chrome around a conversation stops getting in the way of it — chat scrolls inside chat, a paused run leaves you able to act, and an approval is answerable where you are looking | SHELL-01, SHELL-02, SHELL-03, SHELL-04, SHELL-05 | 5 | none expected | ⚠ **G-2 fires NARROWLY — sketch `SHELL-04`'s folder-choice surface and `SHELL-05`'s shell signal**, the two net-new surfaces; `SHELL-01/02/03` are bug fixes on shipped surfaces with named causes. ⭐ **`SURF-03`'s home was RULED at scoping** (operator, 2026-09-11): the **app shell**, not the Health tab — this is no longer an open question. Folds **`SEED-029`** (Continue-on-cap **IS** `BUG-260904-05`'s fix) + **`SEED-042`** (the "not in the KB" half of attach) + **`SEED-045`**'s chat-list / nav-collapse items. **G-5**: `ChatLayout.tsx` (**49/25/997**), `MessageInput.tsx` (**29/14/643**), `PendingAskCard.tsx` (**14/7/765**) — all fire. ⚠ `PendingAskCard.tsx` is a **cross-surface shell**, not a chat component: a redesign lands in chat first and shows up in the workflow panel. UI hint |
+| 245 | The Verification Debt — Discharged or Retired in Writing | Every v4.0 row that was never driven has a verdict a person can read, and no phase's record calls a self-verification a review | DEBT-01, DEBT-02, DEBT-03 | 4 | none | ⭐ **`DEBT-03` IS A HONESTY REQUIREMENT, NOT A BUILD — it must not become a re-review.** Its whole content is: the word in the file, and the ruling in `STATE.md`. ⚠ **Blocked on ONE Azure app registration** — **M-1 first, it unblocks the other 8**. ⚠ **G-3 applies hard here**: several of these are ≤ 1 file / ≤ 10 lines of doc edit and are `/gsd:fast`, never plans. **Target 2-3 plans — the smallest phase in the milestone, deliberately.** No source change expected beyond what a driven row exposes. No UI. No migration |
+| 246 | The Recall Cliff, and the Screen That Describes It | A tenant owning a small share of a large corpus gets honest recall out of the box, and the number on the Settings screen is the number in force | RECALL-01, RECALL-02 | 4 | none expected | ⚠⚠ **`retrieval_service.py` (19/11/456 — the ledger cell is CORRECT) is at its THIRD G-5 LANDING. The extraction, owed since Phase 231, must be PROPOSED AS THE FIRST OPTION at discuss-phase, and no line may land there until that proposal is answered.** ⚠ **Depends on Phase 242** — `hnsw_ef_search` is set on the tab `SHIP-01` repairs; **the plans must ASSERT the tab saves, never assume it**. ⚠ `RECALL-02`'s home is **`retrieval_tuning.py`, which has NO LEDGER ROW — one is owed in this phase's commit.** ⛔ **`D-v4.0-EF-DEFAULT` recorded why the default was left alone: re-open it EXPLICITLY, never reverse it silently.** ⛔ No new Python package. **G-5**: `config.py` (83/48/1506) fires — its `MODEL_CAPABILITIES` seam stays OWED. UI hint (the Retrieval card) |
+
+---
+
+### Phase Checklist
+
+- [ ] **Phase 242: Ship It — and Prove What Already Shipped** — the Search tab saves on the database production serves from, a bound that was added in Python becomes a constraint in the schema, and the three SHIP claims the register still carries as owed are each replaced by a measurement or a written retirement (SHIP-01..04) ⚠ THE PREMISE IS STALE — READ THE CORRECTIONS BLOCK · blocked on a cloud DSN for 2/5 SC
+- [ ] **Phase 243: The Thinking Block and the Follow-Scroll Seam** — one calm line while a model thinks, expandable into a timeline; deltas that repaint on a cadence instead of per token; a scroll position that survives a tool call; and reasoning visible on a plain answer (CHAT-01..05) ⚠ G-2 SKETCH MANDATORY · CHAT-02 + CHAT-03 ARE ONE MECHANISM
+- [ ] **Phase 244: The Chat Shell and the Composer** — chat scrolls inside chat, a cap-paused run leaves you able to act, an approval is answerable in the thread, a local file attaches to a message, and a source that stopped reading reaches you in the shell (SHELL-01..05) ⭐ SURF-03's home RULED: the app shell
+- [ ] **Phase 245: The Verification Debt — Discharged or Retired in Writing** — 238's nine rows and 233's five rows each carry a verdict, and 238 / 240 / 241 say "self-verified" in their own records with `OV-SOLO-01` written into STATE.md (DEBT-01..03) ⭐ HONESTY, NOT A BUILD · blocked on one Azure app registration · smallest phase, 2-3 plans
+- [ ] **Phase 246: The Recall Cliff, and the Screen That Describes It** — an install answers correctly for a small tenant in a large corpus without anyone touching a setting, and the breadth on screen is the breadth in force (RECALL-01, RECALL-02) ⚠ THIRD G-5 LANDING — PROPOSE THE EXTRACTION FIRST · depends on 242
+
+---
+
+### Phase Details
+
+#### Phase 242: Ship It — and Prove What Already Shipped
+
+**Goal**: An operator can change a search setting and save it **on the database production actually serves from**, a bound that was added in Python becomes a constraint the schema enforces, and every SHIP claim the register still carries as owed work is replaced by either a measurement or a written retirement — so nothing later in this milestone is stacked on a premise that went stale within a day.
+**Depends on**: Nothing (first phase). ⭐ **Phase 246 depends on this one** — `RECALL-01` is unreachable while the tab it lives on cannot save.
+**Requirements**: SHIP-01, SHIP-02, SHIP-03, SHIP-04
+**Success Criteria** (what must be TRUE):
+
+  1. An operator opens Settings → Search **against the cloud database production serves from**, changes one field, and the save succeeds — and it succeeds **whatever value that database is holding** in a field they did not touch. ⚠ Verified by reading the **network response**, never the banner: `241-HUMAN-UAT.md`'s row 3 recorded that a red banner is exactly what a passing refusal looks like, and *"presence of an error is not evidence of the RIGHT error."* (SHIP-01)
+  2. A field the operator did not edit can no longer take the whole tab down with it — either the tab submits only what changed, or it reports every failing field at once instead of raising on the first. And when a refusal names a field they never touched, the sentence says so (*"this was already set to a value outside the allowed range"*) rather than presenting it as a rejection of what they just typed (SHIP-01).
+  3. `app_settings.multimodal_max_vision_calls` cannot hold a value outside the bound the API enforces — a CHECK constraint exists, any existing out-of-range row is brought into range by the same migration, and re-running the migration is safe (SHIP-01). ⭐ **This is the general fix, not the specific one**: the class of bug recurs on the next bound added to any settings column until a bound in Python is also a constraint in the schema.
+  4. `scripts/verify-v40-cloud-migrations.sql` has been run **against cloud** and its verdict is written into this phase's record — each of `153, 154, 155, 156, 166..176` present exactly once. Any migration found missing is applied by pasting into the cloud SQL editor in numeric order, never `db push` / `db reset`; and the non-code parity half (env vars, seed rows, provider keys, `SANDBOX_IMAGE`) is walked per `docs/DEPLOYMENT-WORKFLOW.md` (SHIP-03).
+  5. A person reading this milestone's record can tell, **with the evidence beside it**, that the v4.0 production push already landed at `1f313670b` on 2026-09-10 and that 241's UAT row 5 was driven on a local substitute with its cloud window permanently closed (`dbd63864b`) — so both read as **decisions with a written reason**, not as owed work quietly carried forward. `SEED-242` (`app.<domain>`) is closed or re-armed with a named trigger, its routing half having landed at `f63a8ebcc` (SHIP-02, SHIP-04).
+
+**Plans**: TBD
+
+**UI hint**: yes (the Settings → Search tab, its payload and its refusal copy).
+**Migrations**: **177** `177_app_settings_vision_calls_bound.sql` — the CHECK constraint plus the in-range data fix. ⚠ Applied to **local** by pasting into the SQL editor, then to **cloud** in the same operation as the promotion; `scripts/regenerate-full-schema.sh` afterwards, no `--reset`.
+**Flags**: ⚠⚠ **READ THE CORRECTIONS BLOCK ABOVE BEFORE PLANNING.** Three of this phase's four requirements describe a world that changed on 2026-09-10; planning them as written produces work that is already done, and one drive that is unreproducible. ⚠ **`SHIP-02` is NOT re-plannable** — the environment it needed no longer exists anywhere, by the UAT record's own words. ⚠ **Blocked on a read-capable cloud DSN for SC#1 and SC#4** — SC#2 and SC#3 are fully deliverable without it and should be sequenced first so the phase is never idle. **G-5**: `settings.py` (**36/19/854**), `SettingsPage.tsx` (**45/23/1751** — the tab seam stays OWED), `user_settings.py` (**50/32/1561** — stale in the ledger for the fourth close running) — all honoured by construction; **update the ledger rows AND their sections in `docs/HOT-FILE-LEDGER.md` in the same commit.** ⚠ `check-deploy-drift.sh` gates any env-var or seed change. **Skip research-phase**: every line is already read at file:line.
+
+**## How we'd know this failed**
+
+- The tab is declared fixed on the strength of the operator's **local** install, where the `1001 → 1000` data fix already landed — and production, which nobody measured, is still refusing every save.
+- A green banner is read off the screen instead of the network response, and a refusal is mistaken for a success or the reverse — the exact error `241-HUMAN-UAT.md` caught itself making.
+- The bound is fixed for `multimodal_max_vision_calls` only, and the next settings column with a Python-side bound reproduces the identical outage.
+- `SHIP-02` is re-planned as a drive, burns a plan, and cannot close — because the database shape it needs does not exist anywhere.
+- The cloud migration set is "verified" by re-reading the deploy record that claimed it, rather than by querying the database. **A register knows only the register below it; the database is the bottom.**
+- Migration 177 is applied with `db push` or `db reset`, and the operator's data goes with it.
+
+---
+
+#### Phase 243: The Thinking Block and the Follow-Scroll Seam
+
+**Goal**: While a model is thinking, the operator sees one calm, structured surface instead of a monospace blob repainted once per token — and if they scroll up to read something, the product leaves them there.
+**Depends on**: Nothing structural. ⭐ **May run alongside 242** — the blast radii do not intersect.
+**Requirements**: CHAT-01, CHAT-02, CHAT-03, CHAT-04, CHAT-05
+**Success Criteria** (what must be TRUE):
+
+  1. During a reasoning stream the operator sees a **single calm line**, and expanding it gives a structured timeline rather than a flat wall — and the rendered surface **matches the operator-approved sketch**, which is the acceptance bar for this criterion and not a description of one (CHAT-01, `BUG-260718-02` part A). ⚠ Today `RunCard.tsx:501` renders `whitespace-pre-wrap font-mono` — verified by opening the file on 2026-09-11, not by reading the report.
+  2. A long reasoning stream produces a thinking block that **updates steadily and does not flicker** — the message list repaints on a coalesced cadence, not once per delta. Observable by an operator watching a slow reasoning model, and measurable as a repaint count that does not track the token count (CHAT-02). ⚠ `lib/throttle.ts` already exists and is wired only to the cache writer; the UI path is the gap.
+  3. The operator scrolls up while a tool is preparing, and **stays where they scrolled** — through the rest of the tool call, through the tokens that follow, until they choose to come back down (CHAT-03, `BUG-260823-01`). ⭐ Same seam as criterion 2: `MessageList.tsx:164-176` is one `messages`-dependent effect whose `behavior: "smooth"` branch at `:171` re-arms the pin it was meant to release.
+  4. A reasoning model answering a plain question **with no tool calls at all** still shows its thinking — the reasoning surface is not gated on a tool-bearing turn (CHAT-04).
+  5. A run that finished while the operator was on another page shows its **final answer resolved out of the narration fold** when they navigate back to it — with no reload (CHAT-05, `BUG-260707-03` residual #2, whose send-path half already shipped at Phase 176).
+
+**Plans**: TBD
+
+**UI hint**: yes — ⚠⚠ **and G-2 is MANDATORY, not advisory.**
+**Migrations**: none expected.
+**Flags**: ⚠⚠ **`/gsd:sketch` RUNS BEFORE `/gsd:plan-phase 243`.** Live UI, an operator saying *"feels like"*, and an explicit gold-standard comparison (Claude.ai) — all three of G-2's triggers. **The operator-approved mockup is the acceptance bar**; no criterion here is written in a form a sketch cannot be measured against. ⭐ **`CHAT-02` and `CHAT-03` MAY NOT BE SPLIT ACROSS PHASES OR ACROSS PLANS THAT CANNOT SEE EACH OTHER** (`D-v4.1-02`) — they are one line of code, and fixing either alone re-breaks the other. **G-5**: `StreamsProvider.tsx` (**88/35/4189** — ledger reads `85/34/4144`, **+1 phase**), `MessageList.tsx` (**20/8/292**), `RunCard.tsx` (**27/13/729** — **newly crosses the threshold; the cell reads `26/12/728`**), `MessageItem.tsx` (**66/32/707** — **DISCHARGED at Phase 227; honoured by construction, do not re-hollow it**). **Read each file's section in `docs/HOT-FILE-LEDGER.md` before planning**, and update row + section in the same commit. ⚠ **`SEED-049`'s trigger has FIRED verbatim** and it is deferred **by decision** — record it as fired-and-deferred; re-open at the first criterion here that cannot be verified without a live E2E drive. ⛔ **No streaming-architecture rewrite** — these are surgical fixes on named lines; D-14's red line holds and provider differences stay at the gateway / adapter / sanitizer boundary. ⚠ `vitest-count-gate.cjs` needs `TARGETS` **and** `BASELINE` for any new suite — a suite in one knob and not the other runs while guarding nothing. ⚠ `SEED-171`'s five cap-independent flaky suites sit near this blast radius: capture failing filenames from the gate's own persisted JSON **before** re-running anything. **Skip research-phase.**
+
+**## How we'd know this failed**
+
+- The thinking block is restyled and the flicker survives — because the repaint cadence was never touched, only the CSS.
+- `CHAT-02` and `CHAT-03` land in different plans that do not see each other, the smooth-scroll branch gets fixed twice with opposite intent, and the pin re-arms again.
+- The scroll fix works while streaming and breaks the settled view, or works on a short thread and fails on a long one — because it was verified once by hand and never on a thread with fifty messages.
+- The sketch is approved and the build drifts from it, and the phase closes against a description of the mockup rather than the mockup — **the named sketch-to-build drift failure mode**.
+- A green composition fence coexists with the shipped defect because it asserts a block is **present** by `data-testid` while the content drifts. **Presence assertions cannot see content drift** — assert the rendered CONTENT where the words are the deliverable.
+- Reasoning appears on pure-text replies but the streaming cursor, the narration banner or the citation branch regress with it, and nobody notices because the criteria only asked about reasoning.
+
+---
+
+#### Phase 244: The Chat Shell and the Composer
+
+**Goal**: The chrome around a conversation stops getting in the way of it — the page holds still while the messages move, a paused run leaves the operator something to do, an approval is answerable where they are already looking, and a file can join a message.
+**Depends on**: Phase 243 (shares the chat frame; sequencing them stops two phases re-hollowing it at once). ⚠ **A sequencing preference, not a hard dependency** — if 243's sketch stalls, 244 may start, provided the two never hold the chat frame open simultaneously.
+**Requirements**: SHELL-01, SHELL-02, SHELL-03, SHELL-04, SHELL-05
+**Success Criteria** (what must be TRUE):
+
+  1. The operator scrolls a long conversation and **the nav rail stays put** — the message list scrolls inside the chat pane, and no dead space opens under the composer at any window height or after the workspace panel opens and closes (SHELL-01, `BUG-260828-08`).
+  2. A Deep run paused at its iteration cap leaves the operator **able to act**: either the composer works, or the control that actually continues the run is on screen and continues it. ⛔ Never a disabled composer beside a message telling them to use it (SHELL-02, `BUG-260904-05`, folding `SEED-029`). ⚠ Verified **after a reload**, not only during a live stream — Phase 228 removed the reload that used to free them.
+  3. An approval pause is answerable **from the chat thread**, with the same two actions the workflow panel offers, and answering it in either home settles it in both (SHELL-03, `BUG-260828-07`, severity high).
+  4. A person attaches a **local file** to a chat message and the agent can use it; and a cloud import **asks which Library folder it goes to** instead of writing permanently to the root (SHELL-04, `BUG-260905-01`, folding `SEED-042`'s "not in the KB" half).
+  5. A watched source that has stopped reading raises a signal the operator **sees in the app shell while doing something else** — not only if they happen to open the Health tab (SHELL-05, `SURF-03`).
+
+**Plans**: TBD
+
+**UI hint**: yes.
+**Migrations**: none expected.
+**Flags**: ⚠ **G-2 fires NARROWLY** — `/gsd:sketch` for `SHELL-04`'s folder-choice surface and `SHELL-05`'s shell signal, the two net-new surfaces in this phase. `SHELL-01/02/03` are bug fixes on shipped surfaces with named causes and do not need one; **say so explicitly rather than sketching everything or nothing**. ⭐ **`SURF-03`'s home was RULED at scoping (operator, 2026-09-11): the app shell.** Closing it against the Health tab alone was already recorded as insufficient — settled, and not to be re-litigated at discuss-phase. Folds **`SEED-029`**, **`SEED-042`**, and **`SEED-045`**'s chat-list / nav-collapse items (the rest of that umbrella stays planted). **G-5**: `ChatLayout.tsx` (**49/25/997**), `MessageInput.tsx` (**29/14/643**), `PendingAskCard.tsx` (**14/7/765** — ledger reads `13/7/736`) — all fire, all honoured by construction expected. ⚠ **`PendingAskCard.tsx` is a CROSS-SURFACE SHELL, not a chat component** — a redesign lands in chat first and then appears in the workflow panel; check both homes. ⚠ `SHELL-04`'s cloud-import half touches the ingest splice Phase 229 built — **a file must still be minted by `mint_document_row` / `splice_document`, never by a new hand-rolled insert**. **Skip research-phase.**
+
+**## How we'd know this failed**
+
+- The scroll is fixed at one window height and the dead space returns at another, or when the workspace panel opens.
+- The cap-paused composer is "fixed" by removing the message that told the operator to use it — the sentence goes away and the operator is still stuck.
+- Approve renders in the thread but answering it there does not settle the panel's copy, so the same pause is now actionable twice and agreed in neither.
+- A local attach ships that quietly writes to the Library anyway — `SEED-042`'s *"not in the KB"* half is the point, and losing it makes SHELL-04 a duplicate of the import it was meant to complement.
+- The shell signal fires for a source that is healthy, or does not fire for one that stopped — a signal nobody will trust after the first false one.
+- `SURF-03` is closed against a Health-tab row again, which the v4.0 close already recorded as not satisfying it.
+
+---
+
+#### Phase 245: The Verification Debt — Discharged or Retired in Writing
+
+**Goal**: Every v4.0 row that was never driven has a verdict a person can read, and no phase's record calls a self-verification a review — so the next milestone opens on ground whose measured extent is known.
+**Depends on**: Nothing. ⭐ **May run at any point in the milestone**, and should be started early: its longest pole is an operator action, not an engineering one.
+**Requirements**: DEBT-01, DEBT-02, DEBT-03
+**Success Criteria** (what must be TRUE):
+
+  1. Each of Phase 238's **nine** UAT rows reads **pass**, **⛔ blocked with its reason and its blocking id**, or **retired with a named trigger**. No row is silently absent. ⚠ **M-1 is driven first — it unblocks the other eight**; S-1 / S-2 may be retired on `SEED-256` (no work/school tenant) alone, provided the retirement says so (DEBT-01).
+  2. Each of Phase 233's **five** G-4 operator rows has been driven in a live browser by a person, with a written verdict per row. Owed since the phase shipped and never run (DEBT-02).
+  3. A person opening `238-VERIFICATION.md`, `240-VERIFICATION.md` and `241-VERIFICATION.md` finds the words **"self-verified"** and does **not** find "reviewed" — and can tell from each file which gate did and did not run (DEBT-03).
+  4. `STATE.md → Guardrail overrides` carries the `OV-SOLO-01` ruling in full: that solo running continues, that the dispatched code-review subagent is **mandatory** on any phase touching a trust boundary and is **not** an independent gate, that `/code-review ultra` stays ruled out on cost, and **what its next re-arm trigger is** — so it cannot lapse unnoticed a second time (DEBT-03).
+
+**Plans**: TBD
+
+**UI hint**: no.
+**Migrations**: none.
+**Flags**: ⭐⭐ **`DEBT-03` IS A HONESTY REQUIREMENT AND MUST NOT BECOME A RE-REVIEW.** Its entire content is the word in three files and the ruling in one. A phase that re-reviews 238 / 240 / 241 has silently changed the requirement into a different and much larger one. ⚠ **G-3 APPLIES HARD**: a one-word edit to a VERIFICATION.md is `/gsd:fast`, never a plan. **Target 2-3 plans — deliberately the smallest phase in the milestone**, and the temptation to grow it is exactly the consolidation-milestone failure mode `PROJECT.md` names at scoping. ⚠ **Blocked on ONE Azure app registration** (`MICROSOFT_OAUTH_CLIENT_ID` / `_SECRET`) — an **operator action**: schedule it, do not simulate it, and never mark a row done on the strength of a green suite. ⚠ No source change is expected; if a driven row **exposes a defect**, that defect is triaged under G-3 / G-7 as fast-fix, deferred-to-a-named-phase, or accepted with a reason — **it does not silently expand this phase**. ⚠ Also owed from earlier and named rather than left silent: **237's rule-builder surface was never manually clicked** (owed by decision) and **`SEED-177` still reads `status: planted` while its retire-the-egress-fence trigger already fired** — both are candidates for a written retirement in the same pass.
+
+**## How we'd know this failed**
+
+- A row is marked done on the strength of a passing test suite rather than a driven observation — the failure this requirement family exists to prevent.
+- `DEBT-03` turns into a re-review of three phases, and a two-line honesty fix becomes the largest phase in the milestone.
+- A VERIFICATION.md gets the word "self-verified" added while its verdict section still reads as though a reviewer signed it — the word changes and the document still lies.
+- `OV-SOLO-01` is recorded without a re-arm trigger, and lapses unnoticed exactly the way it did between 2026-09-08 and 2026-09-10.
+- The Azure registration does not arrive and the phase **stalls**, rather than delivering `DEBT-02`, `DEBT-03` and `DEBT-01`'s retirement arm — none of which needs a credential at all.
+
+---
+
+#### Phase 246: The Recall Cliff, and the Screen That Describes It
+
+**Goal**: A tenant owning a small share of a large corpus gets honest answers **out of the box**, without anyone knowing a setting exists — and the search breadth the Settings screen displays is the search breadth actually in force.
+**Depends on**: **Phase 242** (`SHIP-01`). ⭐ **A hard dependency, not a preference**: `hnsw_ef_search` is set on the tab that cannot save, so the remedy Phase 241 shipped is presently unreachable by an operator. ⚠ **This phase's plans may not ASSUME the tab works — they assert it, on the database they measure.**
+**Requirements**: RECALL-01, RECALL-02
+**Success Criteria** (what must be TRUE):
+
+  1. A tenant owning **0.2% of a 100,000-chunk corpus** gets its documents back on a filtered search **with nobody having touched a setting** — measured on the recall harness Phase 230 shipped, at the selectivities Phase 241 measured, where `recall@20` reads **0.040** today and `ef_search = 200` restores **1.000** (RECALL-01, `QUEUE-06`).
+  2. An operator who *does* want to change search breadth can reach the control and save it, on a Settings tab that saves. ⭐ This is what makes `QUEUE-06`'s shipped remedy actually reachable, and it is why this phase comes after 242 (RECALL-01).
+  3. The number on the Settings screen is the number in force: the no-op shortcut **asks the server what it holds** instead of comparing against a compiled-in `40`, so an install running against a Postgres tuned to anything else can never be shown a breadth that is not in effect (RECALL-02, `SEED-268`).
+  4. The change is defended by a measurement that would **fail if the default regressed** — the harness run recorded before and after, both figures written into the phase record with their corpus size and execution plan beside them, never a claim that recall improved (RECALL-01).
+
+**Plans**: TBD
+
+**UI hint**: yes (the Retrieval card's search-breadth control and its help text).
+**Migrations**: none expected. ⚠ If the shipped default changes in `config.py` rather than in a settings row, that is a **code default**, not a migration — say which one it is.
+**Flags**: ⚠⚠⚠ **`backend/app/services/retrieval_service.py` (re-derived **19 / 11 / 456** — the ledger cell is CORRECT for once) IS AT ITS THIRD G-5 LANDING.** The extraction has been owed since Phase 231; 241 was the deliberate **second** landing, capped at 11 non-comment lines with a fence driven RED at 13, and the obligation is written into the file itself. **`/gsd:discuss-phase 246` must produce the extraction proposal as its FIRST option, before the planned change — and no line may land in that file until the proposal is answered.** ⚠ **`RECALL-02`'s home is `backend/app/services/retrieval_tuning.py`, which has NO LEDGER ROW at all** — G-5 cannot fire on it at any count. **A row is owed in this phase's commit**, with its section in `docs/HOT-FILE-LEDGER.md`, same commit. ⛔ **`D-v4.0-EF-DEFAULT` recorded WHY the default was left alone at the v4.0 close — re-open that decision EXPLICITLY and record the reversal; never reverse it silently.** ⚠ **`SEED-076` §3's lever ordering was REFUTED by 241's measurement**: `iterative_scan` alone is **not** sufficient (0.494 / 0.564 / 0.684), and `ef_search = 1000` measured **reproducibly worse** than 400 — do not re-derive that ordering from the seed. ⚠ **A recall figure measured on a corpus the planner Seq-Scans is not a recall figure** — `241-VERDICT-CORRECTION-PLAN-PATH.md` found `document_chunks_embedding_idx` with `idx_scan = 0` for a database's entire life. ⛔ No new Python package. **G-5**: `config.py` (**83/48/1506** — stale for the eleventh time; the `MODEL_CAPABILITIES` seam stays OWED), `SettingsPage.tsx`, `settings.py`, `user_settings.py` — all fire, all honoured by construction expected. **Skip research-phase.**
+
+**## How we'd know this failed**
+
+- The default is raised and nothing measures it, so the phase closes on a config diff and a hope. **A number without a harness run beside it is a claim.**
+- The improvement is measured on the operator's local corpus, which is too small for the index to be used at all — the trap `241-HUMAN-UAT.md` row 6 documented, where "no visible difference" was the *correct* result.
+- A line lands in `retrieval_service.py` for the third time and the extraction proposal is written after the fact, or not at all.
+- `retrieval_tuning.py` gets its `RECALL-02` change and still has no ledger row, so the next phase to touch it is invisible to G-5 again — exactly `scheduler_service.py`'s gap at Phase 234.
+- Raising the default fixes small-tenant recall and quietly costs every large-tenant query its latency, because only the recall side was ever a criterion.
+- `RECALL-02` ships and the screen is still authoritative about a value it never asked the server for, because the fix was applied to the frontend's `?? 40` fallback rather than to the backend's `_SERVER_DEFAULT_EF_SEARCH` shortcut.
+
+---
+
+### Coverage Map — 19 / 19 requirements, each in exactly one phase
+
+| REQ-ID | Phase | REQ-ID | Phase |
+|---|---|---|---|
+| SHIP-01 | 242 | SHELL-01 | 244 |
+| SHIP-02 | 242 | SHELL-02 | 244 |
+| SHIP-03 | 242 | SHELL-03 | 244 |
+| SHIP-04 | 242 | SHELL-04 | 244 |
+| CHAT-01 | 243 | SHELL-05 | 244 |
+| CHAT-02 | 243 | DEBT-01 | 245 |
+| CHAT-03 | 243 | DEBT-02 | 245 |
+| CHAT-04 | 243 | DEBT-03 | 245 |
+| CHAT-05 | 243 | RECALL-01 | 246 |
+| | | RECALL-02 | 246 |
+
+**SHIP 4 · CHAT 5 · SHELL 5 · DEBT 3 · RECALL 2 = 19.** No orphans. No duplicates. ⚠ **The denominator is 19 and the intake said 17** — see correction 1. Any later coverage check that reads 17 is checking against the wrong number.
+
+---
+
+### Guardrail summary — where each rule fires, and its disposition
+
+| Rule | Fires on | Disposition |
+|---|---|---|
+| **G-1** phase chain cap | Not fired — no `<base>.N` inserts exist yet. ⚠ Watch 243 / 244: they share the chat frame, and a third insert on it would fire | — |
+| **G-2** sketch before plan for UX | **243 (MANDATORY, whole phase)** · **244 (NARROW — `SHELL-04` + `SHELL-05` only)** · 246's Retrieval-card copy is help text on a shipped card, not a new surface | `/gsd:sketch` runs before `/gsd:plan-phase` for both |
+| **G-3** lightweight commands | **245 above all** (one-word doc edits) · any ≤ 1 file / ≤ 10 line fix in 242 or 244 | **`/gsd:fast` or `/gsd:quick`, never a plan** |
+| **G-4** lived-experience UAT | **242, 243, 244, 246** — all touch user-visible UI. Operator-defined *"I'd recognize failure here"* scenarios at **scope time**, not post-hoc | Chrome MCP drives all three per phase; wire format + screenshot are insufficient |
+| **G-5** refactor between feature waves | 242 (3 files) · **243 (4 files, `RunCard.tsx` NEWLY FIRING)** · 244 (3 files) · **246 (`retrieval_service.py` — THIRD LANDING, extraction owed since 231)** | Each phase reads `docs/HOT-FILE-LEDGER.md` before planning; `node scripts/check-hot-file-ledger.cjs <phase>` gates. ⚠ **246's extraction must be PROPOSED FIRST** |
+| **G-6** failure criteria upfront | All five phases | `## How we'd know this failed` written above, at roadmap time |
+| **G-7** gap-closure round cap | Not fired yet | `node scripts/check-gap-closure-rounds.cjs <phase>` at every `gaps_found` |
+| **G-8** plan-count proportion | ⭐ **THE GOVERNOR ON THIS MILESTONE.** Targets: 242 → 3-4 · 243 → 4-5 · 244 → 4-5 · **245 → 2-3** · 246 → 3-4 | A phase exceeding **6** must name in CONTEXT.md what genuinely cannot share a worktree. ⛔ Never cut: the verifier, TDD RED drives, security review, migration discipline |
+| **`OV-SOLO-01`** | Every phase in this milestone | Solo running continues by the operator's 2026-09-11 ruling. The dispatched code-review subagent is **MANDATORY** on any phase touching a trust boundary and is **NOT** an independent gate. Every phase closes reading **"self-verified"** |
+
+---
+
+### Migration reservations — monotonic from 177
+
+| Number | File | Phase |
+|---|---|---|
+| **177** | `177_app_settings_vision_calls_bound.sql` — CHECK constraint + in-range data fix | 242 |
+
+⚠ Filenames must match `<digits>_name.sql` — letter suffixes like `177b` are silently skipped by the Supabase CLI. Apply by **pasting into the SQL editor**, never `db push` / `db reset`, then `bash scripts/regenerate-full-schema.sh` (no `--reset`). ⚠ **Cloud parity is part of the same operation as the promotion**, not a follow-up.
+
+---
+
+### Deferred with triggers intact (not in this milestone)
+
+| Item | Why | Re-open trigger |
+|---|---|---|
+| `SEED-013` / `SEED-195` — Open Platform | **This is v5.0.** A capability axis; mixing it in is how a consolidation milestone loses its stopping point | The next capability milestone |
+| `SEED-049` — E2E Playwright revival | ⚠ **Its trigger IS already true** and it is deferred **by decision**, not oversight | The first Phase 243 criterion that cannot be verified without it |
+| `SEED-045` — UI/UX polish umbrella (residue) | Its chat-list / nav-collapse items fold into `SHELL-01`; the rest do not | Next polish pass |
+| `SEED-211` BUILD · `SEED-224` · `SEED-265/266/267` · `SEED-004` | Recorded at the v4.0 close with migration paths; none is a consolidation item | As written in each seed |
+| `BUS-171` — the 23-item operator queue triage | **Parked is not dropped** | Operator's call; the method is in the bus item |
+| **The 161-seed register sweep** | ⚠ At 161 `trigger_when` entries, a full sweep **is a phase of work, not a step in a command**. The sweep run at this milestone's scoping was **targeted against its scope** and surfaced 6 firing seeds | ⚠ **The register's size is itself a finding, and it does not shrink by being re-deferred** |
+
+---
+
+### Progress
+
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 242. Ship It — and Prove What Already Shipped | 0/? | Not started | — |
+| 243. The Thinking Block and the Follow-Scroll Seam | 0/? | Not started (⚠ sketch owed first) | — |
+| 244. The Chat Shell and the Composer | 0/? | Not started | — |
+| 245. The Verification Debt | 0/? | Not started | — |
+| 246. The Recall Cliff | 0/? | Not started | — |
+
+**0 / 5 phases complete · 0 / 19 requirements delivered.**
 
 ---
 

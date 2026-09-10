@@ -21,6 +21,27 @@ register knows only the register below it; the code is the bottom.
 
 ### SHIP — v4.0 reaches production
 
+> ### ⛔ CORRECTION 2026-09-11, hours after this section was written — MEASURED, not read
+>
+> **The four SHIP requirements below were written from `STATE.md`'s v4.0-close text, which was true
+> when written and false within a day.** The originals are preserved verbatim rather than
+> overwritten, because *how* they went stale is the finding. Driven at HEAD while writing the roadmap:
+>
+> | Claim below | Measured |
+> |---|---|
+> | *"v4.0 has never deployed"* / *"cloud is 15 migrations behind"* | ⛔ **FALSE.** `production` is at `e65610ac2`, containing `1f313670b "Merge master into production — deploy v4.0 Connected Knowledge"` (2026-09-10). `git log --oneline production..develop` = **2 commits, both v4.1 planning docs** |
+> | **SHIP-02** — row 5 is owed and expires | ⛔ **SPENT, and its loss already written.** `241-HUMAN-UAT.md` reads `status: complete`, 6/6; row 5 ran on a **local substitute** and its own text says the fifteen migrations, 176 included, went to cloud as one batch during the deploy prep. Retired in writing at `dbd63864b`. **Not re-plannable — the database shape it needs exists nowhere** |
+> | **SHIP-03** — migrations owed | ⚠ **CLAIMED applied by the deploy record, UNVERIFIED by measurement.** Phase 242 queries cloud rather than re-reading the record |
+> | **SHIP-04** — the push is owed | ⛔ **ALREADY HAPPENED.** Not a push to schedule; a deployed state to verify. `SEED-242`'s routing half also landed, at `f63a8ebcc` |
+> | **SHIP-01** — blocking bug | ✅ **STILL OPEN, and the register UNDERSTATES it.** `settings.py:466-467`'s bound, `SettingsPage.tsx:888`'s all-or-nothing payload and the missing CHECK constraint are all live. But the `1001 → 1000` data fix landed **locally and was left there**, so it no longer reproduces on the install the report names. ⚠⚠ **What cloud holds is UNMEASURED, and cloud is what production serves** |
+>
+> ⚠ **The forced ordering — row 5 → migrations → push — was RESOLVED BY EVENTS, in the wrong order.**
+> The rule stands for any future expiring row; what is corrected is the belief that *this* window is
+> still open. **A roadmap that plans an unreproducible drive is a roadmap that cannot close.**
+>
+> ⭐ **This milestone's own method rule paid for itself on day one:** *a register knows only the
+> register below it, and the code is the bottom.*
+
 - [ ] **SHIP-01**: An operator can save the Settings → Search tab. Today every save returns HTTP 400
       because a **stored** `multimodal_max_vision_calls` of `1001` sits outside the bound the API
       enforces, and the banner names a field the operator never touched. Closes `BUG-260910-03`
@@ -109,11 +130,35 @@ register knows only the register below it; the code is the bottom.
 
 ## Traceability
 
-Filled by the roadmapper. Every REQ-ID above maps to exactly one phase.
+Filled by the roadmapper 2026-09-11. **Every REQ-ID above maps to exactly one phase. 19 / 19 mapped, no orphans, no duplicates.**
 
-| REQ-ID | Phase |
-|---|---|
-| _(pending roadmap)_ | |
+⚠ **THE COUNT IS 19, NOT 17.** This file's own header block, `PROJECT.md`, and commit `c1a395abf` (*"17 REQ-IDs, 5 categories"*) all say **17**. Counted from the checkboxes above: **SHIP 4 · CHAT 5 · SHELL 5 · DEBT 3 · RECALL 2 = 19.** The original figure is recorded rather than overwritten, because **a coverage check run against the wrong denominator is exactly how a requirement survives a whole milestone unnoticed** — and this is the second consecutive milestone it has happened on (v4.0 opened saying *34* against an actual *38*).
+
+| REQ-ID | Phase | Status |
+|---|---|---|
+| SHIP-01 | 242 — Ship It | Pending |
+| SHIP-02 | 242 — Ship It | Pending — ⚠ **its second arm is ALREADY SATISFIED**, retired in writing at `dbd63864b`; the drive is unreproducible |
+| SHIP-03 | 242 — Ship It | Pending — ⚠ claimed done by the deploy record, **unverified against cloud** |
+| SHIP-04 | 242 — Ship It | Pending — ⚠ **the push already landed** at `1f313670b` (2026-09-10); what is owed is the verification |
+| CHAT-01 | 243 — Thinking block + follow-scroll seam | Pending — ⚠ G-2 sketch owed before planning |
+| CHAT-02 | 243 — Thinking block + follow-scroll seam | Pending |
+| CHAT-03 | 243 — Thinking block + follow-scroll seam | Pending — ⭐ **one mechanism with CHAT-02; may not be split** |
+| CHAT-04 | 243 — Thinking block + follow-scroll seam | Pending |
+| CHAT-05 | 243 — Thinking block + follow-scroll seam | Pending |
+| SHELL-01 | 244 — Chat shell + composer | Pending |
+| SHELL-02 | 244 — Chat shell + composer | Pending |
+| SHELL-03 | 244 — Chat shell + composer | Pending |
+| SHELL-04 | 244 — Chat shell + composer | Pending — ⚠ G-2 sketch owed (net-new surface) |
+| SHELL-05 | 244 — Chat shell + composer | Pending — ⚠ G-2 sketch owed (net-new surface) |
+| DEBT-01 | 245 — The verification debt | Pending — ⚠ blocked on one Azure app registration; **M-1 first** |
+| DEBT-02 | 245 — The verification debt | Pending |
+| DEBT-03 | 245 — The verification debt | Pending — ⭐ **honesty requirement, NOT a re-review** |
+| RECALL-01 | 246 — The recall cliff | Pending — ⚠ **depends on SHIP-01**; `retrieval_service.py`'s extraction must be proposed first |
+| RECALL-02 | 246 — The recall cliff | Pending — its home is `retrieval_tuning.py`, which has **no ledger row** |
+
+**Coverage: 19 / 19 ✓**
+
+⚠ **Four of these requirements were written against a world that changed on 2026-09-10 and the corrections are in the roadmap, not here** — see `.planning/ROADMAP.md` → *"Corrections measured at HEAD on 2026-09-11"*. **Do not plan `SHIP-02`, `SHIP-03` or `SHIP-04` from the wording above without reading that block first.**
 
 ---
 

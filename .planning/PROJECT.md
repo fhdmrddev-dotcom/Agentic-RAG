@@ -24,9 +24,16 @@ Consolidation & Chat Polish**, 4 phases between two capability milestones, which
 
 **The reason it comes now rather than a capability milestone:**
 
-1. ⛔ **v4.0 has never deployed.** Cloud is **15 migrations behind** (`153-156`, `166-176`). Building
-   a new capability axis on top of undeployed, unreviewed machinery compounds risk instead of
-   retiring it.
+1. ~~⛔ **v4.0 has never deployed.** Cloud is **15 migrations behind** (`153-156`, `166-176`).~~
+   ⛔ **CORRECTED HOURS LATER, 2026-09-11 — struck through rather than deleted, because this
+   sentence was copied out of `STATE.md`'s v4.0-close text and was already false when copied.**
+   Measured: `production` sits at `e65610ac2`, containing `1f313670b "Merge master into
+   production — deploy v4.0 Connected Knowledge"` (2026-09-10), and `git log production..develop`
+   returns **2 commits, both v4.1 planning docs**. **v4.0 IS deployed.** What is genuinely unknown
+   is whether cloud's data matches — the migrations are *claimed* applied by the deploy record and
+   verified by no measurement. ⭐ **The milestone survives the correction:** its reason was never
+   "push the button", it was *"v4.0 is code nobody has proven is running."* That is still true, and
+   Phase 242 now proves it instead of performing it.
 2. ⛔ **Chat carries 14 open bugs** — the largest single coherent cluster in the reported-bugs
    register, on the product's primary surface.
 3. ⛔ **A `severity: blocking` bug reported 2026-09-10 makes Settings → Search unsaveable**

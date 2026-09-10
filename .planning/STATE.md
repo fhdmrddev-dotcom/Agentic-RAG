@@ -2,15 +2,18 @@
 gsd_state_version: 1.0
 milestone: v4.1
 milestone_name: "Ship It & Feel It"
-status: planning
+status: roadmapped
 last_updated: "2026-09-11T00:00:00.000Z"
 last_activity: 2026-09-11
 progress:
-  total_phases: 0
+  total_phases: 5
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
   percent: 0
+requirements:
+  total: 19
+  delivered: 0
 ---
 
 # Project State
@@ -37,15 +40,46 @@ surface the operator uses daily. Phase numbering continues at **242**.
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 242 — Ship It — and Prove What Already Shipped (not started)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-09-11 — Milestone v4.1 started
+Status: Roadmapped — awaiting `/gsd:discuss-phase 242`
+Progress: 0 / 5 phases · 0 / 19 requirements · `[░░░░░░░░░░] 0%`
+Last activity: 2026-09-11 — ROADMAP written, 5 phases (242-246), 19/19 requirements mapped
 
-⚠ **Order is FORCED at the front of this milestone and cannot be re-sequenced for convenience:**
-`BUG-260910-03` (blocking, Settings→Search unsaveable) → **241 UAT row 5 on CLOUD** → migrations
-`153-156, 166-176` in numeric order → production push. Row 5 proves an arm that becomes
-**unreproducible forever** once migration 176 reaches cloud.
+**Phases:** 242 Ship It · 243 Thinking block + follow-scroll seam (⚠ sketch first) ·
+244 Chat shell + composer · 245 The verification debt · 246 The recall cliff.
+Full detail: [`ROADMAP.md`](ROADMAP.md).
+
+### ⚠⚠ THE FORCED ORDER WAS RESOLVED BY EVENTS — the original is kept below, never overwritten
+
+This section read, at scoping:
+
+> ⚠ **Order is FORCED at the front of this milestone and cannot be re-sequenced for convenience:**
+> `BUG-260910-03` (blocking, Settings→Search unsaveable) → **241 UAT row 5 on CLOUD** → migrations
+> `153-156, 166-176` in numeric order → production push. Row 5 proves an arm that becomes
+> **unreproducible forever** once migration 176 reaches cloud.
+
+⛔ **Every clause after the first is already spent, measured at HEAD on 2026-09-11 while writing the roadmap:**
+
+- **The production push already landed** — `1f313670b` *"Merge master into production — deploy v4.0 Connected Knowledge"* (2026-09-10), plus `e65610ac2` for the `app.<domain>` routing half. `git log --oneline production..develop` returns **2 commits, both v4.1 planning docs**.
+- **Row 5's cloud window is CLOSED, and its loss is already written down.** `241-HUMAN-UAT.md` reads `status: complete`, 6/6 driven; row 5 ran on a **local substitute** and its closing section states the fifteen migrations — 176 included — went to cloud as one batch during the production prep. Retired in writing at `dbd63864b`. **`SHIP-02` is not re-plannable.**
+- **The migrations are therefore CLAIMED applied**, by a record rather than by a measurement. Phase 242 runs `scripts/verify-v40-cloud-migrations.sql` **against cloud**.
+- **`SHIP-01` is genuinely open** — but only its structural half: `settings.py:466-467`'s bound, `SettingsPage.tsx:888`'s all-or-nothing payload, and the missing CHECK constraint are all still live at HEAD. The `1001 → 1000` data fix landed **locally** and was left in place, so the bug no longer reproduces there. ⚠⚠ **The value cloud holds is UNMEASURED, and cloud is what production serves.**
+
+⭐ **This is the milestone's own method rule paying for itself on day one:** *a register knows only the register below it, and the code is the bottom.* Two sections of this file and four requirement statements were true when written and false within twenty-four hours. **`STATE.md` and `REQUIREMENTS.md` both still say "v4.0 has never deployed" elsewhere; those sentences are stale and are corrected here rather than deleted there.**
+
+⚠ **What STILL stands, unchanged:** `RECALL-01` depends on `SHIP-01` (Phase 246 after Phase 242, and its plans assert the tab saves rather than assuming it) · `CHAT-02` and `CHAT-03` are one mechanism and share Phase 243 · G-2 fires on Phase 243 with the operator-approved mockup as the acceptance bar · `retrieval_service.py`'s extraction, owed since Phase 231, is **proposed first** at Phase 246.
+
+### ⚠ Two phases can be blocked on something that is not engineering
+
+| Phase | Blocked on | Deliverable without it |
+|---|---|---|
+| **242** | a read-capable **cloud DSN** | SC#2 + SC#3 — the CHECK migration, the changed-fields-only payload, the worded refusal. Sequence these first so the phase is never idle |
+| **245** | **one Azure app registration** — ⚠ **run row M-1 first, it unblocks the other 8** | `DEBT-02` and `DEBT-03` in full, plus `DEBT-01`'s retirement arm |
+
+### ⚠ G-8 is the governor on this milestone
+
+Plan targets: **242 → 3-4 · 243 → 4-5 · 244 → 4-5 · 245 → 2-3 · 246 → 3-4.** A phase above **6** must name in CONTEXT.md what genuinely cannot share a worktree. A fix that is ≤ 1 file / ≤ 10 lines with no schema or API surface is **`/gsd:fast` under G-3, never a plan**. The named failure mode is Phase 235's **17 plans for 4-6 plans of substance** — and a consolidation milestone has no natural stopping point.
 
 ⚠ **`OV-SOLO-01` was RULED ON at this milestone's scoping (2026-09-11, operator), not left to
 lapse.** Solo running continues. The substitute for the independent gate: the dispatched
@@ -186,7 +220,33 @@ re-derivable at any time with `gsd-sdk query audit-open`.
 Both v4.0 overrides are preserved verbatim in `.planning/milestones/v4.0-STATE-at-close.md` →
 *Guardrail overrides*. Record every new override here, per the CLAUDE.md orchestrator protocol.
 
-### ⚠ OV-SOLO-01 — ITS RE-ARM TRIGGER HAS FIRED, AND THE CONDITION IS STILL TRUE
+### ⭐ OV-SOLO-01 — RULED ON 2026-09-11 BY THE OPERATOR. It did NOT lapse.
+
+**Ruling (operator, 2026-09-11, at v4.1 scoping):** **solo running continues.** The substitute for the
+independent gate is the **dispatched code-review subagent**, which is **MANDATORY** on any phase
+touching a trust boundary. ⛔ **It is NOT an independent gate**, and every phase closed under it must
+read **"self-verified"** in its own VERIFICATION.md — never "reviewed". `/code-review ultra` stays
+**ruled out on cost**.
+
+⭐ **It is also not worthless, and that is measured rather than assumed:** on Phase 239 exactly this
+arrangement returned **19 findings including 2 Criticals**, one being a destructive tool bindable as
+the file *reader* and then called by the watch loop on every file, unattended.
+
+**What does NOT lapse either way:** decisions still go to the operator, never self-settled. Baselines
+are still captured before source work. RED-first still holds. The mechanical gates — backend ceiling,
+count gate, hot-file ledger, CLAUDE.md size — are unaffected by who is at the keyboard and remain the
+honest floor.
+
+**Re-arm trigger:** Gemini's quota returns, **or the v4.1 close, whichever is first.** ⚠ The previous
+version of this override carried a date-based trigger that arrived and was not acted on for a day —
+which is precisely how a self-verification comes to read like a review. **`DEBT-03` (Phase 245) exists
+to close that gap in writing**, on phases 238, 240 and 241.
+
+**Applies to:** every phase in v4.1 (242-246).
+
+---
+
+#### ⚠ The original entry, preserved — OV-SOLO-01 before the ruling
 
 `OV-SOLO-01` (operator, 2026-09-08) set aside `AGENTS.md` §3 / §6.3 — the two-agent separation
 itself — for 2026-09-08 and 2026-09-09, with the re-arm trigger *"Gemini's quota returns, or
