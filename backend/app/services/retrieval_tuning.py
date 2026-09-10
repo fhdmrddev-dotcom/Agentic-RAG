@@ -19,8 +19,11 @@ changed from the Settings UI, which is exactly what the operator asked for (D-09
 1. ⛔ **The GUC NAME is a hardcoded literal inside the statement text; only the VALUE is an
    asyncpg bind parameter** — ``SELECT set_config('hnsw.ef_search', $1, true)``. Postgres has no
    bind-parameter form for a parameter NAME, so a name built from a caller's string would be a
-   direct injection into a ``SET``. `ef_search` is coerced through ``int()`` and `iterative_scan`
-   is checked against the three-member tuple BEFORE either is bound (threat T-241-14).
+   direct injection into a ``SET``. `ef_search` is coerced through ``int()`` **and bounded by
+   the same floor/ceiling the API refuses on**, and `iterative_scan` is checked against the
+   three-member tuple, BEFORE either is bound (threat T-241-14). Both checks are repeated HERE
+   rather than trusted from the API, because a settings COLUMN and a `config.py` env field both
+   reach this function without passing the API at all (241-REVIEW WR-05).
 
 2. ⛔ **``set_config``'s third argument is ``true`` — LOCAL to the transaction.**
    ``get_user_pg_connection`` (``dependencies.py:159-177``) already opens
@@ -49,7 +52,11 @@ import logging
 import asyncpg
 
 from app.config import settings
-from app.models.user_settings import HNSW_ITERATIVE_SCAN_VALUES
+from app.models.user_settings import (
+    HNSW_EF_SEARCH_CEILING,
+    HNSW_EF_SEARCH_FLOOR,
+    HNSW_ITERATIVE_SCAN_VALUES,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -111,7 +118,8 @@ async def apply_hnsw_session_knobs(
     Args:
         conn: an asyncpg connection already inside a transaction.
         ef_search: how many candidate vectors the index walks before the query's filters are
-            applied. ``None``, or the server default, issues nothing.
+            applied. ``None``, the server default, or anything outside
+            ``HNSW_EF_SEARCH_FLOOR..HNSW_EF_SEARCH_CEILING`` issues nothing.
         iterative_scan: one of ``off`` / ``strict_order`` / ``relaxed_order``. Anything else —
             including a value hand-written into the settings column — issues nothing.
     """
@@ -120,6 +128,29 @@ async def apply_hnsw_session_knobs(
             resolved_ef = int(ef_search)
         except (TypeError, ValueError):
             logger.warning("Ignoring an unusable hnsw.ef_search value: %r", ef_search)
+            resolved_ef = _SERVER_DEFAULT_EF_SEARCH
+        if not HNSW_EF_SEARCH_FLOOR <= resolved_ef <= HNSW_EF_SEARCH_CEILING:
+            # ⛔ THE SECOND DOOR FOR ef_search — symmetric with the one `iterative_scan` has
+            #    below, and it was missing (Phase 241 review, WR-05). `PATCH /settings` refuses
+            #    an out-of-range breadth on the way IN, but TWO routes reach this line without
+            #    ever passing it:
+            #      1. the settings COLUMN, which a hand-edit in the SQL editor could have
+            #         written (migration 176's CHECK is a backstop the write path swallows —
+            #         BUG-260909-01);
+            #      2. `config.py`'s `hnsw_ef_search` BaseSettings field, so `HNSW_EF_SEARCH` in
+            #         `backend/.env` is what `_val` returns whenever the column is NULL — which
+            #         is every row until an operator chooses a value.
+            #    Falling back to the server default (rather than clamping to a boundary) keeps
+            #    the module's rule intact: a number nobody chose buys nothing, and this function
+            #    then issues NOTHING at all for this knob.
+            logger.warning(
+                "Ignoring an out-of-range hnsw.ef_search value %r (allowed %d..%d); the search "
+                "runs at the server's own setting. Check the hnsw_ef_search column and the "
+                "HNSW_EF_SEARCH environment variable.",
+                resolved_ef,
+                HNSW_EF_SEARCH_FLOOR,
+                HNSW_EF_SEARCH_CEILING,
+            )
             resolved_ef = _SERVER_DEFAULT_EF_SEARCH
         if resolved_ef != _SERVER_DEFAULT_EF_SEARCH:
             await _set_local(conn, _SQL_EF_SEARCH, str(resolved_ef), guc="hnsw.ef_search")
