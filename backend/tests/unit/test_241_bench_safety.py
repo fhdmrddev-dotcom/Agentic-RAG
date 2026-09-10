@@ -206,3 +206,184 @@ def test_the_guard_is_not_dead_code_when_destructive_statements_exist() -> None:
     if not has_destructive:
         pytest.skip("no destructive statement in the builder yet (241-02 Task 1 state)")
     assert any(_GUARD_CALL.search(line) for line in lines)
+
+
+# -- WR-01 (241-REVIEW): the host LIST, the port, and the query string ---------
+#
+# THE GUARD ENFORCED A WEAKER INVARIANT THAN THE ONE ITS DOCSTRING STATES, and the
+#    gap is MEASURED in this repo against the installed asyncpg 0.31.0 rather than
+#    reasoned about:
+#
+#        dsn = "postgresql://postgres:postgres@localhost:54322,prod.example.com:5432/recall_bench"
+#        urlparse(dsn).hostname   ->  'localhost'                 # what the guard read
+#        asyncpg _parse_connect_dsn_and_args(dsn) addrs
+#                                 ->  [('localhost', 54322), ('prod.example.com', 5432)]
+#
+#    asyncpg splits the URI netloc on `,` and FAILS OVER to the later addresses, while
+#    `urlparse().hostname` reports only the FIRST. Local Docker being down is a
+#    documented, frequent condition on this machine (CLAUDE.md's Windows
+#    port-reservation trap: a container reports `Up (healthy)` while its port accepts
+#    nothing), so the failover is the ORDINARY path on a bad day -- and `maintenance_dsn`
+#    carried the whole host list through verbatim to
+#    `DROP DATABASE IF EXISTS "recall_bench" WITH (FORCE)`.
+#
+# AND `urlparse(...).port` RAISES ValueError on that same DSN
+#    (`Port could not be cast to integer value as '54322,prod.example.com:5432'`), so a
+#    port arm can neither read `.port` unguarded nor run before the host-list arm.
+
+
+_MULTI_HOST_DSNS = [
+    # the review's exact bypass string, verbatim
+    "postgresql://postgres:postgres@localhost:54322,prod.example.com:5432/recall_bench",
+    "postgresql://127.0.0.1:54322,10.0.0.9:5432/recall_bench",
+    "postgresql://postgres:postgres@127.0.0.1:54322,db.abcdefgh.supabase.co:5432/recall_bench",
+    # the loopback entry SECOND -- the shape a first-host check would not help with either
+    "postgresql://postgres:postgres@prod.example.com:5432,127.0.0.1:54322/recall_bench",
+]
+
+
+def _asyncpg_connect_addresses(dsn: str) -> list:
+    """The addresses asyncpg would actually dial for ``dsn``.
+
+    This reaches into asyncpg's PRIVATE parser on purpose: the whole finding is that the
+    driver's view of a DSN differs from ``urllib.parse``'s, and only the driver can be
+    asked what it would dial. The signature is filled by introspection and the case SKIPS
+    rather than fails if a future asyncpg gains a parameter this file does not know -- a
+    premise control must never become a maintenance trap that reds the canonical gate.
+    """
+    import inspect
+
+    from asyncpg import connect_utils
+
+    fn = connect_utils._parse_connect_dsn_and_args
+    supplied = {
+        "dsn": dsn,
+        "host": None,
+        "port": None,
+        "user": "postgres",
+        "password": None,
+        "passfile": None,
+        "database": None,
+        "ssl": None,
+        "direct_tls": False,
+        "server_settings": None,
+        "target_session_attrs": "any",
+        "krbsrvname": None,
+        "gsslib": "gssapi",
+        "service": None,
+        "servicefile": None,
+    }
+    accepted = set(inspect.signature(fn).parameters)
+    unknown = accepted - set(supplied)
+    if unknown:
+        pytest.skip(f"asyncpg's private DSN parser gained parameters {sorted(unknown)}")
+    addrs, _params = fn(**{k: v for k, v in supplied.items() if k in accepted})
+    return list(addrs)
+
+
+def test_the_premise_asyncpg_really_fails_over_to_a_second_host() -> None:
+    """THE PREMISE, MEASURED. A fence built on a claim about a library must prove the claim.
+
+    If this ever passes for the wrong reason -- because asyncpg stopped supporting host
+    lists -- the refusal below becomes belt-and-braces rather than load-bearing, and this
+    case is where that would be discovered.
+    """
+    addrs = _asyncpg_connect_addresses(_MULTI_HOST_DSNS[0])
+    assert len(addrs) == 2, f"asyncpg no longer expands the host list: {addrs!r}"
+    assert addrs[1][0] == "prod.example.com", addrs
+    # ... and this is the single host the old guard read instead.
+    import urllib.parse
+
+    assert urllib.parse.urlparse(_MULTI_HOST_DSNS[0]).hostname == "localhost"
+
+
+@pytest.mark.parametrize("dsn", _MULTI_HOST_DSNS)
+def test_a_comma_separated_host_list_is_refused(dsn: str) -> None:
+    """A host LIST cannot be proven loopback, so it is refused rather than half-checked."""
+    with pytest.raises(brb.BenchTargetRefused) as exc:
+        brb.assert_bench_target(dsn)
+    message = str(exc.value)
+    # the refusal must name the ACTUAL problem. A DSN whose FIRST host is remote is
+    # refused by the older host arm too -- but with a message about that one host, which
+    # would leave the list itself unmentioned and the finding unrecorded.
+    assert "list" in message.lower(), message
+    assert "," in message, message
+
+
+def test_the_refused_host_list_is_never_handed_to_maintenance_dsn() -> None:
+    """The end-to-end property, not merely the guard's return value.
+
+    ``maintenance_dsn`` only swaps the PATH, so anything the guard lets past reaches the
+    very connection that issues ``DROP DATABASE``. The two halves are asserted together
+    here so they are not separated by an act of faith.
+    """
+    dsn = _MULTI_HOST_DSNS[0]
+    assert "prod.example.com" in brb.maintenance_dsn(dsn), (
+        "maintenance_dsn no longer carries the netloc through verbatim; re-derive this case"
+    )
+    with pytest.raises(brb.BenchTargetRefused):
+        brb.assert_bench_target(dsn)
+
+
+# -- the port arm --------------------------------------------------------------
+
+
+def test_the_allowed_port_is_a_module_constant() -> None:
+    """One constant, so the guard and the shipped default DSNs cannot disagree."""
+    assert brb.ALLOWED_PORTS == frozenset({54322})
+
+
+@pytest.mark.parametrize("port", [5432, 5433, 6543, 80, 54321])
+def test_a_recall_bench_on_a_non_supabase_port_is_refused(port: int) -> None:
+    """Loopback is not enough: a local SSH tunnel forwards a REMOTE cluster onto 127.0.0.1.
+
+    The port cannot prove the cluster is local either -- a tunnel can be bound to 54322 --
+    but it removes every port the operator never meant to use, which is the difference
+    between a typo reaching an irreversible drop and a typo being refused.
+    """
+    with pytest.raises(brb.BenchTargetRefused) as exc:
+        brb.assert_bench_target(_dsn("127.0.0.1", brb.BENCH_DB_NAME, port=port))
+    assert str(port) in str(exc.value)
+
+
+def test_a_dsn_with_no_port_at_all_is_refused() -> None:
+    """An absent port means libpq's 5432, which is not where local Supabase lives."""
+    with pytest.raises(brb.BenchTargetRefused):
+        brb.assert_bench_target("postgresql://postgres:postgres@127.0.0.1/recall_bench")
+
+
+# -- the query-string arm ------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "host=prod.example.com",
+        "hostaddr=10.0.0.9",
+        "port=5432",
+        "dbname=postgres",
+        "sslmode=require",
+    ],
+)
+def test_a_dsn_carrying_a_query_string_is_refused(query: str) -> None:
+    """MEASURED INERT TODAY, AND REFUSED ANYWAY -- say which of the two it is.
+
+    On asyncpg 0.31.0 a ``?host=`` / ``?port=`` / ``?dbname=`` override is IGNORED when the
+    netloc already supplies that value (measured: the parser still returns
+    ``[('127.0.0.1', 54322)]`` with database ``recall_bench``). So this arm closes nothing
+    today. It is here because the guard's contract is *"refuse the shapes it cannot reason
+    about"*, and a keyword the guard does not model is exactly such a shape -- a driver
+    upgrade, or a different driver, would make it live with nobody re-reading this file.
+    """
+    with pytest.raises(brb.BenchTargetRefused) as exc:
+        brb.assert_bench_target(f"{_dsn('127.0.0.1', brb.BENCH_DB_NAME)}?{query}")
+    lowered = str(exc.value).lower()
+    assert "quer" in lowered or "parameter" in lowered, lowered
+
+
+def test_the_accepted_target_still_passes_after_the_three_new_arms() -> None:
+    """POSITIVE CONTROL. Three new refusals could be satisfied by refusing everything; the
+    shipped default ``--bench-dsn`` must still be accepted."""
+    brb.assert_bench_target(
+        f"postgresql://postgres:postgres@127.0.0.1:54322/{brb.BENCH_DB_NAME}"
+    )
