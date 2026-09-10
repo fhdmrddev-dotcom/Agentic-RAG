@@ -99,7 +99,18 @@ class PreviewItem:
     #: True when a routing rule suggested `destination` rather than the chosen folder.
     rule_suggested: bool = False
     web_view_url: str | None = None
+    #: ⚠ WHAT THE ROW SHOWS. May be a breadcrumb this service assembled, so it is a DISPLAY
+    #: value and nothing may persist it. See `source_path` for the one that may.
     path: str | None = None
+    #: ⭐ WHAT MAY BE STORED — the adapter's own answer, or `None`.
+    #:
+    #: ⛔ `None` MEANS UNKNOWN AND STAYS `None`. `metadata.source.path` is read back by
+    #: `ingest_enrich` into a classification RULE, and a fabricated value there is SEED-253's
+    #: whole defect: `path contains '/Finance/'` returns False for a file that IS in Finance,
+    #: while `path contains 'Rates'` returns True because it matched the FILENAME — so the dead
+    #: rule looks alive. "We do not know this file's folder" and "this file is at the root" are
+    #: different facts, and a rule must not be able to match the difference away.
+    source_path: str | None = None
 
 
 @dataclass
@@ -260,6 +271,22 @@ class WalkResult:
     truncated: bool = False
     #: Which budget stopped it, so the surface can say something true rather than "some files".
     stopped_by: str | None = None
+    #: ⭐ `external_id -> the breadcrumb this walk ASSEMBLED`, for files whose adapter supplied
+    #: no path. **DISPLAY ONLY, and that is why it lives here instead of on the file.**
+    #:
+    #: ⛔ THIS FIELD EXISTS BECAUSE THE WALK USED TO WRITE THE BREADCRUMB BACK ONTO
+    #: `SourceFile.path` (238 CR-01). That mutation turned a DTO whose contract is *"a path is
+    #: real or it is absent"* into one that quietly carried an assembled value, and every reader
+    #: downstream — including one that persisted it into `metadata.source.path`, where a
+    #: classification RULE reads it — had no way left to tell the two apart. Worse, the
+    #: breadcrumb is seeded from the REQUEST's `folder_name`, so a caller posting
+    #: `{"folder_name": "Finance"}` decided a stored provenance fact for every file imported.
+    #:
+    #: ⚠ A DOWNSTREAM FIX CANNOT WORK HERE, and this was measured before choosing: by the time
+    #: `build_preview` runs, `getattr(f, "path", None)` has ALREADY been overwritten, so reading
+    #: it "for the honest value" reads the fabrication. The separation has to happen at the
+    #: point of fabrication — here — or it does not happen at all.
+    display_paths: dict[str, str] = field(default_factory=dict)
 
 
 async def walk_source_files(
@@ -330,8 +357,16 @@ async def walk_source_files(
                 if f.id in seen_files:
                     continue
                 seen_files.add(f.id)
+                # ⛔ THIS USED TO BE `f.path = ...` AND THAT WRITE WAS CR-01 (238 review).
+                #   The breadcrumb is assembled by US — from the REQUEST's `folder_name` plus
+                #   the folder names `browse()` returned — so it is not the adapter's answer to
+                #   "where is this file?" and must never be mistaken for it. It is recorded
+                #   BESIDE the file, keyed by id, so a reader has to ask for the display value
+                #   by name and cannot receive it by accident.
                 if getattr(f, "path", None) is None:
-                    f.path = f"{current_path}/{f.name}" if current_path else f"/{f.name}"
+                    result.display_paths[f.id] = (
+                        f"{current_path}/{f.name}" if current_path else f"/{f.name}"
+                    )
                 result.files.append(f)
             if len(result.files) >= MAX_FILES:
                 del result.files[MAX_FILES:]
@@ -580,16 +615,22 @@ async def build_preview(
         )
         destination: str | None = None
         rule_suggested = False
-        # ⚠ CORRECTED 2026-09-07 (Phase 238) — the old comment here said *"adapters do not yet
-        # populate f.path"*, and SEED-253 says production *always* substitutes `/<filename>`.
-        # Measured: BOTH are now too broad. `_walk_folder` above sets `f.path` from the
-        # traversal breadcrumb (`:333-334`) before this line ever runs, and the Graph adapter
-        # sets a real `parentReference.path`. So this `or` is the last resort for a listing
-        # that had neither — a flat, unnamed folder — and it is kept, deliberately, because a
-        # preview ROW is a thing a person is looking at and a blank path column is not the
-        # honest signal here. ⛔ The arm that WAS dangerous — the same fabrication reaching a
-        # RULE — was removed at its own site in `ingest_enrich.py`.
-        file_path = getattr(f, "path", None) or f"/{f.name}"
+        # ── TWO VALUES, AND THE SPLIT IS THE POINT (238 CR-01) ────────────────────────────
+        #
+        # ⭐ `adapter_path` is the SOURCE's answer. `None` means unknown, and it stays `None`
+        #    all the way to `metadata.source.path`, because that value is read back into a
+        #    classification RULE and a fabricated one there is SEED-253's entire defect.
+        #
+        # ⭐ `file_path` is what the ROW SHOWS: the adapter's answer, else the breadcrumb the
+        #    walk assembled, else `/<name>`. The display fallback is KEPT DELIBERATELY — a
+        #    preview row is a thing a person is looking at, and a blank path column is not the
+        #    honest signal there.
+        #
+        # ⚠ These were ONE value until Phase 238's review, and they read identically at this
+        #   line because the walk wrote its breadcrumb back onto `f.path`. That is precisely
+        #   why the fix could not live here: `getattr(f, "path", None)` was already the lie.
+        adapter_path = getattr(f, "path", None)
+        file_path = adapter_path or walk.display_paths.get(f.id) or f"/{f.name}"
         if bucket == "add":
             destination, rule_suggested = _suggest_destination(
                 rules=rules,
@@ -617,7 +658,8 @@ async def build_preview(
                 destination=destination,
                 rule_suggested=rule_suggested,
                 web_view_url=f.web_view_url,
-                path=file_path,
+                path=file_path,          # what the row shows
+                source_path=adapter_path,  # what may be persisted — None when unknown
             )
         )
 
@@ -721,11 +763,18 @@ async def confirm_preview(
                 folder_id=destination_folder_id,
                 external_id=item.external_id,
                 source_version=item.modified_at,
-                # SEED-253 / D-238-07.4 — the preview already resolved this file's real folder
-                # path (adapter-supplied, or the walk's breadcrumb). Handing it to the importer
-                # is what makes a folder-shaped rule work for a hand-imported document, not
+                # SEED-253 / D-238-07.4 — handing the file's real folder path to the importer
+                # is what makes a folder-shaped rule work for a hand-imported document and not
                 # only for a watched one.
-                source_path=item.path,
+                #
+                # ⛔ `item.source_path`, NEVER `item.path` (238 CR-01). `item.path` is what the
+                # ROW SHOWS and may be a breadcrumb this service assembled from the REQUEST's
+                # `folder_name`; persisting it let a client posting `{"folder_name": "Finance"}`
+                # decide a stored provenance fact that governs automated filing, and gave the
+                # same Drive file a different `metadata.source.path` through this door than
+                # through the watch loop. `source_path` is the ADAPTER's answer or `None`, which
+                # is exactly what `watch_service` writes — the two writers agree by construction.
+                source_path=item.source_path,
                 source_system=system,
             )
         except Exception as exc:  # noqa: BLE001 — a refusal is NAMED, never a silent drop

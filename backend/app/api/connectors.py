@@ -207,6 +207,11 @@ from app.services.sources.base import SourceConnectionDisabled  # noqa: E402
 
 router = APIRouter(prefix="/connectors", tags=["connectors"])
 
+#: Fields of `preview_service.PreviewItem` that exist for the SERVER and never reach the wire.
+#: ⛔ `source_path` is the only value that may be persisted into `metadata.source.path`, and it
+#: is read from the server's own re-run of `build_preview` — never from a client (238 CR-01).
+_PREVIEW_ITEM_SERVER_ONLY = frozenset({"source_path"})
+
 # The ONE machine-readable reason code this router emits. It is deliberately NOT a member of
 # `egress.REFUSAL_REASONS` — that frozenset is a CLOSED six-row table about DESTINATIONS
 # (UI-SPEC §4c) and carries its own `len(...) == 6` assert. This code is about the PLATFORM:
@@ -1879,7 +1884,22 @@ async def preview_source_folder(
     return SourcePreviewResponse(
         folder_id=preview.folder_id,
         folder_name=preview.folder_name,
-        items=[SourcePreviewItem(**asdict(i)) for i in preview.items],
+        # ⛔ `source_path` IS SERVER-ONLY AND IS DROPPED HERE ON PURPOSE (238 CR-01).
+        #
+        # It is the value that may be persisted into `metadata.source.path`, where a
+        # classification rule reads it. Putting it on the wire would invite the next confirm
+        # door to accept it back from a client — which is the caller-controlled-provenance half
+        # of CR-01 re-opened by a different route. The confirm endpoint re-runs `build_preview`
+        # server-side and reads `item.source_path` from THAT, never from a request body.
+        #
+        # ⚠ `SourcePreviewItem` is `extra="forbid"`, so this filter is load-bearing rather than
+        #   tidy: without it the whole preview endpoint 500s.
+        items=[
+            SourcePreviewItem(
+                **{k: v for k, v in asdict(i).items() if k not in _PREVIEW_ITEM_SERVER_ONLY}
+            )
+            for i in preview.items
+        ],
         counts=preview.counts,
         total=preview.total,
         truncated=preview.truncated,
