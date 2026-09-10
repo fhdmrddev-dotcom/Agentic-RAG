@@ -109,3 +109,36 @@ is not proof of innocence — that is this project's own standing rule and it ap
 Wave 1 is treated as passing and Wave 2 proceeds. The backend ceiling held; the count
 gate's red is inherited flake on files this phase cannot reach. This is stated as a
 DECISION, not as a claim that everything ran green.
+
+---
+
+## ✅ FINAL GATE AT PHASE CLOSE — the failing SET is identical, not merely the count
+
+Re-derived after all five plans, the CR-01 fix and the four warning fixes:
+
+```
+71 failed, 4491 passed, 2 xfailed, 2 xpassed
+```
+
+`+117` passed over the phase's start (`4374`), all of it this phase's new coverage.
+
+**The set was diffed in BOTH directions against the Wave-1 post-merge set** — not just compared by
+count, because an equal count can hide a swap:
+
+```
+wave-1 set: 71  ·  final set: 71
+NEW since wave 1  : (empty)
+GONE since wave 1 : (empty)
+```
+
+⚠ **`241-VERIFICATION.md` records a minor finding that the `test_retrieval_service.py` sub-count
+"drifted 15 → 3 while the total held at 71", flagged there as unexplained. That is REFUTED by
+measurement and the original is left standing in that file rather than edited out.** Re-derived from
+the persisted gate output at close: `test_retrieval_service.py` contributes **15**, exactly as this
+file recorded at Wave 1, and the whole set is byte-identical to Wave 1's.
+
+⭐ **The reason it is worth correcting rather than shrugging at:** a stable total with a moving
+sub-count is precisely the signature of a SWAP — one failure fixed, one introduced — which is the
+thing set-diffing exists to catch. Had the drift been real it would have been the most important
+line in the verification. It was not real, and the way to know was to diff the set rather than to
+argue about the count. **A per-file count read from a summary is not a measurement.**
