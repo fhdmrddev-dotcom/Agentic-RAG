@@ -178,7 +178,16 @@ Stated here rather than discovered at execution. **A phase that can be blocked o
   4. A reasoning model answering a plain question **with no tool calls at all** still shows its thinking — the reasoning surface is not gated on a tool-bearing turn (CHAT-04).
   5. A run that finished while the operator was on another page shows its **final answer resolved out of the narration fold** when they navigate back to it — with no reload (CHAT-05, `BUG-260707-03` residual #2, whose send-path half already shipped at Phase 176).
 
-**Plans**: TBD
+**Plans**: 5 plans, in 5 waves — **fully serial, and the reason is measured, not a preference.**
+
+Plans:
+- [ ] 243-01-PLAN.md — the safety net: characterization cases for the thinking block written against the UNMOVED `RunCard`, driven RED against two planted defects, registered in both gate knobs (CHAT-01 guard, CHAT-04 declared-defect case)
+- [ ] 243-02-PLAN.md — the seam: `ThinkingBlock` extracted from `RunCard` and mounted from `MessageItem` for BOTH message shapes; the tool-conditionality disappears by construction; `RunCard.tsx`'s G-5 discharge (CHAT-01 structure, CHAT-04)
+- [ ] 243-03-PLAN.md — the cadence and the scroll, together per `D-v4.1-02`: a RED drive at HEAD first, then producer-side coalescing on the delta callbacks, then CHAT-03 fixed or discharged as already-fixed-by-228 (CHAT-02 + CHAT-03)
+- [ ] 243-04-PLAN.md — V1's thin rule: four classes out, `text-sm`, real paragraphs, the self-removing clamp, and a duration that is measured or absent — never derived from character count (CHAT-01 appearance)
+- [ ] 243-05-PLAN.md — the answer out of the fold, verified on the NAVIGATION path and not only a live send (CHAT-05)
+
+⚠ **No wave holds two plans, and that is a measurement rather than a G-8 failure.** Every plan must edit `scripts/vitest-count-gate.cjs` (a `BASELINE` key naming a file that does not yet exist makes the gate exit 2, so a suite and its pin land in ONE commit) and `docs/HOT-FILE-LEDGER.md` + `CLAUDE.md` (the same-commit sync rule). Three shared artifacts every plan touches ⇒ zero disjoint `files_modified` sets ⇒ no parallel wave exists to be had. With parallelism unavailable, plan count is a pure context-budget decision, and 5 plans of ~30-40% beat 3 of ~55% on the quality curve. Semantic dependencies are narrower than the waves: 243-03 is independent of 243-02/04/05 and 243-05 depends only on 243-02.
 
 **UI hint**: yes — ⚠⚠ **and G-2 is MANDATORY, not advisory.**
 **Migrations**: none expected.
