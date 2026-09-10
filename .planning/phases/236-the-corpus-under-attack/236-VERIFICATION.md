@@ -3,7 +3,22 @@
 - **Verified at**: `68858a3c5`
 - **Method**: every figure re-measured, never read from the builder's claim; every behavioural
   criterion driven.
-- **Verdict**: ⛔ **REVISE — SC#2 overclaims and SC#1 is not met.** The engineering is good and the
+- **Verdict**: ⛔ **REVISE — SC#2 overclaims and SC#1 is not met.**
+- ⚠ **THIS VERDICT IS SUPERSEDED IN PART — READ `236-VALIDATION.md` BESIDE IT.** Added
+  2026-09-10 by the v4.0 milestone audit, which found this file still reading as an open REVISE
+  with nothing pointing at what discharged it. **The verdict named TWO problems and exactly ONE
+  was fixed:**
+    - **SC#2 (the GA gate) — now genuinely PASS.** `236-VALIDATION.md` records **8/8 mutations
+      caught loudly** via the in-process `--disable-defense=<name>` fixture
+      (`scripts/run-defense-mutations.sh`, `236-MUTATION-REPORT.md`). The overclaim this verdict
+      named was answered by DRIVING it, which is why `STATE.md` records *GA GATE MET 2026-09-06*.
+    - ⛔ **SC#1 — STILL OWED, and not by an oversight.** The offline unit suites pass 11/11, but
+      the live end-to-end sync across external providers needs real credentials the phase could
+      not supply. `236-VALIDATION.md` marks it **OWED**, not passed.
+  ⭐ **So "236 is closed" and "236 is fully verified" are different statements, and only the first
+  is true.** The GA gate is met; one success criterion is still owed on credentials.
+  ⚠ Recorded here rather than by editing the verdict, because a verdict that quietly becomes a
+  PASS is how a phase stops being able to say what it did not check. The engineering is good and the
   structure is right; two of the three success criteria are not yet supported by the evidence
   offered for them.
 
