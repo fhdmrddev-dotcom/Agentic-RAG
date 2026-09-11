@@ -1,9 +1,9 @@
 ---
 phase: 242-ship-it-and-prove-what-already-shipped
 verified: 2026-09-11T09:40:00Z
-status: human_needed
-status_note: "⚠ 'human_needed' STANDS, but only for SC#1's PRODUCTION half and SC#4's parity walk. The frontmatter below was STALE for eight commits and is corrected here — see the close audit at the foot of this file."
-score: "4.5 / 5 — SC#2, SC#3, SC#5 verified mechanically AND driven; SC#4 measured against cloud (24/25, the one FAIL labelled expected); SC#1 driven 4/5 locally, its production row owed"
+status: complete
+status_note: "⭐ CLOSED under D-242-08 (operator). Was `human_needed`; the only remaining item — Row 5 on production — was measured UNRUNNABLE (242 is not deployed; 70 commits sit on develop) and is DEFERRED to the next promotion to production, with the parity walk folded into it. Rows 1-4 driven and pass."
+score: "4.5 / 5 (CLOSED) — SC#2, SC#3, SC#5 verified mechanically AND driven; SC#4 measured against cloud (24/25, the one FAIL labelled expected); SC#1 driven 4/5 locally, its production row owed"
 overrides_applied: 0
 solo_run: true
 independent_review: false
@@ -443,3 +443,62 @@ already registered as cap-independent flaky. **The deterministic evidence — th
 four in-scope suites, the backend SET diff, the typecheck set diff — is all green.** A re-run on a
 quiet tree is the right next measurement and is listed as owed rather than performed here, because
 re-running until green is exactly the habit SEED-171 exists to prevent.
+
+---
+
+# ⭐ D-242-08 — ROW 5 IS DEFERRED BY OPERATOR DECISION, AND THE PHASE CLOSES
+
+**Operator, 2026-09-11:** *"defer and proceed — let's make the deployment on a milestone
+achievement or at the end of the milestone."*
+
+## The measurement that made this the right call, taken before the decision
+
+⛔ **PHASE 242'S CODE IS NOT IN PRODUCTION.** `origin/production` is at `e65610ac2`; **70 commits
+on `develop` are not in it**, including every line this phase wrote. So Row 5 —
+*"change one field on the deployed product and read the payload"* — **was never runnable**. Driving
+it would have measured the OLD build and reported ~24 keys: a false failure.
+
+⚠ **This is recorded as a METHOD error of mine, not just a fact.** I twice handed the operator a
+step-by-step for Row 5 without first checking whether the code under test was deployed. The row's
+own expected result was unreachable. **Check that the build under test is the build deployed, before
+asking anyone to measure it.**
+
+## What is deferred, and what is NOT
+
+| | |
+|---|---|
+| **Deferred** | Row 5 only — the drive of the changed-fields payload **on production**. |
+| **NOT deferred** | Everything the row would have proven about the CODE. Rows 1-4 are driven and pass on a real browser; the mechanism is verified. |
+| **Re-open trigger** | ⭐ **The next promotion to `production`** — planned for a v4.1 milestone achievement or the milestone close. **Row 5 is driven AS PART OF that deploy's verification**, not as leftover 242 work. |
+
+⭐ **This is a decision with a written reason, not owed work quietly carried forward** — the same
+standard SC#5 applied to SHIP-02, applied now to this phase's own last row. Promoting 70 commits to
+production to close one row whose expected result is already known is the wrong trade; the deploy
+should be its own deliberate step with its own verification.
+
+⚠ **And the deploy will carry a real obligation:** migration **178 is ALREADY in cloud** while the
+code that assumes it is not. That is safe today — the deployed build sends all 24 fields, every
+cloud value is in range, so saves succeed — but it is a **schema-ahead-of-code** state and the
+promotion must not assume otherwise.
+
+## Cloud state at the close — measured, not claimed
+
+| | |
+|---|---|
+| Migration 178 | ✅ **APPLIED** by the operator. Both CHECKs present with the exact definitions; `app_settings` still holds its single row at `(100, 50)` |
+| Migrations `153-178` | ✅ **25/25 PASS** — the previous run's single FAIL was 178's own row, now resolved. The verifier's stale *"EXPECTED FAIL"* label corrected in the same commit |
+| Security advisor | ✅ **No ERROR-level findings.** Same WARN set as before the apply — nothing regressed |
+| `BUG-260911-01` | ✅ remediated in production (migration 177) |
+
+## Final status
+
+**Phase 242: CLOSED.** SC#2, SC#3, SC#5 verified and driven. SC#4's migration half measured
+(25/25); its parity walk **folds into the deferred deploy**, where it belongs. SC#1 verified on
+every reachable surface, its production row deferred under D-242-08.
+
+⛔ **Still true and still said plainly:** this was a **solo run**. `OV-SOLO-01` applies. No
+independent reviewer has read this phase.
+
+⚠ **One measurement owed, and it is cheap:** a count-gate re-run on a quiet tree. The close run read
+`failed 7` across three files this phase provably never touched (two are SEED-171's registered
+flaky suites) while a peer session was driving a browser here. Not a blocker; not an acquittal either.

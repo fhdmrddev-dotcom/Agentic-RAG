@@ -169,11 +169,12 @@ with c(mig, what, ok) as (values
   ('177', 'anon cannot execute resize_embedding_column (deletes every vector)',
    not has_function_privilege('anon','public.resize_embedding_column(integer)','EXECUTE')),
 
-  -- ⛔ Phase 242's own migration. It is DELIBERATELY not applied to cloud yet — a production write
-  --    needs per-action operator approval — so this row is EXPECTED TO FAIL until it is applied,
-  --    and that is the one FAIL in this script that is not a defect. Low urgency: cloud holds 100
-  --    and 50, both in range, so the constraint is a backstop against a future hand-edit.
-  ('178', 'app_settings bound CHECKs present (EXPECTED FAIL until 178 is applied to cloud)',
+  -- ⭐ APPLIED TO CLOUD 2026-09-11 by the operator, and this row's LABEL was corrected in the same
+  --    breath. It previously read "EXPECTED FAIL until 178 is applied to cloud" — true when written,
+  --    false within hours, and a checker carrying a stale "expected fail" is how a real regression
+  --    gets waved through. Verified after the apply: both constraints present with the right
+  --    definitions, `app_settings` still holds its single row at (100, 50).
+  ('178', 'app_settings bound CHECKs present (multimodal_max_vision_calls + vision_max_pages)',
    (select count(*) from pg_constraint
     where conname in ('app_settings_multimodal_max_vision_calls_bound',
                       'app_settings_vision_max_pages_bound')) = 2)
