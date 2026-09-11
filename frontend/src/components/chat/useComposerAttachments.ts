@@ -17,9 +17,23 @@
  * ⚠ `refusal` carries the server's OWN sentence and the name of the file it refused — both
  * atoms, because the approved mockup draws both (D-244-27). It is never paraphrased: a refusal
  * that softens the reason cannot be acted on.
+ *
+ * ⛔ **NO THREAD IS A REFUSAL, NEVER A RETURN (`244-07` / CR-01).** Both verbs opened with a bare
+ * `if (!threadId) return`, and `ChatArea` renders this composer with `threadId={null}` on its
+ * welcome screen — so on the first chat anybody opens, a pick produced no chip, no request and
+ * no word. The cloud half was worse: returning `undefined` rather than throwing made the picker
+ * take its SUCCESS path and close identically to a real attach.
+ *
+ * ⚠ **THE ARM NOT TAKEN, recorded rather than left implicit:** creating the thread at ATTACH
+ * time. It is the nicer product, and it was refused here because it is not a defect fix — it
+ * needs `onCreateThread` threaded down through `MessageInput`, and `MessageInput`'s draft-key
+ * effect calls `clear()` on every `threadId` change, so the chip the person just made would be
+ * wiped by the thread its own creation produced. That is a phase, with its own fences. This
+ * commit's contract is narrower and absolute: **a door may never do nothing.**
  */
 import { useCallback, useState } from "react"
 import { attachConnectionFileToThread, uploadWorkspaceTemplate } from "@/lib/api"
+import { COPY } from "./composerCopy"
 import type { WorkspaceFile } from "@/types"
 import { detachAttachment } from "./ChatAttachmentChip"
 import { useStreamActions } from "@/providers/StreamsProvider"
@@ -72,7 +86,10 @@ export function useComposerAttachments(threadId?: string | null): ComposerAttach
    */
   const attachLocalFile = useCallback(
     async (f: File) => {
-      if (!threadId) return
+      if (!threadId) {
+        setRefusal({ fileName: f.name, message: COPY.shared.refuseNoThread })
+        return
+      }
       try {
         land(await uploadWorkspaceTemplate(threadId, f))
       } catch (e) {
@@ -95,7 +112,15 @@ export function useComposerAttachments(threadId?: string | null): ComposerAttach
    */
   const attachCloudFile = useCallback(
     async (connectionId: string, fileId: string, displayName: string) => {
-      if (!threadId) return
+      if (!threadId) {
+        // ⛔ THROWN, not returned. `ConnectedFilePickerModal.handleConfirm` branches on this
+        // promise: a resolve is a SUCCESS, and an early `return undefined` therefore closed the
+        // dialog exactly as a real attach does (CR-01). The refusal is set FIRST so the
+        // composer's strip is already rendered by the time the modal unmounts itself.
+        const refused = new Error(COPY.shared.refuseNoThread)
+        setRefusal({ fileName: displayName, message: refused.message })
+        throw refused
+      }
       try {
         land(await attachConnectionFileToThread(threadId, connectionId, fileId))
       } catch (e) {
