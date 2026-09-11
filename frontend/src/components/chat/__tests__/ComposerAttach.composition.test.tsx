@@ -14,12 +14,23 @@
  * ⛔ EVERY WORD IS READ FROM THE PORT (`composerCopy`), which is itself fenced against the
  * sketch's `COPY.js` by `ChatAttachmentChip.states.test.tsx` Test 5.
  */
-import { render, screen, fireEvent, waitFor, within } from "@testing-library/react"
+import { render, screen, fireEvent, waitFor, within, cleanup } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-import { describe, it, expect, vi, beforeEach } from "vitest"
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
+import { TooltipProvider } from "@/components/ui/tooltip"
 import { MessageInput, _resetComposerDraftsForTest } from "../MessageInput"
+import { MessageItem } from "../MessageItem"
 import { COPY } from "../composerCopy"
+import { detachAttachment, _resetDetachedAttachmentsForTest } from "../ChatAttachmentChip"
+// ⚠ The STORE, imported directly — in a TEST. D-068-03 makes `useStreamsStore` an implementation
+// detail for PRODUCTION callers; seeding a slice is exactly the case a named hook cannot serve,
+// and mocking the whole provider module would break the `MessageInput` half of this file.
+import { useStreamsStore } from "@/stores/streamsStore"
 import * as api from "@/lib/api"
+
+vi.mock("@/lib/supabase", () => ({
+  supabase: { auth: { getSession: vi.fn().mockResolvedValue({ data: { session: null } }) } },
+}))
 
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<any>("@/lib/api")
@@ -243,5 +254,185 @@ describe("Composer attach — the ordered blocks sketch 236 draws", () => {
     // 244-02 collapsed three hand-typed copies into one `?raw`-fenced constant. A fourth here
     // would be invisible to that fence.
     expect(input.getAttribute("accept")).toBe([...COPY.engine.ALLOWED_EXT].join(","))
+  })
+
+  // ── Block: the composer's own DOM order ────────────────────────────────────────────────
+  it("8 — ORDER, composer: the chips row precedes the + trigger, which precedes the textarea", async () => {
+    const user = userEvent.setup()
+    render(<MessageInput onSend={vi.fn()} disabled={false} threadId="t-1" />)
+    await waitFor(() => expect(api.listConnectorConnections).toHaveBeenCalled())
+
+    await user.click(screen.getByTestId(COPY.engine.PLUS_BTN_TESTID))
+    await user.click(await screen.findByText(COPY.a.itemLocal))
+    pickFile()
+    await screen.findByTestId("chat-attachment-chip")
+
+    const row = screen.getByTestId("active-connector-chips")
+    const plus = screen.getByTestId(COPY.engine.PLUS_BTN_TESTID)
+    const textarea = screen.getByPlaceholderText(COPY.shared.composerPlaceholder)
+
+    expect(precedes(row, textarea)).toBe(true)
+    expect(precedes(textarea, plus)).toBe(true)
+  })
+
+  it("9 — ATOMS, chip: icon, name, size, scope, remove — in that order", async () => {
+    const user = userEvent.setup()
+    render(<MessageInput onSend={vi.fn()} disabled={false} threadId="t-1" />)
+    await waitFor(() => expect(api.listConnectorConnections).toHaveBeenCalled())
+
+    await user.click(screen.getByTestId(COPY.engine.PLUS_BTN_TESTID))
+    await user.click(await screen.findByText(COPY.a.itemLocal))
+    pickFile()
+
+    const chip = await screen.findByTestId("chat-attachment-chip")
+    const icon = chip.querySelector('[aria-hidden="true"]')!
+    const name = chip.querySelector("[data-chip-name]")!
+    const scope = chip.querySelector("[data-chip-scope]")!
+    const remove = chip.querySelector("[data-chip-remove]")!
+
+    expect(precedes(icon, name)).toBe(true)
+    expect(precedes(name, scope)).toBe(true)
+    expect(precedes(scope, remove)).toBe(true)
+    // the size sits between the name and the scope word — asserted on the rendered value
+    expect(chip.textContent).toContain("84.0 KB")
+  })
+})
+
+// ── Block: the SENT message ──────────────────────────────────────────────────────────────
+//
+// ⭐ D-244-22's BUILD OBLIGATION lives here, not in the composer. Variant A won because the
+// promise SURVIVES: *"reopening the chat tomorrow, the transcript still says `this chat only` —
+// B's footer is long gone by then."* A chip that carries the scope word only while pending has
+// shipped B's weakness at A's cost, and these cases are what stop that shipping silently.
+describe("The sent message — the scope word in the transcript", () => {
+  const T = "t-sent"
+  const T0 = Date.parse("2026-09-11T10:00:00.000Z")
+
+  const userMsg = {
+    id: "m-user-1",
+    thread_id: T,
+    user_id: "u-1",
+    role: "user" as const,
+    content: "Compare these quarterly rates against the Meridian contract.",
+    created_at: new Date(T0 + 60_000).toISOString(),
+    updated_at: new Date(T0 + 60_000).toISOString(),
+  }
+  const assistantMsg = {
+    ...userMsg,
+    id: "m-ai-1",
+    role: "assistant" as const,
+    content: "Two line items sit above the contracted cap.",
+    created_at: new Date(T0 + 90_000).toISOString(),
+  }
+  const attached = {
+    ...UPLOADED,
+    created_at: new Date(T0 + 30_000).toISOString(),
+    expires_at: new Date(T0 + 30_000 + 24 * 3_600_000).toISOString(),
+  }
+
+  function seed(files: any[]) {
+    useStreamsStore.getState().actions.replaceWorkspaceFilesForThread(T, files as any)
+  }
+
+  function seedMessages(msgs: any[]) {
+    useStreamsStore.getState().actions.setMessagesForBucket("chat", T, () => msgs as any)
+  }
+
+  beforeEach(() => {
+    _resetDetachedAttachmentsForTest()
+    seed([attached])
+    seedMessages([userMsg, assistantMsg])
+    vi.setSystemTime(new Date(T0 + 120_000))
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    seed([])
+    seedMessages([])
+    cleanup()
+  })
+
+  it("10 — ORDER, sent: the read-only chip PRECEDES the user's text", () => {
+    render(
+      <TooltipProvider>
+        <MessageItem message={userMsg as any} />
+      </TooltipProvider>,
+    )
+    const chip = screen.getByTestId("chat-attachment-chip")
+    expect(chip.getAttribute("data-chip-state")).toBe("sent")
+
+    const text = screen.getByText(/Compare these quarterly rates/)
+    // ⛔ "the chip in read-only form ABOVE the user's text" — above is part of the contract.
+    expect(precedes(chip, text)).toBe(true)
+    // read-only: nothing to remove in a transcript.
+    expect(chip.querySelector("[data-chip-remove]")).toBeNull()
+  })
+
+  it("11 — ATOM, sent: the chip renders COPY.a.sentNote — the scope word, a day later", () => {
+    render(
+      <TooltipProvider>
+        <MessageItem message={userMsg as any} />
+      </TooltipProvider>,
+    )
+    const chip = screen.getByTestId("chat-attachment-chip")
+    expect(chip.querySelector("[data-chip-scope]")!.textContent).toContain(COPY.a.sentNote)
+  })
+
+  it("12 — ATOM, agent pointer: the assistant row renders `Read <file>` as ONE line", () => {
+    render(
+      <TooltipProvider>
+        <MessageItem message={assistantMsg as any} />
+      </TooltipProvider>,
+    )
+    const pointer = screen.getByTestId("agent-read-pointer")
+    expect(pointer.textContent).toContain(COPY.shared.agentReadLine("Meridian-Q4-pricing.xlsx"))
+    // ⚠ a POINTER, one line — the run surface owns the heavy receipt (the sketch draws it so).
+    expect(pointer.querySelectorAll("*").length).toBeLessThan(4)
+  })
+
+  it("12b — the association rule's EDGE CASE: an upload removed before send appears on NO row", () => {
+    detachAttachment(T, attached.path)
+    render(
+      <TooltipProvider>
+        <MessageItem message={userMsg as any} />
+      </TooltipProvider>,
+    )
+    expect(screen.queryByTestId("chat-attachment-chip")).toBeNull()
+  })
+
+  it("12c — an AGENT-written workspace file is not an attachment and wears no chip", () => {
+    seed([{ ...attached, kind: "agent_output" }])
+    render(
+      <TooltipProvider>
+        <MessageItem message={userMsg as any} />
+      </TooltipProvider>,
+    )
+    expect(screen.queryByTestId("chat-attachment-chip")).toBeNull()
+  })
+
+  it("12d — an upload made AFTER the last user message belongs to no sent row (it is pending)", () => {
+    seed([{ ...attached, created_at: new Date(T0 + 119_000).toISOString() }])
+    render(
+      <TooltipProvider>
+        <MessageItem message={userMsg as any} />
+      </TooltipProvider>,
+    )
+    expect(screen.queryByTestId("chat-attachment-chip")).toBeNull()
+  })
+
+  it("13 — the NEGATIVE that makes Test 10 real: a chip rendered BELOW the text fails it", () => {
+    // ⛔ A composition fence nobody has seen fire is a presence assertion wearing a costume.
+    // This fixture is the reordered arm, in isolation: the SAME two nodes, text first.
+    const { container } = render(
+      <div>
+        <p>Compare these quarterly rates against the Meridian contract.</p>
+        <span data-testid="chat-attachment-chip" data-chip-state="sent" />
+      </div>,
+    )
+    const chip = container.querySelector('[data-testid="chat-attachment-chip"]')!
+    const text = container.querySelector("p")!
+    // Test 10 asserts `precedes(chip, text) === true`; on the reordered arm it is FALSE.
+    expect(precedes(chip, text)).toBe(false)
+    expect(precedes(text, chip)).toBe(true)
   })
 })

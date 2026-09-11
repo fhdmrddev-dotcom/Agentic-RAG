@@ -117,6 +117,74 @@ export function _resetDetachedAttachmentsForTest(): void {
   detachedByThread.clear()
 }
 
+/**
+ * ── THE ASSOCIATION RULE (Phase 244 / 244-05 T3) ────────────────────────────────────────
+ *
+ * Which attachments belong to a SENT user message?
+ *
+ * ⛔ THE CONSTRAINT THAT PICKS THE RULE: it must survive a reload. D-244-22's whole reason for
+ * choosing variant A is that *"reopening the chat tomorrow, the transcript still says
+ * `this chat only`"*. A client-only field stamped at send time would satisfy every test in this
+ * repo and **fail the requirement the day after**, because a message loaded from the database
+ * carries no such field. ⛔ And a backend field is out: D-244-01 and the ROADMAP both say
+ * `Migrations: none expected`.
+ *
+ * So the association is DERIVED from two things that are both persisted — the thread's
+ * `workspace_files` rows (each with a `created_at`) and the messages' own `created_at` —
+ * plus the session-scoped detach registry above.
+ *
+ * **The rule, stated once:** an upload belongs to the FIRST user message sent at or after it.
+ * Equivalently, for user message `M` with predecessor user message `P`:
+ *
+ *     P.created_at  <  file.created_at  <=  M.created_at        (no lower bound if M is first)
+ *
+ * and the file is `kind === "template_input"` (what `workspace.py`'s upload route stamps —
+ * ⛔ an AGENT-written workspace file is not an attachment and must never wear this chip) and is
+ * not detached.
+ *
+ * ⚠ THE CONSEQUENCE, NAMED RATHER THAN DISCOVERED LATER: a file uploaded AFTER the last user
+ * message belongs to no sent message. That is correct — it is still pending in the composer —
+ * and it is why the composer holds its own list instead of reading this.
+ *
+ * ⚠ CLOCK SKEW IS A REAL EDGE HERE, and the boundary is chosen for it. `created_at` on the file
+ * is stamped by Postgres; `created_at` on an optimistic user message is stamped by the client.
+ * The `<=` upper bound is INCLUSIVE so a file and a message written in the same millisecond
+ * associate rather than falling through to the next message; the lower bound is EXCLUSIVE so the
+ * same file cannot land on two rows. ⛔ Never make both inclusive.
+ *
+ * ⚠ `previousUserMessageAt` IS A SCALAR ON PURPOSE, and it is the reason this function takes a
+ * timestamp rather than the message list. `MessageItem` is `React.memo`'d so a 50-message thread
+ * does not re-render every row on every stream delta; handing a row the messages ARRAY — as a
+ * prop or as a selector result — reinstates that cost, because the array identity changes on
+ * every delta. `StreamsProvider.usePreviousUserMessageAt` selects this one string instead.
+ */
+export function attachmentsForMessage(
+  message: { role: string; created_at: string; thread_id?: string },
+  /** The `created_at` of the USER message immediately before this one; `null` if it is the first. */
+  previousUserMessageAt: string | null,
+  files: readonly WorkspaceFile[],
+): WorkspaceFile[] {
+  if (message.role !== "user") return []
+
+  const upper = new Date(message.created_at).getTime()
+  if (Number.isNaN(upper)) return []
+  const prev = previousUserMessageAt === null ? NaN : new Date(previousUserMessageAt).getTime()
+  // ⚠ An UNPARSEABLE predecessor is NOT treated as "no predecessor" — that would widen the window
+  // and hand this row every earlier attachment in the thread. It is treated as an unbounded lower
+  // edge only when the predecessor is genuinely ABSENT (the first user message).
+  const lower = previousUserMessageAt === null ? -Infinity : Number.isNaN(prev) ? upper : prev
+
+  return files.filter((f) => {
+    if (f.kind !== "template_input") return false
+    if (!f.created_at) return false
+    const at = new Date(f.created_at).getTime()
+    if (Number.isNaN(at)) return false
+    if (!(at > lower && at <= upper)) return false
+    if (message.thread_id && isAttachmentDetached(message.thread_id, f.path)) return false
+    return true
+  })
+}
+
 export function ChatAttachmentChip({ file, state, onRemove }: ChatAttachmentChipProps) {
   const effective = chatAttachmentState(file, state)
   const name = attachmentDisplayName(file)
