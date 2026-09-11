@@ -51,9 +51,12 @@ not get promoted.
 
 <decisions>
 
-### D-242-01 — Migration 177 CLAMPS an out-of-range row; it never resets to default (operator)
+### D-242-01 — Migration 178 CLAMPS an out-of-range row; it never resets to default (operator)
 
-A CHECK cannot be added while a row violates it, so the value must move first. **Clamp:**
+A CHECK cannot be added while a row violates it, so the value must move first. ⚠ **Renumbered 177 → 178 on 2026-09-11** — `177` was taken by the security fix found during this
+very discussion (`BUG-260911-01`), which ships first because it is a live production exposure.
+
+**Clamp:**
 `least(greatest(multimodal_max_vision_calls, 1), 1000)`.
 
 ⚠ **Generalised, never keyed to the one value we happened to see.** The local row was `1001`; cloud
@@ -121,6 +124,24 @@ named, in `REQUIREMENTS.md` and in the phase record. ⚠ **`REQUIREMENTS.md` and
 contain sentences saying v4.0 has never deployed** — corrections were written beside the originals
 at the roadmap commit; this phase confirms them against the database rather than against git alone.
 
+
+### D-242-07 — A production security exposure was found BY this phase's own work, and it ships first
+
+`BUG-260911-01` (**blocking**): `app_settings` and `user_settings` have RLS disabled in production
+and `anon` holds all table privileges; `resize_embedding_column` — which deletes every vector — is
+callable unauthenticated. Found by running the Supabase security advisor while discharging SC#4.
+
+**Migration `177_rls_app_settings_user_settings.sql` is written and NOT applied** — it is a
+production change and awaits operator authorisation. The safety of revoking was **traced, not
+assumed**: the frontend never touches either table, the backend reads them on the service role, and
+`get_user_supabase` runs as `authenticated` (never `anon`) and its callers do not reference them.
+
+⭐ **The reusable lesson, and it belongs in the deploy checklist:** every gate this project runs
+stayed green, because every one of them reads through the service role. **Nothing in the suite ever
+makes a request as `anon`.** That is the same blind spot migration 156 recorded on
+`connector_connections` — the third time this class has fired. **Add the Supabase advisor call to
+the deploy parity checklist.**
+
 </decisions>
 
 <deferred>
@@ -157,7 +178,7 @@ at the roadmap commit; this phase confirms them against the database rather than
 | `backend/app/api/settings.py:466-467` | 36/19/854 — **G-5 FIRES** | `1 <= n <= 1000`, Python only. The SEED-227 comment explaining *why* the bound exists is good and must survive the move to a constraint |
 | `frontend/src/pages/SettingsPage.tsx:876-901` | 45/23/1751 — **G-5 FIRES** | ~22 fields sent unconditionally; the confirm-gate diff sits ~4 lines below and is the reusable baseline |
 | `backend/app/models/user_settings.py` | 50/32/1561 — **G-5 FIRES**, ledger stale for the 4th close running | Bounds constants live here |
-| `supabase/migrations/` | no CHECK on `app_settings` bounded columns | 177 is the first |
+| `supabase/migrations/` | no CHECK on `app_settings` bounded columns | 178 is the first |
 
 ⚠ **All three source files fire G-5 and are honoured by construction here** — a bound, a payload
 shape and a sentence. **Update each ledger row AND its section in `docs/HOT-FILE-LEDGER.md` in the
@@ -183,7 +204,7 @@ the real plan work.
   Python-side bound reproduces the identical outage. **The deliverable is the class fix, not the
   instance.**
 - The migration hard-codes `1001` and does nothing in cloud, where the value is `100`.
-- Migration 177 is applied with `db push` or `db reset`, and the operator's local data goes with it.
+- Migration 178 is applied with `db push` or `db reset`, and the operator's local data goes with it.
 - The payload change ships as *"report all errors"* — the failure becomes legible and stays possible,
   and Phase 246 stays hostage.
 - `verify-v40-cloud-migrations.sql` is left as-is and the next reader concludes migration 156 never
