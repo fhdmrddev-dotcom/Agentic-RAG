@@ -135,6 +135,12 @@ describe("Composer attach — the ordered blocks sketch 236 draws", () => {
     expect(
       screen.queryByText("Files here stay in this chat. The Library is for files you keep."),
     ).toBeNull()
+
+    // ⛔ D-244-23: `Import` is the LIBRARY door's word, and the ROADMAP names a quiet Library
+    // write as SHELL-04's failure mode. Asserted on the RENDERED menu, not by grepping the file —
+    // `ConnectorsFlyout` may legitimately carry the word elsewhere in the product.
+    const menu = screen.getByTestId("composer-attach-group").closest('[role="menu"]') ?? document.body
+    expect(menu.textContent).not.toMatch(/\bImport\b/)
   })
 
   // ── Block: the composer chips row ──────────────────────────────────────────────────────
