@@ -17,9 +17,15 @@ relates_to:
   - docs/OPERATOR.md
   - docs/DEPLOYMENT-WORKFLOW.md
 trigger_when: >
-  The next production push (any promotion to `production` after 2026-09-03). This is deploy
-  configuration, not application code, and it cannot be verified without a Vercel preview — so it
-  is done AT the push, with the reviewer guiding the operator step by step, never silently on develop.
+  ⚠ RE-ARMED 2026-09-11 at Phase 242 (SC#5), NOT CLOSED. The original trigger — "the next
+  production push (any promotion to `production` after 2026-09-03)" — HAS FIRED: the v4.0 push
+  landed at `1f313670b` on 2026-09-10, and the routing half of this seed landed with it at
+  `f63a8ebcc` (the app moved to /app, `VITE_APP_URL` is read by the landing's Sign in). What did
+  NOT happen is the DNS + host-rewrite half, which is the part the operator asked to be guided
+  through. It is deploy configuration, not application code, and cannot be verified without a
+  Vercel preview. NARROWED TRIGGER: the NEXT promotion to `production` after 2026-09-11 — at which
+  point the seven-step setup is walked WITH the operator, or this seed is closed as not-wanted.
+  Never silently on develop.
 ---
 
 ## What the operator decided
