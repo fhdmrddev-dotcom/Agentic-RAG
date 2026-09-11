@@ -41,7 +41,12 @@ vi.mock("@/providers/StreamsProvider", () => ({
 
 import { ChatHistoryColumn } from "../ChatHistoryColumn"
 
-const NOW = Date.now()
+// ⚠ ANCHORED TO LOCAL NOON, NOT `Date.now()`. `bucketFor` floors to the LOCAL CALENDAR
+// DAY, so a fixture built as `Date.now() - 1h` falls on YESTERDAY whenever the suite runs
+// between 00:00 and ~02:00 local — and the "Today" assertion below then fails for a reason
+// that has nothing to do with the code under test. Measured red at 00:17 on 2026-09-12,
+// green when 244-01 pinned it. Noon keeps every offset here (max 2h) inside one local day.
+const NOW = new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate(), 12, 0, 0, 0).getTime()
 const iso = (msAgo: number) => new Date(NOW - msAgo).toISOString()
 const HOUR = 3_600_000
 
