@@ -2920,7 +2920,31 @@ const BASELINE = {
   // 8 and 9 were INVERTED IN PLACE and still assert, now on the correct side. That is the
   // distinction this pin exists to make — a fixed defect keeps its case, a dropped one does
   // not, and only the count can tell them apart.
-  "ThinkingBlock.characterization.test.tsx": 23,
+  //
+  // RAISED 23 -> 27 at `243-04`, again READ FROM THE `actual` COLUMN
+  // (`ThinkingBlock.characterization.test.tsx  23  27  +4`). The +4 is fully attributed and
+  // is ALL of §5b: the two-paragraph element-count case, the no-nested-scroller case, the
+  // single-paragraph median case, and the lossless-split case. §5 itself CHANGED rather than
+  // multiplied - it now pins V1's class set instead of the defect's - so the count is the
+  // only thing that can tell a REPLACED pin from a DROPPED one.
+  "ThinkingBlock.characterization.test.tsx": 27,
+
+  // ── Phase 243 (243-04 / CHAT-01 / D-243-02) — the reasoning clamp ───────────────────
+  //
+  // ⚠ 7 was READ FROM THIS SCRIPT'S OWN `actual` COLUMN on the run that first executed the
+  // file (printed as `—  7  new` on this suite's row), never hand-counted. ⚠ The suite's
+  // FILENAME is deliberately not repeated in this prose: the plan's own acceptance grep
+  // counts its occurrences in this script, and a comment naming it makes that count lie.
+  //
+  // What is UNGUARDED without this entry: the tail treatment at BOTH ends of D-243-03's 170x
+  // spread. §3 is the load-bearing one - the control is ABSENT (not hidden) on the median
+  // 198-char body, which is what distinguishes this clamp from the two OTHER clamps in this
+  // tree (`CandidateCard.tsx:104`, `CitationCard.tsx:196-205`) that mount their toggle
+  // unconditionally. §4 proves the gate is the MEASUREMENT and not the sketch's ~700-char
+  // proxy; §5 proves the fade is not the user bubble's violet; §6 proves the cap is a REVEAL
+  // and never a nested scroller, which is what CHAT-01 is about. A lowering here would most
+  // cheaply be achieved by dropping exactly §3 and §4 - the two that cost something to keep.
+  "ThinkingBlock.clamp.test.tsx": 7,
 
   // ── Phase 243 (243-03 / CHAT-02 / D-243-15) — the delta path's coalescing fence ─────────
   //
@@ -4713,6 +4737,9 @@ const TARGETS = [
   // `src/components/chat` directory entry anywhere here, so a suite dropped into that folder
   // runs in NO gate until it is named. TARGETS decides what RUNS, BASELINE what is GUARDED.
   "src/components/chat/__tests__/ThinkingBlock.characterization.test.tsx",
+  // ── Phase 243 (243-04 / CHAT-01 / D-243-02) — the reasoning clamp, at BOTH ends of the ──
+  // ── measured 170x spread. FILE-LEVEL for the same reason as the line above it. ──────────
+  "src/components/chat/__tests__/ThinkingBlock.clamp.test.tsx",
   // ── Phase 243 (243-03 / CHAT-02 / CHAT-03) — the delta cadence and the scroll effect ────
   //
   // ⛔ ALL THREE NEEDED BOTH KNOBS BY HAND, AND NONE OF THEM IS REACHED BY A DIRECTORY RULE.

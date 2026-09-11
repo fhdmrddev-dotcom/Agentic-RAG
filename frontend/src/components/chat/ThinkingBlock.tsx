@@ -59,8 +59,9 @@
  * draws only when reasoning is ABSENT — so leaving it behind creates no second renderer of
  * reasoning. State 3 is this component's `return null`.
  */
-import { useState } from "react"
+import { useLayoutEffect, useRef, useState } from "react"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { cn } from "@/lib/utils"
 import { FoldTrigger } from "./FoldTrigger"
 
 interface ThinkingBlockProps {
@@ -100,10 +101,53 @@ function toParagraphs(reasoning: string): string[] {
     .filter(Boolean)
 }
 
+/**
+ * Sketch 234 V1, `index.html:139-142` — the tail treatment's height, in pixels.
+ *
+ * ⛔ THE COPY `Show all of it` IS NEW. It does not exist anywhere in this tree (measured:
+ * `Show all` appears at `ModelDiscoveryPanel.tsx:480`, `templateFirstVocabulary.ts:237` and
+ * `runLogVocabulary.ts:50`, none of them a text-clamp control, and the shipped clamp says
+ * `Read more`). WHAT IS REUSED IS THE MECHANISM, NEVER THE STRING — `UserMessageBubble.tsx:26-64`,
+ * four moves: measure pre-paint, cap while collapsed, fade only while capped, and ⭐ gate the
+ * CONTROL on measured overflow so it removes itself instead of sitting inert on a short body.
+ * Describing this as copy reuse would be wrong, so it is described as what it is.
+ *
+ * ⚠ THE VALUE IS DUPLICATED IN THE CAP CLASS BELOW, AND IT HAS TO BE: Tailwind's arbitrary
+ * value must be a literal for the compiler to emit the rule. The suite pins both, so the two
+ * cannot drift apart silently.
+ */
+const CLAMP_MAX_PX = 300
+
 export function ThinkingBlock({ reasoningContent, isStreaming }: ThinkingBlockProps) {
   // Phase 076.2 D-01: collapsed by default. ⚠ The DEFAULT is untouched by the move — the
   // 224-PREFLIGHT §3.2 rule holds: flipping it would be a regression dressed as consistency.
   const [thinkingOpen, setThinkingOpen] = useState(false)
+  // ── THE CLAMP (D-243-02 / sketch 234 V1 — the shipped sketch-050 mechanism) ───────────
+  const bodyRef = useRef<HTMLDivElement>(null)
+  const [overflowing, setOverflowing] = useState(false)
+  const [clampExpanded, setClampExpanded] = useState(false)
+  // `useLayoutEffect` (NOT `useEffect`) so the measure runs PRE-PAINT — `UserMessageBubble.tsx:32-35`
+  // records the reason: a post-paint measure shows one frame at full height before the cap
+  // applies (RESEARCH Pitfall 5). Keyed on the content, which is what changes during a stream.
+  //
+  // ⚠ THE COMPARISON IS AGAINST THE CAP, NOT AGAINST `clientHeight`, AND THE DIFFERENCE IS
+  //   OBSERVABLE. `scrollHeight > clientHeight` (the bubble's form) can only be true once the
+  //   cap is already APPLIED, which would leave the cap class on a 198-char body forever — and
+  //   D-243-02 requires the affordance to REMOVE ITSELF below the threshold, not to be present
+  //   and inert. Measuring the natural height against the cap gives the same answer without
+  //   that circularity. The sketch's `chars < 700` is a PROXY for this measurement; porting the
+  //   number instead of the measurement would be a second rule.
+  //
+  // ⚠ `thinkingOpen` IS IN THE DEPS AND IT IS LOAD-BEARING, not defensive — MEASURED: the
+  //   first run of this suite read `expected […] to include 'max-h-[300px]'` with the
+  //   implementation already written. `CollapsibleContent` does not render its children while
+  //   the fold is SHUT, so at mount `bodyRef.current` is null and there is nothing to measure;
+  //   with the content alone in the deps the effect never ran again once the body appeared.
+  //   D-243-02 keeps the fold CLOSED by default, so that is the ordinary path, not an edge.
+  useLayoutEffect(() => {
+    const el = bodyRef.current
+    if (el) setOverflowing(el.scrollHeight > CLAMP_MAX_PX + 1)
+  }, [reasoningContent, thinkingOpen])
   // ⛔ THE SELF-GUARD. This one line is what makes the tool-conditionality disappear by
   //    construction: the block decides for itself whether it has anything to say, and its
   //    mount site therefore needs to decide nothing.
@@ -148,15 +192,47 @@ export function ThinkingBlock({ reasoningContent, isStreaming }: ThinkingBlockPr
             CHAT-01 is about. The thin rule and its indent STAY: they are the one thing V1
             keeps. Pinned by §5 / §5b of the characterization net. */}
         <div
+          ref={bodyRef}
           data-testid="thinking-body"
-          className="px-3 py-2 text-sm text-muted-foreground leading-relaxed border-l-2 border-muted-foreground/20 ml-3"
+          className={cn(
+            "px-3 py-2 text-sm text-muted-foreground leading-relaxed border-l-2 border-muted-foreground/20 ml-3",
+            // ⛔ A CAP WITH A REVEAL, NEVER A SCROLLER. That distinction IS CHAT-01: the
+            //    shipped body hid its tail behind a scrollbar nested inside a scrolling
+            //    conversation; this hides it behind a control that gives it back.
+            overflowing && !clampExpanded && "relative max-h-[300px] overflow-hidden",
+          )}
         >
           {toParagraphs(reasoningContent).map((paragraph, i) => (
             <p key={i} data-testid="thinking-paragraph" className="mb-[11px] last:mb-0">
               {paragraph}
             </p>
           ))}
+          {/* The fade runs to the MESSAGE BODY background. ⛔ Not to the user bubble's violet:
+              that colour is matched to the bubble's own gradient and is legible only on it,
+              which is one of the four bindings that make `UserBubble` copyable but not
+              mountable here. */}
+          {overflowing && !clampExpanded && (
+            <div
+              aria-hidden
+              data-testid="thinking-fade"
+              className="pointer-events-none absolute inset-x-0 bottom-0 h-[76px] bg-gradient-to-t from-background to-transparent"
+            />
+          )}
         </div>
+        {/* ⭐ GATED ON MEASURED OVERFLOW — THE MOVE THAT MATTERS. Below the threshold this
+            control is not rendered at all, so the median 198-char body looks finished rather
+            than truncated. The two other clamps in this tree mount their toggle
+            unconditionally; D-243-02 names that shape as the thing not to copy. */}
+        {overflowing && (
+          <button
+            type="button"
+            data-testid="thinking-clamp-toggle"
+            onClick={() => setClampExpanded((v) => !v)}
+            className="ml-[28px] mt-[9px] text-xs text-primary underline underline-offset-2"
+          >
+            {clampExpanded ? "Show less" : "Show all of it"}
+          </button>
+        )}
       </CollapsibleContent>
     </Collapsible>
   )
