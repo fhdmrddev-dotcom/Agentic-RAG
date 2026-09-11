@@ -513,3 +513,36 @@ plan is CSS class tokens, one JSX conditional, three test files and registry tex
 5. ⚠ **`sketchComposition.test.tsx`** — if it reds again under a concurrent wave, add it to
    `SEED-171` as a sixth cap-independent flaky suite.
 6. ⚠ **Every other plan in this phase will hit `--reporter=basic`.** Use `--reporter=default`.
+
+---
+
+## Self-Check: PASSED
+
+**Files claimed as created — all 5 present on disk:**
+
+```
+FOUND: frontend/src/components/layout/__tests__/ChatLayout.scrollFrame.test.tsx
+FOUND: frontend/src/components/layout/__tests__/ChatHistoryColumn.clickPath.test.tsx
+FOUND: frontend/src/components/layout/__tests__/ChatHistoryColumn.rowIdentity.test.tsx
+FOUND: .planning/phases/244-the-chat-shell-and-the-composer/244-01-BUG-260911-02-TRACE.md
+FOUND: .planning/phases/244-the-chat-shell-and-the-composer/244-01-SUMMARY.md
+```
+
+**Commits claimed — all 7 present, `git log 223b3ea4f..HEAD`:**
+
+```
+2b8533b96 docs(244-01): SUMMARY — the scroll frame, the click sink and the thread row
+e08c2b448 fix(244-01):  GREEN — the thread row spends its width on the thread
+2002f5623 test(244-01): RED   — the thread row must spend its width on the thread
+85329f554 fix(244-01):  GREEN — the row's invisible click sink, found by tracing BUG-260911-02
+4cdbdd7fa test(244-01): RED   — drive BUG-260911-02's candidates at the components
+d5b3a1257 fix(244-01):  GREEN — bound the chat frame with the four-link min-h-0 chain
+d8035798d test(244-01): RED   — the four-link min-h-0 chain fence
+```
+
+⭐ **The RED→GREEN order is visible in the log itself** — each `test(244-01)` commit is the parent of
+its `fix(244-01)` pair, so the TDD gate sequence is auditable from `git log` rather than asserted
+here. ⚠ **Zero file deletions in any of the seven commits**
+(`git diff --diff-filter=D --name-only` on each → empty).
+
+⛔ **STATE.md and ROADMAP.md were NOT touched** — the orchestrator owns those writes after the wave.
