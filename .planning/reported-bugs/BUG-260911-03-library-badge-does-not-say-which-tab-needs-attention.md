@@ -5,9 +5,9 @@ reported: 2026-09-11
 reported_by: operator
 surface: Agentic-RAG
 severity: minor
-status: open
+status: folded
 affected_areas: [frontend/navigation, frontend/library, UX/legibility, SURF-03]
-folded_into: null
+folded_into: 244
 verified_closed_by: null
 related_seeds: []
 re_open_trigger: null

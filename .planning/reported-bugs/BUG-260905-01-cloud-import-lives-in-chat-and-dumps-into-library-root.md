@@ -3,11 +3,11 @@ id: BUG-260905-01
 title: Cloud import is in the CHAT composer, writes permanently to the Library ROOT with no folder choice — and chat has no local-file upload at all
 surface: Agentic-RAG
 severity: major
-status: open
+status: folded
 reported: 2026-09-05
 reported_by: Operator, manual testing at Phase 229 close
 affected_areas: [chat, composer, connectors, ingestion, documents, library, folders]
-folded_into:
+folded_into: 244
 re_open_trigger:
 related: [SEED-247, ATTACH-01, SEED-213]
 ---

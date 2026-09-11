@@ -4,9 +4,9 @@ title: Thread-history rows cannot be told apart — one icon for every thread ty
 reported: 2026-08-16
 surface: Agentic-RAG
 severity: major
-status: open
+status: folded
 affected_areas: [frontend/navigation, frontend/chat-list, frontend/layout, harness/workflow-ui]
-folded_into: null
+folded_into: 244
 verified_closed_by: null
 related_seeds: [SEED-113, SEED-155]
 re_open_trigger: null

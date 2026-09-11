@@ -3,11 +3,11 @@ id: BUG-260904-05
 title: A cap-paused Deep run disables the composer and then tells you to "start a new message" — and Phase 228 removed the reload that used to free you
 surface: Agentic-RAG
 severity: major
-status: open
+status: folded
 reported: 2026-09-04
 reported_by: Claude, during Phase 228 post-execution verification
 affected_areas: [chat, run-lifecycle, composer, cap_paused, continue]
-folded_into:
+folded_into: 244
 re_open_trigger:
 related: [BUG-260818-03, SEED-180]
 ---

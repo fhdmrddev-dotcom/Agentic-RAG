@@ -102,3 +102,27 @@ populates). It is not a general "attach a file to this chat" affordance.
 strongest evidence in this seed.** Two different file doors sit in the same panel: one that fills a
 template, one that does not exist yet. Whoever builds the attach must name both so the pair reads as
 a choice rather than a puzzle.
+
+---
+
+## ⚠ ROUTED AT PHASE 244 DISCUSS (2026-09-11) — THE FORK IS RESOLVED, AND THIS SEED'S COST ESTIMATE WAS WRONG
+
+**Half B (ephemeral file attach) is folded into `SHELL-04`.** The fork this seed deliberately left open
+was decided as **option (ii), reuse `workspace_files`** (`D-244-01`).
+
+⛔⛔ **THE REASON IT WAS CHEAP IS THAT THIS SEED'S OWN ESTIMATE IS REFUTED AT HEAD — the original is
+kept above rather than edited.** It states: *"To let a **user** attach a file here we'd need a **new
+user-write endpoint + RLS policy** allowing user-origin rows"* and that `backend/app/api/workspace.py`
+*"exposes only **GET** endpoints"*. **Both already exist**, shipped by Phase 100 (TMPL-01):
+`POST /threads/{id}/workspace/files` at `workspace.py:229`, and `workspace_files_insert_own`
+(`FOR INSERT TO authenticated`) in migration 054. Also already present: a 10 MB cap checked three
+times, magic-byte validation, **15** accepted extensions, a TTL read-gate, `ON DELETE CASCADE`, a panel
+renderer, an API client, and a caller in the chat shell (`ChatLayout.tsx:377`).
+
+⭐ **The finding worth keeping: a seed's cost estimate rots exactly like a measured number does.** This
+one was accurate when written and became wrong when an unrelated phase built the endpoint for a
+different reason. A fork is only open until someone measures it.
+
+⚠ **Half C (voice / STT) stays PLANTED** — no code exists, rated LOW, and Phase 244 does not touch it.
+`status` stays `folded` on the strength of half B; **do not read that as closing half C.**
+**Re-open trigger for half C, unchanged:** the operator wants to dictate a prompt by voice.

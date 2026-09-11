@@ -4,9 +4,9 @@ title: The first click on a chat in the list highlights it but does not open it 
 reported: 2026-09-11
 surface: Agentic-RAG
 severity: major
-status: open
+status: folded
 affected_areas: [frontend/chat, frontend/navigation, frontend/chat-list, UX/legibility]
-folded_into: null
+folded_into: 244
 verified_closed_by: null
 related_seeds: []
 re_open_trigger: null
