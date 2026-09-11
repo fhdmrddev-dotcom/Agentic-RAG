@@ -3440,6 +3440,13 @@ const BASELINE = {
   // This is that close. BOTH knobs, for the reason the entry above states.
   "ConnectionFormPanel.sourceTools.test.tsx": 14,
   "ConnectionFormPanel.refreshReceipt.test.tsx": 4,
+  // ── Phase 244 (244-02 T1 / SHELL-04 / D-244-24) ─────────────────────────────────────────
+  // 6 cases, measured — not guessed — on a green run of the suite alone. BOTH knobs in the
+  // SAME COMMIT, for the reason the TARGETS block above states: `src/lib` is not a directory
+  // entry, so a suite there can sit on the wrong side of exactly one knob for a whole phase.
+  // ⭐ The pin was FALSIFIED before it was written: deleting `.pdf` from
+  // `workspaceAllowedExt.ts` turned 3 of the 6 red, and the file was restored md5-identical.
+  "workspaceAllowedExt.lockstep.test.ts": 6,
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -4868,6 +4875,20 @@ const TARGETS = [
   // throttle` on this file returned nothing. It is adopted here, not created here, and it now
   // guards two primitives with OPPOSITE contracts (see docs/HOT-FILE-LEDGER.md).
   "src/__tests__/lib/throttle.test.ts",
+  // ── Phase 244 (244-02 T1 / SHELL-04 / D-244-24) — the allow-list lockstep fence ─────────
+  //
+  // ⛔ FILE-LEVEL BY NECESSITY, and this script has now recorded the same fact about `src/lib`
+  // eleven times: there is NO bare-directory entry for `src/lib` or `src/lib/__tests__`
+  // anywhere in this array, so a suite dropped there runs in NO gate until it is named — here
+  // AND in BASELINE. TARGETS decides what RUNS; BASELINE decides what is GUARDED.
+  //
+  // What it guards: `frontend/src/lib/workspaceAllowedExt.ts` is the single frontend source of
+  // the chat-attachment `accept=` list, and this suite imports `backend/app/api/workspace.py`
+  // with `?raw` to assert SET EQUALITY against the server's four `_*_EXT` category literals.
+  // The invariant it replaces was two source comments pointing at each other plus a third
+  // hand-typed copy in the sketch's COPY.js — enforced by nothing, and about to rot the moment
+  // D-244-24 added `.pdf`.
+  "src/lib/__tests__/workspaceAllowedExt.lockstep.test.ts",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")

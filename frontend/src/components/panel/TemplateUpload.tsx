@@ -8,15 +8,22 @@
  * Hidden file input + a quiet button. accept= is a UX hint only — the server's
  * validate_upload is the real gate (T-100-06-01 / T-151-03). Phase 151 (D-09)
  * widened the allowlist beyond OOXML to real skill assets (scripts, .md/.json/
- * .csv, images), kept in lockstep with workspace.py _ALLOWED_EXT. On success the
- * returned row is optimistically upserted (panel reconciles, no refresh, D-03);
- * errors surface inline — nothing renders in chat (D-04).
+ * .csv, images). On success the returned row is optimistically upserted (panel
+ * reconciles, no refresh, D-03); errors surface inline — nothing renders in chat (D-04).
+ *
+ * ⭐ Phase 244 (SHELL-04 / D-244-24): this docblock used to say the list was "kept in
+ * lockstep with workspace.py _ALLOWED_EXT" — an invariant asked for and enforced by
+ * nothing, one of THREE hand-typed copies. The literal is gone; accept= now reads
+ * WORKSPACE_ACCEPT_ATTR from `@/lib/workspaceAllowedExt`, and
+ * `src/lib/__tests__/workspaceAllowedExt.lockstep.test.ts` parses workspace.py as source
+ * and asserts set equality. The lockstep is a MECHANISM now, not a sentence.
  */
 import { useRef, useState } from "react"
 import { Upload } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useViewingThread, useStreamActions } from "@/providers/StreamsProvider"
 import { uploadWorkspaceTemplate } from "@/lib/api"
+import { WORKSPACE_ACCEPT_ATTR } from "@/lib/workspaceAllowedExt"
 
 export function TemplateUpload() {
   const threadId = useViewingThread()
@@ -52,7 +59,7 @@ export function TemplateUpload() {
       <input
         ref={fileInputRef}
         type="file"
-        accept=".docx,.pptx,.xlsx,.md,.json,.csv,.txt,.py,.js,.sh,.png,.jpg,.jpeg,.gif,.webp"
+        accept={WORKSPACE_ACCEPT_ATTR}
         aria-label="Upload template file"
         tabIndex={-1}
         className="hidden"

@@ -126,8 +126,16 @@ _OOXML_EXT = {".docx", ".pptx", ".xlsx"}
 _TEXT_EXT = {".md", ".json", ".csv", ".txt", ".py", ".js", ".sh"}
 # Images — validated by leading magic bytes (D-09).
 _IMAGE_EXT = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
-# The full set the door accepts — kept in lockstep with TemplateUpload.tsx accept=.
-_ALLOWED_EXT = _OOXML_EXT | _TEXT_EXT | _IMAGE_EXT
+# Phase 244 (SHELL-04 / D-244-24) — PDF, validated by leading magic bytes (%PDF-).
+# Its OWN category on purpose: a PDF is a NUL-bearing binary, so `_TEXT_EXT` would refuse it at
+# `_looks_like_text`, and a bare add to `_ALLOWED_EXT` would fall through all three category
+# branches to the belt-and-braces 422 at the bottom of validate_upload.
+_PDF_EXT = {".pdf"}
+# The full set the door accepts. ⭐ Phase 244: the lockstep with the frontend's accept= is now a
+# MECHANISM, not this comment — `frontend/src/lib/workspaceAllowedExt.ts` is the single frontend
+# source and `src/lib/__tests__/workspaceAllowedExt.lockstep.test.ts` parses these four set
+# literals out of this file and asserts set equality against it.
+_ALLOWED_EXT = _OOXML_EXT | _TEXT_EXT | _IMAGE_EXT | _PDF_EXT
 # OOXML part-name prefix that distinguishes the three OOXML types (defense-in-depth).
 _OOXML_MARKER = {".docx": "word/", ".pptx": "ppt/", ".xlsx": "xl/"}
 
@@ -181,6 +189,20 @@ def _image_magic_ok(ext: str, raw: bytes) -> bool:
     return False
 
 
+def _pdf_magic_ok(raw: bytes) -> bool:
+    """Verify a PDF payload's leading magic bytes (Phase 244, D-244-24).
+
+    Mirrors ``_image_magic_ok``'s shape. Every PDF begins with the five-byte header
+    ``%PDF-`` followed by its version (``%PDF-1.7``, ``%PDF-2.0``). A renamed ``.exe`` /
+    ``.zip`` / arbitrary blob fails, so the extension alone never admits a payload
+    (T-244-02-01). Deliberately NOT a full container parse: the bytes are never handed to a
+    PDF library by this door — they are stored and later read by the agent inside the
+    sandbox — so the check that matters here is "this is not something else wearing a
+    ``.pdf`` name".
+    """
+    return raw[:5] == b"%PDF-"
+
+
 def validate_upload(filename: str, raw: bytes) -> str:
     """Magic-byte / content gate for the widened skill-asset allowlist (D-09, stdlib only).
 
@@ -188,6 +210,13 @@ def validate_upload(filename: str, raw: bytes) -> str:
     ZIP/OOXML branch for ``.docx/.pptx/.xlsx`` and ADDS per-category branches for
     text-ish assets (``.md/.json/.csv/.txt/.py/.js/.sh`` — utf-8-decodable + NUL
     reject) and images (``.png/.jpg/.jpeg/.gif/.webp`` — leading magic bytes).
+
+    Phase 244 (SHELL-04 / D-244-24) adds a FOURTH category, ``.pdf`` (``%PDF-`` magic
+    bytes). It is ruled in rather than discovered: sketch 236 measured that a signed
+    contract PDF is the likeliest first thing anyone attaches to a chat, and the same
+    phase gives ``execute_code`` reach to these bytes at ``/sandbox/attachments/`` where
+    ``pypdf`` already ships in the sandbox image — so a ``.pdf`` is genuinely USABLE, not
+    merely accepted.
 
     The ``len(raw) > MAX_FILE_SIZE`` DoS/office-bomb guard trips BEFORE any parse
     for EVERY type (T-151-03-02) — the route also pre-checks the declared part
@@ -214,6 +243,11 @@ def validate_upload(filename: str, raw: bytes) -> str:
     if ext in _IMAGE_EXT:
         if not _image_magic_ok(ext, raw):
             raise HTTPException(422, f"File contents do not match a {ext} image")
+        return ext
+    # Phase 244 (SHELL-04 / D-244-24) — the FOURTH category. Same voice as the image branch.
+    if ext in _PDF_EXT:
+        if not _pdf_magic_ok(raw):
+            raise HTTPException(422, f"File contents do not match a {ext} document")
         return ext
     # Unreachable (ext already gated against _ALLOWED_EXT); belt-and-braces.
     raise HTTPException(422, f"Unsupported type {ext}")

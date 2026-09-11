@@ -10039,6 +10039,9 @@ cells rot within days.
 | [`frontend/src/components/sources/sourceCapability.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcessourcecapabilityts) | 3 / 2 / 160 | no (2 phases) | ⚠ row STALE THREE TIMES (`0/0/38`, `2/2/98`, `3/2/138`). **240**: the `is_enabled` refusal lands HERE, one predicate for both surfaces (BUG-260908-02) |
 | [`backend/app/services/sources/adapters/mcp_source.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesadaptersmcp_sourcepy) | 9 / 1 / 1271 | no (1 phase) | ⚠ STALE at every close so far (`2/1/643` → `6/1/1022` → `8/1/1259`). SEED-258 removed its `MAX_FILE_BYTES`; `_guard` reads the operator setting at each use |
 | [`frontend/src/components/settings/connectionRowVerdict.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectionrowverdictts) | 2 / 2 / 99 | no (2 phases) | ⚠ **absent for its entire life — row added 239-03, and the ledger gate FAILED on it at this phase's base.** young (221 / 239). The row's verdict, DERIVED never stored. See §239-03 |
+| [`backend/app/api/workspace.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkspacepy) | 11 / 6 / 654 | ⚠ **FIRES** | ⚠ **absent while FIRING for its ENTIRE LIFE at 6 phases — row added 244-02.** honoured by construction (**244**): a FOURTH category set + a fourth branch, the three shipped branches untouched |
+| [`frontend/src/components/panel/TemplateUpload.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspaneltemplateuploadtsx) | 2 / 2 / 91 | no (2 phases) | ⚠ absent for its entire life — row added 244-02 at the SECOND phase, not the third. **244**: the `accept=` literal is GONE; it reads the fenced constant |
+| [`frontend/src/lib/workspaceAllowedExt.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibworkspaceallowedextts) | 1 / 1 / 54 | no (new) | young (created 244-02). Row added AT CREATION, per the `settingsSearchPayload.ts` precedent — an absent row is invisible to G-5 at any count |
 
 
 
@@ -10996,3 +10999,108 @@ interaction end-to-end (`pointerdown` on the real fold trigger), and `§10` is i
 click with no prior scroll-up must leave following intact.
 
 **It inherits `20 / 8 / 300`, and that figure goes stale on the next commit touching the file.**
+
+---
+
+## `backend/app/api/workspace.py`
+
+**`11 / 6 / 654`** (re-derived 2026-09-11, Phase 244 plan `244-02`). Phases: 084 · 087 · 100 · 101.1 · 151 · 163.
+
+⚠ **IT WAS ABSENT FROM THIS LEDGER FOR ITS ENTIRE LIFE, WHILE FIRING.** `244-CONTEXT.md` D-244-20
+asserted *"all of this phase's hot files HAVE ledger rows"* and that claim was **measured FALSE** at
+planning (`244-PATTERNS.md` § C-8): `node scripts/check-hot-file-ledger.cjs 244` exited 1 and named
+this file first. **A claim that is present and WRONG stops the audit**, which is the `App.tsx`
+23-phase failure one file over. The row above is that repair.
+
+**What this file is.** The single net-new workspace WRITE endpoint —
+`POST /threads/{id}/workspace/files` (`upload_template`, Phase 100 / TMPL-01) — plus the validator
+that guards it. Bytes land in `workspace_files` with `kind='template_input'` and
+`expires_at = now + app_settings.template_ttl_hours`.
+
+**The invariants it carries, and which a future edit must not quietly drop:**
+
+- **The DoS/office-bomb guard trips BEFORE any parse, for EVERY type** (T-151-03-02), and the 10 MB
+  cap is enforced **three times** — once on the parser-declared part size **before the body is
+  materialised** (WR-04), once after `.read()`, once inside `validate_upload`.
+- **Extension is never sufficient.** Every category has a content gate: OOXML is a real
+  `zipfile.is_zipfile` + `[Content_Types].xml` + a per-type part-name marker; text is
+  utf-8-decodable and NUL-free; images and PDF are leading magic bytes.
+- **The filename sanitiser (WR-05) exists so ordinary names do not surface a path 422** — it is a UX
+  affordance, not the security boundary; `validate_path` is.
+- **`kind='template_input'` marks untrusted provenance** and is what keeps these bytes off the
+  docxtpl Jinja render path (T-151-03-03). ⛔ Phase 244 deliberately did NOT add a new `kind`:
+  D-244-01 forbids a new table, bucket, RLS policy or migration.
+
+**Phase 244 (`244-02` T1, SHELL-04 / D-244-24) — honoured by construction.** `.pdf` is accepted via
+a **fourth category set** (`_PDF_EXT`) and a **fourth branch** dispatching to `_pdf_magic_ok`
+(`raw[:5] == b"%PDF-"`), mirroring `_image_magic_ok`'s shape. The three shipped branches, the three
+size checks, the sanitiser and the TTL stamp are byte-unchanged — they are type-agnostic and needed
+nothing. ⛔ `.pdf` could NOT join `_TEXT_EXT` (a PDF is NUL-bearing, so `_looks_like_text` refuses
+it) and could not be added bare to `_ALLOWED_EXT` (it would fall past all three branches to the
+belt-and-braces 422 that was previously unreachable). **T-244-02-01 was driven RED** against five
+payloads — a renamed PE, a renamed ZIP, plain text, empty, and `%PDF` one byte short — each asserting
+the sentence is the CONTAINER check's, not the allow-list's.
+
+**⭐ The lockstep became a mechanism here.** This file's own comment said the list was *"kept in
+lockstep with TemplateUpload.tsx accept="*, and `TemplateUpload.tsx`'s docblock said the reverse —
+two comments pointing at each other with a third hand-typed copy in the sketch's `COPY.engine`.
+`frontend/src/lib/__tests__/workspaceAllowedExt.lockstep.test.ts` now parses the four `_*_EXT` set
+literals out of this file with `?raw` and asserts **set equality**, and
+`backend/tests/unit/test_244_workspace_pdf.py` parses the sketch's `COPY.js` and pins the three
+refusal SENTENCES to it. Both fences were falsified against planted defects.
+
+**The named seam, if this file is next refactored:** `validate_upload`'s category dispatch is now
+four parallel `if ext in _X_EXT:` arms that differ only in their predicate and their sentence. A
+`dict[frozenset[str], tuple[Callable, str]]` registry would make a fifth container type DATA rather
+than a fifth branch. ⛔ Not taken at 244 — the phase's charter was `SHELL-04`, not a refactor.
+
+---
+
+## `frontend/src/components/panel/TemplateUpload.tsx`
+
+**`2 / 2 / 91`** (re-derived 2026-09-11, `244-02`). Phases: 100 · 151.
+
+⚠ **Absent for its entire life — row added at the SECOND phase, not the third**, following the
+`settingsSearchPayload.ts` precedent. It does not fire G-5 and the row is not there because it does;
+it is there because **a file with no row is invisible to G-5 at any count, forever, silently.**
+
+**What it is.** The panel-local ephemeral-template upload affordance: a hidden `<input type="file">`
+plus a quiet button, extracted from `FilesSection` at `100-06` because `WorkspacePanel`'s
+`hasActivity` short-circuit made the `FilesSection` copy structurally unreachable on a fresh thread
+(a G-4 lived-experience gap found in live UAT).
+
+**Invariants.** `accept=` is a **UX hint only** — the server's `validate_upload` is the real gate.
+On success the returned row is optimistically upserted and the panel reconciles with no refresh
+(D-03); errors surface **inline** via `role="alert"` and nothing renders in chat (D-04).
+
+**Phase 244 (`244-02` T1).** The hand-typed `accept=".docx,.pptx,…"` literal — copy #2 of three — is
+**gone**; the input reads `WORKSPACE_ACCEPT_ATTR` from `@/lib/workspaceAllowedExt`. The docblock
+sentence claiming the list was "kept in lockstep with workspace.py `_ALLOWED_EXT`" was replaced
+rather than left standing, because it described an invariant nothing enforced. The lockstep fence
+asserts `not.toMatch(/accept="\.[a-z]/)` on this file's source, so a re-introduced literal goes red.
+
+---
+
+## `frontend/src/lib/workspaceAllowedExt.ts`
+
+**`1 / 1 / 54`** — created by `244-02` T1. Row added **at creation**.
+
+**The single frontend source of the attachment allow-list.** Exports `WORKSPACE_ALLOWED_EXT`
+(grouped by the server's own four validator categories, in the server's order) and
+`WORKSPACE_ACCEPT_ATTR` (the comma-joined `accept=` value).
+
+⛔ **This is a UX hint, never a gate.** `backend/app/api/workspace.py`'s `validate_upload` is the
+real boundary; this constant only stops the OS file dialog offering something the door will refuse.
+**If the fence disagrees with the server, THIS FILE IS WRONG** — widen `workspace.py` (with a
+validator for the new container) and let the fence pull this along, never the reverse.
+
+**Its guard.** `src/lib/__tests__/workspaceAllowedExt.lockstep.test.ts` imports `workspace.py` with
+`?raw`, parses `_OOXML_EXT` / `_TEXT_EXT` / `_IMAGE_EXT` / `_PDF_EXT`, asserts each parses NON-EMPTY
+before anything rests on it (a vacuous parse is how a `?raw` fence passes while seeing nothing),
+asserts the server really unions all four into `_ALLOWED_EXT`, and then asserts **set equality**
+against this constant. ⚠ It is in **BOTH** gate knobs — `src/lib` has no bare-directory `TARGETS`
+entry, so an unnamed suite here runs in no gate at all.
+
+⛔ **Do not add an extension here to make a test pass.** The fence was falsified by deleting `.pdf`
+from this file: three of its six cases went red (`expected [ … ](12) to deeply equal [ … ](13)`), and
+the file was restored **md5-identical** (`5a63ea3e3adca51608f084de66ec8219`).
