@@ -28,6 +28,16 @@
  * **Case 3 below is the executable form of that docblock**, and it was driven RED against a
  * planted top-level mount.
  *
+ * ⚠ MEASURED WHILE BUILDING THAT FENCE, and it makes C-3's arithmetic an UNDERSTATEMENT
+ * rather than an overstatement — recorded beside the original, never over it. C-3 costs the
+ * mount at "2 fetches on one row", one per `usePanelReconcile`. **A single `PendingAskStack`
+ * mount was measured firing `getThreadPendingAsks` TWICE** (probe: 1 stack → 2 calls;
+ * 3 stacks → 7). So the hook fires twice per mount, and a top-level mount would be ~4 ask
+ * fetches PER ROW, not 2. The conclusion is unchanged and strengthened; only the constant was
+ * wrong. ⛔ Case 3 therefore asserts an EQUALITY against a one-row control instead of a
+ * literal — a literal encodes a per-mount constant that has already been measured wrong once,
+ * and the property that actually matters is that the cost does not scale with ROW COUNT.
+ *
  * ⚠ WHAT NARROWS IT, measured rather than inherited. The plan's `<interfaces>` says the arm is
  * narrowed by `MessageList.tsx:237` passing `isStreaming={isStreaming && isLastAssistant}`.
  * **Measured: that is not the gate.** `MessageItem.tsx` derives its own
@@ -116,6 +126,16 @@ function wrap(ui: React.ReactElement) {
   )
 }
 
+// ⚠ jsdom implements no `scrollIntoView`, and `MessageList`'s follow-scroll effect calls it on
+// mount — without this stub case 3 dies with `TypeError: … is not a function` before the fetch
+// count can be read. ⛔ It is a MOUNT ENABLER, nothing more: this suite asserts no scroll
+// behaviour, and the project's own note about `MessageList.test.tsx` stubbing this tree-wide
+// (and thereby blinding itself to the scroll effect) is the reason that scope is stated here
+// rather than left for a later reader to discover.
+if (!Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = function () {}
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   localStorage.clear()
@@ -171,7 +191,7 @@ describe("SHELL-03 / BUG-260828-07 — the controls join the cue, inline at the 
     expect(getThreadPendingAsks).not.toHaveBeenCalled()
   })
 
-  it("3 — six rows, ONE ask fetch (the C-3 cost fence)", async () => {
+  it("3 — SIX rows cost exactly what ONE row costs (the C-3 cost fence)", async () => {
     const older: Message[] = Array.from({ length: 5 }, (_, i) => ({
       id: `m-${i}`,
       thread_id: THREAD,
@@ -183,13 +203,26 @@ describe("SHELL-03 / BUG-260828-07 — the controls join the cue, inline at the 
       runStatus: "completed",
     })) as Message[]
 
-    wrap(<MessageList messages={[...older, assistantRow()]} isStreaming threadId={THREAD} />)
+    // ── The control: ONE row, which is the irreducible cost of mounting the stack at all.
+    const single = wrap(
+      <MessageList messages={[assistantRow()]} isStreaming threadId={THREAD} />,
+    )
+    await screen.findByRole("radio", { name: APPROVE })
+    const oneRowCalls = getThreadPendingAsks.mock.calls.length
+    single.unmount()
+    getThreadPendingAsks.mockClear()
 
-    expect(await screen.findByRole("radio", { name: APPROVE })).toBeInTheDocument()
-    // ⛔ ONE. A top-level mount in MessageItem makes this SIX — that plant is what drove this
-    // case RED, and it is the executable form of MessageItem.tsx:180-188's measured
-    // "6 calls, versus 1 with this component".
-    expect(getThreadPendingAsks).toHaveBeenCalledTimes(1)
+    // ── The measurement: SIX rows, only the last of which carries a live ask.
+    wrap(<MessageList messages={[...older, assistantRow()]} isStreaming threadId={THREAD} />)
+    await screen.findByRole("radio", { name: APPROVE })
+
+    // ⛔ THE INVARIANT IS ROW-INDEPENDENCE, not a magic number — deliberately asserted as an
+    // EQUALITY against the one-row control rather than against a literal. A literal would
+    // rot the moment `usePanelReconcile`'s per-mount cost changed, and would then be
+    // "corrected" by someone reading it as drift instead of as the cost multiplying.
+    expect(getThreadPendingAsks.mock.calls.length).toBe(oneRowCalls)
+    // …and concretely below one-per-row, so a regression cannot hide inside the equality.
+    expect(getThreadPendingAsks.mock.calls.length).toBeLessThan(6)
   })
 
   it("4 — a row with no PENDING ask mounts nothing and buys no fetch", async () => {

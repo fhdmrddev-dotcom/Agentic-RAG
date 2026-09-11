@@ -628,7 +628,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | Hot file (FIRING) | commits / phases / lines | Verdict (abridged) |
 |---|---|---|
 | `frontend/src/components/chat/ToolCallPanel.tsx` | 51 / 23 / 351 | ✅ **G-5 DISCHARGED (227-02)** |
-| `frontend/src/components/chat/MessageItem.tsx` | 68 / 33 / 755 | ✅ **G-5 DISCHARGED (227-03)**. NOT re-hollowed (**243-02/04/05**): `useState` 3→3, `useEffect` 0→0, props 5→5; 243-05's 9 deletions are the `StreamingNarration` arm, all accounted |
+| `frontend/src/components/chat/MessageItem.tsx` | 70 / 34 / 803 | ✅ **G-5 DISCHARGED (227-03)**. STILL not re-hollowed (**244-03**): `useState` 3→3, `useEffect` 0→0, props 5→5, one import + one mount inside an arm that was already there |
 | `backend/app/api/threads.py` | 245 / 82 / 1617 | ⚠ row was STALE at `243 / 80 / 1590`. honoured by construction (**244-03**): one pure-read query loses a WHERE predicate, gains a Python guard. ⛔ no writer added |
 | `frontend/src/providers/StreamsProvider.tsx` | 90 / 36 / 4435 | ⚠ row STALE THREE TIMES. honoured by construction (**243-06**): the span became an interval over the reasoning stream; the burst bound rides the EXISTING negative rule |
 | `frontend/src/hooks/useMessages.ts` | 74 / 27 / 127 | extraction due |
@@ -667,7 +667,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/chat/MessageInput.tsx` | 29 / 14 / 643 | honoured by construction (194.1) |
 | `frontend/src/components/chat/MessageList.tsx` | 21 / 9 / 307 | ⚠ row STALE a THIRD time (`19/8/267` → `20/8/292` → `20/8/300`). honoured by construction (**244-01**): `min-h-0` on the ONE `<ScrollArea>` call site |
 | `frontend/src/components/chat/ChatArea.tsx` | 72 / 36 / 710 | honoured by construction (**244-03**): ONE boolean gains `&& !workflowLock.capPaused`. No second branch, no new state — the whole composer chain already reads this one value |
-| `frontend/src/components/panel/PendingAskCard.tsx` | 13 / 7 / 736 | honoured by construction (194.1 / **214**) |
+| `frontend/src/components/panel/PendingAskCard.tsx` | 14 / 7 / 765 | ⚠ row was STALE at `13 / 7 / 736`. UNTOUCHED by 244-03 (`0 0`) — the chat approval is a MOUNT of its shipped `PendingAskStack`, never an edit to the cross-surface shell |
 | `frontend/src/pages/WorkflowRunPage.tsx` | 28 / 9 / 1670 | honoured by construction (200 / 200.1 / 200.2 / **214**) |
 | `frontend/src/components/chat/OutputFileCard.tsx` | 8 / 7 / 219 | honoured by construction (195) |
 | `frontend/src/components/panel/FilesSection.tsx` | 8 / 5 / 334 | honoured by construction (195) |
