@@ -128,6 +128,23 @@ in `244-CONTEXT.md` with how to re-derive each:
 - **`import_single_file` already takes `folder_id`** (Phase 233) — the chat route simply never passes
   one, which is the whole reason imports land at root.
 
+⭐ **G-2 DISCHARGED 2026-09-11 — sketch 236, winner `A — Scope on the chip`** (`7f5420cdc`).
+`.planning/sketches/236-the-file-that-belongs-to-this-chat/index.html` **is the acceptance bar**; its
+`COPY.js` is ported, not re-typed. The `+` menu stays plain and the **chip** carries
+`this chat only · 24h`. ⛔ **The obligation that creates:** the scope word must be rendered by the
+**SENT message**, not only the pending composer chip — a menu is read once and closed, a chip survives
+into the transcript, and a build that puts it solely in the composer ships B's weakness at A's cost.
+B's footer is preserved as the cheapest addition if UAT wants it (`D-244-22..27`).
+
+⚠⚠ **AND THE SKETCH FOUND A SCOPE QUESTION THE PLAN MUST RULE ON: `.pdf` IS NOT ACCEPTED.**
+`_ALLOWED_EXT` is **fifteen** extensions — OOXML ∪ 7 text ∪ 5 image — with **no PDF**, and a signed
+contract PDF is the likeliest first thing anyone attaches. Either accept the gap and carry the
+server's verbatim 422, or add `.pdf` — **not free**, because that door was built for workflow
+templates and nothing in `workspace.py` validates a PDF container. **Assuming either way is the
+failure.** Two more drawn states the build owes: the **expired chip** (the TTL is a read gate, so an
+old transcript holds a chip pointing at nothing) and the **one-item menu** (the cloud item is gated on
+`hasCloudStorage`, so the local item must read alone).
+
 **Locked shape:** attachments reuse `workspace_files`, **read inline, never embedded**, existing TTL +
 cascade, no promote control (D-244-01/03/04) · the agent is told by a **system-prompt line**, which owes
 an **8-row cross-provider measurement** (D-244-02) · the composer's cloud item **re-points at the

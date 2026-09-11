@@ -191,6 +191,45 @@ cost of not reading them is building what exists.
   `ATTENTION_PRODUCERS.length === 1`; `SEED-231` (approvals) stays the registry's *intended* future
   tenant and is **not** taken here, even though `SHELL-03` makes it topical.
 
+### The G-2 sketch — RESOLVED 2026-09-11, acceptance bar set
+
+- **D-244-22 — Sketch 236 winner is `A — Scope on the chip` (operator, 2026-09-11).** The `+` menu
+  stays plain (`Attach a file` / `From cloud storage` / `Tools and connectors`); the **chip** is the
+  only place that says `this chat only · 24h`. ⭐ **The reason, which is also the build obligation:**
+  a menu is read once and closed, **a chip is still on screen while the person types and survives
+  into the transcript**. ⛔ **So the scope word MUST be rendered by the SENT message, not only by the
+  pending composer chip** — a build that puts it solely in the composer has shipped B's weakness with
+  A's cost. The approved mockup at
+  `.planning/sketches/236-the-file-that-belongs-to-this-chat/index.html` **is the acceptance bar**,
+  and `COPY.js` beside it is ported, not re-typed.
+- **D-244-23 — Not taken, recorded rather than dropped.** B's menu header, its footer *"Files here
+  stay in this chat. The Library is for files you keep."*, and its in-modal destination chip stay in
+  the sketch under tab B and in `COPY.b`. ⚠ **If UAT shows people still expect the Library, B's
+  footer is the cheapest single addition** — one line, no layout change — and it **composes with A**
+  rather than replacing it. ⛔ **The confirm button is the last moment before the file exists: keep
+  `Attach`, never `Import`** — `Import` is the Library door's word.
+- **D-244-24 — ⚠⚠ `.pdf` IS NOT ACCEPTED, and the plan must RULE on it rather than discover it.**
+  `_ALLOWED_EXT` (`workspace.py:124-130`) is **fifteen** extensions — OOXML ∪ 7 text ∪ 5 image —
+  with **no PDF**, and a signed contract PDF is the likeliest first thing anyone attaches. Either the
+  phase accepts the gap and the refusal copy carries the server's verbatim 422, or `_ALLOWED_EXT`
+  gains `.pdf` — **not free**, because that door was built for workflow templates
+  (`kind='template_input'`) and nothing in `workspace.py` validates a PDF container. ⛔ **Assuming
+  either way is the failure**; the sketch draws the refusal so it cannot be improvised.
+- **D-244-25 — The expired chip is part of the deliverable, because of D-244-04.** The TTL is a read
+  gate, so a week-old transcript holds a chip pointing at nothing. Ship the drawn state — struck
+  through, dashed, *"No longer available"*, with *"Files attached to a chat are kept for 24 hours."*
+  as the title — never a dead link or a silent disappearance.
+- **D-244-26 — The chip lands in the EXISTING chips row and the one-item menu case is checked.**
+  `ActiveConnectorChips` (`MessageInput.tsx:321-327`) already renders there, so the attachment is a
+  **sibling of the connector chip, not a new region**. ⚠ The cloud item is gated on
+  `hasCloudStorage`, so **a person with no cloud connection sees the local item alone** — it must
+  read correctly by itself, and the sketch draws both present.
+- **D-244-27 — A text-only build contract is NOT sufficient.** The 2026-08-29 correction recorded
+  **200 green assertions** over a surface the operator called *"nothing at all like what we
+  designed"*, because the contract asserted vocabulary and never composition. Sketch 236's README
+  therefore names the **ordered blocks and their required atoms** (chips row · `+` menu · cloud modal
+  · refusal · sent message); assert those by `data-*` hook, driven RED first.
+
 ### Scope, decomposition and the folded reports
 
 - **D-244-16 — Three further open reports FOLD into 244** (operator, at this discuss). All are
@@ -321,6 +360,17 @@ None folded.
 - `frontend/src/providers/StreamsProvider.tsx:4004` — `useAskUserPrompt`, a store selector.
 - `supabase/migrations/054_workspace_files.sql` — the table, the CHECKs, the four RLS policies, the
   `ON DELETE CASCADE`.
+
+### The approved design (G-2 acceptance bar)
+- `.planning/sketches/236-the-file-that-belongs-to-this-chat/index.html` — **the acceptance bar.**
+  Winner `A`; tab B preserves the not-taken arm.
+- `.planning/sketches/236-the-file-that-belongs-to-this-chat/COPY.js` — **port this object; do not
+  re-type strings.** `COPY.engine` holds the real `_ALLOWED_EXT`, `MAX_MB`, `TTL_HOURS`,
+  `PLUS_BTN_TESTID` and the server's three 422 sentences.
+- `.planning/sketches/236-the-file-that-belongs-to-this-chat/README.md` — the three findings, and the
+  **ordered composition blocks** a build must reproduce (D-244-27).
+- `.planning/sketches/MANIFEST.md` § *Phase 244* — why only one sketch, and the per-requirement
+  verdict table.
 
 ### Project rules that bind this phase
 - `CLAUDE.md` → **UAT scoreboard recipe** (the 8-row roster rule, derived from `MODEL_CAPABILITIES`,
