@@ -216,10 +216,21 @@ export function ChatHistoryColumn({
                 CSS-gated — hidden at rest (opacity-0), revealed on hover OR keyboard
                 focus-within (or while the options menu is open) so a keyboard-only user
                 can Tab to them (A11Y-01). The gradient scrim fades a long title out
-                behind the buttons so they never visually collide with the text. */}
+                behind the buttons so they never visually collide with the text.
+
+                ⛔ Phase 244-01 (BUG-260911-02 trace): `pointer-events-none` on the
+                CONTAINER, `pointer-events-auto` on each real control. This container is
+                `absolute inset-y-0 right-0` with a `pl-10` scrim and is painted AFTER the
+                row <button>, so it WINS THE HIT TEST over the right-hand strip of every
+                row — while being invisible at rest. A pointer landing on that strip hit a
+                div with no handler and the thread was simply not selected, though the
+                hover treatment and this very reveal both fired: the reported appearance
+                exactly. ⭐ The sibling run-dot overlay below/above already had the token
+                and says why in its own comment — the ASYMMETRY is what found this, not a
+                guess. ⚠ Removing `pointer-events-auto` from either button disarms it. */}
             <div
               className={cn(
-                "absolute inset-y-0 right-0 flex items-center gap-1 pl-10 pr-1.5 bg-gradient-to-l from-sidebar via-sidebar to-transparent rounded-r-lg",
+                "absolute inset-y-0 right-0 flex items-center gap-1 pl-10 pr-1.5 bg-gradient-to-l from-sidebar via-sidebar to-transparent rounded-r-lg pointer-events-none",
                 "opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100",
                 isMenuOpen && "opacity-100",
               )}
@@ -231,7 +242,7 @@ export function ChatHistoryColumn({
                     e.stopPropagation()
                     void streamActions.stopThread(thread.id)
                   }}
-                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-destructive/40 text-destructive bg-destructive/15 hover:bg-destructive/25 transition-colors"
+                  className="pointer-events-auto flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-destructive/40 text-destructive bg-destructive/15 hover:bg-destructive/25 transition-colors"
                   aria-label="Stop run"
                 >
                   <Square className="h-2.5 w-2.5 fill-current" aria-hidden="true" />
@@ -239,7 +250,7 @@ export function ChatHistoryColumn({
               )}
               <button
                 type="button"
-                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-accent hover:bg-muted cursor-pointer transition-colors"
+                className="pointer-events-auto flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-accent hover:bg-muted cursor-pointer transition-colors"
                 onClick={(e) => {
                   e.stopPropagation()
                   setMenuOpenId(isMenuOpen ? null : thread.id)

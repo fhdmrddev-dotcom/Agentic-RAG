@@ -9,7 +9,7 @@ affected_areas: [frontend/chat, frontend/navigation, frontend/chat-list, UX/legi
 folded_into: 244
 verified_closed_by: null
 related_seeds: []
-re_open_trigger: null
+re_open_trigger: "Live browser on /app, activeView=chat. Hover a chat row and click its RIGHT-HAND THIRD (over the ⋯ scrim) ONCE. If the row highlights and the pane stays on 'How can I help you?', the 244-01 trace §4 (the opacity-0 actions overlay with no pointer-events-none) is CONFIRMED and the shipped fix closes this. If it reproduces when clicking the row's LEFT (title) region instead, §4 is REFUTED and C-6 candidate (a) — activeView/drawer path — is the live one. Trace: .planning/phases/244-the-chat-shell-and-the-composer/244-01-BUG-260911-02-TRACE.md"
 reproduces_on:
   branch: develop
   commit: 993139f39
@@ -77,3 +77,38 @@ That check is the first thing whoever picks this up should do, before assuming a
 snapshot/reconcile path) to populate the bucket; a first click may land before that path is armed,
 leaving the id set and the bucket empty. ⚠ **This was NOT traced in the code** — it is where to look
 first, not what is wrong. Drive it before reporting it.
+
+---
+
+## Traced 2026-09-11 (Phase 244 plan 01 Task 2) — ⛔ STILL `folded`, NOT `closed`
+
+Full trace: `.planning/phases/244-the-chat-shell-and-the-composer/244-01-BUG-260911-02-TRACE.md`.
+Driven suite: `frontend/src/components/layout/__tests__/ChatHistoryColumn.clickPath.test.tsx`.
+
+⛔ **NEITHER CHECK THIS REPORT ASKED FOR WAS RUN.** Production: `could not check — no
+browser-driving tool available to that executor`. `develop`: same. **The report's opening
+instruction is still owed**, and the `re_open_trigger` above names the exact click to make.
+
+**What the trace DID establish, driven against the real components:**
+
+- ⛔ **There is no two-step handler.** One click → one `onSelectThread` call; `useThreads.selectThread`
+  is exactly `setSelectedThread(thread)`. The `setViewingThread` hypothesis above is about the
+  *message bucket*, not about selection, and selection is where the symptom was attributed.
+- ⛔ **"Highlighted AND showing the welcome pane" is self-inconsistent as selection state.** Both read
+  the SAME value (`ChatArea.tsx:472` `if (!thread)` vs the row's `selectedThread?.id === thread.id`).
+  ⭐ **The highlight was almost certainly HOVER** — an un-selected row carries `hover:bg-accent/40`
+  and the `⋯` is revealed by `group-hover`. **The symptom is therefore "the click did not select at
+  all", not "selected but not opened".**
+- ⭐ **Leading candidate, named with file:line:** `ChatHistoryColumn.tsx`'s always-rendered
+  `opacity-0` actions container is `absolute inset-y-0 right-0` with a `pl-10` scrim, painted after
+  the row `<button>` — **an invisible click sink over the right-hand strip of every row.** Its
+  documented sibling (the SEED-064 run dot) carries `pointer-events-none`; this one did not. **The
+  asymmetry is the evidence.**
+- ✅ **Fixed anyway, as a defect in its own right** (`pointer-events-none` on the container,
+  `pointer-events-auto` on both controls), driven RED first. ⛔ **This is NOT claimed to close this
+  report** — jsdom cannot hit-test, so the browser confirmation is what the re-open trigger asks for.
+
+⚠ **One inference in this report does not hold.** *"Clicking via the element reference (`ref`) …
+so it is not a hit-test or pointer-target problem"* — a synthetic click on a WRAPPER never reaches a
+handler bound to a CHILD (driven). A failing ref click is therefore consistent with a target problem
+rather than evidence against one.

@@ -3453,6 +3453,13 @@ const BASELINE = {
   // inventory BY FILE so a third, UNBOUNDED call site cannot arrive silently. All five were
   // driven RED against the shipped tree before the classes were added.
   "ChatLayout.scrollFrame.test.tsx": 5,
+  // `ChatHistoryColumn.clickPath.test.tsx` — 10 cases. The BUG-260911-02 trace, driven
+  // against the real components: C-6's candidates (b) and (c) refuted, plus the FOURTH
+  // candidate C-6 did not list (the always-rendered `opacity-0` actions overlay had no
+  // `pointer-events-none` while its documented sibling did). One case was RED on the shipped
+  // tree; the rest were green and are the trace's own controls. ⚠ jsdom does no hit-testing,
+  // so this suite does NOT close the bug — it stays `folded`, with a browser re-open trigger.
+  "ChatHistoryColumn.clickPath.test.tsx": 10,
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -4888,6 +4895,11 @@ const TARGETS = [
   // `src/components/workflows`), so this suite runs in NO gate until it is named here AND
   // pinned in BASELINE above. Both were added in the same commit as the class changes.
   "src/components/layout/__tests__/ChatLayout.scrollFrame.test.tsx",
+  // ⚠ NOTE FOR A LATER READER: `ChatHistoryColumn.test.tsx` and `.a11y.test.tsx` have shipped
+  // since Phase 156 and are in NEITHER knob — `grep -c ChatHistoryColumn` on this file read
+  // **0** before Phase 244. 244-01 adopts its own two suites; the two inherited ones stay
+  // unadopted here because this plan did not author them and cannot vouch for their stability.
+  "src/components/layout/__tests__/ChatHistoryColumn.clickPath.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
