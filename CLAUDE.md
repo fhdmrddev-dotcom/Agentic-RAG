@@ -599,7 +599,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/chat/ToolCallPanel.tsx` | 51 / 23 / 351 | ✅ **G-5 DISCHARGED (227-02)** |
 | `frontend/src/components/chat/MessageItem.tsx` | 67 / 33 / 726 | ✅ **G-5 DISCHARGED (227-03)**; ⚠ row was STALE at `62/33/702`. NOT re-hollowed (**243-02**): `useState` 3→3, `useEffect` 0→0, props 5→5, 0 deleted — a MOUNT, measured |
 | `backend/app/api/threads.py` | 243 / 80 / 1590 | extraction TAKEN 2026-08-17 · honoured by construction (**214**) |
-| `frontend/src/providers/StreamsProvider.tsx` | 85 / 34 / 4144 | honoured by construction (194.1 / **214**) |
+| `frontend/src/providers/StreamsProvider.tsx` | 89 / 36 / 4325 | ⚠ row was STALE at `85/34/4144`. honoured by construction (**243-03**): 2 delta callbacks coalesced INSIDE the existing factory — closure state, not a 6th concern |
 | `frontend/src/hooks/useMessages.ts` | 74 / 27 / 127 | extraction due |
 | `backend/app/services/anthropic_service.py` | 11 / 10 / 354 | adapter-pattern audit due |
 | `backend/app/services/embedding_service.py` | 9 / 5 / 354 | ⚠ absent for its entire life at 5 phases — row added 236 (SC#2) |
@@ -632,7 +632,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/harness_engine.py` | 54 / 20 / 3135 | honoured by construction (194 / **214**) |
 | `frontend/src/components/chat/RunCard.tsx` | 28 / 14 / 710 | ⭐ **G-5 DISCHARGED (243-02)** — the reasoning fold left for `ThinkingBlock.tsx`, `-39/+20`, one `useState` fewer. ⚠ row was STALE at `26/12/728`. State 2 stayed, by decision |
 | `frontend/src/components/chat/MessageInput.tsx` | 29 / 14 / 643 | honoured by construction (194.1) |
-| `frontend/src/components/chat/MessageList.tsx` | 19 / 8 / 267 | honoured by construction (194.1) |
+| `frontend/src/components/chat/MessageList.tsx` | 20 / 8 / 292 | ⚠ row was STALE at `19/8/267`. **243-03 did NOT modify it** — the scroll rate fell from upstream (61→13); D-17’s `RunStatusStrip` block byte-unchanged |
 | `frontend/src/components/chat/ChatArea.tsx` | 70 / 35 / 678 | ⚠ row was STALE at `67 / 32 / 595` |
 | `frontend/src/components/panel/PendingAskCard.tsx` | 13 / 7 / 736 | honoured by construction (194.1 / **214**) |
 | `frontend/src/pages/WorkflowRunPage.tsx` | 28 / 9 / 1670 | honoured by construction (200 / 200.1 / 200.2 / **214**) |

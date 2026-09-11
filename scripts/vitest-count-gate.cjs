@@ -2940,6 +2940,41 @@ const BASELINE = {
   // so retuning the window without re-deriving them is caught here rather than silently
   // leaving a comment that lies.
   "streamsProvider_243_cadence.test.tsx": 9,
+
+  // ── Phase 243 (243-03 / CHAT-03 / D-243-16) — the scroll effect's ONLY behavioural fence ─
+  //
+  // ⚠ 8 was READ FROM THIS SCRIPT'S OWN `actual` COLUMN on the run that first executed the
+  // file (printed as `— 8 new`), never hand-counted.
+  //
+  // What is UNGUARDED without this entry: EVERYTHING about `MessageList.tsx:141-176`.
+  // `MessageList.test.tsx` stubs `HTMLElement.prototype.scrollIntoView` to a NO-OP tree-wide
+  // (`:61-65`), so until this file existed nothing in this tree could see how many times that
+  // effect scrolls, or with which `behavior`. This suite installs a SPY instead. §3 pins the
+  // residual CHAT-03 defect (a sub-threshold nudge up must not be re-armed by a scroll nobody
+  // produced) and §5 pins its MIRROR (a deliberate flick back down MUST still re-arm) — the
+  // pair is the design, and a "fix" that drops either half is what this count catches. §7 is
+  // the only case here that drives the REAL producer, and it is what makes D-243-04's claim a
+  // measurement: 60 deltas produced 61 scrolls before the coalescing and 13 after.
+  //
+  // ⚠ Every case runs on a 54-message thread. A 3-message fixture cannot show the failure
+  // mode the ROADMAP names ("works on a short thread and fails on a long one").
+  "MessageList.scroll.test.tsx": 8,
+
+  // ── Phase 243 (243-03 / CHAT-02) — ADOPTED, NOT CREATED, and it was ungated since 068.5 ──
+  //
+  // ⛔ THIS FILE ALREADY EXISTED AND WAS IN NEITHER KNOB. `grep -n "throttle"` on this script
+  // returned NOTHING before 243-03 — `lib/throttle.ts` shipped at Phase 068.5 with a suite
+  // that has guarded nothing for the whole of its life. Registered in both knobs here.
+  //
+  // ⚠ 11 was READ FROM THIS SCRIPT'S OWN `actual` COLUMN (printed as `— 11 new`). It is 4
+  // inherited cases plus 7 added by 243-03, and the split matters: the 4 pin `makeThrottle`'s
+  // trailing-only, last-write-wins contract, which is CORRECT for its one call site (the
+  // localStorage cache writer) and would DROP TOKENS on the delta path. The 7 pin the new
+  // `makeAccumulatingCoalescer`, whose contract is the opposite on both axes.
+  //
+  // ⛔ A future editor who "unifies" the two primitives breaks one of the two call sites
+  // silently. A decrease here is most cheaply achieved by exactly that.
+  "throttle.test.ts": 11,
   // ══════════════════════════════════════════════════════════════════════════════
   // Added at Phase 214's CLOSE (plan `214-15`), collected here AFTER every file
   // exists — a `BASELINE` key naming a path that does not yet exist makes this gate
@@ -4697,6 +4732,14 @@ const TARGETS = [
   // are NAMED rather than left unlooked-for. An unadopted suite someone wrote down is a
   // different thing from one nobody noticed.
   "src/__tests__/providers/streamsProvider_243_cadence.test.tsx",
+  // ⚠ The scroll suite below is a SEPARATE FILE from `MessageList.test.tsx` on purpose:
+  // that one stubs `scrollIntoView` to a NO-OP tree-wide (`:61-65`), so nothing mounted under it
+  // can see the scroll effect at all. This is the ONLY behavioural coverage that effect has.
+  "src/__tests__/components/chat/MessageList.scroll.test.tsx",
+  // ⚠ The throttle suite below ALREADY EXISTED and was ENTIRELY UNGATED before 243-03 — `grep -n
+  // throttle` on this file returned nothing. It is adopted here, not created here, and it now
+  // guards two primitives with OPPOSITE contracts (see docs/HOT-FILE-LEDGER.md).
+  "src/__tests__/lib/throttle.test.ts",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")

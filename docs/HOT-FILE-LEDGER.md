@@ -9527,7 +9527,7 @@ cells rot within days.
 | [`frontend/src/components/chat/ToolCallPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattoolcallpaneltsx) | 51 / 23 / 351 | **FIRES** | ✅ **G-5 DISCHARGED (227-02)** — extracted ToolCallDetails, StepRow, toolStepDerivation (1019 → 351 lines) |
 | [`frontend/src/components/chat/MessageItem.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageitemtsx) | 67 / 33 / 726 | **FIRES** | ✅ **G-5 DISCHARGED (227-03)**; ⚠ row was STALE at `62/33/702`. NOT re-hollowed (**243-02**): `useState` 3→3, `useEffect` 0→0, props 5→5, 0 deleted — a MOUNT, measured |
 | [`backend/app/api/threads.py`](docs/HOT-FILE-LEDGER.md#backendappapithreadspy) | 243 / 80 / 1590 | **FIRES** | extraction TAKEN 2026-08-17 · honoured by construction (**214**) — one launch-inputs field on a request model it already owns |
-| [`frontend/src/providers/StreamsProvider.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcprovidersstreamsprovidertsx) | 85 / 34 / 4144 | **FIRES** | honoured by construction (194.1 / **214**) — one run field added to the wire type |
+| [`frontend/src/providers/StreamsProvider.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcprovidersstreamsprovidertsx) | 89 / 36 / 4325 | **FIRES** | ⚠ row was STALE at `85/34/4144`. honoured by construction (**243-03**): two callbacks coalesced inside the existing factory — closure state, not a sixth concern |
 | [`frontend/src/hooks/useMessages.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusemessagests) | 74 / 27 / 127 | ⚠ **FIRES** | extraction due |
 | [`backend/app/services/anthropic_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesanthropic_servicepy) | 11 / 10 / 354 | ⚠ **FIRES** | adapter-pattern audit due |
 | [`frontend/src/components/workflows/WorkflowCanvas.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsworkflowcanvastsx) | 31 / 9 / 1708 | **FIRES** | honoured by construction (199 / 200 / **214**) — 214-04 widened the panel and touched no node logic |
@@ -9560,7 +9560,9 @@ cells rot within days.
 | [`frontend/src/components/chat/RunCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatruncardtsx) | 28 / 14 / 710 | **FIRES** | ⭐ **G-5 DISCHARGED (243-02)** — the reasoning fold left for `ThinkingBlock.tsx`, `-39/+20`, one `useState` fewer. ⚠ row was STALE at `26/12/728`. State 2 stayed, by decision |
 | [`frontend/src/components/chat/ThinkingBlock.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatthinkingblocktsx) | 1 / 1 / 117 | no | ⚠ **row at ONE phase BY DESIGN** — a file absent from this list is invisible to G-5 at any count (`App.tsx`: 23 phases). Invariant: **exactly one reasoning renderer** |
 | [`frontend/src/components/chat/MessageInput.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageinputtsx) | 29 / 14 / 643 | **FIRES** | honoured by construction (194.1) |
-| [`frontend/src/components/chat/MessageList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessagelisttsx) | 19 / 8 / 267 | **FIRES** | honoured by construction (194.1) |
+| [`frontend/src/components/chat/MessageList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessagelisttsx) | 20 / 8 / 292 | **FIRES** | ⚠ row was STALE at `19/8/267`. **243-03 did NOT modify it** — the scroll rate fell from upstream; `RunStatusStrip`s D-17 block untouched |
+| [`frontend/src/hooks/useFollowScroll.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusefollowscrollts) | 3 / 2 / 265 | does not fire | ⛔ **NO ROW FOR ITS ENTIRE LIFE — added 243-03.** A re-arm now also refuses when the last gesture was UP; three clocks/conditions, none collapsible |
+| [`frontend/src/lib/throttle.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibthrottlets) | 2 / 2 / 108 | does not fire | ⛔ **NO ROW FOR ITS ENTIRE LIFE — added 243-03.** TWO opposite primitives on purpose; ⛔ never unify them — one of the two call sites breaks silently |
 | [`frontend/src/components/chat/ChatArea.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatchatareatsx) | 70 / 35 / 678 | **FIRES** | ⚠ row was STALE at `67 / 32 / 595` — **+3 phases** unrecorded. honoured by construction (194.1 / **235**) |
 | [`frontend/src/components/panel/PendingAskCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelpendingaskcardtsx) | 13 / 7 / 736 | **FIRES** | honoured by construction (194.1 / **214**) — ⚠ it still renders `Needs you`; `stepIdentityVocabulary`'s six PAUSE sentences reach it from nothing (`SEED-219`) |
 | [`frontend/src/pages/WorkflowRunPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowrunpagetsx) | 28 / 9 / 1670 | **FIRES** | honoured by construction (200 / 200.1 / 200.2 / **214**) — it resolves the step identity ONCE and its children render it |
@@ -10482,3 +10484,175 @@ not the index.
 into `supabase/migrations/` nor into `full-schema.sql` — production's is Supabase Auth's own, and a
 hand-rolled one would be an authentication bypass on the 156 call sites that ask it who the caller
 is.
+
+---
+
+## `frontend/src/hooks/useFollowScroll.ts`
+
+**Re-derived 2026-09-11 (`243-03`):** `3 commits / 2 phases / 265 L` · quick-task buckets excluded: none · **G-5 does NOT fire** (2 phases vs threshold 3).
+
+⛔ **THIS FILE HAD NO ROW AT ALL UNTIL THIS COMMIT, AND THE COUNT IS NOT WHY THE ROW EXISTS.**
+`node scripts/check-hot-file-ledger.cjs 243` reported `[no-row]` for it. A file missing from the
+scan list is invisible to its own guardrail **at any commit count, forever** — `App.tsx` went 23
+phases like that, `NavPanel.tsx` 11, `config.py` its entire life. The row is added at 2 phases so
+that the third one cannot be the phase that discovers the omission.
+
+⚠ **AND IT IS THE FILE `BUG-260823-01` IS ABOUT.** G-5 has been structurally absent on the file
+carrying the chat surface's single most-felt defect, across both attempts to fix it.
+
+### Phases touched (verbatim)
+
+`095` (`53b6128b6`, 2026-06-05 — `feat(095-04)`, the follow/release/re-arm/jump machine, D-03) ·
+`243` (`243-03`, 2026-09-11). ⚠ **The commit between them is NOT phase-tagged and that matters:**
+`64357e979` (2026-09-04, `fix(chat): stop the streaming run dragging a scrolled-away reader
+(BUG-260904-02)`) is a **dated quick task**, raised during Phase 227's review, and it landed
+**7.5 hours before Phase 228 was scoped** (228's first commit is `7a5207dfd` at 19:34; this one is
+11:46). It is therefore counted in the `chat` bucket, not a numeric one — which is exactly how a
+substantial rewrite of a hot file can happen with no phase to hang an audit on. Re-derive with
+`git log --oneline -- frontend/src/hooks/useFollowScroll.ts | wc -l` → 3.
+
+### The two clocks, and why there are two (verbatim from the file, so nobody collapses them)
+
+> *"a gesture may cancel our claim for the purpose of LETTING GO, and may never cancel it for the
+> purpose of TAKING HOLD again."*
+
+- `programmaticUntilRef` — **cancellable**, gates the **RELEASE**. A user gesture zeroes it, because
+  their scroll must always be able to free them, even mid-animation.
+- `hardProgrammaticUntilRef` — **uncancellable**, gates the **RE-ARM**. Measured in a browser
+  2026-09-04 on a run with a live tool step: with only the cancellable timer, scrolling up still
+  dragged the reader back **+1136 px** (5661 → 6797) with the chip already gone.
+- `PROGRAMMATIC_SCROLL_SETTLE_MS = 900` and `USER_GESTURE_WINDOW_MS = 1500` both carry
+  browser-measured comments. ⛔ Neither is a free parameter; a plan that widens either owes the
+  measurement.
+
+### G-5 status + what Phase 243 changed
+
+**Does not fire.** `243-03` added **one ref and one clause**, at the line D-243-05 predicted
+(`:196-201`): a re-arm additionally requires that the **last classified gesture was not `"up"`**.
+
+⚠ **THE DEFECT IT CLOSES IS NOT THE ONE `BUG-260823-01` DESCRIBES.** That report blames a
+programmatic-scroll flag cleared on the next animation frame; that code has not existed since
+`64357e979`. The residual is narrower: a reader who nudges up by **less than
+`FOLLOW_SCROLL_THRESHOLD`** releases the pin and is still, by geometry, *near the bottom* — so
+between the 900 ms hard clock and the 1500 ms gesture window (**~600 ms**) any scroll event re-pinned
+them, including ones no person produced. **Driven RED before it was fixed**, at both levels:
+`useFollowScroll.test.ts` case A (`expected true to be false`) and
+`MessageList.scroll.test.tsx` §3.
+
+⚠ **THE CADENCE CHANGE IN `243-03` SLIGHTLY WIDENS THAT WINDOW RATHER THAN NARROWING IT** — the
+effect now refreshes the hard clock up to 60 ms less often, so the gap can reach ~660 ms. The fix is
+needed *more* after the coalescing, not less. Recorded because the opposite would have been the
+comfortable assumption.
+
+⛔ **THE MIRROR IS BINDING.** A deliberate flick back DOWN that coasts to the bottom MUST still
+re-arm, and touch drags / scrollbar grabs (whose direction the event does not carry) arrive as
+`"unknown"` and must keep falling through to the geometry. Both are fenced beside the defect case in
+both suites. **A fix that passes one by breaking the other is a regression.**
+
+**Per G-5 the next phase adding a genuinely second concern owes a refactor recommendation FIRST.**
+No seam is proposed: at 265 lines this is one state machine with one job, and its size is comments
+recording three measured fixes rather than logic. It inherits `3 / 2 / 265`.
+
+---
+
+## `frontend/src/lib/throttle.ts`
+
+**Re-derived 2026-09-11 (`243-03`):** `2 commits / 2 phases / 108 L` · quick-task buckets excluded: none · **G-5 does NOT fire** (2 phases vs threshold 3).
+
+⛔ **NO ROW FOR ITS ENTIRE LIFE UNTIL THIS COMMIT** — `check-hot-file-ledger.cjs 243` reported
+`[no-row]`. Added for the same reason as its neighbour above: absence from the scan list is not a
+weak guardrail, it is no guardrail.
+
+### Phases touched (verbatim)
+
+`068.5` (the trailing-edge throttle, for the localStorage cache writer) · `243` (`243-03`).
+
+### ⛔ THE INVARIANT: TWO OPPOSITE PRIMITIVES, ON PURPOSE. DO NOT UNIFY THEM.
+
+This 108-line file exports **two** coalescers whose contracts are the **opposite of each other on
+both axes**, and each is correct for exactly one call site:
+
+| | `makeThrottle` (068.5) | `makeAccumulatingCoalescer` (243-03) |
+|---|---|---|
+| leading edge | **no** (`:8-9`, deliberate — N writes per burst would defeat the batch) | **yes** (a reply's first character must not wait a window) |
+| what a window keeps | **the LAST call only** (`:19,28` — `lastArgs = args`) | **everything** (it carries NO ARGUMENTS; the buffer is the caller's closure) |
+| call site | the localStorage cache writer, `StreamsProvider.tsx:3525` | the delta path, `makeStreamCallbacks` |
+
+⚠ **A future editor who "unifies" these breaks ONE of the two call sites SILENTLY.** Giving
+`makeThrottle` a leading edge reintroduces the per-burst write storm 068.5 exists to prevent.
+Giving the delta path last-write-wins **drops tokens** — and every cadence measurement still passes,
+which is why `streamsProvider_243_cadence.test.tsx` §2/§3 reconstruct the exact concatenation of 60
+individually distinguishable deltas rather than counting calls.
+
+### G-5 status
+
+**Does not fire.** `243-03` was **purely additive**: `git diff` over this file has **zero deletions**,
+so `makeThrottle`'s body is byte-unchanged and its four existing cases pass untouched. The new export
+follows `useLiveValidation.ts:11-22`'s recorded precedent — *reuse the SHAPE, not the function* — and
+its docblock names `makeThrottle`, states which half is reused and states both differences.
+
+**Per G-5 the next phase adding a genuinely second concern owes a refactor recommendation FIRST.**
+No seam proposed; a third primitive here would be the trigger to ask whether this is a file or a
+folder. It inherits `2 / 2 / 108`.
+
+---
+
+## `frontend/src/providers/StreamsProvider.tsx` — `243-03` (CHAT-02)
+
+**Re-derived 2026-09-11:** `89 / 36 / 4325` · quick-task buckets excluded: `260529`. ⚠ **The scan-list
+row read `85 / 34 / 4144` — stale by two phases**, which is this ledger's own recurring finding paid
+for again on the file that documents it about itself.
+
+**G-5 FIRES (36 phases vs threshold 3) — honoured BY CONSTRUCTION, and measured rather than asserted.**
+`useState[(<]` **0 → 0** · `useEffect(` **8 → 8** · exported symbols unchanged except one additive
+member. What landed is **closure state inside an already-existing factory**, beside the shipped
+`let currentIteration = 0` — two string buffers, one flusher and one coalescer — so it is **not a
+sixth concern** beside the five this file's section already names (per-surface message buckets, SSE
+subscription lifecycle, mount/derive reconcile, `sendMessage`'s kickoff path, run-liveness slices).
+
+⚠ **ONE SURPRISE, FOUND BY A DRIVEN RED RATHER THAN BY READING, AND IT IS THE USEFUL PART.**
+Coalescing the two delta callbacks alone **broke Anthropic's interleaved text/tool_use ordering**
+(`StreamsProvider.anthropic-ordering.test.ts`, B-260519-01): with `text3` still in the buffer, the
+tool block that FOLLOWS it was written first. Measured as
+`expected 'text1text2' to be 'text1text2text3'`. **Every structural callback must drain the buffer
+before its body runs** — implemented as ONE generic wrapper over all 47 callbacks stated in the
+negative (*the only things that do not flush are the two that FILL the buffer*), because an explicit
+flush in each is both invasive and forgettable and the 48th would silently re-open it.
+
+⛔ **THE UPDATE SHAPE DID NOT MOVE.** `grep -c "prev.map"` is **44 → 44**. `MessageItem.tsx:213-219`
+records that the `memo` contract depends on replace-not-push identity; coalescing the CADENCE was in
+scope, mutating in place is D-243-08's red line.
+
+⛔ **THE THREE `onTerminal` CALL SITES EACH GAINED ONE LINE, AND THE REASON IS ORDERING.** All three
+replace `callbacks.onTerminal` with a wrapper that calls the original **LAST** (`:1642`, `:2090`,
+`:2564`), and two of those bodies reconcile the message from the server — a flush landing afterwards
+would append the buffered tail onto replaced content. Each wrapper therefore calls
+`callbacks.flushDeltas()` first, and the explicit `: StreamCallbacks` annotation was dropped at each
+so the additive member survives inference.
+
+**It inherits `89 / 36 / 4325`, and that figure goes stale on the next commit touching the file.**
+
+---
+
+## `frontend/src/components/chat/MessageList.tsx` — `243-03` (CHAT-03)
+
+**Re-derived 2026-09-11:** `20 / 8 / 292` · no quick-task buckets. ⚠ **The scan-list row read
+`19 / 8 / 267` — stale since `194.1`.**
+
+⛔ **`243-03` DID NOT MODIFY THIS FILE, AND THAT IS THE FINDING RATHER THAN AN OMISSION.** The plan
+named it in `files_modified` and the effect at `:141-176` is the line CHAT-02 and CHAT-03 share — but
+the cadence fix landed upstream in the producer and the scroll fix landed downstream in the hook, so
+the shared line needed no edit at all. **Measured:** 60 real deltas driven through
+`makeStreamCallbacks` into this component produced **61** `scrollIntoView` calls before the coalescing
+and **13** after, with `useFollowScroll.ts` held constant across both runs
+(`MessageList.scroll.test.tsx` §7). That pair is D-243-04's claim — *they are one mechanism* — as a
+measurement instead of a sentence.
+
+⚠ **AND THE EFFECT HAD NO BEHAVIOURAL COVERAGE AT ALL UNTIL THIS PLAN.** `MessageList.test.tsx:61-65`
+stubs `scrollIntoView` to a **no-op** tree-wide, so no suite in this tree could see how many times the
+effect scrolls or with which `behavior`. `MessageList.scroll.test.tsx` is a separate file for exactly
+that reason and installs a **spy**; its cases run on a **54-message** thread, because the ROADMAP names
+*"works on a short thread and fails on a long one"* as this surface's failure mode.
+
+**D-17 re-verified, not assumed:** the `RunStatusStrip` floating-chip block is byte-unchanged — the
+whole file is. **It inherits `20 / 8 / 292`.**

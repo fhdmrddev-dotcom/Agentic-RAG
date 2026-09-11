@@ -7,9 +7,12 @@ severity: major
 status: folded
 affected_areas: [frontend/streaming, frontend/chat, UX/scroll]
 folded_into: "243"        # CHAT-03, at /gsd:plan-phase 243, 2026-09-11
-verified_closed_by: null
+verified_closed_by: null  # 243-03 fixed a residual under DRIVEN vitest fences. NOT `closed`:
+                          # this file records TWO prior fixes that measured clean on synthetic
+                          # events and were refuted by a real mouse wheel. Closure needs the
+                          # real-wheel UAT row (243-VALIDATION.md), not a unit test.
 related_seeds: [SEED-008]
-re_open_trigger: null
+re_open_trigger: "A reader is dragged to the live edge during a run on a real mouse/trackpad after 243-03 ships, OR the 243 UAT row for a long streaming thread is not driven before the phase closes"
 reproduces_on:
   branch — develop
   commit — f17f9581
@@ -129,3 +132,78 @@ establishing what still reproduces at HEAD. If nothing does, CHAT-03 closes as *
 and this file is closed with the discharging commit named — **and that is a legitimate outcome, not
 a failure.** See `243-CONTEXT.md` → **D-243-05** for the candidate residual that must be checked
 rather than assumed (a ~600 ms window between the 900 ms hard clock and the 1500 ms gesture window).
+
+---
+
+## ⚠ SECOND CORRECTION 2026-09-11 (`243-03`) — A RESIDUAL DID REPRODUCE, AND IT IS NOT THE ONE ABOVE. Both earlier texts are kept verbatim.
+
+`D-243-05` named three legitimate outcomes for the RED drive this report was routed into. **The
+outcome was #3: the residual is real but DIFFERENT from the report.** Recorded beside the original
+rather than over it, because *why* the report was wrong is the useful part and *why it was still
+pointing at something* is the second useful part.
+
+### The discharging commit, established by measurement rather than asserted
+
+`git log -S "hardProgrammaticUntilRef" -- frontend/src/hooks/useFollowScroll.ts` returns exactly one
+commit, and the file has only three in its life:
+
+| sha | date | subject |
+|---|---|---|
+| `53b6128b6` | 2026-06-05 | `feat(095-04): useFollowScroll follow/release/re-arm/jump state machine (D-03)` |
+| **`64357e979`** | **2026-09-04** | **`fix(chat): stop the streaming run dragging a scrolled-away reader (BUG-260904-02)`** |
+| `243-03` | 2026-09-11 | this work |
+
+**`64357e979` is the commit that deleted every line this report blames**, and it landed **twelve
+days** after this report was filed (`2026-08-23`), while the report sat `status: open` throughout.
+
+⚠ **AND IT IS NOT A PHASE 228 COMMIT, although `243-CONTEXT.md` D-243-05 and the correction above
+both say so.** Measured: it is timestamped `2026-09-04 11:46`, and Phase 228's first commit
+(`7a5207dfd docs(228): capture phase context`) is `19:34` the same day — **7 hours 48 minutes
+later**. `64357e979` is an untagged `fix(chat)` **quick task raised during Phase 227's review**
+(`BUG-260904-02`'s own frontmatter: `verified_closed_by: "quick task 260904"`). The attribution is
+corrected here rather than upstream, in the register that owns it. **The substance of D-243-05 is
+unaffected** — the code was replaced before this report was ever acted on.
+
+### What still reproduced at HEAD, driven before anything was written
+
+Two levels, both RED **before** any production edit, on the code that exists today:
+
+- `__tests__/hooks/useFollowScroll.test.ts` — *"⭐ A — an UPWARD gesture, then a near-bottom scroll
+  1000 ms later: the pin must NOT re-arm"* → **`AssertionError: expected true to be false`**.
+- `__tests__/components/chat/MessageList.scroll.test.tsx` §3 — the same sequence through the real
+  component on a **54-message** thread → the Jump-to-live chip **vanished**, i.e. the pin re-armed.
+
+**The mechanism, which this report did not and could not name:** a reader who nudges up by **less
+than `FOLLOW_SCROLL_THRESHOLD` (120 px)** releases the pin and is still, by geometry, *near the
+bottom*. `beginProgrammaticScroll` had set the uncancellable clock to `now + 900` on the last token
+before the nudge, and `USER_GESTURE_WINDOW_MS` runs to `now + 1500` — so for roughly **600 ms** BOTH
+re-arm conditions hold and **any** scroll event re-pins them. Scroll events are not produced only by
+people: scroll anchoring as the streaming content above reflows, a focus move, a late layout shift.
+
+### The fix, and the mirror that constrains it
+
+One ref and one clause, at `useFollowScroll.ts:196-201` — **the exact line D-243-05 predicted**. A
+re-arm now additionally requires that **the last classified gesture was not `"up"`**. That is the
+file's own stated principle carried one step further: *a gesture buys the right to let go, never the
+right to take hold again*.
+
+⛔ It is a DIRECTION, not a ban, and the mirror is fenced beside the defect in both suites: a
+deliberate flick back **down** that coasts to the bottom MUST still re-arm, and touch drags /
+scrollbar grabs arrive as `"unknown"` and keep falling through to the geometry. **No reader is
+stranded**, and a fix that passed one case by breaking the other would be a regression.
+
+⚠ **`243-03`'s delta coalescing slightly WIDENS the window** (the effect refreshes the hard clock up
+to 60 ms less often, so the gap can reach ~660 ms). The fix is needed *more* after the cadence
+change, not less.
+
+### Why this is `folded` and not `closed`
+
+⛔ **Because this file's own history forbids the shortcut.** `64357e979`'s commit message:
+
+> *"Attempts 1 and 2 measured CLEAN on a synthetic WheelEvent and were still broken with a real
+> mouse. A synthetic input event is not evidence about an input-driven bug."*
+
+Everything above is a synthetic `WheelEvent` in jsdom. It is strictly more than this report ever
+had — the effect had **zero** behavioural coverage before `243-03`, because `MessageList.test.tsx`
+stubs `scrollIntoView` to a no-op — but it is not a real wheel. **Closure is owed a real-mouse UAT
+row on a long streaming thread**, and `re_open_trigger` now says so.

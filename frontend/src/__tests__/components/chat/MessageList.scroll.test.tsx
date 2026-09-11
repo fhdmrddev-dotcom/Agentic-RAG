@@ -23,6 +23,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest"
 import { render, screen, act } from "@testing-library/react"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { MessageList } from "@/components/chat/MessageList"
+import { makeStreamCallbacks } from "@/providers/StreamsProvider"
 import { PROGRAMMATIC_SCROLL_SETTLE_MS, USER_GESTURE_WINDOW_MS } from "@/hooks/useFollowScroll"
 import type { Message } from "@/types"
 
@@ -324,5 +325,63 @@ describe("Phase 243 Plan 03 — MessageList's scroll effect, seen through a real
 
     expect(scrollIntoViewSpy).toHaveBeenCalledTimes(1)
     expect(scrollIntoViewSpy).toHaveBeenCalledWith({ behavior: "smooth" })
+  })
+
+  it("§7 — ⭐ D-243-04 MEASURED: 60 real deltas through the producer no longer make 60 scrolls", () => {
+    // ⛔ THIS IS THE CASE THAT JOINS CHAT-02 TO CHAT-03, and it is the only one here that
+    // drives the REAL `makeStreamCallbacks` rather than calling `rerender` by hand. Every
+    // other case in this file measures scrolls per RENDER; this one measures scrolls per
+    // DELTA, which is the quantity the reader actually experiences.
+    //
+    // `MessageList.tsx:141-176` has `messages` in its dep array, so it re-runs once per
+    // `setMessages`. Coalescing the producer therefore reduces the SCROLL rate without a
+    // single line changing in `useFollowScroll.ts` — which is D-243-04's claim, measured
+    // rather than asserted.
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] })
+    try {
+      let messages = makeLongThread("")
+      const utils = render(
+        <TooltipProvider>
+          <MessageList messages={messages} isStreaming={true} />
+        </TooltipProvider>,
+      )
+      const vp = utils.container.querySelector("[data-radix-scroll-area-viewport]") as HTMLElement
+      atBottom(vp)
+      act(() => flushRaf())
+      scrollIntoViewSpy.mockClear()
+
+      const setMessages = (updater: Message[] | ((prev: Message[]) => Message[])) => {
+        messages = typeof updater === "function" ? updater(messages) : updater
+        act(() => {
+          utils.rerender(
+            <TooltipProvider>
+              <MessageList messages={messages} isStreaming={true} />
+            </TooltipProvider>,
+          )
+        })
+      }
+      const callbacks = makeStreamCallbacks({
+        assistantId: "a-live",
+        threadId: "thread-1",
+        setMessages,
+      })
+
+      const deltas = Array.from({ length: 60 }, (_, i) => `tok${i} `)
+      for (const d of deltas) {
+        callbacks.onDelta!(d)
+        vi.advanceTimersByTime(10)
+        clock += 10
+      }
+      callbacks.onDone!()
+
+      // Before the coalescing this was 60 — one scroll per token, which is the whole of
+      // what "it keeps yanking while it writes" is made of.
+      expect(scrollIntoViewSpy.mock.calls.length).toBeLessThanOrEqual(14)
+      expect(scrollIntoViewSpy.mock.calls.length).toBeLessThan(deltas.length)
+      // ⛔ And not at the cost of a single character.
+      expect(messages[messages.length - 1].content).toBe(deltas.join(""))
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
