@@ -199,6 +199,54 @@ async def test_hydration_runs_once_per_session():
     assert getattr(ctx, "_attachments_hydrated", False) is True
 
 
+# ── 2b. WR-02 (244-07) — once per SESSION means ACROSS AGENT-LOOP ITERATIONS ───
+async def test_hydration_runs_once_across_agent_loop_iterations():
+    """⛔ THE CASE ABOVE COULD NOT SEE THE DEFECT, AND THAT IS THE FINDING.
+
+    It re-uses ONE ``ctx``, and the guard flag lived on ``ctx`` — so it proved only that
+    parallel tool calls inside a single iteration do not re-copy. But
+    ``agent_loop.py:2790`` says literally *"Phase 083 D-01: construct ToolContext once per
+    iteration"*, so a fresh object means a fresh ``getattr`` default and the guard reset on
+    every iteration. A run calling ``execute_code`` in eight iterations copied the same
+    10 MB attachment eight times — the DoS arm the shipped comment claimed to have closed.
+
+    ⚠ The SESSION is what persists (``SandboxSessionManager`` caches it per ``thread_id``
+    until idle eviction), so this case holds the session fixed and varies the ctx — which is
+    exactly what the agent loop does.
+    """
+    rows = [_row("/a1b2c3d4-report.docx")]
+    thread_id = str(uuid.uuid4())
+    with _sandbox_patched(rows) as (_g, session):
+        await _handle_execute_code({"code": "print(1)"}, _make_ctx(thread_id=thread_id, iteration=0))
+        first = len(_attachment_copies(session))
+        # A NEW ToolContext, same thread, same cached session — iteration 2 of the same run.
+        await _handle_execute_code({"code": "print(2)"}, _make_ctx(thread_id=thread_id, iteration=1))
+        second = len(_attachment_copies(session))
+        await _handle_execute_code({"code": "print(3)"}, _make_ctx(thread_id=thread_id, iteration=2))
+        third = len(_attachment_copies(session))
+
+    assert first == 1
+    assert second == 1, (
+        "the attachment was copied AGAIN on the second agent-loop iteration — the guard is "
+        "per-ToolContext, not per sandbox session, and the comment says otherwise"
+    )
+    assert third == 1
+
+
+async def test_a_DIFFERENT_session_hydrates_again():
+    """⛔ THE POSITIVE CONTROL. A guard keyed on something global would pass 2b while breaking
+    the case that matters: a new container (worker bounce, idle eviction) has an EMPTY
+    ``/sandbox/attachments`` and must be filled."""
+    rows = [_row("/a1b2c3d4-report.docx")]
+    thread_id = str(uuid.uuid4())
+    with _sandbox_patched(rows) as (_g, session_one):
+        await _handle_execute_code({"code": "print(1)"}, _make_ctx(thread_id=thread_id))
+        assert len(_attachment_copies(session_one)) == 1
+    with _sandbox_patched(rows) as (_g, session_two):
+        await _handle_execute_code({"code": "print(2)"}, _make_ctx(thread_id=thread_id))
+        assert len(_attachment_copies(session_two)) == 1
+
+
 # ── 3. An EXPIRED attachment never arrives, and there is no second expiry rule ─
 async def test_expired_attachment_is_not_hydrated():
     rows = [_row("/live-report.docx"), _row("/dead-old.xlsx", expired=True)]
