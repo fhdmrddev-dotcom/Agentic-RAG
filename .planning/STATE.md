@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v4.1
 milestone_name: "Ship It & Feel It"
 status: roadmapped
-last_updated: "2026-09-11T03:30:00.000Z"
+last_updated: "2026-09-11T05:10:00.000Z"
 last_activity: 2026-09-11
 progress:
   total_phases: 5
   completed_phases: 0
   total_plans: 5
-  completed_plans: 1
+  completed_plans: 3
   percent: 0
 requirements:
   total: 19
@@ -40,11 +40,11 @@ surface the operator uses daily. Phase numbering continues at **242**.
 
 ## Current Position
 
-Phase: 242 — Ship It (in discussion, separate session) · **243 — The Thinking Block and the Follow-Scroll Seam (IN EXECUTION — 2 / 5 plans done)**
-Plan: 243 — 5 plans, 5 serial waves (243-01 … 243-05). **243-01, 243-02 DONE** (waves 1-2) → next: 243-03
-Status: **243-02 EXECUTED** — the reasoning fold left `RunCard` for `ThinkingBlock.tsx` and is mounted from `MessageItem` for BOTH message shapes with no tool test anywhere (`2a62acb60`), pin 17 → 23 read from the gate's own column (`4bbd2c724`), three ledger rows + three sections in one commit (`3de4a0cd3`). **CHAT-04 CLOSED** — the 31% of reasoning-bearing turns that call no tool now draw their thinking. ⭐ **`RunCard.tsx`'s G-5 obligation is DISCHARGED by deletion** (`-39/+20`, 729 → 710 L, one `useState` fewer) after four phases of *"passes forward UNTOUCHED AND UNDISCHARGED"*; `MessageItem.tsx` was **NOT re-hollowed** (`useState` 3→3, `useEffect` 0→0, props 5→5, **0 deleted lines**). 243-01's net passes across the move with **§8/§9 inverted and §6b's render line moved** — ⚠ the plan's *"§8 and only §8"* criterion is refuted by measurement (§6b's positive control lived on the card). The `thinkingOpen` remount question 243-01 flagged is **DECIDED: no `key` on the mount**, fenced twice (§12 source, §13 behaviour). Gate `failed 0` both runs, `count gate OK — 250/250`, typecheck 67/67 naming none of this plan's files. ⚠ The two inherited `sketchComposition` failures did not reproduce for the second plan running — still ONE-per-plan green samples of a `SEED-171` flake, not a fix. ⚠ G-4 lived-experience UAT on this surface is **owed**; no browser was opened.
+Phase: 242 — Ship It (in discussion, separate session) · **243 — The Thinking Block and the Follow-Scroll Seam (IN EXECUTION — 3 / 5 plans done)**
+Plan: 243 — 5 plans, 5 serial waves (243-01 … 243-05). **243-01, 243-02, 243-03 DONE** (waves 1-3) → next: 243-04
+Status: **243-03 EXECUTED — the phase’s most consequential plan, and the RED drive changed its shape.** CHAT-02: the delta path now coalesces PRODUCER-side (`makeAccumulatingCoalescer`, 60 ms, leading edge) — **60 deltas made 61 `setMessages` calls and now make 12** (`bfdf899b1`). CHAT-03: **D-243-05 outcome 3** — a residual DID reproduce at HEAD and it is **NOT** the defect `BUG-260823-01` names; that report’s cause was deleted by `64357e979`, which is measured to be a **quick task 7h48m BEFORE Phase 228 was scoped**, not a 228 commit. The real residual: a nudge up under 120px releases the pin but stays “near bottom”, so between the 900 ms hard clock and the 1500 ms gesture window **any** scroll event re-pinned the reader. One ref, one clause, at the line D-243-05 predicted (`8d7dfab43`); the mirror (a flick back DOWN still re-arms) stays green. ⭐ **D-243-04 MEASURED rather than asserted:** 60 real deltas produced **61** `scrollIntoView` calls before the coalescing and **13** after, with `useFollowScroll.ts` held constant — and `MessageList.tsx` needed **no edit at all**. ⚠ A trap the plan did not name broke two shipped tests and was caught by a base-set diff (13 base / 15 / 13): every STRUCTURAL callback must drain the text buffer or Anthropic’s interleaved text/tool_use order inverts. `count gate OK — 253/253, failed 0`; typecheck 67, set diff empty. Three suites into both knobs — **`throttle.ts` had been ungated since 068.5**. Four ledger triples re-derived; `useFollowScroll.ts` and `throttle.ts` had **NO ROW AT ALL**, so G-5 was structurally absent on the very file this bug is about. ⚠ `BUG-260823-01` stays **`folded`, not `closed`** — every fence here is a synthetic `WheelEvent`, and this file’s own history records two fixes that passed those and failed a real mouse. **A real-wheel UAT row is owed** (`re_open_trigger` now says so; `SEED-049`/D-243-09 agree).
 Progress: 0 / 5 phases · 0 / 19 requirements · `[░░░░░░░░░░] 0%`
-Last activity: 2026-09-11 — 243-02 executed (wave 2 of 5): one reasoning renderer, mounted for both message shapes; RunCard's G-5 discharged
+Last activity: 2026-09-11 — 243-03 executed (wave 3 of 5): the delta path coalesced producer-side, and a scroll residual that was NOT the reported one, driven then fixed
 
 **Phases:** 242 Ship It · 243 Thinking block + follow-scroll seam (⚠ sketch first) ·
 244 Chat shell + composer · 245 The verification debt · 246 The recall cliff.
