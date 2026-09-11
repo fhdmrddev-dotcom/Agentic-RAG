@@ -731,7 +731,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/hooks/useDocuments.ts` | 8 / 3 / 120 | ⚠ absent at 3 phases. Realtime is a hint, not truth |
 | `frontend/src/pages/KnowledgeHealthPage.tsx` | 12 / 6 / **DELETED** | **RETIRED (217.1-14)** |
 | `backend/app/api/knowledge_health.py` | 11 / 6 / 737 | honoured by construction (**217.1-11**) |
-| `backend/app/services/agent_loop.py` | 39 / 20 / 3154 | ⚠ absent from BOTH for its ENTIRE LIFE at **20 phases** |
+| `backend/app/services/agent_loop.py` | 41 / 20 / 3275 | ⚠ row STALE at `39/20/3154`. honoured by construction (**244-02**): a SIXTH conditional append in the shipped `memory_note` shape, gated General-mode-only, announcing the path the hydration really writes |
 | `backend/app/services/tool_dispatcher.py` | 80 / 34 / 4868 | ⚠ row STALE for the 3rd close at `77/32/4679`. honoured by construction (**244-02**): 2 helpers + a 4-line guarded call site; `workspace_read`'s binary branch untouched |
 | `backend/app/api/document_governance.py` | 5 / 3 / 416 | ⚠ absent at 3 phases. ⚠ Its low-confidence cutoff is the ConfidenceChi |
 | `frontend/src/components/ingestion/ViewsGroup.tsx` | 5 / 3 / 259 | ⚠ absent for its ENTIRE LIFE at **3 phases** |

@@ -241,12 +241,25 @@ def assert_note_reaches_the_assembled_messages(source: str) -> None:
 
 
 def assert_nothing_provider_specific(source: str) -> None:
-    """⚠ This is the SHARED path; the provider split happens below at `create_streaming_chat`."""
+    """⚠ This is the SHARED path; the provider split happens below at `create_streaming_chat`.
+
+    ⚠ The DOCSTRING is stripped before the check — the prose deliberately says the word
+    "provider" to record the invariant, and a fence that read prose would fail on the very
+    sentence documenting what it guards.
+    """
     tree = ast.parse(source)
+    seen = False
     for node in ast.walk(tree):
         if isinstance(node, ast.FunctionDef) and node.name == "_build_attachment_note":
+            seen = True
+            if (node.body and isinstance(node.body[0], ast.Expr)
+                    and isinstance(node.body[0].value, ast.Constant)
+                    and isinstance(node.body[0].value.value, str)):
+                node.body = node.body[1:]
             body = ast.unparse(node)
+            assert len(body) > 200, "the strip left nothing — this fence would pass vacuously"
             assert "provider" not in body, "the renderer contains provider-specific handling"
+    assert seen, "_build_attachment_note does not exist"
 
 
 def test_the_note_is_general_mode_only():

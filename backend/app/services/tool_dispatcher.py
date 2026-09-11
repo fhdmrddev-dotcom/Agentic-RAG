@@ -1777,6 +1777,13 @@ _ATTACHMENTS_DIR = "/sandbox/attachments"
 # the tool result, never silent (the `confirm_preview` refusal discipline).
 _ATTACHMENT_HYDRATION_MAX_FILES = 50
 
+# A bound on the BASENAME. ⚠ Found by the Task-3 prompt fence, not by this task's own tests: a
+# 4,000-character filename produced a 4,000-character container path AND flooded the turn's system
+# prompt, because nothing here capped length. Most filesystems refuse a component over 255 bytes,
+# so an unbounded name is also an ENOENT the agent cannot diagnose. The tail is cut, never the
+# head — workspace paths carry a `uuid8-` prefix, so truncation keeps names distinguishable.
+_ATTACHMENT_NAME_MAX = 120
+
 
 def _attachment_container_path(path: str) -> str:
     """Reduce an attacker-controlled workspace path to a BASENAME under ``_ATTACHMENTS_DIR``.
@@ -1790,7 +1797,9 @@ def _attachment_container_path(path: str) -> str:
       3. the charset is narrowed to ``validate_path``'s own set, so nothing shell- or
          path-significant survives even if a future basename implementation changed;
       4. leading dots are stripped, so ``..`` cannot survive as a name in its own right, and an
-         empty residue falls back to a fixed literal rather than producing the directory itself.
+         empty residue falls back to a fixed literal rather than producing the directory itself;
+      5. the length is capped (``_ATTACHMENT_NAME_MAX``) — an unbounded component is an ENOENT on
+         most filesystems and, since Task 3 announces this exact path, a prompt flood.
     """
     import re as _re_attach  # module-local idiom (see _handle_load_skill / the exec hint)
 
@@ -1798,6 +1807,8 @@ def _attachment_container_path(path: str) -> str:
     base = os.path.basename(candidate)
     base = _re_attach.sub(r"[^A-Za-z0-9._\- ]", "_", base)
     base = base.lstrip(".").strip()
+    if len(base) > _ATTACHMENT_NAME_MAX:
+        base = base[:_ATTACHMENT_NAME_MAX].strip()
     if not base:
         base = "attachment"
     return f"{_ATTACHMENTS_DIR}/{base}"

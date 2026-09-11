@@ -7509,6 +7509,48 @@ Its width is not its own: the 430px track is set by the host grid. The mobile ar
 
 ### `backend/app/services/agent_loop.py`
 
+**Triple re-derived 2026-09-11 (`244-02`): `41 / 20 / 3275` — G-5: ⚠ FIRES.** ⚠ The row read
+`39 / 20 / 3154`. Re-derive, never copy forward.
+
+**What `244-02` T3 did (SHELL-04 / D-244-02).** Nothing announced an attachment: the tools existed,
+the announcement did not, so a file joining a thread was not the same as the agent using it. A
+**SIXTH conditional append**, in the exact shape of the shipped `memory_note` (`:1447-1453`), plus
+one pure renderer `_build_attachment_note`. **Honoured by construction** — no provider branch, no
+new tool, no new event, no migration.
+
+**The three things that bind it:**
+
+1. ⛔ **GENERAL MODE ONLY, and the indentation is the enforcement.** `get_explorer_tools()` returns
+   `[LS, TREE, GREP, GLOB, READ_DOCUMENT, ANALYZE_DOCUMENT]` — **no workspace tool and no
+   `execute_code`** — so announcing an attachment in Explorer is a promise the agent cannot keep,
+   which is strictly worse than silence because the model will try. An AST fence walks the append's
+   ancestor chain for an `agent_mode`/`explorer` `If`, and it is **falsified in the suite** against
+   an ungated source string.
+2. ⛔ **IT MUST REACH `messages[0]["content"]`.** A note built after the terminator is a variable
+   nobody reads — the exact defect Phase 216 shipped **with 6929 green tests**, because every test
+   called the helper directly and none asserted the call site. A second AST fence compares line
+   numbers and is likewise falsified against a source where the append follows the terminator.
+3. ⛔ **THE ANNOUNCED PATH IS `_attachment_container_path`, IMPORTED — never re-derived.** One rule,
+   one home. A divergence between the prompt's sanitiser and the hydration's would hand the model a
+   path the container does not contain, and **no test of either half alone could see it**.
+
+**⭐ THE FENCE FOUND A REAL DEFECT IN THE SIBLING TASK, which is the finding worth keeping.** The
+4,000-character-filename injection case went red on `len(entry_lines[0]) < 400` — not because the
+renderer was wrong, but because **`_attachment_container_path` had no length cap at all**. An
+unbounded component is an `ENOENT` on most filesystems (255-byte limit) *and*, once Task 3 announces
+it, a prompt flood. Fixed at the one home (`_ATTACHMENT_NAME_MAX = 120`, tail cut so the `uuid8-`
+prefix survives). ⚠ **Task 2's own six cases could not see it** — they asserted traversal, not
+length.
+
+**T-244-02-03 driven RED**: `name` was replaced with the raw `raw_path.lstrip("/")`; four cases went
+red, including `AssertionError: injected text reached the prompt on a line of its own, outside the
+list entry`. The file was restored **md5-identical** (`877936016fd7566f5ab02edf2fe23370`).
+
+⛔ **The read failure arm is deliberate**: a workspace read that fails must never break the turn —
+chat continues without the line, logged loudly rather than silently.
+
+**The prior entry, preserved:**
+
 **Triple derived 2026-08-31: `39 / 20 / 3154` — G-5: ⚠ FIRES.** ⚠ **Absent from BOTH the CLAUDE.md table and this file for its ENTIRE LIFE, at twenty phases** — the same failure `api.ts` (97 phases), `config.py` (42) and `ChatArea.tsx` (28) each suffered: a hot file with no row is permanently invisible to its own guardrail, and G-5 could never have fired on it at any count. Row added by the 2026-08-31 honest-refusal pass, the first change to touch its connector block since Phase 216.
 
 **What 2026-08-31 did:** the connector-tool wiring block no longer resolves the org itself. It calls `connectors/org_scope.resolve_connector_org` and, on an unresolved scope, raises the module-local `_NoConnectorScope` — caught in its OWN `except` arm, ahead of the broad one, so "you are in no org" is not logged as "Failed to wire connector tools". The `org_id = user_id_str` fallback is **deleted**, not moved.
@@ -10009,7 +10051,7 @@ cells rot within days.
 | [`frontend/src/hooks/useDocuments.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusedocumentsts) | 8 / 3 / 120 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent at 3 phases. Realtime is a hint, not truth — it reconciles by fetch (D-v2.5-03), and `table_count`/`image_count`/`chunk_count` are server-side |
 | [`frontend/src/pages/KnowledgeHealthPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesknowledgehealthpagetsx) | 12 / 6 / **DELETED** | ⚠ **FIRES** | **RETIRED (217.1-14)** — the Library's Health tab absorbed it; `ChatLayout`'s fallback replaced by `UnknownViewFallback` (`:871`). ⚠ absent for its ENTIRE LIFE |
 | [`backend/app/api/knowledge_health.py`](docs/HOT-FILE-LEDGER.md#backendappapiknowledgehealthpy) | 11 / 6 / 737 | ⚠ **FIRES** | honoured by construction (**217.1-11**) — adds `could_not_search`; `retrieval_count` byte-unchanged. ⚠ absent at **6 phases**. Audit-analytics from `audit_log`. Service-role by exception |
-| [`backend/app/services/agent_loop.py`](docs/HOT-FILE-LEDGER.md#backendappservicesagent_looppy) | 39 / 20 / 3154 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **20 phases** — row added 2026-08-31. Honoured by construction: the `org_id = user_id` fallback DELETED, resolution moved to a leaf |
+| [`backend/app/services/agent_loop.py`](docs/HOT-FILE-LEDGER.md#backendappservicesagent_looppy) | 41 / 20 / 3275 | ⚠ **FIRES** | ⚠ row STALE at `39/20/3154`. honoured by construction (**244-02**): a SIXTH conditional append in the shipped `memory_note` shape, gated General-mode-only |
 | [`backend/app/services/tool_dispatcher.py`](docs/HOT-FILE-LEDGER.md#backendappservicestool_dispatcherpy) | 80 / 34 / 4868 | ⚠ **FIRES** | ⚠ row STALE AGAIN at `77 / 32 / 4679`. honoured by construction (**244-02**): 2 module-level helpers + a 4-line guarded call site; `workspace_read`'s binary branch untouched |
 | [`backend/app/api/document_governance.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentgovernancepy) | 5 / 3 / 416 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent at 3 phases. ⚠ Its low-confidence cutoff is the ConfidenceChip tier (**0.5**) — a DIFFERENT measure from `knowledge_health`'s **0.38** retrieval similarity |
 | [`frontend/src/pages/GovernancePage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesgovernancepagetsx) | 4 / 1 / 355 | no (1 phase) | young (119) — ⚠ row added because it is being MERGED into the Library (operator, 2026-08-28); it is feature-gated while Documents is not, so the gate must move with it |
