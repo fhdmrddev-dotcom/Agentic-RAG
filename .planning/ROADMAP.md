@@ -240,7 +240,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 244-05-PLAN.md — the composer's attach affordance: the chip, the `+` menu, the sent-message scope word (SHELL-04)
+- [x] 244-05-PLAN.md — the composer's attach affordance: the chip, the `+` menu, the sent-message scope word (SHELL-04)
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
