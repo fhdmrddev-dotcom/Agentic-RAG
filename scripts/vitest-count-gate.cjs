@@ -3460,6 +3460,13 @@ const BASELINE = {
   // tree; the rest were green and are the trace's own controls. ⚠ jsdom does no hit-testing,
   // so this suite does NOT close the bug — it stays `folded`, with a browser re-open trigger.
   "ChatHistoryColumn.clickPath.test.tsx": 10,
+  // `ChatHistoryColumn.rowIdentity.test.tsx` — 7 cases. BUG-260816-03 (b) + (c): the folder
+  // chip is bounded (`max-w-[96px]` + `truncate` + a `title=`), and an unscoped row renders
+  // NO chip. 3 of the 7 were RED on the shipped tree; the other 4 are controls, incl. the
+  // FOLDER-mode "Unfiled" GROUP HEADER, which is `groupByFolder`'s and is untouched.
+  // ⛔ Sub-defect (a) is NOT taken — `Thread` has no kind discriminator and D-244-18 forbids
+  // a second sketched surface. The report stays `folded`.
+  "ChatHistoryColumn.rowIdentity.test.tsx": 7,
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -4900,6 +4907,7 @@ const TARGETS = [
   // **0** before Phase 244. 244-01 adopts its own two suites; the two inherited ones stay
   // unadopted here because this plan did not author them and cannot vouch for their stability.
   "src/components/layout/__tests__/ChatHistoryColumn.clickPath.test.tsx",
+  "src/components/layout/__tests__/ChatHistoryColumn.rowIdentity.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")

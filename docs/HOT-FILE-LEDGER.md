@@ -9808,7 +9808,7 @@ cells rot within days.
 | [`backend/app/models/thread.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsthreadpy) | 16 / 10 / 438 | ⚠ **FIRES** | honoured by construction (200.1 / **214**) |
 | [`frontend/src/components/workflows/canvasModel.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowscanvasmodelts) | 13 / 6 / 752 | ⚠ **FIRES** | ⚠ absent from BOTH at 6 phases (added 200) |
 | [`frontend/src/components/layout/ChatLayout.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutchatlayouttsx) | 50 / 26 / 1005 | ⚠ **FIRES** | ⚠ row was STALE at `46 / 24 / 921`. honoured by construction (**244-01**): two class TOKENS (`min-h-0` on the grid track and `<main>`) — no state, no prop, no branch |
-| [`frontend/src/components/layout/ChatHistoryColumn.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutchathistorycolumntsx) | 5 / 1 / 480 | below threshold | ⚠ **ABSENT from BOTH registers for its entire life — row added 244-01 AT ITS SECOND PHASE**, the `settingsSearchPayload.ts` precedent. D-244-20 claimed otherwise; the gate refuted it |
+| [`frontend/src/components/layout/ChatHistoryColumn.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutchathistorycolumntsx) | 7 / 2 / 513 | below threshold | ⚠ **ABSENT from BOTH for its ENTIRE LIFE — row added 244-01 at its SECOND phase** (`settingsSearchPayload.ts` precedent). D-244-20 claimed a row existed; the gate refuted it |
 | [`frontend/src/hooks/useThreads.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusethreadsts) | 4 / 2 / 64 | below threshold | ⚠ **ABSENT from BOTH registers for its entire life — row added 244-01.** The app's ONE thread-selection owner; `selectThread` is a bare `setState`, so "first click does not open" cannot originate here |
 | [`backend/app/services/harness/grounding.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessgroundingpy) | 21 / 8 / 1414 | **FIRES** | honoured by construction (193.1 / 211 / **214**) — ⚠ **extraction still OWED**; 214 changed no capability set |
 | [`frontend/src/components/workflows/PhaseFormPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsphaseformpaneltsx) | 30 / 14 / 1566 | **FIRES** | honoured by construction ×6 (185 / 193 / 193.1 / 199 / 200 / **214**) |
@@ -11097,7 +11097,35 @@ is the `settingsSearchPayload.ts` precedent: **a row is added at CREATION, not a
 Stop/options controls, per the A11Y-01 CSS-gated reveal), inline rename, the delete-confirm dialog, the
 SEED-064 running dot, the "Filter this list…" box, and the date/folder group-mode switch.
 
-**Seam:** not proposed. At one phase and 480 lines the honest first step is the row.
+**What `244-01` changed, and the invariants it leaves behind.** It inherits **`7 / 2 / 513`**.
+
+1. ⛔ **THE OVERLAY IS CLICK-THROUGH AND ITS CONTROLS ARE NOT.** The always-rendered `opacity-0`
+   actions container is `absolute inset-y-0 right-0` with a `pl-10` scrim and is painted AFTER the
+   row `<button>`, so it **won the hit test over the right-hand strip of every row while being
+   invisible**. It now carries `pointer-events-none`, and each of its two controls carries
+   `pointer-events-auto`. ⚠ **Removing either token re-opens it**: the container's alone makes the
+   buttons dead, the buttons' alone re-arms the sink. ⭐ It was found by an **asymmetry**, not a
+   hunch — its sibling, the SEED-064 run-dot overlay with the identical geometry, already carried
+   the token and explained it in its own comment. Both halves are now driven.
+2. **(BUG-260816-03 c) THE META CHIP IS BOUNDED.** `max-w-[96px] truncate` plus a `title=`. It kept
+   `shrink-0` with no cap while the title carried `truncate flex-1 min-w-0`, so an arbitrary
+   user-authored folder name won unconditionally — measured, a 134 px chip left **85 px of a 485 px
+   title (17.5 %)**, and every folder-scoped row sampled was truncated. ⛔ *Organising your work made
+   your work harder to find.* **The title span is UNCHANGED** — it was already correct; the defect
+   was the chip's width, not the title's.
+3. **(BUG-260816-03 b) AN UNSCOPED ROW RENDERS NOTHING.** The italic "Unfiled" fallback sat on
+   **471 of 524 rows (90 %)**. It now returns `null`, riding the shipped `empty ⇒ render nothing`
+   rule. ⛔ **`folderLabel` ITSELF IS UNTOUCHED** and must stay so — `groupByFolder` still needs the
+   "Unfiled" GROUP LABEL in folder mode. *The absence decision belongs to this row, never to the
+   shared vocabulary leaf.* ⚠ One shipped case in `ChatHistoryColumn.test.tsx` PINNED the old
+   behaviour and was **re-baselined deliberately, with the reason written into it** — never deleted.
+4. ⛔ **SUB-DEFECT (a) IS DEFERRED IN WRITING, NOT DROPPED.** One icon for every thread kind stays
+   shipped because `Thread` carries **no** kind/workflow discriminator (it needs a `GET /threads`
+   feed change) and because the report routes it to `/gsd:sketch` while **D-244-18** limits Phase 244
+   to one sketched surface. **Re-open trigger: the next phase that adds a thread-kind field to
+   `GET /threads`, or the next chat-list sketch.** `BUG-260816-03` stays `folded`, never `closed`.
+
+**Seam:** not proposed. At two phases and 513 lines the honest first step is the row.
 
 ### `frontend/src/hooks/useThreads.ts` — row added `244-01`
 

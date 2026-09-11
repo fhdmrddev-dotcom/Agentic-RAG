@@ -650,7 +650,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/models/thread.py` | 16 / 10 / 438 | honoured by construction (200.1 / **214**) |
 | `frontend/src/components/workflows/canvasModel.ts` | 13 / 6 / 752 | ⚠ absent from BOTH at 6 phases (added 200) |
 | `frontend/src/components/layout/ChatLayout.tsx` | 50 / 26 / 1005 | ⚠ row was STALE at `46 / 24 / 921`. honoured by construction (**244-01**): two class TOKENS — `min-h-0` on the grid track and `<main>`; no state, no prop, no branch |
-| `frontend/src/components/layout/ChatHistoryColumn.tsx` | 5 / 1 / 480 | ⚠ absent from BOTH for its ENTIRE LIFE — row added 244-01 at its SECOND phase (the `settingsSearchPayload.ts` precedent). D-244-20 claimed a row existed; the gate refuted it |
+| `frontend/src/components/layout/ChatHistoryColumn.tsx` | 7 / 2 / 513 | ⚠ absent from BOTH for its ENTIRE LIFE — row added 244-01 at its SECOND phase (the `settingsSearchPayload.ts` precedent); D-244-20 claimed a row existed and the gate refuted it |
 | `frontend/src/hooks/useThreads.ts` | 4 / 2 / 64 | ⚠ absent from BOTH for its ENTIRE LIFE — row added 244-01. The app's ONE thread-selection owner; `selectThread` is a bare `setState`, so BUG-260911-02 cannot originate here |
 | `backend/app/services/harness/grounding.py` | 21 / 8 / 1414 | honoured by construction (193.1 / 211 / **214**) |
 | `frontend/src/components/workflows/PhaseFormPanel.tsx` | 30 / 14 / 1566 | honoured by construction ×6 (185 / 193 / 193.1 / 199 / 200 / **214**) |

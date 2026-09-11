@@ -172,26 +172,48 @@ export function ChatHistoryColumn({
                   <HighlightTitle title={thread.title} query={query} />
                 </span>
                 {/* Per-row meta (sketch .r-meta rowCompact swap): DATE mode shows the
-                    folder chip (name, or an italic "Unfiled"); FOLDER mode shows the
-                    date bucket instead — the group header already names the folder, so
-                    the chip would be redundant — reusing the tested `bucketFor`. */}
+                    folder chip (name only when the thread is scoped); FOLDER mode shows
+                    the date bucket instead — the group header already names the folder, so
+                    the chip would be redundant — reusing the tested `bucketFor`.
+
+                    ⚠ Phase 244-01 — BUG-260816-03, two changes, both to THIS ROW only:
+
+                    (c) THE CHIP IS BOUNDED. It kept `shrink-0` (layout stability) with no
+                    width cap, while the title carries `truncate flex-1 min-w-0` — so an
+                    arbitrary, user-authored folder name won UNCONDITIONALLY. Measured in the
+                    report: a 134 px chip left 85 px of an 485 px title — **17.5 % visible,
+                    roughly one word**, and every folder-scoped row sampled was truncated.
+                    ⛔ *Organising your work made your work harder to find.* `max-w-[96px]`
+                    + `truncate` caps it; `title=` keeps the full name reachable on hover.
+                    The title span is UNCHANGED — it was already correct.
+
+                    (b) AN UNSCOPED ROW RENDERS NOTHING. The italic "Unfiled" fallback was on
+                    **471 of 524 rows (90 %)** and distinguished nothing, while competing with
+                    the 53 rows that carry a real folder. ⭐ This rides the shipped
+                    `empty ⇒ render nothing` rule (`ActiveConnectorChips.tsx:24`,
+                    `AttentionPopover.tsx:75`, `PendingAskCard.tsx:733`) — an application of an
+                    established pattern, not a new design.
+                    ⛔ `folderLabel` ITSELF IS UNTOUCHED: `groupByFolder` still needs the
+                    "Unfiled" GROUP LABEL in folder mode. The absence decision belongs to this
+                    row, never to the shared vocabulary leaf.
+
+                    ⛔ Sub-defect (a) — one icon for every thread kind — is NOT taken. `Thread`
+                    carries no kind discriminator (a `GET /threads` feed change), and the report
+                    routes it to `/gsd:sketch` while D-244-18 limits this phase to one sketched
+                    surface. The report stays `folded`, never `closed`. */}
                 {groupMode === "folder" ? (
                   <span className="inline-flex items-center gap-1 text-[10px] shrink-0 whitespace-nowrap text-muted-foreground">
                     {bucketFor(thread.updated_at)}
                   </span>
-                ) : (
+                ) : thread.folder_id ? (
                   <span
-                    className={cn(
-                      "inline-flex items-center gap-1 text-[10px] shrink-0 whitespace-nowrap",
-                      thread.folder_id ? "text-muted-foreground" : "text-muted-foreground/70 italic",
-                    )}
+                    className="inline-flex max-w-[96px] items-center gap-1 truncate text-[10px] shrink-0 whitespace-nowrap text-muted-foreground"
+                    title={folderLabel(folders, thread.folder_id)}
                   >
-                    {thread.folder_id && (
-                      <FolderIcon className="h-3 w-3 shrink-0" aria-hidden="true" />
-                    )}
+                    <FolderIcon className="h-3 w-3 shrink-0" aria-hidden="true" />
                     {folderLabel(folders, thread.folder_id)}
                   </span>
-                )}
+                ) : null}
               </div>
             </button>
 
