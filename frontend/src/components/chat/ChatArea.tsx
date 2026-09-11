@@ -113,7 +113,31 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
   // background workflow on another thread cannot lock THIS composer. Drives the
   // disable-with-tooltip on both selectors (D-03/D-05).
   const workflowLock = useWorkflowLockForThread(thread?.id ?? null)
-  const workflowLocked = workflowLock !== null
+  // ── Phase 244-03 (SHELL-02 / BUG-260904-05 / D-244-08 arm 2) — A CAP-PAUSE IS NOT A
+  //    RUNNING WORKFLOW, and the composer must be able to tell them apart.
+  //
+  // The shipped expression was `workflowLock !== null`. The reconcile branch at :184 below
+  // sets a lock for a DEEP run paused at its iteration cap, so that read disabled the
+  // composer the message on screen was telling the operator to use ("Start a new message to
+  // keep going", MessageItem.tsx:576). The UI instructed an action it forbade.
+  //
+  // ⛔ C-1 — D-244-08's FIRST proposal is a NO-OP, recorded here beside the decision rather
+  // than overwriting it. It offered `workflowLock?.mode === "harness"`. Measured:
+  // `WorkflowLock.mode` is the LITERAL type `"harness"` (streamsStore.ts:89) with exactly one
+  // member, and the cap-paused branch at :184-192 HARD-CODES `mode: "harness"` for a Deep
+  // run — so that gate is TRUE for precisely the run it was meant to unlock. `capPaused` is
+  // the only working discriminator on the shipped type, which is the decision's second arm.
+  //
+  // ⛔ NOTHING ELSE IN THE CHAIN CHANGES. MessageInput.tsx:287/337-339 key `canSend`, the
+  // placeholder, the `title` and `disabled` off this ONE boolean, so D-244-10 ("the harness
+  // copy is untouched") holds by construction rather than by a second branch — a genuine
+  // harness run still reads "Workflow running — Cancel to switch back" on both axes.
+  // Fenced in `__tests__/ChatArea.capPausedComposer.test.tsx`.
+  //
+  // ⚠ The CLIENT half alone would have shipped the same defect one level down: the server's
+  // cap_paused read was unbounded in time, so the lock returned on the next reconcile. The
+  // other half is in `backend/app/api/threads.py`'s `runs` probe.
+  const workflowLocked = workflowLock !== null && !workflowLock.capPaused
   const streamActions = useStreamActions()
   // Phase 068.5 Gap-01: true when this thread has a loadMessages fetch in
   // flight. Passed to MessageList so the cold-load skeleton only renders when

@@ -48,6 +48,11 @@ import { toolLabel, toolSummary, outerBannerLabel, harnessBannerProgress } from 
 import { type SeamKind } from "@/components/panel/SeamPointer"
 import { SeamCard, type SeamCardPayload } from "@/components/panel/SeamCard"
 import { PausedRunCue } from "@/components/panel/PausedRunCue"
+// Phase 244-03 (SHELL-03 / BUG-260828-07): the SHIPPED, zero-prop, self-resolving answer
+// surface — the same component WorkspacePanel mounts. Rendered ONLY inside the narrow
+// `isMessageStreaming && hasPendingAsk` arm below; see that mount's docblock for the
+// measured reason (C-3: it carries two `usePanelReconcile` fetches per mount).
+import { PendingAskStack } from "@/components/panel/PendingAskCard"
 // Phase 087-02: the WorkspacePanel owns the open action; the chat-side seam
 // affordances request it via this module-level signal (additive wiring — no
 // MessageItem→MessageList→ChatArea prop re-plumbing, PANEL-06 safe).
@@ -397,7 +402,50 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
             The ask_user PausedRunCue is load-bearing (not duplicated) and stays. */}
         {isMessageStreaming && message.tool_calls && message.tool_calls.length > 0 && (
           <div className="mt-1 flex flex-col gap-0.5">
-            {hasPendingAsk(message.tool_calls) && <PausedRunCue />}
+            {/* ── Phase 244-03 Task 2 (SHELL-03 / BUG-260828-07, HIGH / D-244-12) — THE
+                   CONTROLS JOIN THE CUE.
+                ⛔ The defect this closes: driving an armed approval, the panel offered
+                "Approve this step" / "Do not run it" / a reason field / Send Answer, and the
+                CHAT rendered the question with NO BUTTONS. A human gate that appears without
+                its controls is worse than one that does not appear — it says a decision is
+                required and then offers no way to make it. The run sat until it was stopped.
+                ⭐ THE SHIPPED STACK, MOUNTED — never a chat-native second renderer of the same
+                pause (D-244-11's rejected arm, the Phase 095 build-once inventory rule,
+                SEED-219's complaint). Two renderers of one decision is how the two homes came
+                to disagree in the first place; one component in both homes is why answering in
+                either settles it in both, structurally.
+                ⛔ WHY IT IS **INSIDE THIS ARM** AND NOT AT THIS COMPONENT'S TOP LEVEL — the
+                same measurement HarnessOuterBanner's docblock records at :180-188. C-3 refuted
+                the planning claim that "a third reader is free": `useAskUserPrompt` is NOT a
+                bare selector — it mounts `usePanelReconcile`, which fires a real
+                `getThreadPendingAsks` FETCH per mount, and `PendingAskStack` also calls
+                `usePhases` for a SECOND one. Its early `if (asks.length === 0) return null`
+                cannot save it: hooks run BEFORE the return. `MessageList` renders one
+                `MessageItem` per message with NO virtualisation, so a top-level mount is
+                2 fetches × N ROWS. Measured at 6 rows: **6 ask fetches, versus 1 here** —
+                fenced by `__tests__/MessageItem.inlineApproval.test.tsx` case 3, which was
+                driven RED against exactly that planted top-level mount.
+                ⚠ THE NARROWING IS `isMessageStreaming`, i.e. `message.runStatus ===
+                "streaming"` — this component's OWN derivation, NOT the `isStreaming` prop
+                `MessageList.tsx:237` passes. At most one row carries a live run status, which
+                is what makes a fetch-mounting child affordable here.
+                ⛔ NOT pinned above the composer (D-244-12's rejected arm): that duplicates the
+                panel's pin-to-top and competes with the never-vanishes run-status strip.
+                ⚠ C-4, recorded rather than discovered later: this is the SECOND
+                `PendingAskStack` mount in the product (CONTEXT implied two existed; measured,
+                there was ONE — `WorkspacePanel.tsx:438`. `WorkflowRunPage.tsx:1629` mounts
+                `PendingAskCard` DIRECTLY, with its own ordering and its own `runIsOver`). It
+                makes `useAskUserPrompt` the **THIRD** concurrent reader in the tree, which
+                FIRES arm 1 of `attentionConditions.ts`'s three-part hoist re-open trigger.
+                The hoist is deliberately NOT taken here — this is a HIGH-severity bug fix, not
+                a refactor — and the fired arm is recorded in 244-03-SUMMARY.md so the deferral
+                has a real trigger rather than a silent one. */}
+            {hasPendingAsk(message.tool_calls) && (
+              <>
+                <PausedRunCue />
+                <PendingAskStack />
+              </>
+            )}
           </div>
         )}
         {/* SEED-098 Change 2/3: the loose `Skill activated: docx` line is GONE —
