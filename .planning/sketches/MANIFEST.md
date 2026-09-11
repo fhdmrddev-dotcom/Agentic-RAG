@@ -2776,3 +2776,54 @@ strip is what it expands into while a run is live: **one object at two sizes, no
 - **CHAT-04 is a placement question, not a gate flip** — measured: `RunCard.tsx:478-502` is the ONLY renderer of `reasoningContent` in the codebase, so a pure-text reply has no home for it rather than a hidden one.
 - **235's winner sets Phase 243's component seam** — A and B end with one reasoning renderer, C ends with two (it cannot show live streaming, which the Phase 095 build-once inventory rule forbids).
 - ⚠ **`RunCard.tsx` newly fires G-5** — re-derived from git 2026-09-11 as **27 commits / 13 phases**, against a stale ledger cell of `26/12/728`.
+
+---
+
+## Phase 244 — The Chat Shell and the Composer (v4.1, 2026-09-11)
+
+**G-2 fires NARROWLY on Phase 244** — and ⭐ **the ROADMAP's "two net-new surfaces" was measured wrong
+by one.** `SHELL-05`'s app-shell signal **already shipped at Phase 235 plan 09**
+(`attentionConditions.ts` · `AttentionPopover.tsx` · badged on the desktop rail, the mobile drawer nav
+row and the hamburger · three suites), so sketching it would be redrawing a surface the operator had
+already approved. `SHELL-01/02/03` are bug fixes on shipped surfaces with named causes.
+**One sketch, said explicitly — not everything, not nothing** (`D-244-18`).
+
+| Req | Already decided | Verdict |
+|---|---|---|
+| **SHELL-05** shell signal | Shipped at Phase 235 plan 09 under `SURF-03`; `D-235-03` fixes the registry at one tenant and a test asserts the count | Not sketched. Its open half is `BUG-260911-03` — attribute the count to a Library tab — which is propagation, not design |
+| **SHELL-01** scroll frame | Cause named: no `min-h-0` on `ChatArea.tsx:552` → `MessageList.tsx:212` | A CSS-chain bug fix |
+| **SHELL-02** cap-paused composer | `BUG-260904-05` carries the fix shape; Continue already ships | A gating bug fix |
+| **SHELL-03** approval in thread | `PendingAskStack` is zero-prop and self-resolving; Phase 095's build-once rule decides the renderer | A mount, not a design |
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 236 | the-file-that-belongs-to-this-chat | How does a person know a file is HERE, not in the Library? | ✅ **A — Scope on the chip** ★ (operator, 2026-09-11) · the `+` menu stays plain; the chip is the only place that says *"this chat only · 24h"*, and it rides into the sent message | phase-244, shell-04, chat, composer, attach, scope, g2-sketch-gate |
+
+- **Why A over B** — a menu is read once and closed; **a chip is still on screen while the person types
+  and survives into the transcript.** Reopening the chat tomorrow, A still says `this chat only`;
+  B's menu footer is long gone. ⛔ **The obligation that creates:** the scope word must be rendered by
+  the **SENT message**, not only by the pending composer chip — a build that puts it solely in the
+  composer has shipped B's weakness with A's cost.
+- **Not taken, recorded rather than dropped** — B's menu header, its footer *"Files here stay in this
+  chat. The Library is for files you keep."*, and its in-modal destination chip. All preserved under
+  tab B and in `COPY.js` → `COPY.b`. ⚠ **If UAT shows people still expect the Library, B's footer is
+  the cheapest single addition** (one line, no layout change) and it **composes with A** rather than
+  replacing it.
+- ⛔ **The confirm button is the last moment before the file exists** — keep A's `Attach`, and never
+  `Import`, which is the word the Library door uses.
+- ⚠⚠ **`.pdf` IS NOT ACCEPTED, and a PDF is the most likely first file anyone attaches.**
+  `_ALLOWED_EXT` (`backend/app/api/workspace.py:124-130`) is **fifteen** extensions — OOXML ∪ 7 text ∪
+  5 image — with **no PDF**. Drawn as its own state carrying the server's verbatim 422. **A scope
+  decision for the plan, not for the sketch:** accept the gap and make the refusal good, or add
+  `.pdf` — not free, since that door was built for workflow templates (`kind='template_input'`) and
+  nothing in `workspace.py` validates a PDF container.
+- ⚠ **The TTL is a READ GATE, not a delete** (`D-244-04`) — after `template_ttl_hours` (24) the row
+  survives invisibly and the file stops resolving, so a week-old transcript holds a chip pointing at
+  nothing. The `Expired (24h)` state draws that rather than leaving a build to improvise a dead link.
+- ⚠ **The cloud item is gated on `hasCloudStorage`**, so a person with no cloud connection sees the
+  local item alone — it must read correctly by itself. Both variants are drawn with both present.
+- **The chip lands in the composer's EXISTING chips row** — `ActiveConnectorChips`
+  (`MessageInput.tsx:321-327`) already renders there, so the attachment is a sibling of the connector
+  chip, not a new region.
+- **Scenario deliberately authored** (*Q4 supplier pricing review*, Meridian) per the
+  realistic-not-fixture rule; every engine fact in `COPY.engine` is read from shipped source.
