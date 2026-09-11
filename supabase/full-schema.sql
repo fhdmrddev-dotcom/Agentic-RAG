@@ -719,8 +719,17 @@ CREATE TABLE public.app_settings (
     CONSTRAINT app_settings_extraction_table_engine_pdf_check CHECK ((extraction_table_engine_pdf = ANY (ARRAY['camelot'::text, 'pdfplumber'::text]))),
     CONSTRAINT app_settings_hnsw_ef_search_bounds CHECK (((hnsw_ef_search IS NULL) OR ((hnsw_ef_search >= 10) AND (hnsw_ef_search <= 1000)))),
     CONSTRAINT app_settings_hnsw_iterative_scan_values CHECK (((hnsw_iterative_scan IS NULL) OR (hnsw_iterative_scan = ANY (ARRAY['off'::text, 'strict_order'::text, 'relaxed_order'::text])))),
-    CONSTRAINT app_settings_source_max_file_size_mb_bounds CHECK (((source_max_file_size_mb IS NULL) OR ((source_max_file_size_mb >= 1) AND (source_max_file_size_mb <= 50))))
+    CONSTRAINT app_settings_multimodal_max_vision_calls_bound CHECK (((multimodal_max_vision_calls IS NULL) OR ((multimodal_max_vision_calls >= 1) AND (multimodal_max_vision_calls <= 1000)))),
+    CONSTRAINT app_settings_source_max_file_size_mb_bounds CHECK (((source_max_file_size_mb IS NULL) OR ((source_max_file_size_mb >= 1) AND (source_max_file_size_mb <= 50)))),
+    CONSTRAINT app_settings_vision_max_pages_bound CHECK (((vision_max_pages IS NULL) OR ((vision_max_pages >= 1) AND (vision_max_pages <= 500))))
 );
+
+
+--
+-- Name: COLUMN app_settings.multimodal_max_vision_calls; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.app_settings.multimodal_max_vision_calls IS 'SEED-227. The per-document ceiling on paid vision calls during ingestion. Bounded 1..1000 by the API (app/api/settings.py) and, since Phase 242, by app_settings_multimodal_max_vision_calls_bound here — because the two ends fail in opposite and equally silent ways: 0 disables image description for the whole install while every ingestion still reports success, and an unbounded value turns one upload into unbounded spend. Neither end announces itself, so a refusal is the only thing that can. NULL is legal and means "use the config.py default".';
 
 
 --
@@ -755,7 +764,7 @@ COMMENT ON COLUMN public.app_settings.vision_model IS 'Model used to transcribe 
 -- Name: COLUMN app_settings.vision_max_pages; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON COLUMN public.app_settings.vision_max_pages IS 'Hard ceiling on pages transcribed per document. A document with more pages is transcribed up to this number and the shortfall is recorded in documents.metadata._vision.truncated AND stated in every chunk header, so a partial transcription can never read as complete.';
+COMMENT ON COLUMN public.app_settings.vision_max_pages IS 'SEED-226. The per-document ceiling on transcribed pages during ingestion. Bounded 1..500 by the API and, since Phase 242, by app_settings_vision_max_pages_bound here. This one silently SHORTENS documents: 0 would transcribe nothing while every ingestion still reported success, and an unbounded value turns one 1,000-page scan into 1,000 paid calls. NULL is legal and means "use the config.py default".';
 
 
 --
@@ -6277,6 +6286,12 @@ CREATE POLICY "Users can view tuner runs on own or global skills" ON public.tune
 
 
 --
+-- Name: app_settings; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.app_settings ENABLE ROW LEVEL SECURITY;
+
+--
 -- Name: audit_log; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
@@ -6956,6 +6971,33 @@ ALTER TABLE public.tuner_runs ENABLE ROW LEVEL SECURITY;
 --
 
 ALTER TABLE public.user_memory ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: user_settings; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.user_settings ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: user_settings user_settings_owner_insert; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY user_settings_owner_insert ON public.user_settings FOR INSERT TO authenticated WITH CHECK ((user_id = auth.uid()));
+
+
+--
+-- Name: user_settings user_settings_owner_select; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY user_settings_owner_select ON public.user_settings FOR SELECT TO authenticated USING ((user_id = auth.uid()));
+
+
+--
+-- Name: user_settings user_settings_owner_update; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY user_settings_owner_update ON public.user_settings FOR UPDATE TO authenticated USING ((user_id = auth.uid())) WITH CHECK ((user_id = auth.uid()));
+
 
 --
 -- Name: workflow_definitions; Type: ROW SECURITY; Schema: public; Owner: -
