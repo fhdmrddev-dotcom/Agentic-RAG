@@ -230,8 +230,8 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 244-01-PLAN.md — the scroll frame's `min-h-0` chain + the three chat-list bugs (SHELL-01)
-- [ ] 244-02-PLAN.md — the agent can USE an attachment: `.pdf` accepted, sandbox reach, the system-prompt line (SHELL-04)
+- [x] 244-01-PLAN.md — the scroll frame's `min-h-0` chain + the three chat-list bugs (SHELL-01)
+- [x] 244-02-PLAN.md — the agent can USE an attachment: `.pdf` accepted, sandbox reach, the system-prompt line (SHELL-04)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 

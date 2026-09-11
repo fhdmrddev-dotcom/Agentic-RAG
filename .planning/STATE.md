@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v4.1
 milestone_name: Ship It & Feel It
 status: executing
-last_updated: "2026-09-11T18:13:49.474Z"
+last_updated: "2026-09-11T18:32:35.366Z"
 last_activity: 2026-09-11
 progress:
   total_phases: 12
@@ -31,14 +31,14 @@ See: `.planning/PROJECT.md` (updated 2026-09-10)
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviors (skills) that persist and can be shared.
 
-**Current focus:** **v4.1 Ship It & Feel It** — started 2026-09-11, a deliberate CONSOLIDATION
+**Current focus:** Phase 244 — the-chat-shell-and-the-composer
 milestone (not v5.0: it opens no new capability axis). Ship v4.0 to production, then fix the chat
 surface the operator uses daily. Phase numbering continues at **242**.
 
 ## Current Position
 
-Phase: **242 — Ship It, and Prove What Already Shipped ✅ CLOSED 2026-09-11 (self-verified, `OV-SOLO-01`)** · **243 — The Thinking Block and the Follow-Scroll Seam ✅ COMPLETE (2026-09-11)** · **244 — The Chat Shell and the Composer ▶ PLANNED, READY TO EXECUTE (2026-09-11)**
-Plan: 242 — 2 plans + 2 G-3 fast tasks, all landed · 243 — 5 plans + 243-06 (review fixes), all landed · 244 — **SIX plans in 4 waves, written and checker-PASSED; none executed yet.** ⚠ D-244-17 locked FOUR; the deviation is recorded beside the original in `244-CONTEXT.md` (`SHELL-04` alone is cut into three, on context cost — C-2 makes `SHELL-02` two-layer and C-9 added a third backend seam).
+Phase: 244 (the-chat-shell-and-the-composer) — EXECUTING
+Plan: 1 of 6
 
 ### ✅ Phase 243 — CLOSED 2026-09-11
 
@@ -68,7 +68,7 @@ second is required. Found by driving, reachable by no fence in this phase, and i
 this session silently went nowhere. **Not checked against production** — named in the report as the
 first thing to do.
 
-Status: Ready to execute
+Status: Executing Phase 244
 
 ⭐ **UAT DRIVEN IN A REAL BROWSER, 2026-09-11 — 4 of 5 rows PASS** (`242-UAT-RESULTS.md`; Chrome DevTools MCP, operator's own session, every row scored on the `PUT /settings` REQUEST PAYLOAD, never on a banner). **Row 2 is SHIP-01 itself:** with `multimodal_max_vision_calls = 1001` planted and the UI showing it `invalid`, changing only *Search breadth* sent `{"hnsw_ef_search":50}` → **200**. **That is the save the operator could not perform** — the identical action used to return a 400 about images, on a field they never opened. Row 1: `{"rrf_k":61}`, `content-length: 12`, persisted across a reload. Row 3: the stored-value sentence at 400 **and** the old sentence unchanged when the value is genuinely typed. Row 4: both CHECKs refuse, NULL accepted — and **the clamp fired on REAL data and announced itself** (`CLAMPED 1 row(s) … moved to the nearest bound, NOT reset to the column default`). ⛔ **Row 5 (cloud) is OWED — operator.** ⚠⚠ **AND DRIVING IT FOUND A DEFECT IN THE UAT DOC ITSELF:** Row 3's steps said *"re-enter 1001 yourself"*, which **cannot produce the sentence** — a diffed payload drops a value equal to its baseline. Driven the way it is actually reachable (another client re-sending the stored value) and the row corrected beside its original. **A UAT row written against a diffed payload must ask whether the field it edits will actually travel.** SHIP-01 stays **UNTICKED** only on its production half; **SHIP-02 / SHIP-03 / SHIP-04 are CLOSED with their evidence inline** in `REQUIREMENTS.md` — decisions, not quiet ticks.
 
@@ -108,17 +108,23 @@ overlap; the three append-only registries carry an explicit merge-order block in
 
 ⚠ **NINE measured corrections to this phase's own locked CONTEXT, C-1..C-9 in `244-PATTERNS.md`** —
 three changed a plan's shape, and they are recorded BESIDE their originals, never overwriting:
+
 - **C-1** `D-244-08`'s proposed gate is a **no-op** (`ChatArea.tsx:187` hard-codes `mode:"harness"`
   on the very branch it meant to unlock) — the only working discriminator is `capPaused`.
+
 - **C-2** the cap-paused lock **RETURNS**: only `continue_run` clears `status='cap_paused'`, so
   unlocking the composer alone ships the defect one layer down. Both layers are planned.
+
 - **C-3/C-4** `D-244-11`'s "a third reader is free" is **refuted** — `useAskUserPrompt` mounts a
   fetch per mount, and `MessageItem.tsx:180-188` already measured that cost as 6-vs-1 and closed it.
+
 - **C-5** ⭐ `AttentionCondition` carries **no kind**, so `BUG-260911-03` costs ONE optional field
   and needs no second producer (`D-235-03` + a literal `length === 1` assertion forbid one).
+
 - **C-8** `D-244-20`'s "all hot files HAVE ledger rows" is **FALSE** — the gate exits 1 on **nine**
   `[no-row]` files, including `backend/app/api/workspace.py` at **11/6/620**, G-5-firing and
   invisible to it for its entire life. Each row is owed by exactly one named task.
+
 - **C-9** ⭐⭐ **the one that changed the phase's shape:** `workspace_read` returns
   `"Content available via REST API."` for every binary MIME and the sandbox has **no** workspace
   reach — so criterion 4's *"and the agent can use it"* was unsatisfied for **8 of the 15 accepted
