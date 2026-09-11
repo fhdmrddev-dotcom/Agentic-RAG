@@ -7,7 +7,7 @@ environment: "local dev — vite :5173, backend :8000, Supabase :54322, Redis :6
 thread: "261d5f57-36fb-40ec-bb0b-1c72b7550350 — 'UAT 243 L-2 — long thread (seeded, deletable)'"
 rows_driven: [L-2, L-3, L-4, L-5, L-6 (settled frame)]
 rows_partial: [L-1]
-rows_owed: [L-1, L-6-live-frame, M-1, P-1, G-1, N-1, N-2, N-3, N-4, cross-provider x8]
+rows_owed: [L-1, L-6-live-frame, cross-provider-x8-ATTEMPTED-ABANDONED, M-1, P-1, G-1, N-1, N-2, N-3, N-4, cross-provider x8]
 ---
 
 # Phase 243 — UAT results, driven in a real browser
@@ -359,20 +359,61 @@ check named as the first thing to do and explicitly **not** done here.
 ⭐ **This is the G-4 argument in one line: no fence in this phase could have found it, and the only
 reason it is now written down is that somebody drove the product.**
 
-## ⛔ Owed — not driven
+## ⛔ Owed at close — stated as a decision, never as a claim that everything ran
 
-| Row | What it needs |
-|---|---|
-| **L-6 (live frame)** | the settled frame is DONE above. The **streaming** frame vs the sketch's `▶ Replay the stream` is still owed — that is where the accent and the animated dots live |
-| **M-1 / P-1 / G-1 / N-1..N-4** | multi-tool, parallel-thread, long-message, and the phase's own added rows |
-| **Cross-provider ×8** | every row above ran on **deepseek only**. Reasoning is a provider-shaped feature; seven native providers plus OpenRouter are untested here |
+### The cross-provider board — ATTEMPTED, ABANDONED, and the reason is the point
 
-⚠ **One provider is not a cross-provider scoreboard.** `SC#10`'s roster is unmet, and saying so is
-the point of the rule.
+**All eight providers have keys configured** (`OPENAI`, `ANTHROPIC`, `GOOGLE`, `DEEPSEEK`, `ZHIPU`,
+`MINIMAX`, `MOONSHOT`, `OPENROUTER` — checked), and all eight representatives are **registry-backed**
+in `MODEL_CAPABILITIES`. So the board was **drivable in principle** and is not blocked on credentials.
 
-## Cleanup owed
+**It was attempted and stopped.** ⛔ **Not because it is hard, but because the driver could not
+reliably target the composer's provider picker.** Two prompts were typed and submitted into what
+looked like the right state and went nowhere; a third selected **`minimax / MiniMax-M3`** when
+**`anthropic`** had been clicked. That was caught only because the composer was screenshotted
+afterwards.
 
-The seeded thread is **deletable** and says so in its title:
-`261d5f57-36fb-40ec-bb0b-1c72b7550350`. It also now carries five real runs' worth of genuine
-transcript, which makes it a useful fixture for L-1/L-5 — **left in place deliberately**, to be
-removed when the remaining rows are done.
+⚠⚠ **A scoreboard whose provider attribution is unverified is worse than no scoreboard**, because it
+reads as evidence. `SC#10` exists to prove the surface holds across providers; a row that silently
+ran on the wrong one would assert exactly what it failed to test. **Stopping was the honest call.**
+
+⚠ The API shortcut CLAUDE.md recommends (*"drive each row as a real run with a per-request `model` +
+`provider`"*) was **not available to this driver**: the browser extension refuses to surface a JWT
+(correctly), and `backend/.env` is deny-listed (correctly). **Neither guard was worked around.**
+
+**What the board still needs:** one operator session, or a driver holding a token, sending the same
+no-tool reasoning prompt on each of the eight and recording whether `reasoning_content` arrives and
+the fold renders. ⚠ **Expect legitimate ⛔ rows** — not every provider emits reasoning at all, and a
+provider that emits none is a valid row **with that reason written**, not an omission.
+
+### L-1 — the flicker row
+
+Failed twice on harness mechanics (see above), **never on the product**. It is the only row gating
+`BUG-260718-02`'s part B. **Run it with the folds closed and the sampler on `requestAnimationFrame`.**
+
+### L-6's live frame
+
+The settled frame scored **9/9**. The **streaming** frame was never put beside the sketch's
+`▶ Replay the stream`, and that is where the sketch's own acceptance criterion lives — *"three things
+true simultaneously"* — plus the live-state accent and animated dots, **confirmed not ported**.
+
+### Found while driving, not this phase's, filed not absorbed
+
+**`BUG-260911-02`** — the first click on a chat highlights it but does not open it; a second is
+required. Hit **four times**, then isolated (click 1 → 0 thinking triggers, click 2 → 8). ⚠ **It is
+why prompts in this session went nowhere**, and a person would have concluded the app lost their
+message. **Whether it is new, and whether production reproduces it, was NOT checked** — that is named
+in the report as the first thing to do.
+
+### Observed, routed onward
+
+On returning to a thread after a finished run, the transcript restores **scrolled to the middle**
+rather than to the answer. CHAT-05 is silent on scroll restoration so L-4 still passes. **Routed to
+Phase 244**, which owns the chat shell.
+
+### Cleanup
+
+The seeded thread `261d5f57-36fb-40ec-bb0b-1c72b7550350` (*"UAT 243 L-2 — long thread (seeded,
+deletable)"*) holds 60 seed messages, six real runs, and the two L-5 fixtures (the real 33,713-char
+and 202-char reasoning bodies). **Left in place deliberately** — it is the fixture L-1 and L-6's live
+frame need. Delete it when they are done.

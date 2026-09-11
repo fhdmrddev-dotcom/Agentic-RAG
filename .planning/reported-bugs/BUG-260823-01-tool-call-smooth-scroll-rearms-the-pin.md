@@ -4,10 +4,10 @@ title: Scrolling up during a tool call snaps you back to the bottom — the smoo
 reported: 2026-08-23
 surface: Agentic-RAG
 severity: major
-status: folded
+status: closed
 affected_areas: [frontend/streaming, frontend/chat, UX/scroll]
 folded_into: "243"        # CHAT-03, at /gsd:plan-phase 243, 2026-09-11
-verified_closed_by: null  # 243-03 fixed a residual under DRIVEN vitest fences. NOT `closed`:
+verified_closed_by: "243-03 `8d7dfab43` + 243-06 `0790ad7b0`, driven by UAT row L-2 with a REAL wheel on a 60-message thread, 2026-09-11"  # 243-03 fixed a residual under DRIVEN vitest fences. NOT `closed`:
                           # this file records TWO prior fixes that measured clean on synthetic
                           # events and were refuted by a real mouse wheel. Closure needs the
                           # real-wheel UAT row (243-VALIDATION.md), not a unit test.
@@ -207,3 +207,42 @@ Everything above is a synthetic `WheelEvent` in jsdom. It is strictly more than 
 had — the effect had **zero** behavioural coverage before `243-03`, because `MessageList.test.tsx`
 stubs `scrollIntoView` to a no-op — but it is not a real wheel. **Closure is owed a real-mouse UAT
 row on a long streaming thread**, and `re_open_trigger` now says so.
+
+---
+
+## ✅ CLOSED 2026-09-11 — by the real-wheel drive this file's own history demanded
+
+This report was left `folded` rather than `closed` at 243-03 for one stated reason: **every fence was
+a synthetic `WheelEvent`, and this file records two prior fixes that passed synthetic events and
+failed a real mouse.** Its `re_open_trigger` named the missing evidence exactly.
+
+**That evidence now exists.** UAT row **L-2**, driven 2026-09-11 on a **60-message** thread with a
+**real wheel** injected through the browser's input pipeline, mid-tool-call, measured for ~25 s
+through the end of a five-step run:
+
+| | |
+|---|---|
+| anchor position at release → after 25 s | `top = 287` → `top = 287` |
+| min / max across 257 samples | **287 / 287** |
+| **drift** | **0 px** |
+| app-initiated `scrollIntoView` calls since release | **0** |
+
+The `↓ Jump to live` chip appeared on the wheel-up, and the run finished underneath without moving
+the reader.
+
+⚠ **The measurement method is part of the closure, because the first two readings said FAILED.**
+They tracked `scrollTop`, which showed a 1,039 px "drag" that was not real — message rows grow and
+run cards collapse under the viewport, so `scrollTop` moves while the text on screen does not.
+Instrumenting `Element.prototype.scrollIntoView` proved **zero app scrolls in either release
+window**. ⛔ **A future re-check that measures `scrollTop` will "reproduce" a defect that is not
+there. Measure a fixed anchor's `getBoundingClientRect().top`.**
+
+⚠ **What was fixed is NOT what this report blamed** — see the 2026-09-11 correction above. The named
+root cause was gone before the phase started; the residual found by the RED drive was a **< 120 px
+nudge** that releases the pin while leaving the reader near-bottom, re-pinned by any scroll in the
+gap between the 900 ms hard clock and the 1500 ms gesture window. Plus `243-06` HI-2: a **click**
+inside the transcript re-armed it, which this phase made routine by putting a `<button>` on every
+assistant row.
+
+⚠ **Honest limit:** one real-wheel drive, one provider, one gesture shape. Strong evidence, not proof.
+**Re-open on any sighting of the reader being moved during a live run.**

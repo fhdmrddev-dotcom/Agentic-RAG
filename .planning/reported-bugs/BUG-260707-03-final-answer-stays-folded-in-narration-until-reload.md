@@ -6,7 +6,7 @@ surface: Agentic-RAG
 severity: minor                    # FIXED 2026-07-07 (same day) — scoped content reconcile at clean Deep terminal
 status: folded                    # STAYS folded at 243-05 (2026-09-11) — the code half is measured; residual #1 (live verification) and #3 (SEED-094) are untouched
 affected_areas: [frontend/chat-ui, frontend/streaming]
-folded_into: "176, 243"   # residual #2 (the nav/mount path) routed to 243 / CHAT-05 at /gsd:plan-phase 243, 2026-09-11
+folded_into: "176, 243"   # residual #2 CLOSED 2026-09-11 by UAT row L-4   # residual #2 (the nav/mount path) routed to 243 / CHAT-05 at /gsd:plan-phase 243, 2026-09-11
 verified_closed_by: null   # NOT closed: every fence here is synthetic. G-4 browser row owed — see the 243-05 section below.
 related_seeds: [SEED-094]
 re_open_trigger: "A live tool-bearing run whose answer is still not readable as body text on navigate-back — or any run where the run-end reconcile swaps in a stray interim line (residual #3 / SEED-094)."
@@ -148,3 +148,36 @@ Specifically owed, by name:
    Sketch 234 V1 — the operator-approved acceptance bar — draws exactly this, and `dedupParagraphs`
    still applies; but nobody has *watched* a ten-tool run under it.
 3. **Residual #3 (`SEED-094`) is untouched and out of scope**, as it was at 176.
+
+---
+
+## ✅ RESIDUAL #2 CLOSED 2026-09-11 — driven on the navigation path, not the send path
+
+**UAT row L-4.** A three-step `execute_code` run was started, the operator **navigated away to
+Library mid-stream**, the run finished **off-screen** (confirmed at the database: `tools = 3 ·
+content = 5,604 chars · reasoning = 265 chars`), and the operator **navigated back**.
+
+| | |
+|---|---|
+| thinking triggers on return | 9 |
+| `StreamingNarration` nodes anywhere | **0** |
+| final answer rendered | ✅ |
+| `performance.getEntriesByType('navigation')[0].type` | **`"navigate"`** |
+
+⭐ **That last row is what makes it a closure rather than an anecdote** — a reload reports
+`"reload"`. It reports `"navigate"`, the original page load. The answer resolved purely by leaving
+and returning, with no F5.
+
+⭐ **And the structural half: `narrationNodes = 0`.** 243-05 deleted the arm, so there is no longer a
+fold for the answer to be trapped inside. **The defect cannot recur by the mechanism that caused
+it** — that is a stronger closure than "we fixed the timing".
+
+⚠ **The premise in this file's own second sentence was measured FALSE** before the fix: the mount-path
+reconcile shipped at Phase 176 and had a fence. What actually remained was **where the answer was
+drawn**. See `CHAT-05` in REQUIREMENTS.md.
+
+⚠ **Residual #1 — *"not live-verified"* — is a separate line and is NOT closed by this.**
+
+⚠ **Observed while driving, not a failure of this report:** on return the transcript restores
+**scrolled to the middle** of the thread rather than to the answer. CHAT-05 says nothing about scroll
+restoration. **Routed to Phase 244**, which owns the chat shell.

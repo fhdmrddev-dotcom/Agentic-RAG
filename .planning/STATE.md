@@ -40,8 +40,37 @@ surface the operator uses daily. Phase numbering continues at **242**.
 
 ## Current Position
 
-Phase: **242 — Ship It, and Prove What Already Shipped (CODE-COMPLETE, self-verified, UAT OWED)** · **243 — The Thinking Block and the Follow-Scroll Seam (CODE-COMPLETE, self-verified, UAT OWED)**
+Phase: **242 — Ship It, and Prove What Already Shipped (CODE-COMPLETE, self-verified, UAT OWED)** · **243 — The Thinking Block and the Follow-Scroll Seam ✅ COMPLETE (2026-09-11)**
 Plan: 242 — 2 plans + 2 G-3 fast tasks, all landed · 243 — 5 plans + 243-06 (review fixes), all landed
+
+### ✅ Phase 243 — CLOSED 2026-09-11
+
+All five ROADMAP success criteria true and demonstrated; **CHAT-01..05 all tick**. **Five UAT rows
+driven in a real browser** on a purpose-seeded 60-message thread: **L-2** (a **real wheel**
+mid-tool-call — anchor drift **0 px** across 257 samples, **0** app `scrollIntoView` calls),
+**L-3**, **L-4** (`navigation.type === "navigate"` — **no reload**), **L-5** (the real corpus
+extremes; **3 clamp controls for exactly 3 clamped bodies**), **L-6 settled frame** (**9/9** against
+sketch 234 V1, from computed style).
+
+`BUG-260823-01` **closed** — its `re_open_trigger` named a real-wheel row and L-2 supplied it.
+`BUG-260707-03` residual #2 **closed**. `BUG-260718-02` stays **`folded`**, part B open on L-1.
+
+⚠ **`243-VERIFICATION.md` reads `passed` but says "self-verified", never "reviewed"**
+(`OV-SOLO-01`).
+
+⛔ **Owed, as a DECISION and not an omission** (full detail in `243-UAT-RESULTS.md`):
+**L-1** (failed twice on harness mechanics, never on the product) · **L-6's live frame** · and the
+**cross-provider board — ATTEMPTED and ABANDONED.** All eight keys are configured and all eight
+representatives are registry-backed, so it is not credential-blocked; it stopped because **the driver
+could not verify which provider a row actually ran on** (a click intended for `anthropic` selected
+`minimax`, caught only by screenshot). **A scoreboard with unverified attribution is worse than
+none.**
+
+⚠ **`BUG-260911-02` filed** — the first click on a chat highlights it but does not open it; a
+second is required. Found by driving, reachable by no fence in this phase, and it is why prompts in
+this session silently went nowhere. **Not checked against production** — named in the report as the
+first thing to do.
+
 
 Status: **242 code-complete.** Commits `05203a1ed` (verifier repair) · `d3eae092b` (migration 178 + the class fence) · `1c67f20d5` (SEED-271) · `46292bb81` (changed-fields payload + stored-value refusal) · `681b82680` (register closure + VALIDATION).
 

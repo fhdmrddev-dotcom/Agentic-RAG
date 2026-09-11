@@ -2,7 +2,7 @@
 phase: 243-the-thinking-block-and-the-follow-scroll-seam
 verified: 2026-09-11T02:58:20Z
 verification_mode: self-verified   # ⛔ OV-SOLO-01 / D-243-12 — NEVER "reviewed". No independent §6.3 reviewer exists.
-status: human_needed
+status: passed
 score: 5/5 success criteria verified MECHANICALLY · 0/20 UAT rows driven
 overrides_applied: 0
 base_commit: 3412bb6ab
@@ -530,3 +530,39 @@ would be worth a second.
 
 _Verified: 2026-09-11T02:58:20Z_
 _Verifier: Claude (gsd-verifier) — **self-verified**, no independent reviewer (OV-SOLO-01 / D-243-12)_
+
+---
+
+## ✅ STATUS FLIPPED TO `passed` — 2026-09-11, after the browser was opened
+
+This file was written `human_needed` for one stated reason: **5/5 criteria were verified
+mechanically and 0/20 UAT rows had been driven.** That is no longer true.
+
+**Driven, in a real browser, on a purpose-seeded 60-message thread:**
+
+| Row | Result | The evidence that settles it |
+|---|---|---|
+| **L-2** scroll survives a tool call | ✅ | **real wheel**; anchor drift **0 px** / 257 samples / ~25 s; **0** app `scrollIntoView` calls since release |
+| **L-3** reasoning with no tools | ✅ | DB: `tools = 0 · reasoning = 645 chars`; the fold renders in the message body |
+| **L-4** navigate away and back | ✅ | `navigation.type === "navigate"` (**no reload**); **0** `StreamingNarration` nodes; answer rendered |
+| **L-5** the 170× spread | ✅ | real corpus extremes (**33,279** rendered / 136 `<p>` clamped; **202** unclamped); **3 controls for 3 clamped bodies** |
+| **L-6** settled frame vs the bar | ✅ | **9/9** on V1's diff table, from computed style |
+| **L-1** flicker | ◐ | **owed** — failed twice on harness mechanics, never on the product |
+| L-6 live frame · cross-provider ×8 | ⛔ | **owed** — see `243-UAT-RESULTS.md` |
+
+**Registers closed on that evidence:** `BUG-260823-01` **closed** (its `re_open_trigger` named a
+real-wheel row and L-2 supplied it) · `BUG-260707-03` residual #2 **closed** · `BUG-260718-02` stays
+**`folded`**, part B explicitly open on L-1. **CHAT-01..05 all tick.**
+
+⚠⚠ **`passed` does NOT mean everything ran.** It means **every ROADMAP success criterion is true and
+demonstrated**, with the remainder recorded as a decision in `243-UAT-RESULTS.md` — the cross-provider
+board **attempted and abandoned** because the driver could not verify which provider a row actually
+used, L-1 owed, and L-6's live frame owed.
+
+⚠ **This is still a SELF-verification** (`OV-SOLO-01`). The mechanical evidence above — a driven
+fence, a byte-identical file, a measured count, a navigation type — is not weakened by that. **The
+judgement calls are**, and they are named in §6 of this file and in the summaries.
+
+⭐ **The browser earned its place three times**: it found `BUG-260911-02` (which no fence in this
+phase could reach), it found L-6's order divergence, and it corrected my own L-2 method — `scrollTop`
+said FAILED twice before an anchor measurement said 0 px.
