@@ -77,19 +77,39 @@ register knows only the register below it; the code is the bottom.
 
 ### CHAT — the thinking block and the follow-scroll seam
 
-- [ ] **CHAT-01**: During a reasoning stream the thinking block reads as a calm, structured surface,
-      not a flat `whitespace-pre-wrap` font-mono blob (`RunCard.tsx:501`). The operator's stated
-      comparison is Claude.ai — a single calm line while streaming, expandable into a timeline.
-      ⚠ **G-2 fires: `/gsd:sketch` first, and the operator-approved mockup is the acceptance bar.**
-      Closes `BUG-260718-02` part A. Folds `SEED-032` (reasoning real-time UI parity).
-- [ ] **CHAT-02**: Reasoning deltas reach the UI on a coalesced cadence. Today
-      `StreamsProvider.tsx:421-425` fires a full `setMessages` **per token**, unthrottled — while
-      `lib/throttle.ts` exists and is wired only to the cache writer, never to the UI path.
-- [ ] **CHAT-03**: Scrolling up during a tool call leaves you where you scrolled. Today
-      `MessageList.tsx:164-176` re-runs per token (its deps include `messages`) and calls
-      `scrollIntoView` each time — with `behavior: "smooth"` whenever a tool is preparing.
-      ⭐ **This is the same seam as CHAT-02's repaint**, and it is `BUG-260823-01`'s root cause:
-      two open bugs, one mechanism. Scoping them apart would fix one and re-break the other.
+- [~] **CHAT-01**: ⚠ **CODE-COMPLETE at Phase 243, checkbox deliberately UNTICKED — the deliverable is
+      a perception and no browser has been opened.** ~~During a reasoning stream the thinking block
+      reads as a calm, structured surface, not a flat `whitespace-pre-wrap` font-mono blob
+      (`RunCard.tsx:501`)~~ — **shipped**: the four classes are gone, the body renders real
+      paragraphs at `text-sm`, and the renderer moved to `ThinkingBlock.tsx` (`b9819b7ab`,
+      `96ca3909c`, `2a988c3de`). **G-2 was DISCHARGED** by sketches 234 (V1 "Thin rule") and 235
+      (B "bare line"), operator 2026-09-11. ⚠ **"expandable into a timeline" is PRE-SKETCH LANGUAGE
+      and must not be built** — the operator rejected V2 Segmented (*"the labels are ours, not the
+      model's"*) and V3 Beats (*"discards the model's actual words"*); **V1's paragraphs ARE the
+      structure**. `BUG-260718-02` stays **`folded`, not closed** — every fence is synthetic.
+      Ticks when `243-VALIDATION.md` row **L-6** is driven against `sketches/234/index.html`.
+      Folds `SEED-032`.
+- [x] **CHAT-02**: ✅ **DELIVERED at Phase 243 (`bfdf899b1`).** ~~Today `StreamsProvider.tsx:421-425`
+      fires a full `setMessages` **per token**, unthrottled — while `lib/throttle.ts` exists and is
+      wired only to the cache writer, never to the UI path.~~ ⚠ **That sentence went FALSE the moment
+      the phase shipped and is struck through rather than deleted — leaving it standing would have
+      been this file committing the phase's own rot mode, inside the phase.** Shipped:
+      `makeAccumulatingCoalescer` (60 ms, **with** a leading edge, so the first token is not delayed)
+      on the producer side. **Measured: 60 real deltas → 61 `scrollIntoView` calls before, ≤14 after**,
+      byte-exact content. ⛔ `makeThrottle` is last-write-wins, so accumulation moved into a closure
+      accumulator flushed THROUGH the coalescer, draining on every structural callback — a naive wrap
+      dropped tokens AND inverted Anthropic's interleaved text/tool_use order.
+- [~] **CHAT-03**: ⚠ **CODE-COMPLETE at Phase 243 (`8d7dfab43`), checkbox UNTICKED — every fence is a
+      synthetic `WheelEvent`, and this bug's own history records TWO fixes that passed synthetic
+      events and failed a real mouse.** ⛔ ~~it is `BUG-260823-01`'s root cause~~ — **the report's
+      stated cause NO LONGER EXISTED**: it was repaired at `64357e979` (2026-09-04 11:46, an
+      **untagged quick task**, not Phase 228), while the report sat `status: open` for nineteen days.
+      The RED drive found a **different** residual: a nudge of **< 120 px** releases the pin but
+      leaves the reader near-bottom, so between the 900 ms hard clock and the 1500 ms gesture window
+      **any** scroll re-pinned them. One ref, one clause, `useFollowScroll.ts:236`.
+      ⭐ **The one-mechanism claim was MEASURED TRUE: `MessageList.tsx` is byte-unchanged** — the
+      scroll half moved because the cadence half did. Ticks when row **L-2** is driven with a **real
+      wheel on a ≥50-message thread**. `BUG-260823-01` stays **`folded`**.
 - [x] **CHAT-04**: Reasoning is visible on pure-text replies, not only on tool-bearing turns.
       ~~`MessageItem.tsx:437-439` gates it on tool calls today, so a reasoning model answering a
       plain question shows no thinking at all.~~
@@ -179,8 +199,8 @@ Filled by the roadmapper 2026-09-11. **Every REQ-ID above maps to exactly one ph
 | SHIP-03 | 242 — Ship It | Pending — ⚠ claimed done by the deploy record, **unverified against cloud** |
 | SHIP-04 | 242 — Ship It | Pending — ⚠ **the push already landed** at `1f313670b` (2026-09-10); what is owed is the verification |
 | CHAT-01 | 243 — Thinking block + follow-scroll seam | **Code-complete, UAT-owed.** G-2 sketch DONE (234 V1 / 235 B). 243-01 the net; **243-02 the STRUCTURE**; **243-04 the APPEARANCE** — four classes out, `text-sm`, real paragraphs, a self-removing clamp, and an HONEST duration (`b9819b7ab`, `96ca3909c`, `2a988c3de`). ⚠ **The box stays unticked deliberately:** the requirement's words are *"reads as a calm surface"*, which is a PERCEPTION, and every fence shipped for it is synthetic — the same standard on which `BUG-260718-02` was left `folded` rather than `closed`. Tick it at `/gsd:verify-work 243`, after the G-4 row. ⚠ One DECLARED difference from the acceptance bar (D-243-13) is recorded in `243-04-SUMMARY.md` for `243-VERIFICATION.md` to carry |
-| CHAT-02 | 243 — Thinking block + follow-scroll seam | Pending |
-| CHAT-03 | 243 — Thinking block + follow-scroll seam | Pending — ⭐ **one mechanism with CHAT-02; may not be split** |
+| CHAT-02 | 243 — Thinking block + follow-scroll seam | ✅ **DELIVERED** `bfdf899b1` — producer-side coalescer, 60 ms, leading edge. 60 deltas → 61 scrolls before / ≤14 after |
+| CHAT-03 | 243 — Thinking block + follow-scroll seam | ⚠ **Code-complete, UNTICKED** — `8d7dfab43`. ⭐ one-mechanism claim MEASURED: `MessageList.tsx` byte-unchanged. Ticks on row **L-2**, real wheel, ≥50 messages |
 | CHAT-04 | 243 — Thinking block + follow-scroll seam | ✅ **DONE 2026-09-11 (`243-02`, `2a62acb60`)** — 243-01 pinned the defect as §8; 243-02 INVERTED it. One reasoning renderer, mounted unconditionally. ⚠ The requirement's own line number (`:437-439`) was wrong — corrected in place, not deleted |
 | CHAT-05 | 243 — Thinking block + follow-scroll seam | **Code-complete, UAT-owed** (`243-05`, `5e03d12b0` + `63e56e79f`). ⭐ **The requirement's own second sentence was WRONG and is corrected in place above, not deleted:** the navigation reconcile shipped at Phase 176 and was never re-measured; the live residual was the RENDER BRANCH. `MessageItem` loses the `StreamingNarration` arm; the answer now takes the settled answer's own renderers, below the thinking line. ⚠ Unticked on the same standard as CHAT-01 — synthetic fences only, **G-4 browser row owed**, `BUG-260707-03` stays `folded` |
 | SHELL-01 | 244 — Chat shell + composer | Pending |
