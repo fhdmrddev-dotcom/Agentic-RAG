@@ -103,8 +103,28 @@ REVOKE DELETE ON public.user_settings FROM authenticated;
 --       DELETES EVERY VECTOR IN THE CORPUS. It was executable by `anon` at
 --       /rest/v1/rpc/resize_embedding_column. It is called by the re-embed path on the service
 --       role and has no business being reachable from a browser.
+--
+--       ⚠⚠ REVOKING FROM `anon` ALONE IS A NO-OP, AND THIS WAS MEASURED, NOT REASONED.
+--       The first version of this migration revoked from `anon` and `authenticated` only. It
+--       applied cleanly to local and the verify block still reported
+--       `*** FAIL *** anon cannot resize embeddings`. The ACL says why:
+--
+--           proacl = {=X/postgres, postgres=X/postgres, service_role=X/postgres}
+--                     ↑ an EMPTY grantee before "=" is PUBLIC
+--
+--       **Postgres grants EXECUTE on every function to PUBLIC by default.** `anon` inherits it
+--       from PUBLIC, so revoking the role changes nothing while the PUBLIC grant stands. The
+--       revoke MUST target PUBLIC, and the roles that legitimately need it are then granted back
+--       explicitly.
+--
+--       ⭐ The same is true of EVERY function the security advisor flagged as anon-executable.
+--          A future sweep that revokes role-by-role will silently achieve nothing.
+REVOKE EXECUTE ON FUNCTION public.resize_embedding_column(integer) FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.resize_embedding_column(integer) FROM anon;
 REVOKE EXECUTE ON FUNCTION public.resize_embedding_column(integer) FROM authenticated;
+
+-- The re-embed path calls this on the service role; restore it explicitly now PUBLIC is gone.
+GRANT EXECUTE ON FUNCTION public.resize_embedding_column(integer) TO service_role;
 
 COMMIT;
 
