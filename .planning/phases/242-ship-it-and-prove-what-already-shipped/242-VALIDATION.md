@@ -1,14 +1,16 @@
 ---
 phase: 242-ship-it-and-prove-what-already-shipped
-status: owed
-driven: 0 / 5
+status: driven
+driven: 4 / 5
+results: 242-UAT-RESULTS.md
 surface: Agentic-RAG
 ---
 
 # Phase 242 — VALIDATION (UAT rows)
 
-**Authored 2026-09-11, at the phase's close. ⛔ ZERO ROWS DRIVEN — no browser was opened at any
-point in this phase.**
+**Authored 2026-09-11 at the phase's close. ⭐ DRIVEN THE SAME DAY IN A REAL BROWSER (Chrome
+DevTools MCP): rows 1-4 PASS, row 5 owed to the operator on cloud.** Full evidence — request
+payloads, statuses, verbatim response bodies — in **`242-UAT-RESULTS.md`**.
 
 ⚠ **Why this file exists at all, and why it was nearly missed:** the ROADMAP marks Phase 242
 **UI hint: yes**, so **G-4 fires** — *"Operator-defined 'I'd recognize failure here' scenarios…
@@ -84,18 +86,34 @@ still 1001 and is simply not in the request.
 | **Requirement** | SHIP-01 · D-242-03 |
 | **Where** | ⛔ **LOCAL ONLY** — it reuses Row 2's planted value, and Row 2's warning applies in full |
 
-**Steps** — with `multimodal_max_vision_calls = 1001` stored (same setup as row 2), open the
-*Images read per document* field, **re-enter 1001 yourself**, and save.
+⚠⚠ **CORRECTED 2026-09-11 AFTER DRIVING IT — THIS ROW'S ORIGINAL STEPS COULD NOT PRODUCE ITS OWN
+EXPECTED RESULT, and the original is described rather than quietly replaced.** It read: *"open the
+Images read per document field, **re-enter 1001 yourself**, and save."* **That cannot work, by
+construction.** After D-242-02 the payload is a diff against the hydrated baseline, so re-entering
+`1001` over a stored `1001` compares **equal**, the key is dropped, and nothing is sent. ⭐ The code
+already said so and the row did not read it — `_range_refusal_detail`'s docstring: *"D-242-02 makes
+the untouched-field path unreachable FROM THE UI — it does not make it unreachable… any other client
+can send the stored value back."* **A UAT row written against a diffed payload must ask whether the
+field it edits will actually travel.**
 
-**Pass** — the banner reads, in substance: *"'Images read per document' was already set to 1001,
-which is outside the allowed range of 1–1000. That is what is blocking this save — nothing you just
-changed is at fault."*
-**Fail** — the old sentence (*"must be between 1 and 1000"*), which is truthful about the rule and
-misleading about the cause.
+**Steps — ARM A (the stored-value sentence), as "another client":** with
+`multimodal_max_vision_calls = 1001` stored (same LOCAL setup as row 2), issue a real authenticated
+`PUT /settings` carrying only `{"multimodal_max_vision_calls": 1001}` — from the browser console
+with the page's own bearer token and `x-org-id`, or curl. **Driven 2026-09-11: 400 with the
+stored-value sentence.**
 
-**Mirror, in the same row** — type **2000** instead. The banner must read the OLD sentence, because
-now you DID type it and that sentence carries what the bound buys. ⚠ Getting the nicer sentence here
-would be a regression: the new branch must not swallow the old one.
+**Steps — ARM B (the negative control), through the real UI:** open the *Images read per document*
+field, type **2000**, and save. **Driven 2026-09-11: the OLD sentence, verbatim.**
+
+**Pass, ARM A** — the response body reads, in substance: *"'Images read per document' was already
+set to 1001, which is outside the allowed range of 1–1000. That is what is blocking this save —
+nothing you just changed is at fault."*
+**Fail, ARM A** — the old sentence (*"must be between 1 and 1000"*), which is truthful about the
+rule and misleading about the cause.
+
+**Pass, ARM B** — the banner reads the **OLD** sentence, because now you DID type it and that
+sentence carries what the bound buys (SEED-227). ⚠ Getting the nicer sentence here would be a
+REGRESSION: the new branch must not swallow the old one.
 
 ---
 
