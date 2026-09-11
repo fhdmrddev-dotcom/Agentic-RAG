@@ -9995,7 +9995,7 @@ cells rot within days.
 | [`backend/app/services/harness_engine.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharness_enginepy) | 54 / 20 / 3135 | **FIRES** | honoured by construction (194 / **214**) — 214-06 resolved the pause's service at ONE call site |
 | [`frontend/src/components/chat/RunCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatruncardtsx) | 28 / 14 / 710 | **FIRES** | ⭐ **G-5 DISCHARGED (243-02)** — the reasoning fold left for `ThinkingBlock.tsx`, `-39/+20`, one `useState` fewer. ⚠ row was STALE at `26/12/728`. State 2 stayed, by decision |
 | [`frontend/src/components/chat/ThinkingBlock.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatthinkingblocktsx) | 4 / 1 / 283 | no | ⚠ **row at ONE phase BY DESIGN**; `117 → 283` in one phase (**243-04**). Invariants: **one reasoning renderer**, and **no duration derived from length** |
-| [`frontend/src/components/chat/MessageInput.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageinputtsx) | 29 / 14 / 643 | **FIRES** | honoured by construction (194.1) |
+| [`frontend/src/components/chat/MessageInput.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageinputtsx) | 30 / 15 / 855 | **FIRES** | ⛔ **244-05 GREW IT +212 and a SEAM IS NOW OWED** — the local attach door (2 states, 2 handlers, 3 JSX blocks). The row was correct at `29 / 14 / 643`; the extraction is named in §244-05 |
 | [`frontend/src/components/chat/MessageList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessagelisttsx) | 21 / 9 / 307 | **FIRES** | ⚠ row STALE a THIRD time (`19/8/267` → `20/8/292` → `20/8/300`). honoured by construction (**244-01**): `min-h-0` added to the ONE `<ScrollArea>` call site — a class token, no state, no prop |
 | [`frontend/src/hooks/useFollowScroll.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusefollowscrollts) | 4 / 2 / 314 | does not fire | ⛔ **NO ROW FOR ITS ENTIRE LIFE — added 243-03**, then STALE at `3/2/265` one phase on. **243-06:** the re-arm now asks whether the reader is STILL leaving, not what they last did |
 | [`frontend/src/lib/throttle.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibthrottlets) | 2 / 2 / 108 | does not fire | ⛔ **NO ROW FOR ITS ENTIRE LIFE — added 243-03.** TWO opposite primitives on purpose; ⛔ never unify them — one of the two call sites breaks silently |
@@ -10218,6 +10218,7 @@ cells rot within days.
 | [`frontend/src/lib/workspaceAllowedExt.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibworkspaceallowedextts) | 1 / 1 / 54 | no (new) | young (created 244-02). Row added AT CREATION, per the `settingsSearchPayload.ts` precedent — an absent row is invisible to G-5 at any count |
 | [`frontend/src/components/chat/ChatAttachmentChip.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatchatattachmentchiptsx) | 1 / 1 / 144 | no (new) | young (created 244-05). Row added AT CREATION. The ONE chip, THREE states; `sent` carrying `this chat only` is D-244-22's build obligation and `expired` is D-244-25's |
 | [`frontend/src/components/chat/composerCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatcomposercopyts) | 1 / 1 / 93 | no (new) | young (created 244-05). Row added AT CREATION. A PORT of sketch 236's `COPY.js`, fenced `?raw`. ⛔ `COPY.b` is deliberately NOT ported (D-244-23) |
+| [`frontend/src/components/chat/ActiveConnectorChips.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatactiveconnectorchipstsx) | 2 / 2 / 82 | no (2 phases) | ⚠ absent for its entire life — row added 244-05 at its SECOND phase. **244**: the row container HOISTED out; it is bare chips now, `null` on empty (D-244-26) |
 
 
 
@@ -11771,3 +11772,107 @@ ROADMAP names a quiet Library write as `SHELL-04`'s failure mode (D-244-23 / `T-
 **Seam.** None owed. ⚠ The rule that keeps it small: this file holds **strings the sketch declares**.
 Copy that has no sketch behind it does not belong here — it belongs wherever it is rendered, where a
 reader can see nobody approved it.
+
+---
+
+## `frontend/src/components/chat/ActiveConnectorChips.tsx`
+
+**`2 / 2 / 82`** — re-derived at `244-05` T2. ⚠ **Absent from the scan list for its ENTIRE LIFE**
+(created Phase 216) — the row is added here at its **second** phase, not its third, per the
+`settingsSearchPayload.ts` precedent. D-244-20 claimed all of this phase's hot files had rows;
+`244-PATTERNS.md` C-8 measured that false and the gate named this file unprompted.
+
+**What changed at 244-05: THE ROW CONTAINER WAS HOISTED OUT.** The component no longer owns a
+`<div>`, a `Using:` label or the `active-connector-chips` testid — it renders its chips as a
+**fragment**, and `null` when nothing is armed. `MessageInput` owns the row.
+
+⛔ **THE RULING, AND WHY THE OBVIOUS ARM WAS WRONG.** D-244-26 says the chat-attachment chip is
+*"a **sibling** of the connector chip, not a new region"*. Three arms existed:
+
+| arm | verdict |
+|---|---|
+| a `children` / `extra` **slot inside this component** | ⛔ **WRONG, and measurably so.** It returned `null` on empty, so the attachment chip would **VANISH for a person with no connector armed** — precisely the one-item case D-244-26 orders checked |
+| a **second `<div>` beneath** it | ⛔ the "new region" the decision forbids, and the easy accident |
+| **HOIST** the container into `MessageInput` | ✅ taken |
+
+⭐ **THE RULING HAS AN EXECUTABLE FORM, and without it the ruling is prose.**
+`ComposerAttach.composition.test.tsx` Test 4 was driven **RED against the forbidden arm actually
+built** — a `children` slot here, the container and label restored, `MessageInput` passing the
+chips through — which failed with `Unable to find an element by:
+[data-testid="chat-attachment-chip"]`. Both files were then restored **md5-identical**
+(`75ac2afcd28bf03920e8c2bcd9c6b0ed`, `f45dfe40c32361955a171c44ac36b01a`).
+
+**The invariants this file now carries.**
+
+1. ⛔ **The empty arm stays `null`, never an empty fragment.** The `Using:` label lives in the
+   hoisted container, so `MessageInput` must be able to tell that no chips came back. This
+   component decides whether CHIPS exist; the composer decides whether the ROW does.
+2. ⛔ **The per-chip `active-connector-chip-{id}` testids are unmoved.** They are what
+   `MessageInput.connectors.test.tsx` actually uses, at **nine** call sites; the container testid
+   it does *not* use was the one that moved. Measured before the hoist, not assumed —
+   `grep -rn 'active-connector-chip'` over `src/` returns those nine and nothing else.
+3. **Exactly ONE mount** (`MessageInput.tsx`). That is what makes the hoist contained rather than a
+   cross-surface change, and it is the fact to re-check before any future move.
+
+**Seam.** None owed at 2 phases. ⚠ The thing to watch: this is now a *chip renderer* with no frame
+of its own. If a third chip kind joins the row, the right shape is a `ComposerChipsRow` that takes
+chip children — a container extracted from `MessageInput`, **not** a slot pushed back into here.
+
+---
+
+### `frontend/src/components/chat/MessageInput.tsx` — `244-05`
+
+**Re-derived at this task: `30 / 15 / 855`.** The `194.1` row read `29 / 14 / 643` and **was
+correct when written** — it is this plan's commit that moves it, which is why the figure is
+re-derived here rather than carried forward.
+
+⛔ **THIS IS NOT "HONOURED BY CONSTRUCTION", AND SAYING SO WOULD BE THE ROT THIS LEDGER EXISTS TO
+STOP.** `244-05` added **+212 lines** to a file that already FIRES G-5 at 15 phases: two pieces of
+state (`pendingAttachments`, `refusal`), a ref, a store action, three handlers
+(`handleAttachLocalFile`, `onAttachInputChange`, `handleRemoveAttachment`), and three new JSX
+blocks (the refusal region, the hoisted chips row, the two-door menu). **A seam is OWED.**
+
+**THE NAMED SEAM, so the next phase does not have to invent one:**
+`useComposerAttachments(threadId)` — a hook returning
+`{ pendingAttachments, refusal, attachInputRef, onAttachInputChange, removeAttachment, dismissRefusal }`,
+plus a `ComposerChipsRow` presentational container taking chip children. That splits the door's
+*behaviour* from the composer's *layout* and leaves `MessageInput` holding the shell, the drafts,
+the connector set and the toolbar — the four things it was already about.
+⚠ **It was NOT taken here, deliberately:** this plan's own charter is the surface sketch 236 drew,
+and an extraction in the same commit as a new feature is how a refactor's blast radius gets
+attributed to the feature. ⛔ **The next plan whose `files_modified` names this file must propose
+the extraction FIRST** — the `retrieval_service.py` rule (SEED-224), applied here.
+
+**What this task built, and the decisions inside it.**
+
+- **The `+` menu is TWO DOORS in the drawn order** — `Attach a file` (never gated) →
+  `From cloud storage` (still `hasCloudStorage`-gated) → the connectors section. ⚠ The divider
+  used to wrap the cloud item **alone**, so hiding it left a dangling rule; the border belongs to
+  the group now, and the group is never empty because the local door is never gated. That is the
+  one-item case D-244-26 orders checked, fixed structurally rather than by a second condition.
+- ⛔ **`ConnectorsFlyout` was NOT re-labelled** to carry `COPY.a.itemConnectors`. Its own
+  `Connectors` header is asserted **verbatim** by `MessageInput.connectors.test.tsx` (BASELINE 5,
+  measured 9 cases at this base), and renaming a shipped surface to satisfy a word in a new fence
+  is breaking a guard to make a guard pass. The section label above it carries the sketch's word
+  instead. ⚠ **The cost is honest and recorded:** the menu now shows a section label and the
+  flyout's own title — logged in `deferred-items.md` rather than left for someone to find.
+- **The refusal is a REGION with three atoms in document order** — `[data-refusal-file]` →
+  `[data-refusal-sentence]` → `[data-refusal-dismiss]` — because `index.html` § `refuseHTML` draws
+  all three and the operator approved all three. ⚠ *"A new attempt clears the error"* is **not** a
+  substitute for the dismiss control: a person who picks the wrong file and walks away must be able
+  to put the composer back **without uploading something else**. Driven RED against a
+  sentence-only fixture (`expected null not to be null`), file restored md5-identical.
+- ⛔ **NO CLIENT-SIDE SIZE OR TYPE GATE was added.** `accept=` reads `WORKSPACE_ACCEPT_ATTR` and is
+  a UX hint only (T-244-05-01); the real boundary is `validate_upload`'s magic-byte + container
+  checks, and the 10 MB cap is enforced server-side three times including **before body
+  materialisation** (WR-04). A second client cap could only ever disagree with the server.
+  `grep -c 'accept="\.'` on this file is **0**.
+- **Pending attachments are CLEARED on send and on thread switch.** ⚠ The thread-switch clear is a
+  decision, not symmetry with the draft map: a chip that followed you into another conversation
+  would be saying `this chat only` **about a chat it is not in** — the one sentence this whole
+  surface exists to make true. The bytes are not lost; they stay in the thread they were uploaded
+  to.
+- ⚠ **`useStreamActions()` is safe to call here with no provider mounted** — it is a plain zustand
+  selector (`StreamsProvider.tsx`), not a context read. Checked before adding it, because
+  `MessageInput` is rendered bare in four shipped suites and a context hook would have turned them
+  all red for a reason that looks like the plan's fault.

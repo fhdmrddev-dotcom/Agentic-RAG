@@ -3546,6 +3546,29 @@ const BASELINE = {
   // so an unstripped grep measures the explanation — the first draft asserted its own
   // `grep -c ... is 0` while containing the sentence, making the claim false by stating it.
   "ChatAttachmentChip.states.test.tsx": 10,
+  // -- Phase 244 (244-05 T2+T3 / SHELL-04 / D-244-26 / D-244-27) — the ordered-block fence -----
+  // BOTH KNOBS, SAME COMMIT. `src/components/chat` has no bare-directory TARGETS entry.
+  //
+  // 10 cases at T2, MEASURED on a green run of the suite alone; T3 extends it.
+  // NINE of the ten were RED on the shipped tree before the build — `Unable to find an element
+  // with the text: Attach a file` and `Unable to find an element by:
+  // [data-testid="composer-attach-input"]`. The tenth (a connector with no attachment) is the
+  // CONTROL: it was green before and its job is to prove the hoist changed nothing else.
+  //
+  // Two deliberate falsifications, both restored md5-identical:
+  //   · Test 4 driven RED against the FORBIDDEN arm — a `children` slot inside
+  //     `ActiveConnectorChips`, which returns `null` on empty — giving `Unable to find an element
+  //     by: [data-testid="chat-attachment-chip"]`. That is D-244-26's ruling in executable form;
+  //     without the RED the ruling is prose. (75ac2afcd28bf03920e8c2bcd9c6b0ed /
+  //     f45dfe40c32361955a171c44ac36b01a.)
+  //   · Tests 6b/6c driven RED against a SENTENCE-ONLY refusal (filename and dismiss atoms
+  //     deleted) — `expected null not to be null` and `expected <div role="alert" …> to be null`.
+  //     The revision pass found that block short two of its three atoms IN THE BUILD; this is
+  //     what stops it narrowing again.
+  //
+  // ⛔ Order is asserted with `compareDocumentPosition`, never `getAllByTestId(...)[0]` — query
+  // order and document order agree often enough to make a reordering bug invisible.
+  "ComposerAttach.composition.test.tsx": 10,
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -5062,6 +5085,16 @@ const TARGETS = [
   // copy PORT against `.planning/sketches/236-.../COPY.js` read with `?raw`, so a re-typed
   // string (a silently different product) cannot land.
   "src/components/chat/__tests__/ChatAttachmentChip.states.test.tsx",
+  // -- Phase 244 (244-05 T2+T3 / SHELL-04) — the composer attach door's composition ----------
+  //
+  // FILE-LEVEL BY NECESSITY — `src/components/chat` appears in this array only inside comments.
+  //
+  // What it guards: the FIVE ordered blocks sketch 236's README names, by DOM POSITION rather
+  // than by vocabulary. D-244-27 exists because the 2026-08-29 correction recorded 200 green
+  // assertions over a surface the operator called "nothing at all like what we designed" — a
+  // contract that asserted words and never composition. This suite owns four of the five blocks
+  // (the `+` menu, the chips row, the refusal, the sent message); the cloud modal is `244-06`'s.
+  "src/components/chat/__tests__/ComposerAttach.composition.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")

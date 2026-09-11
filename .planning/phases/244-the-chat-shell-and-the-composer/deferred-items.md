@@ -81,3 +81,53 @@ under load"* is the observation that rules oversubscription out here, the same w
 
 ⚠ **One green sample would prove nothing and there wasn't one** — this suite was red on all
 three invocations. It is named rather than left unlooked-for.
+
+---
+
+## `244-05` — DEFERRED, with named triggers
+
+### 1. The `+` menu shows TWO connectors headings (cosmetic, recorded not hidden)
+
+Sketch 236's third menu item is `Tools and connectors` (`COPY.a.itemConnectors`). The shipped
+`ConnectorsFlyout` **inlines the whole connectors panel** rather than being a door, and its own
+header already reads `Connectors`. So the built menu now carries a section label
+(`Tools and connectors`) directly above the flyout's own `Connectors` title.
+
+⛔ **The obvious fix — re-label the flyout — was REFUSED, and the reason is not taste.**
+`MessageInput.connectors.test.tsx` asserts `screen.getByText("Connectors")`, an exact full-string
+match, at BASELINE 5 (measured 9 cases at this base). Renaming a shipped surface so a NEW fence can
+pass is breaking a guard to make a guard, and `ConnectorsFlyout.tsx` is not in this plan's
+`files_modified` or in the ledger's scan list.
+
+**Re-open trigger:** the next plan whose `files_modified` names
+`frontend/src/components/chat/ConnectorsFlyout.tsx` — `244-06` touches this same menu and is the
+natural home. The fix is to drop the flyout's internal header and let the menu's section label be
+the only title, updating `MessageInput.connectors.test.tsx` in the same commit.
+
+### 2. Remove is a DETACH, not a DELETE — `workspace.py` has no DELETE route
+
+Measured at this base: `backend/app/api/workspace.py` ships **six** routes — one `POST /files` and
+five GETs — and **no DELETE**. So removing an attachment chip cannot un-upload the file. The bytes
+stay in `workspace_files` inside their 24h read gate and are still hydrated into
+`/sandbox/attachments/` for the thread by `244-02`.
+
+`244-05` closes what it can: a session-scoped detach registry
+(`ChatAttachmentChip.detachAttachment`) keeps a removed file out of the composer AND out of the
+transcript's association rule, fenced by `ComposerAttach.composition.test.tsx`.
+
+⛔ **Its limit, stated rather than hidden:** after a hard reload, within the TTL, a detached file
+falls back inside the association window and re-associates with the next sent message. ⛔ Do NOT
+close this with a persisted client-side hide — that would claim the bytes are gone when they are
+not, which is the exact dishonesty `SHELL-04` exists to remove.
+
+**Re-open trigger:** any plan that adds `DELETE /threads/{id}/workspace/files/{file_id}`. At that
+point the registry becomes a real delete call and this note is deleted with it.
+
+### 3. `MessageInput.tsx` — the extraction is OWED, not taken
+
+`244-05` grew it `643 → 855` on a file already FIRING G-5 at 15 phases. The named seam
+(`useComposerAttachments` + a `ComposerChipsRow` container) is written into
+`docs/HOT-FILE-LEDGER.md` § `frontend/src/components/chat/MessageInput.tsx` — `244-05`.
+
+**Re-open trigger:** the next plan whose `files_modified` names this file must **propose the
+extraction first** — the `retrieval_service.py` / SEED-224 rule applied here.

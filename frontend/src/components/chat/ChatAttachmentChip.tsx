@@ -79,6 +79,44 @@ export function attachmentDisplayName(file: WorkspaceFile): string {
   return segments[segments.length - 1] || file.path
 }
 
+/**
+ * ── THE DETACH REGISTRY (Phase 244 / 244-05 T2) ─────────────────────────────────────────
+ *
+ * ⚠ REMOVE IS A DETACH, NOT A DELETE, AND SAYING SO IS THE HONEST PART.
+ * `backend/app/api/workspace.py` ships SIX routes and **none of them is a DELETE** — measured at
+ * this base: one `POST /files` and five GETs. So a file the person "removes" from the composer is
+ * still in `workspace_files`, still inside its 24h read gate, and still hydrated into
+ * `/sandbox/attachments/` for this thread by `244-02`. What removal can honestly mean is
+ * therefore: *this file is not part of the message I am about to send.*
+ *
+ * This registry is what carries that from the composer to the transcript. It is module-scoped and
+ * SESSION-SCOPED — the same shape as `composerDraftsByThread` and `activeConnectorsByThread`,
+ * which sit in `MessageInput.tsx` for the same reason.
+ *
+ * ⛔ ITS LIMIT, STATED RATHER THAN HIDDEN: after a hard reload, within the TTL, a detached file
+ * falls back inside the time window and re-associates with the next sent message. The honest
+ * close is a DELETE route on the workspace door — backend scope this plan does not carry — and
+ * until then the chip is at least TRUE (the file does belong to this chat, and the agent can read
+ * it). ⛔ Do not "fix" this with a persisted client-side hide: that would claim the bytes are
+ * gone when they are not, which is the one thing this whole surface exists to stop doing.
+ */
+const detachedByThread = new Map<string, Set<string>>()
+
+export function detachAttachment(threadId: string, path: string): void {
+  const set = detachedByThread.get(threadId) ?? new Set<string>()
+  set.add(path)
+  detachedByThread.set(threadId, set)
+}
+
+export function isAttachmentDetached(threadId: string, path: string): boolean {
+  return detachedByThread.get(threadId)?.has(path) ?? false
+}
+
+/** Test-only: reset the module-scoped detach registry between cases. */
+export function _resetDetachedAttachmentsForTest(): void {
+  detachedByThread.clear()
+}
+
 export function ChatAttachmentChip({ file, state, onRemove }: ChatAttachmentChipProps) {
   const effective = chatAttachmentState(file, state)
   const name = attachmentDisplayName(file)

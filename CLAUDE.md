@@ -664,7 +664,8 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/api/runs.py` | 35 / 16 / 1430 | honoured by construction (194) |
 | `backend/app/services/harness_engine.py` | 54 / 20 / 3135 | honoured by construction (194 / **214**) |
 | `frontend/src/components/chat/RunCard.tsx` | 28 / 14 / 710 | ⭐ **G-5 DISCHARGED (243-02)** — the reasoning fold left for `ThinkingBlock.tsx`, `-39/+20`, one `useState` fewer. ⚠ row was STALE at `26/12/728`. State 2 stayed, by decision |
-| `frontend/src/components/chat/MessageInput.tsx` | 29 / 14 / 643 | honoured by construction (194.1) |
+| `frontend/src/components/chat/MessageInput.tsx` | 30 / 15 / 855 | ⛔ **244-05 GREW IT +212 and a SEAM IS NOW OWED** — the local attach door. The row was CORRECT at `29 / 14 / 643`; the named extraction is in §244-05 of the detail file |
+| `frontend/src/components/chat/ActiveConnectorChips.tsx` | 2 / 2 / 82 | ⚠ absent for its ENTIRE LIFE — row added 244-05 at its SECOND phase. **244**: the row container HOISTED out; bare chips now, `null` on empty (D-244-26) |
 | `frontend/src/components/chat/MessageList.tsx` | 21 / 9 / 307 | ⚠ row STALE a THIRD time (`19/8/267` → `20/8/292` → `20/8/300`). honoured by construction (**244-01**): `min-h-0` on the ONE `<ScrollArea>` call site |
 | `frontend/src/components/chat/ChatArea.tsx` | 72 / 36 / 710 | honoured by construction (**244-03**): ONE boolean gains `&& !workflowLock.capPaused`. No second branch, no new state — the whole composer chain already reads this one value |
 | `frontend/src/components/panel/PendingAskCard.tsx` | 14 / 7 / 765 | ⚠ row was STALE at `13 / 7 / 736`. UNTOUCHED by 244-03 (`0 0`) — the chat approval is a MOUNT of its shipped `PendingAskStack`, never an edit to the cross-surface shell |
