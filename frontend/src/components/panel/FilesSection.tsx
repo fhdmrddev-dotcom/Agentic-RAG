@@ -114,12 +114,22 @@ import { TemplateUpload } from "./TemplateUpload"
  * The return type is now TOTAL (`string`, never `null`) — which is what makes the
  * blank unrepresentable rather than merely unlikely.
  */
-const EXPIRY_UNKNOWN = "expiry unknown"
+/**
+ * ⭐ EXPORTED AT PHASE 244 (244-05 T1) — IMPORTED, NEVER RE-DERIVED.
+ *
+ * The chat attachment chip (`components/chat/ChatAttachmentChip.tsx`) needs exactly the reading
+ * this function already computes, and D-244-25's expired state is only honest if it agrees with
+ * the panel's. A second copy of these rules is how two surfaces come to disagree about what an
+ * absent `expires_at` means — and this particular function has already been WRONG TWICE (the
+ * `null`-on-absent blank, then "expires in NaNm" on an unparseable value). The body is unchanged;
+ * only the two `export` keywords are new.
+ */
+export const EXPIRY_UNKNOWN = "expiry unknown"
 
 // ── Ephemeral-template expiry helpers (D-02) — compute on render from
 //    expires_at; NO per-second timer (Anti-Pattern). An agent file renders no
 //    trailing slot at all, so it is byte-identical either way (D-11). ──
-function expiryCaption(expiresAt?: string): string {
+export function expiryCaption(expiresAt?: string): string {
   if (!expiresAt) return EXPIRY_UNKNOWN  // the wire did not say — say THAT
   const at = new Date(expiresAt).getTime()
   // 199 CR WR-02 — an UNPARSEABLE date is a third case, and totality over `string` did not

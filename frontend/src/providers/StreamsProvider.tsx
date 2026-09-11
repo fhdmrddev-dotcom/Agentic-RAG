@@ -3999,6 +3999,67 @@ export function useWorkspaceFiles(threadId: string | null): {
   return { data, isLoading, error, reconcile }
 }
 
+/**
+ * Phase 244 (244-05 T3 / SHELL-04) — A PURE READ of a thread's workspace files. NO FETCH.
+ *
+ * ⛔ `useWorkspaceFiles` above cannot be used here and the reason is a real cost, not a style
+ * preference: it runs `usePanelReconcile`, which FETCHES. `MessageItem` is rendered once per
+ * message, so calling it from a transcript row would fire one reconcile per row — N fetches for
+ * an N-message thread, on every mount. This selector reads the same slice the panel already
+ * reconciles into and adds no traffic at all.
+ *
+ * ⚠ It is a named hook rather than a raw `useStreamsStore` call at the consumer, because D-068-03
+ * makes the store an implementation detail: external callers go through this layer. The selector
+ * returns the SAME array identity until the slice is replaced wholesale (the store never mutates
+ * in place), so a `memo`'d consumer does not re-render on unrelated stream traffic.
+ */
+export function useWorkspaceFilesSnapshot(threadId: string | null): WorkspaceFile[] {
+  return useStreamsStore((s) =>
+    threadId ? (s.workspaceFilesByThread.get(threadId) ?? EMPTY_FILES) : EMPTY_FILES,
+  )
+}
+
+/**
+ * Phase 244 (244-05 T3) — the `created_at` of the TWO user messages immediately preceding
+ * `messageId`, most-recent first, joined by `|`. Either side may be empty.
+ *
+ * ⛔ A STRING, NOT AN OBJECT OR AN ARRAY, AND THAT IS LOAD-BEARING. A zustand selector compares
+ * with `Object.is`, so returning `{ lower, upper }` or `[a, b]` builds a fresh identity on EVERY
+ * store write and re-renders the consumer on every stream delta — the precise cost
+ * `MessageItem`'s `React.memo` (075.4-04) exists to avoid. A joined string compares by value.
+ *
+ * ⛔ WHY NOT THE MESSAGE LIST. Same reason, one step further: handing a transcript row the
+ * messages ARRAY — as a prop or as a selector result — reinstates the per-delta re-render for
+ * every row in the thread. ⛔ And not a PROP either: threading it from `MessageList` would put
+ * the association rule in the list's render path and create a second place that has to agree
+ * about it.
+ *
+ * TWO values rather than one because both callers need a WINDOW: a user row bounds
+ * `(previous user turn, itself]`, and an assistant row bounds `(the turn before that, the turn it
+ * answers]`. One selector, one pass, one stable value.
+ */
+export function usePrecedingUserTurns(
+  threadId: string | null,
+  messageId: string,
+  surfaceId: SurfaceId = "chat",
+): string {
+  return useStreamsStore((s) => {
+    if (!threadId) return "|"
+    const msgs = s.bucketsBySurface.get(surfaceId)?.get(threadId)
+    if (!msgs) return "|"
+    let prev = ""
+    let prevPrev = ""
+    for (const m of msgs) {
+      if (m.id === messageId) break
+      if (m.role === "user") {
+        prevPrev = prev
+        prev = m.created_at
+      }
+    }
+    return `${prev}|${prevPrev}`
+  })
+}
+
 // useAskUserPrompt surfaces a PendingAsk[] — parallel asks are possible
 // (D-085-06), so reconcile REPLACES the inner Map atomically (D-086-08).
 export function useAskUserPrompt(threadId: string | null): {

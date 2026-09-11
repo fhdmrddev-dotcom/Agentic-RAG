@@ -3526,6 +3526,62 @@ const BASELINE = {
   // `libraryTabAfterNavigate` that returns `pending` unconditionally — and both files were
   // restored md5-identical. A guard nobody has seen fire is not a guard.
   "LibraryPage.tabAttention.test.tsx": 15,
+  // ── Phase 244 (244-05 T1 / SHELL-04 / D-244-22 / D-244-25) — the attachment chip ────────
+  // ⛔ BOTH KNOBS, SAME COMMIT. `src/components/chat` has NO bare-directory TARGETS entry (this
+  // array has exactly two: `src/landing` and `src/components/workflows`), so a suite dropped
+  // into `src/components/chat/__tests__/` runs in NO gate until it is NAMED there AND pinned
+  // here. TARGETS decides what RUNS; BASELINE decides what is GUARDED.
+  //
+  // 10 cases, MEASURED on a green run of the suite alone — not copied from the plan.
+  // ⭐ THE LOAD-BEARING ONE IS CASE 2: the SENT chip still renders `this chat only`. Sketch 236's
+  // winner (A — Scope on the chip) won BECAUSE the promise survives into the transcript, so a
+  // build that carries the scope word only while pending has shipped B's weakness at A's cost.
+  // It was FALSIFIED against a planted defect — the scope span gated on `pending` — which fired
+  // `AssertionError: expected null not to be null`, and `ChatAttachmentChip.tsx` was restored
+  // md5-identical (c83330e2bb38628b9f431e6f85d3011e).
+  // ⚠ Case 4 pins the THREE expiry readings against `FilesSection.expiryCaption`, which the chip
+  // IMPORTS rather than re-derives: ABSENT and UNPARSEABLE are the same third case, the word is
+  // `expiry unknown` and never `no expiry`, and neither is amber.
+  // ⚠ Case 5a is COMMENT-STRIPPED on purpose. The chip's docblock EXPLAINS that it holds no copy,
+  // so an unstripped grep measures the explanation — the first draft asserted its own
+  // `grep -c ... is 0` while containing the sentence, making the claim false by stating it.
+  "ChatAttachmentChip.states.test.tsx": 10,
+  // -- Phase 244 (244-05 T2+T3 / SHELL-04 / D-244-26 / D-244-27) — the ordered-block fence -----
+  // BOTH KNOBS, SAME COMMIT. `src/components/chat` has no bare-directory TARGETS entry.
+  //
+  // 10 cases at T2, MEASURED on a green run of the suite alone; T3 extends it.
+  // NINE of the ten were RED on the shipped tree before the build — `Unable to find an element
+  // with the text: Attach a file` and `Unable to find an element by:
+  // [data-testid="composer-attach-input"]`. The tenth (a connector with no attachment) is the
+  // CONTROL: it was green before and its job is to prove the hoist changed nothing else.
+  //
+  // Two deliberate falsifications, both restored md5-identical:
+  //   · Test 4 driven RED against the FORBIDDEN arm — a `children` slot inside
+  //     `ActiveConnectorChips`, which returns `null` on empty — giving `Unable to find an element
+  //     by: [data-testid="chat-attachment-chip"]`. That is D-244-26's ruling in executable form;
+  //     without the RED the ruling is prose. (75ac2afcd28bf03920e8c2bcd9c6b0ed /
+  //     f45dfe40c32361955a171c44ac36b01a.)
+  //   · Tests 6b/6c driven RED against a SENTENCE-ONLY refusal (filename and dismiss atoms
+  //     deleted) — `expected null not to be null` and `expected <div role="alert" …> to be null`.
+  //     The revision pass found that block short two of its three atoms IN THE BUILD; this is
+  //     what stops it narrowing again.
+  //
+  // ⛔ Order is asserted with `compareDocumentPosition`, never `getAllByTestId(...)[0]` — query
+  // order and document order agree often enough to make a reordering bug invisible.
+  // T3 EXTENDS IT TO 19 — the sent-message block. ⚠ THE FIRST RED FOR CASES 10/11/12 WAS PARTLY
+  // VACUOUS AND IS RECORDED RATHER THAN TIDIED AWAY: the suite seeded the store through
+  // `actions.replaceWorkspaceFilesForThread`, and `streamsStore.ts` initialises `actions` as
+  // NO-OP STUBS that only `StreamsProvider` replaces ON MOUNT. So those cases were red because
+  // nothing had been seeded, not because the chip was absent — a RED for the wrong reason proves
+  // as little as a green one. Re-driven after the seeding was fixed to `setState`:
+  //   · the sent chip deleted from the user row -> cases 10 and 11 red
+  //     (`Unable to find an element by: [data-testid="chat-attachment-chip"]`)
+  //   · the agent pointer deleted -> case 12 red (`[data-testid="agent-read-pointer"]`)
+  //   · the detach / `kind` / upper-bound conditions deleted from `attachmentsForMessage` ->
+  //     cases 12b, 12c and 12d red, each on its own removed condition
+  // `MessageItem.tsx` and `ChatAttachmentChip.tsx` were restored md5-identical after every plant
+  // (`bab2a9868f07b37d2e29766d95574eed`, `0b092b18f2cf83756f1d2213c9f36306`).
+  "ComposerAttach.composition.test.tsx": 19,
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -5029,6 +5085,29 @@ const TARGETS = [
   // bought with: no second producer, no third `useSourceAttention()` reader, and no second
   // writer of `libraryTab` (the Phase 235 plan-15 defect).
   "src/pages/__tests__/LibraryPage.tabAttention.test.tsx",
+  // ── Phase 244 (244-05 T1 / SHELL-04) — the chat attachment chip's three states ──────────
+  //
+  // ⛔ FILE-LEVEL BY NECESSITY — the same fact this script has now recorded beside every 244
+  // chat block: `src/components/chat` appears in this array only inside COMMENTS, never as a
+  // bare directory entry, so an unnamed suite there runs in no gate at all.
+  //
+  // What it guards: the ONE chip component behind the composer's local-attach door. Its
+  // `sent` state carrying `this chat only` is D-244-22's build obligation — the reason variant A
+  // was chosen over B — and its `expired` state is D-244-25's, because the TTL is a READ GATE
+  // and a week-old transcript otherwise holds a chip pointing at nothing. It also fences the
+  // copy PORT against `.planning/sketches/236-.../COPY.js` read with `?raw`, so a re-typed
+  // string (a silently different product) cannot land.
+  "src/components/chat/__tests__/ChatAttachmentChip.states.test.tsx",
+  // -- Phase 244 (244-05 T2+T3 / SHELL-04) — the composer attach door's composition ----------
+  //
+  // FILE-LEVEL BY NECESSITY — `src/components/chat` appears in this array only inside comments.
+  //
+  // What it guards: the FIVE ordered blocks sketch 236's README names, by DOM POSITION rather
+  // than by vocabulary. D-244-27 exists because the 2026-08-29 correction recorded 200 green
+  // assertions over a surface the operator called "nothing at all like what we designed" — a
+  // contract that asserted words and never composition. This suite owns four of the five blocks
+  // (the `+` menu, the chips row, the refusal, the sent message); the cloud modal is `244-06`'s.
+  "src/components/chat/__tests__/ComposerAttach.composition.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")

@@ -10,7 +10,24 @@ import { Button } from "@/components/ui/button"
 // selector over the harness demux's `phasesByThread` slice. It is called from
 // `HarnessOuterBanner` below — NOT from `MessageItem` itself — and the reason is
 // measured rather than stylistic; see that component's docblock.
-import { useWorkflowLockForThread, usePhases } from "@/providers/StreamsProvider"
+import {
+  useWorkflowLockForThread,
+  usePhases,
+  // ── Phase 244 (244-05 T3 / SHELL-04 / D-244-22) — the sent chip's two inputs ────────────
+  // ⛔ BOTH ARE PURE READS AND NEITHER FETCHES. `useWorkspaceFiles` (the panel's hook) runs
+  // `usePanelReconcile`, so calling it here would fire ONE RECONCILE PER TRANSCRIPT ROW.
+  // ⛔ And `usePreviousUserMessageAt` returns a SCALAR rather than the messages array, because
+  // this component is `React.memo`'d (075.4-04) and an array whose identity changes on every
+  // stream delta reinstates exactly the per-row re-render that memo exists to prevent.
+  useWorkspaceFilesSnapshot,
+  usePrecedingUserTurns,
+} from "@/providers/StreamsProvider"
+import {
+  ChatAttachmentChip,
+  attachmentsForMessage,
+  attachmentDisplayName,
+} from "./ChatAttachmentChip"
+import { COPY } from "./composerCopy"
 // Phase 092-07 (Facet C): after a Harness Continue the backend mints a FRESH
 // producer runs row + returns its id; re-subscribe its live stream (per-thread
 // keyed, additive — mirrors panelOpenSignal).
@@ -237,20 +254,87 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
   // without prop-drilling; adding it changes no DOM (byte-identical, G-5).
   const [messageBody, setMessageBody] = useState<HTMLDivElement | null>(null)
 
+  /**
+   * ── Phase 244 (244-05 T3 / SHELL-04 / D-244-22) — THE ATTACHMENTS THIS ROW CARRIES ──────
+   *
+   * ⭐ THIS IS THE REASON VARIANT A WON, AND THE THING A BUILD DROPS SILENTLY. D-244-22:
+   * *"a menu is read once and closed, a chip is still on screen while the person types and
+   * survives into the transcript… a build that puts it solely in the composer has shipped B's
+   * weakness with A's cost."* So the scope word is rendered HERE, on a message that may be a
+   * week old, not only on the pending composer chip.
+   *
+   * ⛔ DERIVED FROM PERSISTED DATA, NEVER FROM A FIELD STAMPED AT SEND TIME. A client-only
+   * `message.attachments` would satisfy every test in this repo and fail the requirement THE
+   * NEXT DAY, because a message loaded from the database carries no such field — which is the
+   * exact durability D-244-22 chose A for. ⛔ And a backend field is out: D-244-01 and the
+   * ROADMAP both say `Migrations: none expected`. The rule lives in one place
+   * (`ChatAttachmentChip.attachmentsForMessage`) and its edges are fenced there.
+   *
+   * ⚠ Both hooks are unconditional and sit ABOVE the `isUser` early return, because the Rules of
+   * Hooks do not care that one branch ignores the result. The assistant branch uses them too —
+   * for the `Read <file>` pointer.
+   */
+  const threadAttachments = useWorkspaceFilesSnapshot(message.thread_id ?? null)
+  const [prevUserAt, prevPrevUserAt] = usePrecedingUserTurns(
+    message.thread_id ?? null,
+    message.id,
+  ).split("|")
+  // A USER row bounds `(the previous user turn, itself]`; an ASSISTANT row bounds
+  // `(the turn before that, the turn it answers]` — one rule, two readings of the same window.
+  const ownAttachments = attachmentsForMessage(
+    isUser
+      ? { role: "user", created_at: message.created_at, thread_id: message.thread_id }
+      : { role: "user", created_at: prevUserAt, thread_id: message.thread_id },
+    (isUser ? prevUserAt : prevPrevUserAt) || null,
+    threadAttachments,
+  )
+
   if (isUser) {
+    // ⚠ THE OUTER ROW IS BYTE-UNCHANGED, AND THAT IS DELIBERATE. The first draft replaced
+    // `flex justify-end` with `flex flex-col items-end`, and `MessageItem.test.tsx`'s
+    // "aligns user message to the right (justify-end)" case caught it — a shipped fence doing
+    // exactly its job. The stacking happens in a NEW INNER wrapper instead, so this node's
+    // class string and `data-testid` are identical to the shipped ones.
     return (
       <div className="flex justify-end py-2 animate-fadeSlideUp" data-testid="user-message">
-        <div className="flex items-end gap-2.5 max-w-[70%]">
-          <div className="gradient-primary text-white rounded-2xl rounded-br-md px-4 py-2.5 text-sm leading-relaxed shadow-sm">
-            <UserBubble content={message.content} />
-          </div>
-          <div className="flex-shrink-0 w-7 h-7 rounded-full bg-muted border border-border/50 flex items-center justify-center mb-0.5">
-            <User className="w-3.5 h-3.5 text-foreground/70" />
+        <div className="flex flex-col items-end max-w-[70%]">
+          {/* ⛔ ABOVE the text — "the chip in read-only form above the user's text" is part of
+              the Build Contract, not a layout detail (sketch 236 § `data-s="sent"`). Fenced by
+              `ComposerAttach.composition.test.tsx` Test 10 with `compareDocumentPosition`. */}
+          {ownAttachments.length > 0 && (
+            <div className="flex flex-wrap justify-end gap-1.5 mb-1.5 mr-9">
+              {ownAttachments.map((f) => (
+                <ChatAttachmentChip key={f.path} file={f} state="sent" />
+              ))}
+            </div>
+          )}
+          <div className="flex items-end gap-2.5">
+            <div className="gradient-primary text-white rounded-2xl rounded-br-md px-4 py-2.5 text-sm leading-relaxed shadow-sm">
+              <UserBubble content={message.content} />
+            </div>
+            <div className="flex-shrink-0 w-7 h-7 rounded-full bg-muted border border-border/50 flex items-center justify-center mb-0.5">
+              <User className="w-3.5 h-3.5 text-foreground/70" />
+            </div>
           </div>
         </div>
       </div>
     )
   }
+
+  /**
+   * Phase 244 (244-05 T3) — the agent's ONE-LINE pointer: `Read <file>`.
+   *
+   * ⚠ A POINTER, NOT A RECEIPT. The sketch draws a single line with a tick, and the run surface
+   * already owns the heavy receipt (`unified-execution-surface.md`); a second, richer copy here
+   * would be two surfaces racing to be the live thing — the drift trap `chat-panel-seam.md` D2
+   * avoids. Fenced by composition Test 12, which asserts the node holds fewer than four elements.
+   *
+   * ⚠ It is derived from the attachments of the PRECEDING user turn, which is what
+   * `attachmentsForMessage` returns for a user row. `244-02` hydrates every non-expired thread
+   * attachment into `/sandbox/attachments/`, so "the agent could read it" is true for all of
+   * them — this line says that, and does not claim a specific tool call happened.
+   */
+  const precedingAttachments = ownAttachments
 
   const hasRunningTools = message.tool_calls?.some((tc) => tc.status === "running") ?? false
   const hasAnyTools = (message.tool_calls?.length ?? 0) > 0
@@ -361,6 +445,23 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
             !allToolsDone
           }
         />
+        {/* ── Phase 244 (244-05 T3 / D-244-27) — the agent's ONE-LINE pointer ──────────────
+            `Read <file>`, sketch 236 § `data-s="sent"`. ⚠ A POINTER, NOT A RECEIPT: the run
+            surface already owns the heavy one (`unified-execution-surface.md`), and a second
+            richer copy here is two surfaces racing to be the live thing — the drift trap
+            `chat-panel-seam.md` D2 avoids. Composition Test 12 pins it under four elements.
+            ⚠ WHAT IT CLAIMS, exactly: `244-02` hydrates every non-expired thread attachment
+            into `/sandbox/attachments/` and announces it in the turn's system prompt, so
+            "the agent could read this" is TRUE for each of them. ⛔ It does not claim a
+            specific tool call happened — there is no wire event that would make that honest. */}
+        {precedingAttachments.length > 0 && (
+          <div
+            data-testid="agent-read-pointer"
+            className="mb-1.5 text-[11px] text-muted-foreground"
+          >
+            {precedingAttachments.map((f) => COPY.shared.agentReadLine(attachmentDisplayName(f))).join(" · ")}
+          </div>
+        )}
         {/* Phase 243 Plan 02 (CHAT-01 / CHAT-04 / D-243-01 — sketch 235 winner B) — THE ONE
             REASONING RENDERER, mounted for BOTH message shapes.
             ⛔ UNCONDITIONAL BY CONSTRUCTION, AND THAT IS THE WHOLE FIX. It used to live

@@ -1,8 +1,35 @@
 /**
- * Phase 216 (CHAT-06 / D-216-06) — Active Connector Chips Bar.
+ * Phase 216 (CHAT-06 / D-216-06) — Active Connector Chips.
  *
- * Displays dismissible chips directly above the composer for every connector
- * currently active in the session, keeping tool availability clear and visible.
+ * Renders a dismissible chip for every connector currently armed in the session, keeping tool
+ * availability clear and visible directly above the composer.
+ *
+ * ⭐ PHASE 244 (244-05 T2 / D-244-26) — THE ROW CONTAINER WAS HOISTED OUT OF THIS COMPONENT, and
+ * the reason is measured rather than stylistic.
+ *
+ * D-244-26 says the chat-attachment chip is *"a **sibling** of the connector chip, not a new
+ * region"*. Three arms were available and two of them are wrong:
+ *
+ *   ⛔ a `children` / `extra` SLOT here — this component returned `null` when nothing was armed,
+ *      so the attachment chip would **vanish for a person with no connector**, which is exactly
+ *      the one-item case D-244-26 orders checked;
+ *   ⛔ a SECOND `<div>` beneath this one — that is the "new region" the decision forbids, and it
+ *      is the easy accident;
+ *   ✅ HOIST. `MessageInput` owns the row container, its `data-testid` and its `Using:` label;
+ *      this component renders its chips as a FRAGMENT and `null` when empty. The row appears when
+ *      EITHER an attachment or a connector exists, and nothing at all when neither does.
+ *
+ * ⚠ THE EMPTY ARM IS STILL LOAD-BEARING and must stay `null`, not an empty fragment: the `Using:`
+ * label lives in the hoisted container now, and a caller that renders this alongside no chips must
+ * be able to tell that nothing came back. `MessageInput` decides whether the ROW exists; this
+ * component decides only whether CHIPS do.
+ *
+ * ⚠ `data-testid="active-connector-chips"` MOVED to the hoisted container (`MessageInput.tsx`) so
+ * no existing suite silently loses its hook. The per-chip `active-connector-chip-{id}` hooks —
+ * the ones `MessageInput.connectors.test.tsx` actually uses, at nine call sites — are unmoved.
+ *
+ * ⛔ This component has exactly ONE mount (`MessageInput.tsx`), which is what makes the hoist
+ * contained rather than a cross-surface change.
  */
 
 import { X } from "lucide-react"
@@ -27,13 +54,7 @@ export function ActiveConnectorChips({
   if (activeConns.length === 0) return null
 
   return (
-    <div
-      data-testid="active-connector-chips"
-      className="flex flex-wrap items-center gap-1.5 px-3 py-1.5 mb-1 bg-muted/40 rounded-lg border border-border/40"
-    >
-      <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider mr-1">
-        Using:
-      </span>
+    <>
       {activeConns.map((conn) => (
         <span
           key={conn.id}
@@ -56,6 +77,6 @@ export function ActiveConnectorChips({
           </button>
         </span>
       ))}
-    </div>
+    </>
   )
 }
