@@ -88,12 +88,22 @@ describe("SHELL-01 · the chat frame is bounded — the four-link min-h-0 chain"
     expect(main![1]).toContain("overflow-hidden")
   })
 
-  it("link 4: ChatArea's chat-column root carries min-h-0 alongside flex flex-col h-full", () => {
-    // The root of the thread branch: `flex flex-col h-full bg-background`.
-    const root = CHAT_AREA.match(/className="(flex flex-col h-full[^"]*)"/)
-    expect(root, "the ChatArea column root className was not found").not.toBeNull()
-    expect(root![1]).toContain("h-full")
-    expect(root![1]).toContain("min-h-0")
+  /**
+   * ⚠ MEASURED DURING THE GREEN PASS, recorded rather than quietly absorbed: `ChatArea.tsx`
+   * has **TWO** roots carrying `flex flex-col h-full bg-background` — the WELCOME branch
+   * (`if (!thread)`) and the thread branch. The plan named only the second. A `.match()`
+   * assertion found the first and stayed RED, which is the fence doing its job. Both carry
+   * the link-4 obligation, so this asserts EVERY such root, not the first one.
+   */
+  it("link 4: EVERY ChatArea column root carries min-h-0 alongside flex flex-col h-full", () => {
+    const roots = Array.from(CHAT_AREA.matchAll(/className="(flex flex-col h-full[^"]*)"/g)).map(
+      (m) => m[1],
+    )
+    expect(roots.length, "no ChatArea column root className was found").toBeGreaterThanOrEqual(2)
+    for (const cls of roots) {
+      expect(cls).toContain("h-full")
+      expect(cls, `a ChatArea column root is unbounded: ${cls}`).toContain("min-h-0")
+    }
   })
 
   it("link 5: MessageList's <ScrollArea> is BOUNDED — min-h-0 alongside flex-1", () => {

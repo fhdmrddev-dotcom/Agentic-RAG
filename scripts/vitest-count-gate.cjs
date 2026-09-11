@@ -3440,6 +3440,19 @@ const BASELINE = {
   // This is that close. BOTH knobs, for the reason the entry above states.
   "ConnectionFormPanel.sourceTools.test.tsx": 14,
   "ConnectionFormPanel.refreshReceipt.test.tsx": 4,
+  // ── Phase 244 plan 01 (SHELL-01 / BUG-260828-08 / BUG-260816-03) ──────────────────────
+  //
+  // ⛔ BOTH KNOBS, BY NECESSITY. `src/components/layout` is NOT a bare directory entry in
+  // TARGETS (this file records that fact beside four other blocks already, and it is still
+  // true here), so a suite dropped into `src/components/layout/__tests__/` runs in NO gate
+  // until it is NAMED in TARGETS and PINNED here. TARGETS decides what RUNS; BASELINE
+  // decides what is GUARDED (the Phase 214 `WorkflowScheduleModal` lesson, inverted).
+  //
+  // `ChatLayout.scrollFrame.test.tsx` — 5 cases. Four ?raw class-list assertions, one per
+  // link of the `min-h-0` chain, plus an `import.meta.glob` sweep pinning the `<ScrollArea>`
+  // inventory BY FILE so a third, UNBOUNDED call site cannot arrive silently. All five were
+  // driven RED against the shipped tree before the classes were added.
+  "ChatLayout.scrollFrame.test.tsx": 5,
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -4868,6 +4881,13 @@ const TARGETS = [
   // throttle` on this file returned nothing. It is adopted here, not created here, and it now
   // guards two primitives with OPPOSITE contracts (see docs/HOT-FILE-LEDGER.md).
   "src/__tests__/lib/throttle.test.ts",
+  // ── Phase 244 plan 01 (SHELL-01 / BUG-260828-08) — the chat frame's min-h-0 chain ──────
+  //
+  // ⛔ FILE-LEVEL, BY NECESSITY: `src/components/layout` is NOT a bare directory entry
+  // anywhere in this array (this file has exactly two — `src/landing` and
+  // `src/components/workflows`), so this suite runs in NO gate until it is named here AND
+  // pinned in BASELINE above. Both were added in the same commit as the class changes.
+  "src/components/layout/__tests__/ChatLayout.scrollFrame.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")

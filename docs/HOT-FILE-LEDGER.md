@@ -9807,7 +9807,9 @@ cells rot within days.
 | [`backend/app/api/workflow_runs.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkflow_runspy) | 11 / 8 / 1003 | **FIRES** | honoured by construction (200 / 200.1 / **214**) — no longer *at threshold*: it measures **8** phases |
 | [`backend/app/models/thread.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsthreadpy) | 16 / 10 / 438 | ⚠ **FIRES** | honoured by construction (200.1 / **214**) |
 | [`frontend/src/components/workflows/canvasModel.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowscanvasmodelts) | 13 / 6 / 752 | ⚠ **FIRES** | ⚠ absent from BOTH at 6 phases (added 200) |
-| [`frontend/src/components/layout/ChatLayout.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutchatlayouttsx) | 49 / 25 / 997 | ⚠ **FIRES** | ⚠ row was STALE at `46 / 24 / 921`. honoured by construction (**235**) — it reads the attention registry ONCE and hands it to three renderers |
+| [`frontend/src/components/layout/ChatLayout.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutchatlayouttsx) | 50 / 26 / 1005 | ⚠ **FIRES** | ⚠ row was STALE at `46 / 24 / 921`. honoured by construction (**244-01**): two class TOKENS (`min-h-0` on the grid track and `<main>`) — no state, no prop, no branch |
+| [`frontend/src/components/layout/ChatHistoryColumn.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutchathistorycolumntsx) | 5 / 1 / 480 | below threshold | ⚠ **ABSENT from BOTH registers for its entire life — row added 244-01 AT ITS SECOND PHASE**, the `settingsSearchPayload.ts` precedent. D-244-20 claimed otherwise; the gate refuted it |
+| [`frontend/src/hooks/useThreads.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusethreadsts) | 4 / 2 / 64 | below threshold | ⚠ **ABSENT from BOTH registers for its entire life — row added 244-01.** The app's ONE thread-selection owner; `selectThread` is a bare `setState`, so "first click does not open" cannot originate here |
 | [`backend/app/services/harness/grounding.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessgroundingpy) | 21 / 8 / 1414 | **FIRES** | honoured by construction (193.1 / 211 / **214**) — ⚠ **extraction still OWED**; 214 changed no capability set |
 | [`frontend/src/components/workflows/PhaseFormPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsphaseformpaneltsx) | 30 / 14 / 1566 | **FIRES** | honoured by construction ×6 (185 / 193 / 193.1 / 199 / 200 / **214**) |
 | [`backend/app/db/workflows.py`](docs/HOT-FILE-LEDGER.md#backendappdbworkflowspy) | 48 / 25 / 2585 | **FIRES** | honoured by construction (193.2 / 194 / 192.2 / 200.1 / **214**) |
@@ -9822,10 +9824,10 @@ cells rot within days.
 | [`frontend/src/components/chat/RunCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatruncardtsx) | 28 / 14 / 710 | **FIRES** | ⭐ **G-5 DISCHARGED (243-02)** — the reasoning fold left for `ThinkingBlock.tsx`, `-39/+20`, one `useState` fewer. ⚠ row was STALE at `26/12/728`. State 2 stayed, by decision |
 | [`frontend/src/components/chat/ThinkingBlock.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatthinkingblocktsx) | 4 / 1 / 283 | no | ⚠ **row at ONE phase BY DESIGN**; `117 → 283` in one phase (**243-04**). Invariants: **one reasoning renderer**, and **no duration derived from length** |
 | [`frontend/src/components/chat/MessageInput.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageinputtsx) | 29 / 14 / 643 | **FIRES** | honoured by construction (194.1) |
-| [`frontend/src/components/chat/MessageList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessagelisttsx) | 20 / 8 / 300 | **FIRES** | ⚠ row STALE twice (`19/8/267`, then `20/8/292`). **243-06 DOES modify it** — one arm on the existing wheel mapping; `deltaY === 0` decides nothing |
+| [`frontend/src/components/chat/MessageList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessagelisttsx) | 21 / 9 / 307 | **FIRES** | ⚠ row STALE a THIRD time (`19/8/267` → `20/8/292` → `20/8/300`). honoured by construction (**244-01**): `min-h-0` added to the ONE `<ScrollArea>` call site — a class token, no state, no prop |
 | [`frontend/src/hooks/useFollowScroll.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusefollowscrollts) | 4 / 2 / 314 | does not fire | ⛔ **NO ROW FOR ITS ENTIRE LIFE — added 243-03**, then STALE at `3/2/265` one phase on. **243-06:** the re-arm now asks whether the reader is STILL leaving, not what they last did |
 | [`frontend/src/lib/throttle.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibthrottlets) | 2 / 2 / 108 | does not fire | ⛔ **NO ROW FOR ITS ENTIRE LIFE — added 243-03.** TWO opposite primitives on purpose; ⛔ never unify them — one of the two call sites breaks silently |
-| [`frontend/src/components/chat/ChatArea.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatchatareatsx) | 70 / 35 / 678 | **FIRES** | ⚠ row was STALE at `67 / 32 / 595` — **+3 phases** unrecorded. honoured by construction (194.1 / **235**) |
+| [`frontend/src/components/chat/ChatArea.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatchatareatsx) | 71 / 36 / 686 | **FIRES** | ⚠ row was STALE at `67 / 32 / 595`. honoured by construction (**244-01**): `min-h-0` on BOTH column roots — ⚠ the fence found the SECOND (welcome branch) the plan had not named |
 | [`frontend/src/components/panel/PendingAskCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelpendingaskcardtsx) | 13 / 7 / 736 | **FIRES** | honoured by construction (194.1 / **214**) — ⚠ it still renders `Needs you`; `stepIdentityVocabulary`'s six PAUSE sentences reach it from nothing (`SEED-219`) |
 | [`frontend/src/pages/WorkflowRunPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowrunpagetsx) | 28 / 9 / 1670 | **FIRES** | honoured by construction (200 / 200.1 / 200.2 / **214**) — it resolves the step identity ONCE and its children render it |
 | [`frontend/src/components/chat/OutputFileCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatoutputfilecardtsx) | 8 / 7 / 219 | **FIRES** | honoured by construction (195) |
@@ -10996,3 +10998,120 @@ interaction end-to-end (`pointerdown` on the real fold trigger), and `§10` is i
 click with no prior scroll-up must leave following intact.
 
 **It inherits `20 / 8 / 300`, and that figure goes stale on the next commit touching the file.**
+
+---
+
+## Phase 244 plan 01 (`SHELL-01` / `BUG-260828-08` / `BUG-260911-02` / `BUG-260816-03`)
+
+### `frontend/src/components/layout/ChatLayout.tsx` — `244-01`
+
+**Re-derived at this plan's base `223b3ea4f` with the `CLAUDE.md` recipe: `49 / 25 / 997`** — the row
+was ALREADY CORRECT for once, which is worth recording in a ledger whose recurring finding is the
+opposite. It inherits **`50 / 26 / 1005`** with this plan's own commit. Six-digit dated quick-task
+buckets: checked, **none**.
+
+**G-5 FIRES (26 phases vs threshold 3) — honoured BY CONSTRUCTION, no override.** The measured reason
+is that this plan adds **two class TOKENS and nothing else**: `min-h-0` on the grid-track div and on
+the `<main>` cell. No `useState`, no `useEffect`, no prop, no branch, no new import. A file that gains
+two Tailwind tokens has gained no concern.
+
+⚠ **WHY THOSE TWO TOKENS ARE LOAD-BEARING, stated so a later "tidy" cannot delete them as noise.** A
+flex item's `min-height` defaults to **`auto`**, i.e. *at least as tall as my content*. `flex-1` is
+therefore **not a bound**. Without `min-h-0` on every link between the fixed-height root
+(`flex h-screen`) and the scroller, the chat column grew to the whole transcript, the **page root**
+scrolled instead of the message list, and the nav rail travelled up and off with it
+(`BUG-260828-08`). The chain has **FOUR** broken links, not the two the phase's F-5 hypothesis named:
+this file's grid track and `<main>`, then `ChatArea.tsx`'s column roots, then `MessageList.tsx`'s
+`<ScrollArea>`.
+
+**Analog copied, not invented:** `metadata/DocumentDetailPanel.tsx:257` + `:300`
+(`flex h-full min-h-0 flex-col` over `min-h-0 flex-1 overflow-y-auto`), and `panel/WorkspacePanel.tsx:622`
+which applies the identical rule at a shell root.
+
+⛔ **THE FENCE IS A PRESENCE ASSERTION AND DOES NOT CLOSE `SHELL-01`.** jsdom performs no layout, so
+`layout/__tests__/ChatLayout.scrollFrame.test.tsx` can only prove the tokens are present and that no
+third `<ScrollArea>` arrives unbounded. D-244-19's measured bound — `document.scrollingElement.scrollHeight
+<= clientHeight`, plus the rail's **leaf bounding rect** unchanged after a scroll, at least three viewport
+heights times panel closed and open — is a G-4 row in `244-VALIDATION.md` and is driven in a real browser.
+⚠ `scrollTop` is **not** the reader's position (this project once measured a 1,039 px drag that never
+happened); measure a leaf element's rect.
+
+**Seam:** unchanged from the 200 entry above — the `ActiveView` mount switch, ~150 lines of branch
+owning none of the state around it. Not taken here, and this plan is not the phase that should take it.
+
+### `frontend/src/components/chat/ChatArea.tsx` — `244-01`
+
+**Re-derived: `70 / 35 / 678` at base** — the row was correct. It inherits **`71 / 36 / 686`**.
+
+**G-5 FIRES HARD (36 phases) — honoured BY CONSTRUCTION.** One class token, applied to **both** column
+roots. `useState` / `useEffect` / props all unmoved.
+
+⭐ **THE FINDING OF THIS TASK, and it came from the fence rather than from the plan.** The plan named
+**one** site (`:552`, the thread branch). `ChatArea.tsx` has **TWO** roots carrying
+`flex flex-col h-full bg-background` — the `if (!thread)` **welcome branch** at `:474` is the other,
+and it carries the identical link-4 obligation. A `.match()`-based assertion (first occurrence) found
+the welcome branch, stayed RED after the planned edit, and forced the second site to be seen. The
+assertion was then widened to `matchAll` over **every** such root, so a third branch added later
+cannot ship unbounded. **A single-match source fence is a coin flip on which site it guards** — that is
+the transferable lesson, not the two tokens.
+
+**Seam:** unchanged and still the strongest frontend extraction case on this ledger — thread header +
+title editing, message-loading/reconcile wiring, composer-bar assembly, mode/prefill plumbing, and the
+drawer/history chrome are five concerns in one component.
+
+### `frontend/src/components/chat/MessageList.tsx` — `244-01`
+
+**Row was STALE a THIRD time.** Readings in order, every one kept: `19 / 8 / 267` (194.1) →
+`20 / 8 / 292` (243-03) → `20 / 8 / 300` (243-06) → **re-derived here at base: `21 / 9 / 300`**. It
+inherits **`21 / 9 / 307`**. The ninth phase bucket is `243`; `32` remains a real pre-padding-era phase,
+not a truncation.
+
+**G-5 FIRES (9 phases) — honoured BY CONSTRUCTION.** `<ScrollArea className="flex-1">` became
+`<ScrollArea className="min-h-0 flex-1">`. One token on an existing call site.
+
+⚠ **THE PRIMITIVE CANNOT SUPPLY THIS BOUND FOR ITSELF, and that is why the fix lives at the call site.**
+`ui/scroll-area.tsx` renders the Root as `relative overflow-hidden` and the Viewport as `h-full w-full`.
+The Root's height comes from `flex-1` on an item whose `min-height` is `auto`, so the Root grows to the
+transcript and the Viewport's `h-full` resolves to that **grown** height — the scrollbar exists and
+nothing ever scrolls inside it. ⭐ The sibling call site is the control: `chat/tool-bodies/ReadDocumentBody.tsx:53`
+passes an explicit `max-h-64` and scrolls correctly. `src/` has exactly **two** `<ScrollArea>` call
+sites and the new fence pins that inventory **by file**, so a third arriving unbounded reds.
+
+**Seam:** unchanged — the message map vs. the scroll/jump-to-live machinery vs. the empty-state
+suggestions vs. the run line's mount.
+
+### `frontend/src/components/layout/ChatHistoryColumn.tsx` — row added `244-01`
+
+**`5 / 1 / 480` at this plan's base** (phase bucket: `156` only). ⚠ **ABSENT FROM BOTH REGISTERS FOR
+ITS ENTIRE LIFE** — `grep -c ChatHistoryColumn docs/HOT-FILE-LEDGER.md` and `grep -c` in `CLAUDE.md`
+both returned **0**, so G-5 could never have fired on it at any count.
+
+⚠ **THE ROW IS ADDED BECAUSE `D-244-20` CLAIMED IT ALREADY EXISTED, AND THE GATE REFUTED THE CLAIM.**
+`244-CONTEXT.md` D-244-20 states *"all of this phase's hot files HAVE ledger rows"*;
+`node scripts/check-hot-file-ledger.cjs 244` names **nine** files with none, this among them. **A claim
+that is present and WRONG answers the auditor with `satisfied` and stops the audit** — the ledger's own
+recurring finding, paid again. It is below the G-5 threshold today, so the obligation discharged here
+is the `settingsSearchPayload.ts` precedent: **a row is added at CREATION, not at the third phase.**
+
+**What it holds:** the full-height chat-history column — the thread row (a real `<button>` with sibling
+Stop/options controls, per the A11Y-01 CSS-gated reveal), inline rename, the delete-confirm dialog, the
+SEED-064 running dot, the "Filter this list…" box, and the date/folder group-mode switch.
+
+**Seam:** not proposed. At one phase and 480 lines the honest first step is the row.
+
+### `frontend/src/hooks/useThreads.ts` — row added `244-01`
+
+**`4 / 2 / 64` at this plan's base** (phase buckets: `08`, `166`). ⚠ **ABSENT FROM BOTH REGISTERS FOR
+ITS ENTIRE LIFE**, and named by the gate alongside `ChatHistoryColumn.tsx`.
+
+**What it holds, and why it matters to `BUG-260911-02`:** this hook is the app's **one** owner of
+`selectedThread`. `selectThread` is a bare `setSelectedThread(thread)` — no async, no intermediate
+state, no second step. `ChatHistoryColumn.tsx:166` calls it directly and `ChatLayout.tsx` passes
+`selectedThread` straight to `ChatArea`. **So a "first click selects but does not open" symptom cannot
+originate in this file**, and any future plan proposing a handler patch here should re-read the trace
+in `.planning/phases/244-the-chat-shell-and-the-composer/244-01-BUG-260911-02-TRACE.md` first.
+
+⚠ `selectThread` accepts `Thread | null` deliberately (IN-01: an org switch must be able to DESELECT a
+stale thread). Narrowing it back to `Thread` re-opens a cross-org selection leak.
+
+**Seam:** not proposed. 64 lines, one concern.

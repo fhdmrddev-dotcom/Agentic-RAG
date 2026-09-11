@@ -786,14 +786,22 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
         // Phase 087-08: nav-style 2-state track — clamp(...) when open, 52px when
         // rail. NO 0 column: the rail is always present, so the panel is always
         // reopenable by mouse (incl. the empty/welcome screen).
+        //
+        // Phase 244-01 (SHELL-01 / BUG-260828-08): `min-h-0` here and on <main> below are
+        // links 2 and 3 of a FOUR-link chain (ChatArea.tsx and MessageList.tsx carry 4 and
+        // 5). A flex item's min-height defaults to `auto`, so `flex-1` alone does NOT bound
+        // this track: it grew to the whole transcript, the PAGE ROOT scrolled instead of the
+        // message list, and the nav rail travelled with it. Shipped analog copied rather than
+        // invented: DocumentDetailPanel.tsx:257/300. Pinned by
+        // layout/__tests__/ChatLayout.scrollFrame.test.tsx.
         <div
-          className="grid min-w-0 flex-1 overflow-hidden motion-safe:transition-[grid-template-columns] motion-safe:duration-300"
+          className="grid min-w-0 min-h-0 flex-1 overflow-hidden motion-safe:transition-[grid-template-columns] motion-safe:duration-300"
           style={{
             gridTemplateColumns:
               "1fr " + (panelState === "open" ? "clamp(300px,30%,420px)" : "52px"),
           }}
         >
-          <main className="min-w-0 overflow-hidden">
+          <main className="min-w-0 min-h-0 overflow-hidden">
             <ChatArea
               thread={selectedThread}
               onCreateThread={newThread}
