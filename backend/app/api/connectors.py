@@ -1829,6 +1829,17 @@ async def import_connection_file(
     # (BUG-260907-03).
     except SourceConnectionDisabled as exc:
         raise _disabled_connection_response(exc) from None
+    # ⚠ WR-06 (244-07) — AND BEFORE THE CATCH-ALL FOR THE SAME REASON, one class wider.
+    # Starlette's ``HTTPException`` IS an ``Exception``, so without this arm EVERY deliberate
+    # refusal raised deeper was relabelled: ``async_mint_document_row``'s folder-ownership 403,
+    # its "Folder not found" 404 and the ``on_conflict="raise"`` 409 all arrived as
+    # ``502 "Failed to download cloud file: 403: Cannot upload to a folder you do not own"`` —
+    # a sentence `LibraryCloudImport` renders verbatim, blaming the provider for a file it never
+    # asked for. ⚠ Those branches only became REACHABLE at `244-06`, which is the first commit
+    # that passed ``folder_id``. The sibling route (`workspace.py`) has carried this arm since
+    # the day it was written; the two doors disagreed until now.
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error("Failed to fetch file %s from connection %s: %s", file_id, connection_id, exc)
         raise HTTPException(
