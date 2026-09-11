@@ -1,0 +1,67 @@
+src/__tests__/hooks/useDocuments.test.ts(130,7): error TS2322: Type 'Promise<{ isDuplicate: boolean; }>' is not assignable to type 'Promise<void>'.
+src/__tests__/hooks/useFolders.test.ts(217,13): error TS6133: 'result' is declared but its value is never read.
+src/__tests__/hooks/useMessages.test.ts(126,5): error TS2353: Object literal may only specify known properties, and 'isStreaming' does not exist in type 'StreamsState | Partial<StreamsState> | ((state: StreamsState) => StreamsState | Partial<StreamsState>)'.
+src/__tests__/hooks/useMessages.test.ts(192,10): error TS2554: Expected 2-3 arguments, but got 1.
+src/__tests__/hooks/useMessages.test.ts(254,11): error TS2554: Expected 2-3 arguments, but got 1.
+src/__tests__/hooks/useMessages.test.ts(342,10): error TS2554: Expected 2-3 arguments, but got 1.
+src/__tests__/hooks/useMessages.test.ts(388,10): error TS2554: Expected 2-3 arguments, but got 1.
+src/__tests__/providers/streamsProvider_state01b_403.test.tsx(23,22): error TS6133: 'waitFor' is declared but its value is never read.
+src/__tests__/routing/vercelRouting.test.ts(13,30): error TS2307: Cannot find module 'node:fs' or its corresponding type declarations.
+src/__tests__/routing/vercelRouting.test.ts(14,25): error TS2307: Cannot find module 'node:path' or its corresponding type declarations.
+src/__tests__/routing/vercelRouting.test.ts(43,34): error TS2304: Cannot find name '__dirname'.
+src/components/chat/__tests__/ChatAreaMode.test.tsx(104,8): error TS2322: Type '{ providers: readonly [{ readonly id: "openai"; readonly name: "OpenAI"; readonly models: readonly ["gpt-test"]; readonly is_active: true; }]; selectedProvider: "openai"; models: readonly ["gpt-test"]; selectedModel: "gpt-test"; onSend: () => void; disabled: true; threadId: string; onAgentModeChange: () => void; }' is not assignable to type 'Props'.
+src/components/chat/__tests__/ChatAreaMode.test.tsx(140,8): error TS2322: Type '{ providers: readonly [{ readonly id: "openai"; readonly name: "OpenAI"; readonly models: readonly ["gpt-test"]; readonly is_active: true; }]; selectedProvider: "openai"; models: readonly ["gpt-test"]; selectedModel: "gpt-test"; onSend: Mock<...>; disabled: false; workflowLocked: true; onAgentModeChange: () => void; }' is not assignable to type 'Props'.
+src/components/chat/__tests__/ChatAreaMode.test.tsx(162,8): error TS2322: Type '{ providers: readonly [{ readonly id: "openai"; readonly name: "OpenAI"; readonly models: readonly ["gpt-test"]; readonly is_active: true; }]; selectedProvider: "openai"; models: readonly ["gpt-test"]; selectedModel: "gpt-test"; onSend: () => void; disabled: false; workflowLocked: false; onAgentModeChange: () => voi...' is not assignable to type 'Props'.
+src/components/chat/__tests__/ChatAreaMode.test.tsx(44,8): error TS2322: Type '{ providers: readonly [{ readonly id: "openai"; readonly name: "OpenAI"; readonly models: readonly ["gpt-test"]; readonly is_active: true; }]; selectedProvider: "openai"; models: readonly ["gpt-test"]; selectedModel: "gpt-test"; onSend: () => void; disabled: false; onAgentModeChange: () => void; }' is not assignable to type 'Props'.
+src/components/chat/__tests__/MessageInput.connectors.test.tsx(1,26): error TS6133: 'fireEvent' is declared but its value is never read.
+src/components/chat/MessageInput.tsx(14,3): error TS6133: 'DropdownMenuSeparator' is declared but its value is never read.
+src/components/chat/MessageSkeleton.tsx(14,36): error TS2503: Cannot find namespace 'JSX'.
+src/components/layout/__tests__/ChatLayoutLaunch.test.tsx(173,8): error TS2740: Type '{ onSignOut: Mock<Procedure>; activeView: "workflows"; onNavigate: Mock<Procedure>; prefillMessage: null; onSetPrefillMessage: Mock<Procedure>; }' is missing the following properties from type 'Props': navItems, isOperator, operatorIdentity, studioSkillId, and 5 more.
+src/components/layout/NavPanel.test.tsx(87,38): error TS2352: Conversion of type '{ user: { id: string; email: string; user_metadata: { name: string; }; }; }' to type 'UseAuth' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+src/components/library/__tests__/IngestionTab.test.tsx(133,10): error TS6133: 'renderTechnical' is declared but its value is never read.
+src/components/library/__tests__/IngestionTab.test.tsx(210,11): error TS6133: 'source' is declared but its value is never read.
+src/components/library/__tests__/IngestionTab.test.tsx(228,11): error TS6133: 'addFilesPanel' is declared but its value is never read.
+src/components/library/__tests__/IngestionTab.test.tsx(42,3): error TS2741: Property 'user_id' is missing in type '{ id: string; name: string; parent_id: null; is_org_shared: false; created_at: string; updated_at: string; }' but required in type 'Folder'.
+src/components/library/__tests__/IngestionTab.test.tsx(43,3): error TS2741: Property 'user_id' is missing in type '{ id: string; name: string; parent_id: null; is_org_shared: false; created_at: string; updated_at: string; }' but required in type 'Folder'.
+src/components/library/__tests__/IngestionTab.test.tsx(506,11): error TS6133: 'user' is declared but its value is never read.
+src/components/library/__tests__/IngestionTab.test.tsx(512,33): error TS2345: Argument of type 'string' is not assignable to parameter of type 'IngestionStageKey'.
+src/components/library/__tests__/sketchComposition.test.tsx(333,15): error TS2739: Type '{ documents: Document[]; }' is missing the following properties from type 'IngestionTabProps': upload, uploading
+src/components/library/__tests__/ViewCardGrid.test.tsx(21,46): error TS2554: Expected 0 arguments, but got 1.
+src/components/library/__tests__/ViewCardGrid.test.tsx(22,44): error TS2554: Expected 0 arguments, but got 1.
+src/components/library/__tests__/ViewCardGrid.test.tsx(82,34): error TS2345: Argument of type '(id: string) => Promise<{ total: number; }>' is not assignable to parameter of type '() => Promise<{ total: number; }>'.
+src/components/library/indexing/FoldersIndexTable.tsx(22,7): error TS6133: 'UNKNOWN' is declared but its value is never read.
+src/components/metadata/__tests__/CR01.reset.test.tsx(2,16): error TS2307: Cannot find module 'node:fs' or its corresponding type declarations.
+src/components/panel/__tests__/FilesSection.test.tsx(149,19): error TS2304: Cannot find name 'WorkspaceFile'.
+src/components/panel/__tests__/FilesSection.test.tsx(159,19): error TS2304: Cannot find name 'WorkspaceFile'.
+src/components/panel/__tests__/FilesSection.test.tsx(168,19): error TS2304: Cannot find name 'WorkspaceFile'.
+src/components/panel/FilePreview.test.tsx(33,5): error TS2783: 'path' is specified more than once, so this usage will be overwritten.
+src/components/panel/FilePreview.test.tsx(34,5): error TS2783: 'size_bytes' is specified more than once, so this usage will be overwritten.
+src/components/panel/FilePreview.test.tsx(35,5): error TS2783: 'mime_type' is specified more than once, so this usage will be overwritten.
+src/components/settings/__tests__/ConnectionFormPanel.oauth.test.tsx(101,9): error TS2322: Type '{ open: true; mode: "create"; presetServiceId: string; onClose: () => void; canManage: boolean; }' is not assignable to type 'IntrinsicAttributes & ConnectionFormPanelProps'.
+src/components/settings/__tests__/ConnectionFormPanel.oauth.test.tsx(131,9): error TS2322: Type '{ open: true; mode: "edit"; connection: ConnectorConnection; onClose: () => void; canManage: boolean; }' is not assignable to type 'IntrinsicAttributes & ConnectionFormPanelProps'.
+src/components/settings/__tests__/ConnectionFormPanel.oauth.test.tsx(180,9): error TS2322: Type '{ open: true; mode: "edit"; connection: ConnectorConnection; onClose: () => void; canManage: boolean; onCheck: Mock<Procedure>; }' is not assignable to type 'IntrinsicAttributes & ConnectionFormPanelProps'.
+src/components/settings/__tests__/ConnectionFormPanel.oauth.test.tsx(2,26): error TS6133: 'fireEvent' is declared but its value is never read.
+src/components/settings/__tests__/ConnectionFormPanel.oauth.test.tsx(2,37): error TS6133: 'waitFor' is declared but its value is never read.
+src/components/settings/__tests__/ConnectionFormPanel.oauth.test.tsx(227,9): error TS2322: Type '{ open: true; mode: "edit"; connection: { id: string; service_id: string; name: string; auth_type: "static_key"; account_email: null; capability: "post_message"; config: ConnectorConnectionConfig; ... 13 more ...; updated_at?: string | ... 1 more ... | undefined; }; onClose: () => void; canManage: boolean; onCheck: ...' is not assignable to type 'IntrinsicAttributes & ConnectionFormPanelProps'.
+src/components/settings/__tests__/ConnectionFormPanel.oauth.test.tsx(8,1): error TS6133: 'api' is declared but its value is never read.
+src/components/settings/__tests__/ConnectionFormPanel.sourceTools.test.tsx(47,1): error TS6133: 'connectorServiceSource' is declared but its value is never read.
+src/components/settings/ConnectionFormPanel.tsx(1028,16): error TS2339: Property 'auth_type' does not exist on type 'ConnectorConnectionCreate'.
+src/components/settings/ConnectionFormPanel.tsx(1029,16): error TS2339: Property 'status' does not exist on type 'ConnectorConnectionCreate'.
+src/components/settings/ConnectionFormPanel.tsx(1059,48): error TS2339: Property 'auth_type' does not exist on type 'ConnectorConnectionUpdate'.
+src/components/settings/ConnectionFormPanel.tsx(1155,9): error TS2322: Type 'ConnectorCapability | "oauth" | null' is not assignable to type 'ConnectorCapability | null'.
+src/components/settings/ConnectionFormPanel.tsx(979,11): error TS2353: Object literal may only specify known properties, and 'auth_type' does not exist in type 'ConnectorConnectionCreate'.
+src/components/settings/MemorySection.tsx(52,8): error TS2339: Property 'finally' does not exist on type 'PromiseLike<void>'.
+src/components/skills/SkillFormDialog.tsx(396,13): error TS2322: Type 'RefObject<HTMLInputElement | null>' is not assignable to type 'RefObject<HTMLInputElement>'.
+src/components/skills/SkillFormDialog.tsx(582,11): error TS2322: Type 'RefObject<HTMLInputElement | null>' is not assignable to type 'RefObject<HTMLInputElement>'.
+src/components/workflows/WorkflowDoorSwitch.tsx(399,13): error TS2322: Type '((def: BuilderDefinition, draftId: string | null) => void | Promise<void>) | undefined' is not assignable to type '((def: WorkflowDefinitionJSON, draftId: string | null) => void | Promise<void>) | undefined'.
+src/lib/api.test.ts(131,5): error TS2322: Type '{ onDelta?: ((text: string) => void) | undefined; onReasoningDelta?: ((text: string) => void) | undefined; onDone?: (() => void) | undefined; onTerminal: (kind: "done" | "error" | "cancelled" | "timed_out" | "reader_done", error?: string) => Promise<void> | void; ... 46 more ...; onCursor?: ((msId: string) => void) ...' is not assignable to type 'StreamCallbacks'.
+src/lib/api.ts(252,3): error TS2724: '"./api/library"' has no exported member named 'IndexSummary'. Did you mean 'getIndexSummary'?
+src/lib/api.ts(253,3): error TS2305: Module '"./api/library"' has no exported member 'FolderIndexRow'.
+src/pages/LibraryPage.tsx(45,29): error TS6133: 'TabsList' is declared but its value is never read.
+src/pages/LibraryPage.tsx(45,39): error TS6133: 'TabsTrigger' is declared but its value is never read.
+src/pages/SettingsPage.test.tsx(83,3): error TS2322: Type '{ active_provider: string; llm_model: string; available_models: string[]; providers: ProviderInfo[]; embedding_model: string; embedding_base_url: string; ... 48 more ...; deprecated_models?: string[] | undefined; }' is not assignable to type 'FullAppSettings'.
+src/pages/SettingsPage.tsx(1271,60): error TS2322: Type '{ children: Element[]; label: string; tooltip: string; }' is not assignable to type 'IntrinsicAttributes & { label: string; children: ReactNode; }'.
+src/pages/SettingsPage.tsx(931,9): error TS2561: Object literal may only specify known properties, but 'web_search_enabled' does not exist in type 'SettingsUpdate'. Did you mean to write 'hybrid_search_enabled'?
+src/providers/OrgProvider.test.tsx(23,1): error TS6133: 'ReactNode' is declared but its value is never read.
+src/providers/OrgProvider.test.tsx(71,3): error TS2741: Property 'can_manage_sso' is missing in type '{ org_id: string; role: string; can_manage: boolean; can_audit_view: boolean; memberships: OrgMembership[]; }' but required in type 'OrgPermissions'.
+src/stores/streamsStore.ts(382,55): error TS2345: Argument of type 'StateCreator<{ bucketsBySurface: Map<string, Map<string, Message[]>>; viewedThreadId: null; streamingThreads: Set<string>; stoppingThreads: Set<string>; stopNotConfirmed: Set<...>; ... 12 more ...; actions: { ...; }; }, [], [...]>' is not assignable to parameter of type 'StateCreator<StreamsState, [], [["zustand/subscribeWithSelector", never]]>'.

@@ -1,10 +1,37 @@
 -- v4.0 cloud migration verification — READ ONLY, writes nothing.
--- Paste into the Supabase SQL editor (cloud) and send back the output.
+-- Paste into the Supabase SQL editor (cloud), or run it over the Supabase MCP
+-- (`execute_sql` — reads need no approval), and read the output.
 --
--- Expected at Stage B: every row ok=true INCLUDING the last one, because
--- migration 176 is deliberately withheld until Phase 241's UAT row 5 has run.
--- Expected after Stage E: the last row flips to ok=false — that row asserts
--- 176 is ABSENT, so it is the one check that is supposed to invert.
+-- ⚠⚠ REPAIRED 2026-09-11 (Phase 242, D-242-05). THIS SCRIPT PRODUCED TWO FALSE `FAIL`s AND
+--    BOTH WOULD HAVE BEEN BELIEVED. It is the tool the phase was built to trust, and a checker
+--    that fails closed on its own blind spot is worse than no checker. What changed, and why:
+--
+--  1. THE `156` GRANT CHECK READ THE WRONG CATALOG.  It asked
+--     `information_schema.column_privileges`, which by SQL-standard definition shows ONLY the
+--     grants VISIBLE TO THE CONNECTING ROLE — so under any role that is neither grantor nor
+--     grantee it returns EMPTY FOR EVERY COLUMN, not just for the one being asked about. That is
+--     exactly what happened: the row read `*** FAIL ***` while the database was perfectly correct.
+--     Re-read authoritatively from `pg_attribute.attacl`, the column's real ACL, it carries
+--     `authenticated=arw/postgres, service_role=arw/postgres` — migration 156's exact grant set,
+--     deliberately wider than every other column on the table (which carry `r` only).
+--     ⭐ Third time the `connector_connections` column-grant trap has been in play on this table,
+--        and the FIRST time the checker was the thing at fault.
+--     The row below now reads `attacl` directly AND corroborates with `has_column_privilege`,
+--     which answers the question that actually matters — *can `authenticated` read this column* —
+--     regardless of whether the grant was expressed at column, table or PUBLIC level.
+--
+--  2. THE `176` ROW ASSERTED ABSENCE, AND THAT WINDOW CLOSED ON 2026-09-10.  It was written to
+--     guard the pre-deploy window: 176 was deliberately withheld until Phase 241's UAT row 5 had
+--     run, so `ok` meant "still absent". Row 5 was driven on a local substitute and its cloud
+--     window is permanently closed (`241-HUMAN-UAT.md`, retired in writing at `dbd63864b`); the
+--     fifteen migrations went to cloud as one batch during the v4.0 production prep. So the
+--     inverted row was reporting `*** FAIL ***` for the SUCCESS case.
+--     ⛔ The polarity is now PRESENCE, permanently. Do not flip it back — there is no environment
+--        left in which "176 absent" is the correct state.
+--
+-- Expected now, on any database that has had the full v4.0 set applied: EVERY row PASS.
+-- A `*** FAIL ***` means that migration genuinely has not landed — apply it by pasting into the
+-- SQL editor in numeric order, NEVER `supabase db push` / `db reset`.
 
 with c(mig, what, ok) as (values
 
@@ -40,11 +67,26 @@ with c(mig, what, ok) as (values
           where table_schema='public' and table_name='connector_connections'
             and column_name='default_ingest_visibility')),
 
-  ('156', 'that column is GRANTed to authenticated (the 118 trap)',
-   exists(select 1 from information_schema.column_privileges
-          where table_schema='public' and table_name='connector_connections'
-            and column_name='default_ingest_visibility'
-            and grantee='authenticated' and privilege_type='SELECT')),
+  -- ⚠ REPAIRED (D-242-05). `information_schema.column_privileges` shows only the grants the
+  --   CONNECTING role can see, so it returns empty for every column under a role that is neither
+  --   grantor nor grantee — a false FAIL that says nothing about the database. `pg_attribute.attacl`
+  --   is the column's real ACL and is readable by anyone who can read the catalog.
+  ('156', 'that column carries an explicit column-level GRANT to authenticated (the 118 trap)',
+   exists(select 1
+          from pg_attribute a
+          join pg_class c on c.oid = a.attrelid
+          join pg_namespace n on n.oid = c.relnamespace,
+               lateral unnest(coalesce(a.attacl, '{}'::aclitem[])) as acl
+          where n.nspname='public' and c.relname='connector_connections'
+            and a.attname='default_ingest_visibility'
+            and split_part(acl::text, '=', 1) = 'authenticated'
+            and split_part(split_part(acl::text, '=', 2), '/', 1) like '%r%')),
+
+  -- The corroborating half: the question that actually matters, answered by Postgres itself and
+  -- independent of HOW the grant was expressed (column, table, or PUBLIC).
+  ('156', 'authenticated can in fact SELECT that column (has_column_privilege)',
+   has_column_privilege('authenticated', 'public.connector_connections',
+                        'default_ingest_visibility', 'SELECT')),
 
   ('166', 'app_settings.vision_model + vision_max_pages',
    (select count(*) from information_schema.columns
@@ -88,10 +130,16 @@ with c(mig, what, ok) as (values
           where table_schema='public' and table_name='documents'
             and column_name='thread_key')),
 
-  ('176', 'HNSW knobs still ABSENT (must stay false until UAT row 5 runs)',
+  -- ⚠ POLARITY CHANGED 2026-09-11 (D-242-05), and it does not change back. This row used to
+  --   assert the knobs were ABSENT — a deliberate inversion guarding the pre-deploy window while
+  --   176 was withheld for Phase 241's UAT row 5. That window closed on 2026-09-10 when the
+  --   fifteen migrations went to cloud in one batch, so the inverted row began reporting
+  --   `*** FAIL ***` for the SUCCESS case. There is no environment left in which absence is
+  --   correct.
+  ('176', 'app_settings.hnsw_ef_search + hnsw_iterative_scan PRESENT',
    (select count(*) from information_schema.columns
     where table_schema='public' and table_name='app_settings'
-      and column_name in ('hnsw_ef_search','hnsw_iterative_scan')) = 0)
+      and column_name in ('hnsw_ef_search','hnsw_iterative_scan')) = 2)
 
 )
 select mig,
