@@ -25,19 +25,23 @@ import { TERM_MAP, usePlainLabel } from "@/lib/termMap"
 import { ConnectorsFlyout } from "./ConnectorsFlyout"
 import { ActiveConnectorChips } from "./ActiveConnectorChips"
 import { ConnectedFilePickerModal } from "./ConnectedFilePickerModal"
-import { listConnectorConnections, uploadWorkspaceTemplate, type ConnectorConnection } from "@/lib/api"
-import type { Message, WorkspaceFile } from "@/types"
+import { listConnectorConnections, type ConnectorConnection } from "@/lib/api"
+import type { Message } from "@/types"
 // ── Phase 244 (244-05 T2 / SHELL-04) — the composer's LOCAL attach door ──────────────────
 // Sketch 236's winner is A — Scope on the chip (operator, 2026-09-11): the `+` menu stays PLAIN
 // and the CHIP carries `this chat only · 24h`. Every word below comes from the port; ⛔ nothing
 // here is re-typed out of the sketch's HTML (the feedback-sketch-to-build-drift rule).
 import { COPY } from "./composerCopy"
-import { ChatAttachmentChip, detachAttachment } from "./ChatAttachmentChip"
+import { ChatAttachmentChip } from "./ChatAttachmentChip"
+// ⛔ G-5: the attach state + its three verbs live in their OWN seam now (244-06). `244-05` named
+// this extraction as the debt it was deliberately not paying in the same commit as a feature.
+import { useComposerAttachments } from "./useComposerAttachments"
 // ⛔ The `accept=` list is READ, never re-listed. 244-02 collapsed three hand-typed copies into
 // this one constant and fenced it `?raw` against `backend/app/api/workspace.py`; a fourth copy
 // here would be invisible to that fence (T-244-05-02).
 import { WORKSPACE_ACCEPT_ATTR } from "@/lib/workspaceAllowedExt"
-import { useStreamActions } from "@/providers/StreamsProvider"
+// ⛔ `useStreamActions` moved WITH the state it served — `useComposerAttachments` owns the
+// optimistic `setWorkspaceFileForThread` reconcile for BOTH doors now (244-06 / G-5).
 
 interface Provider {
   id: string
@@ -129,17 +133,21 @@ export function MessageInput({
   const [filePickerOpen, setFilePickerOpen] = useState(false)
   const [plusMenuOpen, setPlusMenuOpen] = useState(false)
 
-  // ── Phase 244 (244-05 T2 / SHELL-04) — the local attach door's own state ───────────────
-  // `pendingAttachments` is what the person has attached but not yet SENT. It is composer-local
-  // on purpose: the chips the transcript renders are derived from the thread's persisted
-  // workspace files (see `ChatAttachmentChip.attachmentsForMessage`), so nothing here needs to
-  // survive a reload — and a reload MUST NOT resurrect a composer draft as a sent attachment.
-  const [pendingAttachments, setPendingAttachments] = useState<WorkspaceFile[]>([])
-  // ⭐ The server's VERBATIM 422 plus the name of the file it refused. Both atoms, because the
-  // approved mockup draws both (D-244-27); a bare sentence does not satisfy the Build Contract.
-  const [refusal, setRefusal] = useState<{ fileName: string; message: string } | null>(null)
+  // ── Phase 244 (244-06 T3 / SHELL-04 / G-5) — BOTH ATTACH DOORS LIVE IN ONE SEAM ────────
+  // ⛔ The state and the three verbs were EXTRACTED to `useComposerAttachments` because
+  // `244-05` grew this file `643 → 855`, refused to call that "honoured by construction", and
+  // NAMED this seam as the debt. ⭐ The cloud door therefore lands in the hook and this file
+  // SHRINKS rather than growing a third time on a G-5-firing surface.
+  const {
+    pending: pendingAttachments,
+    refusal,
+    attachLocalFile,
+    attachCloudFile,
+    removeAttachment: handleRemoveAttachment,
+    dismissRefusal,
+    clear: clearAttachments,
+  } = useComposerAttachments(threadId)
   const attachInputRef = useRef<HTMLInputElement>(null)
-  const { setWorkspaceFileForThread } = useStreamActions()
 
   // Phase 223 (BUG-260902-03 / D-223-06 / D-223-07):
   // Decision 2: key the restore on Map.has(), never on the value.
@@ -217,66 +225,23 @@ export function MessageInput({
     })
   }, [draftKey])
 
-  /**
-   * ── Phase 244 (244-05 T2 / SHELL-04) — THE LOCAL ATTACH HANDLER ──────────────────────
-   *
-   * Shape copied from `components/panel/TemplateUpload.tsx`, which already drives the same
-   * route: `e.target.value = ""` BEFORE dispatch (so re-selecting the SAME file fires `change`
-   * again — a real bug a build drops silently), then `uploadWorkspaceTemplate`, then an
-   * optimistic `setWorkspaceFileForThread` so the panel reconciles with no refresh.
-   *
-   * ⭐ THE CAUGHT MESSAGE IS THE SERVER'S OWN 422. `uploadWorkspaceTemplate` throws
-   * `new Error(err.detail)`, and `err.detail` is `workspace.py`'s verbatim sentence
-   * (`COPY.engine.REFUSE_TYPE` / `REFUSE_SIZE` / `REFUSE_EMPTY`). ⛔ It is NEVER paraphrased and
-   * NEVER replaced with a friendlier client string — the sketch draws the server's words on
-   * purpose, because a refusal that softens the reason cannot be acted on.
-   *
-   * ⛔ NO CLIENT-SIDE SIZE OR TYPE GATE. `accept=` is a UX hint (T-244-05-01); the real boundary
-   * is `validate_upload`'s magic-byte + container checks, and the cap is enforced server-side
-   * three times including BEFORE body materialisation (WR-04 / T-244-05-04). A second client cap
-   * could only ever disagree with the server.
-   */
-  const handleAttachLocalFile = useCallback(
-    async (f: File) => {
-      if (!threadId) return
-      try {
-        const uploaded = await uploadWorkspaceTemplate(threadId, f)
-        setWorkspaceFileForThread(threadId, uploaded) // optimistic reconcile (no refresh)
-        setPendingAttachments((prev) => [...prev, uploaded])
-        setRefusal(null)
-      } catch (e) {
-        setRefusal({ fileName: f.name, message: e instanceof Error ? e.message : "Upload failed" })
-      }
-    },
-    [threadId, setWorkspaceFileForThread],
-  )
-
   const onAttachInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]
     // Reset the input so re-selecting the same file fires change again (TemplateUpload.tsx).
     e.target.value = ""
-    if (f) void handleAttachLocalFile(f)
+    if (f) void attachLocalFile(f)
   }
 
   /**
-   * ⚠ REMOVE IS A DETACH, NOT A DELETE, AND THE UI MUST NOT IMPLY OTHERWISE.
-   *
-   * `backend/app/api/workspace.py` ships SIX routes and **none of them is a DELETE** (measured at
-   * this base: one POST, five GETs). So the bytes stay in `workspace_files` until the TTL read
-   * gate hides them, and `244-02`'s sandbox hydration will still surface them to the agent for
-   * this thread. Removing the chip therefore means: *this file is not part of the message I am
-   * about to send.* It is recorded in the session-scoped detach registry so the transcript's
-   * association rule skips it too.
-   *
-   * ⛔ Do NOT "fix" this by adding a client-side hide that claims the file is gone. The honest
-   * close is a DELETE route, which is backend scope this plan does not carry.
+   * ── Phase 244 (244-06 T3 / D-244-05) — THE CLOUD DOOR'S COMMIT ────────────────────────
+   * The modal raises the pick; THIS decides what it means, and it means *this conversation*.
+   * ⛔ It does not touch `value`: the arm D-244-02 rejects is appending `Attached file: <name>`
+   * into the person's draft, which this mount carried until this commit.
    */
-  const handleRemoveAttachment = useCallback(
-    (file: WorkspaceFile) => {
-      if (threadId) detachAttachment(threadId, file.path)
-      setPendingAttachments((prev) => prev.filter((f) => f.path !== file.path))
-    },
-    [threadId],
+  const handleAttachCloudFile = useCallback(
+    ({ connectionId, file }: { connectionId: string; file: { id: string; name: string } }) =>
+      attachCloudFile(connectionId, file.id, file.name),
+    [attachCloudFile],
   )
 
   // Per-thread drafts: on thread switch, stash the outgoing thread's unsent
@@ -294,13 +259,9 @@ export function MessageInput({
     else composerDraftsByThread.delete(prevKey)
     setValue(composerDraftsByThread.get(draftKey) ?? "")
 
-    // Phase 244 (244-05 T2): an attachment belongs to the conversation it was attached IN.
-    // ⛔ Unlike the draft text and the connector set, pending attachments are NOT carried across
-    // a thread switch — a chip that followed you into another chat would be saying
-    // `this chat only` about a chat it is not in, which is the one sentence this surface exists
-    // to make true. The bytes are not lost: they remain in the thread they were uploaded to.
-    setPendingAttachments([])
-    setRefusal(null)
+    // Phase 244 (244-05 T2, extracted at 244-06): an attachment belongs to the conversation it
+    // was attached IN — the reason lives with the state now, in `useComposerAttachments`.
+    clearAttachments()
 
     // The connector selection belongs to the CONVERSATION, not to the composer instance:
     // switching away and back must not quietly re-arm, or disarm, a set of services.
@@ -364,8 +325,7 @@ export function MessageInput({
     setValue("")
     // Phase 244 (244-05 T2): the pending chips have become SENT chips — the transcript renders
     // them from the thread's persisted workspace files now, so the composer lets them go.
-    setPendingAttachments([])
-    setRefusal(null)
+    clearAttachments()
     // Per-thread drafts: a successful hand-off consumes the draft.
     composerDraftsByThread.delete(draftKey)
     if (textareaRef.current) {
@@ -440,7 +400,7 @@ export function MessageInput({
             <button
               type="button"
               data-refusal-dismiss
-              onClick={() => setRefusal(null)}
+              onClick={dismissRefusal}
               className={cn(
                 "shrink-0 rounded-md border border-border px-2 py-0.5 font-medium text-foreground/80",
                 "hover:bg-accent focus:outline-none focus-visible:ring-1 focus-visible:ring-ring",
@@ -842,13 +802,19 @@ export function MessageInput({
         onChange={onAttachInputChange}
       />
 
+      {/* ── Phase 244 (244-06 T3 / D-244-05 / BUG-260905-01) — THE CLOUD DOOR, RE-POINTED ──
+          ⛔ This mount used to carry `onFileImported`, which appended `Attached file: <name>`
+          into the person's DRAFT — the arm D-244-02 rejects in writing ("it edits the person's
+          words"). It is gone, and it left in the SAME COMMIT as the re-point on purpose: the
+          two behaviours must never both be live, and removing the text edit alone would have
+          left the cloud door doing nothing visible at all.
+          ⭐ The pick now lands in `workspace_files` for THIS thread, so both composer doors
+          mean the same thing and neither writes a `documents` row. */}
       <ConnectedFilePickerModal
         open={filePickerOpen}
         onOpenChange={setFilePickerOpen}
         connections={connections}
-        onFileImported={(doc) => {
-          setValue((prev) => (prev ? `${prev}\nAttached file: ${doc.filename}` : `Please analyze attached file: ${doc.filename}`))
-        }}
+        onConfirm={handleAttachCloudFile}
       />
     </div>
   )

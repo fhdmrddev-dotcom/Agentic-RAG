@@ -3582,6 +3582,50 @@ const BASELINE = {
   // `MessageItem.tsx` and `ChatAttachmentChip.tsx` were restored md5-identical after every plant
   // (`bab2a9868f07b37d2e29766d95574eed`, `0b092b18f2cf83756f1d2213c9f36306`).
   "ComposerAttach.composition.test.tsx": 19,
+  // ── Phase 244 (244-06 T3 / SHELL-04 / D-244-05 / D-244-27) — the cloud modal ────────────
+  // ⛔ BOTH KNOBS, SAME COMMIT. `src/components/chat` still has NO bare-directory TARGETS entry.
+  //
+  // 9 cases, MEASURED on a green run of the suite alone — not copied from the plan.
+  // EIGHT were RED on the shipped tree (`Unable to find an element by:
+  // [data-testid="cloud-file-picker"]`, and `COPY.a.cloudSub is not a function`), because the
+  // shipped modal had NO source line, NO selection state — every row carried its own immediate
+  // `Import` button, so a click WAS the commit — and NO cancel/confirm footer.
+  // ⭐ The ninth (case 8) was GREEN from the start BY DESIGN: it is case 7's ordered predicate
+  // run against a deliberately mis-composed fixture, so it proves the assertion CAN fail.
+  //
+  // Four falsifications, every file restored md5-identical:
+  //   · the Library minter + the draft edit re-added to `MessageInput`'s cloud callback ->
+  //     case 1 `expected "vi.fn()" to not be called at all, but actually been called 1 times`
+  //     and case 2 `expected 'what does this say about pricing\nAtt…' to be 'what does this say
+  //     about pricing'` (f50eb09abe2356c465d1a3cc48904f7d)
+  //   · the footer MOVED above the file list -> case 7 `expected false to be true`
+  //   · the list made range-selecting -> case 7 `expected 2 to be 1` — the COUNT assertion, which
+  //     is why it counts rather than checking the row it clicked (4d9613e752594050a5f4e227086539db)
+  // ⚠ THE SECOND PLANT'S FIRST ATTEMPT WAS RED FOR THE WRONG REASON and is recorded rather than
+  // tidied away: it DUPLICATED the footer instead of moving it, giving `Found multiple elements
+  // by: [data-testid="cloud-cancel"]` — a failure explainable without reference to the defect.
+  "ConnectedFilePickerModal.thread.test.tsx": 9,
+  // ── Phase 244 (244-06 T2 / SHELL-04 / D-244-06 / D-244-07) — the LIBRARY's cloud door ───
+  // ⛔ BOTH KNOBS, SAME COMMIT. `src/pages` is NOT a bare-directory TARGETS entry either.
+  //
+  // 8 cases, MEASURED on a green run of the suite alone. ALL EIGHT were RED on the shipped
+  // tree — six with `Unable to find an element by: [data-testid="library-cloud-import"]`,
+  // because the Library had no single-file cloud door AT ALL, and two source fences.
+  //
+  // ⭐ THE LOAD-BEARING ONE IS CASE 2: with no folder selected the door renders its REASON as
+  // TEXT. D-244-06's ruling is that silently rooting is the defect, and a control that greys
+  // out with no words is the same failure wearing a different hat — so the assertion is on the
+  // rendered sentence, never on the `disabled` attribute.
+  // ⚠ Case 5 is D-244-23 read in the MIRROR: the Library's confirm must NOT be `Attach`. Two
+  // consequences (a 24h thread file / a permanent KB document) must not share one word.
+  //
+  // ⚠ TWO PLAN FIGURES DID NOT HOLD AND ARE CORRECTED IN THE TEST BODY, not over it:
+  //   · the plan asked that `grep 'folder_id' LibraryPage.tsx` be empty — it is a `Document`
+  //     FIELD read there, so the criterion could not pass on an untouched tree. The fence now
+  //     measures the property meant: no `folder_id:` body KEY.
+  //   · that read count is **7**, not the 5 a first pass took from `grep -n` — one line carries
+  //     three occurrences. ⛔ A LINE count is not an OCCURRENCE count.
+  "LibraryPage.cloudImport.test.tsx": 8,
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -5108,6 +5152,27 @@ const TARGETS = [
   // contract that asserted words and never composition. This suite owns four of the five blocks
   // (the `+` menu, the chips row, the refusal, the sent message); the cloud modal is `244-06`'s.
   "src/components/chat/__tests__/ComposerAttach.composition.test.tsx",
+  // -- Phase 244 (244-06 T3 / SHELL-04 / D-244-05 / D-244-27) — the CLOUD modal, the fifth block
+  //
+  // FILE-LEVEL BY NECESSITY — `src/components/chat` appears in this array only inside comments.
+  //
+  // What it guards: (a) the ROADMAP's named failure mode for SHELL-04 — the composer's cloud
+  // door quietly minting a LIBRARY row — asserted as a NEGATIVE, because a positive-only test
+  // passes while BOTH writes happen; (b) the person's typed draft staying byte-unchanged, which
+  // is D-244-02's explicitly rejected arm and was SHIPPED until this plan; (c) the fifth and
+  // last of D-244-27's ordered blocks, which carried a vocabulary-only assertion and no DOM
+  // fence anywhere in the plan set before this pass.
+  "src/components/chat/__tests__/ConnectedFilePickerModal.thread.test.tsx",
+  // -- Phase 244 (244-06 T2 / SHELL-04 / D-244-06) — the LIBRARY's single-file cloud door -----
+  //
+  // FILE-LEVEL BY NECESSITY — `src/pages` has no bare-directory entry in this array either.
+  //
+  // What it guards: the half of BUG-260905-01 that is a MISSING capability rather than a wrong
+  // one — *"the import should be from the Library, not from the chat"*. Specifically: the door
+  // takes its destination from the page's OWN selection, reuses the SHIPPED `canUploadToFolder`
+  // predicate rather than inventing a second permission rule, renders a REASON in every
+  // unavailable state, and speaks the server's refusal verbatim.
+  "src/pages/__tests__/LibraryPage.cloudImport.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")

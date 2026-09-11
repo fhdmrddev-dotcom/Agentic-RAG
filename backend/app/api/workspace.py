@@ -24,11 +24,16 @@ from app.db.workspace import get_file_by_id
 # asyncpg-backed write/read (passed as the duck-typed `pool` into workspace_service /
 # db.workspace, which run under SET LOCAL ROLE authenticated). No producer path here.
 from app.dependencies import (
+    get_active_org_id,
     get_current_user,
     get_user_pg_connection,
     get_user_supabase_client,
 )
 from app.models.user_settings import load_app_settings_async
+# Phase 244 (SHELL-04 / D-244-05) — the composer's cloud door lands HERE, not in the Library.
+from app.models.workspace import WorkspaceConnectionAttachRequest
+from app.services import connector_service
+from app.services.sources.base import SourceConnectionDisabled
 from app.services.workspace_service import (
     MAX_FILE_SIZE,
     FileTooLargeError,
@@ -284,18 +289,47 @@ async def upload_template(
     if file.size is not None and file.size > MAX_FILE_SIZE:
         raise HTTPException(422, "File too large. Maximum size is 10 MB.")
     raw = await file.read()
+    return await _persist_workspace_upload(
+        thread_id=thread_id,
+        request=request,
+        current_user=current_user,
+        supabase=supabase,
+        filename=file.filename or "",
+        raw=raw,
+    )
+
+
+async def _persist_workspace_upload(
+    *,
+    thread_id: str,
+    request: Request,
+    current_user: dict,
+    supabase: Client,
+    filename: str,
+    raw: bytes,
+) -> dict:
+    """The ONE writer of an ephemeral ``kind='template_input'`` workspace file.
+
+    ⭐ Phase 244 (SHELL-04 / D-244-05) extracted this from ``upload_template`` so the CLOUD
+    door (``attach_connection_file`` below) cannot drift from the LOCAL one on validation, on
+    the TTL or on filename sanitisation. ⛔ Two writers is how a second door quietly grows a
+    laxer gate; there is one, and both routes call it. Behaviour is byte-identical to the
+    Phase-100 inline version — the caller still owns the pre-read ``file.size`` short-circuit,
+    because only a multipart part declares a size before it is materialised (WR-04).
+    """
     if len(raw) == 0:
         raise HTTPException(422, "File is empty")
     if len(raw) > MAX_FILE_SIZE:
         raise HTTPException(422, "File too large. Maximum size is 10 MB.")
-    ext = validate_upload(file.filename or "", raw)  # D-12/D-09 magic-byte + content gate
+    ext = validate_upload(filename, raw)  # D-12/D-09 magic-byte + content gate
     ttl_hours = (await load_app_settings_async()).template_ttl_hours  # D-05
     expires_at = datetime.now(timezone.utc) + timedelta(hours=ttl_hours)
     # WR-05 (100-REVIEW): sanitize the ORIGINAL filename to validate_path's charset
     # (^/[a-zA-Z0-9._/\- ]+$, no '..') so ordinary names — "Q3 Report (final).docx",
     # "P&L 2026.xlsx", "Übersicht.docx", "report..v2.docx" — don't surface a
     # confusing "invalid path characters" 422 to a user who never typed a path.
-    stem = file.filename or f"template{ext}"
+    # ⚠ Phase 244: a CLOUD provider's filename is equally untrusted, and lands here too.
+    stem = filename or f"template{ext}"
     safe_name = re.sub(r"[^a-zA-Z0-9._\- ]", "_", stem)
     safe_name = re.sub(r"\.{2,}", ".", safe_name).strip() or f"template{ext}"
     path = f"/{uuid4().hex[:8]}-{safe_name}"
@@ -322,6 +356,75 @@ async def upload_template(
     result["kind"] = "template_input"
     result["expires_at"] = expires_at.isoformat()
     return result
+
+
+@router.post("/files/from-connection")
+async def attach_connection_file(
+    thread_id: str,
+    request: Request,
+    body: WorkspaceConnectionAttachRequest,
+    active_org: str = Depends(get_active_org_id),
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_user_supabase_client),
+):
+    """Attach ONE connected-cloud file to THIS THREAD (Phase 244 / SHELL-04 / D-244-05).
+
+    ⛔ **THIS ROUTE MINTS NO ``documents`` ROW.** It is the un-inversion of `BUG-260905-01`:
+    the composer's cloud door used to call the LIBRARY's single-file import, so a file picked
+    mid-chat was written permanently into the Library root. The bytes now land in
+    ``workspace_files`` under the same 24h TTL read gate as a local attach, and both composer
+    doors mean the same thing — *this conversation* (D-244-05).
+
+    ⭐ It lives HERE, not in ``connectors.py``, and the placement is the guarantee: this module
+    imports neither ``import_single_file`` nor ``ingest_splice``, so *"the chat writes nothing
+    to the KB"* is structural rather than a promise a future edit can quietly break.
+
+    The provider's bytes are untrusted and go through the SAME ``_persist_workspace_upload``
+    the local door uses — ``validate_upload``'s magic-byte / container gate, the 10 MB cap and
+    the filename sanitiser. ⛔ No second, laxer gate for "our own" cloud.
+    """
+    from app.services.sources.import_service import fetch_cloud_file
+
+    await _verify_thread_ownership(thread_id, current_user, supabase)  # 404 on non-owner
+
+    conn = await connector_service.get_connection(
+        connection_id=str(body.connection_id),
+        org_id=str(active_org),
+        supabase=supabase,
+    )
+    if not conn:
+        # D-062-12: absence, not refusal — a 403 would confirm the id names a real row.
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Connection not found")
+
+    try:
+        filename, raw, _mime = await fetch_cloud_file(conn, body.file_id)
+    # ⚠ BEFORE the broad handler below, exactly as `connectors.py`'s import route orders them
+    # (BUG-260907-03): a disabled connection is not a provider error, and wording it that way
+    # is how a control that failed to stop something reads as the provider's fault.
+    except SourceConnectionDisabled as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"reason_code": "connection_disabled", "message": str(exc)},
+        ) from None
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(
+            "Failed to fetch file %s from connection %s: %s", body.file_id, body.connection_id, exc
+        )
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Failed to download cloud file: {exc}",
+        )
+
+    return await _persist_workspace_upload(
+        thread_id=thread_id,
+        request=request,
+        current_user=current_user,
+        supabase=supabase,
+        filename=filename,
+        raw=raw,
+    )
 
 
 # Must-haves export alias: the route handler is named ``upload_template`` to

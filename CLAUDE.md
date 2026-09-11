@@ -664,7 +664,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/api/runs.py` | 35 / 16 / 1430 | honoured by construction (194) |
 | `backend/app/services/harness_engine.py` | 54 / 20 / 3135 | honoured by construction (194 / **214**) |
 | `frontend/src/components/chat/RunCard.tsx` | 28 / 14 / 710 | ⭐ **G-5 DISCHARGED (243-02)** — the reasoning fold left for `ThinkingBlock.tsx`, `-39/+20`, one `useState` fewer. ⚠ row was STALE at `26/12/728`. State 2 stayed, by decision |
-| `frontend/src/components/chat/MessageInput.tsx` | 30 / 15 / 855 | ⛔ **244-05 GREW IT +212 and a SEAM IS NOW OWED** — the local attach door. The row was CORRECT at `29 / 14 / 643`; the named extraction is in §244-05 of the detail file |
+| `frontend/src/components/chat/MessageInput.tsx` | 31 / 15 / 821 | ⭐ **THE OWED SEAM WAS TAKEN (244-06)** — `useComposerAttachments`. It SHRANK `855 → 821` **while gaining the cloud door**; ⛔ the `ComposerChipsRow` half stays OWED |
 | `frontend/src/components/chat/ActiveConnectorChips.tsx` | 2 / 2 / 82 | ⚠ absent for its ENTIRE LIFE — row added 244-05 at its SECOND phase. **244**: the row container HOISTED out; bare chips now, `null` on empty (D-244-26) |
 | `frontend/src/components/chat/MessageList.tsx` | 21 / 9 / 307 | ⚠ row STALE a THIRD time (`19/8/267` → `20/8/292` → `20/8/300`). honoured by construction (**244-01**): `min-h-0` on the ONE `<ScrollArea>` call site |
 | `frontend/src/components/chat/ChatArea.tsx` | 72 / 36 / 710 | honoured by construction (**244-03**): ONE boolean gains `&& !workflowLock.capPaused`. No second branch, no new state — the whole composer chain already reads this one value |
@@ -709,8 +709,8 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/ConnectionPicker.tsx` | 7 / 5 / 888 | honoured by construction (206.2 / **214**) |
 | `frontend/src/components/workflows/ExternalActionSection.tsx` | 8 / 5 / 179 | honoured by construction (206.2 / **214**) |
 | `frontend/src/components/workflows/McpToolPicker.tsx` | 5 / 5 / 601 | honoured by construction (211 / **214**) |
-| `backend/app/models/connector.py` | 24 / 13 / 772 | honoured by construction (**239-06 / SEED-259**): the argument mapping rides the declared `dict[str,str]` as flat prefixed keys — no new field, no shape change, no migration |
-| `backend/app/api/connectors.py` | 41 / 19 / 2091 | ⚠ **extraction still OWED and the file GREW again** (2071→2091 at 238-04). honoured by construction (**238-04**): `source_path` is dropped at the boundary, server-only |
+| `backend/app/models/connector.py` | 25 / 14 / 800 | ⚠ row was STALE at `24/13/772`. honoured by construction (**244-06**): a NEW request model, ⛔ no field added to an existing one — `folder_id: str` REQUIRED, so 422 fires before the handler |
+| `backend/app/api/connectors.py` | 42 / 20 / 2102 | ⛔ **extraction still OWED and the file GREW a THIRD time** (2071→2091→2102). honoured by construction (**244-06**): ONE parameter, ONE forward; the refusal is the MODEL, not a branch here |
 | `backend/app/services/sources/preview_service.py` | 8 / 4 / 826 | ⚠ row STALE TWICE; the 2nd read “238: comment-only” while 238 re-opened SEED-253 here. **238-04: display ≠ stored; the walk no longer mutates `SourceFile.path`** |
 | `backend/app/security/egress.py` | 13 / 5 / 982 | honoured by construction (232): Google Drive read/export pins; docstri |
 | `backend/app/services/connector_service.py` | 25 / 9 / 1772 | honoured by construction (**239-06**): the write boundary knows a mapping KEY from a tool name by ALLOW-LIST — an unknown key is still read as a tool name and still refused |
@@ -724,11 +724,11 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/WorkflowScheduleModal.tsx` | 3 / 3 / 601 | ⚠ absent for its entire life; it crossed the threshold in 214-09 on a  |
 | `frontend/src/components/workflows/nodePresentation.ts` | 8 / 7 / 221 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
 | `frontend/src/lib/api/threads.ts` | 7 / 3 / 1683 | young (207 split, 214) |
-| `frontend/src/lib/api/connectors.ts` | 16 / 10 / 718 | honoured by construction (**233**) |
+| `frontend/src/lib/api/connectors.ts` | 17 / 11 / 740 | honoured by construction (**244-06**): `importCloudFile` gains a REQUIRED body declared BESIDE `SourcePreviewRequest` — ⛔ never inline in a component |
 | `frontend/src/lib/api/workflows.ts` | 4 / 4 / 1081 | ⚠ absent until 214; the 207 split created it with NO row. **`lib/api.t |
 | `frontend/src/lib/connectionMark.tsx` | 7 / 4 / 313 | ✅ **the move IS the seam, and it was TAKEN (214-08)** |
 | `frontend/src/components/ingestion/DocumentList.tsx` | 24 / 13 / 294 | ✅ **seam TAKEN (217.1-05)** |
-| `frontend/src/pages/LibraryPage.tsx` | 45 / 14 / 955 | ⚠ row STALE a THIRD time. honoured by construction (**244-04**): one optional prop + one `useMemo` over a strict leaf; ⛔ NO `useSourceAttention()` added. ⚠ needs `--follow` or it reads `1` |
+| `frontend/src/pages/LibraryPage.tsx` | 46 / 15 / 970 | ⚠ row STALE a FOURTH time, one plan later. honoured by construction (**244-06**): ONE mount + 3 EXISTING props; the door owns its own connections read, so the page gained no effect |
 | `backend/app/services/retrieval_service.py` | 19 / 11 / 456 | ⛔ **extraction still OWED (SEED-224, since 231).** 241 is the SECOND landing, 11 lines; a THIRD must propose the extraction FIRST |
 | `frontend/src/components/metadata/DocumentDetailPanel.tsx` | 9 / 6 / 496 | ⚠ **the row was STALE at `6 / 5 / 405`.** honoured by construction (21 |
 | `frontend/src/hooks/useDocuments.ts` | 8 / 3 / 120 | ⚠ absent at 3 phases. Realtime is a hint, not truth |
@@ -745,15 +745,18 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/ingestion/__tests__/IngestionStrip.test.tsx` | 3 / 3 / 516 | ⚠ absent; row added 233, which repaired the INHERITED red `229-03` cau |
 | `frontend/src/components/layout/NavPanel.tsx` | 20 / 11 / 329 | ⚠ absent from BOTH for its ENTIRE LIFE at **11 phases** |
 | `frontend/src/App.tsx` | 32 / 23 / 374 | ⚠ absent for its ENTIRE LIFE at **23 phases**; row then STALE at `31/23/351`. ⭐ **244-04 left it BYTE-UNCHANGED and FENCED it** — `setLibraryTab(` still 2, driven RED against a planted 3rd writer |
+| `frontend/src/components/library/LibraryCloudImport.tsx` | 1 / 1 / 194 | young (created 244-06). Row added AT CREATION. The Library's single-file cloud door — ⛔ it renders a REASON in every unavailable state; a silent grey-out is the same failure as a silent root write |
 | `frontend/src/components/library/LibraryHeaderBar.tsx` | 2 / 1 / 204 | ⚠ absent for its entire life — row added **244-04** at its SECOND touch. ⛔ the ONE set of tab triggers: a hidden duplicate broke 41 cases; `aria-hidden` on the count is load-bearing |
 | `frontend/src/lib/nav-items.ts` | 8 / 6 / 95 | ⚠ absent at 6 phases |
 | `backend/app/api/classification_rules.py` | 3 / 3 / 226 | row added 237 at threshold. Validates rule_scope and enforces WATCH_ALLOWED_FIELDS refusal (422) for arrival watch rules. |
 | `frontend/src/components/classification/RuleBuilderPanel.tsx` | 4 / 3 / 502 | row added 237 at threshold. Adds scope selector segmented control; filters out-of-scope conditions on scope switch. |
-| `backend/app/api/workspace.py` | 11 / 6 / 654 | ⚠ **absent while FIRING for its ENTIRE LIFE at 6 phases — row added 244-02** (D-244-20 said otherwise; C-8 measured it false). honoured by construction (**244**): a 4th category set + a 4th branch |
+| `backend/app/api/workspace.py` | 13 / 7 / 757 | ⚠ row was STALE at `11/6/654` ONE PLAN later — the fastest rot recorded here. honoured by construction (**244-06**): the persist tail EXTRACTED to ONE writer both doors call |
 | `frontend/src/components/panel/TemplateUpload.tsx` | 2 / 2 / 91 | ⚠ absent for its entire life — row added 244-02 at the SECOND phase. **244**: the `accept=` literal is GONE; it reads the fenced constant |
 | `frontend/src/lib/workspaceAllowedExt.ts` | 1 / 1 / 54 | young (created 244-02). Row added AT CREATION — an absent row is invisible to G-5 at any count |
 | `frontend/src/components/chat/ChatAttachmentChip.tsx` | 1 / 1 / 144 | young (created 244-05). Row added AT CREATION. ONE chip, THREE states; `sent` carrying `this chat only` is D-244-22's build obligation, `expired` is D-244-25's |
-| `frontend/src/components/chat/composerCopy.ts` | 1 / 1 / 93 | young (created 244-05). Row added AT CREATION. A PORT of sketch 236's `COPY.js`, `?raw`-fenced. ⛔ `COPY.b` is deliberately NOT ported (D-244-23) |
+| `frontend/src/components/chat/composerCopy.ts` | 2 / 1 / 103 | young (created 244-05). Row added AT CREATION. A PORT of sketch 236's `COPY.js`, `?raw`-fenced. ⛔ `COPY.b` NOT ported (D-244-23). **244-06**: `cloudSub` ported by SHAPE |
+| `frontend/src/components/chat/ConnectedFilePickerModal.tsx` | 3 / 2 / 336 | ⚠ **absent for its ENTIRE LIFE — row added 244-06, and the ledger GATE is what found it (C-8's last `[no-row]`).** REBUILT: select-then-confirm; the commit is the PARENT's |
+| `frontend/src/components/chat/useComposerAttachments.ts` | 1 / 1 / 158 | young (created 244-06). Row added AT CREATION. ⭐ THE SEAM `244-05` NAMED AND OWED — both attach doors' state + verbs; it CANNOT reach `setValue` |
 
 When a new phase enters discuss-phase, the orchestrator must scan PLAN.md `files_modified` against this ledger. Any match against a G-5-firing row means the discuss-phase produces a refactor recommendation as the first option, not the planned feature — and the phase reads that file's section in `docs/HOT-FILE-LEDGER.md` before planning, because that is where the named seam and the binding invariants live.
 

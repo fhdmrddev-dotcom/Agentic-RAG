@@ -146,6 +146,7 @@ from app.dependencies import (
 )
 from app.models.connector import (
     ApplicationAvailability,
+    ConnectionFileImportRequest,
     ConnectorCheckResponse,
     ConnectorConnectionCreate,
     ConnectorConnectionResponse,
@@ -1787,12 +1788,21 @@ async def list_connection_files(
 async def import_connection_file(
     connection_id: str,
     file_id: str,
+    body: ConnectionFileImportRequest,
     background_tasks: BackgroundTasks,
     active_org: str = Depends(get_active_org_id),
     user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_user_supabase_client),
 ):
-    """Phase 216 / Phase 232 (ATTACH-01 / SRC-01): User-initiated single file import."""
+    """Phase 216 / Phase 232 (ATTACH-01 / SRC-01): User-initiated single file import.
+
+    ⛔ **THE "NOBODY CHOSE A FOLDER" REFUSAL IS ENFORCED BY THE MODEL, NOT BY A BRANCH HERE**
+    (Phase 244 / D-244-06). ``ConnectionFileImportRequest.folder_id`` is a REQUIRED ``str`` on a
+    ``extra="forbid"`` base, so FastAPI answers 422 before this function runs. ⛔ Do NOT
+    "helpfully" add a root fallback: landing a named file somewhere nobody asked for IS
+    `BUG-260905-01`, and a fallback added here would pass every test in
+    ``test_244_import_destination_required.py`` except the one that reads this source.
+    """
     from app.services.sources.import_service import import_single_file
 
     conn = await connector_service.get_connection(
@@ -1811,6 +1821,7 @@ async def import_connection_file(
             active_org=str(active_org),
             background_tasks=background_tasks,
             supabase=supabase,
+            folder_id=body.folder_id,
         )
     # ⚠ BEFORE the broad handler below, which turns anything it catches into a 502 "the
     # provider returned an error". A disabled connection is not a provider error, and wording

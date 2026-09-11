@@ -131,3 +131,41 @@ point the registry becomes a real delete call and this note is deleted with it.
 
 **Re-open trigger:** the next plan whose `files_modified` names this file must **propose the
 extraction first** — the `retrieval_service.py` / SEED-224 rule applied here.
+
+> ✅ **DISCHARGED at `244-06` — and recorded here rather than deleted, because the trigger FIRING
+> as written is the useful fact.** `244-06`'s `files_modified` named the file, so the rule bound.
+> `useComposerAttachments.ts` was extracted and `MessageInput.tsx` went **`855 → 821` while gaining
+> the cloud door**. ⛔ **The `ComposerChipsRow` half is STILL OWED** — see item 5 below.
+
+### 4. `backend/app/api/connectors.py` — the extraction is OWED for a THIRD landing running
+
+`2051 → 2071` (Phase 239 gap-closure) → `2091` (`238-04`) → **`2102` (`244-06`)**. Each landing was
+small and each was defensible on its own; the pattern is not. `244-06` added eleven lines — one
+request-body parameter and one forward — and is honoured by construction **for those eleven lines**,
+which is narrower than "the file is fine".
+
+**Re-open trigger:** the FOURTH landing. A plan whose `files_modified` names this file must propose
+the split (the source-browse / preview / import routes away from connector CRUD) before adding
+another line, in the same shape `244-05` used for `MessageInput.tsx` — which item 3 shows works.
+
+### 5. `ComposerChipsRow` — the second half of `244-05`'s named seam, still owed
+
+`244-06` took `useComposerAttachments` (the *behaviour* half) and deliberately left the *layout*
+half. The chips row is still inline JSX in `MessageInput.tsx`, hoisted there by `244-05` under
+`D-244-26`.
+
+**Why not now:** moving it is a layout change whose blast radius runs through
+`ComposerAttach.composition.test.tsx`'s DOM-order fences, and mixing it into a commit that also
+re-points a door would make a red impossible to attribute.
+
+**Re-open trigger:** the next plan whose `files_modified` names
+`frontend/src/components/chat/MessageInput.tsx`.
+
+### 6. ⛔ `BUG-260905-01` is BUILT but NOT VERIFIED-CLOSED
+
+All three halves the operator reported are built and fenced (see the report's own
+*Disposition at Phase 244 plan 06* table). `status:` stays **`folded`** and `verified_closed_by:`
+stays **empty**, deliberately: a green unit test is not a reproduction. The close belongs to the
+driven rows in `244-VALIDATION.md`, against a real Google Drive connection.
+
+**Re-open trigger:** it is already open — `/gsd:verify-work` owns it.

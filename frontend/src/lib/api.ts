@@ -76,6 +76,7 @@ export {
   listDocuments,
   uploadDocument,
   uploadWorkspaceTemplate,
+  attachConnectionFileToThread,
   DownloadError,
   downloadSandboxOutput,
   downloadWorkspaceFile,
@@ -465,6 +466,7 @@ export type {
   SourcePreviewItem,
   SourcePreviewResponse,
   SourcePreviewRequest,
+  ConnectionFileImportRequest,
   SourceConfirmOutcome,
   SourceConfirmResponse,
 } from "./api/connectors"

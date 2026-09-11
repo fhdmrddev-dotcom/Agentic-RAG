@@ -9,6 +9,9 @@ import {
 } from "react"
 import { Folder, PanelLeftClose, PanelLeftOpen, SlidersHorizontal, X } from "lucide-react"
 import { DocumentUpload } from "@/components/ingestion/DocumentUpload"
+// Phase 244 (244-06 T2 / SHELL-04) — the Library's own single-file cloud door. It owns its
+// connections read so this page gains a MOUNT, not an effect.
+import { LibraryCloudImport } from "@/components/library/LibraryCloudImport"
 import { DocumentList } from "@/components/ingestion/DocumentList"
 import { DocumentDetailPanel } from "@/components/metadata/DocumentDetailPanel"
 import { FolderBreadcrumb } from "@/components/ingestion/FolderBreadcrumb"
@@ -677,6 +680,18 @@ export function LibraryPage({
         folderId={selectedFolderId}
         folderName={selectedFolderName}
         disabled={!canUploadToFolder}
+      />
+
+      {/* ── Phase 244 (244-06 T2 / SHELL-04 / D-244-06 / BUG-260905-01) — THE CLOUD DOOR ──
+          The operator's sentence: *"the import should be from the Library, not from the chat."*
+          It sits BESIDE the upload button because that is where a person already goes to put a
+          file in the Library, and it takes its destination from the selection this page already
+          owns — ⛔ no second folder picker, ⛔ no second permission rule. */}
+      <LibraryCloudImport
+        folderId={selectedFolderId}
+        folderName={selectedFolderName}
+        canUpload={canUploadToFolder}
+        onImported={loadDocuments}
       />
 
       {/* Phase 217.1-06 (LIB-01 / D-217.1 sparkline-drop) — CHUNKS · VECTORS · FOUND BY

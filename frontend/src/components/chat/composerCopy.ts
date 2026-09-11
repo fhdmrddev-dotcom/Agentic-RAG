@@ -73,6 +73,15 @@ const a = {
   chipTtl: "24h",
   chipRemove: "Remove",
   cloudTitle: "Choose a file",
+  /**
+   * ⭐ PORTED BY SHAPE, not as a literal (`244-06`). The sketch writes
+   * `cloudSub: "From Google Drive · Meridian Supply"` — a SCENARIO line: `Meridian Supply` is
+   * the authored connection name in `COPY.scenario`, which is fixture data and not product.
+   * The two nouns are therefore parameters, and `ConnectedFilePickerModal.thread.test.tsx`
+   * Test 3b feeds the scenario's own values back in and asserts the sketch's literal
+   * reappears verbatim — so the port is fenced against drift exactly as the strings are.
+   */
+  cloudSub: (provider: string, connection: string): string => `From ${provider} · ${connection}`,
   cloudConfirm: "Attach",
   cloudCancel: "Cancel",
   /** ⭐ The scope word in the TRANSCRIPT. D-244-22's build obligation lives on this one key. */

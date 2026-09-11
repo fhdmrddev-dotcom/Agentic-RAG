@@ -462,24 +462,46 @@ export async function listCloudFiles(
   return res.json() as Promise<CloudFileListResponse>
 }
 
-/** Phase 216 (ATTACH-01): Import one named file from connected cloud storage. */
+/**
+ * Phase 244 (SHELL-04 / D-244-06) — where ONE named cloud file lands in the Library.
+ *
+ * ⛔ `folder_id` IS REQUIRED, mirroring `ConnectionFileImportRequest` on the server. It is
+ * declared HERE, beside `SourcePreviewRequest`, and never inline in a component — the hot-file
+ * ledger records THREE separate wire-type drifts in `lib/api/org.ts` alone, every one of them a
+ * shape typed at a call site.
+ *
+ * ⚠ It differs from `SourcePreviewRequest.destination_folder_id` (`string | null`, absent = root)
+ * on purpose: importing a whole FOLDER into the root is a thing a person can mean; a single named
+ * file landing there is what happens when nobody was asked (`BUG-260905-01`).
+ */
+export interface ConnectionFileImportRequest {
+  folder_id: string
+}
+
+/** Phase 216 (ATTACH-01) / Phase 244 (SHELL-04): import one named file into a chosen folder. */
 export async function importCloudFile(
   connectionId: string,
   fileId: string,
+  body: ConnectionFileImportRequest,
 ): Promise<{ id: string; filename: string; mime_type: string; file_size: number; status: string }> {
   const headers = await getAuthHeaders()
   const res = await fetch(
-    `${API_BASE}/connectors/connections/${connectionId}/files/${fileId}/import`,
+    `${API_BASE}/connectors/connections/${encodeURIComponent(connectionId)}/files/${encodeURIComponent(fileId)}/import`,
     {
       method: "POST",
-      headers,
+      headers: { ...headers, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
     },
   )
   if (!res.ok) {
+    // ⭐ `readConnectorFailure`, not `readConnectorReasonCode`: the server's 422 arrives as a
+    // plain-string `detail`, and reading only the coded shape dropped every such sentence
+    // (the `probeMcpServer` finding). S-4 — the refusal is the SERVER's words, never a paraphrase.
+    const failure = await readConnectorFailure(res)
     throw new ConnectorApiError(
-      "Failed to import cloud file",
+      failure.message || "Failed to import cloud file",
       res.status,
-      await readConnectorReasonCode(res),
+      failure.reasonCode,
     )
   }
   return res.json()

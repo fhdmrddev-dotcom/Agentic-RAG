@@ -8,9 +8,26 @@ reported: 2026-09-05
 reported_by: Operator, manual testing at Phase 229 close
 affected_areas: [chat, composer, connectors, ingestion, documents, library, folders]
 folded_into: 244
-re_open_trigger:
+re_open_trigger: The driven UAT rows in 244-VALIDATION.md fail to reproduce any of the three fixes
 related: [SEED-247, ATTACH-01, SEED-213]
 ---
+
+## Disposition at Phase 244 plan 06 (2026-09-12)
+
+⛔ **`status` stays `folded`, NOT `closed`, and that is a decision rather than an oversight.** All
+three halves of the report are BUILT and fenced:
+
+| The operator's sentence | Where it is answered | Fenced by |
+|---|---|---|
+| *"the import should be from the Library, not from the chat"* | the Library's single-file cloud door, beside its upload button | `LibraryPage.cloudImport.test.tsx` |
+| *"anything in the chat should stay temporarily in that thread"* | the composer's cloud door writes `workspace_files`, never `documents` | `ConnectedFilePickerModal.thread.test.tsx` Test 1 (a NEGATIVE) · `test_244_cloud_attach_is_thread_scoped.py` case 2 (a SOURCE fence) |
+| *"I do not see any upload button, only Import from Cloud"* | the `+` menu's local door | `ComposerAttach.composition.test.tsx` (244-05) |
+| *"it ingested into a folder I did not want — the root"* | `ConnectionFileImportRequest.folder_id` is REQUIRED; unset is a 422 at the model boundary | `test_244_import_destination_required.py` |
+
+⛔ **`verified_closed_by` is deliberately still EMPTY.** A green unit test is not a reproduction.
+The close belongs to the driven rows in `244-VALIDATION.md`, against a real Google Drive
+connection, and none were driven by this plan. ⚠ `status:` frontmatter IS the index — flipping it
+on a passing suite is exactly how a bug that still reproduces stops being looked for.
 
 ## What the operator observed
 
