@@ -3004,6 +3004,9 @@ const BASELINE = {
   // were re-expressed in the same vocabulary and still count 1 each; the total moves by the
   // three new cases only.
   "streamsProvider_243_cadence.test.tsx": 18,
+  // 243-06 (MD-4): this suite existed since Phase 176 and was in NEITHER knob, so it ran
+  // nowhere and guarded nothing. Registered here when MD-4 added the failed-terminal cases.
+  "streamsProvider_bug_260707_03_final_answer_resolve.test.tsx": 6,
 
   // ── Phase 243 (243-03 / CHAT-03 / D-243-16) — the scroll effect's ONLY behavioural fence ─
   //
@@ -4824,6 +4827,7 @@ const TARGETS = [
   // are NAMED rather than left unlooked-for. An unadopted suite someone wrote down is a
   // different thing from one nobody noticed.
   "src/__tests__/providers/streamsProvider_243_cadence.test.tsx",
+  "src/__tests__/providers/streamsProvider_bug_260707_03_final_answer_resolve.test.tsx",
   // ⚠ The scroll suite below is a SEPARATE FILE from `MessageList.test.tsx` on purpose:
   // that one stubs `scrollIntoView` to a NO-OP tree-wide (`:61-65`), so nothing mounted under it
   // can see the scroll effect at all. This is the ONLY behavioural coverage that effect has.

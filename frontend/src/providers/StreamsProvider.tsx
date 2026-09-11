@@ -2210,14 +2210,30 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                 // loadMessages replace; the .finally() loadMessages floor remains the
                 // reload-time backstop (D-v2.5-03). SEED-094 (backend stray last-line)
                 // stays OUT (D-09) — this faithfully renders whatever was persisted.
-                if (kind === "done" || kind === "reader_done") {
+                // ⚠ 243-06 (MD-4) — THIS GATE USED TO READ `kind === "done" || kind === "reader_done"`,
+                // AND 243-05 TURNED THAT NARROWING INTO A USER-VISIBLE DEFECT. The original is
+                // named here rather than silently widened. Before 243-05 a FAILED run's interim
+                // narration stayed folded inside `StreamingNarration`; that arm is now deleted, so
+                // the raw blob renders as the answer, with the answer's own renderers — and
+                // PERMANENTLY, because a failed run never reached this reconcile at all. Every
+                // terminal kind now reconciles; the list is spelled in full so it is total over the
+                // `kind` union rather than a negation that a sixth kind would silently join.
+                // ⛔ THE `!answer.content` GUARD BELOW IS WHAT MAKES THAT SAFE, and it is the whole
+                // reason this is not a one-word change: a cancelled or errored run may have
+                // persisted NOTHING, and overwriting a visible blob with an empty string would
+                // replace a bad answer with no answer — a strictly worse failure than the one
+                // being fixed.
+                if (["done", "reader_done", "error", "cancelled", "timed_out"].includes(kind)) {
                   const rid = run.run_id
                   getMessages(threadId)
                     .then((persisted) => {
                       const answer = persisted.find(
                         (m) => m.runId === rid && m.role === "assistant",
                       )
-                      if (!answer) return
+                      // ⛔ 243-06 (MD-4): `!answer.content` is load-bearing, not defensive —
+                      // see the gate's note. An empty persisted answer must leave the
+                      // visible text alone rather than blank it.
+                      if (!answer || !answer.content) return
                       useStreamsStore
                         .getState()
                         .actions.setMessagesForBucket(surfaceId, threadId, (prev) =>
@@ -2678,7 +2694,20 @@ export function StreamsProvider({ children }: PropsWithChildren) {
               // reload-time reconcile as the floor (D-v2.5-03: reconcile via fetch).
               // Keyed by the OWNING threadId so a resolve landing after a
               // thread-switch updates its own bucket, never the viewed thread.
-              if (kind === "done" || kind === "reader_done") {
+              // ⚠ 243-06 (MD-4) — THIS GATE USED TO READ `kind === "done" || kind === "reader_done"`,
+              // AND 243-05 TURNED THAT NARROWING INTO A USER-VISIBLE DEFECT. The original is
+              // named here rather than silently widened. Before 243-05 a FAILED run's interim
+              // narration stayed folded inside `StreamingNarration`; that arm is now deleted, so
+              // the raw blob renders as the answer, with the answer's own renderers — and
+              // PERMANENTLY, because a failed run never reached this reconcile at all. Every
+              // terminal kind now reconciles; the list is spelled in full so it is total over the
+              // `kind` union rather than a negation that a sixth kind would silently join.
+              // ⛔ THE `!answer.content` GUARD BELOW IS WHAT MAKES THAT SAFE, and it is the whole
+              // reason this is not a one-word change: a cancelled or errored run may have
+              // persisted NOTHING, and overwriting a visible blob with an empty string would
+              // replace a bad answer with no answer — a strictly worse failure than the one
+              // being fixed.
+              if (["done", "reader_done", "error", "cancelled", "timed_out"].includes(kind)) {
                 const rid = registeredRunId
                 if (rid) {
                   getMessages(threadId)
@@ -2686,7 +2715,10 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                       const answer = persisted.find(
                         (m) => m.runId === rid && m.role === "assistant",
                       )
-                      if (!answer) return
+                      // ⛔ 243-06 (MD-4): `!answer.content` is load-bearing, not defensive —
+                      // see the gate's note. An empty persisted answer must leave the
+                      // visible text alone rather than blank it.
+                      if (!answer || !answer.content) return
                       useStreamsStore
                         .getState()
                         .actions.setMessagesForBucket(surfaceId, threadId, (prev) =>
