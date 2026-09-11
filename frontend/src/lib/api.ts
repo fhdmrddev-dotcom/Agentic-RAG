@@ -76,6 +76,7 @@ export {
   listDocuments,
   uploadDocument,
   uploadWorkspaceTemplate,
+  attachConnectionFileToThread,
   DownloadError,
   downloadSandboxOutput,
   downloadWorkspaceFile,

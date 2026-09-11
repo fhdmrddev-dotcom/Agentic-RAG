@@ -9995,7 +9995,7 @@ cells rot within days.
 | [`backend/app/services/harness_engine.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharness_enginepy) | 54 / 20 / 3135 | **FIRES** | honoured by construction (194 / **214**) — 214-06 resolved the pause's service at ONE call site |
 | [`frontend/src/components/chat/RunCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatruncardtsx) | 28 / 14 / 710 | **FIRES** | ⭐ **G-5 DISCHARGED (243-02)** — the reasoning fold left for `ThinkingBlock.tsx`, `-39/+20`, one `useState` fewer. ⚠ row was STALE at `26/12/728`. State 2 stayed, by decision |
 | [`frontend/src/components/chat/ThinkingBlock.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatthinkingblocktsx) | 4 / 1 / 283 | no | ⚠ **row at ONE phase BY DESIGN**; `117 → 283` in one phase (**243-04**). Invariants: **one reasoning renderer**, and **no duration derived from length** |
-| [`frontend/src/components/chat/MessageInput.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageinputtsx) | 30 / 15 / 855 | **FIRES** | ⛔ **244-05 GREW IT +212 and a SEAM IS NOW OWED** — the local attach door (2 states, 2 handlers, 3 JSX blocks). The row was correct at `29 / 14 / 643`; the extraction is named in §244-05 |
+| [`frontend/src/components/chat/MessageInput.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageinputtsx) | 31 / 15 / 821 | **FIRES** | ⭐ **THE OWED SEAM WAS TAKEN (244-06)** — `useComposerAttachments`. It SHRANK `855 → 821` **while gaining the cloud door**; ⛔ the `ComposerChipsRow` half of the named seam stays OWED |
 | [`frontend/src/components/chat/MessageList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessagelisttsx) | 21 / 9 / 307 | **FIRES** | ⚠ row STALE a THIRD time (`19/8/267` → `20/8/292` → `20/8/300`). honoured by construction (**244-01**): `min-h-0` added to the ONE `<ScrollArea>` call site — a class token, no state, no prop |
 | [`frontend/src/hooks/useFollowScroll.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusefollowscrollts) | 4 / 2 / 314 | does not fire | ⛔ **NO ROW FOR ITS ENTIRE LIFE — added 243-03**, then STALE at `3/2/265` one phase on. **243-06:** the re-arm now asks whether the reader is STILL leaving, not what they last did |
 | [`frontend/src/lib/throttle.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibthrottlets) | 2 / 2 / 108 | does not fire | ⛔ **NO ROW FOR ITS ENTIRE LIFE — added 243-03.** TWO opposite primitives on purpose; ⛔ never unify them — one of the two call sites breaks silently |
@@ -10213,11 +10213,13 @@ cells rot within days.
 | [`frontend/src/components/sources/sourceCapability.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcessourcecapabilityts) | 3 / 2 / 160 | no (2 phases) | ⚠ row STALE THREE TIMES (`0/0/38`, `2/2/98`, `3/2/138`). **240**: the `is_enabled` refusal lands HERE, one predicate for both surfaces (BUG-260908-02) |
 | [`backend/app/services/sources/adapters/mcp_source.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesadaptersmcp_sourcepy) | 9 / 1 / 1271 | no (1 phase) | ⚠ STALE at every close so far (`2/1/643` → `6/1/1022` → `8/1/1259`). SEED-258 removed its `MAX_FILE_BYTES`; `_guard` reads the operator setting at each use |
 | [`frontend/src/components/settings/connectionRowVerdict.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectionrowverdictts) | 2 / 2 / 99 | no (2 phases) | ⚠ **absent for its entire life — row added 239-03, and the ledger gate FAILED on it at this phase's base.** young (221 / 239). The row's verdict, DERIVED never stored. See §239-03 |
-| [`backend/app/api/workspace.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkspacepy) | 11 / 6 / 654 | ⚠ **FIRES** | ⚠ **absent while FIRING for its ENTIRE LIFE at 6 phases — row added 244-02.** honoured by construction (**244**): a FOURTH category set + a fourth branch, the three shipped branches untouched |
+| [`backend/app/api/workspace.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkspacepy) | 13 / 7 / 757 | ⚠ **FIRES** | ⚠ row was STALE at `11 / 6 / 654` one plan later. honoured by construction (**244-06**): the persist tail EXTRACTED to ONE writer both doors call; the 2nd route adds no 2nd gate |
 | [`frontend/src/components/panel/TemplateUpload.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspaneltemplateuploadtsx) | 2 / 2 / 91 | no (2 phases) | ⚠ absent for its entire life — row added 244-02 at the SECOND phase, not the third. **244**: the `accept=` literal is GONE; it reads the fenced constant |
 | [`frontend/src/lib/workspaceAllowedExt.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibworkspaceallowedextts) | 1 / 1 / 54 | no (new) | young (created 244-02). Row added AT CREATION, per the `settingsSearchPayload.ts` precedent — an absent row is invisible to G-5 at any count |
 | [`frontend/src/components/chat/ChatAttachmentChip.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatchatattachmentchiptsx) | 1 / 1 / 144 | no (new) | young (created 244-05). Row added AT CREATION. The ONE chip, THREE states; `sent` carrying `this chat only` is D-244-22's build obligation and `expired` is D-244-25's |
-| [`frontend/src/components/chat/composerCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatcomposercopyts) | 1 / 1 / 93 | no (new) | young (created 244-05). Row added AT CREATION. A PORT of sketch 236's `COPY.js`, fenced `?raw`. ⛔ `COPY.b` is deliberately NOT ported (D-244-23) |
+| [`frontend/src/components/chat/composerCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatcomposercopyts) | 2 / 1 / 103 | no (new) | young (created 244-05). Row added AT CREATION. A PORT of sketch 236's `COPY.js`, fenced `?raw`. ⛔ `COPY.b` is deliberately NOT ported (D-244-23). **244-06**: `cloudSub` ported by SHAPE |
+| [`frontend/src/components/chat/ConnectedFilePickerModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatconnectedfilepickermodaltsx) | 3 / 2 / 336 | no (2 phases) | ⚠ **absent for its ENTIRE LIFE — row added 244-06, and the ledger gate FAILED on it at this phase's base (C-8).** 244-06 REBUILT it: select-then-confirm, and the commit is the parent's |
+| [`frontend/src/components/chat/useComposerAttachments.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatusecomposerattachmentsts) | 1 / 1 / 158 | no (new) | young (created 244-06). Row added AT CREATION. ⭐ THE SEAM `244-05` NAMED AND OWED — both attach doors' state and verbs; `MessageInput.tsx` shrank `855 → 821` |
 | [`frontend/src/components/chat/ActiveConnectorChips.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatactiveconnectorchipstsx) | 2 / 2 / 82 | no (2 phases) | ⚠ absent for its entire life — row added 244-05 at its SECOND phase. **244**: the row container HOISTED out; it is bare chips now, `null` on empty (D-244-26) |
 
 
@@ -11328,6 +11330,49 @@ stale thread). Narrowing it back to `Thread` re-opens a cross-org selection leak
 
 ## `backend/app/api/workspace.py`
 
+**`13 / 7 / 757`** (re-derived 2026-09-12, Phase 244 plan `244-06`). Phases: 084 · 087 · 100 · 101.1
+· 151 · 163 · **244**. ⚠ The row read `11 / 6 / 654` **one plan earlier** and was already stale by
+the time the next plan in the SAME PHASE opened it — the fastest rot this ledger has recorded.
+
+### 244-06 — a SECOND write route, and the reason it adds no second gate
+
+`POST /threads/{id}/workspace/files/from-connection` is the composer's cloud door
+(`SHELL-04` / `D-244-05`). Two things make it additive rather than a widening:
+
+1. ⭐ **The persist tail was EXTRACTED to `_persist_workspace_upload`, and both doors call it.**
+   `upload_template` keeps only the part that is genuinely multipart-specific — the pre-read
+   `file.size` short-circuit (WR-04), which exists because only a multipart part declares a size
+   before its body is materialised. Everything else — the empty check, the cap, `validate_upload`'s
+   magic-byte gate, the TTL read and the filename sanitiser — is now written once.
+   ⛔ **Two writers is how a second door quietly grows a laxer gate.** `test_244_cloud_attach_is_thread_scoped.py`
+   pins `def validate_upload(` at 1, `= validate_upload(` at 1 and `template_ttl_hours` at 1.
+   ⚠ The first version of that fence asserted `count("validate_upload(") == 1` and **could not pass
+   on an untouched tree** — the string occurs twice, once as the `def`. Corrected beside the
+   original in the test body; this is the fourth 244 plan to find a written figure wrong.
+2. ⭐ **THE PLACEMENT IS THE GUARANTEE.** This module imports neither `import_single_file` nor
+   `ingest_splice`, so *"the chat writes nothing to the KB"* is structural rather than a promise.
+   The fence asserts it **on the source, comment-stripped**, because a mock only sees the paths a
+   test happens to exercise. Driven RED against a planted `import_single_file` import.
+
+**The exception ordering was copied deliberately and then DRIVEN.** `connectors.py`'s import route
+carries a comment saying the `except SourceConnectionDisabled` arm must precede the broad
+`except Exception` 502 (`BUG-260907-03`) — *and a comment is not a test*. This door repeats the
+shape, so it repeats the risk; the arm was moved below the broad one as a plant and the case fired
+`a control we applied reported as the provider's fault` / `assert 502 != 502`. It answers **409**
+with `reason_code: connection_disabled`, not a 502 blaming the provider.
+
+**Invariant this file now carries:** a `workspace_files` row is the ONLY thing either door writes,
+and `WorkspaceConnectionAttachRequest` deliberately has **no `folder_id`** — a destination on a
+thread-scoped body would be a Library shape on the wrong door. The Library's single-file import
+takes `ConnectionFileImportRequest`, whose `folder_id` is REQUIRED (`D-244-06`).
+
+**Named seam, still owed:** nothing proposed. At 7 phases the file is five routes of read and two
+of write; the read side is the natural cut if it crosses again.
+
+---
+
+### Prior entries
+
 **`11 / 6 / 654`** (re-derived 2026-09-11, Phase 244 plan `244-02`). Phases: 084 · 087 · 100 · 101.1 · 151 · 163.
 
 ⚠ **IT WAS ABSENT FROM THIS LEDGER FOR ITS ENTIRE LIFE, WHILE FIRING.** `244-CONTEXT.md` D-244-20
@@ -11731,7 +11776,22 @@ extraction is `chatAttachment.ts` beside it, and the render stays here.
 
 ## `frontend/src/components/chat/composerCopy.ts`
 
-**`1 / 1 / 93`** — created by `244-05` T1. Row added **at creation**.
+**`2 / 1 / 103`** — created by `244-05` T1. Row added **at creation**. ⚠ The row read `1 / 1 / 93`
+one plan later; `244-06` T3 added `cloudSub`.
+
+### 244-06 — `cloudSub` is ported BY SHAPE, and the reason is a boundary worth naming
+
+The sketch writes `cloudSub: "From Google Drive · Meridian Supply"`. ⛔ **That literal could not be
+ported as a literal**, because `Meridian Supply` is the authored connection name in `COPY.scenario`
+— *fixture data, not product*, exactly like the scenario the port's own docblock already excludes.
+So the two nouns became parameters, and the fence became a RECONSTRUCTION:
+`COPY.a.cloudSub("Google Drive", "Meridian Supply")` must equal the sketch's literal verbatim
+(`ConnectedFilePickerModal.thread.test.tsx` Test 3b). ⭐ That is the same treatment `REFUSE_TYPE`
+and `agentReadLine` already get, so this file now has **one** rule for builders rather than two.
+
+⚠ The `key: "value"` pair list in `ChatAttachmentChip.states.test.tsx` Test 5 was **deliberately not
+extended** — a builder is not a pair, and adding it there would have required loosening the
+assertion that makes the pair list worth having.
 
 **A PORT of `.planning/sketches/236-the-file-that-belongs-to-this-chat/COPY.js`, not a re-typing of
 it.** The sketch renders nothing that is not in that object, the operator approved the sketch, and
@@ -11842,6 +11902,45 @@ the connector set and the toolbar — the four things it was already about.
 and an extraction in the same commit as a new feature is how a refactor's blast radius gets
 attributed to the feature. ⛔ **The next plan whose `files_modified` names this file must propose
 the extraction FIRST** — the `retrieval_service.py` rule (SEED-224), applied here.
+
+---
+
+### 244-06 — ⭐ THE OWED SEAM WAS TAKEN, AND THE FILE SHRANK WHILE GAINING A FEATURE
+
+**`31 / 15 / 821`**, re-derived at this plan's commit. `244-06` is *"the next plan whose
+`files_modified` names this file"*, so the paragraph above is a rule with a date on it, and this is
+the date. ⛔ **The word *"honoured by construction"* is still not written here** — it was not earned
+by the change being small, it was earned by the extraction.
+
+**What moved, verbatim:** `frontend/src/components/chat/useComposerAttachments.ts` now owns
+`pending`, `refusal`, `attachLocalFile`, `attachCloudFile`, `removeAttachment`, `dismissRefusal`
+and `clear`, plus the `useStreamActions` optimistic reconcile. `MessageInput` keeps the shell, the
+drafts, the connector set and the toolbar — the four things it was already about.
+
+| | before (`244-05`) | after (`244-06`) |
+|---|---|---|
+| lines | 855 | **821** |
+| `useState` in this file | 6 | **4** |
+| the cloud door | a callback that EDITED the draft | a 3-line delegate to the hook |
+
+⚠ **The measurement that matters is the SIGN, not the size.** `-34` lines is small; what makes it a
+discharge is that the **cloud door was added in the same commit** and the file still went down. A
+third landing that grew it would have been the third consecutive growth on a 15-phase file.
+
+⛔ **HALF THE NAMED SEAM IS STILL OWED, and it is named again rather than quietly dropped:**
+`ComposerChipsRow`. The chips row is still inline JSX inside `MessageInput` (the hoist `244-05`
+performed under `D-244-26`). It was left because moving it is a *layout* change with its own blast
+radius across `ComposerAttach.composition.test.tsx`'s DOM-order fences, and mixing it into a commit
+that also re-points a door would make a red impossible to attribute. **Re-open trigger: the next
+plan whose `files_modified` names this file.**
+
+**And the arm that is now impossible rather than merely absent.** The draft-editing callback
+(`setValue(prev => prev + "\nAttached file: …")`) was `D-244-02`'s explicitly rejected arm and it was
+SHIPPED until this commit. It is gone, and it went **in the same commit as the re-point** — never
+before it, because removing the text edit alone would have left the cloud door doing nothing
+visible at all, and never after, because then a commit would exist where both behaviours are live.
+`useComposerAttachments` cannot reach `setValue` at all, which is the structural half of the same
+guarantee.
 
 **What this task built, and the decisions inside it.**
 
@@ -11961,3 +12060,109 @@ memo'd consumer on every stream delta. ⚠ That is not a micro-optimisation here
 bare CANNOT seed a slice through `actions.*` — the call silently does nothing. Suites seed with
 `useStreamsStore.setState` directly. Found by driving a test that failed for the wrong reason, not
 by reading the code.
+
+---
+
+## `frontend/src/components/chat/ConnectedFilePickerModal.tsx`
+
+**`3 / 2 / 336`** (re-derived 2026-09-12 at `244-06`). Phases: **216** (created) · **232**.
+
+⚠ **IT WAS ABSENT FROM THIS LEDGER FOR ITS ENTIRE LIFE, AND THE LEDGER GATE IS WHAT FOUND IT** —
+`node scripts/check-hot-file-ledger.cjs 244` exited 1 naming this file, and it was the LAST
+remaining `[no-row]` of the nine `244-PATTERNS.md` § C-8 measured at planning. `244-CONTEXT.md`
+D-244-20 had asserted the opposite. ⭐ **A 262-row table nobody reads end-to-end is a hope; the gate
+cannot not-notice** — this row exists because a script failed, not because an agent remembered.
+
+### What it is
+
+The ONE cloud file picker. It mounts in exactly two places after `244-06`: the composer
+(`MessageInput.tsx`) and the Library (`LibraryPage.tsx`). ⛔ There is no second file-picker
+vocabulary, and there must not be — two pickers is how one door silently grows a different list.
+
+### 244-06 — it was REBUILT, and the sizing hypothesis it refuted is the finding
+
+⛔ **THE PLAN FIRST GUESSED THIS WAS "ATTRIBUTES PLUS A TEST" AND THAT GUESS WAS MEASURED WRONG.**
+The hypothesis was that the shipped modal already composed in sketch 236's drawn order and needed
+only `data-*` hooks. Read in full at the revision pass, it composed in **none** of it:
+
+- **No source line.** An optional multi-connection tab switcher plus a generic `DialogDescription`
+  sat where the mockup draws `From Google Drive · <connection>`.
+- ⛔ **No selection state AT ALL.** Every row carried its own immediate `Import` button, so a click
+  WAS the commit. There was no select-then-confirm interaction to hook.
+- ⛔ **No cancel/confirm footer.** The dialog closed via the header ✕ or a backdrop click.
+
+So this was an **interaction-model change**. The acceptance criteria did not move — the ordered
+`compareDocumentPosition` assertion and the count-based single-select fence are correct either way,
+which is why it was a sizing correction and not a re-plan. ⚠ **Recorded so the next author reads
+the measurement rather than re-deriving it.**
+
+### The invariants this file now carries
+
+1. **The five blocks in the drawn order** — `[data-testid=cloud-title]` → `cloud-source` →
+   `cloud-filelist` → `cloud-cancel` → `cloud-confirm`, with **cancel BEFORE confirm**
+   (`index.html` § `modalHTML` `.mbot`). Fenced by DOM order, driven RED by MOVING the footer
+   above the list (`expected false to be true`).
+   ⚠ The first attempt at that plant DUPLICATED the footer instead of moving it and went red with
+   `Found multiple elements by: [data-testid="cloud-cancel"]` — **a RED explainable without
+   reference to the defect proves as little as a green**, so it was re-driven.
+2. **Single-select, asserted by COUNT.** Exactly one row may carry `data-cloud-row-selected="true"`.
+   ⛔ *"the row I clicked is selected"* would pass on a list that selected both; driven RED against
+   a range-selecting plant (`expected 2 to be 1`).
+3. ⛔ **IT DOES NOT DECIDE WHAT A PICK MEANS.** `onConfirm` is raised and the CALLER commits. Until
+   `244-06` this file called `importCloudFile` itself, which mints a LIBRARY document — that is
+   `BUG-260905-01` in one line of code.
+4. **The confirm word is a PROP with the chat default.** `Attach` for the composer (`D-244-23`:
+   *"the confirm button is the last moment before the file exists"*), `Import` for the Library.
+   ⛔ Two consequences must not share one word.
+5. **A failure is said ONCE.** `handleConfirm` swallows the rejection and closes; the caller has
+   already rendered the server's sentence in its own refusal region. ⚠ This is deliberate and
+   commented at the `catch` — a bare empty catch here would read as an oversight.
+6. **The provider noun comes from `service_id`, never the display NAME.** Reading a provider out of
+   a name is the fourth-leak shape Phase 238 measured in `import_service.fetch_cloud_file`, where a
+   Microsoft connection someone had typed "Google migration" into was read by the Google adapter.
+
+**Named seam:** none proposed at 2 phases. If a third consumer appears, the cut is the file LIST
+(browse + search + select) away from the dialog chrome.
+
+---
+
+## `frontend/src/components/chat/useComposerAttachments.ts`
+
+**`1 / 1 / 158`** — created by `244-06` T3. Row added **at creation**, per the
+`settingsSearchPayload.ts` / `workspaceAllowedExt.ts` precedent: **an absent row is invisible to
+G-5 at any count**, and waiting for the third phase is how `App.tsx` went 23 phases unseen.
+
+⭐ **THIS FILE IS THE DISCHARGE OF A DEBT `244-05` NAMED IN WRITING.** That plan grew
+`MessageInput.tsx` `643 → 855`, refused to call it *"honoured by construction"*, named
+`useComposerAttachments` + `ComposerChipsRow` as the seam, and recorded the rule: *"the next plan
+whose `files_modified` names this file must propose the extraction FIRST"* (the
+`retrieval_service.py` / SEED-224 precedent). `244-06` is that plan. See
+§`frontend/src/components/chat/MessageInput.tsx` → *244-06* for the before/after measurement.
+
+### What it owns, and the two things it deliberately cannot do
+
+Both attach doors' state (`pending`, `refusal`) and their verbs (`attachLocalFile`,
+`attachCloudFile`, `removeAttachment`, `dismissRefusal`, `clear`), plus the optimistic
+`setWorkspaceFileForThread` reconcile so the panel updates with no refresh.
+
+- ⛔ **IT CANNOT REACH THE DRAFT TEXT.** Nothing here imports or receives `setValue`. That is
+  `D-244-02`'s rejected arm made structurally impossible rather than merely absent — and it was
+  live in the product until this commit.
+- ⛔ **IT CANNOT REACH THE LIBRARY MINTER.** `attachCloudFile` calls
+  `attachConnectionFileToThread`, never `importCloudFile`. Both doors land in `workspace_files`
+  under the 24h TTL read gate and neither writes a `documents` row, which is what makes
+  *"not in the KB"* true by construction (`D-244-03` / `D-244-05`).
+
+### The limit that is stated rather than hidden
+
+⚠ **REMOVE IS A DETACH, NOT A DELETE**, and the docblock says so at the handler. `workspace.py`
+ships **seven** routes after `244-06` — two POSTs and five GETs — and **none is a DELETE**. So the
+bytes stay until the TTL read gate hides them, and `244-02`'s sandbox hydration still surfaces them
+to the agent for this thread. ⛔ Do NOT close this with a persisted client-side hide: that would
+claim the bytes are gone when they are not, which is the one dishonesty this surface exists to
+remove. **Re-open trigger:** any plan adding `DELETE /threads/{id}/workspace/files/{file_id}`.
+
+**One shared landing, on purpose.** `land()` is the single place a successful upload becomes a chip,
+so the two doors cannot drift on reconcile order or on refusal-clearing. `attachCloudFile`
+RE-THROWS after setting `refusal` — the modal needs to know the pick did not take, and it renders
+nothing itself.

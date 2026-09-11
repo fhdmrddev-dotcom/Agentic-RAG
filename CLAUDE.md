@@ -664,7 +664,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/api/runs.py` | 35 / 16 / 1430 | honoured by construction (194) |
 | `backend/app/services/harness_engine.py` | 54 / 20 / 3135 | honoured by construction (194 / **214**) |
 | `frontend/src/components/chat/RunCard.tsx` | 28 / 14 / 710 | ⭐ **G-5 DISCHARGED (243-02)** — the reasoning fold left for `ThinkingBlock.tsx`, `-39/+20`, one `useState` fewer. ⚠ row was STALE at `26/12/728`. State 2 stayed, by decision |
-| `frontend/src/components/chat/MessageInput.tsx` | 30 / 15 / 855 | ⛔ **244-05 GREW IT +212 and a SEAM IS NOW OWED** — the local attach door. The row was CORRECT at `29 / 14 / 643`; the named extraction is in §244-05 of the detail file |
+| `frontend/src/components/chat/MessageInput.tsx` | 31 / 15 / 821 | ⭐ **THE OWED SEAM WAS TAKEN (244-06)** — `useComposerAttachments`. It SHRANK `855 → 821` **while gaining the cloud door**; ⛔ the `ComposerChipsRow` half stays OWED |
 | `frontend/src/components/chat/ActiveConnectorChips.tsx` | 2 / 2 / 82 | ⚠ absent for its ENTIRE LIFE — row added 244-05 at its SECOND phase. **244**: the row container HOISTED out; bare chips now, `null` on empty (D-244-26) |
 | `frontend/src/components/chat/MessageList.tsx` | 21 / 9 / 307 | ⚠ row STALE a THIRD time (`19/8/267` → `20/8/292` → `20/8/300`). honoured by construction (**244-01**): `min-h-0` on the ONE `<ScrollArea>` call site |
 | `frontend/src/components/chat/ChatArea.tsx` | 72 / 36 / 710 | honoured by construction (**244-03**): ONE boolean gains `&& !workflowLock.capPaused`. No second branch, no new state — the whole composer chain already reads this one value |
@@ -749,11 +749,13 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/lib/nav-items.ts` | 8 / 6 / 95 | ⚠ absent at 6 phases |
 | `backend/app/api/classification_rules.py` | 3 / 3 / 226 | row added 237 at threshold. Validates rule_scope and enforces WATCH_ALLOWED_FIELDS refusal (422) for arrival watch rules. |
 | `frontend/src/components/classification/RuleBuilderPanel.tsx` | 4 / 3 / 502 | row added 237 at threshold. Adds scope selector segmented control; filters out-of-scope conditions on scope switch. |
-| `backend/app/api/workspace.py` | 11 / 6 / 654 | ⚠ **absent while FIRING for its ENTIRE LIFE at 6 phases — row added 244-02** (D-244-20 said otherwise; C-8 measured it false). honoured by construction (**244**): a 4th category set + a 4th branch |
+| `backend/app/api/workspace.py` | 13 / 7 / 757 | ⚠ row was STALE at `11/6/654` ONE PLAN later — the fastest rot recorded here. honoured by construction (**244-06**): the persist tail EXTRACTED to ONE writer both doors call |
 | `frontend/src/components/panel/TemplateUpload.tsx` | 2 / 2 / 91 | ⚠ absent for its entire life — row added 244-02 at the SECOND phase. **244**: the `accept=` literal is GONE; it reads the fenced constant |
 | `frontend/src/lib/workspaceAllowedExt.ts` | 1 / 1 / 54 | young (created 244-02). Row added AT CREATION — an absent row is invisible to G-5 at any count |
 | `frontend/src/components/chat/ChatAttachmentChip.tsx` | 1 / 1 / 144 | young (created 244-05). Row added AT CREATION. ONE chip, THREE states; `sent` carrying `this chat only` is D-244-22's build obligation, `expired` is D-244-25's |
-| `frontend/src/components/chat/composerCopy.ts` | 1 / 1 / 93 | young (created 244-05). Row added AT CREATION. A PORT of sketch 236's `COPY.js`, `?raw`-fenced. ⛔ `COPY.b` is deliberately NOT ported (D-244-23) |
+| `frontend/src/components/chat/composerCopy.ts` | 2 / 1 / 103 | young (created 244-05). Row added AT CREATION. A PORT of sketch 236's `COPY.js`, `?raw`-fenced. ⛔ `COPY.b` NOT ported (D-244-23). **244-06**: `cloudSub` ported by SHAPE |
+| `frontend/src/components/chat/ConnectedFilePickerModal.tsx` | 3 / 2 / 336 | ⚠ **absent for its ENTIRE LIFE — row added 244-06, and the ledger GATE is what found it (C-8's last `[no-row]`).** REBUILT: select-then-confirm; the commit is the PARENT's |
+| `frontend/src/components/chat/useComposerAttachments.ts` | 1 / 1 / 158 | young (created 244-06). Row added AT CREATION. ⭐ THE SEAM `244-05` NAMED AND OWED — both attach doors' state + verbs; it CANNOT reach `setValue` |
 
 When a new phase enters discuss-phase, the orchestrator must scan PLAN.md `files_modified` against this ledger. Any match against a G-5-firing row means the discuss-phase produces a refactor recommendation as the first option, not the planned feature — and the phase reads that file's section in `docs/HOT-FILE-LEDGER.md` before planning, because that is where the named seam and the binding invariants live.
 
