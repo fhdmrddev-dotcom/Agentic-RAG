@@ -25,6 +25,14 @@
  *     under D-243-13, which also has to find that number an honest source first.
  * Any other plan turning one of these red has changed a pixel it did not mean to.
  *
+ * ⚠ 243-04 MADE A THIRD EDIT, AND IT IS RECORDED HERE RATHER THAN ABSORBED. §10's needle
+ * gained a second arm. It is not a pixel and it is not an exemption: V1's body renders real
+ * paragraphs, so the single-arm needle matched no file at all and §10c read `expected [] to
+ * have a length of 1`. The uniqueness claim is UNCHANGED and the discrimination is STRONGER
+ * (§10b now drives both arms plus the two innocents a looser needle would have caught).
+ * ⛔ A fence re-aimed to keep passing would be the failure; this one was re-aimed to keep
+ * MEANING the same thing, and the RED that forced it is quoted at the needle.
+ *
  * ⚠ TWO CASES PIN A DEFECT ON PURPOSE — §8 and §9. They assert what is WRONG today so that
  * 243-02's inversion is a MEASURED improvement rather than a side effect. Neither is ever to
  * be read as desired behaviour.
@@ -154,8 +162,27 @@ function chatSource(basename: string): string {
  *     preceded by `=`, which is why the leading `[^=]` is load-bearing, not decoration), or
  *   - a guard READING it, `!message.reasoningContent`, which state 2 still needs.
  * Written bare as /reasoningContent/ the fence would count three files and mean nothing.
+ *
+ * ⚠⚠ SECOND ARM ADDED BY 243-04, AND THE FENCE WOULD HAVE READ **ZERO** WITHOUT IT.
+ * D-243-02 changes the body from one interpolated string to sketch 234 V1's real
+ * paragraphs (`index.html:332`), so the shipped render is now
+ * `{toParagraphs(reasoningContent).map(...)}` and the single-arm needle matched NOTHING -
+ * §10c failed `expected [] to have a length of 1`. ⭐ That RED is the fence working: a
+ * source fence has to know what a render LOOKS like, so a change to the render shape is
+ * exactly the moment it must be re-aimed. ⛔ The fix is an ALTERNATION of two NAMED render
+ * shapes, never a widening to `[^}]*reasoningContent[^}]*` - measured, that looser form
+ * matches BOTH innocents in the tree (`RunCard.tsx:487`'s state-2 guard and
+ * `MessageItem.tsx:612`'s banner-label call), which would turn a uniqueness fence into a
+ * fence that reds on correct code. §10b drives both arms and both of those innocents.
  */
-const RENDERS_REASONING = /(^|[^=])\{\s*(?:message\.)?reasoningContent\s*\}/
+const RENDERS_REASONING = new RegExp(
+  [
+    // arm 1 - the pre-243-04 shape, kept: `{reasoningContent}` / `{message.reasoningContent}`
+    "(^|[^=]){\\s*(?:message\\.)?reasoningContent\\s*}",
+    // arm 2 - V1's shape: the paragraph split, rendered as children
+    "(^|[^=]){\\s*toParagraphs\\(\\s*(?:message\\.)?reasoningContent\\s*\\)",
+  ].join("|"),
+)
 
 /** The one JSX element that mounts `tag`, comments stripped, asserted to be unique. */
 function soleMountExpression(src: string, tag: string): string {
@@ -293,29 +320,112 @@ describe("Phase 243 — the thinking block, characterized against the UNMOVED co
   })
 
   // ── §5 — the body's class tokens. SETTLED. ──
-  it("§5 — the reasoning body's class tokens, pinned as the thing 243-04 will change", () => {
+  //
+  // ⭐ CHANGED BY 243-04, AND THIS SUITE'S OWN DOCBLOCK AUTHORISED EXACTLY THIS EDIT
+  //    ("THE ONE PLAN PERMITTED TO CHANGE ANY OF THIS IS 243-04 … §5 (the body's class
+  //    tokens)"). 243-01 pinned the OPPOSITE set DELIBERATELY — it was characterizing the
+  //    shipped defect so the change would be a MEASURED one rather than an assertion edited
+  //    to match whatever got written. The reason for the change is a file, not an opinion:
+  //    `.planning/sketches/234-the-thinking-block/index.html` §V1 (`:127-137`) — the
+  //    operator-approved winner. Its `.reasoning` rule is `margin-left:12px; padding-left:16px;
+  //    border-left:2px; font-size:var(--text-sm)` over REAL `<p>` elements, which is why the
+  //    monospaced voice, the preserved newlines and the 16rem nested scroller all go.
+  //
+  // ⚠ THE ASSERTION MOVED TO THE BODY'S OWN TESTID, and that is forced by the change rather
+  //   than chosen: the prose now lives in a `<p>` CHILD, so `getByText` returns the paragraph
+  //   and asserting `className` on it would be asserting the wrong element's classes.
+  it("§5 — the reasoning body's class tokens: V1's set, changed here by the ONE plan permitted to", () => {
     renderWithTooltip(<MessageItem message={makeMessage({ reasoningContent: REASONING_MEDIAN })} />)
     expandSettledRun()
     fireEvent.click(screen.getByTestId("thinking-trigger"))
-    const body = screen.getByText(REASONING_MEDIAN, { normalizer: RAW })
+    const body = screen.getByTestId("thinking-body")
+    const tokens = body.className.split(/\s+/)
     // ⚠ THIS IS THE CLASS-STRING FORM, AND IT IS LEGITIMATE HERE BECAUSE THE CLASSES ARE THE
     //   DELIVERABLE of 243-04's V1 diff — it is not a presence assertion in disguise.
-    //   243-04 / D-243-02 is the ONE authorised change:
-    //     LEAVING  → font-mono · whitespace-pre-wrap · max-h-64 · overflow-y-auto
+    //     STAYING  → border-l-2 · ml-3     (D-243-02: "that is the whole visual change")
     //     CHANGING → text-xs becomes text-sm
-    //     STAYING  → border-l-2 · ml-3
-    //   Any other plan that reds this line has restyled the reasoning body by accident.
-    for (const token of [
-      "text-xs",
-      "font-mono",
-      "whitespace-pre-wrap",
-      "max-h-64",
-      "overflow-y-auto",
-      "border-l-2",
-      "ml-3",
-    ]) {
-      expect(body.className.split(/\s+/)).toContain(token)
+    for (const token of ["text-sm", "border-l-2", "ml-3"]) {
+      expect(tokens).toContain(token)
     }
+    //     LEAVING  → the four dropped classes, plus the size step they replace.
+    // ⛔ The absence half is the load-bearing one: `overflow-y-auto` + `max-h-64` are the
+    //    nested scroller inside a scrolling conversation that CHAT-01 is about, and
+    //    `font-mono` + `whitespace-pre-wrap` are the "machine transcript" voice the sketch
+    //    replaced with the page's own prose.
+    for (const token of ["text-xs", "font-mono", "whitespace-pre-wrap", "max-h-64", "overflow-y-auto"]) {
+      expect(tokens).not.toContain(token)
+    }
+  })
+
+  // ── §5b — ADDED BY 243-04. Real paragraphs, which is WHY dropping `whitespace-pre-wrap`
+  //    is correct rather than a regression to a run-on wall. Sketch `index.html:332`:
+  //    `ps.map(p => "<p>" + p + "</p>")`. SETTLED. ──
+  describe("§5b — the body is real paragraphs (sketch 234 V1, `index.html:332`)", () => {
+    /** Two paragraphs, blank-line separated — the shape the sketch's `ps` array carries. */
+    const TWO_PARAS = [
+      "The user is asking about the retention policy, and the policy was revised last quarter.",
+      "So I should search the knowledge base for the current document before answering anything.",
+    ]
+    const REASONING_TWO_PARAS = TWO_PARAS.join("\n\n")
+
+    /** The rendered paragraph blocks, in document order. */
+    function paragraphs(): HTMLElement[] {
+      return Array.from(
+        screen.getByTestId("thinking-body").querySelectorAll<HTMLElement>("[data-testid='thinking-paragraph']"),
+      )
+    }
+
+    function openBody(reasoning: string) {
+      renderWithTooltip(<MessageItem message={makeMessage({ reasoningContent: reasoning })} />)
+      expandSettledRun()
+      fireEvent.click(screen.getByTestId("thinking-trigger"))
+    }
+
+    it("§5b-i — two blank-line-separated paragraphs render as TWO block elements, one paragraph's text each", () => {
+      openBody(REASONING_TWO_PARAS)
+      const ps = paragraphs()
+      // ⭐ ELEMENT COUNT and PER-ELEMENT text, not a substring of the container: a container
+      //    substring would pass with the whole thing in one undivided block, which is the
+      //    exact shape this case exists to refuse.
+      expect(ps).toHaveLength(2)
+      expect(ps[0].textContent).toBe(TWO_PARAS[0])
+      expect(ps[1].textContent).toBe(TWO_PARAS[1])
+    })
+
+    it("§5b-ii — NO NESTED SCROLLER: the body carries no overflow-y-auto and no max-h-* token at all", () => {
+      openBody(REASONING_LONG)
+      const tokens = screen.getByTestId("thinking-body").className.split(/\s+/)
+      // ⭐ THE CASE THAT STOPS THE DEFECT BEING RESTYLED BACK IN. A scrollbar inside a
+      //    scrolling conversation is what CHAT-01 is about, and `max-h-64` was only one
+      //    spelling of it — so the assertion is over the SHAPE of the token, not the literal.
+      expect(tokens).not.toContain("overflow-y-auto")
+      expect(tokens.filter((t) => /^max-h-/.test(t))).toEqual([])
+      expect(tokens.filter((t) => /^overflow-/.test(t))).toEqual([])
+      // Positive control: the body really did render this fixture, so the absences above are
+      // measured against a rendered element rather than an empty one.
+      expect(screen.getByTestId("thinking-body").textContent?.length).toBeGreaterThan(30_000)
+    })
+
+    it("§5b-iii — a single-paragraph body renders ONE block: the median 198-char case gains no scaffolding", () => {
+      openBody(REASONING_MEDIAN)
+      // D-243-03: the median reasoning is 198 chars — one short paragraph. A surface that
+      // wrapped it in three containers would be calm at 33 KB and fussy at the common case.
+      expect(paragraphs()).toHaveLength(1)
+      expect(paragraphs()[0].textContent).toBe(REASONING_MEDIAN)
+    })
+
+    it("§5b-iv — LOSSLESS: every non-blank line of the source survives the split", () => {
+      const ragged = "  First thought.  \n\n\n   Second thought, after two blank lines.\n\nThird.\n\n  "
+      openBody(ragged)
+      const joined = paragraphs()
+        .map((p) => p.textContent ?? "")
+        .join("\n")
+      // ⛔ A paragraph split that ATE text would still satisfy an element-count assertion.
+      //    This is the case that stops a trim/filter from deleting a model's words.
+      for (const line of ragged.split("\n").map((l) => l.trim()).filter(Boolean)) {
+        expect(joined).toContain(line)
+      }
+    })
   })
 
   // ── §6 — the planning placeholder. THE ONLY SECTION ANCHORED TO THE CARD. ──
@@ -491,6 +601,20 @@ describe("Phase 243 — the thinking block, characterized against the UNMOVED co
       expect("the block renders message.reasoningContent verbatim as text children").not.toMatch(
         RENDERS_REASONING,
       )
+      // ⭐ ARM 2, ADDED BY 243-04 — V1's real-paragraph render (`index.html:332`). Without
+      //    this the fence reads ZERO and §10c is red on correct code.
+      expect("          {toParagraphs(reasoningContent).map((paragraph, i) => (").toMatch(
+        RENDERS_REASONING,
+      )
+      expect("{toParagraphs(message.reasoningContent).map((p) => p)}").toMatch(RENDERS_REASONING)
+      // ⛔ AND THE TWO INNOCENTS THE LOOSE FORM WOULD HAVE CAUGHT, QUOTED FROM THE TREE.
+      //    A widened `\{[^}]*reasoningContent[^}]*\}` matches both of these, which is why the
+      //    needle is an alternation of NAMED shapes rather than a broader pattern.
+      expect("          {!message.reasoningContent && isStreamingNow && message.isPlanning && (")
+        .not.toMatch(RENDERS_REASONING) // RunCard.tsx:487 — state 2's guard
+      expect(
+        '<span className="italic">{outerBannerLabel(null, false, message.isPlanning ?? false, false, !message.content && !!message.reasoningContent)}</span>',
+      ).not.toMatch(RENDERS_REASONING) // MessageItem.tsx:612 — a label call, not a render
     })
 
     it("§10c — exactly one production file in components/chat renders it, and it is ThinkingBlock.tsx", () => {

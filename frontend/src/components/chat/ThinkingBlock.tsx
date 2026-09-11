@@ -3,9 +3,17 @@
  * — THE ONE REASONING RENDERER.
  *
  * Extracted verbatim from `RunCard.tsx:478-505` and mounted from `MessageItem` for BOTH
- * message shapes. Nothing about how it LOOKS changed in this move; the V1 visual diff (the
- * four dropped classes, `text-xs` → `text-sm`, `Thought for N seconds`) is 243-04's, and it
- * was deliberately kept out of here so the move could be proven byte-neutral first.
+ * message shapes. Nothing about how it LOOKS changed in that move: the V1 visual diff was
+ * deliberately kept out of 243-02 so the move could be proven byte-neutral first.
+ *
+ * ⭐ PHASE 243 PLAN 04 IS WHERE THAT DIFF LANDED — the acceptance bar is a FILE,
+ * `.planning/sketches/234-the-thinking-block/index.html`, §V1. Four classes out, one size
+ * step, real paragraphs, a clamp whose control removes itself, and one label.
+ *
+ * ⚠ NO CLASS TOKEN IS SPELLED IN THIS FILE'S PROSE, AND THAT IS DELIBERATE. The class set
+ * is the deliverable and it is asserted by a `grep -o ... | sort | uniq -c` over this file;
+ * a comment naming a dropped token makes that count read as though the token still shipped.
+ * Same rule, one register over, as the fence-needle note further down (the 187-24 trap).
  *
  * ── WHY THE COMPONENT BOUNDARY *IS* THE FIX ─────────────────────────────────────────────
  *
@@ -66,6 +74,32 @@ interface ThinkingBlockProps {
   isStreaming?: boolean
 }
 
+/**
+ * Sketch 234 V1, `index.html:332` — `ps.map(p => "<p>" + p + "</p>")`.
+ *
+ * ⭐ THIS IS WHY DROPPING THE PRE-WRAP RULE IS CORRECT RATHER THAN A REGRESSION TO A
+ * RUN-ON WALL. The shipped body preserved every newline literally in a monospaced face; V1
+ * turns BLANK-LINE breaks into real paragraph elements and lets single newlines inside a
+ * paragraph collapse to spaces, which is what prose does. Measured against D-243-03's 170x
+ * spread: the median 198-char body is ONE paragraph (no scaffolding around one sentence) and
+ * the 33,713-char tail is readable instead of being a wall behind a scrollbar.
+ *
+ * ⛔ LOSSLESS BY CONSTRUCTION, and fenced as such (§5b-iv). Empty segments are dropped and
+ * each paragraph is trimmed — no NON-BLANK line may be lost, because a split that ate a
+ * model's words would still satisfy any element-count assertion.
+ *
+ * ⛔ THE ANSWER'S TWO-PASS PARAGRAPH-DEDUP HELPER IN `lib/messageText.ts` IS NOT USED HERE,
+ * and the omission is a decision: applying it would silently delete a model's deliberately
+ * repeated reasoning line. Reasoning is the model's raw prose, not the answer. (Its name is
+ * unspelled for the same grep reason as the class tokens.)
+ */
+function toParagraphs(reasoning: string): string[] {
+  return reasoning
+    .split(/\n[ \t]*\n/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean)
+}
+
 export function ThinkingBlock({ reasoningContent, isStreaming }: ThinkingBlockProps) {
   // Phase 076.2 D-01: collapsed by default. ⚠ The DEFAULT is untouched by the move — the
   // 224-PREFLIGHT §3.2 rule holds: flipping it would be a regression dressed as consistency.
@@ -84,7 +118,8 @@ export function ThinkingBlock({ reasoningContent, isStreaming }: ThinkingBlockPr
       <CollapsibleTrigger asChild>
         {/* Phase 224-05 (BUG-260902-07, second half): the SHARED FoldTrigger — the same
             element CitationList mounts. This trigger carried the identical buried-control
-            defect (text-xs, muted/80, a bare 12px chevron, no surface) and is fixed ONCE for
+            defect (the smaller type size, muted/80, a bare 12px chevron, no surface) and is
+            fixed ONCE for
             both rather than twice similarly.
             ⚠ NO `count`: reasoning has no countable unit and inventing one would be
             fabricated precision. */}
@@ -103,13 +138,24 @@ export function ThinkingBlock({ reasoningContent, isStreaming }: ThinkingBlockPr
             `blockedNotice` gets under A23 / T-174-03-01. ⚠ The forbidden API is NOT SPELLED
             here on purpose: §12 fences this file's source for it, and prose that names the
             needle turns a real fence into a lie about itself (the 187-24 trap).
-            ⚠ These ten class tokens are pinned by §5 of the characterization net. 243-04 is
-            the ONE plan permitted to change them. */}
+            ⚠ ⭐ THE SKETCH ITSELF USES THAT ESCAPE HATCH (`index.html:332` assigns
+            `innerHTML`) BECAUSE IT IS A STATIC MOCKUP OVER FIXTURE PROSE. That is exactly the
+            line a port must not cross: the shape is the deliverable, the mechanism is not.
+
+            ⚠ THE CLASS SET IS V1's, CHANGED BY 243-04 UNDER D-243-02 AND BY NO OTHER PLAN.
+            Dropped: the monospaced voice, the literally-preserved newlines, and the 16rem
+            nested scroller — a scrollbar inside a scrolling conversation, which is what
+            CHAT-01 is about. The thin rule and its indent STAY: they are the one thing V1
+            keeps. Pinned by §5 / §5b of the characterization net. */}
         <div
           data-testid="thinking-body"
-          className="px-3 py-2 text-xs text-muted-foreground whitespace-pre-wrap font-mono leading-relaxed max-h-64 overflow-y-auto border-l-2 border-muted-foreground/20 ml-3"
+          className="px-3 py-2 text-sm text-muted-foreground leading-relaxed border-l-2 border-muted-foreground/20 ml-3"
         >
-          {reasoningContent}
+          {toParagraphs(reasoningContent).map((paragraph, i) => (
+            <p key={i} data-testid="thinking-paragraph" className="mb-[11px] last:mb-0">
+              {paragraph}
+            </p>
+          ))}
         </div>
       </CollapsibleContent>
     </Collapsible>
