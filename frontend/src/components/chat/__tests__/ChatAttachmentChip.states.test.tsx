@@ -33,6 +33,17 @@ import chipSource from "../ChatAttachmentChip.tsx?raw"
 
 const HOUR = 3_600_000
 
+/**
+ * ⚠ COMMENTS ARE STRIPPED BEFORE ANY SOURCE ASSERTION, and this is not tidiness.
+ * 244-02 recorded the mirror of it (*"a source fence that reads prose can be made to LIE by its
+ * own docstring"*); this fence hit the opposite failure the first time it ran — the chip's
+ * docblock explains WHY it carries no `dangerouslySetInnerHTML`, and `not.toContain(...)` read
+ * the explanation as the thing. A fence over CODE must look at code.
+ */
+function code(src: string): string {
+  return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "")
+}
+
 function file(over: Partial<WorkspaceFile> = {}): WorkspaceFile {
   return {
     id: "wf-1",
@@ -178,19 +189,34 @@ describe("ChatAttachmentChip — pending / sent / expired", () => {
     expect(Object.keys(COPY)).not.toContain("b")
   })
 
+  it("5a — no user-visible string is hand-typed into the chip's JSX", () => {
+    // ⚠ COMMENTS STRIPPED, and that is the whole point of this case. The chip's docblock EXPLAINS
+    // that it holds no copy, and an unstripped `grep` therefore measures the explanation. The
+    // first draft of that docblock asserted its own `grep -c ... is 0` while containing the
+    // sentence, which made the claim false by stating it. Prose about code is not code.
+    const body = code(chipSource)
+    expect(body).toContain("export function ChatAttachmentChip") // non-vacuity
+    for (const s of [COPY.a.chipScope, COPY.a.sentNote, COPY.a.chipTtl, COPY.shared.expiredChip, COPY.shared.expiredWhy]) {
+      expect(body).not.toContain(s)
+    }
+  })
+
   it("5b — the allow-list is NOT a fourth hand-typed copy", () => {
     // 244-02 collapsed three copies into `lib/workspaceAllowedExt.ts` with a ?raw lockstep fence
     // against `workspace.py`. The port must CONSUME that constant, never re-list it.
-    expect(chipSource).not.toMatch(/"\.docx"/)
+    expect(code(chipSource)).not.toMatch(/"\.docx"/)
     expect(COPY.engine.ALLOWED_EXT).toContain(".pdf")
     expect(COPY.engine.ALLOWED_EXT.length).toBe(16)
   })
 
   it("6 — the icon is the shipped shared mark, not one invented here", () => {
     // Source fence: the ONE per-extension icon module, and no hand-drawn glyph.
-    expect(chipSource).toMatch(/import\s*\{[^}]*\bfileIcon\b[^}]*\}\s*from\s*"@\/lib\/fileIcon"/)
-    expect(chipSource).not.toContain("<svg")
-    expect(chipSource).not.toContain("dangerouslySetInnerHTML")
+    const body = code(chipSource)
+    // Non-vacuity: the stripper must not have eaten the file.
+    expect(body).toContain("export function ChatAttachmentChip")
+    expect(body).toMatch(/import\s*\{[^}]*\bfileIcon\b[^}]*\}\s*from\s*"@\/lib\/fileIcon"/)
+    expect(body).not.toContain("<svg")
+    expect(body).not.toContain("dangerouslySetInnerHTML")
 
     // Rendered: the decorative glyph is present and hidden from the a11y tree.
     render(<ChatAttachmentChip file={file()} state="pending" />)

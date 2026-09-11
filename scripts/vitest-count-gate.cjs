@@ -3526,6 +3526,26 @@ const BASELINE = {
   // `libraryTabAfterNavigate` that returns `pending` unconditionally — and both files were
   // restored md5-identical. A guard nobody has seen fire is not a guard.
   "LibraryPage.tabAttention.test.tsx": 15,
+  // ── Phase 244 (244-05 T1 / SHELL-04 / D-244-22 / D-244-25) — the attachment chip ────────
+  // ⛔ BOTH KNOBS, SAME COMMIT. `src/components/chat` has NO bare-directory TARGETS entry (this
+  // array has exactly two: `src/landing` and `src/components/workflows`), so a suite dropped
+  // into `src/components/chat/__tests__/` runs in NO gate until it is NAMED there AND pinned
+  // here. TARGETS decides what RUNS; BASELINE decides what is GUARDED.
+  //
+  // 10 cases, MEASURED on a green run of the suite alone — not copied from the plan.
+  // ⭐ THE LOAD-BEARING ONE IS CASE 2: the SENT chip still renders `this chat only`. Sketch 236's
+  // winner (A — Scope on the chip) won BECAUSE the promise survives into the transcript, so a
+  // build that carries the scope word only while pending has shipped B's weakness at A's cost.
+  // It was FALSIFIED against a planted defect — the scope span gated on `pending` — which fired
+  // `AssertionError: expected null not to be null`, and `ChatAttachmentChip.tsx` was restored
+  // md5-identical (c83330e2bb38628b9f431e6f85d3011e).
+  // ⚠ Case 4 pins the THREE expiry readings against `FilesSection.expiryCaption`, which the chip
+  // IMPORTS rather than re-derives: ABSENT and UNPARSEABLE are the same third case, the word is
+  // `expiry unknown` and never `no expiry`, and neither is amber.
+  // ⚠ Case 5a is COMMENT-STRIPPED on purpose. The chip's docblock EXPLAINS that it holds no copy,
+  // so an unstripped grep measures the explanation — the first draft asserted its own
+  // `grep -c ... is 0` while containing the sentence, making the claim false by stating it.
+  "ChatAttachmentChip.states.test.tsx": 10,
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -5029,6 +5049,19 @@ const TARGETS = [
   // bought with: no second producer, no third `useSourceAttention()` reader, and no second
   // writer of `libraryTab` (the Phase 235 plan-15 defect).
   "src/pages/__tests__/LibraryPage.tabAttention.test.tsx",
+  // ── Phase 244 (244-05 T1 / SHELL-04) — the chat attachment chip's three states ──────────
+  //
+  // ⛔ FILE-LEVEL BY NECESSITY — the same fact this script has now recorded beside every 244
+  // chat block: `src/components/chat` appears in this array only inside COMMENTS, never as a
+  // bare directory entry, so an unnamed suite there runs in no gate at all.
+  //
+  // What it guards: the ONE chip component behind the composer's local-attach door. Its
+  // `sent` state carrying `this chat only` is D-244-22's build obligation — the reason variant A
+  // was chosen over B — and its `expired` state is D-244-25's, because the TTL is a READ GATE
+  // and a week-old transcript otherwise holds a chip pointing at nothing. It also fences the
+  // copy PORT against `.planning/sketches/236-.../COPY.js` read with `?raw`, so a re-typed
+  // string (a silently different product) cannot land.
+  "src/components/chat/__tests__/ChatAttachmentChip.states.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
