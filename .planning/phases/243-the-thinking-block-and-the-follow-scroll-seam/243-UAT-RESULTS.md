@@ -6,7 +6,7 @@ driver: claude (solo — OV-SOLO-01)
 environment: "local dev — vite :5173, backend :8000, Supabase :54322, Redis :6379; deepseek / deepseek-v4-flash"
 thread: "261d5f57-36fb-40ec-bb0b-1c72b7550350 — 'UAT 243 L-2 — long thread (seeded, deletable)'"
 rows_driven: [L-2, L-3, L-4, L-5, L-6 (settled frame)]
-rows_partial: [L-1]
+rows_partial: [L-5 (short arm owed)]
 rows_owed: [L-1, L-6-live-frame, cross-provider-x8-ATTEMPTED-ABANDONED, M-1, P-1, G-1, N-1, N-2, N-3, N-4, cross-provider x8]
 ---
 
@@ -417,3 +417,97 @@ The seeded thread `261d5f57-36fb-40ec-bb0b-1c72b7550350` (*"UAT 243 L-2 — long
 deletable)"*) holds 60 seed messages, six real runs, and the two L-5 fixtures (the real 33,713-char
 and 202-char reasoning bodies). **Left in place deliberately** — it is the fixture L-1 and L-6's live
 frame need. Delete it when they are done.
+
+---
+
+# Session 2 — 2026-09-11, driven by Claude via Chrome DevTools MCP
+
+**Environment:** local dev — vite :5173 (IPv6 `::1` only), backend :8000, Supabase :54322,
+operator's own signed-in session. Provider `deepseek / deepseek-v4-flash`.
+⭐ **Eight providers hold keys** (`openai, anthropic, google, openrouter, deepseek, moonshot,
+minimax, zhipu`) — measured off `GET /settings`, so the cross-provider rows are **drivable**, not
+blocked. `ollama` and `lmstudio` are unkeyed.
+
+## L-1 — the fold control does not churn ✅ **PASS**
+
+Sampled the trigger's `textContent` every 250 ms for 3 s during a live reasoning stream:
+**twelve samples, one distinct value — `Thinking...`.** No per-token flicker, no churning count.
+At settle the same trigger read **`Thought for 80 seconds`** — a span that was actually measured
+(D-243-13's honest duration), not derived from string length.
+
+## N-1 — open the fold mid-stream and leave it open ✅ **PASS**
+
+Clicked the trigger while the run was streaming, then sampled every 600 ms for 5.4 s:
+
+```
+aria-expanded  true  true  true  true  true  true  true  true  true  true
+body chars   14891 15381 15894 16413 16818 17251 17628 18058 18498 18749
+```
+
+**Reasoning kept arriving underneath a fold the user opened, and the fold never closed itself or
+re-opened on its own.** The trigger text stayed stable throughout.
+
+## L-5 — the long body clamps, and the control removes itself ✅ **PASS (long arm)**
+
+On a **61,301-char** rendered reasoning body:
+
+| | before | after clicking *Show all of it* |
+|---|---|---|
+| `clientHeight` | **300** | **20,907** |
+| `scrollHeight` | 20,918 | 20,907 |
+| `max-h-[300px]` present | **yes** | **no** |
+| control present | **yes** | ⭐ **no — it removed itself** |
+
+⭐ The body's classes read `px-3 py-2 text-sm text-muted-foreground leading-relaxed border-l-2
+border-muted-foreground/20 ml-3 relative max-h-[300px] overflow-hidden` — **243-04's V1 rule
+exactly**: the four classes gone (`text-xs`, `font-mono`, `whitespace-pre-wrap`, `max-h-64`),
+stepped to `text-sm`, real paragraphs, and the sketch-050 self-removing control.
+
+⛔ **SHORT ARM NOT DRIVEN — and the reason is a provider fact, not a defect.** The row wants a
+**198-char** reasoning body. Asked `deepseek-v4-flash` a trivial question (*"What is 2+2?"*) and it
+returned `content` length **1** with `reasoning_content` length **0** — no reasoning at all, so no
+fold renders and there is nothing to measure. **Owed**, and it needs a provider that emits short
+reasoning rather than none.
+
+## L-4 — navigate away and come back WITHOUT reloading ✅ **PASS** (CHAT-05)
+
+Started a reasoning run, navigated **in-app** to Library while it streamed, waited 45 s for it to
+finish **while away**, then navigated back via Chat → the thread.
+
+```
+performance.getEntriesByType("navigation").length  →  1
+```
+
+⭐ **One navigation entry for the entire session — the document never reloaded.** The row's own
+warning is *"the 'without reloading' is the whole row — a reload passes trivially and proves
+nothing"*, and that is now **proven rather than asserted**.
+
+On return: the final answer renders as **settled prose** (*"…It — not the wolf, goat, cabbage, or
+lantern — is what makes the puzzle bind."*), `foldCount: 0`, and the run's trigger is **collapsed**.
+**The answer is OUT of the narration fold.**
+
+⚠ The returned-to trigger reads **`Thinking`** with no digit — correct, and it is 243-04's
+**declared** honest fallback: a message the client did not watch stream carries no measured span.
+This is the one declared difference from the mockup, behaving exactly as declared.
+
+## Method note — a probe of mine was wrong, and it is recorded rather than buried
+
+For several samples I detected "is the run still streaming?" by looking for a button whose
+`aria-label` matches `/stop/i`. **That also matches `1 source stopped reading`**, a shell banner
+button that is always present on this install — so my probe reported `running: true` over runs the
+database recorded as `completed`. **No product defect; my detector's fault.** Recorded because the
+next person writing a browser probe on this shell will reach for the same regex.
+
+## Still owed on this phase
+
+| row | why |
+|---|---|
+| **L-5 short arm** | needs a provider that emits SHORT reasoning; deepseek emits none on trivial prompts |
+| **L-6 live frame** | the settled frame was driven in session 1; the live frame is not |
+| **M-1** | multi-tool prompt (`search_documents` + `execute_code`) |
+| **P-1** | thread A streaming while thread B accepts a prompt |
+| **G-1** | ≥50-message thread — the seeded thread from session 1 exists and can carry it |
+| **N-2** | temp-id → DB-id reconcile with the fold open |
+| **N-3** | reasoning-without-tools below tool-bearing turns |
+| **N-4** | stop mid-reasoning (the `.flush()` at the terminal edge) |
+| **cross-provider ×8** | ⭐ **NOT blocked** — eight providers hold keys |
