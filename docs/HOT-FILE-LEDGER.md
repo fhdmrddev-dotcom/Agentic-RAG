@@ -182,6 +182,12 @@ Decomposed non-message presentation responsibilities (823 lines → 702 lines, s
 - Extracted `UserMessageBubble.tsx` (~65 L): user message presentation, 7-line clamp, gradient fade.
 - Delegated terminal run status to `RunTerminalStatus` in `RunCard.tsx` (SC#1 / SC#3 preparation).
 
+**⚠ RE-DERIVED AT PHASE 243 (2026-09-11, plan `243-02`) — recorded BESIDE the previous value, never over it: `62 / 33 / 702` → `67 / 33 / 726`.** The phase COUNT is unchanged at 33 and the commit count moved by five, which is worth stating rather than glossing: the `sed` recipe's bucket set gained `228` and `243` while dropping nothing, and the arithmetic works because the previous figure was itself measured at a different commit. **Six-digit dated quick-task buckets, NAMED rather than silently subtracted: `260328`, `260405`, `260630`** — three of them, exactly as `CLAUDE.md`'s recipe warns. The raw recipe also prints non-numeric buckets (`phase`, `Add Module 8: Sub`, and four whole untagged subjects) which the numeric filter drops. Re-derive with: `git log --oneline -- frontend/src/components/chat/MessageItem.tsx | wc -l` → 67; the numeric `sed` recipe minus six-digit buckets → 33; `wc -l <file>` → 726.
+
+**⛔ THIS FILE WAS G-5 DISCHARGED AT PHASE 227 AND PHASE 243 DID NOT RE-HOLLOW IT — stated explicitly because that is the failure this row is most exposed to.** A phase that mounts a component here could just as easily have moved state up into the parent, and the difference is invisible in prose. **The proof is four numbers, each of which a second concern would have moved:** `useState[(<]` **3 → 3** · `useEffect(` **0 → 0** · props on `interface Props` **5 → 5** · **deleted lines: 0** (`git diff --numstat 149360176 HEAD` → `19 / 0`). **All nineteen added lines are one JSX mount and its docblock.** The fold's state lives inside `ThinkingBlock` — which is where it lived inside `RunCard` before the move — so **no state crossed this boundary in either direction**.
+
+**⚠ THE MOUNT CARRIES TWO PROHIBITIONS, AND BOTH ARE FENCED ON SOURCE rather than left to discipline** (`ThinkingBlock.characterization.test.tsx` §12): the mount expression may contain **no tool-list condition** — a condition here would restore `CHAT-04`'s defect in a form that reads as tidiness — and **no `key`**, because `key={message.id}` would close an open fold on every temp-id → DB-id reconcile (§13 fences the behaviour, so the two cannot drift apart). **It inherits `67 / 33 / 726`.**
+
 > ⚠ **THIS ROW WAS FOUND STALE AT EXTRACTION AND THE CORRECTION IS RECORDED BESIDE THE ORIGINAL, NEVER OVER IT.**
 > The verbatim cells below are the text as it stood in `CLAUDE.md`, and they are **wrong about this file's hotness**.
 > Measured at extraction: **57 commits / 29 phases / 856 L**.
@@ -1605,6 +1611,33 @@ carries the verdict — **honoured by construction (194)** — and this is the c
 
 **⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `46 / 16 / 2567` → `54 / 20 / 3135`.** The approval composer takes the service it cannot know as a parameter; a failing connection lookup can no longer kill the pause. Phase buckets gain `214`.
 
+## `frontend/src/components/chat/ThinkingBlock.tsx`
+
+**Created 2026-09-11 (Phase 243, plan `243-02`):** `1 commit / 1 phase / 117 L` · **G-5 does NOT fire** (1 phase against a threshold of 3).
+
+### Why a row exists at ONE phase
+
+⚠ **Because a hot file missing from the scan list is invisible to its own guardrail at ANY commit count, forever, silently — and the count at which someone remembers to add it is the count at which the invisibility ends.** `App.tsx` went **23 phases** like that; `NavPanel.tsx` **11**; `backend/app/config.py` its entire life; `frontend/src/lib/api.ts` reached **97 phases** as the hottest file in the repository with no row at all. Measured before this row existed: `node scripts/check-hot-file-ledger.cjs --files frontend/src/components/chat/ThinkingBlock.tsx` reported `[no-row]`. **The row is the cheap half; the invisibility is the expensive half.**
+
+### What it is
+
+**THE ONE REASONING RENDERER** (D-243-01 / sketch 235's operator-approved winner B). Extracted from `RunCard.tsx:478-505` and mounted from `MessageItem` for **both** message shapes. Before it, `RunCard` was the **only** renderer of `reasoningContent` in the codebase and `MessageItem` mounted `RunCard` only on a tool-bearing turn — so **105 of 340 reasoning-bearing rows (31%, measured for D-243-03) had their reasoning drawn nowhere.** ⚠ `CHAT-04` reads as though a gate needed flipping and it did not: **removing a gate reveals nothing when the component that would do the revealing is never mounted.** The fix is a component boundary.
+
+### The invariants that bind it
+
+1. ⛔ **EXACTLY ONE RENDERER, and it is mechanical.** `ThinkingBlock.characterization.test.tsx` §10c sweeps every production `.tsx` under `components/chat/` read `?raw`, strips comments first, and asserts that exactly ONE file matches a JSX-child interpolation of the reasoning value — with a positive control (§10b) proving the needle discriminates a *render* from a *prop pass* (`reasoningContent={…}`, whose brace is preceded by `=`) and from a *guard* (`!message.reasoningContent`, which `RunCard`'s state 2 still needs). **Written bare as `/reasoningContent/` the fence would count three files and mean nothing.**
+2. ⛔ **THE TOOL-CONDITIONALITY DISAPPEARS BY CONSTRUCTION, NEVER VIA A SECOND BRANCH.** The component self-guards on its own content (`if (!reasoningContent) return null` — the `StreamingNarration.tsx:27` shape) and the mount site therefore tests nothing. §12 fences the mount expression on source for a tool-list token and for `key=`.
+3. ⚠ **NO `key` ON THE MOUNT — A DECISION, NOT AN OMISSION** (`243-PATTERNS.md` §F.8, which flagged it as a thing `243-02` had to DECIDE). `RunCard` held this fold state and reset only its own `userExpanded` on an id change, so an open fold survived the temp-id → DB-id reconcile; `MessageList.tsx:220` keys a run-bearing assistant row by `runId`, which is stable across that swap. `key={message.id}` is the cheap answer and would close an open fold on every reconcile — **a behaviour change smuggled in as tidiness**. §13 fences the behaviour so it cannot drift from §12's source fence.
+4. ⛔ **Provider-authored reasoning renders as React TEXT CHILDREN ONLY** (T-243-02-01) — no raw-HTML escape hatch, no markdown pipeline, matching `blockedNotice` under A23 / T-174-03-01. ⚠ The forbidden API is deliberately **not spelled** in the file's own prose, because a fence whose needle appears in the comment explaining it is a lie about itself (the 187-24 trap).
+5. ⚠ **This file is production source under `chat/`, so it enters `WorkspacePanel.test.tsx:1137-1141`'s RAW, un-stripped `?raw` sweep** — `productionOnly()` excludes `__tests__` and `*.test.tsx`, and this is neither. The destructive-call and lock-id spellings may not appear **even in comments**. Phase 194.1 tripped that fence twice on docblocks that merely explained the rule.
+6. ⚠ **The ten body class tokens and the `Thinking` / `Thinking...` labels are PINNED** by §5 / §1a / §2 of the characterization net. **243-04 is the one plan permitted to change them** (sketch 234's V1 diff, and `Thought for N seconds` under D-243-13, which must find that number an honest source first). Any other plan that reds those lines has restyled the reasoning body by accident.
+
+### The named seam, if it ever grows a second concern
+
+It has exactly one today: draw the reasoning. **The seam is the FOLD CONTROL versus the BODY** — the trigger already delegates to the shared `FoldTrigger` (Phase 224-05's *"one fold control, used twice"*), so a second concern would most plausibly arrive as body treatment: a duration label (D-243-13), a copy button, per-provider formatting, or markdown. **Any of those belongs beside the body, never inside the trigger**, and a third fold anywhere in the tree mounts `FoldTrigger` rather than copying it.
+
+---
+
 ## `frontend/src/components/chat/RunCard.tsx`
 
 **Re-derived 2026-08-17 (extraction):** `21 commits / 9 phases / 608 L` · **G-5 FIRES** (9 phases vs threshold 3) — honoured by construction (194).
@@ -1629,6 +1662,14 @@ carries the verdict — **honoured by construction (194)** — and this is the c
 **⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `21 / 9 / 608` → `22 / 10 / 661`.** 214-11 mounted `StepIdentity`; the card takes props from the same wire as every other surface (T-214-11-04). Phase buckets gain `214`.
 
 **⚠ RE-DERIVED AT PHASE 227's CLOSE (2026-09-04, plan `227-03`) — recorded BESIDE the previous value, never over it: `24 / 10 / 688` → `26 / 12 / 728`.** Gained `RunTerminalStatus` (SC#1 / SC#3 single-owner terminal status row). Phase buckets gain `224` and `227`.
+
+**⭐ RE-DERIVED AT PHASE 243 (2026-09-11, plan `243-02`) — recorded BESIDE the previous value, never over it: `26 / 12 / 728` → `28 / 14 / 710`.** Phase buckets gain `228` and `243`. ⚠ **The raw `sed` recipe prints SEVENTEEN buckets and three are NOT phases — `chat`, `streaming` and `ui` — so the PHASE count is 14 and the recipe's 17 is what the command prints.** `streaming` is the untagged 075.x fix/revert pair this cell already documents; `chat` and `ui` are likewise untagged subjects. **ZERO six-digit dated quick-task buckets.** Re-derive with: `git log --oneline -- frontend/src/components/chat/RunCard.tsx | wc -l` → 28; the numeric `sed` recipe → `075.7 075.8 076.1 076.2 095 095.1 128 155 194 214 224 227 228 243`; `wc -l <file>` → 710.
+
+**⭐⭐ THE G-5 OBLIGATION IS DISCHARGED, AND THE DISCHARGE IS A DELETION RATHER THAN A CLAIM.** This row has said for four consecutive phases that the obligation *"passes forward COMPLETELY UNTOUCHED AND UNDISCHARGED"* — that sentence is kept above rather than deleted, because being able to see how long it stood is the point. `243-02` took a **fourth concern OUT** of a file whose named seam lists three: the collapsible reasoning fold (Phase 076.2 D-01 state 1) left for `ThinkingBlock.tsx`, mounted a level up from `MessageItem`. **Measured, not asserted:** `git diff --numstat 149360176 HEAD` → **`20 / 39`** (twenty added, **thirty-nine deleted**), `wc -l` **729 → 710**, real `useState` call sites **3 → 2** (a fourth `useState(` match at `:486` was a *comment* inside the `FoldTrigger` docblock and left with the block — both figures are recorded so the next reader running `grep -c "useState[(<]"` sees 4 → 2 and knows why), `useEffect(` **2 → 2**, props **2 → 2**.
+
+**⚠ WHAT DELIBERATELY DID NOT MOVE, SO THE NEXT READER DOES NOT MISTAKE IT FOR AN INCOMPLETE EXTRACTION.** Phase 076.2 D-01's contract had **three** states and only state 1 left. **State 2 — the `data-testid="thinking-row"` planning placeholder — stayed here on a measured reason:** the `{elapsedLabel}` it renders comes from **55 lines of card-internal derivation** (`:143-198` — `runStartMs`, `frozenEndRef`, `wasStreamingRef` and the D-05 honesty gate) reading `message.startedAt`, `message.created_at` and `message.completedAt`. Moving it would have widened a leaf's props to carry machinery it has no other use for. It is a planning-GAP placeholder on a live run, **not a reasoning renderer** — it draws only when reasoning is ABSENT — so leaving it behind creates **no second renderer of reasoning**, which is the invariant that actually mattered. ⚠ The ternary chain it used to sit in is gone; the mutual exclusion §6b pins is now written out as `!message.reasoningContent && isStreamingNow && message.isPlanning`, **by construction rather than by the shape of a chain**.
+
+**The three seams this row names — the run-identity header, the status/terminal vocabulary (`statusGlyph` / `statusWord` / `categorizeError`), and the elapsed-timer machinery — ALL REMAIN**, and the elapsed machinery is now the one with the strongest claim on the next extraction, because state 2 is the only thing still holding it in a card. **The next phase adding a genuinely new concern here still owes a refactor recommendation FIRST. It inherits `28 / 14 / 710`.**
 
 ## `frontend/src/components/chat/MessageInput.tsx`
 
@@ -9484,7 +9525,7 @@ cells rot within days.
 | File | commits / phases / lines | G-5 | Disposition |
 |---|---|---|---|
 | [`frontend/src/components/chat/ToolCallPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattoolcallpaneltsx) | 51 / 23 / 351 | **FIRES** | ✅ **G-5 DISCHARGED (227-02)** — extracted ToolCallDetails, StepRow, toolStepDerivation (1019 → 351 lines) |
-| [`frontend/src/components/chat/MessageItem.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageitemtsx) | 62 / 33 / 702 | **FIRES** | ✅ **G-5 DISCHARGED (227-03)** — extracted UserMessageBubble, messageText, delegated RunTerminalStatus (823 → 702 lines) |
+| [`frontend/src/components/chat/MessageItem.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageitemtsx) | 67 / 33 / 726 | **FIRES** | ✅ **G-5 DISCHARGED (227-03)**; ⚠ row was STALE at `62/33/702`. NOT re-hollowed (**243-02**): `useState` 3→3, `useEffect` 0→0, props 5→5, 0 deleted — a MOUNT, measured |
 | [`backend/app/api/threads.py`](docs/HOT-FILE-LEDGER.md#backendappapithreadspy) | 243 / 80 / 1590 | **FIRES** | extraction TAKEN 2026-08-17 · honoured by construction (**214**) — one launch-inputs field on a request model it already owns |
 | [`frontend/src/providers/StreamsProvider.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcprovidersstreamsprovidertsx) | 85 / 34 / 4144 | **FIRES** | honoured by construction (194.1 / **214**) — one run field added to the wire type |
 | [`frontend/src/hooks/useMessages.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusemessagests) | 74 / 27 / 127 | ⚠ **FIRES** | extraction due |
@@ -9516,7 +9557,8 @@ cells rot within days.
 | [`backend/app/services/run_lifecycle.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_lifecyclepy) | 6 / 3 / 459 | **FIRES** | honoured by construction (194) — at threshold |
 | [`backend/app/api/runs.py`](docs/HOT-FILE-LEDGER.md#backendappapirunspy) | 35 / 16 / 1430 | **FIRES** | honoured by construction (194) |
 | [`backend/app/services/harness_engine.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharness_enginepy) | 54 / 20 / 3135 | **FIRES** | honoured by construction (194 / **214**) — 214-06 resolved the pause's service at ONE call site |
-| [`frontend/src/components/chat/RunCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatruncardtsx) | 26 / 12 / 728 | **FIRES** | honoured by construction (194 / 214 / **227**) — gained RunTerminalStatus |
+| [`frontend/src/components/chat/RunCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatruncardtsx) | 28 / 14 / 710 | **FIRES** | ⭐ **G-5 DISCHARGED (243-02)** — the reasoning fold left for `ThinkingBlock.tsx`, `-39/+20`, one `useState` fewer. ⚠ row was STALE at `26/12/728`. State 2 stayed, by decision |
+| [`frontend/src/components/chat/ThinkingBlock.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatthinkingblocktsx) | 1 / 1 / 117 | no | ⚠ **row at ONE phase BY DESIGN** — a file absent from this list is invisible to G-5 at any count (`App.tsx`: 23 phases). Invariant: **exactly one reasoning renderer** |
 | [`frontend/src/components/chat/MessageInput.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageinputtsx) | 29 / 14 / 643 | **FIRES** | honoured by construction (194.1) |
 | [`frontend/src/components/chat/MessageList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessagelisttsx) | 19 / 8 / 267 | **FIRES** | honoured by construction (194.1) |
 | [`frontend/src/components/chat/ChatArea.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatchatareatsx) | 70 / 35 / 678 | **FIRES** | ⚠ row was STALE at `67 / 32 / 595` — **+3 phases** unrecorded. honoured by construction (194.1 / **235**) |

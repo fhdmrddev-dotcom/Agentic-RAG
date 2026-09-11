@@ -597,7 +597,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | Hot file (FIRING) | commits / phases / lines | Verdict (abridged) |
 |---|---|---|
 | `frontend/src/components/chat/ToolCallPanel.tsx` | 51 / 23 / 351 | ✅ **G-5 DISCHARGED (227-02)** |
-| `frontend/src/components/chat/MessageItem.tsx` | 62 / 33 / 702 | ✅ **G-5 DISCHARGED (227-03)** |
+| `frontend/src/components/chat/MessageItem.tsx` | 67 / 33 / 726 | ✅ **G-5 DISCHARGED (227-03)**; ⚠ row was STALE at `62/33/702`. NOT re-hollowed (**243-02**): `useState` 3→3, `useEffect` 0→0, props 5→5, 0 deleted — a MOUNT, measured |
 | `backend/app/api/threads.py` | 243 / 80 / 1590 | extraction TAKEN 2026-08-17 · honoured by construction (**214**) |
 | `frontend/src/providers/StreamsProvider.tsx` | 85 / 34 / 4144 | honoured by construction (194.1 / **214**) |
 | `frontend/src/hooks/useMessages.ts` | 74 / 27 / 127 | extraction due |
@@ -630,7 +630,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/run_lifecycle.py` | 6 / 3 / 459 | honoured by construction (194) |
 | `backend/app/api/runs.py` | 35 / 16 / 1430 | honoured by construction (194) |
 | `backend/app/services/harness_engine.py` | 54 / 20 / 3135 | honoured by construction (194 / **214**) |
-| `frontend/src/components/chat/RunCard.tsx` | 26 / 12 / 728 | honoured by construction (194 / 214 / **227**) |
+| `frontend/src/components/chat/RunCard.tsx` | 28 / 14 / 710 | ⭐ **G-5 DISCHARGED (243-02)** — the reasoning fold left for `ThinkingBlock.tsx`, `-39/+20`, one `useState` fewer. ⚠ row was STALE at `26/12/728`. State 2 stayed, by decision |
 | `frontend/src/components/chat/MessageInput.tsx` | 29 / 14 / 643 | honoured by construction (194.1) |
 | `frontend/src/components/chat/MessageList.tsx` | 19 / 8 / 267 | honoured by construction (194.1) |
 | `frontend/src/components/chat/ChatArea.tsx` | 70 / 35 / 678 | ⚠ row was STALE at `67 / 32 / 595` |
