@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v4.1
 milestone_name: "Ship It & Feel It"
 status: roadmapped
-last_updated: "2026-09-11T05:10:00.000Z"
+last_updated: "2026-09-11T06:05:00.000Z"
 last_activity: 2026-09-11
 progress:
   total_phases: 5
   completed_phases: 0
   total_plans: 5
-  completed_plans: 3
+  completed_plans: 4
   percent: 0
 requirements:
   total: 19
@@ -40,11 +40,13 @@ surface the operator uses daily. Phase numbering continues at **242**.
 
 ## Current Position
 
-Phase: 242 — Ship It (in discussion, separate session) · **243 — The Thinking Block and the Follow-Scroll Seam (IN EXECUTION — 3 / 5 plans done)**
-Plan: 243 — 5 plans, 5 serial waves (243-01 … 243-05). **243-01, 243-02, 243-03 DONE** (waves 1-3) → next: 243-04
+Phase: 242 — Ship It (in discussion, separate session) · **243 — The Thinking Block and the Follow-Scroll Seam (IN EXECUTION — 4 / 5 plans done)**
+Plan: 243 — 5 plans, 5 serial waves (243-01 … 243-05). **243-01, 243-02, 243-03, 243-04 DONE** (waves 1-4) → next: 243-05
+Status: **243-04 EXECUTED — sketch 234 V1 shipped, and the phase's one genuine design gap was closed by REFUSING the mockup's number.** The body drops the four classes and steps to `text-sm`, rendering REAL paragraphs (`b9819b7ab`); the tail clamps at 300px with a control that **removes itself** below the measured threshold — the shipped sketch-050 mechanism COPIED, never mounted (`96ca3909c`); and the fold label reads `Thought for N seconds` **only when a span was measured** (`2a988c3de`). ⛔ **D-243-13 honoured mechanically:** the sketch's `Math.round(chars / 180)` is a DEMO AFFORDANCE, and on the 32,951-char fixture it computes to *"Thought for 183 seconds"* — a plausible number derived from string length. `grep -c "/ 180"` is **0**; a DB-loaded message reads `Thinking` with **no digit**; `git diff --stat -- supabase/ backend/` is **EMPTY**. ⚠ **THE ONE DECLARED DIFFERENCE FROM THE ACCEPTANCE BAR** (for `243-VERIFICATION.md` to carry): the mockup reads `Thought for 6 seconds` on EVERY message including historical ones; the shipped surface reads `Thinking` on any message it did not watch stream. **Declared with its reason = a decision; undeclared = drift.** ⭐ **Two plan errors found by driving rather than assuming:** (1) §10's uniqueness needle matched **ZERO** files after the render shape changed — re-aimed as an alternation of two NAMED shapes, because the obvious widening was measured to match two innocents; (2) `MessageItem.tsx` had to take the new prop and is **not in `files_modified`** — edited anyway, with its ledger row updated in the same commit, since the ledger gate reads `files_modified` and not the diff. **That is the identical blindness the plan cites to CLOSE the formatter extraction, arriving from the other direction.** ⚠ `BUG-260718-02` → **`folded`, NOT `closed`**: the code half is measured and named commit-by-commit, but the reported defect is a PERCEPTION and every fence here is synthetic — the same standard 243-03 held its sibling to. `SEED-269` planted (three elapsed formatters, one home owed). `count gate OK — 254/254, failed 0, 7994→8017`; typecheck 67, **set diff empty both ways**. Four ledger triples re-derived; `StreamsProvider.tsx`'s row was STALE for the SECOND time in two plans, written one plan earlier the same day.
+
 Status: **243-03 EXECUTED — the phase’s most consequential plan, and the RED drive changed its shape.** CHAT-02: the delta path now coalesces PRODUCER-side (`makeAccumulatingCoalescer`, 60 ms, leading edge) — **60 deltas made 61 `setMessages` calls and now make 12** (`bfdf899b1`). CHAT-03: **D-243-05 outcome 3** — a residual DID reproduce at HEAD and it is **NOT** the defect `BUG-260823-01` names; that report’s cause was deleted by `64357e979`, which is measured to be a **quick task 7h48m BEFORE Phase 228 was scoped**, not a 228 commit. The real residual: a nudge up under 120px releases the pin but stays “near bottom”, so between the 900 ms hard clock and the 1500 ms gesture window **any** scroll event re-pinned the reader. One ref, one clause, at the line D-243-05 predicted (`8d7dfab43`); the mirror (a flick back DOWN still re-arms) stays green. ⭐ **D-243-04 MEASURED rather than asserted:** 60 real deltas produced **61** `scrollIntoView` calls before the coalescing and **13** after, with `useFollowScroll.ts` held constant — and `MessageList.tsx` needed **no edit at all**. ⚠ A trap the plan did not name broke two shipped tests and was caught by a base-set diff (13 base / 15 / 13): every STRUCTURAL callback must drain the text buffer or Anthropic’s interleaved text/tool_use order inverts. `count gate OK — 253/253, failed 0`; typecheck 67, set diff empty. Three suites into both knobs — **`throttle.ts` had been ungated since 068.5**. Four ledger triples re-derived; `useFollowScroll.ts` and `throttle.ts` had **NO ROW AT ALL**, so G-5 was structurally absent on the very file this bug is about. ⚠ `BUG-260823-01` stays **`folded`, not `closed`** — every fence here is a synthetic `WheelEvent`, and this file’s own history records two fixes that passed those and failed a real mouse. **A real-wheel UAT row is owed** (`re_open_trigger` now says so; `SEED-049`/D-243-09 agree).
 Progress: 0 / 5 phases · 0 / 19 requirements · `[░░░░░░░░░░] 0%`
-Last activity: 2026-09-11 — 243-03 executed (wave 3 of 5): the delta path coalesced producer-side, and a scroll residual that was NOT the reported one, driven then fixed
+Last activity: 2026-09-11 — 243-04 executed (wave 4 of 5): sketch 234 V1's surface shipped, and a duration was REFUSED rather than fabricated
 
 **Phases:** 242 Ship It · 243 Thinking block + follow-scroll seam (⚠ sketch first) ·
 244 Chat shell + composer · 245 The verification debt · 246 The recall cliff.
