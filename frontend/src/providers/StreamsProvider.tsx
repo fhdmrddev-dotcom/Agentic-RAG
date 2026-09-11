@@ -98,7 +98,7 @@ import {
   type StreamsState,
   type WorkflowLock,
 } from "@/stores/streamsStore"
-import { makeThrottle } from "@/lib/throttle"
+import { makeThrottle, makeAccumulatingCoalescer } from "@/lib/throttle"
 import { writeSnapshotToLocalStorage } from "@/lib/streamsCache"
 import { makeToolKey } from "@/lib/toolKey"
 // Phase 095.1 Plan 02 (D-095.1-01/02): the deterministic activity-derived
@@ -393,6 +393,27 @@ type ThreadBoundSetMessages = (
  * a regression — Anthropic's interleaved text + tool_use stream relies on this
  * invariant to keep accumulating text across tool blocks.
  */
+/**
+ * Phase 243 Plan 03 (CHAT-02 / D-243-15) — how long the delta path may hold text before
+ * it repaints. ⚠ PICKED DELIBERATELY, AND THE NUMBER IS THE DECISION.
+ *
+ * Measured premise: the backend emits ONE `delta` SSE event per provider chunk and does
+ * NOT batch (`backend/app/services/agent_loop.py` — `_emit(redis, run_id, 'delta', ...)`,
+ * no coalescing anywhere on that path), so the client sees the raw provider token
+ * cadence. At a realistic 30-100 tok/s that is a delta every 10-33 ms, and every one of
+ * them used to be one `setMessages` and therefore one run of `MessageList.tsx:141-176`.
+ *
+ * 60 ms is ~3.6 frames at 60 Hz: text still flows visibly, while the repaint rate stops
+ * tracking the token rate (a 3-6x reduction across that band). It is deliberately NOT
+ * the cache writer's 500 ms (`makeThrottle(writeNow, 500)`, `:3525`) — half a second of
+ * nothing before a reply starts is a pause the reader can feel.
+ *
+ * ⚠ The first delta is NOT delayed at all: the coalescer has a leading edge, so the
+ * worst-case first-paint cost is 0 ms and the worst case for any LATER delta is 60 ms.
+ * Fenced by `streamsProvider_243_cadence.test.tsx` §6, and this constant is pinned by §8.
+ */
+export const DELTA_COALESCE_MS = 60
+
 export function makeStreamCallbacks(opts: {
   assistantId: string
   threadId: string
@@ -402,39 +423,108 @@ export function makeStreamCallbacks(opts: {
   // below still receives title-only).
   onTitleUpdate?: (threadId: string, title: string) => void
   setMessages: ThreadBoundSetMessages
-}): StreamCallbacks {
+}): StreamCallbacks & { flushDeltas: () => void } {
   const { assistantId, threadId, onTitleUpdate, setMessages } = opts
   // D-067-03: closure-tracked iteration counter, stamped onto each ToolCall
   // created in onToolPreparing/onToolStart. Updated on every iteration_start
   // SSE event BEFORE setMessages.
   let currentIteration = 0
-  return {
+
+  // -- Phase 243 Plan 03 (CHAT-02 / D-243-15) - the coalesced delta path --------------
+  //
+  // ⛔ PRODUCER-SIDE, AND THE REASON IS D-243-04 RATHER THAN HABIT. `MessageList.tsx`'s
+  // one effect (`:141-176`) has `messages` in its dep array, so it re-runs on EVERY
+  // `setMessages` and, while streaming and pinned, scrolls. The repaint cadence and the
+  // scroll behaviour are therefore the same line of code, and only reducing how often
+  // `setMessages` fires reduces how often that effect runs. A consumer-side
+  // `useDeferredValue` in `ThinkingBlock` would coalesce the FOLD's repaint and leave
+  // the scroll effect running per token - CHAT-02 closed and CHAT-03 untouched, which is
+  // precisely the "fixed one and re-broke the other" failure the ROADMAP names.
+  //
+  // ⛔ THE BUFFER LIVES HERE, BESIDE `currentIteration`, AND NOT IN THE COALESCER'S
+  // ARGUMENTS. `makeThrottle` is last-write-wins (`lib/throttle.ts:19,28`) and the
+  // accumulation used to live inside the updater (`m.content + delta`), so wrapping
+  // these callbacks in it would silently DROP TOKENS while every cadence measurement
+  // still looked right. `makeAccumulatingCoalescer` takes no arguments at all for that
+  // reason; there is nothing for a window to discard. Fenced by
+  // `streamsProvider_243_cadence.test.tsx` §2 / §3.
+  //
+  // ⛔ THE UPDATE SHAPE IS UNCHANGED. Still one `prev.map` returning a NEW array with a
+  // NEW object for the target row - `MessageItem.tsx:213-219` records that the `memo`
+  // contract depends on replace-not-push identity. Coalescing the CADENCE is in scope;
+  // mutating in place is D-243-08's red line.
+  let pendingContent = ""
+  let pendingReasoning = ""
+  let sawContentDelta = false
+
+  const applyPendingDeltas = () => {
+    const content = pendingContent
+    const reasoning = pendingReasoning
+    if (!content && !reasoning) return
+    pendingContent = ""
+    pendingReasoning = ""
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === assistantId
+          ? {
+              ...m,
+              // `isPlanning` clears only on CONTENT - reasoning is not an answer.
+              ...(content ? { isPlanning: false, content: m.content + content } : {}),
+              ...(reasoning ? { reasoningContent: (m.reasoningContent ?? "") + reasoning } : {}),
+            }
+          : m,
+      ),
+    )
+  }
+
+  const coalesceDeltas = makeAccumulatingCoalescer(applyPendingDeltas, DELTA_COALESCE_MS)
+
+  const raw: StreamCallbacks & { flushDeltas: () => void } = {
     onDelta: (delta) => {
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === assistantId ? { ...m, isPlanning: false, content: m.content + delta } : m,
-        ),
-      )
+      pendingContent += delta
+      coalesceDeltas()
+      if (!sawContentDelta) {
+        // ⚠ The planning -> answering transition is a STATE CHANGE, not a token, and
+        // it must paint at once or the working badge lingers for up to a window. If no
+        // window was open the call above already fired on the leading edge and this
+        // flush is a no-op; if reasoning had opened one, this drains it NOW. Either way
+        // it costs at most one extra `setMessages` per run, exactly once.
+        sawContentDelta = true
+        coalesceDeltas.flush()
+      }
     },
     // Phase 076.2 D-01: accumulate DeepSeek reasoning_content deltas on message.
-    // Same accumulation pattern as onDelta for content.
+    // Same accumulation pattern as onDelta for content - now through the same buffer,
+    // so interleaved content and reasoning land in ONE `setMessages` rather than two.
     onReasoningDelta: (delta) => {
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === assistantId
-            ? { ...m, reasoningContent: (m.reasoningContent ?? "") + delta }
-            : m,
-        ),
-      )
+      pendingReasoning += delta
+      coalesceDeltas()
     },
     onDone: () => {
+      // ⛔ FLUSH FIRST. Anything still buffered belongs to this run and must land before
+      // the terminal bookkeeping, or a snapshot is taken over a half-applied buffer.
+      coalesceDeltas.flush()
       setMessages((prev) =>
         prev.map((m) => (m.id === assistantId ? { ...m, isPlanning: false } : m)),
       )
     },
     onTerminal: () => {
       // Default no-op — caller wraps to flip runStatus and handle buffer_expired.
+      // ⚠ Phase 243: the flush is ALSO here, as the backstop for a terminal that arrives
+      // without a `done` (error / abort). The three call sites flush at the TOP of their
+      // wrapper as well, because each wrapper runs a body BEFORE it calls this one and
+      // some of those bodies reconcile the message from the server - a flush that landed
+      // afterwards would append the buffered tail onto replaced content.
+      coalesceDeltas.flush()
     },
+    /**
+     * Phase 243 Plan 03 (CHAT-02) - drain the coalesced delta buffer NOW.
+     *
+     * Exposed because all three `onTerminal` call sites REPLACE `callbacks.onTerminal`
+     * with a wrapper that calls the original LAST (`:1551`, `:1999`, `:2473`). The
+     * buffer has to be drained before those wrapper bodies run, not after.
+     */
+    flushDeltas: () => coalesceDeltas.flush(),
     // Inject the run's OWNING threadId (closure) so a generated title is applied
     // to THIS run's chat — not whatever thread the user is viewing when the title
     // SSE arrives (the cross-wiring under parallel chats / fast nav).
@@ -1130,6 +1220,40 @@ export function makeStreamCallbacks(opts: {
           emitFailure: sub.failure,
         }),
   }
+
+  // ⛔ EVERY STRUCTURAL EVENT DRAINS THE TEXT BUFFER FIRST, AND THIS IS A CORRECTNESS
+  // REQUIREMENT RATHER THAN TIDINESS — it was found by a DRIVEN RED, not by reading.
+  //
+  // Anthropic's normalized stream INTERLEAVES text and tool_use blocks
+  // (`StreamsProvider.anthropic-ordering.test.ts`, B-260519-01):
+  //   delta(text1) -> tool_use(0) -> delta(text2) -> tool_use(1) -> delta(text3)
+  // With the deltas coalesced, `text3` can still be sitting in the buffer when the tool
+  // block that FOLLOWS it is written — so the transcript would show a tool card above
+  // text the reader has not been shown yet, and a run that ends on a tool event would
+  // drop its tail entirely. Measured: without this, those two ordering cases fail with
+  // `expected 'text1text2' to be 'text1text2text3'`.
+  //
+  // ⚠ WRAPPED GENERICALLY RATHER THAN CALLBACK BY CALLBACK, and that is the decision.
+  // This factory returns 47 callbacks; an explicit flush in each is both invasive and
+  // forgettable, and the 48th — added by a phase that never read this comment — would
+  // silently re-open the defect. The rule is stated ONCE, and it is the negative form:
+  // the ONLY things that do not flush are the two callbacks that FILL the buffer.
+  const FILLS_THE_BUFFER = new Set(["onDelta", "onReasoningDelta", "flushDeltas"])
+  return Object.fromEntries(
+    Object.entries(raw).map(([key, value]) =>
+      typeof value !== "function" || FILLS_THE_BUFFER.has(key)
+        ? [key, value]
+        : [
+            key,
+            (...args: unknown[]) => {
+              coalesceDeltas.flush()
+              return (value as (...a: unknown[]) => unknown)(...args)
+            },
+          ],
+    ),
+    // One cast, at one place: the mapping preserves every key and every arity, and
+    // `Object.fromEntries` cannot express that in the type system.
+  ) as StreamCallbacks & { flushDeltas: () => void }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1524,7 +1648,7 @@ export function StreamsProvider({ children }: PropsWithChildren) {
           producerRunId,
         ),
       }))
-      const callbacks: StreamCallbacks = makeStreamCallbacks({
+      const callbacks = makeStreamCallbacks({
         // No assistant placeholder to target — the resumed run's phase/sub-agent
         // events render in the panel via the shared callbacks; the chat transcript
         // is reconciled separately. Use the run id as the target id (harmless when
@@ -1540,6 +1664,10 @@ export function StreamsProvider({ children }: PropsWithChildren) {
       }
       const originalOnTerminal = callbacks.onTerminal
       callbacks.onTerminal = (kind, errorPayload) => {
+        // ⛔ Phase 243 (CHAT-02): drain the coalesced delta buffer BEFORE this wrapper
+        // body runs. It reconciles / snapshots the message, and a flush that landed
+        // afterwards would append the buffered tail onto replaced content.
+        callbacks.flushDeltas()
         subscriptionsRef.current.delete(producerRunId)
         useStreamsStore.setState((s) => ({
           subscriptionsByThread: _removeRunFromThread(
@@ -1864,13 +1992,17 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                 subscriptionsByThread: _addRunToThread(s.subscriptionsByThread, threadId, run.run_id),
               }))
 
-              const callbacks: StreamCallbacks = makeStreamCallbacks({
+              const callbacks = makeStreamCallbacks({
                 assistantId: targetId,
                 threadId,
                 setMessages: setMessagesForBucketBound(surfaceId, threadId),
               })
               const originalOnTerminal = callbacks.onTerminal
               callbacks.onTerminal = async (kind, errorPayload) => {
+                // ⛔ Phase 243 (CHAT-02): drain the coalesced delta buffer BEFORE this wrapper
+                // body runs. It reconciles / snapshots the message, and a flush that landed
+                // afterwards would append the buffered tail onto replaced content.
+                callbacks.flushDeltas()
                 // Phase 075.1 Plan 01: widened transient-stream-end probe.
                 // Read the placeholder's current tool_calls from the store so
                 // the helper can detect "kind === 'done' with active tools".
@@ -2310,7 +2442,7 @@ export function StreamsProvider({ children }: PropsWithChildren) {
             })
 
             // Step 2: open the GET stream and dispatch SSE events to per-message-id callbacks.
-            const callbacks: StreamCallbacks = makeStreamCallbacks({
+            const callbacks = makeStreamCallbacks({
               assistantId,
               threadId,
               onTitleUpdate: opts?.onTitleUpdate,
@@ -2319,6 +2451,10 @@ export function StreamsProvider({ children }: PropsWithChildren) {
 
             const originalOnTerminal = callbacks.onTerminal
             callbacks.onTerminal = async (kind, errorPayload) => {
+              // ⛔ Phase 243 (CHAT-02): drain the coalesced delta buffer BEFORE this wrapper
+              // body runs. It reconciles / snapshots the message, and a flush that landed
+              // afterwards would append the buffered tail onto replaced content.
+              callbacks.flushDeltas()
               // Phase 075.1 Plan 01: widened transient-stream-end probe.
               // sendMessage path uses `registeredRunId` (populated after the
               // POST returns); reconcile path uses `run.run_id`. Shared

@@ -2921,6 +2921,25 @@ const BASELINE = {
   // distinction this pin exists to make — a fixed defect keeps its case, a dropped one does
   // not, and only the count can tell them apart.
   "ThinkingBlock.characterization.test.tsx": 23,
+
+  // ── Phase 243 (243-03 / CHAT-02 / D-243-15) — the delta path's coalescing fence ─────────
+  //
+  // ⚠ 9 was READ FROM THIS SCRIPT'S OWN `actual` COLUMN on the run that first executed the
+  // file (printed as `— 9 new` beside this suite name), never hand-counted from `it(` literals.
+  //
+  // What is UNGUARDED without this entry: `makeStreamCallbacks` now BUFFERS text between
+  // repaints, and the two ways that goes wrong are invisible to every other suite in this
+  // tree. §2/§3 reconstruct the exact concatenation of 60 individually-distinguishable
+  // deltas — the guard against `makeThrottle`'s last-write-wins shape being reintroduced,
+  // which would drop tokens while every cadence measurement still looked right. §6 asserts
+  // the FIRST delta paints with no window elapsed (a trailing-only coalescer would delay a
+  // reply's first character). §4/§5 assert both terminal edges drain the buffer. A lowering
+  // here would most cheaply be achieved by dropping exactly those.
+  //
+  // ⛔ §8 pins DELTA_COALESCE_MS at 60. The case NAMES of §1 do arithmetic on that number,
+  // so retuning the window without re-deriving them is caught here rather than silently
+  // leaving a comment that lies.
+  "streamsProvider_243_cadence.test.tsx": 9,
   // ══════════════════════════════════════════════════════════════════════════════
   // Added at Phase 214's CLOSE (plan `214-15`), collected here AFTER every file
   // exists — a `BASELINE` key naming a path that does not yet exist makes this gate
@@ -4659,6 +4678,25 @@ const TARGETS = [
   // `src/components/chat` directory entry anywhere here, so a suite dropped into that folder
   // runs in NO gate until it is named. TARGETS decides what RUNS, BASELINE what is GUARDED.
   "src/components/chat/__tests__/ThinkingBlock.characterization.test.tsx",
+  // ── Phase 243 (243-03 / CHAT-02 / CHAT-03) — the delta cadence and the scroll effect ────
+  //
+  // ⛔ ALL THREE NEEDED BOTH KNOBS BY HAND, AND NONE OF THEM IS REACHED BY A DIRECTORY RULE.
+  // This file has exactly TWO bare-directory TARGETS entries — `src/landing` and
+  // `src/components/workflows`. `src/__tests__` was never adopted and `src/components/chat`
+  // appears only inside comments. A suite in any of these folders runs in NO gate until it is
+  // named here. (Phase 214 measured the mirror of this trap on `WorkflowScheduleModal`: a
+  // directory entry made a suite RUN while BASELINE guarded nothing.)
+  //
+  // ⚠ `src/__tests__/providers` is in NEITHER knob, which means all TEN other shipped
+  // `StreamsProvider` suites are currently UNGATED — `StreamsProvider.anthropic-ordering`,
+  // `.dedup`, `.stopping`, `.stopping.baseline`, `.transient`, `.watchdog`, `streamPool`,
+  // `streamsProvider.test.tsx`, `_067_5_regression`, `_075_7_reconcile_race`,
+  // `_075_9_clientkey`, `_bug_260707_01`, `_bug_260707_03`, `_state01b_403`. Adopting them is
+  // OUT OF SCOPE for 243-03 (13 of their cases are red at this phase's base commit, so
+  // adopting them would turn the shared gate red for a reason no plan here owns) — but they
+  // are NAMED rather than left unlooked-for. An unadopted suite someone wrote down is a
+  // different thing from one nobody noticed.
+  "src/__tests__/providers/streamsProvider_243_cadence.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
