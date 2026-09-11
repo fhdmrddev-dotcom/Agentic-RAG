@@ -185,13 +185,48 @@ declares the correction rather than hiding it.
 
 ## Warnings (none is a BLOCKER; each is a decision the orchestrator should see)
 
-**W-1 — The cloud 20/20 verdict is a claim this verifier could not re-drive.**
-This agent has no Supabase MCP tool. `REQUIREMENTS.md:199` and commit `05203a1ed`'s message both
-say *"20/20 PASS"*; nothing in the repository can confirm it. Per CLAUDE.md, **reads over the
-Supabase MCP are free and need no approval** — the orchestrator should paste
-`scripts/verify-v40-cloud-migrations.sql` into `execute_sql` and record the verdict **in this file**,
-which is the phase record SC#4 names. Until then SC#4's headline sits one register above the
-database.
+**W-1 — ✅ CLOSED BY THE ORCHESTRATOR, and the verdict now lives HERE rather than in a commit
+message.** The verifier agent had no Supabase MCP tool and correctly refused to score a claim it
+could not re-drive — the ROADMAP's own failure list names *"verified by re-reading the record"* as
+the failure mode. The read was then driven directly (reads are free, no approval needed), against
+project `esnfauggawekgbvkqkyf`, **on the post-review version of the script, which now carries four
+rows for migration 177 and one for 178**:
+
+```
+2026-09-11 · scripts/verify-v40-cloud-migrations.sql vs CLOUD  →  24 PASS · 1 FAIL
+
+  153  PASS  table ingestion_jobs
+  154  PASS  ×4  (source_connection_id · ingest_visibility · connection_doc_is_visible ·
+                  match_document_chunks and keyword_search_chunks both REPLACED)
+  155  PASS  connector_connections.default_ingest_visibility
+  156  PASS  ×2  explicit column-level GRANT to authenticated  +  has_column_privilege
+  166  PASS  app_settings.vision_model + vision_max_pages
+  167  PASS  resize_embedding_column resizes skill_embeddings
+  168  PASS  table connector_watches
+  169  PASS  table connector_watch_items
+  170  PASS  documents.source_state
+  171  PASS  no-op placeholder
+  172  PASS  table connector_sync_runs
+  173  PASS  classification_rules.rule_scope
+  174  PASS  app_settings.source_max_file_size_mb
+  175  PASS  documents.thread_key
+  176  PASS  hnsw_ef_search + hnsw_iterative_scan PRESENT
+  177  PASS  ×4  app_settings RLS on · user_settings RLS on ·
+                 anon can NEITHER read nor write app_settings ·
+                 anon cannot execute resize_embedding_column
+  178  *** FAIL ***  app_settings bound CHECKs present   ← EXPECTED. 178 is deliberately not
+                                                            applied to cloud (operator-owed).
+```
+
+⛔ **The one FAIL is the row that is LABELLED as an expected fail**, and it is the only migration in
+the set this phase authored. Every migration `153-156, 166..177` is present.
+
+⭐ **The four `177` rows did not exist when the verifier ran.** They were added by the code review's
+WR-09, which pointed out that a parity checker claiming *"every row PASS means parity"* had **no row
+for the one migration that is a security fix** — the RLS/`anon` fix whose own header records that
+every gate in this project stayed green while `app_settings` was world-writable. That is precisely
+the blind spot 177 exists to close, in the one artifact that could close it. **SC#4's migration half
+is now measured, not claimed.**
 
 **W-2 — SC#4's non-code parity half is not walked.** Env vars, seed rows, provider keys and
 `SANDBOX_IMAGE` are **named operator-owed** in `REQUIREMENTS.md` and `STATE.md`. That is **honest** —
