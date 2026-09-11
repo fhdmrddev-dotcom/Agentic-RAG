@@ -6732,6 +6732,53 @@ Phases touched: 190, 206.1, 211.
 **Disposition: honoured by construction (211).** Connector persistence and decryption service.
 
 
+## frontend/src/pages/settingsSearchPayload.ts
+
+**Created 2026-09-11 by Phase 242 (`242-03`). Measured `1 commit / 1 phase / 116 L` — it does NOT
+fire G-5.** ⭐ **The row is here at CREATION rather than at the third phase, deliberately.** This
+ledger's own repeated finding is that an absent row makes G-5 **absent forever, silently, at any
+count** — `App.tsx` went 23 phases like that, `config.py` its entire life. Adding the row when the
+file is born costs one line; adding it later costs a phase's blindness.
+
+**What it holds:** `searchPayloadFrom` (the Search tab's 24-key payload as `hydrate` leaves it),
+`onlyChanged` (the diff), `searchBodyFor` (what `handleSaveSearch` actually PUTs) and
+`KEY_PLACEHOLDER`.
+
+**Why it is a module and not three exports from `SettingsPage.tsx`:** it WAS three exports from
+`SettingsPage.tsx`, and the phase's code review measured the cost — exporting non-components from a
+component file trips `react-refresh/only-export-components` and **breaks Fast Refresh for a
+1,773-line form page**. Two new lint errors on a file that had zero, and `npm run lint` is not gated
+in CI (only `lint:a11y` is), so nothing in the pipeline would have caught it.
+
+**⚠ WHAT BINDS THIS FILE:**
+
+1. ⛔⛔ **`searchPayloadFrom` MUST MIRROR `SettingsPage.tsx`'s `hydrate` EXPRESSION FOR EXPRESSION.**
+   Drift in one direction is harmless (a field is sent that did not change); drift in the other is
+   a **silent drop** — a real operator edit compares equal to the baseline, is never sent, and the
+   save reports success while changing nothing.
+2. ⚠⚠ **THE FENCE PROVES NON-DRIFT ONLY AS WIDE AS ITS FIXTURE, AND THE FIRST VERSION WAS TOO
+   NARROW.** `§1 FIXTURE B` in `pages/__tests__/SettingsPage.changedFields.test.tsx` must hold a
+   value DIFFERENT FROM THE `useState` INITIAL for **every one of the 24 keys**. It originally held
+   the initial for NINE of them (`embedding_base_url`, `rerank_enabled`, `rerank_provider`,
+   `rerank_model`, `rerank_top_n`, `retrieval_match_threshold`, `hybrid_search_enabled`,
+   `vector_search_weight`, `keyword_search_weight`), so a hard-coded baseline for any of those was
+   green against every case in the file. ⛔ `retrieval_match_threshold: 0.3` was the dangerous one —
+   `0.3` is also the most likely value an operator drags the threshold BACK to. **Adding a 25th key
+   means touching `hydrate`, `full`, this file AND that fixture; the first three alone leave it
+   unproven.**
+3. ⚠ **`onlyChanged` iterates `Object.keys(next)`, never the baseline.** Iterating the baseline
+   would silently drop forever any key added to the payload but forgotten here.
+4. ⚠ **`Object.is`, and the obvious reason for it is WRONG.** It does not rescue a `NaN` from an
+   emptied number input (the baseline is always a real number, so `Object.is(NaN, 100)` is false).
+   The only difference from `===` is `+0` / `-0`, where `Object.is` SENDS — the safe direction.
+5. ⭐ **`searchBodyFor` exists so the test can drive the REAL decision.** An earlier `§7` restated
+   `baseline ? onlyChanged(…) : full` in the test and would have stayed green if the component's
+   fallback were changed to `{}`.
+
+**No seam owed.** The file is 116 lines with one responsibility.
+
+---
+
 ## frontend/src/pages/SettingsPage.tsx
 
 **⚠ RE-DERIVED 2026-09-11 (plan `242-02`): `46 commits / 24 phases / 1858 L`** — the row read
@@ -9788,7 +9835,7 @@ cells rot within days.
 | [`backend/app/main.py`](docs/HOT-FILE-LEDGER.md#backendappmainpy) | 82 / 59 / 950 | ⚠ **FIRES** | ⚠ row was STALE by **FOURTEEN PHASES** at `79 / 45 / 876`. honoured by construction (**BUG-260902-06**): one more start/stop pair beside the scheduler |
 | [`backend/app/config.py`](docs/HOT-FILE-LEDGER.md#backendappconfigpy) | 83 / 48 / 1506 | ⚠ **FIRES** | ⚠ STALE AGAIN at `82 / 47 / 1489` — the ELEVENTH phase to find this row wrong. honoured by construction (**241**): four hnsw defaults, no reader changed; MODEL_CAPABILITIES-out seam stays OWED |
 | [`backend/app/api/admin.py`](docs/HOT-FILE-LEDGER.md#backendappapiadminpy) | 33 / 13 / 1740 | ⚠ **FIRES** | ⚠ row was STALE at `32 / 12 / 1733`. honoured by construction (**BUG-260902-06**): two write seams swap invalidate for broadcast; the two WR-03 READ seams deliberately unchanged |
-| [`backend/app/api/settings.py`](docs/HOT-FILE-LEDGER.md#backendappapisettingspy) | 35 / 19 / 814 | ⚠ **FIRES** | ⚠ STALE AGAIN at `34 / 18 / 738`. honoured by construction (**241-03**): the same four seams; bounds SERVED not re-typed, and the 400 names the COST |
+| [`backend/app/api/settings.py`](docs/HOT-FILE-LEDGER.md#backendappapisettingspy) | 38 / 20 / 972 | ⚠ **FIRES** | ⚠ STALE for the THIRD close running at `35 / 19 / 814`. honoured by construction (**242**): one refusal helper behind an allow-list, four call sites, every typed sentence preserved |
 | [`backend/app/services/multimodal_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmultimodal_servicepy) | 14 / 7 / 984 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** — row added SEED-227, which is also where its silent truncation was found |
 | [`backend/app/api/documents.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentspy) | 87 / 34 / 2414 | ⚠ **FIRES** | ✅ **DISCHARGED AGAIN (240-03)** — the email-attachment loop extracted to `services/email_attachments.py`. 240-04 adds the conversation read |
 | [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 171 / 41 / 4850 | ⚠ **FIRES** | ⚠ row was STALE at `167 / 38 / 4786`. honoured by construction (**240**): three suites into BOTH knobs; verdict `7914 · 7149 · 247/247` |
@@ -9855,7 +9902,8 @@ cells rot within days.
 | [`backend/app/services/connectors/grants.py`](docs/HOT-FILE-LEDGER.md#backendappservicesconnectorsgrantspy) | 1 / 1 / 92 | no (1 phase) | ⚠ absent — row added 221. It is THE grant-time gate: 92 L deciding every connector call |
 | [`frontend/src/components/settings/connectionsCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectionscopyts) | 15 / 8 / 784 | ⚠ **FIRES** | no seam proposed — a vocabulary doing one thing many times is the right shape. ⚠ row was STALE at `13 / 7 / 737`. honoured by construction (**239-03**): one word, one union member. See §239-03 |
 | [`frontend/src/components/settings/connectionFormCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectionformcopyts) | 19 / 8 / 1631 | ⚠ **FIRES** | ⚠ row STALE TWICE (`15 / 8 / 1216`, `17 / 8 / 1293`). ⛔ 239-05 named the seam — `configFromDraft`'s ARM SET; 239-07 RODE it: one serializer both arms call. See §239-07 |
-| [`frontend/src/pages/SettingsPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagessettingspagetsx) | 44 / 23 / 1738 | ⚠ **FIRES** | ⚠ STALE AGAIN at `43 / 22 / 1647`. honoured by construction (**241-03**) — two FieldRows on a SHIPPED card; the tab-registration seam stays OWED |
+| [`frontend/src/pages/SettingsPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagessettingspagetsx) | 47 / 24 / 1773 | ⚠ **FIRES** | ⚠ STALE for the THIRD close running at `44 / 23 / 1738`. ⭐ SHRANK — 242 moved the payload helpers out; the tab-registration seam stays OWED |
+| [`frontend/src/pages/settingsSearchPayload.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcpagessettingssearchpayloadts) | 1 / 1 / 116 | no | Created by 242. Row added AT CREATION rather than at the third phase — an absent row makes G-5 absent forever, silently, at any count |
 | [`frontend/src/components/settings/SourceFileCeilingCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingssourcefileceilingcardtsx) | 1 / 1 / 117 | no (1 phase) | young (239-10) — ⚠ a row minted at creation reads `1 / 1` forever unless RE-DERIVED. Owns no number and no sentence |
 | [`frontend/src/components/settings/sourceCeilingCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingssourceceilingcopyts) | 1 / 1 / 109 | no (1 phase) | young (239-10) — the ONE number it owns (recommendation) is pinned to `user_settings.py` by a `?raw` test; the bounds are SERVED |
 | [`frontend/src/components/settings/ModelPillRow.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsmodelpillrowtsx) | 4 / 3 / 141 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent for its entire life — row added 2026-08-27 at 212's close, same D-22 pair as `SettingsPage.tsx` |
