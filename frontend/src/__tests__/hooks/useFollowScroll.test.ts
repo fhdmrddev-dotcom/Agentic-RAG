@@ -251,3 +251,138 @@ describe("Phase 095 Plan 04 — useFollowScroll (D-03)", () => {
     expect(result.current.isPinned).toBe(true)
   })
 })
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Phase 243 Plan 03 Task 1 (D-243-05) — THE RED DRIVE, at HEAD, against the code
+// that actually exists rather than against a bug report.
+// ══════════════════════════════════════════════════════════════════════════════
+//
+// ⚠ `BUG-260823-01` names a root cause — a programmatic-scroll flag cleared on the
+// NEXT ANIMATION FRAME — and that code NO LONGER EXISTS. It was replaced on
+// 2026-09-04 by `64357e979` (BUG-260904-02), twelve days after the report was filed,
+// while the report stayed `status: open`. So none of the cases below test the report;
+// they test HEAD.
+//
+// The candidate residual D-243-05 names, restated so it is CHECKED and not assumed:
+// while pinned, `MessageList`'s effect refreshes `hardProgrammaticUntilRef` to
+// `now + PROGRAMMATIC_SCROLL_SETTLE_MS` (900) on EVERY token. A gesture at `t` opens
+// `USER_GESTURE_WINDOW_MS` (1500). Between `t + 900` and `t + 1500` there is a
+// ~600 ms window in which BOTH re-arm conditions are satisfied, so ANY scroll event
+// whose geometry is within `FOLLOW_SCROLL_THRESHOLD` (120px) of the bottom re-arms
+// the pin — including one the reader did not cause.
+//
+// ⭐ THE PAIR IS THE POINT. Case A must not re-arm; case B MUST. A fix that passes A
+// by refusing every late re-arm breaks B, which `:191-227`'s own ⭐ comment records as
+// the whole design ("a flick that coasts to the bottom still re-arms").
+
+describe("Phase 243 Plan 03 (D-243-05) — the ~600 ms re-arm window, driven at HEAD", () => {
+  let clock = 0
+  beforeEach(() => {
+    clock = 1_000_000
+    vi.spyOn(Date, "now").mockImplementation(() => clock)
+  })
+  afterEach(() => {
+    vi.mocked(Date.now).mockRestore()
+  })
+
+  /** A viewport whose geometry the case moves, the way a real one moves. */
+  function movableViewport() {
+    return makeViewport({ scrollHeight: 1000, clientHeight: 500, scrollTop: 500 })
+  }
+  function setGeom(vp: HTMLElement, scrollTop: number) {
+    ;(vp as unknown as { scrollTop: number }).scrollTop = scrollTop
+  }
+
+  it("⭐ A — an UPWARD gesture, then a near-bottom scroll 1000 ms later: the pin must NOT re-arm", () => {
+    const vp = movableViewport()
+    const { result } = renderHook(() => useFollowScroll(() => vp, true))
+
+    // Token cadence while pinned: the effect claims each scroll it starts. The LAST
+    // claim is the one that matters — it expires at t + 900.
+    act(() => {
+      result.current.beginProgrammaticScroll()
+      clock += 40
+      result.current.beginProgrammaticScroll()
+      clock += 40
+      result.current.beginProgrammaticScroll()
+    })
+
+    // The reader wheels UP. A small nudge — 60px — so they are still inside the 120px
+    // near-bottom threshold. This is the shape that matters: a big scroll lands in the
+    // RELEASE branch on every later event and can never re-arm, so it cannot show the bug.
+    const t = clock
+    setGeom(vp, 440) // dist = 1000 - 440 - 500 = 60  (< 120, "near bottom")
+    act(() => {
+      result.current.noteUserGesture("up")
+      result.current.onScroll()
+    })
+    expect(result.current.isPinned).toBe(false)
+
+    // 1000 ms later: past the 900 ms hard clock, still inside the 1500 ms gesture window.
+    // A scroll event arrives that the reader did not produce (scroll anchoring as the
+    // streaming content above them grows, a focus move, a late layout shift).
+    clock = t + 1000
+    act(() => {
+      result.current.onScroll()
+    })
+
+    // The reader stays where they put themselves.
+    expect(result.current.isPinned).toBe(false)
+    expect(result.current.showJumpToLive).toBe(true)
+  })
+
+  it("⭐ B — THE MIRROR: a downward flick that COASTS to the bottom inside the gesture window MUST still re-arm", () => {
+    const vp = movableViewport()
+    const { result } = renderHook(() => useFollowScroll(() => vp, true))
+
+    // The reader scrolls well up and the pin releases.
+    setGeom(vp, 100) // dist 400
+    act(() => {
+      result.current.noteUserGesture("up")
+      result.current.onScroll()
+    })
+    expect(result.current.isPinned).toBe(false)
+
+    // Much later — outside every window — they flick back DOWN toward the live edge.
+    clock += 5_000
+    const t = clock
+    act(() => {
+      result.current.noteUserGesture("down")
+    })
+
+    // The flick coasts: the scroll events it produces land at the bottom 400 ms later,
+    // inside the 1500 ms gesture window and past any programmatic claim.
+    clock = t + 400
+    setGeom(vp, 500) // dist 0
+    act(() => {
+      result.current.onScroll()
+    })
+
+    expect(result.current.isPinned).toBe(true)
+    expect(result.current.showJumpToLive).toBe(false)
+  })
+
+  it("⭐ C — the tail of our OWN scroll still cannot re-arm inside the hard window (BUG-260904-02's fence, re-driven at HEAD)", () => {
+    const vp = movableViewport()
+    const { result } = renderHook(() => useFollowScroll(() => vp, true))
+
+    const t = clock
+    setGeom(vp, 100)
+    act(() => {
+      result.current.beginProgrammaticScroll()
+      result.current.noteUserGesture("up")
+      result.current.onScroll()
+    })
+    expect(result.current.isPinned).toBe(false)
+
+    // 300 ms later the tail of that same animation lands at the bottom — inside the
+    // 900 ms hard clock, so it is refused.
+    clock = t + 300
+    setGeom(vp, 500)
+    act(() => {
+      result.current.onScroll()
+      result.current.onScroll()
+    })
+    expect(result.current.isPinned).toBe(false)
+  })
+})
