@@ -367,6 +367,48 @@ def _validate_confidence_buckets(high: float | None, medium: float | None) -> No
         )
 
 
+async def _range_refusal_detail(
+    *,
+    field: str,
+    label: str,
+    submitted,
+    lo,
+    hi,
+    typed_detail: str,
+) -> str:
+    """Phase 242 (D-242-03) — when the value being refused is the one ALREADY STORED, say so.
+
+    ⛔ WHY THIS EXISTS. Every bound below refuses with a sentence that is truthful about the RULE
+    and silent about the CAUSE. The operator's install held `multimodal_max_vision_calls = 1001` —
+    a value they never typed — and the Search tab sent all 24 of its fields on every save, so that
+    sentence appeared while they were editing a retrieval threshold, naming a field on a card they
+    had not opened. It reads as a rejection of what they just typed. It was not.
+
+    ⚠ D-242-02 (changed-fields-only) makes the untouched-field path unreachable FROM THE UI — it
+    does not make it unreachable. The operator can edit the offending field itself, and any other
+    client can send the stored value back. So the sentence is still owed.
+
+    ⛔ THIS MUST NEVER TURN A 400 INTO A 500. The nicer sentence needs a settings read and a
+    settings read can fail (pool blip, connection reset, a settings object predating the column).
+    Every failure falls back to `typed_detail`, which is the sentence that ships today and carries
+    what the bound BUYS. A nicer error message that can crash is worse than a blunt one.
+
+    ⭐ ONE HELPER, FOUR SITES. SC#3's "the general fix, not the specific one" applies to the
+    sentence as much as to the CHECK constraint.
+    """
+    try:
+        stored = getattr(await load_app_settings_async(), field, None)
+    except Exception:  # noqa: BLE001 — any read failure falls back; see the docstring
+        stored = None
+    if stored is not None and stored == submitted:
+        return (
+            f"'{label}' was already set to {stored}, which is outside the allowed range of "
+            f"{lo}–{hi}. That is what is blocking this save — nothing you just changed "
+            f"is at fault. Set it to a value between {lo} and {hi} to save this tab."
+        )
+    return typed_detail
+
+
 # ── Routes ────────────────────────────────────────────────────────────────────
 
 # Phase 148 (VIS-01) — the model-registry / Settings surface is an Operators-only governed
@@ -467,9 +509,16 @@ async def update_settings(
         if not 1 <= body.multimodal_max_vision_calls <= 1000:
             raise HTTPException(
                 status_code=400,
-                detail=(
-                    "Images read per document must be between 1 and 1000. "
-                    "0 would silently stop every image from being read."
+                detail=await _range_refusal_detail(
+                    field="multimodal_max_vision_calls",
+                    label="Images read per document",
+                    submitted=body.multimodal_max_vision_calls,
+                    lo=1,
+                    hi=1000,
+                    typed_detail=(
+                        "Images read per document must be between 1 and 1000. "
+                        "0 would silently stop every image from being read."
+                    ),
                 ),
             )
         updates["multimodal_max_vision_calls"] = body.multimodal_max_vision_calls
@@ -492,9 +541,16 @@ async def update_settings(
         if not 1 <= body.vision_max_pages <= 500:
             raise HTTPException(
                 status_code=400,
-                detail=(
-                    "Pages read per document must be between 1 and 500. "
-                    "0 would silently stop every scanned page from being read."
+                detail=await _range_refusal_detail(
+                    field="vision_max_pages",
+                    label="Pages read per document",
+                    submitted=body.vision_max_pages,
+                    lo=1,
+                    hi=500,
+                    typed_detail=(
+                        "Pages read per document must be between 1 and 500. "
+                        "0 would silently stop every scanned page from being read."
+                    ),
                 ),
             )
         updates["vision_max_pages"] = body.vision_max_pages
@@ -519,15 +575,22 @@ async def update_settings(
         ):
             raise HTTPException(
                 status_code=400,
-                detail=(
-                    f"The largest file a connected source may import must be between "
-                    f"{SOURCE_MAX_FILE_SIZE_MB_FLOOR} and {SOURCE_MAX_FILE_SIZE_MB_CEILING} MB. "
-                    f"0 would stop every source importing while each sync still reported "
-                    f"success. Raising it costs memory: the whole response is held in memory "
-                    f"per in-flight request from a server we do not control, and file content "
-                    f"arrives base64-encoded at 4/3 its size. "
-                    f"{SOURCE_MAX_FILE_SIZE_MB_CEILING} MB is the app's own upload limit, so a "
-                    f"connected source can never admit a file you could not upload by hand."
+                detail=await _range_refusal_detail(
+                    field="source_max_file_size_mb",
+                    label="Largest file a connected source may import",
+                    submitted=body.source_max_file_size_mb,
+                    lo=SOURCE_MAX_FILE_SIZE_MB_FLOOR,
+                    hi=SOURCE_MAX_FILE_SIZE_MB_CEILING,
+                    typed_detail=(
+                        f"The largest file a connected source may import must be between "
+                        f"{SOURCE_MAX_FILE_SIZE_MB_FLOOR} and {SOURCE_MAX_FILE_SIZE_MB_CEILING} MB. "
+                        f"0 would stop every source importing while each sync still reported "
+                        f"success. Raising it costs memory: the whole response is held in memory "
+                        f"per in-flight request from a server we do not control, and file content "
+                        f"arrives base64-encoded at 4/3 its size. "
+                        f"{SOURCE_MAX_FILE_SIZE_MB_CEILING} MB is the app's own upload limit, so a "
+                        f"connected source can never admit a file you could not upload by hand."
+                    ),
                 ),
             )
         updates["source_max_file_size_mb"] = body.source_max_file_size_mb
@@ -567,12 +630,21 @@ async def update_settings(
     #   model, retrieval threshold, rrf_k), not just these two knobs. Cloud has not had 176
     #   applied, so without this gate the next deploy ships a 500.
     #
-    #   The frontend sends both keys UNCONDITIONALLY (SettingsPage.tsx), so "the operator did
+    #   ~~The frontend sends both keys UNCONDITIONALLY (SettingsPage.tsx), so "the operator did
     #   not touch them" is indistinguishable here from "the operator set them" unless we
-    #   compare against what is stored. Hence: silently drop an UNCHANGED value (nothing was
+    #   compare against what is stored.~~ Hence: silently drop an UNCHANGED value (nothing was
     #   asked for), and REFUSE a CHANGED one with a worded 409 naming the migration -- never
     #   accept a change and discard it, which is Phase 240's "screen that discards its own
     #   answer".
+    #
+    #   ⚠ CORRECTED 2026-09-11 (Phase 242, D-242-02) — the struck sentence above is kept rather
+    #   than deleted, because the SHAPE it justifies is unchanged and only its premise moved.
+    #   `SettingsPage.tsx` now sends CHANGED FIELDS ONLY, so an untouched knob no longer arrives
+    #   here at all and the stored-comparison below is BELT-AND-BRACES rather than load-bearing
+    #   for the UI path. ⛔ IT IS STILL LOAD-BEARING FOR EVERY OTHER CLIENT: this endpoint is not
+    #   the Settings page, and a caller that does send both keys unchanged must still be dropped
+    #   silently rather than refused. Do not delete the comparison on the strength of what one
+    #   frontend now does.
     if not await app_settings_has_hnsw_columns():
         _stored = await load_app_settings_async()
         _asked = [
@@ -602,7 +674,13 @@ async def update_settings(
         if not HNSW_EF_SEARCH_FLOOR <= body.hnsw_ef_search <= HNSW_EF_SEARCH_CEILING:
             raise HTTPException(
                 status_code=400,
-                detail=(
+                detail=await _range_refusal_detail(
+                    field="hnsw_ef_search",
+                    label="Search breadth",
+                    submitted=body.hnsw_ef_search,
+                    lo=HNSW_EF_SEARCH_FLOOR,
+                    hi=HNSW_EF_SEARCH_CEILING,
+                    typed_detail=(
                     f"Search breadth must be between {HNSW_EF_SEARCH_FLOOR} and "
                     f"{HNSW_EF_SEARCH_CEILING}. It is how many candidate vectors the index "
                     f"walks before your filters are applied, so raising it costs time and "
@@ -613,6 +691,7 @@ async def update_settings(
                     f"database's own maximum; below {HNSW_EF_SEARCH_FLOOR} the scan walks so "
                     f"little that filtered searches would come back near-empty while still "
                     f"reporting success."
+                    ),
                 ),
             )
         updates["hnsw_ef_search"] = body.hnsw_ef_search

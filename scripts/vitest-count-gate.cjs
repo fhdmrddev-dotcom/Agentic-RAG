@@ -1492,7 +1492,18 @@ const BASELINE = {
   // 241-03: 13 -> 23. The +10 are the two HNSW knobs on the shipped Retrieval card (QUEUE-06 /
   // D-09), all asserting rendered CONTENT rather than presence — the served bounds reaching the
   // input's min/max, the three pgvector modes by VALUE, and both keys on the save payload.
-  "SettingsPage.test.tsx": 23,
+  // 242-02: 23 -> 24. Phase 241's "Save Search Settings carries both keys" case became TWO, because
+  // D-242-02 changed the contract it pinned: the tab now sends CHANGED FIELDS ONLY, so an untouched
+  // `hnsw_ef_search` is no longer on the payload. The original assertion was NOT deleted — deleting
+  // it would erase 241 D-09's guarantee silently while looking like a tidy-up. It became (a) an
+  // edited knob rides AND its untouched sibling is absent, and (b) both ride when both are edited.
+  "SettingsPage.test.tsx": 24,
+  // ── ADOPTED 2026-09-11 (Phase 242) — the three SettingsPage suites that were in NEITHER knob. ──
+  // Numbers read from the gate's own `— N new` column, never hand-counted. The full reason and the
+  // red-suite repair are in the TARGETS block for these files.
+  "SettingsPage.a11y.test.tsx": 4,
+  "SettingsPage.sourceCeiling.test.tsx": 9,
+  "SettingsPage.changedFields.test.tsx": 17,
   // ── 188-12: the fifteen files that RAN inside TARGETS with NO pin at all. ──
   // Inherited from Phases 183-187, none authored by this phase. They are pinned here because
   // the reason to leave a suite unpinned ("it postdates the pin, its count is free to grow")
@@ -3976,6 +3987,27 @@ const TARGETS = [
   // which had been red for hours unseen.
   // ⚠ No bareName collision: the sibling is `SettingsPage.a11y.test.tsx`, a distinct key.
   "src/pages/SettingsPage.test.tsx",
+  // ── ADOPTED 2026-09-11 (Phase 242) — THREE MORE SettingsPage SUITES. ──────────────────────
+  // ⚠ THE FINDING THAT FORCED IT: `grep -n "SettingsPage" scripts/vitest-count-gate.cjs`
+  // returned exactly TWO hits before this commit — the BASELINE key and the TARGETS path
+  // directly above — while `src/pages/__tests__/` held two more SettingsPage suites that had
+  // NEVER RUN UNDER THE GATE. `src/pages` is not a directory entry here, so a file-level list
+  // is the only thing that reaches them, and nobody had added them.
+  // ⛔ AND ONE OF THEM WAS RED. `SettingsPage.a11y.test.tsx` failed all four of its cases —
+  // proven inherited at the phase's base commit, with Phase 242's own `SettingsPage.tsx`
+  // stashed away. The cause was in the SUITE, not the page: its `renderSettings` lacked
+  // `EffectiveFeaturesProvider`, and SettingsPage renders the AI Model / Search / Integrations
+  // tabs only when `model_management` resolves true, so every case audited a page whose tab
+  // never mounted. Repaired in the same commit, because pinning a red suite turns the shared
+  // gate red and pinning it with an allowance makes a gate that cannot fail (the Phase 235
+  // decision on `sourceComposition.test.tsx`, applied in the other direction).
+  // ⭐ Adoption RAISES the total. That is the desirable direction and is not drift.
+  "src/pages/__tests__/SettingsPage.a11y.test.tsx",
+  "src/pages/__tests__/SettingsPage.sourceCeiling.test.tsx",
+  // Phase 242's own suite — the changed-fields-only payload fence (D-242-02). Registered in
+  // BOTH knobs in the SAME commit: a BASELINE key naming a file that does not exist makes the
+  // gate exit 2 and halts every agent.
+  "src/pages/__tests__/SettingsPage.changedFields.test.tsx",
   // Added in 188-10 — and this one is an ADOPTION, not a new file, which is the case the
   // panel-directory comment above explicitly reserved: "a later phase that wants
   // WorkspacePanel inside the gate should adopt it deliberately, with its own measured

@@ -674,7 +674,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/main.py` | 82 / 59 / 950 | ⚠ row was STALE by **FOURTEEN PHASES**. honoured by construction (**BUG-260902-06**) |
 | `backend/app/config.py` | 83 / 48 / 1506 | ⚠ STALE AGAIN at `82/47/1489` — the ELEVENTH. honoured by construction (**241**): 4 hnsw defaults, no reader changed. `MODEL_CAPABILITIES` seam still OWED |
 | `backend/app/api/admin.py` | 33 / 13 / 1740 | ⚠ row was STALE. honoured by construction (**BUG-260902-06**): 2 write seams broadcast; the 2 WR-03 READ seams deliberately do not |
-| `backend/app/api/settings.py` | 35 / 19 / 814 | ⚠ STALE AGAIN at `34/18/738`. honoured by construction (**241-03**): bounds SERVED not re-typed; the 400 names the COST |
+| `backend/app/api/settings.py` | 37 / 20 / 933 | ⚠ STALE for the THIRD close running at `35/19/814`. honoured by construction (**242-02**): one shared refusal helper, four call sites, every typed sentence preserved |
 | `backend/app/services/multimodal_service.py` | 14 / 7 / 984 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
 | `backend/app/api/documents.py` | 85 / 33 / 2437 | ✅ **DISCHARGED (229)** |
 | `scripts/vitest-count-gate.cjs` | 167 / 38 / 4786 | ⚠ row was STALE at `159 / 36 / 4687`. honoured by construction (**235* |
@@ -699,7 +699,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/lib/api/org.ts` | 11 / 8 / 629 | ⚠ absent for its ENTIRE LIFE at 4 phases; row then STALE at `6 / 4 / 562`. ⚠ **THIRD wire-type drift in this ONE file** (239: `auth_type: "mcp"`) |
 | `frontend/src/components/settings/connectionsCopy.ts` | 15 / 8 / 784 | no seam proposed. honoured by construction (**239**): one word, one union member, one arm — and the arm cannot reach a capability row |
 | `frontend/src/components/settings/connectionFormCopy.ts` | 19 / 8 / 1631 | ⛔ 239-05 named the seam: `configFromDraft`'s arm set. 239-07 RODE it — one serializer both arms call |
-| `frontend/src/pages/SettingsPage.tsx` | 44 / 23 / 1738 | ⚠ STALE AGAIN at `43/22/1647`. honoured by construction (**241-03**): two FieldRows on a SHIPPED card. tab seam still OWED |
+| `frontend/src/pages/SettingsPage.tsx` | 46 / 24 / 1858 | ⚠ STALE for the THIRD close running at `44/23/1738`. honoured by construction (**242-02**): a payload DIFF, no new surface. tab seam still OWED |
 | `frontend/src/components/settings/ModelPillRow.tsx` | 4 / 3 / 141 | ⚠ absent for its entire life |
 | `frontend/src/components/workflows/phaseVocabulary.ts` | 16 / 6 / 990 | honoured by construction (206.2) |
 | `frontend/src/components/workflows/ConnectionPicker.tsx` | 7 / 5 / 888 | honoured by construction (206.2 / **214**) |

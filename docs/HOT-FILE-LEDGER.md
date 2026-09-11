@@ -2496,6 +2496,53 @@ carries the verdict — **⚠ absent at 12 phases (added 196)** — and this is 
 
 ### `backend/app/api/settings.py`
 
+**⚠ RE-DERIVED 2026-09-11 (plan `242-02`): `37 commits / 20 phases / 933 L`** — the row read
+`35 / 19 / 814`, **stale for the third consecutive close**. Six-digit dated-quick-task buckets:
+checked, none exist.
+
+**What Phase 242 did:** added ONE module-level helper, `_range_refusal_detail`, and routed all four
+numeric bound sites' `detail=` through it. When the value being refused is the one ALREADY STORED,
+the sentence says so — *"'Images read per document' was already set to 1001 … nothing you just
+changed is at fault"* — and otherwise it returns today's sentence **byte for byte**.
+
+**Why G-5 is honoured by construction:** no new endpoint, no new query on the success path, no new
+import (`load_app_settings_async` was already imported and already called later in the same
+handler). The helper is the only new symbol; the four call sites are an expression substitution.
+
+**⚠ WHAT BINDS THIS FILE, added by 242:**
+
+1. ⛔ **THE REFUSAL PATH MAY NEVER BECOME A 500.** `_range_refusal_detail` reads settings, and a
+   settings read can fail — a pool blip, a connection reset, a settings object predating the
+   column. Every failure falls back to the typed sentence. Driven, not asserted:
+   `test_242_stored_value_refusal.py` monkeypatches `load_app_settings_async` to **raise**, and to
+   return an object with **no attributes at all**, and requires today's sentence in both. **A nicer
+   error message that can crash is worse than a blunt one.**
+2. ⭐ **THE TYPED SENTENCES ARE THE DELIVERABLE OF THREE EARLIER SEEDS AND NONE WAS REWORDED.**
+   SEED-226, SEED-227 and SEED-258 each explain what a bound BUYS — *"0 would silently stop every
+   image from being read"*, *"raising it costs memory … base64-inflated 4/3"*. The helper adds a
+   SECOND sentence for a DIFFERENT cause; it never replaces the first. A fence asserts all three
+   markers still appear in the module, so a future tidy-up reds rather than erases them.
+3. ⚠ **ONE COMMENT WAS CORRECTED BESIDE ITS ORIGINAL, NOT DELETED** — the CR-01 hnsw gate's
+   *"the frontend sends both keys UNCONDITIONALLY"*, which D-242-02 made false. The struck sentence
+   stays; the correction records that the stored-comparison is now belt-and-braces **for the UI
+   path only** and remains load-bearing for every other client. ⛔ **Do not delete the comparison on
+   the strength of what one frontend now does** — this endpoint is not the Settings page.
+4. ⚠ **A BOUND HERE IS NOW ALSO A SCHEMA OBLIGATION.**
+   `backend/tests/unit/test_242_settings_bounds_have_schema_constraints.py` parses this file with
+   `ast` and fails when a numeric bound has no matching CHECK in `supabase/migrations/`. Its
+   allow-list is **EMPTY**. Two detectors run — the narrow `if not lo <= body.x <= hi:` idiom and a
+   shape-independent one — so writing the next bound as `if body.x < LO or body.x > HI:` does not
+   escape it. ⛔ **`retrieval_top_k` and `rrf_k` (`:535-541`) have NO bound at all** — not in Python,
+   not in the schema. That is `SEED-271`, and this file is one of its two triggers.
+
+**The named seam, still OWED:** this handler is a 500-line linear wall of `if body.X is not None`
+assignments. The obvious extraction is a declarative field table (name → column, optional bound,
+optional label) that both the assignment loop and the bound loop walk. 242 did not take it — the
+plan was a sentence, not a refactor — and taking it would need the four comment blocks above to
+survive as data, which is the design work it owes.
+
+---
+
 **Re-derived 2026-08-18 (plan `196-09`): `30 commits / 16 phases / 616 L`** ⚠ **RE-DERIVED at Phase 241's close (2026-09-10): `35 / 19 / 814`.** Honoured by construction at 241: both hnsw knobs on GET + PATCH, with the floor / ceiling / the three enum members **SERVED** rather than re-typed in the form, and a 400 that names the COST and not merely the range (SEED-258). · six-digit dated quick-task
 buckets: **checked, none exist** · **G-5 FIRES** (16 phases vs threshold 3) — absent from this ledger until now.
 
@@ -6686,6 +6733,70 @@ Phases touched: 190, 206.1, 211.
 
 
 ## frontend/src/pages/SettingsPage.tsx
+
+**⚠ RE-DERIVED 2026-09-11 (plan `242-02`): `46 commits / 24 phases / 1858 L`** — the row read
+`44 / 23 / 1738`, **stale for the third consecutive close**.
+
+**What Phase 242 did (D-242-02):** the Search tab sends **CHANGED FIELDS ONLY**. Two exported
+module-level helpers — `searchPayloadFrom(data)` (the payload as `hydrate` leaves it) and
+`onlyChanged(next, baseline)` — one new `searchBaseline` state set inside `hydrate`, and one line in
+`handleSaveSearch`. The 24-key literal is unchanged; it is now called `full` and diffed.
+
+**Why G-5 is honoured by construction:** a payload SHAPE, not a new surface. No card, no field, no
+tab, no fetch. `hydrate` gains one call; the confirm-on-save gate is untouched and still reads `s`.
+
+**⚠ WHAT BINDS THIS FILE, added by 242:**
+
+1. ⛔⛔ **THE DANGEROUS DIRECTION IS A SILENT DROP, NOT A SPURIOUS SEND.** If `searchPayloadFrom`
+   drifts from `hydrate`, a REAL edit looks unchanged and is never sent — a save that reports
+   success and changes nothing, which is Phase 240's *"screen that discards its own answer"*.
+2. ⚠⚠ **ONE FIXTURE CANNOT DETECT THAT, AND THIS WAS PROVEN BY PLANTING IT.**
+   `__tests__/SettingsPage.changedFields.test.tsx` §1 runs against **two** fixtures: all-nullable
+   NULL, and every nullable column holding a distinctive NON-DEFAULT value. Writing
+   `hnsw_ef_search: 40` as a CONSTANT (matching the `useState(40)`) instead of
+   `data.hnsw_ef_search ?? 40` is **green against the all-NULL fixture** — measured, as a planted
+   defect — and in production, where the column holds 200, an operator dragging it back to 40 has
+   their edit discarded. The non-default fixture and §2b are what caught it. **Never reduce §1 to
+   one fixture.**
+3. ⚠ **`onlyChanged` iterates `Object.keys(next)`, and the direction is load-bearing.** Iterating
+   the baseline would silently drop forever any key added to the payload but forgotten in
+   `searchPayloadFrom`. This way the failure is a harmless extra field on the wire.
+4. ⚠ **`Object.is`, and the obvious reason for it is WRONG.** It does NOT rescue a `NaN` from an
+   emptied number input — the baseline is always a real number and `Object.is(NaN, 100)` is false,
+   so a transient `NaN` is sent either way. The only difference from `===` is `+0` / `-0`, where
+   `Object.is` SENDS. Sending is the safe direction. (An earlier draft of the plan shipped the
+   wrong rationale in a source comment; it is corrected in the file.)
+5. ⚠ **A REAL BEHAVIOUR CHANGE AT THE DATABASE, named rather than discovered later:** pressing Save
+   used to MATERIALISE hydrate's fallbacks into columns (`extraction_model` preset-derived,
+   `vision_model` `""`, `hnsw_ef_search` 40, `hnsw_iterative_scan` `"off"`, `vision_max_pages` 50).
+   A NULL column now STAYS NULL. Resolution is equivalent — `_val()` falls back to the `config.py`
+   default — and it is arguably the better behaviour, but it is a change.
+6. ⭐ **PHASE 241 D-09's GUARANTEE SURVIVES AND WAS NOT DELETED.** `SettingsPage.test.tsx`'s
+   *"carries both keys on the payload the tab already sends"* case pinned `hnsw_ef_search: 40` on a
+   save that edited only its sibling — which this change makes false. It became TWO cases (an
+   edited knob rides and its untouched sibling is absent; both ride when both are edited) with the
+   original quoted in a comment. **Deleting it would have erased 241's guarantee while looking like
+   a tidy-up.**
+7. ⚠ **`FieldRow` (`:98-105`) associates NO form control with its label** — no `htmlFor`, no
+   `aria-labelledby` — so `getByLabelText("RRF-K constant")` finds the label and then throws. Only
+   *Search breadth* and *Keep scanning* carry an explicit aria-label. 242's suite works around it
+   with a `fieldInput(label)` helper and records it here rather than silently; **it is a real
+   accessibility gap on this tab and nothing in the repo currently fails because of it.**
+
+**Gate coverage, and the finding that came with it:** before 242, `grep -n "SettingsPage"
+scripts/vitest-count-gate.cjs` returned **two** hits, while `src/pages/__tests__/` held two more
+SettingsPage suites that had **never run under the gate** (`src/pages` is not a directory entry).
+⛔ **One of them, `SettingsPage.a11y.test.tsx`, was RED — all four cases — and had been invisible.**
+Cause was in the SUITE: its `renderSettings` lacked `EffectiveFeaturesProvider`, so the
+`model_management`-gated tabs never mounted and every case audited an absence. Repaired and all
+three adopted in the same commit.
+
+**The named seam, still OWED:** the tab split. This file is 1858 lines hosting five tabs; each tab's
+state, hydrate slice, payload builder and save handler could live beside its own panel. 242 made the
+Search tab's payload a named function, which is the first brick — `searchPayloadFrom` is exactly the
+shape the other four would take.
+
+---
 
 **Added 2026-08-27, at Phase 212's close, by the reviewer's driven check.** Measured **34 commits /
 21 phases / 1426 lines** — it FIRES G-5 and had **no row for the project's entire life**, so the

@@ -47,12 +47,35 @@ vi.mock("@/components/settings/ReembedStatusCard", () => ({ ReembedStatusCard: (
 
 import { SettingsPage } from "../SettingsPage"
 import { TechnicalNamesProvider } from "@/providers/TechnicalNamesProvider"
+import { EffectiveFeaturesProvider } from "@/providers/EffectiveFeaturesProvider"
 
+/**
+ * ⚠⚠ REPAIRED 2026-09-11 (Phase 242). THIS SUITE WAS RED — all four cases — AND NOBODY COULD SEE
+ * IT, because it sits in NEITHER knob of `scripts/vitest-count-gate.cjs` and `src/pages` is not a
+ * directory entry there. It has therefore never run under the gate. Phase 242 adopts it, which
+ * meant first finding out why it was failing.
+ *
+ * ⛔ THE CAUSE WAS THIS FUNCTION, NOT THE PAGE. `EffectiveFeaturesProvider` was missing, and
+ * `SettingsPage` renders the AI Model / Search / Integrations tabs ONLY when the effective-features
+ * map resolves `model_management` true — a NULL context is fail-closed by the contract `App.tsx`
+ * states at its provider mount. So every case rendered a page with no AI Model tab, and all four
+ * failed on `Unable to find role="button" and name /technical names/i` — an ABSENCE, never a
+ * defect in the control they were written to audit.
+ *
+ * `SettingsPage.test.tsx`'s own render helper already carried this provider and says so in a
+ * comment: *"THE PROVIDER IS NOT DECORATION — IT IS THE PRECONDITION FOR THE TAB UNDER TEST."*
+ * The sibling suite simply never got it.
+ *
+ * ⚠ Proven inherited before it was touched: the four failures reproduce identically with Phase
+ * 242's `SettingsPage.tsx` stashed away, at the phase's base commit.
+ */
 function renderSettings() {
   return render(
-    <TechnicalNamesProvider>
-      <SettingsPage />
-    </TechnicalNamesProvider>,
+    <EffectiveFeaturesProvider value={{ features: { model_management: true }, loading: false, refetch: () => {} }}>
+      <TechnicalNamesProvider>
+        <SettingsPage />
+      </TechnicalNamesProvider>
+    </EffectiveFeaturesProvider>,
   )
 }
 
