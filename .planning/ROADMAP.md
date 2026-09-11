@@ -223,7 +223,21 @@ Plans:
   4. A person attaches a **local file** to a chat message and the agent can use it; and a cloud import **asks which Library folder it goes to** instead of writing permanently to the root (SHELL-04, `BUG-260905-01`, folding `SEED-042`'s "not in the KB" half).
   5. A watched source that has stopped reading raises a signal the operator **sees in the app shell while doing something else** — not only if they happen to open the Health tab (SHELL-05, `SURF-03`).
 
-**Plans**: TBD
+**Plans**: 6 plans in 4 waves
+
+Plans:
+- [ ] 244-01-PLAN.md — the scroll frame's `min-h-0` chain + the three chat-list bugs (SHELL-01)
+- [ ] 244-02-PLAN.md — the agent can USE an attachment: `.pdf` accepted, sandbox reach, the system-prompt line (SHELL-04)
+- [ ] 244-03-PLAN.md — the paused run: the cap-paused composer (both layers) + the approval in the thread (SHELL-02, SHELL-03)
+- [ ] 244-04-PLAN.md — the shell says THAT, the tab says WHERE: the attention tab attribution (SHELL-05)
+- [ ] 244-05-PLAN.md — the composer's attach affordance: the chip, the `+` menu, the sent-message scope word (SHELL-04)
+- [ ] 244-06-PLAN.md — the two doors un-inverted: cloud→thread, Library import asks its folder (SHELL-04)
+
+⚠ **SIX plans, not the FOUR `D-244-17` locked** — the deviation is recorded in every plan. `SHELL-04` alone is cut into three, on **context cost** and never on difficulty: **C-2** makes `SHELL-02` a two-layer change against a backend baseline at its zero-headroom ceiling, and **C-9** (measured at planning) shows criterion 4's *"and the agent can use it"* is unsatisfied for **8 of the 15 accepted extensions**, because `workspace_read` returns a note for every binary and the sandbox had no reach at all. G-8's never-cut list — verifier, TDD RED drives, `security_enforcement` / `code_review`, migration discipline — is intact.
+
+**Waves**: 1 = {244-01, 244-02} · 2 = {244-03, 244-04} · 3 = {244-05} · 4 = {244-06}. Same-wave plans have zero `files_modified` overlap on source files; the three append-only registries (`scripts/vitest-count-gate.cjs`, `docs/HOT-FILE-LEDGER.md`, `CLAUDE.md`) are resolved BOTH-sides on conflict and create no wave dependency.
+
+**Validation**: `244-VALIDATION.md` — the 8-row cross-provider board (D-244-02, derived from `MODEL_CAPABILITIES`), the 4-axis bandwidth rows, and seven G-4 lived-experience rows (L-1..L-7). ⛔ **No success criterion closes on a unit test.**
 
 **UI hint**: yes.
 **Migrations**: none expected.
