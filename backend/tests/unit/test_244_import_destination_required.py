@@ -27,7 +27,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
 from app.api import connectors
@@ -155,6 +155,39 @@ def test_a_disabled_connection_is_named_not_reported_as_a_provider_error(
     )
     assert res.status_code in (403, 409, 422), res.text
     assert "provider returned an error" not in res.text.lower()
+    assert "download cloud file" not in res.text.lower()
+
+
+# ── 5b · WR-06 (244-07) — a DELIBERATE refusal is not relabelled as the provider's fault ──
+#
+# ⛔ Case 5 fenced ONE exception type by ordering. This fences the CLASS. Starlette's
+# `HTTPException` IS an `Exception`, and this route had `except SourceConnectionDisabled` and then
+# a bare `except Exception` with NOTHING in between — so every refusal raised deeper arrived as
+# `502 "Failed to download cloud file: 403: Cannot upload to a folder you do not own"`, which
+# `LibraryCloudImport` renders verbatim while no file was ever downloaded and the fault is not the
+# provider's. ⚠ Before this phase the route never PASSED `folder_id`, so
+# `async_mint_document_row`'s ownership branch was unreachable; `244-06` passing it made these
+# raises live. The sibling route added in the same phase (`workspace.py`) gets it right.
+@pytest.mark.parametrize(
+    "code,detail",
+    [
+        (403, "Cannot upload to a folder you do not own"),
+        (404, "Folder not found"),
+        (409, "This file is already in the Library"),
+    ],
+)
+def test_a_deliberate_refusal_keeps_its_own_status_and_sentence(
+    monkeypatch, router_client, wired, code, detail
+):
+    monkeypatch.setattr(
+        "app.services.sources.import_service.import_single_file",
+        AsyncMock(side_effect=HTTPException(status_code=code, detail=detail)),
+    )
+    res = router_client.post(IMPORT_PATH, headers=_headers(), json={"folder_id": FOLDER_ID})
+
+    assert res.status_code == code, res.text
+    assert res.json()["detail"] == detail
+    # ⛔ the mask itself, named: OUR refusal must never wear the provider's error sentence.
     assert "download cloud file" not in res.text.lower()
 
 
