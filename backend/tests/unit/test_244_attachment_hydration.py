@@ -196,7 +196,13 @@ async def test_hydration_runs_once_per_session():
     # ⛔ ZERO further copies on the second call — the sandbox session is cached per
     # thread_id until idle eviction, so re-copying is pure container I/O for nothing.
     assert second - first == 0
-    assert getattr(ctx, "_attachments_hydrated", False) is True
+    # ⚠ The flag's HOME moved at `244-07` (WR-02). It was `ctx._attachments_hydrated`, which is
+    # re-created every agent-loop iteration; it is now on the SESSION, which is what "once per
+    # session" was always claiming. Case 2b is the case that could see the difference.
+    assert session in tool_dispatcher._hydrated_sessions
+    assert getattr(ctx, "_attachments_hydrated", False) is False, (
+        "the flag is back on the per-iteration ToolContext — that is the WR-02 defect"
+    )
 
 
 # ── 2b. WR-02 (244-07) — once per SESSION means ACROSS AGENT-LOOP ITERATIONS ───
