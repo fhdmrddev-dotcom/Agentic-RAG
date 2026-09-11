@@ -149,6 +149,31 @@ check each against `git diff --numstat 96adfd668 HEAD`, and do NOT reach for the
 The cap held at 2 and produced this result on the first invocation; adjusting it is measured not
 to fix failures of this shape (CLAUDE.md correction 2026-08-17 §(b)).
 
+## ⚠⚠ THIS BASELINE WAS INCOMPLETE — added 2026-09-11 at 243-06, by measurement
+
+The failing set above names **two** inherited cases, both in
+`library/__tests__/sketchComposition.test.tsx`. **That was not the whole inherited red.**
+
+The phase’s mandatory code review checked out the base commit and measured **13 further red
+cases**, byte-identical at base, in three suites:
+
+- `src/__tests__/providers/streamsProvider.test.tsx`
+- `src/__tests__/providers/StreamsProvider.dedup.test.ts`
+- `src/__tests__/providers/streamsProvider_075_9_clientkey.test.tsx`
+
+⛔ **They never appeared in the verdict line because all three are in NEITHER gate knob** — the
+gate says so about `src/__tests__` itself. So a baseline derived from the gate’s output is
+structurally blind to them, which is exactly how this file came to claim a set it did not have.
+
+⚠ **And one of those red suites was cited by `243-03-PLAN.md:275` as a harness reference**, with
+nobody noticing it was red.
+
+⭐ **The lesson is not “add three files” — it is that a baseline taken from a gate inherits the
+gate’s blind spots.**  has exactly two bare-directory entries, so an unadopted suite is
+invisible to any measurement that reads the gate rather than the tree. ** registered
+ — in neither knob since Phase 176 —
+for the same reason.**
+
 ## The typecheck baseline
 
 ⚠ `npx tsc --noEmit` in `frontend/` checks **ZERO files** — `tsconfig.json` is solution-style.
