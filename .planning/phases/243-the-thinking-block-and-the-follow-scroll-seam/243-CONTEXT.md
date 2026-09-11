@@ -162,6 +162,51 @@ coasting scroll event within `120px` of the bottom re-arms the pin. Whether that
 the intended re-arm depends on the geometry a real wheel produces. **Drive it. Do not reason
 about it in a plan file and call that evidence.**
 
+⚠⚠ **CORRECTION 2026-09-11 (plan `243-03`, at its close) — "Phase 228" IS WRONG, AND THE ORIGINAL IS KEPT ABOVE RATHER THAN OVERWRITTEN.** Every paragraph in this decision attributes the repair to
+Phase 228. **Measured:**
+
+```
+64357e979  2026-09-04 11:46  fix(chat): stop the streaming run dragging a scrolled-away reader (BUG-260904-02)
+722467ff8  2026-09-04 19:11  docs: create milestone v4.0 Connected Knowledge roadmap (14 phases)
+c10a93790  2026-09-04 19:45  docs: Phase 228 pre-flight — execute with 9 gaps, 3 blocking
+```
+
+**The fix lands at 11:46 and the milestone Phase 228 belongs to is not created until 19:11** — it is
+an **untagged quick task**, raised during Phase 227's review, seven and a half hours before Phase 228
+existed. Established with `git log -S "hardProgrammaticUntilRef"`, not read off a report.
+
+⭐ **The decision's substance is UNCHANGED and its instruction was RIGHT** — the code the bug report
+blames really is gone, the RED drive really was owed, and it really did find something. **What was
+wrong is the label**, and the label is how a later reader would go looking. ⚠ It also explains the
+staleness the decision is about: an untagged fix **belongs to no phase's close**, so no phase's
+paperwork had an obligation to update `BUG-260823-01`. **A commit with no phase tag has no register
+that owes it an entry** — which is a sharper version of this project's standing finding than the one
+this decision was written to record.
+
+---
+
+### ⭐ THE DRIVE'S VERDICT — **outcome 3**, and the plan's hedge earned its place
+
+A residual **did** reproduce at HEAD, and it is **not** the defect `BUG-260823-01` names.
+
+- Hook case A: `AssertionError: expected true to be false`.
+- List §3, on a **54-message** thread: the Jump-to-live chip vanished after a scroll nobody produced.
+- Both mirror cases stayed green throughout, so the fix could not over-correct.
+
+**The real mechanism, which no register held:** a nudge upward of **less than 120 px** releases the
+pin but leaves the reader still *near bottom* — so in the gap between the 900 ms hard clock and the
+1500 ms gesture window, **any** scroll event re-pinned them. ⚠ **That is exactly the ~600 ms window
+D-243-05 named as the candidate to check rather than assume**, and it was a defect after all. The
+repair is one ref and one clause at `useFollowScroll.ts:196-201` — the line the decision predicted.
+
+### ⭐ D-243-04 VINDICATED BY MEASUREMENT, and cheaper than expected
+
+60 real deltas produced **61** `scrollIntoView` calls before the coalescing and **13** after, with
+`useFollowScroll.ts` held constant (a base-provider + fixed-hook control run also read 61).
+⚠ **`MessageList.tsx` needed no edit at all** — the CHAT-03 half of the seam moved because the
+CHAT-02 half did, which is precisely what *"they are one line of code"* claimed and what splitting
+them across plans would have hidden.
+
 ### D-243-06 — CHAT-01 and CHAT-05 are ONE defect, found while sketching
 
 **Whose:** sketch 234, §*Operator constraints, applied*, item 2.
