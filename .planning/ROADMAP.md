@@ -244,7 +244,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 244-06-PLAN.md — the two doors un-inverted: cloud→thread, Library import asks its folder (SHELL-04)
+- [x] 244-06-PLAN.md — the two doors un-inverted: cloud→thread, Library import asks its folder (SHELL-04)
 
 ⚠ **SIX plans, not the FOUR `D-244-17` locked** — the deviation is recorded in every plan. `SHELL-04` alone is cut into three, on **context cost** and never on difficulty: **C-2** makes `SHELL-02` a two-layer change against a backend baseline at its zero-headroom ceiling, and **C-9** (measured at planning) shows criterion 4's *"and the agent can use it"* is unsatisfied for **8 of the 15 accepted extensions**, because `workspace_read` returns a note for every binary and the sandbox had no reach at all. G-8's never-cut list — verifier, TDD RED drives, `security_enforcement` / `code_review`, migration discipline — is intact.
 
