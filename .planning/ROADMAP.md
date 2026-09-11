@@ -235,8 +235,8 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 244-03-PLAN.md — the paused run: the cap-paused composer (both layers) + the approval in the thread (SHELL-02, SHELL-03)
-- [ ] 244-04-PLAN.md — the shell says THAT, the tab says WHERE: the attention tab attribution (SHELL-05)
+- [x] 244-03-PLAN.md — the paused run: the cap-paused composer (both layers) + the approval in the thread (SHELL-02, SHELL-03)
+- [x] 244-04-PLAN.md — the shell says THAT, the tab says WHERE: the attention tab attribution (SHELL-05)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
