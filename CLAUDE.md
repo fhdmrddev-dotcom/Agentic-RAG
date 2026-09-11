@@ -709,8 +709,8 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/ConnectionPicker.tsx` | 7 / 5 / 888 | honoured by construction (206.2 / **214**) |
 | `frontend/src/components/workflows/ExternalActionSection.tsx` | 8 / 5 / 179 | honoured by construction (206.2 / **214**) |
 | `frontend/src/components/workflows/McpToolPicker.tsx` | 5 / 5 / 601 | honoured by construction (211 / **214**) |
-| `backend/app/models/connector.py` | 24 / 13 / 772 | honoured by construction (**239-06 / SEED-259**): the argument mapping rides the declared `dict[str,str]` as flat prefixed keys — no new field, no shape change, no migration |
-| `backend/app/api/connectors.py` | 41 / 19 / 2091 | ⚠ **extraction still OWED and the file GREW again** (2071→2091 at 238-04). honoured by construction (**238-04**): `source_path` is dropped at the boundary, server-only |
+| `backend/app/models/connector.py` | 25 / 14 / 800 | ⚠ row was STALE at `24/13/772`. honoured by construction (**244-06**): a NEW request model, ⛔ no field added to an existing one — `folder_id: str` REQUIRED, so 422 fires before the handler |
+| `backend/app/api/connectors.py` | 42 / 20 / 2102 | ⛔ **extraction still OWED and the file GREW a THIRD time** (2071→2091→2102). honoured by construction (**244-06**): ONE parameter, ONE forward; the refusal is the MODEL, not a branch here |
 | `backend/app/services/sources/preview_service.py` | 8 / 4 / 826 | ⚠ row STALE TWICE; the 2nd read “238: comment-only” while 238 re-opened SEED-253 here. **238-04: display ≠ stored; the walk no longer mutates `SourceFile.path`** |
 | `backend/app/security/egress.py` | 13 / 5 / 982 | honoured by construction (232): Google Drive read/export pins; docstri |
 | `backend/app/services/connector_service.py` | 25 / 9 / 1772 | honoured by construction (**239-06**): the write boundary knows a mapping KEY from a tool name by ALLOW-LIST — an unknown key is still read as a tool name and still refused |

@@ -736,6 +736,33 @@ class SourcePreviewRequest(_StrictBase):
     only_external_ids: list[str] | None = None
 
 
+class ConnectionFileImportRequest(_StrictBase):
+    """Where ONE named cloud file should land in the Library (Phase 244 / SHELL-04 / D-244-06).
+
+    ⛔ **`folder_id` IS REQUIRED, AND THAT IS THE REFUSAL.** D-244-06, verbatim: *"unset folder =
+    refuse, never silently root — silently rooting is the defect."* Because the field has no
+    default and ``_StrictBase`` is ``extra="forbid"``, FastAPI answers **422 before the handler
+    runs**, so the refusal cannot be forgotten in a branch a future edit adds. The hand-rolled
+    ``if not body.folder_id: raise HTTPException(422, …)`` is the REJECTED arm: it would live
+    inside a handler that already has two ``except`` arms and a 502 catch-all, which is exactly
+    the kind of guard that survives as prose after a refactor.
+
+    ⚠ **IT DIFFERS FROM :class:`SourcePreviewRequest` ON PURPOSE, AND THE DIFFERENCE IS NOT AN
+    INCONSISTENCY.** That model's ``destination_folder_id`` is ``str | None = None`` and means
+    *root* when absent — correct for the FOLDER door, because importing a whole tree into the
+    root is a thing a person can genuinely mean. A single named file landing in the root is not
+    something anyone means; it is what happens when nobody was asked. The operator reported
+    exactly that (`BUG-260905-01`): *"it ingested into a folder I did not want — the root."*
+
+    ⛔ This is a NEW request model, not a field added to an existing one. ``models/connector.py``
+    fires G-5 and its Phase 239 precedent was *"no new field, no shape change, no migration"*;
+    an additive request body stays in that spirit.
+    """
+
+    #: The Library folder the person chose. ⛔ No default — absence is a refusal, not a root write.
+    folder_id: str
+
+
 __all__ = [
     "ConnectorCapability",
     "ServiceId",
@@ -763,6 +790,7 @@ __all__ = [
     "McpProbeAuthResponse",
     "McpOAuthStartRequest",
     "McpOAuthStartResponse",
+    "ConnectionFileImportRequest",
     "SourcePreviewItem",
     "SourcePreviewRequest",
     "SourcePreviewResponse",

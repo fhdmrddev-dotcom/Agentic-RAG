@@ -6134,6 +6134,41 @@ time, on the backend.
 
 ## `backend/app/models/connector.py`
 
+**Re-derived 2026-09-12 at `244-06`: `25 / 14 / 800`.** ⚠ The row read `24 / 13 / 772`.
+
+### 244-06 — a NEW request model, and why the refusal lives in its SHAPE
+
+`ConnectionFileImportRequest` carries one field: `folder_id: str`, **required, no default**.
+Because `_StrictBase` is `extra="forbid"`, FastAPI answers **422 before the handler runs**, so
+`D-244-06`'s ruling — *"unset folder = refuse, never silently root — silently rooting is the
+defect"* — cannot be forgotten in a branch a later edit adds.
+
+⛔ **The hand-rolled `if not body.folder_id: raise HTTPException(422, …)` is the REJECTED arm**, and
+the reason is structural rather than stylistic: it would live inside a handler that already has two
+`except` arms and a 502 catch-all, which is exactly the kind of guard that survives as prose after
+a refactor. `test_244_import_destination_required.py` case 6b asserts `"if not body.folder_id"`
+does **not** appear in `connectors.py`.
+
+⚠ **IT DISAGREES WITH `SourcePreviewRequest` ON PURPOSE, AND THE DISAGREEMENT IS THE DESIGN.** That
+model's `destination_folder_id` is `str | None = None` and means *root* when absent — correct for
+the FOLDER door, because importing a whole tree into the root is a thing a person can mean. A
+single named file landing in the root is not something anyone means; it is what happens when nobody
+was asked. Case 6c pins BOTH halves, so a future "consistency" edit that makes them agree goes red.
+
+⚠ **AND A MEASURED LIMIT ON THE FENCE ITSELF.** Driven against a plant weakening the field to
+`str | None = None`, the **no-body** case stayed GREEN — FastAPI requires the body because the
+*parameter* has no default, whatever the fields inside it do. Only the explicit-null case and the
+`is_required()` case went red. So the no-body case is the regression guard for `BUG-260905-01`'s
+literal reproduction; the REQUIREMENT is pinned by the other two, and dropping either would leave a
+fence that cannot see the defect. Recorded in the test body beside the case.
+
+⛔ **No field was added to an existing model**, keeping the Phase 239 precedent (*"no new field, no
+shape change, no migration"*) on a file that fires G-5 at 14 phases.
+
+---
+
+### Prior entries
+
 **Re-derived at `211-05`'s own commit (2026-08-27): `5 commits / 3 phases / 450 L` · ⚠ G-5
 FIRES, EXACTLY AT THRESHOLD, and it crossed in the commit that added this row.**
 Phases: `190` · `206` · `211`.
@@ -6214,6 +6249,38 @@ take it.
 ---
 
 ## `backend/app/api/connectors.py`
+
+**Re-derived 2026-09-12 at `244-06`: `42 / 20 / 2102`.** ⚠ The row read `41 / 19 / 2091`.
+
+### 244-06 — the file GREW a THIRD time and the extraction is STILL owed
+
+⛔ **Say it plainly rather than in a verdict cell: `2051 → 2071 → 2091 → 2102`.** The extraction has
+been owed since before Phase 238, was deferred once at `238-04` *while the file grew*, and is
+deferred again here. This is the third consecutive landing that added lines to a 20-phase router.
+
+**Why it was not taken now:** the change is **one parameter and one forward** —
+`body: ConnectionFileImportRequest` and `folder_id=body.folder_id` — and it rides the seam Phase 233
+already built (`import_single_file` has accepted `folder_id` since `D-233-01`). An extraction in the
+same commit as a behaviour change would attribute the refactor's blast radius to the feature, on a
+router 19 other suites exercise. ⛔ **It is honoured by construction, and that phrase is doing
+narrow work here: it describes the ELEVEN LINES, not the file.**
+
+**The invariant this task DRIVES that a comment previously carried alone.** `:1826` says the
+`except SourceConnectionDisabled` arm must precede the broad `except Exception` 502 — *"a disabled
+connection is not a provider error, and wording it that way is how a control that failed to stop
+something reads as Microsoft's fault"* (`BUG-260907-03`). **A comment is not a test.** The arm was
+moved below the broad handler as a plant and case 5 fired
+`a control WE applied was reported as the provider's fault` / `assert 502 != 502`; the file was
+restored md5-identical (`3aae759417cf5c4f75273b14b2a4fef8`). The 502's message is byte-unchanged,
+pinned by case 7.
+
+**And the minter fence.** Case 6 asserts on this file's SOURCE, comments stripped, that neither
+`mint_document_row` nor a hand-rolled `table("documents").insert` appears — a ROADMAP-level warning
+tied to Phase 229's splice. `import_single_file` stays the only seam.
+
+---
+
+### Prior entries
 
 **Re-derived at `211-05`'s own commit (2026-08-27): `6 commits / 3 phases / 734 L` · ⚠ G-5
 FIRES, EXACTLY AT THRESHOLD, and it crossed in the commit that added this row.**
@@ -10090,9 +10157,9 @@ cells rot within days.
 | [`frontend/src/components/workflows/McpToolPicker.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsmcptoolpickertsx) | 5 / 5 / 601 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | honoured by construction (211 / **214**) — net **−44 L** |
 | [`frontend/src/components/workflows/externalShapeVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsexternalshapevocabularyts) | 2 / 1 / 109 | no (1 phase) | young (206.2) |
 | [`frontend/src/components/workflows/McpToolPicker.reachability.test.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsmcptoolpickerreachabilitytesttsx) | 1 / 1 / 316 | no (1 phase) | young (206.2) |
-| [`backend/app/models/connector.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsconnectorpy) | 24 / 13 / 772 | ⚠ **FIRES** | honoured by construction (**239-06 / SEED-259**): the argument mapping rides the declared `dict[str,str]` as flat prefixed keys — no new field, no shape change, no migration |
+| [`backend/app/models/connector.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsconnectorpy) | 25 / 14 / 800 | ⚠ **FIRES** | ⚠ row was STALE at `24 / 13 / 772`. honoured by construction (**244-06**): a NEW request model, ⛔ no field added to an existing one — `folder_id: str` REQUIRED, so 422 fires before the handler |
 | [`backend/app/services/mcp_client.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmcp_clientpy) | 9 / 6 / 526 | ⚠ **FIRES** | ⚠ row STALE TWICE (`4/2/407` reading `no`, then `7/5/480`). honoured by construction (**SEED-258**): the body cap is DERIVED, so no envelope knob exists to disagree |
-| [`backend/app/api/connectors.py`](docs/HOT-FILE-LEDGER.md#backendappapiconnectorspy) | 41 / 19 / 2091 | ⚠ **FIRES** | ⚠ **extraction still OWED and the file GREW AGAIN** (2051→2071 at the 239 gap-closure: `_provider_said`, LO-05). The named seam is unchanged |
+| [`backend/app/api/connectors.py`](docs/HOT-FILE-LEDGER.md#backendappapiconnectorspy) | 42 / 20 / 2102 | ⚠ **FIRES** | ⛔ **extraction still OWED and the file GREW a THIRD time** (2051→2071→2091→2102). honoured by construction (**244-06**): ONE parameter, ONE forward; the refusal is the MODEL, not a branch here |
 | [`backend/app/security/egress.py`](docs/HOT-FILE-LEDGER.md#backendappsecurityegresspy) | 13 / 5 / 982 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | honoured by construction (232): Google Drive read/export pins; docstrings updated to source contract |
 | [`backend/app/services/google/availability.py`](docs/HOT-FILE-LEDGER.md#backendappservicesgoogleavailabilitypy) | 0 / 0 / 277 | no (new) | young (221-02) — the per-application probe. ⚠ It imports `_http`'s parser and writes NO second one |
 | [`backend/app/services/google/writes.py`](docs/HOT-FILE-LEDGER.md#backendappservicesgooglewritespy) | 2 / 1 / 625 | no (1 phase) | ⚠ absent for its entire life — row added 221-02, which found `create_event` REFUSING every naive local time |

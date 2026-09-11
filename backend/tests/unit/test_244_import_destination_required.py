@@ -96,6 +96,14 @@ def test_the_chosen_folder_reaches_import_single_file(router_client, wired):
 
 
 # ── 2 · NO BODY ⇒ 422. ⛔ Never 200-into-root — that IS BUG-260905-01 ─────────────────────
+#
+# ⚠ MEASURED, AND IT CHANGES WHAT THIS CASE IS WORTH: case 2 alone does NOT pin the requirement.
+# Driven against a plant that weakened the field to `folder_id: str | None = None`, this case
+# stayed GREEN — FastAPI requires the BODY because the parameter has no default, regardless of
+# whether any field inside it is required. It was cases 3 and 6b that went red
+# (`assert 200 == 422`, and `is_required()` returning False). ⛔ So the no-body case is the
+# REGRESSION guard for `BUG-260905-01`'s literal reproduction; the REQUIREMENT is pinned by the
+# other two, and dropping either of them would leave a fence that cannot see the defect.
 def test_an_import_with_no_body_is_refused_never_rooted(router_client, wired):
     res = router_client.post(IMPORT_PATH, headers=_headers())
 
