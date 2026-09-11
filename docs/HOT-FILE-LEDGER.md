@@ -1638,6 +1638,54 @@ It has exactly one today: draw the reasoning. **The seam is the FOLD CONTROL ver
 
 ---
 
+---
+
+### ── `243-04` (CHAT-01 / D-243-02 / D-243-13) — `1 / 1 / 117` → **`4 / 1 / 283`** ──────────
+
+**Still ONE phase, and the row is still here BY DESIGN** — a file absent from the scan list is
+invisible to G-5 at any count, forever, silently. This file grew **+166 lines in a single phase**,
+which is precisely the shape that reaches three phases before anyone notices.
+
+**What landed, in three commits:**
+
+1. **V1's thin rule** — the body drops the monospaced face, the literal newlines and the 16rem
+   nested scroller, steps up one size, and renders the reasoning as **real paragraph elements**
+   (sketch `index.html:332`). ⭐ The acceptance bar is a FILE, not a description of one.
+2. **The clamp** — the shipped sketch-050 mechanism (`UserMessageBubble.tsx:26-64`), COPIED and not
+   mounted, because that component is hard-bound to the violet user bubble in four places. Its
+   control is gated on **measured overflow**, so it removes itself on the median 198-char body
+   instead of sitting inert the way this tree's two OTHER clamps do.
+3. **An honest label** — `Thought for N seconds` when a span was measured, and the bare word when
+   it was not.
+
+**⛔ THE INVARIANTS THIS FILE NOW CARRIES, AND EACH IS FENCED RATHER THAN ASSERTED:**
+
+- **Exactly ONE renderer of the reasoning body** (§10c, on source). ⚠ Its needle gained a second arm
+  at `243-04` **because the single-arm form matched ZERO files after the render shape changed** and
+  §10c read `expected [] to have a length of 1`. **That RED is the fence working** — a source fence
+  must know what a render looks like — and the fix is an ALTERNATION of two NAMED shapes, never a
+  widening, which was measured to match `RunCard.tsx:487`'s guard and `MessageItem.tsx:612`'s label
+  call.
+- **NO duration derived from length** (§14d, §10f). The sketch's `Math.round(chars / 180)` is a demo
+  affordance; `grep -c "/ 180"` over this file and `StreamsProvider.tsx` is **0**.
+- **NO nested scroller** (§5b-ii, §6-clamp). A cap paired with a reveal is the opposite affordance
+  from a scrollbar inside a scrolling conversation, which is what CHAT-01 is about.
+- **The fold default is UNCHANGED** — closed at rest AND while streaming (§3, §7-clamp).
+- **NO class token is spelled in this file's prose.** The class set is the deliverable and it is
+  asserted by a `grep -o … | sort | uniq -c`; a comment naming a dropped token makes that count read
+  as though the token still shipped. Same trap as the needle above, one register over.
+
+**⚠ A KNOWN DEBT, NAMED RATHER THAN HIDDEN:** `thoughtForLabel` is the **THIRD** file-local elapsed
+formatter in this folder (`RunCard.tsx:588-594`, `MessageList.tsx:49-58`). The extraction was
+**closed deliberately** — it would have edited two G-5-firing files that `243-04`'s `files_modified`
+does not name, and **the ledger gate reads `files_modified`, not the diff**, so it could not have
+caught the resulting unrecorded edits. Owed at `SEED-269`, with an acceptance criterion.
+
+**Named seam:** none yet. At 283 lines with one state concern, one measurement and one label, the
+first thing to leave should be the clamp — there are now three of them in this tree and no shared
+home, which is `SEED-269`'s shape one concern over.
+
+
 ## `frontend/src/components/chat/RunCard.tsx`
 
 **Re-derived 2026-08-17 (extraction):** `21 commits / 9 phases / 608 L` · **G-5 FIRES** (9 phases vs threshold 3) — honoured by construction (194).
@@ -2197,6 +2245,40 @@ COMMIT.** `EmitSubStep` is consumed by `PhaseCard.tsx`'s `SUBSTEP_META` map; a m
 as nothing, which on a run surface is a silent lie rather than a visible gap. `196-03` shipped both halves
 together and pinned the whole union with an `it.each` over `SUBSTEPS`, so a future member with no meta entry
 fails a test rather than a user.
+
+
+---
+
+**⚠ RE-DERIVED 2026-09-11 (plan `243-04`): `85 commits / 65 phases / 1380 L`** — the row read
+`78 / 60 / 1331`, so it was **STALE by 7 commits and 5 phases**, and this is the SECOND consecutive
+re-derivation to find it so. Quick-task bucket excluded: `260405`. ⚠ **The plan's own
+`<interfaces>` block measured `84 / 66 / 1369`** and the 66-vs-65 gap is entirely that exclusion —
+recorded rather than reconciled silently, because two honest derivations that disagree by one are
+more useful than one number nobody can reproduce.
+
+**What `243-04` did:** added ONE optional field, `reasoningMs?: number`, beside the existing
+client-only fields (`isPlanning`, `runStatus`).
+
+**Why G-5 is honoured by construction:** one optional member appended to one interface. No type
+renamed, widened or removed; **no wire field, no column, no migration** — `git diff --stat --
+supabase/ backend/` is EMPTY at this commit, and that emptiness is an acceptance criterion rather
+than an observation.
+
+**⛔ WHAT BINDS THIS FIELD, AND IT IS THE OPPOSITE OF THE UNION RULE ABOVE: ITS ABSENCE IS THE
+CONTRACT.** `EmitSubStep` binds a renderer to supply a meta entry; `reasoningMs` binds a renderer to
+supply NOTHING. It is measured on the client during a live stream, so a DB-loaded, reloaded or
+navigated-to message simply does not have one — and `ThinkingBlock` reads that absence as *"not
+honestly known"* and renders a label with no digit in it. **A future plan that "fixes" the absence
+by defaulting it to `0`, or by back-filling it from `reasoningContent.length`, ships a fabricated
+duration** — which is D-243-13's whole subject and the reason `RunCard.tsx:181-186`'s honesty rule
+exists (`BUG-260606-02`'s "1440m" lie). Fenced by `ThinkingBlock.characterization.test.tsx` §14c /
+§14d, the second of which drives a 33,713-char body specifically because that is the scale at which
+a length-derived number looks most plausible.
+
+**Named seam, still OWED:** this file is a barrel and nothing here proposes splitting it. At 65
+phases the count is high for the structural reason recorded above — almost any feature that adds a
+field touches it — so the seam, when someone takes it, is by DOMAIN (chat / workflow / library /
+settings), not by size.
 
 **THE NAMED SEAM:** per-domain type modules under `frontend/src/types/` with a re-exporting barrel — the same
 shape, the same barrel requirement and the same re-export invariant as `api.ts` above, and for the same
@@ -9525,9 +9607,9 @@ cells rot within days.
 | File | commits / phases / lines | G-5 | Disposition |
 |---|---|---|---|
 | [`frontend/src/components/chat/ToolCallPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattoolcallpaneltsx) | 51 / 23 / 351 | **FIRES** | ✅ **G-5 DISCHARGED (227-02)** — extracted ToolCallDetails, StepRow, toolStepDerivation (1019 → 351 lines) |
-| [`frontend/src/components/chat/MessageItem.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageitemtsx) | 67 / 33 / 726 | **FIRES** | ✅ **G-5 DISCHARGED (227-03)**; ⚠ row was STALE at `62/33/702`. NOT re-hollowed (**243-02**): `useState` 3→3, `useEffect` 0→0, props 5→5, 0 deleted — a MOUNT, measured |
+| [`frontend/src/components/chat/MessageItem.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageitemtsx) | 68 / 33 / 727 | **FIRES** | ✅ **G-5 DISCHARGED (227-03)**. NOT re-hollowed (**243-02**, **243-04**): one prop added to the existing mount, `useState` 3→3, 0 deleted — measured |
 | [`backend/app/api/threads.py`](docs/HOT-FILE-LEDGER.md#backendappapithreadspy) | 243 / 80 / 1590 | **FIRES** | extraction TAKEN 2026-08-17 · honoured by construction (**214**) — one launch-inputs field on a request model it already owns |
-| [`frontend/src/providers/StreamsProvider.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcprovidersstreamsprovidertsx) | 89 / 36 / 4325 | **FIRES** | ⚠ row was STALE at `85/34/4144`. honoured by construction (**243-03**): two callbacks coalesced inside the existing factory — closure state, not a sixth concern |
+| [`frontend/src/providers/StreamsProvider.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcprovidersstreamsprovidertsx) | 90 / 36 / 4380 | **FIRES** | ⚠ row STALE TWICE. honoured by construction (**243-04**): the measured span is three closure vars beside `currentIteration`, riding the update the coalescer already performs |
 | [`frontend/src/hooks/useMessages.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusemessagests) | 74 / 27 / 127 | ⚠ **FIRES** | extraction due |
 | [`backend/app/services/anthropic_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesanthropic_servicepy) | 11 / 10 / 354 | ⚠ **FIRES** | adapter-pattern audit due |
 | [`frontend/src/components/workflows/WorkflowCanvas.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsworkflowcanvastsx) | 31 / 9 / 1708 | **FIRES** | honoured by construction (199 / 200 / **214**) — 214-04 widened the panel and touched no node logic |
@@ -9558,7 +9640,7 @@ cells rot within days.
 | [`backend/app/api/runs.py`](docs/HOT-FILE-LEDGER.md#backendappapirunspy) | 35 / 16 / 1430 | **FIRES** | honoured by construction (194) |
 | [`backend/app/services/harness_engine.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharness_enginepy) | 54 / 20 / 3135 | **FIRES** | honoured by construction (194 / **214**) — 214-06 resolved the pause's service at ONE call site |
 | [`frontend/src/components/chat/RunCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatruncardtsx) | 28 / 14 / 710 | **FIRES** | ⭐ **G-5 DISCHARGED (243-02)** — the reasoning fold left for `ThinkingBlock.tsx`, `-39/+20`, one `useState` fewer. ⚠ row was STALE at `26/12/728`. State 2 stayed, by decision |
-| [`frontend/src/components/chat/ThinkingBlock.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatthinkingblocktsx) | 1 / 1 / 117 | no | ⚠ **row at ONE phase BY DESIGN** — a file absent from this list is invisible to G-5 at any count (`App.tsx`: 23 phases). Invariant: **exactly one reasoning renderer** |
+| [`frontend/src/components/chat/ThinkingBlock.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatthinkingblocktsx) | 4 / 1 / 283 | no | ⚠ **row at ONE phase BY DESIGN**; `117 → 283` in one phase (**243-04**). Invariants: **one reasoning renderer**, and **no duration derived from length** |
 | [`frontend/src/components/chat/MessageInput.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageinputtsx) | 29 / 14 / 643 | **FIRES** | honoured by construction (194.1) |
 | [`frontend/src/components/chat/MessageList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessagelisttsx) | 20 / 8 / 292 | **FIRES** | ⚠ row was STALE at `19/8/267`. **243-03 did NOT modify it** — the scroll rate fell from upstream; `RunStatusStrip`s D-17 block untouched |
 | [`frontend/src/hooks/useFollowScroll.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusefollowscrollts) | 3 / 2 / 265 | does not fire | ⛔ **NO ROW FOR ITS ENTIRE LIFE — added 243-03.** A re-arm now also refuses when the last gesture was UP; three clocks/conditions, none collapsible |
@@ -9569,7 +9651,7 @@ cells rot within days.
 | [`frontend/src/components/chat/OutputFileCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatoutputfilecardtsx) | 8 / 7 / 219 | **FIRES** | honoured by construction (195) |
 | [`frontend/src/components/panel/FilesSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelfilessectiontsx) | 8 / 5 / 334 | **FIRES** | honoured by construction (195) |
 | [`frontend/src/lib/api.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapits) | 187 / 110 / 422 | ⚠ **FIRES** | ✅ **SPLIT TAKEN (207)** — this path is the re-export BARREL. ⚠ **its 12 domain MODULES had no rows of their own until 214** |
-| [`frontend/src/types/index.ts`](docs/HOT-FILE-LEDGER.md#frontendsrctypesindexts) | 78 / 60 / 1331 | ⚠ **FIRES** | no seam proposed — a barrel of wire types; ⚠ absent until 196, at 56 phases (214) |
+| [`frontend/src/types/index.ts`](docs/HOT-FILE-LEDGER.md#frontendsrctypesindexts) | 85 / 65 / 1380 | ⚠ **FIRES** | ⚠ row was STALE at `78/60/1331`. honoured by construction (**243-04**): one optional CLIENT-ONLY field whose ABSENCE is load-bearing. seam still OWED |
 | [`backend/app/main.py`](docs/HOT-FILE-LEDGER.md#backendappmainpy) | 82 / 59 / 950 | ⚠ **FIRES** | ⚠ row was STALE by **FOURTEEN PHASES** at `79 / 45 / 876`. honoured by construction (**BUG-260902-06**): one more start/stop pair beside the scheduler |
 | [`backend/app/config.py`](docs/HOT-FILE-LEDGER.md#backendappconfigpy) | 83 / 48 / 1506 | ⚠ **FIRES** | ⚠ STALE AGAIN at `82 / 47 / 1489` — the ELEVENTH phase to find this row wrong. honoured by construction (**241**): four hnsw defaults, no reader changed; MODEL_CAPABILITIES-out seam stays OWED |
 | [`backend/app/api/admin.py`](docs/HOT-FILE-LEDGER.md#backendappapiadminpy) | 33 / 13 / 1740 | ⚠ **FIRES** | ⚠ row was STALE at `32 / 12 / 1733`. honoured by construction (**BUG-260902-06**): two write seams swap invalidate for broadcast; the two WR-03 READ seams deliberately unchanged |
@@ -10633,6 +10715,43 @@ so the additive member survives inference.
 **It inherits `89 / 36 / 4325`, and that figure goes stale on the next commit touching the file.**
 
 ---
+
+---
+
+## `frontend/src/providers/StreamsProvider.tsx` — `243-04` (D-243-13, the measured span)
+
+**Re-derived 2026-09-11: `90 / 36 / 4380`.** ⚠ The row read `89 / 36 / 4325`, written **one plan
+earlier the same day**, which had itself corrected a row stale at `85 / 34 / 4144`. **Twice in two
+plans is not carelessness — it is what a figure written at a phase's close does to a file this
+hot**, and it is recorded here rather than quietly overwritten.
+
+**What `243-04` added:** three closure variables beside `currentIteration` (`reasoningStartMs`,
+`reasoningSpanSettled`, `pendingReasoningMs`), one idempotent `closeReasoningSpan()`, and one field
+merged into the update `applyPendingDeltas` already performs.
+
+**Why G-5 is honoured by construction:** no new concern, no new module state, **no new
+`setMessages` call on the hot path** — the span rides a flush that was already happening, and it is
+written at most once per run.
+
+**⛔ THREE THINGS BIND ANY FUTURE EDIT HERE, AND ALL THREE ARE FENCED IN
+`streamsProvider_243_cadence.test.tsx` §10:**
+
+1. **The stamp is taken in the RAW callback, ABOVE the coalescer.** `243-03` wrapped these callbacks
+   in an accumulating window; a start read inside the coalesced flush would date the span from the
+   WINDOW rather than from the delta — late by up to `DELTA_COALESCE_MS`, and unrecoverable
+   afterwards.
+2. **The span settles ONCE.** A late interleaved reasoning block must not re-open it, or the value
+   drifts toward the whole-run duration D-243-13 explicitly rejects (`RunCard`'s elapsed already
+   measures that, tool calls included, which is why it cannot be labelled *"thought for"*).
+3. **`onDone` writes it on the bookkeeping update, not via `flush()`.** Measured: the coalescer's
+   `flush()` applies only when a window was OPEN, so a span closed on a quiet terminal edge would
+   otherwise never land.
+
+**⛔ AND NO TIMER.** The label is a settled value. A live-ticking span would re-introduce exactly
+the per-token repaint `CHAT-02` had just removed, at 4 Hz, in the component the phase was calming.
+
+**Named seam:** unchanged — this factory is still the right home, and the next thing to leave
+should be a WHOLE callback family, never a variable.
 
 ## `frontend/src/components/chat/MessageList.tsx` — `243-03` (CHAT-03)
 

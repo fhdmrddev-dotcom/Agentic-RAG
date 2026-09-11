@@ -2927,7 +2927,13 @@ const BASELINE = {
   // single-paragraph median case, and the lossless-split case. §5 itself CHANGED rather than
   // multiplied - it now pins V1's class set instead of the defect's - so the count is the
   // only thing that can tell a REPLACED pin from a DROPPED one.
-  "ThinkingBlock.characterization.test.tsx": 27,
+  //
+  // RAISED 27 -> 33 at `243-04` task 3, from the `actual` column again. The +6 is §14, the
+  // label's three arms: MEASURED (a), pluralisation (b), and ⛔ the two REFUSALS (c, d) plus
+  // the streaming and no-count guards (e, f). ⛔ §14d is the one that costs something to keep -
+  // it drives a 33,713-char body specifically because that is the scale at which a
+  // length-derived duration looks most plausible, and it is the cheapest case to drop.
+  "ThinkingBlock.characterization.test.tsx": 33,
 
   // ── Phase 243 (243-04 / CHAT-01 / D-243-02) — the reasoning clamp ───────────────────
   //
@@ -2963,7 +2969,13 @@ const BASELINE = {
   // ⛔ §8 pins DELTA_COALESCE_MS at 60. The case NAMES of §1 do arithmetic on that number,
   // so retuning the window without re-deriving them is caught here rather than silently
   // leaving a comment that lies.
-  "streamsProvider_243_cadence.test.tsx": 9,
+  //
+  // RAISED 9 -> 15 at `243-04` (D-243-13). The +6 is §10, the MEASURED reasoning span, which
+  // lives in this file rather than the component net because the stamp is delta-path
+  // behaviour and this file already owns the `makeStreamCallbacks` harness and its module
+  // mocks. §10c (no reasoning -> the field is ABSENT) and §10d (the span settles once) are the
+  // two that stop a fabricated or whole-run duration; a lowering would most cheaply drop them.
+  "streamsProvider_243_cadence.test.tsx": 15,
 
   // ── Phase 243 (243-03 / CHAT-03 / D-243-16) — the scroll effect's ONLY behavioural fence ─
   //

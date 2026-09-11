@@ -457,12 +457,50 @@ export function makeStreamCallbacks(opts: {
   let pendingReasoning = ""
   let sawContentDelta = false
 
+  // -- Phase 243 Plan 04 (D-243-13) - the MEASURED reasoning span -----------------------
+  //
+  // ⛔ THE SKETCH COMPUTES THIS NUMBER FROM THE CHARACTER COUNT AND THAT IS A DEMO
+  // AFFORDANCE, NOT A DESIGN DECISION. Porting it would ship a duration derived from string
+  // length - the same sin as the `count` `FoldTrigger` already forbids for reasoning
+  // ("no countable unit ... inventing one would be fabricated precision"), one unit over.
+  //
+  // ⛔ AND THERE IS NO PERSISTED SOURCE TO SWAP IN. `messages.reasoning_content` is the only
+  // reasoning column - no started/completed timestamps exist anywhere in the model - and
+  // `RunCard`'s elapsed machinery measures the WHOLE RUN, every tool call included, which is
+  // wrong by construction for "thought for" on any tool-bearing turn. So it is measured HERE,
+  // live, and when it is not known the label simply carries no number (`RunCard.tsx:181-186`'s
+  // honesty rule). ⛔ No migration: this value is client-only and a reloaded message has none.
+  //
+  // ⛔ THE START IS STAMPED IN THE RAW CALLBACK, ABOVE THE COALESCER. Reading it inside
+  // `applyPendingDeltas` would date the span from the WINDOW that flushed the first delta
+  // rather than from the delta itself - late by up to `DELTA_COALESCE_MS`, and wrong in a way
+  // no later measurement could recover.
+  //
+  // ⛔ NO TIMER, NO TICK. The label is a SETTLED value, written once. A live-ticking span
+  // would re-introduce exactly the per-token repaint CHAT-02 just removed, at 4 Hz.
+  let reasoningStartMs: number | null = null
+  let reasoningSpanSettled = false
+  let pendingReasoningMs: number | undefined
+
+  /** Close the span, once. Idempotent: a second call (onDone after a content delta, or a late
+   *  interleaved reasoning block) must not re-open it, or the value drifts toward the
+   *  whole-run duration this decision exists to reject. */
+  const closeReasoningSpan = () => {
+    if (reasoningStartMs === null || reasoningSpanSettled) return
+    reasoningSpanSettled = true
+    pendingReasoningMs = Date.now() - reasoningStartMs
+  }
+
   const applyPendingDeltas = () => {
     const content = pendingContent
     const reasoning = pendingReasoning
-    if (!content && !reasoning) return
+    // The measured span rides the SAME update rather than adding a `setMessages` of its own -
+    // it is written at most once per run, at a moment when a flush is already happening.
+    const spanMs = pendingReasoningMs
+    if (!content && !reasoning && spanMs === undefined) return
     pendingContent = ""
     pendingReasoning = ""
+    pendingReasoningMs = undefined
     setMessages((prev) =>
       prev.map((m) =>
         m.id === assistantId
@@ -471,6 +509,7 @@ export function makeStreamCallbacks(opts: {
               // `isPlanning` clears only on CONTENT - reasoning is not an answer.
               ...(content ? { isPlanning: false, content: m.content + content } : {}),
               ...(reasoning ? { reasoningContent: (m.reasoningContent ?? "") + reasoning } : {}),
+              ...(spanMs !== undefined ? { reasoningMs: spanMs } : {}),
             }
           : m,
       ),
@@ -481,6 +520,9 @@ export function makeStreamCallbacks(opts: {
 
   const raw: StreamCallbacks & { flushDeltas: () => void } = {
     onDelta: (delta) => {
+      // D-243-13: reasoning ENDS when the answer begins. Taken here, in the RAW callback, at
+      // the moment the first content delta actually arrived.
+      if (!sawContentDelta) closeReasoningSpan()
       pendingContent += delta
       coalesceDeltas()
       if (!sawContentDelta) {
@@ -497,15 +539,28 @@ export function makeStreamCallbacks(opts: {
     // Same accumulation pattern as onDelta for content - now through the same buffer,
     // so interleaved content and reasoning land in ONE `setMessages` rather than two.
     onReasoningDelta: (delta) => {
+      // D-243-13: the START, on the FIRST reasoning delta and nowhere else.
+      if (reasoningStartMs === null) reasoningStartMs = Date.now()
       pendingReasoning += delta
       coalesceDeltas()
     },
     onDone: () => {
+      // D-243-13: reasoning that never yielded a content delta still ENDS - here.
+      closeReasoningSpan()
       // ⛔ FLUSH FIRST. Anything still buffered belongs to this run and must land before
       // the terminal bookkeeping, or a snapshot is taken over a half-applied buffer.
       coalesceDeltas.flush()
+      // ⚠ `flush()` applies only when a window was OPEN (`throttle.ts` - it returns early
+      // with nothing pending), so a span closed on a quiet terminal edge would otherwise never
+      // land. It rides the bookkeeping update that always runs instead.
+      const spanMs = pendingReasoningMs
+      pendingReasoningMs = undefined
       setMessages((prev) =>
-        prev.map((m) => (m.id === assistantId ? { ...m, isPlanning: false } : m)),
+        prev.map((m) =>
+          m.id === assistantId
+            ? { ...m, isPlanning: false, ...(spanMs !== undefined ? { reasoningMs: spanMs } : {}) }
+            : m,
+        ),
       )
     },
     onTerminal: () => {

@@ -374,6 +374,7 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
         <ThinkingBlock
           reasoningContent={message.reasoningContent}
           isStreaming={isMessageStreaming}
+          reasoningMs={message.reasoningMs}
         />
         {message.tool_calls && message.tool_calls.length > 0 && (
           <RunCard message={message} isStreaming={isStreaming} />

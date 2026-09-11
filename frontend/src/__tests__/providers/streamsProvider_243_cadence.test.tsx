@@ -208,4 +208,97 @@ describe("Phase 243 Plan 03 (CHAT-02) — the delta path coalesces, producer-sid
     expect(a.current().reasoningContent).toBe("ra")
     expect(b.current().reasoningContent).toBe("rb")
   })
+
+  // ===================================================================================
+  // §10 - ADDED BY 243-04 (D-243-13). THE MEASURED REASONING SPAN.
+  //
+  // ⚠ THESE CASES LIVE HERE RATHER THAN IN `ThinkingBlock.characterization.test.tsx`, AND
+  //   THAT IS A DEVIATION FROM 243-04's `files_modified`, RECORDED RATHER THAN ABSORBED. The
+  //   stamp is delta-path behaviour and THIS file is the delta path's fence: it already owns
+  //   the `makeStreamCallbacks` harness and the `@/lib/api` + `@/lib/supabase` module mocks
+  //   that driving the provider requires. Importing the provider into the characterization
+  //   net would have forced those same hoisted mocks onto 33 component cases that render
+  //   `MessageItem` (which imports `@/lib/api`) - a much larger blast radius than the thing
+  //   being tested. The LABEL arms are component behaviour and DID go in the net (§14).
+  //
+  // ⛔ THE STAMP IS TAKEN IN THE RAW CALLBACK, BEFORE THE COALESCER. A start read inside the
+  //   coalesced flush would be late by up to one window, which at a 60 ms window is 1% of a
+  //   6 s span - small, and wrong for a reason nobody could see afterwards.
+  // ===================================================================================
+  describe("§10 — the measured reasoning span (D-243-13)", () => {
+    it("§10a — first reasoning delta to first CONTENT delta is measured onto the message", () => {
+      const { callbacks, current } = makeHarness()
+      callbacks.onReasoningDelta!("weighing the evidence")
+      vi.advanceTimersByTime(6_000)
+      callbacks.onReasoningDelta!(" some more")
+      callbacks.onDelta!("The answer is")
+
+      // ~6 s, not exact-equal: the harness advances fake timers, and an assertion on an exact
+      // millisecond would pin the test to the coalescer's internals rather than to the span.
+      expect(current().reasoningMs).toBeGreaterThanOrEqual(6_000)
+      expect(current().reasoningMs).toBeLessThan(6_100)
+    })
+
+    it("§10b — `onDone` closes an OPEN span: reasoning that never yields a content delta still ends", () => {
+      const { callbacks, current } = makeHarness()
+      callbacks.onReasoningDelta!("thought about it and said nothing")
+      vi.advanceTimersByTime(2_500)
+      callbacks.onDone!()
+      expect(current().reasoningMs).toBeGreaterThanOrEqual(2_500)
+      expect(current().reasoningMs).toBeLessThan(2_600)
+    })
+
+    it("§10c — ⛔ NO REASONING, NO SPAN: a content-only run leaves the field ABSENT", () => {
+      // ⭐ ABSENCE IS LOAD-BEARING HERE, not a tidiness preference: `ThinkingBlock` reads the
+      //    ABSENCE of this field as "not honestly known" and falls back to a label with no
+      //    number in it. A zero would be a measured claim that the model thought for no time.
+      const { callbacks, current } = makeHarness()
+      callbacks.onDelta!("straight to the answer")
+      callbacks.onDone!()
+      expect(current().reasoningMs).toBeUndefined()
+    })
+
+    it("§10d — the span is settled ONCE: later reasoning deltas do not re-open or extend it", () => {
+      const { callbacks, current } = makeHarness()
+      callbacks.onReasoningDelta!("first")
+      vi.advanceTimersByTime(3_000)
+      callbacks.onDelta!("answer begins")
+      const settled = current().reasoningMs
+      vi.advanceTimersByTime(30_000)
+      callbacks.onReasoningDelta!("a late interleaved reasoning block")
+      callbacks.onDone!()
+      // ⛔ A span that kept growing would end up measuring the WHOLE RUN - exactly the value
+      //    `RunCard` already computes and which D-243-13 rejects as "thought for", because it
+      //    includes every tool call.
+      expect(current().reasoningMs).toBe(settled)
+    })
+
+    it("§10e — two runs measure INDEPENDENTLY: the stamp is per-instance closure state", () => {
+      const a = makeHarness("assistant-A")
+      const b = makeHarness("assistant-B")
+      a.callbacks.onReasoningDelta!("a thinks")
+      vi.advanceTimersByTime(1_000)
+      b.callbacks.onReasoningDelta!("b thinks")
+      vi.advanceTimersByTime(4_000)
+      a.callbacks.onDelta!("a answers")
+      b.callbacks.onDelta!("b answers")
+
+      expect(a.current().reasoningMs).toBeGreaterThanOrEqual(5_000)
+      expect(b.current().reasoningMs).toBeGreaterThanOrEqual(4_000)
+      expect(b.current().reasoningMs).toBeLessThan(5_000)
+    })
+
+    it("§10f — ⛔ NOT DERIVED FROM LENGTH: a 33 KB reasoning body measured in 1 s reports ~1 s", () => {
+      // ⭐ THE MECHANICAL REFUSAL OF THE SKETCH'S DEMO AFFORDANCE, at the producer end. Under
+      //    `index.html:338` this fixture would report ~187 seconds. The span is a CLOCK
+      //    reading; the body's size has no vote.
+      const { callbacks, current } = makeHarness()
+      callbacks.onReasoningDelta!("x".repeat(33_713))
+      vi.advanceTimersByTime(1_000)
+      callbacks.onDelta!("done thinking")
+      expect(current().reasoningContent!.length).toBe(33_713)
+      expect(current().reasoningMs).toBeGreaterThanOrEqual(1_000)
+      expect(current().reasoningMs).toBeLessThan(1_100)
+    })
+  })
 })

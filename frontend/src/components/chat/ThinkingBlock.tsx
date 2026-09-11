@@ -73,6 +73,12 @@ interface ThinkingBlockProps {
   reasoningContent?: string
   /** Whether the OWNING MESSAGE is still streaming — drives the label and nothing else. */
   isStreaming?: boolean
+  /**
+   * Phase 243 Plan 04 (D-243-13) — the MEASURED reasoning span in ms, or `undefined`.
+   * ⛔ `undefined` IS A VALUE HERE, not a gap to fill. It means the client did not watch this
+   * message stream (a reload, a navigation, a DB load), and the label then carries NO number.
+   */
+  reasoningMs?: number
 }
 
 /**
@@ -116,9 +122,42 @@ function toParagraphs(reasoning: string): string[] {
  * value must be a literal for the compiler to emit the rule. The suite pins both, so the two
  * cannot drift apart silently.
  */
+/**
+ * Phase 243 Plan 04 (D-243-13) — the fold label, and the REFUSAL that is the point of it.
+ *
+ * ⛔ THE NUMBER IS A CLOCK READING OR IT IS ABSENT. The sketch derives it from the character
+ * count (`index.html:338`) so the mockup reads plausibly at every Scale setting; that is a demo
+ * affordance and porting it would present string length as a duration. When no span was
+ * measured — a reloaded message, a DB load, any turn this client did not watch — the label
+ * falls back to the shipped word and carries no digit at all. That is `RunCard.tsx:181-186`'s
+ * honesty rule, which exists because `Date.now()` against a stale `created_at` once shipped as
+ * "1440m" (`BUG-260606-02`).
+ *
+ * ⚠ A THIRD FILE-LOCAL ELAPSED HELPER IS BEING ACCEPTED HERE, DELIBERATELY AND WITH A COST.
+ * `RunCard.tsx:588-594` (`formatElapsed`, tenths then `Nm Ns`) and `MessageList.tsx:49-58`
+ * (`formatFloatingElapsed`, whole seconds then `Nm Ns`, null-on-unparseable) are already two
+ * near-duplicates, and NEITHER emits this unit — whole seconds with pluralisation, a floor of
+ * one, and no minute form. The extraction is OWED, not forgotten:
+ * `.planning/seeds/SEED-269-one-home-for-the-elapsed-formatter.md` names all three sites.
+ * ⛔ It is not taken HERE because extracting would edit `RunCard.tsx` and `MessageList.tsx`,
+ * and neither is in this plan's `files_modified` — so neither would receive the ledger row +
+ * section update D-243-07 requires in the same commit, and the ledger gate reads
+ * `files_modified` rather than the diff, so it could not have caught the omission. A guard
+ * that cannot see the thing it guards is this phase's recurring finding; a duplicated
+ * four-line formatter is the smaller debt.
+ */
+function thoughtForLabel(reasoningMs: number | undefined): string {
+  if (reasoningMs === undefined) return "Thinking"
+  // The floor of one second is the ONE part of the sketch's line worth keeping: it is about the
+  // label's grammar, not about where the number came from. A 200 ms span is still a second's
+  // worth of thinking to a reader; `0 seconds` would read as a malfunction.
+  const seconds = Math.max(1, Math.round(reasoningMs / 1000))
+  return `Thought for ${seconds} second${seconds === 1 ? "" : "s"}`
+}
+
 const CLAMP_MAX_PX = 300
 
-export function ThinkingBlock({ reasoningContent, isStreaming }: ThinkingBlockProps) {
+export function ThinkingBlock({ reasoningContent, isStreaming, reasoningMs }: ThinkingBlockProps) {
   // Phase 076.2 D-01: collapsed by default. ⚠ The DEFAULT is untouched by the move — the
   // 224-PREFLIGHT §3.2 rule holds: flipping it would be a regression dressed as consistency.
   const [thinkingOpen, setThinkingOpen] = useState(false)
@@ -173,7 +212,12 @@ export function ThinkingBlock({ reasoningContent, isStreaming }: ThinkingBlockPr
           aria-expanded={thinkingOpen}
           className="px-3 py-1.5 text-left"
         >
-          <FoldTrigger open={thinkingOpen} label={isStreaming ? "Thinking..." : "Thinking"} />
+          {/* ⚠ THE LABEL IS THE ONLY THING V1 CHANGES ABOUT THE FOLD CONTROL (D-243-02) — the
+              component itself is the shared one `CitationList` also mounts, unchanged. */}
+          <FoldTrigger
+            open={thinkingOpen}
+            label={isStreaming ? "Thinking..." : thoughtForLabel(reasoningMs)}
+          />
         </button>
       </CollapsibleTrigger>
       <CollapsibleContent className="data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0">

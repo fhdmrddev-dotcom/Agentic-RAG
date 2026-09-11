@@ -685,6 +685,103 @@ describe("Phase 243 — the thinking block, characterized against the UNMOVED co
     expect(chatSource("ThinkingBlock.tsx")).not.toContain("dangerouslySetInnerHTML")
   })
 
+  // =================================================================================
+  // §14 - ADDED BY 243-04 (D-243-13). THE LABEL, AND THE REFUSAL TO INVENT IT.
+  // =================================================================================
+  describe("§14 — `Thought for N seconds`: measured, or ABSENT (D-243-13)", () => {
+    it("§14a — a MEASURED span renders the trigger text exactly `Thought for 6 seconds`", () => {
+      renderWithTooltip(
+        <MessageItem
+          message={makeMessage({ reasoningContent: REASONING_MEDIAN, reasoningMs: 6_000 })}
+        />,
+      )
+      expandSettledRun()
+      expect(triggerText()).toBe("Thought for 6 seconds")
+    })
+
+    it("§14b — PLURALISATION: a ~1 s span is singular", () => {
+      renderWithTooltip(
+        <MessageItem
+          message={makeMessage({ reasoningContent: REASONING_MEDIAN, reasoningMs: 1_100 })}
+        />,
+      )
+      expandSettledRun()
+      expect(triggerText()).toBe("Thought for 1 second")
+      // A sub-second span still reads `1 second` rather than `0 seconds`: the sketch's own
+      // `Math.max(1, ...)` floor is the one part of `:338` worth keeping, because it is about
+      // the LABEL'S grammar and not about where the number came from.
+      cleanup()
+      renderWithTooltip(
+        <MessageItem
+          message={makeMessage({ reasoningContent: REASONING_MEDIAN, reasoningMs: 200 })}
+        />,
+      )
+      expandSettledRun()
+      expect(triggerText()).toBe("Thought for 1 second")
+    })
+
+    it("§14c — ⛔ UNKNOWN ⇒ NO DURATION: a DB-loaded message reads exactly `Thinking`, with no digit", () => {
+      // ⭐ THE CASE THAT STOPS THE FABRICATION. A reloaded / navigated-to message carries
+      //    `reasoningContent` and NO measured span, because the span is client-only state that
+      //    a page load does not have. `RunCard.tsx:181-186`'s honesty rule, applied to a second
+      //    value: "terminal + no completedAt + no frozenEnd -> NO duration", which exists
+      //    because capturing `Date.now()` against a stale `created_at` was the `BUG-260606-02`
+      //    1440m lie.
+      renderWithTooltip(<MessageItem message={makeMessage({ reasoningContent: REASONING_MEDIAN })} />)
+      expandSettledRun()
+      expect(triggerText()).toBe("Thinking")
+      expect(triggerText()).not.toMatch(/\d/)
+    })
+
+    it("§14d — ⛔ NEVER FROM LENGTH: a 33 KB body with no measured span still renders NO duration", () => {
+      // ⭐ THE MECHANICAL REFUSAL OF D-243-13. Under the sketch's demo affordance
+      //    (`index.html:338`, a round of the character count over 180) this exact fixture would
+      //    read "Thought for 183 seconds" - a plausible-looking number derived from STRING
+      //    LENGTH and presented as a duration. That is the same sin as the `count` §4 forbids,
+      //    one unit over, and it is refused here at the scale where it looks most convincing.
+      renderWithTooltip(<MessageItem message={makeMessage({ reasoningContent: REASONING_LONG })} />)
+      expandSettledRun()
+      expect(triggerText()).toBe("Thinking")
+      expect(triggerText()).not.toMatch(/\d/)
+      // The positive control: the body really is 33 KB, so the absence above is measured
+      // against the fixture that would have produced the most convincing lie.
+      expect(REASONING_LONG.length).toBeGreaterThan(30_000)
+    })
+
+    it("§14e — STREAMING IS UNCHANGED: a measured span does not leak into the live label", () => {
+      // A span can exist on a message that is STILL streaming (reasoning ended, content began).
+      // The live label is `Thinking...` until the message settles - §2 must still pass, and
+      // this case says so on the fixture that could break it.
+      renderWithTooltip(
+        <MessageItem
+          message={makeMessage({
+            runStatus: "streaming",
+            reasoningContent: REASONING_MEDIAN,
+            reasoningMs: 6_000,
+          })}
+          isStreaming
+        />,
+      )
+      expect(triggerText()).toBe("Thinking...")
+      expect(triggerText()).not.toMatch(/\d/)
+    })
+
+    it("§14f — the label is the ONLY thing that changed: still no count, and the fold still starts closed", () => {
+      renderWithTooltip(
+        <MessageItem
+          message={makeMessage({ reasoningContent: REASONING_MEDIAN, reasoningMs: 6_000 })}
+        />,
+      )
+      expandSettledRun()
+      // ⛔ D-243-02: no `count` on the trigger. The ONE digit the label may carry is a
+      //    MEASURED duration; a unit, a total or a step count is still forbidden.
+      expect(triggerText()).toBe("Thought for 6 seconds")
+      expect(triggerText()).not.toMatch(/chars|steps|tokens|·/)
+      // ⛔ And the fold default is untouched by the label change.
+      expect(screen.queryByText(REASONING_MEDIAN, { normalizer: RAW })).toBeNull()
+    })
+  })
+
   it("§13 — the fold SURVIVES the temp-id to DB-id reconcile — the remount semantics, DECIDED here", () => {
     // 243-PATTERNS F.8 flagged this as a thing 243-02 must DECIDE rather than inherit.
     // `RunCard` holds `thinkingOpen` today and is not re-keyed, so an open fold survives the

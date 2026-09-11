@@ -597,9 +597,9 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | Hot file (FIRING) | commits / phases / lines | Verdict (abridged) |
 |---|---|---|
 | `frontend/src/components/chat/ToolCallPanel.tsx` | 51 / 23 / 351 | ✅ **G-5 DISCHARGED (227-02)** |
-| `frontend/src/components/chat/MessageItem.tsx` | 67 / 33 / 726 | ✅ **G-5 DISCHARGED (227-03)**; ⚠ row was STALE at `62/33/702`. NOT re-hollowed (**243-02**): `useState` 3→3, `useEffect` 0→0, props 5→5, 0 deleted — a MOUNT, measured |
+| `frontend/src/components/chat/MessageItem.tsx` | 68 / 33 / 727 | ✅ **G-5 DISCHARGED (227-03)**. NOT re-hollowed (**243-02**, **243-04**): one prop added to the existing mount, `useState` 3→3, `useEffect` 0→0, 0 deleted — measured |
 | `backend/app/api/threads.py` | 243 / 80 / 1590 | extraction TAKEN 2026-08-17 · honoured by construction (**214**) |
-| `frontend/src/providers/StreamsProvider.tsx` | 89 / 36 / 4325 | ⚠ row was STALE at `85/34/4144`. honoured by construction (**243-03**): 2 delta callbacks coalesced INSIDE the existing factory — closure state, not a 6th concern |
+| `frontend/src/providers/StreamsProvider.tsx` | 90 / 36 / 4380 | ⚠ row STALE TWICE (`85/34/4144`, then `89/36/4325` ONE PLAN later). honoured by construction (**243-04**): the measured span is 3 closure vars beside `currentIteration` |
 | `frontend/src/hooks/useMessages.ts` | 74 / 27 / 127 | extraction due |
 | `backend/app/services/anthropic_service.py` | 11 / 10 / 354 | adapter-pattern audit due |
 | `backend/app/services/embedding_service.py` | 9 / 5 / 354 | ⚠ absent for its entire life at 5 phases — row added 236 (SC#2) |
@@ -639,7 +639,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/chat/OutputFileCard.tsx` | 8 / 7 / 219 | honoured by construction (195) |
 | `frontend/src/components/panel/FilesSection.tsx` | 8 / 5 / 334 | honoured by construction (195) |
 | `frontend/src/lib/api.ts` | 187 / 110 / 422 | ✅ **SPLIT TAKEN (207)** |
-| `frontend/src/types/index.ts` | 78 / 60 / 1331 | no seam proposed |
+| `frontend/src/types/index.ts` | 85 / 65 / 1380 | ⚠ row was STALE at `78/60/1331` — **7 commits, 5 phases**. honoured by construction (**243-04**): ONE optional client-only field, `reasoningMs`, whose ABSENCE is the honest-fallback signal. seam still OWED |
 | `backend/app/main.py` | 82 / 59 / 950 | ⚠ row was STALE by **FOURTEEN PHASES**. honoured by construction (**BUG-260902-06**) |
 | `backend/app/config.py` | 83 / 48 / 1506 | ⚠ STALE AGAIN at `82/47/1489` — the ELEVENTH. honoured by construction (**241**): 4 hnsw defaults, no reader changed. `MODEL_CAPABILITIES` seam still OWED |
 | `backend/app/api/admin.py` | 33 / 13 / 1740 | ⚠ row was STALE. honoured by construction (**BUG-260902-06**): 2 write seams broadcast; the 2 WR-03 READ seams deliberately do not |
