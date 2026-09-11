@@ -632,7 +632,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/harness_engine.py` | 54 / 20 / 3135 | honoured by construction (194 / **214**) |
 | `frontend/src/components/chat/RunCard.tsx` | 28 / 14 / 710 | ⭐ **G-5 DISCHARGED (243-02)** — the reasoning fold left for `ThinkingBlock.tsx`, `-39/+20`, one `useState` fewer. ⚠ row was STALE at `26/12/728`. State 2 stayed, by decision |
 | `frontend/src/components/chat/MessageInput.tsx` | 29 / 14 / 643 | honoured by construction (194.1) |
-| `frontend/src/components/chat/MessageList.tsx` | 20 / 8 / 292 | ⚠ row was STALE at `19/8/267`. **243-03 did NOT modify it** — the scroll rate fell from upstream (61→13); D-17’s `RunStatusStrip` block byte-unchanged |
+| `frontend/src/components/chat/MessageList.tsx` | 20 / 8 / 300 | ⚠ row STALE at `19/8/267`, then at `20/8/292`. honoured by construction (**243-06**): one arm added to the EXISTING wheel mapping — `deltaY === 0` decides nothing |
 | `frontend/src/components/chat/ChatArea.tsx` | 70 / 35 / 678 | ⚠ row was STALE at `67 / 32 / 595` |
 | `frontend/src/components/panel/PendingAskCard.tsx` | 13 / 7 / 736 | honoured by construction (194.1 / **214**) |
 | `frontend/src/pages/WorkflowRunPage.tsx` | 28 / 9 / 1670 | honoured by construction (200 / 200.1 / 200.2 / **214**) |

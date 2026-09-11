@@ -362,6 +362,130 @@ describe("Phase 243 Plan 03 (D-243-05) — the ~600 ms re-arm window, driven at 
     expect(result.current.showJumpToLive).toBe(false)
   })
 
+  it("⭐ D — RED DRIVE (HI-2): one DIRECTIONLESS gesture must not undo the reader's decision to leave", () => {
+    // ⚠ THE INTENT REF IS OVERWRITTEN BY EVERY GESTURE, and `MessageList.tsx:115` maps
+    //    `pointerdown` / `touchmove` to "unknown" — which passes `!== "up"`. So the release
+    //    case A fences survives only until the reader touches the transcript for ANY reason.
+    // ⚠ AND PHASE 243 PUT A CLICK TARGET ON EVERY ASSISTANT ROW INSIDE THE VIEWPORT (the
+    //    thinking fold's `<button>`), so this is a DESIGNED interaction now, not an accident.
+    const vp = movableViewport()
+    const { result } = renderHook(() => useFollowScroll(() => vp, true))
+
+    act(() => {
+      result.current.beginProgrammaticScroll()
+    })
+    const t = clock
+    setGeom(vp, 440) // dist 60 — still "near bottom", the only shape that can reach the re-arm
+    act(() => {
+      result.current.noteUserGesture("up")
+      result.current.onScroll()
+    })
+    expect(result.current.isPinned).toBe(false)
+
+    // Case A's ground, re-established: 1000 ms on, still released.
+    clock = t + 1000
+    act(() => {
+      result.current.onScroll()
+    })
+    expect(result.current.isPinned).toBe(false)
+
+    // The reader clicks something in the transcript — the thinking fold, a citation, a
+    // selection. `pointerdown` carries no direction, so it arrives as "unknown".
+    act(() => {
+      result.current.noteUserGesture()
+      result.current.onScroll()
+    })
+
+    // They asked to be left where they are and have not asked otherwise.
+    expect(result.current.isPinned).toBe(false)
+    expect(result.current.showJumpToLive).toBe(true)
+  })
+
+  it("⭐ D-mirror-1 — a directionless gesture with NO prior 'up' still re-arms by geometry", () => {
+    // ⛔ THE BIT ONLY EVER TAKES HOLD WHEN THE READER SAID "UP". A touch drag or a scrollbar
+    //    grab that coasts to the bottom, from a release the GEOMETRY produced, must still
+    //    re-arm — a fix that passes D by refusing every directionless re-arm is a regression.
+    const vp = movableViewport()
+    const { result } = renderHook(() => useFollowScroll(() => vp, true))
+
+    setGeom(vp, 100) // dist 400 — released by geometry, no gesture intent recorded
+    act(() => {
+      result.current.noteUserGesture()
+      result.current.onScroll()
+    })
+    expect(result.current.isPinned).toBe(false)
+
+    clock += 5_000
+    setGeom(vp, 500) // the drag lands at the bottom
+    act(() => {
+      result.current.noteUserGesture()
+      result.current.onScroll()
+    })
+    expect(result.current.isPinned).toBe(true)
+  })
+
+  it("⭐ D-mirror-2 — `jumpToLive()` clears the decision: the chip is how a reader comes back", () => {
+    const vp = movableViewport()
+    const { result } = renderHook(() => useFollowScroll(() => vp, true))
+
+    setGeom(vp, 440)
+    act(() => {
+      result.current.noteUserGesture("up")
+      result.current.onScroll()
+    })
+    expect(result.current.isPinned).toBe(false)
+
+    act(() => {
+      result.current.jumpToLive()
+    })
+    expect(result.current.isPinned).toBe(true)
+
+    // …and afterwards a directionless gesture near the bottom re-arms as it always did:
+    // the sticky bit is gone, not merely overridden for one call.
+    clock += 5_000
+    act(() => {
+      result.current.noteUserGesture("up")
+      result.current.onScroll()
+    })
+    expect(result.current.isPinned).toBe(false)
+    act(() => {
+      result.current.jumpToLive()
+      clock += 2_000
+      result.current.noteUserGesture()
+      result.current.onScroll()
+    })
+    expect(result.current.isPinned).toBe(true)
+  })
+
+  it("⭐ D-mirror-3 — a NEW run clears the decision: 'leave me alone' is scoped to the run it was said in", () => {
+    // ⚠ WITHOUT THIS THE BIT IS PERMANENT FOR A READER WHO RETURNS BY SCROLLBAR. They said
+    //    "up" once, came back by a drag (directionless), and would never follow again in any
+    //    later turn. The bit is the reader's answer to THIS run, so a new run re-asks.
+    const vp = movableViewport()
+    const { result, rerender } = renderHook(({ s }) => useFollowScroll(() => vp, s), {
+      initialProps: { s: true },
+    })
+
+    setGeom(vp, 440)
+    act(() => {
+      result.current.noteUserGesture("up")
+      result.current.onScroll()
+    })
+    expect(result.current.isPinned).toBe(false)
+
+    // The run ends, and a new one begins.
+    rerender({ s: false })
+    rerender({ s: true })
+
+    clock += 5_000
+    setGeom(vp, 500)
+    act(() => {
+      result.current.noteUserGesture()
+      result.current.onScroll()
+    })
+    expect(result.current.isPinned).toBe(true)
+  })
+
   it("⭐ C — the tail of our OWN scroll still cannot re-arm inside the hard window (BUG-260904-02's fence, re-driven at HEAD)", () => {
     const vp = movableViewport()
     const { result } = renderHook(() => useFollowScroll(() => vp, true))

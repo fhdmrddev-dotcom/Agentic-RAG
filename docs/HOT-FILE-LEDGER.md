@@ -9664,8 +9664,8 @@ cells rot within days.
 | [`frontend/src/components/chat/RunCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatruncardtsx) | 28 / 14 / 710 | **FIRES** | ⭐ **G-5 DISCHARGED (243-02)** — the reasoning fold left for `ThinkingBlock.tsx`, `-39/+20`, one `useState` fewer. ⚠ row was STALE at `26/12/728`. State 2 stayed, by decision |
 | [`frontend/src/components/chat/ThinkingBlock.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatthinkingblocktsx) | 4 / 1 / 283 | no | ⚠ **row at ONE phase BY DESIGN**; `117 → 283` in one phase (**243-04**). Invariants: **one reasoning renderer**, and **no duration derived from length** |
 | [`frontend/src/components/chat/MessageInput.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageinputtsx) | 29 / 14 / 643 | **FIRES** | honoured by construction (194.1) |
-| [`frontend/src/components/chat/MessageList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessagelisttsx) | 20 / 8 / 292 | **FIRES** | ⚠ row was STALE at `19/8/267`. **243-03 did NOT modify it** — the scroll rate fell from upstream; `RunStatusStrip`s D-17 block untouched |
-| [`frontend/src/hooks/useFollowScroll.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusefollowscrollts) | 3 / 2 / 265 | does not fire | ⛔ **NO ROW FOR ITS ENTIRE LIFE — added 243-03.** A re-arm now also refuses when the last gesture was UP; three clocks/conditions, none collapsible |
+| [`frontend/src/components/chat/MessageList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessagelisttsx) | 20 / 8 / 300 | **FIRES** | ⚠ row STALE twice (`19/8/267`, then `20/8/292`). **243-06 DOES modify it** — one arm on the existing wheel mapping; `deltaY === 0` decides nothing |
+| [`frontend/src/hooks/useFollowScroll.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusefollowscrollts) | 4 / 2 / 314 | does not fire | ⛔ **NO ROW FOR ITS ENTIRE LIFE — added 243-03**, then STALE at `3/2/265` one phase on. **243-06:** the re-arm now asks whether the reader is STILL leaving, not what they last did |
 | [`frontend/src/lib/throttle.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibthrottlets) | 2 / 2 / 108 | does not fire | ⛔ **NO ROW FOR ITS ENTIRE LIFE — added 243-03.** TWO opposite primitives on purpose; ⛔ never unify them — one of the two call sites breaks silently |
 | [`frontend/src/components/chat/ChatArea.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatchatareatsx) | 70 / 35 / 678 | **FIRES** | ⚠ row was STALE at `67 / 32 / 595` — **+3 phases** unrecorded. honoured by construction (194.1 / **235**) |
 | [`frontend/src/components/panel/PendingAskCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelpendingaskcardtsx) | 13 / 7 / 736 | **FIRES** | honoured by construction (194.1 / **214**) — ⚠ it still renders `Needs you`; `stepIdentityVocabulary`'s six PAUSE sentences reach it from nothing (`SEED-219`) |
@@ -10775,6 +10775,20 @@ the per-token repaint `CHAT-02` had just removed, at 4 Hz, in the component the 
 **Named seam:** unchanged — this factory is still the right home, and the next thing to leave
 should be a WHOLE callback family, never a variable.
 
+## `frontend/src/hooks/useFollowScroll.ts` — `243-06` (review finding HI-2)
+
+**Re-derived 2026-09-11:** `4 / 2 / 314` (commits measured BEFORE this commit lands, lines AFTER its edit — the pair goes stale on the commit that writes it). **Does not fire** (2 phases vs threshold 3). ⚠ The scan-list row read `3 / 2 / 265`, **stale one phase after it was created** — the row `243-03` added to fix a permanent absence was itself wrong within a day, which is this ledger's own recurring finding rather than a new one.
+
+⛔ **243-06 REPAIRS A HOLE IN 243-03'S OWN FIX, AND THE HOLE IS WHAT THE THIRD RE-ARM CLAUSE ASKED.** `243-03` added `lastGestureIntentRef.current !== "up"` — *"the last thing the reader did must not have been to leave."* **But that ref is OVERWRITTEN BY EVERY GESTURE**, and `MessageList.tsx` maps `pointerdown` / `touchmove` to `"unknown"`, which passes the test. **DRIVEN (⭐D): wheel-up → released → 1000 ms on, still released (243-03's fix holding) → ONE `pointerdown` → the next scroll event re-pinned them. `expected true to be false`.** ⚠ **And Phase 243 is what turned that into a designed interaction**: `ThinkingBlock` puts a `<button>` on every reasoning-bearing assistant row **inside this viewport**, so "the reader clicks something in the transcript mid-run" went from an accident to the feature. ⭐ **The phase's own new affordance re-opened the defect the phase existed to close** — a cross-plan seam neither plan could see alone.
+
+**The repair is a second ref, and the ASYMMETRY is the whole of it:** `leftDeliberatelyRef` is TAKEN only by an `"up"` intent and GIVEN BACK only by an explicit `"down"`, by `jumpToLive()`, or by a new run. ⛔ **A gesture that carries no direction can do NEITHER** — it cannot strand a reader who never asked to be left, and it cannot speak for one who did. This is the same principle the file's two clocks already encode (*a gesture buys the right to LET GO, never to TAKE HOLD*) carried one step further: `lastGestureIntentRef` answers *"what was the last input"*, which any later click overwrites; `leftDeliberatelyRef` answers *"has the reader asked to be left alone and not taken it back"*, which is the question the re-arm was always trying to ask.
+
+⛔ **THE MIRRORS ARE HALF THE DESIGN AND ARE FENCED BESIDE THE DEFECT, because a fix that passes one by breaking the other is a regression, not a fix.** All four were GREEN against the pre-fix code (so they are not red-washed) and are GREEN after: **D-mirror-1** a directionless drag with NO prior `"up"` still re-arms by geometry; **D-mirror-2** `jumpToLive()` CLEARS the bit outright rather than merely re-pinning (the chip is how a reader comes back, and a bit left set would be undone by the next scroll event); **D-mirror-3** a new run clears it — ⚠ **without which the bit is PERMANENT for a reader who wheels up once and returns by dragging the SCROLLBAR**, since a scrollbar grab is directionless and therefore cannot clear what it cannot set. The bit is the reader's answer to THIS run, so a new run re-asks. `⭐B` / `§5` (an explicit flick back down) and the geometry-release cases carried over unchanged.
+
+**Invariant this file now carries:** ⛔ **only a DIRECTED intent may change the reader's standing decision.** A future phase adding a fifth gesture listener must decide which of the three intents it maps to, and mapping a directionless input to `"down"` re-opens HI-2 exactly. ⚠ `MessageList.tsx:109` already did that once — `deltaY < 0 ? "up" : "down"` read a horizontal wheel (`deltaY === 0`) as a deliberate scroll down — fixed in the same commit and fenced by `MessageList.scroll.test.tsx` §9.
+
+---
+
 ## `frontend/src/components/chat/MessageList.tsx` — `243-03` (CHAT-03)
 
 **Re-derived 2026-09-11:** `20 / 8 / 292` · no quick-task buckets. ⚠ **The scan-list row read
@@ -10797,3 +10811,29 @@ that reason and installs a **spy**; its cases run on a **54-message** thread, be
 
 **D-17 re-verified, not assumed:** the `RunStatusStrip` floating-chip block is byte-unchanged — the
 whole file is. **It inherits `20 / 8 / 292`.**
+
+⚠ **RE-DERIVED AT `243-06` (2026-09-11) — `20 / 8 / 292` → `20 / 8 / 300`, and this time the file IS
+modified.** The paragraph above records `243-03` naming this file in `files_modified` and touching
+nothing; **the follow-up review found the reason that was only half true.** The gesture→intent mapping
+at `:108-118` is where a `wheel` becomes an `"up"`, a `"down"` or an `"unknown"`, and one arm of it was
+wrong: `e.deltaY < 0 ? "up" : "down"` classified **every `deltaY === 0` wheel — horizontal, shift+wheel,
+a sideways trackpad flick — as a deliberate scroll DOWN**, which refreshed the gesture clock and gave
+back a reader's *"leave me alone"*. **Driven at the component level (`§9`): the Jump-to-live chip
+vanished after a horizontal wheel**, i.e. the reader was silently re-pinned.
+
+**The change is one arm on an existing branch** — `deltaY === 0` returns `"unknown"` and decides
+nothing — so it is honoured by construction rather than by an extraction: no new listener, no new
+gesture, no change to the four events attached at `:117`. ⛔ **The binding invariant is stated in
+`useFollowScroll.ts`'s section and is enforced HERE:** only a DIRECTED intent may change the reader's
+standing decision, so a fifth listener added to `gestures` must say which of the three intents it maps
+to, and mapping a directionless input to `"down"` re-opens HI-2 exactly.
+
+⭐ **And the sharper finding, recorded because it is a CROSS-PLAN seam rather than a bug in either
+plan:** `243-02` mounted `ThinkingBlock` — a real `<button>` — on every reasoning-bearing assistant row
+**inside this scroll viewport**, while `243-03` fixed the re-arm against a model in which clicking the
+transcript was an accident. **Neither plan was wrong on its own; the phase shipped a new click target
+into the exact surface whose click handling the sibling plan was hardening.** `§8` now drives that
+interaction end-to-end (`pointerdown` on the real fold trigger), and `§10` is its mirror: the same
+click with no prior scroll-up must leave following intact.
+
+**It inherits `20 / 8 / 300`, and that figure goes stale on the next commit touching the file.**

@@ -3022,7 +3022,14 @@ const BASELINE = {
   //
   // ⚠ Every case runs on a 54-message thread. A 3-message fixture cannot show the failure
   // mode the ROADMAP names ("works on a short thread and fails on a long one").
-  "MessageList.scroll.test.tsx": 8,
+  //
+  // ⚠ RAISED 8 -> 11 at `243-06` (review finding HI-2). §8 drove RED at the component level with
+  // the REAL interaction this phase introduced — a `pointerdown` on `ThinkingBlock`'s fold
+  // `<button>`, which sits inside this viewport on every reasoning-bearing row — and the
+  // Jump-to-live chip vanished, i.e. the reader was dragged back. §9 drove the horizontal wheel
+  // (`deltaY === 0`, which used to read as "down"). §10 is their mirror: the same click with no
+  // prior scroll-up must leave following intact.
+  "MessageList.scroll.test.tsx": 11,
 
   // ── Phase 243 (243-03 / CHAT-02) — ADOPTED, NOT CREATED, and it was ungated since 068.5 ──
   //
@@ -3287,7 +3294,17 @@ const BASELINE = {
   // cancel our claim for the purpose of letting go but NEVER for taking hold again, and an
   // upward gesture must release synchronously rather than a commit later. Each was driven RED,
   // and two of them only after a REAL mouse wheel refuted a synthetic one that measured clean.
-  "useFollowScroll.test.ts": 10,
+  //
+  // ⚠ RAISED 10 -> 17 at `243-06`, AND THE +7 IS TWO DIFFERENT THINGS — attributed rather than
+  // quoted as one number, because an unexplained `+n` is the thing to worry about. **+3 were
+  // already on disk and unpinned**: `243-03` added cases ⭐A / ⭐B / ⭐C and did not re-baseline,
+  // so the file ran at 13 against a pin of 10 for a whole phase. **+4 are `243-06`'s** (review
+  // finding HI-2): ⭐D drove RED — `expected true to be false` — that ONE directionless
+  // `pointerdown` re-pinned a reader who had wheeled up and stayed released for 1000 ms, and
+  // D-mirror-1/2/3 pin the three ways the decision must still be GIVEN BACK (a geometry-only
+  // release, `jumpToLive()`, a new run). ⛔ The mirrors are the half a later "fix" would drop:
+  // refusing every directionless re-arm passes ⭐D and strands every scrollbar user.
+  "useFollowScroll.test.ts": 17,
   // ── BUG-260904-01 (2026-09-04) — the Continue button's ONLY behavioural guard ──────────
   // Pinned in the SAME COMMIT that creates it (a BASELINE key naming a path that does not yet
   // exist makes this gate ERROR at exit 2, not fail). Bare name confirmed unique tree-wide.

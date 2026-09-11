@@ -131,6 +131,38 @@ function unattributedScroll(vp: HTMLElement) {
   })
 }
 
+/**
+ * A reader CLICKING something inside the transcript, and then the reflow that click causes.
+ * ⚠ `pointerdown` is dispatched from the clicked element so it BUBBLES to the viewport
+ * exactly as a real one does — `MessageList.tsx:117` attaches the gesture listeners to the
+ * viewport, not to the target. The direction is not in the event, so the hook sees "unknown".
+ */
+function clickInsideTranscript(vp: HTMLElement, target: HTMLElement) {
+  act(() => {
+    target.dispatchEvent(new Event("pointerdown", { bubbles: true }))
+    target.click()
+    vp.dispatchEvent(new Event("scroll"))
+  })
+}
+
+/** A HORIZONTAL wheel / shift+wheel: `deltaY === 0`. It says nothing about up or down. */
+function horizontalWheel(vp: HTMLElement) {
+  act(() => {
+    vp.dispatchEvent(new WheelEvent("wheel", { deltaX: 120, deltaY: 0 }))
+    vp.dispatchEvent(new Event("scroll"))
+  })
+}
+
+/** The live assistant row carries reasoning, so `ThinkingBlock` mounts its fold `<button>`. */
+function withThinking(messages: Message[]): Message[] {
+  const copy = messages.slice()
+  const last = { ...copy[copy.length - 1] } as Message
+  ;(last as { reasoningContent?: string }).reasoningContent =
+    "Let me work out what the user is asking for before I answer."
+  copy[copy.length - 1] = last
+  return copy
+}
+
 describe("Phase 243 Plan 03 — MessageList's scroll effect, seen through a real spy", () => {
   let scrollIntoViewSpy: ReturnType<typeof vi.fn>
   let clock = 0
@@ -290,6 +322,84 @@ describe("Phase 243 Plan 03 — MessageList's scroll effect, seen through a real
 
     scrollIntoViewSpy.mockClear()
     messages = withMoreTokens(messages, " resumed")
+    rerenderStreaming(messages)
+    expect(scrollIntoViewSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it("§8 — ⭐ RED DRIVE (HI-2): the reader nudges up, then OPENS THE THINKING FOLD — the click must not re-pin them", () => {
+    // ⛔ THIS IS THE INTERACTION PHASE 243 ITSELF ADDED. `ThinkingBlock` puts a `<button>` on
+    //    every reasoning-bearing assistant row INSIDE the scroll viewport, so clicking in the
+    //    transcript is now a designed act. `MessageList.tsx:115` maps `pointerdown` to
+    //    "unknown", which passed the re-arm's `!== "up"` clause — one click and the reader who
+    //    scrolled away is dragged back to the live edge, which is the operator report verbatim.
+    let messages = withThinking(withPreparingTool(makeLongThread()))
+    const { vp, rerenderStreaming } = mountStreaming(messages)
+
+    messages = withMoreTokens(messages, " a")
+    rerenderStreaming(messages)
+    const t = clock
+
+    nudgedUp(vp)
+    userScroll(vp, "up")
+    expect(screen.getByTestId("jump-to-live-chip")).toBeInTheDocument()
+    scrollIntoViewSpy.mockClear()
+
+    // Past the hard clock, inside the gesture window — the same ~600 ms ground as §3.
+    clock = t + 1000
+    const trigger = screen.getByTestId("thinking-trigger")
+    clickInsideTranscript(vp, trigger)
+
+    // Still released, and the tokens that follow still do not move them.
+    expect(screen.queryByTestId("jump-to-live-chip")).toBeInTheDocument()
+    for (let i = 0; i < 4; i++) {
+      messages = withMoreTokens(messages, ` post${i}`)
+      rerenderStreaming(messages)
+      clock += 40
+    }
+    expect(scrollIntoViewSpy).toHaveBeenCalledTimes(0)
+  })
+
+  it("§9 — ⭐ RED DRIVE (HI-2): a HORIZONTAL wheel carries no vertical direction and must not read as 'down'", () => {
+    // `MessageList.tsx:109` was `e.deltaY < 0 ? "up" : "down"` — so `deltaY === 0` (a
+    // horizontal wheel, a shift+wheel, a trackpad sideways flick) was classified as a
+    // deliberate scroll DOWN, refreshing the gesture clock and clearing an "up" decision.
+    let messages = withPreparingTool(makeLongThread())
+    const { vp, rerenderStreaming } = mountStreaming(messages)
+
+    messages = withMoreTokens(messages, " a")
+    rerenderStreaming(messages)
+    const t = clock
+
+    nudgedUp(vp)
+    userScroll(vp, "up")
+    expect(screen.getByTestId("jump-to-live-chip")).toBeInTheDocument()
+    scrollIntoViewSpy.mockClear()
+
+    clock = t + 1000
+    horizontalWheel(vp)
+
+    expect(screen.queryByTestId("jump-to-live-chip")).toBeInTheDocument()
+    for (let i = 0; i < 4; i++) {
+      messages = withMoreTokens(messages, ` post${i}`)
+      rerenderStreaming(messages)
+      clock += 40
+    }
+    expect(scrollIntoViewSpy).toHaveBeenCalledTimes(0)
+  })
+
+  it("§10 — ⭐ THE MIRROR for §8/§9: a click inside the transcript with NO prior scroll-up leaves following intact", () => {
+    // ⛔ The reader never asked to be left alone. Opening the fold while at the live edge must
+    //    not release the pin, and must not stop the following — a fix that buys §8 by making
+    //    every transcript click a release would be the opposite bug.
+    let messages = withThinking(withPreparingTool(makeLongThread()))
+    const { vp, rerenderStreaming } = mountStreaming(messages)
+
+    const trigger = screen.getByTestId("thinking-trigger")
+    clickInsideTranscript(vp, trigger)
+    expect(screen.queryByTestId("jump-to-live-chip")).toBeNull()
+
+    scrollIntoViewSpy.mockClear()
+    messages = withMoreTokens(messages, " still following")
     rerenderStreaming(messages)
     expect(scrollIntoViewSpy).toHaveBeenCalledTimes(1)
   })

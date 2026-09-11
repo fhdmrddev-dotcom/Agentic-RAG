@@ -106,7 +106,15 @@ export function MessageList({ messages, isStreaming, isLoading = false, onSendMe
       const UP_KEYS = new Set(["PageUp", "ArrowUp", "Home"])
       const DOWN_KEYS = new Set(["PageDown", "ArrowDown", "End"])
       const onGesture = (e: Event) => {
-        if (e instanceof WheelEvent) return noteUserGesture(e.deltaY < 0 ? "up" : "down")
+        if (e instanceof WheelEvent) {
+          // ⚠ 243-06 (HI-2): `deltaY < 0 ? "up" : "down"` classified a HORIZONTAL wheel,
+          // a shift+wheel and a sideways trackpad flick — all `deltaY === 0` — as a
+          // deliberate scroll DOWN, which refreshed the gesture clock and gave back a
+          // reader's "leave me alone". Zero vertical movement says nothing about direction,
+          // so it is "unknown" and decides nothing. Fenced by `MessageList.scroll.test.tsx` §9.
+          if (e.deltaY === 0) return noteUserGesture("unknown")
+          return noteUserGesture(e.deltaY < 0 ? "up" : "down")
+        }
         if (e instanceof KeyboardEvent) {
           if (UP_KEYS.has(e.key)) return noteUserGesture("up")
           if (DOWN_KEYS.has(e.key)) return noteUserGesture("down")
