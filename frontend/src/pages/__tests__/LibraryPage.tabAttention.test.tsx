@@ -197,14 +197,22 @@ const EXPECTED_LABELS: ReadonlyArray<readonly [LibraryTab, string]> = [
   ["health", "Health"],
 ]
 
-/** Conditions shaped exactly as the one registered producer emits them. */
-function stoppedConditions(n: number, tab: LibraryTab | undefined = "health"): AttentionCondition[] {
+/**
+ * Conditions shaped exactly as the one registered producer emits them.
+ *
+ * ⚠ **`null` MEANS "no tab", NOT `undefined` — and that distinction cost a red run.** The first
+ * cut took `tab: LibraryTab | undefined = "health"`, so the case that meant to build a TAB-LESS
+ * condition passed `undefined` and got the DEFAULT back. It read green in the RED run (nothing
+ * rendered at all yet) and only failed once the feature worked, which is the worst order to
+ * find a fixture bug in. A default parameter cannot express "explicitly absent"; `null` can.
+ */
+function stoppedConditions(n: number, tab: LibraryTab | null = "health"): AttentionCondition[] {
   return Array.from({ length: n }, (_, i) => ({
     id: `watch-${i + 1}`,
     title: `Rate sheets ${i + 1}`,
     detail: "The watched folder is no longer shared with this connection.",
     onOpen: vi.fn(),
-    ...(tab ? { tab } : {}),
+    ...(tab === null ? {} : { tab }),
   }))
 }
 
@@ -317,7 +325,7 @@ describe("Library tab attention — the tab says WHERE", () => {
   })
 
   it("a condition with NO tab marks nothing and does not crash — the field is optional", async () => {
-    renderPage(<LibraryPage attentionConditions={stoppedConditions(2, undefined)} />)
+    renderPage(<LibraryPage attentionConditions={stoppedConditions(2, null)} />)
     await waitFor(() => expect(screen.getAllByRole("tab").length).toBe(5))
     for (const [tab] of EXPECTED_LABELS) {
       expect(markOn(tab)).toBeNull()
@@ -372,7 +380,7 @@ describe("attentionCountByTab — the derivation, with nothing mounted", () => {
   it("ignores conditions with no tab rather than bucketing them under a default", () => {
     // ⛔ A tab-less condition belongs to no Library tab. Bucketing it anywhere would make the
     // shell's count and the tab's count disagree about the same thing.
-    expect(attentionCountByTab(stoppedConditions(2, undefined))).toEqual({})
+    expect(attentionCountByTab(stoppedConditions(2, null))).toEqual({})
   })
 
   it("an empty registry derives an empty map, never a map of zeroes", () => {

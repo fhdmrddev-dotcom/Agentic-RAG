@@ -7247,6 +7247,25 @@ order is still load-bearing and still enforced from `LibraryPage.tsx` by `nth-ch
 
 ### `frontend/src/pages/LibraryPage.tsx`
 
+⚠ **RE-DERIVED AT `244-04` (2026-09-11): `45 / 14 / 923` at base `310b91e83`** — the scan-list row
+read `44 / 14 / 922`, one commit and one line behind. `--follow` used, as this file's own rename note
+below requires; without it the recipe reads **1** and has measured the RENAME, not the file.
+
+⭐ **`244-04` — THE PAGE RECEIVES A VERDICT; IT DOES NOT FETCH ONE.** It gains one optional prop
+(`attentionConditions`), one `useMemo` over a strict leaf (`attentionCountByTab`), and passes the
+resulting map to the header row. ⛔ **No `useSourceAttention()` call was added here**, because that is
+arm 1 of `attentionConditions.ts`'s own re-open trigger — *a third concurrent reader* — and firing a
+file's documented deferral to save one prop is exactly the trade that deferral exists to refuse. A
+`?raw` fence in this plan's suite asserts the page's stripped code never names the hook.
+
+⚠ **THE MARK IS RENDERED BY `LibraryHeaderBar.tsx`, NOT HERE — a DEVIATION from the plan's own
+wording, recorded rather than silently absorbed.** `244-04-PLAN.md` says *"`LibraryPage.tsx`: render
+the per-tab mark on the segmented control"*. The five triggers **moved out of this file at sketch
+231-A**: `LibraryPage.tsx:794` carries a comment saying so, and keeping a second copy here is the
+`getMultipleElementsFoundError` defect that block records (a hidden duplicate of an interactive
+control is not a preserved contract, it is a second control). So the page composes and the header
+row draws. The `LIBRARY_TABS`-derived-from-`TAB_LABELS` rule is untouched — `D-217-15` holds.
+
 ⚠ **RE-DERIVED 2026-09-05 (Phase 233): `40 / 12 / 825`** — the row read `35 / 11 / 814`.
 **Honoured by construction:** 233 changed ONE container class and no branch, because 217-09's seam
 was taken and every tab body is already a CHILD.
@@ -8651,8 +8670,24 @@ unless it is written down.
 
 ## frontend/src/App.tsx
 
-**31 / 23 / 351** · ⚠ **FIRES** · the app root: auth gate, provider stack, and the view/tab state
+**32 / 23 / 374** · ⚠ **FIRES** · the app root: auth gate, provider stack, and the view/tab state
 every top-level navigator sets.
+
+⚠ **RE-DERIVED AT `244-04` — the row read `31 / 23 / 351` and was STALE by a commit and 23 lines.**
+Measured with `git log --follow` at base `310b91e83`; the phase count is genuinely unchanged at 23.
+
+⭐ **`244-04` LEFT THIS FILE BYTE-UNCHANGED, AND THAT IS THE DELIVERABLE, NOT AN OMISSION.** The
+plan named it in `files_modified` so its writer count could be FENCED, not edited: the per-tab
+attention attribution rides the hand-off that already exists, so `setLibraryTab(` is still called
+exactly **twice** and `libraryTabAfterNavigate` still owns the lifetime. ⛔ A second writer here is
+the Phase 235 plan-15 defect verbatim — one badge click permanently redefining where the Library
+opens — and it is now pinned by a `?raw` count in `LibraryPage.tabAttention.test.tsx`, **driven RED
+against a deliberately planted third writer** (`expected 3 to be 2`) with the file restored
+md5-identical.
+
+⚠ **THE COUNT IS TAKEN OVER STRIPPED CODE, NEVER RAW TEXT.** This file carries a long comment block
+about this very hand-off; a raw-text count would be satisfiable — or breakable — by a comment, which
+is the 187-24 lesson this file's own `:96-106` docblock already records once.
 
 ⚠ **IT HAD NO ROW FOR ITS ENTIRE LIFE — TWENTY-THREE PHASES.** G-5 could never have fired on the
 application's root component. Recorded plainly because the number is the point: this is the second
@@ -9943,7 +9978,8 @@ cells rot within days.
 | [`backend/app/api/workflow_runs.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkflow_runspy) | 11 / 8 / 1003 | **FIRES** | honoured by construction (200 / 200.1 / **214**) — no longer *at threshold*: it measures **8** phases |
 | [`backend/app/models/thread.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsthreadpy) | 16 / 10 / 438 | ⚠ **FIRES** | honoured by construction (200.1 / **214**) |
 | [`frontend/src/components/workflows/canvasModel.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowscanvasmodelts) | 13 / 6 / 752 | ⚠ **FIRES** | ⚠ absent from BOTH at 6 phases (added 200) |
-| [`frontend/src/components/layout/ChatLayout.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutchatlayouttsx) | 50 / 26 / 1005 | ⚠ **FIRES** | ⚠ row was STALE at `46 / 24 / 921`. honoured by construction (**244-01**): two class TOKENS (`min-h-0` on the grid track and `<main>`) — no state, no prop, no branch |
+| [`frontend/src/components/layout/ChatLayout.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutchatlayouttsx) | 51 / 26 / 1010 | ⚠ **FIRES** | ⚠ row was STALE at `46 / 24 / 921`. honoured by construction (**244-04**): ONE prop on an existing mount — a 4th renderer off the SAME one read; `ATTENTION_PRODUCERS.flatMap` still appears once |
+| [`frontend/src/components/library/LibraryHeaderBar.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibrarylibraryheaderbartsx--row-added-244-04) | 2 / 1 / 204 | no (1 phase) | ⚠ absent for its entire life — row added 244-04 at its SECOND touch. ⛔ the ONE set of tab triggers: a hidden duplicate broke 41 cases. `aria-hidden` on the count is load-bearing |
 | [`frontend/src/components/layout/ChatHistoryColumn.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutchathistorycolumntsx) | 7 / 2 / 513 | below threshold | ⚠ **ABSENT from BOTH for its ENTIRE LIFE — row added 244-01 at its SECOND phase** (`settingsSearchPayload.ts` precedent). D-244-20 claimed a row existed; the gate refuted it |
 | [`frontend/src/hooks/useThreads.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusethreadsts) | 4 / 2 / 64 | below threshold | ⚠ **ABSENT from BOTH registers for its entire life — row added 244-01.** The app's ONE thread-selection owner; `selectThread` is a bare `setState`, so "first click does not open" cannot originate here |
 | [`backend/app/services/harness/grounding.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessgroundingpy) | 21 / 8 / 1414 | **FIRES** | honoured by construction (193.1 / 211 / **214**) — ⚠ **extraction still OWED**; 214 changed no capability set |
@@ -10096,7 +10132,7 @@ cells rot within days.
 | [`frontend/src/lib/api/workflows.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiworkflowsts) | 4 / 4 / 1081 | ⚠ **FIRES** | ⚠ absent until 214; the 207 split created it with NO row. **`lib/api.ts`'s row is the BARREL, not these modules.** 214.1: docblock only, zero behaviour |
 | [`frontend/src/lib/connectionMark.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclibconnectionmarktsx) | 7 / 4 / 313 | ⚠ **FIRES** | ✅ **the move IS the seam, and it was TAKEN (214-08)** — `settings/` → `lib/`; four run + canvas surfaces now import ONE map |
 | [`frontend/src/components/ingestion/DocumentList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestiondocumentlisttsx) | 24 / 13 / 294 | ⚠ **FIRES** | ✅ **seam TAKEN (217.1-05)** — `DocumentRow.tsx` extracted with the sketch's five affordances (−315 L). ⚠ 7-column order still load-bearing: `LibraryPage` sheds cols 3–5 by `nth-child` |
-| [`frontend/src/pages/LibraryPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpageslibrarypagetsx) | 44 / 14 / 922 | ⚠ **FIRES** | ⚠ row was STALE at `40 / 12 / 825`. honoured by construction (**235**) — one tab prop, one cross-tab hop. ⚠ re-derive with `git log --follow`, else it reads `1` |
+| [`frontend/src/pages/LibraryPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpageslibrarypagetsx) | 45 / 14 / 955 | ⚠ **FIRES** | ⚠ row STALE a THIRD time. honoured by construction (**244-04**): one optional prop + one `useMemo` over a strict leaf; ⛔ no `useSourceAttention()` added. ⚠ needs `--follow` |
 | [`backend/app/services/retrieval_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrievalservicepy) | 19 / 11 / 456 | ⚠ **FIRES** | ⛔ **extraction still OWED** (`SEED-224`, since 231) — 241 is the SECOND landing, capped at 11 lines by a fence; a THIRD must propose the extraction FIRST |
 | [`backend/app/services/recall_eval.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrecallevalpy) | 2 / 2 / 978 | no (2 phases) | rewritten in place at 241 (`1 / 1 / 67` → here). ⭐ driven LIVE at 241-04: it reported `Hit@1 0.78` AND refused a bench it could not read — both arms real |
 | [`scripts/build-recall-bench.py`](docs/HOT-FILE-LEDGER.md#scriptsbuild-recall-benchpy) | 4 / 1 / 1088 | no (1 phase) | ⚠ row ADDED at 241-04 — the only `DROP DATABASE` in the repo. Guard + constant-interpolation + AST fence, all driven RED. It built GREEN and unreadable; assert the READ |
@@ -10136,7 +10172,7 @@ cells rot within days.
 | [`frontend/src/components/sources/watchProductMark.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourceswatchproductmarkts) | 0 / 0 / 38 | no (new) | young (240) — which PRODUCT a watched folder came from, read from its ADDRESS. ⛔ Never from `service_id`: Gmail and Drive share one connection |
 | [`frontend/src/components/sources/CreateWatchModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcescreatewatchmodaltsx) | 4 / 1 / 283 | no (1 phase) | honoured by construction (**240**): byte-unchanged. ⛔ Its auto-select of `capable[0]` is why BUG-260908-02 mattered most here |
 | [`frontend/src/components/layout/NavPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutnavpaneltsx) | 20 / 11 / 329 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **11 phases** — row added 235. honoured by construction: 2 optional props, 0 `useState`. Unwired ⇒ silence |
-| [`frontend/src/App.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcapptsx) | 31 / 23 / 351 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **23 phases** — row added 235. honoured by construction: one navigator, the shape `handleOpenStudio` already had |
+| [`frontend/src/App.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcapptsx) | 32 / 23 / 374 | ⚠ **FIRES** | ⚠ absent for its ENTIRE LIFE at **23 phases**; row then STALE. ⭐ **244-04 left it BYTE-UNCHANGED and FENCED it**: `setLibraryTab(` still 2, driven RED against a planted 3rd writer |
 | [`frontend/src/lib/nav-items.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibnav-itemsts) | 8 / 6 / 95 | ⚠ **FIRES** | ⚠ absent at 6 phases — row added 235, which CONSIDERED it and deliberately left it alone: no twelfth `ActiveView` member; the Library already has one |
 | [`frontend/src/components/library/HealthTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibraryhealthtabtsx) | 9 / 2 / 199 | no (2 phases) | row added 235 BELOW threshold on purpose. One import, one optional prop, one mount, ZERO branches; the handler lives at the page boundary |
 | [`frontend/src/pages/librarySelection.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcpageslibraryselectionts) | 2 / 2 / 312 | no (2 phases) | ⚠ absent for its entire life — row added 235, which did NOT modify it but made `App.tsx` import `LibraryTab` from it rather than re-declare it |
@@ -11389,3 +11425,82 @@ entry, so an unnamed suite here runs in no gate at all.
 ⛔ **Do not add an extension here to make a test pass.** The fence was falsified by deleting `.pdf`
 from this file: three of its six cases went red (`expected [ … ](12) to deeply equal [ … ](13)`), and
 the file was restored **md5-identical** (`5a63ea3e3adca51608f084de66ec8219`).
+
+---
+
+# Phase 244 plan 04 (SHELL-05 · BUG-260911-03) — the badge's count, attributed to a tab
+
+> ⚠ **REGISTRY REGION OWNED BY `244-04`.** The orchestrator merges `244-03` first and re-applies
+> this plan's registry hunks by hand. Everything below this heading is `244-04`'s; nothing above it
+> was rewritten except the four rows/sections named in this plan's SUMMARY.
+
+### `frontend/src/components/layout/ChatLayout.tsx` — `244-04`
+
+**Re-derived at this plan's base `310b91e83`: `50 / 26 / 1005`** — the row was CORRECT, inherited
+from `244-01` earlier in the same phase. It becomes **`51 / 26 / 1010`** with this plan's commit.
+
+**G-5 FIRES (26 phases) — honoured BY CONSTRUCTION.** This plan adds **one prop on one existing
+mount**, plus a comment. `attentionConditions` was already computed at `:534-544` for three
+renderers; a fourth now hangs off the SAME single read. No `useState`, no `useEffect`, no branch, no
+new import, and critically **no second call of the registry** — `ATTENTION_PRODUCERS.flatMap` still
+appears exactly once, which this plan's suite asserts from source.
+
+⚠ **THE MOUNT'S 120-CHARACTER PROXIMITY WINDOW IS A LIVE FENCE AND IT SURVIVED.**
+`renameFence.test.ts:182` requires the `activeView === "documents" ?` branch and the
+`<LibraryPage onNavigate={onNavigate}` opening to sit within 120 characters of each other, and
+`ChatLayout.tsx` carries a comment saying **nothing may go between them**. The new prop is appended
+AFTER `initialTab`, where the fence deliberately stopped claiming the mount's signature at `235-08`.
+A comment in the gap would have broken a fence about the Documents→Library rename, which has nothing
+to do with attention badges.
+
+### `frontend/src/components/library/LibraryHeaderBar.tsx` — row added `244-04`
+
+**`2 / 1 / 162` at base → `2 / 1 / 204` with this commit.** Does NOT fire (1 phase vs threshold 3).
+
+⚠ **IT HAD NO ROW AT ALL, AND THE ROW IS ADDED AT ITS SECOND TOUCH RATHER THAN AT ITS THIRD PHASE** —
+the `settingsSearchPayload.ts` precedent. **An absent row is invisible to G-5 at any count**, so the
+cost of adding one early is a table line and the cost of adding one late is the `App.tsx` 23-phase
+hole. ⚠ No `244` plan named this file: this plan reached it because the plan's own wording pointed at
+`LibraryPage.tsx` and the control had MOVED out of it at sketch 231-A.
+
+⭐ **THIS IS WHERE THE FIVE TAB TRIGGERS LIVE, AND THERE IS EXACTLY ONE SET OF THEM.** The first cut
+of 231-A kept a hidden `TabsList` in the page "to preserve the `<screen>-tabslist` hook", which put a
+SECOND element with `role="tab"` and the same accessible name into the tree — `getByRole("tab",
+{ name })` then threw `getMultipleElementsFoundError` in **41 cases**. **A hidden duplicate of an
+interactive control is not a preserved contract, it is a second control.** Any future per-tab
+affordance belongs here, singular.
+
+**What `244-04` adds:** one optional `attention?: Readonly<Record<string, number>>` and one
+conditional `<span>` per trigger. **The component derives nothing and fetches nothing** — it is
+handed a map exactly as it is handed `tabs` and `inFlight`; `D-235-05` keeps the verdict server-side.
+
+⛔ **`aria-hidden` ON THE COUNT IS LOAD-BEARING, NOT DECORATION.** `IngestionTab.tsx:176-188` records
+this project's own measurement: an unhidden count turned a tab's accessible name into *"In progress
+3"* and broke six `getByRole` cases. **A badge may decorate a control's name; it may not RENAME it.**
+This plan's suite asserts the five accessible names are still exactly `TAB_LABELS`' values **while a
+mark is rendered** — a `data-testid` presence assertion could not have seen that.
+
+⚠ **EMPTY ⇒ RENDER NOTHING.** No zero badge, no reserved space, no dimmed dot. A resting Library is
+byte-identical to before this plan. The count map itself OMITS empty tabs rather than carrying
+zeroes, so the rule lives in the leaf instead of being re-decided by every caller.
+
+⚠ **A COUNT, NOT A DOT — `D-244-15` left the draw to the builder and this is the reason.** The shell
+has already earned a number, and the operator's own complaint is that *"the cost scales the wrong
+way"*: the badge is most useful exactly when several things are wrong. A dot would discard that
+number at the moment it starts being worth having. The warning tone and pill shape are the SHIPPED
+rail-badge vocabulary — `D-244-18` forbids re-designing this operator-approved surface, so no new
+mark was invented.
+
+**Named seam:** none proposed. The file is one row, and the thing to watch here is not size — it is
+the second-control defect above. Folder context or any other per-tab affordance goes **inside this
+row**, never above it and never as a parallel strip.
+
+### `frontend/src/components/layout/attentionConditions.ts` — `244-04` Task 2 addendum
+
+`attentionCountByTab` lands here rather than in the page, and the placement IS the argument: it is a
+**strict leaf** — no React, no hook, no fetch — so `LibraryPage` renders a mark from conditions the
+shell already resolved instead of asking the server the same question a third time. This file's own
+declined-threading note records that the verdict was NOT threaded down at Phase 235, to avoid
+coupling the Library page to the app shell. What crosses that boundary now is **a type and a pure
+function**, never the hook — and the `?raw` inventories in both of this plan's suites are what keep
+it that way.

@@ -192,6 +192,32 @@ export function useStoppedSourceConditions(onOpen: () => void): AttentionConditi
 }
 
 /**
+ * How many conditions each Library tab owns — the shell's count, attributed.
+ *
+ * ⛔ A STRICT LEAF: no React, no hook, no fetch. It exists so `LibraryPage` can be handed the
+ * conditions the shell ALREADY resolved and render a mark, rather than calling
+ * `useSourceAttention()` a third time to ask the same question again (arm 1 of the re-open
+ * trigger above). That is the whole reason the attribution is cheap.
+ *
+ * ⚠ **A TAB WITH NOTHING IS ABSENT FROM THE MAP, NEVER PRESENT AS `0`.** The render rule on the
+ * other side is *empty ⇒ render nothing* — no zero badges, no reserved space — and a map of
+ * zeroes would make that rule the caller's problem instead of this function's.
+ *
+ * ⚠ A condition with NO `tab` is COUNTED NOWHERE. Bucketing it under a default would make the
+ * shell's total and the tabs' totals disagree about the same thing, silently.
+ */
+export function attentionCountByTab(
+  conditions: readonly AttentionCondition[],
+): Partial<Record<LibraryTab, number>> {
+  const counts: Partial<Record<LibraryTab, number>> = {}
+  for (const condition of conditions) {
+    if (!condition.tab) continue
+    counts[condition.tab] = (counts[condition.tab] ?? 0) + 1
+  }
+  return counts
+}
+
+/**
  * ⛔ EXACTLY ONE ENTRY IN PHASE 235. See the docblock — a second one here is scope creep, and
  * the suite fails if you add it.
  */

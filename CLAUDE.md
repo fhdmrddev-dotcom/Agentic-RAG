@@ -649,7 +649,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/api/workflow_runs.py` | 11 / 8 / 1003 | honoured by construction (200 / 200.1 / **214**) |
 | `backend/app/models/thread.py` | 16 / 10 / 438 | honoured by construction (200.1 / **214**) |
 | `frontend/src/components/workflows/canvasModel.ts` | 13 / 6 / 752 | ⚠ absent from BOTH at 6 phases (added 200) |
-| `frontend/src/components/layout/ChatLayout.tsx` | 50 / 26 / 1005 | ⚠ row was STALE at `46 / 24 / 921`. honoured by construction (**244-01**): two class TOKENS — `min-h-0` on the grid track and `<main>`; no state, no prop, no branch |
+| `frontend/src/components/layout/ChatLayout.tsx` | 51 / 26 / 1010 | ⚠ row was STALE at `46/24/921`. honoured by construction (**244-04**): ONE prop on an existing mount — a 4th renderer off the SAME one read; the registry is still resolved exactly once |
 | `frontend/src/components/layout/ChatHistoryColumn.tsx` | 7 / 2 / 513 | ⚠ absent from BOTH for its ENTIRE LIFE — row added 244-01 at its SECOND phase (the `settingsSearchPayload.ts` precedent); D-244-20 claimed a row existed and the gate refuted it |
 | `frontend/src/hooks/useThreads.ts` | 4 / 2 / 64 | ⚠ absent from BOTH for its ENTIRE LIFE — row added 244-01. The app's ONE thread-selection owner; `selectThread` is a bare `setState`, so BUG-260911-02 cannot originate here |
 | `backend/app/services/harness/grounding.py` | 21 / 8 / 1414 | honoured by construction (193.1 / 211 / **214**) |
@@ -727,7 +727,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/lib/api/workflows.ts` | 4 / 4 / 1081 | ⚠ absent until 214; the 207 split created it with NO row. **`lib/api.t |
 | `frontend/src/lib/connectionMark.tsx` | 7 / 4 / 313 | ✅ **the move IS the seam, and it was TAKEN (214-08)** |
 | `frontend/src/components/ingestion/DocumentList.tsx` | 24 / 13 / 294 | ✅ **seam TAKEN (217.1-05)** |
-| `frontend/src/pages/LibraryPage.tsx` | 44 / 14 / 922 | ⚠ row was STALE at `40 / 12 / 825`. honoured by construction (**235**) |
+| `frontend/src/pages/LibraryPage.tsx` | 45 / 14 / 955 | ⚠ row STALE a THIRD time. honoured by construction (**244-04**): one optional prop + one `useMemo` over a strict leaf; ⛔ NO `useSourceAttention()` added. ⚠ needs `--follow` or it reads `1` |
 | `backend/app/services/retrieval_service.py` | 19 / 11 / 456 | ⛔ **extraction still OWED (SEED-224, since 231).** 241 is the SECOND landing, 11 lines; a THIRD must propose the extraction FIRST |
 | `frontend/src/components/metadata/DocumentDetailPanel.tsx` | 9 / 6 / 496 | ⚠ **the row was STALE at `6 / 5 / 405`.** honoured by construction (21 |
 | `frontend/src/hooks/useDocuments.ts` | 8 / 3 / 120 | ⚠ absent at 3 phases. Realtime is a hint, not truth |
@@ -743,7 +743,8 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/library/IngestionTab.tsx` | 17 / 6 / 512 | ⚠ row was STALE at `13 / 4 / 456` |
 | `frontend/src/components/ingestion/__tests__/IngestionStrip.test.tsx` | 3 / 3 / 516 | ⚠ absent; row added 233, which repaired the INHERITED red `229-03` cau |
 | `frontend/src/components/layout/NavPanel.tsx` | 20 / 11 / 329 | ⚠ absent from BOTH for its ENTIRE LIFE at **11 phases** |
-| `frontend/src/App.tsx` | 31 / 23 / 351 | ⚠ absent from BOTH for its ENTIRE LIFE at **23 phases** |
+| `frontend/src/App.tsx` | 32 / 23 / 374 | ⚠ absent for its ENTIRE LIFE at **23 phases**; row then STALE at `31/23/351`. ⭐ **244-04 left it BYTE-UNCHANGED and FENCED it** — `setLibraryTab(` still 2, driven RED against a planted 3rd writer |
+| `frontend/src/components/library/LibraryHeaderBar.tsx` | 2 / 1 / 204 | ⚠ absent for its entire life — row added **244-04** at its SECOND touch. ⛔ the ONE set of tab triggers: a hidden duplicate broke 41 cases; `aria-hidden` on the count is load-bearing |
 | `frontend/src/lib/nav-items.ts` | 8 / 6 / 95 | ⚠ absent at 6 phases |
 | `backend/app/api/classification_rules.py` | 3 / 3 / 226 | row added 237 at threshold. Validates rule_scope and enforces WATCH_ALLOWED_FIELDS refusal (422) for arrival watch rules. |
 | `frontend/src/components/classification/RuleBuilderPanel.tsx` | 4 / 3 / 502 | row added 237 at threshold. Adds scope selector segmented control; filters out-of-scope conditions on scope switch. |

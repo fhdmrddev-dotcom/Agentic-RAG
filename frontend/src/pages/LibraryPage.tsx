@@ -49,6 +49,14 @@ import { cn } from "@/lib/utils"
 import { EMPTY_FILTER } from "@/types"
 import type { Document, MetadataFieldDef, SavedView, ViewFilter } from "@/types"
 import type { ActiveView } from "@/App"
+// Phase 244 plan 04 (SHELL-05 · BUG-260911-03) — the shell's ALREADY-RESOLVED conditions and
+// the strict leaf that buckets them. ⛔ A TYPE and a PURE FUNCTION only: this page must never
+// call `useSourceAttention()`, which would be arm 1 of that registry's own re-open trigger
+// (a THIRD concurrent reader) fired to save one prop.
+import {
+  attentionCountByTab,
+  type AttentionCondition,
+} from "@/components/layout/attentionConditions"
 import {
   activeFolderId,
   activeViewId,
@@ -193,7 +201,22 @@ function useIsWide(): boolean {
 export function LibraryPage({
   onNavigate,
   initialTab,
-}: { onNavigate?: (view: ActiveView) => void; initialTab?: LibraryTab } = {}) {
+  attentionConditions,
+}: {
+  onNavigate?: (view: ActiveView) => void
+  initialTab?: LibraryTab
+  /**
+   * Phase 244 plan 04 — the app-shell's conditions, threaded DOWN AS DATA.
+   *
+   * ⛔ The page receives a verdict; it does not fetch one. `attentionConditions.ts`'s own
+   * re-open trigger names *a third concurrent reader* as arm 1, and a `useSourceAttention()`
+   * call here would be exactly that — fired to save a prop, on the one surface where a doubled
+   * poll is least excusable because a Library tab body is already polling.
+   *
+   * Absent ⇒ no tab carries a mark, which is what every caller other than `ChatLayout` gets.
+   */
+  attentionConditions?: readonly AttentionCondition[]
+} = {}) {
   const { user } = useAuth()
   const { documents, uploading, uploadingCount, upload, deleteDoc, loadDocuments } = useDocuments()
   const { folders, createFolder, renameFolder, deleteFolder, toggleOrgShared } = useFolders()
@@ -211,6 +234,14 @@ export function LibraryPage({
     initialTab ? pageReducer(opening, { type: "SELECT_TAB", tab: initialTab }) : opening,
   )
   const tab = lib.selection.tab
+
+  // Phase 244 plan 04 — the shell says THAT, the tab strip says WHERE. Derived from conditions
+  // the shell already resolved; a tab with nothing is ABSENT from the map, so the control
+  // renders nothing rather than a zero.
+  const attentionByTab = useMemo(
+    () => attentionCountByTab(attentionConditions ?? []),
+    [attentionConditions],
+  )
 
   /** Phase 235-08 (D-235-17) — the Health tab's route BACK to the source card.
    *
@@ -763,6 +794,7 @@ export function LibraryPage({
             totalDocuments={documents.length}
             onOpenQueue={() => dispatch({ type: "SELECT_TAB", tab: "ingestion" })}
             listTestId={`${tab}-tabslist`}
+            attention={attentionByTab}
           />
         </div>
 

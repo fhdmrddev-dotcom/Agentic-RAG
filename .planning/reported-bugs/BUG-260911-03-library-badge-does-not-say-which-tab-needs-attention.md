@@ -11,6 +11,19 @@ folded_into: 244
 verified_closed_by: null
 related_seeds: []
 re_open_trigger: null
+# ⛔ STATUS STAYS `folded`, DELIBERATELY, AND `verified_closed_by` STAYS NULL.
+# `244-04` BUILT the attribution — the owning tab now carries the count and the other four render
+# nothing — and 15 unit cases assert it on the RENDERED WORDS. ⛔ That is not the same as the
+# operator seeing it. The closing evidence is the DRIVEN row in `244-VALIDATION.md`
+# (D-244-15(b)); a green unit test has never once been this project's definition of closed, and
+# `SURF-03` was ticked on a code reading for a whole milestone precisely because that line blurred.
+# Set `verified_closed_by` to the VALIDATION row id, never to a commit hash.
+#
+# ⚠ ONE OF THIS REPORT'S OWN GUESSES WAS REFUTED, AND THE REPORT ASKED FOR EXACTLY THAT:
+# *"the likely shape is that `attentionConditions` already knows what KIND each condition is …
+# verify that before building anything."* Verified from source — it did NOT. The condition carried
+# four fields and no kind; the PRODUCER carried it. The fix is one optional `tab?: LibraryTab` set
+# by the producer that already exists (C-5), not a re-read of a field that was never there.
 reproduces_on:
   branch: develop
   commit: 52d110f86
