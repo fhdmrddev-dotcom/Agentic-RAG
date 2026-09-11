@@ -47,6 +47,7 @@ remembered; it is checked at import.
 from __future__ import annotations
 
 from typing import Annotated, Any, Literal, get_args
+from uuid import UUID as _UUID
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
 
@@ -127,6 +128,31 @@ def _normalise_service_id(value: str) -> str:
 # allow-list: D-211-01 makes this FREE TEXT precisely so an unknown service is storable, and
 # a `Literal` here would be migration 116's `capability` mistake moved one column over.
 ServiceId = Annotated[str, Field(min_length=1, max_length=64), AfterValidator(_normalise_service_id)]
+
+
+def _require_library_folder_id(value: str) -> str:
+    """A destination is a ``folders.id`` value or it is not a destination (WR-05 / 244-07).
+
+    ⛔ ``str`` ALONE WAS NOT THE GUARANTEE THE DOCSTRING CLAIMED. Pydantic accepts ``""`` for a
+    bare ``str``, and every consumer of a folder id downstream is truthiness-gated
+    (``ingest_splice.py:154`` — ``if folder_id:``), so a blank destination did not fail the
+    ownership check: **it skipped it**, and reached the insert on a ``uuid`` column.
+
+    ⚠ THE RETURN TYPE STAYS ``str`` ON PURPOSE. Declaring the field ``UUID`` would validate the
+    same shape and then hand a ``UUID`` object to ``supabase-py``'s query builder and to the
+    insert payload — a runtime-type change on a shipped path, in a commit whose whole job is to
+    fix a defect. Validating the shape and returning the caller's own string changes nothing but
+    what is ACCEPTED.
+    """
+    try:
+        _UUID(value)
+    except (AttributeError, TypeError, ValueError):
+        raise ValueError("must be a Library folder id (UUID)") from None
+    return value
+
+
+#: A ``folders.id``, validated as a UUID and carried as a ``str``.
+LibraryFolderId = Annotated[str, Field(min_length=1), AfterValidator(_require_library_folder_id)]
 
 
 # ── the capability vocabulary ────────────────────────────────────────────────────────────
@@ -739,10 +765,13 @@ class SourcePreviewRequest(_StrictBase):
 class ConnectionFileImportRequest(_StrictBase):
     """Where ONE named cloud file should land in the Library (Phase 244 / SHELL-04 / D-244-06).
 
-    ⛔ **`folder_id` IS REQUIRED, AND THAT IS THE REFUSAL.** D-244-06, verbatim: *"unset folder =
-    refuse, never silently root — silently rooting is the defect."* Because the field has no
-    default and ``_StrictBase`` is ``extra="forbid"``, FastAPI answers **422 before the handler
-    runs**, so the refusal cannot be forgotten in a branch a future edit adds. The hand-rolled
+    ⛔ **`folder_id` IS REQUIRED AND NON-BLANK, AND THAT IS THE REFUSAL.** D-244-06, verbatim:
+    *"unset folder = refuse, never silently root — silently rooting is the defect."* Because the
+    field has no default, ``_StrictBase`` is ``extra="forbid"`` and the type is
+    :data:`LibraryFolderId`, FastAPI answers **422 before the handler runs**, so the refusal
+    cannot be forgotten in a branch a future edit adds. ⚠ **The last of those three conjuncts
+    was missing until `244-07`** — the field was a bare ``str``, which accepts ``""``, and this
+    paragraph claimed a structural guarantee it did not have (WR-05). The hand-rolled
     ``if not body.folder_id: raise HTTPException(422, …)`` is the REJECTED arm: it would live
     inside a handler that already has two ``except`` arms and a 502 catch-all, which is exactly
     the kind of guard that survives as prose after a refactor.
@@ -760,12 +789,18 @@ class ConnectionFileImportRequest(_StrictBase):
     """
 
     #: The Library folder the person chose. ⛔ No default — absence is a refusal, not a root write.
-    folder_id: str
+    #: ⚠ AND THE TYPE CARRIES THE REST OF THE CLAIM (WR-05 / 244-07). A bare ``str`` accepted
+    #: ``""``, so the paragraph above was true of ABSENCE and false of BLANKNESS: ``""`` passed
+    #: validation and then skipped ``ingest_splice.py``'s truthiness-gated ownership check
+    #: (``if folder_id:``) entirely, landing the row unchecked. ``LibraryFolderId`` validates
+    #: UUID shape and returns a ``str``, so nothing downstream sees a new type.
+    folder_id: LibraryFolderId
 
 
 __all__ = [
     "ConnectorCapability",
     "ServiceId",
+    "LibraryFolderId",
     "ToolGrantPosture",
     "AuthType",
     "ConnectionStatus",
