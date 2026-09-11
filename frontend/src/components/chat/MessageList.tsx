@@ -209,7 +209,14 @@ export function MessageList({ messages, isStreaming, isLoading = false, onSendMe
   const renderMessages = dedupMessagesByRunId(messages)
 
   return (
-    <ScrollArea className="flex-1">
+    // Phase 244-01 (SHELL-01 / BUG-260828-08): link 5 — the LAST link, and the one the
+    // primitive cannot supply for itself. `ui/scroll-area.tsx` makes the Root
+    // `relative overflow-hidden` and the Viewport `h-full w-full`; the Root's height comes
+    // from `flex-1` on an item whose `min-height` is `auto`, so the Root grows to the
+    // transcript and `h-full` resolves to that grown height — nothing scrolls INSIDE.
+    // ⭐ The sibling call site proves it: tool-bodies/ReadDocumentBody.tsx:53 passes an
+    // explicit `max-h-64` bound and scrolls correctly.
+    <ScrollArea className="min-h-0 flex-1">
       <div ref={containerRef} className="relative space-y-1 px-6 py-6 max-w-4xl mx-auto">
         {/* Phase 068.5 (D-068.5-11 + D-068.5-12): cold-load skeleton placeholder
             when the bucket is empty AND a reconcile fetch is in flight.

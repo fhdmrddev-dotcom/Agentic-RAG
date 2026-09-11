@@ -471,7 +471,10 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
 
   if (!thread) {
     return (
-      <div className="flex flex-col h-full bg-background">
+      // Phase 244-01 (SHELL-01): the WELCOME branch is the same column root as the thread
+      // branch below and carries the same link-4 obligation. ⚠ Found by the fence, not by
+      // the plan — `ChatArea.tsx` has TWO roots with this class list and the plan named one.
+      <div className="flex flex-col h-full min-h-0 bg-background">
         {/* Phase 156 REFINEMENT: desktop reopen handle for the welcome state — only when
             history is collapsed (so an empty chat can still bring the list back). */}
         {reopenHistoryButton && (
@@ -549,7 +552,12 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
   const scopedFolder = thread.folder_id ? folders.find((f) => f.id === thread.folder_id) : null
 
   return (
-    <div className="flex flex-col h-full bg-background">
+    // Phase 244-01 (SHELL-01 / BUG-260828-08): link 4 of the four-link `min-h-0` chain
+    // (ChatLayout's grid track and <main> are 2 and 3; MessageList's ScrollArea is 5).
+    // `h-full` sets this column's height, but its own flex CHILD — the message list — has
+    // `min-height: auto` unless this container's chain is zeroed, so the column grew to the
+    // transcript and the page root scrolled. Analog: DocumentDetailPanel.tsx:257.
+    <div className="flex flex-col h-full min-h-0 bg-background">
       <div className="px-6 py-3 bg-background/80 backdrop-blur-md flex items-center gap-2.5 border-b border-border/30">
         {/* Phase 156 REFINEMENT: the ▷ reopen-history handle (desktop, collapsed-only). */}
         {reopenHistoryButton}

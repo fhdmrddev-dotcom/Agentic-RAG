@@ -649,7 +649,9 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/api/workflow_runs.py` | 11 / 8 / 1003 | honoured by construction (200 / 200.1 / **214**) |
 | `backend/app/models/thread.py` | 16 / 10 / 438 | honoured by construction (200.1 / **214**) |
 | `frontend/src/components/workflows/canvasModel.ts` | 13 / 6 / 752 | ⚠ absent from BOTH at 6 phases (added 200) |
-| `frontend/src/components/layout/ChatLayout.tsx` | 49 / 25 / 997 | ⚠ row was STALE at `46 / 24 / 921`. honoured by construction (**235**) |
+| `frontend/src/components/layout/ChatLayout.tsx` | 50 / 26 / 1005 | ⚠ row was STALE at `46 / 24 / 921`. honoured by construction (**244-01**): two class TOKENS — `min-h-0` on the grid track and `<main>`; no state, no prop, no branch |
+| `frontend/src/components/layout/ChatHistoryColumn.tsx` | 7 / 2 / 513 | ⚠ absent from BOTH for its ENTIRE LIFE — row added 244-01 at its SECOND phase (the `settingsSearchPayload.ts` precedent); D-244-20 claimed a row existed and the gate refuted it |
+| `frontend/src/hooks/useThreads.ts` | 4 / 2 / 64 | ⚠ absent from BOTH for its ENTIRE LIFE — row added 244-01. The app's ONE thread-selection owner; `selectThread` is a bare `setState`, so BUG-260911-02 cannot originate here |
 | `backend/app/services/harness/grounding.py` | 21 / 8 / 1414 | honoured by construction (193.1 / 211 / **214**) |
 | `frontend/src/components/workflows/PhaseFormPanel.tsx` | 30 / 14 / 1566 | honoured by construction ×6 (185 / 193 / 193.1 / 199 / 200 / **214**) |
 | `backend/app/db/workflows.py` | 48 / 25 / 2585 | honoured by construction (193.2 / 194 / 192.2 / 200.1 / **214**) |
@@ -663,8 +665,8 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/harness_engine.py` | 54 / 20 / 3135 | honoured by construction (194 / **214**) |
 | `frontend/src/components/chat/RunCard.tsx` | 28 / 14 / 710 | ⭐ **G-5 DISCHARGED (243-02)** — the reasoning fold left for `ThinkingBlock.tsx`, `-39/+20`, one `useState` fewer. ⚠ row was STALE at `26/12/728`. State 2 stayed, by decision |
 | `frontend/src/components/chat/MessageInput.tsx` | 29 / 14 / 643 | honoured by construction (194.1) |
-| `frontend/src/components/chat/MessageList.tsx` | 20 / 8 / 300 | ⚠ row STALE at `19/8/267`, then at `20/8/292`. honoured by construction (**243-06**): one arm added to the EXISTING wheel mapping — `deltaY === 0` decides nothing |
-| `frontend/src/components/chat/ChatArea.tsx` | 70 / 35 / 678 | ⚠ row was STALE at `67 / 32 / 595` |
+| `frontend/src/components/chat/MessageList.tsx` | 21 / 9 / 307 | ⚠ row STALE a THIRD time (`19/8/267` → `20/8/292` → `20/8/300`). honoured by construction (**244-01**): `min-h-0` on the ONE `<ScrollArea>` call site |
+| `frontend/src/components/chat/ChatArea.tsx` | 71 / 36 / 686 | ⚠ row was STALE at `67 / 32 / 595`. honoured by construction (**244-01**): `min-h-0` on BOTH column roots — the fence found the 2nd (welcome branch) the plan had not named |
 | `frontend/src/components/panel/PendingAskCard.tsx` | 13 / 7 / 736 | honoured by construction (194.1 / **214**) |
 | `frontend/src/pages/WorkflowRunPage.tsx` | 28 / 9 / 1670 | honoured by construction (200 / 200.1 / 200.2 / **214**) |
 | `frontend/src/components/chat/OutputFileCard.tsx` | 8 / 7 / 219 | honoured by construction (195) |

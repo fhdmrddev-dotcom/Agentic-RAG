@@ -9,7 +9,7 @@ affected_areas: [frontend/navigation, frontend/chat-list, frontend/layout, harne
 folded_into: 244
 verified_closed_by: null
 related_seeds: [SEED-113, SEED-155]
-re_open_trigger: null
+re_open_trigger: "SUB-DEFECT (a) ONLY is still open — one hardcoded icon for every thread kind. (b) and (c) shipped in Phase 244 plan 01. Re-open on EITHER: (1) the next phase that adds a thread-kind / workflow discriminator to the GET /threads feed (today `Thread` in frontend/src/types/index.ts:7-14 carries none, so no row can branch), OR (2) the next chat-list sketch — the report itself routes (a) to /gsd:sketch and D-244-18 limited Phase 244 to ONE sketched surface (sketch 236, the composer). Consider sketching it together with SEED-155's library-card layout so the thread row and WorkflowCard do not invent two visual languages for 'this is a workflow'."
 reproduces_on:
   branch: develop
   commit: 045a83dc
@@ -135,6 +135,46 @@ The real work is deciding what a thread row owes the reader:
 an inherited G-5 refactor obligation.** If the thread-row sketch touches the same identity
 vocabulary (how a workflow announces itself in a list), consider doing them in one sketch so the
 library card and the thread row do not invent two different visual languages for the same idea.
+
+---
+
+## Partly shipped 2026-09-11 (Phase 244 plan 01 Task 3) — ⛔ STILL `folded`, (a) IS THE OPEN HALF
+
+| Sub-defect | State |
+|---|---|
+| **(a)** one hardcoded icon for every thread kind | ⛔ **OPEN — deferred in writing, with the re-open trigger in this file's frontmatter** |
+| **(b)** the repeated "Unfiled" chip | ✅ shipped — an unscoped row now renders **no chip at all** |
+| **(c)** the folder chip truncating the title | ✅ shipped — the chip is capped at `max-w-[96px]` + `truncate`, with a `title=` keeping the full name reachable |
+
+⭐ **C-7 — the report was PARTLY ALREADY BUILT, and the work was planned against the markup rather
+than against this report.** At the phase's base the row already rendered a lead icon, a truncating
+title with a full-title `title=` attribute and `HighlightTitle`, and a mode-switched meta chip.
+**What was missing was a BOUND on the chip and the ABSENCE of the empty-state chip** — not the chip.
+
+**(c)** The title span was **not** changed: `truncate flex-1 min-w-0` was already correct. The defect
+was the chip's *unbounded* `shrink-0`, exactly as this report's own hypothesis says.
+**(b)** Rides the shipped `empty ⇒ render nothing` rule (`ActiveConnectorChips.tsx:24`,
+`AttentionPopover.tsx:75`, `PendingAskCard.tsx:733`) — an application of an established project
+pattern, not a new design. ⛔ **`folderLabel` itself is UNTOUCHED**: `groupByFolder` still needs the
+"Unfiled" GROUP LABEL in FOLDER mode, which is pinned by its own case.
+
+⚠ **One shipped test PINNED the defect and was re-baselined deliberately** —
+`ChatHistoryColumn.test.tsx`'s *"renders a folder chip (or 'Unfiled') per row"* asserted the 90 %
+chip. The reason is written into the case rather than the assertion being quietly deleted.
+
+⛔ **WHY (a) WAS NOT TAKEN — structural, not a difficulty judgement, and stated so it is not read as
+"out of scope":**
+
+1. `Thread` (`frontend/src/types/index.ts:7-14`) carries **no** kind/workflow discriminator, so no
+   row can branch until `GET /threads` grows a field. That is a **feed change**, present in no source
+   artifact for Phase 244.
+2. This report's own instruction is *"G-2 FIRES, HARD, AND THIS ROUTES TO `/gsd:sketch` BEFORE ANY
+   SPEC OR DISCUSS"* — and **D-244-18 rules that G-2 fires on exactly one surface in Phase 244**
+   (sketch 236, the composer). Sketching a second surface would contradict a locked decision.
+
+**Driven by:** `frontend/src/components/layout/__tests__/ChatHistoryColumn.rowIdentity.test.tsx`
+(7 cases, 3 of them RED on the shipped tree). ⚠ jsdom does no layout, so the suite pins the class
+contract that PRODUCES the bound; the pixel measurements in this report are re-driven as a G-4 row.
 
 ## Workarounds (prompt-side, code-side, or UI-side)
 

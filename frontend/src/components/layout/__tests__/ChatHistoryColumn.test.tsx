@@ -142,11 +142,25 @@ describe("ChatHistoryColumn — inline filter (SC#2)", () => {
 })
 
 describe("ChatHistoryColumn — preserved row behaviors (D-09)", () => {
-  it('renders a folder chip (or "Unfiled") per row', () => {
+  /**
+   * ⚠ RE-BASELINED 2026-09-11 (Phase 244 plan 01, `BUG-260816-03` (b)) — DELIBERATELY, with
+   * the reason written in rather than the assertion quietly deleted. This case previously
+   * read `expect(screen.getByText("Unfiled")).toBeInTheDocument()` and it was the one test in
+   * the tree PINNING THE DEFECT: the italic "Unfiled" fallback was measured on **471 of 524
+   * rows (90 %)**, distinguished nothing, and competed with the 53 rows carrying a real
+   * folder. The row now follows this project's shipped `empty ⇒ render nothing` rule
+   * (`ActiveConnectorChips.tsx:24`, `AttentionPopover.tsx:75`, `PendingAskCard.tsx:733`).
+   *
+   * ⛔ The negative is asserted HERE so the change is visible in the suite that used to
+   * guarantee the opposite; the positive-and-negative pair is driven in
+   * `ChatHistoryColumn.rowIdentity.test.tsx`. ⚠ `folderLabel` is UNCHANGED — the FOLDER-mode
+   * "Unfiled" GROUP HEADER below is untouched and still asserted.
+   */
+  it('renders a folder chip per SCOPED row, and NOTHING for an unscoped one (244-01)', () => {
     renderColumn()
     expect(screen.getAllByText("Finance")).toHaveLength(2)     // Q3 + Board deck
     expect(screen.getAllByText("Engineering")).toHaveLength(2) // Debug + Compare
-    expect(screen.getByText("Unfiled")).toBeInTheDocument()    // Old prototype (null folder)
+    expect(screen.queryByText("Unfiled")).toBeNull()           // Old prototype (null folder)
   })
 
   it("the per-row options menu opens Rename + Delete", () => {

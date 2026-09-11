@@ -3440,6 +3440,33 @@ const BASELINE = {
   // This is that close. BOTH knobs, for the reason the entry above states.
   "ConnectionFormPanel.sourceTools.test.tsx": 14,
   "ConnectionFormPanel.refreshReceipt.test.tsx": 4,
+  // ── Phase 244 plan 01 (SHELL-01 / BUG-260828-08 / BUG-260816-03) ──────────────────────
+  //
+  // ⛔ BOTH KNOBS, BY NECESSITY. `src/components/layout` is NOT a bare directory entry in
+  // TARGETS (this file records that fact beside four other blocks already, and it is still
+  // true here), so a suite dropped into `src/components/layout/__tests__/` runs in NO gate
+  // until it is NAMED in TARGETS and PINNED here. TARGETS decides what RUNS; BASELINE
+  // decides what is GUARDED (the Phase 214 `WorkflowScheduleModal` lesson, inverted).
+  //
+  // `ChatLayout.scrollFrame.test.tsx` — 5 cases. Four ?raw class-list assertions, one per
+  // link of the `min-h-0` chain, plus an `import.meta.glob` sweep pinning the `<ScrollArea>`
+  // inventory BY FILE so a third, UNBOUNDED call site cannot arrive silently. All five were
+  // driven RED against the shipped tree before the classes were added.
+  "ChatLayout.scrollFrame.test.tsx": 5,
+  // `ChatHistoryColumn.clickPath.test.tsx` — 10 cases. The BUG-260911-02 trace, driven
+  // against the real components: C-6's candidates (b) and (c) refuted, plus the FOURTH
+  // candidate C-6 did not list (the always-rendered `opacity-0` actions overlay had no
+  // `pointer-events-none` while its documented sibling did). One case was RED on the shipped
+  // tree; the rest were green and are the trace's own controls. ⚠ jsdom does no hit-testing,
+  // so this suite does NOT close the bug — it stays `folded`, with a browser re-open trigger.
+  "ChatHistoryColumn.clickPath.test.tsx": 10,
+  // `ChatHistoryColumn.rowIdentity.test.tsx` — 7 cases. BUG-260816-03 (b) + (c): the folder
+  // chip is bounded (`max-w-[96px]` + `truncate` + a `title=`), and an unscoped row renders
+  // NO chip. 3 of the 7 were RED on the shipped tree; the other 4 are controls, incl. the
+  // FOLDER-mode "Unfiled" GROUP HEADER, which is `groupByFolder`'s and is untouched.
+  // ⛔ Sub-defect (a) is NOT taken — `Thread` has no kind discriminator and D-244-18 forbids
+  // a second sketched surface. The report stays `folded`.
+  "ChatHistoryColumn.rowIdentity.test.tsx": 7,
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -4868,6 +4895,19 @@ const TARGETS = [
   // throttle` on this file returned nothing. It is adopted here, not created here, and it now
   // guards two primitives with OPPOSITE contracts (see docs/HOT-FILE-LEDGER.md).
   "src/__tests__/lib/throttle.test.ts",
+  // ── Phase 244 plan 01 (SHELL-01 / BUG-260828-08) — the chat frame's min-h-0 chain ──────
+  //
+  // ⛔ FILE-LEVEL, BY NECESSITY: `src/components/layout` is NOT a bare directory entry
+  // anywhere in this array (this file has exactly two — `src/landing` and
+  // `src/components/workflows`), so this suite runs in NO gate until it is named here AND
+  // pinned in BASELINE above. Both were added in the same commit as the class changes.
+  "src/components/layout/__tests__/ChatLayout.scrollFrame.test.tsx",
+  // ⚠ NOTE FOR A LATER READER: `ChatHistoryColumn.test.tsx` and `.a11y.test.tsx` have shipped
+  // since Phase 156 and are in NEITHER knob — `grep -c ChatHistoryColumn` on this file read
+  // **0** before Phase 244. 244-01 adopts its own two suites; the two inherited ones stay
+  // unadopted here because this plan did not author them and cannot vouch for their stability.
+  "src/components/layout/__tests__/ChatHistoryColumn.clickPath.test.tsx",
+  "src/components/layout/__tests__/ChatHistoryColumn.rowIdentity.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
