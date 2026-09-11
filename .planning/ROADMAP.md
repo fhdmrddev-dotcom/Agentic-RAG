@@ -151,6 +151,7 @@ Stated here rather than discovered at execution. **A phase that can be blocked o
 **Plans**: 2 plans + 2 G-3 fast tasks — **proportionate under G-8, and the phase SHRANK twice during execution rather than growing.**
 
 Plans:
+
 - [x] 242-01-PLAN.md — ✅ **DONE 2026-09-11** (`d3eae092b`, `1c67f20d5`) — a Python-only bound becomes a schema constraint, and the CLASS stops recurring. Migration **178** clamps first (order load-bearing), then `DROP IF EXISTS` + `ADD CONSTRAINT`, NULL legal; applied to **LOCAL only** with row counts asserted, re-run proven a no-op, and the clamp (1001→1000, 0→1) and NULL arms **driven inside rolled-back transactions** — because the clamp is a no-op in every environment this phase touches, so every stated verification would otherwise have passed over an untested statement. ⚠ **DECLARED DEVIATION:** 178 covers TWO columns, because `pg_constraint` showed 174/176 had already constrained three of the five the CONTEXT deferred. The fence (`test_242_settings_bounds_have_schema_constraints.py`, 17 cases, **two detectors**, seen RED on both columns) therefore carries an **EMPTY** allow-list. `SEED-271` planted on what survived: `retrieval_top_k` / `rrf_k` have no bound anywhere
 - [x] 242-02-PLAN.md — ✅ **DONE 2026-09-11** (`46292bb81`) — the Search tab sends **changed fields only** (D-242-02) and the refusal **names the stored value** at all four bound sites (D-242-03), through one helper that can never turn a 400 into a 500. ⭐ **Two planted defects driven RED, file restored md5-identical** — and the second is the finding: a baseline of constants instead of data is **GREEN against an all-NULL fixture** and silently discards a real `200 → 40` edit on the very knob Phase 246 needs. Caught only by the non-default fixture and §2b. ⛔ Two guards found passing vacuously and repaired: `SettingsPage.a11y.test.tsx` (RED on all four cases, in NEITHER knob, cause was its own missing `EffectiveFeaturesProvider`) and `check-hot-file-ledger.cjs` (**exit 0 over 0 parsed files** on a CRLF plan). Three SettingsPage suites adopted; `8046 → 8077` with every `+1` attributed
 - [x] **fast** — `scripts/verify-v40-cloud-migrations.sql` repaired (`05203a1ed`, D-242-05) and run against cloud: **20/20 PASS**. Both of its FAILs were the CHECKER, not the database (SHIP-03)
@@ -187,6 +188,7 @@ Plans:
 **Plans**: 5 plans, in 5 waves — **fully serial, and the reason is measured, not a preference.**
 
 Plans:
+
 - [x] 243-01-PLAN.md — ✅ **DONE 2026-09-11** (`a17955cc3`, `f9bd3ccc7` — 17 cases, both knobs, 2 plants driven RED) — the safety net: characterization cases for the thinking block written against the UNMOVED `RunCard`, driven RED against two planted defects, registered in both gate knobs (CHAT-01 guard, CHAT-04 declared-defect case)
 - [x] 243-02-PLAN.md — ✅ **DONE 2026-09-11** (`2a62acb60`, `4bbd2c724`, `3de4a0cd3`) — the seam: `ThinkingBlock` extracted from `RunCard` and mounted from `MessageItem` for BOTH message shapes, tool-conditionality gone BY CONSTRUCTION (exactly ONE JSX-child render of `reasoningContent` in `frontend/src`). **CHAT-04 CLOSED.** ⭐ `RunCard.tsx`'s G-5 **DISCHARGED by deletion** (`-39/+20`, 729 → 710 L, one `useState` fewer); `MessageItem.tsx` **not re-hollowed** (`useState` 3→3, `useEffect` 0→0, props 5→5, 0 deleted). Net passes with §8/§9 inverted and §6b's render line moved; remount semantics **DECIDED** (no `key`). Gate `failed 0`, pin 17 → 23
 - [x] 243-03-PLAN.md — the cadence and the scroll, together per `D-v4.1-02`: a RED drive at HEAD first, then producer-side coalescing on the delta callbacks, then CHAT-03 fixed or discharged as already-fixed-by-228 (CHAT-02 + CHAT-03)
@@ -226,11 +228,22 @@ Plans:
 **Plans**: 6 plans in 4 waves
 
 Plans:
+**Wave 1**
+
 - [ ] 244-01-PLAN.md — the scroll frame's `min-h-0` chain + the three chat-list bugs (SHELL-01)
 - [ ] 244-02-PLAN.md — the agent can USE an attachment: `.pdf` accepted, sandbox reach, the system-prompt line (SHELL-04)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 244-03-PLAN.md — the paused run: the cap-paused composer (both layers) + the approval in the thread (SHELL-02, SHELL-03)
 - [ ] 244-04-PLAN.md — the shell says THAT, the tab says WHERE: the attention tab attribution (SHELL-05)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 244-05-PLAN.md — the composer's attach affordance: the chip, the `+` menu, the sent-message scope word (SHELL-04)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
 - [ ] 244-06-PLAN.md — the two doors un-inverted: cloud→thread, Library import asks its folder (SHELL-04)
 
 ⚠ **SIX plans, not the FOUR `D-244-17` locked** — the deviation is recorded in every plan. `SHELL-04` alone is cut into three, on **context cost** and never on difficulty: **C-2** makes `SHELL-02` a two-layer change against a backend baseline at its zero-headroom ceiling, and **C-9** (measured at planning) shows criterion 4's *"and the agent can use it"* is unsatisfied for **8 of the 15 accepted extensions**, because `workspace_read` returns a note for every binary and the sandbox had no reach at all. G-8's never-cut list — verifier, TDD RED drives, `security_enforcement` / `code_review`, migration discipline — is intact.
