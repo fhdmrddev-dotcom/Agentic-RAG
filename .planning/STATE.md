@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v4.1
 milestone_name: "Ship It & Feel It"
 status: roadmapped
-last_updated: "2026-09-11T09:10:00.000Z"
+last_updated: "2026-09-11T14:30:00.000Z"
 last_activity: 2026-09-11
 progress:
   total_phases: 5
@@ -40,8 +40,8 @@ surface the operator uses daily. Phase numbering continues at **242**.
 
 ## Current Position
 
-Phase: **242 — Ship It, and Prove What Already Shipped ✅ CLOSED 2026-09-11 (self-verified, `OV-SOLO-01`)** · **243 — The Thinking Block and the Follow-Scroll Seam ✅ COMPLETE (2026-09-11)**
-Plan: 242 — 2 plans + 2 G-3 fast tasks, all landed · 243 — 5 plans + 243-06 (review fixes), all landed
+Phase: **242 — Ship It, and Prove What Already Shipped ✅ CLOSED 2026-09-11 (self-verified, `OV-SOLO-01`)** · **243 — The Thinking Block and the Follow-Scroll Seam ✅ COMPLETE (2026-09-11)** · **244 — The Chat Shell and the Composer ▶ CONTEXT GATHERED (2026-09-11)**
+Plan: 242 — 2 plans + 2 G-3 fast tasks, all landed · 243 — 5 plans + 243-06 (review fixes), all landed · 244 — **4 plans planned by surface seam (D-244-17), none written yet**
 
 ### ✅ Phase 243 — CLOSED 2026-09-11
 
@@ -98,8 +98,73 @@ Status: **243 code-complete.** 5/5 ROADMAP success criteria verified MECHANICALL
 Status: **243-04 EXECUTED — sketch 234 V1 shipped, and the phase's one genuine design gap was closed by REFUSING the mockup's number.** The body drops the four classes and steps to `text-sm`, rendering REAL paragraphs (`b9819b7ab`); the tail clamps at 300px with a control that **removes itself** below the measured threshold — the shipped sketch-050 mechanism COPIED, never mounted (`96ca3909c`); and the fold label reads `Thought for N seconds` **only when a span was measured** (`2a988c3de`). ⛔ **D-243-13 honoured mechanically:** the sketch's `Math.round(chars / 180)` is a DEMO AFFORDANCE, and on the 32,951-char fixture it computes to *"Thought for 183 seconds"* — a plausible number derived from string length. `grep -c "/ 180"` is **0**; a DB-loaded message reads `Thinking` with **no digit**; `git diff --stat -- supabase/ backend/` is **EMPTY**. ⚠ **THE ONE DECLARED DIFFERENCE FROM THE ACCEPTANCE BAR** (for `243-VERIFICATION.md` to carry): the mockup reads `Thought for 6 seconds` on EVERY message including historical ones; the shipped surface reads `Thinking` on any message it did not watch stream. **Declared with its reason = a decision; undeclared = drift.** ⭐ **Two plan errors found by driving rather than assuming:** (1) §10's uniqueness needle matched **ZERO** files after the render shape changed — re-aimed as an alternation of two NAMED shapes, because the obvious widening was measured to match two innocents; (2) `MessageItem.tsx` had to take the new prop and is **not in `files_modified`** — edited anyway, with its ledger row updated in the same commit, since the ledger gate reads `files_modified` and not the diff. **That is the identical blindness the plan cites to CLOSE the formatter extraction, arriving from the other direction.** ⚠ `BUG-260718-02` → **`folded`, NOT `closed`**: the code half is measured and named commit-by-commit, but the reported defect is a PERCEPTION and every fence here is synthetic — the same standard 243-03 held its sibling to. `SEED-269` planted (three elapsed formatters, one home owed). `count gate OK — 254/254, failed 0, 7994→8017`; typecheck 67, **set diff empty both ways**. Four ledger triples re-derived; `StreamsProvider.tsx`'s row was STALE for the SECOND time in two plans, written one plan earlier the same day.
 
 Status: **243-03 EXECUTED — the phase’s most consequential plan, and the RED drive changed its shape.** CHAT-02: the delta path now coalesces PRODUCER-side (`makeAccumulatingCoalescer`, 60 ms, leading edge) — **60 deltas made 61 `setMessages` calls and now make 12** (`bfdf899b1`). CHAT-03: **D-243-05 outcome 3** — a residual DID reproduce at HEAD and it is **NOT** the defect `BUG-260823-01` names; that report’s cause was deleted by `64357e979`, which is measured to be a **quick task 7h48m BEFORE Phase 228 was scoped**, not a 228 commit. The real residual: a nudge up under 120px releases the pin but stays “near bottom”, so between the 900 ms hard clock and the 1500 ms gesture window **any** scroll event re-pinned the reader. One ref, one clause, at the line D-243-05 predicted (`8d7dfab43`); the mirror (a flick back DOWN still re-arms) stays green. ⭐ **D-243-04 MEASURED rather than asserted:** 60 real deltas produced **61** `scrollIntoView` calls before the coalescing and **13** after, with `useFollowScroll.ts` held constant — and `MessageList.tsx` needed **no edit at all**. ⚠ A trap the plan did not name broke two shipped tests and was caught by a base-set diff (13 base / 15 / 13): every STRUCTURAL callback must drain the text buffer or Anthropic’s interleaved text/tool_use order inverts. `count gate OK — 253/253, failed 0`; typecheck 67, set diff empty. Three suites into both knobs — **`throttle.ts` had been ungated since 068.5**. Four ledger triples re-derived; `useFollowScroll.ts` and `throttle.ts` had **NO ROW AT ALL**, so G-5 was structurally absent on the very file this bug is about. ⚠ `BUG-260823-01` stays **`folded`, not `closed`** — every fence here is a synthetic `WheelEvent`, and this file’s own history records two fixes that passed those and failed a real mouse. **A real-wheel UAT row is owed** (`re_open_trigger` now says so; `SEED-049`/D-243-09 agree).
-Progress: 0 / 5 phases CLOSED · **2 of 5 CODE-COMPLETE (242, 243), both UAT-owed** · 4 / 19 requirements delivered (SHIP-02, SHIP-03, SHIP-04, CHAT-02, CHAT-04 — ⚠ SHIP-01, CHAT-01, CHAT-03, CHAT-05 are code-complete and deliberately UNTICKED pending G-4 rows) · `[██░░░░░░░░] 21%`
-Last activity: 2026-09-11 — **Phase 242 planned and executed end-to-end**: a Python-only bound became a schema constraint over an EMPTY fence allow-list, the Search tab stopped sending what nobody changed, and three SHIP claims closed by measurement — while two guards that were passing vacuously turned out to be the phase's most useful finding
+### ▶ Phase 244 — CONTEXT GATHERED 2026-09-11, not yet planned
+
+`244-CONTEXT.md` + `244-DISCUSSION-LOG.md` at `233a14d6d`, base `5ebd0fbca`. **21 decisions**
+(D-244-01..21) across four discussed gray areas.
+
+⭐⭐ **THREE OF THE FIVE CRITERIA ARE SUBSTANTIALLY ALREADY BUILT, AND THREE REGISTERS SAY OTHERWISE.**
+This is the Phase 242 pattern repeating — *"three of its four requirements were already true"* — and it
+was caught by scouting the code rather than by reading the ROADMAP. All five findings are **F-1..F-5**
+in `244-CONTEXT.md` with how to re-derive each:
+
+- **`SHELL-05`'s app-shell signal shipped at Phase 235 plan 09** — `attentionConditions.ts` is a
+  producer registry with exactly one tenant, badged on the desktop rail, the mobile drawer nav row and
+  the hamburger, with three suites. ⛔ **So the ROADMAP's *"two net-new surfaces"* is wrong by one and
+  only ONE sketch is owed** (D-244-18). ⚠ But Phase 235 closed `SURF-03` **UNTICKED**, so criterion 5
+  has never been driven end to end — `SHELL-05`'s work is *verify, then attribute the count to a tab*.
+- **`SHELL-04`'s hard half shipped at Phase 100 (TMPL-01)** — `POST /threads/{id}/workspace/files`
+  already writes **thread-scoped, TTL-expiring, magic-byte-validated** files with an RLS **insert**
+  policy for the **user**, a 10 MB cap checked three times, 15 extensions, `ON DELETE CASCADE`, a panel
+  renderer, an API client, and a caller already in the chat shell (`ChatLayout.tsx:377`).
+  ⛔ **`SEED-042`'s *"option (ii) costs a new write endpoint + RLS"* and `SEED-247`'s *"`workspace_files`
+  is the agent's, not a home for a person's attachment"* are both FALSE at HEAD.** Both seeds now carry
+  the refutation beside the original. *"Temporary"* has been expressible since Phase 100.
+- **`SEED-029`'s Continue affordance shipped** (`_MAX_CONTINUES_PER_RUN = 3`, three suites) — so
+  `SHELL-02` is only the **composer lock**, not the button.
+- **`SEED-045`'s two folded anchors shipped at Phase 156** — collapsed-rail New Chat (D-02) and the
+  chat-list search on desktop **and** mobile. **That fold is empty**; what is open on the surface is
+  `BUG-260911-02` and `BUG-260816-03`, both now folded into 244.
+- **`import_single_file` already takes `folder_id`** (Phase 233) — the chat route simply never passes
+  one, which is the whole reason imports land at root.
+
+**Locked shape:** attachments reuse `workspace_files`, **read inline, never embedded**, existing TTL +
+cascade, no promote control (D-244-01/03/04) · the agent is told by a **system-prompt line**, which owes
+an **8-row cross-provider measurement** (D-244-02) · the composer's cloud item **re-points at the
+thread** and the folder-asking import's door moves to the **Library** (D-244-05/06) · the composer
+**unlocks** by gating on harness MODE not lock presence, which makes the shipped sentence honest so no
+copy is rewritten (D-244-08/10) · the **same zero-prop `PendingAskStack`** mounts inline at the paused
+message, making *"settles in both homes"* **structural** (D-244-11/12) · **4 plans by surface seam**
+(D-244-17).
+
+⛔ **Named obligations a plan must not quietly drop:** `SHELL-02` must **assert** that posting at
+`cap_paused` actually starts a run — the server has no refusal, but whether posting clears the paused
+row is **unverified** (D-244-09) · `BUG-260828-07` is **HIGH** and closes on a **driven** row, not a
+fence (D-244-14) · `SHELL-01` closes on a **measured bound** at ≥3 viewport heights × panel open/closed,
+using a **leaf bounding rect** and never `scrollTop` (D-244-19) · ⛔ **no second tenant in the attention
+registry** — `D-235-03` forbids it and a test asserts the count (D-244-15).
+
+⚠ **Register write-backs made at discuss, because a routing not written into the register is invisible
+to the next sweep:** **7** reported bugs → `status: folded`, `folded_into: 244` (the four named by
+`SHELL-01..04`, plus `BUG-260911-03` / `BUG-260911-02` / `BUG-260816-03` folded by operator ruling) ·
+`SEED-247` answered on **5 of its 6 questions**, narrowed to Q4 alone, `priority: high → medium` ·
+`SEED-042`, `SEED-029`, `SEED-045` each carry their refutation and a narrowed trigger.
+
+⚠ **G-5: every hot file this phase touches HAS a ledger row** (`check-hot-file-ledger.cjs 244` will not
+fail on a missing row) — but **three triples were STALE** and are re-derived in D-244-20:
+`PendingAskCard.tsx` **14/7/765** (ledger `13/7/736`), `MessageItem.tsx` **69/33/755** (`68/33/755`),
+`NavPanel.tsx` **21/11/344** (`20/11/329`).
+
+⚠ **Solo: no independent reviewer exists.** A review round here is a self-review and
+`244-VERIFICATION.md` must say *"self-verified"*, never *"reviewed"* (`OV-SOLO-01`).
+
+⚠ **METHOD NOTE, paid for again:** the first frontmatter write-back pass **silently matched nothing on
+three CRLF files and reported no error**. Caught by re-reading the frontmatter, not by an exit status —
+the same class as Phase 242's `check-hot-file-ledger.cjs` passing vacuously over a CRLF plan. **A
+command that changed nothing and a command that succeeded look identical.**
+
+Progress: **1 / 5 phases CLOSED (242)** · 243 code-complete, UAT-owed · **244 context gathered**  · 4 / 19 requirements delivered (SHIP-02, SHIP-03, SHIP-04, CHAT-02, CHAT-04 — ⚠ SHIP-01, CHAT-01, CHAT-03, CHAT-05 are code-complete and deliberately UNTICKED pending G-4 rows) · `[██░░░░░░░░] 21%`
+Last activity: 2026-09-11 — **Phase 244 context gathered**: four gray areas settled into 21 decisions, and scouting the code found that **three of the phase's five criteria are substantially already built** — the shell signal (235), the thread-scoped upload endpoint (100) and Continue (pre-243) — refuting two seed premises, one ROADMAP flag and one fold outright
 
 **Phases:** 242 Ship It · 243 Thinking block + follow-scroll seam (⚠ sketch first) ·
 244 Chat shell + composer · 245 The verification debt · 246 The recall cliff.
