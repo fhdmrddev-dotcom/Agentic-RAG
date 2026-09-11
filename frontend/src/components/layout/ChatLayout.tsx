@@ -542,6 +542,11 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
   // where one check failed and the next recovered arrives as an empty array and signals
   // nothing (SC#4).
   const showAttention = attentionCount > 0 && Boolean(onOpenLibraryHealth)
+  // Phase 244 plan 04 (SHELL-05 · BUG-260911-03): a FOURTH renderer hangs off the SAME one
+  // read — the Library's own tab strip. ⛔ The conditions travel DOWN as data (see the mount
+  // below); nothing here calls `useSourceAttention()` and neither does the page, because arm 1
+  // of `attentionConditions.ts`'s re-open trigger is a third concurrent reader. The shell says
+  // THAT something needs attention; the tab strip says WHERE.
 
   return (
     <div className="flex h-screen bg-background">
@@ -844,7 +849,7 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
               `undefined` on every ordinary entry, so the Library keeps its own default; it
               is set only by App's `handleOpenLibraryHealth`. */}
           {activeView === "documents" ? (
-            <LibraryPage onNavigate={onNavigate} initialTab={libraryTab} />
+            <LibraryPage onNavigate={onNavigate} initialTab={libraryTab} attentionConditions={attentionConditions} />
           ) : activeView === "skills" ? (
             <SkillsPage
               onTryInChat={handleTryInChat}

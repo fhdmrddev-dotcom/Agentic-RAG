@@ -3500,6 +3500,32 @@ const BASELINE = {
   // (a single stack fires the ask fetch TWICE, not once), and the property that matters is
   // that the cost does not scale with ROW COUNT.
   "MessageItem.inlineApproval.test.tsx": 8,
+  // ── Phase 244 (244-04 T1 / SHELL-05 / BUG-260911-03 / C-5) ──────────────────────────────
+  // ⛔ BOTH KNOBS, BY NECESSITY — the fact this script has now recorded beside five other
+  // blocks and which is STILL true: `src/components/layout` is NOT a bare directory entry in
+  // TARGETS, so a suite dropped into `src/components/layout/__tests__/` runs in NO gate until
+  // it is NAMED there AND pinned here. TARGETS decides what RUNS; BASELINE decides what is
+  // GUARDED, and a suite can sit on the wrong side of exactly one of them for a whole phase.
+  //
+  // 10 cases, MEASURED on a green run of the suite alone — not copied from the plan. TWO were
+  // driven RED against the shipped tree before `tab?: LibraryTab` existed (`expected undefined
+  // to be "health"`); the other EIGHT are controls that were green before the edit and whose
+  // job is to prove the edit changed nothing else — the registry's one-tenant count, the five
+  // cause sentences asserted on their WORDS, and the `?raw` reader inventory.
+  "attentionTab.test.ts": 10,
+  // ── Phase 244 (244-04 T2 / SHELL-05 / BUG-260911-03) ────────────────────────────────────
+  // ⛔ BOTH KNOBS, and this script has now recorded the same fact about `src/pages` a dozen
+  // times: there is NO `src/pages` bare-directory entry in TARGETS — it is reached by NAMED
+  // FILES ONLY — so a suite dropped into `src/pages/__tests__/` runs in NO gate until it is
+  // named there AND pinned here.
+  //
+  // 15 cases, MEASURED on a green run of the suite alone. EIGHT were RED on the shipped tree
+  // (no tab carries a mark; `attentionCountByTab is not a function`; the ChatLayout key-link
+  // fence). The two hand-off cases were GREEN before the edit, so they were driven RED against
+  // PLANTED defects — a second `setLibraryTab(` writer in `App.tsx`, and a
+  // `libraryTabAfterNavigate` that returns `pending` unconditionally — and both files were
+  // restored md5-identical. A guard nobody has seen fire is not a guard.
+  "LibraryPage.tabAttention.test.tsx": 15,
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -4976,6 +5002,33 @@ const TARGETS = [
   // and that BOTH other homes of the cross-surface shell — `WorkspacePanel`'s stack mount and
   // `WorkflowRunPage`'s direct card mount — still render their shipped copy.
   "src/components/chat/__tests__/MessageItem.inlineApproval.test.tsx",
+  // ── Phase 244 (244-04 T1 / SHELL-05 / BUG-260911-03) — the condition's tab attribution ──
+  //
+  // ⛔ FILE-LEVEL BY NECESSITY: there is no `src/components/layout` bare-directory entry in
+  // this array (it has exactly two — `src/landing` and `src/components/workflows`), so this
+  // suite runs in NO gate until it is named here AND pinned in BASELINE above. Both were
+  // added in the SAME COMMIT as the field it guards.
+  //
+  // What it guards: `AttentionCondition` gained ONE optional `tab?: LibraryTab`, set by the
+  // single registered producer. The load-bearing cases are the ones that prove NOTHING ELSE
+  // MOVED — `ATTENTION_PRODUCERS.length === 1` (D-235-03), the five cause sentences asserted
+  // on the rendered WORDS rather than on a `detail` key, and a `?raw` sweep pinning the
+  // `useSourceAttention()` call-site inventory BY FILE so arm 1 of the registry's own re-open
+  // trigger (a third concurrent reader) cannot be fired silently by a later plan.
+  "src/components/layout/__tests__/attentionTab.test.ts",
+  // ── Phase 244 (244-04 T2 / SHELL-05 / BUG-260911-03) — the tab says WHERE ───────────────
+  //
+  // ⛔ FILE-LEVEL BY NECESSITY: `src/pages` is reached by NAMED FILES ONLY in this array and
+  // `src/pages/__tests__` by nothing at all — the fact that let two `SettingsPage` suites sit
+  // in `src/pages/__tests__/` having NEVER RUN UNDER THE GATE (see that block above).
+  //
+  // What it guards: the per-tab attention mark on the Library's segmented control, asserted on
+  // the RENDERED WORDS and the ACCESSIBLE NAMES rather than on a `data-testid`'s existence — a
+  // presence assertion cannot see content drift, and a badge that renamed its control would be
+  // invisible to one. It also pins the three prohibitions the attribution could have been
+  // bought with: no second producer, no third `useSourceAttention()` reader, and no second
+  // writer of `libraryTab` (the Phase 235 plan-15 defect).
+  "src/pages/__tests__/LibraryPage.tabAttention.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
