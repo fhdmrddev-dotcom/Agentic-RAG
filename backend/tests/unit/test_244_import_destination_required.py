@@ -29,6 +29,7 @@ from unittest.mock import AsyncMock
 import pytest
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 
 from app.api import connectors
 from app.main import app as real_app
@@ -120,6 +121,37 @@ def test_an_explicit_null_folder_is_refused(router_client, wired):
 
     assert res.status_code == 422, res.text
     assert wired.await_count == 0
+
+
+# ── 3b · WR-05 (244-07) — an EMPTY STRING is not a destination either ────────────────────
+#
+# ⛔ THE DOCSTRING PROMISED A STRUCTURAL GUARANTEE THAT WAS NOT STRUCTURAL. A bare `str` accepts
+# `""`, and the ownership gate downstream is truthiness-based — `ingest_splice.py:154` reads
+# `if folder_id:`, so `""` skips the 404/403 check ENTIRELY and reaches the insert with
+# `"folder_id": ""`, which is `BUG-260905-01`'s "landed somewhere nobody chose" with the check
+# that would have caught it switched off. A non-UUID like `"root"` takes the same path.
+# ⚠ The UI cannot send either (`LibraryCloudImport.handleConfirm` guards `if (!folderId) return`),
+# so this is API surface only — but the promise was written as structural and it was not.
+@pytest.mark.parametrize("bad", ["", "   ", "root", "not-a-uuid"])
+def test_a_blank_or_malformed_folder_is_refused_before_the_handler(router_client, wired, bad):
+    res = router_client.post(IMPORT_PATH, headers=_headers(), json={"folder_id": bad})
+
+    assert res.status_code == 422, res.text
+    assert wired.await_count == 0, (
+        f"the minter was reached with folder_id={bad!r} — the ownership check downstream is "
+        "truthiness-based, so a blank destination skips it and the row lands unchecked"
+    )
+
+
+def test_the_model_itself_refuses_a_blank_folder():
+    """⛔ Asserted on the MODEL, not through a route: the docstring's whole claim is that the
+    refusal happens before any handler branch exists to forget it."""
+    with pytest.raises(ValidationError):
+        ConnectionFileImportRequest(folder_id="")
+    with pytest.raises(ValidationError):
+        ConnectionFileImportRequest(folder_id="root")
+    # …and the POSITIVE CONTROL: a real folder id still constructs, unchanged.
+    assert ConnectionFileImportRequest(folder_id=FOLDER_ID).folder_id == FOLDER_ID
 
 
 # ── 4 · `_StrictBase`'s extra="forbid" is live on this shape ─────────────────────────────
