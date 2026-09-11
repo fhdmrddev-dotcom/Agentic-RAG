@@ -20,10 +20,15 @@
 const COPY = {
   /* ── Engine facts — REAL, do not edit without re-reading the source ───────── */
   engine: {
+    // ⭐ Phase 244 / D-244-24 — `.pdf` IS TAKEN and shipped (`_PDF_EXT`, `%PDF-` magic bytes).
+    // This list is PINNED to the server: `backend/tests/unit/test_244_workspace_pdf.py` parses
+    // this array out of this file and asserts set equality against `workspace.py _ALLOWED_EXT`,
+    // so the acceptance bar and the build cannot drift apart silently. Sixteen, not fifteen.
     ALLOWED_EXT: [
       ".docx", ".pptx", ".xlsx",
       ".md", ".json", ".csv", ".txt", ".py", ".js", ".sh",
       ".png", ".jpg", ".jpeg", ".gif", ".webp",
+      ".pdf",
     ],
     MAX_MB: 10,
     TTL_HOURS: 24,

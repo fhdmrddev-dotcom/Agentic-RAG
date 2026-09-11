@@ -66,6 +66,13 @@ from app.services.citation_markers import (
     normalize_citation_markers,
 )
 from app.services.tool_dispatcher import ToolContext, ToolResult, dispatch_tool
+# Phase 244 (SHELL-04 / D-244-02): ONE home for the container-path rule.
+# ⛔ The prompt must announce the EXACT path the hydration writes. Re-deriving the basename here
+# would be a second copy of a sanitiser, and a divergence between the two hands the model a path
+# that does not exist — a defect no test of either half alone could see.
+# Cycle-safe: agent_loop already imports tool_dispatcher above, and tool_dispatcher never imports
+# agent_loop at module level.
+from app.services.tool_dispatcher import _attachment_container_path
 # Phase 164 (D-164-02): reuse the shared retrieval user-context seam for the match_skills
 # DEFINER RPC (retrieval_service is already in the import graph via tool_dispatcher above —
 # no new cycle; it never imports agent_loop).
@@ -1156,6 +1163,74 @@ def _select_hero_filenames(files: list[dict], user_message: str | None) -> set[s
     return {_hero_pick(files)["filename"]}
 
 
+# ── Phase 244 (SHELL-04 / D-244-02) — the attachment announcement ─────────────
+#
+# ⛔ A FILENAME IS ATTACKER-CONTROLLED TEXT CROSSING INTO THE SYSTEM PROMPT. That is a
+# prompt-injection surface (T-244-02-03), not a formatting nicety: a name carrying CR/LF plus
+# `## System` would open a heading of its own inside the model's instructions.
+
+
+def _one_line(text: str, cap: int) -> str:
+    """Collapse any text to a single bounded line safe to place after a `- ` bullet."""
+    import re as _re_attach_note  # module-local idiom
+
+    flat = _re_attach_note.sub(r"[\r\n\t\x00-\x1f]+", " ", text or "")
+    flat = _re_attach_note.sub(r"\s+", " ", flat).strip()
+    # Markdown structure characters — a name cannot open a heading, a code fence, a link or a
+    # list of its own inside the prompt.
+    flat = _re_attach_note.sub(r"[`*_#\[\]<>|]", "", flat)
+    if len(flat) > cap:
+        flat = flat[:cap].rstrip() + "…"
+    return flat
+
+
+def _build_attachment_note(rows: list[dict] | None) -> str:
+    """Render the system-prompt section announcing this thread's attached files.
+
+    Returns `""` when there is nothing to announce — S-2, empty renders NOTHING: no heading, no
+    "no files attached" sentence, no reserved space. That is what keeps the zero-attachment
+    prompt byte-identical to today's.
+
+    ⛔ WHAT THIS MUST NOT SAY. D-244-03 makes *"not in the knowledge base"* **structurally** true
+    (no chunks, no vectors, no `documents` row), so the prompt says exactly what the data model
+    says. Promising retrieval here would be a promise nothing can keep.
+
+    ⚠ The container path is `_attachment_container_path` — the SAME function the hydration uses
+    — never a re-derived basename. One rule, one home; a divergence would announce a path the
+    sandbox does not contain.
+
+    ⚠ Nothing provider-specific belongs here: this feeds the SHARED path, and the provider split
+    happens below at `create_streaming_chat`.
+
+    ⚠ No expiry rule lives here either. `list_files_in_thread` applies
+    the gate in SQL and this renderer consumes that listing — one gate, two readers (D-244-04).
+    """
+    if not rows:
+        return ""
+    lines = []
+    for row in rows:
+        raw_path = row.get("path") or ""
+        # ⭐ The displayed NAME is derived from the container PATH, not re-sanitised from the raw
+        # filename. That removes the divergence entirely: the name the model reads is the name
+        # on disk, and `_one_line` is a belt-and-braces no-op over a charset that already
+        # excludes every markdown structure character.
+        container = _attachment_container_path(raw_path)
+        name = _one_line(container.rsplit("/", 1)[-1], 160) or "(unnamed file)"
+        size = row.get("size_bytes") or 0
+        mime = _one_line(str(row.get("mime_type") or "unknown"), 60)
+        lines.append(f"- {name} ({size:,} bytes, {mime}) — readable at `{container}`")
+    return (
+        "\n\n## Files attached to this conversation\n"
+        "The user attached these files to THIS conversation. They are scoped to this "
+        "conversation only, they are NOT in the knowledge base, and they will not be found by "
+        "search_documents. They expire, so use them in this conversation rather than assuming "
+        "they persist.\n"
+        "Read a text file with workspace_read; read ANY of them — spreadsheets, documents, "
+        "slides, PDFs, images — from the path below inside execute_code.\n"
+        + "\n".join(lines)
+    )
+
+
 # ---------------------------------------------------------------------------
 # Agent loop
 # ---------------------------------------------------------------------------
@@ -1566,6 +1641,33 @@ async def run_agent_loop(
             pass
         except Exception:
             logger.warning("Failed to wire connector tools into chat agent loop", exc_info=True)
+
+        # Phase 244 (SHELL-04 / D-244-02) — announce this thread's attached files.
+        # The SIXTH conditional append, in the exact shape of `memory_note` above.
+        #
+        # ⛔ GENERAL MODE ONLY, and the indentation is what enforces it: this sits inside the
+        # `if body.agent_mode != "explorer":` block. `get_explorer_tools()` returns
+        # [LS, TREE, GREP, GLOB, READ_DOCUMENT, ANALYZE_DOCUMENT] — no workspace tool and no
+        # execute_code — so announcing an attachment there is a promise the agent cannot keep,
+        # which is strictly worse than silence because the model will try.
+        #
+        # ⚠ `list_files_in_thread` applies the expiry gate IN SQL, so the line inherits
+        # "not expired" for free — one gate, two readers (D-244-04). ⛔ No second expiry rule.
+        # ⛔ A read failure must never break the turn: chat continues without the line, loudly
+        # in the log rather than silently.
+        try:
+            from app.db.workspace import list_files_in_thread  # noqa: PLC0415 — cycle-safe leaf
+
+            _attachment_rows = await list_files_in_thread(
+                await get_pg_pool(),
+                UUID(thread_id) if isinstance(thread_id, str) else thread_id,
+            )
+            if _attachment_rows:
+                attachment_note = _build_attachment_note(_attachment_rows)
+                active_system_prompt = active_system_prompt + attachment_note
+        except Exception:
+            logger.warning("Failed to read thread attachments for the system prompt",
+                           exc_info=True)
 
     messages: list[dict] = [{"role": "system", "content": active_system_prompt}]
     # Phase 075.5 D-075.5-01: _reconstruct_history echoes thought_signature

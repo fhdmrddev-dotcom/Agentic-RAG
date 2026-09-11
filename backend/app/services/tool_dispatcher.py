@@ -1758,6 +1758,138 @@ def _derive_actual_exit_code(exec_result) -> int:
     return code
 
 
+# ── Phase 244 (SHELL-04 / C-9) — thread attachments reach the sandbox ─────────
+#
+# WHY THIS EXISTS. `244-CONTEXT.md` said "nothing new is needed on the tool side". Measured at
+# this base that is TRUE FOR TEXT and FALSE FOR BINARY: `workspace_service.read_file` returns the
+# literal "Content available via REST API." for any binary MIME (:391-402), and the sandbox had NO
+# workspace reach at all (`grep -rn "workspace" sandbox_service.py` -> no matches). EIGHT of the
+# sixteen accepted extensions are binary, and sketch 236's headline scenario file is an .xlsx — so
+# SHELL-04's "and the agent can use it" clause was unsatisfied for the MOST LIKELY attachments.
+#
+# ⛔ `workspace_read`'s binary branch is DELIBERATELY LEFT ALONE. Its note is honest for a
+# text-reading tool; this is a SECOND, correct route rather than making the first one lie.
+_ATTACHMENTS_DIR = "/sandbox/attachments"
+
+# A bound on container I/O per session. The 10 MB per-file cap is enforced at the upload door
+# (three times, including before body materialisation — WR-04), but nothing caps the COUNT of
+# workspace rows a thread can accumulate, and the agent writes here too. A truncation is NAMED in
+# the tool result, never silent (the `confirm_preview` refusal discipline).
+_ATTACHMENT_HYDRATION_MAX_FILES = 50
+
+# A bound on the BASENAME. ⚠ Found by the Task-3 prompt fence, not by this task's own tests: a
+# 4,000-character filename produced a 4,000-character container path AND flooded the turn's system
+# prompt, because nothing here capped length. Most filesystems refuse a component over 255 bytes,
+# so an unbounded name is also an ENOENT the agent cannot diagnose. The tail is cut, never the
+# head — workspace paths carry a `uuid8-` prefix, so truncation keeps names distinguishable.
+_ATTACHMENT_NAME_MAX = 120
+
+
+def _attachment_container_path(path: str) -> str:
+    """Reduce an attacker-controlled workspace path to a BASENAME under ``_ATTACHMENTS_DIR``.
+
+    ⛔ T-244-02-02. A filename is attacker-controlled text and this value becomes a CONTAINER
+    PATH; an f-string of the raw path writes wherever the caller likes. Four reductions, in
+    order, each load-bearing:
+
+      1. backslashes are normalised so a Windows-style separator cannot hide a segment;
+      2. ``os.path.basename`` discards every directory segment — ``../../etc/passwd`` -> ``passwd``;
+      3. the charset is narrowed to ``validate_path``'s own set, so nothing shell- or
+         path-significant survives even if a future basename implementation changed;
+      4. leading dots are stripped, so ``..`` cannot survive as a name in its own right, and an
+         empty residue falls back to a fixed literal rather than producing the directory itself;
+      5. the length is capped (``_ATTACHMENT_NAME_MAX``) — an unbounded component is an ENOENT on
+         most filesystems and, since Task 3 announces this exact path, a prompt flood.
+    """
+    import re as _re_attach  # module-local idiom (see _handle_load_skill / the exec hint)
+
+    candidate = (path or "").replace("\\", "/").rstrip("/")
+    base = os.path.basename(candidate)
+    base = _re_attach.sub(r"[^A-Za-z0-9._\- ]", "_", base)
+    base = base.lstrip(".").strip()
+    if len(base) > _ATTACHMENT_NAME_MAX:
+        base = base[:_ATTACHMENT_NAME_MAX].strip()
+    if not base:
+        base = "attachment"
+    return f"{_ATTACHMENTS_DIR}/{base}"
+
+
+async def _hydrate_thread_attachments(ctx: ToolContext, session) -> list[str]:
+    """Copy this thread's non-expired workspace files into ``/sandbox/attachments/``.
+
+    Returns a list of NAMED failure/truncation notes (empty on a clean run) for the caller to
+    surface in the tool result. ⛔ T-244-02-07: a file the user attached is never dropped
+    silently — a per-file failure is logged AND named, the way `preview_service.confirm_preview`
+    names a refusal.
+
+    ⚠ ONE EXPIRY GATE, TWO READERS (D-244-04). `ws_list_files` -> `list_files_in_thread` applies
+    ``expires_at IS NULL OR expires_at > now()`` IN SQL, so WHICH files exist is decided there and
+    nowhere else. `get_file_by_path` is used only to fetch the content columns the listing does
+    not select, and it is deliberately UNFILTERED on expiry — which is exactly why it must never
+    be the thing that decides membership.
+
+    ⚠ The copy shape is `render_template`'s `_copy_in` (:3580-3601): NamedTemporaryFile ->
+    `copy_to_runtime` -> unlink. ⛔ NOT the skill-file loop's base64-in-source preamble — that
+    inflates the generated code file by 33% and would be catastrophic on a 10 MB attachment.
+
+    ⚠ D-v2.5-01: every blocking call goes through `run_in_threadpool`.
+    """
+    import tempfile as _tempfile_local
+    import os as _os_local
+
+    notes: list[str] = []
+    try:
+        rows = await ws_list_files(ctx.pool, thread_id=UUID(ctx.thread_id))
+    except Exception:
+        logger.warning("attachment hydration: listing failed for thread %s", ctx.thread_id,
+                       exc_info=True)
+        return notes
+    if not rows:
+        return notes  # S-2: empty => do nothing at all. No mkdir, no note, no event.
+
+    if len(rows) > _ATTACHMENT_HYDRATION_MAX_FILES:
+        notes.append(
+            f"Only the first {_ATTACHMENT_HYDRATION_MAX_FILES} of {len(rows)} workspace files "
+            f"were copied into {_ATTACHMENTS_DIR}/. Read the rest with workspace_read."
+        )
+        rows = rows[:_ATTACHMENT_HYDRATION_MAX_FILES]
+
+    try:
+        await run_in_threadpool(session.execute_command, f"mkdir -p {_ATTACHMENTS_DIR}")
+    except Exception:
+        logger.warning("attachment hydration: mkdir failed", exc_info=True)
+
+    def _copy_in(local_bytes: bytes, container_path: str) -> None:
+        with _tempfile_local.NamedTemporaryFile(mode="wb", delete=False) as _tmp:
+            _tmp.write(local_bytes)
+            _local = _tmp.name
+        try:
+            session.copy_to_runtime(_local, container_path)
+        finally:
+            try:
+                _os_local.unlink(_local)
+            except OSError:
+                pass
+
+    for row in rows:
+        src_path = row.get("path") or ""
+        dest = _attachment_container_path(src_path)
+        try:
+            file_row = await get_file_by_path(ctx.pool, UUID(ctx.thread_id), src_path)
+            if file_row is None:
+                raise WorkspaceError(f"row vanished between listing and read: {src_path}")
+            content = await _get_file_content(ctx.pool, ctx.supabase, file_row)
+            await run_in_threadpool(_copy_in, content, dest)
+        except Exception as e:
+            logger.warning("attachment hydration: %s failed: %s", src_path, e, exc_info=True)
+            notes.append(
+                f"Could not load the attached file {os.path.basename(src_path)} into "
+                f"{_ATTACHMENTS_DIR}/ ({type(e).__name__}). It is still readable with "
+                f"workspace_read if it is a text file."
+            )
+    return notes
+
+
 async def _handle_execute_code(args: dict, ctx: ToolContext) -> ToolResult:
     """Execute code in the sandbox container.
 
@@ -1870,6 +2002,22 @@ async def _handle_execute_code(args: dict, ctx: ToolContext) -> ToolResult:
             await run_in_threadpool(session.execute_command, "mkdir -p /sandbox/output")
         except Exception:
             pass
+
+        # Phase 244 (SHELL-04 / C-9) — hydrate this thread's attachments into
+        # /sandbox/attachments/ so a binary attachment is USABLE, not merely present.
+        # ⚠ ONCE PER SESSION, in the exact shape of the `_output_baseline_seeded` guard at
+        # :1850. The sandbox session is cached per thread_id until idle eviction, so the files
+        # stay put; re-copying on every call would be pure container I/O for nothing, and on a
+        # 10 MB attachment it is the DoS arm of T-244-02-05.
+        # ⚠ The flag is set BEFORE the work, not after: a hard failure must not re-attempt
+        # container I/O on every subsequent execute_code call. Per-FILE failures are already
+        # handled and named individually inside the helper, so nothing is lost by it.
+        # ⛔ A thread with no attachments performs no mkdir, no copy and adds no note — Deep and
+        # Harness share this handler, so the zero-attachment path must cost exactly nothing.
+        _attachment_notes: list[str] = []
+        if not getattr(ctx, "_attachments_hydrated", False):
+            ctx._attachments_hydrated = True
+            _attachment_notes = await _hydrate_thread_attachments(ctx, session)
 
         # Inject skill files into sandbox
         skill_files_req = args.get("skill_files") or []
@@ -2209,6 +2357,11 @@ async def _handle_execute_code(args: dict, ctx: ToolContext) -> ToolResult:
             "stdout": exec_result.stdout or "",
             "stderr": exec_result.stderr or "",
         }
+        # Phase 244 (T-244-02-07) — a file the user attached that could NOT be loaded is NAMED
+        # to the model, never silently dropped. Guarded on a non-empty list, so a clean run (and
+        # every zero-attachment run) carries no new key and stays byte-identical.
+        if _attachment_notes:
+            _llm_payload["attachments"] = _attachment_notes
         # 2026-08-19 — SELF-REPAIR for the single most expensive authoring mistake
         # observed: the model writes correct code that opens `/sandbox/<file>` but
         # omits the `skill_files` argument, so the file is never injected. The raw
