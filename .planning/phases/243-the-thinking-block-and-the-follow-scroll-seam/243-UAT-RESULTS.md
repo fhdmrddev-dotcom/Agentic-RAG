@@ -5,9 +5,9 @@ driven: 2026-09-11
 driver: claude (solo — OV-SOLO-01)
 environment: "local dev — vite :5173, backend :8000, Supabase :54322, Redis :6379; deepseek / deepseek-v4-flash"
 thread: "261d5f57-36fb-40ec-bb0b-1c72b7550350 — 'UAT 243 L-2 — long thread (seeded, deletable)'"
-rows_driven: [L-2, L-3, L-5, L-6 (settled frame)]
+rows_driven: [L-2, L-3, L-4, L-5, L-6 (settled frame)]
 rows_partial: [L-1]
-rows_owed: [L-1, L-4, L-6-live-frame, M-1, P-1, G-1, N-1, N-2, N-3, N-4, cross-provider x8]
+rows_owed: [L-1, L-6-live-frame, M-1, P-1, G-1, N-1, N-2, N-3, N-4, cross-provider x8]
 ---
 
 # Phase 243 — UAT results, driven in a real browser
@@ -300,11 +300,69 @@ support a claim about per-token churn.
 the control churns. **It remains owed**, and the honest next step is to run it with the folds
 **closed** and the sampler driven from `requestAnimationFrame` rather than `setInterval`.
 
+---
+
+## ✅ L-4 — PASSES. The answer resolves on the navigation path, with no reload.
+
+**This is CHAT-05's actual criterion**, and the one the send path could never have tested — Phase
+176 already fixed that half, so a live-send check would have passed while the residual stood.
+
+**Drive:**
+
+1. Started a three-step `execute_code` run on the UAT thread.
+2. Six seconds in, **navigated away to Library** while it streamed — a nav click, not a reload.
+3. Waited on the Library page until the run finished there. Confirmed at the database, off-screen:
+   `assistant · tools = 3 · content = 5,604 chars · reasoning = 265 chars`.
+4. **Navigated back to Chat.**
+
+**Measured on return:**
+
+| | |
+|---|---|
+| thinking triggers | **9** — the new run's fold is present |
+| `StreamingNarration` nodes anywhere | **0** |
+| final answer text rendered | ✅ *"…triangular numbers through T(…"* |
+| the ten-paragraph commentary | ✅ present |
+| `performance.getEntriesByType('navigation')[0].type` | **`"navigate"`** |
+
+⭐ **That last row is the one that makes this a pass rather than an anecdote.** A reload would report
+`"reload"`. It reports `"navigate"` — the **original** page load — so the answer resolved purely by
+leaving and coming back. **No F5, no remount of the app.**
+
+⭐ And `narrationNodes: 0` is the structural half: there is no fold for the answer to be stuck
+inside, because 243-05 deleted the arm. The defect cannot recur by the mechanism that caused it.
+
+⚠ **One observation, not a failure:** on return the transcript restored **scrolled to the middle**
+of the thread rather than to the live edge or to the new answer. CHAT-05 says nothing about scroll
+restoration, so this row still passes — but a person coming back to a finished run would reasonably
+expect to land on the answer. **Recorded as an observation for Phase 244**, which owns the chat
+shell.
+
+---
+
+## ⛔ A defect found by driving, filed rather than absorbed
+
+`BUG-260911-02` — **the first click on a chat highlights it but does not open it; a second click is
+required.** Hit **four times** across this session before it was recognised as a defect rather than
+as the driver mis-clicking, then isolated: same coordinate, click 1 → 0 thinking triggers (empty
+state), click 2 → 8.
+
+⚠ **It is why two UAT prompts in this session went nowhere** — typed into what looked like a loaded
+thread, verified at the database as never written. **A person would have concluded the app lost
+their message.**
+
+⛔ **Not Phase 243's** — thread selection is not the thinking block, the cadence, the scroll seam or
+the answer's render branch, and it reproduces on messages that predate the phase. Filed at
+`.planning/reported-bugs/BUG-260911-02-…md`, with the *"is it new? does it reproduce on production?"*
+check named as the first thing to do and explicitly **not** done here.
+
+⭐ **This is the G-4 argument in one line: no fence in this phase could have found it, and the only
+reason it is now written down is that somebody drove the product.**
+
 ## ⛔ Owed — not driven
 
 | Row | What it needs |
 |---|---|
-| **L-4** | navigate away mid-run, return without reloading |
 | **L-6 (live frame)** | the settled frame is DONE above. The **streaming** frame vs the sketch's `▶ Replay the stream` is still owed — that is where the accent and the animated dots live |
 | **M-1 / P-1 / G-1 / N-1..N-4** | multi-tool, parallel-thread, long-message, and the phase's own added rows |
 | **Cross-provider ×8** | every row above ran on **deepseek only**. Reasoning is a provider-shaped feature; seven native providers plus OpenRouter are untested here |
