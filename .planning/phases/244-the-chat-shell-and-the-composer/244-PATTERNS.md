@@ -10,6 +10,12 @@
 > `244-CONTEXT.md` were driven against the source and **three are false or a no-op**. Two of them
 > change the shape of a plan (the composer gate and the approval mount), and one of them answers
 > a question D-244-09 says is "UNVERIFIED" — it is verifiable from source, and the answer is bad.
+>
+> ⚠ **ADDENDUM (revision pass, 2026-09-11):** two further corrections — **C-8** and **C-9** — were
+> measured during planning and were recorded **only inside PLAN.md files**, where nobody consulting
+> this map would find them. They are appended to the section below in the same register. The count in
+> the sentence above is the mapper's original and is **left as written** rather than edited, per this
+> project's record-beside-the-original convention.
 
 ---
 
@@ -207,6 +213,67 @@ The thread row at `ChatHistoryColumn.tsx:168-194` already renders **an icon**
 **folder chip** with an italic "Unfiled" fallback (`folderLabel(folders, thread.folder_id)`), mode-
 switched against a date bucket. Read the bug report against *this* markup before planning work —
 this is the F-4 pattern (already-shipped) one layer down.
+
+### ⚠ C-8 — D-244-20's *"all of this phase's hot files HAVE ledger rows"* is **FALSE**
+
+⛔ **Measured, not asserted.** `node scripts/check-hot-file-ledger.cjs 244` **exits 1** and names
+**nine** files with no `docs/HOT-FILE-LEDGER.md` row:
+
+```
+G-5 CANNOT FIRE ON 9 FILE(S) — they have no ledger row:
+  [no-row] backend/app/api/workspace.py   (named by 244-02-PLAN.md)
+  [no-row] frontend/src/components/chat/ActiveConnectorChips.tsx   (named by 244-05-PLAN.md)
+  [no-row] frontend/src/components/chat/ChatAttachmentChip.tsx   (named by 244-05-PLAN.md)
+  [no-row] frontend/src/components/chat/ConnectedFilePickerModal.tsx   (named by 244-06-PLAN.md)
+  [no-row] frontend/src/components/chat/composerCopy.ts   (named by 244-05-PLAN.md)
+  [no-row] frontend/src/components/layout/ChatHistoryColumn.tsx   (named by 244-01-PLAN.md)
+  [no-row] frontend/src/components/panel/TemplateUpload.tsx   (named by 244-02-PLAN.md)
+  [no-row] frontend/src/hooks/useThreads.ts   (named by 244-01-PLAN.md)
+  [no-row] frontend/src/lib/workspaceAllowedExt.ts   (named by 244-02-PLAN.md)
+```
+
+⛔ **`backend/app/api/workspace.py` measures `11 / 6 / 620`** (re-derived with the CLAUDE.md recipe at
+this base) — **it is FIRING G-5 and has been invisible to it for its entire life.** That is the
+`App.tsx` (23 phases) and `config.py` (whole life) failure one file over, and **D-244-20 answered the
+auditor with `satisfied` over it**: a claim that is present and WRONG stops the audit, which is worse
+than an absent claim. The other eight sit below the threshold, so the obligation there is the
+`settingsSearchPayload.ts` precedent — **a row is added at CREATION, not at the third phase.**
+
+**Row ownership — one file → exactly ONE task** (⛔ the gate fails `[duplicate-row]`, so a second
+well-meaning row is a red gate):
+
+| File | Row owed by |
+|---|---|
+| `backend/app/api/workspace.py` · `TemplateUpload.tsx` · `workspaceAllowedExt.ts` | `244-02` T1 |
+| `ChatHistoryColumn.tsx` · `useThreads.ts` | `244-01` |
+| `ActiveConnectorChips.tsx` · `ChatAttachmentChip.tsx` · `composerCopy.ts` | `244-05` T1/T2 |
+| `ConnectedFilePickerModal.tsx` | `244-06` T3 |
+
+⚠ **S-8 below repeats D-244-20's claim and is SUPERSEDED by this correction** — left as written
+rather than overwritten, because the original being wrong is the finding. ⛔ Same-commit sync rule
+still binds: the CLAUDE.md row and the `docs/HOT-FILE-LEDGER.md` section move together, disposition
+cell capped at 200 chars.
+
+### ⚠ C-9 — `<code_context>`'s *"nothing new is needed on the tool side"* is TRUE for text, **FALSE for binary**
+
+`244-CONTEXT.md` § `<code_context>` states: *"`workspace_read` / `workspace_list` … the agent's
+existing reach into `workspace_files`. **Nothing new is needed on the tool side.**"*
+
+**Measured at this base:** `workspace_read` returns the literal `"Content available via REST API."`
+for **any binary MIME**, and the sandbox has **no workspace mount** —
+`grep -rn "workspace" backend/app/services/sandbox_service.py` returns **no matches**. **Eight of the
+fifteen accepted extensions are binary** (3 OOXML + 5 image), and sketch 236's own headline scenario
+file is `Meridian-Q4-pricing.xlsx`. So `SHELL-04`'s *"and the agent can use it"* clause is **not
+satisfied by the status quo for the most likely attachments** — a person attaches a spreadsheet and
+the agent tells them to use the REST API.
+
+⭐ **This is also why the phase ships six plans and not four** (see the `D-244-17` correction now
+recorded in `244-CONTEXT.md`): it is a **third backend seam inside one requirement**. `244-02` Task 2
+closes it by hydrating the thread's non-expired workspace files into `/sandbox/attachments/` using
+**the injection mechanism that already exists in the same function** — the skill-file loop at
+`tool_dispatcher.py:1888-1923`, guarded once per session in the shape of `_output_baseline_seeded`.
+⛔ **No new subsystem and no second expiry rule**: `D-244-04`'s SQL read gate on the listing stays the
+only one.
 
 ---
 

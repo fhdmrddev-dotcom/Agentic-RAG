@@ -229,6 +229,20 @@ cost of not reading them is building what exists.
   designed"*, because the contract asserted vocabulary and never composition. Sketch 236's README
   therefore names the **ordered blocks and their required atoms** (chips row · `+` menu · cloud modal
   · refusal · sent message); assert those by `data-*` hook, driven RED first.
+  ⚠ **COVERAGE AUDITED AT THE REVISION PASS, 2026-09-11 — recorded beside the original.** The first
+  plan set delivered ordered fences for **three** of the five blocks. The **Cloud modal** carried a
+  **vocabulary-only** assertion (`cloudTitle` / `cloudSub` / `cloudConfirm`) and no DOM-order fence
+  anywhere; the **Refusal** was short **two of its three atoms in the BUILD** — no task in any plan
+  rendered a filename or a dismiss control. ⛔ That is the silent narrowing this decision exists to
+  prevent, so shipping it would have been self-defeating. **Closed by BUILDING, not by ruling.**
+  ⭐ **The arm was chosen by LOOKING at the approved mockup, not by cost:** `index.html` § `refuseHTML`
+  draws `<b>` filename → `<code>` verbatim 422 → `<button class="ok">OK</button>`, and
+  `COPY.shared.refusalDismiss` (`"OK"`) is in `COPY.js` — the operator approved all three, so ruling
+  them out in `D-244-24`'s style was **not available**.
+  **Fence ownership, one row per block:** chips row → `244-05` T3 Test 9 + Test 8 · `+` menu →
+  `244-05` T2 Test 1 · **cloud modal → `244-06` T3 Tests 7-8 (added)** · **refusal → `244-05` T2
+  Tests 6 / 6b / 6c (added)** · sent message → `244-05` T3 Tests 10-13. Both new fences are driven
+  **RED first** and their strings are ported from `COPY.js`, never re-typed.
 
 ### Scope, decomposition and the folded reports
 
@@ -250,6 +264,20 @@ cost of not reading them is building what exists.
   4. **SHELL-05** — verify the shipped signal, then the tab attribution (D-244-15).
   ⛔ **NEVER cut to save time:** the verifier, TDD RED drives, `security_enforcement` / `code_review`,
   and migration discipline. The lever is **targeted suites per task, FULL gates once per WAVE**.
+  ⚠ **CORRECTED AT PLANNING, 2026-09-11 — recorded BESIDE the original, never overwriting it: the
+  phase ships SIX plans, not four.** The sentence above stands exactly as the operator locked it; what
+  changed is that **`SHELL-04` alone is cut into three** — *the agent can use it* (`244-02`) · *the
+  composer affordance* (`244-05`) · *the two doors* (`244-06`). The seam decomposition this decision
+  chose is otherwise **honoured exactly**. The reason is the one legitimate split reason in the
+  planner's charter — **context cost, never difficulty**:
+  **C-9** (`244-PATTERNS.md`) measures `SHELL-04`'s *"and the agent can use it"* clause **unsatisfied
+  for 8 of the 15 accepted extensions**, adding a third backend seam inside one requirement; **C-2**
+  turns `SHELL-02` into a two-layer change against a backend baseline at its **ceiling of 71 with zero
+  headroom**. Together `SHELL-04` spans **~16 files across both tiers** — far past one agent's ~50%
+  context budget. ⛔ Nothing on G-8's never-cut list was cut. The full reasoning is in every plan's
+  `<execution_context>` under *"⚠ D-244-17 DEVIATION"*, and in `ROADMAP.md`'s phase-244 plan list.
+  ⭐ Recorded here because a reader who opens **this file alone** would otherwise read *"FOUR plans"*
+  as current — which is the same register-drift this project has now paid for repeatedly.
 - **D-244-18 — G-2 fires on ONE surface, not two.** Sketch **the composer's `+` menu and the
   destination moment** — the net-new thing a person sees, and where they form the "temporary vs
   permanent" mental model. ⛔ **Do NOT sketch `SHELL-05`'s signal:** per **F-1** it is shipped and the
