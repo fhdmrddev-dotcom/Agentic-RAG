@@ -57,7 +57,8 @@ vi.mock("@/lib/api", async () => {
 vi.mock("@/components/settings/MemorySection", () => ({ MemorySection: () => null }))
 vi.mock("@/components/settings/ReembedStatusCard", () => ({ ReembedStatusCard: () => null }))
 
-import { SettingsPage, searchPayloadFrom, onlyChanged } from "../SettingsPage"
+import { SettingsPage } from "../SettingsPage"
+import { searchPayloadFrom, onlyChanged, searchBodyFor } from "../settingsSearchPayload"
 
 function mkSettings(overrides: Partial<FullAppSettings> = {}): FullAppSettings {
   return {
@@ -132,17 +133,41 @@ const ALL_NULL = () =>
  */
 const NON_DEFAULT = () =>
   mkSettings({
-    vision_model: "gpt-4o",
-    vision_max_pages: 123,
-    hnsw_ef_search: 200,
-    hnsw_iterative_scan: "relaxed_order",
-    extraction_model: "some-other-extractor",
-    extraction_provider: "ollama",
-    embedding_provider: "google",
-    embedding_dimensions: 3072,
-    multimodal_max_vision_calls: 1001,
-    retrieval_top_k: 7,
-    rrf_k: 42,
+    // ⚠⚠ EVERY ONE OF THE 24 PAYLOAD KEYS DIFFERS FROM ITS `useState` INITIAL. That is the
+    // whole contract of this fixture, and the first version of it did NOT hold: nine keys
+    // (`embedding_base_url` "", `rerank_enabled` false, `rerank_provider` "api", `rerank_model` "",
+    // `rerank_top_n` 5, `retrieval_match_threshold` 0.3, `hybrid_search_enabled` true,
+    // `vector_search_weight` 1, `keyword_search_weight` 1) held exactly their useState initials,
+    // so a HARD-CODED baseline for any of them would have been green against every case in this
+    // file — the very defect the ⚠⚠ block at the top describes for `hnsw_ef_search`.
+    // ⛔ `retrieval_match_threshold: 0.3` was the dangerous one: 0.3 is also the most likely value
+    //    an operator drags the threshold BACK to, so a constant baseline would silently discard it.
+    // Found by this phase's code review. A 25th key added to `hydrate` / `full` /
+    // `searchPayloadFrom` but not here is UNPROVEN, however green this suite looks.
+    embedding_model: "text-embedding-3-large",     // useState ""
+    embedding_base_url: "https://example.invalid/v1", // useState ""
+    embedding_dimensions: 3072,                    // useState 1536
+    embedding_provider: "google",                  // useState "openai"
+    extraction_provider: "ollama",                 // useState "openai"
+    extraction_model: "some-other-extractor",      // useState "" / preset
+    rerank_enabled: true,                          // useState false
+    rerank_provider: "cohere",                     // useState "api"
+    rerank_model: "rerank-3.5",                    // useState ""
+    rerank_top_n: 11,                              // useState 5
+    multimodal_max_vision_calls: 1001,             // useState 100
+    vision_model: "gpt-4o",                        // useState ""
+    vision_max_pages: 123,                         // useState 50 (hydrate fallback)
+    retrieval_top_k: 7,                            // useState 5
+    retrieval_match_threshold: 0.47,               // useState 0.3  ← the dangerous one
+    hybrid_search_enabled: false,                  // useState true
+    hybrid_candidate_count: 33,                    // useState 20
+    vector_search_weight: 0.6,                     // useState 1.0
+    keyword_search_weight: 0.4,                    // useState 1.0
+    rrf_k: 42,                                     // useState 60
+    hnsw_ef_search: 200,                           // useState 40
+    hnsw_iterative_scan: "relaxed_order",          // useState "off"
+    // The two API keys are covered by §4 rather than by a value here: their baseline is
+    // KEY_PLACEHOLDER on both sides by construction, so no fixture value can distinguish them.
   })
 
 function renderSettings(features: Record<string, boolean> = { model_management: true }) {
@@ -407,9 +432,11 @@ describe("§7 — an unknown baseline is NOT collapsed into 'nothing changed'", 
     // `s === null` and the page renders its full-page error branch, so there is no Save button and
     // `handleSaveSearch` is unreachable. The property is about the fallback, and the fallback is
     // `searchBaseline ? onlyChanged(full, searchBaseline) : full`.
+    // ⭐ Calls `searchBodyFor` — the SAME function `handleSaveSearch` calls — rather than
+    // restating `baseline ? onlyChanged(...) : full`. An earlier version restated it, and would
+    // have stayed green if the component's fallback were changed to `{}`.
     const full = searchPayloadFrom(NON_DEFAULT())
-    const baseline: SettingsUpdate | null = null
-    const body = baseline ? onlyChanged(full, baseline) : full
+    const body = searchBodyFor(full, null)
     expect(Object.keys(body).length).toBe(24)
     expect(body).toEqual(full)
   })

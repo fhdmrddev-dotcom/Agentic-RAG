@@ -74,15 +74,44 @@
 BEGIN;
 
 -- ── 1. Clamp, so the constraints below can be created. Generalised; no literal `1001` anywhere.
-UPDATE public.app_settings
-   SET multimodal_max_vision_calls = least(greatest(multimodal_max_vision_calls, 1), 1000)
- WHERE multimodal_max_vision_calls IS NOT NULL
-   AND (multimodal_max_vision_calls < 1 OR multimodal_max_vision_calls > 1000);
+--
+-- ⚠⚠ THE CLAMP ANNOUNCES ITSELF, AND THAT IS NOT DECORATION. This migration fixes a bug whose
+--    whole nature is a VALUE THAT CHANGED WITHOUT SAYING SO — the operator's install held 1001 and
+--    nothing ever told them. Repairing it with another silent value change would be the same fault
+--    wearing a different hat. On the SQL-editor paste path the NOTICE below is the ONLY thing that
+--    reports it; `scripts/apply_migration_178.py` prints before/after values for the same reason.
+--    ⭐ A NOTICE is not an error: it does not fail the migration, and a clean database prints
+--       "nothing to repair", which is itself worth seeing.
+DO $$
+DECLARE
+  v_calls int := 0;
+  v_pages int := 0;
+BEGIN
+  WITH repaired AS (
+    UPDATE public.app_settings
+       SET multimodal_max_vision_calls = least(greatest(multimodal_max_vision_calls, 1), 1000)
+     WHERE multimodal_max_vision_calls IS NOT NULL
+       AND (multimodal_max_vision_calls < 1 OR multimodal_max_vision_calls > 1000)
+    RETURNING 1
+  )
+  SELECT count(*) INTO v_calls FROM repaired;
 
-UPDATE public.app_settings
-   SET vision_max_pages = least(greatest(vision_max_pages, 1), 500)
- WHERE vision_max_pages IS NOT NULL
-   AND (vision_max_pages < 1 OR vision_max_pages > 500);
+  WITH repaired AS (
+    UPDATE public.app_settings
+       SET vision_max_pages = least(greatest(vision_max_pages, 1), 500)
+     WHERE vision_max_pages IS NOT NULL
+       AND (vision_max_pages < 1 OR vision_max_pages > 500)
+    RETURNING 1
+  )
+  SELECT count(*) INTO v_pages FROM repaired;
+
+  IF v_calls = 0 AND v_pages = 0 THEN
+    RAISE NOTICE '178: nothing to repair — every stored value was already in range.';
+  ELSE
+    RAISE NOTICE '178: CLAMPED % row(s) of multimodal_max_vision_calls into 1..1000 and % row(s) of vision_max_pages into 1..500. The stored value was outside the range the API enforces; it has been moved to the nearest bound, NOT reset to the column default.', v_calls, v_pages;
+  END IF;
+END
+$$;
 
 -- ── 2. The constraints, in the 174/176 shape.
 ALTER TABLE public.app_settings

@@ -139,7 +139,44 @@ with c(mig, what, ok) as (values
   ('176', 'app_settings.hnsw_ef_search + hnsw_iterative_scan PRESENT',
    (select count(*) from information_schema.columns
     where table_schema='public' and table_name='app_settings'
-      and column_name in ('hnsw_ef_search','hnsw_iterative_scan')) = 2)
+      and column_name in ('hnsw_ef_search','hnsw_iterative_scan')) = 2),
+
+  -- ⚠⚠ ADDED 2026-09-11 (Phase 242 code review, WR-09). THIS SCRIPT'S HEADER CLAIMS "every row
+  --    PASS" MEANS PARITY, AND IT HAD NO ROW FOR THE ONE MIGRATION THAT IS A SECURITY FIX.
+  --    `177_rls_app_settings_user_settings.sql` (BUG-260911-01) enables RLS on `app_settings` and
+  --    `user_settings` and takes `anon` off both, after they were found world-readable AND
+  --    world-WRITABLE in production. Its own header records the reason nothing caught it: every
+  --    gate in this project reads through the SERVICE ROLE, so no test ever makes a request as
+  --    `anon`. **A parity checker with no row for it has exactly the blind spot 177 exists to
+  --    close** — so it gets four rows, not one, and they assert the OUTCOME (can anon do it?)
+  --    rather than the mechanism.
+  --    ⭐ Measured 2026-09-11: all four PASS in production. 177 is APPLIED to cloud.
+  ('177', 'app_settings has RLS enabled',
+   (select relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace
+    where n.nspname='public' and c.relname='app_settings')),
+
+  ('177', 'user_settings has RLS enabled',
+   (select relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace
+    where n.nspname='public' and c.relname='user_settings')),
+
+  ('177', 'anon can NEITHER read nor write app_settings',
+   not has_table_privilege('anon','public.app_settings','SELECT')
+   and not has_table_privilege('anon','public.app_settings','UPDATE')),
+
+  -- ⚠ The PUBLIC trap, and why this row asserts the outcome: functions are granted EXECUTE to
+  --   PUBLIC by default, so REVOKE … FROM anon is a NO-OP while the PUBLIC grant stands. 177
+  --   measured that the hard way. `resize_embedding_column` DELETES EVERY VECTOR IN THE CORPUS.
+  ('177', 'anon cannot execute resize_embedding_column (deletes every vector)',
+   not has_function_privilege('anon','public.resize_embedding_column(integer)','EXECUTE')),
+
+  -- ⛔ Phase 242's own migration. It is DELIBERATELY not applied to cloud yet — a production write
+  --    needs per-action operator approval — so this row is EXPECTED TO FAIL until it is applied,
+  --    and that is the one FAIL in this script that is not a defect. Low urgency: cloud holds 100
+  --    and 50, both in range, so the constraint is a backstop against a future hand-edit.
+  ('178', 'app_settings bound CHECKs present (EXPECTED FAIL until 178 is applied to cloud)',
+   (select count(*) from pg_constraint
+    where conname in ('app_settings_multimodal_max_vision_calls_bound',
+                      'app_settings_vision_max_pages_bound')) = 2)
 
 )
 select mig,

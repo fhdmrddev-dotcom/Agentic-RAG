@@ -118,6 +118,48 @@ class TestTheSentenceNamesTheCause:
         )
         assert detail == TYPED
 
+    async def test_an_unknown_field_never_reaches_getattr(self, monkeypatch):
+        """⛔ WR-04 — the allow-list, and it is about SECRETS, not tidiness.
+
+        The settings object carries ten provider API keys and the Supabase management token, and
+        this helper's return value goes straight into an HTTP 400 body. A bare `getattr` on a
+        caller-supplied name would put one of those on the wire the moment a future call site
+        passed the wrong string. `field` is a literal at all four sites today; the allow-list is
+        what keeps that true rather than hoping it stays true.
+        """
+        async def _secrets(*_a, **_kw):
+            return _Stored(openai_api_key="sk-THE-REAL-KEY", multimodal_max_vision_calls=1001)
+
+        monkeypatch.setattr(settings_api, "load_app_settings_async", _secrets)
+        detail = await settings_api._range_refusal_detail(
+            field="openai_api_key",
+            label="OpenAI key",
+            submitted="sk-THE-REAL-KEY",
+            lo=1,
+            hi=10,
+            typed_detail=TYPED,
+        )
+        assert detail == TYPED
+        assert "sk-THE-REAL-KEY" not in detail
+
+    async def test_the_allow_list_matches_the_bounds_that_ship(self):
+        """The allow-list may not silently narrow: every detected numeric bound must be on it."""
+        import importlib.util
+        from pathlib import Path
+
+        detector_path = Path(__file__).with_name(
+            "test_242_settings_bounds_have_schema_constraints.py"
+        )
+        spec = importlib.util.spec_from_file_location("_bounds_detector2", detector_path)
+        detector = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(detector)
+        detected = detector.bounded_fields(detector.SETTINGS_PY.read_text(encoding="utf-8"))
+        missing = sorted(detected - set(settings_api._BOUNDED_SETTINGS_FIELDS))
+        assert missing == [], (
+            f"{missing} are bounded in api/settings.py but absent from _BOUNDED_SETTINGS_FIELDS, "
+            "so their refusal can never name the stored value — it silently falls back."
+        )
+
     async def test_a_missing_attribute_falls_back_rather_than_raising(self, monkeypatch):
         """The other failure shape: a settings object that predates the column entirely."""
         async def _stored(*_a, **_kw):
@@ -167,15 +209,35 @@ class TestTheSentenceNamesTheCause:
 class TestTheFourSitesUseTheHelper:
     """The seam is wired, not merely present — a helper nobody calls is a helper that does nothing."""
 
-    def test_all_four_bound_sites_route_their_detail_through_it(self):
-        import inspect
+    def test_every_bound_site_routes_its_detail_through_it(self):
+        """⚠ COUNTED AGAINST THE DETECTED BOUNDS, NOT AGAINST THE LITERAL 4.
 
-        source = inspect.getsource(settings_api.update_settings)
-        calls = source.count("_range_refusal_detail(")
-        assert calls == 4, (
-            f"expected all four numeric bound sites to build their detail through the shared "
-            f"helper; found {calls}. The four are multimodal_max_vision_calls, vision_max_pages, "
-            f"source_max_file_size_mb and hnsw_ef_search."
+        An earlier version asserted `calls == 4`, and the phase verifier caught why that is weak:
+        **a FIFTH bound added without the helper leaves the count at 4 and passes silently** — the
+        exact class-fix-shipping-as-an-instance-fix failure ROADMAP SC#3 names. The expected number
+        is now derived from the same `ast` detector `test_242_settings_bounds_have_schema_constraints.py`
+        uses, so adding a bound raises the requirement automatically.
+        """
+        import importlib.util
+        import inspect
+        from pathlib import Path
+
+        detector_path = Path(__file__).with_name(
+            "test_242_settings_bounds_have_schema_constraints.py"
+        )
+        spec = importlib.util.spec_from_file_location("_bounds_detector", detector_path)
+        detector = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(detector)
+
+        settings_source = detector.SETTINGS_PY.read_text(encoding="utf-8")
+        expected = len(detector.bounded_fields(settings_source))
+        calls = inspect.getsource(settings_api.update_settings).count("_range_refusal_detail(")
+
+        assert calls == expected, (
+            f"api/settings.py has {expected} numeric bound(s) but only {calls} of them build their "
+            f"refusal through the shared helper. A bound that raises its own bare sentence cannot "
+            f"tell a value the operator typed from one that was already stored — which is the "
+            f"defect D-242-03 exists to fix, reappearing on a new field."
         )
 
     def test_not_one_of_the_seed_comment_blocks_was_deleted(self):

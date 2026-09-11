@@ -7,6 +7,14 @@ Applies `supabase/migrations/178_app_settings_vision_calls_bound.sql` to the liv
   2. IT IS RE-RUNNABLE — the file is applied a SECOND time in the same run and the resulting values
      and constraint set are asserted identical to after the first apply.
 
+⚠ THE MIGRATION OWNS ITS OWN TRANSACTION, NOT THIS SCRIPT. The file carries `BEGIN;` / `COMMIT;`
+  (correct for the SQL-editor paste path, which has no implicit transaction), so running it through
+  psycopg2 — which has ALREADY opened one — prints two harmless server warnings:
+  `there is already a transaction in progress` and then `there is no transaction in progress`.
+  Both are expected. Atomicity is the migration's, and it is real; the script's `conn.commit()`
+  afterwards is a no-op. ⛔ Do NOT "fix" the warnings by stripping BEGIN/COMMIT from the file — that
+  would remove the atomicity the paste path depends on, which is the path the operator uses.
+
 ⛔ THE DSN IS HARD-CODED TO 127.0.0.1 AND NO ENVIRONMENT VARIABLE IS READ. Applying 178 to cloud is
    a production write and needs explicit per-action operator approval (CLAUDE.md → "Supabase MCP —
    reads are free, WRITES ARE APPROVAL-GATED"). This script cannot reach cloud even by accident.
@@ -17,6 +25,7 @@ Applies `supabase/migrations/178_app_settings_vision_calls_bound.sql` to the liv
 Run: backend/venv/Scripts/python scripts/apply_migration_178.py
 """
 
+import re
 import sys
 from pathlib import Path
 
@@ -67,9 +76,17 @@ def main() -> int:
         print(f"  constraints : {before['constraints']}")
 
         # ── first apply ───────────────────────────────────────────────────────────────────────
+        del conn.notices[:]
         with conn.cursor() as cur:
             cur.execute(sql)
         conn.commit()
+        # ⚠ WR-08 (code review): the migration RAISEs a NOTICE saying how many rows it clamped, or
+        #   that there was nothing to repair. This migration fixes a bug whose whole nature is a
+        #   value that changed without saying so — repairing it with another silent value change
+        #   would be the same fault wearing a different hat. On the SQL-editor paste path the
+        #   NOTICE is the only report; here it is echoed so this path is not silent either.
+        for note in conn.notices:
+            print(f"  [migration] {note.strip()}")
         with conn.cursor() as cur:
             after1 = _snapshot(cur)
         print("\nAFTER FIRST APPLY")
@@ -176,7 +193,17 @@ def main() -> int:
                     "update public.app_settings "
                     "set multimodal_max_vision_calls = null, vision_max_pages = null"
                 )
-                cur.execute(sql.replace("BEGIN;", "").replace("COMMIT;", ""))
+                # ⚠ WR-07 (code review): this strip used to be two literal `.replace()` calls,
+                #   so the safety of a DESTRUCTIVE plant depended on a literal string in ANOTHER
+                #   file. Renaming `COMMIT;` there would have committed the NULL plant to the
+                #   operator's database. Now it is a regex on word boundaries AND an assertion —
+                #   if either statement survives the strip, the plant does not run at all.
+                inner = re.sub(r"(?im)^\s*(BEGIN|COMMIT)\s*;\s*$", "", sql)
+                assert not re.search(r"(?im)^\s*(BEGIN|COMMIT)\s*;", inner), (
+                    "refusing to run the NULL-arm plant: the migration still contains a "
+                    "transaction statement after stripping, so a rollback could not undo it"
+                )
+                cur.execute(inner)
                 cur.execute(
                     "select multimodal_max_vision_calls, vision_max_pages from public.app_settings"
                 )

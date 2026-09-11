@@ -56,7 +56,18 @@ payload** and **the response body**. A green tick proves nothing here; the whole
 | | |
 |---|---|
 | **Requirement** | SHIP-01 |
-| **Setup** | ⚠ Needs a stored out-of-range value, and **migration 178 now makes that impossible to create through the database** — that is the point of the migration. To exercise it, run against an environment where 178 has NOT been applied, or temporarily `ALTER TABLE public.app_settings DROP CONSTRAINT app_settings_multimodal_max_vision_calls_bound;`, set `multimodal_max_vision_calls = 1001`, and restore the constraint afterwards **by re-running migration 178**, which clamps the row first. |
+| **Where** | ⛔⛔ **LOCAL ONLY. NEVER CLOUD.** |
+| **Setup** | ⚠ Needs a stored out-of-range value, and **migration 178 now makes that impossible to create through the database** — that is the point of the migration. On **local**, temporarily `ALTER TABLE public.app_settings DROP CONSTRAINT app_settings_multimodal_max_vision_calls_bound;`, set `multimodal_max_vision_calls = 1001`, and restore the constraint afterwards **by re-running migration 178**, which clamps the row first. |
+
+⛔⛔ **DO NOT RUN THIS ROW AGAINST CLOUD, AND THE FIRST DRAFT OF THIS FILE INVITED EXACTLY THAT.**
+It read *"run against an environment where 178 has NOT been applied, **or** temporarily DROP
+CONSTRAINT…"* and named no environment. **Cloud is precisely such an environment** — 178 is
+deliberately not applied there. So the sentence, as written, told a reader to plant `1001` in
+**production**: an un-approved production write, which would then **break the very tab this phase
+repaired** for every real user until someone noticed. Caught by the phase verifier; the original is
+described here rather than quietly replaced, because the wording was plausible and the next person
+writing a UAT setup will be tempted by the same shortcut. **A UAT row that mutates data must name
+its environment in its own header.**
 
 **Steps** — with `multimodal_max_vision_calls = 1001` stored, change only *Search breadth* and save.
 
@@ -71,6 +82,7 @@ still 1001 and is simply not in the request.
 | | |
 |---|---|
 | **Requirement** | SHIP-01 · D-242-03 |
+| **Where** | ⛔ **LOCAL ONLY** — it reuses Row 2's planted value, and Row 2's warning applies in full |
 
 **Steps** — with `multimodal_max_vision_calls = 1001` stored (same setup as row 2), open the
 *Images read per document* field, **re-enter 1001 yourself**, and save.

@@ -55,7 +55,13 @@ import { TechnicalNamesToggle } from "@/components/admin/TechnicalNamesToggle"
 import { useTechnicalNames } from "@/providers/TechnicalNamesProvider"
 import { usePlainLabel } from "@/lib/termMap"
 
-const KEY_PLACEHOLDER = "***"
+// Phase 242 — the payload helpers moved to `./settingsSearchPayload` (react-refresh:
+// exporting non-components from a component file breaks Fast Refresh on this page).
+import {
+  KEY_PLACEHOLDER,
+  searchPayloadFrom,
+  searchBodyFor,
+} from "./settingsSearchPayload"
 
 const PROVIDER_META: Record<string, { label: string; defaultBase: string; keyLabel: string }> = {
   openai:     { label: "OpenAI",                    defaultBase: "api.openai.com",                    keyLabel: "API Key" },
@@ -554,97 +560,6 @@ function AuditLogSection() {
  * page (`pages/ConnectionsPage.tsx`) and this page has one door again.
  */
 
-// ══════════════════════════════════════════════════════════════════════════════════════════════
-// Phase 242 (SHIP-01 / D-242-02) — THE SEARCH TAB SENDS ONLY WHAT CHANGED.
-//
-// ⛔ WHY, AND IT IS NOT TIDINESS. `handleSaveSearch` used to send all 24 Search fields on every
-//    save, so ONE stored value out of range refused the ENTIRE tab — the reranker, the embedding
-//    model, the retrieval threshold, `rrf_k`, and (since Phase 241 D-09) `hnsw_ef_search`, the knob
-//    Phase 246's whole remedy is delivered on. The operator's install held
-//    `multimodal_max_vision_calls = 1001`, a value they never typed, and every Search save failed
-//    with a sentence about images while they were editing a threshold.
-//    Reporting every failing field at once would only make that LEGIBLE. Sending only what changed
-//    makes it IMPOSSIBLE, and unblocks Phase 246 permanently.
-//
-// ⛔ THE DANGEROUS DIRECTION IS A SILENT DROP, NOT A SPURIOUS SEND. If the baseline disagrees with
-//    what `hydrate` actually put in the fields, a REAL edit looks unchanged and is never sent — a
-//    save that reports success and changes nothing, which is Phase 240's "screen that discards its
-//    own answer". Two fences stand against it, both in
-//    `pages/__tests__/SettingsPage.changedFields.test.tsx`:
-//      · a no-edit save must produce `{}` — against TWO fixtures, one all-NULL and one where every
-//        nullable column holds a distinctive NON-DEFAULT value. ⚠ The second fixture is the whole
-//        point: with only the all-NULL one, writing `hnsw_ef_search: 40` here as a CONSTANT would
-//        pass, and an operator dragging a stored 200 back to the default 40 would have their edit
-//        silently discarded.
-//      · an edit from a stored non-default value TO the default must still be sent.
-// ══════════════════════════════════════════════════════════════════════════════════════════════
-
-/**
- * The Search tab's payload as it stands the instant `hydrate(data)` finishes — the baseline the
- * save diffs against.
- *
- * ⚠⚠ THIS MUST MIRROR `hydrate` EXACTLY, expression for expression. It is a separate function
- * rather than a capture of the state because the state is 24 separate `useState`s; the fences
- * named above are what prove the two have not drifted, and they fail loudly when they do.
- *
- * The two API-key fields are `KEY_PLACEHOLDER` on BOTH sides deliberately: `***` means "keep the
- * existing key" and `save_app_settings` (`backend/app/models/user_settings.py:542`) skips it
- * outright, so dropping an untouched key changes nothing at the database and simply stops it
- * riding the wire.
- */
-export function searchPayloadFrom(data: FullAppSettings): SettingsUpdate {
-  const exProvider = data.extraction_provider || "openai"
-  const exPreset = EXTRACTION_PRESETS.find((p) => p.key === exProvider)
-  return {
-    embedding_model: data.embedding_model,
-    embedding_api_key: KEY_PLACEHOLDER,
-    embedding_base_url: data.embedding_base_url,
-    embedding_dimensions: data.embedding_dimensions,
-    embedding_provider: data.embedding_provider || "openai",
-    extraction_provider: exProvider,
-    extraction_model: data.extraction_model || exPreset?.model || "",
-    rerank_enabled: data.rerank_enabled,
-    rerank_provider: data.rerank_provider,
-    rerank_api_key: KEY_PLACEHOLDER,
-    rerank_model: data.rerank_model,
-    rerank_top_n: data.rerank_top_n,
-    multimodal_max_vision_calls: data.multimodal_max_vision_calls,
-    vision_model: data.vision_model ?? "",
-    vision_max_pages: data.vision_max_pages ?? 50,
-    retrieval_top_k: data.retrieval_top_k,
-    retrieval_match_threshold: data.retrieval_match_threshold,
-    hybrid_search_enabled: data.hybrid_search_enabled,
-    hybrid_candidate_count: data.hybrid_candidate_count,
-    vector_search_weight: data.vector_search_weight,
-    keyword_search_weight: data.keyword_search_weight,
-    rrf_k: data.rrf_k,
-    hnsw_ef_search: data.hnsw_ef_search ?? 40,
-    hnsw_iterative_scan: data.hnsw_iterative_scan ?? "off",
-  }
-}
-
-/**
- * Keep only the keys whose value differs from the baseline.
- *
- * ⚠ ITERATES `Object.keys(next)`, NOT the baseline — and that direction is load-bearing. Iterating
- * the baseline would mean a key added to the payload but forgotten in `searchPayloadFrom` is
- * DROPPED FOREVER AND SILENTLY. This way it is simply always sent, which is the safe failure.
- *
- * ⚠ `Object.is`, not `===`, and the real reason is NOT the one you might expect: `Object.is` does
- * NOT rescue a `NaN` from an emptied number input, because the baseline is always a real number
- * and `Object.is(NaN, 100)` is `false` — so a transient `NaN` is sent either way. The single
- * behavioural difference is `+0` / `-0`, where `Object.is` SENDS and `===` would drop. Sending is
- * the safe direction, so `Object.is` it is.
- */
-export function onlyChanged(next: SettingsUpdate, baseline: SettingsUpdate): SettingsUpdate {
-  const out: Record<string, unknown> = {}
-  const base = baseline as unknown as Record<string, unknown>
-  for (const [key, value] of Object.entries(next as unknown as Record<string, unknown>)) {
-    if (!Object.is(value, base[key])) out[key] = value
-  }
-  return out as SettingsUpdate
-}
-
 export function SettingsPage() {
   const featuresCtx = useEffectiveFeaturesOptional()
   const canManageModels = featuresCtx?.features.model_management === true
@@ -1005,7 +920,7 @@ export function SettingsPage() {
     // unrelated stored value drifting out of range. See the header block above this component for
     // why this is changed-fields-only rather than report-all-errors, and for the two fences that
     // stand against the silent-drop failure.
-    const body: SettingsUpdate = searchBaseline ? onlyChanged(full, searchBaseline) : full
+    const body: SettingsUpdate = searchBodyFor(full, searchBaseline)
 
     // Phase 111.1 D-02/D-03 — confirm-on-save gate. ONLY fire when the embedding
     // model OR dimensions actually changed (a no-change save commits silently).

@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel, Field
 from supabase import Client
@@ -22,7 +24,24 @@ from app.services.audit_service import write_audit_entry
 from app.services.reembed_service import start_reembed
 from app.services.skill_tuner_service import resolve_skill_builder_model
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/settings", tags=["settings"])
+
+# Phase 242 (D-242-03) — the settings columns `_range_refusal_detail` is allowed to read back.
+# ⛔ An ALLOW-LIST rather than a bare `getattr`: the settings object also carries ten provider API
+#    keys and the Supabase management token, and this function's return value goes straight into an
+#    HTTP 400 body. Keep it in step with the numeric bounds in `update_settings` — and note that
+#    `backend/tests/unit/test_242_stored_value_refusal.py` already asserts that EVERY bound the
+#    `ast` detector finds routes through this helper, so adding a bound without updating both reds.
+_BOUNDED_SETTINGS_FIELDS = frozenset(
+    {
+        "multimodal_max_vision_calls",
+        "vision_max_pages",
+        "source_max_file_size_mb",
+        "hnsw_ef_search",
+    }
+)
 
 # ── Phase 163 (TEN-02 / D-03 / D-05) — settings client policy ─────────────────
 # These handlers KEEP the hardened service-role client (classified carve-out, marked
@@ -396,9 +415,29 @@ async def _range_refusal_detail(
     ⭐ ONE HELPER, FOUR SITES. SC#3's "the general fix, not the specific one" applies to the
     sentence as much as to the CHECK constraint.
     """
+    # ⛔ ALLOW-LIST, not a bare getattr (code review WR-04). The settings object carries every
+    #    provider API key and the Supabase management token; `getattr` on a caller-supplied name
+    #    would put one of those into an HTTP 400 body the moment a future site passed the wrong
+    #    string. `field` is a literal at all four call sites today — the allow-list is what keeps
+    #    that true rather than hoping it stays true. An unknown name falls back silently.
+    if field not in _BOUNDED_SETTINGS_FIELDS:
+        logger.warning(
+            "_range_refusal_detail called with an unknown field %r — falling back to the typed "
+            "sentence. Add it to _BOUNDED_SETTINGS_FIELDS if it is a real bounded column.",
+            field,
+        )
+        return typed_detail
     try:
         stored = getattr(await load_app_settings_async(), field, None)
     except Exception:  # noqa: BLE001 — any read failure falls back; see the docstring
+        # ⚠ LOGGED, not swallowed (code review WR-05). The fallback is correct behaviour, but a
+        #   settings read failing here means the same read is failing elsewhere, and a refusal path
+        #   that hides that makes the real fault harder to find than the message it improves.
+        logger.warning(
+            "_range_refusal_detail: settings read failed for %s; using the typed sentence",
+            field,
+            exc_info=True,
+        )
         stored = None
     if stored is not None and stored == submitted:
         return (
