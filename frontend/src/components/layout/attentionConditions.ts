@@ -78,12 +78,44 @@
  * suite therefore also carries a `?raw` INVENTORY FENCE that sweeps every non-test source file
  * for `useSourceAttention(` call sites and pins the total, so a FOURTH reader reddens a test
  * instead of silently multiplying the poll rate again.
+ *
+ * ── ⭐ PHASE 244 PLAN 04 (SHELL-05 · BUG-260911-03 · C-5) — THE CONDITION LEARNS ITS TAB ─
+ *
+ * The operator's complaint was that *"the badge creates a question it then refuses to answer"*:
+ * it names a count and stops at the Library door, leaving five tabs to hunt through.
+ *
+ * `BUG-260911-03` guessed the cause — *"the likely shape is that `attentionConditions` already
+ * knows what KIND each condition is … **verify that before building anything**"* — and the
+ * guess was **wrong, measured**: `AttentionCondition` carried four fields and no kind at all.
+ * The kind lives on `AttentionProducer.key`, and on `StoppedSource.cause`, which the producer
+ * below **consumes and discards** into the `detail` sentence. So the answer is one OPTIONAL
+ * field, set by the producer that already exists.
+ *
+ * ⛔ **ARM 1 OF THE RE-OPEN TRIGGER WAS CHECKED BEFORE THIS CHANGE, NOT AFTER.** The trigger
+ * five paragraphs up names *a third concurrent reader* as arm 1. The tab attribution is
+ * threaded to `LibraryPage` **as data**, down the props path the shell already owns — so the
+ * reader count is still TWO and the call-site inventory is still the same three files. Had it
+ * been closed by calling `useSourceAttention()` in the page, this change would have fired its
+ * own file's deferral to save one prop.
+ *
+ * ⚠ `244-03` independently fires arm 1's SHAPE for a different hook (`useAskUserPrompt`). The
+ * deferral should be triggered ONCE, on both data points, rather than twice by halves.
+ *
+ * ⛔ **`SEED-231` (nobody is told an approval is waiting) WAS CONSIDERED AND NOT TAKEN.**
+ * `SHELL-03` made it topical, which is exactly when a seam gets filled in by accident. It stays
+ * the registry's INTENDED future tenant, re-openable only by a deliberate override with the
+ * count argued against D-235-03 — never as a fill-in while a neighbouring field was added.
  */
 
 import { useMemo } from "react"
 
 import { useSourceAttention } from "@/hooks/useSourceAttention"
 import { SENTENCE_FOR_CAUSE } from "@/components/sources/sourceHealthVocabulary"
+// ⛔ IMPORTED, NEVER RE-TYPED. `librarySelection.ts` owns the five-member tab vocabulary and
+// `LibraryPage`'s segmented control is DERIVED from it (`D-217-15` treats a sixth key as a
+// schema change). A local copy of the union here would be a second place a sixth tab has to
+// be spelled — which is the drift that rule exists to prevent.
+import type { LibraryTab } from "@/pages/librarySelection"
 
 /**
  * ONE actionable app-level condition — a thing that is true right now, that a person can do
@@ -105,6 +137,22 @@ export interface AttentionCondition {
    * without the popover growing a branch about who its conditions belong to.
    */
   onOpen: () => void
+  /**
+   * The Library tab that OWNS this condition — the shell says THAT something needs attention,
+   * this is what lets the Library say WHERE (`BUG-260911-03`).
+   *
+   * ⚠ OPTIONAL, deliberately. A future tenant of this registry may have no Library home at all
+   * (`SEED-231`'s waiting approval is not a tab), and a required field would force it to name
+   * one it does not have. An absent `tab` marks nothing and is not an error.
+   *
+   * ⛔ It exists because the CONDITION carried no kind while the PRODUCER did (C-5). The report
+   * that asked for this guessed the opposite and said so: *"verify that before building
+   * anything — this report asserts the symptom, not the cause."* Verified; this is the answer.
+   *
+   * ⛔ It is a `LibraryTab` union member, which cannot carry free text — so this field can
+   * never become the second route by which a raw provider error reaches the UI (T-244-04-02).
+   */
+  tab?: LibraryTab
 }
 
 /**
@@ -134,6 +182,10 @@ export function useStoppedSourceConditions(onOpen: () => void): AttentionConditi
         title: source.source_folder_name,
         detail: SENTENCE_FOR_CAUSE[source.cause](source.connection_name ?? ""),
         onOpen,
+        // ⛔ FROM THE PRODUCER'S OWN KIND, never from the source's `cause`. A stopped watched
+        // source is the Health tab's, whichever way it stopped — and a client that read the
+        // cause to pick a destination would be the second decider D-235-05 forbids.
+        tab: "health" as const,
       })),
     [stopped, onOpen],
   )

@@ -3474,6 +3474,19 @@ const BASELINE = {
   // ⭐ The pin was FALSIFIED before it was written: deleting `.pdf` from
   // `workspaceAllowedExt.ts` turned 3 of the 6 red, and the file was restored md5-identical.
   "workspaceAllowedExt.lockstep.test.ts": 6,
+  // ── Phase 244 (244-04 T1 / SHELL-05 / BUG-260911-03 / C-5) ──────────────────────────────
+  // ⛔ BOTH KNOBS, BY NECESSITY — the fact this script has now recorded beside five other
+  // blocks and which is STILL true: `src/components/layout` is NOT a bare directory entry in
+  // TARGETS, so a suite dropped into `src/components/layout/__tests__/` runs in NO gate until
+  // it is NAMED there AND pinned here. TARGETS decides what RUNS; BASELINE decides what is
+  // GUARDED, and a suite can sit on the wrong side of exactly one of them for a whole phase.
+  //
+  // 10 cases, MEASURED on a green run of the suite alone — not copied from the plan. TWO were
+  // driven RED against the shipped tree before `tab?: LibraryTab` existed (`expected undefined
+  // to be "health"`); the other EIGHT are controls that were green before the edit and whose
+  // job is to prove the edit changed nothing else — the registry's one-tenant count, the five
+  // cause sentences asserted on their WORDS, and the `?raw` reader inventory.
+  "attentionTab.test.ts": 10,
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -4929,6 +4942,20 @@ const TARGETS = [
   // hand-typed copy in the sketch's COPY.js — enforced by nothing, and about to rot the moment
   // D-244-24 added `.pdf`.
   "src/lib/__tests__/workspaceAllowedExt.lockstep.test.ts",
+  // ── Phase 244 (244-04 T1 / SHELL-05 / BUG-260911-03) — the condition's tab attribution ──
+  //
+  // ⛔ FILE-LEVEL BY NECESSITY: there is no `src/components/layout` bare-directory entry in
+  // this array (it has exactly two — `src/landing` and `src/components/workflows`), so this
+  // suite runs in NO gate until it is named here AND pinned in BASELINE above. Both were
+  // added in the SAME COMMIT as the field it guards.
+  //
+  // What it guards: `AttentionCondition` gained ONE optional `tab?: LibraryTab`, set by the
+  // single registered producer. The load-bearing cases are the ones that prove NOTHING ELSE
+  // MOVED — `ATTENTION_PRODUCERS.length === 1` (D-235-03), the five cause sentences asserted
+  // on the rendered WORDS rather than on a `detail` key, and a `?raw` sweep pinning the
+  // `useSourceAttention()` call-site inventory BY FILE so arm 1 of the registry's own re-open
+  // trigger (a third concurrent reader) cannot be fired silently by a later plan.
+  "src/components/layout/__tests__/attentionTab.test.ts",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")

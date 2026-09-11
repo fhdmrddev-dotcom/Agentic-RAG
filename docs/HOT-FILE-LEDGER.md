@@ -8963,12 +8963,25 @@ concrete — and the zero-filter is what disposes of it: the `missing` bit simpl
 ⛔ **It renders no verdict and derives no count.** It is handed `AttentionCondition[]` and renders
 them. The server decided; `attentionConditions.ts` shaped; this draws.
 
+⭐ **PHASE 244 PLAN 04 LEFT IT BYTE-UNCHANGED, AND THAT IS A DECISION.** The plan named it in
+`files_modified` and permitted a tab hint on each row; it was declined. This component **writes no
+copy at all** — `sourceHealthVocabulary` owns every string — and the words a person needs are
+already there (`title` + the cause sentence). The tab attribution's job is to say WHERE in the
+Library, which is a thing the Library says; repeating it in the popover would have put a second
+author of the same fact on the far side of the door. The `tab` field it now carries passes through
+this component untouched. Triple unchanged: **1 / 1 / 109**.
+
 ---
 
 ## frontend/src/components/layout/attentionConditions.ts
 
-**1 / 1 / 102** · no (1 phase) · **the app-shell attention registry: a GENERAL surface with EXACTLY
+**3 / 2 / 200** · no (2 phases) · **the app-shell attention registry: a GENERAL surface with EXACTLY
 ONE TENANT.**
+
+⚠ **RE-DERIVED AT `244-04` (2026-09-11) — the row read `1 / 1 / 102` and was STALE on both the
+commit count and the line count.** It missed `235-15`'s reader-count correction entirely, so the
+triple a reader could have checked was one phase and ~46 lines behind before this phase opened.
+Measured with `git log --follow` at base `310b91e83`; phase buckets, verbatim: `235` · `244`.
 
 ⛔ **D-235-03, and the constraint is ENFORCED rather than requested:**
 `NavPanel.badge.test.tsx` asserts `ATTENTION_PRODUCERS.length === 1` **literally**, so the next
@@ -8991,6 +9004,40 @@ result to three renderers (desktop rail, mobile drawer nav row, drawer hamburger
 `useSourceAttention()` in the same tree means two polls and eventually two disagreeing answers.
 `ChatLayout.badge.test.tsx` asserts the fetch fires `toHaveBeenCalledTimes(1)` — never
 `toHaveBeenCalled()`, which is true of both worlds.
+
+⚠ **THAT PARAGRAPH IS THE REFUTED ONE, AND IT IS KEPT RATHER THAN DELETED BECAUSE BEING WRONG IS
+THE FINDING.** The file's own docblock was corrected at `235-15`: the shipped tree already had
+**TWO** readers when *"one reader per render tree"* was written (the shell, plus whichever Library
+tab body is mounted), and they cannot disagree, because D-235-05 puts the debounce on the SERVER.
+The cost is a doubled poll RATE while the Library is open, never a second opinion.
+
+⭐ **PHASE 244 PLAN 04 — `tab?: LibraryTab`, AND ARM 1 WAS CHECKED BEFORE THE EDIT, NOT AFTER.**
+`BUG-260911-03` guessed that the condition already knew its kind and **told the builder to verify
+that before building anything**. Verified from source: it did NOT — the four shipped fields carry no
+kind. The kind lives on `AttentionProducer.key`, and on `StoppedSource.cause`, which the producer
+**consumes and discards** into `detail`. So the fix is ONE optional field set by the producer that
+already exists: no second producer, `ATTENTION_PRODUCERS.length === 1` untouched, and `detail`
+byte-identical (asserted on the rendered sentences, not on a key).
+
+⛔ **THE FIELD IS OPTIONAL ON PURPOSE.** `SEED-231`'s waiting approval has no Library home, and a
+required field would force the next tenant to name a tab it does not have.
+
+⛔ **AND `SEED-231` ITSELF WAS CONSIDERED AND NOT TAKEN.** `SHELL-03` made it topical, which is
+exactly when a seam gets filled in by accident. It stays the registry's intended future tenant,
+re-openable only by a deliberate override with the count argued.
+
+⚠ **ARM 1 OF THIS FILE'S OWN RE-OPEN TRIGGER — *a third concurrent reader* — STAYS UNFIRED BY THIS
+PLAN, DELIBERATELY.** The attribution is threaded to `LibraryPage` as DATA down the props path the
+shell already owns. Closing it by calling `useSourceAttention()` in the page would have fired this
+file's own deferral to save one prop. ⚠ `244-03` independently fires arm 1's SHAPE for
+`useAskUserPrompt` — a different hook, the same trigger. **Trigger the hoist once, on both data
+points, rather than twice by halves.**
+
+⚠ **A MEASURED CORRECTION TO `244-04-PLAN.md`'s OWN BRIEF:** it asked the fence to pin *"exactly TWO
+`useSourceAttention()` call sites in `src/`"*. There are **THREE** — this file,
+`library/IngestionTab.tsx` and `library/SourcesAttentionSection.tsx` — which is what the shipped
+fence pins. **TWO is the count of CONCURRENT readers**, not of call sites. Pinning the plan's number
+would have been red on an untouched tree.
 
 ---
 
@@ -9025,6 +9072,13 @@ no second fetch.
 
 ⛔ **A CONSUMER THAT READS ONLY `loading` + `stopped` WILL PRINT AN ALL-CLEAR IT NEVER RECEIVED.**
 That is the single most important sentence about this file.
+
+⚠ **RE-DERIVED AT `244-04` AND UNCHANGED — `2 / 1 / 131`, byte-untouched by this phase, ON PURPOSE.**
+Arm 1 of `attentionConditions.ts`'s re-open trigger is *a third concurrent reader of this hook*, and
+the per-tab attribution `244-04` shipped is threaded as DATA precisely so that arm stays unfired.
+Its `?raw` inventory fence is re-asserted in `244-04`'s own suite: **three call sites, two of which
+are mutually exclusive by tab.** A row re-derived and found CURRENT is still worth recording — the
+audit that only writes when a number moves cannot tell *checked* from *not looked at*.
 
 ---
 
@@ -10098,7 +10152,7 @@ cells rot within days.
 | [`frontend/src/components/sources/runHistoryFold.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcesrunhistoryfoldts) | 1 / 1 / 125 | no (1 phase) | young (235) — the pure quiet-run fold; separating it is what proved the fence's collapsed-3/expanded-17 red was a FIXTURE defect |
 | [`frontend/src/components/sources/RunHistoryList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcesrunhistorylisttsx) | 2 / 1 / 235 | no (1 phase) | young (235) — ✅ **G1a CLOSED (235-16)**: the summed one number replaced by the per-category breakdown. ⚠ It mounts BEHIND A CLICK; five fence reds are a harness finding |
 | [`frontend/src/components/layout/AttentionPopover.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutattentionpopovertsx) | 1 / 1 / 109 | no (1 phase) | young (235) — ⛔ it renders no verdict and derives no count; it is handed conditions and draws them |
-| [`frontend/src/components/layout/attentionConditions.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutattentionconditionsts) | 1 / 1 / 102 | no (1 phase) | young (235) — a GENERAL registry with EXACTLY ONE tenant, ENFORCED: a suite asserts `ATTENTION_PRODUCERS.length === 1`. The `SEED-231` seam |
+| [`frontend/src/components/layout/attentionConditions.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutattentionconditionsts) | 3 / 2 / 200 | no (2 phases) | ⚠ row was STALE at `1 / 1 / 102`. honoured by construction (**244-04**): ONE optional `tab?: LibraryTab` set by the one existing producer — no second tenant, `detail` byte-identical |
 | [`frontend/src/components/library/SourcesAttentionSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibrarysourcesattentionsectiontsx) | 2 / 1 / 197 | no (1 phase) | young (235) — three separately-named honest states. ⛔ A DOOR, never a repair; no handler ⇒ no control |
 | [`frontend/src/hooks/useSourceAttention.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusesourceattentionts) | 2 / 1 / 131 | no (1 phase) | young (235) — ⛔ a consumer reading only `loading` + `stopped` will print an all-clear it never received. `verdictKnown` is the sixth field |
 | [`frontend/src/lib/libraryTabHandoff.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcliblibrarytabhandoffts) | 1 / 1 / 59 | no (1 phase) | young (235-15) — the hand-off LIFETIME rule. ⛔ An intent consumed once, never a mode; a strict leaf with zero runtime imports, so it is tested without mounting anything |
