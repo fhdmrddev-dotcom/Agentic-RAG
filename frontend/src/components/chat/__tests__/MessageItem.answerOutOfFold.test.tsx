@@ -30,7 +30,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, screen, cleanup, act, waitFor, renderHook } from "@testing-library/react"
 import React, { type ReactNode } from "react"
 import { TooltipProvider } from "@/components/ui/tooltip"
-import type { Message, Citation } from "@/types"
+import type { Message, Citation, ToolCall } from "@/types"
 
 // ⚠ THE MOCK SPREADS THE REAL MODULE rather than re-exporting a hand-picked list
 // (`MessageList.test.tsx:30-40`, recorded there as load-bearing). `MessageItem`'s subtree
@@ -110,6 +110,17 @@ const BLOB = [NARRATION, ANSWER_P1, ANSWER_P2].join("\n\n")
 const REASONING =
   "Both documents are already in the retrieved set, so I do not need another search."
 
+/** A settled tool row. ⚠ `status` is one of the FOUR the type declares — `running` / `done` /
+ *  `interrupted` / `preparing`. An earlier draft of this file wrote `"completed"`, which every
+ *  assertion here still passed (`hasRunningTools` only tests `=== "running"`) while `tsc`
+ *  reported it — a fixture that is green and wrong. */
+const SETTLED_TOOL: ToolCall = {
+  id: "tc-1",
+  name: "search_documents",
+  status: "done",
+  args: { query: "withholding" },
+}
+
 function makeMessage(overrides: Partial<Message> = {}): Message {
   return {
     id: "m-fold-1",
@@ -128,7 +139,7 @@ function liveToolBearing(overrides: Partial<Message> = {}): Message {
   return makeMessage({
     runStatus: "streaming",
     reasoningContent: REASONING,
-    tool_calls: [{ id: "tc-1", name: "search_documents", status: "completed", args: {} }],
+    tool_calls: [SETTLED_TOOL],
     ...overrides,
   } as Partial<Message>)
 }
@@ -199,7 +210,7 @@ describe("§3 the streaming caret survives the change", () => {
     const { container } = renderItem(
       <MessageItem
         message={liveToolBearing({
-          tool_calls: [{ id: "tc-1", name: "execute_code", status: "running", args: {} }],
+          tool_calls: [{ ...SETTLED_TOOL, name: "execute_code", status: "running" }],
         } as Partial<Message>)}
         isStreaming
       />,
@@ -227,12 +238,13 @@ describe("§4 StreamingNarration is neither deleted nor restyled", () => {
 // §5 — THE CITATION BRANCH AND ITS ABSENCE HINT (ROADMAP collateral surface #3)
 const CITATIONS: Citation[] = [
   {
-    index: 1,
     document_id: "doc-1",
-    document_name: "invoice1092.pdf",
-    chunk_id: "c-1",
-    snippet: "withheld 4,120.00",
-  } as Citation,
+    filename: "invoice1092.pdf",
+    chunk_index: 0,
+    passage: "withheld 4,120.00",
+    similarity: 0.91,
+    is_full_doc: false,
+  },
 ]
 
 describe("§5 the citation branch and the absence hint keep their gates", () => {
@@ -252,9 +264,7 @@ describe("§5 the citation branch and the absence hint keep their gates", () => 
         message={makeMessage({
           runStatus: "completed",
           citations: CITATIONS,
-          tool_calls: [
-            { id: "tc-1", name: "search_documents", status: "completed", args: {} },
-          ],
+          tool_calls: [SETTLED_TOOL],
         } as Partial<Message>)}
       />,
     )

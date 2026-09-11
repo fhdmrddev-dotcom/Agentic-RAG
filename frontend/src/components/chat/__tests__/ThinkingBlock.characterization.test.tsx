@@ -651,10 +651,22 @@ describe("Phase 243 — the thinking block, characterized against the UNMOVED co
     })
     expect(firstToolRowAt).toBeGreaterThan(-1)
 
-    // The answer body - a streaming tool-bearing turn routes content through
-    // StreamingNarration (MessageItem.tsx:425), which is a DIFFERENT construct from this
-    // block and is deliberately left alone here (D-243-14; 243-05 owns it).
-    const bodyAt = indexOfTestId("streaming-narration")
+    // The answer body.
+    //
+    // ⚠ THIS ANCHOR READ `indexOfTestId("streaming-narration")` UNTIL 243-05, and the
+    // original is recorded here rather than silently swapped, because WHY it had to change is
+    // the finding. It used the FOLD as a stand-in for the answer - and the answer being
+    // inside that fold IS the defect CHAT-05 names (D-243-06). The line above even said
+    // "243-05 owns it". 243-05 removed the `StreamingNarration` arm, so a live tool-bearing
+    // turn now routes `message.content` through the same shipped renderers as the settled
+    // answer, and this anchor is the RENDERED CONTENT rather than a testid (D-243-11 -
+    // presence assertions cannot see content drift).
+    //
+    // Positive control: the anchor must actually be on the page, or the comparison below
+    // would be a claim about nothing.
+    const bodyAt = nodes.findIndex(
+      (n) => n.children.length === 0 && n.textContent?.trim() === "Assistant response text",
+    )
     expect(bodyAt).toBeGreaterThan(-1)
 
     expect(thinkingAt).toBeLessThan(firstToolRowAt)

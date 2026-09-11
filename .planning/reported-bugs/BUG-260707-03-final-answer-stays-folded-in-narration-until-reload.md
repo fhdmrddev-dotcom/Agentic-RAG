@@ -4,12 +4,12 @@ title: Final answer stays folded inside the streaming-narration collapsible afte
 reported: 2026-07-07
 surface: Agentic-RAG
 severity: minor                    # FIXED 2026-07-07 (same day) — scoped content reconcile at clean Deep terminal
-status: folded                    # folded_into 176 (2026-07-22) — extend reconcile to nav/mount path + live-verify; see 176-CONTEXT.md D-07/D-08
+status: folded                    # STAYS folded at 243-05 (2026-09-11) — the code half is measured; residual #1 (live verification) and #3 (SEED-094) are untouched
 affected_areas: [frontend/chat-ui, frontend/streaming]
 folded_into: "176, 243"   # residual #2 (the nav/mount path) routed to 243 / CHAT-05 at /gsd:plan-phase 243, 2026-09-11
-verified_closed_by: null
+verified_closed_by: null   # NOT closed: every fence here is synthetic. G-4 browser row owed — see the 243-05 section below.
 related_seeds: [SEED-094]
-re_open_trigger: null
+re_open_trigger: "A live tool-bearing run whose answer is still not readable as body text on navigate-back — or any run where the run-end reconcile swaps in a stray interim line (residual #3 / SEED-094)."
 resolution_applied: 2026-07-07
 reproduces_on:
   branch: develop
@@ -102,3 +102,49 @@ reconcile swaps in the persisted text. **That makes `CHAT-01` and `CHAT-05` one 
 ⚠ Phase 243 must verify the **mount / navigation** path specifically, not only a live send — the
 send path is exactly the half that already shipped, so a live-send check would pass while the
 residual stands.
+
+
+---
+
+## Verdict at Phase 243 plan `243-05` (2026-09-11) — residual #2 closed in CODE, the report stays `folded`
+
+**Residual #2 was TWO things, and only one of them was still owed. That is this plan's main finding
+and it corrects the routing note above rather than confirming it.**
+
+| Half of residual #2 | Status measured 2026-09-11 | Evidence |
+|---|---|---|
+| the **reconcile** half — a backgrounded run's clean terminal must swap the blob for the persisted answer without a reload | ⭐ **ALREADY SHIPPED at Phase 176 (RENDER-02 / D-07)**, and it was shipped with a fence | `StreamsProvider.tsx` mount-path `onTerminal` carries the mirrored content-reconcile; `streamsProvider_bug_260707_03_final_answer_resolve.test.tsx`'s second `describe` drives it. `243-05`'s own §6a and §6b were driven independently and were **GREEN on the first run** |
+| the **render branch** half — WHERE the answer is drawn while the run is live | ⛔ **STILL BROKEN, and this is what `243-05` fixed** | `MessageItem.tsx`'s `StreamingNarration` arm routed `message.content` into the one-line italic gist on every tool-bearing streaming turn, so the answer was written INSIDE a fold. Driven RED in 4 cases, then made green |
+
+⇒ The routing note above says residual #2 *"still relies on a reload"*. **Measured, it did not — the
+reload dependency had been removed thirteen months' worth of phases earlier and nobody re-measured
+it.** What remained was the branch, which no reload-related wording would ever have named.
+
+### What changed
+
+`MessageItem.tsx` lost the `StreamingNarration` arm of its content ternary (`-9 / +37`, the
+additions being the docblock that records the trade). A live tool-bearing turn now routes
+`message.content` through the **same two shipped renderers as the settled answer** —
+`CitedMarkdown` when citations are present, `MarkdownRenderer` otherwise — below the settled
+thinking line, with the streaming caret at the live edge. `StreamingNarration.tsx` is
+**byte-identical** and was not deleted; this was its last production caller, and its retirement is
+recorded as owed rather than taken.
+
+### ⛔ Why the status is NOT `closed`
+
+**Every fence behind the claim above is synthetic**, and this report's own history is the reason
+that matters: residual #1 — *"Not live-verified"* — was written on 2026-07-07 and **is still open
+today**, twenty-six months of project time later, while the code half was called done twice. A
+third code-half claim closed on synthetic evidence would repeat that exactly.
+
+Specifically owed, by name:
+
+1. **Residual #1, untouched.** No live Deep run has been watched resolving un-folded. Owed as a
+   **G-4 browser row**: start a tool-bearing run, navigate to `/library`, let it finish, navigate
+   back **without reloading**, and read whether the answer is body text under the thinking line.
+2. **The narration trade is a JUDGEMENT call, not a measurement** (D-243-12, solo running). The
+   interim narration is no longer folded to a gist, so a long agentic run's process prose now
+   renders in the transcript until the run-end reconcile replaces it with the persisted answer.
+   Sketch 234 V1 — the operator-approved acceptance bar — draws exactly this, and `dedupParagraphs`
+   still applies; but nobody has *watched* a ten-tool run under it.
+3. **Residual #3 (`SEED-094`) is untouched and out of scope**, as it was at 176.

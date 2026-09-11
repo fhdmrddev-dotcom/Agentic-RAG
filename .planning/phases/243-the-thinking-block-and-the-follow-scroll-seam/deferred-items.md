@@ -19,3 +19,32 @@ auto-fixed). ⚠ The useful finding is the second bullet's shape, not the red it
 is in neither knob is invisible to the gate, so a class rename can orphan it for 16 phases and the
 verdict line still reads `count gate OK`.** Same failure mode `SEED-222` names for the six unpinned
 suites, one file over.
+
+
+---
+
+## `StreamingNarration.tsx` — ZERO production callers after `243-05`, and its retirement is OWED, not taken
+
+`243-05` removed the component's last production caller (`MessageItem.tsx`'s content ternary) to
+close CHAT-05: the final answer was being written **inside** that fold. The file is
+**byte-identical** — `git diff --stat -- frontend/src/components/chat/StreamingNarration.tsx` is
+empty — and `243-05-PLAN.md` forbids deleting it in this plan, in as many words.
+
+**State, measured after the fix:**
+
+- production callers: **0** (`grep -rn "StreamingNarration" frontend/src --include=*.tsx` returns
+  only its own file, `src/__tests__/components/StreamingNarration.test.tsx`, two docblock mentions
+  in `CitedMarkdown.tsx` / `ThinkingBlock.tsx`, and two comments in `StreamsProvider.tsx`)
+- its own suite still runs and still passes (3 cases), so the component is *covered* while being
+  *unmounted* — the shape `192.2-06` recorded for `src/dev/SketchLibraryCard.tsx`: a surface that
+  outlived its purpose with the obligation carried by prose rather than by anything executable
+- it carries the identical `max-h-64 overflow-y-auto border-l-2` nested scroller that `243-04`
+  removed from the thinking body — ⛔ **that is NOT a reason to "fix it while in there"**
+  (`243-PATTERNS` §F.4); it is narration, not reasoning
+
+**Owed decision, for a later phase to take deliberately:** delete the component + its suite, or
+re-purpose it. ⛔ **Whoever takes it must NOT re-mount it on the live answer path** — that re-opens
+`BUG-260707-03` exactly as it stood. Two stale references also go with it: `StreamsProvider.tsx`
+`:2151` and `:2615` still describe *"StreamingNarration's fold gives way to a clean answer"*, which
+is now a description of a fold nothing renders. Left alone here on purpose — `StreamsProvider` is a
+G-5-firing file and `243-05` modified it not at all.

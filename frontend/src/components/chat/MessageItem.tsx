@@ -35,7 +35,6 @@ import { CitedMarkdown } from "./CitedMarkdown"
 // under the answer body on the settled cited-assistant branch (self-guards on
 // citations, never a banner) — never on the streaming/user path (G-5 additive).
 import { AbsenceHint } from "./AbsenceHint"
-import { StreamingNarration } from "./StreamingNarration"
 import { ConfidenceBadge } from "./ConfidenceBadge"
 import { CitationList } from "./CitationList"
 import { SuggestionPills } from "./SuggestionPills"
@@ -442,14 +441,43 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
         )}
         {message.content ? (
           <div ref={setMessageBody} className="text-sm text-foreground">
-            {isMessageStreaming && (message.tool_calls?.length ?? 0) > 0 && message.role === "assistant" ? (
-              // Live agentic run: message.content here is the model's interim
-              // narration ("Now I'll search…"), not the final answer. Fold it to
-              // a one-line gist (click to expand the full trail). At run-end the
-              // backend-persisted final answer renders normally via the else path.
-              // NEVER given markers — the body streams calm & unmarked (D-05).
-              <StreamingNarration content={dedupParagraphs(message.content)} />
-            ) : message.role === "assistant" && message.citations && message.citations.length > 0 ? (
+            {/* Phase 243 Plan 05 (CHAT-05 / CHAT-01 — D-243-06, D-243-14) — THE ANSWER IS
+                NOT WRITTEN INSIDE A FOLD. A third arm used to sit here, ahead of both of
+                these, and it is the whole of `BUG-260707-03`:
+
+                  isMessageStreaming && tool_calls.length > 0 && role === "assistant"
+                    ? <StreamingNarration content={dedupParagraphs(message.content)} />
+
+                ⭐ The answer was never missing and never un-streamed — `StreamsProvider`
+                appends `content: m.content + delta` per token throughout. It was ROUTED into
+                the one-line italic gist, so the operator watched their final deliverable sit
+                folded until the run-end reconcile swapped in the persisted text. That is why
+                D-243-06 calls CHAT-01 and CHAT-05 ONE defect: fixing WHERE the answer renders
+                is CHAT-05's live half, and 243-02 already put the thinking above it.
+
+                ⚠ THE ORIGINAL CONTRACT, KEPT VERBATIM RATHER THAN DELETED, because it was
+                true when written and a later phase must be able to see what was traded:
+                  "Live agentic run: message.content here is the model's interim narration
+                   ("Now I'll search…"), not the final answer. Fold it to a one-line gist
+                   (click to expand the full trail). At run-end the backend-persisted final
+                   answer renders normally via the else path. NEVER given markers — the body
+                   streams calm & unmarked (D-05)."
+                It is half right, and the half that fails is the one that mattered: the blob's
+                TAIL is the answer, so folding the blob folds the answer.
+
+                ⛔ A NARROWER FOLD WAS CONSIDERED AND REJECTED ON A MEASURED GROUND, not a
+                taste one — gating the fold on `hasRunningTools` OSCILLATES. `content`
+                accumulates across every iteration, so between tool N finishing and tool N+1
+                starting the predicate flips false and the body swaps from gist to blob and
+                back, once per iteration. Holding it open would need new state in this file,
+                which re-hollows the Phase 227 discharge. So the live content now takes the
+                SAME two shipped renderers as the settled answer, below the thinking line,
+                with the caret at the live edge (sketch 234 V1).
+
+                ⛔ `StreamingNarration.tsx` is NOT deleted and NOT restyled by this plan
+                (243-PATTERNS §F.4). This was its last production caller; its retirement is a
+                separate decision and is recorded as owed rather than taken here. */}
+            {message.role === "assistant" && message.citations && message.citations.length > 0 ? (
               // Phase 153-05 (CITE-01 / G-5 additive): the settled cited-assistant
               // answer routes to CitedMarkdown, which upgrades validated [n] to
               // interactive markers over the SAME dedupParagraphs output. This is

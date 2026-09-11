@@ -2952,6 +2952,25 @@ const BASELINE = {
   // cheaply be achieved by dropping exactly §3 and §4 - the two that cost something to keep.
   "ThinkingBlock.clamp.test.tsx": 7,
 
+  // ── Phase 243 (243-05 / CHAT-05 / CHAT-01 — D-243-06) — the answer out of the fold ─────
+  //
+  // ⚠ 13 was READ FROM THIS SCRIPT'S OWN `actual` COLUMN on the run that first executed the
+  // file (printed as `— 13 new` beside this suite name), never hand-counted from `it(`
+  // literals.
+  //
+  // What is UNGUARDED without this entry, and none of it is covered anywhere else in the
+  // tree: §1/§2 that a live tool-bearing run writes its answer as the message BODY and in
+  // DOCUMENT ORDER below the thinking line (the CHAT-05 fix itself); §3 that the streaming
+  // caret survives it; §4 that `StreamingNarration` is neither deleted nor restyled; §5 that
+  // the absence hint's gate did not flip as a side effect; and §6 the NAVIGATION path, driven
+  // through `StreamsProvider`'s own callbacks and reconcile — the only fence in the tree that
+  // drives a run terminating while its thread is not the mounted surface.
+  //
+  // ⛔ A lowering here would most cheaply be achieved by dropping §6, which is the half
+  // `BUG-260707-03` residual #2 is actually stated on and the half a live-send check cannot
+  // see. `src/providers` sits in NEITHER knob, so §6 is guarded here or nowhere.
+  "MessageItem.answerOutOfFold.test.tsx": 13,
+
   // ── Phase 243 (243-03 / CHAT-02 / D-243-15) — the delta path's coalescing fence ─────────
   //
   // ⚠ 9 was READ FROM THIS SCRIPT'S OWN `actual` COLUMN on the run that first executed the
@@ -4752,6 +4771,14 @@ const TARGETS = [
   // ── Phase 243 (243-04 / CHAT-01 / D-243-02) — the reasoning clamp, at BOTH ends of the ──
   // ── measured 170x spread. FILE-LEVEL for the same reason as the line above it. ──────────
   "src/components/chat/__tests__/ThinkingBlock.clamp.test.tsx",
+  // ── Phase 243 (243-05 / CHAT-05 / CHAT-01 — D-243-06) — the answer out of the fold ─────
+  //
+  // ⛔ FILE-LEVEL, BY NECESSITY: `src/components/chat` has NO directory entry (D-243-17), so
+  // this suite runs in NO gate until it is named here AND in BASELINE. It is the only fence
+  // in the tree that drives the NAVIGATION path — a run terminating while its thread is not
+  // the mounted surface — and the only one asserting the answer's DOCUMENT POSITION relative
+  // to the thinking line and the tool rows.
+  "src/components/chat/__tests__/MessageItem.answerOutOfFold.test.tsx",
   // ── Phase 243 (243-03 / CHAT-02 / CHAT-03) — the delta cadence and the scroll effect ────
   //
   // ⛔ ALL THREE NEEDED BOTH KNOBS BY HAND, AND NONE OF THEM IS REACHED BY A DIRECTORY RULE.
