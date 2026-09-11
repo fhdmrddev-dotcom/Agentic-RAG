@@ -106,8 +106,19 @@ register knows only the register below it; the code is the bottom.
       render of the reasoning value in `frontend/src`. 105 of 340 reasoning-bearing rows (**31%**)
       are the shape that had never been drawn.
 - [ ] **CHAT-05**: A finished answer resolves out of the narration fold live, on the mount/navigation
-      path as well as the send path. `BUG-260707-03`'s send-path reconcile shipped; its residual #2
-      (a backgrounded run watched after navigation) still relies on a reload.
+      path as well as the send path. `BUG-260707-03`'s send-path reconcile shipped; ~~its residual #2
+      (a backgrounded run watched after navigation) still relies on a reload.~~
+      ⚠⚠ **THAT LAST CLAUSE IS REFUTED BY MEASUREMENT AND IS STRUCK THROUGH RATHER THAN DELETED
+      (`243-05`, 2026-09-11) — being able to see how long it stood is the point.** The
+      mount/navigation reconcile **shipped at Phase 176 (RENDER-02 / D-07)** and has had a fence
+      since; `243-05` drove the path independently through `StreamsProvider`'s own callbacks and
+      reconcile and found it **GREEN against unmodified code**. The real residual was never the
+      reload — it was **WHERE the answer was drawn**: `MessageItem` routed `message.content` into
+      `StreamingNarration` on every tool-bearing streaming turn, so the answer was written **inside
+      a fold**. That arm is gone (`63e56e79f`). ⚠ **The box stays unticked deliberately:** every
+      fence is synthetic, and `BUG-260707-03`'s residual #1 (*"not live-verified"*) has been open
+      since 2026-07-07 while the code half has now been called done three times. Tick it at
+      `/gsd:verify-work 243`, after the G-4 browser row.
 
 ### SHELL — the chat shell and composer
 
@@ -171,7 +182,7 @@ Filled by the roadmapper 2026-09-11. **Every REQ-ID above maps to exactly one ph
 | CHAT-02 | 243 — Thinking block + follow-scroll seam | Pending |
 | CHAT-03 | 243 — Thinking block + follow-scroll seam | Pending — ⭐ **one mechanism with CHAT-02; may not be split** |
 | CHAT-04 | 243 — Thinking block + follow-scroll seam | ✅ **DONE 2026-09-11 (`243-02`, `2a62acb60`)** — 243-01 pinned the defect as §8; 243-02 INVERTED it. One reasoning renderer, mounted unconditionally. ⚠ The requirement's own line number (`:437-439`) was wrong — corrected in place, not deleted |
-| CHAT-05 | 243 — Thinking block + follow-scroll seam | Pending |
+| CHAT-05 | 243 — Thinking block + follow-scroll seam | **Code-complete, UAT-owed** (`243-05`, `5e03d12b0` + `63e56e79f`). ⭐ **The requirement's own second sentence was WRONG and is corrected in place above, not deleted:** the navigation reconcile shipped at Phase 176 and was never re-measured; the live residual was the RENDER BRANCH. `MessageItem` loses the `StreamingNarration` arm; the answer now takes the settled answer's own renderers, below the thinking line. ⚠ Unticked on the same standard as CHAT-01 — synthetic fences only, **G-4 browser row owed**, `BUG-260707-03` stays `folded` |
 | SHELL-01 | 244 — Chat shell + composer | Pending |
 | SHELL-02 | 244 — Chat shell + composer | Pending |
 | SHELL-03 | 244 — Chat shell + composer | Pending |
