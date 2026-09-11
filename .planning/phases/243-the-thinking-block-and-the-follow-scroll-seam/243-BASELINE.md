@@ -168,10 +168,10 @@ structurally blind to them, which is exactly how this file came to claim a set i
 ⚠ **And one of those red suites was cited by `243-03-PLAN.md:275` as a harness reference**, with
 nobody noticing it was red.
 
-⭐ **The lesson is not “add three files” — it is that a baseline taken from a gate inherits the
-gate’s blind spots.**  has exactly two bare-directory entries, so an unadopted suite is
-invisible to any measurement that reads the gate rather than the tree. ** registered
- — in neither knob since Phase 176 —
+⭐ **The lesson is not "add three files" — it is that a baseline taken from a gate inherits the
+gate's blind spots.** `TARGETS` has exactly two bare-directory entries, so an unadopted suite is
+invisible to any measurement that reads the gate rather than the tree. **`243-06` registered
+`streamsProvider_bug_260707_03_final_answer_resolve.test.tsx` — in neither knob since Phase 176 —
 for the same reason.**
 
 ## The typecheck baseline
