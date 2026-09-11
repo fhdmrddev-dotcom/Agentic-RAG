@@ -1,7 +1,21 @@
 # Phase 242 — BASELINE
 
-**Measured 2026-09-11 at `7ac71638ecf25e234399eeba81ef996742d414bc`** (branch `develop`), quiet
-tree, no sibling agent, every command run from the repo root unless stated. ⚠ **Every gate
+**Measured 2026-09-11 at `7ac71638ecf25e234399eeba81ef996742d414bc`** (branch `develop`), clean
+working tree, every command run from the repo root unless stated.
+
+⚠⚠ **CORRECTED AT THE PHASE'S CLOSE — THIS FILE ORIGINALLY SAID "no sibling agent", AND THAT WAS
+FALSE.** A **peer session was active on this repository throughout**, driving Phase 243's UAT in a
+real browser: the base commit above is itself one of its commits (`docs(243): UAT driven in a real
+browser — L-2 and L-3 PASS`, 08:01), and `bd088e6c6` landed at 08:06, one minute after this phase's
+first commit. **The original sentence is struck rather than deleted because CLAUDE.md's cap rule is
+explicit that at two concurrent test-running agents `count gate OK` goes non-deterministic**, and a
+claim of quietness that nobody checked is exactly the kind this project keeps paying for.
+
+⭐ **What it does NOT change, and why:** every gate run in this phase came back **green on the first
+invocation** — `count gate OK` twice, `failed 0` both times. Oversubscription's signature is a
+`STACK_TRACE_ERROR` timeout in an untouched file, i.e. a false RED; it does not manufacture a false
+GREEN. So the verdicts stand. ⚠ Had any run gone red, this sentence would have been the first thing
+to check. ⚠ **Every gate
 criterion in this phase's plans is written as a SET DIFF against this file, never as a colour and
 never as a count.** A count throws away the set; the set is what distinguishes a new failure from an
 inherited one.
