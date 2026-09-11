@@ -9958,9 +9958,9 @@ cells rot within days.
 | File | commits / phases / lines | G-5 | Disposition |
 |---|---|---|---|
 | [`frontend/src/components/chat/ToolCallPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattoolcallpaneltsx) | 51 / 23 / 351 | **FIRES** | ✅ **G-5 DISCHARGED (227-02)** — extracted ToolCallDetails, StepRow, toolStepDerivation (1019 → 351 lines) |
-| [`frontend/src/components/chat/MessageItem.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageitemtsx) | 70 / 34 / 803 | **FIRES** | ✅ **G-5 DISCHARGED (227-03)**. STILL not re-hollowed (**244-03**): `useState` 3→3, `useEffect` 0→0, props 5→5, one import + one mount inside an arm that was already there |
+| [`frontend/src/components/chat/MessageItem.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageitemtsx) | 71 / 37 / 904 | **FIRES** | ✅ G-5 DISCHARGED (227-03). STILL not re-hollowed (**244-05**): `useState` 3→3, `useEffect` 0→0, props 5→5; TWO pure store reads, no fetch, no prop. ⚠ row was STALE at `70 / 34 / 803` |
 | [`backend/app/api/threads.py`](docs/HOT-FILE-LEDGER.md#backendappapithreadspy) | 245 / 82 / 1617 | **FIRES** | ⚠ row was STALE at `243 / 80 / 1590`. honoured by construction (**244-03**): ONE existing pure-read query loses a WHERE predicate and gains a Python guard. ⛔ no writer added |
-| [`frontend/src/providers/StreamsProvider.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcprovidersstreamsprovidertsx) | 90 / 36 / 4380 | **FIRES** | ⚠ row STALE TWICE. honoured by construction (**243-04**): the measured span is three closure vars beside `currentIteration`, riding the update the coalescer already performs |
+| [`frontend/src/providers/StreamsProvider.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcprovidersstreamsprovidertsx) | 94 / 38 / 4528 | **FIRES** | ⚠ row STALE a FOURTH time (`90 / 36 / 4380`). honoured by construction (**244-05**): TWO pure SELECTORS, no state, no effect, no action — both return values zustand can compare with `Object.is` |
 | [`frontend/src/hooks/useMessages.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusemessagests) | 74 / 27 / 127 | ⚠ **FIRES** | extraction due |
 | [`backend/app/services/anthropic_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesanthropic_servicepy) | 11 / 10 / 354 | ⚠ **FIRES** | adapter-pattern audit due |
 | [`frontend/src/components/workflows/WorkflowCanvas.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsworkflowcanvastsx) | 31 / 9 / 1708 | **FIRES** | honoured by construction (199 / 200 / **214**) — 214-04 widened the panel and touched no node logic |
@@ -11876,3 +11876,88 @@ the extraction FIRST** — the `retrieval_service.py` rule (SEED-224), applied h
   selector (`StreamsProvider.tsx`), not a context read. Checked before adding it, because
   `MessageInput` is rendered bare in four shipped suites and a context hook would have turned them
   all red for a reason that looks like the plan's fault.
+
+---
+
+### `frontend/src/components/chat/MessageItem.tsx` — `244-05`
+
+**Re-derived at this task: `71 / 37 / 904`.** The `244-03` row read `70 / 34 / 803` and was correct
+when written; it is this plan's own commit plus the intervening wave that moves it.
+
+**G-5 FIRES HARD (37 phases), and the 227-03 discharge is STILL not undone — measured, not
+asserted:** `useState` **3 → 3**, `useEffect` **0 → 0**, `Props` **5 → 5**. The file gained ~40
+lines across two render sites and two hook calls, and gained **no state, no effect and no prop**.
+
+⛔ **THE INVARIANT THIS TASK ADDS: the scope word is rendered by the SENT message.** D-244-22,
+verbatim — *"a build that puts it solely in the composer has shipped B's weakness with A's cost."*
+It is the reason sketch 236's variant A beat B, and it is the single most skippable-looking line in
+the plan. Fenced by `ComposerAttach.composition.test.tsx` Tests 10 and 11.
+
+⛔ **ASSOCIATION IS DERIVED FROM PERSISTED DATA, NEVER STAMPED AT SEND TIME.** A client-only
+`message.attachments` field would pass every test in this repository and **fail the requirement the
+next day**, because a message loaded from the database carries no such field — and *"reopening the
+chat tomorrow, the transcript still says `this chat only`"* IS the requirement. A backend field was
+also unavailable: D-244-01 and the ROADMAP both say `Migrations: none expected`. The rule therefore
+lives in **one** place — `ChatAttachmentChip.attachmentsForMessage` — over `workspace_files`'
+`created_at` and the messages' own, and its three edges are fenced (detached / agent-written /
+still-pending).
+
+⛔ **TWO PURE STORE READS, AND NEITHER MAY BECOME A PROP OR A FETCH.**
+
+1. `useWorkspaceFilesSnapshot` — **not** `useWorkspaceFiles`, which runs `usePanelReconcile` and
+   therefore FETCHES. This component renders once per message, so the panel's hook here is **one
+   reconcile per transcript row**, N fetches for an N-message thread, on every mount.
+2. `usePrecedingUserTurns` — returns a **joined STRING**, not an object or an array. A zustand
+   selector compares with `Object.is`; a fresh `{ lower, upper }` identity on every store write
+   re-renders this row on every stream delta, which is exactly what the 075.4-04 `React.memo`
+   exists to prevent. ⛔ And not a prop from `MessageList` either: that would put the association
+   rule in the list's render path and create a second place that has to agree about it.
+
+⚠ **TWO REAL FINDINGS FROM THIS TASK, both caught by shipped fences rather than by review.**
+
+- **A layout regression.** The first draft changed the user row's outer `<div>` from
+  `flex justify-end` to `flex flex-col items-end`, and `src/__tests__/components/MessageItem.test.tsx`'s
+  *"aligns user message to the right (justify-end)"* case went red. The stacking moved into a NEW
+  INNER wrapper; the tested node's class string and `data-testid` are byte-identical to the shipped
+  ones. ⭐ A 2026-era fence over a class string is exactly the kind that looks like noise until it
+  fires.
+- **FOUR suites with PARTIAL `@/providers/StreamsProvider` mock factories went red at MOUNT** —
+  `MessageItem.capPaused` / `.cancelledRun` / `.continueButton` / `.retry`, all declaring only
+  `useWorkflowLockForThread`. This is the `196-08` failure mode verbatim (*"nine suites threw at
+  mount because their `@/lib/api` mock factories did not declare a newly-added export"*). ⛔ The fix
+  is to DECLARE the new exports in each factory — never to make the component tolerate `undefined`
+  hooks, which would hide the next one. **Adding an export to a module that partial-mock factories
+  cover is a blast radius, and it is invisible to `tsc`.**
+
+**Seam.** ✅ Discharged at 227-03 and still discharged. ⚠ The thing to watch: this file now hosts
+THREE of Phase 244's changes (the 244-03 approval mount, this chip and this pointer). None added
+state — but a fourth that does would re-open the discharge, and the honest test is the
+`useState` / `useEffect` / props triple above, re-measured rather than assumed.
+
+---
+
+### `frontend/src/providers/StreamsProvider.tsx` — `244-05`
+
+**Re-derived: `94 / 38 / 4528`.** ⚠ The row was STALE a **fourth** time — it read `90 / 36 / 4380`
+in the detail file and `90 / 36 / 4435` in CLAUDE.md, **two different figures for one file in two
+registers**, which is the drift the same-commit sync rule exists to stop.
+
+**Honoured by construction.** The diff is **two exported SELECTORS** —
+`useWorkspaceFilesSnapshot` and `usePrecedingUserTurns` — and nothing else. **No state, no effect,
+no action, no subscription, no branch in the demux.** Both read slices the provider already
+maintains.
+
+⛔ **THE RULE THEY BOTH OBEY: a selector must return something `Object.is` can compare.** One
+returns the slice array (the store replaces it wholesale, never mutates in place, so identity is
+stable); the other returns a **joined string** rather than the `{ lower, upper }` pair it logically
+is, because an object literal rebuilds its identity on every store write and would re-render every
+memo'd consumer on every stream delta. ⚠ That is not a micro-optimisation here: the consumer is
+`MessageItem`, one instance per message.
+
+⚠ **WHY A NAMED HOOK AT ALL, rather than letting the consumer read the store:** D-068-03 —
+`useStreamsStore` is an implementation detail and external callers go through the named-hook layer.
+⚠ **The TESTS are the exception and they need it:** `streamsStore.ts` initialises `actions` as
+**no-op stubs** that only this provider installs on mount, so a suite rendering a chat component
+bare CANNOT seed a slice through `actions.*` — the call silently does nothing. Suites seed with
+`useStreamsStore.setState` directly. Found by driving a test that failed for the wrong reason, not
+by reading the code.

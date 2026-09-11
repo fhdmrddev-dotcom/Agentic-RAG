@@ -628,9 +628,9 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | Hot file (FIRING) | commits / phases / lines | Verdict (abridged) |
 |---|---|---|
 | `frontend/src/components/chat/ToolCallPanel.tsx` | 51 / 23 / 351 | ✅ **G-5 DISCHARGED (227-02)** |
-| `frontend/src/components/chat/MessageItem.tsx` | 70 / 34 / 803 | ✅ **G-5 DISCHARGED (227-03)**. STILL not re-hollowed (**244-03**): `useState` 3→3, `useEffect` 0→0, props 5→5, one import + one mount inside an arm that was already there |
+| `frontend/src/components/chat/MessageItem.tsx` | 71 / 37 / 904 | ✅ G-5 DISCHARGED (227-03). STILL not re-hollowed (**244-05**): `useState` 3→3, `useEffect` 0→0, props 5→5; TWO pure store reads, no fetch, no prop. ⚠ row was STALE at `70/34/803` |
 | `backend/app/api/threads.py` | 245 / 82 / 1617 | ⚠ row was STALE at `243 / 80 / 1590`. honoured by construction (**244-03**): one pure-read query loses a WHERE predicate, gains a Python guard. ⛔ no writer added |
-| `frontend/src/providers/StreamsProvider.tsx` | 90 / 36 / 4435 | ⚠ row STALE THREE TIMES. honoured by construction (**243-06**): the span became an interval over the reasoning stream; the burst bound rides the EXISTING negative rule |
+| `frontend/src/providers/StreamsProvider.tsx` | 94 / 38 / 4528 | ⚠ row STALE a FOURTH time (`90/36/4435`). honoured by construction (**244-05**): TWO pure SELECTORS — no state, no effect, no action; both return values `Object.is` can compare |
 | `frontend/src/hooks/useMessages.ts` | 74 / 27 / 127 | extraction due |
 | `backend/app/services/anthropic_service.py` | 11 / 10 / 354 | adapter-pattern audit due |
 | `backend/app/services/embedding_service.py` | 9 / 5 / 354 | ⚠ absent for its entire life at 5 phases — row added 236 (SC#2) |

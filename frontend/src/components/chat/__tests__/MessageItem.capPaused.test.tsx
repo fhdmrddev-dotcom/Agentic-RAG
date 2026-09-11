@@ -28,6 +28,14 @@ let mockLock: {
 
 vi.mock("@/providers/StreamsProvider", () => ({
   useWorkflowLockForThread: () => mockLock,
+  // ⚠ Phase 244 (244-05 T3): `MessageItem` now reads TWO more PURE store selectors —
+  // `useWorkspaceFilesSnapshot` and `usePrecedingUserTurns` — for D-244-22's sent-attachment
+  // chip. A PARTIAL mock factory of this module leaves them `undefined` and the component throws
+  // AT MOUNT: the exact failure `196-08` recorded, when nine suites went red because a mock
+  // factory had not declared a newly-added export. Declared so this suite keeps testing its
+  // own subject; neither value affects the cap-paused card.
+  useWorkspaceFilesSnapshot: () => [],
+  usePrecedingUserTurns: () => "|",
 }))
 
 import { MessageItem } from "../MessageItem"

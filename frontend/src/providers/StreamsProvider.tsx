@@ -4020,35 +4020,43 @@ export function useWorkspaceFilesSnapshot(threadId: string | null): WorkspaceFil
 }
 
 /**
- * Phase 244 (244-05 T3) — the `created_at` of the USER message immediately before `messageId`,
- * or `null` if it is the first. A SCALAR, deliberately.
+ * Phase 244 (244-05 T3) — the `created_at` of the TWO user messages immediately preceding
+ * `messageId`, most-recent first, joined by `|`. Either side may be empty.
  *
- * ⛔ WHY A SCALAR AND NOT THE MESSAGE LIST. `MessageItem` is `React.memo`'d (075.4-04) so a
- * 50-message thread does not re-render every row on every stream delta. Handing a row the
- * messages ARRAY — as a prop or as a selector result — reinstates exactly that cost, because the
- * array identity changes on every delta. A zustand selector re-RUNS on every store write but only
- * re-RENDERS when the selected value changes, and this one selects a timestamp string that moves
- * only when a user message is added. That is the whole reason this hook exists rather than the
- * obvious `useThreadMessages` call.
+ * ⛔ A STRING, NOT AN OBJECT OR AN ARRAY, AND THAT IS LOAD-BEARING. A zustand selector compares
+ * with `Object.is`, so returning `{ lower, upper }` or `[a, b]` builds a fresh identity on EVERY
+ * store write and re-renders the consumer on every stream delta — the precise cost
+ * `MessageItem`'s `React.memo` (075.4-04) exists to avoid. A joined string compares by value.
  *
- * ⛔ And not a PROP either: threading it from `MessageList` would put the association rule in the
- * list's render path and add a second place that has to agree about it.
+ * ⛔ WHY NOT THE MESSAGE LIST. Same reason, one step further: handing a transcript row the
+ * messages ARRAY — as a prop or as a selector result — reinstates the per-delta re-render for
+ * every row in the thread. ⛔ And not a PROP either: threading it from `MessageList` would put
+ * the association rule in the list's render path and create a second place that has to agree
+ * about it.
+ *
+ * TWO values rather than one because both callers need a WINDOW: a user row bounds
+ * `(previous user turn, itself]`, and an assistant row bounds `(the turn before that, the turn it
+ * answers]`. One selector, one pass, one stable value.
  */
-export function usePreviousUserMessageAt(
+export function usePrecedingUserTurns(
   threadId: string | null,
   messageId: string,
   surfaceId: SurfaceId = "chat",
-): string | null {
+): string {
   return useStreamsStore((s) => {
-    if (!threadId) return null
+    if (!threadId) return "|"
     const msgs = s.bucketsBySurface.get(surfaceId)?.get(threadId)
-    if (!msgs) return null
-    let prev: string | null = null
+    if (!msgs) return "|"
+    let prev = ""
+    let prevPrev = ""
     for (const m of msgs) {
-      if (m.id === messageId) return prev
-      if (m.role === "user") prev = m.created_at
+      if (m.id === messageId) break
+      if (m.role === "user") {
+        prevPrev = prev
+        prev = m.created_at
+      }
     }
-    return null
+    return `${prev}|${prevPrev}`
   })
 }
 

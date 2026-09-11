@@ -330,12 +330,28 @@ describe("The sent message — the scope word in the transcript", () => {
     expires_at: new Date(T0 + 30_000 + 24 * 3_600_000).toISOString(),
   }
 
+  // ⚠ SEEDED WITH `setState`, NOT THROUGH `actions`, and the reason is measured rather than
+  // stylistic: `streamsStore.ts` initialises `actions` as NO-OP STUBS and the real writers are
+  // installed by `StreamsProvider` ON MOUNT. This suite renders `MessageItem` and `MessageInput`
+  // bare (as every other chat suite does), so an `actions.replaceWorkspaceFilesForThread(...)`
+  // call here silently does NOTHING — the test would seed nothing and then fail for a reason
+  // that looks like the component's fault. Found by driving it, not by reading it.
   function seed(files: any[]) {
-    useStreamsStore.getState().actions.replaceWorkspaceFilesForThread(T, files as any)
+    useStreamsStore.setState((s) => {
+      const next = new Map(s.workspaceFilesByThread)
+      next.set(T, files as any)
+      return { workspaceFilesByThread: next }
+    })
   }
 
   function seedMessages(msgs: any[]) {
-    useStreamsStore.getState().actions.setMessagesForBucket("chat", T, () => msgs as any)
+    useStreamsStore.setState((s) => {
+      const surf = new Map(s.bucketsBySurface.get("chat") ?? [])
+      surf.set(T, msgs as any)
+      const next = new Map(s.bucketsBySurface)
+      next.set("chat", surf)
+      return { bucketsBySurface: next }
+    })
   }
 
   beforeEach(() => {

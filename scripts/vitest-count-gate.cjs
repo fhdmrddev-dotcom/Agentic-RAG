@@ -3568,7 +3568,20 @@ const BASELINE = {
   //
   // ⛔ Order is asserted with `compareDocumentPosition`, never `getAllByTestId(...)[0]` — query
   // order and document order agree often enough to make a reordering bug invisible.
-  "ComposerAttach.composition.test.tsx": 10,
+  // T3 EXTENDS IT TO 19 — the sent-message block. ⚠ THE FIRST RED FOR CASES 10/11/12 WAS PARTLY
+  // VACUOUS AND IS RECORDED RATHER THAN TIDIED AWAY: the suite seeded the store through
+  // `actions.replaceWorkspaceFilesForThread`, and `streamsStore.ts` initialises `actions` as
+  // NO-OP STUBS that only `StreamsProvider` replaces ON MOUNT. So those cases were red because
+  // nothing had been seeded, not because the chip was absent — a RED for the wrong reason proves
+  // as little as a green one. Re-driven after the seeding was fixed to `setState`:
+  //   · the sent chip deleted from the user row -> cases 10 and 11 red
+  //     (`Unable to find an element by: [data-testid="chat-attachment-chip"]`)
+  //   · the agent pointer deleted -> case 12 red (`[data-testid="agent-read-pointer"]`)
+  //   · the detach / `kind` / upper-bound conditions deleted from `attachmentsForMessage` ->
+  //     cases 12b, 12c and 12d red, each on its own removed condition
+  // `MessageItem.tsx` and `ChatAttachmentChip.tsx` were restored md5-identical after every plant
+  // (`bab2a9868f07b37d2e29766d95574eed`, `0b092b18f2cf83756f1d2213c9f36306`).
+  "ComposerAttach.composition.test.tsx": 19,
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
