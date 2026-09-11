@@ -7525,6 +7525,46 @@ Its width is not its own: the 430px track is set by the host grid. The mobile ar
 
 ### `backend/app/services/tool_dispatcher.py`
 
+**Triple re-derived 2026-09-11 (`244-02`): `80 / 34 / 4868` — G-5: ⚠ FIRES.** ⚠ The row read
+`77 / 32 / 4679`; **STALE for the third close running.** Re-derive, never copy forward.
+
+**What `244-02` T2 did (SHELL-04's second clause — C-9).** `workspace_read` returns
+`"Content available via REST API."` for **any binary MIME**, and the sandbox had **no workspace
+reach at all** (`grep -rn "workspace" sandbox_service.py` → no matches). **Eight of the sixteen
+accepted extensions are binary**, and sketch 236's headline file is an `.xlsx` — so
+*"and the agent can use it"* was **unsatisfied for the most likely attachments**: a person attaches
+a spreadsheet and the agent tells them to call a REST API it cannot reach.
+
+Two module-level helpers (`_attachment_container_path`, `_hydrate_thread_attachments`) and a
+**four-line guarded call site** inside `_handle_execute_code`, after the `mkdir -p /sandbox/output`
+step and before the skill-file loop. **Honoured by construction** — no new subsystem, no new tool,
+no new SSE event, no migration:
+
+- ⛔ **`workspace_read`'s binary branch is DELIBERATELY UNTOUCHED.** Its note is honest for a
+  text-reading tool; this is a SECOND, correct route rather than making the first one lie.
+- **The copy shape is `render_template`'s `_copy_in` (`:3580-3601`)** — `NamedTemporaryFile` →
+  `copy_to_runtime` → `unlink`. ⛔ NOT the skill-file loop's base64-in-source preamble, which
+  inflates the generated code file by 33% and would be catastrophic on a 10 MB attachment.
+- **The once-per-session guard is the shipped `_output_baseline_seeded` shape.** The flag is set
+  **before** the work, not after, because a hard failure must not re-attempt container I/O on
+  every subsequent call; per-FILE failures are named individually, so nothing is lost by it.
+- **ONE expiry gate, two readers (D-244-04).** `ws_list_files` decides membership in SQL;
+  `get_file_by_path` — deliberately UNFILTERED on expiry — is used only to fetch the content
+  columns the listing does not select. A source fence parses the helper (docstring and comments
+  stripped via `ast`, so the prose that QUOTES the predicate cannot make the fence lie) and fails
+  on `expires_at` / `is_expired` / `utcnow` / `now()`.
+- **T-244-02-02 driven RED**: `dest = _attachment_container_path(...)` was replaced by the naive
+  `f"{_ATTACHMENTS_DIR}/{src_path}"`; five parametrised cases went red —
+  `assert ['/sandbox/attachments/../../etc/passwd'] == ['/sandbox/attachments/passwd']` — and the
+  file was restored **md5-identical** (`35c2afce75d1f51df19b80bf5a81c0c1`).
+- **T-244-02-07**: a per-file failure is logged AND appended to `_llm_payload["attachments"]`.
+  Guarded on a non-empty list, so a clean run and every zero-attachment run carry no new key.
+- ⚠ **`_ATTACHMENT_HYDRATION_MAX_FILES = 50` is a Rule-2 addition the plan did not name.** The
+  10 MB cap bounds each FILE, nothing bounded the COUNT, and the agent writes here too. The
+  truncation is NAMED in the tool result, never silent.
+
+**The prior close's entry, preserved:**
+
 **Triple re-derived 2026-08-31: `72 / 29 / 4624` — G-5: ⚠ FIRES.** ⚠ The row read `67 / 28 / 4336` one day earlier; the file is being edited faster than its row is re-derived, which is this ledger's own recurring finding rather than a new one.
 
 **What 2026-08-31 did (the honest-refusal pass, `_handle_connector_chat_tool`):** `resolve_connector_org` replaces a swallowed `except: pass` + `org_id = str(user_id)`, and `except: conns = []` becomes a named `connector_lookup_failed`. Three faults that shared one innocent sentence now each say which they were. **Honoured by construction** — the org resolution EXTRACTED to `connectors/org_scope.py` (a new leaf, 124 L) rather than growing here; the net addition is two refusal literals. Guarded by `tests/unit/test_connector_org_scope_and_refusals.py`, **5 of whose 12 cases were driven RED against HEAD** before the fix.
@@ -9970,7 +10010,7 @@ cells rot within days.
 | [`frontend/src/pages/KnowledgeHealthPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesknowledgehealthpagetsx) | 12 / 6 / **DELETED** | ⚠ **FIRES** | **RETIRED (217.1-14)** — the Library's Health tab absorbed it; `ChatLayout`'s fallback replaced by `UnknownViewFallback` (`:871`). ⚠ absent for its ENTIRE LIFE |
 | [`backend/app/api/knowledge_health.py`](docs/HOT-FILE-LEDGER.md#backendappapiknowledgehealthpy) | 11 / 6 / 737 | ⚠ **FIRES** | honoured by construction (**217.1-11**) — adds `could_not_search`; `retrieval_count` byte-unchanged. ⚠ absent at **6 phases**. Audit-analytics from `audit_log`. Service-role by exception |
 | [`backend/app/services/agent_loop.py`](docs/HOT-FILE-LEDGER.md#backendappservicesagent_looppy) | 39 / 20 / 3154 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **20 phases** — row added 2026-08-31. Honoured by construction: the `org_id = user_id` fallback DELETED, resolution moved to a leaf |
-| [`backend/app/services/tool_dispatcher.py`](docs/HOT-FILE-LEDGER.md#backendappservicestool_dispatcherpy) | 77 / 32 / 4679 | ⚠ **FIRES** | honoured by construction (2026-08-31) — the org resolution EXTRACTED to `connectors/org_scope.py`; ⚠ the row was STALE at `67 / 28 / 4336` after ONE day |
+| [`backend/app/services/tool_dispatcher.py`](docs/HOT-FILE-LEDGER.md#backendappservicestool_dispatcherpy) | 80 / 34 / 4868 | ⚠ **FIRES** | ⚠ row STALE AGAIN at `77 / 32 / 4679`. honoured by construction (**244-02**): 2 module-level helpers + a 4-line guarded call site; `workspace_read`'s binary branch untouched |
 | [`backend/app/api/document_governance.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentgovernancepy) | 5 / 3 / 416 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent at 3 phases. ⚠ Its low-confidence cutoff is the ConfidenceChip tier (**0.5**) — a DIFFERENT measure from `knowledge_health`'s **0.38** retrieval similarity |
 | [`frontend/src/pages/GovernancePage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesgovernancepagetsx) | 4 / 1 / 355 | no (1 phase) | young (119) — ⚠ row added because it is being MERGED into the Library (operator, 2026-08-28); it is feature-gated while Documents is not, so the gate must move with it |
 | [`frontend/src/components/ingestion/DocumentUpload.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestiondocumentuploadtsx) | 10 / 1 / 144 | no (1 phase) | young (056) — ⚠ absent for its entire life. ⛔ It reports NO byte progress (`onUploadProgress` absent), so any upload percentage is unknowable |

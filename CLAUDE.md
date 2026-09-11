@@ -732,7 +732,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/pages/KnowledgeHealthPage.tsx` | 12 / 6 / **DELETED** | **RETIRED (217.1-14)** |
 | `backend/app/api/knowledge_health.py` | 11 / 6 / 737 | honoured by construction (**217.1-11**) |
 | `backend/app/services/agent_loop.py` | 39 / 20 / 3154 | ⚠ absent from BOTH for its ENTIRE LIFE at **20 phases** |
-| `backend/app/services/tool_dispatcher.py` | 77 / 32 / 4679 | honoured by construction (2026-08-31) |
+| `backend/app/services/tool_dispatcher.py` | 80 / 34 / 4868 | ⚠ row STALE for the 3rd close at `77/32/4679`. honoured by construction (**244-02**): 2 helpers + a 4-line guarded call site; `workspace_read`'s binary branch untouched |
 | `backend/app/api/document_governance.py` | 5 / 3 / 416 | ⚠ absent at 3 phases. ⚠ Its low-confidence cutoff is the ConfidenceChi |
 | `frontend/src/components/ingestion/ViewsGroup.tsx` | 5 / 3 / 259 | ⚠ absent for its ENTIRE LIFE at **3 phases** |
 | `frontend/src/components/ui/tabs.tsx` | 3 / 3 / 78 | ⚠ absent for its ENTIRE LIFE |

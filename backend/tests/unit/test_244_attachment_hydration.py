@@ -218,12 +218,26 @@ def test_hydration_adds_no_second_expiry_rule():
     "consumed the gated listing" from "re-implemented the same predicate correctly by
     coincidence", and a duplicated rule is the thing that drifts.
     """
+    import ast
     import inspect
+    import re as _re
 
     src = inspect.getsource(tool_dispatcher._hydrate_thread_attachments)
-    assert "ws_list_files" in src
+    # ⚠ Strip the DOCSTRING and the `#` comments before asserting. The prose deliberately
+    # QUOTES the SQL predicate to say where the one gate lives, and a fence that reads prose
+    # would fail on the very sentence that documents the invariant it is guarding.
+    tree = ast.parse(src.lstrip())
+    fn = tree.body[0]
+    if (fn.body and isinstance(fn.body[0], ast.Expr)
+            and isinstance(fn.body[0].value, ast.Constant)
+            and isinstance(fn.body[0].value.value, str)):
+        fn.body = fn.body[1:]
+    code = _re.sub(r"^\s*#.*$", "", ast.unparse(fn), flags=_re.M)
+
+    assert "ws_list_files" in code
+    assert len(code) > 400, "the docstring strip left nothing — the fence would pass vacuously"
     for forbidden in ("expires_at", "is_expired", "utcnow", "now()"):
-        assert forbidden not in src, f"hydration re-implements expiry via {forbidden!r}"
+        assert forbidden not in code, f"hydration re-implements expiry via {forbidden!r}"
 
 
 # ── 4. TRAVERSAL — T-244-02-02 ────────────────────────────────────────────────
