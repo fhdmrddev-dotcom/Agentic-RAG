@@ -724,11 +724,11 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/WorkflowScheduleModal.tsx` | 3 / 3 / 601 | ⚠ absent for its entire life; it crossed the threshold in 214-09 on a  |
 | `frontend/src/components/workflows/nodePresentation.ts` | 8 / 7 / 221 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
 | `frontend/src/lib/api/threads.ts` | 7 / 3 / 1683 | young (207 split, 214) |
-| `frontend/src/lib/api/connectors.ts` | 16 / 10 / 718 | honoured by construction (**233**) |
+| `frontend/src/lib/api/connectors.ts` | 17 / 11 / 740 | honoured by construction (**244-06**): `importCloudFile` gains a REQUIRED body declared BESIDE `SourcePreviewRequest` — ⛔ never inline in a component |
 | `frontend/src/lib/api/workflows.ts` | 4 / 4 / 1081 | ⚠ absent until 214; the 207 split created it with NO row. **`lib/api.t |
 | `frontend/src/lib/connectionMark.tsx` | 7 / 4 / 313 | ✅ **the move IS the seam, and it was TAKEN (214-08)** |
 | `frontend/src/components/ingestion/DocumentList.tsx` | 24 / 13 / 294 | ✅ **seam TAKEN (217.1-05)** |
-| `frontend/src/pages/LibraryPage.tsx` | 45 / 14 / 955 | ⚠ row STALE a THIRD time. honoured by construction (**244-04**): one optional prop + one `useMemo` over a strict leaf; ⛔ NO `useSourceAttention()` added. ⚠ needs `--follow` or it reads `1` |
+| `frontend/src/pages/LibraryPage.tsx` | 46 / 15 / 970 | ⚠ row STALE a FOURTH time, one plan later. honoured by construction (**244-06**): ONE mount + 3 EXISTING props; the door owns its own connections read, so the page gained no effect |
 | `backend/app/services/retrieval_service.py` | 19 / 11 / 456 | ⛔ **extraction still OWED (SEED-224, since 231).** 241 is the SECOND landing, 11 lines; a THIRD must propose the extraction FIRST |
 | `frontend/src/components/metadata/DocumentDetailPanel.tsx` | 9 / 6 / 496 | ⚠ **the row was STALE at `6 / 5 / 405`.** honoured by construction (21 |
 | `frontend/src/hooks/useDocuments.ts` | 8 / 3 / 120 | ⚠ absent at 3 phases. Realtime is a hint, not truth |
@@ -745,6 +745,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/ingestion/__tests__/IngestionStrip.test.tsx` | 3 / 3 / 516 | ⚠ absent; row added 233, which repaired the INHERITED red `229-03` cau |
 | `frontend/src/components/layout/NavPanel.tsx` | 20 / 11 / 329 | ⚠ absent from BOTH for its ENTIRE LIFE at **11 phases** |
 | `frontend/src/App.tsx` | 32 / 23 / 374 | ⚠ absent for its ENTIRE LIFE at **23 phases**; row then STALE at `31/23/351`. ⭐ **244-04 left it BYTE-UNCHANGED and FENCED it** — `setLibraryTab(` still 2, driven RED against a planted 3rd writer |
+| `frontend/src/components/library/LibraryCloudImport.tsx` | 1 / 1 / 194 | young (created 244-06). Row added AT CREATION. The Library's single-file cloud door — ⛔ it renders a REASON in every unavailable state; a silent grey-out is the same failure as a silent root write |
 | `frontend/src/components/library/LibraryHeaderBar.tsx` | 2 / 1 / 204 | ⚠ absent for its entire life — row added **244-04** at its SECOND touch. ⛔ the ONE set of tab triggers: a hidden duplicate broke 41 cases; `aria-hidden` on the count is load-bearing |
 | `frontend/src/lib/nav-items.ts` | 8 / 6 / 95 | ⚠ absent at 6 phases |
 | `backend/app/api/classification_rules.py` | 3 / 3 / 226 | row added 237 at threshold. Validates rule_scope and enforces WATCH_ALLOWED_FIELDS refusal (422) for arrival watch rules. |

@@ -7221,6 +7221,25 @@ One of the twelve domain modules the 207 split created. The barrel re-exports it
 
 ### `frontend/src/lib/api/connectors.ts`
 
+⚠ **RE-DERIVED 2026-09-12 (`244-06`): `17 / 11 / 740`** — the row read `16 / 10 / 718`.
+
+⭐ **`244-06` — `importCloudFile` GAINS A REQUIRED BODY, and the type is declared HERE.**
+`ConnectionFileImportRequest { folder_id: string }` sits beside `SourcePreviewRequest`, ⛔ never
+inline in a component: this ledger records **three separate wire-type drifts in `lib/api/org.ts`
+alone**, every one of them a shape typed at a call site. `LibraryPage.cloudImport.test.tsx` fences
+the absence of a `folder_id:` body key on the page.
+
+⚠ **A SECOND, QUIETER FIX RODE ALONG AND IS NAMED RATHER THAN ABSORBED.** The failure path read
+`readConnectorReasonCode`, which parses only the CODED refusal shape — so the server's plain-string
+`detail` was **dropped**, and every caller saw the hard-coded `"Failed to import cloud file"`
+instead of the sentence the server sent. That is the `probeMcpServer` finding one function over.
+It now reads `readConnectorFailure`, so `S-4` (*the refusal is the server's words*) actually holds
+on this path. The ids are also `encodeURIComponent`-wrapped, matching `postPreview`.
+
+---
+
+### Prior entries
+
 ⚠ **RE-DERIVED 2026-09-05 (Phase 233): `12 / 7 / 690`** — the row read `11 / 6 / 594`. Honoured by
 construction: `previewSource` and `confirmSourcePreview` share ONE `postPreview` helper rather than
 duplicating the auth/error dance a third time. ⚠ **`lib/api.ts`'s row is the BARREL, not this
@@ -7313,6 +7332,29 @@ order is still load-bearing and still enforced from `LibraryPage.tsx` by `nth-ch
 ---
 
 ### `frontend/src/pages/LibraryPage.tsx`
+
+⚠ **RE-DERIVED AT `244-06` (2026-09-12): `46 / 15 / 970`** (`--follow`, as the rename note below
+requires). The row read `45 / 14 / 955` and was written **one plan earlier, in this same phase**.
+
+⭐ **`244-06` — THE CLOUD DOOR IS A MOUNT, NOT AN EFFECT.** The page gains one element,
+`<LibraryCloudImport>`, fed **three props it already computes** (`selectedFolderId`,
+`selectedFolderName`, `canUploadToFolder`) plus `loadDocuments`. ⛔ **It did NOT gain a
+`listConnectorConnections` effect**: the door owns its own connections read, because this file
+fires G-5 at 15 phases and a new fetch + a fourth piece of state is exactly the growth the
+guardrail exists to notice. ⛔ **No second permission expression** — `const canUploadToFolder =`
+still occurs exactly once, and the identifier exactly four times (one declaration, three
+consumers), both pinned by `LibraryPage.cloudImport.test.tsx`.
+
+⚠ **AND A PLAN CRITERION THAT COULD NOT PASS ON AN UNTOUCHED TREE, corrected beside the original.**
+`244-06-PLAN.md` asks that `grep -rn 'folder_id' LibraryPage.tsx` show no inline wire shape — but
+`folder_id` is a `Document` FIELD read **seven** times here. The fence measures the property meant:
+no `folder_id:` body KEY, plus a pin on the seven field reads. ⚠ The pin was first written as
+**5**, taken from `grep -n`'s LINE count when one line carries three occurrences — **a line count
+is not an occurrence count**, and this file is where that was paid for.
+
+---
+
+### Prior entries
 
 ⚠ **RE-DERIVED AT `244-04` (2026-09-11): `45 / 14 / 923` at base `310b91e83`** — the scan-list row
 read `44 / 14 / 922`, one commit and one line behind. `--follow` used, as this file's own rename note
@@ -10046,6 +10088,7 @@ cells rot within days.
 | [`backend/app/models/thread.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsthreadpy) | 16 / 10 / 438 | ⚠ **FIRES** | honoured by construction (200.1 / **214**) |
 | [`frontend/src/components/workflows/canvasModel.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowscanvasmodelts) | 13 / 6 / 752 | ⚠ **FIRES** | ⚠ absent from BOTH at 6 phases (added 200) |
 | [`frontend/src/components/layout/ChatLayout.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutchatlayouttsx) | 51 / 26 / 1010 | ⚠ **FIRES** | ⚠ row was STALE at `46 / 24 / 921`. honoured by construction (**244-04**): ONE prop on an existing mount — a 4th renderer off the SAME one read; `ATTENTION_PRODUCERS.flatMap` still appears once |
+| [`frontend/src/components/library/LibraryCloudImport.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibrarylibrarycloudimporttsx) | 1 / 1 / 194 | no (new) | young (created 244-06). Row added AT CREATION. The Library's single-file cloud door — ⛔ it renders a REASON in every unavailable state; a silent grey-out is the same failure as a silent root write |
 | [`frontend/src/components/library/LibraryHeaderBar.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibrarylibraryheaderbartsx--row-added-244-04) | 2 / 1 / 204 | no (1 phase) | ⚠ absent for its entire life — row added 244-04 at its SECOND touch. ⛔ the ONE set of tab triggers: a hidden duplicate broke 41 cases. `aria-hidden` on the count is load-bearing |
 | [`frontend/src/components/layout/ChatHistoryColumn.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutchathistorycolumntsx) | 7 / 2 / 513 | below threshold | ⚠ **ABSENT from BOTH for its ENTIRE LIFE — row added 244-01 at its SECOND phase** (`settingsSearchPayload.ts` precedent). D-244-20 claimed a row existed; the gate refuted it |
 | [`frontend/src/hooks/useThreads.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusethreadsts) | 4 / 2 / 64 | below threshold | ⚠ **ABSENT from BOTH registers for its entire life — row added 244-01.** The app's ONE thread-selection owner; `selectThread` is a bare `setState`, so "first click does not open" cannot originate here |
@@ -10194,12 +10237,12 @@ cells rot within days.
 | [`frontend/src/components/workflows/stepIdentityVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsstepidentityvocabularyts) | 1 / 1 / 206 | no (1 phase) | young (214-11) — ⚠ its six PAUSE sentences are consumed by NOTHING (`SEED-219`) |
 | [`frontend/src/lib/api/knowledge.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiknowledgets) | 2 / 2 / 803 | no (2 phases) | young (207 split, 214) — ⚠ **NOT covered by `lib/api.ts`'s row: that row is the BARREL** |
 | [`frontend/src/lib/api/threads.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapithreadsts) | 7 / 3 / 1683 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | young (207 split, 214) — ⚠ **NOT covered by `lib/api.ts`'s row: that row is the BARREL** |
-| [`frontend/src/lib/api/connectors.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiconnectorsts) | 16 / 10 / 718 | ⚠ **FIRES** | honoured by construction (**233**) — two functions over one shared `postPreview` helper. **`lib/api.ts`'s row is the BARREL, not this module** |
+| [`frontend/src/lib/api/connectors.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiconnectorsts) | 17 / 11 / 740 | ⚠ **FIRES** | ⚠ row was STALE at `16 / 10 / 718`. honoured by construction (**244-06**): `importCloudFile` gains a REQUIRED body declared BESIDE `SourcePreviewRequest` — ⛔ never inline in a component |
 | [`frontend/src/lib/api/skills.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiskillsts) | 4 / 2 / 715 | no (2 phases) | ⚠ **absent for its ENTIRE LIFE — row added 239-10**, the fifth 207-split module found with none. Holds `FullAppSettings`, not skills. **`lib/api.ts`'s row is the BARREL** |
 | [`frontend/src/lib/api/workflows.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiworkflowsts) | 4 / 4 / 1081 | ⚠ **FIRES** | ⚠ absent until 214; the 207 split created it with NO row. **`lib/api.ts`'s row is the BARREL, not these modules.** 214.1: docblock only, zero behaviour |
 | [`frontend/src/lib/connectionMark.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclibconnectionmarktsx) | 7 / 4 / 313 | ⚠ **FIRES** | ✅ **the move IS the seam, and it was TAKEN (214-08)** — `settings/` → `lib/`; four run + canvas surfaces now import ONE map |
 | [`frontend/src/components/ingestion/DocumentList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestiondocumentlisttsx) | 24 / 13 / 294 | ⚠ **FIRES** | ✅ **seam TAKEN (217.1-05)** — `DocumentRow.tsx` extracted with the sketch's five affordances (−315 L). ⚠ 7-column order still load-bearing: `LibraryPage` sheds cols 3–5 by `nth-child` |
-| [`frontend/src/pages/LibraryPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpageslibrarypagetsx) | 45 / 14 / 955 | ⚠ **FIRES** | ⚠ row STALE a THIRD time. honoured by construction (**244-04**): one optional prop + one `useMemo` over a strict leaf; ⛔ no `useSourceAttention()` added. ⚠ needs `--follow` |
+| [`frontend/src/pages/LibraryPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpageslibrarypagetsx) | 46 / 15 / 970 | ⚠ **FIRES** | ⚠ row STALE a FOURTH time, ONE PLAN later. honoured by construction (**244-06**): ONE mount + 3 EXISTING props; the door owns its connections read, so the page gained no effect |
 | [`backend/app/services/retrieval_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrievalservicepy) | 19 / 11 / 456 | ⚠ **FIRES** | ⛔ **extraction still OWED** (`SEED-224`, since 231) — 241 is the SECOND landing, capped at 11 lines by a fence; a THIRD must propose the extraction FIRST |
 | [`backend/app/services/recall_eval.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrecallevalpy) | 2 / 2 / 978 | no (2 phases) | rewritten in place at 241 (`1 / 1 / 67` → here). ⭐ driven LIVE at 241-04: it reported `Hit@1 0.78` AND refused a bench it could not read — both arms real |
 | [`scripts/build-recall-bench.py`](docs/HOT-FILE-LEDGER.md#scriptsbuild-recall-benchpy) | 4 / 1 / 1088 | no (1 phase) | ⚠ row ADDED at 241-04 — the only `DROP DATABASE` in the repo. Guard + constant-interpolation + AST fence, all driven RED. It built GREEN and unreadable; assert the READ |
@@ -12233,3 +12276,48 @@ remove. **Re-open trigger:** any plan adding `DELETE /threads/{id}/workspace/fil
 so the two doors cannot drift on reconcile order or on refusal-clearing. `attachCloudFile`
 RE-THROWS after setting `refusal` — the modal needs to know the pick did not take, and it renders
 nothing itself.
+
+---
+
+## `frontend/src/components/library/LibraryCloudImport.tsx`
+
+**`1 / 1 / 194`** — created by `244-06` T2. Row added **at creation**.
+
+⭐ **This is the half of `BUG-260905-01` that is a MISSING capability rather than a wrong one.**
+The operator: *"the door is not where intended — the import should be from the Library, not from
+the chat."* Before this the single-file cloud import existed ONLY in the composer and wrote into
+the Library root; `244-06` moved the capability here and re-pointed the composer at the thread.
+
+⚠ **It is the THIN COMPLEMENT, not a replacement (`D-244-07`).** The Library already owns a
+folder-choosing cloud door — Phase 233's `preview_source_folder` → commit path, which brings a
+whole tree with a diff pass first. This is the one-named-file case beside it.
+
+### Four prohibitions, each with a measured defect behind it
+
+1. ⛔ **No second folder picker.** The destination is the page's own `selectedFolderId`, already on
+   screen and already governing the upload button beside it. A second way to choose a folder is a
+   second answer to *"where did my file go"*.
+2. ⛔ **No second permission rule.** `canUploadToFolder` arrives as a PROP from the page's shipped
+   predicate. `LibraryPage.cloudImport.test.tsx` pins the identifier's occurrence count at 4 (one
+   declaration, three consumers) and `const canUploadToFolder =` at exactly 1.
+3. ⛔ **No forked file-picker vocabulary.** It mounts the SAME `ConnectedFilePickerModal` the
+   composer mounts, with the Library's own `title` and `confirmLabel`.
+4. ⛔ **NO SILENT REFUSAL — and this is the invariant most likely to be lost.** Every unavailable
+   state renders its REASON as text (`noConnection` → `needsDestination` → `notYourFolder`, in
+   that priority order, because a person with no connection cannot be helped by being told to pick
+   a folder). `D-244-06`'s ruling is that silently rooting is the defect; a control that greys out
+   with no words replaces one thing the person cannot act on with another. **Case 2 asserts the
+   rendered sentence, never the `disabled` attribute.**
+
+### Why it owns its own connections read
+
+`LibraryPage.tsx` fires G-5 at 15 phases and did **not** fetch connections before this. Putting the
+`listConnectorConnections` effect here means the page gained a MOUNT and three existing props
+rather than an effect and a fourth piece of state. ⚠ A failed read leaves the door saying *"No
+cloud storage is connected yet"* — the honest reading of *"we could not see any"*, never a door
+that opens onto an empty list.
+
+⛔ **The confirm word is `Import here`, and it must never become `Attach`.** `D-244-23` read in the
+mirror: `Attach` means a file that lives in one conversation for 24 hours, `Import` means a
+permanent KB document. Two consequences must not share one word. Case 5 fences it from this side;
+`ConnectedFilePickerModal.thread.test.tsx` Test 3 fences it from the composer's.

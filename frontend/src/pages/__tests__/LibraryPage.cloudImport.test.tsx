@@ -364,8 +364,22 @@ describe("the Library's cloud door — what the page must NOT grow", () => {
   it("no wire-shape literal is inlined on the page", () => {
     // ⛔ The request type lives in `lib/api/connectors.ts` beside `SourcePreviewRequest`. The
     // ledger records THREE wire-type drifts in `lib/api/org.ts` alone, all from inline shapes.
+    //
+    // ⚠ MEASURED, AND THE PLAN'S OWN CRITERION WAS UNSATISFIABLE AS WRITTEN. `244-06-PLAN.md`
+    // asks that `grep -rn 'folder_id' LibraryPage.tsx` show no inline wire shape — but
+    // `folder_id` is a `Document` FIELD, read **five** times on this page at base
+    // (`d.folder_id === selectedFolderId`, the null counts, the per-folder tally). A bare
+    // `not.toContain` therefore could not pass on an untouched tree.
+    //
+    // The property MEANT is: no request-body OBJECT LITERAL is typed here. A body key is
+    // `folder_id:`; a field read is `.folder_id`. The fence measures the first.
     expect(pageSource).toContain("LibraryCloudImport") // non-vacuity
-    expect(pageSource).not.toContain("folder_id")
+    expect(pageSource).not.toMatch(/\bfolder_id\s*:/)
+    // ⚠ SEVEN reads, not five — the first count here was taken from `grep -n`, which prints
+    // five LINES, and one of them (`counts[d.folder_id] = (counts[d.folder_id] ?? 0) + 1`)
+    // carries three occurrences. ⛔ A LINE count is not an OCCURRENCE count, and the fence
+    // needs the second. Pinned so an EIGHTH is a diff a reviewer sees.
+    expect(pageSource.match(/\.folder_id\b/g)?.length).toBe(7)
   })
 
   it("the door reads the SHIPPED permission predicate, and no second one is introduced", () => {

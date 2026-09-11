@@ -3605,6 +3605,27 @@ const BASELINE = {
   // tidied away: it DUPLICATED the footer instead of moving it, giving `Found multiple elements
   // by: [data-testid="cloud-cancel"]` — a failure explainable without reference to the defect.
   "ConnectedFilePickerModal.thread.test.tsx": 9,
+  // ── Phase 244 (244-06 T2 / SHELL-04 / D-244-06 / D-244-07) — the LIBRARY's cloud door ───
+  // ⛔ BOTH KNOBS, SAME COMMIT. `src/pages` is NOT a bare-directory TARGETS entry either.
+  //
+  // 8 cases, MEASURED on a green run of the suite alone. ALL EIGHT were RED on the shipped
+  // tree — six with `Unable to find an element by: [data-testid="library-cloud-import"]`,
+  // because the Library had no single-file cloud door AT ALL, and two source fences.
+  //
+  // ⭐ THE LOAD-BEARING ONE IS CASE 2: with no folder selected the door renders its REASON as
+  // TEXT. D-244-06's ruling is that silently rooting is the defect, and a control that greys
+  // out with no words is the same failure wearing a different hat — so the assertion is on the
+  // rendered sentence, never on the `disabled` attribute.
+  // ⚠ Case 5 is D-244-23 read in the MIRROR: the Library's confirm must NOT be `Attach`. Two
+  // consequences (a 24h thread file / a permanent KB document) must not share one word.
+  //
+  // ⚠ TWO PLAN FIGURES DID NOT HOLD AND ARE CORRECTED IN THE TEST BODY, not over it:
+  //   · the plan asked that `grep 'folder_id' LibraryPage.tsx` be empty — it is a `Document`
+  //     FIELD read there, so the criterion could not pass on an untouched tree. The fence now
+  //     measures the property meant: no `folder_id:` body KEY.
+  //   · that read count is **7**, not the 5 a first pass took from `grep -n` — one line carries
+  //     three occurrences. ⛔ A LINE count is not an OCCURRENCE count.
+  "LibraryPage.cloudImport.test.tsx": 8,
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -5142,6 +5163,16 @@ const TARGETS = [
   // last of D-244-27's ordered blocks, which carried a vocabulary-only assertion and no DOM
   // fence anywhere in the plan set before this pass.
   "src/components/chat/__tests__/ConnectedFilePickerModal.thread.test.tsx",
+  // -- Phase 244 (244-06 T2 / SHELL-04 / D-244-06) — the LIBRARY's single-file cloud door -----
+  //
+  // FILE-LEVEL BY NECESSITY — `src/pages` has no bare-directory entry in this array either.
+  //
+  // What it guards: the half of BUG-260905-01 that is a MISSING capability rather than a wrong
+  // one — *"the import should be from the Library, not from the chat"*. Specifically: the door
+  // takes its destination from the page's OWN selection, reuses the SHIPPED `canUploadToFolder`
+  // predicate rather than inventing a second permission rule, renders a REASON in every
+  // unavailable state, and speaks the server's refusal verbatim.
+  "src/pages/__tests__/LibraryPage.cloudImport.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")

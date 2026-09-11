@@ -466,6 +466,7 @@ export type {
   SourcePreviewItem,
   SourcePreviewResponse,
   SourcePreviewRequest,
+  ConnectionFileImportRequest,
   SourceConfirmOutcome,
   SourceConfirmResponse,
 } from "./api/connectors"
