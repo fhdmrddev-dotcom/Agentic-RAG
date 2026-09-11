@@ -3474,6 +3474,18 @@ const BASELINE = {
   // ⭐ The pin was FALSIFIED before it was written: deleting `.pdf` from
   // `workspaceAllowedExt.ts` turned 3 of the 6 red, and the file was restored md5-identical.
   "workspaceAllowedExt.lockstep.test.ts": 6,
+  // ── Phase 244 (244-03 T1 / SHELL-02 / BUG-260904-05) ────────────────────────────
+  // 5 cases, MEASURED on a green run of the suite alone — not guessed. BOTH KNOBS IN THE
+  // SAME COMMIT, for the reason this file now records beside its other chat blocks:
+  // `src/components/chat` has NO bare-directory TARGETS entry, so a suite dropped there
+  // runs in NO gate until it is NAMED there AND pinned here.
+  // ⛔ TWO of the five are a NEGATIVE-REGRESSION fence over `MessageItem.tsx:576-578` — the
+  // ROADMAP names deleting that sentence as the ANTI-FIX for BUG-260904-05, so this pin is
+  // what stops the wrong fix passing. ⚠ They assert the rendered SENTENCE verbatim, never a
+  // `data-testid`: a presence assertion cannot see content drift.
+  // ⭐ Driven RED first — 2 of the 5 failed on the shipped tree with `Unable to find an
+  // element with the placeholder text of: Ask anything…`.
+  "ChatArea.capPausedComposer.test.tsx": 5,
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -4929,6 +4941,18 @@ const TARGETS = [
   // hand-typed copy in the sketch's COPY.js — enforced by nothing, and about to rot the moment
   // D-244-24 added `.pdf`.
   "src/lib/__tests__/workspaceAllowedExt.lockstep.test.ts",
+  // ── Phase 244 (244-03 T1 / SHELL-02 / BUG-260904-05) — the composer at a cap-pause ─────
+  //
+  // ⛔ FILE-LEVEL BY NECESSITY. This array has exactly TWO bare-directory entries —
+  // `src/landing` and `src/components/workflows`. `src/components/chat` appears only inside
+  // comments (D-243-17), so this suite runs in NO gate until it is named here AND pinned in
+  // BASELINE above. TARGETS decides what RUNS; BASELINE decides what is GUARDED.
+  //
+  // What it guards: the ONE boolean at `ChatArea.tsx:140` that lets the composer tell a
+  // cap-pause from a running workflow, the harness lock's copy on BOTH axes (placeholder AND
+  // title, byte-for-byte — D-244-10), and the two sentences at `MessageItem.tsx:576-578`
+  // whose deletion is the ROADMAP's named anti-fix.
+  "src/components/chat/__tests__/ChatArea.capPausedComposer.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")

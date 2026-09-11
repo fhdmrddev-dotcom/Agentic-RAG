@@ -9870,7 +9870,7 @@ cells rot within days.
 |---|---|---|---|
 | [`frontend/src/components/chat/ToolCallPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattoolcallpaneltsx) | 51 / 23 / 351 | **FIRES** | ✅ **G-5 DISCHARGED (227-02)** — extracted ToolCallDetails, StepRow, toolStepDerivation (1019 → 351 lines) |
 | [`frontend/src/components/chat/MessageItem.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageitemtsx) | 68 / 33 / 755 | **FIRES** | ✅ **G-5 DISCHARGED (227-03)**. NOT re-hollowed (**243-02/04/05**): `useState` 3→3, `useEffect` 0→0, props 5→5; 243-05's 9 deletions are the `StreamingNarration` arm, all accounted |
-| [`backend/app/api/threads.py`](docs/HOT-FILE-LEDGER.md#backendappapithreadspy) | 243 / 80 / 1590 | **FIRES** | extraction TAKEN 2026-08-17 · honoured by construction (**214**) — one launch-inputs field on a request model it already owns |
+| [`backend/app/api/threads.py`](docs/HOT-FILE-LEDGER.md#backendappapithreadspy) | 245 / 82 / 1617 | **FIRES** | ⚠ row was STALE at `243 / 80 / 1590`. honoured by construction (**244-03**): ONE existing pure-read query loses a WHERE predicate and gains a Python guard. ⛔ no writer added |
 | [`frontend/src/providers/StreamsProvider.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcprovidersstreamsprovidertsx) | 90 / 36 / 4380 | **FIRES** | ⚠ row STALE TWICE. honoured by construction (**243-04**): the measured span is three closure vars beside `currentIteration`, riding the update the coalescer already performs |
 | [`frontend/src/hooks/useMessages.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusemessagests) | 74 / 27 / 127 | ⚠ **FIRES** | extraction due |
 | [`backend/app/services/anthropic_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesanthropic_servicepy) | 11 / 10 / 354 | ⚠ **FIRES** | adapter-pattern audit due |
@@ -9909,7 +9909,7 @@ cells rot within days.
 | [`frontend/src/components/chat/MessageList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessagelisttsx) | 21 / 9 / 307 | **FIRES** | ⚠ row STALE a THIRD time (`19/8/267` → `20/8/292` → `20/8/300`). honoured by construction (**244-01**): `min-h-0` added to the ONE `<ScrollArea>` call site — a class token, no state, no prop |
 | [`frontend/src/hooks/useFollowScroll.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusefollowscrollts) | 4 / 2 / 314 | does not fire | ⛔ **NO ROW FOR ITS ENTIRE LIFE — added 243-03**, then STALE at `3/2/265` one phase on. **243-06:** the re-arm now asks whether the reader is STILL leaving, not what they last did |
 | [`frontend/src/lib/throttle.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibthrottlets) | 2 / 2 / 108 | does not fire | ⛔ **NO ROW FOR ITS ENTIRE LIFE — added 243-03.** TWO opposite primitives on purpose; ⛔ never unify them — one of the two call sites breaks silently |
-| [`frontend/src/components/chat/ChatArea.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatchatareatsx) | 71 / 36 / 686 | **FIRES** | ⚠ row was STALE at `67 / 32 / 595`. honoured by construction (**244-01**): `min-h-0` on BOTH column roots — ⚠ the fence found the SECOND (welcome branch) the plan had not named |
+| [`frontend/src/components/chat/ChatArea.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatchatareatsx) | 72 / 36 / 710 | **FIRES** | honoured by construction (**244-03**): ONE boolean gains `&& !workflowLock.capPaused`. No second branch, no new state — the whole lock chain already reads this one value |
 | [`frontend/src/components/panel/PendingAskCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelpendingaskcardtsx) | 13 / 7 / 736 | **FIRES** | honoured by construction (194.1 / **214**) — ⚠ it still renders `Needs you`; `stepIdentityVocabulary`'s six PAUSE sentences reach it from nothing (`SEED-219`) |
 | [`frontend/src/pages/WorkflowRunPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowrunpagetsx) | 28 / 9 / 1670 | **FIRES** | honoured by construction (200 / 200.1 / 200.2 / **214**) — it resolves the step identity ONCE and its children render it |
 | [`frontend/src/components/chat/OutputFileCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatoutputfilecardtsx) | 8 / 7 / 219 | **FIRES** | honoured by construction (195) |
@@ -11335,3 +11335,75 @@ entry, so an unnamed suite here runs in no gate at all.
 ⛔ **Do not add an extension here to make a test pass.** The fence was falsified by deleting `.pdf`
 from this file: three of its six cases went red (`expected [ … ](12) to deeply equal [ … ](13)`), and
 the file was restored **md5-identical** (`5a63ea3e3adca51608f084de66ec8219`).
+
+
+### `frontend/src/components/chat/ChatArea.tsx` — `244-03`
+
+**Re-derived at this task's commit: `72 / 36 / 710`.** The `244-01` row was correct when written and is
+one commit behind by the time this lands — both readings are kept, which is this ledger's habit for a
+figure that moves on its own commit.
+
+**G-5 FIRES HARD (36 phases) — honoured BY CONSTRUCTION.** The diff is **one boolean expression** plus
+its docblock: `workflowLock !== null` became `workflowLock !== null && !workflowLock.capPaused`.
+`useState` / `useEffect` / props / the reconcile branch at `:184` are all unmoved.
+
+⛔ **THE INVARIANT THIS FILE NOW CARRIES: one lock boolean, read by the whole composer chain.**
+`MessageInput.tsx` keys `canSend` (`:287`), the placeholder and the `title` (`:337-339`), `disabled`
+(`:339`) and the `+` menu (`:524-537`) off this SINGLE value. That is why D-244-10 ("the harness copy is
+untouched") is free rather than fenced twice — there is no second branch that could disagree. ⛔ **A
+future pause type must extend THIS expression, never add a parallel one**; two booleans here is how the
+placeholder and the `disabled` attribute start telling different stories.
+
+⚠ **C-1 — THE PROPOSED GATE WAS A NO-OP, and the correction is recorded beside the decision rather
+than over it.** `D-244-08` offered `workflowLock?.mode === "harness"`. Measured: `WorkflowLock.mode` is
+the **literal** type `"harness"` (`streamsStore.ts:89`) with exactly one member, and the Deep cap-paused
+reconcile branch at `:184-192` **hard-codes** `mode: "harness"`. So the gate is TRUE for precisely the
+run it was meant to unlock. The verbatim string survives in the source **as a comment only**
+(`grep -n 'mode === "harness"'` returns one line, `:125`, inside the docblock) — which is the
+correction record the plan's action mandates, and is why the task's `grep -c ... == 0` criterion is
+recorded in the SUMMARY as satisfied-in-spirit rather than silently passed.
+
+⚠ **THE CLIENT HALF ALONE SHIPS THE DEFECT ONE LEVEL DOWN.** The server's `cap_paused` read was
+unbounded in time, so the lock came straight back on the next reconcile. See
+`backend/app/api/threads.py` — `244-03` below. A plan that touches this expression without the server
+read has fixed a symptom for one render.
+
+**Seam:** unchanged and still the strongest frontend extraction case on this ledger — thread header +
+title editing, message-loading/reconcile wiring, composer-bar assembly, mode/prefill plumbing, and the
+drawer/history chrome are five concerns in one component.
+
+### `backend/app/api/threads.py` — `244-03`
+
+**Row was STALE.** It read `243 / 80 / 1590`; re-derived at base it measured `244 / 81 / 1590`, and it
+inherits **`245 / 82 / 1617`** at this task's commit. `244` was **not** in its bucket list before this
+plan. Both readings are kept rather than one overwritten.
+
+**G-5 FIRES HARD (82 phases) — honoured BY CONSTRUCTION.** One EXISTING pure-read query loses a `WHERE`
+predicate and gains a Python guard. No new query, no new route, no new model field, and ⛔ **no
+writer**.
+
+⛔ **THE INVARIANT: `get_thread_workflow` WRITES NOTHING, and that is now executable.** `C-2` offered
+two closures and this file took the READ bound. The rejected arm — retiring the stale row when a new run
+starts — would have made this endpoint (or `POST /messages`) a **second writer of `runs.status`** beside
+`continue_run` (`api/runs.py:1082-1086`). Two writers of one status column is how `runs:active` and
+`runs.status` drift, which Phase 145 / D-149-09 made one atomic co-write to prevent.
+`test_244_cap_paused_lock_bound.py` asserts the handler's source carries no `.update(` / `.insert(` /
+`.delete(`, so the pure-read claim can no longer rot into a comment.
+
+⚠ **WHY THE OLD READ WAS WRONG IN A WAY NO TEST COULD SEE.** It filtered `AND status = 'cap_paused'`
+**before** it ordered, so it answered *"has this thread EVER been paused"* while every caller read it as
+*"is this thread paused NOW"*. Nothing on `POST /threads/{id}/messages` (`:728`) refuses a cap-paused
+thread or clears the old row — it mints a fresh `runs` row (`:873` → `:899`) — and the ONLY clearer of
+that status anywhere in the backend is `continue_run`. So the endpoint re-locked the thread's composer
+on every reconcile, forever. ⛔ **A `WHERE` that filters on a mutable status BEFORE an `ORDER BY` on time
+is answering a different question from the one it looks like it is answering.**
+
+⚠ **THE CONFTEST POOL MOCK CANNOT FENCE THIS.** `mock_asyncpg_pool.set_fetchrow_results` answers from
+a QUEUE and ignores the SQL, so the shipped query and the bounded one receive the same canned row and a
+behavioural case passes under both. The suite therefore ships a **semantic fake** that implements the
+`WHERE` / `ORDER BY` / `LIMIT` over one in-memory `runs` table — which is what makes the case RED before
+and GREEN after. ⛔ A later plan editing this block must keep that fake, or its fence stops being one.
+
+**Seam:** the SSE-transport extraction is TAKEN (2026-08-17). What remains in one file is the thread
+CRUD, the message POST + kickoff, the workflow reconcile read and the tool-approval route — four
+concerns, and the reconcile read is the cleanest of them to lift.
