@@ -173,7 +173,30 @@ D-243-01's sentence rather than from the drawing.
 ⭐ **L-6 is the only row that could have caught it, and it did. That is the whole argument for the
 row.**
 
-### The operator's call, stated as a question rather than assumed
+### ⭐ RESOLVED FROM THE REGISTER — no operator call is needed, and my first framing was over-cautious
+
+This was first written up as *"the operator's call"*. **That was wrong, and the answer was already
+in the sketches.** Sketch 235's README, verbatim (`:79-80`):
+
+> *"234 decides what the expanded surface **contains**, 235 decides **where it hangs**. They are one
+> component in two questions."*
+
+**Order IS placement, and placement is explicitly 235's question.** So:
+
+- **The shipped order is CORRECT.** It follows the sketch that owns the question, via D-243-01.
+- **234's V1 drawing is stale on a question it does not own.** Its authority is the expanded
+  surface's *contents* — where it scores **nine of nine** above.
+
+⚠ **The bar is therefore not "234's picture in every respect"** — it is *234 for contents, 235 for
+placement*, and the phase satisfied both. **The difference is declared here rather than treated as
+drift**, which is all that was ever owed.
+
+⛔ **What IS still owed is an edit to sketch 234**, so the contradiction does not outlive this phase
+and mislead the next reader: its V1 frame should carry a one-line note that placement was settled by
+235 and that the frame's own tool/thinking order is superseded. **A drawing that disagrees with the
+decision it helped produce is exactly the rot this project keeps paying for.**
+
+~~### The operator's call, stated as a question rather than assumed~~
 
 **Which order is right?** Both are defensible and the phase cannot settle it alone:
 
