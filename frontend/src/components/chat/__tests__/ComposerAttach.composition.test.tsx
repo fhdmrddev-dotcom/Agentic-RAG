@@ -302,6 +302,46 @@ describe("Composer attach — the ordered blocks sketch 236 draws", () => {
     // the size sits between the name and the scope word — asserted on the rendered value
     expect(chip.textContent).toContain("84.0 KB")
   })
+
+  // ── Block: the NO-THREAD door (244-07 / CR-01) ─────────────────────────────────────────
+  //
+  // ⛔ THE WORST AVAILABLE OUTCOME IS A SILENT SUCCESS, and that is what shipped. `ChatArea`
+  // renders THIS SAME composer in its welcome branch with `threadId={null}`, and both verbs in
+  // `useComposerAttachments` opened with a bare `if (!threadId) return`. Neither `+` item is
+  // gated, so on a brand-new chat — the first place anyone tries the phase's headline feature —
+  // a pick produced no chip, no refusal, no request and no console line.
+  //
+  // ⚠ These cases are written against `threadId={null}`, which is the EXACT prop `ChatArea.tsx`
+  // passes (`threadId={thread?.id ?? null}`), not a stand-in for it.
+  it("10 — a composer with NO thread refuses the local pick OUT LOUD, and never uploads", async () => {
+    render(<MessageInput onSend={vi.fn()} disabled={false} threadId={null} />)
+    pickFile("Meridian-contract-signed.pdf")
+
+    const alert = await screen.findByTestId("composer-refusal")
+    // ⭐ The SAME three atoms the 422 refusal renders — one vocabulary for one fact (D-244-27).
+    expect(alert.querySelector("[data-refusal-file]")?.textContent).toBe(
+      "Meridian-contract-signed.pdf",
+    )
+    expect(alert.querySelector("[data-refusal-sentence]")?.textContent).toBe(
+      COPY.shared.refuseNoThread,
+    )
+    expect(alert.querySelector("[data-refusal-dismiss]")).not.toBeNull()
+
+    // ⛔ THE NEGATIVES. No request left the browser and nothing pretended to land.
+    expect(api.uploadWorkspaceTemplate).not.toHaveBeenCalled()
+    expect(screen.queryByTestId("chat-attachment-chip")).toBeNull()
+  })
+
+  it("10b — the same composer WITH a thread still uploads: case 10 is not a blanket refusal", async () => {
+    render(<MessageInput onSend={vi.fn()} disabled={false} threadId="t-1" />)
+    pickFile("Meridian-Q4-pricing.xlsx")
+
+    // ⛔ THE POSITIVE CONTROL. A refusal that fires on every pick would pass case 10 while
+    // breaking the door outright — which is a worse defect than the one being fixed.
+    await waitFor(() => expect(api.uploadWorkspaceTemplate).toHaveBeenCalledTimes(1))
+    await screen.findByTestId("chat-attachment-chip")
+    expect(screen.queryByTestId("composer-refusal")).toBeNull()
+  })
 })
 
 // ── Block: the SENT message ──────────────────────────────────────────────────────────────

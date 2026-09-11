@@ -17,11 +17,12 @@
  * ⛔ NEVER `getAllByTestId(...)[0]` — that is QUERY order, not DOCUMENT order, and the two agree
  * often enough to make a reordering bug invisible.
  */
-import { render, screen, waitFor, within, cleanup } from "@testing-library/react"
+import { render, screen, waitFor, within, cleanup, renderHook, act } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { ConnectedFilePickerModal } from "../ConnectedFilePickerModal"
 import { MessageInput, _resetComposerDraftsForTest } from "../MessageInput"
+import { useComposerAttachments } from "../useComposerAttachments"
 import { COPY } from "../composerCopy"
 import * as api from "@/lib/api"
 
@@ -268,5 +269,67 @@ describe("The composer's cloud door — this conversation, not the Library", () 
     const list = within(root).getByTestId("x-filelist")
     const cancel = within(root).getByTestId("x-cancel")
     expect(precedes(list, cancel)).toBe(false)
+  })
+
+  // ── 9 · THE NO-THREAD CASE (244-07 / CR-01) — the worst outcome was a SILENT SUCCESS ────
+  //
+  // ⛔ `attachCloudFile` opened with a bare `if (!threadId) return`, which returns `undefined`
+  // rather than throwing — so `handleConfirm` took its SUCCESS path, `onOpenChange(false)` ran
+  // in `finally`, and the modal closed exactly as it does on a real attach. From the person's
+  // side the pick was indistinguishable from one that worked, and nothing had happened.
+  // ⚠ `ChatArea` renders this composer with `threadId={null}` on its welcome screen, so this is
+  // the FIRST chat anybody opens, not an edge case.
+  it("9 — a threadless composer refuses the cloud pick VISIBLY and calls neither client", async () => {
+    const user = userEvent.setup()
+    render(<MessageInput onSend={vi.fn()} disabled={false} threadId={null} />)
+    await waitFor(() => expect(api.listConnectorConnections).toHaveBeenCalled())
+
+    const modal = await openCloudDoorFromComposer(user)
+    await within(modal).findByText(CLOUD_FILES[0].name)
+    await user.click(within(modal).getByText(CLOUD_FILES[0].name))
+    await user.click(within(modal).getByTestId("cloud-confirm"))
+
+    const alert = await screen.findByTestId("composer-refusal")
+    expect(alert.getAttribute("role")).toBe("alert")
+    expect(alert.querySelector("[data-refusal-file]")?.textContent).toBe(CLOUD_FILES[0].name)
+    expect(alert.querySelector("[data-refusal-sentence]")?.textContent).toBe(
+      COPY.shared.refuseNoThread,
+    )
+    // ⛔ THE NEGATIVES. Neither door was opened — not the thread one, and certainly not the
+    // Library minter the whole file exists to keep out of the chat.
+    expect(api.attachConnectionFileToThread).not.toHaveBeenCalled()
+    expect(api.importCloudFile).not.toHaveBeenCalled()
+    expect(screen.queryByTestId("chat-attachment-chip")).toBeNull()
+  })
+
+  it("9b — attachCloudFile REJECTS with no thread, so no caller can read the no-op as success", async () => {
+    // ⛔ THE REASON THE VERB MUST THROW AND NOT MERELY SET STATE. `handleConfirm` branches on
+    // the promise: a resolve is a success. This asserts the contract at the seam rather than
+    // through the modal, because the modal closes either way (by design — its `finally`).
+    const { result } = renderHook(() => useComposerAttachments(null))
+    let caught: unknown
+    await act(async () => {
+      await result.current
+        .attachCloudFile("conn-cloud", "cf-1", "Notes.md")
+        .catch((e: unknown) => {
+          caught = e
+        })
+    })
+    expect(caught).toBeInstanceOf(Error)
+    expect((caught as Error).message).toBe(COPY.shared.refuseNoThread)
+    // …and the refusal is carried on the SAME state the 422 path uses.
+    expect(result.current.refusal?.fileName).toBe("Notes.md")
+    expect(api.attachConnectionFileToThread).not.toHaveBeenCalled()
+  })
+
+  it("9c — WITH a thread the verb still resolves: 9/9b are not a blanket refusal", async () => {
+    // ⛔ THE POSITIVE CONTROL. A verb that threw on every call would pass both cases above.
+    const { result } = renderHook(() => useComposerAttachments("t-1"))
+    await act(async () => {
+      await result.current.attachCloudFile("conn-cloud", "cf-1", "Meridian-Q4-pricing.xlsx")
+    })
+    expect(api.attachConnectionFileToThread).toHaveBeenCalledWith("t-1", "conn-cloud", "cf-1")
+    expect(result.current.refusal).toBeNull()
+    expect(result.current.pending.map((f) => f.path)).toEqual([ATTACHED.path])
   })
 })

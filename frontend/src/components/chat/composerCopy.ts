@@ -97,6 +97,15 @@ const shared = {
   expiredChip: "No longer available",
   expiredWhy: "Files attached to a chat are kept for 24 hours.",
   refusalDismiss: "OK",
+  /**
+   * ⭐ NOT PORTED FROM THE SKETCH — sketch 236 does not draw this case, because it draws a chat
+   * that already exists. `244-07` (CR-01) found that both attach doors returned silently when
+   * `threadId` is null (the welcome screen), so a pick produced no chip, no request and no word.
+   * ⛔ The one thing a door may never do is nothing. An attachment is scoped to a conversation
+   * by construction (`workspace_files.thread_id` is NOT NULL), so with no conversation there is
+   * nothing to attach TO — and this sentence says exactly that, in the person's terms.
+   */
+  refuseNoThread: "Send a message first — a file belongs to a conversation.",
 } as const
 
 export const COPY = { engine, a, shared } as const
