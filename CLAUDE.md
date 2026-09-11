@@ -409,6 +409,37 @@ paid for a second time.
 - Dispatch worktree agents **one message at a time** (`run_in_background: true`), never several
   `Agent()` calls in one message — simultaneous `git worktree add` races on `.git/config.lock`.
 
+## Supabase MCP — reads are free, WRITES ARE APPROVAL-GATED (MANDATORY)
+
+`.mcp.json` configures the Supabase MCP against the **production** project. ⚠ **As of 2026-09-11 it
+is NO LONGER pinned `read_only=true`** — the flag was removed to apply migration 177, and the
+operator chose to govern access **by this rule rather than by the flag**.
+
+- **READS need no approval and should be used freely.** ⭐ They are the cheapest production evidence
+  this project has. `execute_sql` (SELECT), `get_advisors`, `list_*`, `query_logs`. Any claim of the
+  form *"we cannot see cloud"* is now false — check before writing it down.
+- ⛔ **EVERY WRITE NEEDS EXPLICIT PER-ACTION OPERATOR APPROVAL.** DDL, DML, `apply_migration`, a
+  settings change — state exactly what will run, wait for a clear yes, then run it. **Approval for
+  one write is never approval for the next.** This is the same standing rule as a production push.
+- ⚠ **A rule is weaker than the flag it replaced, and that is the accepted trade.** `read_only=true`
+  could not be forgotten; this can. **Restoring the flag is always the safer default** once a
+  write-needing task is done — propose it rather than leaving standing write access open.
+
+⭐ **What the read path found the day it was first used (BUG-260911-01):** `app_settings` and
+`user_settings` had RLS **disabled** in production with `anon` holding all privileges, and
+`resize_embedding_column` — which deletes every vector — was callable unauthenticated. **Every gate
+in this project stayed green**, because every gate reads through the **service role** and *nothing in
+the suite ever makes a request as `anon`*. Same blind spot migration 156 recorded on
+`connector_connections`; third time this class has fired. ⛔ **Run
+`get_advisors(security)` as part of the deploy parity checklist.**
+
+⚠ **AND THE POSTGRES TRAP THAT MAKES A NAIVE FIX A NO-OP:** functions are granted `EXECUTE` to
+**`PUBLIC`** by default, so `REVOKE … FROM anon` changes nothing while the PUBLIC grant stands —
+measured, when 177's first version applied cleanly and verify still read `FAIL`. **Revoke from
+`PUBLIC`, then grant back the roles that genuinely need it.** The 13 SECURITY DEFINER functions still
+flagged by the advisor are all in this state; a role-by-role sweep of them would silently achieve
+nothing.
+
 ## Deployment (cloud) — operator-gated
 
 Live deploys are **always operator-triggered**. The branch + promotion model and the local↔cloud parity rules live in `docs/DEPLOYMENT-WORKFLOW.md`; recurring failure modes + their fixes live in `docs/DEPLOYMENT-LESSONS.md` (read both before any cloud-touching work). Architecture/accounts: `docs/DEPLOYMENT-PIPELINE.md`.
