@@ -240,9 +240,15 @@ describe("Phase 243 Plan 03 (CHAT-02) — the delta path coalesces, producer-sid
     })
 
     it("§10b — `onDone` closes an OPEN span: reasoning that never yields a content delta still ends", () => {
+      // ⚠ AMENDED BY 243-06 (HI-1), AND THE AMENDMENT IS THE SEMANTICS, NOT THE BEHAVIOUR.
+      //    The case still fences exactly what its name says — a terminal with no content
+      //    delta closes the span — but it now measures the REASONING STREAM (first delta to
+      //    last delta) rather than the gap from the first reasoning delta to the answer, so
+      //    it takes two deltas to describe an interval. §10i fences the one-delta form.
       const { callbacks, current } = makeHarness()
-      callbacks.onReasoningDelta!("thought about it and said nothing")
+      callbacks.onReasoningDelta!("thought about it")
       vi.advanceTimersByTime(2_500)
+      callbacks.onReasoningDelta!(" and said nothing")
       callbacks.onDone!()
       expect(current().reasoningMs).toBeGreaterThanOrEqual(2_500)
       expect(current().reasoningMs).toBeLessThan(2_600)
@@ -276,10 +282,14 @@ describe("Phase 243 Plan 03 (CHAT-02) — the delta path coalesces, producer-sid
     it("§10e — two runs measure INDEPENDENTLY: the stamp is per-instance closure state", () => {
       const a = makeHarness("assistant-A")
       const b = makeHarness("assistant-B")
+      // ⚠ Two deltas each (243-06 / HI-1): the span is the interval over which reasoning
+      //    tokens were OBSERVED arriving, so one delta describes no interval (§10i).
       a.callbacks.onReasoningDelta!("a thinks")
       vi.advanceTimersByTime(1_000)
       b.callbacks.onReasoningDelta!("b thinks")
       vi.advanceTimersByTime(4_000)
+      a.callbacks.onReasoningDelta!(" a still thinks")
+      b.callbacks.onReasoningDelta!(" b still thinks")
       a.callbacks.onDelta!("a answers")
       b.callbacks.onDelta!("b answers")
 
@@ -288,13 +298,71 @@ describe("Phase 243 Plan 03 (CHAT-02) — the delta path coalesces, producer-sid
       expect(b.current().reasoningMs).toBeLessThan(5_000)
     })
 
+    it("§10h — RED DRIVE (HI-1, the multi-burst shape): thinking in TWO bursts around a 40 s tool sums to the thinking, not to the wall clock", () => {
+      const { callbacks, current } = makeHarness()
+      // Burst 1 — 5 s of reasoning tokens actually arriving.
+      callbacks.onReasoningDelta!("first, I should establish what the user means. ")
+      vi.advanceTimersByTime(5_000)
+      callbacks.onReasoningDelta!("I will look it up.")
+      callbacks.onToolPreparing!("search_documents", 0)
+      callbacks.onToolStart!("search_documents", { query: "x" })
+      vi.advanceTimersByTime(40_000)
+      callbacks.onToolEnd!("search_documents", "…results…", "preparing-0-0")
+      callbacks.onIterationStart!(2)
+      // Burst 2 — 10 s more reasoning, on the next iteration, over the tool's output.
+      callbacks.onReasoningDelta!("the results say X. ")
+      vi.advanceTimersByTime(10_000)
+      callbacks.onReasoningDelta!("So the answer is Y.")
+      callbacks.onDelta!("The answer is Y.")
+      callbacks.onDone!()
+
+      // ⭐ 5 s + 10 s. The 40 s the tool ran is not thinking and is excluded BY CONSTRUCTION:
+      //    only a reasoning delta moves either end of a burst.
+      expect(current().reasoningMs).toBeGreaterThanOrEqual(15_000)
+      expect(current().reasoningMs).toBeLessThan(15_100)
+    })
+
+    it("§10i — RED DRIVE (HI-1, the honesty rule): ONE reasoning delta is a single OBSERVATION, not an interval — no duration at all", () => {
+      // ⛔ THE SPAN IS THE TIME REASONING TOKENS WERE OBSERVED ARRIVING. With exactly one
+      //    delta we saw the stream at a single instant and know nothing about how long it
+      //    took; the silence that follows belongs to whatever came next, which is the very
+      //    conflation HI-1 is. D-243-13 point 2 answers it: when it is not honestly known,
+      //    show NO duration. `thoughtForLabel(undefined)` then carries no digit.
+      const { callbacks, current } = makeHarness()
+      callbacks.onReasoningDelta!("thought about it and said nothing")
+      vi.advanceTimersByTime(2_500)
+      callbacks.onDone!()
+      expect(current().reasoningMs).toBeUndefined()
+    })
+
+    it("§10g — RED DRIVE (HI-1): reasoning, then a 40 s TOOL, then the answer — the tool is not thinking", () => {
+      const { callbacks, current } = makeHarness()
+      callbacks.onReasoningDelta!("Let me check the docs.")
+      vi.advanceTimersByTime(100)
+      callbacks.onReasoningDelta!(" I will search.")
+      // ⚠ NO CONTENT DELTA BETWEEN THE REASONING AND THE TOOL. That is not an edge case —
+      //    `agent_loop.py:2078-2100` emits `reasoning_delta` and `tool_preparing` from the
+      //    same elif chain with nothing required between them, which is the ordinary shape
+      //    for a reasoning model that thinks and then calls a tool with no preamble.
+      callbacks.onToolPreparing!("search_documents", 0)
+      callbacks.onToolStart!("search_documents", { query: "x" })
+      vi.advanceTimersByTime(40_000)
+      callbacks.onToolEnd!("search_documents", "…results…", "preparing-0-0")
+      callbacks.onIterationStart!(2)
+      callbacks.onDelta!("Here is the answer.")
+      callbacks.onDone!()
+
+      expect(current().reasoningMs).toBeLessThan(5_000)
+    })
+
     it("§10f — ⛔ NOT DERIVED FROM LENGTH: a 33 KB reasoning body measured in 1 s reports ~1 s", () => {
       // ⭐ THE MECHANICAL REFUSAL OF THE SKETCH'S DEMO AFFORDANCE, at the producer end. Under
       //    `index.html:338` this fixture would report ~187 seconds. The span is a CLOCK
       //    reading; the body's size has no vote.
       const { callbacks, current } = makeHarness()
-      callbacks.onReasoningDelta!("x".repeat(33_713))
+      callbacks.onReasoningDelta!("x".repeat(33_712))
       vi.advanceTimersByTime(1_000)
+      callbacks.onReasoningDelta!("x")
       callbacks.onDelta!("done thinking")
       expect(current().reasoningContent!.length).toBe(33_713)
       expect(current().reasoningMs).toBeGreaterThanOrEqual(1_000)

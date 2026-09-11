@@ -476,19 +476,60 @@ export function makeStreamCallbacks(opts: {
   // rather than from the delta itself - late by up to `DELTA_COALESCE_MS`, and wrong in a way
   // no later measurement could recover.
   //
-  // ⛔ NO TIMER, NO TICK. The label is a SETTLED value, written once. A live-ticking span
-  // would re-introduce exactly the per-token repaint CHAT-02 just removed, at 4 Hz.
+  // ⛔ NO TIMER, NO TICK. The label is a SETTLED value, written when a burst closes. A
+  // live-ticking span would re-introduce exactly the per-token repaint CHAT-02 just removed.
+  //
+  // ⚠⚠ AMENDED BY 243-06 (review finding HI-1), AND THE ORIGINAL FORM IS DESCRIBED HERE
+  // RATHER THAN SILENTLY REPLACED, because it shipped and a later reader must see the trade.
+  // 243-04 measured `Date.now() - reasoningStartMs` at the first CONTENT delta. Nothing
+  // closed the span at a tool boundary, and `agent_loop.py:2078-2100` emits `reasoning_delta`
+  // then `tool_preparing` with NO content delta required between them — the ordinary shape for
+  // a reasoning model that thinks and then calls a tool with no preamble. DRIVEN
+  // (`§10g`): 100 ms of reasoning either side of a 40 s tool reported **40100**, and the fold
+  // read "Thought for 40 seconds". ⛔ That is precisely what D-243-13 forbids — it rejects
+  // `RunCard`'s whole-run elapsed BECAUSE it "includes every tool call" — reproduced through a
+  // different variable, and it passed every honesty fence because the number really was a
+  // clock reading. A clock reading of the wrong interval is still a fabrication.
+  //
+  // ⭐ SO THE INTERVAL IS THE REASONING STREAM ITSELF: `reasoningLastMs - reasoningStartMs`,
+  // and ONLY a reasoning delta moves either end. No interleaving of any kind — tool, sub-agent,
+  // code output, approval wait, ask_user — can inflate a burst, because none of them is a
+  // reasoning delta. That is strictly stronger than the alternative the review offered (close
+  // the span at `onToolPreparing` / `onToolStart`), which still bills the argument-streaming
+  // window and is defeated by any future long-running callback nobody remembered to hook.
+  //
+  // ⛔ AND A BURST IS BOUNDED BY ANY STREAM EVENT THAT IS NOT A REASONING DELTA — stated ONCE,
+  // in the negative, in the generic wrapper below, for the same reason the buffer drain is
+  // (`:1339`): 47 callbacks and a 48th arriving from a phase that never read this comment.
+  // ⚠ THE FAILURE DIRECTION OF THAT RULE IS DELIBERATE. If some event ever does interleave
+  // inside a real reasoning stream, every burst becomes one delta and the label loses its
+  // number — it can never GAIN a wrong one. Absence is D-243-13's own fallback.
+  //
+  // ⭐ AND THE VALUE IS A TOTAL, NOT A FIRST BURST (243-06's stated semantics decision).
+  // A reasoning model that calls tools thinks ONCE PER ITERATION, so multi-burst is the
+  // ordinary shape for exactly the models this label is for, and the fold at rest shows EVERY
+  // burst's text. A number measuring only the first burst would under-report the body sitting
+  // next to it. Each burst closes and ADDS; the tool time between bursts is excluded by
+  // construction rather than by a hook. Driven by §10h: 5 s + 40 s tool + 10 s ⇒ 15 s.
+  //
+  // ⛔ AND A ZERO-LENGTH BURST WRITES NOTHING. One reasoning delta is a single OBSERVATION,
+  // not an interval — we saw the stream at one instant and know nothing about its duration,
+  // and the silence after it belongs to whatever came next. D-243-13 point 2 is the answer:
+  // when it is not honestly known, show NO duration. Fenced by §10i.
   let reasoningStartMs: number | null = null
-  let reasoningSpanSettled = false
+  let reasoningLastMs = 0
+  let reasoningTotalMs = 0
   let pendingReasoningMs: number | undefined
 
-  /** Close the span, once. Idempotent: a second call (onDone after a content delta, or a late
-   *  interleaved reasoning block) must not re-open it, or the value drifts toward the
-   *  whole-run duration this decision exists to reject. */
+  /** Close the OPEN burst and add it to the running total. Idempotent — after a close there is
+   *  no open burst, so a second call does nothing until the next reasoning delta opens one. */
   const closeReasoningSpan = () => {
-    if (reasoningStartMs === null || reasoningSpanSettled) return
-    reasoningSpanSettled = true
-    pendingReasoningMs = Date.now() - reasoningStartMs
+    if (reasoningStartMs === null) return
+    const burstMs = reasoningLastMs - reasoningStartMs
+    reasoningStartMs = null
+    if (burstMs <= 0) return
+    reasoningTotalMs += burstMs
+    pendingReasoningMs = reasoningTotalMs
   }
 
   const applyPendingDeltas = () => {
@@ -521,8 +562,11 @@ export function makeStreamCallbacks(opts: {
   const raw: StreamCallbacks & { flushDeltas: () => void } = {
     onDelta: (delta) => {
       // D-243-13: reasoning ENDS when the answer begins. Taken here, in the RAW callback, at
-      // the moment the first content delta actually arrived.
-      if (!sawContentDelta) closeReasoningSpan()
+      // the moment the content delta actually arrived.
+      // ⚠ 243-06 (HI-1): on EVERY content delta, not only the first. A later iteration can
+      // open a second burst, and the answer beginning again closes it — the guard used to be
+      // `if (!sawContentDelta)` and would have left that burst open until the terminal.
+      closeReasoningSpan()
       pendingContent += delta
       coalesceDeltas()
       if (!sawContentDelta) {
@@ -539,8 +583,13 @@ export function makeStreamCallbacks(opts: {
     // Same accumulation pattern as onDelta for content - now through the same buffer,
     // so interleaved content and reasoning land in ONE `setMessages` rather than two.
     onReasoningDelta: (delta) => {
-      // D-243-13: the START, on the FIRST reasoning delta and nowhere else.
-      if (reasoningStartMs === null) reasoningStartMs = Date.now()
+      // D-243-13: the START, on the first reasoning delta of a BURST and nowhere else — and
+      // the END, moved forward by every delta of that burst (243-06 / HI-1). These two are the
+      // only writes to either end of the interval, which is what makes the measurement
+      // un-inflatable by anything that is not reasoning.
+      const now = Date.now()
+      if (reasoningStartMs === null) reasoningStartMs = now
+      reasoningLastMs = now
       pendingReasoning += delta
       coalesceDeltas()
     },
@@ -1293,6 +1342,11 @@ export function makeStreamCallbacks(opts: {
   // forgettable, and the 48th — added by a phase that never read this comment — would
   // silently re-open the defect. The rule is stated ONCE, and it is the negative form:
   // the ONLY things that do not flush are the two callbacks that FILL the buffer.
+  // ⚠ 243-06 (HI-1) — THE SAME NEGATIVE RULE NOW CARRIES A SECOND OBLIGATION, and it is
+  // deliberately stated in the SAME place rather than in a second list that could drift from
+  // this one: a structural event also CLOSES the open reasoning burst (see the span block at
+  // `:466`). `onDelta` is excluded here and closes the burst itself; `onReasoningDelta` is what
+  // opens and extends one; `flushDeltas` is a drain, not an event.
   const FILLS_THE_BUFFER = new Set(["onDelta", "onReasoningDelta", "flushDeltas"])
   return Object.fromEntries(
     Object.entries(raw).map(([key, value]) =>
@@ -1301,6 +1355,7 @@ export function makeStreamCallbacks(opts: {
         : [
             key,
             (...args: unknown[]) => {
+              closeReasoningSpan()
               coalesceDeltas.flush()
               return (value as (...a: unknown[]) => unknown)(...args)
             },

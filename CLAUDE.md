@@ -599,7 +599,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/chat/ToolCallPanel.tsx` | 51 / 23 / 351 | ✅ **G-5 DISCHARGED (227-02)** |
 | `frontend/src/components/chat/MessageItem.tsx` | 68 / 33 / 755 | ✅ **G-5 DISCHARGED (227-03)**. NOT re-hollowed (**243-02/04/05**): `useState` 3→3, `useEffect` 0→0, props 5→5; 243-05's 9 deletions are the `StreamingNarration` arm, all accounted |
 | `backend/app/api/threads.py` | 243 / 80 / 1590 | extraction TAKEN 2026-08-17 · honoured by construction (**214**) |
-| `frontend/src/providers/StreamsProvider.tsx` | 90 / 36 / 4380 | ⚠ row STALE TWICE (`85/34/4144`, then `89/36/4325` ONE PLAN later). honoured by construction (**243-04**): the measured span is 3 closure vars beside `currentIteration` |
+| `frontend/src/providers/StreamsProvider.tsx` | 90 / 36 / 4435 | ⚠ row STALE THREE TIMES. honoured by construction (**243-06**): the span became an interval over the reasoning stream; the burst bound rides the EXISTING negative rule |
 | `frontend/src/hooks/useMessages.ts` | 74 / 27 / 127 | extraction due |
 | `backend/app/services/anthropic_service.py` | 11 / 10 / 354 | adapter-pattern audit due |
 | `backend/app/services/embedding_service.py` | 9 / 5 / 354 | ⚠ absent for its entire life at 5 phases — row added 236 (SC#2) |

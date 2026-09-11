@@ -2994,7 +2994,16 @@ const BASELINE = {
   // behaviour and this file already owns the `makeStreamCallbacks` harness and its module
   // mocks. §10c (no reasoning -> the field is ABSENT) and §10d (the span settles once) are the
   // two that stop a fabricated or whole-run duration; a lowering would most cheaply drop them.
-  "streamsProvider_243_cadence.test.tsx": 15,
+  //
+  // RAISED 15 -> 18 at `243-06` (review finding HI-1). The +3 is §10g / §10h / §10i, and all
+  // three were driven RED against 243-04's shipped code — §10g read `expected 40100 to be less
+  // than 5000` for 100 ms of thinking either side of a 40 s tool. They are the cases that pin
+  // WHICH INTERVAL the number is: §10g that a tool call is not thinking, §10h that a
+  // multi-burst turn sums its bursts rather than its wall clock, §10i that one reasoning delta
+  // is an observation and not an interval (so no duration is written at all). §10b and §10f
+  // were re-expressed in the same vocabulary and still count 1 each; the total moves by the
+  // three new cases only.
+  "streamsProvider_243_cadence.test.tsx": 18,
 
   // ── Phase 243 (243-03 / CHAT-03 / D-243-16) — the scroll effect's ONLY behavioural fence ─
   //
