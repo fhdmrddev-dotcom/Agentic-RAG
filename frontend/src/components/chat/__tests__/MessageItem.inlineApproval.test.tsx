@@ -229,9 +229,12 @@ describe("SHELL-03 / BUG-260828-07 — the controls join the cue, inline at the 
     wrap(
       <MessageItem
         message={assistantRow({
-          tool_calls: [
-            { id: "tc-done", name: "ask_user", status: "completed", args: {} },
-          ],
+          // ⚠ `"done"`, not `"completed"` — `ToolCall.status` is
+          // `"preparing" | "running" | "done" | "interrupted"`, and `hasPendingAsk` matches
+          // only the middle two. The first draft of this case used `"completed"`, which
+          // typechecks nowhere and would have made the case pass for a reason unrelated to
+          // the arm it is testing.
+          tool_calls: [{ id: "tc-done", name: "ask_user", status: "done", args: {} }],
         })}
         isStreaming
         isLastAssistant
