@@ -262,8 +262,64 @@ def assert_nothing_provider_specific(source: str) -> None:
     assert seen, "_build_attachment_note does not exist"
 
 
+def assert_note_is_not_announced_in_harness(source: str) -> None:
+    """⛔ WR-03 (244-07) — `agent_mode` HAS A THIRD VALUE, and the gate only excluded one.
+
+    The block sits inside `if body.agent_mode != "explorer":`, and both the comment and
+    `244-02-SUMMARY.md`'s key decision call that *"General mode only"*. It is not:
+    `_apply_origin_filter` (`agent_loop.py:960`) evaluates `agent_mode == "harness"`, so a
+    harness phase reached the announcement too. A harness phase carries
+    `ToolContext.phase_whitelist` and a tool outside that set is REFUSED at dispatch — so a
+    phase whose whitelist omits `execute_code` was told *"read ANY of them … inside
+    execute_code"*. That is the exact failure the explorer exclusion exists to prevent: a
+    promise the agent cannot keep, which is strictly worse than silence because the model will
+    try it.
+
+    ⚠ The fence reads the whole ancestor chain, so it does not care WHICH `if` carries the
+    word — only that no reachable path to the append leaves harness unexcluded.
+    """
+    tree = ast.parse(source)
+    appends = _note_appends(tree)
+    assert appends, f"no `active_system_prompt = ... {NOTE_VAR}` assignment exists at all"
+    parents = _parents(tree)
+    for node in appends:
+        chain: list[ast.AST] = []
+        cur: ast.AST | None = parents.get(node)
+        while cur is not None:
+            chain.append(cur)
+            cur = parents.get(cur)
+        gated = any(
+            isinstance(n, ast.If) and "harness" in ast.unparse(n.test) for n in chain
+        )
+        assert gated, (
+            f"the attachment note at line {node.lineno} is NOT excluded from harness mode — a "
+            "phase whose whitelist omits execute_code is told to use it."
+        )
+
+
 def test_the_note_is_general_mode_only():
     assert_note_is_general_mode_only(AGENT_LOOP.read_text(encoding="utf-8"))
+
+
+def test_the_note_is_not_announced_in_harness_mode():
+    assert_note_is_not_announced_in_harness(AGENT_LOOP.read_text(encoding="utf-8"))
+
+
+def test_the_harness_fence_can_actually_fire():
+    """⛔ A fence nobody has seen fire is not a fence — falsified against the SHIPPED shape,
+    which is the arm this defect actually took (explorer excluded, harness not)."""
+    explorer_only = (
+        "def run_agent_loop(body):\n"
+        "    active_system_prompt = 'x'\n"
+        "    if body.agent_mode != 'explorer':\n"
+        "        attachment_note = 'y'\n"
+        "        active_system_prompt = active_system_prompt + attachment_note\n"
+        "    messages: list[dict] = [{'role': 'system', 'content': active_system_prompt}]\n"
+    )
+    # ⚠ The OLD fence passes on this source — which is why the defect shipped green.
+    assert_note_is_general_mode_only(explorer_only)
+    with pytest.raises(AssertionError, match="harness"):
+        assert_note_is_not_announced_in_harness(explorer_only)
 
 
 def test_the_note_reaches_the_assembled_system_message():
