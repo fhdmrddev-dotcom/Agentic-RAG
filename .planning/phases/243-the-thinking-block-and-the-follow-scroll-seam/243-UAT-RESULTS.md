@@ -5,9 +5,9 @@ driven: 2026-09-11
 driver: claude (solo — OV-SOLO-01)
 environment: "local dev — vite :5173, backend :8000, Supabase :54322, Redis :6379; deepseek / deepseek-v4-flash"
 thread: "261d5f57-36fb-40ec-bb0b-1c72b7550350 — 'UAT 243 L-2 — long thread (seeded, deletable)'"
-rows_driven: [L-2, L-3]
+rows_driven: [L-2, L-3, L-6 (settled frame)]
 rows_partial: [L-1]
-rows_owed: [L-4, L-5, L-6, M-1, P-1, G-1, N-1, N-2, N-3, N-4, cross-provider x8]
+rows_owed: [L-4, L-5, L-6-live-frame, M-1, P-1, G-1, N-1, N-2, N-3, N-4, cross-provider x8]
 ---
 
 # Phase 243 — UAT results, driven in a real browser
@@ -111,13 +111,101 @@ pass.** The mechanical cadence evidence stands separately: 243-03 measured 60 de
 
 ---
 
+---
+
+## ◐ L-6 — the shipped surface beside `sketches/234/index.html`. **Body PASSES exactly. Order DIFFERS from the bar, and the difference was undeclared.**
+
+**Method:** the sketch served over HTTP (`file://` is blocked to the driver) and the app opened in a
+second tab. **Both surfaces measured from their own DOM**, not compared by eye off two screenshots.
+
+### ✅ The body is an exact match to V1's diff table
+
+Shipped, read from the live element's `className` and computed style:
+
+```
+px-3 py-2 text-sm text-muted-foreground leading-relaxed
+border-l-2 border-muted-foreground/20 ml-3 relative
+max-h-[300px] overflow-hidden
+```
+
+| V1 requires | Shipped | |
+|---|---|---|
+| drop `font-mono` | absent · computed `Inter, ui-sans-serif` | ✅ |
+| drop `whitespace-pre-wrap` | absent · computed `white-space: normal` | ✅ |
+| drop `max-h-64` | absent · replaced by the sketch's own `max-h-[300px]` | ✅ |
+| drop `overflow-y-auto` | absent · `overflow: hidden` (the clamp) | ✅ |
+| `text-xs` → `text-sm` | computed **14px** | ✅ |
+| **keep** `border-l-2` | present · computed `1.6px` | ✅ |
+| **keep** `ml-3` | present | ✅ |
+| real paragraphs, not a blob | **11 `<p>` elements** | ✅ |
+| clamp + a self-removing control | **"Show all of it"** present on the long body | ✅ |
+| ⛔ no `count` on the trigger | trigger reads `Thinking`, **no digit** | ✅ |
+
+⭐ **Nine of nine. The visual contract shipped exactly as drawn** — including the clamp height the
+sketch specifies rather than a re-invented one.
+
+### ⛔ THE FINDING: the two sketches contradict each other on ORDER, and the build followed the one that is *not* the bar
+
+Measured from each DOM, same session:
+
+| | thinking trigger | first tool row | verdict |
+|---|---|---|---|
+| **Sketch 234 V1** (the acceptance bar) | `top = 254` | `top = 188` | **TOOLS ABOVE THINKING** |
+| **Shipped** | `top = 14100` | run card `top = 14233` | **THINKING ABOVE TOOLS** |
+
+**They are opposite.**
+
+- **Sketch 235's winner B** binds: *"thinking sits **above** the tool rows and the answer, matching
+  the order in time"* — and `243-CONTEXT.md` **D-243-01** carried that rule into the build.
+- **Sketch 234's V1 frame draws the reverse**, and **235's own README says**: *"Sketch 234's
+  `index.html` is the G-2 acceptance bar for Phase 243, **not this one**."*
+
+⇒ **The build is consistent with D-243-01 and inconsistent with the file that D-243-01's own phase
+named as the bar.**
+
+⚠ **This is not a defect in the code — it is an undeclared difference from the acceptance bar**, and
+that is precisely the *named* failure mode: *"the sketch is approved and the build drifts from it,
+and the phase closes against a description of the mockup rather than the mockup."* The phase
+declared **two** differences (D-243-13's duration, and criterion 1's pre-sketch "timeline" wording).
+**This is a third, and nobody wrote it down** — because everyone, including me, reasoned from
+D-243-01's sentence rather than from the drawing.
+
+⭐ **L-6 is the only row that could have caught it, and it did. That is the whole argument for the
+row.**
+
+### The operator's call, stated as a question rather than assumed
+
+**Which order is right?** Both are defensible and the phase cannot settle it alone:
+
+- **Thinking above** (shipped, 235-B): matches the order in time — the model thinks, then acts.
+- **Tools above** (234-V1): the run's work reads first and the reasoning sits closer to the answer
+  it produced.
+
+⛔ **Not changed unilaterally.** `RunCard` and `MessageItem` both carry live G-5 obligations, and
+re-ordering the message body is a visual decision with an operator-approved drawing on each side.
+**Recorded here, routed to the operator.**
+
+### Two differences the verifier flagged, re-checked here
+
+| | |
+|---|---|
+| clamp threshold | shipped clamps on **measured overflow** (`max-h-[300px]` + `overflow-hidden`) rather than the sketch's `chars < 700`. **Behaviourally equivalent and arguably better** — it clamps what actually overflows rather than guessing from length. Still a difference; now declared. |
+| live-state accent + animated dots | **not ported.** Confirmed absent. A live-state affordance the sketch draws and the build does not have. |
+
+### What L-6 does NOT cover
+
+The comparison ran on a **settled, historical** message. **The live/streaming frame was not compared
+against the sketch's `▶ Replay the stream`** — which is where the accent and the dots live, and
+where the sketch's own acceptance criterion (*"three things true simultaneously"*) is written.
+**That half of L-6 is still owed.**
+
 ## ⛔ Owed — not driven
 
 | Row | What it needs |
 |---|---|
 | **L-4** | navigate away mid-run, return without reloading |
 | **L-5** | the fold opened at **33,713** chars and at **198** chars — the 170× spread |
-| **L-6** | the shipped surface **beside `sketches/234-the-thinking-block/index.html`** — the G-2 acceptance bar, and the only row that can catch sketch-to-build drift |
+| **L-6 (live frame)** | the settled frame is DONE above. The **streaming** frame vs the sketch's `▶ Replay the stream` is still owed — that is where the accent and the animated dots live |
 | **M-1 / P-1 / G-1 / N-1..N-4** | multi-tool, parallel-thread, long-message, and the phase's own added rows |
 | **Cross-provider ×8** | every row above ran on **deepseek only**. Reasoning is a provider-shaped feature; seven native providers plus OpenRouter are untested here |
 
