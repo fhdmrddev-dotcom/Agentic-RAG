@@ -129,8 +129,19 @@ plan does not re-query what is already measured:
 | migrations `153-156, 166..176` | **present** — 17/19 structural checks PASS, both FAILs explained and false |
 
 ⛔ **Migration 178 is NOT applied to cloud by this phase.** A cloud write needs explicit
-per-action operator approval; the phase record names it as operator-owed alongside migration 177
-(`BUG-260911-01`), which is also written, applied to local, and awaiting the same approval.
+per-action operator approval; the phase record names it as operator-owed.
+
+⚠⚠ **CORRECTED AT THE PHASE'S CLOSE — the struck clause is kept because inheriting it would be the
+error.** This paragraph originally continued *"…alongside migration 177 (`BUG-260911-01`), which is
+also written, applied to local, and **awaiting the same approval**"*, inheriting `242-CONTEXT.md`
+D-242-07 without re-measuring it. **Measured on 2026-09-11 over the read-only Supabase MCP:
+migration 177 IS APPLIED TO CLOUD.** Its own VERIFY block returns **7/7 PASS** — RLS enabled on both
+`app_settings` and `user_settings`, `anon` unable to read or write either, `anon` unable to execute
+`resize_embedding_column`, `service_role` still writing — and the Supabase security advisor's
+`rls_disabled_in_public` **ERROR is gone**, with no ERROR-level finding left on the project.
+**`BUG-260911-01` is remediated in production.** ⛔ The 13 SECURITY DEFINER functions still flagged
+at WARN are unchanged and expected: 177's own header warns that a role-by-role revoke sweep would
+**silently achieve nothing**, because the grant comes from `PUBLIC`.
 
 ---
 
