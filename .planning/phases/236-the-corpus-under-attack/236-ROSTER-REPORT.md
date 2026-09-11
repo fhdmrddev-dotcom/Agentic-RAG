@@ -1,6 +1,6 @@
 # Phase 236: Dynamic Provider Native Roster Report (SC#10, TRUST-02)
 
-**Generated At:** `2026-09-11T05:32:06.534290+00:00`  
+**Generated At:** `2026-09-11T15:02:26.610489+00:00`  
 **Derivation Source:** `app.config.MODEL_CAPABILITIES` (Dynamically Derived without re-typing)  
 **Total Derived Providers:** 8  
 **Total Registered Models:** 61  
