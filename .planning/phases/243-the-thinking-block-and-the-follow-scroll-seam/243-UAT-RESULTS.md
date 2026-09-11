@@ -5,9 +5,9 @@ driven: 2026-09-11
 driver: claude (solo — OV-SOLO-01)
 environment: "local dev — vite :5173, backend :8000, Supabase :54322, Redis :6379; deepseek / deepseek-v4-flash"
 thread: "261d5f57-36fb-40ec-bb0b-1c72b7550350 — 'UAT 243 L-2 — long thread (seeded, deletable)'"
-rows_driven: [L-2, L-3, L-6 (settled frame)]
+rows_driven: [L-2, L-3, L-5, L-6 (settled frame)]
 rows_partial: [L-1]
-rows_owed: [L-4, L-5, L-6-live-frame, M-1, P-1, G-1, N-1, N-2, N-3, N-4, cross-provider x8]
+rows_owed: [L-1, L-4, L-6-live-frame, M-1, P-1, G-1, N-1, N-2, N-3, N-4, cross-provider x8]
 ---
 
 # Phase 243 — UAT results, driven in a real browser
@@ -222,12 +222,89 @@ against the sketch's `▶ Replay the stream`** — which is where the accent and
 where the sketch's own acceptance criterion (*"three things true simultaneously"*) is written.
 **That half of L-6 is still owed.**
 
+---
+
+## ✅ L-5 — PASSES. The 170× spread, measured on the real corpus at both ends.
+
+**Fixtures are REAL corpus text, not generated.** The corpus was queried first:
+
+```
+reasoning-bearing messages: 346   min 3   median 200   max 33,713
+```
+
+The **actual** 33,713-char body (`ecc426ff-…`) and a **real** 202-char body were copied into the UAT
+thread, so the extremes under test are the ones the sketch quotes rather than lorem padding.
+
+**All eight folds opened at once**, measured from computed style:
+
+| chars | `max-height` | `overflow` | rendered | `<p>` | clamped | "Show all of it" |
+|---|---|---|---|---|---|---|
+| 63 | none | visible | 39 px | 1 | no | — |
+| **202** ← the median | none | visible | **84 px** | 1 | **no** | **—** |
+| 317 | none | visible | 152 px | 3 | no | — |
+| 330 | none | visible | 152 px | 3 | no | — |
+| 645 | none | visible | 254 px | 4 | no | — |
+| 939 | **300px** | **hidden** | 300 px | 5 | **yes** | ✔ |
+| 2,681 | **300px** | **hidden** | 300 px | 11 | **yes** | ✔ |
+| **33,279** ← the max | **300px** | **hidden** | **300 px** | **136** | **yes** | ✔ |
+
+⭐ **Exactly three controls for exactly three clamped bodies.** The control **removes itself** on all
+five short ones — D-243-02's *"below the threshold the control removes itself rather than sitting
+inert"*, holding across five independent lengths rather than at one tested point.
+
+⭐ **Both ends of the design tension pass their own test:**
+- **Median (202 chars → 84 px, one paragraph, no control):** reads as **finished**, not truncated.
+  There is no chrome around a sentence.
+- **Max (33,279 chars → 136 paragraphs behind a 300 px clamp):** the wall is **skimmable**, and the
+  tail is one click away rather than inside a nested scrollbar.
+
+### ⭐ The declared clamp difference is now measured, and it is the BETTER rule
+
+The sketch clamps on `chars < 700`; the build clamps on **measured overflow at 300 px**. The eight
+rows show why that matters: a **645-char** body renders **254 px** and is left alone, while a
+**939-char** body would have overflowed and is clamped. **A character count would have clamped the
+645 one** (it is under 700 — so no) — more precisely, it would have mis-sorted bodies whose rendered
+height does not track their length, which is every body containing a list or a long word. **The
+build measures the thing that actually matters.** Recorded as a difference from the bar, and as an
+improvement on it.
+
+⚠ **33,279 rendered vs 33,713 stored** — a 434-char gap. That is `innerText` collapsing whitespace
+and newlines, **not truncation**: the clamp is `overflow: hidden` on a full subtree, and the
+paragraph count (136) is the whole body.
+
+---
+
+## ◐ L-1 — STILL INCONCLUSIVE after a second attempt. Recorded as owed, not as a pass.
+
+Two instrumented attempts failed for **harness** reasons, not product reasons, and neither produced
+a number worth quoting:
+
+1. The first watcher used `querySelector` and tracked the **first** trigger in the document — a
+   settled historical message. Already recorded above.
+2. The rewritten watcher tracked the **last** trigger correctly, but **the prompt never sent**: with
+   all eight folds open (one of them 136 paragraphs) the composer had moved, and the click landed
+   off it. **Verified at the database — no user message was written, and no stray thread was
+   created.** A second attempt after a reload failed the same way, the thread not having re-loaded.
+
+⚠ **The `setInterval` sampler was also throttled to ~3 Hz** against its requested 20 Hz while the
+heavy fold was open — so even a successful send would have produced a repaint trace too coarse to
+support a claim about per-token churn.
+
+**What IS known, and it is not nothing:**
+- **Mechanically:** 243-03 drove 60 real deltas through the real `makeStreamCallbacks` and measured
+  **61 → ≤14** `scrollIntoView` calls with byte-exact content, at a 60 ms coalescing window.
+- **Qualitatively:** across ~six live runs driven in this session the thinking line was observed
+  settling and going quiet, with no visible flicker in any screenshot taken mid-stream.
+
+⛔ **Neither of those is L-1.** L-1 asks an operator to watch a slow reasoning model and say whether
+the control churns. **It remains owed**, and the honest next step is to run it with the folds
+**closed** and the sampler driven from `requestAnimationFrame` rather than `setInterval`.
+
 ## ⛔ Owed — not driven
 
 | Row | What it needs |
 |---|---|
 | **L-4** | navigate away mid-run, return without reloading |
-| **L-5** | the fold opened at **33,713** chars and at **198** chars — the 170× spread |
 | **L-6 (live frame)** | the settled frame is DONE above. The **streaming** frame vs the sketch's `▶ Replay the stream` is still owed — that is where the accent and the animated dots live |
 | **M-1 / P-1 / G-1 / N-1..N-4** | multi-tool, parallel-thread, long-message, and the phase's own added rows |
 | **Cross-provider ×8** | every row above ran on **deepseek only**. Reasoning is a provider-shaped feature; seven native providers plus OpenRouter are untested here |
