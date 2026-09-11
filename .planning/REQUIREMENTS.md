@@ -90,9 +90,21 @@ register knows only the register below it; the code is the bottom.
       `scrollIntoView` each time — with `behavior: "smooth"` whenever a tool is preparing.
       ⭐ **This is the same seam as CHAT-02's repaint**, and it is `BUG-260823-01`'s root cause:
       two open bugs, one mechanism. Scoping them apart would fix one and re-break the other.
-- [ ] **CHAT-04**: Reasoning is visible on pure-text replies, not only on tool-bearing turns.
-      `MessageItem.tsx:437-439` gates it on tool calls today, so a reasoning model answering a
-      plain question shows no thinking at all.
+- [x] **CHAT-04**: Reasoning is visible on pure-text replies, not only on tool-bearing turns.
+      ~~`MessageItem.tsx:437-439` gates it on tool calls today, so a reasoning model answering a
+      plain question shows no thinking at all.~~
+      ⚠ **THE LINE NUMBER WAS WRONG AND THE DIAGNOSIS WAS WRONG, and the original is struck
+      through rather than deleted because the correction is the useful part** (D-243-14). The
+      gate was at `MessageItem.tsx:359-361`, not `:437-439` — `:425` is the `StreamingNarration`
+      branch, a different construct that gates on the same predicate, which is why the wrong line
+      survived three documents. And **removing a gate would have revealed nothing**: `RunCard` was
+      the ONLY renderer of `reasoningContent` in the codebase, and it is mounted only on a
+      tool-bearing turn.
+      ✅ **CLOSED 2026-09-11 by `243-02`** (`2a62acb60`): the fold is now `ThinkingBlock.tsx`,
+      self-guarding on its own content and mounted from `MessageItem` with **no tool test
+      anywhere** — the conditionality disappears by construction. Measured: exactly ONE JSX-child
+      render of the reasoning value in `frontend/src`. 105 of 340 reasoning-bearing rows (**31%**)
+      are the shape that had never been drawn.
 - [ ] **CHAT-05**: A finished answer resolves out of the narration fold live, on the mount/navigation
       path as well as the send path. `BUG-260707-03`'s send-path reconcile shipped; its residual #2
       (a backgrounded run watched after navigation) still relies on a reload.
@@ -155,10 +167,10 @@ Filled by the roadmapper 2026-09-11. **Every REQ-ID above maps to exactly one ph
 | SHIP-02 | 242 — Ship It | Pending — ⚠ **its second arm is ALREADY SATISFIED**, retired in writing at `dbd63864b`; the drive is unreproducible |
 | SHIP-03 | 242 — Ship It | Pending — ⚠ claimed done by the deploy record, **unverified against cloud** |
 | SHIP-04 | 242 — Ship It | Pending — ⚠ **the push already landed** at `1f313670b` (2026-09-10); what is owed is the verification |
-| CHAT-01 | 243 — Thinking block + follow-scroll seam | Pending — G-2 sketch DONE (234 V1 / 235 B). 243-01 shipped the pre-extraction net (17 cases); the requirement itself lands in 243-02/243-04 |
+| CHAT-01 | 243 — Thinking block + follow-scroll seam | Partial — G-2 sketch DONE (234 V1 / 235 B). 243-01 shipped the net (17 cases); **243-02 landed the STRUCTURE** (one renderer, one fold instead of two, order-in-time). The APPEARANCE half — four classes out, `text-sm`, the duration — is **243-04** |
 | CHAT-02 | 243 — Thinking block + follow-scroll seam | Pending |
 | CHAT-03 | 243 — Thinking block + follow-scroll seam | Pending — ⭐ **one mechanism with CHAT-02; may not be split** |
-| CHAT-04 | 243 — Thinking block + follow-scroll seam | Pending — 243-01 PINNED the defect as a declared-defect case (§8); 243-02 inverts it |
+| CHAT-04 | 243 — Thinking block + follow-scroll seam | ✅ **DONE 2026-09-11 (`243-02`, `2a62acb60`)** — 243-01 pinned the defect as §8; 243-02 INVERTED it. One reasoning renderer, mounted unconditionally. ⚠ The requirement's own line number (`:437-439`) was wrong — corrected in place, not deleted |
 | CHAT-05 | 243 — Thinking block + follow-scroll seam | Pending |
 | SHELL-01 | 244 — Chat shell + composer | Pending |
 | SHELL-02 | 244 — Chat shell + composer | Pending |
