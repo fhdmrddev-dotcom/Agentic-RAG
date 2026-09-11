@@ -1645,29 +1645,38 @@ async def run_agent_loop(
         # Phase 244 (SHELL-04 / D-244-02) — announce this thread's attached files.
         # The SIXTH conditional append, in the exact shape of `memory_note` above.
         #
-        # ⛔ GENERAL MODE ONLY, and the indentation is what enforces it: this sits inside the
-        # `if body.agent_mode != "explorer":` block. `get_explorer_tools()` returns
-        # [LS, TREE, GREP, GLOB, READ_DOCUMENT, ANALYZE_DOCUMENT] — no workspace tool and no
-        # execute_code — so announcing an attachment there is a promise the agent cannot keep,
-        # which is strictly worse than silence because the model will try.
+        # ⛔ GENERAL MODE ONLY — AND THE GATE NOW NAMES ITS OWN RULE RATHER THAN INHERITING THE
+        # ENCLOSING BLOCK'S (WR-03 / 244-07). It used to rely on the indentation alone, inside
+        # `if body.agent_mode != "explorer":`, and the comment plus `244-02-SUMMARY.md` both
+        # called that "General mode only". It was not: `agent_mode` has a THIRD value —
+        # `"harness"` (see `_apply_origin_filter`) — which the negation of one other mode does
+        # not exclude. A harness phase carries `ToolContext.phase_whitelist` and a tool outside
+        # that set is REFUSED at dispatch, so a phase whose whitelist omits `execute_code` was
+        # being told *"read ANY of them … inside execute_code"*.
+        #
+        # ⭐ That is the SAME failure the explorer exclusion exists to prevent — a promise the
+        # agent cannot keep, strictly worse than silence because the model will try it. The
+        # condition below is deliberately REDUNDANT with the enclosing `if`: a gate that states
+        # its whole rule cannot be silently widened by an edit to the block around it.
         #
         # ⚠ `list_files_in_thread` applies the expiry gate IN SQL, so the line inherits
         # "not expired" for free — one gate, two readers (D-244-04). ⛔ No second expiry rule.
         # ⛔ A read failure must never break the turn: chat continues without the line, loudly
         # in the log rather than silently.
-        try:
-            from app.db.workspace import list_files_in_thread  # noqa: PLC0415 — cycle-safe leaf
+        if body.agent_mode not in ("explorer", "harness"):
+            try:
+                from app.db.workspace import list_files_in_thread  # noqa: PLC0415 — cycle-safe leaf
 
-            _attachment_rows = await list_files_in_thread(
-                await get_pg_pool(),
-                UUID(thread_id) if isinstance(thread_id, str) else thread_id,
-            )
-            if _attachment_rows:
-                attachment_note = _build_attachment_note(_attachment_rows)
-                active_system_prompt = active_system_prompt + attachment_note
-        except Exception:
-            logger.warning("Failed to read thread attachments for the system prompt",
-                           exc_info=True)
+                _attachment_rows = await list_files_in_thread(
+                    await get_pg_pool(),
+                    UUID(thread_id) if isinstance(thread_id, str) else thread_id,
+                )
+                if _attachment_rows:
+                    attachment_note = _build_attachment_note(_attachment_rows)
+                    active_system_prompt = active_system_prompt + attachment_note
+            except Exception:
+                logger.warning("Failed to read thread attachments for the system prompt",
+                               exc_info=True)
 
     messages: list[dict] = [{"role": "system", "content": active_system_prompt}]
     # Phase 075.5 D-075.5-01: _reconstruct_history echoes thought_signature
