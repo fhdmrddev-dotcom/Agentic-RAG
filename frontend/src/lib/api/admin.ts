@@ -815,27 +815,31 @@ export async function addModelById(body: AddModelBody): Promise<void> {
   if (!res.ok) throw new ApiError(await errorDetail(res, "Failed to add the model."), res.status)
 }
 
-/** Remove one model's stored `model_capabilities_overrides` row (`DELETE /admin/models/{id}`).
+/** Remove ONE model from the registry (`DELETE /admin/models/{id}`) — any model.
  *
- *  ⚠ THE VERB IS HONEST ONLY FOR A `db_only` ROW. The endpoint deletes a ROW; a model also
- *  declared in the backend's built-in registry (`config.py`) cannot be removed by any runtime
- *  write, so for those the delete RESETS the model to its built-in defaults and it stays in the
- *  list. The resolved `still_built_in` says which happened, so the caller reports the real
- *  consequence instead of the one the button says.
+ *  ⚠ TWO MECHANISMS BEHIND ONE VERB, and `mode` reports which ran. The registry is a union of
+ *  the backend's built-in `MODEL_CAPABILITIES` (declared in `config.py`) and the
+ *  `model_capabilities_overrides` rows, so a DB-only model is hard-deleted (`"deleted"`) while
+ *  a code-declared one — which has no row to delete — gets a tombstone the union skips
+ *  (`"tombstoned"`, mig 179). Either way the model leaves the registry, the picker and the
+ *  capability resolver, and either way it can be added back with `addModelById`.
  *
- *  A 404 (no stored row — a pure built-in), a 409 (the org default, the same no-dead-default
- *  guard `setModelCapability` enforces) or a 500 surfaces as `ApiError` carrying the server
- *  `detail`, so the row can show the plain-language refusal in place (mirrors
- *  `setModelCapability`). The client adds NO authority — the router 404-gates non-operators. */
-export async function removeModel(modelId: string): Promise<{ still_built_in: boolean }> {
+ *  Callers do not normally branch on `mode`: it is carried so the distinction is inspectable
+ *  rather than inferred, since it decides what a direct reader of the table would see.
+ *
+ *  A 404 (not in either half of the union) or a 409 (the org default — the same
+ *  no-dead-default guard `setModelCapability` enforces) surfaces as `ApiError` carrying the
+ *  server `detail`, so the row can show the plain-language refusal in place. The client adds
+ *  NO authority — the router 404-gates non-operators. */
+export async function removeModel(modelId: string): Promise<{ mode: "deleted" | "tombstoned" }> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/admin/models/${encodeURIComponent(modelId)}`, {
     method: "DELETE",
     headers,
   })
   if (!res.ok) throw new ApiError(await errorDetail(res, "Failed to remove the model."), res.status)
-  const body = (await res.json()) as { still_built_in?: boolean }
-  return { still_built_in: body.still_built_in === true }
+  const body = (await res.json()) as { mode?: string }
+  return { mode: body.mode === "tombstoned" ? "tombstoned" : "deleted" }
 }
 
 /** Lock/unlock + pin the org default (`PUT /admin/models/{id}/lock`, Plan 06) — the

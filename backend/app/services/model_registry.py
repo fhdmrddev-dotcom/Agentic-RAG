@@ -184,6 +184,7 @@ async def build_model_registry_rows() -> list[dict]:
     from app.models.user_settings import (  # noqa: PLC0415
         _load_settings_from_db,
         load_all_model_overrides,
+        load_removed_model_ids,
     )
 
     settings_row = await _load_settings_from_db()
@@ -191,11 +192,22 @@ async def build_model_registry_rows() -> list[dict]:
     model_locked = bool(settings_row.get("llm_model_locked"))
 
     overrides = await load_all_model_overrides()
+    # mig 179 — the tombstones. A DB-only model is hard-DELETEd and never appears here; this set
+    # exists for the ids that CANNOT be deleted, because they are declared in code rather than
+    # stored. Subtracting it from the built-in half below is the ONLY thing that makes a
+    # code-declared model removable at all: without it the delete clears the operator's stored
+    # values and the model is back on the very next read.
+    removed = await load_removed_model_ids()
 
     rows = []
     seen = set()
-    # DEF rows (built-in registry) overlaid with any OVR.
+    # DEF rows (built-in registry) overlaid with any OVR — minus anything tombstoned.
     for model_id, cap in MODEL_CAPABILITIES.items():
+        if model_id in removed:
+            # Removed by an operator. `seen` is deliberately NOT marked: there is no row to fall
+            # through to (load_all_model_overrides filters tombstones out), so the DB-only loop
+            # below cannot resurrect it either.
+            continue
         rows.append(_registry_row(model_id, cap, overrides.get(model_id), default_model, model_locked))
         seen.add(model_id)
     # DB-only rows (in overrides, not in the built-in registry) — discovery-confirmed models.

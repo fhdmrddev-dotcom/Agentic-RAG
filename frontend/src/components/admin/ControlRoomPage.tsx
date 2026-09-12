@@ -871,9 +871,9 @@ export function ControlRoomPage({ identity, onBack }: ControlRoomPageProps) {
                 <p className="mt-0.5 max-w-[74ch] text-xs text-muted-foreground/80">
                   Every model the platform can route to, and what it can do. Editing a capability
                   takes effect on the next request — no restart. Enabled models appear in users’
-                  model picker; disabled ones are hidden. Models you added — by ID or from
-                  discovery — carry a <span className="font-medium text-foreground">Remove</span>;
-                  models built into this deployment can’t be removed, only disabled.
+                  model picker; disabled ones are hidden. Any model can be{" "}
+                  <span className="font-medium text-foreground">removed</span> — add it back any
+                  time by ID, or pick it up again from discovery.
                 </p>
               </div>
               <span className="flex-1" />

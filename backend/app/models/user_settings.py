@@ -627,6 +627,12 @@ _model_overrides_cache_time: float = 0.0
 _all_model_overrides_cache: dict[str, dict] = {}
 _all_model_overrides_cache_time: float = 0.0
 
+# mig 179 — the tombstoned ids (`removed = true`), the ONE set both caches above filter OUT.
+# Invalidated by the SAME `invalidate_model_overrides_cache` call as its two siblings, so a
+# removal and the registry read that follows it can never disagree.
+_removed_model_ids_cache: set[str] = set()
+_removed_model_ids_cache_time: float = 0.0
+
 
 async def _load_model_overrides() -> dict[str, dict]:
     """Return enabled model_capabilities_overrides rows as {model_id: row_dict}.
@@ -641,8 +647,13 @@ async def _load_model_overrides() -> dict[str, dict]:
     try:
         from app.dependencies import get_pg_pool
         pool = await get_pg_pool()
+        # mig 179: `removed` is the tombstone — a model an operator took out of the registry,
+        # including a code-declared one that cannot be DELETEd because it does not live in this
+        # table. Filtered HERE rather than at each consumer: everything on the request path
+        # reads through this cache, so one predicate makes a removed model unresolvable
+        # everywhere instead of in whichever call sites someone remembered to audit.
         rows = await pool.fetch(
-            "SELECT * FROM model_capabilities_overrides WHERE enabled = true"
+            "SELECT * FROM model_capabilities_overrides WHERE enabled = true AND removed = false"
         )
         _model_overrides_cache = {r["model_id"]: dict(r) for r in rows}
     except Exception:
@@ -665,8 +676,13 @@ def invalidate_model_overrides_cache() -> None:
     the operator registry read (load_all_model_overrides) refresh together.
     """
     global _model_overrides_cache_time, _all_model_overrides_cache_time
+    global _removed_model_ids_cache_time
     _model_overrides_cache_time = 0.0
     _all_model_overrides_cache_time = 0.0
+    # mig 179: the tombstone set invalidates WITH its two siblings. A remove writes one row and
+    # changes two answers ("is it a live override?" and "is it removed?"); refreshing only one
+    # of them leaves the registry able to contradict itself for up to the 30s TTL.
+    _removed_model_ids_cache_time = 0.0
 
 
 async def load_all_model_overrides() -> dict[str, dict]:
@@ -687,7 +703,14 @@ async def load_all_model_overrides() -> dict[str, dict]:
     try:
         from app.dependencies import get_pg_pool
         pool = await get_pg_pool()
-        rows = await pool.fetch("SELECT * FROM model_capabilities_overrides")
+        # mig 179: "ALL rows" means all LIVE rows. A `removed = true` row is a TOMBSTONE, not a
+        # model — it exists so the union can skip a code-declared id that has no row to delete.
+        # Letting one through here would put a removed model back in the registry editor, the
+        # picker's disabled-id set and the provider builder at once. The one reader that needs
+        # tombstones asks for them by name: `load_removed_model_ids`.
+        rows = await pool.fetch(
+            "SELECT * FROM model_capabilities_overrides WHERE removed = false"
+        )
         _all_model_overrides_cache = {r["model_id"]: dict(r) for r in rows}
     except Exception:
         logger.warning(
@@ -698,6 +721,45 @@ async def load_all_model_overrides() -> dict[str, dict]:
             _all_model_overrides_cache = {}
     _all_model_overrides_cache_time = _time.time()
     return _all_model_overrides_cache
+
+
+async def load_removed_model_ids() -> set[str]:
+    """Return the tombstoned ``model_id`` set — mig 179, the ONE read that sees removed rows.
+
+    A DB-only model is hard-DELETEd and never appears here. This set exists for the models
+    that CANNOT be deleted: the ids declared in ``config.py``'s built-in ``MODEL_CAPABILITIES``,
+    which have no row to remove. ``build_model_registry_rows`` subtracts this set from the
+    built-in half of the union, and ``add_model_by_id`` consults it so a removed model can be
+    added back (the duplicate guard must not refuse an id that is no longer in the registry).
+
+    ⚠ SHARES THE ALL-ROWS CACHE TIMESTAMP DELIBERATELY, so a removal and the registry read that
+    follows it can never disagree: ``invalidate_model_overrides_cache`` zeroes both, and the
+    same 30s TTL governs both. A separate cache here would make "is it gone?" answerable two
+    ways at once, which is the class of bug D-07's twin-invalidation pattern exists to prevent.
+
+    Never raises (mirrors its siblings): a DB blip returns an EMPTY set, which fails toward
+    showing a model rather than hiding one — the safe direction for a read whose failure mode
+    would otherwise be a registry that silently shrinks.
+    """
+    global _removed_model_ids_cache, _removed_model_ids_cache_time
+    now = _time.time()
+    if (now - _removed_model_ids_cache_time) < _SETTINGS_CACHE_TTL:
+        return _removed_model_ids_cache
+
+    try:
+        from app.dependencies import get_pg_pool
+        pool = await get_pg_pool()
+        rows = await pool.fetch(
+            "SELECT model_id FROM model_capabilities_overrides WHERE removed = true"
+        )
+        _removed_model_ids_cache = {r["model_id"] for r in rows}
+    except Exception:
+        logger.warning(
+            "load_removed_model_ids: DB read failed; returning stale/empty set",
+            exc_info=True,
+        )
+    _removed_model_ids_cache_time = _time.time()
+    return _removed_model_ids_cache
 
 
 # ── Row-to-value helpers ─────────────────────────────────────────────────────
