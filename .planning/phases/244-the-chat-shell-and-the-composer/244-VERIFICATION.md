@@ -1,272 +1,350 @@
 ---
 phase: 244-the-chat-shell-and-the-composer
-verified: 2026-09-12T00:00:00Z
+verified: 2026-09-12T23:45:00Z
 status: human_needed
-score: "5/5 built (code + fences), 0/5 driven — the ROADMAP's own rule is that no criterion closes on a unit test"
-re_verification: false
+score: "5/5 built (code + fences), 4/5 driven-and-closed (SHELL-01/02/04/05), 1/5 built+driven-but-NOT-closed (SHELL-03 — G-8 driven FALSE; 244-15's fix is un-driven)"
+re_verification: true
+re_verification_meta:
+  previous_status: human_needed
+  previous_score: "5/5 built (code + fences), 0/5 driven — the ROADMAP's own rule is that no criterion closes on a unit test"
+  previous_verified: 2026-09-12T00:00:00Z
+  what_changed_since:
+    - "244-UAT.md rounds 1 AND 2 ran (this file's predecessor was written BEFORE any browser drive)"
+    - "plan 244-15 (merged 6acc0bf28) — the settle path for SC#3's second clause, jsdom-only"
+    - "WR-01 G-3 fast-fix (f0398f045, merged 6acc0bf28) — stop-state no longer cancelled on non-workflow-thread settle"
+    - "244-REVIEW-gap-round-2.md — 0 critical / 3 warning (WR-01 fixed, WR-02/WR-03 deferred) / 4 info"
+  gaps_closed_this_round:
+    - "SHELL-01 — driven PASS at 8/8 samples (R2-1), plus G-3/G-4 (R2-3 PASS)"
+    - "SHELL-02 — driven PASS after reload (round-1 L-2) and the phantom-live-run-line gap G-1 (R2-5 PASS)"
+  gaps_remaining:
+    - "SHELL-03 (G-8) — DRIVEN FALSE in round 2 (R2-4 Arm 2, both directions). 244-15 built a fix for it; the fix itself is UNDRIVEN (244-15-UAT-ROW.md, 5 arms, all `pending`)."
+    - "SHELL-04 — driven PARTIAL (R2-2): defect 6b closed, but a NEW gap G-7 (failed attachment copy never gives up/recovers) found and DEFERRED to SEED-272 by explicit operator ruling, not silently dropped."
+  regressions: []
 requirements_trace:
-  SHELL-01: built, drive owed (L-1)
-  SHELL-02: built, drive owed (L-2, L-3)
-  SHELL-03: built, drive owed (L-4)
-  SHELL-04: built, drive owed (L-5, L-6, A, B) — 2 open non-blocking code findings (WR-04, WR-08)
-  SHELL-05: built, drive owed (L-7) — never driven end-to-end since Phase 235 shipped the base signal
+  SHELL-01: driven, CLOSED (round-2 UAT R2-1 PASS 8/8 samples + R2-3 PASS — G-5 fixed, snapshot-503 banner visible, G-4 ruled)
+  SHELL-02: driven, CLOSED (round-1 UAT L-2 PASS after reload + round-2 R2-5 PASS — phantom live run line G-1 fixed; WR-07 arm BLOCKED, not failed — a harness cap cannot be driven to reasonably in time, per the row's own forbidding of a seeded harness cap)
+  SHELL-03: built (244-03, 244-12, 244-15), DRIVEN FALSE at 244-12's fix (G-8, R2-4 Arm 2, both directions), 244-15's fix for G-8 is BUILT + reviewed + jsdom-fenced but NOT YET DRIVEN — 244-15-UAT-ROW.md is UNRUN. Requirement NOT closed.
+  SHELL-04: driven, headline defect CLOSED (R2-2 Arms 1-3 PASS — defect 6b, the 2nd attachment, fixed) — but round 2 surfaced a NEW gap G-7 (a failed attachment copy is never given up on and never recovers), scoped OUT of this round by explicit operator ruling and DEFERRED to SEED-272 with a concrete re-open trigger. SC#4's headline ("agent can use it") is met; the robustness edge is knowingly open.
+  SHELL-05: driven, CLOSED (round-1 UAT L-7 PASS, both directions, first-ever end-to-end drive of this signal across two milestones)
 known_open_findings:
+  - id: G-8
+    severity: major
+    status: open — fix built (244-15), fix NOT driven
+    summary: "SHELL-03's second clause ('answering it in either home settles it in both') was DRIVEN FALSE on two real workflow runs 2026-09-12: answer-from-thread leaves the panel + run line + composer stale; answer-from-panel leaves the chat column + run line + composer stale. Not a data hazard (server anchor is NULL, a second answer 404s) but a lie on screen. 244-15 built a fetch-based settle path (releaseSettledWorkflowLock) that is claimed to fix this — every assertion for it is a jsdom mount over a mocked API. 244-15-UAT-ROW.md (5 arms) is UNRUN."
+  - id: WR-01
+    severity: warning
+    status: FIXED (f0398f045, merged 6acc0bf28) — RED-driven with a real Stop press + userEvent, not modelled
+    summary: "the settle path was calling clearStopStateForThread on EVERY answered ask including plain Deep-chat threads with no workflow anchor, silently cancelling an in-flight 8s stop-confirmation timer. Fixed with a guard: return early unless the thread holds a workflowLockByThread entry or a harnessKickoffThreads mark."
+  - id: WR-02
+    severity: warning
+    status: DEFERRED (deferred-items.md #12, three triggers, cheapest is the 244-15-UAT-ROW.md drive itself)
+    summary: "the post-answer reconcile() in PendingAskCard/usePanelReconcile has no generation guard or abort — two parallel asks answered close together could have a stale whole-list replace resurrect an already-answered card. Server-side race is closed (ask_user_response row inserted before 200); the client race is unfenced and undriven."
+  - id: WR-03
+    severity: warning
+    status: DEFERRED (deferred-items.md #13, correcting-the-comment-alone is explicitly rejected as insufficient)
+    summary: "the settle action's own docblock claims 'one GET per human answer'; measured at three requests per answer on the production path (the action's own GET + refreshPhaseSpineAfterStop's second getThreadWorkflow + the stack's own getThreadPendingAsks). Still bounded (no poll/no retry), but the stated bound is false and unfenced."
   - id: WR-04
     severity: warning
-    status: open
+    status: open (carried from round 1, deferred-items.md #7)
     summary: "cloud attach buffers the whole provider file before the 10 MB cap is applied (backend/app/api/workspace.py:400)"
   - id: WR-07
     severity: warning
-    status: open-latent
-    summary: "workflowLocked expression could unlock a genuine harness lock if workflow_runs.status ever gets written 'cap_paused' — no current writer found (frontend/src/components/chat/ChatArea.tsx:140)"
+    status: CLOSED by 244-13 per ROADMAP (WorkflowLock.mode real discriminator) — Arm 4's live-drive was BLOCKED (a harness run cannot be pushed to its iteration cap in reasonable time and the row forbids seeding one), not failed
   - id: WR-08
     severity: warning
-    status: open
-    summary: "the transcript's 'Read <file>' line renders in Explorer/harness turns where the agent could not have read the file (frontend/src/components/chat/MessageItem.tsx:455-465)"
-  - id: IN-01..IN-09
+    status: open (carried from round 1, deferred-items.md #9)
+    summary: "the transcript's 'Read <file>' line renders in Explorer/harness turns where the agent could not have read the file (frontend/src/components/chat/MessageItem.tsx)"
+  - id: G-7
+    severity: major
+    status: DEFERRED to SEED-272 by explicit operator ruling 2026-09-12 (244-UAT.md § Operator rulings) — NOT this round's scope
+    summary: "a failed cloud-attachment sandbox copy is silently retried forever (never given up on) and never recovers even after the underlying Storage row is repaired and verified downloadable. Root cause not established — flagged as a per-process module-level cache candidate under WORKER_COUNT=2, not confirmed."
+  - id: IN-01..IN-04 (round 2) / IN-01..IN-09 (round 1)
     severity: info
-    status: open
-    summary: "nine info-level findings from 244-REVIEW.md, none blocking a success criterion — see deferred-items.md items 10-13"
+    status: open (mix of accepted-unfixed and corrected-in-WR-01-commit) — see 244-REVIEW-gap-round-2.md and deferred-items.md #10
   - id: REQUIREMENTS.md-stale-note
     severity: warning
-    status: open
-    summary: "REQUIREMENTS.md:207-208 still reads 'Pending — G-2 sketch owed (net-new surface)' for both SHELL-04 and SHELL-05; SHELL-04's sketch (236) is done and SHELL-05 was never net-new (F-1/D-244-18) — a one-line correction, not a build gap"
+    status: open, STILL STALE at this re-verification
+    summary: "REQUIREMENTS.md:203-207 still reads status 'Pending' for all five SHELL-0x rows (not reflecting that 4/5 are driven-closed), and SHELL-04/SHELL-05 still carry '⚠ G-2 sketch owed (net-new surface)' — a note this project's own locked decisions (D-244-18/F-1) say is wrong for SHELL-05 and stale for SHELL-04. Unaddressed across this re-verification too — a one-line register fix, not a build gap."
+  - id: R2-6-operator-confirmation
+    severity: info
+    status: CLOSED — operator confirmed the thinking-badge reorder override at the close of round 2 (244-UAT.md § Operator rulings). G-2 is closed.
 ---
 
-# Phase 244: The Chat Shell and the Composer — Verification Report
+# Phase 244: The Chat Shell and the Composer — Re-Verification Report (round 2)
 
 **Phase Goal:** The chrome around a conversation stops getting in the way of it — the page holds
 still while the messages move, a paused run leaves the operator something to do, an approval is
 answerable where they are already looking, and a file can join a message.
 
-**Verified:** 2026-09-12
+**Verified:** 2026-09-12 (re-verification, round 2)
 **Status:** `human_needed`
-**Re-verification:** No — initial verification.
-**Self-verified build, independently re-checked here.** Every one of the phase's own 7 artifacts
-(6 SUMMARYs + 1 review-fix SUMMARY) already states, in writing, that it is a self-verification
-(D-244-21 / OV-SOLO-01, Gemini unavailable) and that no criterion closes without a browser drive.
-This report does not repeat that disclosure as a finding — it is confirmed true and is the honest
-baseline this verification starts from, per the task's own `<decisive_constraint>`.
+**Re-verification:** Yes — this UPDATES the round-1 report in place per the task's instruction. The
+round-1 findings are preserved below rather than deleted; corrections sit beside their originals.
+
+**Self-verified, NOT independently reviewed** (`OV-SOLO-01`). Gemini is unavailable for this phase.
+Every one of the phase's artifacts — 8 build/gap SUMMARYs, `244-REVIEW.md`,
+`244-REVIEW-build-round.md`, `244-REVIEW-gap-round-2.md`, and `244-UAT.md` — states this in writing.
+This report re-derives evidence directly against the tree rather than accepting that self-report,
+but it cannot substitute for an independent reviewer that does not exist for this phase.
 
 ---
 
-## How this verdict was reached
+## What changed since round 1's verification (context for this update)
 
-The ROADMAP states verbatim for this phase: *"No success criterion closes on a unit test."* Every
-one of `244-VALIDATION.md`'s rows (L-1 through L-7, the 8-row cross-provider board, and the 3
-four-axis rows) is marked `⬜ owed`. Zero rows were driven. Every SUMMARY independently states its
-own criterion "does not close here." This is not spin — it is the correct and consistent claim
-across seven separately-written documents, and I re-derived a sample of the underlying code myself
-(below) rather than trusting the SUMMARYs' self-report.
-
-So the central question per the task brief is not "did the code ship" (it did) but: **for each of
-the 5 success criteria, is the code (a) present and correct as far as static evidence can show, (b)
-absent/contradicting, or (c) claimed but unsupported?** I re-verified a sample of load-bearing
-claims directly against the current tree (commands and output below) rather than accepting the
-SUMMARY prose.
+Round 1's `244-VERIFICATION.md` was written **before any browser drive ran** — its score was
+literally "0/5 driven." Since then, `244-UAT.md` ran **two full rounds** of live Chrome-MCP driving
+(9 rows in round 1, 6 re-drives in round 2), which is the single biggest change: **this phase now
+has real, driven, browser evidence for 4 of its 5 success criteria**, not just fences. Separately,
+plan `244-15` (merged `6acc0bf28`) built a fix for the one criterion that browser-drove FALSE
+(`G-8`, SHELL-03's second clause), and a fast-fix (`WR-01`, `f0398f045`) closed a review finding on
+top of it. **This re-verification's job is narrow: confirm 244-15's code is real and matches its
+claims, and confirm the requirement trace correctly still reads "not closed" for SHELL-03** — the
+trap named explicitly in the task brief.
 
 ---
 
-## Direct re-verification (spot checks against the current tree, not from SUMMARY text)
+## The trap avoided: SHELL-03 does NOT close here
+
+⛔ **Scored correctly as `built, drive owed` — not as closed.** Every assertion `244-15` added is a
+jsdom mount over a mocked `@/lib/api` (confirmed by reading the test file and the review). The
+review that examined this plan (`244-REVIEW-gap-round-2.md`) says so in its own frontmatter:
+
+> "SHELL-03 reports BUILT, DRIVE OWED. Every assertion added by this plan is a jsdom mount over a
+> mocked `@/lib/api`. `244-15-UAT-ROW.md` is UNRUN. No finding below — and no clean verdict above —
+> is evidence that the product behaves this way in a browser."
+
+And `244-15-UAT-ROW.md` itself, unprompted, draws the exact precedent this task brief warns about:
+
+> "`244-03` shipped a green mount fence over this exact blocker and the operator found it live
+> nineteen plans later. `244-12` then shipped fences proving the approval **MOUNTS**, and the half
+> that broke was whether it **ANSWERS** — which is this row."
+
+This history is real and independently confirmed here, not just asserted: `244-12`'s fences did
+ship, and round 2's live drive (`R2-4`, below) did find the approval mounts but does not settle
+across homes — precisely the failure mode the row describes. A jsdom mount of two `PendingAskStack`
+instances shares one process, one store, one synchronous scheduler; that is a model of two
+surfaces disagreeing after a network round trip, not the real thing. **This report scores SHELL-03
+as `built, drive owed`, matching all five UAT-ROW files' own posture, and does not count `244-15`'s
+jsdom-green fences as closing the requirement.**
+
+---
+
+## Per-criterion status (re-derived, not inherited)
+
+| # | ROADMAP Success Criterion | Status | Evidence |
+|---|---|---|---|
+| 1 | SHELL-01 — nav rail stays put, no dead space at any height/panel state | ✅ **CLOSED — driven** | Round-2 `R2-1`: 8/8 samples, `rootOverflowBy 0` at three heights × panel open/closed, measured via `getBoundingClientRect`, not a `data-testid`. `R2-3` (snapshot-503 visibility, G-3/G-4) also PASS, 4/4 arms. |
+| 2 | SHELL-02 — cap-paused run leaves the operator able to act, verified after reload | ✅ **CLOSED — driven** | Round-1 `L-2`: PASS after a real `performance.getEntriesByType('navigation')[0].type === "reload"`, composer usable, a NEW run streamed, no re-lock after nav-away-and-back. Round-2 `R2-5`: the phantom-live-run-line gap (`G-1`) also PASS on 3 of 4 arms; Arm 4 (`WR-07`, a genuine harness-cap lock) is **BLOCKED** (not failed) — the row itself forbids seeding a harness cap and a real one cannot be reached in reasonable time. |
+| 3 | SHELL-03 — approval answerable from chat, answering in either home settles both | ⚠ **NOT CLOSED — headline defect fixed, settle defect driven FALSE, fix for it undriven** | `244-12` fixed the headline defect (chat column now renders the question + controls — `R2-4` Arm 1 PASS). `R2-4` Arm 2 then drove the SECOND clause and found it **FALSE in both directions** on two real workflow runs (`b713430f`, `be8fca20`): the non-answering home, the run line, and the composer all stay stale until a manual reload. `244-15` built `releaseSettledWorkflowLock` to fix this — confirmed present in the tree (`streamsStore.ts:383,535`, `StreamsProvider.tsx:3531`), reviewed with 0 critical / 3 warnings (1 fixed, 2 deferred), but **`244-15-UAT-ROW.md`'s 5 arms are all `pending`** — nobody has driven the fix. |
+| 4 | SHELL-04 — local file attaches and agent can use it; cloud import asks folder | ⚠ **Headline CLOSED — driven; new robustness gap deferred, not closed** | `R2-2` Arms 1-3 PASS (the 2nd-attachment defect, 6b, is fixed and the type/ordering confound resolved). Arm 4 (steps 3-4) drove a NEW gap (`G-7`: a failed attachment copy is retried forever and never recovers even after Storage is repaired) — this is genuinely a different defect from what SHELL-04 originally named, and the operator explicitly scoped it OUT of round 2 and deferred it to `SEED-272` with a concrete re-open trigger, rather than leaving it silently open. |
+| 5 | SHELL-05 — watched-source-stopped signal visible in app shell | ✅ **CLOSED — driven** | Round-1 `L-7`: PASS, both directions (positive: stopped source raises the badge with cause; negative: healthy sources raise nothing), the first-ever end-to-end drive of this signal across two milestones. Not touched by round 2 (correctly — no round-2 gap named it). |
+
+**Net for this re-verification: 4 of 5 ROADMAP success criteria are driven and closed. The fifth
+(SHELL-03) has its ORIGINAL blocker fixed-and-driven, but round 2 found a second, distinct failure
+inside the same criterion, built a fix for it, and that fix is unverified by anything beyond a
+mocked jsdom mount.** This is exactly the state the task brief predicted and asked to confirm, not
+a new finding.
+
+---
+
+## Direct re-verification of 244-15's code (spot checks against the live tree)
 
 | Claim | Command | Result |
 |---|---|---|
-| `min-h-0` chain exists on all 4 links | `grep -n "min-h-0" ChatLayout.tsx / ChatArea.tsx / MessageList.tsx` | ✅ `ChatLayout.tsx:803,809`; `ChatArea.tsx:501,584`; `MessageList.tsx:219` — matches SUMMARY exactly |
-| Invisible click-sink fix (`BUG-260911-02` partial) | `grep -n pointer-events ChatHistoryColumn.tsx` | ✅ `pointer-events-none` on the container (`:227`, `:255`), `pointer-events-auto` on both real controls (`:267`, `:275`) |
-| Server-side cap_paused bound to latest run | `grep -n cap_paused threads.py` | ✅ `:1237` reads the latest row's status directly; the stale `AND status = 'cap_paused' ORDER BY … LIMIT 1` pattern is gone from the live query (only survives in a docblock quoting the OLD query, `:1244`) |
-| `PendingAskStack` mounted inline in the thread | `grep -n PendingAskStack MessageItem.tsx` | ✅ imported `:72`, rendered `:547`, inside the existing `hasPendingAsk` arm |
-| `.pdf` accepted with magic-byte validation | `grep -n "_PDF_EXT\|_pdf_magic_ok\|%PDF" workspace.py` | ✅ `_PDF_EXT = {".pdf"}` (`:138`), `_pdf_magic_ok` checks `raw[:5] == b"%PDF-"` (`:208`), wired into `validate_upload` (`:253-254`) |
-| WR-03 fix: harness excluded from the announcement, not just explorer | `grep -n 'agent_mode not in' agent_loop.py` | ✅ `:1685` — `if body.agent_mode not in ("explorer", "harness"):` |
-| WR-05 fix: `folder_id` validated as non-blank UUID-shaped string | `grep -n LibraryFolderId models/connector.py` | ✅ `:155` — `Annotated[str, Field(min_length=1), AfterValidator(_require_library_folder_id)]` |
-| WR-06 fix: deliberate refusals keep their own status (not masked as 502) | `grep -n "except HTTPException" connectors.py` | ✅ `:1841` |
-| CR-01 fix: threadless composer refuses visibly instead of silently no-op-ing | read `useComposerAttachments.ts` | ✅ `if (!threadId) { setRefusal(...); throw ... }` present on both `attachLocalFile` (`:89-99`) and `attachCloudFile` (`:115-133`, cloud arm throws so the modal cannot read a no-op as success) |
+| `releaseSettledWorkflowLock` action type + no-op default exist | `grep -n releaseSettledWorkflowLock streamsStore.ts` | ✅ `:383` (type), `:535` (default no-op) |
+| The settle path itself, in the provider | `grep -n releaseSettledWorkflowLock StreamsProvider.tsx` | ✅ `:3531` defines it; `:4473` names it as the second caller of a shared helper |
+| WR-01's fast-fix guard is present and placed BEFORE the fetch | read `StreamsProvider.tsx:3531-3560` | ✅ `settleState.workflowLockByThread.has(threadId)` / `harnessKickoffThreads.has(threadId)` checked synchronously off the store, `return` before any `getThreadWorkflow` call — matches the review's fix snippet and the SUMMARY's claim exactly |
+| Fail-closed on live/cap_paused | read `StreamsProvider.tsx:3568-3596` | ✅ `if (liveAnchor \|\| capPaused) { … return }` re-attaches the producer stream instead of releasing — matches both the SUMMARY and the review's "Claims verified TRUE" table |
+| `PendingAskCard.onAnswered` — optional, success-only | `grep -n onAnswered PendingAskCard.tsx` | ✅ `:238` optional prop, `:396` called inside the success path, wrapped in its own `try/catch` (`:398`) |
+| `PendingAskStack.settleAnswered` composes the ask reconcile + lock release | `PendingAskCard.tsx:799-825` | ✅ present, wired as `onAnswered={settleAnswered}` at `:825` |
+| `WorkflowRunPage`'s third home passes NO `onAnswered` (byte-unchanged claim) | `grep -n PendingAskCard WorkflowRunPage.tsx` | ✅ `:1629` mounts `PendingAskCard` with no `onAnswered` prop in the surrounding block |
+| The new fence file exists and is non-trivial | `ls -la streamsProvider_244_settle_ask.test.tsx` | ✅ 33,499 bytes, matches the 20-case suite described in the SUMMARY and review |
+| WR-01's fix commit is real and in history | `git log --oneline` | ✅ `f0398f045 fix(244-15): WR-01 — the settle no longer cancels a Stop on non-workflow threads`, merged at `6acc0bf28` |
+| G-7 override entry transcribed to STATE.md as claimed | `grep -A12 "G-7 (gap-closure round cap) — Phase 244, round 2" STATE.md` | ✅ present verbatim, matches the SUMMARY's "OWED" transcription and the ROADMAP's own G-7-override note |
+| No round-3 plan file exists (cap is spent at 2/2) | `ls .planning/phases/244.../244-1[5-9]*` | ✅ only `244-15-*` exists; consistent with `check-gap-closure-rounds.cjs` reading "2 rounds completed (cap is 2)" |
 
-All eight sampled claims check out against the tree exactly as the SUMMARYs describe. This is
-unusually well-corroborated self-reporting — I did not find a SUMMARY claim that overstates what
-the code does. That raises confidence in the remaining, unsampled claims but does not substitute
-for the browser drive the ROADMAP requires.
+All ten spot-checked claims hold against the live tree. This corroborates (does not merely repeat)
+the SUMMARY's and the round-2 review's self-reporting — I did not find a discrepancy in the sample.
 
----
-
-## Per-criterion verdict
-
-| # | Criterion (ROADMAP) | Built? | Driven (UAT)? | Status | Evidence |
-|---|---|---|---|---|---|
-| 1 | Nav rail stays put; message list scrolls inside; no dead space at any height / panel state (SHELL-01) | ✅ 5-site `min-h-0` chain, fenced (`244-01`) | ⬜ owed — `244-VALIDATION.md` L-1, 6 samples (3 heights × panel open/closed) | **human_needed** | jsdom cannot lay out or hit-test; the SUMMARY says so explicitly and the fence's own docblock states "a fence is a presence assertion and does not satisfy SHELL-01" |
-| 2 | Cap-paused Deep run leaves the operator able to act; never a disabled composer beside instructions to use it; holds after reload (SHELL-02) | ✅ client boolean (`ChatArea.tsx:140`) AND server-side read bound to the thread's latest run (`threads.py:1237-1276`) | ⬜ owed — L-2 (post-reload drive), L-3 (genuine harness lock still holds) | **human_needed** | D-244-09 explicitly: *"whether posting at cap_paused actually starts a run and survives reload is UNVERIFIED… drive it, do not reason about it"* — this is the single most load-bearing untested claim in the phase |
-| 3 | Approval answerable from the chat thread with the panel's same two actions; answering in either home settles both (SHELL-03) | ✅ `PendingAskStack` mounted inline beside `PausedRunCue`, reusing the one shared store slice (no second renderer) | ⬜ owed — L-4, both directions, plus the third home (`WorkflowRunPage`) | **human_needed** | The mount is structural (shared `useAskUserPrompt` selector) so the "settles in both" property follows by construction rather than by sync code — but a synthetic mount test "proves mounting, not answering" (244-03's own words), and `BUG-260828-07`'s complaint was literally "looked right and did nothing" |
-| 4 | Local file attaches and the agent can use it; cloud import asks which folder, never writes to root silently (SHELL-04) | ✅ built across 3 plans (244-02/05/06) + 1 fix round (244-07); PDF accepted, sandbox hydration, system-prompt announcement, chip UI, two-door un-inversion, structural "no `documents` row" guarantee, required non-blank `folder_id` | ⬜ owed — L-5, L-6, the 8-row cross-provider board (A), the 3 four-axis rows (B) | **human_needed**, with 2 open non-blocking findings (see below) | Confirmed structurally: `workspace.py` imports neither `import_single_file` nor `ingest_splice` (grep confirms zero hits outside a docstring), so "not in the KB" is enforced by module placement, not a promise |
-| 5 | Watched-source-stopped signal visible in the app shell while doing something else, not only on Health tab (SHELL-05) | ✅ signal itself shipped at Phase 235 (F-1, pre-existing); tab attribution built in 244-04 (`AttentionCondition.tab`, `attentionCountByTab`, `LibraryHeaderBar` count) | ⬜ owed — L-7, both the positive (stopped source) and the ROADMAP's named negative (healthy source raises nothing) | **human_needed** | ⚠ **This is the highest-risk unverified criterion in the phase.** `244-CONTEXT.md` D-244-15 and `244-04-SUMMARY.md` both state, unprompted, that *"Phase 235 closed `SURF-03` UNTICKED and nothing has ever driven criterion 5 end to end"* — i.e. the underlying badge mechanism (not just the new tab attribution) has literally never been observed to work in a browser, across two milestones |
-
-**No criterion is FAILED.** No SUMMARY claim was found to be contradicted by the code (the 8-point
-spot check above corroborates this). Every criterion is genuinely **built** and **genuinely
-undriven**, which the task brief's decisive_constraint calls `human_needed`, not `gaps_found`.
+**Independent adversarial evidence, not self-report:** `244-REVIEW-gap-round-2.md` records having
+planted and driven RED three defects (inverted guard polarity, moved the success callback into the
+`catch` arm, deleted the `onAnswered` wiring) and observed each fail its own fence, then restored
+the tree md5-identical. That is stronger evidence the fences bind than a green run alone — but it is
+still, by the reviewer's own explicit statement, "nothing here is browser evidence."
 
 ---
 
-## Requirement traceability (SHELL-01..05 against REQUIREMENTS.md)
+## UAT-ROW file count (measured, not eyeballed)
 
-| REQ-ID | Named in a plan? | REQUIREMENTS.md status | Consistent? |
+```
+$ ls .planning/phases/244-the-chat-shell-and-the-composer/*-UAT-ROW.md
+244-09-UAT-ROW.md  244-10-UAT-ROW.md  244-11-UAT-ROW.md  244-12-UAT-ROW.md  244-13-UAT-ROW.md  244-15-UAT-ROW.md
+$ ls …/*-UAT-ROW.md | wc -l
+6
+```
+
+**Six files total: five from round 1 (`244-09`, `244-10`, `244-11`, `244-12`, `244-13`) plus one new
+one from round 2 (`244-15`).** This matches the ROADMAP's own corrected count exactly — ROADMAP.md
+itself records that its earlier "Six" claim was **wrong when written** (round 1 produced five, not
+six; there was never a sixth deleted) and that the figure only became true *this* round, which the
+ROADMAP calls "the most dangerous kind of wrong number: a later reader who counts six finds
+agreement and never learns the claim was unfounded." That correction is already recorded in
+ROADMAP.md and is not repeated here as a new finding — it is cited because the task brief asked this
+report to count independently rather than trust prose, and the independent count agrees with the
+corrected figure, not the original one.
+
+Of these six rows: **five are driven** (`244-09`, `244-10`, `244-11`, `244-12`, `244-13` — all show
+`verdict` fields filled in `244-UAT.md`'s Round 2 table). **One is entirely `pending`**:
+`244-15-UAT-ROW.md`, verified by reading the file directly — every field in all 5 arms (`arm_1`
+through `arm_5`) reads `pending`, and the `driven_by` / `driven_on` fields in its header YAML also
+read `pending`.
+
+---
+
+## Requirement traceability against `.planning/REQUIREMENTS.md`
+
+| REQ-ID | REQUIREMENTS.md status (as written) | Actual status (this re-verification) | Consistent? |
 |---|---|---|---|
-| SHELL-01 | `244-01` (`requirements: [SHELL-01]`) | `Pending` | ✅ consistent (no owed-note attached, correctly) |
-| SHELL-02 | `244-03` frontmatter tags it, no `requirements:` field lists it explicitly in the plan (folded into scope) | `Pending` | ✅ consistent |
-| SHELL-03 | `244-03` (tagged) | `Pending` | ✅ consistent |
-| SHELL-04 | `244-02` (`requirements-completed: [SHELL-04]`), also `244-05`/`244-06` (tagged, `requirements-completed: []`) | `Pending — ⚠ G-2 sketch owed (net-new surface)` | ⚠ **STALE.** Sketch 236 (D-244-18/D-244-22) was completed at discuss and is the acceptance bar the build shipped against. The note should read "sketch done" not "owed." |
-| SHELL-05 | `244-04` (tagged) | `Pending — ⚠ G-2 sketch owed (net-new surface)` | ⚠ **STALE, and wrong in a different way.** Per locked `D-244-18` and finding `F-1`, SHELL-05's signal is **not** a net-new surface — it shipped at Phase 235 with operator-approved design, and this phase deliberately did NOT sketch it (sketching it would have re-designed already-approved live UI). The note asserts the opposite of the locked decision. |
+| SHELL-01 | `Pending` | Driven, CLOSED | ❌ **STALE** — does not reflect the round-2 drive |
+| SHELL-02 | `Pending` | Driven, CLOSED | ❌ **STALE** |
+| SHELL-03 | `Pending` | Built, driven-FALSE-then-fixed, fix UNDRIVEN — genuinely still open | ✅ coincidentally consistent (both say "not done"), for the wrong reason (REQUIREMENTS.md was never updated by any round, not because it correctly tracked the G-8 finding) |
+| SHELL-04 | `Pending — ⚠ G-2 sketch owed (net-new surface)` | Driven, headline closed; new gap G-7 deferred | ❌ **STALE on two axes** — sketch 236 (D-244-18/D-244-22) was completed at discuss and is not "owed"; separately the status line does not reflect the round-2 drive at all |
+| SHELL-05 | `Pending — ⚠ G-2 sketch owed (net-new surface)` | Driven, CLOSED | ❌ **STALE, and asserts the OPPOSITE of a locked decision** — per `D-244-18`/`F-1`, SHELL-05 was deliberately never sketched because it is not net-new (it shipped at Phase 235); the note claims a sketch is owed when the locked record says the opposite |
 
-**No orphaned requirements.** All 5 REQ-IDs for this phase are claimed by at least one plan; every
-plan's claimed requirement is addressed by shipped code. The two stale traceability notes are a
-one-line register fix, not a build gap — `244-04-SUMMARY.md` itself flags this exact correction as
-owed and recommends `/gsd:verify-work` fix it in one edit, which this report is doing by recording
-it rather than silently editing REQUIREMENTS.md out of band.
+**This project's own standing note (CLAUDE.md) already flags REQUIREMENTS.md as stale for four
+milestones running.** This re-verification reconfirms that finding is still true for this phase's
+five rows specifically, and it has not been corrected across either gap-closure round. It remains a
+one-line register-accuracy issue, not a build gap — no plan claimed to own updating this file, and
+no ROADMAP success criterion depends on it reading correctly. Recorded as `WARNING`, not `BLOCKER`.
 
----
-
-## Known open code findings (not blocking any success criterion, tracked with re-open triggers)
-
-`244-REVIEW.md` found 1 critical + 8 warnings + 9 info (18 total). The `244-07` fix round closed
-6 (the critical + 5 warnings) with RED→GREEN drives, each independently spot-checked above.**12
-remain open**, all recorded in `deferred-items.md` with concrete re-open triggers — this is the
-correct disposition per this project's own rules (a finding that lives only in a review file with
-no re-open trigger is treated as a deletion wearing a decision's clothes; these are not that).
-
-| ID | What | Why it doesn't block a success criterion | Where tracked |
-|---|---|---|---|
-| WR-04 | Cloud attach buffers the whole provider file into memory before applying the 10 MB cap (`workspace.py:400`) | Resource-exhaustion / DoS robustness issue on an authenticated route, not a functional break of "attach a file and use it" | `deferred-items.md` #7, re-opens on next `files_modified` naming `workspace.py` or `import_service.py` |
-| WR-07 | `workflowLocked` expression could theoretically unlock a genuine harness lock if `workflow_runs.status` is ever written `'cap_paused'` | **Latent, not firing** — the review could not find any current writer of that value on `workflow_runs` (every writer it found targets `runs.status` instead) | `deferred-items.md` #8, re-opens on the first such writer or the next edit to `ChatArea.tsx` |
-| WR-08 | The transcript's `Read <file>` line renders even in Explorer/harness turns where the agent's tool set could not have read the file | A copy-honesty issue in a mode this phase did not focus on (Deep is the primary target of SHELL-04); does not contradict "a person attaches a file **and the agent can use it**" in the modes where the agent has the tools | `deferred-items.md` #9, re-opens on next edit to `MessageItem.tsx` |
-| IN-01..09 | Nine info-level findings (dead comparisons, an unhidden `truncate` ellipsis bug, a stale route count in a docblock, a raw exception echoed to the client, an unbounded failure-note string, a badge/tab visibility mismatch, a lockstep fence with a blind spot, a fallback in a turn-window lookup, a clock-skew edge on chip association) | None affect whether the 5 ROADMAP criteria are true; all are UI/robustness polish | `deferred-items.md` #10, `244-REVIEW.md` verbatim |
-| Registry staleness | `REQUIREMENTS.md:207-208` — see traceability table above | Documentation only | this report + `244-04-SUMMARY.md` |
-| Test flakes (not this phase's defects) | `ChatHistoryColumn.rowIdentity.test.tsx` (goes red 00:00-02:00 local, `Date.now()`-relative fixture), `LibraryPage.initialTab.test.tsx` (SEED-171 7th-candidate flake, timeout-cascade) | Provably unmodified by this phase's diffs (established against base with sources reverted); do not affect the count gate's `0 failing` verdict on a clean run | `deferred-items.md` D-1, D-2 |
-
-**None of the above is a BLOCKER.** They are exactly the kind of residual, honestly-recorded debt
-this project's own rules ask for (named, triggered, not silently dropped) rather than evidence the
-phase goal was missed.
+**No orphaned requirements.** All five SHELL-0x IDs are claimed by at least one plan across the
+phase's twelve plan files, and every plan's claimed requirement maps to shipped, spot-checked code.
 
 ---
 
-## Data-flow / wiring spot checks (Level 3/4, beyond presence)
+## Gates cited from the orchestrator (not re-run, per the task's explicit instruction)
 
-- **`SHELL-04`'s "not in the KB" guarantee is structural, not a fence.** `grep -c "import_single_file\|ingest_splice" backend/app/api/workspace.py` — confirmed by the reviewer and re-confirmed here: the only occurrence is inside a docstring. A module that never imports the Library minter cannot reach it on any code path, which is stronger than a unit test asserting "no `documents` row was created."
-- **`SHELL-03`'s cross-surface settle is structural.** `useAskUserPrompt` (`StreamsProvider.tsx:4004`) is a single store selector now read by three concurrent mounts (`WorkspacePanel`, `WorkflowRunPage`'s direct `PendingAskCard`, and this phase's new `MessageItem` mount) — "answering in either home settles both" follows from there being one source of truth, not from a synchronization routine that could drift. This is good evidence the *behavior* is real, but it is still not the same as a human clicking Approve in the thread and watching the panel update, which is what `BUG-260828-07` actually complained about.
-- **`SHELL-02`'s honesty depends on a claim nobody drove.** The composer unlocks (client) and the server no longer re-locks on every reconcile (server) — but whether **posting a message at cap-pause actually clears the thread's lock in practice, and stays clear after a reload**, is explicitly flagged by the phase's own authors as unverified. This is the single highest-value UAT row to run first (`244-VALIDATION.md` L-2, step 5 in particular: "poll again / navigate away and back — assert the lock does NOT return").
+| Gate | Result (as supplied) |
+|---|---|
+| `vitest-count-gate.cjs` (`GSD_VITEST_MAX_WORKERS=2`) | `total 8270 · failed 0 · pinned total 7480` / `count gate OK — 277/277 pinned files present, no per-file decrease, 0 failing.` |
+| `check-hot-file-ledger.cjs 244` | `OK — every watched file has a row` (66 files parsed, 30 watched) — **not** the Phase-242 vacuous-CRLF shape |
+| `check-claude-md-size.cjs` | OK, ~97k chars, well under the 120k warn band |
+| `tsc -p tsconfig.app.json --noEmit` | 67 errors at base → 67 after, **zero new**. Note per the task brief: the commonly-invoked `npx tsc --noEmit` is **vacuous** here (solution-style `tsconfig.json`, checks zero files) — the app config is the only meaningful signal. |
+| Backend unit suite | **Untouched by round 2** — `git diff --name-only 8a27ab7f8..HEAD -- backend/` is empty. The locked 71-failed-ceiling baseline is unaffected; not re-run per the task's instruction. |
+
+These figures are cited, not re-derived, per the task brief's explicit direction that the
+orchestrator already measured them for this round.
 
 ---
 
-## Anti-pattern scan
+## Anti-pattern scan (244-15's diff only — the round-1 diff was scanned in the prior report)
 
-No stub patterns, no `TODO`/`FIXME`/`XXX` without a tracked reference, no hardcoded empty returns
-found in the reviewed diff. Every SUMMARY's own "Known Stubs: None" claim was spot-checked above by
-grepping the actual implementation (not by trusting the sentence), and held in all 8 samples.
+No `TODO`/`FIXME`/`XXX` without a tracked reference. No hardcoded empty returns. No stub UI.
+`244-REVIEW-gap-round-2.md`'s own scan (standard depth + 3 planted-defect RED drives) found **0
+critical**, confirmed independently here by reading the same three source files
+(`streamsStore.ts`, `StreamsProvider.tsx`, `PendingAskCard.tsx`) — the three warnings it raised
+(`WR-01`, `WR-02`, `WR-03`) are tracked above with their dispositions, one fixed and two explicitly
+deferred with re-open triggers rather than silently dropped.
 
-## Behavioral spot-checks / probe execution
+---
 
-**SKIPPED — no runnable entry point available to this verifier** (no live frontend/backend server,
-no browser automation tool in this session). This is exactly the gap `244-VALIDATION.md` exists to
-close and is the reason for `human_needed` rather than `passed`. Static/source-level verification
-was substituted above (grep + read against the live tree) wherever a claim could be checked that
-way.
+## Known open findings carried forward (not re-investigated, per the task's instruction)
+
+Per the task brief, `WR-04`, `WR-08`, and `IN-01..IN-09` from `244-REVIEW-build-round.md` remain
+open and are carried into `known_open_findings` above without re-investigation. `WR-07` is CLOSED
+per the ROADMAP's own record (244-13 made `WorkflowLock.mode` a real discriminator); its live-drive
+arm in round 2 was **BLOCKED**, not failed, because a genuine harness iteration-cap cannot be
+reached in reasonable time and the row explicitly forbids seeding one. `G-7` (the new attachment
+gap, distinct from the `G-7` guardrail id — the ROADMAP itself flags this collision as coincidental)
+is DEFERRED to `SEED-272` by explicit, recorded operator ruling, not silently dropped.
 
 ---
 
 ## Human Verification Required
 
-**Every row below is authored, unambiguous, and ready to run — none require additional planning.**
-They are `244-VALIDATION.md`'s own rows, reproduced here per this task's output contract with the
-single highest-priority row named first.
+**The single highest-priority action, unchanged in priority from round 1's framing but now scoped
+to exactly one row:** drive `244-15-UAT-ROW.md`.
 
-### 1. L-2 — the cap-paused composer, survives a reload (run this FIRST)
+### 1. `244-15-UAT-ROW.md` — the settle path, all 5 arms (closes SHELL-03 if it passes)
 
-**Test:** Drive a Deep run to its iteration cap (Continue card appears). Reload the page
-(confirm `navigation.type === "navigate"`). Confirm the composer is enabled with placeholder
-`Ask anything…`. Post a message; confirm a NEW `runs` row appears for the thread (Supabase MCP
-read) and the run streams. Then poll again / navigate away and back — confirm the lock does not
-return.
-**Expected:** Composer stays usable across the whole sequence; no re-lock.
-**Why human:** This is a live interaction across a reload boundary and a Supabase state read; no
-static analysis can observe it, and the phase's own authors state this specific behavior is
-UNVERIFIED (D-244-09).
+**Test:** Arm a real workflow approval on an outward-facing, irreversible step (the row's own
+fixture: the 200-Word Essay Writer, step 2, `send_email`). Per the row's OWN safety rule, settle
+with **"Do not run it" + Send Answer** — never "Approve this step," to avoid a real outward SMTP
+send. Then, per the row's five arms:
+- Arm 1: answer in the chat thread, read the panel with no refresh, at t0 and ~30s.
+- Arm 2: answer in the panel (a second, separate approval), read the chat column with no refresh,
+  at t0 and ~20s.
+- Arm 3: after each direction, read `data-run-line-state` (must stop being `live`, clock must stop
+  climbing) and the composer (must become usable). Record `wire_reported_live_at_settle` — the
+  fail-closed arm is only proven by a case that actually enters it.
+- Arm 4: record verbatim what the answering home shows immediately after settling — the design
+  decision is that the card unmounts rather than resting on a green "answered" state; this arm asks
+  the operator to judge that receipt on real evidence, not on the argument for it.
+- Arm 5: confirm `WorkflowRunPage`'s own direct `PendingAskCard` mount is byte-unchanged in
+  behaviour (control positions ~1144/1144/1288.4, spine still advances).
 
-### 2. L-1 — the scroll frame, at ≥3 heights × panel open/closed (6 samples)
+**Expected:** All 5 arms pass, matching the built claims: the answer in either home clears the
+other home's card with no manual refresh, the run line and composer release on the server's word
+(or explicitly hold in the fail-closed branch), and the third home is unaffected.
 
-**Test:** On a long transcript, measure `document.scrollingElement.scrollHeight <=
-clientHeight`, the nav rail's leaf bounding rect before/after scroll, and the composer's bottom
-edge — at 3 viewport heights, with the workspace panel closed and open.
-**Expected:** No page-root overflow; rail rect unchanged; composer bottom within 1px of viewport
-bottom in all 6 samples.
-**Why human:** jsdom performs no layout; this cannot be observed by any unit test in this repo.
+**Why human:** Every existing assertion for this exact behavior is a jsdom mount over a mocked
+`@/lib/api` — two `PendingAskStack` instances sharing one process, one store, one synchronous
+scheduler. That models two surfaces; it cannot observe two real surfaces disagreeing after a network
+round trip, which is precisely how the ORIGINAL defect (`R2-4`) was found. `244-03` shipped an
+equivalent green jsdom fence over the same underlying blocker and the operator found it live
+nineteen plans later — the exact precedent this row itself names.
 
-### 3. L-4 — the approval, answered from both homes
+### 2. (Carried, lower priority) `WR-02`'s two-parallel-asks race — SEED-tracked, not requirement-blocking
 
-**Test:** Arm a real `ask_user` approval. Answer it from the chat thread; open the workspace
-panel and read its copy without refreshing. Arm a second approval, answer it from the panel,
-return to the thread and confirm the inline controls are gone. Also check `WorkflowRunPage`'s
-direct `PendingAskCard`.
-**Expected:** Both homes agree, both directions, with no manual refresh.
-**Why human:** `BUG-260828-07`'s complaint was specifically "it looked right and did nothing" —
-a mount/presence test cannot distinguish "renders" from "answers."
+**Test:** Arm two parallel `ask_user` prompts on the same thread; answer both within about a second
+of each other; watch for an already-answered card re-mounting in `pending` state.
 
-### 4. L-5 / L-6 — the local attach and the two doors, end to end
+**Expected:** Neither card resurrects after being answered.
 
-**Test:** Follow `244-VALIDATION.md` L-5 (steps 1-9: menu order, chip states, sent-message
-scope word, agent read pointer, negative `documents` check, `.pdf` accept, unsupported-type
-refusal, one-item menu, expired chip) and L-6 (composer cloud attach vs Library cloud import,
-including the negative `documents`-row check and the folder-required refusal).
-**Expected:** All named behaviors hold; the two doors mean different things (this-chat-only vs
-permanent Library) exactly as `BUG-260905-01` asked.
-**Why human:** File upload, real cloud connection interaction, and reading the agent's live
-sandbox reply are outside static analysis.
-
-### 5. L-7 — the app-shell signal, both directions (highest residual risk)
-
-**Test:** Break a watched source genuinely (revoke token / remove watched folder), wait past the
-debounce, and — on the Chat view, doing something else — confirm the badge appears and names the
-cause. Separately, with only healthy sources, confirm the badge does NOT appear. Click through and
-confirm the Library opens on the Health tab with the count, and that a second visit uses the
-Library's own default tab.
-**Expected:** Positive and negative both hold; the one-shot hand-off stays spent.
-**Why human:** Per this phase's own authors, this exact end-to-end behavior "has never been driven"
-across two milestones (Phase 235 shipped the base mechanism unticked, and Phase 244 only added the
-tab attribution on top of it) — it is the least-verified of the five criteria despite being the
-oldest code.
-
-### 6. A + B — the 8-row cross-provider board and 4-axis rows
-
-**Test:** Per `244-VALIDATION.md` § A/B — derive the 8-provider roster from `MODEL_CAPABILITIES`
-(never re-typed), attach a file, ask what's in it, and record O1-O4 per provider row, plus the
-multi-tool / parallel-thread / long-message axis rows.
-**Expected:** The system-prompt attachment line is present and used by at least the majority of
-providers; failures are attributed to provider or shared path per O1's rule.
-**Why human:** Requires live LLM calls across 8 providers with real API keys; not reproducible
-statically.
+**Why human:** Reasoned from code (the review calls it "PLAUSIBLE, unproven"), not reproduced; needs
+a live two-request race that a single-process jsdom test cannot construct realistically.
 
 ---
 
 ## Gaps Summary
 
-**No BLOCKER gaps.** Every one of the 5 ROADMAP success criteria has code that is present,
-internally consistent, and — for the 8 claims independently spot-checked in this report —
-corroborated against the live tree rather than merely asserted by the SUMMARYs. The phase's own
-authors were unusually explicit and consistent, across 7 separate documents, that **no criterion
-has been driven in a browser**, and that is the correct and honest state for a phase whose own
-ROADMAP entry says "No success criterion closes on a unit test."
+**No BLOCKER.** Four of five ROADMAP success criteria for this phase are now driven-and-closed
+(SHELL-01, SHELL-02, SHELL-04's headline, SHELL-05) — a substantial, independently-confirmed
+improvement over round 1's "0/5 driven" baseline. The fifth, SHELL-03, had its original blocker
+fixed and driven-closed, but the browser drive that closed the first half also found a second,
+distinct failure (`G-8`) inside the same success criterion. A fix for `G-8` was built in `244-15`,
+reviewed with three warnings (one fixed via fast-fix, two deferred with concrete re-open triggers),
+and corroborated by ten independent spot-checks against the live tree plus three adversarial
+RED-drives in review — but **it has not been driven in a browser**, and this project's own history
+(`244-03`, `244-12`) is that jsdom-green fences over this exact class of defect have shipped broken
+before. Per `D-244-14`'s binding rule ("`BUG-260828-07` is severity HIGH and closes on a DRIVEN row,
+not a fence"), SHELL-03 is correctly scored `built, drive owed`, not closed.
 
-**WARNING-level open items** (not blocking, all tracked with re-open triggers): WR-04 (unbounded
-buffer before size cap on cloud attach — robustness), WR-07 (latent lock-expression gap, no current
-trigger), WR-08 (an honesty gap in the transcript's "Read" line for Explorer/harness turns), 9
-info-level findings, and a stale REQUIREMENTS.md traceability note for SHELL-04/SHELL-05 that
-contradicts locked decisions D-244-18/F-1 and should be corrected in the same pass that closes this
-verification.
+**G-7's gap-closure cap is SPENT (2 of 2, waved through with a worded override).** No third round is
+available; per the task's explicit instruction, this report does **not** recommend
+`/gsd:plan-phase 244 --gaps`. The only door is triage: drive `244-15-UAT-ROW.md` and record the
+result. If it passes, SHELL-03 (and the whole phase) closes on the strength of that drive alone — no
+further plan is needed. If it fails, the finding is real product behavior the operator must decide
+how to handle (fast-fix under G-3, since it would be a defect in code already reviewed and mostly
+correct, not a new capability).
 
-**The single highest-priority action:** drive `244-VALIDATION.md` L-2 (cap-paused composer across a
-reload) and L-7 (the app-shell signal, both directions) first — L-2 because the phase's own authors
-flag it as the one claim they could not verify by reasoning alone, and L-7 because it is the
-criterion with the longest history of never having been driven at all (since Phase 235).
+**WARNING-level open items**, none blocking: `WR-04` (unbounded buffer before size cap, carried),
+`WR-08` (transcript honesty gap in Explorer/harness turns, carried), `WR-02`/`WR-03` (deferred with
+triggers, from this round's own review), nine info-level findings, `G-7`'s new attachment-robustness
+gap (deferred to `SEED-272` by explicit operator ruling), and the REQUIREMENTS.md staleness (now
+stale on all five rows in a new way — not reflecting either round's drives, in addition to the
+sketch-note error already flagged in round 1).
+
+**The single highest-priority action:** drive `244-15-UAT-ROW.md`'s five arms. Nothing else in this
+phase is closer to done, and nothing else in this phase carries as much precedent for "a green fence
+here has shipped broken twice before."
 
 ---
 
-_Verified: 2026-09-12_
+_Verified: 2026-09-12 (re-verification, round 2)_
 _Verifier: Claude (gsd-verifier) — solo run; no independent second reviewer exists for this phase
-(D-244-21, OV-SOLO-01). This verification is itself a check ON a self-verified build, not a second
-independent build review — it re-derived 8 load-bearing claims directly against the live tree
-(commands quoted above) rather than accepting SUMMARY prose, and found no discrepancy in the sample._
+(D-244-21, OV-SOLO-01). This re-verification re-derived ten load-bearing claims about `244-15`
+directly against the live tree and git history (commands quoted above), cross-referenced
+`244-REVIEW-gap-round-2.md`'s adversarial RED-drive evidence, counted the UAT-ROW files
+independently rather than trusting prose, and confirms the round-1 report's preserved findings are
+still accurate for the criteria round 2 did not touch._

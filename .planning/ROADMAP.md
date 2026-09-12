@@ -257,8 +257,47 @@ Plans:
 `244-14` fix round (no PLAN, the `244-07`/`244-08` pattern; consumes no G-7 round). Gates on the
 merged tree: **`count gate OK` — 275/275 pinned, 0 failing** (total 8245 · pinned 7455) · backend at
 the locked **71-failed ceiling** · ledger gate **0** · **G-7 clear at 1 round of 2**. Per-plan detail
-and tick marks are in the *Gap closure — round 1* listing below. ⛔ **Six `244-NN-UAT-ROW.md` files
-are owed a browser drive — every verdict `pending`, and no criterion closes until they run.**
+and tick marks are in the *Gap closure — round 1* listing below. ⛔ **~~Six~~ FIVE
+`244-NN-UAT-ROW.md` files are owed a browser drive — every verdict `pending`, and no criterion
+closes until they run.**
+
+⚠ **THE `Six` ABOVE WAS WRONG WHEN WRITTEN, AND IS STRUCK THROUGH RATHER THAN DELETED.** Measured
+at the round-2 close by listing the files, not by trusting the sentence: round 1 produced
+**FIVE** rows — `244-09`, `244-10`, `244-11`, `244-12`, `244-13` — and `git log --diff-filter=D`
+over the glob returns **nothing**, so no sixth was ever written and deleted. `244-14` was a fix round
+and authored no row. **The total is six only NOW, because round 2 added `244-15-UAT-ROW.md`** — the
+figure happened to become true one round after it was asserted, which is the most dangerous kind of
+wrong number: a later reader who counts six finds agreement and never learns the claim was
+unfounded. Re-derive with `ls …/*UAT-ROW*.md | wc -l`, never from this prose.
+
+✅ **GAP-CLOSURE ROUND 2 EXECUTED 2026-09-12** — one plan, `244-15` (G-8 / SC#3's second clause),
+plus a **WR-01 fix round** (no PLAN; the `244-07`/`244-08`/`244-14` pattern, consumes no G-7 round).
+Gates measured by the orchestrator on the merged tree, verdict lines read verbatim:
+**`count gate OK` — 277/277 pinned, 0 failing** (total **8270** · pinned **7480**) · ledger gate **OK**
+(66 files parsed, 30 watched — not the Phase-242 vacuous-CRLF shape) · CLAUDE.md **97k, OK** ·
+`tsc -p tsconfig.app.json --noEmit` **67 → 67, zero new** · **backend untouched** by this round
+(`git diff --name-only … -- backend/` empty), so the locked **71-failed ceiling** is unaffected and
+was not re-run. **G-7: the cap is SPENT** — 2 of 2, waved through on the gate's worded escape hatch
+(`STATE.md → Guardrail overrides`). **G-8 does not fire** — one plan.
+
+**Review** (`244-REVIEW-gap-round-2.md`, diff base `8a27ab7f8`, **0 critical / 3 warning / 4 info**;
+it retires nothing from either prior review file):
+- ⭐ **The four headline claims were CONFIRMED by planted-defect RED drives, not by reading prose** —
+  inverting the guard's polarity reds 5 cases, moving `onAnswered` into the `catch` reds 1, deleting
+  it from the stack reds 2. **The two-homes pair is not presence-vacuous.**
+- ⛔ **`WR-01` was a regression THIS round introduced, and it was FIXED here as a G-3 fast-fix**
+  (`f0398f045`): the settle ran on **every** answered ask, so answering a prompt on a Deep chat run
+  disarmed the 8s stop-confirmation timer and `StopControl` re-rendered a pressable **Stop** over a
+  still-streaming run. A 7-line precondition; driven RED first by pressing Stop **for real**, since a
+  hand-seeded slice would have left the disarm — half the finding — unobserved.
+- `WR-02` / `WR-03` — **DEFERRED as decisions** with fireable triggers, `deferred-items.md` §§ 12-13.
+
+⛔ **THE PHASE IS NOT CLOSED. Re-verification returns `human_needed`, 4/5 criteria driven-and-closed.**
+SHELL-01, SHELL-02, SHELL-04's headline and SHELL-05 are now genuinely **driven**, not merely fenced.
+**SHELL-03 is `built, drive owed`** — `244-15-UAT-ROW.md`'s five arms are all `pending`, and
+`D-244-14` binds: *`BUG-260828-07` closes on a DRIVEN row, not a fence.* ⚠ This phase has already
+been burned twice by the inverse error (`244-03`, `244-12`), which is why a green 8270-case gate is
+recorded above as a gate result and **not** as evidence of behaviour.
 
 ⚠ **ONE BACKEND TEST IS FLAKY ON A ZERO-HEADROOM CEILING — measured at this close, recorded rather
 than smoothed over.** Four runs of `pytest tests/unit -q --continue-on-collection-errors` at the

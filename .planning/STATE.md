@@ -536,6 +536,60 @@ above — nothing else survives the reset silently.**
 
 ## Phase 244 — owed verification (recorded 2026-09-12)
 
+⚠⚠ **SUPERSEDED AT THE ROUND-2 CLOSE, 2026-09-12 — the original text is preserved below, never
+overwritten, because what it got WRONG is the useful part.** It reads *"zero `244-VALIDATION.md` rows
+have been driven"* and lists L-2 / L-7 / L-1 / L-3 / L-4 / L-5 / L-6 as owed. **Two full browser
+rounds have since run** (`244-UAT.md` § R1, § R2), and re-verification measures **4 of 5 ROADMAP
+success criteria DRIVEN AND CLOSED** — SHELL-01, SHELL-02, SHELL-04's headline, SHELL-05. The
+owed-list below is therefore not merely out of date, it names as owed several rows that have since
+passed. ⛔ **A stale owed-list is worse than no list: it sends the next session to re-drive work that
+is done and lets the one genuinely owed row hide inside seven.**
+
+### The CURRENT position — ONE row owed, and it is named
+
+⛔ **Phase 244 is BUILT + REVIEWED, NOT CLOSED.** Re-verification (`244-VERIFICATION.md`,
+`re_verification: true`) returns **`human_needed`**, score **4/5 driven-and-closed**.
+
+**The single blocking item:**
+
+> **Drive `.planning/phases/244-the-chat-shell-and-the-composer/244-15-UAT-ROW.md`** — five arms, all
+> `pending`. It scores **SC#3's second clause**: *answering an approval in either home settles it in
+> both*, plus the run-line and composer readings.
+
+**Why it cannot be waved through on the fences.** `G-8` was driven **FALSE in a real browser on two
+real workflow runs**. Round 2 (`244-15`, merged `6acc0bf28`) built the settle path for it, and the
+code is real — ten load-bearing claims were spot-checked against the live tree and all held. But
+**every assertion added is a jsdom mount over a mocked `@/lib/api`**, and this phase has been burned
+by exactly that twice: `244-03` shipped a green mount fence over this same blocker and the operator
+found it live nineteen plans later; `244-12` shipped fences proving the approval MOUNTS when the half
+that broke was whether it ANSWERS. `D-244-14` binds — *`BUG-260828-07` is severity HIGH and closes on
+a DRIVEN row, not a fence.*
+
+**Round-2 gates, measured by the orchestrator on the merged tree (not inherited from an executor):**
+count gate `total 8270 · failed 0 · pinned 7480 · 277/277` · ledger gate OK (66 files parsed, 30
+watched — not the Phase-242 vacuous-CRLF shape) · CLAUDE.md 97k OK · `tsc -p tsconfig.app.json` 67 → 67,
+zero new · **backend untouched by round 2**, so the locked 71-failed ceiling is unaffected.
+
+**Round-2 review dispositions** (`244-REVIEW-gap-round-2.md`, 0 critical / 3 warning):
+- **`WR-01` FIXED** as a G-3 fast-fix (`f0398f045`) — it was a regression `244-15` itself introduced:
+  the settle ran on **every** answered ask, so answering a prompt on a Deep chat run disarmed the 8s
+  stop-confirmation timer and `StopControl` re-rendered a pressable **Stop** over a still-streaming
+  run. Driven RED first, pressing Stop for real rather than hand-seeding the slice.
+- **`WR-02` / `WR-03` DEFERRED** as decisions with fireable triggers — `deferred-items.md` §§ 12-13.
+
+⛔ **G-7's round cap is SPENT (2 of 2, overridden — see § Guardrail overrides).** If the owed drive
+finds a defect, `/gsd:plan-phase 244 --gaps` is **NOT available**. Triage is the only door: fast-fix
+(G-3) / defer with a trigger / accept. A third round needs the operator, not a flag.
+
+⚠ **Also new, and not this round's scope:** SHELL-04 gained a second gap in round 2 — a failed
+cloud-attachment copy never gives up and never recovers — deferred to **`SEED-272`** by explicit
+operator ruling.
+
+---
+
+### ⚠ ORIGINAL TEXT, 2026-09-12 (stale — kept for the record, do NOT act on its owed-list)
+
+
 Phase 244 is **BUILT, NOT VERIFIED**. Verification returned `human_needed`: 5/5 success
 criteria have real wired code (8 load-bearing claims spot-checked against the live tree,
 all held), and **zero `244-VALIDATION.md` rows have been driven**. The ROADMAP states
