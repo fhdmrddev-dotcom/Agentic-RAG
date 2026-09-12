@@ -3498,6 +3498,88 @@ export function StreamsProvider({ children }: PropsWithChildren) {
           useStreamsStore.setState((s) => ({
             workflowLockByThread: _clearWorkflowLock(s.workflowLockByThread, threadId),
           })),
+        // ── Phase 244-15 (SHELL-03 / UAT gap G-8) — THE SETTLE PATH. IT RELEASES ONLY. ──
+        //
+        // ⛔ THIS IS DELIBERATELY NOT A SEVENTH `setWorkflowLockForThread` WRITER, and that
+        // is this path's central design constraint rather than a stylistic preference. Six
+        // sites write that key; two of them are fenced against each other by
+        // `__tests__/providers/workflowLockWriters.lockstep.test.ts` because they had already
+        // drifted apart once (`244-08` / `244-13` / `244-14` CR-01). A reader who adds a
+        // `setWorkflowLockForThread` call inside this action is re-opening `G-1`: they would be
+        // introducing a seventh derivation of one fact, from a path nobody orders against the
+        // other six. If a lock needs SETTING, the mount reconcile and the SSE already do it.
+        //
+        // WHY IT EXISTS. The designed cross-home settle for an answered approval is the
+        // `ask_user_response` SSE (→ `removePendingAskForThread`, :1168). On the WORKFLOW path
+        // the client is not subscribed to that run's stream, so the SSE never lands, nothing
+        // re-reads the thread's workflow state, and `workflowLockByThread` keeps a lock the
+        // server dropped — a `live` run line with a climbing 1s clock and a composer disabled
+        // on "Workflow running — Cancel to switch back", over a finished run. Driven in a real
+        // browser, `244-UAT.md` § R2-4.
+        //
+        // ⚠ FETCH-BASED, NOT A SECOND OPTIMISTIC UPDATE — `D-v2.5-03`, verbatim: *Realtime is
+        // a hint, not truth — always reconcile via fetch*. A second optimistic mechanism that
+        // can drift from the first IS the defect being fixed.
+        //
+        // ⚠ AND IT NEVER POLLS. One GET per human answer, bounded by the number of answers.
+        // `ThreadRunLine.tsx`'s D-11 rule binds: WorkflowRunPage already owns the polling
+        // concern. Fenced (with the no-seventh-writer rule) by
+        // `__tests__/providers/streamsProvider_244_settle_ask.test.tsx` Test 8.
+        releaseSettledWorkflowLock: (threadId) => {
+          if (!threadId) return
+          void (async () => {
+            let wf: Awaited<ReturnType<typeof getThreadWorkflow>>
+            try {
+              wf = await getThreadWorkflow(threadId)
+            } catch (err) {
+              // Swallowed for `refreshPhaseSpineAfterStop`'s stated reason: the surface was
+              // ALREADY stale, and a rejected background read must never surface as an error
+              // nobody can act on — least of all from a click handler inside a card that has
+              // no error boundary (`BUG-260529-03`). Writing nothing is the honest outcome:
+              // we could not read, so we do not know, so we do not guess.
+              console.warn("[StreamsProvider] settle read after answer failed", err)
+              return
+            }
+            // THE TWO SHIPPED GUARDS, READ OFF THE WIRE AND NOT RE-DERIVED. These are the
+            // exact conditions of the two `setWorkflowLockForThread` arms in this file's own
+            // mount reconcile (:2411 and :2447) — quoted by reference on purpose, because a
+            // second client-side derivation of one fact is how these registers drift.
+            const liveAnchor = !!(
+              wf.locked &&
+              !wf.lock_is_stale &&
+              wf.active_workflow_run_id
+            )
+            const capPaused = !!wf.cap_paused
+            if (liveAnchor || capPaused) {
+              // ⛔ RELEASE NOTHING. Unlocking the composer during a live harness run is the
+              // elevation `T-244-03-01` names; a cap-paused lock is a lock the person still
+              // needs (`244-08`). Fail-closed is the DIRECTION, not merely the agreement.
+              //
+              // Re-attach the live producer shell instead — the identical arm the mount
+              // reconcile owns at :2440, idempotent per `subscribeProducerStream`'s docblock.
+              // This is what lets the SHIPPED terminal handler clear the lock when the run
+              // really ends, instead of this path inventing a second terminal route.
+              if (wf.latest_producer_run_id) {
+                subscribeProducerStreamRef.current?.(threadId, wf.latest_producer_run_id)
+              }
+              return
+            }
+            // The server has dropped the anchor (or calls it stale — the shipped F2 self-heal
+            // reading). Release, in this order.
+            //
+            // ⚠ `clearStopStateForThread` AND NOT A HAND-WRITTEN SET DELETE.
+            // `useHarnessLiveForThread` (:4711) has TWO disjuncts —
+            // `harnessKickoffThreads.has(tid) || lock?.mode === "harness"` — so clearing only
+            // the lock leaves the run line reading `live` with its 1s `setInterval` clock on a
+            // dead run. That function is the SHIPPED writer of `harnessKickoffThreads` (it also
+            // clears `stoppingThreads` / `stopNotConfirmed` and disarms the stop timer, all
+            // correct here: the server has just said the run is over). Two writers of one slice
+            // that differ is how slices drift in this file.
+            useStreamsStore.getState().actions.clearWorkflowLockForThread(threadId)
+            clearStopStateForThread(threadId)
+            refreshPhaseSpineAfterStop(threadId)
+          })()
+        },
         // --- Phase 094 (PANEL-08/09): panel-only phase-timeline mutators ---
         // Copy-then-mutate the phasesByThread Map (new Map → set), keyed strictly
         // by the passed (OWNING) threadId. NEVER touch bucketsBySurface — the
@@ -4355,6 +4437,12 @@ export function useTasks(threadId: string | null): {
  * common case right, it does not make the read authoritative. A failure is
  * swallowed for the same reason: the panel was already stale, and a rejected
  * background fetch must never surface as an error the user cannot act on.
+ *
+ * ⚠ SECOND CALLER SINCE 244-15 (G-8): the `releaseSettledWorkflowLock` settle path calls it
+ * on the release arm, after the server has confirmed the thread's workflow anchor is gone.
+ * THE CONTRACT IS UNCHANGED — viewed-thread-scoped, best-effort, swallow-on-failure — and it
+ * is named here rather than left for the next reader to discover. There is deliberately no
+ * second phase-spine refresher and no rename: one concern, one home.
  */
 function refreshPhaseSpineAfterStop(threadId: string): void {
   if (useStreamsStore.getState().viewedThreadId !== threadId) return

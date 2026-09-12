@@ -365,6 +365,22 @@ export interface StreamsState {
     setWorkflowLockForThread: (threadId: string, lock: WorkflowLock) => void
     /** Clear a thread's workflow lock — GC delete-the-key (unlock / terminal). */
     clearWorkflowLockForThread: (threadId: string) => void
+    /**
+     * Phase 244-15 (SHELL-03 / UAT gap G-8) — re-read `GET /threads/{id}/workflow` and
+     * RELEASE a lock the server has already dropped.
+     *
+     * ⛔ WHAT IT DOES NOT DO IS THE POINT: **it never SETS a lock.** There are six
+     * `setWorkflowLockForThread` write sites and two of them are fenced in lockstep
+     * (`__tests__/providers/workflowLockWriters.lockstep.test.ts`); this adds no seventh
+     * derivation. When the server still reports a live — or cap-paused — run it releases
+     * NOTHING and re-attaches the live producer stream instead, so the SHIPPED terminal
+     * handler stays the only thing that ends a lock's life.
+     *
+     * ⚠ `void`, NOT `Promise<void>`: it is fire-and-forget from a click handler (a rejected
+     * background read must never reach a card with no error boundary), and a `void` return is
+     * what lets the no-op stub below stay a bare arrow.
+     */
+    releaseSettledWorkflowLock: (threadId: string) => void
     // ──────────────────────────────────────────────────────────────────────────
     // Phase 094 Plan 02 (PANEL-08 / PANEL-09) — panel-only phase-timeline
     // mutators. Each copy-then-mutates the phasesByThread Map (new Map → set),
@@ -512,6 +528,11 @@ export const useStreamsStore = create<StreamsState>()(subscribeWithSelector(() =
     // can fire before the provider's mount-time useEffect registers real bodies.
     setWorkflowLockForThread: () => {},
     clearWorkflowLockForThread: () => {},
+    // Phase 244-15 (G-8): same reason — `PendingAskStack` reaches this through
+    // `useStreamsStore.getState().actions`, and eight suites mount that stack with
+    // `@/providers/StreamsProvider` mocked and no provider at all. A synchronous no-op is
+    // exactly the right behaviour there: with no provider there is no lock to release.
+    releaseSettledWorkflowLock: () => {},
     // Phase 094 Plan 02 (PANEL-08/09): synchronous no-op stubs — a harness
     // phase_* / gate_failed / run_failed SSE can fire BEFORE the provider's
     // mount-time useEffect registers real bodies (Pitfall 5 — NOT notMounted).

@@ -3035,6 +3035,16 @@ const BASELINE = {
   // would re-open the hole `244-08` shut, so the DIRECTION is pinned as its own case.
   "workflowLockWriters.lockstep.test.ts": 5,
 
+  // ── Phase 244-15 (SHELL-03 / UAT gap G-8) — the answer-settles-both-homes fences ───────
+  //
+  // 8 cases at the Task-1 commit, read from this script's own `actual` column, never
+  // hand-counted. Three of them are NEGATIVE CONTROLS (a live anchor, a cap-paused lock and
+  // a failed read each release NOTHING) — the arms that keep the settle from becoming the
+  // elevation `T-244-03-01` names, and the easiest kind of case to delete without anyone
+  // noticing. Test 8 is the source sweep that forbids a SEVENTH `setWorkflowLockForThread`
+  // derivation; without a pin it could be silently dropped and the gate would still say OK.
+  "streamsProvider_244_settle_ask.test.tsx": 8,
+
   // ── Phase 243 (243-03 / CHAT-03 / D-243-16) — the scroll effect's ONLY behavioural fence ─
   //
   // ⚠ 8 was READ FROM THIS SCRIPT'S OWN `actual` COLUMN on the run that first executed the
@@ -5145,6 +5155,16 @@ const TARGETS = [
   // reason no plan here owns. (Measured on this round's base and again after its changes:
   // the same 14, name for name.)
   "src/__tests__/providers/workflowLockWriters.lockstep.test.ts",
+  // ── Phase 244-15 (SHELL-03 / G-8) — the settle path's fences ──────────────────────────
+  //
+  // FILE-LEVEL for the identical reason as the four neighbours here: `src/__tests__` is not
+  // a bare-directory TARGETS entry anywhere in this array, so a suite placed there runs in
+  // NO gate until it is named here AND pinned in BASELINE. TARGETS decides what RUNS;
+  // BASELINE decides what is GUARDED, and a suite can sit on the wrong side of exactly one
+  // of them. ⛔ Do NOT "simplify" this to a `src/__tests__/providers` directory entry — the
+  // fourteen INHERITED failures documented above live in that folder and would turn the
+  // shared gate red for a reason no plan here owns.
+  "src/__tests__/providers/streamsProvider_244_settle_ask.test.tsx",
   // ⚠ The scroll suite below is a SEPARATE FILE from `MessageList.test.tsx` on purpose:
   // that one stubs `scrollIntoView` to a NO-OP tree-wide (`:61-65`), so nothing mounted under it
   // can see the scroll effect at all. This is the ONLY behavioural coverage that effect has.
