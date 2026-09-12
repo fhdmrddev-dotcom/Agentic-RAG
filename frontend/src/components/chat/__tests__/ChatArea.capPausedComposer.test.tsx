@@ -196,6 +196,53 @@ describe("SHELL-02 / BUG-260904-05 — a cap-paused Deep run leaves the composer
     expect(screen.queryByPlaceholderText("Ask anything…")).toBeNull()
   })
 
+  it("5 — a harness run whose OWN status is cap_paused stays LOCKED (T-244-03-01)", async () => {
+    // ⛔ THE STATE CASE 2 COULD NOT SEE, AND THE REASON THE DEFECT SURVIVED A GREEN FENCE.
+    //
+    // `HARNESS_LOCKED_STATE` sets `cap_paused: false`, so every earlier case reads the
+    // discriminator on a run that is locked OR paused — never one that is BOTH. The plan's
+    // declared mitigation for `T-244-03-01` is verbatim: *"the discriminator is `capPaused`,
+    // which is set only on the `state.cap_paused` reconcile branch"*. It was ALSO set on the
+    // genuine-lock branch (`ChatArea.tsx:205`), and `workflowLocked` then evaluated FALSE for
+    // a live harness run — the composer unlocking mid-run.
+    //
+    // ⚠ THIS STATE IS LATENT, NOT IMPOSSIBLE, AND THAT IS WHY THE CASE CONSTRUCTS IT DIRECTLY
+    // RATHER THAN WAITING FOR A WRITER. `244-SECURITY.md` OPEN-1 records that no writer of
+    // `'cap_paused'` onto `workflow_runs.status` could be found — but the value is schema-valid
+    // (`063_dual_mode_continue.sql:57` adds it to BOTH status columns), `threads.py:1238` sets
+    // `cap_paused = run_status == "cap_paused"` straight off that column, and
+    // `_TERMINAL_WORKFLOW_STATUSES` (`threads.py:1095`) does not contain it — so the row is
+    // simultaneously `locked: true` and `cap_paused: true`. A fence that waits for the first
+    // writer is a fence that arrives after the defect ships.
+    //
+    // ⛔ FAIL-CLOSED IS THE CHOSEN DIRECTION. Keeping a genuine harness lock costs a person one
+    // Cancel click; unlocking during a live run is the EoP this threat names.
+    getThreadWorkflow.mockResolvedValue({
+      ...HARNESS_LOCKED_STATE,
+      run_status: "cap_paused",
+      cap_paused: true,
+      continues_used: 1,
+      continues_remaining: 2,
+    })
+    renderChatArea()
+
+    // The lock must have LANDED first — otherwise everything below passes vacuously on a
+    // thread that was never locked at all, which is the failure a presence assertion cannot
+    // see (Phase 235's lesson, one surface over).
+    await waitFor(() =>
+      expect(useStreamsStore.getState().workflowLockByThread.has(THREAD.id)).toBe(true),
+    )
+
+    // CAUSE — the discriminator itself.
+    expect(useStreamsStore.getState().workflowLockByThread.get(THREAD.id)?.capPaused).toBe(false)
+
+    // CONSEQUENCE — what the person actually sees. Both are asserted because the cause alone
+    // would let a future refactor satisfy the flag while the composer unlocked some other way.
+    const box = await screen.findByPlaceholderText("Workflow running — Cancel to switch back")
+    expect(box).toBeDisabled()
+    expect(screen.queryByPlaceholderText("Ask anything…")).toBeNull()
+  })
+
   it("4 — a non-empty draft can be SENT while capPaused (Send is not gated by the pause)", async () => {
     getThreadWorkflow.mockResolvedValue(CAP_PAUSED_STATE)
     renderChatArea()
