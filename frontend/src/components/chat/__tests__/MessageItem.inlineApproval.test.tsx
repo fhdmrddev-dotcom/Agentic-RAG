@@ -50,6 +50,46 @@
  * **driven both-directions** row in `244-VALIDATION.md`: a real armed approval, answered from
  * the thread and seen settled in the panel, then the reverse. A synthetic mount test proves
  * MOUNTING, never ANSWERING. This file claims no part of that row.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════════════════════
+ * ⛔⛔ CORRECTION — Phase 244 plan 12 (G-6, BLOCKER). EVERYTHING ABOVE THIS LINE IS PRESERVED
+ * RATHER THAN REWRITTEN, BECAUSE THE DOCBLOCK BEING CONFIDENT AND WRONG IS THE FINDING.
+ *
+ * This suite was GREEN and the bug it claims to fence was **still live in the product**. Driven
+ * 2026-09-12 in Chrome on a REAL workflow-raised approval (200-Word Essay Writer, step 2 "act"),
+ * the chat thread rendered NO approval controls and NO paused cue. All three controls measured
+ * at `left >= 1103` against the panel's own left edge of `1082` — every one inside the panel.
+ * `anyApprovalControlInChatColumn = FALSE`.
+ *
+ * ⭐ WHY THIS FILE COULD NOT SEE IT: every case above **CONSTRUCTS**
+ * `tool_calls: [{ name: "ask_user", status: "running" }]` — the DEEP-AGENT shape — and so proves
+ * the component renders WHEN HANDED that shape. It never asks whether the product emits it for a
+ * workflow run. The row the harness actually writes is `role="system"` with
+ * `tool_calls: [{ kind: "ask_user_prompt" }]`: no `name`, no `status`. **The harness speaks
+ * `kind`; `hasPendingAsk` reads `name`/`status`.**
+ *
+ * ⛔⛔ AND WIDENING THAT PREDICATE WOULD HAVE CLOSED NOTHING — measured at planning, twice,
+ * because it is the obvious wrong turn. `backend/app/api/threads.py:427-438` and `:682-691`
+ * BOTH apply `.neq("role", "system")` (`BUG-260528-01` — `MessageResponse.role` is
+ * `Literal["user","assistant"]` and serializing a system row 500s the whole thread). **No
+ * message in the transcript carries the harness carrier shape at all.** A wider predicate would
+ * have shipped a SECOND green fence over the same blocker.
+ *
+ * ⭐ THE FIX IS A MOVE, NOT A PREDICATE. The mount went to LIST level in `MessageList.tsx`, a
+ * sibling of `ThreadRunLine` — whose own shipped comment already makes this exact argument for a
+ * harness kickoff that inserts no assistant node. `PendingAskStack` is zero-prop and
+ * self-resolving, so a pause reaches it through the STORE, with no message to anchor to.
+ *
+ * ⚠ CONSEQUENCE FOR THIS FILE, stated so a later reader does not "tidy" it back:
+ *   · Cases 1, 2, 3 and 5 now render through **`MessageList`**. Their numbers and their claims
+ *     are kept; each carries a line saying what its anchor used to be and why it moved.
+ *   · Case 4 deliberately KEEPS its bare-`MessageItem` anchor — see its own docblock. It is now
+ *     the executable proof that the ROW mounts no stack at all, which is a claim only a
+ *     row-level render can make.
+ *   · W1-W5 are the new cases. **W1 is the gap**: it seeds through the PRODUCT's own writer path
+ *     and carries no ask-bearing message whatsoever.
+ * ⛔ NO CASE WAS DELETED. The count gate's contract is *no per-file DECREASE*, and the narrow
+ * mount's reasoning is the only written record of a cost that is still true about a per-row mount.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, screen, cleanup, waitFor } from "@testing-library/react"
@@ -118,6 +158,39 @@ function assistantRow(over: Partial<Message> = {}): Message {
   } as Message
 }
 
+/**
+ * 244-12 (G-6): AN ORDINARY TURN — a user row and an assistant row, and **nothing else**.
+ *
+ * ⛔ NO `tool_calls` ON EITHER ROW, AND THAT ABSENCE IS THE WHOLE POINT. This is the transcript
+ * a WORKFLOW-raised pause actually produces on the wire: the carrier row is `role="system"` and
+ * `threads.py`'s `.neq("role","system")` filters it off, so the frontend receives ordinary rows
+ * and learns about the pause ONLY through the store. A fixture that hand-builds an `ask_user`
+ * tool call is the exact failure this gap is about.
+ */
+function plainTurn(): Message[] {
+  return [
+    {
+      id: "m-plain-user",
+      thread_id: THREAD,
+      user_id: "u-1",
+      role: "user",
+      content: "Write the essay and email it to procurement.",
+      created_at: "2026-09-11T08:59:00Z",
+      updated_at: "2026-09-11T08:59:00Z",
+    },
+    {
+      id: "m-plain-assistant",
+      thread_id: THREAD,
+      user_id: "u-1",
+      role: "assistant",
+      content: "Starting the workflow.",
+      created_at: "2026-09-11T08:59:30Z",
+      updated_at: "2026-09-11T08:59:30Z",
+      runStatus: "completed",
+    },
+  ] as Message[]
+}
+
 function wrap(ui: React.ReactElement) {
   return render(
     <StreamsProvider>
@@ -157,7 +230,11 @@ afterEach(() => cleanup())
 
 describe("SHELL-03 / BUG-260828-07 — the controls join the cue, inline at the paused message", () => {
   it("1 — the paused row renders the cue AND the panel's two actions, by their LABELS", async () => {
-    wrap(<MessageItem message={assistantRow()} isStreaming isLastAssistant />)
+    // ⚠ 244-12 RE-AIMED IN PLACE. This case's anchor was a BARE `<MessageItem>`; it now renders
+    // through `<MessageList>`. The claim is unchanged — cue and actions, together, on a paused
+    // Deep turn — but the controls are no longer the ROW's to render, so a row-level render
+    // would now assert a mount that was deliberately removed.
+    wrap(<MessageList messages={[assistantRow()]} isStreaming threadId={THREAD} />)
 
     // The shipped cue is unchanged and still there — this is additive, not a replacement.
     expect(await screen.findByText("ask_user · awaiting your answer")).toBeInTheDocument()
@@ -173,25 +250,41 @@ describe("SHELL-03 / BUG-260828-07 — the controls join the cue, inline at the 
     expect(screen.getByText(ASK.prompt)).toBeInTheDocument()
   })
 
-  it("2 — a row whose OWN run is not streaming renders no approval controls", async () => {
-    // ⚠ The real gate is `message.runStatus === "streaming"` (MessageItem's own
+  it("2 — a row whose OWN run is not streaming renders no inline CUE, and does not OWN the controls", async () => {
+    // ⚠ 244-12 RE-AIMED IN PLACE, and the re-aim is a real change of claim rather than a change
+    // of anchor. The original read "renders no approval controls", which was a statement about
+    // the per-row mount. That mount is gone: the controls now come from LIST level and are
+    // present here. What SURVIVES the move — and is still worth fencing — is that the per-row
+    // narrowing still governs the CUE, and that the row does not own the controls.
+    // ⚠ The real gate for the cue is `message.runStatus === "streaming"` (MessageItem's own
     // `isMessageStreaming`), NOT the `isStreaming` prop — which is deliberately passed TRUE
     // here so the case cannot pass for the wrong reason.
     wrap(
-      <MessageItem
-        message={assistantRow({ id: "m-old", runStatus: "completed" })}
+      <MessageList
+        messages={[assistantRow({ id: "m-old", runStatus: "completed" })]}
         isStreaming
-        isLastAssistant
+        threadId={THREAD}
       />,
     )
 
-    await waitFor(() => expect(screen.queryByText("ask_user · awaiting your answer")).toBeNull())
-    expect(screen.queryByRole("radio", { name: APPROVE })).toBeNull()
-    expect(screen.queryByRole("button", { name: "Send Answer" })).toBeNull()
-    expect(getThreadPendingAsks).not.toHaveBeenCalled()
+    // The controls ARE on the page — from the list-level mount, fed by the store.
+    const approve = await screen.findByRole("radio", { name: APPROVE })
+    // …and the inline cue is NOT, because this row's own run is not streaming.
+    expect(screen.queryByText("ask_user · awaiting your answer")).toBeNull()
+
+    // ⛔ THE CONTROLS ARE NOT INSIDE THE ROW. Positive control first: the row must actually be
+    // on the page, or the containment check below would be a claim about nothing.
+    const rows = Array.from(document.querySelectorAll('[data-testid="assistant-message"]'))
+    expect(rows.length).toBeGreaterThan(0)
+    for (const row of rows) expect(row.contains(approve)).toBe(false)
   })
 
   it("3 — SIX rows cost exactly what ONE row costs (the C-3 cost fence)", async () => {
+    // ⚠ 244-12: this case ALREADY rendered through `MessageList`, so its anchor did not move —
+    // but its meaning did. It used to prove that a NARROW per-row mount did not multiply; it now
+    // proves that a LIST-LEVEL mount cannot, by construction. ⛔ It is kept rather than replaced
+    // by W3: this case drives the DEEP shape (a row carrying the ask), W3 drives the WORKFLOW
+    // shape (no ask-bearing row at all), and the cost property has to hold on both.
     const older: Message[] = Array.from({ length: 5 }, (_, i) => ({
       id: `m-${i}`,
       thread_id: THREAD,
@@ -225,7 +318,15 @@ describe("SHELL-03 / BUG-260828-07 — the controls join the cue, inline at the 
     expect(getThreadPendingAsks.mock.calls.length).toBeLessThan(6)
   })
 
-  it("4 — a row with no PENDING ask mounts nothing and buys no fetch", async () => {
+  it("4 — the ROW ITSELF mounts no stack and buys no fetch — not for a settled ask, and not for a live one", async () => {
+    // ⚠ 244-12 — THIS CASE DELIBERATELY KEEPS ITS BARE-`MessageItem` ANCHOR, and that is a
+    // decision rather than an oversight. 244-12's plan asked for cases 1-5 to be re-aimed
+    // through `MessageList`; doing so HERE would have required emptying the store to keep the
+    // "nothing renders" half true, at which point the case would pass because there was nothing
+    // to render — the precise failure mode this whole gap is about — and it would duplicate W4.
+    // Kept at row level, it is instead the EXECUTABLE FORM OF TASK 2's REMOVAL: the row mounts
+    // no `PendingAskStack`, so it buys no `getThreadPendingAsks`, and that is a claim only a
+    // row-level render can make. The LIST-level cost is W4's to publish.
     wrap(
       <MessageItem
         message={assistantRow({
@@ -243,6 +344,14 @@ describe("SHELL-03 / BUG-260828-07 — the controls join the cue, inline at the 
 
     await waitFor(() => expect(screen.queryByRole("button", { name: "Send Answer" })).toBeNull())
     expect(getThreadPendingAsks).not.toHaveBeenCalled()
+
+    // ⛔ AND THE SHARP HALF, added by 244-12: the SAME is true of a row carrying a LIVE ask —
+    // the shape that used to mount the stack. The row renders its cue and nothing else.
+    cleanup()
+    wrap(<MessageItem message={assistantRow()} isStreaming isLastAssistant />)
+    expect(await screen.findByText("ask_user · awaiting your answer")).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: "Send Answer" })).toBeNull()
+    expect(getThreadPendingAsks).not.toHaveBeenCalled()
   })
 
   it("5 — the settle is STRUCTURAL: a second reader sees the same slice, at no second fetch", async () => {
@@ -254,9 +363,12 @@ describe("SHELL-03 / BUG-260828-07 — the controls join the cue, inline at the 
       const { data } = useAskUserPrompt(THREAD)
       return <div data-testid="sibling">{data.length === 0 ? "settled" : data[0].prompt}</div>
     }
+    // ⚠ 244-12 RE-AIMED IN PLACE: the anchor moved from a bare `<MessageItem>` to
+    // `<MessageList>`, because that is where the chat column's approval surface now lives. The
+    // claim is unchanged.
     wrap(
       <>
-        <MessageItem message={assistantRow()} isStreaming isLastAssistant />
+        <MessageList messages={[assistantRow()]} isStreaming threadId={THREAD} />
         <SiblingReader />
       </>,
     )
@@ -272,6 +384,157 @@ describe("SHELL-03 / BUG-260828-07 — the controls join the cue, inline at the 
     expect(screen.queryByRole("radio", { name: APPROVE })).toBeNull()
     // ⛔ No re-fetch on either side — the settle travelled through the store, not the wire.
     expect(getThreadPendingAsks.mock.calls.length).toBe(callsBefore)
+  })
+})
+
+describe("G-6 (244-12, BLOCKER) — the shape the PRODUCT writes, not the shape a test builds", () => {
+  it("W1 — a WORKFLOW-raised pause reaches the chat column with NO ask-bearing message at all", async () => {
+    // ⛔ THE GAP, EXECUTABLE. Every case above hands the component a constructed
+    // `tool_calls: [{ name: "ask_user", status: "running" }]`. The harness writes no such row to
+    // the transcript — its carrier is `role="system"` and `threads.py` filters it off the wire —
+    // so this case carries NO ask-bearing message whatsoever and learns about the pause exactly
+    // the way the product does.
+    //
+    // ⛔ SEEDED THROUGH THE PRODUCT'S OWN WRITER. The slice starts EMPTY; `useAskUserPrompt`
+    // mounts `usePanelReconcile`, whose `fetcher` IS `getThreadPendingAsks`, and the resolved
+    // rows are written by `replacePendingAsksForThread`. That is the thread-open path the
+    // operator drove — not a hand-written store value, and certainly not a hand-written message.
+    useStreamsStore.setState({ pendingAsksByThread: new Map() })
+
+    const messages = plainTurn()
+    // The negative control that makes this case about the PRODUCT's shape rather than about a
+    // convenient fixture: assert the absence BEFORE rendering, so it cannot be argued after.
+    for (const m of messages) expect(m.tool_calls).toBeUndefined()
+
+    wrap(<MessageList messages={messages} isStreaming={false} threadId={THREAD} />)
+
+    // ⚠ THE RENDERED CONTROL WORDS, never a `data-testid`. `BUG-260828-07`'s complaint was
+    // literally "it looked right and did nothing", which a presence assertion cannot see.
+    expect(await screen.findByRole("radio", { name: APPROVE })).toBeInTheDocument()
+    expect(screen.getByRole("radio", { name: DECLINE })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Send Answer" })).toBeInTheDocument()
+    // …and the question, so the column cannot offer controls for an invisible prompt.
+    expect(screen.getByText(ASK.prompt)).toBeInTheDocument()
+    // …written by the product's fetcher, which is the half that makes the seeding honest.
+    expect(getThreadPendingAsks).toHaveBeenCalled()
+  })
+
+  it("W2 — the DEEP path is not traded away, and the pause renders EXACTLY ONE set of controls", async () => {
+    // ⛔ BOTH MUST HOLD. A fix that swaps one unreachable path for another is not a fix, and a
+    // fix that leaves BOTH mounts in place gives one decision two homes in the same column —
+    // "actionable twice and agreed in neither", the ROADMAP's own named failure mode. The
+    // `getAllBy…` length assertions are what distinguish the two outcomes.
+    wrap(<MessageList messages={[assistantRow()]} isStreaming threadId={THREAD} />)
+
+    expect(await screen.findByText("ask_user · awaiting your answer")).toBeInTheDocument()
+    expect(screen.getAllByRole("radio", { name: APPROVE })).toHaveLength(1)
+    expect(screen.getAllByRole("radio", { name: DECLINE })).toHaveLength(1)
+    expect(screen.getAllByRole("button", { name: "Send Answer" })).toHaveLength(1)
+  })
+
+  it("W3 — SIX ordinary rows cost exactly what ONE costs, on the WORKFLOW shape", async () => {
+    // C-3's measurement, re-driven AT THE NEW SITE rather than assumed by it. This is the
+    // property that made the original mount narrow; a list-level mount should make it
+    // structural, and "should" is not a fence.
+    const single = wrap(
+      <MessageList messages={plainTurn()} isStreaming={false} threadId={THREAD} />,
+    )
+    await screen.findByRole("radio", { name: APPROVE })
+    const oneTurnCalls = getThreadPendingAsks.mock.calls.length
+    single.unmount()
+    getThreadPendingAsks.mockClear()
+
+    const many: Message[] = Array.from({ length: 6 }, (_, i) => ({
+      id: `m-w3-${i}`,
+      thread_id: THREAD,
+      user_id: "u-1",
+      role: i % 2 === 0 ? "user" : "assistant",
+      content: `turn ${i}`,
+      created_at: `2026-09-11T08:0${i}:00Z`,
+      updated_at: `2026-09-11T08:0${i}:00Z`,
+      runStatus: "completed",
+    })) as Message[]
+
+    wrap(<MessageList messages={many} isStreaming={false} threadId={THREAD} />)
+    await screen.findByRole("radio", { name: APPROVE })
+
+    // ⛔ AN EQUALITY AGAINST A CONTROL, never a literal — a literal encodes a per-mount constant
+    // this project has already measured wrong once (see the header). The property that matters
+    // is that the cost does not scale with ROW COUNT.
+    expect(getThreadPendingAsks.mock.calls.length).toBe(oneTurnCalls)
+    expect(getThreadPendingAsks.mock.calls.length).toBeLessThan(6)
+  })
+
+  it("W4 — no pause: nothing renders — and the unconditional mount's REAL cost is asserted, not hidden", async () => {
+    // ⚠ THE MEASURED TRUTH RATHER THAN THE CONVENIENT ONE. The list-level mount is
+    // UNCONDITIONAL, so it buys `getThreadPendingAsks` on EVERY thread open — including threads
+    // that will never pause. The Deep path previously bought zero there. That regression is
+    // REAL, it was accepted deliberately (every gate on this mount is a narrowing mount
+    // condition, and a narrowing mount condition is what made SHELL-03 unreachable twice over),
+    // and this case ASSERTS it rather than writing an assertion that would hide it.
+    useStreamsStore.setState({ pendingAsksByThread: new Map() })
+    getThreadPendingAsks.mockResolvedValue([])
+
+    const noPause = wrap(
+      <MessageList messages={plainTurn()} isStreaming={false} threadId={THREAD} />,
+    )
+    await waitFor(() => expect(getThreadPendingAsks).toHaveBeenCalled())
+    expect(screen.queryByRole("radio", { name: APPROVE })).toBeNull()
+    expect(screen.queryByRole("button", { name: "Send Answer" })).toBeNull()
+    expect(screen.queryByText("ask_user · awaiting your answer")).toBeNull()
+    const noPauseCalls = getThreadPendingAsks.mock.calls.length
+    // ⛔ NON-ZERO. This is the bought fetch, named.
+    expect(noPauseCalls).toBeGreaterThan(0)
+
+    noPause.unmount()
+    getThreadPendingAsks.mockClear()
+    getThreadPendingAsks.mockResolvedValue([ASK])
+
+    wrap(<MessageList messages={plainTurn()} isStreaming={false} threadId={THREAD} />)
+    await screen.findByRole("radio", { name: APPROVE })
+
+    // …and it is the SAME cost with and without a pause, which is what "unconditional" means
+    // and what bounds the regression: one mount per thread, never one per row and never a
+    // second one when a pause appears.
+    expect(noPauseCalls).toBe(getThreadPendingAsks.mock.calls.length)
+  })
+
+  it("W5 — the settle is STRUCTURAL on the SSE path too: one slice, both readers, no second fetch", async () => {
+    // Case 5 drives the store's `replace` (the reconcile path). This drives the OTHER product
+    // writer: `onAskUserPrompt` → `addPendingAskForThread` and `onAskUserResponse` →
+    // `removePendingAskForThread` (`StreamsProvider.tsx:1165-1168`). Both writers feed the ONE
+    // slice both homes read, which is what makes "answering in either home settles both"
+    // structural rather than synchronised.
+    function SiblingReader() {
+      const { data } = useAskUserPrompt(THREAD)
+      return <div data-testid="sibling-sse">{data.length === 0 ? "settled" : data[0].prompt}</div>
+    }
+
+    useStreamsStore.setState({ pendingAsksByThread: new Map() })
+    getThreadPendingAsks.mockResolvedValue([])
+
+    wrap(
+      <>
+        <MessageList messages={plainTurn()} isStreaming={false} threadId={THREAD} />
+        <SiblingReader />
+      </>,
+    )
+    await waitFor(() => expect(screen.getByTestId("sibling-sse")).toHaveTextContent("settled"))
+    expect(screen.queryByRole("radio", { name: APPROVE })).toBeNull()
+    const callsAfterMount = getThreadPendingAsks.mock.calls.length
+
+    // The SSE prompt arrives.
+    useStreamsStore.getState().actions.addPendingAskForThread(THREAD, ASK)
+    expect(await screen.findByRole("radio", { name: APPROVE })).toBeInTheDocument()
+    expect(screen.getByTestId("sibling-sse")).toHaveTextContent(ASK.prompt)
+
+    // The answer lands — from EITHER home; the wire event is the same one.
+    useStreamsStore.getState().actions.removePendingAskForThread(THREAD, ASK.tool_call_id)
+    await waitFor(() => expect(screen.queryByRole("radio", { name: APPROVE })).toBeNull())
+    expect(screen.getByTestId("sibling-sse")).toHaveTextContent("settled")
+
+    // ⛔ Neither the arrival nor the settle went back to the wire.
+    expect(getThreadPendingAsks.mock.calls.length).toBe(callsAfterMount)
   })
 })
 
