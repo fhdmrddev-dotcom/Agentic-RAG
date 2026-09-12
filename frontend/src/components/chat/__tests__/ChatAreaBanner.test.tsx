@@ -54,6 +54,17 @@ vi.mock("@/lib/api", async (importActual) => {
       mode: "deep",
       active_workflow_run_id: null,
     }),
+    // ⚠ Phase 244-12 (G-6) — THE SAME TRAP THE COMMENT ABOVE ALREADY DESCRIBES, FIRING AGAIN
+    // FOR THE SAME REASON, which is why it is recorded here rather than quietly patched.
+    // `MessageList` now mounts `PendingAskStack` at LIST level (the workflow-raised approval
+    // had no reachable mount — SHELL-03 / BUG-260828-07), and that stack calls
+    // `useAskUserPrompt` → `usePanelReconcile` → `getThreadPendingAsks`. This factory is an
+    // ALLOW-LIST, so the omission threw at import binding and took SEVEN cases red — none of
+    // them about approvals. ⭐ The durable repair is the `{ ...actual, … }` spread this project
+    // adopted in Phase 196; it is not applied here because widening a byte-unchanged suite
+    // beyond its own defect is not this gap-closure round's to do (G-7). ⛔ A THIRD occurrence
+    // should take the spread rather than add a fourth line.
+    getThreadPendingAsks: vi.fn().mockResolvedValue([]),
   }
 })
 

@@ -178,17 +178,44 @@ describe("§1 CHAT-05 — a live tool-bearing run writes its answer as the messa
   })
 })
 
-// §2 — THE ORDER IN TIME (D-243-01), ASSERTED BY DOCUMENT POSITION
-describe("§2 D-243-01 — thinking, then the tool rows, then the answer", () => {
-  it("places the thinking trigger before the run card and the run card before the answer body", () => {
+// §2 — THE ORDER ON SCREEN, ASSERTED BY DOCUMENT POSITION
+/**
+ * ⚠⚠ RE-DRIVEN BY 244-12 (G-2), NOT DELETED — and the fact that this fence EXISTED AT ALL is the
+ * finding worth keeping.
+ *
+ * `244-12-PLAN.md` named exactly one fence on the thinking/tools order:
+ * `ThinkingBlock.characterization.test.tsx` §11. **There were two.** This one lives in a different
+ * file, under a different heading, and the plan's `files_modified` did not list it — so it was
+ * found by the count gate going red across the whole suite rather than by anyone reading the plan.
+ * ⛔ A source-order invariant asserted in two places is not redundancy; it is two places that must
+ * be changed together, and only a full-gate run can say how many there are.
+ *
+ * THE OVERRIDE, recorded here as it is recorded at the mount and in §11:
+ *   243 (D-243-01, locked): "ORDER IS THE ORDER IN TIME — above the run card's tool rows and above
+ *        the answer."
+ *   244 (G-2, the operator, live during UAT, verbatim): "the thinking badge it's recommended to be
+ *        below the container of the tools not above".
+ * ⛔ AN OPERATOR OVERRIDE, NOT A DEFECT FIX. Nothing was measured wrong about the 243 order.
+ *
+ * Exactly ONE relation is inverted. The run card still precedes the ANSWER, and the badge still
+ * precedes the ANSWER — the new order is tools -> thinking -> answer, which is why the third
+ * assertion below is ADDED rather than merely preserved: without it, "thinking moved" and
+ * "thinking fell past the answer" would be indistinguishable.
+ */
+describe("§2 D-243-01, OVERRIDDEN 2026-09-12 — the tool rows, then thinking, then the answer", () => {
+  it("places the run card before the thinking trigger, and both before the answer body", () => {
     renderItem(<MessageItem message={liveToolBearing()} isStreaming />)
 
     const thinking = screen.getByTestId("thinking-block")
     const runCard = screen.getByTestId("run-card")
     const answer = screen.getByText(ANSWER_P1)
 
-    expect(isAfter(thinking, runCard)).toBe(true)
+    // ⚠ INVERTED by G-2. It read `expect(isAfter(thinking, runCard)).toBe(true)`.
+    expect(isAfter(runCard, thinking)).toBe(true)
+    // Unchanged: the tool rows still precede the answer.
     expect(isAfter(runCard, answer)).toBe(true)
+    // ADDED by 244-12: and the badge still precedes the answer, so the move is bounded.
+    expect(isAfter(thinking, answer)).toBe(true)
   })
 })
 
