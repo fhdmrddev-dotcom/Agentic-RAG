@@ -457,3 +457,29 @@ Cleared at the v4.0 close. The decision log lives in `.planning/PROJECT.md` (`##
 eight v4.0 decisions were added there at this close. The pre-reset snapshot is
 `.planning/milestones/v4.0-STATE-at-close.md`. **Open items carried forward are the nine sections
 above — nothing else survives the reset silently.**
+
+## Phase 244 — owed verification (recorded 2026-09-12)
+
+Phase 244 is **BUILT, NOT VERIFIED**. Verification returned `human_needed`: 5/5 success
+criteria have real wired code (8 load-bearing claims spot-checked against the live tree,
+all held), and **zero `244-VALIDATION.md` rows have been driven**. The ROADMAP states
+verbatim: *"No success criterion closes on a unit test."*
+
+⛔ Do NOT mark 244 complete until these are driven and written back into
+`.planning/phases/244-the-chat-shell-and-the-composer/244-VALIDATION.md`:
+
+1. **L-2 FIRST** — the cap-paused composer still lets the operator act **after a reload**.
+   This is the one claim the phase's own authors flagged as unsettleable by reasoning;
+   Phase 228 removed the reload that used to free them.
+2. **L-7** — the app-shell attention signal, **both directions** (fires for a stopped
+   source, stays silent for a healthy one). Never driven end-to-end since Phase 235
+   shipped the mechanism — oldest code, highest residual risk.
+3. L-1, L-3, L-4, L-5, L-6, then the 8-row cross-provider board (D-244-02).
+
+Also owed, one line each:
+- `REQUIREMENTS.md:207-208` carries a SHELL-04/SHELL-05 traceability note that
+  **contradicts locked D-244-18 / finding F-1**. Record the correction beside it, not over it.
+- 12 of 18 code-review findings remain open — `deferred-items.md`, each with a re-open
+  trigger. `WR-08` is *worse-shaped* after the 244-07 fix round.
+- `connectors.py` took its FIFTH landing; the split is proposed in writing and declined
+  once more. A sixth propose-and-decline is the pattern that deferral exists to stop.

@@ -388,7 +388,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 242. Ship It — and Prove What Already Shipped | 0/? | Not started | — |
 | 243. The Thinking Block and the Follow-Scroll Seam | 0/? | Not started (⚠ sketch owed first) | — |
-| 244. The Chat Shell and the Composer | 0/? | Not started | — |
+| 244. The Chat Shell and the Composer | 7/7 | ⚠ Built — UAT owed | Verified `human_needed` 2026-09-12: 5/5 criteria BUILT, **0/5 driven**. ⛔ No criterion closes on a unit test. Owed: all 7 `L-` rows + the 8-row cross-provider board in `244-VALIDATION.md`. **Run L-2 first** (cap-paused composer survives a RELOAD), then L-7. 12 of 18 code-review findings open in `deferred-items.md`. |
 | 245. The Verification Debt | 0/? | Not started | — |
 | 246. The Recall Cliff | 0/? | Not started | — |
 
