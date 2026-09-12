@@ -75,7 +75,7 @@ paraphrasing.
 | 1 | Open the cap-paused Deep thread from the chat list | the amber Continue card renders | `pending` |
 | 2 | `document.querySelectorAll('[data-run-line-state]')` | **length 0** — no run line at all, live or stopped | `pending` |
 | 3 | Sweep every leaf element for `/Starting workflow|Working on phase|phases? done/i` | **zero** matches | `pending` |
-| 4 | Read the Continue card's text | verbatim `Reached the Continue limit — this run is stopped. Start a new message to keep going.` | `pending` |
+| 4 | Read the Continue card's text | verbatim `Reached the Continue limit — this run is stopped. Start a new message to keep going.` ⚠ **THIS SENTENCE IS MODE-DEPENDENT SINCE `244-14` (WR-01)** — it is the DEEP wording and this arm is a Deep thread, so it is still exactly right here; a HARNESS cap-pause reads the Cancel wording instead (Arm 4 step 2b). Reading the harness sentence on THIS thread is a failure, not a variant. | `pending` |
 | 5 | ⛔ **In the SAME rect pass as 4:** confirm no element carries `data-run-line-state="live"` | the card is on screen AND the phantom is not | `pending` |
 | 6 | Instrument `window.setInterval` **before** opening the thread; open it; wait 5 s | **no** call registered with a `1000` ms delay (the provider's 5000 ms stream watchdog is expected and is NOT this) | `pending` |
 | 7 | Count `GET /threads/{id}/workflow` calls across the thread open (Network panel or a `fetch` counter) | ⚠ **RECORD THE NUMBER rather than asserting one.** `ThreadRunLine` legitimately makes one; what must be gone is the **per-assistant-row** cost `HarnessOuterBanner` added on the Deep path. Compare against the same count on an ordinary Deep thread with no lock — they should MATCH. | `pending` |
@@ -137,6 +137,7 @@ cap) is the reachable one, and reaching it needs a workflow whose step actually 
 |---|---|---|---|
 | 1 | If a harness run can be driven to a cap in reasonable time: do so | the Continue card appears on a workflow thread | `pending` |
 | 2 | Read the composer | still **DISABLED**, still `Workflow running — Cancel to switch back` on both axes | `pending` |
+| 2b | ⛔ **ADDED BY `244-14` (WR-01), and it is the half step 2 could not see.** In the SAME rect pass as step 2, read the Continue card's sentence | verbatim `Reached the Continue limit — this run is stopped. Cancel the workflow to start something new.` ⛔ Seeing `Start a new message to keep going.` here is the defect: the transcript would be instructing the one action the composer beside it forbids. | `pending` |
 | 3 | If step 1 is not reachable | ⛔ record **BLOCKED with the reason** — never silently omit the arm (a scoreboard that lists only what passed is not a scoreboard). The jsdom fences are `ChatArea.capPausedComposer.test.tsx` D5 and `ThreadRunLineKickoff.test.tsx` D5b(a). | `pending` |
 
 ---

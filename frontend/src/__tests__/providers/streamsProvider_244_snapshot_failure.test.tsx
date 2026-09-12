@@ -84,6 +84,7 @@ vi.mock("@/lib/supabase", () => ({
 import { StreamsProvider, useStreamActions } from "@/providers/StreamsProvider"
 import { useStreamsStore } from "@/stores/streamsStore"
 import type { StreamCallbacks } from "@/lib/api"
+import { stripComments } from "@/lib/stripComments.testutil"
 
 /** The client's REAL throw for a 503 — `threads.ts:1067`, verbatim shape. */
 const SNAPSHOT_503 = () => new Error("Failed to fetch snapshot (status 503)")
@@ -153,6 +154,10 @@ describe("244-11 / G-3 — a snapshot failure reaches the per-thread error slice
   })
 
   it("Test 2 (CONTROL — the happy path is untouched) — a resolving snapshot writes NO error and hydrates", async () => {
+    // ⚠ THIS CASE IS BLIND TO THE CLEAR, BY CONSTRUCTION, AND IT SAYS SO RATHER THAN LOOKING
+    // LIKE COVERAGE. It starts from the empty Map the `beforeEach` installs, so it asserts
+    // only that success writes NOTHING. Whether success REMOVES a prior entry is Test 2b —
+    // the transition CR-01 was, and this blindness is why nothing caught it.
     const THREAD_ID = "thread-ok"
     mockGetSnapshot.mockResolvedValue({
       ...EMPTY_SNAPSHOT,
@@ -182,20 +187,123 @@ describe("244-11 / G-3 — a snapshot failure reaches the per-thread error slice
     expect(bucket.map((m) => m.id)).toEqual(["m-1"])
   })
 
-  it("Test 3 (CONTROL — a navigation is not a failure) — an AbortError writes NOTHING", async () => {
-    // `reconcile` is fired from `setViewingThread` on EVERY thread switch. Without this
-    // arm, every switch that cancels an in-flight snapshot would raise a banner on
-    // arrival at the thread the person actually wanted.
-    const THREAD_ID = "thread-aborted"
-    mockGetSnapshot.mockRejectedValue(new DOMException("aborted", "AbortError"))
-
+  it("Test 2b (THE MISSING TRANSITION — CR-01) — a later SUCCESS clears the entry the failure set", async () => {
+    /**
+     * ⛔ THE CASE TEST 2 STRUCTURALLY COULD NOT SEE, and the reason is the whole finding.
+     * Test 2 above starts from `reconcileErrors: new Map()` (the `beforeEach` reset), so it can
+     * only observe *"success writes no error"* — never *"success CLEARS a prior error"*. A
+     * control that begins in the CLEAN state cannot see a missing transition out of the DIRTY
+     * one. This phase has now paid for that shape three times; this case starts DIRTY.
+     *
+     * ⚠ AND IT STARTS DIRTY THROUGH THE PRODUCT'S OWN WRITER, not through a `setState` seed —
+     * the first `reconcile` really 503s, which is what makes the second call's assertion a
+     * claim about the pair rather than about a fixture. The sequence is exactly the one UAT
+     * row L-1's setup observed: open thread → 503 → navigate away → come back → 200.
+     *
+     * ⛔ WHY THE SECOND HALF MATTERS MORE THAN THE FIRST. `ChatArea.tsx:712-717` picks its
+     * sentence off `messages.length`: with an entry present AND a hydrated transcript it reads
+     * *"Couldn't load latest messages. Showing cached version."* over content that was just
+     * fetched from the server. That is a false claim ABOUT THE SCREEN — the precise thing
+     * `244-11` was written to stop — so the bucket assertion below is not decoration.
+     */
+    const THREAD_ID = "thread-recovers"
     const { result } = renderProvider()
 
+    // 1. The failure really happens, through the shipped arm.
+    mockGetSnapshot.mockRejectedValueOnce(SNAPSHOT_503())
+    await act(async () => {
+      await result.current.reconcile(THREAD_ID)
+    })
+    expect(
+      useStreamsStore.getState().reconcileErrors.has(THREAD_ID),
+      "the dirty state was never reached — this case would then prove nothing",
+    ).toBe(true)
+
+    // 2. The person comes back and the snapshot resolves. 78 messages in the real trace; one
+    //    is enough to make `messages.length` non-zero, which is what flips the sentence.
+    mockGetSnapshot.mockResolvedValue({
+      ...EMPTY_SNAPSHOT,
+      messages: [
+        {
+          id: "m-1",
+          thread_id: THREAD_ID,
+          user_id: "user-1",
+          role: "user",
+          content: "hello",
+          created_at: "2026-09-12T00:00:00Z",
+          updated_at: "2026-09-12T00:00:00Z",
+          tool_calls: [],
+        },
+      ],
+    })
     await act(async () => {
       await result.current.reconcile(THREAD_ID)
     })
 
-    expect(useStreamsStore.getState().reconcileErrors.has(THREAD_ID)).toBe(false)
+    expect(
+      useStreamsStore.getState().reconcileErrors.has(THREAD_ID),
+      "a successful reconcile left the failure entry behind — the banner is sticky for the " +
+        "life of the session, and with a hydrated transcript it now reads 'Showing cached " +
+        "version' over freshly fetched content",
+    ).toBe(false)
+    const bucket =
+      useStreamsStore.getState().bucketsBySurface.get("chat")?.get(THREAD_ID) ?? []
+    expect(bucket.map((m) => m.id)).toEqual(["m-1"])
+  })
+
+  it("Test 3 (THE PRECONDITION, replacing a control that could not fire — WR-04) — reconcile's getSnapshot is called with NO signal", async () => {
+    /**
+     * ⛔ WHAT THIS REPLACES AND WHY. Test 3 used to reject with a hand-built `DOMException`
+     * and assert the provider's `instanceof DOMException` arm swallowed it. That arm was
+     * UNREACHABLE — `getSnapshot(threadId, signal?)` takes an optional signal and `reconcile`
+     * passes none, so nothing can abort the fetch — and its comment justified itself by naming
+     * a cancellation mechanism the code does not have (`reconcileInFlightRef` DROPS a second
+     * reconcile; it does not abort the first). The case passed because the fixture constructed
+     * the shape it then asserted: this suite's own header warns about exactly that, one case
+     * above where it happened.
+     *
+     * ⭐ SO THE ARM IS DELETED AND THE OBLIGATION IS FENCED INSTEAD. The thing that was ever
+     * true is a PRECONDITION: while no signal is threaded through, an abort is impossible and
+     * no guard is owed. The moment someone threads one — the parameter is already there,
+     * inviting it — this case goes red and the shipped two-shape guard
+     * (`loadMessages`, :3241-3242 — `Error.name` AND a duck-typed `{ name }`, because the shape
+     * differs between jsdom, undici and the browser) must be restored in the same commit.
+     *
+     * ⚠ COMMENTS ARE STRIPPED FIRST. The deletion note in that very catch block QUOTES the old
+     * call shape, so an unstripped sweep would match prose and pass for the wrong reason —
+     * the `244-12` failure, which this round also repaired one file over (IN-02).
+     */
+    const src = stripComments(
+      ((await import("@/providers/StreamsProvider.tsx?raw")).default as string).replace(
+        /\r\n/g,
+        "\n",
+      ),
+    )
+    expect(src.length, "the provider source parsed empty — this fence would pass vacuously").toBeGreaterThan(
+      50000,
+    )
+
+    // ⚠ THE FILE HAS THREE `await getSnapshot(...)` CALLS — measured, not assumed: the
+    // stream-end probe (`:262`), `reconcile` (`:1949`) and the watchdog's `probeThread`
+    // (`:3841`). This claim is about RECONCILE's, so the call is identified by the handler
+    // that follows it (`console.error("reconcile failed:", …)`) rather than by its shape,
+    // which the other two share.
+    const calls = [
+      ...src.matchAll(
+        /snapshot = await getSnapshot\(([^)]*)\)[\s\S]{0,300}?console\.error\("reconcile failed:"/g,
+      ),
+    ].map((m) => m[1])
+    expect(
+      calls,
+      "reconcile's `snapshot = await getSnapshot(...)` call was not found — this fence is " +
+        "pointing at nothing and must be re-aimed rather than left silently matching zero",
+    ).toHaveLength(1)
+    expect(
+      calls[0].trim(),
+      "reconcile's getSnapshot now takes a second argument. If that is an AbortSignal, an " +
+        "abort is reachable and the shipped two-shape guard (Error.name AND a duck-typed " +
+        "{ name }, loadMessages :3241-3242) must be restored in THIS commit — WR-04.",
+    ).toBe("threadId")
   })
 
   it("Test 4 (CONTROL — the slice is per-thread) — a failure on A leaves B clean", async () => {

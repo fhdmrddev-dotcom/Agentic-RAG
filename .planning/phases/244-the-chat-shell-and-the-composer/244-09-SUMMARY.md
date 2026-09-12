@@ -99,9 +99,19 @@ automatic-minimum-size rule is direction-dependent. The comment says which of th
 
 **Scope held, measured rather than asserted:**
 
+⚠ **CORRECTED 2026-09-12 by `244-14` (review WR-05) — THIS TABLE PUBLISHED THE TWO TOKENS THAT
+WERE CLEAN AND OMITTED THE ONE THE EDIT HAD BROKEN, so it read clean on precisely the count that
+was wrong.** The trailing comment in `NavPanel.tsx` claimed *neither* token was spelled verbatim;
+`min-h-0` was, at `:215`, so `grep -c` returned **2**. Deviation 1 below was raised for exactly
+this conflict and the remedy reached only one of the two tokens. The original rows are kept and
+the missing one is added rather than the table being quietly re-measured; the fix was in the
+COMMENT (name the token by its CSS declaration), never in the grep.
+
 | check | result |
 |---|---|
 | `grep -c "overflow-y-auto" NavPanel.tsx` | **1** |
+| `grep -c "min-h-0" NavPanel.tsx` | ⛔ **2 when this table was written — the row that was missing.** `1` after `244-14` named it by declaration instead |
+| `grep -c "overflow-x-hidden" NavPanel.tsx` | **1** — added by `244-14` (review IN-01); `overflow-y-auto` alone makes the x axis compute to `auto` |
 | `grep -c "mt-auto" NavPanel.tsx` | **1** — unchanged from pre-edit |
 | `git diff --stat NavPanel.tsx` | `27 +, 1 -` — one changed source line, 26 comment lines |
 | `git diff ChatLayout.tsx ChatArea.tsx MessageList.tsx` | **EMPTY** — the five `244-01` sites untouched |
@@ -269,6 +279,13 @@ are clean.
   attribution also lives in the fence's docblock, where it is read on purpose.
 - **Files modified:** `frontend/src/components/layout/NavPanel.tsx`
 - **Commit:** `5dbbc6d84`
+- ⚠ **AND IT WAS APPLIED TO ONLY ONE OF THE TWO — corrected 2026-09-12 by `244-14` (WR-05).**
+  ``⭐ `min-h-0` BESIDE IT IS DEFENSIVE`` at `:215` spelled the token verbatim, so the count it was
+  protecting read **2**, and the acceptance table above did not publish that count. The remedy is
+  the one this deviation already names, applied to the second token as well: it now reads *"the
+  automatic-minimum-size override beside it"*. ⛔ The grep was not loosened — this is the 187-24
+  vacuity class reproduced inside the comment that cites 187-24, and loosening the check is how it
+  would have been hidden rather than fixed.
 
 ### 2. [Out of scope — logged, not fixed] The phase-wide ledger gate is red for a plan that has not run
 

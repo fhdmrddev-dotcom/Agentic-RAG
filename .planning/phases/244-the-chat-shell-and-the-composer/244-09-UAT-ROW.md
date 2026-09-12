@@ -98,6 +98,15 @@ const rail = document.querySelector('div.md\\:flex.flex-col.h-full.min-h-0.overf
 | `rail.scrollHeight > rail.clientHeight` | **required** | `pending` |
 | the rail's computed `overflow-y` is `auto` (not `visible`) | **required** | `pending` |
 | the rail's footer block is reachable by scrolling the rail | **required** | `pending` |
+| ⛔ **ADDED BY `244-14` (review IN-01):** the rail's computed `overflow-x` is **`hidden`**, and `rail.scrollWidth <= rail.clientWidth` | **required** | `pending` |
+| ⛔ **ADDED BY `244-14` (review IN-01):** toggle the rail collapsed ⇄ expanded (58px ⇄ 210px) and watch through the ~300ms transition — **no horizontal scrollbar appears at any point**, and the collapsed-state badge is NOT clipped (it ends 5px inside the 58px box) | **required** | `pending` |
+
+⚠ **Why the two new rows exist.** Per CSS overflow, setting one axis to a non-`visible` value makes
+the other compute to `auto` — so `overflow-y-auto` alone left this width-ANIMATING column
+horizontally scrollable, and its children switch to their expanded layout on the same tick the
+width starts moving. `overflow-x-hidden` makes the computed value `hidden auto`. ⛔ jsdom performs
+no layout, so link 6's new token assertion proves the class is PRESENT and nothing more — the
+scrollbar and the badge are this row's, not the fence's.
 
 ⛔ **The overflow must have moved INTO the rail, not vanished.** "No page overflow" is achievable by
 losing content, and this is the only assertion that refuses that reading.

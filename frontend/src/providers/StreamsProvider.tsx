@@ -1960,11 +1960,26 @@ export function StreamsProvider({ children }: PropsWithChildren) {
               // `lib/api/threads.ts:1063`'s docstring already claimed otherwise
               // ("the StreamsProvider consumer routes via its existing error handler").
               //
-              // ⚠ AN ABORT IS NOT A FAILURE. `reconcile` is fired from `setViewingThread`
-              // on EVERY thread switch; without this arm each switch that cancels an
-              // in-flight snapshot would raise a banner on the thread the person actually
-              // wanted. Symmetric with the loadMessages wait-abort guard at :3203.
-              if (err instanceof DOMException && err.name === "AbortError") return
+              // ⛔ 244-14 (review WR-04) — THE ABORT ARM THAT USED TO SIT HERE IS DELETED,
+              // AND ITS DELETION IS THE HONEST OPTION OF THE TWO. It read
+              // `if (err instanceof DOMException && err.name === "AbortError") return`, and
+              // all three of its claims were wrong at once:
+              //   1. UNREACHABLE. `getSnapshot(threadId, signal?)` takes an OPTIONAL signal
+              //      and the call below passes NONE, so nothing can abort this fetch.
+              //   2. THE JUSTIFICATION NAMED A MECHANISM THE CODE DOES NOT HAVE. It said a
+              //      thread switch "cancels an in-flight snapshot"; the in-flight protection
+              //      here is `reconcileInFlightRef`, which DROPS the second reconcile — it
+              //      does not abort the first.
+              //   3. NARROWER THAN THE WRITER IT CLAIMED TO MIRROR. `loadMessages` tests both
+              //      `Error.name` AND a duck-typed `{ name }` (:3241-3242), because the shape
+              //      differs between jsdom, undici and the browser.
+              // A guard for a state the product cannot produce is dead code carrying a false
+              // sentence, and its test was a control over a branch nothing can reach.
+              // ⛔ THE OBLIGATION IS NOW ENFORCED INSTEAD OF GUESSED: if a signal is ever
+              // threaded into the `getSnapshot` call below, restore the SHIPPED two-shape
+              // abort guard IN THE SAME COMMIT. `streamsProvider_244_snapshot_failure.test.tsx`
+              // Test 3 fails the moment that call grows a second argument, which is a fence
+              // that CAN fire — unlike the control it replaced.
               // ⛔ The EXACT shipped write from the loadMessages failure path (:3209-3215),
               // reused rather than re-invented: two writers of one slice that differ is how
               // slices drift here. It lands in the per-thread `reconcileErrors` Map
@@ -1973,6 +1988,17 @@ export function StreamsProvider({ children }: PropsWithChildren) {
               // no new renderer, no automatic retry, and `Retry-After` is deliberately NOT
               // consumed (that would be a new behaviour, not a gap fix — see
               // deferred-items.md).
+              //
+              // ⚠ 244-14 (CR-01) — THE THIRD HALF OF THE COPIED WRITER IS DELIBERATELY NOT
+              // TAKEN, and the reason is measured rather than stylistic. `loadMessages`
+              // retries ONCE at 1s before it raises (:3243, D-068.5-09). Doing that here
+              // would hold `reconcileInFlightRef` — a GLOBAL flag, not a per-thread one
+              // (:1470/:1942) — for that whole second, and `reconcile` early-returns while it
+              // is held. A thread switch during the sleep would therefore DROP the new
+              // thread's reconcile entirely: the person lands on a conversation that never
+              // reconciles at all, which is a worse failure than a banner they can dismiss.
+              // ⛔ So the banner raises on attempt 0, BY DECISION. Make the in-flight guard
+              // per-thread first if a retry is ever wanted here — see deferred-items.md.
               useStreamsStore.setState((s) => ({
                 reconcileErrors: new Map(s.reconcileErrors).set(
                   threadId,
@@ -1980,6 +2006,34 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                 ),
               }))
               return
+            }
+
+            // ── Phase 244-14 (CR-01) — THE OTHER HALF OF THE WRITER THIS ARM COPIED.
+            //
+            // `244-11` reused the loadMessages FAILURE write above and left its
+            // CLEAR-ON-SUCCESS behind (:3232-3238, which lives in `loadMessages` and not
+            // here). ⛔ `reconcile` IS THE THREAD-OPEN PATH — `loadMessages` runs only from
+            // `handleRetryReconcile`, the `buffer_expired` arm and the stream-terminal
+            // `finally` — so on an ordinary open there was NO writer that could clear the
+            // entry, and one transient 503 painted the banner for the life of the session.
+            //
+            // ⛔ AND THE SECOND FAILURE IS WORSE THAN THE FIRST: once the transcript hydrates,
+            // `ChatArea.tsx:712-717` picks its sentence off `messages.length` and flips to
+            // "Couldn't load latest messages. Showing cached version." OVER FRESHLY FETCHED
+            // CONTENT — a claim ABOUT THE SCREEN that is false, which is the exact thing
+            // `244-11`'s own docblock says it exists to prevent.
+            //
+            // The `has` guard keeps the steady state free: no `setState`, so no subscriber
+            // wakes on the overwhelmingly common clean open. Byte-for-byte the shipped
+            // loadMessages clear, on purpose — two writers of one slice that differ is how
+            // slices drift here. Driven by `streamsProvider_244_snapshot_failure.test.tsx`
+            // Test 2b, which starts DIRTY through this very arm.
+            if (useStreamsStore.getState().reconcileErrors.has(threadId)) {
+              useStreamsStore.setState((s) => {
+                const next = new Map(s.reconcileErrors)
+                next.delete(threadId)
+                return { reconcileErrors: next }
+              })
             }
 
             // Hydrate messages bucket. Phase 075.7 follow-up: widen the MERGE
@@ -2362,7 +2416,20 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                     // `active_workflow_run_id`, which is the server's own definition of
                     // harness (`threads.py:1195`).
                     mode: "harness",
-                    capPaused: wf.cap_paused,
+                    // ⛔ ALWAYS `false` ON THIS BRANCH — 244-14 (review WR-02), MIRRORED FROM
+                    // `ChatArea.tsx`'s site (T-244-03-01 / 244-08). This read the server's flag
+                    // through while the OTHER mount-time writer of the SAME key, on the SAME
+                    // branch of the SAME GET, hard-coded `false`. Both fire on every thread
+                    // open; whichever settled last won; nothing ordered them. After `244-13`
+                    // the surviving consequence is WR-01's — whether a genuine live harness run
+                    // renders the Continue card was decided by a promise race.
+                    // ⚠ FAIL-CLOSED IS THE DIRECTION, not just the agreement: a harness run
+                    // paused at its own cap keeps the composer locked, so the person clicks
+                    // Cancel instead of typing into a composer the server will 409. Unlocking
+                    // during a live harness run is the elevation `T-244-03-01` names.
+                    // Fenced by `__tests__/providers/workflowLockWriters.lockstep.test.ts`,
+                    // which compares the two sites' expressions rather than trusting a comment.
+                    capPaused: false,
                     continuesRemaining: wf.continues_remaining,
                   })
                   // Phase 092-07 (Facet C, startup-sweep re-attach): when the

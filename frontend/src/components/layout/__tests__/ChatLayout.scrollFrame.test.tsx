@@ -74,6 +74,7 @@ import chatLayoutSource from "@/components/layout/ChatLayout.tsx?raw"
 import chatAreaSource from "@/components/chat/ChatArea.tsx?raw"
 import messageListSource from "@/components/chat/MessageList.tsx?raw"
 import navPanelSource from "@/components/layout/NavPanel.tsx?raw"
+import { stripComments } from "@/lib/stripComments.testutil"
 
 /** The house normaliser — CRLF checkouts must not change what a fence sees. */
 const lf = (s: string) => s.replace(/\r\n/g, "\n")
@@ -84,12 +85,13 @@ const MESSAGE_LIST = lf(messageListSource)
 const NAV_PANEL = lf(navPanelSource)
 
 /**
- * Strip `//` line comments and block comments so a comment MENTIONING `<ScrollArea` can
- * neither satisfy nor break a count. ⚠ Deliberately crude (it does not parse strings) —
- * it is applied only to the call-site sweep below, never to a class-list assertion.
+ * ⚠ 244-14 (review IN-02) — `stripComments` MOVED; THE RULE DID NOT. It now lives in
+ * `@/lib/stripComments.testutil` (imported above), because
+ * `MessageItem.inlineApproval.test.tsx` needed the same normaliser and a SECOND copy of it is
+ * precisely the drift this file's own fences exist to catch. It strips `//` and block comments
+ * so a comment MENTIONING `<ScrollArea` can neither satisfy nor break the count below.
+ * ⛔ It is applied only to the call-site sweep, never to a class-list assertion.
  */
-const stripComments = (s: string): string =>
-  s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^[ \t]*\/\/.*$/gm, "")
 
 /** Every `<ScrollArea …>` OPENING tag — not `<ScrollAreaPrimitive.*`, not `</ScrollArea>`. */
 const scrollAreaOpenings = (src: string): string[] =>
@@ -207,5 +209,19 @@ describe("SHELL-01 · the chat frame is bounded — the four-link min-h-0 chain"
       rail![1],
       `the rail root cannot scroll its own content and will push the document: ${rail![1]}`,
     ).toContain("overflow-y-auto")
+    // ⛔ 244-14 (review IN-01) — THE HORIZONTAL AXIS IS PINNED TOO, and it is a real
+    // consequence of link 6 rather than tidiness. Per CSS overflow, when one axis is not
+    // `visible` the other COMPUTES to `auto` — so `overflow-y-auto` alone silently made this
+    // box horizontally scrollable. The rail is a width-ANIMATING column
+    // (`motion-safe:transition-[width]`, 58px ⇄ 210px) whose children switch to their expanded
+    // layout on the same tick the width starts moving, so for ~300ms the content is laid out
+    // for 210px inside a box still 58px wide: a horizontal scrollbar can flash, or the rail
+    // can be dragged sideways. `overflow-x-hidden` makes the computed value `hidden auto`,
+    // which is well-defined. ⚠ It cannot clip the collapsed badge — measured: the `-right-1`
+    // badge ends 5px INSIDE the 58px box.
+    expect(
+      rail![1],
+      `the rail root's horizontal axis computes to \`auto\` and can flash a scrollbar mid-animation: ${rail![1]}`,
+    ).toContain("overflow-x-hidden")
   })
 })

@@ -125,6 +125,7 @@ import { StreamsProvider, useAskUserPrompt } from "@/providers/StreamsProvider"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { useStreamsStore } from "@/stores/streamsStore"
 import type { Message, PendingAsk } from "@/types"
+import { stripComments } from "@/lib/stripComments.testutil"
 
 const THREAD = "thread-approval"
 
@@ -596,12 +597,25 @@ describe("D-244-13 — the cross-surface shell's OTHER TWO homes still render th
     // the file. A source fence that counts a token cannot tell code from a comment; the only
     // repair is to count in the file that now OWNS the mount and to assert ZERO in the one that
     // does not. Both directions are asserted, with a non-empty positive control on each.
-    const item = (await import("../MessageItem.tsx?raw")).default as string
-    const list = (await import("../MessageList.tsx?raw")).default as string
+    //
+    // ⛔ 244-14 (review IN-02) — AND BOTH SIDES ARE NOW COUNTED WITH THE COMMENTS REMOVED.
+    // The repair above made the ZERO side immune and left the ONE side carrying the identical
+    // hazard one file over: a future comment in `MessageList.tsx` that happens to spell the
+    // opening bracket holds the count at 1 with the mount DELETED. DRIVEN, not reasoned —
+    // the mount was removed from `MessageList.tsx` and replaced by a comment naming it, and
+    // this case stayed GREEN; with `stripComments` it goes red, and the file was restored
+    // md5-identical afterwards. The normaliser is the SHARED one
+    // (`@/lib/stripComments.testutil`), reused rather than re-implemented, because the fix for
+    // "two copies of a rule drift" must not itself be a second copy of a rule.
+    const item = stripComments((await import("../MessageItem.tsx?raw")).default as string)
+    const list = stripComments((await import("../MessageList.tsx?raw")).default as string)
     expect(item.length).toBeGreaterThan(1000)
     expect(list.length).toBeGreaterThan(1000)
     expect([...item.matchAll(/<PendingAskStack/g)]).toHaveLength(0)
-    expect([...list.matchAll(/<PendingAskStack/g)]).toHaveLength(1)
+    expect(
+      [...list.matchAll(/<PendingAskStack/g)],
+      "the list-level mount is gone from MessageList.tsx — the chat column renders no approval",
+    ).toHaveLength(1)
     // …and the CUE stayed behind, which is what makes the split deliberate rather than a move
     // of everything.
     expect([...item.matchAll(/<PausedRunCue/g)]).toHaveLength(1)

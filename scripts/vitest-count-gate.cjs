@@ -3025,7 +3025,15 @@ const BASELINE = {
   // the slice stays per-thread. ⚠ Tests 1 AND 4 were both RED before the fix — 4 was
   // planned as a control, but its positive half (`has(A) === true`) is built on the very
   // write the gap was missing, so a "control" can sit downstream of the defect it guards.
-  "streamsProvider_244_snapshot_failure.test.tsx": 4,
+  "streamsProvider_244_snapshot_failure.test.tsx": 5,
+  // ── Phase 244-14 (review WR-02) — the two mount-time lock writers are in lockstep ──────
+  //
+  // 5 cases, read from this script's own `actual` column: a non-vacuity control on both
+  // sources, the branch really exists in both, both write `mode: "harness"`, the two
+  // `capPaused` expressions are IDENTICAL, and the agreed value is `false`. The last two are
+  // separate on purpose — agreement alone is satisfiable by agreeing on `cap_paused`, which
+  // would re-open the hole `244-08` shut, so the DIRECTION is pinned as its own case.
+  "workflowLockWriters.lockstep.test.ts": 5,
 
   // ── Phase 243 (243-03 / CHAT-03 / D-243-16) — the scroll effect's ONLY behavioural fence ─
   //
@@ -5127,6 +5135,16 @@ const TARGETS = [
   // a directory entry made a suite RUN while BASELINE guarded nothing. TARGETS decides what
   // RUNS; BASELINE decides what is GUARDED.
   "src/__tests__/providers/streamsProvider_244_snapshot_failure.test.tsx",
+  // ── Phase 244-14 (review WR-02) — the lock-writer lockstep fence ──────────────────────
+  //
+  // Named FILE-LEVEL for the same reason as its three neighbours: `src/__tests__` is not a
+  // bare-directory TARGETS entry anywhere in this array, so a suite placed there runs in NO
+  // gate until it is listed here AND pinned in BASELINE. ⛔ Do NOT "simplify" this to a
+  // `src/__tests__/providers` directory entry — the fourteen INHERITED failures documented
+  // above are in that folder, and a directory entry would turn the shared gate red for a
+  // reason no plan here owns. (Measured on this round's base and again after its changes:
+  // the same 14, name for name.)
+  "src/__tests__/providers/workflowLockWriters.lockstep.test.ts",
   // ⚠ The scroll suite below is a SEPARATE FILE from `MessageList.test.tsx` on purpose:
   // that one stubs `scrollIntoView` to a NO-OP tree-wide (`:61-65`), so nothing mounted under it
   // can see the scroll effect at all. This is the ONLY behavioural coverage that effect has.

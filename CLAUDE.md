@@ -628,9 +628,9 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | Hot file (FIRING) | commits / phases / lines | Verdict (abridged) |
 |---|---|---|
 | `frontend/src/components/chat/ToolCallPanel.tsx` | 51 / 23 / 351 | ✅ **G-5 DISCHARGED (227-02)** |
-| `frontend/src/components/chat/MessageItem.tsx` | 74 / 34 / 981 | ✅ 227-03 discharge intact. honoured by construction (**244-13**): the banner branch tests the lock's MODE, not its presence. State 4→4, effects 0→0, props 5→5. ⚠ `34` subtracts 3 dated buckets |
+| `frontend/src/components/chat/MessageItem.tsx` | 75 / 34 / 1000 | ⚠ row STALE a 4th time (`74/34/981`). honoured by construction (**244-14/WR-01**): the Continue card reads the lock's MODE, like the composer beside it. State 3→3, effects 0→0, props 5→5 |
 | `backend/app/api/threads.py` | 245 / 82 / 1617 | ⚠ row was STALE at `243 / 80 / 1590`. honoured by construction (**244-03**): one pure-read query loses a WHERE predicate, gains a Python guard. ⛔ no writer added |
-| `frontend/src/providers/StreamsProvider.tsx` | 97 / 37 / 4660 | ⚠ row STALE a SIXTH time (`96/37/4614`). honoured by construction (**244-13**): 4 lock writes gain a discriminator. ⛔ `useHarnessLiveForThread` still returns a BOOLEAN, never the lock |
+| `frontend/src/providers/StreamsProvider.tsx` | 100 / 37 / 4727 | ⚠ row STALE a 7th time (`97/37/4660`). honoured by construction (**244-14**): reconcile CLEARS on success, ONE capPaused value, the unreachable abort arm deleted. ⛔ no retry: the in-flight ref is GLOBAL |
 | `frontend/src/hooks/useMessages.ts` | 74 / 27 / 127 | extraction due |
 | `backend/app/services/anthropic_service.py` | 11 / 10 / 354 | adapter-pattern audit due |
 | `backend/app/services/embedding_service.py` | 9 / 5 / 354 | ⚠ absent for its entire life at 5 phases — row added 236 (SC#2) |
@@ -737,7 +737,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/pages/KnowledgeHealthPage.tsx` | 12 / 6 / **DELETED** | **RETIRED (217.1-14)** |
 | `backend/app/api/knowledge_health.py` | 11 / 6 / 737 | honoured by construction (**217.1-11**) |
 | `backend/app/services/agent_loop.py` | 44 / 21 / 3303 | ⚠ **its own cell said “gated General-mode-only” and that was FALSE for harness.** honoured by construction (**244-07**): the gate now names its rule; the renderer allow-lists `kind` |
-| `backend/app/services/tool_dispatcher.py` | 84 / 35 / 4966 | ⚠ row was STALE at `83/35/4913`. honoured by construction (**244-10**): the marker changes TYPE — set→dict of copied paths. No new call site, no new handler, traversal fence byte-unchanged |
+| `backend/app/services/tool_dispatcher.py` | 85 / 35 / 5048 | ⚠ row STALE again (`84/35/4966`). honoured by construction (**244-14/WR-03**): `already` is written on SUCCESS or after a CAPPED give-up; the failure is named on EVERY attempt. Traversal fence byte-unchanged |
 | `backend/app/api/document_governance.py` | 5 / 3 / 416 | ⚠ absent at 3 phases. ⚠ Its low-confidence cutoff is the ConfidenceChi |
 | `frontend/src/components/ingestion/ViewsGroup.tsx` | 5 / 3 / 259 | ⚠ absent for its ENTIRE LIFE at **3 phases** |
 | `frontend/src/components/ui/tabs.tsx` | 3 / 3 / 78 | ⚠ absent for its ENTIRE LIFE |
@@ -745,7 +745,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/verdictModel.ts` | 6 / 3 / 355 | ⚠ absent for its ENTIRE LIFE |
 | `frontend/src/components/library/IngestionTab.tsx` | 17 / 6 / 512 | ⚠ row was STALE at `13 / 4 / 456` |
 | `frontend/src/components/ingestion/__tests__/IngestionStrip.test.tsx` | 3 / 3 / 516 | ⚠ absent; row added 233, which repaired the INHERITED red `229-03` cau |
-| `frontend/src/components/layout/NavPanel.tsx` | 22 / 12 / 370 | ⚠ absent for its ENTIRE LIFE at 11 phases; row then STALE at `20/11/329`. ⭐ **244-09**: the rail bounds itself — it, not the transcript, overflowed the PAGE below 540px |
+| `frontend/src/components/layout/NavPanel.tsx` | 23 / 12 / 381 | ⚠ row STALE at `22/12/370`. **244-14**: WR-05 — the docblock stopped being false about itself (`min-h-0` read 2); IN-01 — `overflow-x-hidden`, since one axis makes the other compute to `auto` |
 | `frontend/src/App.tsx` | 32 / 23 / 374 | ⚠ absent for its ENTIRE LIFE at **23 phases**; row then STALE at `31/23/351`. ⭐ **244-04 left it BYTE-UNCHANGED and FENCED it** — `setLibraryTab(` still 2, driven RED against a planted 3rd writer |
 | `frontend/src/components/library/LibraryCloudImport.tsx` | 1 / 1 / 194 | young (created 244-06). Row added AT CREATION. The Library's single-file cloud door — ⛔ it renders a REASON in every unavailable state; a silent grey-out is the same failure as a silent root write |
 | `frontend/src/components/library/LibraryHeaderBar.tsx` | 2 / 1 / 204 | ⚠ absent for its entire life — row added **244-04** at its SECOND touch. ⛔ the ONE set of tab triggers: a hidden duplicate broke 41 cases; `aria-hidden` on the count is load-bearing |
@@ -754,6 +754,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/classification/RuleBuilderPanel.tsx` | 4 / 3 / 502 | row added 237 at threshold. Adds scope selector segmented control; filters out-of-scope conditions on scope switch. |
 | `backend/app/api/workspace.py` | 13 / 7 / 757 | ⚠ row was STALE at `11/6/654` ONE PLAN later — the fastest rot recorded here. honoured by construction (**244-06**): the persist tail EXTRACTED to ONE writer both doors call |
 | `frontend/src/components/panel/TemplateUpload.tsx` | 2 / 2 / 91 | ⚠ absent for its entire life — row added 244-02 at the SECOND phase. **244**: the `accept=` literal is GONE; it reads the fenced constant |
+| `frontend/src/lib/stripComments.testutil.ts` | 1 / 1 / 28 | young (created 244-14 / IN-02). Row added AT CREATION. ⛔ The ONE home of *a `?raw` fence cannot tell code from a comment*; 3 consumers. Never apply it to a class-list or string-CONTENT assertion |
 | `frontend/src/lib/workspaceAllowedExt.ts` | 1 / 1 / 54 | young (created 244-02). Row added AT CREATION — an absent row is invisible to G-5 at any count |
 | `frontend/src/components/chat/ChatAttachmentChip.tsx` | 1 / 1 / 144 | young (created 244-05). Row added AT CREATION. ONE chip, THREE states; `sent` carrying `this chat only` is D-244-22's build obligation, `expired` is D-244-25's |
 | `frontend/src/components/chat/composerCopy.ts` | 2 / 1 / 103 | young (created 244-05). Row added AT CREATION. A PORT of sketch 236's `COPY.js`, `?raw`-fenced. ⛔ `COPY.b` NOT ported (D-244-23). **244-06**: `cloudSub` ported by SHAPE |

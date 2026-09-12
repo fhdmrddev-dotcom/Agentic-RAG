@@ -100,7 +100,7 @@ def _row(path: str, *, expired: bool = False, size: int = 12, mime: str = "appli
 
 
 @contextlib.contextmanager
-def _sandbox_patched(rows, *, content=b"%PDF-1.7 bytes", content_error_for=None):
+def _sandbox_patched(rows, *, content=b"%PDF-1.7 bytes", content_error_for=None, content_error_limit=None):
     """Patch the sandbox stack + the three workspace readers the hydration uses.
 
     ``ws_list_files`` is stubbed to apply the SAME predicate the real SQL applies
@@ -132,9 +132,19 @@ def _sandbox_patched(rows, *, content=b"%PDF-1.7 bytes", content_error_for=None)
                 return dict(r, content_inline=content)
         return None
 
+    # ⭐ 244-14 (review WR-03) — a TRANSIENT failure is a distinct fixture from a permanent one,
+    # and the distinction is the whole finding: the realistic failure set on this path (Supabase
+    # Storage, the pg pool, the Docker daemon) is dominated by blips, and a blip used to mark the
+    # file copied for the rest of the ~30-minute session. `content_error_limit=N` fails the first
+    # N reads of that path and then succeeds; `None` fails forever, which is the shipped shape.
+    attempts: dict[str, int] = {}
+
     async def _fake_content(_pool, _supabase, file_row):
-        if content_error_for is not None and file_row.get("path") == content_error_for:
-            raise RuntimeError("storage download failed")
+        path = file_row.get("path")
+        if content_error_for is not None and path == content_error_for:
+            attempts[path] = attempts.get(path, 0) + 1
+            if content_error_limit is None or attempts[path] <= content_error_limit:
+                raise RuntimeError("storage download failed")
         return content
 
     with contextlib.ExitStack() as stack:
@@ -520,4 +530,118 @@ async def test_a_row_that_expires_between_calls_is_never_copied():
     assert _DEST_B in copies, "the live late attachment did not arrive"
     assert not any("expired-late" in c for c in copies), (
         "an EXPIRED row reached the container — hydration reached around the one expiry gate"
+    )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Phase 244-14 (review WR-03) — A TRANSIENT FAILURE IS NOT A PERMANENT ONE.
+#
+# ⛔ THE FINDING. `244-10` recorded the path BEFORE the attempt, and justified it as *"a
+# permanently-broken file costs one attempt per SESSION and not one per `execute_code` call; its
+# failure is already named individually below, so nothing is lost."* The first clause is true.
+# **The second is only true of the call in which the failure happened.** On every LATER call the
+# path is filtered out at the incremental filter, so no note is produced and the model receives
+# no signal at all.
+#
+# ⛔ AND THE `except` CATCHES EVERY EXCEPTION, NOT ONLY PERMANENT ONES. The realistic failure set
+# here is dominated by transients: `_get_file_content` reaching Supabase Storage,
+# `get_file_by_path` on the pg pool, `copy_to_runtime` against a Docker daemon. One Storage blip
+# on the person's `.xlsx` therefore named the failure once, marked the file copied for the
+# remaining ~30 minutes of the cached session, and left `/sandbox/attachments/` permanently short
+# that file with no further note — the exact silence UAT `L-5` defect 6b cost ten wasted agent
+# rounds to discover.
+#
+# ⭐ THE DEVIATION'S REAL CONSTRAINT IS KEPT, NOT REVERTED. A permanently-broken file must still
+# not re-attempt a DB read plus a container write on every call for half an hour. So *claimed* is
+# separated from *succeeded*, and the DoS bound comes from CAPPING the attempts
+# (`_ATTACHMENT_HYDRATION_MAX_ATTEMPTS`) rather than from never retrying at all.
+#
+# ⚠ THE STRONGEST NEW CLAIM IN `244-10` WAS THE ONE WITH NO FENCE — no case drove a SECOND
+# `execute_code` after a failure, which is the only place the claim can be checked. These are it.
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+async def test_a_transient_failure_is_retried_on_the_next_call_and_then_arrives():
+    """F1 — ONE Storage blip must not cost the file for the whole session.
+
+    ⛔ Asserted on the COPY TARGET, never on a note: the deliverable is the FILE. A note saying
+    "could not load" while the file later arrives is honest; a file that never arrives is defect
+    6b wearing a different hat.
+    """
+    rows = [_row(_A), _row(_B)]
+    thread_id = str(uuid.uuid4())
+    # fileB's content read fails exactly ONCE, then succeeds — a blip, not a broken row.
+    with _sandbox_patched(rows, content_error_for=_B, content_error_limit=1) as (_g, session):
+        r1 = await _handle_execute_code({"code": "print(1)"}, _make_ctx(thread_id=thread_id))
+        assert _DEST_B not in _attachment_copies(session), "fixture did not fail the first read"
+        # …and the failure is NAMED on the call it happened in (the shipped discipline).
+        assert any(
+            "uat-note.pdf" in str(n)
+            for n in (json.loads(r1.llm_content).get("attachments") or [])
+        )
+
+        await _handle_execute_code({"code": "print(2)"}, _make_ctx(thread_id=thread_id))
+
+    copies = _attachment_copies(session)
+    assert _DEST_B in copies, (
+        "a file that failed ONE transient read was never retried — it is missing from "
+        f"/sandbox/attachments for the life of the session. copy targets seen: {copies}"
+    )
+    assert copies.count(_DEST_A) == 1, "the healthy file was re-copied — WR-02's DoS arm re-opened"
+
+
+async def test_a_permanent_failure_is_named_on_every_attempt_then_given_up_on():
+    """F2 — the retry is BOUNDED, and the silence is gone.
+
+    Two properties in one case, because they are in tension and a case proving only one is how
+    the original deviation came to be written:
+      · the failure is NAMED on every attempt, not only on the call that raced the blip;
+      · after `_ATTACHMENT_HYDRATION_MAX_ATTEMPTS` the path is given up on DELIBERATELY, so a
+        permanently-broken file costs a bounded number of attempts per SESSION rather than one
+        DB read plus one container write on every `execute_code` call for ~30 minutes.
+    """
+    rows = [_row(_A), _row(_B)]
+    thread_id = str(uuid.uuid4())
+    with _sandbox_patched(rows, content_error_for=_B) as (_g, session):  # fails forever
+        notes = []
+        for i in range(4):
+            res = await _handle_execute_code({"code": f"print({i})"}, _make_ctx(thread_id=thread_id))
+            notes.append(json.loads(res.llm_content).get("attachments") or [])
+
+    named = [i for i, n in enumerate(notes) if any("uat-note.pdf" in str(x) for x in n)]
+    cap = tool_dispatcher._ATTACHMENT_HYDRATION_MAX_ATTEMPTS
+    assert named[:2] == [0, 1], (
+        f"a permanently-broken file was named on calls {named} — it must be named on EVERY "
+        "attempt, not once. On the calls that follow, the model is told nothing at all, which is "
+        "the silence L-5 cost ten wasted rounds."
+    )
+    assert len(named) == cap, (
+        f"the retry is unbounded — named on {len(named)} of 4 calls against a cap of {cap}"
+    )
+    # ⛔ GIVEN UP ON, not retried forever, and the healthy file is still copied exactly once.
+    assert _DEST_B not in _attachment_copies(session)
+    assert _attachment_copies(session).count(_DEST_A) == 1
+
+
+async def test_a_failed_path_consumes_the_copy_budget_only_once_it_is_given_up_on():
+    """F3 — the truncation note must not become a lie.
+
+    ⚠ WR-03's related finding, fenced rather than left as prose: `already` counts paths against
+    the session budget, so under the shipped shape a flaky Storage could exhaust the 50-file cap
+    without a single file arriving — and the note it then emits (*"Only the first 50 of N …"*)
+    is false in that state. With the retry, a path enters the budget only when it SUCCEEDS or is
+    deliberately given up on, so the budget counts files the container actually holds.
+    """
+    rows = [_row(_A), _row(_B)]
+    thread_id = str(uuid.uuid4())
+    with patch.object(tool_dispatcher, "_ATTACHMENT_HYDRATION_MAX_FILES", 2):
+        with _sandbox_patched(rows, content_error_for=_B, content_error_limit=1) as (_g, session):
+            await _handle_execute_code({"code": "print(1)"}, _make_ctx(thread_id=thread_id))
+            # fileB failed once. If that failure consumed the budget, the retry cannot run.
+            await _handle_execute_code({"code": "print(2)"}, _make_ctx(thread_id=thread_id))
+
+    copies = _attachment_copies(session)
+    assert _DEST_B in copies, (
+        "a FAILED path consumed the session copy budget, so the retry was truncated away — the "
+        f"budget counts files that never arrived. copy targets seen: {copies}"
     )

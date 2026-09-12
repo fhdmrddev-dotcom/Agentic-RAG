@@ -393,6 +393,84 @@ describe("244-13 / WR-07 — a harness lock that is ITSELF cap-paused stays lock
     expect(box).toHaveAttribute("title", "Workflow running — Cancel to switch back")
     expect(screen.queryByPlaceholderText("Ask anything…")).toBeNull()
   })
+
+  /**
+   * ⛔ D7 — WR-01, THE MIRROR `244-13` LEFT OPEN, in ONE tree.
+   *
+   * `244-13` moved `ChatArea.tsx:167` onto the lock's MODE, which is right. The Continue
+   * card one component over (`MessageItem.tsx:790-798`) was left gated on `capPaused` ALONE,
+   * so for exactly one state — `mode: "harness"` AND `capPaused: true` — the two surfaces
+   * decouple and the transcript says **"Start a new message to keep going"** over a composer
+   * that has just been DISABLED. That is the ROADMAP's named anti-fix inverted: *"never a
+   * disabled composer beside a message telling them to use it"*, moved one file over rather
+   * than closed.
+   *
+   * ⛔ BOTH HALVES IN ONE TREE, the D6 discipline: a suite that proves each half in its own
+   * render is consistent with a product that never shows them together — and "together" is
+   * the entire claim. The browser measured exactly that contradiction for the Deep case
+   * (UAT `G-1`, one `getBoundingClientRect` pass).
+   *
+   * ⚠ THE SEED RACE D5 CARRIES (review IN-04, deferred) CANNOT MAKE THIS CASE PASS WRONGLY,
+   * and that is by construction rather than by luck. MEASURED here while writing it: the
+   * mount effect settles TWICE — the first call is aborted by the re-run and writes nothing,
+   * the second writes the lock. A hypothetical THIRD settle would re-write
+   * `capPaused: false`, which DELETES the Continue card entirely — turning the positive
+   * assertion below red. The negative assertion is therefore never reached in a raced run,
+   * so it cannot pass vacuously. (`mode` is `"harness"` on every settle, so the composer's
+   * disabled state is not what discriminates here — the card is.)
+   */
+  it("D7 (WR-01) — a harness cap-pause locks the composer AND drops the 'start a new message' sentence", async () => {
+    getThreadWorkflow.mockResolvedValue(HARNESS_LOCKED_STATE)
+
+
+    const message = {
+      id: "m-harness-capped",
+      thread_id: THREAD.id,
+      user_id: "u-1",
+      role: "assistant",
+      content: "Partial phase output before the run hit its Continue cap.",
+      created_at: "2026-09-11T00:00:00Z",
+      updated_at: "2026-09-11T00:00:00Z",
+    } as Message
+
+    render(
+      <StreamsProvider>
+        <TooltipProvider>
+          <ChatArea thread={THREAD} onCreateThread={vi.fn().mockResolvedValue(THREAD)} folders={[]} />
+          <MessageItem message={message} isLastAssistant />
+        </TooltipProvider>
+      </StreamsProvider>,
+    )
+    await waitFor(() =>
+      expect(useStreamsStore.getState().workflowLockByThread.has(THREAD.id)).toBe(true),
+    )
+    seedHarnessCapPausedLock()
+
+    // CAUSE — asserted ONCE, not in a `waitFor`, so a regression cannot be papered over by a
+    // retry.
+    const lock = useStreamsStore.getState().workflowLockByThread.get(THREAD.id)
+    expect(lock?.mode).toBe("harness")
+    expect(lock?.capPaused).toBe(true)
+    expect(lock?.continuesRemaining).toBe(0)
+
+    // CONSEQUENCE 1 — the composer is shut, and says why.
+    const box = await screen.findByPlaceholderText("Workflow running — Cancel to switch back")
+    expect(box).toBeDisabled()
+
+    // CONSEQUENCE 2 — the card is still there and still says the run is stopped …
+    expect(
+      screen.getByText(
+        "Reached the Continue limit — this run is stopped. Cancel the workflow to start something new.",
+      ),
+    ).toBeInTheDocument()
+    // … and the DEEP sentence, which instructs the one action the composer forbids, is gone.
+    expect(
+      screen.queryByText(
+        "Reached the Continue limit — this run is stopped. Start a new message to keep going.",
+      ),
+      "the transcript tells the person to start a new message while the composer is disabled",
+    ).toBeNull()
+  })
 })
 
 describe("244-13 / D6 — the Deep cap-pause keeps BOTH halves, in ONE tree", () => {
