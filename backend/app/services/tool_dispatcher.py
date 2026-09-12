@@ -1785,21 +1785,36 @@ _ATTACHMENT_HYDRATION_MAX_FILES = 50
 # head — workspace paths carry a `uuid8-` prefix, so truncation keeps names distinguishable.
 _ATTACHMENT_NAME_MAX = 120
 
-# WR-02 (244-07). The once-per-session marker, keyed on the SANDBOX SESSION rather than on the
-# per-iteration `ToolContext` — see the call site in `_handle_execute_code` for the measurement.
+# WR-02 (244-07) / L-5 defect 6b (244-10). A per-session record of WHICH workspace paths were
+# copied — not merely THAT hydration ran — keyed on the SANDBOX SESSION rather than on the
+# per-iteration `ToolContext`.
 #
-# ⚠ A **WeakSet of sessions**, not an attribute ON the session, and the reason is measured rather
-# than stylistic: `setattr(session, flag, True)` works on the real object but `getattr(mock, flag,
-# False)` on a `MagicMock` returns an auto-created child mock, which is TRUTHY — so the guard read
-# "already hydrated" on the very first call and every hydration test went red with zero copies.
-# A guard whose correctness depends on the test double's attribute policy is a guard nobody can
-# fence. Membership is by identity and needs nothing of the object but a weakref.
+# ⛔ WHY THE TYPE CHANGED, measured in a real browser and not reasoned about. `244-07` closed
+# WR-02 with a `weakref.WeakSet` of sessions: hydration ran ONCE, on the call that created the
+# entry. That is right for the DoS arm WR-02 named and WRONG for this one, because
+# `SandboxSessionManager` caches the session per `thread_id` until idle eviction — so once a
+# session was marked, NO LATER ATTACHMENT WAS EVER COPIED INTO IT. The agent's own round-4
+# output is the evidence:
+#       /sandbox/attachments [] ['c679b991-Meridian-Q4-pricing.xlsx']
+# — the directory holds only the first file. It recovered the second at round 10 via the
+# `workspace_read` fallback, ~49 s and ~10 wasted rounds later. ⛔ "The SECOND attachment did not
+# hydrate", never ".pdf does not hydrate": that run attached .xlsx first and .pdf second, so
+# ordering is confounded with file type and the type-specific claim is NOT established.
 #
-# ⭐ The LIFETIME is the point. `SandboxSessionManager` holds the session in its per-thread cache
-# until idle eviction, so the entry lives exactly as long as the `/sandbox/attachments` directory
-# it describes; a new container (worker bounce, eviction) is a new object, is absent from this
-# set, and re-hydrates — which is correct rather than incidental.
-_hydrated_sessions: weakref.WeakSet = weakref.WeakSet()
+# ⭐ THE RECORD NOW SAYS WHICH FILES, so a claim about hydration can never again outlive the
+# files it was about. WR-02's DoS arm survives at per-FILE granularity: an already-copied path is
+# still never copied twice.
+#
+# ⚠ THREE PROPERTIES ARE INHERITED FROM WR-02 RATHER THAN RE-ARGUED HERE:
+#   1. **keyed by the SESSION**, so the record's lifetime is exactly the lifetime of the
+#      `/sandbox/attachments` directory it describes — a new container (worker bounce, idle
+#      eviction) is a new key with an empty set and re-hydrates, correct rather than incidental;
+#   2. **weak**, so the record cannot pin a session alive;
+#   3. **membership/keying, NEVER `getattr`** — `setattr(session, flag, True)` works on the real
+#      object but `getattr(mock, flag, False)` on a `MagicMock` returns an auto-created child
+#      mock, which is TRUTHY, so an attribute-based guard reads "already hydrated" on the very
+#      first call and cannot be fenced at all.
+_hydrated_files: "weakref.WeakKeyDictionary[object, set[str]]" = weakref.WeakKeyDictionary()
 
 
 def _attachment_container_path(path: str) -> str:
@@ -1831,13 +1846,26 @@ def _attachment_container_path(path: str) -> str:
     return f"{_ATTACHMENTS_DIR}/{base}"
 
 
-async def _hydrate_thread_attachments(ctx: ToolContext, session) -> list[str]:
-    """Copy this thread's non-expired workspace files into ``/sandbox/attachments/``.
+async def _hydrate_thread_attachments(ctx: ToolContext, session, already: set[str]) -> list[str]:
+    """Copy this thread's not-yet-copied, non-expired workspace files into ``/sandbox/attachments/``.
 
     Returns a list of NAMED failure/truncation notes (empty on a clean run) for the caller to
     surface in the tool result. ⛔ T-244-02-07: a file the user attached is never dropped
     silently — a per-file failure is logged AND named, the way `preview_service.confirm_preview`
     names a refusal.
+
+    ⭐ ``already`` IS THE CALLER'S OWN SET (244-10), mutated in place rather than returned and
+    re-unioned — the two are equivalent, and passing the live object is what makes the record
+    land BEFORE the copy is attempted even on the paths that raise. A path is recorded the
+    moment it is claimed, so a permanently-broken file costs one attempt per SESSION and not one
+    per `execute_code` call; its failure is already named individually below, so nothing is lost.
+
+    ⚠ THE COST THIS ADDS, named rather than discovered later: hydration used to run
+    ``ws_list_files`` ONCE PER SESSION and now runs it ONCE PER ``execute_code`` CALL. That is
+    one bounded, thread-scoped DB listing on a handler that already awaits container I/O —
+    accepted deliberately, because the alternative (an invalidation signal from the upload door
+    into the dispatcher) is a SECOND mechanism that can go out of sync, and a marker that went
+    out of sync with the container is exactly how this hole was made.
 
     ⚠ ONE EXPIRY GATE, TWO READERS (D-244-04). `ws_list_files` -> `list_files_in_thread` applies
     ``expires_at IS NULL OR expires_at > now()`` IN SQL, so WHICH files exist is decided there and
@@ -1864,12 +1892,29 @@ async def _hydrate_thread_attachments(ctx: ToolContext, session) -> list[str]:
     if not rows:
         return notes  # S-2: empty => do nothing at all. No mkdir, no note, no event.
 
-    if len(rows) > _ATTACHMENT_HYDRATION_MAX_FILES:
+    # ⭐ 244-10. Only the rows this session has not already received, and the filter is applied
+    # to THE GATED LISTING'S OUTPUT — it adds no second expiry rule (D-244-04: `ws_list_files`'
+    # SQL is the one home of `expires_at IS NULL OR expires_at > now()`).
+    rows = [r for r in rows if (r.get("path") or "") not in already]
+    if not rows:
+        # ⛔ The STEADY STATE, and it is the common one: a run calling execute_code eight times
+        # reaches here seven times. No mkdir, no copy, no note — the same nothing the
+        # zero-attachment path costs, which Deep and Harness both share.
+        return notes
+
+    # ⛔ T-244-10-01 — THE CAP IS A SESSION TOTAL, NEVER A PER-CALL COUNT. Making the copy
+    # incremental is exactly what would turn this into a per-call budget, letting a thread
+    # exceed it by attaching across several calls — the DoS arm of T-244-02-05, re-opened by the
+    # fix that closes defect 6b.
+    if len(already) + len(rows) > _ATTACHMENT_HYDRATION_MAX_FILES:
         notes.append(
-            f"Only the first {_ATTACHMENT_HYDRATION_MAX_FILES} of {len(rows)} workspace files "
-            f"were copied into {_ATTACHMENTS_DIR}/. Read the rest with workspace_read."
+            f"Only the first {_ATTACHMENT_HYDRATION_MAX_FILES} of "
+            f"{len(already) + len(rows)} workspace files were copied into "
+            f"{_ATTACHMENTS_DIR}/. Read the rest with workspace_read."
         )
-        rows = rows[:_ATTACHMENT_HYDRATION_MAX_FILES]
+        rows = rows[:max(_ATTACHMENT_HYDRATION_MAX_FILES - len(already), 0)]
+    if not rows:
+        return notes  # budget exhausted — NAMED above, never silent.
 
     try:
         await run_in_threadpool(session.execute_command, f"mkdir -p {_ATTACHMENTS_DIR}")
@@ -1891,6 +1936,9 @@ async def _hydrate_thread_attachments(ctx: ToolContext, session) -> list[str]:
     for row in rows:
         src_path = row.get("path") or ""
         dest = _attachment_container_path(src_path)
+        # ⚠ Recorded BEFORE the attempt (see the docstring): a hard per-file failure must not
+        # re-attempt container I/O on every subsequent execute_code call. It is named below.
+        already.add(src_path)
         try:
             file_row = await get_file_by_path(ctx.pool, UUID(ctx.thread_id), src_path)
             if file_row is None:
@@ -2023,8 +2071,8 @@ async def _handle_execute_code(args: dict, ctx: ToolContext) -> ToolResult:
         # Phase 244 (SHELL-04 / C-9) — hydrate this thread's attachments into
         # /sandbox/attachments/ so a binary attachment is USABLE, not merely present.
         #
-        # ⛔ ONCE PER SANDBOX SESSION — AND THE FLAG LIVES ON THE SESSION, WHICH IS THE ONLY
-        # OBJECT THAT SURVIVES LONG ENOUGH TO MEAN IT (WR-02 / 244-07). It was written on `ctx`
+        # ⛔ ONCE PER FILE PER SANDBOX SESSION — AND THE RECORD LIVES ON THE SESSION, WHICH IS
+        # THE ONLY OBJECT THAT SURVIVES LONG ENOUGH TO MEAN IT (WR-02 / 244-07). It was on `ctx`
         # "in the exact shape of the `_output_baseline_seeded` guard", and that shape is wrong
         # for this claim: `agent_loop.py` constructs a **new ToolContext on every iteration**
         # (its own comment says so — *"Phase 083 D-01: construct ToolContext once per
@@ -2034,24 +2082,29 @@ async def _handle_execute_code(args: dict, ctx: ToolContext) -> ToolResult:
         # attachment eight times — the DoS arm of T-244-02-05, still open behind a comment
         # saying it was closed.
         #
-        # ⭐ The marker is `_hydrated_sessions` (see its definition): membership by identity in a
-        # WeakSet, so its lifetime is EXACTLY the lifetime of the `/sandbox/attachments` directory
-        # it describes.
+        # ⭐ THE MARKER IS `_hydrated_files` (see its definition), AND ITS TYPE CHANGED AT 244-10
+        # BECAUSE A BOOLEAN WAS THE DEFECT. A `WeakSet` of sessions said only THAT hydration had
+        # run, so a file attached AFTER the sandbox existed was never copied — the session is
+        # cached per `thread_id` until idle eviction, so "already hydrated" stayed true for the
+        # whole 30 minutes while the container's contents were provably stale. The record now
+        # says WHICH paths arrived, and the helper is consulted on EVERY call rather than once.
         # ⚠ `_output_baseline_seeded` above is left alone deliberately: it is a different claim
         # on a different cadence, and moving it is not this defect.
-        # ⚠ The marker is set BEFORE the work, not after: a hard failure must not re-attempt
-        # container I/O on every subsequent execute_code call. Per-FILE failures are already
-        # handled and named individually inside the helper, so nothing is lost by it.
-        # ⛔ A thread with no attachments performs no mkdir, no copy and adds no note — Deep and
-        # Harness share this handler, so the zero-attachment path must cost exactly nothing.
-        _attachment_notes: list[str] = []
-        if session not in _hydrated_sessions:
-            try:
-                _hydrated_sessions.add(session)
-            except TypeError:  # pragma: no cover — a session that cannot be weak-referenced
-                # Degrades to the shipped per-iteration behaviour rather than breaking the turn.
-                logger.warning("attachment hydration: session is not weak-referenceable")
-            _attachment_notes = await _hydrate_thread_attachments(ctx, session)
+        # ⚠ Each path is recorded BEFORE its copy is attempted, inside the helper: a hard failure
+        # must not re-attempt container I/O on every subsequent execute_code call. Per-FILE
+        # failures are already handled and named individually there, so nothing is lost by it.
+        # ⛔ A thread with no NEW attachments performs no mkdir, no copy and adds no note — Deep
+        # and Harness share this handler, so the steady state must cost exactly nothing.
+        try:
+            _already_copied = _hydrated_files.get(session)
+            if _already_copied is None:
+                _already_copied = set()
+                _hydrated_files[session] = _already_copied
+        except TypeError:  # pragma: no cover — a session that cannot be weak-referenced
+            # Degrades to the shipped per-call behaviour rather than breaking the turn.
+            logger.warning("attachment hydration: session is not weak-referenceable")
+            _already_copied = set()
+        _attachment_notes = await _hydrate_thread_attachments(ctx, session, _already_copied)
 
         # Inject skill files into sandbox
         skill_files_req = args.get("skill_files") or []
