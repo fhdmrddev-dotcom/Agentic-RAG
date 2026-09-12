@@ -3035,6 +3035,30 @@ const BASELINE = {
   // would re-open the hole `244-08` shut, so the DIRECTION is pinned as its own case.
   "workflowLockWriters.lockstep.test.ts": 5,
 
+  // ── Phase 244-15 (SHELL-03 / UAT gap G-8) — the answer-settles-both-homes fences ───────
+  //
+  // 8 cases at the Task-1 commit, read from this script's own `actual` column, never
+  // hand-counted. Three of them are NEGATIVE CONTROLS (a live anchor, a cap-paused lock and
+  // a failed read each release NOTHING) — the arms that keep the settle from becoming the
+  // elevation `T-244-03-01` names, and the easiest kind of case to delete without anyone
+  // noticing. Test 8 is the source sweep that forbids a SEVENTH `setWorkflowLockForThread`
+  // derivation; without a pin it could be silently dropped and the gate would still say OK.
+  // ⚠ RAISED `8` → `12` IN TASK 2 OF THE SAME PLAN, from the same `actual` column. The four
+  // added cases are the two-homes pair (answer in A clears B; answer in B clears A — TWO
+  // directions, because a fence over one is passed by a fix that only works one way), a
+  // refused-answer case that must settle NOTHING, and the third home (`WorkflowRunPage` mounts
+  // the CARD, not the stack) asserted by API call count rather than by render.
+  "streamsProvider_244_settle_ask.test.tsx": 12,
+
+  // ── Phase 244-15 — a RED, UNGATED fence, repaired and finally adopted ─────────────────
+  //
+  // ⚠ FOUND IN NEITHER KNOB AND RED SINCE `d58fa43a0`. The gate never RAN it, so nothing
+  // noticed its `?raw` line-count pin going stale two phases ago: measured at 244-15's base,
+  // `1 failed | 8 passed`, `expected 766 to be 737`. Thirteenth suite found in this state; the
+  // structural fix is SEED-229. Re-baselined to 837 and adopted in the SAME commit, and ONLY
+  // because all 9 cases are green — adopting a red suite turns the shared gate red.
+  "PendingAskCard.retired.baseline.test.tsx": 9,
+
   // ── Phase 243 (243-03 / CHAT-03 / D-243-16) — the scroll effect's ONLY behavioural fence ─
   //
   // ⚠ 8 was READ FROM THIS SCRIPT'S OWN `actual` COLUMN on the run that first executed the
@@ -4846,6 +4870,11 @@ const TARGETS = [
   // panel __tests__ entries here are FILE-LEVEL, so this file was invisible until its
   // name was typed. Twelfth such suite in a week; SEED-229 has the structural fix.
   "src/components/panel/__tests__/PendingAskCard.test.tsx",
+  // ⚠ ITS SIBLING WAS IN NEITHER KNOB TOO, and stayed that way when the line above was added
+  // 2026-09-01 — so the suite that reads the approval card's THREE shipped retirement sentences
+  // out of source has never been executed by this gate, and its `?raw` pin sat RED and unseen
+  // from `d58fa43a0` until 244-15. Adopted here WITH the re-baseline, in one commit.
+  "src/components/panel/__tests__/PendingAskCard.retired.baseline.test.tsx",
   // ── Added for SEED-227, in the SAME COMMIT that creates the file — the two-knob trap
   // ── again, and MEASURED rather than assumed: `grep -n "components/metadata"` over this
   // ── whole script returned NOTHING before this line was written. `src/components/metadata`
@@ -5145,6 +5174,16 @@ const TARGETS = [
   // reason no plan here owns. (Measured on this round's base and again after its changes:
   // the same 14, name for name.)
   "src/__tests__/providers/workflowLockWriters.lockstep.test.ts",
+  // ── Phase 244-15 (SHELL-03 / G-8) — the settle path's fences ──────────────────────────
+  //
+  // FILE-LEVEL for the identical reason as the four neighbours here: `src/__tests__` is not
+  // a bare-directory TARGETS entry anywhere in this array, so a suite placed there runs in
+  // NO gate until it is named here AND pinned in BASELINE. TARGETS decides what RUNS;
+  // BASELINE decides what is GUARDED, and a suite can sit on the wrong side of exactly one
+  // of them. ⛔ Do NOT "simplify" this to a `src/__tests__/providers` directory entry — the
+  // fourteen INHERITED failures documented above live in that folder and would turn the
+  // shared gate red for a reason no plan here owns.
+  "src/__tests__/providers/streamsProvider_244_settle_ask.test.tsx",
   // ⚠ The scroll suite below is a SEPARATE FILE from `MessageList.test.tsx` on purpose:
   // that one stubs `scrollIntoView` to a NO-OP tree-wide (`:61-65`), so nothing mounted under it
   // can see the scroll effect at all. This is the ONLY behavioural coverage that effect has.

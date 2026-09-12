@@ -630,7 +630,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/chat/ToolCallPanel.tsx` | 51 / 23 / 351 | ✅ **G-5 DISCHARGED (227-02)** |
 | `frontend/src/components/chat/MessageItem.tsx` | 75 / 34 / 1000 | ⚠ row STALE a 4th time (`74/34/981`). honoured by construction (**244-14/WR-01**): the Continue card reads the lock's MODE, like the composer beside it. State 3→3, effects 0→0, props 5→5 |
 | `backend/app/api/threads.py` | 245 / 82 / 1617 | ⚠ row was STALE at `243 / 80 / 1590`. honoured by construction (**244-03**): one pure-read query loses a WHERE predicate, gains a Python guard. ⛔ no writer added |
-| `frontend/src/providers/StreamsProvider.tsx` | 100 / 37 / 4727 | ⚠ row STALE a 7th time (`97/37/4660`). honoured by construction (**244-14**): reconcile CLEARS on success, ONE capPaused value, the unreachable abort arm deleted. ⛔ no retry: the in-flight ref is GLOBAL |
+| `frontend/src/providers/StreamsProvider.tsx` | 101 / 37 / 4815 | ⚠ row STALE an 8th time (`100/37/4727`). honoured by construction (**244-15**): ONE action that RELEASES — `setWorkflowLockForThread(` reads 5 before and 5 after. ⛔ no timer, no seventh writer |
 | `frontend/src/hooks/useMessages.ts` | 74 / 27 / 127 | extraction due |
 | `backend/app/services/anthropic_service.py` | 11 / 10 / 354 | adapter-pattern audit due |
 | `backend/app/services/embedding_service.py` | 9 / 5 / 354 | ⚠ absent for its entire life at 5 phases — row added 236 (SC#2) |
@@ -668,9 +668,9 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/chat/ActiveConnectorChips.tsx` | 2 / 2 / 82 | ⚠ absent for its ENTIRE LIFE — row added 244-05 at its SECOND phase. **244**: the row container HOISTED out; bare chips now, `null` on empty (D-244-26) |
 | `frontend/src/components/chat/MessageList.tsx` | 23 / 10 / 366 | ⚠ row STALE a FOURTH time (`21/9/307`). **244-12**: its SECOND list-level mount — `PendingAskStack` beside `ThreadRunLine`, both above `bottomRef`. ⛔ unconditional, measured +4 fetches/thread-open |
 | `frontend/src/components/chat/ChatArea.tsx` | 75 / 36 / 781 | ⚠ row STALE a THIRD time (`74/36/743`). honoured by construction (**244-13**): the SAME one boolean now tests the lock's MODE — WR-07 closed, no second branch, no new state |
-| `frontend/src/stores/streamsStore.ts` | 20 / 13 / 525 | ⚠ **absent for its ENTIRE LIFE at 13 phases — row added 244-13; the ledger gate was RED on it at every earlier commit of this phase.** `WorkflowLock.mode` is a REAL discriminator now |
+| `frontend/src/stores/streamsStore.ts` | 21 / 13 / 546 | ⚠ row STALE at `20/13/525`, one plan after it was ADDED. honoured by construction (**244-15**): ONE action type + ONE bare no-op stub. ⛔ `void`, never `Promise<void>` — it fires from a click handler |
 | `frontend/src/lib/toolMeta.ts` | 10 / 6 / 218 | ⚠ **absent for its ENTIRE LIFE at 6 phases — row added 244-13, which does NOT modify it.** ⛔ the ONE home of the harness activity string; a literal copied elsewhere makes its pin vacuous |
-| `frontend/src/components/panel/PendingAskCard.tsx` | 14 / 7 / 765 | ⚠ row was STALE at `13 / 7 / 736`. UNTOUCHED by 244-03 (`0 0`) — the chat approval is a MOUNT of its shipped `PendingAskStack`, never an edit to the cross-surface shell |
+| `frontend/src/components/panel/PendingAskCard.tsx` | 15 / 8 / 836 | ⚠ row was STALE at `14/7/765`; G-5 FIRES at 8 phases. honoured by construction (**244-15**): ONE optional prop, ONE composed callback in the STACK, `useState` 9→9 — no new state on a 3-home shell |
 | `frontend/src/pages/WorkflowRunPage.tsx` | 28 / 9 / 1670 | honoured by construction (200 / 200.1 / 200.2 / **214**) |
 | `frontend/src/components/chat/OutputFileCard.tsx` | 8 / 7 / 219 | honoured by construction (195) |
 | `frontend/src/components/panel/FilesSection.tsx` | 10 / 6 / 363 | ⚠ row was STALE at `8 / 5 / 334`. honoured by construction (**244-05**): TWO `export` keywords, zero body change — the chat chip IMPORTS `expiryCaption`, never re-derives its three readings |
@@ -682,7 +682,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/api/settings.py` | 38 / 20 / 972 | ⚠ STALE for the THIRD close running at `35/19/814`. honoured by construction (**242**): one refusal helper behind an allow-list, four call sites, every typed sentence preserved |
 | `backend/app/services/multimodal_service.py` | 14 / 7 / 984 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
 | `backend/app/api/documents.py` | 85 / 33 / 2437 | ✅ **DISCHARGED (229)** |
-| `scripts/vitest-count-gate.cjs` | 167 / 38 / 4786 | ⚠ row was STALE at `159 / 36 / 4687`. honoured by construction (**235* |
+| `scripts/vitest-count-gate.cjs` | 211 / 46 / 5618 | ⚠ row STALE a 3rd time, by **44 commits / 8 phases** (`167/38/4786`). **244-15** adopted TWO suites into BOTH knobs — one of them RED and ungated since `d58fa43a0` |
 | `backend/app/services/eval_runner_service.py` | 12 / 7 / 959 | ⚠ absent at 7 phases (added 196) |
 | `frontend/src/components/panel/PhaseCard.tsx` | 16 / 10 / 755 | honoured by construction (200 / **214**) |
 | `frontend/src/components/panel/PhaseTimeline.tsx` | 9 / 7 / 385 | honoured by construction (**214**) |
