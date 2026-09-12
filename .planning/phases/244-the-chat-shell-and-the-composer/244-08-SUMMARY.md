@@ -42,7 +42,7 @@ browser; `244-VALIDATION.md`'s rows stay `⬜ owed`.
 
 ## 1 · `T-244-06-07` (DoS) — the chat's cloud door reads under its own 10 MB cap
 
-**Status: CLOSED.** `workspace.py:412` — `fetch_cloud_file(conn, body.file_id,
+**Status: CLOSED.** `workspace.py:416` — `fetch_cloud_file(conn, body.file_id,
 max_bytes=MAX_FILE_SIZE)`.
 
 ### ⚠ The audit's framing was OVERSTATED, and that changed the fix
@@ -111,7 +111,8 @@ the envelope cap.
 
 ## 2 · `T-244-03-01` (EoP) — the discriminator lives on one branch
 
-**Status: CLOSED.** `ChatArea.tsx:205-224` — the genuine-lock branch sets `capPaused: false`.
+**Status: CLOSED.** `ChatArea.tsx:226` — the genuine-lock branch sets `capPaused: false` (the
+reason is recorded at `:205-225`).
 
 The declared mitigation was already written: *"the discriminator is `capPaused`, which is set
 only on the `state.cap_paused` reconcile branch."* It was set on both, and
