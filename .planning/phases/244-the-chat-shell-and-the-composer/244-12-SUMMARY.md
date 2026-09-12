@@ -355,3 +355,12 @@ None — no new network endpoint, auth path, file access or schema surface.
 4. `sketchComposition.test.tsx` is a **sixth SEED-171 candidate** — named here rather than left
    silent.
 5. An independent review is owed: this was **self-verified**.
+
+---
+
+## Self-Check: PASSED
+
+- `244-12-SUMMARY.md` — FOUND · `244-12-UAT-ROW.md` — FOUND
+- commits FOUND: `e1e264dba` · `39b6e2802` · `5953ef1de` · `70a9803a8` · `f60aec274`
+- working tree clean; `.planning/STATE.md` and `.planning/ROADMAP.md` byte-unchanged from base
+  `32ada21e1` (the orchestrator owns those writes)
