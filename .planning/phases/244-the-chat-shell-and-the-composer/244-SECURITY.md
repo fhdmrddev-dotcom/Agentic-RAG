@@ -1,28 +1,34 @@
 ---
 phase: 244-the-chat-shell-and-the-composer
 slug: the-chat-shell-and-the-composer
-status: draft
-threats_total: 41
-threats_closed: 38
-threats_open: 3
+status: verified
+threats_total: 42
+threats_closed: 42
+threats_open: 0
 asvs_level: 1
 created: 2026-09-12
 base_commit: 223b3ea4f
-head_commit: 144015cdd
+head_commit: e79fbabd0
 ---
 
 # Phase 244 — Security
 
 > Per-phase security contract: threat register, accepted risks, and audit trail.
-> **Verification method:** every `mitigate` disposition was re-checked against the CURRENT tree at
-> HEAD (`144015cdd`), after the `244-07` fix round. No verdict rests on a test assertion — each
-> CLOSED row cites the mitigating CODE. Rows the prior code review had already looked at were
-> re-derived here rather than inherited.
+> **Verification method:** every `mitigate` disposition was re-checked against the CURRENT tree —
+> first at `144015cdd` after the `244-07` fix round, then again at `e79fbabd0` after the `244-08`
+> defect round closed the last three. No verdict rests on a test assertion — each CLOSED row cites
+> the mitigating CODE. Rows the prior code review had already looked at were re-derived rather
+> than inherited.
 
 ⚠ **COUNT DISCREPANCY, RECORDED NOT SILENTLY RESOLVED.** The audit brief states **40** threats.
 The six `<threat_model>` blocks carry **41** rows — 35 register rows (01×4, 02×7, 03×6, 04×5,
 05×6, 06×7) plus **6** `T-244-0N-SC` supply-chain rows, one per plan. All 41 are verified below;
-the totals in the frontmatter are the measured 41, not the quoted 40.
+the totals in the frontmatter were the measured 41, not the quoted 40.
+
+⚠ **NOW 42**, and the extra row is not an accounting change: `244-08` registered
+**`T-244-UF-1`** — the net-new `from-connection` route that appeared in no plan's
+`<threat_model>` and that carried `T-244-06-07`. It is a row of its own precisely so the count
+records that a threat surface once had none.
 
 ---
 
@@ -59,7 +65,7 @@ the totals in the frontmatter are the measured 41, not the quoted 40.
 | T-244-02-06 | Information disclosure | EXPIRED attachment resurfacing in prompt/sandbox | mitigate | One SQL gate, two readers: `db/workspace.py:207,219` — `(expires_at IS NULL OR expires_at > now())`. `agent_loop.py:1694` and `tool_dispatcher.py:1862` both consume that listing; neither adds a second expiry rule. | closed |
 | T-244-02-07 | Repudiation | hydration failure silently dropping a file | mitigate | `tool_dispatcher.py:1897-1906` — per-file exception is logged AND appended to `notes`, surfaced in the tool result; the over-cap truncation is likewise named (`:1868-1871`). | closed |
 | T-244-02-SC | Tampering | npm/pip/cargo installs | mitigate | Same measurement as `T-244-01-SC` — no manifest touched; the sandbox image tag is unchanged. | closed |
-| **T-244-03-01** | **Elevation of privilege** | **unlocking the composer during a GENUINE harness run** | **mitigate** | ⛔ **PARTIAL — see OPEN-1.** `ChatArea.tsx:140` reads `workflowLock !== null && !workflowLock.capPaused`, but `capPaused` is ALSO set on the genuine-lock branch (`ChatArea.tsx:201-207`, `capPaused: state.cap_paused`), not only on the cap-paused branch (`:208-217`) the mitigation names. | **open** |
+| T-244-03-01 | Elevation of privilege | unlocking the composer during a GENUINE harness run | mitigate | ✅ **CLOSED by `244-08`** (`d76b252a8`). `ChatArea.tsx:226` — the genuine-lock branch now sets `capPaused: false`, so the discriminator read at `ChatArea.tsx:140` is satisfied only from the `state.cap_paused` reconcile branch (`:229-238`), which is the declared mitigation verbatim. Fail-closed by choice, not deleted as unreachable — the reason is recorded at `ChatArea.tsx:205-223`. Fenced by case 5 of `ChatArea.capPausedComposer.test.tsx`, RED at `79cd5ba44` with `expected true to be false`. | closed |
 | T-244-03-02 | Tampering | an approval answerable twice | mitigate | ONE component in both homes — `MessageItem.tsx:544-547` mounts the shipped `PendingAskStack`, never a chat-native second renderer; one slice + one reconcile at `PendingAskCard.tsx:692`; the `runIsOver` two-conjunct guard is unchanged (`PendingAskCard.tsx:714`, `:427`). Server remains the authority. | closed |
 | T-244-03-03 | Repudiation | chat/panel state divergence | mitigate | Structural, same citations as 03-02 (one slice, one reconcile, one component). ⚠ The both-directions **driven** row (`244-VALIDATION.md` L-4) is `⬜ owed` — structure is verified, behaviour is not. | closed |
 | T-244-03-04 | Information disclosure | read bound exposing another thread's run row | mitigate | `threads.py:1117-1127` ownership gate (404 first); the new probe at `threads.py:1268-1276` is `WHERE thread_id = $1` executed through `_rls_fetchrow` (`:1137-1139`, `get_user_pg_connection` → `SET LOCAL ROLE authenticated`). No client-supplied run id. | closed |
@@ -76,7 +82,7 @@ the totals in the frontmatter are the measured 41, not the quoted 40.
 | T-244-05-02 | Tampering | a re-typed extension list drifting from the server's | mitigate | One frontend source `workspaceAllowedExt.ts:30-54`; element-for-element equal to `workspace.py:129-143` (`_OOXML_EXT` / `_TEXT_EXT` / `_IMAGE_EXT` / `_PDF_EXT`), verified by reading both. Both `accept=` sites read `WORKSPACE_ACCEPT_ATTR`. ⚠ See note N-3 (`IN-07`). | closed |
 | T-244-05-03 | Information disclosure | crafted filename rendered into the transcript | mitigate | `ChatAttachmentChip.tsx:215,228` — `truncate max-w-[140px]` on the name span in both arms; React text node, and no `dangerouslySetInnerHTML` in the file (only the docblock at `:37` naming its absence). | closed |
 | T-244-05-04 | Denial of service | 10 MB+ upload from the composer | mitigate | Local door: pre-materialisation reject `workspace.py:289` (`file.size`), post-read `:322`, plus `FileTooLargeError` from `ws_write_file` (`:352-353`). Client adds no second cap. ⚠ The **cloud** door's copy of this is OPEN — see OPEN-3. | closed |
-| **T-244-05-05** | **Repudiation** | **expired attachment vanishing from an old transcript** | **mitigate** | ⛔ **PARTIAL — see OPEN-2.** The `expired` arm exists and says `No longer available` (`ChatAttachmentChip.tsx:206-219`, `composerCopy.ts:97`), but the rows it renders come from a listing the SERVER already filters on expiry (`workspace.py:455`), so after expiry + reload the chip cannot render at all. | **open** |
+| T-244-05-05 | Repudiation | expired attachment vanishing from an old transcript | mitigate | ✅ **CLOSED by `244-08`** (`8b6887a2a`). `workspace.py:475-528` — opt-in `include_expired`; `lib/api/threads.ts:1120-1123` and both slice-fillers (`StreamsProvider.tsx:4052` via `:3999`, and `:1302`) ask for it, so the `expired` arm at `ChatAttachmentChip.tsx:206-219` is reachable after a reload. A TOMBSTONE, not a resurrection: the content route keeps its gate (`workspace.py:558`), the hydrator reads the OTHER listing (`db/workspace.py:207,219`, untouched), and the panel filters expired rows back out (`StreamsProvider.tsx:4045`). ⚠ Three limits deferred — `deferred-items.md` item 14. | closed |
 | T-244-05-06 | Spoofing | UI implying the file is in the knowledge base | mitigate | Structurally true: the composer path writes only `workspace_files` (`workspace.py:301-357`) and mints no `documents` row. Copy: `composerCopy.ts:72,88` (`this chat only`) and `:85` (`cloudConfirm: "Attach"`, never `Import`); rendered at `ChatAttachmentChip.tsx:238`. | closed |
 | T-244-05-SC | Tampering | npm/pip/cargo installs | mitigate | No manifest touched. | closed |
 | T-244-06-01 | Elevation of privilege | writing into a Library folder the caller does not own | mitigate | Server: `ingest_splice.py:153-168` — folder existence 404 + `folder_check.data["user_id"] != user_id` → 403; `user_id` comes from `get_current_user` and the connection is resolved org-scoped (`connectors.py:1808-1815`). Client: the page's shipped predicate `LibraryPage.tsx:382` passed as a prop to `LibraryCloudImport.tsx:61`, never re-derived. | closed |
@@ -85,98 +91,114 @@ the totals in the frontmatter are the measured 41, not the quoted 40.
 | T-244-06-04 | Information disclosure | disabled-connection failure masked as a generic 502 | mitigate | `connectors.py:1827-1841` — `except SourceConnectionDisabled` → 409, then `except HTTPException: raise` (added by `244-07`/WR-06 so deeper 403/404/409s keep their status), then the broad 502. Same ordering on the new workspace door (`workspace.py:404-419`). | closed |
 | T-244-06-05 | Spoofing | chat cloud door quietly minting a Library row | mitigate | The composer posts to `POST /threads/{id}/workspace/files/from-connection` (`lib/api/documents.ts:93-101`, called at `useComposerAttachments.ts:125`), which lands in `workspace.py` — a module with no minter import (see 06-03). The negative is structural, not a positive-only test. | closed |
 | T-244-06-06 | Information disclosure | untrusted provider filename/bytes entering thread or Library | mitigate | Workspace path: provider bytes go through the SAME `_persist_workspace_upload` (`workspace.py:420-427`) → `validate_upload` magic bytes, 10 MB cap, filename sanitiser (`:322-337`). Library path: unchanged splice (`connectors.py:1812-1823`). The filename also reaches the prompt through `_one_line` (see 02-03). | closed |
-| **T-244-06-07** | **Denial of service** | **unbounded provider download** | **mitigate** | ⛔ **OPEN — see OPEN-3.** Egress half is closed (`adapters/google_drive.py:17`, `adapters/microsoft_graph.py:44` → `app.security.egress.send_pinned_http`). Size half is NOT: `workspace.py:400` awaits `fetch_cloud_file` with no bound, and the 10 MB cap is applied to `len(raw)` afterwards (`:322`). `import_service.py` carries no size check at all. | **open** |
+| T-244-06-07 | Denial of service | unbounded provider download | mitigate | ✅ **CLOSED by `244-08`** (`085a57fe9`). `workspace.py:416` — `fetch_cloud_file(conn, body.file_id, max_bytes=MAX_FILE_SIZE)`; `import_service.py:303` threads it; `sources/base.py:104-127` `clamp_read_cap` is the ONE home for the clamp (a caller may only TIGHTEN the operator ceiling). Drive (`google_drive.py:322,358,373`) and Graph (`microsoft_graph.py:419`) hand it to `send_pinned_http`, which refuses a declared over-cap length BEFORE reading and abandons the wire read past it. `EgressResponseTooLarge` → 422 (`workspace.py:433-434`), never the provider 502. ⚠ The audit's "multi-GB" framing was measured OVERSTATED — see OPEN-3's correction. | closed |
 | T-244-06-SC | Tampering | npm/pip/cargo installs | mitigate | No manifest touched. | closed |
+| **T-244-UF-1** | Multiple (spoofing · EoP · info disclosure · DoS) | `POST /threads/{id}/workspace/files/from-connection` — **retroactively registered by `244-08`** | mitigate | ⚠ **REGISTERED LATE, AND THE LATENESS IS THE POINT — not folded into a neighbouring row.** This route is net-new surface that appeared in NO plan's `<threat_model>`, and it is the route that carried `T-244-06-07`. Four dispositions, each verified in code: **auth** `_verify_thread_ownership` (`workspace.py:389`, 404 on non-owner) + org-scoped connection lookup (`:391-398`, 404 on cross-org, never 403); **content** provider bytes go through the shared `_persist_workspace_upload` (`:444`, defined `:303`) — magic bytes, 10 MB cap, filename sanitiser; **privilege** writes only `workspace_files` and imports no minter, so it cannot reach `documents` (`T-244-06-03`/`06-05`); **error shape** the disabled-connection 409 and the size 422 both precede the broad 502 (`:420-441`); **size** now capped before materialisation (`:416`). | closed |
 
 *Status: open · closed*
 *Disposition: mitigate (implementation required) · accept (documented risk) · transfer (third-party)*
 
 ---
 
-## Open Threats — detail
+## Closed Threats — detail (these three were OPEN-1, OPEN-2 and OPEN-3)
 
-### OPEN-1 · `T-244-03-01` — the `capPaused` discriminator is set on BOTH branches (maps to `WR-07`)
+⭐ **Closed by `244-08`, 2026-09-12.** The original findings are preserved verbatim under each
+heading rather than deleted — a register that erases what it once said cannot be audited, and
+**two of the three findings turned out to be partly WRONG**, which is only visible if the
+original is still there to read.
 
-**Declared mitigation:** *"The discriminator is `capPaused`, which is set only on the
-`state.cap_paused` reconcile branch."*
+Full evidence, RED drives and gate readings: **`244-08-SUMMARY.md`**.
 
-**Measured at HEAD:** it is set on **two** branches.
+---
 
-```tsx
-// ChatArea.tsx:201-207 — the GENUINE-LOCK branch
-if (state.locked && !state.lock_is_stale && state.active_workflow_run_id) {
-  streamActions.setWorkflowLockForThread(tid, { runId: …, mode: "harness",
-    capPaused: state.cap_paused, … })     // ← the discriminator, on a real harness lock
-```
+### ✅ CLOSED-1 · `T-244-03-01` — the `capPaused` discriminator now lives on ONE branch
 
-`threads.py:1238` sets `cap_paused = run_status == "cap_paused"` from `workflow_runs.status`, and
-`_TERMINAL_WORKFLOW_STATUSES` (`threads.py:1095`) does not contain `cap_paused` — so that state is
-simultaneously `locked: true` and `cap_paused: true`, and `ChatArea.tsx:140` then evaluates
-`workflowLocked === false`: **the composer unlocks during a genuine harness run.**
+**Was OPEN-1 (maps to `WR-07`).** *Original finding, unaltered:* the discriminator was set on
+**two** branches, so a run that is simultaneously `locked: true` and `cap_paused: true` made
+`ChatArea.tsx:140` evaluate `workflowLocked === false` — **the composer unlocking during a
+genuine harness run.**
 
-**Reachability:** latent. The review could not find a writer of `'cap_paused'` onto
-`workflow_runs.status` (every located writer targets `runs.status`). ⛔ Do not close it as
-unreachable — the value is schema-valid (`063_dual_mode_continue.sql:57`, added explicitly on BOTH
-status columns) and is read as live by `db/workflows.py:1320`. D-244-08 asked for both conjuncts;
-one shipped.
+**The finding was CORRECT and is fixed at `d76b252a8`.** `ChatArea.tsx:226` sets
+`capPaused: false` on the genuine-lock branch; the reconcile branch at `:229-238` remains the
+only producer of a `true`. That is `244-03`'s declared mitigation word for word.
 
-**Blast radius if it fires:** the composer lock is a client-side UX control — `POST
-/threads/{id}/messages` has no `cap_paused` refusal (stated at `threads.py:1249-1251`), so this is
-a UI-honesty/EoP-shaped defect, not a server privilege bypass.
+⛔ **Fail-closed by choice, not deleted as unreachable.** OPEN-1's instruction — *"do not close
+it as unreachable"* — was honoured: the state is still latent (no writer of `'cap_paused'` onto
+`workflow_runs.status` has been found) but remains schema-valid and non-terminal, so the fence
+CONSTRUCTS it rather than waiting for a writer.
 
-**Tracked as:** `deferred-items.md` item 8. **Re-open trigger:** a plan naming `ChatArea.tsx`, or
-the first writer of `'cap_paused'` onto `workflow_runs.status`.
+⭐ **Why a green fence coexisted with the defect, which is the transferable part.**
+`ChatArea.capPausedComposer.test.tsx`'s `HARNESS_LOCKED_STATE` sets `cap_paused: false`, so all
+five shipped cases read the discriminator on a run that is locked **OR** paused — **never one
+that is BOTH.** The missing case was a missing STATE, not a missing assertion.
 
-### OPEN-2 · `T-244-05-05` — the expired chip cannot render after a reload
+---
 
-**Declared mitigation:** *"the chip must say `No longer available`, never disappear."*
+### ✅ CLOSED-2 · `T-244-05-05` — the expired chip is reachable after a reload
 
-**Measured at HEAD:** the arm exists (`ChatAttachmentChip.tsx:206-219`) and its state is derived,
-not passed (`chatAttachmentState`, `:68-74`). But the rows it renders come from
-`useWorkspaceFilesSnapshot` (`MessageItem.tsx:277` → `StreamsProvider.tsx:4016-4020`), whose slice
-is filled by `getThreadWorkspaceFiles` (`lib/api/threads.ts:1106-1114`) → `GET
-/threads/{id}/workspace/files`, and that route applies the expiry gate server-side:
+**Was OPEN-2.** *Original finding, unaltered:* the `expired` arm existed but its rows came from
+a listing the server filtered on expiry, so after expiry + reload the chip could not render at
+all.
 
-```python
-# workspace.py:455
-.or_("expires_at.is.null,expires_at.gt." + _now_iso())   # D-06: exclude expired templates
-```
+**The finding was CORRECT and is fixed at `8b6887a2a`** with an opt-in `include_expired`.
 
-So an expired attachment is **absent from the listing**, `attachmentsForMessage`
-(`ChatAttachmentChip.tsx:177-185`) returns nothing for that row, and the chip **disappears** from
-the old transcript — the exact repudiation the threat names. The `expired` arm is reachable only
-within a live session whose slice was fetched before expiry.
+⚠ **ONE ASSUMPTION IN THE BRIEF WAS MEASURED WRONG, and it decided the shape of the fix.** The
+instruction said *"`db/workspace.py:207,219` is ONE SQL expiry gate with TWO readers"* and
+warned against opening the hydrator's gate while fixing the renderer's. **There are TWO
+independent gates, in different modules, and the renderer never read the one named:**
 
-**Not a new threat** — this is the declared mitigation failing to cover the path after a reload.
-⚠ Related and separately tracked: `WR-08` (`deferred-items.md` item 9) — the transcript's
-`Read <file>` line renders for Explorer/harness turns where no hydration happened, made
-*worse-shaped* by `244-07`'s WR-03 fix.
+| gate | readers | this round |
+|---|---|---|
+| `db/workspace.py:207,219` — asyncpg `list_files_in_thread` | sandbox hydrator (`tool_dispatcher.py:1862`) **and** prompt announcement (`agent_loop.py:1694`) | ⛔ **UNTOUCHED** |
+| `workspace.py:530` — the supabase REST listing | panel **and** transcript, through ONE store slice | ⭐ opt-in widening |
 
-### OPEN-3 · `T-244-06-07` — a new unbounded provider read (maps to `WR-04`)
+Constraint **(a)** — *a tombstone, not a resurrection* — therefore holds in three independent
+places: the content route keeps its gate (`workspace.py:558`), the hydrator reads the other
+listing entirely, and the PANEL filters expired rows back out
+(`StreamsProvider.tsx:4045`) so no preview is ever offered for one. A fence in
+`test_244_08_expired_attachment_is_a_tombstone.py` refuses an `include_expired` ever appearing
+in `db/workspace.py`, and was **driven RED against a planted gate removal**.
 
-**Declared mitigation:** *"the workspace cap is enforced before body materialisation. Assert no new
-unbounded read is introduced."* A new unbounded read **was** introduced by this phase:
+⛔ **What is NOT closed, and is deferred rather than claimed** — `deferred-items.md` item 14:
+the detach registry is still session-scoped with no DELETE route; nothing re-fetches when a file
+expires *while a tab stays open* (worst case an optimistic label — the content route still
+404s); `useResolvedFileId` deliberately stays on the gated default.
 
-```python
-# workspace.py:400 — inside the NET-NEW from-connection route
-filename, raw, _mime = await fetch_cloud_file(conn, body.file_id)   # no size bound
-…
-# workspace.py:322 — the cap, applied AFTER the whole file is resident
-if len(raw) > MAX_FILE_SIZE: raise HTTPException(422, "File too large…")
-```
+---
 
-`import_service.py` contains no size check (grep for `max_file_size` / `len(raw)`: 0 hits), and
-`fetch_cloud_file` (`import_service.py:274-292`) delegates straight to `adapter.read_file`. A
-multi-GB pick from the person's own Drive is resident in a worker (`WORKER_COUNT=2`) before the
-422. The **egress** half of the threat IS closed (`send_pinned_http`, both adapters).
+### ✅ CLOSED-3 · `T-244-06-07` — the cloud door reads under its own 10 MB cap
 
-⚠ Pre-existing on the Library path and **inherited by a new route whose docstring claims the guard
-it does not have** (`workspace.py:383-384`). Also weakens the cloud half of `T-244-05-04`.
+**Was OPEN-3 (maps to `WR-04`).** *Original finding, unaltered:* the route awaited
+`fetch_cloud_file` with no bound and the 10 MB cap was applied to `len(raw)` afterwards.
 
-**Tracked as:** `deferred-items.md` item 7. **Re-open trigger:** a plan naming `workspace.py` or
-`services/sources/import_service.py`. Fix: resolve the provider's declared size from the listing
-the picker already rendered and refuse before `read_file`; stronger, a streaming read with a
-running byte counter.
+**That half was CORRECT and is fixed at `085a57fe9`.**
+
+⚠ ⚠ **BUT THE SEVERITY WAS OVERSTATED, AND THE ORIGINAL SENTENCE IS KEPT ABOVE RATHER THAN
+CORRECTED IN PLACE.** OPEN-3 states *"A multi-GB pick from the person's own Drive is resident in
+a worker (`WORKER_COUNT=2`) before the 422."* **Measured false.** `send_pinned_http`
+(`egress.py:830-852`) already refused a declared over-cap `content-length` **before a single
+body byte was read**, then streamed with a running counter and abandoned the read past
+`max_bytes` — and both first-party adapters already passed `max_bytes=source_max_file_bytes()`.
+
+So the real residency bound was **the operator's source ceiling: 1–50 MB, default 25**
+(`user_settings.py:1227-1242`). The gap was **2.5–5× the declared cap**, not unbounded.
+
+⭐ **This mattered.** OPEN-3 prescribed *"a streaming read with a running byte counter"* as the
+stronger fix — **that already existed.** What was missing was a way for a caller with a tighter
+ceiling to SAY so. The fix is therefore a parameter, not a rewrite: `read_file` gains an
+optional `max_bytes`, and `sources/base.py:104` `clamp_read_cap` is the ONE home for
+`min(request, operator ceiling)` so a caller can only ever TIGHTEN.
+
+⚠ **One family is asymmetric and it is stated, not hidden.** `mcp_source` enforces the cap
+**after decode** — a file arrives base64 inside a JSON-RPC envelope, so no prefix of the
+response means *"the file is this big"*. Residency there stays bounded by
+`mcp_max_body_bytes()`, derived one-way from the same ceiling. **No envelope knob was added**
+(SEED-258). `mock_source` accepts and does not enforce, and says so: it has no transport.
+
+**Does this strengthen the cloud half of `T-244-05-04`?** **Yes, by exactly the measured
+amount.** The cloud door's residual drops from *"up to the operator ceiling, 25 MB default"* to
+*"10 MB"* for Drive, Graph and Gmail. ⚠ It does **not** become identical to the local door for
+MCP, whose bound remains the envelope cap.
 
 ---
 
@@ -184,11 +206,16 @@ running byte counter.
 
 | ID | Flag | Source | Disposition verified here |
 |----|------|--------|---------------------------|
-| UF-1 | `new-endpoint` — `POST /threads/{id}/workspace/files/from-connection` | `244-06-SUMMARY.md` `## Threat Flags` | **WARNING, not a blocker.** Net-new surface absent from every plan's `<threat_model>`. Re-checked at HEAD: **auth** `_verify_thread_ownership` (`workspace.py:391`, 404 on non-owner) + org-scoped connection lookup (`:393-400`, 404 on cross-org, never 403); **content** provider bytes go through the shared `_persist_workspace_upload` (`:420-427`); **privilege** writes only `workspace_files`, cannot reach `documents` (no minter import); **error shape** disabled-connection arm precedes the broad handler (`:404-419`). ⛔ **It also carries OPEN-3** — the unbounded `fetch_cloud_file` at `:400` lives on this very route. |
+| UF-1 | `new-endpoint` — `POST /threads/{id}/workspace/files/from-connection` | `244-06-SUMMARY.md` `## Threat Flags` | ⭐ **RETROACTIVELY REGISTERED by `244-08` as `T-244-UF-1`** — a row of its own in the register above, **never folded into a neighbouring row**, because the whole finding is that this surface was absent from every plan's `<threat_model>` and folding it in would erase that. Original verdict preserved: **WARNING, not a blocker.** All four dispositions were re-verified at HEAD (`workspace.py:389` auth · `:391-398` org scope · `:444` shared content gate · `:420-441` error ordering) and a fifth was ADDED — the size cap at `:416`, which is `T-244-06-07`'s fix and which lived on this very route. |
 
 No other `## Threat Flags` section declares new surface: `244-01`, `244-02`, `244-03`, `244-04`
 and `244-07` all state **None** (verified by reading each); `244-05-SUMMARY.md` has **no
 `## Threat Flags` section at all** — recorded as an omission, not read as "none".
+
+⛔ **`244-08` DID NOT BACK-FILL IT, deliberately.** Writing a `## Threat Flags` section into a
+summary after the fact would make that summary claim a check its author never ran. The omission
+stays an omission; what `244-08` owed was the missing REGISTER entry (`T-244-UF-1` above), and
+that is where it was paid.
 
 ---
 
@@ -216,9 +243,16 @@ and `244-07` all state **None** (verified by reading each); `244-05-SUMMARY.md` 
 
 ## Accepted Risks Log
 
-No accepted risks. Every threat in this register carries disposition `mitigate`; the three open
-rows are gaps in declared mitigations, **not** accepted risk, and none has been signed off by the
-operator as accepted.
+No accepted risks. Every threat in this register carries disposition `mitigate`, and as of
+`244-08` every one of them is **closed on code**. The three rows that were open were gaps in
+declared mitigations — **never** accepted risk — and none was ever signed off by the operator as
+accepted. They were implemented, not waived.
+
+⚠ **The unfinished work that remains is DEFERRED, not ACCEPTED**, and it lives where deferrals
+live: `deferred-items.md` items 14 (three named limits of the tombstone fix), 15 (three inherited
+red suites outside the count gate) and 16 (another writer was active in the tree during the
+round). A deferral carries a re-open trigger; an accepted risk carries an operator's name. None
+of these has one, so none of them belongs in the table below.
 
 | Risk ID | Threat Ref | Rationale | Accepted By | Date |
 |---------|------------|-----------|-------------|------|
@@ -231,6 +265,7 @@ operator as accepted.
 | Audit Date | Threats Total | Closed | Open | Run By |
 |------------|---------------|--------|------|--------|
 | 2026-09-12 | 41 | 38 | 3 | `gsd-security-auditor` (Claude, solo — no independent reviewer available, D-244-21) |
+| 2026-09-12 | 42 | 42 | 0 | `244-08` defect round (Claude, solo — ⚠ the same agent that wrote the fixes, so this row is a SELF-VERIFICATION; see N-1) |
 
 ---
 
@@ -238,10 +273,23 @@ operator as accepted.
 
 - [x] All threats have a disposition (mitigate / accept / transfer)
 - [x] Accepted risks documented in Accepted Risks Log (none)
-- [ ] `threats_open: 0` confirmed — **NO: 3 open** (`T-244-03-01`, `T-244-05-05`, `T-244-06-07`)
-- [ ] `status: verified` set in frontmatter
+- [x] `threats_open: 0` confirmed — `T-244-03-01`, `T-244-05-05` and `T-244-06-07` are each
+      closed on CODE, with a file:line citation in the register and a RED-driven fence
+- [x] `status: verified` set in frontmatter
 
-**Approval:** pending — three declared mitigations are incomplete. Each is already registered in
-`deferred-items.md` with a re-open trigger (items 7, 8, and the 05-05 gap named here for the first
-time); closing them requires either implementation or an explicit operator-signed accepted-risk
-entry above, then a re-run of `/gsd:secure-phase`.
+**Approval:** the three declared mitigations are now implemented. ⛔ **Two qualifications, stated
+rather than buried, because a gate that cannot fail is worthless:**
+
+1. ⚠ **This is a SELF-VERIFICATION.** `244-08` wrote the fixes AND flipped these rows, and no
+   independent reviewer exists (`D-244-21` / `OV-SOLO-01`). `N-1` stands unchanged.
+2. ⚠ **`threats_open: 0` is a CODE verdict, not a DRIVEN one.** Every row in
+   `244-VALIDATION.md` is still `⬜ owed` — including the one natural UAT for `T-244-05-05`
+   (attach → wait out the TTL → reload → read the chip) and any live cloud pick that would
+   exercise `T-244-06-07`'s cap against a real provider. **A closed register row means the
+   mitigating code was read and fenced; it does not mean anybody watched it work.**
+
+⭐ **What `244-08` measured WRONG in this document and corrected beside the original:** OPEN-3's
+*"multi-GB resident"* severity (the real bound was the 25 MB operator ceiling, because the
+streaming counter OPEN-3 prescribed already existed), and the brief's *"ONE SQL expiry gate with
+TWO readers"* (there are two independent gates, and the renderer never read the one named).
+Both originals are preserved above.

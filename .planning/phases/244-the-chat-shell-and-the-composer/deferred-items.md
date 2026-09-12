@@ -271,3 +271,74 @@ unattributable.
 
 **Re-open trigger:** the SIXTH landing. ⛔ A sixth plan that proposes-and-declines again is
 the pattern item 4 exists to stop; at that point the split is the plan.
+
+### 14. The tombstone is a LISTING fix; the DETACH and the transcript's own read are not covered
+
+**Found by:** `244-08`, while closing `T-244-05-05`.
+
+`GET /threads/{id}/workspace/files?include_expired=true` now lets an expired attachment reach
+the transcript, and the chip renders `No longer available`. ⛔ **Three things that fix does NOT
+do, named so nobody reads the row as wider than it is:**
+
+1. **A DETACHED file is still detached forever, and the detach registry is still session-scoped.**
+   `ChatAttachmentChip.tsx`'s own docblock already records this (*"after a hard reload, within
+   the TTL, a detached file falls back inside the time window"*). Widening the listing changes
+   neither arm. The honest close is still a DELETE route on the workspace door.
+2. **The transcript's expired rows are bounded by whatever the PANEL last fetched.** The slice
+   is filled by `usePanelReconcile` on thread-switch and by the `run_completed` self-heal —
+   both now ask for expired rows — but nothing re-fetches when a file expires *while the tab is
+   open*. Within a session, a chip crosses from live to expired only because `expiryCaption`
+   re-derives on the next render; it does not poll. That is correct for a flat `24h` promise
+   (D-244: *"never a per-second countdown"*) and it means a tab left open for a day can show a
+   live chip for a file that has just expired. The chip's CONTENT route already 404s, so the
+   worst case is an optimistic label, not a false download.
+3. **`useResolvedFileId` was left on the GATED default deliberately.** It backfills a missing
+   `id` by path for the PANEL's selected file, and an expired row has no honest use there.
+   Recorded because it is the one caller of `getThreadWorkspaceFiles` that does NOT pass
+   `includeExpired`, and a future reader will wonder whether that was an oversight.
+
+**Re-open trigger:** a plan that adds a DELETE route to `backend/app/api/workspace.py`, or the
+first UAT row that drives an attachment across its TTL boundary in a single open session
+(`244-VALIDATION.md` has no such row today).
+
+### 15. Three suites were RED at `5edb08292` and are outside the count gate's pinned set
+
+**Found by:** `244-08`, running `src/providers src/components/panel src/components/chat src/lib`.
+
+- `src/lib/model-info.test.ts` — `expected 'mid' to be 'high'` (a costTier pin)
+- `src/lib/__tests__/termMap.test.tsx` — 19 mapped keys against a contract table of 18
+- `src/components/panel/__tests__/PendingAskCard.retired.baseline.test.tsx` — `expected 766 to
+  be 737`, a source-LENGTH pin
+
+⛔ **Inherited, and provably not this round's.** None appears in
+`git diff --name-only 5edb08292 HEAD`, and `PendingAskCard.tsx` is byte-identical at the base
+commit (765 lines both sides) — so the source was already 29 lines past its pin before this
+work began. ⚠ **They are invisible to `vitest-count-gate.cjs`**, which read `failed 4` on the
+same tree and named none of them: these three files sit in NEITHER knob. That is the
+`sourceComposition.test.tsx` situation CLAUDE.md already records, three more times.
+
+**Re-open trigger:** the next plan whose `files_modified` names `model-info.ts`, `termMap`, or
+`PendingAskCard.tsx` — at which point the pin must be re-baselined deliberately rather than
+discovered.
+
+### 16. ⚠ ANOTHER WRITER WAS ACTIVE IN THIS WORKING TREE DURING `244-08`
+
+**Found by:** `244-08`, at 09:0x local on 2026-09-12.
+
+Five frontend files were modified in the worktree *during this session*, by something that is
+not this executor — `frontend/src/components/admin/ControlRoomPage.tsx`,
+`ModelDiscoveryPanel.tsx`, `ModelRegistryTab.tsx`, `frontend/src/lib/api.ts` and
+`frontend/src/lib/api/admin.ts` (+438/-17, mtimes 08:42–08:47). They were absent from
+`git status` when this session started.
+
+⛔ **They were left strictly alone** — not staged, not reverted, not tested against. But they
+were PRESENT on disk for every gate reading recorded in `244-08-SUMMARY.md`, so the
+whole-tree verdicts are not solely attributable to this round. The per-file readings are: the
+count gate's per-file deltas are `+6` and account for exactly the six cases added here, and the
+backend failing-test-id SET is byte-identical to the pre-work baseline.
+
+⚠ This is the condition CLAUDE.md warns makes a shared gate non-deterministic. **A gate run
+while another agent writes the same tree measures both of you.**
+
+**Re-open trigger:** none — this is a standing hazard, not a defect. Recorded so a later reader
+of this phase's numbers knows the tree was not quiet.
