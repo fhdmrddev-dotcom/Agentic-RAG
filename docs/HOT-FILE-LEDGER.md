@@ -7783,9 +7783,69 @@ chat continues without the line, logged loudly rather than silently.
 **Triple re-derived 2026-09-11 (`244-02`): `80 / 34 / 4868` — G-5: ⚠ FIRES.**
 
 
-⚠ **RE-DERIVED 2026-09-12 at `244-07`: `83 / 35 / 4913`** (⚠ the six-digit buckets `260529` and
-`260705` are DATED QUICK TASKS and are subtracted). The row read `80 / 34 / 4868` — **stale for
-the fourth close running**, which is this file's own recurring finding about itself.
+⚠ **RE-DERIVED 2026-09-12 at `244-10`: `84 / 35 / 4966`** (37 buckets before subtracting the
+six-digit DATED QUICK TASKS `260529` and `260705`). The row read `83 / 35 / 4913` — stale again,
+one plan later, which is this file's own recurring finding about itself.
+
+#### 244-10 — the fix for WR-02 is what made this hole, and that is the whole finding
+
+⛔ **`244-07`'S FIX WAS RIGHT FOR THE ARM IT NAMED AND CREATED THIS ONE.** Moving the marker onto
+the sandbox session made hydration run exactly once — and `SandboxSessionManager` caches that
+session per `thread_id` until idle eviction (30 min default), so **once a session was marked, no
+LATER attachment was ever copied into it.** The agent's own round-4 output in L-5 is the evidence,
+not an inference:
+
+```
+/sandbox/attachments [] ['c679b991-Meridian-Q4-pricing.xlsx']
+```
+
+— the directory holds only the FIRST file. The agent then burned rounds 5-12 hunting the second
+one and recovered it at round 10 via the `workspace_read` fallback, ~49 s later. **SHELL-04's
+*"and the agent can use it"* was true for the first attachment and only ACCIDENTALLY true for
+later ones**; it survived the UAT because a fallback exists, at a cost of ten wasted rounds.
+
+⛔ **SAY "the second attachment did not hydrate", NEVER ".pdf does not hydrate".** That single run
+attached `.xlsx` first and `.pdf` second, so **ordering is confounded with file type** and the
+type-specific claim is NOT established. `244-10-UAT-ROW.md`'s third arm (a fresh thread whose
+FIRST attachment is the `.pdf`) is what resolves the confound, in a real browser; no unit test can.
+
+⭐ **THE INVARIANT THAT NOW HOLDS: *the record says WHICH files, so a claim about hydration can
+never again outlive the files it was about.*** `_hydrated_sessions` (a `weakref.WeakSet`) becomes
+`_hydrated_files` (a `weakref.WeakKeyDictionary[session, set[str]]` of copied workspace paths),
+consulted on EVERY `execute_code` call instead of once. **A boolean about a mutable directory is
+the defect class**, and it is the same shape as this project's recorded lesson that a presence
+assertion cannot see content drift.
+
+**Three properties are INHERITED from WR-02 rather than re-argued** — keyed by the SESSION (so the
+record's lifetime is exactly the directory's, and a new container re-hydrates); weak (it cannot pin
+a session alive); and **membership/keying, never `getattr`** (the `MagicMock` truthiness trap
+below, which is why an attribute on the session cannot be fenced at all).
+
+⛔ **T-244-10-01 — MAKING THE COPY INCREMENTAL IS EXACTLY WHAT WOULD TURN THE CAP INTO A NON-CAP.**
+`_ATTACHMENT_HYDRATION_MAX_FILES` is now compared against `len(already) + len(new)` — the SESSION
+total — because a per-call budget lets a thread exceed it by attaching across several calls, which
+is T-244-02-05's DoS arm re-opened by the fix that closes this gap. Driven by a case that patches
+the cap to 2 and makes three calls.
+
+⚠ **THE COST IS NAMED, not discovered later:** hydration ran `ws_list_files` **once per session**
+and now runs it **once per `execute_code` call** — one bounded, thread-scoped DB listing on a
+handler that already awaits container I/O. **Accepted deliberately**, because the alternative (an
+invalidation signal from the upload door into the dispatcher) is a SECOND mechanism that can go out
+of sync, and *a marker that went out of sync with the container is how this hole was made*.
+
+⚠ **TWO SHIPPED CASES WERE RE-DRIVEN, NOT DELETED.** `test_hydration_runs_once_per_session`
+asserted `session in _hydrated_sessions` — **an assertion about the MARKER'S TYPE**, and the type is
+what changed. It now asserts the property anyone actually cares about (the same FILE is copied once
+per session), which is strictly stronger and survives the next marker change too. Deleting it would
+have retired WR-02's DoS fence in the commit that re-opened its risk.
+
+⛔ **BYTE-UNCHANGED, asserted from the diff rather than claimed:** `_attachment_container_path`'s
+five traversal reductions (T-244-02-02), the `_copy_in` NamedTemporaryFile → `copy_to_runtime` →
+`unlink` shape, `_output_baseline_seeded`, and the expiry gate's single home in `ws_list_files`'
+SQL. **No changed line in the diff mentions any of those identifiers.**
+
+⛔ **THIS DID NOT CLOSE SHELL-04.** A unit test with a fake session cannot prove a file lands in a
+real container; the plan reports *built, drive owed*.
 
 #### 244-07 — WR-02: “once per session” was written on an object that lives one iteration
 
@@ -10367,7 +10427,7 @@ cells rot within days.
 | [`frontend/src/pages/KnowledgeHealthPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesknowledgehealthpagetsx) | 12 / 6 / **DELETED** | ⚠ **FIRES** | **RETIRED (217.1-14)** — the Library's Health tab absorbed it; `ChatLayout`'s fallback replaced by `UnknownViewFallback` (`:871`). ⚠ absent for its ENTIRE LIFE |
 | [`backend/app/api/knowledge_health.py`](docs/HOT-FILE-LEDGER.md#backendappapiknowledgehealthpy) | 11 / 6 / 737 | ⚠ **FIRES** | honoured by construction (**217.1-11**) — adds `could_not_search`; `retrieval_count` byte-unchanged. ⚠ absent at **6 phases**. Audit-analytics from `audit_log`. Service-role by exception |
 | [`backend/app/services/agent_loop.py`](docs/HOT-FILE-LEDGER.md#backendappservicesagent_looppy) | 44 / 21 / 3303 | ⚠ **FIRES** | ⚠ row STALE at `39/20/3154`. honoured by construction (**244-02**): a SIXTH conditional append in the shipped `memory_note` shape, gated General-mode-only |
-| [`backend/app/services/tool_dispatcher.py`](docs/HOT-FILE-LEDGER.md#backendappservicestool_dispatcherpy) | 83 / 35 / 4913 | ⚠ **FIRES** | ⚠ row STALE AGAIN at `77 / 32 / 4679`. honoured by construction (**244-02**): 2 module-level helpers + a 4-line guarded call site; `workspace_read`'s binary branch untouched |
+| [`backend/app/services/tool_dispatcher.py`](docs/HOT-FILE-LEDGER.md#backendappservicestool_dispatcherpy) | 84 / 35 / 4966 | ⚠ **FIRES** | ⚠ row was STALE at `83/35/4913`. honoured by construction (**244-10**): the marker changes TYPE — set→dict of copied paths. No new call site, no new handler, traversal fence byte-unchanged |
 | [`backend/app/api/document_governance.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentgovernancepy) | 5 / 3 / 416 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent at 3 phases. ⚠ Its low-confidence cutoff is the ConfidenceChip tier (**0.5**) — a DIFFERENT measure from `knowledge_health`'s **0.38** retrieval similarity |
 | [`frontend/src/pages/GovernancePage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesgovernancepagetsx) | 4 / 1 / 355 | no (1 phase) | young (119) — ⚠ row added because it is being MERGED into the Library (operator, 2026-08-28); it is feature-gated while Documents is not, so the gate must move with it |
 | [`frontend/src/components/ingestion/DocumentUpload.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestiondocumentuploadtsx) | 10 / 1 / 144 | no (1 phase) | young (056) — ⚠ absent for its entire life. ⛔ It reports NO byte progress (`onUploadProgress` absent), so any upload percentage is unknowable |
