@@ -37,8 +37,45 @@ surface the operator uses daily. Phase numbering continues at **242**.
 
 ## Current Position
 
-Phase: 244 (the-chat-shell-and-the-composer) — EXECUTING
-Plan: 1 of 6
+Phase: 244 (the-chat-shell-and-the-composer) — GAP CLOSURE PLANNED (round 1 of a cap of 2)
+Plan: 6 of 6 built · 5 gap-closure plans written (244-09 … 244-13), none executed
+
+**Build plans 244-01 … 244-06 are SHIPPED.** `244-UAT.md` then drove all 9 rows in a real browser —
+**4 passed, 5 issues** — and `/gsd:plan-phase 244 --gaps` planned round 1 against them at
+`8cd9d8119`. ⚠ **`244-VERIFICATION.md` is STALE relative to that UAT**: it reads `status:
+human_needed` / "0 rows driven" because it was written BEFORE the drive. Take the gaps from
+`244-UAT.md` § Gaps, never from the verification report.
+
+Gaps closed by the round: **G-6 (blocker, SHELL-03)** · G-1 + open review finding **WR-07**
+(SHELL-02) · G-5 (SHELL-01) · G-3 + G-4 · G-2 (an **operator override** of a locked Phase 243
+rationale, not a defect) · and L-5 defect 6b (the second attachment never hydrates, SHELL-04).
+**SHELL-05 is in no `requirements` field, deliberately** — no gap touches it and L-7 was driven end
+to end for the first time, in both directions, and passed.
+
+⛔ **No plan closes a success criterion.** Each produces a `244-NN-UAT-ROW.md` driven at
+`/gsd:verify-work` (D-244-14 / D-244-19); G-6 shipping behind a GREEN fence is the whole reason.
+
+⚠ **A GUARDRAIL WAS FOUND MIS-KEYED WHILE PLANNING THIS ROUND, and it is recorded because the
+failure was silent.** `scripts/check-gap-closure-rounds.cjs` keys on `gap_closure`, **not** on
+`gap_closure_round` — with only the round field the gate read `0 gap-closure`, so **a round 2 would
+never have been capped by G-7.** Its `scalar()` regex also swallows an inline `#` comment, so the
+first fix silently did not take. Both fields are now set on their OWN LINES in all five plans and
+the gate reads `5 gap-closure · rounds completed: 1 (cap is 2)`.
+
+**Verified by `gsd-plan-checker`: `VERIFICATION PASSED`, no blockers.** Three planner claims were
+re-checked against the tree rather than accepted — `threads.py:438`/`:691` do both carry
+`.neq("role","system")` (so widening `hasPendingAsk` would have closed NOTHING and shipped a second
+green fence); `WorkflowLock.mode` has zero production consumers (the one `.mode ===` hit is the
+server wire type `ThreadWorkflowState.mode`, a different field); and `toolMeta.ts:197` cannot reach
+a Deep thread once the discriminator lands. ⚠ **Solo run** — Gemini unavailable, so this is a
+SELF-verification, never a review (D-244-21 / OV-SOLO-01).
+
+⛔ **One gate is red BY DESIGN until execution:** `node scripts/check-hot-file-ledger.cjs 244`
+reports `[no-row] frontend/src/stores/streamsStore.ts` (12 phases, invisible to G-5 its whole life).
+`244-13` Task 3 adds that row **and its section in the same commit**; `toolMeta.ts` (6 phases) gets
+one there too, and `244-09` re-derives `NavPanel.tsx`'s triple — the row reads `20/11/329`, measured
+`21/11/344`. ⚠ The UAT's G-5 block claims `NavPanel.tsx` has **no** ledger row; that is **stale**,
+the row was added at Phase 235.
 
 ### ✅ Phase 243 — CLOSED 2026-09-11
 

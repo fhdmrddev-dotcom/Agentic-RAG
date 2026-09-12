@@ -248,6 +248,29 @@ Plans:
 
 - [x] 244-06-PLAN.md — the two doors un-inverted: cloud→thread, Library import asks its folder (SHELL-04)
 
+**Wave 5** — *gap-closure round 1* (planned 2026-09-12, `8cd9d8119`; G-7 clear, cap is 2)
+
+- [ ] 244-09-PLAN.md — G-5: the nav RAIL overflows the page below ~540px viewport (SHELL-01)
+- [ ] 244-10-PLAN.md — L-5 defect 6b: the SECOND attachment never reaches `/sandbox/attachments` (SHELL-04)
+
+**Wave 6** *(blocked on Wave 5 completion)*
+
+- [ ] 244-11-PLAN.md — G-3 a snapshot 503 renders a silently incomplete transcript + G-4's written ruling (SHELL-01)
+- [ ] 244-12-PLAN.md — **G-6 (BLOCKER)** a workflow-raised approval has no chat controls + G-2 the badge order (SHELL-03)
+
+**Wave 7** *(blocked on Wave 6 completion)*
+
+- [ ] 244-13-PLAN.md — G-1 the phantom live run line on a Deep cap-paused thread, and open review finding WR-07 with it (SHELL-02)
+
+⚠ **The gaps come from `244-UAT.md` § Gaps, NOT from `244-VERIFICATION.md`** — that report reads
+`human_needed` / "0 rows driven" because it was written BEFORE the browser drive; the UAT then drove
+all 9 rows (**4 passed, 5 issues**). ⛔ **No gap plan closes a success criterion** — each produces a
+`244-NN-UAT-ROW.md` driven at `/gsd:verify-work` (D-244-14 / D-244-19). **SHELL-05 is in no
+`requirements` field, deliberately**: no gap touches it and L-7 passed end to end, both directions,
+on its first-ever drive. **Wave safety:** zero same-wave source-file overlap, and never more than
+**two** test-running agents per wave — CLAUDE.md measures the shared vitest gate going
+non-deterministic at three, so the split is that ceiling and not taste.
+
 **Gap closure — round 1** *(`/gsd:plan-phase 244 --gaps`, 2026-09-12; `check-gap-closure-rounds.cjs 244` = **G-7 clear**, 1 of 2 rounds)*
 
 ⚠ Authored against **`244-UAT.md`'s `## Gaps` section**, not against `244-VERIFICATION.md` — that
