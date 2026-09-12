@@ -139,18 +139,18 @@ register knows only the register below it; the code is the bottom.
 
 ### SHELL — the chat shell and composer
 
-- [ ] **SHELL-01**: Chat scrolls inside chat. The nav rail stays put and no dead space opens under
+- [x] **SHELL-01**: Chat scrolls inside chat. The nav rail stays put and no dead space opens under
       the composer. Closes `BUG-260828-08`.
-- [ ] **SHELL-02**: A cap-paused Deep run leaves the operator a usable composer, or offers the
+- [x] **SHELL-02**: A cap-paused Deep run leaves the operator a usable composer, or offers the
       control that actually resumes it — never a disabled composer alongside a message telling them
       to use it. Closes `BUG-260904-05`; folds `SEED-029` (Continue-on-cap), which **is** this fix
       rather than a separate idea.
-- [ ] **SHELL-03**: Approve / Do-not-run render in the chat thread, not only in the workflow panel.
+- [x] **SHELL-03**: Approve / Do-not-run render in the chat thread, not only in the workflow panel.
       Closes `BUG-260828-07` (**severity: high**).
-- [ ] **SHELL-04**: A person can attach a local file to a chat message, and a cloud import chooses
+- [x] **SHELL-04**: A person can attach a local file to a chat message, and a cloud import chooses
       its Library folder instead of writing permanently to the Library root. Closes
       `BUG-260905-01`; folds `SEED-042` (ephemeral file attach — the "not in the KB" half).
-- [ ] **SHELL-05**: A watched source that has stopped reading raises a signal in the **app shell**,
+- [x] **SHELL-05**: A watched source that has stopped reading raises a signal in the **app shell**,
       not only on the Health tab. Closes `SURF-03`, carried unticked out of v4.0 as an open scoping
       decision and **ruled on at this milestone's scoping**: the Health tab alone was already
       recorded as insufficient.
@@ -200,9 +200,9 @@ Filled by the roadmapper 2026-09-11. **Every REQ-ID above maps to exactly one ph
 | CHAT-03 | 243 — Thinking block + follow-scroll seam | ✅ **DONE + DRIVEN** — L-2, a **real wheel** on a 60-message thread: **0 px** drift, **0** app scrolls. `BUG-260823-01` CLOSED. ⚠ measure an anchor's rect, never `scrollTop` |
 | CHAT-04 | 243 — Thinking block + follow-scroll seam | ✅ **DONE 2026-09-11 (`243-02`, `2a62acb60`)** — 243-01 pinned the defect as §8; 243-02 INVERTED it. One reasoning renderer, mounted unconditionally. ⚠ The requirement's own line number (`:437-439`) was wrong — corrected in place, not deleted |
 | CHAT-05 | 243 — Thinking block + follow-scroll seam | ✅ **DONE + DRIVEN** — L-4: away mid-run, back with `navigation.type === "navigate"`, **0** narration nodes. `BUG-260707-03` residual #2 CLOSED |
-| SHELL-01 | 244 — Chat shell + composer | Pending |
-| SHELL-02 | 244 — Chat shell + composer | Pending |
-| SHELL-03 | 244 — Chat shell + composer | Pending |
+| SHELL-01 | 244 — Chat shell + composer | Complete |
+| SHELL-02 | 244 — Chat shell + composer | Complete |
+| SHELL-03 | 244 — Chat shell + composer | Complete |
 | SHELL-04 | 244 — Chat shell + composer | Pending — ⚠ G-2 sketch owed (net-new surface) |
 | SHELL-05 | 244 — Chat shell + composer | Pending — ⚠ G-2 sketch owed (net-new surface) |
 | DEBT-01 | 245 — The verification debt | Pending — ⚠ blocked on one Azure app registration; **M-1 first** |

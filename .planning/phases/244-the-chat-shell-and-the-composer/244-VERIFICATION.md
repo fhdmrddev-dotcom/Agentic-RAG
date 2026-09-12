@@ -77,7 +77,7 @@ still while the messages move, a paused run leaves the operator something to do,
 answerable where they are already looking, and a file can join a message.
 
 **Verified:** 2026-09-12 (re-verification, round 2)
-**Status:** `human_needed`
+**Status:** `passed` — ⚠ this line read `human_needed` until 2026-09-13 and is corrected, not overwritten: the report was accurate when written (4/5 driven) and became wrong the moment `244-15-UAT-ROW.md` was driven. `previous_status: human_needed` in the frontmatter preserves that.
 **Re-verification:** Yes — this UPDATES the round-1 report in place per the task's instruction. The
 round-1 findings are preserved below rather than deleted; corrections sit beside their originals.
 

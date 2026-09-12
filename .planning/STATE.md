@@ -2,15 +2,16 @@
 gsd_state_version: 1.0
 milestone: v4.1
 milestone_name: Ship It & Feel It
-status: executing
-last_updated: "2026-09-11T18:32:35.366Z"
+status: ready_to_plan
+last_updated: 2026-09-12T20:49:25.474Z
 last_activity: 2026-09-11
 progress:
   total_phases: 12
   completed_phases: 2
   total_plans: 13
-  completed_plans: 9
+  completed_plans: 24
   percent: 17
+stopped_at: Phase 244 complete (15/12) — ready to discuss Phase 245
 ---
 
 # Project State
@@ -31,14 +32,14 @@ See: `.planning/PROJECT.md` (updated 2026-09-10)
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviors (skills) that persist and can be shared.
 
-**Current focus:** Phase 244 — the-chat-shell-and-the-composer
+**Current focus:** Phase 245 — the verification debt — discharged or retired in writing
 milestone (not v5.0: it opens no new capability axis). Ship v4.0 to production, then fix the chat
 surface the operator uses daily. Phase numbering continues at **242**.
 
 ## Current Position
 
-Phase: 244 (the-chat-shell-and-the-composer) — GAP CLOSURE ROUND 1 **EXECUTED**, UAT OWED
-Plan: 11 of 11 built (6 build + 5 gap-closure) · **0 of 6 UAT rows driven**
+Phase: 245
+Plan: Not started
 
 **Round 1 executed 2026-09-12 in 3 waves + a fix round**, all merged to `develop`. Gates on the
 merged tree: **`count gate OK` — 275/275 pinned, 0 failing** (total 8245 · pinned 7455) · backend at
@@ -123,7 +124,7 @@ second is required. Found by driving, reachable by no fence in this phase, and i
 this session silently went nowhere. **Not checked against production** — named in the report as the
 first thing to do.
 
-Status: Executing Phase 244
+Status: Ready to plan
 
 ⭐ **UAT DRIVEN IN A REAL BROWSER, 2026-09-11 — 4 of 5 rows PASS** (`242-UAT-RESULTS.md`; Chrome DevTools MCP, operator's own session, every row scored on the `PUT /settings` REQUEST PAYLOAD, never on a banner). **Row 2 is SHIP-01 itself:** with `multimodal_max_vision_calls = 1001` planted and the UI showing it `invalid`, changing only *Search breadth* sent `{"hnsw_ef_search":50}` → **200**. **That is the save the operator could not perform** — the identical action used to return a 400 about images, on a field they never opened. Row 1: `{"rrf_k":61}`, `content-length: 12`, persisted across a reload. Row 3: the stored-value sentence at 400 **and** the old sentence unchanged when the value is genuinely typed. Row 4: both CHECKs refuse, NULL accepted — and **the clamp fired on REAL data and announced itself** (`CLAMPED 1 row(s) … moved to the nearest bound, NOT reset to the column default`). ⛔ **Row 5 (cloud) is OWED — operator.** ⚠⚠ **AND DRIVING IT FOUND A DEFECT IN THE UAT DOC ITSELF:** Row 3's steps said *"re-enter 1001 yourself"*, which **cannot produce the sentence** — a diffed payload drops a value equal to its baseline. Driven the way it is actually reachable (another client re-sending the stored value) and the row corrected beside its original. **A UAT row written against a diffed payload must ask whether the field it edits will actually travel.** SHIP-01 stays **UNTICKED** only on its production half; **SHIP-02 / SHIP-03 / SHIP-04 are CLOSED with their evidence inline** in `REQUIREMENTS.md` — decisions, not quiet ticks.
 
@@ -273,7 +274,7 @@ the same class as Phase 242's `check-hot-file-ledger.cjs` passing vacuously over
 command that changed nothing and a command that succeeded look identical.**
 
 Progress: **1 / 5 phases CLOSED (242)** · 243 code-complete, UAT-owed · **244 context gathered**  · 4 / 19 requirements delivered (SHIP-02, SHIP-03, SHIP-04, CHAT-02, CHAT-04 — ⚠ SHIP-01, CHAT-01, CHAT-03, CHAT-05 are code-complete and deliberately UNTICKED pending G-4 rows) · `[██░░░░░░░░] 21%`
-Last activity: 2026-09-11
+Last activity: 2026-09-12
 
 **Phases:** 242 Ship It · 243 Thinking block + follow-scroll seam (⚠ sketch first) ·
 244 Chat shell + composer · 245 The verification debt · 246 The recall cliff.
