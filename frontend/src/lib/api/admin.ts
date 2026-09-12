@@ -531,6 +531,14 @@ export interface ModelRegistryRow {
    *  05 Task 3). Additive — the Plan-05 backend `_registry_row` already emits it (the seven
    *  `_MODEL_CAP_COLUMNS` names); Plan 07 extends the TS type per the 149-04/05 handoff. */
   overridden_fields: string[]
+  /** TRUE when this model exists ONLY as a `model_capabilities_overrides` row — an
+   *  add-by-ID or a discovery-confirmed model. It decides what `removeModel` actually does:
+   *  on a `db_only` row the DELETE removes the model from the registry; on any other row the
+   *  model is declared in the backend's built-in `MODEL_CAPABILITIES` (shipped in code), so
+   *  the DELETE clears the stored overrides and the model STAYS in the list at its defaults.
+   *  Optional for forward/backward compat with a backend that predates the field — absent
+   *  reads as `false`, i.e. the conservative "this will only reset it" wording. */
+  db_only?: boolean
 }
 
 /** The editable-columns patch body for `PATCH /admin/models/{id}` (Plan 06). Every
@@ -553,6 +561,32 @@ export interface ModelCapabilityPatch {
   /** AUTH-04: an explicit `null` is a Reset (clears the override to DEF) — the same
    *  explicit-null semantics every other column here carries. */
   emit_tier?: "force_strict" | "force" | "coerce" | null
+}
+
+/** The server's accepted range for each integer capability column, MIRRORED from
+ *  `backend/app/api/admin.py:_MODEL_CAP_INT_BOUNDS`. A value outside its range is a 422 from
+ *  `PATCH /admin/models/{id}` — refused before any DB touch (T-196-IV2b: a well-typed `0`
+ *  timeout fires every per-call timer instantly, and a `0` context window is a broken row, not
+ *  a smaller model).
+ *
+ *  ⚠ THIS IS A MIRROR, NOT THE WALL. The server is the wall; this exists so a caller can avoid
+ *  SENDING a value it already knows will be refused — specifically a provider-returned
+ *  capability, which no human typed and which is therefore worth dropping rather than turning
+ *  into a failed write. Keep it in sync with the backend dict; a drift here can only ever make
+ *  the client send something the server then refuses honestly, never the reverse. */
+export const MODEL_CAP_INT_BOUNDS: Readonly<Record<string, readonly [number, number]>> = {
+  llm_call_timeout_seconds: [1, 3600],
+  context_window_tokens: [1, 10_000_000],
+  max_output_tokens: [1, 1_000_000],
+}
+
+/** True when `value` is a legal write for `column` — non-integer / out-of-range reads false.
+ *  A column with no declared bound (every non-integer column) is always legal here; its own
+ *  type/enum guard lives server-side. */
+export function isWithinModelCapBounds(column: string, value: number): boolean {
+  const bounds = MODEL_CAP_INT_BOUNDS[column]
+  if (!bounds) return true
+  return Number.isInteger(value) && value >= bounds[0] && value <= bounds[1]
 }
 
 /** The request body for `POST /admin/models` (Plan 02 — the D-159-02 add-by-ID write).
@@ -633,6 +667,38 @@ export interface DiscoveryResult {
   changed: DiscoveredChangedModel[]
   vanished: DiscoveredVanishedModel[]
   providers: DiscoveryProviderOutcome[]
+}
+
+/** One model a confirm run could not write, with the server's own plain-language reason. */
+export interface DiscoveryConfirmFailure {
+  modelId: string
+  reason: string
+}
+
+/** What a discovery confirm run ACTUALLY did.
+ *
+ *  ⚠ THIS TYPE EXISTS BECAUSE THE CONFIRM LOOP USED TO ABORT ON THE FIRST REFUSAL. Confirming
+ *  is N independent `PATCH /admin/models/{id}` writes, and the loop was a bare
+ *  `for (…) await …` — so ONE 422 threw, every model after it was never attempted, and the
+ *  operator got a single "Couldn't apply the changes" with no count and no names. A 4xx also
+ *  raises before the audit floor writes, so the abort left NO trace in the ledger either: the
+ *  only evidence that half a batch was dropped was the models quietly not being there.
+ *  Measured live 2026-09-12: OpenRouter returns `x-ai/grok-4.20` and
+ *  `x-ai/grok-4.20-multi-agent` with `max_output = 1,800,000`, over the server's 1,000,000
+ *  ceiling — they sat at index 229/230 of a 490-model run, so a "Select all" lost 261 models.
+ *
+ *  Every write is now attempted, and the result is REPORTED rather than reduced to a boolean:
+ *  a partial apply must say how partial it was. */
+export interface DiscoveryConfirmReport {
+  /** Writes the server accepted. */
+  applied: number
+  /** Writes the server refused, each with its verbatim `detail`. */
+  failures: DiscoveryConfirmFailure[]
+  /** Provider-returned capability VALUES that were dropped before the request because they
+   *  fall outside the server's accepted range. The model is still written — without that one
+   *  field, which stays unset rather than being silently clamped to a number the provider
+   *  never said. */
+  droppedValues: number
 }
 
 /** Read the model registry (`GET /admin/models`, Plan 05). Plain authed GET — the
@@ -747,6 +813,29 @@ export async function addModelById(body: AddModelBody): Promise<void> {
     body: JSON.stringify(body),
   })
   if (!res.ok) throw new ApiError(await errorDetail(res, "Failed to add the model."), res.status)
+}
+
+/** Remove one model's stored `model_capabilities_overrides` row (`DELETE /admin/models/{id}`).
+ *
+ *  ⚠ THE VERB IS HONEST ONLY FOR A `db_only` ROW. The endpoint deletes a ROW; a model also
+ *  declared in the backend's built-in registry (`config.py`) cannot be removed by any runtime
+ *  write, so for those the delete RESETS the model to its built-in defaults and it stays in the
+ *  list. The resolved `still_built_in` says which happened, so the caller reports the real
+ *  consequence instead of the one the button says.
+ *
+ *  A 404 (no stored row — a pure built-in), a 409 (the org default, the same no-dead-default
+ *  guard `setModelCapability` enforces) or a 500 surfaces as `ApiError` carrying the server
+ *  `detail`, so the row can show the plain-language refusal in place (mirrors
+ *  `setModelCapability`). The client adds NO authority — the router 404-gates non-operators. */
+export async function removeModel(modelId: string): Promise<{ still_built_in: boolean }> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/admin/models/${encodeURIComponent(modelId)}`, {
+    method: "DELETE",
+    headers,
+  })
+  if (!res.ok) throw new ApiError(await errorDetail(res, "Failed to remove the model."), res.status)
+  const body = (await res.json()) as { still_built_in?: boolean }
+  return { still_built_in: body.still_built_in === true }
 }
 
 /** Lock/unlock + pin the org default (`PUT /admin/models/{id}/lock`, Plan 06) — the

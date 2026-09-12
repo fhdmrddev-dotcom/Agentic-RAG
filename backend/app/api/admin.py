@@ -1499,6 +1499,114 @@ async def set_model_capability(
     return {"ok": True, "model_id": model_id, "changed": present_cols}
 
 
+@router.delete("/models/{model_id:path}")
+async def remove_model_override(
+    model_id: str,
+    request: Request,
+    _floor: None = Depends(operator_audit_floor),
+):
+    """DELETE the stored ``model_capabilities_overrides`` row for one model.
+
+    THE HONEST SCOPE, stated first because the button's label depends on it: this endpoint
+    deletes a ROW, and a row is the only thing an operator owns. A model that also exists in
+    the built-in ``MODEL_CAPABILITIES`` (declared in ``config.py``, shipped in code) CANNOT be
+    removed from the registry by any runtime write — deleting its override row RESETS it to the
+    built-in defaults and it stays in the list. Only a DB-ONLY model (present in the overrides
+    table, absent from the built-in registry — an add-by-ID or a discovery-confirmed row) truly
+    disappears. The response says which of the two happened (``still_built_in``) so the UI can
+    report the real consequence rather than the one the verb implies.
+
+    GUARDS, all BEFORE any write (the allowlist-before-touch discipline this module uses
+    everywhere):
+
+      * empty / slash-or-whitespace-only id → 422 (the ``:path`` converter matches ``""``;
+        same structural guard as ``set_model_capability`` / ``set_model_lock``).
+      * no stored row → 404. Nothing to remove is not a success — a silent 2xx here would let
+        the UI report a deletion that never happened.
+      * the model is the org default (``app_settings.llm_model``) → 409. Removing the default's
+        row cannot be allowed for the SAME reason ``set_model_capability`` refuses to disable
+        it (D-149-09, no dead default): for a DB-only default the model would vanish from the
+        registry entirely while ``llm_model`` still names it, and every request-path fallback
+        would resolve to a model that no longer exists. Locked or not, the remedy is the same —
+        pick a new default first — so the refusal names the lock only when there is one.
+
+    The read is forced FRESH (``invalidate_*`` before the load) for the WR-03 reason the two
+    sibling guards document: a per-worker 30s cache can hold another worker's stale snapshot,
+    and a guard that reads stale state is not a guard. On success: ``broadcast_model_overrides_change``
+    (BUG-260902-06 — invalidate here AND publish to the siblings, or the next GET has a
+    coin-flip chance of serving the removed row) + a ✎ ``model.removed`` receipt. On a
+    persistence failure: a ``model.remove_failed`` stamp + a real 500, never a false 2xx.
+    Non-operators are 404'd by the router gate.
+    """
+    if not model_id or not model_id.strip("/ \t\r\n"):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="model_id must be non-empty.",
+        )
+
+    from app.models.user_settings import (  # function-local (Pitfall 4)
+        _load_settings_from_db,
+        invalidate_model_overrides_cache,
+        invalidate_settings_cache,
+        load_all_model_overrides,
+    )
+
+    # WR-03: force a FRESH cross-worker read for BOTH guards below.
+    invalidate_model_overrides_cache()
+    overrides = await load_all_model_overrides()
+    if model_id not in overrides:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=(
+                "That model has no stored row to remove — it is a built-in default. "
+                "Disable it instead to take it out of the picker."
+            ),
+        )
+
+    invalidate_settings_cache()
+    _s = await _load_settings_from_db()
+    if model_id == (_s.get("llm_model") or ""):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "This model is locked as the org default — unlock it and pick a new default first."
+                if bool(_s.get("llm_model_locked"))
+                else "This is the org default model — pick a new default first."
+            ),
+        )
+
+    still_built_in = model_id in MODEL_CAPABILITIES
+
+    pool = deps._pg_pool  # CR-02: live module attribute, never an import snapshot
+    write_ok = False
+    if pool is not None:
+        try:
+            # Parameterized single-row delete — the id is a $1 bind, never interpolated.
+            await pool.execute(
+                "DELETE FROM model_capabilities_overrides WHERE model_id = $1", model_id
+            )
+            write_ok = True
+        except Exception:
+            logger.exception("remove_model_override: delete failed for %s", model_id)
+
+    if not write_ok:
+        request.state.audit_action = "model.remove_failed"
+        request.state.audit_label = f"Removing {model_id} failed to persist"
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not remove the model — it was not changed.",
+        )
+
+    await broadcast_model_overrides_change()  # SC#1: gone on the next request, on every worker
+    request.state.audit_action = "model.removed"
+    request.state.audit_label = (
+        f"Reset {model_id} to its built-in defaults (still in the registry)"
+        if still_built_in
+        else f"Removed {model_id} from the registry"
+    )
+    return {"ok": True, "model_id": model_id, "still_built_in": still_built_in}
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # Phase 149 (MODEL-02 / D-149-07) — the dedicated lock/unlock endpoint
 # ══════════════════════════════════════════════════════════════════════════════

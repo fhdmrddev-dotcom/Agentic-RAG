@@ -38,6 +38,7 @@ import { ChevronRight, Lock, RefreshCw } from "lucide-react"
 
 import {
   addModelById,
+  ApiError,
   getAdminActiveRuns,
   getBackpressure,
   disableUser,
@@ -52,6 +53,7 @@ import {
   grantOperator,
   killRun,
   recordControlPlaneEvent,
+  removeModel,
   revokeOperator,
   runModelDiscovery,
   setFeatureAudience,
@@ -62,6 +64,7 @@ import {
   type AddModelBody,
   type AdminActiveRun as ActiveRun,
   type BackpressureSignals,
+  type DiscoveryConfirmFailure,
   type FeatureAudience,
   type FullAppSettings,
   type GovernedFeature,
@@ -597,13 +600,53 @@ export function ControlRoomPage({ identity, onBack }: ControlRoomPageProps) {
   // fan-out. Confirming routes each chosen change through the PATCH capability seam, then
   // re-fetches the registry so any newly-confirmed model appears (propose-only — SC#3).
   const handleRunDiscovery = useCallback(() => runModelDiscovery(), [])
+  // ⚠ EVERY WRITE IS ATTEMPTED, AND THE OUTCOME IS REPORTED. This loop used to be a bare
+  // `for (…) await setModelCapability(…)`, so the FIRST server refusal threw out of the whole
+  // loop: every model after the offender was never attempted, and the panel showed one generic
+  // "Couldn't apply the changes" with no count and no names. Because a 4xx raises before the
+  // audit floor writes, the abort left nothing in the ledger either — the only evidence was the
+  // models quietly not being there. Measured 2026-09-12: two OpenRouter ids
+  // (`x-ai/grok-4.20*`, max_output 1,800,000 > the 1,000,000 ceiling) sat at index 229/230 of a
+  // 490-model run, so one "Select all" silently lost 261 models.
+  //
+  // Per-item isolation is the fix, NOT a wider server bound — the bound is a deliberate guard
+  // (T-196-IV2b) and a batch write must survive one bad row regardless of which row it is. The
+  // registry is re-fetched whenever ANYTHING landed, so a partial apply still shows its part.
   const handleConfirmDiscovery = useCallback(
     async (changes: Array<{ modelId: string; patch: ModelCapabilityPatch }>) => {
+      let applied = 0
+      const failures: DiscoveryConfirmFailure[] = []
       for (const { modelId, patch } of changes) {
-        await setModelCapability(modelId, patch)
+        try {
+          await setModelCapability(modelId, patch)
+          applied += 1
+        } catch (err) {
+          // The server's own plain-language `detail` (ApiError.message) — never a generic
+          // sentence in its place. The operator needs to know WHICH model and WHY.
+          failures.push({
+            modelId,
+            reason: err instanceof ApiError ? err.message : "Couldn’t save that model.",
+          })
+        }
       }
+      if (applied > 0) {
+        pulseRecording()
+        if (alive.current) void fetchRegistry()
+      }
+      return { applied, failures }
+    },
+    [fetchRegistry, pulseRecording],
+  )
+  // Remove one model's stored override row → `DELETE /admin/models/{id}`. The registry is
+  // re-fetched from the SERVER rather than optimistically spliced: on a built-in model the row
+  // does not disappear, it reverts to its defaults, and only the server knows which of the two
+  // the delete produced. Rejections propagate so the row renders the refusal in place.
+  const handleRemoveModel = useCallback(
+    async (modelId: string) => {
+      const res = await removeModel(modelId)
       pulseRecording()
       if (alive.current) void fetchRegistry()
+      return res
     },
     [fetchRegistry, pulseRecording],
   )
@@ -828,7 +871,9 @@ export function ControlRoomPage({ identity, onBack }: ControlRoomPageProps) {
                 <p className="mt-0.5 max-w-[74ch] text-xs text-muted-foreground/80">
                   Every model the platform can route to, and what it can do. Editing a capability
                   takes effect on the next request — no restart. Enabled models appear in users’
-                  model picker; disabled ones are hidden.
+                  model picker; disabled ones are hidden. Models you added — by ID or from
+                  discovery — carry a <span className="font-medium text-foreground">Remove</span>;
+                  models built into this deployment can’t be removed, only disabled.
                 </p>
               </div>
               <span className="flex-1" />
@@ -842,6 +887,7 @@ export function ControlRoomPage({ identity, onBack }: ControlRoomPageProps) {
               onSetCapability={handleSetCapability}
               onLock={handleLock}
               onAddModel={handleAddModel}
+              onRemoveModel={handleRemoveModel}
               showTechnical={showTechnical}
             />
             <ModelDiscoveryPanel

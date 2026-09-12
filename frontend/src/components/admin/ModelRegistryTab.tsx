@@ -30,7 +30,7 @@
 // `rows === null` → a calm loading placeholder (honest, mirrors UsersAndAccess).
 // ─────────────────────────────────────────────────────────────────────────────
 import { useEffect, useMemo, useRef, useState } from "react"
-import { Check, ChevronDown, Loader2, Lock, Plus, RotateCcw, Unlock } from "lucide-react"
+import { AlertTriangle, Check, ChevronDown, Loader2, Lock, Plus, RotateCcw, Trash2, Unlock } from "lucide-react"
 
 import { ApiError, type AddModelBody, type ModelCapabilityPatch, type ModelRegistryRow } from "@/lib/api"
 import { familyDefaults } from "@/lib/model-defaults"
@@ -54,6 +54,19 @@ interface ModelRegistryTabProps {
    *  Optional so the leaf renders byte-identical where the shell hasn't wired it yet — the
    *  "+ Add model by ID" affordance appears ONLY when the shell provides this handler. */
   onAddModel?: (body: AddModelBody) => Promise<void>
+  /** Remove one model's stored override row → `DELETE /admin/models/{id}`.
+   *
+   *  ⚠ WHAT IT REMOVES DEPENDS ON THE ROW, and the control says so rather than promising a
+   *  deletion the backend cannot perform. On a `db_only` row (an add-by-ID or a
+   *  discovery-confirmed model) the model leaves the registry. On any other row the model is
+   *  declared in the backend's built-in `MODEL_CAPABILITIES` — shipped in code — so the delete
+   *  clears the operator's stored values and the model STAYS in the list at its defaults. The
+   *  resolved `still_built_in` reports which actually happened.
+   *
+   *  Rejects with an `ApiError` (404 no stored row / 409 the org default) so the row surfaces
+   *  the plain-language refusal in place. Optional — the affordance renders ONLY when the shell
+   *  wires it, so the leaf stays byte-identical where it hasn't. */
+  onRemoveModel?: (modelId: string) => Promise<{ still_built_in: boolean }>
   /** When true, reveal the raw column names (⌥ LANG-01 reveal). */
   showTechnical: boolean
 }
@@ -118,6 +131,7 @@ export function ModelRegistryTab({
   onSetCapability,
   onLock,
   onAddModel,
+  onRemoveModel,
   showTechnical,
 }: ModelRegistryTabProps) {
   const groups = useMemo(() => (rows ? groupByProvider(rows) : []), [rows])
@@ -221,7 +235,7 @@ export function ModelRegistryTab({
                       <Th className="w-[8%]">
                         Tools {showTechnical && <TechName>native_tools</TechName>}
                       </Th>
-                      <Th className="w-[16%]">
+                      <Th className="w-[13%]">
                         <span className="inline-flex items-center gap-1">
                           Document filling {showTechnical && <TechName>emit_tier</TechName>}
                           <span
@@ -237,7 +251,7 @@ export function ModelRegistryTab({
                         Enabled {showTechnical && <TechName>enabled</TechName>}
                       </Th>
                       <Th className="w-[9%]">Users see</Th>
-                      <Th className="w-[10%]" aria-label="Row actions" />
+                      <Th className="w-[13%]" aria-label="Row actions" />
                     </tr>
                   </thead>
                   <tbody>
@@ -247,6 +261,7 @@ export function ModelRegistryTab({
                         row={row}
                         onSetCapability={onSetCapability}
                         onLock={onLock}
+                        onRemoveModel={onRemoveModel}
                         showTechnical={showTechnical}
                       />
                     ))}
@@ -285,11 +300,13 @@ function ModelRow({
   row,
   onSetCapability,
   onLock,
+  onRemoveModel,
   showTechnical,
 }: {
   row: ModelRegistryRow
   onSetCapability: (modelId: string, patch: ModelCapabilityPatch) => Promise<void>
   onLock: (modelId: string, locked: boolean) => Promise<void>
+  onRemoveModel?: (modelId: string) => Promise<{ still_built_in: boolean }>
   showTechnical: boolean
 }) {
   const [busy, setBusy] = useState(false)
@@ -332,6 +349,39 @@ function ModelRow({
       window.setTimeout(() => setReceipt(false), 3500)
     } catch (err) {
       setErrorDetail(err instanceof ApiError ? err.message : "Couldn’t update the lock — try again.")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /** Remove this model's stored override row.
+   *
+   *  ⚠ THE SUCCESS PATH STILL HAS SOMETHING TO SAY, which is why this does not reuse the plain
+   *  ✎-receipt flash the other two writes use. On a DB-only row the row simply disappears on the
+   *  shell's re-fetch and there is nothing left to render a receipt into; on a BUILT-IN row it
+   *  does NOT disappear — the model is declared in code, so the delete cleared the operator's
+   *  values and the row comes back at its defaults. Reporting that as a generic "recorded" would
+   *  leave the operator watching a row they just asked to remove sit there unexplained. */
+  async function remove() {
+    if (busy || !onRemoveModel) return
+    setBusy(true)
+    setErrorDetail(null)
+    try {
+      const { still_built_in } = await onRemoveModel(id)
+      if (still_built_in) {
+        // Not an error — a consequence. Rendered in the same in-row slot, which is the only
+        // place the operator is already looking.
+        setErrorDetail(
+          "This model is built into this deployment, so it can’t be removed from the list — " +
+            "its stored settings were cleared and it’s back at its defaults. Disable it to take " +
+            "it out of the picker.",
+        )
+      } else {
+        setReceipt(true)
+        window.setTimeout(() => setReceipt(false), 3500)
+      }
+    } catch (err) {
+      setErrorDetail(err instanceof ApiError ? err.message : "Couldn’t remove that model — try again.")
     } finally {
       setBusy(false)
     }
@@ -441,6 +491,9 @@ function ModelRow({
           <div className="flex items-center justify-end gap-2">
             {busy && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" aria-hidden="true" />}
             <RowResetControl row={row} busy={busy} onWrite={write} />
+            {onRemoveModel && (
+              <RemoveControl row={row} busy={busy} onRemove={remove} />
+            )}
             {receipt && (
               <span className="inline-flex items-center gap-1 text-[11px] font-medium text-warning" role="status">
                 <Check className="h-3 w-3 text-success" aria-hidden="true" />✎ recorded
@@ -646,6 +699,113 @@ function NumericCell({
         onReset={onReset}
       />
     </div>
+  )
+}
+
+/** The row-level Remove — `DELETE /admin/models/{id}`. ICON-ONLY, and present on EVERY row.
+ *
+ *  ⚠ IT RENDERS ON EVERY ROW, BUT IT IS ONLY LIVE ON SOME — and that is the whole design.
+ *  Only a `db_only` row (an add-by-ID or a discovery-confirmed model) exists solely in
+ *  `model_capabilities_overrides`, so only there does a delete genuinely remove the model.
+ *  Every other row is declared in the backend's built-in `MODEL_CAPABILITIES`, shipped in
+ *  `config.py`: no runtime write can remove it, and the model is back on the next read.
+ *
+ *  ⚠ AND ON A BUILT-IN ROW A DELETE WOULD BE WORSE THAN USELESS. `_registry_row` resolves an
+ *  ABSENT `enabled` to **true** (`model_registry.py`), so clearing the override row of a
+ *  built-in model an operator had deliberately DISABLED would put it back in front of users —
+ *  the exact hazard `RESETTABLE_CAPS` above documents and excludes `enabled` for. A destructive
+ *  control whose real effect is "un-hide this model" is the worst version of this button.
+ *
+ *  ⭐ SO IT IS GATED, NOT ABSENT — the `RowToggle`/`LockControl` honest-lock idiom this file
+ *  already uses for the anthropic/google Tools column. An absent control answers the question
+ *  "why can't I remove this one?" with silence, which is exactly how it reads when only a
+ *  fifth of the list has the affordance. A dimmed control with a tooltip answers it in place,
+ *  and names the control that WILL do what the operator wants (Enabled → off).
+ *
+ *  ⚠ ARM-TO-CONFIRM, per the Control-Room graded-action-guards rule — the same two-click shape
+ *  as `RowResetControl`, one tier stronger because this destroys the only record that the model
+ *  existed rather than restoring a built-in default. Icon-only, so the ARMED state must be
+ *  unmistakable without a word: the button fills destructive and the glyph swaps to a filled
+ *  alert. It disarms after 4s so an armed destructive control is never left sitting on screen,
+ *  and the accessible name is STABLE across both states (an assistive-tech user must not have a
+ *  control rename itself mid-interaction) — the changing half is the `title`.
+ *
+ *  ⚠ ICON-ONLY IS NOT A STYLE CHOICE. This cell also carries the busy spinner, the ✎ receipt,
+ *  `RowResetControl` and `LockControl` inside a `table-fixed` 10% column; a worded "Remove"
+ *  pushed the row over its width and painted across the `✓ in picker` chip in the column
+ *  before it. Same lesson `fmtNum` records one screen up: this table's columns are budgeted,
+ *  and a control that overflows one steals from its neighbour rather than wrapping. */
+function RemoveControl({
+  row,
+  busy,
+  onRemove,
+}: {
+  row: ModelRegistryRow
+  busy: boolean
+  onRemove: () => void
+}) {
+  const [armed, setArmed] = useState(false)
+  const disarmAt = useRef<number | null>(null)
+  useEffect(
+    () => () => {
+      if (disarmAt.current !== null) window.clearTimeout(disarmAt.current)
+    },
+    [],
+  )
+
+  const dbOnly = row.db_only === true
+  // WHY it cannot be removed, in the order the operator should hear it: the org-default guard
+  // outranks the built-in one because it is the one with a remedy they can act on right now.
+  const gatedReason = row.is_default
+    ? "This is the org default — pick a new default model first, then remove this one."
+    : !dbOnly
+      ? `${row.model_id} is built into this deployment, so it can’t be removed from the registry — it would come straight back. To take it out of users’ picker, turn Enabled off.`
+      : null
+  const gated = gatedReason !== null
+
+  // ⚠ DERIVED, never a setState during render. A row can BECOME gated under an armed click
+  // (it is made the org default from another surface and the shell re-fetches), and an armed
+  // destructive control must not survive into a state where the click is a guaranteed refusal.
+  // Reading `armed && !gated` settles that without a render-phase write and without an effect.
+  const showArmed = armed && !gated
+
+  return (
+    <button
+      type="button"
+      aria-label={`Remove ${row.model_id} from the registry`}
+      aria-disabled={gated || busy}
+      title={
+        gatedReason ??
+        (showArmed
+          ? `Click again to remove ${row.model_id}`
+          : `Remove ${row.model_id} — it exists only as a stored row, so this takes it out of the registry entirely. You can add it back with “Add model by ID”.`)
+      }
+      onClick={() => {
+        if (gated || busy) return
+        if (!armed) {
+          setArmed(true)
+          disarmAt.current = window.setTimeout(() => setArmed(false), 4000)
+          return
+        }
+        if (disarmAt.current !== null) window.clearTimeout(disarmAt.current)
+        setArmed(false)
+        onRemove()
+      }}
+      className={cn(
+        "inline-flex h-6 w-6 flex-none items-center justify-center rounded-[5px] border transition-colors",
+        gated
+          ? "cursor-not-allowed border-transparent text-muted-foreground/40"
+          : showArmed
+            ? "border-destructive bg-destructive/20 text-destructive"
+            : "border-transparent text-muted-foreground hover:border-border hover:bg-destructive/10 hover:text-destructive",
+      )}
+    >
+      {showArmed ? (
+        <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
+      ) : (
+        <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+      )}
+    </button>
   )
 }
 

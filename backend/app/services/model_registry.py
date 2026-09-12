@@ -97,6 +97,13 @@ def _registry_row(model_id, cap, ovr, default_model, model_locked):
     # allowlist and stays defined in app.api.admin — see this module's docstring.
     from app.api.admin import _MODEL_CAP_COLUMNS  # noqa: PLC0415 — cycle break, see docstring
 
+    # Captured BEFORE the `cap or {}` coalesce below, which erases the distinction: a model
+    # with NO built-in MODEL_CAPABILITIES entry exists ONLY as a DB row, so deleting that row
+    # genuinely removes it from the registry. Every other row is declared in config.py and
+    # comes back on the next read no matter what the DB says — the Remove control uses this to
+    # say which of the two a click would actually do, rather than promising a deletion that
+    # code makes impossible.
+    db_only = not cap and bool(ovr)
     cap = cap or {}
     ovr = ovr or {}
 
@@ -141,6 +148,11 @@ def _registry_row(model_id, cap, ovr, default_model, model_locked):
         "is_locked": bool(model_locked) and model_id == default_model,
         # Additive (Plan 07 extends the ModelRegistryRow type): per-field OVR-vs-DEF for Reset.
         "overridden_fields": overridden_fields,
+        # Additive: TRUE when this row exists only in model_capabilities_overrides. It is the
+        # difference between "Remove deletes this model" and "Remove resets it to its built-in
+        # defaults and it stays in the list" — see the comment at the top of this function.
+        # Deliberately NOT in _AUTHOR_ROW_FIELDS: it describes an operator-editor affordance.
+        "db_only": db_only,
     }
 
 
