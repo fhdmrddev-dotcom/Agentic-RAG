@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v4.1
 milestone_name: Ship It & Feel It
 status: ready_to_plan
-last_updated: 2026-09-12T20:49:25.474Z
+last_updated: 2026-09-13T00:00:00.000Z
 last_activity: 2026-09-11
 progress:
   total_phases: 12
@@ -11,7 +11,7 @@ progress:
   total_plans: 13
   completed_plans: 24
   percent: 17
-stopped_at: Phase 244 complete (15/12) — ready to discuss Phase 245
+stopped_at: Phase 245 context gathered — ready to plan (245-CONTEXT.md)
 ---
 
 # Project State
@@ -39,7 +39,20 @@ surface the operator uses daily. Phase numbering continues at **242**.
 ## Current Position
 
 Phase: 245
-Plan: Not started
+Plan: Not started — **context gathered 2026-09-13** (`245-CONTEXT.md`, `ffbb43c31`)
+
+⚠ **245's SCOPE TEXT IS STALE AND THE CONTEXT MEASURED IT.** Three of the four ROADMAP success
+criteria are not in the state the ROADMAP / REQUIREMENTS / this file describe — measured at HEAD
+against the artifacts, not read from the register. **SC#1: 238's nine UAT rows were ALREADY DRIVEN**
+on 2026-09-07 (`238-VERIFICATION.md:208-220` — 7 full pass, 2 half, S-1/S-2 blocked); the operator
+completed the Azure registration hours after 238-SUMMARY was written. **SC#3: all three
+VERIFICATION.md files already say "self-verified" in prose**, none carries a machine-readable marker,
+and `reviewed` appears 11x in each in honest sentences naming the owed review — so SC#3 taken
+literally would delete the record it protects. **SC#4: `OV-SOLO-01` is ALREADY written in full** at
+`:474-497`, all four elements including its re-arm trigger. **Only SC#2 — 233's five G-4 rows — is
+genuinely owed.** ⛔ **Read `245-CONTEXT.md` → `<measured_at_head>` before planning**: the bare scope
+text would plan a re-drive of nine rows driven six days ago. See also item 4 below, which carries the
+same stale claim and is corrected in place by D-08.
 
 **Round 1 executed 2026-09-12 in 3 waves + a fix round**, all merged to `develop`. Gates on the
 merged tree: **`count gate OK` — 275/275 pinned, 0 failing** (total 8245 · pinned 7455) · backend at
