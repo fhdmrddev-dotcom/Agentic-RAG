@@ -6136,6 +6136,33 @@ time, on the backend.
 
 **Re-derived 2026-09-12 at `244-06`: `25 / 14 / 800`.** ⚠ The row read `24 / 13 / 772`.
 
+**Re-derived 2026-09-12 at `244-07`: `26 / 14 / 835`.** ⚠ The row read `25 / 14 / 800` — stale
+for the SECOND close running, and this time the cell was not merely stale, it **repeated the claim
+the review falsified**.
+
+### 244-07 — WR-05: the refusal was in the SHAPE for absence and nowhere at all for blankness
+
+⛔ `244-06`'s cell above says *"`folder_id: str` REQUIRED, so 422 fires before the handler"*. True
+of a MISSING field and false of `""`: Pydantic accepts the empty string for a bare `str`, and every
+consumer of a folder id downstream is truthiness-gated — `ingest_splice.py:154` reads
+`if folder_id:` — so a blank destination did not FAIL the ownership check, it **skipped** it, and
+reached the insert on a `uuid` column. `"root"` took the same path. That is `BUG-260905-01` with
+the guard that would have caught it switched off.
+
+⭐ **The fix keeps the guarantee STRUCTURAL, which is the part `244-06` got right.**
+`LibraryFolderId = Annotated[str, Field(min_length=1), AfterValidator(...)]` — the shape
+`ServiceId` two hundred lines up already uses in this file. ⚠ **The runtime type stays `str` on
+purpose:** declaring the field `UUID` validates the same shape and then hands a `UUID` object to
+`supabase-py`'s query builder and to the insert payload — a runtime-type change on a shipped path,
+inside a commit whose whole job is a defect fix.
+
+⚠ **The docstring was edited in the same commit**, because a paragraph asserting a guarantee the
+code does not have is worse than no paragraph: it answers the next auditor with *satisfied* and
+stops the audit. **Named seam: unchanged and none proposed** — this file's growth is additive
+request models, not a tangle.
+
+---
+
 ### 244-06 — a NEW request model, and why the refusal lives in its SHAPE
 
 `ConnectionFileImportRequest` carries one field: `folder_id: str`, **required, no default**.
@@ -6251,6 +6278,30 @@ take it.
 ## `backend/app/api/connectors.py`
 
 **Re-derived 2026-09-12 at `244-06`: `42 / 20 / 2102`.** ⚠ The row read `41 / 19 / 2091`.
+
+**Re-derived 2026-09-12 at `244-07`: `43 / 20 / 2113`.**
+
+### 244-07 — WR-06: the FIFTH landing, and the extraction is PROPOSED then declined in writing
+
+⛔ **`2051 → 2071 → 2091 → 2102 → 2113`.** `deferred-items.md` item 4 says the FOURTH landing must
+propose the split before adding a line. `244-06` was the fourth; this is the fifth. The proposal is
+made and recorded rather than skipped: **split the source-browse / preview / import routes away
+from connector CRUD**, which is ~6 routes and no shared state beyond `connector_service`. It is
+**declined here** because this is a defect round on code shipped hours earlier, and an extraction
+in the same commit as a behaviour fix makes a red unattributable — the identical reason
+`244-06` gave for leaving `ComposerChipsRow` alone, which is a reason that has held twice.
+
+**The change is one arm:** `except HTTPException: raise`, immediately before the catch-all.
+Starlette's `HTTPException` IS an `Exception`, so without it every deliberate refusal raised
+deeper was relabelled `502 "Failed to download cloud file: <code>: <our own sentence>"` — a
+sentence `LibraryCloudImport` renders verbatim, blaming the provider for a file it never fetched.
+
+⭐ **THE DATING IS THE FINDING.** Those branches were UNREACHABLE until `244-06`, the first commit
+that passed `folder_id` at all. A fix that makes a downstream refusal live must ask what the
+caller does with it — and the sibling route written in the SAME phase (`workspace.py`) already
+had the arm, so the two doors disagreed from the day the second one was written.
+
+---
 
 ### 244-06 — the file GREW a THIRD time and the extraction is STILL owed
 
@@ -7637,7 +7688,41 @@ Its width is not its own: the 430px track is set by the host grid. The mobile ar
 
 ### `backend/app/services/agent_loop.py`
 
-**Triple re-derived 2026-09-11 (`244-02`): `41 / 20 / 3275` — G-5: ⚠ FIRES.** ⚠ The row read
+**Triple re-derived 2026-09-11 (`244-02`): `41 / 20 / 3275` — G-5: ⚠ FIRES.**
+
+
+⚠ **RE-DERIVED 2026-09-12 at `244-07`: `44 / 21 / 3303`** — and the row's own words were WRONG,
+not merely stale. It read *"gated General-mode-only"*; the code was gated `!= "explorer"`, and
+`agent_mode` has a THIRD value.
+
+#### 244-07 — WR-03 and WR-01: two sentences the code did not mean
+
+**WR-03.** `_apply_origin_filter` (`:960`) evaluates `agent_mode == "harness"`, so the announcement
+reached harness runs. A harness phase carries `ToolContext.phase_whitelist` and a tool outside it
+is REFUSED at dispatch — so a phase whose whitelist omits `execute_code` was told *"read ANY of
+them … inside execute_code"*. That is precisely the failure the explorer exclusion exists to
+prevent. ⭐ **The gate now NAMES ITS OWN RULE** (`not in ("explorer", "harness")`), redundantly
+with the block around it, because a rule enforced by indentation cannot see a value being added
+to the thing it is indented under.
+
+**WR-01.** `list_files_in_thread` returns every non-expired `workspace_files` row and the agent
+writes there too — `workspace_write` rows carry NULL `kind` and NULL `expires_at`, so they passed
+the expiry gate and were announced under *"The user attached these files … They expire"*. Both
+halves false. `ChatAttachmentChip` had the rule right from the start, so **the UI and the prompt
+described the same set differently** — and the prompt is the half the model acts on.
+
+⭐ **The filter is in the RENDERER, as an ALLOW-LIST on `_ATTACHMENT_KIND`.** In the renderer so
+the dynamic fence drives the real thing; an allow-list because migration 068 permits
+`'template_input'`, `'agent'` and NULL, and a kind added tomorrow must default to NOT being called
+something the user attached. ⛔ A thread whose only rows are agent-written now renders **no
+heading at all** — a true-sounding heading over an empty list is the same lie with the evidence
+removed.
+
+⚠ **NAMED SEAM, still owed and now sharper:** the prompt-assembly block is six conditional appends
+deep inside one 400-line branch. The appends want to be a list of small renderers the branch
+folds over; `_build_attachment_note` is the only one of the six that already IS one.
+
+--- ⚠ The row read
 `39 / 20 / 3154`. Re-derive, never copy forward.
 
 **What `244-02` T3 did (SHELL-04 / D-244-02).** Nothing announced an attachment: the tools existed,
@@ -7695,7 +7780,35 @@ chat continues without the line, logged loudly rather than silently.
 
 ### `backend/app/services/tool_dispatcher.py`
 
-**Triple re-derived 2026-09-11 (`244-02`): `80 / 34 / 4868` — G-5: ⚠ FIRES.** ⚠ The row read
+**Triple re-derived 2026-09-11 (`244-02`): `80 / 34 / 4868` — G-5: ⚠ FIRES.**
+
+
+⚠ **RE-DERIVED 2026-09-12 at `244-07`: `83 / 35 / 4913`** (⚠ the six-digit buckets `260529` and
+`260705` are DATED QUICK TASKS and are subtracted). The row read `80 / 34 / 4868` — **stale for
+the fourth close running**, which is this file's own recurring finding about itself.
+
+#### 244-07 — WR-02: “once per session” was written on an object that lives one iteration
+
+⛔ The guard was `getattr(ctx, "_attachments_hydrated", False)`, chosen *"in the exact shape of
+the `_output_baseline_seeded` guard"*. **That shape is wrong for this claim.** `agent_loop.py`
+constructs a new `ToolContext` on every iteration — its own comment says so — so a fresh object
+meant a fresh `getattr` default, and the guard only ever suppressed re-copies among PARALLEL tool
+calls inside ONE iteration. Eight `execute_code` iterations re-copied the same 10 MB attachment
+eight times: the DoS arm of T-244-02-05, open behind a comment saying it was closed.
+
+⭐ **MEASURED SURPRISE THAT CHANGED THE DESIGN, recorded because it will recur.** The obvious fix
+— `setattr(session, flag, True)` — turned **every** hydration case red with ZERO copies:
+`getattr` on a `MagicMock` auto-creates a child mock, which is **truthy**, so the guard read
+*"already hydrated"* on the first call. **A guard whose correctness depends on the test double's
+attribute policy cannot be fenced.** The marker is a module-level `weakref.WeakSet` of sessions,
+keyed by identity — it needs nothing of the object but a weakref, and its lifetime is exactly the
+lifetime of the `/sandbox/attachments` directory it describes.
+
+⚠ **`_output_baseline_seeded` HAS THE SAME BUG AND WAS LEFT ALONE, deliberately and in writing.**
+It is a different claim on a different cadence and fixing it is not this defect. **Re-open
+trigger:** the next plan whose `files_modified` names this file.
+
+--- ⚠ The row read
 `77 / 32 / 4679`; **STALE for the third close running.** Re-derive, never copy forward.
 
 **What `244-02` T2 did (SHELL-04's second clause — C-9).** `workspace_read` returns
@@ -10200,9 +10313,9 @@ cells rot within days.
 | [`frontend/src/components/workflows/McpToolPicker.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsmcptoolpickertsx) | 5 / 5 / 601 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | honoured by construction (211 / **214**) — net **−44 L** |
 | [`frontend/src/components/workflows/externalShapeVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsexternalshapevocabularyts) | 2 / 1 / 109 | no (1 phase) | young (206.2) |
 | [`frontend/src/components/workflows/McpToolPicker.reachability.test.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsmcptoolpickerreachabilitytesttsx) | 1 / 1 / 316 | no (1 phase) | young (206.2) |
-| [`backend/app/models/connector.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsconnectorpy) | 25 / 14 / 800 | ⚠ **FIRES** | ⚠ row was STALE at `24 / 13 / 772`. honoured by construction (**244-06**): a NEW request model, ⛔ no field added to an existing one — `folder_id: str` REQUIRED, so 422 fires before the handler |
+| [`backend/app/models/connector.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsconnectorpy) | 26 / 14 / 835 | ⚠ **FIRES** | ⚠ row was STALE at `24 / 13 / 772`. honoured by construction (**244-06**): a NEW request model, ⛔ no field added to an existing one — `folder_id: str` REQUIRED, so 422 fires before the handler |
 | [`backend/app/services/mcp_client.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmcp_clientpy) | 9 / 6 / 526 | ⚠ **FIRES** | ⚠ row STALE TWICE (`4/2/407` reading `no`, then `7/5/480`). honoured by construction (**SEED-258**): the body cap is DERIVED, so no envelope knob exists to disagree |
-| [`backend/app/api/connectors.py`](docs/HOT-FILE-LEDGER.md#backendappapiconnectorspy) | 42 / 20 / 2102 | ⚠ **FIRES** | ⛔ **extraction still OWED and the file GREW a THIRD time** (2051→2071→2091→2102). honoured by construction (**244-06**): ONE parameter, ONE forward; the refusal is the MODEL, not a branch here |
+| [`backend/app/api/connectors.py`](docs/HOT-FILE-LEDGER.md#backendappapiconnectorspy) | 43 / 20 / 2113 | ⚠ **FIRES** | ⛔ **extraction still OWED and the file GREW a THIRD time** (2051→2071→2091→2102). honoured by construction (**244-06**): ONE parameter, ONE forward; the refusal is the MODEL, not a branch here |
 | [`backend/app/security/egress.py`](docs/HOT-FILE-LEDGER.md#backendappsecurityegresspy) | 13 / 5 / 982 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | honoured by construction (232): Google Drive read/export pins; docstrings updated to source contract |
 | [`backend/app/services/google/availability.py`](docs/HOT-FILE-LEDGER.md#backendappservicesgoogleavailabilitypy) | 0 / 0 / 277 | no (new) | young (221-02) — the per-application probe. ⚠ It imports `_http`'s parser and writes NO second one |
 | [`backend/app/services/google/writes.py`](docs/HOT-FILE-LEDGER.md#backendappservicesgooglewritespy) | 2 / 1 / 625 | no (1 phase) | ⚠ absent for its entire life — row added 221-02, which found `create_event` REFUSING every naive local time |
@@ -10253,8 +10366,8 @@ cells rot within days.
 | [`frontend/src/hooks/useDocuments.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusedocumentsts) | 8 / 3 / 120 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent at 3 phases. Realtime is a hint, not truth — it reconciles by fetch (D-v2.5-03), and `table_count`/`image_count`/`chunk_count` are server-side |
 | [`frontend/src/pages/KnowledgeHealthPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesknowledgehealthpagetsx) | 12 / 6 / **DELETED** | ⚠ **FIRES** | **RETIRED (217.1-14)** — the Library's Health tab absorbed it; `ChatLayout`'s fallback replaced by `UnknownViewFallback` (`:871`). ⚠ absent for its ENTIRE LIFE |
 | [`backend/app/api/knowledge_health.py`](docs/HOT-FILE-LEDGER.md#backendappapiknowledgehealthpy) | 11 / 6 / 737 | ⚠ **FIRES** | honoured by construction (**217.1-11**) — adds `could_not_search`; `retrieval_count` byte-unchanged. ⚠ absent at **6 phases**. Audit-analytics from `audit_log`. Service-role by exception |
-| [`backend/app/services/agent_loop.py`](docs/HOT-FILE-LEDGER.md#backendappservicesagent_looppy) | 41 / 20 / 3275 | ⚠ **FIRES** | ⚠ row STALE at `39/20/3154`. honoured by construction (**244-02**): a SIXTH conditional append in the shipped `memory_note` shape, gated General-mode-only |
-| [`backend/app/services/tool_dispatcher.py`](docs/HOT-FILE-LEDGER.md#backendappservicestool_dispatcherpy) | 80 / 34 / 4868 | ⚠ **FIRES** | ⚠ row STALE AGAIN at `77 / 32 / 4679`. honoured by construction (**244-02**): 2 module-level helpers + a 4-line guarded call site; `workspace_read`'s binary branch untouched |
+| [`backend/app/services/agent_loop.py`](docs/HOT-FILE-LEDGER.md#backendappservicesagent_looppy) | 44 / 21 / 3303 | ⚠ **FIRES** | ⚠ row STALE at `39/20/3154`. honoured by construction (**244-02**): a SIXTH conditional append in the shipped `memory_note` shape, gated General-mode-only |
+| [`backend/app/services/tool_dispatcher.py`](docs/HOT-FILE-LEDGER.md#backendappservicestool_dispatcherpy) | 83 / 35 / 4913 | ⚠ **FIRES** | ⚠ row STALE AGAIN at `77 / 32 / 4679`. honoured by construction (**244-02**): 2 module-level helpers + a 4-line guarded call site; `workspace_read`'s binary branch untouched |
 | [`backend/app/api/document_governance.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentgovernancepy) | 5 / 3 / 416 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent at 3 phases. ⚠ Its low-confidence cutoff is the ConfidenceChip tier (**0.5**) — a DIFFERENT measure from `knowledge_health`'s **0.38** retrieval similarity |
 | [`frontend/src/pages/GovernancePage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesgovernancepagetsx) | 4 / 1 / 355 | no (1 phase) | young (119) — ⚠ row added because it is being MERGED into the Library (operator, 2026-08-28); it is feature-gated while Documents is not, so the gate must move with it |
 | [`frontend/src/components/ingestion/DocumentUpload.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestiondocumentuploadtsx) | 10 / 1 / 144 | no (1 phase) | young (056) — ⚠ absent for its entire life. ⛔ It reports NO byte progress (`onUploadProgress` absent), so any upload percentage is unknowable |
@@ -10327,9 +10440,9 @@ cells rot within days.
 | [`frontend/src/components/panel/TemplateUpload.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspaneltemplateuploadtsx) | 2 / 2 / 91 | no (2 phases) | ⚠ absent for its entire life — row added 244-02 at the SECOND phase, not the third. **244**: the `accept=` literal is GONE; it reads the fenced constant |
 | [`frontend/src/lib/workspaceAllowedExt.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibworkspaceallowedextts) | 1 / 1 / 54 | no (new) | young (created 244-02). Row added AT CREATION, per the `settingsSearchPayload.ts` precedent — an absent row is invisible to G-5 at any count |
 | [`frontend/src/components/chat/ChatAttachmentChip.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatchatattachmentchiptsx) | 1 / 1 / 144 | no (new) | young (created 244-05). Row added AT CREATION. The ONE chip, THREE states; `sent` carrying `this chat only` is D-244-22's build obligation and `expired` is D-244-25's |
-| [`frontend/src/components/chat/composerCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatcomposercopyts) | 2 / 1 / 103 | no (new) | young (created 244-05). Row added AT CREATION. A PORT of sketch 236's `COPY.js`, fenced `?raw`. ⛔ `COPY.b` is deliberately NOT ported (D-244-23). **244-06**: `cloudSub` ported by SHAPE |
+| [`frontend/src/components/chat/composerCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatcomposercopyts) | 3 / 1 / 111 | no (new) | young (created 244-05). Row added AT CREATION. A PORT of sketch 236's `COPY.js`, fenced `?raw`. ⛔ `COPY.b` is deliberately NOT ported (D-244-23). **244-06**: `cloudSub` ported by SHAPE |
 | [`frontend/src/components/chat/ConnectedFilePickerModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatconnectedfilepickermodaltsx) | 3 / 2 / 336 | no (2 phases) | ⚠ **absent for its ENTIRE LIFE — row added 244-06, and the ledger gate FAILED on it at this phase's base (C-8).** 244-06 REBUILT it: select-then-confirm, and the commit is the parent's |
-| [`frontend/src/components/chat/useComposerAttachments.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatusecomposerattachmentsts) | 1 / 1 / 158 | no (new) | young (created 244-06). Row added AT CREATION. ⭐ THE SEAM `244-05` NAMED AND OWED — both attach doors' state and verbs; `MessageInput.tsx` shrank `855 → 821` |
+| [`frontend/src/components/chat/useComposerAttachments.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatusecomposerattachmentsts) | 2 / 1 / 183 | no (new) | young (created 244-06). Row added AT CREATION. ⭐ THE SEAM `244-05` NAMED AND OWED — both attach doors' state and verbs; `MessageInput.tsx` shrank `855 → 821` |
 | [`frontend/src/components/chat/ActiveConnectorChips.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatactiveconnectorchipstsx) | 2 / 2 / 82 | no (2 phases) | ⚠ absent for its entire life — row added 244-05 at its SECOND phase. **244**: the row container HOISTED out; it is bare chips now, `null` on empty (D-244-26) |
 
 
@@ -11886,6 +11999,14 @@ extraction is `chatAttachment.ts` beside it, and the render stays here.
 
 ## `frontend/src/components/chat/composerCopy.ts`
 
+⚠ **RE-DERIVED 2026-09-12 at `244-07`: `3 / 1 / 111`.** Still young (created `244-05`).
+
+**244-07 (CR-01).** One key added: `COPY.shared.refuseNoThread`. ⚠ **NOT a port** — sketch 236
+does not draw this case, because it draws a chat that already exists. It is recorded as such in
+the key's own docblock so the `?raw` fence's set-equality reading is not misread as drift.
+
+---
+
 **`2 / 1 / 103`** — created by `244-05` T1. Row added **at creation**. ⚠ The row read `1 / 1 / 93`
 one plan later; `244-06` T3 added `cloudSub`.
 
@@ -12237,6 +12358,30 @@ the measurement rather than re-deriving it.**
 ---
 
 ## `frontend/src/components/chat/useComposerAttachments.ts`
+
+⚠ **RE-DERIVED 2026-09-12 at `244-07`: `2 / 1 / 183`.** Still young (created `244-06`).
+
+### 244-07 — CR-01: both verbs opened with a bare `if (!threadId) return`
+
+⛔ `ChatArea` renders the composer with `threadId={null}` on its welcome screen — the FIRST chat
+anybody opens — so a pick produced no chip, no request, no refusal and no console line. The cloud
+half was worse: returning `undefined` rather than throwing made
+`ConnectedFilePickerModal.handleConfirm` take its SUCCESS path and close identically to a real
+attach. **A silent success is the worst available outcome**, and it was also a REGRESSION — the
+pre-phase `onFileImported` path worked from a threadless composer.
+
+⭐ **Option (b) of the two the review offered: refuse VISIBLY, and make the cloud verb THROW.**
+The refusal lands in the same `refusal` state and renders the same three atoms a 422 does
+(D-244-27) — one vocabulary for one fact.
+
+⚠ **THE ARM NOT TAKEN, recorded rather than left implicit:** creating the thread at ATTACH time.
+It is the nicer product — `handleSend` already creates one on first send — and it is not a defect
+fix: it needs `onCreateThread` threaded down through `MessageInput`, and `MessageInput`'s
+draft-key effect calls `clear()` on every `threadId` change, so the chip the person just made
+would be wiped by the thread its own creation produced. **Re-open trigger:** any plan scoping
+*“attach before the first message”* as a capability.
+
+---
 
 **`1 / 1 / 158`** — created by `244-06` T3. Row added **at creation**, per the
 `settingsSearchPayload.ts` / `workspaceAllowedExt.ts` precedent: **an absent row is invisible to

@@ -709,8 +709,8 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/ConnectionPicker.tsx` | 7 / 5 / 888 | honoured by construction (206.2 / **214**) |
 | `frontend/src/components/workflows/ExternalActionSection.tsx` | 8 / 5 / 179 | honoured by construction (206.2 / **214**) |
 | `frontend/src/components/workflows/McpToolPicker.tsx` | 5 / 5 / 601 | honoured by construction (211 / **214**) |
-| `backend/app/models/connector.py` | 25 / 14 / 800 | ⚠ row was STALE at `24/13/772`. honoured by construction (**244-06**): a NEW request model, ⛔ no field added to an existing one — `folder_id: str` REQUIRED, so 422 fires before the handler |
-| `backend/app/api/connectors.py` | 42 / 20 / 2102 | ⛔ **extraction still OWED and the file GREW a THIRD time** (2071→2091→2102). honoured by construction (**244-06**): ONE parameter, ONE forward; the refusal is the MODEL, not a branch here |
+| `backend/app/models/connector.py` | 26 / 14 / 835 | ⚠ row STALE for the 2nd close at `25/14/800`, and its own cell repeated the CLAIM that was false. honoured by construction (**244-07**): `folder_id` typed, not branched |
+| `backend/app/api/connectors.py` | 43 / 20 / 2113 | ⛔ **extraction OWED, FIFTH landing** (2051→2071→2091→2102→2113). honoured by construction (**244-07**): ONE `except HTTPException: raise`, the arm the sibling route already had |
 | `backend/app/services/sources/preview_service.py` | 8 / 4 / 826 | ⚠ row STALE TWICE; the 2nd read “238: comment-only” while 238 re-opened SEED-253 here. **238-04: display ≠ stored; the walk no longer mutates `SourceFile.path`** |
 | `backend/app/security/egress.py` | 13 / 5 / 982 | honoured by construction (232): Google Drive read/export pins; docstri |
 | `backend/app/services/connector_service.py` | 25 / 9 / 1772 | honoured by construction (**239-06**): the write boundary knows a mapping KEY from a tool name by ALLOW-LIST — an unknown key is still read as a tool name and still refused |
@@ -734,8 +734,8 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/hooks/useDocuments.ts` | 8 / 3 / 120 | ⚠ absent at 3 phases. Realtime is a hint, not truth |
 | `frontend/src/pages/KnowledgeHealthPage.tsx` | 12 / 6 / **DELETED** | **RETIRED (217.1-14)** |
 | `backend/app/api/knowledge_health.py` | 11 / 6 / 737 | honoured by construction (**217.1-11**) |
-| `backend/app/services/agent_loop.py` | 41 / 20 / 3275 | ⚠ row STALE at `39/20/3154`. honoured by construction (**244-02**): a SIXTH conditional append in the shipped `memory_note` shape, gated General-mode-only, announcing the path the hydration really writes |
-| `backend/app/services/tool_dispatcher.py` | 80 / 34 / 4868 | ⚠ row STALE for the 3rd close at `77/32/4679`. honoured by construction (**244-02**): 2 helpers + a 4-line guarded call site; `workspace_read`'s binary branch untouched |
+| `backend/app/services/agent_loop.py` | 44 / 21 / 3303 | ⚠ **its own cell said “gated General-mode-only” and that was FALSE for harness.** honoured by construction (**244-07**): the gate now names its rule; the renderer allow-lists `kind` |
+| `backend/app/services/tool_dispatcher.py` | 83 / 35 / 4913 | ⚠ row STALE for the 4th close at `80/34/4868`. honoured by construction (**244-07**): the hydration marker moved to a WeakSet of sessions — no new call site |
 | `backend/app/api/document_governance.py` | 5 / 3 / 416 | ⚠ absent at 3 phases. ⚠ Its low-confidence cutoff is the ConfidenceChi |
 | `frontend/src/components/ingestion/ViewsGroup.tsx` | 5 / 3 / 259 | ⚠ absent for its ENTIRE LIFE at **3 phases** |
 | `frontend/src/components/ui/tabs.tsx` | 3 / 3 / 78 | ⚠ absent for its ENTIRE LIFE |
