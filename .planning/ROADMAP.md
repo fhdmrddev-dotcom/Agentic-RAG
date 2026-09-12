@@ -225,7 +225,9 @@ Plans:
   4. A person attaches a **local file** to a chat message and the agent can use it; and a cloud import **asks which Library folder it goes to** instead of writing permanently to the root (SHELL-04, `BUG-260905-01`, folding `SEED-042`'s "not in the KB" half).
   5. A watched source that has stopped reading raises a signal the operator **sees in the app shell while doing something else** — not only if they happen to open the Health tab (SHELL-05, `SURF-03`).
 
-**Plans**: 6 plans in 4 waves
+**Plans**: 6 build plans in 4 waves, **+ 5 gap-closure plans in 3 waves** (round 1, 2026-09-12).
+⚠ Eleven plan files total; the 5 are the round, not a re-plan. **G-8**: the round is 5 plans, inside
+the 3-5 band, so G-8 does not fire and no justification is owed. **G-7**: 1 round of 2 used.
 
 Plans:
 **Wave 1**
@@ -245,6 +247,43 @@ Plans:
 **Wave 4** *(blocked on Wave 3 completion)*
 
 - [x] 244-06-PLAN.md — the two doors un-inverted: cloud→thread, Library import asks its folder (SHELL-04)
+
+**Gap closure — round 1** *(`/gsd:plan-phase 244 --gaps`, 2026-09-12; `check-gap-closure-rounds.cjs 244` = **G-7 clear**, 1 of 2 rounds)*
+
+⚠ Authored against **`244-UAT.md`'s `## Gaps` section**, not against `244-VERIFICATION.md` — that
+report reads `human_needed` / *"0 rows driven"* and was written BEFORE the browser drive. The UAT
+then drove **all 9 rows: 4 pass / 5 issue**.
+
+**Wave 5** *(the wave numbering continues the phase; ≤ 2 test-running agents per wave is a MEASURED
+ceiling, not a preference — the shared vitest gate goes non-deterministic at three)*
+
+- [ ] 244-09-PLAN.md — **G-5** the nav rail cannot fit and pushes the document below ~540px viewport height; `min-h-0 overflow-y-auto` on the rail root, a link-6 source pin, and `NavPanel.tsx`'s stale ledger row (SHELL-01)
+- [ ] 244-10-PLAN.md — **L-5 defect 6b** the SECOND attachment never reaches `/sandbox/attachments`; the per-session marker records WHICH files were copied, not merely THAT hydration ran (SHELL-04) · backend only
+
+**Wave 6** *(blocked on Wave 5 — a SCHEDULING dependency, not a data one)*
+
+- [ ] 244-11-PLAN.md — **G-3 + G-4** a snapshot 503 renders a silently incomplete transcript; the shipped `reconcileErrors` slice + its shipped banner are connected, and `BUG-260911-02` gets a written ruling (SHELL-01)
+- [ ] 244-12-PLAN.md — **G-6 (BLOCKER) + G-2** a workflow-raised approval has no controls in the chat column; the mount moves to LIST level where a `role='system'` carrier can reach it, and the thinking badge moves below the tools per the operator's override (SHELL-03)
+
+**Wave 7** *(blocked on Wave 6 — it edits four files those two plans own)*
+
+- [ ] 244-13-PLAN.md — **G-1 + WR-07** the thread lock does not say what it is: a Deep cap-pause renders a phantom live workflow run line with a 1s clock, and a harness cap-pause would unlock the composer. `WorkflowLock.mode` becomes a real discriminator; two files that have NEVER had a ledger row get one (SHELL-02)
+
+⚠ **`SHELL-05` is deliberately absent from every `requirements` field above, and that is a claim
+rather than an omission:** no gap touches it. **L-7 was driven end to end for the first time in this
+project's history — in BOTH directions — and passed**, including the negative arm and
+`BUG-260911-03`'s tab attribution. Padding a plan with it would have manufactured coverage.
+
+⛔ **No plan here closes a criterion.** Every one produces a `244-NN-UAT-ROW.md` driven at
+`/gsd:verify-work`; `D-244-14` and `D-244-19` both require a DRIVEN row, and `244-12`'s blocker is
+the criterion whose green fence was the whole problem. Each plan reports **built, drive owed**.
+
+⛔ **G-7 compliance, checked rather than asserted:** no task introduces a user-facing capability.
+Every fix connects shipped machinery (the `reconcileErrors` banner, `PendingAskStack`, the
+`ThreadRunLine` list-level precedent) or corrects a discriminator. Four findings are DEFERRED with
+fireable re-open triggers in `deferred-items.md` (`244-13` Task 3): the late attachment chip
+(retracted to MINOR during the UAT), Google-native Drive files, the un-reproduced `200`-creates-
+nothing import, `Retry-After` consumption, WR-08 and WR-04.
 
 ⚠ **SIX plans, not the FOUR `D-244-17` locked** — the deviation is recorded in every plan. `SHELL-04` alone is cut into three, on **context cost** and never on difficulty: **C-2** makes `SHELL-02` a two-layer change against a backend baseline at its zero-headroom ceiling, and **C-9** (measured at planning) shows criterion 4's *"and the agent can use it"* is unsatisfied for **8 of the 15 accepted extensions**, because `workspace_read` returns a note for every binary and the sandbox had no reach at all. G-8's never-cut list — verifier, TDD RED drives, `security_enforcement` / `code_review`, migration discipline — is intact.
 
