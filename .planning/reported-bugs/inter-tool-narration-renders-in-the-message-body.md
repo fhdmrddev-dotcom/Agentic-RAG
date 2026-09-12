@@ -4,11 +4,11 @@ title: Inter-tool narration renders in the chat body instead of a fold — and a
 reported: 2026-09-12
 surface: Agentic-RAG
 severity: major
-status: open
+status: closed
 affected_areas: [frontend/streaming, backend/agent-loop, chat/message-rendering]
 folded_into: null
-verified_closed_by: null
-related_seeds: [SEED-173, SEED-172]
+verified_closed_by: "live browser drive 2026-09-13 (c6a6b46d4)"
+related_seeds: [SEED-173, SEED-172, SEED-259]
 re_open_trigger: null
 reproduces_on:
   branch: develop
@@ -131,4 +131,30 @@ not yet seen a real run fold. Nothing here is verified against a live model.
 NOT explain why the same three sentences appeared three times. If the 4B was restating itself, the
 fold now hides it and the underlying repetition remains. **Do not read a clean body as evidence
 that the repetition was fixed** — it was never diagnosed.
+
+---
+
+## 2026-09-13 — CLOSED. Merged to `develop` at `c6a6b46d4`, verified in a LIVE BROWSER RUN.
+
+⭐ **THE VERIFICATION IS THE POINT: driving the app found a defect that thirteen green cases did
+not.** The first fix shipped a second one — `RunCard`'s planning row and the fold both drew, so the
+screen carried `deciding next step…` and `Thinking...` stacked. Its guard asked `!reasoningContent`
+ALONE, a complete question while the fold had ONE input; narration made it two and opened a window
+where narration is set and reasoning is still empty. ⚠ **The double is TRANSIENT** (the row is gated
+on `isStreamingNow`), so every test over a FINISHED message passed against broken code. `§7` renders
+the streaming state and was driven RED against the unfixed guard.
+
+**Measured across three live runs on `deepseek-v4-flash`:** mid-stream, ONE collapsed `Thinking...`
+fold under the run card and no planning row; opening it shows the model's process; the body stays
+empty until the answer, which then renders alone; on completion the label settles to
+`Thought for 1 second`.
+
+⛔ **WHAT IS CLOSED IS THE TITLE OF THIS REPORT AND NOTHING WIDER.**
+
+- ⚠ **"Everything folded under thinking" was NOT REPRODUCED.** In every drive the answer landed in
+  the body. The likely reading is the real window between the last tool finishing and the answer
+  starting — long on a slow local model, and it read as noise while the duplicate badge was there.
+  **Recorded as not-reproduced, not as fixed.**
+- ⛔ **The REPETITION in the original screenshot remains UNATTRIBUTED and is now SEED-259.** The fold
+  hides it; it does not explain it. **Do not read a clean body as evidence the repetition is gone.**
 
