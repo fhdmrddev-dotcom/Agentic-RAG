@@ -13747,3 +13747,32 @@ One prop on the existing `ThinkingBlock` mount. No new branch; the call site sti
 and guarded nothing. ⚠ Do NOT "simplify" either to a directory entry: `src/__tests__/providers`
 holds fourteen inherited failures and a directory entry turns the shared gate red for a reason no
 plan here owns. **TARGETS decides what RUNS; BASELINE decides what is GUARDED.**
+
+---
+
+### `frontend/src/components/chat/RunCard.tsx` — BUG-260912-01, the regression the fix itself shipped
+
+**Measured 2026-09-13: `29 commits / 14 phases / 723 L`** (supersedes `28 / 14 / 710`).
+
+⛔ **THE FIX FOR BUG-260912-01 SHIPPED A SECOND DEFECT, AND A LIVE BROWSER RUN IS WHAT FOUND IT —
+not any of the thirteen green cases written for it.** State 2's guard reads
+`!message.reasoningContent && isStreamingNow && message.isPlanning`. That was a COMPLETE question
+while `ThinkingBlock` had exactly one input: reasoning absent ⇒ the fold is not drawing ⇒ this row
+is the only indicator. Adding narration as a second input opened a window where `narrationContent`
+is set and `reasoningContent` is still empty — **the fold drew, and so did this row.** Measured
+mid-stream: `deciding next step…` and `Thinking...` stacked on screen.
+
+⭐ **THE EXCLUSION WAS NEVER "REASONING IS ABSENT"; IT WAS "THE FOLD IS NOT DRAWING."** The guard
+encoded the first because the two were equivalent at the time. `!message.narrationContent` restores
+the intent.
+
+⚠ **WHY THIRTEEN GREEN CASES MISSED IT, AND WHY THE NEW ONE DRIVES `isStreaming`:** this row is
+gated on `isStreamingNow`, so the double **collapses the moment the run settles**. Every test over
+a finished message sees one indicator and passes against the broken code. §7 of
+`ThinkingBlock.narration.test.tsx` renders the STREAMING state specifically, and was driven RED
+against the unfixed guard.
+
+⚠ **THE GENERAL LESSON, worth more than the fix:** a boolean guard that encodes "the other thing is
+not rendering" by naming *that thing's only input* silently rots the day a second input is added.
+Both renderers now read both inputs; nothing executable binds them, which is the residual risk.
+

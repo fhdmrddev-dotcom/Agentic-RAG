@@ -483,8 +483,21 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
               it here creates no second renderer and costs no prop widening.
               ⚠ The `!message.reasoningContent` guard is what used to be the ternary's first
               arm. It is written out explicitly so the mutual exclusion §6b pins survives BY
-              CONSTRUCTION rather than by the shape of a chain that no longer exists. */}
-          {!message.reasoningContent && isStreamingNow && message.isPlanning && (
+              CONSTRUCTION rather than by the shape of a chain that no longer exists.
+
+              ⛔ BUG-260912-01 — `!message.narrationContent` IS THE SECOND HALF OF THAT SAME
+              MUTUAL EXCLUSION, AND OMITTING IT SHIPPED A VISIBLE DOUBLE. Measured in a live
+              run on 2026-09-13: mid-stream the page carried BOTH `deciding next step…` (this
+              row) and `Thinking...` (the fold) stacked on top of each other.
+              WHY IT APPEARED ONLY NOW: this row's guard asks about reasoning ALONE, which
+              was a complete question while the fold had exactly one input. Once narration
+              became a second input, a window opened where `narrationContent` is already set
+              and `reasoningContent` is still empty — the fold draws, and so did this. The
+              exclusion was never "reasoning is absent"; it was "the fold is not drawing".
+              ⚠ It is transient (this row is gated on `isStreamingNow`, so the double
+              collapses when the run settles) — which is exactly why no static test caught it
+              and why the fence added for it drives the STREAMING state. */}
+          {!message.reasoningContent && !message.narrationContent && isStreamingNow && message.isPlanning && (
             <div
               data-testid="thinking-row"
               className="px-3 py-1.5 text-xs italic text-muted-foreground/80 flex items-center gap-2"

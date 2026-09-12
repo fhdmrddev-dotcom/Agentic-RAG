@@ -110,4 +110,31 @@ describe("BUG-260912-01 — narration folds", () => {
     renderIt(<MessageItem message={makeMessage()} />)
     expect(screen.queryByTestId("thinking-block")).not.toBeInTheDocument()
   })
+
+  it("§7 shows exactly ONE thinking indicator mid-stream, never the fold AND the planning row", () => {
+    // ⛔ THE REGRESSION THIS FIX SHIPPED, CAUGHT IN A LIVE BROWSER RUN AND NOT BY ANY TEST.
+    // `RunCard`'s planning row asked `!reasoningContent` — a COMPLETE question while the fold
+    // had exactly one input. Narration made it a second input, opening a window where
+    // narration is set and reasoning is still empty: the fold drew, and so did the row.
+    // Measured on 2026-09-13 mid-stream: `deciding next step…` and `Thinking...` stacked.
+    //
+    // ⚠ THE STREAMING STATE IS LOAD-BEARING HERE. The row is gated on `isStreamingNow`, so
+    // the double COLLAPSES once the run settles — a test over a finished message sees one
+    // indicator and passes against the broken code. That is precisely why this defect
+    // survived six green cases above it.
+    renderIt(
+      <MessageItem
+        message={makeMessage({
+          content: "",
+          narrationContent: NARRATION,
+          isPlanning: true,
+          runStatus: "streaming",
+          tool_calls: [{ id: "t1", name: "search_documents", status: "done", args: {} }],
+        } as Partial<Message>)}
+        isStreaming
+      />,
+    )
+    expect(screen.getByTestId("thinking-block")).toBeInTheDocument()
+    expect(screen.queryByTestId("thinking-row")).not.toBeInTheDocument()
+  })
 })

@@ -2963,10 +2963,11 @@ const BASELINE = {
   // cheaply be achieved by dropping exactly §3 and §4 - the two that cost something to keep.
   "ThinkingBlock.clamp.test.tsx": 7,
   // BUG-260912-01 — both counts READ FROM A REAL RUN after the edits landed, never guessed.
-  // 6 each: narration = §1..§6 (fold-draws / body-clean / paragraphs / no-invented-span /
-  // both-sources / inert); turnfold = §1..§6 (move / three-turns / flush-first / blank-line
-  // separator / inert / no-span).
-  "ThinkingBlock.narration.test.tsx": 6,
+  // narration 7 = §1..§6 (fold-draws / body-clean / paragraphs / no-invented-span /
+  // both-sources / inert) plus §7, the MID-STREAM double-indicator regression this fix
+  // shipped and a live browser run caught; turnfold 6 = §1..§6 (move / three-turns /
+  // flush-first / blank-line separator / inert / no-span).
+  "ThinkingBlock.narration.test.tsx": 7,
   "streamsProvider_bug260912_turnfold.test.tsx": 6,
 
   // ── Phase 243 (243-05 / CHAT-05 / CHAT-01 — D-243-06) — the answer out of the fold ─────
