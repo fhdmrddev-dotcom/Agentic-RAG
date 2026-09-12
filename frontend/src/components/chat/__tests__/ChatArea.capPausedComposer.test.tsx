@@ -406,7 +406,17 @@ describe("244-13 / D6 — the Deep cap-pause keeps BOTH halves, in ONE tree", ()
    * turns a case RED that ALSO asserts the composer is usable.
    */
   it("D6 — composer enabled with 'Ask anything…' AND the Continue-limit sentence rendered", async () => {
-    getThreadWorkflow.mockResolvedValue(CAP_PAUSED_STATE)
+    // ⚠ `continues_remaining: 0` is load-bearing and was MEASURED, not assumed: the card
+    // renders the ITERATION-limit sentence while continues are left and the CONTINUE-limit
+    // sentence only when they are exhausted (`MessageItem.tsx:776-778`). The state UAT row
+    // L-2 drove had `continues_used=3`, so that is the state this case reproduces — a
+    // fixture that cannot express the state a claim is about pins the claim in the state
+    // that refutes it (244-11's lesson, one surface over).
+    getThreadWorkflow.mockResolvedValue({
+      ...CAP_PAUSED_STATE,
+      continues_used: 3,
+      continues_remaining: 0,
+    })
     const message = {
       id: "m-capped",
       thread_id: THREAD.id,

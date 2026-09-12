@@ -137,7 +137,34 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
   // ⚠ The CLIENT half alone would have shipped the same defect one level down: the server's
   // cap_paused read was unbounded in time, so the lock returned on the next reconcile. The
   // other half is in `backend/app/api/threads.py`'s `runs` probe.
-  const workflowLocked = workflowLock !== null && !workflowLock.capPaused
+  //
+  // ── Phase 244-13 (review finding WR-07 / UAT gap G-1) — C-1's MEASUREMENT STANDS, AND
+  //    THE TYPE IT MEASURED IS WHAT CHANGED ────────────────────────────────────────────
+  //
+  // ⛔ The C-1 paragraph directly above is KEPT VERBATIM rather than corrected, because it
+  // was RIGHT when written: with `WorkflowLock.mode` a one-member literal and every writer
+  // hard-coding it, `workflowLock?.mode === "harness"` really was a no-op. `244-13` made
+  // `mode` a REAL discriminator (`streamsStore.ts` — `"harness" | "cap_paused"`, set from
+  // the server's own `ThreadWorkflowState.mode` at all six write sites), which is what
+  // makes `D-244-08`'s FIRST arm correct after all.
+  //
+  // ⛔ WHY THE SECOND ARM ALONE WAS NOT ENOUGH — this is WR-07, and it is a real hole
+  // rather than a tidy-up. `workflowLock !== null && !workflowLock.capPaused` unlocks the
+  // composer for a GENUINE harness run that is itself cap-paused. The person types, sends,
+  // and `workflow_kickoff.preflight_workflow_kickoff:174` answers 409 "Thread is
+  // workflow-locked" — the exact "UI instructs an action it forbids" inversion this phase
+  // exists to remove, one branch over. ⚠ The RECONCILE route to that state is latent (no
+  // writer of `'cap_paused'` onto `workflow_runs.status` was found), but the SSE route is
+  // NOT: `StreamsProvider.tsx:1193`'s `onCapPaused` sets `capPaused: true` on whatever lock
+  // the thread holds, including the kickoff-seeded harness lock. Site 1 now INHERITS
+  // `"harness"` there, and this expression is what turns that inheritance into a locked
+  // composer. Fenced by `__tests__/ChatArea.capPausedComposer.test.tsx` D5, and the writer
+  // itself by `__tests__/ThreadRunLineKickoff.test.tsx` D5b(a).
+  //
+  // ⛔ NOTHING ELSE IN THE COMPOSER CHAIN CHANGES, still: `MessageInput.tsx:287/337-339`
+  // key `canSend`, the placeholder, the `title` and `disabled` off this ONE boolean, so
+  // D-244-10 holds by construction rather than by a second branch.
+  const workflowLocked = workflowLock !== null && workflowLock.mode === "harness"
   const streamActions = useStreamActions()
   // Phase 068.5 Gap-01: true when this thread has a loadMessages fetch in
   // flight. Passed to MessageList so the cold-load skeleton only renders when
@@ -201,6 +228,9 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
         if (state.locked && !state.lock_is_stale && state.active_workflow_run_id) {
           streamActions.setWorkflowLockForThread(tid, {
             runId: state.active_workflow_run_id,
+            // 244-13 — WRITE SITE 5 of 6. Genuinely harness, said EXPLICITLY: this arm
+            // requires a live, non-stale `active_workflow_run_id`, which is the server's
+            // own definition of harness (`threads.py:1195`).
             mode: "harness",
             // ⛔ ALWAYS `false` ON THIS BRANCH — `T-244-03-01` / 244-08. This read
             // `capPaused: state.cap_paused`, and `244-03`'s own declared mitigation says the
@@ -231,7 +261,15 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
           if (runId) {
             streamActions.setWorkflowLockForThread(tid, {
               runId,
-              mode: "harness",
+              // ⛔ 244-13 — WRITE SITE 6 of 6, AND THE PHANTOM'S SOURCE. This line used to
+              // hard-code the harness discriminator (named by ROLE, not respelled — a prose
+              // copy moves the acceptance grep, the 187-24 lesson) for a DEEP run that has
+              // no workflow and never had one. That is what `244-PATTERNS.md` C-1 measured,
+              // and what made UAT gap G-1's phantom live run line render 41px under a card
+              // saying the run is stopped.
+              // DERIVED FROM THE WIRE — `threads.py:1195` already computed it; a second
+              // client-side derivation of one fact is how the drift happened.
+              mode: state.mode === "harness" ? "harness" : "cap_paused",
               capPaused: true,
               continuesRemaining: state.continues_remaining,
             })
