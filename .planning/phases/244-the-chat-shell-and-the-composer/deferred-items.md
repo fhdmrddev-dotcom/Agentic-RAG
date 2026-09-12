@@ -354,3 +354,34 @@ CLAUDE.md's *"capture the SET, never a tail"* rule paying for itself.
 
 **Re-open trigger:** none — this is a standing hazard, not a defect. Recorded so a later reader
 of this phase's numbers knows the tree was not quiet.
+
+---
+
+## `244-09` — the phase-wide ledger gate is RED for a plan that has not run yet (inherited, out of scope)
+
+`node scripts/check-hot-file-ledger.cjs 244` exits **1** at `244-09`'s base (`a2c8da1af`) and still
+exits 1 at its close. The single finding is **not this plan's**:
+
+```
+  scan list: 265 rows · subject: 61 files · watched: 29
+  [no-row] frontend/src/stores/streamsStore.ts   (named by 244-13-PLAN.md)
+```
+
+⚠ **Measured at base BEFORE this plan's first edit, so it is inherited rather than introduced** —
+the base run printed byte-identical output. `244-09` touched neither `streamsStore.ts` nor
+`244-13-PLAN.md`.
+
+⭐ **The parse is NOT vacuous, and that is the thing worth asserting.** Phase 242 recorded a run
+reporting `subject: 0 files` on a CRLF plan — exit 0 over nothing parsed. This run reads
+`subject: 61 files · watched: 29`, so the gate genuinely inspected the phase. Scoped to this plan's
+own file it is clear: `check-hot-file-ledger.cjs --files frontend/src/components/layout/NavPanel.tsx`
+→ `ledger gate OK`, exit 0.
+
+⛔ **Not fixed here, deliberately.** Adding a row for a file this plan does not modify, on behalf of
+a plan that has not been written into the tree, would put a triple in the ledger derived at a commit
+before the work that makes it hot — the exact staleness this ledger's own rows keep recording. It
+also risks a `[duplicate-row]` collision with `244-13` when it runs.
+
+**Re-open trigger:** `244-13` executing. Its first ledger obligation is `streamsStore.ts`'s row +
+section, in the same commit. If `244-13` is cut from the phase, the row is still owed by whichever
+plan next names that file — the gate will keep saying so.
