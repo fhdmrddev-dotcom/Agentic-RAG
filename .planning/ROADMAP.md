@@ -292,7 +292,19 @@ it retires nothing from either prior review file):
   hand-seeded slice would have left the disarm — half the finding — unobserved.
 - `WR-02` / `WR-03` — **DEFERRED as decisions** with fireable triggers, `deferred-items.md` §§ 12-13.
 
-⛔ **THE PHASE IS NOT CLOSED. Re-verification returns `human_needed`, 4/5 criteria driven-and-closed.**
+✅ **PHASE 244 VERIFIED 2026-09-13 — re-verification reads `passed`, 5/5 criteria DRIVEN AND CLOSED.**
+`SHELL-03` closed on drive attempt 2 of `244-15-UAT-ROW.md`: two runs on two threads, answered in the
+CHAT column and in the PANEL, each clearing BOTH homes with no refresh (+12.6 s and +2.0 s), the run
+line leaving `"live"`, the composer becoming usable, and both runs reaching `run=failed` / `act=failed`
+server-side. **SC#3 is met in both clauses.** ⛔ Not covered by that PASS: the **fail-closed** arms
+(`wire_reported_live_at_settle` was false both times — jsdom Tests 3/4/5 remain their only evidence)
+and the **Deep-mode** `ask_user` path (undriven). ⚠ Attempt 1 was invalidated by a `--reload` backend
+restarting under this session's own git merges, and the defect-shaped reading it produced was
+**withdrawn rather than published**.
+
+⚠ The paragraph below described the position BEFORE that drive and is kept, not overwritten:
+
+⛔ ~~**THE PHASE IS NOT CLOSED. Re-verification returns `human_needed`, 4/5 criteria driven-and-closed.**~~
 SHELL-01, SHELL-02, SHELL-04's headline and SHELL-05 are now genuinely **driven**, not merely fenced.
 **SHELL-03 is `built, drive owed`** — `244-15-UAT-ROW.md`'s five arms are all `pending`, and
 `D-244-14` binds: *`BUG-260828-07` closes on a DRIVEN row, not a fence.* ⚠ This phase has already

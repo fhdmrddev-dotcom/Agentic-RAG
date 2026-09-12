@@ -1,8 +1,8 @@
 ---
 phase: 244-the-chat-shell-and-the-composer
 verified: 2026-09-12T23:45:00Z
-status: human_needed
-score: "5/5 built (code + fences), 4/5 driven-and-closed (SHELL-01/02/04/05), 1/5 built+driven-but-NOT-closed (SHELL-03 — G-8 driven FALSE; 244-15's fix is un-driven)"
+status: passed
+score: "5/5 built, 5/5 DRIVEN AND CLOSED — SHELL-03 closed 2026-09-13 on drive attempt 2 of 244-15-UAT-ROW.md (both directions, two runs, server-verified)"
 re_verification: true
 re_verification_meta:
   previous_status: human_needed
@@ -23,7 +23,7 @@ re_verification_meta:
 requirements_trace:
   SHELL-01: driven, CLOSED (round-2 UAT R2-1 PASS 8/8 samples + R2-3 PASS — G-5 fixed, snapshot-503 banner visible, G-4 ruled)
   SHELL-02: driven, CLOSED (round-1 UAT L-2 PASS after reload + round-2 R2-5 PASS — phantom live run line G-1 fixed; WR-07 arm BLOCKED, not failed — a harness cap cannot be driven to reasonably in time, per the row's own forbidding of a seeded harness cap)
-  SHELL-03: built (244-03, 244-12, 244-15), DRIVEN FALSE at 244-12's fix (G-8, R2-4 Arm 2, both directions), 244-15's fix for G-8 is BUILT + reviewed + jsdom-fenced but NOT YET DRIVEN — 244-15-UAT-ROW.md is UNRUN. Requirement NOT closed.
+  SHELL-03: CLOSED 2026-09-13. Built across 244-03 / 244-12 / 244-15; G-8 was driven FALSE at R2-4 (both directions). 244-15's settle path was then DRIVEN in a real browser on two separate runs — answered in the CHAT column (panel cleared at +12.6s, still clear at +48.3s) and in the PANEL (chat cleared at +2.0s, still clear at +56.3s), run line left "live" and the composer became usable in both, with both runs reaching run=failed / act=failed server-side. ROADMAP SC#3 met in BOTH clauses. NOT proven: the fail-closed arms (wire_reported_live_at_settle was false both times, so that branch never ran — jsdom Tests 3/4/5 remain its only evidence) and the Deep-mode ask_user path (undriven).
   SHELL-04: driven, headline defect CLOSED (R2-2 Arms 1-3 PASS — defect 6b, the 2nd attachment, fixed) — but round 2 surfaced a NEW gap G-7 (a failed attachment copy is never given up on and never recovers), scoped OUT of this round by explicit operator ruling and DEFERRED to SEED-272 with a concrete re-open trigger. SC#4's headline ("agent can use it") is met; the robustness edge is knowingly open.
   SHELL-05: driven, CLOSED (round-1 UAT L-7 PASS, both directions, first-ever end-to-end drive of this signal across two milestones)
 known_open_findings:

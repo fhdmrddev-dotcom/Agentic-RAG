@@ -5,9 +5,9 @@ plan: 244-15
 gap: G-8
 closes: SHELL-03
 severity: major
-status: partial-BLOCKED
+status: PASS
 driven_by: claude (solo, OV-SOLO-01)
-driven_on: 2026-09-12T19:2x UTC
+driven_on: 2026-09-13 (attempt 2; attempt 1 blocked — see below)
 blocked_reason: backend uvicorn --reload restarted its workers mid-run (git merges rewrote tracked files) while a full pytest tests/unit run was hammering the same local Supabase; the armed run died at the pause and the backend went unresponsive (4x 10s timeouts, having answered in 0.31s minutes earlier)
 ```
 
@@ -332,3 +332,181 @@ arm_5: { verdict: PASS, note: "see the measured table above" }
 4. Two runs are needed — Arm 1 answers in the CHAT column, Arm 2 in the PANEL.
 5. Clean up: run `51924c91-84a6-48b4-8865-b6c92feb009a` is **stranded `active`** in the DB with its
    `act` phase pending. It is an orphan of this attempt, not live work.
+
+---
+
+# DRIVE ATTEMPT 2 — 2026-09-13, Claude solo (`OV-SOLO-01`). ✅ **PASS. `SHELL-03` CLOSES.**
+
+The operator confirmed the attempt-1 backend hang was their own testing, and restarted it. The
+environment checklist attempt 1 wrote was then executed **before** touching the app, which is the only
+reason this attempt is evidence and attempt 1 was not.
+
+## Environment — verified BEFORE driving, not assumed
+
+| check | result |
+|---|---|
+| `/health` twice, ≥ 30 s apart | **200 in 0.220 s**, then **200 in 0.216 s** — one 200 is not evidence, and attempt 1 proved it in the other direction |
+| competing `pytest tests/unit` | **none** |
+| uvicorn shape | `71228 (venv) → 66712 (--reload, owns :8000) → 59460 (worker)` — a normal parent/supervisor/worker chain, **not** the two-uvicorn double-bind |
+| git operations during the drive | **none** — the backend still runs `--reload`, and attempt 1's merges under it are what invalidated that attempt |
+
+⚠ **Two runs were driven, in the two directions, on separate threads**, so neither arm can be passed
+by a fix that only works one way:
+
+| | run id | thread | answered in |
+|---|---|---|---|
+| **A** | `34117b9f-ad00-4880-aaf1-7ba72b59eeb8` | `f722b064-1c0d-4723-9611-75aef09d00b4` | **CHAT column** |
+| **B** | `25279958-5fd7-4fc7-a7bd-ff0730ededfe` | `f837ad1f-8588-424d-9e87-f24ba930ab15` | **PANEL** |
+
+⛔ **Operator-safety discipline held.** `to:` was `uat-do-not-send@example.invalid` (RFC-reserved,
+unroutable) on both runs, both settled with **"Do not run it" + Send Answer**, and **"Approve this
+step" was never clicked.** No email was sent.
+
+## The baseline both runs started from — identical, and it reproduces `R2-4`
+
+| control | CHAT `left` | PANEL `left` |
+|---|---|---|
+| `Approve this step` | **546.8** | **1245.9** |
+| `Do not run it` | **546.8** | **1245.9** |
+| `Send Answer` | **1075.9** | **1392.4** |
+
+`aside.left = 1224.3` · `data-run-line-state = "live"` · the panel rendering
+
+> *"NEEDS YOU — No deadline — the run is waiting for your answer and will not continue on its own"*
+
+⭐ **The chat-column figure `546.8` is the SAME number `R2-4` measured**, which is what makes these
+two rows comparable rather than merely similar.
+
+## Arm 1 — THREAD → PANEL ✅ PASS
+
+```yaml
+arm_1:
+  verdict: PASS
+  answered_in: chat
+  aside_left: 1224.3
+  panel_controls_left_at_t0: []          # GONE — was 1245.9 / 1245.9 / 1392.4
+  panel_controls_left_at_t30: []         # still gone at +48.3s
+  panel_sentence_read_at_t0: "(absent — the NEEDS YOU sentence is gone; the panel reads its normal
+    Workspace / TODOS / FILES 0 / VERSIONS content)"
+  panel_sentence_read_at_t30: "(absent)"
+  panel_card_gone_without_refresh: TRUE
+  settled_with: "Do not run it"
+  elapsed_to_first_reading_ms: 12644
+```
+
+⭐ **This is the exact measurement `R2-4` failed.** There, the panel was still rendering *"NEEDS YOU —
+… waiting for your answer"* **three minutes** after the answer was accepted. Here it is gone at
+**+12.6 s**, with **no manual refresh**, and still gone at **+48.3 s**.
+
+## Arm 2 — PANEL → THREAD (the mirror) ✅ PASS
+
+```yaml
+arm_2:
+  verdict: PASS
+  answered_in: panel
+  chat_controls_left_at_t0: []           # GONE at +2.0s — was 546.8 / 546.8 / 1075.9
+  chat_controls_left_at_t20: []          # still gone at +31.3s and +56.3s
+  chat_column_sentence_read: "(absent — no NEEDS YOU anywhere in the document)"
+  chat_controls_gone_without_refresh: TRUE
+  settled_with: "Do not run it"
+```
+
+⭐ `R2-4` measured all three chat-column controls **still at 546.8 / 988.4 at +6 s and +20 s**. Here
+they are gone at **+2.0 s**.
+
+## Arm 3 — the run line and the composer, BOTH directions ✅ PASS
+
+```yaml
+arm_3:
+  verdict: PASS
+  a1_run_line_state_before: "live"
+  a1_run_line_state_after: "(none)"      # the attribute is gone — not "live"
+  a1_clock_reading_1: "47s so far"       # last reading while live
+  a1_clock_reading_2: "(absent — the run line unmounted, so the clock stopped existing)"
+  a1_composer_usable: TRUE
+  a1_seconds_answer_to_reading: 12.6
+  a2_run_line_state_after: "(none)"
+  a2_composer_usable: TRUE               # false at +2.0s, TRUE by +13.3s
+  a2_seconds_answer_to_reading: 13.3
+  a2_composer_rechecked: "usable at +31.3s and +56.3s"
+  wire_reported_live_at_settle: false    # both runs took the RELEASE arm
+  latest_producer_run_id_present: n/a    # only meaningful when the above is true
+```
+
+⚠ **The composer was still `disabled` at +2.0 s on the panel direction and usable by +13.3 s.** The
+row anticipated this — *"the release is gated on the server having dropped the anchor, so a few
+seconds is expected; a stuck reading at +60 s is a FAIL."* Three readings (+13.3 s, +31.3 s, +56.3 s)
+all read usable, so it released and stayed released.
+
+⛔ **THE FAIL-CLOSED ARMS WERE NOT EXERCISED, AND THE ROW SAID THIS WOULD HAPPEN.**
+`wire_reported_live_at_settle` is **false** on both runs — the server had already dropped the anchor
+each time, so the release arm was taken and the `liveAnchor || capPaused` refusal never ran. **The
+only evidence those arms have is still jsdom (Tests 3, 4, 5).** Recorded as a field, exactly as the
+row demanded, rather than being quietly scored as covered.
+
+## Arm 4 — the receipt ✅ measured verbatim; ⚠ ONE OPERATOR QUESTION LEFT OPEN
+
+```yaml
+arm_4:
+  verdict: PASS (measured)
+  answering_home_after_settle: "the card UNMOUNTS and the message stream carries the receipt:
+    '... subject: test, to: uat-do-not-send@example.invalid. — aborted by user
+     phase: act - reason recorded by the step'"
+  green_answered_state_visible_at_all: "not observed at the sampling resolution used"
+  visible_ms_before_unmount: "not measured (< ~900ms between click and first read)"
+  operator_accepts_the_receipt: PENDING — operator judgement, see below
+```
+
+⭐ **This is better than the behaviour the plan ruled on.** `244-15` predicted the card would simply
+unmount, leaving nothing. It does unmount — but the thread is **not** left silent: it carries
+**"— aborted by user · phase: act · reason recorded by the step"**, which names *who* ended it, *which*
+phase, and that the reason was kept. ⚠ **The one thing this row cannot decide is whether the operator
+accepts that as the receipt**, since the green *"Answered · agent resumed"* state is never dwelt on.
+That is the actual question Arm 4 exists to ask, and it is left for the operator rather than answered
+by the driver.
+
+## Arm 5 — the third home ✅ PASS (measured in attempt 1, same frontend build)
+
+```yaml
+arm_5:
+  verdict: PASS
+  card_renders: TRUE
+  control_lefts: "1237.6 / 1237.6 / 1382 against aside.left 1156"
+  spine_advances: TRUE                   # "2m 36s so far" -> "2m 46s so far"
+  answering_here_still_works: not re-driven in attempt 2
+```
+
+⚠ **Honest scoping:** attempt 1's Arm 5 reading was taken on the **same merged frontend build** and
+**before** the backend failed, so it stands. Absolute lefts differ from `R2-4`'s `1144 / 1144 / 1288.4`
+only because the automation window is a different width; **the invariant that holds is the relation** —
+all three controls right of the panel edge, card complete, spine climbing. `answering_here_still_works`
+was not re-driven and is **not** claimed.
+
+## Server agreement — the cross-check the UI cannot give itself
+
+```
+RUN A (answered in CHAT)  | run=failed | phases=[(0,'write-essay','completed'), (1,'act','failed')]
+RUN B (answered in PANEL) | run=failed | phases=[(0,'write-essay','completed'), (1,'act','failed')]
+```
+
+Both directions reached the same server state, so the UI was not merely clearing itself optimistically.
+⚠ **Vocabulary observation, not a defect and not this row's scope:** a step the operator *declined*
+records as **`failed`**. That is how the product already models a decline; it is noted because a future
+reader diffing run statuses will see `failed` and may read it as an error.
+
+---
+
+## VERDICT
+
+✅ **`SHELL-03` CLOSES, and ROADMAP `SC#3` is met in both clauses** — *"An approval pause is answerable
+from the chat thread, with the same two actions the workflow panel offers, and answering it in either
+home settles it in both."* Driven in a real browser, in both directions, on two separate runs, with
+server-side agreement.
+
+**What this PASS still does NOT mean**, carried verbatim from the row's own contract:
+- It says **nothing** about the **Deep-mode** `ask_user` path, which remains undriven.
+- It does **not** prove the **fail-closed** arms — `wire_reported_live_at_settle` was `false` both
+  times, so that branch never ran. jsdom Tests 3/4/5 remain their only evidence.
+- It does **not** retire `244-12`'s +4-fetches-per-thread-open cost, nor the extra GET per answered
+  approval (`WR-03` measured that bound as **three** requests, not the docblock's "one" —
+  `deferred-items.md` § 13).

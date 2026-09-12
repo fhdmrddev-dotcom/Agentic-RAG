@@ -545,6 +545,48 @@ owed-list below is therefore not merely out of date, it names as owed several ro
 passed. ⛔ **A stale owed-list is worse than no list: it sends the next session to re-drive work that
 is done and lets the one genuinely owed row hide inside seven.**
 
+### ✅ CLOSED 2026-09-13 — the owed row was DRIVEN and it PASSED
+
+⭐ **`244-15-UAT-ROW.md` was driven in a real browser on 2026-09-13 (attempt 2) and PASSES.**
+`SHELL-03` closes; re-verification reads **`passed`, 5/5 driven-and-closed**. The text below this
+block described the position when ONE row was still owed, and is kept because its checklist is what
+made attempt 2 work.
+
+| arm | verdict | the measurement |
+|---|---|---|
+| 1 — chat → panel | **PASS** | panel controls gone at **+12.6 s**, still gone at **+48.3 s**, no refresh. `R2-4` still showed *"NEEDS YOU"* **three minutes** after answering |
+| 2 — panel → chat | **PASS** | chat controls gone at **+2.0 s**, still gone at **+56.3 s**. `R2-4` had all three still at 546.8 / 988.4 at +20 s |
+| 3 — run line + composer | **PASS** | `data-run-line-state` `"live"` → gone; composer usable by **+12.6 s** / **+13.3 s**, re-read usable at +31.3 s and +56.3 s |
+| 4 — the receipt | **measured** | card unmounts; the stream carries *"— aborted by user · phase: act · reason recorded by the step"*. ⚠ whether that is an acceptable receipt is an **operator judgement**, left open |
+| 5 — third home | **PASS** | 1237.6 / 1237.6 / 1382 against `aside.left` 1156, spine climbing |
+
+Two runs on two threads (`34117b9f` answered in CHAT, `25279958` answered in PANEL), so neither arm is
+passed by a one-way fix. Both reached **`run=failed` / `act=failed`** server-side, so the UI was not
+clearing itself optimistically. ⛔ **Safety held:** `to:` was `uat-do-not-send@example.invalid`
+(RFC-unroutable), both settled with **"Do not run it"**, *"Approve this step"* was never clicked, no
+email sent.
+
+⛔ **What the PASS does NOT cover, recorded so it is not later assumed:**
+- the **fail-closed** arms never ran — `wire_reported_live_at_settle` was **false** both times, so the
+  `liveAnchor || capPaused` refusal was never exercised. jsdom Tests 3/4/5 remain its only evidence;
+- the **Deep-mode** `ask_user` path is still **undriven**;
+- `WR-02` / `WR-03` stay deferred with triggers (`deferred-items.md` §§ 12-13), and `SEED-272` still
+  holds SHELL-04's second gap.
+
+⚠ **A METHOD FINDING WORTH MORE THAN THE ROW — attempt 1 produced a defect-shaped reading that was
+WITHDRAWN, not published.** The chat column said *"The run was stopped"* and re-enabled the composer
+while the DB still read `active` with the ask pending — the exact inverse of the fail-closed
+invariant, and one sentence from being written up as critical. The process table killed it: the
+backend runs **`uvicorn --reload`**, and **this session's own `git merge` calls rewrote tracked files
+underneath it**, restarting the workers mid-run. The client was rendering a dead stream.
+⭐ **A UAT driven against a `--reload` backend while the driver is merging branches is measuring its
+own tooling.** Establish the box is quiet FIRST, and treat any mid-drive worker restart as
+invalidating every observation after it.
+
+---
+
+### ⚠ The position while the row was still owed (kept — its checklist is what made attempt 2 work)
+
 ### The CURRENT position — ONE row owed, and it is named
 
 ⛔ **Phase 244 is BUILT + REVIEWED, NOT CLOSED.** Re-verification (`244-VERIFICATION.md`,
