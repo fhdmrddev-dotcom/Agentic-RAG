@@ -628,7 +628,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | Hot file (FIRING) | commits / phases / lines | Verdict (abridged) |
 |---|---|---|
 | `frontend/src/components/chat/ToolCallPanel.tsx` | 51 / 23 / 351 | ✅ **G-5 DISCHARGED (227-02)** |
-| `frontend/src/components/chat/MessageItem.tsx` | 71 / 37 / 904 | ✅ G-5 DISCHARGED (227-03). STILL not re-hollowed (**244-05**): `useState` 3→3, `useEffect` 0→0, props 5→5; TWO pure store reads, no fetch, no prop. ⚠ row was STALE at `70/34/803` |
+| `frontend/src/components/chat/MessageItem.tsx` | 73 / 34 / 954 | ✅ 227-03 discharge intact — **244-12 DELETED a mount**: state 4→4, effects 0→0, props 5→5. ⚠ `34` subtracts dated buckets (`37` without). ⛔ G-2 override: RunCard ABOVE ThinkingBlock, 243's rationale kept beside it |
 | `backend/app/api/threads.py` | 245 / 82 / 1617 | ⚠ row was STALE at `243 / 80 / 1590`. honoured by construction (**244-03**): one pure-read query loses a WHERE predicate, gains a Python guard. ⛔ no writer added |
 | `frontend/src/providers/StreamsProvider.tsx` | 94 / 38 / 4528 | ⚠ row STALE a FOURTH time (`90/36/4435`). honoured by construction (**244-05**): TWO pure SELECTORS — no state, no effect, no action; both return values `Object.is` can compare |
 | `frontend/src/hooks/useMessages.ts` | 74 / 27 / 127 | extraction due |
@@ -666,7 +666,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/chat/RunCard.tsx` | 28 / 14 / 710 | ⭐ **G-5 DISCHARGED (243-02)** — the reasoning fold left for `ThinkingBlock.tsx`, `-39/+20`, one `useState` fewer. ⚠ row was STALE at `26/12/728`. State 2 stayed, by decision |
 | `frontend/src/components/chat/MessageInput.tsx` | 31 / 15 / 821 | ⭐ **THE OWED SEAM WAS TAKEN (244-06)** — `useComposerAttachments`. It SHRANK `855 → 821` **while gaining the cloud door**; ⛔ the `ComposerChipsRow` half stays OWED |
 | `frontend/src/components/chat/ActiveConnectorChips.tsx` | 2 / 2 / 82 | ⚠ absent for its ENTIRE LIFE — row added 244-05 at its SECOND phase. **244**: the row container HOISTED out; bare chips now, `null` on empty (D-244-26) |
-| `frontend/src/components/chat/MessageList.tsx` | 21 / 9 / 307 | ⚠ row STALE a THIRD time (`19/8/267` → `20/8/292` → `20/8/300`). honoured by construction (**244-01**): `min-h-0` on the ONE `<ScrollArea>` call site |
+| `frontend/src/components/chat/MessageList.tsx` | 23 / 10 / 366 | ⚠ row STALE a FOURTH time (`21/9/307`). **244-12**: its SECOND list-level mount — `PendingAskStack` beside `ThreadRunLine`, both above `bottomRef`. ⛔ unconditional, measured +4 fetches/thread-open |
 | `frontend/src/components/chat/ChatArea.tsx` | 72 / 36 / 710 | honoured by construction (**244-03**): ONE boolean gains `&& !workflowLock.capPaused`. No second branch, no new state — the whole composer chain already reads this one value |
 | `frontend/src/components/panel/PendingAskCard.tsx` | 14 / 7 / 765 | ⚠ row was STALE at `13 / 7 / 736`. UNTOUCHED by 244-03 (`0 0`) — the chat approval is a MOUNT of its shipped `PendingAskStack`, never an edit to the cross-surface shell |
 | `frontend/src/pages/WorkflowRunPage.tsx` | 28 / 9 / 1670 | honoured by construction (200 / 200.1 / 200.2 / **214**) |

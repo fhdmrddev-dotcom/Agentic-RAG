@@ -484,15 +484,34 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
             §F.8): `key={message.id}` would close an open fold on every temp-id → DB-id
             reconcile. Fenced by §12 on source and by §13 on behaviour.
             ⚠ ORDER IS THE ORDER IN TIME — above the run card's tool rows and above the
-            answer. A sibling of WorkingBadge and RunCard, in the style those two use. */}
+            answer. A sibling of WorkingBadge and RunCard, in the style those two use.
+
+            ⚠⚠ THAT LAST SENTENCE IS PHASE 243'S RATIONALE AND IT WAS OVERRIDDEN ON 2026-09-12.
+            It is kept above, word for word, because deleting it would tell the next reader the
+            243 order was an accident. It was not: it was chosen deliberately, and it was
+            changed deliberately.
+              · WHO: the operator, live during Phase 244's UAT (gap G-2).
+              · WHAT, verbatim: "the thinking badge it's recommended to be below the container
+                of the tools not above".
+              · SO: the render order below is now RunCard (the tool container) -> ThinkingBlock
+                -> the answer. ⛔ THIS IS AN OPERATOR OVERRIDE, NOT A DEFECT FIX — nothing was
+                measured wrong about the 243 order, and a re-reversal later is a legitimate
+                decision rather than a regression.
+              · The badge still precedes the ANSWER; only its relation to the tool rows moved.
+            ⛔ NOTHING ELSE ABOUT THIS MOUNT CHANGED, and all three properties are still fenced
+            on source by `ThinkingBlock.characterization.test.tsx` §12: no tool test (it would
+            restore the CHAT-04 defect 243-02 closed), no `key=` (it would close an open fold on
+            every temp-id -> DB-id reconcile, 243-PATTERNS §F.8), and `ThinkingBlock.tsx` never
+            spells `tool_calls`. §11 pins the NEW order and was driven RED against the old one
+            before this move. */}
+        {message.tool_calls && message.tool_calls.length > 0 && (
+          <RunCard message={message} isStreaming={isStreaming} />
+        )}
         <ThinkingBlock
           reasoningContent={message.reasoningContent}
           isStreaming={isMessageStreaming}
           reasoningMs={message.reasoningMs}
         />
-        {message.tool_calls && message.tool_calls.length > 0 && (
-          <RunCard message={message} isStreaming={isStreaming} />
-        )}
         {/* Phase 216 / Phase 224: inline tool approval decision card (settled transcript receipt or when not streaming) */}
         {message.toolApproval && (message.toolApproval.decision || !isStreaming) && (
           <ChatToolApprovalCard

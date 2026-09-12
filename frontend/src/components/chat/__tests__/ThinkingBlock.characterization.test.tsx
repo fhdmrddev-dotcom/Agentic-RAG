@@ -629,7 +629,30 @@ describe("Phase 243 — the thinking block, characterized against the UNMOVED co
     })
   })
 
-  it("§11 — ORDER ON SCREEN (D-243-01): thinking precedes the tool rows AND the answer — the order in time", () => {
+  /**
+   * ⚠⚠ §11's ORDER WAS OVERRIDDEN BY THE OPERATOR ON 2026-09-12, and this case was RE-DRIVEN
+   * rather than deleted. The 243 order is preserved in the title and in this note because
+   * "the order was chosen deliberately, then changed deliberately" is the fact a later reader
+   * needs — the alternative reading, that 243 got it wrong by accident, is false.
+   *
+   * 243 (D-243-01, locked, still in `MessageItem.tsx`'s own comment):
+   *   "ORDER IS THE ORDER IN TIME — above the run card's tool rows and above the answer."
+   * 244 (G-2, operator, live during UAT, verbatim):
+   *   "the thinking badge it's recommended to be below the container of the tools not above"
+   *
+   * ⛔ THIS IS AN OVERRIDE, NOT A DEFECT FIX. Nothing was measured wrong about the 243 order;
+   * an operator looked at it and wanted the other one. Exactly ONE relation is inverted —
+   * `thinkingAt < firstToolRowAt` becomes `firstToolRowAt < thinkingAt`. **`thinkingAt < bodyAt`
+   * is UNCHANGED**: the badge still precedes the answer, so the new order is
+   * tools -> thinking -> answer rather than a free-for-all.
+   *
+   * ⛔ BOTH STATEMENTS OF EACH RELATION ARE KEPT — the index comparison AND the
+   * `compareDocumentPosition` restatement — because §11's own comment says the second exists so
+   * "a future container restructure cannot make the indices agree by accident", and a
+   * re-ordering is exactly the moment that reason is load-bearing. All three positive controls
+   * are kept too; without them the comparison is a claim about nothing.
+   */
+  it("§11 — ORDER ON SCREEN (D-243-01, OVERRIDDEN by the operator 2026-09-12): the tool rows precede thinking, and thinking still precedes the answer", () => {
     const { container } = renderWithTooltip(
       <MessageItem
         message={makeMessage({ runStatus: "streaming", reasoningContent: REASONING_MEDIAN })}
@@ -669,13 +692,16 @@ describe("Phase 243 — the thinking block, characterized against the UNMOVED co
     )
     expect(bodyAt).toBeGreaterThan(-1)
 
-    expect(thinkingAt).toBeLessThan(firstToolRowAt)
+    // ⚠ THE ONE INVERTED RELATION (G-2, operator override 2026-09-12). It read
+    // `expect(thinkingAt).toBeLessThan(firstToolRowAt)` from Phase 243 until this plan.
+    expect(firstToolRowAt).toBeLessThan(thinkingAt)
+    // …and the one that did NOT change: the badge still precedes the answer.
     expect(thinkingAt).toBeLessThan(bodyAt)
     // Stated the other way too, on the DOM's own relation rather than on an index, so a
     // future container restructure cannot make the indices agree by accident.
     const thinking = nodes[thinkingAt]
     expect(
-      thinking.compareDocumentPosition(nodes[firstToolRowAt]) & Node.DOCUMENT_POSITION_FOLLOWING,
+      thinking.compareDocumentPosition(nodes[firstToolRowAt]) & Node.DOCUMENT_POSITION_PRECEDING,
     ).toBeTruthy()
     expect(
       thinking.compareDocumentPosition(nodes[bodyAt]) & Node.DOCUMENT_POSITION_FOLLOWING,
@@ -688,7 +714,14 @@ describe("Phase 243 — the thinking block, characterized against the UNMOVED co
     // `key=` would close an open fold on every temp-id to DB-id reconcile (13). Both are
     // cheap to write and invisible in review - hence a fence.
     const mount = soleMountExpression(chatSource("MessageItem.tsx"), "ThinkingBlock")
+    // ⛔ NON-VACUITY FIRST, ADDED BY 244-12. This case survived a re-ordering of the mount
+    // (G-2), and a resolver that silently matched NOTHING after the move would make every
+    // `not.toContain` below pass over an empty string — the Phase-242 `check-hot-file-ledger`
+    // failure (a gate exiting 0 over zero parsed files) in a different file. Assert that the
+    // expression was actually found, and that it is a real mount rather than a fragment.
+    expect(mount.length).toBeGreaterThan(20)
     expect(mount).toContain("<ThinkingBlock")
+    expect(mount).toContain("reasoningContent")
     expect(mount).not.toContain("tool_calls")
     expect(mount).not.toContain("key=")
     // And the block itself cannot be conditioned on tools even internally.
