@@ -3536,7 +3536,22 @@ const BASELINE = {
   // equality, not a literal: the per-mount constant has already been measured wrong once
   // (a single stack fires the ask fetch TWICE, not once), and the property that matters is
   // that the cost does not scale with ROW COUNT.
-  "MessageItem.inlineApproval.test.tsx": 8,
+  // ── Phase 244 (244-12 / G-6, the phase's BLOCKER) — RE-BASELINED 8 → 13 ───────────────
+  // ⛔ THE +5 IS FULLY ATTRIBUTED, WITH NO RESIDUAL: W1 (a workflow pause reaches the chat
+  // column with NO ask-bearing message at all), W2 (the Deep path survives and renders EXACTLY
+  // ONE control set), W3 (six ordinary rows cost what one costs, on the workflow shape),
+  // W4 (no pause → nothing renders, and the unconditional mount's bought fetch is ASSERTED
+  // rather than hidden), W5 (the settle is structural on the SSE writer path too).
+  // ⚠ NO CASE WAS DELETED — 1/2/3/5 were RE-AIMED IN PLACE onto `MessageList`, and 4 kept its
+  // row-level anchor on purpose. Removing them and re-homing to a new suite would have been a
+  // per-file DECREASE, which is exactly what this knob exists to refuse.
+  // ⭐ AND THE FINDING WORTH MORE THAN THE NUMBER: the 8 cases pinned above were GREEN while the
+  // blocker was live in the product. They CONSTRUCTED the Deep-agent shape
+  // (`tool_calls:[{name:"ask_user",status:"running"}]`), which the harness never writes — so the
+  // suite proved the component renders when handed that shape and never that the product emits
+  // it. W1 seeds through the PRODUCT's own writer instead. A count pin cannot see this class of
+  // defect; only the fixture can.
+  "MessageItem.inlineApproval.test.tsx": 13,
   // ── Phase 244 (244-04 T1 / SHELL-05 / BUG-260911-03 / C-5) ──────────────────────────────
   // ⛔ BOTH KNOBS, BY NECESSITY — the fact this script has now recorded beside five other
   // blocks and which is STILL true: `src/components/layout` is NOT a bare directory entry in

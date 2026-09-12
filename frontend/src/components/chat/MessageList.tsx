@@ -4,6 +4,10 @@ import { MessageItem } from "./MessageItem"
 import { MessageSkeleton } from "./MessageSkeleton"
 import { RunStatusStrip } from "./RunStatusStrip"
 import { ThreadRunLine } from "./ThreadRunLine"
+// Phase 244-12 (SHELL-03 / G-6): the SHIPPED, zero-prop, self-resolving approval surface — the
+// same component WorkspacePanel mounts. It lives HERE rather than in MessageItem because a
+// workflow-raised pause has no message to anchor to; see the mount's docblock below.
+import { PendingAskStack } from "@/components/panel/PendingAskCard"
 import { useFollowScroll } from "@/hooks/useFollowScroll"
 import { unifiedStepCount } from "@/lib/stepCount"
 import { dedupMessagesByRunId } from "@/lib/dedupMessages"
@@ -259,6 +263,61 @@ export function MessageList({ messages, isStreaming, isLoading = false, onSendMe
             so the returning reading has to come from the persisted row. Both facts
             point at the same placement. */}
         <ThreadRunLine threadId={threadId ?? null} />
+
+        {/* ── Phase 244-12 (SHELL-03 / BUG-260828-07, severity HIGH / G-6 — THE PHASE'S BLOCKER)
+               ── THE APPROVAL, WHERE A HARNESS PAUSE CAN ACTUALLY REACH IT.
+
+            ⛔ THE DEFECT, DRIVEN 2026-09-12 IN CHROME on a REAL workflow-raised approval
+            (200-Word Essay Writer, step 2 "act"): the chat thread rendered NO approval controls
+            and NO paused cue. All three controls — "Approve this step", "Do not run it",
+            "Send Answer" — measured at left >= 1103 against the panel's own left edge of 1082,
+            every one INSIDE the panel. `anyApprovalControlInChatColumn = FALSE`. That is
+            BUG-260828-07's original complaint ("it looked right and did nothing") still true,
+            and 244-03's fence was GREEN over it the whole time.
+
+            ⚠ WHY LIST LEVEL AND NOT MESSAGE LEVEL — the argument, not the conclusion, because a
+            later reader will otherwise "tidy" this back into the row where it is unreachable.
+            244-03 mounted `PendingAskStack` inside MessageItem's
+            `isMessageStreaming && hasPendingAsk(message.tool_calls)` arm. For a WORKFLOW pause
+            that arm is unreachable THREE times over:
+              1. `hasPendingAsk` requires `tc.name === "ask_user"` and a running/interrupted
+                 `status`; the harness writes `tool_calls: [{ kind: "ask_user_prompt" }]` — no
+                 `name`, no `status`. The harness speaks `kind`; the predicate reads `name`.
+              2. the carrier row is `role="system"`, never a streaming assistant row.
+              3. ⛔⛔ AND THAT ROW NEVER REACHES THE FRONTEND AT ALL: `threads.py:427-438` and
+                 `:682-691` both apply `.neq("role","system")` (BUG-260528-01 — `MessageResponse
+                 .role` is Literal["user","assistant"] and serializing a system row 500s the
+                 whole thread). ⛔ So WIDENING THE PREDICATE WOULD HAVE CLOSED NOTHING and would
+                 have shipped a second green fence over the same blocker. There is no message to
+                 anchor to — which is EXACTLY the argument `ThreadRunLine`'s own comment above
+                 already makes for a harness kickoff that inserts no assistant node. One surface
+                 over, the same fact, the same placement.
+
+            ⚠ WHY UNCONDITIONAL, recorded as the REJECTED ARM with its reason. A cheaper gate was
+            available — mount only when the thread holds a harness lock, or only when some
+            message carries a pending ask. ⛔ REJECTED: every such gate is a NARROWING MOUNT
+            CONDITION, and a narrowing mount condition is precisely what made SHELL-03
+            unreachable twice over. Buying back two fetches per thread open by re-introducing
+            this phase's own failure mode, on this phase's blocker, is the wrong trade. The cost
+            is bounded and MEASURED rather than estimated: ONE mount per thread, never one per
+            row (W3), and the same cost with a pause as without one (W4) — both in
+            `__tests__/MessageItem.inlineApproval.test.tsx`. ⚠ The no-pause cost is REAL and is
+            published rather than hidden: the Deep path used to buy zero fetches here.
+
+            ⭐ ZERO-PROP AND SELF-GUARDING. `PendingAskStack` resolves its own thread via
+            `useViewingThread()` and returns null on `asks.length === 0`, so nothing is threaded
+            to it and nothing renders when there is no pause. It reads the SAME
+            `pendingAsksByThread` slice `WorkspacePanel.tsx:438` reads — which is why the chat
+            and the panel cannot disagree, and why answering in EITHER home settles BOTH
+            structurally (D-244-11): one slice, one reconcile, nothing kept in sync by hand.
+
+            ⛔ EXACTLY ONE CHAT-COLUMN MOUNT. The per-row mount was REMOVED from MessageItem in
+            the same commit. Two homes for one decision in one column is "actionable twice and
+            agreed in neither" — the ROADMAP's own named failure mode.
+
+            ⚠ PLACEMENT: after the messages map and BEFORE `<div ref={bottomRef} />`, so the
+            auto-scroll anchor still lands at the true bottom of the scrollable content. */}
+        <PendingAskStack />
 
         <div ref={bottomRef} />
 

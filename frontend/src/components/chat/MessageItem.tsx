@@ -65,11 +65,20 @@ import { toolLabel, toolSummary, outerBannerLabel, harnessBannerProgress } from 
 import { type SeamKind } from "@/components/panel/SeamPointer"
 import { SeamCard, type SeamCardPayload } from "@/components/panel/SeamCard"
 import { PausedRunCue } from "@/components/panel/PausedRunCue"
-// Phase 244-03 (SHELL-03 / BUG-260828-07): the SHIPPED, zero-prop, self-resolving answer
-// surface — the same component WorkspacePanel mounts. Rendered ONLY inside the narrow
-// `isMessageStreaming && hasPendingAsk` arm below; see that mount's docblock for the
-// measured reason (C-3: it carries two `usePanelReconcile` fetches per mount).
-import { PendingAskStack } from "@/components/panel/PendingAskCard"
+// ⚠ Phase 244-03 (SHELL-03 / BUG-260828-07) IMPORTED `PendingAskStack` HERE, and Phase 244-12
+// REMOVED IT. The original note is preserved rather than deleted, because its reasoning is
+// still TRUE about a per-row mount and is the only written record of a measured cost:
+//   "the SHIPPED, zero-prop, self-resolving answer surface — the same component WorkspacePanel
+//    mounts. Rendered ONLY inside the narrow `isMessageStreaming && hasPendingAsk` arm below;
+//    see that mount's docblock for the measured reason (C-3: it carries two
+//    `usePanelReconcile` fetches per mount)."
+// ⛔ WHAT WAS WRONG WAS NOT THE COST ARGUMENT BUT THE REACHABILITY. G-6 drove a REAL
+// workflow-raised approval on 2026-09-12 and the chat column rendered no controls at all: the
+// harness's carrier row is `role="system"` with `tool_calls: [{kind: "ask_user_prompt"}]`, and
+// `threads.py`'s `.neq("role","system")` means it never reaches the frontend — so there is no
+// message here to hang the mount on, at any predicate. The mount now lives at LIST level in
+// `MessageList.tsx`, which is strictly CHEAPER than this one (one per thread, never one per
+// matching row) and is reachable for BOTH pause shapes. ⛔ Do not re-import it here.
 // Phase 087-02: the WorkspacePanel owns the open action; the chat-side seam
 // affordances request it via this module-level signal (additive wiring — no
 // MessageItem→MessageList→ChatArea prop re-plumbing, PANEL-06 safe).
@@ -475,15 +484,34 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
             §F.8): `key={message.id}` would close an open fold on every temp-id → DB-id
             reconcile. Fenced by §12 on source and by §13 on behaviour.
             ⚠ ORDER IS THE ORDER IN TIME — above the run card's tool rows and above the
-            answer. A sibling of WorkingBadge and RunCard, in the style those two use. */}
+            answer. A sibling of WorkingBadge and RunCard, in the style those two use.
+
+            ⚠⚠ THAT LAST SENTENCE IS PHASE 243'S RATIONALE AND IT WAS OVERRIDDEN ON 2026-09-12.
+            It is kept above, word for word, because deleting it would tell the next reader the
+            243 order was an accident. It was not: it was chosen deliberately, and it was
+            changed deliberately.
+              · WHO: the operator, live during Phase 244's UAT (gap G-2).
+              · WHAT, verbatim: "the thinking badge it's recommended to be below the container
+                of the tools not above".
+              · SO: the render order below is now RunCard (the tool container) -> ThinkingBlock
+                -> the answer. ⛔ THIS IS AN OPERATOR OVERRIDE, NOT A DEFECT FIX — nothing was
+                measured wrong about the 243 order, and a re-reversal later is a legitimate
+                decision rather than a regression.
+              · The badge still precedes the ANSWER; only its relation to the tool rows moved.
+            ⛔ NOTHING ELSE ABOUT THIS MOUNT CHANGED, and all three properties are still fenced
+            on source by `ThinkingBlock.characterization.test.tsx` §12: no tool test (it would
+            restore the CHAT-04 defect 243-02 closed), no `key=` (it would close an open fold on
+            every temp-id -> DB-id reconcile, 243-PATTERNS §F.8), and `ThinkingBlock.tsx` never
+            spells `tool_calls`. §11 pins the NEW order and was driven RED against the old one
+            before this move. */}
+        {message.tool_calls && message.tool_calls.length > 0 && (
+          <RunCard message={message} isStreaming={isStreaming} />
+        )}
         <ThinkingBlock
           reasoningContent={message.reasoningContent}
           isStreaming={isMessageStreaming}
           reasoningMs={message.reasoningMs}
         />
-        {message.tool_calls && message.tool_calls.length > 0 && (
-          <RunCard message={message} isStreaming={isStreaming} />
-        )}
         {/* Phase 216 / Phase 224: inline tool approval decision card (settled transcript receipt or when not streaming) */}
         {message.toolApproval && (message.toolApproval.decision || !isStreaming) && (
           <ChatToolApprovalCard
@@ -503,7 +531,17 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
             The ask_user PausedRunCue is load-bearing (not duplicated) and stays. */}
         {isMessageStreaming && message.tool_calls && message.tool_calls.length > 0 && (
           <div className="mt-1 flex flex-col gap-0.5">
-            {/* ── Phase 244-03 Task 2 (SHELL-03 / BUG-260828-07, HIGH / D-244-12) — THE
+            {/* ⛔⛔ SUPERSEDED BY PHASE 244-12 — READ THIS FIRST, THEN THE BLOCK BELOW.
+                Everything below is 244-03's reasoning, KEPT VERBATIM rather than rewritten,
+                because being confident and green while the blocker was live is the finding. Its
+                COST measurement (C-3) is still correct and still binds any future per-row mount.
+                Its REACHABILITY claim was wrong: this arm never fires for a workflow-raised
+                approval, at any predicate, because the harness's carrier row is `role="system"`
+                and is filtered off the wire. The controls now mount ONCE at list level in
+                `MessageList.tsx`; only `PausedRunCue` remains here. ⚠ The list-level mount is
+                CHEAPER than the arm described below (one per thread, not one per matching row),
+                so nothing in this cost argument was traded away to close G-6.
+                ── Phase 244-03 Task 2 (SHELL-03 / BUG-260828-07, HIGH / D-244-12) — THE
                    CONTROLS JOIN THE CUE.
                 ⛔ The defect this closes: driving an armed approval, the panel offered
                 "Approve this step" / "Do not run it" / a reason field / Send Answer, and the
@@ -541,12 +579,24 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
                 The hoist is deliberately NOT taken here — this is a HIGH-severity bug fix, not
                 a refactor — and the fired arm is recorded in 244-03-SUMMARY.md so the deferral
                 has a real trigger rather than a silent one. */}
-            {hasPendingAsk(message.tool_calls) && (
-              <>
-                <PausedRunCue />
-                <PendingAskStack />
-              </>
-            )}
+            {/* ⛔ Phase 244-12 (G-6, BLOCKER): the `PendingAskStack` MOUNT WAS HERE and is GONE
+                — ⚠ written without its angle bracket ON PURPOSE, because case 6c of
+                `__tests__/MessageItem.inlineApproval.test.tsx` counts OPENING-TAG occurrences of
+                that identifier in this file's SOURCE and asserts ZERO. A prose mention carrying
+                the bracket would make that fence pass for the wrong reason — it did, until the
+                count was actually read rather than assumed. — the
+                cue stays, the controls moved to LIST level (`MessageList.tsx`, a sibling of
+                `ThreadRunLine`). The docblock above is preserved because its COST argument is
+                still true about a per-row mount; what it could not know is that this arm is
+                unreachable for a WORKFLOW pause at any predicate, because the harness's carrier
+                row is `role="system"` and `threads.py:427-438` / `:682-691` filter it off the
+                wire (BUG-260528-01). There is no message here to anchor to.
+                ⚠ THE CUE IS DELIBERATELY LEFT INLINE. `PausedRunCue` is D-244-12's IN-TRANSCRIPT
+                marker for the Deep path — it marks the ROW that paused, which is a per-row fact
+                and the one thing that genuinely belongs at message level. It buys no fetch.
+                ⛔ ONE chat-column mount, not two: two homes for one decision in one column is
+                "actionable twice and agreed in neither". */}
+            {hasPendingAsk(message.tool_calls) && <PausedRunCue />}
           </div>
         )}
         {/* SEED-098 Change 2/3: the loose `Skill activated: docx` line is GONE —

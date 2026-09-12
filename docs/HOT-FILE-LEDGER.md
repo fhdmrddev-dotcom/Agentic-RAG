@@ -12834,3 +12834,88 @@ drift*, and a testid fence here would have passed against the wrong sentence. �
 version"* but asserted that copy under a hard-coded `messages: []`, i.e. in the one state where the
 sentence it pinned was false. **A fixture that cannot express the state a claim is about will pin
 the claim in the state that refutes it.**
+### `frontend/src/components/chat/MessageList.tsx` — `244-12`
+
+**Re-derived at this task: `23 / 10 / 366`** (commits / phases / lines; the phase figure is
+identical on both accountings — there are no dated six-digit buckets in this file's history). The
+`244-01` row read `21 / 9 / 307` and was correct when written. ⚠ **That is the FOURTH consecutive
+close at which this row was found stale** (`19/8/267` → `20/8/292` → `20/8/300` → `21/9/307`), which
+is this ledger's own recurring finding rather than anyone's oversight.
+
+⭐ **THIS FILE GAINED ITS SECOND LIST-LEVEL MOUNT, and it is the same argument as the first.**
+`ThreadRunLine` (194.1-06) sits at list level because *"a harness kickoff inserts NO assistant node,
+so there is no message for a run reading to anchor to."* `PendingAskStack` now sits beside it for a
+measured instance of the identical fact: a workflow-raised **pause** has no message to anchor to
+either, because its carrier row is `role="system"` with `tool_calls: [{kind: "ask_user_prompt"}]`
+and `backend/app/api/threads.py:427-438` / `:682-691` both apply `.neq("role","system")`
+(`BUG-260528-01`) — **the row never reaches the frontend at all.**
+
+⛔ **THE BINDING INVARIANT: BOTH LIST-LEVEL MOUNTS SIT BETWEEN THE MESSAGES MAP AND `bottomRef`.**
+`<ThreadRunLine>` at `:265`, `<PendingAskStack />` at `:320`, `<div ref={bottomRef} />` at `:322`.
+Moving either below `bottomRef` puts content under the auto-scroll anchor, so the list would stop
+scrolling to its own true bottom. Fenced behaviourally by `MessageList.runline.baseline.test.tsx`
+(8 cases) and structurally by `MessageItem.inlineApproval.test.tsx` case 6c, which counts
+`<PendingAskStack` occurrences and asserts **exactly one here and ZERO in `MessageItem.tsx`**.
+
+⛔ **THE MOUNT IS UNCONDITIONAL, AND THAT IS A DECISION WITH A PUBLISHED PRICE.** A cheaper gate
+existed — mount only under a harness lock, or only when a message carries a pending ask. Rejected:
+**every such gate is a narrowing mount condition, and a narrowing mount condition is precisely what
+made SHELL-03 unreachable twice over.** The price, measured 2026-09-12 by toggling this exact mount
+off and on rather than estimated: `getThreadPendingAsks` **0 → 2** and `getThreadWorkflow`
+**1 → 3** per THREAD OPEN — **+4 fetches**, constant in row count and constant in whether a pause
+exists. The plan estimated "roughly 2-4"; the measurement is 4, and it is recorded here because a
+cost that is only in a SUMMARY is a cost nobody re-reads. Fenced by `W3` (6 rows cost what 1 costs)
+and `W4` (no-pause cost asserted non-zero and equal to the with-pause cost).
+
+⚠ **THE NAMED SEAM, if a third list-level mount is ever proposed:** these two are now a *list
+furniture* band — run reading, pause, scroll anchor — and a third would make the case for extracting
+a `ThreadListFooter` that owns the band's order. ⛔ Not taken here: this is a gap-closure round on
+the phase's blocker, and a refactor inside one is how G-7 runaways start.
+
+---
+
+### `frontend/src/components/chat/MessageItem.tsx` — `244-12`
+
+**Re-derived at this task: `73 / 34 / 954`** commits / phases / lines — ⚠ **and the convention
+matters here, so it is stated rather than left to be guessed.** `34` SUBTRACTS the dated six-digit
+quick-task buckets; without that subtraction the same history reads **37**, which is the figure the
+`244-05` row carries. Both are correct about different questions; **only the subtracted figure feeds
+G-5**, and G-5 fires either way.
+
+⚠ **THE 227-03 DISCHARGE IS STILL NOT UNDONE, and this plan moved it in the good direction for the
+first time in a while: it DELETED a mount rather than adding one.** Measured before and after, not
+asserted: `useState` **4 → 4**, `useEffect` **0 → 0**, `Props` **5 → 5** (`message`, `isStreaming`,
+`onSendMessage`, `onResume`, `isLastAssistant`). ⚠ The `useState` figure reads 4 here against the
+`244-05` row's 3 — that is a `grep -c` of the token, which counts the import line; the row's 3 counts
+call sites. Same file, two questions.
+
+⛔ **THIS FILE NO LONGER MOUNTS `PendingAskStack`, AND THE REASONING FOR WHY IT ONCE DID IS
+PRESERVED RATHER THAN DELETED.** 244-03's C-3 cost docblock is still correct and still binds any
+future per-row mount (`useAskUserPrompt` mounts `usePanelReconcile`, so a top-level mount here is
+fetches × N rows with no virtualisation). What it could not know is that its arm was **unreachable**
+for a workflow pause at any predicate. The block is kept verbatim under a `SUPERSEDED BY 244-12`
+header — a reader must be able to see that the narrow mount was a measured choice, not a mistake.
+
+⛔ **`PausedRunCue` STAYS INLINE AND IS NOT PART OF THE MOVE.** It marks the ROW that paused, which
+is a genuinely per-row fact (D-244-12's in-transcript marker for the Deep path), and it buys no
+fetch. The split is deliberate: the cue is per-row, the controls are per-thread.
+
+⚠ **A `?raw` SOURCE FENCE CANNOT TELL CODE FROM A COMMENT, and this plan paid for that in its own
+commit.** Case 6c counted `<PendingAskStack` in this file and asserted `1`. After the mount left, a
+PROSE mention in the "it was here and is gone" comment kept the count at 1 and **the fence went on
+passing over a file that no longer contained the thing it counted.** Repaired by counting in the
+file that now owns the mount and asserting ZERO here; the comment is now written without the angle
+bracket, with the reason inline so nobody re-adds it.
+
+⛔ **THE G-2 ORDER OVERRIDE, RECORDED BESIDE THE RATIONALE IT OVERRIDES.** `<RunCard>` now renders
+ABOVE `<ThinkingBlock>` (`:508` vs `:510`), i.e. **tools → thinking → answer**. Phase 243's locked
+sentence — *"ORDER IS THE ORDER IN TIME — above the run card's tool rows and above the answer"* — is
+kept word for word in the same comment, under the operator's verbatim direction of 2026-09-12:
+*"the thinking badge it's recommended to be below the container of the tools not above"*.
+⛔ **This is an OPERATOR OVERRIDE, not a defect fix.** Nothing was measured wrong about the 243
+order; a re-reversal later is a decision, not a regression. `ThinkingBlock.characterization.test.tsx`
+§11 was **inverted in exactly one relation, driven RED against the unmoved source**
+(`AssertionError: expected 43 to be less than 10`) and then green — never deleted. `thinkingAt <
+bodyAt` is UNCHANGED, and §12's three mount invariants (no tool test, no `key=`, no `tool_calls` in
+`ThinkingBlock.tsx`) survive the move, now with a non-vacuity assertion so a resolver that matched
+nothing could not pass every `not.toContain` over an empty string.
