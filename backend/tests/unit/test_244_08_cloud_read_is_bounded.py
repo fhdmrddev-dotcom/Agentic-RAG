@@ -174,7 +174,13 @@ async def test_a_caller_can_only_tighten_the_operator_ceiling(monkeypatch):
         return SimpleNamespace(status_code=200, body=b"payload", headers={})
 
     monkeypatch.setattr(gd, "send_pinned_http", _fake_send)
-    monkeypatch.setattr(gd, "source_max_file_bytes", lambda: 25 * 1024 * 1024)
+    # ⚠ PATCHED AT THE OPERATOR SETTING, NOT IN THE ADAPTER'S NAMESPACE. The RED drive
+    # patched `gd.source_max_file_bytes`, because that is where the ceiling was read when the
+    # RED was written; the fix moved the clamp into ONE home (`base.clamp_read_cap`), which is
+    # the point of the fix. Patching here asserts the same property against the shipped shape.
+    monkeypatch.setattr(
+        "app.models.user_settings.source_max_file_bytes", lambda: 25 * 1024 * 1024
+    )
     monkeypatch.setattr(
         gd.GoogleDriveSourceAdapter, "_get_auth_token", AsyncMock(return_value="tok")
     )
@@ -211,7 +217,9 @@ async def test_graph_read_file_hands_the_callers_cap_to_the_transport(monkeypatc
     monkeypatch.setattr(mg, "get_fresh_access_token", AsyncMock(return_value="tok"))
 
     adapter = mg.MicrosoftGraphSourceAdapter()
-    await adapter.read_file({"service_id": "onedrive"}, "item-1", max_bytes=1_000_000)
+    await adapter.read_file(
+        {"id": "conn-1", "service_id": "onedrive"}, "item-1", max_bytes=1_000_000
+    )
 
     download = [c for c in calls if c["capability"] == "graph_download"]
     assert download, "no content download was issued"

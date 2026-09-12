@@ -32,6 +32,7 @@ from app.dependencies import (
 from app.models.user_settings import load_app_settings_async
 # Phase 244 (SHELL-04 / D-244-05) — the composer's cloud door lands HERE, not in the Library.
 from app.models.workspace import WorkspaceConnectionAttachRequest
+from app.security.egress import EgressResponseTooLarge
 from app.services import connector_service
 from app.services.sources.base import SourceConnectionDisabled
 from app.services.workspace_service import (
@@ -397,7 +398,22 @@ async def attach_connection_file(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Connection not found")
 
     try:
-        filename, raw, _mime = await fetch_cloud_file(conn, body.file_id)
+        # ⛔ 244-08 (T-244-06-07 / OPEN-3) — THE CAP GOES IN, IT IS NOT MEASURED ON THE WAY OUT.
+        #
+        # This call used to pass no bound at all, and `_persist_workspace_upload` then applied
+        # `len(raw) > MAX_FILE_SIZE` — a refusal issued AFTER the whole body was resident in a
+        # worker. The declared mitigation for this route reads *"the workspace cap is enforced
+        # before body materialisation"*, and it was not.
+        #
+        # ⚠ THE AUDIT'S "MULTI-GB" FRAMING WAS OVERSTATED AND THE CORRECTION IS RECORDED HERE
+        # RATHER THAN QUIETLY DROPPED: `send_pinned_http` already refused a declared over-cap
+        # `content-length` before reading a byte and abandoned the wire read past `max_bytes`,
+        # and both first-party adapters already passed `source_max_file_bytes()`. So residency
+        # was bounded by the SOURCE ceiling (1-50 MB, default 25), not unbounded — a real gap
+        # of 2.5-5x the declared 10 MB cap. Fixed for its actual size.
+        #
+        # ⚠ A caller can only TIGHTEN: `clamp_read_cap` mins this against the operator ceiling.
+        filename, raw, _mime = await fetch_cloud_file(conn, body.file_id, max_bytes=MAX_FILE_SIZE)
     # ⚠ BEFORE the broad handler below, exactly as `connectors.py`'s import route orders them
     # (BUG-260907-03): a disabled connection is not a provider error, and wording it that way
     # is how a control that failed to stop something reads as the provider's fault.
@@ -408,6 +424,14 @@ async def attach_connection_file(
         ) from None
     except HTTPException:
         raise
+    # ⛔ OUR OWN SIZE REFUSAL IS NOT THE PROVIDER'S FAULT (244-08). The cap above is enforced
+    # by the transport, which signals it as `EgressResponseTooLarge`; swallowed by the broad
+    # handler below it became `502 Failed to download cloud file`, telling a person their
+    # Drive is broken when their file is simply too big. Same rule `T-244-06-04` closed on,
+    # applied to the guard this round added — and it answers the SAME 422 sentence the local
+    # door does, because the two doors must not word one refusal two ways.
+    except EgressResponseTooLarge:
+        raise HTTPException(422, "File too large. Maximum size is 10 MB.") from None
     except Exception as exc:
         logger.error(
             "Failed to fetch file %s from connection %s: %s", body.file_id, body.connection_id, exc

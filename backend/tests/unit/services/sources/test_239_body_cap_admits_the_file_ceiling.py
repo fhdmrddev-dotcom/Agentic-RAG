@@ -149,10 +149,42 @@ def test_the_mcp_file_ceiling_still_matches_its_sibling_families(configured):
             for node in ast.walk(tree)
             if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
         }
-        assert "source_max_file_bytes" in called, (
-            f"{name} never CALLS the shared ceiling — parity across the families is no longer "
-            "claimable (SC#3 'behaves exactly as Drive does'). An import alone is not a read."
+        # ⚠ WIDENED DELIBERATELY, 244-08, by the procedure this case's own docstring
+        # prescribes — and the property it protects is STRENGTHENED, not softened.
+        #
+        # `T-244-06-07` needed a caller to be able to TIGHTEN the ceiling for one read (the
+        # chat's cloud door accepts 10 MB; it was asking for the whole 25 MB source ceiling
+        # and throwing the rest away). Re-deriving "min(request, ceiling)" inside each adapter
+        # would have reinstated exactly what SEED-258 removed — three copies agreeing by luck
+        # — one level down. So the clamp has ONE home, `base.clamp_read_cap`, and Drive and
+        # Graph now reach the ceiling THROUGH it.
+        #
+        # ⛔ THE FENCE STILL REFUSES A PRIVATE COPY. Reaching the ceiling through the shared
+        # clamp is allowed; reading it from anywhere else is not, and `clamp_read_cap` is
+        # asserted below to call the real accessor — so the chain cannot be faked by a helper
+        # that merely borrows the name.
+        assert called & {"source_max_file_bytes", "clamp_read_cap"}, (
+            f"{name} never reaches the shared ceiling — neither source_max_file_bytes() nor "
+            "clamp_read_cap(). Parity across the families is no longer claimable (SC#3 "
+            "'behaves exactly as Drive does'). An import alone is not a read."
         )
+
+    # …and the new link in the chain is real: the shared clamp reads the shared accessor.
+    from app.services.sources import base as sources_base
+
+    clamp_calls = {
+        node.func.id
+        for node in ast.walk(ast.parse(inspect.getsource(sources_base.clamp_read_cap)))
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+    }
+    assert "source_max_file_bytes" in clamp_calls, (
+        "clamp_read_cap does not call source_max_file_bytes — the families now reach the "
+        "ceiling through it, so a clamp that does not read the operator setting silently "
+        "restores the private-copy state SEED-258 removed."
+    )
+    assert sources_base.clamp_read_cap(10**12) == us.source_max_file_bytes(), (
+        "clamp_read_cap let a caller RAISE the operator ceiling. It may only tighten."
+    )
 
     # And behaviourally: a value no constant ever held resolves identically for all three.
     configured(7)
