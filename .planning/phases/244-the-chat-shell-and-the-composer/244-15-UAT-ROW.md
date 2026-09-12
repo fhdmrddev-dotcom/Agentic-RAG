@@ -5,9 +5,10 @@ plan: 244-15
 gap: G-8
 closes: SHELL-03
 severity: major
-status: pending
-driven_by: pending
-driven_on: pending
+status: partial-BLOCKED
+driven_by: claude (solo, OV-SOLO-01)
+driven_on: 2026-09-12T19:2x UTC
+blocked_reason: backend uvicorn --reload restarted its workers mid-run (git merges rewrote tracked files) while a full pytest tests/unit run was hammering the same local Supabase; the armed run died at the pause and the backend went unresponsive (4x 10s timeouts, having answered in 0.31s minutes earlier)
 ```
 
 ⛔ **THIS PLAN DID NOT CLOSE SHELL-03 AND MUST NOT BE READ AS HAVING DONE SO.** `D-244-14` binds:
@@ -227,3 +228,107 @@ arm_5:
   mount (+4 fetches per thread open). This plan adds **one more GET per answered approval**, bounded
   by the number of answers and fired by an explicit human click — **no timer, no poller**, fenced by
   Test 8.
+
+
+---
+
+# DRIVE ATTEMPT 1 — 2026-09-12, Claude solo (`OV-SOLO-01`). **PARTIAL / BLOCKED.**
+
+## Verdict: Arm 5 PASS · the pause renders in BOTH homes with the composer disabled · Arms 1-4 BLOCKED
+
+⛔ **THE ROW IS NOT CLOSED AND `SHELL-03` STAYS `built, drive owed`.** What follows is what was
+actually measured before the environment failed, plus one finding that was **WITHDRAWN** rather than
+published — the withdrawal is the most important line in this section.
+
+### Environment (recorded because it is the blocker, not an aside)
+
+| | |
+|---|---|
+| App | `localhost:5173`, authenticated as the operator's own account |
+| Backend | `python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 **--reload**` (PID 1212) |
+| Concurrent load | **`python -m pytest tests/unit`** (PID 72224), started mid-drive |
+| Fixture | `200-Word Essay Writer` — step 2 `act`, `external_action`, `send_email`, `action_risk_armed: true`, `arg_sources.to.source = "ask"` |
+| Run launched | `51924c91-84a6-48b4-8865-b6c92feb009a`, thread `68539c29-c20a-4bcc-a4cd-506df22aece1` |
+| Safety | `to:` was set to **`uat-do-not-send@example.invalid`** — RFC-reserved and unroutable, so even an accidental Approve could not reach a person. **"Approve this step" was never clicked.** |
+
+### What WAS measured, before the failure
+
+⭐ **The run reached the approval pause correctly**, and the pause rendered the exact sentence
+`R2-4` caught stuck:
+
+> *"NEEDS YOU — No deadline — the run is waiting for your answer and will not continue on its own"*
+> *"Step 2 of 2, \"act\", is about to run. This step is marked as needing your approval first."*
+
+**Arm 5 — the third home (`WorkflowRunPage`) — PASS.** Measured, not asserted:
+
+| | measured |
+|---|---|
+| `aside.left` | **1156** |
+| `Approve this step` | `left` **1237.6** |
+| `Do not run it` | `left` **1237.6** |
+| `Send Answer` | `left` **1382** |
+| spine advances | **YES** — `2m 36s so far` → `2m 46s so far` across two reads |
+
+⚠ Absolute lefts differ from `R2-4`'s `1144 / 1144 / 1288.4` because the automation window is a
+different width. **The invariant that holds is the relation**: all three controls sit right of the
+panel edge, the card renders in full, and the spine climbs.
+
+**The approval reached BOTH homes at once** (the precondition Arms 1-2 score, measured in the chat
+thread with `aside.left = 1224.3`):
+
+| home | `Send Answer` `left` | side of `aside.left = 1224.3` |
+|---|---|---|
+| CHAT column | **1075.9** | left of the edge ⇒ in the thread |
+| PANEL | **1392.4** | right of the edge ⇒ in the panel |
+
+…and the **composer read `disabled: true`** while the run was live — the `R2-4` condition, correctly
+present. ⛔ **This is the SETUP for Arms 1-3, not a pass of them.** Nothing was ever answered, so the
+settle path was never exercised.
+
+### ⚠⚠ A FINDING THAT WAS WITHDRAWN — recorded because withdrawing it is the result
+
+Mid-drive the chat column rendered
+
+> *"The run was stopped, so this question no longer needs an answer"*
+
+with `Send Answer` greyed and **the composer re-enabled**, while the database still read
+`workflow_runs.status = 'active'`, phase `act` = `active`, **no stop message, no metadata, ask still
+pending.** That shape — *client releases the composer over a run the server still calls live* — is the
+exact inverse of the fail-closed invariant Arm 3 exists to protect, and it was one sentence away from
+being written up as a critical defect in the settle path.
+
+⛔ **It is NOT one, and the evidence that kills it is the process table.** The backend runs with
+**`--reload`**, and this session's own `git merge` operations rewrote tracked files underneath it:
+uvicorn restarted its workers mid-run (fresh workers timestamped **11:15 PM** and **11:20 PM**), which
+killed the run's event stream. The client rendered a dead stream as *"stopped"*; the DB row stayed
+`active` because **nothing ever wrote a stop**. The backend then stopped answering entirely — four
+consecutive **10 s** timeouts on `/health`, having answered in **0.31 s** minutes earlier.
+
+⭐ **The lesson, which outlives this row:** *a UAT driven against a `--reload` backend while the
+driver is merging git branches is measuring its own tooling.* The defect-shaped reading was real on
+screen and false about the product. **Establish the environment is quiet BEFORE driving, and treat any
+mid-drive worker restart as invalidating every observation after it** — the same discipline this
+project already applies to capturing failing test filenames before a re-run.
+
+### Arms not driven
+
+```yaml
+arm_1: { verdict: BLOCKED, reason: "backend died at the pause before any answer was sent" }
+arm_2: { verdict: BLOCKED, reason: "requires a second armed run; none could be launched" }
+arm_3: { verdict: BLOCKED, reason: "no answer was ever sent, so no release could be observed" }
+arm_4: { verdict: BLOCKED, reason: "no answer was ever sent, so there is no receipt to read" }
+arm_5: { verdict: PASS, note: "see the measured table above" }
+```
+
+### What the next drive needs (a checklist, so attempt 2 is not attempt 1 again)
+
+1. ⛔ **A quiet tree and a quiet box.** No `git merge`/`checkout` during the drive — they restart a
+   `--reload` backend. No concurrent `pytest tests/unit` (it shares the local Supabase; CLAUDE.md's
+   parallel-execution rule 4 already forbids concurrent DB-mutating suites).
+2. **Restart the backend cleanly first** and confirm `/health` answers fast **twice**, ≥ 30 s apart —
+   one 200 is not evidence of a healthy backend, as this drive proved in the other direction.
+3. Relaunch the fixture; keep `to: uat-do-not-send@example.invalid`; settle **only** with
+   **"Do not run it" + Send Answer**.
+4. Two runs are needed — Arm 1 answers in the CHAT column, Arm 2 in the PANEL.
+5. Clean up: run `51924c91-84a6-48b4-8865-b6c92feb009a` is **stranded `active`** in the DB with its
+   `act` phase pending. It is an orphan of this attempt, not live work.
