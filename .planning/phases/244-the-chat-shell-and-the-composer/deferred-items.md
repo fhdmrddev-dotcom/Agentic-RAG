@@ -169,3 +169,105 @@ stays **empty**, deliberately: a green unit test is not a reproduction. The clos
 driven rows in `244-VALIDATION.md`, against a real Google Drive connection.
 
 **Re-open trigger:** it is already open — `/gsd:verify-work` owns it.
+
+---
+
+## `244-07` — the review findings NOT fixed, each with a trigger
+
+`244-07` was scoped by the operator to SIX of `244-REVIEW.md`'s eighteen findings (CR-01, WR-01,
+WR-02, WR-03, WR-05, WR-06). The other twelve are listed here rather than left in a report
+nothing sweeps — a finding that only exists in a review file is a deferral with no re-open,
+which is a deletion that looks like a decision.
+
+### 7. `WR-04` — the cloud attach buffers the whole provider file before the 10 MB cap
+
+`workspace.py:400` calls `fetch_cloud_file` unbounded and checks `len(raw) > MAX_FILE_SIZE`
+afterwards. A 2 GB pick from the person's own Drive is resident in a worker (`WORKER_COUNT=2`)
+before the 422. ⚠ **Pre-existing on the Library path** (`import_single_file` has the same
+shape) and inherited by a NEW route that documents a guard it does not have.
+
+**Re-open trigger:** the next plan whose `files_modified` names `backend/app/api/workspace.py`
+or `backend/app/services/sources/import_service.py`. The fix is to resolve the provider's
+declared size from the listing the picker already rendered and refuse BEFORE `read_file`; the
+stronger version is a streaming read with a running byte counter.
+
+### 8. `WR-07` — `workflowLocked` unlocks a genuine harness lock when the run is cap-paused
+
+`ChatArea.tsx:140`. ⚠ **Latent, not firing:** the review looked for a writer of
+`workflow_runs.status = 'cap_paused'` and could not find one (every `cap_paused` write it
+located targets `runs.status`). D-244-08 asked for both conjuncts and one was implemented.
+
+**Re-open trigger:** either a plan whose `files_modified` names `ChatArea.tsx`, or the first
+writer of `'cap_paused'` onto `workflow_runs.status` — whichever comes first. ⛔ Do not close
+this by asserting it is unreachable: the value is schema-valid (`063_dual_mode_continue.sql:57`,
+added explicitly "on BOTH status columns") and is read as live by `db/workflows.py:1320`.
+
+### 9. `WR-08` — the transcript says `Read <file>` for a turn that could not read it
+
+`MessageItem.tsx:455-465`. In Explorer mode the announcement is gated out AND the tool set
+carries neither `execute_code` nor a workspace tool, so no hydration happens either — and the
+row still says `Read contract.pdf`, in the past tense. ⚠ **`244-07` made this WORSE-SHAPED,
+not worse:** WR-03 adds `harness` to the excluded set, so there are now two modes for which the
+line's justification does not hold. The count of affected modes changed; the defect did not.
+
+**Re-open trigger:** the next plan whose `files_modified` names `MessageItem.tsx`.
+⚠ The wording half (`Available to the agent: X` instead of `Read X`) is an OPERATOR call — the
+strings are ported from sketch 236's `COPY.js`. The mode gate is not an operator call.
+
+### 10. `IN-01` … `IN-09` — nine info-level findings, carried verbatim
+
+Not restated here; they are in `244-REVIEW.md` with file:line, and the review file is the
+record. Two are worth naming because they are one-liners a future plan will want:
+`IN-03` (two new files disagree about how many routes `workspace.py` ships — SIX vs SEVEN; the
+seven is correct) and `IN-07` (the lockstep fence sweeps `TemplateUpload.tsx` only, so a
+hand-typed `accept=` re-introduced in `MessageInput.tsx` would be invisible to it).
+
+**Re-open trigger:** each rides the next plan that names its file.
+
+---
+
+## `244-07` — two findings the FIXING produced, recorded because nobody else saw them
+
+### 11. The HYDRATOR still copies agent-written files into `/sandbox/attachments/`
+
+`WR-01` was fixed in the ANNOUNCEMENT (`_build_attachment_note`) because that is what the
+operator's list asked for. The review named a second half: `_hydrate_thread_attachments` reads
+the same unfiltered listing, so `workspace_write` output is still copied into a directory
+called `attachments`. ⚠ **This is a consistency wart, not a lie** — nothing tells the model
+those files are the user's any more — and it is bounded by the WR-02 fix, which makes the copy
+happen once per sandbox session rather than once per iteration.
+
+⛔ **Not folded in** because it is a behaviour change beyond the stated scope: agent files have
+been reachable at that path since `244-02` shipped, and removing a path the agent may already
+be using belongs in a plan that can drive it.
+
+**Re-open trigger:** the next plan whose `files_modified` names
+`backend/app/services/tool_dispatcher.py`. The fix is one line, in the helper, mirroring
+`_ATTACHMENT_KIND`.
+
+### 12. `_output_baseline_seeded` has the EXACT bug WR-02 fixed, one guard above it
+
+`tool_dispatcher.py:1979-1982` stores its flag on `ctx`, and `ctx` is rebuilt every agent-loop
+iteration — which is the whole of WR-02. It was left alone deliberately: it is a different
+claim on a different cadence (an output-file BASELINE arguably SHOULD be re-snapshotted per
+iteration), and changing it inside a defect fix for a different guard would make a red
+unattributable.
+
+⚠ **Stated rather than silent, because the shipped comment on the attachment guard said "in
+the exact shape of the `_output_baseline_seeded` guard" — and that shape was the defect.**
+Whoever picks this up must decide what the baseline MEANS before moving its flag, not copy the
+WeakSet.
+
+**Re-open trigger:** the next plan whose `files_modified` names
+`backend/app/services/tool_dispatcher.py`.
+
+### 13. `deferred-items.md` item 4's trigger FIRED and was honoured by proposal, not by action
+
+`backend/app/api/connectors.py` took its FIFTH landing (`2102 → 2113`). Item 4 says the fourth
+must propose the split before adding a line. The split IS proposed — source-browse / preview /
+import away from connector CRUD — and recorded in `docs/HOT-FILE-LEDGER.md`, and it was
+declined for this round because a defect fix and an extraction in one commit make a red
+unattributable.
+
+**Re-open trigger:** the SIXTH landing. ⛔ A sixth plan that proposes-and-declines again is
+the pattern item 4 exists to stop; at that point the split is the plan.
