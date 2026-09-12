@@ -385,3 +385,48 @@ also risks a `[duplicate-row]` collision with `244-13` when it runs.
 **Re-open trigger:** `244-13` executing. Its first ledger obligation is `streamsStore.ts`'s row +
 section, in the same commit. If `244-13` is cut from the phase, the row is still owed by whichever
 plan next names that file — the gate will keep saying so.
+
+---
+
+## `244-09` — the count gate RED on both runs, with a DIFFERENT suite each time (SEED-171's defining property, reproduced)
+
+Two full `GSD_VITEST_MAX_WORKERS=2 node scripts/vitest-count-gate.cjs` runs from the repo root, on a
+**byte-identical tree** (clean `git status`, same HEAD `9de33f29c`), one sibling agent active
+(`244-10`, backend-only, different worktree):
+
+| run | verdict line | the one failing case |
+|---|---|---|
+| 1 | `total 8215 · failed 1 · pinned total 7426` | `src/components/library/__tests__/sketchComposition.test.tsx` — **its own POSITIVE CONTROL** (*"the page renders its heading — the mount harness works"*), `STACK_TRACE_ERROR` |
+| 2 | `total 8215 · failed 1 · pinned total 7426` | `src/pages/WorkflowRunPage.test.tsx` — *"re-reads the ask slice on wake"*, `AssertionError: expected 0 to be greater than 0` |
+
+⭐ **The failing SET is never the same twice** — SEED-171's defining property, and the reason it says
+no number can be pinned for this. ⭐ **`WorkflowRunPage.test.tsx` IS one of SEED-171's five named
+suites** (added at Phase 195's close), and `expected 0 to be greater than 0` is the exact signature
+SEED-171 records for `WorkflowBuilderPage.canvas.test.tsx`. ⚠ **`sketchComposition.test.tsx` is NOT
+one of the five** and is proposed as a **sixth** below.
+
+**Filenames were captured from the gate's own persisted JSON BEFORE either re-run**, per CLAUDE.md.
+⛔ **The cap was NOT touched.** It held at `2` for every invocation.
+
+**Both files are provably unmodified by `244-09`.** Its whole diff against base `a2c8da1af` is seven
+files — `244-09-UAT-ROW.md`, `deferred-items.md`, `CLAUDE.md`, `docs/HOT-FILE-LEDGER.md`,
+`NavPanel.tsx`, `ChatLayout.scrollFrame.test.tsx`, `scripts/vitest-count-gate.cjs` — and neither
+failing file is among them; `git status --short` is empty.
+
+⭐ **And for `sketchComposition.test.tsx` there is a STRUCTURAL argument, not just a green sample:**
+its only source import path is `@/pages/LibraryPage` (dynamic), and `grep -n NavPanel
+frontend/src/pages/LibraryPage.tsx` returns **nothing** — **the suite's module graph cannot reach the
+one source file this plan changed.** Run in isolation at this HEAD it reads `46 passed | 1 skipped`,
+`failed 0`, in 15.63s of test time — a slow suite whose own harness control timed out under the
+shared gate's load. ⚠ Stated as *"provably unmodified"*, never *"fine"*: **one green sample of a
+flaky suite is not proof of innocence.**
+
+⛔ **`ChatLayout.scrollFrame.test.tsx` read `6 6 0` on BOTH runs** (BASELINE 6, actual 6, delta 0) —
+this plan's `+1` is fully attributed with no residual, and the gate reported **no per-file decrease
+anywhere**. The sole `RESULT: COUNT GATE VIOLATED` reason on both runs was `[failing-tests]`.
+
+**Re-open trigger:** `sketchComposition.test.tsx` failing a third time in any phase → add it to
+`SEED-171`'s named set as the **sixth** cap-independent flaky suite, so a future red can be triaged
+in one step instead of re-derived. It is deliberately NOT added to the seed here: `244-09` is a
+gap-closure round (G-7) and editing a shared register outside its `files_modified` during a parallel
+wave is a merge hazard the finding does not justify.
