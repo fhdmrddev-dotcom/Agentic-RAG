@@ -1102,13 +1102,29 @@ export async function getThreadTodos(
 }
 
 /** GET /threads/{tid}/workspace/files (workspace.py:99). Returns the workspace
- *  file index for the thread. */
+ *  file index for the thread.
+ *
+ *  `includeExpired` (Phase 244-08 / T-244-05-05) asks the server for rows past their TTL, for
+ *  the ONE reader that needs them: the TRANSCRIPT, which must still be able to say a file was
+ *  attached (`No longer available`) instead of letting the chip vanish from an old
+ *  conversation. ⛔ It does NOT make those rows readable — the per-file content route keeps its
+ *  own expiry gate, so a tombstone 404s if anything tries to open it.
+ *
+ *  ⚠ THIRD PARAMETER, DEFAULT OFF, AND THAT SHAPE IS DELIBERATE. `usePanelReconcile` calls this
+ *  as `(threadId, signal)`, so anything added ahead of `signal` would silently become the
+ *  abort argument. `useResolvedFileId` calls it too and wants the gated answer; leaving the
+ *  default off means it is untouched. */
 export async function getThreadWorkspaceFiles(
   threadId: string,
   signal?: AbortSignal,
+  opts?: { includeExpired?: boolean },
 ): Promise<WorkspaceFile[]> {
   const headers = await getAuthHeaders()
-  const res = await fetch(`${API_BASE}/threads/${threadId}/workspace/files`, { headers, signal })
+  const query = opts?.includeExpired ? "?include_expired=true" : ""
+  const res = await fetch(`${API_BASE}/threads/${threadId}/workspace/files${query}`, {
+    headers,
+    signal,
+  })
   if (!res.ok) throw new Error("Failed to list workspace files")
   return (await res.json()) as WorkspaceFile[]
 }

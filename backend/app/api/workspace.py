@@ -472,6 +472,13 @@ def _now_iso() -> str:
 async def list_workspace_files(
     thread_id: str,
     prefix: str | None = Query(None, description="Path prefix filter"),
+    include_expired: bool = Query(
+        False,
+        description=(
+            "Include rows past their TTL. For the TRANSCRIPT, which must be able to say a "
+            "file WAS attached. Expired rows stay unreadable — their content route is gated."
+        ),
+    ),
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_user_supabase_client),
 ):
@@ -479,6 +486,30 @@ async def list_workspace_files(
 
     RLS ensures only the thread owner can see files. Returns metadata list
     sorted by path. Optional prefix filter narrows results.
+
+    ── ⛔ ``include_expired`` — Phase 244-08 (T-244-05-05 / OPEN-2) ────────────────────────
+
+    `244-05`'s declared mitigation is *"the chip must say `No longer available`, never
+    disappear."* The chip's `expired` arm was built and was UNREACHABLE AFTER A RELOAD,
+    because this route filtered the row away before the transcript could render it. An
+    attachment therefore vanished from an old conversation — the repudiation the threat names:
+    the transcript stops being able to say what was sent.
+
+    ⭐ A TOMBSTONE, NOT A RESURRECTION, and the difference is enforced elsewhere rather than
+    promised here:
+
+      · the per-file **content** route keeps its expiry gate, so the bytes stay unreachable
+        (404) — a chip a person can still open is the file relabelled, not a tombstone;
+      · the **sandbox hydrator** and the **system-prompt announcement** read a DIFFERENT
+        listing — ``db.workspace.list_files_in_thread``, asyncpg, its own SQL expiry gate with
+        two readers — which this parameter cannot reach and must never grow. `T-244-02-06` is
+        closed on that gate, and `test_244_08_expired_attachment_is_a_tombstone.py` refuses an
+        ``include_expired`` appearing there.
+
+    ⚠ OPT-IN, NEVER A REMOVED GATE. The default answer is byte-identical, so `useResolvedFileId`
+    — which calls this same route to backfill an id — and the panel's own reconcile are
+    untouched. Deleting the filter would have been shorter and would have widened every caller
+    at once, including two that have no use for an expired row.
     """
     await _verify_thread_ownership(thread_id, current_user, supabase)
 
@@ -486,9 +517,17 @@ async def list_workspace_files(
         supabase.table("workspace_files")
         .select("id, path, size_bytes, mime_type, created_at, updated_at, kind, expires_at")
         .eq("thread_id", thread_id)
-        .or_("expires_at.is.null,expires_at.gt." + _now_iso())  # D-06: exclude expired templates; agent files pass
         .order("path")
     )
+    # ⛔ `is not True`, NOT `if not include_expired` — AND THE REASON IS A MEASURED TRAP, not
+    # style. Called as a plain function (as a unit test does), an unsupplied `include_expired`
+    # is the `Query(False)` OBJECT, which is TRUTHY — so `if not include_expired` SKIPPED the
+    # gate on every direct call. FastAPI itself resolves the real `False`, so production was
+    # correct and only the reachable-by-hand path was wrong; this makes the ONLY value that
+    # widens the listing the literal `True`, so anything else fails CLOSED.
+    if include_expired is not True:
+        # D-06: exclude expired templates; agent files (NULL expiry) pass either way.
+        query = query.or_("expires_at.is.null,expires_at.gt." + _now_iso())
     if prefix:
         query = query.like("path", f"{prefix}%")
     resp = await aexec(query)

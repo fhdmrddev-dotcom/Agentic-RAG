@@ -1295,7 +1295,11 @@ export function makeStreamCallbacks(opts: {
       // here — no guard needed beyond the status==="completed" check. The Plan-08
       // snapshot degrade ensures this refetch path doesn't 503 on a GC'd buffer.
       if (status === "completed") {
-        getThreadWorkspaceFiles(threadId)
+        // 244-08: the SECOND filler of this slice, and it must ask for the same rows as the
+        // first. A self-heal that fetched the GATED listing would quietly drop every expired
+        // attachment from the transcript on the next harness completion — the defect
+        // T-244-05-05 names, re-entering by a path nobody was looking at.
+        getThreadWorkspaceFiles(threadId, undefined, { includeExpired: true })
           .then((files) =>
             useStreamsStore.getState().actions.replaceWorkspaceFilesForThread(threadId, files),
           )
@@ -3980,20 +3984,72 @@ export function useDerivedPanel(threadId: string | null): DerivedPanelItem[] {
   }, [threadId, messages])
 }
 
+/**
+ * Phase 244-08 (T-244-05-05) — the ONE fetch that fills `workspaceFilesByThread`.
+ *
+ * ⛔ A NAMED MODULE-SCOPE FUNCTION, NOT AN INLINE ARROW. `usePanelReconcile` takes `fetcher`
+ * into a `useCallback` dependency list; a new closure every render would re-run the reconcile
+ * effect on every render, which is one fetch per keystroke on a thread with a live stream.
+ *
+ * ⚠ IT ASKS FOR EXPIRED ROWS ON PURPOSE. The slice feeds BOTH the panel and the transcript, and
+ * the transcript must be able to say a file WAS attached after its TTL ran out — the
+ * repudiation `T-244-05-05` names. The panel filters them back out in `useWorkspaceFiles`; the
+ * bytes stay unreachable either way, because the content route keeps its own expiry gate.
+ */
+function fetchWorkspaceFilesIncludingExpired(
+  threadId: string,
+  signal?: AbortSignal,
+): Promise<WorkspaceFile[]> {
+  return getThreadWorkspaceFiles(threadId, signal, { includeExpired: true })
+}
+
+/**
+ * Is this row past its TTL? ⚠ DERIVED FROM `expires_at`, never from a server-supplied flag —
+ * the same rule `chatAttachmentState` uses for the chip, stated once per layer rather than
+ * invented twice. A NULL expiry (every agent-written file) is never expired.
+ *
+ * ⚠ AN UNPARSEABLE DATE IS NOT EXPIRED. `NaN <= Date.now()` is false, and that is the polarity
+ * we want: a row we cannot read the expiry of keeps showing in the panel rather than silently
+ * disappearing from it. `expiryCaption` made the same call for the same reason (199 CR WR-02).
+ */
+function isExpiredFile(f: WorkspaceFile): boolean {
+  if (!f.expires_at) return false
+  const at = new Date(f.expires_at).getTime()
+  return !Number.isNaN(at) && at <= Date.now()
+}
+
 export function useWorkspaceFiles(threadId: string | null): {
   data: WorkspaceFile[]
   isLoading: boolean
   error: Error | null
   reconcile: () => Promise<void>
 } {
-  const data = useStreamsStore((s) =>
+  const all = useStreamsStore((s) =>
     threadId ? (s.workspaceFilesByThread.get(threadId) ?? EMPTY_FILES) : EMPTY_FILES,
+  )
+  // ⭐ Phase 244-08 (T-244-05-05) — THE PANEL FILTERS; THE SLICE CARRIES EVERYTHING.
+  //
+  // The slice now holds expired rows, because the TRANSCRIPT needs them: an attachment past
+  // its TTL must still be nameable in an old conversation (`No longer available`) instead of
+  // silently vanishing. The PANEL has no honest use for one — it offers a preview, and the
+  // per-file content route still refuses an expired row (404) — so a listed tombstone here is
+  // a broken affordance. One slice, two readers, and the reader that cares decides.
+  //
+  // ⚠ MEMOISED ON THE SLICE, NOT FILTERED INSIDE THE SELECTOR. A `.filter()` in the
+  // `useStreamsStore` selector mints a new array every render, and `useSyncExternalStore`
+  // compares by identity — every stream delta would re-render `FilesSection` and
+  // `WorkspacePanel`, which is the PANEL-06 isolation this file is built around. The slice is
+  // replaced wholesale (never mutated), so its identity is a sound memo key. Fenced by case 5
+  // of `providers/__tests__/expiredAttachmentTombstone.test.tsx`.
+  const data = useMemo(
+    () => (all.some(isExpiredFile) ? all.filter((f) => !isExpiredFile(f)) : all),
+    [all],
   )
   const replace = useStreamsStore((s) => s.actions.replaceWorkspaceFilesForThread)
   const { isLoading, error, reconcile } = usePanelReconcile<WorkspaceFile>({
     threadId,
     hookId: "files",
-    fetcher: getThreadWorkspaceFiles,
+    fetcher: fetchWorkspaceFilesIncludingExpired,
     replace,
   })
   return { data, isLoading, error, reconcile }

@@ -134,6 +134,16 @@ async def test_the_listing_still_hides_expired_rows_by_default(monkeypatch):
         "the opt-in this fix is. Every other caller of this route would silently widen with it."
     )
 
+    # ⚠ AND THE DECLARED DEFAULT, read off the signature. The call above passes nothing, so it
+    # exercises whatever the parameter falls back to — but a FastAPI `Query(...)` default is an
+    # OBJECT, and an object is truthy. Asserting the declared value too is what distinguishes
+    # "the gate held because the default is False" from "the gate held by accident".
+    declared = inspect.signature(workspace.list_workspace_files).parameters["include_expired"]
+    assert getattr(declared.default, "default", declared.default) is False, (
+        "include_expired no longer defaults to False. The widening is an opt-in for the "
+        "transcript; defaulting it on hands expired rows to every caller of this route."
+    )
+
 
 # ── 2 · THE TRANSCRIPT CAN ASK — and gets the expired row back ────────────────────────────
 @pytest.mark.asyncio
