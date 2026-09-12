@@ -202,7 +202,28 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
           streamActions.setWorkflowLockForThread(tid, {
             runId: state.active_workflow_run_id,
             mode: "harness",
-            capPaused: state.cap_paused,
+            // ⛔ ALWAYS `false` ON THIS BRANCH — `T-244-03-01` / 244-08. This read
+            // `capPaused: state.cap_paused`, and `244-03`'s own declared mitigation says the
+            // discriminator is *"set only on the `state.cap_paused` reconcile branch"* below.
+            // It was set on both, and `workflowLocked` at :140 is
+            // `workflowLock !== null && !workflowLock.capPaused` — so a run that is locked AND
+            // paused UNLOCKED THE COMPOSER MID-RUN.
+            //
+            // ⚠ THAT STATE IS LATENT, NOT IMPOSSIBLE, WHICH IS WHY THIS IS FAIL-CLOSED RATHER
+            // THAN DELETED AS UNREACHABLE. No writer of `'cap_paused'` onto
+            // `workflow_runs.status` has been found — but the value is schema-valid
+            // (`063_dual_mode_continue.sql:57` adds it to BOTH status columns),
+            // `threads.py:1238` sets `cap_paused` straight off that column, and
+            // `_TERMINAL_WORKFLOW_STATUSES` (`threads.py:1095`) does not contain it. So the
+            // server can answer `locked: true, cap_paused: true` today.
+            //
+            // ⚠ WHAT IT COSTS IF THAT ARM EVER GOES LIVE, stated rather than discovered later:
+            // a harness run paused at its own cap keeps the composer locked, so the person
+            // clicks Cancel instead of typing. That is the cheap direction. Unlocking during a
+            // live harness run is the elevation this threat names — and the ordinary Deep
+            // cap-pause, which is the case `BUG-260904-05` was actually about, has no
+            // `active_workflow_run_id` and so still takes the branch below.
+            capPaused: false,
             continuesRemaining: state.continues_remaining,
           })
         } else if (state.cap_paused) {
