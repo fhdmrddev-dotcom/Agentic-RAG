@@ -248,19 +248,23 @@ Plans:
 
 - [x] 244-06-PLAN.md — the two doors un-inverted: cloud→thread, Library import asks its folder (SHELL-04)
 
-**Wave 5** — *gap-closure round 1* (planned 2026-09-12, `8cd9d8119`; G-7 clear, cap is 2)
+✅ **GAP-CLOSURE ROUND 1 EXECUTED 2026-09-12** — plans `244-09` … `244-13` in 3 waves, plus a
+`244-14` fix round (no PLAN, the `244-07`/`244-08` pattern; consumes no G-7 round). Gates on the
+merged tree: **`count gate OK` — 275/275 pinned, 0 failing** (total 8245 · pinned 7455) · backend at
+the locked **71-failed ceiling** · ledger gate **0** · **G-7 clear at 1 round of 2**. Per-plan detail
+and tick marks are in the *Gap closure — round 1* listing below. ⛔ **Six `244-NN-UAT-ROW.md` files
+are owed a browser drive — every verdict `pending`, and no criterion closes until they run.**
 
-- [ ] 244-09-PLAN.md — G-5: the nav RAIL overflows the page below ~540px viewport (SHELL-01)
-- [ ] 244-10-PLAN.md — L-5 defect 6b: the SECOND attachment never reaches `/sandbox/attachments` (SHELL-04)
-
-**Wave 6** *(blocked on Wave 5 completion)*
-
-- [ ] 244-11-PLAN.md — G-3 a snapshot 503 renders a silently incomplete transcript + G-4's written ruling (SHELL-01)
-- [ ] 244-12-PLAN.md — **G-6 (BLOCKER)** a workflow-raised approval has no chat controls + G-2 the badge order (SHELL-03)
-
-**Wave 7** *(blocked on Wave 6 completion)*
-
-- [ ] 244-13-PLAN.md — G-1 the phantom live run line on a Deep cap-paused thread, and open review finding WR-07 with it (SHELL-02)
+⚠ **ONE BACKEND TEST IS FLAKY ON A ZERO-HEADROOM CEILING — measured at this close, recorded rather
+than smoothed over.** Four runs of `pytest tests/unit -q --continue-on-collection-errors` at the
+merge commit read **71, 72, 71, 71**. The final run's normalized unique `FAILED` ids count **71**,
+matching its summary line, so **the ceiling holds** — but the `72` sighting is real and its extra
+test was not captured. ⛔ **The ceiling has ZERO headroom, so a single flaky backend test can fail the
+gate on a clean tree.** Re-open trigger: **any backend run reading 72 — capture the FAILED SET that
+time** (`grep "^FAILED " | sed 's/ - .*//' | sed 's|C:\.*||' | sort -u`) and diff it against a 71-run.
+⚠ Normalising is mandatory, not optional: pytest interleaves a `RuntimeWarning` from stderr onto the
+end of a `FAILED` line, **attaching to a different test on each run**, so a raw diff reports a
+fabricated regression.
 
 ⚠ **The gaps come from `244-UAT.md` § Gaps, NOT from `244-VERIFICATION.md`** — that report reads
 `human_needed` / "0 rows driven" because it was written BEFORE the browser drive; the UAT then drove
@@ -280,17 +284,17 @@ then drove **all 9 rows: 4 pass / 5 issue**.
 **Wave 5** *(the wave numbering continues the phase; ≤ 2 test-running agents per wave is a MEASURED
 ceiling, not a preference — the shared vitest gate goes non-deterministic at three)*
 
-- [ ] 244-09-PLAN.md — **G-5** the nav rail cannot fit and pushes the document below ~540px viewport height; `min-h-0 overflow-y-auto` on the rail root, a link-6 source pin, and `NavPanel.tsx`'s stale ledger row (SHELL-01)
-- [ ] 244-10-PLAN.md — **L-5 defect 6b** the SECOND attachment never reaches `/sandbox/attachments`; the per-session marker records WHICH files were copied, not merely THAT hydration ran (SHELL-04) · backend only
+- [x] 244-09-PLAN.md — **G-5** the nav rail cannot fit and pushes the document below ~540px viewport height; `min-h-0 overflow-y-auto` on the rail root, a link-6 source pin, and `NavPanel.tsx`'s stale ledger row (SHELL-01)
+- [x] 244-10-PLAN.md — **L-5 defect 6b** the SECOND attachment never reaches `/sandbox/attachments`; the per-session marker records WHICH files were copied, not merely THAT hydration ran (SHELL-04) · backend only
 
 **Wave 6** *(blocked on Wave 5 — a SCHEDULING dependency, not a data one)*
 
-- [ ] 244-11-PLAN.md — **G-3 + G-4** a snapshot 503 renders a silently incomplete transcript; the shipped `reconcileErrors` slice + its shipped banner are connected, and `BUG-260911-02` gets a written ruling (SHELL-01)
-- [ ] 244-12-PLAN.md — **G-6 (BLOCKER) + G-2** a workflow-raised approval has no controls in the chat column; the mount moves to LIST level where a `role='system'` carrier can reach it, and the thinking badge moves below the tools per the operator's override (SHELL-03)
+- [x] 244-11-PLAN.md — **G-3 + G-4** a snapshot 503 renders a silently incomplete transcript; the shipped `reconcileErrors` slice + its shipped banner are connected, and `BUG-260911-02` gets a written ruling (SHELL-01)
+- [x] 244-12-PLAN.md — **G-6 (BLOCKER) + G-2** a workflow-raised approval has no controls in the chat column; the mount moves to LIST level where a `role='system'` carrier can reach it, and the thinking badge moves below the tools per the operator's override (SHELL-03)
 
 **Wave 7** *(blocked on Wave 6 — it edits four files those two plans own)*
 
-- [ ] 244-13-PLAN.md — **G-1 + WR-07** the thread lock does not say what it is: a Deep cap-pause renders a phantom live workflow run line with a 1s clock, and a harness cap-pause would unlock the composer. `WorkflowLock.mode` becomes a real discriminator; two files that have NEVER had a ledger row get one (SHELL-02)
+- [x] 244-13-PLAN.md — **G-1 + WR-07** the thread lock does not say what it is: a Deep cap-pause renders a phantom live workflow run line with a 1s clock, and a harness cap-pause would unlock the composer. `WorkflowLock.mode` becomes a real discriminator; two files that have NEVER had a ledger row get one (SHELL-02)
 
 ⚠ **`SHELL-05` is deliberately absent from every `requirements` field above, and that is a claim
 rather than an omission:** no gap touches it. **L-7 was driven end to end for the first time in this

@@ -37,45 +37,63 @@ surface the operator uses daily. Phase numbering continues at **242**.
 
 ## Current Position
 
-Phase: 244 (the-chat-shell-and-the-composer) — GAP CLOSURE PLANNED (round 1 of a cap of 2)
-Plan: 6 of 6 built · 5 gap-closure plans written (244-09 … 244-13), none executed
+Phase: 244 (the-chat-shell-and-the-composer) — GAP CLOSURE ROUND 1 **EXECUTED**, UAT OWED
+Plan: 11 of 11 built (6 build + 5 gap-closure) · **0 of 6 UAT rows driven**
 
-**Build plans 244-01 … 244-06 are SHIPPED.** `244-UAT.md` then drove all 9 rows in a real browser —
-**4 passed, 5 issues** — and `/gsd:plan-phase 244 --gaps` planned round 1 against them at
-`8cd9d8119`. ⚠ **`244-VERIFICATION.md` is STALE relative to that UAT**: it reads `status:
-human_needed` / "0 rows driven" because it was written BEFORE the drive. Take the gaps from
-`244-UAT.md` § Gaps, never from the verification report.
+**Round 1 executed 2026-09-12 in 3 waves + a fix round**, all merged to `develop`. Gates on the
+merged tree: **`count gate OK` — 275/275 pinned, 0 failing** (total 8245 · pinned 7455) · backend at
+the locked **71-failed ceiling** · `check-hot-file-ledger.cjs 244` exits **0** · `check-claude-md-size`
+OK · **G-7 clear, 1 round of a cap of 2.**
 
-Gaps closed by the round: **G-6 (blocker, SHELL-03)** · G-1 + open review finding **WR-07**
-(SHELL-02) · G-5 (SHELL-01) · G-3 + G-4 · G-2 (an **operator override** of a locked Phase 243
-rationale, not a defect) · and L-5 defect 6b (the second attachment never hydrates, SHELL-04).
-**SHELL-05 is in no `requirements` field, deliberately** — no gap touches it and L-7 was driven end
-to end for the first time, in both directions, and passed.
+| plan | gap | what shipped |
+|---|---|---|
+| `244-09` | G-5 | the nav RAIL bounds itself — it, not the transcript, overflowed the PAGE below 540px |
+| `244-10` | L-5 6b | the hydration record says WHICH files, not merely THAT it ran |
+| `244-11` | G-3 + G-4 | a failed snapshot is recorded and surfaced; **G-4 ruled SECOND CAUSE** |
+| `244-12` | **G-6 (blocker)** + G-2 | the approval mounts at LIST level, where a harness pause can reach it |
+| `244-13` | G-1 + **WR-07** | the lock says what it IS — `mode: "harness" \| "cap_paused"` |
+| `244-14` | review fixes | 9 findings fixed (1 critical + 5 warnings + 3 info), 3 deferred with triggers |
 
-⛔ **No plan closes a success criterion.** Each produces a `244-NN-UAT-ROW.md` driven at
-`/gsd:verify-work` (D-244-14 / D-244-19); G-6 shipping behind a GREEN fence is the whole reason.
+⛔ **NOTHING HERE CLOSES A SUCCESS CRITERION, BY DESIGN.** Every plan reports *built, drive owed*
+(D-244-14 / D-244-19); the ROADMAP's own rule is that **no criterion closes on a unit test**. **Six
+`244-NN-UAT-ROW.md` files carry the browser rows, every verdict `pending`.** G-6 shipping behind a
+GREEN fence is the whole reason this discipline exists.
 
-⚠ **A GUARDRAIL WAS FOUND MIS-KEYED WHILE PLANNING THIS ROUND, and it is recorded because the
-failure was silent.** `scripts/check-gap-closure-rounds.cjs` keys on `gap_closure`, **not** on
-`gap_closure_round` — with only the round field the gate read `0 gap-closure`, so **a round 2 would
-never have been capped by G-7.** Its `scalar()` regex also swallows an inline `#` comment, so the
-first fix silently did not take. Both fields are now set on their OWN LINES in all five plans and
-the gate reads `5 gap-closure · rounds completed: 1 (cap is 2)`.
+⚠ **The code review found a CRITICAL that this round itself introduced, and it inverted the very
+thing `244-11` was written to prevent.** `reconcile` copied `loadMessages`' failure WRITE but not its
+**clear-on-success** — which lives in `loadMessages`, not `reconcile`. Since `reconcile` is the
+thread-open path, nothing could clear the key: one transient 503 painted the banner permanently and
+later flipped it to *"Showing cached version"* **over freshly fetched content**. ⛔ **Its own control
+test started from an empty Map and so could not see the missing transition.** Fixed in `244-14`,
+fixture repaired so the fence can fail.
 
-**Verified by `gsd-plan-checker`: `VERIFICATION PASSED`, no blockers.** Three planner claims were
-re-checked against the tree rather than accepted — `threads.py:438`/`:691` do both carry
-`.neq("role","system")` (so widening `hasPendingAsk` would have closed NOTHING and shipped a second
-green fence); `WorkflowLock.mode` has zero production consumers (the one `.mode ===` hit is the
-server wire type `ThreadWorkflowState.mode`, a different field); and `toolMeta.ts:197` cannot reach
-a Deep thread once the discriminator lands. ⚠ **Solo run** — Gemini unavailable, so this is a
-SELF-verification, never a review (D-244-21 / OV-SOLO-01).
+⭐ **FIVE FENCE LESSONS, each MEASURED in this round and each a way a green test coexists with a live
+defect.** They are recorded together because they are one finding seen five times:
+1. **A fence that CONSTRUCTS the shape it asserts** proves the component renders when handed it — never that the product emits it. (G-6's original, and why it shipped green.)
+2. **Presence assertions cannot see content drift** — a testid fence would have passed against the wrong sentence (`244-11`).
+3. **A `?raw` fence cannot tell code from a comment** — `244-12` caught ITS OWN fence passing because a prose mention kept a count at 1 after the mount had left.
+4. **A control can live downstream of the defect it guards** — `244-11` found one RED for that reason.
+5. **A fixture that cannot express the state a claim is about will pin the claim in the state that refutes it** — `"Showing cached version"` was pinned under `messages: []`.
 
-⛔ **One gate is red BY DESIGN until execution:** `node scripts/check-hot-file-ledger.cjs 244`
-reports `[no-row] frontend/src/stores/streamsStore.ts` (12 phases, invisible to G-5 its whole life).
-`244-13` Task 3 adds that row **and its section in the same commit**; `toolMeta.ts` (6 phases) gets
-one there too, and `244-09` re-derives `NavPanel.tsx`'s triple — the row reads `20/11/329`, measured
-`21/11/344`. ⚠ The UAT's G-5 block claims `NavPanel.tsx` has **no** ledger row; that is **stale**,
-the row was added at Phase 235.
+⚠ **TWO REGISTER DEFECTS FOUND, BOTH INVISIBLE TO THEIR OWN GATE.**
+- **The two ledger tables had drifted apart and only one is gated.** `CLAUDE.md`'s shortlist and `docs/HOT-FILE-LEDGER.md`'s scan list disagreed on `MessageItem.tsx` and `StreamsProvider.tsx` — **including on the phase count (`34` vs `37`), the figure G-5 actually fires on.** `check-hot-file-ledger.cjs` reads only the scan list, so the shortlist can rot unseen. Both corrected; a `--sync` mode would close it mechanically.
+- **`ThreadRunLineKickoff.test.tsx` was in NEITHER gate knob** and had guarded nothing since Phase 194.1 — the Phase 214 `WorkflowScheduleModal` finding again. Adopted into both.
+- **`streamsStore.ts` and `toolMeta.ts` had NO ledger row for their entire lives** (20/13/525 and 10/6/218). Three executors deliberately declined to add `streamsStore.ts`'s, each recording why: **a row minted by a non-owner goes stale before its owner lands, and a row present-and-wrong stops the audit.** `244-13` owned it.
+
+⚠ **The count gate's published figures are STALE in CLAUDE.md for the SEVENTH time.** Its last
+correction reads `7816 / 7020 / 241` (2026-09-07); measured here **`8245 / 7455 / 275`**. A growing
+number is the gate WORKING — its contract is *no per-file decrease* + *zero failing*, never a fixed
+total — but the correction entry is **owed at phase close**.
+
+⚠ **SEED-171 gained no confirmed sixth suite.** `sketchComposition.test.tsx` flaked in waves 1 and 2
+(two executors nominated it) but was **green on both of `244-13`'s runs and both of `244-14`'s** — so
+it stands at **two occurrences, not three**. `WorkflowBuilderPage.canvas.test.tsx` (SEED-171's fifth)
+went red once in `244-14` and was proved unmodified. **One green sample of a flaky suite proves
+nothing, and neither does one red one.**
+
+⚠ **Solo run throughout (D-244-21 / OV-SOLO-01).** Gemini is unavailable, so every artifact of this
+round is a **self-verification, never a review** — including the code review, which Claude both
+requested and acted on.
 
 ### ✅ Phase 243 — CLOSED 2026-09-11
 
