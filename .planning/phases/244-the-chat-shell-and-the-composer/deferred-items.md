@@ -430,3 +430,57 @@ anywhere**. The sole `RESULT: COUNT GATE VIOLATED` reason on both runs was `[fai
 in one step instead of re-derived. It is deliberately NOT added to the seed here: `244-09` is a
 gap-closure round (G-7) and editing a shared register outside its `files_modified` during a parallel
 wave is a merge hazard the finding does not justify.
+
+---
+
+## `244-11` — two deferrals and one confirmation
+
+### 1. ⛔ DEFERRED: consuming `Retry-After: 10` on a snapshot 503
+
+The snapshot endpoint sets `Retry-After: 10` alongside its 503 body (`threads.py:517`/`:526`), and
+`244-11` cites that header as **evidence the server is explicit** — it does **not** read it.
+**Consuming it is an automatic-retry feature**, which is a new behaviour and not a gap fix (G-7),
+and an automatic retry on a 503 storm is an amplification risk the plan's threat register accepts
+precisely by NOT adding one (`T-244-11-03`). Recovery stays exactly one user click on the shipped
+**Retry** control.
+
+**Re-open trigger:** a phase that scopes snapshot/reconcile *resilience* (backoff, retry policy,
+degraded-mode) rather than *legibility*. At that point read the header, and decide the backoff
+there — never inside a banner.
+
+### 2. ⛔ DEFERRED: the 503's own root cause
+
+`244-11` closes the **legibility** half of UAT `G-3` (the UI now says a snapshot failed). It does
+**not** touch why the snapshot fails. Partially established: `redis.xinfo_stream(f"run:{rid}")`
+either times out (2.0 s) or errors; a `ResponseError('no such key')` is correctly degraded at
+`:508`. ⚠ A `cap_paused` run is **non-terminal**, so it keeps being probed on every thread open,
+and the seeded `cap_paused` thread produced both observed 503s — **whether that is causal was NOT
+established and must not be written down as though it were.**
+
+**Re-open trigger:** the UAT row's Arm 1 reproducing the banner on an UNPATCHED thread open — i.e.
+a real 503 in the wild, not a forced one. That is the point at which the backend half becomes
+worth a phase.
+
+### 3. ⚠ CONFIRMATION, not a new finding: `sketchComposition.test.tsx` flaked AGAIN
+
+`244-09`'s entry above set the re-open trigger: *"failing a third time in any phase → add it to
+`SEED-171`'s named set as the sixth cap-independent flaky suite."* **`244-11`'s full gate run is a
+further occurrence** — both its §2 positive controls timed out at 5000 ms under the shared gate,
+and again when the three suites were re-run alone.
+
+⭐ **AND IT WAS PROVED INHERITED, not merely argued.** With `244-11`'s two source files
+(`ChatArea.tsx`, `StreamsProvider.tsx`) **checked out at the base commit** `32ada21e1`, the same
+two `sketchComposition` cases **still failed**, alongside a `WorkflowsPage.test.tsx` case — and
+`WorkflowCanvas.test.tsx`, red twice at HEAD, went **green**. **The failing set is never the same
+twice**, which is `SEED-171`'s signature exactly. ⛔ The cap was never touched.
+
+⚠ **Near-name hazard worth recording:** `src/components/library/__tests__/sketchComposition.test.tsx`
+(this one) is a DIFFERENT file from `src/components/sources/sourceComposition.test.tsx`, which
+CLAUDE.md records as a **standing red in NEITHER knob** by a Phase 235 decision. Two
+`*Composition.test.tsx` files, two different dispositions — do not read a note about one as covering
+the other.
+
+**Re-open trigger (unchanged, now closer):** the NEXT phase to see it red should add it to
+`SEED-171` as the sixth named suite. `244-11` does not, for the same reason `244-09` did not: this
+is a gap-closure round running in a parallel wave, and editing a shared register outside
+`files_modified` is a merge hazard the finding does not justify.

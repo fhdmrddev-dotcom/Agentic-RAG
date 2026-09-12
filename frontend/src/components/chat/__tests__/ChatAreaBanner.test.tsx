@@ -18,10 +18,19 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, screen, cleanup, waitFor } from "@testing-library/react"
 
+// ── Phase 244-11 (G-3): the transcript's EMPTINESS is now a variable, not a constant ──
+//
+// The banner's non-ApiError sentence depends on whether anything is actually on screen
+// ("Showing cached version" is a claim ABOUT THE SCREEN). Before 244-11 this suite pinned
+// one sentence with a hard-coded `messages: []`, i.e. it asserted the cached-version copy
+// in the one state where that copy is FALSE. The hook mock now reads a mutable holder so a
+// case can declare which of the two states it is in. ⛔ Reset in `beforeEach`.
+const hookState = vi.hoisted(() => ({ messages: [] as unknown[] }))
+
 // ── Mock useMessages (heavy hook; ChatArea only needs the stub fns to mount) ──
 vi.mock("@/hooks/useMessages", () => ({
   useMessages: () => ({
-    messages: [],
+    messages: hookState.messages,
     loadMessages: vi.fn().mockResolvedValue(undefined),
     sendMessage: vi.fn().mockResolvedValue(undefined),
     stopStreaming: vi.fn(),
@@ -83,6 +92,31 @@ const THREAD: Thread = {
   updated_at: "2026-06-10T00:00:00Z",
 } as Thread
 
+// ⚠ 244-11: jsdom implements NO layout, so `Element.prototype.scrollIntoView` does not
+// exist. The moment this suite mounts a NON-EMPTY transcript, `MessageList`'s follow-scroll
+// effect (MessageList.tsx:160) throws `bottomRef.current?.scrollIntoView is not a function`
+// and takes the whole case down before any assertion runs. Stubbed here for the same reason
+// `MessageList.test.tsx:61-65` stubs it. ⛔ This suite therefore says NOTHING about the
+// scroll effect — `src/__tests__/components/chat/MessageList.scroll.test.tsx` owns that, and
+// it is deliberately a separate file so this stub cannot reach it.
+if (!Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = function scrollIntoViewStub() {}
+}
+
+/** One persisted message — i.e. there IS something cached on screen to be "showing". */
+const CACHED_TRANSCRIPT = [
+  {
+    id: "m-cached-1",
+    thread_id: "thread-A",
+    user_id: "user-1",
+    role: "user",
+    content: "a message that is already on screen",
+    created_at: "2026-06-10T00:00:00Z",
+    updated_at: "2026-06-10T00:00:00Z",
+    tool_calls: [],
+  },
+]
+
 function renderChatArea() {
   return render(
     <StreamsProvider>
@@ -111,6 +145,9 @@ beforeEach(() => {
     // one test never bleeds into the next (the lock map is not mock-cleared).
     workflowLockByThread: new Map(),
   })
+  // 244-11: default to the EMPTY transcript the suite has always mounted. A case that
+  // needs cached content on screen declares it (case c, Test 6).
+  hookState.messages = []
 })
 
 afterEach(() => cleanup())
@@ -151,6 +188,12 @@ describe("099-08 refusal banner", () => {
   })
 
   it("c — a plain reconcile Error keeps the cached-version copy AND shows Retry", async () => {
+    // ⚠ 244-11 (G-3): this case declares a NON-EMPTY transcript, which it always meant.
+    // It was written against a hard-coded `messages: []` and so asserted "Showing cached
+    // version" in the ONE state where that sentence is false. The claim under test —
+    // *a plain reconcile Error keeps the cached-version copy* — is unchanged; what changed
+    // is that the fixture now actually has a cached version to be showing.
+    hookState.messages = CACHED_TRANSCRIPT
     useStreamsStore.setState((s) => ({
       reconcileErrors: new Map(s.reconcileErrors).set("thread-A", new Error("boom")),
     }))
@@ -217,6 +260,59 @@ describe("099-08 refusal banner", () => {
     await waitFor(() =>
       expect((textarea as HTMLTextAreaElement).value).toBe("message that never dispatched"),
     )
+  })
+})
+
+/**
+ * Phase 244 plan 11 (SHELL-01 / UAT gap G-3) — THE SENTENCE MUST MATCH THE SCREEN.
+ *
+ * `"Couldn't load latest messages. Showing cached version."` is a claim ABOUT THE SCREEN.
+ * When the snapshot fails on a thread that has nothing rendered yet, there IS no cached
+ * version — the banner would be telling the person that the empty pane in front of them is
+ * their conversation. The bug report this phase folds in names that exact misreading:
+ * *"the natural reading is 'this conversation is empty'"*, followed by typing into it.
+ *
+ * ⛔ THESE CASES ASSERT RENDERED CONTENT, NEVER A `data-testid`. This project's own
+ * recorded lesson: *presence assertions cannot see content drift* — a green fence on
+ * `getByTestId("reconcile-error-banner")` would have passed happily against the wrong
+ * sentence, which is how this phase's G-6 shipped green.
+ */
+describe("244-11 / G-3 — the non-ApiError banner sentence is true of what is on screen", () => {
+  const EMPTY_COPY = "Couldn't load this conversation. It's still there — try again."
+  const CACHED_COPY = "Couldn't load latest messages. Showing cached version."
+
+  it("Test 5 (THE GAP) — an EMPTY transcript does not claim a cached version, and Retry is offered", async () => {
+    hookState.messages = []
+    useStreamsStore.setState((s) => ({
+      reconcileErrors: new Map(s.reconcileErrors).set(
+        "thread-A",
+        // The client's REAL throw for a snapshot 503 — a bare Error, not an ApiError
+        // (frontend/src/lib/api/threads.ts:1067), so the banner takes its non-ApiError arm.
+        new Error("Failed to fetch snapshot (status 503)"),
+      ),
+    }))
+
+    renderChatArea()
+
+    await waitFor(() => expect(screen.getByText(EMPTY_COPY)).toBeInTheDocument())
+    // ⛔ The sentence that is FALSE here must be absent, not merely "some banner present".
+    expect(screen.queryByText(CACHED_COPY)).not.toBeInTheDocument()
+    // A 503 is not in NON_RETRYABLE, so the shipped Retry control is the recovery.
+    expect(screen.getByRole("button", { name: "Retry loading messages" })).toBeInTheDocument()
+  })
+
+  it("Test 6 (CONTROL) — with a transcript on screen the SHIPPED sentence survives byte-exactly", async () => {
+    // ⛔ This plan changes copy in ONE state only. Changing it everywhere would be a
+    // redesign, not a gap fix (G-7).
+    hookState.messages = CACHED_TRANSCRIPT
+    useStreamsStore.setState((s) => ({
+      reconcileErrors: new Map(s.reconcileErrors).set("thread-A", new Error("boom")),
+    }))
+
+    renderChatArea()
+
+    await waitFor(() => expect(screen.getByText(CACHED_COPY)).toBeInTheDocument())
+    expect(screen.queryByText(EMPTY_COPY)).not.toBeInTheDocument()
   })
 })
 

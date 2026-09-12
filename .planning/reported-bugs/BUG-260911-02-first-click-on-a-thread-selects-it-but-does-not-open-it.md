@@ -9,7 +9,7 @@ affected_areas: [frontend/chat, frontend/navigation, frontend/chat-list, UX/legi
 folded_into: 244
 verified_closed_by: null
 related_seeds: []
-re_open_trigger: "Live browser on /app, activeView=chat. Hover a chat row and click its RIGHT-HAND THIRD (over the ⋯ scrim) ONCE. If the row highlights and the pane stays on 'How can I help you?', the 244-01 trace §4 (the opacity-0 actions overlay with no pointer-events-none) is CONFIRMED and the shipped fix closes this. If it reproduces when clicking the row's LEFT (title) region instead, §4 is REFUTED and C-6 candidate (a) — activeView/drawer path — is the live one. Trace: .planning/phases/244-the-chat-shell-and-the-composer/244-01-BUG-260911-02-TRACE.md"
+re_open_trigger: "ONE live browser visit on /app, activeView=chat, settles BOTH discriminators. (i) TARGET — hover a chat row and click its RIGHT-HAND THIRD (over the ⋯ scrim) ONCE; if it fails there but succeeds on the row's LEFT (title) region, trace §4 (the opacity-0 actions overlay with no pointer-events-none) is CONFIRMED; if it fails on the LEFT region too, §4 is REFUTED and C-6 candidate (a) — activeView/drawer path — is the live one. (ii) APPEARANCE — on the failed click, read WHICH PANE renders: the WELCOME state ('How can I help you?' PLUS the two starter-prompt chips '📁 Search connected files' / '💬 Draft a team update', all three of which occur exactly once in ChatArea.tsx and ONLY inside `if (!thread)`) means the click did not select at all (§4/(a)); the THREAD FRAME with a header and an EMPTY transcript means it DID select and the snapshot-503 path (trace §6, UAT G-3) is the live cause. ⚠ NEW OBSERVABLE that did not exist when this report was filed (2026-09-11): since Phase 244-11 the snapshot-503 arm renders a VISIBLE amber banner with Retry, and the §4 arm never does — so the banner's presence decides (ii) at a glance. Its ABSENCE in the original report is therefore NOT evidence about the cause. Trace: .planning/phases/244-the-chat-shell-and-the-composer/244-01-BUG-260911-02-TRACE.md §6"
 reproduces_on:
   branch: develop
   commit: 993139f39
@@ -112,3 +112,32 @@ instruction is still owed**, and the `re_open_trigger` above names the exact cli
 so it is not a hit-test or pointer-target problem"* — a synthetic click on a WRAPPER never reaches a
 handler bound to a CHILD (driven). A failing ref click is therefore consistent with a target problem
 rather than evidence against one.
+
+---
+
+## Re-checked 2026-09-12 (Phase 244 plan 11, G-4) — ⭐ **SECOND CAUSE**. ⛔ STILL `folded`.
+
+Full ruling: `.planning/phases/244-the-chat-shell-and-the-composer/244-01-BUG-260911-02-TRACE.md`
+**§6** (appended beside §§1-5, which are unchanged). Claude, solo — a **self-verification, not a
+review**, and **no browser was driven**.
+
+Phase 244's UAT found a mechanism that was not in the candidate set when §§1-5 were written:
+`GET /threads/{id}/snapshot` returned **503 on 2 of 4 observed calls** and
+`StreamsProvider.reconcile` swallowed it in one clause, so a selected thread rendered its header
+and composer around a **silently empty transcript** — *"a 78-message thread opening completely
+EMPTY; a second click on the same row loaded it."* **That is this report's complaint, and its
+measured evidence** (`thinking-trigger` 0 after click 1, 8 after click 2) **is reproduced by it
+exactly.**
+
+⚠ **It is a SECOND cause, not the same defect, and the two are distinguishable ON SCREEN.** Taken
+literally this report describes the WELCOME pane, and the 503 path **provably cannot produce
+that**: `How can I help you?` and the two starter-prompt chips each occur exactly once in
+`ChatArea.tsx` and all sit inside `if (!thread)`, so a SELECTED thread cannot render any of them.
+⚠ But §3(c) already refuted one half of the described appearance (the "highlight" was almost
+certainly HOVER), so the description is not a reliable single target — which is why this lands on
+SECOND CAUSE rather than UNRELATED.
+
+⛔ **Not closed, and not closable from a chair.** Nothing here reproduced anything in a browser.
+The `re_open_trigger` above now carries **both** discriminators in one visit, and names the amber
+banner that Phase 244-11 added as a **new observable that did not exist when this report was
+filed** — do not read its absence in the original observation as evidence either way.

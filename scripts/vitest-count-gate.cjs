@@ -3018,6 +3018,14 @@ const BASELINE = {
   // 243-06 (MD-4): this suite existed since Phase 176 and was in NEITHER knob, so it ran
   // nowhere and guarded nothing. Registered here when MD-4 added the failed-terminal cases.
   "streamsProvider_bug_260707_03_final_answer_resolve.test.tsx": 6,
+  // ── Phase 244 plan 11 (SHELL-01 / G-3) — a failed snapshot must reach the error slice ──
+  //
+  // 4 cases: Test 1 the gap (a 503 writes `reconcileErrors`), Test 2 the happy path writes
+  // nothing, Test 3 an AbortError writes nothing (a navigation is not a failure), Test 4
+  // the slice stays per-thread. ⚠ Tests 1 AND 4 were both RED before the fix — 4 was
+  // planned as a control, but its positive half (`has(A) === true`) is built on the very
+  // write the gap was missing, so a "control" can sit downstream of the defect it guards.
+  "streamsProvider_244_snapshot_failure.test.tsx": 4,
 
   // ── Phase 243 (243-03 / CHAT-03 / D-243-16) — the scroll effect's ONLY behavioural fence ─
   //
@@ -3334,7 +3342,10 @@ const BASELINE = {
   "MessageItem.cancelledRun.test.tsx": 8,
   "MessageItem.blockedNotice.test.tsx": 4,
   "MessageItem.harnessBanner.test.tsx": 11,
-  "ChatAreaBanner.test.tsx": 7,
+  // 244-11 (G-3): 7 → 9. +2 exactly — Test 5 (empty transcript ⇒ no cached-version claim)
+  // and Test 6 (non-empty ⇒ the shipped sentence byte-exact). No residual: case (c) was
+  // re-fixtured, not duplicated, and its count is unchanged.
+  "ChatAreaBanner.test.tsx": 9,
   "ChatAreaMode.test.tsx": 5,
   "RunCard.characterization.test.tsx": 8,
   "MessageItem.test.tsx": 24,
@@ -5072,6 +5083,15 @@ const TARGETS = [
   // different thing from one nobody noticed.
   "src/__tests__/providers/streamsProvider_243_cadence.test.tsx",
   "src/__tests__/providers/streamsProvider_bug_260707_03_final_answer_resolve.test.tsx",
+  // ── Phase 244 plan 11 (SHELL-01 / UAT gap G-3) — the swallowed snapshot failure ────────
+  //
+  // Named FILE-LEVEL for the same reason as its two neighbours above: `src/__tests__` is
+  // not a bare-directory TARGETS entry anywhere in this array, so this suite would run in
+  // NO gate until it is listed here AND pinned in BASELINE. Both landed in the commit that
+  // drove it RED. ⚠ Phase 214 measured the mirror trap on `WorkflowScheduleModal.test.tsx`:
+  // a directory entry made a suite RUN while BASELINE guarded nothing. TARGETS decides what
+  // RUNS; BASELINE decides what is GUARDED.
+  "src/__tests__/providers/streamsProvider_244_snapshot_failure.test.tsx",
   // ⚠ The scroll suite below is a SEPARATE FILE from `MessageList.test.tsx` on purpose:
   // that one stubs `scrollIntoView` to a NO-OP tree-wide (`:61-65`), so nothing mounted under it
   // can see the scroll effect at all. This is the ONLY behavioural coverage that effect has.

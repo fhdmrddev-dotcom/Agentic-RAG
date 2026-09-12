@@ -661,10 +661,22 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
               message. Rendered as React text children — never HTML
               (T-099-08-01). A plain reconcile Error (no status) keeps the
               cached-version copy + Retry. */}
+          {/* Phase 244-11 (SHELL-01 / UAT gap G-3): the non-ApiError arm's sentence is a
+              claim ABOUT THE SCREEN, so it depends on what is actually on it. With an
+              EMPTY transcript there is no cached version, and telling the person there is
+              one is how BUG-260911-02's reporter read an empty pane as an empty
+              conversation and typed into it. ⛔ ONE new state only — the non-empty
+              sentence is byte-unchanged, and the ApiError arm (099-08's server-detail
+              copy, T-099-08-01) is untouched. ⛔ The literal names no status code, no
+              exception type and no dependency: say what is true of the THING, never what
+              the code experienced. `messages` is the same value the composer and
+              MessageList already read — no new state, no new effect, no new prop. */}
           <span>
             {reconcileError instanceof ApiError
               ? reconcileError.message
-              : "Couldn't load latest messages. Showing cached version."}
+              : messages.length === 0
+                ? "Couldn't load this conversation. It's still there — try again."
+                : "Couldn't load latest messages. Showing cached version."}
           </span>
           <span className="flex gap-2 items-center">
             {!hideRetry && (
