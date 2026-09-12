@@ -263,7 +263,7 @@ describe("WatchedFoldersSection", () => {
      */
     const CAUSES = Object.keys(CONTROL_FOR_CAUSE) as SourceFailureCause[]
 
-    it("the table it loops over is non-empty and carries all five causes", () => {
+    it("the table it loops over is non-empty and carries all six causes", () => {
       // ⚠ RE-BASELINED 4 → 5 (plan 13, gap-closure round 1) — a THIRD non-vacuity pin on the
       //   cause union, found by running the wider suite rather than by reading the plan's file
       //   list, which named only the two pins in `sourceHealthVocabulary.test.ts`.
@@ -271,7 +271,12 @@ describe("WatchedFoldersSection", () => {
       //   fifth cause PASSED FIRST TIME against an unmodified `WatchedFoldersSection.tsx` —
       //   which is D-235-11 ("the map is DATA, never a branch in the card") demonstrated at the
       //   render level rather than asserted, and is worth more than the count itself.
-      expect(CAUSES).toHaveLength(5)
+      // ⚠ RE-BASELINED 5 → 6 (BUG-260912-01, 2026-09-12), and the sentence above held a
+      //   SECOND time: the sixth cause's generated case passed first time against an
+      //   unmodified card. Two independent demonstrations that the map is data.
+      //   ⚠ It was found the same way — by running the wider suite, not by reading a file
+      //     list. This pin is invisible from `sourceHealthVocabulary.test.ts`.
+      expect(CAUSES).toHaveLength(6)
     })
 
     for (const cause of CAUSES) {

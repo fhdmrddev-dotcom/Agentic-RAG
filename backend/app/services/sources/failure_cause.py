@@ -68,13 +68,13 @@ import re
 from typing import Literal
 
 # ⚠ ONE LINE, PLAIN TEXT, GREPPABLE. See the ``?raw`` note in the module docblock.
-Cause = Literal["token_revoked", "folder_gone", "unreachable", "connection_disabled", "unknown"]
+Cause = Literal["token_revoked", "folder_gone", "unreachable", "connection_disabled", "app_credentials_invalid", "unknown"]
 
 #: ⭐ D-235-10 — **cause-dependent promotion to `stopped`.** A cause the next tick CANNOT
 #: recover from is stopped on the FIRST failure. Membership here is the whole rule; there is
 #: deliberately no second place that decides it.
 HARD_CAUSES: frozenset[Cause] = frozenset(
-    {"token_revoked", "folder_gone", "connection_disabled"}
+    {"token_revoked", "folder_gone", "connection_disabled", "app_credentials_invalid"}
 )
 
 #: ⭐ D-235-10 — a cause that MIGHT recover needs this many consecutive failures before the
@@ -100,6 +100,30 @@ _STATUS_CAUSE: dict[int, Cause] = {
     503: "unreachable",
     504: "unreachable",
 }
+
+#: ⭐ BUG-260912-01 — THE ONE TELL THAT OUTRANKS THE STATUS TABLE, AND WHY IT MAY.
+#:
+#: `_STATUS_CAUSE` is consulted before the regexes because *"a code is a stronger signal than
+#: prose"*, and that rule stands. This is not an exception to it — it is the SAME rule applied
+#: to a stronger code. `invalid_client` is the RFC 6749 §5.2 error code, a machine-readable
+#: enum the authorization server emits, and it is strictly more specific than the transport
+#: status carrying it. Every `invalid_client` arrives on a 400 or a 401, so consulting the
+#: status first makes this cause unreachable in practice — which is exactly what happened:
+#: a deployment whose Google client secret no longer matched its client id was narrated as
+#: `token_revoked` and offered **Reconnect**, a control that provably cannot fix it, because
+#: the authorization-code exchange uses the same broken secret.
+#:
+#: ⛔ NARROW ON THE WORDING AND ON THE FACT, both. It matches the error CODE and the two
+#: phrasings of the one sentence Google returns beside it — never the word "client", never a
+#: bare 401. `unauthorized_client` is deliberately absent: `oauth_refresh_service` already
+#: reads that as a revoked grant, and two modules disagreeing about one code is the drift this
+#: package exists to prevent.
+_APP_CREDENTIALS_TELL: re.Pattern[str] = re.compile(
+    r"\binvalid_client\b"
+    r"|client secret is invalid"
+    r"|invalid client secret",
+    re.IGNORECASE,
+)
 
 #: ⭐ Ordered — FIRST MATCH WINS — mirroring `ingestionErrorVocabulary.ts:99-112`. Each matcher
 #: is deliberately BROAD ON THE FACT and NARROW ON THE WORDING: a provider's prose is not ours
@@ -172,6 +196,13 @@ def classify_failure_cause(message: str | None, *, status_code: int | None = Non
     matcher recognises all resolve to ``"unknown"``, whose sentence on the frontend is the
     shipped honest fallback. A confident cause we cannot prove is worse than admitting it.
     """
+    # ⭐ BUG-260912-01 — ASKED FIRST, and only this one tell is. See `_APP_CREDENTIALS_TELL`
+    # for why a §5.2 error code outranks the transport status rather than contradicting the
+    # "code beats prose" rule. It reads the MESSAGE, so a caller with a status and no message
+    # falls straight through to the table below, unchanged.
+    if message and _APP_CREDENTIALS_TELL.search(message):
+        return "app_credentials_invalid"
+
     if status_code is not None:
         mapped = _STATUS_CAUSE.get(status_code)
         if mapped is not None:

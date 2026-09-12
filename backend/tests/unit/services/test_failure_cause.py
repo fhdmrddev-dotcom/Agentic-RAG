@@ -28,7 +28,7 @@ from app.services.sources.failure_cause import (
 # ── ⚠ NON-VACUITY — asserted BEFORE anything loops over the union ─────────────────────────
 
 
-def test_non_vacuity_the_cause_union_has_five_members() -> None:
+def test_non_vacuity_the_cause_union_has_six_members() -> None:
     """An emptied `Cause` union would make every property below pass over nothing.
 
     ⚠ RE-BASELINED 4 → 5 (Phase 235 plan 13, gap-closure round 1). The fifth member is
@@ -36,13 +36,24 @@ def test_non_vacuity_the_cause_union_has_five_members() -> None:
     as `unknown` — *"It stopped, and no reason was recorded."* — with a **Retry now** control
     that provably cannot change a deliberately-disabled connection. The number moves because
     the union genuinely gained a member, never to make an assertion pass.
+
+    ⚠ RE-BASELINED 5 → 6 (BUG-260912-01, 2026-09-12), for the same reason and with the same
+    discipline — in the SAME commit that widened the union, so the tree is never red between
+    the two halves. The sixth member is `app_credentials_invalid`: THIS DEPLOYMENT'S OAuth app
+    registration was rejected (`invalid_client`), which was previously narrated as
+    `token_revoked` and offered **Reconnect** — a control that provably cannot fix it, because
+    the authorization-code exchange uses the same broken client secret. The two causes have
+    OPPOSITE owners: one is fixed by the account holder, the other by the operator.
+    ⛔ The properties this member must satisfy live in
+    `test_bug_260912_invalid_client_is_its_own_cause.py`, not here.
     """
-    assert len(get_args(Cause)) == 5
+    assert len(get_args(Cause)) == 6
     assert set(get_args(Cause)) == {
         "token_revoked",
         "folder_gone",
         "unreachable",
         "connection_disabled",
+        "app_credentials_invalid",
         "unknown",
     }
 
