@@ -1234,13 +1234,31 @@ async def add_model_by_id(
     # second row (the operator edits the existing model in the table instead).
     from app.models.user_settings import load_all_model_overrides  # function-local (Pitfall 4)
     mid_lc = model_id.lower()
-    existing_lc = {k.lower() for k in MODEL_CAPABILITIES} | {
-        k.lower() for k in (await load_all_model_overrides())
-    }
-    if mid_lc in existing_lc:
+    _overrides = await load_all_model_overrides()
+    # ⚠ THE REFUSAL NAMES *WHERE* IT ALREADY IS, because "edit it in the table instead" is a dead
+    # end when the operator cannot find it in the table — which is exactly how this endpoint gets
+    # reached. The registry groups by PROVIDER, and a model's provider is NOT derivable from its
+    # id: `deepseek/deepseek-v4.1-flash` is an OpenRouter id and files under `openrouter`, while
+    # the `deepseek` group holds only the two native `deepseek-v4-*` ids. An operator who looks
+    # under the provider the id spells, finds nothing, and is then told "it's already there"
+    # has been given a contradiction rather than a direction. So: name the provider, the exact
+    # STORED id (casing can differ from what they typed — the match is case-folded), and whether
+    # it is currently shown to users, which is usually the real question behind "where is it?".
+    _existing_by_lc = {k.lower(): (k, v.get("provider")) for k, v in _overrides.items()}
+    for _k, _cap in MODEL_CAPABILITIES.items():
+        _existing_by_lc.setdefault(_k.lower(), (_k, _cap.get("provider")))
+    if mid_lc in _existing_by_lc:
+        _stored_id, _stored_provider = _existing_by_lc[mid_lc]
+        _provider = _stored_provider or _infer_provider_for(_stored_id)
+        _row = _overrides.get(_stored_id) or {}
+        _enabled = _row.get("enabled")
+        _state = "hidden from users" if _enabled is False else "shown to users"
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="That model is already in the registry — edit it in the table instead.",
+            detail=(
+                f"'{_stored_id}' is already in the registry, under the "
+                f"{_provider} group ({_state}) — open that group in the table to edit it."
+            ),
         )
 
     # Build the upsert EXACTLY like set_model_capability: column names ONLY from the code

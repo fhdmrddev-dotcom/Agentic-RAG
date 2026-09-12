@@ -146,6 +146,40 @@ export function ModelRegistryTab({
   // has to decide what to do about a provider that appears later.
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
 
+  // ⚠ A SEARCH, BECAUSE FINDING A MODEL OTHERWISE MEANS GUESSING ITS PROVIDER — and the id does
+  // not tell you. `deepseek/deepseek-v4.1-flash` files under `openrouter`; the `deepseek` group
+  // holds only the two native `deepseek-v4-*` ids. With every group folded by default, an
+  // operator who opens the group the id spells finds nothing, concludes the model was never
+  // added, and reaches for "Add model by ID" — which refuses it as already present. That
+  // contradiction is what this box removes; the matching REFUSAL now names the provider too.
+  //
+  // Display-only, exactly like the discovery panel's `newSearch`: it narrows what is RENDERED
+  // and never what is stored, enabled or written. While a query is active every group with a
+  // match renders OPEN (the fold is what hides the answer, so a search that still required a
+  // click would not have found anything), and the count in each header reports the matches
+  // rather than the group, so the numbers on screen never disagree with the rows on screen.
+  const [search, setSearch] = useState("")
+  const query = search.trim().toLowerCase()
+  // Filter the GROUPS, not the section list: a provider with no match drops out entirely rather
+  // than rendering an empty accordion the operator has to open to learn it is empty.
+  const visibleGroups = useMemo<[string, ModelRegistryRow[]][]>(() => {
+    if (!query) return groups
+    const out: [string, ModelRegistryRow[]][] = []
+    for (const [provider, providerRows] of groups) {
+      // A provider-name match keeps the WHOLE group — "openrouter" should list openrouter's
+      // models, not the zero of them whose id happens to contain the word.
+      const matched = provider.toLowerCase().includes(query)
+        ? providerRows
+        : providerRows.filter((r) => r.model_id.toLowerCase().includes(query))
+      if (matched.length > 0) out.push([provider, matched])
+    }
+    return out
+  }, [groups, query])
+  const matchCount = useMemo(
+    () => visibleGroups.reduce((n, [, providerRows]) => n + providerRows.length, 0),
+    [visibleGroups],
+  )
+
   if (rows === null) {
     return (
       <div
@@ -180,9 +214,41 @@ export function ModelRegistryTab({
       {/* D-159-02: the "+ Add model by ID" affordance sits ABOVE the (byte-identical)
           provider-grouped table. Rendered only when the shell wires `onAddModel`. */}
       {onAddModel && <AddModelSection onAddModel={onAddModel} />}
+
+      {/* Find a model without knowing its provider — see the `search` state above for why that
+          is the load-bearing part. Matches the model id AND the provider name, so both "which
+          group is glm-5.3-flash in" and "show me everything on openrouter" are one box. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          type="search"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Find a model by id or provider…"
+          aria-label="Find a model by id or provider"
+          className="h-8 min-w-[14rem] flex-1 rounded-[8px] border border-border bg-background px-2.5 text-xs text-foreground placeholder:text-muted-foreground/50 focus:border-primary focus:outline-none"
+        />
+        {query && (
+          <span className="text-[11px] text-muted-foreground/80" data-testid="registry-search-count">
+            {matchCount} of {rows.length} model{rows.length === 1 ? "" : "s"}
+          </span>
+        )}
+      </div>
+
+      {query && matchCount === 0 && (
+        <div
+          data-testid="registry-search-empty"
+          className="rounded-[10px] border border-dashed border-border bg-surface px-4 py-6 text-center text-sm text-muted-foreground"
+        >
+          No model matches “{search.trim()}”. It may not be in the registry yet — add it with
+          “Add model by ID” above.
+        </div>
+      )}
+
       <section aria-label="Model registry" className="space-y-2.5">
-      {groups.map(([provider, providerRows]) => {
-        const isCollapsed = !expanded.has(provider)
+      {visibleGroups.map(([provider, providerRows]) => {
+        // While searching, a group with a match renders OPEN regardless of the fold: the fold is
+        // what hid the answer in the first place.
+        const isCollapsed = query ? false : !expanded.has(provider)
         const Logo = providerLogo(provider)
         const shownCount = providerRows.filter((r) => r.enabled).length
         return (
