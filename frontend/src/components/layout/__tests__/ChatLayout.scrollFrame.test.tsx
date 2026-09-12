@@ -74,6 +74,7 @@ import chatLayoutSource from "@/components/layout/ChatLayout.tsx?raw"
 import chatAreaSource from "@/components/chat/ChatArea.tsx?raw"
 import messageListSource from "@/components/chat/MessageList.tsx?raw"
 import navPanelSource from "@/components/layout/NavPanel.tsx?raw"
+import { stripComments } from "@/lib/stripComments.testutil"
 
 /** The house normaliser — CRLF checkouts must not change what a fence sees. */
 const lf = (s: string) => s.replace(/\r\n/g, "\n")
@@ -84,12 +85,13 @@ const MESSAGE_LIST = lf(messageListSource)
 const NAV_PANEL = lf(navPanelSource)
 
 /**
- * Strip `//` line comments and block comments so a comment MENTIONING `<ScrollArea` can
- * neither satisfy nor break a count. ⚠ Deliberately crude (it does not parse strings) —
- * it is applied only to the call-site sweep below, never to a class-list assertion.
+ * ⚠ 244-14 (review IN-02) — `stripComments` MOVED; THE RULE DID NOT. It now lives in
+ * `@/lib/stripComments.testutil` (imported above), because
+ * `MessageItem.inlineApproval.test.tsx` needed the same normaliser and a SECOND copy of it is
+ * precisely the drift this file's own fences exist to catch. It strips `//` and block comments
+ * so a comment MENTIONING `<ScrollArea` can neither satisfy nor break the count below.
+ * ⛔ It is applied only to the call-site sweep, never to a class-list assertion.
  */
-const stripComments = (s: string): string =>
-  s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^[ \t]*\/\/.*$/gm, "")
 
 /** Every `<ScrollArea …>` OPENING tag — not `<ScrollAreaPrimitive.*`, not `</ScrollArea>`. */
 const scrollAreaOpenings = (src: string): string[] =>
