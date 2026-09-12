@@ -700,7 +700,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/settings/ConnectionsTab.tsx` | 25 / 9 / 1635 | ⚠ the row was STALE at `17 / 7 / 1477`. honoured by construction (**22 |
 | `frontend/src/components/settings/ConnectionFormPanel.tsx` | 28 / 10 / 2477 | ⭐ **NAMED SEAM TAKEN (239-08)** — `SourceToolsCard.tsx` extracted, `2807 → 2477`, a pure move. ⛔ the WIDER `ConnectionShapeFields.tsx` seam stays OWED |
 | `frontend/src/lib/api/org.ts` | 11 / 8 / 629 | ⚠ absent for its ENTIRE LIFE at 4 phases; row then STALE at `6 / 4 / 562`. ⚠ **THIRD wire-type drift in this ONE file** (239: `auth_type: "mcp"`) |
-| `frontend/src/components/settings/connectionsCopy.ts` | 15 / 8 / 784 | no seam proposed. honoured by construction (**239**): one word, one union member, one arm — and the arm cannot reach a capability row |
+| `frontend/src/components/settings/connectionsCopy.ts` | 16 / 9 / 804 | ⚠ row was STALE at `15/8/784`. honoured by construction (**BUG-260912-01**): ONE arm MOVED above the oauth_byo block — `failed` was unreachable for the one shape OAuth breaks |
 | `frontend/src/components/settings/connectionFormCopy.ts` | 19 / 8 / 1631 | ⛔ 239-05 named the seam: `configFromDraft`'s arm set. 239-07 RODE it — one serializer both arms call |
 | `frontend/src/pages/SettingsPage.tsx` | 47 / 24 / 1773 | ⚠ STALE for the THIRD close running at `44/23/1738`. ⭐ SHRANK — 242 moved the payload helpers to `settingsSearchPayload.ts`. tab seam still OWED |
 | `frontend/src/pages/settingsSearchPayload.ts` | 1 / 1 / 116 | young (created 242). Row added AT CREATION, not at the third phase — an absent row is invisible to G-5 at any count |
@@ -710,7 +710,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/ExternalActionSection.tsx` | 8 / 5 / 179 | honoured by construction (206.2 / **214**) |
 | `frontend/src/components/workflows/McpToolPicker.tsx` | 5 / 5 / 601 | honoured by construction (211 / **214**) |
 | `backend/app/models/connector.py` | 26 / 14 / 835 | ⚠ row STALE for the 2nd close at `25/14/800`, and its own cell repeated the CLAIM that was false. honoured by construction (**244-07**): `folder_id` typed, not branched |
-| `backend/app/api/connectors.py` | 43 / 20 / 2113 | ⛔ **extraction OWED, FIFTH landing** (2051→2071→2091→2102→2113). honoured by construction (**244-07**): ONE `except HTTPException: raise`, the arm the sibling route already had |
+| `backend/app/api/connectors.py` | 44 / 21 / 2140 | ⛔ **extraction OWED, SIXTH landing** (2051→2071→2091→2102→2113→2140). honoured by construction (**BUG-260912-01**): ONE `except` arm above the generic one, no new route, no new helper |
 | `backend/app/services/sources/preview_service.py` | 8 / 4 / 826 | ⚠ row STALE TWICE; the 2nd read “238: comment-only” while 238 re-opened SEED-253 here. **238-04: display ≠ stored; the walk no longer mutates `SourceFile.path`** |
 | `backend/app/security/egress.py` | 13 / 5 / 982 | honoured by construction (232): Google Drive read/export pins; docstri |
 | `backend/app/services/connector_service.py` | 25 / 9 / 1772 | honoured by construction (**239-06**): the write boundary knows a mapping KEY from a tool name by ALLOW-LIST — an unknown key is still read as a tool name and still refused |
@@ -757,6 +757,10 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/chat/composerCopy.ts` | 2 / 1 / 103 | young (created 244-05). Row added AT CREATION. A PORT of sketch 236's `COPY.js`, `?raw`-fenced. ⛔ `COPY.b` NOT ported (D-244-23). **244-06**: `cloudSub` ported by SHAPE |
 | `frontend/src/components/chat/ConnectedFilePickerModal.tsx` | 3 / 2 / 336 | ⚠ **absent for its ENTIRE LIFE — row added 244-06, and the ledger GATE is what found it (C-8's last `[no-row]`).** REBUILT: select-then-confirm; the commit is the PARENT's |
 | `frontend/src/components/chat/useComposerAttachments.ts` | 1 / 1 / 158 | young (created 244-06). Row added AT CREATION. ⭐ THE SEAM `244-05` NAMED AND OWED — both attach doors' state + verbs; it CANNOT reach `setValue` |
+| `backend/app/services/oauth_refresh_service.py` | 5 / 3 / 362 | ⚠ absent for its ENTIRE LIFE — row added **BUG-260912-01**. The ONE token-renewal seam; `invalid_client` now raises its own named error, NEVER a subclass of the revoked one |
+| `frontend/src/components/sources/SourceFolderPicker.tsx` | 2 / 2 / 375 | ⚠ absent for its entire life — row added **BUG-260912-01** at its SECOND touch. ⛔ a failed child load renders a REASON; "No subfolders" is a claim about the drive and needs an answer to make it |
+| `frontend/src/components/sources/sourceHealthVocabulary.ts` | 6 / 3 / 560 | ⚠ absent for its entire life — row added **BUG-260912-01** at its THIRD phase, so G-5 FIRES on the next touch. SIX causes now; the sixth is the deployment's own credentials |
+| `backend/app/services/sources/failure_cause.py` | 3 / 2 / 227 | ⚠ absent for its entire life — row added **BUG-260912-01**. ⛔ its `Cause` union must stay ONE plain-text line: a frontend suite binds it by `?raw` and a computed union is invisible to that fence |
 
 When a new phase enters discuss-phase, the orchestrator must scan PLAN.md `files_modified` against this ledger. Any match against a G-5-firing row means the discuss-phase produces a refactor recommendation as the first option, not the planned feature — and the phase reads that file's section in `docs/HOT-FILE-LEDGER.md` before planning, because that is where the named seam and the binding invariants live.
 

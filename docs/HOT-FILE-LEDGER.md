@@ -12466,3 +12466,126 @@ that opens onto an empty list.
 mirror: `Attach` means a file that lives in one conversation for 24 hours, `Import` means a
 permanent KB document. Two consequences must not share one word. Case 5 fences it from this side;
 `ConnectedFilePickerModal.thread.test.tsx` Test 3 fences it from the composer's.
+
+---
+
+## BUG-260912-01 — four rows added, two corrected (2026-09-12)
+
+A user reported that the Library's Ingestion tab said **"No subfolders"** for a freshly
+reconnected Google account. The measured cause was not in the folder code at all:
+`GOOGLE_OAUTH_CLIENT_SECRET` in `backend/.env` no longer matched `GOOGLE_OAUTH_CLIENT_ID`, so
+Google answered every token refresh `401 {"error": "invalid_client"}`. **Three surfaces then
+each said something false, and the user had to ask a model to find out what was wrong.** The
+files below carry the fix; four of them had **no ledger row at all**, which is why none of
+them could ever have been surfaced to a phase planning work here.
+
+### `backend/app/services/oauth_refresh_service.py` — 5 / 3 / 362 (row added at this fix)
+
+The single seam that renews an OAuth token. It already special-cased `invalid_grant` to
+`OAuthRevokedError`; everything else, `invalid_client` included, fell into a generic
+`OAuthError` whose message embeds `res.text`. So the **only** place the real cause existed was
+a log line, and every surface above flattened it to *"the provider refused"*.
+
+⛔ **`OAuthClientCredentialsError` IS NOT A SUBCLASS OF `OAuthRevokedError`, and that is the
+binding property.** The two errors have opposite owners:
+
+| | meaning | who fixes it | the control that works |
+|---|---|---|---|
+| `OAuthRevokedError` | one person's authorisation ended | that person | **Reconnect** |
+| `OAuthClientCredentialsError` | this deployment's app registration is wrong | the operator | correct the secret on the server |
+
+Every `except OAuthRevokedError` already in the tree says *"reconnect it once"*. Inheriting
+would have silently re-acquired that wrong sentence at each of them — the exact defect being
+closed. ⚠ It also carries **no provider body**: the token endpoint is the one request whose
+body holds a refresh token, so the error names the fact and the detail stays in the log.
+
+### `backend/app/services/sources/failure_cause.py` — 3 / 2 / 227 (row added at this fix)
+
+Gained a sixth `Cause`, `app_credentials_invalid`, HARD (no cadence of retries repairs a wrong
+secret).
+
+⭐ **The ordering is the whole fix, and it does NOT contradict the file's "a code beats prose"
+rule — it applies that rule to a stronger code.** `_STATUS_CAUSE[401] = "token_revoked"` was
+consulted before the regexes, and **every `invalid_client` arrives on a 400 or a 401**, so the
+new cause would have been unreachable in practice. `invalid_client` is the RFC 6749 section 5.2
+error code — a machine-readable enum, strictly more specific than the transport status carrying
+it — so it is asked first, keyed on the message and never on a status class. A plain 401 with
+nothing to say about client credentials still reads `token_revoked`; that containment is driven.
+
+⛔ **The `Cause` union must stay ONE plain-text `Literal` line.**
+`sourceHealthVocabulary.test.ts` imports this module by `?raw` and extracts the literals with a
+regex. A computed union, a loop, or a union assembled from constants would be invisible to that
+fence and a seventh cause could ship with nothing to say about it.
+
+### `frontend/src/components/sources/sourceHealthVocabulary.ts` — 6 / 3 / 560 (row added at this fix)
+
+⚠ **At three phases it now FIRES G-5 on the next touch**, and the row exists so that firing is
+possible at all. Six causes; the new row's control is **not** `Reconnect X` — the user on the
+measurement did reconnect, twice, and could not have succeeded. Its `action` reuses the
+existing `reconnect` **door** (the Connections surface, where these credentials are corrected),
+so the shipped *"every cause carries exactly one action, drawn from the three named actions"*
+pin stays green **by construction** rather than by being loosened — the same move
+`connection_disabled` made.
+
+⭐ **Its sentence NAMES the useless action in order to rule it out** — *"…and reconnecting will
+not clear it."* Silence would be cheaper and worse: a person looking at a stopped source
+reaches for Reconnect by default. ⚠ A first cut of the suite asserted that the word
+`reconnect` was absent and was **wrong** — a substring ban cannot tell an instruction from a
+refusal. The property is now driven as what it actually is: the imperative absent, the refusal
+present.
+
+⚠ Three count baselines moved 5 to 6, in the same commit as the union: two in
+`sourceHealthVocabulary.test.ts` and **a third in `WatchedFoldersSection.test.tsx` that is
+invisible from the first file** — found by running the wider suite, exactly as the 4 to 5
+re-baseline recorded. The sixth cause's generated render case **passed first time against an
+unmodified card**, a second independent demonstration that the cause-to-control map is data.
+
+### `frontend/src/components/sources/SourceFolderPicker.tsx` — 2 / 2 / 375 (row added at this fix)
+
+⛔ **THE INVARIANT: a load that FAILED and a folder that is EMPTY are different facts, and only
+one of them may be claimed without an answer from the provider.** `handleToggleExpand`'s
+`catch` called `console.error` and set nothing, leaving `childrenMap[id]` undefined; the
+renderer read that as `[]` and printed **"No subfolders"** — a statement about the user's
+drive, manufactured from a request that never got one. The error branch is now asked **first**,
+per node.
+
+⚠ **Errors are PER NODE, never one shared string.** A single shared `error` would make one
+recoverable per-folder fault look like a whole-connection one; a sibling that succeeds keeps
+its own outcome, and that containment is driven.
+
+⛔ **Both the root and the child branch go through `sourceFailureSentence`.** The root branch
+used to render `err.message` raw, and on this measurement that string was the backend's
+sentence with a JSON dict and an OAuth error code appended. The vocabulary passes a string
+through only on **positive proof of plainness**, so the worst case is the honest fallback
+rather than a leak. ⚠ A legacy case pinned that raw pass-through (the words `Network
+connection dropped` appearing verbatim); it was **changed deliberately**, and a new case drives
+the other half — the backend's own authored, punctuated prose still survives intact.
+
+### `frontend/src/components/settings/connectionsCopy.ts` — 16 / 9 / 804 (row corrected; was `15 / 8 / 784`)
+
+`connectionStateOf` read `last_check_verdict === "failed"` **below** the
+`auth_type === "oauth_byo" && status === "active"` arm — so for the one shape OAuth failures
+actually happen to, the failed verdict was **unreachable**. Measured on the live database: the
+`Google Workspace` row carried `status active` / `last_check_verdict failed` and the function
+answered `source_only` — *"Ready as source"* — while every Drive call on it was dying.
+
+⭐ **The file already stated the correct precedence and did not honour it.** The comment on the
+later `source-only` line reads *"⚠ BELOW `failed`, on purpose: a credential that failed says
+something more specific than a capability that exists."* That was true of one arm and false of
+the other. ⚠ And `connectionRowVerdict`'s zero-action arm claims `source-only` asserts *"the
+credential is not revoked **or errored**"* — it never consulted the one column that records an
+error. The read moved above both arms; `disabled` and `revoked` still outrank it.
+
+### `backend/app/api/connectors.py` — 44 / 21 / 2140 (row corrected; was `43 / 20 / 2113`)
+
+⛔ **SIXTH landing with the extraction still owed** (2051, 2071, 2091, 2102, 2113, 2140).
+
+`_check_oauth_connection` — the operator's one diagnostic control — flattened every non-revoked
+refusal to *"The provider refused to renew this authorisation."* The new arm sits **above** the
+generic `except (OAuthTokenUnavailable, OAuthError)`, which is load-bearing:
+`OAuthClientCredentialsError` **is** an `OAuthError` and Python takes the first matching
+clause, so moving it below re-hides the cause.
+
+⚠ **It is the one sentence on this route that names US rather than a vendor or a person.** The
+route is `require_org_manage`, so its audience is exactly the audience who can act on it. The
+docstring's narrowing is unchanged: no secret and no provider body travels.
