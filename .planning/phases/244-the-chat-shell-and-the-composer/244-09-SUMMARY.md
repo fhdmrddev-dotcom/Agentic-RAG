@@ -307,3 +307,16 @@ exiting 0 with a non-vacuous parse.
 2. **An independent review.** This was a solo run; the build and the verification share an author.
 3. `SEED-171`'s sixth suite, if `sketchComposition.test.tsx` reds a third time — trigger recorded in
    `deferred-items.md`.
+
+---
+
+## Self-Check: PASSED
+
+Files asserted present on disk: `244-09-SUMMARY.md`, `244-09-UAT-ROW.md`, `NavPanel.tsx`,
+`ChatLayout.scrollFrame.test.tsx` — all **FOUND**.
+
+Commits asserted present in `git log a2c8da1af..HEAD`: `5dbbc6d84`, `9de33f29c`, `2cafef502` — all
+**FOUND**. `git status --short` is **empty**.
+
+⛔ Neither `STATE.md` nor `ROADMAP.md` was modified — the orchestrator owns those writes after the
+wave completes.
