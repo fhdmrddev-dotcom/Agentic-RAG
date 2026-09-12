@@ -259,9 +259,18 @@ none of them: they sit in NEITHER knob.
 ### ⚠ The tree was not quiet (deferred item 16)
 
 Five frontend admin/api files were modified in this worktree **during this session** by another
-writer (+438/−17, mtimes 08:42–08:47, absent from `git status` at session start). They were left
-strictly alone, but were on disk for every whole-tree gate reading above. **The per-file
-readings are attributable; the whole-tree verdicts are not solely mine.**
+writer (+438/−17, mtimes 08:42–08:47, absent from `git status` at session start), and by 09:07:46
+two BACKEND files had joined them (`api/admin.py`, `services/model_registry.py`). They were left
+strictly alone, but were on disk for the whole-tree gate readings above.
+
+⚠ **The timing matters for the one zero-headroom gate.** My backend BASELINE ran ~08:35–08:45
+(before those backend edits) and my final backend run ~09:20–09:26 (after them) — **not the same
+tree.** ⭐ **The comparison survives because a SET was captured, not a count:** the failing
+test-id set is byte-identical across both runs (71 ids each side, `diff` empty), so neither this
+round nor the other writer added a backend failure. Had only `71` been recorded, a one-in/one-out
+swap would have been invisible.
+
+**The per-file readings are attributable; the whole-tree verdicts are not solely mine.**
 
 ---
 

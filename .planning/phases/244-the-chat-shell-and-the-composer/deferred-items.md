@@ -340,5 +340,17 @@ backend failing-test-id SET is byte-identical to the pre-work baseline.
 ⚠ This is the condition CLAUDE.md warns makes a shared gate non-deterministic. **A gate run
 while another agent writes the same tree measures both of you.**
 
+⚠ **AND IT KEPT GOING, WHICH MATTERS FOR THE ONE ZERO-HEADROOM GATE.** By 09:07:46 two BACKEND
+files had joined them — `backend/app/api/admin.py` and `backend/app/services/model_registry.py`.
+**The timing is the finding:** this executor's backend BASELINE ran ~08:35–08:45 (before those
+edits) and its final backend run ~09:20–09:26 (after them). The two readings are therefore
+**not** taken on the same tree.
+
+⭐ **The comparison survives it, and the reason is that a SET was captured rather than a count.**
+The failing **test-id set** is byte-identical across the two runs — 71 ids each side, `diff`
+empty — so neither this round's changes nor the other writer's introduced a new backend failure.
+Had only the count `71` been recorded, a one-in/one-out swap would have been invisible. This is
+CLAUDE.md's *"capture the SET, never a tail"* rule paying for itself.
+
 **Re-open trigger:** none — this is a standing hazard, not a defect. Recorded so a later reader
 of this phase's numbers knows the tree was not quiet.
