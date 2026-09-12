@@ -272,11 +272,22 @@ describe("the ROADMAP's named ANTI-FIX — MessageItem.tsx:576's sentence surviv
    * Rendered inside the REAL provider with the lock seeded on the store, because this case is
    * about the CARD's copy and not about how the lock got there (case 1 above covers that).
    */
+  /**
+   * ⚠ RE-AIMED BY `244-13`, AND THE ORIGINAL IS RECORDED RATHER THAN SILENTLY REPLACED.
+   * This fixture read `mode: "harness", capPaused: true` — not because anyone believed a
+   * Deep cap-pause was a harness run, but because that is what the product WROTE at the time
+   * (`ChatArea.tsx:234` hard-coded `"harness"` at every write site, which is what made
+   * `C-1` measure `D-244-08`'s first proposal a no-op). Once `WorkflowLock.mode` became a
+   * real discriminator, the old value stopped describing a Deep cap-pause and started
+   * describing WR-07's harness-cap-pause state instead — a different case entirely, now
+   * fenced by `D5` above. ⛔ Nothing was deleted: cases 3 and 3b still assert the same two
+   * sentences, over the shape the product now writes.
+   */
   function renderPausedItem(continuesRemaining: number) {
     useStreamsStore.setState((s) => ({
       workflowLockByThread: new Map(s.workflowLockByThread).set(THREAD.id, {
         runId: "run-deep-capped",
-        mode: "harness",
+        mode: "cap_paused",
         capPaused: true,
         continuesRemaining,
       }),
@@ -312,6 +323,124 @@ describe("the ROADMAP's named ANTI-FIX — MessageItem.tsx:576's sentence surviv
     renderPausedItem(2)
     expect(
       screen.getByText("Reached the iteration limit — some tools haven't run yet."),
+    ).toBeInTheDocument()
+  })
+})
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Phase 244-13 — D5 (WR-07) and D6 (SHELL-02's shipped half, in ONE tree)
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("244-13 / WR-07 — a harness lock that is ITSELF cap-paused stays locked", () => {
+  /**
+   * ⛔ THE FINDING, from `244-REVIEW.md` § WR-07, open at this round's start.
+   * `ChatArea.tsx:140` reads `workflowLock !== null && !workflowLock.capPaused`. A GENUINE
+   * harness lock that is also cap-paused therefore UNLOCKS the composer; the person types,
+   * sends, and `workflow_kickoff.preflight_workflow_kickoff:174` answers **409 "Thread is
+   * workflow-locked"** — *"the UI instructs an action it forbids"*, which is the exact
+   * inversion this phase exists to remove, one branch over.
+   *
+   * ⚠ REACHABILITY, STATED HONESTLY AND NOT OVERSOLD. The review looked for a writer of
+   * `workflow_runs.status = 'cap_paused'` and found none, so the RECONCILE route is latent.
+   * The SSE route is NOT latent: `StreamsProvider.tsx:1193`'s `onCapPaused` writes
+   * `capPaused: true` onto whatever lock the thread holds, including a live harness lock
+   * seeded by the kickoff at `:2539`. `ThreadRunLineKickoff.test.tsx` D5b(a) drives exactly
+   * that, through the real `sendMessage` and the real SSE callback.
+   *
+   * ⛔ WHY THIS CASE WRITES THE LOCK THROUGH THE STORE ACTION RATHER THAN THROUGH A SERVER
+   * FRAME, said plainly rather than left as a smell. `ChatArea`'s own genuine-lock branch
+   * hard-codes `capPaused: false` (244-08's `T-244-03-01` fix), so this state CANNOT be
+   * produced from `getThreadWorkflow` inside this harness at all — the two writers that do
+   * produce it are `StreamsProvider.tsx:1195` (SSE) and `:2345` (reconcile), and neither is
+   * reachable here: this suite spreads the REAL `@/lib/api`, so `getSnapshot` throws in jsdom
+   * and the provider's reconcile dies in its own catch before it reaches its workflow block.
+   * The shape is therefore taken from those two writers and named, and the writer that
+   * produces it is fenced in the other file. What THIS case is about is the ONE boolean at
+   * `ChatArea.tsx:140` — and that boolean is the thing WR-07 is about.
+   */
+  function seedHarnessCapPausedLock() {
+    useStreamsStore.setState((s) => ({
+      workflowLockByThread: new Map(s.workflowLockByThread).set(THREAD.id, {
+        runId: "wr-live-1",
+        mode: "harness" as const,
+        capPaused: true,
+        continuesRemaining: 0,
+      }),
+    }))
+  }
+
+  it("D5 — the composer stays DISABLED, with the harness sentence on BOTH axes", async () => {
+    // The mount reconcile must not overwrite the seed: answer with the same harness lock the
+    // seed describes, so `ChatArea.tsx:204` re-writes `mode: "harness"` and only `capPaused`
+    // differs — which is precisely the state under test.
+    getThreadWorkflow.mockResolvedValue(HARNESS_LOCKED_STATE)
+    renderChatArea()
+    await waitFor(() =>
+      expect(useStreamsStore.getState().workflowLockByThread.has(THREAD.id)).toBe(true),
+    )
+    seedHarnessCapPausedLock()
+
+    // CAUSE — the discriminator says harness, and the pause does not change that.
+    await waitFor(() => {
+      const lock = useStreamsStore.getState().workflowLockByThread.get(THREAD.id)
+      expect(lock?.mode).toBe("harness")
+      expect(lock?.capPaused).toBe(true)
+    })
+
+    // CONSEQUENCE — the rendered SENTENCE on both axes, never a bare `disabled` attribute.
+    const box = await screen.findByPlaceholderText("Workflow running — Cancel to switch back")
+    expect(box).toBeDisabled()
+    expect(box).toHaveAttribute("title", "Workflow running — Cancel to switch back")
+    expect(screen.queryByPlaceholderText("Ask anything…")).toBeNull()
+  })
+})
+
+describe("244-13 / D6 — the Deep cap-pause keeps BOTH halves, in ONE tree", () => {
+  /**
+   * ⛔ WHAT THIS ADDS OVER CASES 1 AND 3, which already assert each half separately: the
+   * browser measured the two halves CONTRADICTING each other while both were on screen
+   * (UAT `G-1`, one `getBoundingClientRect` pass). A suite that proves each half in its own
+   * tree is consistent with a product that never shows them together. ⚠ ⛔ The ROADMAP's
+   * named ANTI-FIX is deleting the Continue-limit sentence to make the contradiction go
+   * away — this case is what stops that happening by accident, because deleting it here
+   * turns a case RED that ALSO asserts the composer is usable.
+   */
+  it("D6 — composer enabled with 'Ask anything…' AND the Continue-limit sentence rendered", async () => {
+    getThreadWorkflow.mockResolvedValue(CAP_PAUSED_STATE)
+    const message = {
+      id: "m-capped",
+      thread_id: THREAD.id,
+      user_id: "u-1",
+      role: "assistant",
+      content: "Partial analysis before the iteration cap.",
+      created_at: "2026-09-11T00:00:00Z",
+      updated_at: "2026-09-11T00:00:00Z",
+    } as Message
+    render(
+      <StreamsProvider>
+        <TooltipProvider>
+          <ChatArea thread={THREAD} onCreateThread={vi.fn().mockResolvedValue(THREAD)} folders={[]} />
+          <MessageItem message={message} isLastAssistant />
+        </TooltipProvider>
+      </StreamsProvider>,
+    )
+
+    // The lock landed, and it landed as a cap-pause rather than as a workflow.
+    await waitFor(() => {
+      const lock = useStreamsStore.getState().workflowLockByThread.get(THREAD.id)
+      expect(lock?.capPaused).toBe(true)
+      expect(lock?.mode).toBe("cap_paused")
+    })
+
+    // Half one — the composer the sentence names is usable.
+    const box = await screen.findByPlaceholderText("Ask anything…")
+    expect(box).not.toBeDisabled()
+
+    // Half two — the sentence is still there to be obeyed, in the SAME tree.
+    expect(
+      screen.getByText(
+        "Reached the Continue limit — this run is stopped. Start a new message to keep going.",
+      ),
     ).toBeInTheDocument()
   })
 })
