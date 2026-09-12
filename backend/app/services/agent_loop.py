@@ -2808,6 +2808,29 @@ async def run_agent_loop(
                 **({"reasoning_content": full_reasoning_content} if full_reasoning_content else {}),
             })
 
+            # BUG-260912-01 — TELL THE UI WHAT THIS LOOP ALREADY KNOWS.
+            #
+            # The two lines below consume `full_content` into the tool-calling assistant
+            # message and drop it. At THIS EXACT POINT the text is known to be narration —
+            # the model talking about what it is going to do — and NOT the answer. The
+            # deltas carrying it were streamed to the browser character by character with
+            # no such marker, so `StreamsProvider` appended them to the message body and
+            # nothing ever took them back: `delta` is append-only and no retraction event
+            # exists. Over a five-tool run the body became a wall of "I'll start by…",
+            # "Now let me…", "Excellent analysis!…" with the real answer buried underneath.
+            #
+            # ⭐ PERSISTENCE WAS NEVER WRONG, WHICH IS WHY THIS IS ONE EVENT AND NOT A
+            # MIGRATION. Because of this very reset, the row written at `_persist_assistant_
+            # message` holds ONLY the final turn's text — measured on the live DB: an
+            # assistant message with 7 tool calls persists 308 chars, no narration. A reload
+            # already rendered correctly. The live stream was the only liar.
+            #
+            # ⛔ EMITTED ONLY WHEN THERE IS SOMETHING TO FOLD. A turn that called a tool with
+            # no preamble (the ordinary shape for a strong model) has nothing to move, and a
+            # boundary event there would make the consumer open an empty fold.
+            if full_content:
+                await _emit(redis, run_id, 'turn_boundary')
+
             # Phase 076.2 Pitfall 1: reset accumulators after consuming them.
             # Without this, iteration 2's reasoning would carry iteration 1's
             # content concatenated. Same pattern as full_content resets at lines

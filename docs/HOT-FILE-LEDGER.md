@@ -13630,3 +13630,149 @@ because the two halves differ and getting it wrong is silent.
 executable binds them; that is a real gap and the honest place to record it is here.
 
 **THE TAB SEAM REMAINS OWED.**
+
+---
+
+## BUG-260912-01 — the turn-boundary fold, seven files
+
+The defect lived in the gap between two halves that were each correct. `delta` is APPEND-ONLY
+and no retraction event exists; `agent_loop` discards a tool-calling turn's text by resetting
+`full_content`, which fixes persistence and the model's context and tells the browser nothing.
+So the body accumulated every "I'll start by…" the model wrote while the row held only the answer.
+
+⭐ **THE MEASUREMENT THAT SIZED THE FIX.** Before writing a line: an assistant message with **7
+tool calls persists 308 characters** and no narration. **A reload already rendered correctly.**
+Only the live stream lied — so the fix is ONE event and a client-only field, not a migration.
+
+⚠ **NO EXISTING TEST COULD HAVE CAUGHT IT.** Backend tests assert what is PERSISTED (right).
+Frontend tests assert that a delta APPENDS (right). Nothing owned *"does the screen still agree
+with the row?"*. That is the question the two new suites ask.
+
+⛔ **AND IT READ AS MODEL-SPECIFIC WITHOUT BEING SO.** The one fold was fed only by
+`reasoning_delta` — the provider's dedicated channel. A model routing thought through it folded
+cleanly; a model that merely *talks* put everything in the body. The renderer was not wrong for
+one model and right for another; it was **blind to the distinction**.
+
+---
+
+### `backend/app/services/agent_loop.py` — BUG-260912-01, honoured by construction
+
+**Measured 2026-09-12: `44 commits / 21 phases / 3326 L`** (supersedes `44 / 21 / 3303`).
+
+One guarded `await _emit(redis, run_id, 'turn_boundary')` immediately above the existing
+accumulator reset. ⛔ **Order is load-bearing and fails SILENTLY if reversed**: emitting after
+`full_content = ""` compiles, passes every other case, and breaks the day the payload carries the
+text. Pinned by `test_bug_260912_01_turn_boundary_event.py`. ⛔ **Guarded on `if full_content:`** —
+a turn that called a tool with no preamble has nothing to fold, and an unguarded boundary would
+make the consumer open an empty one (D-14 default-inert).
+
+---
+
+### `frontend/src/providers/StreamsProvider.tsx` — BUG-260912-01, honoured by construction
+
+**Measured 2026-09-12: `102 commits / 37 phases / 4880 L`** (supersedes `102 / 37 / 4847`).
+
+One callback, `onTurnBoundary`, which moves `content` into `narrationContent` and clears it.
+
+⛔ **IT FLUSHES THE COALESCER FIRST, AND THAT IS THE WHOLE CORRECTNESS ARGUMENT.** `pendingContent`
+may hold the turn's tail inside an open `DELTA_COALESCE_MS` window; moving `m.content` while that
+buffer is unflushed folds the HEAD of the turn and appends its TAIL to the NEXT turn's body —
+narration leaking into the answer, a worse version of the bug being fixed, and invisible to every
+other case. Driven by `§3` of the turnfold suite.
+
+⚠ It also closes the reasoning span, or a burst opened before a tool call stays open across the
+whole execution and `reasoningMs` bills the tool — the exact inflation 243-06/HI-1 measured at
+40100 ms and rejected. ⚠ A turn that narrated nothing returns the row **identical**, not a new
+object: a needless replace is a needless repaint under D-243-08's memo contract.
+
+---
+
+### `frontend/src/components/chat/ThinkingBlock.tsx` — BUG-260912-01, ROW ADDED AT ITS FIRST PHASE
+
+**Measured 2026-09-12: `4 commits / 1 phase / 313 L`** — far below G-5's threshold, and **absent
+from both registers for its entire life.** Added on the `settingsSearchPayload.ts` precedent: an
+absent row is invisible to G-5 at *any* count, so the count is not the reason to write one.
+
+⛔ **THE ONE RENDERER OF THE MODEL'S PROCESS PROSE, NOW FROM TWO SOURCES — one fold, never two.**
+243-03's finding was that a second renderer is how this prose ends up drawn nowhere, or twice.
+The self-guard asks about BOTH inputs, which is what keeps the mount site free of conditionality.
+
+⛔ **`toParagraphs(reasoningContent)` IS A PINNED SOURCE SHAPE, NOT A STYLE CHOICE.** §10c of
+`ThinkingBlock.characterization.test.tsx` uses it as the one-renderer needle. Writing
+`toParagraphs(reasoningContent ?? "")` makes that fence read **ZERO renderers on correct code** —
+measured: it turned the count gate red on this fix's first full run. The `undefined` is absorbed
+INSIDE the helper instead. ⭐ **A characterization fence caught a real regression in a file whose
+author was trying to be careful**, which is the argument for keeping such fences.
+
+⚠ Narration and reasoning stay **two fields, deliberately**. Merging them is the smaller diff and
+would make "Thought for N seconds" describe an interval it never measured.
+
+---
+
+### `frontend/src/lib/api/threads.ts` — BUG-260912-01, honoured by construction
+
+**Measured 2026-09-12: `9 commits / 5 phases / 1715 L`** (supersedes a row reading `7 / 3 / 1683`).
+
+One optional callback and one dispatch arm. ⛔ **`turn_boundary` carries NO payload on purpose:**
+the text is already in the consumer's hands, and a second copy could disagree with the first —
+which is precisely the defect (two places disagreeing about what the body contained).
+
+---
+
+### `frontend/src/types/index.ts` — BUG-260912-01, honoured by construction
+
+**Measured 2026-09-12: `85 commits / 66 phases / 1398 L`** (supersedes `85 / 65 / 1380`).
+
+One optional client-only field, `narrationContent`. ⛔ **No column, and the absence is CORRECT
+rather than a gap:** `agent_loop` discards this text by design, so a reloaded message has never
+carried it. Persisting it would mean storing prose the model is not meant to re-read.
+**THE SEAM REMAINS OWED.**
+
+---
+
+### `frontend/src/components/chat/MessageItem.tsx` — BUG-260912-01, honoured by construction
+
+**Measured 2026-09-12: `75 commits / 34 phases / 1004 L`** (supersedes `75 / 34 / 1000`).
+
+One prop on the existing `ThinkingBlock` mount. No new branch; the call site still decides nothing.
+
+---
+
+### `scripts/vitest-count-gate.cjs` — BUG-260912-01
+
+**Measured 2026-09-12: `212 commits / 46 phases / 5649 L`** (supersedes `211 / 46 / 5618`).
+
+⛔ **BOTH KNOBS, SAME COMMIT, FOR BOTH NEW SUITES.** Neither `src/components/chat` nor
+`src/__tests__` has a bare-directory TARGETS entry, so both fences would have run in **no gate**
+and guarded nothing. ⚠ Do NOT "simplify" either to a directory entry: `src/__tests__/providers`
+holds fourteen inherited failures and a directory entry turns the shared gate red for a reason no
+plan here owns. **TARGETS decides what RUNS; BASELINE decides what is GUARDED.**
+
+---
+
+### `frontend/src/components/chat/RunCard.tsx` — BUG-260912-01, the regression the fix itself shipped
+
+**Measured 2026-09-13: `29 commits / 14 phases / 723 L`** (supersedes `28 / 14 / 710`).
+
+⛔ **THE FIX FOR BUG-260912-01 SHIPPED A SECOND DEFECT, AND A LIVE BROWSER RUN IS WHAT FOUND IT —
+not any of the thirteen green cases written for it.** State 2's guard reads
+`!message.reasoningContent && isStreamingNow && message.isPlanning`. That was a COMPLETE question
+while `ThinkingBlock` had exactly one input: reasoning absent ⇒ the fold is not drawing ⇒ this row
+is the only indicator. Adding narration as a second input opened a window where `narrationContent`
+is set and `reasoningContent` is still empty — **the fold drew, and so did this row.** Measured
+mid-stream: `deciding next step…` and `Thinking...` stacked on screen.
+
+⭐ **THE EXCLUSION WAS NEVER "REASONING IS ABSENT"; IT WAS "THE FOLD IS NOT DRAWING."** The guard
+encoded the first because the two were equivalent at the time. `!message.narrationContent` restores
+the intent.
+
+⚠ **WHY THIRTEEN GREEN CASES MISSED IT, AND WHY THE NEW ONE DRIVES `isStreaming`:** this row is
+gated on `isStreamingNow`, so the double **collapses the moment the run settles**. Every test over
+a finished message sees one indicator and passes against the broken code. §7 of
+`ThinkingBlock.narration.test.tsx` renders the STREAMING state specifically, and was driven RED
+against the unfixed guard.
+
+⚠ **THE GENERAL LESSON, worth more than the fix:** a boolean guard that encodes "the other thing is
+not rendering" by naming *that thing's only input* silently rots the day a second input is added.
+Both renderers now read both inputs; nothing executable binds them, which is the residual risk.
+

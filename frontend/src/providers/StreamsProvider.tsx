@@ -593,6 +593,39 @@ export function makeStreamCallbacks(opts: {
       pendingReasoning += delta
       coalesceDeltas()
     },
+    // BUG-260912-01 — the turn that just streamed ended in TOOL CALLS, so its body text was
+    // narration. Move it into the fold and start a fresh body, so `content` holds only the
+    // FINAL turn: the answer. That is already what the persisted row contains, so this makes
+    // the live stream agree with the reload instead of diverging from it.
+    onTurnBoundary: () => {
+      // ⛔ FLUSH FIRST, AND THIS IS THE WHOLE CORRECTNESS ARGUMENT. `pendingContent` may still
+      // hold this turn's tail inside an open coalescing window (`DELTA_COALESCE_MS`). Moving
+      // `m.content` while that buffer is unflushed would fold the head of the turn and then
+      // append its tail to the NEXT turn's body — narration leaking into the answer, which is
+      // a worse version of the bug being fixed. `onDone` flushes for the same reason.
+      coalesceDeltas.flush()
+      // ⚠ Reasoning ENDS at a turn boundary too. Without this, a burst opened before a tool
+      // call stays open across the entire tool execution and `reasoningMs` bills the tool —
+      // exactly the inflation 243-06 (HI-1) measured at 40100 ms and rejected.
+      closeReasoningSpan()
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.id !== assistantId) return m
+          // Nothing streamed this turn: leave the row IDENTICAL. Returning a new object would
+          // break `MessageItem`'s memo contract for no change (D-243-08's replace-not-push
+          // identity rule cuts both ways — a needless replace is a needless repaint).
+          if (!m.content) return m
+          return {
+            ...m,
+            // Separated by a blank line so `toParagraphs` renders each turn's narration as its
+            // own paragraph instead of running two turns into one sentence — which is the
+            // `…in parallel.I found several…` seam visible in the reported screenshot.
+            narrationContent: m.narrationContent ? `${m.narrationContent}\n\n${m.content}` : m.content,
+            content: "",
+          }
+        }),
+      )
+    },
     onDone: () => {
       // D-243-13: reasoning that never yielded a content delta still ENDS - here.
       closeReasoningSpan()

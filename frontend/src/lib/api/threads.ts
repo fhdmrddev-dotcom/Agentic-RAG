@@ -232,6 +232,16 @@ export interface StreamCallbacks {
   /** Phase 076.2 D-01: DeepSeek reasoning_content streaming delta.
    * Accumulates on message.reasoningContent for real-time thinking display. */
   onReasoningDelta?: (text: string) => void
+  /**
+   * BUG-260912-01 — the turn that just streamed ended in TOOL CALLS, so everything it said
+   * was narration, not the answer. The consumer moves the body text accumulated so far into
+   * the fold and starts a fresh body.
+   *
+   * ⛔ CARRIES NO PAYLOAD ON PURPOSE. The text is already in the consumer's hands; sending it
+   * again would be a second copy that could disagree with the first, and the whole defect is
+   * that two places disagreed about what the body contained.
+   */
+  onTurnBoundary?: () => void
   onDone: () => void
   // Phase 066 D-066-06: 4th kind 'timed_out' — distinct from 'error' (LLM/system failure)
   // and 'cancelled' (user-Stop). Hooks set runStatus='timed_out' on this; MessageItem
@@ -684,6 +694,8 @@ export async function subscribeToRun(
         if (t === "delta") callbacks.onDelta(parsed.content as string)
         else if (t === "reasoning_delta" && callbacks.onReasoningDelta)
           callbacks.onReasoningDelta(parsed.content as string)
+        else if (t === "turn_boundary" && callbacks.onTurnBoundary)
+          callbacks.onTurnBoundary()
         else if (t === "title" && callbacks.onTitleUpdate)
           callbacks.onTitleUpdate(parsed.content as string)
         else if (t === "tool_preparing" && callbacks.onToolPreparing)

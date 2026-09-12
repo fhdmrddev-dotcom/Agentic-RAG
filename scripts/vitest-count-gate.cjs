@@ -2962,6 +2962,13 @@ const BASELINE = {
   // and never a nested scroller, which is what CHAT-01 is about. A lowering here would most
   // cheaply be achieved by dropping exactly §3 and §4 - the two that cost something to keep.
   "ThinkingBlock.clamp.test.tsx": 7,
+  // BUG-260912-01 — both counts READ FROM A REAL RUN after the edits landed, never guessed.
+  // narration 7 = §1..§6 (fold-draws / body-clean / paragraphs / no-invented-span /
+  // both-sources / inert) plus §7, the MID-STREAM double-indicator regression this fix
+  // shipped and a live browser run caught; turnfold 6 = §1..§6 (move / three-turns /
+  // flush-first / blank-line separator / inert / no-span).
+  "ThinkingBlock.narration.test.tsx": 7,
+  "streamsProvider_bug260912_turnfold.test.tsx": 6,
 
   // ── Phase 243 (243-05 / CHAT-05 / CHAT-01 — D-243-06) — the answer out of the fold ─────
   //
@@ -4164,6 +4171,15 @@ const TARGETS = [
   "src/components/chat/RunCard.test.tsx",
   "src/components/chat/RunCard.timer.test.tsx",
   "src/components/chat/__tests__/ChatArea.approval.test.tsx",
+  // ── BUG-260912-01 — narration renders in the fold, not the body ───────────────────────
+  //
+  // ⛔ `src/components/chat` has NO bare-directory TARGETS entry (this file says so in four
+  // separate places), so a suite dropped into `src/components/chat/__tests__/` runs in NO
+  // gate until it is NAMED here AND pinned in BASELINE. Its sibling
+  // `ThinkingBlock.characterization.test.tsx` is already in both, which is exactly why IT
+  // caught this fix breaking the one-renderer needle (§10c) and this new suite could not
+  // have. Both knobs, same commit.
+  "src/components/chat/__tests__/ThinkingBlock.narration.test.tsx",
   // ⭐ Added in 214.1-02 — THE SECOND KNOB for this phase's headline artefact, and it was
   // MEASURED to be needed rather than added by habit: the pre-edit gate run printed no row
   // whatsoever for this file, because `src/pages` is reached by NAMED FILES ONLY and there
@@ -5171,6 +5187,15 @@ const TARGETS = [
   // a directory entry made a suite RUN while BASELINE guarded nothing. TARGETS decides what
   // RUNS; BASELINE decides what is GUARDED.
   "src/__tests__/providers/streamsProvider_244_snapshot_failure.test.tsx",
+  // ── BUG-260912-01 — the turn-boundary fold ────────────────────────────────────────────
+  //
+  // Named FILE-LEVEL for the same reason as its neighbours above: `src/__tests__` is not a
+  // bare-directory TARGETS entry anywhere in this array, so this suite would run in NO gate
+  // until it is listed here AND pinned in BASELINE. ⛔ Do NOT widen this to a
+  // `src/__tests__/providers` directory entry — the fourteen INHERITED failures named above
+  // live in that folder and a directory entry turns the shared gate red for a reason no plan
+  // here owns. Both knobs landed in the commit that drove this suite RED.
+  "src/__tests__/providers/streamsProvider_bug260912_turnfold.test.tsx",
   // ── Phase 244-14 (review WR-02) — the lock-writer lockstep fence ──────────────────────
   //
   // Named FILE-LEVEL for the same reason as its three neighbours: `src/__tests__` is not a
