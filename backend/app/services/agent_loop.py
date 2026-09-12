@@ -1184,6 +1184,14 @@ def _one_line(text: str, cap: int) -> str:
     return flat
 
 
+#: The ONE `workspace_files.kind` a person's attachment carries — stamped by the upload route
+#: (`workspace.py`, `kind="template_input"`, D-12) and by nothing else. ⛔ WR-01 (244-07): the
+#: announcement is an ALLOW-LIST on this value, because every other kind on that table is
+#: something the AGENT wrote, and calling that "a file the user attached" is a lie the model acts
+#: on. `ChatAttachmentChip.attachmentsForMessage` tests the same string on the client.
+_ATTACHMENT_KIND = "template_input"
+
+
 def _build_attachment_note(rows: list[dict] | None) -> str:
     """Render the system-prompt section announcing this thread's attached files.
 
@@ -1204,7 +1212,18 @@ def _build_attachment_note(rows: list[dict] | None) -> str:
 
     ⚠ No expiry rule lives here either. `list_files_in_thread` applies
     the gate in SQL and this renderer consumes that listing — one gate, two readers (D-244-04).
+
+    ⛔ **A `kind` FILTER DOES LIVE HERE, AND IT IS AN ALLOW-LIST (WR-01 / 244-07).** The listing
+    is every non-expired `workspace_files` row for the thread, and the agent writes there too —
+    `workspace_write` rows carry a NULL `kind` and a NULL `expires_at`, so they passed the expiry
+    gate and were announced under a heading that says *"The user attached these files … They
+    expire"*. Both halves false, in a sentence the model acts on. `ChatAttachmentChip` had the
+    rule right all along (*"an AGENT-written workspace file is not an attachment and must never
+    wear this chip"*), so the UI and the prompt described the same set differently.
+    ⚠ ALLOW-LIST, never a deny-list: migration 068 permits `kind IN ('template_input','agent')`
+    plus NULL, and a kind added tomorrow must default to NOT being called a user attachment.
     """
+    rows = [r for r in (rows or []) if r.get("kind") == _ATTACHMENT_KIND]
     if not rows:
         return ""
     lines = []
