@@ -74,6 +74,48 @@ def test_the_note_promises_no_retrieval():
             )
 
 
+# ── WR-01 (244-07) — the note is about ATTACHMENTS, and only those ───────────
+#
+# ⛔ THE UI AND THE PROMPT DISAGREED ABOUT THE SAME SET. `list_files_in_thread` selects EVERY
+# non-expired `workspace_files` row for the thread and there is no `kind` filter anywhere on this
+# path — while `ChatAttachmentChip.attachmentsForMessage` requires `kind === "template_input"` and
+# its docblock says *"an AGENT-written workspace file is not an attachment and must never wear
+# this chip"*. Agent rows carry a NULL kind and a NULL `expires_at`, so they always passed.
+#
+# Concrete: a Deep run calling `workspace_write` ten times made the NEXT turn's system prompt say
+# *"The user attached these files … They expire"* about ten files the user never attached and that
+# never expire. ⛔ Two lies in one sentence, and the model acts on both.
+def _agent_row(path: str) -> dict:
+    """What `workspace_write` leaves behind: NULL kind, NULL expiry."""
+    return {"path": path, "size_bytes": 44, "mime_type": "text/plain", "kind": None}
+
+
+def test_an_agent_written_file_is_not_announced_as_something_the_user_attached():
+    note = _build_attachment_note([
+        _row("/a1b2c3d4-contract.pdf"),
+        _agent_row("/scratch-notes.md"),
+        _agent_row("/step-3-output.txt"),
+    ])
+
+    assert "a1b2c3d4-contract.pdf" in note, "the real attachment must still be announced"
+    assert "scratch-notes.md" not in note
+    assert "step-3-output.txt" not in note
+
+
+def test_a_thread_with_ONLY_agent_files_gets_no_announcement_at_all():
+    """⛔ Not "an announcement listing nothing" — NO announcement. A heading that says the user
+    attached files, over an empty list, is the same false sentence with the evidence removed."""
+    assert _build_attachment_note([_agent_row("/scratch-notes.md")]) == ""
+
+
+def test_an_unknown_kind_is_not_announced_either():
+    """⚠ The rule is an ALLOW-LIST on `template_input`, not a deny-list on the kinds that exist
+    today. Migration 068 permits `kind IN ('template_input','agent')` plus NULL, and a kind added
+    tomorrow must default to NOT being called *"a file the user attached"*."""
+    assert _build_attachment_note([{**_agent_row("/x.bin"), "kind": "agent"}]) == ""
+    assert _build_attachment_note([{**_agent_row("/y.bin"), "kind": "some_future_kind"}]) == ""
+
+
 def test_the_note_says_the_files_expire():
     note = _build_attachment_note([_row("/x-report.docx")])
     assert "expire" in note.lower()
