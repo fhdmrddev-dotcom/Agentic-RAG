@@ -528,10 +528,14 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
         {message.tool_calls && message.tool_calls.length > 0 && (
           <RunCard message={message} isStreaming={isStreaming} />
         )}
+        {/* BUG-260912-01 — `narrationContent` is the same one fold's SECOND source. The mount
+            site still decides nothing: ThinkingBlock's self-guard asks whether EITHER has
+            content, which is what keeps this call site free of tool-conditionality. */}
         <ThinkingBlock
           reasoningContent={message.reasoningContent}
           isStreaming={isMessageStreaming}
           reasoningMs={message.reasoningMs}
+          narrationContent={message.narrationContent}
         />
         {/* Phase 216 / Phase 224: inline tool approval decision card (settled transcript receipt or when not streaming) */}
         {message.toolApproval && (message.toolApproval.decision || !isStreaming) && (

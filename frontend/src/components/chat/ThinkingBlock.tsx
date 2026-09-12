@@ -79,6 +79,17 @@ interface ThinkingBlockProps {
    * message stream (a reload, a navigation, a DB load), and the label then carries NO number.
    */
   reasoningMs?: number
+  /**
+   * BUG-260912-01 — the model's NARRATION from earlier turns: the prose it wrote before each
+   * tool call. Folded here instead of left in the message body, where a five-tool run buried
+   * the answer under "I'll start by…" / "Now let me…" / "Excellent analysis!…".
+   *
+   * ⚠ A SECOND INPUT TO THE SAME FOLD, NEVER A SECOND FOLD. This component's docblock records
+   * that it is the ONLY renderer of the model's process prose, and the 243-03 finding was that
+   * a second renderer is how that prose ends up drawn nowhere (or twice). One fold, two
+   * sources; the self-guard below decides for itself whether either has anything to say.
+   */
+  narrationContent?: string
 }
 
 /**
@@ -100,8 +111,14 @@ interface ThinkingBlockProps {
  * repeated reasoning line. Reasoning is the model's raw prose, not the answer. (Its name is
  * unspelled for the same grep reason as the class tokens.)
  */
-function toParagraphs(reasoning: string): string[] {
-  return reasoning
+function toParagraphs(reasoning: string | undefined): string[] {
+  // ⚠ `undefined` IS ABSORBED HERE, NOT AT THE CALL SITE, AND THAT IS NOT A STYLE CHOICE.
+  // `ThinkingBlock.characterization.test.tsx` §10c pins the EXACT source shape
+  // `toParagraphs(reasoningContent)` as the one-renderer needle (arm 2 of RENDERS_REASONING).
+  // Writing `toParagraphs(reasoningContent ?? "")` at the call site makes that fence read ZERO
+  // renderers on correct code — MEASURED: it turned the count gate red on the first run of
+  // BUG-260912-01's fix. The guard is right; the call shape is what had to give.
+  return (reasoning ?? "")
     .split(/\n[ \t]*\n/)
     .map((paragraph) => paragraph.trim())
     .filter(Boolean)
@@ -157,7 +174,7 @@ function thoughtForLabel(reasoningMs: number | undefined): string {
 
 const CLAMP_MAX_PX = 300
 
-export function ThinkingBlock({ reasoningContent, isStreaming, reasoningMs }: ThinkingBlockProps) {
+export function ThinkingBlock({ reasoningContent, isStreaming, reasoningMs, narrationContent }: ThinkingBlockProps) {
   // Phase 076.2 D-01: collapsed by default. ⚠ The DEFAULT is untouched by the move — the
   // 224-PREFLIGHT §3.2 rule holds: flipping it would be a regression dressed as consistency.
   const [thinkingOpen, setThinkingOpen] = useState(false)
@@ -186,11 +203,15 @@ export function ThinkingBlock({ reasoningContent, isStreaming, reasoningMs }: Th
   useLayoutEffect(() => {
     const el = bodyRef.current
     if (el) setOverflowing(el.scrollHeight > CLAMP_MAX_PX + 1)
-  }, [reasoningContent, thinkingOpen])
+  }, [reasoningContent, narrationContent, thinkingOpen])
   // ⛔ THE SELF-GUARD. This one line is what makes the tool-conditionality disappear by
   //    construction: the block decides for itself whether it has anything to say, and its
   //    mount site therefore needs to decide nothing.
-  if (!reasoningContent) return null
+  // ⛔ THE SELF-GUARD NOW ASKS ABOUT BOTH SOURCES. A run with narration and no provider
+  //    reasoning (the ordinary case for every model that does not expose a reasoning channel —
+  //    which is most of them, and the reason BUG-260912-01 looked model-specific) must still
+  //    draw a fold, or the narration is moved out of the body and rendered nowhere at all.
+  if (!reasoningContent && !narrationContent) return null
   return (
     <Collapsible
       open={thinkingOpen}
@@ -248,6 +269,15 @@ export function ThinkingBlock({ reasoningContent, isStreaming, reasoningMs }: Th
         >
           {toParagraphs(reasoningContent).map((paragraph, i) => (
             <p key={i} data-testid="thinking-paragraph" className="mb-[11px] last:mb-0">
+              {paragraph}
+            </p>
+          ))}
+          {/* BUG-260912-01 — the same paragraph treatment, the same TEXT-CHILDREN-ONLY rule
+              (T-243-02-01), its own testid so a fence can tell the two sources apart. They
+              share one visual column because they are one thing to the reader: what the model
+              did before it answered. */}
+          {toParagraphs(narrationContent).map((paragraph, i) => (
+            <p key={`n${i}`} data-testid="thinking-narration-paragraph" className="mb-[11px] last:mb-0">
               {paragraph}
             </p>
           ))}

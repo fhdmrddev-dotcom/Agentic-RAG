@@ -96,3 +96,39 @@ self-hosted model is not a mechanism anyone should rely on. Relates to SEED-172 
 ⛔ Do NOT fix this by filtering narration out at the backend. It is legitimately useful mid-run —
 that is what the fold is for — and dropping it would also remove it from the model's own context,
 which is the thing that keeps a multi-turn run coherent.
+
+---
+
+## 2026-09-12 — FIX BUILT on branch `fix/BUG-260912-01-turn-fold`. ⚠ STATUS STAYS `open`.
+
+`agent_loop` now emits a guarded `turn_boundary` at the point it already knew the text was
+narration; `StreamsProvider.onTurnBoundary` flushes the coalescer, then moves `content` into a new
+client-only `narrationContent`; `ThinkingBlock` renders that as a SECOND source of the one existing
+fold. Seven files, ~1 event and 1 field.
+
+**Fences (both driven RED against the unfixed code first):**
+`backend/tests/unit/test_bug_260912_01_turn_boundary_event.py` (5 cases — 5/5 RED) ·
+`frontend/src/__tests__/providers/streamsProvider_bug260912_turnfold.test.tsx` (6 — 6/6 RED) ·
+`frontend/src/components/chat/__tests__/ThinkingBlock.narration.test.tsx` (6 — 3/6 RED; the other
+three are negative guards that pass trivially on code that renders nothing).
+Both new suites adopted into **BOTH** count-gate knobs in the same commit — neither
+`src/components/chat` nor `src/__tests__` has a bare-directory TARGETS entry.
+
+**Gates:** backend `71 failed / 4702 passed / 0 collection errors` (baseline exact) · count gate
+`279/279 pinned · 8282 · 0 failing` (+12 = the two new suites, fully attributed) · `tsc -p
+tsconfig.app.json` set-identical at 67.
+
+⭐ **A CHARACTERIZATION FENCE CAUGHT A REAL REGRESSION IN THIS FIX**, which is the argument for
+keeping such fences. `ThinkingBlock.characterization.test.tsx` §10c pins the exact source shape
+`toParagraphs(reasoningContent)` as its one-renderer needle; writing `toParagraphs(reasoningContent
+?? "")` made it read **ZERO renderers on correct code** and turned the gate red. The guard was
+right and the call shape gave way — the `undefined` is absorbed inside the helper.
+
+⛔ **WHY `open` AND NOT `closed`:** not merged, and **not driven in a browser**. The operator has
+not yet seen a real run fold. Nothing here is verified against a live model.
+
+⚠ **AND THE REPETITION IS STILL UNATTRIBUTED.** This fix moves narration out of the body; it does
+NOT explain why the same three sentences appeared three times. If the 4B was restating itself, the
+fold now hides it and the underlying repetition remains. **Do not read a clean body as evidence
+that the repetition was fixed** — it was never diagnosed.
+
