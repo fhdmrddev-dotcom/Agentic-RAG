@@ -153,6 +153,10 @@ describe("244-11 / G-3 — a snapshot failure reaches the per-thread error slice
   })
 
   it("Test 2 (CONTROL — the happy path is untouched) — a resolving snapshot writes NO error and hydrates", async () => {
+    // ⚠ THIS CASE IS BLIND TO THE CLEAR, BY CONSTRUCTION, AND IT SAYS SO RATHER THAN LOOKING
+    // LIKE COVERAGE. It starts from the empty Map the `beforeEach` installs, so it asserts
+    // only that success writes NOTHING. Whether success REMOVES a prior entry is Test 2b —
+    // the transition CR-01 was, and this blindness is why nothing caught it.
     const THREAD_ID = "thread-ok"
     mockGetSnapshot.mockResolvedValue({
       ...EMPTY_SNAPSHOT,
@@ -177,6 +181,70 @@ describe("244-11 / G-3 — a snapshot failure reaches the per-thread error slice
     })
 
     expect(useStreamsStore.getState().reconcileErrors.has(THREAD_ID)).toBe(false)
+    const bucket =
+      useStreamsStore.getState().bucketsBySurface.get("chat")?.get(THREAD_ID) ?? []
+    expect(bucket.map((m) => m.id)).toEqual(["m-1"])
+  })
+
+  it("Test 2b (THE MISSING TRANSITION — CR-01) — a later SUCCESS clears the entry the failure set", async () => {
+    /**
+     * ⛔ THE CASE TEST 2 STRUCTURALLY COULD NOT SEE, and the reason is the whole finding.
+     * Test 2 above starts from `reconcileErrors: new Map()` (the `beforeEach` reset), so it can
+     * only observe *"success writes no error"* — never *"success CLEARS a prior error"*. A
+     * control that begins in the CLEAN state cannot see a missing transition out of the DIRTY
+     * one. This phase has now paid for that shape three times; this case starts DIRTY.
+     *
+     * ⚠ AND IT STARTS DIRTY THROUGH THE PRODUCT'S OWN WRITER, not through a `setState` seed —
+     * the first `reconcile` really 503s, which is what makes the second call's assertion a
+     * claim about the pair rather than about a fixture. The sequence is exactly the one UAT
+     * row L-1's setup observed: open thread → 503 → navigate away → come back → 200.
+     *
+     * ⛔ WHY THE SECOND HALF MATTERS MORE THAN THE FIRST. `ChatArea.tsx:712-717` picks its
+     * sentence off `messages.length`: with an entry present AND a hydrated transcript it reads
+     * *"Couldn't load latest messages. Showing cached version."* over content that was just
+     * fetched from the server. That is a false claim ABOUT THE SCREEN — the precise thing
+     * `244-11` was written to stop — so the bucket assertion below is not decoration.
+     */
+    const THREAD_ID = "thread-recovers"
+    const { result } = renderProvider()
+
+    // 1. The failure really happens, through the shipped arm.
+    mockGetSnapshot.mockRejectedValueOnce(SNAPSHOT_503())
+    await act(async () => {
+      await result.current.reconcile(THREAD_ID)
+    })
+    expect(
+      useStreamsStore.getState().reconcileErrors.has(THREAD_ID),
+      "the dirty state was never reached — this case would then prove nothing",
+    ).toBe(true)
+
+    // 2. The person comes back and the snapshot resolves. 78 messages in the real trace; one
+    //    is enough to make `messages.length` non-zero, which is what flips the sentence.
+    mockGetSnapshot.mockResolvedValue({
+      ...EMPTY_SNAPSHOT,
+      messages: [
+        {
+          id: "m-1",
+          thread_id: THREAD_ID,
+          user_id: "user-1",
+          role: "user",
+          content: "hello",
+          created_at: "2026-09-12T00:00:00Z",
+          updated_at: "2026-09-12T00:00:00Z",
+          tool_calls: [],
+        },
+      ],
+    })
+    await act(async () => {
+      await result.current.reconcile(THREAD_ID)
+    })
+
+    expect(
+      useStreamsStore.getState().reconcileErrors.has(THREAD_ID),
+      "a successful reconcile left the failure entry behind — the banner is sticky for the " +
+        "life of the session, and with a hydrated transcript it now reads 'Showing cached " +
+        "version' over freshly fetched content",
+    ).toBe(false)
     const bucket =
       useStreamsStore.getState().bucketsBySurface.get("chat")?.get(THREAD_ID) ?? []
     expect(bucket.map((m) => m.id)).toEqual(["m-1"])

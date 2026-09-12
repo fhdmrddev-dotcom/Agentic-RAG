@@ -1973,6 +1973,17 @@ export function StreamsProvider({ children }: PropsWithChildren) {
               // no new renderer, no automatic retry, and `Retry-After` is deliberately NOT
               // consumed (that would be a new behaviour, not a gap fix — see
               // deferred-items.md).
+              //
+              // ⚠ 244-14 (CR-01) — THE THIRD HALF OF THE COPIED WRITER IS DELIBERATELY NOT
+              // TAKEN, and the reason is measured rather than stylistic. `loadMessages`
+              // retries ONCE at 1s before it raises (:3243, D-068.5-09). Doing that here
+              // would hold `reconcileInFlightRef` — a GLOBAL flag, not a per-thread one
+              // (:1470/:1942) — for that whole second, and `reconcile` early-returns while it
+              // is held. A thread switch during the sleep would therefore DROP the new
+              // thread's reconcile entirely: the person lands on a conversation that never
+              // reconciles at all, which is a worse failure than a banner they can dismiss.
+              // ⛔ So the banner raises on attempt 0, BY DECISION. Make the in-flight guard
+              // per-thread first if a retry is ever wanted here — see deferred-items.md.
               useStreamsStore.setState((s) => ({
                 reconcileErrors: new Map(s.reconcileErrors).set(
                   threadId,
@@ -1980,6 +1991,34 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                 ),
               }))
               return
+            }
+
+            // ── Phase 244-14 (CR-01) — THE OTHER HALF OF THE WRITER THIS ARM COPIED.
+            //
+            // `244-11` reused the loadMessages FAILURE write above and left its
+            // CLEAR-ON-SUCCESS behind (:3232-3238, which lives in `loadMessages` and not
+            // here). ⛔ `reconcile` IS THE THREAD-OPEN PATH — `loadMessages` runs only from
+            // `handleRetryReconcile`, the `buffer_expired` arm and the stream-terminal
+            // `finally` — so on an ordinary open there was NO writer that could clear the
+            // entry, and one transient 503 painted the banner for the life of the session.
+            //
+            // ⛔ AND THE SECOND FAILURE IS WORSE THAN THE FIRST: once the transcript hydrates,
+            // `ChatArea.tsx:712-717` picks its sentence off `messages.length` and flips to
+            // "Couldn't load latest messages. Showing cached version." OVER FRESHLY FETCHED
+            // CONTENT — a claim ABOUT THE SCREEN that is false, which is the exact thing
+            // `244-11`'s own docblock says it exists to prevent.
+            //
+            // The `has` guard keeps the steady state free: no `setState`, so no subscriber
+            // wakes on the overwhelmingly common clean open. Byte-for-byte the shipped
+            // loadMessages clear, on purpose — two writers of one slice that differ is how
+            // slices drift here. Driven by `streamsProvider_244_snapshot_failure.test.tsx`
+            // Test 2b, which starts DIRTY through this very arm.
+            if (useStreamsStore.getState().reconcileErrors.has(threadId)) {
+              useStreamsStore.setState((s) => {
+                const next = new Map(s.reconcileErrors)
+                next.delete(threadId)
+                return { reconcileErrors: next }
+              })
             }
 
             // Hydrate messages bucket. Phase 075.7 follow-up: widen the MERGE
