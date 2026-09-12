@@ -511,3 +511,43 @@ trusts the index instead of the register mis-classifies a known flake as a new o
 guardrail prose, and a phase quietly editing another phase's register is how corrections lose their
 authorship. The next phase that touches CLAUDE.md's `SEED-171` sentence should re-derive the count
 from this seed rather than increment it.
+
+---
+
+### ⚠ THE REGISTER-DRIFT PREDICTION FIRED A SECOND TIME — Phase 244, plan `244-15` (2026-09-12)
+
+The section above closes by naming the exact failure mode *"an agent that trusts the index instead of
+the register mis-classifies a known flake as a new one"*, and records that Phase 243 did it once.
+**It happened again, unprompted, twenty-four hours later, and the recurrence is the finding.**
+
+`244-15`'s post-merge count gate read `failed 3` on its first run. The executor did the procedure
+**correctly** — filenames captured from the gate's own persisted JSON *before* any re-run, cap
+untouched at `2`, each name checked against an empty `git diff --numstat` against the base, both green
+in isolation, second full run `failed 0` with identical totals. **Nothing about the method was wrong.**
+
+What was wrong was the classification, and it came from CLAUDE.md rather than from here:
+
+| Suite it named | It reported | This register says |
+|---|---|---|
+| `src/pages/WorkflowBuilderPage.canvas.test.tsx` | "one of the seed's five" | listed (added `196-05`) |
+| `src/components/library/__tests__/sketchComposition.test.tsx` | "**a sixth suite**, in a directory none of the five share" | **listed since 2026-09-06**, with its failing pair recorded verbatim |
+
+⛔ **There is no sixth suite, and there was no eighth.** Both names were already here. The count has
+been **SEVEN** in this file since the Phase 237 baseline; **CLAUDE.md still says "five" in three
+places** (`§ Parallel execution` rule 2, lines ~239 / ~315, plus a "three" at ~361 preserved from the
+original planting). An executor reading the index and not the register arrives at "sixth" by correct
+arithmetic on a stale premise.
+
+⭐ **What this escalates:** the first occurrence was caught in review and struck through in
+`243-BASELINE.md`. This one reached an orchestrator as *"new evidence for SEED-171, not folded in"* —
+i.e. it was about to be written into a register as a new datum. **The cost of the stale index is now
+measured twice, and the second time it nearly grew the register by a row that was already in it.**
+
+⚠ **STILL FLAGGED, STILL NOT SILENTLY FIXED, and now for a second recorded reason.** `244-15` is a
+G-7-overridden gap-closure plan (see `STATE.md → Guardrail overrides`); a closure round may not
+quietly rewrite another phase's guardrail prose, and the seed's own rule above says the count must be
+**re-derived from this file**, never incremented from the index. The re-open trigger is unchanged and
+now has two data points behind it:
+
+> **The next phase that touches CLAUDE.md's `SEED-171` sentence re-derives the suite count from this
+> file.** Until it does, expect a third misclassification — the mechanism is intact.

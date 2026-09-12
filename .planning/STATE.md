@@ -449,6 +449,27 @@ re-derivable at any time with `gsd-sdk query audit-open`.
 Both v4.0 overrides are preserved verbatim in `.planning/milestones/v4.0-STATE-at-close.md` →
 *Guardrail overrides*. Record every new override here, per the CLAUDE.md orchestrator protocol.
 
+### G-7 (gap-closure round cap) — Phase 244, round 2 → plan `244-15`
+
+`node scripts/check-gap-closure-rounds.cjs 244` reads `rounds completed: 2 (cap is 2)` and prints
+`G-7 fires`. **Re-derived by the orchestrator at the merge of `244-15`, not inherited from the
+executor's claim** — the gate's own derivation names both rounds (`8cd9d8119` → 244-09..13,
+`8a27ab7f8` → 244-15).
+
+Waved through on the gate's **worded** escape hatch, with the criterion:
+
+> *"SC#3: an approval answered in one home does not settle it in the other, and the run line +
+> composer keep a lock the server has already dropped."*
+
+Verdict: **`G-7 passed WITH OVERRIDES`** — never `clear`. Rests on the operator's recorded ruling at
+the close of round 2 (`244-UAT.md` § *Operator rulings — 2026-09-12*). The
+`[new-capability-in-closure]` arm stayed clear on its own merits.
+
+⛔ **This is the last round available.** A third gap-closure round needs the operator, not a flag —
+if verification returns `gaps_found` on this phase again, triage (fast-fix / defer / accept) is the
+only door, and `/gsd:plan-phase 244 --gaps` must NOT be routed to.
+
+
 ### ⭐ OV-SOLO-01 — RULED ON 2026-09-11 BY THE OPERATOR. It did NOT lapse.
 
 **Ruling (operator, 2026-09-11, at v4.1 scoping):** **solo running continues.** The substitute for the

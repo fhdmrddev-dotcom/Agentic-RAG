@@ -317,7 +317,7 @@ Recorded under `STATE.md → Guardrail overrides`.
 
 **Wave 8**
 
-- [ ] 244-15-PLAN.md — **G-8** answering an approval in one home does not settle it in the other, and the run line + composer keep a lock the server has already dropped. ONE fetch-based settle path that RELEASES (never sets) — `D-v2.5-03` applied to the ANSWER transition (SHELL-03)
+- [x] 244-15-PLAN.md — **G-8** answering an approval in one home does not settle it in the other, and the run line + composer keep a lock the server has already dropped. ONE fetch-based settle path that RELEASES (never sets) — `D-v2.5-03` applied to the ANSWER transition (SHELL-03)
 
 ⛔ **This plan does not close `SHELL-03` either.** It reports **built, drive owed**;
 `244-15-UAT-ROW.md` carries both directions plus the run-line and composer readings, scored by
