@@ -735,7 +735,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/pages/KnowledgeHealthPage.tsx` | 12 / 6 / **DELETED** | **RETIRED (217.1-14)** |
 | `backend/app/api/knowledge_health.py` | 11 / 6 / 737 | honoured by construction (**217.1-11**) |
 | `backend/app/services/agent_loop.py` | 44 / 21 / 3303 | ⚠ **its own cell said “gated General-mode-only” and that was FALSE for harness.** honoured by construction (**244-07**): the gate now names its rule; the renderer allow-lists `kind` |
-| `backend/app/services/tool_dispatcher.py` | 83 / 35 / 4913 | ⚠ row STALE for the 4th close at `80/34/4868`. honoured by construction (**244-07**): the hydration marker moved to a WeakSet of sessions — no new call site |
+| `backend/app/services/tool_dispatcher.py` | 84 / 35 / 4966 | ⚠ row was STALE at `83/35/4913`. honoured by construction (**244-10**): the marker changes TYPE — set→dict of copied paths. No new call site, no new handler, traversal fence byte-unchanged |
 | `backend/app/api/document_governance.py` | 5 / 3 / 416 | ⚠ absent at 3 phases. ⚠ Its low-confidence cutoff is the ConfidenceChi |
 | `frontend/src/components/ingestion/ViewsGroup.tsx` | 5 / 3 / 259 | ⚠ absent for its ENTIRE LIFE at **3 phases** |
 | `frontend/src/components/ui/tabs.tsx` | 3 / 3 / 78 | ⚠ absent for its ENTIRE LIFE |

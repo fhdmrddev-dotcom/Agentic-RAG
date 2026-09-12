@@ -184,22 +184,31 @@ async def test_the_attachments_directory_is_created():
 
 # ── 2. Once per SESSION, not once per call ────────────────────────────────────
 async def test_hydration_runs_once_per_session():
+    """⚠ RE-DRIVEN AT 244-10 — THE CLAIM IS UNCHANGED, THE INSTRUMENT MOVED.
+
+    This case used to assert ``session in tool_dispatcher._hydrated_sessions`` — a MEMBERSHIP
+    CHECK ON A ``WeakSet``, i.e. an assertion about the MARKER'S TYPE rather than about the
+    product's behaviour. `244-10` changes that type (the marker now records WHICH paths were
+    copied, not merely THAT hydration ran), so the old assertion would have failed for a reason
+    that has nothing to do with the property anyone cares about.
+
+    ⭐ It is re-aimed at the property that actually matters — **the same FILE is copied once per
+    session** — which is strictly stronger than the boolean it replaces: a per-file count still
+    fails if the file is re-copied, and it additionally survives any future change of marker.
+    ⛔ The case is NOT deleted; deleting it would have retired WR-02's DoS fence.
+    """
     rows = [_row("/a1b2c3d4-report.docx")]
     ctx = _make_ctx()
     with _sandbox_patched(rows) as (_g, session):
         await _handle_execute_code({"code": "print(1)"}, ctx)
-        first = len(_attachment_copies(session))
+        first = list(_attachment_copies(session))
         await _handle_execute_code({"code": "print(2)"}, ctx)
-        second = len(_attachment_copies(session))
+        second = list(_attachment_copies(session))
 
-    assert first == 1
-    # ⛔ ZERO further copies on the second call — the sandbox session is cached per
+    assert first == ["/sandbox/attachments/a1b2c3d4-report.docx"]
+    # ⛔ ZERO further copies of THAT FILE on the second call — the sandbox session is cached per
     # thread_id until idle eviction, so re-copying is pure container I/O for nothing.
-    assert second - first == 0
-    # ⚠ The flag's HOME moved at `244-07` (WR-02). It was `ctx._attachments_hydrated`, which is
-    # re-created every agent-loop iteration; it is now on the SESSION, which is what "once per
-    # session" was always claiming. Case 2b is the case that could see the difference.
-    assert session in tool_dispatcher._hydrated_sessions
+    assert second == first, "the same attachment was copied twice into one session"
     assert getattr(ctx, "_attachments_hydrated", False) is False, (
         "the flag is back on the per-iteration ToolContext — that is the WR-02 defect"
     )
@@ -219,24 +228,31 @@ async def test_hydration_runs_once_across_agent_loop_iterations():
     ⚠ The SESSION is what persists (``SandboxSessionManager`` caches it per ``thread_id``
     until idle eviction), so this case holds the session fixed and varies the ctx — which is
     exactly what the agent loop does.
+
+    ⚠ RE-DRIVEN AT 244-10 — SAME TREATMENT AS THE CASE ABOVE. Its claim ("eight iterations do
+    not copy the same 10 MB attachment eight times") is still exactly right; only its INSTRUMENT
+    moved, from a bare call COUNT to the copied TARGET PATHS. A count cannot tell a re-copy of
+    the same file from a copy of a different one, and `244-10` makes "a different one" possible
+    for the first time, so the count became ambiguous the moment the fix landed.
     """
     rows = [_row("/a1b2c3d4-report.docx")]
     thread_id = str(uuid.uuid4())
+    dest = "/sandbox/attachments/a1b2c3d4-report.docx"
     with _sandbox_patched(rows) as (_g, session):
         await _handle_execute_code({"code": "print(1)"}, _make_ctx(thread_id=thread_id, iteration=0))
-        first = len(_attachment_copies(session))
+        first = list(_attachment_copies(session))
         # A NEW ToolContext, same thread, same cached session — iteration 2 of the same run.
         await _handle_execute_code({"code": "print(2)"}, _make_ctx(thread_id=thread_id, iteration=1))
-        second = len(_attachment_copies(session))
+        second = list(_attachment_copies(session))
         await _handle_execute_code({"code": "print(3)"}, _make_ctx(thread_id=thread_id, iteration=2))
-        third = len(_attachment_copies(session))
+        third = list(_attachment_copies(session))
 
-    assert first == 1
-    assert second == 1, (
+    assert first == [dest]
+    assert second == [dest], (
         "the attachment was copied AGAIN on the second agent-loop iteration — the guard is "
         "per-ToolContext, not per sandbox session, and the comment says otherwise"
     )
-    assert third == 1
+    assert third == [dest]
 
 
 async def test_a_DIFFERENT_session_hydrates_again():
@@ -348,3 +364,160 @@ async def test_a_hydration_failure_is_named_and_does_not_abort_the_run():
     notes = payload.get("attachments")
     assert notes, "a hydration failure produced no note in the tool result"
     assert any("broken-sheet.xlsx" in str(n) for n in notes)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Phase 244 Plan 10 (gap-closure round 1) — L-5 defect 6b.
+#
+# ⛔ THE DEFECT, IN THE AGENT'S OWN ROUND-4 OUTPUT, not inferred:
+#       /sandbox/attachments [] ['c679b991-Meridian-Q4-pricing.xlsx']
+# — the directory holds only the FIRST file. The agent then burned rounds 5-12 hunting the
+# second one and recovered it at round 10 via the `workspace_read` fallback, ~49 s later.
+#
+# ⭐ THE CAUSE IS IN THE CODE. `244-07` closed WR-02 by moving the hydration marker from the
+# per-iteration `ToolContext` onto the SANDBOX SESSION — right for the DoS arm it named, and
+# wrong for this one: `SandboxSessionManager` caches the session per `thread_id` until idle
+# eviction, so once a session is marked, no LATER attachment is ever copied into it.
+#
+# ⛔ SAY "the second attachment did not hydrate", NEVER ".pdf does not hydrate". The UAT's
+# single run attached .xlsx first and .pdf second, so ORDERING IS CONFOUNDED WITH FILE TYPE and
+# the type-specific claim is NOT ESTABLISHED. The `244-10-UAT-ROW.md` third arm resolves it in a
+# real browser; nothing here can.
+#
+# ⚠ These cases mutate the `rows` LIST between calls, because that is the shape the product
+# produces: `ws_list_files` is re-read from the live table on every call, so a row inserted by
+# the upload door between two `execute_code` invocations simply appears in the next listing.
+# ══════════════════════════════════════════════════════════════════════════════
+
+_A = "/a1b2c3d4-Meridian-Q4-pricing.xlsx"
+_B = "/902f62ba-uat-note.pdf"
+_DEST_A = "/sandbox/attachments/a1b2c3d4-Meridian-Q4-pricing.xlsx"
+_DEST_B = "/sandbox/attachments/902f62ba-uat-note.pdf"
+
+
+# ── A. THE GAP — a file attached AFTER the session exists must still arrive ────
+async def test_an_attachment_added_after_the_session_exists_is_copied():
+    """L-5 defect 6b. Two `execute_code` calls on ONE session; fileB is attached between them.
+
+    ⛔ Asserted on the COPY TARGET PATHS handed to `copy_to_runtime`, never on a note string and
+    never on a call count — the words are not the deliverable here, the FILE is. A note saying
+    "copied" while the container holds nothing is precisely the failure mode the UAT caught.
+    """
+    rows = [_row(_A, mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")]
+    thread_id = str(uuid.uuid4())
+    with _sandbox_patched(rows) as (_g, session):
+        await _handle_execute_code({"code": "print(1)"}, _make_ctx(thread_id=thread_id))
+        assert _attachment_copies(session) == [_DEST_A], "the FIRST attachment never arrived"
+
+        # The person attaches a second file. The upload door writes a workspace_files row; the
+        # sandbox session is untouched and still cached for this thread.
+        rows.append(_row(_B))
+
+        await _handle_execute_code({"code": "print(2)"}, _make_ctx(thread_id=thread_id))
+
+    copies = _attachment_copies(session)
+    assert _DEST_B in copies, (
+        "the SECOND attachment was never copied into /sandbox/attachments — the agent can only "
+        f"reach the first file. copy targets seen: {copies}"
+    )
+
+
+# ── B. WR-02 SURVIVES, PER FILE — the first file is not copied twice ───────────
+async def test_the_already_copied_file_is_not_copied_again_when_a_new_one_arrives():
+    """⛔ THE CASE THAT STOPS THE FIX BECOMING "re-copy everything every call".
+
+    WR-02's DoS arm (T-244-02-05) is a real cost: a 10 MB attachment re-pushed into the
+    container on every agent-loop iteration. Making the copy INCREMENTAL is what closes defect
+    6b; making it UNCONDITIONAL would re-open WR-02. Both must hold at once, which is only
+    possible if the record is per FILE rather than per session.
+    """
+    rows = [_row(_A)]
+    thread_id = str(uuid.uuid4())
+    with _sandbox_patched(rows) as (_g, session):
+        await _handle_execute_code({"code": "print(1)"}, _make_ctx(thread_id=thread_id))
+        rows.append(_row(_B))
+        await _handle_execute_code({"code": "print(2)"}, _make_ctx(thread_id=thread_id))
+        await _handle_execute_code({"code": "print(3)"}, _make_ctx(thread_id=thread_id))
+
+    copies = _attachment_copies(session)
+    assert copies.count(_DEST_A) == 1, (
+        f"fileA was copied {copies.count(_DEST_A)} times across three calls — WR-02 re-opened"
+    )
+    assert copies.count(_DEST_B) == 1, (
+        f"fileB was copied {copies.count(_DEST_B)} times across three calls"
+    )
+
+
+# ── C. THE CAP IS A SESSION TOTAL, NOT A PER-CALL COUNT (T-244-10-01) ──────────
+async def test_the_copy_budget_is_a_session_total_not_a_per_call_count():
+    """⛔ A PER-CALL CAP IS NOT A CAP.
+
+    Making the copy incremental is exactly what would turn `_ATTACHMENT_HYDRATION_MAX_FILES`
+    into a per-call budget, letting a thread exceed it by attaching across several calls — the
+    DoS arm of T-244-02-05, re-opened by the fix that closes defect 6b. The cap is therefore
+    compared against ``len(already) + len(new)``, and the truncation is NAMED.
+    """
+    rows = [_row("/aaaaaaa1-one.pdf")]
+    thread_id = str(uuid.uuid4())
+    with patch.object(tool_dispatcher, "_ATTACHMENT_HYDRATION_MAX_FILES", 2):
+        with _sandbox_patched(rows) as (_g, session):
+            await _handle_execute_code({"code": "print(1)"}, _make_ctx(thread_id=thread_id))
+            rows.append(_row("/aaaaaaa2-two.pdf"))
+            await _handle_execute_code({"code": "print(2)"}, _make_ctx(thread_id=thread_id))
+            rows.append(_row("/aaaaaaa3-three.pdf"))
+            result = await _handle_execute_code({"code": "print(3)"}, _make_ctx(thread_id=thread_id))
+
+    copies = _attachment_copies(session)
+    assert len(copies) == 2, (
+        f"the session copied {len(copies)} files against a cap of 2 — the cap is per CALL, "
+        f"not per session: {copies}"
+    )
+    assert not any("three" in c for c in copies), "the third file crossed a cap of 2"
+    # ⛔ NAMED, never silent — the `confirm_preview` refusal discipline.
+    notes = json.loads(result.llm_content).get("attachments")
+    assert notes, "the budget truncated silently — the agent is told nothing"
+    assert any("workspace_read" in str(n) for n in notes)
+
+
+# ── D. THE ZERO-ATTACHMENT PATH STILL COSTS EXACTLY NOTHING ───────────────────
+async def test_no_attachments_still_costs_nothing_on_every_call():
+    """⛔ Deep and Harness SHARE this handler. Hydration used to run once per session; it now
+    runs on every `execute_code` call, so an empty listing must not become a per-call `mkdir`.
+    """
+    thread_id = str(uuid.uuid4())
+    with _sandbox_patched([]) as (_g, session):
+        for i in range(3):
+            result = await _handle_execute_code({"code": f"print({i})"}, _make_ctx(thread_id=thread_id))
+
+    assert _attachment_copies(session) == []
+    cmds = [str(c.args[0]) for c in session.execute_command.call_args_list if c.args]
+    assert not any("attachments" in c for c in cmds), (
+        f"an empty thread ran container I/O for the attachments dir: {cmds}"
+    )
+    assert "attachments" not in json.loads(result.llm_content)
+
+
+# ── E. ONE EXPIRY GATE — the incremental filter adds no second rule ────────────
+async def test_a_row_that_expires_between_calls_is_never_copied():
+    """D-244-04 re-driven against the incremental path.
+
+    The expiry decision has ONE home — `ws_list_files`' SQL predicate. The incremental filter is
+    applied to THAT listing's output, so a row absent from the listing can never be copied, on
+    call 1 or call 5. ⛔ The source fence `test_hydration_adds_no_second_expiry_rule` below is
+    the other half: this case cannot distinguish "consumed the gated listing" from
+    "re-implemented the predicate correctly by coincidence".
+    """
+    rows = [_row(_A)]
+    thread_id = str(uuid.uuid4())
+    with _sandbox_patched(rows) as (_g, session):
+        await _handle_execute_code({"code": "print(1)"}, _make_ctx(thread_id=thread_id))
+        # A second file is attached AND is already past its TTL — the listing's SQL drops it.
+        rows.append(_row("/deadbeef-expired-late.pdf", expired=True))
+        rows.append(_row(_B))
+        await _handle_execute_code({"code": "print(2)"}, _make_ctx(thread_id=thread_id))
+
+    copies = _attachment_copies(session)
+    assert _DEST_B in copies, "the live late attachment did not arrive"
+    assert not any("expired-late" in c for c in copies), (
+        "an EXPIRED row reached the container — hydration reached around the one expiry gate"
+    )
