@@ -792,8 +792,27 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
               workflowLock?.capPaused && (
                 <div className="mt-2 flex flex-col gap-1.5 rounded-md border border-amber-400/30 bg-amber-400/10 px-3 py-2">
                   <span className="text-xs text-amber-400">
+                    {/* ⛔ Phase 244-14 (WR-01) — THE SENTENCE READS THE LOCK'S MODE, because the
+                        composer beside it does. `244-13` moved `ChatArea.tsx:167` onto
+                        `lock.mode === "harness"` and left this card gated on `capPaused` alone,
+                        so for exactly one state — a HARNESS run that is itself cap-paused — the
+                        two surfaces decoupled and this row told the person to "start a new
+                        message" over a composer reading "Workflow running — Cancel to switch
+                        back", DISABLED. That is the ROADMAP's named anti-fix inverted: the UI
+                        instructing the one action it forbids, moved one component over rather
+                        than closed.
+                        ⚠ REACHABLE, not latent: `onCapPaused` (StreamsProvider write site 1)
+                        INHERITS `"harness"` onto whatever lock the thread holds, and
+                        `ThreadRunLineKickoff.test.tsx` D5b(a) drives it through the real
+                        `sendMessage` + the real SSE bundle.
+                        ⛔ NEITHER SENTENCE IS DELETED — that is the anti-fix. The Deep one is
+                        still exactly what a Deep cap-pause reads (D6 / case 3); the harness arm
+                        names the action that IS available, which is Cancel. Both halves in one
+                        tree: `ChatArea.capPausedComposer.test.tsx` D6 and D7. */}
                     {continueExhausted || workflowLock.continuesRemaining <= 0
-                      ? "Reached the Continue limit — this run is stopped. Start a new message to keep going."
+                      ? workflowLock.mode === "harness"
+                        ? "Reached the Continue limit — this run is stopped. Cancel the workflow to start something new."
+                        : "Reached the Continue limit — this run is stopped. Start a new message to keep going."
                       : "Reached the iteration limit — some tools haven't run yet."}
                   </span>
                   {!continueExhausted && workflowLock.continuesRemaining > 0 && (
