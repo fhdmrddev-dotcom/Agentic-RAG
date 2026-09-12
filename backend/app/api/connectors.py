@@ -674,6 +674,7 @@ async def _check_oauth_connection(
     person at their network.
     """
     from app.services.oauth_refresh_service import (  # deferred: keeps the import graph flat
+        OAuthClientCredentialsError,
         OAuthError,
         OAuthRevokedError,
         OAuthTokenUnavailable,
@@ -696,6 +697,32 @@ async def _check_oauth_connection(
     except OAuthRevokedError:
         bucket = "rejected"
         provider_message = "This authorisation was revoked or has expired — reconnect it once."
+    except OAuthClientCredentialsError:
+        # ── ⭐ BUG-260912-01 — THE OPERATOR'S ANSWER, AND THE ONE ARM THAT NAMES US ───────
+        #
+        # Measured 2026-09-12: a deployment whose `GOOGLE_OAUTH_CLIENT_SECRET` no longer
+        # matched its client id reached the generic arm below and answered *"The provider
+        # refused to renew this authorisation."* The operator reconnected — which cannot
+        # work, because the code exchange presents the same secret — and the real cause was
+        # only recoverable by reading the token endpoint's body out of a script.
+        #
+        # ⛔ ABOVE the generic arm, because `OAuthClientCredentialsError` IS an `OAuthError`
+        # and Python takes the first matching clause. Moving it below re-hides the cause.
+        #
+        # ⚠ IT NAMES US, NOT THE PROVIDER AND NOT THE PERSON. Every other sentence on this
+        # route reports what a vendor said; this one reports what OUR configuration is. That
+        # is the distinction the surface above keys on, so the wording carries it explicitly.
+        #
+        # ⚠ NO SECRET AND NO PROVIDER BODY TRAVELS — the docstring's narrowing is unchanged.
+        # The route is `require_org_manage`, so the audience for this sentence is exactly the
+        # audience who can act on it.
+        bucket = "rejected"
+        provider_message = (
+            "The OAuth application credentials configured on this server were rejected by "
+            "the provider — the client ID and client secret for this integration do not "
+            "match a live OAuth client. Reconnecting will not clear this; the credentials "
+            "have to be corrected on the server first."
+        )
     except (OAuthTokenUnavailable, OAuthError) as exc:
         logger.warning(
             "OAuth check failed for connection %s: %s", connection_id, type(exc).__name__

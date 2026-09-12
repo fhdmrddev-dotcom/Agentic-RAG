@@ -42,6 +42,30 @@ class OAuthTokenUnavailable(OAuthError):
     pass
 
 
+class OAuthClientCredentialsError(OAuthError):
+    """⭐ BUG-260912-01 — THIS DEPLOYMENT'S OAuth app registration was rejected.
+
+    RFC 6749 §5.2 `invalid_client`: the authorization server does not accept the client id /
+    client secret pair this server presented. That is a fact about the OPERATOR'S
+    configuration, and it is a different fact from `OAuthRevokedError` in the one way that
+    decides what every surface above should say:
+
+      · `OAuthRevokedError`        — one person's authorisation ended.  Fix: **Reconnect**.
+      · `OAuthClientCredentialsError` — the app's own credentials are wrong.  Reconnect
+        **provably cannot help**, because `oauth_service.resolve_client_credentials` hands
+        the authorization-code exchange the same broken secret.
+
+    ⛔ DELIBERATELY NOT A SUBCLASS OF `OAuthRevokedError`. Every `except OAuthRevokedError`
+    already in this codebase says "reconnect it once"; inheriting would silently re-acquire
+    the wrong sentence at each of them — which is precisely the defect being closed.
+
+    ⛔ IT CARRIES NO PROVIDER BODY. The token endpoint is the one request whose body holds a
+    refresh token, so `_check_oauth_connection`'s narrowing applies here too: this names the
+    fact, and the detail stays in the log.
+    """
+    pass
+
+
 def resolve_refresh_provider(service_id: str) -> OAuthProvider:
     """Which vendor's token endpoint renews this connection — or a REFUSAL.
 
@@ -105,7 +129,27 @@ async def refresh_oauth_token_at_provider(
                 if "invalid_grant" in err_code or "unauthorized_client" in err_code:
                     logger.warning("Provider %s returned invalid_grant on refresh: %s", provider, err_json)
                     raise OAuthRevokedError("OAuth authorization was revoked or expired at provider")
-            except OAuthRevokedError:
+                # ⭐ BUG-260912-01 — ASKED AFTER `invalid_grant`, NEVER BEFORE IT, and the
+                # order is load-bearing: the two codes are disjoint in the spec, but a server
+                # that emitted both would be describing a revoked grant, which is the arm a
+                # person can act on themselves. `unauthorized_client` stays on the arm above
+                # (it is about THIS grant type for this client, not about the credentials).
+                #
+                # ⚠ RFC 6749 §5.2 permits 400 OR 401 for `invalid_client`; Google uses 401.
+                # Both are already inside this block, so no status is special-cased here.
+                if "invalid_client" in err_code:
+                    logger.error(
+                        "Provider %s rejected THIS DEPLOYMENT'S OAuth client credentials "
+                        "(invalid_client). The configured client id and client secret do not "
+                        "match a live OAuth client at the provider — reconnecting cannot fix "
+                        "this, because the code exchange uses the same secret.",
+                        provider,
+                    )
+                    raise OAuthClientCredentialsError(
+                        "The OAuth application credentials configured on this server were "
+                        "rejected by the provider."
+                    )
+            except (OAuthRevokedError, OAuthClientCredentialsError):
                 raise
             except Exception:
                 pass
