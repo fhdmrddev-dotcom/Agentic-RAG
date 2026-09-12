@@ -472,6 +472,16 @@ describe("G-6 (244-12, BLOCKER) — the shape the PRODUCT writes, not the shape 
     // REAL, it was accepted deliberately (every gate on this mount is a narrowing mount
     // condition, and a narrowing mount condition is what made SHELL-03 unreachable twice over),
     // and this case ASSERTS it rather than writing an assertion that would hide it.
+    //
+    // ⚠ THE REAL FIGURE, measured 2026-09-12 by toggling this exact mount off and on against
+    // this exact fixture — NOT the plan's "roughly 2-4" estimate, which understated it:
+    //     getThreadPendingAsks  0 -> 2      (useAskUserPrompt's usePanelReconcile)
+    //     getThreadWorkflow     1 -> 3      (PendingAskStack's usePhases -> reconcilePhases)
+    //   ⇒ +4 fetches per THREAD OPEN, on every thread, pause or no pause.
+    // ⛔ The assertions below deliberately bind the SHAPE of the cost (non-zero, and identical
+    // with and without a pause) rather than the literal 2 — a literal encodes a per-mount
+    // constant this project has already measured wrong once. The literal lives here and in
+    // 244-12-SUMMARY.md, where a reader can see it rot.
     useStreamsStore.setState({ pendingAsksByThread: new Map() })
     getThreadPendingAsks.mockResolvedValue([])
 
@@ -578,9 +588,22 @@ describe("D-244-13 — the cross-surface shell's OTHER TWO homes still render th
     expect(runPage.length).toBeGreaterThan(1000)
     expect(panel).toContain("<PendingAskStack")
     expect(runPage).toContain("<PendingAskCard")
-    // …and the chat mount is exactly ONE render site, inside the hasPendingAsk arm.
+    // …and the chat column mounts it exactly ONCE — at LIST level, not per row.
+    // ⚠ 244-12 INVERTED THIS ASSERTION, and the reason is worth more than the assertion.
+    // It used to read `toHaveLength(1)` against `MessageItem.tsx`. After the mount moved, a
+    // PROSE mention of the identifier in MessageItem's own "it was here and is gone" comment
+    // kept that count at 1 — so the fence went on passing while the thing it counted had left
+    // the file. A source fence that counts a token cannot tell code from a comment; the only
+    // repair is to count in the file that now OWNS the mount and to assert ZERO in the one that
+    // does not. Both directions are asserted, with a non-empty positive control on each.
     const item = (await import("../MessageItem.tsx?raw")).default as string
+    const list = (await import("../MessageList.tsx?raw")).default as string
     expect(item.length).toBeGreaterThan(1000)
-    expect([...item.matchAll(/<PendingAskStack/g)]).toHaveLength(1)
+    expect(list.length).toBeGreaterThan(1000)
+    expect([...item.matchAll(/<PendingAskStack/g)]).toHaveLength(0)
+    expect([...list.matchAll(/<PendingAskStack/g)]).toHaveLength(1)
+    // …and the CUE stayed behind, which is what makes the split deliberate rather than a move
+    // of everything.
+    expect([...item.matchAll(/<PausedRunCue/g)]).toHaveLength(1)
   })
 })
