@@ -10330,7 +10330,7 @@ cells rot within days.
 | [`frontend/src/components/chat/ToolCallPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattoolcallpaneltsx) | 51 / 23 / 351 | **FIRES** | ✅ **G-5 DISCHARGED (227-02)** — extracted ToolCallDetails, StepRow, toolStepDerivation (1019 → 351 lines) |
 | [`frontend/src/components/chat/MessageItem.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageitemtsx) | 75 / 34 / 1000 | **FIRES** | ⚠ row STALE a FOURTH time (`74/34/981`). honoured by construction (**244-14 / WR-01**): the Continue card reads the lock's MODE, like the composer beside it. State 3→3, effects 0→0, props 5→5 |
 | [`backend/app/api/threads.py`](docs/HOT-FILE-LEDGER.md#backendappapithreadspy) | 245 / 82 / 1617 | **FIRES** | ⚠ row was STALE at `243 / 80 / 1590`. honoured by construction (**244-03**): ONE existing pure-read query loses a WHERE predicate and gains a Python guard. ⛔ no writer added |
-| [`frontend/src/providers/StreamsProvider.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcprovidersstreamsprovidertsx) | 100 / 37 / 4727 | **FIRES** | ⚠ row STALE a 7th time (`97/37/4660`). honoured by construction (**244-14**): reconcile CLEARS on success, ONE capPaused value, the dead abort arm deleted. ⛔ no retry — the in-flight ref is GLOBAL |
+| [`frontend/src/providers/StreamsProvider.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcprovidersstreamsprovidertsx) | 101 / 37 / 4815 | **FIRES** | ⚠ row STALE a 7th time (`97/37/4660`). honoured by construction (**244-14**): reconcile CLEARS on success, ONE capPaused value, the dead abort arm deleted. ⛔ no retry — the in-flight ref is GLOBAL |
 | [`frontend/src/hooks/useMessages.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusemessagests) | 74 / 27 / 127 | ⚠ **FIRES** | extraction due |
 | [`backend/app/services/anthropic_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesanthropic_servicepy) | 11 / 10 / 354 | ⚠ **FIRES** | adapter-pattern audit due |
 | [`frontend/src/components/workflows/WorkflowCanvas.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsworkflowcanvastsx) | 31 / 9 / 1708 | **FIRES** | honoured by construction (199 / 200 / **214**) — 214-04 widened the panel and touched no node logic |
@@ -10371,7 +10371,7 @@ cells rot within days.
 | [`frontend/src/hooks/useFollowScroll.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusefollowscrollts) | 4 / 2 / 314 | does not fire | ⛔ **NO ROW FOR ITS ENTIRE LIFE — added 243-03**, then STALE at `3/2/265` one phase on. **243-06:** the re-arm now asks whether the reader is STILL leaving, not what they last did |
 | [`frontend/src/lib/throttle.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibthrottlets) | 2 / 2 / 108 | does not fire | ⛔ **NO ROW FOR ITS ENTIRE LIFE — added 243-03.** TWO opposite primitives on purpose; ⛔ never unify them — one of the two call sites breaks silently |
 | [`frontend/src/components/chat/ChatArea.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatchatareatsx) | 75 / 36 / 781 | **FIRES** | ⚠ row STALE a THIRD time (`72/36/710`). honoured by construction (**244-13**): the SAME one boolean now tests the lock's MODE — WR-07. No second branch, no new state |
-| [`frontend/src/components/panel/PendingAskCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelpendingaskcardtsx) | 14 / 7 / 765 | **FIRES** | ⚠ row was STALE at `13 / 7 / 736`. UNTOUCHED by 244-03 (`0 0`) — the chat approval MOUNTS its shipped `PendingAskStack`, never edits the shell. ⚠ `SEED-219` still open |
+| [`frontend/src/components/panel/PendingAskCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelpendingaskcardtsx) | 15 / 8 / 836 | **FIRES** | ⚠ row was STALE at `13 / 7 / 736`. UNTOUCHED by 244-03 (`0 0`) — the chat approval MOUNTS its shipped `PendingAskStack`, never edits the shell. ⚠ `SEED-219` still open |
 | [`frontend/src/pages/WorkflowRunPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowrunpagetsx) | 28 / 9 / 1670 | **FIRES** | honoured by construction (200 / 200.1 / 200.2 / **214**) — it resolves the step identity ONCE and its children render it |
 | [`frontend/src/components/chat/OutputFileCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatoutputfilecardtsx) | 8 / 7 / 219 | **FIRES** | honoured by construction (195) |
 | [`frontend/src/components/panel/FilesSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelfilessectiontsx) | 10 / 6 / 363 | **FIRES** | ⚠ row was STALE at `8 / 5 / 334`. honoured by construction (**244-05**): TWO `export` keywords, zero body change — the chat chip IMPORTS `expiryCaption` rather than re-deriving its three readings |
@@ -10383,7 +10383,7 @@ cells rot within days.
 | [`backend/app/api/settings.py`](docs/HOT-FILE-LEDGER.md#backendappapisettingspy) | 38 / 20 / 972 | ⚠ **FIRES** | ⚠ STALE for the THIRD close running at `35 / 19 / 814`. honoured by construction (**242**): one refusal helper behind an allow-list, four call sites, every typed sentence preserved |
 | [`backend/app/services/multimodal_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmultimodal_servicepy) | 14 / 7 / 984 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** — row added SEED-227, which is also where its silent truncation was found |
 | [`backend/app/api/documents.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentspy) | 87 / 34 / 2414 | ⚠ **FIRES** | ✅ **DISCHARGED AGAIN (240-03)** — the email-attachment loop extracted to `services/email_attachments.py`. 240-04 adds the conversation read |
-| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 171 / 41 / 4850 | ⚠ **FIRES** | ⚠ row was STALE at `167 / 38 / 4786`. honoured by construction (**240**): three suites into BOTH knobs; verdict `7914 · 7149 · 247/247` |
+| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 211 / 46 / 5618 | ⚠ **FIRES** | ⚠ row was STALE at `167 / 38 / 4786`. honoured by construction (**240**): three suites into BOTH knobs; verdict `7914 · 7149 · 247/247` |
 | [`backend/app/services/eval_runner_service.py`](docs/HOT-FILE-LEDGER.md#backendappserviceseval_runner_servicepy) | 12 / 7 / 959 | ⚠ **FIRES** | ⚠ absent at 7 phases (added 196) |
 | [`frontend/src/components/panel/PhaseCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasecardtsx) | 16 / 10 / 755 | ⚠ **FIRES** | honoured by construction (200 / **214**) — the failure sentinel NARROWED to both-sources-empty |
 | [`frontend/src/components/panel/PhaseTimeline.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasetimelinetsx) | 9 / 7 / 385 | ⚠ **FIRES** | honoured by construction (**214**) — it mounts the shared identity; ⚠ absent from BOTH until 200 |
@@ -10593,7 +10593,7 @@ cells rot within days.
 | [`frontend/src/components/chat/ConnectedFilePickerModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatconnectedfilepickermodaltsx) | 3 / 2 / 336 | no (2 phases) | ⚠ **absent for its ENTIRE LIFE — row added 244-06, and the ledger gate FAILED on it at this phase's base (C-8).** 244-06 REBUILT it: select-then-confirm, and the commit is the parent's |
 | [`frontend/src/components/chat/useComposerAttachments.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatusecomposerattachmentsts) | 2 / 1 / 183 | no (new) | young (created 244-06). Row added AT CREATION. ⭐ THE SEAM `244-05` NAMED AND OWED — both attach doors' state and verbs; `MessageInput.tsx` shrank `855 → 821` |
 | [`frontend/src/components/chat/ActiveConnectorChips.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatactiveconnectorchipstsx) | 2 / 2 / 82 | no (2 phases) | ⚠ absent for its entire life — row added 244-05 at its SECOND phase. **244**: the row container HOISTED out; it is bare chips now, `null` on empty (D-244-26) |
-| [`frontend/src/stores/streamsStore.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcstoresstreamsstorets) | 20 / 13 / 525 | **FIRES** | ⚠ **absent for its ENTIRE LIFE at 13 phases — row added 244-13, and the phase's ledger gate was RED on it at every prior commit.** **244-13**: `WorkflowLock.mode` becomes a REAL discriminator |
+| [`frontend/src/stores/streamsStore.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcstoresstreamsstorets) | 21 / 13 / 546 | **FIRES** | ⚠ **absent for its ENTIRE LIFE at 13 phases — row added 244-13, and the phase's ledger gate was RED on it at every prior commit.** **244-13**: `WorkflowLock.mode` becomes a REAL discriminator |
 | [`frontend/src/lib/toolMeta.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibtoolmetats) | 10 / 6 / 218 | **FIRES** | ⚠ **absent for its ENTIRE LIFE at 6 phases — row added 244-13, which does NOT modify it.** ⛔ the ONE home of the harness activity string: a literal copied elsewhere makes its byte-pin vacuous |
 
 
@@ -13240,3 +13240,193 @@ observation rather than fixed here, since this round created only one of the two
 ⭐ **DRIVEN, not reasoned.** The mount was removed from `MessageList.tsx` and replaced by a comment
 naming it; case 6c stayed **GREEN**. With `stripComments` it goes red. `MessageList.tsx` was restored
 **md5-identical** (`ad87aa8abc5fa53bba038f5f85b0124c`).
+
+---
+
+## `frontend/src/providers/StreamsProvider.tsx` — `244-15`
+
+**Triple re-derived at this plan's close: `101 / 37 / 4815`.** The row read `100 / 37 / 4727` and was
+STALE for the **eighth** consecutive time. It is this file's own recurring finding: a figure written
+at a phase's close goes stale on the next commit that touches it, sometimes the same afternoon.
+
+**G-5 FIRES (37 phases against a threshold of 3) — honoured BY CONSTRUCTION, no override.**
+
+**The measured reason, a test rather than an argument.** The plan's central design constraint was
+that the settle path must **RELEASE ONLY**, never become a seventh derivation of the workflow lock:
+
+| figure | before | after |
+|---|---|---|
+| `grep -c "setWorkflowLockForThread(" StreamsProvider.tsx` | **5** | **5** |
+| `setInterval` / `setTimeout` inside the new action body | — | **0** |
+| new phase-spine refreshers | — | **0** (the shipped `refreshPhaseSpineAfterStop` gained a second caller and a docblock sentence naming it) |
+| new `getThreadWorkflow` readers | — | **1**, in its own `try/catch` |
+
+**What was added.** One action, `releaseSettledWorkflowLock(threadId)`, placed immediately after
+`clearWorkflowLockForThread` so the two live together. One `getThreadWorkflow` read; the two SHIPPED
+guards read **off the wire** rather than re-derived (`locked && !lock_is_stale &&
+active_workflow_run_id` for a live anchor; `cap_paused` for a cap pause — the exact conditions of
+this file's own two mount-reconcile `setWorkflowLockForThread` arms, quoted by reference); either one
+holding releases **nothing** and re-attaches `latest_producer_run_id` through the shipped
+`subscribeProducerStreamRef` arm instead, so the **shipped terminal handler** stays the only thing
+that ends a lock's life. Otherwise: `clearWorkflowLockForThread` → `clearStopStateForThread` →
+`refreshPhaseSpineAfterStop`.
+
+⚠ **`clearStopStateForThread` AND NOT A HAND-WRITTEN SET DELETE, and this is the half most likely to
+be "simplified" later.** `useHarnessLiveForThread` (`:4711`) has **TWO disjuncts** —
+`harnessKickoffThreads.has(tid) || lock?.mode === "harness"` — so clearing only the lock leaves the
+run line reading `live` with its 1 s `setInterval` clock on a dead run, which is **half of what the
+operator actually saw**. `clearStopStateForThread` is the SHIPPED writer of `harnessKickoffThreads`.
+**Two writers of one slice that differ is how slices drift in this file**, which `244-14`'s CR-01
+already paid for once. Test 2 seeds **both** disjuncts and asserts **both**, precisely so a fix that
+cleared one would go red.
+
+**The invariants that now bind this file, added by this plan:**
+
+1. ⛔ **The settle path may never call `setWorkflowLockForThread`.** A call there re-opens `G-1`: it
+   would be a seventh derivation of one fact, from a path nobody orders against the other six. The
+   source comment says so **and** Test 8 sweeps the brace-matched action body (on comment-stripped
+   source, because the comment names the forbidden symbol in order to forbid it).
+2. ⛔ **It may never grow a timer.** `ThreadRunLine.tsx`'s `D-11` binds — *"WorkflowRunPage already
+   owns the polling concern"*. One GET per human answer, bounded by the number of answers.
+3. ⛔ **Fail-closed is the DIRECTION, not merely the agreement.** A live anchor **or** `cap_paused`
+   releases nothing. Unlocking the composer during a live harness run is the elevation
+   `T-244-03-01` names; a cap-paused lock is a lock the person still needs (`244-08`). Tests 3, 4
+   and 5 assert **object identity** (`toBe`), so a path that cleared and rewrote an equal lock still
+   fails.
+4. **A failed read writes nothing and does not propagate.** The caller is a click handler in a card
+   with **no error boundary** (`BUG-260529-03` crashed the whole panel on a null `options`). Test 6
+   asserts the lock Map and the kickoff Set are the **same object references** afterwards.
+
+⚠ **WHAT THE FENCES CANNOT SEE, recorded here rather than left implicit.** Every one of the twelve
+cases is a **jsdom mount over a mocked API**. They prove the settle path does what it claims when
+handed a wire shape; they **cannot** prove the product hands it that shape. The driven evidence is
+`244-15-UAT-ROW.md` and it is **UNRUN**.
+
+**Per G-5 the next phase adding a genuinely second concern here owes a refactor recommendation
+FIRST; the seam is unchanged and still untaken — the per-surface message buckets, the SSE
+subscription lifecycle, the mount/derive reconcile, `sendMessage`'s kickoff path and the
+run-liveness slices are five concerns in one 4815-line provider. It inherits `101 / 37 / 4815`, and
+that figure goes stale on the next commit touching the file.**
+
+---
+
+## `frontend/src/stores/streamsStore.ts` — `244-15`
+
+**Triple re-derived: `21 / 13 / 546`.** The row read `20 / 13 / 525` — **stale one plan after it was
+added**, which is worth recording plainly: this file's row was created by `244-13` and was already
+wrong by `244-15`. **G-5 FIRES (13 phases) — honoured BY CONSTRUCTION, no override.**
+
+**What was added: one action type and one bare no-op stub.** `releaseSettledWorkflowLock` is declared
+directly beneath `clearWorkflowLockForThread` in the `actions` interface, and its synchronous no-op
+default sits beside `clearWorkflowLockForThread: () => {}`.
+
+⚠ **TYPED `void`, NOT `Promise<void>`, and the reason is structural rather than cosmetic.** It is
+fire-and-forget from a click handler — a rejected background read must never reach a surface with no
+error boundary — and a `void` return is what lets the stub stay a **bare arrow**. The stub is not
+decoration: a store consumer can fire before the provider's mount effect registers real bodies, and
+`PendingAskStack` reaches this action through `useStreamsStore.getState().actions` from **eight
+suites that mount it with no provider at all**. A synchronous no-op is exactly the right behaviour
+there — with no provider there is no lock to release.
+
+**The invariant this adds:** ⛔ **the action's doc comment must keep saying what it does NOT do.** It
+releases a lock the server has already dropped; it never sets one. A future reader who finds only
+*"re-reads the workflow state"* has lost the one sentence that stops the next editor turning it into
+a seventh lock writer.
+
+**Per G-5 the next phase adding a genuinely second concern owes a refactor recommendation FIRST. It
+inherits `21 / 13 / 546`.**
+
+---
+
+## `frontend/src/components/panel/PendingAskCard.tsx` — `244-15`
+
+**Triple re-derived: `15 / 8 / 836`.** The row read `14 / 7 / 765`. ⚠ **The PHASE count moved, 7 → 8**
+— so this file crossed further into G-5 rather than merely gaining lines. **G-5 FIRES — honoured BY
+CONSTRUCTION, no override.**
+
+**The measured reason, the same test this project's other cross-surface shells use:**
+
+| figure | before | after |
+|---|---|---|
+| `grep -c "useState[(<]"` | **9** | **9** |
+| new fetch call sites in this file | — | **0** |
+| new hooks | — | **0** |
+| new store slices | — | **0** |
+| new user-facing strings | — | **0** (a gap-closure round may not introduce a capability — guardrail G-7) |
+
+⛔ **THE `useState` FIGURE IS THE LOAD-BEARING ONE.** The card already carries **nine** pieces of
+state; a tenth would be **new state ownership on a cross-surface shell with THREE homes**
+(`D-244-13`). The settle deliberately lives in `PendingAskStack`, which is the only one of the two
+that knows the thread id, and the card learns nothing about what settling means — it knows only that
+its answer was accepted.
+
+**What was added.** One optional prop, `onAnswered?: () => void`, in the same register as `runIsOver`
+/ `action` / `service`: optional so that **every existing caller renders exactly the card it rendered
+before the prop existed**. It is called **once**, in `handleSubmit`, **after** the optimistic
+`setAnsweredValue` / `setState("answered")` flip and **only on the success path** — never in any
+`catch` arm — and the call is wrapped so a throwing callback cannot take the card down.
+
+In `PendingAskStack`, `settleAnswered` composes exactly two shipped things and creates **no third
+mechanism**: the `reconcile()` the stack already holds from `useAskUserPrompt(threadId)` (one GET →
+`replacePendingAsksForThread` → **one** shared store key → both homes drop the card), and
+`releaseSettledWorkflowLock(threadId)`.
+
+⛔ **REACHED THROUGH `useStreamsStore.getState().actions`, NOT `useStreamActions()` — MEASURED, NOT
+STYLISTIC, and the comment in the source says so to stop it being tidied.** Eight suites mock
+`@/providers/StreamsProvider` with an **allow-list** factory and render this stack directly or
+through `WorkspacePanel` / `MessageList`: `ChatArea.approval`, `MessageItem.continueButton`,
+`StopControl.baseline`, `PendingAskCard`, `PendingAskCard.retired.baseline`, `WorkspacePanel`,
+`WorkspacePanel.derived`, `WorkflowRunPage`. A new provider-hook import makes every one of them throw
+on an omitted export.
+
+⚠ **ONE BEHAVIOUR CHANGE THAT MUST NOT BE READ AS A DETAIL, and it is a DECISION rather than a
+discovery.** Once the settle lands, the **answering** card **UNMOUNTS** instead of resting on its
+green *"Answered · agent resumed"* state. That is the SHIPPED behaviour of the `ask_user_response`
+SSE path (this file's own `:22` docblock: *"the SSE then removes the prompt from the store,
+reactively clearing the card"*), extended to the workflow path that never receives that SSE.
+**`244-15-UAT-ROW.md` Arm 4 READS what the answering home shows afterwards** so the operator judges
+the receipt on evidence rather than on this argument.
+
+⛔ **`WorkflowRunPage`'s home is BEHAVIOURALLY BYTE-UNCHANGED and this is a claim, not an
+assumption.** It mounts `PendingAskCard` **directly** (`WorkflowRunPage.tsx:1629`), not the stack,
+and the new callback defaults to absent. Test 12 asserts it by **API call count** rather than by
+render — a render assertion would pass for a card that fired the settle and simply had not
+re-rendered yet. Arm 5 of the UAT row is the driven half of the same claim.
+
+⚠ **A RED, UNGATED FENCE WAS FOUND ON THIS FILE AND REPAIRED HERE.**
+`PendingAskCard.retired.baseline.test.tsx` pins the card's `?raw` line count, and it had been red
+since `d58fa43a0` — measured at this plan's base as `1 failed | 8 passed`, `expected 766 to be 737`.
+**It was in NEITHER count-gate knob**, so the gate never ran it and nothing guarded the three shipped
+retirement sentences it reads out of source. Pin superseded in place `737 → 837` (the chain
+`487 → 630 → 650 → 737 → 837` stays visible) and the suite adopted into **both** knobs — **only
+because all nine cases are green**; adopting a red suite turns the shared gate red. Thirteenth suite
+found in this state; `SEED-229` carries the structural fix.
+
+**Per G-5 the next phase touching this file owes a refactor recommendation FIRST. The seam is named
+rather than implied: `PendingAskCard` (the card's own render + countdown + submit) and
+`PendingAskStack` (thread resolution, `runIsOver` derivation, step-identity resolution, and now the
+settle) are two concerns sharing one file — and the stack is the half that keeps growing. It
+inherits `15 / 8 / 836`.**
+
+---
+
+## `scripts/vitest-count-gate.cjs` — `244-15`
+
+**Triple re-derived: `211 / 46 / 5618`.** The row read `171 / 41 / 4850` in the scan list and
+`167 / 38 / 4786` in CLAUDE.md — **two registers disagreeing with each other and both wrong**, by up
+to **44 commits and 8 phases**. Both are corrected here, in the same commit.
+
+**What changed: two suites adopted into BOTH knobs.**
+
+| suite | TARGETS | BASELINE | why |
+|---|---|---|---|
+| `src/__tests__/providers/streamsProvider_244_settle_ask.test.tsx` | **added** (file-level) | **8**, then **12** | `src/__tests__` is not a bare-directory entry anywhere in this file, so the new suite ran in **no** gate until it was named |
+| `src/components/panel/__tests__/PendingAskCard.retired.baseline.test.tsx` | **added** (file-level) | **9** | in NEITHER knob and RED since `d58fa43a0` |
+
+⛔ **FILE-LEVEL, DELIBERATELY NOT THE DIRECTORY.** A `src/__tests__/providers` directory entry would
+pull in the **fourteen inherited failures** documented in that file's own comment block and turn the
+shared gate red for a reason no plan here owns. **TARGETS decides what RUNS; BASELINE decides what is
+GUARDED, and a suite can sit on the wrong side of exactly one of them** — which is precisely the
+state the card's baseline suite was in.
+
+**Per G-5 the next phase owes a refactor recommendation FIRST. It inherits `211 / 46 / 5618`.**
