@@ -13546,6 +13546,16 @@ That is the shape SEED-172 recorded and SEED-173 generalised.
 
 ---
 
+⭐ **OPERATOR-CONFIRMED LIVE, 2026-09-12** — driven in the real app against a remote Unsloth
+server exposed through a Cloudflare tunnel, which is the configuration the whole change exists for
+(a `custom` endpoint, a URL this codebase has no vendor knowledge of, reached over the network).
+That closes the G-4 lived-experience gate, which the 45 passing `SettingsPage` cases could not:
+they assert the field RENDERS, never that a save reaches a server and answers.
+
+⚠ **What the confirmation does NOT cover, stated so it is not read as broader than it is:** whether
+that model emits TOOL CALLS. `capability_source=inferred` is still the resolution for any id absent
+from `MODEL_CAPABILITIES`, and a `native_tools=False` landing is silent — see SEED-173's note.
+
 ### `backend/app/config.py` — mig 180, honoured by construction
 
 **Measured 2026-09-12: `83 commits / 48 phases / 1572 L`** (supersedes `83 / 48 / 1506`; the row had gone stale for the **twelfth** time).

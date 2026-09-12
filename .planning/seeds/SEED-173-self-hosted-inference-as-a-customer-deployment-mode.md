@@ -189,3 +189,9 @@ with nothing saying why. **Reaching an endpoint is not parity.**
 
 **Re-open trigger, unchanged and now sharper:** the next time anyone needs a local model to use
 tools, or the capability-inference patterns / `_INFERENCE_FALLBACK_PROVIDER` are touched.
+
+**2026-09-12, same day — the reachability half is OPERATOR-CONFIRMED LIVE**, driven against a remote
+Unsloth server behind a Cloudflare tunnel. ⛔ The parity half above is unchanged and untested: nobody
+has yet watched a self-hosted model attempt a tool call. **That is the next thing to measure, and a
+green chat reply is not evidence of it.**
+
