@@ -1960,11 +1960,26 @@ export function StreamsProvider({ children }: PropsWithChildren) {
               // `lib/api/threads.ts:1063`'s docstring already claimed otherwise
               // ("the StreamsProvider consumer routes via its existing error handler").
               //
-              // ⚠ AN ABORT IS NOT A FAILURE. `reconcile` is fired from `setViewingThread`
-              // on EVERY thread switch; without this arm each switch that cancels an
-              // in-flight snapshot would raise a banner on the thread the person actually
-              // wanted. Symmetric with the loadMessages wait-abort guard at :3203.
-              if (err instanceof DOMException && err.name === "AbortError") return
+              // ⛔ 244-14 (review WR-04) — THE ABORT ARM THAT USED TO SIT HERE IS DELETED,
+              // AND ITS DELETION IS THE HONEST OPTION OF THE TWO. It read
+              // `if (err instanceof DOMException && err.name === "AbortError") return`, and
+              // all three of its claims were wrong at once:
+              //   1. UNREACHABLE. `getSnapshot(threadId, signal?)` takes an OPTIONAL signal
+              //      and the call below passes NONE, so nothing can abort this fetch.
+              //   2. THE JUSTIFICATION NAMED A MECHANISM THE CODE DOES NOT HAVE. It said a
+              //      thread switch "cancels an in-flight snapshot"; the in-flight protection
+              //      here is `reconcileInFlightRef`, which DROPS the second reconcile — it
+              //      does not abort the first.
+              //   3. NARROWER THAN THE WRITER IT CLAIMED TO MIRROR. `loadMessages` tests both
+              //      `Error.name` AND a duck-typed `{ name }` (:3241-3242), because the shape
+              //      differs between jsdom, undici and the browser.
+              // A guard for a state the product cannot produce is dead code carrying a false
+              // sentence, and its test was a control over a branch nothing can reach.
+              // ⛔ THE OBLIGATION IS NOW ENFORCED INSTEAD OF GUESSED: if a signal is ever
+              // threaded into the `getSnapshot` call below, restore the SHIPPED two-shape
+              // abort guard IN THE SAME COMMIT. `streamsProvider_244_snapshot_failure.test.tsx`
+              // Test 3 fails the moment that call grows a second argument, which is a fence
+              // that CAN fire — unlike the control it replaced.
               // ⛔ The EXACT shipped write from the loadMessages failure path (:3209-3215),
               // reused rather than re-invented: two writers of one slice that differ is how
               // slices drift here. It lands in the per-thread `reconcileErrors` Map
