@@ -716,3 +716,74 @@ records and a re-hydrate.
 - any plan moves the sandbox-session record off the process (Redis, or a marker written INSIDE the
   container — the latter is the cheaper one, because the container IS the thing the record is a
   claim about).
+
+---
+
+## Gap-closure round 2 (`244-15`) — deferred by the orchestrator at the phase close, 2026-09-12
+
+Source: `244-REVIEW-gap-round-2.md` (diff base `8a27ab7f8`, the review of `244-15` alone; it retires
+nothing from the two prior review files). Of that review's three warnings, **`WR-01` was FIXED as a
+G-3 fast-fix** in the same close — it was a regression `244-15` itself introduced, and the G-7
+protocol prescribes fast-fix, never a third round. The two below are deferred **as decisions**, with
+triggers that can actually fire.
+
+⚠ **Both are properties of the NEW settle path.** Neither predates `244-15`, so neither can be
+dismissed as inherited. They are deferred because each needs a design answer that a spent
+gap-closure round is the wrong place to give.
+
+### 12. [`WR-02` · warning · missing guard CONFIRMED, interleaving PLAUSIBLE] The post-answer `reconcile()` has no abort and does a whole-list REPLACE
+
+**Where:** `frontend/src/components/panel/PendingAskCard.tsx` (`PendingAskStack`'s `settleAnswered`)
+→ `frontend/src/hooks/usePanelReconcile.ts:105-111`.
+
+The reconcile the settle composes is `usePanelReconcile`'s **manual** hatch. Its `AbortController` is
+constructed per call and **never aborted**; its only post-await guard is its own `signal.aborted`,
+which nothing ever sets; and it ends in a whole-list `replacePendingAsksForThread`. Two answers in
+quick succession whose responses land in inverted order therefore let the older response's list win —
+**resurrecting a card the person has already answered.**
+
+⭐ **The adjacent server race was ruled OUT, by reading the server rather than assuming it:**
+`backend/app/api/runs.py:838` writes the response row *before* returning 200, and
+`backend/app/api/panel.py:193` filters `NOT EXISTS` on that row. So a reconcile that starts after the
+answer's 200 cannot see the answered ask. The exposure is **client-side ordering only** — which is
+also why it is narrow enough to defer.
+
+**Why deferred, not fixed:** the fix is not a one-liner. Aborting the previous in-flight reconcile
+needs an owner for the controller (a ref on the stack, or a change inside `usePanelReconcile` that
+every other caller inherits), and the honest alternative — making the write a targeted remove rather
+than a list replace — reopens which component owns `pendingAsksByThread`. That is a design call.
+
+**Re-open trigger (any one):**
+- **the `244-15-UAT-ROW.md` browser drive observes an answered card reappearing** — this is the
+  cheapest trigger and it is owed anyway;
+- any plan touches `usePanelReconcile.ts` or `replacePendingAsksForThread`;
+- a thread is ever able to hold **two** pending asks at once (today the surface effectively serialises
+  them, which is the whole reason the window is narrow — that property is load-bearing and undeclared).
+
+### 13. [`WR-03` · warning · CONFIRMED] The settle's "one GET per answer" bound is wrong — it is up to three
+
+**Where:** `frontend/src/providers/StreamsProvider.tsx`, the `releaseSettledWorkflowLock` docblock.
+
+The docblock argues bounded-ness from *"One GET per human answer"*. Measured: `refreshPhaseSpineAfterStop`'s
+only guard is `viewedThreadId !== threadId`, and the stack's `threadId` **is** `useViewingThread()` —
+so on the production path a **second** `getThreadWorkflow` always fires, plus the ask reconcile's own
+GET. **Three requests, not one.** The SUMMARY contradicts itself on the same point (line 51 says
+"one", line 336 says "two") and **both undercount**.
+
+⛔ **The bound itself still holds** — it is O(human answers), never a poll, and nothing retries. What
+is wrong is the **number in the prose**, and the fence that was supposed to protect it:
+`streamsProvider_244_settle_ask.test.tsx` Test 8 cannot see the second GET because in Tests 2-6
+`viewedThreadId` is `null`, so that branch never executes in the suite. **A fence that cannot reach
+the code it claims to bound is this project's standing failure mode, recorded here rather than
+quietly corrected.**
+
+⚠ **Deferred as a DECISION and not as a typo fix**, because correcting the comment alone leaves the
+fence still unable to fire. The real work is a case that sets `viewedThreadId === threadId` — which
+means deciding whether the second GET should exist at all, or whether the settle should pass the
+already-read `wf` into the spine refresh instead of re-fetching it.
+
+**Re-open trigger (any one):**
+- any plan edits `releaseSettledWorkflowLock`, `refreshPhaseSpineAfterStop`, or Test 8;
+- the request count is ever load-bearing (a rate limit, a cost budget, an offline/flaky-network row);
+- **the next phase that touches this docblock** — it must re-derive the count from the code, never
+  copy the number forward. Two registers already disagree about it.
