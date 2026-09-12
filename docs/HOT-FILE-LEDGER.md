@@ -8849,7 +8849,95 @@ buckets, `documents.py` **3**, `ingest_enrich.py` **1**, `vitest-count-gate.cjs`
 
 ## frontend/src/components/layout/NavPanel.tsx
 
-**20 / 11 / 329** · ⚠ **FIRES** · the desktop nav rail.
+**22 / 12 / 370** · ⚠ **FIRES** · the desktop nav rail.
+
+⚠ **RE-DERIVED AT `244-09` — the row read `20 / 11 / 329` and was STALE by two commits, a phase
+and forty-one lines.** Measured with CLAUDE.md's own recipe at commit `5dbbc6d84`, from the repo
+root, with the arithmetic published rather than asserted: **zero** six-digit dated quick-task
+buckets were present to subtract, and **four** non-numeric buckets were discarded (`nav`, `phase`,
+`SEED`, and one untagged `fix:` subject). The twelve phase buckets are `043 044 103 146 148 155 156
+166 235 244 45 48` — ⚠ note `045/45` and `048/48` are the same two phases spelled two ways, a
+pre-existing convention artifact of this recipe that is **preserved rather than silently corrected**,
+because changing the accounting inside a re-derivation would make the delta unreadable.
+
+### ⭐ 244-09 — THIS IS THE FILE PHASE 244's OWN FIRST CRITERION TURNED ON, AND THE LEDGER POINTED ELSEWHERE
+
+SHELL-01 asks that *"no dead space opens under the composer **at any window height**"*. Driven in
+Chrome on 2026-09-12 across six samples (three viewport heights × panel open/closed), **two failed**:
+
+| viewport h | panel | `#root` sh / ch | overflow |
+|---|---|---|---|
+| 436 | CLOSED | 540 / 436 | **+104px** |
+| 436 | OPEN | 540 / 436 | **+104px** |
+| 576 / 696 | either | equal | 0 |
+
+The threshold bisected to **h=516 (+24px)**. `rootScrollHeight` is **pinned at 540px at every
+viewport**, and panel state makes no difference at all — which is itself diagnostic: the overflowing
+element is in neither the panel nor the message column.
+
+**It is this rail.** Its auto-margin footer block (the org/operator shields + the ProfileMenu
+identity anchor, 128px tall) measured `bottom = 540px`, past the rail's own box, and the walk up the
+parent chain found `overflow-y: visible` on every ancestor to `<html>` — so the excess escaped to
+the page scrollbar. The rail root computed `overflow-y: visible` **and** `min-height: auto`: it could
+neither scroll nor clip its own content.
+
+⭐ **THE FINDING IS ABOUT THE SWEEP, NOT THE CLASS.** `244-01` fixed exactly this mechanism, at five
+sites — `ChatLayout.tsx:803,809`, `ChatArea.tsx:501,584`, `MessageList.tsx:219` — **all in the
+MESSAGE column**. The workspace `<aside>` already carried `flex h-screen min-h-0 min-w-0 flex-col
+overflow-hidden`. The rail is the **one column of the shell that got neither treatment**, and it is
+the one that was broken. A sweep that follows the ledger sweeps the files the ledger lists; this file
+**sat outside the G-5 audit for eleven phases** before Phase 235 added its row, so when `244-01` went
+looking for unbounded flex children it looked at the column the ledger pointed at.
+
+**The fix is one source line**: `min-h-0 overflow-y-auto` on the rail root. The overflow rule is what
+does the work — the box was **already** bounded at the viewport (`h-full` inside `div.flex.h-screen`,
+measured `height = viewport`), so the content escaped purely because the computed overflow was
+`visible`. `min-h-0` is defensive, carried for symmetry with `244-01`'s five sites and because the
+automatic-minimum-size rule is direction-dependent. The in-file comment says **which of the two does
+the work**, because a comment that claims more than it can is this ledger's own recurring defect.
+
+⛔ **DO NOT "FIX" A RECURRENCE WITH A `min-height` ON THE PAGE, `#root` OR ANY ANCESTOR.** That makes
+the page scroll deliberately, which IS the bug. ⛔ **And do not shrink or re-order the footer block** —
+the footer is not too big; the rail could not scroll.
+
+⚠ **TWO MEASUREMENT CORRECTIONS FROM THE DRIVE, RECORDED SO THEY ARE NOT RE-MADE.** Both are in
+`244-UAT.md` verbatim; both were caught before they were allowed to stand.
+1. **The composer gap is NOT the failing measure.** An earlier reading logged `106.6px` at h=436 and
+   called it "grown" — an artifact of reading the rect against an already-scrolled root. Re-measured
+   unscrolled it is **37.0px at all six samples**, footer gap 12.0px at all six. `rootOverflowBy` is
+   the only measure that moves.
+2. ⛔ **`document.scrollingElement` / `documentElement` is the WRONG instrument in the automation
+   browser.** The extension injects nodes into `<body>`, and `documentElement.scrollHeight` measured
+   **1522 at a viewport of 696** — a number with nothing to do with the app. The correct instrument
+   is `document.getElementById('root').scrollHeight` vs its own rect height (`document.body
+   .scrollHeight` agrees). A briefly-believed "second instance at h=696" was purely measurement error
+   and is **not** a finding.
+
+✅ **RAIL DRIFT IS NOT THE DEFECT AND MUST NOT BE "FIXED".** With a real trusted scroll (a synthetic
+`WheelEvent` moves the list 0px and is discarded), the rail's Δ `dTop`/`dLeft` is **0** and app
+`scrollIntoView` calls are **0** at every height *including* where the root overflows. The rail does
+not move — **it cannot FIT**.
+
+⛔ **THE FENCE CANNOT CLOSE THIS AND SAYS SO.** `ChatLayout.scrollFrame.test.tsx` gains link 6
+(`5` → `6` in BOTH gate knobs), driven RED twice — once against the shipped tree, once against a
+planted deletion of `overflow-y-auto` alone, restored between drives. **jsdom performs no layout**, so
+link 6 pins only that the token cannot be deleted silently. The pixels are
+`.planning/phases/244-the-chat-shell-and-the-composer/244-09-UAT-ROW.md`, driven at
+`/gsd:verify-work`. SHELL-01 is **built, drive owed** — never closed by this plan.
+
+⚠ **AND A CLAIM ABOUT THIS ROW WAS ITSELF STALE.** `244-UAT.md`'s G-5 block asserts *"NavPanel.tsx has
+NO hot-file ledger row"* and lists adding one under `missing:`. **That is false** — Phase 235 added it,
+and `check-hot-file-ledger.cjs --files frontend/src/components/layout/NavPanel.tsx` exits `0`. Acting
+on it would have added a **second** row and failed `[duplicate-row]`. The correction is recorded here
+rather than in the UAT, because *"the row exists but is stale"* and *"the row is absent"* call for
+opposite actions and only one of them is safe.
+
+**Named seam if it is touched again (updated at `244-09`, superseding nothing):** the rail's three
+regions — logo/toggle, the nav list, and the auto-margin footer — are **one flat flex column with no
+scroll owner**. Today the whole rail scrolls, which is right at 370 lines and wrong the moment the nav
+list grows: the **nav list** is the region that should own the scroll, with the logo and the footer
+pinned. Extract `NavRailScrollRegion` before a second producer of nav items is ever registered.
+⭐ The Phase 235 seam below still stands and is NOT superseded.
 
 ⚠ **IT HAD NO ROW IN THIS LEDGER FOR ITS ENTIRE LIFE — ELEVEN PHASES.** G-5's threshold is three, so
 this file crossed it eight phases ago and **the guardrail could never have fired on it at any count**,
@@ -10394,7 +10482,7 @@ cells rot within days.
 | [`frontend/src/components/sources/WatchedFoldersSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourceswatchedfolderssectiontsx) | 4 / 1 / 935 | no (1 phase) | ⚠ row STALE at `2 / 0 / 393` — **it MORE THAN DOUBLED**. 235 paid the owed outcome line. ⭐ seam named NOW, not at threshold: extract `WatchedSourceCard` |
 | [`frontend/src/components/sources/watchProductMark.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourceswatchproductmarkts) | 0 / 0 / 38 | no (new) | young (240) — which PRODUCT a watched folder came from, read from its ADDRESS. ⛔ Never from `service_id`: Gmail and Drive share one connection |
 | [`frontend/src/components/sources/CreateWatchModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcescreatewatchmodaltsx) | 4 / 1 / 283 | no (1 phase) | honoured by construction (**240**): byte-unchanged. ⛔ Its auto-select of `capable[0]` is why BUG-260908-02 mattered most here |
-| [`frontend/src/components/layout/NavPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutnavpaneltsx) | 20 / 11 / 329 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **11 phases** — row added 235. honoured by construction: 2 optional props, 0 `useState`. Unwired ⇒ silence |
+| [`frontend/src/components/layout/NavPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutnavpaneltsx) | 22 / 12 / 370 | ⚠ **FIRES** | ⚠ absent for its ENTIRE LIFE at 11 phases; row then STALE at `20/11/329`. ⭐ **244-09**: the rail bounds itself — it, not the transcript, overflowed the PAGE below 540px |
 | [`frontend/src/App.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcapptsx) | 32 / 23 / 374 | ⚠ **FIRES** | ⚠ absent for its ENTIRE LIFE at **23 phases**; row then STALE. ⭐ **244-04 left it BYTE-UNCHANGED and FENCED it**: `setLibraryTab(` still 2, driven RED against a planted 3rd writer |
 | [`frontend/src/lib/nav-items.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibnav-itemsts) | 8 / 6 / 95 | ⚠ **FIRES** | ⚠ absent at 6 phases — row added 235, which CONSIDERED it and deliberately left it alone: no twelfth `ActiveView` member; the Library already has one |
 | [`frontend/src/components/library/HealthTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibraryhealthtabtsx) | 9 / 2 / 199 | no (2 phases) | row added 235 BELOW threshold on purpose. One import, one optional prop, one mount, ZERO branches; the handler lives at the page boundary |

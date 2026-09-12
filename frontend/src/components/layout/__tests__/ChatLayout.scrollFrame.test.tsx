@@ -44,6 +44,28 @@
  * rail moving or the dead space under the composer. What this pins is that the four classes
  * cannot be deleted silently, and that a THIRD `<ScrollArea` call site cannot arrive unbounded.
  * The pixels are driven in a real browser at `/gsd:verify-work`.
+ *
+ * ── ⚠ PHASE 244 PLAN 09 (gap G-5) — THE SIXTH LINK, AND WHY THERE HAD TO BE ONE ─────────
+ *
+ * The five links above are ALL in the MESSAGE column. The shell has a SIBLING column — the
+ * desktop nav rail (`NavPanel.tsx`) — and 244-01 gave it neither treatment. Driven in Chrome
+ * on 2026-09-12, that omission is measurable: below a viewport height of ~540px the PAGE ROOT
+ * overflows (h=436 → `#root` scrollHeight 540 vs clientHeight 436, **+104px**; h=516 → +24px),
+ * and the whole page scrolls. `rootScrollHeight` is PINNED at 540 at every viewport, and panel
+ * state makes no difference at all — which is itself diagnostic: the overflowing element is
+ * neither in the panel nor in the transcript.
+ *
+ * The rail's `mt-auto` footer block (`NavPanel.tsx`, the org/operator shields + ProfileMenu,
+ * 128px tall) measures bottom = 540px, past the rail's own box, and every ancestor up to
+ * `<html>` reads `overflow-y: visible` — so the excess escapes to the page scrollbar.
+ *
+ * ⛔ THE FIX IS NOT A `min-height` ANYWHERE. That makes the page scroll deliberately, which IS
+ * the bug. The rail root gets `overflow-y-auto` so it scrolls its OWN content.
+ *
+ * ⛔ AND THIS CASE CANNOT VERIFY THAT. jsdom performs NO LAYOUT, so link 6 pins only that the
+ * token cannot be deleted silently and proves NOTHING about whether the page overflows. The
+ * pixels live in `.planning/phases/244-the-chat-shell-and-the-composer/244-09-UAT-ROW.md`,
+ * driven in a real browser at `/gsd:verify-work`.
  */
 
 import { describe, it, expect } from "vitest"
@@ -51,6 +73,7 @@ import { describe, it, expect } from "vitest"
 import chatLayoutSource from "@/components/layout/ChatLayout.tsx?raw"
 import chatAreaSource from "@/components/chat/ChatArea.tsx?raw"
 import messageListSource from "@/components/chat/MessageList.tsx?raw"
+import navPanelSource from "@/components/layout/NavPanel.tsx?raw"
 
 /** The house normaliser — CRLF checkouts must not change what a fence sees. */
 const lf = (s: string) => s.replace(/\r\n/g, "\n")
@@ -58,6 +81,7 @@ const lf = (s: string) => s.replace(/\r\n/g, "\n")
 const CHAT_LAYOUT = lf(chatLayoutSource)
 const CHAT_AREA = lf(chatAreaSource)
 const MESSAGE_LIST = lf(messageListSource)
+const NAV_PANEL = lf(navPanelSource)
 
 /**
  * Strip `//` line comments and block comments so a comment MENTIONING `<ScrollArea` can
@@ -149,5 +173,39 @@ describe("SHELL-01 · the chat frame is bounded — the four-link min-h-0 chain"
       const bounded = /\bmin-h-0\b/.test(site.attrs) || /\bmax-h-/.test(site.attrs) || /\bh-/.test(site.attrs)
       expect(bounded, `${site.file} mounts an UNBOUNDED <ScrollArea>: ${site.attrs.trim()}`).toBe(true)
     }
+  })
+
+  /**
+   * ⭐ LINK 6 (Phase 244 plan 09, gap G-5) — THE SIBLING COLUMN.
+   *
+   * Links 2-5 bound the MESSAGE column. This one bounds the NAV RAIL, the column measured to
+   * be the actual source of the page-root overflow below ~540px (see the header block).
+   *
+   * ⛔ `overflow-y-auto` IS THE FIX; `min-h-0` IS DEFENSIVE. The rail's box is ALREADY bounded
+   * at the viewport (`h-full` inside `div.flex.h-screen`, measured `height = viewport`), so the
+   * excess escapes purely because the computed overflow is `visible`. `min-h-0` is carried for
+   * symmetry with the five sites 244-01 established, and because the automatic-minimum-size
+   * rule is direction-dependent — it costs nothing and removes a future question. Naming which
+   * token does the work matters here: a comment that claims more than it can is how this
+   * project's hot-file ledger rows go wrong.
+   *
+   * ⛔ jsdom PERFORMS NO LAYOUT. This asserts the tokens are PRESENT. It cannot observe the
+   * page overflowing, the rail scrolling, or the dead space under the composer — the pixels are
+   * `244-09-UAT-ROW.md`, driven in a real browser.
+   */
+  it("link 6: NavPanel's rail root is BOUNDED and scrolls its own content", () => {
+    // The rail root — the only class list in the file opening `hidden md:flex flex-col`.
+    const rail = NAV_PANEL.match(/"(hidden md:flex flex-col[^"]*)"/)
+    expect(
+      rail,
+      "the NavPanel rail-root className was not found — did the class list change? " +
+        "Link 6 must be re-pointed rather than left silently matching nothing.",
+    ).not.toBeNull()
+    expect(rail![1]).toContain("h-full")
+    expect(rail![1], `the rail root is unbounded: ${rail![1]}`).toContain("min-h-0")
+    expect(
+      rail![1],
+      `the rail root cannot scroll its own content and will push the document: ${rail![1]}`,
+    ).toContain("overflow-y-auto")
   })
 })
