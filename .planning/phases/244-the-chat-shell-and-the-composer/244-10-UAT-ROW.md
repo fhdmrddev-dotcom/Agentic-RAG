@@ -91,6 +91,27 @@ Name them here as L-5 and L-6 did:
 | `workspace_files` | `/{uuid8}-Meridian-Q4-pricing.xlsx`, `/{uuid8}-uat-note.pdf` (×2 threads) | yes — or leave: TTL is 24 h |
 | `documents` | ⛔ **none expected.** If a row appears, that is a SEPARATE blocker on SHELL-04's negative clause. | n/a |
 
+## ⛔ Arm 4 — ADDED BY `244-14` (review WR-03): a failed copy must not go quiet
+
+`244-10` recorded a path as copied BEFORE attempting it, so ONE Supabase Storage blip marked the
+file copied for the rest of the ~30-minute session and named it on exactly one tool result. Every
+later `execute_code` filtered the path out, so the model heard nothing — the same silence defect
+6b cost ten wasted agent rounds to discover. `244-14` records on SUCCESS and retries up to
+`_ATTACHMENT_HYDRATION_MAX_ATTEMPTS = 2`, naming the failure on every attempt.
+
+⚠ **This arm is BLOCKED unless a failure can be induced honestly.** ⛔ Do not fake one by editing
+the code — that measures the edit. The cheap honest lever is to delete the Storage object (or
+revoke access to it) between two `execute_code` calls in one thread, so the row still lists and
+the content read fails. If that is not reachable, record **BLOCKED with the reason** and lean on
+cases F1/F2/F3 in `backend/tests/unit/test_244_attachment_hydration.py` — never silently omit it.
+
+| # | Step | Expected | Verdict |
+|---|---|---|---|
+| 1 | Attach two files; break the SECOND one's Storage object; run `execute_code` | the tool result names the second file (`Could not load the attached file …`) and the first still arrives | `pending` |
+| 2 | Run `execute_code` a SECOND time, still broken | ⛔ the note is **present again** — this is the half that was silent | `pending` |
+| 3 | Run `execute_code` a THIRD time | the note is **gone** and no further container I/O is attempted for it — given up on, deliberately and once | `pending` |
+| 4 | Repair the Storage object after ONE failure instead, then run `execute_code` again | the file **arrives** in `/sandbox/attachments/` — a blip does not cost the file for the session | `pending` |
+
 ## Out of scope for this row — do NOT re-litigate
 
 - **defect 6a** — RETRACTED the same session. The chip is **LATE, not absent**; severity MINOR.
