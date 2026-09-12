@@ -254,6 +254,24 @@ export function connectionStateOf(
     isSourceCapable: isSourceCapable === true,
   })
 
+  // ── ⭐ BUG-260912-01 — A FAILING CREDENTIAL OUTRANKS EVERY CAPABILITY READING ─────────
+  //
+  // ⚠ MOVED UP from below the `oauth_byo` arm, where it was UNREACHABLE for the one shape
+  // OAuth failures actually happen to. Measured 2026-09-12 on the live database: the
+  // `Google Workspace` row carried `status active` / `last_check_verdict failed` and this
+  // function answered `source_only` — `✓ Ready as source` — while every Drive call on it was
+  // dying at token refresh. The check had recorded the failure the previous evening and the
+  // surface had no way to say so.
+  //
+  // ⭐ THIS IS THE FILE'S OWN STATED PRECEDENCE, FINALLY HONOURED. The comment on the
+  // `source-only` line further down already reads *"⚠ BELOW `failed`, on purpose: a
+  // credential that failed says something more specific than a capability that exists."*
+  // That sentence was true of one arm and false of the other; now it is true of both.
+  //
+  // ⛔ IT STAYS BELOW `disabled` and `revoked`. A switched-off connection is not a failing
+  // one, and calling it failing would send a person to fix a credential nobody broke.
+  if (connection.last_check_verdict === "failed") return "failed"
+
   if (connection.auth_type === "oauth_byo" && connection.status === "active") {
     if (verdict === "source-only") return "source_only"
     if (verdict === "unusable") return "unusable"
@@ -262,7 +280,9 @@ export function connectionStateOf(
     // must do is skip this arm's `ready`, and it does.
     if (verdict === "ready") return "ready"
   }
-  if (connection.last_check_verdict === "failed") return "failed"
+  // ⚠ The `failed` read that used to sit HERE moved above the arm overhead (BUG-260912-01).
+  //   It is not duplicated: a second copy on this line would be dead code, and a reader
+  //   finding one would reasonably conclude the arm above is allowed to outrank it.
 
   // ── Phase 239 (D-239-08) — the SAME reading for a row that is not `oauth_byo` ──────────
   //
