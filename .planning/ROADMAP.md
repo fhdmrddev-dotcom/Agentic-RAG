@@ -225,9 +225,14 @@ Plans:
   4. A person attaches a **local file** to a chat message and the agent can use it; and a cloud import **asks which Library folder it goes to** instead of writing permanently to the root (SHELL-04, `BUG-260905-01`, folding `SEED-042`'s "not in the KB" half).
   5. A watched source that has stopped reading raises a signal the operator **sees in the app shell while doing something else** — not only if they happen to open the Health tab (SHELL-05, `SURF-03`).
 
-**Plans**: 6 build plans in 4 waves, **+ 5 gap-closure plans in 3 waves** (round 1, 2026-09-12).
-⚠ Eleven plan files total; the 5 are the round, not a re-plan. **G-8**: the round is 5 plans, inside
-the 3-5 band, so G-8 does not fire and no justification is owed. **G-7**: 1 round of 2 used.
+**Plans**: 6 build plans in 4 waves, **+ 5 gap-closure plans in 3 waves** (round 1, 2026-09-12),
+**+ 1 gap-closure plan in 1 wave** (round 2, 2026-09-12).
+⚠ Twelve plan files total; neither round is a re-plan. **G-8**: round 1 is 5 plans and round 2 is
+**one**, both inside the 3-5 band, so G-8 does not fire and no justification is owed. **G-7**:
+**2 rounds of 2 used — the cap is now SPENT.** Round 2 fires the round-cap and is waved through on
+the gate's worded escape hatch, because `G-8` is an unmet ROADMAP success criterion (SC#3, second
+clause) and the operator ruled it the round's sole scope. ⛔ A third round is not available to a
+flag; it needs the operator.
 
 Plans:
 **Wave 1**
@@ -295,6 +300,28 @@ ceiling, not a preference — the shared vitest gate goes non-deterministic at t
 **Wave 7** *(blocked on Wave 6 — it edits four files those two plans own)*
 
 - [x] 244-13-PLAN.md — **G-1 + WR-07** the thread lock does not say what it is: a Deep cap-pause renders a phantom live workflow run line with a 1s clock, and a harness cap-pause would unlock the composer. `WorkflowLock.mode` becomes a real discriminator; two files that have NEVER had a ledger row get one (SHELL-02)
+
+**Gap closure — round 2** *(`/gsd:plan-phase 244 --gaps`, 2026-09-12; ONE plan, one wave)*
+
+⚠ Authored against **`244-UAT.md`'s `## Gaps — round 2`** block, gap **`G-8`** — the sole unmet
+ROADMAP success criterion after the round-1 drive. ⛔ **Scope is exactly one gap, on the operator's
+ruling:** `G-7` (a failed attachment copy never gives up and never recovers) is **DEFERRED to
+[`SEED-272`](../seeds/SEED-272-a-failed-attachment-copy-never-gives-up-and-never-recovers.md)** with
+a concrete re-open trigger — it is a robustness gap adjacent to a criterion that is met, while
+`G-8` is a criterion that is not.
+
+⚠ **`G-7` (the guardrail, not the gap id — they collide by coincidence) FIRES on this round and is
+OVERRIDDEN with a worded reason**, not waved through on an absent finding:
+`check-gap-closure-rounds.cjs 244 --unmet-criterion "SC#3: …"` reads **`G-7 passed WITH OVERRIDES`**.
+Recorded under `STATE.md → Guardrail overrides`.
+
+**Wave 8**
+
+- [ ] 244-15-PLAN.md — **G-8** answering an approval in one home does not settle it in the other, and the run line + composer keep a lock the server has already dropped. ONE fetch-based settle path that RELEASES (never sets) — `D-v2.5-03` applied to the ANSWER transition (SHELL-03)
+
+⛔ **This plan does not close `SHELL-03` either.** It reports **built, drive owed**;
+`244-15-UAT-ROW.md` carries both directions plus the run-line and composer readings, scored by
+POSITION against the panel edge and by the rendered SENTENCE — never by `data-testid` presence.
 
 ⚠ **`SHELL-05` is deliberately absent from every `requirements` field above, and that is a claim
 rather than an omission:** no gap touches it. **L-7 was driven end to end for the first time in this
