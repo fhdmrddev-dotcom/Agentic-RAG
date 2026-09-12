@@ -3485,7 +3485,23 @@ const BASELINE = {
   // `data-testid`: a presence assertion cannot see content drift.
   // ⭐ Driven RED first — 2 of the 5 failed on the shipped tree with `Unable to find an
   // element with the placeholder text of: Ask anything…`.
-  "ChatArea.capPausedComposer.test.tsx": 5,
+  // ⚠ RE-BASELINED 5 -> 6 BY 244-08. Case 5 closes `T-244-03-01`: a harness run whose OWN
+  // status is `cap_paused` used to UNLOCK the composer, because `capPaused` was set on the
+  // genuine-lock branch as well as the reconcile branch. The five cases above could not see
+  // it — `HARNESS_LOCKED_STATE` sets `cap_paused: false`, so the discriminator was only ever
+  // read on a run that is locked OR paused, never one that is BOTH.
+  "ChatArea.capPausedComposer.test.tsx": 6,
+  // ── Phase 244-08 (T-244-05-05 / OPEN-2) — the expired attachment TOMBSTONE ──────────
+  // 5 cases, measured on a green run of the suite alone. BOTH KNOBS, SAME COMMIT.
+  // ⭐ Driven RED first — 3 of the 5 failed on the shipped tree: `expected undefined to be
+  // true` (the fetch never asked for expired rows), `expected ['wf-agent','wf-expired'] to
+  // deeply equal ['wf-agent']`, and `expected 2 to be 1`.
+  // ⚠ CASE 4 IS A POSITIVE CONTROL AND IT EARNED ITS PLACE: the first draft of the suite
+  // mounted no `StreamsProvider`, so `actions.replaceWorkspaceFilesForThread` was still the
+  // no-op stub at `streamsStore.ts:463` and ALL FIVE cases went red — a textbook-looking RED
+  // that would have failed over a correct implementation too (244-05's exact mistake). Case
+  // 4 failing is what told the difference.
+  "expiredAttachmentTombstone.test.tsx": 5,
   // ── Phase 244 (244-03 T2 / SHELL-03 / BUG-260828-07, HIGH) ───────────────────────
   // 8 cases, MEASURED on a green run of the suite alone. BOTH KNOBS, SAME COMMIT —
   // `src/components/chat` has no bare-directory TARGETS entry.
@@ -5173,6 +5189,21 @@ const TARGETS = [
   // predicate rather than inventing a second permission rule, renders a REASON in every
   // unavailable state, and speaks the server's refusal verbatim.
   "src/pages/__tests__/LibraryPage.cloudImport.test.tsx",
+  // ── Phase 244-08 (T-244-05-05 / OPEN-2) — the expired attachment TOMBSTONE ──────────
+  //
+  // BOTH KNOBS, SAME COMMIT, AND BOTH ARE NEEDED. `src/providers` sits in NEITHER knob —
+  // verified by reading this array, not assumed: there is no bare-directory entry for it,
+  // and line 341 of this file records a prior plan deciding NOT to add one. So without the
+  // line below the gate would never EXECUTE this suite, and a file the gate never runs has
+  // falsified nothing.
+  //
+  // What it guards: the SUPPLY LINE for `ChatAttachmentChip`'s `expired` arm. That arm was
+  // built by 244-05, was green in its own component test throughout, and was UNREACHABLE
+  // after a reload because the server filtered the row away before the transcript could ask
+  // for it. A component test cannot see a missing supply line. It also pins the NEGATIVE —
+  // the panel must NOT list an expired row — because "the transcript can see expired files"
+  // and "expired files came back everywhere" are otherwise the same green.
+  "src/providers/__tests__/expiredAttachmentTombstone.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
