@@ -423,7 +423,12 @@ nothing import, `Retry-After` consumption, WR-08 and WR-04.
   3. A person opening `238-VERIFICATION.md`, `240-VERIFICATION.md` and `241-VERIFICATION.md` finds the words **"self-verified"** and does **not** find "reviewed" — and can tell from each file which gate did and did not run (DEBT-03).
   4. `STATE.md → Guardrail overrides` carries the `OV-SOLO-01` ruling in full: that solo running continues, that the dispatched code-review subagent is **mandatory** on any phase touching a trust boundary and is **not** an independent gate, that `/code-review ultra` stays ruled out on cost, and **what its next re-arm trigger is** — so it cannot lapse unnoticed a second time (DEBT-03).
 
-**Plans**: TBD
+**Plans**: 3 plans, 3 waves (⛔ serial — each wave's files overlap the next, and wave 2 mutates the local DB alone under worktree rule 4)
+
+Plans:
+- [ ] 245-01-PLAN.md — DEBT-03: the `verification_mode: self-verified` marker in five VERIFICATION.md files, an executable guard + PostToolUse hook driven RED, and SC#4 discharged by citing `OV-SOLO-01`. ⭐ Needs no credential, no infra, no operator — the arm that cannot stall.
+- [ ] 245-02-PLAN.md — DEBT-02 + DEBT-01's M-9 arm: 233's five G-4 rows driven live (row 2 first, measured against the DB before anything is imported) and M-9 driven through BOTH doors with the rule created through `RuleBuilderPanel`.
+- [ ] 245-03-PLAN.md — DEBT-01's paper arm: M-8 flipped off a self-contradicting HALF PASS, S-1/S-2 retired across three registers in one commit, four homes of the stale Azure claim corrected BESIDE their originals, `SEED-177` refuted, 240's five mail rows deferred with triggers.
 
 **UI hint**: no.
 **Migrations**: none.
