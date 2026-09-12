@@ -186,3 +186,21 @@ lmstudio_base_url: str = "http://localhost:1234/v1"
 **LM Studio models must be registered under `provider: "lmstudio"`.** Registering them under
 `ollama` points them at `:11434`, which on this box is not running at all — the request would fail
 with a connection error that looks nothing like a provider-mapping mistake.
+
+---
+
+## 2026-09-12 — NOT discharged by migration 180, and the distinction matters.
+
+Mig 180 made local providers' **endpoint and key** settable from the Settings UI, which is the half
+this seed's own `relates_to` points at (*"a case where the rule is followed for cloud models and
+unreachable for local ones"*). **That specific complaint is now false.**
+
+⛔ **The endpoint this seed is actually ABOUT is untouched.** `POST /admin/models` still validates
+its provider argument against the 8-cloud SSRF **discovery** allowlist rather than the routing
+roster, so a local model still cannot be registered, tuned or given a timeout through the UI, and a
+`model_capabilities_overrides` row must still be inserted by hand with `enabled=true` set manually
+(the API forces `false`). The hidden 600 s openai-SDK read timeout that no setting can reach is also
+unchanged.
+
+⚠ **Do not close this on the strength of 180.** The guard is CORRECT for discovery and WRONG for
+add; that sentence is the whole seed and it is still true.

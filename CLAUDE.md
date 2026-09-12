@@ -677,9 +677,9 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/lib/api.ts` | 187 / 110 / 422 | ✅ **SPLIT TAKEN (207)** |
 | `frontend/src/types/index.ts` | 85 / 65 / 1380 | ⚠ row was STALE at `78/60/1331` — **7 commits, 5 phases**. honoured by construction (**243-04**): ONE optional client-only field, `reasoningMs`, whose ABSENCE is the honest-fallback signal. seam still OWED |
 | `backend/app/main.py` | 82 / 59 / 950 | ⚠ row was STALE by **FOURTEEN PHASES**. honoured by construction (**BUG-260902-06**) |
-| `backend/app/config.py` | 83 / 48 / 1506 | ⚠ STALE AGAIN at `82/47/1489` — the ELEVENTH. honoured by construction (**241**): 4 hnsw defaults, no reader changed. `MODEL_CAPABILITIES` seam still OWED |
+| `backend/app/config.py` | 83 / 48 / 1572 | ⚠ STALE AGAIN at `83/48/1506` — the TWELFTH. honoured by construction (**mig 180**): `_SELF_HOSTED_PROVIDERS` is a TABLE replacing the `if provider == "ollama"` duplicated in 4 files. `MODEL_CAPABILITIES` seam still OWED |
 | `backend/app/api/admin.py` | 33 / 13 / 1740 | ⚠ row was STALE. honoured by construction (**BUG-260902-06**): 2 write seams broadcast; the 2 WR-03 READ seams deliberately do not |
-| `backend/app/api/settings.py` | 38 / 20 / 972 | ⚠ STALE for the THIRD close running at `35/19/814`. honoured by construction (**242**): one refusal helper behind an allow-list, four call sites, every typed sentence preserved |
+| `backend/app/api/settings.py` | 38 / 20 / 980 | ⚠ row was STALE at `38/20/972`. honoured by construction (**mig 180**): the base_url write arm is now ONE table lookup covering all 3 self-hosted providers. ⛔ no new route, no second branch |
 | `backend/app/services/multimodal_service.py` | 14 / 7 / 984 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
 | `backend/app/api/documents.py` | 85 / 33 / 2437 | ✅ **DISCHARGED (229)** |
 | `scripts/vitest-count-gate.cjs` | 211 / 46 / 5618 | ⚠ row STALE a 3rd time, by **44 commits / 8 phases** (`167/38/4786`). **244-15** adopted TWO suites into BOTH knobs — one of them RED and ungated since `d58fa43a0` |
@@ -704,7 +704,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/lib/api/org.ts` | 11 / 8 / 629 | ⚠ absent for its ENTIRE LIFE at 4 phases; row then STALE at `6 / 4 / 562`. ⚠ **THIRD wire-type drift in this ONE file** (239: `auth_type: "mcp"`) |
 | `frontend/src/components/settings/connectionsCopy.ts` | 16 / 9 / 804 | ⚠ row was STALE at `15/8/784`. honoured by construction (**BUG-260912-01**): ONE arm MOVED above the oauth_byo block — `failed` was unreachable for the one shape OAuth breaks |
 | `frontend/src/components/settings/connectionFormCopy.ts` | 19 / 8 / 1631 | ⛔ 239-05 named the seam: `configFromDraft`'s arm set. 239-07 RODE it — one serializer both arms call |
-| `frontend/src/pages/SettingsPage.tsx` | 47 / 24 / 1773 | ⚠ STALE for the THIRD close running at `44/23/1738`. ⭐ SHRANK — 242 moved the payload helpers to `settingsSearchPayload.ts`. tab seam still OWED |
+| `frontend/src/pages/SettingsPage.tsx` | 47 / 24 / 1814 | ⚠ row was STALE at `47/24/1773`. honoured by construction (**mig 180**): `isOllama` → `meta.selfHosted`; the card gained a 2nd FIELD, not a 2nd branch. tab seam still OWED |
 | `frontend/src/pages/settingsSearchPayload.ts` | 1 / 1 / 116 | young (created 242). Row added AT CREATION, not at the third phase — an absent row is invisible to G-5 at any count |
 | `frontend/src/components/settings/ModelPillRow.tsx` | 4 / 3 / 141 | ⚠ absent for its entire life |
 | `frontend/src/components/workflows/phaseVocabulary.ts` | 16 / 6 / 990 | honoured by construction (206.2) |
@@ -714,13 +714,14 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/models/connector.py` | 26 / 14 / 835 | ⚠ row STALE for the 2nd close at `25/14/800`, and its own cell repeated the CLAIM that was false. honoured by construction (**244-07**): `folder_id` typed, not branched |
 | `backend/app/api/connectors.py` | 44 / 21 / 2140 | ⛔ **extraction OWED, SIXTH landing** (2051→2071→2091→2102→2113→2140). honoured by construction (**BUG-260912-01**): ONE `except` arm above the generic one, no new route, no new helper |
 | `backend/app/services/sources/preview_service.py` | 8 / 4 / 826 | ⚠ row STALE TWICE; the 2nd read “238: comment-only” while 238 re-opened SEED-253 here. **238-04: display ≠ stored; the walk no longer mutates `SourceFile.path`** |
+| `backend/app/security/secret_cipher.py` | 4 / 2 / 256 | ⚠ absent for its ENTIRE LIFE — row added at **mig 180**, its SECOND phase. ⛔ `SECRET_COLUMNS` is the ONE encrypt-on-write set: a provider key column absent from it is stored PLAINTEXT and nothing says so |
 | `backend/app/security/egress.py` | 13 / 5 / 982 | honoured by construction (232): Google Drive read/export pins; docstri |
 | `backend/app/services/connector_service.py` | 25 / 9 / 1772 | honoured by construction (**239-06**): the write boundary knows a mapping KEY from a tool name by ALLOW-LIST — an unknown key is still read as a tool name and still refused |
 | `backend/app/services/sources/base.py` | 9 / 5 / 336 | ⚠ **absent while FIRING at 5 phases — row added 239-03.** honoured by construction (239): protocol resolution stayed DATA (two dicts), never a branch |
 | `backend/app/services/sources/__init__.py` | 5 / 3 / 40 | ⚠ **absent while FIRING — row added 239-03.** The ONE eager-import site: an adapter missing from this list is unregistered, so the list is load-bearing |
 | `backend/app/services/mcp_client.py` | 9 / 6 / 526 | ⚠ row STALE TWICE (`4/2/407` reading `no`, then `7/5/480`) — a row present and WRONG stops the audit. **SEED-258: the body cap is DERIVED; no envelope knob exists to disagree** |
 | `backend/app/models/message.py` | 17 / 10 / 124 | ⚠ absent from BOTH for its ENTIRE LIFE at **8 phases** |
-| `backend/app/models/user_settings.py` | 50 / 32 / 1561 | ⚠ STALE for the FOURTH close running at `49/31/1524`. honoured by construction (**241-03**): two `_val` calls + the bounds constants in the SEED-258 home |
+| `backend/app/models/user_settings.py` | 51 / 32 / 1648 | ⚠ STALE for the FIFTH close running at `50/32/1561`. honoured by construction (**mig 180**): `_build_providers`' ollama-only arm became one table lookup; the failed-write log now NAMES the columns |
 | `backend/app/services/harness/reachability.py` | 4 / 4 / 463 | ⚠ absent from BOTH for its ENTIRE LIFE at **4 phases** |
 | `backend/app/services/workflow_kickoff.py` | 8 / 6 / 554 | ⚠ absent for its ENTIRE LIFE at **6 phases** |
 | `frontend/src/components/workflows/WorkflowScheduleModal.tsx` | 3 / 3 / 601 | ⚠ absent for its entire life; it crossed the threshold in 214-09 on a  |

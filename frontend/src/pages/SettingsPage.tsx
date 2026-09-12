@@ -63,7 +63,24 @@ import {
   searchBodyFor,
 } from "./settingsSearchPayload"
 
-const PROVIDER_META: Record<string, { label: string; defaultBase: string; keyLabel: string }> = {
+/**
+ * `selfHosted` marks a provider whose ENDPOINT belongs to the operator rather than a vendor.
+ * Those cards render a Base URL field AND an API-key field; every other card renders the key
+ * alone, because its endpoint is fixed in `_PROVIDER_BASE_URLS` and is not ours to change.
+ *
+ * ⚠ This flag replaces a bare `provider.id === "ollama"` check, which is why LM Studio — a
+ * first-class provider since Phase 111 — had NO way to set its base URL for its entire life,
+ * and why its card offered an API-key box writing to a column that did not exist until
+ * migration 180. It must stay in step with `_SELF_HOSTED_PROVIDERS` in `backend/app/config.py`.
+ *
+ * `urlHint` states the /v1 rule per provider, because the two halves differ and getting it
+ * wrong is silent: ollama's stored URL omits /v1 (the backend appends it), everyone else's
+ * is used verbatim.
+ */
+const PROVIDER_META: Record<
+  string,
+  { label: string; defaultBase: string; keyLabel: string; selfHosted?: boolean; urlHint?: string }
+> = {
   openai:     { label: "OpenAI",                    defaultBase: "api.openai.com",                    keyLabel: "API Key" },
   anthropic:  { label: "Anthropic",                 defaultBase: "api.anthropic.com",                 keyLabel: "API Key" },
   google:     { label: "Google Gemini",             defaultBase: "generativelanguage.googleapis.com", keyLabel: "API Key" },
@@ -72,7 +89,21 @@ const PROVIDER_META: Record<string, { label: string; defaultBase: string; keyLab
   minimax:    { label: "MiniMax",                   defaultBase: "api.minimax.chat",                  keyLabel: "API Key" },
   zhipu:      { label: "GLM (Zhipu)",               defaultBase: "open.bigmodel.cn",                  keyLabel: "API Key" },
   openrouter: { label: "OpenRouter (experimental)", defaultBase: "openrouter.ai",                     keyLabel: "API Key" },
-  ollama:     { label: "Ollama",                    defaultBase: "http://localhost:11434",             keyLabel: "Base URL" },
+  ollama: {
+    label: "Ollama (local)", defaultBase: "http://localhost:11434", keyLabel: "API Key (optional)",
+    selfHosted: true,
+    urlHint: "Paste the endpoint you curl — /v1 included. It is stored without the suffix and re-added automatically.",
+  },
+  lmstudio: {
+    label: "LM Studio (local)", defaultBase: "http://localhost:1234/v1", keyLabel: "API Key (optional)",
+    selfHosted: true,
+    urlHint: "Include /v1 — this URL is used exactly as typed.",
+  },
+  custom: {
+    label: "Custom endpoint (OpenAI-compatible)", defaultBase: "", keyLabel: "API Key (optional)",
+    selfHosted: true,
+    urlHint: "Any OpenAI-compatible server — vLLM, Unsloth, llama.cpp, or a tunnel. Include /v1; used exactly as typed.",
+  },
 }
 
 // Phase 123.1-03 (D-09 / D-10) — the skill-builder model picker no longer uses a
@@ -272,7 +303,7 @@ function ProviderCard({
   onSetActive: () => void
 }) {
   const meta = PROVIDER_META[provider.id]
-  const isOllama = provider.id === "ollama"
+  const isSelfHosted = meta?.selfHosted === true
 
   return (
     <div className={cn(
@@ -301,30 +332,40 @@ function ProviderCard({
       </div>
 
       <div className="space-y-2">
-        {isOllama ? (
+        {/* SEED-173 — a self-hosted card shows BOTH halves. The old code showed the Base URL
+            field INSTEAD of the key field, and only for ollama, so an endpoint behind real
+            auth (vLLM --api-key, a tunnel with a bearer token) was unreachable by design. */}
+        {isSelfHosted && (
           <div>
             <Label className="text-xs text-muted-foreground mb-1 block">Base URL</Label>
             <TextInput
-              value={state.base_url || meta?.defaultBase || "http://localhost:11434"}
+              value={state.base_url || meta?.defaultBase || ""}
               onChange={(v) => onChange({ ...state, base_url: v })}
-              placeholder="http://localhost:11434"
+              placeholder={meta?.defaultBase || "https://your-host.example.com/v1"}
             />
-          </div>
-        ) : (
-          <div>
-            <Label className="text-xs text-muted-foreground mb-1 block">{meta?.keyLabel ?? "API Key"}</Label>
-            <ApiKeyInput
-              value={state.api_key}
-              onChange={(v) => onChange({ ...state, api_key: v })}
-            />
+            {meta?.urlHint && (
+              <p className="text-[11px] text-muted-foreground mt-1">{meta.urlHint}</p>
+            )}
           </div>
         )}
+        <div>
+          <Label className="text-xs text-muted-foreground mb-1 block">{meta?.keyLabel ?? "API Key"}</Label>
+          <ApiKeyInput
+            value={state.api_key}
+            onChange={(v) => onChange({ ...state, api_key: v })}
+          />
+          {isSelfHosted && (
+            <p className="text-[11px] text-muted-foreground mt-1">
+              Leave empty for a server with no auth — a placeholder is sent for you.
+            </p>
+          )}
+        </div>
         <div>
           <Label className="text-xs text-muted-foreground mb-1 block">Models (comma-separated)</Label>
           <TextInput
             value={state.models}
             onChange={(v) => onChange({ ...state, models: v })}
-            placeholder={isOllama ? "llama3.2,mistral,codellama" : "model-a,model-b"}
+            placeholder={isSelfHosted ? "the exact id from GET <base-url>/models" : "model-a,model-b"}
           />
         </div>
       </div>

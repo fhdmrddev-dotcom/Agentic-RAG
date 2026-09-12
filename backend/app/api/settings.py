@@ -4,7 +4,12 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel, Field
 from supabase import Client
 
-from app.config import MODEL_CAPABILITIES, _infer_provider_for
+from app.config import (
+    MODEL_CAPABILITIES,
+    _infer_provider_for,
+    _SELF_HOSTED_PROVIDERS,
+    normalize_self_hosted_base_url,
+)
 from app.dependencies import get_current_user, get_supabase, require_visible
 from app.models.user_settings import (
     HNSW_EF_SEARCH_CEILING,
@@ -494,13 +499,16 @@ async def update_settings(
         updates[f"{p.id}_api_key"] = p.api_key  # save_app_settings handles "***" skip
         if p.models:
             provider_model_lists[p.id] = p.models  # list, not CSV
-        if p.id == "ollama" and p.base_url:
-            # Strip /v1 suffix -- _build_providers appends it at load time.
-            # Without this, each save round-trips http://host/v1 -> stored as-is -> /v1/v1 next load.
-            raw = p.base_url.rstrip("/")
-            if raw.endswith("/v1"):
-                raw = raw[:-3]
-            updates["ollama_base_url"] = raw
+        # SEED-173 — persist the base_url for EVERY self-hosted provider, not just ollama.
+        # ⚠ This condition read `p.id == "ollama"` until migration 180, which is why a base
+        # URL typed on the LM Studio card was accepted by the API, dropped on the floor, and
+        # answered with 200 + "Saved". normalize_self_hosted_base_url owns the /v1 rule and is
+        # the exact inverse of the resolve_ helper the loader uses -- keep them paired, or a
+        # save round-trips http://host/v1 -> stored as-is -> /v1/v1 on the next load.
+        if p.id in _SELF_HOSTED_PROVIDERS and p.base_url is not None:
+            updates[str(_SELF_HOSTED_PROVIDERS[p.id]["url_field"])] = (
+                normalize_self_hosted_base_url(p.id, p.base_url)
+            )
     if provider_model_lists:
         updates["provider_model_lists"] = provider_model_lists  # JSONB column
 

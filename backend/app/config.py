@@ -14,11 +14,59 @@ _PROVIDER_BASE_URLS: dict[str, str] = {
     "openrouter": "https://openrouter.ai/api/v1",
     "ollama": "",  # resolved dynamically from ollama_base_url
     "lmstudio": "",  # resolved dynamically from lmstudio_base_url (Phase 111 D-111-7)
+    "custom": "",  # SEED-173 — generic OpenAI-compatible endpoint, resolved from custom_base_url
     "deepseek": "https://api.deepseek.com/v1",
     "moonshot": "https://api.moonshot.ai/v1",
     "minimax": "https://api.minimax.io/v1",        # INTERNATIONAL host — matches int'l key (D-089 docs curation 2026-05-30; api.minimax.chat is the China host, rejects int'l keys w/ 401)
     "zhipu": "https://api.z.ai/api/paas/v4",        # INTERNATIONAL z.ai host — matches docs.z.ai key (D-089 docs curation 2026-05-30; open.bigmodel.cn is the China host, separate key namespace)
 }
+
+
+# SEED-173 — providers whose endpoint is supplied by the OPERATOR, not fixed by a vendor.
+# Every one of them has an empty string in _PROVIDER_BASE_URLS above; this table says which
+# settings column carries the operator's URL and whether "/v1" is appended to it.
+#
+# ⚠ THIS IS A TABLE, NOT A BRANCH, DELIBERATELY. The /v1 asymmetry is the trap that made the
+# old code wrong: ollama_base_url OMITS /v1 and has it appended at load, while LM Studio's URL
+# already CONTAINS /v1. That single difference was expressed as an `if provider == "ollama"`
+# in FOUR separate files (config.py, user_settings.py:_build_providers, api/settings.py's PUT,
+# SettingsPage.tsx's `isOllama`), and three of the four simply had no lmstudio arm — which is
+# why LM Studio's base URL was unreachable from the UI for its entire life. Adding a
+# self-hosted provider must stay a ONE-EDIT operation (D-075.4-B2): add a row HERE.
+#
+# append_v1=False means the stored value is used VERBATIM — the operator types the whole URL,
+# /v1 included. That is the right default for anything new; ollama's True is back-compat for
+# rows already stored without it.
+_SELF_HOSTED_PROVIDERS: dict[str, dict[str, object]] = {
+    "ollama":   {"url_field": "ollama_base_url",   "key_field": "ollama_api_key",   "append_v1": True,  "dummy_key": "ollama"},
+    "lmstudio": {"url_field": "lmstudio_base_url", "key_field": "lmstudio_api_key", "append_v1": False, "dummy_key": "lm-studio"},
+    "custom":   {"url_field": "custom_base_url",   "key_field": "custom_api_key",   "append_v1": False, "dummy_key": "not-needed"},
+}
+
+
+def resolve_self_hosted_base_url(provider: str, raw: str) -> str:
+    """Turn a STORED self-hosted base_url into the URL the OpenAI client is given.
+
+    Inverse of ``normalize_self_hosted_base_url`` — the pair MUST stay inverses, or a save
+    round-trips into ``/v1/v1`` (the bug the old ollama-only strip existed to prevent).
+    """
+    spec = _SELF_HOSTED_PROVIDERS[provider]
+    base = (raw or "").rstrip("/")
+    return f"{base}/v1" if spec["append_v1"] else base
+
+
+def normalize_self_hosted_base_url(provider: str, raw: str) -> str:
+    """Turn an OPERATOR-TYPED base_url into the value stored in app_settings.
+
+    Operators paste the endpoint they actually curl — which almost always ends in /v1. For an
+    append_v1 provider that suffix must come OFF before storage, because it is re-added at
+    load; for every other provider it is kept, because nothing re-adds it.
+    """
+    spec = _SELF_HOSTED_PROVIDERS[provider]
+    base = (raw or "").strip().rstrip("/")
+    if spec["append_v1"] and base.endswith("/v1"):
+        base = base[: -len("/v1")]
+    return base
 
 
 # Plan 075.4-02 D-075.4-B1/B2/B3 — typed unknown-provider exception; FORWARD-REF #6
@@ -832,9 +880,20 @@ class Settings(BaseSettings):
     google_api_key: str = ""
     openrouter_api_key: str = ""
     ollama_base_url: str = "http://localhost:11434"
+    # Self-hosted providers may also carry a bearer token: vLLM's --api-key, a tunnel's
+    # auth header, a reverse proxy in front of the box. Empty is the normal case (a bare
+    # Ollama / LM Studio server has no auth) and a dummy is substituted at resolve time,
+    # because the OpenAI SDK refuses an empty key outright.
+    ollama_api_key: str = ""
     # Phase 111 D-111-7 — LM Studio first-class provider (local OpenAI-compatible
     # server). Its URL ALREADY includes /v1, unlike ollama which appends it.
     lmstudio_base_url: str = "http://localhost:1234/v1"
+    lmstudio_api_key: str = ""
+    # SEED-173 — the generic OpenAI-compatible slot. No vendor knowledge: whatever the
+    # operator pastes is the endpoint, verbatim, /v1 included. Covers vLLM, Unsloth,
+    # llama.cpp, text-generation-webui, and anything reachable through a tunnel.
+    custom_base_url: str = ""
+    custom_api_key: str = ""
 
     # Direct provider keys (Phase 076.1 — curated OpenAI-compatible providers)
     deepseek_api_key: str = ""
@@ -862,6 +921,8 @@ class Settings(BaseSettings):
     moonshot_models: str = ""
     minimax_models: str = ""
     zhipu_models: str = ""
+    lmstudio_models: str = ""
+    custom_models: str = ""
 
     @model_validator(mode="after")
     def resolve_llm_provider(self) -> "Settings":
@@ -882,23 +943,28 @@ class Settings(BaseSettings):
             "anthropic": self.anthropic_api_key,
             "google": self.google_api_key,
             "openrouter": self.openrouter_api_key,
-            "ollama": "ollama",  # Ollama doesn't require a real key
-            "lmstudio": "lm-studio",  # LM Studio doesn't require a real key (Phase 111 D-111-7)
             "deepseek": self.deepseek_api_key,
             "moonshot": self.moonshot_api_key,
             "minimax": self.minimax_api_key,
             "zhipu": self.zhipu_api_key,
+            # Self-hosted providers: the OPERATOR'S key wins, and the dummy is only the
+            # fallback. ⚠ These three used to be HARDCODED to "ollama" / "lm-studio" here,
+            # which meant a self-hosted endpoint behind real auth (vLLM --api-key, a tunnel
+            # requiring a bearer token) could never be reached — the configured key was
+            # discarded before it was ever sent. That is the SEED-173 blocker.
+            **{
+                pid: (getattr(self, str(spec["key_field"]), "") or str(spec["dummy_key"]))
+                for pid, spec in _SELF_HOSTED_PROVIDERS.items()
+            },
         }
 
         resolved_key = key_map[provider]
         if resolved_key:
             self.llm_api_key = resolved_key
 
-        if provider == "ollama":
-            self.llm_base_url = f"{self.ollama_base_url.rstrip('/')}/v1"
-        elif provider == "lmstudio":
-            # LM Studio's URL ALREADY includes /v1 — NO append (unlike ollama).
-            self.llm_base_url = self.lmstudio_base_url.rstrip("/")
+        if provider in _SELF_HOSTED_PROVIDERS:
+            raw = getattr(self, str(_SELF_HOSTED_PROVIDERS[provider]["url_field"]), "")
+            self.llm_base_url = resolve_self_hosted_base_url(provider, str(raw))
         else:
             self.llm_base_url = _PROVIDER_BASE_URLS[provider]
 

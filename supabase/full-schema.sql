@@ -716,6 +716,10 @@ CREATE TABLE public.app_settings (
     source_max_file_size_mb integer DEFAULT 25,
     hnsw_ef_search integer,
     hnsw_iterative_scan text,
+    lmstudio_base_url text DEFAULT 'http://localhost:1234/v1'::text,
+    lmstudio_api_key text,
+    custom_base_url text DEFAULT ''::text,
+    custom_api_key text,
     CONSTRAINT app_settings_extraction_table_engine_pdf_check CHECK ((extraction_table_engine_pdf = ANY (ARRAY['camelot'::text, 'pdfplumber'::text]))),
     CONSTRAINT app_settings_hnsw_ef_search_bounds CHECK (((hnsw_ef_search IS NULL) OR ((hnsw_ef_search >= 10) AND (hnsw_ef_search <= 1000)))),
     CONSTRAINT app_settings_hnsw_iterative_scan_values CHECK (((hnsw_iterative_scan IS NULL) OR (hnsw_iterative_scan = ANY (ARRAY['off'::text, 'strict_order'::text, 'relaxed_order'::text])))),
@@ -786,6 +790,27 @@ COMMENT ON COLUMN public.app_settings.hnsw_ef_search IS 'Phase 241 / SEED-076. H
 --
 
 COMMENT ON COLUMN public.app_settings.hnsw_iterative_scan IS 'Phase 241 / SEED-076. pgvector''s hnsw.iterative_scan: off | strict_order | relaxed_order. When on, the index KEEPS scanning until enough rows survive the query''s filters instead of returning a short list — the direct remedy for filtered-search under-fill. THREE values, not a boolean: strict_order preserves exact distance ordering, relaxed_order trades ordering for speed, and a boolean column would silently lose one of them. ⚠ This GUC DOES NOT EXIST below pgvector 0.8, so the application applies it in its own try and degrades the TUNING, never the SEARCH, on an older server. Its two memory companions (hnsw.max_scan_tuples, hnsw.scan_mem_multiplier) are deliberately NOT settings — they are hardcoded in config.py because a wrong value there is a memory footgun. NULL reads as config.py''s ''off''.';
+
+
+--
+-- Name: COLUMN app_settings.lmstudio_base_url; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.app_settings.lmstudio_base_url IS 'LM Studio OpenAI-compatible endpoint. INCLUDES /v1 -- stored and used verbatim (unlike ollama_base_url, which omits /v1 and has it appended at load).';
+
+
+--
+-- Name: COLUMN app_settings.custom_base_url; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.app_settings.custom_base_url IS 'Generic OpenAI-compatible endpoint (vLLM / Unsloth / llama.cpp / any tunnel). Stored and used VERBATIM -- include /v1 yourself.';
+
+
+--
+-- Name: COLUMN app_settings.custom_api_key; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.app_settings.custom_api_key IS 'Bearer token for custom_base_url. Encrypted at rest via SECRET_COLUMNS when SECRETS_ENCRYPTION_KEY is configured.';
 
 
 --
@@ -1903,6 +1928,7 @@ CREATE TABLE public.model_capabilities_overrides (
     deprecated boolean DEFAULT false NOT NULL,
     deprecated_reason text,
     emit_tier text,
+    removed boolean DEFAULT false NOT NULL,
     CONSTRAINT model_capabilities_overrides_emit_tier_check CHECK (((emit_tier IS NULL) OR (emit_tier = ANY (ARRAY['force_strict'::text, 'force'::text, 'coerce'::text]))))
 );
 
@@ -1912,6 +1938,13 @@ CREATE TABLE public.model_capabilities_overrides (
 --
 
 COMMENT ON COLUMN public.model_capabilities_overrides.emit_tier IS 'Phase 196 (AUTH-04 / D-14). The forced-emission tier an OPERATOR asserts for this model, overlaid over the code registry by config.get_model_capability_async. NULL means "not tracked here" and is the shipped state for all 37 pre-120 rows — forced_emit.py then applies its read-time cap.get("emit_tier", "coerce") default, so NULL is byte-identical to today. The CHECK vocabulary is pinned EQUAL to set(_RUNGS_BY_TIER) in backend/app/services/forced_emit.py and to _MODEL_CAP_ENUM_COLUMNS["emit_tier"] in backend/app/api/admin.py by backend/tests/unit/test_196_emit_tier_two_layer_pin.py. A tier this CHECK accepted but the ladder rejected would be rewritten to "coerce" by the boundary guard at forced_emit.py:377 and the run would degrade SILENTLY — hence the closed set. D-122-04 still holds: emit_tier is the single source of truth; forced_emission and strict_json_schema are DEPRECATED-UNREAD and no derived view may re-read them.';
+
+
+--
+-- Name: COLUMN model_capabilities_overrides.removed; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.model_capabilities_overrides.removed IS 'Tombstone. TRUE means this model_id is removed from the registry — including a model declared in the built-in MODEL_CAPABILITIES dict, which cannot be deleted from the DB because it does not live there. Both override caches filter removed = false, so a tombstoned model is invisible to the picker, the capability resolver and the provider builder; build_model_registry_rows additionally skips the matching built-in. Re-adding the model clears the tombstone. A DB-only model is hard-DELETEd instead and never carries one.';
 
 
 --
@@ -4328,6 +4361,13 @@ CREATE INDEX idx_workspace_versions_file ON public.workspace_file_versions USING
 --
 
 CREATE INDEX message_feedback_user_created_idx ON public.message_feedback USING btree (user_id, created_at DESC);
+
+
+--
+-- Name: model_capabilities_overrides_removed_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX model_capabilities_overrides_removed_idx ON public.model_capabilities_overrides USING btree (model_id) WHERE (removed = true);
 
 
 --

@@ -13521,3 +13521,102 @@ the seam is unchanged and still untaken — per-surface message buckets, the SSE
 lifecycle, the mount/derive reconcile, `sendMessage`'s kickoff path and the run-liveness slices are
 five concerns in one 4847-line provider. It inherits `102 / 37 / 4847`, and that figure goes stale on
 the next commit touching the file.**
+
+---
+
+## Migration 180 — self-hosted endpoints (SEED-173 / SEED-172), five files
+
+One change, five rows, because the defect *was* the duplication. The `/v1` asymmetry between
+Ollama (stores **without** `/v1`, has it appended at load) and every other OpenAI-compatible
+server (stores it **verbatim**) was written as a separate `if provider == "ollama"` in **four
+files** — and three of the four never grew a second arm. The fix is one table, `_SELF_HOSTED_PROVIDERS`
+in `config.py`, plus an inverse pair of helpers; the four call sites each became a lookup.
+
+**What that duplication actually cost**, measured rather than asserted:
+
+| | Symptom | Silent how? |
+|---|---|---|
+| PUT gated on `p.id == "ollama"` | a base URL typed for LM Studio was **dropped on the floor** | **HTTP 200 + "Saved"** — the genuinely silent half |
+| no `lmstudio_api_key` column | `UndefinedColumn` on the one composed `UPDATE` | HTTP 500 **for the whole tab**, message `Failed to save settings` — honest but undiagnosable |
+| `key_map` hardcoded `"ollama"` / `"lm-studio"` | the operator's real bearer token **discarded before the call** | no error at all; an endpoint behind auth just 401s |
+
+⚠ **`lmstudio` was a first-class provider from Phase 111 (D-111-7) and had no column, no UI field,
+no write arm and no display name for its entire life.** Its card rendered the raw id `lmstudio`.
+That is the shape SEED-172 recorded and SEED-173 generalised.
+
+---
+
+### `backend/app/config.py` — mig 180, honoured by construction
+
+**Measured 2026-09-12: `83 commits / 48 phases / 1572 L`** (supersedes `83 / 48 / 1506`; the row had gone stale for the **twelfth** time).
+
+Adds `_SELF_HOSTED_PROVIDERS` (a 3-row table) and the inverse pair `normalize_self_hosted_base_url`
+/ `resolve_self_hosted_base_url`. `resolve_llm_provider`'s two `if provider ==` arms collapse to one
+membership test; `key_map`'s hardcoded local-provider entries become a comprehension over the table,
+so **an operator key now wins and the dummy is only the fallback** — the OpenAI SDK's refusal of an
+empty key is the sole reason a dummy exists at all.
+
+⛔ **The inverse property is the load-bearing one, not the strip.** `normalize_` and `resolve_` must
+stay inverses or a save compounds on itself (`…/v1` → `…/v1/v1` → `…/v1/v1/v1`), because the UI
+re-submits whatever it last loaded. `test_180_self_hosted_provider_endpoints.py` pins idempotence,
+not the strip.
+
+**THE NAMED SEAM REMAINS OWED:** `MODEL_CAPABILITIES` + its two readers want `services/model_registry.py`.
+
+---
+
+### `backend/app/models/user_settings.py` — mig 180, honoured by construction
+
+**Measured 2026-09-12: `51 commits / 32 phases / 1648 L`** (supersedes `50 / 32 / 1561` — stale for the **fifth** close running).
+
+`_build_providers`' `if pid == "ollama"` arm becomes a `_SELF_HOSTED_PROVIDERS` lookup, so all three
+self-hosted providers resolve their endpoint and their dummy-key fallback identically. Adds the two
+missing `_PROVIDER_DISPLAY_NAMES` entries.
+
+⭐ **`save_app_settings`'s failure log now NAMES the columns it tried to write.** The caller has
+raised a real 500 since Phase 150 (D-150-07) — so this was never a *false* success — but the message
+is a bare `Failed to save settings`, and the single most likely cause is a knob that shipped in code
+without its migration. That class has now fired three times: mig 078 (`skill_builder_model`, ~10
+days), mig 176 (`hnsw_*`, `test_241_cr01`), mig 180 (`lmstudio_api_key`). Column **names** only —
+these rows carry API keys (T-081.1-04).
+
+---
+
+### `backend/app/api/settings.py` — mig 180, honoured by construction
+
+**Measured 2026-09-12: `38 commits / 20 phases / 980 L`** (supersedes `38 / 20 / 972`).
+
+The base_url write arm is one table lookup covering all three self-hosted providers, delegating the
+`/v1` rule to `normalize_self_hosted_base_url`. ⛔ No new route, no new helper, no second branch.
+The `KNOWN_PROVIDERS` boundary check (Phase 150 CR-01) is byte-unchanged and still the thing that
+stops a crafted `p.id` reaching the column name.
+
+---
+
+### `backend/app/security/secret_cipher.py` — mig 180, ROW ADDED AT ITS SECOND PHASE
+
+**Measured 2026-09-12: `4 commits / 2 phases / 256 L`** — below G-5's threshold, **and absent from
+both registers for its entire life.** Added here on the `settingsSearchPayload.ts` precedent: an
+absent row is invisible to G-5 at *any* count, so the count is not the reason to write one.
+
+⛔ **`SECRET_COLUMNS` is the ONE encrypt-on-write set.** A provider key column absent from it is
+stored **plaintext**, and nothing in the app says so — there is no gate that compares the set against
+the `*_api_key` columns that actually exist. `lmstudio_api_key` and `custom_api_key` were added in the
+same commit as the migration that created them, which is the only reason they are not that case.
+
+---
+
+### `frontend/src/pages/SettingsPage.tsx` — mig 180, honoured by construction
+
+**Measured 2026-09-12: `47 commits / 24 phases / 1814 L`** (supersedes `47 / 24 / 1773`).
+
+`isOllama` becomes `meta.selfHosted`, a flag on `PROVIDER_META`. ⭐ **The card gained a second FIELD,
+not a second branch:** a self-hosted provider now renders Base URL **and** API key, where the old code
+rendered the URL *instead of* the key and only for Ollama — which is why an endpoint behind real auth
+was unreachable by design. Each self-hosted entry carries a `urlHint` stating its own `/v1` rule,
+because the two halves differ and getting it wrong is silent.
+
+⚠ `PROVIDER_META` must stay in step with `_SELF_HOSTED_PROVIDERS` in `backend/app/config.py`. Nothing
+executable binds them; that is a real gap and the honest place to record it is here.
+
+**THE TAB SEAM REMAINS OWED.**

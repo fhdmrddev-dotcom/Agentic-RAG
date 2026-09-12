@@ -28,7 +28,13 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from app.config import settings as env_settings, MODEL_CAPABILITIES, _PROVIDER_BASE_URLS
+from app.config import (
+    settings as env_settings,
+    MODEL_CAPABILITIES,
+    _PROVIDER_BASE_URLS,
+    _SELF_HOSTED_PROVIDERS,
+    resolve_self_hosted_base_url,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +51,10 @@ _PROVIDER_DISPLAY_NAMES: dict[str, str] = {
     "google": "Google Gemini",
     "openrouter": "OpenRouter",
     "ollama": "Ollama (local)",
+    # Phase 111 split lmstudio out as its own provider but never gave it a display name,
+    # so the Settings card rendered the raw id "lmstudio" for its entire life.
+    "lmstudio": "LM Studio (local)",
+    "custom": "Custom endpoint (OpenAI-compatible)",
     "deepseek": "DeepSeek",
     "moonshot": "Moonshot (Kimi)",
     "minimax": "MiniMax",
@@ -606,8 +616,14 @@ async def save_app_settings(updates: dict[str, Any]) -> bool:
         await broadcast_settings_change()
         return True
     except Exception:
-        logger.warning(
-            "save_app_settings: DB write failed; settings not persisted",
+        # ⚠ NAME THE COLUMNS. The caller turns False into a bare HTTP 500 "Failed to save
+        # settings", which is true but undiagnosable — and the single most likely cause is an
+        # UndefinedColumn from a knob that shipped in CODE without its migration (mig 078's
+        # skill_builder_model hid for ~10 days; lmstudio_api_key for longer, until mig 180).
+        # Column NAMES only, never values — these rows carry API keys (T-081.1-04).
+        logger.error(
+            "save_app_settings: DB write failed; settings NOT persisted. columns=%s",
+            sorted(clean.keys()),
             exc_info=True,
         )
         return False
@@ -805,7 +821,6 @@ def _build_providers(row: dict) -> list[LLMProvider]:
     alphabetically, then static registry models alphabetically.
     """
     active_id = _val(row, "llm_provider", "llm_provider", "")
-    ollama_base = str(_val(row, "ollama_base_url", "ollama_base_url", "http://localhost:11434")).rstrip("/")
 
     # D-17: provider_model_lists JSONB column stores {"openai": [...], "anthropic": [...]}
     # Defensive: the migration runner json.dumps() before asyncpg's JSONB codec,
@@ -875,9 +890,19 @@ def _build_providers(row: dict) -> list[LLMProvider]:
         if disabled_ids:
             models = [m for m in models if m not in disabled_ids]
 
-        if pid == "ollama":
-            base_url = f"{ollama_base}/v1"
-            api_key = api_key or "ollama"
+        # SEED-173 — a self-hosted provider's endpoint comes from the operator's settings
+        # column, not from the static registry (whose entry for it is ""). Table-driven so
+        # that ollama, lmstudio and custom are handled IDENTICALLY; the only per-provider
+        # difference is the /v1 rule, which lives in _SELF_HOSTED_PROVIDERS.
+        #
+        # ⚠ The dummy key is a FALLBACK, never an override: an operator who put a real
+        # bearer token on the card (vLLM --api-key, a tunnel behind auth) must have it sent.
+        # The OpenAI SDK refuses an empty api_key, which is the only reason a dummy exists.
+        if pid in _SELF_HOSTED_PROVIDERS:
+            spec = _SELF_HOSTED_PROVIDERS[pid]
+            stored = str(_val(row, str(spec["url_field"]), str(spec["url_field"]), ""))
+            base_url = resolve_self_hosted_base_url(pid, stored)
+            api_key = api_key or str(spec["dummy_key"])
         else:
             base_url = meta["base_url"]
 
