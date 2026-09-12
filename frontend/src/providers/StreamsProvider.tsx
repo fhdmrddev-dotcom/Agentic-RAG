@@ -2401,7 +2401,20 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                     // `active_workflow_run_id`, which is the server's own definition of
                     // harness (`threads.py:1195`).
                     mode: "harness",
-                    capPaused: wf.cap_paused,
+                    // ⛔ ALWAYS `false` ON THIS BRANCH — 244-14 (review WR-02), MIRRORED FROM
+                    // `ChatArea.tsx`'s site (T-244-03-01 / 244-08). This read the server's flag
+                    // through while the OTHER mount-time writer of the SAME key, on the SAME
+                    // branch of the SAME GET, hard-coded `false`. Both fire on every thread
+                    // open; whichever settled last won; nothing ordered them. After `244-13`
+                    // the surviving consequence is WR-01's — whether a genuine live harness run
+                    // renders the Continue card was decided by a promise race.
+                    // ⚠ FAIL-CLOSED IS THE DIRECTION, not just the agreement: a harness run
+                    // paused at its own cap keeps the composer locked, so the person clicks
+                    // Cancel instead of typing into a composer the server will 409. Unlocking
+                    // during a live harness run is the elevation `T-244-03-01` names.
+                    // Fenced by `__tests__/providers/workflowLockWriters.lockstep.test.ts`,
+                    // which compares the two sites' expressions rather than trusting a comment.
+                    capPaused: false,
                     continuesRemaining: wf.continues_remaining,
                   })
                   // Phase 092-07 (Facet C, startup-sweep re-attach): when the
