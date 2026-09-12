@@ -3452,7 +3452,17 @@ const BASELINE = {
   // link of the `min-h-0` chain, plus an `import.meta.glob` sweep pinning the `<ScrollArea>`
   // inventory BY FILE so a third, UNBOUNDED call site cannot arrive silently. All five were
   // driven RED against the shipped tree before the classes were added.
-  "ChatLayout.scrollFrame.test.tsx": 5,
+  //
+  // ⚠ 5 → 6 at Phase 244 plan 09 (gap G-5). `+1` — LINK 6, and the reason it exists is that the
+  // five above are ALL in the MESSAGE column. The shell's SIBLING column (`NavPanel.tsx`, the
+  // desktop nav rail) got neither treatment, and a Chrome drive on 2026-09-12 measured the
+  // consequence: below ~540px of viewport height the PAGE ROOT overflowed (h=436 → `#root`
+  // scrollHeight 540 vs clientHeight 436) and the whole page scrolled. Link 6 pins the rail
+  // root's `min-h-0` + `overflow-y-auto`, and was driven RED TWICE — once against the shipped
+  // tree, once against a planted deletion of `overflow-y-auto` alone.
+  // ⛔ IT PROVES NOTHING ABOUT PIXELS. jsdom performs no layout; the measured bound is
+  // `244-09-UAT-ROW.md`, driven in a real browser at `/gsd:verify-work`.
+  "ChatLayout.scrollFrame.test.tsx": 6,
   // `ChatHistoryColumn.clickPath.test.tsx` — 10 cases. The BUG-260911-02 trace, driven
   // against the real components: C-6's candidates (b) and (c) refuted, plus the FOURTH
   // candidate C-6 did not list (the always-rendered `opacity-0` actions overlay had no

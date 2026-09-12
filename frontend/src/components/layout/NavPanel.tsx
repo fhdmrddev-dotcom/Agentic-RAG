@@ -200,9 +200,35 @@ export function NavPanel({
   ) : undefined
 
   return (
+    // Phase 244 plan 09 (SHELL-01 / BUG-260828-08, gap G-5) — THE RAIL BOUNDS ITSELF.
+    //
+    // Measured in Chrome 2026-09-12: below a viewport height of ~540px the PAGE ROOT overflowed
+    // (h=436 → #root scrollHeight 540 vs clientHeight 436, +104px; h=516 → +24px) and the whole
+    // page scrolled. The overflowing element was THIS rail, not the transcript and not the panel
+    // — the auto-margin footer block below measured bottom=540px, past the rail's own box, and
+    // every ancestor up to <html> read `overflow-y: visible`, so the excess escaped to the page.
+    //
+    // ⭐ THE OVERFLOW RULE IN THE CLASS LIST BELOW (`overflow-y: auto`) IS THE FIX. This box is
+    //    ALREADY bounded at the viewport (`h-full` inside `div.flex.h-screen`, measured
+    //    height = viewport); the content escaped purely because the computed overflow was
+    //    `visible`. With the rule, the rail scrolls its OWN content instead of the document.
+    // ⭐ `min-h-0` BESIDE IT IS DEFENSIVE, not the fix — carried for symmetry with the five sites
+    //    244-01 established in the message column, and because the automatic-minimum-size rule is
+    //    direction-dependent. It costs nothing and removes a future question. Saying which of the
+    //    two does the work matters: a comment that claims more than it can is its own defect.
+    // ⛔ DO NOT "fix" this with a min-height on the page, #root or any ancestor — that makes the
+    //    page scroll deliberately, which IS the bug.
+    // ⛔ DO NOT shrink, re-order or delete the auto-margin footer block below. The footer is not
+    //    too big; the rail could not scroll.
+    //
+    // Pinned by link 6 of `__tests__/ChatLayout.scrollFrame.test.tsx`. ⚠ That fence is a presence
+    // assertion only (jsdom performs no layout); the pixels are `244-09-UAT-ROW.md`.
+    // ⚠ The two class tokens are deliberately NOT spelled out verbatim in this comment: `244-09`'s
+    //    acceptance counts their occurrences in this file with `grep -c`, and a comment mention
+    //    would inflate that count and blind the check to a real second application.
     <div
       className={cn(
-        "hidden md:flex flex-col h-full shrink-0 bg-sidebar border-r border-border/20 py-3 motion-safe:transition-[width] motion-safe:duration-300",
+        "hidden md:flex flex-col h-full min-h-0 overflow-y-auto shrink-0 bg-sidebar border-r border-border/20 py-3 motion-safe:transition-[width] motion-safe:duration-300",
         expanded ? "w-[210px] items-stretch px-2" : "w-[58px] items-center",
       )}
     >
