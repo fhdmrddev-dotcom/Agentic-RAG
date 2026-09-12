@@ -627,3 +627,92 @@ silent, because a reader who finds no `244` entry cannot otherwise tell that fro
 **Re-open trigger:** the next plan whose `files_modified` names
 `frontend/src/components/chat/ThreadRunLine.tsx` — at its THIRD phase it owes a detail section in
 `docs/HOT-FILE-LEDGER.md`.
+
+---
+
+## `244-14` — three items the ROUND-1 REVIEW raised that this fix round did NOT close
+
+⚠ These are deferrals with FIREABLE triggers, not omissions. Each names a file, a command or an
+observable condition, so the re-open is a check somebody can RUN rather than a memory somebody has
+to have. (That discipline exists because this project measured its seeds register to be swept by
+NOTHING — a `trigger_when` nobody reads is a deletion that looks like a decision.)
+
+### 9. [review IN-04] `ChatArea.capPausedComposer.test.tsx` D5 seeds AFTER awaiting the reconcile
+
+**Where:** `frontend/src/components/chat/__tests__/ChatArea.capPausedComposer.test.tsx:365-380`.
+
+D5 waits for the lock to land, then calls `seedHarnessCapPausedLock()` to flip `capPaused` to
+`true`. `ChatArea`'s workflow effect re-runs on `[thread?.id, streamActions]` and its `.then`
+writes `capPaused: false`, so a second settle after the seed silently restores the state the case
+is NOT about, and the following `waitFor` would then pass on its first tick only by ordering luck.
+
+⚠ **MEASURED BY `244-14` WHILE WRITING D7, AND IT IS SHARPER THAN THE REVIEW STATED: the effect
+really does settle TWICE in this harness** — the first call is aborted by the re-run and writes
+nothing; the second writes the lock. The review presented the race as hypothetical; the double
+settle is not. What remains unproven is only whether a THIRD settle can land after the seed.
+
+⛔ **NOT FIXED HERE, deliberately.** D5 is `244-13`'s case and its pass is not in doubt; editing
+another plan's case to remove a race it has not been observed to lose is a change with no driven
+defect behind it. **D7, added by this round, does not reproduce the shape:** a late settle there
+flips `capPaused` to `false`, which DELETES the Continue card and reds D7's positive assertion
+before its negative assertion is reached — fail-safe by construction rather than by luck.
+
+**Re-open trigger (any one):**
+- `ChatArea.capPausedComposer.test.tsx` appears in a gate run's failing-file list with D5 named;
+- any plan edits `ChatArea.tsx`'s mount-reconcile effect or its dependency array;
+- the next plan that touches this suite for any reason.
+
+**The fix, written out so it need not be re-derived:** assert the post-seed value once with
+`expect(...)` instead of `waitFor(...)` — a regression then cannot be papered over by a retry — or
+make `getThreadWorkflow` resolve exactly once (`mockResolvedValueOnce` plus a rejecting default
+that `ChatArea`'s own `.catch` swallows). ⚠ The second form was TRIED here and needs care: with a
+rejecting default the lock never lands at all, because the FIRST, aborted settle consumes the
+`Once`.
+
+### 10. [review IN-05] The truncation note repeats on every call once the copy budget is exhausted
+
+**Where:** `backend/app/services/tool_dispatcher.py` — the
+`len(already) + len(rows) > _ATTACHMENT_HYDRATION_MAX_FILES` arm.
+
+Once the session has copied its cap, every later `execute_code` re-lists, re-computes the
+comparison, appends *"Only the first 50 of N workspace files were copied…"* and returns. The note
+is correct and NAMED (the `T-244-02-07` discipline), but a run calling `execute_code` eight times
+pushes the same sentence into eight tool results.
+
+⚠ **`244-14` changed this arm's reachability and says so rather than leaving it implied:** a path
+now enters `already` on SUCCESS or after being given up on, so a session with flaky Storage reaches
+the cap later than before — a long session still reaches it. ⛔ The related WR-03 finding — that
+the note could be FALSE, because failed paths consumed the budget with no file arriving — **IS
+fixed**, and is fenced by case F3. What remains is repetition of a TRUE note.
+
+**Re-open trigger (any one):** a real run is observed emitting the truncation note in ≥ 3 tool
+results of one turn; **or** `_ATTACHMENT_HYDRATION_MAX_FILES` is lowered from 50, which makes this
+arm ordinary rather than exceptional; **or** any plan adds a second sentence to this arm.
+
+**The fix:** a `noted` marker in the same per-session record pair (`_session_hydration_records`) —
+emit the truncation note on the first call that hits the cap and not again while the count is
+unchanged.
+
+### 11. [review § Security, "not a vulnerability but worth recording once"] Under `WORKER_COUNT=2` the hydration record is PER PROCESS
+
+**Where:** `_hydrated_files` / `_hydration_failures` in `backend/app/services/tool_dispatcher.py`,
+and `SandboxSessionManager.get_or_create` (`backend/app/services/sandbox_service.py:25`).
+
+Each uvicorn worker builds its OWN session object re-attached to the SAME container, so the record
+is per-process and one file can be copied once per worker. ⛔ **PRE-EXISTING and NOT this round's
+defect** — the `WeakSet` marker `244-07` shipped had the identical property and `244-10`'s
+`WeakKeyDictionary` inherited it. It is bounded by worker count (2 by default), and it OVER-copies
+rather than under-copies: the container ends up holding the file, which is the deliverable.
+
+⚠ `244-14` adds a second `WeakKeyDictionary` and changes nothing about this property — both records
+are keyed by the same session object and share its lifetime, so a worker bounce still yields empty
+records and a re-hydrate.
+
+**Re-open trigger (any one):**
+- `WORKER_COUNT` is raised above 2 in `backend/.env.example`, `docker-compose.prod.yml` or
+  `deploy/onebox.env.example` — the duplicate-copy count scales linearly with it;
+- a UAT run observes `/sandbox/attachments/` receiving the same file twice, or a copy cost that
+  scales with worker count;
+- any plan moves the sandbox-session record off the process (Redis, or a marker written INSIDE the
+  container — the latter is the cheaper one, because the container IS the thing the record is a
+  claim about).
