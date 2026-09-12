@@ -628,9 +628,9 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | Hot file (FIRING) | commits / phases / lines | Verdict (abridged) |
 |---|---|---|
 | `frontend/src/components/chat/ToolCallPanel.tsx` | 51 / 23 / 351 | ✅ **G-5 DISCHARGED (227-02)** |
-| `frontend/src/components/chat/MessageItem.tsx` | 73 / 34 / 954 | ✅ 227-03 discharge intact — **244-12 DELETED a mount**: state 4→4, effects 0→0, props 5→5. ⚠ `34` subtracts dated buckets (`37` without). ⛔ G-2 override: RunCard ABOVE ThinkingBlock, 243's rationale kept beside it |
+| `frontend/src/components/chat/MessageItem.tsx` | 74 / 34 / 981 | ✅ 227-03 discharge intact. honoured by construction (**244-13**): the banner branch tests the lock's MODE, not its presence. State 4→4, effects 0→0, props 5→5. ⚠ `34` subtracts 3 dated buckets |
 | `backend/app/api/threads.py` | 245 / 82 / 1617 | ⚠ row was STALE at `243 / 80 / 1590`. honoured by construction (**244-03**): one pure-read query loses a WHERE predicate, gains a Python guard. ⛔ no writer added |
-| `frontend/src/providers/StreamsProvider.tsx` | 96 / 37 / 4614 | ⚠ row STALE a FIFTH time (`94/38/4528`). honoured by construction (**244-11**): ONE existing catch — a console.error is not a state. ⛔ the AbortError arm is load-bearing |
+| `frontend/src/providers/StreamsProvider.tsx` | 97 / 37 / 4660 | ⚠ row STALE a SIXTH time (`96/37/4614`). honoured by construction (**244-13**): 4 lock writes gain a discriminator. ⛔ `useHarnessLiveForThread` still returns a BOOLEAN, never the lock |
 | `frontend/src/hooks/useMessages.ts` | 74 / 27 / 127 | extraction due |
 | `backend/app/services/anthropic_service.py` | 11 / 10 / 354 | adapter-pattern audit due |
 | `backend/app/services/embedding_service.py` | 9 / 5 / 354 | ⚠ absent for its entire life at 5 phases — row added 236 (SC#2) |
@@ -667,7 +667,9 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/chat/MessageInput.tsx` | 31 / 15 / 821 | ⭐ **THE OWED SEAM WAS TAKEN (244-06)** — `useComposerAttachments`. It SHRANK `855 → 821` **while gaining the cloud door**; ⛔ the `ComposerChipsRow` half stays OWED |
 | `frontend/src/components/chat/ActiveConnectorChips.tsx` | 2 / 2 / 82 | ⚠ absent for its ENTIRE LIFE — row added 244-05 at its SECOND phase. **244**: the row container HOISTED out; bare chips now, `null` on empty (D-244-26) |
 | `frontend/src/components/chat/MessageList.tsx` | 23 / 10 / 366 | ⚠ row STALE a FOURTH time (`21/9/307`). **244-12**: its SECOND list-level mount — `PendingAskStack` beside `ThreadRunLine`, both above `bottomRef`. ⛔ unconditional, measured +4 fetches/thread-open |
-| `frontend/src/components/chat/ChatArea.tsx` | 74 / 36 / 743 | ⚠ row was STALE at `72/36/710`. honoured by construction (**244-11**): ONE ternary in a rendered span. ⛔ the banner sentence is a claim ABOUT THE SCREEN; `Showing cached version` must stay 1 |
+| `frontend/src/components/chat/ChatArea.tsx` | 75 / 36 / 781 | ⚠ row STALE a THIRD time (`74/36/743`). honoured by construction (**244-13**): the SAME one boolean now tests the lock's MODE — WR-07 closed, no second branch, no new state |
+| `frontend/src/stores/streamsStore.ts` | 20 / 13 / 525 | ⚠ **absent for its ENTIRE LIFE at 13 phases — row added 244-13; the ledger gate was RED on it at every earlier commit of this phase.** `WorkflowLock.mode` is a REAL discriminator now |
+| `frontend/src/lib/toolMeta.ts` | 10 / 6 / 218 | ⚠ **absent for its ENTIRE LIFE at 6 phases — row added 244-13, which does NOT modify it.** ⛔ the ONE home of the harness activity string; a literal copied elsewhere makes its pin vacuous |
 | `frontend/src/components/panel/PendingAskCard.tsx` | 14 / 7 / 765 | ⚠ row was STALE at `13 / 7 / 736`. UNTOUCHED by 244-03 (`0 0`) — the chat approval is a MOUNT of its shipped `PendingAskStack`, never an edit to the cross-surface shell |
 | `frontend/src/pages/WorkflowRunPage.tsx` | 28 / 9 / 1670 | honoured by construction (200 / 200.1 / 200.2 / **214**) |
 | `frontend/src/components/chat/OutputFileCard.tsx` | 8 / 7 / 219 | honoured by construction (195) |

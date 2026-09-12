@@ -10328,9 +10328,9 @@ cells rot within days.
 | File | commits / phases / lines | G-5 | Disposition |
 |---|---|---|---|
 | [`frontend/src/components/chat/ToolCallPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattoolcallpaneltsx) | 51 / 23 / 351 | **FIRES** | ✅ **G-5 DISCHARGED (227-02)** — extracted ToolCallDetails, StepRow, toolStepDerivation (1019 → 351 lines) |
-| [`frontend/src/components/chat/MessageItem.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageitemtsx) | 71 / 37 / 904 | **FIRES** | ✅ G-5 DISCHARGED (227-03). STILL not re-hollowed (**244-05**): `useState` 3→3, `useEffect` 0→0, props 5→5; TWO pure store reads, no fetch, no prop. ⚠ row was STALE at `70 / 34 / 803` |
+| [`frontend/src/components/chat/MessageItem.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageitemtsx) | 74 / 34 / 981 | **FIRES** | ⚠ row STALE a THIRD time (`71/37/904`; `34` subtracts 3 dated buckets). honoured by construction (**244-13**): a PRESENCE test becomes a MODE test. State 4→4, effects 0→0, props 5→5 |
 | [`backend/app/api/threads.py`](docs/HOT-FILE-LEDGER.md#backendappapithreadspy) | 245 / 82 / 1617 | **FIRES** | ⚠ row was STALE at `243 / 80 / 1590`. honoured by construction (**244-03**): ONE existing pure-read query loses a WHERE predicate and gains a Python guard. ⛔ no writer added |
-| [`frontend/src/providers/StreamsProvider.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcprovidersstreamsprovidertsx) | 94 / 38 / 4528 | **FIRES** | ⚠ row STALE a FOURTH time (`90 / 36 / 4380`). honoured by construction (**244-05**): TWO pure SELECTORS, no state, no effect, no action — both return values zustand can compare with `Object.is` |
+| [`frontend/src/providers/StreamsProvider.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcprovidersstreamsprovidertsx) | 97 / 37 / 4660 | **FIRES** | ⚠ row STALE a SIXTH time (`94/38/4528`; `37` subtracts one dated bucket). honoured by construction (**244-13**): 4 lock writes gain a discriminator; the selector still returns a BOOLEAN |
 | [`frontend/src/hooks/useMessages.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusemessagests) | 74 / 27 / 127 | ⚠ **FIRES** | extraction due |
 | [`backend/app/services/anthropic_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesanthropic_servicepy) | 11 / 10 / 354 | ⚠ **FIRES** | adapter-pattern audit due |
 | [`frontend/src/components/workflows/WorkflowCanvas.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsworkflowcanvastsx) | 31 / 9 / 1708 | **FIRES** | honoured by construction (199 / 200 / **214**) — 214-04 widened the panel and touched no node logic |
@@ -10370,7 +10370,7 @@ cells rot within days.
 | [`frontend/src/components/chat/MessageList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessagelisttsx) | 21 / 9 / 307 | **FIRES** | ⚠ row STALE a THIRD time (`19/8/267` → `20/8/292` → `20/8/300`). honoured by construction (**244-01**): `min-h-0` added to the ONE `<ScrollArea>` call site — a class token, no state, no prop |
 | [`frontend/src/hooks/useFollowScroll.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusefollowscrollts) | 4 / 2 / 314 | does not fire | ⛔ **NO ROW FOR ITS ENTIRE LIFE — added 243-03**, then STALE at `3/2/265` one phase on. **243-06:** the re-arm now asks whether the reader is STILL leaving, not what they last did |
 | [`frontend/src/lib/throttle.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibthrottlets) | 2 / 2 / 108 | does not fire | ⛔ **NO ROW FOR ITS ENTIRE LIFE — added 243-03.** TWO opposite primitives on purpose; ⛔ never unify them — one of the two call sites breaks silently |
-| [`frontend/src/components/chat/ChatArea.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatchatareatsx) | 72 / 36 / 710 | **FIRES** | honoured by construction (**244-03**): ONE boolean gains `&& !workflowLock.capPaused`. No second branch, no new state — the whole lock chain already reads this one value |
+| [`frontend/src/components/chat/ChatArea.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatchatareatsx) | 75 / 36 / 781 | **FIRES** | ⚠ row STALE a THIRD time (`72/36/710`). honoured by construction (**244-13**): the SAME one boolean now tests the lock's MODE — WR-07. No second branch, no new state |
 | [`frontend/src/components/panel/PendingAskCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelpendingaskcardtsx) | 14 / 7 / 765 | **FIRES** | ⚠ row was STALE at `13 / 7 / 736`. UNTOUCHED by 244-03 (`0 0`) — the chat approval MOUNTS its shipped `PendingAskStack`, never edits the shell. ⚠ `SEED-219` still open |
 | [`frontend/src/pages/WorkflowRunPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowrunpagetsx) | 28 / 9 / 1670 | **FIRES** | honoured by construction (200 / 200.1 / 200.2 / **214**) — it resolves the step identity ONCE and its children render it |
 | [`frontend/src/components/chat/OutputFileCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatoutputfilecardtsx) | 8 / 7 / 219 | **FIRES** | honoured by construction (195) |
@@ -10401,7 +10401,7 @@ cells rot within days.
 | [`frontend/src/components/workflows/library/RunModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryrunmodaltsx) | 8 / 5 / 713 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ✅ **deferred extraction DISCHARGED (214-12)** — one declared-input renderer, shared with chat and the schedule door |
 | [`frontend/src/components/panel/PanelEmpty.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelpanelemptytsx) | 4 / 4 / 52 | ⚠ **FIRES** | ⚠ absent at 4 phases — invisible to G-5 for its entire life (199) |
 | [`frontend/src/components/chat/StopControl.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatstopcontroltsx) | 3 / 1 / 315 | no (1 phase) | young — owes a detail section at its 3rd phase |
-| [`frontend/src/components/chat/ThreadRunLine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatthreadrunlinetsx) | 1 / 1 / 357 | no (1 phase) | young — owes a detail section at its 3rd phase |
+| [`frontend/src/components/chat/ThreadRunLine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatthreadrunlinetsx) | 1 / 1 / 357 | no (1 phase) | ⚠ re-derived at 244-13 and UNMOVED — `244` FIXED G-1 in its INPUT, not here, so it is still at phase 1 and NOT one away. Detail section owed at its 3rd phase |
 | [`frontend/src/components/chat/ActiveRunsTray.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatactiverunstraytsx) | 2 / 1 / 164 | no (1 phase) | young — owes a detail section at its 3rd phase |
 | [`frontend/src/components/files/FileRow.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsfilesfilerowtsx) | 1 / 1 / 275 | no (1 phase) | young (195) |
 | [`frontend/src/components/files/fileRowUtils.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsfilesfilerowutilsts) | 1 / 1 / 133 | no (1 phase) | young (195) |
@@ -10592,6 +10592,8 @@ cells rot within days.
 | [`frontend/src/components/chat/ConnectedFilePickerModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatconnectedfilepickermodaltsx) | 3 / 2 / 336 | no (2 phases) | ⚠ **absent for its ENTIRE LIFE — row added 244-06, and the ledger gate FAILED on it at this phase's base (C-8).** 244-06 REBUILT it: select-then-confirm, and the commit is the parent's |
 | [`frontend/src/components/chat/useComposerAttachments.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatusecomposerattachmentsts) | 2 / 1 / 183 | no (new) | young (created 244-06). Row added AT CREATION. ⭐ THE SEAM `244-05` NAMED AND OWED — both attach doors' state and verbs; `MessageInput.tsx` shrank `855 → 821` |
 | [`frontend/src/components/chat/ActiveConnectorChips.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatactiveconnectorchipstsx) | 2 / 2 / 82 | no (2 phases) | ⚠ absent for its entire life — row added 244-05 at its SECOND phase. **244**: the row container HOISTED out; it is bare chips now, `null` on empty (D-244-26) |
+| [`frontend/src/stores/streamsStore.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcstoresstreamsstorets) | 20 / 13 / 525 | **FIRES** | ⚠ **absent for its ENTIRE LIFE at 13 phases — row added 244-13, and the phase's ledger gate was RED on it at every prior commit.** **244-13**: `WorkflowLock.mode` becomes a REAL discriminator |
+| [`frontend/src/lib/toolMeta.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibtoolmetats) | 10 / 6 / 218 | **FIRES** | ⚠ **absent for its ENTIRE LIFE at 6 phases — row added 244-13, which does NOT modify it.** ⛔ the ONE home of the harness activity string: a literal copied elsewhere makes its byte-pin vacuous |
 
 
 
@@ -12919,3 +12921,137 @@ order; a re-reversal later is a decision, not a regression. `ThinkingBlock.chara
 bodyAt` is UNCHANGED, and §12's three mount invariants (no tool test, no `key=`, no `tool_calls` in
 `ThinkingBlock.tsx`) survive the move, now with a non-vacuity assertion so a resolver that matched
 nothing could not pass every `not.toContain` over an empty string.
+
+---
+
+## `frontend/src/stores/streamsStore.ts`
+
+⚠ **ADDED 2026-09-12 BY `244-13`, AFTER BEING ABSENT FOR ITS ENTIRE LIFE AT THIRTEEN PHASES —
+and the ledger GATE is what made that impossible to keep ignoring.** `node
+scripts/check-hot-file-ledger.cjs 244` exited `1` with `[no-row]
+frontend/src/stores/streamsStore.ts (named by 244-13-PLAN.md)` at **every commit of Phase 244**,
+because `244-13-PLAN.md` named the file in `files_modified` from the moment the plan set was
+written. **Three earlier executors saw that red and deliberately did not clear it**, each
+recording why: a row minted by a non-owner goes stale before its owner lands, and *a row present
+and WRONG answers the auditor with a verdict and stops the audit, which is worse than an absent
+one.* That is the correct call and it is recorded here so the restraint does not read as
+oversight. Re-derived at this commit: **`20 commits / 13 phases / 525 lines`** — buckets
+`068 068.5 075.4 086 092 094 098 099 101.1 176 194 194.1 244`, **zero dated quick-task buckets**,
+so the phase count needs no subtraction.
+
+### 244-13 — `WorkflowLock.mode` becomes a real discriminator
+
+**The change is four words in a type**, and it is the whole fix for UAT gap `G-1` and review
+finding `WR-07`:
+
+```ts
+  mode: "harness"                 →   mode: "harness" | "cap_paused"
+```
+
+⛔ **WHY A ONE-MEMBER LITERAL WAS A DEFECT RATHER THAN A STYLE PROBLEM.** `244-PATTERNS.md`
+**C-1** measured that `D-244-08`'s proposed composer gate — `workflowLock?.mode === "harness"` —
+was a **NO-OP**, because the type had exactly one member and **all six write sites hard-coded
+it**, including the branch that locks a DEEP run paused at its iteration cap. So the gate was
+`true` for precisely the run it was meant to unlock. **C-1 was RIGHT when written**; what
+`244-13` changed is the type, not the measurement, and C-1's paragraph is kept verbatim in
+`ChatArea.tsx` beside the correction rather than being overwritten.
+
+⚠ **THE DEFECT ARRIVED WITHOUT THIS FILE BEING TOUCHED, which is the general lesson.** The lock
+used to be harness-only, so *presence* and *harness* were the same fact and three consumers
+tested presence. `244-03` then made the SERVER populate the lock for a cap-paused DEEP run
+(`threads.py:1237-1276`). **A server change reached three client consumers written against the
+old invariant**, and nothing typechecked, nothing failed, and nothing in either suite ever asked
+*"what does a DEEP thread with a cap_paused lock render?"*. What the browser then measured, in
+one `getBoundingClientRect` pass: an amber card at `top=272` reading *"Reached the Continue limit
+— this run is stopped."* and a run receipt at `top=313` reading the harness activity string with
+`data-run-line-state="live"`, on a thread that has never had a workflow, plus a 1 s
+`setInterval` clock ticking for it.
+
+**The invariants that now bind this file:**
+
+1. ⛔ **`mode` is SET FROM THE SERVER'S OWN ANSWER, never inferred from `capPaused`.** The
+   backend computes the fact once (`threads.py:1195`) and ships it as
+   `ThreadWorkflowState.mode`. A second client-side derivation of one fact is exactly how the
+   two registers drifted; five of the six write sites now either state `"harness"` on an arm
+   that structurally requires a live `active_workflow_run_id`, or read `wf.mode` / `state.mode`
+   straight off the wire.
+2. ⚠ **The `cap_paused` SSE is the ONE site with no answer available, and its rule is an
+   INFERENCE with a reason rather than a fact.** The event carries `runId` +
+   `continuesRemaining` and no mode, so `StreamsProvider.tsx:1193` **INHERITS** the thread's
+   existing lock mode and defaults to `"cap_paused"`. It is exactly as strong as the two writes
+   that could have put a harness lock there — the kickoff seed and the reconcile — and both are
+   harness-only. ⛔ This is also the **reachable** half of `WR-07`: keeping `"harness"` here is
+   what stops a harness run that hits its own cap from unlocking the composer mid-run.
+3. ⛔ **Existing fixtures writing `mode: "harness"` stay valid** — they describe harness locks.
+   The union is WIDENED rather than replaced precisely so that is true.
+4. ⛔ **The `runId` two-id landmine is UNTOUCHED**, and its JSDoc directly above `mode` is the
+   reason this file is where the new invariant was written down. `useHarnessLiveForThread` still
+   returns a **BOOLEAN** and still never hands back the lock record; the `194-03` F-1 fence (no
+   Stop mount may read `runId` or call `cancelRun(` directly) is byte-unchanged.
+
+⭐ **THE TYPECHECKER WAS RUN AS A WORKLIST AND RETURNED AN EMPTY ONE — a measurement, not an
+assumption.** Widening a literal union surfaces every site that assumed the single member;
+`npx tsc -p tsconfig.app.json --noEmit` produced a **set diff empty in both directions** against
+the 67-error base (one pre-existing error moved line 382 → 423 and is the same error). That
+confirms the plan's grep (`grep -rn "\.mode ===" frontend/src` → every hit is a test fixture or
+an unrelated `builder.mode === "edit"`), and it is what made this a contained change rather than
+a sweep. ⚠ **One `.mode ===` hit is NOT a consumer of this type and must not be "fixed"**:
+`StreamsProvider.tsx`'s `wf.mode === "harness"` reads the SERVER WIRE type
+`ThreadWorkflowState.mode`, which has been `"deep" | "harness"` all along.
+
+**Per G-5 the next phase adding a genuinely second concern here owes a refactor recommendation
+FIRST. The seam is named rather than implied:** this file is a per-surface message-bucket store,
+a per-thread run-liveness store (`streamingThreads` / `stoppingThreads` / `stopNotConfirmed` /
+`harnessKickoffThreads` / `workflowLockByThread`), a per-thread panel-slice store
+(`phasesByThread` / `todosByThread` / files / asks) and a reconcile-error store, in one 525-line
+module. **It inherits `20 / 13 / 525`, and that figure goes stale on the next commit touching
+the file.**
+
+---
+
+## `frontend/src/lib/toolMeta.ts`
+
+⚠ **ADDED 2026-09-12 BY `244-13`, WHICH DOES NOT MODIFY THIS FILE — and that is deliberate
+rather than an accident of scope.** Measured with the gate itself: `node
+scripts/check-hot-file-ledger.cjs --files frontend/src/lib/toolMeta.ts` → `[no-row]`, at
+**`10 commits / 6 phases / 218 lines`** (buckets `067.1 098 174 194 224 56`, **zero dated
+quick-task buckets**). **G-5 FIRES at double its threshold and could never have fired at all**,
+because the gate keys on rows and this file has never had one. ⛔ **The reason a row is worth
+minting for a file the phase did not edit:** `G-1`'s own artifact list names `toolMeta.ts:197`
+as the supplier of the harness activity string the phantom rendered — **the file the phase's
+criterion turned on sat outside the audit**. That is exactly what happened to `NavPanel.tsx` for
+eleven phases and to `App.tsx` for twenty-three, and in both of those cases the absence was
+found only after the defect.
+
+### The invariant this file carries, and why a copy anywhere else is the failure mode
+
+⛔ **IT IS THE SINGLE HOME OF THE HARNESS ACTIVITY STRING, AND EVERY CONSUMER CALLS IT RATHER
+THAN COPYING IT.** `outerBannerLabel()` owns the pre-tools sentence for both modes;
+`ThreadRunLine.liveWord()` obtains the live word by **calling** `outerBannerLabel(..., isHarness
+= true, ...)`, and `MessageItem`'s `HarnessOuterBanner` does the same. `__tests__/toolMeta.test.ts`
+byte-pins the string as a `D-14` decision. **A literal copied into any other module makes that
+pin vacuous** — the acceptance grep moves and the pin stops guarding the rendered value. The
+file's own `:160-173` comment records this at length (the 187-24 / 193.2-F-3 lesson) and
+deliberately declines to spell the string in its own prose for the same reason. ⚠ `244-13`
+honoured that rule under pressure: two comments it authored quoted a literal that an acceptance
+grep counts, and both were reworded to name the thing by ROLE instead.
+
+⚠ **THIS FILE IS ALSO WHERE `G-1` BECAME VISIBLE, WITHOUT BEING WHERE `G-1` LIVED.** The phantom
+rendered the harness string on a Deep thread — but `toolMeta.ts` was answering exactly the
+question it was asked (`isHarness: true`); the lie was in the caller's *argument*, supplied by a
+presence test in `StreamsProvider.tsx` and in `MessageItem.tsx`. **`244-13` therefore fixed the
+INPUT and left this file byte-unchanged**, which is the correct direction and is recorded so a
+later reader does not come looking for a defect here. The second half of that rule:
+`harnessBannerProgress` deliberately falls THROUGH to the pinned pre-phase-1 string whenever the
+slice is absent or unadvanced — *an absent slice degrades to the shipped truth rather than to an
+invented one* (`T-194-07-01`).
+
+⚠ **`phaseIndex` IS 0-BASED and `harnessBannerProgress` renders `phaseIndex + 1` (`:128`)** —
+measured at `244-13` when a 1-based fixture made the middle phase of three read *"Step 3 of 3"*.
+Recorded here because it is the kind of off-by-one that produces a plausible wrong number rather
+than a crash.
+
+**Per G-5 the next phase adding a genuinely second concern here owes a refactor recommendation
+FIRST; the seam is named rather than implied** — the per-tool copy map, the outer-banner state
+machine and `harnessBannerProgress`'s phase arithmetic are three concerns in one module, and the
+third is the only one that is not a lookup table. **It inherits `10 / 6 / 218`.**
