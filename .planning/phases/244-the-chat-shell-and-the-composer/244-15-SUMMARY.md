@@ -366,3 +366,19 @@ No commit deleted a tracked file (`git diff --diff-filter=D HEAD~1 HEAD` empty o
 **Next action:** drive `244-15-UAT-ROW.md` in a real browser. Start with **Arm 1** (thread → panel),
 and hold the operator-safety rule: the fixture step is outward-facing and irreversible — settle with
 **"Do not run it" + Send Answer**, never *"Approve this step"*.
+
+---
+
+## Self-Check: PASSED
+
+**Created files, existence verified on disk:**
+
+- `FOUND: frontend/src/__tests__/providers/streamsProvider_244_settle_ask.test.tsx`
+- `FOUND: .planning/phases/244-the-chat-shell-and-the-composer/244-15-UAT-ROW.md`
+- `FOUND: .planning/phases/244-the-chat-shell-and-the-composer/244-15-SUMMARY.md`
+
+**Commits, verified present in `git log`:** `c1dca467a` · `c31420d2d` · `0cd3a0bd6` · `0ae8edcbf`.
+
+**Shared-file invariant verified, not assumed.** `git diff --name-only 8a27ab7f8 HEAD` lists ten
+files and **neither `.planning/STATE.md` nor `.planning/ROADMAP.md` is among them**. The working tree
+is clean (`git status --short` empty).
