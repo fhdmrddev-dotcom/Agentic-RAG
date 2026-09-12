@@ -1932,6 +1932,36 @@ export function StreamsProvider({ children }: PropsWithChildren) {
               snapshot = await getSnapshot(threadId)
             } catch (err) {
               console.error("reconcile failed:", err)
+              // ── Phase 244-11 (SHELL-01 / UAT gap G-3) — RECORD THE FAILURE, DO NOT
+              //    SWALLOW IT.
+              //
+              // Driven 2026-09-12: GET /threads/{id}/snapshot returned 503 on 2 of 4
+              // observed calls, and the chat surface said NOTHING — header fine, composer
+              // fine, transcript silently incomplete. A sweep of every leaf element for
+              // /unavailable|error|failed|retry|try again|something went wrong/i returned
+              // ZERO matches. The console.error above WAS the entire handler, and
+              // `lib/api/threads.ts:1063`'s docstring already claimed otherwise
+              // ("the StreamsProvider consumer routes via its existing error handler").
+              //
+              // ⚠ AN ABORT IS NOT A FAILURE. `reconcile` is fired from `setViewingThread`
+              // on EVERY thread switch; without this arm each switch that cancels an
+              // in-flight snapshot would raise a banner on the thread the person actually
+              // wanted. Symmetric with the loadMessages wait-abort guard at :3203.
+              if (err instanceof DOMException && err.name === "AbortError") return
+              // ⛔ The EXACT shipped write from the loadMessages failure path (:3209-3215),
+              // reused rather than re-invented: two writers of one slice that differ is how
+              // slices drift here. It lands in the per-thread `reconcileErrors` Map
+              // (D-075.4-A1), which `useReconcileErrorForThread` already feeds to
+              // ChatArea's shipped amber banner — Retry and dismiss included. No new slice,
+              // no new renderer, no automatic retry, and `Retry-After` is deliberately NOT
+              // consumed (that would be a new behaviour, not a gap fix — see
+              // deferred-items.md).
+              useStreamsStore.setState((s) => ({
+                reconcileErrors: new Map(s.reconcileErrors).set(
+                  threadId,
+                  err instanceof Error ? err : new Error(String(err)),
+                ),
+              }))
               return
             }
 
