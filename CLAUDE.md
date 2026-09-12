@@ -630,7 +630,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/chat/ToolCallPanel.tsx` | 51 / 23 / 351 | ✅ **G-5 DISCHARGED (227-02)** |
 | `frontend/src/components/chat/MessageItem.tsx` | 75 / 34 / 1000 | ⚠ row STALE a 4th time (`74/34/981`). honoured by construction (**244-14/WR-01**): the Continue card reads the lock's MODE, like the composer beside it. State 3→3, effects 0→0, props 5→5 |
 | `backend/app/api/threads.py` | 245 / 82 / 1617 | ⚠ row was STALE at `243 / 80 / 1590`. honoured by construction (**244-03**): one pure-read query loses a WHERE predicate, gains a Python guard. ⛔ no writer added |
-| `frontend/src/providers/StreamsProvider.tsx` | 101 / 37 / 4815 | ⚠ row STALE an 8th time (`100/37/4727`). honoured by construction (**244-15**): ONE action that RELEASES — `setWorkflowLockForThread(` reads 5 before and 5 after. ⛔ no timer, no seventh writer |
+| `frontend/src/providers/StreamsProvider.tsx` | 102 / 37 / 4847 | ⭐ row was ACCURATE at base (`101/37/4815`) — first time in 9. honoured by construction (**244-15/WR-01**): a PRECONDITION above the fetch, no new arm; `setWorkflowLockForThread(` 5→5, no timer |
 | `frontend/src/hooks/useMessages.ts` | 74 / 27 / 127 | extraction due |
 | `backend/app/services/anthropic_service.py` | 11 / 10 / 354 | adapter-pattern audit due |
 | `backend/app/services/embedding_service.py` | 9 / 5 / 354 | ⚠ absent for its entire life at 5 phases — row added 236 (SC#2) |

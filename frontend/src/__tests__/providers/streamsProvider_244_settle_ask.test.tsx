@@ -117,7 +117,7 @@ import { StreamsProvider, useStreamActions } from "@/providers/StreamsProvider"
 import { useStreamsStore, type WorkflowLock } from "@/stores/streamsStore"
 import { PendingAskStack, PendingAskCard } from "@/components/panel/PendingAskCard"
 import type { StreamCallbacks } from "@/lib/api"
-import type { PendingAsk } from "@/types"
+import type { Message, PendingAsk } from "@/types"
 import { stripComments } from "@/lib/stripComments.testutil"
 
 const THREAD_ID = "thread-settle"
@@ -609,5 +609,188 @@ describe("244-15 / G-8 — an answer in ONE home clears the other", () => {
     expect(reconcileSpy).not.toHaveBeenCalled()
     expect(mockGetThreadPendingAsks).not.toHaveBeenCalled()
     expect(mockGetThreadWorkflow).not.toHaveBeenCalled()
+  })
+})
+
+/**
+ * ⛔ WR-01 (gap-closure round 2, `244-REVIEW-gap-round-2.md`) — THE SETTLE OWNS ONE FACT AND
+ * MUST TOUCH NOTHING ELSE.
+ *
+ * The cases above all seed a WORKFLOW thread. `PendingAskStack` mounts for EVERY thread — the
+ * panel and the chat column (`MessageList.tsx:320`) — so the settle also fires on a plain Deep
+ * chat run, which has no workflow anchor at all. For such a thread the server always reports no
+ * anchor and no cap-pause, so the fail-closed arm never holds and the RELEASE arm always runs —
+ * calling `clearStopStateForThread`, which clears `stoppingThreads` ∪ `stopNotConfirmed` AND
+ * DISARMS THE 8s CLIMB-DOWN TIMER, on a thread this path has nothing to release on.
+ *
+ * The consequence is user-visible and is the mirror image of the NEW LIE
+ * `clearStopStateForThread`'s own docblock warns about: press Stop on a streaming chat run that
+ * has a pending `ask_user`, answer the prompt inside the 8-second window, and
+ * `StopControl.tsx:287` swaps "Stopping…" back to a pressable Stop button while the run keeps
+ * streaming — the climb-down that is the ONLY route back to an honest reading never fires.
+ *
+ * ⚠ THE TIMER IS HALF THE FINDING, so these cases PRESS STOP FOR REAL rather than hand-seeding
+ * `stoppingThreads`. The 8s handle lives in a provider ref whose only writer is
+ * `recordStopPress`, reachable only through `stopThread`/`stopStream`; a seeded Set models the
+ * READING and leaves the timer — the invisible half — unobserved.
+ */
+describe("244-15 / WR-01 — a thread with nothing to release keeps its STOP slice", () => {
+  /** The live bucket row `resolveStopRunId` reads FIRST, so the stop resolves an id without a
+   *  workflow frame read — a Deep chat run, which is the whole point of these cases. */
+  function seedStreamingBucket(runId = "run-producer-1") {
+    act(() => {
+      useStreamsStore.setState((s) => {
+        const surf = new Map(s.bucketsBySurface.get("chat") ?? new Map<string, Message[]>())
+        surf.set(THREAD_ID, [
+          {
+            id: "m-1",
+            thread_id: THREAD_ID,
+            user_id: "",
+            role: "assistant",
+            content: "",
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            tool_calls: [],
+            runStatus: "streaming",
+            runId,
+          } as unknown as Message,
+        ])
+        const buckets = new Map(s.bucketsBySurface)
+        buckets.set("chat", surf)
+        return { bucketsBySurface: buckets }
+      })
+    })
+  }
+
+  it("Test 13 (THE REGRESSION, driven through the stack) — answering an ask does not cancel an in-flight Stop", async () => {
+    /**
+     * ⛔ THE PRECONDITION IS ASSERTED, NOT ASSUMED: no lock and no kickoff mark. Without that
+     * assertion this case would pass for a thread that simply had nothing to clear.
+     */
+    useStreamsStore.setState({ viewedThreadId: THREAD_ID })
+    mockGetThreadPendingAsks.mockResolvedValue([ASK])
+    render(
+      <StreamsProvider>
+        <div data-testid="home-a">
+          <PendingAskStack />
+        </div>
+      </StreamsProvider>,
+    )
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Send Answer" })).toBeInTheDocument(),
+    )
+    await drain()
+
+    expect(useStreamsStore.getState().workflowLockByThread.has(THREAD_ID)).toBe(false)
+    expect(useStreamsStore.getState().harnessKickoffThreads.has(THREAD_ID)).toBe(false)
+
+    seedStreamingBucket()
+    await act(async () => {
+      await useStreamsStore.getState().actions.stopThread(THREAD_ID)
+    })
+    expect(
+      useStreamsStore.getState().stoppingThreads.has(THREAD_ID),
+      "the Stop press did not register — this case would then prove nothing about the settle",
+    ).toBe(true)
+
+    mockGetThreadPendingAsks.mockResolvedValue([])
+    const user = userEvent.setup()
+    await user.click(screen.getByRole("radio", { name: "Do not run it" }))
+    await user.click(screen.getByRole("button", { name: "Send Answer" }))
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: "Send Answer" })).toBeNull(),
+    )
+    await drain()
+
+    expect(
+      useStreamsStore.getState().stoppingThreads.has(THREAD_ID),
+      "answering the prompt cleared the STOP slice of a thread with no workflow — " +
+        "`StopControl` re-renders a pressable Stop over a run that is still streaming",
+    ).toBe(true)
+    expect(useStreamsStore.getState().stopNotConfirmed.has(THREAD_ID)).toBe(false)
+  })
+
+  it("Test 14 (THE INVISIBLE HALF) — the 8s climb-down still fires after an answer", async () => {
+    /**
+     * ⚠ THE CASE TEST 13 CANNOT SEE. `clearStopStateForThread` also `clearTimeout`s the
+     * handle, and a disarmed timer is observable only by letting the window elapse: at
+     * `STOP_TIMEOUT_MS` the climb-down must still flip stopping → not-confirmed, which is the
+     * ONLY route back to a pressable Stop (`useStopNotConfirmedForThread`, sketch 168-B).
+     *
+     * ⚠ FAKE TIMERS, AND THEREFORE NO `userEvent` IN THIS CASE — the two do not mix without an
+     * `advanceTimers` bridge. The stack→action edge is already fenced by Tests 9, 10 and 13;
+     * this case owns the action's own precondition.
+     */
+    vi.useFakeTimers()
+    try {
+      const { result } = renderProvider()
+      seedStreamingBucket()
+      act(() => {
+        void result.current.stopThread(THREAD_ID)
+      })
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0)
+      })
+      expect(useStreamsStore.getState().stoppingThreads.has(THREAD_ID)).toBe(true)
+
+      await act(async () => {
+        result.current.releaseSettledWorkflowLock(THREAD_ID)
+        await vi.advanceTimersByTimeAsync(0)
+      })
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(8000)
+      })
+      expect(
+        useStreamsStore.getState().stopNotConfirmed.has(THREAD_ID),
+        "the settle DISARMED the 8s timer on a thread it has nothing to release on — the " +
+          "climb-down never fires and the surface never climbs back to an honest reading",
+      ).toBe(true)
+      expect(useStreamsStore.getState().stoppingThreads.has(THREAD_ID)).toBe(false)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it("Test 15 (NO USELESS READ) — a thread with nothing to release issues no workflow GET", async () => {
+    /**
+     * The guard sits ABOVE the fetch, so the settle on a Deep thread is not merely harmless —
+     * it is free. (Recorded against WR-03: this path's read count is not one per answer.)
+     */
+    const { result } = renderProvider()
+    const lockBefore = useStreamsStore.getState().workflowLockByThread
+    const kickoffBefore = useStreamsStore.getState().harnessKickoffThreads
+    mockGetThreadWorkflow.mockClear()
+
+    await act(async () => {
+      result.current.releaseSettledWorkflowLock(THREAD_ID)
+    })
+    await drain()
+
+    expect(mockGetThreadWorkflow).not.toHaveBeenCalled()
+    expect(useStreamsStore.getState().workflowLockByThread).toBe(lockBefore)
+    expect(useStreamsStore.getState().harnessKickoffThreads).toBe(kickoffBefore)
+  })
+
+  it("Test 16 (POSITIVE CONTROL — the KICKOFF MARK alone is enough to proceed)", async () => {
+    /**
+     * ⛔ THE ARM THAT KEEPS THE GUARD FROM BEING TOO NARROW. `useHarnessLiveForThread` has TWO
+     * disjuncts, and the synchronous pre-lock kickoff window holds the mark WITHOUT a lock. A
+     * guard that demanded the lock would return early exactly there and leave the run line
+     * reading `live` with its 1s clock — re-opening the defect from the other side.
+     */
+    const { result } = renderProvider()
+    act(() => {
+      useStreamsStore.setState({ harnessKickoffThreads: new Set([THREAD_ID]) })
+    })
+    expect(useStreamsStore.getState().workflowLockByThread.has(THREAD_ID)).toBe(false)
+
+    await act(async () => {
+      result.current.releaseSettledWorkflowLock(THREAD_ID)
+    })
+    await drain()
+
+    expect(mockGetThreadWorkflow).toHaveBeenCalledWith(THREAD_ID)
+    expect(useStreamsStore.getState().harnessKickoffThreads.has(THREAD_ID)).toBe(false)
   })
 })

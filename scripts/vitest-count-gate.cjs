@@ -3048,7 +3048,14 @@ const BASELINE = {
   // directions, because a fence over one is passed by a fix that only works one way), a
   // refused-answer case that must settle NOTHING, and the third home (`WorkflowRunPage` mounts
   // the CARD, not the stack) asserted by API call count rather than by render.
-  "streamsProvider_244_settle_ask.test.tsx": 12,
+  // ⚠ RAISED `12` → `16` BY THE WR-01 FIX ROUND, from the same `actual` column. Three of the
+  // four were DRIVEN RED against the unguarded code first: the settle cleared the STOP slice of
+  // a thread with no workflow (Test 13, through the stack), disarmed its 8s climb-down timer
+  // (Test 14, the half a state assertion cannot see), and issued a pointless workflow GET
+  // (Test 15). The fourth is the POSITIVE CONTROL that keeps the new guard from being too
+  // narrow — the kickoff mark ALONE must still let the settle proceed (Test 16), which is the
+  // pre-lock window and would otherwise be closed off by a guard demanding the lock.
+  "streamsProvider_244_settle_ask.test.tsx": 16,
 
   // ── Phase 244-15 — a RED, UNGATED fence, repaired and finally adopted ─────────────────
   //

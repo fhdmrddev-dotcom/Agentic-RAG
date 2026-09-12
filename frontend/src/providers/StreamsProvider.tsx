@@ -3502,7 +3502,10 @@ export function StreamsProvider({ children }: PropsWithChildren) {
         //
         // ⛔ THIS IS DELIBERATELY NOT A SEVENTH `setWorkflowLockForThread` WRITER, and that
         // is this path's central design constraint rather than a stylistic preference. Six
-        // sites write that key; two of them are fenced against each other by
+        // DERIVING sites write that key (each marked `WRITE SITE n of 6`), plus one re-key in
+        // this file's producer-resubscribe arm that spreads an EXISTING lock and derives none —
+        // measured seven call sites in all (IN-01). Two of the six are fenced against each
+        // other by
         // `__tests__/providers/workflowLockWriters.lockstep.test.ts` because they had already
         // drifted apart once (`244-08` / `244-13` / `244-14` CR-01). A reader who adds a
         // `setWorkflowLockForThread` call inside this action is re-opening `G-1`: they would be
@@ -3527,6 +3530,30 @@ export function StreamsProvider({ children }: PropsWithChildren) {
         // `__tests__/providers/streamsProvider_244_settle_ask.test.tsx` Test 8.
         releaseSettledWorkflowLock: (threadId) => {
           if (!threadId) return
+          // ── WR-01 (gap-closure round 2): THIS PATH OWNS ONE FACT AND TOUCHES NOTHING ELSE ──
+          //
+          // `PendingAskStack` mounts for EVERY thread — the panel and the chat column
+          // (`MessageList.tsx:320`) — so this fires on a plain Deep chat run too, which has no
+          // workflow anchor at all. For such a thread the server always reports no anchor and no
+          // cap-pause, so the fail-closed arm never holds and the release arm ALWAYS ran —
+          // calling `clearStopStateForThread`, which also DISARMS the 8s stop-confirmation timer.
+          // Measured consequence: Stop a streaming chat run with a pending ask, answer inside the
+          // window, and `StopControl` swaps "Stopping…" back to a pressable Stop while the run
+          // keeps streaming — the climb-down never fires. The mirror image of the NEW LIE
+          // `clearStopStateForThread`'s own docblock warns about, on the surface Phase 194.1
+          // built to be honest about stopping.
+          //
+          // ⚠ BOTH DISJUNCTS OF `useHarnessLiveForThread`, and the second one is not optional:
+          // the synchronous pre-lock kickoff window holds the MARK with no lock, and a guard
+          // demanding the lock would return early exactly there. Read off the store, ABOVE the
+          // fetch, so a thread with nothing to release also costs nothing to settle.
+          const settleState = useStreamsStore.getState()
+          if (
+            !settleState.workflowLockByThread.has(threadId) &&
+            !settleState.harnessKickoffThreads.has(threadId)
+          ) {
+            return
+          }
           void (async () => {
             let wf: Awaited<ReturnType<typeof getThreadWorkflow>>
             try {
@@ -3542,8 +3569,9 @@ export function StreamsProvider({ children }: PropsWithChildren) {
             }
             // THE TWO SHIPPED GUARDS, READ OFF THE WIRE AND NOT RE-DERIVED. These are the
             // exact conditions of the two `setWorkflowLockForThread` arms in this file's own
-            // mount reconcile (:2411 and :2447) — quoted by reference on purpose, because a
-            // second client-side derivation of one fact is how these registers drift.
+            // mount reconcile (:2412 and :2449 — re-measured, IN-02) — quoted by reference on
+            // purpose, because a second client-side derivation of one fact is how these
+            // registers drift.
             const liveAnchor = !!(
               wf.locked &&
               !wf.lock_is_stale &&
@@ -3556,7 +3584,8 @@ export function StreamsProvider({ children }: PropsWithChildren) {
               // needs (`244-08`). Fail-closed is the DIRECTION, not merely the agreement.
               //
               // Re-attach the live producer shell instead — the identical arm the mount
-              // reconcile owns at :2440, idempotent per `subscribeProducerStream`'s docblock.
+              // reconcile owns at :2441 (re-measured, IN-02), idempotent per
+              // `subscribeProducerStream`'s docblock.
               // This is what lets the SHIPPED terminal handler clear the lock when the run
               // really ends, instead of this path inventing a second terminal route.
               if (wf.latest_producer_run_id) {
@@ -3568,7 +3597,10 @@ export function StreamsProvider({ children }: PropsWithChildren) {
             // reading). Release, in this order.
             //
             // ⚠ `clearStopStateForThread` AND NOT A HAND-WRITTEN SET DELETE.
-            // `useHarnessLiveForThread` (:4711) has TWO disjuncts —
+            // ⚠ CITED BY SYMBOL, NOT BY LINE — the retired `(:4711)` was 87 lines stale in the
+            // commit that wrote it (IN-02); an inline `:NNNN` rots on the very edit that adds
+            // lines above it, and this file has now paid for that twice.
+            // `useHarnessLiveForThread` (exported from this file) has TWO disjuncts —
             // `harnessKickoffThreads.has(tid) || lock?.mode === "harness"` — so clearing only
             // the lock leaves the run line reading `live` with its 1s `setInterval` clock on a
             // dead run. That function is the SHIPPED writer of `harnessKickoffThreads` (it also

@@ -13430,3 +13430,94 @@ GUARDED, and a suite can sit on the wrong side of exactly one of them** — whic
 state the card's baseline suite was in.
 
 **Per G-5 the next phase owes a refactor recommendation FIRST. It inherits `211 / 46 / 5618`.**
+
+---
+
+## `frontend/src/providers/StreamsProvider.tsx` — `244-15` fix round (WR-01)
+
+**Triple re-derived with this commit: `102 / 37 / 4847`.** ⭐ **The row was ACCURATE at base
+(`101 / 37 / 4815`) — the FIRST time in nine consecutive closes**, because `244-15` re-derived it
+rather than copying it forward. Recorded because eight staleness notes in a row make the ledger read
+like a file nobody can keep current; it is keepable, and the mechanism is the recipe, not care.
+
+**G-5 FIRES (37 phases against a threshold of 3) — honoured BY CONSTRUCTION, no override.** The
+change is a PRECONDITION added above an existing action's `try`. No new arm, no new concern, no new
+state, and the seam this file owes is untouched and unenlarged.
+
+**The defect, which the twelve shipped fences could not see because every one of them seeded a
+WORKFLOW thread.** `PendingAskStack` mounts for EVERY thread — the panel and the chat column
+(`MessageList.tsx:320`) — so the settle also fired on a plain Deep chat run. For such a thread the
+server always reports no anchor and no `cap_paused`, so the fail-closed arm never held and the
+RELEASE arm **always** ran, calling `clearStopStateForThread`, which clears `stoppingThreads` ∪
+`stopNotConfirmed` **and disarms the 8s climb-down timer**. Press Stop on a streaming chat run that
+has a pending `ask_user`, answer inside the window, and `StopControl.tsx:287` swaps "Stopping…" back
+to a pressable **Stop** button while the run keeps streaming — and the *"we could not confirm the
+stop"* climb-down, **the only route back to an honest reading** (sketch 168-B's losing arm), never
+fires. It is the mirror image of the NEW LIE `clearStopStateForThread`'s own docblock warns about, on
+the one surface Phase 194.1 built to be honest about stopping.
+
+**The fix, in full — a precondition, not a behaviour change:**
+
+```ts
+const settleState = useStreamsStore.getState()
+if (
+  !settleState.workflowLockByThread.has(threadId) &&
+  !settleState.harnessKickoffThreads.has(threadId)
+) {
+  return
+}
+```
+
+**Why BOTH disjuncts, and why the second is not optional.** They are exactly the two halves of
+`useHarnessLiveForThread`. The synchronous pre-lock kickoff window holds the **mark** with no lock,
+so a guard demanding the lock would return early precisely there and leave the run line reading
+`live` with its 1s clock — re-opening the defect from the other side. **Test 16 is that positive
+control**, and it passed BEFORE the fix as well as after, which is what makes it a control rather
+than a co-signature.
+
+**Measured, before → after:**
+
+| figure | before | after |
+|---|---|---|
+| `grep -c "setWorkflowLockForThread(" StreamsProvider.tsx` | **5** | **5** |
+| `setInterval` / `setTimeout` added | — | **0** |
+| new arms / new state / new fetch sites | — | **0** (the guard sits ABOVE the existing read) |
+| `getThreadWorkflow` calls per answered ask on a Deep thread | **1** (then a 2nd via `refreshPhaseSpineAfterStop`) | **0** |
+
+⭐ **THREE OF THE FOUR NEW CASES WERE DRIVEN RED AGAINST THE UNGUARDED CODE FIRST**, verbatim:
+Test 13 (through the stack, real `userEvent` click) — *"answering the prompt cleared the STOP slice
+of a thread with no workflow … expected false to be true"*; Test 14 (fake timers, t+8000) — *"the
+settle DISARMED the 8s timer … expected false to be true"*; Test 15 — *"expected "vi.fn()" to not be
+called at all, but actually been called 1 times"*. `3 failed | 13 passed (16)` before, `16 passed
+(16)` after. **A guard nobody has seen fire is not a guard**, and a test written after the fix proves
+nothing about the fix.
+
+⚠ **THE TIMER IS HALF THE FINDING AND A SEEDED `Set` CANNOT SEE IT.** The 8s handle lives in a
+provider ref whose only writer is `recordStopPress`, reachable only through `stopThread` /
+`stopStream` — so Tests 13 and 14 **press Stop for real** (seeding the live message bucket so
+`resolveStopRunId` resolves from the bucket, never the frame). A hand-seeded `stoppingThreads` models
+the READING and leaves the disarm unobserved, which is exactly how this defect stayed invisible.
+
+**Two rotted citations corrected in the same block (IN-02), and one count (IN-01).** ``
+`useHarnessLiveForThread` (:4711) `` was **87 lines stale in the commit that wrote it** and is now
+cited **by symbol**, deliberately, so it cannot rot again; `(:2411 and :2447)` → `(:2412 and :2449)`;
+`:2440` → `:2441`. The action's docblock said *"Six sites write that key"* — measured **seven** call
+sites, six of them `WRITE SITE n of 6` derivations plus one producer-resubscribe **re-key** that
+spreads an existing lock and derives none. The sentence now says both, because an auditor sweeping
+for writers off the number six misses one.
+
+⛔ **WR-02 and WR-03 ARE DEFERRED BY THE ORCHESTRATOR AND ARE NOT TOUCHED HERE.** WR-02's unordered
+`reconcile()` (`PendingAskCard.tsx:809`) has no generation guard; WR-03's *"One GET per human
+answer"* sentence is still false on the production path — this fix makes it narrower (zero GETs on a
+Deep thread) without making it true. Neither is closed; both are still open findings in
+`244-REVIEW-gap-round-2.md`.
+
+⚠ **STILL NO BROWSER EVIDENCE FOR ANY OF IT.** All sixteen cases are jsdom mounts over a mocked
+`@/lib/api`. `244-15-UAT-ROW.md` remains **UNRUN**, and the scenario this fix closes — a Stop press
+and an answer inside one 8-second window — is a *lived* sequence that no jsdom case can claim.
+
+**Per G-5 the next phase adding a genuinely second concern here owes a refactor recommendation FIRST;
+the seam is unchanged and still untaken — per-surface message buckets, the SSE subscription
+lifecycle, the mount/derive reconcile, `sendMessage`'s kickoff path and the run-liveness slices are
+five concerns in one 4847-line provider. It inherits `102 / 37 / 4847`, and that figure goes stale on
+the next commit touching the file.**
