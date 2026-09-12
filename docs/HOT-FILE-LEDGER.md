@@ -12737,3 +12737,100 @@ clause, so moving it below re-hides the cause.
 ⚠ **It is the one sentence on this route that names US rather than a vendor or a person.** The
 route is `require_org_manage`, so its audience is exactly the audience who can act on it. The
 docstring's narrowing is unchanged: no secret and no provider body travels.
+
+---
+
+### `frontend/src/providers/StreamsProvider.tsx` — `244-11`
+
+**Re-derived 2026-09-12: `96 / 37 / 4614`.** ⚠ The row was STALE a **FIFTH** time — it read
+`94 / 38 / 4528`. ⚠ And note the **phase count went DOWN, 38 → 37**, which is not a file losing
+history: the recipe in CLAUDE.md subtracts six-digit dated quick-task buckets and the prior
+reading did not. **Re-derive with the recipe; do not diff two numbers from two accountings.**
+
+**Honoured by construction.** The whole diff is **one `catch` clause** inside the already-existing
+`reconcile` action — `+30` lines, most of them the comment explaining why. **No new action, no new
+slice, no new subscription, no new effect, no new export, no branch anywhere in the demux.** It
+writes into `reconcileErrors`, a per-thread Map that has existed since `075.4-01` (D-075.4-A1) and
+already has a live writer, a live selector (`useReconcileErrorForThread`) and a live renderer.
+
+⭐ **WHAT THE GAP ACTUALLY WAS, because it is the generalisable part.** The clause read
+`console.error("reconcile failed:", err); return`. **A console call is not a user-visible state**,
+and treating one as if it were is how `GET /threads/{id}/snapshot` could 503 on **2 of 4 observed
+calls** while a sweep of every leaf element for
+`/unavailable|error|failed|retry|try again|something went wrong/i` returned **ZERO** matches. The
+server was explicit the whole time — body `{"detail": "Streaming infrastructure unavailable"}`,
+header `Retry-After: 10` — and both were discarded.
+
+⚠ **A DOCSTRING ASSERTED THE ROUTING THAT DID NOT EXIST.** `frontend/src/lib/api/threads.ts:1063`
+reads *"Both surface as a generic Error to the caller; the StreamsProvider consumer routes via its
+existing error handler."* **There was no such routing.** A claim in a docstring is not a claim
+anything executes — this file's own recurring finding, one register over.
+
+⛔ **THE ABORT ARM IS LOAD-BEARING AND MUST NOT BE "SIMPLIFIED" AWAY.**
+`if (err instanceof DOMException && err.name === "AbortError") return` sits above the write.
+`reconcile` is fired from `setViewingThread` **on every thread switch**, so without it each switch
+that cancels an in-flight snapshot would raise a failure banner on the thread the person actually
+wanted — the ROADMAP's own named failure mode (*a signal nobody trusts after the first false one*)
+manufactured by the fix for a silence. It is symmetric with the `loadMessages` wait-abort guard.
+
+⛔ **THE WRITE IS COPIED, NOT INVENTED.** It is byte-equivalent to the `loadMessages` second-failure
+write. **Two writers of one slice that differ is how slices drift here**, and this slice now has
+exactly two writers that agree.
+
+⛔ **`Retry-After` IS DELIBERATELY NOT CONSUMED, and no retry loop was added.** `loadMessages`
+already has a two-attempt `tryFetch` and the banner's **Retry** button is the shipped user-driven
+recovery; a third retry mechanism is a new behaviour, not a gap fix (G-7), and an automatic one
+would amplify a 503 storm (T-244-11-03). Recovery stays exactly one user click.
+
+**Fence:** `frontend/src/__tests__/providers/streamsProvider_244_snapshot_failure.test.tsx`
+(4 cases, **both knobs** of the count gate). ⚠ Every assertion reads the **store**, never a
+`console.error` spy — asserting on a console call would have re-encoded the very mistake.
+⚠ And a measured surprise worth keeping: **Test 4, written as a per-thread-scoping CONTROL, was
+RED at RED time** — its positive half (`has(A) === true`) sits downstream of the missing write.
+**A control can live downstream of the defect it guards; record its colour, never assume it.**
+
+---
+
+### `frontend/src/components/chat/ChatArea.tsx` — `244-11`
+
+**Re-derived 2026-09-12: `74 / 36 / 743`.** ⚠ The row was STALE at `72 / 36 / 710` — two commits
+and 33 lines, inside the same phase.
+
+**Honoured by construction.** The diff is **one ternary inside an already-rendered `<span>`** plus
+its comment. **Zero new `useState`, zero new `useEffect`, zero new props, zero new reads** —
+`messages` is the same value the composer, `useComposerModel` and `MessageList` already consume,
+destructured at the top of the component since long before this plan.
+
+⭐ **THE INVARIANT THIS ROW EXISTS TO CARRY: the banner's non-`ApiError` sentence is a claim ABOUT
+THE SCREEN, so it must depend on the screen.** `"Couldn't load latest messages. Showing cached
+version."` is true when a transcript is rendered behind it and **false when nothing is**, and the
+false case is the one a snapshot failure on thread-open actually produces. `BUG-260911-02`'s
+reporter recorded exactly that misreading — *"the natural reading is 'this conversation is
+empty'"* — and then typed a message into it.
+
+The empty-transcript sentence is `"Couldn't load this conversation. It's still there — try
+again."` ⛔ **It names no status code, no exception type and no dependency** (T-244-11-01): say
+what is true of the THING, never what the code experienced. It is a client-authored literal and
+interpolates nothing from the server.
+
+⛔ **ONE new state, and one only.** `grep -c "Showing cached version"` must stay **1** — the
+non-empty sentence is byte-unchanged, and the `ApiError` arm (099-08's server-detail copy, reviewed
+under T-099-08-01 as React text children, never `dangerouslySetInnerHTML`) is untouched, as are the
+`data-testid` selection, the 409 arm, `NON_RETRYABLE`, `hideRetry`, the dismiss control and
+`role` / `aria-live`.
+
+⭐ **`ChatArea.tsx` ALSO CARRIES THE `BUG-260911-02` DISCRIMINATOR, and a future edit can destroy
+it silently.** Three literals occur **exactly once each** in this file and all sit inside the
+`if (!thread)` welcome branch: `How can I help you?` and the two Phase-216 starter-prompt chips
+`📁 Search connected files` / `💬 Draft a team update`. **Because a SELECTED thread cannot render
+any of them, their presence proves the click did not select at all** — which is the one-glance
+reading that separates trace §4's overlay click-sink from the snapshot-503 path. **Duplicating any
+of those literals into the thread branch would destroy a live diagnostic.**
+
+**Fence:** `ChatAreaBanner.test.tsx` Tests 5-6 (pin `7 → 9`). ⛔ They assert the **rendered
+sentence**, never `getByTestId("reconcile-error-banner")` — *presence assertions cannot see content
+drift*, and a testid fence here would have passed against the wrong sentence. ⚠ The suite's case
+**(c)** had to be re-fixtured with a non-empty transcript: it always MEANT *"there is a cached
+version"* but asserted that copy under a hard-coded `messages: []`, i.e. in the one state where the
+sentence it pinned was false. **A fixture that cannot express the state a claim is about will pin
+the claim in the state that refutes it.**
