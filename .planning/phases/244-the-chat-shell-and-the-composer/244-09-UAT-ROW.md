@@ -1,5 +1,14 @@
 # 244-09 UAT ROW — SHELL-01 / BUG-260828-08 re-drive (gap G-5)
 
+---
+
+> ⛔ **DRIVEN 2026-09-12 by `/gsd:verify-work 244` — VERDICT: PASS.**
+> R2-1: all 8 samples rootOverflowBy 0; overflow moved INTO the rail; rail does not drift.
+> Full readings: `244-UAT.md` § "Round 2 — DRIVEN 2026-09-12". ⚠ Solo run (D-244-21 /
+> OV-SOLO-01): this is a SELF-VERIFICATION, never a review.
+> The `pending` fields below are left as WRITTEN so the row's own asks stay legible.
+
+
 ⛔ **THIS FILE IS AUTHORED BY `244-09` AND DRIVEN AT `/gsd:verify-work`.** Plan `244-09` built the
 fix and pinned it with a source fence; it does **not** claim this row. Every verdict below reads
 `pending` and must stay `pending` until a real browser produces the number beside it.

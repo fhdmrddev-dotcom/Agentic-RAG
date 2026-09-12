@@ -1,5 +1,14 @@
 # 244-11 — the browser row (UAT gap G-3 / G-4), UNFILLED
 
+---
+
+> ⛔ **DRIVEN 2026-09-12 by `/gsd:verify-work 244` — VERDICT: PASS.**
+> R2-3: all 4 arms PASS; both banner sentences driven; G-4 RULED (same defect).
+> Full readings: `244-UAT.md` § "Round 2 — DRIVEN 2026-09-12". ⚠ Solo run (D-244-21 /
+> OV-SOLO-01): this is a SELF-VERIFICATION, never a review.
+> The `pending` fields below are left as WRITTEN so the row's own asks stay legible.
+
+
 **Owner:** `/gsd:verify-work`. ⛔ **Nothing below was driven by the executor.** Every verdict field
 reads `pending`. `244-11` reports **built, drive owed** for `SHELL-01` — never closed (D-244-14 /
 D-244-19).

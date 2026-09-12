@@ -1,4 +1,13 @@
 ---
+
+---
+
+> ⛔ **DRIVEN 2026-09-12 by `/gsd:verify-work 244` — VERDICT: PARTIAL.**
+> R2-2: Arms 1-3 PASS (defect 6b CLOSED, confound resolved). Arm 4 steps 3-4 FAIL -> gap G-7.
+> Full readings: `244-UAT.md` § "Round 2 — DRIVEN 2026-09-12". ⚠ Solo run (D-244-21 /
+> OV-SOLO-01): this is a SELF-VERIFICATION, never a review.
+> The `pending` fields below are left as WRITTEN so the row's own asks stay legible.
+
 phase: 244-the-chat-shell-and-the-composer
 plan: 10
 row: L-5b

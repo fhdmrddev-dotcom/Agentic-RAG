@@ -1,5 +1,14 @@
 # 244-13 — the browser row `SHELL-02` actually closes on (UAT gap G-1 + review WR-07)
 
+---
+
+> ⛔ **DRIVEN 2026-09-12 by `/gsd:verify-work 244` — VERDICT: PASS.**
+> R2-5: Arms 1-3 PASS (G-1 CLOSED). Arm 4 (WR-07) BLOCKED with reason.
+> Full readings: `244-UAT.md` § "Round 2 — DRIVEN 2026-09-12". ⚠ Solo run (D-244-21 /
+> OV-SOLO-01): this is a SELF-VERIFICATION, never a review.
+> The `pending` fields below are left as WRITTEN so the row's own asks stay legible.
+
+
 ```yaml
 plan: 244-13
 requirement: SHELL-02
