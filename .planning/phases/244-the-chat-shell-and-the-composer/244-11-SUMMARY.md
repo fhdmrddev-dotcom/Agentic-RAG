@@ -331,3 +331,12 @@ construction: the new sentence is a **client-authored literal** that interpolate
 4. Two deferrals recorded in `deferred-items.md`: consuming `Retry-After`, and the 503's own root
    cause.
 5. ⚠ **An independent review.** This plan is a self-verification (D-244-21).
+
+---
+
+## Self-Check: PASSED
+
+All five claimed artefacts exist on disk (`streamsProvider_244_snapshot_failure.test.tsx`,
+`244-11-UAT-ROW.md`, `244-11-SUMMARY.md`, and the two modified source files). All five commits
+resolve in `git log 32ada21e1..HEAD`, with the file lists above matching what each message claims.
+`STATE.md` and `ROADMAP.md` are untouched — the orchestrator owns those writes.
