@@ -32,7 +32,16 @@
  * treating it as one is what made this class of gap invisible for the life of the feature.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
-import { renderHook, act, cleanup } from "@testing-library/react"
+import {
+  renderHook,
+  render,
+  screen,
+  within,
+  waitFor,
+  act,
+  cleanup,
+} from "@testing-library/react"
+import userEvent from "@testing-library/user-event"
 import type { ReactNode } from "react"
 
 const {
@@ -106,7 +115,9 @@ vi.mock("@/lib/supabase", () => ({
 
 import { StreamsProvider, useStreamActions } from "@/providers/StreamsProvider"
 import { useStreamsStore, type WorkflowLock } from "@/stores/streamsStore"
+import { PendingAskStack, PendingAskCard } from "@/components/panel/PendingAskCard"
 import type { StreamCallbacks } from "@/lib/api"
+import type { PendingAsk } from "@/types"
 import { stripComments } from "@/lib/stripComments.testutil"
 
 const THREAD_ID = "thread-settle"
@@ -123,6 +134,20 @@ const EMPTY_SNAPSHOT = {
   messages: [],
   active_runs: [],
   since_cursors: {},
+}
+
+/**
+ * The fixture prompt, shaped like the real one the operator answered — two choices, a
+ * `run_id` present (a prompt WITHOUT one gates `Send Answer` behind "Preparing…"), and no
+ * `created_at` (the SSE path, so the card seeds a fresh countdown rather than rendering
+ * expired on mount).
+ */
+const ASK: PendingAsk = {
+  tool_call_id: "tc-1",
+  prompt: "Approve this step?",
+  options: ["Approve this step", "Do not run it"],
+  timeout_seconds: 300,
+  run_id: "run-producer-1",
 }
 
 function renderProvider() {
@@ -447,5 +472,142 @@ describe("244-15 / G-8 — the settle path RELEASES a lock the server has alread
         "hand-rolled Set delete",
     ).toMatch(/clearStopStateForThread\(/)
     expect(body).toMatch(/refreshPhaseSpineAfterStop\(/)
+  })
+})
+
+/**
+ * ⭐ THE HALF THAT MATTERS: one answer, both homes.
+ *
+ * ⚠ AND THE SAME LIMIT APPLIES, restated where the cases are rather than only in the header.
+ * Two `<PendingAskStack/>` instances under one provider in jsdom is a MODEL of two surfaces,
+ * not two surfaces: they share a process, a store instance and a synchronous scheduler. The
+ * real failure had a network round trip in the middle of it. A green run here says the
+ * mechanism composes; it does not say the product does.
+ */
+describe("244-15 / G-8 — an answer in ONE home clears the other", () => {
+  /** Mount the two homes over one thread — the panel's stack and the chat column's stack. */
+  function renderTwoHomes() {
+    useStreamsStore.setState({ viewedThreadId: THREAD_ID })
+    mockGetThreadPendingAsks.mockResolvedValue([ASK])
+    return render(
+      <StreamsProvider>
+        <div data-testid="home-a">
+          <PendingAskStack />
+        </div>
+        <div data-testid="home-b">
+          <PendingAskStack />
+        </div>
+      </StreamsProvider>,
+    )
+  }
+
+  /** Answer inside one home: pick the SAFE choice, then Send Answer. */
+  async function answerIn(home: "home-a" | "home-b") {
+    const user = userEvent.setup()
+    const scope = within(screen.getByTestId(home))
+    // ⚠ "Do not run it" ON PURPOSE, mirroring the operator-safety rule the UAT row carries:
+    // the fixture step is outward-facing and irreversible. It costs nothing here and keeps
+    // the fence and the driven row describing the same click.
+    await user.click(scope.getByRole("radio", { name: "Do not run it" }))
+    await user.click(scope.getByRole("button", { name: "Send Answer" }))
+  }
+
+  it("Test 9 (THE DEFECT — chat → panel) — answering in home A clears home B", async () => {
+    /**
+     * ⚠ BEFORE THE WIRING THIS CASE IS RED ON THE SECOND HOME WHILE THE FIRST GOES GREEN,
+     * and that asymmetry IS the measured defect reproduced in jsdom: `handleSubmit` flips
+     * COMPONENT-LOCAL `useState` to "answered", so home A stops offering Send Answer and
+     * home B — a different component instance with its own `useState` — never hears.
+     */
+    renderTwoHomes()
+    await waitFor(() =>
+      expect(screen.getAllByRole("button", { name: "Send Answer" })).toHaveLength(2),
+    )
+
+    // The server has accepted the answer; the next GET excludes it (`panel.py:190-205`
+    // filters NOT EXISTS a matching `ask_user_response` row, and `runs.py` Step 2 persists
+    // that row BEFORE the POST returns — there is no race on this half).
+    mockGetThreadPendingAsks.mockResolvedValue([])
+    await answerIn("home-a")
+
+    await waitFor(() =>
+      expect(
+        within(screen.getByTestId("home-b")).queryByRole("button", { name: "Send Answer" }),
+        "the sibling home still offers an answer to a prompt the server has already settled",
+      ).toBeNull(),
+    )
+  })
+
+  it("Test 10 (the reverse direction — panel → chat) — answering in home B clears home A", async () => {
+    /**
+     * ⛔ TWO CASES, NOT ONE. The UAT measured both directions separately and they failed for
+     * one cause — but a fence over a single direction is passed by a fix that only works one
+     * way, and nothing would say so.
+     */
+    renderTwoHomes()
+    await waitFor(() =>
+      expect(screen.getAllByRole("button", { name: "Send Answer" })).toHaveLength(2),
+    )
+
+    mockGetThreadPendingAsks.mockResolvedValue([])
+    await answerIn("home-b")
+
+    await waitFor(() =>
+      expect(
+        within(screen.getByTestId("home-a")).queryByRole("button", { name: "Send Answer" }),
+        "the sibling home still offers an answer to a prompt the server has already settled",
+      ).toBeNull(),
+    )
+  })
+
+  it("Test 11 (a FAILED answer settles NOTHING) — a 500 leaves the card answerable", async () => {
+    /**
+     * The settle runs on SUCCESS only. An answer the server refused must leave the prompt in
+     * the store and the card answerable — settling on a refusal would clear a prompt that is
+     * still genuinely waiting, which is a worse lie than the one being fixed.
+     */
+    renderTwoHomes()
+    await waitFor(() =>
+      expect(screen.getAllByRole("button", { name: "Send Answer" })).toHaveLength(2),
+    )
+
+    const asksBefore = mockGetThreadPendingAsks.mock.calls.length
+    const wfBefore = mockGetThreadWorkflow.mock.calls.length
+    const { ApiError } = await import("@/lib/api")
+    mockAnswerAskUser.mockRejectedValue(
+      new ApiError("Failed to submit ask_user answer", 500),
+    )
+
+    await answerIn("home-a")
+
+    await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument())
+    expect(mockGetThreadPendingAsks.mock.calls.length).toBe(asksBefore)
+    expect(mockGetThreadWorkflow.mock.calls.length).toBe(wfBefore)
+    expect(
+      useStreamsStore.getState().pendingAsksByThread.get(THREAD_ID)?.length,
+      "a refused answer removed the prompt — the person can no longer answer a run that is " +
+        "still waiting",
+    ).toBe(1)
+  })
+
+  it("Test 12 (the THIRD home is untouched) — a bare card with no onAnswered settles nothing", async () => {
+    /**
+     * ⛔ `WorkflowRunPage` mounts `PendingAskCard` DIRECTLY (`:1629`), not the stack, and its
+     * home was measured CORRECT during the drive. The new callback is OPTIONAL and defaults
+     * to absent, so that home is behaviourally byte-unchanged. Asserted BY CALL COUNT on the
+     * mocked API rather than by render — a render assertion would pass for a card that fired
+     * the settle and simply had not re-rendered yet.
+     */
+    const reconcileSpy = vi.fn().mockResolvedValue(undefined)
+    const user = userEvent.setup()
+    render(<PendingAskCard ask={ASK} reconcile={reconcileSpy} />)
+
+    await user.click(screen.getByRole("radio", { name: "Do not run it" }))
+    await user.click(screen.getByRole("button", { name: "Send Answer" }))
+
+    await waitFor(() => expect(mockAnswerAskUser).toHaveBeenCalledTimes(1))
+    expect(reconcileSpy).not.toHaveBeenCalled()
+    expect(mockGetThreadPendingAsks).not.toHaveBeenCalled()
+    expect(mockGetThreadWorkflow).not.toHaveBeenCalled()
   })
 })

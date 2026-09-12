@@ -3043,7 +3043,21 @@ const BASELINE = {
   // elevation `T-244-03-01` names, and the easiest kind of case to delete without anyone
   // noticing. Test 8 is the source sweep that forbids a SEVENTH `setWorkflowLockForThread`
   // derivation; without a pin it could be silently dropped and the gate would still say OK.
-  "streamsProvider_244_settle_ask.test.tsx": 8,
+  // ⚠ RAISED `8` → `12` IN TASK 2 OF THE SAME PLAN, from the same `actual` column. The four
+  // added cases are the two-homes pair (answer in A clears B; answer in B clears A — TWO
+  // directions, because a fence over one is passed by a fix that only works one way), a
+  // refused-answer case that must settle NOTHING, and the third home (`WorkflowRunPage` mounts
+  // the CARD, not the stack) asserted by API call count rather than by render.
+  "streamsProvider_244_settle_ask.test.tsx": 12,
+
+  // ── Phase 244-15 — a RED, UNGATED fence, repaired and finally adopted ─────────────────
+  //
+  // ⚠ FOUND IN NEITHER KNOB AND RED SINCE `d58fa43a0`. The gate never RAN it, so nothing
+  // noticed its `?raw` line-count pin going stale two phases ago: measured at 244-15's base,
+  // `1 failed | 8 passed`, `expected 766 to be 737`. Thirteenth suite found in this state; the
+  // structural fix is SEED-229. Re-baselined to 837 and adopted in the SAME commit, and ONLY
+  // because all 9 cases are green — adopting a red suite turns the shared gate red.
+  "PendingAskCard.retired.baseline.test.tsx": 9,
 
   // ── Phase 243 (243-03 / CHAT-03 / D-243-16) — the scroll effect's ONLY behavioural fence ─
   //
@@ -4856,6 +4870,11 @@ const TARGETS = [
   // panel __tests__ entries here are FILE-LEVEL, so this file was invisible until its
   // name was typed. Twelfth such suite in a week; SEED-229 has the structural fix.
   "src/components/panel/__tests__/PendingAskCard.test.tsx",
+  // ⚠ ITS SIBLING WAS IN NEITHER KNOB TOO, and stayed that way when the line above was added
+  // 2026-09-01 — so the suite that reads the approval card's THREE shipped retirement sentences
+  // out of source has never been executed by this gate, and its `?raw` pin sat RED and unseen
+  // from `d58fa43a0` until 244-15. Adopted here WITH the re-baseline, in one commit.
+  "src/components/panel/__tests__/PendingAskCard.retired.baseline.test.tsx",
   // ── Added for SEED-227, in the SAME COMMIT that creates the file — the two-knob trap
   // ── again, and MEASURED rather than assumed: `grep -n "components/metadata"` over this
   // ── whole script returned NOTHING before this line was written. `src/components/metadata`
