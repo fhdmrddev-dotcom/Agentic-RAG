@@ -10328,9 +10328,9 @@ cells rot within days.
 | File | commits / phases / lines | G-5 | Disposition |
 |---|---|---|---|
 | [`frontend/src/components/chat/ToolCallPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattoolcallpaneltsx) | 51 / 23 / 351 | **FIRES** | ✅ **G-5 DISCHARGED (227-02)** — extracted ToolCallDetails, StepRow, toolStepDerivation (1019 → 351 lines) |
-| [`frontend/src/components/chat/MessageItem.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageitemtsx) | 74 / 34 / 981 | **FIRES** | ⚠ row STALE a THIRD time (`71/37/904`; `34` subtracts 3 dated buckets). honoured by construction (**244-13**): a PRESENCE test becomes a MODE test. State 4→4, effects 0→0, props 5→5 |
+| [`frontend/src/components/chat/MessageItem.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageitemtsx) | 75 / 34 / 1000 | **FIRES** | ⚠ row STALE a FOURTH time (`74/34/981`). honoured by construction (**244-14 / WR-01**): the Continue card reads the lock's MODE, like the composer beside it. State 3→3, effects 0→0, props 5→5 |
 | [`backend/app/api/threads.py`](docs/HOT-FILE-LEDGER.md#backendappapithreadspy) | 245 / 82 / 1617 | **FIRES** | ⚠ row was STALE at `243 / 80 / 1590`. honoured by construction (**244-03**): ONE existing pure-read query loses a WHERE predicate and gains a Python guard. ⛔ no writer added |
-| [`frontend/src/providers/StreamsProvider.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcprovidersstreamsprovidertsx) | 97 / 37 / 4660 | **FIRES** | ⚠ row STALE a SIXTH time (`94/38/4528`; `37` subtracts one dated bucket). honoured by construction (**244-13**): 4 lock writes gain a discriminator; the selector still returns a BOOLEAN |
+| [`frontend/src/providers/StreamsProvider.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcprovidersstreamsprovidertsx) | 100 / 37 / 4727 | **FIRES** | ⚠ row STALE a 7th time (`97/37/4660`). honoured by construction (**244-14**): reconcile CLEARS on success, ONE capPaused value, the dead abort arm deleted. ⛔ no retry — the in-flight ref is GLOBAL |
 | [`frontend/src/hooks/useMessages.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusemessagests) | 74 / 27 / 127 | ⚠ **FIRES** | extraction due |
 | [`backend/app/services/anthropic_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesanthropic_servicepy) | 11 / 10 / 354 | ⚠ **FIRES** | adapter-pattern audit due |
 | [`frontend/src/components/workflows/WorkflowCanvas.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsworkflowcanvastsx) | 31 / 9 / 1708 | **FIRES** | honoured by construction (199 / 200 / **214**) — 214-04 widened the panel and touched no node logic |
@@ -10515,7 +10515,7 @@ cells rot within days.
 | [`frontend/src/pages/KnowledgeHealthPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesknowledgehealthpagetsx) | 12 / 6 / **DELETED** | ⚠ **FIRES** | **RETIRED (217.1-14)** — the Library's Health tab absorbed it; `ChatLayout`'s fallback replaced by `UnknownViewFallback` (`:871`). ⚠ absent for its ENTIRE LIFE |
 | [`backend/app/api/knowledge_health.py`](docs/HOT-FILE-LEDGER.md#backendappapiknowledgehealthpy) | 11 / 6 / 737 | ⚠ **FIRES** | honoured by construction (**217.1-11**) — adds `could_not_search`; `retrieval_count` byte-unchanged. ⚠ absent at **6 phases**. Audit-analytics from `audit_log`. Service-role by exception |
 | [`backend/app/services/agent_loop.py`](docs/HOT-FILE-LEDGER.md#backendappservicesagent_looppy) | 44 / 21 / 3303 | ⚠ **FIRES** | ⚠ row STALE at `39/20/3154`. honoured by construction (**244-02**): a SIXTH conditional append in the shipped `memory_note` shape, gated General-mode-only |
-| [`backend/app/services/tool_dispatcher.py`](docs/HOT-FILE-LEDGER.md#backendappservicestool_dispatcherpy) | 84 / 35 / 4966 | ⚠ **FIRES** | ⚠ row was STALE at `83/35/4913`. honoured by construction (**244-10**): the marker changes TYPE — set→dict of copied paths. No new call site, no new handler, traversal fence byte-unchanged |
+| [`backend/app/services/tool_dispatcher.py`](docs/HOT-FILE-LEDGER.md#backendappservicestool_dispatcherpy) | 85 / 35 / 5048 | ⚠ **FIRES** | ⚠ row STALE again (`84/35/4966`). honoured by construction (**244-14/WR-03**): `already` is written on SUCCESS or after a CAPPED give-up; every attempt is NAMED. Traversal fence byte-unchanged |
 | [`backend/app/api/document_governance.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentgovernancepy) | 5 / 3 / 416 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent at 3 phases. ⚠ Its low-confidence cutoff is the ConfidenceChip tier (**0.5**) — a DIFFERENT measure from `knowledge_health`'s **0.38** retrieval similarity |
 | [`frontend/src/pages/GovernancePage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesgovernancepagetsx) | 4 / 1 / 355 | no (1 phase) | young (119) — ⚠ row added because it is being MERGED into the Library (operator, 2026-08-28); it is feature-gated while Documents is not, so the gate must move with it |
 | [`frontend/src/components/ingestion/DocumentUpload.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestiondocumentuploadtsx) | 10 / 1 / 144 | no (1 phase) | young (056) — ⚠ absent for its entire life. ⛔ It reports NO byte progress (`onUploadProgress` absent), so any upload percentage is unknowable |
@@ -10542,7 +10542,7 @@ cells rot within days.
 | [`frontend/src/components/sources/WatchedFoldersSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourceswatchedfolderssectiontsx) | 4 / 1 / 935 | no (1 phase) | ⚠ row STALE at `2 / 0 / 393` — **it MORE THAN DOUBLED**. 235 paid the owed outcome line. ⭐ seam named NOW, not at threshold: extract `WatchedSourceCard` |
 | [`frontend/src/components/sources/watchProductMark.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourceswatchproductmarkts) | 0 / 0 / 38 | no (new) | young (240) — which PRODUCT a watched folder came from, read from its ADDRESS. ⛔ Never from `service_id`: Gmail and Drive share one connection |
 | [`frontend/src/components/sources/CreateWatchModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcescreatewatchmodaltsx) | 4 / 1 / 283 | no (1 phase) | honoured by construction (**240**): byte-unchanged. ⛔ Its auto-select of `capable[0]` is why BUG-260908-02 mattered most here |
-| [`frontend/src/components/layout/NavPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutnavpaneltsx) | 22 / 12 / 370 | ⚠ **FIRES** | ⚠ absent for its ENTIRE LIFE at 11 phases; row then STALE at `20/11/329`. ⭐ **244-09**: the rail bounds itself — it, not the transcript, overflowed the PAGE below 540px |
+| [`frontend/src/components/layout/NavPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutnavpaneltsx) | 23 / 12 / 381 | ⚠ **FIRES** | ⚠ row STALE at `22/12/370`. **244-14**: WR-05 — the docblock stopped being false about itself (`min-h-0` read 2); IN-01 — `overflow-x-hidden`, since one axis makes the other compute to `auto` |
 | [`frontend/src/App.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcapptsx) | 32 / 23 / 374 | ⚠ **FIRES** | ⚠ absent for its ENTIRE LIFE at **23 phases**; row then STALE. ⭐ **244-04 left it BYTE-UNCHANGED and FENCED it**: `setLibraryTab(` still 2, driven RED against a planted 3rd writer |
 | [`frontend/src/lib/nav-items.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibnav-itemsts) | 8 / 6 / 95 | ⚠ **FIRES** | ⚠ absent at 6 phases — row added 235, which CONSIDERED it and deliberately left it alone: no twelfth `ActiveView` member; the Library already has one |
 | [`frontend/src/components/library/HealthTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibraryhealthtabtsx) | 9 / 2 / 199 | no (2 phases) | row added 235 BELOW threshold on purpose. One import, one optional prop, one mount, ZERO branches; the handler lives at the page boundary |
@@ -10587,6 +10587,7 @@ cells rot within days.
 | [`backend/app/api/workspace.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkspacepy) | 13 / 7 / 757 | ⚠ **FIRES** | ⚠ row was STALE at `11 / 6 / 654` one plan later. honoured by construction (**244-06**): the persist tail EXTRACTED to ONE writer both doors call; the 2nd route adds no 2nd gate |
 | [`frontend/src/components/panel/TemplateUpload.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspaneltemplateuploadtsx) | 2 / 2 / 91 | no (2 phases) | ⚠ absent for its entire life — row added 244-02 at the SECOND phase, not the third. **244**: the `accept=` literal is GONE; it reads the fenced constant |
 | [`frontend/src/lib/workspaceAllowedExt.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibworkspaceallowedextts) | 1 / 1 / 54 | no (new) | young (created 244-02). Row added AT CREATION, per the `settingsSearchPayload.ts` precedent — an absent row is invisible to G-5 at any count |
+| [`frontend/src/lib/stripComments.testutil.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibstripcommentstestutilts) | 1 / 1 / 28 | no (new) | young (created 244-14 / IN-02). Row added AT CREATION. ⛔ The ONE home of *a `?raw` fence cannot tell code from a comment*; 3 consumers. Never apply it to a class-list or string-CONTENT assertion |
 | [`frontend/src/components/chat/ChatAttachmentChip.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatchatattachmentchiptsx) | 1 / 1 / 144 | no (new) | young (created 244-05). Row added AT CREATION. The ONE chip, THREE states; `sent` carrying `this chat only` is D-244-22's build obligation and `expired` is D-244-25's |
 | [`frontend/src/components/chat/composerCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatcomposercopyts) | 3 / 1 / 111 | no (new) | young (created 244-05). Row added AT CREATION. A PORT of sketch 236's `COPY.js`, fenced `?raw`. ⛔ `COPY.b` is deliberately NOT ported (D-244-23). **244-06**: `cloudSub` ported by SHAPE |
 | [`frontend/src/components/chat/ConnectedFilePickerModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatconnectedfilepickermodaltsx) | 3 / 2 / 336 | no (2 phases) | ⚠ **absent for its ENTIRE LIFE — row added 244-06, and the ledger gate FAILED on it at this phase's base (C-8).** 244-06 REBUILT it: select-then-confirm, and the commit is the parent's |
@@ -13055,3 +13056,187 @@ than a crash.
 FIRST; the seam is named rather than implied** — the per-tool copy map, the outer-banner state
 machine and `harnessBannerProgress`'s phase arithmetic are three concerns in one module, and the
 third is the only one that is not a lookup table. **It inherits `10 / 6 / 218`.**
+
+---
+
+### `frontend/src/providers/StreamsProvider.tsx` — `244-14` (fix round: CR-01, WR-02, WR-04)
+
+**Re-derived at this round: `100 / 37 / 4727`** commits / phases / lines — ⚠ **the row was STALE for
+the SEVENTH time** at `97 / 37 / 4660`. `37` subtracts the dated six-digit quick-task bucket, as
+every prior cell on this file records. The phase count did not move, and it did not move because a
+FIX round carries the phase number it is fixing. `+3` commits, `+67` lines, comment-dominated.
+
+**Honoured by construction — three edits, no new state, no new action, no new effect.**
+
+- **CR-01.** `reconcile` gained the CLEAR-ON-SUCCESS half of the writer `244-11` copied only the
+  failure half of. ⛔ The invariant this file now carries explicitly: **a path that can WRITE
+  `reconcileErrors` must also be able to CLEAR it.** `244-11` took the write from `loadMessages` and
+  left the clear behind — and because `reconcile` is the THREAD-OPEN path while `loadMessages` runs
+  only from Retry / `buffer_expired` / the stream-terminal `finally`, an ordinary open had no writer
+  that could clear. One transient 503 painted the banner for the life of the session, and once the
+  transcript hydrated `ChatArea.tsx:715` flipped it to *"Showing cached version"* over freshly
+  fetched content. ⚠ The `has()` guard is load-bearing for COST, not correctness: without it every
+  clean thread open would `setState` a shared slice and wake every subscriber.
+- **⛔ THE 1s SILENT RETRY WAS DELIBERATELY NOT COPIED, and the reason is a property of THIS file
+  rather than a preference.** `reconcileInFlightRef` (`:1470`) is a **single global boolean**, not a
+  per-thread map, and `reconcile` early-returns while it is held. Sleeping 1s inside it would make a
+  thread switch during the sleep DROP the new thread's reconcile entirely — the person lands on a
+  conversation that never reconciles, which is strictly worse than a dismissable banner. **Make the
+  in-flight guard per-thread before anyone adds a retry here.**
+- **WR-02.** Write site 2 of 6 now writes `capPaused: false` on the genuine-harness-lock branch,
+  matching `ChatArea.tsx`'s site 5 (`T-244-03-01` / `244-08`). Both fired on every thread open, both
+  called the same GET, both took the same branch, both wrote the same key with DIFFERENT values, and
+  nothing ordered them. ⛔ **The invariant is now EXECUTABLE rather than commented:**
+  `src/__tests__/providers/workflowLockWriters.lockstep.test.ts` extracts both branch bodies and
+  compares the two `capPaused` EXPRESSIONS, then pins the DIRECTION separately — agreement alone is
+  satisfiable by agreeing on `cap_paused`, which would re-open the hole `244-08` shut. ⚠ That fence
+  strips comments before extracting, and here that is load-bearing: `ChatArea.tsx`'s own comment on
+  this branch QUOTES the rejected expression.
+- **WR-04.** The `instanceof DOMException` abort arm is **deleted**. It was unreachable
+  (`getSnapshot(threadId, signal?)` is called with no signal), its comment named a cancellation
+  mechanism the code does not have (`reconcileInFlightRef` DROPS; it does not abort), and it was
+  narrower than the shipped guard it claimed to mirror. ⭐ **The obligation is now enforced instead
+  of guessed:** Test 3 asserts reconcile's `getSnapshot` call takes exactly `threadId`, so threading
+  a signal reds it and demands the two-shape guard in the same commit. ⚠ **The file has THREE
+  `await getSnapshot(...)` sites** — `:262` (stream-end probe), reconcile's, and `:3841`
+  (`probeThread`) — so the fence identifies its target by the handler that FOLLOWS it, never by the
+  call's shape.
+
+**Per G-5 this file still FIRES at 37 phases and the named seam is unchanged:**
+`useHarnessLiveForThread` still returns a BOOLEAN rather than the lock, which is what let a presence
+test stand in for a mode test in the first place. **It inherits `100 / 37 / 4727`.**
+
+---
+
+### `frontend/src/components/chat/MessageItem.tsx` — `244-14` (fix round: WR-01)
+
+**Re-derived at this round: `75 / 34 / 1000`** — the row was STALE at `74 / 34 / 981`. `34` subtracts
+the three dated six-digit buckets the `244-12` cell names; unsubtracted the same history reads `37`.
+
+**Honoured by construction — one ternary, no new state, no new prop, no new effect.** Measured
+before and after rather than asserted: `useState` call sites **3 → 3**, `useEffect` **0 → 0**, props
+**5 → 5**.
+
+⛔ **THE INVARIANT THIS FILE NOW CARRIES: the Continue card's copy reads the SAME discriminator the
+composer beside it reads.** `244-13` moved `ChatArea.tsx:167` onto `lock.mode === "harness"` and left
+this card gated on `capPaused` alone, so for exactly one state — `mode: "harness"` AND
+`capPaused: true` — the two surfaces decoupled and the transcript said *"Start a new message to keep
+going"* over a composer that had just been DISABLED. **That is the ROADMAP's named anti-fix inverted,
+moved one component over rather than closed.** It is the MIRROR of `WR-07`, not a residue of it.
+
+⚠ **REACHABLE, NOT LATENT:** `onCapPaused` (StreamsProvider write site 1) INHERITS `"harness"` onto
+whatever lock the thread holds, and `ThreadRunLineKickoff.test.tsx` **D5b(a)** drives that through
+the real `sendMessage` and the real SSE callback bundle.
+
+⛔ **NEITHER SENTENCE WAS DELETED — deleting one IS the ROADMAP's named anti-fix.** The Deep wording
+is still exactly what a Deep cap-pause reads (D6 / case 3); the harness arm names the action that IS
+available, which is Cancel. Both halves are asserted in ONE tree by
+`ChatArea.capPausedComposer.test.tsx` **D7**, which is fail-safe by construction: a raced re-settle
+flips `capPaused` to `false` and DELETES the card, reddening the positive assertion before the
+negative one is reached.
+
+**The 227-03 discharge is still not undone. It inherits `75 / 34 / 1000`.**
+
+---
+
+### `frontend/src/components/layout/NavPanel.tsx` — `244-14` (fix round: WR-05, IN-01)
+
+**Re-derived at this round: `23 / 12 / 381`** — the row was STALE at `22 / 12 / 370`.
+
+⛔ **WR-05 IS AN HONESTY DEFECT IN A FENCE'S OWN DOCBLOCK, WHICH IS WHY IT IS RECORDED AT LENGTH FOR
+AN ELEVEN-CHARACTER FIX.** The trailing note claimed *"The two class tokens are deliberately NOT
+spelled out verbatim in this comment"*, and gave the right reason: `244-09`'s acceptance counts them
+with `grep -c`, so a comment mention inflates the count and blinds the check to a real second
+application. **`min-h-0` WAS spelled verbatim at `:215`, so the count read 2.** Worse, the
+`244-09-SUMMARY` acceptance table published `overflow-y-auto` (1) and `mt-auto` (1) and **omitted the
+one token whose count the edit had broken** — so the table read clean on precisely the wrong number.
+⚠ **This is the 187-24 vacuity class reproduced INSIDE the comment that cites 187-24**, and the
+remedy was never to loosen the grep: the token is now named by its CSS declaration, the way the
+load-bearing one already was. All four tokens read **1**.
+
+⭐ **IN-01 is the one behaviour change this round could name without a browser.** Per CSS overflow,
+when one axis is not `visible` the other COMPUTES to `auto` — so `overflow-y-auto` alone left this
+**width-ANIMATING** column (`motion-safe:transition-[width]`, 58px ⇄ 210px) horizontally scrollable,
+and its children switch to their expanded layout on the same tick the width starts moving.
+`overflow-x-hidden` makes the computed value `hidden auto`. ⚠ It cannot clip the collapsed badge —
+the `-right-1` badge ends 5px INSIDE the 58px box.
+
+⛔ **THE INVARIANTS, unchanged and re-stated because this file's whole bug was an invariant living
+only in prose:** the rail bounds ITSELF; **never** a `min-height` on the page, `#root` or any
+ancestor (that makes the page scroll deliberately, which IS the bug); and the `mt-auto` footer block
+is neither shrunk, re-ordered nor deleted. Link 6 of `ChatLayout.scrollFrame.test.tsx` pins all four
+tokens — ⚠ **as a PRESENCE assertion only; jsdom performs no layout, so the pixels are
+`244-09-UAT-ROW.md` §4, which this round extended with the horizontal axis.**
+
+**It inherits `23 / 12 / 381`.**
+
+---
+
+### `backend/app/services/tool_dispatcher.py` — `244-14` (fix round: WR-03)
+
+**Re-derived at this round: `85 / 35 / 5048`** — the row was STALE at `84 / 35 / 4966`.
+
+⛔ **THE INVARIANT THIS FILE NOW CARRIES, AND THE ONE IT USED TO CARRY, RECORDED SIDE BY SIDE because
+the old one was confident and wrong.** `244-10` recorded a path in `already` **BEFORE** attempting
+it, and justified it as *"a permanently-broken file costs one attempt per SESSION and not one per
+`execute_code` call; its failure is already named individually below, so nothing is lost."* The first
+clause is true. **The second is true only of the call the failure happened in** — every later call
+filters the path out before the loop, so no note is produced and the model is told nothing at all.
+And the `except` catches EVERY exception, while the realistic failure set on this path is dominated
+by TRANSIENTS (Supabase Storage, the pg pool, the Docker daemon). **One blip therefore cost the
+person's file for the whole ~30-minute cached session, in silence — the identical shape of the
+defect 6b this function was rewritten to fix, which cost ten wasted agent rounds.**
+
+⭐ **`already` now means *"do not attempt this path again"* and has exactly TWO writers: success, and
+the give-up arm after `_ATTACHMENT_HYDRATION_MAX_ATTEMPTS` (2) failures.** `_hydration_failures` is
+its companion per-session record, and `_session_hydration_records` is the ONE resolver of both, so a
+caller cannot acquire one and forget the other. ⛔ **The DoS bound the original was protecting is
+KEPT — it is paid for by a CAP rather than by never retrying**, so a genuinely broken row still costs
+a bounded number of attempts per session rather than one DB read plus one container write on every
+call for half an hour. The failure is **NAMED on every attempt**: the silence was never the first
+note going missing, it was every note AFTER it.
+
+⚠ **A CONSEQUENCE WORTH NAMING: the truncation note could previously be FALSE.** `already` counted
+FAILED paths against the 50-file session budget, so a flaky Storage could exhaust the cap with no
+file arriving while the run was told *"Only the first 50 of N workspace files were copied…"*. Fenced
+by case **F3**.
+
+⛔ **WHAT DID NOT CHANGE, verified rather than assumed:** `_attachment_container_path` is
+byte-unchanged (the five-reduction traversal fence), the record still keys on the RAW workspace path
+and never on the derived container destination, the cap is still a SESSION total compared as
+`max(MAX - len(already), 0)` so it cannot become a negative index, and both records are keyed by the
+sandbox session — which is keyed by `thread_id` — so a record cannot cross a thread or a tenant.
+⚠ Under `WORKER_COUNT=2` the records remain PER PROCESS: pre-existing since `244-07`, bounded by
+worker count, over-copying rather than under- (deferred item 11).
+
+**Per G-5 this file FIRES at 35 phases. It inherits `85 / 35 / 5048`.**
+
+---
+
+### `frontend/src/lib/stripComments.testutil.ts` — created by `244-14` (review IN-02)
+
+**`1 / 1 / 28`** — young, and the row is added **AT CREATION** rather than at its third phase,
+because an absent row is invisible to G-5 at any count (the `workspaceAllowedExt.ts` and
+`settingsSearchPayload.ts` precedent).
+
+⛔ **THE ONE HOME OF A RULE THIS PROJECT HAS ALREADY PAID FOR: a `?raw` source fence CANNOT TELL CODE
+FROM A COMMENT.** `244-12` measured it the expensive way — `MessageItem.inlineApproval` asserted
+`<PendingAskStack` appeared exactly once in `MessageItem.tsx`, the mount MOVED to `MessageList.tsx`,
+and a prose mention in MessageItem's own *"it was here and is gone"* comment held the count at 1
+while the thing it counted had left the file. `244-12`'s repair fixed the ZERO side and left the ONE
+side carrying the identical hazard one file over (review **IN-02**).
+
+⭐ **IT IS SHARED BECAUSE THE FIX FOR *"two copies of a rule drift"* MUST NOT ITSELF BE A SECOND COPY
+OF A RULE.** Three consumers today: `ChatLayout.scrollFrame.test.tsx` (which authored the original
+and now imports it), `MessageItem.inlineApproval.test.tsx`, and
+`workflowLockWriters.lockstep.test.ts`.
+
+⛔ **DELIBERATELY CRUDE — it does not parse strings, so it must NEVER be applied to an assertion
+about string CONTENT, nor to a class-list assertion.** ⚠ The `.testutil` suffix is load-bearing (the
+`lib/apiSource.testutil.ts` precedent): nothing under `src/` outside a `*.test.*` file may import it.
+⚠ `apiSource.testutil.ts` is the same class of file and carries NO ledger row — recorded as an
+observation rather than fixed here, since this round created only one of the two.
+
+⭐ **DRIVEN, not reasoned.** The mount was removed from `MessageList.tsx` and replaced by a comment
+naming it; case 6c stayed **GREEN**. With `stripComments` it goes red. `MessageList.tsx` was restored
+**md5-identical** (`ad87aa8abc5fa53bba038f5f85b0124c`).
