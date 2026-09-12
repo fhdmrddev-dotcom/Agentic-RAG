@@ -223,6 +223,27 @@ interface Props {
  *   - only when `workflowLock != null` ⇒ a DEEP thread never mounts it, so the
  *     Deep path costs zero fetches and zero subscriptions and stays byte-identical.
  *
+ * ⛔⛔ THE SENTENCE DIRECTLY ABOVE WAS **FALSE FROM `244-03` UNTIL `244-13`**, AND IT IS
+ * KEPT VERBATIM RATHER THAN REWRITTEN, because *the fact that it read as true for nine
+ * plans is the finding*. It was correct when written (Phase 194): the thread lock was
+ * harness-only, so `workflowLock != null` really did mean "harness". `244-03` then made
+ * the SERVER populate the lock for a cap-paused DEEP run (`threads.py:1237-1276`) — and
+ * nothing in this file changed, so a DEEP thread began mounting this component. Measured
+ * at `244-13`'s RED drive: **1 `getThreadWorkflow` fetch on the Deep path**, which is
+ * exactly the `T-194-07-03` denial-of-service cost the paragraph above claims the Deep
+ * path does not pay, plus the harness activity string rendered on a thread that has never
+ * had a workflow (UAT gap `G-1`).
+ *
+ * ⛔ THE GATE IS NOW A TEST ON THE LOCK'S MODE at the branch below (named by ROLE and NOT
+ * respelled here — a prose copy moves the acceptance grep and makes it vacuous, the 187-24
+ * lesson `toolMeta.ts:160-173` records at length), and the invariant is
+ * carried by an ASSERTION rather than by this paragraph — which is `G-1`'s own
+ * `why_no_fence_caught_it`, verbatim: *"the invariant that broke lived in a COMMENT, not
+ * in an assertion."* The assertion is `__tests__/ThreadRunLineKickoff.test.tsx` **D3**
+ * (the DEEP banner string AND a zero `getThreadWorkflow` delta over the row's mount), with
+ * **D4** as its positive control on a genuine harness lock. ⚠ A future reader who wants to
+ * widen this mount must move D3, not this comment.
+ *
  * The rendered `<span className="italic">` is the shipped one, unchanged.
  */
 function HarnessOuterBanner({ message }: { message: Message }) {
@@ -834,7 +855,13 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
                 call with `false` substituted for `workflowLock != null` — provably
                 the same value, since that is the only branch where the lock is null.
                 Both arms render the identical shipped <span className="italic">. */}
-            {workflowLock != null ? (
+            {/* ⛔ Phase 244-13 (UAT gap G-1): the gate is the lock's MODE, not its
+                PRESENCE. The sentence above became false at 244-03 — a DEEP thread
+                CAN carry a lock now (a cap-pause), and reading presence mounted the
+                harness banner on the primary Deep path. See the docblock repair at
+                `HarnessOuterBanner`. Fenced by `__tests__/ThreadRunLineKickoff.test.tsx`
+                D3 (the DEEP string + ZERO getThreadWorkflow calls) and D4. */}
+            {workflowLock?.mode === "harness" ? (
               <HarnessOuterBanner message={message} />
             ) : (
               <span className="italic">{outerBannerLabel(null, false, message.isPlanning ?? false, false, !message.content && !!message.reasoningContent)}</span>

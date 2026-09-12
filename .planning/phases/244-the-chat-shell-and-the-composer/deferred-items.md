@@ -484,3 +484,146 @@ the other.
 `SEED-171` as the sixth named suite. `244-11` does not, for the same reason `244-09` did not: this
 is a gap-closure round running in a parallel wave, and editing a shared register outside
 `files_modified` is a merge hazard the finding does not justify.
+
+---
+
+## `244-13` — the round's six deferrals, each with a trigger a reader can actually FIRE
+
+⛔ **`244-13` is the LAST plan of gap-closure round 1**, and G-7 forbids a closure round from
+introducing a new user-facing capability. Several of the items below are exactly that, which is
+why they are deferred rather than taken. ⚠ **A `trigger_when` that names no file, command or
+observable condition is not fireable, and a deferral without one is a deletion wearing a
+decision's clothes** — so every entry names one.
+
+⚠ **CROSS-CHECKED BEFORE WRITING, and the check is stated so it can be repeated:** items 1-6
+below were compared against this file's existing entries **7 (`WR-04`), 8 (`WR-07`), 9
+(`WR-08`) and 10 (`IN-01`…`IN-09`)**. Two are DELIBERATE re-statements with changed status
+(`WR-08` and `WR-04`, whose triggers this round did not fire and which must not silently expire
+with the phase); **one is REMOVED from the deferred set rather than restated — entry 8
+(`WR-07`) is CLOSED by this plan**, see below. `IN-01`…`IN-09` are NOT restated: entry 10 already
+carries them and duplicating a register is how two registers start disagreeing.
+
+### ✅ NOT a deferral — `WR-07` (entry 8 above) is CLOSED by `244-13`
+
+Recorded here because entry 8's re-open trigger was *"either a plan whose `files_modified` names
+`ChatArea.tsx`, or the first writer of `'cap_paused'` onto `workflow_runs.status`"* — **the first
+arm FIRED, and it was honoured.** `ChatArea.tsx:140` now reads `workflowLock !== null &&
+workflowLock.mode === "harness"`, fenced by `ChatArea.capPausedComposer.test.tsx` **D5** (driven
+RED: `Unable to find an element with the placeholder text of: Workflow running — Cancel to switch
+back`) and by `ThreadRunLineKickoff.test.tsx` **D5b(a)** on the writer side. ⚠ Entry 8's own
+instruction — *"⛔ Do not close this by asserting it is unreachable"* — is obeyed: the reconcile
+route remains latent and the fix is fail-closed anyway.
+
+### 1. `L-5` defect 6a — the sent-message attachment chip is LATE, not absent
+
+⚠ **RETRACTED AND RE-SCORED MINOR DURING THE UAT ITSELF**, and that retraction is the reason this
+is a deferral rather than a bug: the chip DOES appear in the settled transcript, so `D-244-22`'s
+build obligation IS met. What is deferred is the window — a person who attaches a file and
+immediately re-reads their own message sees **no scope word for the duration of the run**.
+
+⚠ Likely the same mechanism as **`IN-09`** (a client-stamped message time compared against a
+Postgres-stamped file time), which entry 10 above already carries; they should be investigated
+together rather than separately.
+
+**Re-open trigger:** the next plan whose `files_modified` names
+`frontend/src/components/chat/ChatAttachmentChip.tsx` or
+`frontend/src/components/chat/useComposerAttachments.ts`.
+
+### 2. A Google-native Drive file cannot be attached — `Unsupported type (none)`
+
+Two problems in one refusal. **Native Docs/Sheets/Slides are the most common thing in a real
+Drive**, so the composer's cloud door refuses the majority case; and the copy leaks the extension
+check's internal state (`none` is the absent extension, not a type the person can act on).
+
+⚠ **THE LIBRARY INGEST PATH DOES HANDLE THEM** — `backend/app/security/egress.py` carries Drive
+read **and EXPORT** pins — so the composer door appears to be missing an export step the other
+door already has. ⛔ **Stated as the likely asymmetry to CHECK, not as a measured fact.** Nobody
+drove the Library path against a native Doc during this round.
+
+**Re-open trigger:** the next phase touching the composer's cloud door
+(`frontend/src/components/chat/ConnectedFilePickerModal.tsx` /
+`useComposerAttachments.ts`) **or** `backend/app/api/workspace.py`'s `_ALLOWED_EXT`.
+
+### 3. A Library import answered HTTP 200 and created nothing — NOT REPRODUCED
+
+⛔ **The response BODY was not captured**, so there is nothing to diagnose and nothing to assert.
+Recording it with an honest *not reproduced* is the whole point: an unreproduced observation that
+is deleted cannot be recognised the second time it happens.
+
+**Re-open trigger:** any further Library import that answers **200** without producing a
+`documents` row — ⛔ **capture the response body that time**, and the `documents` / `document_
+chunks` counts either side of the call.
+
+### 4. `Retry-After: 10` on a snapshot 503 is still discarded
+
+`244-11` makes the failure VISIBLE and deliberately adds **no automatic retry** — an auto-retry is
+a new behaviour, not a gap fix (G-7), and an automatic retry into a 503 storm is an amplification
+risk its threat register accepts precisely by not adding one. Recovery stays exactly one user
+click on the shipped **Retry** control. ⚠ This restates the `244-11` entry above with its status
+unchanged, so the trigger does not expire when the phase closes.
+
+**Re-open trigger:** a phase that adds ANY automatic retry to the snapshot path
+(`frontend/src/providers/StreamsProvider.tsx`'s `reconcile` or `backend/app/api/threads.py:495-530`)
+— at which point the header is read there and the backoff decided there, never inside a banner.
+
+### 5. `WR-08` — the transcript says `Read <file>` for a turn that could not read it
+
+`frontend/src/components/chat/MessageItem.tsx:455-465`. In Explorer mode the announcement is gated
+out **and** the tool set carries neither `execute_code` nor a workspace tool, so no hydration
+happens either — and the row still says `Read contract.pdf`, in the past tense.
+
+⚠ **ENTRY 9 ABOVE SET THE TRIGGER *"the next plan whose `files_modified` names
+`MessageItem.tsx`"* — AND THAT TRIGGER FIRED ON THIS VERY PLAN.** It is recorded as fired and
+**declined**, not as unnoticed: `244-13` is a gap-closure round, the **mode gate is a code fix
+but the WORDING is an OPERATOR call** (the strings are ported from sketch 236's `COPY.js`), and
+changing shipped copy inside a closure round is the "smuggled feature" G-7 exists to stop. ⛔ A
+trigger that fires and is silently re-armed is worse than one that never fired; this one is
+answered.
+
+**Re-open trigger (re-armed, narrowed):** the next plan that names
+`frontend/src/components/chat/composerCopy.ts`, **or** any plan scoping Explorer-mode transcript
+honesty. ⚠ Take the **mode gate** without waiting for the operator; take the wording only with one.
+
+### 6. `WR-04` — the cloud attach buffers the whole provider file before the 10 MB cap
+
+`backend/app/api/workspace.py:400` calls `fetch_cloud_file` unbounded and checks
+`len(raw) > MAX_FILE_SIZE` afterwards, so a 2 GB pick is resident in a worker (`WORKER_COUNT=2`)
+before the 422. ⚠ Pre-existing on the Library path too (`import_single_file` has the same shape).
+Restated from entry 7 with its status unchanged — ⛔ **`244-13` is a frontend-only plan
+(`git diff --stat -- backend/ supabase/` is EMPTY), so it could not have taken this even if the
+round allowed it.**
+
+**Re-open trigger (unchanged):** the next plan whose `files_modified` names
+`backend/app/api/workspace.py` or `backend/app/services/sources/import_service.py`. The fix is to
+resolve the provider's declared size from the listing the picker already rendered and refuse
+BEFORE `read_file`; the stronger version is a streaming read with a running byte counter.
+
+---
+
+## `244-13` — two findings the WORK produced, recorded because nobody else saw them
+
+### 7. The two ledger tables had DRIFTED APART, and only one of them is gated
+
+Measured while updating rows: `CLAUDE.md`'s G-5-FIRING shortlist read `MessageItem.tsx
+73 / 34 / 954` and `StreamsProvider.tsx 96 / 37 / 4614`, while `docs/HOT-FILE-LEDGER.md`'s
+**authoritative** scan list still read `71 / 37 / 904` and `94 / 38 / 4528` for the same two
+files. Waves 1-2 updated the shortlist and not the scan list. ⚠ **`scripts/check-hot-file-ledger.cjs`
+reads ONLY the scan list**, so the table an agent is most likely to read at planning time is the
+one nothing verifies — and the two disagreed on the phase count (`34` vs `37`) as well as the
+triple, which is the figure G-5 actually fires on.
+
+**Re-open trigger:** the next plan that edits either table should diff the two file lists; a
+`--sync` mode on `check-hot-file-ledger.cjs` that fails when a path's triple differs between
+`CLAUDE.md` and `docs/HOT-FILE-LEDGER.md` would close it mechanically.
+
+### 8. `ThreadRunLine.tsx` is still at ONE phase — its ledger prose predicted otherwise
+
+`244-13-PLAN.md` stated that this round *"makes it phase 2"* and asked for the row to record that
+it is one phase from owing a detail section. **It is not:** `244` fixed `G-1` in the run line's
+**INPUT** (`useHarnessLiveForThread`), leaving `ThreadRunLine.tsx` byte-unchanged, so the
+re-derived triple is **`1 / 1 / 357` — unmoved**. Recorded as *checked, unmoved* rather than left
+silent, because a reader who finds no `244` entry cannot otherwise tell that from *nobody checked*.
+
+**Re-open trigger:** the next plan whose `files_modified` names
+`frontend/src/components/chat/ThreadRunLine.tsx` — at its THIRD phase it owes a detail section in
+`docs/HOT-FILE-LEDGER.md`.

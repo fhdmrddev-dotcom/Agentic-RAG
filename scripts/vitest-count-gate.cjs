@@ -3511,7 +3511,27 @@ const BASELINE = {
   // genuine-lock branch as well as the reconcile branch. The five cases above could not see
   // it — `HARNESS_LOCKED_STATE` sets `cap_paused: false`, so the discriminator was only ever
   // read on a run that is locked OR paused, never one that is BOTH.
-  "ChatArea.capPausedComposer.test.tsx": 6,
+  // ⚠ RE-BASELINED 6 -> 8 BY 244-13 (UAT gap G-1 / review WR-07). D5 closes WR-07 — the ONE
+  // boolean at `ChatArea.tsx:140` now reads the lock's MODE, so a genuine harness run that is
+  // itself cap-paused stays locked. D6 asserts BOTH of SHELL-02's halves in ONE tree, which
+  // is what the browser measured contradicting each other; cases 1 and 3 assert them in
+  // separate trees and are therefore consistent with a product that never shows them together.
+  "ChatArea.capPausedComposer.test.tsx": 8,
+  // ── Phase 244-13 (UAT gap G-1) — the run line a DEEP cap-pause must NOT draw ─────────
+  // ⚠⚠ ADOPTED, NOT RE-BASELINED. This suite shipped at Phase 194.1 and has been in NEITHER
+  // knob ever since: `grep -n "ThreadRunLineKickoff" scripts/vitest-count-gate.cjs` returned
+  // NOTHING, so it ran in no gate and guarded nothing for ~50 phases. `src/components/chat`
+  // has no bare-directory TARGETS entry (this array has exactly two — `src/landing` and
+  // `src/components/workflows`), so a suite dropped there is invisible until it is NAMED in
+  // TARGETS **and** pinned here. ⭐ Adopting a suite RAISES the grand total; that is the
+  // desirable direction and must not be read as drift.
+  // 4 shipped cases (194.1-06's R5 pair + the two dead-interval cases) + 6 added by 244-13:
+  // D1 no phantom run line · D2 no phantom 1s clock · D3 the DEEP banner at ZERO fetches
+  // (T-194-07-03's disposition, voided by 244-03, now an ASSERTION rather than a comment) ·
+  // D4 the genuine harness run unharmed (D3's positive control) · D5b(a)/(b) the cap_paused
+  // SSE inheriting the lock's mode rather than hard-coding "harness".
+  // ⭐ Driven RED first — D1, D3, D5b(b) and D6 all failed on the shipped tree.
+  "ThreadRunLineKickoff.test.tsx": 10,
   // ── Phase 244-08 (T-244-05-05 / OPEN-2) — the expired attachment TOMBSTONE ──────────
   // 5 cases, measured on a green run of the suite alone. BOTH KNOBS, SAME COMMIT.
   // ⭐ Driven RED first — 3 of the 5 failed on the shipped tree: `expected undefined to be
@@ -5154,6 +5174,18 @@ const TARGETS = [
   // title, byte-for-byte — D-244-10), and the two sentences at `MessageItem.tsx:576-578`
   // whose deletion is the ROADMAP's named anti-fix.
   "src/components/chat/__tests__/ChatArea.capPausedComposer.test.tsx",
+  // ── Phase 244-13 (UAT gap G-1) — the run line a DEEP cap-pause must NOT draw ───────────
+  //
+  // ⛔ FILE-LEVEL BY NECESSITY — same reason as the entry directly above it.
+  // ⚠ ADOPTED AT ITS ~50th PHASE OF LIFE, not created here: this suite shipped with 194.1-06
+  // and has been in NEITHER knob ever since, so a green gate said nothing about the thread
+  // run line at all. TARGETS decides what RUNS; BASELINE decides what is GUARDED.
+  //
+  // What it guards: that `useHarnessLiveForThread` reads the lock's MODE rather than its
+  // PRESENCE, so a Deep cap-pause draws no `data-run-line-state="live"` line, starts no 1s
+  // clock and mounts nothing that fetches `getThreadWorkflow` — while a genuine harness run
+  // still draws its line, its harness word and its advancing step.
+  "src/components/chat/__tests__/ThreadRunLineKickoff.test.tsx",
   // ── Phase 244 (244-03 T2 / SHELL-03 / BUG-260828-07) — the approval, answerable inline ──
   //
   // ⛔ FILE-LEVEL BY NECESSITY — same reason as the entry directly above it.

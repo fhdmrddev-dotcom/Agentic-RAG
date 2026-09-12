@@ -86,7 +86,48 @@ export interface WorkflowLock {
    * phase*, which is why it is recorded HERE, at the type's own declaration, this time.
    */
   runId: string
-  mode: "harness"
+  /**
+   * WHAT THIS LOCK IS — a real discriminator since Phase 244-13, and it must stay one.
+   *
+   * ⚠ THIS FIELD WAS THE SINGLE-MEMBER LITERAL `"harness"` UNTIL 2026-09-12, AND THAT
+   * ORIGINAL IS RECORDED HERE RATHER THAN OVERWRITTEN, because a reader who finds
+   * `mode === "harness"` in old prose needs to know it used to be a tautology. Every one
+   * of the SIX write sites hard-coded `"harness"`, including the branch that locks a DEEP
+   * run paused at its iteration cap — so `244-PATTERNS.md` **C-1** correctly MEASURED
+   * `D-244-08`'s proposed gate (`workflowLock?.mode === "harness"`) to be a NO-OP. C-1 was
+   * right when written; what changed is the type, not the measurement.
+   *
+   *   - `"harness"`    — a non-terminal WORKFLOW run owns this thread's anchor. A live run
+   *                      line, the harness banner and a locked composer are all correct.
+   *   - `"cap_paused"` — a DEEP run paused at its iteration cap. ⛔ **THERE IS NO WORKFLOW.**
+   *                      Nothing may read this lock as evidence that a harness run is live:
+   *                      no `data-run-line-state="live"`, no 1s clock, no harness banner,
+   *                      and no component that fetches `getThreadWorkflow` on this path.
+   *
+   * ⛔ SET IT FROM THE SERVER'S OWN ANSWER, NEVER INFER IT FROM `capPaused`. The backend
+   * already computes the fact at `threads.py:1195` (`mode = "harness" if
+   * active_workflow_run_id is not None else "deep"`) and ships it as
+   * `ThreadWorkflowState.mode` (`models/thread.py:361`). A second client-side derivation of
+   * one fact is exactly how the two registers drifted apart in the first place.
+   *
+   * ⚠ THE ONE SITE THAT CANNOT READ IT OFF THE WIRE IS THE `cap_paused` SSE
+   * (`StreamsProvider.tsx:1193`): the event carries `runId` + `continuesRemaining` and no
+   * mode at all. Its rule is an INFERENCE with a reason — INHERIT the thread's existing
+   * lock mode, defaulting to `"cap_paused"` — and it is exactly as strong as the two writes
+   * that could have put a harness lock there (the kickoff seed and the reconcile).
+   *
+   * ⚠ WHY THIS LIVES AT THE TYPE AND NOT IN A CONSUMER'S COMMENT. `244`'s UAT gap `G-1`
+   * records that the invariant which broke *"lived in a COMMENT, not in an assertion"* —
+   * `MessageItem.tsx`'s docblock asserted a DEEP thread never mounts the harness banner,
+   * and `244-03`'s SERVER change silently made that sentence false. This file's own
+   * `runId` JSDoc below records the identical lesson one field over: *a measurement that
+   * lives in one consumer's comment is invisible to the next phase.* The executable half is
+   * `ThreadRunLineKickoff.test.tsx` D1-D4 and `ChatArea.capPausedComposer.test.tsx` D5/D6.
+   *
+   * ⚠ Existing fixtures writing `mode: "harness"` stay VALID — they describe harness locks.
+   * That is why the union is WIDENED rather than replaced.
+   */
+  mode: "harness" | "cap_paused"
   /** True when the run is cap_paused (a Continue card is pending). */
   capPaused: boolean
   /** Continues remaining (max_continues_per_run - continues_used, D-06). */

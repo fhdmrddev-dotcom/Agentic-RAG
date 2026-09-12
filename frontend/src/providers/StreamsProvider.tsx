@@ -1189,10 +1189,27 @@ export function makeStreamCallbacks(opts: {
     // (the durable carrier row is filtered from /messages — BUG-260528-01).
     // Closes over the factory's `threadId` (the owning thread), so a background
     // thread's cap_paused never touches the viewed thread's lock.
+    // ── Phase 244-13 (UAT gap G-1 / review WR-07) — WRITE SITE 1 of 6, and the ONLY
+    //    one with no answer on the wire. The `cap_paused` SSE carries `runId` +
+    //    `continuesRemaining` and NOTHING about mode, so this value is an INFERENCE
+    //    with a reason rather than a fact off the wire: INHERIT whatever this thread's
+    //    lock already says, and default to `"cap_paused"`.
+    //    ⛔ Do NOT hard-code `"harness"` here (it did until 2026-09-12): a DEEP run
+    //    that hits its iteration cap mid-stream arrives through THIS callback, and the
+    //    old value made it read as a live workflow — the phantom run line G-1 measured,
+    //    by its live route rather than by the reconcile.
+    //    ⚠ The inference is exactly as strong as the two writes that could have put a
+    //    harness lock on this thread: the kickoff seed (`:2539`) and the reconcile
+    //    (`:2343`). Both are harness-only, so an existing `"harness"` is evidence.
+    //    ⛔ And it is the reachable half of WR-07: keeping `"harness"` here is what stops
+    //    a harness run that caps from UNLOCKING the composer mid-run (`ChatArea.tsx:140`).
     onCapPaused: (info) =>
       useStreamsStore.getState().actions.setWorkflowLockForThread(threadId, {
         runId: info.runId,
-        mode: "harness",
+        mode:
+          useStreamsStore.getState().workflowLockByThread.get(threadId)?.mode === "harness"
+            ? "harness"
+            : "cap_paused",
         capPaused: true,
         continuesRemaining: info.continuesRemaining,
       }),
@@ -2340,6 +2357,10 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                 if (wf.locked && !wf.lock_is_stale && wf.active_workflow_run_id) {
                   actions.setWorkflowLockForThread(threadId, {
                     runId: wf.active_workflow_run_id,
+                    // 244-13 — WRITE SITE 2 of 6. Genuinely harness, and said EXPLICITLY
+                    // rather than left to a default: this arm requires a live, non-stale
+                    // `active_workflow_run_id`, which is the server's own definition of
+                    // harness (`threads.py:1195`).
                     mode: "harness",
                     capPaused: wf.cap_paused,
                     continuesRemaining: wf.continues_remaining,
@@ -2360,7 +2381,12 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                   if (runId) {
                     actions.setWorkflowLockForThread(threadId, {
                       runId,
-                      mode: "harness",
+                      // 244-13 — WRITE SITE 3 of 6, and usually a DEEP cap-pause. DERIVED
+                      // FROM THE WIRE, never from `capPaused`: the server already answers
+                      // this question at `threads.py:1195` and re-deriving it client-side
+                      // from `active_workflow_run_id` would be a second derivation of one
+                      // fact — which is how these two registers drifted apart (G-1).
+                      mode: wf.mode === "harness" ? "harness" : "cap_paused",
                       capPaused: true,
                       continuesRemaining: wf.continues_remaining,
                     })
@@ -2536,6 +2562,9 @@ export function StreamsProvider({ children }: PropsWithChildren) {
             if (opts?.workflowDefinitionId && run_id) {
               useStreamsStore.getState().actions.setWorkflowLockForThread(threadId, {
                 runId: run_id,
+                // 244-13 — WRITE SITE 4 of 6. Genuinely harness by construction: this
+                // branch is gated on `opts.workflowDefinitionId`, which a Deep send
+                // never sets.
                 mode: "harness",
                 capPaused: false,
                 continuesRemaining: 3,
@@ -4595,10 +4624,27 @@ export const useWorkflowLockForThread = (threadId: string | null): WorkflowLock 
  *  both leak the `WorkflowLock.runId` two-id landmine (see its JSDoc in
  *  `streamsStore.ts`) to callers that have no business resolving ids, and give
  *  every consumer an object-identity dependency this selector does not need. */
+/** ⛔ CORRECTED BY PHASE 244-13 (UAT gap G-1) — THE SECOND DISJUNCT WAS A PRESENCE TEST,
+ *  AND IT BECAME WRONG WITHOUT THIS FILE BEING TOUCHED. The original read:
+ *
+ *      s.harnessKickoffThreads.has(threadId) || s.workflowLockByThread.has(threadId)
+ *
+ *  i.e. it treated ANY non-null lock as *"a harness run is live"*. That was TRUE for as
+ *  long as the lock was harness-only — and `244-03` made the SERVER populate the lock for a
+ *  cap-paused DEEP run (`threads.py:1237-1276`). A server change reached a client consumer
+ *  written against the old invariant, and the result was measured on screen: a live
+ *  `data-run-line-state="live"` receipt reading the harness activity string, 41px under an
+ *  amber card saying the run was stopped, on a thread that has never had a workflow — plus
+ *  a 1s `setInterval` clock (`ThreadRunLine.tsx:243-249`) ticking for it.
+ *
+ *  ⛔ The test is now on the lock's MODE, which says what the lock IS (see `WorkflowLock`'s
+ *  own JSDoc in `streamsStore.ts`). `harnessKickoffThreads` is UNCHANGED and still
+ *  load-bearing — it covers the synchronous pre-lock kickoff window. */
 export const useHarnessLiveForThread = (threadId: string | null): boolean =>
   useStreamsStore((s) =>
     threadId
-      ? s.harnessKickoffThreads.has(threadId) || s.workflowLockByThread.has(threadId)
+      ? s.harnessKickoffThreads.has(threadId) ||
+        s.workflowLockByThread.get(threadId)?.mode === "harness"
       : false,
   )
 
