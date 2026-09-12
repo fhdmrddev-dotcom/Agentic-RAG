@@ -2,556 +2,515 @@
 phase: 244-the-chat-shell-and-the-composer
 reviewed: 2026-09-12T00:00:00Z
 depth: standard
-diff_base: 223b3ea4f
-files_reviewed: 29
+diff_base: 8cd9d8119
+round: gap-closure-1
+supersedes: 244-REVIEW-build-round.md
+supersedes_note: |
+  ⛔ THIS FILE DOES NOT RETIRE THE BUILD ROUND'S FINDINGS. `244-REVIEW-build-round.md` is the
+  review of a DIFFERENT diff (`223b3ea4f..HEAD`, 29 files) and is preserved verbatim; its
+  frontmatter carries the disposition of all 18 findings, of which WR-04, WR-08 and IN-01..IN-09
+  are still OPEN with fireable triggers in `deferred-items.md`. `WR-07` is CLOSED by `244-13`.
+  This file reviews ONLY `8cd9d8119..b11e99c8e` (gap-closure round 1, plans 244-09 … 244-13).
+files_reviewed: 16
 files_reviewed_list:
-  - backend/app/api/connectors.py
-  - backend/app/api/threads.py
-  - backend/app/api/workspace.py
-  - backend/app/models/connector.py
-  - backend/app/models/workspace.py
-  - backend/app/services/agent_loop.py
   - backend/app/services/tool_dispatcher.py
-  - frontend/src/components/chat/ActiveConnectorChips.tsx
+  - frontend/src/components/layout/NavPanel.tsx
+  - frontend/src/providers/StreamsProvider.tsx
   - frontend/src/components/chat/ChatArea.tsx
-  - frontend/src/components/chat/ChatAttachmentChip.tsx
-  - frontend/src/components/chat/ConnectedFilePickerModal.tsx
-  - frontend/src/components/chat/MessageInput.tsx
   - frontend/src/components/chat/MessageItem.tsx
   - frontend/src/components/chat/MessageList.tsx
-  - frontend/src/components/chat/composerCopy.ts
-  - frontend/src/components/chat/useComposerAttachments.ts
-  - frontend/src/components/layout/ChatHistoryColumn.tsx
-  - frontend/src/components/layout/ChatLayout.tsx
-  - frontend/src/components/layout/attentionConditions.ts
-  - frontend/src/components/library/LibraryCloudImport.tsx
-  - frontend/src/components/library/LibraryHeaderBar.tsx
-  - frontend/src/components/panel/FilesSection.tsx
-  - frontend/src/components/panel/TemplateUpload.tsx
-  - frontend/src/lib/api.ts
-  - frontend/src/lib/api/connectors.ts
-  - frontend/src/lib/api/documents.ts
-  - frontend/src/lib/workspaceAllowedExt.ts
-  - frontend/src/pages/LibraryPage.tsx
-  - frontend/src/providers/StreamsProvider.tsx
+  - frontend/src/stores/streamsStore.ts
+  - backend/tests/unit/test_244_attachment_hydration.py
+  - frontend/src/components/layout/__tests__/ChatLayout.scrollFrame.test.tsx
+  - frontend/src/__tests__/providers/streamsProvider_244_snapshot_failure.test.tsx
+  - frontend/src/components/chat/__tests__/ChatAreaBanner.test.tsx
+  - frontend/src/components/chat/__tests__/MessageItem.inlineApproval.test.tsx
+  - frontend/src/components/chat/__tests__/ThinkingBlock.characterization.test.tsx
+  - frontend/src/components/chat/__tests__/ChatArea.capPausedComposer.test.tsx
+  - frontend/src/components/chat/__tests__/ThreadRunLineKickoff.test.tsx
+  - frontend/src/components/chat/__tests__/MessageItem.answerOutOfFold.test.tsx
 findings:
   critical: 1
-  warning: 8
-  info: 9
-  total: 18
-status: partially_resolved
-resolved_by: 244-07
-resolved_at: 2026-09-12
-resolved:
-  - CR-01   # both composer attach doors silent with no thread — refuses visibly, cloud verb throws
-  - WR-01   # announcement had no kind filter — allow-list on template_input, in the renderer
-  - WR-02   # "once per session" was per-iteration — marker moved to a WeakSet of sessions
-  - WR-03   # "General mode only" excluded only explorer — harness now excluded too
-  - WR-05   # folder_id accepted "" — LibraryFolderId validates UUID shape, still a str
-  - WR-06   # folder 403/404 and duplicate 409 masked as 502 — except HTTPException: raise
-open:
-  - WR-04   # cloud attach buffers the whole provider file before the 10 MB cap
-  - WR-07   # workflowLocked unlocks a genuine harness lock when the run is cap-paused (LATENT)
-  - WR-08   # transcript says "Read <file>" for a turn that could not read it
-  - IN-01
-  - IN-02
-  - IN-03
-  - IN-04
-  - IN-05
-  - IN-06
-  - IN-07
-  - IN-08
-  - IN-09
-# ⛔ Every `open` item carries a concrete re-open trigger in `deferred-items.md` (items 7-10).
-# A finding that lives only in a review file is a deferral with no re-open, which is a deletion
-# that looks like a decision.
+  warning: 5
+  info: 5
+  total: 11
+status: issues-found
 ---
 
-> ⚠ **STATUS, 2026-09-12 — SIX OF EIGHTEEN ARE CLOSED AND TWELVE STAND.** `244-07` fixed the six
-> the operator scoped (`CR-01`, `WR-01`, `WR-02`, `WR-03`, `WR-05`, `WR-06`), each with a RED
-> drive committed before its GREEN. All six reproduced against the CURRENT file first; none was
-> already fixed. The findings below are **left verbatim, never edited to match the code** — a
-> review is the record of what was true when it was written, and the frontmatter above is where
-> the disposition lives. Full account: `244-07-SUMMARY.md`.
->
-> ⚠ `WR-08` is worse-SHAPED after `244-07`, not worse: `WR-03` adds `harness` to the excluded
-> set, so there are now **two** modes for which the `Read <file>` line's justification fails.
-
-# Phase 244: Code Review Report
+# Phase 244 — gap-closure round 1: Code Review Report
 
 **Reviewed:** 2026-09-12
-**Depth:** standard (per-file analysis of the diff `223b3ea4f..HEAD`, language-aware)
-**Files Reviewed:** 29 non-test source files
+**Depth:** standard (per-file analysis of `8cd9d8119..b11e99c8e`, language-aware)
+**Files Reviewed:** 7 non-test source files + 9 test files
 **Status:** issues_found
 
 ## Summary
 
-Six plans across both tiers: the `min-h-0` scroll frame, thread-row identity + the hit-test sink,
-workspace attachments the agent can read, the cap-pause composer unlock, the inline approval, the
-attention tab attribution, and the two re-pointed cloud doors.
+Five plans, five measured gaps. Four of the five fixes address the cause they name and nothing
+else. The fifth (`244-11`, gap G-3) reuses **half** of the shipped writer it says it copied: it
+takes the failure WRITE from the `loadMessages` path and leaves behind that path's
+clear-on-success and its silent single retry — so a transient snapshot 503 now paints a banner
+that never goes away, and once the transcript loads the banner asserts the exact sentence
+`244-11` exists to prevent (**CR-01**).
+
+`244-13`'s lock discriminator is correct at all six write sites and at every consumer I could
+find — but it fixes WR-07's direction and leaves the mirror open one component over: the Continue
+card is still gated on `capPaused` alone, so a harness run that caps now renders *"Start a new
+message to keep going"* over a composer that has just been disabled (**WR-01**). Two mount-time
+writers of the same lock still disagree about `capPaused`, and after this round that disagreement
+is what decides whether that card renders at all (**WR-02**).
 
 **What held up under adversarial reading, verified rather than accepted:**
 
-- **The allow-list lockstep is a real mechanism, not a comment.**
-  `frontend/src/lib/__tests__/workspaceAllowedExt.lockstep.test.ts` imports
-  `backend/app/api/workspace.py` with `?raw`, parses all four `_*_EXT` set literals, asserts
-  **set equality** against `WORKSPACE_ALLOWED_EXT`, and separately asserts that `_ALLOWED_EXT`
-  unions all four names. A member added on one side goes red. The claim is supported.
-- **Path traversal via a filename is closed.** `_attachment_container_path`
-  (`tool_dispatcher.py:1783`) normalises backslashes → `os.path.basename` → charset narrow →
-  `lstrip(".")` → length cap → non-empty fallback. `../../etc/passwd` reduces to `passwd`, and the
-  result is always `/{_ATTACHMENTS_DIR}/{basename}`. The prompt renderer imports **that same
-  function** rather than re-deriving, so there is one rule with one home.
-- **Prompt injection through the announcement is closed.** The announced name is derived from the
-  container path (charset `[A-Za-z0-9._\- ]`, cap 120), then passed through `_one_line`, which
-  strips CR/LF/control chars and every markdown structure character. A filename cannot open a
-  heading, a fence or a list inside the system prompt.
-- **Cloud import destination is not an IDOR.** `import_single_file` → `async_mint_document_row`
-  (`ingest_splice.py:154-168`) validates the folder exists and `user_id` matches, 404/403
-  otherwise; the connection itself is resolved org-scoped
-  (`connector_service.get_connection(..., org_id=active_org)`).
-- **The ingest splice is respected.** The Library door still mints through
-  `async_mint_document_row` + `_enqueue_or_splice`; `backend/app/api/workspace.py` imports neither
-  `import_single_file` nor `ingest_splice` (the only occurrence is inside a docstring), so the chat
-  door structurally cannot write a `documents` row.
-- **The cap-pause lock bound is server-side.** `threads.py:1243-1276` now reads the thread's
-  **latest** run and then tests `status == 'cap_paused'`, so the client boolean cannot resurrect a
-  stale pause and the client half alone is not load-bearing. It adds no second writer of
-  `runs.status`.
-- **The gate registry was not weakened.** `git diff --numstat` on `scripts/vitest-count-gate.cjs`
-  reads `305 0` — purely additive, no entry deleted.
-- **No new type errors.** `npx tsc -p tsconfig.app.json --noEmit` in `frontend/` reports **67**
-  errors at HEAD, identical to the recorded base count.
-
-**Key concerns.** One blocker: both composer attach doors are a **silent no-op on a chat that has
-no thread yet**, which is the most likely place a person first tries the phase's headline feature —
-and the cloud door reports success while doing nothing. Beyond that, three claims written into the
-code do not match what the code does (hydration "once per session", the announcement "General mode
-only", and the required-`folder_id` refusal), and the attachment announcement tells the model that
-agent-written scratch files are files "the user attached" and that they "expire" when they do not.
+- **The path-traversal fence is genuinely byte-unchanged.** `_attachment_container_path`
+  (`tool_dispatcher.py:1820-1846`) does not appear in the diff at all; `_ATTACHMENTS_DIR` and
+  `_ATTACHMENT_NAME_MAX` are untouched. The new per-file record keys on the **raw workspace
+  path** (`row["path"]`), never on the container destination, so the record cannot be used to
+  smuggle a path past the sanitiser — the dedup decision and the destination decision remain two
+  separate derivations of one row.
+- **The new cap arithmetic cannot be driven negative.** `rows[:max(MAX - len(already), 0)]` plus
+  the second `if not rows: return notes` means budget exhaustion returns a NAMED note and copies
+  nothing, rather than slicing with a negative index (which in Python would silently copy from
+  the tail). Driven in the suite's case C against `_ATTACHMENT_HYDRATION_MAX_FILES = 2`.
+- **The in-place mutation of `already` is safe for every caller.** `_hydrate_thread_attachments`
+  has exactly **one** call site (`tool_dispatcher.py:2107`); the set it receives is the one stored
+  in `_hydrated_files[session]`, keyed per sandbox session, which is itself keyed per `thread_id`
+  (`sandbox_service.get_or_create:25`). No second caller shares the object, and the `TypeError`
+  fallback builds a throw-away set rather than aliasing a shared one.
+- **`StreamsProvider.tsx:4368`'s `wf.mode === "harness"` was correctly left alone.** That read is
+  inside `reconcilePhases` and consumes `ThreadWorkflowState.mode` (`lib/api/threads.ts:1276`,
+  `"deep" | "harness"`) — the **server wire type**, a different field from the client store's
+  `WorkflowLock.mode`. Confirmed by reading both declarations; the two are not interchangeable
+  and the diff does not conflate them.
+- **`244-12`'s mount renders nothing when there is no pause, and cannot double-render in the chat
+  column.** `PendingAskStack` returns `null` on `asks.length === 0` (`PendingAskCard.tsx:734`);
+  the per-row mount was removed from `MessageItem` in the same commit; `WorkspacePanel.tsx:436`
+  is the only other mount and it is a *different column*, gated on `pendingAsks.length > 0`, which
+  is the deliberate two-homes design (D-244-11) rather than a duplicate.
+- **The cost claim is constant in row count.** `usePanelReconcile` fires on `[threadId]` only, so
+  the mount's fetches scale with thread opens, not with rows — verified in source, and fenced by
+  W3/W4 with an equality against a control rather than a literal. I found nothing larger than the
+  published +4, nothing unbounded, and nothing that scales with row count.
+- **No new type errors.** `npx tsc -p tsconfig.app.json --noEmit` in `frontend/` reports **67**,
+  byte-identical to the recorded base count, and none of the 67 sit in a file this round touched.
+- **The gate registry was not weakened.** `git diff --numstat scripts/vitest-count-gate.cjs` reads
+  `81 4`; every removed line is a baseline number REPLACED by a larger one
+  (`ChatAreaBanner 7→9`, `ChatLayout.scrollFrame 5→6`, `ChatArea.capPausedComposer 6→8`,
+  `MessageItem.inlineApproval 8→13`) plus two newly-pinned files. No entry was deleted.
+- **No plan over-claims.** All five SUMMARYs state *built, drive owed*; `244-11`, `244-12` and
+  `244-13` say explicitly that `SHELL-01`/`SHELL-03`/`SHELL-02` are **not** closed (D-244-14 /
+  D-244-19). No fence asserts otherwise.
+- **G-7 holds on capability.** Nothing in the round adds a user-facing capability. The one item
+  that reads as new surface is a *re-ordering* (G-2), not a capability — see IN-03 for the record
+  defect attached to it.
 
 ---
 
 ## Critical Issues
 
-### CR-01: Both composer attach doors silently do nothing on a chat with no thread — and the cloud door reports success
+### CR-01: A successful reconcile never clears the error it just set — `244-11`'s banner is sticky, and once the transcript loads it asserts the sentence the plan was written to prevent
 
-**File:** `frontend/src/components/chat/useComposerAttachments.ts:75`, `:98`
-**Also:** `frontend/src/components/chat/ChatArea.tsx:571` (`{inputBar}` inside the `if (!thread)`
-branch), `frontend/src/components/chat/ChatArea.tsx:435` (`threadId={thread?.id ?? null}`),
-`frontend/src/components/chat/MessageInput.tsx:493-512` (the `+` menu items, ungated)
+**File:** `frontend/src/providers/StreamsProvider.tsx:1955-1982` (the new write)
+**Also:** `frontend/src/providers/StreamsProvider.tsx:3232-3238` (the ONLY clear, and it is in
+`loadMessages`, not in `reconcile`), `frontend/src/components/chat/ChatArea.tsx:712-717` (the
+sentence), `frontend/src/components/chat/ChatArea.tsx:174-186` (`handleRetryReconcile`)
 
-**Issue:** `ChatArea` renders the **same** `MessageInput` in its welcome/no-thread branch, passing
-`threadId={null}`. Both attach verbs begin with `if (!threadId) return`:
+**Issue:** the new arm says, verbatim, that it is *"The EXACT shipped write from the loadMessages
+failure path (:3209-3215), reused rather than re-invented: two writers of one slice that differ is
+how slices drift here."* The write was reused. **The other two halves of that writer were not:**
+
+| the shipped `loadMessages` writer | the new `reconcile` arm |
+|---|---|
+| **silent single retry at 1s before the banner** (`:3243`, D-068.5-09 — "handles transient outage") | banner on the FIRST failure |
+| **clears the entry on success** (`:3232-3238`) | no clear anywhere in `reconcile` |
+| aborts matched two ways (`Error.name` AND a duck-typed `{name}`, `:3241-3242`) | `instanceof DOMException` only (WR-04) |
+
+`reconcile` is the thread-open path — `loadMessages` is called only from `handleRetryReconcile`
+(`ChatArea.tsx:184`), the `buffer_expired` arm (`:2305`) and the stream-terminal `finally`
+(`:2341`). So on an ordinary thread open there is **no writer that can clear the entry**.
+
+Concrete, and it is precisely the sequence UAT row L-1 setup already observed (*"first click
+empty, second click fine"*):
+
+1. Open thread A. `getSnapshot` 503s (measured 2 of 4). `reconcileErrors.set("A", err)`.
+   Transcript empty → banner reads *"Couldn't load this conversation. It's still there — try
+   again."* — correct, and the fix working.
+2. Navigate to thread B, then back to A. `setViewingThread` → `reconcile("A")` → **200**. The
+   bucket hydrates and all 78 messages render.
+3. The banner is **still there**, because nothing deleted the key — and `messages.length` is now
+   non-zero, so `ChatArea.tsx:715` flips it to
+   *"Couldn't load latest messages. Showing cached version."* over a **freshly fetched**
+   transcript. That is the exact false claim `244-11`'s own docblock calls *"a claim ABOUT THE
+   SCREEN"* and was written to stop.
+
+The banner persists for the life of the session on that thread unless the person notices the
+Retry or × they have no reason to click, because the conversation in front of them is complete.
+
+**Why no fence saw it:** `streamsProvider_244_snapshot_failure.test.tsx` Test 2 is the happy-path
+control — and it starts from `reconcileErrors: new Map()` in `beforeEach`, so it can only observe
+*"success writes no error"*, never *"success clears a prior error"*. This is the round's own
+recorded lesson firing a third time: **a control that begins in the clean state cannot see a
+missing transition out of the dirty one.**
+
+**Fix:** restore the other half of the writer it copied — clear on success, inside `reconcile`,
+immediately after the snapshot resolves:
 
 ```ts
-const attachLocalFile = useCallback(async (f: File) => {
-  if (!threadId) return          // :75
-  ...
+snapshot = await getSnapshot(threadId)
+// … then, before hydrating the bucket:
+if (useStreamsStore.getState().reconcileErrors.has(threadId)) {
+  useStreamsStore.setState((s) => {
+    const next = new Map(s.reconcileErrors)
+    next.delete(threadId)
+    return { reconcileErrors: next }
+  })
+}
 ```
 
-Neither `+` menu item is gated on `threadId`, so on a brand-new chat:
-
-1. **Local door.** `+ → "Attach a file"` opens the OS dialog, the person picks `contract.pdf`,
-   `onAttachInputChange` fires, `attachLocalFile` returns immediately. No chip, no `refusal`
-   region, no console error, no request. The file was never uploaded and nothing on screen says so.
-2. **Cloud door, worse.** `attachCloudFile` also returns at `:98` — it returns `undefined` rather
-   than throwing, so `ConnectedFilePickerModal.handleConfirm` takes the success path, `onOpenChange(false)`
-   runs in `finally`, and the modal closes exactly as it does on a real attach. The interaction is
-   indistinguishable from success.
-
-This is also a **regression on a shipped path**: before this phase the cloud modal's
-`onFileImported` worked from a threadless composer (it imported to the Library and prefilled the
-draft). After the re-point it is inert there.
-
-The phase's own acceptance bar (`sketch 236`) is about a person putting a file into a conversation;
-"open a new chat and attach a contract" is the first thing anyone will try.
-
-**Fix:** decide the no-thread case explicitly instead of returning. Either disable the two menu
-items with a reason when `threadId` is falsy, or create the thread first, or refuse loudly:
+and add the missing case to the suite — **seed the error, then resolve the snapshot, and assert
+the key is gone**:
 
 ```ts
-const attachLocalFile = useCallback(async (f: File) => {
-  if (!threadId) {
-    setRefusal({ fileName: f.name, message: "Send a message first — a file belongs to a conversation." })
-    return
-  }
-  ...
+it("Test 2b (THE MISSING TRANSITION) — a resolving snapshot CLEARS a prior failure", async () => {
+  useStreamsStore.setState((s) => ({
+    reconcileErrors: new Map(s.reconcileErrors).set(THREAD_ID, SNAPSHOT_503()),
+  }))
+  mockGetSnapshot.mockResolvedValue(EMPTY_SNAPSHOT)
+  await act(async () => { await result.current.reconcile(THREAD_ID) })
+  expect(useStreamsStore.getState().reconcileErrors.has(THREAD_ID)).toBe(false)
+})
 ```
 
-and, at minimum, make `attachCloudFile` `throw` in the same branch so the modal cannot close as
-though the pick took. A fence over "the `+` menu with `threadId === null`" belongs in
-`ComposerAttach.composition.test.tsx`, which currently only exercises the threaded case.
+⚠ Separately, consider whether the **first** failure should raise the banner at all. The shipped
+path retries once at 1s precisely because the observed failure mode here is transient (the second
+click succeeded, twice). Raising on attempt 0 makes the banner more likely to be seen on a thread
+that would have loaded a second later — which is a legitimate decision, but it is a DIFFERENT
+decision from the one the comment claims to be making, and it is not recorded anywhere.
 
 ---
 
 ## Warnings
 
-### WR-01: The attachment announcement claims agent-written scratch files are "files the user attached", and that they expire
+### WR-01: `244-13` fixed WR-07's direction and left the mirror — a harness cap-pause now shows "Start a new message to keep going" over a composer it has just disabled
 
-**File:** `backend/app/services/agent_loop.py:1661-1667`, `:1221-1230`
+**File:** `frontend/src/components/chat/MessageItem.tsx:790-798`
+**Also:** `frontend/src/components/chat/ChatArea.tsx:167`,
+`frontend/src/providers/StreamsProvider.tsx:1207-1215` (the writer that produces the state),
+`frontend/src/providers/StreamsProvider.tsx:4643-4648`
 
-**Issue:** the announcement is built from `list_files_in_thread(pool, thread_id)`
-(`backend/app/db/workspace.py:187-224`), which selects **every** `workspace_files` row for the
-thread with `expires_at IS NULL OR expires_at > now()`. There is **no `kind` filter anywhere** —
-`grep -n template_input backend/app/services/agent_loop.py` returns nothing. Per migration
-`068_workspace_template_ephemeral.sql:19` the column is `kind IS NULL OR kind IN
-('template_input','agent')`, and agent-written rows carry a NULL kind and a **NULL `expires_at`**
-(so they always pass the gate).
+**Issue:** the Continue card's gate was **not** moved onto the new discriminator:
 
-Concrete failure: a Deep run where the agent calls `workspace_write` ten times produces ten rows.
-The next turn's system prompt then says, verbatim:
-
-> "The user attached these files to THIS conversation… They expire, so use them in this
-> conversation rather than assuming they persist."
-
-— about ten files the user never attached and that never expire. The transcript chip does filter
-correctly (`ChatAttachmentChip.attachmentsForMessage` requires `kind === "template_input"` and its
-docblock says *"an AGENT-written workspace file is not an attachment and must never wear this
-chip"*), so the UI and the prompt disagree about the same set. The same unfiltered list drives
-`_hydrate_thread_attachments`, so agent output is also copied into a directory named
-`/sandbox/attachments/`.
-
-**Fix:** apply the rule the chip already states, in the renderer and the hydrator:
-
-```python
-rows = [r for r in (_attachment_rows or []) if r.get("kind") == "template_input"]
+```tsx
+{message.role === "assistant" && isLastAssistant && workflowLock?.capPaused && ( … )}
 ```
 
-If agent files are deliberately included, the prompt must not call them "attached by the user" and
-must not claim they expire.
+Before this round, `workflowLocked = lock !== null && !lock.capPaused`, so the card and the
+composer agreed: card visible ⇒ composer enabled. After `ChatArea.tsx:167` became
+`lock.mode === "harness"`, the two decouple for exactly one state — `mode: "harness"` **and**
+`capPaused: true`:
 
-### WR-02: The hydration guard is per-ITERATION, not "once per sandbox session" — the DoS arm it names is still open
+- composer: **disabled**, placeholder and `title` both *"Workflow running — Cancel to switch back"*
+- transcript, on the last assistant row: *"Reached the Continue limit — this run is stopped.
+  **Start a new message to keep going.**"* (`MessageItem.tsx:796`, the `continuesRemaining <= 0`
+  arm)
 
-**File:** `backend/app/services/tool_dispatcher.py:2008-2020`
+That is the *"UI instructs an action it forbids"* inversion this phase exists to remove, moved
+one component over rather than closed. It is the mirror of WR-07, not a residue of it.
 
-**Issue:** the comment states *"ONCE PER SESSION, in the exact shape of the
-`_output_baseline_seeded` guard"* and *"re-copying on every call … on a 10 MB attachment it is the
-DoS arm of T-244-02-05"*. The flag is stored on `ctx`:
+**Reachability, stated honestly:** the state is produced by the product, not only by a fixture.
+`onCapPaused` (write site 1) now **inherits** `"harness"` and sets `capPaused: true` on whatever
+lock the thread holds, and `ThreadRunLineKickoff.test.tsx` **D5b(a)** drives exactly that through
+the real `sendMessage` + the real SSE callback bundle. The producer side is
+`agent_loop.persist_cap_paused` (`agent_loop.py:328-385`), reached from the shared loop at
+`:2579-2603` — the same loop a harness phase runs. The RECONCILE route stays latent (no writer of
+`workflow_runs.status = 'cap_paused'` was found, and `ChatArea.tsx:256` forces `capPaused: false`
+on that branch anyway); the **SSE route is not latent**.
 
-```python
-if not getattr(ctx, "_attachments_hydrated", False):
-    ctx._attachments_hydrated = True
+⚠ A second consumer carries the same shape: `useHarnessLiveForThread` returns `true` for
+`mode === "harness"`, so a harness run parked at its iteration cap still renders
+`data-run-line-state="live"` and a 1s `setInterval` clock (`ThreadRunLine.tsx:243-249`). That may
+be defensible — a cap-paused harness run is non-terminal — but it is the same question G-1 asked
+about the Deep case, and nobody asked it about this one.
+
+**Fix:** make the card's copy read the discriminator the lock now carries, so the two surfaces
+cannot disagree:
+
+```tsx
+{message.role === "assistant" && isLastAssistant && workflowLock?.capPaused && (
+  …
+  {continueExhausted || workflowLock.continuesRemaining <= 0
+    ? workflowLock.mode === "harness"
+      ? "Reached the Continue limit — this run is stopped. Cancel the workflow to start something new."
+      : "Reached the Continue limit — this run is stopped. Start a new message to keep going."
+    : "Reached the iteration limit — some tools haven't run yet."}
 ```
 
-but `ToolContext` is constructed **once per agent-loop iteration** —
-`backend/app/services/agent_loop.py:2790` says so literally: *"Phase 083 D-01: construct
-ToolContext once per iteration."* A fresh object means a fresh `getattr` default, so the guard only
-suppresses re-copies among parallel tool calls **inside one iteration**.
+and add the case to `ChatArea.capPausedComposer.test.tsx` beside D5: with the harness cap-paused
+lock, assert the composer is disabled **and** that the Deep sentence is absent — in one tree, the
+way D6 already does for the Deep case.
 
-Concrete: a thread with a 10 MB `.xlsx` attachment, a run that calls `execute_code` in eight
-separate iterations → **eight** full copies (temp file write + `copy_to_runtime`) of the same 10 MB,
-≈80 MB of container I/O per run. The stated bound is 50 files, so the worst case is 500 MB per
-iteration.
+### WR-02: Two mount-time writers of the same lock disagree about `capPaused`, and after this round that disagreement decides whether the Continue card renders during a live harness run
 
-**Fix:** key the guard on something that lives as long as the sandbox session — e.g. a marker file
-inside the container (`test -d /sandbox/attachments/.hydrated`), or a module-level
-`set[thread_id]` beside the session cache, or hang the flag on the `session` object rather than on
-`ctx`. If per-iteration is acceptable, delete the "once per session" claim rather than leaving it.
+**File:** `frontend/src/providers/StreamsProvider.tsx:2365` (`capPaused: wf.cap_paused`) vs
+`frontend/src/components/chat/ChatArea.tsx:256` (`capPaused: false`)
 
-### WR-03: The announcement is not "General mode only" — harness runs get it too, against their phase whitelist
+**Issue:** both fire on thread open, both call `getThreadWorkflow(threadId)`, both take the
+`locked && !lock_is_stale && active_workflow_run_id` branch, and both write the same store key —
+with **different** values for `capPaused`. `244-08` fixed the ChatArea site (its comment at
+`:236-249` explains why `false` is the safe value); the mirrored site in the provider's reconcile
+was left passing the server's flag through. Whichever resolves last wins, and neither is ordered
+against the other.
 
-**File:** `backend/app/services/agent_loop.py:1389` (the enclosing gate), `:1642-1670`
+While `workflowLocked` read `!capPaused` this was WR-07's bug surface. Now that `workflowLocked`
+reads `mode`, the surviving consequence is WR-01's: whether a genuine live harness run shows the
+Continue card at all depends on a promise race. The provider's own comment on this arm says the
+mode is *"said EXPLICITLY rather than left to a default"* — the `capPaused` line one row below it
+was not given the same treatment.
 
-**Issue:** the block sits inside `if body.agent_mode != "explorer":`, and the comment plus
-`244-02-SUMMARY.md`'s key-decision both describe this as *"General mode only"*. `agent_mode` has a
-third value — `"harness"` (see `_apply_origin_filter`, `agent_loop.py:960`) — and it is **not**
-excluded. A harness phase carries `ToolContext.phase_whitelist`, and a tool not in that set is
-refused at dispatch.
-
-Concrete: a workflow phase whose whitelist omits `execute_code` and `workspace_read` still receives
-*"read ANY of them … from the path below inside execute_code"*. The model then attempts a tool that
-is refused — which is the precise failure the explorer exclusion exists to avoid ("a promise the
-agent cannot keep … strictly worse than silence because the model will try").
-
-**Fix:** gate on the mode the decision names, not on the negation of one other mode:
-
-```python
-if body.agent_mode not in ("explorer", "harness"):
-```
-
-or condition the line on the effective tool set (`"execute_code" in {t names}`), which also keeps
-it honest if the whitelist changes.
-
-### WR-04: The cloud attach downloads the whole provider file into memory before the 10 MB cap is applied
-
-**File:** `backend/app/api/workspace.py:400`, cap at `:322`
-
-**Issue:** the local door pre-checks `file.size` **before** materialising the body (WR-04,
-`:288-290`), and `_persist_workspace_upload`'s docstring says the caller still owns that
-short-circuit *"because only a multipart part declares a size before it is materialised"*. That is
-not true of the cloud door: `CloudFileItem` (the row the picker already rendered) carries a size,
-and `body.file_id` could be size-checked against the listing before the fetch. Instead:
-
-```python
-filename, raw, _mime = await fetch_cloud_file(conn, body.file_id)   # :400 — unbounded
-...
-if len(raw) > MAX_FILE_SIZE:  # :322 — after the whole object is resident
-```
-
-`fetch_cloud_file` → `adapter.read_file` has no size bound of its own. Concrete: an authenticated
-user picks a 2 GB video from their own Drive; the backend buffers 2 GB in a worker process
-(`WORKER_COUNT=2`) and only then answers 422. Two such requests can exhaust the box for every
-tenant.
-
-Pre-existing on the Library import path (`import_single_file` has the same shape); **new here** in
-that the workspace door is a new route that inherits it while documenting a guard it does not have.
-
-**Fix:** resolve the provider's declared size before downloading and refuse early, mirroring
-WR-04's ordering — e.g. look the id up in the adapter's listing/metadata call and
-`raise HTTPException(422, "File too large. Maximum size is 10 MB.")` before `read_file`. A streaming
-read with a running byte counter that aborts past `MAX_FILE_SIZE` is the stronger version.
-
-### WR-05: `folder_id: str` is required but not non-empty — the documented "refusal by the model" does not cover `""` or a non-UUID
-
-**File:** `backend/app/models/connector.py:763`, consumed at
-`backend/app/services/ingest_splice.py:154`
-
-**Issue:** the docstring claims *"Because the field has no default and `_StrictBase` is
-`extra="forbid"`, FastAPI answers **422 before the handler runs**, so the refusal cannot be
-forgotten in a branch a future edit adds."* Pydantic's bare `str` accepts `""`, and the ownership
-gate downstream is truthiness-based:
-
-```python
-if folder_id:                       # ingest_splice.py:154 — "" skips the whole check
-    folder_check = supabase.table("folders")...
-```
-
-Concrete: `POST /connectors/connections/{id}/files/{fid}/import` with `{"folder_id": ""}` passes
-validation, skips the 404/403 ownership check entirely, and reaches the insert at
-`ingest_splice.py:241` with `"folder_id": ""` — which a `uuid` column rejects, producing a 500
-(further masked as a 502 by WR-06). A non-UUID string like `"root"` behaves the same way. The
-UI cannot send this (`LibraryCloudImport.handleConfirm` guards `if (!folderId) return`), so this is
-API-surface only — but the guarantee is written as structural and it is not.
-
-**Fix:** make the type carry the constraint, which is what the docstring promises:
-
-```python
-from uuid import UUID
-folder_id: UUID          # or: folder_id: str = Field(min_length=1)
-```
-
-`UUID` also gives a 422 for `"root"`, and the handler already stringifies on the way in.
-
-### WR-06: `import_connection_file` turns the folder 403/404 and the duplicate 409 into a 502 "the provider returned an error"
-
-**File:** `backend/app/api/connectors.py:1819-1838`
-
-**Issue:** the route has `except SourceConnectionDisabled` and then a bare `except Exception` that
-wraps everything in a 502 — with **no `except HTTPException: raise`** in between. Starship
-`HTTPException` is an `Exception`, so every deliberate refusal raised deeper is relabelled. Before
-this phase the route never passed `folder_id`, so `async_mint_document_row`'s ownership branch was
-unreachable; passing it (`:1824`) makes those raises live.
-
-Concrete: importing into a folder owned by someone else returns
-
-```
-502 {"detail": "Failed to download cloud file: 403: Cannot upload to a folder you do not own"}
-```
-
-and `LibraryCloudImport` renders exactly that sentence in its refusal strip — while the file was
-never downloaded and the fault is not the provider's. The `on_conflict="raise"` duplicate 409 and
-the "Folder not found" 404 are mangled the same way. The new workspace route added in this same
-phase gets this right (`workspace.py:405-406` has `except HTTPException: raise`), so the two doors
-disagree.
-
-**Fix:** add the arm the sibling route already has, immediately before the catch-all:
-
-```python
-    except SourceConnectionDisabled as exc:
-        raise _disabled_connection_response(exc) from None
-    except HTTPException:
-        raise
-    except Exception as exc:
-        ...
-```
-
-### WR-07: `workflowLocked` unlocks a genuine harness lock whenever the workflow run itself is cap-paused
-
-**File:** `frontend/src/components/chat/ChatArea.tsx:140`
-
-**Issue:**
+**Fix:** make the two writers identical. Either hoist the branch into one helper both sites call,
+or apply `244-08`'s ruling at the second site too:
 
 ```ts
-const workflowLocked = workflowLock !== null && !workflowLock.capPaused
+mode: "harness",
+// ⛔ ALWAYS false on this branch — mirrored from ChatArea.tsx:256 (T-244-03-01 / 244-08).
+capPaused: false,
 ```
 
-`capPaused` is set from two different places. The **second** branch (`:208-217`) is the synthetic
-Deep lock this phase means to release. The **first** branch (`:200-207`) is a genuine harness lock
-and it copies the server's flag straight through: `capPaused: state.cap_paused`. Server-side,
-`cap_paused = run_status == "cap_paused"` where `run_status` is `workflow_runs.status`
-(`threads.py:1236`), and `_TERMINAL_WORKFLOW_STATUSES` is `("completed","failed","cancelled")` —
-so `cap_paused` is **non-terminal**, meaning `locked=True` and `cap_paused=True` can be returned
-together. In that state the composer enables, the person types and sends, and
-`workflow_kickoff.preflight_workflow_kickoff:174` answers **409 "Thread is workflow-locked"** —
-the exact "UI instructs an action it forbids" inversion this phase exists to remove, one branch
-over.
+and fence it with a source assertion that the two class-of-branch writes agree, in the style of
+`workspaceAllowedExt.lockstep.test.ts`.
 
-The ChatArea comment asserts *"a genuine harness run still reads 'Workflow running — Cancel to
-switch back' on both axes"*; nothing in the expression enforces that.
+### WR-03: A transient per-file hydration failure is recorded as permanent for the whole session, and its note is emitted exactly once
 
-⚠ **Reachability, stated honestly:** `workflow_runs.status='cap_paused'` is schema-valid
-(`063_dual_mode_continue.sql:57`, added explicitly "on BOTH status" columns) and is treated as a
-live non-terminal state by `db/workflows.py:1320` and `api/workflows.py:1774`. **I could not find a
-current writer of that value on `workflow_runs`** (every `cap_paused` write I could locate targets
-`runs.status`), so today this is latent rather than firing. D-244-08's own wording asked for both
-conjuncts; only one was implemented.
+**File:** `backend/app/services/tool_dispatcher.py:1938-1954` (`already.add(src_path)` at `:1941`,
+before the `try` at `:1942`)
 
-**Fix:** discriminate the two lock origins rather than relying on `mode`, which the comment
-correctly notes is a single-member literal — e.g. carry the server's `locked` onto the lock and
-gate on it:
+**Issue:** the deviation's justification is *"a permanently-broken file costs one attempt per
+SESSION and not one per `execute_code` call; its failure is already named individually below, so
+nothing is lost."* The first clause is true. **The second is only true of the call in which the
+failure happened.** On every later call the path is filtered out at `:1899`
+(`rows = [r for r in rows if … not in already]`), so no note is produced and the model receives
+no signal at all.
+
+The `except` at `:1946` catches **every** exception, not only permanent ones. The realistic
+failure set on this path is dominated by transient causes: `_get_file_content` reaching Supabase
+Storage, `get_file_by_path` on the pg pool, and `copy_to_runtime` against a Docker daemon. A
+single Storage blip on the person's `.xlsx` therefore:
+
+1. names the failure once, in the tool result of whichever `execute_code` call happened to race
+   the blip;
+2. marks the file copied for the remaining ~30 minutes of the cached session;
+3. leaves `/sandbox/attachments/` permanently short that file, with no further note — the exact
+   silence UAT L-5 defect 6b cost ten wasted agent rounds to discover.
+
+The suite pins the failure note (`test_a_hydration_failure_is_named_and_does_not_abort_the_run`)
+but **no case drives a second `execute_code` after a failure**, which is the only place the
+deviation's claim can be checked. The strongest new claim in the plan is the one with no fence.
+
+**Fix:** separate *claimed* from *succeeded*, and keep the DoS bound by capping retries rather
+than by never retrying:
+
+```python
+for row in rows:
+    src_path = row.get("path") or ""
+    dest = _attachment_container_path(src_path)
+    try:
+        …
+        await run_in_threadpool(_copy_in, content, dest)
+        already.add(src_path)                     # ← on SUCCESS
+    except Exception as e:
+        failed[src_path] = failed.get(src_path, 0) + 1
+        if failed[src_path] >= _ATTACHMENT_HYDRATION_MAX_RETRIES:   # e.g. 2
+            already.add(src_path)                 # give up, once, deliberately
+        logger.warning(…)
+        notes.append(…)                           # named on EVERY attempt, not once
+```
+
+and add case F: *"a file that fails once is retried on the next call and NAMED again; a file that
+fails twice is given up on and named a final time."*
+
+⚠ Related, and worth naming so it is not rediscovered: `already` counts **failed** paths against
+the 50-file session budget at `:1910`, so a run whose Storage is flaky can exhaust the copy budget
+without a single file arriving. The truncation note it then emits (*"Only the first 50 of N …"*)
+is false in that state.
+
+### WR-04: The `AbortError` arm in `reconcile` is unreachable, its stated justification is factually wrong, and it is narrower than the shipped guard it claims to mirror
+
+**File:** `frontend/src/providers/StreamsProvider.tsx:1967`
+
+**Issue:** three separate problems in one line.
+
+1. **Unreachable.** `getSnapshot(threadId, signal?)` (`lib/api/threads.ts:1063-1071`) takes an
+   *optional* signal — and the call at `:1950` passes **none**. Nothing can abort this fetch, so
+   the branch cannot fire.
+2. **The justification is false.** The comment reads: *"`reconcile` is fired from
+   `setViewingThread` on EVERY thread switch; without this arm each switch that cancels an
+   in-flight snapshot would raise a banner on the thread the person actually wanted."* No switch
+   cancels this snapshot; the in-flight protection here is `reconcileInFlightRef` (`:1942`), which
+   **drops** the second reconcile rather than aborting the first. A comment that names a mechanism
+   the code does not have is the class of defect this phase has already paid for twice.
+3. **Narrower than the writer it copied.** The shipped `loadMessages` guard tests *both*
+   `err instanceof Error && err.name === "AbortError"` **and** a duck-typed `{ name }`
+   (`:3241-3242`), and `usePanelReconcile.ts:86-95` does the same — precisely because the shape
+   differs between jsdom, undici and the browser. This arm tests `instanceof DOMException` only.
+   If a signal is ever threaded through (the parameter is already there, inviting it), a non-
+   `DOMException` abort will paint the banner CR-01 makes permanent.
+
+`streamsProvider_244_snapshot_failure.test.tsx` **Test 3** is a control over a branch the product
+cannot reach, and it passes because the fixture constructs a `DOMException` by hand — the same
+"the test constructs the shape it then asserts" pattern the file's own header warns about, one
+case below the warning.
+
+**Fix:** either thread the signal through and make the guard real, or delete the branch and the
+paragraph together. If it is kept, widen it to the shipped shape:
 
 ```ts
-const workflowLocked = workflowLock !== null && (workflowLock.harnessLocked || !workflowLock.capPaused)
+if (err instanceof Error && err.name === "AbortError") return
+if (err && typeof err === "object" && "name" in err &&
+    (err as { name: string }).name === "AbortError") return
 ```
 
-setting `harnessLocked: true` in the `state.locked && …` branch and `false` in the `cap_paused`-only
-branch (both in `ChatArea.tsx` and the mirrored reconcile in `StreamsProvider.tsx:2306/2325`).
+### WR-05: `NavPanel.tsx`'s comment claims neither class token is spelled verbatim — one of them is, and it is the one whose count the SUMMARY does not report
 
-### WR-08: The transcript says "Read <file>" for a turn in which the agent was never told the file exists
+**File:** `frontend/src/components/layout/NavPanel.tsx:215` (the literal) vs `:227-229` (the claim)
+**Also:** `.planning/phases/244-the-chat-shell-and-the-composer/244-09-SUMMARY.md:104-105`
+(the acceptance table), `:257-271` (deviation 1)
 
-**File:** `frontend/src/components/chat/MessageItem.tsx:455-465`
-(`COPY.shared.agentReadLine`, `composerCopy.ts:112`)
+**Issue:** the trailing note says:
 
-**Issue:** the assistant row renders `Read <name>` for every attachment in the preceding user turn's
-window. Its docblock justifies this as *"`244-02` hydrates every non-expired thread attachment …
-so 'the agent could read it' is TRUE for all of them"*. That justification does not hold in
-Explorer mode: the announcement is gated out (`agent_loop.py:1389`) **and** the explorer tool set
-carries neither `execute_code` nor any workspace tool, so no hydration happens either. The agent
-cannot have read the file, and the row still says it did — in the past tense.
+> *"The two class tokens are deliberately NOT spelled out verbatim in this comment: `244-09`'s
+> acceptance counts their occurrences in this file with `grep -c`, and a comment mention would
+> inflate that count and blind the check to a real second application."*
 
-Concrete: attach `contract.pdf`, switch the composer to Explorer, send "summarise this". The reply
-cannot mention the file, and the line above it reads `Read contract.pdf`.
+But `:215` reads ``⭐ `min-h-0` BESIDE IT IS DEFENSIVE, not the fix``. Measured:
 
-**Fix:** either render the pointer only when the turn's mode could reach the file, or change the
-wording to a capability statement rather than an event (`Available to the agent: contract.pdf`).
-The strings are ported from `COPY.js`, so a copy change is an operator call — the mode gate is not.
+```
+grep -c "overflow-y-auto" NavPanel.tsx  →  1   ✅ as claimed
+grep -c "min-h-0"         NavPanel.tsx  →  2   ⛔ inflated by the comment
+```
+
+The SUMMARY's acceptance table publishes `overflow-y-auto` (1) and `mt-auto` (1) and **omits
+`min-h-0`** — i.e. the one token whose count the edit broke is the one not reported, so the table
+reads clean. Deviation 1 was raised for exactly this conflict and the fix was applied to one of
+the two tokens.
+
+The consequence is small (a second real application of `min-h-0` in this file would read 3, not
+2) but it is the 187-24 vacuity class reproduced *inside the comment that cites 187-24*, and the
+next reader running the documented grep gets a number the documentation does not explain.
+
+**Fix:** name the defensive token by CSS declaration the way the load-bearing one already is —
+e.g. *"the automatic-minimum-size override beside it is defensive"* — and add the third row to
+the SUMMARY's acceptance table so the count is published rather than inferred.
 
 ---
 
 ## Info
 
-### IN-01: Dead comparison in the chip's expiry word, and a flat `24h` shown for a file with a minute left
+### IN-01: `overflow-y-auto` on the rail root also turns `overflow-x` into `auto`
 
-**File:** `frontend/src/components/chat/ChatAttachmentChip.tsx:196`
+**File:** `frontend/src/components/layout/NavPanel.tsx:231`
 
-`caption === COPY.engine.TTL_HOURS + "h"` compares against `"24h"`, a string `expiryCaption`
-(`FilesSection.tsx:132-146`) can never return — its three shapes are `"expiry unknown"`,
-`"expired"`, and `"expires in Nh"` / `"expires in Nm"`. The clause is unreachable; only the
-`startsWith("expires in")` arm ever fires. A consequence worth naming: because the whole
-`expires in …` range maps to the literal `24h`, a chip for a file with 1 minute left reads `24h`.
-The docblock calls this "the PROMISE, not a clock" and the sketch draws it flat, so it is a
-decision — but the dead clause should go.
+Per CSS overflow, when one axis is not `visible` the other computes to `auto`. The rail is a
+width-animating column (`motion-safe:transition-[width]`, `w-[58px]` ⇄ `w-[210px]`) whose children
+switch to their expanded layout on the same tick the width starts animating — so during the
+~300 ms expand the content is laid out for 210 px inside a box that is still 58 px wide, and the
+rail can flash a horizontal scrollbar or become horizontally scrollable. (Tooltips and the
+`AttentionPopover` are safe: Radix Popper positions them `fixed`, and nothing in the rail's
+ancestor chain establishes a containing block for fixed descendants.)
 
-**Fix:** `const expiryWord = caption.startsWith("expires in") ? COPY.a.chipTtl : caption`.
+**Fix:** `overflow-y-auto overflow-x-hidden` → computed `overflow: hidden auto`, which is
+well-defined and cannot clip the collapsed badge (measured: the `-right-1` badge ends 5 px inside
+the 58 px box).
 
-### IN-02: `truncate` on an `inline-flex` clips the folder chip without an ellipsis
+### IN-02: The repaired `?raw` fence still cannot tell code from a comment — it only moved which file is at risk
 
-**File:** `frontend/src/components/layout/ChatHistoryColumn.tsx:210`
+**File:** `frontend/src/components/chat/__tests__/MessageItem.inlineApproval.test.tsx:597-603`
 
-`className="inline-flex max-w-[96px] … truncate …"` — `text-overflow: ellipsis` applies to a block
-container's own inline content; on a flex container the text node becomes an anonymous flex item
-and is clipped hard instead. The width cap works (which is the reported defect's fix), but a long
-folder name ends mid-character with no `…`.
+`244-12` caught its own fence passing for the wrong reason (a prose mention of `<PendingAskStack`
+in `MessageItem.tsx` held the count at 1 after the mount left) and repaired it by asserting **0**
+in `MessageItem.tsx` and **1** in `MessageList.tsx`. The zero-assertion is now immune. The
+one-assertion is not: a future comment in `MessageList.tsx` that carries the opening bracket keeps
+the count at 1 with the mount deleted, which is the identical failure one file over.
+`ChatLayout.scrollFrame.test.tsx` already ships the remedy (`stripComments` before counting).
 
-**Fix:** wrap the label in its own `<span className="truncate">` inside the flex row, leaving
-`max-w-[96px] overflow-hidden` on the container.
+**Fix:** apply the same `stripComments` normaliser before `matchAll` on both sides.
 
-### IN-03: Two new files disagree about how many routes `workspace.py` ships — both written this phase
+### IN-03: The G-2 re-order shipped INSIDE the closure round while the UAT record says it was taken outside it, and no row covers it
 
-**File:** `frontend/src/components/chat/ChatAttachmentChip.tsx:87-90` ("SIX routes … one `POST
-/files` and five GETs") vs `frontend/src/components/chat/useComposerAttachments.ts:113` ("SEVEN
-routes … two POSTs, five GETs")
+**File:** `.planning/phases/244-the-chat-shell-and-the-composer/244-UAT.md:759-762`
+**Commit:** `5953ef1de feat(244-12): G-2 — the thinking badge below the tools, as an OPERATOR OVERRIDE`
 
-The second is correct at HEAD (`workspace.py` has POST `/files`, POST `/files/from-connection`, and
-five GETs). The first was accurate when `244-05` wrote it and went stale inside the same phase when
-`244-06` added the route. Both are load-bearing prose for the detach-is-not-delete rule.
+The round-2 table states *"`G-2` HAS NO ROW IN THIS TABLE AND THAT IS DELIBERATE … it was taken
+outside the closure round."* The **decision** was taken outside; the **change** was not — it is a
+`244-12` commit that re-orders `MessageItem.tsx:527-533` and re-drives two fences. The result is
+that the round's only user-visible visual change is the one item with no UAT row, in a round whose
+whole premise is *built, drive owed*.
 
-**Fix:** correct the `ChatAttachmentChip` docblock to seven, or drop the count from both and point
-at the one file.
+It is **not** a G-7 violation (a re-order is not a new capability), and the source fences were
+driven RED against the old order in both files. But *"no row"* and *"outside the round"* are
+different claims and only the first is true.
 
-### IN-04: The 502 body echoes the raw exception string to the client
+**Fix:** correct the sentence to *"the decision was taken outside the round; the edit shipped in
+`244-12` and owes a visual row"*, and add a one-line R2-6 row so the operator's own override is
+confirmed on screen.
 
-**File:** `backend/app/api/workspace.py:417` (mirrors `connectors.py:1836`)
+### IN-04: `ChatArea.capPausedComposer.test.tsx` D5 seeds after awaiting the reconcile, and a late settle can overwrite the seed
 
-`detail=f"Failed to download cloud file: {exc}"` forwards whatever the adapter raised — which can
-carry provider URLs, request ids, or fragments of an upstream error body — to an end user, and the
-composer renders it verbatim in the refusal strip. The log line above it already records the full
-exception.
+**File:** `frontend/src/components/chat/__tests__/ChatArea.capPausedComposer.test.tsx:365-380`
 
-**Fix:** return a fixed sentence to the client and keep `exc` in the log. Pre-existing pattern
-copied from `connectors.py`; newly introduced at this route.
+The case waits for the lock to land, then calls `seedHarnessCapPausedLock()` to flip `capPaused`
+to `true`. `ChatArea`'s workflow effect re-runs on `[thread?.id, streamActions]` and its `.then`
+writes `capPaused: false` — so a second settle after the seed silently restores the state the case
+is NOT about, and the following `waitFor` would then pass on its first tick only by luck of
+ordering. The docblock explains why the seed exists (the branch cannot produce this state); it does
+not guard against the branch racing it.
 
-### IN-05: The hydration failure note is unbounded, unlike the path it describes
+**Fix:** assert the post-seed value once with `expect(...)` rather than `waitFor(...)` so a
+regression cannot be papered over by a retry, or make `getThreadWorkflow` resolve exactly once
+(`mockResolvedValueOnce` + a rejecting default).
 
-**File:** `backend/app/services/tool_dispatcher.py:1886`
+### IN-05: The truncation note is re-emitted on every subsequent `execute_code` call once the budget is exhausted
 
-`os.path.basename(src_path)` is used raw in a note that goes into `_llm_payload["attachments"]`,
-while the container path immediately above is capped at `_ATTACHMENT_NAME_MAX = 120`. Upload-time
-sanitisation (`workspace.py:333-335`) bounds the charset but never the length, so a 4,000-character
-filename that fails to copy produces a 4,000-character line in the model's tool result — the
-prompt-flood the cap was added to stop, on the failure path.
+**File:** `backend/app/services/tool_dispatcher.py:1908-1918`
 
-**Fix:** reuse the bounded name — `_attachment_container_path(src_path).rsplit("/", 1)[-1]`.
-
-### IN-06: A Library tab can carry an attention badge while the shell badge is suppressed
-
-**File:** `frontend/src/components/layout/ChatLayout.tsx:544` vs `:852`
-
-`showAttention` requires `Boolean(onOpenLibraryHealth)`, but `attentionConditions` is passed to
-`LibraryPage` unconditionally. In a mount where `onOpenLibraryHealth` is absent, the rail shows
-nothing and the Library tab strip still shows a count — the "WHERE" without the "THAT".
-
-**Fix:** pass `attentionConditions={showAttention ? attentionConditions : []}` so both renderers
-hang off one predicate.
-
-### IN-07: The lockstep fence sweeps only `TemplateUpload.tsx` for a re-introduced `accept=` literal
-
-**File:** `frontend/src/lib/__tests__/workspaceAllowedExt.lockstep.test.ts:78-85`
-
-The final case asserts `expect(code).not.toMatch(/accept="\.[a-z]/)` against `TemplateUpload.tsx`
-only. The composer's new input (`MessageInput.tsx:795`) is the second consumer and correctly reads
-`WORKSPACE_ACCEPT_ATTR` today, but a hand-typed list re-introduced there would be invisible to the
-fence — the exact rot the suite exists to catch.
-
-**Fix:** add `MessageInput.tsx?raw` to the same sweep, or glob the two consumers.
-
-### IN-08: `usePrecedingUserTurns` silently falls back to the last two user turns when the message id is absent
-
-**File:** `frontend/src/providers/StreamsProvider.tsx:4046-4058`
-
-The loop `break`s on `m.id === messageId`; if the id is not in the bucket (an optimistic id replaced
-by the server's, a row from another surface), it runs to completion and returns the thread's last
-two user timestamps. The consumer then computes an attachment window for the wrong turn, and chips
-can appear on a row they do not belong to.
-
-**Fix:** track whether the id was found and return `"|"` when it was not.
-
-### IN-09: Client-stamped message time vs Postgres-stamped file time can drop the chip from the message just sent
-
-**File:** `frontend/src/components/chat/ChatAttachmentChip.tsx:170-183`
-
-The association window is `P.created_at < file.created_at <= M.created_at`. `file.created_at` comes
-from Postgres; the optimistic user message's `created_at` is client-stamped. The docblock makes the
-upper bound inclusive for the same-millisecond case, which does not cover a client clock a second
-or two behind the server: `file.created_at > M.created_at` puts the file outside the window and the
-chip vanishes from the message it belongs to until the server echo replaces the optimistic row.
-
-**Fix:** allow a small tolerance on the upper bound for optimistic rows, or prefer the server-echoed
-`created_at` for the association once it lands.
+Once `len(already) >= _ATTACHMENT_HYDRATION_MAX_FILES`, every later call re-lists, re-computes
+`len(already) + len(rows) > MAX`, appends *"Only the first 50 of N workspace files were copied…"*
+and returns. The note is correct and NAMED (which is the discipline), but a run calling
+`execute_code` eight times pushes the same sentence into eight tool results. Harmless today at a
+50-file cap; worth a `if not already_noted_this_session` marker if the note ever grows.
 
 ---
 
-## Notes on the already-recorded items
+## Which of the five gap fixes I verified, and which I could not
 
-Checked against `deferred-items.md` and found **no worse than recorded**:
-`MessageInput.tsx` measures **821** lines (the claimed `855 → 821`),
-`useComposerAttachments.ts` is a real extraction of state + three verbs,
-`backend/app/api/connectors.py` measures **2102** (the claimed `2091 → 2102`, eleven lines), and
-the `ComposerChipsRow` half is genuinely still inline JSX as the note says.
+| plan | gap | verified statically? | what I could NOT verify |
+|---|---|---|---|
+| **244-09** | G-5 (rail overflows below ~540 px) | ✅ **Yes, as far as source goes.** The rail root now carries `min-h-0 overflow-y-auto`; it is the one element the UAT measured to escape; the `mt-auto` footer is untouched, and `margin-top: auto` correctly resolves to 0 once the content overflows, so the fix cannot make the footer unreachable. No `min-height` was added to any ancestor (the named anti-fix). | **The pixels.** jsdom performs no layout; link 6 is a presence assertion and says so. `244-09-UAT-ROW.md` is unfilled. IN-01 is the one behaviour change I can name without a browser. |
+| **244-10** | L-5 defect 6b (2nd attachment never hydrates) | ✅ **Cause addressed.** `WeakSet[session]` → `WeakKeyDictionary[session, set[path]]`, consulted per call, filter applied to the gated listing's output (no second expiry rule), cap is a session total, traversal fence byte-unchanged, in-place mutation safe for the single caller. | **That a byte lands in a real container** — every case drives a `MagicMock`. And **WR-03**: a failed copy DOES poison the record, which is the one thing the deviation asserts it does not cost. |
+| **244-11** | G-3 (a snapshot 503 reaches nothing) | ⚠ **Partially.** The write lands in the right slice with the right key; the copy is content-asserted rather than testid-asserted; the empty/non-empty sentences are both fenced and the shipped one is byte-unchanged. | **The pair is incomplete — CR-01.** The clear-on-success and the silent retry were not carried across, and the abort guard (**WR-04**) is unreachable with a false justification. Nothing here rules on G-4. |
+| **244-12** | G-6 (workflow approval unreachable in chat) | ✅ **Yes, to the limit of source.** The mount is list-level, unconditional, zero-prop, returns `null` with no pause; the per-row mount is gone; the panel's mount is a separate column gated on `pendingAsks.length > 0`; cost is constant in row count and in pause existence; W1 seeds through the product's own fetcher and carries no ask-bearing message. | **That the harness carrier actually populates `pendingAsksByThread`.** No source path proves it; the strongest evidence is UAT L-4, which observed the panel rendering all three controls off that same slice. R2-4 is the row that settles it. Also unverified: the `sticky top-0` card's placement at the bottom of a long transcript. |
+| **244-13** | G-1 + WR-07 (lock says what it IS) | ✅ **The widening itself is correct.** All six write sites read the server's `ThreadWorkflowState.mode` or are harness by construction; site 1's inheritance is the only inference and it is reasoned and driven (D5b). `useHarnessLiveForThread` and `MessageItem:862` are mode-gated; `StreamsProvider:4368` correctly still reads the **wire** type; `PendingAskStack`'s `runIsOver` still reads presence but is harmless (a Deep thread has no phases). No path treats a `cap_paused` lock as harness. | **WR-01** — the reverse direction is open at `MessageItem.tsx:792`, and **WR-02** — the two mount-time writers still disagree on `capPaused`. And the browser: `244-13-UAT-ROW.md` is unfilled. |
+
+## Security
+
+No new issues. `tool_dispatcher.py` is the only backend file in the diff.
+
+- `_attachment_container_path` is **absent from the diff** — the traversal fence (`\`→`/`
+  normalise → `basename` → charset narrow → `lstrip(".")` → 120-char cap → non-empty fallback) is
+  byte-unchanged, as the SUMMARY claims.
+- The per-file record keys on `row["path"]` (the workspace path), never on the derived container
+  destination, so it cannot be used to smuggle a path past the sanitiser or to make one row's
+  record satisfy another row's copy.
+- The slice bound is `max(MAX - len(already), 0)`, so the cap cannot become a negative index.
+- The `WeakKeyDictionary` is keyed by the sandbox session, which is keyed by `thread_id`, so a
+  record cannot cross a thread or a tenant. A worker bounce produces a new session object and a
+  fresh (empty) record — over-copying, never under-.
+- ⚠ Not a vulnerability but worth recording once: in the multi-worker default (`WORKER_COUNT=2`)
+  each worker builds its own session object **re-attached to the same container**, so the record
+  is per-process and the same file can be copied once per worker. Pre-existing (the `WeakSet` had
+  the identical property) and bounded by worker count.
 
 ---
 
 _Reviewed: 2026-09-12_
 _Reviewer: Claude (gsd-code-reviewer) — solo run, no independent second reviewer (OV-SOLO-01)_
-_Depth: standard_
+_Depth: standard · diff `8cd9d8119..b11e99c8e`_
