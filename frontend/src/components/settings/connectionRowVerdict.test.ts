@@ -428,3 +428,97 @@ describe("connectionStateOf — D-221-12 in the shipped resolver", () => {
     expect(capable(row)).toBe("ready")
   })
 })
+
+// ══════════════════════════════════════════════════════════════════════════════════════
+// BUG-260912-01 — A FAILING CREDENTIAL MUST OUTRANK A CAPABILITY THAT EXISTS
+//
+// ⭐ MEASURED 2026-09-12 against the live local database. The `Google Workspace` row read:
+//
+//     status              active
+//     last_check_verdict  failed          ← the check ALREADY knew, the previous evening
+//     error_message       null
+//     is_enabled          true
+//
+// …and `connectionStateOf` returned `source_only` — `✓ Ready as source`. Every Drive call
+// on that connection was dying at token refresh with `invalid_client`.
+//
+// ⛔ THE CAUSE IS ORDERING, NOT A MISSING READ. The `failed` arm exists and sits at
+// `connectionsCopy.ts`, but the `auth_type === "oauth_byo" && status === "active"` arm
+// returns ABOVE it — so for the one shape OAuth failures actually happen to, the `failed`
+// verdict was unreachable. The file's own comment further down already states the intended
+// precedence: *"⚠ BELOW `failed`, on purpose: a credential that failed says something more
+// specific than a capability that exists."* The code did not honour its own sentence.
+//
+// ⚠ AND THE COMMENT ON `connectionRowVerdict`'s zero-action arm claims `source-only`
+// asserts "the credential is not revoked OR ERRORED". It never consulted the one column
+// that records an error. This suite is that claim, driven.
+// ══════════════════════════════════════════════════════════════════════════════════════
+
+describe("BUG-260912-01 — `failed` outranks every capability reading", () => {
+  const capable = (c: ConnectorConnection, families: string[] | null = FAMILIES) =>
+    connectionStateOf(c, undefined, isSourceCapable(c, families))
+
+  /** The row as it actually stood in the database on 2026-09-12. */
+  const THE_LIVE_ROW = connection({
+    service_id: "google",
+    name: "Google Workspace",
+    auth_type: "oauth_byo",
+    status: "active",
+    discovered_tools: [],
+    last_check_verdict: "failed",
+  })
+
+  it("⭐ THE BUG: the live Google row said `✓ Ready as source` while its check said failed", () => {
+    expect(capable(THE_LIVE_ROW)).toBe("failed")
+    expect(capable(THE_LIVE_ROW)).not.toBe("source_only")
+    expect(CONNECTION_STATE_WORDS[capable(THE_LIVE_ROW)]).not.toBe(CONNECTION_STATE_SOURCE_ONLY)
+  })
+
+  it("the same precedence holds for an oauth row that HAS actions", () => {
+    // `ready` is the arm a discovered connection reaches. A failing credential outranks it
+    // too — actions that exist are no evidence that the token still mints.
+    expect(
+      capable(
+        connection({
+          service_id: "google",
+          auth_type: "oauth_byo",
+          status: "active",
+          discovered_tools: ["a", "b"] as unknown as ConnectorConnection["discovered_tools"],
+          last_check_verdict: "failed",
+        }),
+      ),
+    ).toBe("failed")
+  })
+
+  it("⛔ CONTAINMENT — `disabled` and `revoked` still outrank `failed`", () => {
+    // They are read BEFORE it and must stay there: a switched-off connection is not a
+    // failing one, and saying so would send a person to fix a credential nobody broke.
+    expect(capable(connection({ ...THE_LIVE_ROW, is_enabled: false }))).toBe("disabled")
+    expect(capable(connection({ ...THE_LIVE_ROW, status: "revoked" }))).toBe("revoked")
+  })
+
+  it("⛔ CONTAINMENT — a row whose check said `ok` is completely unaffected", () => {
+    // The Phase 239 pin, restated here on purpose: this change must move exactly one
+    // verdict. `ok` and `not_checked` keep every word they had.
+    expect(
+      capable(connection({ ...THE_LIVE_ROW, last_check_verdict: "ok" })),
+    ).toBe("source_only")
+    expect(
+      capable(connection({ ...THE_LIVE_ROW, last_check_verdict: "not_checked" })),
+    ).toBe("source_only")
+    expect(capable(connection({ ...THE_LIVE_ROW, last_check_verdict: null }))).toBe("source_only")
+  })
+
+  it("⛔ CONTAINMENT — a non-oauth row that already reached `failed` still does", () => {
+    expect(
+      capable(
+        connection({
+          service_id: "slack",
+          auth_type: "static_key",
+          status: "active",
+          last_check_verdict: "failed",
+        }),
+      ),
+    ).toBe("failed")
+  })
+})
