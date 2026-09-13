@@ -39,18 +39,30 @@ Specifically:
   - Record p95 query latency deltas before and after alongside recall for visibility, avoiding a brittle hard timeout wall.
 
 ### 3. Server GUC Shortcut Fix (`RECALL-02` / `SEED-268`)
-- **D-246-05: Probe server setting on pool init + skip only if matching true server setting.**
-  - Replace hardcoded `_SERVER_DEFAULT_EF_SEARCH = 40` in `backend/app/services/retrieval_tuning.py`.
-  - Probe `SELECT current_setting('hnsw.ef_search', true)` on connection/pool probe and cache the server's actual setting.
-  - In `apply_hnsw_session_knobs`, skip `SET LOCAL` only if `resolved_ef == probed_server_default`.
-  - When an explicit value or configured default differs from what Postgres actually holds, `SET LOCAL hnsw.ef_search = $1` is always executed.
-  - Drive RED with a unit test simulating a server whose native default is non-40 (e.g. 64).
+- **D-246-05: Server setting probe with transaction isolation, null-safe fallback, and TTL caching.**
+  - Replace the compiled-in `_SERVER_DEFAULT_EF_SEARCH = 40` shortcut in `backend/app/services/retrieval_tuning.py` (Finding 2).
+  - **Fresh Connection / Isolation (2a):** `SELECT current_setting('hnsw.ef_search', true)` is executed on a clean connection outside of any active transaction. Tested with a driven unit test proving a prior `SET LOCAL` on a borrower cannot poison the cached server default.
+  - **NULL / Missing GUC Fallback (2b):** If the query returns `NULL` (e.g. pgvector not loaded or GUC unknown), the server default resolves to `None`. In this state, `apply_hnsw_session_knobs` issues nothing and lets the server execute untuned.
+  - **TTL-bounded Caching (2c):** Cache the probed setting with a 60-second TTL rather than process-lifetime permanence, ensuring that an operator's `ALTER SYSTEM` or `ALTER DATABASE` takes effect without requiring a server reboot, permanently closing the staleness loophole.
+  - **Replacement Scope (Finding 4):** The probed server default specifically replaces the `:155` no-op shortcut. Lines `:131` (unparseable input) and `:154` (out-of-range input) retain their strict fail-safe behavior: issue NOTHING and run untuned at the server's own setting.
+  - **Hot-Path Statement Acknowledged (Finding 3):** Raising default to 200 inverts the shortcut guard (`200 != 40`), meaning `SET LOCAL` will execute on every vector search. This minor in-transaction overhead (<1ms) is explicitly accepted as the mechanism that delivers the 0.040 $\rightarrow$ 1.000 recall restoration.
 
 ### 4. Settings UI & Retrieval Card Copy
-- **D-246-06: Update `SettingsPage.tsx` search breadth fallback and state to 200.**
-  - Update initial state `useState(200)` and fallback `data.hnsw_ef_search ?? 200`.
+- **D-246-06: Pre-fetch loading state without compiled-in guesses (Finding 1).**
+  - In `frontend/src/pages/SettingsPage.tsx`, initialize `hnswEfSearch` as `useState<number | null>(null)`.
+  - While pre-fetch (`hnswEfSearch === null`), render a neutral loading placeholder/skeleton rather than guessing 40 or 200 on first paint.
+  - Delete the dead `?? 40` fallback entirely in `setHnswEfSearch(data.hnsw_ef_search)` since the backend GET `/settings` schema returns a non-optional integer.
+  - This eliminates compiled-in frontend defaults and guarantees the screen only asserts breadth values received from the server.
 - **D-246-07: Update help text to state 'Default is 200'.**
   - Update the copy in `frontend/src/pages/SettingsPage.tsx` from `"200 is a good starting point"` to `"Default is 200 — on our 100,000-passage test library it returned every result that should have been found, for small and large teams alike. Higher is not better: 1000 measured worse than 400."`
+
+### 5. Governance & Verification Directives
+- **D-246-08: Waive G-2 sketch in writing (Finding 5).**
+  - G-2 is waived because the UI change is limited to a 5-word lead-phrase update on an existing card and rendering null during initial load; no new layout or component surface is created.
+- **D-246-09: SC#2 verification scoped to local database under test (Finding 6).**
+  - SC#2 asserts locally that modifying Search breadth in the Settings tab persists to `app_settings` and returns 200. Production promotion remains deferred per `D-242-08`.
+- **D-246-10: Hot File Ledger sync for `retrieval_tuning.py`.**
+  - Update the row and section in `docs/HOT-FILE-LEDGER.md` to reflect Phase 246's second phase landing (re-derived at HEAD: 1 phase / 3 commits / 274 lines; advancing to 2 phases).
 
 ### Claude's Discretion
 None — all key implementation choices (fencing strategy, migration avoidance, server probe caching, and copy calibration) were confirmed.

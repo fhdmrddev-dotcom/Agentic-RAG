@@ -56,6 +56,12 @@
 
 **User's choice:** Probe server setting on pool init
 **Notes:** Eliminates the hardcoded `_SERVER_DEFAULT_EF_SEARCH = 40` constant. When a server holds 64 and a user sets 40, `SET LOCAL` is properly issued.
+**Review Round 1 Resolutions (Finding 2):**
+- (2a) Connection isolation: Probe runs on a fresh connection outside any request transaction. Tested with a driven unit test proving a previous borrower's `SET LOCAL` cannot poison the cached server default.
+- (2b) Fallback: If `current_setting` returns NULL (pgvector uninstalled/unknown GUC), server default resolves to `None` and issues nothing.
+- (2c) Cache invalidation: Cache has a 60-second TTL rather than lifetime immutability, ensuring `ALTER SYSTEM/DATABASE` takes effect without restarts.
+- (Finding 4): Probed server default replaces the `:155` no-op shortcut; `:131` and `:154` invalid fallbacks retain safe no-tuning behavior.
+- (Finding 3): Hot-path statement execution of `SET LOCAL` for 200 is explicitly accepted as the mechanism for recall restoration.
 
 ---
 
@@ -63,12 +69,17 @@
 
 | Option | Description | Selected |
 |--------|-------------|----------|
-| Update copy to 'Default is 200' | Align copy and fallback (`?? 200`) to reflect that 200 is now the active out-of-the-box default while preserving the 1000-worse-than-400 warning | ✓ |
+| Update copy to 'Default is 200' | Align copy and fallback to reflect that 200 is now the active out-of-the-box default while preserving the 1000-worse-than-400 warning | ✓ |
 | Keep '200 is a good starting point' copy | Only update the frontend state/fallback from 40 to 200 without changing descriptive text | |
 | You decide | Whichever phrasing feels most natural in the Settings page | |
 
 **User's choice:** Update copy to 'Default is 200'
 **Notes:** Ensures visual honesty on `SettingsPage.tsx` matching server reality.
+**Review Round 1 Resolutions (Finding 1):**
+- Pre-fetch loading state: `hnswEfSearch` initialized to `useState<number | null>(null)`. Screen renders a neutral skeleton/placeholder before data resolves, eliminating pre-fetch guesses.
+- Dead code removal: Unreachable `??` fallback in `setHnswEfSearch(data.hnsw_ef_search)` removed, preventing frontend default drift.
+- (Finding 5): G-2 sketch formally waived in writing.
+- (Finding 6): SC#2 verification scoped locally against the test database; production deploy verification remains deferred per `D-242-08`.
 
 ---
 
