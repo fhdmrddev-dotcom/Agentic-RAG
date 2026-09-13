@@ -162,6 +162,12 @@ register knows only the register below it; the code is the bottom.
       first: it unblocks the other 8.** SharePoint rows S-1 / S-2 sit separately on `SEED-256`
       (no work/school tenant) and may be retired on that ground alone.
       &nbsp;
+      ⚠ **CORRECTED 2026-09-13 (Phase 245) — the two lines above are preserved, not deleted.**
+      *"Blocked on one Azure app registration — run M-1 first: it unblocks the other 8"* is **FALSE,
+      and was false when this requirement was written.** All nine of 238's M rows were **DRIVEN LIVE on 2026-09-07** (`238-VERIFICATION.md:213-231` — 7 full pass, 2 half at the time; **four defects found by driving and NONE by the 15-case unit suite**). The operator completed the Azure registration *hours after* `238-SUMMARY.md` was written.
+      **The blocker was discharged six days before six live registers stopped saying so** — and
+      `238-VERIFICATION.md:139`, the bottom register, carried the correction the whole time.
+      &nbsp;
       ⛔ **S-1 / S-2 RETIRED IN WRITING 2026-09-13 (Phase 245, D-07) — `SEED-256`.** Ground: **no
       M365 work/school tenant**, confirmed LIVE rather than assumed — `check()` returned
       **`drive_type: personal`**, so there is no `/sites/` to address. **An account boundary, not
@@ -222,6 +228,7 @@ Filled by the roadmapper 2026-09-11. **Every REQ-ID above maps to exactly one ph
 | SHELL-04 | 244 — Chat shell + composer | Pending — ⚠ G-2 sketch owed (net-new surface) |
 | SHELL-05 | 244 — Chat shell + composer | Pending — ⚠ G-2 sketch owed (net-new surface) |
 | DEBT-01 | 245 — The verification debt | Pending — ⚠ blocked on one Azure app registration; **M-1 first** |
+| DEBT-01 | 245 — The verification debt | ⚠ **CORRECTED 2026-09-13 (Phase 245) — the row above is preserved, not deleted.** ✅ **Complete** (`245-03`). *"blocked on one Azure app registration; M-1 first"* was **FALSE**: All nine of 238's M rows were **DRIVEN LIVE on 2026-09-07** (`238-VERIFICATION.md:213-231` — 7 full pass, 2 half at the time; **four defects found by driving and NONE by the 15-case unit suite**). The operator completed the Azure registration *hours after* `238-SUMMARY.md` was written. 238's table is terminal — **eleven rows, 8 ✅ PASS · 1 ⛔ BLOCKED with reason/id/trigger (M-9, `BUG-260913-01`) · 2 ⛔ RETIRED (S-1/S-2, `SEED-256`) · 0 HALF.** ⚠ Residue named not hidden: M-9's Microsoft/OneDrive arm |
 | DEBT-02 | 245 — The verification debt | Pending |
 | DEBT-03 | 245 — The verification debt | ✅ **Complete** (`245-01`, 2026-09-13) — marker in FIVE files with ZERO prose deleted, gate + PostToolUse hook driven RED on both arms, SC#4 discharged by citation. ⚠ SC#4 was ALREADY TRUE at HEAD while this row read `Pending`. |
 | RECALL-01 | 246 — The recall cliff | Pending — ⚠ **depends on SHIP-01**; `retrieval_service.py`'s extraction must be proposed first |

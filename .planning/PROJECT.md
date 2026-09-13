@@ -117,6 +117,11 @@ under G-3, never a plan.
 > 2026-09-09, `/code-review ultra` ruled out on cost. Their verdicts are the builder's own.
 > ⛔ **Two UAT sets owed on credentials** (238: an Azure app registration · 241 row 5: a cloud DSN,
 > ⚠ **and row 5 dies the moment migration 176 reaches cloud**). ⛔ **Cloud is 15 migrations behind.**
+> &nbsp;
+> ⚠ **CORRECTED 2026-09-13 (Phase 245) — the two lines above are preserved, not deleted.** The
+> *238: an Azure app registration* half is **FALSE**: All nine of 238's M rows were **DRIVEN LIVE on 2026-09-07** (`238-VERIFICATION.md:213-231` — 7 full pass, 2 half at the time; **four defects found by driving and NONE by the 15-case unit suite**). The operator completed the Azure registration *hours after* `238-SUMMARY.md` was written.
+> ✅ **Phase 245 closed that set** (`245-VERDICT.md` §SC#1). ⛔ The *241 row 5: a cloud DSN* half
+> **remains true**, deadline included.
 >
 > The scoping text below is preserved as written at the milestone's open.
 
@@ -884,6 +889,11 @@ All 20 v3.3 requirements delivered (16 CORE + 4 STRETCH).
 ⛔ **NOT validated — five requirements, named rather than rounded up:**
 
 - ⛔ `SRC-03` — Microsoft Graph ships **structurally**; all nine live UAT rows are blocked on one Azure app registration (SharePoint separately on `SEED-256`)
+  - ⚠ **CORRECTED 2026-09-13 (Phase 245) — the bullet above is preserved, not deleted.** *"all nine
+    live UAT rows are blocked on one Azure app registration"* is **FALSE**: All nine of 238's M rows were **DRIVEN LIVE on 2026-09-07** (`238-VERIFICATION.md:213-231` — 7 full pass, 2 half at the time; **four defects found by driving and NONE by the 15-case unit suite**). The operator completed the Azure registration *hours after* `238-SUMMARY.md` was written.
+    ✅ Phase 245 closed SC#1 — **8 PASS · 1 ⛔ BLOCKED (M-9) · 2 ⛔ RETIRED (S-1/S-2, `SEED-256`)**.
+    ⛔ `SRC-03` itself is **not** thereby validated — that is a separate judgement for a milestone
+    audit, and this correction changes only the **reason** given, never the verdict.
 - ⛔ `QUEUE-06` — the defect was measured and the remedy shipped, but **the DEFAULT is unchanged**, so out of the box the requirement is still not met; cloud has no columns until migration 176 lands
 - ⛔ `SURF-03` — a broken watch reaching someone not on the page: its **home is still an open scoping decision**; the Health tab alone does not satisfy it
 - ⛔ `DEBT-03` — `/code-review ultra review-base-225`, ruled out by the operator on cost

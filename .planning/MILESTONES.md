@@ -26,6 +26,18 @@ Recorded rather than smoothed. Full evidence: [`milestones/v4.0-MILESTONE-AUDIT.
 - ⛔ **THREE PHASES CLOSED WITHOUT AN INDEPENDENT §6.3 REVIEW — 238, 240 and 241.** Gemini has been unavailable since 2026-09-09 and the operator has ruled out `/code-review ultra` on cost, so no independent reviewer existed. CLAUDE.md requires that whoever REVIEWS a phase must not have shaped the build; **these three verdicts are the builder's own, and the milestone audit is a self-audit for the same reason.** What that does not weaken is the mechanical evidence — a hash, a byte-identical file, a driven function. What it weakens is every judgement call about whether an owed item was acceptable.
 - ⛔ **`QUEUE-06` is NOT ticked even though the remedy shipped.** The two knobs ship as operator settings (migration 176) but **the DEFAULT is unchanged**, so out of the box the requirement is still not met — an operator must turn the knob. ⚠ Cloud has no columns at all until 176 is applied there.
 - ⛔ **`SRC-03` is structural-only.** Microsoft Graph ships and its fence caught a **fourth provider leak nobody had spotted** — `import_service` fell back to the Drive adapter on a connection's **display name** — but **all nine live UAT rows are blocked on one Azure app registration** (`MICROSOFT_OAUTH_CLIENT_ID/SECRET`; run M-1 first, it unblocks the other eight). SharePoint rows S-1/S-2 are separately blocked on `SEED-256` (no work/school tenant).
+  - ⭐⭐ **CORRECTED 2026-09-13 (Phase 245) — the bullet above is preserved, not deleted, and this is
+    THE STRONGEST CASE IN THE SET: this close record was FALSE ON THE DAY IT WAS WRITTEN.** The nine
+    M rows were **DRIVEN LIVE on 2026-09-07**; **v4.0 closed on 2026-09-10** — three days later —
+    and the close record still said *"all nine live UAT rows are blocked on one Azure app
+    registration"*. All nine of 238's M rows were **DRIVEN LIVE on 2026-09-07** (`238-VERIFICATION.md:213-231` — 7 full pass, 2 half at the time; **four defects found by driving and NONE by the 15-case unit suite**). The operator completed the Azure registration *hours after* `238-SUMMARY.md` was written. ⭐ `238-VERIFICATION.md:139` — the bottom
+    register — read *"The operator completed the Azure app registration, so the rows below stopped
+    being owed"* **at the moment this milestone was closed**. **Nobody opened it.** *Each register
+    only knows the one below it; the artifact is the bottom*
+    (`feedback_a_review_is_a_claim_about_code_not_the_code`). ✅ Phase 245 closed the set: 238's
+    eleven rows read **8 PASS · 1 ⛔ BLOCKED (M-9, `BUG-260913-01`) · 2 ⛔ RETIRED (S-1/S-2,
+    `SEED-256`) · 0 HALF**. ⛔ The *SharePoint separately blocked on `SEED-256`* half was **true**
+    and is now a **written retirement** rather than a block.
 - ⚠⚠ **241's UAT row 5 has a DEADLINE that must not be buried: it dies the moment migration 176 reaches cloud.** Five of its six rows are driven and passed; row 5 must run on **cloud, BEFORE 176 is applied there**, or it becomes unreproducible forever.
 - ⛔ **Cloud is 15 migrations behind** — `153-156` and `166-176` are all pending; v4.0 has not deployed. Operator decision 2026-09-10: they are applied immediately **before** the next push, in numeric order, once each (`bash scripts/pending-cloud-migrations.sh`).
 - ⛔ **`SURF-03`'s home is still an OPEN SCOPING DECISION.** There is no in-app notification surface in this product; the recommendation is an app-shell signal **plus** the Health-tab row, and **closing it against the Health tab alone does not satisfy the requirement.**

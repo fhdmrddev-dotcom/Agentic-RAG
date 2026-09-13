@@ -309,6 +309,142 @@ wrong.** That is `feedback_a_review_is_a_claim_about_code_not_the_code` in one m
 register only knows the one below it; the artifact is the bottom.* The sweep that corrects all
 sixteen live instances is recorded in its own section below.
 
+## § The stale-claim sweep — sixteen live-register homes corrected BESIDE their originals (D-08)
+
+**The claim:** *"238's nine rows are blocked on one Azure app registration — run M-1 first, it
+unblocks the other 8."* **FALSE at HEAD, and false for six days.**
+
+### ⛔ The set is DERIVED over TWO phrases, never enumerated — and that is the load-bearing part
+
+An earlier draft of `245-03` **enumerated four homes**. The derivation found **nine-plus**, including
+**both routing tables** — the two things an orchestrator actually reads to decide whether this phase
+is blocked. ⚠ **One phrase is not the derivation either:** `REQUIREMENTS.md:208` matched only
+*"Azure app registration"* (it reads *"blocked on one Azure app registration; **M-1 first**"*), and
+`ROADMAP.md:421` spells the number `eight` where every other home spells it `8`.
+
+```
+grep -rn "unblocks the other"     --include="*.md" .planning CLAUDE.md | grep -v "phases/245-"   #  8 hits
+grep -rn "Azure app registration" --include="*.md" .planning CLAUDE.md | grep -v "phases/245-"   # 28 hits
+#                                                                              union = 32 hits / 17 files
+```
+
+*"Guardrails miss what is absent"* — **re-derive the whole list, never trust a list.** The sweep is
+re-runnable: `sweep-stale-claim.cjs` (scratchpad — ⛔ never in the watched tree) walks every `*.md`
+under `.planning/` plus `CLAUDE.md`, skips `phases/245-`, and for each hit demands **either** a
+`CORRECTED 2026-09-13` line within ±8 lines **or** its literal `file:line` token in this file's
+exclusion table below.
+
+| run | result |
+|---|---|
+| **baseline, before any edit** | `--- 32 hits · 32 uncorrected-and-unexplained` · **exit 1 (RED)** |
+| **after the corrections + this table** | `--- 43 hits · 0 uncorrected-and-unexplained (27 corrected-beside · 16 named-in-exclusion-table)` · **exit 0** |
+
+⚠ The hit count *grows* from 32 to 43 because the correction sentences themselves contain the phrase.
+That is the gate working: a correction is inside its own ±8-line window, so it self-satisfies.
+
+### The sixteen CORRECTED live registers
+
+| file:line (pre-edit) | what it is | note |
+|---|---|---|
+| `ROADMAP.md:110` | ⭐⭐ the milestone **credential-blocked routing table** | **highest traffic in the set** — what an orchestrator reads to decide if 245 is blocked |
+| `STATE.md:340` | ⭐⭐ *"Two phases can be blocked on something that is not engineering"* | the other routing table, same reason |
+| `ROADMAP.md:121` | the phase-table row | read on every roadmap scan |
+| `ROADMAP.md:131` | the milestone checklist line | |
+| `ROADMAP.md:421` | Phase 245 **SC#1** (spells it `eight`) | ⛔ the criterion itself is **still exactly right**; only its blocking claim was false |
+| `ROADMAP.md:435` | Phase 245 **Flags** | carried **two** false claims — the Azure one and `SEED-177` |
+| `ROADMAP.md:593` | the credential paragraph | its 241-row-5 half **remains true** |
+| `REQUIREMENTS.md:161-162` | **DEBT-01** | the requirement |
+| `REQUIREMENTS.md:208` | the **traceability row** (second phrase only) | ⚠ a corrected requirement with an uncorrected traceability row is a **half-corrected register** — this phase's own subject |
+| `STATE.md:415` | item 4's credential-blocked table | ⚠ also resolved its **"9 includes S-1/S-2?"** ambiguity and pointed at 238's footer as the anchor |
+| `PROJECT.md:118`, `:886` | the project's standing statement of the gap | `:886`'s `SRC-03` **verdict** is untouched — only the reason given |
+| ⭐ `MILESTONES.md:28` | **the v4.0 close record** | **the strongest case in the set** — see below |
+| `v4.0-ROADMAP.md:14`, `:828` | the same close record, one register over | archived, but a **close record**, not a dated snapshot of a belief — that is the line the exclusions draw |
+| *(out of repo)* `~/.claude/projects/C--Vibe-Apps-Agentic-RAG/memory/project_238_built_unreviewed.md` | the agent-memory index line **and** its body | ⚠ cannot be diffed; before/after quoted in `245-03-SUMMARY.md` |
+
+**C-5's survival fence:** all **32** originally-matched lines were captured verbatim *before* editing
+and each was re-asserted afterwards as a **contiguous substring** (`grep -F`, whole line — not a
+"distinctive fragment", which a wholesale rewrite retaining the fragment would pass). **32/32 OK,
+0 LOST.** `git diff --numstat` shows **0 deletions** in all six repo homes.
+
+### ⭐ `MILESTONES.md:28` — the close record was FALSE ON THE DAY IT WAS WRITTEN
+
+The nine M rows were **driven 2026-09-07**. **v4.0 closed 2026-09-10** — three days later — and its
+close record still read *"all nine live UAT rows are blocked on one Azure app registration."*
+**This is not a fact that changed; it is a record that was wrong when written**, and the correction
+says so rather than merely updating the number.
+
+### ⭐⭐ And the finding that outranks all sixteen: the bottom register already carried the correction
+
+`238-VERIFICATION.md:139` has read *"The operator completed the Azure app registration, so the rows
+below stopped being owed"* **since 2026-09-07**. **The artifact was right the whole time and every
+layer above it was wrong for six days.** That is
+`feedback_a_review_is_a_claim_about_code_not_the_code` in one measurement — *each register only knows
+the one below it; the artifact is the bottom* — and on 2026-09-10 the same asymmetry ran the other
+way, when two Phase 239 criticals were escalated as live after being fixed two days earlier.
+
+### ⛔ EXCLUDED — named with the reason, never silently skipped
+
+**Dated snapshots that were TRUE when written, and are not routing surfaces.** ⚠ Correcting a
+phase's own dated record would erase *when* something was believed, which is the opposite of D-08's
+point.
+
+| file:line | reason for exclusion |
+|---|---|
+| `.planning/milestones/v4.0-MILESTONE-AUDIT.md:7` | dated audit snapshot, true when written |
+| `.planning/milestones/v4.0-MILESTONE-AUDIT.md:182` | ditto |
+| `.planning/milestones/v4.0-MILESTONE-AUDIT.md:270` | ditto |
+| `.planning/milestones/v4.0-STATE-at-close.md:327` | dated state-at-close snapshot |
+| `.planning/milestones/v4.0-STATE-at-close.md:509` | ditto |
+| `.planning/milestones/v4.0-phases/238-microsoft-graph-onedrive/238-SUMMARY.md:178` | 238's own dated record — ⭐ and it is where the *"hours after"* fact comes from |
+| `.planning/milestones/v4.0-phases/238-microsoft-graph-onedrive/238-SUMMARY.md:202` | ditto |
+| `.planning/milestones/v4.0-phases/238-microsoft-graph-onedrive/238-04-SUMMARY.md:236` | a plan's own dated record |
+| `.planning/milestones/v4.0-phases/238-microsoft-graph-onedrive/238-CONTEXT.md:320` | a phase's dated scoping record |
+| `.planning/milestones/v4.0-phases/238-microsoft-graph-onedrive/238-VERIFICATION.md:139` | ⭐⭐ **excluded because it is ALREADY CORRECT** — it is the register that was right |
+| `.planning/milestones/v4.0-phases/240-mail-is-a-shape-not-a-fourth-adapter/240-CONTEXT.md:78` | a phase's dated scoping record |
+| `.planning/milestones/v4.0-phases/240-mail-is-a-shape-not-a-fourth-adapter/240-VERIFICATION.md:231` | 240's own dated carry-forward record |
+| `.planning/reported-bugs/onedrive-adapter-silently-truncates-and-mismatches-folder-paths.md:176` | a dated bug report; its own record of what was true at filing |
+| `.planning/seeds/SEED-253-source-file-path-is-synthetic-no-adapter-populates-it.md:157` | a seed's dated body prose; ⚠ its **substance** is re-opened by `BUG-260913-01` (see §SC#1) but its history is not rewritten |
+| `.planning/seeds/SEED-260-graph-mail-is-a-second-mail-module-not-a-second-adapter.md:3` | a seed's dated title/body; not a routing surface |
+| `.planning/seeds/SEED-260-graph-mail-is-a-second-mail-module-not-a-second-adapter.md:58` | ditto |
+
+**16 corrected · 16 excluded-and-named · 0 neither.**
+
+---
+
+## § `SEED-177` — REFUTED (D-15)
+
+The ROADMAP's Phase 245 Flags block said: *"`SEED-177` still reads `status: planted` while its
+retire-the-egress-fence trigger already fired"*. **CLAUDE.md carried the same sentence**, at the end
+of the connector-architecture bullet.
+
+**Measured directly against the seed:**
+
+```
+status: partially-answered  # trigger #2 ANSWERED by Phase 206 (2026-08-25); triggers #1 and #4 have NOT fired
+```
+
+⛔ **Both halves of the claim were wrong.** The status is not `planted`, and the fired trigger did
+**not** go unhandled — the seed's own frontmatter records it as ANSWERED, and
+`backend/tests/unit/test_189_no_egress.py`'s Case A source fence was **consciously retired under
+`D-206-07`** with the reason written into the test body, which is *exactly* what the seed demanded
+(*"retire the fence DELIBERATELY, never trip it by surprise"*).
+
+**Corrected in both homes, beside their originals:** `ROADMAP.md`'s Flags block and `CLAUDE.md`.
+⛔ **The seed itself is NOT edited — it is correct.** `git diff -- SEED-177-*.md` is **EMPTY**, and
+that is asserted mechanically so a "helpful" edit to a correct seed cannot slip in.
+`node scripts/check-claude-md-size.cjs` exits `0` (**99,441 chars · 66.3% of limit**).
+
+⭐ **The shape of this one is worth more than the fix.** CLAUDE.md's bullet **already carried a
+correction two sentences earlier** — *"the fence, the seed and this bullet are three registers and
+only one of them was updated"* — and **the very next sentence was an instance of the same rot.** The
+bullet now demonstrates its own lesson twice, in the same paragraph.
+
+⛔ **No broader trigger sweep happened (D-15).** `SEED-177` is high-priority with Open Platform
+attached, so ruling on triggers #1 and #4 is a **capability decision, not bookkeeping**. Trigger:
+`SEED-013` / Open Platform getting a phase number. Recorded in the deferred list below.
+
+---
+
 ## § SC#2 — OWED, owned by `245-02`
 
 ⛔ **EMPTY OF VERDICTS BY DESIGN.** `245-01` **has not opened a browser**, and nothing in it may be

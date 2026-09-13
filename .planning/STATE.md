@@ -338,6 +338,7 @@ This section read, at scoping:
 |---|---|---|
 | **242** | a read-capable **cloud DSN** | SC#2 + SC#3 — the CHECK migration, the changed-fields-only payload, the worded refusal. Sequence these first so the phase is never idle |
 | **245** | **one Azure app registration** — ⚠ **run row M-1 first, it unblocks the other 8** | `DEBT-02` and `DEBT-03` in full, plus `DEBT-01`'s retirement arm |
+| **245** | ⚠ **CORRECTED 2026-09-13 (Phase 245) — NOT BLOCKED, and was not blocked when this table was written.** The row above is preserved, not deleted. All nine of 238's M rows were **DRIVEN LIVE on 2026-09-07** (`238-VERIFICATION.md:213-231` — 7 full pass, 2 half at the time; **four defects found by driving and NONE by the 15-case unit suite**). The operator completed the Azure registration *hours after* `238-SUMMARY.md` was written. ⭐⭐ **With `ROADMAP.md`'s credential table this is the highest-traffic home of the false claim — these two are what an orchestrator reads to decide whether 245 is blocked.** | **Everything, and it all landed:** SC#1 (`245-03`), SC#2 (`245-02`, five rows driven live), SC#3 + SC#4 (`245-01`). See `245-VERDICT.md` and `245-UAT-RESULTS.md` |
 
 ### ⚠ G-8 is the governor on this milestone
 
@@ -413,6 +414,7 @@ fired and the condition it described is still true.**
 | Phase | Rows | Blocked on |
 |---|---|---|
 | 238 | **9** | one Azure app registration (`MICROSOFT_OAUTH_CLIENT_ID/SECRET`) — **run M-1 first, it unblocks the other 8**; SharePoint rows S-1/S-2 separately on `SEED-256` (no work/school tenant) |
+| 238 | **ELEVEN — 9 M rows + S-1/S-2** | ⚠ **CORRECTED 2026-09-13 (Phase 245) — the row above is preserved, not deleted. NOT BLOCKED: ✅ SC#1 CLOSED.** All nine of 238's M rows were **DRIVEN LIVE on 2026-09-07** (`238-VERIFICATION.md:213-231` — 7 full pass, 2 half at the time; **four defects found by driving and NONE by the 15-case unit suite**). The operator completed the Azure registration *hours after* `238-SUMMARY.md` was written. ⚠ **And the "9" above was ambiguous** — it read as though S-1/S-2 were included, while `REQUIREMENTS.md` read as though they were not. **Resolved at the anchor: `238-VERIFICATION.md`'s footer now states ELEVEN rows and defines "nine" as the M rows only.** Terminal state: **8 ✅ PASS · 1 ⛔ BLOCKED (M-9 — no `/Finance/` folder in the OneDrive account, an operator action; blocking id `BUG-260913-01`; trigger: that folder existing, or the next phase touching Graph ingestion) · 2 ⛔ RETIRED (S-1/S-2 — `SEED-256`, ground `drive_type: personal`)** |
 | 241 | **1** (row 5 of 6) | a read-capable cloud DSN — ⚠ **and it expires, see item 1** |
 
 Also owed from earlier in the milestone and never driven: **233's five G-4 rows**, **236's live
