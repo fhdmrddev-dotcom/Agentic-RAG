@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v4.1
 milestone_name: Ship It & Feel It
-status: phase_complete
-last_updated: 2026-09-13T12:00:00.000Z
+status: in_progress
+last_updated: 2026-09-13T12:01:00.000Z
 last_activity: 2026-09-13
 progress:
   total_phases: 12
-  completed_phases: 4   # 242, 243, 244, 245. NOTE: this field read `2` at Phase 245's start while the ROADMAP checklist showed three phases complete — corrected from the ROADMAP, not from this field
+  completed_phases: 4   # 242, 243, 244, 245.
   total_plans: 13
-  completed_plans: 27   # +3 for 245-01/02/03. NOTE: `total_plans: 13` above is already smaller than this and was stale before Phase 245; left as found rather than invented
+  completed_plans: 27
   percent: 17
-stopped_at: "Phase 245 COMPLETE 2026-09-13 — 4/4 SC closed (245-VERDICT.md, 245-UAT-RESULTS.md). Next: Phase 246, which depends hard on Phase 242 / SHIP-01"
+stopped_at: "Phase 246 context gathered (246-CONTEXT.md). Next: plan Phase 246."
 ---
 
 # Project State
@@ -39,9 +39,9 @@ surface the operator uses daily. Phase numbering continues at **242**.
 
 ## Current Position
 
-Phase: 245 — ✅ **CLOSED 2026-09-13, ACCEPTED BY THE OPERATOR AT UAT** (`245-UAT.md`, 10/10).
-Plan: **ALL THREE COMPLETE — `245-01` · `245-02` · `245-03`, 2026-09-13.**
-Next: **Phase 246** (The Recall Cliff). ⚠ It depends hard on **Phase 242 / `SHIP-01`**.
+Phase: 246 — in_progress (Context gathered, ready for planning)
+Plan: Ready for 246-01-PLAN.md
+Next: /gsd:plan-phase 246
 
 ⭐ **THE UAT'S BEST FINDING CAME FROM THE OPERATOR, AND IT CAME FROM AN INSTRUCTION THAT WAS WRONG.**
 Nine rows were scored green from the artifact (the phase changed zero source lines, so a screen
