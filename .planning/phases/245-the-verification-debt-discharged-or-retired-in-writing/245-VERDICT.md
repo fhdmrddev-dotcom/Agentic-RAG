@@ -4,7 +4,7 @@ kind: verdict
 written: 2026-09-13
 author: claude (solo — OV-SOLO-01)
 verification_mode: self-verified   # ⛔ OV-SOLO-01 — this file is not exempt from its own rule
-sc_status: { "1": owed-245-03, "2": owed-245-02, "3": discharged, "4": discharged }
+sc_status: { "1": closed, "2": owed-245-02, "3": discharged, "4": discharged }
 ---
 
 # Phase 245 — Verdict
@@ -200,27 +200,114 @@ greppable even though the *trigger* is not.
 
 ---
 
-## § SC#1 — OWED, owned by `245-03` (with `245-02` for its driven arm)
-
-⛔ **EMPTY OF VERDICTS BY DESIGN.** An unfilled section with an owner is not silence; a missing
-section is. `245-01` makes **no claim** about any of Phase 238's rows.
+## § SC#1 — CLOSED (`245-03`, with `245-02` for its driven arm)
 
 > *"Each of Phase 238's **nine** UAT rows reads pass, ⛔ blocked with its reason and its blocking id,
 > or retired with a named trigger. No row is silently absent."*
 
-**Must contain when filled:**
-- All nine of 238's rows, each with `pass` / `⛔ blocked + reason + blocking id` / `retired + named
-  trigger`. **M-1 is driven first — it unblocks the other eight.**
-- **M-9** driven through BOTH doors (watch loop AND manual import), with the
-  `path contains '/Finance/'` rule created through the real `RuleBuilderPanel` surface — `245-02`.
-- **M-8** flipped off the self-contradicting half-verdict it currently carries (238's own wording,
-  quoted in the ROADMAP — deliberately not restated here, so no verdict token appears in this
-  section) — `245-03`.
-- **S-1 / S-2** retired on `SEED-256` (no work/school tenant) alone, **provided the retirement says
-  so** — `245-03`.
-- ⚠ Blocked on **one Azure app registration** (`MICROSOFT_OAUTH_CLIENT_ID` / `_SECRET`), an
-  **operator action**: schedule it, do not simulate it, and never mark a row done on the strength of
-  a green suite.
+### ⚠ ELEVEN or nine — resolved in writing, not inherited
+
+238's table holds **ELEVEN** rows: `M-1`…`M-9` **plus** `S-1` and `S-2`. **"Nine" means the M rows
+only**; S-1/S-2 are two *additional* rows, never a subset. The ambiguity was live in the registers —
+`REQUIREMENTS.md` DEBT-01 read as though 9 excluded them, `STATE.md` item 4 as though 9 included
+them — and it is now resolved **at the anchor**, in `238-VERIFICATION.md`'s own footer, with both
+registers pointing there.
+
+### Every one of the eleven rows, terminal
+
+| # | Row | Terminal verdict | How it got there |
+|---|---|---|---|
+| M-1 | Connect a Microsoft 365 account → OAuth round trip | ✅ **PASS** | driven live 2026-09-07 |
+| M-2 | The connection appears in the connected-source picker | ✅ **PASS** | driven live (operator) |
+| M-3 | Browse OneDrive, drill into a folder | ✅ **PASS** | driven live |
+| M-4 | Preview a OneDrive folder → the four buckets | ✅ **PASS** | driven live (operator) |
+| M-5 | Files read through the two-step download | ✅ **PASS** | driven live — found two defects |
+| M-6 | A watch runs on schedule and brings in a new file | ✅ **PASS** | driven live |
+| M-7 | Delete at source → the Library document is NOT deleted | ✅ **PASS** | driven live |
+| M-8 | Disconnect → watching freezes, nothing is deleted | ✅ **PASS** | **headline flipped by `245-03` (D-06)** — see below |
+| M-9 | A `path contains '/Finance/'` rule fires for a file in that folder | ⛔ **BLOCKED** — Microsoft/OneDrive arm not driven; no `/Finance/` folder exists in the OneDrive account (**operator action**). Blocking id **`BUG-260913-01`** for the arm that WAS driven. **Trigger: that folder existing, or the next phase touching Graph ingestion.** | driven by `245-02` **against the wrong provider** — see below |
+| **S-1** | Browse a SharePoint document library | ⛔ **RETIRED — `SEED-256`** | **written retirement, `245-03` (D-07)** |
+| **S-2** | `Sites.Read.All` self-consent vs admin approval in an enterprise tenant | ⛔ **RETIRED — `SEED-256`** | ditto |
+
+**8 ✅ PASS · 1 ⛔ BLOCKED with reason, id and trigger · 2 ⛔ RETIRED with a named trigger · 0 HALF ·
+0 silently absent.** ⛔ `HALF` is not one of SC#1's three admissible verdicts, and after this plan no
+row carries it.
+
+### M-8 — the flip, and why it was a flip and not a re-drive
+
+The row read `⚠ HALF PASS — and the failing half is a DEFECT, BUG-260907-03` **while its own body
+already ended** `✅ FIXED THE SAME DAY … driven both directions on the same row … BUG-260907-03
+closed.` **The row contradicted itself, and a reader believed whichever half they reached first** —
+DEBT-03's failure mode mirrored inside a table.
+
+⛔ **NOT re-driven (D-06).** Re-driving means disabling a live integration again for a result already
+in the file. The fix landed at the choke point (`SourceRegistry.get_adapter` raising
+`SourceConnectionDisabled`), was driven **both directions on that row** (disabled → refused with no
+network call; enabled → 6 folders), and the bug is closed. **Cited, not re-measured.** The original
+assessment is preserved verbatim inside the row, labelled as history.
+
+### M-9 — why a real, traced failure does **not** make this row FAIL
+
+`245-02` created the rule **through the real `RuleBuilderPanel` surface** (`rule_scope: watch`,
+`path contains '/Finance/'`, persisted and verified in the DB) and drove it through **both doors**
+per D-05. Both wrote `metadata.source.path = null`; the rule never fired.
+
+⭐ **But 238 is a Microsoft Graph phase, so M-9's own provider is OneDrive — where `path` IS
+populated** (`/Attachments/…`, this very table's M-6 and M-7 documents). `245-02` exercised **Google
+Drive**. So the failure is real and belongs to a **wider, different defect**, filed as
+**`BUG-260913-01`**: *the Google Drive adapter never writes `metadata.source.path`, on either door,
+so every path-based classification rule is silently inert for every Drive document.* No error, no
+warning; the rule reads as enabled and matches nothing, forever.
+
+⚠ **Calling M-9 PASS would be false; calling it FAIL would blame the wrong component.** ⛔ BLOCKED
+with a reason, a blocking id and a named trigger is the honest verdict — and this is *the same class
+of error the phase exists to prevent, caught in flight*: a row marked done on evidence that does not
+address it.
+
+⛔ **Not fixed here, by decision (D-16).** The G-3 line is ≤ 1 file / ≤ 10 lines / no schema or API
+surface; this needs an adapter change **plus a cross-adapter fence**. Filing it is the complete
+response. ⭐ The fix owes the fence as much as the patch — the gap existed on Microsoft until 238 and
+on Drive since 232, so a test asserting that *every* adapter populates `source.path` is what stops
+the next adapter repeating it. ⚠ `v4.0-ROADMAP.md:828` already recorded the shape of this
+(*"SEED-253 partially discharged (Graph populates `path`; Drive still cannot)"*) — **`245-02` is what
+turned that note into a measured, filed defect with a blast radius.**
+
+### S-1 / S-2 — retired in writing, across three registers, in ONE commit
+
+**Ground:** no M365 work/school tenant. **Confirmed LIVE rather than assumed** — `check()` returned
+**`drive_type: personal`**, and a personal account has **no `/sites/` to address at all**. No scope
+unlocks it: `Sites.Read.All` on a personal account has nothing to point at. **An account boundary,
+not effort.**
+
+**Re-open path:** `SEED-256`'s **four** existing `trigger_when` arms, cited by reference and left
+byte-unchanged — (a) a free M365 Developer tenant; (b) ⭐ a customer or pilot org on M365, *the real
+one, because it arrives WITH the admin-consent question attached*; (c) any paid M365
+Business/Enterprise subscription; (d) a phase proposing SharePoint as a source.
+
+⚠ **Retired ≠ answered.** `SEED-256` carries an unresolved MEDIUM-confidence research question that
+travels with the row: whether `Sites.Read.All` self-consents in a typical **enterprise** tenant or
+requires **admin approval**. That has a *sales* consequence, not just a test one, and the seed names
+it as the first thing to drive when the trigger fires.
+
+**The three registers, one commit** (`Dockerfile.sandbox` ↔ `docs/SANDBOX-PACKAGES.md`'s same-commit
+rule): `238-VERIFICATION.md`'s table · `REQUIREMENTS.md` DEBT-01 · `SEED-256`'s `status: deferred`.
+⛔ **Seed-only was rejected on a measurement:** the seeds register is swept by **nothing**
+(`grep -rln "SEED" .claude/commands/gsd/` returns only `capture.md`, the command that *writes*
+seeds), so a retirement held only by a seed is held by nothing. ⚠ **`status:` frontmatter IS the
+index** — a body sentence saying "still open" is invisible to every scan, which is why the flip, not
+the prose, is the deliverable.
+
+### ⭐ What SC#1 actually cost to discover — worth more than the verdicts above
+
+**All nine M rows were DRIVEN LIVE on 2026-09-07.** The operator completed the Azure app registration
+*hours after* `238-SUMMARY.md` was written, and `238-VERIFICATION.md:139` has read *"The operator
+completed the Azure app registration, so the rows below stopped being owed"* **ever since**.
+
+**Meanwhile six live registers said the rows were blocked, for six days.** ⭐⭐ **The bottom register
+already carried the correction — the artifact was right the whole time and every layer above it was
+wrong.** That is `feedback_a_review_is_a_claim_about_code_not_the_code` in one measurement: *each
+register only knows the one below it; the artifact is the bottom.* The sweep that corrects all
+sixteen live instances is recorded in its own section below.
 
 ## § SC#2 — OWED, owned by `245-02`
 

@@ -157,10 +157,26 @@ register knows only the register below it; the code is the bottom.
 
 ### DEBT — v4.0's verification debt, discharged or explicitly retired
 
-- [ ] **DEBT-01**: Phase 238's **9** UAT rows driven, or retired row by row with a written reason.
+- [x] **DEBT-01**: Phase 238's **9** UAT rows driven, or retired row by row with a written reason.
       Blocked on one Azure app registration (`MICROSOFT_OAUTH_CLIENT_ID` / `_SECRET`) — ⚠ **run M-1
       first: it unblocks the other 8.** SharePoint rows S-1 / S-2 sit separately on `SEED-256`
       (no work/school tenant) and may be retired on that ground alone.
+      &nbsp;
+      ⛔ **S-1 / S-2 RETIRED IN WRITING 2026-09-13 (Phase 245, D-07) — `SEED-256`.** Ground: **no
+      M365 work/school tenant**, confirmed LIVE rather than assumed — `check()` returned
+      **`drive_type: personal`**, so there is no `/sites/` to address. **An account boundary, not
+      effort.** Re-open path: `SEED-256`'s **four** existing `trigger_when` arms, cited by reference
+      and left unchanged. ⚠ This retirement moved through **three registers in ONE commit** — this
+      row, `238-VERIFICATION.md`'s table, and `SEED-256`'s `status: deferred` — because the seeds
+      register is swept by **nothing**, so a retirement held only by a seed is held by nothing.
+      &nbsp;
+      ✅ **DEBT-01 COMPLETE 2026-09-13 (Phase 245).** 238's table is **terminal**: **eleven** rows —
+      `M-1`…`M-9` (the "nine") plus `S-1`/`S-2` — reading **8 ✅ PASS · 1 ⛔ BLOCKED-with-reason-id-and-trigger
+      (M-9) · 2 ⛔ RETIRED**. ⛔ **No row reads HALF**, which the requirement's own wording does not admit.
+      ⚠ **Named, not hidden, inside a ticked box:** M-9's **Microsoft/OneDrive arm is still owed** —
+      `245-02` drove it against **Google Drive**, which failed for a *different* reason
+      (**`BUG-260913-01`**). Trigger: a `/Finance/` folder existing in the OneDrive account (operator
+      action), or the next phase touching Graph ingestion.
 - [ ] **DEBT-02**: Phase 233's **5** G-4 operator rows driven. Owed since the phase shipped and never
       run.
 - [x] **DEBT-03**: Every v4.0 phase that closed without an independent §6.3 review (**238, 240, 241**)
