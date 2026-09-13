@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v4.1
 milestone_name: Ship It & Feel It
-status: ready_to_plan
-last_updated: 2026-09-13T00:00:00.000Z
-last_activity: 2026-09-11
+status: phase_complete
+last_updated: 2026-09-13T12:00:00.000Z
+last_activity: 2026-09-13
 progress:
   total_phases: 12
-  completed_phases: 2
+  completed_phases: 4   # 242, 243, 244, 245. NOTE: this field read `2` at Phase 245's start while the ROADMAP checklist showed three phases complete — corrected from the ROADMAP, not from this field
   total_plans: 13
-  completed_plans: 24
+  completed_plans: 27   # +3 for 245-01/02/03. NOTE: `total_plans: 13` above is already smaller than this and was stale before Phase 245; left as found rather than invented
   percent: 17
-stopped_at: Phase 245 context gathered — ready to plan (245-CONTEXT.md)
+stopped_at: "Phase 245 COMPLETE 2026-09-13 — 4/4 SC closed (245-VERDICT.md, 245-UAT-RESULTS.md). Next: Phase 246, which depends hard on Phase 242 / SHIP-01"
 ---
 
 # Project State
@@ -39,6 +39,68 @@ surface the operator uses daily. Phase numbering continues at **242**.
 ## Current Position
 
 Phase: 245
+Plan: **ALL THREE COMPLETE — `245-01` · `245-02` · `245-03`, 2026-09-13.**
+Next: **Phase 246** (The Recall Cliff). ⚠ It depends hard on **Phase 242 / `SHIP-01`**.
+
+⭐ **PHASE 245 IS DONE: 4 / 4 SUCCESS CRITERIA CLOSED.** Verdict:
+**`.planning/phases/245-the-verification-debt-discharged-or-retired-in-writing/245-VERDICT.md`** —
+read its **closing scoreboard** first. Driven evidence: **`245-UAT-RESULTS.md`**.
+⛔ **No scoreboard row cites a test suite as its evidence**, which was this phase's first named
+failure mode.
+
+| SC | Verdict | By | Evidence type |
+|---|---|---|---|
+| **SC#1** — 238's rows each terminal | ✅ **CLOSED** | `245-03` + `245-02` | written retirement · artifact grep · driven observation |
+| **SC#2** — 233's five G-4 rows driven live | ✅ **CLOSED** | `245-02` | ⭐ driven observation, four DB tables with `max(created_at)` |
+| **SC#3** — the honesty marker | ✅ **CLOSED** | `245-01` | artifact grep · citation |
+| **SC#4** — `OV-SOLO-01` in full | ✅ **CLOSED** | `245-01` | citation (⚠ already true at HEAD) |
+
+⚠ **Two NAMED residues, never silent — both carry a trigger in the verdict's deferred table:**
+**M-9's Microsoft/OneDrive arm** (needs a `/Finance/` folder in the OneDrive account — an operator
+action) and **233 row 3's refusal arm** (nothing was refused, so the arm was never exercised).
+⛔ **238, 240 and 241 still owe an independent §6.3 review** — DEBT-03 was always *"say so in the
+record"*, never *"do it"*, and this phase did not do it.
+
+⭐ **ONE DEFECT FOUND BY DRIVING, filed not fixed (D-16): `BUG-260913-01`** — the **Google Drive
+adapter never writes `metadata.source.path`, on either door**, so every path-based classification
+rule is **silently inert for every Drive document**. No error; the rule reads as enabled and matches
+nothing. ⚠ Its first diagnosis blamed the manual-import door and was **refuted by driving the second
+door** — D-05's both-doors insistence is the only reason the cause is right.
+
+⚠ **The phase's real finding was not any of its four criteria** — and it is why every home of the
+sentence quoted next now carries a **CORRECTED 2026-09-13** line beside it, this file's own two homes
+(`:340` and `:415`) included. *"238's nine rows are blocked on one
+Azure app registration — run M-1 first"* was **FALSE for six days** across **six live registers**
+(`ROADMAP` · `REQUIREMENTS` · this file · `PROJECT` · `MILESTONES` · `v4.0-ROADMAP`) plus one agent
+memory file — while **`238-VERIFICATION.md:139`, the bottom register, carried the correction the whole
+time.** ⭐ `MILESTONES.md:28` is the strongest case: rows driven **2026-09-07**, v4.0 closed
+**2026-09-10** — **the close record was false on the day it was written.** All sixteen live instances
+are corrected **BESIDE** their originals (D-08, derived over two phrases — an enumeration had missed
+five, including both routing tables); the sixteen excluded dated snapshots are **named with reasons**
+in the verdict. *Each register only knows the one below it; the artifact is the bottom.*
+
+⚠ **`SEED-177` REFUTED (D-15)** — it reads `status: partially-answered`, not `planted`, and its own
+frontmatter already records trigger #2 as ANSWERED by Phase 206. Corrected in ROADMAP Flags **and
+CLAUDE.md**; ⛔ **the seed itself is byte-unchanged.**
+⚠ **240's five G-4 mail rows are DEFERRED with a trigger each** (D-13), written out verbatim in the
+verdict — ⛔ **no mail watch has ever run in this product**, so 240's SC#4 is inherited by
+construction and `M-4`/`M-5` are what would settle it.
+
+⛔ **No application source was touched** — `git diff --stat -- backend/ frontend/ supabase/` is
+EMPTY, so the backend 71-failed ceiling and the vitest count gate were **deliberately not run** and
+no hot-file-ledger row is owed. Gates that WERE run: `check-verification-honesty.cjs` **0** ·
+`check-claude-md-size.cjs` **0** (99,441 chars · 66.3%) · the stale-claim sweep **RED then green**
+(`32 hits / 32 uncorrected` → `0 uncorrected-and-unexplained`).
+
+⚠ **The ROADMAP's Phase 245 checklist box is deliberately left unticked here** — closing a phase is
+the orchestrator's call at `/gsd:verify-work`, not an executor's. The correction rows this plan added
+to `ROADMAP.md:110` and `:121` record what actually landed.
+
+---
+
+⚠ **The block below is the position as of `245-01`, preserved rather than overwritten** (D-08's rule,
+applied to this file's own history):
+
 Plan: **`245-01` COMPLETE 2026-09-13** (`8f85969d5` → `77c598f42` → `ab4f07289`, base `d4d9dc024`).
 Next: `245-02` (DEBT-02 + DEBT-01's M-9 arm — live browser drives; serial, mutates the local DB).
 

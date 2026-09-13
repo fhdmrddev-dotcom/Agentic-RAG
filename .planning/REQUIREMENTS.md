@@ -183,8 +183,19 @@ register knows only the register below it; the code is the bottom.
       `245-02` drove it against **Google Drive**, which failed for a *different* reason
       (**`BUG-260913-01`**). Trigger: a `/Finance/` folder existing in the OneDrive account (operator
       action), or the next phase touching Graph ingestion.
-- [ ] **DEBT-02**: Phase 233's **5** G-4 operator rows driven. Owed since the phase shipped and never
+- [x] **DEBT-02**: Phase 233's **5** G-4 operator rows driven. Owed since the phase shipped and never
       run.
+      &nbsp;
+      ✅ **COMPLETE 2026-09-13 (`245-02`) — DRIVEN IN A REAL BROWSER, five rows, five written
+      verdicts, all ✅ PASS.** Evidence: `.planning/phases/245-…/245-UAT-RESULTS.md`.
+      ⛔ **Not one verdict rests on a test suite.** Row **2** was driven **first** (as
+      `233-VERIFICATION.md:88` instructs — the one criterion invisible from the screen) and scored
+      against the database: `documents · document_chunks · folders · ingestion_jobs` all **+0** *and*
+      **`max(created_at)` unmoved** across a nine-minute window. ⭐ The gate that made the rest
+      believable was an **equality, not a name match** — the folder id the app rendered equalled the
+      id `create_folder` returned, byte-identical.
+      ⚠ **One arm owed, named not hidden:** row 3's *"a refusal names its cause"* was never exercised
+      because nothing was refused. Trigger: the next drive that induces a refusal.
 - [x] **DEBT-03**: Every v4.0 phase that closed without an independent §6.3 review (**238, 240, 241**)
       says **"self-verified"** in its own record, and the `OV-SOLO-01` ruling is written into
       `STATE.md → Guardrail overrides` rather than left to lapse. ⚠ **A verdict that reads "reviewed"
@@ -229,7 +240,7 @@ Filled by the roadmapper 2026-09-11. **Every REQ-ID above maps to exactly one ph
 | SHELL-05 | 244 — Chat shell + composer | Pending — ⚠ G-2 sketch owed (net-new surface) |
 | DEBT-01 | 245 — The verification debt | Pending — ⚠ blocked on one Azure app registration; **M-1 first** |
 | DEBT-01 | 245 — The verification debt | ⚠ **CORRECTED 2026-09-13 (Phase 245) — the row above is preserved, not deleted.** ✅ **Complete** (`245-03`). *"blocked on one Azure app registration; M-1 first"* was **FALSE**: All nine of 238's M rows were **DRIVEN LIVE on 2026-09-07** (`238-VERIFICATION.md:213-231` — 7 full pass, 2 half at the time; **four defects found by driving and NONE by the 15-case unit suite**). The operator completed the Azure registration *hours after* `238-SUMMARY.md` was written. 238's table is terminal — **eleven rows, 8 ✅ PASS · 1 ⛔ BLOCKED with reason/id/trigger (M-9, `BUG-260913-01`) · 2 ⛔ RETIRED (S-1/S-2, `SEED-256`) · 0 HALF.** ⚠ Residue named not hidden: M-9's Microsoft/OneDrive arm |
-| DEBT-02 | 245 — The verification debt | Pending |
+| DEBT-02 | 245 — The verification debt | ✅ **Complete** (`245-02`, 2026-09-13) — 233's five G-4 rows **DRIVEN IN A REAL BROWSER**, five written verdicts, all ✅ PASS; row 2 driven first and scored against four database tables with `max(created_at)`. ⛔ Evidence is **driven observation**, never a suite. ⚠ Row 3's refusal arm owed, trigger named |
 | DEBT-03 | 245 — The verification debt | ✅ **Complete** (`245-01`, 2026-09-13) — marker in FIVE files with ZERO prose deleted, gate + PostToolUse hook driven RED on both arms, SC#4 discharged by citation. ⚠ SC#4 was ALREADY TRUE at HEAD while this row read `Pending`. |
 | RECALL-01 | 246 — The recall cliff | Pending — ⚠ **depends on SHIP-01**; `retrieval_service.py`'s extraction must be proposed first |
 | RECALL-02 | 246 — The recall cliff | Pending — its home is `retrieval_tuning.py`, which has **no ledger row** |

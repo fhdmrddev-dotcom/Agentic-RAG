@@ -4,13 +4,21 @@ kind: verdict
 written: 2026-09-13
 author: claude (solo — OV-SOLO-01)
 verification_mode: self-verified   # ⛔ OV-SOLO-01 — this file is not exempt from its own rule
-sc_status: { "1": closed, "2": owed-245-02, "3": discharged, "4": discharged }
+sc_status: { "1": closed, "2": closed, "3": discharged, "4": discharged }
+phase_status: complete   # 4/4 success criteria closed; two carry a NAMED residue with a trigger, never a silent one
+residue_owed: [238-M-9-microsoft-arm, 233-row-3-refusal-arm, 240-five-mail-rows, independent-6.3-review]
 ---
 
 # Phase 245 — Verdict
 
-**Written by `245-01`.** SC#3 and SC#4 are discharged here. SC#1 and SC#2 are **named, owned and
-empty** — see their sections at the bottom.
+**Opened by `245-01`** (SC#3, SC#4), **driven by `245-02`** (SC#2), **closed by `245-03`** (SC#1,
+the stale-claim sweep, the deferrals and the scoreboard). ⚠ The original opening sentence read
+*"SC#1 and SC#2 are **named, owned and empty** — see their sections at the bottom"*; it is preserved
+here rather than overwritten, because **an unfilled section with an owner is not silence, and both
+are now filled.** ⛔ **No owned section in this file is empty.**
+
+**Read the scoreboard at the bottom first** if you want one answer: **4 / 4 closed**, two with a
+named residue and a trigger.
 
 ⛔ **This is a SELF-verification, not a review.** Gemini is unavailable; no independent AGENTS.md §6.3
 reviewer exists. Note the recursion out loud rather than leaving it to be noticed: **this is the
@@ -445,15 +453,149 @@ attached, so ruling on triggers #1 and #4 is a **capability decision, not bookke
 
 ---
 
-## § SC#2 — OWED, owned by `245-02`
-
-⛔ **EMPTY OF VERDICTS BY DESIGN.** `245-01` **has not opened a browser**, and nothing in it may be
-read as evidence about a driven row.
+## § SC#2 — CLOSED (`245-02`, driven in a real browser 2026-09-13)
 
 > *"Each of Phase 233's **five** G-4 operator rows has been driven in a live browser by a person,
 > with a written verdict per row. Owed since the phase shipped and never run."*
 
-**Must contain when filled:** five rows, each with a written verdict from a live browser drive,
-recorded in `245-UAT-RESULTS.md` (which `245-02` owns per D-12). **Row 2 is driven first, measured
-against the DB before anything is imported.** ⛔ A row marked done on the strength of a passing test
-suite is the precise failure this requirement family exists to prevent.
+⛔ **Not one verdict below rests on a test suite.** Each is an observation; every database claim is a
+measurement taken at a named moment. **Full evidence, table by table, is in `245-UAT-RESULTS.md`** —
+summarised here, ⛔ **never duplicated** (two homes for one verdict is drift by construction).
+
+### The five rows
+
+| # | Row | Verdict | The measurement that settles it |
+|---|---|---|---|
+| **2** | Close without confirming → `documents`, `document_chunks`, `folders`, `ingestion_jobs` unchanged | ✅ **PASS** — **driven FIRST**, as `233-VERIFICATION.md:88` instructs | `162→162 · 7988→7988 · 25→25 · 72→72` = **+0 on all four**, and ⭐ **`max(created_at)` unmoved on all four** across a **nine-minute** window containing a full browse, **two** preview calls and a cancel. **Counts alone cannot distinguish *nothing written* from *written and removed*; the timestamps can.** |
+| **1** | Four buckets, counts sum, the hatched segment reads as uncertainty | ✅ **PASS** | `3 + 0 + 0 + 2 = 5` = the folder's file count. The bar rendered a solid segment **plus a hatched one**, and the hatching maps to *can't tell*. ⭐ Each uncertain row **names its own cause**, and the button read **"Add 3 · read 2"** — what it will add outright vs. what it must read to decide, not flattened into one number |
+| **3** | Confirm → counts match the preview, the bar dissolves | ✅ **PASS**, **one arm owed** | `documents +5 · chunks +5 · jobs +5`, all five `status=completed`; the product printed its own reconciliation **"1 accounted · 0 unaccounted — preview said 1 — 1 accepted."** ⛔ **Owed arm: *"a refusal names its cause"* was never exercised** — nothing was refused. **Trigger: the next drive that induces one** (oversized / permission-denied / unreadable) |
+| **4** | Confirm the same folder twice → nothing re-imported or re-embedded | ✅ **PASS** | Second preview: **0 added · 5 already here · 0 unsupported · 0 can't tell**; all four tables flat and no `max(created_at)` moved. ⭐ **Stronger than idempotence:** the button rendered `"Add 0"` with `disabled = true`, read off the live DOM — a second import **cannot be issued** |
+| **5** | A native Google Doc already in the Library resolves *can't tell* → *already here* | ✅ **PASS** | The same file observed in **both** states: *"Can't tell without reading it — native Google file"* → **"Already here"**, and the *can't tell* bucket went **2 → 0**. The cleanest of the five, and the reason D-11 put a native Doc in the fixture |
+
+**5 driven · 5 ✅ PASS · 1 arm owed with a named trigger · 0 claimed.**
+
+### ⛔ The identity gate that made all five worth believing
+
+**An invisible fixture folder and a broken preview are indistinguishable**, so this gated every row —
+and it was an **equality, not a name match**: `create_folder` returned
+**`1e-mOprqjjxp3AHa8IPE8d4QnK4hYorSP`**, and the React component rendering the selected node in the
+app's own Drive browser carried **`folderId = "1e-mOprqjjxp3AHa8IPE8d4QnK4hYorSP"`**, read off live
+props. **Byte-identical.** ⚠ **243's lesson applied**: *a click for `anthropic` selected `minimax`;
+a scoreboard with unverified attribution is worse than none.*
+
+⚠ **`DEVIATION-245-02-A`** — D-10 assigned the Drive-side setup to the operator; the Drive MCP
+authenticates as the **same account** the app's `oauth_byo` connection uses, so Claude created the
+fixture. **The operator authorised that and the local-corpus writes explicitly, in chat, before
+anything ran**, and the STOP arm and identity gate were kept regardless — *approval to write is not
+proof the accounts match.*
+
+### ⚠ Observed while capturing row 2's baseline, and kept rather than smoothed
+
+The Library header read **152 documents** while the database read **162**. **The screen and the corpus
+disagree.** ⭐ **That is precisely why row 2 is scored against the database** — and it is a finding
+this drive was not looking for.
+
+---
+
+## § 240's five G-4 mail rows — DEFERRED, each with a named trigger (D-13)
+
+⛔ **Out of 245's scope by the ROADMAP's own wording**, and folding five more live rows into a
+2-3-plan phase is the consolidation failure mode — **M-4 disables a live integration and M-5 deletes
+at the source.** ⛔ **But silence is how they got here**, so all five are written out verbatim from
+`240-VERIFICATION.md:206-214`.
+
+| # | Row (verbatim) | Why it needs a person (240's own words) | Trigger |
+|---|---|---|---|
+| **M-1** | *Watch a real Gmail label; a message arrives by itself and reads as a document* | *"Run this first — it unblocks M-2 and M-3."* ⚠ The Google connection may need ONE reconnect: `gmail.readonly` was added to `default_scopes` on 2026-08-31, and a token minted before that answers `403` | ⭐ **the gate for M-2 and M-3** — the next phase touching mail ingestion, **or** the v4.1 close sweep, whichever is first |
+| **M-2** | *Open a watched message with an attachment; the attachment is its own document, findable from both ends* | *"the queue-path fix, driven for real rather than against a mock"* | **after M-1**, same window |
+| **M-3** | *Search the Library for a phrase from message 1 of a long thread; **one** result, not fourteen* | *"SC#1 at product level"* | **after M-1**, same window |
+| **M-4** | *Disable the Google connection; the mail watch stops **and** browse/preview refuse* | ⚠ *"Disables a live integration"* | the next phase touching mail ingestion, or the v4.1 close sweep — ⚠ **needs an operator go-ahead each time**, as 238's M-8 did |
+| **M-5** | *Delete a message at the source; the document is **not** deleted and the source state says what happened* | ⚠ *"Destructive at the source — your call"* | ditto, **operator decision required** |
+
+⚠ **240's own §2, recorded beside them because it is the reason the deferral matters:**
+**NO MAIL WATCH HAS EVER RUN IN THIS PRODUCT.** Phase 240's SC#4 is therefore inherited **by
+construction** (`watch_service.py` byte-unchanged, so Phase 234's four promises apply), and
+**`M-4` and `M-5` are what would settle it.** ⛔ Five rows deferred *and* a success criterion held by
+construction is a larger owed balance than any single row — say it in one place rather than in five.
+
+⚠ Also 240's, same trigger: **`BUG-260910-02`** (Phase 240 build-review open warnings —
+`backend/sources`, `frontend/sources`, `frontend/library`).
+
+---
+
+## § Deferred and NAMED — nothing leaves this phase silently
+
+| # | Item | Trigger |
+|---|---|---|
+| 1 | **M-9's Microsoft/OneDrive arm** — the one row SC#1 records as ⛔ BLOCKED | a `/Finance/` folder existing in the OneDrive account (**operator action**), or the next phase touching Graph ingestion |
+| 2 | **`BUG-260913-01`** — the Google Drive adapter never writes `metadata.source.path`; **every path-based classification rule is silently inert for every Drive document.** ⛔ Not fixed here (D-16 / G-3): it needs an adapter change **plus a cross-adapter fence** | the next phase touching Drive ingestion or classification rules. ⭐ **The fence is owed as much as the patch** — the gap existed on Microsoft until 238 and on Drive since 232 |
+| 3 | **233 row 3's refusal arm** — *"a refusal names its cause"*, never exercised because nothing was refused | the next drive that induces a refusal (oversized · permission-denied · unreadable) |
+| 4 | **237's out-of-scope condition filtering on scope switch** — ⭐ the *only* part of 237 the `245-02` click did **not** cover; see `245-UAT-RESULTS.md` § *237's rule-builder* rather than a duplicate here | the next classification-rules phase |
+| 5 | **240's five G-4 mail rows + `BUG-260910-02`** — section above | the next phase touching mail ingestion, or the v4.1 close sweep |
+| 6 | **`SEED-177`'s remaining arms (#1, #4)** — a **capability** decision, not bookkeeping | `SEED-013` / Open Platform getting a phase number |
+| 7 | **Making `OV-SOLO-01`'s re-arm trigger executable** — considered under D-04, **not taken**; what shipped is the greppable `OV-SOLO-01-status:` index, so a *retirement* is machine-readable even though the *trigger* is not | the **v4.1 close**, where the re-arm fires and can be watched working or failing |
+| 8 | **The five open `BUG-260909-03..07` reports** — reviewed and explicitly **not folded** (245 has no source-change budget). ⚠ **Recorded honestly rather than rounded either way:** the drives passed *through* `frontend/sources` and the watch surfaces but **did not exercise their specific claims**, so none was reproduced **and none was contradicted** | the next `frontend/sources` / `backend/watches` phase |
+| 9 | **The independent §6.3 review still owed by 238, 240 and 241** | ⛔ Gemini's return. **DEBT-03 was only ever *"say so in the record"*, never *"do it"*** — and this phase did not do it, which SC#3's section states in its own words |
+| 10 | **The 13 `SECURITY DEFINER` functions still `anon`-executable** (migration 177's own prediction) — unrelated to this phase, named so it is not lost. ⚠ **A role-by-role revoke achieves NOTHING while the `PUBLIC` grant stands** | the next security/migration phase; `get_advisors(security)` in the deploy parity checklist |
+| 11 | **`BUS-171` — the 23-item operator queue**, 6 days old and addressed to Claude. **Parked is not dropped.** Not folded because it is a *triage deliverable for the operator*, not verification debt | operator availability |
+| 12 | **`245-02`'s UAT fixture teardown** — the Drive folder `1e-mOprqjjxp3AHa8IPE8d4QnK4hYorSP` (7 files incl. `Finance/`), Library folder `245-UAT-DELETABLE` + its 7 documents, the `Finance` watch, and the M-9 rule. ⚠ **Held deliberately: they are `245-UAT-RESULTS.md`'s evidence** | this verdict being accepted |
+
+---
+
+## § The closing scoreboard
+
+⛔ **No row cites a test suite as its evidence.** That is this phase's **first named failure mode**,
+and a scoreboard that violated it would be self-refuting.
+
+| SC | Verdict | Discharged by | Evidence type |
+|---|---|---|---|
+| **SC#1** — 238's rows each read pass / ⛔ blocked-with-reason-and-id / retired-with-a-trigger | ✅ **CLOSED** | `245-03` (M-8's flip, M-9's conversion, S-1/S-2's retirement, the footer) + `245-02` (M-9's drive) | **written retirement** + **artifact grep** (`238-VERIFICATION.md`'s eleven rows) + **driven observation** (M-9, both doors) |
+| **SC#2** — 233's five G-4 rows driven live, a written verdict each | ✅ **CLOSED** | `245-02` | ⭐ **driven observation** — a real browser, live infra, and **four database tables measured before/after with `max(created_at)`** |
+| **SC#3** — the three files say "self-verified", and a reader can tell which gate ran | ✅ **CLOSED** | `245-01` | **artifact grep** (the `verification_mode` token in 6 files) + **citation** (the prose was already honest and is byte-unchanged) |
+| **SC#4** — `OV-SOLO-01` in `STATE.md` in full, with a re-arm trigger | ✅ **CLOSED** | `245-01` | **citation** — the operator's ruling quoted verbatim, ⛔ never re-derived |
+
+**4 / 4 closed.** ⚠ Two carry a **named** residue rather than a silent one: SC#1's M-9 Microsoft arm,
+and SC#2's row-3 refusal arm. **Both are in the deferred table with triggers.**
+
+### The five `## How we'd know this failed` items, each answered
+
+1. **"A row is marked done on the strength of a passing test suite rather than a driven
+   observation."** ⛔ **DID NOT HAPPEN — and it was refused twice, in both directions.** Every SC#2
+   row is a browser observation with a database measurement; no scoreboard row above cites a suite.
+   ⭐ **And the near-miss is the better evidence:** `245-02` drove M-9, saw a real failure, and
+   **refused to mark the row either PASS or FAIL** because the failure was against the wrong
+   provider. *A row marked done on evidence that does not address it* is this failure mode wearing a
+   drive's clothes, and it was caught in flight.
+2. **"`DEBT-03` turns into a re-review of three phases."** ⛔ **DID NOT HAPPEN.** `245-01`'s reads of
+   238/240/241 were **line-ranged to their frontmatter** (238:1-10, 240:1-16, 241:1-20) precisely so
+   no verdict could be re-judged, and `245-03` touched **only** M-8's headline, M-9's verdict, the
+   S-1/S-2 rows and the footer — `git diff` on `238-VERIFICATION.md` shows **5 changed lines and
+   nothing else**; M-1…M-7 are byte-unchanged.
+3. **"A VERIFICATION.md gets 'self-verified' added while its verdict still reads as though a reviewer
+   signed it."** ⛔ **DID NOT HAPPEN, and it is mechanical rather than asserted:** `git diff` shows
+   **ZERO deletions** in all five marked files and **every added line is frontmatter**. ⭐ The
+   inverse trap was found and refused too — SC#3's literal *"does not find 'reviewed'"* clause was
+   measured **unsatisfiable** (35 honest occurrences naming the owed review), and satisfying it
+   literally would have **deleted the honesty the criterion exists to protect**.
+4. **"`OV-SOLO-01` is recorded without a re-arm trigger and lapses unnoticed."** ⛔ **DID NOT
+   HAPPEN** — the trigger reads *"Gemini's quota returns, or the v4.1 close, whichever is first"*,
+   quoted verbatim in §SC#4, and `245-01` added a **greppable `OV-SOLO-01-status:` index** so a
+   future *retirement* is machine-readable. ⚠ The **trigger itself is still not executable**;
+   deferred item 7 names that, with the v4.1 close as its trigger.
+5. **"The Azure registration does not arrive and the phase stalls."** ⛔ **DID NOT HAPPEN — and the
+   premise was false.** ⭐⭐ **The registration was never the blocker.** It had been complete for
+   **six days** when this phase was planned, and the rows had been driven for six days. **The
+   phase's real risk was believing its own register** — which is the risk that actually fired, on
+   six live registers at once, and it is what §*The stale-claim sweep* exists to record. The
+   degraded-mode machinery the plans carried for a credential that never came was never needed;
+   what was needed was opening the artifact.
+
+---
+
+## § What this phase did NOT verify, stated as owed
+
+- ⛔ **238, 240 and 241 still owe an independent AGENTS.md §6.3 review.** This phase does **not**
+  discharge that and must not read as though it does. DEBT-03 was always *"say so in the record"*.
+- ⛔ **240's five mail rows are deferred, not driven.** Named with triggers; not closed.
+- ⛔ **This verdict is itself a SELF-verification** (`OV-SOLO-01`), including the part that certifies
+  the honesty marker. The recursion is stated rather than left to be noticed.
