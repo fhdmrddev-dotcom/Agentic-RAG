@@ -32,10 +32,11 @@ See: `.planning/PROJECT.md` (updated 2026-09-10)
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviors (skills) that persist and can be shared.
 
-**Current focus:** v4.1 milestone close (242-246 phase-complete)
-(⚠ depends hard on Phase 242 / `SHIP-01`). **Phase 245 CLOSED 2026-09-13, operator-accepted at UAT.**
-milestone (not v5.0: it opens no new capability axis). Ship v4.0 to production, then fix the chat
-surface the operator uses daily. Phase numbering continues at **242**.
+**Current focus:** **v4.1 milestone close — all five phases (242-246) are complete.**
+242 shipped · 243 closed · 244 closed · **245 CLOSED 2026-09-13, operator-accepted at UAT** ·
+**246 CLOSED 2026-09-13, peer-reviewed, `RECALL-01` deliberately left open**.
+A consolidation milestone (not v5.0: it opens no new capability axis). Phase numbering continues
+at **247** in the next milestone.
 
 ## Current Position
 
