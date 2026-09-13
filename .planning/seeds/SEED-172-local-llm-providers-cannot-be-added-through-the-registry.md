@@ -4,7 +4,13 @@ title: Local LLM providers (Ollama / LM Studio) cannot be added through the Mode
 created: 2026-08-17
 planted_during: operator local-model testing, during Phase 195 execution
 status: planted
-priority: medium
+priority: medium   # ⬆ the operator fired arm 1 on 2026-09-13; see `trigger_fired`
+trigger_fired: >
+  2026-09-13, at the v4.1 milestone close — the OPERATOR, unprompted: "I need to add manually from
+  the model registry the models for Ollama or LM Studio and configure the timeout and everything,
+  the context." That is arm 1 of `trigger_when`, verbatim, reported as lived friction rather than
+  found by a sweep. ⚠ It fired ~4 weeks after planting, and nothing swept the register in between —
+  the seed was reachable the whole time and it took a person hitting the wall to surface it.
 relates_to:
   - Phase 149 (MODEL-01 / MODEL-02) — built the Model Registry tab and the add-model endpoint whose
     provider guard this seed is about. The guard is CORRECT for discovery and WRONG for add.
@@ -204,3 +210,56 @@ unchanged.
 
 ⚠ **Do not close this on the strength of 180.** The guard is CORRECT for discovery and WRONG for
 add; that sentence is the whole seed and it is still true.
+
+
+---
+
+# ⭐ TRIGGER FIRED — 2026-09-13, by the operator, at the v4.1 close
+
+**The friction is exactly what this seed predicted**, in the operator's own words: a local model has
+to be added *by hand*, and its **timeout** and **context window** configured *by hand*, because the
+registry door is shut to it. Nothing above is amended — it was right — and two further facts were
+measured at the moment the trigger fired.
+
+## ⚠ NEW FINDING A — the manual step is not one step, it is three, and one of them is invisible
+
+Registering a local model by hand means inserting a `model_capabilities_overrides` row **and**
+setting `enabled = true` yourself (the API forces `false`) **and** supplying
+`context_window_tokens`, because an id absent from `MODEL_CAPABILITIES` resolves
+`capability_source = inferred` and silently loses `emit_tier` *and* `native_tools`. ⛔ **A local
+model left `inferred` runs with `native_tools=False`, which short-circuits above every tool gate** —
+the failure recorded in `project_local_models_structured_mode_trap`. So the manual work is not
+cosmetic tuning: **skip it and the model silently loses tool use.**
+
+## ⚠ NEW FINDING B — `lmstudio` is missing from two more capability tables, and is safe only by luck
+
+Measured in `backend/app/config.py` on 2026-09-13. `ollama` carries an explicit entry in both;
+`lmstudio` carries none:
+
+| Table | `ollama` | `lmstudio` | Fallback it lands on |
+|---|---|---|---|
+| `_INFERRED_DEFAULT_MAX_TOKENS` (line 515) | `8192` | ⛔ **absent** | `.get(provider, 8192)` → 8192 |
+| `_SUB_AGENT_MODEL_DEFAULTS` (line 827) | `""` | ⛔ **absent** | `.get(provider, "")` → `""` |
+
+**Both absences are currently HARMLESS — and that is the finding, not the reassurance.** The generic
+fallback happens to equal what `ollama` declares explicitly, so the behaviour is correct *by
+coincidence*. ⚠⚠ **This is the identical shape as the defect that DID fire**, recorded in this very
+file's neighbour at `config.py:106-115`: `lmstudio` was absent from `PROVIDER_CONTEXT_DEFAULTS`, fell
+through to the `100_000` unknown-provider fallback, and runs died with
+`400: request (41206 tokens) exceeds the available context size (32768)`. **A provider missing from a
+capability table is invisible until the day the fallback and the truth disagree** — and no gate can
+see the difference, because a `.get(k, default)` never fails.
+
+⛔ **Do not "fix" these two by adding entries alone.** Two rows would remove today's luck and leave
+the class untouched: the real defect is that a provider can be absent from a capability table with
+nothing saying so. The executable form is a test that enumerates `_PROVIDER_BASE_URLS` and asserts
+every provider appears in every capability table, so the NEXT provider added cannot be silently
+half-registered.
+
+## Routing at the v4.1 close
+
+**Not folded into v4.1** — it is a capability, not a defect in shipped v4.1 work, and folding a new
+capability into a closing milestone is the G-7 failure mode this project has already paid for.
+**Carried to the next milestone as a candidate requirement**, alongside `SEED-040`
+(model-registry self-service) and `SEED-135`, which it is now the concrete, operator-reported
+instance of.
