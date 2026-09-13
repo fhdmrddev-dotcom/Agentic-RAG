@@ -271,6 +271,23 @@ describe("searchPayloadFrom — the baseline MIRRORS hydrate, on both fixtures",
     expect(b.multimodal_max_vision_calls).toBe(1001)
   })
 
+  it("⛔ a NULL hnsw_ef_search falls back to 40, the value the BACKEND coalesces a NULL column to", () => {
+    // ⚠⚠ THIS CASE EXISTS BECAUSE NEITHER FIXTURE ABOVE EXERCISED THE `??` FALLBACK FOR THIS KEY.
+    // `ALL_NULL()` nulls six columns and `hnsw_ef_search` is NOT one of them — it holds
+    // `mkSettings`' base 200 — so FIXTURE A reads a STORED value here, exactly like FIXTURE B, and
+    // both stayed green while `settingsSearchPayload.ts` carried `?? 200`. That constant arrived in
+    // 246-02 (549d98ec9) with the since-abandoned raise-the-default work and survived the revert
+    // (521f4a025), which touched six files and missed this one. Found by the v4.1 milestone audit
+    // (INT-01), NOT by this file.
+    // ⛔ 40 is not a preference: `user_settings.py:1036` coalesces a NULL column to 40 on read, and
+    //    Phase 246 measured `ef_search = 200` as a ~1.1 s SEQUENTIAL SCAN. A baseline of 200 would
+    //    make an operator's drag back to the real default look "unchanged" and silently drop it.
+    const b = searchPayloadFrom(
+      mkSettings({ hnsw_ef_search: null } as unknown as Partial<FullAppSettings>),
+    )
+    expect(b.hnsw_ef_search).toBe(40)
+  })
+
   it("FIXTURE A: a NULL column's baseline is hydrate's fallback, so an untouched field is not 'changed'", () => {
     const b = searchPayloadFrom(ALL_NULL())
     expect(b.hnsw_ef_search).toBe(200)

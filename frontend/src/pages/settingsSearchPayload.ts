@@ -73,7 +73,7 @@ export function searchPayloadFrom(data: FullAppSettings): SettingsUpdate {
     vector_search_weight: data.vector_search_weight,
     keyword_search_weight: data.keyword_search_weight,
     rrf_k: data.rrf_k,
-    hnsw_ef_search: data.hnsw_ef_search ?? 200,
+    hnsw_ef_search: data.hnsw_ef_search ?? 40,
     hnsw_iterative_scan: data.hnsw_iterative_scan ?? "off",
   }
 }

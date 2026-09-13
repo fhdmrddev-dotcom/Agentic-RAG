@@ -565,13 +565,36 @@ MORE than expected; see `245-VERDICT.md`.
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 242. Ship It — and Prove What Already Shipped | 0/? | Not started | — |
-| 243. The Thinking Block and the Follow-Scroll Seam | 0/? | Not started (⚠ sketch owed first) | — |
+| 242. Ship It — and Prove What Already Shipped | 2 plans + 2 fast | ✅ **Complete 2026-09-11** | Self-verified (`OV-SOLO-01`), score **4.5/5**. 4 of 5 UAT rows driven in a real browser; row 5 (production) DEFERRED under D-242-08 as measured UNRUNNABLE — re-open trigger is the next promotion. `SHIP-02` retired in writing (`dbd63864b`); `SHIP-03` 20/20 against cloud; `SHIP-04` already landed. Migration **178** |
+| 243. The Thinking Block and the Follow-Scroll Seam | 5/5 | ✅ **Complete 2026-09-11** | Self-verified, **5/5 criteria**. CHAT-01 9/9 vs sketch 234 V1 on computed style; CHAT-03 driven with a **real wheel** on a 60-message thread (0 px drift, 0 app scrolls → BUG-260823-01 closed); CHAT-05 driven, 0 narration nodes |
 | 244. The Chat Shell and the Composer | 12/12 + 3 fix rounds | ✅ **Complete 2026-09-13** | Verified `passed`: **5/5 criteria DRIVEN and closed**. SHELL-03 closed on drive attempt 2 of `244-15-UAT-ROW.md` — two runs, two threads, answered in the CHAT column (panel cleared +12.6s) and in the PANEL (chat cleared +2.0s), run line left `live`, composer usable, both runs `run=failed`/`act=failed` server-side. ⛔ **NOT covered:** the fail-closed arms never ran (`wire_reported_live_at_settle` false both times — jsdom Tests 3/4/5 are their only evidence) and **Deep-mode `ask_user` is undriven**. ⚠ **G-7 cap SPENT** (2 of 2, overridden). Open: `WR-02`/`WR-03` + the build round's `WR-04`/`WR-08`/`IN-01..09` in `deferred-items.md`; SHELL-04's second gap → `SEED-272`. |
-| 245. The Verification Debt | 0/? | Not started | — |
-| 246. The Recall Cliff | 0/3 | Ready to execute | — |
+| 245. The Verification Debt | 3/3 | ✅ **Complete 2026-09-13** | Self-verified, **4/4 SC closed**, two with a NAMED residue and a trigger. Closes on `245-VERDICT.md` — ⚠ deliberately outside the honesty gate's `*-VERIFICATION.md` glob (widening it mid-flight would have changed the guard's contract with no review). `residue_owed`: 238-M-9-microsoft-arm · 233-row-3-refusal-arm · 240-five-mail-rows · independent-6.3-review |
+| 246. The Recall Cliff | 3/3 | ✅ **Complete 2026-09-13** | ⭐ **First phase since `OV-SOLO-01` was re-armed to carry `verification_mode: peer-reviewed`** — gemini built, claude reviewed at three gates. **3/4 SC — `SC#1`/`RECALL-01` UNMET BY MEASUREMENT, and that refutation IS the deliverable.** ⛔ One commit (`521f4a025`, the revert) is the reviewer's own and is named `self-verified` in `review_caveat`; the v4.1 audit then found INT-01 inside exactly that commit |
 
-**0 / 5 phases complete · 0 / 19 requirements delivered.**
+**5 / 5 phases complete · 18 / 19 requirements delivered.**
+
+⚠⚠ **THIS LINE READ `0 / 5 phases complete · 0 / 19 requirements delivered` UNTIL THE v4.1 MILESTONE
+AUDIT (2026-09-13), WITH ALL FIVE PHASES CLOSED AND FOURTEEN BOXES TICKED — and the original is
+recorded here rather than quietly overwritten, because this is the register `/gsd:complete-milestone`
+reads to build the archive.** Four of the five rows above said *"Not started"* or *"Ready to
+execute"*; only 244's was current. A close run against it would have written **"0/5 complete"** into
+v4.1's permanent historical record.
+
+⛔ **The drift ran in BOTH directions across the registers, which is why no single one can be trusted
+alone:** `SHIP-02/03/04` sat **unchecked** in `REQUIREMENTS.md` while their traceability rows carried
+full closing evidence, and `SHELL-04/05` + `RECALL-02` sat **ticked** while their rows still read
+*"Pending"*. `DEBT-01` held two rows in a table asserting *"no duplicates"*. `STATE.md` frontmatter
+read `total_phases: 12 · completed_phases: 4 · percent: 17`.
+
+⚠ **This is the identical class this ROADMAP OPENS by correcting in v4.0** (*"the requirement count
+is 19, not 17"*). **A coverage check run against the wrong denominator is how a requirement survives
+a milestone unnoticed** — and one milestone later the denominator register was wrong again, in a
+different column. Re-derive from the phase directories, never from this line.
+
+**The one undelivered requirement is `RECALL-01`, and it is undelivered ON PURPOSE** — Phase 246
+proved by `EXPLAIN (ANALYZE)` that no `hnsw_ef_search` value fixes the small-tenant cliff *through
+the index* (every index walk returns ONE row; every good recall figure is a ~1.1 s sequential scan).
+The default is reverted to 40 and the remaining path is `SEED-273` (`hnsw.iterative_scan`).
 
 ---
 

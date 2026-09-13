@@ -6,12 +6,12 @@ status: in_progress
 last_updated: 2026-09-13T12:10:00.000Z
 last_activity: 2026-09-13
 progress:
-  total_phases: 12
-  completed_phases: 4   # 242, 243, 244, 245.
-  total_plans: 16
-  completed_plans: 27
-  percent: 17
-stopped_at: "Phase 246 executed (3 plans); BLOCKED on sequential scan disclosure & latency regression. Awaiting operator decision."
+  total_phases: 5       # ⚠ read 12 until the v4.1 milestone audit (2026-09-13); v4.1 is phases 242-246
+  completed_phases: 5   # 242, 243, 244, 245, 246 — all closed
+  total_plans: 25       # 242:2 · 243:5 · 244:12 · 245:3 · 246:3
+  completed_plans: 25
+  percent: 100
+stopped_at: "v4.1 audited 2026-09-13 (gaps_found — RECALL-01 unmet BY MEASUREMENT, deliberately). Registers repaired, INT-01 fixed + fenced. Milestone close in progress."
 ---
 
 # Project State

@@ -57,21 +57,21 @@ register knows only the register below it; the code is the bottom.
 >
 > Full record: `.planning/phases/242-ship-it-and-prove-what-already-shipped/242-CONTEXT.md`.
 
-- [ ] **SHIP-01**: An operator can save the Settings → Search tab. Today every save returns HTTP 400
+- [x] ✅ **SHIP-01** — DELIVERED at Phase 242 (4/5 UAT rows driven in a real browser; the production row deferred under D-242-08 as measured UNRUNNABLE, re-open trigger = the next promotion). **ORIGINAL TEXT FOLLOWS** : An operator can save the Settings → Search tab. Today every save returns HTTP 400
       because a **stored** `multimodal_max_vision_calls` of `1001` sits outside the bound the API
       enforces, and the banner names a field the operator never touched. Closes `BUG-260910-03`
       (**severity: blocking**, reported 2026-09-10, reproduces on the operator's live local install).
       ⚠ **This is a prerequisite for RECALL-01, not a parallel item** — `hnsw_ef_search` is set on the
       tab that cannot save, so the `QUEUE-06` remedy Phase 241 shipped is presently unreachable.
-- [ ] **SHIP-02**: Phase 241's UAT row 5 is driven on **cloud** and recorded, or explicitly retired
+- [x] ✅ **SHIP-02** — SATISFIED BY ITS SECOND ARM: **retired in writing** at `dbd63864b`. The pre-176 database shape the drive needs exists nowhere, so it is not re-plannable; the retirement carries its evidence beside it rather than being silently ticked. **ORIGINAL TEXT FOLLOWS** : Phase 241's UAT row 5 is driven on **cloud** and recorded, or explicitly retired
       with a written reason. ⚠ **It expires:** the "no columns" arm it exists to prove becomes
       unreproducible **forever** once migration 176 is applied to cloud. Source:
       `.planning/milestones/v4.0-phases/241-recall-at-corpus-scale/241-HUMAN-UAT.md`.
-- [ ] **SHIP-03**: Cloud runs v4.0. Migrations `153, 154, 155, 156, 166..176` applied in numeric
+- [x] ✅ **SHIP-03** — MEASURED against cloud (20/20 structural checks over the Supabase MCP), not re-read from the deploy record; the verifier's own two FALSE FAILs were repaired first (`05203a1ed`). ⛔ The **non-code parity half** stays operator-owed and is named, not ticked. **ORIGINAL TEXT FOLLOWS** : Cloud runs v4.0. Migrations `153, 154, 155, 156, 166..176` applied in numeric
       order, once each, by pasting into the cloud Supabase SQL editor — never `db push` / `db reset`.
       The non-code parity half (env vars, seed rows, provider keys, `SANDBOX_IMAGE`) completed per
       `docs/DEPLOYMENT-WORKFLOW.md`.
-- [ ] **SHIP-04**: The production push is proposed to the operator and waits for an explicit yes.
+- [x] ✅ **SHIP-04** — ALREADY HAPPENED (`1f313670b`, 2026-09-10), confirmed against the DATABASE and not only against git. Not a push to schedule; a deployed state, verified. **ORIGINAL TEXT FOLLOWS** : The production push is proposed to the operator and waits for an explicit yes.
       `develop` → `master` → `production`, promoted surgically. Carries `SEED-242` (`app.<domain>`),
       whose routing half already landed at `f63a8ebcc`.
 
@@ -218,7 +218,15 @@ register knows only the register below it; the code is the bottom.
 
 ## Traceability
 
-Filled by the roadmapper 2026-09-11. **Every REQ-ID above maps to exactly one phase. 19 / 19 mapped, no orphans, no duplicates.**
+Filled by the roadmapper 2026-09-11. **Every REQ-ID above maps to exactly one phase. 19 / 19 mapped, no orphans.**
+
+⚠ **CORRECTED 2026-09-13 at the v4.1 milestone audit — this line said `no duplicates` and the table
+below has always held TWO `DEBT-01` rows** (the original, plus the Phase 245 correction that
+preserves it rather than overwriting it). The claim is amended rather than the rows merged: keeping a
+superseded row beside its correction is this project's convention and is deliberate, so what was
+wrong was the **assertion**, not the table. ⛔ A summary line that describes the table incorrectly is
+the same defect class as the ROADMAP Progress table reading `0 / 5 phases complete` — **a register
+that is present and WRONG answers the auditor and stops the audit.**
 
 ⚠ **THE COUNT IS 19, NOT 17.** This file's own header block, `PROJECT.md`, and commit `c1a395abf` (*"17 REQ-IDs, 5 categories"*) all say **17**. Counted from the checkboxes above: **SHIP 4 · CHAT 5 · SHELL 5 · DEBT 3 · RECALL 2 = 19.** The original figure is recorded rather than overwritten, because **a coverage check run against the wrong denominator is exactly how a requirement survives a whole milestone unnoticed** — and this is the second consecutive milestone it has happened on (v4.0 opened saying *34* against an actual *38*).
 
@@ -236,14 +244,14 @@ Filled by the roadmapper 2026-09-11. **Every REQ-ID above maps to exactly one ph
 | SHELL-01 | 244 — Chat shell + composer | Complete |
 | SHELL-02 | 244 — Chat shell + composer | Complete |
 | SHELL-03 | 244 — Chat shell + composer | Complete |
-| SHELL-04 | 244 — Chat shell + composer | Pending — ⚠ G-2 sketch owed (net-new surface) |
-| SHELL-05 | 244 — Chat shell + composer | Pending — ⚠ G-2 sketch owed (net-new surface) |
+| SHELL-04 | 244 — Chat shell + composer | ⚠ **CORRECTED 2026-09-13 at the v4.1 milestone audit — the row read `Pending — G-2 sketch owed` while the phase had DRIVEN and CLOSED it.** ✅ **Complete** — R2-2 arms 1-3 PASS in a real browser, defect 6b (the 2nd attachment) fixed. The robustness edge G-7 (a failed attachment copy never gives up and never recovers) is **knowingly open** and deferred to `SEED-272` by explicit operator ruling, with a concrete re-open trigger |
+| SHELL-05 | 244 — Chat shell + composer | ⚠ **CORRECTED 2026-09-13 at the v4.1 milestone audit — the row read `Pending — G-2 sketch owed`.** ✅ **Complete** — round-1 UAT L-7 PASS, **both directions**, the first end-to-end drive of this signal across two milestones. Closes `SURF-03`, carried unticked out of v4.0 |
 | DEBT-01 | 245 — The verification debt | Pending — ⚠ blocked on one Azure app registration; **M-1 first** |
 | DEBT-01 | 245 — The verification debt | ⚠ **CORRECTED 2026-09-13 (Phase 245) — the row above is preserved, not deleted.** ✅ **Complete** (`245-03`). *"blocked on one Azure app registration; M-1 first"* was **FALSE**: All nine of 238's M rows were **DRIVEN LIVE on 2026-09-07** (`238-VERIFICATION.md:213-231` — 7 full pass, 2 half at the time; **four defects found by driving and NONE by the 15-case unit suite**). The operator completed the Azure registration *hours after* `238-SUMMARY.md` was written. 238's table is terminal — **eleven rows, 8 ✅ PASS · 1 ⛔ BLOCKED with reason/id/trigger (M-9, `BUG-260913-01`) · 2 ⛔ RETIRED (S-1/S-2, `SEED-256`) · 0 HALF.** ⚠ Residue named not hidden: M-9's Microsoft/OneDrive arm |
 | DEBT-02 | 245 — The verification debt | ✅ **Complete** (`245-02`, 2026-09-13) — 233's five G-4 rows **DRIVEN IN A REAL BROWSER**, five written verdicts, all ✅ PASS; row 2 driven first and scored against four database tables with `max(created_at)`. ⛔ Evidence is **driven observation**, never a suite. ⚠ Row 3's refusal arm owed, trigger named |
 | DEBT-03 | 245 — The verification debt | ✅ **Complete** (`245-01`, 2026-09-13) — marker in FIVE files with ZERO prose deleted, gate + PostToolUse hook driven RED on both arms, SC#4 discharged by citation. ⚠ SC#4 was ALREADY TRUE at HEAD while this row read `Pending`. |
-| RECALL-01 | 246 — The recall cliff | Pending — ⚠ **depends on SHIP-01**; `retrieval_service.py`'s extraction must be proposed first |
-| RECALL-02 | 246 — The recall cliff | Pending — its home is `retrieval_tuning.py`, which has **no ledger row** |
+| RECALL-01 | 246 — The recall cliff | ⛔ **UNMET AT PHASE 246's CLOSE, BY MEASUREMENT, AND LEFT OPEN DELIBERATELY** (the row previously read `Pending — depends on SHIP-01`). `EXPLAIN (ANALYZE)` on a 100k-chunk bench: `ef_search` 40/60/80 → **Index Scan, ONE row**, recall ~0.05, ~4 ms; 100/150/200 → **Seq Scan**, recall 1.000, ~1,100 ms. **No value fixes the cliff through the index.** Default reverted to 40 (`521f4a025`); remaining path `SEED-273` (`hnsw.iterative_scan`). ⚠ Phase 241's contrary conclusion **never inspected a plan** |
+| RECALL-02 | 246 — The recall cliff | ⚠ **CORRECTED 2026-09-13 at the v4.1 milestone audit — the row read `Pending`.** ✅ **Complete** (246 SC#3 MET) — the backend probe asks Postgres (`retrieval_tuning.py`) and the screen renders `null` + a skeleton pre-fetch, never a compiled-in guess. ⛔ `retrieval_tuning.py` still has **no hot-file ledger row** |
 
 **Coverage: 19 / 19 ✓**
 
