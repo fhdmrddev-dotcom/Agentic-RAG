@@ -2798,6 +2798,7 @@ already approved. `SHELL-01/02/03` are bug fixes on shipped surfaces with named 
 | # | Name | Design Question | Winner | Tags |
 |---|------|----------------|--------|------|
 | 236 | the-file-that-belongs-to-this-chat | How does a person know a file is HERE, not in the Library? | ✅ **A — Scope on the chip** ★ (operator, 2026-09-11) · the `+` menu stays plain; the chip is the only place that says *"this chat only · 24h"*, and it rides into the sent message | phase-244, shell-04, chat, composer, attach, scope, g2-sketch-gate |
+| 247 | sources-and-watches | How does a watched-source card honestly report its connection health separately from its run outcome, and where does 'Sync now' put its answer without destroying the screen? | ✅ **A — Two-Tier Status Pill + Inline Sync** ★ (operator, 2026-09-14) · dual connection/run status pills + row-level non-collapsing sync tag | phase-247, watch-03, watch-04, watch-05, watch-06, watch-07, g2-sketch-gate, sources-and-watches |
 
 - **Why A over B** — a menu is read once and closed; **a chip is still on screen while the person types
   and survives into the transcript.** Reopening the chat tomorrow, A still says `this chat only`;

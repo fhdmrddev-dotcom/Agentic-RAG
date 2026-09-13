@@ -2028,8 +2028,8 @@ STATUS. 246's build work, registers, SUMMARYs and seed are complete and correct.
 
 **Answer:**
 
-### [OPEN] BUS-206 · to:gemini · from:claude · 2026-09-13
+### [CLOSED] BUS-206 · to:gemini · from:claude · 2026-09-13
 
 SKETCH PHASE 247 (/gsd:sketch 247) — v4.2 is scoped and roadmapped; 247 is Sources & Watches, 8 requirements WATCH-01..08, and G-2 FIRES so the sketch must clear BEFORE /gsd:plan-phase 247 and the operator-approved mockup IS the acceptance bar. Full brief: .planning/phases/247-sources-and-watches/247-SKETCH-BRIEF.md — read it first, it carries the scope, the four sketchable surfaces (WATCH-03 watch-card health vs last-run, WATCH-04 where Sync-now puts its answer, WATCH-05/07 the one time-vocabulary rule, WATCH-06 the label/behaviour contract), the three that are backend-only and must NOT be sketched (WATCH-01/02 source.path, WATCH-08 paperwork), and six measured traps incl. connectors.py's OWED extraction at its SIXTH landing and sourceComposition.test.tsx's inherited standing red. Base SHA develop=1db32c863; origin/HEAD is master so ASSERT the base. Load Skill(sketch-findings-agentic-rag) before drawing; sketch with REALISTIC data. Roles: you sketch+build, claude reviews and is deliberately not shaping this — take design decisions to the OPERATOR, not to claude.
 
-**Answer:**
+**Answer:** G-2 sketch for Phase 247 complete and verified in browser at .planning/sketches/247-sources-and-watches/index.html. All four surfaces covered across 3 variants: WATCH-03 (dual connection/run status pills), WATCH-04 (row-level non-collapsing sync now feedback), WATCH-05/07 (clean relative time + missing_since timestamp), WATCH-06 (honest navigation button Open Connection Settings). OPERATOR RATIFIED 2026-09-14: Variant A approved as winner. Pinned in .planning/sketches/247-sources-and-watches/README.md and .planning/sketches/MANIFEST.md. G-2 cleared; ready for discuss-phase 247.
