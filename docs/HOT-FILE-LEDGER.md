@@ -7525,6 +7525,13 @@ both 231 and 241).
 The planning-time figure `1 / 1 / 67` is kept above; the file grew **14x** inside one phase, which is
 what a rewrite-in-place looks like in a triple.
 
+⚠ **RE-DERIVED AT PHASE 246 (2026-09-13, `246-03`): `3 / 4 / 1070` — G-5: no (3 phases).**
+Landing 3 (Phase 246 / Blocker B): safe as-is. Evaluated for extraction vs safe-as-is per Blocker B / D-246-12:
+- It is an offline evaluation module with a clean two-layer architecture (Layer 1 mechanical comparison vs Layer 2 semantic probes).
+- It has zero coupling to the request-serving path (never called from FastAPI endpoints or background workers).
+- Import-safe by construction (no module-scope DSN or network calls, verified by `test_241_recall_harness_honesty.py`).
+- Phase 246 changes are strictly additive instrumentation: added `inspect_execution_plan` (`EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)` verifying `idx_scan > 0`), query timing, and p50/p95 latency percentiles.
+
 ⭐ **IT NOW HAS THE PROPERTY IT LACKED: it can report a failure.** Driven live for the first time at
 `241-04`, against the operator's real corpus, it returned **`Hit@1 0.78 · MRR 0.778`** with two
 honest misses and one target reported ABSENT and **excluded** from the metric — where its
@@ -10514,7 +10521,7 @@ cells rot within days.
 | [`frontend/src/components/ingestion/DocumentList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestiondocumentlisttsx) | 24 / 13 / 294 | ⚠ **FIRES** | ✅ **seam TAKEN (217.1-05)** — `DocumentRow.tsx` extracted with the sketch's five affordances (−315 L). ⚠ 7-column order still load-bearing: `LibraryPage` sheds cols 3–5 by `nth-child` |
 | [`frontend/src/pages/LibraryPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpageslibrarypagetsx) | 46 / 15 / 970 | ⚠ **FIRES** | ⚠ row STALE a FOURTH time, ONE PLAN later. honoured by construction (**244-06**): ONE mount + 3 EXISTING props; the door owns its connections read, so the page gained no effect |
 | [`backend/app/services/retrieval_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrievalservicepy) | 19 / 11 / 456 | ⚠ **FIRES** | ⛔ **extraction still OWED** (`SEED-224`, since 231) — 241 is the SECOND landing, capped at 11 lines by a fence; a THIRD must propose the extraction FIRST |
-| [`backend/app/services/recall_eval.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrecallevalpy) | 2 / 2 / 978 | no (2 phases) | rewritten in place at 241 (`1 / 1 / 67` → here). ⭐ driven LIVE at 241-04: it reported `Hit@1 0.78` AND refused a bench it could not read — both arms real |
+| [`backend/app/services/recall_eval.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrecallevalpy) | 3 / 4 / 1070 | no (3 phases) | Phase 246 landing: safe as-is (offline test/eval harness, zero request-path side effects, clean 2-layer design). Added `inspect_execution_plan` (EXPLAIN + `idx_scan > 0`) & latency p50/p95 |
 | [`scripts/build-recall-bench.py`](docs/HOT-FILE-LEDGER.md#scriptsbuild-recall-benchpy) | 4 / 1 / 1088 | no (1 phase) | ⚠ row ADDED at 241-04 — the only `DROP DATABASE` in the repo. Guard + constant-interpolation + AST fence, all driven RED. It built GREEN and unreadable; assert the READ |
 | [`backend/app/services/retrieval_tuning.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrievaltuningpy) | 4 / 2 / 364 | no (2 phases) | young (241, 246). ⛔ `ef_search` is the lever (200 → recall 1.000); dynamic server probe + 60s TTL cache (246, SEED-268) |
 | [`frontend/src/components/metadata/DocumentDetailPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsmetadatadocumentdetailpaneltsx) | 12 / 7 / 596 | ⚠ **FIRES** | honoured by construction (**240**): ONE child section mounted, gated on metadata, no shell change. ⚠ CR-01's fence caught a missing reset before it shipped |
