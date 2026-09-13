@@ -2,15 +2,11 @@
 gsd_state_version: 1.0
 milestone: v4.2
 milestone_name: The Connected Knowledge You Can Actually Run
-status: planning
-last_updated: "2026-09-13T15:10:00.000Z"
-last_activity: 2026-09-13 — Milestone v4.2 started; v4.1 deployed to production (eebc4c42f)
+status: in-progress
+last_updated: "2026-09-14T00:32:00.000Z"
+last_activity: 2026-09-14 — Phase 247 G-2 sketch Variant A ratified; discuss-phase complete; 247-CONTEXT.md written
 progress:
-  # ⚠ HAND-WRITTEN, as every block in this file must be. `gsd-sdk query milestone.complete`
-  # overwrote the v4.1 block at its close with `total_phases: 12 · completed_plans: 30 ·
-  # percent: 42` — three wrong numbers against a milestone of 5 phases and 25 plans, all
-  # complete. Re-derive from the phase directories, never from a summary line.
-  total_phases: 0       # set when the roadmap is approved
+  total_phases: 5
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -106,10 +102,10 @@ owed work at all.
 
 ## Current Position
 
-Phase: Not started (roadmap pending)
+Phase: 247 — Sources & Watches
 Plan: —
-Status: Defining requirements — v4.2 scoped, REQUIREMENTS.md written, roadmap next
-Last activity: 2026-09-13 — Milestone v4.2 started; v4.1 deployed to production (`eebc4c42f`)
+Status: Discuss-phase complete (247-CONTEXT.md locked); ready for /gsd:plan-phase 247
+Last activity: 2026-09-14 — Phase 247 G-2 sketch Variant A ratified; discuss-phase complete; 247-CONTEXT.md locked
 
 ### v4.2 disposition of the seven carried items
 
