@@ -10,6 +10,16 @@ folded_into: null
 verified_closed_by: null
 related_seeds: [SEED-094]
 re_open_trigger: "Any phase re-touching agent_loop.py run termination/finalization, OR a user reports todos stuck '0/N, task 1 in progress' after a run that finished and delivered. Promote via SEED-094 at /gsd:new-milestone."
+trigger_fired: >
+  2026-09-13, at /gsd:new-milestone — the OPERATOR, unprompted: "sometimes the task is completed
+  perfectly but the To Do List is not updated so it looks like it's unfinished job". That is arm 2
+  of re_open_trigger, verbatim, reported as lived friction rather than found by a sweep.
+  ⛔ This report is NOT re-opened, and the reason is recorded rather than assumed: the code it was
+  deferred against HAS since changed — Phase 138 shipped `reconcile_open_todos_on_run_end`
+  (todos_service.py:117, called from run_producer.py:146) and SEED-094 closed on it. The new
+  sighting is therefore filed fresh as BUG-260913-02, which names the ONE measurement that
+  separates "the 138 reconciler did not fire" (a defect) from "it fired and its honesty marker
+  reads as a failure verdict" (a scoping decision). Route through that report, not this one.
 reproduces_on:
   branch: develop
   commit: 06ae19dc
