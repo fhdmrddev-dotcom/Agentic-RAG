@@ -129,3 +129,30 @@ in the OneDrive account and creating one is an operator action).
 - Phase 238 Defect 3, rows M-6/M-7/M-9: `.planning/milestones/v4.0-phases/238-microsoft-graph-onedrive/238-VERIFICATION.md`
 - Phase 245 CONTEXT **D-05** — required both doors; that requirement is what produced the correct cause.
 - `backend/app/services/sources/preview_service.py` (238-04 *display ≠ stored*), `backend/app/services/sources/base.py`.
+
+## ⭐ Why it is SILENT — added 2026-09-13 during Phase 245's UAT, found by the OPERATOR
+
+⚠ **`path` is not rendered on any screen in the product.** Measured, not assumed:
+
+- `frontend/src/components/metadata/DocumentDetailPanel.tsx` — **zero** matches for
+  `source_path` / `metadata.source` / a path field. The document detail panel never shows it.
+- Across all of `frontend/src`, the **only** file mentioning `source_path` / `source.path` is
+  `frontend/src/components/classification/RuleBuilderPanel.tsx:119` — the list of fields a rule
+  may be written AGAINST.
+
+⛔ **So the product lets a user build a rule on a field it will never display.** That is the
+mechanism behind the word *silently* in this bug's title, and it is a **second, separable defect**
+from the null write: even once the adapter is fixed, a user whose path rule matches nothing has no
+surface anywhere that shows what `path` actually holds. Fixing only the adapter leaves the
+diagnosis impossible for the next provider that regresses.
+
+⭐ **How it was found is the point.** During Phase 245's UAT the operator was told to "look at the
+source path in the detail panel" and replied *"I did not see in the metadata source path"* — the
+instruction was wrong, and being wrong is what exposed the field's invisibility. **A bug whose
+observation step cannot be carried out is telling you something about the product**, not about the
+reader. ⚠ This is also why the row was scored from the artifact and not from the screen: the
+screen cannot answer it.
+
+**Consequence for any fix plan:** repairing `import_service` alone closes half of this. The other
+half is surfacing `path` where a person can read it — the detail panel is the natural home
+(`DocumentDetailPanel.tsx`, which already renders per-field metadata with a `ConfidenceChip`).

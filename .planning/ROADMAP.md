@@ -437,8 +437,8 @@ nothing import, `Retry-After` consumption, WR-08 and WR-04.
 
 Plans:
 - [x] 245-01-PLAN.md — DEBT-03: the `verification_mode: self-verified` marker in five VERIFICATION.md files, an executable guard + PostToolUse hook driven RED, and SC#4 discharged by citing `OV-SOLO-01`. ⭐ Needs no credential, no infra, no operator — the arm that cannot stall.
-- [ ] 245-02-PLAN.md — DEBT-02 + DEBT-01's M-9 arm: 233's five G-4 rows driven live (row 2 first, measured against the DB before anything is imported) and M-9 driven through BOTH doors with the rule created through `RuleBuilderPanel`.
-- [ ] 245-03-PLAN.md — DEBT-01's paper arm: M-8 flipped off a self-contradicting HALF PASS, S-1/S-2 retired across three registers in one commit, EVERY live-register home of the stale Azure claim corrected BESIDE its original (derived over two phrases, 32 hits swept, exclusions named), `SEED-177` refuted, 240's five mail rows deferred with triggers.
+- [x] 245-02-PLAN.md — DEBT-02 + DEBT-01's M-9 arm: 233's five G-4 rows driven live (row 2 first, measured against the DB before anything is imported) and M-9 driven through BOTH doors with the rule created through `RuleBuilderPanel`.
+- [x] 245-03-PLAN.md — DEBT-01's paper arm: M-8 flipped off a self-contradicting HALF PASS, S-1/S-2 retired across three registers in one commit, EVERY live-register home of the stale Azure claim corrected BESIDE its original (derived over two phrases, 32 hits swept, exclusions named), `SEED-177` refuted, 240's five mail rows deferred with triggers.
 
 **UI hint**: no.
 **Migrations**: none.
