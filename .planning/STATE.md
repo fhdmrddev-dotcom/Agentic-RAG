@@ -510,6 +510,12 @@ to close that gap in writing**, on phases 238, 240 and 241.
 
 **Applies to:** every phase in v4.1 (242-246).
 
+**Confirmed by Phase 245 (DEBT-03 / SC#4), 2026-09-13:** measured **complete at HEAD before the phase
+began** — all four elements and the re-arm trigger present. Cited verbatim in `245-VERDICT.md` §SC#4.
+⛔ Nothing here was re-derived, reordered or rewritten. ⚠ The register said `pending`; the artifact
+said `done`. **Three registers can be wrong in the direction of "still owed" too** — the same class of
+error as the stale Azure claim `245-03` corrects, running the other way.
+
 ---
 
 #### ⚠ The original entry, preserved — OV-SOLO-01 before the ruling
