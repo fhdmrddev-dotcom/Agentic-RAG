@@ -95,7 +95,7 @@ function mkSettings(overrides: Partial<FullAppSettings> = {}): FullAppSettings {
     vector_search_weight: 1,
     keyword_search_weight: 1,
     rrf_k: 60,
-    hnsw_ef_search: 40,
+    hnsw_ef_search: 200,
     hnsw_iterative_scan: "off",
     hnsw_ef_search_floor: 10,
     hnsw_ef_search_ceiling: 1000,
@@ -116,7 +116,6 @@ const ALL_NULL = () =>
   mkSettings({
     vision_model: null,
     vision_max_pages: null,
-    hnsw_ef_search: null,
     hnsw_iterative_scan: null,
     extraction_model: null,
     extraction_provider: null,
@@ -274,7 +273,7 @@ describe("searchPayloadFrom — the baseline MIRRORS hydrate, on both fixtures",
 
   it("FIXTURE A: a NULL column's baseline is hydrate's fallback, so an untouched field is not 'changed'", () => {
     const b = searchPayloadFrom(ALL_NULL())
-    expect(b.hnsw_ef_search).toBe(40)
+    expect(b.hnsw_ef_search).toBe(200)
     expect(b.hnsw_iterative_scan).toBe("off")
     expect(b.vision_max_pages).toBe(50)
     expect(b.vision_model).toBe("")
@@ -439,5 +438,51 @@ describe("§7 — an unknown baseline is NOT collapsed into 'nothing changed'", 
     const body = searchBodyFor(full, null)
     expect(Object.keys(body).length).toBe(24)
     expect(body).toEqual(full)
+  })
+})
+
+describe("§8 — Phase 246 (RECALL-02): pre-fetch loading honesty and copy calibration", () => {
+  it("displays 'Default is 200' in help text", async () => {
+    mockGetSettings.mockResolvedValue(mkSettings())
+    renderSettings()
+    await openSearch()
+    await screen.findByLabelText("Search breadth")
+    expect(screen.getByText("Default is 200")).toBeInTheDocument()
+  })
+
+  it("renders a neutral loading placeholder when hnsw_ef_search has not loaded", async () => {
+    mockGetSettings.mockResolvedValue(mkSettings({ hnsw_ef_search: null as unknown as number }))
+    renderSettings()
+    await openSearch()
+
+    // When hnsw_ef_search is null, Search breadth has a neutral skeleton placeholder
+    expect(screen.getByLabelText("Loading search breadth")).toBeInTheDocument()
+    expect(screen.queryByLabelText("Search breadth")).not.toBeInTheDocument()
+  })
+
+  it("when data.hnsw_ef_search is 200, the loaded input renders 200", async () => {
+    mockGetSettings.mockResolvedValue(mkSettings({ hnsw_ef_search: 200 }))
+    renderSettings()
+    await openSearch()
+    const input = (await screen.findByLabelText("Search breadth")) as HTMLInputElement
+    expect(input.value).toBe("200")
+  })
+
+  it("editing hnsw_ef_search to 50 sends {'hnsw_ef_search': 50} on save", async () => {
+    mockGetSettings.mockResolvedValue(mkSettings({ hnsw_ef_search: 200 }))
+    renderSettings()
+    await openSearch()
+    const input = await screen.findByLabelText("Search breadth")
+    await userEvent.clear(input)
+    await userEvent.type(input, "50")
+    expect(await saveSearch()).toEqual({ hnsw_ef_search: 50 })
+  })
+
+  it("leaving hnsw_ef_search unchanged sends nothing in the diff payload", async () => {
+    mockGetSettings.mockResolvedValue(mkSettings({ hnsw_ef_search: 200 }))
+    renderSettings()
+    await openSearch()
+    await screen.findByLabelText("Search breadth")
+    expect(await saveSearch()).toEqual({})
   })
 })

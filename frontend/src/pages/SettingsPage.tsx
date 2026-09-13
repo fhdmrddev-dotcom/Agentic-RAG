@@ -722,11 +722,9 @@ export function SettingsPage() {
   const [vectorWeight, setVectorWeight] = useState(1.0)
   const [keywordWeight, setKeywordWeight] = useState(1.0)
   const [rrfK, setRrfK] = useState(60)
-  // Phase 241 (QUEUE-06 / D-09) — search breadth and iterative scan. ⛔ The BOUNDS are served
-  // by `GET /settings` and start as null, exactly like the source ceiling above: there is no
-  // honest cold value for a bound the server has not stated yet, and typing 10/1000 here would
-  // make the form a second private copy of numbers migration 176's CHECK also carries.
-  const [hnswEfSearch, setHnswEfSearch] = useState(40)
+  // Phase 246 (RECALL-02 / Finding 1 / D-246-06) — hnswEfSearch starts as null (pre-fetch state)
+  // so the screen renders a neutral skeleton rather than asserting a compiled-in guess on first paint.
+  const [hnswEfSearch, setHnswEfSearch] = useState<number | null>(null)
   const [hnswIterativeScan, setHnswIterativeScan] = useState("off")
   const [hnswEfSearchFloor, setHnswEfSearchFloor] = useState<number | null>(null)
   const [hnswEfSearchCeiling, setHnswEfSearchCeiling] = useState<number | null>(null)
@@ -818,12 +816,8 @@ export function SettingsPage() {
     setVectorWeight(data.vector_search_weight)
     setKeywordWeight(data.keyword_search_weight)
     setRrfK(data.rrf_k)
-    // Phase 241. ⚠ HI-02, the same rule the source ceiling above states: the STORED value is
-    // always rendered, and `??` covers only a backend predating the field entirely — never a
-    // stored value, which would make "open the page and press Save" a silent reset. Migration
-    // 176 being authored-but-not-applied is NOT that case: the column is absent, `_val()`
-    // returns the config default, and the server still sends 40 / "off".
-    setHnswEfSearch(data.hnsw_ef_search ?? 40)
+    // Phase 246 (Finding 1): delete dead ?? fallback; backend GET /settings returns non-optional int
+    setHnswEfSearch(data.hnsw_ef_search)
     setHnswIterativeScan(data.hnsw_iterative_scan ?? "off")
     setHnswEfSearchFloor(data.hnsw_ef_search_floor ?? null)
     setHnswEfSearchCeiling(data.hnsw_ef_search_ceiling ?? null)
@@ -952,7 +946,7 @@ export function SettingsPage() {
       keyword_search_weight: keywordWeight,
       rrf_k: rrfK,
       // Phase 241 (QUEUE-06 / D-09) — the two knobs ride the payload this tab already sends.
-      hnsw_ef_search: hnswEfSearch,
+      hnsw_ef_search: hnswEfSearch ?? undefined,
       hnsw_iterative_scan: hnswIterativeScan,
     }
 
@@ -1626,13 +1620,17 @@ export function SettingsPage() {
                     toggle would hide a control that is still in effect.
                     ⛔ The bounds are SERVED, never typed here — see `hnswEfSearchFloor`. */}
                 <FieldRow label="Search breadth">
-                  <NumberInput
-                    value={hnswEfSearch}
-                    onChange={setHnswEfSearch}
-                    min={hnswEfSearchFloor ?? undefined}
-                    max={hnswEfSearchCeiling ?? undefined}
-                    ariaLabel="Search breadth"
-                  />
+                  {hnswEfSearch === null ? (
+                    <div className="h-8 w-full rounded-md bg-muted/40 animate-pulse" aria-label="Loading search breadth" />
+                  ) : (
+                    <NumberInput
+                      value={hnswEfSearch}
+                      onChange={setHnswEfSearch}
+                      min={hnswEfSearchFloor ?? undefined}
+                      max={hnswEfSearchCeiling ?? undefined}
+                      ariaLabel="Search breadth"
+                    />
+                  )}
                 </FieldRow>
                 <p className="text-xs text-muted-foreground -mt-1 mb-2">
                   How many candidate passages the index looks at before your filters are
@@ -1643,7 +1641,7 @@ export function SettingsPage() {
                   {hnswEfSearchFloor !== null && hnswEfSearchCeiling !== null && (
                     <> {" "}Allowed: {hnswEfSearchFloor}&ndash;{hnswEfSearchCeiling}.</>
                   )}
-                  {/* Phase 241 — the RECOMMENDATION, stated as EVIDENCE rather than as a blanket
+                  {/* Phase 241 & 246 — the RECOMMENDATION, stated as EVIDENCE rather than as a blanket
                       prescription. Measured on a 100,000-passage bench at three tenant sizes
                       (241-VALIDATION.md): 200 reached full recall at every one, and 1000 was
                       REPRODUCIBLY WORSE than 400 — so "set it as high as it goes" is measurably
@@ -1651,7 +1649,7 @@ export function SettingsPage() {
                       what the operator ought to want. */}
                   {" "}
                   <span className="font-medium text-foreground">
-                    200 is a good starting point
+                    Default is 200
                   </span>
                   {" "}&mdash; on our 100,000-passage test library it returned every result that
                   should have been found, for small and large teams alike. Higher is not better:
