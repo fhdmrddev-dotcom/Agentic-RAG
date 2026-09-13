@@ -203,14 +203,14 @@ register knows only the register below it; the code is the bottom.
 
 ### RECALL — the cliff, and the screen that describes it
 
-- [ ] **RECALL-01**: A tenant owning a small share of a large corpus gets honest recall **out of the
+- [ ] ⛔ **RECALL-01** — **UNMET AT PHASE 246's CLOSE, BY MEASUREMENT, AND LEFT OPEN DELIBERATELY.** 246 proved no `ef_search` value repairs the cliff *through the index*: every genuine index walk returns ONE row, and every good recall figure is a sequential scan (~1.1 s). The default was reverted to 40. Follow-up: `SEED-273` (`hnsw.iterative_scan`). ⚠ Phase 241's contrary conclusion never inspected a plan. **ORIGINAL TEXT FOLLOWS** : A tenant owning a small share of a large corpus gets honest recall **out of the
       box**. Measured at the v4.0 close: at the default `hnsw.ef_search = 40`, a tenant owning 0.2% of
       a 100k-chunk corpus scores `recall@20` of **0.040**; `ef_search = 200` restores **1.000**.
       ⚠ **It is a cliff, not a slope** — an install crosses it with no deploy and no setting change.
       `QUEUE-06` is honestly unticked today; this ticks it. Depends on **SHIP-01**.
       ⚠ **`retrieval_service.py` is at its THIRD G-5 landing** (owed since 231, second landing was
       241): the extraction must be **proposed before** any change lands there.
-- [ ] **RECALL-02**: The Settings screen cannot display a search breadth that is not in effect.
+- [x] ✅ **RECALL-02** — MET at Phase 246 (the backend probe asks Postgres; the screen renders nothing until it answers). **ORIGINAL TEXT FOLLOWS** : The Settings screen cannot display a search breadth that is not in effect.
       Today the no-op shortcut compares against a hardcoded `40` rather than what the server holds.
       Folds `SEED-268`.
 

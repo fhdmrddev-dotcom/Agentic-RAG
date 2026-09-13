@@ -32,415 +32,52 @@ See: `.planning/PROJECT.md` (updated 2026-09-10)
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviors (skills) that persist and can be shared.
 
-**Current focus:** Phase 246 — the recall cliff, and the screen that describes it
+**Current focus:** v4.1 milestone close (242-246 phase-complete)
 (⚠ depends hard on Phase 242 / `SHIP-01`). **Phase 245 CLOSED 2026-09-13, operator-accepted at UAT.**
 milestone (not v5.0: it opens no new capability axis). Ship v4.0 to production, then fix the chat
 surface the operator uses daily. Phase numbering continues at **242**.
 
 ## Current Position
 
-Phase: 246 — BLOCKED (Plans 01..03 executed; Seq Scan & latency regression disclosed on bus; awaiting operator decision)
-Plan: Post-execution review complete (BUS-202 / BUS-203 answered)
-Next: Operator ruling on Phase 246 path forward (Option A: iterative scan vs Option B: accepted cost vs Option C: ef_search tuning)
-
-⭐ **THE UAT'S BEST FINDING CAME FROM THE OPERATOR, AND IT CAME FROM AN INSTRUCTION THAT WAS WRONG.**
-Nine rows were scored green from the artifact (the phase changed zero source lines, so a screen
-could not answer them). The tenth thing checked was an OPTIONAL app confirmation of
-`BUG-260913-01`, and the operator was told *"read the document's source path in the detail panel"*
-and replied **"I did not see in the metadata source path"** — because **`metadata.source.path` is
-rendered NOWHERE in the product.** Measured: `DocumentDetailPanel.tsx` has **zero** matches; the
-only frontend file naming `source_path` is `RuleBuilderPanel.tsx:119`, **the list of fields a rule
-may be written AGAINST.** ⛔ **The app lets a user build a rule on a field it never displays** —
-that is the mechanism behind the word *silently* in `BUG-260913-01`, and a **second, separable
-defect** from the null write: fixing the adapter alone leaves the next regression undiagnosable.
-Appended to the bug, **not fixed here** (ROADMAP Flags: a driven row's defect does not silently
-expand this phase). ⭐ **A UAT row whose observation step cannot be carried out is telling you
-something about the PRODUCT, not about the reader.**
-
-⚠ **A bookkeeping gap the phase itself had:** `ROADMAP.md` still read `- [ ]` for `245-02` and
-`245-03` after both shipped. Fixed inline under G-3 at UAT. **The phase that exists to stop
-registers disagreeing with the truth was carrying one.**
-
-⛔ **`/gsd:secure-phase 245` NOT RUN, and this is a DECISION rather than an omission.**
-`security_enforcement` is `true` and no `245-SECURITY.md` exists. The phase's **only** source file
-is `scripts/check-verification-honesty.cjs` — a dev-time gate that reads planning markdown and
-touches no runtime path, no request, no credential and **no trust boundary** — so `OV-SOLO-01`'s
-mandatory-dispatched-review arm does not fire. Re-open trigger: any phase that makes that script,
-or its hook, read anything outside `.planning/`.
-
-⭐ **PHASE 245 IS DONE: 4 / 4 SUCCESS CRITERIA CLOSED.** Verdict:
-**`.planning/phases/245-the-verification-debt-discharged-or-retired-in-writing/245-VERDICT.md`** —
-read its **closing scoreboard** first. Driven evidence: **`245-UAT-RESULTS.md`**.
-⛔ **No scoreboard row cites a test suite as its evidence**, which was this phase's first named
-failure mode.
-
-| SC | Verdict | By | Evidence type |
-|---|---|---|---|
-| **SC#1** — 238's rows each terminal | ✅ **CLOSED** | `245-03` + `245-02` | written retirement · artifact grep · driven observation |
-| **SC#2** — 233's five G-4 rows driven live | ✅ **CLOSED** | `245-02` | ⭐ driven observation, four DB tables with `max(created_at)` |
-| **SC#3** — the honesty marker | ✅ **CLOSED** | `245-01` | artifact grep · citation |
-| **SC#4** — `OV-SOLO-01` in full | ✅ **CLOSED** | `245-01` | citation (⚠ already true at HEAD) |
-
-⚠ **Two NAMED residues, never silent — both carry a trigger in the verdict's deferred table:**
-**M-9's Microsoft/OneDrive arm** (needs a `/Finance/` folder in the OneDrive account — an operator
-action) and **233 row 3's refusal arm** (nothing was refused, so the arm was never exercised).
-⛔ **238, 240 and 241 still owe an independent §6.3 review** — DEBT-03 was always *"say so in the
-record"*, never *"do it"*, and this phase did not do it.
-
-⭐ **ONE DEFECT FOUND BY DRIVING, filed not fixed (D-16): `BUG-260913-01`** — the **Google Drive
-adapter never writes `metadata.source.path`, on either door**, so every path-based classification
-rule is **silently inert for every Drive document**. No error; the rule reads as enabled and matches
-nothing. ⚠ Its first diagnosis blamed the manual-import door and was **refuted by driving the second
-door** — D-05's both-doors insistence is the only reason the cause is right.
-
-⚠ **The phase's real finding was not any of its four criteria** — and it is why every home of the
-sentence quoted next now carries a **CORRECTED 2026-09-13** line beside it, this file's own two homes
-(`:340` and `:415`) included. *"238's nine rows are blocked on one
-Azure app registration — run M-1 first"* was **FALSE for six days** across **six live registers**
-(`ROADMAP` · `REQUIREMENTS` · this file · `PROJECT` · `MILESTONES` · `v4.0-ROADMAP`) plus one agent
-memory file — while **`238-VERIFICATION.md:139`, the bottom register, carried the correction the whole
-time.** ⭐ `MILESTONES.md:28` is the strongest case: rows driven **2026-09-07**, v4.0 closed
-**2026-09-10** — **the close record was false on the day it was written.** All sixteen live instances
-are corrected **BESIDE** their originals (D-08, derived over two phrases — an enumeration had missed
-five, including both routing tables); the sixteen excluded dated snapshots are **named with reasons**
-in the verdict. *Each register only knows the one below it; the artifact is the bottom.*
-
-⚠ **`SEED-177` REFUTED (D-15)** — it reads `status: partially-answered`, not `planted`, and its own
-frontmatter already records trigger #2 as ANSWERED by Phase 206. Corrected in ROADMAP Flags **and
-CLAUDE.md**; ⛔ **the seed itself is byte-unchanged.**
-⚠ **240's five G-4 mail rows are DEFERRED with a trigger each** (D-13), written out verbatim in the
-verdict — ⛔ **no mail watch has ever run in this product**, so 240's SC#4 is inherited by
-construction and `M-4`/`M-5` are what would settle it.
-
-⛔ **No application source was touched** — `git diff --stat -- backend/ frontend/ supabase/` is
-EMPTY, so the backend 71-failed ceiling and the vitest count gate were **deliberately not run** and
-no hot-file-ledger row is owed. Gates that WERE run: `check-verification-honesty.cjs` **0** ·
-`check-claude-md-size.cjs` **0** (99,441 chars · 66.3%) · the stale-claim sweep **RED then green**
-(`32 hits / 32 uncorrected` → `0 uncorrected-and-unexplained`).
-
-⚠ **The ROADMAP's Phase 245 checklist box is deliberately left unticked here** — closing a phase is
-the orchestrator's call at `/gsd:verify-work`, not an executor's. The correction rows this plan added
-to `ROADMAP.md:110` and `:121` record what actually landed.
-
----
-
-⚠ **The block below is the position as of `245-01`, preserved rather than overwritten** (D-08's rule,
-applied to this file's own history):
-
-Plan: **`245-01` COMPLETE 2026-09-13** (`8f85969d5` → `77c598f42` → `ab4f07289`, base `d4d9dc024`).
-Next: `245-02` (DEBT-02 + DEBT-01's M-9 arm — live browser drives; serial, mutates the local DB).
-
-⭐ **`245-01` discharged SC#3 and SC#4; SC#1 and SC#2 are untouched and owed.** Five
-`*-VERIFICATION.md` files carry `verification_mode: self-verified` with **ZERO prose deleted**
-(238/240 had no frontmatter at all); `scripts/check-verification-honesty.cjs` +
-`.claude/hooks/verification-honesty-guard.js` (PostToolUse `6 → 7`) were **driven RED on both arms**
-and the victim restored md5-identical. Verdict: `245-VERDICT.md`. Full arm output: `245-01-SUMMARY.md`.
-⚠ **Its own SUMMARY and verdict carry the marker** — this is a SELF-verification under `OV-SOLO-01`.
-⚠ **SC#4 was already true at HEAD before the phase began** while three registers called it pending —
-the mirror of the stale Azure claim `245-03` corrects.
-⚠ **Line-reference correction, per D-08 (original kept below, not overwritten):** `OV-SOLO-01` reads
-**`:487-511`**, not `:474-497` — that pointer was already stale by 13 lines *before* `245-01` touched
-this file, and `245-01` shifted it 2 further. **A stale line reference is how a citation stops being
-checkable.**
-⚠ **Two inherited defects named rather than fixed** (`deferred-items.md`): `244-VERIFICATION.md`'s
-frontmatter **does not parse as YAML, and did not at HEAD** — which is exactly why the gate is
-zero-dependency; and `236-ROSTER-REPORT.md` was already dirty in the working tree.
-
-**Context gathered 2026-09-13** (`245-CONTEXT.md`, `ffbb43c31`)
-
-⚠ **245's SCOPE TEXT IS STALE AND THE CONTEXT MEASURED IT.** Three of the four ROADMAP success
-criteria are not in the state the ROADMAP / REQUIREMENTS / this file describe — measured at HEAD
-against the artifacts, not read from the register. **SC#1: 238's nine UAT rows were ALREADY DRIVEN**
-on 2026-09-07 (`238-VERIFICATION.md:208-220` — 7 full pass, 2 half, S-1/S-2 blocked); the operator
-completed the Azure registration hours after 238-SUMMARY was written. **SC#3: all three
-VERIFICATION.md files already say "self-verified" in prose**, none carries a machine-readable marker,
-and `reviewed` appears 11x in each in honest sentences naming the owed review — so SC#3 taken
-literally would delete the record it protects. **SC#4: `OV-SOLO-01` is ALREADY written in full** at
-`:474-497`, all four elements including its re-arm trigger. **Only SC#2 — 233's five G-4 rows — is
-genuinely owed.** ⛔ **Read `245-CONTEXT.md` → `<measured_at_head>` before planning**: the bare scope
-text would plan a re-drive of nine rows driven six days ago. See also item 4 below, which carries the
-same stale claim and is corrected in place by D-08.
-
-**Round 1 executed 2026-09-12 in 3 waves + a fix round**, all merged to `develop`. Gates on the
-merged tree: **`count gate OK` — 275/275 pinned, 0 failing** (total 8245 · pinned 7455) · backend at
-the locked **71-failed ceiling** · `check-hot-file-ledger.cjs 244` exits **0** · `check-claude-md-size`
-OK · **G-7 clear, 1 round of a cap of 2.**
-
-| plan | gap | what shipped |
-|---|---|---|
-| `244-09` | G-5 | the nav RAIL bounds itself — it, not the transcript, overflowed the PAGE below 540px |
-| `244-10` | L-5 6b | the hydration record says WHICH files, not merely THAT it ran |
-| `244-11` | G-3 + G-4 | a failed snapshot is recorded and surfaced; **G-4 ruled SECOND CAUSE** |
-| `244-12` | **G-6 (blocker)** + G-2 | the approval mounts at LIST level, where a harness pause can reach it |
-| `244-13` | G-1 + **WR-07** | the lock says what it IS — `mode: "harness" \| "cap_paused"` |
-| `244-14` | review fixes | 9 findings fixed (1 critical + 5 warnings + 3 info), 3 deferred with triggers |
-
-⛔ **NOTHING HERE CLOSES A SUCCESS CRITERION, BY DESIGN.** Every plan reports *built, drive owed*
-(D-244-14 / D-244-19); the ROADMAP's own rule is that **no criterion closes on a unit test**. **Six
-`244-NN-UAT-ROW.md` files carry the browser rows, every verdict `pending`.** G-6 shipping behind a
-GREEN fence is the whole reason this discipline exists.
-
-⚠ **The code review found a CRITICAL that this round itself introduced, and it inverted the very
-thing `244-11` was written to prevent.** `reconcile` copied `loadMessages`' failure WRITE but not its
-**clear-on-success** — which lives in `loadMessages`, not `reconcile`. Since `reconcile` is the
-thread-open path, nothing could clear the key: one transient 503 painted the banner permanently and
-later flipped it to *"Showing cached version"* **over freshly fetched content**. ⛔ **Its own control
-test started from an empty Map and so could not see the missing transition.** Fixed in `244-14`,
-fixture repaired so the fence can fail.
-
-⭐ **FIVE FENCE LESSONS, each MEASURED in this round and each a way a green test coexists with a live
-defect.** They are recorded together because they are one finding seen five times:
-1. **A fence that CONSTRUCTS the shape it asserts** proves the component renders when handed it — never that the product emits it. (G-6's original, and why it shipped green.)
-2. **Presence assertions cannot see content drift** — a testid fence would have passed against the wrong sentence (`244-11`).
-3. **A `?raw` fence cannot tell code from a comment** — `244-12` caught ITS OWN fence passing because a prose mention kept a count at 1 after the mount had left.
-4. **A control can live downstream of the defect it guards** — `244-11` found one RED for that reason.
-5. **A fixture that cannot express the state a claim is about will pin the claim in the state that refutes it** — `"Showing cached version"` was pinned under `messages: []`.
-
-⚠ **TWO REGISTER DEFECTS FOUND, BOTH INVISIBLE TO THEIR OWN GATE.**
-- **The two ledger tables had drifted apart and only one is gated.** `CLAUDE.md`'s shortlist and `docs/HOT-FILE-LEDGER.md`'s scan list disagreed on `MessageItem.tsx` and `StreamsProvider.tsx` — **including on the phase count (`34` vs `37`), the figure G-5 actually fires on.** `check-hot-file-ledger.cjs` reads only the scan list, so the shortlist can rot unseen. Both corrected; a `--sync` mode would close it mechanically.
-- **`ThreadRunLineKickoff.test.tsx` was in NEITHER gate knob** and had guarded nothing since Phase 194.1 — the Phase 214 `WorkflowScheduleModal` finding again. Adopted into both.
-- **`streamsStore.ts` and `toolMeta.ts` had NO ledger row for their entire lives** (20/13/525 and 10/6/218). Three executors deliberately declined to add `streamsStore.ts`'s, each recording why: **a row minted by a non-owner goes stale before its owner lands, and a row present-and-wrong stops the audit.** `244-13` owned it.
-
-⚠ **The count gate's published figures are STALE in CLAUDE.md for the SEVENTH time.** Its last
-correction reads `7816 / 7020 / 241` (2026-09-07); measured here **`8245 / 7455 / 275`**. A growing
-number is the gate WORKING — its contract is *no per-file decrease* + *zero failing*, never a fixed
-total — but the correction entry is **owed at phase close**.
-
-⚠ **SEED-171 gained no confirmed sixth suite.** `sketchComposition.test.tsx` flaked in waves 1 and 2
-(two executors nominated it) but was **green on both of `244-13`'s runs and both of `244-14`'s** — so
-it stands at **two occurrences, not three**. `WorkflowBuilderPage.canvas.test.tsx` (SEED-171's fifth)
-went red once in `244-14` and was proved unmodified. **One green sample of a flaky suite proves
-nothing, and neither does one red one.**
-
-⚠ **Solo run throughout (D-244-21 / OV-SOLO-01).** Gemini is unavailable, so every artifact of this
-round is a **self-verification, never a review** — including the code review, which Claude both
-requested and acted on.
-
-### ✅ Phase 243 — CLOSED 2026-09-11
-
-All five ROADMAP success criteria true and demonstrated; **CHAT-01..05 all tick**. **Five UAT rows
-driven in a real browser** on a purpose-seeded 60-message thread: **L-2** (a **real wheel**
-mid-tool-call — anchor drift **0 px** across 257 samples, **0** app `scrollIntoView` calls),
-**L-3**, **L-4** (`navigation.type === "navigate"` — **no reload**), **L-5** (the real corpus
-extremes; **3 clamp controls for exactly 3 clamped bodies**), **L-6 settled frame** (**9/9** against
-sketch 234 V1, from computed style).
-
-`BUG-260823-01` **closed** — its `re_open_trigger` named a real-wheel row and L-2 supplied it.
-`BUG-260707-03` residual #2 **closed**. `BUG-260718-02` stays **`folded`**, part B open on L-1.
-
-⚠ **`243-VERIFICATION.md` reads `passed` but says "self-verified", never "reviewed"**
-(`OV-SOLO-01`).
-
-⛔ **Owed, as a DECISION and not an omission** (full detail in `243-UAT-RESULTS.md`):
-**L-1** (failed twice on harness mechanics, never on the product) · **L-6's live frame** · and the
-**cross-provider board — ATTEMPTED and ABANDONED.** All eight keys are configured and all eight
-representatives are registry-backed, so it is not credential-blocked; it stopped because **the driver
-could not verify which provider a row actually ran on** (a click intended for `anthropic` selected
-`minimax`, caught only by screenshot). **A scoreboard with unverified attribution is worse than
-none.**
-
-⚠ **`BUG-260911-02` filed** — the first click on a chat highlights it but does not open it; a
-second is required. Found by driving, reachable by no fence in this phase, and it is why prompts in
-this session silently went nowhere. **Not checked against production** — named in the report as the
-first thing to do.
-
-Status: Ready to plan
-
-⭐ **UAT DRIVEN IN A REAL BROWSER, 2026-09-11 — 4 of 5 rows PASS** (`242-UAT-RESULTS.md`; Chrome DevTools MCP, operator's own session, every row scored on the `PUT /settings` REQUEST PAYLOAD, never on a banner). **Row 2 is SHIP-01 itself:** with `multimodal_max_vision_calls = 1001` planted and the UI showing it `invalid`, changing only *Search breadth* sent `{"hnsw_ef_search":50}` → **200**. **That is the save the operator could not perform** — the identical action used to return a 400 about images, on a field they never opened. Row 1: `{"rrf_k":61}`, `content-length: 12`, persisted across a reload. Row 3: the stored-value sentence at 400 **and** the old sentence unchanged when the value is genuinely typed. Row 4: both CHECKs refuse, NULL accepted — and **the clamp fired on REAL data and announced itself** (`CLAMPED 1 row(s) … moved to the nearest bound, NOT reset to the column default`). ⛔ **Row 5 (cloud) is OWED — operator.** ⚠⚠ **AND DRIVING IT FOUND A DEFECT IN THE UAT DOC ITSELF:** Row 3's steps said *"re-enter 1001 yourself"*, which **cannot produce the sentence** — a diffed payload drops a value equal to its baseline. Driven the way it is actually reachable (another client re-sending the stored value) and the row corrected beside its original. **A UAT row written against a diffed payload must ask whether the field it edits will actually travel.** SHIP-01 stays **UNTICKED** only on its production half; **SHIP-02 / SHIP-03 / SHIP-04 are CLOSED with their evidence inline** in `REQUIREMENTS.md` — decisions, not quiet ticks.
-
-⭐ **THE PHASE SHRANK BECAUSE THREE OF ITS FOUR REQUIREMENTS WERE ALREADY TRUE, AND SHRANK AGAIN WHEN A SECOND CONTEXT CLAIM WAS MEASURED FALSE.** `242-CONTEXT.md` deferred a CHECK sweep over five columns as *"a phase, not a gap"* — **migrations 174 and 176 had already constrained three of them**, so the real gap was two columns and migration **178** closed both. The fence's allow-list is therefore **EMPTY**, which is the only state in which a fence like that certifies anything. ⚠ What is genuinely open is a DIFFERENT finding: **`retrieval_top_k` and `rrf_k` have no bound anywhere** — not in Python, not in the schema. That is **`SEED-271`**, triggered by Phase 246 or the next phase touching `settings.py`.
-
-⚠⚠ **CORRECTION TO `242-CONTEXT.md` D-242-07, measured over the read-only Supabase MCP: migration `177_rls_app_settings_user_settings.sql` IS APPLIED TO CLOUD.** The CONTEXT says *"written and NOT applied — awaits operator authorisation"*. Its own VERIFY block returns **7/7 PASS** in production and the security advisor's `rls_disabled_in_public` **ERROR is gone**. **`BUG-260911-01` is remediated in production.** ⛔ The 13 SECURITY DEFINER WARNs remain, exactly as 177's header predicted — a role-by-role revoke sweep would silently achieve nothing because the grant comes from `PUBLIC`.
-
-⭐ **Two defects found that this phase did not cause, both fixed:** (1) `SettingsPage.a11y.test.tsx` was **RED on all four cases and in NEITHER gate knob** — proven inherited at the base commit; the cause was the suite's own `renderSettings` missing `EffectiveFeaturesProvider`, so every case audited a page whose tab never mounted. (2) ⛔⛔ **`check-hot-file-ledger.cjs` PASSED VACUOUSLY over a CRLF plan file** — `subject: 0 files · watched: 0`, `ledger gate OK`, exit 0, having parsed nothing. Both repaired and driven both ways. **A gate that passes because it read nothing answers the auditor with "clear" and stops the audit.**
-
-⭐ **D-242-08 — ROW 5 DEFERRED BY OPERATOR DECISION, AND THE PHASE CLOSED.** *"defer and proceed — let's make the deployment on a milestone achievement or at the end of the milestone."* ⛔ **The measurement that made it right: 242'S CODE IS NOT IN PRODUCTION** — `origin/production` = `e65610ac2`, **70 commits behind `develop`** — so Row 5 was **never runnable** and driving it would have measured the OLD build and reported ~24 keys. ⚠ **Recorded as a METHOD error:** a step-by-step for Row 5 was handed to the operator twice before anyone checked the code under test was deployed. **Check that the build under test is the build deployed, before asking anyone to measure it.** **Re-open trigger: the next promotion to `production`**, where Row 5 and the parity walk are driven as part of THAT deploy's verification. ⚠ **Migration 178 is ALREADY in cloud while the code that assumes it is not** — safe today (the deployed build sends all 24 fields, every cloud value in range) but a **schema-ahead-of-code** state the promotion must not assume away.
-
-⭐ **Cloud at the close, measured:** migration **178 APPLIED** by the operator (both CHECKs, exact definitions, row intact at `100 / 50`) · migrations `153-178` **25/25 PASS** · security advisor **no ERROR findings**. The verifier's *"EXPECTED FAIL until 178 is applied"* label was true when written and false hours later — **corrected**, because a checker carrying a stale expected-fail is how a real regression gets waved through.
-
-⚠ **One cheap measurement owed:** a **count-gate re-run on a quiet tree.** The close run read `failed 7` across three files 242 provably never touched (two are SEED-171's registered flaky suites) while a peer session drove a browser here. Not a blocker; not an acquittal.
-
-⛔ **Operator-owed, named rather than implicit:** walk the **non-code deploy parity half** · drive `242-VALIDATION.md`. `SEED-242` is **RE-ARMED** with a narrowed trigger (the next promotion to `production`), not closed.
-
-⭐ **REVIEWED (self-review — solo) AND THE REVIEW ROUND FOUND A HOLE IN THIS PHASE'S BEST FENCE.** `242-VERIFICATION.md` = **3/5 mechanical · 2/5 operator-owed · 0 failed**; `242-REVIEW.md` = **0 critical · 10 warning**. The one that mattered: **§1's FIXTURE B held the `useState` INITIAL for NINE of 24 keys**, so a hard-coded baseline for any of them was green against every case — including `retrieval_match_threshold: 0.3`, the value an operator is most likely to drag the threshold BACK to. Fixture widened to differ on all 24; planting that constant now reds two cases. **The fence proves non-drift only as wide as its fixture.** Also fixed: Fast Refresh broken by exporting non-components (helpers moved to `settingsSearchPayload.ts`, eslint clean, ⚠ **`npm run lint` is NOT gated in CI**); the cloud verifier had **no row for migration 177**, the security fix (four added — **24/25 PASS against cloud**, the one FAIL being 178 as labelled); a fifth bound without the helper now reds (was `== 4`, silent); the refusal reads through an **allow-list**, not a bare `getattr` over a secrets-bearing object. ⛔ **And a safety defect in my own UAT doc:** `242-VALIDATION.md` Row 2 could be read as applying to CLOUD, which would have planted `1001` in production and broken the very tab this phase repaired. Rows 2/3 now say `LOCAL ONLY` in their own headers. Full round: `242-03-SUMMARY.md`.
-
-⚠ Gates at 242's close: backend **71 failed / 4548 passed**, failing SET **identical** to `242-backend-base-set.txt` (ceiling held, zero headroom) · `count gate OK — 259/259, failed 0, 8046 → 8077`, every +1 attributed with no residual · typecheck **67**, set diff **empty both ways** · `check-deploy-drift.sh` **PASS** · ledger + CLAUDE.md-size gates exit 0. Both G-5 rows (`settings.py` **38/20/972**, `SettingsPage.tsx` **47/24/1773** — it SHRANK) were **stale for the third consecutive close** and were re-derived with the raw output in `242-02-SUMMARY.md`.
-Status: **243 code-complete.** 5/5 ROADMAP success criteria verified MECHANICALLY, each opened in the code rather than scored from a SUMMARY. ⚠ **`243-VERIFICATION.md` reads `human_needed` and says "self-verified", never "reviewed"** (`OV-SOLO-01` — no independent reviewer exists). ⛔ **0 of 20 UAT rows driven — no browser has been opened in this phase at any point.** Run **L-2 first** (real wheel, ≥50-message thread): `243-06`'s HI-2 was exactly the class of defect a synthetic `WheelEvent` cannot see, and `BUG-260823-01`'s own history records two fixes that passed synthetic events and failed a real mouse. **CHAT-02 and CHAT-04 are ticked; CHAT-01, CHAT-03 and CHAT-05 are deliberately UNTICKED** — their deliverables are perceptions and every fence is synthetic. All three bug reports (`BUG-260718-02`, `BUG-260823-01`, `BUG-260707-03`) stay `folded`, not `closed`, on the same standard.
-
-Status: **243-04 EXECUTED — sketch 234 V1 shipped, and the phase's one genuine design gap was closed by REFUSING the mockup's number.** The body drops the four classes and steps to `text-sm`, rendering REAL paragraphs (`b9819b7ab`); the tail clamps at 300px with a control that **removes itself** below the measured threshold — the shipped sketch-050 mechanism COPIED, never mounted (`96ca3909c`); and the fold label reads `Thought for N seconds` **only when a span was measured** (`2a988c3de`). ⛔ **D-243-13 honoured mechanically:** the sketch's `Math.round(chars / 180)` is a DEMO AFFORDANCE, and on the 32,951-char fixture it computes to *"Thought for 183 seconds"* — a plausible number derived from string length. `grep -c "/ 180"` is **0**; a DB-loaded message reads `Thinking` with **no digit**; `git diff --stat -- supabase/ backend/` is **EMPTY**. ⚠ **THE ONE DECLARED DIFFERENCE FROM THE ACCEPTANCE BAR** (for `243-VERIFICATION.md` to carry): the mockup reads `Thought for 6 seconds` on EVERY message including historical ones; the shipped surface reads `Thinking` on any message it did not watch stream. **Declared with its reason = a decision; undeclared = drift.** ⭐ **Two plan errors found by driving rather than assuming:** (1) §10's uniqueness needle matched **ZERO** files after the render shape changed — re-aimed as an alternation of two NAMED shapes, because the obvious widening was measured to match two innocents; (2) `MessageItem.tsx` had to take the new prop and is **not in `files_modified`** — edited anyway, with its ledger row updated in the same commit, since the ledger gate reads `files_modified` and not the diff. **That is the identical blindness the plan cites to CLOSE the formatter extraction, arriving from the other direction.** ⚠ `BUG-260718-02` → **`folded`, NOT `closed`**: the code half is measured and named commit-by-commit, but the reported defect is a PERCEPTION and every fence here is synthetic — the same standard 243-03 held its sibling to. `SEED-269` planted (three elapsed formatters, one home owed). `count gate OK — 254/254, failed 0, 7994→8017`; typecheck 67, **set diff empty both ways**. Four ledger triples re-derived; `StreamsProvider.tsx`'s row was STALE for the SECOND time in two plans, written one plan earlier the same day.
-
-Status: **243-03 EXECUTED — the phase’s most consequential plan, and the RED drive changed its shape.** CHAT-02: the delta path now coalesces PRODUCER-side (`makeAccumulatingCoalescer`, 60 ms, leading edge) — **60 deltas made 61 `setMessages` calls and now make 12** (`bfdf899b1`). CHAT-03: **D-243-05 outcome 3** — a residual DID reproduce at HEAD and it is **NOT** the defect `BUG-260823-01` names; that report’s cause was deleted by `64357e979`, which is measured to be a **quick task 7h48m BEFORE Phase 228 was scoped**, not a 228 commit. The real residual: a nudge up under 120px releases the pin but stays “near bottom”, so between the 900 ms hard clock and the 1500 ms gesture window **any** scroll event re-pinned the reader. One ref, one clause, at the line D-243-05 predicted (`8d7dfab43`); the mirror (a flick back DOWN still re-arms) stays green. ⭐ **D-243-04 MEASURED rather than asserted:** 60 real deltas produced **61** `scrollIntoView` calls before the coalescing and **13** after, with `useFollowScroll.ts` held constant — and `MessageList.tsx` needed **no edit at all**. ⚠ A trap the plan did not name broke two shipped tests and was caught by a base-set diff (13 base / 15 / 13): every STRUCTURAL callback must drain the text buffer or Anthropic’s interleaved text/tool_use order inverts. `count gate OK — 253/253, failed 0`; typecheck 67, set diff empty. Three suites into both knobs — **`throttle.ts` had been ungated since 068.5**. Four ledger triples re-derived; `useFollowScroll.ts` and `throttle.ts` had **NO ROW AT ALL**, so G-5 was structurally absent on the very file this bug is about. ⚠ `BUG-260823-01` stays **`folded`, not `closed`** — every fence here is a synthetic `WheelEvent`, and this file’s own history records two fixes that passed those and failed a real mouse. **A real-wheel UAT row is owed** (`re_open_trigger` now says so; `SEED-049`/D-243-09 agree).
-
-### ▶ Phase 244 — PLANNED 2026-09-11, READY TO EXECUTE
-
-`244-CONTEXT.md` + `244-DISCUSSION-LOG.md` at `233a14d6d`, base `5ebd0fbca`; sketch 236's winner
-locked at `1ff80a1da`. **27 decisions** (D-244-01..27) across four discussed gray areas plus the
-G-2 sketch resolution.
-
-**Plans: SIX in 4 waves**, `c10a0316c` + the re-verification sizing correction. Checker returned
-`VERIFICATION PASSED` on the second pass — findings verified against source, not against the
-revision's own claims. Waves: `01`+`02` → `03`+`04` → `05` → `06`. Zero same-wave source-file
-overlap; the three append-only registries carry an explicit merge-order block in plans 01-04.
-
-⚠ **NINE measured corrections to this phase's own locked CONTEXT, C-1..C-9 in `244-PATTERNS.md`** —
-three changed a plan's shape, and they are recorded BESIDE their originals, never overwriting:
-
-- **C-1** `D-244-08`'s proposed gate is a **no-op** (`ChatArea.tsx:187` hard-codes `mode:"harness"`
-  on the very branch it meant to unlock) — the only working discriminator is `capPaused`.
-
-- **C-2** the cap-paused lock **RETURNS**: only `continue_run` clears `status='cap_paused'`, so
-  unlocking the composer alone ships the defect one layer down. Both layers are planned.
-
-- **C-3/C-4** `D-244-11`'s "a third reader is free" is **refuted** — `useAskUserPrompt` mounts a
-  fetch per mount, and `MessageItem.tsx:180-188` already measured that cost as 6-vs-1 and closed it.
-
-- **C-5** ⭐ `AttentionCondition` carries **no kind**, so `BUG-260911-03` costs ONE optional field
-  and needs no second producer (`D-235-03` + a literal `length === 1` assertion forbid one).
-
-- **C-8** `D-244-20`'s "all hot files HAVE ledger rows" is **FALSE** — the gate exits 1 on **nine**
-  `[no-row]` files, including `backend/app/api/workspace.py` at **11/6/620**, G-5-firing and
-  invisible to it for its entire life. Each row is owed by exactly one named task.
-
-- **C-9** ⭐⭐ **the one that changed the phase's shape:** `workspace_read` returns
-  `"Content available via REST API."` for every binary MIME and the sandbox has **no** workspace
-  reach — so criterion 4's *"and the agent can use it"* was unsatisfied for **8 of the 15 accepted
-  extensions**, including the sketch's own headline `.xlsx`. `244-02` closes it. `.pdf` is RULED
-  **taken** (`D-244-24`) rather than assumed either way.
-
-⚠ **`244-06` Task 3 was re-sized at the re-verification pass:** `ConnectedFilePickerModal.tsx` does
-**not** compose in the drawn order — no source line, no selection state (each row imports
-immediately), no cancel/confirm footer. So that task **builds select-then-confirm**, not "attributes
-plus a test". The stale framing is struck through in the plan, not deleted.
-
-⭐⭐ **THREE OF THE FIVE CRITERIA ARE SUBSTANTIALLY ALREADY BUILT, AND THREE REGISTERS SAY OTHERWISE.**
-This is the Phase 242 pattern repeating — *"three of its four requirements were already true"* — and it
-was caught by scouting the code rather than by reading the ROADMAP. All five findings are **F-1..F-5**
-in `244-CONTEXT.md` with how to re-derive each:
-
-- **`SHELL-05`'s app-shell signal shipped at Phase 235 plan 09** — `attentionConditions.ts` is a
-  producer registry with exactly one tenant, badged on the desktop rail, the mobile drawer nav row and
-  the hamburger, with three suites. ⛔ **So the ROADMAP's *"two net-new surfaces"* is wrong by one and
-  only ONE sketch is owed** (D-244-18). ⚠ But Phase 235 closed `SURF-03` **UNTICKED**, so criterion 5
-  has never been driven end to end — `SHELL-05`'s work is *verify, then attribute the count to a tab*.
-
-- **`SHELL-04`'s hard half shipped at Phase 100 (TMPL-01)** — `POST /threads/{id}/workspace/files`
-  already writes **thread-scoped, TTL-expiring, magic-byte-validated** files with an RLS **insert**
-  policy for the **user**, a 10 MB cap checked three times, 15 extensions, `ON DELETE CASCADE`, a panel
-  renderer, an API client, and a caller already in the chat shell (`ChatLayout.tsx:377`).
-  ⛔ **`SEED-042`'s *"option (ii) costs a new write endpoint + RLS"* and `SEED-247`'s *"`workspace_files`
-  is the agent's, not a home for a person's attachment"* are both FALSE at HEAD.** Both seeds now carry
-  the refutation beside the original. *"Temporary"* has been expressible since Phase 100.
-
-- **`SEED-029`'s Continue affordance shipped** (`_MAX_CONTINUES_PER_RUN = 3`, three suites) — so
-  `SHELL-02` is only the **composer lock**, not the button.
-
-- **`SEED-045`'s two folded anchors shipped at Phase 156** — collapsed-rail New Chat (D-02) and the
-  chat-list search on desktop **and** mobile. **That fold is empty**; what is open on the surface is
-  `BUG-260911-02` and `BUG-260816-03`, both now folded into 244.
-
-- **`import_single_file` already takes `folder_id`** (Phase 233) — the chat route simply never passes
-  one, which is the whole reason imports land at root.
-
-⭐ **G-2 DISCHARGED 2026-09-11 — sketch 236, winner `A — Scope on the chip`** (`7f5420cdc`).
-`.planning/sketches/236-the-file-that-belongs-to-this-chat/index.html` **is the acceptance bar**; its
-`COPY.js` is ported, not re-typed. The `+` menu stays plain and the **chip** carries
-`this chat only · 24h`. ⛔ **The obligation that creates:** the scope word must be rendered by the
-**SENT message**, not only the pending composer chip — a menu is read once and closed, a chip survives
-into the transcript, and a build that puts it solely in the composer ships B's weakness at A's cost.
-B's footer is preserved as the cheapest addition if UAT wants it (`D-244-22..27`).
-
-⚠⚠ **AND THE SKETCH FOUND A SCOPE QUESTION THE PLAN MUST RULE ON: `.pdf` IS NOT ACCEPTED.**
-`_ALLOWED_EXT` is **fifteen** extensions — OOXML ∪ 7 text ∪ 5 image — with **no PDF**, and a signed
-contract PDF is the likeliest first thing anyone attaches. Either accept the gap and carry the
-server's verbatim 422, or add `.pdf` — **not free**, because that door was built for workflow
-templates and nothing in `workspace.py` validates a PDF container. **Assuming either way is the
-failure.** Two more drawn states the build owes: the **expired chip** (the TTL is a read gate, so an
-old transcript holds a chip pointing at nothing) and the **one-item menu** (the cloud item is gated on
-`hasCloudStorage`, so the local item must read alone).
-
-**Locked shape:** attachments reuse `workspace_files`, **read inline, never embedded**, existing TTL +
-cascade, no promote control (D-244-01/03/04) · the agent is told by a **system-prompt line**, which owes
-an **8-row cross-provider measurement** (D-244-02) · the composer's cloud item **re-points at the
-thread** and the folder-asking import's door moves to the **Library** (D-244-05/06) · the composer
-**unlocks** by gating on harness MODE not lock presence, which makes the shipped sentence honest so no
-copy is rewritten (D-244-08/10) · the **same zero-prop `PendingAskStack`** mounts inline at the paused
-message, making *"settles in both homes"* **structural** (D-244-11/12) · **4 plans by surface seam**
-(D-244-17).
-
-⛔ **Named obligations a plan must not quietly drop:** `SHELL-02` must **assert** that posting at
-`cap_paused` actually starts a run — the server has no refusal, but whether posting clears the paused
-row is **unverified** (D-244-09) · `BUG-260828-07` is **HIGH** and closes on a **driven** row, not a
-fence (D-244-14) · `SHELL-01` closes on a **measured bound** at ≥3 viewport heights × panel open/closed,
-using a **leaf bounding rect** and never `scrollTop` (D-244-19) · ⛔ **no second tenant in the attention
-registry** — `D-235-03` forbids it and a test asserts the count (D-244-15).
-
-⚠ **Register write-backs made at discuss, because a routing not written into the register is invisible
-to the next sweep:** **7** reported bugs → `status: folded`, `folded_into: 244` (the four named by
-`SHELL-01..04`, plus `BUG-260911-03` / `BUG-260911-02` / `BUG-260816-03` folded by operator ruling) ·
-`SEED-247` answered on **5 of its 6 questions**, narrowed to Q4 alone, `priority: high → medium` ·
-`SEED-042`, `SEED-029`, `SEED-045` each carry their refutation and a narrowed trigger.
-
-⚠ **G-5: every hot file this phase touches HAS a ledger row** (`check-hot-file-ledger.cjs 244` will not
-fail on a missing row) — but **three triples were STALE** and are re-derived in D-244-20:
-`PendingAskCard.tsx` **14/7/765** (ledger `13/7/736`), `MessageItem.tsx` **69/33/755** (`68/33/755`),
-`NavPanel.tsx` **21/11/344** (`20/11/329`).
-
-⚠ **Solo: no independent reviewer exists.** A review round here is a self-review and
-`244-VERIFICATION.md` must say *"self-verified"*, never *"reviewed"* (`OV-SOLO-01`).
-
-⚠ **METHOD NOTE, paid for again:** the first frontmatter write-back pass **silently matched nothing on
-three CRLF files and reported no error**. Caught by re-reading the frontmatter, not by an exit status —
-the same class as Phase 242's `check-hot-file-ledger.cjs` passing vacuously over a CRLF plan. **A
-command that changed nothing and a command that succeeded look identical.**
-
-Progress: **1 / 5 phases CLOSED (242)** · 243 code-complete, UAT-owed · **244 context gathered**  · 4 / 19 requirements delivered (SHIP-02, SHIP-03, SHIP-04, CHAT-02, CHAT-04 — ⚠ SHIP-01, CHAT-01, CHAT-03, CHAT-05 are code-complete and deliberately UNTICKED pending G-4 rows) · `[██░░░░░░░░] 21%`
-Last activity: 2026-09-12
-
-**Phases:** 242 Ship It · 243 Thinking block + follow-scroll seam (⚠ sketch first) ·
-244 Chat shell + composer · 245 The verification debt · 246 The recall cliff.
-Full detail: [`ROADMAP.md`](ROADMAP.md).
-
-### ⚠⚠ THE FORCED ORDER WAS RESOLVED BY EVENTS — the original is kept below, never overwritten
-
-This section read, at scoping:
-
-> ⚠ **Order is FORCED at the front of this milestone and cannot be re-sequenced for convenience:**
-> `BUG-260910-03` (blocking, Settings→Search unsaveable) → **241 UAT row 5 on CLOUD** → migrations
-> `153-156, 166-176` in numeric order → production push. Row 5 proves an arm that becomes
-> **unreproducible forever** once migration 176 reaches cloud.
-
-⛔ **Every clause after the first is already spent, measured at HEAD on 2026-09-11 while writing the roadmap:**
-
-- **The production push already landed** — `1f313670b` *"Merge master into production — deploy v4.0 Connected Knowledge"* (2026-09-10), plus `e65610ac2` for the `app.<domain>` routing half. `git log --oneline production..develop` returns **2 commits, both v4.1 planning docs**.
-- **Row 5's cloud window is CLOSED, and its loss is already written down.** `241-HUMAN-UAT.md` reads `status: complete`, 6/6 driven; row 5 ran on a **local substitute** and its closing section states the fifteen migrations — 176 included — went to cloud as one batch during the production prep. Retired in writing at `dbd63864b`. **`SHIP-02` is not re-plannable.**
-- **The migrations are therefore CLAIMED applied**, by a record rather than by a measurement. Phase 242 runs `scripts/verify-v40-cloud-migrations.sql` **against cloud**.
-- **`SHIP-01` is genuinely open** — but only its structural half: `settings.py:466-467`'s bound, `SettingsPage.tsx:888`'s all-or-nothing payload, and the missing CHECK constraint are all still live at HEAD. The `1001 → 1000` data fix landed **locally** and was left in place, so the bug no longer reproduces there. ⚠⚠ **The value cloud holds is UNMEASURED, and cloud is what production serves.**
-
-⭐ **This is the milestone's own method rule paying for itself on day one:** *a register knows only the register below it, and the code is the bottom.* Two sections of this file and four requirement statements were true when written and false within twenty-four hours. **`STATE.md` and `REQUIREMENTS.md` both still say "v4.0 has never deployed" elsewhere; those sentences are stale and are corrected here rather than deleted there.**
-
-⚠ **What STILL stands, unchanged:** `RECALL-01` depends on `SHIP-01` (Phase 246 after Phase 242, and its plans assert the tab saves rather than assuming it) · `CHAT-02` and `CHAT-03` are one mechanism and share Phase 243 · G-2 fires on Phase 243 with the operator-approved mockup as the acceptance bar · `retrieval_service.py`'s extraction, owed since Phase 231, is **proposed first** at Phase 246.
-
-### ⚠ Two phases can be blocked on something that is not engineering
-
-| Phase | Blocked on | Deliverable without it |
-|---|---|---|
-| **242** | a read-capable **cloud DSN** | SC#2 + SC#3 — the CHECK migration, the changed-fields-only payload, the worded refusal. Sequence these first so the phase is never idle |
-| **245** | **one Azure app registration** — ⚠ **run row M-1 first, it unblocks the other 8** | `DEBT-02` and `DEBT-03` in full, plus `DEBT-01`'s retirement arm |
-| **245** | ⚠ **CORRECTED 2026-09-13 (Phase 245) — NOT BLOCKED, and was not blocked when this table was written.** The row above is preserved, not deleted. All nine of 238's M rows were **DRIVEN LIVE on 2026-09-07** (`238-VERIFICATION.md:213-231` — 7 full pass, 2 half at the time; **four defects found by driving and NONE by the 15-case unit suite**). The operator completed the Azure registration *hours after* `238-SUMMARY.md` was written. ⭐⭐ **With `ROADMAP.md`'s credential table this is the highest-traffic home of the false claim — these two are what an orchestrator reads to decide whether 245 is blocked.** | **Everything, and it all landed:** SC#1 (`245-03`), SC#2 (`245-02`, five rows driven live), SC#3 + SC#4 (`245-01`). See `245-VERDICT.md` and `245-UAT-RESULTS.md` |
-
-### ⚠ G-8 is the governor on this milestone
-
-Plan targets: **242 → 3-4 · 243 → 4-5 · 244 → 4-5 · 245 → 2-3 · 246 → 3-4.** A phase above **6** must name in CONTEXT.md what genuinely cannot share a worktree. A fix that is ≤ 1 file / ≤ 10 lines with no schema or API surface is **`/gsd:fast` under G-3, never a plan**. The named failure mode is Phase 235's **17 plans for 4-6 plans of substance** — and a consolidation milestone has no natural stopping point.
-
-⚠ **`OV-SOLO-01` was RULED ON at this milestone's scoping (2026-09-11, operator), not left to
-lapse.** Solo running continues. The substitute for the independent gate: the dispatched
-code-review subagent is **MANDATORY** on any phase touching a trust boundary, and every phase closed
-under it reads **"self-verified"** in its own VERIFICATION.md — never "reviewed".
-
-⚠ **`SURF-03` was RULED ON at the same moment** — its home is the **app shell**, landing in the
-chat-shell phase. It is no longer an open scoping question.
-
----
+Phase: 246 — ✅ **CLOSED 2026-09-13.** 3 / 4 success criteria. ⭐ **The first phase since
+`OV-SOLO-01` was re-armed to carry `verification_mode: peer-reviewed`** — gemini built, claude
+reviewed at three gates. ⛔ One commit (`521f4a025`, the revert) is claude's own and is named as
+self-verified in `246-VERIFICATION.md`'s `review_caveat`, not folded into the headline.
+Next: **v4.1 is phase-complete (242-246). The next action is the milestone close, not a phase.**
+
+⛔⛔ **`RECALL-01` IS UNMET AND THAT IS THE DELIVERABLE, NOT A SHORTFALL.** Phase 246 set out to fix
+small-tenant recall by raising `hnsw_ef_search` to 200 and instead **proved the knob cannot fix it.**
+`EXPLAIN (ANALYZE)` inside `match_document_chunks` on a 100k-chunk bench:
+
+| `ef_search` | plan | rows | recall@20 | latency |
+|---|---|---|---|---|
+| 40 / 60 / 80 | **Index Scan** | **1** | ~0.05 | ~4 ms |
+| 100 / 150 / 200 | **Seq Scan** | 20 | 1.000 | ~1,100 ms |
+
+**Every genuine index walk returns ONE row; every good recall number is a table scan.** The default
+is reverted to **40** (`521f4a025`) — shipping 200 would have cost every tenant ~1.1 s a query to fix
+a cliff only small tenants have, by a mechanism nobody intended.
+
+⚠ **IT REACHES BACKWARD INTO A SHIPPED CONCLUSION.** Phase 241 concluded `ef_search = 200` restores
+recall and **never inspected a plan**, so `QUEUE-06`'s remedy and `D-v4.0-EF-DEFAULT`'s reversal rest
+on a measurement that did not mean what it said. Deliberately NOT repaired inside 246 — it is an
+operator-facing conclusion. Follow-up is **`SEED-273`** (`hnsw.iterative_scan`, currently `off`),
+whose trigger names both 241's re-measurement and `SEED-076`'s refuted ordering — that refutation is
+itself suspect now, since those runs may also have crossed the cost inflection.
+
+⚠ **THE BACKEND CEILING IS NOT A STABLE PROPERTY, MEASURED.** CLAUDE.md locks it at **71 with zero
+headroom**; this session read **71, 72, 72 and 77** on one tree. A proposed root cause (repo-root
+CWD) was REFUTED — `test_sql_service.py` fails 12 from both directories, `test_explorer_agent.py` 6
+from both, and both runs collected an identical 4,787 items. ⛔ Owed as its own work: re-derive the
+ceiling as **a set with a flake band**, never a single integer.
+
+⭐ **PROCESS FINDING, PAID FOR TWICE IN ONE PHASE.** Two mechanism-shaped root causes were published
+and **both were wrong** — claude's post-filter/Seq-Scan argument (refuted by a docstring in the file
+under review) and gemini's CWD explanation (refuted by two commands). The bare observation was true
+and sufficient in both cases; the causal story added only confidence. **Report the observation;
+propose the mechanism only when you have driven it.** ⚠ And claude's *conclusion* was right while its
+*argument* was wrong — the withdrawal that followed was a SECOND error, corrected only because gemini
+ran the measurement it had been told to skip.
 
 ## Carried into v4.1 from the v4.0 close
 
