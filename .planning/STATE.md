@@ -11,7 +11,7 @@ progress:
   total_plans: 16
   completed_plans: 27
   percent: 17
-stopped_at: "Phase 246 planned (3 plans, 246-PREFLIGHT.md clean). Next: /gsd:execute-phase 246."
+stopped_at: "Phase 246 executed (3 plans); BLOCKED on sequential scan disclosure & latency regression. Awaiting operator decision."
 ---
 
 # Project State
@@ -39,9 +39,9 @@ surface the operator uses daily. Phase numbering continues at **242**.
 
 ## Current Position
 
-Phase: 246 — in_progress (Plans written, 246-PREFLIGHT.md clean)
-Plan: Ready for 246-01-PLAN.md (Wave 1)
-Next: /gsd:execute-phase 246
+Phase: 246 — BLOCKED (Plans 01..03 executed; Seq Scan & latency regression disclosed on bus; awaiting operator decision)
+Plan: Post-execution review complete (BUS-202 / BUS-203 answered)
+Next: Operator ruling on Phase 246 path forward (Option A: iterative scan vs Option B: accepted cost vs Option C: ef_search tuning)
 
 ⭐ **THE UAT'S BEST FINDING CAME FROM THE OPERATOR, AND IT CAME FROM AN INSTRUCTION THAT WAS WRONG.**
 Nine rows were scored green from the artifact (the phase changed zero source lines, so a screen
