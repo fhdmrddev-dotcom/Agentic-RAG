@@ -134,7 +134,24 @@ cmd_close() {
   local id="${1:-}"
   [ -n "$id" ] || die "close needs <BUS-NNN>"
   grep -q "$id" "$BUS" || die "$id not found in OPEN.md"
-  sed -i.bak "s/^### \[OPEN\] $id /### [CLOSED] $id /" "$BUS" && rm -f "$BUS.bak"
+
+  # ⚠ MATCH [OPEN] **OR** [ANSWERED], and gate the success line on the WRITE.
+  # What stood here: `sed -i "s/^### \[OPEN\] $id /.../"` followed by an unconditional
+  # `echo "closed $id"`. Two defects, driven RED on BUS-048 (2026-09-14):
+  #   1. An item answered via `cmd_answer` keeps its `[ANSWERED]` header, so `close` could
+  #      NEVER close one — the single state a finished item is most likely to be in.
+  #   2. `sed` exits 0 whether or not it substituted, so the verb printed "closed BUS-048"
+  #      over a byte-identical file.
+  # ⭐ `cmd_answer` directly above carries the comment this function ignored — *"A verb that
+  # writes a false record is the defect this project keeps paying for, so the success line
+  # is gated on the write, not on reach."* Same file, four lines apart.
+  # ⚠ `cmd_archive` sweeps `^### \[CLOSED\]` and resets on `^### \[OPEN\]`, so an ANSWERED
+  # header was invisible to it too — a stuck item could never be archived either.
+  local before after
+  before=$(md5sum < "$BUS")
+  sed -i.bak -E "s/^### \[(OPEN|ANSWERED)\] $id /### [CLOSED] $id /" "$BUS" && rm -f "$BUS.bak"
+  after=$(md5sum < "$BUS")
+  [ "$before" != "$after" ] || die "$id was NOT closed — it is already [CLOSED], or its header is malformed. Nothing was written."
   echo "closed $id"
 }
 
