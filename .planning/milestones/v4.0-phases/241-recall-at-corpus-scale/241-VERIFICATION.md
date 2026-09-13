@@ -1,6 +1,7 @@
 ---
 phase: 241-recall-at-corpus-scale
 verified: 2026-09-10T00:00:00Z
+verification_mode: self-verified   # ⛔ OV-SOLO-01 / D-245-01 — NEVER "reviewed". No independent §6.3 reviewer exists.
 status: human_needed
 score: 3/3 must-haves (ROADMAP success criteria) independently re-derived and confirmed honest; 1 human-verification item outstanding
 overrides_applied: 0

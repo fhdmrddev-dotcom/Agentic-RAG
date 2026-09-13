@@ -1,6 +1,7 @@
 ---
 phase: 244-the-chat-shell-and-the-composer
 verified: 2026-09-12T23:45:00Z
+verification_mode: self-verified   # ⛔ OV-SOLO-01 / D-245-01 — NEVER "reviewed". No independent §6.3 reviewer exists.
 status: passed
 score: "5/5 built, 5/5 DRIVEN AND CLOSED — SHELL-03 closed 2026-09-13 on drive attempt 2 of 244-15-UAT-ROW.md (both directions, two runs, server-verified)"
 re_verification: true

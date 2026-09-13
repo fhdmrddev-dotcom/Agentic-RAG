@@ -1,3 +1,10 @@
+---
+phase: 240-mail-is-a-shape-not-a-fourth-adapter
+verified: 2026-09-09                # the date this file's own header already carries
+verification_mode: self-verified   # ⛔ OV-SOLO-01 / D-245-01 — NEVER "reviewed". No independent §6.3 reviewer exists.
+independent_review: owed            # AGENTS.md §6.3 — nobody who did not shape this build has looked at it
+---
+
 # Phase 240 — Verification
 
 **Date:** 2026-09-09

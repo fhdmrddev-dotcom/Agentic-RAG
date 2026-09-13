@@ -1,6 +1,7 @@
 ---
 phase: 242-ship-it-and-prove-what-already-shipped
 verified: 2026-09-11T09:40:00Z
+verification_mode: self-verified   # ⛔ OV-SOLO-01 / D-245-01 — NEVER "reviewed". No independent §6.3 reviewer exists.
 status: complete
 status_note: "⭐ CLOSED under D-242-08 (operator). Was `human_needed`; the only remaining item — Row 5 on production — was measured UNRUNNABLE (242 is not deployed; 70 commits sit on develop) and is DEFERRED to the next promotion to production, with the parity walk folded into it. Rows 1-4 driven and pass."
 score: "4.5 / 5 (CLOSED) — SC#2, SC#3, SC#5 verified mechanically AND driven; SC#4 measured against cloud (24/25, the one FAIL labelled expected); SC#1 driven 4/5 locally, its production row owed"
