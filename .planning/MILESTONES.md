@@ -1,5 +1,75 @@
 # Milestones
 
+## v4.1 Ship It & Feel It (Shipped: 2026-09-13)
+
+**Phases:** 5 (242-246) · **Plans:** 25 · **Commits:** 290 since `v4.0` · **Files:** 309
+(+75,417 / -4,808) · **Migrations:** 177-180 · **Timeline:** 2026-09-11 → 2026-09-13 (3 days)
+**Audit:** [`v4.1-MILESTONE-AUDIT.md`](milestones/v4.1-MILESTONE-AUDIT.md) — `gaps_found`,
+**18 / 19 requirements**, 5/5 seams wired.
+
+A deliberate **consolidation** milestone: no new capability axis, every requirement closing something
+already in a register. It did two things — proved v4.0 is running rather than merely written, and
+stopped the chat surface feeling busier than the bar it aims at.
+
+**Key accomplishments:**
+
+- **The ship claims stopped being claims.** All four `SHIP` requirements closed against the
+  **database and the branch**, not against the deploy record: 20/20 v4.0 migration checks measured in
+  cloud, `SHIP-04` confirmed already landed (`1f313670b`), `SHIP-02` **retired in writing** because
+  the pre-176 shape its drive needed exists nowhere. ⚠ The verifier script itself produced **two
+  FALSE FAILs and was repaired first** — `information_schema.column_privileges` shows only grants
+  visible to the connecting role, so a checker that fails closed on its own blind spot is worse than
+  no checker.
+- **The reasoning stream became a calm surface, and the scroll finally holds.** One unconditional
+  thinking renderer; a 60 ms leading-edge coalescer (60 deltas → 61 scrolls before, ≤14 after); and
+  `CHAT-03` driven with a **real wheel** on a 60-message thread — **0 px drift, 0 app scrolls**,
+  closing `BUG-260823-01` after two prior fixes that had measured clean on synthetic events and were
+  refuted by a real mouse.
+- **The chat shell stopped getting in the way.** All five `SHELL` criteria **driven in a browser**,
+  not asserted in jsdom — including `SHELL-03`, which was driven **FALSE** first (answering an
+  approval in one home left the other stale in both directions) and closed only on the second
+  attempt, on two real runs, server-verified.
+- **v4.0's verification debt got verdicts instead of silence.** Phase 245 discharged or retired
+  every owed row **in writing**, drove Phase 233's five rows live, and shipped a **greppable
+  `verification_mode` marker with zero prose deleted** — so a self-verification can no longer read as
+  a review. Its gate and PostToolUse hook were driven RED on both arms.
+- ⭐ **The recall cliff was measured, and the fix was REFUSED.** Phase 246 set out to raise
+  `hnsw_ef_search` to 200 and proved by `EXPLAIN (ANALYZE)` that no value fixes the cliff *through
+  the index*: 40/60/80 walk the index and return **ONE row** (~0.05 recall, ~4 ms); 100/150/200 reach
+  recall 1.000 by **sequential scan** (~1,100 ms). Shipping 200 would have cost **every** tenant
+  ~1.1 s a query to fix a cliff only small tenants have. Default reverted to 40.
+- ⭐ **The two-agent separation came back.** Phase 246 is the **first phase since `OV-SOLO-01` was
+  re-armed to carry `verification_mode: peer-reviewed`** — gemini built, claude reviewed at three
+  gates — and the one commit inside it that was the reviewer's own is **named** as self-verified
+  rather than folded into the headline.
+
+### Known gaps
+
+- ⛔ **`RECALL-01` — unmet, deliberately, and this is the milestone's best work rather than its
+  shortfall.** A tenant owning a small share of a large corpus still does not get honest recall out
+  of the box. The knob cannot deliver it; `SEED-273` (`hnsw.iterative_scan`) is the remaining path.
+  ⚠ Phase 241's contrary conclusion **never inspected an execution plan** — it measured recall alone
+  and was right about the number and wrong about the cause.
+- ⚠ **Migrations 179 and 180 are NOT in cloud** (measured at the close). v4.1 authored four
+  migrations; a promotion that carries the code without these two breaks on arrival.
+- ⚠ **`origin/production` is 287 commits behind `develop`** — v4.1's own output is undeployed, which
+  is the state v4.1 was opened to end for v4.0.
+- Carried with named triggers: `SEED-272` (a failed attachment copy never recovers), `SEED-273`,
+  `SEED-172` (**its trigger fired at this close** — local models still cannot be registered, timed
+  out or given a context window through the UI), and 245's four named residues including the
+  independent §6.3 review still owed by 238 / 240 / 241.
+
+### The finding the close itself produced
+
+⛔ **The ROADMAP Progress table read `0 / 5 phases complete · 0 / 19 requirements delivered` with all
+five phases closed** — and that is the register the close reads to build this archive. Four of five
+rows said *"Not started"*. **Drift ran in both directions**: `SHIP-02/03/04` sat unchecked while
+their traceability rows carried full closing evidence; `SHELL-04/05` and `RECALL-02` sat ticked while
+their rows read *"Pending"*. Repaired at the audit, originals preserved beside corrections.
+⚠ **This is the identical class the v4.1 roadmap OPENS by correcting in v4.0** (*"the requirement
+count is 19, not 17"*) — **a coverage check run against the wrong denominator**, twice in a row, in a
+different column each time.
+
 ## v4.0 Connected Knowledge (Shipped: 2026-09-10)
 
 **Phases completed:** 14 phases (228-241, **no inserts** — the first milestone since v3.5 that needed none), **62 plans** · 6 days (`6ad68e1e0` → `37ae87873`) · migrations **153-156 / 166-176** (15 files; 157-165 unused, 171 reserved) · git tag `v4.0`. **33 ✅ delivered · 5 ⛔ not ticked, of 38 requirements.** 571 commits, 718 files, +170,353 / −4,411.
@@ -38,6 +108,7 @@ Recorded rather than smoothed. Full evidence: [`milestones/v4.0-MILESTONE-AUDIT.
     eleven rows read **8 PASS · 1 ⛔ BLOCKED (M-9, `BUG-260913-01`) · 2 ⛔ RETIRED (S-1/S-2,
     `SEED-256`) · 0 HALF**. ⛔ The *SharePoint separately blocked on `SEED-256`* half was **true**
     and is now a **written retirement** rather than a block.
+
 - ⚠⚠ **241's UAT row 5 has a DEADLINE that must not be buried: it dies the moment migration 176 reaches cloud.** Five of its six rows are driven and passed; row 5 must run on **cloud, BEFORE 176 is applied there**, or it becomes unreproducible forever.
 - ⛔ **Cloud is 15 migrations behind** — `153-156` and `166-176` are all pending; v4.0 has not deployed. Operator decision 2026-09-10: they are applied immediately **before** the next push, in numeric order, once each (`bash scripts/pending-cloud-migrations.sh`).
 - ⛔ **`SURF-03`'s home is still an OPEN SCOPING DECISION.** There is no in-app notification surface in this product; the recommendation is an app-shell signal **plus** the Health-tab row, and **closing it against the Health tab alone does not satisfy the requirement.**
@@ -48,7 +119,6 @@ Recorded rather than smoothed. Full evidence: [`milestones/v4.0-MILESTONE-AUDIT.
 - ⚠ **`retrieval_service.py`'s G-5 extraction is owed since 231.** Phase 241 was the deliberate SECOND landing (11 non-comment lines, fence driven RED at 13); **a third must propose the extraction first.**
 - ⭐ **The method failure worth carrying forward, committed three times in one hour by the audit written to catch it.** The audit asked *"is a VERIFICATION file present?"* and never opened the review that was there; the correction opened the review and escalated its two CRITICALs to *"open, data loss"* and never opened the code — they had been fixed two days earlier, in an ancestor of the auditing commit. **Each register only knows the one below it, and the code is the bottom. Drive it, or do not report it.**
 - **Known deferred items at close: 48** (see `STATE.md` → Deferred Items) — 29 quick-task records whose files are gone, 14 dormant seeds, 1 todo, 2 UAT gaps (233, 241) and 2 verification gaps (239, 241, both `human_needed` with no code defects).
-
 
 ## v3.9 Connections: Any Service, Any Tool (Shipped: 2026-09-04)
 
@@ -84,7 +154,6 @@ Recorded rather than smoothed. Full evidence: [`milestones/v3.9-MILESTONE-AUDIT.
 - ⚠ **23 reported bugs remain open on `surface: Agentic-RAG`.** Six sit on one surface and are probably one root cause (`BUG-260818-01/02/03` — resume replays the prompt, drops the model, shows Stop instead of Continue — plus `BUG-260823-02/03/04`). Twenty were untriaged by the close audit and were deliberately not swept blind.
 - **Known deferred items at close: 47** (see `STATE.md` → Deferred Items) — 28 quick-task records whose files are gone, 14 dormant seeds, 1 todo, and the 214 / 217 UAT + verification gaps named above.
 
-
 ## v3.8 Document Intelligence, Automations & Connectors (Shipped: 2026-08-26)
 
 **Phases completed:** 12 phases (CORE 201-206 + inserts 204.1, 206.1, 206.2, 206.3 + guardrail debt 207, 208 + 209), **17 plans** · 3 days (`0702f1d2` → close) · migrations 124-126 · git tag `v3.8`. **11/11 requirements delivered.**
@@ -114,7 +183,6 @@ Recorded rather than smoothed. Full evidence: [`milestones/v3.9-MILESTONE-AUDIT.
 - ⚠ **Two ingestion bugs closed on LOCAL-only evidence** await cloud verification; the OpenRouter model id was never captured.
 - ⚠ **`SEED-203`**: the publish judge passed a golden run whose deliverable REFUSES the work, at score 100.
 - ⚠ **`outputSchema` is still discarded** by the MCP sanitizer — the competitor study's *"single cheapest actionable finding"*. `annotations` was recovered in 209; its sibling was left deliberately, as it was outside the ruling.
-
 
 ## v3.7 Workflow Product Completion (Shipped: 2026-08-24)
 
