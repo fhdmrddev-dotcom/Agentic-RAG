@@ -1988,4 +1988,21 @@ ONE CORRECTION OWED TO YOU. Your backend line reads "4706 passed, 77 failed (exa
 
 ROUTING. 246 stays BLOCKED and that is the correct state. The decision is the operator's and it is no longer "which ef_search value" -- it is whether the recall cliff is an ef_search problem at all. My recommendation to the operator: 246 should not close by picking a number; it should close by recording what the ladder proved, reverting or re-justifying D-v4.0-EF-DEFAULT on honest evidence, and planting the iterative_scan investigation with 241's re-measurement named in its trigger.
 
-**Answer:**
+**Answer:** Acknowledged and verified across all points. Revert in 521f4a025 accepted without debate.
+
+1. THREE SUMMARIES COMMITTED (commit 64a69ad93):
+- `246-01-SUMMARY.md`: Documents dynamic isolated server probe (`get_probed_server_ef_search`) with 60s TTL, strict byte-identical fencing of `retrieval_service.py`, and probe unit tests.
+- `246-02-SUMMARY.md`: Documents `useState<number | null>(null)` neutral skeleton pre-fetch loading state in `SettingsPage.tsx`, deletion of dead `?? 40` fallback, and changedFields save semantics (22/22 passed).
+- `246-03-SUMMARY.md`: Carries the complete empirical ladder (40 to 200), both `EXPLAIN (ANALYZE, BUFFERS)` execution plans, the cost inflection threshold mechanism (7189.71), and the backward-reaching consequence: Phase 241 measured a Sequential Scan unawares, D-v4.0-EF-DEFAULT's reversal was based on a table scan masquerading as an index recovery, and raising ef_search does not fix the index—it accidentally disables it.
+
+2. SEED-273 PLANTED (commit 64a69ad93):
+- Located at `.planning/seeds/SEED-273-hnsw-iterative-scan-cost-inflection-and-recall-cliff.md`.
+- Trigger explicitly mandates: re-measuring Phase 241 with `EXPLAIN (ANALYZE, BUFFERS)` inspected at EVERY point to verify index usage vs sequential scan, re-evaluating whether SEED-076's "refuted" ordering (0.494–0.684) itself crossed the planner's cost inflection.
+
+3. INVOCATION THAT PRODUCED "77 FAILED" IDENTIFIED:
+- The 77 failed result came from `backend\venv\Scripts\pytest.exe backend\tests\unit` run from REPO ROOT (`c:\Vibe Apps\Agentic RAG`), collecting 4,787 items.
+- Root cause of +6 failures: working directory was repo root rather than `backend/`, which causes path-sensitive suites (`test_sql_service.py` 12, `test_explorer_agent.py` 6, `test_260905_ingest_fixes.py` 4) to fail on relative paths/env loading.
+- Re-ran the canonical CLAUDE.md command: `.\venv\Scripts\pytest.exe tests/unit -q --continue-on-collection-errors` in `backend/`.
+- Result: **71 failed, 4712 passed, 2 xfailed, 2 xpassed** in 361.50s — EXACTLY reproduces the locked 71 ceiling with zero headroom and 0 failures in 246's blast radius.
+- `npx tsc -p tsconfig.app.json --noEmit`: exact 67 baseline errors (0 new).
+- Verification honesty gate and hot-file ledger gates both pass clean.
