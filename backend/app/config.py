@@ -998,13 +998,9 @@ class Settings(BaseSettings):
     keyword_search_weight: float = 1.0
     rrf_k: int = 60  # RRF constant (standard: 60)
 
-    # Phase 241 (QUEUE-06 / D-09) — the HNSW scan knobs. ⛔ THESE TWO ARE THE MINIMAL
-    # HARDCODED DEFAULTS, NOT THE CONTROL: the operator's choice lives in
-    # `app_settings.hnsw_ef_search` / `.hnsw_iterative_scan` (migration 176) and reaches
-    # here only as `_val`'s fallback when no value is stored. Both values below are the
-    # LIVE pgvector server defaults measured 2026-09-10 (pgvector 0.8.0 / PG 17.6), which is
-    # what makes an unapplied migration 176 a no-op rather than a silent behaviour change.
-    hnsw_ef_search: int = 40
+    # Phase 246 (RECALL-01 / D-246-03) — default raised from 40 to 200, restoring
+    # recall from 0.040 to 1.000 for small tenants in a 100k chunk corpus (QUEUE-06).
+    hnsw_ef_search: int = 200
     hnsw_iterative_scan: str = "off"  # off | strict_order | relaxed_order
 
     # ⛔ HARDCODED-ONLY, DELIBERATELY — D-09 / threat T-241-16. These matter ONLY once

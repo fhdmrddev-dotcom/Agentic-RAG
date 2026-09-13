@@ -7567,6 +7567,15 @@ this file belongs in `backend/tests/unit/`.
 
 ⚠ **RE-DERIVED AT PHASE 241's CLOSE (2026-09-10, `241-04`): `1 / 1 / 161`.**
 
+⚠ **RE-DERIVED AT PHASE 246 (2026-09-13, `246-01`): `4 / 2 / 364` — G-5: no (2 phases).**
+
+⭐ **Phase 246 (`246-01` / `RECALL-02` / `SEED-268`): Dynamic server probe and 60s TTL cache.**
+The compiled-in `_SERVER_DEFAULT_EF_SEARCH = 40` shortcut is replaced with `get_server_ef_search`,
+which queries Postgres `SELECT current_setting('hnsw.ef_search', true)` outside request transactions
+and caches the result for 60 seconds. If the server default matches the resolved ef_search, `SET LOCAL`
+is skipped. If the server default differs (e.g. 64 on a tuned cloud instance, closing SEED-268), `SET LOCAL`
+is issued.
+
 ⭐ **Its two knobs were MEASURED at `241-04`, and the measurement changed the advice.**
 `hnsw.ef_search` is the primary lever — `200` restores `recall@20 = 1.000` at every tenant
 selectivity measured (0.2% / 2% / 20%) against a shipped `40` that scores `0.040 / 0.068 / 0.360`.
@@ -10507,7 +10516,7 @@ cells rot within days.
 | [`backend/app/services/retrieval_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrievalservicepy) | 19 / 11 / 456 | ⚠ **FIRES** | ⛔ **extraction still OWED** (`SEED-224`, since 231) — 241 is the SECOND landing, capped at 11 lines by a fence; a THIRD must propose the extraction FIRST |
 | [`backend/app/services/recall_eval.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrecallevalpy) | 2 / 2 / 978 | no (2 phases) | rewritten in place at 241 (`1 / 1 / 67` → here). ⭐ driven LIVE at 241-04: it reported `Hit@1 0.78` AND refused a bench it could not read — both arms real |
 | [`scripts/build-recall-bench.py`](docs/HOT-FILE-LEDGER.md#scriptsbuild-recall-benchpy) | 4 / 1 / 1088 | no (1 phase) | ⚠ row ADDED at 241-04 — the only `DROP DATABASE` in the repo. Guard + constant-interpolation + AST fence, all driven RED. It built GREEN and unreadable; assert the READ |
-| [`backend/app/services/retrieval_tuning.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrievaltuningpy) | 1 / 1 / 161 | no (1 phase) | young (241). ⛔ `ef_search` is the lever (200 → recall 1.000); `iterative_scan` alone reaches only 0.494-0.684. NEVER advise the 1000 maximum — measured WORSE than 400 |
+| [`backend/app/services/retrieval_tuning.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrievaltuningpy) | 4 / 2 / 364 | no (2 phases) | young (241, 246). ⛔ `ef_search` is the lever (200 → recall 1.000); dynamic server probe + 60s TTL cache (246, SEED-268) |
 | [`frontend/src/components/metadata/DocumentDetailPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsmetadatadocumentdetailpaneltsx) | 12 / 7 / 596 | ⚠ **FIRES** | honoured by construction (**240**): ONE child section mounted, gated on metadata, no shell change. ⚠ CR-01's fence caught a missing reset before it shipped |
 | [`frontend/src/components/metadata/DocumentConversationSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsmetadatadocumentconversationsectiontsx) | 0 / 0 / 155 | no (new) | young (240) — the read that makes `thread_key` visible. ⛔ Bounded height + a worded truncation, because BUG-260908-01 is the same panel unbounded |
 | [`frontend/src/lib/api/documents.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapidocumentsts) | 2 / 2 / 389 | no (2 phases) | ⚠ **absent for its ENTIRE LIFE — row added 240.** ⭐ The Phase 207 `lib/api.ts` split created it with no row, exactly as its sibling `api/workflows.ts` records |

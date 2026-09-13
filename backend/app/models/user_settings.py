@@ -157,12 +157,8 @@ class UserEffectiveSettings(BaseModel):
     vector_search_weight: float
     keyword_search_weight: float
     rrf_k: int
-    # Phase 241 (QUEUE-06 / D-09, migration 176) — the two HNSW scan knobs, applied per
-    # request with `SET LOCAL` inside the transaction `get_user_pg_connection` already
-    # opens. ⛔ Their two memory companions (`hnsw_max_scan_tuples`,
-    # `hnsw_scan_mem_multiplier`) are deliberately absent from this model: they stay
-    # hardcoded in `config.py` because a wrong value is a memory footgun (T-241-16).
-    hnsw_ef_search: int = 40
+    # Phase 246 (RECALL-01 / D-246-03) — default raised from 40 to 200
+    hnsw_ef_search: int = 200
     hnsw_iterative_scan: str = "off"
 
     # Web search
@@ -1034,12 +1030,10 @@ def _build_settings_from_row(row: dict) -> UserEffectiveSettings:
         keyword_search_weight=float(_val(row, "keyword_search_weight", "keyword_search_weight", 1.0)),
         rrf_k=int(_val(row, "rrf_k", "rrf_k", 60)),
 
-        # Phase 241 (QUEUE-06 / D-09, migration 176). ⚠ env_attr is NOT None here, unlike the
-        # app-only switches below: these two have a REAL `config.py` fallback and that fallback
-        # is the "minimal hardcoded value" D-09 names. A missing column — the state until an
-        # operator pastes 176 in 241-04 — therefore reads 40 / "off", which IS the live pgvector
-        # server configuration, so applying this plan changes no search until somebody chooses to.
-        hnsw_ef_search=int(_val(row, "hnsw_ef_search", "hnsw_ef_search", 40)),
+        # Phase 246 (RECALL-01 / D-246-03). Default raised from 40 to 200:
+        # A missing column or NULL value reads 200, which restores recall from 0.040 to 1.000
+        # for small tenants in a 100k chunk corpus without requiring a schema migration.
+        hnsw_ef_search=int(_val(row, "hnsw_ef_search", "hnsw_ef_search", 200)),
         hnsw_iterative_scan=str(_val(row, "hnsw_iterative_scan", "hnsw_iterative_scan", "off")),
 
         tavily_api_key=str(_val(row, "tavily_api_key", "tavily_api_key", "")),
