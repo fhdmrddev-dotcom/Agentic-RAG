@@ -25,6 +25,225 @@
 - ✅ **v3.9 Connections: Any Service, Any Tool** — Phases **210-227** (shipped 2026-09-04, git tag `v3.9`). 16 phases (210-217 CORE + inserts 214.1 / 217.1 + 220-227; **218 absorbed** into 217.1; **219 deferred**), **111 plans**, migrations **127-129 / 140-141 / 150-152**, 9 days. **34/39 requirements delivered · 3 partial · 2 shipped-but-never-driven.** A connection became `{service identity, auth, discovered tools, per-tool grants}` — so adding a service adds **rows, not code**: Notion connects by OAuth with no developer console and returns **41 tools for zero lines of tool code**, and six Google applications sit under one token with **11/11 live writes**. Per-tool grants, an approval moment that stops a real run, an audit receipt per outbound call, connections usable by name in chat, and the Library as one home for documents. ⚠ **Phase 219 DEFERRED to the Connected Knowledge milestone** with `LIB-08/09/10` and `SEED-209/210/211/212` — its SC#1 *“watched on a schedule”* IS this milestone's own binding security re-open trigger ([`audit`](milestones/v3.9-MILESTONE-AUDIT.md)).
 - ✅ **v4.0 Connected Knowledge** — Phases **228-241** (shipped 2026-09-10, git tag `v4.0`). 14 phases, **62 plans**, migrations **153-156 / 166-176**, 6 days. **33/38 requirements delivered · 5 ⛔ not ticked** (`SRC-03` Azure-blocked · `QUEUE-06` remedy shipped but the DEFAULT is unchanged · `SURF-03` home still an open decision · `DEBT-03` ultra ruled out · `DEBT-04` gated on a production push). The knowledge base stopped depending on somebody remembering to upload: a source is connected **once**, previewed before it brings anything in, and then watched on the **shipped** scheduler. Four families as thin adapters over ONE contract — Google Drive · OneDrive/SharePoint via Graph · **any** MCP file server · mail — with **239 proving zero-code by HASH** against GitHub MCP and **240 proving mail is a SHAPE, not a fourth adapter** (`sources/base.py` byte-identical). Connection-scoped visibility at all four RLS sites, a durable queue with cap/retry/resume, and the anti-injection discipline **actually attacked** (13/13 refused · 8/8 mutations caught · live drive refused by 8/8 native providers). ⚠ **241 measured a REAL recall defect at customer scale** — `recall@20` **0.040** at the shipped `ef_search = 40`, a **cliff not a slope**. ⛔ **238, 240 and 241 closed WITHOUT an independent §6.3 review**; two UAT sets owed on credentials ([`audit`](milestones/v4.0-MILESTONE-AUDIT.md)).
 - ✅ **v4.1 Ship It & Feel It** — Phases **242-246** (shipped 2026-09-13, git tag `v4.1`). 5 phases, **25 plans**, migrations **177-180**, 3 days. **18/19 requirements delivered · 1 ⛔ unmet BY MEASUREMENT.** A deliberate **CONSOLIDATION** milestone — no new capability axis; every requirement closed something already in a register. The ship claims closed against the **database and the branch** rather than the deploy record; the chat surface stopped getting in the way (follow-scroll driven with a **real wheel** — 0 px drift, closing `BUG-260823-01` after two fixes that had passed on synthetic events; all five `SHELL` criteria driven in a browser); and v4.0's verification debt got **written verdicts** plus a greppable marker so a self-verification can no longer read as a review. ⭐ **Its best work is the requirement it did NOT deliver:** 246 proved by `EXPLAIN (ANALYZE)` that no `hnsw_ef_search` value fixes the small-tenant recall cliff through the index — every index walk returns **ONE row**, every good recall figure is a **~1.1 s sequential scan** — so the 200 default was **refused and reverted to 40**, with `RECALL-01` left open on `SEED-273`. ⭐ 246 is also the **first peer-reviewed phase since `OV-SOLO-01` was re-armed**. ⚠ Migrations **179/180 are not in cloud** and `production` is **287 commits behind**, so v4.1's own output is undeployed ([`audit`](milestones/v4.1-MILESTONE-AUDIT.md)).
+- 🚧 **v4.2 The Connected Knowledge You Can Actually Run** — Phases **247-251** (started 2026-09-13). **26 requirements in 6 categories**, 25 of them mapped to five phases and `DEBT-06` held as a **milestone-wide standing gate**. ⚠ **The bullet above is CORRECTED, not rewritten: its closing claim — *"migrations 179/180 are not in cloud and `production` is 287 commits behind, so v4.1's own output is undeployed"* — was true when written and is now FALSE.** Measured at this scoping: `production` moved `e65610ac2 → eebc4c42f` (**292 commits**), `production..develop` is **0**, migrations **179 and 180 are applied and verified in cloud** (177/178 measured **already present** — `scripts/pending-cloud-migrations.sh` diffs git refs, not the live database, and over-reported by two), and `get_advisors(security)` returns **zero ERROR findings**. **v4.1 IS deployed.** v4.2 is therefore the SECOND consecutive **consolidation** milestone — no new capability axis, every requirement closes something already in a register, and each was **DRIVEN against the tree on 2026-09-13 rather than read from a `status:` field**, a method that caught three wrong register entries (two stale toward *"still broken"*, one toward *"fine"*). Watch-loop honesty (247) · the credential boundary (248) · the model you actually run (249) · run-honesty residue (250) · register integrity (251). **v4.2 opens on deployed code for the first time in three milestones.**
+
+---
+
+## v4.2 The Connected Knowledge You Can Actually Run — IN PROGRESS (started 2026-09-13)
+
+**5 phases** (247-251, no inserts planned), **26 requirements** in 6 categories.
+**Scope source:** `.planning/REQUIREMENTS.md` · **scoping record:** `PROJECT.md` → *Current Milestone: v4.2*.
+**Numbering continues at 247** — v4.1 ended at 246; nothing resets.
+**Migration head at open = `180`; next free slot = `181`** (expected in 248 only; 247/249 may need one, 250/251 should need none).
+
+**Goal:** the capability v4.0 built and v4.1 deployed becomes the surface you can **live on** — the watch
+loop tells the truth, a credential cannot land in a readable column, and the model you want to run
+registers itself.
+
+### Two facts carried in, so they are not rediscovered
+
+⭐ **v4.1 IS DEPLOYED as of 2026-09-13.** `production` = `eebc4c42f`, **0 behind `develop`**, all
+migrations **through 180 applied and verified in cloud**, `get_advisors(security)` returns **zero ERROR
+findings**. This is the state v4.1 existed to reach and v4.0 never reached — **v4.2 is the first
+milestone in three to open on deployed code.** Every *"cloud is N migrations behind"* sentence
+inherited from a v4.0 / v4.1 register is stale; re-derive before quoting one.
+
+⚠ **The UAT ledger moved with that promotion, and it moved in BOTH directions:**
+- **242's UAT row 5 is now UNBLOCKED and OWED** — the production promotion **was its trigger**. It is a
+  real owed row, not a closed one, and it belongs in the first phase close that can carry it.
+- **241's UAT row 5 is EXPIRED, NOT OWED** — it needed a read-capable cloud DSN to prove an arm that
+  **migration 176 already being in cloud makes unreproducible.** ⛔ Do not plan it, do not carry it as
+  debt, and do not let a future audit re-open it as *"never run"*: it is **retired by measurement**.
+
+### Known shape-risk, stated at scoping rather than discovered later
+
+⚠⚠ **THIS IS THE SECOND CONSECUTIVE CONSOLIDATION MILESTONE, AND THE RISK COMPOUNDS RATHER THAN
+FADES.** v4.1 named it in writing — *"a consolidation milestone has no natural stopping point; every
+register it opens contains more than it can close"* — **and then ran 17 plans for 4-6 plans of
+substance anyway.** The registers are larger now (27 open `surface: Agentic-RAG` bugs, 161 planted
+seeds of 280, a 23-item operator queue), and `SEED-013` / `SEED-195` (Open Platform, reserved as
+**v5.0**) has now been deferred **twice**; a third deferral needs a written reason, not silence.
+
+⚠ **G-8 IS THE GOVERNOR OF THIS MILESTONE, more than on any capability milestone.**
+- **Target 3-5 plans per phase.** Above **6**, CONTEXT.md must name what genuinely **cannot share a
+  worktree** — adjacency is not a reason for a second plan.
+- A bug that is **≤ 1 file / ≤ 10 lines with no schema or API surface is `/gsd:fast` under G-3, never a
+  plan.** Several requirements here are explicitly that shape (`WATCH-06`, `WATCH-07`, plausibly
+  `MODEL-07`), and counting them as plans is how 4-6 becomes 17.
+- ⛔ **Never cut to save time:** the verifier, TDD RED drives, `security_enforcement` / `code_review`,
+  migration discipline. **The lever is plan COUNT, never the agent roster.**
+
+⚠ **`retrieval_service.py`'s G-5 extraction has been owed since Phase 231, and Phase 241 was the
+deliberate SECOND landing.** No phase here is expected to touch it — **but if one does, the extraction
+must be PROPOSED FIRST** (`SEED-224`), before the change that would be its third landing.
+
+⚠ **G-5 generally: read `docs/HOT-FILE-LEDGER.md` at discuss-phase, not the CLAUDE.md table.** The
+CLAUDE.md rows carry the verdict only; the named seam and the binding invariants live in the detail
+file, and `node scripts/check-hot-file-ledger.cjs <phase>` is what actually enforces a row's existence.
+Per-phase likely collisions are named in the Flags column below.
+
+### DEBT-06 — a standing gate across the whole milestone, not a phase
+
+`DEBT-06` is the only requirement **not** mapped to a phase, deliberately. It is a gate that runs
+**alongside** the build rather than a bucket of work, and it discharges at these points:
+
+| When | What discharges it |
+|---|---|
+| At each v4.2 phase close (247-251) | The phase's own §6.3 independent review runs **before** the phase is marked complete. `OV-SOLO-01` is **RE-ARMED** (Gemini returned 2026-09-13), so `AGENTS.md` §3 / §6.3 two-agent separation is back in force: **a phase's builder may not be its reviewer.** Record `verification_mode: peer-reviewed` with the reviewer named. |
+| Alongside 247 and 248 | The **backlog** rows — Phases **238, 240, 241** — each receive a `/gsd:code-review <phase>` **or** a **written refusal naming who decided and why**. |
+| Alongside 249, 250 and 251 | The **v4.1** rows — Phases **242-246** — same instrument. `BUS-202` is already waiting: Gemini reports Phase 246 complete and ready for post-phase review. (246 already carries `peer-reviewed`; confirm it rather than re-run it.) |
+| At milestone close | Every one of 238 / 240 / 241 / 242-246 reads either `independent_review: done` **or** a written refusal. A row that reads **neither** is an **unmet `DEBT-06`**, not a rounding error. |
+
+⛔ **Re-arming the rule retro-reviews NOTHING.** Those phases stay `verification_mode: self-verified`
+with `independent_review: owed` until a review actually runs.
+⚠ **`/code-review ultra` stays ruled out on cost** (standing operator decision). The **normal**
+`/gsd:code-review <phase>` is the instrument — and it is what caught 241's shipped HTTP 500.
+
+### Phase Table
+
+| Phase | Name | Goal | Requirements | SC# | Flags |
+|-------|------|------|--------------|-----|-------|
+| 247 | Sources & Watches — the surface you now live on | A watched source tells the truth about itself: what it brought in, where that came from, whether it is healthy, and when something went missing | WATCH-01, WATCH-02, WATCH-03, WATCH-04, WATCH-05, WATCH-06, WATCH-07, WATCH-08 | 5 | ⚠ **G-2 FIRES — `/gsd:sketch` BEFORE `/gsd:plan-phase 247`**, operator-approved mockup is the acceptance bar; **UI hint: yes**; **G-4** lived-experience UAT (3 operator-defined "I'd recognize failure here" scenarios, defined at scope-time); **G-3** — `WATCH-06` / `WATCH-07` are `/gsd:fast` candidates, not plans; **G-5** likely: `backend/app/api/connectors.py` (⛔ extraction OWED at its SIXTH landing), `backend/app/services/sources/preview_service.py`, `backend/app/services/connector_service.py`, `frontend/src/components/settings/ConnectionsTab.tsx`, `frontend/src/components/sources/sourceHealthVocabulary.ts` (fires on next touch), `backend/app/services/sources/failure_cause.py` (⛔ its `Cause` union must stay ONE plain-text line — a frontend suite binds it by `?raw`), `frontend/src/lib/api/connectors.ts`; migration only if `missing_since` needs backfill; **242's owed UAT row 5** can ride this close |
+| 248 | The Credential Boundary | A secret cannot come to rest anywhere a reader who should not see it can read it | CRED-01, CRED-02, CRED-03, CRED-04 | 4 | ⚠ **TRUST BOUNDARY — threat model MANDATORY, dispatched `security_enforcement` + `code_review` NOT optional**; ⛔ **`REVOKE … FROM anon` is a NO-OP while the default `PUBLIC` grant stands** (see phase detail); **migration expected — next free slot `181`**, applied by pasting into the SQL editor, then `bash scripts/regenerate-full-schema.sh`; **cloud parity is security-bearing** — `CRED-04` writes `get_advisors(security)` into the deploy checklist; **G-5**: `backend/app/models/connector.py`, `backend/app/api/connectors.py`, `backend/app/security/secret_cipher.py` (⛔ `SECRET_COLUMNS` is the ONE encrypt-on-write set), `frontend/src/components/settings/ConnectionFormPanel.tsx` (wider `ConnectionShapeFields.tsx` seam OWED), `connectionFormCopy.ts`; no G-2 — refusal copy is a sentence, not a surface |
+| 249 | The Model You Actually Run | The model a person wants to run registers itself from the UI, announces what it can and cannot do, and reaches every worker | MODEL-04, MODEL-05, MODEL-06, MODEL-07, MODEL-08, MODEL-09 | 5 | ⚠⚠ **`MODEL-09` HAS A PRECONDITION — re-measure BEFORE planning** (see phase detail); **G-2 light** — `MODEL-05` / `MODEL-07` are picker-surface legibility, sketch only if discuss-phase surfaces a visual decision; **UI hint: yes**; **SC#10 cross-provider** — `MODEL-04` / `MODEL-05` touch provider routing, so the full native roster + OpenRouter (8 rows) applies, **derived from `MODEL_CAPABILITIES`, never re-typed**; **G-5**: `backend/app/config.py` (⛔ `MODEL_CAPABILITIES` seam OWED at 48 phases), `backend/app/models/user_settings.py` (32), `frontend/src/pages/SettingsPage.tsx` (tab seam OWED, 24), `backend/app/api/admin.py`, `backend/app/api/settings.py`, `backend/app/main.py` (the broadcast path for `MODEL-06`), `frontend/src/components/admin/ModelRegistryTab.tsx`, `backend/app/services/eval_runner_service.py`; `SEED-172` / `SEED-040` / `SEED-135` are **answered by editing the seed**, not by shipping |
+| 250 | Run Honesty — the residue | A run never claims something that did not happen — not about your question, not about its own output, not about work it did not finish | HONEST-01, HONEST-02, HONEST-03, HONEST-04 | 4 | ⚠⚠ **`HONEST-04` IS BLOCKED ON ONE MEASUREMENT that must be resolved at DISCUSS-phase, not at plan time** — the two arms lead to **OPPOSITE** fixes (see phase detail); ⛔ **auto-completing open todos at a clean run end is REJECTED** (rejected 2026-06-26, recorded so it is not re-proposed as new); **SC#10 cross-provider MANDATORY** — streaming + agent loop, and `HONEST-02` is filed `cross-provider/openai`; **red line D-14** — provider differences stay at the adapter boundary, never a shared-path fork; **G-2** for `HONEST-03` / `HONEST-04` (workspace panel + todo list are live UI); **UI hint: yes**; **G-5**: `backend/app/services/agent_loop.py` (21), `frontend/src/providers/StreamsProvider.tsx` (37), `frontend/src/components/panel/WorkspacePanel.tsx`, `backend/app/api/threads.py` (82), `backend/app/services/tool_dispatcher.py` (35); ⚠ `run_producer.py` + `todos_service.py` carry **NO ledger row** — add one at the plan that touches them |
+| 251 | Register Integrity | The registers can be trusted as an index — an id resolves, a trigger is swept by something executable, and the operator queue is a decision list | REG-01, REG-02, REG-03 | 3 | **No G-2** (no product UI); **no SC#10**; **no migration**; **G-5 light** — the blast radius is `.planning/seeds/`, `.claude/commands/gsd/` and `scripts/`, none of which carry hot-file rows; ⛔ **`REG-03`: Claude may NOT close bus items** — the deliverable is a list the operator can rule on; ⚠ the new sweep in `REG-02` must be **driven RED against a planted defect** before it is trusted — a guard nobody has seen fire is not a guard, and Phase 242 measured two of this project's guards passing **vacuously** |
+
+### Phase Checklist
+
+- [ ] **Phase 247: Sources & Watches — the surface you now live on** — Drive/Graph paths stored whole and actually used by classification, watch health reads its connection, "Sync now" answers in place, a missing file says when, labels match behaviour, 240's seven warnings dispositioned (WATCH-01..08)
+- [ ] **Phase 248: The Credential Boundary** — a secret pasted into a non-secret field is refused not stored, the grant marker claims only what is knowable, all 13 anon-executable SECDEF functions ruled on, `get_advisors(security)` in the deploy checklist (CRED-01..04)
+- [ ] **Phase 249: The Model You Actually Run** — local / self-hosted models addable from the UI, unregistered ids say so at pick time, registry writes reach every worker, the hide control is the discoverable one, refused writes report failure, eval engines name their own cause (MODEL-04..09)
+- [ ] **Phase 250: Run Honesty — the residue** — trimming never eats your own question, a silent reasoning model says what happened, the panel stops working when the run ends, a finished task leaves no false todo (HONEST-01..04)
+- [ ] **Phase 251: Register Integrity** — 8 duplicate seed ids resolved, an executable seeds sweep, `BUS-171`'s 23-item operator queue triaged into a decision list (REG-01..03)
+
+### Phase Details
+
+#### Phase 247: Sources & Watches — the surface you now live on
+
+**Goal**: A watched source tells the truth about itself — what it brought in, where that came from, whether it is healthy, and when something went missing — so a person can rely on the watch loop instead of re-checking it by hand.
+**Depends on**: Nothing (first phase of v4.2). It builds on v4.0's shipped watch loop, which reached production **for the first time on 2026-09-13** — these are the eight defects standing between *"it shipped"* and *"you can rely on it"*.
+**Requirements**: WATCH-01, WATCH-02, WATCH-03, WATCH-04, WATCH-05, WATCH-06, WATCH-07, WATCH-08
+**Success Criteria** (what must be TRUE):
+
+  1. A document ingested from Google Drive or from OneDrive/SharePoint carries the same `metadata.source.path` an uploaded one does — a classification rule keyed on path **matches it**, and the path displayed equals the path stored, with no truncation (WATCH-01, WATCH-02).
+  2. A watch card reports the health of **the connection it rides**: a healthy connection whose last run failed reads healthy, and a broken connection whose last run happened to succeed reads broken (WATCH-03).
+  3. Pressing "Sync now" produces an answer **where it was pressed** — the section it writes into stays open and the result is readable without re-navigating (WATCH-04).
+  4. A file that has gone missing at the source states **when** it went missing; every action label matches what the action does (a fix performs a fix, navigation is labelled as navigation); and every timestamp is either absolute or relative, never both concatenated (WATCH-05, WATCH-06, WATCH-07).
+  5. Each of Phase 240's **seven** open build-review warnings reads either *closed* or *accepted, with the reason written down* — none is left undispositioned (WATCH-08).
+
+**Plans**: TBD
+**UI hint**: yes
+**Flags**: ⚠ **G-2 FIRES — `/gsd:sketch` runs BEFORE `/gsd:plan-phase 247`, and the operator-approved mockup is the acceptance bar.** All eight WATCH complaints are **legibility** complaints: what a card claims, where an answer lands, how a timestamp reads, whether a label tells the truth about its own button. **A wire-format fix that does not change what a person reads has not satisfied this phase** — and this project has already measured a green composition fence coexisting with a shipped legibility defect, because presence assertions cannot see content drift. Assert the rendered **content** where the words are the deliverable. · **G-4**: three operator-defined *"I'd recognize failure here"* scenarios, defined **at scope-time**, driven in Chrome at verification — a screenshot plus a wire assertion is insufficient. · **G-3**: `WATCH-06` and `WATCH-07` look like ≤ 1-file / ≤ 10-line fixes; if they measure that way they are `/gsd:fast`, **not plans**. · **G-5**: see the Flags column above — `backend/app/api/connectors.py` has an **extraction OWED at its sixth landing**, so a plan that lands there must say why it is not the seventh. · **242's UAT row 5 is unblocked and owed** and can be driven at this phase's close. · Migration only if `missing_since` needs a backfill; prefer writing it forward.
+
+#### Phase 248: The Credential Boundary
+
+**Goal**: A secret cannot come to rest anywhere a reader who should not see it can read it — not in a mis-typed field, not behind a marker that overclaims its own authorship, and not through a function the exposed API schema hands to `anon`.
+**Depends on**: Nothing structurally. Sequenced **after 247** because its `connectors.py` / `connector_service.py` / `connector.py` blast radius overlaps 247's, and worktree Rule 4 forbids two plans mutating the same local Postgres concurrently.
+**Requirements**: CRED-01, CRED-02, CRED-03, CRED-04
+**Success Criteria** (what must be TRUE):
+
+  1. A credential pasted into a field that is not a secret field is **refused, not stored** — and the refusal **names which field takes a secret** (CRED-01). Measured live 2026-09-13: `custom_client_id` is a bare `str | None = None` at `backend/app/models/connector.py` **244 / 351 / 558** — no pattern, no length bound, no shape check — while `config` is `SELECT`-able org-wide by `authenticated` and `secret_ciphertext` is not.
+  2. The grant override marker claims only what the app can actually know — it does not assert a human author for a change the system cannot attribute (CRED-02).
+  3. Each of the advisor's **13** anon-executable `SECURITY DEFINER` findings is either **revoked** or **recorded as intentionally public with the reason** — and a re-run of `get_advisors(security)` shows the ruled-on set rather than the original thirteen (CRED-03).
+  4. `get_advisors(security)` is a step of the deploy parity checklist that a promotion cannot silently skip (CRED-04).
+
+**Plans**: TBD
+**Flags**: ⚠ **TRUST BOUNDARY — a threat model is MANDATORY and the dispatched code review is NOT optional.** `security_enforcement` and `code_review` are both on in `config.json`; neither may be cut to save time, on this phase least of all. · ⛔⛔ **THE TRAP THAT MAKES A NAIVE `CRED-03` FIX A NO-OP: Postgres grants `EXECUTE` to `PUBLIC` by default, so `REVOKE … FROM anon` changes NOTHING while the `PUBLIC` grant stands.** **Revoke from `PUBLIC`, then grant back the roles that genuinely need it.** This was **measured, not reasoned** — migration 177's first version applied cleanly and verify still read `FAIL`. **A role-by-role sweep of the 13 flagged functions would silently achieve nothing**, and would produce a green migration over an unchanged exposure. · ⭐ **`get_advisors(security)` is the only instrument that has ever caught this class.** `BUG-260911-01` was invisible to every gate this project runs, because **every gate reads through the service role and nothing in the suite ever makes a request as `anon`.** A `CRED-01` fence exercised only through the service role reproduces that blind spot exactly — **make at least one assertion as `anon`.** · **Migration expected; next free slot is `181`** — apply by pasting into the Supabase SQL editor (never `db push` / `db reset`), then `bash scripts/regenerate-full-schema.sh`. · **Supabase MCP reads are free and should be used** to verify the advisor set; **every write against production stays per-action operator-approved**. · **G-5**: `connector.py`, `connectors.py`, `secret_cipher.py` (⛔ a provider-key column absent from `SECRET_COLUMNS` is stored **plaintext** and nothing says so), `ConnectionFormPanel.tsx`, `connectionFormCopy.ts`.
+
+#### Phase 249: The Model You Actually Run
+
+**Goal**: The model a person wants to run registers itself from the UI, announces what it can and cannot do before it is used, and reaches every worker — so *"add a model"* stops meaning *"edit code and deploy"*, and a silent capability loss stops being the failure mode.
+**Depends on**: Nothing structurally. ⚠ **It has a PRECONDITION rather than a dependency — see the flags.**
+**Requirements**: MODEL-04, MODEL-05, MODEL-06, MODEL-07, MODEL-08, MODEL-09
+**Success Criteria** (what must be TRUE):
+
+  1. A local or self-hosted model — Ollama, LM Studio, vLLM, or any OpenAI-compatible endpoint — is added from the **Model Registry UI** and is then selectable and usable in chat, with **no code edit and no deploy** (MODEL-04).
+  2. Picking a model whose id is absent from the capability registry **says so at pick time**, instead of resolving `capability_source = inferred`, silently losing `native_tools`, and producing a run that simply never calls a tool while nothing says why (MODEL-05).
+  3. A registry or settings change made through one worker is visible on the **next** request no matter which worker serves it — a newly added model appears every time, not roughly half the time at the default `WORKER_COUNT=2` (MODEL-06).
+  4. The control that hides a model from the picker is the one a person reaches first, and a settings write the database **refuses** reports **failure** rather than 200 + "Saved" (MODEL-07, MODEL-08).
+  5. Every configured eval engine either reports healthy or **names its own cause** — no opaque `provider_error` (MODEL-09).
+
+**Plans**: TBD
+**UI hint**: yes
+**Flags**: ⚠⚠ **`MODEL-09` MUST BE RE-MEASURED BEFORE IT IS PLANNED — this is a precondition on the phase, not a task inside it.** `BUG-260809-01` (0/8 engines healthy, 6 of 8 hiding why) was measured against the **OLD production on 2026-08-09**, and **292 commits have landed since**. ⛔ **Engine health is a LIVE SWEEP and is NOT PERSISTED, so it cannot be re-derived from the database, from a log, or from the Supabase MCP read path.** It needs **one operator click: Settings → Eval engine health → Run sweep.** Ask for it at `/gsd:discuss-phase 249` and record the result there. **If the sweep now reads healthy, `MODEL-09` collapses to a written closure rather than a plan** — and planning it first would build a fix for a defect that may no longer exist. · **SC#10 cross-provider**: `MODEL-04` / `MODEL-05` touch provider routing, so the **full native roster + OpenRouter (8 rows)** applies — **derive the roster from `MODEL_CAPABILITIES`, never re-type it**, and prefer a registry-backed id (an id absent from the registry measures a weaker configuration than the one that ships, which is `MODEL-05`'s own defect). A row with no key is recorded ⛔ with its reason, never dropped. · **`MODEL-04`'s root cause is already located**: `POST /admin/models` validates its provider argument against the **8-cloud SSRF discovery allowlist** rather than the routing roster — ⛔ **widening the roster must NOT widen the SSRF fence**, which is a different list for a different reason. · **`SEED-172`, `SEED-040` and `SEED-135` are answered by EDITING THE SEED** — flip `status` and record where it went; a seed that shipped but still reads `planted` will be re-proposed forever. · **G-5**: `config.py` (⛔ the `MODEL_CAPABILITIES` seam is OWED at 48 phases), `user_settings.py`, `SettingsPage.tsx` (tab seam OWED), `admin.py`, `settings.py`, `main.py`, `ModelRegistryTab.tsx`, `eval_runner_service.py`.
+
+#### Phase 250: Run Honesty — the residue
+
+**Goal**: A run never claims something that did not happen — not about the question you asked, not about output it did not produce, not about work it did not finish.
+**Depends on**: Nothing structurally. Sequenced after 249 because `MODEL-05`'s capability honesty and `HONEST-02`'s empty-response honesty are adjacent failure modes, and the later phase inherits the earlier one's vocabulary rather than inventing a second one.
+**Requirements**: HONEST-01, HONEST-02, HONEST-03, HONEST-04
+**Success Criteria** (what must be TRUE):
+
+  1. Context trimming never drops the user's own question — a long thread keeps every question the user asked, and the agent never announces that a question asked eight turns ago was trimmed (HONEST-01).
+  2. A reasoning model that produces no text inside a tool loop **says what happened** rather than returning "empty response after N iterations" (HONEST-02).
+  3. The workspace panel stops claiming a run is in progress the moment that run ends — **including a run that timed out**, which today leaves the panel working forever (HONEST-03).
+  4. A task that completed leaves **no todo asserting unfinished work** — and nothing was auto-completed to achieve that (HONEST-04).
+
+**Plans**: TBD
+**UI hint**: yes
+**Flags**: ⚠⚠ **`HONEST-04` IS BLOCKED ON ONE MEASUREMENT, AND IT MUST BE RESOLVED AT `/gsd:discuss-phase 250`, NOT AT PLAN TIME — THE TWO ARMS LEAD TO OPPOSITE FIXES.** The question is whether the stuck todo item carries the string `" (run ended — not completed)"`. **PRESENT ⇒ the reconciler RAN, and this is a copy / scoping decision for the operator** (what should a reconciled-but-unfinished item say, and should it say it at all). **ABSENT ⇒ the reconciler did NOT run, and this is a backend defect** — either the gate at `backend/app/services/run_producer.py:145` (`terminal_status == "completed" and result_sink.get("cap_disposition") != "cap_paused"`) never admitted the run, or the `except BaseException` at `:155` swallowed the failure into a log line nobody reads. **Planning before this is measured builds one of two mutually exclusive fixes at random.** · ⛔ **AUTO-COMPLETING OPEN TODOS AT A CLEAN RUN END IS REJECTED, and was rejected on 2026-06-26** — a clean terminal status is **not proof the listed work happened**, and shipping it fabricates success. Recorded here so it is not re-proposed as new. · **SC#10 cross-provider is MANDATORY** — this phase touches streaming, the agent loop and run state; `HONEST-02` is filed `cross-provider/openai`, and a fix proven on one provider is not proven. · **Red line D-14**: provider differences stay at the adapter / sanitizer boundary; never fork the shared path, and Deep Mode stays byte-identical. · **G-2** for `HONEST-03` / `HONEST-04` — both are live-UI honesty, and `Skill("sketch-findings-agentic-rag")` owns the workspace-panel and run-card vocabulary they must speak. · **G-5**: `agent_loop.py`, `StreamsProvider.tsx`, `WorkspacePanel.tsx`, `threads.py`, `tool_dispatcher.py`; ⚠ **`run_producer.py` and `todos_service.py` carry NO ledger row** — `node scripts/check-hot-file-ledger.cjs 250` will fail until one is added, and that is the gate working, not the gate breaking.
+
+#### Phase 251: Register Integrity
+
+**Goal**: The registers can be trusted as an index — a reference by id resolves to exactly one thing, a `trigger_when` is swept by something executable rather than by hope, and the operator's queue is a list they can actually rule on.
+**Depends on**: Nothing. ⚠ **Sequenced LAST on purpose:** 247-250 will each plant, flip and answer seeds, so running the de-duplication and the sweep before them would leave the milestone's own output unswept. `REG-02`'s new sweep should be run **over this milestone's own seeds** as its first real exercise.
+**Requirements**: REG-01, REG-02, REG-03
+**Success Criteria** (what must be TRUE):
+
+  1. No two seeds share an id — the **8 known duplicates** (`022, 092, 228, 229, 231, 253, 259, 269`) each resolve to exactly one seed, so a reference by id can be followed (REG-01).
+  2. A person can run **one command** that reads every `trigger_when` in the register and prints the seeds whose trigger is already true — the sweep is **executable**, not a paragraph in `CLAUDE.md` asking an agent to read 161 planted seeds of 280 (REG-02).
+  3. `BUS-171`'s **23** `--to operator` items exist as a decision list the operator can rule on in one sitting — each classified *superseded* (naming the evidence), *live decision* (one line), or *carries an unfixed finding* — and every item in that last class is **verified to be held by a durable register, planting one where it is not** (REG-03).
+
+**Plans**: TBD
+**Flags**: ⛔ **Claude may NOT close bus items** — `REG-03`'s deliverable is a **list the operator rules on**, and an item closed without the operator seeing it is a decision taken by the wrong party. The 2026-09-06 sweep found **two findings held only by a bus item**, which is exactly why the third classification arm exists. · ⚠ **`REG-02`'s new sweep must be DRIVEN RED against a planted defect before it is trusted.** A guard nobody has seen fire is not a guard — and this project has measured that twice in one phase: Phase 242 found `check-hot-file-ledger.cjs` exiting `0` over **zero parsed files** on a CRLF plan, and a pinned a11y suite that was red in **neither** knob. · ⚠ **`status:` frontmatter IS the index** — prose inside a seed body saying *"still open"* is invisible to any scan, so `REG-01`'s de-duplication must preserve and correct the **frontmatter**, not only the filenames. · **The cost of not doing this is measured, not theoretical:** `SEED-172` sat reachable for **four weeks** and it took a person hitting the wall to surface it. · No G-2, no SC#10, no migration, no product-surface G-5 rows.
+
+### Coverage
+
+**26 requirements · 25 mapped to exactly one phase each · 1 (`DEBT-06`) held as a milestone-wide standing gate. No orphans, no duplicates.**
+
+| Phase | Requirements | Count |
+|---|---|---|
+| 247 | WATCH-01, WATCH-02, WATCH-03, WATCH-04, WATCH-05, WATCH-06, WATCH-07, WATCH-08 | 8 |
+| 248 | CRED-01, CRED-02, CRED-03, CRED-04 | 4 |
+| 249 | MODEL-04, MODEL-05, MODEL-06, MODEL-07, MODEL-08, MODEL-09 | 6 |
+| 250 | HONEST-01, HONEST-02, HONEST-03, HONEST-04 | 4 |
+| 251 | REG-01, REG-02, REG-03 | 3 |
+| *milestone standing gate* | DEBT-06 | 1 |
+| | **Total** | **26** |
+
+⚠ **Re-derive this from the phase directories at close, never from this table or from a summary line.**
+v4.1's own close found its Progress table reading **`0 / 5 phases complete · 0 / 19 requirements
+delivered`** with all five phases closed and fourteen boxes ticked, and the drift ran in **both**
+directions. **A coverage check run against the wrong denominator is how a requirement survives a
+milestone unnoticed** — v4.0 shipped with that defect in the requirement COUNT, v4.1 nearly shipped
+with it in the phase STATUS.
+
+### Progress
+
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 247. Sources & Watches — the surface you now live on | 0/? | Not started (⚠ `/gsd:sketch` owed BEFORE planning) | - |
+| 248. The Credential Boundary | 0/? | Not started (⚠ threat model mandatory) | - |
+| 249. The Model You Actually Run | 0/? | Not started (⚠ `MODEL-09` re-measurement owed) | - |
+| 250. Run Honesty — the residue | 0/? | Not started (⚠ `HONEST-04` measurement owed at discuss) | - |
+| 251. Register Integrity | 0/? | Not started | - |
+
+**0 / 5 phases complete · 0 / 26 requirements delivered.**
+
+**Guardrails firing (v4.2):**
+
+- **G-2 sketch-first:** **Phase 247 — binding, sketch BEFORE plan.** Phase 250 for `HONEST-03` / `HONEST-04`; Phase 249 light, only if discuss-phase surfaces a visual decision on the picker. **Phases 248 and 251 need no sketch** — refusal copy is a sentence, and 251 has no product surface.
+- **G-3 lightweight commands:** `WATCH-06`, `WATCH-07` and plausibly `MODEL-07` are `/gsd:fast` candidates at ≤ 1 file / ≤ 10 lines with no schema or API surface. **Counting them as plans is exactly how v4.1's 4-6 plans of substance became 17.**
+- **G-4 lived-experience UAT:** Phase 247 (mandatory — three operator-defined scenarios, set at scope-time, driven in Chrome), Phase 250 (panel + todo honesty), Phase 249 (the model picker).
+- **G-5 hot files:** audited at discuss-phase against **`docs/HOT-FILE-LEDGER.md`**, enforced by `node scripts/check-hot-file-ledger.cjs <phase>`. ⛔ **`backend/app/api/connectors.py` carries an OWED extraction at its sixth landing** (247 / 248) and **`backend/app/config.py`'s `MODEL_CAPABILITIES` seam is owed at 48 phases** (249) — either one landing again must say why it is not the next. ⚠ `run_producer.py` and `todos_service.py` have **no row at all** (250). ⚠ **`retrieval_service.py`'s extraction, owed since 231 with 241 as the deliberate second landing, must be PROPOSED FIRST if any phase here touches it.**
+- **G-7 gap-closure cap:** `node scripts/check-gap-closure-rounds.cjs <phase>` at every `gaps_found`, before emitting any `--gaps` routing. ⛔ **A closure round may never introduce a new user-facing capability** — that is a phase, not a gap.
+- **G-8 plan-count proportion:** **3-5 plans per phase; above 6, CONTEXT.md names what genuinely cannot share a worktree.** This is the **governing** guardrail of the milestone, for the reason written at the top of this section.
+- **SC#10 cross-provider:** Phase 250 (mandatory — streaming + agent loop) and Phase 249 (`MODEL-04` / `MODEL-05` — provider routing). Phases 247, 248 and 251 touch no streamed state and are deliberately **not** flagged.
+- **Threat model:** **Phase 248 only, and mandatory there.** No other phase crosses a trust boundary; flag one if a discuss-phase surfaces otherwise.
+- **Reported-bugs mandate:** every requirement here originates in `.planning/reported-bugs/`. At each `/gsd:discuss-phase`, re-list open `surface: Agentic-RAG` reports, fold the matching ones, and **write the routing back into each report's frontmatter** (`status` + `folded_into` / `re_open_trigger`). ⚠ **`BUG-260911-01` and `BUG-260910-03` are measured FIXED and must be flipped to `closed`** — bookkeeping, not work; leaving them `open` is what made two of three registers stale at scoping.
+- **Seeds mandate:** `SEED-172`, `SEED-040`, `SEED-135` (249) and `SEED-224` (if `retrieval_service.py` is touched) are **answered by editing the seed**, not by shipping the code. Phase 251 then sweeps what this milestone itself planted.
+- **Cloud parity:** ⭐ **nothing is owed at open** — migrations through **180** are applied and verified in cloud, and `production` is level with `develop`. Phase 248's expected migration (**`181`**) is **security-bearing**: its code half and its SQL half must reach cloud in **one operation**, and `get_advisors(security)` runs as part of that promotion (`CRED-04`).
 
 ---
 

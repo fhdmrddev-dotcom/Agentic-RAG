@@ -237,13 +237,41 @@ not optional.
 
 ## Traceability
 
-Filled during roadmap creation.
+**Filled 2026-09-13 at roadmap creation** (`.planning/ROADMAP.md` → *v4.2 The Connected Knowledge You
+Can Actually Run*). **26 requirements · 25 mapped to exactly one phase each · 1 (`DEBT-06`) held as a
+milestone-wide standing gate. Coverage 26/26 — no orphans, no duplicates.**
 
 | Requirement | Phase | Status |
 |---|---|---|
-| WATCH-01 … WATCH-08 | — | Pending |
-| CRED-01 … CRED-04 | — | Pending |
-| MODEL-04 … MODEL-09 | — | Pending |
-| HONEST-01 … HONEST-04 | — | Pending |
-| REG-01 … REG-03 | — | Pending |
-| DEBT-06 | — | Pending |
+| WATCH-01 | Phase 247 — Sources & Watches | Pending |
+| WATCH-02 | Phase 247 — Sources & Watches | Pending |
+| WATCH-03 | Phase 247 — Sources & Watches | Pending |
+| WATCH-04 | Phase 247 — Sources & Watches | Pending |
+| WATCH-05 | Phase 247 — Sources & Watches | Pending |
+| WATCH-06 | Phase 247 — Sources & Watches | Pending (⚠ `/gsd:fast` candidate under G-3, not a plan) |
+| WATCH-07 | Phase 247 — Sources & Watches | Pending (⚠ `/gsd:fast` candidate under G-3, not a plan) |
+| WATCH-08 | Phase 247 — Sources & Watches | Pending |
+| CRED-01 | Phase 248 — The Credential Boundary | Pending |
+| CRED-02 | Phase 248 — The Credential Boundary | Pending |
+| CRED-03 | Phase 248 — The Credential Boundary | Pending (⛔ revoke from `PUBLIC`, not from `anon`) |
+| CRED-04 | Phase 248 — The Credential Boundary | Pending |
+| MODEL-04 | Phase 249 — The Model You Actually Run | Pending |
+| MODEL-05 | Phase 249 — The Model You Actually Run | Pending |
+| MODEL-06 | Phase 249 — The Model You Actually Run | Pending |
+| MODEL-07 | Phase 249 — The Model You Actually Run | Pending |
+| MODEL-08 | Phase 249 — The Model You Actually Run | Pending |
+| MODEL-09 | Phase 249 — The Model You Actually Run | ⚠ **Blocked on re-measurement** — one operator click on Settings → Eval engine health → Run sweep, at `/gsd:discuss-phase 249`, BEFORE it is planned |
+| HONEST-01 | Phase 250 — Run Honesty | Pending |
+| HONEST-02 | Phase 250 — Run Honesty | Pending |
+| HONEST-03 | Phase 250 — Run Honesty | Pending |
+| HONEST-04 | Phase 250 — Run Honesty | ⚠ **Blocked on one measurement** — does the stuck todo carry `" (run ended — not completed)"`? Present ⇒ copy decision; absent ⇒ backend defect (`run_producer.py:145` gate / `:155` swallow). **Opposite fixes — resolve at discuss-phase** |
+| REG-01 | Phase 251 — Register Integrity | Pending |
+| REG-02 | Phase 251 — Register Integrity | Pending |
+| REG-03 | Phase 251 — Register Integrity | Pending (⛔ Claude may not close bus items — deliverable is a list the operator rules on) |
+| DEBT-06 | **Milestone-wide standing gate** (no phase) | Pending — discharged alongside the build: 238 / 240 / 241 beside 247-248, 242-246 beside 249-251, and each v4.2 phase reviewed at its own close. ⛔ Re-arming `OV-SOLO-01` retro-reviews nothing |
+
+⚠ **Re-derive this table from the phase directories at close, never from a summary line.** v4.1's own
+close found its ROADMAP Progress table reading `0 / 5 phases complete · 0 / 19 requirements delivered`
+with all five phases closed, and drift ran in **both** directions — rows carrying full closing evidence
+while their boxes were unticked, and ticked boxes whose rows still read *"Pending"*. **A coverage check
+run against the wrong denominator is how a requirement survives a milestone unnoticed.**
