@@ -44,7 +44,7 @@ from app.models.user_settings import _build_settings_from_row
 #: operator sets a value") stops being true and this file must say so.
 LIVE_SERVER_EF_SEARCH = 40
 LIVE_SERVER_ITERATIVE_SCAN = "off"
-CODE_DEFAULT_EF_SEARCH = 200
+CODE_DEFAULT_EF_SEARCH = 40
 
 
 def test_an_empty_row_reads_the_live_server_configuration():

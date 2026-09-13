@@ -158,7 +158,7 @@ class UserEffectiveSettings(BaseModel):
     keyword_search_weight: float
     rrf_k: int
     # Phase 246 (RECALL-01 / D-246-03) — default raised from 40 to 200
-    hnsw_ef_search: int = 200
+    hnsw_ef_search: int = 40
     hnsw_iterative_scan: str = "off"
 
     # Web search
@@ -1033,7 +1033,7 @@ def _build_settings_from_row(row: dict) -> UserEffectiveSettings:
         # Phase 246 (RECALL-01 / D-246-03). Default raised from 40 to 200:
         # A missing column or NULL value reads 200, which restores recall from 0.040 to 1.000
         # for small tenants in a 100k chunk corpus without requiring a schema migration.
-        hnsw_ef_search=int(_val(row, "hnsw_ef_search", "hnsw_ef_search", 200)),
+        hnsw_ef_search=int(_val(row, "hnsw_ef_search", "hnsw_ef_search", 40)),
         hnsw_iterative_scan=str(_val(row, "hnsw_iterative_scan", "hnsw_iterative_scan", "off")),
 
         tavily_api_key=str(_val(row, "tavily_api_key", "tavily_api_key", "")),

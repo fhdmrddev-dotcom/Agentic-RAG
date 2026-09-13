@@ -1,10 +1,30 @@
 """Phase 246 Plan 03 (RECALL-01) — Dual-measurement recall and latency verification.
 
-Asserts:
-  1. The execution plan against recall_bench uses an HNSW index scan (not Seq Scan).
-  2. Under default configuration (code default ef_search = 200), recall@20 restores from 0.040 to >= 0.99
-     for the 0.2% tenant in the 100,000-chunk benchmark corpus.
-  3. The regression guard at ef_search = 40 collapses (< 0.10, reproducing the ~0.040 cliff).
+⚠ **CORRECTED 2026-09-13 (post-execution review). The original assertion list is preserved
+below, struck, because what it CLAIMED is the finding.** It read:
+
+    ~~1. The execution plan against recall_bench uses an HNSW index scan (not Seq Scan).
+    2. Under default configuration (code default ef_search = 200), recall@20 restores from
+       0.040 to >= 0.99 for the 0.2% tenant in the 100,000-chunk benchmark corpus.~~
+
+⛔ Point 1 is FALSE at ``ef_search = 200`` and point 2's parenthesis is no longer true.
+``EXPLAIN (ANALYZE)`` inside ``match_document_chunks`` proved the planner ABANDONS
+``document_chunks_embedding_idx`` once the HNSW scan's cost crosses the table-scan cost, which
+happens between ef 80 and ef 100. The full ladder is in ``246-VERIFICATION-DATA.md``:
+
+    ef  40 / 60 / 80  -> Index Scan,  1 row,  recall ~0.05,  ~4 ms
+    ef 100 / 150 / 200 -> Seq Scan,  20 rows, recall  1.000,  ~1,100 ms
+
+⭐ So ``recall = 1.000`` here is NOT evidence of a working index search — it is a full table
+scan finding everything slowly. **Every genuine index walk in this corpus returns ONE row**, so
+there is no value of ``ef_search`` that repairs the cliff through the index. The code default
+was reverted to ``40``; ``ef_search`` is not the lever, and the real one is very likely
+``hnsw.iterative_scan`` (currently ``off``), which is planted as follow-up work.
+
+What this module asserts NOW:
+  1. ``ef_search = 200`` reaches ``recall@20 >= 0.99`` — recorded as a MEASUREMENT, with the
+     mechanism (a sequential scan) named rather than implied.
+  2. The regression guard at ``ef_search = 40`` collapses (< 0.10, reproducing the ~0.040 cliff).
 
 Target isolation (Blocker A): Runs exclusively against recall_bench, never against live postgres.
 """
@@ -67,13 +87,19 @@ async def test_query_execution_plan_uses_hnsw_index(bench_available):
 
 @pytest.mark.asyncio
 async def test_recall_default_restores_small_tenant_recall(bench_available):
-    """Default configuration (ef_search = 200) restores small tenant recall from 0.040 to >= 0.99."""
+    """``ef_search = 200`` reaches recall >= 0.99 — ⛔ BY SEQ SCAN, not by an index walk.
+
+    ⚠ This is NOT the code default. The default is ``40`` (reverted at the post-execution
+    review); 200 is passed explicitly below so this case keeps measuring the same thing it
+    always did. See the module docstring for the ladder and why the number is not a success.
+    """
     async with measuring_connection(BENCH_DSN, SMALL_TENANT_USER_ID) as conn:
         # Sample 5 query vectors for fast, deterministic evaluation
         vectors = await sample_query_vectors(conn, count=5, seed="241")
         shape = FILTER_SHAPES[0]
 
-        # In Phase 246, default ef_search is 200
+        # ⛔ 200 is passed EXPLICITLY and is NOT the code default (which is 40). Reading the
+        #    default here would make this case silently change meaning the next time it moves.
         res = await measure_layer1(
             conn,
             k=20,

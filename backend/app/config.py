@@ -1000,7 +1000,7 @@ class Settings(BaseSettings):
 
     # Phase 246 (RECALL-01 / D-246-03) — default raised from 40 to 200, restoring
     # recall from 0.040 to 1.000 for small tenants in a 100k chunk corpus (QUEUE-06).
-    hnsw_ef_search: int = 200
+    hnsw_ef_search: int = 40
     hnsw_iterative_scan: str = "off"  # off | strict_order | relaxed_order
 
     # ⛔ HARDCODED-ONLY, DELIBERATELY — D-09 / threat T-241-16. These matter ONLY once

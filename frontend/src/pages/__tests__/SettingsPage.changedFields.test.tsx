@@ -442,12 +442,19 @@ describe("§7 — an unknown baseline is NOT collapsed into 'nothing changed'", 
 })
 
 describe("§8 — Phase 246 (RECALL-02): pre-fetch loading honesty and copy calibration", () => {
-  it("displays 'Default is 200' in help text", async () => {
+  // ⚠ CORRECTED 2026-09-13 (post-execution review). This case read
+  //   `expect(screen.getByText("Default is 200"))` and it FAILED when the default was reverted
+  //   to 40 — which is this case EARNING ITS KEEP. A presence assertion on the paragraph would
+  //   have stayed green while the screen told every operator a number that is no longer true.
+  // ⛔ The revert is not cosmetic: 246 proved by EXPLAIN that ef_search >= 100 makes the planner
+  //   ABANDON the HNSW index, so 200's "full recall" was a ~1.1s sequential scan. Ladder in
+  //   246-VERIFICATION-DATA.md. Pin the number the product actually ships.
+  it("displays 'Default is 40' in help text", async () => {
     mockGetSettings.mockResolvedValue(mkSettings())
     renderSettings()
     await openSearch()
     await screen.findByLabelText("Search breadth")
-    expect(screen.getByText("Default is 200")).toBeInTheDocument()
+    expect(screen.getByText("Default is 40")).toBeInTheDocument()
   })
 
   it("renders a neutral loading placeholder when hnsw_ef_search has not loaded", async () => {

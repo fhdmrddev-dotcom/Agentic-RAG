@@ -1642,18 +1642,28 @@ export function SettingsPage() {
                     <> {" "}Allowed: {hnswEfSearchFloor}&ndash;{hnswEfSearchCeiling}.</>
                   )}
                   {/* Phase 241 & 246 — the RECOMMENDATION, stated as EVIDENCE rather than as a blanket
-                      prescription. Measured on a 100,000-passage bench at three tenant sizes
-                      (241-VALIDATION.md): 200 reached full recall at every one, and 1000 was
-                      REPRODUCIBLY WORSE than 400 — so "set it as high as it goes" is measurably
-                      wrong here, and the ceiling is not the goal. Say what was measured, not
-                      what the operator ought to want. */}
+                      prescription. ⚠ CORRECTED 2026-09-13 (Phase 246) — the original is kept
+                      because the claim it made is the finding. It read: "Measured on a
+                      100,000-passage bench at three tenant sizes (241-VALIDATION.md): 200
+                      reached full recall at every one". ⛔ That number was real but its
+                      MECHANISM was not what anyone believed: 246 inspected the execution plan
+                      and found the planner ABANDONS the HNSW index above ef ~80, so 200's
+                      "full recall" was a SEQUENTIAL SCAN at ~1.1s, not a wider index search.
+                      Phase 241 never inspected a plan. Every genuine index walk returns ONE
+                      row, so no ef_search value repairs the cliff — the default is back at 40
+                      and the real lever is likely hnsw.iterative_scan. Full ladder:
+                      246-VERIFICATION-DATA.md. Say what was measured, AND how it was measured —
+                      241 said the first and not the second, which is why this rotted. */}
                   {" "}
                   <span className="font-medium text-foreground">
-                    Default is 200
+                    Default is 40
                   </span>
-                  {" "}&mdash; on our 100,000-passage test library it returned every result that
-                  should have been found, for small and large teams alike. Higher is not better:
-                  1000 measured worse than 400.
+                  {" "}&mdash; raising this does not reliably widen the search. On a
+                  100,000-passage test library, values of 100 and above made the database stop
+                  using its search index and read every passage instead: answers got complete,
+                  but each search took about a second rather than four milliseconds. Values below
+                  that kept the index and returned very little for a small team. If searches are
+                  missing results, tell us rather than raising this — the setting is not the fix.
                 </p>
 
                 {/* ⛔ A SELECT, NEVER A TOGGLE. `strict_order` and `relaxed_order` are two
