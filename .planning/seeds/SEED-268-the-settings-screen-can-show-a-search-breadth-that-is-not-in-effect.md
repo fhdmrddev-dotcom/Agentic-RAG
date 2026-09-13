@@ -81,3 +81,7 @@ has been OWED since Phase 231 and Phase 241 was the deliberate SECOND landing; t
 `retrieval_tuning.py`, which is where it already is.
 
 Related: [[SEED-076]], [[SEED-267]].
+
+## Resolution Note (Phase 246)
+Fixed in Phase 246 via dynamic server probe with a 60-second TTL cache (`get_server_ef_search`).
+Consequence: For up to 60 seconds after an operator retunes Postgres via `ALTER SYSTEM` or `ALTER DATABASE`, the screen can still show a breadth that is not in force until the cache expires. This replaces an unbounded desync window with a bounded 60-second TTL.

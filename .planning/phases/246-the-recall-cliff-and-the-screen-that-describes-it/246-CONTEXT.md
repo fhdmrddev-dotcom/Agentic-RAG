@@ -63,9 +63,16 @@ Specifically:
   - SC#2 asserts locally that modifying Search breadth in the Settings tab persists to `app_settings` and returns 200. Production promotion remains deferred per `D-242-08`.
 - **D-246-10: Hot File Ledger sync for `retrieval_tuning.py`.**
   - Update the row and section in `docs/HOT-FILE-LEDGER.md` to reflect Phase 246's second phase landing (re-derived at HEAD: 1 phase / 3 commits / 274 lines; advancing to 2 phases).
+- **D-246-11: Benchmark Database Build & Isolation via `scripts/build-recall-bench.py` (Blocker A).**
+  - The evaluation harness, HNSW index-scan check (`idx_scan > 0`), and recall measurements run SOLELY against the dedicated throwaway `recall_bench` database (`postgresql://postgres:postgres@127.0.0.1:54322/recall_bench`), NEVER against the live development database (`postgres`).
+  - Task `246-03-01` explicitly executes `scripts/build-recall-bench.py` to build the 100,000-chunk skewed benchmark database with skew parameters `0.002, 0.02, 0.2` before any evaluation tasks run.
+- **D-246-12: `recall_eval.py` G-5 Evaluation & Safe-as-Is Justification (Blocker B).**
+  - G-5 obligation evaluated: Option 1A (extract query plan inspection into `services/recall_plan_inspector.py`) vs Option 1B (safe as-is).
+  - Chosen: Option 1B (safe as-is). `recall_eval.py` is an offline evaluation module with a clean two-layer architecture (Layer 1 mechanical comparison vs Layer 2 semantic probes), zero request-serving path coupling, import-safe by construction, and changes in Phase 246 are strictly additive instrumentation (EXPLAIN plan inspection and query latency recording).
+  - Per the same-commit sync rule, its ledger row in `docs/HOT-FILE-LEDGER.md` is updated in the same commit to record its 3rd phase landing (230, 241, 246).
 
 ### Claude's Discretion
-None — all key implementation choices (fencing strategy, migration avoidance, server probe caching, and copy calibration) were confirmed.
+None — all key implementation choices (fencing strategy, migration avoidance, server probe caching, copy calibration, bench database isolation, and G-5 ledger sync) were confirmed.
 
 </decisions>
 

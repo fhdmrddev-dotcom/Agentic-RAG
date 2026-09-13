@@ -1,10 +1,11 @@
 ---
 type: preflight-review
+kind: builder-self-audit
 phase: 246
 phase_name: "The Recall Cliff, and the Screen That Describes It"
-builder: gemini
+author: gemini
 reviewer: pending
-reviewed_at: 2026-09-13
+reviewed_at: null
 tree_state: clean at `6fc3519b5` — reviewed BEFORE any 246 execution commit
 plans_reviewed: [246-01, 246-02, 246-03]
 ---
