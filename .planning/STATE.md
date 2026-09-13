@@ -486,6 +486,8 @@ only door, and `/gsd:plan-phase 244 --gaps` must NOT be routed to.
 
 ### ⭐ OV-SOLO-01 — RULED ON 2026-09-11 BY THE OPERATOR. It did NOT lapse.
 
+OV-SOLO-01-status: live   # machine-readable index for scripts/check-verification-honesty.cjs. Flip to `retired-<YYYY-MM-DD>` when the ruling is re-armed; ⛔ do not delete it — an absent marker SKIPS the claims-review arm.
+
 **Ruling (operator, 2026-09-11, at v4.1 scoping):** **solo running continues.** The substitute for the
 independent gate is the **dispatched code-review subagent**, which is **MANDATORY** on any phase
 touching a trust boundary. ⛔ **It is NOT an independent gate**, and every phase closed under it must
