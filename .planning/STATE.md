@@ -593,9 +593,33 @@ if verification returns `gaps_found` on this phase again, triage (fast-fix / def
 only door, and `/gsd:plan-phase 244 --gaps` must NOT be routed to.
 
 
-### ⭐ OV-SOLO-01 — RULED ON 2026-09-11 BY THE OPERATOR. It did NOT lapse.
+### ⭐ OV-SOLO-01 — RE-ARMED 2026-09-13. ITS TRIGGER FIRED AND WAS ACTED ON THE SAME DAY.
 
-OV-SOLO-01-status: live   # machine-readable index for scripts/check-verification-honesty.cjs. Flip to `retired-<YYYY-MM-DD>` when the ruling is re-armed; ⛔ do not delete it — an absent marker SKIPS the claims-review arm.
+⭐⭐ **THE TRIGGER FIRED: Gemini is available again (operator, 2026-09-13).** The ruling's own
+re-arm trigger read *"Gemini's quota returns, or the v4.1 close, whichever is first"* — the first
+arm arrived. **The two-agent separation of `AGENTS.md` §3 / §6.3 is BACK IN FORCE from this moment:**
+a phase's builder may not be its reviewer, and a solo run is no longer authorised for new phases.
+
+⚠ **This is the whole reason the trigger was written down.** The PREVIOUS version of this override
+carried a date-based trigger that arrived and went unacted-on for a day, and Phase 245's SC#4 exists
+because of that lapse. **It did not lapse a second time: the trigger fired and was honoured in the
+same session**, before any work was handed out under the old regime.
+
+⛔ **What does NOT change retroactively.** Every phase already closed under the ruling (238, 240,
+241, 242, 243, 244, 245) stays **`verification_mode: self-verified`** and keeps
+**`independent_review: owed`**. Re-arming the rule does not retro-review anything; those debts are
+still owed and are still listed where they were. **The honesty gate
+(`scripts/check-verification-honesty.cjs`) and its PostToolUse hook stay in force permanently** —
+they are not an artefact of solo running, they are how any future self-verification stays visible.
+
+**Next re-arm trigger (for the re-armed state):** if Gemini becomes unavailable again, this flips
+back to `live` **with a dated entry and a named expected-return**, never silently.
+
+OV-SOLO-01-status: retired-2026-09-13   # RE-ARMED — Gemini returned 2026-09-13, the trigger's first arm. Flip back to `live` ONLY with a dated entry naming why. ⛔ do not delete it — an absent marker SKIPS the claims-review arm.
+
+#### ⬇ The ruling as it stood while solo running was authorised (2026-09-11 → 2026-09-13) — preserved, not overwritten
+
+OV-SOLO-01-status-historical: live   # machine-readable index for scripts/check-verification-honesty.cjs. Flip to `retired-<YYYY-MM-DD>` when the ruling is re-armed; ⛔ do not delete it — an absent marker SKIPS the claims-review arm.
 
 **Ruling (operator, 2026-09-11, at v4.1 scoping):** **solo running continues.** The substitute for the
 independent gate is the **dispatched code-review subagent**, which is **MANDATORY** on any phase
