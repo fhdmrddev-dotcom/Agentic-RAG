@@ -706,7 +706,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/settings/connectionsCopy.ts` | 16 / 9 / 804 | ⚠ row was STALE at `15/8/784`. honoured by construction (**BUG-260912-01**): ONE arm MOVED above the oauth_byo block — `failed` was unreachable for the one shape OAuth breaks |
 | `frontend/src/components/settings/connectionFormCopy.ts` | 19 / 8 / 1631 | ⛔ 239-05 named the seam: `configFromDraft`'s arm set. 239-07 RODE it — one serializer both arms call |
 | `frontend/src/pages/SettingsPage.tsx` | 47 / 24 / 1814 | ⚠ row was STALE at `47/24/1773`. honoured by construction (**mig 180**): `isOllama` → `meta.selfHosted`; the card gained a 2nd FIELD, not a 2nd branch. tab seam still OWED |
-| `frontend/src/pages/settingsSearchPayload.ts` | 1 / 1 / 116 | young (created 242). Row added AT CREATION, not at the third phase — an absent row is invisible to G-5 at any count |
+| `frontend/src/pages/settingsSearchPayload.ts` | 2 / 2 / 116 | young (created 242). Row added AT CREATION, not at the third phase — an absent row is invisible to G-5 at any count |
 | `frontend/src/components/settings/ModelPillRow.tsx` | 4 / 3 / 141 | ⚠ absent for its entire life |
 | `frontend/src/components/workflows/phaseVocabulary.ts` | 16 / 6 / 990 | honoured by construction (206.2) |
 | `frontend/src/components/workflows/ConnectionPicker.tsx` | 7 / 5 / 888 | honoured by construction (206.2 / **214**) |
@@ -734,6 +734,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/ingestion/DocumentList.tsx` | 24 / 13 / 294 | ✅ **seam TAKEN (217.1-05)** |
 | `frontend/src/pages/LibraryPage.tsx` | 46 / 15 / 970 | ⚠ row STALE a FOURTH time, one plan later. honoured by construction (**244-06**): ONE mount + 3 EXISTING props; the door owns its own connections read, so the page gained no effect |
 | `backend/app/services/retrieval_service.py` | 19 / 11 / 456 | ⛔ **extraction still OWED (SEED-224, since 231).** 241 is the SECOND landing, 11 lines; a THIRD must propose the extraction FIRST |
+| `backend/app/services/recall_eval.py` | 4 / 3 / 1070 | ⚠ **FIRES (3 phases).** Offline eval harness; safe as-is (Blocker B / D-246-12), additive plan inspection & latency p50/p95 |
 | `frontend/src/components/metadata/DocumentDetailPanel.tsx` | 9 / 6 / 496 | ⚠ **the row was STALE at `6 / 5 / 405`.** honoured by construction (21 |
 | `frontend/src/hooks/useDocuments.ts` | 8 / 3 / 120 | ⚠ absent at 3 phases. Realtime is a hint, not truth |
 | `frontend/src/pages/KnowledgeHealthPage.tsx` | 12 / 6 / **DELETED** | **RETIRED (217.1-14)** |

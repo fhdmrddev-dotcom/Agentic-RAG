@@ -6852,8 +6852,7 @@ Phases touched: 190, 206.1, 211.
 
 ## frontend/src/pages/settingsSearchPayload.ts
 
-**Created 2026-09-11 by Phase 242 (`242-03`). Measured `1 commit / 1 phase / 116 L` — it does NOT
-fire G-5.** ⭐ **The row is here at CREATION rather than at the third phase, deliberately.** This
+**Created 2026-09-11 by Phase 242 (`242-03`). Re-derived 2026-09-13 (Phase 246 / `246-02`): `2 commits / 2 phases / 116 L` — G-5: no (2 phases).** ⭐ **The row is here at CREATION rather than at the third phase, deliberately.** This
 ledger's own repeated finding is that an absent row makes G-5 **absent forever, silently, at any
 count** — `App.tsx` went 23 phases like that, `config.py` its entire life. Adding the row when the
 file is born costs one line; adding it later costs a phase's blindness.
@@ -7525,7 +7524,7 @@ both 231 and 241).
 The planning-time figure `1 / 1 / 67` is kept above; the file grew **14x** inside one phase, which is
 what a rewrite-in-place looks like in a triple.
 
-⚠ **RE-DERIVED AT PHASE 246 (2026-09-13, `246-03`): `3 / 4 / 1070` — G-5: no (3 phases).**
+⚠ **RE-DERIVED AT PHASE 246 (2026-09-13, `246-03`): `4 / 3 / 1070` — G-5: ⚠ FIRES (3 phases).**
 Landing 3 (Phase 246 / Blocker B): safe as-is. Evaluated for extraction vs safe-as-is per Blocker B / D-246-12:
 - It is an offline evaluation module with a clean two-layer architecture (Layer 1 mechanical comparison vs Layer 2 semantic probes).
 - It has zero coupling to the request-serving path (never called from FastAPI endpoints or background workers).
@@ -10464,7 +10463,7 @@ cells rot within days.
 | [`frontend/src/components/settings/connectionsCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectionscopyts) | 15 / 8 / 784 | ⚠ **FIRES** | no seam proposed — a vocabulary doing one thing many times is the right shape. ⚠ row was STALE at `13 / 7 / 737`. honoured by construction (**239-03**): one word, one union member. See §239-03 |
 | [`frontend/src/components/settings/connectionFormCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectionformcopyts) | 19 / 8 / 1631 | ⚠ **FIRES** | ⚠ row STALE TWICE (`15 / 8 / 1216`, `17 / 8 / 1293`). ⛔ 239-05 named the seam — `configFromDraft`'s ARM SET; 239-07 RODE it: one serializer both arms call. See §239-07 |
 | [`frontend/src/pages/SettingsPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagessettingspagetsx) | 47 / 24 / 1773 | ⚠ **FIRES** | ⚠ STALE for the THIRD close running at `44 / 23 / 1738`. ⭐ SHRANK — 242 moved the payload helpers out; the tab-registration seam stays OWED |
-| [`frontend/src/pages/settingsSearchPayload.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcpagessettingssearchpayloadts) | 1 / 1 / 116 | no | Created by 242. Row added AT CREATION rather than at the third phase — an absent row makes G-5 absent forever, silently, at any count |
+| [`frontend/src/pages/settingsSearchPayload.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcpagessettingssearchpayloadts) | 2 / 2 / 116 | no (2 phases) | Created by 242. Row added AT CREATION rather than at the third phase — an absent row makes G-5 absent forever, silently, at any count |
 | [`frontend/src/components/settings/SourceFileCeilingCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingssourcefileceilingcardtsx) | 1 / 1 / 117 | no (1 phase) | young (239-10) — ⚠ a row minted at creation reads `1 / 1` forever unless RE-DERIVED. Owns no number and no sentence |
 | [`frontend/src/components/settings/sourceCeilingCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingssourceceilingcopyts) | 1 / 1 / 109 | no (1 phase) | young (239-10) — the ONE number it owns (recommendation) is pinned to `user_settings.py` by a `?raw` test; the bounds are SERVED |
 | [`frontend/src/components/settings/ModelPillRow.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsmodelpillrowtsx) | 4 / 3 / 141 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent for its entire life — row added 2026-08-27 at 212's close, same D-22 pair as `SettingsPage.tsx` |
@@ -10521,7 +10520,7 @@ cells rot within days.
 | [`frontend/src/components/ingestion/DocumentList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestiondocumentlisttsx) | 24 / 13 / 294 | ⚠ **FIRES** | ✅ **seam TAKEN (217.1-05)** — `DocumentRow.tsx` extracted with the sketch's five affordances (−315 L). ⚠ 7-column order still load-bearing: `LibraryPage` sheds cols 3–5 by `nth-child` |
 | [`frontend/src/pages/LibraryPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpageslibrarypagetsx) | 46 / 15 / 970 | ⚠ **FIRES** | ⚠ row STALE a FOURTH time, ONE PLAN later. honoured by construction (**244-06**): ONE mount + 3 EXISTING props; the door owns its connections read, so the page gained no effect |
 | [`backend/app/services/retrieval_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrievalservicepy) | 19 / 11 / 456 | ⚠ **FIRES** | ⛔ **extraction still OWED** (`SEED-224`, since 231) — 241 is the SECOND landing, capped at 11 lines by a fence; a THIRD must propose the extraction FIRST |
-| [`backend/app/services/recall_eval.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrecallevalpy) | 3 / 4 / 1070 | no (3 phases) | Phase 246 landing: safe as-is (offline test/eval harness, zero request-path side effects, clean 2-layer design). Added `inspect_execution_plan` (EXPLAIN + `idx_scan > 0`) & latency p50/p95 |
+| [`backend/app/services/recall_eval.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrecallevalpy) | 4 / 3 / 1070 | ⚠ **FIRES** | Phase 246 landing: safe as-is (offline test/eval harness, zero request-path side effects, clean 2-layer design). Added `inspect_execution_plan` (EXPLAIN + `idx_scan > 0`) & latency p50/p95 |
 | [`scripts/build-recall-bench.py`](docs/HOT-FILE-LEDGER.md#scriptsbuild-recall-benchpy) | 4 / 1 / 1088 | no (1 phase) | ⚠ row ADDED at 241-04 — the only `DROP DATABASE` in the repo. Guard + constant-interpolation + AST fence, all driven RED. It built GREEN and unreadable; assert the READ |
 | [`backend/app/services/retrieval_tuning.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrievaltuningpy) | 4 / 2 / 364 | no (2 phases) | young (241, 246). ⛔ `ef_search` is the lever (200 → recall 1.000); dynamic server probe + 60s TTL cache (246, SEED-268) |
 | [`frontend/src/components/metadata/DocumentDetailPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsmetadatadocumentdetailpaneltsx) | 12 / 7 / 596 | ⚠ **FIRES** | honoured by construction (**240**): ONE child section mounted, gated on metadata, no shell change. ⚠ CR-01's fence caught a missing reset before it shipped |
