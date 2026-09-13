@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v4.2
 milestone_name: The Connected Knowledge You Can Actually Run
 status: in-progress
-last_updated: "2026-09-14T00:32:00.000Z"
-last_activity: 2026-09-14 — Phase 247 G-2 sketch Variant A ratified; discuss-phase complete; 247-CONTEXT.md written
+last_updated: "2026-09-14T00:45:00.000Z"
+last_activity: 2026-09-14 — Phase 247 planned across 4 plans (247-01..04); 247-PREFLIGHT.md cross-plan seam audit written; ready for reviewer preflight check
 progress:
   total_phases: 5
   completed_phases: 0
-  total_plans: 0
+  total_plans: 4
   completed_plans: 0
   percent: 0
 ---
@@ -32,7 +32,7 @@ See: `.planning/PROJECT.md` (updated 2026-09-13)
 can be taught new behaviors (skills) that persist and can be shared.
 
 **Current focus:** **v4.2 The Connected Knowledge You Can Actually Run** — started 2026-09-13.
-Phases **247+**. Requirements: `.planning/REQUIREMENTS.md`. Next action: `/gsd:discuss-phase 247`.
+Phases **247+**. Requirements: `.planning/REQUIREMENTS.md`. Next action: Pre-flight review of Phase 247 plans by Claude Code.
 
 ## ✅ v4.1 IS DEPLOYED — 2026-09-13, and this closes three of the seven carried items below
 
