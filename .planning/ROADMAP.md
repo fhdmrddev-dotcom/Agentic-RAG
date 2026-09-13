@@ -483,7 +483,10 @@ MORE than expected; see `245-VERDICT.md`.
   3. The number on the Settings screen is the number in force: the no-op shortcut **asks the server what it holds** instead of comparing against a compiled-in `40`, so an install running against a Postgres tuned to anything else can never be shown a breadth that is not in effect (RECALL-02, `SEED-268`).
   4. The change is defended by a measurement that would **fail if the default regressed** — the harness run recorded before and after, both figures written into the phase record with their corpus size and execution plan beside them, never a claim that recall improved (RECALL-01).
 
-**Plans**: TBD
+**Plans**: 3 plans · 3 waves
+- [ ] 246-01-PLAN.md — Backend defaults (200 in config.py / models/user_settings.py), server setting probe with TTL cache, dynamic shortcut, and ledger sync (Wave 1)
+- [ ] 246-02-PLAN.md — Settings UI pre-fetch loading state (null + skeleton), dead ?? removal, and copy calibration ("Default is 200") (Wave 2)
+- [ ] 246-03-PLAN.md — Recall & latency dual-measurement harness with HNSW index scan assertion and verification data logging (Wave 3)
 
 **UI hint**: yes (the Retrieval card's search-breadth control and its help text).
 **Migrations**: none expected. ⚠ If the shipped default changes in `config.py` rather than in a settings row, that is a **code default**, not a migration — say which one it is.
@@ -566,7 +569,7 @@ MORE than expected; see `245-VERDICT.md`.
 | 243. The Thinking Block and the Follow-Scroll Seam | 0/? | Not started (⚠ sketch owed first) | — |
 | 244. The Chat Shell and the Composer | 12/12 + 3 fix rounds | ✅ **Complete 2026-09-13** | Verified `passed`: **5/5 criteria DRIVEN and closed**. SHELL-03 closed on drive attempt 2 of `244-15-UAT-ROW.md` — two runs, two threads, answered in the CHAT column (panel cleared +12.6s) and in the PANEL (chat cleared +2.0s), run line left `live`, composer usable, both runs `run=failed`/`act=failed` server-side. ⛔ **NOT covered:** the fail-closed arms never ran (`wire_reported_live_at_settle` false both times — jsdom Tests 3/4/5 are their only evidence) and **Deep-mode `ask_user` is undriven**. ⚠ **G-7 cap SPENT** (2 of 2, overridden). Open: `WR-02`/`WR-03` + the build round's `WR-04`/`WR-08`/`IN-01..09` in `deferred-items.md`; SHELL-04's second gap → `SEED-272`. |
 | 245. The Verification Debt | 0/? | Not started | — |
-| 246. The Recall Cliff | 0/? | Not started | — |
+| 246. The Recall Cliff | 0/3 | Ready to execute | — |
 
 **0 / 5 phases complete · 0 / 19 requirements delivered.**
 
