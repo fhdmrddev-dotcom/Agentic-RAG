@@ -1,20 +1,20 @@
 ---
 gsd_state_version: 1.0
-milestone: v4.1
-milestone_name: Ship It & Feel It
-status: Awaiting next milestone
-last_updated: "2026-09-13T13:34:20.428Z"
-last_activity: 2026-09-13 — Milestone v4.1 completed and archived
+milestone: v4.2
+milestone_name: The Connected Knowledge You Can Actually Run
+status: planning
+last_updated: "2026-09-13T15:10:00.000Z"
+last_activity: 2026-09-13 — Milestone v4.2 started; v4.1 deployed to production (eebc4c42f)
 progress:
-  # ⚠ HAND-WRITTEN, TWICE. `gsd-sdk query milestone.complete` overwrote this block at the v4.1 close
-  # with `total_phases: 12 · completed_plans: 30 · percent: 42` — three wrong numbers, against a
-  # milestone of 5 phases and 25 plans, all complete. The SDK's state writers are known to publish
-  # false records (see the banner below); this block is the measured truth.
-  total_phases: 5       # v4.1 = phases 242-246
-  completed_phases: 5   # all closed
-  total_plans: 25       # 242:2 · 243:5 · 244:12 · 245:3 · 246:3
-  completed_plans: 25
-  percent: 100
+  # ⚠ HAND-WRITTEN, as every block in this file must be. `gsd-sdk query milestone.complete`
+  # overwrote the v4.1 block at its close with `total_phases: 12 · completed_plans: 30 ·
+  # percent: 42` — three wrong numbers against a milestone of 5 phases and 25 plans, all
+  # complete. Re-derive from the phase directories, never from a summary line.
+  total_phases: 0       # set when the roadmap is approved
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -35,12 +35,41 @@ See: `.planning/PROJECT.md` (updated 2026-09-13)
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviors (skills) that persist and can be shared.
 
-**Current focus:** **none — v4.1 CLOSED and archived 2026-09-13 (git tag `v4.1`).**
-Next action is `/gsd:new-milestone`; phase numbering resumes at **247**.
+**Current focus:** **v4.2 The Connected Knowledge You Can Actually Run** — started 2026-09-13.
+Phases **247+**. Requirements: `.planning/REQUIREMENTS.md`. Next action: `/gsd:discuss-phase 247`.
 
-## ⛔ Carried out of the v4.1 close — read before scoping anything
+## ✅ v4.1 IS DEPLOYED — 2026-09-13, and this closes three of the seven carried items below
 
-Written at the close, 2026-09-13. **These are the input to the next milestone, not history.**
+**Measured at the deploy, not read from a record:**
+
+| | Before | After |
+|---|---|---|
+| `production` tip | `e65610ac2` | **`eebc4c42f`** |
+| `production..develop` | **292 commits** | **0** |
+| `master` | `2f2142316` | `84e3b020f` |
+| Cloud migrations pending | claimed 4 (`177-180`) | **0** |
+| `get_advisors(security)` ERROR findings | **2** | **0** |
+
+⚠ **`scripts/pending-cloud-migrations.sh` OVER-REPORTED BY TWO, and the reason is structural, not a
+bug:** it diffs **git refs** against `origin/production`, never the live database. `177` and `178`
+were measured **already applied** in cloud (RLS on both tables, `anon` absent from both ACLs,
+`app_settings_multimodal_max_vision_calls_bound` present). Only `179` and `180` were genuinely
+pending; both are additive `ADD COLUMN IF NOT EXISTS`, applied by the operator via the SQL editor and
+verified live — `removed` NOT NULL DEFAULT false, its partial index present, **33 override rows, 0
+tombstoned** (nothing vanished from the picker), and all four self-hosted endpoint columns with their
+defaults on the single `app_settings` row. ⭐ **Confirm a migration against the DATABASE, never
+against a git diff.**
+
+⚠ **The Vercel MCP cannot see this project.** It is authenticated to `fahed-mrads-projects`, which
+holds exactly one project — `rag-app`, built from `fhdautomation/rag-app`, last deployed February.
+**That is not Agentic RAG.** Frontend build state is dashboard-only from here; the operator confirmed
+the live app serves the new version by hand.
+
+## ⛔ Carried out of the v4.1 close — status re-derived 2026-09-13 at v4.2 scoping
+
+Written at the close, 2026-09-13. **These were the input to this milestone.** ⭐ Each now carries its
+measured disposition rather than being re-copied forward — three are discharged, and item 1 was never
+owed work at all.
 
 1. ⛔ **`RECALL-01` is UNMET and that is a finished decision, not owed work.** Phase 246 proved by
    `EXPLAIN (ANALYZE)` that no `hnsw_ef_search` value fixes the small-tenant recall cliff *through
@@ -77,10 +106,22 @@ Written at the close, 2026-09-13. **These are the input to the next milestone, n
 
 ## Current Position
 
-Phase: Milestone v4.1 complete
+Phase: Not started (roadmap pending)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-09-13 — Milestone v4.1 completed and archived
+Status: Defining requirements — v4.2 scoped, REQUIREMENTS.md written, roadmap next
+Last activity: 2026-09-13 — Milestone v4.2 started; v4.1 deployed to production (`eebc4c42f`)
+
+### v4.2 disposition of the seven carried items
+
+| # | Carried item | Disposition at v4.2 scoping |
+|---|---|---|
+| 1 | `RECALL-01` unmet | ⛔ **Not owed work — a finished decision.** Out of scope, re-open path `SEED-273`. Any retry must inspect a **PLAN**, not a recall number |
+| 2 | Migrations 179/180 not in cloud | ✅ **DISCHARGED** — applied and verified live 2026-09-13 |
+| 3 | `production` 287 behind | ✅ **DISCHARGED** — now 0. ⚠ 242's UAT row 5 is unblocked and owed; **241's row 5 is EXPIRED, not owed** (migration 176 was already in cloud, so the no-columns arm it proves is unreproducible forever) |
+| 4 | `SEED-172` fired | ➡ **SCOPED** as `MODEL-04` / `MODEL-05`, with `SEED-040` and `SEED-135` |
+| 5 | Independent §6.3 review owed by 238/240/241 | ➡ **SCOPED** as `DEBT-06`, widened to 242-246, as a **standing gate** not a phase. `OV-SOLO-01` re-armed; `BUS-202` already waiting on Phase 246 |
+| 6 | Named residues with triggers | ⏸ Carried unchanged — `SEED-272`, `238-M-9-microsoft-arm`, `233-row-3-refusal-arm`, `240-five-mail-rows`, `SHELL-03`'s fail-closed and Deep-mode arms |
+| 7 | Register integrity (8 duplicate seed ids; 161 planted) | ➡ **SCOPED** as `REG-01` / `REG-02` / `REG-03` — the first time this has been given requirement ids rather than a close-note |
 
 ## Carried into v4.1 from the v4.0 close
 

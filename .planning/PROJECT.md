@@ -10,6 +10,80 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 
 ---
 
+## Current Milestone: v4.2 The Connected Knowledge You Can Actually Run
+
+**Started:** 2026-09-13 · Phase numbering continues at **247**.
+
+**Goal:** the capability v4.0 built and v4.1 deployed becomes the surface you can live on — the watch
+loop tells the truth, a credential cannot land in a readable column, and the model you want to run
+registers itself.
+
+⭐ **v4.1 DID deploy, and that is what makes this milestone different from the last one.** Measured at
+this scoping: `production` moved `e65610ac2 → eebc4c42f`, **292 commits**, and `production..develop`
+is now **0**. Migrations 179 and 180 were applied to cloud first (177 and 178 were measured
+**already present** — `scripts/pending-cloud-migrations.sh` diffs git refs, not the live database, so
+it over-reported by two). The operator confirmed the live app serves the new version. **v4.2 therefore
+opens on deployed code for the first time in three milestones**, which is the state v4.1 existed to
+reach.
+
+**Target features:**
+
+- **The watch loop you can rely on** — Drive writes `metadata.source.path` so a watched file
+  classifies like an uploaded one; Graph folder paths stop truncating; a watch card reports **its
+  connection's** health, not its last run's; "Sync now" answers in place; a missing file says *when*;
+  a button worded as a fix performs one. Eight defects on the capability that reached users on
+  2026-09-13.
+- **The credential boundary** — a secret pasted into a non-secret field is refused rather than stored
+  in a column every org member can read, and the 13 anon-executable `SECURITY DEFINER` functions are
+  each ruled on rather than left standing.
+- **The model you actually run** — a local / self-hosted model registers from the UI without a code
+  edit, an unregistered id says so at pick time instead of silently losing `native_tools`, and a
+  refused settings write stops reporting success.
+- **The run-honesty residue** — a trim never eats your own question, a reasoning model that returns
+  nothing says what happened, and a finished task stops leaving a todo list that claims otherwise.
+- **Register integrity** — 8 duplicate seed ids resolved, the 161-seed sweep made executable rather
+  than aspirational, and `BUS-171`'s 23-item operator queue triaged into decisions.
+
+**Decisions taken at scoping (2026-09-13, operator):**
+- ⭐ **`OV-SOLO-01` is RE-ARMED and the review debt becomes a standing gate, not a phase.** Gemini
+  returned 2026-09-13, so `AGENTS.md` §3 / §6.3 two-agent separation is back in force: **a phase's
+  builder may not be its reviewer.** `DEBT-06` discharges 238 / 240 / 241 / 242-246 *alongside* the
+  build. ⛔ Re-arming retro-reviews nothing — those phases stay `self-verified` with
+  `independent_review: owed` until a review actually runs.
+- **Three register entries were driven, not read — and two were wrong.** `BUG-260911-01` and
+  `BUG-260910-03`, both `status: open` and both **blocking**, are measured **fixed**; `BUG-260907-02`,
+  which reads the same way, is measured **live**. Scoping from status fields alone would have
+  front-loaded two non-problems and under-weighted a credential leak.
+- **The workflow / publish-gauntlet cluster (5 bugs) is deferred BY NAME**, with its ids written into
+  `REQUIREMENTS.md`. A cluster deferred by name can be re-opened; one deferred by silence cannot.
+- **`MODEL-09` is planned only after a re-measurement.** `BUG-260809-01` (cloud eval engine 0/8) was
+  measured against the *old* production and 292 commits have landed since. Engine health is a live
+  sweep and is not persisted, so it cannot be re-derived from the database.
+
+**Binding constraints (not aspirations):**
+- ⚠ **G-2 fires on the watch-surface phase** — live UI, and all eight complaints are *legibility*
+  complaints. `/gsd:sketch` before `/gsd:plan-phase`; the operator-approved mockup is the acceptance bar.
+- ⚠ **The credential phase touches a trust boundary** — threat model mandatory, dispatched code review
+  not optional.
+- ⛔ **`REVOKE … FROM anon` is a NO-OP while the default `PUBLIC` grant stands** — measured when
+  migration 177's first version applied cleanly and verify still read `FAIL`. Revoke from `PUBLIC`,
+  then grant back what genuinely needs it. A role-by-role sweep of the 13 flagged functions would
+  silently achieve nothing.
+- ⚠ **`retrieval_service.py`'s G-5 extraction, owed since 231, is at its THIRD landing** if anything
+  here touches it. The extraction must be proposed FIRST.
+- ⛔ **Auto-completing open todos at a clean run end is rejected** — it fabricates success. Recorded so
+  it is not re-proposed as new; it was already rejected on 2026-06-26.
+
+**Known shape-risk, stated at scoping rather than discovered later:** ⚠ **this is the SECOND
+CONSECUTIVE consolidation milestone.** v4.1 named the risk — *"a consolidation milestone has no
+natural stopping point"* — and then ran 17 plans for 4-6 plans of substance anyway. **The risk
+compounds rather than fades:** the registers are larger now, and `SEED-013` / `SEED-195` (Open
+Platform, reserved as **v5.0**) has now been deferred **twice**. A third deferral needs a written
+reason, not silence. **G-8 is the governor**: 3-5 plans per phase, and a ≤ 1-file / ≤ 10-line bug is
+`/gsd:fast` under G-3, never a plan.
+
+---
+
 ## Last Shipped: v4.1 Ship It & Feel It (2026-09-13)
 
 **Started:** 2026-09-11 · **Shipped:** 2026-09-13, git tag `v4.1` · 5 phases (242-246), 25 plans,
