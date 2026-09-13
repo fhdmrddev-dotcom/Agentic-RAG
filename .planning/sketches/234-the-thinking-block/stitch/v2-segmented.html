@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AIFlow - Conversation Thread</title>
+<!-- Google Fonts: Inter & JetBrains Mono -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols Outlined -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Configuration -->
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "on-secondary": "#2e303c",
+            "outline-variant": "#464651",
+            "secondary": "#c5c5d5",
+            "on-tertiary-fixed-variant": "#564500",
+            "on-secondary-fixed": "#191b26",
+            "surface-container-high": "#262a32",
+            "on-surface-variant": "#c6c5d2",
+            "error-container": "#93000a",
+            "secondary-fixed-dim": "#c5c5d5",
+            "secondary-fixed": "#e1e1f1",
+            "surface-container": "#1c2027",
+            "on-secondary-fixed-variant": "#444653",
+            "on-primary-container": "#363f88",
+            "tertiary-fixed": "#ffe081",
+            "on-tertiary-container": "#554400",
+            "error": "#ffb4ab",
+            "on-primary": "#1f2871",
+            "outline": "#908f9c",
+            "surface-bright": "#363941",
+            "inverse-surface": "#e0e2ed",
+            "surface-tint": "#bcc2ff",
+            "surface-container-lowest": "#0b0e15",
+            "tertiary-container": "#d1b144",
+            "on-primary-fixed": "#040e5d",
+            "on-tertiary-fixed": "#231b00",
+            "surface-container-low": "#181c23",
+            "surface": "#10131b",
+            "surface-dim": "#10131b",
+            "on-tertiary": "#3c2f00",
+            "on-background": "#e0e2ed",
+            "background": "#10131b",
+            "secondary-container": "#444653",
+            "surface-container-highest": "#31353d",
+            "primary-container": "#a5aeff",
+            "on-surface": "#e0e2ed",
+            "tertiary": "#eecd5d",
+            "tertiary-fixed-dim": "#e5c455",
+            "primary": "#c8ccff",
+            "on-secondary-container": "#b3b4c3",
+            "inverse-primary": "#4f58a2",
+            "surface-variant": "#31353d",
+            "on-error": "#690005",
+            "on-primary-fixed-variant": "#374089",
+            "primary-fixed": "#dfe0ff",
+            "inverse-on-surface": "#2d3038",
+            "on-error-container": "#ffdad6",
+            "primary-fixed-dim": "#bcc2ff"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+          "spacing": {
+            "md": "16px",
+            "lg": "24px",
+            "gutter": "24px",
+            "xl": "32px",
+            "xs": "8px",
+            "container-max": "1200px",
+            "base": "4px",
+            "sm": "12px"
+          },
+          "fontFamily": {
+            "headline-md": ["Inter"],
+            "label-caps": ["JetBrains Mono"],
+            "code-md": ["JetBrains Mono"],
+            "body-md": ["Inter"],
+            "display": ["Inter"],
+            "headline-lg": ["Inter"],
+            "body-sm": ["Inter"],
+            "body-lg": ["Inter"]
+          },
+          "fontSize": {
+            "headline-md": ["24px", { "lineHeight": "1.3", "fontWeight": "500" }],
+            "label-caps": ["12px", { "lineHeight": "1.0", "letterSpacing": "0.05em", "fontWeight": "500" }],
+            "code-md": ["14px", { "lineHeight": "1.6", "fontWeight": "400" }],
+            "body-md": ["16px", { "lineHeight": "1.5", "fontWeight": "400" }],
+            "display": ["48px", { "lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "600" }],
+            "headline-lg": ["32px", { "lineHeight": "1.2", "fontWeight": "600" }],
+            "body-sm": ["14px", { "lineHeight": "1.5", "fontWeight": "400" }],
+            "body-lg": ["18px", { "lineHeight": "1.6", "fontWeight": "400" }]
+          }
+        }
+      }
+    };
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 20;
+      font-size: 18px;
+      line-height: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+    .animate-caret {
+      animation: blink 0.9s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+  </style>
+</head>
+<body class="bg-background text-on-surface font-body-md text-body-md antialiased min-h-screen flex flex-col selection:bg-primary-container/20 selection:text-primary">
+<!-- TopNavBar -->
+<header class="w-full top-0 sticky z-40 bg-background dark:bg-background">
+<div class="flex justify-between items-center h-16 px-gutter max-w-container-max mx-auto">
+<div class="flex items-center gap-3">
+<span class="font-headline-md text-headline-md font-semibold text-on-surface tracking-tight">AIFlow</span>
+<span class="font-label-caps text-label-caps text-outline-variant tracking-wider ml-1">THREAD #4082</span>
+</div>
+<div class="flex items-center gap-2">
+<button aria-label="History" class="w-9 h-9 flex items-center justify-center rounded-lg text-on-surface-variant hover:bg-surface-container-highest transition-colors active:scale-95 duration-100">
+<span class="material-symbols-outlined" data-icon="history">history</span>
+</button>
+<button aria-label="Settings" class="w-9 h-9 flex items-center justify-center rounded-lg text-on-surface-variant hover:bg-surface-container-highest transition-colors active:scale-95 duration-100">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+</button>
+<div class="w-px h-4 bg-outline-variant/20 mx-1"></div>
+<div class="w-8 h-8 rounded-full bg-surface-container-high border border-outline-variant/20 flex items-center justify-center text-primary font-label-caps text-label-caps font-medium">
+          AF
+        </div>
+</div>
+</div>
+</header>
+<!-- Main Focus Conversation Canvas -->
+<main class="flex-1 w-full max-w-[800px] mx-auto px-md md:px-lg pt-4 pb-28">
+<!-- Conversation Header & Context Info -->
+<div class="mb-10 pb-4 border-b border-outline-variant/10 flex items-baseline justify-between">
+<h1 class="font-body-sm text-body-sm text-on-surface-variant font-medium">
+        Technical Architecture • <span class="text-on-surface">Zero-downtime distributed migration</span>
+</h1>
+<span class="font-label-caps text-label-caps text-outline-variant">Active Session</span>
+</div>
+<div class="flex flex-col gap-12">
+<!-- ========================================================================= -->
+<!-- TURN 1: FINISHED, FOLDED (Quiet, collapsed thought state with tool run)    -->
+<!-- ========================================================================= -->
+<article class="flex flex-col gap-3">
+<!-- Model Chip Micro-Badge -->
+<div class="flex items-center gap-2">
+<div class="inline-flex items-center px-2 py-0.5 rounded bg-surface-container-low border border-outline-variant/15 text-outline font-label-caps text-label-caps">
+            sonnet-3.7
+          </div>
+</div>
+<!-- Coexisting Tool Run: Exactly 3 completed tool steps (whisper-thin, understated rows) -->
+<div class="flex flex-col gap-1.5 py-1">
+<div class="flex items-center gap-2 font-label-caps text-label-caps text-on-surface-variant/70">
+<span class="material-symbols-outlined text-outline-variant text-[14px]" data-icon="check">check</span>
+<span class="text-outline-variant">Search documentation</span>
+<span class="text-outline-variant/50">→</span>
+<span class="text-on-surface-variant/80 font-code-md text-code-md">8 results found</span>
+</div>
+<div class="flex items-center gap-2 font-label-caps text-label-caps text-on-surface-variant/70">
+<span class="material-symbols-outlined text-outline-variant text-[14px]" data-icon="check">check</span>
+<span class="text-outline-variant">Read schema definition</span>
+<span class="text-outline-variant/50">→</span>
+<span class="text-on-surface-variant/80 font-code-md text-code-md">postgres/v14_cluster.sql</span>
+</div>
+<div class="flex items-center gap-2 font-label-caps text-label-caps text-on-surface-variant/70">
+<span class="material-symbols-outlined text-outline-variant text-[14px]" data-icon="check">check</span>
+<span class="text-outline-variant">Synthesize migration steps</span>
+<span class="text-outline-variant/50">→</span>
+<span class="text-on-surface-variant/80 font-code-md text-code-md">partition_matrix.json</span>
+</div>
+</div>
+<!-- Folded/Collapsed Thinking Row -->
+<div class="flex items-center gap-2 py-0.5 text-on-surface-variant/60 cursor-pointer hover:text-on-surface-variant transition-colors select-none">
+<span class="material-symbols-outlined text-outline text-[16px]" data-icon="spark">spark</span>
+<span class="font-body-sm text-body-sm">Thought for 6 seconds</span>
+<span class="material-symbols-outlined text-outline-variant text-[16px]" data-icon="keyboard_arrow_down">keyboard_arrow_down</span>
+</div>
+<!-- Final Answer: Full-strength high-contrast markdown prose directly below -->
+<div class="flex flex-col gap-3 pt-1 text-on-surface font-body-md text-body-md leading-relaxed">
+<p>
+            For a zero-downtime transition of your shard layout, execute the dual-write sync phase first. The Postgres replication slot must be configured before backfilling legacy partition records to ensure replication lag remains bounded under heavy write spikes.
+          </p>
+<p class="text-on-surface-variant">
+            Once write verification confirms continuous checksum parity between both partitions, shift the reads using your dynamic feature flag proxy. We will keep shadow writes enabled for an additional 48 hours to guarantee absolute rollback safety without data degradation.
+          </p>
+</div>
+</article>
+<!-- ========================================================================= -->
+<!-- TURN 2: REASONING RHYTHM BLOCKS & LIVE STREAMING ANSWER                   -->
+<!-- ========================================================================= -->
+<article class="flex flex-col gap-3 pt-6 border-t border-outline-variant/10">
+<!-- Model Chip Micro-Badge -->
+<div class="flex items-center gap-2">
+<div class="inline-flex items-center px-2 py-0.5 rounded bg-surface-container-low border border-outline-variant/15 text-outline font-label-caps text-label-caps">
+            sonnet-3.7
+          </div>
+</div>
+<!-- Quiescent Settled Thinking Summary Bar -->
+<div class="flex items-center gap-2 py-0.5 text-on-surface-variant/70 select-none">
+<span class="material-symbols-outlined text-outline text-[16px]" data-icon="spark">spark</span>
+<span class="font-body-sm text-body-sm">Thought for 11s</span>
+<span class="material-symbols-outlined text-outline-variant text-[16px]" data-icon="keyboard_arrow_up">keyboard_arrow_up</span>
+</div>
+<!-- Thinking Block: Soft Segmented Rhythm Blocks (Unboxed, quiet sans prose, gentle phase cues) -->
+<div class="py-2 flex flex-col gap-4 text-on-surface-variant font-body-sm text-body-sm">
+<!-- Segment 1: Ingestion & Intent -->
+<div class="flex flex-col gap-1.5">
+<div class="flex items-center gap-2">
+<span class="font-label-caps text-[11px] tracking-wide text-outline px-1.5 py-0.5 rounded-full bg-surface-container-low border border-outline-variant/15">problem-framing</span>
+</div>
+<p class="leading-relaxed pl-0.5">
+              The objective is maintaining consensus validity across isolated regional clusters during catastrophic fiber sever events without introducing split-brain mutations or requiring operator intervention.
+            </p>
+</div>
+<!-- Segment 2: Invariant Evaluation -->
+<div class="flex flex-col gap-1.5">
+<div class="flex items-center gap-2">
+<span class="font-label-caps text-[11px] tracking-wide text-outline px-1.5 py-0.5 rounded-full bg-surface-container-low border border-outline-variant/15">raft-semantics</span>
+</div>
+<p class="leading-relaxed pl-0.5">
+              Evaluating quorum lease dynamics under asymmetric isolation. Raft demands a strict majority for committed log entries. If asymmetric degradation isolates nodes, the isolated minority must instantly step down from primary writes and return deterministic backoff markers.
+            </p>
+</div>
+<!-- Segment 3: Epoch Verification -->
+<div class="flex flex-col gap-1.5">
+<div class="flex items-center gap-2">
+<span class="font-label-caps text-[11px] tracking-wide text-outline px-1.5 py-0.5 rounded-full bg-surface-container-low border border-outline-variant/15">clock-skew-mitigation</span>
+</div>
+<p class="leading-relaxed pl-0.5">
+              Local lease expirations tied to monotonic sequence heartbeats circumvent NTP desynchronization vulnerabilities, confirming valid read leases even under high virtualization jitter.
+            </p>
+</div>
+</div>
+<!-- Separator between finished thinking trace and mid-stream response -->
+<div class="w-full h-px bg-outline-variant/10 my-1"></div>
+<!-- Live Answer: Mid-stream state with active streaming cursor -->
+<div class="flex flex-col gap-3 pt-1 text-on-surface font-body-md text-body-md leading-relaxed">
+<p>
+            To prevent split-brain anomalies while sustaining low-latency reads across partitioned regions, adopt <strong>epoch-fenced quorum leases</strong> instead of node-local timers.
+          </p>
+<p class="text-on-surface inline">
+            When a partition boundary isolates two clusters, the sub-majority cluster immediately transitions to read-only mode after three missed heartbeat epochs (≤150ms). Clients attempting state mutations receive an explicit <code class="font-code-md text-code-md bg-surface-container px-1.5 py-0.5 rounded text-primary">ERR_EPOCH_STALE</code> response, triggering immediate rerouting to the active consensus leader, ensuring that lease renewals maintain consensus across isolated nodes<span class="inline-block w-[2px] h-[1.15em] bg-primary ml-1.5 align-middle rounded-full animate-caret"></span>
+</p>
+</div>
+</article>
+</div>
+</main>
+<!-- Subtle Minimal Bottom Chat Input Container -->
+<div class="fixed bottom-0 left-0 right-0 pointer-events-none bg-gradient-to-t from-background via-background/95 to-transparent pt-8 pb-6">
+<div class="max-w-[800px] mx-auto px-md md:px-lg pointer-events-auto">
+<div class="flex items-center gap-3 bg-surface-container border border-outline-variant/20 rounded-xl px-4 py-2.5 shadow-2xl focus-within:border-primary/50 transition-colors">
+<input class="flex-1 bg-transparent border-0 p-0 text-on-surface placeholder:text-outline-variant focus:ring-0 font-body-sm text-body-sm outline-none" placeholder="Send a message or refine reasoning..." type="text"/>
+<div class="flex items-center gap-2">
+<span class="font-label-caps text-label-caps text-outline-variant">⌘K</span>
+<button aria-label="Send" class="w-7 h-7 rounded-lg bg-primary-container text-on-primary-container flex items-center justify-center hover:opacity-90 active:scale-95 transition-all">
+<span class="material-symbols-outlined text-[16px]" data-icon="arrow_upward">arrow_upward</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</body></html>

@@ -132,6 +132,60 @@ export function useFollowScroll(
   const hardProgrammaticUntilRef = useRef(0)
   /** epoch ms of the last real user input on the container. */
   const lastGestureAtRef = useRef(0)
+  /**
+   * ⚠ PHASE 243 (CHAT-03) — WHAT the last real user input was TRYING TO DO, kept beside
+   * WHEN it happened, because the re-arm needs both and used to have only one.
+   *
+   * DRIVEN, not reasoned (`__tests__/hooks/useFollowScroll.test.ts` case A and
+   * `__tests__/components/chat/MessageList.scroll.test.tsx` §3): a reader who nudges UP
+   * by less than `FOLLOW_SCROLL_THRESHOLD` releases the pin and is still, by geometry,
+   * "near the bottom". `beginProgrammaticScroll` had set the hard clock to `now + 900`
+   * on the last token before that nudge, and the gesture window runs to `now + 1500` —
+   * so for roughly 600 ms BOTH re-arm conditions hold, and ANY scroll event in that
+   * window re-pins them. Scroll events are not only produced by people: scroll
+   * anchoring as the streaming content above reflows, a focus move, a late layout
+   * shift. The reader is then followed again and dragged to the live edge.
+   *
+   * ⚠ THIS IS NOT THE DEFECT `BUG-260823-01` DESCRIBES. That report blames a
+   * programmatic-scroll flag cleared on the next animation frame, and that code has not
+   * existed since `64357e979` (2026-09-04). This is a narrower residual with a
+   * different cause, found by driving HEAD rather than by reading the report.
+   */
+  const lastGestureIntentRef = useRef<UserScrollIntent>("unknown")
+  /**
+   * ⚠⚠ 243-06 (review finding HI-2) — THE READER'S DECISION, KEPT AS A DECISION RATHER THAN
+   * AS THE LAST THING THEY HAPPENED TO DO.
+   *
+   * `lastGestureIntentRef` above is OVERWRITTEN BY EVERY GESTURE, and `MessageList.tsx:115`
+   * maps `pointerdown` / `touchmove` to `"unknown"` — which passes a `!== "up"` test. So the
+   * release 243-03 shipped survived only until the reader touched the transcript for ANY
+   * reason at all. DRIVEN (`useFollowScroll.test.ts` ⭐D, `MessageList.scroll.test.tsx` §8):
+   * wheel-up → released → 1000 ms on, still released → ONE `pointerdown` → the next scroll
+   * event re-pinned them and the Jump-to-live chip vanished.
+   *
+   * ⚠ AND PHASE 243 IS WHAT MADE THAT A DESIGNED INTERACTION. `ThinkingBlock` puts a
+   * `<button>` on every reasoning-bearing assistant row INSIDE this viewport, so "the reader
+   * clicks something in the transcript mid-run" went from an accident to the feature.
+   *
+   * ⛔ THE ASYMMETRY IS THE WHOLE POINT, and it is the same principle the two clocks above
+   * already encode, carried one step further. An intent may only ever TAKE this bit
+   * (`"up"` — the reader saying "leave me here" out loud) or GIVE IT BACK unambiguously
+   * (`"down"`, `jumpToLive()`, a new run). A gesture that carries no direction can do
+   * NEITHER: it cannot strand a reader who never asked to be left, and it cannot speak for
+   * one who did. Directionless input still falls through to the geometry whenever this bit
+   * is clear, so the mirror cases — a touch drag or a scrollbar grab coasting to the bottom
+   * — re-arm exactly as before (⭐D-mirror-1, §10).
+   */
+  const leftDeliberatelyRef = useRef(false)
+  /**
+   * ⚠ THE BIT IS SCOPED TO THE RUN IT WAS SAID IN. Without this, a reader who wheels up once
+   * and returns by dragging the SCROLLBAR (directionless, so it cannot clear the bit) would
+   * never be followed again in any later turn. A new run is a new question, so it re-asks.
+   * Fenced by ⭐D-mirror-3.
+   */
+  const prevIsStreamingRef = useRef(isStreaming)
+  if (isStreaming && !prevIsStreamingRef.current) leftDeliberatelyRef.current = false
+  prevIsStreamingRef.current = isStreaming
 
   const setIsPinned = useCallback((next: boolean) => {
     if (isPinnedRef.current === next) return
@@ -151,6 +205,7 @@ export function useFollowScroll(
   // over an animation we started — and it is the thing a re-arm is allowed to trust.
   const noteUserGesture = useCallback((intent: UserScrollIntent = "unknown") => {
     lastGestureAtRef.current = Date.now()
+    lastGestureIntentRef.current = intent
     programmaticUntilRef.current = 0
     // Release the pin RIGHT HERE, synchronously, rather than waiting for the scroll event
     // this gesture is about to produce.
@@ -172,7 +227,14 @@ export function useFollowScroll(
     // following along, and releasing on it would flash the "↓ Jump to live" chip for a frame
     // before the scroll event re-armed. Inputs whose direction we cannot read (touch drags,
     // scrollbar grabs) fall through to `onScroll`, which reads the geometry instead.
-    if (intent === "up") setIsPinned(false)
+    // 243-06 (HI-2): an "up" TAKES the bit, an explicit "down" gives it back, and "unknown"
+    // touches neither — see `leftDeliberatelyRef`'s docblock for why that asymmetry is the fix.
+    if (intent === "up") {
+      leftDeliberatelyRef.current = true
+      setIsPinned(false)
+    } else if (intent === "down") {
+      leftDeliberatelyRef.current = false
+    }
     const vp = getViewport()
     if (vp) vp.scrollTop = vp.scrollTop
   }, [getViewport, setIsPinned])
@@ -190,18 +252,44 @@ export function useFollowScroll(
       setIsPinned(false)
       return
     }
-    // Near the bottom. Re-arm needs BOTH: our own animation must have finished (the
-    // uncancellable clock — a gesture cannot buy the tail permission to re-arm), and the user
-    // must actually have brought the view back. Either check alone leaves the reader draggable.
+    // Near the bottom. Re-arm needs THREE things now, and the third was added by Phase 243
+    // (CHAT-03) after the first two were measured insufficient:
+    //   1. our own animation must have finished (the uncancellable clock — a gesture cannot
+    //      buy the tail permission to re-arm);
+    //   2. the user must actually have been at the controls recently; and
+    //   3. ⚠ THE LAST THING THEY DID MUST NOT HAVE BEEN TO LEAVE.
+    //
+    // (3) is the same principle this file already states for the two clocks, carried one
+    // step further: a gesture buys the right to LET GO, never the right to TAKE HOLD again
+    // — and an UPWARD gesture is the reader saying "leave me here" out loud. Without it,
+    // a reader who nudged up less than FOLLOW_SCROLL_THRESHOLD is still geometrically
+    // "near the bottom", so any scroll event between the 900 ms clock and the 1500 ms
+    // window re-pinned them — including scroll events no person produced.
+    //
+    // ⛔ AND THE OPPOSITE MUST STAY TRUE, WHICH IS WHY THIS IS A DIRECTION AND NOT A BAN.
+    // A deliberate flick back DOWN that coasts to the bottom MUST still re-arm, and so
+    // must a touch drag or a scrollbar grab, whose direction the event does not carry —
+    // those arrive as "unknown" and still fall through to the geometry, exactly as before.
+    // The mirror case is fenced beside the defect case in both suites; a fix that passes
+    // one by breaking the other is a regression, not a fix.
     if (
       Date.now() >= hardProgrammaticUntilRef.current &&
-      Date.now() - lastGestureAtRef.current <= USER_GESTURE_WINDOW_MS
+      Date.now() - lastGestureAtRef.current <= USER_GESTURE_WINDOW_MS &&
+      lastGestureIntentRef.current !== "up" &&
+      // 243-06 (HI-2): …and they must not be STILL leaving. `lastGestureIntentRef` answers
+      // "what was the last input", which any later click overwrites; this answers "has the
+      // reader asked to be left alone and not taken it back", which is the question the
+      // re-arm was always trying to ask.
+      !leftDeliberatelyRef.current
     ) {
       setIsPinned(true)
     }
   }, [getViewport, setIsPinned])
 
   const jumpToLive = useCallback(() => {
+    // ⛔ THE CHIP IS HOW A READER COMES BACK, so it must clear the decision outright — not
+    // merely re-pin, which the next scroll event would then undo. Fenced by ⭐D-mirror-2.
+    leftDeliberatelyRef.current = false
     setIsPinned(true)
     const vp = getViewport()
     if (!vp) return

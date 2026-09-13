@@ -1,6 +1,8 @@
 ---
 id: SEED-045
-status: dormant
+status: folded          # folded_into v4.1 (SHELL-01) at /gsd:new-milestone 2026-09-11
+folded_into: "v4.1"
+
 planted: 2026-05-31
 planted_during: v2.8 (Harness Engine & Workflow Mode — surfaced during Phase 090 operator-testing-notes triage)
 trigger_when: A dedicated UI/UX polish milestone is scoped (v2.4 "Stability, Polish & UX Fixes" precedent), typically after v2.8 harness ships; OR any specific nav/chat-list usability item is reported
@@ -45,3 +47,28 @@ Present during `/gsd:new-milestone` when the milestone scope matches:
 ## Notes
 
 The collapsed-rail New Chat is the one item worth considering BEFORE the milestone — it's a real "can't do the most common action while collapsed" usability bug, and a small contained fix. Everything else collects into the polish milestone. Keep all changes on the Aether/Deep-Midnight design system and run the lived-experience UI UAT (memory `feedback_uat_lived_experience_gap` / `feedback_exhaustive_ui_state_sweep`) — polish work is exactly where felt-experience defects hide.
+
+---
+
+## ⛔ ROUTED AT PHASE 244 DISCUSS (2026-09-11) — BOTH FOLDED ANCHORS ARE ALREADY SHIPPED
+
+The ROADMAP folds this seed's **chat-list / nav-collapse** items into `SHELL-01`. Measured at
+`5ebd0fbca`, **both anchors shipped at Phase 156** and the fold is therefore empty:
+
+- **Anchor 1 — collapsed nav panel hides "New Chat".** ⛔ Refuted. The collapsible `w-64 ↔ w-16` column
+  that masked its content **no longer exists** — `NavPanel.tsx:22-26` records its removal, and New Chat
+  lives **permanently on the rail, reachable from EVERY view** (`:232-234`, Phase 156 D-02, *"SC#1 by
+  construction"*).
+- **Anchor 2 — long chat list is a flat endless scroll.** ⚠ **Half refuted.** The **search** half
+  shipped on desktop (⌘K) **and** mobile (`ChatLayout.tsx:643-656`, the shared `matchesTitle`
+  predicate, Phase 156 Wave 3 / D-08) with match highlighting. **Still absent:** date-section grouping,
+  pinning, folder grouping.
+
+⭐ **What is actually open on the surface this fold pointed at is two reported bugs, not this seed** —
+both folded into Phase 244 at this discuss: `BUG-260911-02` (first click selects a thread but does not
+open it) and `BUG-260816-03` (thread-row identity: icon, folder chip, title truncation).
+
+⚠ **Status stays `planted` for the REMAINING umbrella** — grouping, pinning, folder grouping, and the
+other minor-enhancement items. The two anchors are discharged and must not be re-proposed.
+**Re-open trigger (narrowed):** the thread list becomes unwieldy again for a reason **search cannot
+fix** — i.e. someone needs grouping or pinning specifically.

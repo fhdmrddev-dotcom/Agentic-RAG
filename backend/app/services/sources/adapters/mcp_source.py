@@ -106,6 +106,7 @@ from app.services.sources.base import (
     SourceHealth,
     SourceNode,
     SourceRegistry,
+    clamp_read_cap,
 )
 
 # ── ⚠ SEED-258: ~~`MAX_FILE_BYTES = 25 * 1024 * 1024`~~ — REMOVED, along with the two
@@ -1147,8 +1148,25 @@ class McpSourceAdapter(SourceAdapter):
         self,
         connection: Any,
         file_id: str,
+        max_bytes: int | None = None,
     ) -> tuple[str, bytes, str]:
-        """Read one file. Returns `(filename, content_bytes, mime_type)`."""
+        """Read one file. Returns `(filename, content_bytes, mime_type)`.
+
+        ⚠ ``max_bytes`` IS ENFORCED **AFTER** DECODE HERE, AND THAT IS A REAL DIFFERENCE FROM
+        THE HTTP FAMILIES — stated rather than papered over (244-08 / T-244-06-07).
+
+        Drive and Graph hand the cap to ``send_pinned_http``, which refuses a declared
+        over-cap ``content-length`` before a byte is read. MCP has no such attribution point:
+        the file arrives base64-encoded INSIDE a JSON-RPC envelope, so there is no prefix of
+        the response whose length means "the file is this big". The transport-level bound that
+        DOES apply is ``mcp_max_body_bytes()`` — derived one-way from the same operator
+        ceiling (SEED-258) — so residency is bounded by the envelope cap, and this check makes
+        the CALLER's tighter ceiling honest rather than silently ignored.
+
+        ⛔ Do not "fix" the asymmetry by adding an envelope knob. SEED-258's whole finding is
+        that one operator number must force the other; two settings is the disagreement it
+        removed.
+        """
         binding = await _resolve_binding(connection)
         # ⛔ SEED-259, the reader's half. A read that comes back with nothing is minted as an
         # empty document, embedded, and answered out of the knowledge base as the file.
@@ -1183,6 +1201,13 @@ class McpSourceAdapter(SourceAdapter):
                 f"The server returned no content blocks for {filename!r}, so nothing was "
                 f"imported. (A 0-byte file is not this case — that arrives as an empty "
                 f"content block and is imported as the empty file it is.)"
+            )
+
+        cap = clamp_read_cap(max_bytes)
+        if len(payload) > cap:
+            raise McpToolResultError(
+                f"{filename!r} is {len(payload):,} bytes, over the {cap:,}-byte ceiling this "
+                "read was given, so nothing was imported."
             )
 
         return filename, payload, stated_mime or _mime_for(filename, from_text=True)

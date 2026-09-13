@@ -113,7 +113,58 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
   // background workflow on another thread cannot lock THIS composer. Drives the
   // disable-with-tooltip on both selectors (D-03/D-05).
   const workflowLock = useWorkflowLockForThread(thread?.id ?? null)
-  const workflowLocked = workflowLock !== null
+  // ── Phase 244-03 (SHELL-02 / BUG-260904-05 / D-244-08 arm 2) — A CAP-PAUSE IS NOT A
+  //    RUNNING WORKFLOW, and the composer must be able to tell them apart.
+  //
+  // The shipped expression was `workflowLock !== null`. The reconcile branch at :184 below
+  // sets a lock for a DEEP run paused at its iteration cap, so that read disabled the
+  // composer the message on screen was telling the operator to use ("Start a new message to
+  // keep going", MessageItem.tsx:576). The UI instructed an action it forbade.
+  //
+  // ⛔ C-1 — D-244-08's FIRST proposal is a NO-OP, recorded here beside the decision rather
+  // than overwriting it. It offered `workflowLock?.mode === "harness"`. Measured:
+  // `WorkflowLock.mode` is the LITERAL type `"harness"` (streamsStore.ts:89) with exactly one
+  // member, and the cap-paused branch at :184-192 HARD-CODES `mode: "harness"` for a Deep
+  // run — so that gate is TRUE for precisely the run it was meant to unlock. `capPaused` is
+  // the only working discriminator on the shipped type, which is the decision's second arm.
+  //
+  // ⛔ NOTHING ELSE IN THE CHAIN CHANGES. MessageInput.tsx:287/337-339 key `canSend`, the
+  // placeholder, the `title` and `disabled` off this ONE boolean, so D-244-10 ("the harness
+  // copy is untouched") holds by construction rather than by a second branch — a genuine
+  // harness run still reads "Workflow running — Cancel to switch back" on both axes.
+  // Fenced in `__tests__/ChatArea.capPausedComposer.test.tsx`.
+  //
+  // ⚠ The CLIENT half alone would have shipped the same defect one level down: the server's
+  // cap_paused read was unbounded in time, so the lock returned on the next reconcile. The
+  // other half is in `backend/app/api/threads.py`'s `runs` probe.
+  //
+  // ── Phase 244-13 (review finding WR-07 / UAT gap G-1) — C-1's MEASUREMENT STANDS, AND
+  //    THE TYPE IT MEASURED IS WHAT CHANGED ────────────────────────────────────────────
+  //
+  // ⛔ The C-1 paragraph directly above is KEPT VERBATIM rather than corrected, because it
+  // was RIGHT when written: with `WorkflowLock.mode` a one-member literal and every writer
+  // hard-coding it, `workflowLock?.mode === "harness"` really was a no-op. `244-13` made
+  // `mode` a REAL discriminator (`streamsStore.ts` — `"harness" | "cap_paused"`, set from
+  // the server's own `ThreadWorkflowState.mode` at all six write sites), which is what
+  // makes `D-244-08`'s FIRST arm correct after all.
+  //
+  // ⛔ WHY THE SECOND ARM ALONE WAS NOT ENOUGH — this is WR-07, and it is a real hole
+  // rather than a tidy-up. `workflowLock !== null && !workflowLock.capPaused` unlocks the
+  // composer for a GENUINE harness run that is itself cap-paused. The person types, sends,
+  // and `workflow_kickoff.preflight_workflow_kickoff:174` answers 409 "Thread is
+  // workflow-locked" — the exact "UI instructs an action it forbids" inversion this phase
+  // exists to remove, one branch over. ⚠ The RECONCILE route to that state is latent (no
+  // writer of `'cap_paused'` onto `workflow_runs.status` was found), but the SSE route is
+  // NOT: `StreamsProvider.tsx:1193`'s `onCapPaused` sets `capPaused: true` on whatever lock
+  // the thread holds, including the kickoff-seeded harness lock. Site 1 now INHERITS
+  // `"harness"` there, and this expression is what turns that inheritance into a locked
+  // composer. Fenced by `__tests__/ChatArea.capPausedComposer.test.tsx` D5, and the writer
+  // itself by `__tests__/ThreadRunLineKickoff.test.tsx` D5b(a).
+  //
+  // ⛔ NOTHING ELSE IN THE COMPOSER CHAIN CHANGES, still: `MessageInput.tsx:287/337-339`
+  // key `canSend`, the placeholder, the `title` and `disabled` off this ONE boolean, so
+  // D-244-10 holds by construction rather than by a second branch.
+  const workflowLocked = workflowLock !== null && workflowLock.mode === "harness"
   const streamActions = useStreamActions()
   // Phase 068.5 Gap-01: true when this thread has a loadMessages fetch in
   // flight. Passed to MessageList so the cold-load skeleton only renders when
@@ -177,8 +228,32 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
         if (state.locked && !state.lock_is_stale && state.active_workflow_run_id) {
           streamActions.setWorkflowLockForThread(tid, {
             runId: state.active_workflow_run_id,
+            // 244-13 — WRITE SITE 5 of 6. Genuinely harness, said EXPLICITLY: this arm
+            // requires a live, non-stale `active_workflow_run_id`, which is the server's
+            // own definition of harness (`threads.py:1195`).
             mode: "harness",
-            capPaused: state.cap_paused,
+            // ⛔ ALWAYS `false` ON THIS BRANCH — `T-244-03-01` / 244-08. This read
+            // `capPaused: state.cap_paused`, and `244-03`'s own declared mitigation says the
+            // discriminator is *"set only on the `state.cap_paused` reconcile branch"* below.
+            // It was set on both, and `workflowLocked` at :140 is
+            // `workflowLock !== null && !workflowLock.capPaused` — so a run that is locked AND
+            // paused UNLOCKED THE COMPOSER MID-RUN.
+            //
+            // ⚠ THAT STATE IS LATENT, NOT IMPOSSIBLE, WHICH IS WHY THIS IS FAIL-CLOSED RATHER
+            // THAN DELETED AS UNREACHABLE. No writer of `'cap_paused'` onto
+            // `workflow_runs.status` has been found — but the value is schema-valid
+            // (`063_dual_mode_continue.sql:57` adds it to BOTH status columns),
+            // `threads.py:1238` sets `cap_paused` straight off that column, and
+            // `_TERMINAL_WORKFLOW_STATUSES` (`threads.py:1095`) does not contain it. So the
+            // server can answer `locked: true, cap_paused: true` today.
+            //
+            // ⚠ WHAT IT COSTS IF THAT ARM EVER GOES LIVE, stated rather than discovered later:
+            // a harness run paused at its own cap keeps the composer locked, so the person
+            // clicks Cancel instead of typing. That is the cheap direction. Unlocking during a
+            // live harness run is the elevation this threat names — and the ordinary Deep
+            // cap-pause, which is the case `BUG-260904-05` was actually about, has no
+            // `active_workflow_run_id` and so still takes the branch below.
+            capPaused: false,
             continuesRemaining: state.continues_remaining,
           })
         } else if (state.cap_paused) {
@@ -186,7 +261,15 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
           if (runId) {
             streamActions.setWorkflowLockForThread(tid, {
               runId,
-              mode: "harness",
+              // ⛔ 244-13 — WRITE SITE 6 of 6, AND THE PHANTOM'S SOURCE. This line used to
+              // hard-code the harness discriminator (named by ROLE, not respelled — a prose
+              // copy moves the acceptance grep, the 187-24 lesson) for a DEEP run that has
+              // no workflow and never had one. That is what `244-PATTERNS.md` C-1 measured,
+              // and what made UAT gap G-1's phantom live run line render 41px under a card
+              // saying the run is stopped.
+              // DERIVED FROM THE WIRE — `threads.py:1195` already computed it; a second
+              // client-side derivation of one fact is how the drift happened.
+              mode: state.mode === "harness" ? "harness" : "cap_paused",
               capPaused: true,
               continuesRemaining: state.continues_remaining,
             })
@@ -471,7 +554,10 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
 
   if (!thread) {
     return (
-      <div className="flex flex-col h-full bg-background">
+      // Phase 244-01 (SHELL-01): the WELCOME branch is the same column root as the thread
+      // branch below and carries the same link-4 obligation. ⚠ Found by the fence, not by
+      // the plan — `ChatArea.tsx` has TWO roots with this class list and the plan named one.
+      <div className="flex flex-col h-full min-h-0 bg-background">
         {/* Phase 156 REFINEMENT: desktop reopen handle for the welcome state — only when
             history is collapsed (so an empty chat can still bring the list back). */}
         {reopenHistoryButton && (
@@ -549,7 +635,12 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
   const scopedFolder = thread.folder_id ? folders.find((f) => f.id === thread.folder_id) : null
 
   return (
-    <div className="flex flex-col h-full bg-background">
+    // Phase 244-01 (SHELL-01 / BUG-260828-08): link 4 of the four-link `min-h-0` chain
+    // (ChatLayout's grid track and <main> are 2 and 3; MessageList's ScrollArea is 5).
+    // `h-full` sets this column's height, but its own flex CHILD — the message list — has
+    // `min-height: auto` unless this container's chain is zeroed, so the column grew to the
+    // transcript and the page root scrolled. Analog: DocumentDetailPanel.tsx:257.
+    <div className="flex flex-col h-full min-h-0 bg-background">
       <div className="px-6 py-3 bg-background/80 backdrop-blur-md flex items-center gap-2.5 border-b border-border/30">
         {/* Phase 156 REFINEMENT: the ▷ reopen-history handle (desktop, collapsed-only). */}
         {reopenHistoryButton}
@@ -608,10 +699,22 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
               message. Rendered as React text children — never HTML
               (T-099-08-01). A plain reconcile Error (no status) keeps the
               cached-version copy + Retry. */}
+          {/* Phase 244-11 (SHELL-01 / UAT gap G-3): the non-ApiError arm's sentence is a
+              claim ABOUT THE SCREEN, so it depends on what is actually on it. With an
+              EMPTY transcript there is no cached version, and telling the person there is
+              one is how BUG-260911-02's reporter read an empty pane as an empty
+              conversation and typed into it. ⛔ ONE new state only — the non-empty
+              sentence is byte-unchanged, and the ApiError arm (099-08's server-detail
+              copy, T-099-08-01) is untouched. ⛔ The literal names no status code, no
+              exception type and no dependency: say what is true of the THING, never what
+              the code experienced. `messages` is the same value the composer and
+              MessageList already read — no new state, no new effect, no new prop. */}
           <span>
             {reconcileError instanceof ApiError
               ? reconcileError.message
-              : "Couldn't load latest messages. Showing cached version."}
+              : messages.length === 0
+                ? "Couldn't load this conversation. It's still there — try again."
+                : "Couldn't load latest messages. Showing cached version."}
           </span>
           <span className="flex gap-2 items-center">
             {!hideRetry && (

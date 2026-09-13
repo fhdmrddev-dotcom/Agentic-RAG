@@ -50,6 +50,10 @@ _ENVELOPE_PREFIX = "enc:v1:"
 SECRET_COLUMNS: frozenset[str] = frozenset({
     "openai_api_key", "anthropic_api_key", "google_api_key",
     "openrouter_api_key", "ollama_api_key", "deepseek_api_key",
+    # SEED-173 (migration 180) — self-hosted endpoints may sit behind real auth (vLLM
+    # --api-key, a tunnel bearer token). Those are secrets like any other and MUST be in
+    # this set, or they would be the only provider keys stored as plaintext.
+    "lmstudio_api_key", "custom_api_key",
     "moonshot_api_key", "minimax_api_key", "zhipu_api_key",
     "embedding_api_key", "rerank_api_key", "tavily_api_key",
     # Phase 168 (SSO — SAML CORE, D-168-01): the Cloud Supabase Management/PAT (sbp_) token the

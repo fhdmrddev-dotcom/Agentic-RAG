@@ -232,6 +232,16 @@ export interface StreamCallbacks {
   /** Phase 076.2 D-01: DeepSeek reasoning_content streaming delta.
    * Accumulates on message.reasoningContent for real-time thinking display. */
   onReasoningDelta?: (text: string) => void
+  /**
+   * BUG-260912-01 — the turn that just streamed ended in TOOL CALLS, so everything it said
+   * was narration, not the answer. The consumer moves the body text accumulated so far into
+   * the fold and starts a fresh body.
+   *
+   * ⛔ CARRIES NO PAYLOAD ON PURPOSE. The text is already in the consumer's hands; sending it
+   * again would be a second copy that could disagree with the first, and the whole defect is
+   * that two places disagreed about what the body contained.
+   */
+  onTurnBoundary?: () => void
   onDone: () => void
   // Phase 066 D-066-06: 4th kind 'timed_out' — distinct from 'error' (LLM/system failure)
   // and 'cancelled' (user-Stop). Hooks set runStatus='timed_out' on this; MessageItem
@@ -684,6 +694,8 @@ export async function subscribeToRun(
         if (t === "delta") callbacks.onDelta(parsed.content as string)
         else if (t === "reasoning_delta" && callbacks.onReasoningDelta)
           callbacks.onReasoningDelta(parsed.content as string)
+        else if (t === "turn_boundary" && callbacks.onTurnBoundary)
+          callbacks.onTurnBoundary()
         else if (t === "title" && callbacks.onTitleUpdate)
           callbacks.onTitleUpdate(parsed.content as string)
         else if (t === "tool_preparing" && callbacks.onToolPreparing)
@@ -1102,13 +1114,29 @@ export async function getThreadTodos(
 }
 
 /** GET /threads/{tid}/workspace/files (workspace.py:99). Returns the workspace
- *  file index for the thread. */
+ *  file index for the thread.
+ *
+ *  `includeExpired` (Phase 244-08 / T-244-05-05) asks the server for rows past their TTL, for
+ *  the ONE reader that needs them: the TRANSCRIPT, which must still be able to say a file was
+ *  attached (`No longer available`) instead of letting the chip vanish from an old
+ *  conversation. ⛔ It does NOT make those rows readable — the per-file content route keeps its
+ *  own expiry gate, so a tombstone 404s if anything tries to open it.
+ *
+ *  ⚠ THIRD PARAMETER, DEFAULT OFF, AND THAT SHAPE IS DELIBERATE. `usePanelReconcile` calls this
+ *  as `(threadId, signal)`, so anything added ahead of `signal` would silently become the
+ *  abort argument. `useResolvedFileId` calls it too and wants the gated answer; leaving the
+ *  default off means it is untouched. */
 export async function getThreadWorkspaceFiles(
   threadId: string,
   signal?: AbortSignal,
+  opts?: { includeExpired?: boolean },
 ): Promise<WorkspaceFile[]> {
   const headers = await getAuthHeaders()
-  const res = await fetch(`${API_BASE}/threads/${threadId}/workspace/files`, { headers, signal })
+  const query = opts?.includeExpired ? "?include_expired=true" : ""
+  const res = await fetch(`${API_BASE}/threads/${threadId}/workspace/files${query}`, {
+    headers,
+    signal,
+  })
   if (!res.ok) throw new Error("Failed to list workspace files")
   return (await res.json()) as WorkspaceFile[]
 }

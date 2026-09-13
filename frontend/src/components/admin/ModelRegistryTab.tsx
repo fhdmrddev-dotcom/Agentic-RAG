@@ -30,7 +30,7 @@
 // `rows === null` → a calm loading placeholder (honest, mirrors UsersAndAccess).
 // ─────────────────────────────────────────────────────────────────────────────
 import { useEffect, useMemo, useRef, useState } from "react"
-import { Check, ChevronDown, Loader2, Lock, Plus, RotateCcw, Unlock } from "lucide-react"
+import { AlertTriangle, Check, ChevronDown, Loader2, Lock, Plus, RotateCcw, Trash2, Unlock } from "lucide-react"
 
 import { ApiError, type AddModelBody, type ModelCapabilityPatch, type ModelRegistryRow } from "@/lib/api"
 import { familyDefaults } from "@/lib/model-defaults"
@@ -54,6 +54,17 @@ interface ModelRegistryTabProps {
    *  Optional so the leaf renders byte-identical where the shell hasn't wired it yet — the
    *  "+ Add model by ID" affordance appears ONLY when the shell provides this handler. */
   onAddModel?: (body: AddModelBody) => Promise<void>
+  /** Remove ONE model from the registry → `DELETE /admin/models/{id}`.
+   *
+   *  Works on EVERY model since mig 179: a DB-only model is deleted, a code-declared one is
+   *  tombstoned and skipped by the union. `mode` reports which ran; this table does not branch
+   *  on it, because the operator-visible outcome is the same — the model is gone, and
+   *  "Add model by ID" brings it back.
+   *
+   *  Rejects with an `ApiError` (404 not in the registry / 409 the org default) so the row
+   *  surfaces the plain-language refusal in place. Optional — the affordance renders ONLY when
+   *  the shell wires it, so the leaf stays byte-identical where it hasn't. */
+  onRemoveModel?: (modelId: string) => Promise<{ mode: "deleted" | "tombstoned" }>
   /** When true, reveal the raw column names (⌥ LANG-01 reveal). */
   showTechnical: boolean
 }
@@ -118,6 +129,7 @@ export function ModelRegistryTab({
   onSetCapability,
   onLock,
   onAddModel,
+  onRemoveModel,
   showTechnical,
 }: ModelRegistryTabProps) {
   const groups = useMemo(() => (rows ? groupByProvider(rows) : []), [rows])
@@ -131,6 +143,40 @@ export function ModelRegistryTab({
   // to be back-filled once `rows` arrives — which flashes the table open on first paint and
   // has to decide what to do about a provider that appears later.
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
+
+  // ⚠ A SEARCH, BECAUSE FINDING A MODEL OTHERWISE MEANS GUESSING ITS PROVIDER — and the id does
+  // not tell you. `deepseek/deepseek-v4.1-flash` files under `openrouter`; the `deepseek` group
+  // holds only the two native `deepseek-v4-*` ids. With every group folded by default, an
+  // operator who opens the group the id spells finds nothing, concludes the model was never
+  // added, and reaches for "Add model by ID" — which refuses it as already present. That
+  // contradiction is what this box removes; the matching REFUSAL now names the provider too.
+  //
+  // Display-only, exactly like the discovery panel's `newSearch`: it narrows what is RENDERED
+  // and never what is stored, enabled or written. While a query is active every group with a
+  // match renders OPEN (the fold is what hides the answer, so a search that still required a
+  // click would not have found anything), and the count in each header reports the matches
+  // rather than the group, so the numbers on screen never disagree with the rows on screen.
+  const [search, setSearch] = useState("")
+  const query = search.trim().toLowerCase()
+  // Filter the GROUPS, not the section list: a provider with no match drops out entirely rather
+  // than rendering an empty accordion the operator has to open to learn it is empty.
+  const visibleGroups = useMemo<[string, ModelRegistryRow[]][]>(() => {
+    if (!query) return groups
+    const out: [string, ModelRegistryRow[]][] = []
+    for (const [provider, providerRows] of groups) {
+      // A provider-name match keeps the WHOLE group — "openrouter" should list openrouter's
+      // models, not the zero of them whose id happens to contain the word.
+      const matched = provider.toLowerCase().includes(query)
+        ? providerRows
+        : providerRows.filter((r) => r.model_id.toLowerCase().includes(query))
+      if (matched.length > 0) out.push([provider, matched])
+    }
+    return out
+  }, [groups, query])
+  const matchCount = useMemo(
+    () => visibleGroups.reduce((n, [, providerRows]) => n + providerRows.length, 0),
+    [visibleGroups],
+  )
 
   if (rows === null) {
     return (
@@ -166,9 +212,41 @@ export function ModelRegistryTab({
       {/* D-159-02: the "+ Add model by ID" affordance sits ABOVE the (byte-identical)
           provider-grouped table. Rendered only when the shell wires `onAddModel`. */}
       {onAddModel && <AddModelSection onAddModel={onAddModel} />}
+
+      {/* Find a model without knowing its provider — see the `search` state above for why that
+          is the load-bearing part. Matches the model id AND the provider name, so both "which
+          group is glm-5.3-flash in" and "show me everything on openrouter" are one box. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          type="search"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Find a model by id or provider…"
+          aria-label="Find a model by id or provider"
+          className="h-8 min-w-[14rem] flex-1 rounded-[8px] border border-border bg-background px-2.5 text-xs text-foreground placeholder:text-muted-foreground/50 focus:border-primary focus:outline-none"
+        />
+        {query && (
+          <span className="text-[11px] text-muted-foreground/80" data-testid="registry-search-count">
+            {matchCount} of {rows.length} model{rows.length === 1 ? "" : "s"}
+          </span>
+        )}
+      </div>
+
+      {query && matchCount === 0 && (
+        <div
+          data-testid="registry-search-empty"
+          className="rounded-[10px] border border-dashed border-border bg-surface px-4 py-6 text-center text-sm text-muted-foreground"
+        >
+          No model matches “{search.trim()}”. It may not be in the registry yet — add it with
+          “Add model by ID” above.
+        </div>
+      )}
+
       <section aria-label="Model registry" className="space-y-2.5">
-      {groups.map(([provider, providerRows]) => {
-        const isCollapsed = !expanded.has(provider)
+      {visibleGroups.map(([provider, providerRows]) => {
+        // While searching, a group with a match renders OPEN regardless of the fold: the fold is
+        // what hid the answer in the first place.
+        const isCollapsed = query ? false : !expanded.has(provider)
         const Logo = providerLogo(provider)
         const shownCount = providerRows.filter((r) => r.enabled).length
         return (
@@ -221,7 +299,7 @@ export function ModelRegistryTab({
                       <Th className="w-[8%]">
                         Tools {showTechnical && <TechName>native_tools</TechName>}
                       </Th>
-                      <Th className="w-[16%]">
+                      <Th className="w-[13%]">
                         <span className="inline-flex items-center gap-1">
                           Document filling {showTechnical && <TechName>emit_tier</TechName>}
                           <span
@@ -237,7 +315,7 @@ export function ModelRegistryTab({
                         Enabled {showTechnical && <TechName>enabled</TechName>}
                       </Th>
                       <Th className="w-[9%]">Users see</Th>
-                      <Th className="w-[10%]" aria-label="Row actions" />
+                      <Th className="w-[13%]" aria-label="Row actions" />
                     </tr>
                   </thead>
                   <tbody>
@@ -247,6 +325,7 @@ export function ModelRegistryTab({
                         row={row}
                         onSetCapability={onSetCapability}
                         onLock={onLock}
+                        onRemoveModel={onRemoveModel}
                         showTechnical={showTechnical}
                       />
                     ))}
@@ -285,11 +364,13 @@ function ModelRow({
   row,
   onSetCapability,
   onLock,
+  onRemoveModel,
   showTechnical,
 }: {
   row: ModelRegistryRow
   onSetCapability: (modelId: string, patch: ModelCapabilityPatch) => Promise<void>
   onLock: (modelId: string, locked: boolean) => Promise<void>
+  onRemoveModel?: (modelId: string) => Promise<{ mode: "deleted" | "tombstoned" }>
   showTechnical: boolean
 }) {
   const [busy, setBusy] = useState(false)
@@ -332,6 +413,24 @@ function ModelRow({
       window.setTimeout(() => setReceipt(false), 3500)
     } catch (err) {
       setErrorDetail(err instanceof ApiError ? err.message : "Couldn’t update the lock — try again.")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /** Remove this model from the registry.
+   *
+   *  No success receipt, deliberately: the row is GONE on the shell's re-fetch, so there is
+   *  nothing left to render one into. A refusal (the org-default 409) lands in the same in-row
+   *  slot every other write on this row uses — never a silent failure. */
+  async function remove() {
+    if (busy || !onRemoveModel) return
+    setBusy(true)
+    setErrorDetail(null)
+    try {
+      await onRemoveModel(id)
+    } catch (err) {
+      setErrorDetail(err instanceof ApiError ? err.message : "Couldn’t remove that model — try again.")
     } finally {
       setBusy(false)
     }
@@ -441,6 +540,9 @@ function ModelRow({
           <div className="flex items-center justify-end gap-2">
             {busy && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" aria-hidden="true" />}
             <RowResetControl row={row} busy={busy} onWrite={write} />
+            {onRemoveModel && (
+              <RemoveControl row={row} busy={busy} onRemove={remove} />
+            )}
             {receipt && (
               <span className="inline-flex items-center gap-1 text-[11px] font-medium text-warning" role="status">
                 <Check className="h-3 w-3 text-success" aria-hidden="true" />✎ recorded
@@ -646,6 +748,114 @@ function NumericCell({
         onReset={onReset}
       />
     </div>
+  )
+}
+
+/** The row-level Remove — `DELETE /admin/models/{id}`. ICON-ONLY, live on EVERY row but one.
+ *
+ *  ⭐ EVERY MODEL IS REMOVABLE, INCLUDING THE ONES DECLARED IN CODE. That was not true until
+ *  mig 179. The registry is a union of `config.py`'s built-in `MODEL_CAPABILITIES` and the
+ *  `model_capabilities_overrides` rows, so a delete could only ever remove a ROW — and for the
+ *  code-declared majority it cleared the operator's stored values while the model reappeared on
+ *  the next read. The backend now TOMBSTONES those ids (`removed = true`) and the union skips
+ *  them, so removal means the same thing on every row. The built-in ids were a development
+ *  convenience, not a contract; an operator pruning their list should not have to know which
+ *  half of the union a model came from, and after this they do not.
+ *
+ *  ⚠ THE ORG DEFAULT IS THE ONE REFUSAL, and it is not a limitation of the mechanism — it is
+ *  D-149-09, no dead default: `app_settings.llm_model` would name a model no longer in the
+ *  registry, and every request-path fallback resolves through it. Gated rather than hidden
+ *  (the `RowToggle`/`LockControl` honest-lock idiom), with the one-click remedy in the tooltip.
+ *
+ *  ⚠ REMOVAL IS REVERSIBLE, WHICH IS WHAT MAKES IT SAFE TO OFFER THIS BROADLY. "Add model by
+ *  ID" clears the tombstone, and discovery proposes a removed model as new again — so the cost
+ *  of a wrong click is re-adding it, not a lost capability.
+ *
+ *  ⚠ ARM-TO-CONFIRM, per the Control-Room graded-action-guards rule — the same two-click shape
+ *  as `RowResetControl`, one tier stronger because this takes the model out of every user's
+ *  picker rather than restoring a built-in default. Icon-only, so the ARMED state must be
+ *  unmistakable without a word: the button fills destructive and the glyph swaps to a filled
+ *  alert. It disarms after 4s so an armed destructive control is never left sitting on screen,
+ *  and the accessible name is STABLE across both states (an assistive-tech user must not have a
+ *  control rename itself mid-interaction) — the changing half is the `title`.
+ *
+ *  ⚠ ICON-ONLY IS NOT A STYLE CHOICE. This cell also carries the busy spinner, the ✎ receipt,
+ *  `RowResetControl` and `LockControl` inside a `table-fixed` 10% column; a worded "Remove"
+ *  pushed the row over its width and painted across the `✓ in picker` chip in the column
+ *  before it. Same lesson `fmtNum` records one screen up: this table's columns are budgeted,
+ *  and a control that overflows one steals from its neighbour rather than wrapping. */
+function RemoveControl({
+  row,
+  busy,
+  onRemove,
+}: {
+  row: ModelRegistryRow
+  busy: boolean
+  onRemove: () => void
+}) {
+  const [armed, setArmed] = useState(false)
+  const disarmAt = useRef<number | null>(null)
+  useEffect(
+    () => () => {
+      if (disarmAt.current !== null) window.clearTimeout(disarmAt.current)
+    },
+    [],
+  )
+
+  // ⚠ ONE REMAINING GATE, AND IT IS THE ONLY ONE WITH A REASON THE OPERATOR CANNOT REMOVE BY
+  // CHANGING THEIR MIND. Built-in rows used to be gated too, because a delete could not stick;
+  // mig 179's tombstone made removal stick for them, so that gate is gone. The org default
+  // stays refused for the D-149-09 no-dead-default reason — `app_settings.llm_model` would name
+  // a model that is no longer in the registry, and every request-path fallback resolves through
+  // it. The remedy is one click away and the tooltip names it.
+  const gatedReason = row.is_default
+    ? "This is the org default — pick a new default model first, then remove this one."
+    : null
+  const gated = gatedReason !== null
+
+  // ⚠ DERIVED, never a setState during render. A row can BECOME gated under an armed click
+  // (it is made the org default from another surface and the shell re-fetches), and an armed
+  // destructive control must not survive into a state where the click is a guaranteed refusal.
+  // Reading `armed && !gated` settles that without a render-phase write and without an effect.
+  const showArmed = armed && !gated
+
+  return (
+    <button
+      type="button"
+      aria-label={`Remove ${row.model_id} from the registry`}
+      aria-disabled={gated || busy}
+      title={
+        gatedReason ??
+        (showArmed
+          ? `Click again to remove ${row.model_id}`
+          : `Remove ${row.model_id} from the registry — it leaves users’ model picker and this table. You can add it back any time with “Add model by ID”, or pick it up again from discovery.`)
+      }
+      onClick={() => {
+        if (gated || busy) return
+        if (!armed) {
+          setArmed(true)
+          disarmAt.current = window.setTimeout(() => setArmed(false), 4000)
+          return
+        }
+        if (disarmAt.current !== null) window.clearTimeout(disarmAt.current)
+        setArmed(false)
+        onRemove()
+      }}
+      className={cn(
+        "inline-flex h-6 w-6 flex-none items-center justify-center rounded-[5px] border transition-colors",
+        gated
+          ? "cursor-not-allowed border-transparent text-muted-foreground/40"
+          : showArmed
+            ? "border-destructive bg-destructive/20 text-destructive"
+            : "border-transparent text-muted-foreground hover:border-border hover:bg-destructive/10 hover:text-destructive",
+      )}
+    >
+      {showArmed ? (
+        <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
+      ) : (
+        <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+      )}
+    </button>
   )
 }
 

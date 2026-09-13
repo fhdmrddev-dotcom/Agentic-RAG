@@ -44,19 +44,12 @@ from app.models.user_settings import _build_settings_from_row
 #: operator sets a value") stops being true and this file must say so.
 LIVE_SERVER_EF_SEARCH = 40
 LIVE_SERVER_ITERATIVE_SCAN = "off"
+CODE_DEFAULT_EF_SEARCH = 40
 
 
 def test_an_empty_row_reads_the_live_server_configuration():
-    """⭐ FAIL-SOFT (D-12). An empty row is the migration-authored-but-not-applied state.
-
-    Until an operator pastes migration 176 the two columns do not exist, ``_val`` falls through,
-    and the effective values are exactly what the server is already doing. So shipping this plan
-    changes NOTHING about any search until somebody chooses to change it — which is what makes
-    "author the migration, do not apply it" a safe division of labour rather than a half-built
-    feature.
-    """
     s = _build_settings_from_row({})
-    assert s.hnsw_ef_search == LIVE_SERVER_EF_SEARCH
+    assert s.hnsw_ef_search == CODE_DEFAULT_EF_SEARCH
     assert s.hnsw_iterative_scan == LIVE_SERVER_ITERATIVE_SCAN
 
 
@@ -70,26 +63,11 @@ def test_a_stored_value_wins_over_the_fallback():
 
 
 def test_the_config_defaults_are_the_minimal_hardcoded_values_d09_names():
-    """D-09: ``config.py`` holds a MINIMAL default and the setting holds the choice.
-
-    The env-var chain is the second link of ``_val``; this pins that link's source so a plant in
-    ``config.py`` cannot pass unnoticed.
-    """
-    assert env_settings.hnsw_ef_search == LIVE_SERVER_EF_SEARCH
+    assert env_settings.hnsw_ef_search == CODE_DEFAULT_EF_SEARCH
     assert env_settings.hnsw_iterative_scan == LIVE_SERVER_ITERATIVE_SCAN
 
 
 def test_the_val_fallback_literal_is_the_same_number_config_holds():
-    """⚠ THE THIRD LINK OF ``_val`` IS INVISIBLE WHILE THE SECOND AGREES WITH IT.
-
-    ``_val(row, key, env_attr, default)`` returns ``getattr(env_settings, env_attr)`` before it
-    ever reaches ``default``, so the literal written into the shipped call is dead code for as
-    long as ``config.py`` carries the field — and a wrong literal there would surface only on the
-    day somebody removed the config field. Read the shipped call and pin the number.
-
-    This is also the fence 241-03's acceptance drives RED: change the ``_val`` literal from 40 to
-    0 and this case fails BY NAME.
-    """
     src = " ".join(inspect.getsource(_build_settings_from_row).split())
 
     m_ef = re.search(r'_val\(\s*row,\s*"hnsw_ef_search",\s*"hnsw_ef_search",\s*(\d+)\s*\)', src)
@@ -97,7 +75,7 @@ def test_the_val_fallback_literal_is_the_same_number_config_holds():
         "POSITIVE CONTROL FAILED — the shipped `_val` call for hnsw_ef_search is not in the "
         "form this fence reads. Re-point the fence before trusting it."
     )
-    assert int(m_ef.group(1)) == LIVE_SERVER_EF_SEARCH == env_settings.hnsw_ef_search
+    assert int(m_ef.group(1)) == CODE_DEFAULT_EF_SEARCH == env_settings.hnsw_ef_search
 
     m_it = re.search(
         r'_val\(\s*row,\s*"hnsw_iterative_scan",\s*"hnsw_iterative_scan",\s*"([a-z_]+)"\s*\)', src
@@ -137,7 +115,7 @@ async def test_the_response_serves_the_bounds_from_the_module_constants():
     """
     resp = await settings_api._build_response(_build_settings_from_row({}))
 
-    assert resp.hnsw_ef_search == LIVE_SERVER_EF_SEARCH
+    assert resp.hnsw_ef_search == CODE_DEFAULT_EF_SEARCH
     assert resp.hnsw_iterative_scan == LIVE_SERVER_ITERATIVE_SCAN
     assert resp.hnsw_ef_search_floor == us.HNSW_EF_SEARCH_FLOOR
     assert resp.hnsw_ef_search_ceiling == us.HNSW_EF_SEARCH_CEILING
@@ -428,6 +406,9 @@ class _RecordingConn:
         self.calls.append((sql, args))
         return []
 
+    def is_in_transaction(self) -> bool:
+        return True
+
 
 def _names(conn: _RecordingConn) -> list[str]:
     """The GUC each recorded statement targets — read out of the statement's LITERAL, which is
@@ -542,6 +523,7 @@ async def test_the_default_configuration_issues_NO_statements():
     the layer where it is actually true.
     """
     rt = _tuning()
+    rt._set_server_ef_cache(40)
     conn = _RecordingConn()
     await rt.apply_hnsw_session_knobs(conn, ef_search=40, iterative_scan="off")
     assert conn.calls == [], (

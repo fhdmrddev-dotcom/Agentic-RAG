@@ -77,6 +77,15 @@ export function ConnectedSourceSection({
 
   const options = useMemo(() => connections ?? [], [connections])
 
+  /** BUG-260912-01 — the picker names the connection in a failure sentence. Resolved HERE
+   *  rather than inside the picker: the name belongs to the row this section already holds,
+   *  and a component that re-fetched it to narrate an error would be a second read of a fact
+   *  already in hand. Absent, the sentence degrades to "the connection" rather than a gap. */
+  const connectionName = useMemo(
+    () => options.find((c) => c.id === connectionId)?.name ?? "",
+    [options, connectionId],
+  )
+
   // Nothing to offer → render nothing at all. An empty picker that explains itself is still a
   // control somebody has to read past.
   if (connections !== null && options.length === 0) return null
@@ -152,6 +161,7 @@ export function ConnectedSourceSection({
               leftSlot={
                 <SourceFolderPicker
                   connectionId={connectionId}
+                  connectionName={connectionName}
                   selectedFolderId={folder?.folderId ?? null}
                   onSelectFolder={setFolder}
                 />

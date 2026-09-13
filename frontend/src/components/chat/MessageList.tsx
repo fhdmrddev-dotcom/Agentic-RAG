@@ -4,6 +4,10 @@ import { MessageItem } from "./MessageItem"
 import { MessageSkeleton } from "./MessageSkeleton"
 import { RunStatusStrip } from "./RunStatusStrip"
 import { ThreadRunLine } from "./ThreadRunLine"
+// Phase 244-12 (SHELL-03 / G-6): the SHIPPED, zero-prop, self-resolving approval surface — the
+// same component WorkspacePanel mounts. It lives HERE rather than in MessageItem because a
+// workflow-raised pause has no message to anchor to; see the mount's docblock below.
+import { PendingAskStack } from "@/components/panel/PendingAskCard"
 import { useFollowScroll } from "@/hooks/useFollowScroll"
 import { unifiedStepCount } from "@/lib/stepCount"
 import { dedupMessagesByRunId } from "@/lib/dedupMessages"
@@ -106,7 +110,15 @@ export function MessageList({ messages, isStreaming, isLoading = false, onSendMe
       const UP_KEYS = new Set(["PageUp", "ArrowUp", "Home"])
       const DOWN_KEYS = new Set(["PageDown", "ArrowDown", "End"])
       const onGesture = (e: Event) => {
-        if (e instanceof WheelEvent) return noteUserGesture(e.deltaY < 0 ? "up" : "down")
+        if (e instanceof WheelEvent) {
+          // ⚠ 243-06 (HI-2): `deltaY < 0 ? "up" : "down"` classified a HORIZONTAL wheel,
+          // a shift+wheel and a sideways trackpad flick — all `deltaY === 0` — as a
+          // deliberate scroll DOWN, which refreshed the gesture clock and gave back a
+          // reader's "leave me alone". Zero vertical movement says nothing about direction,
+          // so it is "unknown" and decides nothing. Fenced by `MessageList.scroll.test.tsx` §9.
+          if (e.deltaY === 0) return noteUserGesture("unknown")
+          return noteUserGesture(e.deltaY < 0 ? "up" : "down")
+        }
         if (e instanceof KeyboardEvent) {
           if (UP_KEYS.has(e.key)) return noteUserGesture("up")
           if (DOWN_KEYS.has(e.key)) return noteUserGesture("down")
@@ -201,7 +213,14 @@ export function MessageList({ messages, isStreaming, isLoading = false, onSendMe
   const renderMessages = dedupMessagesByRunId(messages)
 
   return (
-    <ScrollArea className="flex-1">
+    // Phase 244-01 (SHELL-01 / BUG-260828-08): link 5 — the LAST link, and the one the
+    // primitive cannot supply for itself. `ui/scroll-area.tsx` makes the Root
+    // `relative overflow-hidden` and the Viewport `h-full w-full`; the Root's height comes
+    // from `flex-1` on an item whose `min-height` is `auto`, so the Root grows to the
+    // transcript and `h-full` resolves to that grown height — nothing scrolls INSIDE.
+    // ⭐ The sibling call site proves it: tool-bodies/ReadDocumentBody.tsx:53 passes an
+    // explicit `max-h-64` bound and scrolls correctly.
+    <ScrollArea className="min-h-0 flex-1">
       <div ref={containerRef} className="relative space-y-1 px-6 py-6 max-w-4xl mx-auto">
         {/* Phase 068.5 (D-068.5-11 + D-068.5-12): cold-load skeleton placeholder
             when the bucket is empty AND a reconcile fetch is in flight.
@@ -244,6 +263,61 @@ export function MessageList({ messages, isStreaming, isLoading = false, onSendMe
             so the returning reading has to come from the persisted row. Both facts
             point at the same placement. */}
         <ThreadRunLine threadId={threadId ?? null} />
+
+        {/* ── Phase 244-12 (SHELL-03 / BUG-260828-07, severity HIGH / G-6 — THE PHASE'S BLOCKER)
+               ── THE APPROVAL, WHERE A HARNESS PAUSE CAN ACTUALLY REACH IT.
+
+            ⛔ THE DEFECT, DRIVEN 2026-09-12 IN CHROME on a REAL workflow-raised approval
+            (200-Word Essay Writer, step 2 "act"): the chat thread rendered NO approval controls
+            and NO paused cue. All three controls — "Approve this step", "Do not run it",
+            "Send Answer" — measured at left >= 1103 against the panel's own left edge of 1082,
+            every one INSIDE the panel. `anyApprovalControlInChatColumn = FALSE`. That is
+            BUG-260828-07's original complaint ("it looked right and did nothing") still true,
+            and 244-03's fence was GREEN over it the whole time.
+
+            ⚠ WHY LIST LEVEL AND NOT MESSAGE LEVEL — the argument, not the conclusion, because a
+            later reader will otherwise "tidy" this back into the row where it is unreachable.
+            244-03 mounted `PendingAskStack` inside MessageItem's
+            `isMessageStreaming && hasPendingAsk(message.tool_calls)` arm. For a WORKFLOW pause
+            that arm is unreachable THREE times over:
+              1. `hasPendingAsk` requires `tc.name === "ask_user"` and a running/interrupted
+                 `status`; the harness writes `tool_calls: [{ kind: "ask_user_prompt" }]` — no
+                 `name`, no `status`. The harness speaks `kind`; the predicate reads `name`.
+              2. the carrier row is `role="system"`, never a streaming assistant row.
+              3. ⛔⛔ AND THAT ROW NEVER REACHES THE FRONTEND AT ALL: `threads.py:427-438` and
+                 `:682-691` both apply `.neq("role","system")` (BUG-260528-01 — `MessageResponse
+                 .role` is Literal["user","assistant"] and serializing a system row 500s the
+                 whole thread). ⛔ So WIDENING THE PREDICATE WOULD HAVE CLOSED NOTHING and would
+                 have shipped a second green fence over the same blocker. There is no message to
+                 anchor to — which is EXACTLY the argument `ThreadRunLine`'s own comment above
+                 already makes for a harness kickoff that inserts no assistant node. One surface
+                 over, the same fact, the same placement.
+
+            ⚠ WHY UNCONDITIONAL, recorded as the REJECTED ARM with its reason. A cheaper gate was
+            available — mount only when the thread holds a harness lock, or only when some
+            message carries a pending ask. ⛔ REJECTED: every such gate is a NARROWING MOUNT
+            CONDITION, and a narrowing mount condition is precisely what made SHELL-03
+            unreachable twice over. Buying back two fetches per thread open by re-introducing
+            this phase's own failure mode, on this phase's blocker, is the wrong trade. The cost
+            is bounded and MEASURED rather than estimated: ONE mount per thread, never one per
+            row (W3), and the same cost with a pause as without one (W4) — both in
+            `__tests__/MessageItem.inlineApproval.test.tsx`. ⚠ The no-pause cost is REAL and is
+            published rather than hidden: the Deep path used to buy zero fetches here.
+
+            ⭐ ZERO-PROP AND SELF-GUARDING. `PendingAskStack` resolves its own thread via
+            `useViewingThread()` and returns null on `asks.length === 0`, so nothing is threaded
+            to it and nothing renders when there is no pause. It reads the SAME
+            `pendingAsksByThread` slice `WorkspacePanel.tsx:438` reads — which is why the chat
+            and the panel cannot disagree, and why answering in EITHER home settles BOTH
+            structurally (D-244-11): one slice, one reconcile, nothing kept in sync by hand.
+
+            ⛔ EXACTLY ONE CHAT-COLUMN MOUNT. The per-row mount was REMOVED from MessageItem in
+            the same commit. Two homes for one decision in one column is "actionable twice and
+            agreed in neither" — the ROADMAP's own named failure mode.
+
+            ⚠ PLACEMENT: after the messages map and BEFORE `<div ref={bottomRef} />`, so the
+            auto-scroll anchor still lands at the true bottom of the scrollable content. */}
+        <PendingAskStack />
 
         <div ref={bottomRef} />
 

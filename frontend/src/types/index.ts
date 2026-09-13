@@ -212,6 +212,35 @@ export interface Message {
    * Accumulated during streaming via reasoning_delta SSE events.
    * Rendered in a collapsible "Thinking" block in RunCard. */
   reasoningContent?: string
+  /**
+   * BUG-260912-01 — the model's NARRATION from earlier turns of this run: the prose it wrote
+   * before each tool call ("I'll start by searching…", "Now let me analyze…"). Moved out of
+   * `content` by `StreamsProvider` on each `turn_boundary` event, so the body holds only the
+   * FINAL turn — the answer — exactly as the persisted row already does.
+   *
+   * ⛔ CLIENT-ONLY, AND THE ABSENCE IS CORRECT RATHER THAN A GAP. There is no column for it:
+   * `agent_loop` discards this text by design (the reset that consumes `full_content`), so a
+   * reloaded message has never carried it and does not start to now. A message the client did
+   * not watch stream simply has no narration to fold, which is the same thing the database
+   * says. Adding a column would mean persisting text the model is not meant to re-read.
+   *
+   * ⚠ Distinct from `reasoningContent`, deliberately, and NOT merged into it. Reasoning is the
+   * provider's dedicated channel (`reasoning_delta`); this is ordinary assistant prose that
+   * happened to precede a tool call. Merging them would also corrupt `reasoningMs`, which is
+   * measured from reasoning deltas ALONE and would start describing an interval it never saw.
+   */
+  narrationContent?: string
+  /** Phase 243 Plan 04 (D-243-13): how long the model spent REASONING on this turn, in ms —
+   * MEASURED ON THE CLIENT during a live stream (first `reasoning_delta` to first content
+   * delta, or to `done`), stamped by `StreamsProvider`'s `makeStreamCallbacks`.
+   * ⛔ CLIENT-ONLY. There is no column for it and no wire field: a message loaded from the
+   * database, or one the client did not watch stream, has NO measured span — and that
+   * ABSENCE is load-bearing rather than incidental. `ThinkingBlock` reads it as "not honestly
+   * known" and renders a label with no number in it, which is `RunCard.tsx:181-186`'s honesty
+   * rule (the one `BUG-260606-02`'s "1440m" lie paid for) applied to a second value.
+   * ⛔ Never derive it from `reasoningContent.length`: that is the sketch's demo affordance
+   * (`sketches/234-the-thinking-block/index.html:338`) and D-243-13 refuses it. */
+  reasoningMs?: number
   /** Phase 149 Plan 09 (D-149-10): honest disabled-model fallback notice. Stamped by
    * StreamsProvider from the `model_disabled_fallback` SSE event when the user's selected
    * model was operator-DISABLED and the run fell back to the org default. `message` already

@@ -180,6 +180,11 @@ export function CreateWatchModal({
               <div className="border rounded-lg bg-card/40 p-2 max-h-56 overflow-y-auto">
                 <SourceFolderPicker
                   connectionId={selectedConnectionId}
+                  /* BUG-260912-01 — so a browse failure names the connection rather than
+                     degrading to the generic stand-in. The row is already in hand here. */
+                  connectionName={
+                    connections?.find((c) => c.id === selectedConnectionId)?.name ?? ""
+                  }
                   selectedFolderId={selectedFolder?.folderId}
                   onSelectFolder={setSelectedFolder}
                 />

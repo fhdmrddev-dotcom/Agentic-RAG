@@ -98,7 +98,7 @@ import {
   type StreamsState,
   type WorkflowLock,
 } from "@/stores/streamsStore"
-import { makeThrottle } from "@/lib/throttle"
+import { makeThrottle, makeAccumulatingCoalescer } from "@/lib/throttle"
 import { writeSnapshotToLocalStorage } from "@/lib/streamsCache"
 import { makeToolKey } from "@/lib/toolKey"
 // Phase 095.1 Plan 02 (D-095.1-01/02): the deterministic activity-derived
@@ -393,6 +393,27 @@ type ThreadBoundSetMessages = (
  * a regression — Anthropic's interleaved text + tool_use stream relies on this
  * invariant to keep accumulating text across tool blocks.
  */
+/**
+ * Phase 243 Plan 03 (CHAT-02 / D-243-15) — how long the delta path may hold text before
+ * it repaints. ⚠ PICKED DELIBERATELY, AND THE NUMBER IS THE DECISION.
+ *
+ * Measured premise: the backend emits ONE `delta` SSE event per provider chunk and does
+ * NOT batch (`backend/app/services/agent_loop.py` — `_emit(redis, run_id, 'delta', ...)`,
+ * no coalescing anywhere on that path), so the client sees the raw provider token
+ * cadence. At a realistic 30-100 tok/s that is a delta every 10-33 ms, and every one of
+ * them used to be one `setMessages` and therefore one run of `MessageList.tsx:141-176`.
+ *
+ * 60 ms is ~3.6 frames at 60 Hz: text still flows visibly, while the repaint rate stops
+ * tracking the token rate (a 3-6x reduction across that band). It is deliberately NOT
+ * the cache writer's 500 ms (`makeThrottle(writeNow, 500)`, `:3525`) — half a second of
+ * nothing before a reply starts is a pause the reader can feel.
+ *
+ * ⚠ The first delta is NOT delayed at all: the coalescer has a leading edge, so the
+ * worst-case first-paint cost is 0 ms and the worst case for any LATER delta is 60 ms.
+ * Fenced by `streamsProvider_243_cadence.test.tsx` §6, and this constant is pinned by §8.
+ */
+export const DELTA_COALESCE_MS = 60
+
 export function makeStreamCallbacks(opts: {
   assistantId: string
   threadId: string
@@ -402,39 +423,245 @@ export function makeStreamCallbacks(opts: {
   // below still receives title-only).
   onTitleUpdate?: (threadId: string, title: string) => void
   setMessages: ThreadBoundSetMessages
-}): StreamCallbacks {
+}): StreamCallbacks & { flushDeltas: () => void } {
   const { assistantId, threadId, onTitleUpdate, setMessages } = opts
   // D-067-03: closure-tracked iteration counter, stamped onto each ToolCall
   // created in onToolPreparing/onToolStart. Updated on every iteration_start
   // SSE event BEFORE setMessages.
   let currentIteration = 0
-  return {
+
+  // -- Phase 243 Plan 03 (CHAT-02 / D-243-15) - the coalesced delta path --------------
+  //
+  // ⛔ PRODUCER-SIDE, AND THE REASON IS D-243-04 RATHER THAN HABIT. `MessageList.tsx`'s
+  // one effect (`:141-176`) has `messages` in its dep array, so it re-runs on EVERY
+  // `setMessages` and, while streaming and pinned, scrolls. The repaint cadence and the
+  // scroll behaviour are therefore the same line of code, and only reducing how often
+  // `setMessages` fires reduces how often that effect runs. A consumer-side
+  // `useDeferredValue` in `ThinkingBlock` would coalesce the FOLD's repaint and leave
+  // the scroll effect running per token - CHAT-02 closed and CHAT-03 untouched, which is
+  // precisely the "fixed one and re-broke the other" failure the ROADMAP names.
+  //
+  // ⛔ THE BUFFER LIVES HERE, BESIDE `currentIteration`, AND NOT IN THE COALESCER'S
+  // ARGUMENTS. `makeThrottle` is last-write-wins (`lib/throttle.ts:19,28`) and the
+  // accumulation used to live inside the updater (`m.content + delta`), so wrapping
+  // these callbacks in it would silently DROP TOKENS while every cadence measurement
+  // still looked right. `makeAccumulatingCoalescer` takes no arguments at all for that
+  // reason; there is nothing for a window to discard. Fenced by
+  // `streamsProvider_243_cadence.test.tsx` §2 / §3.
+  //
+  // ⛔ THE UPDATE SHAPE IS UNCHANGED. Still one `prev.map` returning a NEW array with a
+  // NEW object for the target row - `MessageItem.tsx:213-219` records that the `memo`
+  // contract depends on replace-not-push identity. Coalescing the CADENCE is in scope;
+  // mutating in place is D-243-08's red line.
+  let pendingContent = ""
+  let pendingReasoning = ""
+  let sawContentDelta = false
+
+  // -- Phase 243 Plan 04 (D-243-13) - the MEASURED reasoning span -----------------------
+  //
+  // ⛔ THE SKETCH COMPUTES THIS NUMBER FROM THE CHARACTER COUNT AND THAT IS A DEMO
+  // AFFORDANCE, NOT A DESIGN DECISION. Porting it would ship a duration derived from string
+  // length - the same sin as the `count` `FoldTrigger` already forbids for reasoning
+  // ("no countable unit ... inventing one would be fabricated precision"), one unit over.
+  //
+  // ⛔ AND THERE IS NO PERSISTED SOURCE TO SWAP IN. `messages.reasoning_content` is the only
+  // reasoning column - no started/completed timestamps exist anywhere in the model - and
+  // `RunCard`'s elapsed machinery measures the WHOLE RUN, every tool call included, which is
+  // wrong by construction for "thought for" on any tool-bearing turn. So it is measured HERE,
+  // live, and when it is not known the label simply carries no number (`RunCard.tsx:181-186`'s
+  // honesty rule). ⛔ No migration: this value is client-only and a reloaded message has none.
+  //
+  // ⛔ THE START IS STAMPED IN THE RAW CALLBACK, ABOVE THE COALESCER. Reading it inside
+  // `applyPendingDeltas` would date the span from the WINDOW that flushed the first delta
+  // rather than from the delta itself - late by up to `DELTA_COALESCE_MS`, and wrong in a way
+  // no later measurement could recover.
+  //
+  // ⛔ NO TIMER, NO TICK. The label is a SETTLED value, written when a burst closes. A
+  // live-ticking span would re-introduce exactly the per-token repaint CHAT-02 just removed.
+  //
+  // ⚠⚠ AMENDED BY 243-06 (review finding HI-1), AND THE ORIGINAL FORM IS DESCRIBED HERE
+  // RATHER THAN SILENTLY REPLACED, because it shipped and a later reader must see the trade.
+  // 243-04 measured `Date.now() - reasoningStartMs` at the first CONTENT delta. Nothing
+  // closed the span at a tool boundary, and `agent_loop.py:2078-2100` emits `reasoning_delta`
+  // then `tool_preparing` with NO content delta required between them — the ordinary shape for
+  // a reasoning model that thinks and then calls a tool with no preamble. DRIVEN
+  // (`§10g`): 100 ms of reasoning either side of a 40 s tool reported **40100**, and the fold
+  // read "Thought for 40 seconds". ⛔ That is precisely what D-243-13 forbids — it rejects
+  // `RunCard`'s whole-run elapsed BECAUSE it "includes every tool call" — reproduced through a
+  // different variable, and it passed every honesty fence because the number really was a
+  // clock reading. A clock reading of the wrong interval is still a fabrication.
+  //
+  // ⭐ SO THE INTERVAL IS THE REASONING STREAM ITSELF: `reasoningLastMs - reasoningStartMs`,
+  // and ONLY a reasoning delta moves either end. No interleaving of any kind — tool, sub-agent,
+  // code output, approval wait, ask_user — can inflate a burst, because none of them is a
+  // reasoning delta. That is strictly stronger than the alternative the review offered (close
+  // the span at `onToolPreparing` / `onToolStart`), which still bills the argument-streaming
+  // window and is defeated by any future long-running callback nobody remembered to hook.
+  //
+  // ⛔ AND A BURST IS BOUNDED BY ANY STREAM EVENT THAT IS NOT A REASONING DELTA — stated ONCE,
+  // in the negative, in the generic wrapper below, for the same reason the buffer drain is
+  // (`:1339`): 47 callbacks and a 48th arriving from a phase that never read this comment.
+  // ⚠ THE FAILURE DIRECTION OF THAT RULE IS DELIBERATE. If some event ever does interleave
+  // inside a real reasoning stream, every burst becomes one delta and the label loses its
+  // number — it can never GAIN a wrong one. Absence is D-243-13's own fallback.
+  //
+  // ⭐ AND THE VALUE IS A TOTAL, NOT A FIRST BURST (243-06's stated semantics decision).
+  // A reasoning model that calls tools thinks ONCE PER ITERATION, so multi-burst is the
+  // ordinary shape for exactly the models this label is for, and the fold at rest shows EVERY
+  // burst's text. A number measuring only the first burst would under-report the body sitting
+  // next to it. Each burst closes and ADDS; the tool time between bursts is excluded by
+  // construction rather than by a hook. Driven by §10h: 5 s + 40 s tool + 10 s ⇒ 15 s.
+  //
+  // ⛔ AND A ZERO-LENGTH BURST WRITES NOTHING. One reasoning delta is a single OBSERVATION,
+  // not an interval — we saw the stream at one instant and know nothing about its duration,
+  // and the silence after it belongs to whatever came next. D-243-13 point 2 is the answer:
+  // when it is not honestly known, show NO duration. Fenced by §10i.
+  let reasoningStartMs: number | null = null
+  let reasoningLastMs = 0
+  let reasoningTotalMs = 0
+  let pendingReasoningMs: number | undefined
+
+  /** Close the OPEN burst and add it to the running total. Idempotent — after a close there is
+   *  no open burst, so a second call does nothing until the next reasoning delta opens one. */
+  const closeReasoningSpan = () => {
+    if (reasoningStartMs === null) return
+    const burstMs = reasoningLastMs - reasoningStartMs
+    reasoningStartMs = null
+    if (burstMs <= 0) return
+    reasoningTotalMs += burstMs
+    pendingReasoningMs = reasoningTotalMs
+  }
+
+  const applyPendingDeltas = () => {
+    const content = pendingContent
+    const reasoning = pendingReasoning
+    // The measured span rides the SAME update rather than adding a `setMessages` of its own -
+    // it is written at most once per run, at a moment when a flush is already happening.
+    const spanMs = pendingReasoningMs
+    if (!content && !reasoning && spanMs === undefined) return
+    pendingContent = ""
+    pendingReasoning = ""
+    pendingReasoningMs = undefined
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === assistantId
+          ? {
+              ...m,
+              // `isPlanning` clears only on CONTENT - reasoning is not an answer.
+              ...(content ? { isPlanning: false, content: m.content + content } : {}),
+              ...(reasoning ? { reasoningContent: (m.reasoningContent ?? "") + reasoning } : {}),
+              ...(spanMs !== undefined ? { reasoningMs: spanMs } : {}),
+            }
+          : m,
+      ),
+    )
+  }
+
+  const coalesceDeltas = makeAccumulatingCoalescer(applyPendingDeltas, DELTA_COALESCE_MS)
+
+  const raw: StreamCallbacks & { flushDeltas: () => void } = {
     onDelta: (delta) => {
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === assistantId ? { ...m, isPlanning: false, content: m.content + delta } : m,
-        ),
-      )
+      // D-243-13: reasoning ENDS when the answer begins. Taken here, in the RAW callback, at
+      // the moment the content delta actually arrived.
+      // ⚠ 243-06 (HI-1): on EVERY content delta, not only the first. A later iteration can
+      // open a second burst, and the answer beginning again closes it — the guard used to be
+      // `if (!sawContentDelta)` and would have left that burst open until the terminal.
+      closeReasoningSpan()
+      pendingContent += delta
+      coalesceDeltas()
+      if (!sawContentDelta) {
+        // ⚠ The planning -> answering transition is a STATE CHANGE, not a token, and
+        // it must paint at once or the working badge lingers for up to a window. If no
+        // window was open the call above already fired on the leading edge and this
+        // flush is a no-op; if reasoning had opened one, this drains it NOW. Either way
+        // it costs at most one extra `setMessages` per run, exactly once.
+        sawContentDelta = true
+        coalesceDeltas.flush()
+      }
     },
     // Phase 076.2 D-01: accumulate DeepSeek reasoning_content deltas on message.
-    // Same accumulation pattern as onDelta for content.
+    // Same accumulation pattern as onDelta for content - now through the same buffer,
+    // so interleaved content and reasoning land in ONE `setMessages` rather than two.
     onReasoningDelta: (delta) => {
+      // D-243-13: the START, on the first reasoning delta of a BURST and nowhere else — and
+      // the END, moved forward by every delta of that burst (243-06 / HI-1). These two are the
+      // only writes to either end of the interval, which is what makes the measurement
+      // un-inflatable by anything that is not reasoning.
+      const now = Date.now()
+      if (reasoningStartMs === null) reasoningStartMs = now
+      reasoningLastMs = now
+      pendingReasoning += delta
+      coalesceDeltas()
+    },
+    // BUG-260912-01 — the turn that just streamed ended in TOOL CALLS, so its body text was
+    // narration. Move it into the fold and start a fresh body, so `content` holds only the
+    // FINAL turn: the answer. That is already what the persisted row contains, so this makes
+    // the live stream agree with the reload instead of diverging from it.
+    onTurnBoundary: () => {
+      // ⛔ FLUSH FIRST, AND THIS IS THE WHOLE CORRECTNESS ARGUMENT. `pendingContent` may still
+      // hold this turn's tail inside an open coalescing window (`DELTA_COALESCE_MS`). Moving
+      // `m.content` while that buffer is unflushed would fold the head of the turn and then
+      // append its tail to the NEXT turn's body — narration leaking into the answer, which is
+      // a worse version of the bug being fixed. `onDone` flushes for the same reason.
+      coalesceDeltas.flush()
+      // ⚠ Reasoning ENDS at a turn boundary too. Without this, a burst opened before a tool
+      // call stays open across the entire tool execution and `reasoningMs` bills the tool —
+      // exactly the inflation 243-06 (HI-1) measured at 40100 ms and rejected.
+      closeReasoningSpan()
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.id !== assistantId) return m
+          // Nothing streamed this turn: leave the row IDENTICAL. Returning a new object would
+          // break `MessageItem`'s memo contract for no change (D-243-08's replace-not-push
+          // identity rule cuts both ways — a needless replace is a needless repaint).
+          if (!m.content) return m
+          return {
+            ...m,
+            // Separated by a blank line so `toParagraphs` renders each turn's narration as its
+            // own paragraph instead of running two turns into one sentence — which is the
+            // `…in parallel.I found several…` seam visible in the reported screenshot.
+            narrationContent: m.narrationContent ? `${m.narrationContent}\n\n${m.content}` : m.content,
+            content: "",
+          }
+        }),
+      )
+    },
+    onDone: () => {
+      // D-243-13: reasoning that never yielded a content delta still ENDS - here.
+      closeReasoningSpan()
+      // ⛔ FLUSH FIRST. Anything still buffered belongs to this run and must land before
+      // the terminal bookkeeping, or a snapshot is taken over a half-applied buffer.
+      coalesceDeltas.flush()
+      // ⚠ `flush()` applies only when a window was OPEN (`throttle.ts` - it returns early
+      // with nothing pending), so a span closed on a quiet terminal edge would otherwise never
+      // land. It rides the bookkeeping update that always runs instead.
+      const spanMs = pendingReasoningMs
+      pendingReasoningMs = undefined
       setMessages((prev) =>
         prev.map((m) =>
           m.id === assistantId
-            ? { ...m, reasoningContent: (m.reasoningContent ?? "") + delta }
+            ? { ...m, isPlanning: false, ...(spanMs !== undefined ? { reasoningMs: spanMs } : {}) }
             : m,
         ),
       )
     },
-    onDone: () => {
-      setMessages((prev) =>
-        prev.map((m) => (m.id === assistantId ? { ...m, isPlanning: false } : m)),
-      )
-    },
     onTerminal: () => {
       // Default no-op — caller wraps to flip runStatus and handle buffer_expired.
+      // ⚠ Phase 243: the flush is ALSO here, as the backstop for a terminal that arrives
+      // without a `done` (error / abort). The three call sites flush at the TOP of their
+      // wrapper as well, because each wrapper runs a body BEFORE it calls this one and
+      // some of those bodies reconcile the message from the server - a flush that landed
+      // afterwards would append the buffered tail onto replaced content.
+      coalesceDeltas.flush()
     },
+    /**
+     * Phase 243 Plan 03 (CHAT-02) - drain the coalesced delta buffer NOW.
+     *
+     * Exposed because all three `onTerminal` call sites REPLACE `callbacks.onTerminal`
+     * with a wrapper that calls the original LAST (`:1551`, `:1999`, `:2473`). The
+     * buffer has to be drained before those wrapper bodies run, not after.
+     */
+    flushDeltas: () => coalesceDeltas.flush(),
     // Inject the run's OWNING threadId (closure) so a generated title is applied
     // to THIS run's chat — not whatever thread the user is viewing when the title
     // SSE arrives (the cross-wiring under parallel chats / fast nav).
@@ -995,10 +1222,27 @@ export function makeStreamCallbacks(opts: {
     // (the durable carrier row is filtered from /messages — BUG-260528-01).
     // Closes over the factory's `threadId` (the owning thread), so a background
     // thread's cap_paused never touches the viewed thread's lock.
+    // ── Phase 244-13 (UAT gap G-1 / review WR-07) — WRITE SITE 1 of 6, and the ONLY
+    //    one with no answer on the wire. The `cap_paused` SSE carries `runId` +
+    //    `continuesRemaining` and NOTHING about mode, so this value is an INFERENCE
+    //    with a reason rather than a fact off the wire: INHERIT whatever this thread's
+    //    lock already says, and default to `"cap_paused"`.
+    //    ⛔ Do NOT hard-code `"harness"` here (it did until 2026-09-12): a DEEP run
+    //    that hits its iteration cap mid-stream arrives through THIS callback, and the
+    //    old value made it read as a live workflow — the phantom run line G-1 measured,
+    //    by its live route rather than by the reconcile.
+    //    ⚠ The inference is exactly as strong as the two writes that could have put a
+    //    harness lock on this thread: the kickoff seed (`:2539`) and the reconcile
+    //    (`:2343`). Both are harness-only, so an existing `"harness"` is evidence.
+    //    ⛔ And it is the reachable half of WR-07: keeping `"harness"` here is what stops
+    //    a harness run that caps from UNLOCKING the composer mid-run (`ChatArea.tsx:140`).
     onCapPaused: (info) =>
       useStreamsStore.getState().actions.setWorkflowLockForThread(threadId, {
         runId: info.runId,
-        mode: "harness",
+        mode:
+          useStreamsStore.getState().workflowLockByThread.get(threadId)?.mode === "harness"
+            ? "harness"
+            : "cap_paused",
         capPaused: true,
         continuesRemaining: info.continuesRemaining,
       }),
@@ -1101,7 +1345,11 @@ export function makeStreamCallbacks(opts: {
       // here — no guard needed beyond the status==="completed" check. The Plan-08
       // snapshot degrade ensures this refetch path doesn't 503 on a GC'd buffer.
       if (status === "completed") {
-        getThreadWorkspaceFiles(threadId)
+        // 244-08: the SECOND filler of this slice, and it must ask for the same rows as the
+        // first. A self-heal that fetched the GATED listing would quietly drop every expired
+        // attachment from the transcript on the next harness completion — the defect
+        // T-244-05-05 names, re-entering by a path nobody was looking at.
+        getThreadWorkspaceFiles(threadId, undefined, { includeExpired: true })
           .then((files) =>
             useStreamsStore.getState().actions.replaceWorkspaceFilesForThread(threadId, files),
           )
@@ -1130,6 +1378,46 @@ export function makeStreamCallbacks(opts: {
           emitFailure: sub.failure,
         }),
   }
+
+  // ⛔ EVERY STRUCTURAL EVENT DRAINS THE TEXT BUFFER FIRST, AND THIS IS A CORRECTNESS
+  // REQUIREMENT RATHER THAN TIDINESS — it was found by a DRIVEN RED, not by reading.
+  //
+  // Anthropic's normalized stream INTERLEAVES text and tool_use blocks
+  // (`StreamsProvider.anthropic-ordering.test.ts`, B-260519-01):
+  //   delta(text1) -> tool_use(0) -> delta(text2) -> tool_use(1) -> delta(text3)
+  // With the deltas coalesced, `text3` can still be sitting in the buffer when the tool
+  // block that FOLLOWS it is written — so the transcript would show a tool card above
+  // text the reader has not been shown yet, and a run that ends on a tool event would
+  // drop its tail entirely. Measured: without this, those two ordering cases fail with
+  // `expected 'text1text2' to be 'text1text2text3'`.
+  //
+  // ⚠ WRAPPED GENERICALLY RATHER THAN CALLBACK BY CALLBACK, and that is the decision.
+  // This factory returns 47 callbacks; an explicit flush in each is both invasive and
+  // forgettable, and the 48th — added by a phase that never read this comment — would
+  // silently re-open the defect. The rule is stated ONCE, and it is the negative form:
+  // the ONLY things that do not flush are the two callbacks that FILL the buffer.
+  // ⚠ 243-06 (HI-1) — THE SAME NEGATIVE RULE NOW CARRIES A SECOND OBLIGATION, and it is
+  // deliberately stated in the SAME place rather than in a second list that could drift from
+  // this one: a structural event also CLOSES the open reasoning burst (see the span block at
+  // `:466`). `onDelta` is excluded here and closes the burst itself; `onReasoningDelta` is what
+  // opens and extends one; `flushDeltas` is a drain, not an event.
+  const FILLS_THE_BUFFER = new Set(["onDelta", "onReasoningDelta", "flushDeltas"])
+  return Object.fromEntries(
+    Object.entries(raw).map(([key, value]) =>
+      typeof value !== "function" || FILLS_THE_BUFFER.has(key)
+        ? [key, value]
+        : [
+            key,
+            (...args: unknown[]) => {
+              closeReasoningSpan()
+              coalesceDeltas.flush()
+              return (value as (...a: unknown[]) => unknown)(...args)
+            },
+          ],
+    ),
+    // One cast, at one place: the mapping preserves every key and every arity, and
+    // `Object.fromEntries` cannot express that in the type system.
+  ) as StreamCallbacks & { flushDeltas: () => void }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1524,7 +1812,7 @@ export function StreamsProvider({ children }: PropsWithChildren) {
           producerRunId,
         ),
       }))
-      const callbacks: StreamCallbacks = makeStreamCallbacks({
+      const callbacks = makeStreamCallbacks({
         // No assistant placeholder to target — the resumed run's phase/sub-agent
         // events render in the panel via the shared callbacks; the chat transcript
         // is reconciled separately. Use the run id as the target id (harmless when
@@ -1540,6 +1828,10 @@ export function StreamsProvider({ children }: PropsWithChildren) {
       }
       const originalOnTerminal = callbacks.onTerminal
       callbacks.onTerminal = (kind, errorPayload) => {
+        // ⛔ Phase 243 (CHAT-02): drain the coalesced delta buffer BEFORE this wrapper
+        // body runs. It reconciles / snapshots the message, and a flush that landed
+        // afterwards would append the buffered tail onto replaced content.
+        callbacks.flushDeltas()
         subscriptionsRef.current.delete(producerRunId)
         useStreamsStore.setState((s) => ({
           subscriptionsByThread: _removeRunFromThread(
@@ -1690,7 +1982,91 @@ export function StreamsProvider({ children }: PropsWithChildren) {
               snapshot = await getSnapshot(threadId)
             } catch (err) {
               console.error("reconcile failed:", err)
+              // ── Phase 244-11 (SHELL-01 / UAT gap G-3) — RECORD THE FAILURE, DO NOT
+              //    SWALLOW IT.
+              //
+              // Driven 2026-09-12: GET /threads/{id}/snapshot returned 503 on 2 of 4
+              // observed calls, and the chat surface said NOTHING — header fine, composer
+              // fine, transcript silently incomplete. A sweep of every leaf element for
+              // /unavailable|error|failed|retry|try again|something went wrong/i returned
+              // ZERO matches. The console.error above WAS the entire handler, and
+              // `lib/api/threads.ts:1063`'s docstring already claimed otherwise
+              // ("the StreamsProvider consumer routes via its existing error handler").
+              //
+              // ⛔ 244-14 (review WR-04) — THE ABORT ARM THAT USED TO SIT HERE IS DELETED,
+              // AND ITS DELETION IS THE HONEST OPTION OF THE TWO. It read
+              // `if (err instanceof DOMException && err.name === "AbortError") return`, and
+              // all three of its claims were wrong at once:
+              //   1. UNREACHABLE. `getSnapshot(threadId, signal?)` takes an OPTIONAL signal
+              //      and the call below passes NONE, so nothing can abort this fetch.
+              //   2. THE JUSTIFICATION NAMED A MECHANISM THE CODE DOES NOT HAVE. It said a
+              //      thread switch "cancels an in-flight snapshot"; the in-flight protection
+              //      here is `reconcileInFlightRef`, which DROPS the second reconcile — it
+              //      does not abort the first.
+              //   3. NARROWER THAN THE WRITER IT CLAIMED TO MIRROR. `loadMessages` tests both
+              //      `Error.name` AND a duck-typed `{ name }` (:3241-3242), because the shape
+              //      differs between jsdom, undici and the browser.
+              // A guard for a state the product cannot produce is dead code carrying a false
+              // sentence, and its test was a control over a branch nothing can reach.
+              // ⛔ THE OBLIGATION IS NOW ENFORCED INSTEAD OF GUESSED: if a signal is ever
+              // threaded into the `getSnapshot` call below, restore the SHIPPED two-shape
+              // abort guard IN THE SAME COMMIT. `streamsProvider_244_snapshot_failure.test.tsx`
+              // Test 3 fails the moment that call grows a second argument, which is a fence
+              // that CAN fire — unlike the control it replaced.
+              // ⛔ The EXACT shipped write from the loadMessages failure path (:3209-3215),
+              // reused rather than re-invented: two writers of one slice that differ is how
+              // slices drift here. It lands in the per-thread `reconcileErrors` Map
+              // (D-075.4-A1), which `useReconcileErrorForThread` already feeds to
+              // ChatArea's shipped amber banner — Retry and dismiss included. No new slice,
+              // no new renderer, no automatic retry, and `Retry-After` is deliberately NOT
+              // consumed (that would be a new behaviour, not a gap fix — see
+              // deferred-items.md).
+              //
+              // ⚠ 244-14 (CR-01) — THE THIRD HALF OF THE COPIED WRITER IS DELIBERATELY NOT
+              // TAKEN, and the reason is measured rather than stylistic. `loadMessages`
+              // retries ONCE at 1s before it raises (:3243, D-068.5-09). Doing that here
+              // would hold `reconcileInFlightRef` — a GLOBAL flag, not a per-thread one
+              // (:1470/:1942) — for that whole second, and `reconcile` early-returns while it
+              // is held. A thread switch during the sleep would therefore DROP the new
+              // thread's reconcile entirely: the person lands on a conversation that never
+              // reconciles at all, which is a worse failure than a banner they can dismiss.
+              // ⛔ So the banner raises on attempt 0, BY DECISION. Make the in-flight guard
+              // per-thread first if a retry is ever wanted here — see deferred-items.md.
+              useStreamsStore.setState((s) => ({
+                reconcileErrors: new Map(s.reconcileErrors).set(
+                  threadId,
+                  err instanceof Error ? err : new Error(String(err)),
+                ),
+              }))
               return
+            }
+
+            // ── Phase 244-14 (CR-01) — THE OTHER HALF OF THE WRITER THIS ARM COPIED.
+            //
+            // `244-11` reused the loadMessages FAILURE write above and left its
+            // CLEAR-ON-SUCCESS behind (:3232-3238, which lives in `loadMessages` and not
+            // here). ⛔ `reconcile` IS THE THREAD-OPEN PATH — `loadMessages` runs only from
+            // `handleRetryReconcile`, the `buffer_expired` arm and the stream-terminal
+            // `finally` — so on an ordinary open there was NO writer that could clear the
+            // entry, and one transient 503 painted the banner for the life of the session.
+            //
+            // ⛔ AND THE SECOND FAILURE IS WORSE THAN THE FIRST: once the transcript hydrates,
+            // `ChatArea.tsx:712-717` picks its sentence off `messages.length` and flips to
+            // "Couldn't load latest messages. Showing cached version." OVER FRESHLY FETCHED
+            // CONTENT — a claim ABOUT THE SCREEN that is false, which is the exact thing
+            // `244-11`'s own docblock says it exists to prevent.
+            //
+            // The `has` guard keeps the steady state free: no `setState`, so no subscriber
+            // wakes on the overwhelmingly common clean open. Byte-for-byte the shipped
+            // loadMessages clear, on purpose — two writers of one slice that differ is how
+            // slices drift here. Driven by `streamsProvider_244_snapshot_failure.test.tsx`
+            // Test 2b, which starts DIRTY through this very arm.
+            if (useStreamsStore.getState().reconcileErrors.has(threadId)) {
+              useStreamsStore.setState((s) => {
+                const next = new Map(s.reconcileErrors)
+                next.delete(threadId)
+                return { reconcileErrors: next }
+              })
             }
 
             // Hydrate messages bucket. Phase 075.7 follow-up: widen the MERGE
@@ -1864,13 +2240,17 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                 subscriptionsByThread: _addRunToThread(s.subscriptionsByThread, threadId, run.run_id),
               }))
 
-              const callbacks: StreamCallbacks = makeStreamCallbacks({
+              const callbacks = makeStreamCallbacks({
                 assistantId: targetId,
                 threadId,
                 setMessages: setMessagesForBucketBound(surfaceId, threadId),
               })
               const originalOnTerminal = callbacks.onTerminal
               callbacks.onTerminal = async (kind, errorPayload) => {
+                // ⛔ Phase 243 (CHAT-02): drain the coalesced delta buffer BEFORE this wrapper
+                // body runs. It reconciles / snapshots the message, and a flush that landed
+                // afterwards would append the buffered tail onto replaced content.
+                callbacks.flushDeltas()
                 // Phase 075.1 Plan 01: widened transient-stream-end probe.
                 // Read the placeholder's current tool_calls from the store so
                 // the helper can detect "kind === 'done' with active tools".
@@ -1968,14 +2348,30 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                 // loadMessages replace; the .finally() loadMessages floor remains the
                 // reload-time backstop (D-v2.5-03). SEED-094 (backend stray last-line)
                 // stays OUT (D-09) — this faithfully renders whatever was persisted.
-                if (kind === "done" || kind === "reader_done") {
+                // ⚠ 243-06 (MD-4) — THIS GATE USED TO READ `kind === "done" || kind === "reader_done"`,
+                // AND 243-05 TURNED THAT NARROWING INTO A USER-VISIBLE DEFECT. The original is
+                // named here rather than silently widened. Before 243-05 a FAILED run's interim
+                // narration stayed folded inside `StreamingNarration`; that arm is now deleted, so
+                // the raw blob renders as the answer, with the answer's own renderers — and
+                // PERMANENTLY, because a failed run never reached this reconcile at all. Every
+                // terminal kind now reconciles; the list is spelled in full so it is total over the
+                // `kind` union rather than a negation that a sixth kind would silently join.
+                // ⛔ THE `!answer.content` GUARD BELOW IS WHAT MAKES THAT SAFE, and it is the whole
+                // reason this is not a one-word change: a cancelled or errored run may have
+                // persisted NOTHING, and overwriting a visible blob with an empty string would
+                // replace a bad answer with no answer — a strictly worse failure than the one
+                // being fixed.
+                if (["done", "reader_done", "error", "cancelled", "timed_out"].includes(kind)) {
                   const rid = run.run_id
                   getMessages(threadId)
                     .then((persisted) => {
                       const answer = persisted.find(
                         (m) => m.runId === rid && m.role === "assistant",
                       )
-                      if (!answer) return
+                      // ⛔ 243-06 (MD-4): `!answer.content` is load-bearing, not defensive —
+                      // see the gate's note. An empty persisted answer must leave the
+                      // visible text alone rather than blank it.
+                      if (!answer || !answer.content) return
                       useStreamsStore
                         .getState()
                         .actions.setMessagesForBucket(surfaceId, threadId, (prev) =>
@@ -2048,8 +2444,25 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                 if (wf.locked && !wf.lock_is_stale && wf.active_workflow_run_id) {
                   actions.setWorkflowLockForThread(threadId, {
                     runId: wf.active_workflow_run_id,
+                    // 244-13 — WRITE SITE 2 of 6. Genuinely harness, and said EXPLICITLY
+                    // rather than left to a default: this arm requires a live, non-stale
+                    // `active_workflow_run_id`, which is the server's own definition of
+                    // harness (`threads.py:1195`).
                     mode: "harness",
-                    capPaused: wf.cap_paused,
+                    // ⛔ ALWAYS `false` ON THIS BRANCH — 244-14 (review WR-02), MIRRORED FROM
+                    // `ChatArea.tsx`'s site (T-244-03-01 / 244-08). This read the server's flag
+                    // through while the OTHER mount-time writer of the SAME key, on the SAME
+                    // branch of the SAME GET, hard-coded `false`. Both fire on every thread
+                    // open; whichever settled last won; nothing ordered them. After `244-13`
+                    // the surviving consequence is WR-01's — whether a genuine live harness run
+                    // renders the Continue card was decided by a promise race.
+                    // ⚠ FAIL-CLOSED IS THE DIRECTION, not just the agreement: a harness run
+                    // paused at its own cap keeps the composer locked, so the person clicks
+                    // Cancel instead of typing into a composer the server will 409. Unlocking
+                    // during a live harness run is the elevation `T-244-03-01` names.
+                    // Fenced by `__tests__/providers/workflowLockWriters.lockstep.test.ts`,
+                    // which compares the two sites' expressions rather than trusting a comment.
+                    capPaused: false,
                     continuesRemaining: wf.continues_remaining,
                   })
                   // Phase 092-07 (Facet C, startup-sweep re-attach): when the
@@ -2068,7 +2481,12 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                   if (runId) {
                     actions.setWorkflowLockForThread(threadId, {
                       runId,
-                      mode: "harness",
+                      // 244-13 — WRITE SITE 3 of 6, and usually a DEEP cap-pause. DERIVED
+                      // FROM THE WIRE, never from `capPaused`: the server already answers
+                      // this question at `threads.py:1195` and re-deriving it client-side
+                      // from `active_workflow_run_id` would be a second derivation of one
+                      // fact — which is how these two registers drifted apart (G-1).
+                      mode: wf.mode === "harness" ? "harness" : "cap_paused",
                       capPaused: true,
                       continuesRemaining: wf.continues_remaining,
                     })
@@ -2244,6 +2662,9 @@ export function StreamsProvider({ children }: PropsWithChildren) {
             if (opts?.workflowDefinitionId && run_id) {
               useStreamsStore.getState().actions.setWorkflowLockForThread(threadId, {
                 runId: run_id,
+                // 244-13 — WRITE SITE 4 of 6. Genuinely harness by construction: this
+                // branch is gated on `opts.workflowDefinitionId`, which a Deep send
+                // never sets.
                 mode: "harness",
                 capPaused: false,
                 continuesRemaining: 3,
@@ -2310,7 +2731,7 @@ export function StreamsProvider({ children }: PropsWithChildren) {
             })
 
             // Step 2: open the GET stream and dispatch SSE events to per-message-id callbacks.
-            const callbacks: StreamCallbacks = makeStreamCallbacks({
+            const callbacks = makeStreamCallbacks({
               assistantId,
               threadId,
               onTitleUpdate: opts?.onTitleUpdate,
@@ -2319,6 +2740,10 @@ export function StreamsProvider({ children }: PropsWithChildren) {
 
             const originalOnTerminal = callbacks.onTerminal
             callbacks.onTerminal = async (kind, errorPayload) => {
+              // ⛔ Phase 243 (CHAT-02): drain the coalesced delta buffer BEFORE this wrapper
+              // body runs. It reconciles / snapshots the message, and a flush that landed
+              // afterwards would append the buffered tail onto replaced content.
+              callbacks.flushDeltas()
               // Phase 075.1 Plan 01: widened transient-stream-end probe.
               // sendMessage path uses `registeredRunId` (populated after the
               // POST returns); reconcile path uses `run.run_id`. Shared
@@ -2432,7 +2857,20 @@ export function StreamsProvider({ children }: PropsWithChildren) {
               // reload-time reconcile as the floor (D-v2.5-03: reconcile via fetch).
               // Keyed by the OWNING threadId so a resolve landing after a
               // thread-switch updates its own bucket, never the viewed thread.
-              if (kind === "done" || kind === "reader_done") {
+              // ⚠ 243-06 (MD-4) — THIS GATE USED TO READ `kind === "done" || kind === "reader_done"`,
+              // AND 243-05 TURNED THAT NARROWING INTO A USER-VISIBLE DEFECT. The original is
+              // named here rather than silently widened. Before 243-05 a FAILED run's interim
+              // narration stayed folded inside `StreamingNarration`; that arm is now deleted, so
+              // the raw blob renders as the answer, with the answer's own renderers — and
+              // PERMANENTLY, because a failed run never reached this reconcile at all. Every
+              // terminal kind now reconciles; the list is spelled in full so it is total over the
+              // `kind` union rather than a negation that a sixth kind would silently join.
+              // ⛔ THE `!answer.content` GUARD BELOW IS WHAT MAKES THAT SAFE, and it is the whole
+              // reason this is not a one-word change: a cancelled or errored run may have
+              // persisted NOTHING, and overwriting a visible blob with an empty string would
+              // replace a bad answer with no answer — a strictly worse failure than the one
+              // being fixed.
+              if (["done", "reader_done", "error", "cancelled", "timed_out"].includes(kind)) {
                 const rid = registeredRunId
                 if (rid) {
                   getMessages(threadId)
@@ -2440,7 +2878,10 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                       const answer = persisted.find(
                         (m) => m.runId === rid && m.role === "assistant",
                       )
-                      if (!answer) return
+                      // ⛔ 243-06 (MD-4): `!answer.content` is load-bearing, not defensive —
+                      // see the gate's note. An empty persisted answer must leave the
+                      // visible text alone rather than blank it.
+                      if (!answer || !answer.content) return
                       useStreamsStore
                         .getState()
                         .actions.setMessagesForBucket(surfaceId, threadId, (prev) =>
@@ -3090,6 +3531,120 @@ export function StreamsProvider({ children }: PropsWithChildren) {
           useStreamsStore.setState((s) => ({
             workflowLockByThread: _clearWorkflowLock(s.workflowLockByThread, threadId),
           })),
+        // ── Phase 244-15 (SHELL-03 / UAT gap G-8) — THE SETTLE PATH. IT RELEASES ONLY. ──
+        //
+        // ⛔ THIS IS DELIBERATELY NOT A SEVENTH `setWorkflowLockForThread` WRITER, and that
+        // is this path's central design constraint rather than a stylistic preference. Six
+        // DERIVING sites write that key (each marked `WRITE SITE n of 6`), plus one re-key in
+        // this file's producer-resubscribe arm that spreads an EXISTING lock and derives none —
+        // measured seven call sites in all (IN-01). Two of the six are fenced against each
+        // other by
+        // `__tests__/providers/workflowLockWriters.lockstep.test.ts` because they had already
+        // drifted apart once (`244-08` / `244-13` / `244-14` CR-01). A reader who adds a
+        // `setWorkflowLockForThread` call inside this action is re-opening `G-1`: they would be
+        // introducing a seventh derivation of one fact, from a path nobody orders against the
+        // other six. If a lock needs SETTING, the mount reconcile and the SSE already do it.
+        //
+        // WHY IT EXISTS. The designed cross-home settle for an answered approval is the
+        // `ask_user_response` SSE (→ `removePendingAskForThread`, :1168). On the WORKFLOW path
+        // the client is not subscribed to that run's stream, so the SSE never lands, nothing
+        // re-reads the thread's workflow state, and `workflowLockByThread` keeps a lock the
+        // server dropped — a `live` run line with a climbing 1s clock and a composer disabled
+        // on "Workflow running — Cancel to switch back", over a finished run. Driven in a real
+        // browser, `244-UAT.md` § R2-4.
+        //
+        // ⚠ FETCH-BASED, NOT A SECOND OPTIMISTIC UPDATE — `D-v2.5-03`, verbatim: *Realtime is
+        // a hint, not truth — always reconcile via fetch*. A second optimistic mechanism that
+        // can drift from the first IS the defect being fixed.
+        //
+        // ⚠ AND IT NEVER POLLS. One GET per human answer, bounded by the number of answers.
+        // `ThreadRunLine.tsx`'s D-11 rule binds: WorkflowRunPage already owns the polling
+        // concern. Fenced (with the no-seventh-writer rule) by
+        // `__tests__/providers/streamsProvider_244_settle_ask.test.tsx` Test 8.
+        releaseSettledWorkflowLock: (threadId) => {
+          if (!threadId) return
+          // ── WR-01 (gap-closure round 2): THIS PATH OWNS ONE FACT AND TOUCHES NOTHING ELSE ──
+          //
+          // `PendingAskStack` mounts for EVERY thread — the panel and the chat column
+          // (`MessageList.tsx:320`) — so this fires on a plain Deep chat run too, which has no
+          // workflow anchor at all. For such a thread the server always reports no anchor and no
+          // cap-pause, so the fail-closed arm never holds and the release arm ALWAYS ran —
+          // calling `clearStopStateForThread`, which also DISARMS the 8s stop-confirmation timer.
+          // Measured consequence: Stop a streaming chat run with a pending ask, answer inside the
+          // window, and `StopControl` swaps "Stopping…" back to a pressable Stop while the run
+          // keeps streaming — the climb-down never fires. The mirror image of the NEW LIE
+          // `clearStopStateForThread`'s own docblock warns about, on the surface Phase 194.1
+          // built to be honest about stopping.
+          //
+          // ⚠ BOTH DISJUNCTS OF `useHarnessLiveForThread`, and the second one is not optional:
+          // the synchronous pre-lock kickoff window holds the MARK with no lock, and a guard
+          // demanding the lock would return early exactly there. Read off the store, ABOVE the
+          // fetch, so a thread with nothing to release also costs nothing to settle.
+          const settleState = useStreamsStore.getState()
+          if (
+            !settleState.workflowLockByThread.has(threadId) &&
+            !settleState.harnessKickoffThreads.has(threadId)
+          ) {
+            return
+          }
+          void (async () => {
+            let wf: Awaited<ReturnType<typeof getThreadWorkflow>>
+            try {
+              wf = await getThreadWorkflow(threadId)
+            } catch (err) {
+              // Swallowed for `refreshPhaseSpineAfterStop`'s stated reason: the surface was
+              // ALREADY stale, and a rejected background read must never surface as an error
+              // nobody can act on — least of all from a click handler inside a card that has
+              // no error boundary (`BUG-260529-03`). Writing nothing is the honest outcome:
+              // we could not read, so we do not know, so we do not guess.
+              console.warn("[StreamsProvider] settle read after answer failed", err)
+              return
+            }
+            // THE TWO SHIPPED GUARDS, READ OFF THE WIRE AND NOT RE-DERIVED. These are the
+            // exact conditions of the two `setWorkflowLockForThread` arms in this file's own
+            // mount reconcile (:2412 and :2449 — re-measured, IN-02) — quoted by reference on
+            // purpose, because a second client-side derivation of one fact is how these
+            // registers drift.
+            const liveAnchor = !!(
+              wf.locked &&
+              !wf.lock_is_stale &&
+              wf.active_workflow_run_id
+            )
+            const capPaused = !!wf.cap_paused
+            if (liveAnchor || capPaused) {
+              // ⛔ RELEASE NOTHING. Unlocking the composer during a live harness run is the
+              // elevation `T-244-03-01` names; a cap-paused lock is a lock the person still
+              // needs (`244-08`). Fail-closed is the DIRECTION, not merely the agreement.
+              //
+              // Re-attach the live producer shell instead — the identical arm the mount
+              // reconcile owns at :2441 (re-measured, IN-02), idempotent per
+              // `subscribeProducerStream`'s docblock.
+              // This is what lets the SHIPPED terminal handler clear the lock when the run
+              // really ends, instead of this path inventing a second terminal route.
+              if (wf.latest_producer_run_id) {
+                subscribeProducerStreamRef.current?.(threadId, wf.latest_producer_run_id)
+              }
+              return
+            }
+            // The server has dropped the anchor (or calls it stale — the shipped F2 self-heal
+            // reading). Release, in this order.
+            //
+            // ⚠ `clearStopStateForThread` AND NOT A HAND-WRITTEN SET DELETE.
+            // ⚠ CITED BY SYMBOL, NOT BY LINE — the retired `(:4711)` was 87 lines stale in the
+            // commit that wrote it (IN-02); an inline `:NNNN` rots on the very edit that adds
+            // lines above it, and this file has now paid for that twice.
+            // `useHarnessLiveForThread` (exported from this file) has TWO disjuncts —
+            // `harnessKickoffThreads.has(tid) || lock?.mode === "harness"` — so clearing only
+            // the lock leaves the run line reading `live` with its 1s `setInterval` clock on a
+            // dead run. That function is the SHIPPED writer of `harnessKickoffThreads` (it also
+            // clears `stoppingThreads` / `stopNotConfirmed` and disarms the stop timer, all
+            // correct here: the server has just said the run is over). Two writers of one slice
+            // that differ is how slices drift in this file.
+            useStreamsStore.getState().actions.clearWorkflowLockForThread(threadId)
+            clearStopStateForThread(threadId)
+            refreshPhaseSpineAfterStop(threadId)
+          })()
+        },
         // --- Phase 094 (PANEL-08/09): panel-only phase-timeline mutators ---
         // Copy-then-mutate the phasesByThread Map (new Map → set), keyed strictly
         // by the passed (OWNING) threadId. NEVER touch bucketsBySurface — the
@@ -3702,23 +4257,136 @@ export function useDerivedPanel(threadId: string | null): DerivedPanelItem[] {
   }, [threadId, messages])
 }
 
+/**
+ * Phase 244-08 (T-244-05-05) — the ONE fetch that fills `workspaceFilesByThread`.
+ *
+ * ⛔ A NAMED MODULE-SCOPE FUNCTION, NOT AN INLINE ARROW. `usePanelReconcile` takes `fetcher`
+ * into a `useCallback` dependency list; a new closure every render would re-run the reconcile
+ * effect on every render, which is one fetch per keystroke on a thread with a live stream.
+ *
+ * ⚠ IT ASKS FOR EXPIRED ROWS ON PURPOSE. The slice feeds BOTH the panel and the transcript, and
+ * the transcript must be able to say a file WAS attached after its TTL ran out — the
+ * repudiation `T-244-05-05` names. The panel filters them back out in `useWorkspaceFiles`; the
+ * bytes stay unreachable either way, because the content route keeps its own expiry gate.
+ */
+function fetchWorkspaceFilesIncludingExpired(
+  threadId: string,
+  signal?: AbortSignal,
+): Promise<WorkspaceFile[]> {
+  return getThreadWorkspaceFiles(threadId, signal, { includeExpired: true })
+}
+
+/**
+ * Is this row past its TTL? ⚠ DERIVED FROM `expires_at`, never from a server-supplied flag —
+ * the same rule `chatAttachmentState` uses for the chip, stated once per layer rather than
+ * invented twice. A NULL expiry (every agent-written file) is never expired.
+ *
+ * ⚠ AN UNPARSEABLE DATE IS NOT EXPIRED. `NaN <= Date.now()` is false, and that is the polarity
+ * we want: a row we cannot read the expiry of keeps showing in the panel rather than silently
+ * disappearing from it. `expiryCaption` made the same call for the same reason (199 CR WR-02).
+ */
+function isExpiredFile(f: WorkspaceFile): boolean {
+  if (!f.expires_at) return false
+  const at = new Date(f.expires_at).getTime()
+  return !Number.isNaN(at) && at <= Date.now()
+}
+
 export function useWorkspaceFiles(threadId: string | null): {
   data: WorkspaceFile[]
   isLoading: boolean
   error: Error | null
   reconcile: () => Promise<void>
 } {
-  const data = useStreamsStore((s) =>
+  const all = useStreamsStore((s) =>
     threadId ? (s.workspaceFilesByThread.get(threadId) ?? EMPTY_FILES) : EMPTY_FILES,
+  )
+  // ⭐ Phase 244-08 (T-244-05-05) — THE PANEL FILTERS; THE SLICE CARRIES EVERYTHING.
+  //
+  // The slice now holds expired rows, because the TRANSCRIPT needs them: an attachment past
+  // its TTL must still be nameable in an old conversation (`No longer available`) instead of
+  // silently vanishing. The PANEL has no honest use for one — it offers a preview, and the
+  // per-file content route still refuses an expired row (404) — so a listed tombstone here is
+  // a broken affordance. One slice, two readers, and the reader that cares decides.
+  //
+  // ⚠ MEMOISED ON THE SLICE, NOT FILTERED INSIDE THE SELECTOR. A `.filter()` in the
+  // `useStreamsStore` selector mints a new array every render, and `useSyncExternalStore`
+  // compares by identity — every stream delta would re-render `FilesSection` and
+  // `WorkspacePanel`, which is the PANEL-06 isolation this file is built around. The slice is
+  // replaced wholesale (never mutated), so its identity is a sound memo key. Fenced by case 5
+  // of `providers/__tests__/expiredAttachmentTombstone.test.tsx`.
+  const data = useMemo(
+    () => (all.some(isExpiredFile) ? all.filter((f) => !isExpiredFile(f)) : all),
+    [all],
   )
   const replace = useStreamsStore((s) => s.actions.replaceWorkspaceFilesForThread)
   const { isLoading, error, reconcile } = usePanelReconcile<WorkspaceFile>({
     threadId,
     hookId: "files",
-    fetcher: getThreadWorkspaceFiles,
+    fetcher: fetchWorkspaceFilesIncludingExpired,
     replace,
   })
   return { data, isLoading, error, reconcile }
+}
+
+/**
+ * Phase 244 (244-05 T3 / SHELL-04) — A PURE READ of a thread's workspace files. NO FETCH.
+ *
+ * ⛔ `useWorkspaceFiles` above cannot be used here and the reason is a real cost, not a style
+ * preference: it runs `usePanelReconcile`, which FETCHES. `MessageItem` is rendered once per
+ * message, so calling it from a transcript row would fire one reconcile per row — N fetches for
+ * an N-message thread, on every mount. This selector reads the same slice the panel already
+ * reconciles into and adds no traffic at all.
+ *
+ * ⚠ It is a named hook rather than a raw `useStreamsStore` call at the consumer, because D-068-03
+ * makes the store an implementation detail: external callers go through this layer. The selector
+ * returns the SAME array identity until the slice is replaced wholesale (the store never mutates
+ * in place), so a `memo`'d consumer does not re-render on unrelated stream traffic.
+ */
+export function useWorkspaceFilesSnapshot(threadId: string | null): WorkspaceFile[] {
+  return useStreamsStore((s) =>
+    threadId ? (s.workspaceFilesByThread.get(threadId) ?? EMPTY_FILES) : EMPTY_FILES,
+  )
+}
+
+/**
+ * Phase 244 (244-05 T3) — the `created_at` of the TWO user messages immediately preceding
+ * `messageId`, most-recent first, joined by `|`. Either side may be empty.
+ *
+ * ⛔ A STRING, NOT AN OBJECT OR AN ARRAY, AND THAT IS LOAD-BEARING. A zustand selector compares
+ * with `Object.is`, so returning `{ lower, upper }` or `[a, b]` builds a fresh identity on EVERY
+ * store write and re-renders the consumer on every stream delta — the precise cost
+ * `MessageItem`'s `React.memo` (075.4-04) exists to avoid. A joined string compares by value.
+ *
+ * ⛔ WHY NOT THE MESSAGE LIST. Same reason, one step further: handing a transcript row the
+ * messages ARRAY — as a prop or as a selector result — reinstates the per-delta re-render for
+ * every row in the thread. ⛔ And not a PROP either: threading it from `MessageList` would put
+ * the association rule in the list's render path and create a second place that has to agree
+ * about it.
+ *
+ * TWO values rather than one because both callers need a WINDOW: a user row bounds
+ * `(previous user turn, itself]`, and an assistant row bounds `(the turn before that, the turn it
+ * answers]`. One selector, one pass, one stable value.
+ */
+export function usePrecedingUserTurns(
+  threadId: string | null,
+  messageId: string,
+  surfaceId: SurfaceId = "chat",
+): string {
+  return useStreamsStore((s) => {
+    if (!threadId) return "|"
+    const msgs = s.bucketsBySurface.get(surfaceId)?.get(threadId)
+    if (!msgs) return "|"
+    let prev = ""
+    let prevPrev = ""
+    for (const m of msgs) {
+      if (m.id === messageId) break
+      if (m.role === "user") {
+        prevPrev = prev
+        prev = m.created_at
+      }
+    }
+    return `${prev}|${prevPrev}`
+  })
 }
 
 // useAskUserPrompt surfaces a PendingAsk[] — parallel asks are possible
@@ -3834,6 +4502,12 @@ export function useTasks(threadId: string | null): {
  * common case right, it does not make the read authoritative. A failure is
  * swallowed for the same reason: the panel was already stale, and a rejected
  * background fetch must never surface as an error the user cannot act on.
+ *
+ * ⚠ SECOND CALLER SINCE 244-15 (G-8): the `releaseSettledWorkflowLock` settle path calls it
+ * on the release arm, after the server has confirmed the thread's workflow anchor is gone.
+ * THE CONTRACT IS UNCHANGED — viewed-thread-scoped, best-effort, swallow-on-failure — and it
+ * is named here rather than left for the next reader to discover. There is deliberately no
+ * second phase-spine refresher and no rename: one concern, one home.
  */
 function refreshPhaseSpineAfterStop(threadId: string): void {
   if (useStreamsStore.getState().viewedThreadId !== threadId) return
@@ -4170,10 +4844,27 @@ export const useWorkflowLockForThread = (threadId: string | null): WorkflowLock 
  *  both leak the `WorkflowLock.runId` two-id landmine (see its JSDoc in
  *  `streamsStore.ts`) to callers that have no business resolving ids, and give
  *  every consumer an object-identity dependency this selector does not need. */
+/** ⛔ CORRECTED BY PHASE 244-13 (UAT gap G-1) — THE SECOND DISJUNCT WAS A PRESENCE TEST,
+ *  AND IT BECAME WRONG WITHOUT THIS FILE BEING TOUCHED. The original read:
+ *
+ *      s.harnessKickoffThreads.has(threadId) || s.workflowLockByThread.has(threadId)
+ *
+ *  i.e. it treated ANY non-null lock as *"a harness run is live"*. That was TRUE for as
+ *  long as the lock was harness-only — and `244-03` made the SERVER populate the lock for a
+ *  cap-paused DEEP run (`threads.py:1237-1276`). A server change reached a client consumer
+ *  written against the old invariant, and the result was measured on screen: a live
+ *  `data-run-line-state="live"` receipt reading the harness activity string, 41px under an
+ *  amber card saying the run was stopped, on a thread that has never had a workflow — plus
+ *  a 1s `setInterval` clock (`ThreadRunLine.tsx:243-249`) ticking for it.
+ *
+ *  ⛔ The test is now on the lock's MODE, which says what the lock IS (see `WorkflowLock`'s
+ *  own JSDoc in `streamsStore.ts`). `harnessKickoffThreads` is UNCHANGED and still
+ *  load-bearing — it covers the synchronous pre-lock kickoff window. */
 export const useHarnessLiveForThread = (threadId: string | null): boolean =>
   useStreamsStore((s) =>
     threadId
-      ? s.harnessKickoffThreads.has(threadId) || s.workflowLockByThread.has(threadId)
+      ? s.harnessKickoffThreads.has(threadId) ||
+        s.workflowLockByThread.get(threadId)?.mode === "harness"
       : false,
   )
 

@@ -1,0 +1,500 @@
+/**
+ * Phase 244 plan 05 Tasks 2+3 (SHELL-04 / D-244-26 / D-244-27) —
+ * THE ORDERED-BLOCK COMPOSITION FENCE for the composer's attach door.
+ *
+ * ⛔ A TEXT-ONLY CONTRACT IS NOT SUFFICIENT, and this suite exists because of a measured failure,
+ * not a preference. The 2026-08-29 correction recorded **200 green assertions** over a surface the
+ * operator called *"nothing at all like what we designed"* — because the contract asserted
+ * VOCABULARY and never COMPOSITION. So sketch 236's README names the ordered blocks and their
+ * required atoms, and this file asserts them **by DOM order**, with `compareDocumentPosition`.
+ *
+ * ⛔ NEVER `getAllByTestId(...)[0]`. That is QUERY order, not DOCUMENT order, and the two agree
+ * often enough to make a reordering bug invisible.
+ *
+ * ⛔ EVERY WORD IS READ FROM THE PORT (`composerCopy`), which is itself fenced against the
+ * sketch's `COPY.js` by `ChatAttachmentChip.states.test.tsx` Test 5.
+ */
+import { render, screen, fireEvent, waitFor, within, cleanup } from "@testing-library/react"
+import userEvent from "@testing-library/user-event"
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
+import { TooltipProvider } from "@/components/ui/tooltip"
+import { MessageInput, _resetComposerDraftsForTest } from "../MessageInput"
+import { MessageItem } from "../MessageItem"
+import { COPY } from "../composerCopy"
+import { detachAttachment, _resetDetachedAttachmentsForTest } from "../ChatAttachmentChip"
+// ⚠ The STORE, imported directly — in a TEST. D-068-03 makes `useStreamsStore` an implementation
+// detail for PRODUCTION callers; seeding a slice is exactly the case a named hook cannot serve,
+// and mocking the whole provider module would break the `MessageInput` half of this file.
+import { useStreamsStore } from "@/stores/streamsStore"
+import * as api from "@/lib/api"
+
+vi.mock("@/lib/supabase", () => ({
+  supabase: { auth: { getSession: vi.fn().mockResolvedValue({ data: { session: null } }) } },
+}))
+
+vi.mock("@/lib/api", async () => {
+  const actual = await vi.importActual<any>("@/lib/api")
+  return {
+    ...actual,
+    listConnectorConnections: vi.fn(),
+    uploadWorkspaceTemplate: vi.fn(),
+  }
+})
+
+/** `a` comes BEFORE `b` in document order. The primitive, stated once. */
+function precedes(a: Element, b: Element): boolean {
+  return Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING)
+}
+
+const CLOUD_CONN = {
+  id: "conn-cloud",
+  org_id: "org-1",
+  name: "Google Workspace",
+  service_id: "google_workspace",
+  capability: null,
+  is_enabled: true,
+  config: {},
+  created_at: "2026-09-01T00:00:00Z",
+  updated_at: "2026-09-01T00:00:00Z",
+}
+
+const SLACK_CONN = { ...CLOUD_CONN, id: "conn-slack", name: "Slack Ops", service_id: "slack" }
+
+const UPLOADED = {
+  id: "wf-1",
+  path: "Meridian-Q4-pricing.xlsx",
+  size_bytes: 86_016,
+  mime_type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  kind: "template_input",
+  created_at: new Date().toISOString(),
+  expires_at: new Date(Date.now() + 23 * 3_600_000).toISOString(),
+}
+
+function pickFile(name = "Meridian-Q4-pricing.xlsx") {
+  const input = screen.getByTestId("composer-attach-input") as HTMLInputElement
+  fireEvent.change(input, { target: { files: [new File(["x"], name)] } })
+  return input
+}
+
+describe("Composer attach — the ordered blocks sketch 236 draws", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    _resetComposerDraftsForTest()
+    if (!Element.prototype.hasPointerCapture) Element.prototype.hasPointerCapture = () => false
+    if (!Element.prototype.setPointerCapture) Element.prototype.setPointerCapture = () => {}
+    if (!Element.prototype.releasePointerCapture) Element.prototype.releasePointerCapture = () => {}
+    if (!Element.prototype.scrollIntoView) Element.prototype.scrollIntoView = () => {}
+    vi.mocked(api.listConnectorConnections).mockResolvedValue([CLOUD_CONN] as any)
+    vi.mocked(api.uploadWorkspaceTemplate).mockResolvedValue(UPLOADED as any)
+  })
+
+  // ── Block: the `+` menu ────────────────────────────────────────────────────────────────
+  it("1 — the menu renders local -> cloud -> connectors, in THAT order, with COPY.a's words", async () => {
+    const user = userEvent.setup()
+    render(<MessageInput onSend={vi.fn()} disabled={false} threadId="t-1" />)
+    await waitFor(() => expect(api.listConnectorConnections).toHaveBeenCalled())
+
+    await user.click(screen.getByTestId(COPY.engine.PLUS_BTN_TESTID))
+
+    const local = await screen.findByText(COPY.a.itemLocal)
+    const cloud = await screen.findByText(COPY.a.itemCloud)
+    const connectors = await screen.findByText(COPY.a.itemConnectors)
+
+    // ⛔ DOCUMENT order, not query order.
+    expect(precedes(local, cloud)).toBe(true)
+    expect(precedes(cloud, connectors)).toBe(true)
+  })
+
+  it("2 — the ONE-ITEM case: no cloud connection, no orphaned divider, the local item reads alone", async () => {
+    vi.mocked(api.listConnectorConnections).mockResolvedValue([SLACK_CONN] as any)
+    const user = userEvent.setup()
+    render(<MessageInput onSend={vi.fn()} disabled={false} threadId="t-1" />)
+    await waitFor(() => expect(api.listConnectorConnections).toHaveBeenCalled())
+
+    await user.click(screen.getByTestId(COPY.engine.PLUS_BTN_TESTID))
+
+    const local = await screen.findByText(COPY.a.itemLocal)
+    expect(local).toBeDefined()
+    // D-244-26: `hasCloudStorage` is false, so the cloud door is ABSENT entirely.
+    expect(screen.queryByText(COPY.a.itemCloud)).toBeNull()
+    // …and the local item must still read correctly BY ITSELF — it is the first child of the
+    // file group, with nothing dangling above it.
+    const group = screen.getByTestId("composer-attach-group")
+    expect(within(group).queryByText(COPY.a.itemCloud)).toBeNull()
+    expect(group.children.length).toBe(1)
+  })
+
+  it("3 — variant A's menu is PLAIN: no header and no footer (B's arm cannot drift in)", async () => {
+    const user = userEvent.setup()
+    render(<MessageInput onSend={vi.fn()} disabled={false} threadId="t-1" />)
+    await user.click(screen.getByTestId(COPY.engine.PLUS_BTN_TESTID))
+    await screen.findByText(COPY.a.itemLocal)
+
+    // The two strings D-244-23 records in the sketch and does NOT ship.
+    expect(screen.queryByText("Add a file to this chat")).toBeNull()
+    expect(
+      screen.queryByText("Files here stay in this chat. The Library is for files you keep."),
+    ).toBeNull()
+
+    // ⛔ D-244-23: `Import` is the LIBRARY door's word, and the ROADMAP names a quiet Library
+    // write as SHELL-04's failure mode. Asserted on the RENDERED menu, not by grepping the file —
+    // `ConnectorsFlyout` may legitimately carry the word elsewhere in the product.
+    const menu = screen.getByTestId("composer-attach-group").closest('[role="menu"]') ?? document.body
+    expect(menu.textContent).not.toMatch(/\bImport\b/)
+  })
+
+  // ── Block: the composer chips row ──────────────────────────────────────────────────────
+  it("4 — the HOISTED row: an attachment with NO connectors still renders the chip", async () => {
+    const user = userEvent.setup()
+    render(<MessageInput onSend={vi.fn()} disabled={false} threadId="t-1" />)
+    await waitFor(() => expect(api.listConnectorConnections).toHaveBeenCalled())
+
+    await user.click(screen.getByTestId(COPY.engine.PLUS_BTN_TESTID))
+    await user.click(await screen.findByText(COPY.a.itemLocal))
+    pickFile()
+
+    // ⛔ THIS IS THE RULING'S EXECUTABLE FORM. `ActiveConnectorChips` returns `null` when no
+    // connector is armed, so a `children` slot INSIDE it would make the attachment chip vanish
+    // for a person with no connector — precisely the case D-244-26 orders checked. The row
+    // container is therefore owned by `MessageInput`, and the chips component is bare.
+    const chip = await screen.findByTestId("chat-attachment-chip")
+    const row = screen.getByTestId("active-connector-chips")
+    expect(row.contains(chip)).toBe(true)
+    expect(screen.queryByTestId("active-connector-chip-conn-cloud")).toBeNull()
+  })
+
+  it("5 — a connector with NO attachment renders the row exactly as today; NEITHER renders nothing", async () => {
+    const user = userEvent.setup()
+    render(<MessageInput onSend={vi.fn()} disabled={false} threadId="t-1" />)
+    await waitFor(() => expect(api.listConnectorConnections).toHaveBeenCalled())
+
+    // S-2: with neither an attachment nor a connector, there is NO row and no reserved space.
+    expect(screen.queryByTestId("active-connector-chips")).toBeNull()
+
+    await user.click(screen.getByTestId(COPY.engine.PLUS_BTN_TESTID))
+    await user.click(await screen.findByTestId("connector-toggle-conn-cloud"))
+
+    const row = await screen.findByTestId("active-connector-chips")
+    expect(within(row).getByTestId("active-connector-chip-conn-cloud")).toBeDefined()
+    // The shipped label, unchanged by the hoist.
+    expect(row.textContent).toContain("Using:")
+    expect(screen.queryByTestId("chat-attachment-chip")).toBeNull()
+  })
+
+  // ── Block: the refusal ─────────────────────────────────────────────────────────────────
+  it("6 — a refusal renders the SERVER's sentence verbatim, for all three 422s", async () => {
+    const sentences = [
+      COPY.engine.REFUSE_TYPE(".pdf", [...COPY.engine.ALLOWED_EXT].sort().join(", ")),
+      COPY.engine.REFUSE_SIZE,
+      COPY.engine.REFUSE_EMPTY,
+    ]
+    for (const sentence of sentences) {
+      vi.mocked(api.uploadWorkspaceTemplate).mockRejectedValueOnce(new Error(sentence))
+      const { unmount } = render(<MessageInput onSend={vi.fn()} disabled={false} threadId="t-1" />)
+      pickFile("Meridian-contract-signed.pdf")
+
+      const alert = await screen.findByRole("alert")
+      // ⛔ the SENTENCE, not "an error element exists".
+      expect(alert.textContent).toContain(sentence)
+      unmount()
+    }
+  })
+
+  it("6b — the refusal's THREE atoms, in DOCUMENT order: filename -> sentence -> dismiss", async () => {
+    const sentence = COPY.engine.REFUSE_TYPE(".pdf", ".csv, .docx")
+    vi.mocked(api.uploadWorkspaceTemplate).mockRejectedValueOnce(new Error(sentence))
+    render(<MessageInput onSend={vi.fn()} disabled={false} threadId="t-1" />)
+    pickFile("Meridian-contract-signed.pdf")
+
+    const alert = await screen.findByRole("alert")
+    const name = alert.querySelector("[data-refusal-file]")
+    const dismiss = alert.querySelector("[data-refusal-dismiss]")
+    const said = alert.querySelector("[data-refusal-sentence]")
+
+    // ⚠ The approved mockup DRAWS all three (`index.html` § refuseHTML: <b> filename, <code>
+    // sentence, <button class="ok">). None is optional and none may be dropped as "redundant" —
+    // a silent narrowing here is the precise failure D-244-27 was written to stop.
+    expect(name).not.toBeNull()
+    expect(said).not.toBeNull()
+    expect(dismiss).not.toBeNull()
+
+    expect(name!.textContent).toContain("Meridian-contract-signed.pdf")
+    expect(said!.textContent).toBe(sentence)
+    expect(dismiss!.textContent).toContain(COPY.shared.refusalDismiss)
+
+    expect(precedes(name!, said!)).toBe(true)
+    expect(precedes(said!, dismiss!)).toBe(true)
+  })
+
+  it("6c — the dismiss WORKS: clicking it removes the refusal region entirely", async () => {
+    const user = userEvent.setup()
+    vi.mocked(api.uploadWorkspaceTemplate).mockRejectedValueOnce(new Error(COPY.engine.REFUSE_SIZE))
+    render(<MessageInput onSend={vi.fn()} disabled={false} threadId="t-1" />)
+    pickFile("huge.xlsx")
+
+    const alert = await screen.findByRole("alert")
+    await user.click(alert.querySelector("[data-refusal-dismiss]") as HTMLElement)
+
+    // ⛔ asserted on the REGION's absence, never on a state variable.
+    await waitFor(() => expect(screen.queryByRole("alert")).toBeNull())
+    // …and the composer is still usable.
+    expect(screen.getByPlaceholderText(COPY.shared.composerPlaceholder)).toBeDefined()
+  })
+
+  it("7 — re-selecting the SAME file fires the change handler again", async () => {
+    render(<MessageInput onSend={vi.fn()} disabled={false} threadId="t-1" />)
+    const input = pickFile()
+    await waitFor(() => expect(api.uploadWorkspaceTemplate).toHaveBeenCalledTimes(1))
+
+    // The `e.target.value = ""` reset from `TemplateUpload` — a real bug a build drops silently:
+    // without it the browser fires no `change` for an identical second selection.
+    expect(input.value).toBe("")
+
+    fireEvent.change(input, { target: { files: [new File(["x"], "Meridian-Q4-pricing.xlsx")] } })
+    await waitFor(() => expect(api.uploadWorkspaceTemplate).toHaveBeenCalledTimes(2))
+  })
+
+  it("7b — the accept attribute is the FENCED constant, never a hand-typed list", async () => {
+    render(<MessageInput onSend={vi.fn()} disabled={false} threadId="t-1" />)
+    const input = screen.getByTestId("composer-attach-input") as HTMLInputElement
+    // 244-02 collapsed three hand-typed copies into one `?raw`-fenced constant. A fourth here
+    // would be invisible to that fence.
+    expect(input.getAttribute("accept")).toBe([...COPY.engine.ALLOWED_EXT].join(","))
+  })
+
+  // ── Block: the composer's own DOM order ────────────────────────────────────────────────
+  it("8 — ORDER, composer: the chips row precedes the + trigger, which precedes the textarea", async () => {
+    const user = userEvent.setup()
+    render(<MessageInput onSend={vi.fn()} disabled={false} threadId="t-1" />)
+    await waitFor(() => expect(api.listConnectorConnections).toHaveBeenCalled())
+
+    await user.click(screen.getByTestId(COPY.engine.PLUS_BTN_TESTID))
+    await user.click(await screen.findByText(COPY.a.itemLocal))
+    pickFile()
+    await screen.findByTestId("chat-attachment-chip")
+
+    const row = screen.getByTestId("active-connector-chips")
+    const plus = screen.getByTestId(COPY.engine.PLUS_BTN_TESTID)
+    const textarea = screen.getByPlaceholderText(COPY.shared.composerPlaceholder)
+
+    expect(precedes(row, textarea)).toBe(true)
+    expect(precedes(textarea, plus)).toBe(true)
+  })
+
+  it("9 — ATOMS, chip: icon, name, size, scope, remove — in that order", async () => {
+    const user = userEvent.setup()
+    render(<MessageInput onSend={vi.fn()} disabled={false} threadId="t-1" />)
+    await waitFor(() => expect(api.listConnectorConnections).toHaveBeenCalled())
+
+    await user.click(screen.getByTestId(COPY.engine.PLUS_BTN_TESTID))
+    await user.click(await screen.findByText(COPY.a.itemLocal))
+    pickFile()
+
+    const chip = await screen.findByTestId("chat-attachment-chip")
+    const icon = chip.querySelector('[aria-hidden="true"]')!
+    const name = chip.querySelector("[data-chip-name]")!
+    const scope = chip.querySelector("[data-chip-scope]")!
+    const remove = chip.querySelector("[data-chip-remove]")!
+
+    expect(precedes(icon, name)).toBe(true)
+    expect(precedes(name, scope)).toBe(true)
+    expect(precedes(scope, remove)).toBe(true)
+    // the size sits between the name and the scope word — asserted on the rendered value
+    expect(chip.textContent).toContain("84.0 KB")
+  })
+
+  // ── Block: the NO-THREAD door (244-07 / CR-01) ─────────────────────────────────────────
+  //
+  // ⛔ THE WORST AVAILABLE OUTCOME IS A SILENT SUCCESS, and that is what shipped. `ChatArea`
+  // renders THIS SAME composer in its welcome branch with `threadId={null}`, and both verbs in
+  // `useComposerAttachments` opened with a bare `if (!threadId) return`. Neither `+` item is
+  // gated, so on a brand-new chat — the first place anyone tries the phase's headline feature —
+  // a pick produced no chip, no refusal, no request and no console line.
+  //
+  // ⚠ These cases are written against `threadId={null}`, which is the EXACT prop `ChatArea.tsx`
+  // passes (`threadId={thread?.id ?? null}`), not a stand-in for it.
+  it("10 — a composer with NO thread refuses the local pick OUT LOUD, and never uploads", async () => {
+    render(<MessageInput onSend={vi.fn()} disabled={false} threadId={null} />)
+    pickFile("Meridian-contract-signed.pdf")
+
+    const alert = await screen.findByTestId("composer-refusal")
+    // ⭐ The SAME three atoms the 422 refusal renders — one vocabulary for one fact (D-244-27).
+    expect(alert.querySelector("[data-refusal-file]")?.textContent).toBe(
+      "Meridian-contract-signed.pdf",
+    )
+    expect(alert.querySelector("[data-refusal-sentence]")?.textContent).toBe(
+      COPY.shared.refuseNoThread,
+    )
+    expect(alert.querySelector("[data-refusal-dismiss]")).not.toBeNull()
+
+    // ⛔ THE NEGATIVES. No request left the browser and nothing pretended to land.
+    expect(api.uploadWorkspaceTemplate).not.toHaveBeenCalled()
+    expect(screen.queryByTestId("chat-attachment-chip")).toBeNull()
+  })
+
+  it("10b — the same composer WITH a thread still uploads: case 10 is not a blanket refusal", async () => {
+    render(<MessageInput onSend={vi.fn()} disabled={false} threadId="t-1" />)
+    pickFile("Meridian-Q4-pricing.xlsx")
+
+    // ⛔ THE POSITIVE CONTROL. A refusal that fires on every pick would pass case 10 while
+    // breaking the door outright — which is a worse defect than the one being fixed.
+    await waitFor(() => expect(api.uploadWorkspaceTemplate).toHaveBeenCalledTimes(1))
+    await screen.findByTestId("chat-attachment-chip")
+    expect(screen.queryByTestId("composer-refusal")).toBeNull()
+  })
+})
+
+// ── Block: the SENT message ──────────────────────────────────────────────────────────────
+//
+// ⭐ D-244-22's BUILD OBLIGATION lives here, not in the composer. Variant A won because the
+// promise SURVIVES: *"reopening the chat tomorrow, the transcript still says `this chat only` —
+// B's footer is long gone by then."* A chip that carries the scope word only while pending has
+// shipped B's weakness at A's cost, and these cases are what stop that shipping silently.
+describe("The sent message — the scope word in the transcript", () => {
+  const T = "t-sent"
+  const T0 = Date.parse("2026-09-11T10:00:00.000Z")
+
+  const userMsg = {
+    id: "m-user-1",
+    thread_id: T,
+    user_id: "u-1",
+    role: "user" as const,
+    content: "Compare these quarterly rates against the Meridian contract.",
+    created_at: new Date(T0 + 60_000).toISOString(),
+    updated_at: new Date(T0 + 60_000).toISOString(),
+  }
+  const assistantMsg = {
+    ...userMsg,
+    id: "m-ai-1",
+    role: "assistant" as const,
+    content: "Two line items sit above the contracted cap.",
+    created_at: new Date(T0 + 90_000).toISOString(),
+  }
+  const attached = {
+    ...UPLOADED,
+    created_at: new Date(T0 + 30_000).toISOString(),
+    expires_at: new Date(T0 + 30_000 + 24 * 3_600_000).toISOString(),
+  }
+
+  // ⚠ SEEDED WITH `setState`, NOT THROUGH `actions`, and the reason is measured rather than
+  // stylistic: `streamsStore.ts` initialises `actions` as NO-OP STUBS and the real writers are
+  // installed by `StreamsProvider` ON MOUNT. This suite renders `MessageItem` and `MessageInput`
+  // bare (as every other chat suite does), so an `actions.replaceWorkspaceFilesForThread(...)`
+  // call here silently does NOTHING — the test would seed nothing and then fail for a reason
+  // that looks like the component's fault. Found by driving it, not by reading it.
+  function seed(files: any[]) {
+    useStreamsStore.setState((s) => {
+      const next = new Map(s.workspaceFilesByThread)
+      next.set(T, files as any)
+      return { workspaceFilesByThread: next }
+    })
+  }
+
+  function seedMessages(msgs: any[]) {
+    useStreamsStore.setState((s) => {
+      const surf = new Map(s.bucketsBySurface.get("chat") ?? [])
+      surf.set(T, msgs as any)
+      const next = new Map(s.bucketsBySurface)
+      next.set("chat", surf)
+      return { bucketsBySurface: next }
+    })
+  }
+
+  beforeEach(() => {
+    _resetDetachedAttachmentsForTest()
+    seed([attached])
+    seedMessages([userMsg, assistantMsg])
+    vi.setSystemTime(new Date(T0 + 120_000))
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    seed([])
+    seedMessages([])
+    cleanup()
+  })
+
+  it("10 — ORDER, sent: the read-only chip PRECEDES the user's text", () => {
+    render(
+      <TooltipProvider>
+        <MessageItem message={userMsg as any} />
+      </TooltipProvider>,
+    )
+    const chip = screen.getByTestId("chat-attachment-chip")
+    expect(chip.getAttribute("data-chip-state")).toBe("sent")
+
+    const text = screen.getByText(/Compare these quarterly rates/)
+    // ⛔ "the chip in read-only form ABOVE the user's text" — above is part of the contract.
+    expect(precedes(chip, text)).toBe(true)
+    // read-only: nothing to remove in a transcript.
+    expect(chip.querySelector("[data-chip-remove]")).toBeNull()
+  })
+
+  it("11 — ATOM, sent: the chip renders COPY.a.sentNote — the scope word, a day later", () => {
+    render(
+      <TooltipProvider>
+        <MessageItem message={userMsg as any} />
+      </TooltipProvider>,
+    )
+    const chip = screen.getByTestId("chat-attachment-chip")
+    expect(chip.querySelector("[data-chip-scope]")!.textContent).toContain(COPY.a.sentNote)
+  })
+
+  it("12 — ATOM, agent pointer: the assistant row renders `Read <file>` as ONE line", () => {
+    render(
+      <TooltipProvider>
+        <MessageItem message={assistantMsg as any} />
+      </TooltipProvider>,
+    )
+    const pointer = screen.getByTestId("agent-read-pointer")
+    expect(pointer.textContent).toContain(COPY.shared.agentReadLine("Meridian-Q4-pricing.xlsx"))
+    // ⚠ a POINTER, one line — the run surface owns the heavy receipt (the sketch draws it so).
+    expect(pointer.querySelectorAll("*").length).toBeLessThan(4)
+  })
+
+  it("12b — the association rule's EDGE CASE: an upload removed before send appears on NO row", () => {
+    detachAttachment(T, attached.path)
+    render(
+      <TooltipProvider>
+        <MessageItem message={userMsg as any} />
+      </TooltipProvider>,
+    )
+    expect(screen.queryByTestId("chat-attachment-chip")).toBeNull()
+  })
+
+  it("12c — an AGENT-written workspace file is not an attachment and wears no chip", () => {
+    seed([{ ...attached, kind: "agent_output" }])
+    render(
+      <TooltipProvider>
+        <MessageItem message={userMsg as any} />
+      </TooltipProvider>,
+    )
+    expect(screen.queryByTestId("chat-attachment-chip")).toBeNull()
+  })
+
+  it("12d — an upload made AFTER the last user message belongs to no sent row (it is pending)", () => {
+    seed([{ ...attached, created_at: new Date(T0 + 119_000).toISOString() }])
+    render(
+      <TooltipProvider>
+        <MessageItem message={userMsg as any} />
+      </TooltipProvider>,
+    )
+    expect(screen.queryByTestId("chat-attachment-chip")).toBeNull()
+  })
+
+  it("13 — the NEGATIVE that makes Test 10 real: a chip rendered BELOW the text fails it", () => {
+    // ⛔ A composition fence nobody has seen fire is a presence assertion wearing a costume.
+    // This fixture is the reordered arm, in isolation: the SAME two nodes, text first.
+    const { container } = render(
+      <div>
+        <p>Compare these quarterly rates against the Meridian contract.</p>
+        <span data-testid="chat-attachment-chip" data-chip-state="sent" />
+      </div>,
+    )
+    const chip = container.querySelector('[data-testid="chat-attachment-chip"]')!
+    const text = container.querySelector("p")!
+    // Test 10 asserts `precedes(chip, text) === true`; on the reordered arm it is FALSE.
+    expect(precedes(chip, text)).toBe(false)
+    expect(precedes(text, chip)).toBe(true)
+  })
+})

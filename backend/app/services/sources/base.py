@@ -101,6 +101,32 @@ class SourceHealth:
     details: dict[str, Any] = field(default_factory=dict)
 
 
+def clamp_read_cap(max_bytes: int | None) -> int:
+    """The ONE rule for turning a caller's requested read cap into an enforced one.
+
+    Phase 244-08 (T-244-06-07). ``None`` means *"whatever the operator allows"*; a number
+    means *"no more than this, and still no more than the operator allows"*. A caller can
+    therefore only ever tighten.
+
+    ⛔ ONE HOME, not one copy per adapter. `source_max_file_bytes()` exists because three
+    families each held their own ceiling and agreed only by luck; a clamp re-derived per
+    adapter would reinstate exactly that, one level down.
+
+    ⚠ A zero or negative request is read as "nothing usable was asked for", not as "refuse
+    every file" — the same polarity `source_max_file_bytes()` itself uses for a bad stored
+    value. A caller that wants to refuse everything does not express it as a cap.
+
+    ⚠ The settings import is FUNCTION-LOCAL deliberately: this module is the source contract
+    and must stay importable without dragging the settings stack (and its DB read) behind it.
+    """
+    from app.models.user_settings import source_max_file_bytes
+
+    ceiling = source_max_file_bytes()
+    if max_bytes is None or int(max_bytes) <= 0:
+        return ceiling
+    return min(int(max_bytes), ceiling)
+
+
 class SourceAdapter(ABC):
     """Abstract contract for an external document source family."""
 
@@ -130,10 +156,25 @@ class SourceAdapter(ABC):
         self,
         connection: Any,
         file_id: str,
+        max_bytes: int | None = None,
     ) -> tuple[str, bytes, str]:
         """Download a single file's raw content.
 
         Returns (filename, content_bytes, mime_type).
+
+        ``max_bytes`` — Phase 244-08 (T-244-06-07). A caller that will REFUSE a body above its
+        own ceiling says so here, so the refusal happens at the transport instead of after the
+        bytes are resident. The chat's cloud door accepts 10 MB and used to ask for the whole
+        25 MB source ceiling, then throw 15 MB away.
+
+        ⛔ IT MAY ONLY TIGHTEN. Every implementation clamps against
+        ``source_max_file_bytes()`` — the operator's ceiling is the maximum a caller can be
+        given, never a default a caller can talk its way past. Use ``clamp_read_cap`` below
+        rather than re-deriving the rule per adapter; three copies agreeing by luck is the
+        exact shape `source_max_file_bytes()` itself was created to end.
+
+        ⚠ OPTIONAL, DEFAULT ``None`` — every existing caller (the Library import, the watch
+        loop, the preview service) keeps the operator ceiling and is byte-identical.
         """
 
     @abstractmethod

@@ -81,8 +81,12 @@ OMITTED_FROM_ONEBOX=(
   MOONSHOT_API_KEY MOONSHOT_MODELS
   MINIMAX_API_KEY MINIMAX_MODELS
   ZHIPU_API_KEY ZHIPU_MODELS
-  OLLAMA_BASE_URL OLLAMA_MODELS
-  LMSTUDIO_BASE_URL
+  OLLAMA_BASE_URL OLLAMA_MODELS OLLAMA_API_KEY
+  LMSTUDIO_BASE_URL LMSTUDIO_MODELS LMSTUDIO_API_KEY
+  # SEED-173 / mig 180 — the generic OpenAI-compatible slot. Same class as the two
+  # above: a self-hosted endpoint is the OPERATOR'S, configured in the Settings UI,
+  # not a one-box preset knob.
+  CUSTOM_BASE_URL CUSTOM_MODELS CUSTOM_API_KEY
   # reranking — one-box ships RERANK_ENABLED=false (torch/sentence-transformers dropped)
   RERANK_API_KEY RERANK_MODEL RERANK_PROVIDER RERANK_TOP_N
   # S3 / storage — Supabase manages storage; not a one-box knob

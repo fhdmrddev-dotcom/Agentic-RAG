@@ -40,7 +40,6 @@ import re
 from typing import Any
 from urllib.parse import quote, unquote
 
-from app.models.user_settings import source_max_file_bytes
 from app.security.egress import send_pinned_http
 from app.services.oauth_refresh_service import get_fresh_access_token
 from app.services.sources.base import (
@@ -51,6 +50,7 @@ from app.services.sources.base import (
     SourceHealth,
     SourceNode,
     SourceRegistry,
+    clamp_read_cap,
 )
 
 logger = logging.getLogger(__name__)
@@ -352,9 +352,17 @@ class MicrosoftGraphSourceAdapter(SourceAdapter):
         self,
         connection: Any,
         file_id: str,
+        max_bytes: int | None = None,
     ) -> tuple[str, bytes, str]:
-        """Download a file — the documented two-step, and never `/content` (D-238-01)."""
+        """Download a file — the documented two-step, and never `/content` (D-238-01).
+
+        ``max_bytes`` (244-08 / T-244-06-07) tightens the operator ceiling for THIS read,
+        clamped by `clamp_read_cap` so a caller can never raise it. It is handed to the
+        transport, which refuses a declared over-cap length before reading and abandons the
+        wire read past it — the cap therefore bounds RESIDENCY, not just the return value.
+        """
         token = await self._get_auth_token(connection)
+        cap = clamp_read_cap(max_bytes)
 
         # ⚠⚠ NO `$select` HERE, AND THAT IS THE OPPOSITE OF WHAT MICROSOFT DOCUMENTS.
         # Measured against a live personal OneDrive on 2026-09-07, four variants, same item:
@@ -408,7 +416,7 @@ class MicrosoftGraphSourceAdapter(SourceAdapter):
             download_url,
             headers={"Accept": "*/*"},
             timeout=60.0,
-            max_bytes=source_max_file_bytes(),
+            max_bytes=cap,
         )
         if dl_resp.status_code != 200:
             raise ValueError(f"Failed to download file content: HTTP {dl_resp.status_code}")

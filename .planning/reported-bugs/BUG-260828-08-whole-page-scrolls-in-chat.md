@@ -3,8 +3,8 @@ id: BUG-260828-08
 title: The whole page scrolls in chat — the nav rail scrolls away and dead space opens under the composer
 surface: Agentic-RAG
 severity: medium
-status: open
-folded_into: null
+status: folded
+folded_into: 244
 reported: 2026-08-28
 reported_by: operator, driving Phase 214's G-4 checkpoint
 affected_areas: [frontend/src/components/layout/ChatLayout.tsx]

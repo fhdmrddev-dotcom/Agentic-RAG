@@ -449,3 +449,105 @@ run read **`count gate OK` — 7914 total · 7149 pinned · 247/247 · 0 failing
 tree that had been red twice.
 
 ⛔ **"Provably unmodified", never "fine."**
+
+---
+
+## ⭐ THIRD REPRODUCTION OF THE `sketchComposition` PAIR — 2026-09-11 (Phase 243 baseline)
+
+Recorded by claude while capturing the Phase 243 baseline **before any build work** — base
+`96adfd668`, `git diff --numstat HEAD -- frontend` **EMPTY**, `git status --porcelain -- frontend`
+**EMPTY**, cap `2`, repo root, no sibling agent.
+
+```
+  total 7170  7940  +770
+  total 7940  ·  failed 2  ·  pinned total 7170
+FAIL  [failing-tests] 2 test(s) failed — the gate requires 0.
+```
+
+Failing set, from the gate's own persisted JSON before anything was re-run — **byte-for-byte the
+pair this seed already records at 2026-09-06 and 2026-09-10**:
+
+| File | Test | Signature |
+|---|---|---|
+| `src/components/library/__tests__/sketchComposition.test.tsx` | §2 positive control — "the mount harness works" | `Error: STACK_TRACE_ERROR` at `:317` |
+| `src/components/library/__tests__/sketchComposition.test.tsx` | §2 positive control — "the four shipped tab triggers render" | `TestingLibraryElementError: Found multiple elements with the role "tab" and name "Documents"` |
+
+Isolated re-run: **`46 passed | 1 skipped (47)`** in 6.36 s. ⚠ Recorded as **provably unmodified**,
+never as "fine".
+
+### ⭐ THE NEW EVIDENCE: the two failures are ONE failure, and the leak now has its mechanism
+
+The 2026-09-06 entry called the duplicate accessible name *"DOM left over from a sibling test in
+the same worker"* and named it *"the most actionable lead this seed has"*. **This run supplies the
+missing causal step, and it is cheap to state:**
+
+- Failure #1 is a **timeout** at `sketchComposition.test.tsx:317`, so its `afterEach` cleanup never
+  runs and its render tree stays mounted.
+- Failure #2 is the **very next test**, which then finds **two** `role="tab"` nodes named
+  "Documents" — because it is querying two mounted copies of the page.
+
+So `failed 2` **overstates the finding**: there is one root failure and one cascade. That matters
+for this seed's central claim — *the failing set is never the same twice* — because it means the
+set's apparent SIZE partly tracks cascade depth, not the number of independent flakes.
+
+⚠ **And the product is exonerated structurally, not by inference:** `grep -rn "TabsTrigger"
+pages/LibraryPage.tsx components/library/*.tsx` shows the Library's five tabs declared **once**;
+the only other `TabsTrigger` block is `IngestionTab.tsx`'s four **sub**-tabs (`Add files`,
+`In progress`, `Needs attention`, `History`), none named "Documents". **There is no duplicate-tab
+defect to chase.**
+
+### ⛔ A REGISTER-DRIFT FINDING, and it cost a wrong classification in this very session
+
+**`CLAUDE.md` says *"`SEED-171`'s five cap-independent flaky suites"*. This seed says SEVEN.**
+
+Phase 243's baseline was first written from CLAUDE.md's list and therefore classified
+`sketchComposition.test.tsx` as *"a sixth file, not in SEED-171"* — when it has been in this seed
+since 2026-09-06 with **this exact failing pair recorded verbatim**. The error was caught and
+struck through (not deleted) in `243-BASELINE.md`, but it is the fourth-order version of this
+project's standing finding: **an index that summarises a register goes stale, and an agent that
+trusts the index instead of the register mis-classifies a known flake as a new one.**
+
+⚠ **CLAUDE.md's "five" is FLAGGED HERE, NOT SILENTLY FIXED** — Phase 243 does not own that file's
+guardrail prose, and a phase quietly editing another phase's register is how corrections lose their
+authorship. The next phase that touches CLAUDE.md's `SEED-171` sentence should re-derive the count
+from this seed rather than increment it.
+
+---
+
+### ⚠ THE REGISTER-DRIFT PREDICTION FIRED A SECOND TIME — Phase 244, plan `244-15` (2026-09-12)
+
+The section above closes by naming the exact failure mode *"an agent that trusts the index instead of
+the register mis-classifies a known flake as a new one"*, and records that Phase 243 did it once.
+**It happened again, unprompted, twenty-four hours later, and the recurrence is the finding.**
+
+`244-15`'s post-merge count gate read `failed 3` on its first run. The executor did the procedure
+**correctly** — filenames captured from the gate's own persisted JSON *before* any re-run, cap
+untouched at `2`, each name checked against an empty `git diff --numstat` against the base, both green
+in isolation, second full run `failed 0` with identical totals. **Nothing about the method was wrong.**
+
+What was wrong was the classification, and it came from CLAUDE.md rather than from here:
+
+| Suite it named | It reported | This register says |
+|---|---|---|
+| `src/pages/WorkflowBuilderPage.canvas.test.tsx` | "one of the seed's five" | listed (added `196-05`) |
+| `src/components/library/__tests__/sketchComposition.test.tsx` | "**a sixth suite**, in a directory none of the five share" | **listed since 2026-09-06**, with its failing pair recorded verbatim |
+
+⛔ **There is no sixth suite, and there was no eighth.** Both names were already here. The count has
+been **SEVEN** in this file since the Phase 237 baseline; **CLAUDE.md still says "five" in three
+places** (`§ Parallel execution` rule 2, lines ~239 / ~315, plus a "three" at ~361 preserved from the
+original planting). An executor reading the index and not the register arrives at "sixth" by correct
+arithmetic on a stale premise.
+
+⭐ **What this escalates:** the first occurrence was caught in review and struck through in
+`243-BASELINE.md`. This one reached an orchestrator as *"new evidence for SEED-171, not folded in"* —
+i.e. it was about to be written into a register as a new datum. **The cost of the stale index is now
+measured twice, and the second time it nearly grew the register by a row that was already in it.**
+
+⚠ **STILL FLAGGED, STILL NOT SILENTLY FIXED, and now for a second recorded reason.** `244-15` is a
+G-7-overridden gap-closure plan (see `STATE.md → Guardrail overrides`); a closure round may not
+quietly rewrite another phase's guardrail prose, and the seed's own rule above says the count must be
+**re-derived from this file**, never incremented from the index. The re-open trigger is unchanged and
+now has two data points behind it:
+
+> **The next phase that touches CLAUDE.md's `SEED-171` sentence re-derives the suite count from this
+> file.** Until it does, expect a third misclassification — the mechanism is intact.

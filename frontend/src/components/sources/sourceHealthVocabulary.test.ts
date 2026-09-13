@@ -140,20 +140,27 @@ const allSentences: string[] = [
 // ══════════════════════════════════════════════════════════════════════════════════════
 
 describe("sourceHealthVocabulary — non-vacuity", () => {
-  it("the cause table has exactly the five causes", () => {
+  it("the cause table has exactly the six causes", () => {
     // ⚠ RE-BASELINED 4 → 5 (plan 13, gap-closure round 1), deliberately and in the SAME plan
     //   that widened `failure_cause.py`. Widening one side alone leaves the tree red between
     //   waves, which is the whole reason both halves of this wire live in one plan.
+    // ⚠ RE-BASELINED 5 → 6 (BUG-260912-01, 2026-09-12) under the same discipline and in the
+    //   same commit as the backend union. The sixth is the deployment's OWN credentials being
+    //   rejected — previously narrated as `token_revoked` and offered **Reconnect**, which
+    //   cannot work because the code exchange presents the same secret. The number moves
+    //   because the union genuinely gained a member, never to make an assertion pass; the new
+    //   member's own properties are driven in `bug260912AppCredentials.test.ts`.
     const causes = Object.keys(SENTENCE_FOR_CAUSE)
-    expect(causes).toHaveLength(5)
+    expect(causes).toHaveLength(6)
     expect(causes).toContain("token_revoked")
     expect(causes).toContain("folder_gone")
     expect(causes).toContain("unreachable")
     expect(causes).toContain("connection_disabled")
+    expect(causes).toContain("app_credentials_invalid")
     expect(causes).toContain("unknown")
   })
 
-  it("the control table covers the same five causes", () => {
+  it("the control table covers the same six causes", () => {
     expect(Object.keys(CONTROL_FOR_CAUSE).sort()).toEqual(Object.keys(SENTENCE_FOR_CAUSE).sort())
   })
 
@@ -397,12 +404,14 @@ describe("V-09 — bound to failure_cause.py's LIVE source", () => {
     expect(failureCausePySource).toContain("classify_failure_cause")
   })
 
-  it("⚠ NON-VACUITY — the extraction actually found the five cause literals", () => {
+  it("⚠ NON-VACUITY — the extraction actually found the six cause literals", () => {
     // A regex that matched nothing yields [], and [] would satisfy every "for each" below
     // vacuously while looking green. This is the assertion that reds on a rename.
     // ⚠ RE-BASELINED 4 → 5 in the SAME plan that widened the backend union (plan 13).
-    expect(backendCauses()).toHaveLength(5)
+    // ⚠ RE-BASELINED 5 → 6 in the SAME commit that widened it again (BUG-260912-01).
+    expect(backendCauses()).toHaveLength(6)
     expect(backendCauses()).toContain("connection_disabled")
+    expect(backendCauses()).toContain("app_credentials_invalid")
   })
 
   it("⭐ every cause the backend can emit HAS a sentence and a control", () => {

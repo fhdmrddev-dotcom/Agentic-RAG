@@ -95,7 +95,14 @@ function planFiles(dir) {
   if (!plans.length) fail(`no *-PLAN.md in ${dir}`);
   const out = new Map();
   for (const p of plans) {
-    const text = fs.readFileSync(path.join(dir, p), 'utf8');
+    // ⚠⚠ CRLF IS NORMALISED HERE, AND THE REASON IS A VACUOUS PASS THIS GATE ACTUALLY PRODUCED.
+    //    Measured 2026-09-11 (Phase 242): a PLAN.md rewritten by a tool that emitted CRLF made
+    //    `/^---\n/` fail to match, `fm` come back null, and the ENTIRE PLAN be skipped by the
+    //    `continue` below — silently. The gate then printed `subject: 0 files · watched: 0` and
+    //    `ledger gate OK`, exiting 0 over a phase it could not read at all.
+    //    ⛔ A GATE THAT PASSES BECAUSE IT PARSED NOTHING IS WORSE THAN NO GATE: it answers the
+    //    auditor with "clear" and stops the audit. On Windows this is one careless file write away.
+    const text = fs.readFileSync(path.join(dir, p), 'utf8').replace(/\r\n/g, '\n');
     const fm = /^---\n([\s\S]*?)\n---/.exec(text);
     if (!fm) continue;
     const block = /files_modified:\s*\n((?:\s*-\s*.+\n)+)/.exec(fm[1] + '\n');

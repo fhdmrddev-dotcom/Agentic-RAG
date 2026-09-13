@@ -861,6 +861,84 @@ measures the vector path.
   cheap self-dispatched review is what caught 239's two Criticals and 241's shipped HTTP 500 — it is
   worth its cost, and it is still not a review.
 
+## Milestone: v4.1 — Ship It & Feel It
+
+**Shipped:** 2026-09-13 · **Phases:** 5 (242-246) · **Plans:** 25 · **Commits:** 290 · **3 days**
+**Audit:** `gaps_found` — 18/19 requirements.
+
+### What Was Built
+
+The `SHIP` claims were replaced by measurements against the database and the branch. The reasoning
+stream became a calm surface with one unconditional renderer and a 60 ms coalescer, and the
+follow-scroll was driven with a **real wheel**. All five `SHELL` criteria were driven in a browser.
+v4.0's verification debt got written verdicts plus a greppable `verification_mode` marker. And Phase
+246 measured the recall cliff and **refused the fix it had been scoped to ship**.
+
+### What Worked
+
+- ⭐ **Driving the product beat reasoning about it, every single time it was tried.** `CHAT-03` had
+  two prior fixes that measured clean on synthetic `WheelEvent`s and were refuted by a real mouse;
+  this milestone drove a real wheel and got 0 px drift. `SHELL-03` was **driven FALSE** on the first
+  attempt against a phase that had already declared it built. `RECALL-01`'s entire finding came from
+  running `EXPLAIN (ANALYZE)` rather than trusting a recall number.
+- ⭐ **Refusing to ship was the right call and the process allowed it.** 246 could have shipped
+  `ef_search = 200`, ticked `RECALL-01`, and closed 19/19. The plan-level evidence said the number
+  was bought with a table scan, and the milestone closed 18/19 instead. **A green checkbox was
+  available and was declined** — that is the behaviour worth keeping.
+- **The two-agent separation returned and was used immediately.** `OV-SOLO-01`'s re-arm trigger fired
+  and was honoured the same session, before any work was handed out under the old regime — a
+  deliberate correction of the prior lapse that Phase 245's SC#4 exists because of.
+- **Corrections were recorded beside their originals, not over them**, including two corrections to
+  this close's own audit.
+
+### What Was Inefficient
+
+- ⛔ **The registers said the milestone never started.** The ROADMAP Progress table read
+  `0 / 5 phases complete · 0 / 19 requirements delivered` with all five phases closed and fourteen
+  boxes ticked. It was caught by the audit, one step before it would have been archived as v4.1's
+  permanent record. **Every phase closed its own work correctly and none of them updated the shared
+  table** — the cost is not the repair, it is that no one could trust any summary line for three days.
+- ⛔ **The same wrong-denominator class, twice in consecutive milestones.** v4.0 shipped with the
+  requirement COUNT wrong (17 vs 19); v4.1 nearly shipped with the phase STATUS wrong. The v4.1
+  roadmap OPENS by correcting v4.0's instance, which means the lesson was written down and did not
+  transfer to the neighbouring column.
+- ⚠ **A revert missed a fifth site, and nothing could see it.** `521f4a025` claimed "four sites plus
+  the help copy" and left `settingsSearchPayload.ts` at `?? 200`. The fallback had **no test coverage
+  at all** — and the case that looked like its fence (`FIXTURE A: a NULL column's baseline…`) never
+  nulls that column. **A case named for a property it does not exercise is weaker than no case**,
+  because it reads as coverage to the next person.
+- ⚠ **Two migrations never reached cloud in a milestone whose thesis was "prove it is running."**
+  179 and 180 are absent, measured at the close.
+
+### Patterns Established
+
+- **Measure the cloud, don't re-read the deploy record.** 242 ran the verifier against the database
+  and found the verifier itself producing two FALSE FAILs. A checker that fails closed on its own
+  blind spot is worse than no checker.
+- **A requirement can be satisfied by written retirement.** `SHIP-02` closed because the database
+  shape its drive needed exists nowhere — recorded with evidence, not silently dropped or endlessly
+  carried.
+- **Name the self-verified commit inside a peer-reviewed phase.** 246 did not let one reviewer-authored
+  commit make the whole phase's headline false; the audit then found a defect in exactly that commit.
+
+### Key Lessons
+
+1. **The plan, not the metric.** Phase 241 measured recall and concluded 200 fixed the cliff; it never
+   looked at an execution plan. One `EXPLAIN (ANALYZE)` refuted a belief that had shipped for days.
+2. **A register that is present and WRONG stops the audit.** It answers the question, so nobody looks
+   further. Re-derive from the phase directories; never trust a summary line.
+3. **Ask what a test actually exercises, not what it is named.** Two fixtures, a confident header
+   comment, and 22 green cases coexisted with an unfenced constant.
+
+### Cost Observations
+
+- 5 phases / 25 plans / 3 days — **5.0 plans per phase**, the second-lowest since G-8 was ratified.
+- G-8 held without an override on four of five phases; 244 spent a G-7 gap-closure override
+  (round 2, worded escape hatch) and is the one phase that ran to 12 plans.
+- Zero inserts, for the second consecutive milestone.
+
+---
+
 ## Cross-Milestone Trends
 
 | Milestone | Phases | Plans | Avg Plans/Phase | Timeline |
@@ -887,6 +965,7 @@ measures the vector path.
 | v3.8 Document Intelligence, Automations & Connectors | 12 | 17 | 1.4 | 3 days |
 | **v3.9 Connections: Any Service, Any Tool** | **16** | **111** | **6.9** | **9 days** |
 | **v4.0 Connected Knowledge** | **14** | **62** | **4.4** | **6 days** |
+| **v4.1 Ship It & Feel It** | **5** | **25** | **5.0** | **3 days** |
 
 > ⚠ The v3.4 and v3.5 rows were **missing** from this table and were added at the v3.6 close —
 > both milestones shipped without a trends row. **v3.6 is the project's largest milestone by plan
@@ -907,3 +986,14 @@ measures the vector path.
 >
 > **v3.9 is the second-densest milestone by plans per phase (6.9) and the fastest by plans per day
 > (~12).** It ran with worktree parallelism ENABLED, unlike v3.6's 151 fully-serial plans.
+
+
+> ⭐ **v4.1 is the second milestone run entirely under G-8, and the first consolidation milestone
+> since v3.5.** 5.0 plans/phase against v4.0's 4.4 and an 11.6 all-time high; **zero inserts for the
+> second consecutive milestone**. ⚠ The average hides the distribution: **four phases ran 2-5 plans
+> and one (244) ran 12** with a G-7 override — so the consolidation milestone's G-8 risk landed
+> exactly where the roadmap predicted it would, on the chat shell.
+>
+> ⛔ **Its trends row was added AT the close**, continuing the practice v4.0 started — the v3.4 and
+> v3.5 rows were both missing for a milestone or more, which is the same silent-drift class the v4.1
+> close found in the ROADMAP Progress table.
