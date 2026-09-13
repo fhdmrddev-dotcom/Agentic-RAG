@@ -3,7 +3,7 @@ type: preflight-review
 phase: 246
 phase_name: "The Recall Cliff, and the Screen That Describes It"
 builder: gemini
-reviewer: claude
+reviewer: pending
 reviewed_at: 2026-09-13
 tree_state: clean at `6fc3519b5` — reviewed BEFORE any 246 execution commit
 plans_reviewed: [246-01, 246-02, 246-03]
@@ -75,5 +75,7 @@ All 6 findings from `BUS-200` are addressed and integrated.
 4. **Finding 4 (_SERVER_DEFAULT_EF_SEARCH replacement):** Replacement scoped to `:155` no-op shortcut; `:131` and `:154` invalid fallbacks remain fail-safe.
 5. **Finding 5 (G-2 sketch):** Formally waived in writing (`D-246-08`) for 5-word copy update + null loading state on an existing card.
 6. **Finding 6 (SC#2 verification):** Scoped locally against the test database; production deploy remains deferred per `D-242-08`.
+7. **Blocker A (Benchmark Target & Builder):** Resolved in `246-03-01`. `scripts/build-recall-bench.py` explicitly builds the 100,000-chunk skewed `recall_bench` database on `127.0.0.1:54322/recall_bench`. The recall harness and index scan assertions execute exclusively against `recall_bench`, leaving the live development database (`postgres`) untouched.
+8. **Blocker B (`recall_eval.py` G-5 & Safe-as-Is):** Resolved in `246-03-02`. Documented that `recall_eval.py` is safe as-is (offline evaluation module, import-safe by construction, zero request-path coupling, additive instrumentation only), and its ledger row in `docs/HOT-FILE-LEDGER.md` is updated to reflect its 3rd phase landing in the same commit.
 
 Tree is clean. Ready for independent review and execution authorization.
