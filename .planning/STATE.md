@@ -32,15 +32,41 @@ See: `.planning/PROJECT.md` (updated 2026-09-10)
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviors (skills) that persist and can be shared.
 
-**Current focus:** Phase 245 — the verification debt — discharged or retired in writing
+**Current focus:** Phase 246 — the recall cliff, and the screen that describes it
+(⚠ depends hard on Phase 242 / `SHIP-01`). **Phase 245 CLOSED 2026-09-13, operator-accepted at UAT.**
 milestone (not v5.0: it opens no new capability axis). Ship v4.0 to production, then fix the chat
 surface the operator uses daily. Phase numbering continues at **242**.
 
 ## Current Position
 
-Phase: 245
+Phase: 245 — ✅ **CLOSED 2026-09-13, ACCEPTED BY THE OPERATOR AT UAT** (`245-UAT.md`, 10/10).
 Plan: **ALL THREE COMPLETE — `245-01` · `245-02` · `245-03`, 2026-09-13.**
 Next: **Phase 246** (The Recall Cliff). ⚠ It depends hard on **Phase 242 / `SHIP-01`**.
+
+⭐ **THE UAT'S BEST FINDING CAME FROM THE OPERATOR, AND IT CAME FROM AN INSTRUCTION THAT WAS WRONG.**
+Nine rows were scored green from the artifact (the phase changed zero source lines, so a screen
+could not answer them). The tenth thing checked was an OPTIONAL app confirmation of
+`BUG-260913-01`, and the operator was told *"read the document's source path in the detail panel"*
+and replied **"I did not see in the metadata source path"** — because **`metadata.source.path` is
+rendered NOWHERE in the product.** Measured: `DocumentDetailPanel.tsx` has **zero** matches; the
+only frontend file naming `source_path` is `RuleBuilderPanel.tsx:119`, **the list of fields a rule
+may be written AGAINST.** ⛔ **The app lets a user build a rule on a field it never displays** —
+that is the mechanism behind the word *silently* in `BUG-260913-01`, and a **second, separable
+defect** from the null write: fixing the adapter alone leaves the next regression undiagnosable.
+Appended to the bug, **not fixed here** (ROADMAP Flags: a driven row's defect does not silently
+expand this phase). ⭐ **A UAT row whose observation step cannot be carried out is telling you
+something about the PRODUCT, not about the reader.**
+
+⚠ **A bookkeeping gap the phase itself had:** `ROADMAP.md` still read `- [ ]` for `245-02` and
+`245-03` after both shipped. Fixed inline under G-3 at UAT. **The phase that exists to stop
+registers disagreeing with the truth was carrying one.**
+
+⛔ **`/gsd:secure-phase 245` NOT RUN, and this is a DECISION rather than an omission.**
+`security_enforcement` is `true` and no `245-SECURITY.md` exists. The phase's **only** source file
+is `scripts/check-verification-honesty.cjs` — a dev-time gate that reads planning markdown and
+touches no runtime path, no request, no credential and **no trust boundary** — so `OV-SOLO-01`'s
+mandatory-dispatched-review arm does not fire. Re-open trigger: any phase that makes that script,
+or its hook, read anything outside `.planning/`.
 
 ⭐ **PHASE 245 IS DONE: 4 / 4 SUCCESS CRITERIA CLOSED.** Verdict:
 **`.planning/phases/245-the-verification-debt-discharged-or-retired-in-writing/245-VERDICT.md`** —
