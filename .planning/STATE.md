@@ -39,7 +39,26 @@ surface the operator uses daily. Phase numbering continues at **242**.
 ## Current Position
 
 Phase: 245
-Plan: Not started — **context gathered 2026-09-13** (`245-CONTEXT.md`, `ffbb43c31`)
+Plan: **`245-01` COMPLETE 2026-09-13** (`8f85969d5` → `77c598f42` → `ab4f07289`, base `d4d9dc024`).
+Next: `245-02` (DEBT-02 + DEBT-01's M-9 arm — live browser drives; serial, mutates the local DB).
+
+⭐ **`245-01` discharged SC#3 and SC#4; SC#1 and SC#2 are untouched and owed.** Five
+`*-VERIFICATION.md` files carry `verification_mode: self-verified` with **ZERO prose deleted**
+(238/240 had no frontmatter at all); `scripts/check-verification-honesty.cjs` +
+`.claude/hooks/verification-honesty-guard.js` (PostToolUse `6 → 7`) were **driven RED on both arms**
+and the victim restored md5-identical. Verdict: `245-VERDICT.md`. Full arm output: `245-01-SUMMARY.md`.
+⚠ **Its own SUMMARY and verdict carry the marker** — this is a SELF-verification under `OV-SOLO-01`.
+⚠ **SC#4 was already true at HEAD before the phase began** while three registers called it pending —
+the mirror of the stale Azure claim `245-03` corrects.
+⚠ **Line-reference correction, per D-08 (original kept below, not overwritten):** `OV-SOLO-01` reads
+**`:487-511`**, not `:474-497` — that pointer was already stale by 13 lines *before* `245-01` touched
+this file, and `245-01` shifted it 2 further. **A stale line reference is how a citation stops being
+checkable.**
+⚠ **Two inherited defects named rather than fixed** (`deferred-items.md`): `244-VERIFICATION.md`'s
+frontmatter **does not parse as YAML, and did not at HEAD** — which is exactly why the gate is
+zero-dependency; and `236-ROSTER-REPORT.md` was already dirty in the working tree.
+
+**Context gathered 2026-09-13** (`245-CONTEXT.md`, `ffbb43c31`)
 
 ⚠ **245's SCOPE TEXT IS STALE AND THE CONTEXT MEASURED IT.** Three of the four ROADMAP success
 criteria are not in the state the ROADMAP / REQUIREMENTS / this file describe — measured at HEAD

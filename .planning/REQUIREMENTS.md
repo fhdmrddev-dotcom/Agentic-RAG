@@ -163,7 +163,7 @@ register knows only the register below it; the code is the bottom.
       (no work/school tenant) and may be retired on that ground alone.
 - [ ] **DEBT-02**: Phase 233's **5** G-4 operator rows driven. Owed since the phase shipped and never
       run.
-- [ ] **DEBT-03**: Every v4.0 phase that closed without an independent §6.3 review (**238, 240, 241**)
+- [x] **DEBT-03**: Every v4.0 phase that closed without an independent §6.3 review (**238, 240, 241**)
       says **"self-verified"** in its own record, and the `OV-SOLO-01` ruling is written into
       `STATE.md → Guardrail overrides` rather than left to lapse. ⚠ **A verdict that reads "reviewed"
       when it was the builder's own is the failure this requirement exists to prevent.**
@@ -207,7 +207,7 @@ Filled by the roadmapper 2026-09-11. **Every REQ-ID above maps to exactly one ph
 | SHELL-05 | 244 — Chat shell + composer | Pending — ⚠ G-2 sketch owed (net-new surface) |
 | DEBT-01 | 245 — The verification debt | Pending — ⚠ blocked on one Azure app registration; **M-1 first** |
 | DEBT-02 | 245 — The verification debt | Pending |
-| DEBT-03 | 245 — The verification debt | Pending — ⭐ **honesty requirement, NOT a re-review** |
+| DEBT-03 | 245 — The verification debt | ✅ **Complete** (`245-01`, 2026-09-13) — marker in FIVE files with ZERO prose deleted, gate + PostToolUse hook driven RED on both arms, SC#4 discharged by citation. ⚠ SC#4 was ALREADY TRUE at HEAD while this row read `Pending`. |
 | RECALL-01 | 246 — The recall cliff | Pending — ⚠ **depends on SHIP-01**; `retrieval_service.py`'s extraction must be proposed first |
 | RECALL-02 | 246 — The recall cliff | Pending — its home is `retrieval_tuning.py`, which has **no ledger row** |
 
