@@ -644,6 +644,7 @@ async def measure_layer1(
 
         await _set_planner(conn, use_index=True)
         await _apply_hnsw_knobs(conn, ef_search=ef_search, iterative_scan=iterative_scan)
+        t_ann0 = time.perf_counter()
         ann_rows = await _match(
             conn,
             query_vector=query_vector,
@@ -654,6 +655,7 @@ async def measure_layer1(
             folder_ids=folder_ids,
             embedding_model=embedding_model,
         )
+        ann_latency_ms = (time.perf_counter() - t_ann0) * 1000.0
 
         exact_ids = {str(row["id"]) for row in exact_rows}
         ann_ids = {str(row["id"]) for row in ann_rows}
@@ -663,6 +665,7 @@ async def measure_layer1(
             "exact_size": len(exact_ids),
             "ann_size": len(ann_ids),
             "underfill": round(1 - (len(ann_ids) / k), 4) if k else None,
+            "latency_ms": round(ann_latency_ms, 2),
         }
         if not exact_ids:
             # ⚠ An empty denominator. The match_threshold predicate legitimately cuts everything
@@ -675,6 +678,15 @@ async def measure_layer1(
 
     scored = [e["recall_at_k"] for e in per_vector if e["recall_at_k"] is not None]
     underfills = [e["underfill"] for e in per_vector if e["underfill"] is not None]
+    latencies = sorted([e["latency_ms"] for e in per_vector if "latency_ms" in e and e["latency_ms"] is not None])
+
+    p50_latency_ms: float | None = None
+    p95_latency_ms: float | None = None
+    if latencies:
+        p50_idx = int(round(0.50 * (len(latencies) - 1)))
+        p95_idx = int(round(0.95 * (len(latencies) - 1)))
+        p50_latency_ms = round(latencies[p50_idx], 2)
+        p95_latency_ms = round(latencies[p95_idx], 2)
 
     result: dict[str, Any] = {
         "shape": filter_shape.name,
@@ -684,12 +696,74 @@ async def measure_layer1(
         "scored_vectors": len(scored),
         "recall_at_k": round(sum(scored) / len(scored), 4) if scored else None,
         "underfill": round(sum(underfills) / len(underfills), 4) if underfills else None,
+        "p50_latency_ms": p50_latency_ms,
+        "p95_latency_ms": p95_latency_ms,
         "per_vector": per_vector,
         "elapsed_seconds": round(time.monotonic() - started, 3),
     }
     if not scored:
         result["reason"] = "every query vector's exact arm returned 0 rows under this predicate"
     return result
+
+
+run_mechanical_eval = measure_layer1
+
+
+async def inspect_execution_plan(
+    conn: asyncpg.Connection,
+    query: str,
+    *args: Any,
+) -> dict[str, Any]:
+    """Inspect the execution plan of a query with EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON).
+
+    Extracts:
+      - uses_index (bool): True if plan employs an HNSW or Index scan
+      - index_name (str | None): The index name identified if present
+      - execution_time_ms (float): Planning/execution time reported by Postgres
+      - idx_scan (int): Count of scans recorded in pg_stat_user_indexes for document_chunks_embedding_idx
+      - plan (dict): The root Plan node
+    """
+    explain_sql = f"EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) {query}"
+    rows = await conn.fetch(explain_sql, *args)
+    if not rows or not rows[0][0]:
+        return {
+            "uses_index": False,
+            "index_name": None,
+            "execution_time_ms": 0.0,
+            "idx_scan": 0,
+            "plan": {},
+        }
+
+    raw = rows[0][0]
+    data = json.loads(raw) if isinstance(raw, str) else raw
+    root = data[0] if isinstance(data, list) and data else {}
+    top_plan = root.get("Plan", {})
+    exec_time = float(root.get("Execution Time", 0.0))
+
+    found_index: list[str] = []
+
+    def _walk(node: dict[str, Any]) -> None:
+        nt = node.get("Node Type", "")
+        idx = node.get("Index Name", "")
+        if "Index" in nt:
+            found_index.append(idx or nt)
+        for child in node.get("Plans", []):
+            _walk(child)
+
+    _walk(top_plan)
+
+    idx_scan = await conn.fetchval(
+        "SELECT COALESCE(idx_scan, 0) FROM pg_stat_user_indexes WHERE indexrelname = 'document_chunks_embedding_idx'"
+    )
+    idx_scan_count = int(idx_scan) if idx_scan is not None else 0
+
+    return {
+        "uses_index": len(found_index) > 0 or idx_scan_count > 0,
+        "index_name": found_index[0] if found_index else ("document_chunks_embedding_idx" if idx_scan_count > 0 else None),
+        "execution_time_ms": exec_time,
+        "idx_scan": idx_scan_count,
+        "plan": top_plan,
+    }
 
 
 # ─────────────────────────────────────────────────────────────────────────────

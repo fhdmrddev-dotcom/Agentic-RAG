@@ -220,3 +220,95 @@ describe("Phase 176 RENDER-02 (D-07) — clean terminal on the MOUNT/reconcile p
     expect(asst?.runStatus).toBe("completed")
   })
 })
+
+/**
+ * ⚠⚠ Phase 243-06 (MD-4) — A FAILED RUN MUST RECONCILE TOO, AND UNTIL NOW IT NEVER DID.
+ *
+ * Both content-reconcile sites gated on `kind === "done" || kind === "reader_done"`.
+ * That narrowing was harmless while `MessageItem` folded a live tool-bearing run's
+ * content into `StreamingNarration` — a failed run's interim blob simply stayed folded.
+ *
+ * ⛔ 243-05 DELETED THAT ARM, which turned the narrowing into a user-visible defect: the
+ * raw narration blob now renders as the answer, through the answer's own renderers, and
+ * PERMANENTLY — because a failed run never reached the reconcile at all. Found by this
+ * phase's own mandatory code review (`243-REVIEW.md` MD-4), not by a fence.
+ *
+ * ⭐ The pair below is the point. §MD-4a proves the reconcile now fires on a failed
+ * terminal; §MD-4b proves it still REFUSES when the backend persisted nothing — because
+ * replacing a bad answer with an empty one is a worse failure than the one being fixed,
+ * and a fix without that guard would pass §MD-4a alone.
+ */
+describe("243-06 MD-4 — a failed terminal reconciles, but never to nothing", () => {
+  function streamThenTerminal(kind: "error" | "cancelled" | "timed_out") {
+    mockSubscribeToRun.mockImplementation(
+      async (_rid: string, _since: string, cb: StreamCallbacks, _signal?: AbortSignal) => {
+        cb.onDelta?.("Let me search the knowledge base. ")
+        cb.onDelta?.("Now I'll generate the chart. ")
+        cb.onDelta?.("Here is the blob answer tail.")
+        cb.onTerminal?.(kind)
+      },
+    )
+  }
+
+  it.each(["error", "cancelled", "timed_out"] as const)(
+    "§MD-4a — a %s terminal swaps the narration blob for the persisted answer (pre-fix it stayed the blob forever)",
+    async (kind) => {
+      streamThenTerminal(kind)
+      const { result } = renderProvider()
+      await act(async () => {
+        result.current.setViewingThread(THREAD_ID)
+      })
+      await act(async () => {
+        await result.current.sendMessage(THREAD_ID, "do a multi-step thing")
+      })
+
+      expect(BLOB).not.toBe(CLEAN_ANSWER) // guard: the two are distinguishable
+      await waitFor(() => {
+        const bucket =
+          useStreamsStore.getState().bucketsBySurface.get("chat")?.get(THREAD_ID) ?? []
+        const asst = bucket.find((m) => m.role === "assistant" && m.runId === RUN_ID)
+        expect(asst?.content).toBe(CLEAN_ANSWER)
+      })
+    },
+  )
+
+  it("§MD-4b — when the backend persisted NO content, the visible blob is left alone rather than blanked", async () => {
+    // The run died before the backend wrote an answer — the ordinary shape of a hard
+    // failure. `!answer.content` is what stops the reconcile turning a bad answer into
+    // no answer at all.
+    mockGetMessages.mockResolvedValue([
+      {
+        id: "persisted-assistant",
+        thread_id: THREAD_ID,
+        user_id: "user-1",
+        role: "assistant",
+        content: "",
+        created_at: "2026-07-07T00:00:00Z",
+        updated_at: "2026-07-07T00:00:00Z",
+        runId: RUN_ID,
+        runStatus: "failed",
+        tool_calls: [],
+      },
+    ])
+    streamThenTerminal("error")
+
+    const { result } = renderProvider()
+    await act(async () => {
+      result.current.setViewingThread(THREAD_ID)
+    })
+    await act(async () => {
+      await result.current.sendMessage(THREAD_ID, "do a multi-step thing")
+    })
+
+    // Give the fire-and-forget reconcile a real chance to do the wrong thing.
+    await act(async () => {
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    const bucket = useStreamsStore.getState().bucketsBySurface.get("chat")?.get(THREAD_ID) ?? []
+    const asst = bucket.find((m) => m.role === "assistant" && m.runId === RUN_ID)
+    expect(asst?.content).toBe(BLOB)
+    expect(asst?.content).not.toBe("")
+  })
+})

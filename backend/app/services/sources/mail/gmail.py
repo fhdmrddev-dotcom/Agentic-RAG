@@ -41,9 +41,8 @@ import json as jsonlib
 import logging
 from typing import Any
 
-from app.models.user_settings import source_max_file_bytes
 from app.security.egress import send_pinned_http
-from app.services.sources.base import FilePage, SourceNode
+from app.services.sources.base import FilePage, SourceNode, clamp_read_cap
 from app.services.sources.mail import mailbox
 
 logger = logging.getLogger(__name__)
@@ -533,9 +532,17 @@ def _decode_raw(raw_b64url: str) -> bytes:
     return base64.urlsafe_b64decode(padded)
 
 
-async def read_message(token: str, message_id: str) -> tuple[str, bytes, str]:
-    """One message as RFC-822 bytes — the same bytes a ``.eml`` upload carries."""
-    ceiling = source_max_file_bytes()
+async def read_message(
+    token: str, message_id: str, max_bytes: int | None = None
+) -> tuple[str, bytes, str]:
+    """One message as RFC-822 bytes — the same bytes a ``.eml`` upload carries.
+
+    ``max_bytes`` (244-08 / T-244-06-07) lets a caller with a TIGHTER ceiling than the
+    operator's say so — the chat's cloud door accepts 10 MB, and a mail id reaches this
+    function through exactly the same picker a Drive file does. Clamped, so it can only
+    tighten; the 4/3 base64 inflation is applied to whichever ceiling won.
+    """
+    ceiling = clamp_read_cap(max_bytes)
     resp = await send_pinned_http(
         EGRESS_KEY,
         "GET",

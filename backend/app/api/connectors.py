@@ -146,6 +146,7 @@ from app.dependencies import (
 )
 from app.models.connector import (
     ApplicationAvailability,
+    ConnectionFileImportRequest,
     ConnectorCheckResponse,
     ConnectorConnectionCreate,
     ConnectorConnectionResponse,
@@ -673,6 +674,7 @@ async def _check_oauth_connection(
     person at their network.
     """
     from app.services.oauth_refresh_service import (  # deferred: keeps the import graph flat
+        OAuthClientCredentialsError,
         OAuthError,
         OAuthRevokedError,
         OAuthTokenUnavailable,
@@ -695,6 +697,32 @@ async def _check_oauth_connection(
     except OAuthRevokedError:
         bucket = "rejected"
         provider_message = "This authorisation was revoked or has expired — reconnect it once."
+    except OAuthClientCredentialsError:
+        # ── ⭐ BUG-260912-01 — THE OPERATOR'S ANSWER, AND THE ONE ARM THAT NAMES US ───────
+        #
+        # Measured 2026-09-12: a deployment whose `GOOGLE_OAUTH_CLIENT_SECRET` no longer
+        # matched its client id reached the generic arm below and answered *"The provider
+        # refused to renew this authorisation."* The operator reconnected — which cannot
+        # work, because the code exchange presents the same secret — and the real cause was
+        # only recoverable by reading the token endpoint's body out of a script.
+        #
+        # ⛔ ABOVE the generic arm, because `OAuthClientCredentialsError` IS an `OAuthError`
+        # and Python takes the first matching clause. Moving it below re-hides the cause.
+        #
+        # ⚠ IT NAMES US, NOT THE PROVIDER AND NOT THE PERSON. Every other sentence on this
+        # route reports what a vendor said; this one reports what OUR configuration is. That
+        # is the distinction the surface above keys on, so the wording carries it explicitly.
+        #
+        # ⚠ NO SECRET AND NO PROVIDER BODY TRAVELS — the docstring's narrowing is unchanged.
+        # The route is `require_org_manage`, so the audience for this sentence is exactly the
+        # audience who can act on it.
+        bucket = "rejected"
+        provider_message = (
+            "The OAuth application credentials configured on this server were rejected by "
+            "the provider — the client ID and client secret for this integration do not "
+            "match a live OAuth client. Reconnecting will not clear this; the credentials "
+            "have to be corrected on the server first."
+        )
     except (OAuthTokenUnavailable, OAuthError) as exc:
         logger.warning(
             "OAuth check failed for connection %s: %s", connection_id, type(exc).__name__
@@ -1787,12 +1815,21 @@ async def list_connection_files(
 async def import_connection_file(
     connection_id: str,
     file_id: str,
+    body: ConnectionFileImportRequest,
     background_tasks: BackgroundTasks,
     active_org: str = Depends(get_active_org_id),
     user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_user_supabase_client),
 ):
-    """Phase 216 / Phase 232 (ATTACH-01 / SRC-01): User-initiated single file import."""
+    """Phase 216 / Phase 232 (ATTACH-01 / SRC-01): User-initiated single file import.
+
+    ⛔ **THE "NOBODY CHOSE A FOLDER" REFUSAL IS ENFORCED BY THE MODEL, NOT BY A BRANCH HERE**
+    (Phase 244 / D-244-06). ``ConnectionFileImportRequest.folder_id`` is a REQUIRED ``str`` on a
+    ``extra="forbid"`` base, so FastAPI answers 422 before this function runs. ⛔ Do NOT
+    "helpfully" add a root fallback: landing a named file somewhere nobody asked for IS
+    `BUG-260905-01`, and a fallback added here would pass every test in
+    ``test_244_import_destination_required.py`` except the one that reads this source.
+    """
     from app.services.sources.import_service import import_single_file
 
     conn = await connector_service.get_connection(
@@ -1811,6 +1848,7 @@ async def import_connection_file(
             active_org=str(active_org),
             background_tasks=background_tasks,
             supabase=supabase,
+            folder_id=body.folder_id,
         )
     # ⚠ BEFORE the broad handler below, which turns anything it catches into a 502 "the
     # provider returned an error". A disabled connection is not a provider error, and wording
@@ -1818,6 +1856,17 @@ async def import_connection_file(
     # (BUG-260907-03).
     except SourceConnectionDisabled as exc:
         raise _disabled_connection_response(exc) from None
+    # ⚠ WR-06 (244-07) — AND BEFORE THE CATCH-ALL FOR THE SAME REASON, one class wider.
+    # Starlette's ``HTTPException`` IS an ``Exception``, so without this arm EVERY deliberate
+    # refusal raised deeper was relabelled: ``async_mint_document_row``'s folder-ownership 403,
+    # its "Folder not found" 404 and the ``on_conflict="raise"`` 409 all arrived as
+    # ``502 "Failed to download cloud file: 403: Cannot upload to a folder you do not own"`` —
+    # a sentence `LibraryCloudImport` renders verbatim, blaming the provider for a file it never
+    # asked for. ⚠ Those branches only became REACHABLE at `244-06`, which is the first commit
+    # that passed ``folder_id``. The sibling route (`workspace.py`) has carried this arm since
+    # the day it was written; the two doors disagreed until now.
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error("Failed to fetch file %s from connection %s: %s", file_id, connection_id, exc)
         raise HTTPException(

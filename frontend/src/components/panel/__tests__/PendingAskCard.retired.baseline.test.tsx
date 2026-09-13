@@ -203,8 +203,39 @@ describe("194.1-01 — the three shipped retirement sentences, READ from source"
      * fences below are UNTOUCHED and all three passed on the same run — which is what says
      * this edit did not disturb what the file actually guards. D-213-14 also stands: this
      * plan added IDENTITY and no receipt field.
+     *
+     * SUPERSEDED IN PLACE A FOURTH TIME BY PHASE 244-15 — `737` -> `837`. Every earlier figure
+     * is kept above rather than overwritten, so the growth curve stays readable:
+     *
+     *   SUPERSEDED (194.1-05):  630.
+     *   SUPERSEDED (200):       650.
+     *   SUPERSEDED (214-11):    737.
+     *
+     * `836` (`wc -l`), i.e. `837` segments. +100, and the CODE change is one optional prop
+     * (`onAnswered`, defaulting to `undefined` so every existing caller — `WorkflowRunPage`
+     * included — renders exactly the card it rendered before), ONE guarded call on the SUCCESS
+     * arm of `handleSubmit`, and a `settleAnswered` callback in `PendingAskStack` that composes
+     * two things it already had: the ask `reconcile()` and the store's
+     * `releaseSettledWorkflowLock`. No new fetch code, no new hook, no new store slice, and
+     * ⛔ NO NEW `useState` — `grep -c "useState[(<]"` reads 9 before and 9 after, which matters
+     * because a tenth would be new state ownership on a cross-surface shell with three homes.
+     * The rest is the reasoning: why the callback fires on success only and never in a `catch`,
+     * and why the stack reaches the STORE rather than the provider hook (eight suites mock the
+     * provider module with an allow-list factory and would throw on an omitted export).
+     *
+     * ⚠ THIS SUITE WAS RED WHEN 244-15 FOUND IT, AND HAD BEEN SINCE `d58fa43a0`, because it was
+     * in NEITHER count-gate knob — the gate never ran it and nothing guarded it. Measured at
+     * this plan's base: `1 failed | 8 passed`, the single failure being this pin reading
+     * `expected 766 to be 737`. It is re-baselined AND adopted into both knobs in the same
+     * commit; an unpinned suite is not a lightly-guarded one, it is an UNGUARDED one.
+     *
+     * RE-BASELINED, NOT LOOSENED, AND NOT HIDING A REGRESSION. The three retirement-sentence
+     * fences below are UNTOUCHED and all three passed on the same run — which is what says this
+     * edit did not disturb what the file actually guards. The pin stays EXACT for the reason
+     * stated above: a range would stop catching a `?raw` import that silently resolved
+     * elsewhere, which is this clause's only job.
      */
-    expect(src.split("\n").length).toBe(737)
+    expect(src.split("\n").length).toBe(837)
   })
 
   /** (a) The 404-expiry constant — `setExpiredMessage("…")` in the catch. */

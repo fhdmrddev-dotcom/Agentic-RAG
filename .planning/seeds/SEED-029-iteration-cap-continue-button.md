@@ -1,7 +1,9 @@
 ---
 seed_id: SEED-029
 title: "Continue" button on iteration-cap stop — user-confirmed escape valve to resume agent loop with a fresh budget (Claude.ai-style)
-status: planted
+status: folded          # folded_into v4.1 (SHELL-02) at /gsd:new-milestone 2026-09-11
+folded_into: "v4.1"
+
 planted: 2026-05-23
 phase_origin: 075.4 context-gathering (operator question about Claude.ai's tool-call-limit Continue affordance)
 related_seeds: [SEED-012, SEED-026]
@@ -95,3 +97,23 @@ Log per-run: `continues_used: int`. Aggregate dashboard answers "are we setting 
 - D-063-04 Resume mechanism — *the API pattern to reuse*
 - v2.7 PRD Harness Engine — *the likely landing zone*
 - BUG-260523-04 — *the test case that determines whether iteration cap is actually hit by legitimate use*
+
+---
+
+## ⛔ ROUTED AT PHASE 244 DISCUSS (2026-09-11) — THE CAPABILITY IS ALREADY SHIPPED
+
+Measured at `5ebd0fbca`: **the Continue affordance exists.** `_MAX_CONTINUES_PER_RUN = 3`
+(`backend/app/api/threads.py:1096`), the `cap_paused` lifecycle state is live and read at
+`threads.py:1234-1253`, the amber card renders the button (`MessageItem.tsx:572-576`), and three suites
+cover it — `MessageItem.continueButton.test.tsx`, `MessageItem.capPaused.test.tsx`,
+`ChatAreaBanner.test.tsx`.
+
+**So the ROADMAP's fold is right for a reason this seed could not have known:** `SEED-029` *"IS"*
+`BUG-260904-05`'s fix only in the sense that the **button** landed and the **composer** did not follow.
+What Phase 244 does is `D-244-08` — stop gating the composer on lock PRESENCE — not build Continue.
+
+⚠ The one item this seed asked for that is **still absent: telemetry** (*"track Continue clicks vs.
+natural completions — informs whether the cap is set correctly"*). Not folded into 244; it is an
+observability question, not a chat-shell one.
+**Re-open trigger (narrowed):** someone asks whether the 15-iteration cap or the 3-continue cap is set
+correctly, and there is no data to answer with.

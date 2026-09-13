@@ -24,8 +24,58 @@
 - ✅ **v3.8 Document Intelligence, Automations & Connectors** — Phases **201-209** (shipped 2026-08-26, git tag `v3.8`). 12 phases, 17 plans, migrations 124-126, 3 days. **11/11 requirements delivered.** Structured tables and email became first-class ingestion; workflows run unattended on a schedule with a brake that really stops work; a run can read its own prior run; and a workflow reaches any official MCP server with per-tool consent and **zero per-vendor adapter code**. ⚠ Closed `gaps_closed_partial` — three requirements are narrower than their wording and are carried with re-open triggers ([`audit`](milestones/v3.8-MILESTONE-AUDIT.md)).
 - ✅ **v3.9 Connections: Any Service, Any Tool** — Phases **210-227** (shipped 2026-09-04, git tag `v3.9`). 16 phases (210-217 CORE + inserts 214.1 / 217.1 + 220-227; **218 absorbed** into 217.1; **219 deferred**), **111 plans**, migrations **127-129 / 140-141 / 150-152**, 9 days. **34/39 requirements delivered · 3 partial · 2 shipped-but-never-driven.** A connection became `{service identity, auth, discovered tools, per-tool grants}` — so adding a service adds **rows, not code**: Notion connects by OAuth with no developer console and returns **41 tools for zero lines of tool code**, and six Google applications sit under one token with **11/11 live writes**. Per-tool grants, an approval moment that stops a real run, an audit receipt per outbound call, connections usable by name in chat, and the Library as one home for documents. ⚠ **Phase 219 DEFERRED to the Connected Knowledge milestone** with `LIB-08/09/10` and `SEED-209/210/211/212` — its SC#1 *“watched on a schedule”* IS this milestone's own binding security re-open trigger ([`audit`](milestones/v3.9-MILESTONE-AUDIT.md)).
 - ✅ **v4.0 Connected Knowledge** — Phases **228-241** (shipped 2026-09-10, git tag `v4.0`). 14 phases, **62 plans**, migrations **153-156 / 166-176**, 6 days. **33/38 requirements delivered · 5 ⛔ not ticked** (`SRC-03` Azure-blocked · `QUEUE-06` remedy shipped but the DEFAULT is unchanged · `SURF-03` home still an open decision · `DEBT-03` ultra ruled out · `DEBT-04` gated on a production push). The knowledge base stopped depending on somebody remembering to upload: a source is connected **once**, previewed before it brings anything in, and then watched on the **shipped** scheduler. Four families as thin adapters over ONE contract — Google Drive · OneDrive/SharePoint via Graph · **any** MCP file server · mail — with **239 proving zero-code by HASH** against GitHub MCP and **240 proving mail is a SHAPE, not a fourth adapter** (`sources/base.py` byte-identical). Connection-scoped visibility at all four RLS sites, a durable queue with cap/retry/resume, and the anti-injection discipline **actually attacked** (13/13 refused · 8/8 mutations caught · live drive refused by 8/8 native providers). ⚠ **241 measured a REAL recall defect at customer scale** — `recall@20` **0.040** at the shipped `ef_search = 40`, a **cliff not a slope**. ⛔ **238, 240 and 241 closed WITHOUT an independent §6.3 review**; two UAT sets owed on credentials ([`audit`](milestones/v4.0-MILESTONE-AUDIT.md)).
+- ✅ **v4.1 Ship It & Feel It** — Phases **242-246** (shipped 2026-09-13, git tag `v4.1`). 5 phases, **25 plans**, migrations **177-180**, 3 days. **18/19 requirements delivered · 1 ⛔ unmet BY MEASUREMENT.** A deliberate **CONSOLIDATION** milestone — no new capability axis; every requirement closed something already in a register. The ship claims closed against the **database and the branch** rather than the deploy record; the chat surface stopped getting in the way (follow-scroll driven with a **real wheel** — 0 px drift, closing `BUG-260823-01` after two fixes that had passed on synthetic events; all five `SHELL` criteria driven in a browser); and v4.0's verification debt got **written verdicts** plus a greppable marker so a self-verification can no longer read as a review. ⭐ **Its best work is the requirement it did NOT deliver:** 246 proved by `EXPLAIN (ANALYZE)` that no `hnsw_ef_search` value fixes the small-tenant recall cliff through the index — every index walk returns **ONE row**, every good recall figure is a **~1.1 s sequential scan** — so the 200 default was **refused and reverted to 40**, with `RECALL-01` left open on `SEED-273`. ⭐ 246 is also the **first peer-reviewed phase since `OV-SOLO-01` was re-armed**. ⚠ Migrations **179/180 are not in cloud** and `production` is **287 commits behind**, so v4.1's own output is undeployed ([`audit`](milestones/v4.1-MILESTONE-AUDIT.md)).
 
 ---
+
+## v4.1 Ship It & Feel It — SHIPPED 2026-09-13
+
+**5 phases** (242-246, no inserts), **25 plans**, migrations **177-180**, 3 days, git tag `v4.1`.
+**18 ✅ delivered · 1 ⛔ unmet BY MEASUREMENT, of 19 requirements.**
+Full detail: [`milestones/v4.1-ROADMAP.md`](milestones/v4.1-ROADMAP.md) ·
+requirements: [`milestones/v4.1-REQUIREMENTS.md`](milestones/v4.1-REQUIREMENTS.md) ·
+audit: [`milestones/v4.1-MILESTONE-AUDIT.md`](milestones/v4.1-MILESTONE-AUDIT.md) ·
+phases: `.planning/phases/24{2,3,4,5,6}-*`
+
+A deliberate **consolidation** milestone — no new capability axis; every requirement closed something
+already sitting in a register. **The ship claims stopped being claims**: all four `SHIP` items closed
+against the database and the branch rather than the deploy record (20/20 migration checks measured in
+cloud; `SHIP-04` confirmed already landed; `SHIP-02` **retired in writing** because the shape its
+drive needed exists nowhere). **The chat surface stopped getting in the way**: one unconditional
+thinking renderer, a 60 ms coalescer, and a follow-scroll finally driven with a **real wheel** —
+0 px drift, 0 app scrolls, closing `BUG-260823-01` after two prior fixes that had passed on synthetic
+events. All five `SHELL` criteria were **driven in a browser**, `SHELL-03` only on the second attempt
+after being driven FALSE. **v4.0's verification debt got verdicts**: rows discharged or retired in
+writing, and a greppable `verification_mode` marker shipped **with zero prose deleted**, so a
+self-verification can no longer read as a review.
+
+⭐ **The milestone's best work is a requirement it did NOT deliver.** Phase 246 set out to fix the
+small-tenant recall cliff by raising `hnsw_ef_search` to 200 and proved by `EXPLAIN (ANALYZE)` that
+**no value fixes it through the index**: 40/60/80 walk the index and return **ONE row** (~0.05 recall,
+~4 ms); 100/150/200 reach recall 1.000 by **sequential scan** (~1,100 ms). Shipping 200 would have
+cost **every** tenant ~1.1 s a query to cure a cliff only small tenants have. Default reverted to 40;
+`RECALL-01` left open with `SEED-273` (`hnsw.iterative_scan`) as the remaining path. ⚠ Phase 241's
+contrary conclusion **never inspected an execution plan**.
+
+⭐ **Two-agent separation returned.** 246 is the **first phase since `OV-SOLO-01` was re-armed** to
+carry `verification_mode: peer-reviewed` (gemini built, claude reviewed at three gates); the one
+commit inside it authored by the reviewer is **named** self-verified rather than folded into the
+headline — and the close audit then found `INT-01` inside exactly that commit.
+
+⛔ **Open at close:** `RECALL-01` (above) · migrations **179 and 180 are NOT in cloud** (measured) ·
+`origin/production` **287 commits behind `develop`**, so v4.1's own output is undeployed — the state
+v4.1 was opened to end for v4.0 · 245's four named residues, including the independent §6.3 review
+still owed by 238 / 240 / 241 · `SEED-172`, whose trigger **fired at this close** (local models still
+cannot be registered, timed out or given a context window through the UI) · `SEED-272`.
+
+⚠⚠ **THE CLOSE'S OWN FINDING, recorded because it recurred one milestone after being corrected:**
+the Progress table in this file read **`0 / 5 phases complete · 0 / 19 requirements delivered`** with
+all five phases closed and fourteen boxes ticked — and that is the register the close reads to build
+the archive. Drift ran in **both** directions: `SHIP-02/03/04` unchecked while their traceability rows
+carried full closing evidence; `SHELL-04/05` and `RECALL-02` ticked while their rows read *"Pending"*.
+**A coverage check run against the wrong denominator is how a requirement survives a milestone
+unnoticed** — v4.0 shipped with that defect in the requirement COUNT, v4.1 nearly shipped with it in
+the phase STATUS. Re-derive from the phase directories, never from a summary line.
 
 ## v4.0 Connected Knowledge — SHIPPED 2026-09-10
 
@@ -75,6 +125,12 @@ the builder's own. **A self-verification is not a review, and this milestone con
 Azure app registration; 241's row 5 needs a read-capable cloud DSN. ⚠⚠ **241's row 5 has a
 DEADLINE: it dies the moment migration 176 reaches cloud.** ⛔ **Cloud is 15 migrations behind**
 (`153-156`, `166-176`); v4.0 has not deployed.
+
+⚠ **CORRECTED 2026-09-13 (Phase 245) — the paragraph above is preserved, not deleted, because the
+rot being visible IS the finding.** The "238's nine live rows need one Azure app registration" half
+is **FALSE, and was false when written.** All nine of 238's M rows were **DRIVEN LIVE on 2026-09-07** (`238-VERIFICATION.md:213-231` — 7 full pass, 2 half at the time; **four defects found by driving and NONE by the 15-case unit suite**). The operator completed the Azure registration *hours after* `238-SUMMARY.md` was written. **The blocker was
+discharged six days before six live registers stopped saying so.** ⛔ 241's row 5 half **remains
+true** — it still needs a read-capable cloud DSN, and it still dies when migration 176 reaches cloud.
 
 ⭐ **The method failure worth carrying forward, committed three times in one hour by the audit
 written to catch it:** a file listing is not a review; a review is a claim ABOUT code; a summary is a

@@ -77,6 +77,45 @@ export async function uploadWorkspaceTemplate(
   return { ...row, id: row.id ?? row.file_id }
 }
 
+/**
+ * Phase 244 (SHELL-04 / D-244-05 / BUG-260905-01) — attach ONE connected-cloud file to THIS
+ * THREAD via `POST /threads/{tid}/workspace/files/from-connection`.
+ *
+ * ⛔ THIS IS DELIBERATELY NOT `importCloudFile`. That one drives the LIBRARY's single-file
+ * import and mints a `documents` row; this one writes a `workspace_files` row under the same
+ * 24h TTL read gate a local attach gets, and **no `documents` row at all**. Both composer
+ * doors therefore mean the same thing — *this conversation* — which is the un-inversion
+ * `BUG-260905-01` asks for.
+ *
+ * The throw shape mirrors `uploadWorkspaceTemplate`'s exactly: `err.detail` is the server's
+ * OWN sentence and it is never paraphrased, so one refusal vocabulary serves both doors.
+ */
+export async function attachConnectionFileToThread(
+  threadId: string,
+  connectionId: string,
+  fileId: string,
+): Promise<WorkspaceFile> {
+  const token = await getAuthToken()
+  const res = await fetch(`${API_BASE}/threads/${threadId}/workspace/files/from-connection`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ connection_id: connectionId, file_id: fileId }),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Attach failed" }))
+    const detail = (err as { detail?: unknown }).detail
+    // FastAPI sends either a plain string `detail` or `{reason_code, message}` — the disabled
+    // connection uses the second shape, and dropping it would print "[object Object]".
+    const message =
+      typeof detail === "string"
+        ? detail
+        : (detail as { message?: string } | null)?.message ?? "Attach failed"
+    throw new Error(message)
+  }
+  const row = (await res.json()) as WorkspaceFile & { file_id?: string }
+  return { ...row, id: row.id ?? row.file_id }
+}
+
 // Phase 067.3 (D-067.3-R2-01/02/04): JS blob fetch+download for
 // /sandbox-outputs/{path}. Plain <a href> clicks send only cookies and
 // the FastAPI get_current_user dependency reads Authorization: Bearer

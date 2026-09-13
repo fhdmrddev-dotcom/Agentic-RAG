@@ -90,6 +90,7 @@ export type SourceFailureCause =
   | "folder_gone"
   | "unreachable"
   | "connection_disabled"
+  | "app_credentials_invalid"
   | "unknown"
 
 /** The per-FILE failure reasons, for a file inside an otherwise healthy source. */
@@ -142,6 +143,16 @@ export const SENTENCE_FOR_CAUSE: Record<
   //   (the control below), never by a setting name.
   connection_disabled: (connectionName) =>
     `The connection to ${named(connectionName)} is switched off — reading resumes when it is switched back on.`,
+  // ⭐ THE SIXTH CAUSE (BUG-260912-01). It is the only member whose fix belongs to the
+  //   OPERATOR rather than to the person reading this row, and the sentence has to carry
+  //   that or the reader will try the door they already have — which is what happened.
+  //   ⚠ It NAMES the useless action in order to rule it out. Staying silent about
+  //     reconnecting would be cheaper and worse: a person looking at a stopped source
+  //     reaches for Reconnect by default, and this is the one cause it cannot fix.
+  //   ⚠ Its identifier is deliberately not spelled in this comment — the suite counts
+  //     occurrences over this file's source and pins them at four.
+  app_credentials_invalid: (connectionName) =>
+    `The credentials this server uses to reach ${named(connectionName)} were rejected — an administrator has to correct them, and reconnecting will not clear it.`,
   unknown: () => UNKNOWN_SOURCE_FAILURE_SENTENCE,
 }
 
@@ -172,6 +183,18 @@ export const CONTROL_FOR_CAUSE: Record<
   //     pin therefore stays green BY CONSTRUCTION, not by being loosened.
   connection_disabled: {
     label: (connectionName) => `Turn ${named(connectionName)} back on`,
+    action: "reconnect",
+  },
+  // ⭐ THE SIXTH ROW (BUG-260912-01). ⚠ The label is NOT "Reconnect": the operator on the
+  //   2026-09-12 measurement DID reconnect, twice, and could not have succeeded — the
+  //   authorization-code exchange presents the same rejected secret. What does work is
+  //   pressing **Check** on the Connections surface, which now names this state outright.
+  //   ⚠ The ACTION reuses `reconnect` rather than inventing a fourth, exactly as the row
+  //     above does: `reconnect` is a DOOR — the Connections surface — and that is where
+  //     these credentials are corrected. The three-named-actions pin stays green BY
+  //     CONSTRUCTION rather than by being loosened.
+  app_credentials_invalid: {
+    label: (connectionName) => `Check ${named(connectionName)} in Settings`,
     action: "reconnect",
   },
   unknown: { label: () => "Retry now", action: "retry" },
@@ -260,6 +283,20 @@ const MATCHERS: ReadonlyArray<{
   cause: Exclude<SourceFailureCause, "unknown">
   test: RegExp
 }> = [
+  {
+    // ⭐ FIRST, AND THE ORDER IS THE WHOLE FIX (BUG-260912-01). The real body carries BOTH
+    // tells: the §5.2 error code, and the `401` that the arm below matches on. Asked second,
+    // this cause is unreachable in practice — every one of these arrives on a 400 or a 401 —
+    // and the surface tells an operator to reconnect a connection whose reconnect cannot work.
+    // ⚠ Narrow on the wording: the error CODE, and the two phrasings of the one sentence the
+    //   provider returns beside it. Never the bare word "client", never a status on its own.
+    //   `unauthorized_client` is deliberately left to the arm below — it is about this grant
+    //   type for this client, not about the credentials themselves, and the backend's refresh
+    //   service already reads it as a revoked grant. Two modules disagreeing about one code
+    //   is precisely the drift the shared vocabulary exists to prevent.
+    cause: "app_credentials_invalid",
+    test: /\binvalid_client\b|client secret is invalid|invalid client secret/i,
+  },
   {
     cause: "token_revoked",
     test: /invalid_grant|token (?:has been )?(?:expired|revoked)|(?:expired|revoked) (?:credentials|token)|unauthoriz|unauthoris|\b401\b|\b403\b|permission|insufficient (?:authentication )?scopes|access denied|forbidden/i,

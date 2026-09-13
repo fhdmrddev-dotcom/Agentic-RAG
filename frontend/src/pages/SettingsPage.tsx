@@ -55,9 +55,32 @@ import { TechnicalNamesToggle } from "@/components/admin/TechnicalNamesToggle"
 import { useTechnicalNames } from "@/providers/TechnicalNamesProvider"
 import { usePlainLabel } from "@/lib/termMap"
 
-const KEY_PLACEHOLDER = "***"
+// Phase 242 — the payload helpers moved to `./settingsSearchPayload` (react-refresh:
+// exporting non-components from a component file breaks Fast Refresh on this page).
+import {
+  KEY_PLACEHOLDER,
+  searchPayloadFrom,
+  searchBodyFor,
+} from "./settingsSearchPayload"
 
-const PROVIDER_META: Record<string, { label: string; defaultBase: string; keyLabel: string }> = {
+/**
+ * `selfHosted` marks a provider whose ENDPOINT belongs to the operator rather than a vendor.
+ * Those cards render a Base URL field AND an API-key field; every other card renders the key
+ * alone, because its endpoint is fixed in `_PROVIDER_BASE_URLS` and is not ours to change.
+ *
+ * ⚠ This flag replaces a bare `provider.id === "ollama"` check, which is why LM Studio — a
+ * first-class provider since Phase 111 — had NO way to set its base URL for its entire life,
+ * and why its card offered an API-key box writing to a column that did not exist until
+ * migration 180. It must stay in step with `_SELF_HOSTED_PROVIDERS` in `backend/app/config.py`.
+ *
+ * `urlHint` states the /v1 rule per provider, because the two halves differ and getting it
+ * wrong is silent: ollama's stored URL omits /v1 (the backend appends it), everyone else's
+ * is used verbatim.
+ */
+const PROVIDER_META: Record<
+  string,
+  { label: string; defaultBase: string; keyLabel: string; selfHosted?: boolean; urlHint?: string }
+> = {
   openai:     { label: "OpenAI",                    defaultBase: "api.openai.com",                    keyLabel: "API Key" },
   anthropic:  { label: "Anthropic",                 defaultBase: "api.anthropic.com",                 keyLabel: "API Key" },
   google:     { label: "Google Gemini",             defaultBase: "generativelanguage.googleapis.com", keyLabel: "API Key" },
@@ -66,7 +89,21 @@ const PROVIDER_META: Record<string, { label: string; defaultBase: string; keyLab
   minimax:    { label: "MiniMax",                   defaultBase: "api.minimax.chat",                  keyLabel: "API Key" },
   zhipu:      { label: "GLM (Zhipu)",               defaultBase: "open.bigmodel.cn",                  keyLabel: "API Key" },
   openrouter: { label: "OpenRouter (experimental)", defaultBase: "openrouter.ai",                     keyLabel: "API Key" },
-  ollama:     { label: "Ollama",                    defaultBase: "http://localhost:11434",             keyLabel: "Base URL" },
+  ollama: {
+    label: "Ollama (local)", defaultBase: "http://localhost:11434", keyLabel: "API Key (optional)",
+    selfHosted: true,
+    urlHint: "Paste the endpoint you curl — /v1 included. It is stored without the suffix and re-added automatically.",
+  },
+  lmstudio: {
+    label: "LM Studio (local)", defaultBase: "http://localhost:1234/v1", keyLabel: "API Key (optional)",
+    selfHosted: true,
+    urlHint: "Include /v1 — this URL is used exactly as typed.",
+  },
+  custom: {
+    label: "Custom endpoint (OpenAI-compatible)", defaultBase: "", keyLabel: "API Key (optional)",
+    selfHosted: true,
+    urlHint: "Any OpenAI-compatible server — vLLM, Unsloth, llama.cpp, or a tunnel. Include /v1; used exactly as typed.",
+  },
 }
 
 // Phase 123.1-03 (D-09 / D-10) — the skill-builder model picker no longer uses a
@@ -266,7 +303,7 @@ function ProviderCard({
   onSetActive: () => void
 }) {
   const meta = PROVIDER_META[provider.id]
-  const isOllama = provider.id === "ollama"
+  const isSelfHosted = meta?.selfHosted === true
 
   return (
     <div className={cn(
@@ -295,30 +332,40 @@ function ProviderCard({
       </div>
 
       <div className="space-y-2">
-        {isOllama ? (
+        {/* SEED-173 — a self-hosted card shows BOTH halves. The old code showed the Base URL
+            field INSTEAD of the key field, and only for ollama, so an endpoint behind real
+            auth (vLLM --api-key, a tunnel with a bearer token) was unreachable by design. */}
+        {isSelfHosted && (
           <div>
             <Label className="text-xs text-muted-foreground mb-1 block">Base URL</Label>
             <TextInput
-              value={state.base_url || meta?.defaultBase || "http://localhost:11434"}
+              value={state.base_url || meta?.defaultBase || ""}
               onChange={(v) => onChange({ ...state, base_url: v })}
-              placeholder="http://localhost:11434"
+              placeholder={meta?.defaultBase || "https://your-host.example.com/v1"}
             />
-          </div>
-        ) : (
-          <div>
-            <Label className="text-xs text-muted-foreground mb-1 block">{meta?.keyLabel ?? "API Key"}</Label>
-            <ApiKeyInput
-              value={state.api_key}
-              onChange={(v) => onChange({ ...state, api_key: v })}
-            />
+            {meta?.urlHint && (
+              <p className="text-[11px] text-muted-foreground mt-1">{meta.urlHint}</p>
+            )}
           </div>
         )}
+        <div>
+          <Label className="text-xs text-muted-foreground mb-1 block">{meta?.keyLabel ?? "API Key"}</Label>
+          <ApiKeyInput
+            value={state.api_key}
+            onChange={(v) => onChange({ ...state, api_key: v })}
+          />
+          {isSelfHosted && (
+            <p className="text-[11px] text-muted-foreground mt-1">
+              Leave empty for a server with no auth — a placeholder is sent for you.
+            </p>
+          )}
+        </div>
         <div>
           <Label className="text-xs text-muted-foreground mb-1 block">Models (comma-separated)</Label>
           <TextInput
             value={state.models}
             onChange={(v) => onChange({ ...state, models: v })}
-            placeholder={isOllama ? "llama3.2,mistral,codellama" : "model-a,model-b"}
+            placeholder={isSelfHosted ? "the exact id from GET <base-url>/models" : "model-a,model-b"}
           />
         </div>
       </div>
@@ -553,6 +600,7 @@ function AuditLogSection() {
  * rendered either way, so an operator saw the duplicate. Connections now has its own
  * page (`pages/ConnectionsPage.tsx`) and this page has one door again.
  */
+
 export function SettingsPage() {
   const featuresCtx = useEffectiveFeaturesOptional()
   const canManageModels = featuresCtx?.features.model_management === true
@@ -674,11 +722,9 @@ export function SettingsPage() {
   const [vectorWeight, setVectorWeight] = useState(1.0)
   const [keywordWeight, setKeywordWeight] = useState(1.0)
   const [rrfK, setRrfK] = useState(60)
-  // Phase 241 (QUEUE-06 / D-09) — search breadth and iterative scan. ⛔ The BOUNDS are served
-  // by `GET /settings` and start as null, exactly like the source ceiling above: there is no
-  // honest cold value for a bound the server has not stated yet, and typing 10/1000 here would
-  // make the form a second private copy of numbers migration 176's CHECK also carries.
-  const [hnswEfSearch, setHnswEfSearch] = useState(40)
+  // Phase 246 (RECALL-02 / Finding 1 / D-246-06) — hnswEfSearch starts as null (pre-fetch state)
+  // so the screen renders a neutral skeleton rather than asserting a compiled-in guess on first paint.
+  const [hnswEfSearch, setHnswEfSearch] = useState<number | null>(null)
   const [hnswIterativeScan, setHnswIterativeScan] = useState("off")
   const [hnswEfSearchFloor, setHnswEfSearchFloor] = useState<number | null>(null)
   const [hnswEfSearchCeiling, setHnswEfSearchCeiling] = useState<number | null>(null)
@@ -714,6 +760,11 @@ export function SettingsPage() {
   // supplies `deprecated_models` in the settings payload; the picker lights up the
   // `deprecated` badge for these. Defensive default (absent → empty set → no badge).
   const [deprecatedModels, setDeprecatedModels] = useState<Set<string>>(new Set())
+
+  // Phase 242 (D-242-02) — the Search tab's payload as `hydrate` left it. `null` means settings
+  // were never loaded, which is NOT the same as "nothing changed": `handleSaveSearch` sends the
+  // full payload in that case rather than collapsing an unknown into an empty diff.
+  const [searchBaseline, setSearchBaseline] = useState<SettingsUpdate | null>(null)
 
   const hydrate = (data: FullAppSettings) => {
     setS(data)
@@ -765,12 +816,8 @@ export function SettingsPage() {
     setVectorWeight(data.vector_search_weight)
     setKeywordWeight(data.keyword_search_weight)
     setRrfK(data.rrf_k)
-    // Phase 241. ⚠ HI-02, the same rule the source ceiling above states: the STORED value is
-    // always rendered, and `??` covers only a backend predating the field entirely — never a
-    // stored value, which would make "open the page and press Save" a silent reset. Migration
-    // 176 being authored-but-not-applied is NOT that case: the column is absent, `_val()`
-    // returns the config default, and the server still sends 40 / "off".
-    setHnswEfSearch(data.hnsw_ef_search ?? 40)
+    // Phase 246 (Finding 1): delete dead ?? fallback; backend GET /settings returns non-optional int
+    setHnswEfSearch(data.hnsw_ef_search)
     setHnswIterativeScan(data.hnsw_iterative_scan ?? "off")
     setHnswEfSearchFloor(data.hnsw_ef_search_floor ?? null)
     setHnswEfSearchCeiling(data.hnsw_ef_search_ceiling ?? null)
@@ -793,6 +840,9 @@ export function SettingsPage() {
     setInferredProviderFor(data.inferred_provider_for ?? {})
     // Phase 149 (D-149-05): seed the deprecated set defensively (Plan 05 payload).
     setDeprecatedModels(new Set(data.deprecated_models ?? []))
+    // Phase 242 (D-242-02) — re-arm the Search-tab diff baseline. `hydrate` runs on load AND after
+    // every successful save, so a second save of the same edit correctly sends `{}`.
+    setSearchBaseline(searchPayloadFrom(data))
   }
 
   // ⚠ `GET /settings` IS ITSELF `model_management`-GATED, so this fetch is a 403 for a
@@ -871,7 +921,7 @@ export function SettingsPage() {
   }
 
   const handleSaveSearch = async () => {
-    const body: SettingsUpdate = {
+    const full: SettingsUpdate = {
       embedding_model: embeddingModel,
       embedding_api_key: embeddingApiKey || KEY_PLACEHOLDER,
       embedding_base_url: embeddingBaseUrl,
@@ -896,9 +946,16 @@ export function SettingsPage() {
       keyword_search_weight: keywordWeight,
       rrf_k: rrfK,
       // Phase 241 (QUEUE-06 / D-09) — the two knobs ride the payload this tab already sends.
-      hnsw_ef_search: hnswEfSearch,
+      hnsw_ef_search: hnswEfSearch ?? undefined,
       hnsw_iterative_scan: hnswIterativeScan,
     }
+
+    // Phase 242 (D-242-02) — send only what CHANGED. A field the operator never touched can no
+    // longer refuse the whole tab, and Phase 246's hnsw_* remedy stops being hostage to an
+    // unrelated stored value drifting out of range. See the header block above this component for
+    // why this is changed-fields-only rather than report-all-errors, and for the two fences that
+    // stand against the silent-drop failure.
+    const body: SettingsUpdate = searchBodyFor(full, searchBaseline)
 
     // Phase 111.1 D-02/D-03 — confirm-on-save gate. ONLY fire when the embedding
     // model OR dimensions actually changed (a no-change save commits silently).
@@ -1563,13 +1620,17 @@ export function SettingsPage() {
                     toggle would hide a control that is still in effect.
                     ⛔ The bounds are SERVED, never typed here — see `hnswEfSearchFloor`. */}
                 <FieldRow label="Search breadth">
-                  <NumberInput
-                    value={hnswEfSearch}
-                    onChange={setHnswEfSearch}
-                    min={hnswEfSearchFloor ?? undefined}
-                    max={hnswEfSearchCeiling ?? undefined}
-                    ariaLabel="Search breadth"
-                  />
+                  {hnswEfSearch === null ? (
+                    <div className="h-8 w-full rounded-md bg-muted/40 animate-pulse" aria-label="Loading search breadth" />
+                  ) : (
+                    <NumberInput
+                      value={hnswEfSearch}
+                      onChange={setHnswEfSearch}
+                      min={hnswEfSearchFloor ?? undefined}
+                      max={hnswEfSearchCeiling ?? undefined}
+                      ariaLabel="Search breadth"
+                    />
+                  )}
                 </FieldRow>
                 <p className="text-xs text-muted-foreground -mt-1 mb-2">
                   How many candidate passages the index looks at before your filters are
@@ -1580,19 +1641,29 @@ export function SettingsPage() {
                   {hnswEfSearchFloor !== null && hnswEfSearchCeiling !== null && (
                     <> {" "}Allowed: {hnswEfSearchFloor}&ndash;{hnswEfSearchCeiling}.</>
                   )}
-                  {/* Phase 241 — the RECOMMENDATION, stated as EVIDENCE rather than as a blanket
-                      prescription. Measured on a 100,000-passage bench at three tenant sizes
-                      (241-VALIDATION.md): 200 reached full recall at every one, and 1000 was
-                      REPRODUCIBLY WORSE than 400 — so "set it as high as it goes" is measurably
-                      wrong here, and the ceiling is not the goal. Say what was measured, not
-                      what the operator ought to want. */}
+                  {/* Phase 241 & 246 — the RECOMMENDATION, stated as EVIDENCE rather than as a blanket
+                      prescription. ⚠ CORRECTED 2026-09-13 (Phase 246) — the original is kept
+                      because the claim it made is the finding. It read: "Measured on a
+                      100,000-passage bench at three tenant sizes (241-VALIDATION.md): 200
+                      reached full recall at every one". ⛔ That number was real but its
+                      MECHANISM was not what anyone believed: 246 inspected the execution plan
+                      and found the planner ABANDONS the HNSW index above ef ~80, so 200's
+                      "full recall" was a SEQUENTIAL SCAN at ~1.1s, not a wider index search.
+                      Phase 241 never inspected a plan. Every genuine index walk returns ONE
+                      row, so no ef_search value repairs the cliff — the default is back at 40
+                      and the real lever is likely hnsw.iterative_scan. Full ladder:
+                      246-VERIFICATION-DATA.md. Say what was measured, AND how it was measured —
+                      241 said the first and not the second, which is why this rotted. */}
                   {" "}
                   <span className="font-medium text-foreground">
-                    200 is a good starting point
+                    Default is 40
                   </span>
-                  {" "}&mdash; on our 100,000-passage test library it returned every result that
-                  should have been found, for small and large teams alike. Higher is not better:
-                  1000 measured worse than 400.
+                  {" "}&mdash; raising this does not reliably widen the search. On a
+                  100,000-passage test library, values of 100 and above made the database stop
+                  using its search index and read every passage instead: answers got complete,
+                  but each search took about a second rather than four milliseconds. Values below
+                  that kept the index and returned very little for a small team. If searches are
+                  missing results, tell us rather than raising this — the setting is not the fix.
                 </p>
 
                 {/* ⛔ A SELECT, NEVER A TOGGLE. `strict_order` and `relaxed_order` are two

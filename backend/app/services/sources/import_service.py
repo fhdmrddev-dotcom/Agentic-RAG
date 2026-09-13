@@ -274,8 +274,19 @@ list_cloud_files = browse_connection_files
 async def fetch_cloud_file(
     connection: Any,
     file_id: str,
+    max_bytes: int | None = None,
 ) -> tuple[str, bytes, str]:
-    """Download a single file from connected source (legacy shim)."""
+    """Download a single file from connected source (legacy shim).
+
+    ``max_bytes`` — Phase 244-08 (T-244-06-07). A caller whose own ceiling is BELOW the
+    operator's source ceiling passes it here, and the refusal then happens at the transport
+    instead of after the body is resident in a worker. The chat's cloud door accepts 10 MB and
+    used to ask for the whole 25 MB source ceiling, then measure `len(raw)` and throw the rest
+    away — 2.5x the declared cap resident per concurrent attach, on `WORKER_COUNT=2`.
+
+    ⚠ DEFAULT ``None`` = the operator ceiling, so the Library import path, the watch loop and
+    the preview service are untouched.
+    """
     # ⚠ A FOURTH PROVIDER LEAK, AND THE ONE NOBODY HAD SPOTTED — found by the rewritten
     # boundary fence on its FIRST run (Phase 238 / D-238-09). It fell back to the Drive
     # adapter when `"google" in service_name.lower()`, and `service_name` is the connection's
@@ -289,4 +300,4 @@ async def fetch_cloud_file(
             connection.get("service_id", "") if isinstance(connection, dict) else ""
         )
         raise NotImplementedError(f"Cloud file fetching not implemented for service: {service_id}")
-    return await adapter.read_file(connection, file_id)
+    return await adapter.read_file(connection, file_id, max_bytes=max_bytes)

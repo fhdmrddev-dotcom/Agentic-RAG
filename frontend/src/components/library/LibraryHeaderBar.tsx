@@ -54,6 +54,20 @@ export interface LibraryHeaderBarProps {
   /** The `<screen>-tabslist` shell hook (217.1-18). It rides on the VISIBLE control, because
    *  after this change there is only one. */
   listTestId?: string
+  /**
+   * Phase 244 plan 04 (SHELL-05 · BUG-260911-03) — HOW MANY THINGS EACH TAB OWES ATTENTION.
+   *
+   * The app-shell badge names a count and stops at the Library door; the operator's complaint
+   * was that *"the badge creates a question it then refuses to answer"*. **The shell says THAT;
+   * this row says WHERE.**
+   *
+   * ⚠ A tab that is absent — or `0` — renders NOTHING. No zero badge, no reserved space, no
+   * dimmed dot. The resting Library is byte-identical to before.
+   *
+   * ⛔ This component DERIVES nothing and FETCHES nothing. It is handed a map, exactly as it is
+   * handed `tabs` and `inFlight`. The verdict is the server's (`D-235-05`).
+   */
+  attention?: Readonly<Record<string, number>>
   className?: string
 }
 
@@ -66,6 +80,7 @@ export function LibraryHeaderBar({
   totalDocuments,
   onOpenQueue,
   listTestId,
+  attention,
   className,
 }: LibraryHeaderBarProps) {
   const live = inFlight > 0
@@ -106,24 +121,51 @@ export function LibraryHeaderBar({
         data-testid={listTestId ?? "library-tabseg"}
         className="flex gap-0.5 rounded-lg border border-border/60 bg-card/60 p-0.5"
       >
-        {tabs.map(([value, label]) => (
-          <button
-            key={value}
-            type="button"
-            role="tab"
-            aria-selected={tab === value}
-            data-tab={value}
-            onClick={() => onSelectTab(value)}
-            className={cn(
-              "rounded-md px-3 py-1 text-xs transition-colors",
-              tab === value
-                ? "bg-accent text-foreground font-medium"
-                : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            {label}
-          </button>
-        ))}
+        {tabs.map(([value, label]) => {
+          // ⚠ Empty ⇒ render NOTHING. A `0` badge is a control that lights up to say there is
+          // nothing to look at, and the reclaim this row exists for is exactly what that costs.
+          const owed = attention?.[value] ?? 0
+          return (
+            <button
+              key={value}
+              type="button"
+              role="tab"
+              aria-selected={tab === value}
+              data-tab={value}
+              onClick={() => onSelectTab(value)}
+              className={cn(
+                // `relative` anchors the mark below and is inert without it.
+                "relative rounded-md px-3 py-1 text-xs transition-colors",
+                tab === value
+                  ? "bg-accent text-foreground font-medium"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {label}
+              {/* ⛔ `aria-hidden` IS NOT DECORATION — a badge may decorate a control's name, it
+                  may NOT rename it. `IngestionTab.tsx:176-188` measured six `getByRole` cases
+                  breaking when a tab's accessible name became "In progress 3", and there are
+                  41+ `getByRole("tab", { name })` cases against THIS control. The count is what
+                  a person SEES; the name a screen reader announces stays the tab's own.
+
+                  ⚠ A COUNT, not a dot (D-244-15 left the draw to the builder). The shell has
+                  already earned a number and the operator's own point is that *"the cost scales
+                  the wrong way"* — a dot would throw that number away at exactly the moment it
+                  starts being worth having. The warning tone and the pill shape are the SHIPPED
+                  rail-badge vocabulary (D-244-18: this surface is operator-approved, so no new
+                  mark is invented here). A source state is never drawn in the danger token. */}
+              {owed > 0 && (
+                <span
+                  data-testid={`library-tab-attention-${value}`}
+                  aria-hidden="true"
+                  className="absolute -top-1 -right-1 min-w-[16px] h-[16px] px-1 rounded-full bg-warning text-warning-foreground text-[10px] font-bold leading-[16px] text-center"
+                >
+                  {owed}
+                </span>
+              )}
+            </button>
+          )
+        })}
       </div>
 
       {/* ⭐ THE RECLAIMED CORNER DOES A JOB. The right half of this band was empty; it now carries

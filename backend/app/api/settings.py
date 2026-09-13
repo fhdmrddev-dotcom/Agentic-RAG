@@ -1,8 +1,15 @@
+import logging
+
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel, Field
 from supabase import Client
 
-from app.config import MODEL_CAPABILITIES, _infer_provider_for
+from app.config import (
+    MODEL_CAPABILITIES,
+    _infer_provider_for,
+    _SELF_HOSTED_PROVIDERS,
+    normalize_self_hosted_base_url,
+)
 from app.dependencies import get_current_user, get_supabase, require_visible
 from app.models.user_settings import (
     HNSW_EF_SEARCH_CEILING,
@@ -22,7 +29,24 @@ from app.services.audit_service import write_audit_entry
 from app.services.reembed_service import start_reembed
 from app.services.skill_tuner_service import resolve_skill_builder_model
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/settings", tags=["settings"])
+
+# Phase 242 (D-242-03) — the settings columns `_range_refusal_detail` is allowed to read back.
+# ⛔ An ALLOW-LIST rather than a bare `getattr`: the settings object also carries ten provider API
+#    keys and the Supabase management token, and this function's return value goes straight into an
+#    HTTP 400 body. Keep it in step with the numeric bounds in `update_settings` — and note that
+#    `backend/tests/unit/test_242_stored_value_refusal.py` already asserts that EVERY bound the
+#    `ast` detector finds routes through this helper, so adding a bound without updating both reds.
+_BOUNDED_SETTINGS_FIELDS = frozenset(
+    {
+        "multimodal_max_vision_calls",
+        "vision_max_pages",
+        "source_max_file_size_mb",
+        "hnsw_ef_search",
+    }
+)
 
 # ── Phase 163 (TEN-02 / D-03 / D-05) — settings client policy ─────────────────
 # These handlers KEEP the hardened service-role client (classified carve-out, marked
@@ -367,6 +391,68 @@ def _validate_confidence_buckets(high: float | None, medium: float | None) -> No
         )
 
 
+async def _range_refusal_detail(
+    *,
+    field: str,
+    label: str,
+    submitted,
+    lo,
+    hi,
+    typed_detail: str,
+) -> str:
+    """Phase 242 (D-242-03) — when the value being refused is the one ALREADY STORED, say so.
+
+    ⛔ WHY THIS EXISTS. Every bound below refuses with a sentence that is truthful about the RULE
+    and silent about the CAUSE. The operator's install held `multimodal_max_vision_calls = 1001` —
+    a value they never typed — and the Search tab sent all 24 of its fields on every save, so that
+    sentence appeared while they were editing a retrieval threshold, naming a field on a card they
+    had not opened. It reads as a rejection of what they just typed. It was not.
+
+    ⚠ D-242-02 (changed-fields-only) makes the untouched-field path unreachable FROM THE UI — it
+    does not make it unreachable. The operator can edit the offending field itself, and any other
+    client can send the stored value back. So the sentence is still owed.
+
+    ⛔ THIS MUST NEVER TURN A 400 INTO A 500. The nicer sentence needs a settings read and a
+    settings read can fail (pool blip, connection reset, a settings object predating the column).
+    Every failure falls back to `typed_detail`, which is the sentence that ships today and carries
+    what the bound BUYS. A nicer error message that can crash is worse than a blunt one.
+
+    ⭐ ONE HELPER, FOUR SITES. SC#3's "the general fix, not the specific one" applies to the
+    sentence as much as to the CHECK constraint.
+    """
+    # ⛔ ALLOW-LIST, not a bare getattr (code review WR-04). The settings object carries every
+    #    provider API key and the Supabase management token; `getattr` on a caller-supplied name
+    #    would put one of those into an HTTP 400 body the moment a future site passed the wrong
+    #    string. `field` is a literal at all four call sites today — the allow-list is what keeps
+    #    that true rather than hoping it stays true. An unknown name falls back silently.
+    if field not in _BOUNDED_SETTINGS_FIELDS:
+        logger.warning(
+            "_range_refusal_detail called with an unknown field %r — falling back to the typed "
+            "sentence. Add it to _BOUNDED_SETTINGS_FIELDS if it is a real bounded column.",
+            field,
+        )
+        return typed_detail
+    try:
+        stored = getattr(await load_app_settings_async(), field, None)
+    except Exception:  # noqa: BLE001 — any read failure falls back; see the docstring
+        # ⚠ LOGGED, not swallowed (code review WR-05). The fallback is correct behaviour, but a
+        #   settings read failing here means the same read is failing elsewhere, and a refusal path
+        #   that hides that makes the real fault harder to find than the message it improves.
+        logger.warning(
+            "_range_refusal_detail: settings read failed for %s; using the typed sentence",
+            field,
+            exc_info=True,
+        )
+        stored = None
+    if stored is not None and stored == submitted:
+        return (
+            f"'{label}' was already set to {stored}, which is outside the allowed range of "
+            f"{lo}–{hi}. That is what is blocking this save — nothing you just changed "
+            f"is at fault. Set it to a value between {lo} and {hi} to save this tab."
+        )
+    return typed_detail
+
+
 # ── Routes ────────────────────────────────────────────────────────────────────
 
 # Phase 148 (VIS-01) — the model-registry / Settings surface is an Operators-only governed
@@ -413,13 +499,16 @@ async def update_settings(
         updates[f"{p.id}_api_key"] = p.api_key  # save_app_settings handles "***" skip
         if p.models:
             provider_model_lists[p.id] = p.models  # list, not CSV
-        if p.id == "ollama" and p.base_url:
-            # Strip /v1 suffix -- _build_providers appends it at load time.
-            # Without this, each save round-trips http://host/v1 -> stored as-is -> /v1/v1 next load.
-            raw = p.base_url.rstrip("/")
-            if raw.endswith("/v1"):
-                raw = raw[:-3]
-            updates["ollama_base_url"] = raw
+        # SEED-173 — persist the base_url for EVERY self-hosted provider, not just ollama.
+        # ⚠ This condition read `p.id == "ollama"` until migration 180, which is why a base
+        # URL typed on the LM Studio card was accepted by the API, dropped on the floor, and
+        # answered with 200 + "Saved". normalize_self_hosted_base_url owns the /v1 rule and is
+        # the exact inverse of the resolve_ helper the loader uses -- keep them paired, or a
+        # save round-trips http://host/v1 -> stored as-is -> /v1/v1 on the next load.
+        if p.id in _SELF_HOSTED_PROVIDERS and p.base_url is not None:
+            updates[str(_SELF_HOSTED_PROVIDERS[p.id]["url_field"])] = (
+                normalize_self_hosted_base_url(p.id, p.base_url)
+            )
     if provider_model_lists:
         updates["provider_model_lists"] = provider_model_lists  # JSONB column
 
@@ -467,9 +556,16 @@ async def update_settings(
         if not 1 <= body.multimodal_max_vision_calls <= 1000:
             raise HTTPException(
                 status_code=400,
-                detail=(
-                    "Images read per document must be between 1 and 1000. "
-                    "0 would silently stop every image from being read."
+                detail=await _range_refusal_detail(
+                    field="multimodal_max_vision_calls",
+                    label="Images read per document",
+                    submitted=body.multimodal_max_vision_calls,
+                    lo=1,
+                    hi=1000,
+                    typed_detail=(
+                        "Images read per document must be between 1 and 1000. "
+                        "0 would silently stop every image from being read."
+                    ),
                 ),
             )
         updates["multimodal_max_vision_calls"] = body.multimodal_max_vision_calls
@@ -492,9 +588,16 @@ async def update_settings(
         if not 1 <= body.vision_max_pages <= 500:
             raise HTTPException(
                 status_code=400,
-                detail=(
-                    "Pages read per document must be between 1 and 500. "
-                    "0 would silently stop every scanned page from being read."
+                detail=await _range_refusal_detail(
+                    field="vision_max_pages",
+                    label="Pages read per document",
+                    submitted=body.vision_max_pages,
+                    lo=1,
+                    hi=500,
+                    typed_detail=(
+                        "Pages read per document must be between 1 and 500. "
+                        "0 would silently stop every scanned page from being read."
+                    ),
                 ),
             )
         updates["vision_max_pages"] = body.vision_max_pages
@@ -519,15 +622,22 @@ async def update_settings(
         ):
             raise HTTPException(
                 status_code=400,
-                detail=(
-                    f"The largest file a connected source may import must be between "
-                    f"{SOURCE_MAX_FILE_SIZE_MB_FLOOR} and {SOURCE_MAX_FILE_SIZE_MB_CEILING} MB. "
-                    f"0 would stop every source importing while each sync still reported "
-                    f"success. Raising it costs memory: the whole response is held in memory "
-                    f"per in-flight request from a server we do not control, and file content "
-                    f"arrives base64-encoded at 4/3 its size. "
-                    f"{SOURCE_MAX_FILE_SIZE_MB_CEILING} MB is the app's own upload limit, so a "
-                    f"connected source can never admit a file you could not upload by hand."
+                detail=await _range_refusal_detail(
+                    field="source_max_file_size_mb",
+                    label="Largest file a connected source may import",
+                    submitted=body.source_max_file_size_mb,
+                    lo=SOURCE_MAX_FILE_SIZE_MB_FLOOR,
+                    hi=SOURCE_MAX_FILE_SIZE_MB_CEILING,
+                    typed_detail=(
+                        f"The largest file a connected source may import must be between "
+                        f"{SOURCE_MAX_FILE_SIZE_MB_FLOOR} and {SOURCE_MAX_FILE_SIZE_MB_CEILING} MB. "
+                        f"0 would stop every source importing while each sync still reported "
+                        f"success. Raising it costs memory: the whole response is held in memory "
+                        f"per in-flight request from a server we do not control, and file content "
+                        f"arrives base64-encoded at 4/3 its size. "
+                        f"{SOURCE_MAX_FILE_SIZE_MB_CEILING} MB is the app's own upload limit, so a "
+                        f"connected source can never admit a file you could not upload by hand."
+                    ),
                 ),
             )
         updates["source_max_file_size_mb"] = body.source_max_file_size_mb
@@ -567,12 +677,21 @@ async def update_settings(
     #   model, retrieval threshold, rrf_k), not just these two knobs. Cloud has not had 176
     #   applied, so without this gate the next deploy ships a 500.
     #
-    #   The frontend sends both keys UNCONDITIONALLY (SettingsPage.tsx), so "the operator did
+    #   ~~The frontend sends both keys UNCONDITIONALLY (SettingsPage.tsx), so "the operator did
     #   not touch them" is indistinguishable here from "the operator set them" unless we
-    #   compare against what is stored. Hence: silently drop an UNCHANGED value (nothing was
+    #   compare against what is stored.~~ Hence: silently drop an UNCHANGED value (nothing was
     #   asked for), and REFUSE a CHANGED one with a worded 409 naming the migration -- never
     #   accept a change and discard it, which is Phase 240's "screen that discards its own
     #   answer".
+    #
+    #   ⚠ CORRECTED 2026-09-11 (Phase 242, D-242-02) — the struck sentence above is kept rather
+    #   than deleted, because the SHAPE it justifies is unchanged and only its premise moved.
+    #   `SettingsPage.tsx` now sends CHANGED FIELDS ONLY, so an untouched knob no longer arrives
+    #   here at all and the stored-comparison below is BELT-AND-BRACES rather than load-bearing
+    #   for the UI path. ⛔ IT IS STILL LOAD-BEARING FOR EVERY OTHER CLIENT: this endpoint is not
+    #   the Settings page, and a caller that does send both keys unchanged must still be dropped
+    #   silently rather than refused. Do not delete the comparison on the strength of what one
+    #   frontend now does.
     if not await app_settings_has_hnsw_columns():
         _stored = await load_app_settings_async()
         _asked = [
@@ -602,7 +721,13 @@ async def update_settings(
         if not HNSW_EF_SEARCH_FLOOR <= body.hnsw_ef_search <= HNSW_EF_SEARCH_CEILING:
             raise HTTPException(
                 status_code=400,
-                detail=(
+                detail=await _range_refusal_detail(
+                    field="hnsw_ef_search",
+                    label="Search breadth",
+                    submitted=body.hnsw_ef_search,
+                    lo=HNSW_EF_SEARCH_FLOOR,
+                    hi=HNSW_EF_SEARCH_CEILING,
+                    typed_detail=(
                     f"Search breadth must be between {HNSW_EF_SEARCH_FLOOR} and "
                     f"{HNSW_EF_SEARCH_CEILING}. It is how many candidate vectors the index "
                     f"walks before your filters are applied, so raising it costs time and "
@@ -613,6 +738,7 @@ async def update_settings(
                     f"database's own maximum; below {HNSW_EF_SEARCH_FLOOR} the scan walks so "
                     f"little that filtered searches would come back near-empty while still "
                     f"reporting success."
+                    ),
                 ),
             )
         updates["hnsw_ef_search"] = body.hnsw_ef_search

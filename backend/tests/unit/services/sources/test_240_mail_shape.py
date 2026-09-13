@@ -365,12 +365,19 @@ async def test_read_message_refuses_over_the_operator_ceiling(
     SEED-258 removed three private copies of this ceiling that agreed only by coincidence of
     careful authorship, while a fourth disagreed in production. Reintroducing one here is the
     defect, not the convenience.
+
+    ⚠ **RE-TARGETED 244-08, AND THE OLD TARGET IS THE FINDING.** This used to patch
+    `gmail.source_max_file_bytes` with `raising=False`. When `244-08` moved the ceiling read
+    behind `base.clamp_read_cap` — ONE home, so a caller can tighten but never raise — that
+    name left `gmail`'s namespace, and `raising=False` meant the patch **silently landed on
+    nothing**: the ceiling stayed at 25 MB, the 4 KB message passed, and the case failed with
+    `DID NOT RAISE` rather than telling anyone the target had moved. ⛔ `raising=False` is
+    gone. A patch target that disappears must now break loudly, which is the only way this
+    case can go on meaning what it says.
     """
     from app.models.user_settings import source_max_file_bytes
 
-    monkeypatch.setattr(
-        "app.services.sources.mail.gmail.source_max_file_bytes", lambda: 64, raising=False
-    )
+    monkeypatch.setattr("app.models.user_settings.source_max_file_bytes", lambda: 64)
     oversized = b"x" * 4096
 
     def handler(capability, method, url, kwargs):

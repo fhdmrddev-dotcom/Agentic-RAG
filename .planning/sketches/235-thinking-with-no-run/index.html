@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sketch 235 — Thinking With No Run</title>
+<link rel="stylesheet" href="../themes/default.css">
+<style>
+/* ─────────────────────────────────────────────────────────────────────────────
+   Sketch 235 — Phase 243 · CHAT-04
+   The design question: where does reasoning live on a reply that called
+   no tools — i.e. when there is no RunCard to put it in?
+
+   MEASURED: RunCard.tsx is the ONLY component in the app that renders
+   `reasoningContent` (RunCard.tsx:478-502). MessageItem.tsx:425 mounts the
+   run path only when `(message.tool_calls?.length ?? 0) > 0`. So a pure-text
+   reply has no home for reasoning — not a hidden one, none.
+   105 of 340 reasoning-bearing messages in the local DB (31%) are exactly this.
+   ───────────────────────────────────────────────────────────────────────────── */
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:var(--color-bg);color:var(--color-text);
+  font-family:var(--font-sans);font-size:var(--text-base);
+  display:flex;flex-direction:column;
+}
+
+#vnav{
+  display:flex;gap:6px;align-items:center;flex-shrink:0;flex-wrap:wrap;
+  padding:8px 14px;background:var(--color-bg-elev1);
+  border-bottom:1px solid var(--color-border);
+}
+#vnav .lbl{font-size:var(--text-xs);color:var(--color-text-dim);margin-right:6px;letter-spacing:.04em;text-transform:uppercase}
+.vtab{
+  font:inherit;font-size:var(--text-sm);cursor:pointer;
+  background:transparent;color:var(--color-text-muted);
+  border:1px solid var(--color-border);border-radius:var(--radius-full);
+  padding:5px 13px;transition:all .15s ease;
+}
+.vtab:hover{color:var(--color-text);border-color:var(--color-primary-dim);background:var(--color-muted)}
+.vtab.on{background:var(--color-primary-dim);color:var(--color-primary);border-color:var(--color-primary-glow)}
+#vnav .spacer{flex:1}
+.ctl{
+  font:inherit;font-size:var(--text-xs);cursor:pointer;
+  background:var(--color-surface);color:var(--color-text-muted);
+  border:1px solid var(--color-border);border-radius:var(--radius-md);
+  padding:5px 11px;transition:all .15s ease;
+}
+.ctl:hover{color:var(--color-text);border-color:var(--color-primary-dim)}
+.ctl.armed{background:var(--color-primary-dim);color:var(--color-primary);border-color:var(--color-primary-glow)}
+.ctl-group{display:flex;gap:4px;align-items:center;padding-left:10px;border-left:1px solid var(--color-border)}
+.ctl-group .cap{font-size:10px;color:var(--color-text-dim);text-transform:uppercase;letter-spacing:.05em;margin-right:2px}
+
+.variant{flex:1;display:none;min-height:0;overflow:hidden}
+.variant.on{display:flex;flex-direction:column}
+
+.scalebar{
+  flex-shrink:0;padding:9px 24px;background:var(--color-bg-elev1);
+  border-bottom:1px solid var(--color-border);font-size:var(--text-xs);
+  color:var(--color-text-muted);display:flex;gap:18px;align-items:center;flex-wrap:wrap;
+}
+.scalebar b{color:var(--color-text);font-family:var(--font-mono);font-weight:600}
+.scalebar .tag{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-dim)}
+
+.chat{flex:1;overflow-y:auto;padding:22px 0 40px}
+.thread{max-width:760px;margin:0 auto;padding:0 24px;display:flex;flex-direction:column;gap:22px}
+
+.msg{display:flex;gap:12px;align-items:flex-start}
+.avatar{
+  width:28px;height:28px;border-radius:9px;flex-shrink:0;display:grid;place-items:center;
+  font-size:13px;background:var(--color-surface);border:1px solid var(--color-border-soft);
+}
+.avatar.bot{background:linear-gradient(135deg,var(--color-primary-strong),var(--color-accent-violet));border:none}
+.body{flex:1;min-width:0}
+.who{font-size:var(--text-xs);color:var(--color-text-dim);margin-bottom:5px;font-weight:600}
+.usertext{color:var(--color-text);line-height:1.6}
+.answer{color:var(--color-text);line-height:1.68}
+.answer p{margin-bottom:11px}
+.answer p:last-child{margin-bottom:0}
+
+/* the two message shapes this sketch compares side by side */
+.shape-tag{
+  display:inline-flex;align-items:center;gap:6px;font-size:10px;font-family:var(--font-mono);
+  text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-dim);
+  border:1px dashed var(--color-border);border-radius:var(--radius-full);padding:2px 9px;margin-bottom:9px;
+}
+.shape-tag.tools{color:var(--color-success);border-color:var(--color-success-dim)}
+.shape-tag.notools{color:var(--color-warning);border-color:var(--color-warning-dim)}
+
+/* the run frame — present ONLY on the tool-bearing message */
+.runframe{
+  border:1px solid var(--color-border-soft);border-radius:var(--radius-lg);
+  background:var(--color-bg-elev1);padding:11px 13px;margin-bottom:13px;
+}
+.runhead{
+  display:flex;align-items:center;gap:9px;font-size:var(--text-xs);color:var(--color-text-muted);
+  padding-bottom:9px;border-bottom:1px solid var(--color-border);margin-bottom:9px;
+}
+.runhead .el{font-family:var(--font-mono);color:var(--color-text-dim)}
+.steprow{display:flex;gap:10px;align-items:center;font-size:var(--text-xs);color:var(--color-text-muted);padding:3px 0}
+.stepnode{width:6px;height:6px;border-radius:50%;background:var(--color-success);flex-shrink:0}
+
+/* the shared calm line (234's resting state, reused verbatim) */
+.think{margin-bottom:12px}
+.think-line{
+  display:inline-flex;align-items:center;gap:8px;cursor:pointer;
+  font-size:var(--text-sm);color:var(--color-text-muted);
+  padding:5px 11px 5px 9px;border-radius:var(--radius-full);
+  border:1px solid transparent;background:transparent;font-family:inherit;
+  transition:all .16s var(--ease-out);
+}
+.think-line:hover{background:var(--color-muted);border-color:var(--color-border-soft);color:var(--color-text)}
+.think-line:focus-visible{outline:2px solid var(--color-primary);outline-offset:2px}
+.think-line .glyph{font-size:12px;opacity:.85}
+.think-line .chev{font-size:9px;opacity:.5;transition:transform .18s var(--ease-out)}
+.think.open .think-line .chev{transform:rotate(90deg)}
+.think-panel{display:none;margin-top:8px}
+.think.open .think-panel{display:block;animation:fadeSlideUp .26s var(--ease-out)}
+@keyframes fadeSlideUp{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.prose{
+  border-left:2px solid var(--color-border);margin-left:11px;padding:2px 0 2px 16px;
+  font-size:var(--text-sm);line-height:1.72;color:var(--color-text-muted);
+}
+.prose p{margin-bottom:10px}
+.prose p:last-child{margin-bottom:0}
+
+/* ── VARIANT A: a minimal frame — the run frame, minus the run ─────────────── */
+.miniframe{
+  border:1px solid var(--color-border-soft);border-radius:var(--radius-lg);
+  background:var(--color-bg-elev1);padding:9px 12px;margin-bottom:13px;
+}
+.miniframe .think{margin-bottom:0}
+
+/* ── VARIANT C: folded into the footer ─────────────────────────────────────── */
+.msgfoot{
+  display:flex;align-items:center;gap:12px;margin-top:11px;padding-top:9px;
+  border-top:1px solid var(--color-border);font-size:var(--text-xs);color:var(--color-text-dim);
+}
+.footbtn{
+  font:inherit;font-size:var(--text-xs);cursor:pointer;background:none;border:none;
+  color:var(--color-text-dim);padding:0;display:inline-flex;align-items:center;gap:5px;
+  transition:color .15s ease;
+}
+.footbtn:hover{color:var(--color-primary)}
+.footbtn:focus-visible{outline:2px solid var(--color-primary);outline-offset:2px;border-radius:3px}
+.foot-panel{display:none;margin-top:10px}
+.foot-panel.open{display:block;animation:fadeSlideUp .26s var(--ease-out)}
+
+.note{
+  max-width:760px;margin:26px auto 0;padding:0 24px;font-size:var(--text-xs);
+  color:var(--color-text-dim);line-height:1.7;
+}
+.note b{color:var(--color-text-muted)}
+.note code{font-family:var(--font-mono);font-size:11px;color:var(--color-primary);background:var(--color-muted);padding:1px 5px;border-radius:4px}
+.note .hd{
+  color:var(--color-text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;
+  font-size:10px;margin-bottom:6px;padding-top:16px;border-top:1px solid var(--color-border);
+}
+.warn{
+  border-left:2px solid var(--color-warning);background:var(--color-warning-dim);
+  padding:8px 12px;border-radius:0 var(--radius-md) var(--radius-md) 0;margin:10px 0;
+  color:var(--color-text-muted);
+}
+</style>
+</head>
+<body>
+
+<nav id="vnav">
+  <span class="lbl">Sketch 235</span>
+  <button class="vtab on" data-v="today">Today (nothing renders)</button>
+  <button class="vtab" data-v="a">A · Minimal frame</button>
+  <button class="vtab" data-v="b">B · Bare line</button>
+  <button class="vtab" data-v="c">C · In the footer</button>
+  <span class="spacer"></span>
+  <span class="ctl-group">
+    <span class="cap">Compare</span>
+    <button class="ctl armed" data-pair="on">Show both message shapes</button>
+  </span>
+</nav>
+
+<div class="scalebar">
+  <span class="tag">Measured, local DB + source, 2026-09-11</span>
+  <span><b>RunCard.tsx</b> is the only renderer of <code style="font-family:var(--font-mono)">reasoningContent</code></span>
+  <span><b>105 / 340</b> reasoning messages called zero tools</span>
+  <span>their reasoning is stored and <b>never drawn</b></span>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════ -->
+<section class="variant on" data-v="today">
+  <div class="chat"><div class="thread">
+    <div class="msg"><div class="avatar">◍</div><div class="body">
+      <div class="who">You</div>
+      <div class="usertext">Search the library for the 1042-S and tell me the withholding total.</div>
+    </div></div>
+    <div class="msg"><div class="avatar bot">✦</div><div class="body">
+      <div class="who">Assistant · Kimi K3</div>
+      <div class="shape-tag tools">shape 1 · called 3 tools → has a RunCard</div>
+      <div class="runframe">
+        <div class="runhead"><span>✦</span><span>3 steps</span><span class="el">·  8.4s</span></div>
+        <div class="steprow"><span class="stepnode"></span><span>search_documents → 5 chunks</span></div>
+        <div class="steprow"><span class="stepnode"></span><span>fetch_document_file → 2025-1042S.pdf</span></div>
+        <div class="steprow"><span class="stepnode"></span><span>execute_code → sum withholding rows</span></div>
+        <div class="think" data-think="t1">
+          <button class="think-line" data-line="t1"><span class="chev">▶</span><span class="glyph">✦</span><span>Thought for 6 seconds</span></button>
+          <div class="think-panel"><div class="prose" data-slot="t1"></div></div>
+        </div>
+      </div>
+      <div class="answer"><p>The 1042-S reports <b>$3,890.00</b> withheld across the period.</p></div>
+    </div></div>
+
+    <div class="msg"><div class="avatar">◍</div><div class="body">
+      <div class="who">You</div>
+      <div class="usertext">Is a 1042-S filed by the payer or the recipient?</div>
+    </div></div>
+    <div class="msg"><div class="avatar bot">✦</div><div class="body">
+      <div class="who">Assistant · Kimi K3</div>
+      <div class="shape-tag notools">shape 2 · called no tools → no RunCard → no home</div>
+      <div class="answer"><p>The <b>payer</b> (the withholding agent) files it. The recipient receives a copy to support their own return.</p></div>
+      <div class="warn">
+        <b>The model produced 1,180 characters of reasoning before this answer.</b> It is in the
+        database on this row. Nothing on this screen draws it, and there is no control that would.
+      </div>
+    </div></div>
+  </div>
+  <div class="note">
+    <div class="hd">Why this is a placement question, not a gate flip</div>
+    <code>MessageItem.tsx:425</code> mounts the run path only when
+    <code>(message.tool_calls?.length ?? 0) &gt; 0</code>, and <code>RunCard.tsx:478-502</code> is the
+    only place in the codebase that renders <code>reasoningContent</code>. So the second message shape
+    doesn't <em>hide</em> its reasoning — it has nowhere to put it. Removing the gate reveals nothing,
+    because the component that would do the revealing isn't mounted.
+    <div class="hd">The three variants answer: what mounts instead</div>
+    Each variant has a different consequence for the build — whether <code>RunCard</code> gets split,
+    whether reasoning becomes its own component, or whether it rides an existing footer.
+  </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════ -->
+<section class="variant" data-v="a">
+  <div class="chat"><div class="thread">
+    <div class="msg"><div class="avatar">◍</div><div class="body">
+      <div class="who">You</div>
+      <div class="usertext">Is a 1042-S filed by the payer or the recipient?</div>
+    </div></div>
+    <div class="msg"><div class="avatar bot">✦</div><div class="body">
+      <div class="who">Assistant · Kimi K3</div>
+      <div class="shape-tag notools">shape 2 · no tools</div>
+      <div class="miniframe">
+        <div class="think" data-think="a">
+          <button class="think-line" data-line="a"><span class="chev">▶</span><span class="glyph">✦</span><span>Thought for 6 seconds</span></button>
+          <div class="think-panel"><div class="prose" data-slot="a"></div></div>
+        </div>
+      </div>
+      <div class="answer"><p>The <b>payer</b> (the withholding agent) files it. The recipient receives a copy to support their own return.</p></div>
+    </div></div>
+    <div class="msg" data-pairrow><div class="avatar bot">✦</div><div class="body">
+      <div class="who">Assistant · Kimi K3 — the other shape, for comparison</div>
+      <div class="shape-tag tools">shape 1 · 3 tools</div>
+      <div class="runframe">
+        <div class="runhead"><span>✦</span><span>3 steps</span><span class="el">·  8.4s</span></div>
+        <div class="steprow"><span class="stepnode"></span><span>search_documents → 5 chunks</span></div>
+        <div class="think" data-think="a2">
+          <button class="think-line" data-line="a2"><span class="chev">▶</span><span class="glyph">✦</span><span>Thought for 6 seconds</span></button>
+          <div class="think-panel"><div class="prose" data-slot="a2"></div></div>
+        </div>
+      </div>
+      <div class="answer"><p>The 1042-S reports <b>$3,890.00</b> withheld across the period.</p></div>
+    </div></div>
+  </div>
+  <div class="note">
+    <div class="hd">Variant A — a minimal frame: the run frame, minus the run</div>
+    Reasoning gets the same bordered container it has today, just without step rows or a timer.
+    The two message shapes look like <b>siblings</b> — same box, same left edge, same disclosure.
+    <div class="hd">The bet</div>
+    One visual grammar for "the model did something before answering", whether that something was
+    three tools or pure thought. Nothing new to learn.
+    <div class="hd">The cost</div>
+    A box that contains one line is chrome around nothing — and it is drawn on <b>31% of all
+    reasoning messages</b>. Compare the two rows above: the frame earns itself on the tool row and
+    looks empty on the other.
+    <div class="hd">Build consequence</div>
+    <code>RunCard</code> splits: a <code>ThinkingBlock</code> comes out, and the frame becomes a
+    wrapper both paths can mount. This is the biggest refactor of the three — and the only one that
+    also serves <b>CHAT-01</b> and <b>CHAT-05</b> from the same seam.
+  </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════ -->
+<section class="variant" data-v="b">
+  <div class="chat"><div class="thread">
+    <div class="msg"><div class="avatar">◍</div><div class="body">
+      <div class="who">You</div>
+      <div class="usertext">Is a 1042-S filed by the payer or the recipient?</div>
+    </div></div>
+    <div class="msg"><div class="avatar bot">✦</div><div class="body">
+      <div class="who">Assistant · Kimi K3</div>
+      <div class="shape-tag notools">shape 2 · no tools</div>
+      <div class="think" data-think="b" style="margin-bottom:13px">
+        <button class="think-line" data-line="b"><span class="chev">▶</span><span class="glyph">✦</span><span>Thought for 6 seconds</span></button>
+        <div class="think-panel"><div class="prose" data-slot="b"></div></div>
+      </div>
+      <div class="answer"><p>The <b>payer</b> (the withholding agent) files it. The recipient receives a copy to support their own return.</p></div>
+    </div></div>
+    <div class="msg" data-pairrow><div class="avatar bot">✦</div><div class="body">
+      <div class="who">Assistant · Kimi K3 — the other shape, for comparison</div>
+      <div class="shape-tag tools">shape 1 · 3 tools</div>
+      <div class="think" data-think="b2" style="margin-bottom:11px">
+        <button class="think-line" data-line="b2"><span class="chev">▶</span><span class="glyph">✦</span><span>Thought for 6 seconds</span></button>
+        <div class="think-panel"><div class="prose" data-slot="b2"></div></div>
+      </div>
+      <div class="runframe">
+        <div class="runhead"><span>✦</span><span>3 steps</span><span class="el">·  8.4s</span></div>
+        <div class="steprow"><span class="stepnode"></span><span>search_documents → 5 chunks</span></div>
+        <div class="steprow"><span class="stepnode"></span><span>execute_code → sum withholding rows</span></div>
+      </div>
+      <div class="answer"><p>The 1042-S reports <b>$3,890.00</b> withheld across the period.</p></div>
+    </div></div>
+  </div>
+  <div class="note">
+    <div class="hd">Variant B — a bare line above the answer, no container at all</div>
+    The calm line sits directly in the message body. On a tool-bearing message it sits <b>above</b>
+    the run frame — because thinking precedes doing, and the order on screen matches the order in time.
+    <div class="hd">The bet</div>
+    Reasoning is not part of the run; it is what the model did before the run. Giving it its own
+    line — never a box — makes it read as a property of the <em>message</em>, which is what it is on
+    the wire (<code>message.reasoningContent</code>, not a tool call).
+    <div class="hd">The cost</div>
+    It moves the thinking control on tool-bearing messages, which is a change to a surface that
+    isn't broken. Anyone used to finding it inside the run card has to relearn one thing.
+    <div class="hd">Build consequence</div>
+    <code>ThinkingBlock</code> comes out of <code>RunCard</code> and mounts in
+    <code>MessageItem</code> for both shapes. <b>Both</b> reasoning render paths collapse into one
+    component with one owner — the smallest surface area of the three, and the only variant where
+    the reasoning render stops being conditional on tools <em>by construction</em> rather than by a
+    second branch.
+  </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════ -->
+<section class="variant" data-v="c">
+  <div class="chat"><div class="thread">
+    <div class="msg"><div class="avatar">◍</div><div class="body">
+      <div class="who">You</div>
+      <div class="usertext">Is a 1042-S filed by the payer or the recipient?</div>
+    </div></div>
+    <div class="msg"><div class="avatar bot">✦</div><div class="body">
+      <div class="who">Assistant · Kimi K3</div>
+      <div class="shape-tag notools">shape 2 · no tools</div>
+      <div class="answer"><p>The <b>payer</b> (the withholding agent) files it. The recipient receives a copy to support their own return.</p></div>
+      <div class="msgfoot">
+        <button class="footbtn" data-foot="c"><span>✦</span><span>Thought for 6 seconds</span><span style="opacity:.5;font-size:9px">▸</span></button>
+        <span style="opacity:.4">·</span>
+        <span>Kimi K3</span>
+      </div>
+      <div class="foot-panel" data-panel="c"><div class="prose" data-slot="c"></div></div>
+    </div></div>
+    <div class="msg" data-pairrow><div class="avatar bot">✦</div><div class="body">
+      <div class="who">Assistant · Kimi K3 — the other shape, for comparison</div>
+      <div class="shape-tag tools">shape 1 · 3 tools</div>
+      <div class="runframe">
+        <div class="runhead"><span>✦</span><span>3 steps</span><span class="el">·  8.4s</span></div>
+        <div class="steprow"><span class="stepnode"></span><span>search_documents → 5 chunks</span></div>
+        <div class="steprow"><span class="stepnode"></span><span>execute_code → sum withholding rows</span></div>
+      </div>
+      <div class="answer"><p>The 1042-S reports <b>$3,890.00</b> withheld across the period.</p></div>
+      <div class="msgfoot">
+        <button class="footbtn" data-foot="c2"><span>✦</span><span>Thought for 6 seconds</span><span style="opacity:.5;font-size:9px">▸</span></button>
+        <span style="opacity:.4">·</span>
+        <span>Kimi K3</span>
+      </div>
+      <div class="foot-panel" data-panel="c2"><div class="prose" data-slot="c2"></div></div>
+    </div></div>
+  </div>
+  <div class="note">
+    <div class="hd">Variant C — reasoning folds into the message footer, after the answer</div>
+    The answer comes first, unobstructed. Reasoning becomes a provenance affordance sitting beside
+    the model name — the same register as "which model wrote this", because that is the same kind of
+    fact.
+    <div class="hd">The bet</div>
+    Nobody opens a chat to read reasoning; they open it to read the answer. Putting thinking
+    <em>after</em> the answer means the surface never delays the thing you came for, at any length —
+    this is the only variant whose behaviour does not degrade at 33,713 characters.
+    <div class="hd">The cost, and it is the deciding one</div>
+    <b>It cannot show live streaming.</b> A footer under an answer that has not been written yet has
+    nowhere to sit — so this variant needs a <em>second</em> surface for the streaming case, and a
+    second surface is the thing the Phase 095 inventory rule exists to forbid. Check it against
+    sketch 234's <b>Replay the stream</b>: whatever wins there has to live somewhere while it streams.
+    <div class="hd">Build consequence</div>
+    A new footer slot in <code>MessageItem</code> plus a retained in-run surface for the live case.
+    Cheapest to add, and the only variant that ends with <b>two</b> reasoning renderers instead of one.
+  </div>
+  </div>
+</section>
+
+<script>
+/* Real reasoning text — verbatim from this machine's local Supabase
+   (messages.reasoning_content), 2026-09-11. The zero-tool sample. */
+const PS = [
+"The user is asking a definitional question about who files a 1042-S. This doesn't need the knowledge base — it's general tax-form knowledge, and searching would just add latency and a citation to something I already know.",
+"Let me be careful about the direction though. The 1042-S is an information return for US-source income paid to foreign persons. The withholding agent — the payer — is the one with the filing obligation.",
+"Wait, I should double-check I'm not confusing this with the 1042 (the annual return) versus the 1042-S (the per-recipient statement). The 1042 is the aggregate return; the 1042-S is issued per recipient. Both are filed by the withholding agent.",
+"So the answer is the payer. The recipient gets a copy to support their own return, which is worth saying because that's the part people actually get confused about — receiving a copy feels like being the filer."
+];
+
+function fill(){
+  document.querySelectorAll("[data-slot]").forEach(el => {
+    el.innerHTML = PS.map(p => `<p>${p}</p>`).join("");
+  });
+}
+
+document.querySelectorAll(".vtab").forEach(tab => {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll(".vtab").forEach(t => t.classList.remove("on"));
+    tab.classList.add("on");
+    document.querySelectorAll(".variant").forEach(s => s.classList.remove("on"));
+    document.querySelector(`.variant[data-v="${tab.dataset.v}"]`).classList.add("on");
+  });
+});
+
+document.querySelectorAll("[data-line]").forEach(btn => {
+  btn.addEventListener("click", () => btn.closest(".think").classList.toggle("open"));
+});
+
+document.querySelectorAll("[data-foot]").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const p = document.querySelector(`[data-panel="${btn.dataset.foot}"]`);
+    p.classList.toggle("open");
+  });
+});
+
+/* the compare toggle — hide the sibling shape to judge each in isolation */
+const pairBtn = document.querySelector("[data-pair]");
+pairBtn.addEventListener("click", () => {
+  const on = pairBtn.classList.toggle("armed");
+  document.querySelectorAll("[data-pairrow]").forEach(r => { r.style.display = on ? "" : "none"; });
+  pairBtn.textContent = on ? "Show both message shapes" : "One shape only";
+});
+
+fill();
+</script>
+</body>
+</html>

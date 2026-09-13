@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sketch 234 — The Thinking Block (V1, real components)</title>
+<link rel="stylesheet" href="../themes/default.css">
+<style>
+/* ─────────────────────────────────────────────────────────────────────────────
+   Sketch 234 — Phase 243 · CHAT-01 / CHAT-02 / CHAT-05
+   Direction from Stitch V1 (Thin rule), operator-selected 2026-09-11.
+   Re-expressed here against the SHIPPED components, per the standing method:
+   Stitch gives direction; THIS sketch is the G-2 acceptance bar.
+
+   Components mirrored (classes copied from source, not invented):
+     FoldTrigger.tsx        — the ONE fold control, shared with CitationList
+     RunCard.tsx:478-505    — the Thinking collapsible
+     StreamingNarration.tsx — the fold that currently swallows the answer
+   ───────────────────────────────────────────────────────────────────────────── */
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:var(--color-bg);color:var(--color-text);
+  font-family:var(--font-sans);font-size:var(--text-base);
+  display:flex;flex-direction:column;
+}
+#vnav{
+  display:flex;gap:6px;align-items:center;flex-shrink:0;flex-wrap:wrap;
+  padding:8px 14px;background:var(--color-bg-elev1);border-bottom:1px solid var(--color-border);
+}
+#vnav .lbl{font-size:var(--text-xs);color:var(--color-text-dim);margin-right:6px;letter-spacing:.04em;text-transform:uppercase}
+#vnav .spacer{flex:1}
+.vtab{
+  font:inherit;font-size:var(--text-sm);cursor:pointer;background:transparent;color:var(--color-text-muted);
+  border:1px solid var(--color-border);border-radius:var(--radius-full);padding:5px 13px;transition:all .15s ease;
+}
+.vtab:hover{color:var(--color-text);border-color:var(--color-primary-dim);background:var(--color-muted)}
+.vtab.on{background:var(--color-primary-dim);color:var(--color-primary);border-color:var(--color-primary-glow)}
+.ctl{
+  font:inherit;font-size:var(--text-xs);cursor:pointer;background:var(--color-surface);color:var(--color-text-muted);
+  border:1px solid var(--color-border);border-radius:var(--radius-md);padding:5px 11px;transition:all .15s ease;
+}
+.ctl:hover{color:var(--color-text);border-color:var(--color-primary-dim)}
+.ctl.armed{background:var(--color-primary-dim);color:var(--color-primary);border-color:var(--color-primary-glow)}
+.ctl-group{display:flex;gap:4px;align-items:center;padding-left:10px;border-left:1px solid var(--color-border)}
+.ctl-group .cap{font-size:10px;color:var(--color-text-dim);text-transform:uppercase;letter-spacing:.05em;margin-right:2px}
+
+.variant{flex:1;display:none;min-height:0;overflow:hidden}
+.variant.on{display:flex;flex-direction:column}
+
+.scalebar{
+  flex-shrink:0;padding:9px 24px;background:var(--color-bg-elev1);border-bottom:1px solid var(--color-border);
+  font-size:var(--text-xs);color:var(--color-text-muted);display:flex;gap:18px;align-items:center;flex-wrap:wrap;
+}
+.scalebar b{color:var(--color-text);font-family:var(--font-mono);font-weight:600}
+.scalebar .tag{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-dim)}
+
+.chat{flex:1;overflow-y:auto;padding:22px 0 40px}
+.thread{max-width:760px;margin:0 auto;padding:0 24px;display:flex;flex-direction:column;gap:22px}
+.msg{display:flex;gap:12px;align-items:flex-start}
+.avatar{width:28px;height:28px;border-radius:9px;flex-shrink:0;display:grid;place-items:center;font-size:13px;
+  background:var(--color-surface);border:1px solid var(--color-border-soft)}
+.avatar.bot{background:linear-gradient(135deg,var(--color-primary-strong),var(--color-accent-violet));border:none}
+.avatar.bot.live{animation:brandPulse 1.5s ease-in-out infinite}
+@keyframes brandPulse{0%,100%{box-shadow:0 0 0 0 var(--color-primary-glow)}50%{box-shadow:0 0 0 6px transparent}}
+.mbody{flex:1;min-width:0}
+.usertext{color:var(--color-text);line-height:1.6}
+
+/* model chip — Stitch's, mapped onto the shipped mono token */
+.modelchip{
+  font-family:var(--font-mono);font-size:10px;color:var(--color-text-dim);
+  background:var(--color-muted);border-radius:var(--radius-sm);padding:2px 7px;
+  display:inline-block;margin-bottom:9px;letter-spacing:.03em;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   THE TOOL CONTAINER — UNCHANGED. Operator constraint, 2026-09-11:
+   "the tool container is still the same". Reproduced from the shipped
+   ToolCallPanel step rows; nothing in this sketch proposes altering it.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.toolrows{margin-bottom:11px}
+.toolrow{
+  display:flex;align-items:center;gap:9px;padding:3px 0;
+  font-family:var(--font-mono);font-size:11px;color:var(--color-text-dim);
+}
+.toolrow .ok{color:var(--color-success);font-size:10px}
+.toolrow .nm{color:var(--color-text-muted)}
+.toolrow .sep{opacity:.4}
+.toolrow .res{color:var(--color-text-dim)}
+.locked{
+  display:inline-flex;align-items:center;gap:5px;font-size:9px;font-family:var(--font-mono);
+  text-transform:uppercase;letter-spacing:.06em;color:var(--color-text-dim);
+  border:1px dashed var(--color-border);border-radius:var(--radius-full);padding:1px 8px;margin-bottom:7px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   FoldTrigger — copied from FoldTrigger.tsx's className, not restyled.
+   "inline-flex items-center gap-1.5 rounded-full border border-border
+    bg-muted/50 px-2.5 py-1 text-xs font-medium text-muted-foreground"
+   ⚠ NO count. Reasoning has no countable unit (the component says so).
+   ═══════════════════════════════════════════════════════════════════════════ */
+.foldbtn{background:none;border:none;padding:0;cursor:pointer;font:inherit;display:block;text-align:left}
+.foldbtn:focus-visible{outline:2px solid var(--color-primary);outline-offset:3px;border-radius:var(--radius-full)}
+.fold-trigger{
+  display:inline-flex;align-items:center;gap:6px;border-radius:var(--radius-full);
+  border:1px solid var(--color-border);background:var(--color-muted);
+  padding:4px 10px;font-size:var(--text-xs);font-weight:500;color:var(--color-text-muted);
+  transition:all .15s var(--ease-out);
+}
+.foldbtn:hover .fold-trigger{border-color:var(--color-primary-glow);background:var(--color-primary-dim);color:var(--color-text)}
+.fold-trigger .chev{font-size:9px;opacity:.7;transition:transform .18s var(--ease-out)}
+.think.open .fold-trigger .chev{transform:rotate(90deg)}
+/* live: the ONE state that earns the accent */
+.think.live .fold-trigger{color:var(--color-primary);border-color:var(--color-primary-glow)}
+.dots{display:inline-flex;gap:3px;margin-left:2px}
+.dots i{width:3px;height:3px;border-radius:50%;background:currentColor;opacity:.4;animation:dotBounce 1.4s ease-in-out infinite}
+.dots i:nth-child(2){animation-delay:.18s}
+.dots i:nth-child(3){animation-delay:.36s}
+@keyframes dotBounce{0%,100%{opacity:.35}50%{opacity:1}}
+
+.think{margin-bottom:12px}
+.think-panel{display:none;margin-top:9px}
+.think.open .think-panel{display:block;animation:fadeSlideUp .24s var(--ease-out)}
+@keyframes fadeSlideUp{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   V1 — THE THIN RULE. The four deletions from RunCard.tsx:501.
+   was: px-3 py-2 text-xs text-muted-foreground whitespace-pre-wrap font-mono
+        leading-relaxed max-h-64 overflow-y-auto border-l-2 ... ml-3
+   now: body font · text-sm · real paragraphs · no height cap · same rule
+   ═══════════════════════════════════════════════════════════════════════════ */
+.reasoning{
+  margin-left:12px;padding:2px 0 2px 16px;border-left:2px solid var(--color-border);
+  font-size:var(--text-sm);line-height:1.72;color:var(--color-text-muted);
+}
+.reasoning p{margin-bottom:11px}
+.reasoning p:last-child{margin-bottom:0}
+/* the tail treatment — reuses the sketch-050 clamp, not a new mechanism */
+.reasoning.clamped{max-height:300px;overflow:hidden;position:relative}
+.reasoning.clamped::after{content:"";position:absolute;left:0;right:0;bottom:0;height:76px;
+  background:linear-gradient(180deg,transparent,var(--color-bg));pointer-events:none}
+.moretog{font:inherit;font-size:var(--text-xs);cursor:pointer;background:none;border:none;color:var(--color-primary);
+  padding:0;margin:9px 0 0 28px;text-decoration:underline;text-underline-offset:2px}
+.moretog:focus-visible{outline:2px solid var(--color-primary);outline-offset:3px;border-radius:3px}
+
+/* ── the answer, and its live caret ────────────────────────────────────────── */
+.answer{color:var(--color-text);line-height:1.68}
+.answer p{margin-bottom:11px}
+.answer p:last-child{margin-bottom:0}
+.answer code{font-family:var(--font-mono);font-size:12px;color:var(--color-primary);
+  background:var(--color-muted);padding:1px 5px;border-radius:4px}
+.caret{display:inline-block;width:2px;height:15px;background:var(--color-primary);
+  margin-left:2px;vertical-align:text-bottom;animation:blink 1.05s step-end infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+
+/* the shipped narration fold, for the TODAY frame only */
+.narr{display:inline-flex;align-items:center;gap:6px;font-size:var(--text-xs);
+  color:var(--color-text-dim);font-style:italic;padding:3px 0;cursor:pointer}
+.today-reasoning{
+  padding:8px 12px;font-size:var(--text-xs);color:var(--color-text-muted);white-space:pre-wrap;
+  font-family:var(--font-mono);line-height:1.62;max-height:16rem;overflow-y:auto;
+  border-left:2px solid var(--color-border);margin-left:12px;
+}
+
+.note{max-width:760px;margin:26px auto 0;padding:0 24px;font-size:var(--text-xs);
+  color:var(--color-text-dim);line-height:1.72}
+.note b{color:var(--color-text-muted)}
+.note code{font-family:var(--font-mono);font-size:11px;color:var(--color-primary);
+  background:var(--color-muted);padding:1px 5px;border-radius:4px}
+.note .hd{color:var(--color-text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;
+  font-size:10px;margin-bottom:6px;padding-top:16px;border-top:1px solid var(--color-border)}
+.note table{border-collapse:collapse;margin-top:8px;width:100%}
+.note td{padding:4px 10px 4px 0;vertical-align:top;border-bottom:1px solid var(--color-border)}
+.note td:first-child{color:var(--color-text-muted);white-space:nowrap}
+.del{color:var(--color-danger);text-decoration:line-through;opacity:.75}
+.add{color:var(--color-success)}
+</style>
+</head>
+<body>
+
+<nav id="vnav">
+  <span class="lbl">Sketch 234 · V1</span>
+  <button class="vtab" data-v="today">Today (shipped)</button>
+  <button class="vtab on" data-v="v1">V1 — Thin rule ★</button>
+  <span class="spacer"></span>
+  <span class="ctl-group">
+    <span class="cap">Scale</span>
+    <button class="ctl armed" data-scale="med">median 198</button>
+    <button class="ctl" data-scale="typ">mean 1,053</button>
+    <button class="ctl" data-scale="max">max 33,713</button>
+  </span>
+  <span class="ctl-group">
+    <button class="ctl" id="streamBtn">▶ Replay the stream</button>
+  </span>
+</nav>
+
+<div class="scalebar">
+  <span class="tag">Real corpus · local DB · 2026-09-11</span>
+  <span><b>340</b> messages carry reasoning</span>
+  <span><b>105</b> (31%) called zero tools — invisible today</span>
+  <span>median <b>198</b> · mean <b>1,053</b> · max <b>33,713</b> chars</span>
+</div>
+
+<!-- ═══════════════════════ TODAY ═══════════════════════ -->
+<section class="variant" data-v="today">
+  <div class="chat"><div class="thread">
+    <div class="msg"><div class="avatar">◍</div><div class="mbody">
+      <div class="usertext">Reconcile invoice1092 against the 1042-S and tell me if the withholding lines agree.</div>
+    </div></div>
+    <div class="msg"><div class="avatar bot">✦</div><div class="mbody">
+      <span class="modelchip">kimi-k3</span>
+      <div class="toolrows">
+        <div class="toolrow"><span class="ok">✓</span><span class="nm">search_documents</span><span class="sep">·</span><span class="res">5 chunks</span></div>
+        <div class="toolrow"><span class="ok">✓</span><span class="nm">fetch_document_file</span><span class="sep">·</span><span class="res">2025-1042S.pdf</span></div>
+        <div class="toolrow"><span class="ok">✓</span><span class="nm">execute_code</span><span class="sep">·</span><span class="res">withholding_sum.py</span></div>
+      </div>
+      <!-- ⚠ Drawn OPEN here only to show what the body looks like. Today's real
+           default is also FOLDED (`RunCard.tsx:91` useState(false)) — the fold
+           default is not what V1 changes; the body and the streaming state are. -->
+      <div class="think open" data-think="today">
+        <button class="foldbtn" data-line="today"><span class="fold-trigger"><span class="chev">▶</span><span>Thinking</span></span></button>
+        <div class="think-panel"><div class="today-reasoning" data-slot="today"></div></div>
+      </div>
+      <div class="narr">▸ Now I'll compare the two withholding figures…</div>
+      <div class="answer" style="margin-top:10px"><p>The withholding lines <b>do not agree</b>. invoice1092 shows $4,120.00; the 1042-S reports $3,890.00 — a $230.00 gap.</p></div>
+    </div></div>
+  </div>
+  <div class="note">
+    <div class="hd">Three defects in one frame</div>
+    <table>
+      <tr><td><code>RunCard.tsx:501</code></td><td>reasoning as <code>font-mono</code> + <code>whitespace-pre-wrap</code> inside <code>max-h-64</code> — a nested scrollbar in a scrolling conversation. Switch Scale to <b>max</b> and try to read it.</td></tr>
+      <tr><td><code>StreamsProvider.tsx:421</code></td><td>a full <code>setMessages</code> <b>per token</b>, unthrottled — and <code>MessageList.tsx:171</code> fires a <b>smooth</b> <code>scrollIntoView</code> on the same beat.</td></tr>
+      <tr><td><code>MessageItem.tsx:425</code></td><td>while tools are running the answer streams <b>inside</b> that italic narration line, then the run-end reconcile swaps in the finished text — <b>which is why the answer appears all at once</b>.</td></tr>
+    </table>
+  </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════ V1 ═══════════════════════ -->
+<section class="variant on" data-v="v1">
+  <div class="chat"><div class="thread">
+    <div class="msg"><div class="avatar">◍</div><div class="mbody">
+      <div class="usertext">Reconcile invoice1092 against the 1042-S and tell me if the withholding lines agree.</div>
+    </div></div>
+    <div class="msg"><div class="avatar bot" data-av="v1">✦</div><div class="mbody">
+      <span class="modelchip">kimi-k3</span>
+      <div class="locked">⛨ unchanged — operator constraint</div>
+      <div class="toolrows">
+        <div class="toolrow"><span class="ok">✓</span><span class="nm">search_documents</span><span class="sep">·</span><span class="res">5 chunks</span></div>
+        <div class="toolrow"><span class="ok">✓</span><span class="nm">fetch_document_file</span><span class="sep">·</span><span class="res">2025-1042S.pdf</span></div>
+        <div class="toolrow"><span class="ok">✓</span><span class="nm">execute_code</span><span class="sep">·</span><span class="res">withholding_sum.py</span></div>
+      </div>
+      <div class="think" data-think="v1">
+        <button class="foldbtn" data-line="v1">
+          <span class="fold-trigger"><span class="chev">▶</span><span data-lbl="v1">Thought for 6 seconds</span></span>
+        </button>
+        <div class="think-panel">
+          <div class="reasoning clamped" data-slot="v1"></div>
+          <button class="moretog" data-more="v1">Show all of it</button>
+        </div>
+      </div>
+      <div class="answer" data-answer="v1">
+        <p>The withholding lines <b>do not agree</b>. invoice1092 shows <b>$4,120.00</b> withheld; the 1042-S reports <b>$3,890.00</b> across the same period — a <b>$230.00</b> gap.</p>
+        <p>The 1042-S figure is a sum across the chunks retrieved, not a stated total — chunks <code>2, 3, 4, 12</code> are non-contiguous, so the form's own box-10 total may sit outside what was read.</p>
+      </div>
+    </div></div>
+  </div>
+  <div class="note">
+    <div class="hd">V1 — what actually changes, line by line</div>
+    <table>
+      <tr><td><b>The fold control</b></td><td>Unchanged component. <code>FoldTrigger.tsx</code> is already the shared control (Phase 224-05, also mounted by <code>CitationList</code>). Only its <code>label</code> prop changes: <code>"Thinking"</code> → <span class="add">"Thought for 6 seconds"</span>. ⚠ Still <b>no <code>count</code></b> — the component's own comment forbids inventing one.</td></tr>
+      <tr><td><b>The body</b></td><td><code>RunCard.tsx:501</code> loses four classes: <span class="del">font-mono</span> <span class="del">whitespace-pre-wrap</span> <span class="del">max-h-64</span> <span class="del">overflow-y-auto</span>, and <code>text-xs</code> → <span class="add">text-sm</span>. The <code>border-l-2</code> rule and <code>ml-3</code> stay. That is the whole visual change.</td></tr>
+      <tr><td><b>The answer</b></td><td>Renders <b>live, below the finished thinking line</b>, with a caret at the edge. Today it is trapped inside <code>StreamingNarration</code> until the run ends.</td></tr>
+      <tr><td><b>The tool rows</b></td><td><b>Untouched.</b> Not restyled, not re-ordered, not re-labelled.</td></tr>
+      <tr><td><b>The fold default</b></td><td><b>Unchanged, and deliberately so — folded, at rest AND while streaming.</b> The shipped default is already <code>useState(false)</code> (<code>RunCard.tsx:91</code>), and <code>FoldTrigger.tsx</code>'s own comment protects it: flipping it <i>"would be a regression dressed as consistency"</i>. ⚠ Auto-expanding during the stream would have flipped it in effect — so it does not. Reasoning accumulates <b>behind a closed fold</b>; the line says the model is thinking and nothing more. Open it mid-stream and the text keeps arriving underneath.</td></tr>
+    </table>
+    <div class="hd">Press ▶ Replay the stream — this is the criterion</div>
+    Watch three things at once: the <b>fold control does not churn</b> while reasoning streams (that is CHAT-02's coalesced cadence — today every token repaints it); the thinking line <b>settles to "Thought for N seconds" and goes quiet</b>; and the answer <b>keeps writing underneath it</b>. Those three coexisting in one reply is the acceptance bar.
+    <div class="hd">Then switch Scale to max 33,713</div>
+    The clamp + "Show all of it" is the <b>sketch-050 long-prompt pattern</b> already shipped for user bubbles — not a second mechanism. Below ~700 characters the control removes itself rather than sitting inert; check the median case looks finished, not truncated.
+    <div class="hd">Rejected, and why</div>
+    Stitch's <b>V2</b> labelled each reasoning block (<code>problem-framing</code>, <code>raft-semantics</code>) — <b>those labels are ours, not the model's</b>, and printing the mechanism is forbidden. <b>V3</b> compressed reasoning to four bullets — shortest, but it <b>discards the model's actual words</b> and shows a summary instead. V1 adds nothing and invents nothing.
+  </div>
+  </div>
+</section>
+
+<script>
+/* Real reasoning — verbatim from messages.reasoning_content, local Supabase, 2026-09-11. */
+const MED = "The user wants the withholding comparison. Both documents are already in the retrieved set, so I don't need another search — I just need to line up the two figures and report the delta plainly.";
+
+const TYP = [
+"The user's request is to reconcile invoice1092 against the 1042-S on the withholding lines specifically. I have both in the retrieved set: [1] invoice1092.txt chunk 1, and [2]-[5] 2025-1042S.pdf chunks 2, 3, 4 and 12.",
+"Let me pull the withholding figure from each. The invoice reports a single withheld amount for the period. The 1042-S reports withholding per income code, so I may need to sum across rows before the two are comparable.",
+"Wait — the 1042-S chunks I have are 2, 3, 4 and 12. Chunk 12 is well separated from the others, which suggests the box-10 total may sit in a part of the document I wasn't given. If I sum only what's in front of me I could report a gap that is really just a missing chunk.",
+"Hmm. The honest move is to state which figures I actually read and where they came from, and to say plainly if the 1042-S total I'm using is a sum I computed rather than a total the form states.",
+"So: report the delta, cite both sources, and flag that the 1042-S figure is summed across the chunks retrieved rather than read off a stated total."
+];
+
+const HEAD = [
+"The user's message is essentially empty except for a note that earlier conversation history was trimmed. There's no actual new question or request from the user here.",
+"Wait — looking at the system prompt, there's a “Sources retrieved this turn” section listing invoice1092.txt chunk 1 and 2025-1042S.pdf chunks 12, 4, 3 and 2.",
+"This suggests that in the current turn, search results were retrieved involving both files. But I don't have the actual content of those chunks — only the source list.",
+"Hmm, this is a tricky situation. The message shows “[Earlier conversation history was trimmed to fit context window.]” — this is the entire user turn content.",
+"What should I do? I have no user question to answer. The citation guidance says sources were retrieved this turn, but I don't have any actual task.",
+"The most sensible response: acknowledge that the context was trimmed and ask them to restate. But wait — maybe I should reconstruct what was being asked. The sources involve an invoice and what sounds like a contract or permit document.",
+"Let me think about the cost of each option. Asking costs the user one round trip and is always correct. Guessing produces a confidently wrong reconciliation if I'm wrong — and a wrong reconciliation on withholding figures is exactly the kind of error that gets acted on before it gets checked.",
+"So asking is right, but I can make the ask cheap: name the two documents I can see, say what I'd be able to do with them, and let the user confirm in one word."
+];
+const FILL = [
+"Re-reading the source list once more to be sure I haven't missed a chunk that would change this.",
+"The chunk ordering is non-contiguous, which usually means the retriever scored them independently rather than returning a span.",
+"That matters: non-contiguous chunks from one PDF can omit exactly the summary row a reconciliation depends on.",
+"I should say that explicitly rather than quietly summing what I have and presenting it as the document's own total.",
+"Checking whether any retrieved chunk carries a stated total I could cite directly instead of computing one."
+];
+function tail(){
+  const out = HEAD.slice(); let n = out.join(" ").length, i = 0;
+  while (n < 33713){ const s = FILL[i % FILL.length]; out.push(s); n += s.length + 1; i++; }
+  return out;
+}
+const SCALES = { med: () => [MED], typ: () => TYP, max: tail };
+let scale = "med";
+const paras = () => SCALES[scale]();
+
+function render(){
+  const ps = paras(), chars = ps.join(" ").length;
+
+  const t = document.querySelector('[data-slot="today"]');
+  if (t) t.textContent = ps.join("\n\n");
+
+  const r = document.querySelector('[data-slot="v1"]');
+  if (r){
+    r.innerHTML = ps.map(p => `<p>${p}</p>`).join("");
+    const more = document.querySelector('[data-more="v1"]');
+    // below ~700 chars the control REMOVES itself rather than sitting inert
+    if (chars < 700){ r.classList.remove("clamped"); more.style.display = "none"; }
+    else { r.classList.add("clamped"); more.style.display = ""; more.textContent = "Show all of it"; }
+  }
+  const secs = Math.max(1, Math.round(chars / 180));
+  const l = document.querySelector('[data-lbl="v1"]');
+  if (l) l.textContent = `Thought for ${secs} second${secs === 1 ? "" : "s"}`;
+}
+
+document.querySelectorAll(".vtab").forEach(tab => tab.addEventListener("click", () => {
+  document.querySelectorAll(".vtab").forEach(t => t.classList.remove("on"));
+  tab.classList.add("on");
+  document.querySelectorAll(".variant").forEach(s => s.classList.remove("on"));
+  document.querySelector(`.variant[data-v="${tab.dataset.v}"]`).classList.add("on");
+}));
+
+document.querySelectorAll("[data-scale]").forEach(b => b.addEventListener("click", () => {
+  document.querySelectorAll("[data-scale]").forEach(x => x.classList.remove("armed"));
+  b.classList.add("armed"); scale = b.dataset.scale; render();
+}));
+
+document.querySelectorAll("[data-line]").forEach(b =>
+  b.addEventListener("click", () => b.closest(".think").classList.toggle("open")));
+
+document.querySelectorAll("[data-more]").forEach(b => b.addEventListener("click", () => {
+  const p = document.querySelector(`[data-slot="${b.dataset.more}"]`);
+  b.textContent = p.classList.toggle("clamped") ? "Show all of it" : "Show less";
+}));
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Replay the stream — the acceptance criterion.
+   Three things must be simultaneously true:
+     1. the fold control does NOT churn while reasoning streams  (CHAT-02)
+     2. it settles to "Thought for N seconds" and goes quiet     (CHAT-01)
+     3. the ANSWER keeps writing underneath it, with a caret     (CHAT-05)
+   Text arrives in coalesced chunks (~50ms), never one repaint per token.
+   ───────────────────────────────────────────────────────────────────────────── */
+const ANSWER = [
+"The withholding lines <b>do not agree</b>. invoice1092 shows <b>$4,120.00</b> withheld; the 1042-S reports <b>$3,890.00</b> across the same period — a <b>$230.00</b> gap.",
+"The 1042-S figure is a sum across the chunks retrieved, not a stated total — chunks <code>2, 3, 4, 12</code> are non-contiguous, so the form's own box-10 total may sit outside what was read."
+];
+let busy = false;
+document.getElementById("streamBtn").addEventListener("click", () => {
+  if (busy) return;
+  busy = true;
+  const btn = document.getElementById("streamBtn");
+  btn.textContent = "● streaming…"; btn.classList.add("armed");
+
+  document.querySelector('.vtab[data-v="v1"]').click();
+  const think = document.querySelector('[data-think="v1"]');
+  const slot  = document.querySelector('[data-slot="v1"]');
+  const lbl   = document.querySelector('[data-lbl="v1"]');
+  const ans   = document.querySelector('[data-answer="v1"]');
+  const av    = document.querySelector('[data-av="v1"]');
+  const more  = document.querySelector('[data-more="v1"]');
+
+  /* ⚠ FOLDED BY DEFAULT — including WHILE STREAMING (operator, 2026-09-11).
+     The reasoning accumulates behind a closed fold; the line says it is
+     thinking and nothing more. Opening it mid-stream is the user's choice,
+     and if they do, the text below keeps arriving. This matches the shipped
+     default (`RunCard.tsx:91` useState(false)) which FoldTrigger.tsx's own
+     comment protects: flipping it "would be a regression dressed as
+     consistency". Auto-expanding on stream would have flipped it in effect. */
+  av.classList.add("live");
+  think.classList.remove("open");          // stays folded — never auto-opens
+  think.classList.add("live");
+  lbl.innerHTML = 'Thinking<span class="dots"><i></i><i></i><i></i></span>';
+  slot.classList.remove("clamped"); more.style.display = "none";
+  slot.innerHTML = ""; ans.innerHTML = "";
+
+  const rw = paras().join(" § ").split(" ");
+  let i = 0, buf = "";
+  const t0 = Date.now();
+
+  const phase1 = setInterval(() => {
+    for (let k = 0; k < 4 && i < rw.length; k++, i++) buf += rw[i] + " ";
+    slot.innerHTML = buf.split(" § ").map(p => `<p>${p}</p>`).join("");
+    if (i >= rw.length){
+      clearInterval(phase1);
+      // reasoning settles: the line goes QUIET and names its duration
+      const secs = Math.max(1, Math.round((Date.now() - t0) / 1000));
+      think.classList.remove("live");
+      lbl.textContent = `Thought for ${secs} second${secs === 1 ? "" : "s"}`;
+      streamAnswer();
+    }
+  }, 50);
+
+  function streamAnswer(){
+    // the answer writes BELOW the settled thinking line — not inside it
+    let pi = 0, wi = 0, acc = [];
+    const phase2 = setInterval(() => {
+      const words = ANSWER[pi].split(" ");
+      for (let k = 0; k < 3 && wi < words.length; k++, wi++){
+        acc[pi] = (acc[pi] || "") + words[wi] + " ";
+      }
+      ans.innerHTML = acc.map((p, ix) =>
+        `<p>${p}${ix === pi ? '<span class="caret"></span>' : ""}</p>`).join("");
+      if (wi >= words.length){ pi++; wi = 0; }
+      if (pi >= ANSWER.length){
+        clearInterval(phase2);
+        ans.innerHTML = ANSWER.map(p => `<p>${p}</p>`).join("");
+        av.classList.remove("live");
+        busy = false;
+        btn.textContent = "▶ Replay the stream"; btn.classList.remove("armed");
+        render();
+      }
+    }, 55);
+  }
+});
+
+render();
+</script>
+</body>
+</html>

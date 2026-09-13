@@ -1492,7 +1492,18 @@ const BASELINE = {
   // 241-03: 13 -> 23. The +10 are the two HNSW knobs on the shipped Retrieval card (QUEUE-06 /
   // D-09), all asserting rendered CONTENT rather than presence — the served bounds reaching the
   // input's min/max, the three pgvector modes by VALUE, and both keys on the save payload.
-  "SettingsPage.test.tsx": 23,
+  // 242-02: 23 -> 24. Phase 241's "Save Search Settings carries both keys" case became TWO, because
+  // D-242-02 changed the contract it pinned: the tab now sends CHANGED FIELDS ONLY, so an untouched
+  // `hnsw_ef_search` is no longer on the payload. The original assertion was NOT deleted — deleting
+  // it would erase 241 D-09's guarantee silently while looking like a tidy-up. It became (a) an
+  // edited knob rides AND its untouched sibling is absent, and (b) both ride when both are edited.
+  "SettingsPage.test.tsx": 24,
+  // ── ADOPTED 2026-09-11 (Phase 242) — the three SettingsPage suites that were in NEITHER knob. ──
+  // Numbers read from the gate's own `— N new` column, never hand-counted. The full reason and the
+  // red-suite repair are in the TARGETS block for these files.
+  "SettingsPage.a11y.test.tsx": 4,
+  "SettingsPage.sourceCeiling.test.tsx": 9,
+  "SettingsPage.changedFields.test.tsx": 17,
   // ── 188-12: the fifteen files that RAN inside TARGETS with NO pin at all. ──
   // Inherited from Phases 183-187, none authored by this phase. They are pinned here because
   // the reason to leave a suite unpinned ("it postdates the pin, its count is free to grow")
@@ -2894,6 +2905,215 @@ const BASELINE = {
   "watchProductMark.test.ts": 7,
   "navItemsUnknownIsNotDenied.test.ts": 4,
 
+  // ── Phase 243 (243-01 / CHAT-01 / CHAT-04 / D-243-16) — the thinking block's
+  // ── PRE-EXTRACTION characterization net. Pinned in the SAME COMMIT that creates the file
+  // ── and its TARGETS line, because a BASELINE key naming a path that does not yet exist
+  // ── makes this gate ERROR (exit 2) rather than fail.
+  //
+  // ⚠ 17 was READ FROM THIS SCRIPT'S OWN `actual` COLUMN on the run that first executed the
+  // file (printed as `— 17 new`), never hand-counted from `it(` literals and never taken from
+  // a planning document — the plan that authored this suite quotes no number for that reason.
+  //
+  // What is UNGUARDED without this entry: the thinking block's three states have NO other
+  // test anywhere in this tree — `thinking-trigger` and `thinking-row` were asserted by
+  // nothing at all before this file existed. 243-02 MOVES that block out of RunCard and
+  // mounts it from MessageItem; this pin is what stops the move from silently deleting the
+  // cases that certify it. Two of the seventeen pin DEFECTS on purpose (the tool-gated
+  // reasoning of CHAT-04, and the two folds a settled run puts in front of it) — a lowering
+  // here would most cheaply be achieved by dropping exactly those.
+  //
+  // RAISED 17 -> 23 at Phase 243 plan `243-02`, and the number was READ FROM THE GATE'S OWN
+  // `actual` column (`ThinkingBlock.characterization.test.tsx  17  23  +6`), never counted by
+  // hand. The +6 is fully attributed: 10a/10b/10c (the one-renderer source fence and its
+  // positive control), 11 (DOM order), 12 (the no-second-gate fence) and 13 (the fold
+  // survives the temp-id -> DB-id reconcile, which is where the remount semantics were
+  // DECIDED). The two defect cases named above did NOT go away when the defects were fixed:
+  // 8 and 9 were INVERTED IN PLACE and still assert, now on the correct side. That is the
+  // distinction this pin exists to make — a fixed defect keeps its case, a dropped one does
+  // not, and only the count can tell them apart.
+  //
+  // RAISED 23 -> 27 at `243-04`, again READ FROM THE `actual` COLUMN
+  // (`ThinkingBlock.characterization.test.tsx  23  27  +4`). The +4 is fully attributed and
+  // is ALL of §5b: the two-paragraph element-count case, the no-nested-scroller case, the
+  // single-paragraph median case, and the lossless-split case. §5 itself CHANGED rather than
+  // multiplied - it now pins V1's class set instead of the defect's - so the count is the
+  // only thing that can tell a REPLACED pin from a DROPPED one.
+  //
+  // RAISED 27 -> 33 at `243-04` task 3, from the `actual` column again. The +6 is §14, the
+  // label's three arms: MEASURED (a), pluralisation (b), and ⛔ the two REFUSALS (c, d) plus
+  // the streaming and no-count guards (e, f). ⛔ §14d is the one that costs something to keep -
+  // it drives a 33,713-char body specifically because that is the scale at which a
+  // length-derived duration looks most plausible, and it is the cheapest case to drop.
+  "ThinkingBlock.characterization.test.tsx": 33,
+
+  // ── Phase 243 (243-04 / CHAT-01 / D-243-02) — the reasoning clamp ───────────────────
+  //
+  // ⚠ 7 was READ FROM THIS SCRIPT'S OWN `actual` COLUMN on the run that first executed the
+  // file (printed as `—  7  new` on this suite's row), never hand-counted. ⚠ The suite's
+  // FILENAME is deliberately not repeated in this prose: the plan's own acceptance grep
+  // counts its occurrences in this script, and a comment naming it makes that count lie.
+  //
+  // What is UNGUARDED without this entry: the tail treatment at BOTH ends of D-243-03's 170x
+  // spread. §3 is the load-bearing one - the control is ABSENT (not hidden) on the median
+  // 198-char body, which is what distinguishes this clamp from the two OTHER clamps in this
+  // tree (`CandidateCard.tsx:104`, `CitationCard.tsx:196-205`) that mount their toggle
+  // unconditionally. §4 proves the gate is the MEASUREMENT and not the sketch's ~700-char
+  // proxy; §5 proves the fade is not the user bubble's violet; §6 proves the cap is a REVEAL
+  // and never a nested scroller, which is what CHAT-01 is about. A lowering here would most
+  // cheaply be achieved by dropping exactly §3 and §4 - the two that cost something to keep.
+  "ThinkingBlock.clamp.test.tsx": 7,
+  // BUG-260912-01 — both counts READ FROM A REAL RUN after the edits landed, never guessed.
+  // narration 7 = §1..§6 (fold-draws / body-clean / paragraphs / no-invented-span /
+  // both-sources / inert) plus §7, the MID-STREAM double-indicator regression this fix
+  // shipped and a live browser run caught; turnfold 6 = §1..§6 (move / three-turns /
+  // flush-first / blank-line separator / inert / no-span).
+  "ThinkingBlock.narration.test.tsx": 7,
+  "streamsProvider_bug260912_turnfold.test.tsx": 6,
+
+  // ── Phase 243 (243-05 / CHAT-05 / CHAT-01 — D-243-06) — the answer out of the fold ─────
+  //
+  // ⚠ 13 was READ FROM THIS SCRIPT'S OWN `actual` COLUMN on the run that first executed the
+  // file (printed as `— 13 new` beside this suite name), never hand-counted from `it(`
+  // literals.
+  //
+  // What is UNGUARDED without this entry, and none of it is covered anywhere else in the
+  // tree: §1/§2 that a live tool-bearing run writes its answer as the message BODY and in
+  // DOCUMENT ORDER below the thinking line (the CHAT-05 fix itself); §3 that the streaming
+  // caret survives it; §4 that `StreamingNarration` is neither deleted nor restyled; §5 that
+  // the absence hint's gate did not flip as a side effect; and §6 the NAVIGATION path, driven
+  // through `StreamsProvider`'s own callbacks and reconcile — the only fence in the tree that
+  // drives a run terminating while its thread is not the mounted surface.
+  //
+  // ⛔ A lowering here would most cheaply be achieved by dropping §6, which is the half
+  // `BUG-260707-03` residual #2 is actually stated on and the half a live-send check cannot
+  // see. `src/providers` sits in NEITHER knob, so §6 is guarded here or nowhere.
+  "MessageItem.answerOutOfFold.test.tsx": 13,
+
+  // ── Phase 243 (243-03 / CHAT-02 / D-243-15) — the delta path's coalescing fence ─────────
+  //
+  // ⚠ 9 was READ FROM THIS SCRIPT'S OWN `actual` COLUMN on the run that first executed the
+  // file (printed as `— 9 new` beside this suite name), never hand-counted from `it(` literals.
+  //
+  // What is UNGUARDED without this entry: `makeStreamCallbacks` now BUFFERS text between
+  // repaints, and the two ways that goes wrong are invisible to every other suite in this
+  // tree. §2/§3 reconstruct the exact concatenation of 60 individually-distinguishable
+  // deltas — the guard against `makeThrottle`'s last-write-wins shape being reintroduced,
+  // which would drop tokens while every cadence measurement still looked right. §6 asserts
+  // the FIRST delta paints with no window elapsed (a trailing-only coalescer would delay a
+  // reply's first character). §4/§5 assert both terminal edges drain the buffer. A lowering
+  // here would most cheaply be achieved by dropping exactly those.
+  //
+  // ⛔ §8 pins DELTA_COALESCE_MS at 60. The case NAMES of §1 do arithmetic on that number,
+  // so retuning the window without re-deriving them is caught here rather than silently
+  // leaving a comment that lies.
+  //
+  // RAISED 9 -> 15 at `243-04` (D-243-13). The +6 is §10, the MEASURED reasoning span, which
+  // lives in this file rather than the component net because the stamp is delta-path
+  // behaviour and this file already owns the `makeStreamCallbacks` harness and its module
+  // mocks. §10c (no reasoning -> the field is ABSENT) and §10d (the span settles once) are the
+  // two that stop a fabricated or whole-run duration; a lowering would most cheaply drop them.
+  //
+  // RAISED 15 -> 18 at `243-06` (review finding HI-1). The +3 is §10g / §10h / §10i, and all
+  // three were driven RED against 243-04's shipped code — §10g read `expected 40100 to be less
+  // than 5000` for 100 ms of thinking either side of a 40 s tool. They are the cases that pin
+  // WHICH INTERVAL the number is: §10g that a tool call is not thinking, §10h that a
+  // multi-burst turn sums its bursts rather than its wall clock, §10i that one reasoning delta
+  // is an observation and not an interval (so no duration is written at all). §10b and §10f
+  // were re-expressed in the same vocabulary and still count 1 each; the total moves by the
+  // three new cases only.
+  "streamsProvider_243_cadence.test.tsx": 18,
+  // 243-06 (MD-4): this suite existed since Phase 176 and was in NEITHER knob, so it ran
+  // nowhere and guarded nothing. Registered here when MD-4 added the failed-terminal cases.
+  "streamsProvider_bug_260707_03_final_answer_resolve.test.tsx": 6,
+  // ── Phase 244 plan 11 (SHELL-01 / G-3) — a failed snapshot must reach the error slice ──
+  //
+  // 4 cases: Test 1 the gap (a 503 writes `reconcileErrors`), Test 2 the happy path writes
+  // nothing, Test 3 an AbortError writes nothing (a navigation is not a failure), Test 4
+  // the slice stays per-thread. ⚠ Tests 1 AND 4 were both RED before the fix — 4 was
+  // planned as a control, but its positive half (`has(A) === true`) is built on the very
+  // write the gap was missing, so a "control" can sit downstream of the defect it guards.
+  "streamsProvider_244_snapshot_failure.test.tsx": 5,
+  // ── Phase 244-14 (review WR-02) — the two mount-time lock writers are in lockstep ──────
+  //
+  // 5 cases, read from this script's own `actual` column: a non-vacuity control on both
+  // sources, the branch really exists in both, both write `mode: "harness"`, the two
+  // `capPaused` expressions are IDENTICAL, and the agreed value is `false`. The last two are
+  // separate on purpose — agreement alone is satisfiable by agreeing on `cap_paused`, which
+  // would re-open the hole `244-08` shut, so the DIRECTION is pinned as its own case.
+  "workflowLockWriters.lockstep.test.ts": 5,
+
+  // ── Phase 244-15 (SHELL-03 / UAT gap G-8) — the answer-settles-both-homes fences ───────
+  //
+  // 8 cases at the Task-1 commit, read from this script's own `actual` column, never
+  // hand-counted. Three of them are NEGATIVE CONTROLS (a live anchor, a cap-paused lock and
+  // a failed read each release NOTHING) — the arms that keep the settle from becoming the
+  // elevation `T-244-03-01` names, and the easiest kind of case to delete without anyone
+  // noticing. Test 8 is the source sweep that forbids a SEVENTH `setWorkflowLockForThread`
+  // derivation; without a pin it could be silently dropped and the gate would still say OK.
+  // ⚠ RAISED `8` → `12` IN TASK 2 OF THE SAME PLAN, from the same `actual` column. The four
+  // added cases are the two-homes pair (answer in A clears B; answer in B clears A — TWO
+  // directions, because a fence over one is passed by a fix that only works one way), a
+  // refused-answer case that must settle NOTHING, and the third home (`WorkflowRunPage` mounts
+  // the CARD, not the stack) asserted by API call count rather than by render.
+  // ⚠ RAISED `12` → `16` BY THE WR-01 FIX ROUND, from the same `actual` column. Three of the
+  // four were DRIVEN RED against the unguarded code first: the settle cleared the STOP slice of
+  // a thread with no workflow (Test 13, through the stack), disarmed its 8s climb-down timer
+  // (Test 14, the half a state assertion cannot see), and issued a pointless workflow GET
+  // (Test 15). The fourth is the POSITIVE CONTROL that keeps the new guard from being too
+  // narrow — the kickoff mark ALONE must still let the settle proceed (Test 16), which is the
+  // pre-lock window and would otherwise be closed off by a guard demanding the lock.
+  "streamsProvider_244_settle_ask.test.tsx": 16,
+
+  // ── Phase 244-15 — a RED, UNGATED fence, repaired and finally adopted ─────────────────
+  //
+  // ⚠ FOUND IN NEITHER KNOB AND RED SINCE `d58fa43a0`. The gate never RAN it, so nothing
+  // noticed its `?raw` line-count pin going stale two phases ago: measured at 244-15's base,
+  // `1 failed | 8 passed`, `expected 766 to be 737`. Thirteenth suite found in this state; the
+  // structural fix is SEED-229. Re-baselined to 837 and adopted in the SAME commit, and ONLY
+  // because all 9 cases are green — adopting a red suite turns the shared gate red.
+  "PendingAskCard.retired.baseline.test.tsx": 9,
+
+  // ── Phase 243 (243-03 / CHAT-03 / D-243-16) — the scroll effect's ONLY behavioural fence ─
+  //
+  // ⚠ 8 was READ FROM THIS SCRIPT'S OWN `actual` COLUMN on the run that first executed the
+  // file (printed as `— 8 new`), never hand-counted.
+  //
+  // What is UNGUARDED without this entry: EVERYTHING about `MessageList.tsx:141-176`.
+  // `MessageList.test.tsx` stubs `HTMLElement.prototype.scrollIntoView` to a NO-OP tree-wide
+  // (`:61-65`), so until this file existed nothing in this tree could see how many times that
+  // effect scrolls, or with which `behavior`. This suite installs a SPY instead. §3 pins the
+  // residual CHAT-03 defect (a sub-threshold nudge up must not be re-armed by a scroll nobody
+  // produced) and §5 pins its MIRROR (a deliberate flick back down MUST still re-arm) — the
+  // pair is the design, and a "fix" that drops either half is what this count catches. §7 is
+  // the only case here that drives the REAL producer, and it is what makes D-243-04's claim a
+  // measurement: 60 deltas produced 61 scrolls before the coalescing and 13 after.
+  //
+  // ⚠ Every case runs on a 54-message thread. A 3-message fixture cannot show the failure
+  // mode the ROADMAP names ("works on a short thread and fails on a long one").
+  //
+  // ⚠ RAISED 8 -> 11 at `243-06` (review finding HI-2). §8 drove RED at the component level with
+  // the REAL interaction this phase introduced — a `pointerdown` on `ThinkingBlock`'s fold
+  // `<button>`, which sits inside this viewport on every reasoning-bearing row — and the
+  // Jump-to-live chip vanished, i.e. the reader was dragged back. §9 drove the horizontal wheel
+  // (`deltaY === 0`, which used to read as "down"). §10 is their mirror: the same click with no
+  // prior scroll-up must leave following intact.
+  "MessageList.scroll.test.tsx": 11,
+
+  // ── Phase 243 (243-03 / CHAT-02) — ADOPTED, NOT CREATED, and it was ungated since 068.5 ──
+  //
+  // ⛔ THIS FILE ALREADY EXISTED AND WAS IN NEITHER KNOB. `grep -n "throttle"` on this script
+  // returned NOTHING before 243-03 — `lib/throttle.ts` shipped at Phase 068.5 with a suite
+  // that has guarded nothing for the whole of its life. Registered in both knobs here.
+  //
+  // ⚠ 11 was READ FROM THIS SCRIPT'S OWN `actual` COLUMN (printed as `— 11 new`). It is 4
+  // inherited cases plus 7 added by 243-03, and the split matters: the 4 pin `makeThrottle`'s
+  // trailing-only, last-write-wins contract, which is CORRECT for its one call site (the
+  // localStorage cache writer) and would DROP TOKENS on the delta path. The 7 pin the new
+  // `makeAccumulatingCoalescer`, whose contract is the opposite on both axes.
+  //
+  // ⛔ A future editor who "unifies" the two primitives breaks one of the two call sites
+  // silently. A decrease here is most cheaply achieved by exactly that.
+  "throttle.test.ts": 11,
   // ══════════════════════════════════════════════════════════════════════════════
   // Added at Phase 214's CLOSE (plan `214-15`), collected here AFTER every file
   // exists — a `BASELINE` key naming a path that does not yet exist makes this gate
@@ -3142,7 +3362,17 @@ const BASELINE = {
   // cancel our claim for the purpose of letting go but NEVER for taking hold again, and an
   // upward gesture must release synchronously rather than a commit later. Each was driven RED,
   // and two of them only after a REAL mouse wheel refuted a synthetic one that measured clean.
-  "useFollowScroll.test.ts": 10,
+  //
+  // ⚠ RAISED 10 -> 17 at `243-06`, AND THE +7 IS TWO DIFFERENT THINGS — attributed rather than
+  // quoted as one number, because an unexplained `+n` is the thing to worry about. **+3 were
+  // already on disk and unpinned**: `243-03` added cases ⭐A / ⭐B / ⭐C and did not re-baseline,
+  // so the file ran at 13 against a pin of 10 for a whole phase. **+4 are `243-06`'s** (review
+  // finding HI-2): ⭐D drove RED — `expected true to be false` — that ONE directionless
+  // `pointerdown` re-pinned a reader who had wheeled up and stayed released for 1000 ms, and
+  // D-mirror-1/2/3 pin the three ways the decision must still be GIVEN BACK (a geometry-only
+  // release, `jumpToLive()`, a new run). ⛔ The mirrors are the half a later "fix" would drop:
+  // refusing every directionless re-arm passes ⭐D and strands every scrollbar user.
+  "useFollowScroll.test.ts": 17,
   // ── BUG-260904-01 (2026-09-04) — the Continue button's ONLY behavioural guard ──────────
   // Pinned in the SAME COMMIT that creates it (a BASELINE key naming a path that does not yet
   // exist makes this gate ERROR at exit 2, not fail). Bare name confirmed unique tree-wide.
@@ -3158,7 +3388,10 @@ const BASELINE = {
   "MessageItem.cancelledRun.test.tsx": 8,
   "MessageItem.blockedNotice.test.tsx": 4,
   "MessageItem.harnessBanner.test.tsx": 11,
-  "ChatAreaBanner.test.tsx": 7,
+  // 244-11 (G-3): 7 → 9. +2 exactly — Test 5 (empty transcript ⇒ no cached-version claim)
+  // and Test 6 (non-empty ⇒ the shipped sentence byte-exact). No residual: case (c) was
+  // re-fixtured, not duplicated, and its count is unchanged.
+  "ChatAreaBanner.test.tsx": 9,
   "ChatAreaMode.test.tsx": 5,
   "RunCard.characterization.test.tsx": 8,
   "MessageItem.test.tsx": 24,
@@ -3264,6 +3497,253 @@ const BASELINE = {
   // This is that close. BOTH knobs, for the reason the entry above states.
   "ConnectionFormPanel.sourceTools.test.tsx": 14,
   "ConnectionFormPanel.refreshReceipt.test.tsx": 4,
+  // ── Phase 244 plan 01 (SHELL-01 / BUG-260828-08 / BUG-260816-03) ──────────────────────
+  //
+  // ⛔ BOTH KNOBS, BY NECESSITY. `src/components/layout` is NOT a bare directory entry in
+  // TARGETS (this file records that fact beside four other blocks already, and it is still
+  // true here), so a suite dropped into `src/components/layout/__tests__/` runs in NO gate
+  // until it is NAMED in TARGETS and PINNED here. TARGETS decides what RUNS; BASELINE
+  // decides what is GUARDED (the Phase 214 `WorkflowScheduleModal` lesson, inverted).
+  //
+  // `ChatLayout.scrollFrame.test.tsx` — 5 cases. Four ?raw class-list assertions, one per
+  // link of the `min-h-0` chain, plus an `import.meta.glob` sweep pinning the `<ScrollArea>`
+  // inventory BY FILE so a third, UNBOUNDED call site cannot arrive silently. All five were
+  // driven RED against the shipped tree before the classes were added.
+  //
+  // ⚠ 5 → 6 at Phase 244 plan 09 (gap G-5). `+1` — LINK 6, and the reason it exists is that the
+  // five above are ALL in the MESSAGE column. The shell's SIBLING column (`NavPanel.tsx`, the
+  // desktop nav rail) got neither treatment, and a Chrome drive on 2026-09-12 measured the
+  // consequence: below ~540px of viewport height the PAGE ROOT overflowed (h=436 → `#root`
+  // scrollHeight 540 vs clientHeight 436) and the whole page scrolled. Link 6 pins the rail
+  // root's `min-h-0` + `overflow-y-auto`, and was driven RED TWICE — once against the shipped
+  // tree, once against a planted deletion of `overflow-y-auto` alone.
+  // ⛔ IT PROVES NOTHING ABOUT PIXELS. jsdom performs no layout; the measured bound is
+  // `244-09-UAT-ROW.md`, driven in a real browser at `/gsd:verify-work`.
+  "ChatLayout.scrollFrame.test.tsx": 6,
+  // `ChatHistoryColumn.clickPath.test.tsx` — 10 cases. The BUG-260911-02 trace, driven
+  // against the real components: C-6's candidates (b) and (c) refuted, plus the FOURTH
+  // candidate C-6 did not list (the always-rendered `opacity-0` actions overlay had no
+  // `pointer-events-none` while its documented sibling did). One case was RED on the shipped
+  // tree; the rest were green and are the trace's own controls. ⚠ jsdom does no hit-testing,
+  // so this suite does NOT close the bug — it stays `folded`, with a browser re-open trigger.
+  "ChatHistoryColumn.clickPath.test.tsx": 10,
+  // `ChatHistoryColumn.rowIdentity.test.tsx` — 7 cases. BUG-260816-03 (b) + (c): the folder
+  // chip is bounded (`max-w-[96px]` + `truncate` + a `title=`), and an unscoped row renders
+  // NO chip. 3 of the 7 were RED on the shipped tree; the other 4 are controls, incl. the
+  // FOLDER-mode "Unfiled" GROUP HEADER, which is `groupByFolder`'s and is untouched.
+  // ⛔ Sub-defect (a) is NOT taken — `Thread` has no kind discriminator and D-244-18 forbids
+  // a second sketched surface. The report stays `folded`.
+  "ChatHistoryColumn.rowIdentity.test.tsx": 7,
+  // ── Phase 244 (244-02 T1 / SHELL-04 / D-244-24) ─────────────────────────────────────────
+  // 6 cases, measured — not guessed — on a green run of the suite alone. BOTH knobs in the
+  // SAME COMMIT, for the reason the TARGETS block above states: `src/lib` is not a directory
+  // entry, so a suite there can sit on the wrong side of exactly one knob for a whole phase.
+  // ⭐ The pin was FALSIFIED before it was written: deleting `.pdf` from
+  // `workspaceAllowedExt.ts` turned 3 of the 6 red, and the file was restored md5-identical.
+  "workspaceAllowedExt.lockstep.test.ts": 6,
+  // ── Phase 244 (244-03 T1 / SHELL-02 / BUG-260904-05) ────────────────────────────
+  // 5 cases, MEASURED on a green run of the suite alone — not guessed. BOTH KNOBS IN THE
+  // SAME COMMIT, for the reason this file now records beside its other chat blocks:
+  // `src/components/chat` has NO bare-directory TARGETS entry, so a suite dropped there
+  // runs in NO gate until it is NAMED there AND pinned here.
+  // ⛔ TWO of the five are a NEGATIVE-REGRESSION fence over `MessageItem.tsx:576-578` — the
+  // ROADMAP names deleting that sentence as the ANTI-FIX for BUG-260904-05, so this pin is
+  // what stops the wrong fix passing. ⚠ They assert the rendered SENTENCE verbatim, never a
+  // `data-testid`: a presence assertion cannot see content drift.
+  // ⭐ Driven RED first — 2 of the 5 failed on the shipped tree with `Unable to find an
+  // element with the placeholder text of: Ask anything…`.
+  // ⚠ RE-BASELINED 5 -> 6 BY 244-08. Case 5 closes `T-244-03-01`: a harness run whose OWN
+  // status is `cap_paused` used to UNLOCK the composer, because `capPaused` was set on the
+  // genuine-lock branch as well as the reconcile branch. The five cases above could not see
+  // it — `HARNESS_LOCKED_STATE` sets `cap_paused: false`, so the discriminator was only ever
+  // read on a run that is locked OR paused, never one that is BOTH.
+  // ⚠ RE-BASELINED 6 -> 8 BY 244-13 (UAT gap G-1 / review WR-07). D5 closes WR-07 — the ONE
+  // boolean at `ChatArea.tsx:140` now reads the lock's MODE, so a genuine harness run that is
+  // itself cap-paused stays locked. D6 asserts BOTH of SHELL-02's halves in ONE tree, which
+  // is what the browser measured contradicting each other; cases 1 and 3 assert them in
+  // separate trees and are therefore consistent with a product that never shows them together.
+  "ChatArea.capPausedComposer.test.tsx": 8,
+  // ── Phase 244-13 (UAT gap G-1) — the run line a DEEP cap-pause must NOT draw ─────────
+  // ⚠⚠ ADOPTED, NOT RE-BASELINED. This suite shipped at Phase 194.1 and has been in NEITHER
+  // knob ever since: `grep -n "ThreadRunLineKickoff" scripts/vitest-count-gate.cjs` returned
+  // NOTHING, so it ran in no gate and guarded nothing for ~50 phases. `src/components/chat`
+  // has no bare-directory TARGETS entry (this array has exactly two — `src/landing` and
+  // `src/components/workflows`), so a suite dropped there is invisible until it is NAMED in
+  // TARGETS **and** pinned here. ⭐ Adopting a suite RAISES the grand total; that is the
+  // desirable direction and must not be read as drift.
+  // 4 shipped cases (194.1-06's R5 pair + the two dead-interval cases) + 6 added by 244-13:
+  // D1 no phantom run line · D2 no phantom 1s clock · D3 the DEEP banner at ZERO fetches
+  // (T-194-07-03's disposition, voided by 244-03, now an ASSERTION rather than a comment) ·
+  // D4 the genuine harness run unharmed (D3's positive control) · D5b(a)/(b) the cap_paused
+  // SSE inheriting the lock's mode rather than hard-coding "harness".
+  // ⭐ Driven RED first — D1, D3, D5b(b) and D6 all failed on the shipped tree.
+  "ThreadRunLineKickoff.test.tsx": 10,
+  // ── Phase 244-08 (T-244-05-05 / OPEN-2) — the expired attachment TOMBSTONE ──────────
+  // 5 cases, measured on a green run of the suite alone. BOTH KNOBS, SAME COMMIT.
+  // ⭐ Driven RED first — 3 of the 5 failed on the shipped tree: `expected undefined to be
+  // true` (the fetch never asked for expired rows), `expected ['wf-agent','wf-expired'] to
+  // deeply equal ['wf-agent']`, and `expected 2 to be 1`.
+  // ⚠ CASE 4 IS A POSITIVE CONTROL AND IT EARNED ITS PLACE: the first draft of the suite
+  // mounted no `StreamsProvider`, so `actions.replaceWorkspaceFilesForThread` was still the
+  // no-op stub at `streamsStore.ts:463` and ALL FIVE cases went red — a textbook-looking RED
+  // that would have failed over a correct implementation too (244-05's exact mistake). Case
+  // 4 failing is what told the difference.
+  "expiredAttachmentTombstone.test.tsx": 5,
+  // ── Phase 244 (244-03 T2 / SHELL-03 / BUG-260828-07, HIGH) ───────────────────────
+  // 8 cases, MEASURED on a green run of the suite alone. BOTH KNOBS, SAME COMMIT —
+  // `src/components/chat` has no bare-directory TARGETS entry.
+  // ⚠ The two action cases assert the LABELS the panel renders (`Approve this step` /
+  // `Do not run it` / `Send Answer`), never a `data-testid`. BUG-260828-07's complaint is
+  // literally "it looked right and did nothing", and a presence assertion cannot see that.
+  // ⭐ The C-3 cost case was FALSIFIED against a planted top-level mount: three assistant
+  // rows each rendered the approval card ("Found multiple elements with the role radio and
+  // name Approve this step"), and `MessageItem.tsx` was restored md5-identical
+  // (2752d7777c00f0e1dad78fdcc152b09f). ⛔ It asserts SIX rows cost what ONE row costs — an
+  // equality, not a literal: the per-mount constant has already been measured wrong once
+  // (a single stack fires the ask fetch TWICE, not once), and the property that matters is
+  // that the cost does not scale with ROW COUNT.
+  // ── Phase 244 (244-12 / G-6, the phase's BLOCKER) — RE-BASELINED 8 → 13 ───────────────
+  // ⛔ THE +5 IS FULLY ATTRIBUTED, WITH NO RESIDUAL: W1 (a workflow pause reaches the chat
+  // column with NO ask-bearing message at all), W2 (the Deep path survives and renders EXACTLY
+  // ONE control set), W3 (six ordinary rows cost what one costs, on the workflow shape),
+  // W4 (no pause → nothing renders, and the unconditional mount's bought fetch is ASSERTED
+  // rather than hidden), W5 (the settle is structural on the SSE writer path too).
+  // ⚠ NO CASE WAS DELETED — 1/2/3/5 were RE-AIMED IN PLACE onto `MessageList`, and 4 kept its
+  // row-level anchor on purpose. Removing them and re-homing to a new suite would have been a
+  // per-file DECREASE, which is exactly what this knob exists to refuse.
+  // ⭐ AND THE FINDING WORTH MORE THAN THE NUMBER: the 8 cases pinned above were GREEN while the
+  // blocker was live in the product. They CONSTRUCTED the Deep-agent shape
+  // (`tool_calls:[{name:"ask_user",status:"running"}]`), which the harness never writes — so the
+  // suite proved the component renders when handed that shape and never that the product emits
+  // it. W1 seeds through the PRODUCT's own writer instead. A count pin cannot see this class of
+  // defect; only the fixture can.
+  "MessageItem.inlineApproval.test.tsx": 13,
+  // ── Phase 244 (244-04 T1 / SHELL-05 / BUG-260911-03 / C-5) ──────────────────────────────
+  // ⛔ BOTH KNOBS, BY NECESSITY — the fact this script has now recorded beside five other
+  // blocks and which is STILL true: `src/components/layout` is NOT a bare directory entry in
+  // TARGETS, so a suite dropped into `src/components/layout/__tests__/` runs in NO gate until
+  // it is NAMED there AND pinned here. TARGETS decides what RUNS; BASELINE decides what is
+  // GUARDED, and a suite can sit on the wrong side of exactly one of them for a whole phase.
+  //
+  // 10 cases, MEASURED on a green run of the suite alone — not copied from the plan. TWO were
+  // driven RED against the shipped tree before `tab?: LibraryTab` existed (`expected undefined
+  // to be "health"`); the other EIGHT are controls that were green before the edit and whose
+  // job is to prove the edit changed nothing else — the registry's one-tenant count, the five
+  // cause sentences asserted on their WORDS, and the `?raw` reader inventory.
+  "attentionTab.test.ts": 10,
+  // ── Phase 244 (244-04 T2 / SHELL-05 / BUG-260911-03) ────────────────────────────────────
+  // ⛔ BOTH KNOBS, and this script has now recorded the same fact about `src/pages` a dozen
+  // times: there is NO `src/pages` bare-directory entry in TARGETS — it is reached by NAMED
+  // FILES ONLY — so a suite dropped into `src/pages/__tests__/` runs in NO gate until it is
+  // named there AND pinned here.
+  //
+  // 15 cases, MEASURED on a green run of the suite alone. EIGHT were RED on the shipped tree
+  // (no tab carries a mark; `attentionCountByTab is not a function`; the ChatLayout key-link
+  // fence). The two hand-off cases were GREEN before the edit, so they were driven RED against
+  // PLANTED defects — a second `setLibraryTab(` writer in `App.tsx`, and a
+  // `libraryTabAfterNavigate` that returns `pending` unconditionally — and both files were
+  // restored md5-identical. A guard nobody has seen fire is not a guard.
+  "LibraryPage.tabAttention.test.tsx": 15,
+  // ── Phase 244 (244-05 T1 / SHELL-04 / D-244-22 / D-244-25) — the attachment chip ────────
+  // ⛔ BOTH KNOBS, SAME COMMIT. `src/components/chat` has NO bare-directory TARGETS entry (this
+  // array has exactly two: `src/landing` and `src/components/workflows`), so a suite dropped
+  // into `src/components/chat/__tests__/` runs in NO gate until it is NAMED there AND pinned
+  // here. TARGETS decides what RUNS; BASELINE decides what is GUARDED.
+  //
+  // 10 cases, MEASURED on a green run of the suite alone — not copied from the plan.
+  // ⭐ THE LOAD-BEARING ONE IS CASE 2: the SENT chip still renders `this chat only`. Sketch 236's
+  // winner (A — Scope on the chip) won BECAUSE the promise survives into the transcript, so a
+  // build that carries the scope word only while pending has shipped B's weakness at A's cost.
+  // It was FALSIFIED against a planted defect — the scope span gated on `pending` — which fired
+  // `AssertionError: expected null not to be null`, and `ChatAttachmentChip.tsx` was restored
+  // md5-identical (c83330e2bb38628b9f431e6f85d3011e).
+  // ⚠ Case 4 pins the THREE expiry readings against `FilesSection.expiryCaption`, which the chip
+  // IMPORTS rather than re-derives: ABSENT and UNPARSEABLE are the same third case, the word is
+  // `expiry unknown` and never `no expiry`, and neither is amber.
+  // ⚠ Case 5a is COMMENT-STRIPPED on purpose. The chip's docblock EXPLAINS that it holds no copy,
+  // so an unstripped grep measures the explanation — the first draft asserted its own
+  // `grep -c ... is 0` while containing the sentence, making the claim false by stating it.
+  "ChatAttachmentChip.states.test.tsx": 10,
+  // -- Phase 244 (244-05 T2+T3 / SHELL-04 / D-244-26 / D-244-27) — the ordered-block fence -----
+  // BOTH KNOBS, SAME COMMIT. `src/components/chat` has no bare-directory TARGETS entry.
+  //
+  // 10 cases at T2, MEASURED on a green run of the suite alone; T3 extends it.
+  // NINE of the ten were RED on the shipped tree before the build — `Unable to find an element
+  // with the text: Attach a file` and `Unable to find an element by:
+  // [data-testid="composer-attach-input"]`. The tenth (a connector with no attachment) is the
+  // CONTROL: it was green before and its job is to prove the hoist changed nothing else.
+  //
+  // Two deliberate falsifications, both restored md5-identical:
+  //   · Test 4 driven RED against the FORBIDDEN arm — a `children` slot inside
+  //     `ActiveConnectorChips`, which returns `null` on empty — giving `Unable to find an element
+  //     by: [data-testid="chat-attachment-chip"]`. That is D-244-26's ruling in executable form;
+  //     without the RED the ruling is prose. (75ac2afcd28bf03920e8c2bcd9c6b0ed /
+  //     f45dfe40c32361955a171c44ac36b01a.)
+  //   · Tests 6b/6c driven RED against a SENTENCE-ONLY refusal (filename and dismiss atoms
+  //     deleted) — `expected null not to be null` and `expected <div role="alert" …> to be null`.
+  //     The revision pass found that block short two of its three atoms IN THE BUILD; this is
+  //     what stops it narrowing again.
+  //
+  // ⛔ Order is asserted with `compareDocumentPosition`, never `getAllByTestId(...)[0]` — query
+  // order and document order agree often enough to make a reordering bug invisible.
+  // T3 EXTENDS IT TO 19 — the sent-message block. ⚠ THE FIRST RED FOR CASES 10/11/12 WAS PARTLY
+  // VACUOUS AND IS RECORDED RATHER THAN TIDIED AWAY: the suite seeded the store through
+  // `actions.replaceWorkspaceFilesForThread`, and `streamsStore.ts` initialises `actions` as
+  // NO-OP STUBS that only `StreamsProvider` replaces ON MOUNT. So those cases were red because
+  // nothing had been seeded, not because the chip was absent — a RED for the wrong reason proves
+  // as little as a green one. Re-driven after the seeding was fixed to `setState`:
+  //   · the sent chip deleted from the user row -> cases 10 and 11 red
+  //     (`Unable to find an element by: [data-testid="chat-attachment-chip"]`)
+  //   · the agent pointer deleted -> case 12 red (`[data-testid="agent-read-pointer"]`)
+  //   · the detach / `kind` / upper-bound conditions deleted from `attachmentsForMessage` ->
+  //     cases 12b, 12c and 12d red, each on its own removed condition
+  // `MessageItem.tsx` and `ChatAttachmentChip.tsx` were restored md5-identical after every plant
+  // (`bab2a9868f07b37d2e29766d95574eed`, `0b092b18f2cf83756f1d2213c9f36306`).
+  "ComposerAttach.composition.test.tsx": 19,
+  // ── Phase 244 (244-06 T3 / SHELL-04 / D-244-05 / D-244-27) — the cloud modal ────────────
+  // ⛔ BOTH KNOBS, SAME COMMIT. `src/components/chat` still has NO bare-directory TARGETS entry.
+  //
+  // 9 cases, MEASURED on a green run of the suite alone — not copied from the plan.
+  // EIGHT were RED on the shipped tree (`Unable to find an element by:
+  // [data-testid="cloud-file-picker"]`, and `COPY.a.cloudSub is not a function`), because the
+  // shipped modal had NO source line, NO selection state — every row carried its own immediate
+  // `Import` button, so a click WAS the commit — and NO cancel/confirm footer.
+  // ⭐ The ninth (case 8) was GREEN from the start BY DESIGN: it is case 7's ordered predicate
+  // run against a deliberately mis-composed fixture, so it proves the assertion CAN fail.
+  //
+  // Four falsifications, every file restored md5-identical:
+  //   · the Library minter + the draft edit re-added to `MessageInput`'s cloud callback ->
+  //     case 1 `expected "vi.fn()" to not be called at all, but actually been called 1 times`
+  //     and case 2 `expected 'what does this say about pricing\nAtt…' to be 'what does this say
+  //     about pricing'` (f50eb09abe2356c465d1a3cc48904f7d)
+  //   · the footer MOVED above the file list -> case 7 `expected false to be true`
+  //   · the list made range-selecting -> case 7 `expected 2 to be 1` — the COUNT assertion, which
+  //     is why it counts rather than checking the row it clicked (4d9613e752594050a5f4e227086539db)
+  // ⚠ THE SECOND PLANT'S FIRST ATTEMPT WAS RED FOR THE WRONG REASON and is recorded rather than
+  // tidied away: it DUPLICATED the footer instead of moving it, giving `Found multiple elements
+  // by: [data-testid="cloud-cancel"]` — a failure explainable without reference to the defect.
+  "ConnectedFilePickerModal.thread.test.tsx": 9,
+  // ── Phase 244 (244-06 T2 / SHELL-04 / D-244-06 / D-244-07) — the LIBRARY's cloud door ───
+  // ⛔ BOTH KNOBS, SAME COMMIT. `src/pages` is NOT a bare-directory TARGETS entry either.
+  //
+  // 8 cases, MEASURED on a green run of the suite alone. ALL EIGHT were RED on the shipped
+  // tree — six with `Unable to find an element by: [data-testid="library-cloud-import"]`,
+  // because the Library had no single-file cloud door AT ALL, and two source fences.
+  //
+  // ⭐ THE LOAD-BEARING ONE IS CASE 2: with no folder selected the door renders its REASON as
+  // TEXT. D-244-06's ruling is that silently rooting is the defect, and a control that greys
+  // out with no words is the same failure wearing a different hat — so the assertion is on the
+  // rendered sentence, never on the `disabled` attribute.
+  // ⚠ Case 5 is D-244-23 read in the MIRROR: the Library's confirm must NOT be `Attach`. Two
+  // consequences (a 24h thread file / a permanent KB document) must not share one word.
+  //
+  // ⚠ TWO PLAN FIGURES DID NOT HOLD AND ARE CORRECTED IN THE TEST BODY, not over it:
+  //   · the plan asked that `grep 'folder_id' LibraryPage.tsx` be empty — it is a `Document`
+  //     FIELD read there, so the criterion could not pass on an untouched tree. The fence now
+  //     measures the property meant: no `folder_id:` body KEY.
+  //   · that read count is **7**, not the 5 a first pass took from `grep -n` — one line carries
+  //     three occurrences. ⛔ A LINE count is not an OCCURRENCE count.
+  "LibraryPage.cloudImport.test.tsx": 8,
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -3691,6 +4171,15 @@ const TARGETS = [
   "src/components/chat/RunCard.test.tsx",
   "src/components/chat/RunCard.timer.test.tsx",
   "src/components/chat/__tests__/ChatArea.approval.test.tsx",
+  // ── BUG-260912-01 — narration renders in the fold, not the body ───────────────────────
+  //
+  // ⛔ `src/components/chat` has NO bare-directory TARGETS entry (this file says so in four
+  // separate places), so a suite dropped into `src/components/chat/__tests__/` runs in NO
+  // gate until it is NAMED here AND pinned in BASELINE. Its sibling
+  // `ThinkingBlock.characterization.test.tsx` is already in both, which is exactly why IT
+  // caught this fix breaking the one-renderer needle (§10c) and this new suite could not
+  // have. Both knobs, same commit.
+  "src/components/chat/__tests__/ThinkingBlock.narration.test.tsx",
   // ⭐ Added in 214.1-02 — THE SECOND KNOB for this phase's headline artefact, and it was
   // MEASURED to be needed rather than added by habit: the pre-edit gate run printed no row
   // whatsoever for this file, because `src/pages` is reached by NAMED FILES ONLY and there
@@ -3811,6 +4300,27 @@ const TARGETS = [
   // which had been red for hours unseen.
   // ⚠ No bareName collision: the sibling is `SettingsPage.a11y.test.tsx`, a distinct key.
   "src/pages/SettingsPage.test.tsx",
+  // ── ADOPTED 2026-09-11 (Phase 242) — THREE MORE SettingsPage SUITES. ──────────────────────
+  // ⚠ THE FINDING THAT FORCED IT: `grep -n "SettingsPage" scripts/vitest-count-gate.cjs`
+  // returned exactly TWO hits before this commit — the BASELINE key and the TARGETS path
+  // directly above — while `src/pages/__tests__/` held two more SettingsPage suites that had
+  // NEVER RUN UNDER THE GATE. `src/pages` is not a directory entry here, so a file-level list
+  // is the only thing that reaches them, and nobody had added them.
+  // ⛔ AND ONE OF THEM WAS RED. `SettingsPage.a11y.test.tsx` failed all four of its cases —
+  // proven inherited at the phase's base commit, with Phase 242's own `SettingsPage.tsx`
+  // stashed away. The cause was in the SUITE, not the page: its `renderSettings` lacked
+  // `EffectiveFeaturesProvider`, and SettingsPage renders the AI Model / Search / Integrations
+  // tabs only when `model_management` resolves true, so every case audited a page whose tab
+  // never mounted. Repaired in the same commit, because pinning a red suite turns the shared
+  // gate red and pinning it with an allowance makes a gate that cannot fail (the Phase 235
+  // decision on `sourceComposition.test.tsx`, applied in the other direction).
+  // ⭐ Adoption RAISES the total. That is the desirable direction and is not drift.
+  "src/pages/__tests__/SettingsPage.a11y.test.tsx",
+  "src/pages/__tests__/SettingsPage.sourceCeiling.test.tsx",
+  // Phase 242's own suite — the changed-fields-only payload fence (D-242-02). Registered in
+  // BOTH knobs in the SAME commit: a BASELINE key naming a file that does not exist makes the
+  // gate exit 2 and halts every agent.
+  "src/pages/__tests__/SettingsPage.changedFields.test.tsx",
   // Added in 188-10 — and this one is an ADOPTION, not a new file, which is the case the
   // panel-directory comment above explicitly reserved: "a later phase that wants
   // WorkspacePanel inside the gate should adopt it deliberately, with its own measured
@@ -4383,6 +4893,11 @@ const TARGETS = [
   // panel __tests__ entries here are FILE-LEVEL, so this file was invisible until its
   // name was typed. Twelfth such suite in a week; SEED-229 has the structural fix.
   "src/components/panel/__tests__/PendingAskCard.test.tsx",
+  // ⚠ ITS SIBLING WAS IN NEITHER KNOB TOO, and stayed that way when the line above was added
+  // 2026-09-01 — so the suite that reads the approval card's THREE shipped retirement sentences
+  // out of source has never been executed by this gate, and its `?raw` pin sat RED and unseen
+  // from `d58fa43a0` until 244-15. Adopted here WITH the re-baseline, in one commit.
+  "src/components/panel/__tests__/PendingAskCard.retired.baseline.test.tsx",
   // ── Added for SEED-227, in the SAME COMMIT that creates the file — the two-knob trap
   // ── again, and MEASURED rather than assumed: `grep -n "components/metadata"` over this
   // ── whole script returned NOTHING before this line was written. `src/components/metadata`
@@ -4625,6 +5140,236 @@ const TARGETS = [
   // ⚠ Named, not a directory: `src/components/sources` is STILL not a TARGETS directory entry.
   "src/components/sources/watchProductMark.test.ts",
   "src/lib/__tests__/navItemsUnknownIsNotDenied.test.ts",
+  // ── Phase 243 (243-01 / CHAT-01 / CHAT-04 / D-243-16) — the thinking block's ────────────
+  // ── PRE-EXTRACTION characterization net. ────────────────────────────────────────────────
+  // FILE-LEVEL, deliberately NOT the bare directory `src/components/chat/__tests__` — the
+  // same reasoning this script already records beside its 21 other chat entries. There is no
+  // `src/components/chat` directory entry anywhere here, so a suite dropped into that folder
+  // runs in NO gate until it is named. TARGETS decides what RUNS, BASELINE what is GUARDED.
+  "src/components/chat/__tests__/ThinkingBlock.characterization.test.tsx",
+  // ── Phase 243 (243-04 / CHAT-01 / D-243-02) — the reasoning clamp, at BOTH ends of the ──
+  // ── measured 170x spread. FILE-LEVEL for the same reason as the line above it. ──────────
+  "src/components/chat/__tests__/ThinkingBlock.clamp.test.tsx",
+  // ── Phase 243 (243-05 / CHAT-05 / CHAT-01 — D-243-06) — the answer out of the fold ─────
+  //
+  // ⛔ FILE-LEVEL, BY NECESSITY: `src/components/chat` has NO directory entry (D-243-17), so
+  // this suite runs in NO gate until it is named here AND in BASELINE. It is the only fence
+  // in the tree that drives the NAVIGATION path — a run terminating while its thread is not
+  // the mounted surface — and the only one asserting the answer's DOCUMENT POSITION relative
+  // to the thinking line and the tool rows.
+  "src/components/chat/__tests__/MessageItem.answerOutOfFold.test.tsx",
+  // ── Phase 243 (243-03 / CHAT-02 / CHAT-03) — the delta cadence and the scroll effect ────
+  //
+  // ⛔ ALL THREE NEEDED BOTH KNOBS BY HAND, AND NONE OF THEM IS REACHED BY A DIRECTORY RULE.
+  // This file has exactly TWO bare-directory TARGETS entries — `src/landing` and
+  // `src/components/workflows`. `src/__tests__` was never adopted and `src/components/chat`
+  // appears only inside comments. A suite in any of these folders runs in NO gate until it is
+  // named here. (Phase 214 measured the mirror of this trap on `WorkflowScheduleModal`: a
+  // directory entry made a suite RUN while BASELINE guarded nothing.)
+  //
+  // ⚠ `src/__tests__/providers` is in NEITHER knob, which means all TEN other shipped
+  // `StreamsProvider` suites are currently UNGATED — `StreamsProvider.anthropic-ordering`,
+  // `.dedup`, `.stopping`, `.stopping.baseline`, `.transient`, `.watchdog`, `streamPool`,
+  // `streamsProvider.test.tsx`, `_067_5_regression`, `_075_7_reconcile_race`,
+  // `_075_9_clientkey`, `_bug_260707_01`, `_bug_260707_03`, `_state01b_403`. Adopting them is
+  // OUT OF SCOPE for 243-03 (13 of their cases are red at this phase's base commit, so
+  // adopting them would turn the shared gate red for a reason no plan here owns) — but they
+  // are NAMED rather than left unlooked-for. An unadopted suite someone wrote down is a
+  // different thing from one nobody noticed.
+  "src/__tests__/providers/streamsProvider_243_cadence.test.tsx",
+  "src/__tests__/providers/streamsProvider_bug_260707_03_final_answer_resolve.test.tsx",
+  // ── Phase 244 plan 11 (SHELL-01 / UAT gap G-3) — the swallowed snapshot failure ────────
+  //
+  // Named FILE-LEVEL for the same reason as its two neighbours above: `src/__tests__` is
+  // not a bare-directory TARGETS entry anywhere in this array, so this suite would run in
+  // NO gate until it is listed here AND pinned in BASELINE. Both landed in the commit that
+  // drove it RED. ⚠ Phase 214 measured the mirror trap on `WorkflowScheduleModal.test.tsx`:
+  // a directory entry made a suite RUN while BASELINE guarded nothing. TARGETS decides what
+  // RUNS; BASELINE decides what is GUARDED.
+  "src/__tests__/providers/streamsProvider_244_snapshot_failure.test.tsx",
+  // ── BUG-260912-01 — the turn-boundary fold ────────────────────────────────────────────
+  //
+  // Named FILE-LEVEL for the same reason as its neighbours above: `src/__tests__` is not a
+  // bare-directory TARGETS entry anywhere in this array, so this suite would run in NO gate
+  // until it is listed here AND pinned in BASELINE. ⛔ Do NOT widen this to a
+  // `src/__tests__/providers` directory entry — the fourteen INHERITED failures named above
+  // live in that folder and a directory entry turns the shared gate red for a reason no plan
+  // here owns. Both knobs landed in the commit that drove this suite RED.
+  "src/__tests__/providers/streamsProvider_bug260912_turnfold.test.tsx",
+  // ── Phase 244-14 (review WR-02) — the lock-writer lockstep fence ──────────────────────
+  //
+  // Named FILE-LEVEL for the same reason as its three neighbours: `src/__tests__` is not a
+  // bare-directory TARGETS entry anywhere in this array, so a suite placed there runs in NO
+  // gate until it is listed here AND pinned in BASELINE. ⛔ Do NOT "simplify" this to a
+  // `src/__tests__/providers` directory entry — the fourteen INHERITED failures documented
+  // above are in that folder, and a directory entry would turn the shared gate red for a
+  // reason no plan here owns. (Measured on this round's base and again after its changes:
+  // the same 14, name for name.)
+  "src/__tests__/providers/workflowLockWriters.lockstep.test.ts",
+  // ── Phase 244-15 (SHELL-03 / G-8) — the settle path's fences ──────────────────────────
+  //
+  // FILE-LEVEL for the identical reason as the four neighbours here: `src/__tests__` is not
+  // a bare-directory TARGETS entry anywhere in this array, so a suite placed there runs in
+  // NO gate until it is named here AND pinned in BASELINE. TARGETS decides what RUNS;
+  // BASELINE decides what is GUARDED, and a suite can sit on the wrong side of exactly one
+  // of them. ⛔ Do NOT "simplify" this to a `src/__tests__/providers` directory entry — the
+  // fourteen INHERITED failures documented above live in that folder and would turn the
+  // shared gate red for a reason no plan here owns.
+  "src/__tests__/providers/streamsProvider_244_settle_ask.test.tsx",
+  // ⚠ The scroll suite below is a SEPARATE FILE from `MessageList.test.tsx` on purpose:
+  // that one stubs `scrollIntoView` to a NO-OP tree-wide (`:61-65`), so nothing mounted under it
+  // can see the scroll effect at all. This is the ONLY behavioural coverage that effect has.
+  "src/__tests__/components/chat/MessageList.scroll.test.tsx",
+  // ⚠ The throttle suite below ALREADY EXISTED and was ENTIRELY UNGATED before 243-03 — `grep -n
+  // throttle` on this file returned nothing. It is adopted here, not created here, and it now
+  // guards two primitives with OPPOSITE contracts (see docs/HOT-FILE-LEDGER.md).
+  "src/__tests__/lib/throttle.test.ts",
+  // ── Phase 244 plan 01 (SHELL-01 / BUG-260828-08) — the chat frame's min-h-0 chain ──────
+  //
+  // ⛔ FILE-LEVEL, BY NECESSITY: `src/components/layout` is NOT a bare directory entry
+  // anywhere in this array (this file has exactly two — `src/landing` and
+  // `src/components/workflows`), so this suite runs in NO gate until it is named here AND
+  // pinned in BASELINE above. Both were added in the same commit as the class changes.
+  "src/components/layout/__tests__/ChatLayout.scrollFrame.test.tsx",
+  // ⚠ NOTE FOR A LATER READER: `ChatHistoryColumn.test.tsx` and `.a11y.test.tsx` have shipped
+  // since Phase 156 and are in NEITHER knob — `grep -c ChatHistoryColumn` on this file read
+  // **0** before Phase 244. 244-01 adopts its own two suites; the two inherited ones stay
+  // unadopted here because this plan did not author them and cannot vouch for their stability.
+  "src/components/layout/__tests__/ChatHistoryColumn.clickPath.test.tsx",
+  "src/components/layout/__tests__/ChatHistoryColumn.rowIdentity.test.tsx",
+  // ── Phase 244 (244-02 T1 / SHELL-04 / D-244-24) — the allow-list lockstep fence ─────────
+  //
+  // ⛔ FILE-LEVEL BY NECESSITY, and this script has now recorded the same fact about `src/lib`
+  // eleven times: there is NO bare-directory entry for `src/lib` or `src/lib/__tests__`
+  // anywhere in this array, so a suite dropped there runs in NO gate until it is named — here
+  // AND in BASELINE. TARGETS decides what RUNS; BASELINE decides what is GUARDED.
+  //
+  // What it guards: `frontend/src/lib/workspaceAllowedExt.ts` is the single frontend source of
+  // the chat-attachment `accept=` list, and this suite imports `backend/app/api/workspace.py`
+  // with `?raw` to assert SET EQUALITY against the server's four `_*_EXT` category literals.
+  // The invariant it replaces was two source comments pointing at each other plus a third
+  // hand-typed copy in the sketch's COPY.js — enforced by nothing, and about to rot the moment
+  // D-244-24 added `.pdf`.
+  "src/lib/__tests__/workspaceAllowedExt.lockstep.test.ts",
+  // ── Phase 244 (244-03 T1 / SHELL-02 / BUG-260904-05) — the composer at a cap-pause ─────
+  //
+  // ⛔ FILE-LEVEL BY NECESSITY. This array has exactly TWO bare-directory entries —
+  // `src/landing` and `src/components/workflows`. `src/components/chat` appears only inside
+  // comments (D-243-17), so this suite runs in NO gate until it is named here AND pinned in
+  // BASELINE above. TARGETS decides what RUNS; BASELINE decides what is GUARDED.
+  //
+  // What it guards: the ONE boolean at `ChatArea.tsx:140` that lets the composer tell a
+  // cap-pause from a running workflow, the harness lock's copy on BOTH axes (placeholder AND
+  // title, byte-for-byte — D-244-10), and the two sentences at `MessageItem.tsx:576-578`
+  // whose deletion is the ROADMAP's named anti-fix.
+  "src/components/chat/__tests__/ChatArea.capPausedComposer.test.tsx",
+  // ── Phase 244-13 (UAT gap G-1) — the run line a DEEP cap-pause must NOT draw ───────────
+  //
+  // ⛔ FILE-LEVEL BY NECESSITY — same reason as the entry directly above it.
+  // ⚠ ADOPTED AT ITS ~50th PHASE OF LIFE, not created here: this suite shipped with 194.1-06
+  // and has been in NEITHER knob ever since, so a green gate said nothing about the thread
+  // run line at all. TARGETS decides what RUNS; BASELINE decides what is GUARDED.
+  //
+  // What it guards: that `useHarnessLiveForThread` reads the lock's MODE rather than its
+  // PRESENCE, so a Deep cap-pause draws no `data-run-line-state="live"` line, starts no 1s
+  // clock and mounts nothing that fetches `getThreadWorkflow` — while a genuine harness run
+  // still draws its line, its harness word and its advancing step.
+  "src/components/chat/__tests__/ThreadRunLineKickoff.test.tsx",
+  // ── Phase 244 (244-03 T2 / SHELL-03 / BUG-260828-07) — the approval, answerable inline ──
+  //
+  // ⛔ FILE-LEVEL BY NECESSITY — same reason as the entry directly above it.
+  //
+  // What it guards: the ONE `<PendingAskStack />` render site in `MessageItem.tsx`, that it
+  // lives INSIDE the `isMessageStreaming && hasPendingAsk` arm (row-independent fetch cost),
+  // and that BOTH other homes of the cross-surface shell — `WorkspacePanel`'s stack mount and
+  // `WorkflowRunPage`'s direct card mount — still render their shipped copy.
+  "src/components/chat/__tests__/MessageItem.inlineApproval.test.tsx",
+  // ── Phase 244 (244-04 T1 / SHELL-05 / BUG-260911-03) — the condition's tab attribution ──
+  //
+  // ⛔ FILE-LEVEL BY NECESSITY: there is no `src/components/layout` bare-directory entry in
+  // this array (it has exactly two — `src/landing` and `src/components/workflows`), so this
+  // suite runs in NO gate until it is named here AND pinned in BASELINE above. Both were
+  // added in the SAME COMMIT as the field it guards.
+  //
+  // What it guards: `AttentionCondition` gained ONE optional `tab?: LibraryTab`, set by the
+  // single registered producer. The load-bearing cases are the ones that prove NOTHING ELSE
+  // MOVED — `ATTENTION_PRODUCERS.length === 1` (D-235-03), the five cause sentences asserted
+  // on the rendered WORDS rather than on a `detail` key, and a `?raw` sweep pinning the
+  // `useSourceAttention()` call-site inventory BY FILE so arm 1 of the registry's own re-open
+  // trigger (a third concurrent reader) cannot be fired silently by a later plan.
+  "src/components/layout/__tests__/attentionTab.test.ts",
+  // ── Phase 244 (244-04 T2 / SHELL-05 / BUG-260911-03) — the tab says WHERE ───────────────
+  //
+  // ⛔ FILE-LEVEL BY NECESSITY: `src/pages` is reached by NAMED FILES ONLY in this array and
+  // `src/pages/__tests__` by nothing at all — the fact that let two `SettingsPage` suites sit
+  // in `src/pages/__tests__/` having NEVER RUN UNDER THE GATE (see that block above).
+  //
+  // What it guards: the per-tab attention mark on the Library's segmented control, asserted on
+  // the RENDERED WORDS and the ACCESSIBLE NAMES rather than on a `data-testid`'s existence — a
+  // presence assertion cannot see content drift, and a badge that renamed its control would be
+  // invisible to one. It also pins the three prohibitions the attribution could have been
+  // bought with: no second producer, no third `useSourceAttention()` reader, and no second
+  // writer of `libraryTab` (the Phase 235 plan-15 defect).
+  "src/pages/__tests__/LibraryPage.tabAttention.test.tsx",
+  // ── Phase 244 (244-05 T1 / SHELL-04) — the chat attachment chip's three states ──────────
+  //
+  // ⛔ FILE-LEVEL BY NECESSITY — the same fact this script has now recorded beside every 244
+  // chat block: `src/components/chat` appears in this array only inside COMMENTS, never as a
+  // bare directory entry, so an unnamed suite there runs in no gate at all.
+  //
+  // What it guards: the ONE chip component behind the composer's local-attach door. Its
+  // `sent` state carrying `this chat only` is D-244-22's build obligation — the reason variant A
+  // was chosen over B — and its `expired` state is D-244-25's, because the TTL is a READ GATE
+  // and a week-old transcript otherwise holds a chip pointing at nothing. It also fences the
+  // copy PORT against `.planning/sketches/236-.../COPY.js` read with `?raw`, so a re-typed
+  // string (a silently different product) cannot land.
+  "src/components/chat/__tests__/ChatAttachmentChip.states.test.tsx",
+  // -- Phase 244 (244-05 T2+T3 / SHELL-04) — the composer attach door's composition ----------
+  //
+  // FILE-LEVEL BY NECESSITY — `src/components/chat` appears in this array only inside comments.
+  //
+  // What it guards: the FIVE ordered blocks sketch 236's README names, by DOM POSITION rather
+  // than by vocabulary. D-244-27 exists because the 2026-08-29 correction recorded 200 green
+  // assertions over a surface the operator called "nothing at all like what we designed" — a
+  // contract that asserted words and never composition. This suite owns four of the five blocks
+  // (the `+` menu, the chips row, the refusal, the sent message); the cloud modal is `244-06`'s.
+  "src/components/chat/__tests__/ComposerAttach.composition.test.tsx",
+  // -- Phase 244 (244-06 T3 / SHELL-04 / D-244-05 / D-244-27) — the CLOUD modal, the fifth block
+  //
+  // FILE-LEVEL BY NECESSITY — `src/components/chat` appears in this array only inside comments.
+  //
+  // What it guards: (a) the ROADMAP's named failure mode for SHELL-04 — the composer's cloud
+  // door quietly minting a LIBRARY row — asserted as a NEGATIVE, because a positive-only test
+  // passes while BOTH writes happen; (b) the person's typed draft staying byte-unchanged, which
+  // is D-244-02's explicitly rejected arm and was SHIPPED until this plan; (c) the fifth and
+  // last of D-244-27's ordered blocks, which carried a vocabulary-only assertion and no DOM
+  // fence anywhere in the plan set before this pass.
+  "src/components/chat/__tests__/ConnectedFilePickerModal.thread.test.tsx",
+  // -- Phase 244 (244-06 T2 / SHELL-04 / D-244-06) — the LIBRARY's single-file cloud door -----
+  //
+  // FILE-LEVEL BY NECESSITY — `src/pages` has no bare-directory entry in this array either.
+  //
+  // What it guards: the half of BUG-260905-01 that is a MISSING capability rather than a wrong
+  // one — *"the import should be from the Library, not from the chat"*. Specifically: the door
+  // takes its destination from the page's OWN selection, reuses the SHIPPED `canUploadToFolder`
+  // predicate rather than inventing a second permission rule, renders a REASON in every
+  // unavailable state, and speaks the server's refusal verbatim.
+  "src/pages/__tests__/LibraryPage.cloudImport.test.tsx",
+  // ── Phase 244-08 (T-244-05-05 / OPEN-2) — the expired attachment TOMBSTONE ──────────
+  //
+  // BOTH KNOBS, SAME COMMIT, AND BOTH ARE NEEDED. `src/providers` sits in NEITHER knob —
+  // verified by reading this array, not assumed: there is no bare-directory entry for it,
+  // and line 341 of this file records a prior plan deciding NOT to add one. So without the
+  // line below the gate would never EXECUTE this suite, and a file the gate never runs has
+  // falsified nothing.
+  //
+  // What it guards: the SUPPLY LINE for `ChatAttachmentChip`'s `expired` arm. That arm was
+  // built by 244-05, was green in its own component test throughout, and was UNREACHABLE
+  // after a reload because the server filtered the row away before the transcript could ask
+  // for it. A component test cannot see a missing supply line. It also pins the NEGATIVE —
+  // the panel must NOT list an expired row — because "the transcript can see expired files"
+  // and "expired files came back everywhere" are otherwise the same green.
+  "src/providers/__tests__/expiredAttachmentTombstone.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")

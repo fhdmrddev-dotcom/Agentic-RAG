@@ -200,9 +200,46 @@ export function NavPanel({
   ) : undefined
 
   return (
+    // Phase 244 plan 09 (SHELL-01 / BUG-260828-08, gap G-5) — THE RAIL BOUNDS ITSELF.
+    //
+    // Measured in Chrome 2026-09-12: below a viewport height of ~540px the PAGE ROOT overflowed
+    // (h=436 → #root scrollHeight 540 vs clientHeight 436, +104px; h=516 → +24px) and the whole
+    // page scrolled. The overflowing element was THIS rail, not the transcript and not the panel
+    // — the auto-margin footer block below measured bottom=540px, past the rail's own box, and
+    // every ancestor up to <html> read `overflow-y: visible`, so the excess escaped to the page.
+    //
+    // ⭐ THE OVERFLOW RULE IN THE CLASS LIST BELOW (`overflow-y: auto`) IS THE FIX. This box is
+    //    ALREADY bounded at the viewport (`h-full` inside `div.flex.h-screen`, measured
+    //    height = viewport); the content escaped purely because the computed overflow was
+    //    `visible`. With the rule, the rail scrolls its OWN content instead of the document.
+    // ⭐ THE AUTOMATIC-MINIMUM-SIZE OVERRIDE BESIDE IT IS DEFENSIVE, not the fix — carried for
+    //    symmetry with the five sites 244-01 established in the message column, and because that
+    //    rule is direction-dependent. It costs nothing and removes a future question. Saying
+    //    which of the two does the work matters: a comment that claims more than it can is its
+    //    own defect.
+    //    ⚠ 244-14 (review WR-05) — THIS SENTENCE USED TO SPELL THE TOKEN VERBATIM, WHICH MADE
+    //    THE NOTE BELOW FALSE ABOUT ITSELF. `grep -c` read 2, not 1, and `244-09-SUMMARY`'s
+    //    acceptance table published the other two tokens and omitted this one — so the table
+    //    read clean on precisely the count the edit had broken. The token is now named by its
+    //    CSS DECLARATION, the way the load-bearing one already is, and the SUMMARY carries the
+    //    third row. ⛔ The remedy was never to loosen the grep: this is the 187-24 vacuity class
+    //    reproduced inside the comment that cites 187-24.
+    // ⛔ DO NOT "fix" this with a min-height on the page, #root or any ancestor — that makes the
+    //    page scroll deliberately, which IS the bug.
+    // ⛔ DO NOT shrink, re-order or delete the auto-margin footer block below. The footer is not
+    //    too big; the rail could not scroll.
+    //
+    // Pinned by link 6 of `__tests__/ChatLayout.scrollFrame.test.tsx`. ⚠ That fence is a presence
+    // assertion only (jsdom performs no layout); the pixels are `244-09-UAT-ROW.md`.
+    // ⚠ The three class tokens are deliberately NOT spelled out verbatim in this comment:
+    //    `244-09`'s acceptance counts their occurrences in this file with `grep -c`, and a comment
+    //    mention would inflate that count and blind the check to a real second application.
+    //    ⛔ MEASURED 2026-09-12 (244-14 / WR-05): this note was FALSE about one of the two when
+    //    written — the count read 2. All three now read 1, and the SUMMARY publishes all three
+    //    rather than the two that happened to be clean.
     <div
       className={cn(
-        "hidden md:flex flex-col h-full shrink-0 bg-sidebar border-r border-border/20 py-3 motion-safe:transition-[width] motion-safe:duration-300",
+        "hidden md:flex flex-col h-full min-h-0 overflow-y-auto overflow-x-hidden shrink-0 bg-sidebar border-r border-border/20 py-3 motion-safe:transition-[width] motion-safe:duration-300",
         expanded ? "w-[210px] items-stretch px-2" : "w-[58px] items-center",
       )}
     >

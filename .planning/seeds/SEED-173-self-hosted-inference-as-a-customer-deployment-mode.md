@@ -160,3 +160,38 @@ inference, the admin surface, the deployment tiers, and the UAT roster. It shoul
 the connections/platform work (`SEED-146`) and the deployment-tier direction rather than squeezed into
 the v3.7 workflow milestone — but `SEED-172`'s add-model fix is small, independent, and unblocks the
 operator's own testing today, so it can ship first and alone.
+
+---
+
+## 2026-09-12 — PARTIALLY DISCHARGED by migration 180. ⚠ STATUS STAYS `planted`, DELIBERATELY.
+
+**What shipped:** the *reachability* half. Every self-hosted provider (`ollama`, `lmstudio`, and a
+new generic `custom` slot) now carries a base URL **and** an API key that are settable from the
+Settings UI, persisted in `app_settings`, and encrypted at rest. `_SELF_HOSTED_PROVIDERS` in
+`config.py` is the one table; `normalize_/resolve_self_hosted_base_url` own the `/v1` rule. Fence:
+`backend/tests/unit/test_180_self_hosted_provider_endpoints.py` (21 cases).
+
+Three defects were measured and closed:
+1. the Settings PUT gated the base_url write on `p.id == "ollama"`, so a URL typed for LM Studio was
+   **dropped and answered 200 + "Saved"**;
+2. `app_settings` had no `lmstudio_api_key`, so a key typed there took the **whole tab's save** down
+   with an `UndefinedColumn` 500;
+3. `config.py`'s `key_map` **hardcoded** the local-provider key, discarding an operator's real bearer
+   token before the call — which is precisely what blocked a vLLM/Unsloth endpoint behind auth.
+
+**⛔ WHY THIS IS NOT `shipped`.** This seed's requirement is *"behave IDENTICALLY whether served by
+Ollama, LM Studio, vLLM, or the vendor's own OpenAI-compatible API"*, and the half that decides
+BEHAVIOUR is untouched. A model id absent from `MODEL_CAPABILITIES` still resolves
+`capability_source=inferred` and silently loses `emit_tier`; `native_tools` can land `False`, and
+then **tool calls simply do not happen, with no error** (`project_local_models_structured_mode_trap`).
+An operator can now point the app at their own hardware and get a *worse* agent than a cloud row,
+with nothing saying why. **Reaching an endpoint is not parity.**
+
+**Re-open trigger, unchanged and now sharper:** the next time anyone needs a local model to use
+tools, or the capability-inference patterns / `_INFERENCE_FALLBACK_PROVIDER` are touched.
+
+**2026-09-12, same day — the reachability half is OPERATOR-CONFIRMED LIVE**, driven against a remote
+Unsloth server behind a Cloudflare tunnel. ⛔ The parity half above is unchanged and untested: nobody
+has yet watched a self-hosted model attempt a tool call. **That is the next thing to measure, and a
+green chat reply is not evidence of it.**
+

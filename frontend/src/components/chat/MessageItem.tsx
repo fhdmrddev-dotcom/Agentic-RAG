@@ -10,12 +10,30 @@ import { Button } from "@/components/ui/button"
 // selector over the harness demux's `phasesByThread` slice. It is called from
 // `HarnessOuterBanner` below — NOT from `MessageItem` itself — and the reason is
 // measured rather than stylistic; see that component's docblock.
-import { useWorkflowLockForThread, usePhases } from "@/providers/StreamsProvider"
+import {
+  useWorkflowLockForThread,
+  usePhases,
+  // ── Phase 244 (244-05 T3 / SHELL-04 / D-244-22) — the sent chip's two inputs ────────────
+  // ⛔ BOTH ARE PURE READS AND NEITHER FETCHES. `useWorkspaceFiles` (the panel's hook) runs
+  // `usePanelReconcile`, so calling it here would fire ONE RECONCILE PER TRANSCRIPT ROW.
+  // ⛔ And `usePreviousUserMessageAt` returns a SCALAR rather than the messages array, because
+  // this component is `React.memo`'d (075.4-04) and an array whose identity changes on every
+  // stream delta reinstates exactly the per-row re-render that memo exists to prevent.
+  useWorkspaceFilesSnapshot,
+  usePrecedingUserTurns,
+} from "@/providers/StreamsProvider"
+import {
+  ChatAttachmentChip,
+  attachmentsForMessage,
+  attachmentDisplayName,
+} from "./ChatAttachmentChip"
+import { COPY } from "./composerCopy"
 // Phase 092-07 (Facet C): after a Harness Continue the backend mints a FRESH
 // producer runs row + returns its id; re-subscribe its live stream (per-thread
 // keyed, additive — mirrors panelOpenSignal).
 import { requestProducerResubscribe } from "@/providers/producerResubscribeSignal"
 import { RunCard, RunTerminalStatus } from "./RunCard"
+import { ThinkingBlock } from "./ThinkingBlock"
 import { UserBubble } from "./UserMessageBubble"
 // BUG-260904-01: the inline Continue card below calls `continueRun`, and this import had gone
 // missing — the click threw `ReferenceError`, the surrounding catch logged it, and the button
@@ -34,7 +52,6 @@ import { CitedMarkdown } from "./CitedMarkdown"
 // under the answer body on the settled cited-assistant branch (self-guards on
 // citations, never a banner) — never on the streaming/user path (G-5 additive).
 import { AbsenceHint } from "./AbsenceHint"
-import { StreamingNarration } from "./StreamingNarration"
 import { ConfidenceBadge } from "./ConfidenceBadge"
 import { CitationList } from "./CitationList"
 import { SuggestionPills } from "./SuggestionPills"
@@ -48,6 +65,20 @@ import { toolLabel, toolSummary, outerBannerLabel, harnessBannerProgress } from 
 import { type SeamKind } from "@/components/panel/SeamPointer"
 import { SeamCard, type SeamCardPayload } from "@/components/panel/SeamCard"
 import { PausedRunCue } from "@/components/panel/PausedRunCue"
+// ⚠ Phase 244-03 (SHELL-03 / BUG-260828-07) IMPORTED `PendingAskStack` HERE, and Phase 244-12
+// REMOVED IT. The original note is preserved rather than deleted, because its reasoning is
+// still TRUE about a per-row mount and is the only written record of a measured cost:
+//   "the SHIPPED, zero-prop, self-resolving answer surface — the same component WorkspacePanel
+//    mounts. Rendered ONLY inside the narrow `isMessageStreaming && hasPendingAsk` arm below;
+//    see that mount's docblock for the measured reason (C-3: it carries two
+//    `usePanelReconcile` fetches per mount)."
+// ⛔ WHAT WAS WRONG WAS NOT THE COST ARGUMENT BUT THE REACHABILITY. G-6 drove a REAL
+// workflow-raised approval on 2026-09-12 and the chat column rendered no controls at all: the
+// harness's carrier row is `role="system"` with `tool_calls: [{kind: "ask_user_prompt"}]`, and
+// `threads.py`'s `.neq("role","system")` means it never reaches the frontend — so there is no
+// message here to hang the mount on, at any predicate. The mount now lives at LIST level in
+// `MessageList.tsx`, which is strictly CHEAPER than this one (one per thread, never one per
+// matching row) and is reachable for BOTH pause shapes. ⛔ Do not re-import it here.
 // Phase 087-02: the WorkspacePanel owns the open action; the chat-side seam
 // affordances request it via this module-level signal (additive wiring — no
 // MessageItem→MessageList→ChatArea prop re-plumbing, PANEL-06 safe).
@@ -192,6 +223,27 @@ interface Props {
  *   - only when `workflowLock != null` ⇒ a DEEP thread never mounts it, so the
  *     Deep path costs zero fetches and zero subscriptions and stays byte-identical.
  *
+ * ⛔⛔ THE SENTENCE DIRECTLY ABOVE WAS **FALSE FROM `244-03` UNTIL `244-13`**, AND IT IS
+ * KEPT VERBATIM RATHER THAN REWRITTEN, because *the fact that it read as true for nine
+ * plans is the finding*. It was correct when written (Phase 194): the thread lock was
+ * harness-only, so `workflowLock != null` really did mean "harness". `244-03` then made
+ * the SERVER populate the lock for a cap-paused DEEP run (`threads.py:1237-1276`) — and
+ * nothing in this file changed, so a DEEP thread began mounting this component. Measured
+ * at `244-13`'s RED drive: **1 `getThreadWorkflow` fetch on the Deep path**, which is
+ * exactly the `T-194-07-03` denial-of-service cost the paragraph above claims the Deep
+ * path does not pay, plus the harness activity string rendered on a thread that has never
+ * had a workflow (UAT gap `G-1`).
+ *
+ * ⛔ THE GATE IS NOW A TEST ON THE LOCK'S MODE at the branch below (named by ROLE and NOT
+ * respelled here — a prose copy moves the acceptance grep and makes it vacuous, the 187-24
+ * lesson `toolMeta.ts:160-173` records at length), and the invariant is
+ * carried by an ASSERTION rather than by this paragraph — which is `G-1`'s own
+ * `why_no_fence_caught_it`, verbatim: *"the invariant that broke lived in a COMMENT, not
+ * in an assertion."* The assertion is `__tests__/ThreadRunLineKickoff.test.tsx` **D3**
+ * (the DEEP banner string AND a zero `getThreadWorkflow` delta over the row's mount), with
+ * **D4** as its positive control on a genuine harness lock. ⚠ A future reader who wants to
+ * widen this mount must move D3, not this comment.
+ *
  * The rendered `<span className="italic">` is the shipped one, unchanged.
  */
 function HarnessOuterBanner({ message }: { message: Message }) {
@@ -232,20 +284,87 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
   // without prop-drilling; adding it changes no DOM (byte-identical, G-5).
   const [messageBody, setMessageBody] = useState<HTMLDivElement | null>(null)
 
+  /**
+   * ── Phase 244 (244-05 T3 / SHELL-04 / D-244-22) — THE ATTACHMENTS THIS ROW CARRIES ──────
+   *
+   * ⭐ THIS IS THE REASON VARIANT A WON, AND THE THING A BUILD DROPS SILENTLY. D-244-22:
+   * *"a menu is read once and closed, a chip is still on screen while the person types and
+   * survives into the transcript… a build that puts it solely in the composer has shipped B's
+   * weakness with A's cost."* So the scope word is rendered HERE, on a message that may be a
+   * week old, not only on the pending composer chip.
+   *
+   * ⛔ DERIVED FROM PERSISTED DATA, NEVER FROM A FIELD STAMPED AT SEND TIME. A client-only
+   * `message.attachments` would satisfy every test in this repo and fail the requirement THE
+   * NEXT DAY, because a message loaded from the database carries no such field — which is the
+   * exact durability D-244-22 chose A for. ⛔ And a backend field is out: D-244-01 and the
+   * ROADMAP both say `Migrations: none expected`. The rule lives in one place
+   * (`ChatAttachmentChip.attachmentsForMessage`) and its edges are fenced there.
+   *
+   * ⚠ Both hooks are unconditional and sit ABOVE the `isUser` early return, because the Rules of
+   * Hooks do not care that one branch ignores the result. The assistant branch uses them too —
+   * for the `Read <file>` pointer.
+   */
+  const threadAttachments = useWorkspaceFilesSnapshot(message.thread_id ?? null)
+  const [prevUserAt, prevPrevUserAt] = usePrecedingUserTurns(
+    message.thread_id ?? null,
+    message.id,
+  ).split("|")
+  // A USER row bounds `(the previous user turn, itself]`; an ASSISTANT row bounds
+  // `(the turn before that, the turn it answers]` — one rule, two readings of the same window.
+  const ownAttachments = attachmentsForMessage(
+    isUser
+      ? { role: "user", created_at: message.created_at, thread_id: message.thread_id }
+      : { role: "user", created_at: prevUserAt, thread_id: message.thread_id },
+    (isUser ? prevUserAt : prevPrevUserAt) || null,
+    threadAttachments,
+  )
+
   if (isUser) {
+    // ⚠ THE OUTER ROW IS BYTE-UNCHANGED, AND THAT IS DELIBERATE. The first draft replaced
+    // `flex justify-end` with `flex flex-col items-end`, and `MessageItem.test.tsx`'s
+    // "aligns user message to the right (justify-end)" case caught it — a shipped fence doing
+    // exactly its job. The stacking happens in a NEW INNER wrapper instead, so this node's
+    // class string and `data-testid` are identical to the shipped ones.
     return (
       <div className="flex justify-end py-2 animate-fadeSlideUp" data-testid="user-message">
-        <div className="flex items-end gap-2.5 max-w-[70%]">
-          <div className="gradient-primary text-white rounded-2xl rounded-br-md px-4 py-2.5 text-sm leading-relaxed shadow-sm">
-            <UserBubble content={message.content} />
-          </div>
-          <div className="flex-shrink-0 w-7 h-7 rounded-full bg-muted border border-border/50 flex items-center justify-center mb-0.5">
-            <User className="w-3.5 h-3.5 text-foreground/70" />
+        <div className="flex flex-col items-end max-w-[70%]">
+          {/* ⛔ ABOVE the text — "the chip in read-only form above the user's text" is part of
+              the Build Contract, not a layout detail (sketch 236 § `data-s="sent"`). Fenced by
+              `ComposerAttach.composition.test.tsx` Test 10 with `compareDocumentPosition`. */}
+          {ownAttachments.length > 0 && (
+            <div className="flex flex-wrap justify-end gap-1.5 mb-1.5 mr-9">
+              {ownAttachments.map((f) => (
+                <ChatAttachmentChip key={f.path} file={f} state="sent" />
+              ))}
+            </div>
+          )}
+          <div className="flex items-end gap-2.5">
+            <div className="gradient-primary text-white rounded-2xl rounded-br-md px-4 py-2.5 text-sm leading-relaxed shadow-sm">
+              <UserBubble content={message.content} />
+            </div>
+            <div className="flex-shrink-0 w-7 h-7 rounded-full bg-muted border border-border/50 flex items-center justify-center mb-0.5">
+              <User className="w-3.5 h-3.5 text-foreground/70" />
+            </div>
           </div>
         </div>
       </div>
     )
   }
+
+  /**
+   * Phase 244 (244-05 T3) — the agent's ONE-LINE pointer: `Read <file>`.
+   *
+   * ⚠ A POINTER, NOT A RECEIPT. The sketch draws a single line with a tick, and the run surface
+   * already owns the heavy receipt (`unified-execution-surface.md`); a second, richer copy here
+   * would be two surfaces racing to be the live thing — the drift trap `chat-panel-seam.md` D2
+   * avoids. Fenced by composition Test 12, which asserts the node holds fewer than four elements.
+   *
+   * ⚠ It is derived from the attachments of the PRECEDING user turn, which is what
+   * `attachmentsForMessage` returns for a user row. `244-02` hydrates every non-expired thread
+   * attachment into `/sandbox/attachments/`, so "the agent could read it" is true for all of
+   * them — this line says that, and does not claim a specific tool call happened.
+   */
+  const precedingAttachments = ownAttachments
 
   const hasRunningTools = message.tool_calls?.some((tc) => tc.status === "running") ?? false
   const hasAnyTools = (message.tool_calls?.length ?? 0) > 0
@@ -356,9 +475,68 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
             !allToolsDone
           }
         />
+        {/* ── Phase 244 (244-05 T3 / D-244-27) — the agent's ONE-LINE pointer ──────────────
+            `Read <file>`, sketch 236 § `data-s="sent"`. ⚠ A POINTER, NOT A RECEIPT: the run
+            surface already owns the heavy one (`unified-execution-surface.md`), and a second
+            richer copy here is two surfaces racing to be the live thing — the drift trap
+            `chat-panel-seam.md` D2 avoids. Composition Test 12 pins it under four elements.
+            ⚠ WHAT IT CLAIMS, exactly: `244-02` hydrates every non-expired thread attachment
+            into `/sandbox/attachments/` and announces it in the turn's system prompt, so
+            "the agent could read this" is TRUE for each of them. ⛔ It does not claim a
+            specific tool call happened — there is no wire event that would make that honest. */}
+        {precedingAttachments.length > 0 && (
+          <div
+            data-testid="agent-read-pointer"
+            className="mb-1.5 text-[11px] text-muted-foreground"
+          >
+            {precedingAttachments.map((f) => COPY.shared.agentReadLine(attachmentDisplayName(f))).join(" · ")}
+          </div>
+        )}
+        {/* Phase 243 Plan 02 (CHAT-01 / CHAT-04 / D-243-01 — sketch 235 winner B) — THE ONE
+            REASONING RENDERER, mounted for BOTH message shapes.
+            ⛔ UNCONDITIONAL BY CONSTRUCTION, AND THAT IS THE WHOLE FIX. It used to live
+            inside `RunCard`, which mounts only on a turn that called a tool — so the 31% of
+            reasoning-bearing turns that call none had their reasoning drawn NOWHERE
+            (measured: 105 of 340 rows, D-243-03). The block self-guards on its own content,
+            so this site tests nothing. ⛔ Do not add a tool condition here; that would
+            restore the defect in a form that reads as tidiness. Fenced on source by
+            `ThinkingBlock.characterization.test.tsx` §12.
+            ⛔ NO `key` EITHER, and it is a DECISION rather than an omission (243-PATTERNS
+            §F.8): `key={message.id}` would close an open fold on every temp-id → DB-id
+            reconcile. Fenced by §12 on source and by §13 on behaviour.
+            ⚠ ORDER IS THE ORDER IN TIME — above the run card's tool rows and above the
+            answer. A sibling of WorkingBadge and RunCard, in the style those two use.
+
+            ⚠⚠ THAT LAST SENTENCE IS PHASE 243'S RATIONALE AND IT WAS OVERRIDDEN ON 2026-09-12.
+            It is kept above, word for word, because deleting it would tell the next reader the
+            243 order was an accident. It was not: it was chosen deliberately, and it was
+            changed deliberately.
+              · WHO: the operator, live during Phase 244's UAT (gap G-2).
+              · WHAT, verbatim: "the thinking badge it's recommended to be below the container
+                of the tools not above".
+              · SO: the render order below is now RunCard (the tool container) -> ThinkingBlock
+                -> the answer. ⛔ THIS IS AN OPERATOR OVERRIDE, NOT A DEFECT FIX — nothing was
+                measured wrong about the 243 order, and a re-reversal later is a legitimate
+                decision rather than a regression.
+              · The badge still precedes the ANSWER; only its relation to the tool rows moved.
+            ⛔ NOTHING ELSE ABOUT THIS MOUNT CHANGED, and all three properties are still fenced
+            on source by `ThinkingBlock.characterization.test.tsx` §12: no tool test (it would
+            restore the CHAT-04 defect 243-02 closed), no `key=` (it would close an open fold on
+            every temp-id -> DB-id reconcile, 243-PATTERNS §F.8), and `ThinkingBlock.tsx` never
+            spells `tool_calls`. §11 pins the NEW order and was driven RED against the old one
+            before this move. */}
         {message.tool_calls && message.tool_calls.length > 0 && (
           <RunCard message={message} isStreaming={isStreaming} />
         )}
+        {/* BUG-260912-01 — `narrationContent` is the same one fold's SECOND source. The mount
+            site still decides nothing: ThinkingBlock's self-guard asks whether EITHER has
+            content, which is what keeps this call site free of tool-conditionality. */}
+        <ThinkingBlock
+          reasoningContent={message.reasoningContent}
+          isStreaming={isMessageStreaming}
+          reasoningMs={message.reasoningMs}
+          narrationContent={message.narrationContent}
+        />
         {/* Phase 216 / Phase 224: inline tool approval decision card (settled transcript receipt or when not streaming) */}
         {message.toolApproval && (message.toolApproval.decision || !isStreaming) && (
           <ChatToolApprovalCard
@@ -378,6 +556,71 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
             The ask_user PausedRunCue is load-bearing (not duplicated) and stays. */}
         {isMessageStreaming && message.tool_calls && message.tool_calls.length > 0 && (
           <div className="mt-1 flex flex-col gap-0.5">
+            {/* ⛔⛔ SUPERSEDED BY PHASE 244-12 — READ THIS FIRST, THEN THE BLOCK BELOW.
+                Everything below is 244-03's reasoning, KEPT VERBATIM rather than rewritten,
+                because being confident and green while the blocker was live is the finding. Its
+                COST measurement (C-3) is still correct and still binds any future per-row mount.
+                Its REACHABILITY claim was wrong: this arm never fires for a workflow-raised
+                approval, at any predicate, because the harness's carrier row is `role="system"`
+                and is filtered off the wire. The controls now mount ONCE at list level in
+                `MessageList.tsx`; only `PausedRunCue` remains here. ⚠ The list-level mount is
+                CHEAPER than the arm described below (one per thread, not one per matching row),
+                so nothing in this cost argument was traded away to close G-6.
+                ── Phase 244-03 Task 2 (SHELL-03 / BUG-260828-07, HIGH / D-244-12) — THE
+                   CONTROLS JOIN THE CUE.
+                ⛔ The defect this closes: driving an armed approval, the panel offered
+                "Approve this step" / "Do not run it" / a reason field / Send Answer, and the
+                CHAT rendered the question with NO BUTTONS. A human gate that appears without
+                its controls is worse than one that does not appear — it says a decision is
+                required and then offers no way to make it. The run sat until it was stopped.
+                ⭐ THE SHIPPED STACK, MOUNTED — never a chat-native second renderer of the same
+                pause (D-244-11's rejected arm, the Phase 095 build-once inventory rule,
+                SEED-219's complaint). Two renderers of one decision is how the two homes came
+                to disagree in the first place; one component in both homes is why answering in
+                either settles it in both, structurally.
+                ⛔ WHY IT IS **INSIDE THIS ARM** AND NOT AT THIS COMPONENT'S TOP LEVEL — the
+                same measurement HarnessOuterBanner's docblock records at :180-188. C-3 refuted
+                the planning claim that "a third reader is free": `useAskUserPrompt` is NOT a
+                bare selector — it mounts `usePanelReconcile`, which fires a real
+                `getThreadPendingAsks` FETCH per mount, and `PendingAskStack` also calls
+                `usePhases` for a SECOND one. Its early `if (asks.length === 0) return null`
+                cannot save it: hooks run BEFORE the return. `MessageList` renders one
+                `MessageItem` per message with NO virtualisation, so a top-level mount is
+                2 fetches × N ROWS. Measured at 6 rows: **6 ask fetches, versus 1 here** —
+                fenced by `__tests__/MessageItem.inlineApproval.test.tsx` case 3, which was
+                driven RED against exactly that planted top-level mount.
+                ⚠ THE NARROWING IS `isMessageStreaming`, i.e. `message.runStatus ===
+                "streaming"` — this component's OWN derivation, NOT the `isStreaming` prop
+                `MessageList.tsx:237` passes. At most one row carries a live run status, which
+                is what makes a fetch-mounting child affordable here.
+                ⛔ NOT pinned above the composer (D-244-12's rejected arm): that duplicates the
+                panel's pin-to-top and competes with the never-vanishes run-status strip.
+                ⚠ C-4, recorded rather than discovered later: this is the SECOND
+                `PendingAskStack` mount in the product (CONTEXT implied two existed; measured,
+                there was ONE — `WorkspacePanel.tsx:438`. `WorkflowRunPage.tsx:1629` mounts
+                `PendingAskCard` DIRECTLY, with its own ordering and its own `runIsOver`). It
+                makes `useAskUserPrompt` the **THIRD** concurrent reader in the tree, which
+                FIRES arm 1 of `attentionConditions.ts`'s three-part hoist re-open trigger.
+                The hoist is deliberately NOT taken here — this is a HIGH-severity bug fix, not
+                a refactor — and the fired arm is recorded in 244-03-SUMMARY.md so the deferral
+                has a real trigger rather than a silent one. */}
+            {/* ⛔ Phase 244-12 (G-6, BLOCKER): the `PendingAskStack` MOUNT WAS HERE and is GONE
+                — ⚠ written without its angle bracket ON PURPOSE, because case 6c of
+                `__tests__/MessageItem.inlineApproval.test.tsx` counts OPENING-TAG occurrences of
+                that identifier in this file's SOURCE and asserts ZERO. A prose mention carrying
+                the bracket would make that fence pass for the wrong reason — it did, until the
+                count was actually read rather than assumed. — the
+                cue stays, the controls moved to LIST level (`MessageList.tsx`, a sibling of
+                `ThreadRunLine`). The docblock above is preserved because its COST argument is
+                still true about a per-row mount; what it could not know is that this arm is
+                unreachable for a WORKFLOW pause at any predicate, because the harness's carrier
+                row is `role="system"` and `threads.py:427-438` / `:682-691` filter it off the
+                wire (BUG-260528-01). There is no message here to anchor to.
+                ⚠ THE CUE IS DELIBERATELY LEFT INLINE. `PausedRunCue` is D-244-12's IN-TRANSCRIPT
+                marker for the Deep path — it marks the ROW that paused, which is a per-row fact
+                and the one thing that genuinely belongs at message level. It buys no fetch.
+                ⛔ ONE chat-column mount, not two: two homes for one decision in one column is
+                "actionable twice and agreed in neither". */}
             {hasPendingAsk(message.tool_calls) && <PausedRunCue />}
           </div>
         )}
@@ -422,14 +665,43 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
         )}
         {message.content ? (
           <div ref={setMessageBody} className="text-sm text-foreground">
-            {isMessageStreaming && (message.tool_calls?.length ?? 0) > 0 && message.role === "assistant" ? (
-              // Live agentic run: message.content here is the model's interim
-              // narration ("Now I'll search…"), not the final answer. Fold it to
-              // a one-line gist (click to expand the full trail). At run-end the
-              // backend-persisted final answer renders normally via the else path.
-              // NEVER given markers — the body streams calm & unmarked (D-05).
-              <StreamingNarration content={dedupParagraphs(message.content)} />
-            ) : message.role === "assistant" && message.citations && message.citations.length > 0 ? (
+            {/* Phase 243 Plan 05 (CHAT-05 / CHAT-01 — D-243-06, D-243-14) — THE ANSWER IS
+                NOT WRITTEN INSIDE A FOLD. A third arm used to sit here, ahead of both of
+                these, and it is the whole of `BUG-260707-03`:
+
+                  isMessageStreaming && tool_calls.length > 0 && role === "assistant"
+                    ? <StreamingNarration content={dedupParagraphs(message.content)} />
+
+                ⭐ The answer was never missing and never un-streamed — `StreamsProvider`
+                appends `content: m.content + delta` per token throughout. It was ROUTED into
+                the one-line italic gist, so the operator watched their final deliverable sit
+                folded until the run-end reconcile swapped in the persisted text. That is why
+                D-243-06 calls CHAT-01 and CHAT-05 ONE defect: fixing WHERE the answer renders
+                is CHAT-05's live half, and 243-02 already put the thinking above it.
+
+                ⚠ THE ORIGINAL CONTRACT, KEPT VERBATIM RATHER THAN DELETED, because it was
+                true when written and a later phase must be able to see what was traded:
+                  "Live agentic run: message.content here is the model's interim narration
+                   ("Now I'll search…"), not the final answer. Fold it to a one-line gist
+                   (click to expand the full trail). At run-end the backend-persisted final
+                   answer renders normally via the else path. NEVER given markers — the body
+                   streams calm & unmarked (D-05)."
+                It is half right, and the half that fails is the one that mattered: the blob's
+                TAIL is the answer, so folding the blob folds the answer.
+
+                ⛔ A NARROWER FOLD WAS CONSIDERED AND REJECTED ON A MEASURED GROUND, not a
+                taste one — gating the fold on `hasRunningTools` OSCILLATES. `content`
+                accumulates across every iteration, so between tool N finishing and tool N+1
+                starting the predicate flips false and the body swaps from gist to blob and
+                back, once per iteration. Holding it open would need new state in this file,
+                which re-hollows the Phase 227 discharge. So the live content now takes the
+                SAME two shipped renderers as the settled answer, below the thinking line,
+                with the caret at the live edge (sketch 234 V1).
+
+                ⛔ `StreamingNarration.tsx` is NOT deleted and NOT restyled by this plan
+                (243-PATTERNS §F.4). This was its last production caller; its retirement is a
+                separate decision and is recorded as owed rather than taken here. */}
+            {message.role === "assistant" && message.citations && message.citations.length > 0 ? (
               // Phase 153-05 (CITE-01 / G-5 additive): the settled cited-assistant
               // answer routes to CitedMarkdown, which upgrades validated [n] to
               // interactive markers over the SAME dedupParagraphs output. This is
@@ -524,8 +796,27 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
               workflowLock?.capPaused && (
                 <div className="mt-2 flex flex-col gap-1.5 rounded-md border border-amber-400/30 bg-amber-400/10 px-3 py-2">
                   <span className="text-xs text-amber-400">
+                    {/* ⛔ Phase 244-14 (WR-01) — THE SENTENCE READS THE LOCK'S MODE, because the
+                        composer beside it does. `244-13` moved `ChatArea.tsx:167` onto
+                        `lock.mode === "harness"` and left this card gated on `capPaused` alone,
+                        so for exactly one state — a HARNESS run that is itself cap-paused — the
+                        two surfaces decoupled and this row told the person to "start a new
+                        message" over a composer reading "Workflow running — Cancel to switch
+                        back", DISABLED. That is the ROADMAP's named anti-fix inverted: the UI
+                        instructing the one action it forbids, moved one component over rather
+                        than closed.
+                        ⚠ REACHABLE, not latent: `onCapPaused` (StreamsProvider write site 1)
+                        INHERITS `"harness"` onto whatever lock the thread holds, and
+                        `ThreadRunLineKickoff.test.tsx` D5b(a) drives it through the real
+                        `sendMessage` + the real SSE bundle.
+                        ⛔ NEITHER SENTENCE IS DELETED — that is the anti-fix. The Deep one is
+                        still exactly what a Deep cap-pause reads (D6 / case 3); the harness arm
+                        names the action that IS available, which is Cancel. Both halves in one
+                        tree: `ChatArea.capPausedComposer.test.tsx` D6 and D7. */}
                     {continueExhausted || workflowLock.continuesRemaining <= 0
-                      ? "Reached the Continue limit — this run is stopped. Start a new message to keep going."
+                      ? workflowLock.mode === "harness"
+                        ? "Reached the Continue limit — this run is stopped. Cancel the workflow to start something new."
+                        : "Reached the Continue limit — this run is stopped. Start a new message to keep going."
                       : "Reached the iteration limit — some tools haven't run yet."}
                   </span>
                   {!continueExhausted && workflowLock.continuesRemaining > 0 && (
@@ -587,7 +878,13 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
                 call with `false` substituted for `workflowLock != null` — provably
                 the same value, since that is the only branch where the lock is null.
                 Both arms render the identical shipped <span className="italic">. */}
-            {workflowLock != null ? (
+            {/* ⛔ Phase 244-13 (UAT gap G-1): the gate is the lock's MODE, not its
+                PRESENCE. The sentence above became false at 244-03 — a DEEP thread
+                CAN carry a lock now (a cap-pause), and reading presence mounted the
+                harness banner on the primary Deep path. See the docblock repair at
+                `HarnessOuterBanner`. Fenced by `__tests__/ThreadRunLineKickoff.test.tsx`
+                D3 (the DEEP string + ZERO getThreadWorkflow calls) and D4. */}
+            {workflowLock?.mode === "harness" ? (
               <HarnessOuterBanner message={message} />
             ) : (
               <span className="italic">{outerBannerLabel(null, false, message.isPlanning ?? false, false, !message.content && !!message.reasoningContent)}</span>

@@ -1234,13 +1234,39 @@ async def add_model_by_id(
     # second row (the operator edits the existing model in the table instead).
     from app.models.user_settings import load_all_model_overrides  # function-local (Pitfall 4)
     mid_lc = model_id.lower()
-    existing_lc = {k.lower() for k in MODEL_CAPABILITIES} | {
-        k.lower() for k in (await load_all_model_overrides())
-    }
-    if mid_lc in existing_lc:
+    _overrides = await load_all_model_overrides()
+    # mig 179 — a REMOVED model is not a duplicate. It is not in the registry, so the operator
+    # must be able to add it back; that is half of what makes removal safe to offer at all.
+    # `_overrides` already excludes tombstones, so only the built-in half of the check below
+    # needs the subtraction.
+    from app.models.user_settings import load_removed_model_ids  # function-local (Pitfall 4)
+    _removed_lc = {m.lower() for m in await load_removed_model_ids()}
+    # ⚠ THE REFUSAL NAMES *WHERE* IT ALREADY IS, because "edit it in the table instead" is a dead
+    # end when the operator cannot find it in the table — which is exactly how this endpoint gets
+    # reached. The registry groups by PROVIDER, and a model's provider is NOT derivable from its
+    # id: `deepseek/deepseek-v4.1-flash` is an OpenRouter id and files under `openrouter`, while
+    # the `deepseek` group holds only the two native `deepseek-v4-*` ids. An operator who looks
+    # under the provider the id spells, finds nothing, and is then told "it's already there"
+    # has been given a contradiction rather than a direction. So: name the provider, the exact
+    # STORED id (casing can differ from what they typed — the match is case-folded), and whether
+    # it is currently shown to users, which is usually the real question behind "where is it?".
+    _existing_by_lc = {k.lower(): (k, v.get("provider")) for k, v in _overrides.items()}
+    for _k, _cap in MODEL_CAPABILITIES.items():
+        if _k.lower() in _removed_lc:
+            continue  # tombstoned built-in — absent from the registry, so addable
+        _existing_by_lc.setdefault(_k.lower(), (_k, _cap.get("provider")))
+    if mid_lc in _existing_by_lc:
+        _stored_id, _stored_provider = _existing_by_lc[mid_lc]
+        _provider = _stored_provider or _infer_provider_for(_stored_id)
+        _row = _overrides.get(_stored_id) or {}
+        _enabled = _row.get("enabled")
+        _state = "hidden from users" if _enabled is False else "shown to users"
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="That model is already in the registry — edit it in the table instead.",
+            detail=(
+                f"'{_stored_id}' is already in the registry, under the "
+                f"{_provider} group ({_state}) — open that group in the table to edit it."
+            ),
         )
 
     # Build the upsert EXACTLY like set_model_capability: column names ONLY from the code
@@ -1265,9 +1291,23 @@ async def add_model_by_id(
     # authoritative backstop. A genuine duplicate MUST fail SAFE as a 409 (below) — never an upsert
     # that would silently reset an existing row's caps and force ``enabled=false``. This is the ADD
     # path; ``set_model_capability`` owns the deliberate edit/upsert with its reset semantics.
+    # ⚠ mig 179 — THE CONFLICT ARM IS GUARDED BY ``WHERE … .removed``, WHICH IS WHAT KEEPS
+    # WR-01's FAIL-SAFE INTACT WHILE STILL LETTING A REMOVED MODEL BE ADDED BACK. A removed
+    # built-in leaves a TOMBSTONE row behind, so a plain INSERT would now collide on the primary
+    # key and 409 an id that is genuinely absent from the registry — the operator could remove a
+    # model and never get it back. The conflict arm therefore updates ONLY a tombstone. A
+    # collision with a LIVE row matches no arm, updates nothing, and ``RETURNING`` yields no row
+    # — which is exactly the WR-01 race the 409 below exists for, now detected by an empty
+    # result instead of by an exception. Either way: never clobber a live row, never a false 2xx.
+    _conflict_cols = [c for c in insert_cols if c != "model_id"]
     sql = (
-        f"INSERT INTO model_capabilities_overrides ({', '.join(insert_cols)}) "
-        f"VALUES ({placeholders})"
+        f"INSERT INTO model_capabilities_overrides ({', '.join(insert_cols)}, removed) "
+        f"VALUES ({placeholders}, false) "
+        f"ON CONFLICT (model_id) DO UPDATE SET "
+        + ", ".join(f"{c} = EXCLUDED.{c}" for c in _conflict_cols)
+        + ", removed = false, updated_at = now() "
+        "WHERE model_capabilities_overrides.removed "
+        "RETURNING model_id"
     )
     values = [
         model_id,
@@ -1276,21 +1316,21 @@ async def add_model_by_id(
         False,  # ``enabled`` — the FORCED literal, never body-sourced (SC#3)
     ]
 
-    import asyncpg  # function-local (Pitfall 4)
     pool = deps._pg_pool  # CR-02: live module attribute, never an import snapshot
     write_ok = False
     if pool is not None:
         try:
-            await pool.execute(sql, *values)
+            if await pool.fetchval(sql, *values) is None:
+                # The race backstop (WR-01): a LIVE row for this id already exists — a concurrent
+                # worker inserted it after our cache guard read a stale snapshot. Fail safe with
+                # the same 409 the cache guard raises; never clobber it, never a false 500.
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="That model is already in the registry — edit it in the table instead.",
+                )
             write_ok = True
-        except asyncpg.exceptions.UniqueViolationError:
-            # The race backstop (WR-01): a concurrent worker already inserted this id after our
-            # cache guard read a stale snapshot. Fail safe with the SAME 409 the cache guard raises
-            # — never clobber the existing row, never a false 500.
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="That model is already in the registry — edit it in the table instead.",
-            )
+        except HTTPException:
+            raise
         except Exception:
             logger.exception("add_model_by_id: upsert failed for %s", model_id)
 
@@ -1499,6 +1539,146 @@ async def set_model_capability(
     return {"ok": True, "model_id": model_id, "changed": present_cols}
 
 
+@router.delete("/models/{model_id:path}")
+async def remove_model_override(
+    model_id: str,
+    request: Request,
+    _floor: None = Depends(operator_audit_floor),
+):
+    """Remove ONE model from the registry — any model, including a code-declared one.
+
+    TWO MECHANISMS, ONE PROMISE. The registry is a union of the built-in ``MODEL_CAPABILITIES``
+    dict (declared in ``config.py``) and the rows of ``model_capabilities_overrides``, so
+    "remove" cannot mean the same SQL for both halves:
+
+      * a DB-ONLY model (add-by-ID or discovery-confirmed) is hard-``DELETE``d — the row is the
+        model, so deleting it removes it;
+      * a BUILT-IN model has no row to delete, so removal is recorded as a TOMBSTONE
+        (``removed = true``, mig 179) and ``build_model_registry_rows`` skips the matching
+        built-in. Both override caches filter tombstones out, so the model also leaves the
+        picker, the capability resolver and the provider builder in the same write.
+
+    Either way the model is GONE from the registry and can be added back later with
+    ``POST /admin/models``, which clears the tombstone. ``mode`` in the response says which
+    mechanism ran (``"deleted"`` / ``"tombstoned"``) — the caller should not have to infer it,
+    and the distinction matters if anyone ever reads the table directly.
+
+    ⚠ THE BUILT-IN IDS WERE A DEVELOPMENT CONVENIENCE, NOT A CONTRACT. This endpoint used to
+    refuse them, on the correct observation that a delete could not stick. That made ~three
+    quarters of the list permanently unremovable for a reason the operator had no way to act
+    on. The fix is a mechanism that makes removal stick, not a better refusal.
+
+    GUARDS, all BEFORE any write (the allowlist-before-touch discipline this module uses
+    everywhere):
+
+      * empty / slash-or-whitespace-only id → 422 (the ``:path`` converter matches ``""``;
+        same structural guard as ``set_model_capability`` / ``set_model_lock``).
+      * the id is in NEITHER half of the union → 404. Nothing to remove is not a success: a
+        silent 2xx would let the UI report a removal that never happened, and would write a
+        tombstone for an id that never existed.
+      * the model is the org default (``app_settings.llm_model``) → 409. Same reason
+        ``set_model_capability`` refuses to disable it (D-149-09, no dead default): the model
+        would leave the registry while ``llm_model`` still named it, and every request-path
+        fallback would resolve to a model that no longer exists. Locked or not the remedy is
+        the same — pick a new default first — so the refusal names the lock only when there is
+        one.
+
+    The reads are forced FRESH (``invalidate_*`` before the load) for the WR-03 reason the two
+    sibling guards document: a per-worker 30s cache can hold another worker's stale snapshot,
+    and a guard that reads stale state is not a guard. On success:
+    ``broadcast_model_overrides_change`` (BUG-260902-06 — invalidate here AND publish to the
+    siblings, or the next GET has a coin-flip chance of serving the removed model) + a ✎
+    ``model.removed`` receipt. On a persistence failure: a ``model.remove_failed`` stamp + a
+    real 500, never a false 2xx. Non-operators are 404'd by the router gate.
+    """
+    if not model_id or not model_id.strip("/ \t\r\n"):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="model_id must be non-empty.",
+        )
+
+    from app.models.user_settings import (  # function-local (Pitfall 4)
+        _load_settings_from_db,
+        invalidate_model_overrides_cache,
+        invalidate_settings_cache,
+        load_all_model_overrides,
+        load_removed_model_ids,
+    )
+
+    # WR-03: force a FRESH cross-worker read for BOTH guards below.
+    invalidate_model_overrides_cache()
+    overrides = await load_all_model_overrides()
+    # ⚠ A TOMBSTONED BUILT-IN IS STILL IN ``MODEL_CAPABILITIES`` — the dict is code and a removal
+    # cannot edit it — so membership must be asked of the REGISTRY, not of the dict. Without the
+    # subtraction a second DELETE of an already-removed model re-writes its tombstone and answers
+    # 200, and the UI reports a removal that did not happen. Driven: it returned 200 before this
+    # line existed.
+    removed_ids = await load_removed_model_ids()
+    is_built_in = model_id in MODEL_CAPABILITIES and model_id not in removed_ids
+    # Membership is asked of the UNION, because that is what the operator is looking at. A live
+    # stored row OR a live built-in declaration each make the model present and therefore
+    # removable; neither makes it 404. (`overrides` already excludes tombstones — mig 179.)
+    if model_id not in overrides and not is_built_in:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="That model is not in the registry — nothing to remove.",
+        )
+
+    invalidate_settings_cache()
+    _s = await _load_settings_from_db()
+    if model_id == (_s.get("llm_model") or ""):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "This model is locked as the org default — unlock it and pick a new default first."
+                if bool(_s.get("llm_model_locked"))
+                else "This is the org default model — pick a new default first."
+            ),
+        )
+
+    # A built-in cannot be deleted (it is declared in code), so it is TOMBSTONED instead; a
+    # DB-only model IS its row, so the row goes. Both leave the registry; `mode` reports which.
+    mode = "tombstoned" if is_built_in else "deleted"
+    if is_built_in:
+        # The tombstone must survive on top of an EXISTING override row, hence the upsert: a
+        # built-in the operator had also edited has a row already, and a plain INSERT would
+        # collide with the primary key. `provider` is NOT NULL, so it is supplied on insert and
+        # deliberately left alone on conflict — a tombstone records a removal, not a re-typing
+        # of the model's configuration, and the stored values stay put in case it is added back.
+        _provider = MODEL_CAPABILITIES.get(model_id, {}).get("provider") or _infer_provider_for(model_id)
+        sql = (
+            "INSERT INTO model_capabilities_overrides (model_id, provider, removed) "
+            "VALUES ($1, $2, true) "
+            "ON CONFLICT (model_id) DO UPDATE SET removed = true, updated_at = now()"
+        )
+        args: tuple = (sql, model_id, _provider)
+    else:
+        # Parameterized single-row delete — the id is a $1 bind, never interpolated.
+        args = ("DELETE FROM model_capabilities_overrides WHERE model_id = $1", model_id)
+
+    pool = deps._pg_pool  # CR-02: live module attribute, never an import snapshot
+    write_ok = False
+    if pool is not None:
+        try:
+            await pool.execute(*args)
+            write_ok = True
+        except Exception:
+            logger.exception("remove_model_override: %s failed for %s", mode, model_id)
+
+    if not write_ok:
+        request.state.audit_action = "model.remove_failed"
+        request.state.audit_label = f"Removing {model_id} failed to persist"
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not remove the model — it was not changed.",
+        )
+
+    await broadcast_model_overrides_change()  # SC#1: gone on the next request, on every worker
+    request.state.audit_action = "model.removed"
+    request.state.audit_label = f"Removed {model_id} from the registry"
+    return {"ok": True, "model_id": model_id, "mode": mode}
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # Phase 149 (MODEL-02 / D-149-07) — the dedicated lock/unlock endpoint
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1633,7 +1813,10 @@ async def run_model_discovery(
     client value reaches the HTTP client). Stamps a ✎ ``model.discover`` receipt.
     Non-operators are 404'd by the router gate.
     """
-    from app.models.user_settings import load_all_model_overrides  # function-local (Pitfall 4)
+    from app.models.user_settings import (  # function-local (Pitfall 4)
+        load_all_model_overrides,
+        load_removed_model_ids,
+    )
     from app.services.model_discovery_service import (  # function-local (Pitfall 4)
         PROVIDER_ENDPOINTS,
         compute_diff,
@@ -1665,8 +1848,16 @@ async def run_model_discovery(
 
     # Current registry union: built-in DEF ∪ ALL DB override rows (enabled AND disabled).
     # Each entry MUST carry a ``provider`` (compute_diff's vanished detection keys on it).
+    # mig 179: a REMOVED built-in is not part of the current registry, so it must not be fed to
+    # the diff as one. Without this subtraction a model an operator removed would never be
+    # offered again by discovery — the "you can always add it back" half of removal would be
+    # true only through the by-ID form. It is deliberate that a removed model reappears under
+    # `new`: discovery is propose-only, and a proposal is not a re-addition.
+    _removed = await load_removed_model_ids()
     current: dict[str, dict] = {}
     for mid, cap in MODEL_CAPABILITIES.items():
+        if mid in _removed:
+            continue
         current[mid] = dict(cap)
     overrides = await load_all_model_overrides()
     for mid, ovr in overrides.items():

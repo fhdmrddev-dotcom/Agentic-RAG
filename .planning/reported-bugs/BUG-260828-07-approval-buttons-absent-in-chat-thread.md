@@ -3,8 +3,8 @@ id: BUG-260828-07
 title: Approve / Do-not-run render in the workflow panel but not in the chat thread
 surface: Agentic-RAG
 severity: high
-status: open
-folded_into: null
+status: folded
+folded_into: 244
 reported: 2026-08-28
 reported_by: operator, driving Phase 214's G-4 checkpoint
 affected_areas: [frontend/src/components/panel/PendingAskCard.tsx, frontend/src/components/layout/ChatLayout.tsx]

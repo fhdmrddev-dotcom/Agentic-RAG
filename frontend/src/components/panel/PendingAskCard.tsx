@@ -48,6 +48,9 @@ import {
   useWorkflowLockForThread,
   usePhases,
 } from "@/providers/StreamsProvider"
+// Phase 244-15 (G-8): the STORE, deliberately — not a provider hook. See `settleAnswered`
+// in `PendingAskStack` for the measured reason (eight suites mock the provider module).
+import { useStreamsStore } from "@/stores/streamsStore"
 import { answerAskUser, ApiError } from "@/lib/api"
 import type { PendingAsk } from "@/types"
 import {
@@ -219,6 +222,21 @@ interface PendingAskCardProps {
    */
   runIsOver?: boolean
   /**
+   * Phase 244-15 (SHELL-03 / UAT gap G-8) — fired ONCE after a SUCCESSFUL answer, never in
+   * any `catch` arm.
+   *
+   * ⚠ OPTIONAL, defaulting to `undefined` — the same register as `runIsOver` / `action` /
+   * `service`, and for the same reason: every existing caller renders exactly the card it
+   * rendered before this prop existed. `PendingAskStack` is the only production caller that
+   * passes it. `WorkflowRunPage` mounts this card DIRECTLY (`:1629`) and its home was
+   * measured CORRECT during the drive, so it stays behaviourally byte-unchanged.
+   *
+   * ⚠ THE CARD DOES NOT KNOW WHAT SETTLING MEANS, and that is deliberate. It knows only that
+   * its answer was accepted. The stack composes what happens next (the ask reconcile + the
+   * workflow-lock release) because the stack is the one of the two that knows the thread id.
+   */
+  onAnswered?: () => void
+  /**
    * Phase 214-11 Task 2 (STEP-04 / D-214-16 · sketch 216 §3 surface 5) — the identity of the
    * step this pause belongs to, RESOLVED BY THE CALLER.
    *
@@ -259,6 +277,7 @@ export function PendingAskCard({
   ask,
   reconcile,
   runIsOver = false,
+  onAnswered,
   action = null,
   service = null,
   shape,
@@ -358,6 +377,26 @@ export function PendingAskCard({
       // removes the prompt from the store, reactively unmounting this card.
       setAnsweredValue(valueForDisplay)
       setState("answered")
+      // ── Phase 244-15 (G-8) — SUCCESS ONLY, and after the optimistic flip. ──────────
+      //
+      // The comment two lines up describes the SSE path and is still true THERE. On the
+      // WORKFLOW path the client is not subscribed to this run's stream, so that SSE never
+      // lands, the SHARED store is never written, and the sibling home — a different
+      // component instance with its own `useState` — keeps offering to answer a prompt the
+      // server has already settled. This callback is what reaches the store on that path.
+      //
+      // ⛔ NEVER IN A `catch` ARM. A refused answer must leave the card answerable; settling
+      // on a refusal would clear a prompt that is still genuinely waiting.
+      //
+      // ⚠ GUARDED: a throwing callback must not take the card down with it. There is no error
+      // boundary anywhere above this component (`BUG-260529-03`), and the answer has already
+      // been accepted by the server at this point — losing the receipt to a consumer's bug
+      // would be strictly worse than losing the settle.
+      try {
+        onAnswered?.()
+      } catch (cbErr) {
+        console.warn("[PendingAskCard] onAnswered callback threw", cbErr)
+      }
     } catch (err) {
       // Never crash the panel — and never stay silent (096-04 / BUG-260605-01).
       setSubmitting(false)
@@ -732,6 +771,37 @@ export function PendingAskStack() {
   // JSONB off the wire; `stepActionWords` is total over it and carries the WR-04 own-guard.
   const pausedAction = stepActionWords(pausedStep?.capability)
 
+  // ── Phase 244-15 (SHELL-03 / UAT gap G-8) — THE SETTLE, COMPOSED FROM TWO SHIPPED THINGS ──
+  //
+  // Built HERE and not in the card, because the stack is the one of the two that knows the
+  // thread id. It composes exactly two existing mechanisms and creates no third:
+  //
+  //   1. `reconcile()` — the ask reconcile this component ALREADY holds from
+  //      `useAskUserPrompt(threadId)`. ⭐ THIS IS THE WHOLE CROSS-HOME SETTLE, and it needs no
+  //      new fetch code: one GET → `replacePendingAsksForThread` → ONE shared store key
+  //      (`pendingAsksByThread`), which BOTH homes read. `D-244-11`'s structural claim was
+  //      always true of the store; this is what makes it true of the path that reaches it.
+  //   2. `releaseSettledWorkflowLock(threadId)` — re-read the thread's workflow state and
+  //      release a lock the server has already dropped. It RELEASES ONLY; see its own comment.
+  //
+  // ⛔ REACHED THROUGH `useStreamsStore.getState().actions`, NOT through `useStreamActions()`,
+  // and the reason is MEASURED rather than stylistic. Eight suites mock
+  // `@/providers/StreamsProvider` with an ALLOW-LIST factory and render this stack directly or
+  // through `WorkspacePanel` / `MessageList` (ChatArea.approval, MessageItem.continueButton,
+  // StopControl.baseline, PendingAskCard, PendingAskCard.retired.baseline, WorkspacePanel,
+  // WorkspacePanel.derived, WorkflowRunPage). A new provider-hook import would make every one
+  // of them throw on an omitted export. The STORE module is not mocked in those suites, and
+  // its synchronous no-op default is exactly the right behaviour for a stack mounted without a
+  // provider: with no provider there is no lock to release. ⚠ Do not "tidy" this into the hook.
+  //
+  // ⚠ FIRE-AND-FORGET AND ORDER-FREE: neither call depends on the other's result, and both are
+  // best-effort reads whose failure leaves the surface exactly as stale as it already was.
+  const settleAnswered = () => {
+    if (!threadId) return
+    void reconcile()
+    useStreamsStore.getState().actions.releaseSettledWorkflowLock(threadId)
+  }
+
   if (asks.length === 0) return null
 
   // Newest pinned on top (D-03). created_at is GET-only; fall back to the array
@@ -752,6 +822,7 @@ export function PendingAskStack() {
             ask={ask}
             reconcile={reconcile}
             runIsOver={runIsOver}
+            onAnswered={settleAnswered}
             action={pausedAction}
             service={pausedStep?.serviceName ?? null}
             shape={stepMarkShape(pausedStep?.capability, pausedStep?.toolName)}

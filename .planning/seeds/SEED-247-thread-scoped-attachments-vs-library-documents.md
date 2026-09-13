@@ -7,7 +7,7 @@ planted_by: Operator, 2026-09-05 at Phase 229 close — "anything in the chat sh
 surface: Agentic-RAG
 severity: info
 category: product / ingestion scope + knowledge-base hygiene
-priority: high
+priority: medium   # narrowed at Phase 244 discuss — only Q4 (promote-to-Library) remains open
 scope: Medium-Large — a new document SCOPE, plus retrieval and lifecycle rules; not merely a UI move
 affected_areas: [chat, composer, documents, folders, retrieval, ingestion, workspace-files, library]
 related_seeds: [SEED-209, SEED-210, SEED-038, SEED-224]
@@ -81,3 +81,38 @@ something enters the corpus without anyone deciding it should be part of the cor
 the Library **root** with no folder picker, and the chat has **no local-file upload at all** — the two
 doors are exactly inverted. **The folder picker and moving import into the Library are small and fit
 Phase 233.** This seed is the larger half and must not be smuggled into a phase that has not scoped it.
+
+---
+
+## ⭐ ROUTED AT PHASE 244 DISCUSS (2026-09-11) — FIVE OF THE SIX QUESTIONS ARE ANSWERED
+
+`trigger_when` arm **(2)** — *"anyone adds a local-file upload to the chat composer"* — **fired**.
+`SHELL-04` does exactly that, so this seed was read and ruled on rather than walked past.
+Decisions live in `.planning/phases/244-the-chat-shell-and-the-composer/244-CONTEXT.md`.
+
+| Q | Answer | Decision |
+|---|---|---|
+| **1** Where does a thread-scoped file live? | **Reuse `workspace_files`** via the shipped `POST /threads/{id}/workspace/files`. **No migration.** | `D-244-01` |
+| **2** Is it retrievable, and by whom? | **Read INLINE only — never chunked, never embedded.** So retrieval gains **no** scope term and the four Phase 231 RLS sites are untouched | `D-244-03` |
+| **3** What happens when the thread is deleted? | **Cascade** — `workspace_files.thread_id … ON DELETE CASCADE` already (migration 054:7) | `D-244-04` |
+| **4** Can a person promote one to the Library? | ⛔ **DEFERRED** — not asked for by any criterion; needs a folder picker, the mint/splice path and a dedup ruling | deferred |
+| **5** Does it dedupe against Library documents? | **MOOT** — an attachment mints **no `documents` row at all**, so `documents_dedup_idx` is never reached | by construction |
+| **6** Chunking / embedding cost? | **Zero — it is never embedded.** Same answer as Q2 | `D-244-03` |
+
+⛔⛔ **THIS SEED'S OWN PREMISE WAS MEASURED FALSE, and the original is kept above rather than edited.**
+It states: *"`workspace_files` **is** per-thread, but it is the **agent's** workspace — files the agent
+produces during a run — not a home for a person's attachment."* **At HEAD that is not true.** Phase 100
+(TMPL-01) shipped `POST /threads/{id}/workspace/files` — a **user-written**, thread-scoped,
+TTL-expiring, magic-byte-validated upload with an RLS **insert** policy for the user
+(`workspace_files_insert_own`), a 10 MB cap checked three times, 15 accepted extensions, a panel
+renderer, an API client, and a caller already in the chat shell (`ChatLayout.tsx:377`). So *"temporary"*
+**is** a state this product can represent, and has been able to since Phase 100. **The seed's
+conclusion — a chat attachment should not enter the Library — stands; its claim about what the data
+model can express does not.** `SEED-042`'s matching estimate (*"option (ii) costs a new write endpoint
++ RLS"*) is refuted the same way.
+
+⚠ **Status stays `planted`, deliberately, on ONE question only: Q4 (promote to the Library).** Every
+other question is answered and must not be re-proposed.
+**Narrowed `re_open_trigger`:** the first time a person asks to keep a chat attachment permanently, OR
+`SEED-038`'s generated-files/artifacts unification is scheduled — since *"what is a file's scope in
+this product"* is then being answered whole.

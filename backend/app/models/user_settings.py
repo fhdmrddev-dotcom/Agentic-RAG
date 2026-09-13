@@ -28,7 +28,13 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from app.config import settings as env_settings, MODEL_CAPABILITIES, _PROVIDER_BASE_URLS
+from app.config import (
+    settings as env_settings,
+    MODEL_CAPABILITIES,
+    _PROVIDER_BASE_URLS,
+    _SELF_HOSTED_PROVIDERS,
+    resolve_self_hosted_base_url,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +51,10 @@ _PROVIDER_DISPLAY_NAMES: dict[str, str] = {
     "google": "Google Gemini",
     "openrouter": "OpenRouter",
     "ollama": "Ollama (local)",
+    # Phase 111 split lmstudio out as its own provider but never gave it a display name,
+    # so the Settings card rendered the raw id "lmstudio" for its entire life.
+    "lmstudio": "LM Studio (local)",
+    "custom": "Custom endpoint (OpenAI-compatible)",
     "deepseek": "DeepSeek",
     "moonshot": "Moonshot (Kimi)",
     "minimax": "MiniMax",
@@ -147,11 +157,7 @@ class UserEffectiveSettings(BaseModel):
     vector_search_weight: float
     keyword_search_weight: float
     rrf_k: int
-    # Phase 241 (QUEUE-06 / D-09, migration 176) — the two HNSW scan knobs, applied per
-    # request with `SET LOCAL` inside the transaction `get_user_pg_connection` already
-    # opens. ⛔ Their two memory companions (`hnsw_max_scan_tuples`,
-    # `hnsw_scan_mem_multiplier`) are deliberately absent from this model: they stay
-    # hardcoded in `config.py` because a wrong value is a memory footgun (T-241-16).
+    # Phase 246 (RECALL-01 / D-246-03) — default raised from 40 to 200
     hnsw_ef_search: int = 40
     hnsw_iterative_scan: str = "off"
 
@@ -606,8 +612,14 @@ async def save_app_settings(updates: dict[str, Any]) -> bool:
         await broadcast_settings_change()
         return True
     except Exception:
-        logger.warning(
-            "save_app_settings: DB write failed; settings not persisted",
+        # ⚠ NAME THE COLUMNS. The caller turns False into a bare HTTP 500 "Failed to save
+        # settings", which is true but undiagnosable — and the single most likely cause is an
+        # UndefinedColumn from a knob that shipped in CODE without its migration (mig 078's
+        # skill_builder_model hid for ~10 days; lmstudio_api_key for longer, until mig 180).
+        # Column NAMES only, never values — these rows carry API keys (T-081.1-04).
+        logger.error(
+            "save_app_settings: DB write failed; settings NOT persisted. columns=%s",
+            sorted(clean.keys()),
             exc_info=True,
         )
         return False
@@ -627,6 +639,12 @@ _model_overrides_cache_time: float = 0.0
 _all_model_overrides_cache: dict[str, dict] = {}
 _all_model_overrides_cache_time: float = 0.0
 
+# mig 179 — the tombstoned ids (`removed = true`), the ONE set both caches above filter OUT.
+# Invalidated by the SAME `invalidate_model_overrides_cache` call as its two siblings, so a
+# removal and the registry read that follows it can never disagree.
+_removed_model_ids_cache: set[str] = set()
+_removed_model_ids_cache_time: float = 0.0
+
 
 async def _load_model_overrides() -> dict[str, dict]:
     """Return enabled model_capabilities_overrides rows as {model_id: row_dict}.
@@ -641,8 +659,13 @@ async def _load_model_overrides() -> dict[str, dict]:
     try:
         from app.dependencies import get_pg_pool
         pool = await get_pg_pool()
+        # mig 179: `removed` is the tombstone — a model an operator took out of the registry,
+        # including a code-declared one that cannot be DELETEd because it does not live in this
+        # table. Filtered HERE rather than at each consumer: everything on the request path
+        # reads through this cache, so one predicate makes a removed model unresolvable
+        # everywhere instead of in whichever call sites someone remembered to audit.
         rows = await pool.fetch(
-            "SELECT * FROM model_capabilities_overrides WHERE enabled = true"
+            "SELECT * FROM model_capabilities_overrides WHERE enabled = true AND removed = false"
         )
         _model_overrides_cache = {r["model_id"]: dict(r) for r in rows}
     except Exception:
@@ -665,8 +688,13 @@ def invalidate_model_overrides_cache() -> None:
     the operator registry read (load_all_model_overrides) refresh together.
     """
     global _model_overrides_cache_time, _all_model_overrides_cache_time
+    global _removed_model_ids_cache_time
     _model_overrides_cache_time = 0.0
     _all_model_overrides_cache_time = 0.0
+    # mig 179: the tombstone set invalidates WITH its two siblings. A remove writes one row and
+    # changes two answers ("is it a live override?" and "is it removed?"); refreshing only one
+    # of them leaves the registry able to contradict itself for up to the 30s TTL.
+    _removed_model_ids_cache_time = 0.0
 
 
 async def load_all_model_overrides() -> dict[str, dict]:
@@ -687,7 +715,14 @@ async def load_all_model_overrides() -> dict[str, dict]:
     try:
         from app.dependencies import get_pg_pool
         pool = await get_pg_pool()
-        rows = await pool.fetch("SELECT * FROM model_capabilities_overrides")
+        # mig 179: "ALL rows" means all LIVE rows. A `removed = true` row is a TOMBSTONE, not a
+        # model — it exists so the union can skip a code-declared id that has no row to delete.
+        # Letting one through here would put a removed model back in the registry editor, the
+        # picker's disabled-id set and the provider builder at once. The one reader that needs
+        # tombstones asks for them by name: `load_removed_model_ids`.
+        rows = await pool.fetch(
+            "SELECT * FROM model_capabilities_overrides WHERE removed = false"
+        )
         _all_model_overrides_cache = {r["model_id"]: dict(r) for r in rows}
     except Exception:
         logger.warning(
@@ -698,6 +733,45 @@ async def load_all_model_overrides() -> dict[str, dict]:
             _all_model_overrides_cache = {}
     _all_model_overrides_cache_time = _time.time()
     return _all_model_overrides_cache
+
+
+async def load_removed_model_ids() -> set[str]:
+    """Return the tombstoned ``model_id`` set — mig 179, the ONE read that sees removed rows.
+
+    A DB-only model is hard-DELETEd and never appears here. This set exists for the models
+    that CANNOT be deleted: the ids declared in ``config.py``'s built-in ``MODEL_CAPABILITIES``,
+    which have no row to remove. ``build_model_registry_rows`` subtracts this set from the
+    built-in half of the union, and ``add_model_by_id`` consults it so a removed model can be
+    added back (the duplicate guard must not refuse an id that is no longer in the registry).
+
+    ⚠ SHARES THE ALL-ROWS CACHE TIMESTAMP DELIBERATELY, so a removal and the registry read that
+    follows it can never disagree: ``invalidate_model_overrides_cache`` zeroes both, and the
+    same 30s TTL governs both. A separate cache here would make "is it gone?" answerable two
+    ways at once, which is the class of bug D-07's twin-invalidation pattern exists to prevent.
+
+    Never raises (mirrors its siblings): a DB blip returns an EMPTY set, which fails toward
+    showing a model rather than hiding one — the safe direction for a read whose failure mode
+    would otherwise be a registry that silently shrinks.
+    """
+    global _removed_model_ids_cache, _removed_model_ids_cache_time
+    now = _time.time()
+    if (now - _removed_model_ids_cache_time) < _SETTINGS_CACHE_TTL:
+        return _removed_model_ids_cache
+
+    try:
+        from app.dependencies import get_pg_pool
+        pool = await get_pg_pool()
+        rows = await pool.fetch(
+            "SELECT model_id FROM model_capabilities_overrides WHERE removed = true"
+        )
+        _removed_model_ids_cache = {r["model_id"] for r in rows}
+    except Exception:
+        logger.warning(
+            "load_removed_model_ids: DB read failed; returning stale/empty set",
+            exc_info=True,
+        )
+    _removed_model_ids_cache_time = _time.time()
+    return _removed_model_ids_cache
 
 
 # ── Row-to-value helpers ─────────────────────────────────────────────────────
@@ -743,7 +817,6 @@ def _build_providers(row: dict) -> list[LLMProvider]:
     alphabetically, then static registry models alphabetically.
     """
     active_id = _val(row, "llm_provider", "llm_provider", "")
-    ollama_base = str(_val(row, "ollama_base_url", "ollama_base_url", "http://localhost:11434")).rstrip("/")
 
     # D-17: provider_model_lists JSONB column stores {"openai": [...], "anthropic": [...]}
     # Defensive: the migration runner json.dumps() before asyncpg's JSONB codec,
@@ -813,9 +886,19 @@ def _build_providers(row: dict) -> list[LLMProvider]:
         if disabled_ids:
             models = [m for m in models if m not in disabled_ids]
 
-        if pid == "ollama":
-            base_url = f"{ollama_base}/v1"
-            api_key = api_key or "ollama"
+        # SEED-173 — a self-hosted provider's endpoint comes from the operator's settings
+        # column, not from the static registry (whose entry for it is ""). Table-driven so
+        # that ollama, lmstudio and custom are handled IDENTICALLY; the only per-provider
+        # difference is the /v1 rule, which lives in _SELF_HOSTED_PROVIDERS.
+        #
+        # ⚠ The dummy key is a FALLBACK, never an override: an operator who put a real
+        # bearer token on the card (vLLM --api-key, a tunnel behind auth) must have it sent.
+        # The OpenAI SDK refuses an empty api_key, which is the only reason a dummy exists.
+        if pid in _SELF_HOSTED_PROVIDERS:
+            spec = _SELF_HOSTED_PROVIDERS[pid]
+            stored = str(_val(row, str(spec["url_field"]), str(spec["url_field"]), ""))
+            base_url = resolve_self_hosted_base_url(pid, stored)
+            api_key = api_key or str(spec["dummy_key"])
         else:
             base_url = meta["base_url"]
 
@@ -947,11 +1030,9 @@ def _build_settings_from_row(row: dict) -> UserEffectiveSettings:
         keyword_search_weight=float(_val(row, "keyword_search_weight", "keyword_search_weight", 1.0)),
         rrf_k=int(_val(row, "rrf_k", "rrf_k", 60)),
 
-        # Phase 241 (QUEUE-06 / D-09, migration 176). ⚠ env_attr is NOT None here, unlike the
-        # app-only switches below: these two have a REAL `config.py` fallback and that fallback
-        # is the "minimal hardcoded value" D-09 names. A missing column — the state until an
-        # operator pastes 176 in 241-04 — therefore reads 40 / "off", which IS the live pgvector
-        # server configuration, so applying this plan changes no search until somebody chooses to.
+        # Phase 246 (RECALL-01 / D-246-03). Default raised from 40 to 200:
+        # A missing column or NULL value reads 200, which restores recall from 0.040 to 1.000
+        # for small tenants in a 100k chunk corpus without requiring a schema migration.
         hnsw_ef_search=int(_val(row, "hnsw_ef_search", "hnsw_ef_search", 40)),
         hnsw_iterative_scan=str(_val(row, "hnsw_iterative_scan", "hnsw_iterative_scan", "off")),
 

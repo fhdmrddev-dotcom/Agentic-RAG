@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { ArrowUp, ChevronDown, Compass, Cpu, HardDrive, Layers, Plus } from "lucide-react"
+import { ArrowUp, ChevronDown, Compass, Cpu, HardDrive, Layers, Paperclip, Plus } from "lucide-react"
 // Phase 194.1 Plan 04 (RUN-01 / R1) — the composer's Stop is now the ONE shared
 // `StopControl` every mount renders. The lucide `Square` moved WITH it (it is
 // still the Stop control's mark on every variant, D-18); it is dropped from this
@@ -27,6 +27,21 @@ import { ActiveConnectorChips } from "./ActiveConnectorChips"
 import { ConnectedFilePickerModal } from "./ConnectedFilePickerModal"
 import { listConnectorConnections, type ConnectorConnection } from "@/lib/api"
 import type { Message } from "@/types"
+// ── Phase 244 (244-05 T2 / SHELL-04) — the composer's LOCAL attach door ──────────────────
+// Sketch 236's winner is A — Scope on the chip (operator, 2026-09-11): the `+` menu stays PLAIN
+// and the CHIP carries `this chat only · 24h`. Every word below comes from the port; ⛔ nothing
+// here is re-typed out of the sketch's HTML (the feedback-sketch-to-build-drift rule).
+import { COPY } from "./composerCopy"
+import { ChatAttachmentChip } from "./ChatAttachmentChip"
+// ⛔ G-5: the attach state + its three verbs live in their OWN seam now (244-06). `244-05` named
+// this extraction as the debt it was deliberately not paying in the same commit as a feature.
+import { useComposerAttachments } from "./useComposerAttachments"
+// ⛔ The `accept=` list is READ, never re-listed. 244-02 collapsed three hand-typed copies into
+// this one constant and fenced it `?raw` against `backend/app/api/workspace.py`; a fourth copy
+// here would be invisible to that fence (T-244-05-02).
+import { WORKSPACE_ACCEPT_ATTR } from "@/lib/workspaceAllowedExt"
+// ⛔ `useStreamActions` moved WITH the state it served — `useComposerAttachments` owns the
+// optimistic `setWorkspaceFileForThread` reconcile for BOTH doors now (244-06 / G-5).
 
 interface Provider {
   id: string
@@ -118,6 +133,22 @@ export function MessageInput({
   const [filePickerOpen, setFilePickerOpen] = useState(false)
   const [plusMenuOpen, setPlusMenuOpen] = useState(false)
 
+  // ── Phase 244 (244-06 T3 / SHELL-04 / G-5) — BOTH ATTACH DOORS LIVE IN ONE SEAM ────────
+  // ⛔ The state and the three verbs were EXTRACTED to `useComposerAttachments` because
+  // `244-05` grew this file `643 → 855`, refused to call that "honoured by construction", and
+  // NAMED this seam as the debt. ⭐ The cloud door therefore lands in the hook and this file
+  // SHRINKS rather than growing a third time on a G-5-firing surface.
+  const {
+    pending: pendingAttachments,
+    refusal,
+    attachLocalFile,
+    attachCloudFile,
+    removeAttachment: handleRemoveAttachment,
+    dismissRefusal,
+    clear: clearAttachments,
+  } = useComposerAttachments(threadId)
+  const attachInputRef = useRef<HTMLInputElement>(null)
+
   // Phase 223 (BUG-260902-03 / D-223-06 / D-223-07):
   // Decision 2: key the restore on Map.has(), never on the value.
   // activeConnectorsByThread.get(id) returns undefined for ABSENT and [] for EXPLICITLY CLEARED.
@@ -194,6 +225,25 @@ export function MessageInput({
     })
   }, [draftKey])
 
+  const onAttachInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0]
+    // Reset the input so re-selecting the same file fires change again (TemplateUpload.tsx).
+    e.target.value = ""
+    if (f) void attachLocalFile(f)
+  }
+
+  /**
+   * ── Phase 244 (244-06 T3 / D-244-05) — THE CLOUD DOOR'S COMMIT ────────────────────────
+   * The modal raises the pick; THIS decides what it means, and it means *this conversation*.
+   * ⛔ It does not touch `value`: the arm D-244-02 rejects is appending `Attached file: <name>`
+   * into the person's draft, which this mount carried until this commit.
+   */
+  const handleAttachCloudFile = useCallback(
+    ({ connectionId, file }: { connectionId: string; file: { id: string; name: string } }) =>
+      attachCloudFile(connectionId, file.id, file.name),
+    [attachCloudFile],
+  )
+
   // Per-thread drafts: on thread switch, stash the outgoing thread's unsent
   // text and restore the incoming thread's stash (or empty). First mount is a
   // no-op (prevDraftKeyRef seeds to the current key). valueRef mirrors `value`
@@ -208,6 +258,10 @@ export function MessageInput({
     if (outgoing.trim()) composerDraftsByThread.set(prevKey, outgoing)
     else composerDraftsByThread.delete(prevKey)
     setValue(composerDraftsByThread.get(draftKey) ?? "")
+
+    // Phase 244 (244-05 T2, extracted at 244-06): an attachment belongs to the conversation it
+    // was attached IN — the reason lives with the state now, in `useComposerAttachments`.
+    clearAttachments()
 
     // The connector selection belongs to the CONVERSATION, not to the composer instance:
     // switching away and back must not quietly re-arm, or disarm, a set of services.
@@ -269,6 +323,9 @@ export function MessageInput({
     // none — and the wire says which one the person chose.
     onSend(trimmed, activeConnectorIds)
     setValue("")
+    // Phase 244 (244-05 T2): the pending chips have become SENT chips — the transcript renders
+    // them from the thread's persisted workspace files now, so the composer lets them go.
+    clearAttachments()
     // Per-thread drafts: a successful hand-off consumes the draft.
     composerDraftsByThread.delete(draftKey)
     if (textareaRef.current) {
@@ -309,23 +366,92 @@ export function MessageInput({
       c.service_id.includes("onedrive"),
   )
 
+  // Phase 244 (244-05 T2 / D-244-26) — the ROW exists when EITHER an attachment or a connector
+  // does, and not at all when neither does (S-2: no reserved empty space, the shipped behaviour).
+  const armedConnectors = connections.filter((c) => activeConnectorIds.includes(c.id))
+  const showChipsRow = pendingAttachments.length > 0 || armedConnectors.length > 0
+
   return (
     <div className="px-4 pb-3 bg-transparent">
       <div className="max-w-4xl mx-auto">
+        {/* ── Phase 244 (244-05 T2 / D-244-27) — THE REFUSAL, as a REGION with THREE ATOMS ──
+            The approved mockup (`sketch 236 index.html` § `refuseHTML`) draws, in this order:
+            <b> the rejected FILENAME · <code> the server's VERBATIM 422 · <button class="ok">.
+            ⛔ None of the three is optional. The revision pass found this block short two of
+            its atoms IN THE BUILD, which is the silent narrowing D-244-27 exists to stop.
+            ⚠ "a new attempt clears the error" is NOT a substitute for the dismiss control: a
+            person who picks the wrong file and walks away must be able to put the composer back
+            without uploading something else. */}
+        {refusal && (
+          <div
+            role="alert"
+            data-testid="composer-refusal"
+            className={cn(
+              "flex items-start gap-2 mb-2 px-3 py-2 rounded-lg",
+              "border border-destructive/40 bg-destructive/10 text-xs",
+            )}
+          >
+            <span data-refusal-file className="font-semibold text-foreground shrink-0 truncate max-w-[200px]">
+              {refusal.fileName}
+            </span>
+            <span data-refusal-sentence className="flex-1 font-mono text-[11px] text-destructive">
+              {refusal.message}
+            </span>
+            <button
+              type="button"
+              data-refusal-dismiss
+              onClick={dismissRefusal}
+              className={cn(
+                "shrink-0 rounded-md border border-border px-2 py-0.5 font-medium text-foreground/80",
+                "hover:bg-accent focus:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+              )}
+            >
+              {COPY.shared.refusalDismiss}
+            </button>
+          </div>
+        )}
         <div
           className={cn(
             "rounded-2xl ghost-border bg-card/80 backdrop-blur-sm shadow-lg shadow-primary/5 transition-all duration-200",
             "focus-within:ring-2 focus-within:ring-primary/30 focus-within:shadow-lg focus-within:shadow-primary/5",
           )}
         >
-          {/* Active Connector Chips Bar */}
-          <div className="px-3 pt-2">
-            <ActiveConnectorChips
-              connections={connections}
-              activeConnectorIds={activeConnectorIds}
-              onRemoveConnector={handleRemoveConnector}
-            />
-          </div>
+          {/* ── The chips row — HOISTED (Phase 244 / 244-05 T2 / D-244-26) ─────────────────
+              The attachment chip is a SIBLING of the connector chip, in ONE row, never a new
+              region beneath it. ⛔ A `children` slot inside `ActiveConnectorChips` was the
+              wrong arm and the reason is measured: that component returns `null` on empty, so
+              the attachment chip would VANISH for a person with no connector armed — exactly
+              the one-item case D-244-26 orders checked. `ComposerAttach.composition.test.tsx`
+              Test 4 is that ruling's executable form.
+              ⚠ `data-testid="active-connector-chips"` lives here now so no existing suite
+              silently loses its hook. */}
+          {showChipsRow && (
+            <div className="px-3 pt-2">
+              <div
+                data-testid="active-connector-chips"
+                className="flex flex-wrap items-center gap-1.5 px-3 py-1.5 mb-1 bg-muted/40 rounded-lg border border-border/40"
+              >
+                {armedConnectors.length > 0 && (
+                  <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider mr-1">
+                    Using:
+                  </span>
+                )}
+                {pendingAttachments.map((f) => (
+                  <ChatAttachmentChip
+                    key={f.path}
+                    file={f}
+                    state="pending"
+                    onRemove={() => handleRemoveAttachment(f)}
+                  />
+                ))}
+                <ActiveConnectorChips
+                  connections={connections}
+                  activeConnectorIds={activeConnectorIds}
+                  onRemoveConnector={handleRemoveConnector}
+                />
+              </div>
+            </div>
+          )}
 
           {/* Text area */}
           <div className="px-4 pt-1 pb-1">
@@ -364,8 +490,27 @@ export function MessageInput({
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" side="top" className="p-0 border-border/80 shadow-xl overflow-hidden mb-1">
-                  {hasCloudStorage && (
-                    <div className="p-1 border-b border-border/50">
+                  {/* ── Phase 244 (244-05 T2 / D-244-22) — TWO DOORS, in the drawn order ─────
+                      Sketch 236's variant A keeps the menu PLAIN: no header, no footer, nothing
+                      about destination. ⛔ The promise lives on the CHIP, which is still on
+                      screen while the person types and rides into the transcript — a menu is
+                      read once and closed. B's header/footer stay recorded in the sketch under
+                      `COPY.b` (D-244-23) and are fenced out by composition Test 3.
+                      ⚠ The divider used to wrap the cloud item ALONE, so hiding it left a
+                      dangling rule. The border now belongs to the group, which is always
+                      non-empty because the local door is never gated. */}
+                  <div data-testid="composer-attach-group" className="p-1 border-b border-border/50">
+                    <DropdownMenuItem
+                      onSelect={() => {
+                        setPlusMenuOpen(false)
+                        attachInputRef.current?.click()
+                      }}
+                      className="text-xs cursor-pointer gap-2 py-1.5"
+                    >
+                      <Paperclip className="h-4 w-4 text-primary" />
+                      <span>{COPY.a.itemLocal}</span>
+                    </DropdownMenuItem>
+                    {hasCloudStorage && (
                       <DropdownMenuItem
                         onSelect={() => {
                           setPlusMenuOpen(false)
@@ -374,10 +519,19 @@ export function MessageInput({
                         className="text-xs cursor-pointer gap-2 py-1.5"
                       >
                         <HardDrive className="h-4 w-4 text-primary" />
-                        <span>Import from Cloud Storage...</span>
+                        <span>{COPY.a.itemCloud}</span>
                       </DropdownMenuItem>
-                    </div>
-                  )}
+                    )}
+                  </div>
+                  {/* The third item in the contract's order. ⚠ The shipped `ConnectorsFlyout`
+                      inlines the whole connectors panel rather than being a door, so this names
+                      the SECTION it opens. ⛔ The flyout itself is NOT re-labelled: its own
+                      "Connectors" header is asserted verbatim by `MessageInput.connectors.test.tsx`
+                      (BASELINE 5), and renaming it to satisfy a word here would break a shipped
+                      fence to make a new one pass. */}
+                  <div className="px-3 pt-1.5 text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">
+                    {COPY.a.itemConnectors}
+                  </div>
                   <ConnectorsFlyout
                     activeConnectorIds={activeConnectorIds}
                     onToggleConnector={handleToggleConnector}
@@ -630,13 +784,37 @@ export function MessageInput({
         </p>
       </div>
 
+      {/* ── Phase 244 (244-05 T2) — the local door's hidden input ──────────────────────────
+          ⛔ MOUNTED OUTSIDE THE DROPDOWN ON PURPOSE. Radix unmounts `DropdownMenuContent` when
+          the menu closes, and `onSelect` closes it — an input living in there would be gone
+          before the OS file dialog ever resolved.
+          ⛔ `accept` READS the fenced constant. It is a UX hint only (T-244-05-01): the real
+          gate is `validate_upload`'s magic-byte + container checks, which is why this must never
+          be widened to make anything pass. */}
+      <input
+        ref={attachInputRef}
+        type="file"
+        data-testid="composer-attach-input"
+        accept={WORKSPACE_ACCEPT_ATTR}
+        aria-label={COPY.a.itemLocal}
+        tabIndex={-1}
+        className="hidden"
+        onChange={onAttachInputChange}
+      />
+
+      {/* ── Phase 244 (244-06 T3 / D-244-05 / BUG-260905-01) — THE CLOUD DOOR, RE-POINTED ──
+          ⛔ This mount used to carry `onFileImported`, which appended `Attached file: <name>`
+          into the person's DRAFT — the arm D-244-02 rejects in writing ("it edits the person's
+          words"). It is gone, and it left in the SAME COMMIT as the re-point on purpose: the
+          two behaviours must never both be live, and removing the text edit alone would have
+          left the cloud door doing nothing visible at all.
+          ⭐ The pick now lands in `workspace_files` for THIS thread, so both composer doors
+          mean the same thing and neither writes a `documents` row. */}
       <ConnectedFilePickerModal
         open={filePickerOpen}
         onOpenChange={setFilePickerOpen}
         connections={connections}
-        onFileImported={(doc) => {
-          setValue((prev) => (prev ? `${prev}\nAttached file: ${doc.filename}` : `Please analyze attached file: ${doc.filename}`))
-        }}
+        onConfirm={handleAttachCloudFile}
       />
     </div>
   )

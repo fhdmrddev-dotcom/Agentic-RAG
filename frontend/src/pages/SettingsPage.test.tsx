@@ -451,7 +451,27 @@ describe("SettingsPage — search breadth and iterative scan (241 / D-09)", () =
     expect(screen.queryByText(/RRF-K constant/i)).toBeNull()
   })
 
-  it("Save Search Settings carries both keys on the payload the tab already sends", async () => {
+  /**
+   * ⚠⚠ PHASE 242 CHANGED THE CONTRACT THIS CASE PINS, AND THE ORIGINAL IS PRESERVED BELOW RATHER
+   * THAN DELETED — because what Phase 241 D-09 guaranteed still holds, and deleting the case would
+   * have erased that guarantee silently while looking like a tidy-up.
+   *
+   * This case used to read:
+   *
+   *     await userEvent.selectOptions(picker, "relaxed_order")   // edits hnsw_iterative_scan ONLY
+   *     expect(body).toHaveProperty("hnsw_ef_search", 40)        // ← an UNCHANGED field
+   *     expect(body).toHaveProperty("hnsw_iterative_scan", "relaxed_order")
+   *
+   * D-242-02 makes the Search tab send CHANGED FIELDS ONLY, so an untouched `hnsw_ef_search` is no
+   * longer on the payload — and that is the POINT, not a regression: under the old shape any
+   * unrelated stored value out of range refused the whole tab, which made Phase 246's remedy
+   * hostage to a number nobody had touched.
+   *
+   * ⭐ 241's INTENT SURVIVES INTACT and is what the two cases below assert: the two knobs ride the
+   * payload this tab already sends, WHEN THE OPERATOR SETS THEM. The only thing that changed is
+   * that not setting one no longer sends it.
+   */
+  it("Save Search Settings carries a knob the operator ACTUALLY CHANGED (241 D-09, post-242 shape)", async () => {
     renderSettings()
     await openRetrieval()
 
@@ -461,7 +481,25 @@ describe("SettingsPage — search breadth and iterative scan (241 / D-09)", () =
 
     await waitFor(() => expect(mockUpdateSettings).toHaveBeenCalled())
     const body = mockUpdateSettings.mock.calls[0][0]
-    expect(body).toHaveProperty("hnsw_ef_search", 40)
+    expect(body).toHaveProperty("hnsw_iterative_scan", "relaxed_order")
+    // ⛔ And the UNTOUCHED sibling is absent — the D-242-02 property, asserted here rather than
+    // only in `__tests__/SettingsPage.changedFields.test.tsx`, so this file cannot drift back.
+    expect(body).not.toHaveProperty("hnsw_ef_search")
+  })
+
+  it("Save Search Settings carries BOTH knobs when the operator changes both (241 D-09)", async () => {
+    renderSettings()
+    await openRetrieval()
+
+    const breadth = await screen.findByLabelText("Search breadth")
+    await userEvent.clear(breadth)
+    await userEvent.type(breadth, "200")
+    await userEvent.selectOptions(screen.getByLabelText("Keep scanning"), "relaxed_order")
+    await userEvent.click(screen.getByRole("button", { name: /save search settings/i }))
+
+    await waitFor(() => expect(mockUpdateSettings).toHaveBeenCalled())
+    const body = mockUpdateSettings.mock.calls[0][0]
+    expect(body).toHaveProperty("hnsw_ef_search", 200)
     expect(body).toHaveProperty("hnsw_iterative_scan", "relaxed_order")
   })
 

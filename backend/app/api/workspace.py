@@ -24,11 +24,17 @@ from app.db.workspace import get_file_by_id
 # asyncpg-backed write/read (passed as the duck-typed `pool` into workspace_service /
 # db.workspace, which run under SET LOCAL ROLE authenticated). No producer path here.
 from app.dependencies import (
+    get_active_org_id,
     get_current_user,
     get_user_pg_connection,
     get_user_supabase_client,
 )
 from app.models.user_settings import load_app_settings_async
+# Phase 244 (SHELL-04 / D-244-05) — the composer's cloud door lands HERE, not in the Library.
+from app.models.workspace import WorkspaceConnectionAttachRequest
+from app.security.egress import EgressResponseTooLarge
+from app.services import connector_service
+from app.services.sources.base import SourceConnectionDisabled
 from app.services.workspace_service import (
     MAX_FILE_SIZE,
     FileTooLargeError,
@@ -126,8 +132,16 @@ _OOXML_EXT = {".docx", ".pptx", ".xlsx"}
 _TEXT_EXT = {".md", ".json", ".csv", ".txt", ".py", ".js", ".sh"}
 # Images — validated by leading magic bytes (D-09).
 _IMAGE_EXT = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
-# The full set the door accepts — kept in lockstep with TemplateUpload.tsx accept=.
-_ALLOWED_EXT = _OOXML_EXT | _TEXT_EXT | _IMAGE_EXT
+# Phase 244 (SHELL-04 / D-244-24) — PDF, validated by leading magic bytes (%PDF-).
+# Its OWN category on purpose: a PDF is a NUL-bearing binary, so `_TEXT_EXT` would refuse it at
+# `_looks_like_text`, and a bare add to `_ALLOWED_EXT` would fall through all three category
+# branches to the belt-and-braces 422 at the bottom of validate_upload.
+_PDF_EXT = {".pdf"}
+# The full set the door accepts. ⭐ Phase 244: the lockstep with the frontend's accept= is now a
+# MECHANISM, not this comment — `frontend/src/lib/workspaceAllowedExt.ts` is the single frontend
+# source and `src/lib/__tests__/workspaceAllowedExt.lockstep.test.ts` parses these four set
+# literals out of this file and asserts set equality against it.
+_ALLOWED_EXT = _OOXML_EXT | _TEXT_EXT | _IMAGE_EXT | _PDF_EXT
 # OOXML part-name prefix that distinguishes the three OOXML types (defense-in-depth).
 _OOXML_MARKER = {".docx": "word/", ".pptx": "ppt/", ".xlsx": "xl/"}
 
@@ -181,6 +195,20 @@ def _image_magic_ok(ext: str, raw: bytes) -> bool:
     return False
 
 
+def _pdf_magic_ok(raw: bytes) -> bool:
+    """Verify a PDF payload's leading magic bytes (Phase 244, D-244-24).
+
+    Mirrors ``_image_magic_ok``'s shape. Every PDF begins with the five-byte header
+    ``%PDF-`` followed by its version (``%PDF-1.7``, ``%PDF-2.0``). A renamed ``.exe`` /
+    ``.zip`` / arbitrary blob fails, so the extension alone never admits a payload
+    (T-244-02-01). Deliberately NOT a full container parse: the bytes are never handed to a
+    PDF library by this door — they are stored and later read by the agent inside the
+    sandbox — so the check that matters here is "this is not something else wearing a
+    ``.pdf`` name".
+    """
+    return raw[:5] == b"%PDF-"
+
+
 def validate_upload(filename: str, raw: bytes) -> str:
     """Magic-byte / content gate for the widened skill-asset allowlist (D-09, stdlib only).
 
@@ -188,6 +216,13 @@ def validate_upload(filename: str, raw: bytes) -> str:
     ZIP/OOXML branch for ``.docx/.pptx/.xlsx`` and ADDS per-category branches for
     text-ish assets (``.md/.json/.csv/.txt/.py/.js/.sh`` — utf-8-decodable + NUL
     reject) and images (``.png/.jpg/.jpeg/.gif/.webp`` — leading magic bytes).
+
+    Phase 244 (SHELL-04 / D-244-24) adds a FOURTH category, ``.pdf`` (``%PDF-`` magic
+    bytes). It is ruled in rather than discovered: sketch 236 measured that a signed
+    contract PDF is the likeliest first thing anyone attaches to a chat, and the same
+    phase gives ``execute_code`` reach to these bytes at ``/sandbox/attachments/`` where
+    ``pypdf`` already ships in the sandbox image — so a ``.pdf`` is genuinely USABLE, not
+    merely accepted.
 
     The ``len(raw) > MAX_FILE_SIZE`` DoS/office-bomb guard trips BEFORE any parse
     for EVERY type (T-151-03-02) — the route also pre-checks the declared part
@@ -214,6 +249,11 @@ def validate_upload(filename: str, raw: bytes) -> str:
     if ext in _IMAGE_EXT:
         if not _image_magic_ok(ext, raw):
             raise HTTPException(422, f"File contents do not match a {ext} image")
+        return ext
+    # Phase 244 (SHELL-04 / D-244-24) — the FOURTH category. Same voice as the image branch.
+    if ext in _PDF_EXT:
+        if not _pdf_magic_ok(raw):
+            raise HTTPException(422, f"File contents do not match a {ext} document")
         return ext
     # Unreachable (ext already gated against _ALLOWED_EXT); belt-and-braces.
     raise HTTPException(422, f"Unsupported type {ext}")
@@ -250,18 +290,47 @@ async def upload_template(
     if file.size is not None and file.size > MAX_FILE_SIZE:
         raise HTTPException(422, "File too large. Maximum size is 10 MB.")
     raw = await file.read()
+    return await _persist_workspace_upload(
+        thread_id=thread_id,
+        request=request,
+        current_user=current_user,
+        supabase=supabase,
+        filename=file.filename or "",
+        raw=raw,
+    )
+
+
+async def _persist_workspace_upload(
+    *,
+    thread_id: str,
+    request: Request,
+    current_user: dict,
+    supabase: Client,
+    filename: str,
+    raw: bytes,
+) -> dict:
+    """The ONE writer of an ephemeral ``kind='template_input'`` workspace file.
+
+    ⭐ Phase 244 (SHELL-04 / D-244-05) extracted this from ``upload_template`` so the CLOUD
+    door (``attach_connection_file`` below) cannot drift from the LOCAL one on validation, on
+    the TTL or on filename sanitisation. ⛔ Two writers is how a second door quietly grows a
+    laxer gate; there is one, and both routes call it. Behaviour is byte-identical to the
+    Phase-100 inline version — the caller still owns the pre-read ``file.size`` short-circuit,
+    because only a multipart part declares a size before it is materialised (WR-04).
+    """
     if len(raw) == 0:
         raise HTTPException(422, "File is empty")
     if len(raw) > MAX_FILE_SIZE:
         raise HTTPException(422, "File too large. Maximum size is 10 MB.")
-    ext = validate_upload(file.filename or "", raw)  # D-12/D-09 magic-byte + content gate
+    ext = validate_upload(filename, raw)  # D-12/D-09 magic-byte + content gate
     ttl_hours = (await load_app_settings_async()).template_ttl_hours  # D-05
     expires_at = datetime.now(timezone.utc) + timedelta(hours=ttl_hours)
     # WR-05 (100-REVIEW): sanitize the ORIGINAL filename to validate_path's charset
     # (^/[a-zA-Z0-9._/\- ]+$, no '..') so ordinary names — "Q3 Report (final).docx",
     # "P&L 2026.xlsx", "Übersicht.docx", "report..v2.docx" — don't surface a
     # confusing "invalid path characters" 422 to a user who never typed a path.
-    stem = file.filename or f"template{ext}"
+    # ⚠ Phase 244: a CLOUD provider's filename is equally untrusted, and lands here too.
+    stem = filename or f"template{ext}"
     safe_name = re.sub(r"[^a-zA-Z0-9._\- ]", "_", stem)
     safe_name = re.sub(r"\.{2,}", ".", safe_name).strip() or f"template{ext}"
     path = f"/{uuid4().hex[:8]}-{safe_name}"
@@ -290,6 +359,98 @@ async def upload_template(
     return result
 
 
+@router.post("/files/from-connection")
+async def attach_connection_file(
+    thread_id: str,
+    request: Request,
+    body: WorkspaceConnectionAttachRequest,
+    active_org: str = Depends(get_active_org_id),
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_user_supabase_client),
+):
+    """Attach ONE connected-cloud file to THIS THREAD (Phase 244 / SHELL-04 / D-244-05).
+
+    ⛔ **THIS ROUTE MINTS NO ``documents`` ROW.** It is the un-inversion of `BUG-260905-01`:
+    the composer's cloud door used to call the LIBRARY's single-file import, so a file picked
+    mid-chat was written permanently into the Library root. The bytes now land in
+    ``workspace_files`` under the same 24h TTL read gate as a local attach, and both composer
+    doors mean the same thing — *this conversation* (D-244-05).
+
+    ⭐ It lives HERE, not in ``connectors.py``, and the placement is the guarantee: this module
+    imports neither ``import_single_file`` nor ``ingest_splice``, so *"the chat writes nothing
+    to the KB"* is structural rather than a promise a future edit can quietly break.
+
+    The provider's bytes are untrusted and go through the SAME ``_persist_workspace_upload``
+    the local door uses — ``validate_upload``'s magic-byte / container gate, the 10 MB cap and
+    the filename sanitiser. ⛔ No second, laxer gate for "our own" cloud.
+    """
+    from app.services.sources.import_service import fetch_cloud_file
+
+    await _verify_thread_ownership(thread_id, current_user, supabase)  # 404 on non-owner
+
+    conn = await connector_service.get_connection(
+        connection_id=str(body.connection_id),
+        org_id=str(active_org),
+        supabase=supabase,
+    )
+    if not conn:
+        # D-062-12: absence, not refusal — a 403 would confirm the id names a real row.
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Connection not found")
+
+    try:
+        # ⛔ 244-08 (T-244-06-07 / OPEN-3) — THE CAP GOES IN, IT IS NOT MEASURED ON THE WAY OUT.
+        #
+        # This call used to pass no bound at all, and `_persist_workspace_upload` then applied
+        # `len(raw) > MAX_FILE_SIZE` — a refusal issued AFTER the whole body was resident in a
+        # worker. The declared mitigation for this route reads *"the workspace cap is enforced
+        # before body materialisation"*, and it was not.
+        #
+        # ⚠ THE AUDIT'S "MULTI-GB" FRAMING WAS OVERSTATED AND THE CORRECTION IS RECORDED HERE
+        # RATHER THAN QUIETLY DROPPED: `send_pinned_http` already refused a declared over-cap
+        # `content-length` before reading a byte and abandoned the wire read past `max_bytes`,
+        # and both first-party adapters already passed `source_max_file_bytes()`. So residency
+        # was bounded by the SOURCE ceiling (1-50 MB, default 25), not unbounded — a real gap
+        # of 2.5-5x the declared 10 MB cap. Fixed for its actual size.
+        #
+        # ⚠ A caller can only TIGHTEN: `clamp_read_cap` mins this against the operator ceiling.
+        filename, raw, _mime = await fetch_cloud_file(conn, body.file_id, max_bytes=MAX_FILE_SIZE)
+    # ⚠ BEFORE the broad handler below, exactly as `connectors.py`'s import route orders them
+    # (BUG-260907-03): a disabled connection is not a provider error, and wording it that way
+    # is how a control that failed to stop something reads as the provider's fault.
+    except SourceConnectionDisabled as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"reason_code": "connection_disabled", "message": str(exc)},
+        ) from None
+    except HTTPException:
+        raise
+    # ⛔ OUR OWN SIZE REFUSAL IS NOT THE PROVIDER'S FAULT (244-08). The cap above is enforced
+    # by the transport, which signals it as `EgressResponseTooLarge`; swallowed by the broad
+    # handler below it became `502 Failed to download cloud file`, telling a person their
+    # Drive is broken when their file is simply too big. Same rule `T-244-06-04` closed on,
+    # applied to the guard this round added — and it answers the SAME 422 sentence the local
+    # door does, because the two doors must not word one refusal two ways.
+    except EgressResponseTooLarge:
+        raise HTTPException(422, "File too large. Maximum size is 10 MB.") from None
+    except Exception as exc:
+        logger.error(
+            "Failed to fetch file %s from connection %s: %s", body.file_id, body.connection_id, exc
+        )
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Failed to download cloud file: {exc}",
+        )
+
+    return await _persist_workspace_upload(
+        thread_id=thread_id,
+        request=request,
+        current_user=current_user,
+        supabase=supabase,
+        filename=filename,
+        raw=raw,
+    )
+
+
 # Must-haves export alias: the route handler is named ``upload_template`` to
 # satisfy the Plan 100-01 TDD contract (``from app.api.workspace import
 # upload_template``); ``upload_workspace_template`` is the must_haves export name.
@@ -311,6 +472,13 @@ def _now_iso() -> str:
 async def list_workspace_files(
     thread_id: str,
     prefix: str | None = Query(None, description="Path prefix filter"),
+    include_expired: bool = Query(
+        False,
+        description=(
+            "Include rows past their TTL. For the TRANSCRIPT, which must be able to say a "
+            "file WAS attached. Expired rows stay unreadable — their content route is gated."
+        ),
+    ),
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_user_supabase_client),
 ):
@@ -318,6 +486,30 @@ async def list_workspace_files(
 
     RLS ensures only the thread owner can see files. Returns metadata list
     sorted by path. Optional prefix filter narrows results.
+
+    ── ⛔ ``include_expired`` — Phase 244-08 (T-244-05-05 / OPEN-2) ────────────────────────
+
+    `244-05`'s declared mitigation is *"the chip must say `No longer available`, never
+    disappear."* The chip's `expired` arm was built and was UNREACHABLE AFTER A RELOAD,
+    because this route filtered the row away before the transcript could render it. An
+    attachment therefore vanished from an old conversation — the repudiation the threat names:
+    the transcript stops being able to say what was sent.
+
+    ⭐ A TOMBSTONE, NOT A RESURRECTION, and the difference is enforced elsewhere rather than
+    promised here:
+
+      · the per-file **content** route keeps its expiry gate, so the bytes stay unreachable
+        (404) — a chip a person can still open is the file relabelled, not a tombstone;
+      · the **sandbox hydrator** and the **system-prompt announcement** read a DIFFERENT
+        listing — ``db.workspace.list_files_in_thread``, asyncpg, its own SQL expiry gate with
+        two readers — which this parameter cannot reach and must never grow. `T-244-02-06` is
+        closed on that gate, and `test_244_08_expired_attachment_is_a_tombstone.py` refuses an
+        ``include_expired`` appearing there.
+
+    ⚠ OPT-IN, NEVER A REMOVED GATE. The default answer is byte-identical, so `useResolvedFileId`
+    — which calls this same route to backfill an id — and the panel's own reconcile are
+    untouched. Deleting the filter would have been shorter and would have widened every caller
+    at once, including two that have no use for an expired row.
     """
     await _verify_thread_ownership(thread_id, current_user, supabase)
 
@@ -325,9 +517,17 @@ async def list_workspace_files(
         supabase.table("workspace_files")
         .select("id, path, size_bytes, mime_type, created_at, updated_at, kind, expires_at")
         .eq("thread_id", thread_id)
-        .or_("expires_at.is.null,expires_at.gt." + _now_iso())  # D-06: exclude expired templates; agent files pass
         .order("path")
     )
+    # ⛔ `is not True`, NOT `if not include_expired` — AND THE REASON IS A MEASURED TRAP, not
+    # style. Called as a plain function (as a unit test does), an unsupplied `include_expired`
+    # is the `Query(False)` OBJECT, which is TRUTHY — so `if not include_expired` SKIPPED the
+    # gate on every direct call. FastAPI itself resolves the real `False`, so production was
+    # correct and only the reachable-by-hand path was wrong; this makes the ONLY value that
+    # widens the listing the literal `True`, so anything else fails CLOSED.
+    if include_expired is not True:
+        # D-06: exclude expired templates; agent files (NULL expiry) pass either way.
+        query = query.or_("expires_at.is.null,expires_at.gt." + _now_iso())
     if prefix:
         query = query.like("path", f"{prefix}%")
     resp = await aexec(query)

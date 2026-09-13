@@ -542,6 +542,11 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
   // where one check failed and the next recovered arrives as an empty array and signals
   // nothing (SC#4).
   const showAttention = attentionCount > 0 && Boolean(onOpenLibraryHealth)
+  // Phase 244 plan 04 (SHELL-05 · BUG-260911-03): a FOURTH renderer hangs off the SAME one
+  // read — the Library's own tab strip. ⛔ The conditions travel DOWN as data (see the mount
+  // below); nothing here calls `useSourceAttention()` and neither does the page, because arm 1
+  // of `attentionConditions.ts`'s re-open trigger is a third concurrent reader. The shell says
+  // THAT something needs attention; the tab strip says WHERE.
 
   return (
     <div className="flex h-screen bg-background">
@@ -786,14 +791,22 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
         // Phase 087-08: nav-style 2-state track — clamp(...) when open, 52px when
         // rail. NO 0 column: the rail is always present, so the panel is always
         // reopenable by mouse (incl. the empty/welcome screen).
+        //
+        // Phase 244-01 (SHELL-01 / BUG-260828-08): `min-h-0` here and on <main> below are
+        // links 2 and 3 of a FOUR-link chain (ChatArea.tsx and MessageList.tsx carry 4 and
+        // 5). A flex item's min-height defaults to `auto`, so `flex-1` alone does NOT bound
+        // this track: it grew to the whole transcript, the PAGE ROOT scrolled instead of the
+        // message list, and the nav rail travelled with it. Shipped analog copied rather than
+        // invented: DocumentDetailPanel.tsx:257/300. Pinned by
+        // layout/__tests__/ChatLayout.scrollFrame.test.tsx.
         <div
-          className="grid min-w-0 flex-1 overflow-hidden motion-safe:transition-[grid-template-columns] motion-safe:duration-300"
+          className="grid min-w-0 min-h-0 flex-1 overflow-hidden motion-safe:transition-[grid-template-columns] motion-safe:duration-300"
           style={{
             gridTemplateColumns:
               "1fr " + (panelState === "open" ? "clamp(300px,30%,420px)" : "52px"),
           }}
         >
-          <main className="min-w-0 overflow-hidden">
+          <main className="min-w-0 min-h-0 overflow-hidden">
             <ChatArea
               thread={selectedThread}
               onCreateThread={newThread}
@@ -836,7 +849,7 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
               `undefined` on every ordinary entry, so the Library keeps its own default; it
               is set only by App's `handleOpenLibraryHealth`. */}
           {activeView === "documents" ? (
-            <LibraryPage onNavigate={onNavigate} initialTab={libraryTab} />
+            <LibraryPage onNavigate={onNavigate} initialTab={libraryTab} attentionConditions={attentionConditions} />
           ) : activeView === "skills" ? (
             <SkillsPage
               onTryInChat={handleTryInChat}

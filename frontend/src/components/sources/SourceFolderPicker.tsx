@@ -20,6 +20,11 @@ import {
 import { browseSourceFolders, type SourceNode } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+// ⭐ BUG-260912-01 — the SAME vocabulary the Library's source surfaces read. A browse failure
+// and a watch failure are the same fact about the same connection, so they must not acquire
+// two different sentences; and `sourceFailureSentence` is also what keeps a provider's raw
+// dict off this screen (it passes a string through only on positive proof of plainness).
+import { sourceFailureSentence } from "./sourceHealthVocabulary"
 
 export interface SelectedFolder {
   folderId: string
@@ -30,6 +35,10 @@ export interface SelectedFolder {
 
 export interface SourceFolderPickerProps {
   connectionId: string
+  /** ⭐ BUG-260912-01 — the connection's display name, used ONLY to name it in a failure
+   *  sentence. Optional: `sourceFailureSentence` degrades to "the connection" rather than
+   *  printing a gap, so a caller that does not have the name still gets a true sentence. */
+  connectionName?: string
   selectedFolderId?: string | null
   onSelectFolder?: (folder: SelectedFolder) => void
   className?: string
@@ -43,8 +52,13 @@ interface TreeNodeProps {
   expandedIds: Set<string>
   childrenMap: Record<string, SourceNode[]>
   loadingMap: Record<string, boolean>
+  /** ⭐ BUG-260912-01 — PER NODE, never one shared string. A folder that could not be read
+   *  says so on its own row; its siblings are unaffected and keep their own outcome. A single
+   *  shared `error` would make one recoverable fault look like a whole-connection one. */
+  errorMap: Record<string, string>
   parentDriveName?: string | null
   onToggleExpand: (node: SourceNode) => void
+  onRetryChildren: (node: SourceNode) => void
   onSelect: (node: SourceNode, driveName?: string | null) => void
 }
 
@@ -56,13 +70,16 @@ function TreeNode({
   expandedIds,
   childrenMap,
   loadingMap,
+  errorMap,
   parentDriveName,
   onToggleExpand,
+  onRetryChildren,
   onSelect,
 }: TreeNodeProps) {
   const isExpanded = expandedIds.has(node.id)
   const isLoading = !!loadingMap[node.id]
   const children = childrenMap[node.id] || []
+  const childError = errorMap[node.id]
   const isSelected = selectedFolderId === node.id
 
   const isDrive = node.kind === "drive"
@@ -125,7 +142,34 @@ function TreeNode({
       {/* Render children recursively when expanded */}
       {isExpanded && (
         <div role="group" className="flex flex-col">
-          {children.length === 0 && !isLoading ? (
+          {/* ── ⭐ BUG-260912-01 — ASKED FIRST, AND THE ORDER IS THE WHOLE FIX ──────────
+              A load that FAILED and a folder that is EMPTY are different facts, and the
+              empty-state below is a claim about the user's drive. Rendering it from a
+              request that never got an answer is how a rejected client secret came to read
+              as "No subfolders" — a person believed their Drive was empty, reconnected
+              twice, and the real cause was only recoverable from a script. */}
+          {childError ? (
+            <div
+              className="flex items-start gap-1.5 py-1.5 pr-2 text-xs text-destructive"
+              style={{ paddingLeft: `${(depth + 1) * 16 + 24}px` }}
+              data-testid={`folder-children-error-${node.id}`}
+              role="alert"
+            >
+              <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+              <span className="flex-1">{childError}</span>
+              <button
+                type="button"
+                className="shrink-0 underline underline-offset-2 hover:no-underline"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onRetryChildren(node)
+                }}
+                data-testid={`folder-children-retry-${node.id}`}
+              >
+                Retry
+              </button>
+            </div>
+          ) : children.length === 0 && !isLoading ? (
             <div
               className="py-1 text-xs text-muted-foreground italic"
               style={{ paddingLeft: `${(depth + 1) * 16 + 24}px` }}
@@ -143,8 +187,10 @@ function TreeNode({
                 expandedIds={expandedIds}
                 childrenMap={childrenMap}
                 loadingMap={loadingMap}
+                errorMap={errorMap}
                 parentDriveName={currentDriveName}
                 onToggleExpand={onToggleExpand}
+                onRetryChildren={onRetryChildren}
                 onSelect={onSelect}
               />
             ))
@@ -157,6 +203,7 @@ function TreeNode({
 
 export function SourceFolderPicker({
   connectionId,
+  connectionName,
   selectedFolderId,
   onSelectFolder,
   className,
@@ -165,8 +212,25 @@ export function SourceFolderPicker({
   const [childrenMap, setChildrenMap] = useState<Record<string, SourceNode[]>>({})
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const [loadingMap, setLoadingMap] = useState<Record<string, boolean>>({})
+  const [errorMap, setErrorMap] = useState<Record<string, string>>({})
   const [loadingRoots, setLoadingRoots] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
+
+  /** ⭐ BUG-260912-01 — ONE place turns a thrown thing into a sentence a person may read.
+   *
+   *  ⛔ It goes through the shared vocabulary rather than rendering `err.message`. The
+   *  backend's browse route appends the provider's own words to its sentence, and on the
+   *  2026-09-12 measurement those words were a JSON dict carrying an OAuth error code. The
+   *  vocabulary passes a string through only on POSITIVE proof of plainness, so the worst
+   *  case here is the honest fallback rather than a leak. */
+  const asSentence = useCallback(
+    (err: unknown): string =>
+      sourceFailureSentence(
+        err instanceof Error ? err.message : typeof err === "string" ? err : null,
+        connectionName ?? "",
+      ),
+    [connectionName],
+  )
 
   const fetchRoots = useCallback(async () => {
     if (!connectionId) return
@@ -176,16 +240,44 @@ export function SourceFolderPicker({
       const resp = await browseSourceFolders(connectionId)
       setRoots(resp.items || [])
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Failed to browse root folders"
-      setError(message)
+      setError(asSentence(err))
     } finally {
       setLoadingRoots(false)
     }
-  }, [connectionId])
+  }, [connectionId, asSentence])
 
   useEffect(() => {
     fetchRoots()
   }, [fetchRoots])
+
+  /** Load one node's children, recording the OUTCOME either way.
+   *
+   *  ⭐ BUG-260912-01 — the `catch` used to `console.error` and set nothing, which left
+   *  `childrenMap[id]` undefined. The renderer read that as `[]` and printed "No subfolders":
+   *  a claim about the user's drive, manufactured from a request that never got an answer.
+   *  Every exit from this function now writes either children or a reason. */
+  const loadChildren = useCallback(
+    async (node: SourceNode) => {
+      setLoadingMap((prev) => ({ ...prev, [node.id]: true }))
+      setErrorMap((prev) => {
+        if (!(node.id in prev)) return prev
+        const next = { ...prev }
+        delete next[node.id]
+        return next
+      })
+      try {
+        const resp = await browseSourceFolders(connectionId, node.id)
+        setChildrenMap((prev) => ({ ...prev, [node.id]: resp.items || [] }))
+      } catch (err: unknown) {
+        // ⚠ The log line stays — it carries the detail the sentence deliberately does not.
+        console.error(`Failed to load children for folder ${node.id}`, err)
+        setErrorMap((prev) => ({ ...prev, [node.id]: asSentence(err) }))
+      } finally {
+        setLoadingMap((prev) => ({ ...prev, [node.id]: false }))
+      }
+    },
+    [connectionId, asSentence],
+  )
 
   const handleToggleExpand = async (node: SourceNode) => {
     const nextExpanded = new Set(expandedIds)
@@ -198,17 +290,11 @@ export function SourceFolderPicker({
     nextExpanded.add(node.id)
     setExpandedIds(nextExpanded)
 
-    // Load child folders if not already loaded
+    // Load child folders if not already loaded. ⚠ A node that FAILED has no entry in
+    // `childrenMap`, so it is re-asked on a later expand — which is the honest behaviour:
+    // nothing was ever learned about it.
     if (!childrenMap[node.id]) {
-      setLoadingMap((prev) => ({ ...prev, [node.id]: true }))
-      try {
-        const resp = await browseSourceFolders(connectionId, node.id)
-        setChildrenMap((prev) => ({ ...prev, [node.id]: resp.items || [] }))
-      } catch (err: unknown) {
-        console.error(`Failed to load children for folder ${node.id}`, err)
-      } finally {
-        setLoadingMap((prev) => ({ ...prev, [node.id]: false }))
-      }
+      await loadChildren(node)
     }
   }
 
@@ -277,8 +363,10 @@ export function SourceFolderPicker({
           expandedIds={expandedIds}
           childrenMap={childrenMap}
           loadingMap={loadingMap}
+          errorMap={errorMap}
           parentDriveName={rootNode.kind === "drive" ? rootNode.name : null}
           onToggleExpand={handleToggleExpand}
+          onRetryChildren={loadChildren}
           onSelect={handleSelect}
         />
       ))}

@@ -1237,18 +1237,43 @@ async def get_thread_workflow(
     cap_paused = run_status == "cap_paused"
     continues_used = wf_continues_used
     if not cap_paused:
-        # Look at the thread's latest cap_paused `runs` row (Deep-run Continue case).
+        # ── Phase 244-03 (SHELL-02 / BUG-260904-05 / C-2 arm b) — BOUNDED TO THE THREAD'S
+        #    LATEST RUN. The pause belongs to the latest run or it belongs to nobody.
+        #
+        # ⛔ THE SHIPPED READ WAS UNBOUNDED IN TIME, and that is the whole defect. It read
+        # `WHERE thread_id = $1 AND status = 'cap_paused' ORDER BY started_at DESC LIMIT 1`
+        # — filtering BEFORE ordering, so a newer run row was invisible to it. Measured:
+        #   · `POST /threads/{id}/messages` (:728) has NO cap_paused refusal. It mints a
+        #     NEW `runs` row (`run_id = uuid4()` at :873 -> `register_run_start` at :899)
+        #     and writes NOTHING to the previous row.
+        #   · The ONLY writer that clears `status='cap_paused'` anywhere in the backend is
+        #     `continue_run` — `app/api/runs.py:1082-1086`.
+        # => the stale paused row survived every later message, this endpoint kept answering
+        # `cap_paused: true`, and `ChatArea.tsx:184` re-applied the composer lock on every
+        # reconcile. FOREVER, on that thread. Unlocking the composer client-side alone would
+        # have shipped the same defect one level down: type, send, reload, locked again.
+        #
+        # ⛔ THE REJECTED ARM, recorded with its reason rather than left silent: retiring the
+        # row server-side when a new run starts would add a SECOND writer of `runs.status`
+        # beside `continue_run`. Two writers of one status column is how `runs:active` and
+        # `runs.status` drift — the failure Phase 145 / D-149-09 made one atomic co-write to
+        # prevent. This block stays a PURE READ; it adds no writer.
+        #
+        # ⚠ It does not strand a continuable run: `continue_run` resolves its row BY
+        # `run_id` (`.eq("run_id", str(run_id))`), never by scanning for the status, so an
+        # older paused row stops being REPORTED and stays RESUMABLE. Asserted in
+        # `tests/unit/test_244_cap_paused_lock_bound.py`.
         deep_row = await _rls_fetchrow(
             """
             SELECT run_id, status, continues_used
             FROM runs
-            WHERE thread_id = $1 AND status = 'cap_paused'
+            WHERE thread_id = $1
             ORDER BY started_at DESC
             LIMIT 1
             """,
             UUID(thread_id) if isinstance(thread_id, str) else thread_id,
         )
-        if deep_row is not None:
+        if deep_row is not None and deep_row["status"] == "cap_paused":
             cap_paused = True
             continues_used = deep_row["continues_used"] or 0
             if latest_producer_run_id is None and deep_row["run_id"] is not None:

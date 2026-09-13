@@ -21,6 +21,7 @@ from app.services.sources.base import (
     SourceHealth,
     SourceNode,
     SourceRegistry,
+    clamp_read_cap,
 )
 
 
@@ -161,8 +162,18 @@ class MockSourceAdapter(SourceAdapter):
         self,
         connection: Any,
         file_id: str,
+        max_bytes: int | None = None,
     ) -> tuple[str, bytes, str]:
-        """Return mock file bytes and metadata."""
+        """Return mock file bytes and metadata.
+
+        ⚠ ``max_bytes`` is ACCEPTED AND NOT ENFORCED, said plainly rather than left to be
+        inferred (244-08). This adapter synthesises its own bytes from an in-memory dict — it
+        has no transport, so there is nothing for a cap to bound and a clamp here would only
+        pretend to be the guard the real families carry. It is in the signature because the
+        contract declares it; a fixture that silently dropped the kwarg would make every
+        conformance case pass over an adapter that does not implement the contract.
+        """
+        _ = clamp_read_cap(max_bytes)  # contract-shaped no-op; see the docstring above
         if file_id in self._file_contents:
             return self._file_contents[file_id]
 

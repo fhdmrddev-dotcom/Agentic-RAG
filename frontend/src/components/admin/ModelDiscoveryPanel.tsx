@@ -27,6 +27,9 @@ import { AlertTriangle, Check, Loader2, RefreshCw, ShieldCheck } from "lucide-re
 
 import {
   DISCOVERY_UNKNOWN,
+  isWithinModelCapBounds,
+  MODEL_CAP_INT_BOUNDS,
+  type DiscoveryConfirmReport,
   type DiscoveryResult,
   type ModelCapabilityPatch,
 } from "@/lib/api"
@@ -38,8 +41,15 @@ interface ModelDiscoveryPanelProps {
   /** Fan out to each provider's /models and return the ephemeral propose-only diff. */
   onRunDiscovery: () => Promise<DiscoveryResult>
   /** Apply the operator's confirmed changes (the shell routes each to setModelCapability
-   *  per model, then re-fetches the registry + pulses the receipt). */
-  onConfirm: (changes: Array<{ modelId: string; patch: ModelCapabilityPatch }>) => Promise<void>
+   *  per model, then re-fetches the registry + pulses the receipt).
+   *
+   *  ⚠ RESOLVES WITH A REPORT, NEVER JUST `void`. Confirming is N independent writes and the
+   *  server refuses some of them by design (the no-dead-default 409, an out-of-range 422). The
+   *  shell attempts every one and reports what landed; this panel renders that report. A
+   *  confirm that "succeeded" while dropping half the batch is the failure this replaces. */
+  onConfirm: (
+    changes: Array<{ modelId: string; patch: ModelCapabilityPatch }>,
+  ) => Promise<Omit<DiscoveryConfirmReport, "droppedValues">>
   /** Phase 159 (D-159-04): the persisted, default-on suitability filter state (read by the
    *  shell from app_settings `model_discovery_filter_enabled`). DISPLAY-ONLY — when true,
    *  known non-chat "utility" `new` models are hidden; it NEVER mutates the confirmable diff
@@ -128,6 +138,10 @@ export function ModelDiscoveryPanel({
   const [confirming, setConfirming] = useState(false)
   const [confirmError, setConfirmError] = useState<string | null>(null)
   const [applied, setApplied] = useState(false)
+  // What the last confirm ACTUALLY did — kept whether it fully succeeded or partly failed, and
+  // rendered in both places (beside the idle "Run discovery" button, and in the sticky confirm
+  // bar when the diff is still on screen). Cleared when a new run starts.
+  const [report, setReport] = useState<DiscoveryConfirmReport | null>(null)
 
   // D-159-04: an EPHEMERAL per-view "Show all" reveal (default off, reset on each run). It
   // reveals the utility models hidden by the persisted filter WITHOUT changing the persisted
@@ -157,6 +171,8 @@ export function ModelDiscoveryPanel({
     setPhase("running")
     setRunError(null)
     setApplied(false)
+    setReport(null)
+    setConfirmError(null)
     try {
       const res = await onRunDiscovery()
       setResult(res)
@@ -214,9 +230,37 @@ export function ModelDiscoveryPanel({
     return Number.isFinite(n) ? n : undefined
   }
 
-  function buildChanges(): Array<{ modelId: string; patch: ModelCapabilityPatch }> {
-    if (!result) return []
+  /** Out-of-range PROVIDER-RETURNED values are dropped from the patch, and counted.
+   *
+   *  ⚠ MEASURED, NOT HYPOTHETICAL: OpenRouter returns `x-ai/grok-4.20` and
+   *  `x-ai/grok-4.20-multi-agent` with `max_output = 1,800,000`, over the server's 1,000,000
+   *  ceiling, so `PATCH /admin/models/{id}` 422s them. They land at index ~229 of a 490-model
+   *  run — one "Select all" used to lose every model after them.
+   *
+   *  DROPPED, NOT CLAMPED. A clamp would write `1,000,000` — a number the provider never said,
+   *  indistinguishable afterwards from a measured one, and load-bearing at request time. The
+   *  field is simply left unset (the honest "unknown — you set it" state the whole panel is
+   *  built around); the model itself is still written. An OPERATOR-TYPED value is deliberately
+   *  NOT filtered here: a human who types a number is entitled to the server's own refusal,
+   *  naming the bound, rather than having their input silently discarded.
+   *  Returns the count so `confirm()` can say so out loud. */
+  function applyProviderValue(
+    patch: ModelCapabilityPatch,
+    col: keyof ModelCapabilityPatch,
+    value: number | boolean | string,
+  ): boolean {
+    if (typeof value === "number" && !isWithinModelCapBounds(col, value)) return false
+    Object.assign(patch, { [col]: value })
+    return true
+  }
+
+  function buildChanges(): {
+    changes: Array<{ modelId: string; patch: ModelCapabilityPatch }>
+    droppedValues: number
+  } {
+    if (!result) return { changes: [], droppedValues: 0 }
     const changes: Array<{ modelId: string; patch: ModelCapabilityPatch }> = []
+    let droppedValues = 0
 
     for (const m of result.new) {
       if (!accepted.has(m.model_id)) continue
@@ -225,10 +269,11 @@ export function ModelDiscoveryPanel({
         const col = COL_FOR.get(field)
         if (!col) continue
         if (!isUnknown(value)) {
-          Object.assign(patch, { [col]: value })
+          if (!applyProviderValue(patch, col, value)) droppedValues += 1
         } else {
           const d = drafts[m.model_id]?.[field]
           const c = d != null && d.trim() !== "" ? coerce(field, d) : undefined
+          // Operator-typed: sent as-is, so the server answers with its own bound if it refuses.
           if (c !== undefined) Object.assign(patch, { [col]: c })
         }
       }
@@ -242,9 +287,12 @@ export function ModelDiscoveryPanel({
       const patch: ModelCapabilityPatch = {}
       for (const [field, ch] of Object.entries(m.changes)) {
         const col = COL_FOR.get(field)
-        if (col) Object.assign(patch, { [col]: ch.to })
+        if (col && !applyProviderValue(patch, col, ch.to)) droppedValues += 1
       }
-      changes.push({ modelId: m.model_id, patch })
+      // A `changed` row whose ONLY difference was an out-of-range value now carries an empty
+      // patch. Sending it is a documented server no-op ("nothing to change"), but it costs a
+      // round trip and reads as a change that happened — so it is dropped from the batch.
+      if (Object.keys(patch).length > 0) changes.push({ modelId: m.model_id, patch })
     }
 
     for (const m of result.vanished) {
@@ -253,27 +301,50 @@ export function ModelDiscoveryPanel({
       else if (d === "disable") changes.push({ modelId: m.model_id, patch: { enabled: false } })
     }
 
-    return changes
+    return { changes, droppedValues }
   }
 
   async function confirm() {
     if (confirming) return
     setConfirming(true)
     setConfirmError(null)
+    const { changes, droppedValues } = buildChanges()
     try {
-      await onConfirm(buildChanges())
-      // Ephemeral: the proposals are discarded once applied (D-149-12).
-      setApplied(true)
-      setResult(null)
-      setPhase("idle")
+      const outcome = await onConfirm(changes)
+      // ⚠ NORMALIZE, never trust the shape. `onConfirm` used to resolve `void`, and a handler
+      // still written to that contract (an older shell, a test double) resolves `undefined` —
+      // destructuring `failures` straight off it throws inside the report card, turning a
+      // SUCCESSFUL confirm into a render crash. A resolve-without-throw under the old contract
+      // meant every write landed, so that is what an absent report is read as; a partial apply
+      // is only ever claimed on a report that actually says so.
+      const applied =
+        typeof outcome?.applied === "number" ? outcome.applied : changes.length
+      const failures = Array.isArray(outcome?.failures) ? outcome.failures : []
+      const full: DiscoveryConfirmReport = { applied, failures, droppedValues }
+      setReport(full)
+      if (failures.length > 0) {
+        // ⚠ THE DIFF IS KEPT WHEN ANYTHING WAS REFUSED. Discarding it would destroy the only
+        // record of what the operator had selected, and a refusal is often actionable (fill a
+        // capability, pick a different default) — they should be able to fix and re-confirm
+        // without re-running a 30-second fan-out. Already-applied models are simply written
+        // again on a retry; PATCH is idempotent.
+        setConfirmError(null)
+      } else {
+        // Ephemeral: the proposals are discarded once fully applied (D-149-12).
+        setApplied(true)
+        setResult(null)
+        setPhase("idle")
+      }
     } catch {
+      // The shell itself threw — no per-model outcome exists, so claim nothing about counts.
       setConfirmError("Couldn’t apply the changes — try again.")
     } finally {
       setConfirming(false)
     }
   }
 
-  const changeCount = result ? buildChanges().length : 0
+  const built = result ? buildChanges() : { changes: [], droppedValues: 0 }
+  const changeCount = built.changes.length
 
   // D-159-04: the default-on suitability filter is a DISPLAY concern over `result.new` only.
   // It NEVER touches accepted / enableNow / drafts / buildChanges — `changeCount` above is
@@ -355,6 +426,7 @@ export function ModelDiscoveryPanel({
               {runError}
             </div>
           )}
+          {report && <ConfirmReportCard report={report} />}
         </div>
       )}
 
@@ -518,6 +590,10 @@ export function ModelDiscoveryPanel({
             </DiffGroup>
           )}
 
+          {/* The outcome of the last confirm, shown ABOVE the bar while the diff is still up —
+              this is the state a partial apply lands in, and it must not be a one-line error. */}
+          {report && <ConfirmReportCard report={report} />}
+
           {/* Sticky confirm bar. */}
           <div className="sticky bottom-0 flex flex-wrap items-center gap-3 rounded-[12px] border border-border bg-background/95 px-4 py-3 backdrop-blur">
             <span className="text-sm text-foreground">
@@ -525,6 +601,16 @@ export function ModelDiscoveryPanel({
               <span className="ml-2 text-xs text-muted-foreground">
                 {result.new.length} new · {result.changed.length} changed · {result.vanished.length} vanished
               </span>
+              {built.droppedValues > 0 && (
+                <span
+                  className="ml-2 text-xs text-warning"
+                  data-testid="dropped-values-note"
+                  title={`A provider returned a value outside the range this deployment accepts (context ${MODEL_CAP_INT_BOUNDS.context_window_tokens[1].toLocaleString("en-US")} max, max out ${MODEL_CAP_INT_BOUNDS.max_output_tokens[1].toLocaleString("en-US")} max). The model is still written; that one field stays unset rather than being clamped to a number the provider never gave.`}
+                >
+                  · {built.droppedValues} out-of-range value
+                  {built.droppedValues === 1 ? "" : "s"} will be left unset
+                </span>
+              )}
             </span>
             <span className="flex-1" />
             {confirmError && (
@@ -555,6 +641,73 @@ export function ModelDiscoveryPanel({
         </div>
       )}
     </section>
+  )
+}
+
+/** What the last confirm run actually did — applied count, every refusal with the server's own
+ *  reason, and any provider value dropped for being out of range.
+ *
+ *  ⚠ THE COUNT IS THE POINT. The failure this replaces was a batch that stopped at the first
+ *  refusal and reported "Couldn't apply the changes" — a sentence equally true of 0 applied and
+ *  488 applied. A partial apply must say how partial it was, and name the models, or the
+ *  operator's only way to find out is to go looking for models that are not there. */
+function ConfirmReportCard({ report }: { report: DiscoveryConfirmReport }) {
+  const { applied, failures, droppedValues } = report
+  const clean = failures.length === 0
+  return (
+    <div
+      role="status"
+      data-testid="confirm-report"
+      className={cn(
+        "space-y-1.5 rounded-md border px-3.5 py-2.5 text-xs",
+        clean ? "border-success/30 bg-success/[0.06]" : "border-warning/40 bg-warning/[0.06]",
+      )}
+    >
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        {clean ? (
+          <Check className="h-3.5 w-3.5 flex-none text-success" aria-hidden="true" />
+        ) : (
+          <AlertTriangle className="h-3.5 w-3.5 flex-none text-warning" aria-hidden="true" />
+        )}
+        <span className="font-medium text-foreground">
+          Applied {applied} change{applied === 1 ? "" : "s"}
+        </span>
+        {failures.length > 0 && (
+          <span className="font-medium text-warning">
+            · {failures.length} refused by the server
+          </span>
+        )}
+        {applied > 0 && <span className="text-warning">· ✎ recorded</span>}
+      </div>
+
+      {failures.length > 0 && (
+        <ul className="space-y-0.5 pl-5">
+          {failures.map((f) => (
+            <li key={f.modelId} className="text-muted-foreground">
+              <span className="font-mono text-[11px] text-foreground">{f.modelId}</span>
+              {" — "}
+              {f.reason}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {droppedValues > 0 && (
+        <p className="pl-5 text-muted-foreground">
+          {droppedValues} provider value{droppedValues === 1 ? " was" : "s were"} outside the range
+          this deployment accepts and{" "}
+          <span className="font-medium text-foreground">left unset</span> — the model is written,
+          the field is not guessed. Set it by hand in the table above.
+        </p>
+      )}
+
+      {failures.length > 0 && (
+        <p className="pl-5 text-muted-foreground/80">
+          The proposals are still on screen — fix what you can and confirm again. Re-confirming is
+          safe; the models that already applied are simply written again.
+        </p>
+      )}
+    </div>
   )
 }
 

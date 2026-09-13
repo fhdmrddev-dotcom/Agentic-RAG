@@ -38,6 +38,11 @@ vi.mock("@/lib/supabase", () => ({
 // ── Mock the sole StreamsProvider dependency: no workflow lock on this thread ──
 vi.mock("@/providers/StreamsProvider", () => ({
   useWorkflowLockForThread: () => null,
+  // ⚠ Phase 244 (244-05 T3): two more PURE store selectors are read by `MessageItem` for
+  // D-244-22's sent-attachment chip. A partial mock factory leaves them `undefined` and the
+  // component throws AT MOUNT — the `196-08` failure mode. Declared, not worked around.
+  useWorkspaceFilesSnapshot: () => [],
+  usePrecedingUserTurns: () => "|",
 }))
 
 import { MessageItem } from "../MessageItem"

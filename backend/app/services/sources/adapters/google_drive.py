@@ -13,7 +13,6 @@ import logging
 from typing import Any
 from uuid import UUID
 
-from app.models.user_settings import source_max_file_bytes
 from app.security.egress import send_pinned_http
 from app.services.oauth_refresh_service import get_fresh_access_token
 from app.services.sources.base import (
@@ -24,6 +23,7 @@ from app.services.sources.base import (
     SourceHealth,
     SourceNode,
     SourceRegistry,
+    clamp_read_cap,
 )
 # Phase 240 (D-240-01 / D-240-03) — MAIL IS A SHAPE THIS ADAPTER CARRIES, NOT A FOURTH ADAPTER.
 # The Gmail mailbox IS this connection: one row, one token, one consent, one place to revoke
@@ -305,12 +305,22 @@ class GoogleDriveSourceAdapter(SourceAdapter):
         self,
         connection: Any,
         file_id: str,
+        max_bytes: int | None = None,
     ) -> tuple[str, bytes, str]:
-        """Download file content, exporting Google Docs/Sheets to PDF."""
+        """Download file content, exporting Google Docs/Sheets to PDF.
+
+        ``max_bytes`` (244-08 / T-244-06-07) tightens the operator ceiling for THIS read and
+        is handed to the transport, which refuses a declared over-cap ``content-length``
+        before a byte is read and abandons the wire read past the cap. That is what makes the
+        chat door's *"enforced before body materialisation"* true rather than aspirational.
+        """
         token = await self._get_auth_token(connection)
+        cap = clamp_read_cap(max_bytes)
 
         if mail.is_mail_file(file_id):
-            return await mail.gmail.read_message(token, mail.strip_file_prefix(file_id))
+            return await mail.gmail.read_message(
+                token, mail.strip_file_prefix(file_id), max_bytes=cap
+            )
 
         headers = {"Authorization": f"Bearer {token}"}
 
@@ -345,7 +355,7 @@ class GoogleDriveSourceAdapter(SourceAdapter):
                 params={"mimeType": "application/pdf"},
                 headers=headers,
                 timeout=30.0,
-                max_bytes=source_max_file_bytes(),
+                max_bytes=cap,
             )
             if export_resp.status_code != 200:
                 reason = _google_error_reason(export_resp.body)
@@ -360,7 +370,7 @@ class GoogleDriveSourceAdapter(SourceAdapter):
             params={"alt": "media", "supportsAllDrives": "true"},
             headers=headers,
             timeout=30.0,
-            max_bytes=source_max_file_bytes(),
+            max_bytes=cap,
         )
         if dl_resp.status_code != 200:
             reason = _google_error_reason(dl_resp.body)

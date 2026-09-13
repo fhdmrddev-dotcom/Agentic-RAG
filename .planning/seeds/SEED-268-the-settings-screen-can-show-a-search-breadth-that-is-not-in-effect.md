@@ -3,11 +3,12 @@ seed_id: SEED-268
 title: The Settings screen can show a search breadth that is not in effect — the no-op shortcut compares against a hardcoded 40 the server may not have
 created: 2026-09-10
 planted_during: Phase 241 (QUEUE-06) — raised by 241-REVIEW.md WR-06, left OPEN at the phase close
-status: planted
+status: folded          # folded_into v4.1 (RECALL-02) at /gsd:new-milestone 2026-09-11
+folded_into: "v4.1"
+
 priority: medium
 surface: Agentic-RAG
 severity: minor    # Nothing is unsafe. A number is displayed that may not be the one in force.
-folded_into: null
 relates_to:
   - `backend/app/services/retrieval_tuning.py` — `_SERVER_DEFAULT_EF_SEARCH = 40` and the
     `if resolved_ef != _SERVER_DEFAULT_EF_SEARCH:` no-op shortcut.
@@ -80,3 +81,7 @@ has been OWED since Phase 231 and Phase 241 was the deliberate SECOND landing; t
 `retrieval_tuning.py`, which is where it already is.
 
 Related: [[SEED-076]], [[SEED-267]].
+
+## Resolution Note (Phase 246)
+Fixed in Phase 246 via dynamic server probe with a 60-second TTL cache (`get_server_ef_search`).
+Consequence: For up to 60 seconds after an operator retunes Postgres via `ALTER SYSTEM` or `ALTER DATABASE`, the screen can still show a breadth that is not in force until the cache expires. This replaces an unbounded desync window with a bounded 60-second TTL.

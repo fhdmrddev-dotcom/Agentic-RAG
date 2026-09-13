@@ -48,6 +48,7 @@ measurement rather than a prerequisite.
 from __future__ import annotations
 
 import logging
+import time
 
 import asyncpg
 
@@ -64,6 +65,86 @@ logger = logging.getLogger(__name__)
 #: equal to these is a no-op — see the module docstring.
 _SERVER_DEFAULT_EF_SEARCH = 40
 _SERVER_DEFAULT_ITERATIVE_SCAN = "off"
+
+#: Phase 246 (RECALL-02 / D-246-05) — 60s TTL cache prevents staleness from ALTER SYSTEM / ALTER DATABASE.
+_SERVER_EF_CACHE_TTL = 60.0
+_server_ef_cache: tuple[int | None, float] | None = None
+
+
+def _reset_server_ef_cache() -> None:
+    """Reset the server ef_search cache (for tests)."""
+    global _server_ef_cache
+    _server_ef_cache = None
+
+
+def _set_server_ef_cache(value: int | None, ttl: float = _SERVER_EF_CACHE_TTL) -> None:
+    """Explicitly set the server ef_search cache (for tests)."""
+    global _server_ef_cache
+    _server_ef_cache = (value, time.monotonic() + ttl)
+
+
+async def get_server_ef_search(
+    conn=None,
+    *,
+    pool=None,
+    force_refresh: bool = False,
+) -> int | None:
+    """Probe the Postgres server's active hnsw.ef_search setting with a 60s TTL cache.
+
+    Invariant (Finding 2a / D-246-05):
+    Probes outside request transactions (via pool.fetchval on a clean connection) so that
+    transaction-scoped SET LOCAL on a borrower cannot poison the cached server default.
+
+    Returns:
+        int | None: The server's ef_search if configured/supported, or None if pgvector
+        is not loaded or the GUC is unrecognized (Finding 2b / D-246-05).
+    """
+    global _server_ef_cache
+    now = time.monotonic()
+    if not force_refresh and _server_ef_cache is not None:
+        cached_val, expire_at = _server_ef_cache
+        if now < expire_at:
+            return cached_val
+
+    probed_val: int | None = None
+    query = "SELECT current_setting('hnsw.ef_search', true)"
+
+    try:
+        raw = None
+        if pool is not None:
+            raw = await pool.fetchval(query)
+        elif conn is not None and not (hasattr(conn, "is_in_transaction") and conn.is_in_transaction()):
+            if hasattr(conn, "fetchval"):
+                raw = await conn.fetchval(query)
+            elif hasattr(conn, "fetch"):
+                rows = await conn.fetch(query)
+                if rows and len(rows[0]) > 0:
+                    raw = rows[0][0]
+        else:
+            try:
+                from app.dependencies import get_pg_pool
+                p = await get_pg_pool()
+                if p is not None:
+                    raw = await p.fetchval(query)
+            except Exception:
+                raw = None
+
+        if raw is not None and str(raw).strip() != "":
+            probed_val = int(raw)
+        else:
+            probed_val = None
+    except (
+        asyncpg.exceptions.UndefinedObjectError,
+        asyncpg.exceptions.InvalidParameterValueError,
+    ):
+        probed_val = None
+    except Exception as exc:
+        logger.warning("Failed to probe hnsw.ef_search setting: %s", exc)
+        probed_val = None
+
+    _server_ef_cache = (probed_val, now + _SERVER_EF_CACHE_TTL)
+    return probed_val
+
 
 #: ⛔ Errors that mean *"this server cannot do this tuning"* rather than *"this search failed"*.
 #: `UndefinedObjectError` is what a pre-0.8 pgvector raises for `hnsw.iterative_scan`;
@@ -124,36 +205,45 @@ async def apply_hnsw_session_knobs(
             including a value hand-written into the settings column — issues nothing.
     """
     if ef_search is not None:
+        should_set_ef = True
         try:
             resolved_ef = int(ef_search)
         except (TypeError, ValueError):
             logger.warning("Ignoring an unusable hnsw.ef_search value: %r", ef_search)
-            resolved_ef = _SERVER_DEFAULT_EF_SEARCH
-        if not HNSW_EF_SEARCH_FLOOR <= resolved_ef <= HNSW_EF_SEARCH_CEILING:
-            # ⛔ THE SECOND DOOR FOR ef_search — symmetric with the one `iterative_scan` has
-            #    below, and it was missing (Phase 241 review, WR-05). `PATCH /settings` refuses
-            #    an out-of-range breadth on the way IN, but TWO routes reach this line without
-            #    ever passing it:
-            #      1. the settings COLUMN, which a hand-edit in the SQL editor could have
-            #         written (migration 176's CHECK is a backstop the write path swallows —
-            #         BUG-260909-01);
-            #      2. `config.py`'s `hnsw_ef_search` BaseSettings field, so `HNSW_EF_SEARCH` in
-            #         `backend/.env` is what `_val` returns whenever the column is NULL — which
-            #         is every row until an operator chooses a value.
-            #    Falling back to the server default (rather than clamping to a boundary) keeps
-            #    the module's rule intact: a number nobody chose buys nothing, and this function
-            #    then issues NOTHING at all for this knob.
-            logger.warning(
-                "Ignoring an out-of-range hnsw.ef_search value %r (allowed %d..%d); the search "
-                "runs at the server's own setting. Check the hnsw_ef_search column and the "
-                "HNSW_EF_SEARCH environment variable.",
-                resolved_ef,
-                HNSW_EF_SEARCH_FLOOR,
-                HNSW_EF_SEARCH_CEILING,
-            )
-            resolved_ef = _SERVER_DEFAULT_EF_SEARCH
-        if resolved_ef != _SERVER_DEFAULT_EF_SEARCH:
-            await _set_local(conn, _SQL_EF_SEARCH, str(resolved_ef), guc="hnsw.ef_search")
+            should_set_ef = False
+        else:
+            if not HNSW_EF_SEARCH_FLOOR <= resolved_ef <= HNSW_EF_SEARCH_CEILING:
+                # ⛔ THE SECOND DOOR FOR ef_search — symmetric with the one `iterative_scan` has
+                #    below, and it was missing (Phase 241 review, WR-05). `PATCH /settings` refuses
+                #    an out-of-range breadth on the way IN, but TWO routes reach this line without
+                #    ever passing it:
+                #      1. the settings COLUMN, which a hand-edit in the SQL editor could have
+                #         written (migration 176's CHECK is a backstop the write path swallows —
+                #         BUG-260909-01);
+                #      2. `config.py`'s `hnsw_ef_search` BaseSettings field, so `HNSW_EF_SEARCH` in
+                #         `backend/.env` is what `_val` returns whenever the column is NULL — which
+                #         is every row until an operator chooses a value.
+                #    Falling back to the server default (rather than clamping to a boundary) keeps
+                #    the module's rule intact: a number nobody chose buys nothing, and this function
+                #    then issues NOTHING at all for this knob.
+                logger.warning(
+                    "Ignoring an out-of-range hnsw.ef_search value %r (allowed %d..%d); the search "
+                    "runs at the server's own setting. Check the hnsw_ef_search column and the "
+                    "HNSW_EF_SEARCH environment variable.",
+                    resolved_ef,
+                    HNSW_EF_SEARCH_FLOOR,
+                    HNSW_EF_SEARCH_CEILING,
+                )
+                should_set_ef = False
+
+        if should_set_ef:
+            # Phase 246 (RECALL-02 / SEED-268 / Finding 2): Probes server setting dynamically.
+            # If server_default is None (pgvector not loaded or uninitialized GUC), or if
+            # resolved_ef differs from the server default, issue SET LOCAL.
+            # If resolved_ef equals the server default, skip the statement (no-op shortcut).
+            server_default = await get_server_ef_search(conn)
+            if server_default is None or resolved_ef != server_default:
+                await _set_local(conn, _SQL_EF_SEARCH, str(resolved_ef), guc="hnsw.ef_search")
 
     if iterative_scan is None or iterative_scan == _SERVER_DEFAULT_ITERATIVE_SCAN:
         return
