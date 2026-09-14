@@ -19,6 +19,7 @@ from app.models.user_settings import (
     KNOWN_PROVIDERS,
     SOURCE_MAX_FILE_SIZE_MB_CEILING,
     SOURCE_MAX_FILE_SIZE_MB_FLOOR,
+    SettingsWriteRefused,
     load_app_settings,
     load_app_settings_async,
     save_app_settings,
@@ -858,7 +859,15 @@ async def update_settings(
     # below, so a failed save never emits a false settings.update audit row or a spurious
     # re-embed (Phase 147 CR-02 precedent; RESEARCH §Round-trip verification). Round-trip
     # meaning (SC#2): save_app_settings encrypts-then-writes; the one read seam decrypts back.
-    if not await save_app_settings(updates):
+    # Phase 249 (MODEL-08 / BUG-260909-01) — TWO failures, TWO answers. A write the DATABASE
+    # REFUSES is a caller error and now answers 400 naming the column and the rule; a write that
+    # could not REACH the database is still a 500, unchanged. Both still sit BEFORE the audit
+    # write and the re-embed kick below, so neither emits a false settings.update row.
+    try:
+        _persisted = await save_app_settings(updates)
+    except SettingsWriteRefused as refused:
+        raise HTTPException(status_code=400, detail=refused.detail())
+    if not _persisted:
         raise HTTPException(status_code=500, detail="Failed to save settings")
     sanitized = {k: ("[REDACTED]" if "_key" in k or "_secret" in k else v) for k, v in updates.items()}
     background_tasks.add_task(

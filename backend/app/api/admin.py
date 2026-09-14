@@ -50,6 +50,7 @@ from app.models.user_settings import (
     broadcast_model_overrides_change,
     invalidate_model_overrides_cache,
     save_app_settings,
+    SettingsWriteRefused,
     set_feature_visibility,
 )
 from app.services import governance_service
@@ -608,7 +609,19 @@ async def set_flag(
     # write entirely on this path and records nothing. Stamping the error state is
     # belt-and-braces: if the floor is ever changed to record on exceptions, it records a
     # truthful "failed to persist" row, never a false success.
-    if not await save_app_settings({body.key: body.value}):
+    # Phase 249 (MODEL-08 / BUG-260909-01): a write the DATABASE REFUSES is a caller error, not
+    # a server fault, and it now says which column and which rule. For a boolean flag the
+    # realistic refusal is UndefinedColumn — a flag shipped in CODE without its migration — which
+    # is precisely the case a bare 500 made undiagnosable (mig 078 hid ~10 days).
+    try:
+        _persisted = await save_app_settings({body.key: body.value})
+    except SettingsWriteRefused as refused:
+        request.state.audit_action = "flag.write_refused"
+        request.state.audit_label = (
+            f"Flag change for {_FLAG_HUMAN_NAMES[body.key]} was refused by the database"
+        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=refused.detail())
+    if not _persisted:
         request.state.audit_action = "flag.write_failed"
         request.state.audit_label = (
             f"Flag change for {_FLAG_HUMAN_NAMES[body.key]} failed to persist"
@@ -1764,7 +1777,13 @@ async def set_model_lock(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="This model is disabled — enable it first.",
             )
-        if not await save_app_settings({"llm_model": model_id, "llm_model_locked": True}):
+        try:
+            _persisted = await save_app_settings({"llm_model": model_id, "llm_model_locked": True})
+        except SettingsWriteRefused as refused:  # Phase 249 (MODEL-08)
+            request.state.audit_action = "model.lock.write_refused"
+            request.state.audit_label = f"Locking {model_id} was refused by the database"
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=refused.detail())
+        if not _persisted:
             request.state.audit_action = "model.lock.write_failed"
             request.state.audit_label = f"Locking {model_id} as the org default failed to persist"
             raise HTTPException(
@@ -1774,7 +1793,13 @@ async def set_model_lock(
         request.state.audit_action = "model.lock"
         request.state.audit_label = f"Locked {model_id} as the org default"
     else:
-        if not await save_app_settings({"llm_model_locked": False}):
+        try:
+            _persisted = await save_app_settings({"llm_model_locked": False})
+        except SettingsWriteRefused as refused:  # Phase 249 (MODEL-08)
+            request.state.audit_action = "model.unlock.write_refused"
+            request.state.audit_label = f"Unlocking {model_id} was refused by the database"
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=refused.detail())
+        if not _persisted:
             request.state.audit_action = "model.unlock.write_failed"
             request.state.audit_label = f"Unlocking {model_id} failed to persist"
             raise HTTPException(

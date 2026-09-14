@@ -26,6 +26,11 @@ import time as _time
 from enum import Enum
 from typing import Any
 
+# ⚠ MODULE-LEVEL, not function-local. `save_app_settings`'s refusal arm names three asyncpg
+# exception classes in an `except` clause, and an `except` clause is evaluated at exception time —
+# a lazy import inside the `try` would not be in scope there (Phase 249 / MODEL-08).
+import asyncpg
+
 from pydantic import BaseModel
 
 from app.config import (
@@ -37,6 +42,54 @@ from app.config import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+class SettingsWriteRefused(Exception):
+    """The DATABASE REFUSED this settings write — a caller error, not a server fault.
+
+    ⚠ DISTINCT FROM "the write did not reach the database". ``save_app_settings`` returns ``False``
+    for that (a pool blip, a reset connection) and the caller answers 500, which is correct. A
+    CHECK / NOT NULL / undefined-column failure is a different fact — the value, or the column, is
+    wrong — and the caller can only say so if it can tell the two apart.
+
+    ⭐ BUG-260909-01, driven live 2026-09-15: three out-of-range writes in a row all reported
+    ACCEPTED while Postgres rejected every one. Nothing was corrupted (the stored value stayed
+    correct); the defect was that a backstop failing SILENTLY is a backstop that will be trusted
+    and will not report. Migration 174's own header calls that constraint *"the backstop for a
+    hand-edit in this very SQL editor"*.
+
+    ⛔ CARRIES COLUMN NAMES AND THE CONSTRAINT NAME ONLY — never a value, never the row. These rows
+    hold API keys (T-081.1-04), and asyncpg's ``CheckViolationError`` arrives with a ``DETAIL:``
+    line containing **the entire failing row**: every ``enc:v1:`` secret envelope and the
+    operator's self-hosted base URLs among them. Build the message from ``constraint_name`` and
+    the CODE-OWNED column list, never from ``str(exc)``.
+    """
+
+    def __init__(self, columns: list[str], constraint: str | None):
+        self.columns = columns
+        self.constraint = constraint
+        super().__init__(
+            "The database refused this settings write. "
+            f"columns={columns}" + (f" constraint={constraint}" if constraint else "")
+        )
+
+    def detail(self) -> str:
+        """The plain-language sentence an API layer puts in a 400.
+
+        ⚠ Lives HERE, beside the exception, so the four call sites cannot word it four ways —
+        and returns a STRING, not an ``HTTPException``, so the models layer keeps no FastAPI
+        import. ⛔ Column and constraint names only; never a value (T-081.1-04).
+        """
+        cols = ", ".join(self.columns)
+        if self.constraint:
+            return (
+                f"The database refused this change to {cols}. It violates the rule "
+                f"'{self.constraint}'. Nothing was saved."
+            )
+        return (
+            f"The database refused this change to {cols} — that column may not exist yet "
+            f"(a pending migration). Nothing was saved."
+        )
 
 
 class OpenRouterToolStrategy(str, Enum):
@@ -611,12 +664,40 @@ async def save_app_settings(updates: dict[str, Any]) -> bool:
         # covering it here covers SEED-258's source_max_file_size_mb ceiling too.
         await broadcast_settings_change()
         return True
+    except (
+        asyncpg.exceptions.CheckViolationError,
+        asyncpg.exceptions.NotNullViolationError,
+        asyncpg.exceptions.UndefinedColumnError,
+    ) as exc:
+        # ⭐ THE DATABASE DID ITS JOB AND SAID NO — a CALLER error, not a server fault.
+        #
+        # BUG-260909-01 (Phase 249 / MODEL-08): this used to fall into the broad arm below and be
+        # swallowed into the same `False`, so three out-of-range writes in a row all reported
+        # ACCEPTED while Postgres rejected every one. The caller could not tell a refused value
+        # from an unreachable database, and answered 500 to both.
+        #
+        # ⛔ NO `exc_info=True` HERE, and `raise ... from None` below. asyncpg's violation errors
+        # carry a `DETAIL:` line holding THE ENTIRE FAILING ROW — every `enc:v1:` secret envelope
+        # and the operator's self-hosted base URLs among them. A traceback in the log, or a 500
+        # handler rendering `__cause__`, would put that row in front of someone (T-081.1-04).
+        # Column NAMES and the constraint name only.
+        #
+        # ⚠ UndefinedColumnError is deliberately in this family and is the highest-value member:
+        # it is the "knob shipped in CODE without its migration" signature (mig 078's
+        # skill_builder_model hid ~10 days; lmstudio_api_key until mig 180). Naming the column is
+        # the difference between ten days and ten seconds.
+        _constraint = getattr(exc, "constraint_name", None)
+        logger.error(
+            "save_app_settings: DB REFUSED the write; settings NOT persisted. "
+            "columns=%s constraint=%s kind=%s",
+            sorted(clean.keys()), _constraint, type(exc).__name__,
+        )
+        raise SettingsWriteRefused(sorted(clean.keys()), _constraint) from None
     except Exception:
-        # ⚠ NAME THE COLUMNS. The caller turns False into a bare HTTP 500 "Failed to save
-        # settings", which is true but undiagnosable — and the single most likely cause is an
-        # UndefinedColumn from a knob that shipped in CODE without its migration (mig 078's
-        # skill_builder_model hid for ~10 days; lmstudio_api_key for longer, until mig 180).
-        # Column NAMES only, never values — these rows carry API keys (T-081.1-04).
+        # ⚠ UNCHANGED — "the write did not reach the database" (a pool blip, a reset connection).
+        # This arm exists so a settings write can never crash a request, and it still returns
+        # False, which every caller still turns into a 500. That is the right answer HERE.
+        # ⚠ NAME THE COLUMNS: the caller's 500 is otherwise undiagnosable.
         logger.error(
             "save_app_settings: DB write failed; settings NOT persisted. columns=%s",
             sorted(clean.keys()),

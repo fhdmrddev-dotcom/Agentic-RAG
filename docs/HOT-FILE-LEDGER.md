@@ -10417,8 +10417,8 @@ cells rot within days.
 | [`frontend/src/types/index.ts`](docs/HOT-FILE-LEDGER.md#frontendsrctypesindexts) | 85 / 65 / 1380 | ⚠ **FIRES** | ⚠ row was STALE at `78/60/1331`. honoured by construction (**243-04**): one optional CLIENT-ONLY field whose ABSENCE is load-bearing. seam still OWED |
 | [`backend/app/main.py`](docs/HOT-FILE-LEDGER.md#backendappmainpy) | 82 / 59 / 950 | ⚠ **FIRES** | ⚠ row was STALE by **FOURTEEN PHASES** at `79 / 45 / 876`. honoured by construction (**BUG-260902-06**): one more start/stop pair beside the scheduler |
 | [`backend/app/config.py`](docs/HOT-FILE-LEDGER.md#backendappconfigpy) | 86 / 49 / 1568 | ⚠ **FIRES** | ⚠ STALE AGAIN at `83/48/1506` — the THIRTEENTH. honoured by construction (**249-01**): ONE derived frozenset + one Literal widened to the value the code already returned. ⛔ MODEL_CAPABILITIES seam still OWED |
-| [`backend/app/api/admin.py`](docs/HOT-FILE-LEDGER.md#backendappapiadminpy) | 36 / 13 / 1931 | ⚠ **FIRES** | ⚠ row was STALE at `33/13/1740` (+191 lines). honoured by construction (**249-01**): the add-model provider guard swaps its SOURCE LIST; order, 422 shape and every other guard byte-unchanged |
-| [`backend/app/api/settings.py`](docs/HOT-FILE-LEDGER.md#backendappapisettingspy) | 39 / 20 / 1039 | ⚠ **FIRES** | ⚠ row STALE a 4th close running (`38/20/972`). honoured by construction (**249-02**): ONE `_verified_model_ids` helper, TWO callers. ⛔ the picker feed reuses its already-fetched overrides dict |
+| [`backend/app/api/admin.py`](docs/HOT-FILE-LEDGER.md#backendappapiadminpy) | 37 / 14 / 1968 | ⚠ **FIRES** | honoured by construction (**249-01/03**): the add guard swaps its SOURCE LIST; 3 write seams gain a refusal catch. ⛔ order, 422 shape and every other guard byte-unchanged |
+| [`backend/app/api/settings.py`](docs/HOT-FILE-LEDGER.md#backendappapisettingspy) | 40 / 21 / 1048 | ⚠ **FIRES** | honoured by construction (**249-02/03**): ONE `_verified_model_ids` helper w/ 2 callers; PUT gains a refusal arm → 400. ⛔ the 500 arm for an unreachable DB is unchanged |
 | [`backend/app/services/multimodal_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmultimodal_servicepy) | 14 / 7 / 984 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** — row added SEED-227, which is also where its silent truncation was found |
 | [`backend/app/api/documents.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentspy) | 87 / 34 / 2414 | ⚠ **FIRES** | ✅ **DISCHARGED AGAIN (240-03)** — the email-attachment loop extracted to `services/email_attachments.py`. 240-04 adds the conversation read |
 | [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 214 / 46 / 5682 | ⚠ **FIRES** | ⚠ row STALE a 5th time (`211/46/5618`). **249**: FOUR suites into BOTH knobs — incl. `ModelRegistryTab.test.tsx`, which ran NOWHERE and asserted the defect (`toHaveLength(8)`) |
@@ -10512,7 +10512,10 @@ cells rot within days.
 | [`frontend/src/components/settings/grantsVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsgrantsvocabularyts) | 3 / 2 / 115 | no (2 phases) | ⚠ absent for its entire life — row added 221-02. There is deliberately NO `READY` string in it |
 | [`backend/app/services/connector_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesconnector_servicepy) | 25 / 9 / 1772 | ⚠ **FIRES** | honoured by construction (**239-06**): the write boundary knows a mapping KEY from a tool name by ALLOW-LIST — an unknown key is still read as a tool name and still refused |
 | [`backend/app/models/message.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsmessagepy) | 17 / 10 / 124 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **8 phases** — row added 214; honoured by construction (214-16) |
-| [`backend/app/models/user_settings.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsuser_settingspy) | 50 / 32 / 1561 | ⚠ **FIRES** | ⚠ STALE for the FOURTH close running at `49 / 31 / 1524`. honoured by construction (**241-03**): two `_val` calls + the bounds constants in the SEED-258 home |
+| [`backend/app/models/user_settings.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsuser_settingspy) | 54 / 33 / 1723 | ⚠ **FIRES** | ⚠ STALE for the SIXTH close running (`50/32/1561`). honoured by construction (**249-03**): ONE `except` split into two arms + one typed exception. ⛔ the unreachable-DB arm is byte-identical |
+| [`backend/app/api/setup.py`](docs/HOT-FILE-LEDGER.md#backendappapisetuppy) | 6 / 1 / 490 | no (1 phase) | ⚠ **absent for its ENTIRE LIFE — row added 249-03**. ⛔ it deliberately does NOT catch `SettingsWriteRefused`: a refused `setup_complete` reported as success is the bug one layer up |
+| [`backend/app/services/setup_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicessetup_servicepy) | 3 / 1 / 514 | no (1 phase) | ⚠ **absent for its ENTIRE LIFE — row added 249-03**. Same deliberate non-catch as `api/setup.py`; its bool cannot express *the database refused the value* |
+| [`backend/app/api/evals.py`](docs/HOT-FILE-LEDGER.md#backendappapievalspy) | 24 / 7 / 3237 | ⚠ **FIRES** | ⚠ **absent for its ENTIRE LIFE at 7 phases — row added 249-04, which left the file BYTE-UNCHANGED.** ⛔ `_tile_for_run`'s engine-shaped sentence must stay the LAST resort |
 | [`backend/app/services/settings_broadcast.py`](docs/HOT-FILE-LEDGER.md#backendappservicessettings_broadcastpy) | 1 / 1 / 228 | no (1 phase) | young (**BUG-260902-06**) — the cross-worker cache-invalidation leaf: one channel, one payload builder, one re-warm dispatcher, one subscriber |
 | [`backend/app/services/connectors/args.py`](docs/HOT-FILE-LEDGER.md#backendappservicesconnectorsargspy) | 2 / 1 / 474 | no (1 phase) | young (214-01) — the shared argument leaf: resolution, satisfiability, and ONE schema accessor |
 | [`backend/app/services/harness/reachability.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessreachabilitypy) | 4 / 4 / 463 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **4 phases** — row added 214; it is the home of this phase's safety-gate predicate |
@@ -13988,3 +13991,98 @@ the truth about capabilities. Both are now pointed at the shared copy rather tha
 
 Four suites into **both** knobs. ⚠ `src/components/chat` has **no bare-directory entry**
 (`BUG-260912-01` recorded the same thing), so a chat suite must be named or it never executes.
+
+## Phase 249 Plan 03 — a refused write and an unreachable database are different answers (MODEL-08)
+
+**Files:** `backend/app/models/user_settings.py` · `backend/app/api/settings.py` ·
+`backend/app/api/admin.py` · `backend/app/api/setup.py` (row added) ·
+`backend/app/services/setup_service.py` (row added)
+
+### Driven against the live database, before and after
+
+```
+BEFORE source_max_file_size_mb = 25          BEFORE source_max_file_size_mb = 25
+  set      0 -> returned False                 set      0 -> REFUSED: columns=['source_max_file_size_mb']
+  set     51 -> returned False                             constraint=app_settings_source_max_file_size_mb_bounds
+  set    999 -> returned False                 set     51 -> REFUSED: …
+AFTER  source_max_file_size_mb = 25            set    999 -> REFUSED: …
+                                             AFTER  source_max_file_size_mb = 25
+```
+
+⭐ **A SECOND FINDING THE DRIVE SURFACED, WHICH `BUG-260909-01` DOES NOT MENTION.** The old arm
+logged with `exc_info=True`, and asyncpg's `CheckViolationError` arrives carrying a `DETAIL:` line
+with **the entire failing row** — every `enc:v1:` secret envelope and the operator's self-hosted
+tunnel URL among them. `T-081.1-04` says these rows must never be logged. **The bug report is about
+a silent failure; the traceback was a quiet disclosure sitting beside it.**
+
+### `backend/app/models/user_settings.py` — `54 / 33 / 1723`, honoured by construction
+
+⚠ Row stale for the **sixth close running** (`50 / 32 / 1561`).
+
+One `except` becomes two arms, plus `SettingsWriteRefused` and its `detail()` wording.
+
+**Binding invariants:**
+⛔ **The unreachable-database arm is byte-identical** — it still logs with `exc_info=True` and
+still returns `False`, and every caller still turns that into a 500. That is the right answer
+*there*; the broad catch exists so a settings write can never crash a request. Pinned by a case,
+so the split cannot collapse back into one.
+⛔ **The refusal arm logs WITHOUT a traceback and raises `from None`.** Both are for the same
+reason: the row must not reach a log or a 500 handler rendering `__cause__`. Pinned by a case that
+greps the exception, its cause and the log records for the value, for `enc:v1:` and for the URL.
+⛔ **`detail()` lives beside the exception** and returns a **string**, not an `HTTPException`, so
+four call sites cannot word one refusal four ways and the models layer keeps no FastAPI import.
+⚠ **`import asyncpg` is MODULE-level, not function-local.** An `except` clause is evaluated at
+exception time; a lazy import inside the `try` would not be in scope there.
+
+### The six call sites, all read, each dispositioned
+
+| Site | Disposition |
+|---|---|
+| `api/settings.py` PUT | catches → **400** with the column and rule; the 500 arm unchanged |
+| `api/admin.py` kill-switch flag | catches → **400**; audit stamp `flag.write_refused` |
+| `api/admin.py` model lock | catches → **400**; stamp `model.lock.write_refused` |
+| `api/admin.py` model unlock | catches → **400**; stamp `model.unlock.write_refused` |
+| `api/setup.py` `setup_complete` | ⛔ **deliberately does NOT catch** — propagates |
+| `services/setup_service.py` | ⛔ **deliberately does NOT catch** — propagates |
+
+⛔ **The two non-catches are the interesting ones and are commented in place**, because a tidy-up
+that "fixes" them would reintroduce the bug one layer up: a refused `setup_complete` write that
+reported a completed setup is exactly what this phase exists to stop.
+
+⚠ For the three admin sites the realistic refusal is **`UndefinedColumnError`** — a flag shipped
+in CODE without its migration. That is the arm a bare 500 made undiagnosable for ~10 days with
+mig 078's `skill_builder_model`, and until mig 180 with `lmstudio_api_key`.
+
+## Phase 249 Plan 04 — proving what was already built (MODEL-06 / MODEL-09)
+
+### `backend/app/api/evals.py` — `24 / 7 / 3237`, BYTE-UNCHANGED
+
+⚠ **Absent from this ledger for its entire life, at SEVEN phases.** G-5 fires on it and could
+never have said so. The row is added by a plan that deliberately does **not** modify the file —
+an absent row is invisible at any count, so waiting for the next edit would have meant waiting
+for the eighth phase to be the first one G-5 could see.
+
+**Named seam for the next toucher:** the engine-health board (`_tile_for_run` +
+`_build_engine_health_board`, ~80 lines) is a self-contained surface inside a 3,237-line router
+and is the clean first extraction.
+
+**Binding invariant, now fenced:** an unhealthy tile carries the **verbatim** provider/arm error.
+The one engine-shaped sentence (`"The engine did not complete this arm."`) is a correct **last**
+resort for a terminal-but-failed run with no error, and must never become the first — pinned
+structurally by `test_249_worker_broadcast_and_engine_cause.py`, **driven RED against a plant that
+moved it one branch higher**, then restored byte-identical.
+
+### MODEL-06 — what the fence adds that the code did not have
+
+The broadcast machinery shipped with `BUG-260902-06`. What did not exist was anything that would
+notice if a future edit dropped one of the three write seams, or added a publish to one of the two
+WR-03 read-before-guard sites. Both directions are now pinned, and the read direction was
+**driven RED against a planted broadcast**.
+
+⛔ **The multi-worker arm was NOT reproducible in this environment and is recorded as ⛔, not as a
+pass.** Measured: two independent `uvicorn --reload` servers are running on port 8000 from
+different Python installs (`backend/venv` and `C:\Python312`), and `--reload` implies a single
+worker. So the cross-REQUEST half was driven — one write, ten consecutive reads, 10/10 unanimous —
+and the cross-WORKER half rests on the source fence plus the shipped subscriber, not on
+observation. ⚠ The two-server condition is itself a live environment hazard worth the operator's
+attention (the stale-uvicorn trap).
