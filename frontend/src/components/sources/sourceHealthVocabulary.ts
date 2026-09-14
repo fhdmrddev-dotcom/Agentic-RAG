@@ -182,7 +182,10 @@ export const CONTROL_FOR_CAUSE: Record<
   //     shipped "every cause carries exactly one action, drawn from the three named actions"
   //     pin therefore stays green BY CONSTRUCTION, not by being loosened.
   connection_disabled: {
-    label: (connectionName) => `Turn ${named(connectionName)} back on`,
+    label: (connectionName) => {
+      const n = named(connectionName)
+      return n === UNNAMED_CONNECTION ? "Open Connection Settings ↗" : `Open ${n} in Settings ↗`
+    },
     action: "reconnect",
   },
   // ⭐ THE SIXTH ROW (BUG-260912-01). ⚠ The label is NOT "Reconnect": the operator on the
@@ -397,7 +400,7 @@ export const COPY = {
 
   // ── stopped. Says THAT it stopped, and WHEN it last succeeded.
   stopped: (ago: string) => `Stopped reading ${ago}`,
-  lastGood: (when: string) => `Last read successfully on ${when}`,
+  lastGood: (when: string) => `Last read successfully ${when}`,
   neverRead: "It has not read successfully yet.",
 
   // ── quiet runs collapse. Density is RENDERING, never storage — every tick has a row

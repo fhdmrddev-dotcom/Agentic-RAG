@@ -127,8 +127,8 @@ async def test_wr04_user_label_human_name_resolution():
     _LABEL_NAME_CACHE.clear()
 
     # System labels return id unchanged immediately
-    assert await get_label_name("token", "INBOX") == "INBOX"
-    assert await get_label_name("token", "SENT") == "SENT"
+    assert await get_label_name("token", "INBOX", connection_id="conn-1") == "INBOX"
+    assert await get_label_name("token", "SENT", connection_id="conn-1") == "SENT"
 
     # User label queries Gmail API
     mock_resp = MagicMock()
@@ -136,15 +136,41 @@ async def test_wr04_user_label_human_name_resolution():
     mock_resp.body = json.dumps({"id": "Label_9", "name": "Receipts", "type": "user"}).encode("utf-8")
 
     with patch("app.services.sources.mail.gmail.send_pinned_http", AsyncMock(return_value=mock_resp)):
-        name = await get_label_name("token", "Label_9")
+        name = await get_label_name("token", "Label_9", connection_id="conn-1")
         assert name == "Receipts"
 
-        # Cache is populated
-        assert _LABEL_NAME_CACHE["Label_9"] == "Receipts"
+        # Cache is populated under (connection_id, label_id)
+        assert _LABEL_NAME_CACHE[("conn-1", "Label_9")] == "Receipts"
 
         # Next call uses cache
-        name_cached = await get_label_name("token", "Label_9")
+        name_cached = await get_label_name("token", "Label_9", connection_id="conn-1")
         assert name_cached == "Receipts"
+
+
+@pytest.mark.asyncio
+async def test_f1_gmail_label_cache_cross_tenant_isolation():
+    """F-1: Label cache is isolated per-connection; tenant B never sees tenant A's label name."""
+    _LABEL_NAME_CACHE.clear()
+
+    # Tenant A maps Label_9 to "Finance"
+    resp_a = MagicMock(status_code=200, body=json.dumps({"id": "Label_9", "name": "Finance"}).encode("utf-8"))
+    with patch("app.services.sources.mail.gmail.send_pinned_http", AsyncMock(return_value=resp_a)):
+        name_a = await get_label_name("token-a", "Label_9", connection_id="conn-tenant-a")
+        assert name_a == "Finance"
+        assert _LABEL_NAME_CACHE[("conn-tenant-a", "Label_9")] == "Finance"
+
+    # Tenant B has the same Label_9 ID, but maps to "Marketing"
+    # It must NOT return "Finance" from cache! It must query the API with tenant B's connection.
+    resp_b = MagicMock(status_code=200, body=json.dumps({"id": "Label_9", "name": "Marketing"}).encode("utf-8"))
+    with patch("app.services.sources.mail.gmail.send_pinned_http", AsyncMock(return_value=resp_b)) as mock_send_b:
+        name_b = await get_label_name("token-b", "Label_9", connection_id="conn-tenant-b")
+        assert name_b == "Marketing"
+        mock_send_b.assert_awaited_once()
+        assert _LABEL_NAME_CACHE[("conn-tenant-b", "Label_9")] == "Marketing"
+
+    # Confirm cache keys remain completely separated
+    assert _LABEL_NAME_CACHE[("conn-tenant-a", "Label_9")] == "Finance"
+    assert _LABEL_NAME_CACHE[("conn-tenant-b", "Label_9")] == "Marketing"
 
 
 @pytest.mark.asyncio
@@ -152,8 +178,9 @@ async def test_google_drive_list_files_mail_arm_uses_human_label_name():
     """WR-04: GoogleDriveSourceAdapter passes human display name to list_messages."""
     adapter = GoogleDriveSourceAdapter()
     conn = MagicMock()
+    conn.id = "conn-wr04-test"
 
-    _LABEL_NAME_CACHE["Label_9"] = "Receipts"
+    _LABEL_NAME_CACHE[("conn-wr04-test", "Label_9")] = "Receipts"
 
     mock_page = FilePage(
         files=[

@@ -41,6 +41,10 @@ import { COPY } from "./sourceHealthVocabulary"
 
 // @ts-ignore — Vite `?raw` import, typed by vite/client at build time only.
 import watchedFoldersSource from "./WatchedFoldersSection.tsx?raw"
+// @ts-ignore — Vite `?raw` import, typed by vite/client at build time only.
+import watchRowCardSource from "./WatchRowCard.tsx?raw"
+
+const combinedSource = watchedFoldersSource + "\n" + watchRowCardSource
 
 vi.mock("@/lib/api/sources", () => ({
   listWatches: vi.fn(),
@@ -338,25 +342,25 @@ describe("WatchedFoldersSection — the history, and what Sync now says", () => 
      */
     it("⛔ the request-timetable word appears nowhere in the component", () => {
       expect(watchedFoldersSource).toContain("triggerWatchSync") // non-vacuity
-      expect(watchedFoldersSource.toLowerCase()).not.toContain("sched" + "uled")
+      expect(combinedSource.toLowerCase()).not.toContain("sched" + "uled")
     })
 
     it("⛔ no optimistic present-tense progress claim survives", () => {
       expect(watchedFoldersSource).toContain("COPY.asked") // non-vacuity
-      expect(watchedFoldersSource).not.toContain("Check" + "ing now")
+      expect(combinedSource).not.toContain("Check" + "ing now")
     })
 
     it("⛔ SURF-01 — neither push-subscription word appears", () => {
-      expect(watchedFoldersSource).toContain("interval_minutes") // non-vacuity
-      expect(watchedFoldersSource.toLowerCase()).not.toContain("instant" + "ly")
-      expect(watchedFoldersSource.toLowerCase()).not.toContain("on " + "change")
+      expect(watchRowCardSource).toContain("interval_minutes") // non-vacuity
+      expect(combinedSource.toLowerCase()).not.toContain("instant" + "ly")
+      expect(combinedSource.toLowerCase()).not.toContain("on " + "change")
     })
 
     it("⭐ the pinned SURF-01 cadence sentence is byte-identical", () => {
-      expect(watchedFoldersSource).toContain(
+      expect(watchRowCardSource).toContain(
         "<span>checked every {watch.interval_minutes} minutes</span>",
       )
-      expect(watchedFoldersSource).toContain("SURF-01: Exact copy 'checked every N minutes'")
+      expect(watchRowCardSource).toContain("SURF-01: Exact copy 'checked every N minutes'")
     })
   })
 })

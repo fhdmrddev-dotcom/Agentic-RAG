@@ -4,7 +4,7 @@ plan: 01
 status: complete
 wave: 1
 commits:
-  - id: fc5c7fe01
+  - id: e5ded885a
     message: "feat(247-01): Drive & Graph path resolution, WR-04 human label, WR-07 recursive fence"
 requirements_met: [WATCH-01, WATCH-02, WATCH-08]
 gates_passed:

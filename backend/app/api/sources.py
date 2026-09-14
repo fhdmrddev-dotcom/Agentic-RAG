@@ -618,7 +618,7 @@ async def get_source_health(
             c_meta = conn_info.get(conn_id_str)
 
             # WATCH-03 (BUG-260909-03): If the connection was switched off (is_enabled == False),
-            # report immediately as stopped with cause "connection_disabled" without waiting for next scheduled tick.
+            # report immediately as stopped with cause "connection_disabled" without waiting for next watch run cycle.
             if c_meta and c_meta.get("is_enabled") is False:
                 runs = runs_by_watch.get(str(watch["id"]), [])
                 last_good = next(

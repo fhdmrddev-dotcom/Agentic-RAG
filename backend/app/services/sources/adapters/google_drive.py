@@ -74,6 +74,10 @@ def _google_error_reason(body: bytes | str | None) -> str:
         return ""
 
 
+# Multi-tenancy note: Unlike Gmail user labels whose IDs (e.g. 'Label_9') are per-mailbox
+# and collision-prone across accounts, Google Drive file and folder IDs are globally unique
+# opaque strings assigned in Google's namespace. Thus _FOLDER_PATH_CACHE can safely be
+# process-global without cross-tenant collision risk unless two accounts genuinely share the folder.
 _FOLDER_PATH_CACHE: dict[str, tuple[str, str | None]] = {
     "root": ("", None),
     "my_drive": ("", None),
@@ -182,10 +186,13 @@ class GoogleDriveSourceAdapter(SourceAdapter):
             )
 
         token = await self._get_auth_token(connection)
+        conn_id = str(getattr(connection, "id", None) or (
+            connection.get("id") if isinstance(connection, dict) else ""
+        ) or "")
 
         if mail.is_mail_folder(folder_id):
             if folder_id == mail.MAIL_ROOT_ID:
-                return BrowsePage(items=await mail.gmail.list_labels(token), next_page_token=None)
+                return BrowsePage(items=await mail.gmail.list_labels(token, connection_id=conn_id), next_page_token=None)
             # A label has no sub-labels in this model: Gmail's hierarchy is flat and the
             # separator in `Parent/Child` is a display convention, not a tree.
             return BrowsePage(items=[], next_page_token=None)
@@ -290,6 +297,9 @@ class GoogleDriveSourceAdapter(SourceAdapter):
             return FilePage(files=[], next_page_token=None)
 
         token = await self._get_auth_token(connection)
+        conn_id = str(getattr(connection, "id", None) or (
+            connection.get("id") if isinstance(connection, dict) else ""
+        ) or "")
 
         if mail.is_mail_folder(folder_id):
             # The mail root itself holds no messages — labels do.
@@ -297,7 +307,7 @@ class GoogleDriveSourceAdapter(SourceAdapter):
                 return FilePage(files=[], next_page_token=None)
             label_id = mail.strip_folder_prefix(folder_id or "")
             # WR-04: resolve human-readable display name for user labels instead of passing raw label_id
-            label_name = await mail.gmail.get_label_name(token, label_id)
+            label_name = await mail.gmail.get_label_name(token, label_id, connection_id=conn_id)
             return await mail.gmail.list_messages(
                 token,
                 label_id=label_id,

@@ -52,6 +52,8 @@ import {
 
 // @ts-ignore — Vite `?raw` import, typed by vite/client at build time only.
 import watchedFoldersSource from "./WatchedFoldersSection.tsx?raw"
+// @ts-ignore — Vite `?raw` import, typed by vite/client at build time only.
+import watchRowCardSource from "./WatchRowCard.tsx?raw"
 
 vi.mock("@/lib/api/sources", () => ({
   listWatches: vi.fn(),
@@ -705,12 +707,14 @@ describe("WatchedFoldersSection", () => {
 
   // ══ SOURCE FENCES — properties of the SHIPPED file, read as text ═════════════════
   describe("the invariants a later edit must not break", () => {
+    it("non-vacuity — WatchRowCard source is loaded", () => {
+      expect(watchRowCardSource.length).toBeGreaterThan(3000)
+      expect(watchRowCardSource).toContain("WatchRowCard")
+    })
+
     it("⛔ the raw `last_error` is only ever handed to the vocabulary leaf", () => {
-      // ⚠ WIDENED BY PLAN 17, deliberately and with the reason recorded rather than by
-      //   loosening the regex to nothing. `fileFailureKind` is the SAME leaf, and its whole
-      //   return type is a three-value key — a message cannot survive it. The render-level
-      //   proof that nothing leaks is the planted-URL case above, not this grep.
-      const codeHits = watchedFoldersSource
+      // ⚠ WIDENED BY PLAN 17, and updated for Phase 247 WatchRowCard extraction.
+      const codeHits = (watchedFoldersSource + "\n" + watchRowCardSource)
         .split("\n")
         .filter((line: string) => !line.trim().startsWith("*") && line.includes("last_error"))
       expect(codeHits.length).toBeGreaterThan(0) // non-vacuity
@@ -722,43 +726,31 @@ describe("WatchedFoldersSection", () => {
     })
 
     it("⛔ the scope note ships WITH the block — a silent list would overclaim", () => {
-      // ⭐ The licence for this surface to exist. If a later edit removes the note but keeps
-      //   the list, THIS reds — the rendered case above proves it is drawn, and this proves
-      //   the two cannot be separated by an edit that only touches markup.
-      // ⛔ RESTORED TO A TIGHT WINDOW, AND THE RELAXATION IS THE FINDING (code review WR-08).
-      //    The disclosure commit widened this 800 → 2600 — a 3.25× relaxation of the only
-      //    structural guarantee that the scope note lives INSIDE the failures block — in the
-      //    same diff whose new docstring says "if any of them had had to be WEAKENED, that
-      //    would have been the failure." It had been, by me, in that commit.
-      // ⭐ The window did not need to grow: almost all of the new distance was COMMENT PROSE,
-      //    which the fence never stripped. Stripping comments first (the shape
-      //    `RunHistoryList.test.tsx` already uses) restores a bound near the original AND
-      //    makes it stronger than before, because a comment can no longer pad the gap.
-      const code = watchedFoldersSource
+      // ⭐ The licence for this surface to exist.
+      const code = watchRowCardSource
         .replace(/\/\*[\s\S]*?\*\//g, "")
         .replace(/^\s*\/\/.*$/gm, "")
       expect(code).toContain("sources-file-failures") // non-vacuity
-      // ⚠ 1300, MEASURED — not guessed and not flattering. The comment-stripped distance is
-      //   1249 characters of genuine JSX (the disclosure button), against 1679 raw. So the
-      //   real relaxation this commit needed was ~1300, and 2600 was twice what the change
-      //   actually cost. The bound is now the code, and a comment can no longer pad it.
       expect(code).toMatch(/sources-file-failures[\s\S]{0,1300}?FILE_FAILURE_SCOPE_NOTE/)
     })
 
     it("⛔ no per-file row is built with raw HTML", () => {
-      // T-235c-12 — a hostile external FILE NAME is rendered as a text child and React escapes
-      // it. Nothing in this file may opt out of that.
       expect(watchedFoldersSource).not.toContain("dangerouslySetInnerHTML")
+      expect(watchRowCardSource).not.toContain("dangerouslySetInnerHTML")
     })
 
     it("⛔ no full page load survives — this app has no router (SEED-185)", () => {
       expect(watchedFoldersSource).toContain("onNavigateToConnections") // non-vacuity
       expect(watchedFoldersSource).not.toContain("window.location")
+      expect(watchRowCardSource).not.toContain("window.location")
     })
 
     it("⛔ the alarm token is never applied to a source state", () => {
       expect(watchedFoldersSource).toContain("last_status") // the anchor
       expect(watchedFoldersSource).not.toMatch(
+        /last_status\s*===\s*"failed"[\s\S]{0,200}?destructive/,
+      )
+      expect(watchRowCardSource).not.toMatch(
         /last_status\s*===\s*"failed"[\s\S]{0,200}?destructive/,
       )
     })
@@ -781,6 +773,73 @@ describe("WatchedFoldersSection", () => {
     await user.click(screen.getAllByTestId("sources-sync-now")[0])
 
     expect(mockTriggerWatchSync).toHaveBeenCalledWith("watch-1")
+  })
+
+  it("does NOT unmount or collapse the card when Sync now is clicked (WATCH-04)", async () => {
+    mockListWatches.mockResolvedValue(only({}))
+    mockTriggerWatchSync.mockResolvedValue({
+      status: "asked",
+      message: "ok",
+      next_check_within_seconds: 60,
+    })
+    render(<WatchedFoldersSection />)
+    const user = userEvent.setup()
+
+    await waitFor(() => expect(screen.getByText("Q3 Vendor Bills")).toBeInTheDocument())
+    await user.click(screen.getByTestId("sources-source-line").querySelector("button")!)
+    expect(screen.getByTestId("sources-source-card")).toBeInTheDocument()
+
+    await user.click(screen.getAllByTestId("sources-sync-now")[0])
+    // Assert the global loading state was NOT triggered (never unmounts into "Loading watched folders...")
+    expect(screen.queryByText(/loading watched folders\.\.\./i)).not.toBeInTheDocument()
+    expect(screen.getByTestId("sources-source-card")).toBeInTheDocument()
+    expect(screen.getByTestId("sources-sync-outcome")).toBeInTheDocument()
+  })
+
+  it("renders Variant A two-tier status badges (WATCH-03)", async () => {
+    mockListWatches.mockResolvedValue(SAMPLE_WATCHES)
+    render(
+      <WatchedFoldersSection
+        stoppedSources={[
+          {
+            watch_id: "watch-2",
+            source_folder_name: "Vendor Contracts 2026",
+            connection_name: "Google Drive (Procurement)",
+            cause: "connection_disabled",
+            hard: true,
+            stopped_since: new Date().toISOString(),
+            last_good_at: null,
+          },
+        ]}
+      />,
+    )
+
+    await waitFor(() => expect(screen.getAllByTestId("sources-connection-pill")).toHaveLength(2))
+    const pills = screen.getAllByTestId("sources-connection-pill")
+    expect(pills[0]).toHaveTextContent(/connected/i)
+    expect(pills[1]).toHaveTextContent(/connection off/i)
+  })
+
+  it("renders missing items with missing_since timestamp (WATCH-05)", async () => {
+    const MISSING_ITEM = item({
+      id: "miss-1",
+      name: "Q3_Cashflow_Forecast.xlsx",
+      state: "missing",
+      missing_since: new Date(Date.now() - 9 * 24 * 3600_000).toISOString(),
+    })
+    mockListWatches.mockResolvedValue(only({}))
+    mockGetWatch.mockResolvedValue(detail([MISSING_ITEM]))
+    render(<WatchedFoldersSection />)
+    const user = userEvent.setup()
+
+    await waitFor(() => expect(screen.getByTestId("sources-source-line")).toBeInTheDocument())
+    await user.click(screen.getByTestId("sources-source-line").querySelector("button")!)
+
+    await waitFor(() => expect(screen.getByTestId("sources-missing-file")).toBeInTheDocument())
+    const row = screen.getByTestId("sources-missing-file")
+    expect(row).toHaveTextContent("Q3_Cashflow_Forecast.xlsx")
+    expect(row).toHaveTextContent(/missing at source/i)
+    expect(row).toHaveTextContent(/retained in library/i)
   })
 
   it("triggers purge missing files on user action (VIS-05 / SC#3)", async () => {

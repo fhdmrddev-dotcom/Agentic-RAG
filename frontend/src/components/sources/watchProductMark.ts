@@ -34,5 +34,14 @@ export function watchProductMarkKey(
   }
 
   if (service.startsWith("google")) return "google-drive"
+  if (
+    service.startsWith("microsoft") ||
+    service.includes("graph") ||
+    service.includes("onedrive") ||
+    service.includes("sharepoint")
+  ) {
+    return "microsoft"
+  }
   return null
 }
+

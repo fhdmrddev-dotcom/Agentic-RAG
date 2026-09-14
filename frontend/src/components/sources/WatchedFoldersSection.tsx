@@ -1,6 +1,8 @@
 /**
  * Phase 235 plan 10 (SURF-02 / LIB-10 · D-235-11 / D-235-12 / D-235-13 / D-235-14 / D-235-16) —
  * WHAT A WATCHED SOURCE SAYS IT DID.
+ * Phase 247 — Extracted WatchRowCard.tsx to satisfy G-5 (< 1,000 lines).
+ * Non-collapsing sync now (WATCH-04) and Variant A Two-Tier Status Badges (WATCH-03).
  *
  * ── ⭐ VARIANT B SHIPS (operator, 2026-09-06) ────────────────────────────────────────
  *
@@ -65,58 +67,34 @@
  * than twelve (T-235-13). This component derives NO verdict of its own (D-235-05).
  */
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 import {
   AlertCircle,
   AlertTriangle,
-  ChevronDown,
-  ChevronRight,
-  Clock,
   Folder,
   HardDrive,
   Loader2,
-  Pause,
-  Play,
   Plus,
-  RefreshCw,
-  Trash2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   deleteWatch,
-  getWatch,
-  listSyncRuns,
   listWatches,
   purgeWatchFiles,
   triggerWatchSync,
   updateWatch,
   type ConnectorWatch,
-  type ConnectorWatchItem,
   type StoppedSource,
-  type SyncRun,
 } from "@/lib/api/sources"
 import { useFolders } from "@/hooks/useFolders"
-import { relativeBand } from "@/components/workflows/library/relativeChanged"
 import { CreateWatchModal } from "./CreateWatchModal"
-import { RunHistoryList } from "./RunHistoryList"
-import { isQuiet } from "./runHistoryFold"
 import {
   CONTROL_FOR_CAUSE,
   COPY,
-  FILE_FAILURE_HEADING,
-  FILE_FAILURE_SUMMARY,
-  FILE_FAILURE_MORE,
-  FILE_FAILURE_SCOPE_NOTE,
-  SENTENCE_FOR_CAUSE,
-  SENTENCE_FOR_FILE_FAILURE,
-  classifySourceFailure,
-  fileFailureKind,
-  sourceFailureSentence,
   type SourceFailureCause,
 } from "./sourceHealthVocabulary"
 import { cn } from "@/lib/utils"
-import { ConnectionMarkGlyph } from "@/lib/connectionMark"
-import { watchProductMarkKey } from "./watchProductMark"
+import { WatchRowCard as WatchRow, type SourceState } from "./WatchRowCard"
 
 /**
  * ⭐ D-235-12 — THE INSTANCE-LEVEL TRUTH, SAID ONCE.
@@ -152,59 +130,6 @@ export function SourceReaderStatement({ readerRunning }: { readerRunning: boolea
 }
 
 /**
- * The five states a watched source can be in, from this surface's point of view.
- *
- *   • `healthy`  — reading, and the reader is live. THE ONLY collapsible state.
- *   • `waiting`  — nothing is wrong with it; the instance's reader is switched off (D-235-12).
- *                  Collapsible too: it is not broken, and the banner above owns that truth.
- *   • `paused`   — a person paused it. Not reading, so not the one-line case.
- *   • `stopped`  — the SERVER says it stopped reading, or the row's own status says it failed.
- *   • `degraded` — this row could not be read HERE (SEED-239 / D-235-13). Never skipped.
- */
-type SourceState = "healthy" | "waiting" | "paused" | "stopped" | "degraded"
-
-/**
- * ⭐ ONE lookup, replacing the two parallel five-arm ternaries. A sixth state adds a row here
- * and edits nothing else — which is the same shape `CONTROL_FOR_CAUSE` uses one file over.
- *
- * ⛔ Every non-healthy tone is AMBER (the warning token). No source state is ever styled with
- * the alarm token; see the docblock.
- */
-const STATE_PRESENTATION: Record<
-  SourceState,
-  { label: string; pill: string; frame: string }
-> = {
-  healthy: {
-    label: "Reading",
-    pill: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
-    frame: "border-border/80 hover:border-border",
-  },
-  waiting: {
-    label: COPY.readerOffRow,
-    pill: "bg-muted text-muted-foreground",
-    frame: "border-border/60",
-  },
-  paused: {
-    label: "Paused",
-    pill: "bg-muted text-muted-foreground",
-    frame: "border-border/40 bg-muted/20",
-  },
-  stopped: {
-    label: "Stopped",
-    pill: "bg-amber-500/20 text-amber-600 dark:text-amber-300",
-    frame: "border-amber-500/40 bg-amber-500/5 shadow-sm",
-  },
-  degraded: {
-    label: "Unreadable here",
-    pill: "bg-amber-500/20 text-amber-600 dark:text-amber-300",
-    frame: "border-amber-500/40 bg-amber-500/5 shadow-sm",
-  },
-}
-
-/** Only these two states collapse to a line. Everything else is a full card, always. */
-const COLLAPSIBLE_STATES: readonly SourceState[] = ["healthy", "waiting"]
-
-/**
  * ⚠ The ONE place the shipped `last_status` set is read as a failure. Kept as a tiny helper so
  * the expression appears once and cannot drift between two branches.
  *
@@ -236,24 +161,6 @@ function classifyWatch(
 }
 
 /**
- * How many files a tick acted on — all six counts, the errored ones included. A file the
- * reader tried and could not read is still a file this check dealt with.
- *
- * ⚠ Spelled here as well as in `RunHistoryList` because that module does not export it and is
- * not this plan's to edit. Whichever plan next touches both should hoist it into the fold leaf.
- */
-function filesTouched(run: SyncRun): number {
-  return (
-    run.count_new +
-    run.count_modified +
-    run.count_renamed +
-    run.count_missing +
-    run.count_restored +
-    run.count_errors
-  )
-}
-
-/**
  * The pending window, in words. ⚠ It says what was ASKED and when the next pass is due —
  * never that work is happening, because nothing has happened yet.
  */
@@ -266,46 +173,6 @@ function withinPhrase(seconds: number | null | undefined): string {
   if (n < 120) return `${n} seconds`
   return `${Math.round(n / 60)} minutes`
 }
-
-/**
- * ⭐ D-235-14 — THE OUTCOME, not the request.
- *
- * When the history has been fetched the newest stored tick is the truth: quiet ⇒ *"no
- * changes"*, otherwise the count of files that tick acted on. Before the history is fetched
- * (twelve cards must not fire twelve requests to render a list) the watch row's own
- * `item_count` stands in — the number of files this source carries.
- *
- * ⚠ `null` means the wire gave no readable instant. The caller renders `COPY.neverRead`
- * rather than inventing a time, which is `relativeBand`'s own recorded rule.
- */
-function outcomeSentence(
-  watch: ConnectorWatch,
-  runs: SyncRun[] | null,
-  now: number,
-): string | null {
-  const ago = relativeBand(watch.last_run_at, now)
-  if (ago === null) return null
-  const newest = runs?.[0]
-  if (newest) {
-    return isQuiet(newest) ? COPY.checkedNoChange(ago) : COPY.checkedAgo(ago, filesTouched(newest))
-  }
-  return watch.item_count > 0 ? COPY.checkedAgo(ago, watch.item_count) : COPY.checkedNoChange(ago)
-}
-
-/**
- * ⭐ Plan 17 — THE ITEM STATES THAT MEAN *"this file could not be read"*, AND ONLY THOSE.
- *
- * ⛔ `unauthorized` IS DELIBERATELY ABSENT, and this is the load-bearing exclusion.
- *   `watch_service.py:566-575` marks EVERY item at once when the source loses access, so
- *   listing it per file would print ONE SOURCE-LEVEL TRUTH N TIMES — directly beneath a
- *   stopped sentence that has already said it once, in a sentence written for it.
- * ⛔ `present` and `missing` are not failures at all: a file that is gone at the source is a
- *   count in the run history, not a file the reader tried and could not open.
- */
-const FILE_FAILURE_STATES: readonly string[] = ["failed", "skipped_size", "skipped_type"]
-
-/** How many failing files a card names before it starts counting the rest instead. */
-const FILE_FAILURES_SHOWN = 5
 
 export interface WatchedFoldersSectionProps {
   onNavigateToConnections?: () => void
@@ -344,21 +211,23 @@ export function WatchedFoldersSection({
 
   const stoppedById = new Map((stoppedSources ?? []).map((s) => [s.watch_id, s]))
 
-  const loadWatches = async () => {
+  // ⚠ WATCH-04: Non-collapsing sync now and background polling.
+  // `loading = true` is set ONLY on initial load. Subsequent refreshes update state in-place.
+  const loadWatches = async (initial = false) => {
     try {
-      setLoading(true)
+      if (initial) setLoading(true)
       const data = await listWatches()
       setWatches(data)
       setError(null)
     } catch (err: any) {
       setError(err?.message || "Failed to load watched folders.")
     } finally {
-      setLoading(false)
+      if (initial) setLoading(false)
     }
   }
 
   useEffect(() => {
-    loadWatches()
+    loadWatches(true)
   }, [])
 
   // ── The pending ask clears when the SOURCE says so, never on a timer ───────────────
@@ -385,7 +254,7 @@ export function WatchedFoldersSection({
   useEffect(() => {
     if (Object.keys(pendingAsks).length === 0) return
     const id = setInterval(() => {
-      loadWatches()
+      loadWatches(false)
     }, PENDING_REFRESH_MS)
     return () => clearInterval(id)
   }, [pendingAsks])
@@ -416,7 +285,7 @@ export function WatchedFoldersSection({
           },
         }))
       }
-      await loadWatches()
+      await loadWatches(false)
     } catch (err: any) {
       setError(err?.message || "Failed to trigger sync.")
     } finally {
@@ -428,7 +297,7 @@ export function WatchedFoldersSection({
     setActionInProgress(watch.id)
     try {
       await updateWatch(watch.id, { is_active: !watch.is_active })
-      await loadWatches()
+      await loadWatches(false)
     } catch (err: any) {
       setError(err?.message || "Failed to update watch status.")
     } finally {
@@ -443,7 +312,7 @@ export function WatchedFoldersSection({
     setActionInProgress(watch.id)
     try {
       await deleteWatch(watch.id)
-      await loadWatches()
+      await loadWatches(false)
     } catch (err: any) {
       setError(err?.message || "Failed to delete watch.")
     } finally {
@@ -463,7 +332,7 @@ export function WatchedFoldersSection({
     try {
       const res = await purgeWatchFiles(watch.id)
       setFeedbackMessage(res.message || `Purged missing files for ${watch.source_folder_name}.`)
-      await loadWatches()
+      await loadWatches(false)
     } catch (err: any) {
       setError(err?.message || "Failed to purge missing files.")
     } finally {
@@ -591,504 +460,11 @@ export function WatchedFoldersSection({
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         onSuccess={() => {
-          loadWatches()
+          loadWatches(false)
           setFeedbackMessage("Watched folder successfully added.")
         }}
         defaultDestinationFolderId={destinationFolderId}
       />
-    </div>
-  )
-}
-
-interface WatchRowProps {
-  watch: ConnectorWatch
-  state: SourceState
-  stopped?: StoppedSource
-  libraryFolderName: string
-  busy: boolean
-  pendingSays: string | null
-  refusal: string | null
-  canReconnect: boolean
-  onFix: (watch: ConnectorWatch, cause: SourceFailureCause) => void
-  onSyncNow: (watch: ConnectorWatch) => void
-  onToggleActive: (watch: ConnectorWatch) => void
-  onPurge: (watch: ConnectorWatch) => void
-  onDelete: (watch: ConnectorWatch) => void
-}
-
-/**
- * ONE source. A line when it is healthy and closed; a card when it is open, paused, stopped or
- * unreadable. ⚠ The outer wrapper carries `watch-card-{id}` as BOTH an `id` and a `data-testid`
- * on one line: plan 08's `handleGoToSource` scrolls with `getElementById`, which cannot address
- * a `data-testid`, and the shipped hook is what Phase 234's suites already assert.
- */
-function WatchRow({
-  watch,
-  state,
-  stopped,
-  libraryFolderName,
-  busy,
-  pendingSays,
-  refusal,
-  canReconnect,
-  onFix,
-  onSyncNow,
-  onToggleActive,
-  onPurge,
-  onDelete,
-}: WatchRowProps) {
-  const [open, setOpen] = useState(false)
-  const [historyOpen, setHistoryOpen] = useState(false)
-  const [quietExpanded, setQuietExpanded] = useState(false)
-  const [runs, setRuns] = useState<SyncRun[] | null>(null)
-  const [runsLoading, setRunsLoading] = useState(false)
-  const [runsError, setRunsError] = useState<string | null>(null)
-  const [degradedReference, setDegradedReference] = useState(false)
-  /** The stored per-file rows. `null` until asked; `[]` is an answer, not a pending state. */
-  const [items, setItems] = useState<ConnectorWatchItem[] | null>(null)
-  /**
-   * ⭐ The per-file reasons are DISCLOSED, not led with (operator, 2026-09-09 — UAT row M-2).
-   * Collapsed by default: the row owes a count, and the reasons owe a click.
-   */
-  const [failuresOpen, setFailuresOpen] = useState(false)
-  /**
-   * ⚠ A REF, NOT STATE, AND THAT WAS DRIVEN RED BEFORE IT WAS BELIEVED. As `useState` it is an
-   * effect DEPENDENCY, so setting it immediately re-ran the effect, whose cleanup cancelled the
-   * in-flight fetch it had just started — every card asked, every answer was discarded, and the
-   * block rendered nothing while the call count looked perfect.
-   */
-  const itemsAsked = useRef(false)
-  /** Set only on real unmount, so a collapse can never discard an answer already in flight. */
-  const rowMounted = useRef(true)
-
-  const collapsible = COLLAPSIBLE_STATES.includes(state)
-  const asCard = !collapsible || open
-  const presentation = STATE_PRESENTATION[state]
-  const isDegraded = state === "degraded"
-
-  // ⚠ A degraded row's `connection_name`, `item_count`, `last_run_at` and `last_status` are
-  //   MODEL DEFAULTS, not measurements (plan 07). Nothing below renders one of them as fact.
-  // Phase 240 — the product this folder belongs to, read from the folder's ADDRESS.
-  // ⚠ Gmail and Drive share one connection here, so `service_id` cannot tell them apart.
-  const productMarkKey = watchProductMarkKey(watch.source_folder_id, watch.service_id)
-  const connectionName = watch.connection_name ?? ""
-  const connectionLabel = connectionName.trim() || "the connection"
-  // ⛔ T-235-12 / T-235-33 — the raw column reaches the vocabulary leaf and NOTHING ELSE. Both
-  //   calls below are that leaf's own entry points: one answers WHICH CAUSE (so the table can
-  //   pick the one control), the other answers WHAT TO SAY and refuses to pass a provider
-  //   string through without positive proof of plainness. Neither result is the raw string.
-  const cause: SourceFailureCause = stopped?.cause ?? classifySourceFailure(watch.last_error)
-  const control = CONTROL_FOR_CAUSE[cause]
-  // ⚠ When the SERVER named the cause its sentence is the table's, verbatim. When it did not,
-  //   `sourceFailureSentence` resolves the same table for a recognised message and falls back
-  //   HONESTLY for one it does not recognise — never a guess.
-  const stoppedSentence = stopped?.cause
-    ? SENTENCE_FOR_CAUSE[stopped.cause](connectionName)
-    : sourceFailureSentence(watch.last_error, connectionName)
-  const showFix = control.action !== "reconnect" || canReconnect
-
-  const now = Date.now()
-  const outcome = isDegraded ? null : outcomeSentence(watch, runs, now)
-  const stoppedAgo = relativeBand(stopped?.stopped_since ?? watch.last_run_at, now)
-  // ⚠ `/sources/health` reads `last_good_at` over a FIVE-ROW window (plan 06), so a null there
-  //   does NOT mean "never succeeded". `neverRead` is claimed ONLY once the unbounded run list
-  //   has been fetched and holds no success — otherwise this renders nothing at all.
-  const lastGoodBand = relativeBand(stopped?.last_good_at, now)
-  const provenNeverRead = runs !== null && !runs.some((r) => r.status === "success")
-
-  // ── ⭐ THE PER-FILE ROWS — asked ONCE, only for a card that is actually showing ─────
-  //
-  // ⚠ THE COST, STATED RATHER THAN GLOSSED. A stopped or unreadable card is a card the moment
-  //   it renders (those states never collapse), so it asks automatically; a healthy source is
-  //   a LINE and asks nothing until a person opens it. On a healthy instance there are zero
-  //   stopped cards, so the automatic arm costs exactly nothing — and on an unhealthy one the
-  //   ask is bounded by the number of sources that are actually broken.
-  //
-  // ⛔ FAIL-QUIET, and the `try` deliberately WRAPS THE CALL rather than only awaiting it: a
-  //   rejection, and a build where this export is unavailable, both land in the same arm and
-  //   both render nothing. A per-file list nobody could fetch is silence, never an error the
-  //   card did not otherwise have.
-  useEffect(() => {
-    rowMounted.current = true
-    return () => {
-      rowMounted.current = false
-    }
-  }, [])
-
-  useEffect(() => {
-    if (!asCard || itemsAsked.current) return
-    itemsAsked.current = true
-    void (async () => {
-      try {
-        const detail = await getWatch(watch.id)
-        if (rowMounted.current) setItems(detail?.items ?? [])
-      } catch {
-        // Nothing is claimed. The rest of the card is untouched.
-      }
-    })()
-  }, [asCard, watch.id])
-
-  // ⛔ ONE `state` per item means CURRENT STATE, never per-run attribution (D-235-06). The
-  //   scope note beside the heading is what keeps this list from claiming otherwise, and it
-  //   renders unconditionally with the block rather than behind any branch.
-  const failingItems = (items ?? []).filter((i) => FILE_FAILURE_STATES.includes(i.state))
-
-  async function openHistory() {
-    setHistoryOpen(true)
-    if (runs !== null || runsLoading) return
-    setRunsLoading(true)
-    setRunsError(null)
-    try {
-      setRuns(await listSyncRuns(watch.id))
-    } catch (err: any) {
-      setRunsError(err?.message || "The checks for this source could not be loaded.")
-    } finally {
-      setRunsLoading(false)
-    }
-  }
-
-  const statePill = (
-    <span
-      data-testid="sources-state"
-      className={cn(
-        "inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded-full uppercase tracking-wider",
-        presentation.pill,
-      )}
-    >
-      {/* The state reads as glyph + label + colour, never colour alone. */}
-      <span aria-hidden="true">{state === "healthy" ? "●" : "○"}</span>
-      {presentation.label}
-    </span>
-  )
-
-  const cadence = (
-    <>
-      {/* SURF-01: Exact copy 'checked every N minutes' */}
-      <span className="flex items-center gap-1 font-medium text-foreground">
-        <Clock className="h-3 w-3 text-muted-foreground" />
-        <span>checked every {watch.interval_minutes} minutes</span>
-      </span>
-    </>
-  )
-
-  const outcomeLine = (
-    <span data-testid="sources-outcome" className="text-xs text-muted-foreground">
-      {pendingSays ?? outcome ?? COPY.neverRead}
-    </span>
-  )
-
-  return (
-    <div key={watch.id} id={`watch-card-${watch.id}`} data-testid={`watch-card-${watch.id}`}>
-      {!asCard ? (
-        // ── ⭐ VARIANT B — a healthy source is ONE LINE, and it opens on click ────────
-        <div
-          data-testid="sources-source-line"
-          className={cn("rounded-lg border transition-all bg-card/90", presentation.frame)}
-        >
-          <button
-            type="button"
-            onClick={() => setOpen(true)}
-            className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-left"
-          >
-            <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
-            {productMarkKey && (
-              <ConnectionMarkGlyph shape={{ service_id: productMarkKey }} size="row" />
-            )}
-            <span className="font-medium text-sm text-foreground">{watch.source_folder_name}</span>
-            {statePill}
-            {outcomeLine}
-            <span className="flex items-center gap-x-3 text-xs text-muted-foreground">{cadence}</span>
-          </button>
-        </div>
-      ) : (
-        <div
-          data-testid="sources-source-card"
-          className={cn("rounded-lg border p-4 transition-all bg-card/90 space-y-3", presentation.frame)}
-        >
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                {collapsible && (
-                  <button
-                    type="button"
-                    data-testid="sources-collapse"
-                    onClick={() => setOpen(false)}
-                    className="text-muted-foreground hover:text-foreground"
-                    aria-label={COPY.collapse}
-                  >
-                    <ChevronDown className="h-3.5 w-3.5" />
-                  </button>
-                )}
-                {productMarkKey && (
-                  <ConnectionMarkGlyph shape={{ service_id: productMarkKey }} size="row" />
-                )}
-                <span className="font-semibold text-sm text-foreground">
-                  {watch.source_folder_name}
-                </span>
-                {statePill}
-              </div>
-
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                {!isDegraded && (
-                  <>
-                    <span className="flex items-center gap-1">
-                      <HardDrive className="h-3 w-3" />
-                      <span>{connectionLabel}</span>
-                    </span>
-                    <span>&rarr;</span>
-                  </>
-                )}
-                <span className="flex items-center gap-1">
-                  <Folder className="h-3 w-3" />
-                  <span>{libraryFolderName}</span>
-                </span>
-                <span className="text-border">|</span>
-                {cadence}
-              </div>
-
-              {!isDegraded && outcomeLine}
-            </div>
-
-            {/* Actions toolbar */}
-            {!isDegraded && (
-              <div className="flex items-center gap-1.5 self-end sm:self-center">
-                <Button
-                  type="button"
-                  data-testid="sources-sync-now"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => onSyncNow(watch)}
-                  disabled={busy || !watch.is_active}
-                  className="h-8 text-xs gap-1"
-                  title="Check this source now"
-                >
-                  <RefreshCw className={cn("h-3.5 w-3.5", busy && "animate-spin")} />
-                  <span>{COPY.syncNow}</span>
-                </Button>
-
-                <Button
-                  type="button"
-                  data-testid="sources-toggle-history"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => (historyOpen ? setHistoryOpen(false) : openHistory())}
-                  className="h-8 text-xs px-2"
-                >
-                  {historyOpen ? COPY.hideHistory : COPY.history}
-                </Button>
-
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => onToggleActive(watch)}
-                  disabled={busy}
-                  className="h-8 text-xs px-2"
-                  title={watch.is_active ? "Pause watch" : "Resume watch"}
-                >
-                  {watch.is_active ? (
-                    <Pause className="h-3.5 w-3.5" />
-                  ) : (
-                    <Play className="h-3.5 w-3.5" />
-                  )}
-                </Button>
-
-                {/* VIS-05 / SC#3: Purge missing files */}
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => onPurge(watch)}
-                  disabled={busy}
-                  className="h-8 text-xs text-muted-foreground hover:text-foreground"
-                  title="Purge missing or disconnected files from Library"
-                >
-                  Purge missing files
-                </Button>
-
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => onDelete(watch)}
-                  disabled={busy}
-                  className="h-8 text-xs px-2 text-destructive hover:text-destructive hover:bg-destructive/10"
-                  title="Delete watch"
-                  aria-label="Delete watch"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-            )}
-          </div>
-
-          {/* ── ⛔ SEED-239 / D-235-13 — the NAMED degraded row ─────────────────────── */}
-          {isDegraded && (
-            <div className="space-y-2 text-xs">
-              <p data-testid="sources-degraded">{COPY.degraded}</p>
-              <Button
-                type="button"
-                data-testid="sources-report-source"
-                variant="outline"
-                size="sm"
-                className="h-7 text-xs"
-                onClick={() => setDegradedReference(true)}
-              >
-                {COPY.degradedAction}
-              </Button>
-              {/* ⚠ There is no report ENDPOINT, and inventing one would be a control that goes
-                  nowhere. What this reveals is the server's own machine-safe reference token
-                  (`projection_failed:<ExceptionClass>` — plan 07 proves it carries no frame, no
-                  exception text and no table name), so a person can quote it verbatim. */}
-              {degradedReference && (
-                <p data-testid="sources-degraded-reference" className="font-mono text-[11px] text-muted-foreground">
-                  {watch.degraded_reason ?? "no reference was recorded"}
-                </p>
-              )}
-            </div>
-          )}
-
-          {/* ── ⭐ THE STOPPED SENTENCE AND THE ONE CONTROL THAT FIXES THAT CAUSE ──── */}
-          {state === "stopped" && (
-            <div className="space-y-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-2.5 text-xs text-amber-900 dark:text-amber-200">
-              <div className="flex items-start gap-2">
-                <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden="true" />
-                <div className="flex flex-col gap-1">
-                  {stoppedAgo !== null && <span>{COPY.stopped(stoppedAgo)}</span>}
-                  <span data-testid="sources-stopped-sentence">{stoppedSentence}</span>
-                  {lastGoodBand !== null ? (
-                    <span data-testid="sources-last-good">{COPY.lastGood(lastGoodBand)}</span>
-                  ) : provenNeverRead ? (
-                    <span data-testid="sources-last-good">{COPY.neverRead}</span>
-                  ) : null}
-                </div>
-              </div>
-              {showFix && (
-                <div className="flex justify-end">
-                  <Button
-                    type="button"
-                    data-testid="sources-fix"
-                    variant="outline"
-                    size="sm"
-                    className="h-7 text-xs border-amber-500/40 hover:bg-amber-500/20 font-medium"
-                    onClick={() => onFix(watch, cause)}
-                  >
-                    {control.label(connectionName)}
-                  </Button>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ── ⭐ THE FILES IT COULD NOT READ, AS THEY STAND NOW ──────────────────── */}
-          {/* ⛔ OUTSIDE the history, and never inside a run row. A run row is a claim about
-                ONE check; `connector_watch_items` carries one state per file and cannot
-                support that claim, so the block sits here and the note says which claim it
-                IS making. Per-run attribution needs a per-run writer — `SEED-254`.
-              ⛔ With no failing file this renders NOTHING — no heading and no empty state.
-                An empty per-file list is not one of this source's own attention states. */}
-          {failingItems.length > 0 && (
-            <div
-              data-testid="sources-file-failures"
-              className="space-y-1.5 border-t border-border/50 pt-2 text-xs"
-            >
-              {/* ⭐ THE COUNT LEADS; THE REASONS ARE ONE CLICK AWAY. The operator asked for
-                    exactly this on 2026-09-09 after the list opened the section during UAT:
-                    *"we can just put like two files failed ... and if I clicked I should see
-                    the reason"*. ⚠ The warning register and nothing above it — a source state
-                    never escalates further (BUILD-CONTRACT §4). */}
-              <button
-                type="button"
-                data-testid="sources-file-failure-summary"
-                aria-expanded={failuresOpen}
-                onClick={() => setFailuresOpen((v) => !v)}
-                className="flex w-full items-center gap-1.5 text-left text-warning hover:opacity-80"
-              >
-                <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                <span className="font-medium">{FILE_FAILURE_SUMMARY(failingItems.length)}</span>
-                {failuresOpen ? (
-                  <ChevronDown className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                ) : (
-                  <ChevronRight className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                )}
-              </button>
-              {failuresOpen && (
-                <>
-              <p className="font-medium text-foreground">{FILE_FAILURE_HEADING}</p>
-              <p
-                data-testid="sources-file-failure-scope"
-                className="text-[11px] text-muted-foreground"
-              >
-                {FILE_FAILURE_SCOPE_NOTE}
-              </p>
-              <ul className="space-y-1">
-                {failingItems.slice(0, FILE_FAILURES_SHOWN).map((item) => (
-                  <li
-                    key={item.id}
-                    data-testid="sources-file-failure"
-                    className="text-muted-foreground"
-                  >
-                    {/* The name is a TEXT CHILD — React escapes it, and this file introduces
-                        no raw-HTML escape hatch (T-235c-12). */}
-                    <span className="font-medium text-foreground">{item.name}</span>
-                    <span aria-hidden="true"> &mdash; </span>
-                    {/* ⛔ The item's own stored message reaches the vocabulary leaf and NOTHING
-                        ELSE. `fileFailureKind` returns one of three KEYS, so a provider string
-                        cannot ride through it onto the screen (T-235c-11). */}
-                    {SENTENCE_FOR_FILE_FAILURE[fileFailureKind(item.state, item.last_error)]}
-                  </li>
-                ))}
-              </ul>
-              {failingItems.length > FILE_FAILURES_SHOWN && (
-                <p
-                  data-testid="sources-file-failure-more"
-                  className="text-[11px] text-muted-foreground"
-                >
-                  {FILE_FAILURE_MORE(failingItems.length - FILE_FAILURES_SHOWN)}
-                </p>
-              )}
-                </>
-              )}
-            </div>
-          )}
-
-          {/* ⛔ The request was DECLINED, not queued — so it does not render as `asked`. */}
-          {refusal && (
-            <p data-testid="sources-refusal" className="text-[11px] text-muted-foreground">
-              {refusal}
-            </p>
-          )}
-
-          {/* ── THE HISTORY — every tick this source made, one click away ───────────── */}
-          {historyOpen && (
-            <div className="border-t border-border/50 pt-2">
-              {runsLoading ? (
-                // ⚠ SEED-248 — a surface that is still loading must SAY so. An empty list and
-                //   "there is nothing" are indistinguishable, and they mean opposite things.
-                <div
-                  data-testid="sources-history-loading"
-                  className="flex items-center gap-2 px-2 py-1 text-xs text-muted-foreground"
-                >
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
-                  Loading the checks for this source...
-                </div>
-              ) : runsError ? (
-                <p data-testid="sources-history-error" className="px-2 py-1 text-xs text-muted-foreground">
-                  {runsError}
-                </p>
-              ) : (
-                <RunHistoryList
-                  runs={runs ?? []}
-                  connectionName={connectionName}
-                  expanded={quietExpanded}
-                  onToggleExpanded={() => setQuietExpanded((v) => !v)}
-                  now={now}
-                />
-              )}
-            </div>
-          )}
-        </div>
-      )}
     </div>
   )
 }

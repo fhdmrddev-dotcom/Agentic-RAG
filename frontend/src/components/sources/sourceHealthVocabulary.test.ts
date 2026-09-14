@@ -312,7 +312,7 @@ describe("V-07 — each cause maps to exactly ONE named control", () => {
     expect(label).not.toBe("Retry now")
     expect(label).not.toContain("Reconnect")
     expect(label).toContain("Marketing Drive")
-    expect(label).toBe("Turn Marketing Drive back on")
+    expect(label).toBe("Open Marketing Drive in Settings ↗")
     expect(SENTENCE_FOR_CAUSE.connection_disabled("Marketing Drive")).not.toBe(
       UNKNOWN_SOURCE_FAILURE_SENTENCE,
     )
@@ -326,8 +326,8 @@ describe("V-07 — each cause maps to exactly ONE named control", () => {
   })
 
   it("an empty connection name degrades on the new cause too, rather than printing a gap", () => {
-    expect(CONTROL_FOR_CAUSE.connection_disabled.label("")).toBe("Turn the connection back on")
-    expect(CONTROL_FOR_CAUSE.connection_disabled.label("   ")).toBe("Turn the connection back on")
+    expect(CONTROL_FOR_CAUSE.connection_disabled.label("")).toBe("Open Connection Settings ↗")
+    expect(CONTROL_FOR_CAUSE.connection_disabled.label("   ")).toBe("Open Connection Settings ↗")
     expect(SENTENCE_FOR_CAUSE.connection_disabled("")).toContain("the connection")
   })
 
@@ -561,8 +561,9 @@ describe("COPY — the sentences the BUILD-CONTRACT pins", () => {
   it("the stopped pair says THAT it stopped and WHEN it last succeeded", () => {
     expect(COPY.stopped("3 days ago")).toBe("Stopped reading 3 days ago")
     expect(COPY.lastGood("2 September, 09:14")).toBe(
-      "Last read successfully on 2 September, 09:14",
+      "Last read successfully 2 September, 09:14",
     )
+    expect(COPY.lastGood("8m ago")).toBe("Last read successfully 8m ago")
     expect(COPY.neverRead).toBe("It has not read successfully yet.")
   })
 
@@ -676,7 +677,7 @@ describe("instantPhrase — the BUILD-CONTRACT's absolute instant", () => {
     const d = new Date(2026, 8, 2, 9, 14) // 2 September 2026, 09:14 local
     expect(instantPhrase(d.toISOString())).toBe("2 September, 09:14")
     expect(COPY.lastGood(instantPhrase(d.toISOString()) as string)).toBe(
-      "Last read successfully on 2 September, 09:14",
+      "Last read successfully 2 September, 09:14",
     )
   })
 
