@@ -4,10 +4,10 @@ title: An operator wanting a model gone from the chat picker reaches for "deprec
 reported: 2026-09-08
 surface: Agentic-RAG
 severity: major
-status: open
+status: closed
 affected_areas: [frontend/admin, ModelRegistryTab, model-registry, control-room, UX/legibility, chat/model-picker]
-folded_into: null
-verified_closed_by: null
+folded_into: 249
+verified_closed_by: Phase 249 (MODEL-07, 2026-09-15)
 related_seeds: [SEED-258]
 re_open_trigger: null
 reproduces_on:
@@ -96,3 +96,52 @@ complaint half-standing.**
   **`SEED-258`**, whose thesis is exactly this: *a configuration control must carry its effect, not
   just its value*. This is that seed's first instance found in the wild rather than by inventory.
 - **Plant as seed:** n/a — observed, with a live repro.
+
+
+---
+
+## CLOSED 2026-09-15 — Phase 249 (MODEL-07). What shipped, and what deliberately did not.
+
+**This report was right about everything including the diagnosis**, and the fix follows its own
+reasoning rather than the obvious one.
+
+### ⛔ What deliberately did NOT change
+
+`deprecated`'s semantics. `D-149-04` — *"a deprecated row stays enabled/selectable"* — is a shipped
+decision, read by the registry, the composer and `ModelPillRow`. This report says so itself:
+*"The behaviour is CORRECT and the product is doing exactly what it was designed to do."* No
+rename, no coupling to `enabled`, and a case now pins that flipping `deprecated` leaves the
+`CouplingChip` reading `✓ in picker`.
+
+### ⛔ And what was NOT added: a fourth passive affordance
+
+This report's sharpest paragraph is the one about the mechanism that already existed:
+*"A legibility affordance was designed, built, and still lost to the neighbouring toggle in real
+use."* The `Users see` column and its `CouplingChip` ARE the coupling-made-visible affordance.
+**Adding a second one would have repeated the move that already failed.** So the words went **on
+the controls**, where they are reached.
+
+### What shipped
+
+- The **`deprecated`** switch now carries a **visible** sentence beneath it:
+  *"Marks it old. It stays in the picker — use Enabled to take it out, Remove to delete it."*
+  Visible, not a `title=` — an operator arriving with the wrong mental model will not hover a
+  switch to have it corrected.
+- The **`Enabled`** switch carries a screen-reader description: *"On: users can pick this model in
+  chat. Off: it disappears from the picker."* Its visible partner is the `Users see` chip beside it.
+- Both are pinned by `frontend/src/components/admin/__tests__/hideControlLegibility.test.tsx`,
+  asserting **rendered content** resolved through `aria-describedby` — never element presence,
+  because presence assertions cannot see content drift.
+
+### ⭐ One fact this report could not have known
+
+**There are now THREE answers to "get rid of this model", and this report predates one of them.**
+`Remove` (`RemoveControl`) arrived with **migration 179**, after 2026-09-08 — it deletes a DB-only
+row and tombstones a code-declared one. The new copy names all three, so the operator picks rather
+than discovering the third later.
+
+### ⚠ And a finding the fix turned up
+
+`ModelRegistryTab.test.tsx` — the suite covering this very table — was **running outside the
+frontend count gate entirely** (`src/components/admin/` had one named entry and no directory
+entry). It is now in both knobs.

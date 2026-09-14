@@ -1,6 +1,6 @@
 ---
 id: SEED-040
-status: dormant
+status: partially-answered
 planted: 2026-05-30
 planted_during: v2.8 (Harness Engine & Workflow Mode — surfaced during Phase 089/090 cross-provider debugging)
 trigger_when: A new model needs a config.py code edit (or manual DB insert) to get correct capabilities, OR provider_model_lists drifts from a provider's live /models, OR an admin/operator-UI / settings-unification milestone is scoped
@@ -138,3 +138,45 @@ Breadcrumbs: `config.py:339` (`MODEL_CAPABILITIES` google rows — no 3.6), `con
 consumer), `harness_audit` rows for run `da5541c0-a786-4ab0-b5fe-bea8b1850bbf` (`tier: "coerce"`).
 Related: [[SEED-088]] (dynamic model registry / live discovery — the same operator ask from the
 discovery angle).
+
+
+---
+
+## ⭐ PARTIALLY ANSWERED — Phase 249, 2026-09-15. Two arms moved; the core one did not.
+
+This seed is the umbrella *"new models must not need a code edit"*. Phase 249 moved **two of its
+arms** and left the biggest one exactly where it was.
+
+### ✅ The self-service arm, for the providers it could not reach
+
+`SEED-040`'s own framing — *"the DB plumbing already exists but was never surfaced"* — became true
+a second time, one layer up: the **write UI shipped in Phase 149**, and then **excluded
+`ollama` / `lmstudio` / `custom` for its whole life** because the add endpoint validated the SSRF
+discovery allowlist rather than the routing roster. Phase 249 / MODEL-04 fixed that (see
+`SEED-172` finding #1). ⭐ **So the arm that was "no write half" is now "the write half, for every
+provider the app can actually route to."**
+
+### ✅ The eval arm
+
+`BUG-260809-01` — carried under this seed's `related_seeds` — is **CLOSED** by measurement rather
+than by code: a fresh sweep reads **8/8 healthy, zero opaque `provider_error`**, and the
+verbatim-cause property is now fenced. ⛔ That measurement is **local**, not cloud; the report
+records the limit.
+
+### ⛔ WHAT THIS SEED IS ACTUALLY ABOUT IS STILL OPEN
+
+The `trigger_fired` line names it: *"Phase 175 — `gpt-5.6` reasoning models needed `config.py`
+`reasoning_first` / `reasoning_off` edits; the DB-override tier does NOT cover these flags and the
+routing seams bypass the DB entirely."*
+
+**That is unchanged.** The DB override tier still covers only
+`llm_call_timeout_seconds` / `context_window_tokens` / `max_output_tokens` / `native_tools` /
+`deprecated` / `emit_tier`. `reasoning_first`, `reasoning_off`, `max_tools`,
+`uses_max_completion_tokens` and `supports_parallel_tools` remain **code-only**, and
+`MODEL_CAPABILITIES`' extraction seam is **owed at 49 phases**.
+
+⚠ A model needing one of those flags **still needs a code edit and a deploy** — which is this
+seed's own headline. Phase 249 widened WHO can be added; it did not widen WHAT can be configured.
+
+**Re-open trigger, unchanged:** the next model that needs a `config.py` capability edit, or any
+phase that proposes the `MODEL_CAPABILITIES` extraction.

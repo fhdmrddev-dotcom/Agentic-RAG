@@ -100,25 +100,25 @@ defects standing between "it shipped" and "you can rely on it".
 
 ### The Model You Actually Run
 
-- [ ] **MODEL-04**: A local or self-hosted model — Ollama, LM Studio, vLLM, or any OpenAI-compatible
+- [x] **MODEL-04**: A local or self-hosted model — Ollama, LM Studio, vLLM, or any OpenAI-compatible
       endpoint — is addable from the Model Registry **UI**, without a code edit and without a deploy.
       *(`SEED-172`, trigger **fired by the operator 2026-09-13**: `POST /admin/models` validates its
       provider argument against the 8-cloud **SSRF discovery allowlist** rather than the routing
       roster. `SEED-040`, trigger fired 2026-07-22.)*
-- [ ] **MODEL-05**: A model whose id is absent from the capability registry **says so at pick time**.
+- [x] **MODEL-05**: A model whose id is absent from the capability registry **says so at pick time**.
       ⛔ Today it resolves `capability_source = inferred` and silently loses `native_tools`, which
       short-circuits above every tool gate — the run simply never calls a tool and nothing says why.
       *(`SEED-172` second arm, `SEED-135`.)*
-- [ ] **MODEL-06**: A registry or settings change reaches **every** worker, not only the one that
+- [x] **MODEL-06**: A registry or settings change reaches **every** worker, not only the one that
       served the write. *(`BUG-260902-06`, major — `WORKER_COUNT=2` by default, so a newly added
       model appears roughly half the time.)*
-- [ ] **MODEL-07**: The control that hides a model from the picker is the discoverable one.
+- [x] **MODEL-07**: The control that hides a model from the picker is the discoverable one.
       *(`BUG-260908-03`, major — `deprecated` reads as the hide control and `enabled` does not.)*
-- [ ] **MODEL-08**: A settings write the database refuses reports **failure**. *(`BUG-260909-01` —
+- [x] **MODEL-08**: A settings write the database refuses reports **failure**. *(`BUG-260909-01` —
       `save_app_settings` swallows a rejected write and returns 200 + "Saved". Same failure class as
       migration 078, which hid for ~10 days, and as the `lmstudio_api_key` column migration 180 just
       added.)*
-- [ ] **MODEL-09**: Every configured eval engine either reports healthy or **names its own cause** —
+- [x] **MODEL-09**: Every configured eval engine either reports healthy or **names its own cause** —
       no opaque `provider_error`. ⚠ **Re-measure FIRST**: `BUG-260809-01` (0/8 healthy, 6 of 8 hiding
       why) was measured against the **old** production on 2026-08-09. 292 commits have landed since.
       Engine health is a live sweep and is not persisted, so it cannot be re-derived from the
@@ -267,12 +267,12 @@ milestone-wide standing gate. Coverage 26/26 — no orphans, no duplicates.**
 | CRED-02 | Phase 248 — The Credential Boundary | Pending |
 | CRED-03 | Phase 248 — The Credential Boundary | Pending (⛔ revoke from `PUBLIC`, not from `anon`) |
 | CRED-04 | Phase 248 — The Credential Boundary | Pending |
-| MODEL-04 | Phase 249 — The Model You Actually Run | Pending |
-| MODEL-05 | Phase 249 — The Model You Actually Run | Pending |
-| MODEL-06 | Phase 249 — The Model You Actually Run | Pending |
-| MODEL-07 | Phase 249 — The Model You Actually Run | Pending |
-| MODEL-08 | Phase 249 — The Model You Actually Run | Pending |
-| MODEL-09 | Phase 249 — The Model You Actually Run | ⚠ **Blocked on re-measurement** — one operator click on Settings → Eval engine health → Run sweep, at `/gsd:discuss-phase 249`, BEFORE it is planned |
+| MODEL-04 | Phase 249 — The Model You Actually Run | **Complete (partial)** — addable from the UI with no code edit or deploy, driven live for all 3 self-hosted providers. ⛔ *"then usable in chat"* NOT driven: no live self-hosted endpoint answered during the run (`249-UAT.md` §C) |
+| MODEL-05 | Phase 249 — The Model You Actually Run | **Complete** — the chip now renders at pick time (the composer), states the tool-loss consequence, and does not fire on an operator-added model. Driven on all **11** configured providers |
+| MODEL-06 | Phase 249 — The Model You Actually Run | **Complete by construction + fence** — the broadcast was ALREADY shipped (`BUG-260902-06`) and is now pinned in both directions. ⛔ the multi-worker arm is NOT observed: this box runs two single-worker `--reload` servers, so `WORKER_COUNT=2` does not exist here |
+| MODEL-07 | Phase 249 — The Model You Actually Run | **Complete** — the words went ON the two controls, not into a fourth passive column. `deprecated` semantics unchanged (D-149-04) |
+| MODEL-08 | Phase 249 — The Model You Actually Run | **Complete** — reproduced live, then fixed: a refused value is a 400 naming the column and rule; an unreachable DB is still a 500. Also closed a traceback that logged the whole row |
+| MODEL-09 | Phase 249 — The Model You Actually Run | **Closed by measurement, 2026-09-15** — fresh sweep **8/8 healthy, zero opaque `provider_error`**; the stale board's one failure named its cause verbatim. `BUG-260809-01` closed. ⛔ measured **LOCAL**; the cloud half is one operator click and is unmeasured |
 | HONEST-01 | Phase 250 — Run Honesty | Pending |
 | HONEST-02 | Phase 250 — Run Honesty | Pending |
 | HONEST-03 | Phase 250 — Run Honesty | Pending |

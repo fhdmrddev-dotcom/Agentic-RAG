@@ -3,8 +3,8 @@ seed_id: SEED-172
 title: Local LLM providers (Ollama / LM Studio) cannot be added through the Model Registry — the add-model endpoint validates against the SSRF discovery allowlist instead of the routing roster
 created: 2026-08-17
 planted_during: operator local-model testing, during Phase 195 execution
-status: planted
-priority: medium   # ⬆ the operator fired arm 1 on 2026-09-13; see `trigger_fired`
+status: partially-answered
+priority: medium   # ⬆ operator fired arm 1 on 2026-09-13. Finding #1 SHIPPED in Phase 249 (MODEL-04). Findings #2/#3/#4 REMAIN OPEN — see the Phase 249 section at the end.
 trigger_fired: >
   2026-09-13, at the v4.1 milestone close — the OPERATOR, unprompted: "I need to add manually from
   the model registry the models for Ollama or LM Studio and configure the timeout and everything,
@@ -263,3 +263,55 @@ capability into a closing milestone is the G-7 failure mode this project has alr
 **Carried to the next milestone as a candidate requirement**, alongside `SEED-040`
 (model-registry self-service) and `SEED-135`, which it is now the concrete, operator-reported
 instance of.
+
+
+---
+
+## ⭐ ANSWERED IN PART — Phase 249 (MODEL-04), 2026-09-15. **Status is `partially-answered`, not `answered`.**
+
+⛔ **The distinction is the point.** This seed carries **six findings**, and Phase 249 closed
+**one** of them. Flipping it to `answered` would delete five live findings behind a word — which is
+this project's own recorded failure mode (Phase 245 measured a seed whose status and whose
+frontmatter disagreed, and the PROSE was what had rotted).
+
+### ✅ Finding #1 — THE BLOCKER — is CLOSED
+
+The diagnosis in this seed was exact, including both line numbers and both layers. What shipped:
+
+- `backend/app/config.py` gains `ROUTING_PROVIDERS: frozenset[str] = frozenset(_PROVIDER_BASE_URLS)`
+  — **derived**, so it cannot drift from the table it comes from.
+- `POST /admin/models` validates against **that**, not `PROVIDER_ENDPOINTS`.
+- `ModelRegistryTab.tsx`'s `ADD_PROVIDER_ROSTER` widens 8 → **11**, and is **pinned to the backend
+  roster** by a `?raw` lockstep fence that reads `_PROVIDER_BASE_URLS` out of `config.py` at test
+  time. ⛔ The seed named the third copy of the roster; a longer hand-typed array would have fixed
+  today and guaranteed tomorrow's drift.
+- ⛔ **`PROVIDER_ENDPOINTS` is BYTE-UNCHANGED**, and a fence fails if a self-hosted provider ever
+  reaches it. The seed called the original *"a conflation and not a security decision"*, and the
+  fix keeps the security decision intact while removing the conflation.
+
+**Driven live 2026-09-15**, not merely tested: `POST /admin/models` with `provider: ollama` → **200
+`enabled:false`**; the same for `lmstudio` and `custom`; an unknown provider still **422**. The
+registry UI now renders 11 provider sections and the Add form offers 11 options.
+
+### ⛔ Findings #2, #3 and #4 are UNTOUCHED and stay open
+
+| # | Finding | Status |
+|---|---|---|
+| **2** | The **600-second SDK ceiling** `get_llm_client` never sets. Raise a model's timeout above 600 and httpx's read timeout binds instead, surfacing as `APITimeoutError` rather than the `asyncio.TimeoutError` the loop classifies — **and `max_retries=2` means a slow local model can be attempted three times.** | ⛔ **OPEN** |
+| **3** | No range validation on the DB / UI write path for capability values. | ⛔ **OPEN** |
+| **4** | `context_window_tokens` must match the **LOADED** context, not the advertised max — a guidance/affordance gap the Add form does not address. | ⛔ **OPEN** |
+
+⚠ **Finding #2 is the one most likely to bite next**, and it bites exactly the users this phase just
+unblocked: a local model is precisely the kind you would give a 900-second timeout. Phase 249 made
+those models addable and did **nothing** about the ceiling their timeouts will hit.
+
+### Second arm of `trigger_when`, partially answered
+
+*"local models are permanently `capability_source=inferred`"* — a model added through the registry
+now resolves **`db_override`** and counts as **verified** at pick time (Phase 249 / MODEL-05: the
+verified set became the union of built-ins and operator-entered rows), and an unregistered model
+now **says so in the composer** with the consequence spelled out. ⚠ A local model the operator has
+**not** added is still inferred — which is correct, and now visible instead of silent.
+
+**Re-open trigger for the remainder:** any work on `get_llm_client`, on per-model timeouts, or the
+next time someone needs an LLM call to run longer than 600 seconds.

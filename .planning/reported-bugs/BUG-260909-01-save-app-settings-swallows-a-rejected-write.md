@@ -4,10 +4,10 @@ title: save_app_settings() swallows a database CheckViolationError and returns a
 reported: 2026-09-09
 surface: Agentic-RAG
 severity: minor
-status: open
+status: closed
 affected_areas: [backend/settings, app_settings, user_settings.py, error-honesty]
-folded_into: null
-verified_closed_by: null
+folded_into: 249
+verified_closed_by: Phase 249 (MODEL-08, 2026-09-15)
 related_seeds: [SEED-258]
 re_open_trigger: null
 reproduces_on:
@@ -74,3 +74,62 @@ the original intent and removes the silence.
 - **Defer to future phase:** the `SEED-258` configuration-surface work, where settings-write honesty
   is already the theme.
 - **Plant as seed:** n/a — observed, with a live repro.
+
+
+---
+
+## CLOSED 2026-09-15 — Phase 249 (MODEL-08). Reproduced first, against the same constraint.
+
+### Reproduced, verbatim, before anything was changed
+
+```
+BEFORE source_max_file_size_mb = 25
+  set      0 -> returned False
+  set     51 -> returned False
+  set    999 -> returned False
+AFTER  source_max_file_size_mb = 25
+```
+
+Identical to this report's own three lines. Every one raised
+`asyncpg.exceptions.CheckViolationError` on `app_settings_source_max_file_size_mb_bounds` — **the
+database did its job** — and the caller could not tell that from a connection reset.
+
+### After
+
+```
+  set      0 -> REFUSED: columns=['source_max_file_size_mb']
+                constraint=app_settings_source_max_file_size_mb_bounds
+  set     51 -> REFUSED: …
+  set    999 -> REFUSED: …
+AFTER  source_max_file_size_mb = 25
+```
+
+`save_app_settings` raises `SettingsWriteRefused` on the refusal family
+(`CheckViolation` / `NotNullViolation` / `UndefinedColumn`) and still returns `False` for
+everything else. `PUT /settings` and the three admin write seams answer **400** with the column and
+the rule; an unreachable database is still a **500**, byte-identical.
+
+### ⚠ The honest scoping in this report is PRESERVED, not inflated
+
+This was and remains **`severity: minor` and NOT user-reachable** — `api/settings.py:489` validates
+before the write, so the UI and API paths were always correct. **Getting fixed does not make it
+retroactively a user-visible bug.** Its value is the next caller: a script, a migration helper, a
+future admin path that does not re-implement the API's validation.
+
+### ⭐ A SECOND FINDING THIS REPORT DOES NOT MENTION, surfaced by reproducing it
+
+The old arm logged with `exc_info=True`. asyncpg's `CheckViolationError` arrives carrying a
+`DETAIL:` line containing **the entire failing row** — every `enc:v1:` secret envelope and the
+operator's self-hosted tunnel URL among them. `T-081.1-04` says these rows must never be logged.
+
+**So the silent failure had a quiet disclosure sitting beside it.** The refusal arm now logs
+**without** a traceback and raises `from None`, so a 500 handler rendering `__cause__` cannot print
+the row either. Both are pinned by a case that greps the exception, its cause **and** the log
+records for the value, for `enc:v1:` and for the URL.
+
+### ⭐ And the arm this report's "suggested fix direction" got right
+
+`UndefinedColumnError` is deliberately in the refusal family. It is the *knob shipped in CODE
+without its migration* signature this report names — mig 078's `skill_builder_model` hid ~10 days,
+`lmstudio_api_key` until mig 180. Naming that column in the response is the difference between ten
+days and ten seconds.

@@ -1,10 +1,10 @@
 ---
 seed_id: SEED-135
 title: "Model fitness must be visible BEFORE it costs you a run — the app has THREE model roles (chat/retrieve, emit step, publish judge) with three different bars, all picked from flat dropdowns that imply interchangeability; a single-provider tenant can be silently blocked from publishing"
-status: open
+status: partially-answered
 planted: 2026-07-31
 phase_origin: "Phase 185 operator UAT, 2026-07-30/31 (runs da5541c0 and ced8005d). Two independent model-fitness failures surfaced in ONE golden-run attempt: an unregistered chat model silently degraded the emit phase from force to coerce, and a registry-known force-tier Google judge returned provider_error with a null verdict. Neither was announced anywhere before the run burned."
-folded_into: null
+folded_into: 249 (the cheap 80% only — the per-role half stays open)
 category: "Cross-provider model management / honesty at pick time — a SURFACING gap over capability data that already exists in the registry, plus one genuinely missing facet (judge fitness). NOT a re-platform of the LLM call path; the emit ladder and the judge resolver are both correct as written."
 related_seeds: [SEED-040, SEED-088, SEED-122, SEED-082, SEED-085, SEED-118]
 related_memories: [feedback_cross_provider_always_top_of_mind, feedback_provider_uniform_ux, feedback_model_names_representative, project_provider_feature_fit_routing, feedback_investigate_with_tools_first]
@@ -356,3 +356,49 @@ here rather than in a fourth record; per-role model fitness is simply the first 
 of the general rule. Related: [[SEED-117]] (config consolidation), and the standing project direction
 recorded in the `project_dynamic_settings_direction` and `project_admin_panel_plan` memories
 ("everything dynamic → Settings/admin; only API keys stay env secrets").
+
+
+---
+
+## ⭐ THE CHEAP 80% SHIPPED — Phase 249 (MODEL-05), 2026-09-15. The expensive half stays open.
+
+This seed proposed its own split: *"A cheap 80% (surface the tier that already exists in the three
+pickers + validate the judge write against emit_tier) is independently shippable and does not need
+088."* Phase 249 took that split as written.
+
+### ✅ Shipped
+
+- **The pick-time warning exists where the pick happens.** The `unverified` chip had existed since
+  Phase 075.3 — in `ModelPillRow`, on the **Settings** page. The chat composer's dropdown, where a
+  model is actually chosen, had **no marker at all**. It does now, from the same shared copy module,
+  so the two surfaces cannot drift.
+- **It states the CONSEQUENCE, not the mechanism.** For a model whose inferred provider has no
+  native tool calling, the chip says tool calling is disabled, that the run will be structured-mode,
+  and that any tool call will arrive as unreadable text. ⭐ Lifted from `config.py`'s own wording,
+  which reads that way because the previous phrasing (`safe_defaults_applied=True`) **read as
+  benign and hid a total tool-calling failure for a day on 2026-08-18**.
+- **The judge-write validation this seed also asked for ALREADY EXISTED** —
+  `api/settings.py:798` rejects a non-registry `harness_judge_model` with a 400. Measured, not
+  built. Recorded so it is not proposed again.
+- ⛔ **`D-122-05` is untouched.** This seed's own instruction — *"That default is CORRECT and must
+  not change; what is missing is that the degradation is invisible to the person who caused it"* —
+  is honoured exactly: the pick still works, and a case pins that it does.
+
+### ⭐ What the shipped fix measured on the operator's real configuration
+
+**13 of their configured models will silently lose tool calling** — 5 OpenRouter, 6 Ollama,
+2 LM Studio — and until this phase nothing said so at pick time. That is this seed's thesis,
+quantified on a live machine rather than argued.
+
+### ⛔ The expensive half is OPEN and unchanged
+
+**THREE model roles with three different bars** — chat/retrieve, workflow emit step, publish judge —
+all still picked from flat dropdowns that imply interchangeability. The composer chip answers
+*"is this model registered, and will it call tools?"*. It does **not** answer *"is this model fit
+for the emit step?"* or *"can this tenant publish at all?"*, and the single-provider-tenant publish
+block this seed predicts is untouched.
+
+**Re-open trigger: unchanged, verbatim** — the first time a tenant is pinned to a single non-OpenAI,
+non-Anthropic provider; or anyone asks *"which model should I use for X?"* about a workflow emit
+step or the publish judge; or a publish/emit failure is triaged to the model rather than the
+workflow.
