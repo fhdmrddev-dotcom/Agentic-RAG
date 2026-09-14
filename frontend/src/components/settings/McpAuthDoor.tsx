@@ -34,6 +34,8 @@ import {
   MCP_UNREACHABLE_HEADING,
   mcpAuthActionLabel,
   mcpPolicyRefusalMessage,
+  customClientIdError,
+  customClientIdLooksLikeSecret,
   type ConnectionDraft,
 } from "@/components/settings/connectionFormCopy"
 import { cn } from "@/lib/utils"
@@ -138,6 +140,11 @@ export function McpAuthDoor({
     // The one fact both the render and this handler branch on: a server that does NOT
     // advertise RFC 7591 dynamic registration needs the operator's own client credentials.
     const byoCredentials = probeResult?.registration_required === true
+
+    if (byoCredentials && customClientIdLooksLikeSecret(draft.customClientId)) {
+      setOauthError(customClientIdError(draft.customClientId) || "Custom Client ID cannot be a secret or API key")
+      return
+    }
 
     const popup = typeof window !== "undefined" ? window.open("about:blank", "_blank") : null
     if (!popup) {
@@ -350,8 +357,16 @@ export function McpAuthDoor({
                   value={draft.customClientId || ""}
                   onChange={(e) => onDraftChange({ customClientId: e.target.value })}
                   placeholder="e.g. app-client-12345"
-                  className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-xs text-foreground shadow-xs outline-none focus:border-primary"
+                  className={cn(
+                    "w-full rounded-md border bg-background px-3 py-1.5 text-xs text-foreground shadow-xs outline-none focus:border-primary",
+                    customClientIdError(draft.customClientId) ? "border-destructive focus:border-destructive" : "border-input"
+                  )}
                 />
+                {customClientIdError(draft.customClientId) && (
+                  <p data-testid="mcp-client-id-error" className="mt-1 text-xs text-destructive">
+                    {customClientIdError(draft.customClientId)}
+                  </p>
+                )}
               </div>
 
               <div className="space-y-1">
@@ -377,7 +392,11 @@ export function McpAuthDoor({
               type="button"
               data-testid="mcp-oauth-connect-btn"
               onClick={handleOAuthConnect}
-              disabled={isAuthorizing || (regRequired && (!draft.customClientId?.trim() || !draft.customClientSecret?.trim()))}
+              disabled={
+                isAuthorizing ||
+                (regRequired && (!draft.customClientId?.trim() || !draft.customClientSecret?.trim())) ||
+                Boolean(customClientIdError(draft.customClientId))
+              }
               className={cn(
                 "w-full rounded-md bg-primary px-3 py-2 text-xs font-medium text-primary-foreground shadow-xs hover:opacity-90 disabled:opacity-50 transition-opacity flex items-center justify-center gap-2",
               )}

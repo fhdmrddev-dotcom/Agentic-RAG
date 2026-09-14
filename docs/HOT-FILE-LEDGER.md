@@ -10388,6 +10388,8 @@ cells rot within days.
 | [`frontend/src/components/library/LibraryCloudImport.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibrarylibrarycloudimporttsx) | 1 / 1 / 194 | no (new) | young (created 244-06). Row added AT CREATION. The Library's single-file cloud door — ⛔ it renders a REASON in every unavailable state; a silent grey-out is the same failure as a silent root write |
 | [`frontend/src/components/library/LibraryHeaderBar.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibrarylibraryheaderbartsx--row-added-244-04) | 2 / 1 / 204 | no (1 phase) | ⚠ absent for its entire life — row added 244-04 at its SECOND touch. ⛔ the ONE set of tab triggers: a hidden duplicate broke 41 cases. `aria-hidden` on the count is load-bearing |
 | [`frontend/src/components/layout/ChatHistoryColumn.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutchathistorycolumntsx) | 7 / 2 / 513 | below threshold | ⚠ **ABSENT from BOTH for its ENTIRE LIFE — row added 244-01 at its SECOND phase** (`settingsSearchPayload.ts` precedent). D-244-20 claimed a row existed; the gate refuted it |
+| [`frontend/src/components/settings/ActionRow.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsactionrowtsx) | 1 / 1 / 153 | no (1 phase) | Single action permission row in grant list; renders direction, posture buttons, and forward-action reset affordance (CRED-02). |
+| [`frontend/src/components/settings/McpAuthDoor.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsmcpauthdoortsx) | 3 / 1 / 451 | no (1 phase) | Second writer of custom_client_id (Phase 222 BYO door). CRED-01 inline refusal shared with ConnectionFormPanel via customClientIdError; both doors must enforce the same boundary. |
 | [`frontend/src/hooks/useThreads.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusethreadsts) | 4 / 2 / 64 | below threshold | ⚠ **ABSENT from BOTH registers for its entire life — row added 244-01.** The app's ONE thread-selection owner; `selectThread` is a bare `setState`, so "first click does not open" cannot originate here |
 | [`backend/app/services/harness/grounding.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessgroundingpy) | 21 / 8 / 1414 | **FIRES** | honoured by construction (193.1 / 211 / **214**) — ⚠ **extraction still OWED**; 214 changed no capability set |
 | [`frontend/src/components/workflows/PhaseFormPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsphaseformpaneltsx) | 30 / 14 / 1566 | **FIRES** | honoured by construction ×6 (185 / 193 / 193.1 / 199 / 200 / **214**) |
@@ -13812,4 +13814,16 @@ against the unfixed guard.
 ⚠ **THE GENERAL LESSON, worth more than the fix:** a boolean guard that encodes "the other thing is
 not rendering" by naming *that thing's only input* silently rots the day a second input is added.
 Both renderers now read both inputs; nothing executable binds them, which is the residual risk.
+
+### `frontend/src/components/settings/ActionRow.tsx`
+
+**1 / 1 / 153** · G-5: no (1 phase) · Added Phase 248 AT TOUCH (CRED-02).
+
+Renders an individual action row within `ConnectionGrantsList`, showing action name, description, direction badge, permission posture buttons (`allow` / `ask` / `deny`), and the `OVERRIDDEN_RESET` affordance (`Follow the default instead`). Touched in Phase 248 to reword reset affordance to forward action and assert rendered content.
+
+### `frontend/src/components/settings/McpAuthDoor.tsx`
+
+**3 / 1 / 451** · G-5: no (1 phase) · Added Phase 248 AT TOUCH (CRED-01).
+
+Mounts the MCP Authentication door in `ConnectionFormPanel` supporting OAuth 2.0 and BYO client credentials for MCP servers. It is the second writer of `custom_client_id` (alongside `ConnectionFormPanel`), and CRED-01 is only whole because both doors call the same `customClientIdError` validator. A future phase adding a third door or reimplementing the check locally would make the credential boundary fence vacuous without touching what the fence asserts.
 

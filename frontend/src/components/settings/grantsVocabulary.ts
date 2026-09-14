@@ -24,9 +24,9 @@ export const GRANTS_COPY = {
   SEARCH_PLACEHOLDER: (n: number) => `Search ${n} actions`,
   LIST_EMPTY: "No action matches that.",
 
-  // ── ⚠ NOISE AUDIT 2026-08-31 (operator, item C1) ──────────────────────────
+  // ── ⚠ NOISE AUDIT 2026-08-31 (operator, item C1) & CRED-02 ───────────────
   // `OVERRIDDEN_LABEL` was the words "You changed this", printed on every overridden
-  // row — beside `OVERRIDDEN_RESET` ("Use the default"), which ONLY EXISTS on an
+  // row — beside `OVERRIDDEN_RESET` ("Follow the default instead"), which ONLY EXISTS on an
   // overridden row and therefore already says it. On a 44-action GitHub grant list that
   // is two controls where one carries the meaning, repeated down the column.
   //
@@ -36,7 +36,7 @@ export const GRANTS_COPY = {
   // forbids `title` attributes outright, because a tooltip is unreachable by touch and
   // by keyboard — parking meaning there removes it for some readers entirely.
   OVERRIDDEN_LABEL: "",
-  OVERRIDDEN_RESET: "Use the default",
+  OVERRIDDEN_RESET: "Follow the default instead",
 
   // ── Phase 221 · the application axis (D-221-01 / D-221-02) ────────────────────────────
   APPLICATION_COUNT: (n: number) => `${n} ${n === 1 ? "action" : "actions"}`,

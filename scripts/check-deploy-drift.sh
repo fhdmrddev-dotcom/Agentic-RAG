@@ -104,6 +104,9 @@ OMITTED_FROM_ONEBOX=(
   # EMAIL_PROVIDER=none logs the invite link and needs neither. (EMAIL_PROVIDER itself IS in
   # onebox.env.example, so it is not omitted here.)
   RESEND_API_KEY INVITE_FROM_EMAIL
+  # Supabase Management API access token (Phase 248 / CRED-04) — used by scripts/check-security-advisors.sh
+  # for cloud advisory checks; not a one-box knob
+  SUPABASE_ACCESS_TOKEN
 )
 
 FAILURES=()

@@ -155,6 +155,48 @@ def _require_library_folder_id(value: str) -> str:
 LibraryFolderId = Annotated[str, Field(min_length=1), AfterValidator(_require_library_folder_id)]
 
 
+# ── CRED-01 · negative credential-smell boundary on custom_client_id ──────────────────────
+def _validate_custom_client_id(value: str) -> str:
+    """Validate that custom_client_id is an identifier, not a secret or credential (CRED-01).
+
+    Rejects:
+    - Length > 128 characters (tokens/secrets)
+    - Microsoft Entra ID client secret smell (<prefix>~<body>)
+    - Known secret/token prefixes (sk-, ghp-, xoxb-, xoxp-, secret_, whsec_, etc.)
+
+    Does NOT echo the rejected value in error messages to prevent credential leakage (TM-248-06).
+    """
+    stripped = value.strip()
+    if not stripped:
+        raise ValueError("custom_client_id must not be blank if provided")
+    if len(stripped) > 128:
+        raise ValueError(
+            "custom_client_id exceeds maximum length of 128 characters; "
+            "client IDs must not be tokens or secrets"
+        )
+    if "~" in stripped:
+        raise ValueError(
+            "custom_client_id contains '~' which matches Microsoft Entra client secret format; "
+            "client IDs must not be secrets"
+        )
+
+    known_secret_prefixes = (
+        "sk-", "ghp_", "gho_", "ghu_", "ghs_", "ghr_", "xoxb-", "xoxp-", "xapp-",
+        "secret_", "whsec_", "client_secret", "bearer "
+    )
+    if stripped.lower().startswith(known_secret_prefixes):
+        raise ValueError(
+            "custom_client_id appears to be a secret or token; "
+            "client IDs must not be credentials"
+        )
+
+    return stripped
+
+
+#: A validated OAuth client ID (not a secret or token, max 128 chars).
+CustomClientId = Annotated[str, Field(min_length=1), AfterValidator(_validate_custom_client_id)]
+
+
 # ── the capability vocabulary ────────────────────────────────────────────────────────────
 ConnectorCapability = Literal["send_email", "create_ticket", "post_message"]
 
@@ -241,7 +283,7 @@ class McpConfig(_StrictBase):
 
     #: The OAuth application this connection signs in with — supplied by the operator, or
     #: minted by the server itself under RFC 7591 dynamic client registration.
-    custom_client_id: str | None = None
+    custom_client_id: CustomClientId | None = None
 
     #: Phase 239 (D-239-01) — WHICH TOOLS ON THIS SERVER READ FILES, as DATA.
     #:
@@ -348,7 +390,7 @@ class OAuthConnectionConfig(_StrictBase):
     """
 
     provider: OAuthProvider
-    custom_client_id: str | None = None
+    custom_client_id: CustomClientId | None = None
     scopes: list[str] = Field(default_factory=list)
     redirect_uri: str | None = None
     account_email: str | None = None
@@ -555,7 +597,7 @@ class OAuthAuthorizeRequest(_StrictBase):
 
     provider: OAuthProvider
     connection_id: str | None = None
-    custom_client_id: str | None = None
+    custom_client_id: CustomClientId | None = None
     custom_client_secret: str | None = None
     custom_scopes: list[str] = Field(default_factory=list)
 
@@ -801,6 +843,7 @@ __all__ = [
     "ConnectorCapability",
     "ServiceId",
     "LibraryFolderId",
+    "CustomClientId",
     "ToolGrantPosture",
     "AuthType",
     "ConnectionStatus",

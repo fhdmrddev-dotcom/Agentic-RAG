@@ -2,7 +2,12 @@ import { describe, expect, it, vi } from "vitest"
 import { render, screen, fireEvent, waitFor } from "@testing-library/react"
 
 import { ConnectionFormPanel } from "../ConnectionFormPanel"
-import { shapeForService } from "../connectionFormCopy"
+import {
+  CUSTOM_CLIENT_ID_HINT,
+  customClientIdError,
+  customClientIdLooksLikeSecret,
+  shapeForService,
+} from "../connectionFormCopy"
 import { connectionStateOf, credentialReadingOf } from "../connectionsCopy"
 import type { ConnectorConnection } from "@/lib/api"
 import * as api from "@/lib/api"
@@ -236,3 +241,82 @@ describe("an OAuth row does not wear capability-shaped controls", () => {
     expect(screen.getByTestId("connection-destination-footer")).toBeInTheDocument()
   })
 })
+
+describe("CRED-01 — Custom Client ID Inline Refusal (D-248-02)", () => {
+  it("customClientIdLooksLikeSecret identifies Entra secrets, known prefixes, and overlength inputs", () => {
+    // Entra secrets with tilde
+    expect(customClientIdLooksLikeSecret("abc8Q~1234567890abcdef")).toBe(true)
+    expect(customClientIdLooksLikeSecret("foo~bar")).toBe(true)
+    // Known secret prefixes
+    expect(customClientIdLooksLikeSecret("sk-proj-12345")).toBe(true)
+    expect(customClientIdLooksLikeSecret("ghp_1234567890abcdef")).toBe(true)
+    expect(customClientIdLooksLikeSecret("xoxb-1234567890")).toBe(true)
+    // Overlength
+    expect(customClientIdLooksLikeSecret("a".repeat(129))).toBe(true)
+
+    // Valid identifiers MUST pass
+    expect(customClientIdLooksLikeSecret("12345-abcde.apps.googleusercontent.com")).toBe(false)
+    expect(customClientIdLooksLikeSecret("bD78Ksp3xBJew1kL")).toBe(false)
+    expect(customClientIdLooksLikeSecret("my-client-id-123")).toBe(false)
+    expect(customClientIdLooksLikeSecret("")).toBe(false)
+    expect(customClientIdLooksLikeSecret(null)).toBe(false)
+  })
+
+  it("customClientIdError returns informative error text without echoing secret", () => {
+    const entraErr = customClientIdError("abc8Q~secretValueHere")
+    expect(entraErr).toContain("Entra client secret")
+    expect(entraErr).toContain("Custom Client Secret")
+
+    const skErr = customClientIdError("sk-live-12345")
+    expect(skErr).toContain("secret or token")
+
+    const lenErr = customClientIdError("a".repeat(130))
+    expect(lenErr).toContain("exceeds 128 characters")
+
+    expect(customClientIdError("valid-client-id")).toBeNull()
+  })
+
+  it("renders inline error message and disables Authorize button when secret is typed", async () => {
+    render(
+      <ConnectionFormPanel
+        open={true}
+        mode="create"
+        presetServiceId="google"
+        isOrgAdmin={true}
+        liveConnectorsOn={true}
+        onClose={() => {}}
+      />
+    )
+
+    const authorizeBtn = screen.getByTestId("connection-oauth-authorize-btn")
+    expect(authorizeBtn).not.toBeDisabled()
+
+    // Find Custom Client ID input
+    const clientIdInput = screen.getByPlaceholderText(/12345-abcde\.apps\.googleusercontent\.com/i)
+    expect(clientIdInput).toBeInTheDocument()
+
+    // Initially hint is rendered
+    expect(screen.getByText(CUSTOM_CLIENT_ID_HINT)).toBeInTheDocument()
+    expect(screen.queryByTestId("custom-client-id-error")).not.toBeInTheDocument()
+
+    // Type Entra secret into client ID field
+    fireEvent.change(clientIdInput, { target: { value: "myApp~secretKey12345" } })
+
+    // Error message appears inline and hint is replaced
+    await waitFor(() => {
+      expect(screen.getByTestId("custom-client-id-error")).toBeInTheDocument()
+    })
+    expect(screen.getByTestId("custom-client-id-error").textContent).toContain("Entra client secret")
+    expect(authorizeBtn).toBeDisabled()
+
+    // Change to valid client ID
+    fireEvent.change(clientIdInput, { target: { value: "12345-valid.apps.googleusercontent.com" } })
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("custom-client-id-error")).not.toBeInTheDocument()
+    })
+    expect(screen.getByText(CUSTOM_CLIENT_ID_HINT)).toBeInTheDocument()
+    expect(authorizeBtn).not.toBeDisabled()
+  })
+})
+

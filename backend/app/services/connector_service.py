@@ -77,6 +77,7 @@ from datetime import datetime, timezone
 from typing import Awaitable, Callable
 
 from cryptography.fernet import InvalidToken
+from pydantic import ValidationError
 from supabase import Client
 
 from app.dependencies import get_supabase
@@ -84,6 +85,7 @@ from app.models.connector import (
     ConnectorConnectionCreate,
     ConnectorConnectionResponse,
     ConnectorConnectionUpdate,
+    McpConfig,
     _reject_config_capability_mismatch,
 )
 from app.security.secret_cipher import decrypt_secret, encrypt_secret, get_cipher, is_encrypted
@@ -541,6 +543,8 @@ def _to_response(row: dict) -> ConnectorConnectionResponse:
         d["tool_grants"] = {}
     if d.get("discovered_tools") is None:
         d["discovered_tools"] = []
+    if d.get("is_enabled") is None:
+        d["is_enabled"] = True
     # Phase 221 — heal a cache written before the `app` key existed. Function-local for the
     # reason every other `service_tools` import here is: the adapter registry stays out of
     # the cold import graph. See `backfill_application_keys` for why this is a read-time
@@ -564,7 +568,23 @@ def _to_response(row: dict) -> ConnectorConnectionResponse:
             d["account_email"] = cfg.get("account_email")
         if not d.get("account_name") and cfg.get("account_name"):
             d["account_name"] = cfg.get("account_name")
-    return ConnectorConnectionResponse.model_validate(d)
+    try:
+        return ConnectorConnectionResponse.model_validate(d)
+    except ValidationError as e:
+        # ⚠ SEED-239 & TM-248-05: If a stored connection row contains an invalid config
+        # (e.g. legacy row violating a newly tightened model rule like custom_client_id smell),
+        # do NOT allow a single bad row to fail list_connections with a 503 for the whole org.
+        # Fall back to a degraded error representation:
+        logger.warning(
+            "connector_service._to_response: validation failed for connection %s: %s",
+            d.get("id"),
+            e,
+        )
+        d_fallback = dict(d)
+        d_fallback["config"] = McpConfig()
+        d_fallback["status"] = "error"
+        d_fallback["error_message"] = "Connection configuration requires update (validation failed)"
+        return ConnectorConnectionResponse.model_validate(d_fallback)
 
 
 FetchRow = Callable[[str, str], Awaitable[dict | None]]
