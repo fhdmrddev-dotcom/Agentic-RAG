@@ -4,7 +4,7 @@ plan: 02
 status: complete
 wave: 1
 commits:
-  - id: pending
+  - id: 35bbe6c7c
     message: "feat(247-02): watch missing_since lifecycle and connection is_enabled health verdict"
 requirements_met: [WATCH-03, WATCH-05]
 gates_passed:
