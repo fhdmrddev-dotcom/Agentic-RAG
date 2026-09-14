@@ -103,9 +103,32 @@ owed work at all.
 ## Current Position
 
 Phase: 247 — Sources & Watches
-Plan: —
-Status: Discuss-phase complete (247-CONTEXT.md locked); ready for /gsd:plan-phase 247
-Last activity: 2026-09-14 — Phase 247 G-2 sketch Variant A ratified; discuss-phase complete; 247-CONTEXT.md locked
+Plan: 247-01 .. 247-04 (4 plans, inside G-8's 3-5 target)
+Status: **Plans reviewed and CLEARED to execute** (BUS-211). Sketch Variant A ratified · 247-CONTEXT.md locked · 247-PREFLIGHT.md independently reviewed, `reviewer: claude`
+Last activity: 2026-09-14 — plan-gate review returned 2 blocking + 1 minor finding; all three integrated at `735359871` and re-verified; execution cleared
+
+⭐ **First phase of v4.2, and the first planned end-to-end under the re-armed `OV-SOLO-01`** —
+gemini sketched, discussed, planned; claude reviewed and did not shape it. The plan-gate review
+found two things worth recording beyond this phase:
+
+- ⛔ **The standing-red pin could not pass.** `247-PREFLIGHT.md` pinned
+  `sourceComposition.test.tsx` at *"strictly 17 failed | 32 passed"*; the reviewer measured
+  **16 | 33 three consecutive runs** on a tree whose `frontend/` and `backend/` are
+  **byte-identical** to the preflight's own base. Four readings exist across four sources
+  (16/18/17/16, total always 49). ⭐ **It is not flaky WITHIN a session — it does not reproduce
+  ACROSS runners**, which is the worse property: a plan measures a stable number, writes it as a
+  contract, and the next runner fails it having changed nothing. Replaced by a **set** contract —
+  the 16 failing test NAMES are captured in `247-STANDING-RED-BASELINE.md`.
+  ⚠ **Same class as `SEED-274`, planted the same day** for the backend ceiling (71/72/72/77 on one
+  tree against a gate CLAUDE.md calls zero-headroom). **Two gates pinned to an integer over a value
+  that moves.**
+- ⚠ **A G-5 obligation was nearly resolved on a counting technicality.** The preflight read
+  `sourceHealthVocabulary.ts` as *"clean at 2 phases"*; the ledger row reads `6 / 3 / 560` and says
+  *"G-5 FIRES on the next touch"* — and 247-03 is that touch. Its buckets are `235`, `240`,
+  `BUG-260912-01`: **three work units, two numeric**, so the recipe and the row genuinely disagree.
+  Resolved by **discharging it explicitly** (safe-as-is, written rationale) rather than by picking a
+  count. ⭐ The rationale was then **driven, not accepted**: zero imports and zero state both hold,
+  and **18 modules import it** — a fan-in that makes splitting it actively wrong.
 
 ### v4.2 disposition of the seven carried items
 
