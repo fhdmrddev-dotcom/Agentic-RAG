@@ -363,17 +363,27 @@ def test_every_registered_adapter_is_covered_by_the_list_above():
         assert issubclass(adapter_cls, SourceAdapter), adapter_cls
 
 
+#: Provider-specific half modules that live under sources/ (e.g. mail provider implementations)
+#: that are exempt from the vendor-neutral boundary fence, mirroring modules under adapters/.
+PROVIDER_HALF_MODULES = (
+    "app/services/sources/mail/gmail.py",
+)
+
+
 def test_the_fenced_module_list_covers_the_sources_package():
     """A module added to `services/sources/` and forgotten here is silently unfenced — the
-    same class of gap as a hot file with no ledger row."""
+    same class of gap as a hot file with no ledger row (WR-07 recursive check)."""
     package = BACKEND / "app" / "services" / "sources"
     on_disk = {
-        f"app/services/sources/{p.name}"
-        for p in package.glob("*.py")
-        if p.name not in ("__init__.py", "failure_cause.py", "health_verdict.py")
+        "app/services/sources/" + str(p.relative_to(package)).replace("\\", "/")
+        for p in package.rglob("*.py")
+        if p.name != "__init__.py"
+        and "adapters/" not in str(p.relative_to(package)).replace("\\", "/")
+        and p.name not in ("failure_cause.py", "health_verdict.py")
     }
-    missing = on_disk - set(FENCED_MODULES)
+    missing = on_disk - set(FENCED_MODULES) - set(PROVIDER_HALF_MODULES)
     assert not missing, (
         f"unfenced modules in services/sources/: {sorted(missing)} — add them to "
         "FENCED_MODULES, or state here why they carry no source routing"
     )
+

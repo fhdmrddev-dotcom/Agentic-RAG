@@ -151,6 +151,40 @@ def _scope_hint(status_code: int, reason: str) -> str:
     return reason
 
 
+_LABEL_NAME_CACHE: dict[str, str] = {}
+
+
+async def get_label_name(token: str, label_id: str) -> str:
+    """Resolve human-readable label name (e.g. 'Finance' for 'Label_9') for WR-04.
+
+    System labels have id == name. User labels query /labels/{id} and cache the result.
+    """
+    if not label_id:
+        return ""
+    if label_id in ("INBOX", "SENT", "DRAFT", "TRASH", "SPAM", "STARRED", "UNREAD", "IMPORTANT"):
+        return label_id
+    if label_id in _LABEL_NAME_CACHE:
+        return _LABEL_NAME_CACHE[label_id]
+
+    try:
+        resp = await send_pinned_http(
+            EGRESS_KEY,
+            "GET",
+            f"{GMAIL_API_BASE}/labels/{label_id}",
+            headers=_headers(token),
+            timeout=15.0,
+            max_bytes=_LABEL_LIST_MAX_BYTES,
+        )
+        if resp.status_code == 200:
+            data = jsonlib.loads(resp.body)
+            name = str(data.get("name") or label_id)
+            _LABEL_NAME_CACHE[label_id] = name
+            return name
+    except Exception:
+        pass
+    return label_id
+
+
 async def list_labels(token: str) -> list[SourceNode]:
     """Mail labels, as folders. System labels first, then user labels alphabetically."""
     resp = await send_pinned_http(
@@ -171,6 +205,8 @@ async def list_labels(token: str) -> list[SourceNode]:
 
     data = jsonlib.loads(resp.body)
     labels = [lbl for lbl in data.get("labels", []) if isinstance(lbl, dict) and lbl.get("id")]
+    for lbl in labels:
+        _LABEL_NAME_CACHE[str(lbl["id"])] = str(lbl.get("name") or lbl["id"])
 
     def sort_key(lbl: dict[str, Any]) -> tuple[int, str]:
         is_user = 1 if str(lbl.get("type", "")).lower() == "user" else 0
@@ -184,6 +220,7 @@ async def list_labels(token: str) -> list[SourceNode]:
         mailbox.label_to_node(str(lbl["id"]), str(lbl.get("name") or lbl["id"]), anchor)
         for lbl in sorted(labels, key=sort_key)
     ]
+
 
 
 def _subject_of(meta: dict[str, Any]) -> str | None:

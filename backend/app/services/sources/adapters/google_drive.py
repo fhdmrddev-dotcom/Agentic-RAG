@@ -74,6 +74,65 @@ def _google_error_reason(body: bytes | str | None) -> str:
         return ""
 
 
+_FOLDER_PATH_CACHE: dict[str, tuple[str, str | None]] = {
+    "root": ("", None),
+    "my_drive": ("", None),
+}
+
+
+async def _resolve_folder_path(token: str, folder_id: str | None, max_depth: int = 10) -> str:
+    """Resolve full folder hierarchy (e.g. '/Finance/2026') for a folder ID (WATCH-01).
+
+    Traverses parents upward until 'root' or unresolvable parent.
+    Cached in memory to avoid repeated Drive API calls.
+    """
+    if not folder_id or folder_id in ("root", "my_drive", "virtual_root", "shared_drives"):
+        return ""
+
+    headers = {"Authorization": f"Bearer {token}", "Accept": "application/json"}
+    current_id: str | None = folder_id
+    segments: list[str] = []
+    depth = 0
+
+    while current_id and current_id not in ("root", "my_drive", "virtual_root", "shared_drives") and depth < max_depth:
+        depth += 1
+        if current_id in _FOLDER_PATH_CACHE:
+            name, parent_id = _FOLDER_PATH_CACHE[current_id]
+            if name:
+                segments.append(name)
+            current_id = parent_id
+            continue
+
+        safe_id = current_id.replace("'", "\\'")
+        try:
+            resp = await send_pinned_http(
+                "drive_read",
+                "GET",
+                f"{GOOGLE_DRIVE_API_BASE}/files/{safe_id}",
+                params={"fields": "id, name, parents", "supportsAllDrives": "true"},
+                headers=headers,
+                timeout=15.0,
+                max_bytes=128 * 1024,
+            )
+            if resp.status_code != 200:
+                break
+
+            data = jsonlib.loads(resp.body)
+            name = data.get("name", "")
+            parents = data.get("parents") or []
+            parent_id = parents[0] if parents else None
+            _FOLDER_PATH_CACHE[current_id] = (name, parent_id)
+            if name:
+                segments.append(name)
+            current_id = parent_id
+        except Exception:
+            break
+
+    if not segments:
+        return ""
+    return "/" + "/".join(reversed(segments))
+
+
 @SourceRegistry.register("google")
 @SourceRegistry.register("google_workspace")
 class GoogleDriveSourceAdapter(SourceAdapter):
@@ -201,10 +260,14 @@ class GoogleDriveSourceAdapter(SourceAdapter):
         data = jsonlib.loads(resp.body)
         items = []
         for f in data.get("files", []):
+            fid = f.get("id", "")
+            fname = f.get("name", "")
+            if fid:
+                _FOLDER_PATH_CACHE[fid] = (fname, target_parent)
             items.append(
                 SourceNode(
-                    id=f.get("id", ""),
-                    name=f.get("name", ""),
+                    id=fid,
+                    name=fname,
                     kind="folder",
                     drive_id=f.get("driveId"),
                     has_children=True,
@@ -233,10 +296,12 @@ class GoogleDriveSourceAdapter(SourceAdapter):
             if folder_id == mail.MAIL_ROOT_ID:
                 return FilePage(files=[], next_page_token=None)
             label_id = mail.strip_folder_prefix(folder_id or "")
+            # WR-04: resolve human-readable display name for user labels instead of passing raw label_id
+            label_name = await mail.gmail.get_label_name(token, label_id)
             return await mail.gmail.list_messages(
                 token,
                 label_id=label_id,
-                label_name=label_id,
+                label_name=label_name,
                 page_token=page_token,
                 page_size=mail.MAIL_PAGE_SIZE,
                 # The anchor rides in the folder id (D-240-20). A watch stores the id it was
@@ -259,7 +324,7 @@ class GoogleDriveSourceAdapter(SourceAdapter):
             "pageSize": str(min(page_size, 100)),
             "fields": (
                 "nextPageToken, files(id, name, mimeType, size, modifiedTime, driveId, iconLink, "
-                "webViewLink)"
+                "webViewLink, parents)"
             ),
             "q": " and ".join(q_parts),
             "orderBy": "modifiedTime desc",
@@ -287,16 +352,22 @@ class GoogleDriveSourceAdapter(SourceAdapter):
         data = jsonlib.loads(resp.body)
         files = []
         for f in data.get("files", []):
+            parent_ids = f.get("parents") or []
+            file_parent_id = parent_ids[0] if parent_ids else (target_parent if folder_id else None)
+            folder_path = await _resolve_folder_path(token, file_parent_id)
+            file_name = f.get("name", "")
+            full_path = f"{folder_path}/{file_name}" if folder_path else f"/{file_name}"
             files.append(
                 SourceFile(
                     id=f.get("id", ""),
-                    name=f.get("name", ""),
+                    name=file_name,
                     mime_type=f.get("mimeType", "application/octet-stream"),
                     size=int(f.get("size", 0)) if f.get("size") else None,
                     modified_at=f.get("modifiedTime"),
                     drive_id=f.get("driveId"),
                     icon_url=f.get("iconLink"),
                     web_view_url=f.get("webViewLink"),
+                    path=full_path,
                 )
             )
         return FilePage(files=files, next_page_token=data.get("nextPageToken"))
