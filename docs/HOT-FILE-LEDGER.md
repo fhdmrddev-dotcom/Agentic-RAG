@@ -8881,6 +8881,27 @@ read from the row, never from a constant.
 are correctly populated. A watch that has never run is visually identical to one that ran a minute
 ago, which is `BUG-260906-02`'s user-visible half and **Phase 235 SC#1/SC#2's subject**.
 
+### Phase 247 update (2026-09-14) — G-5 line cap discharged
+
+**9 / 3 / 470** · G-5 DISCHARGED.
+
+The file had grown to 1,095 lines across Phase 235 and 240, crossing the 1,000 line G-5 limit.
+Phase 247-03 extracted `WatchRowCard.tsx` (649 lines), moving all per-row layout, history expansion,
+file failure display, missing file tracking, and action buttons into the subcomponent.
+`WatchedFoldersSection.tsx` was reduced to 470 lines and now manages list queries, empty states,
+the CreateWatchModal lifecycle, and non-collapsing refresh (`loadWatches(initial = false)`).
+
+---
+
+## frontend/src/components/sources/WatchRowCard.tsx
+
+**2 / 1 / 649** · young (extracted Phase 247-03) · row card component for watched folders.
+
+Extracted from `WatchedFoldersSection.tsx` to discharge G-5. Implements:
+1. **Variant A Two-Tier Status Badges (WATCH-03):** Connection state (`Connected` vs `Connection Off`) is decoupled from run status (`Active`, `Syncing`, `Paused`, `Error`).
+2. **Missing at Source Display (WATCH-05):** Files that vanished from remote sources render with `missing_since` relative or instant timestamps and state `Retained in Library`.
+3. **Non-Collapsing Row Sync:** Sync feedback renders in-row with explicit change count (`✓ Synced just now (0 changes)`), eliminating race conditions where cards collapsed during polling.
+
 ---
 
 ## frontend/src/components/sources/CreateWatchModal.tsx
@@ -10551,10 +10572,11 @@ cells rot within days.
 | [`frontend/src/components/workflows/PublishBlockedStepCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowspublishblockedstepcardtsx) | 0 / 0 / 101 | no (new) | young (`BUG-260828-09`) — the card a failed publish leads with. ⚠ **G-2 OVERRIDDEN, not satisfied**; jsdom cannot prove what it is for |
 | [`backend/app/services/scheduler_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesscheduler_servicepy) | 5 / 2 / 399 | no (2 phases) | background poll loop + launcher; honoured by construction (204 / 210); watch loop binds to it |
 | [`backend/app/db/schedules.py`](docs/HOT-FILE-LEDGER.md#backendappdbschedulespy) | 1 / 1 / 359 | no (1 phase) | single data-access home for workflow_schedules; claim_due_schedules SKIP LOCKED claim; young (204) |
-| [`backend/app/services/watch_service.py`](docs/HOT-FILE-LEDGER.md#backendappserviceswatch_servicepy) | 4 / 2 / 608 | no (2 phases) | ⚠ row was STALE at `2/1/458`. 235: a run row per tick + a NAMED cause; 235-13 makes seam 2 the ONE writer of `connection_disabled`. ⛔ `release_watch` SWALLOWS its INSERT — no proof a row was STORED |
-| [`backend/app/db/watches.py`](docs/HOT-FILE-LEDGER.md#backendappdbwatchespy) | 2 / 2 / 696 | no (2 phases) | ⚠ row was STALE at `1/1/439`. 235 added the sync-run store + prune; 235-14 adds `last_success_by_watch`, the ONLY UNBOUNDED read. ⛔ the prune's bound is proven against FIXTURES only, never live rows |
-| [`backend/app/api/sources.py`](docs/HOT-FILE-LEDGER.md#backendappapisourcespy) | 5 / 1 / 677 | no (1 phase) | ⚠ row was STALE at `2/0/356`. ✅ 235 fixed `/sync`: REFUSES when the LIVE reader is absent (`BUG-260906-02`). 235-14 closes G2 — polled window UNCHANGED, last-good filled unbounded for stopped only |
-| [`frontend/src/components/sources/WatchedFoldersSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourceswatchedfolderssectiontsx) | 4 / 1 / 935 | no (1 phase) | ⚠ row STALE at `2 / 0 / 393` — **it MORE THAN DOUBLED**. 235 paid the owed outcome line. ⭐ seam named NOW, not at threshold: extract `WatchedSourceCard` |
+| [`backend/app/services/watch_service.py`](docs/HOT-FILE-LEDGER.md#backendappserviceswatch_servicepy) | 7 / 5 / 643 | **FIRES** | ⚠ row STALE at 4/2/608. 247-02: missing_since lifecycle on disappearance/restore; H-5 incomplete listing guard preserved. Seam 2 remains primary writer |
+| [`backend/app/db/watches.py`](docs/HOT-FILE-LEDGER.md#backendappdbwatchespy) | 4 / 3 / 709 | ⚠ **FIRES** | ⚠ row STALE at 2/2/696. 247-02: update_item_state & bulk_update record missing_since on missing; clear_missing_since resets to NULL on restore |
+| [`backend/app/api/sources.py`](docs/HOT-FILE-LEDGER.md#backendappapisourcespy) | 8 / 2 / 693 | no (2 phases) | ⚠ row STALE at 5/1/677. 247-02: immediate connection is_enabled health diagnostics (WATCH-03). Polled window preserved; last-good filled for stopped |
+| [`frontend/src/components/sources/WatchedFoldersSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourceswatchedfolderssectiontsx) | 9 / 3 / 470 | no (3 phases) | ✅ G-5 DISCHARGED (247-03): extracted WatchRowCard.tsx (1095 -> 470 lines). WatchedFoldersSection handles list mounting, CreateWatchModal, and non-collapsing refresh |
+| [`frontend/src/components/sources/WatchRowCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourceswatchrowcardtsx) | 2 / 1 / 649 | no (1 phase) | young (extracted in 247-03 from WatchedFoldersSection.tsx). Per-watch card layout, history fold, Variant A two-tier badges, missing_since remote disappearance feedback |
 | [`frontend/src/components/sources/watchProductMark.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourceswatchproductmarkts) | 0 / 0 / 38 | no (new) | young (240) — which PRODUCT a watched folder came from, read from its ADDRESS. ⛔ Never from `service_id`: Gmail and Drive share one connection |
 | [`frontend/src/components/sources/CreateWatchModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcescreatewatchmodaltsx) | 4 / 1 / 283 | no (1 phase) | honoured by construction (**240**): byte-unchanged. ⛔ Its auto-select of `capable[0]` is why BUG-260908-02 mattered most here |
 | [`frontend/src/components/layout/NavPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutnavpaneltsx) | 23 / 12 / 381 | ⚠ **FIRES** | ⚠ row STALE at `22/12/370`. **244-14**: WR-05 — the docblock stopped being false about itself (`min-h-0` read 2); IN-01 — `overflow-x-hidden`, since one axis makes the other compute to `auto` |
