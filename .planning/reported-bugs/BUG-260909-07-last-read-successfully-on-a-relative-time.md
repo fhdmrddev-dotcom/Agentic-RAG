@@ -4,10 +4,10 @@ title: "Last read successfully on 8 min ago — a preposition for an absolute da
 reported: 2026-09-09
 surface: Agentic-RAG
 severity: info
-status: open
+status: closed
 affected_areas: [frontend/sources]
 folded_into: null
-verified_closed_by: null
+verified_closed_by: Phase 247
 related_seeds: []
 re_open_trigger: null
 reproduces_on:

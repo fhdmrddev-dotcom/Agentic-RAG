@@ -4,10 +4,10 @@ title: "Sync now collapses the entire Watched Folders section into a loading sta
 reported: 2026-09-09
 surface: Agentic-RAG
 severity: major
-status: open
+status: closed
 affected_areas: [frontend/sources]
 folded_into: null
-verified_closed_by: null
+verified_closed_by: Phase 247
 related_seeds: []
 re_open_trigger: null
 reproduces_on:

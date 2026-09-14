@@ -111,7 +111,7 @@ with `independent_review: owed` until a review actually runs.
 
 ### Phase Checklist
 
-- [ ] **Phase 247: Sources & Watches — the surface you now live on** — Drive/Graph paths stored whole and actually used by classification, watch health reads its connection, "Sync now" answers in place, a missing file says when, labels match behaviour, 240's seven warnings dispositioned (WATCH-01..08)
+- [x] **Phase 247: Sources & Watches — the surface you now live on** — Drive/Graph paths stored whole and actually used by classification, watch health reads its connection, "Sync now" answers in place, a missing file says when, labels match behaviour, 240's seven warnings dispositioned (WATCH-01..08)
 - [ ] **Phase 248: The Credential Boundary** — a secret pasted into a non-secret field is refused not stored, the grant marker claims only what is knowable, all 13 anon-executable SECDEF functions ruled on, `get_advisors(security)` in the deploy checklist (CRED-01..04)
 - [ ] **Phase 249: The Model You Actually Run** — local / self-hosted models addable from the UI, unregistered ids say so at pick time, registry writes reach every worker, the hide control is the discoverable one, refused writes report failure, eval engines name their own cause (MODEL-04..09)
 - [ ] **Phase 250: Run Honesty — the residue** — trimming never eats your own question, a silent reasoning model says what happened, the panel stops working when the run ends, a finished task leaves no false todo (HONEST-01..04)

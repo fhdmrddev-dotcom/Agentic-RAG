@@ -243,14 +243,14 @@ milestone-wide standing gate. Coverage 26/26 — no orphans, no duplicates.**
 
 | Requirement | Phase | Status |
 |---|---|---|
-| WATCH-01 | Phase 247 — Sources & Watches | Pending |
-| WATCH-02 | Phase 247 — Sources & Watches | Pending |
-| WATCH-03 | Phase 247 — Sources & Watches | Pending |
-| WATCH-04 | Phase 247 — Sources & Watches | Pending |
-| WATCH-05 | Phase 247 — Sources & Watches | Pending |
-| WATCH-06 | Phase 247 — Sources & Watches | Pending (⚠ `/gsd:fast` candidate under G-3, not a plan) |
-| WATCH-07 | Phase 247 — Sources & Watches | Pending (⚠ `/gsd:fast` candidate under G-3, not a plan) |
-| WATCH-08 | Phase 247 — Sources & Watches | Pending |
+| WATCH-01 | Phase 247 — Sources & Watches | Complete |
+| WATCH-02 | Phase 247 — Sources & Watches | Complete |
+| WATCH-03 | Phase 247 — Sources & Watches | Complete |
+| WATCH-04 | Phase 247 — Sources & Watches | Complete |
+| WATCH-05 | Phase 247 — Sources & Watches | Complete |
+| WATCH-06 | Phase 247 — Sources & Watches | Complete |
+| WATCH-07 | Phase 247 — Sources & Watches | Complete |
+| WATCH-08 | Phase 247 — Sources & Watches | Complete |
 | CRED-01 | Phase 248 — The Credential Boundary | Pending |
 | CRED-02 | Phase 248 — The Credential Boundary | Pending |
 | CRED-03 | Phase 248 — The Credential Boundary | Pending (⛔ revoke from `PUBLIC`, not from `anon`) |
