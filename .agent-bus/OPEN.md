@@ -3007,3 +3007,23 @@ TWO ENVIRONMENT FINDINGS
 Full detail: .planning/phases/249-the-model-you-actually-run/249-SUMMARY.md, 249-VERIFICATION.md, 249-UAT.md
 
 **Answer:**
+
+### [OPEN] BUS-247 · to:operator · from:claude · 2026-09-14
+
+Follow-up to BUS-246. I ran /gsd:code-review 249 after closing the phase. It found TWO BLOCKERS, and both were regressions the phase itself introduced. I reproduced each by driving before changing anything, and both are now fixed and driven again.
+
+CR-01 — the judge model dropdown offered options the server refuses.
+I widened verified_models to include models you added yourself, so the chip would not wrongly call them unverified. But SettingsPage also feeds that same set to the judge-model picker, and the judge validator is unchanged and never reads the database. Driven: glm-4.7-flash was offered in the dropdown and PUT /settings answered 400 Unknown judge model. Fixed with a separate registry_models field carrying the validator's exact set — 61 entries versus the union's 82.
+
+CR-02 — the phase silenced its own headline warning on exactly the models it unblocked.
+This is the one worth your attention. A self-hosted model added through the new door resolves native_tools=False whenever its Native tools field is left unset, which is the default. Because my union marked it 'verified', it was excluded from the tool-loss set — so it ran with every tool unavailable and said so nowhere. Before this phase the Settings chip DID fire for such a model. I had fused two different questions under one name: 'is it registered' and 'will it call tools'. Fixed by computing tool loss from resolved capability. On YOUR configuration the flagged count went from 13 to 16 — three real models were being silenced. The chip now says 'no tools' rather than 'unverified' for these, because calling a model you entered unverified would be false.
+
+Also fixed seven warnings, including one I am not proud of: a THIRD copy of the model tooltip in SettingsPage still said timeout=90s — the exact false number the phase claims to have corrected — two elements above the one I fixed. Four warnings deferred with written reasons.
+
+⛔ WHAT THIS SAYS ABOUT THE CLOSE. My self-verification passed this phase with both blockers present. Every gate was green, six fences were driven red against planted defects, three scenarios were driven in a live browser. Neither blocker was catchable by a gate: CR-01 is a disagreement between two components whose individual tests are both correct, and CR-02 is a warning that correctly does not fire by its own implementation's logic. That is the case for DEBT-06 in one paragraph, and it is why the phase still closes independent_review: owed. A code-review pass is not a peer review.
+
+One gate note, triaged by the rules rather than re-run: the count gate's final run reads failed 1 on src/pages/WorkflowBuilderPage.canvas.test.tsx. That is SEED-171's fifth named flaky suite, failing its own positive control with the signature that seed records, and git diff proves this phase touched neither frontend/src/pages nor components/workflows. I captured the name from the gate's persisted JSON before re-running anything, left the worker cap at 2, and did not repeat the run to get a green. Per-file counts are clean and fully attributed (+11, exactly my two new cases plus one adopted suite).
+
+Detail: .planning/phases/249-the-model-you-actually-run/249-GAP-CLOSURE.md and 249-REVIEW.md
+
+**Answer:**
