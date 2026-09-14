@@ -11,7 +11,7 @@
 |---|---|
 | Milestone | **v4.2 The Connected Knowledge You Can Actually Run** — 5 phases, **247-251**, 26 requirements |
 | Live | ✅ **v4.1 DEPLOYED 2026-09-13** — `production` = `eebc4c42f`, `production..develop` **0**, all migrations through **180** applied and verified in cloud, `get_advisors(security)` returns **zero ERROR** |
-| Phase 247 | Sketch ratified (Variant A) · `247-CONTEXT.md` locked · **4 plans reviewed and CLEARED** (`BUS-211`) · **Gemini executing** |
+| Phase 247 | **BUILT (4 plans, 3 waves) and REVIEWED wave-by-wave. NOT CLOSED — five fast-fix findings, see §2b.** Sketch ratified (Variant A) · context locked · plans cleared (`BUS-211`) |
 | Pipeline | Gemini sketches / plans / builds · **Claude reviews and does not shape** (`OV-SOLO-01` re-armed 2026-09-13) |
 
 ---
@@ -75,7 +75,7 @@ it is TRUE.** Same class as presence-vs-content. Worth a seed if it recurs.
 
 ## 3 · What is running right now
 
-- **A persistent Monitor is armed** (task `bo9781bdm`) watching, once a minute:
+- **A persistent Monitor is armed** (task `b4pfle3op` — v4; v1-v3 were stopped and re-armed, twice to fix defects in the monitor ITSELF: a hardcoded "no source commits yet" that asserted what it never measured, and a `grep -c` count printed twice because it exits 1 on zero) watching, once a minute:
   new commits on `develop` · new files in `.planning/phases/247-sources-and-watches/` · new OPEN
   bus items addressed `to:claude`. ⚠ **It dies with this session.** A new session must re-arm it if
   autonomous monitoring is still wanted.
