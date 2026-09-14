@@ -665,10 +665,10 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/harness_engine.py` | 54 / 20 / 3135 | honoured by construction (194 / **214**) |
 | `frontend/src/components/chat/ThinkingBlock.tsx` | 4 / 1 / 313 | ⚠ absent for its ENTIRE LIFE — row added **BUG-260912-01**. ⛔ the ONE renderer of the model's process prose, now from TWO sources; §10c pins the exact call shape `toParagraphs(reasoningContent)` |
 | `frontend/src/components/chat/RunCard.tsx` | 29 / 14 / 723 | ⭐ G-5 DISCHARGED (243-02). ⚠ row STALE at `28/14/710`. **BUG-260912-01**: its state-2 guard asked `!reasoningContent` ALONE and shipped a VISIBLE mid-stream double once the fold gained a 2nd input |
-| `frontend/src/components/chat/MessageInput.tsx` | 31 / 15 / 821 | ⭐ **THE OWED SEAM WAS TAKEN (244-06)** — `useComposerAttachments`. It SHRANK `855 → 821` **while gaining the cloud door**; ⛔ the `ComposerChipsRow` half stays OWED |
+| `frontend/src/components/chat/MessageInput.tsx` | 32 / 16 / 863 | honoured by construction (**249-02**): ONE chip beside the EXISTING `deprecated` badge, 3 optional props, no state. ⛔ the `ComposerChipsRow` half of the seam stays OWED |
 | `frontend/src/components/chat/ActiveConnectorChips.tsx` | 2 / 2 / 82 | ⚠ absent for its ENTIRE LIFE — row added 244-05 at its SECOND phase. **244**: the row container HOISTED out; bare chips now, `null` on empty (D-244-26) |
 | `frontend/src/components/chat/MessageList.tsx` | 23 / 10 / 366 | ⚠ row STALE a FOURTH time (`21/9/307`). **244-12**: its SECOND list-level mount — `PendingAskStack` beside `ThreadRunLine`, both above `bottomRef`. ⛔ unconditional, measured +4 fetches/thread-open |
-| `frontend/src/components/chat/ChatArea.tsx` | 75 / 36 / 781 | ⚠ row STALE a THIRD time (`74/36/743`). honoured by construction (**244-13**): the SAME one boolean now tests the lock's MODE — WR-07 closed, no second branch, no new state |
+| `frontend/src/components/chat/ChatArea.tsx` | 76 / 37 / 796 | honoured by construction (**249-02**), proven by ARITHMETIC: state hooks 9→9, effect hooks 10→10. Pure pass-through; ⛔ zero derivation added here |
 | `frontend/src/stores/streamsStore.ts` | 21 / 13 / 546 | ⚠ row STALE at `20/13/525`, one plan after it was ADDED. honoured by construction (**244-15**): ONE action type + ONE bare no-op stub. ⛔ `void`, never `Promise<void>` — it fires from a click handler |
 | `frontend/src/lib/toolMeta.ts` | 10 / 6 / 218 | ⚠ **absent for its ENTIRE LIFE at 6 phases — row added 244-13, which does NOT modify it.** ⛔ the ONE home of the harness activity string; a literal copied elsewhere makes its pin vacuous |
 | `frontend/src/components/panel/PendingAskCard.tsx` | 15 / 8 / 836 | ⚠ row was STALE at `14/7/765`; G-5 FIRES at 8 phases. honoured by construction (**244-15**): ONE optional prop, ONE composed callback in the STACK, `useState` 9→9 — no new state on a 3-home shell |
@@ -678,18 +678,18 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/lib/api.ts` | 187 / 110 / 422 | ✅ **SPLIT TAKEN (207)** |
 | `frontend/src/types/index.ts` | 85 / 66 / 1398 | ⚠ row STALE again (`85/65/1380`). honoured by construction (**BUG-260912-01**): ONE optional client-only field, `narrationContent` — no column, because the loop discards this text by design. seam still OWED |
 | `backend/app/main.py` | 82 / 59 / 950 | ⚠ row was STALE by **FOURTEEN PHASES**. honoured by construction (**BUG-260902-06**) |
-| `backend/app/config.py` | 83 / 48 / 1572 | ⚠ STALE AGAIN at `83/48/1506` — the TWELFTH. honoured by construction (**mig 180**): `_SELF_HOSTED_PROVIDERS` is a TABLE replacing the `if provider == "ollama"` duplicated in 4 files. `MODEL_CAPABILITIES` seam still OWED |
-| `backend/app/api/admin.py` | 33 / 13 / 1740 | ⚠ row was STALE. honoured by construction (**BUG-260902-06**): 2 write seams broadcast; the 2 WR-03 READ seams deliberately do not |
-| `backend/app/api/settings.py` | 38 / 20 / 980 | ⚠ row was STALE at `38/20/972`. honoured by construction (**mig 180**): the base_url write arm is now ONE table lookup covering all 3 self-hosted providers. ⛔ no new route, no second branch |
+| `backend/app/config.py` | 87 / 50 / 1593 | ⚠ STALE a 13th time. honoured by construction (**249-01**): ONE derived frozenset `ROUTING_PROVIDERS` + a Literal widened to the value the code already returned. ⛔ `MODEL_CAPABILITIES` seam OWED |
+| `backend/app/api/admin.py` | 38 / 14 / 1968 | honoured by construction (**249-01/03**): the add guard swaps its SOURCE LIST; 3 write seams gain a refusal catch. ⛔ order, 422 shape, every other guard byte-unchanged |
+| `backend/app/api/settings.py` | 41 / 21 / 1048 | honoured by construction (**249-02/03**): ONE `_verified_model_ids` helper, 2 callers; PUT gains a refusal arm → 400. ⛔ the 500 arm for an unreachable DB is unchanged |
 | `backend/app/services/multimodal_service.py` | 14 / 7 / 984 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
 | `backend/app/api/documents.py` | 85 / 33 / 2437 | ✅ **DISCHARGED (229)** |
-| `scripts/vitest-count-gate.cjs` | 212 / 46 / 5649 | ⚠ row STALE a 4th time (`211/46/5618`). **BUG-260912-01** adopted TWO new suites into BOTH knobs — neither `src/components/chat` nor `src/__tests__` has a bare-directory entry |
+| `scripts/vitest-count-gate.cjs` | 215 / 47 / 5682 | ⚠ STALE a 5th time. **249**: FOUR suites into BOTH knobs — incl. `ModelRegistryTab.test.tsx`, which ran NOWHERE and asserted the defect (`toHaveLength(8)`) |
 | `backend/app/services/eval_runner_service.py` | 12 / 7 / 959 | ⚠ absent at 7 phases (added 196) |
 | `frontend/src/components/panel/PhaseCard.tsx` | 16 / 10 / 755 | honoured by construction (200 / **214**) |
 | `frontend/src/components/panel/PhaseTimeline.tsx` | 9 / 7 / 385 | honoured by construction (**214**) |
 | `frontend/src/components/panel/phaseStatusMeta.ts` | 3 / 3 / 236 | ⚠ absent; crossed the threshold in the commit that added its row (200) |
 | `backend/app/services/harness/validator_kinds.py` | 12 / 5 / 749 | ⚠ absent at 5 phases (added 196) |
-| `frontend/src/components/admin/ModelRegistryTab.tsx` | 10 / 4 / 1191 | ⚠ absent at 4 phases (added 196) |
+| `frontend/src/components/admin/ModelRegistryTab.tsx` | 15 / 5 / 1640 | ⚠ **FIRES**. honoured by construction (**249-01**): roster widened 8→11 + words on 2 EXISTING controls. ⛔ `deprecated` semantics unchanged (D-149-04); `AddModelForm` seam OWED |
 | `frontend/src/components/workflows/soulData.ts` | 12 / 10 / 499 | honoured by construction (214 / **214.1**); ⚠ absent until 197, at 7 p |
 | `frontend/src/components/workflows/PublishGauntlet.tsx` | 17 / 9 / 1289 | honoured by construction (214 / **BUG-260828-09**) |
 | `frontend/src/components/workflows/PhaseSpineGraph.tsx` | 5 / 5 / 473 | honoured by construction (200) |
@@ -707,7 +707,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/settings/connectionFormCopy.ts` | 19 / 8 / 1631 | ⛔ 239-05 named the seam: `configFromDraft`'s arm set. 239-07 RODE it — one serializer both arms call |
 | `frontend/src/pages/SettingsPage.tsx` | 47 / 24 / 1814 | ⚠ row was STALE at `47/24/1773`. honoured by construction (**mig 180**): `isOllama` → `meta.selfHosted`; the card gained a 2nd FIELD, not a 2nd branch. tab seam still OWED |
 | `frontend/src/pages/settingsSearchPayload.ts` | 2 / 2 / 116 | young (created 242). Row added AT CREATION, not at the third phase — an absent row is invisible to G-5 at any count |
-| `frontend/src/components/settings/ModelPillRow.tsx` | 4 / 3 / 141 | ⚠ absent for its entire life |
+| `frontend/src/components/settings/ModelPillRow.tsx` | 5 / 4 / 151 | ⚠ **FIRES**. honoured by construction (**249-02**): its local `_tooltipFor` DELETED for the shared module. ⛔ it had claimed `timeout=90s` against a real 300 |
 | `frontend/src/components/workflows/phaseVocabulary.ts` | 16 / 6 / 990 | honoured by construction (206.2) |
 | `frontend/src/components/workflows/ConnectionPicker.tsx` | 7 / 5 / 888 | honoured by construction (206.2 / **214**) |
 | `frontend/src/components/workflows/ExternalActionSection.tsx` | 8 / 5 / 179 | honoured by construction (206.2 / **214**) |
@@ -722,7 +722,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/sources/__init__.py` | 5 / 3 / 40 | ⚠ **absent while FIRING — row added 239-03.** The ONE eager-import site: an adapter missing from this list is unregistered, so the list is load-bearing |
 | `backend/app/services/mcp_client.py` | 9 / 6 / 526 | ⚠ row STALE TWICE (`4/2/407` reading `no`, then `7/5/480`) — a row present and WRONG stops the audit. **SEED-258: the body cap is DERIVED; no envelope knob exists to disagree** |
 | `backend/app/models/message.py` | 17 / 10 / 124 | ⚠ absent from BOTH for its ENTIRE LIFE at **8 phases** |
-| `backend/app/models/user_settings.py` | 51 / 32 / 1648 | ⚠ STALE for the FIFTH close running at `50/32/1561`. honoured by construction (**mig 180**): `_build_providers`' ollama-only arm became one table lookup; the failed-write log now NAMES the columns |
+| `backend/app/models/user_settings.py` | 55 / 34 / 1723 | ⚠ STALE a 6th close running. honoured by construction (**249-03**): ONE `except` split into two arms + one typed exception. ⛔ the unreachable-DB arm is byte-identical |
 | `backend/app/services/harness/reachability.py` | 4 / 4 / 463 | ⚠ absent from BOTH for its ENTIRE LIFE at **4 phases** |
 | `backend/app/services/workflow_kickoff.py` | 8 / 6 / 554 | ⚠ absent for its ENTIRE LIFE at **6 phases** |
 | `frontend/src/components/workflows/WorkflowScheduleModal.tsx` | 3 / 3 / 601 | ⚠ absent for its entire life; it crossed the threshold in 214-09 on a  |
