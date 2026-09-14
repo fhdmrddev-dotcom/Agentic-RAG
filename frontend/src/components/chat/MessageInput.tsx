@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { MODEL_INFO } from "@/lib/model-info"
 import { providerLogo, modelLogo } from "@/lib/providerLogo"
+import { UNVERIFIED, unverifiedDescription } from "@/lib/unverifiedModelCopy"
 import { cn } from "@/lib/utils"
 // Phase 154 (LANG-01 / D-03) — General/Explorer keep their already-plain labels
 // (routed through the single-source term-map so nothing drifts) and gain a one-line
@@ -62,6 +63,16 @@ interface Props {
   selectedModel?: string
   onModelChange?: (model: string) => void
   deprecatedModels?: Set<string>
+  /** Phase 249 (MODEL-05): the ids the platform considers REGISTERED — built-ins PLUS
+   *  operator-entered override rows. A model absent from this set runs on inferred defaults.
+   *  ⚠ Optional + EMPTY-MEANS-UNKNOWN: an empty set marks nothing, so an older backend (or a
+   *  caller that has not wired it) renders exactly as before rather than flagging every model. */
+  verifiedModels?: Set<string>
+  /** Phase 249: per-unverified-model inferred provider, computed server-side. */
+  inferredProviderFor?: Record<string, string>
+  /** ⭐ Phase 249: unverified ids whose inferred provider has NO native tool calling — these
+   *  run with every tool unavailable and say so nowhere else. */
+  toolsLostModels?: Set<string>
   agentMode?: "default" | "explorer"
   onAgentModeChange?: (mode: "default" | "explorer") => void
   prefillMessage?: string | null
@@ -106,6 +117,9 @@ export function _resetComposerDraftsForTest() {
   activeConnectorsByThread.clear()
 }
 
+/** Stable empty default — an omitted `toolsLostModels` must not allocate a new Set per render. */
+const EMPTY_MODEL_SET: ReadonlySet<string> = new Set<string>()
+
 export function MessageInput({
   onSend,
   disabled,
@@ -118,6 +132,9 @@ export function MessageInput({
   selectedModel,
   onModelChange,
   deprecatedModels,
+  verifiedModels,
+  inferredProviderFor,
+  toolsLostModels,
   agentMode = "default",
   onAgentModeChange,
   prefillMessage,
@@ -618,6 +635,14 @@ export function MessageInput({
                     {models.map((m) => {
                       const info = MODEL_INFO[m]
                       const isDeprecated = deprecatedModels?.has(m) ?? false
+                      // Phase 249 (MODEL-05) — THE PICK-TIME WARNING.
+                      //
+                      // ⚠ The guard is `size > 0`, not `!== undefined`. An empty set is the
+                      // honest "we were not told" state — an older backend omits the field, and
+                      // treating that as "nothing is registered" would flag every model in the
+                      // product. Silence must degrade to no claim, never to a false one.
+                      const isUnverified =
+                        (verifiedModels?.size ?? 0) > 0 && !verifiedModels!.has(m)
                       // Phase 149 (D-149-17) + model-icons pass: the model's OWN
                       // family mark per row (Claude/Gemini/Llama/… — MORE specific than the
                       // provider mark, and it differentiates rows within one provider, e.g.
@@ -645,6 +670,23 @@ export function MessageInput({
                             <Cpu className="h-3 w-3 shrink-0 text-muted-foreground" />
                           )}
                           <span className="min-w-0 flex-1 truncate">{m}</span>
+                          {isUnverified && (
+                            <span
+                              className="text-[9px] font-medium text-amber-600 bg-amber-500/10 px-1.5 py-0.5 rounded-full ghost-border shrink-0"
+                              title={unverifiedDescription(
+                                m,
+                                inferredProviderFor ?? {},
+                                toolsLostModels ?? EMPTY_MODEL_SET,
+                              )}
+                              aria-label={unverifiedDescription(
+                                m,
+                                inferredProviderFor ?? {},
+                                toolsLostModels ?? EMPTY_MODEL_SET,
+                              )}
+                            >
+                              {UNVERIFIED.LABEL}
+                            </span>
+                          )}
                           {isDeprecated && (
                             <span
                               className="text-[9px] font-medium text-amber-600 bg-amber-500/10 px-1.5 py-0.5 rounded-full ghost-border shrink-0"

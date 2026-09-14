@@ -1186,7 +1186,8 @@ async def add_model_by_id(
     binds — no client identifier/value ever reaches a SET clause (T-159-02).
 
     Validation runs BEFORE any DB touch (allowlist-before-touch): a blank id → 422; a provider
-    outside ``PROVIDER_ENDPOINTS`` → 422; a wrong-typed cap → 422; a model already in the
+    outside ``config.ROUTING_PROVIDERS`` → 422 (⚠ the ROUTING roster, NOT the SSRF discovery
+    allowlist it used to read — Phase 249 / SEED-172); a wrong-typed cap → 422; a model already in the
     registry (built-in OR override, CASE-FOLDED per the WR-02 precedent so ``GLM-4.5`` can't
     phantom-duplicate ``glm-4.5``) → 409. On success: ``invalidate_model_overrides_cache()`` + a
     ✎ ``model.added`` receipt. On a persistence failure: a ``model.add_failed`` stamp + a real
@@ -1202,11 +1203,22 @@ async def add_model_by_id(
             detail="model_id must be non-empty.",
         )
 
-    # (2) Provider roster allowlist BEFORE any DB touch (function-local import — Pitfall 4). The
-    # SAME hardcoded roster the SSRF discovery gate validates against; an EXPLICIT pick (never
-    # inferred) so the operator owns the provider a DB-only model routes through.
-    from app.services.model_discovery_service import PROVIDER_ENDPOINTS
-    if body.provider not in set(PROVIDER_ENDPOINTS):
+    # (2) Provider ROUTING-roster allowlist BEFORE any DB touch (function-local import —
+    # Pitfall 4). An EXPLICIT pick (never inferred) so the operator owns the provider a DB-only
+    # model routes through.
+    #
+    # ⚠ Phase 249 (MODEL-04 / SEED-172): this used to read
+    # `model_discovery_service.PROVIDER_ENDPOINTS` — the SSRF DISCOVERY allowlist. That is a
+    # DIFFERENT LIST FOR A DIFFERENT REASON, and it omits `ollama` / `lmstudio` / `custom`, so
+    # every self-hosted model was refused here and was unaddable from the registry UI for its
+    # entire life. Their base URL comes from the operator's own app_settings column
+    # (`_SELF_HOSTED_PROVIDERS`, migration 180); the server never DISCOVERS them, so they belong
+    # in the routing roster and NOT in a discovery allowlist.
+    # ⛔ Do not "simplify" this back to one list. `test_249_add_model_routing_roster.py` fails
+    # if a self-hosted provider ever reaches PROVIDER_ENDPOINTS — that would be a new egress
+    # surface pointed at an operator-supplied URL, not a roster tidy-up.
+    from app.config import ROUTING_PROVIDERS
+    if body.provider not in ROUTING_PROVIDERS:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"Unknown provider: {body.provider}",

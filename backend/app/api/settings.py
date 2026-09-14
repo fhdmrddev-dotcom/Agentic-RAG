@@ -184,6 +184,22 @@ class FullSettingsResponse(BaseModel):
     deprecated_models: list[str]
 
 
+def _verified_model_ids(overrides: dict[str, dict]) -> list[str]:
+    """Every model id the platform considers REGISTERED — built-in OR operator-entered.
+
+    ⚠ Phase 249 (MODEL-05). This was ``sorted(MODEL_CAPABILITIES.keys())`` — BUILT-INS ONLY — and
+    that made MODEL-04's success light MODEL-05's warning: a model added through the Model
+    Registry UI lands in ``model_capabilities_overrides`` and resolves
+    ``capability_source="db_override"``, i.e. THE OPERATOR TYPED ITS CAPABILITIES. Calling such a
+    model "not in our verified registry" is the opposite of the truth.
+
+    ⛔ ONE helper, TWO callers (``GET /settings`` and ``GET /settings/providers``). Two surfaces
+    answering the same question about the same model must not be able to disagree — that is the
+    whole shape of the defect this phase exists to close.
+    """
+    return sorted(set(MODEL_CAPABILITIES) | set(overrides))
+
+
 # ── Request models ────────────────────────────────────────────────────────────
 
 class ProviderUpdate(BaseModel):
@@ -271,9 +287,16 @@ async def _build_response(s=None) -> FullSettingsResponse:
     # Phase 149 (MODEL-01 / D-149-05) — the enabled deprecated models for the picker badge.
     # Reads the enabled-only hot cache (deprecated ≠ disabled — a deprecated model stays
     # enabled); _load_model_overrides never raises (returns the stale/empty cache on a blip).
-    from app.models.user_settings import _load_model_overrides
+    from app.models.user_settings import _load_model_overrides, load_all_model_overrides
     _overrides = await _load_model_overrides()
     deprecated_models = sorted(mid for mid, cap in _overrides.items() if cap.get("deprecated"))
+    # Phase 249 (MODEL-05) — the verified UNION reads ALL override rows, not the enabled-only hot
+    # cache above. ⚠ The distinction is load-bearing: a model the operator added and then DISABLED
+    # is still REGISTERED (they typed its capabilities), so sourcing the union from the
+    # enabled-only cache would report it "unverified" the moment it was hidden from the picker.
+    # Both reads are fail-soft and cached; neither raises.
+    _all_overrides = await load_all_model_overrides()
+    _verified_set = set(_verified_model_ids(_all_overrides))
     return FullSettingsResponse(
         active_provider=s.active_provider,
         llm_model=s.llm_model,
@@ -350,7 +373,8 @@ async def _build_response(s=None) -> FullSettingsResponse:
         resolved_harness_judge_model=resolve_judge_model(s),
         # Phase 075.3 D-075.3-13: snapshot of registry-known model_ids
         # (sorted for stable client diffs / test assertions).
-        verified_models=sorted(MODEL_CAPABILITIES.keys()),
+        # Phase 249 (MODEL-05): the UNION — built-ins PLUS operator-entered override rows.
+        verified_models=sorted(_verified_set),
         # Phase 075.3 D-075.3-13 + D-075.3-12: build the inferred-provider map
         # only for model_ids the user has configured (via providers[*].models)
         # that are NOT in the registry. Keeps the payload small (one entry per
@@ -360,7 +384,9 @@ async def _build_response(s=None) -> FullSettingsResponse:
             m: _infer_provider_for(m)
             for p in s.providers
             for m in p.models
-            if m and m not in MODEL_CAPABILITIES
+            # Phase 249: keyed off the UNION, so an operator-added model has no inferred
+            # provider and therefore nothing for the chip to render.
+            if m and m not in _verified_set
         },
         # Phase 149 (MODEL-01 / D-149-05) — enabled deprecated models for the badge.
         deprecated_models=deprecated_models,
@@ -971,10 +997,43 @@ async def get_providers(current_user: dict = Depends(get_current_user)):
     disabled_models = sorted(
         mid for mid, cap in _overrides.items() if cap.get("enabled") is False
     )
+    # Phase 249 (MODEL-05) — WHAT THE COMPOSER NEEDS TO WARN AT PICK TIME.
+    #
+    # The `unverified` chip already existed, in `ModelPillRow` on the SETTINGS page, driven by
+    # these same two fields on the `GET /settings` response. The chat composer's dropdown — the
+    # surface where a model is actually PICKED — had no marker at all, so the warning lived on the
+    # screen where you configure and was absent on the screen where you choose.
+    #
+    # ⛔ ALL THREE REUSE `_overrides`, ALREADY FETCHED ABOVE for deprecated/disabled. No second
+    # read, no new import, no new cache — this is the end-user picker feed (the VIS-01 run
+    # carve-out), and a second thing that can be slow here is a second way for it to break.
+    _verified = _verified_model_ids(_overrides)
+    _verified_set = set(_verified)
+    # Keyed only by CONFIGURED ids that are not registered — one entry per unknown, so the
+    # payload stays small. `_infer_provider_for` is the SERVER's inference; the client never
+    # mirrors the pattern table (RESEARCH §6 Approach b).
+    _inferred = {
+        m: _infer_provider_for(m)
+        for p in s.providers
+        for m in p.models
+        if m and m not in _verified_set
+    }
+    # ⭐ THE CONSEQUENCE, not the mechanism. An inferred provider OUTSIDE _NATIVE_TOOL_PROVIDERS
+    # means the run goes to STRUCTURED mode, the `tools` param is never sent, and any tool call
+    # the model attempts arrives as unparseable prose — the agent loop then breaks after one
+    # iteration with no error anywhere. `config.py` learned to say this out loud on 2026-08-18,
+    # after that exact failure stayed invisible for a day behind the words
+    # `safe_defaults_applied=True`. The chip says it too, and this field is what tells it which
+    # models to say it about.
+    from app.config import _NATIVE_TOOL_PROVIDERS  # function-local (Pitfall 4)
+    _tools_lost = sorted(m for m, prov in _inferred.items() if prov not in _NATIVE_TOOL_PROVIDERS)
     return {
         "active": s.active_provider,
         "active_model": s.llm_model,
         "providers": configured,
         "deprecated_models": deprecated_models,
         "disabled_models": disabled_models,
+        "verified_models": _verified,
+        "inferred_provider_for": _inferred,
+        "inferred_tools_lost": _tools_lost,
     }

@@ -85,6 +85,18 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
     selectedModel,
     setSelectedModel,
     deprecatedModels,
+    // Phase 249 (MODEL-05) — PASS-THROUGH ONLY. Three values read from the hook and handed to
+    // MessageInput beside `deprecatedModels`. ⛔ This plan adds NO state hook and NO effect hook
+    // to this file: its G-5 discharge is recorded as ARITHMETIC, and a derivation here would
+    // spend that discharge on a prop pass.
+    //
+    // ⚠ The two hook names are deliberately NOT spelled in this comment. They are counted by a
+    // raw `grep -c` over this file, so naming them in prose inflates the count and makes the
+    // discharge unverifiable — a trap this file's own docblock already warns about, and one
+    // this comment tripped on its first draft.
+    verifiedModels,
+    inferredProviderFor,
+    toolsLostModels,
     handleProviderChange,
   } = useComposerModel(thread?.id ?? null, messages)
   const [agentMode, setAgentMode] = useState<"default" | "explorer">("default")
@@ -500,6 +512,9 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
       selectedModel={selectedModel}
       onModelChange={setSelectedModel}
       deprecatedModels={deprecatedModels}
+      verifiedModels={verifiedModels}
+      inferredProviderFor={inferredProviderFor}
+      toolsLostModels={toolsLostModels}
       agentMode={agentMode}
       onAgentModeChange={setAgentMode}
       prefillMessage={failedDraft ?? prefillMessage}

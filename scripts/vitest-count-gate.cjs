@@ -120,6 +120,18 @@ const path = require("node:path")
 
 // ── The pin. Keyed by BARE filename (testResults[].name is an absolute path). ──
 const BASELINE = {
+  // ── Phase 249 (MODEL-04 / MODEL-07) ───────────────────────────────────────────────
+  // Adopted with their measured `— N new` figures from the gate's own run, not guessed.
+  // ⭐ `ModelRegistryTab.test.tsx` is adopted because it was RUNNING NOWHERE and asserting
+  // the defect: `expect(...getAllByRole("option")).toHaveLength(8)` pinned the 8-cloud roster
+  // that made every self-hosted model unaddable (SEED-172). A fence outside the gate that
+  // pins a bug is worse than no fence — it reads as coverage.
+  "ModelRegistryTab.test.tsx": 29,
+  "addProviderRoster.lockstep.test.ts": 4,
+  "hideControlLegibility.test.tsx": 6,
+  // Phase 249 Plan 02 (MODEL-05) — the pick-time chip, its negative arm, its consequence text,
+  // and the ⛔ still-selectable pin that stops a future "improvement" turning it into a refusal.
+  "MessageInput.unverified.test.tsx": 7,
   "Seam.test.tsx": 8,
   "TodosSection.test.tsx": 12,
   "CitationList.test.tsx": 15,
@@ -5370,6 +5382,26 @@ const TARGETS = [
   // the panel must NOT list an expired row — because "the transcript can see expired files"
   // and "expired files came back everywhere" are otherwise the same green.
   "src/providers/__tests__/expiredAttachmentTombstone.test.tsx",
+  // ── Phase 249 (MODEL-04 / MODEL-07) ───────────────────────────────────────────────
+  // ⚠ `src/components/admin/` was reached by exactly ONE named entry
+  // (`revertByteIdentical.test.tsx`) and by no directory entry, so the whole Control-Room
+  // Model Registry estate sat outside the gate. That is not "lightly guarded", it is
+  // unguarded — and it had a consequence, not just a shape:
+  //
+  // ⭐ `ModelRegistryTab.test.tsx` asserted the provider select had EXACTLY 8 options. The
+  // 8 were the defect. A green fence pinned SEED-172 in place for the component's whole
+  // life, and nothing ran it under the gate. It is adopted here alongside the two new
+  // suites, and its assertion is now DERIVED from the exported roster rather than typed.
+  //
+  // Added in the SAME COMMIT that creates the two new files — an entry pointing at a path
+  // that does not yet exist makes the gate ERROR (exit 2) rather than fail.
+  "src/components/admin/__tests__/ModelRegistryTab.test.tsx",
+  "src/components/admin/__tests__/addProviderRoster.lockstep.test.ts",
+  "src/components/admin/__tests__/hideControlLegibility.test.tsx",
+  // ── Phase 249 Plan 02 (MODEL-05) ──────────────────────────────────────────────────
+  // ⚠ `src/components/chat` has NO bare-directory entry (BUG-260912-01 recorded the same
+  // thing), so this suite must be named or it never executes under the gate.
+  "src/components/chat/__tests__/MessageInput.unverified.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")

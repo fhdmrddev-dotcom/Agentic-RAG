@@ -10404,11 +10404,11 @@ cells rot within days.
 | [`backend/app/services/harness_engine.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharness_enginepy) | 54 / 20 / 3135 | **FIRES** | honoured by construction (194 / **214**) — 214-06 resolved the pause's service at ONE call site |
 | [`frontend/src/components/chat/RunCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatruncardtsx) | 28 / 14 / 710 | **FIRES** | ⭐ **G-5 DISCHARGED (243-02)** — the reasoning fold left for `ThinkingBlock.tsx`, `-39/+20`, one `useState` fewer. ⚠ row was STALE at `26/12/728`. State 2 stayed, by decision |
 | [`frontend/src/components/chat/ThinkingBlock.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatthinkingblocktsx) | 4 / 1 / 283 | no | ⚠ **row at ONE phase BY DESIGN**; `117 → 283` in one phase (**243-04**). Invariants: **one reasoning renderer**, and **no duration derived from length** |
-| [`frontend/src/components/chat/MessageInput.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageinputtsx) | 31 / 15 / 821 | **FIRES** | ⭐ **THE OWED SEAM WAS TAKEN (244-06)** — `useComposerAttachments`. It SHRANK `855 → 821` **while gaining the cloud door**; ⛔ the `ComposerChipsRow` half of the named seam stays OWED |
+| [`frontend/src/components/chat/MessageInput.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageinputtsx) | 31 / 15 / 863 | **FIRES** | honoured by construction (**249-02**): ONE chip added beside the EXISTING `deprecated` badge, 3 optional props, no state. ⛔ the `ComposerChipsRow` seam stays OWED |
 | [`frontend/src/components/chat/MessageList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessagelisttsx) | 21 / 9 / 307 | **FIRES** | ⚠ row STALE a THIRD time (`19/8/267` → `20/8/292` → `20/8/300`). honoured by construction (**244-01**): `min-h-0` added to the ONE `<ScrollArea>` call site — a class token, no state, no prop |
 | [`frontend/src/hooks/useFollowScroll.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusefollowscrollts) | 4 / 2 / 314 | does not fire | ⛔ **NO ROW FOR ITS ENTIRE LIFE — added 243-03**, then STALE at `3/2/265` one phase on. **243-06:** the re-arm now asks whether the reader is STILL leaving, not what they last did |
 | [`frontend/src/lib/throttle.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibthrottlets) | 2 / 2 / 108 | does not fire | ⛔ **NO ROW FOR ITS ENTIRE LIFE — added 243-03.** TWO opposite primitives on purpose; ⛔ never unify them — one of the two call sites breaks silently |
-| [`frontend/src/components/chat/ChatArea.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatchatareatsx) | 75 / 36 / 781 | **FIRES** | ⚠ row STALE a THIRD time (`72/36/710`). honoured by construction (**244-13**): the SAME one boolean now tests the lock's MODE — WR-07. No second branch, no new state |
+| [`frontend/src/components/chat/ChatArea.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatchatareatsx) | 75 / 36 / 796 | **FIRES** | honoured by construction (**249-02**), proven by ARITHMETIC: state hooks 9→9, effect hooks 10→10. Three values destructured and passed through; ⛔ zero derivation in this file |
 | [`frontend/src/components/panel/PendingAskCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelpendingaskcardtsx) | 15 / 8 / 836 | **FIRES** | ⚠ row was STALE at `13 / 7 / 736`. UNTOUCHED by 244-03 (`0 0`) — the chat approval MOUNTS its shipped `PendingAskStack`, never edits the shell. ⚠ `SEED-219` still open |
 | [`frontend/src/pages/WorkflowRunPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowrunpagetsx) | 28 / 9 / 1670 | **FIRES** | honoured by construction (200 / 200.1 / 200.2 / **214**) — it resolves the step identity ONCE and its children render it |
 | [`frontend/src/components/chat/OutputFileCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatoutputfilecardtsx) | 8 / 7 / 219 | **FIRES** | honoured by construction (195) |
@@ -10416,18 +10416,18 @@ cells rot within days.
 | [`frontend/src/lib/api.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapits) | 187 / 110 / 422 | ⚠ **FIRES** | ✅ **SPLIT TAKEN (207)** — this path is the re-export BARREL. ⚠ **its 12 domain MODULES had no rows of their own until 214** |
 | [`frontend/src/types/index.ts`](docs/HOT-FILE-LEDGER.md#frontendsrctypesindexts) | 85 / 65 / 1380 | ⚠ **FIRES** | ⚠ row was STALE at `78/60/1331`. honoured by construction (**243-04**): one optional CLIENT-ONLY field whose ABSENCE is load-bearing. seam still OWED |
 | [`backend/app/main.py`](docs/HOT-FILE-LEDGER.md#backendappmainpy) | 82 / 59 / 950 | ⚠ **FIRES** | ⚠ row was STALE by **FOURTEEN PHASES** at `79 / 45 / 876`. honoured by construction (**BUG-260902-06**): one more start/stop pair beside the scheduler |
-| [`backend/app/config.py`](docs/HOT-FILE-LEDGER.md#backendappconfigpy) | 83 / 48 / 1506 | ⚠ **FIRES** | ⚠ STALE AGAIN at `82 / 47 / 1489` — the ELEVENTH phase to find this row wrong. honoured by construction (**241**): four hnsw defaults, no reader changed; MODEL_CAPABILITIES-out seam stays OWED |
-| [`backend/app/api/admin.py`](docs/HOT-FILE-LEDGER.md#backendappapiadminpy) | 33 / 13 / 1740 | ⚠ **FIRES** | ⚠ row was STALE at `32 / 12 / 1733`. honoured by construction (**BUG-260902-06**): two write seams swap invalidate for broadcast; the two WR-03 READ seams deliberately unchanged |
-| [`backend/app/api/settings.py`](docs/HOT-FILE-LEDGER.md#backendappapisettingspy) | 38 / 20 / 972 | ⚠ **FIRES** | ⚠ STALE for the THIRD close running at `35 / 19 / 814`. honoured by construction (**242**): one refusal helper behind an allow-list, four call sites, every typed sentence preserved |
+| [`backend/app/config.py`](docs/HOT-FILE-LEDGER.md#backendappconfigpy) | 86 / 49 / 1568 | ⚠ **FIRES** | ⚠ STALE AGAIN at `83/48/1506` — the THIRTEENTH. honoured by construction (**249-01**): ONE derived frozenset + one Literal widened to the value the code already returned. ⛔ MODEL_CAPABILITIES seam still OWED |
+| [`backend/app/api/admin.py`](docs/HOT-FILE-LEDGER.md#backendappapiadminpy) | 36 / 13 / 1931 | ⚠ **FIRES** | ⚠ row was STALE at `33/13/1740` (+191 lines). honoured by construction (**249-01**): the add-model provider guard swaps its SOURCE LIST; order, 422 shape and every other guard byte-unchanged |
+| [`backend/app/api/settings.py`](docs/HOT-FILE-LEDGER.md#backendappapisettingspy) | 39 / 20 / 1039 | ⚠ **FIRES** | ⚠ row STALE a 4th close running (`38/20/972`). honoured by construction (**249-02**): ONE `_verified_model_ids` helper, TWO callers. ⛔ the picker feed reuses its already-fetched overrides dict |
 | [`backend/app/services/multimodal_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmultimodal_servicepy) | 14 / 7 / 984 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** — row added SEED-227, which is also where its silent truncation was found |
 | [`backend/app/api/documents.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentspy) | 87 / 34 / 2414 | ⚠ **FIRES** | ✅ **DISCHARGED AGAIN (240-03)** — the email-attachment loop extracted to `services/email_attachments.py`. 240-04 adds the conversation read |
-| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 211 / 46 / 5618 | ⚠ **FIRES** | ⚠ row was STALE at `167 / 38 / 4786`. honoured by construction (**240**): three suites into BOTH knobs; verdict `7914 · 7149 · 247/247` |
+| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 214 / 46 / 5682 | ⚠ **FIRES** | ⚠ row STALE a 5th time (`211/46/5618`). **249**: FOUR suites into BOTH knobs — incl. `ModelRegistryTab.test.tsx`, which ran NOWHERE and asserted the defect (`toHaveLength(8)`) |
 | [`backend/app/services/eval_runner_service.py`](docs/HOT-FILE-LEDGER.md#backendappserviceseval_runner_servicepy) | 12 / 7 / 959 | ⚠ **FIRES** | ⚠ absent at 7 phases (added 196) |
 | [`frontend/src/components/panel/PhaseCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasecardtsx) | 16 / 10 / 755 | ⚠ **FIRES** | honoured by construction (200 / **214**) — the failure sentinel NARROWED to both-sources-empty |
 | [`frontend/src/components/panel/PhaseTimeline.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasetimelinetsx) | 9 / 7 / 385 | ⚠ **FIRES** | honoured by construction (**214**) — it mounts the shared identity; ⚠ absent from BOTH until 200 |
 | [`frontend/src/components/panel/phaseStatusMeta.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasestatusmetats) | 3 / 3 / 236 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent; crossed the threshold in the commit that added its row (200) |
 | [`backend/app/services/harness/validator_kinds.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessvalidator_kindspy) | 12 / 5 / 749 | ⚠ **FIRES** | ⚠ absent at 5 phases (added 196) |
-| [`frontend/src/components/admin/ModelRegistryTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminmodelregistrytabtsx) | 10 / 4 / 1191 | ⚠ **FIRES** | ⚠ absent at 4 phases (added 196) |
+| [`frontend/src/components/admin/ModelRegistryTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminmodelregistrytabtsx) | 14 / 4 / 1553 | ⚠ **FIRES** | ⚠ row STALE at `10/4/1191` (+362 lines). honoured by construction (**249-01**): roster widened to 11 + words on 2 EXISTING controls. ⛔ `deprecated` semantics unchanged (D-149-04) |
 | [`frontend/src/components/workflows/soulData.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowssouldatats) | 12 / 10 / 499 | ⚠ **FIRES** | honoured by construction (214 / **214.1**); ⚠ absent until 197, at 7 phases |
 | [`frontend/src/components/workflows/PublishGauntlet.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowspublishgauntlettsx) | 17 / 9 / 1289 | ⚠ **FIRES** | honoured by construction (214 / **BUG-260828-09**) — one child card mounted in the slot `PublishRefusalList` already owns; ⚠ absent until 199 |
 | [`frontend/src/components/workflows/PhaseSpineGraph.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsphasespinegraphtsx) | 5 / 5 / 473 | ⚠ **FIRES** | honoured by construction (200) |
@@ -10451,7 +10451,7 @@ cells rot within days.
 | [`backend/app/api/model_registry.py`](docs/HOT-FILE-LEDGER.md#backendappapimodel_registrypy) | 1 / 1 / 155 | no (1 phase) | young (196) |
 | [`frontend/src/components/workflows/ModelField.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsmodelfieldtsx) | 3 / 2 / 370 | no (2 phases) | young (196, 199) |
 | [`frontend/src/components/workflows/modelFitness.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsmodelfitnessts) | 1 / 1 / 130 | no (1 phase) | young (196) |
-| [`frontend/src/hooks/useComposerModel.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusecomposermodelts) | 2 / 1 / 367 | no (1 phase) | young (196) |
+| [`frontend/src/hooks/useComposerModel.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusecomposermodelts) | 2 / 1 / 407 | no (1 phase) | **249-02**: 3 state hooks fed by the ONE existing providers read — ⛔ no second fetch. THE composer's model machine; a derivation added to ChatArea instead would spend that file's G-5 discharge |
 | [`frontend/src/hooks/useModelRegistry.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusemodelregistryts) | 1 / 1 / 109 | no (1 phase) | young (196) |
 | [`frontend/src/components/workflows/decisionsVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsdecisionsvocabularyts) | 1 / 1 / 226 | no (1 phase) | young (197) |
 | [`frontend/src/components/workflows/DecisionsList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsdecisionslisttsx) | 4 / 2 / 413 | no (2 phases) | young (197, 199) |
@@ -10489,7 +10489,9 @@ cells rot within days.
 | [`frontend/src/pages/settingsSearchPayload.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcpagessettingssearchpayloadts) | 2 / 2 / 116 | no (2 phases) | Created by 242. Row added AT CREATION rather than at the third phase — an absent row makes G-5 absent forever, silently, at any count |
 | [`frontend/src/components/settings/SourceFileCeilingCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingssourcefileceilingcardtsx) | 1 / 1 / 117 | no (1 phase) | young (239-10) — ⚠ a row minted at creation reads `1 / 1` forever unless RE-DERIVED. Owns no number and no sentence |
 | [`frontend/src/components/settings/sourceCeilingCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingssourceceilingcopyts) | 1 / 1 / 109 | no (1 phase) | young (239-10) — the ONE number it owns (recommendation) is pinned to `user_settings.py` by a `?raw` test; the bounds are SERVED |
-| [`frontend/src/components/settings/ModelPillRow.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsmodelpillrowtsx) | 4 / 3 / 141 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent for its entire life — row added 2026-08-27 at 212's close, same D-22 pair as `SettingsPage.tsx` |
+| [`frontend/src/components/settings/ModelPillRow.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsmodelpillrowtsx) | 4 / 3 / 151 | ⚠ **FIRES** | honoured by construction (**249-02**): its local `_tooltipFor` DELETED for the shared module. ⛔ it had been claiming `timeout=90s` against a real default of 300 |
+| [`frontend/src/lib/api/settings.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapisettingsts) | 6 / 2 / 460 | no (2 phases) | ⚠ **absent for its ENTIRE LIFE — row added 249-02** at its third touch. The chat picker's wire type; ⛔ every new field is OPTIONAL, so an older backend renders exactly as before |
+| [`frontend/src/lib/unverifiedModelCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibunverifiedmodelcopyts) | 1 / 1 / 88 | no (new) | young (created 249-02). Row added AT CREATION. THE one home for the unverified chip's words, 2 consumers; ⛔ `describeToolsLost` must state the CONSEQUENCE, not that defaults were applied |
 | [`frontend/src/components/settings/servicesCatalog.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsservicescatalogts) | 2 / 1 / 211 | no (1 phase) | young (212) — the presentation lookup migration 127's `service_id` COMMENT names |
 | [`frontend/src/components/settings/catalogCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingscatalogcopyts) | 1 / 1 / 22 | no (1 phase) | young (212) |
 | [`frontend/src/components/settings/connectionRefusalCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectionrefusalcopyts) | 1 / 1 / 567 | no (1 phase) | ⚠ absent for its entire life at 567 L — row added 2026-08-27 |
@@ -13827,3 +13829,162 @@ Renders an individual action row within `ConnectionGrantsList`, showing action n
 
 Mounts the MCP Authentication door in `ConnectionFormPanel` supporting OAuth 2.0 and BYO client credentials for MCP servers. It is the second writer of `custom_client_id` (alongside `ConnectionFormPanel`), and CRED-01 is only whole because both doors call the same `customClientIdError` validator. A future phase adding a third door or reimplementing the check locally would make the credential boundary fence vacuous without touching what the fence asserts.
 
+
+---
+
+## Phase 249 Plan 01 — the routing roster and the hide controls (MODEL-04 / MODEL-07)
+
+**Files:** `backend/app/config.py` · `backend/app/api/admin.py` ·
+`frontend/src/components/admin/ModelRegistryTab.tsx` · `scripts/vitest-count-gate.cjs`
+
+### `backend/app/config.py` — `86 / 49 / 1568`, honoured by construction
+
+⚠ **The row read `83 / 48 / 1506`. That is the THIRTEENTH time this file's cell has been found
+stale**, and the count is published because the *rate* is the finding, not the number.
+
+**What changed:** two additive edits and no branch.
+
+1. `ROUTING_PROVIDERS: frozenset[str] = frozenset(_PROVIDER_BASE_URLS)` — a **derivation**, not a
+   second list. The seam this file's cell has owed for 49 phases (`MODEL_CAPABILITIES`-out) is
+   **still OWED**; a one-line derived frozenset is not that extraction and must not be counted as it.
+2. `capability_source`'s `Literal` gained `"db_override"` — ⭐ **the type declared two values while
+   the code had been returning three since Phase 081.1.** `get_model_capability_async` sets it at
+   `:806`. A type that is wrong about its own module is a register like any other.
+
+**The invariant this file now carries, stated so the next toucher inherits it:**
+⛔ **`ROUTING_PROVIDERS` is not an egress allowlist.** It answers *"may a model route through this
+provider?"*. *"May the server fetch this URL?"* is `model_discovery_service.PROVIDER_ENDPOINTS`,
+and the two are deliberately different lengths. Widening this must never widen that.
+
+### `backend/app/api/admin.py` — `36 / 13 / 1931`, honoured by construction
+
+⚠ The row read `33 / 13 / 1740` — **+191 lines** unrecorded.
+
+**What changed:** the add-model provider guard swaps its **source list** and nothing else. Order is
+unchanged (allowlist-before-touch), the 422 shape is unchanged, the blank-id guard, the per-column
+type guards and the case-folded duplicate check are byte-identical. No new route, no new writer.
+
+⭐ **The defect was one symbol.** `from app.services.model_discovery_service import PROVIDER_ENDPOINTS`
+→ `from app.config import ROUTING_PROVIDERS`. Eight providers versus eleven; the three in the gap
+were `ollama`, `lmstudio` and `custom`, and every self-hosted model was refused `422 Unknown
+provider` for this endpoint's entire life.
+
+### `frontend/src/components/admin/ModelRegistryTab.tsx` — `14 / 4 / 1553`, honoured by construction
+
+⚠ The row read `10 / 4 / 1191` — **+362 lines** unrecorded.
+
+**What changed:**
+- `ADD_PROVIDER_ROSTER` widened 8 → 11 and **exported**, so a fence can read the real constant
+  rather than a copy. Pinned to `backend/app/config.py` by
+  `__tests__/addProviderRoster.lockstep.test.ts` — the third copy of this roster is what caused
+  the defect, so the fix is a pin, not a longer array.
+- `HIDE_CONTROL_COPY` — the words for the two hide-ish controls, in one named constant so the
+  fence binds to a string and not to markup.
+- A visible note under the `deprecated` switch, and an `sr-only` description on `Enabled`.
+- A self-hosted note under the provider select.
+
+**Binding invariants:**
+⛔ **`deprecated`'s semantics do not change (D-149-04).** A deprecated row stays enabled and
+selectable and never moves the coupling chip. `BUG-260908-03` says the behaviour is correct; the
+*reading* is what failed.
+⛔ **Do not add a fourth passive affordance.** The `Users see` column + `CouplingChip` already are
+the "coupling made visible" affordance and were still lost in real use. The words belong **on the
+control**.
+⚠ There are **THREE** answers to *"get rid of this model"* — `deprecated` (badge), `enabled`
+(hides), `Remove` (mig 179). The report predates `Remove`; the copy names all three.
+
+**Named seam, still owed:** the file is 1,553 lines with the row, the add form, the discovery
+panel's siblings and ten small controls in it. `AddModelForm` (~200 lines, its own state machine)
+is the clean first extraction.
+
+### `scripts/vitest-count-gate.cjs` — `214 / 46 / 5650`
+
+⚠ Row stale a fifth time (`211 / 46 / 5618`).
+
+⭐ **THE FINDING IS WHAT WAS NOT IN THE GATE.** `src/components/admin/` was reached by exactly ONE
+named entry and by no directory entry, so the whole Control-Room Model Registry estate ran outside
+the gate — **and `ModelRegistryTab.test.tsx` contained `expect(...getAllByRole("option")).toHaveLength(8)`.**
+The 8 *was* the defect. **A green fence pinned `SEED-172` in place, and nothing executed it under
+the gate.** Three suites are adopted into **both** knobs here, and that assertion is now derived
+from the exported roster.
+
+⚠ This is the same class Phase 214 measured (`WorkflowScheduleModal.test.tsx` running but
+unguarded) and Phase 235 measured (a presence fence blind to content drift) — **TARGETS decides
+what RUNS, BASELINE decides what is GUARDED, and a suite can sit on the wrong side of exactly one.**
+
+## Phase 249 Plan 02 — the warning where the choice is made (MODEL-05)
+
+**Files:** `backend/app/api/settings.py` · `frontend/src/lib/unverifiedModelCopy.ts` (new) ·
+`frontend/src/lib/api/settings.ts` · `frontend/src/hooks/useComposerModel.ts` ·
+`frontend/src/components/chat/ChatArea.tsx` · `frontend/src/components/chat/MessageInput.tsx` ·
+`frontend/src/components/settings/ModelPillRow.tsx` · `scripts/vitest-count-gate.cjs`
+
+### The finding, before the files
+
+⭐ **The `unverified` chip already existed. It was on the wrong surface.** `ModelPillRow`
+(Settings) has rendered it since Phase 075.3, driven by `verified_models` +
+`inferred_provider_for` — both of which `GET /settings` already sent. The chat composer's
+dropdown, where a model is actually **picked**, rendered `deprecated` and `active` and had no
+marker at all. So the warning lived where you configure and was absent where you choose.
+
+⭐ **And `verified_models` was BUILT-INS ONLY.** A model added through the Model Registry UI lands
+in `model_capabilities_overrides` and resolves `capability_source="db_override"` — the operator
+typed its capabilities. It was **absent** from `verified_models`, so **MODEL-04's success would
+have lit MODEL-05's warning.** The set is now the union, from one helper, used by both feeds.
+
+### `backend/app/api/settings.py` — `39 / 20 / 1039`, honoured by construction
+
+⚠ Row stale for the **fourth close running** (`38 / 20 / 972`).
+
+`_verified_model_ids(overrides)` — ONE helper, TWO callers. `GET /settings/providers` gains
+`verified_models`, `inferred_provider_for` and `inferred_tools_lost`.
+
+**Binding invariants:**
+⛔ **The three new fields reuse the `_overrides` dict the handler already fetched.** No second
+read, no new cache. This is the end-user chat picker's feed (the `VIS-01` run carve-out), and a
+second thing that can be slow here is a second way for it to break. Fenced at **source level** by
+`test_249_unverified_at_pick_time.py`, because a runtime call count measures **2** — the second
+read is pre-existing, inside `load_app_settings_async`, and asserting on it would have made this
+phase the owner of an unrelated read.
+⛔ **`require_visible` must never be added to `/settings/providers`** — `test_148_carveouts` guards
+it and gating it is a self-inflicted end-user outage.
+⚠ `/settings`' union reads **`load_all_model_overrides`**, not the enabled-only hot cache: a model
+the operator added and then **disabled** is still **registered**, and sourcing the union from the
+enabled-only cache would call it "unverified" the moment it was hidden.
+
+### `frontend/src/lib/unverifiedModelCopy.ts` — `1 / 1 / 88`, row added AT CREATION
+
+**THE one home for the chip's words**, consumed by both surfaces.
+
+⛔ **`describeToolsLost` must state the CONSEQUENCE.** It is lifted in substance from
+`config.py::_build_inferred_defaults`, whose wording exists because the previous version ended
+`safe_defaults_applied=True` — **which reads as benign, and is exactly how a total tool-calling
+failure stayed invisible for a day on 2026-08-18.** A chip that says only "unverified" repeats
+that mistake one surface up.
+⛔ **It is a warning, never a refusal.** `D-122-05`'s default-SAFE degradation is correct;
+`SEED-135` says so in its own words. The pick still works — pinned by a case.
+
+### `frontend/src/components/chat/ChatArea.tsx` — `75 / 36 / 796`, honoured by ARITHMETIC
+
+**State hooks 9 → 9. Effect hooks 10 → 10.** Three values destructured from the hook and passed
+to `MessageInput`; ⛔ zero derivation in this file, because its G-5 discharge is recorded as
+arithmetic and a derivation here would spend it on a prop pass.
+
+⚠ **A comment naming the two hook functions INFLATED the raw `grep -c` and made the discharge
+read as 9→10 / 10→11.** This file's own docblock already warns about that trap for
+`useComposerModel`; the comment was reworded. **A verification method that a comment can break is
+worth knowing about before it is quoted as evidence.**
+
+### `frontend/src/components/settings/ModelPillRow.tsx` — `4 / 3 / 151`
+
+Its local `_tooltipFor` is **deleted** in favour of the shared module.
+
+⭐ **It had been claiming `timeout=90s`.** `_INFERRED_DEFAULT_TIMEOUT_S` is **300** and has been
+since 2026-05-24. **`SettingsModelBadge.test.tsx` asserted the false number**, so the fence was
+green over a surface that was lying about a capability — on the surface whose whole job is telling
+the truth about capabilities. Both are now pointed at the shared copy rather than re-typing it.
+
+### `scripts/vitest-count-gate.cjs` — `214 / 46 / 5682`
+
+Four suites into **both** knobs. ⚠ `src/components/chat` has **no bare-directory entry**
+(`BUG-260912-01` recorded the same thing), so a chat suite must be named or it never executes.

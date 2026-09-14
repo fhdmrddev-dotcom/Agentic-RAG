@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils"
 import { providerLogo, modelLogo } from "@/lib/providerLogo"
+import { UNVERIFIED, unverifiedDescription } from "@/lib/unverifiedModelCopy"
 
 /**
  * ModelPillRow — Phase 075.3 D-075.3-10/11/12; Phase 149 D-149-17/D-149-05.
@@ -44,6 +45,10 @@ export interface ModelPillRowProps {
   /** Phase 149 (D-149-17): the active provider id, used to prefix the group with
    *  its single-source `@lobehub` logo. Optional — absent/unmapped → no logo. */
   providerId?: string
+  /** ⭐ Phase 249 (MODEL-05): unverified ids whose inferred provider has NO native tool calling.
+   *  Optional — absent → the benign description, i.e. today's wording. A consequence is only
+   *  claimed when the server actually said so. */
+  toolsLostModels?: ReadonlySet<string>
 }
 
 /** Minimal provider display labels for the logo-group header (title-cased for the
@@ -62,16 +67,20 @@ const PROVIDER_LABELS: Record<string, string> = {
   lmstudio: "LM Studio",
 }
 
-/**
- * Builds the locked tooltip text per D-075.3-12 — substitutes the inferred
- * provider + provider-specific max_tokens safe default (D-075.3-07: 4096 for
- * openrouter, 8192 for the big-3 + ollama).
+/*
+ * ⚠ Phase 249 (MODEL-05): the local `_tooltipFor` is GONE. Its text now comes from
+ * `@/lib/unverifiedModelCopy`, shared with the chat composer's dropdown — because the warning
+ * belongs at PICK time and this surface is not where a model is picked. Two copies of one
+ * warning drift; `SEED-172` is this phase's proof of what that costs.
+ *
+ * ⭐ AND THE OLD TEXT WAS WRONG. It said `timeout=90s`. The inferred default is
+ * `_INFERRED_DEFAULT_TIMEOUT_S = 300` (revised 2026-05-24) — this tooltip had been telling
+ * operators a false number, on the surface whose entire job is telling the truth about a model's
+ * capabilities.
  */
-function _tooltipFor(model: string, inferredProviderFor: Record<string, string>): string {
-  const provider = inferredProviderFor[model] ?? "ollama"
-  const maxTokens = provider === "openrouter" ? 4096 : 8192
-  return `This model isn't in our verified registry. Using inferred provider: ${provider}. Safe defaults applied (max_tokens=${maxTokens}, timeout=90s).`
-}
+
+/** Stable empty default — an omitted prop must not allocate a new Set per render. */
+const EMPTY_MODEL_SET: ReadonlySet<string> = new Set<string>()
 
 export function ModelPillRow({
   models,
@@ -81,6 +90,7 @@ export function ModelPillRow({
   onSelect,
   deprecatedModels,
   providerId,
+  toolsLostModels,
 }: ModelPillRowProps) {
   const ProviderMark = providerLogo(providerId)
   const providerLabel = providerId ? (PROVIDER_LABELS[providerId] ?? providerId) : null
@@ -119,9 +129,9 @@ export function ModelPillRow({
               {isUnverified && (
                 <span
                   className="text-[9px] font-medium text-amber-600 bg-amber-500/10 px-1.5 py-0.5 rounded-full ghost-border"
-                  title={_tooltipFor(m, inferredProviderFor)}
+                  title={unverifiedDescription(m, inferredProviderFor, toolsLostModels ?? EMPTY_MODEL_SET)}
                 >
-                  unverified
+                  {UNVERIFIED.LABEL}
                 </span>
               )}
               {isDeprecated && (

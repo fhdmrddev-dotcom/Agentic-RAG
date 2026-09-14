@@ -153,6 +153,26 @@ export interface ComposerModelState {
    */
   disabledModels: Set<string>
   /**
+   * Phase 249 (MODEL-05): the ids the platform considers REGISTERED — built-in capability rows
+   * PLUS operator-entered override rows. A model ABSENT from this set resolves
+   * `capability_source="inferred"` at run time and silently takes safe defaults; the composer
+   * marks it so the person choosing finds out BEFORE the run instead of after it.
+   *
+   * ⚠ Not the same question as `deprecatedModels` (informational sunset) or `disabledModels`
+   * (operator hid it). Three sets, three jobs — do not collapse them.
+   */
+  verifiedModels: Set<string>
+  /** Phase 249: per-unverified-model inferred provider, computed SERVER-side. ⛔ The client
+   *  never mirrors the inference table (RESEARCH §6 Approach b — zero-drift). */
+  inferredProviderFor: Record<string, string>
+  /**
+   * ⭐ Phase 249: the unverified ids whose inferred provider does NOT support native tool
+   * calling. These run in structured mode with the `tools` param unsent — every tool is
+   * unavailable and any tool call arrives as unreadable prose. This set is what lets the chip
+   * say the CONSEQUENCE rather than just the word "unverified".
+   */
+  toolsLostModels: Set<string>
+  /**
    * ⚠ Switching provider deliberately CLOBBERS the model to that provider's first. That is
    * shipped behaviour and it stays: a model id is not portable across providers, so
    * carrying the old selection over would leave the composer naming a model the newly
@@ -263,6 +283,11 @@ export function useComposerModel(
   const [selectedModel, setSelectedModel] = useState<string>("")
   const [deprecatedModels, setDeprecatedModels] = useState<Set<string>>(new Set())
   const [disabledModels, setDisabledModels] = useState<Set<string>>(new Set())
+  // Phase 249 (MODEL-05) — the pick-time warning's three inputs. Same effect below, no new
+  // fetch: they ride the ONE `getProviders()` read this hook already performs.
+  const [verifiedModels, setVerifiedModels] = useState<Set<string>>(new Set())
+  const [inferredProviderFor, setInferredProviderFor] = useState<Record<string, string>>({})
+  const [toolsLostModels, setToolsLostModels] = useState<Set<string>>(new Set())
   const [status, setStatus] = useState<ComposerModelStatus>("loading")
 
   /**
@@ -275,13 +300,25 @@ export function useComposerModel(
 
   useEffect(() => {
     getProviders()
-      .then(({ active, active_model, providers: list, deprecated_models, disabled_models }) => {
+      .then(({
+        active, active_model, providers: list, deprecated_models, disabled_models,
+        verified_models, inferred_provider_for, inferred_tools_lost,
+      }) => {
         setProviders(list)
         // Defensive: absent → empty set → no badge (older backend / read blip).
         setDeprecatedModels(new Set(deprecated_models ?? []))
         // Same defensive shape for the disabled set: an older backend omits the key, and
         // an empty set degrades to "refuse nothing", which is the shipped behaviour.
         setDisabledModels(new Set(disabled_models ?? []))
+        // ⚠ THE DEFENSIVE DEFAULTS ARE NOT CEREMONY, and the two directions differ:
+        //   • absent `verified_models` → EMPTY set would mark EVERY model unverified, so an
+        //     older backend must degrade to "verified" — the chip's own render guard reads
+        //     `verifiedModels.size > 0` for exactly this reason.
+        //   • absent `inferred_tools_lost` → empty set means "claim nothing about tools", which
+        //     is the honest default: never assert a consequence we were not told about.
+        setVerifiedModels(new Set(verified_models ?? []))
+        setInferredProviderFor(inferred_provider_for ?? {})
+        setToolsLostModels(new Set(inferred_tools_lost ?? []))
         const activeProvider = list.find((p) => p.id === active) ?? list[0]
         if (activeProvider) {
           setSelectedProvider(activeProvider.id)
@@ -362,6 +399,9 @@ export function useComposerModel(
     setSelectedModel: chooseModel,
     deprecatedModels,
     disabledModels,
+    verifiedModels,
+    inferredProviderFor,
+    toolsLostModels,
     handleProviderChange,
   }
 }
