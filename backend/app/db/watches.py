@@ -653,14 +653,20 @@ async def update_item_state(
     state: str,
     missing_since: Any = None,
     error: str | None = None,
+    clear_missing_since: bool = False,
 ) -> None:
-    """Update lifecycle state of one tracked item."""
+    """Update lifecycle state of one tracked item (WATCH-05)."""
     async with pool.acquire() as con:
         await con.execute(
             """
             UPDATE connector_watch_items
             SET state = $2,
-                missing_since = COALESCE($3, missing_since),
+                missing_since = CASE
+                    WHEN $5::boolean OR $2 = 'present' THEN NULL
+                    WHEN $3 IS NOT NULL THEN $3
+                    WHEN $2 = 'missing' AND missing_since IS NULL THEN now()
+                    ELSE missing_since
+                END,
                 last_error = $4,
                 updated_at = now()
             WHERE id = $1
@@ -669,6 +675,7 @@ async def update_item_state(
             state,
             missing_since,
             error,
+            clear_missing_since,
         )
 
 
@@ -687,10 +694,16 @@ async def bulk_update_item_states(
             """
             UPDATE connector_watch_items
             SET state = $2,
-                missing_since = CASE WHEN $2 = 'missing' AND missing_since IS NULL THEN now() ELSE missing_since END,
+                missing_since = CASE
+                    WHEN $2 = 'present' THEN NULL
+                    WHEN $3 IS NOT NULL THEN $3
+                    WHEN $2 = 'missing' AND missing_since IS NULL THEN now()
+                    ELSE missing_since
+                END,
                 updated_at = now()
             WHERE id = ANY($1::uuid[])
             """,
             [_as_uuid(i) for i in item_ids],
             state,
+            missing_since,
         )

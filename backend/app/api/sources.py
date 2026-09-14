@@ -73,6 +73,12 @@ def _as_uuid(val: Any) -> UUID:
     return val if isinstance(val, UUID) else UUID(str(val))
 
 
+def _started_at(row: dict[str, Any]) -> datetime | None:
+    val = row.get("started_at")
+    return val if isinstance(val, datetime) else None
+
+
+
 #: The identity a degraded row falls back to when even the raw row cannot supply one. A row
 #: with no readable `id` is not droppable — dropping it is the omission this boundary exists to
 #: prevent — so it is returned under a sentinel that is obviously not a real watch.
@@ -588,13 +594,50 @@ async def get_source_health(
         else {}
     )
 
+    # Pre-fetch connection metadata (name, is_enabled, updated_at) in ONE query (WATCH-03)
+    conn_ids = [w["connection_id"] for w in watches if w.get("connection_id")]
+    conn_info: dict[str, dict] = {}
+    if conn_ids:
+        try:
+            async with pool.acquire() as con:
+                c_rows = await con.fetch(
+                    "SELECT id, name, is_enabled, updated_at FROM connector_connections WHERE id = ANY($1::uuid[])",
+                    list(set(conn_ids)),
+                )
+            conn_info = {str(r["id"]): dict(r) for r in c_rows}
+        except Exception:
+            logger.exception("Failed to fetch connection states in health check")
+
     stopped: list[StoppedSourceResponse] = []
-    stopped_conn_ids: list[UUID] = []
     for watch in watches:
         # ⛔ T-235-21 — PER-ROW ISOLATION. One unprojectable watch must not 500 the endpoint the
         # whole app shell polls. This is SEED-239's shape at a second list; log and skip, so the
         # other sources still get their verdict.
         try:
+            conn_id_str = str(watch.get("connection_id") or "")
+            c_meta = conn_info.get(conn_id_str)
+
+            # WATCH-03 (BUG-260909-03): If the connection was switched off (is_enabled == False),
+            # report immediately as stopped with cause "connection_disabled" without waiting for next scheduled tick.
+            if c_meta and c_meta.get("is_enabled") is False:
+                runs = runs_by_watch.get(str(watch["id"]), [])
+                last_good = next(
+                    (_started_at(r) for r in runs if r.get("status") == "success"),
+                    None,
+                )
+                stopped.append(
+                    StoppedSourceResponse(
+                        watch_id=_as_uuid(watch["id"]),
+                        source_folder_name=watch.get("source_folder_name") or "",
+                        connection_name=c_meta.get("name"),
+                        cause="connection_disabled",
+                        hard=True,
+                        stopped_since=c_meta.get("updated_at") or datetime.now(timezone.utc),
+                        last_good_at=last_good,
+                    )
+                )
+                continue
+
             verdict = verdict_for_runs(runs_by_watch.get(str(watch["id"]), []))
             # A `never_read` verdict is NOT stopped and does not appear here — a watch created
             # and never ticked has not read yet, which is a different sentence the surface owns.
@@ -604,44 +647,17 @@ async def get_source_health(
                 StoppedSourceResponse(
                     watch_id=_as_uuid(watch["id"]),
                     source_folder_name=watch.get("source_folder_name") or "",
-                    connection_name=None,
+                    connection_name=c_meta.get("name") if c_meta else None,
                     cause=verdict.cause or "unknown",
                     hard=verdict.hard,
                     stopped_since=verdict.stopped_since,
                     last_good_at=verdict.last_good_at,
                 )
             )
-            if watch.get("connection_id"):
-                stopped_conn_ids.append(_as_uuid(watch["connection_id"]))
         except Exception:  # noqa: BLE001
             logger.exception(
                 "Skipping watch %s in source health verdict", watch.get("id")
             )
-
-    # Connection names, in ONE query, and only for the watches that actually stopped — which is
-    # zero rows on a healthy instance. The name is for the sentence, never for the verdict.
-    if stopped_conn_ids:
-        try:
-            async with pool.acquire() as con:
-                rows = await con.fetch(
-                    "SELECT id, name FROM connector_connections WHERE id = ANY($1::uuid[])",
-                    list(set(stopped_conn_ids)),
-                )
-            names = {str(r["id"]): r["name"] for r in rows}
-            by_watch_conn = {
-                str(w["id"]): str(w["connection_id"])
-                for w in watches
-                if w.get("id") and w.get("connection_id")
-            }
-            stopped = [
-                s.model_copy(
-                    update={"connection_name": names.get(by_watch_conn.get(str(s.watch_id), ""))}
-                )
-                for s in stopped
-            ]
-        except Exception:  # noqa: BLE001
-            # A missing name costs a sentence a noun. It must never cost the verdict.
-            logger.exception("Failed to resolve connection names for stopped sources")
 
     # ⭐ SC#2 — "says WHEN it last succeeded". The verdict answers that from the window, and for
     # a source that has been dead longer than the window is deep the window has no answer. This
