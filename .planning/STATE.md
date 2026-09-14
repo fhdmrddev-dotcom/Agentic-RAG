@@ -269,6 +269,39 @@ re-derivable at any time with `gsd-sdk query audit-open`.
 
 ## Guardrail overrides
 
+### OV-248-01 — Claude builds Phase 248 END TO END, so 248 has no independent reviewer (operator, 2026-09-14)
+
+**Operator instruction, verbatim:** *"you will handle next phase end to end yourself."*
+
+The next unstarted phase is **248 — The Credential Boundary** (`CRED-01..04`).
+
+⚠ **The concern was stated once, at the time, and is recorded rather than re-litigated.** 248 is the
+**trust-boundary** phase of this milestone: a credential that comes to rest in a column every org
+member can read (`BUG-260907-02`, driven live 2026-09-13), and 13 anon-executable `SECURITY DEFINER`
+functions. **A phase Claude builds, Claude cannot review** (`AGENTS.md` §6.3), so 248 closes
+`self-verified` with `independent_review: owed` — adding to the `DEBT-06` backlog this session spent
+the day measuring. **249, 250 and 251 carry no trust boundary and were offered as no-cost
+alternatives.** The operator has the facts; the decision stands.
+
+⛔ **What this override does NOT suspend:** the threat model stays MANDATORY, the dispatched
+code-review subagent stays MANDATORY (`config.json` `security_enforcement: true`, `code_review: true`)
+— and neither is an independent gate, which is exactly why 248's verdict file must say
+`verification_mode: self-verified` and never "reviewed". ⭐ The honesty gate now ENFORCES that
+automatically: `scripts/check-verification-honesty.cjs` derives its scan set over phases >= 238, live
+and archived, and will pick 248 up the moment a `VERIFICATION.md` or `VERDICT.md` appears.
+
+⚠ **`CRED-03`'s trap is the one to carry into the build:** `REVOKE … FROM anon` is a **no-op** while
+the default `PUBLIC` grant stands — measured when migration 177's first version applied cleanly and
+verify still read `FAIL`. Revoke from `PUBLIC`, then grant back. And a `CRED-01` fence must make at
+least one assertion **as `anon`**: every gate in this project reads through the service role, which is
+precisely the blind spot that hid `BUG-260911-01`.
+
+**Re-open trigger:** if an independent reviewer becomes available before 248 closes, this override
+lapses and the review is taken — it is not spent by having been granted.
+
+OV-248-01-status: live   # flip to `retired-<YYYY-MM-DD>` when 248 closes or an independent reviewer takes it. ⛔ do not delete it — an absent marker reads as an absent decision.
+
+
 Both v4.0 overrides are preserved verbatim in `.planning/milestones/v4.0-STATE-at-close.md` →
 *Guardrail overrides*. Record every new override here, per the CLAUDE.md orchestrator protocol.
 
