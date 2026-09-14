@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "timestamp": "2026-09-14T16:34:23.847Z",
+  "timestamp": "2026-09-14T19:30:00.000Z",
   "phase": "247",
   "phase_name": "Sources & Watches — the surface you now live on",
   "phase_dir": ".planning/phases/247-sources-and-watches",
@@ -9,39 +9,138 @@
   "total_tasks": 4,
   "status": "paused",
   "completed_tasks": [
-    {"id": 1, "name": "247-01 Drive & Graph path resolution, WR-04, WR-07 fence", "status": "done", "commit": "e5ded885a"},
-    {"id": 2, "name": "247-02 missing_since lifecycle + is_enabled health verdict", "status": "done", "commit": "35bbe6c7c"},
-    {"id": 3, "name": "247-03 WatchRowCard extraction, Variant A badges, F-1 cross-tenant fix", "status": "done", "commit": "ef6458c9c"},
-    {"id": 4, "name": "247-04 disposition, ledger sync, verification", "status": "done", "commit": "50feee403"},
-    {"id": 5, "name": "reviewer findings V-1..V-5", "status": "done", "commit": "1f37737ae"},
-    {"id": 6, "name": "SEED-253 fence retired under D-247-01 (post-retraction)", "status": "done", "commit": "3d5f62dc6"}
+    {
+      "id": 1,
+      "name": "247-01 Drive & Graph path resolution, WR-04, WR-07 fence",
+      "status": "done",
+      "commit": "e5ded885a"
+    },
+    {
+      "id": 2,
+      "name": "247-02 missing_since lifecycle + is_enabled health verdict",
+      "status": "done",
+      "commit": "35bbe6c7c"
+    },
+    {
+      "id": 3,
+      "name": "247-03 WatchRowCard extraction, Variant A badges, F-1 cross-tenant fix",
+      "status": "done",
+      "commit": "ef6458c9c"
+    },
+    {
+      "id": 4,
+      "name": "247-04 disposition, ledger sync, verification",
+      "status": "done",
+      "commit": "50feee403"
+    },
+    {
+      "id": 5,
+      "name": "reviewer findings V-1..V-5",
+      "status": "done",
+      "commit": "1f37737ae"
+    },
+    {
+      "id": 6,
+      "name": "SEED-253 fence retired under D-247-01 (post-retraction)",
+      "status": "done",
+      "commit": "3d5f62dc6"
+    },
+    {
+      "id": 9,
+      "name": "Claude read + DROVE Gemini's 240 review-response-range audit — verdict STANDS, 3 citation defects raised on BUS-226",
+      "status": "done",
+      "commit": "pending"
+    }
   ],
   "remaining_tasks": [
-    {"id": 7, "name": "247 G-4 lived-experience UAT — 3 operator-defined browser scenarios", "status": "not_started"},
-    {"id": 8, "name": "Gemini: fix BUS-225 C-1 (WR-05 wording) and C-2 (finding counts)", "status": "not_started"},
-    {"id": 9, "name": "Claude: read Gemini's 240 review-response-range review", "status": "not_started"},
-    {"id": 10, "name": "Phase 248 The Credential Boundary — Claude builds end-to-end per OV-248-01", "status": "not_started"}
+    {
+      "id": 7,
+      "name": "247 G-4 lived-experience UAT — 3 operator-defined browser scenarios",
+      "status": "not_started"
+    },
+    {
+      "id": 8,
+      "name": "Gemini: fix BUS-225 C-1 (WR-05 wording) and C-2 (finding counts)",
+      "status": "not_started"
+    },
+    {
+      "id": 10,
+      "name": "Phase 248 The Credential Boundary — Claude builds end-to-end per OV-248-01",
+      "status": "not_started"
+    }
   ],
   "blockers": [
-    {"description": "247's G-4 browser UAT cannot be driven by Claude — needs the operator", "type": "human_action", "workaround": "none; the code close stands, the UAT is separate"},
-    {"description": "Phase 239 has no eligible independent reviewer — Gemini planned it, Claude executed it, so both shaped it under AGENTS.md 6.3", "type": "external", "workaround": "operator ruling required; options are accept-as-owed, review-with-conflict-declared, or ultra (ruled out on cost)"},
-    {"description": "Claude cannot trigger Gemini — separate process, no channel. The bus is a mailbox, not a doorbell", "type": "external", "workaround": "operator starts Gemini"}
+    {
+      "description": "247's G-4 browser UAT cannot be driven by Claude — needs the operator",
+      "type": "human_action",
+      "workaround": "none; the code close stands, the UAT is separate"
+    },
+    {
+      "description": "Phase 239 has no eligible independent reviewer — Gemini planned it, Claude executed it, so both shaped it under AGENTS.md 6.3",
+      "type": "external",
+      "workaround": "operator ruling required; options are accept-as-owed, review-with-conflict-declared, or ultra (ruled out on cost)"
+    },
+    {
+      "description": "Claude cannot trigger Gemini — separate process, no channel. The bus is a mailbox, not a doorbell",
+      "type": "external",
+      "workaround": "operator starts Gemini"
+    }
   ],
   "human_actions_pending": [
-    {"action": "Drive 247's G-4 UAT — 3 'I'd recognize failure here' scenarios in a real browser", "context": "the phase is entirely about what a person READS; jsdom+pytest cannot see legibility", "blocking": true},
-    {"action": "BUS-208 — replace the revoked Zhipu/GLM and Moonshot keys in backend/.env AND Coolify", "context": "both are dead; they are rows 5 and 7 of the mandatory cross-provider UAT roster", "blocking": false},
-    {"action": "BUS-040 — reconnect Google while org 22f9c615 is active; enable Sheets+Docs APIs in project 877112366454", "context": "SERVICE_DISABLED on two APIs", "blocking": false},
-    {"action": "Rule on Phase 239's reviewer", "context": "nobody untainted exists", "blocking": false},
-    {"action": "Confirm whether Phase 248 starts now", "context": "OV-248-01 makes it Claude end-to-end; it is the trust-boundary phase so it will close self-verified", "blocking": false}
+    {
+      "action": "Drive 247's G-4 UAT — 3 'I'd recognize failure here' scenarios in a real browser",
+      "context": "the phase is entirely about what a person READS; jsdom+pytest cannot see legibility",
+      "blocking": true
+    },
+    {
+      "action": "BUS-208 — replace the revoked Zhipu/GLM and Moonshot keys in backend/.env AND Coolify",
+      "context": "both are dead; they are rows 5 and 7 of the mandatory cross-provider UAT roster",
+      "blocking": false
+    },
+    {
+      "action": "BUS-040 — reconnect Google while org 22f9c615 is active; enable Sheets+Docs APIs in project 877112366454",
+      "context": "SERVICE_DISABLED on two APIs",
+      "blocking": false
+    },
+    {
+      "action": "Rule on Phase 239's reviewer",
+      "context": "nobody untainted exists",
+      "blocking": false
+    },
+    {
+      "action": "Confirm whether Phase 248 starts now",
+      "context": "OV-248-01 makes it Claude end-to-end; it is the trust-boundary phase so it will close self-verified",
+      "blocking": false
+    }
   ],
   "decisions": [
-    {"decision": "VERDICT.md counts as equivalent to VERIFICATION.md for the honesty gate", "rationale": "Phase 245 produced only a VERDICT.md, so the phase that wrote the gate was invisible to it", "phase": "tooling"},
-    {"decision": "DEBT-06 discharged as 3 reviews + 5 reasoned refusals, not 8 reviews", "rationale": "operator ruling; refusals name the mechanical evidence standing in for a reviewer", "phase": "v4.2"},
-    {"decision": "Claude must NOT implement findings from phases Claude reviewed", "rationale": "the fixes would be review-response commits nobody independent has read — the exact gap measured in 240-REVIEW-RECONCILIATION.md", "phase": "247"},
-    {"decision": "The standing-red contract is a SET of 16 test names, never a count", "rationale": "the suite reads 16/17/18 across runners on a byte-identical tree; an integer contract cannot pass reliably", "phase": "247"},
-    {"decision": "SEED-253's Drive-path fence retired under D-247-01 rather than made green", "rationale": "WATCH-01 completed the behaviour the fence guarded; the replacement asserts the NEW invariant", "phase": "247"}
+    {
+      "decision": "VERDICT.md counts as equivalent to VERIFICATION.md for the honesty gate",
+      "rationale": "Phase 245 produced only a VERDICT.md, so the phase that wrote the gate was invisible to it",
+      "phase": "tooling"
+    },
+    {
+      "decision": "DEBT-06 discharged as 3 reviews + 5 reasoned refusals, not 8 reviews",
+      "rationale": "operator ruling; refusals name the mechanical evidence standing in for a reviewer",
+      "phase": "v4.2"
+    },
+    {
+      "decision": "Claude must NOT implement findings from phases Claude reviewed",
+      "rationale": "the fixes would be review-response commits nobody independent has read — the exact gap measured in 240-REVIEW-RECONCILIATION.md",
+      "phase": "247"
+    },
+    {
+      "decision": "The standing-red contract is a SET of 16 test names, never a count",
+      "rationale": "the suite reads 16/17/18 across runners on a byte-identical tree; an integer contract cannot pass reliably",
+      "phase": "247"
+    },
+    {
+      "decision": "SEED-253's Drive-path fence retired under D-247-01 rather than made green",
+      "rationale": "WATCH-01 completed the behaviour the fence guarded; the replacement asserts the NEW invariant",
+      "phase": "247"
+    }
   ],
   "uncommitted_files": [],
-  "next_action": "Read .planning/HANDOFF-260914.md, then BUS-225 (Claude's review of Gemini's 238 review) and the unread Gemini review of Phase 240's review-response range.",
+  "next_action": "Phase 248 — The Credential Boundary. Claude end-to-end per the operator ruling; closes verification_mode: self-verified with independent_review: owed. 248-MEASUREMENTS.md is already written (production read-only facts; the 13 advisor findings split into THREE ACL groups, not one). Start with /gsd:discuss-phase 248.",
   "context_notes": "Phase 247 is CLOSED ON CODE at 3d5f62dc6 after a close that was given, RETRACTED, and re-given on wider evidence. The retraction is the session's most important lesson: the first close was made over three red suites, all CAUSED by the phase, invisible because the review ran every file 247 TOUCHED and no file that DEPENDS on what it changed — one of them a FENCE. For 248 onward: run the touched suites AND their dependents, and establish base-vs-HEAD on anything red before assuming inheritance. Two tooling defects were fixed this session (agent-bus close() wrote false records; the honesty gate read 3 hardcoded paths while 20 verdict files existed) and two more were found in Claude's OWN monitor. The recurring theme across every register touched today: a claim is not evidence until it is driven."
 }

@@ -4,7 +4,7 @@ milestone: v4.2
 milestone_name: The Connected Knowledge You Can Actually Run
 status: in-progress
 last_updated: "2026-09-14T18:00:00.000Z"
-last_activity: 2026-09-14 — Phase 247 completed and verified (4 plans shipped across 3 waves, peer-reviewed, V-1..V-5 resolved). Next: Phase 248.
+last_activity: 2026-09-14 — Phase 247 CLOSED ON CODE at 3d5f62dc6 (4 plans / 3 waves, peer-reviewed, V-1..V-5 resolved, SEED-253 fence retired under D-247-01). G-4 lived-experience UAT still OWED — operator only. Next: Phase 248 (The Credential Boundary), claude end-to-end per the operator ruling, closing self-verified.
 progress:
   total_phases: 5
   completed_phases: 1
@@ -102,10 +102,27 @@ owed work at all.
 
 ## Current Position
 
-Phase: 247 — Sources & Watches
-Plan: 247-01 .. 247-04 (4 plans, inside G-8's 3-5 target)
-Status: **Plans reviewed and CLEARED to execute** (BUS-211). Sketch Variant A ratified · 247-CONTEXT.md locked · 247-PREFLIGHT.md independently reviewed, `reviewer: claude`
-Last activity: 2026-09-14 — plan-gate review returned 2 blocking + 1 minor finding; all three integrated at `735359871` and re-verified; execution cleared
+Phase: **247 — Sources & Watches · CLOSED ON CODE** at `3d5f62dc6`. Next: **248 — The Credential Boundary**
+Plan: 247-01 .. 247-04 — **all 4 shipped across 3 waves**, every plan carrying a SUMMARY
+Status: **Closed on code; G-4 lived-experience UAT OWED (operator only).** Built by gemini, reviewed
+wave-by-wave by claude (`BUS-214` / `BUS-217` / `BUS-218` / `BUS-219`); five findings raised and fixed
+(`1f37737ae`); `SEED-253`'s Drive-path fence retired under **`D-247-01`** with the reason in the test
+body (`3d5f62dc6`). Gates re-derived under claude's own runs: wider blast radius **460 passed / 0
+failed** · 247's own suites 37 · frontend 118/118 · standing red 16-33 with the **same membership** as
+the pinned baseline · honesty gate 10/10 · ledger gate OK.
+Last activity: 2026-09-14 — close **given** (`BUS-221`), **RETRACTED** (`BUS-222`), and **re-given on
+wider evidence** (`BUS-223`)
+
+⚠ **THE RETRACTION IS THE FINDING, AND IT IS CLAUDE'S OWN — recorded here rather than in the phase
+folder, because it is a rule for 248 onward, not a fact about 247.** The first close was given over
+**three red suites, all CAUSED by the phase** — measured both ends (70 passed at base `987e7a685`, 2
+failed at HEAD), so **not inherited** — and all three were invisible because the review ran every file
+247 **TOUCHED** and no file that **DEPENDS** on what 247 changed. One of them was a **fence**.
+⛔ **A reviewer who runs only the phase's own suites measures the phase's own CLAIMS, never its
+CONSEQUENCES.** For every phase from 248: run the touched suites **AND their dependents**, and
+establish **base-vs-HEAD** on anything red rather than assuming inheritance.
+⚠ A limit of the honesty gate found by using it: it printed `honesty gate OK — 10/10` over a
+`verification_mode: peer-reviewed` marker that was **not yet true**. **It checks PRESENCE, never TRUTH.**
 
 ⭐ **First phase of v4.2, and the first planned end-to-end under the re-armed `OV-SOLO-01`** —
 gemini sketched, discussed, planned; claude reviewed and did not shape it. The plan-gate review
