@@ -2,7 +2,7 @@
 phase: 240-mail-is-a-shape-not-a-fourth-adapter
 verified: 2026-09-09                # the date this file's own header already carries
 verification_mode: self-verified   # ⛔ OV-SOLO-01 / D-245-01 — NEVER "reviewed". No independent §6.3 reviewer exists.
-independent_review: owed            # AGENTS.md §6.3 — nobody who did not shape this build has looked at it
+independent_review: partial       # ⚠ CORRECTED 2026-09-14 — was `owed # nobody who did not shape this build has looked at it`, and that was FALSE. `240-REVIEW-BUILD.md` carries `review_type: independent` over the BUILD range (50f66ec39..962dfdfce^, 21 files, 2 Critical + 8 Warning + 6 Info). ⛔ What is genuinely uncovered is the REVIEW-RESPONSE range — notably 9e83203a2, which changed sources/base.py (+23) and watch_service.py (+28/-1) AFTER both reviews. 240-REVIEW.md must NOT be counted: it carries no review_type field. Full measurement: 240-REVIEW-RECONCILIATION.md (measurement, NOT a review — claude built this phase).
 ---
 
 # Phase 240 — Verification
