@@ -147,6 +147,26 @@ would have shipped counting `"auth"` and `"key_env"` as providers.
 
 ---
 
+## Self-check on the riskiest decision (`D-249-18`)
+
+`D-249-18` — *introducing a raised exception into a function that has never raised* — was flagged at
+discuss-phase as the change most worth an operator's second look. It was re-audited at close:
+
+- **All six call sites confirmed by a repo-wide grep**, not by reading the plan back. `grep -rn
+  "save_app_settings(" --include=*.py` (venv and tests excluded) returns exactly the six, and no
+  seventh exists anywhere — no script, no service, no migration helper.
+- **The two propagating sites end in a generic 500, not a leak.** There is **no global
+  `exception_handler`** registered anywhere in `app/`, so FastAPI's default applies:
+  `{"detail":"Internal Server Error"}` to the client, traceback to the log.
+- **`raise ... from None` is load-bearing on exactly this path.** It sets `__suppress_context__`,
+  so Python's traceback printer omits the original `CheckViolationError` — and with it the
+  `DETAIL:` line carrying the whole `app_settings` row. Without it, an *uncaught* refusal on the
+  setup path would have printed every `enc:v1:` envelope into the server log.
+- ⚠ `setup_service.py`'s write is `{f"{provider}_api_key": ...}` — so if that path ever refuses,
+  `detail()` names an **api_key COLUMN**. A column name is schema, not a secret, and the value is
+  never included. Stated because *"the exception names the column"* sounds different when the
+  column is called `_api_key`.
+
 ## Guardrails
 
 | Rule | Status |
