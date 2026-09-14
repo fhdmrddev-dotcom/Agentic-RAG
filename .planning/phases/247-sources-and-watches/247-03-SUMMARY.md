@@ -4,8 +4,8 @@ plan: 03
 status: complete
 wave: 2
 commits:
-  - id: pending
-    message: "feat(247-03): WatchRowCard extraction, Variant A status badges, non-collapsing sync"
+  - id: ef6458c9c
+    message: "feat(247-03): WatchRowCard extraction, Variant A status badges, non-collapsing sync, and multi-tenant cache isolation"
 requirements_met: [WATCH-03, WATCH-04, WATCH-05, WATCH-06, WATCH-07, WATCH-08]
 gates_passed:
   - "frontend/src/components/sources/watchProductMark.test.ts: 10/10 passed"
