@@ -129,7 +129,24 @@ RESULT: COUNT GATE VIOLATED (1 reason)
   FAIL  [failing-tests] 3 test(s) failed — the gate requires 0.
 ```
 
-⛔ **`count gate OK` is therefore NOT a reachable acceptance criterion for Phase 248.** A plan whose
+⚠ **CORRECTED 2026-09-15 AT THE PHASE CLOSE — THE CLAIM BELOW IS REFUTED, AND IT IS THE REVIEWER'S
+OWN ERROR. The original is struck through rather than deleted, because it was published to the
+builder on `BUS-231` and it shaped how the phase was planned.**
+
+**Measured at close, on the revised tree:** `count gate OK — 279/279 pinned files present, no
+per-file decrease, 0 failing.` **The gate IS reachable and it IS green.**
+
+⛔ **THE MISTAKE WAS TREATING A FLAKE AS A PROPERTY.** `sketchComposition.test.tsx` measured 2
+failures at base and 4 mid-phase, and from two red samples this file generalised *"not reachable"*.
+It then measured **47/47 with zero failures** both in isolation and inside the full gate run, on a
+byte-identical file. **A non-deterministic suite is not a permanent red**, and a baseline that
+publishes one as though it were licenses every later phase to skip the gate.
+
+⭐ **What survives:** the failing-name capture procedure, the isolation drive that proved the suite
+innocent, and the whole backend half of this file — which is what made the close decisive. **Only
+this one inference was wrong.**
+
+~~⛔ `count gate OK` is therefore NOT a reachable acceptance criterion for Phase 248.~~ A plan whose
 must-have is *"the gate is green"* has written a criterion that cannot pass for reasons no plan
 controls. Pair it with per-file deltas and the explicitly-run in-scope suites, which are
 deterministic.
