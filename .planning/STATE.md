@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v4.2
 milestone_name: The Connected Knowledge You Can Actually Run
 status: in-progress
-last_updated: "2026-09-14T18:00:00.000Z"
-last_activity: 2026-09-14 — Phase 247 CLOSED ON CODE at 3d5f62dc6 (4 plans / 3 waves, peer-reviewed, V-1..V-5 resolved, SEED-253 fence retired under D-247-01). G-4 lived-experience UAT still OWED — operator only. Next: Phase 248 (The Credential Boundary), claude end-to-end per the operator ruling, closing self-verified.
+last_updated: "2026-09-14T21:30:00.000Z"
+last_activity: 2026-09-14 — Phase 248 CONTEXT LOCKED (248-CONTEXT.md, 15 decisions D-248-01..15 across all four requirements; claude end-to-end per the operator ruling, closing self-verified with independent_review owed to gemini per BUS-227). Three measured findings changed the phase before a question was asked — CRED-02's headline defect is ALREADY FIXED at e615c0dad and the dishonesty MOVED to the affordance; the advisor reports a SECOND 13-finding lint CRED-03 does not name; custom_client_id has THREE homes and McpConfig's is RFC-7591-minted, so a positive shape rule would break the Phase 222 BYO door. REQUIREMENTS.md's CRED-02 citation corrected in the same commit (two bugs share id BUG-260828-02). Phase 247 remains CLOSED ON CODE at 3d5f62dc6 with G-4 lived-experience UAT OWED — operator only. Next: /gsd:plan-phase 248.
 progress:
   total_phases: 5
   completed_phases: 1

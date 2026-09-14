@@ -75,7 +75,19 @@ defects standing between "it shipped" and "you can rely on it".
       live 2026-09-13. `config` is `SELECT`-able by `authenticated` org-wide while `secret_ciphertext`
       is not; a secret written to `config` is readable by every org member.)*
 - [ ] **CRED-02**: The grant override marker claims only what the app can actually know — it does not
-      assert a human author for a change the system cannot attribute. *(`BUG-260828-02`.)*
+      assert a human author for a change the system cannot attribute.
+      *(`.planning/reported-bugs/grant-override-marker-claims-a-person-changed-it.md`. ⚠ **CITATION
+      CORRECTED 2026-09-14 at `/gsd:discuss-phase 248`** — this read `BUG-260828-02`, and **two
+      different bugs carry that id**: the grant-marker one above, and
+      `BUG-260828-02-no-authoring-surface-can-declare-a-workflow-input.md`, which is `status: closed`
+      and folded into 214.1. The bare id resolved by filename to the CLOSED, WRONG one. Cited by path
+      from here. Duplicate ids also exist for `BUG-260528-01` and `BUG-260906-01` → Phase 251.)*
+      ⭐ **MEASURED 2026-09-14: the headline defect is already fixed and the requirement is not
+      discharged.** `GRANTS_COPY.OVERRIDDEN_LABEL` is `""` (`grantsVocabulary.ts:38`, deleted at
+      `e615c0dad`) — *"You changed this"* renders nowhere. What remains is the **affordance**:
+      `ActionRow.tsx:95` still offers *"Use the default"* on rows migration 128's backfill wrote, and
+      `grantsVocabulary.ts` states that the reset's *"mere presence carries exactly what the tag
+      spelled out."* See `D-248-05`.
 - [ ] **CRED-03**: Every `SECURITY DEFINER` function in the exposed API schema is ruled on — each of
       the advisor's **13** anon-executable findings is either *intentionally public, with the reason
       recorded*, or revoked. ⛔ **Revoke from `PUBLIC`, then grant back the roles that need it** — a
