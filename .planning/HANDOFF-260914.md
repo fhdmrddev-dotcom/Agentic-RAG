@@ -34,44 +34,45 @@ will enforce that automatically — see §5.
 
 ---
 
-## 2b · ⛔ PHASE 247 IS BUILT AND REVIEWED — FIVE SMALL FINDINGS FROM CLOSING (state at hand-off)
+## 2b · ✅ PHASE 247 IS CLOSED ON CODE — G-4 UAT STILL OWED
 
-Gemini built 247 across 3 waves and declared completion (`BUS-219`, HEAD `d87f16f7a`). Claude
-reviewed every wave independently (`BUS-214` wave 1, `BUS-217` wave 2, `BUS-218` the disposition,
-`BUS-219` the post-execution review). **Gemini then went quiet — 30+ minutes, zero commits.**
+**Closed 2026-09-14 at `3d5f62dc6`.** Gemini built it across 3 waves; Claude reviewed every wave
+independently (`BUS-214` / `BUS-217` / `BUS-218` / `BUS-219`), raised five findings, verified the
+fixes (`BUS-221`), **retracted that close** (`BUS-222`), and re-closed on wider evidence (`BUS-223`).
 
-⭐ **THE BUILD IS GOOD, and that is measured, not polite.** Every contract held under Claude's own
-runs: standing red held **by SET** (16 vs 16, zero outside the baseline, zero healed — the integer
-form could not have expressed that pass) · G-5 discharged `1094 → 470` against a promised ~650 ·
-`connectors.py` byte-identical across the whole phase · the 18-importer vocabulary contract honoured
-with value-only changes · 43/43 backend, 144/144 frontend, ledger gate OK over 18 files, honesty gate
-10/10.
+**Gates at close, re-derived under Claude's own runs:** wider blast radius
+(`pytest tests/unit/{services,db,api} -k "watch or source or connector or gmail"`) **460 passed, 0
+failed** · 247's own suites 37 · frontend 118/118 · standing red 16/33 with the **same membership**
+as the pinned baseline · honesty gate 10/10 · ledger gate OK.
 
-### The five findings, all fast-fix — none is a re-plan or a new wave
+⭐ **What the phase delivered:** 8 requirements, 5 success criteria, 4 plans. G-5 discharged
+`1094 → 470` by a real seam. `connectors.py` byte-identical throughout, so the sixth-landing
+extraction stays un-triggered. The 18-importer vocabulary contract honoured with value-only changes.
+A **cross-tenant Gmail label leak** found in review and closed fail-closed on `(connection_id,
+label_id)`. `WatchRowCard.tsx` carries a ledger row **at creation**.
 
-| | Finding | Fix |
-|---|---|---|
-| **V-1** | `247-VERIFICATION.md` says `verification_mode: peer-reviewed`, written **before** the wave-3 review existed | flip forward once acted on; never backdate |
-| **V-2** | `score: "8 / 8 success criteria"` scores **requirements**; the ROADMAP defines **5 criteria** | relabel |
-| **V-3** ⛔ | **SC#2 is not driven as written** — it demands a healthy connection whose last run FAILED still reads Connected. The Variant A test asserts two *connection* pills and never sets up that case. **That separation is the whole point of Variant A** | **one test** |
-| **V-4** | `247-DISPOSITION.md` cites `D-234` (does not exist — 234-CONTEXT has D-234-01..04); says `1,095` where measured is 1094; heading reads `WR-01 through WR-09` over 7 rows | three one-line edits |
-| **V-5** | `gmail.py:160,195` — `connection_id: str = ""` is **fail-open**; a future caller that forgets silently restores the cross-tenant leak | one signature |
+⭐ **The SEED-253 fence was retired the RIGHT way** — `test_drive_path_is_the_real_folder` replaces
+`test_drive_path_is_none_not_fabricated` under **`D-247-01`**, with the reason in the test body and
+the NEW invariant asserted rather than the old one deleted. That is the Phase 206 precedent met.
 
-⛔⛔ **CLAUDE MUST NOT IMPLEMENT THESE, and the reason is this session's own finding.** Claude
-reviewed 247. If Claude now writes the SC#2 test, **the fixes that answered the review are themselves
-unreviewed** — which is precisely the gap measured this morning in
-`240-REVIEW-RECONCILIATION.md`: the review-response commits nobody read, one of which changed the
-source **contract file**. ⭐ Implementing them here would recreate that defect in real time, in the
-same session that documented it. **They are Gemini's, or they need an explicit operator ruling.**
+⛔ **STILL OWED — 247's G-4 lived-experience UAT.** Three operator-defined *"I'd recognize failure
+here"* scenarios, driven in a real browser. Everything above is jsdom, pytest and greps, and this
+phase is entirely about **what a person reads** — a health pill, a sync answer, a timestamp, a button
+label. This project has measured twice that a green fence coexists with a shipped legibility defect.
+**The code close was Claude's to give; the UAT is the operator's to drive.**
 
-⚠ **One process cost already materialised and is permanent:** `ef6458c9c` carries wave 1's
-cross-tenant security fix AND wave 2's 649-line extraction in **one commit** (939 insertions, 15
-files), despite `BUS-216` asking for the split. The work is saved; the two can no longer be reverted
-separately.
+⭐⭐ **THE METHOD FINDING THAT COST A WRONG CLOSE, and it is Claude's own.** The first close was given
+over **three red suites**, all CAUSED by the phase (measured both ends: 70 passed at base
+`987e7a685`, 2 failed at HEAD — not inherited). They were invisible because the review ran every file
+247 TOUCHED and no file that DEPENDS on what 247 changed — and one of them was a **fence**, the
+artifact class this project treats most carefully.
+⛔ **A reviewer who runs only the phase's own suites measures the phase's own CLAIMS, never its
+CONSEQUENCES.** For 248 onward: run the touched suites AND their dependents, and establish
+base-vs-HEAD on anything red rather than assuming inheritance.
 
-⭐ **A limit of the honesty gate, found by using it:** it printed `honesty gate OK — 10/10` over a
-`peer-reviewed` marker that was not yet true. **The gate verifies the marker is PRESENT, never that
-it is TRUE.** Same class as presence-vs-content. Worth a seed if it recurs.
+⚠ **A limit of the honesty gate, found by using it:** it printed `honesty gate OK — 10/10` over a
+`verification_mode: peer-reviewed` marker that was not yet true. **It checks PRESENCE, never TRUTH.**
+Worth a seed if it recurs.
 
 ## 3 · What is running right now
 
