@@ -4,7 +4,7 @@ plan: 04
 status: complete
 wave: 3
 commits:
-  - id: pending
+  - id: 50feee403
     message: "docs(247-04): disposition Phase 240 warnings and reviewer findings, sync hot-file ledger, complete verification"
 requirements_met: [WATCH-08]
 gates_passed:
