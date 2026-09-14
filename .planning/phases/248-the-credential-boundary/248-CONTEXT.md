@@ -3,12 +3,45 @@
 **Gathered:** 2026-09-14
 **Status:** Ready for planning
 
-⚠ **Verification mode is `self-verified` by operator ruling.** Claude plans, builds and closes this
-phase end-to-end (operator, 2026-09-14: *"you will handle next phase end to end yourself."*). §6.3
-bars the agent who shaped the build from reviewing it, so `248-VERDICT.md` MUST carry
-`verification_mode: self-verified` with `independent_review: owed`. Gemini has been told it is 248's
-reviewer and must NOT start the build (`BUS-227`). The honesty gate enforces the marker
-automatically — ⚠ but it checks **presence, never truth** (found 2026-09-14 by using it).
+## ⚠ ROLES — REVERSED 2026-09-14, AFTER THIS FILE WAS WRITTEN. READ THIS BEFORE THE DECISIONS.
+
+~~Verification mode is `self-verified` by operator ruling. Claude plans, builds and closes this phase
+end-to-end (operator, 2026-09-14: *"you will handle next phase end to end yourself."*). Gemini has
+been told it is 248's reviewer and must NOT start the build (`BUS-227`).~~
+
+⛔ **SUPERSEDED the same day — the original is struck through rather than deleted, because a reader
+who finds only the new ruling cannot tell that this file was authored under the old one.** Operator,
+2026-09-14, verbatim: *"handover planning and execution to gemini and you review."*
+
+| | |
+|---|---|
+| **Builds** (plans + executes) | **Gemini** |
+| **Reviews** | **Claude** |
+| Armed by | `bash scripts/arm-pair.sh 248 gemini` → `BUS-228` / `BUS-229` |
+| `BUS-227` | ⛔ **RETRACTED IN FULL by `BUS-230`** and closed. It told Gemini in capitals not to start 248 |
+| Expected close | `verification_mode: peer-reviewed` — **not** `self-verified` |
+
+⚠ **AND THE §6.3 PROBLEM THIS CREATES, DISCLOSED RATHER THAN HIDDEN, BECAUSE IT IS THE REVIEWER'S
+OWN.** **Claude wrote this file** — 15 decisions — under the old ruling, and `CLAUDE.md` warns that
+*whoever REVIEWS a phase must not have shaped the build*. The reviewer has therefore shaped the
+design.
+
+- ⭐ **What makes it usable anyway: every one of the 15 decisions was CHOSEN BY THE OPERATOR** through
+  `AskUserQuestion`. Claude framed the options and marked recommendations — that framing is the
+  shaping — and the operator picked each one. **Read this file as operator-ratified input, never as
+  build direction from the reviewer.**
+- ⛔ **The consequence binds the REVIEWER, not the builder: at review, Claude may not defend a
+  decision because it appears here.** If Gemini disagrees with one, that is a DECISION and it goes
+  `--to operator` — never settled agent-to-agent.
+- ⚠ **The cleanest alternative remains open and is the operator's to call:** have Gemini re-run
+  `/gsd:discuss-phase 248` from scratch and supersede this file entirely.
+- ⚠ **The honesty gate cannot catch any of this** — it checks that a `verification_mode` marker is
+  **present**, never that it is **true** (found 2026-09-14 by using it). So 248's verdict must state
+  the shaping in words.
+
+⭐ **Baselines were captured BEFORE the builder started** — `248-GATE-BASELINE.md`, at
+`415f57f8e`. ⛔ **`count gate OK` is NOT reachable for this phase** (3 inherited failures) and the
+backend gate is a **set with a one-test flake band**, not the number `71` that `CLAUDE.md` publishes.
 
 <domain>
 ## Phase Boundary
