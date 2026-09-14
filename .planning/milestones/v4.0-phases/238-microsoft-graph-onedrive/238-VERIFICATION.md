@@ -1,8 +1,8 @@
 ---
 phase: 238-microsoft-graph-onedrive
 verified: 2026-09-07                # the date this file's own header already carries
-verification_mode: self-verified   # ⛔ OV-SOLO-01 / D-245-01 — NEVER "reviewed". No independent §6.3 reviewer exists.
-independent_review: owed            # AGENTS.md §6.3 — nobody who did not shape this build has looked at it
+verification_mode: peer-reviewed   # AGENTS.md §6.3 — independently reviewed by Gemini (238-INDEPENDENT-REVIEW.md)
+independent_review: complete        # 2026-09-14 by Gemini
 ---
 
 # Phase 238 — Verification
