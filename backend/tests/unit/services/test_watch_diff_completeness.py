@@ -1,5 +1,5 @@
 """Unit tests for WatchService completeness and deletion safety guards (Phase 234 — H-5 / SRC-06 / VIS-03 / VIS-04)."""
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import ANY, AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
@@ -131,7 +131,7 @@ async def test_complete_listing_marks_absent_files_missing_and_retains_document(
         assert res["counts"]["missing"] == 1
 
         # Watch item marked missing
-        mock_update_state.assert_awaited_once_with(mock_pool, item_id, state="missing")
+        mock_update_state.assert_awaited_once_with(mock_pool, item_id, state="missing", missing_since=ANY)
 
         # Document marked missing_at_source in Supabase (and row is NOT deleted from DB)
         mock_supabase.table("documents").update.assert_called_with({"source_state": "missing_at_source"})
@@ -179,7 +179,7 @@ async def test_reappearing_file_restores_to_present(mock_pool, mock_supabase, mo
 
         assert res["counts"]["restored"] == 1
         # Item restored to present
-        mock_update_state.assert_awaited_once_with(mock_pool, item_id, state="present")
+        mock_update_state.assert_awaited_once_with(mock_pool, item_id, state="present", clear_missing_since=True)
         # Document source_state cleared
         mock_supabase.table("documents").update.assert_called_with({"source_state": None})
 
