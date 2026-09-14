@@ -129,18 +129,39 @@ async def test_the_refusal_never_carries_the_value_or_the_row(monkeypatch, caplo
         with pytest.raises(SettingsWriteRefused) as ei:
             await save_app_settings({COLUMN: REFUSED_VALUE})
 
-    blob = str(ei.value) + repr(getattr(ei.value, "__cause__", None)) + caplog.text
+    blob = (
+        str(ei.value)
+        + repr(getattr(ei.value, "__cause__", None))
+        # ⛔ WR-01: `__context__` too. `from None` clears `__cause__` ONLY; implicit chaining still
+        # attaches the asyncpg error, whose `DETAIL:` line carries the whole row. `traceback` and
+        # `logging` honour `__suppress_context__` so nothing leaks TODAY — but the arm's own
+        # comment states an absolute, and a future structured reporter that walks the chain
+        # without checking that flag would re-open exactly the leak this arm exists to close.
+        + repr(getattr(ei.value, "__context__", None))
+        + caplog.text
+    )
     assert str(REFUSED_VALUE) not in blob, "the refused VALUE must never be echoed"
     assert "enc:v1:" not in blob, "the failing row's secret envelopes must never be logged"
     assert "trycloudflare" not in blob, "the failing row's URLs must never be logged"
-    # ⛔ `raise ... from None`: a 500 handler that renders __cause__ would print the row.
+    # ⛔ BOTH chain slots, not just one. WR-01: `raise … from None` clears `__cause__` and leaves
+    # `__context__` pointing at the asyncpg error — whose `DETAIL:` line carries the whole row.
+    # The exception is now BUILT in the except arm and RAISED outside it, so neither is set.
     assert ei.value.__cause__ is None
+    assert ei.value.__context__ is None, (
+        "__context__ still holds the asyncpg error and its row-bearing DETAIL line — raise the "
+        "exception OUTSIDE the except block, not merely `from None`"
+    )
 
 
 @pytest.mark.parametrize("exc_cls", [
     asyncpg.exceptions.CheckViolationError,
     asyncpg.exceptions.NotNullViolationError,
     asyncpg.exceptions.UndefinedColumnError,
+    # WR-02: the SIBLINGS. They were falling into the broad arm, which logs `exc_info=True` and
+    # therefore the same row-bearing DETAIL line the refusal arm exists to keep out of the log.
+    asyncpg.exceptions.UniqueViolationError,
+    asyncpg.exceptions.ForeignKeyViolationError,
+    asyncpg.exceptions.ExclusionViolationError,
 ])
 async def test_the_whole_refusal_family_raises(monkeypatch, exc_cls):
     """⭐ `UndefinedColumnError` is the highest-value member and the least obvious one.

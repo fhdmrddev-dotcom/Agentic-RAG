@@ -173,6 +173,19 @@ class FullSettingsResponse(BaseModel):
     # to decide whether to render the "unverified" badge inline next to each
     # model in the main LLM dropdown + selected-label).
     verified_models: list[str]
+    # ⛔ Phase 249 gap-closure (CR-01) — THE JUDGE PICKER'S SET, WHICH IS NOT THE CHIP'S SET.
+    # `verified_models` above became a UNION (built-ins + operator-entered rows) so the pick-time
+    # chip would not fire on a model the operator registered themselves. But `SettingsPage` was
+    # ALSO feeding that set to `JudgeModelPicker`, and the judge validator on PUT /settings is
+    # unchanged: it uses the SYNC `get_model_capability`, which NEVER reads the DB, so every
+    # operator-added option resolved `inferred` and was a GUARANTEED 400 "Unknown judge model".
+    # Driven: `glm-4.7-flash` was offered and refused.
+    # ⛔ THIS FIELD IS THE VALIDATOR'S EXACT SET — built-ins only. Keep them in step: if the judge
+    # validator is ever widened to accept `db_override`, widen THIS, not the picker's feed.
+    registry_models: list[str]
+    # ⭐ CR-02 / WR-05 — resolved-capability tool loss, for the Settings chip. A REGISTERED model
+    # can be tool-less; `verified_models` cannot express that and must not be asked to.
+    tools_lost_models: list[str]
     # Phase 075.3 D-075.3-13 + D-075.3-12: per-unknown-model inferred provider
     # mapping (frontend reads this to substitute {provider} in the tooltip text
     # without mirroring the inference table client-side — RESEARCH.md §6
@@ -199,6 +212,67 @@ def _verified_model_ids(overrides: dict[str, dict]) -> list[str]:
     whole shape of the defect this phase exists to close.
     """
     return sorted(set(MODEL_CAPABILITIES) | set(overrides))
+
+
+def _tools_lost_model_ids(
+    configured_ids: set[str],
+    overrides: dict[str, dict],
+    inferred_provider_for: dict[str, str],
+) -> list[str]:
+    """Model ids that will run with NATIVE TOOL CALLING OFF — a claim about RESOLVED capability.
+
+    ⛔ Phase 249 gap-closure (CR-02). The first version of this computed tool loss only over
+    UNREGISTERED ids, i.e. it asked *"is this model in the registry?"* and answered a different
+    question with it. Those are two questions:
+
+        registered?   -> drives the `unverified` chip
+        calls tools?  -> drives the CONSEQUENCE
+
+    An operator-added row is REGISTERED and can still be tool-less, and that is not an edge case —
+    it is the DEFAULT for the models MODEL-04 newly unblocked. The Add-model form leaves its
+    tri-state on `unknown` whenever `familyDefaults` matches nothing (and it matches nothing for
+    `lmstudio` / `custom`), so `native_tools` is OMITTED, stored NULL, and
+    `get_model_capability_async` then falls back to `_build_inferred_defaults(id, provider)` —
+    which reads False for any provider outside `_NATIVE_TOOL_PROVIDERS`.
+
+    ⚠ MEASURED, not reasoned: a row added as `{model_id: "cr02-probe-local", provider: "lmstudio"}`
+    resolved `capability_source="db_override", native_tools=False` while sitting INSIDE
+    `verified_models` — so the union silenced the warning on exactly the models the same phase
+    made addable. **The phase would have removed the only announcement for its own headline case.**
+
+    Mirrors `get_model_capability_async`'s overlay precedence deliberately: an explicit stored
+    value wins, NULL falls through to the provider inference. ⛔ Keep the two in step.
+    """
+    from app.config import (  # function-local (Pitfall 4)
+        _INFERENCE_FALLBACK_PROVIDER,
+        _NATIVE_TOOL_PROVIDERS,
+        MODEL_CAPABILITIES,
+    )
+
+    lost: set[str] = set()
+    for mid in configured_ids:
+        row = overrides.get(mid)
+        if row is not None and row.get("native_tools") is not None:
+            # the operator SAID so — believe them, either way
+            if row.get("native_tools") is False:
+                lost.add(mid)
+            continue
+        if row is not None:
+            # a registered row with NULL native_tools: the provider decides, exactly as the
+            # runtime overlay does
+            prov = row.get("provider") or _INFERENCE_FALLBACK_PROVIDER
+            if prov not in _NATIVE_TOOL_PROVIDERS:
+                lost.add(mid)
+            continue
+        builtin = MODEL_CAPABILITIES.get(mid)
+        if builtin is not None:
+            if builtin.get("native_tools") is False:
+                lost.add(mid)
+            continue
+        # unregistered: the inference table decides
+        if inferred_provider_for.get(mid, _INFERENCE_FALLBACK_PROVIDER) not in _NATIVE_TOOL_PROVIDERS:
+            lost.add(mid)
+    return sorted(lost)
 
 
 # ── Request models ────────────────────────────────────────────────────────────
@@ -376,6 +450,15 @@ async def _build_response(s=None) -> FullSettingsResponse:
         # (sorted for stable client diffs / test assertions).
         # Phase 249 (MODEL-05): the UNION — built-ins PLUS operator-entered override rows.
         verified_models=sorted(_verified_set),
+        # CR-01: built-ins ONLY — mirrors `get_model_capability`'s sync path exactly.
+        registry_models=sorted(MODEL_CAPABILITIES.keys()),
+        # CR-02 / WR-05: the Settings surface needs the same consequence claim the composer has.
+        tools_lost_models=_tools_lost_model_ids(
+            {m for p in s.providers for m in p.models if m},
+            _all_overrides,
+            {m: _infer_provider_for(m) for p in s.providers for m in p.models
+             if m and m not in _verified_set},
+        ),
         # Phase 075.3 D-075.3-13 + D-075.3-12: build the inferred-provider map
         # only for model_ids the user has configured (via providers[*].models)
         # that are NOT in the registry. Keeps the payload small (one entry per
@@ -1027,15 +1110,18 @@ async def get_providers(current_user: dict = Depends(get_current_user)):
         for m in p.models
         if m and m not in _verified_set
     }
-    # ⭐ THE CONSEQUENCE, not the mechanism. An inferred provider OUTSIDE _NATIVE_TOOL_PROVIDERS
-    # means the run goes to STRUCTURED mode, the `tools` param is never sent, and any tool call
-    # the model attempts arrives as unparseable prose — the agent loop then breaks after one
-    # iteration with no error anywhere. `config.py` learned to say this out loud on 2026-08-18,
-    # after that exact failure stayed invisible for a day behind the words
-    # `safe_defaults_applied=True`. The chip says it too, and this field is what tells it which
-    # models to say it about.
-    from app.config import _NATIVE_TOOL_PROVIDERS  # function-local (Pitfall 4)
-    _tools_lost = sorted(m for m, prov in _inferred.items() if prov not in _NATIVE_TOOL_PROVIDERS)
+    # ⭐ THE CONSEQUENCE, not the mechanism. A model whose resolved `native_tools` is False runs in
+    # STRUCTURED mode: the `tools` param is never sent, and any tool call it attempts arrives as
+    # unparseable prose — the agent loop then breaks after one iteration with no error anywhere.
+    # `config.py` learned to say this out loud on 2026-08-18, after that exact failure stayed
+    # invisible for a day behind the words `safe_defaults_applied=True`.
+    #
+    # ⛔ CR-02: this asks about RESOLVED CAPABILITY, not registry membership. The first version
+    # computed it over unregistered ids only, which silenced it on every operator-added
+    # self-hosted model — i.e. on exactly the models MODEL-04 made addable. See
+    # `_tools_lost_model_ids`.
+    _configured_ids = {m for p in s.providers for m in p.models if m}
+    _tools_lost = _tools_lost_model_ids(_configured_ids, _overrides, _inferred)
     return {
         "active": s.active_provider,
         "active_model": s.llm_model,
@@ -1044,5 +1130,8 @@ async def get_providers(current_user: dict = Depends(get_current_user)):
         "disabled_models": disabled_models,
         "verified_models": _verified,
         "inferred_provider_for": _inferred,
-        "inferred_tools_lost": _tools_lost,
+        # ⚠ RENAMED from `inferred_tools_lost` in the same phase that introduced it: the old name
+        # asserted the claim was about INFERRED models, which was the bug. Nothing outside this
+        # repo consumed it.
+        "tools_lost_models": _tools_lost,
     }

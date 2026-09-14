@@ -302,7 +302,7 @@ export function useComposerModel(
     getProviders()
       .then(({
         active, active_model, providers: list, deprecated_models, disabled_models,
-        verified_models, inferred_provider_for, inferred_tools_lost,
+        verified_models, inferred_provider_for, tools_lost_models,
       }) => {
         setProviders(list)
         // Defensive: absent → empty set → no badge (older backend / read blip).
@@ -314,11 +314,11 @@ export function useComposerModel(
         //   • absent `verified_models` → EMPTY set would mark EVERY model unverified, so an
         //     older backend must degrade to "verified" — the chip's own render guard reads
         //     `verifiedModels.size > 0` for exactly this reason.
-        //   • absent `inferred_tools_lost` → empty set means "claim nothing about tools", which
+        //   • absent `tools_lost_models` → empty set means "claim nothing about tools", which
         //     is the honest default: never assert a consequence we were not told about.
         setVerifiedModels(new Set(verified_models ?? []))
         setInferredProviderFor(inferred_provider_for ?? {})
-        setToolsLostModels(new Set(inferred_tools_lost ?? []))
+        setToolsLostModels(new Set(tools_lost_models ?? []))
         const activeProvider = list.find((p) => p.id === active) ?? list[0]
         if (activeProvider) {
           setSelectedProvider(activeProvider.id)

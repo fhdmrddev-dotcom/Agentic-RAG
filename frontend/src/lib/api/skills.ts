@@ -656,9 +656,19 @@ export interface FullAppSettings {
   // to decide whether to render the "unverified" badge inline next to each
   // model in the main LLM dropdown + selected-label.
   verified_models: string[]
+  /** ⛔ Phase 249 gap-closure (CR-01) — THE JUDGE VALIDATOR'S EXACT SET, built-ins ONLY.
+   *  NOT the same question as `verified_models`, which is a union including operator-entered
+   *  rows. Feeding the union to `JudgeModelPicker` offered options that `PUT /settings` refuses
+   *  with 400, because the judge validator uses the SYNC capability lookup which never reads the
+   *  DB. Optional so an older backend degrades to today's behaviour. */
+  registry_models?: string[]
   // Phase 075.3 D-075.3-13 + D-075.3-12: per-unknown-model inferred provider
   // mapping; frontend reads this to substitute {provider} in the tooltip text.
   inferred_provider_for: Record<string, string>
+  /** ⭐ Phase 249 gap-closure (CR-02): model ids whose RESOLVED `native_tools` is false — a
+   *  claim about capability, NOT about registry membership. An operator-added row can be
+   *  registered AND tool-less at the same time, and that is exactly the case MODEL-04 creates. */
+  tools_lost_models?: string[]
   // Phase 149 (MODEL-01 / D-149-05) — the global set of model_ids flagged
   // `deprecated` in the model registry. Plan 05 populates this in the backend
   // settings payload; the picker (ModelPillRow / MessageInput) reads it

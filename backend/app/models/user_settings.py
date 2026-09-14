@@ -26,9 +26,13 @@ import time as _time
 from enum import Enum
 from typing import Any
 
-# ⚠ MODULE-LEVEL, not function-local. `save_app_settings`'s refusal arm names three asyncpg
-# exception classes in an `except` clause, and an `except` clause is evaluated at exception time —
-# a lazy import inside the `try` would not be in scope there (Phase 249 / MODEL-08).
+# ⚠ MODULE-LEVEL, not function-local. `save_app_settings`'s refusal arm names asyncpg exception
+# classes in its `except` clause, and the clause is evaluated where it is written — a name bound
+# by a lazy import deeper inside the function body is not reliably in scope for it, and an import
+# error there would surface as a confusing NameError during an unrelated failure.
+# ⚠ WR-08: an earlier version of this comment claimed an `except` clause is "evaluated at
+# exception time", which is not the mechanism. Corrected rather than deleted — a comment that is
+# wrong about WHY is how the next reader learns the wrong thing confidently.
 import asyncpg
 
 from pydantic import BaseModel
@@ -665,8 +669,11 @@ async def save_app_settings(updates: dict[str, Any]) -> bool:
         await broadcast_settings_change()
         return True
     except (
-        asyncpg.exceptions.CheckViolationError,
-        asyncpg.exceptions.NotNullViolationError,
+        # ⚠ WR-02 gap-closure: the BASE class, not three leaves. It covers Check / NotNull /
+        # Unique / ForeignKey / Exclusion — every integrity violation is a CALLER error, and the
+        # siblings were otherwise falling into the broad arm below, which logs `exc_info=True`
+        # and therefore the same row-bearing `DETAIL:` line this arm exists to keep out of logs.
+        asyncpg.exceptions.IntegrityConstraintViolationError,
         asyncpg.exceptions.UndefinedColumnError,
     ) as exc:
         # ⭐ THE DATABASE DID ITS JOB AND SAID NO — a CALLER error, not a server fault.
@@ -692,7 +699,12 @@ async def save_app_settings(updates: dict[str, Any]) -> bool:
             "columns=%s constraint=%s kind=%s",
             sorted(clean.keys()), _constraint, type(exc).__name__,
         )
-        raise SettingsWriteRefused(sorted(clean.keys()), _constraint) from None
+        # ⛔ WR-01 gap-closure: BUILD it here, RAISE it after the try. `raise … from None` clears
+        # `__cause__` but NOT `__context__` — the asyncpg error, with its row-bearing `DETAIL:`
+        # line, stayed attached to the object and any handler that walks `__context__` would have
+        # printed every `enc:v1:` envelope. Raising outside the block means no exception is
+        # active, so nothing is attached at all. Measured: `__context__` is None.
+        _refused = SettingsWriteRefused(sorted(clean.keys()), _constraint)
     except Exception:
         # ⚠ UNCHANGED — "the write did not reach the database" (a pool blip, a reset connection).
         # This arm exists so a settings write can never crash a request, and it still returns
@@ -704,6 +716,9 @@ async def save_app_settings(updates: dict[str, Any]) -> bool:
             exc_info=True,
         )
         return False
+    # WR-01: outside every `except`, so the raised exception carries neither `__cause__` nor
+    # `__context__`. Unreachable unless the refusal arm ran.
+    raise _refused
 
 
 # ── Model capabilities overrides cache (Phase 081.1 D-09/D-10) ──────────

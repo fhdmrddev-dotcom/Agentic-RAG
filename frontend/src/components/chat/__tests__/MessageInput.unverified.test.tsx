@@ -144,6 +144,46 @@ describe("MODEL-05 — the model picker warns about an unregistered model", () =
     expect(onModelChange).toHaveBeenCalledWith("llama-4-scout-local")
   })
 
+  it("⛔ CR-02: a REGISTERED model that lost tools is STILL marked", async () => {
+    // The phase's own regression, fenced. `my-db-only-model` is in `verifiedModels` — the
+    // operator added it — AND in `toolsLostModels`, because its Native-tools field was left
+    // unset and its provider has no native tool calling. That is not a contradiction: it is the
+    // DEFAULT for a self-hosted row, i.e. exactly the models MODEL-04 newly enabled.
+    //
+    // The first version guarded the chip on `isUnverified` alone, so this model was silent on
+    // both surfaces — the phase removed the only announcement for its own headline case.
+    await openPicker({
+      verifiedModels: VERIFIED,
+      inferredProviderFor: INFERRED,
+      toolsLostModels: new Set(["llama-4-scout-local", "my-db-only-model"]),
+    })
+
+    const row = rowFor("my-db-only-model")
+    // ⛔ NOT "unverified" — saying that about a model the operator entered would be false.
+    expect(row.textContent).not.toContain("unverified")
+    expect(row.textContent).toContain("no tools")
+
+    const chip = row.querySelector("[title]")
+    const text = chip?.getAttribute("title") ?? ""
+    expect(text).toMatch(/in your registry/i)
+    expect(text).toMatch(/tool calling is DISABLED/i)
+    expect(text).toMatch(/Native tools/i)
+  })
+
+  it("⛔ a registered model that KEEPS its tools is marked with nothing at all", async () => {
+    // The converse arm. Without it the fix above would mark every registered model forever, and
+    // a warning on everything is a warning on nothing.
+    await openPicker({
+      verifiedModels: VERIFIED,
+      inferredProviderFor: INFERRED,
+      toolsLostModels: TOOLS_LOST,
+    })
+
+    const row = rowFor("my-db-only-model")
+    expect(row.textContent).not.toContain("unverified")
+    expect(row.textContent).not.toContain("no tools")
+  })
+
   it("an older backend that sends no verified set marks NOTHING", async () => {
     // ⚠ Silence must degrade to NO CLAIM, never to a false one. An empty/absent verified set
     // means "we were not told", and treating that as "nothing is registered" would flag every

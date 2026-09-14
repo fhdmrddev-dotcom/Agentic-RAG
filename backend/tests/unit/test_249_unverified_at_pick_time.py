@@ -101,7 +101,7 @@ def test_providers_payload_carries_inferred_provider_for(client, auth_headers, m
     assert "gpt-4o" not in body["inferred_provider_for"]
 
 
-def test_inferred_tools_lost_names_only_non_native_buckets(client, auth_headers, mock_asyncpg_pool, monkeypatch):
+def test_tools_lost_names_only_models_that_actually_lose_tools(client, auth_headers, mock_asyncpg_pool, monkeypatch):
     """⭐ The CONSEQUENCE field: which unregistered ids will silently lose tool calling.
 
     Asserted against ``_NATIVE_TOOL_PROVIDERS`` itself rather than a re-typed provider list, so
@@ -112,15 +112,18 @@ def test_inferred_tools_lost_names_only_non_native_buckets(client, auth_headers,
     _prime(monkeypatch, mock_asyncpg_pool, [])
     body = _get_providers(client, auth_headers)
 
-    assert "inferred_tools_lost" in body
-    for mid in body["inferred_tools_lost"]:
-        assert body["inferred_provider_for"][mid] not in _NATIVE_TOOL_PROVIDERS, (
-            f"{mid} was flagged as losing tools, but its inferred provider supports native tools"
-        )
+    assert "tools_lost_models" in body
+    for mid in body["tools_lost_models"]:
+        # ⚠ CR-02: a flagged model is not necessarily UNREGISTERED any more — tool loss is a claim
+        # about resolved capability. For the UNREGISTERED ones the inference table must agree.
+        if mid in body["inferred_provider_for"]:
+            assert body["inferred_provider_for"][mid] not in _NATIVE_TOOL_PROVIDERS, (
+                f"{mid} was flagged as losing tools, but its inferred provider supports native tools"
+            )
     # and the converse: an unverified id whose bucket IS native must NOT be flagged
     for mid, prov in body["inferred_provider_for"].items():
         if prov in _NATIVE_TOOL_PROVIDERS:
-            assert mid not in body["inferred_tools_lost"]
+            assert mid not in body["tools_lost_models"]
 
 
 def test_a_local_model_is_flagged_as_losing_tools(client, auth_headers, mock_asyncpg_pool, monkeypatch):
@@ -135,7 +138,7 @@ def test_a_local_model_is_flagged_as_losing_tools(client, auth_headers, mock_asy
 
     body = _get_providers(client, auth_headers)
 
-    assert "llama-4-scout-local" in body["inferred_tools_lost"]
+    assert "llama-4-scout-local" in body["tools_lost_models"]
 
 
 # ── ⭐ the union: an operator-added model is VERIFIED, not unverified ───────────
@@ -158,7 +161,9 @@ def test_verified_models_is_the_union_with_db_overrides(client, auth_headers, mo
     assert "my-db-only-model" not in body["inferred_provider_for"], (
         "a verified model has no inferred provider, so the chip has nothing to render"
     )
-    assert "my-db-only-model" not in body["inferred_tools_lost"]
+    # ⚠ CR-02: NOT because it is registered — because its provider (`openai`) genuinely HAS
+    # native tools. Registration alone no longer silences this claim; see the CR-02 cases below.
+    assert "my-db-only-model" not in body["tools_lost_models"]
 
 
 def test_settings_payload_verified_models_is_the_same_union(client, auth_headers, mock_asyncpg_pool, monkeypatch):
@@ -206,3 +211,89 @@ def test_the_new_fields_add_no_second_overrides_read():
     # …and they genuinely are the new fields, not an accidental match on an unrelated line.
     for field in ("verified_models", "inferred_provider_for", "inferred_tools_lost"):
         assert field in src
+
+
+# ── ⛔ Gap-closure round 1 — the two blockers the code review found ────────────
+
+def test_cr01_the_judge_picker_feed_is_exactly_the_validator_set(client, auth_headers, mock_asyncpg_pool, monkeypatch):
+    """⛔ CR-01 — the judge picker must not offer options the server refuses with 400.
+
+    DRIVEN before this fence existed: `glm-4.7-flash` (an operator override row) appeared in
+    `verified_models`, `SettingsPage` fed that set to `JudgeModelPicker`, and `PUT /settings`
+    answered **400 "Unknown judge model: glm-4.7-flash"** — because the judge validator uses the
+    SYNC `get_model_capability`, which never reads the DB.
+
+    So `registry_models` exists as the validator's EXACT set. ⛔ If the validator is ever widened
+    to accept `db_override`, widen it here too — the two must not drift, which is the whole shape
+    of the defect this phase is about.
+    """
+    from app.config import MODEL_CAPABILITIES
+
+    _prime(monkeypatch, mock_asyncpg_pool, [_DB_ONLY_ROW])
+    res = client.get("/settings", headers=auth_headers)
+    assert res.status_code == 200, res.text
+    body = res.json()
+
+    assert set(body["registry_models"]) == set(MODEL_CAPABILITIES), (
+        "the judge picker's feed must mirror `get_model_capability`'s sync path exactly"
+    )
+    assert "my-db-only-model" not in body["registry_models"], (
+        "an override-only model in this set is a guaranteed 400 in the judge dropdown"
+    )
+    # …and the chip's set is still the wider union — the two answer different questions.
+    assert "my-db-only-model" in body["verified_models"]
+
+
+def test_cr02_a_registered_but_toolless_model_is_still_flagged(client, auth_headers, mock_asyncpg_pool, monkeypatch):
+    """⛔ CR-02 — the phase's own regression, fenced.
+
+    The first version computed tool loss only over UNREGISTERED ids. An operator-added self-hosted
+    row is REGISTERED (so no `unverified` chip — correct) and resolves `native_tools=False`
+    whenever its Native-tools field was left unset (which is the DEFAULT, because `familyDefaults`
+    matches nothing for `lmstudio`/`custom`). Both surfaces went silent on exactly the models
+    MODEL-04 newly enabled.
+
+    ⚠ MEASURED, not reasoned: `{"model_id": "cr02-probe-local", "provider": "lmstudio"}` resolved
+    `capability_source="db_override", native_tools=False` while sitting inside `verified_models`.
+    """
+    toolless_row = {
+        "model_id": "local-no-tools",
+        "provider": "lmstudio",   # outside _NATIVE_TOOL_PROVIDERS
+        "enabled": True,
+        "deprecated": False,
+        "native_tools": None,     # the Add form's `unknown` tri-state stores NULL
+    }
+    settings_row = dict(_SETTINGS_ROW)
+    settings_row["provider_model_lists"] = {"openai": ["gpt-4o", "local-no-tools"]}
+    _prime(monkeypatch, mock_asyncpg_pool, [toolless_row], settings_row)
+
+    body = _get_providers(client, auth_headers)
+
+    assert "local-no-tools" in body["verified_models"], "it IS registered — the operator added it"
+    assert "local-no-tools" in body["tools_lost_models"], (
+        "REGISTERED and TOOL-LESS at the same time is not a contradiction — it is the default for "
+        "a self-hosted row, and the warning must survive registration"
+    )
+
+
+def test_cr02_an_explicit_native_tools_true_is_believed(client, auth_headers, mock_asyncpg_pool, monkeypatch):
+    """The converse arm: when the operator SAID the model has tools, do not contradict them.
+
+    Without this, the fix above would flag every self-hosted model forever — a warning on
+    everything is a warning on nothing.
+    """
+    row = {
+        "model_id": "local-with-tools",
+        "provider": "lmstudio",
+        "enabled": True,
+        "deprecated": False,
+        "native_tools": True,     # explicit — the operator ticked it
+    }
+    settings_row = dict(_SETTINGS_ROW)
+    settings_row["provider_model_lists"] = {"openai": ["gpt-4o", "local-with-tools"]}
+    _prime(monkeypatch, mock_asyncpg_pool, [row], settings_row)
+
+    body = _get_providers(client, auth_headers)
+
+    assert "local-with-tools" in body["verified_models"]
+    assert "local-with-tools" not in body["tools_lost_models"]

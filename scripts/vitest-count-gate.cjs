@@ -131,7 +131,8 @@ const BASELINE = {
   "hideControlLegibility.test.tsx": 6,
   // Phase 249 Plan 02 (MODEL-05) — the pick-time chip, its negative arm, its consequence text,
   // and the ⛔ still-selectable pin that stops a future "improvement" turning it into a refusal.
-  "MessageInput.unverified.test.tsx": 7,
+  "MessageInput.unverified.test.tsx": 9,
+  "SettingsModelBadge.test.tsx": 9,
   "Seam.test.tsx": 8,
   "TodosSection.test.tsx": 12,
   "CitationList.test.tsx": 15,
@@ -5402,6 +5403,10 @@ const TARGETS = [
   // ⚠ `src/components/chat` has NO bare-directory entry (BUG-260912-01 recorded the same
   // thing), so this suite must be named or it never executes under the gate.
   "src/components/chat/__tests__/MessageInput.unverified.test.tsx",
+  // WR-10 (gap-closure): this suite was EDITED by 249-02 to bind the new shared copy module and
+  // sat in neither knob — so the assertion that catches a drift in that module was not executing
+  // under the gate. `src/__tests__/components` has no bare-directory entry either.
+  "src/__tests__/components/SettingsModelBadge.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")

@@ -1151,8 +1151,10 @@ class AddModelRequest(BaseModel):
     """Body for POST /admin/models — add ONE model by EXPLICIT id + provider (D-159-02).
 
     Unlike the capability PATCH (which INFERS provider from the id/registry), add-by-ID takes
-    the operator's EXPLICIT provider pick, validated against the native-7 + openrouter roster
-    (``PROVIDER_ENDPOINTS``) before any DB touch. There is deliberately NO ``enabled`` field:
+    the operator's EXPLICIT provider pick, validated against the ROUTING roster
+    (``config.ROUTING_PROVIDERS`` — 11 providers) before any DB touch. ⚠ WR-08: this docstring
+    said ``PROVIDER_ENDPOINTS`` (the 8-cloud SSRF DISCOVERY allowlist) and was left saying it by
+    the very phase that stopped reading it — the exact register rot this repo keeps paying for. There is deliberately NO ``enabled`` field:
     the row is forced ``enabled=false`` server-side (the 149 opt-in-enable rule / SC#3 — an add
     never auto-enables; the operator flips it on from the registry table afterward). The
     capability fields are optional pre-fills (every column is null-safe on the table).

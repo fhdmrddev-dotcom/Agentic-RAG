@@ -157,6 +157,25 @@ both knobs, and the copy lives in one module both surfaces read.
 
 ---
 
+## ⛔ The gap-closure round, and what it says
+
+`/gsd:code-review 249` returned **2 blockers and 11 warnings**. SSRF, SQL injection, picker-feed
+availability and the optional-prop defaults were all explicitly clean.
+
+⚠ **Both blockers were regressions THIS PHASE introduced**, and the worse one — **CR-02** —
+**silenced the phase's own headline warning on exactly the models the phase unblocked.** Root cause,
+stated plainly: I fused two questions under one name. *"Is this model registered?"* drives the
+`unverified` chip; *"will it call tools?"* drives the consequence. An operator-added model is
+registered **and** can be tool-less, and my union answered the second question with the first.
+
+Full record, with the before/after drives: **`249-GAP-CLOSURE.md`**.
+
+⛔ **My self-verification passed this phase with both blockers present** — every gate green, six
+fences driven RED, three scenarios driven in a browser. That is the argument for `DEBT-06`, and
+the close still reads `independent_review: owed`: a code-review pass is not a §6.3 peer review.
+
+---
+
 ## ⛔ What this phase may NOT claim
 
 - **Peer review.** Builder and reviewer are the same agent, by the operator's explicit instruction

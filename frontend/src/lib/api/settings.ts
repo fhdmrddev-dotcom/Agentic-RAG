@@ -194,11 +194,11 @@ export async function kickReembed(opts?: { folder_ids?: string[] }): Promise<Ree
  */
 /** The chat composer's provider/model feed.
  *
- * ⚠ Phase 249 (MODEL-05): `verified_models` / `inferred_provider_for` / `inferred_tools_lost`
+ * ⚠ Phase 249 (MODEL-05): `verified_models` / `inferred_provider_for` / `tools_lost_models`
  * are OPTIONAL, exactly like `deprecated_models` before them — an older backend omits them and
  * the composer must render precisely as it did. They carry the pick-time `unverified` warning
  * that previously existed only on the Settings page. */
-export async function getProviders(): Promise<{ active: string; active_model: string; providers: { id: string; name: string; models: string[]; is_active: boolean }[]; deprecated_models?: string[]; disabled_models?: string[]; verified_models?: string[]; inferred_provider_for?: Record<string, string>; inferred_tools_lost?: string[] }> {
+export async function getProviders(): Promise<{ active: string; active_model: string; providers: { id: string; name: string; models: string[]; is_active: boolean }[]; deprecated_models?: string[]; disabled_models?: string[]; verified_models?: string[]; inferred_provider_for?: Record<string, string>; tools_lost_models?: string[] }> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/settings/providers`, { headers, cache: "no-store" })
   if (!res.ok) throw new Error("Failed to get providers")

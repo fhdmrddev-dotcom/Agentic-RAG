@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { MODEL_INFO } from "@/lib/model-info"
 import { providerLogo, modelLogo } from "@/lib/providerLogo"
-import { UNVERIFIED, unverifiedDescription } from "@/lib/unverifiedModelCopy"
+import { NO_TOOLS_LABEL, UNVERIFIED, unverifiedDescription } from "@/lib/unverifiedModelCopy"
 import { cn } from "@/lib/utils"
 // Phase 154 (LANG-01 / D-03) — General/Explorer keep their already-plain labels
 // (routed through the single-source term-map so nothing drifts) and gain a one-line
@@ -643,6 +643,14 @@ export function MessageInput({
                       // product. Silence must degrade to no claim, never to a false one.
                       const isUnverified =
                         (verifiedModels?.size ?? 0) > 0 && !verifiedModels!.has(m)
+                      // ⛔ CR-02: tool loss is a claim about RESOLVED CAPABILITY, and it is
+                      // INDEPENDENT of registry membership. A model the operator added is
+                      // registered (no "unverified") and can still run with tools off — which is
+                      // the DEFAULT for a self-hosted row whose Native-tools field was left unset.
+                      // Guarding the chip on `isUnverified` alone made the warning go silent on
+                      // exactly the models MODEL-04 unblocked.
+                      const isToolsLost = toolsLostModels?.has(m) ?? false
+                      const marked = isUnverified || isToolsLost
                       // Phase 149 (D-149-17) + model-icons pass: the model's OWN
                       // family mark per row (Claude/Gemini/Llama/… — MORE specific than the
                       // provider mark, and it differentiates rows within one provider, e.g.
@@ -670,21 +678,25 @@ export function MessageInput({
                             <Cpu className="h-3 w-3 shrink-0 text-muted-foreground" />
                           )}
                           <span className="min-w-0 flex-1 truncate">{m}</span>
-                          {isUnverified && (
+                          {marked && (
                             <span
                               className="text-[9px] font-medium text-amber-600 bg-amber-500/10 px-1.5 py-0.5 rounded-full ghost-border shrink-0"
                               title={unverifiedDescription(
                                 m,
                                 inferredProviderFor ?? {},
                                 toolsLostModels ?? EMPTY_MODEL_SET,
+                                !isUnverified,
                               )}
                               aria-label={unverifiedDescription(
                                 m,
                                 inferredProviderFor ?? {},
                                 toolsLostModels ?? EMPTY_MODEL_SET,
+                                !isUnverified,
                               )}
                             >
-                              {UNVERIFIED.LABEL}
+                              {/* A registered model is not "unverified" — saying so would be
+                                  false. It gets the label for what is actually wrong with it. */}
+                              {isUnverified ? UNVERIFIED.LABEL : NO_TOOLS_LABEL}
                             </span>
                           )}
                           {isDeprecated && (

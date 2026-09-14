@@ -466,10 +466,16 @@ async def finalize_setup(body: FinalizeBody) -> dict:
     # 3. Auditable DB flag — best-effort + honestly reported (see the docstring rationale).
     setup_complete_persisted = False
     try:
-        # ⛔ Phase 249 (MODEL-08): this deliberately does NOT catch `SettingsWriteRefused`.
-        # A refused `setup_complete` write that reported a completed setup would be this very
-        # bug one layer up — the app would call itself configured when the database said no.
-        # Letting it propagate gives a real error instead of a false success. Do not "fix" it.
+        # ⚠ Phase 249 gap-closure (WR-03) — THIS COMMENT WAS FACTUALLY WRONG AND IS CORRECTED
+        # RATHER THAN DELETED. It previously claimed `SettingsWriteRefused` "propagates… Do not
+        # fix it", while the `except Exception:` three lines below catches it like anything else.
+        # A comment that describes the opposite of the code it annotates is worse than none.
+        #
+        # ⭐ THE CODE IS ALREADY RIGHT, which is why only the comment moves. This write is
+        # best-effort and auditable-only by design (see the docstring): the file is authoritative,
+        # so a failed flag write must not fail finalize. Crucially it does NOT report success —
+        # `setup_complete_persisted` stays False and the caller logs "not persisted yet". A
+        # REFUSAL is therefore reported honestly, which is all MODEL-08 asks of this site.
         setup_complete_persisted = bool(await save_app_settings({"setup_complete": True}))
     except Exception:  # noqa: BLE001 — auditable-only; never fail the (file-authoritative) finalize
         logger.warning(

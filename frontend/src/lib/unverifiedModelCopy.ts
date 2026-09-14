@@ -76,12 +76,44 @@ export const UNVERIFIED = {
   },
 } as const
 
-/** Pick the right description for one model. The two surfaces must not each write this `if`. */
+/**
+ * ⛔ Phase 249 gap-closure (CR-02) — THE THIRD CASE, and the one the first version could not say.
+ *
+ * A model can be REGISTERED and still have tool calling off. That is not an edge case: it is the
+ * DEFAULT for a self-hosted model added through the registry, because the Add form leaves its
+ * tri-state on `unknown` when no family matches, the column stores NULL, and the runtime overlay
+ * then falls back to the provider inference — which is `false` for `ollama` / `lmstudio` /
+ * `custom`.
+ *
+ * Calling such a model "unverified" would be WRONG (the operator entered it) and saying nothing
+ * would be worse (it silently cannot call tools). So it gets its own sentence.
+ */
+export function registeredButToolless(model: string): string {
+  return (
+    `${model} is in your registry, but tool calling is DISABLED for it — its "Native tools" ` +
+    `setting is off or unset. It will run in structured mode: search, code execution and every ` +
+    `other tool are unavailable, and any tool call it tries will arrive as unreadable text. ` +
+    `Set Native tools on its row in the Model Registry to fix it.`
+  )
+}
+
+/** The chip's short label for the registered-but-tool-less case. */
+export const NO_TOOLS_LABEL = "no tools"
+
+/**
+ * Pick the right description for one model. The two surfaces must not each write this `if`.
+ *
+ * ⚠ THREE cases, not two — see `registeredButToolless`. `verified` is passed explicitly rather
+ * than inferred from the absence of an entry, because "we were not told" and "it is registered"
+ * are different states and only the caller knows which it has.
+ */
 export function unverifiedDescription(
   model: string,
   inferredProviderFor: Record<string, string>,
   toolsLostModels: ReadonlySet<string>,
+  verified = false,
 ): string {
+  if (verified) return registeredButToolless(model)
   return toolsLostModels.has(model)
     ? UNVERIFIED.describeToolsLost(model, inferredProviderFor)
     : UNVERIFIED.describe(model, inferredProviderFor)

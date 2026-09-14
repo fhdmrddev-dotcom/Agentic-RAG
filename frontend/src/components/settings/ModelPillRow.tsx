@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils"
 import { providerLogo, modelLogo } from "@/lib/providerLogo"
-import { UNVERIFIED, unverifiedDescription } from "@/lib/unverifiedModelCopy"
+import { NO_TOOLS_LABEL, UNVERIFIED, unverifiedDescription } from "@/lib/unverifiedModelCopy"
 
 /**
  * ModelPillRow — Phase 075.3 D-075.3-10/11/12; Phase 149 D-149-17/D-149-05.
@@ -106,6 +106,9 @@ export function ModelPillRow({
       <div className="flex flex-wrap gap-1.5">
         {models.map((m) => {
           const isUnverified = !verifiedModels.has(m)
+          // ⛔ CR-02: registry membership and tool calling are different questions. A model the
+          // operator added is registered AND can still run with tools off.
+          const isToolsLost = toolsLostModels?.has(m) ?? false
           const isDeprecated = deprecatedModels?.has(m) ?? false
           // Model-icons pass: the model's OWN @lobehub family mark per pill
           // (Claude / Gemini / Llama / …), falling back to the active provider's mark
@@ -126,12 +129,17 @@ export function ModelPillRow({
             >
               {PillMark && <PillMark size={12} />}
               <span>{m}</span>
-              {isUnverified && (
+              {(isUnverified || isToolsLost) && (
                 <span
                   className="text-[9px] font-medium text-amber-600 bg-amber-500/10 px-1.5 py-0.5 rounded-full ghost-border"
-                  title={unverifiedDescription(m, inferredProviderFor, toolsLostModels ?? EMPTY_MODEL_SET)}
+                  title={unverifiedDescription(
+                    m,
+                    inferredProviderFor,
+                    toolsLostModels ?? EMPTY_MODEL_SET,
+                    !isUnverified,
+                  )}
                 >
-                  {UNVERIFIED.LABEL}
+                  {isUnverified ? UNVERIFIED.LABEL : NO_TOOLS_LABEL}
                 </span>
               )}
               {isDeprecated && (

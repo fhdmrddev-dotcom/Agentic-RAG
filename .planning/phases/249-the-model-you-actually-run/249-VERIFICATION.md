@@ -8,7 +8,7 @@ builder: claude
 reviewer: claude
 independent_review: owed
 independent_review_waiver: "Operator instruction, 2026-09-15, verbatim: 'I want you to execute this phase in to end yourself without gemini please proceed autonomously use the tools you have I want to come tomorrow to see it complete.' OV-SOLO-01 / AGENTS.md §6.3 two-agent separation is WAIVED BY INSTRUCTION, not satisfied. This is a FOURTH owed DEBT-06 row beside 238 / 240 / 241."
-score: "6 / 6 requirements delivered · 2 with a NAMED limit"
+score: "6 / 6 requirements delivered · 2 with a NAMED limit · 1 gap-closure round (2 BLOCKERS found by code review, both regressions this phase introduced, both fixed and driven)"
 ---
 
 # Phase 249: The Model You Actually Run — Verification Report
@@ -17,7 +17,26 @@ score: "6 / 6 requirements delivered · 2 with a NAMED limit"
 cannot do before it is used, and reaches every worker — so *"add a model"* stops meaning *"edit
 code and deploy"*, and a silent capability loss stops being the failure mode.
 
-**Verdict: PASS**, self-verified, with two limits stated below rather than discovered later.
+**Verdict: PASS**, self-verified, **after one gap-closure round** — see
+`249-GAP-CLOSURE.md`. Two limits are stated below rather than discovered later.
+
+⚠ **THE MOST IMPORTANT LINE IN THIS REPORT: my first self-verification PASSED THIS PHASE WITH TWO
+BLOCKERS PRESENT.** `/gsd:code-review 249` found them; both were **regressions this phase
+introduced**; both were **reproduced by driving** before a line was changed, and both are fixed.
+
+- **CR-01** — the widened `verified_models` was also feeding `JudgeModelPicker`, so every
+  operator-added option became a guaranteed **400 "Unknown judge model"**. Driven:
+  `glm-4.7-flash` offered, refused.
+- **CR-02** — ⛔ **the phase silenced its own headline warning on exactly the models it
+  unblocked.** A self-hosted row added through the new door resolves `native_tools=False` and, by
+  being "verified", was excluded from the tool-loss set. Driven: `verified: true`,
+  `tools_lost: false`, `native_tools: False`. After the fix the operator's flagged count went
+  **13 → 16**.
+
+⭐ **Neither was catchable by the gates, and that is not a gate failure.** CR-01 is a disagreement
+between two components whose individual tests are both correct; CR-02 is a warning that correctly
+does not fire *by its own implementation's logic*. **No assertion about either surface in isolation
+would have failed.** This is the argument for `DEBT-06` in one paragraph.
 
 ---
 
