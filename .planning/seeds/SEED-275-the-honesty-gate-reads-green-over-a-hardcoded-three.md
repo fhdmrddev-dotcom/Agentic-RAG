@@ -3,7 +3,7 @@ seed_id: SEED-275
 title: The verification-honesty gate reads GREEN over a hardcoded three-path scan set while 20 VERIFICATION.md files exist — and the phase whose whole job was verification debt produced no VERIFICATION.md at all
 created: 2026-09-14
 planted_during: v4.2 / DEBT-06 groundwork, while measuring which phases actually owe an independent review
-status: planted
+status: closed   # ⭐ ANSWERED SAME DAY (2026-09-14) by operator ruling: "fix the gate, VERDICT.md counts as equivalent". Scan set now DERIVED (phases >= 238, live + archived, VERIFICATION.md and VERDICT.md), floor moved onto the derived set, header docstring synced in the same commit — it had explicitly forbidden a total-subject floor, an argument that was sound for the old design and void for this one. Driven RED on three arms incl. the counterfactual: the OLD 3-path set reports "honesty gate OK" over the exact planted defect the new one catches. Finding 2 fixed (239 marked). Finding 3 answered by the ruling.
 priority: high
 surface: Agentic-RAG
 relates_to:
