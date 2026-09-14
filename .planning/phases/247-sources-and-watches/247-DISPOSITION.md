@@ -8,6 +8,8 @@
 
 ## 1. Phase 240 Review Warnings (WR-01 through WR-09)
 
+*Note: WR-01 and WR-03 were closed at Phase 240 by commit `9e83203a2`. The seven remaining warnings are dispositioned below.*
+
 | Warning | Status | Resolution / Disposition |
 |---|---|---|
 | **WR-04** | **FIXED** (247-01) | User label human name resolution implemented in `backend/app/services/sources/mail/gmail.py` via `get_label_name` and consumed by `GoogleDriveSourceAdapter.list_files`. Resolves e.g. `Label_9` to `Receipts` so `SourceFile.path` is `/Receipts` rather than `/Label_9`. |
@@ -15,7 +17,7 @@
 | **WR-09** | **FIXED** (247-03) | In `frontend/src/components/sources/watchProductMark.ts`, mapped `microsoft_graph` to `onedrive` in `SERVICE_ID_TO_MARK`. Verified by 10/10 tests in `watchProductMark.test.ts`. |
 | **WR-02** | **ACCEPTED DEBT** | URL-prefix stripping in `microsoft_graph.py` strips `/drive/root:`, `/drives/{id}/root:`, and `/sites/{site}/drives/{drive}/root:`. Items without root markers return `None`, safely preserving WR-03 without fabricating paths. Full multi-tenant SharePoint cross-site alias traversal deferred. |
 | **WR-05** | **ACCEPTED DEBT** | Missing files display in `WatchRowCard.tsx` caps rendered items to `FILE_FAILURES_SHOWN` (5) with `+N more` counter to prevent DOM overflow during massive remote deletions. Bulk reconciliation actions remain per-watch. |
-| **WR-06** | **ACCEPTED DEBT** | Background sync runs on polled schedule (`interval_minutes`); push notification subscriptions (webhooks) are intentionally absent per architectural decision D-234 (no webhook server). |
+| **WR-06** | **ACCEPTED DEBT** | Background sync runs on polled schedule (`interval_minutes`); push notification subscriptions (webhooks) are intentionally absent per CLAUDE.md's "no delta cursor and no webhook" architectural invariant (polled schedule preserved). |
 | **WR-08** | **FIXED** (247-04) | Formal dispositioning document delivered (`247-DISPOSITION.md`) and hot-file ledger synced with exact git-derived triples. |
 
 ---
@@ -42,4 +44,4 @@
 4. **Standing Red Baseline:**
    - `frontend/src/components/sources/sourceComposition.test.tsx` strictly reproduces the 16 baseline failures documented in `247-STANDING-RED-BASELINE.md` (33 passed / 16 failed). Zero failures outside baseline.
 5. **G-5 Line Cap:**
-   - `WatchedFoldersSection.tsx` reduced from 1,095 lines down to 470 lines via extraction of `WatchRowCard.tsx` (649 lines). Both files well under 1,000 lines.
+   - `WatchedFoldersSection.tsx` reduced from 1094 lines down to 470 lines via extraction of `WatchRowCard.tsx` (649 lines). Both files well under 1,000 lines.

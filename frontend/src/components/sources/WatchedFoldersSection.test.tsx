@@ -820,6 +820,78 @@ describe("WatchedFoldersSection", () => {
     expect(pills[1]).toHaveTextContent(/connection off/i)
   })
 
+  it("discriminates connection health from run outcome in both directions (ROADMAP SC#2 / WATCH-03)", async () => {
+    // Discriminating Case A: Healthy connection whose last run failed (e.g. transient 429 rate limit).
+    // Connection pill MUST read "Connected", run pill MUST read "Error".
+    const healthyConnFailedRun: ConnectorWatch = {
+      id: "watch-disc-1",
+      user_id: "user-1",
+      connection_id: "conn-healthy",
+      connection_name: "Google Drive (Healthy)",
+      service_id: "google",
+      source_folder_id: "gdrive-fld-1",
+      source_folder_name: "Invoices",
+      library_folder_id: "lib-folder-1",
+      interval_minutes: 30,
+      is_active: true,
+      last_run_at: new Date(Date.now() - 5 * 60_000).toISOString(),
+      last_status: "failed",
+      last_error: "429 Too Many Requests: Rate limit exceeded",
+      item_count: 10,
+    }
+
+    // Discriminating Case B: Broken/disabled connection whose last run happened to succeed before it was shut off.
+    // Connection pill MUST read "Connection Off", run pill MUST reflect run status ("Active").
+    const brokenConnSuccessRun: ConnectorWatch = {
+      id: "watch-disc-2",
+      user_id: "user-1",
+      connection_id: "conn-broken",
+      connection_name: "Google Drive (Disabled)",
+      service_id: "google",
+      source_folder_id: "gdrive-fld-2",
+      source_folder_name: "Contracts",
+      library_folder_id: "lib-folder-2",
+      interval_minutes: 30,
+      is_active: true,
+      last_run_at: new Date(Date.now() - 10 * 60_000).toISOString(),
+      last_status: "success",
+      last_error: null,
+      item_count: 5,
+    }
+
+    mockListWatches.mockResolvedValue([healthyConnFailedRun, brokenConnSuccessRun])
+    render(
+      <WatchedFoldersSection
+        stoppedSources={[
+          {
+            watch_id: "watch-disc-2",
+            source_folder_name: "Contracts",
+            connection_name: "Google Drive (Disabled)",
+            cause: "connection_disabled",
+            hard: true,
+            stopped_since: new Date().toISOString(),
+            last_good_at: new Date(Date.now() - 10 * 60_000).toISOString(),
+          },
+        ]}
+      />,
+    )
+
+    await waitFor(() => expect(screen.getAllByTestId("sources-connection-pill")).toHaveLength(2))
+    const connPills = screen.getAllByTestId("sources-connection-pill")
+    const runPills = screen.getAllByTestId("sources-run-pill")
+
+    // Case A: Healthy connection whose last run failed (e.g. 429 rate limit):
+    // Connection pill is Connected; Run pill indicates the run failure ("Run failed (429)").
+    expect(connPills[0]).toHaveTextContent(/connected/i)
+    expect(connPills[0]).not.toHaveTextContent(/connection off/i)
+    expect(runPills[0]).toHaveTextContent(/run failed \(429\)/i)
+
+    // Case B: Broken connection whose last run succeeded:
+    // Connection pill is Connection Off; Run pill is not marked as run failed.
+    expect(connPills[1]).toHaveTextContent(/connection off/i)
+    expect(runPills[1]).not.toHaveTextContent(/run failed/i)
+  })
+
   it("renders missing items with missing_since timestamp (WATCH-05)", async () => {
     const MISSING_ITEM = item({
       id: "miss-1",

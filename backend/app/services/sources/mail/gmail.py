@@ -157,17 +157,20 @@ def _scope_hint(status_code: int, reason: str) -> str:
 _LABEL_NAME_CACHE: dict[tuple[str, str], str] = {}
 
 
-async def get_label_name(token: str, label_id: str, connection_id: str = "") -> str:
+async def get_label_name(token: str, label_id: str, connection_id: str) -> str:
     """Resolve human-readable label name (e.g. 'Finance' for 'Label_9') for WR-04.
 
     System labels have id == name. User labels query /labels/{id} and cache the result.
-    Keyed by (connection_id, label_id) to prevent cross-tenant collisions (F-1).
+    Keyed by (connection_id, label_id) to prevent cross-tenant collisions (F-1, V-5).
+    connection_id is REQUIRED (fail-closed) to prevent silent cross-tenant leakage.
     """
+    if not connection_id:
+        raise ValueError("connection_id is required for multi-tenant label name resolution")
     if not label_id:
         return ""
     if label_id in ("INBOX", "SENT", "DRAFT", "TRASH", "SPAM", "STARRED", "UNREAD", "IMPORTANT"):
         return label_id
-    cache_key = (connection_id or "", label_id)
+    cache_key = (connection_id, label_id)
     if cache_key in _LABEL_NAME_CACHE:
         return _LABEL_NAME_CACHE[cache_key]
 
@@ -192,8 +195,13 @@ async def get_label_name(token: str, label_id: str, connection_id: str = "") -> 
     return label_id
 
 
-async def list_labels(token: str, connection_id: str = "") -> list[SourceNode]:
-    """Mail labels, as folders. System labels first, then user labels alphabetically."""
+async def list_labels(token: str, connection_id: str) -> list[SourceNode]:
+    """Mail labels, as folders. System labels first, then user labels alphabetically.
+
+    connection_id is REQUIRED (fail-closed) to prevent silent cross-tenant leakage.
+    """
+    if not connection_id:
+        raise ValueError("connection_id is required for multi-tenant label listing")
     resp = await send_pinned_http(
         EGRESS_KEY,
         "GET",
@@ -215,7 +223,7 @@ async def list_labels(token: str, connection_id: str = "") -> list[SourceNode]:
     if len(_LABEL_NAME_CACHE) > 5000:
         _LABEL_NAME_CACHE.clear()
     for lbl in labels:
-        _LABEL_NAME_CACHE[(connection_id or "", str(lbl["id"]))] = str(lbl.get("name") or lbl["id"])
+        _LABEL_NAME_CACHE[(connection_id, str(lbl["id"]))] = str(lbl.get("name") or lbl["id"])
 
     def sort_key(lbl: dict[str, Any]) -> tuple[int, str]:
         is_user = 1 if str(lbl.get("type", "")).lower() == "user" else 0

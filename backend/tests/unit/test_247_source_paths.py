@@ -174,6 +174,18 @@ async def test_f1_gmail_label_cache_cross_tenant_isolation():
 
 
 @pytest.mark.asyncio
+async def test_v5_gmail_label_cache_fails_closed_without_connection_id():
+    """V-5: get_label_name and list_labels raise ValueError if connection_id is omitted/empty."""
+    from app.services.sources.mail.gmail import list_labels
+
+    with pytest.raises(ValueError, match="connection_id is required"):
+        await get_label_name("token", "Label_9", connection_id="")
+
+    with pytest.raises(ValueError, match="connection_id is required"):
+        await list_labels("token", connection_id="")
+
+
+@pytest.mark.asyncio
 async def test_google_drive_list_files_mail_arm_uses_human_label_name():
     """WR-04: GoogleDriveSourceAdapter passes human display name to list_messages."""
     adapter = GoogleDriveSourceAdapter()
