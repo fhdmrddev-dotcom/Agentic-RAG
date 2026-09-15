@@ -323,6 +323,31 @@ describe("TodosSection — run honesty (Phase 250, HONEST-03 / HONEST-04)", () =
     expect(screen.getByText("1 of 3 todos complete")).toBeInTheDocument()
   })
 
+  it("hooks are never short-circuited — the source fence a mocked-hook test cannot be", async () => {
+    // ⛔ THIS FENCE EXISTS BECAUSE THE BUG IT GUARDS SHIPPED, AND EVERY TEST ABOVE STAYED
+    // GREEN THROUGH IT. `useStreamingForThread(id) || useLoadingForThread(id)` looks
+    // harmless and is fatal: `||` short-circuits, so the moment a run actually starts the
+    // first selector returns true and the SECOND HOOK IS NEVER CALLED. React counts fewer
+    // hooks than the previous render, throws "Rendered fewer hooks than expected", and the
+    // page goes blank — found by DRIVING the app, on the very scenario this phase was
+    // built for.
+    //
+    // ⚠ A RENDERED TEST CANNOT CATCH IT HERE. The selectors are replaced by `vi.fn()`,
+    // which consumes no hook slot, so React's hook accounting never sees the violation.
+    // The only thing that can see it in this suite is the SOURCE.
+    const src: string = (
+      await import("@/components/panel/TodosSection.tsx?raw")
+    ).default
+
+    const shortCircuitedHook = /\buse[A-Z]\w*\([^)]*\)\s*(\|\||&&|\?\?)/
+    const offenders = src
+      .split(/\r?\n/)
+      .map((line, i) => [i + 1, line.replace(/\/\/.*$/, "")] as const)
+      .filter(([, line]) => shortCircuitedHook.test(line))
+
+    expect(offenders).toEqual([])
+  })
+
   it("derived rows get the identical treatment from the same helper", () => {
     ended()
     setTodos([])

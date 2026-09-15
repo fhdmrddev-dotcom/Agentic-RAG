@@ -14245,15 +14245,27 @@ of the label into the row's `title`.
 
 **Invariants that bind the next editor:**
 1. ⛔ **A LIVE RUN MUST NEVER READ `NOT TICKED`** — the mirror image of the bug being fixed.
-   Liveness is `useStreamingForThread(tid) || useLoadingForThread(tid)`, and the `||` is
-   load-bearing: `streamingThreads` can read empty during a reconnect window.
-2. ⛔ **The rule has ONE home.** `DerivedRow` gets the identical derivation from the identical
+   Liveness ORs `useStreamingForThread` with `useLoadingForThread`, and the OR is load-bearing:
+   `streamingThreads` can read empty during a reconnect window.
+2. ⛔⛔ **CALL THE TWO SELECTORS ON SEPARATE LINES. NEVER
+   `useStreamingForThread(tid) || useLoadingForThread(tid)`.** `||` SHORT-CIRCUITS, so the moment
+   the first returns true — **the moment a run starts** — the second hook is skipped, React throws
+   *"Rendered fewer hooks than expected"* and **the whole page goes white**. It shipped that way
+   for one commit in Phase 250 and was found by DRIVING the app: **22 unit cases on this very
+   component were green over it**, because a `vi.fn()` standing in for a hook consumes no hook
+   slot, so React's accounting never sees the violation. Pinned by a SOURCE fence in
+   `TodosSection.test.tsx` (*"hooks are never short-circuited"*), driven RED against the exact
+   defect. ⚠ **Any suite that renders this component must declare BOTH selectors in its
+   `@/providers/StreamsProvider` mock factory** or every test in it throws at mount —
+   `WorkspacePanel.derived.test.tsx` did, and it was in NEITHER count-gate knob, so the gate read
+   `0 failing` while three of its tests were red. 250 adopted it into both knobs.
+3. ⛔ **The rule has ONE home.** `DerivedRow` gets the identical derivation from the identical
    module; two copies is the drift this phase exists to close.
-3. ⛔ **Nothing here flips `status`** (Phase 138 D-01). The `sr-only` progress line still counts
+4. ⛔ **Nothing here flips `status`** (Phase 138 D-01). The `sr-only` progress line still counts
    only genuine completions.
-4. ⛔ **Non-colour-only A11Y** (088-05) and the 224-05 wrap rule (the badge does not dictate the
+5. ⛔ **Non-colour-only A11Y** (088-05) and the 224-05 wrap rule (the badge does not dictate the
    wrap point) both still hold.
-5. ⛔ **`StreamsProvider.tsx` was NOT modified**, and a future change here should keep it that
+6. ⛔ **`StreamsProvider.tsx` was NOT modified**, and a future change here should keep it that
    way — both selectors have shipped since Phase 075.4.
 ⚠ **A mock factory that omits the two new selectors makes every suite mounting this component
 throw AT MOUNT** (the Phase 196 `@/lib/api` lesson, 249 failures in one run).

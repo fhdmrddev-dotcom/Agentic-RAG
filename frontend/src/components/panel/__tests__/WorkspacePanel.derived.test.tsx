@@ -48,7 +48,19 @@ const useDerivedPanel = vi.fn()
 // (the rest parameter is load-bearing: the mock below SPREADS its args into this fn,
 // and a zero-arity stub is a TS2556 spread-argument error, not merely untidy.)
 const useStreamActions = vi.fn((..._a: unknown[]) => ({ stopThread: vi.fn() }))
+// ⛔ Phase 250 (HONEST-03) — `useStreamingForThread` / `useLoadingForThread` are declared here
+// because THIS SUITE renders the REAL `TodosSection`, and that component now asks whether a run is
+// live on the thread it is showing. A mock factory that omits a newly-added export makes every
+// test in the file throw AT MOUNT — the Phase 196 `@/lib/api` lesson, 249 failures in one run.
+// ⚠ AND THIS SUITE IS IN NEITHER COUNT-GATE KNOB, so the gate read 0 failing while these three
+// were red. It was caught by running the panel directory by hand, not by a gate.
+// Default is a LIVE run, matching how the rest of this file reads: derived rows mirror tool
+// activity, which only exists while something is running.
+const useStreamingForThread = vi.fn(() => true)
+const useLoadingForThread = vi.fn(() => false)
 vi.mock("@/providers/StreamsProvider", () => ({
+  useStreamingForThread: (...a: unknown[]) => useStreamingForThread(...a),
+  useLoadingForThread: (...a: unknown[]) => useLoadingForThread(...a),
   useTodos: (...a: unknown[]) => useTodos(...a),
   useWorkspaceFiles: (...a: unknown[]) => useWorkspaceFiles(...a),
   useAskUserPrompt: (...a: unknown[]) => useAskUserPrompt(...a),

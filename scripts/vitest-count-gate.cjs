@@ -143,6 +143,8 @@ const BASELINE = {
   // 250 CLAIMS this suite because 250 CREATED it — the ?raw lockstep fence binding the
   // frontend marker copy to backend/app/services/todos_service.py.
   "todoRunHonesty.lockstep.test.ts": 4,
+  // Phase 250 — adopted after this phase broke it invisibly (see the TARGETS note).
+  "WorkspacePanel.derived.test.tsx": 4,
   "CitationList.test.tsx": 15,
   "RunCard.test.tsx": 29,
   "RunCard.timer.test.tsx": 7,
@@ -4196,6 +4198,13 @@ const TARGETS = [
   // green while the pair is wrong, and the visible symptom is the raw parenthetical AND a
   // `Not ticked` badge on the same row.
   "src/components/panel/__tests__/todoRunHonesty.lockstep.test.ts",
+  // ⛔ Phase 250 ADOPTS `WorkspacePanel.derived.test.tsx` BECAUSE 250 BROKE IT AND THIS GATE
+  // COULD NOT SEE IT. It was in NEITHER knob, so when the run-honesty change added two selectors
+  // to `TodosSection` and this suite's mock factory did not declare them, all four of its tests
+  // threw AT MOUNT while the gate reported `0 failing`. It is the ONLY suite outside
+  // TodosSection.test.tsx that renders the REAL TodosSection, which is exactly what makes it
+  // worth guarding rather than leaving declined.
+  "src/components/panel/__tests__/WorkspacePanel.derived.test.tsx",
   "src/components/chat/__tests__/CitationList.test.tsx",
   "src/components/chat/RunCard.test.tsx",
   "src/components/chat/RunCard.timer.test.tsx",

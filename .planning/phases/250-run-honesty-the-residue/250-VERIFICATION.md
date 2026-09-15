@@ -6,7 +6,7 @@ independent_review: owed
 reviewer: null
 verdict: PASS
 owed:
-  - "live mirror-image control (a row must never read NOT TICKED while a run streams) — 2 unit fences cover it, one operator click closes it"
+  - "CLOSED 2026-09-15 — live mirror-image control DRIVEN at the operator's request; it FOUND a shipped hook-short-circuit defect that every gate was green over"
   - "HONEST-02 behavioural per-provider rows — an empty-output run cannot be produced on demand"
   - "parallel-thread axis, live"
   - "independent review (DEBT-06) — WAIVED BY INSTRUCTION, NOT SATISFIED"
@@ -107,9 +107,14 @@ file being wrong** — recorded that way rather than as this phase fixing suites
 
 ## What is NOT verified
 
-1. **The live mirror-image control** — a row must never read `NOT TICKED` while a run streams.
-   Two unit fences cover it (including the loading-but-not-streaming reconnect window); a browser
-   confirmation is ⛔ **owed**, one operator click.
+1. ~~**The live mirror-image control**~~ — ✅ **CLOSED 2026-09-15**, driven at the operator's
+   request. ⛔ **It found a REAL DEFECT that had shipped**: `useStreamingForThread(id) ||
+   useLoadingForThread(id)` short-circuits the second hook the moment a run starts, crashing the
+   page to white — and **every gate in this table was green over it**, because a `vi.fn()` standing
+   in for a hook consumes no hook slot. Fixed, and pinned by a source fence driven RED against the
+   exact defect. Full account: `250-UAT.md` §A3 and `250-SUMMARY.md` §4b.
+   ⚠ **This is the phase's own thesis turned on itself** — a verification that claimed a component
+   worked because green tests said so, while it crashed on the first real run.
 2. **`HONEST-02` behaviourally** — fenced by source shape and by the absence of any provider value
    in the block, not by a real empty-output run.
 3. **Parallel-thread axis, live** — thread-scoped by construction, not observed.
@@ -122,7 +127,13 @@ file being wrong** — recorded that way rather than as this phase fixing suites
 
 ## Verdict
 
-**PASS on all four success criteria**, with five items owed and none of them a defect.
+**PASS on all four success criteria**, with four items owed.
+
+⚠ **AMENDED 2026-09-15:** the original verdict read *"five items owed and none of them a defect"*.
+The fifth — the live mirror-image control — was then driven at the operator's request and **found a
+defect that had already shipped** (§4b). The sentence is corrected rather than overwritten, because
+*"none of them a defect"* was a claim about work that had not been checked yet, and that is exactly
+the class of overclaim this phase was built to remove.
 
 ⭐ **The phase's most useful output is not a line of code: the blocking measurement was taken
 before planning, and it showed the report's own either/or was false.** Had it been skipped, one of

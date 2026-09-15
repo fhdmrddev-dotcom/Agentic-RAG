@@ -207,7 +207,19 @@ export function TodosSection() {
   // `streamingThreads` can read empty for a live run, and a row must never flash
   // "not ticked" while the agent is working. Realtime is a hint, not truth (D-v2.5-03).
   // ⛔ Both selectors already ship (Phase 075.4) — StreamsProvider.tsx is NOT modified.
-  const isRunLive = useStreamingForThread(threadId) || useLoadingForThread(threadId)
+  //
+  // ⛔⛔ THE TWO HOOKS ARE CALLED ON THEIR OWN LINES AND THE `||` COMBINES THEIR VALUES.
+  // NEVER write `useStreamingForThread(threadId) || useLoadingForThread(threadId)`.
+  // `||` SHORT-CIRCUITS: the moment the first selector returns true — i.e. the moment a
+  // run actually starts — the second hook is never called, React counts fewer hooks than
+  // the previous render, throws "Rendered fewer hooks than expected", and THE WHOLE PAGE
+  // GOES BLANK. Shipped that way for one commit in Phase 250 and found by DRIVING the app,
+  // not by a test: every unit fence passed, because a `vi.fn()` standing in for a hook
+  // consumes no hook slot, so the violation is structurally invisible to them.
+  // Pinned by `__tests__/TodosSection.test.tsx` → "hooks are never short-circuited".
+  const isStreaming = useStreamingForThread(threadId)
+  const isLoading = useLoadingForThread(threadId)
+  const isRunLive = isStreaming || isLoading
 
   // PRECEDENCE 2 + 3: no real write_todos plan for this thread.
   if (todos.length === 0) {

@@ -181,11 +181,42 @@ control two tests below is what found it.** A fence nobody has seen fire is not 
 
 ---
 
+## 4b · ⛔ A REAL BUG SHIPPED FOR ONE COMMIT, AND DRIVING THE APP IS WHAT FOUND IT
+
+The liveness read went out as:
+
+```ts
+const isRunLive = useStreamingForThread(threadId) || useLoadingForThread(threadId)
+```
+
+**`||` short-circuits.** The instant the first selector returns `true` — **the instant a run
+starts** — the second hook is never called, React counts fewer hooks than the previous render,
+throws *"Rendered fewer hooks than expected"*, and **the entire app unmounts to a white page**.
+
+⭐ **EVERY GATE WAS GREEN OVER IT**: 22 unit cases on this exact component, the count gate, the
+ledger gate, the typecheck. Not through carelessness — **structurally**. The suite replaces both
+selectors with `vi.fn()`, and a `vi.fn()` consumes no hook slot, so React's hook accounting never
+sees the violation. **No rendered test in that file could have caught it.**
+
+It was found by doing the one thing the phase's own record had listed as OWED: sending a real
+message and watching the row. **The owed row was the bug.**
+
+Fixed (two hooks on their own lines, `||` combining their *values*) and pinned by a **source**
+fence — `TodosSection.test.tsx` → *"hooks are never short-circuited"* — driven RED against the
+exact shipped defect with the file restored md5-identical.
+
+⚠ **The lesson is this phase's own thesis turned on itself.** 250 exists because a surface
+claimed something that had not happened. Its own verification claimed a component worked because
+green tests said so — while the component crashed the page on the first real run. **A test that
+mocks the thing under test measures the mock.**
+
+---
+
 ## 5 · Owed at close — none of it a defect
 
 | Owed | Why | How it closes |
 |---|---|---|
-| **A3 — the live mirror-image control** | Needs a real streaming run on a thread with open todos; costs an LLM call and writes into the operator's thread. Two unit fences cover it, including the reconnect window. | One operator click: send any message on such a thread, watch `IN PROGRESS` return. |
+| ~~**A3 — the live mirror-image control**~~ | ✅ **CLOSED 2026-09-15**, at the operator's request to be shown it — and it found the §4b defect. Round trip recorded twice by a 120 ms sampler: `NOT TICKED` → **`IN PROGRESS` + dot** → `NOT TICKED`. | done |
 | **`HONEST-02` per-provider rows** | An empty-output run cannot be produced on demand. | Structural instead: no provider value reaches the taxonomy, fenced. |
 | **Parallel-thread axis, live** | Thread-scoped by construction (`useStreamingForThread(threadId)`), not observed. | Any two-thread drive. |
 | **Independent review (`DEBT-06`)** | Builder == reviewer, by instruction. ⛔ **WAIVED BY INSTRUCTION, NOT SATISFIED.** | `/gsd:code-review 250`, or Gemini. |
