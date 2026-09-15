@@ -120,7 +120,7 @@ with `independent_review: owed` until a review actually runs.
 - [ ] **Phase 248: The Credential Boundary** — a secret pasted into a non-secret field is refused not stored, the grant marker claims only what is knowable, all 13 anon-executable SECDEF functions ruled on, `get_advisors(security)` in the deploy checklist (CRED-01..04)
 - [x] **Phase 249: The Model You Actually Run** — local / self-hosted models addable from the UI, unregistered ids say so at pick time, registry writes reach every worker, the hide control is the discoverable one, refused writes report failure, eval engines name their own cause (MODEL-04..09). **6/6 delivered · 2 with a NAMED limit.** ⭐ Two requirements were ALREADY BUILT and one defect no longer reproduced — measured before planning, so none was rebuilt. ⭐ 13 of the operator's configured models were measured to lose tool calling silently; the composer now says so at pick time, on the model they currently run. ⛔ `verification_mode: self-verified` by operator instruction (*"without gemini"*) — a FOURTH owed `DEBT-06` row. ⛔ Owed: `MODEL-04` end-to-end in chat (no live self-hosted endpoint), `MODEL-06` multi-worker observation (this box runs two single-worker `--reload` servers), `MODEL-09` cloud sweep (one operator click)
 - [x] **Phase 250: Run Honesty — the residue** — trimming never eats your own question, a silent reasoning model says what happened, the panel stops working when the run ends, a finished task leaves no false todo (HONEST-01..04)
-- [ ] **Phase 251: Register Integrity** — 8 duplicate seed ids resolved, an executable seeds sweep, `BUS-171`'s 23-item operator queue triaged into a decision list (REG-01..03)
+- [x] **Phase 251: Register Integrity** — 8 duplicate seed ids resolved, an executable seeds sweep, `BUS-171`'s 23-item operator queue triaged into a decision list (REG-01..03)
 
 ### Phase Details
 
@@ -219,7 +219,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 251-04-PLAN.md — wire the sweep into `discuss-phase` and `new-milestone` where the steps actually are, age the operator queue at every session start, and hand the operator a 5-item decision list
+- [x] 251-04-PLAN.md — wire the sweep into `discuss-phase` and `new-milestone` where the steps actually are, age the operator queue at every session start, and hand the operator a 5-item decision list
 
 ⚠ **No honest parallelism exists in this phase and that is stated rather than hidden.** Three of the
 four plans operate on `.planning/seeds/` and the fourth validates the other three: plan 01's RED arms

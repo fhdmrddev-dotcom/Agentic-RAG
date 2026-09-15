@@ -124,6 +124,25 @@ code, all five phases**. Plans **251-01** `b38bd8444` · **251-02** `eff1afa7e` 
 Plan: **4 / 4 done.** Status: **phase complete — next action `/gsd:complete-milestone`**, after the
 operator rules on `251-BUS-TRIAGE.md`.
 
+⭐ **VERIFIED 2026-09-16 — `251-VERIFICATION.md`, 3 / 3 ROADMAP success criteria, `gaps_found: none`.**
+`verification_mode: self-verified` · `independent_review: owed` (DEBT-06) — the verifier was a
+subagent of the same session that orchestrated the build, so this is NOT the §6.3 two-agent
+separation `OV-SOLO-01` re-armed. ⛔ **Every criterion was RE-DERIVED from the tree, never read from
+a SUMMARY:** REG-02 was proven by EXTRACTING the fenced command out of `discuss-phase.md` and
+`new-milestone.md` **as authored** and RUNNING it — a prose-only mention still passes
+`grep -rn "check-seeds-register"` with zero runnable calls, so presence-grep is not evidence here.
+REG-03 proven by `git diff 97bb24e4d..HEAD -- .agent-bus/` being **empty**: claude wrote nothing.
+
+⚠ **A METHOD TRAP THE VERIFIER HIT AND PUBLISHED RATHER THAN QUIETLY FIXED — it is the D-11 trap
+from the opposite direction.** Its first body-identity re-derivation compared a **git blob** against
+`fs.readFileSync` on the local working tree, where `core.autocrlf=true`, and reported **153 / 276
+seeds with whole-body LF→CRLF drift**. Re-run as **blob-vs-blob** via `git archive`, bypassing the
+checkout entirely: **0 line-ending diffs at every phase commit**, with only the 4 legitimate body
+diffs (the D-06/D-17 live-citation updates plus the one `[id-in-heading]` fix). ⛔ **On this box a
+working-tree read is not a source of truth for byte identity** — CLAUDE.md warns that `git diff`
+cannot SEE line-ending damage; this is the same fact producing a **false positive** instead of a
+false negative. Recorded in `251-VERIFICATION.md` → *Method note*.
+
 ⭐ **THE REGISTER IS GREEN — verdict line verbatim, after 251-04:**
 ```
   register: 293 files · parsed: 293 · skipped: 0 · duplicate ids: 0
