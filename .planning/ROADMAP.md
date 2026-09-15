@@ -49,8 +49,10 @@ milestone in three to open on deployed code.** Every *"cloud is N migrations beh
 inherited from a v4.0 / v4.1 register is stale; re-derive before quoting one.
 
 ⚠ **The UAT ledger moved with that promotion, and it moved in BOTH directions:**
+
 - **242's UAT row 5 is now UNBLOCKED and OWED** — the production promotion **was its trigger**. It is a
   real owed row, not a closed one, and it belongs in the first phase close that can carry it.
+
 - **241's UAT row 5 is EXPIRED, NOT OWED** — it needed a read-capable cloud DSN to prove an arm that
   **migration 176 already being in cloud makes unreproducible.** ⛔ Do not plan it, do not carry it as
   debt, and do not let a future audit re-open it as *"never run"*: it is **retired by measurement**.
@@ -65,11 +67,14 @@ seeds of 280, a 23-item operator queue), and `SEED-013` / `SEED-195` (Open Platf
 **v5.0**) has now been deferred **twice**; a third deferral needs a written reason, not silence.
 
 ⚠ **G-8 IS THE GOVERNOR OF THIS MILESTONE, more than on any capability milestone.**
+
 - **Target 3-5 plans per phase.** Above **6**, CONTEXT.md must name what genuinely **cannot share a
   worktree** — adjacency is not a reason for a second plan.
+
 - A bug that is **≤ 1 file / ≤ 10 lines with no schema or API surface is `/gsd:fast` under G-3, never a
   plan.** Several requirements here are explicitly that shape (`WATCH-06`, `WATCH-07`, plausibly
   `MODEL-07`), and counting them as plans is how 4-6 becomes 17.
+
 - ⛔ **Never cut to save time:** the verifier, TDD RED drives, `security_enforcement` / `code_review`,
   migration discipline. **The lever is plan COUNT, never the agent roster.**
 
@@ -198,9 +203,20 @@ with `independent_review: owed` until a review actually runs.
 **Plans**: 4 plans, all SERIAL (waves 1→2→3→4)
 
 Plans:
+**Wave 1**
+
 - [ ] 251-01-PLAN.md — build `scripts/check-seeds-register.cjs`, the executable sweep, and drive D-04's four arms + the count assertion RED via a committed `--self-test` before the register is touched
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 251-02-PLAN.md — migrate all 283 seeds onto the D-09/D-10/D-16 frontmatter contract with every BODY proven md5-identical over raw Buffers, and write the contract down in TEMPLATE.md, plant-seed.md and CLAUDE.md
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 251-03-PLAN.md — renumber the 8 duplicate-id movers to 277-284 by the D-07/D-20 date rule and leave a disambiguating redirect stub at each old id, touching no product file and no archive
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
 - [ ] 251-04-PLAN.md — wire the sweep into `discuss-phase` and `new-milestone` where the steps actually are, age the operator queue at every session start, and hand the operator a 5-item decision list
 
 ⚠ **No honest parallelism exists in this phase and that is stated rather than hidden.** Three of the
