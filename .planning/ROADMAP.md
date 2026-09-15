@@ -195,7 +195,20 @@ with `independent_review: owed` until a review actually runs.
   2. A person can run **one command** that reads every `trigger_when` in the register and prints the seeds whose trigger is already true — the sweep is **executable**, not a paragraph in `CLAUDE.md` asking an agent to read 161 planted seeds of 280 (REG-02).
   3. `BUS-171`'s **23** `--to operator` items exist as a decision list the operator can rule on in one sitting — each classified *superseded* (naming the evidence), *live decision* (one line), or *carries an unfixed finding* — and every item in that last class is **verified to be held by a durable register, planting one where it is not** (REG-03).
 
-**Plans**: TBD
+**Plans**: 4 plans, all SERIAL (waves 1→2→3→4)
+
+Plans:
+- [ ] 251-01-PLAN.md — build `scripts/check-seeds-register.cjs`, the executable sweep, and drive D-04's four arms + the count assertion RED via a committed `--self-test` before the register is touched
+- [ ] 251-02-PLAN.md — migrate all 283 seeds onto the D-09/D-10/D-16 frontmatter contract with every BODY proven md5-identical over raw Buffers, and write the contract down in TEMPLATE.md, plant-seed.md and CLAUDE.md
+- [ ] 251-03-PLAN.md — renumber the 8 duplicate-id movers to 277-284 by the D-07/D-20 date rule and leave a disambiguating redirect stub at each old id, touching no product file and no archive
+- [ ] 251-04-PLAN.md — wire the sweep into `discuss-phase` and `new-milestone` where the steps actually are, age the operator queue at every session start, and hand the operator a 5-item decision list
+
+⚠ **No honest parallelism exists in this phase and that is stated rather than hidden.** Three of the
+four plans operate on `.planning/seeds/` and the fourth validates the other three: plan 01's RED arms
+plant defects into the same directory plan 02 bulk-rewrites and plan 03 renames, and plan 04's wiring
+invokes plan 01's gate against plan 02's and plan 03's output. `use_worktrees: true` does not create
+parallelism here; a wave boundary that looks parallel and is not is this project's recorded failure.
+
 **Flags**: ⛔ **Claude may NOT close bus items** — `REG-03`'s deliverable is a **list the operator rules on**, and an item closed without the operator seeing it is a decision taken by the wrong party. The 2026-09-06 sweep found **two findings held only by a bus item**, which is exactly why the third classification arm exists. · ⚠ **`REG-02`'s new sweep must be DRIVEN RED against a planted defect before it is trusted.** A guard nobody has seen fire is not a guard — and this project has measured that twice in one phase: Phase 242 found `check-hot-file-ledger.cjs` exiting `0` over **zero parsed files** on a CRLF plan, and a pinned a11y suite that was red in **neither** knob. · ⚠ **`status:` frontmatter IS the index** — prose inside a seed body saying *"still open"* is invisible to any scan, so `REG-01`'s de-duplication must preserve and correct the **frontmatter**, not only the filenames. · **The cost of not doing this is measured, not theoretical:** `SEED-172` sat reachable for **four weeks** and it took a person hitting the wall to surface it. · No G-2, no SC#10, no migration, no product-surface G-5 rows.
 
 ### Coverage
@@ -227,7 +240,7 @@ with it in the phase STATUS.
 | 248. The Credential Boundary | 0/? | Not started (⚠ threat model mandatory) | - |
 | 249. The Model You Actually Run | 0/? | Not started (⚠ `MODEL-09` re-measurement owed) | - |
 | 250. Run Honesty — the residue | 3/3 | ✅ **CLOSED 2026-09-15** — built + self-verified by claude alone (operator instruction). ⚠ `HONEST-04`'s blocking measurement WAS taken first and the report's dichotomy was FALSE (both arms true, of different rows). ⛔ `independent_review: owed` | HONEST-01..04 |
-| 251. Register Integrity | 0/? | Not started | - |
+| 251. Register Integrity | 0/4 | Planned 2026-09-16 — 4 serial plans (G-8 target met) | - |
 
 **4 / 5 phases complete · 14 / 26 requirements delivered** (247, 248, 249, 250 closed; 251 remains).
 
