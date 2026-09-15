@@ -122,6 +122,87 @@ def test_1_2_the_last_user_question_is_never_evicted():
     )
 
 
+def _dominant_payload_history(turns: int = 6, payload_chars: int = 200_000) -> list[dict]:
+    """The shape `_bug_shaped_history` structurally EXCLUDES: ONE dominant payload.
+
+    ⚠ CR-01. `_bug_shaped_history` spreads its bulk over MANY medium tool results
+    (`chunk_chars=4000/6000`), so the overflow is always caused by groups the protected
+    tail does not hold. That is why every §1 fence passed while the floor was broken.
+
+    Here the single 200 KB payload sits in the NEWEST group — the one `protect_tail`
+    keeps — so PASS 1-3 can empty everything they are allowed to touch and the context
+    STILL overflows. That is what drives PASS 4's last-resort arm, and that arm is
+    reached by no other test in this file.
+    """
+    msgs: list[dict] = [_sys("You are a helpful agent.")]
+    for i in range(turns):
+        msgs.append(_user(f"QUESTION-{i}: what does the policy say about clause {i}?"))
+        msgs.append(_assistant(f"Clause {i} says ..."))
+    msgs.append(_user("FINAL QUESTION: summarise every clause for the board."))
+    msgs.append(_assistant_tc([_tc("call-final")]))
+    msgs.append(_tool("call-final", "DOCUMENT " + ("x" * payload_chars)))
+    return msgs
+
+
+@pytest.mark.parametrize("max_tokens", [6_000, 12_000, 20_000])
+def test_1_2b_one_oversized_tool_result_does_not_evict_the_question_it_produced(
+    max_tokens: int,
+):
+    """CR-01 — the floor must hold when the OVERSIZED group is the protected one.
+
+    The docstring scopes the give-up arm to *"the question ALONE exceeds the entire
+    budget"*. This question is 52 characters against a 20,000-token budget, so that
+    escape hatch does not apply: the 200 KB tool result is what overflows, and a tool
+    result is re-derivable by re-running the tool while the question is not.
+
+    ⛔ Before the fix this returned `[system, trim_marker]` at all three budgets —
+    every question gone, INCLUDING the newest, while the payload that caused the
+    overflow was the thing the tail protected.
+    """
+    msgs = _dominant_payload_history()
+    newest_question = _user_contents(msgs)[-1]
+
+    out = trim_messages_to_fit(msgs, max_tokens=max_tokens, reserve_recent=10)
+
+    assert newest_question in _user_contents(out), (
+        f"CR-01: at budget {max_tokens} the newest user question was evicted to keep a "
+        "tool result that is re-derivable — the exact BUG-260906-01 inversion HONEST-01 "
+        "claims to have fixed"
+    )
+    assert estimate_messages_tokens(out) <= max_tokens, (
+        "D-078-02: the returned list must still fit"
+    )
+
+
+def test_1_2c_an_oversized_question_does_not_evict_the_models_final_reply():
+    """CR-01, the OTHER direction — the fence against over-correcting.
+
+    The obvious fix for `test_1_2b` is "prefer the protected group carrying no user
+    turn". It was driven, and it breaks `D-078-01`: it throws away a 13-character final
+    reply to keep the oversized user message that is the ACTUAL cause of the overflow.
+    `test_trim_protected_overrun_preserves_last_message` and `..._trims_inward` in
+    `test_context_window.py` both go red on it.
+
+    ⭐ This pair is the point: neither party to the last-resort arm is unconditionally
+    protected, so a fence for only one of them licenses breaking the other. The rule the
+    two fences agree on is *the group causing the overflow pays.*
+    """
+    msgs = [
+        _sys("You are a helpful agent."),
+        _user("OVERSIZED QUESTION: " + ("y" * 200_000)),
+    ]
+    final_reply = _assistant("Here is the short answer.")
+    msgs.append(final_reply)
+
+    out = trim_messages_to_fit(msgs, max_tokens=2_000, reserve_recent=10)
+
+    assert final_reply in out, (
+        "D-078-01: the model's own final turn must survive an oversized QUESTION — "
+        "HONEST-01's asymmetry orders eviction, it does not make user turns immortal"
+    )
+    assert estimate_messages_tokens(out) <= 2_000, "D-078-02: the list must still fit"
+
+
 def test_1_3_tool_pair_integrity_survives_the_new_order():
     """Invariant 2 — no orphaned tool result, and no assistant stripped of its results.
 

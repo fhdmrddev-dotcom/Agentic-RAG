@@ -433,8 +433,10 @@ def trim_messages_to_fit(
     # user msg" AND THE CODE DID NOT DO THAT. `len(protected) > 1` protects the last
     # MESSAGE, and because agent_loop re-trims at the top of EVERY iteration — after tool
     # results have been appended — that last message is a tool result, not a question. The
-    # floor is now enforced where it belongs: `_remove_oldest_evictable` never evicts the
-    # group holding the newest user turn, so the claim and the code finally agree.
+    # floor is now enforced where it belongs: passes 1-2 strip every other group in both
+    # sections before `_remove_oldest_evictable` will touch the newest-user group, and
+    # when only it and the last group remain the LARGER one pays (⚠ CR-01 — this pass used
+    # to give up the question FIRST, whatever its size; see that helper's docstring).
     # PASS 4 — last resort inside the protected tail (see _remove_oldest_evictable's
     # stated limitation: a question that alone exceeds the whole budget cannot be saved
     # by any ordering, and D-078-02 promises a list that fits rather than an exception).
@@ -606,8 +608,13 @@ def _remove_oldest_evictable(
         would simply stall the loop while the context still overflows. Order still
         prefers non-user groups.
       * ``True`` (the protected tail, after trimmable is exhausted) — this is where the
-        floor lives. **Neither the LAST group nor the group holding the NEWEST user turn
-        is ever evicted.** The last group keeps the model's own final turn (D-078-01);
+        floor lives. Passes 1-2 never touch either the last group or the group holding
+        the newest user turn, so **both outlast every other group in both sections.**
+        ⚠ Neither is protected UNCONDITIONALLY, and claiming that was CR-01: when only
+        those two are left and they still overflow, the LARGER of them goes, because
+        ``D-078-02`` promises a list that fits rather than an exception. That rule is
+        what keeps both floors — the question survives an oversized tool result, and the
+        model's final turn survives an oversized question (D-078-01);
         the newest-user group is the message the turn cannot proceed without, and is the
         floor the old comment claimed while the code protected only the last *message*.
 
@@ -622,12 +629,21 @@ def _remove_oldest_evictable(
     group rather than stranded.
 
     ⚠ **Stated limitation, not an oversight.** When the protected tail has shrunk to the
-    current question plus the model's last reply and the pair STILL overflows, the
-    question is given up — because at that point the question alone exceeds the entire
-    budget and no ordering can save it, while ``D-078-02`` promises a list that fits
-    rather than an exception. ``_TRIM_MARKER`` remains the honest signal in that case.
-    Every realistic ``BUG-260906-01`` shape has many more groups than that and never
-    reaches this arm.
+    newest user group ALONE and it still overflows, the question is given up — at that
+    point the question alone exceeds the entire budget and no ordering can save it, while
+    ``D-078-02`` promises a list that fits rather than an exception. ``_TRIM_MARKER``
+    remains the honest signal in that case.
+
+    ⚠ **CR-01 — this limitation used to be much wider than the sentence above admitted,
+    and the sentence is what hid it.** The give-up arm took ``keep[0]``, the newest user
+    turn, so it fired whenever the PROTECTED TAIL held the oversized group — not only
+    when the question itself was oversized. A 52-character question against a
+    20,000-token budget was evicted by one 200 KB tool result. The claim *"every
+    realistic shape never reaches this arm"* was false: the agent loop appends tool
+    results into exactly that position and re-trims every iteration, so it is the loop's
+    steady state. The arm now gives up the LARGER protected group — see the inline note,
+    which records why the obvious inverse (prefer the non-user group) breaks ``D-078-01``
+    and is not the fix either.
 
     Returns the number of messages removed. ``0`` means "nothing left that may go", which
     both callers already treat as their break condition — that is what guarantees the
@@ -650,9 +666,9 @@ def _remove_oldest_evictable(
             if _has_user(groups[gi]):
                 newest_user_gi = gi
                 break
-        # Order matters: these are tried in REVERSE as the last resort below, so the
-        # newest user turn is given up BEFORE the model's own trailing reply only when
-        # nothing else remains at all (see the docstring's last-resort note).
+        # This list is only ever consulted by the last-resort arm below, which picks a
+        # NON-USER entry before any user one — so the order entries are appended in does
+        # not decide who is given up first (it did until CR-01, and it was wrong).
         if newest_user_gi is not None:
             keep.append(newest_user_gi)
         if (len(groups) - 1) not in keep:
@@ -670,13 +686,37 @@ def _remove_oldest_evictable(
             if gi not in keep:
                 target = gi
                 break
-    # 3 — last resort: only the protected pair is left and it still does not fit, so a
-    # protected group must go after all (D-078-02 — this function ALWAYS returns a list
-    # that fits, it never raises). The newest user turn goes first, because by this point
-    # that turn ALONE exceeds the whole budget: keeping it would hand the provider a
-    # request it rejects, while `_TRIM_MARKER` still tells the model context was lost.
+    # 3 — last resort: only the protected groups are left and they still do not fit, so
+    # a protected group must go after all (D-078-02 — this function ALWAYS returns a list
+    # that fits, it never raises). `keep` holds at most two groups here: the newest user
+    # turn and the last group.
+    #
+    # ⚠ CR-01 — GIVE UP THE BIGGEST ONE, and neither "user first" nor "non-user first"
+    # is the right rule. Both were driven and both break a floor:
+    #
+    #   * `keep[0]` (the newest user turn — what shipped) evicts a 52-character question
+    #     to keep a 200 KB tool result sitting in the last group, then re-enters and eats
+    #     the rest. Measured at a 20,000-token budget: `[system, trim_marker]`. That is
+    #     the `BUG-260906-01` inversion this phase exists to remove.
+    #   * The obvious inverse — prefer the non-user group — breaks `D-078-01` instead:
+    #     `test_trim_protected_overrun_preserves_last_message` and `..._trims_inward` both
+    #     go red, because it throws away a 13-character `"Recent reply."` to keep the
+    #     1300-character user message that is the ACTUAL cause of the overflow.
+    #
+    # The floor was never "the question always wins" or "the last message always wins" —
+    # it is that the group CAUSING the overflow is the one that should pay for it. Taking
+    # the largest group is also what stops the cascade: one removal is far more likely to
+    # suffice, so the `while` loop does not re-enter and strip the tail down to nothing.
+    # Ties go to the group carrying no user turn, because a tool result is re-derivable by
+    # re-running the tool and a question is not (HONEST-01's asymmetry, as the tiebreak).
     if target is None and allow_user and keep:
-        target = keep[0]
+        target = max(
+            keep,
+            key=lambda gi: (
+                estimate_messages_tokens(groups[gi]),
+                _has_user(groups[gi]) is False,
+            ),
+        )
     if target is None:
         return 0
 
