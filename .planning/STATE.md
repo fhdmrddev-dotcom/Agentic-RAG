@@ -4,12 +4,12 @@ milestone: v4.2
 milestone_name: The Connected Knowledge You Can Actually Run
 status: executing
 last_updated: "2026-09-16T12:00:00.000Z"
-last_activity: 2026-09-16 -- Phase 251 plan 02 executed (284 seeds migrated to the frontmatter contract; 284 bodies proven byte-identical)
+last_activity: 2026-09-16 -- Phase 251 plan 03 executed (8 duplicate ids resolved to 277-284 + 8 redirect stubs; the seeds register reads green for the first time)
 progress:
   total_phases: 12
   completed_phases: 1
   total_plans: 19
-  completed_plans: 8
+  completed_plans: 9
   percent: 8
 ---
 
@@ -108,17 +108,45 @@ owed work at all.
 
 ## Current Position
 
-Phase: **251 — Register Integrity** (the last phase of v4.2). Plans **251-01** at `b38bd8444` and
-**251-02 SHIPPED** at `eff1afa7e` (summary `b03c66441`).
-Plan: 251-01 (the gate) + 251-02 (the migration) done · **251-03 / 04 owed**, strictly serial —
-03 renumbers the 8 duplicate ids, 04 wires the sweep into the two GSD touchpoints.
-Status: Ready to execute 251-03
+Phase: **251 — Register Integrity** (the last phase of v4.2). Plans **251-01** at `b38bd8444`,
+**251-02** at `eff1afa7e`, and **251-03 SHIPPED** at `78c8cf010` (summary `f5125638b`).
+Plan: 251-01 (the gate) + 251-02 (the migration) + 251-03 (the renumber) done · **251-04 owed** —
+it wires the sweep into the two GSD touchpoints.
+Status: Ready to execute 251-04
 
-⛔ **Gate reading after 251-02 — this is what 03 is measured against, and it is deliberately not
-green:** `register 284 · parsed 284 · skipped 0` · **8** `[duplicate-id]` · **0** `[no-frontmatter]` ·
-**0** `[missing-key]` · **0** `[unknown-status]` · **284/284** seeds carry all five required keys ·
-**15** carry `partial: true` · unswept **126 / 114** (two figures, never summed) · exit **1**.
-A green gate here would mean the gate had stopped seeing the 8 collisions.
+⭐ **THE REGISTER IS GREEN FOR THE FIRST TIME — verdict line verbatim, after 251-03:**
+```
+  register: 292 files · parsed: 292 · skipped: 0 · duplicate ids: 0
+  unswept:  134 carry no trigger_when at all · 114 carry prose but no structured trigger
+seeds register gate OK — 292/292 parsed, 0 duplicate ids, 292/292 carry all 5 required keys.
+```
+exit **0** · `--self-test 6/6 arms PASS`. ⚠ **`134` is up from `126` by exactly the eight stubs, and
+that is CORRECT** — a stub carries `trigger_when: unset`, which the gate counts as no trigger.
+Reporting `126` would mean it had stopped counting eight real files.
+
+**251-03's result:** 8 movers renumbered to **277-284** (`022→277 · 092→278 · 228→279 · 229→280 ·
+231→281 · 253→282 · 259→283 · 269→284`), 8 redirect stubs at the original ids, and **37 live
+citations rewritten across 18 files, each decided by READING the hit** — 55 more left byte-unchanged
+because they mean the KEEPER. ⛔ `backend/`, `frontend/`, `scripts/` and `.planning/milestones/` are
+**byte-unchanged**, asserted.
+
+⛔ **FOUR ids are read from product code, not the one D-17 names.** `SEED-253` (discuss-phase),
+`SEED-229` + `SEED-231` (planning), and **`SEED-092` found AT EXECUTION** — its four references are
+a11y comments that spell out `SEED-092-remainder`, so a per-id ruling would have called all six
+"keeper" and left four pointing at the wrong seed forever. **91 occurrences across 35 files stay on a
+stub by decision; 54 of them mean a mover.** Every one is listed by file in
+`.planning/phases/251-register-integrity/251-RENUMBER-LEDGER.md` §3e.
+
+⛔ **FOUR moved files still titled themselves with the OLD id in their `# H1`** — the `SEED-068` bad
+precedent one field over. **The gate greps `seed_id`, never headings, so it read `duplicate ids: 0`
+throughout and was structurally incapable of catching it.** A renumber must check the BODY.
+
+⛔ **A FINDING IN THE SHIPPED GATE, DRIVEN AND NOT FIXED — owed to 251-04.**
+`duplicateGroups()` reads `if (stubs.length === 1) continue;`, a COUNT on the stubs rather than a
+shape check on the group, so a **keeper + squatter + stub** trio is waved through as resolved while
+carrying a live collision. Measured on a fixture (arm D). The fix is
+`members.length === 2 && stubs.length === 1` plus a self-test arm; it edits `scripts/`, which 251-03
+forbids. ⚠ **The next free seed id is `286`** — 277-284 are now taken and 285 already was.
 
 ⭐ **284/284 BODIES PROVEN BYTE-IDENTICAL by a digest set derived independently of the migration**
 (a byte scan, not the migration's regex reader), diffed both directions, empty both ways. ⛔ Not by

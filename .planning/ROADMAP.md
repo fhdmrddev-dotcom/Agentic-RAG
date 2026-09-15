@@ -215,7 +215,7 @@ Plans:
 
 ⛔ **251-02 MEASURED 251-03's id space and it has ZERO headroom:** 276 distinct ids, **highest is 285**, so `277-284` are free — **exactly eight, for eight renumbers**. A ninth must jump to **286**; the run is not contiguous. ⚠ `SEED-285` is TAKEN. And the `status: superseded-id` carve-out is live and exercised (gate arm 1b), so the eight stubs will read as resolutions rather than as eight new regressions.
 
-- [ ] 251-03-PLAN.md — renumber the 8 duplicate-id movers to 277-284 by the D-07/D-20 date rule and leave a disambiguating redirect stub at each old id, touching no product file and no archive
+- [x] 251-03-PLAN.md — renumber the 8 duplicate-id movers to 277-284 by the D-07/D-20 date rule and leave a disambiguating redirect stub at each old id, touching no product file and no archive
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
@@ -258,7 +258,7 @@ with it in the phase STATUS.
 | 248. The Credential Boundary | 0/? | Not started (⚠ threat model mandatory) | - |
 | 249. The Model You Actually Run | 0/? | Not started (⚠ `MODEL-09` re-measurement owed) | - |
 | 250. Run Honesty — the residue | 3/3 | ✅ **CLOSED 2026-09-15** — built + self-verified by claude alone (operator instruction). ⚠ `HONEST-04`'s blocking measurement WAS taken first and the report's dichotomy was FALSE (both arms true, of different rows). ⛔ `independent_review: owed` | HONEST-01..04 |
-| 251. Register Integrity | 2/4 | 251-01 + **251-02** shipped 2026-09-16. The register now carries the contract: `[missing-key]` **396 → 0**, `[unknown-status]` **27 → 0**, `[no-frontmatter]` **5 → 0**, **284/284** seeds carry all five required keys (was 73), 15 carry `partial: true`. ⭐ **284/284 bodies proven byte-identical by a digest set derived INDEPENDENTLY of the migration** — ⛔ not by a git-side content comparison, which was measured blind over 553 destroyed bytes. `[duplicate-id]` stays **8** and the gate still exits **1** — that is 251-03's work, and a green gate here would mean the gate had stopped seeing them. ⚠ **REG-01/REG-02 deliberately NOT ticked**: REG-01 is the renumber (03), REG-02's deliverable is the WIRING (D-03, plan 04). | REG-02 (instrument + contract) |
+| 251. Register Integrity | 3/4 | 251-01 + 251-02 + **251-03** shipped 2026-09-16. ⭐ **THE REGISTER IS GREEN FOR THE FIRST TIME** — `register: 292 · parsed: 292 · skipped: 0 · duplicate ids: 0`, `292/292 carry all 5 required keys`, exit **0**, `--self-test 6/6 PASS`. 8 movers at **277-284**, 8 redirect stubs, **37 live citations rewritten across 18 files each decided by READING** and 55 left byte-unchanged because they mean the KEEPER. ⚠ `134` unswept is up from `126` by exactly the 8 stubs and is CORRECT. ⛔ **FOUR ids are read from product code, not the one D-17 names** — `SEED-092` was found AT EXECUTION; 91 occurrences across 35 files stay on a stub by decision, listed by file in `251-RENUMBER-LEDGER.md`. ⛔ **FOUR moved files still titled themselves with the OLD id in their H1** — the gate greps `seed_id`, never headings, so it was green throughout. ⛔ **A FINDING IN THE SHIPPED GATE, driven and OWED TO 04:** the carve-out is `stubs.length === 1`, a COUNT not a shape check, so keeper+squatter+stub reads as resolved. ⚠ **REG-02 still NOT ticked** — its deliverable is the WIRING (plan 04). | REG-01 ✅, REG-02 (instrument + contract) |
 
 **4 / 5 phases complete · 14 / 26 requirements delivered** (247, 248, 249, 250 closed; 251 remains).
 

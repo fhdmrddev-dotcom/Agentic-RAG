@@ -145,9 +145,12 @@ defects standing between "it shipped" and "you can rely on it".
 
 ⚠ This is the recurring defect of the last two milestones, named in both closes and fixed in neither.
 
-- [ ] **REG-01**: No two seeds share an id. **8 duplicates exist** — `022, 092, 228, 229, 231, 253,
+- [x] **REG-01**: No two seeds share an id. ~~**8 duplicates exist** — `022, 092, 228, 229, 231, 253,
       259, 269` — so a reference by id cannot be resolved, and `status:` frontmatter **is** the
-      register index.
+      register index.~~ ⭐ **RESOLVED 2026-09-16 (251-03)** — the original is struck through rather
+      than deleted. All eight movers renumbered to `277-284` by the D-07/D-20 date rule; a
+      `status: superseded-id` redirect stub stands at each original id naming BOTH resolutions.
+      Gate: `register 292 · parsed 292 · skipped 0 · duplicate ids 0`, exit **0**.
 - [ ] **REG-02**: The seeds register is swept by something **executable**. ⚠ CLAUDE.md's rule says
       `/gsd:new-milestone` reads every `trigger_when`; at **161 planted seeds of 280** that sweep is a
       phase of work, not a step in a command — and `grep -rln "SEED" .claude/commands/gsd/` returns
@@ -277,7 +280,7 @@ milestone-wide standing gate. Coverage 26/26 — no orphans, no duplicates.**
 | HONEST-02 | Phase 250 — Run Honesty | ✅ Complete (4-arm taxonomy + honest `reason not captured`; never-reset reasoning counter) |
 | HONEST-03 | Phase 250 — Run Honesty | ✅ Complete (gate admits every TRUE terminal status + panel reads run state, so 53 legacy rows are honest with NO backfill) |
 | HONEST-04 | Phase 250 — Run Honesty | ✅ Complete — **the blocking measurement was TAKEN** (`250-MEASUREMENT.md`): marker PRESENT on the newest rows ⇒ the COPY arm, and the report's dichotomy was FALSE (both arms true of different rows). `NOT TICKED` badge; ⛔ nothing auto-completed |
-| REG-01 | Phase 251 — Register Integrity | Pending |
+| REG-01 | Phase 251 — Register Integrity | ✅ Complete (251-03) — 8 movers renumbered to 277-284 by the D-07/D-20 date rule, 8 `status: superseded-id` redirect stubs at the original ids naming BOTH resolutions. Gate: `register 292 · parsed 292 · duplicate ids 0`, exit 0. ⛔ 91 product-source references across 35 files deliberately left on a stub under D-17, listed by file in `251-RENUMBER-LEDGER.md` |
 | REG-02 | Phase 251 — Register Integrity | Pending |
 | REG-03 | Phase 251 — Register Integrity | Pending (⛔ Claude may not close bus items — deliverable is a list the operator rules on) |
 | DEBT-06 | **Milestone-wide standing gate** (no phase) | Pending — discharged alongside the build: 238 / 240 / 241 beside 247-248, 242-246 beside 249-251, and each v4.2 phase reviewed at its own close. ⛔ Re-arming `OV-SOLO-01` retro-reviews nothing |
