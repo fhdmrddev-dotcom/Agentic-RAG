@@ -237,6 +237,64 @@ def test_1_3_tool_pair_integrity_survives_the_new_order():
                 )
 
 
+def _split_group_history(turns: int = 6, chunk_chars: int = 3_000) -> list[dict]:
+    """A history whose NEWEST atomic group is `assistant(2 tool_calls) + tool + tool`.
+
+    ⚠ CR-02. `protected = rest[-reserve_recent:]` is a RAW INDEX slice, not a group-aware
+    one, so a small `reserve_recent` cuts straight through this group and leaves headless
+    tool results at the head of the protected tail.
+    """
+    msgs: list[dict] = [_sys("You are a helpful agent.")]
+    for i in range(turns):
+        msgs.append(_user(f"QUESTION-{i}: what does the policy say about clause {i}?"))
+        msgs.append(_assistant(f"Clause {i} says ..."))
+    msgs.append(_user("Final question about the docs?"))
+    msgs.append(_assistant_tc([_tc("z1"), _tc("z2")]))
+    msgs.append(_tool("z1", "CHUNK A " + ("a" * chunk_chars)))
+    msgs.append(_tool("z2", "CHUNK B " + ("b" * chunk_chars)))
+    return msgs
+
+
+def _orphan_tool_ids(msgs: list[dict]) -> list[str]:
+    """tool_call_ids answered by no PRECEDING assistant — what a provider 400s on."""
+    live: set[str] = set()
+    orphans: list[str] = []
+    for m in msgs:
+        if m.get("role") == "assistant" and m.get("tool_calls"):
+            live |= {c.get("id") for c in m["tool_calls"] if c.get("id")}
+        if m.get("role") == "tool" and m.get("tool_call_id") not in live:
+            orphans.append(m.get("tool_call_id"))
+    return orphans
+
+
+@pytest.mark.parametrize("reserve_recent", [1, 2, 3, 4])
+@pytest.mark.parametrize("max_tokens", [1_500, 3_500, 7_000, 12_000])
+def test_1_3b_no_orphan_tool_message_ever_reaches_the_provider(
+    reserve_recent: int, max_tokens: int
+):
+    """CR-02 — a headless `tool` message is a hard 400, not a degraded answer.
+
+    OpenAI: *"messages with role 'tool' must be a response to a preceding message with
+    'tool_calls'"*. Anthropic rejects an unmatched `tool_result` block the same way. So
+    this is the whole run dying, not context quietly shrinking.
+
+    ⛔ `test_1_3` claims this invariant and cannot see it: it drives `turns=8,
+    reserve_recent=10`, a shape where the boundary happens to resolve before returning.
+    This sweep picks `reserve_recent` values that SPLIT the newest atomic group, which is
+    the only way the raw index slice strands a child.
+
+    Measured before the fix: `rr=1 b=1500 ORPHANS=['z2']` and `rr=2 b=1500 ORPHANS=['z2']`.
+    """
+    out = trim_messages_to_fit(
+        _split_group_history(), max_tokens=max_tokens, reserve_recent=reserve_recent
+    )
+
+    assert _orphan_tool_ids(out) == [], (
+        f"CR-02: rr={reserve_recent} budget={max_tokens} returned a tool message with no "
+        f"preceding tool_calls — roles={[m.get('role') for m in out]}"
+    )
+
+
 def test_1_4_trim_is_a_noop_when_everything_fits():
     """D-14 — Deep Mode byte-identical. The fast path is untouched."""
     msgs = _bug_shaped_history(turns=2, chunk_chars=50)

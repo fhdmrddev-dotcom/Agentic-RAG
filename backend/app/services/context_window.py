@@ -445,7 +445,48 @@ def trim_messages_to_fit(
             break
         trimmed_any = True
 
-    return _build_candidate(system_msg, trimmable, protected, trimmed_any, pinned_msgs)
+    return _drop_orphan_tool_messages(
+        _build_candidate(system_msg, trimmable, protected, trimmed_any, pinned_msgs)
+    )
+
+
+def _drop_orphan_tool_messages(msgs: list[dict]) -> list[dict]:
+    """Phase 250 CR-02 — drop `tool` messages no preceding assistant asked for.
+
+    This is the BELT to the `keep` rule's braces, and it is deliberately redundant. The
+    group partition, the raw `reserve_recent` index slice and four eviction passes all
+    have to agree for the output to be valid; this function makes the INVALID SHAPE
+    unrepresentable at the exit instead of trusting that agreement.
+
+    ⛔ The cost of being wrong here is not a degraded answer — it is the run dying.
+    OpenAI: *"messages with role 'tool' must be a response to a preceding message with
+    'tool_calls'"*; Anthropic rejects an unmatched `tool_result` block the same way.
+
+    Order is load-bearing: `live` is filled as the list is walked, so a tool result is
+    kept only when its parent has ALREADY been seen. A tool message that precedes its own
+    assistant is as invalid to a provider as one with no assistant at all.
+
+    ⭐ **THIS IS THE WHOLE FIX, AND THE REVIEW'S OTHER HALF WAS MEASURED INERT.** CR-02
+    proposed a second guard — never `keep` a last group that is a headless `tool` — on the
+    diagnosis that `keep` was protecting the orphan *for being last*. Driven: with the
+    sanitiser removed from both arms, that guard changed **0 of 3024** outputs across the
+    shape sweep (turns × children × payload size × trailing reply × `reserve_recent` 0-8 ×
+    seven budgets). It cannot fire, because what actually strands the orphan is the
+    `while len(protected) > 1` guard on PASSES 2 and 4: once the orphan is the ONLY
+    message left in the tail those loops never run, so `_remove_oldest_evictable` is never
+    called and what `keep` holds is irrelevant. It was therefore NOT shipped — a guard
+    nobody has seen fire is not a guard, and an inert one invites the next reader to trust
+    a mechanism that does nothing.
+    """
+    live: set = set()
+    out: list[dict] = []
+    for m in msgs:
+        if m.get("role") == "assistant" and m.get("tool_calls"):
+            live |= {tc.get("id") for tc in m["tool_calls"] if tc.get("id")}
+        if m.get("role") == "tool" and m.get("tool_call_id") not in live:
+            continue  # headless — its parent was trimmed away
+        out.append(m)
+    return out
 
 
 def _atomic_groups(rest: list[dict]) -> list[list[dict]]:
