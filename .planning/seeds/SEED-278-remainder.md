@@ -1,5 +1,5 @@
 ---
-seed_id: SEED-092
+seed_id: SEED-278
 parent_seed: SEED-092
 title: App-wide WCAG 2.1 AA — the exhaustive remainder left after the Phase 155 net-new + worst-offender sweep
 status: planted
@@ -25,6 +25,13 @@ migration_note: |
   the `seed_id:` key was normalised to `seed_id: SEED-092` (D-09 — the FILENAME is what a
   reference resolves against). Its original line(s), verbatim:
   seed_id: SEED-092-remainder
+renumbered_from: SEED-092
+renumbered_because: >
+  D-07/D-20: the OLDEST seed keeps the id, by the `created`-else-`planted` date. This file reads
+  `planted: 2026-07-16`; `SEED-092-app-wide-wcag-aa-contrast-and-icon-button-labels.md` reads
+  `planted: 2026-06-20` and is 26 days older, so it keeps id 092 and this seed moved to 278. No
+  tie-break was needed and git was not consulted. ⛔ Not chosen by reference weight — D-07 rejects
+  that rule by name.
 ---
 
 # SEED-092-remainder — the exhaustive WCAG 2.1 AA audit deferred by Phase 155

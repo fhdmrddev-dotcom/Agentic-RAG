@@ -1,5 +1,5 @@
 ---
-seed_id: SEED-229
+seed_id: SEED-280
 title: Five suites run by the count gate and guarded by nothing
 status: planted
 surface: Agentic-RAG
@@ -9,6 +9,15 @@ trigger_when: "The next phase that edits vitest-count-gate.cjs, or the next time
 trigger_paths:
   - "**/vitest-count-gate.cjs"
 planted: 2026-08-31
+renumbered_from: SEED-229
+renumbered_because: >
+  D-07/D-20: the OLDEST seed keeps the id, by the `created`-else-`planted` date. This file reads
+  `planted: 2026-08-31`; `SEED-229-does-the-golden-run-hang-on-an-armed-approval-checkpoint.md`
+  reads `planted: 2026-08-28` and is 3 days older, so it keeps id 229 and this seed moved to 280.
+  ⚠ The FRONTMATTER date is authoritative: git records this file as ADDED 2026-09-01 00:40:34
+  +0400, a day after its own `planted:` line, and that disagreement does not flip the verdict. ⛔
+  Not chosen by reference weight — D-07 rejects that rule by name, and every live
+  `scripts/vitest-count-gate.cjs` reference to `SEED-229` means THIS seed.
 ---
 
 ## The measured list

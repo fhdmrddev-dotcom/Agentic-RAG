@@ -1,5 +1,5 @@
 ---
-seed_id: SEED-022
+seed_id: SEED-277
 title: Timeout settings UI with tier presets
 status: planted
 planted: 2026-05-25
@@ -13,6 +13,14 @@ re_open_trigger: |
 target_milestone: Settings-overhaul (v3.x)
 surface: Agentic-RAG
 trigger_when: unset
+renumbered_from: SEED-022
+renumbered_because: >
+  D-07/D-20: the OLDEST seed keeps the id, by the `created`-else-`planted` date. This file reads
+  `planted: 2026-05-25`; `SEED-022-camelot-pdf-table-precision-audit.md` reads `planted:
+  2026-05-16` and is 9 days older, so it keeps id 022 and this seed moved to 277. ⚠ The
+  FRONTMATTER date is authoritative: git records this file as ADDED 2026-05-24, a day before its
+  own `planted:` line, and that disagreement does not flip the verdict. ⛔ Not chosen by reference
+  weight — D-07 rejects that rule by name.
 ---
 
 # SEED-022 — Timeout Settings UI with Tier Presets

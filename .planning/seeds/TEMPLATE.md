@@ -12,8 +12,8 @@ trigger_surfaces: []              # controlled enum, see the vocabulary below. �
 migration_note:                   # the verbatim original line of any key a migration DISPLACED — a pre-existing `id:`, or a `surface:` that was not `Agentic-RAG`
 relates_to: []                    # files, phases or other seeds this touches
 folded_into: null                 # phase number when the seed is claimed by one (e.g. "251")
-renumbered_from: null             # D-05, redirect stubs only — the id this file used to claim
-renumbered_because: null          # D-05, redirect stubs only — why it moved
+renumbered_from: null             # D-05 — on a RENUMBERED seed: the id this file used to claim. On its REDIRECT STUB: the id something was renumbered away from, i.e. this file's own
+renumbered_because: null          # D-05 — why it moved. ⛔ Cite the `created`-else-`planted` DATE (D-07/D-20), never reference weight — D-07 rejects "most-referenced keeps it" by name
 ---
 
 # SEED-NNN: [Title]

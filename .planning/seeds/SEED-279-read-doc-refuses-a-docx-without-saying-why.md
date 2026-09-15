@@ -1,5 +1,5 @@
 ---
-seed_id: SEED-228
+seed_id: SEED-279
 title: read_doc on a .docx id returns a bare FAILED_PRECONDITION
 status: planted
 surface: Agentic-RAG
@@ -8,6 +8,14 @@ relates_to:
   - backend/app/services/connectors/service_tools.py
 trigger_when: "The next phase that touches the Google read tools, or the first report of a model looping on read_doc."
 planted: 2026-08-31
+renumbered_from: SEED-228
+renumbered_because: >
+  D-07/D-20: the OLDEST seed keeps the id, by the `created`-else-`planted` date. This file reads
+  `planted: 2026-08-31`; `SEED-228-a-workflow-cannot-say-the-whole-library-on-purpose.md` reads
+  `planted: 2026-08-28` and is 3 days older, so it keeps id 228 and this seed moved to 279. ⚠ The
+  FRONTMATTER date is authoritative: git records this file as ADDED 2026-09-01 00:40:34 +0400, a
+  day after its own `planted:` line, and that disagreement does not flip the verdict. ⛔ Not chosen
+  by reference weight — D-07 rejects that rule by name.
 ---
 
 ## What was measured

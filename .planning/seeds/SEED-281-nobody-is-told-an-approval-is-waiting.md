@@ -1,5 +1,5 @@
 ---
-seed_id: SEED-231
+seed_id: SEED-281
 title: Nobody is told an approval is waiting — an unattended run pauses for a person who is never notified, and this is the collection point for every notification need
 status: planted
 planted: 2026-08-29
@@ -51,6 +51,17 @@ deferred_options:
       the likeliest cause). Two INDEPENDENT triggers, so the deferral cannot be orphaned by
       whichever arrives first.
 trigger_when: unset
+renumbered_from: SEED-231
+renumbered_because: >
+  D-07/D-20: the OLDEST seed keeps the id, by the `created`-else-`planted` date — and this pair
+  TIES on it. Both this file and
+  `SEED-231-decision-coverage-gate-is-blind-to-this-repo-decision-ids.md` read `planted:
+  2026-08-29`, so D-20's tie-break was consulted and PRINTED rather than applied silently: `git
+  log --diff-filter=A --date=iso` gives 2026-08-29 04:00:08 +0400 for the decision-coverage seed
+  and 2026-08-29 05:03:04 +0400 for this one — 62m 56s apart. The older add-commit keeps id 231;
+  this seed moved to 281. ⛔ Not chosen by reference weight — D-07 rejects that rule by name, and
+  the three `frontend/src/components/layout/attentionConditions.ts` references to `SEED-231` mean
+  THIS seed.
 ---
 
 # SEED-231 — the run stopped and asked, and there was nobody in the room

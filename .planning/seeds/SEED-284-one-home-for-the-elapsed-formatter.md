@@ -1,5 +1,5 @@
 ---
-seed_id: SEED-269
+seed_id: SEED-284
 title: Three file-local elapsed formatters now ship — one home is owed, and the third was accepted deliberately rather than overlooked
 created: 2026-09-11
 planted_during: Phase 243 (CHAT-01) — plan 243-04 task 3, at the moment the third one was written
@@ -30,6 +30,14 @@ trigger_paths:
   - "**/RunCard.tsx"
   - "**/ThinkingBlock.tsx"
   - "docs/HOT-FILE-LEDGER.md"
+renumbered_from: SEED-269
+renumbered_because: >
+  D-07/D-20: the OLDEST seed keeps the id, by the `created`-else-`planted` date. This file reads
+  `created: 2026-09-11`;
+  `SEED-269-explanations-are-noise-in-the-form-move-them-behind-an-info-affordance.md` reads
+  `created: 2026-09-10` and is a day older, so it keeps id 269 and this seed moved to 284. No
+  tie-break was needed and git was not consulted. ⛔ Not chosen by reference weight — D-07 rejects
+  that rule by name.
 ---
 
 # SEED-269 — one home for the elapsed formatter

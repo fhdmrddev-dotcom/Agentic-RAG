@@ -1,5 +1,5 @@
 ---
-seed_id: SEED-259
+seed_id: SEED-283
 title: A model's inter-tool narration repeated VERBATIM across turns — observed, never diagnosed, and now hidden by the fold rather than explained
 created: 2026-09-13
 planted_during: BUG-260912-01, at its close
@@ -17,6 +17,14 @@ trigger_when: >
   Anyone sees an assistant message repeat the same sentence across tool turns; OR the agent loop's
   message-assembly for tool-calling turns is touched; OR someone measures a self-hosted model's
   multi-turn coherence for SEED-173.
+renumbered_from: SEED-259
+renumbered_because: >
+  D-07/D-20: the OLDEST seed keeps the id, by the `created`-else-`planted` date. This file reads
+  `created: 2026-09-13`; `SEED-259-tool-names-are-rows-but-argument-shapes-are-not.md` reads
+  `created: 2026-09-08` and is 5 days older, so it keeps id 259 and this seed moved to 283. ⭐ That
+  is the harmless outcome: every product-source reference to `SEED-259`, including the test
+  FILENAME `backend/tests/unit/services/sources/test_259_argument_shapes_are_rows_too.py`, means
+  the keeper and stays correct. ⛔ Not chosen by reference weight — D-07 rejects that rule by name.
 ---
 
 # The observation

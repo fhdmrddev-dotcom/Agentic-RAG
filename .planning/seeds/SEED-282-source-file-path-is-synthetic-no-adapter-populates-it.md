@@ -1,5 +1,5 @@
 ---
-seed_id: SEED-253
+seed_id: SEED-282
 title: A watch rule can filter on `path`, but no adapter populates it — production always substitutes `/<filename>`, so folder-shaped path rules silently never match
 created: 2026-09-06
 planted_during: Phase 237 reviewer re-review (claude, REVIEWER — did not build this phase)
@@ -38,6 +38,19 @@ trigger_when: >
   (ii) a recursive / subfolder watch ships, making a Drive file's folder location meaningful
   rather than constant, or (iii) any user-reported bug of the shape "my path rule does nothing"
   on a DRIVE source.
+renumbered_from: SEED-253
+renumbered_because: >
+  D-07/D-20: the OLDEST seed keeps the id, by the `created`-else-`planted` date — and this pair
+  TIES on it. Both this file and `SEED-253-mobile-has-no-drawer-trigger-outside-the-chat-view.md`
+  read `created: 2026-09-06`, so D-20's tie-break was consulted and PRINTED rather than applied
+  silently: `git log --diff-filter=A --date=iso` gives 2026-09-06 08:36:22 +0400 for the
+  mobile-drawer seed and 2026-09-06 22:00:28 +0400 for this one — 13h 24m 06s apart. The older
+  add-commit keeps id 253; this seed moved to 282. ⛔ Not chosen by reference weight, although this
+  is the pair where that would have changed the answer: ~53 files reference SEED-253 and
+  essentially every live one means THIS seed, while the keeper is cited nowhere outside its own
+  file and the archives. Recorded as an observation beside the rule, never as a reason to depart
+  from it — D-07 rejects `most-referenced keeps it` by name. The 25+ `backend/`/`frontend/`
+  references are deliberately left on the `SEED-253` redirect stub under D-17.
 ---
 
 `Phase 237` made source facts first-class filterable fields and added `path` to both the
