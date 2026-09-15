@@ -314,6 +314,257 @@ function assertAccounting(reg, mode) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
+// THE CONTRACT — D-09's required keys and D-10/D-16's status enum
+//
+// ⚠ S-5 SAME-COMMIT SYNC RULE: these two lists and the enum comment in `.planning/seeds/TEMPLATE.md`
+//   are ONE PAIR. A value added here and not there means the next seed authored re-introduces the
+//   defect the backfill removed; a value added there and not here means the gate reds on a legal
+//   seed. Change both in the same commit, or change neither.
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+
+/** D-09. Ordered, because the remedy text reads in this order. */
+const REQUIRED_KEYS = ['seed_id', 'title', 'status', 'surface', 'trigger_when'];
+
+/**
+ * D-10 as amended by D-16. Ten values, closed.
+ * ⚠ The `partially-*` family is NOT here on purpose — D-16 rules that the qualifier rides on the
+ *   sibling boolean `partial:`, so `partially-folded` becomes `status: folded` + `partial: true`.
+ *   Widening the enum by four axes was the rejected alternative; mapping down onto `status_note`
+ *   alone was rejected because it makes `status: folded` silently include half-open seeds, which is
+ *   REG-02's own failure mode in a new costume.
+ * ⚠ `superseded-id` exists for D-05's redirect stubs and today matches zero files.
+ */
+const STATUS_ENUM = [
+  'planted', 'dormant', 'open', 'partially-answered', 'answered',
+  'folded', 'shipped', 'closed', 'deferred', 'superseded-id',
+];
+
+/** What a scan LOSES without each key — printed beside the code, never as a bare "missing". */
+const KEY_WHY = {
+  seed_id: 'no id in the frontmatter, so the file answers no id lookup and only its FILENAME indexes it',
+  title: 'no title, so a sweep can print the seed but cannot say what it is — the operator gets an id and nothing else',
+  status: '`status:` frontmatter IS the index. Without it this seed is invisible to EVERY status scan, at any count, forever',
+  surface: 'CLAUDE.md\'s documented sweep filters `surface: Agentic-RAG`; a seed without it is unreachable by the rule that is supposed to find it',
+  trigger_when: 'no trigger, so nothing says when to revive this idea — a deferral with no re-open is a deletion that looks like a decision',
+};
+
+/** `created` if present, ELSE `planted` (D-20) — `created` is absent on 185 of 284 files. */
+function seedDate(entry) {
+  if (entry.fm === null) return null;
+  return keyValue(entry.fm, 'created') || keyValue(entry.fm, 'planted') || null;
+}
+
+/**
+ * The git ADD-COMMIT timestamp — D-20's TIE-BREAK ONLY.
+ * ⚠ The frontmatter date is AUTHORITATIVE. Measured: git and frontmatter disagree on two pairs
+ *   (`SEED-022-timeout-settings-ui` reads 2026-05-25 and was added 2026-05-24; both 228/229 movers
+ *   read 2026-08-31 and were added 2026-09-01) without flipping any verdict. The script must not
+ *   pick silently, so this is consulted only when two members of a duplicate group carry the SAME
+ *   date, and the fact that it was consulted is printed.
+ * `--date=iso`, never `--date=short`: the two ties are 63 minutes and 13h 24m apart, and a
+ *   day-resolution date cannot separate either.
+ */
+function gitAddedAt(rel) {
+  const { spawnSync } = require('child_process');
+  const r = spawnSync(
+    'git',
+    ['log', '--diff-filter=A', '--format=%ad', '--date=iso', '-1', '--', rel],
+    { cwd: root, encoding: 'utf8' }
+  );
+  if (r.error || r.status !== 0) return null;
+  return String(r.stdout || '').trim().split('\n')[0] || null;
+}
+
+/** A YAML list key as an ARRAY (bullets), a plain scalar as a one-element array, `[]` when absent. */
+function readList(fm, key) {
+  const r = readKey(fm, key);
+  if (!r) return [];
+  if (r.shape === 'list') {
+    return r.value.split(';').map((s) => unquote(s)).filter(Boolean);
+  }
+  if (r.shape === 'plain') {
+    // `key: [a, b]` inline-flow, or a bare single value.
+    const inline = r.value.match(/^\[(.*)\]$/);
+    if (inline) return inline[1].split(',').map((s) => unquote(s)).filter(Boolean);
+    return r.value ? [r.value] : [];
+  }
+  return r.value ? [r.value] : [];
+}
+
+/**
+ * [duplicate-id] — D-08's gate half. Grouped by the id in the FILENAME, never by frontmatter:
+ * `SEED-068` carries `seed_id: SEED-068  # renumbered from SEED-063…` inside its own value, and at
+ * least one file's frontmatter id disagrees with its name. The filename is what a reference resolves
+ * against, so the filename is the authority.
+ *
+ * ⭐ A group is NOT a finding when exactly one member carries `status: superseded-id` — D-05's
+ *    redirect stub is a legitimate resolution, and without this carve-out Plan 03's output would
+ *    read as eight new regressions.
+ */
+function duplicateGroups(entries) {
+  const byId = new Map();
+  for (const e of entries) {
+    if (!byId.has(e.id)) byId.set(e.id, []);
+    byId.get(e.id).push(e);
+  }
+  const dups = [];
+  for (const [id, members] of [...byId.entries()].sort()) {
+    if (members.length < 2) continue;
+    const stubs = members.filter((m) => m.fm !== null && statusToken(m) === 'superseded-id');
+    if (stubs.length === 1) continue;    // resolved by a D-05 redirect stub
+    dups.push({ id, members, stubs: stubs.length });
+  }
+  return dups;
+}
+
+/** The status VALUE: the first whitespace-delimited token. `null` when the key is absent. */
+function statusToken(entry) {
+  if (entry.fm === null) return null;
+  const raw = keyValue(entry.fm, 'status');
+  if (!raw) return null;
+  const tok = raw.split(/\s+/)[0];
+  return tok || null;
+}
+
+/** Everything AFTER the status token — D-10's `status_note` payload. `''` when there is none. */
+function statusNote(entry) {
+  if (entry.fm === null) return '';
+  const r = readKey(entry.fm, 'status');
+  if (!r) return '';
+  const line = r.shape === 'plain' ? r.head : r.value;
+  const m = String(line).trim().match(/^\S+\s+([\s\S]*)$/);
+  return m ? m[1].trim() : '';
+}
+
+/**
+ * Every finding for one seed, as `[code, why]` tuples (the
+ * `check-verification-honesty.cjs:364-397` shape — a code is never printed without a reason).
+ */
+function findingsFor(entry) {
+  const out = [];
+  if (entry.fm === null) {
+    // ⛔ ONE code, not six. A file with no block at all is a different STATE from a file missing
+    //    keys, and burying it under five `[missing-key]` lines hides which state it is in.
+    out.push([
+      'no-frontmatter',
+      'no `---` fenced block starts at line 1, so `status:` — which IS the index — is invisible to every scan',
+    ]);
+    return out;
+  }
+  for (const key of REQUIRED_KEYS) {
+    if (!keyValue(entry.fm, key)) out.push(['missing-key', `\`${key}\` — ${KEY_WHY[key]}`]);
+  }
+  const tok = statusToken(entry);
+  if (tok !== null && !STATUS_ENUM.includes(tok)) {
+    // ⚠ CASE-SENSITIVE, and that is an EXPLICIT NON-RULE rather than an oversight: `DONE` and
+    //   `done` are BOTH findings. Case-folding would quietly bless two spellings of a token that is
+    //   not in the enum under either casing.
+    out.push([
+      'unknown-status',
+      `\`${tok}\` is outside the ${STATUS_ENUM.length}-value enum (${STATUS_ENUM.join(' | ')})`
+      + (statusNote(entry) ? ` — and it carries ${statusNote(entry).length} chars of prose after the token` : ''),
+    ]);
+  }
+  // D-16: `partial` is validated INDEPENDENTLY of `status`. An illegal status beside an illegal
+  // `partial` produces TWO findings — merging them would let one hide behind the other.
+  const partial = keyValue(entry.fm, 'partial');
+  if (partial && partial !== 'true' && partial !== 'false') {
+    out.push(['unknown-status', `\`partial: ${partial}\` — the D-16 qualifier is a boolean, and only the literals \`true\`/\`false\` are legal`]);
+  }
+  return out;
+}
+
+/**
+ * D-18's TWO figures. ⛔ They are never summed.
+ * `noTrigger` — seeds with no `trigger_when` at all.
+ * `proseOnly` — seeds that HAVE a `trigger_when` but no structured `trigger_paths` /
+ *               `trigger_surfaces` a sweep can match on.
+ * A gate reporting 126 while ~238 are unswept is the comfortable lie REG-02 exists to end.
+ */
+function unsweptCounts(entries) {
+  let noTrigger = 0;
+  let proseOnly = 0;
+  for (const e of entries) {
+    const prose = e.fm === null ? '' : keyValue(e.fm, 'trigger_when');
+    if (!prose || prose === 'unset') {
+      noTrigger++;
+      continue;
+    }
+    const paths = e.fm === null ? [] : readList(e.fm, 'trigger_paths');
+    const surfaces = e.fm === null ? [] : readList(e.fm, 'trigger_surfaces');
+    if (!paths.length && !surfaces.length) proseOnly++;
+  }
+  return { noTrigger, proseOnly };
+}
+
+// ⚠ `trigger_phase_touches` is NOT implemented, and this comment is the reason a later reader must
+//    not "restore" it: D-18 rules it out by measurement — the 31 seeds naming a phase number name it
+//    as HISTORY ("Phase 238 landed a Graph adapter"), not as a future trigger, and nothing declares
+//    phase touches for it to match against.
+
+/** A phase's blast radius: every `files_modified` entry of every `*-PLAN.md`, `/`-normalised. */
+function phaseBlastRadius(phaseArg) {
+  const candidates = [];
+  const live = path.join(root, '.planning', 'phases');
+  const archiveRoot = path.join(root, '.planning', 'milestones');
+  const dirMatches = (d) => new RegExp(`^${phaseArg.replace('.', '\\.')}(?:\\.\\d+)?-`).test(d);
+
+  if (fs.existsSync(live)) {
+    for (const d of fs.readdirSync(live)) if (dirMatches(d)) candidates.push(path.join(live, d));
+  }
+  if (!candidates.length && fs.existsSync(archiveRoot)) {
+    for (const m of fs.readdirSync(archiveRoot)) {
+      const sub = path.join(archiveRoot, m);
+      if (!fs.statSync(sub).isDirectory()) continue;
+      for (const d of fs.readdirSync(sub)) if (dirMatches(d)) candidates.push(path.join(sub, d));
+    }
+  }
+  if (!candidates.length) fail(`no phase directory matches "${phaseArg}" under .planning/phases/ or .planning/milestones/*/`);
+
+  const files = new Set();
+  const surfaces = new Set();
+  const plans = [];
+  for (const dir of candidates) {
+    for (const f of fs.readdirSync(dir)) {
+      if (!/-PLAN\.md$/.test(f)) continue;
+      plans.push(norm(path.relative(root, path.join(dir, f))));
+      const m = frontmatter(fs.readFileSync(path.join(dir, f)).toString('utf8'));
+      if (!m) continue;
+      for (const v of readList(m[1], 'files_modified')) files.add(norm(v));
+      for (const v of readList(m[1], 'surfaces')) surfaces.add(v);
+    }
+  }
+  return { dirs: candidates.map((d) => norm(path.relative(root, d))), plans, files: [...files], surfaces: [...surfaces] };
+}
+
+/**
+ * D-01's match. ⛔ BOTH SIDES NORMALISED to forward slashes: on Windows the glob read out of a seed
+ * and the path read out of a PLAN.md can differ only in separator, and a silent non-match is D-04
+ * arm 3 failing invisibly — which looks exactly like arm 4 passing.
+ * `path.matchesGlob` is a Node built-in (v24.19.0), so D-01 costs zero dependencies.
+ */
+function matchTriggers(entries, blast) {
+  const matched = [];
+  for (const e of entries) {
+    if (e.fm === null) continue;
+    const hits = [];
+    for (const glob of readList(e.fm, 'trigger_paths')) {
+      const g = norm(glob);
+      for (const f of blast.files) {
+        if (path.matchesGlob(norm(f), g)) hits.push({ kind: 'path', glob: g, target: norm(f) });
+      }
+    }
+    for (const s of readList(e.fm, 'trigger_surfaces')) {
+      if (blast.surfaces.includes(s)) hits.push({ kind: 'surface', glob: s, target: s });
+    }
+    if (hits.length) {
+      matched.push({ entry: e, hits, title: keyValue(e.fm, 'title'), status: statusToken(e) });
+    }
+  }
+  return matched;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────
 // CLI
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -336,10 +587,21 @@ function main() {
     mode = 'files';
   }
 
+  let phaseArg = null;
+  const phaseIdx = argv.indexOf('--phase');
+  if (phaseIdx !== -1) {
+    phaseArg = argv[phaseIdx + 1];
+    if (!phaseArg || phaseArg.startsWith('--')) fail('--phase takes a phase number, e.g. --phase 251');
+    if (mode === 'files') fail('--files and --phase are different modes; give one or the other');
+    mode = 'phase';
+  }
+
   const reg = readRegister(dir);
   // ⚠ Accounting is asserted on the WHOLE register, BEFORE any per-file filtering — otherwise the
   //   balance equation would be checked against a set the caller deliberately narrowed.
-  assertAccounting(reg, mode);
+  // ⚠ `--phase` reads the WHOLE register too, so it gets the full equality assertion — only
+  //   `--files` is carved out, because there one file is a legitimate resolution.
+  assertAccounting(reg, mode === 'files' ? 'files' : 'scan');
   if (mode === 'files') {
     const want = new Set(given.map((g) => path.basename(toRepoRel(g))));
     reg.entries = reg.entries.filter((e) => want.has(e.file));
@@ -348,38 +610,125 @@ function main() {
     }
   }
 
-  const noFm = reg.entries.filter((e) => e.fm === null);
   const skippedN = skippedTotal(reg.skipped);
+  const dups = duplicateGroups(reg.entries);
+  const unswept = unsweptCounts(reg.entries);
+  const results = reg.entries.map((e) => ({ entry: e, findings: findingsFor(e) }));
+  const violations = results.filter((r) => r.findings.length);
+  const fileFindings = violations.reduce((n, r) => n + r.findings.length, 0);
+  const complete = results.filter(
+    (r) => !r.findings.some(([c]) => c === 'missing-key' || c === 'no-frontmatter')
+  ).length;
 
   console.log(`\nseeds register — ${norm(path.relative(root, dir))}`);
   if (mode === 'files') {
     console.log(
       `  register: ${reg.registerSize} files · selected by --files: ${reg.entries.length} · `
-      + `skipped: ${skippedN} · no frontmatter: ${noFm.length}`
+      + `skipped: ${skippedN} · duplicate ids: ${dups.length}`
     );
     console.log('    ⚠ per-file mode: the count assertion does NOT apply here — one file is a legitimate resolution.');
   } else {
     console.log(
       `  register: ${reg.registerSize} files · parsed: ${reg.entries.length} · `
-      + `skipped: ${skippedN} · no frontmatter: ${noFm.length}`
+      + `skipped: ${skippedN} · duplicate ids: ${dups.length}`
     );
   }
+  // ⛔ D-18: TWO FIGURES, ON ONE LINE, NEVER SUMMED. A gate reporting only the first while the
+  //    second is larger is the comfortable lie REG-02 exists to end.
+  console.log(
+    `  unswept:  ${unswept.noTrigger} carry no trigger_when at all · `
+    + `${unswept.proseOnly} carry prose but no structured trigger`
+  );
   if (skippedN) {
     for (const [reason, files] of reg.skipped) {
       console.log(`    skipped[${reason}]: ${files.length} — ${files.join(', ')}`);
     }
   }
 
-  if (noFm.length) {
-    console.log(`\n${RED}SEEDS REGISTER GATE FAILS${RST} — ${noFm.length} file(s) with no frontmatter block:`);
-    for (const e of noFm) {
-      console.log(`  [no-frontmatter] ${e.rel}`);
-      console.log('      no `---` fenced block starts at line 1, so `status:` — which IS the index — is invisible to every scan');
+  if (mode === 'phase') {
+    const blast = phaseBlastRadius(phaseArg);
+    const matched = matchTriggers(reg.entries, blast);
+    console.log(
+      `\ntrigger sweep — phase ${phaseArg} (${blast.plans.length} plan file(s), `
+      + `${blast.files.length} path(s) in files_modified)`
+    );
+    if (!blast.surfaces.length) {
+      console.log('  ⚠ the phase declares NO surfaces, so `trigger_surfaces` matched nothing here.');
+      console.log('    That is a fact about the PHASE, not about the register — reported, never passed off as a clean sweep.');
     }
+    if (!matched.length) {
+      console.log(
+        `  0 seeds matched — of ${reg.entries.length} parsed, none carries a structured trigger `
+        + 'this blast radius satisfies.'
+      );
+    } else {
+      console.log(`  ${matched.length} seed(s) matched:`);
+      for (const m of matched) {
+        console.log(`  [trigger-fires] SEED-${m.entry.id} (status: ${m.status || '—'}) ${m.title || '(no title)'}`);
+        for (const h of m.hits) console.log(`      ${h.kind} "${h.glob}"  matched  "${h.target}"`);
+      }
+    }
+  }
+
+  if (dups.length) {
+    console.log(`\n${RED}SEEDS REGISTER GATE FAILS${RST} — ${dups.length} colliding id(s):`);
+    for (const d of dups) {
+      const dates = d.members.map((m) => seedDate(m));
+      const tie = dates.every((x) => x && x === dates[0]);
+      console.log(
+        `  [duplicate-id] SEED-${d.id} — ${d.members.length} files claim this id; `
+        + 'a reference to it resolves to more than one thing'
+      );
+      d.members.forEach((m, i) => console.log(`      ${m.rel}   (${dates[i] || 'NO DATE'})`));
+      if (tie) {
+        // D-20: git is consulted ONLY on a tie, and the fact that it was consulted is PRINTED —
+        // the script must not pick silently between two seeds whose frontmatter dates agree.
+        console.log('      ⚠ both carry the SAME date — D-20 tie-break, git add-commit timestamps:');
+        for (const m of d.members) console.log(`        ${m.file}  added ${gitAddedAt(m.rel) || '(unknown)'}`);
+      }
+    }
+  }
+
+  if (violations.length) {
+    console.log(`\n${RED}SEEDS REGISTER GATE FAILS${RST} — ${fileFindings} finding(s) across ${violations.length} file(s):`);
+    for (const r of violations) {
+      for (const [code, why] of r.findings) {
+        console.log(`  [${code}] ${r.entry.rel}`);
+        console.log(`      ${why}`);
+      }
+    }
+  }
+
+  if (dups.length || violations.length) {
+    console.log(`
+⛔ A register that answers an id lookup with two files, or a status scan with a token no scan knows,
+   is not "slightly untidy" — it is an INDEX THAT LIES, and every agent downstream believes it.
+   \`SEED-172\` sat reachable for four weeks because nothing swept this folder at all.
+
+   [duplicate-id]    renumber the YOUNGER seed (D-07: \`created\` else \`planted\`, git add-commit on
+                     a tie) to a fresh id and leave a \`status: superseded-id\` redirect stub behind.
+   [missing-key]     backfill the key. \`seed_id\` derives from the filename, \`title\` from the H1,
+                     \`surface\` defaults to Agentic-RAG — derive what is derivable, MARK what is not.
+   [unknown-status]  map the token onto the ${STATUS_ENUM.length}-value enum, with \`partial: true\` carrying a
+                     "partially-*" qualifier on any axis (D-16).
+   [no-frontmatter]  the file needs a \`---\` block, not a new value — it is a different STATE.
+
+   ⛔ Do NOT satisfy [unknown-status] by DELETING the prose after the token. That prose IS the
+      deliverable: move it byte-for-byte into \`status_note:\`. The cheapest way to green this code is
+      to destroy exactly what D-10 exists to preserve, and a register that greened by forgetting is
+      worse than one that reds honestly.
+
+   ⚠ THIS GATE SHIPS NO ESCAPE HATCH, deliberately: none of D-04's arms names a condition a worded
+     human reason could make acceptable. If a future phase adds one it must add the
+     \`passed WITH OVERRIDES\` verdict line WITH it — a waved-through finding must never read as an
+     absent one (S-3).`);
     return 1;
   }
 
-  console.log(`${GRN}seeds register gate OK${RST} — ${reg.entries.length}/${reg.registerSize} parsed, 0 unaccounted.`);
+  console.log(
+    `\n${GRN}seeds register gate OK${RST} — ${reg.entries.length}/${reg.registerSize} parsed, `
+    + `0 duplicate ids, ${complete}/${reg.entries.length} carry all ${REQUIRED_KEYS.length} required keys.`
+  );
   return 0;
 }
 
