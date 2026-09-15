@@ -477,19 +477,33 @@ phase's whole subject is not stating things the system has not observed.
 
 ## Info
 
-### IN-01: `_remove_oldest_atomic` is now dead code, and the reason given for keeping it is refuted by a grep
+### IN-01: `_remove_oldest_atomic` is dead, and the NEW helper has no unit test of its own
 
-**File:** `backend/app/services/context_window.py:689-750`
+**File:** `backend/app/services/context_window.py:576-686` (`_remove_oldest_evictable`) and `backend/app/services/context_window.py:689-750` (`_remove_oldest_atomic`)
 
-**Issue:** The retention rationale reads *"deleting a shipped function to tidy a diff is how a
-caller nobody grepped for breaks silently"* (`context_window.py:694-696`). Grepped:
-`_remove_oldest_atomic` appears in **one file in the whole backend** — its own definition.
-Not one call site, not one test. 62 lines of unreachable code justified by a hazard that does
-not exist here.
+**Issue:** Two facts from one grep, run across the whole backend:
 
-**Fix:** either delete it in the same commit that lands CR-01's fix, or keep it and pin it with
-a unit test so the claim "this is the primitive the newer helper's contract is stated against"
-is executable rather than prose.
+```
+$ grep -rnE '_remove_oldest_atomic|_remove_oldest_evictable' backend --include=*.py
+# -> the ONLY file that matches either name is
+#    backend/app/services/context_window.py itself
+```
+
+1. **`_remove_oldest_atomic` is unreachable.** Its retention rationale reads *"deleting a
+   shipped function to tidy a diff is how a caller nobody grepped for breaks silently"*
+   (`context_window.py:694-696`). There is no caller. Not one call site, not one test — 62
+   lines justified by a hazard that a grep refutes.
+
+2. **`_remove_oldest_evictable` — the function this phase added, and the one both CR-01 and
+   CR-02 live inside — is never called directly by any test either.** It is exercised only
+   through `trim_messages_to_fit`, so its `keep` construction and its three-step target
+   selection have no unit-level fence at all. That is why two fixes must be made *inside* it
+   with only end-to-end coverage watching.
+
+**Fix:** delete `_remove_oldest_atomic` in the same commit that lands CR-01's fix, and add
+direct unit tests for `_remove_oldest_evictable` covering each arm — in particular the step-3
+last-resort arm, which is where both Critical findings originate and which no existing test
+reaches on purpose.
 
 ### IN-02: Dead condition in `_build_candidate`
 
