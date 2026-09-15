@@ -23,7 +23,11 @@ findings:
   total: 14
   critical_fixed: 3
   critical_open: 0
-status: issues_found
+  warning_fixed: 6
+  warning_open: 0
+  info_fixed: 4
+  info_open: 1
+status: resolved
 resolution:
   # ⚠ `findings:` above is the AS-REVIEWED tally and is deliberately left alone — a
   # register that rewrites its own history cannot show what was found vs what was done.
@@ -37,10 +41,48 @@ resolution:
     - id: CR-03
       commit: c62b914ca
       note: Anthropic half of the proposal does not apply — thinking is OFF by design
+    - id: WR-01
+      commit: e9d6aef4e
+      note: MEMBERS not zcard — a count cannot tell "only me" from "only someone else"
+    - id: WR-02
+      commit: ecb6e2a71
+      note: observed facts accumulate; "this turn" removed from a run-scoped tally
+    - id: WR-03
+      commit: d57816c65
+      note: shipped the real lint rule + a PostToolUse hook, not a wider regex
+    - id: WR-04
+      commit: e10ca2b76
+      note: one existing assertion TIGHTENED — it forbade the fix outright
+    - id: WR-05
+      commit: ecb6e2a71
+      note: a log, never a raise — D-078-02 promises a list
+    - id: WR-06
+      commit: 863a7b5c7
+      note: claim MEASURED FALSE; defect filed as BUG-260915-01, fix is a phase
+    - id: IN-01
+      commit: 02364bfd8
+      note: 62 dead lines deleted + 4 stale prose references repointed
+    - id: IN-02
+      commit: 02364bfd8
+      note: a conjunct that was always true
+    - id: IN-04
+      commit: 02364bfd8
+      note: uses the shared stripComments; local step kept as a narrow supplement
+    - id: IN-05
+      commit: 02364bfd8
+      note: pins the set of FACTS — the review's branch-count shape went stale in an hour
+  deferred:
+    - id: IN-03
+      reason: >-
+        Collapsing the outer try/finally sits inside `_finalize_producer_run`, the
+        byte-locked eight-invariant finalizer whose ORDERING is the contract (step 3 before
+        step 4's ZREM is what WR-01 turns on). A no-behaviour-change refactor there needs
+        its own commit and its own reading of all eight invariants — it is not review
+        cleanup, and doing it in this round would put an unrelated structural edit under
+        the same gate run as six behaviour fixes.
   open:
-    warning: 6
-    info: 5
-  gate_after: "71 failed / 4848 passed — failing set identical to 250-backend-baseline-set.txt"
+    info: 1
+  gate_after: "backend 71 failed / 4864 passed, set identical to baseline · count gate OK 287/287 0 failing · claude-md OK · deploy drift PASS · G-7 clear · react-hooks gate OK"
 ---
 
 # Phase 250: Code Review Report
@@ -68,10 +110,50 @@ findings were real and reproducible; three fixes were reasoned about rather than
 was driven before shipping, and each failed differently — one broke a floor it did not know
 about, one could not fire at all, one named a provider that has nothing to report.
 
-**Backend gate after all three:** `71 failed / 4848 passed`, failing set byte-identical to
-`250-backend-baseline-set.txt`. Zero new failures; `+23` passes from the new fences.
+---
 
-⚠ **Six Warnings and five Info findings remain OPEN** and are untouched by the above.
+## ⭐ ALL NINE Critical + Warning findings are CLOSED, and four of five Info
+
+| | Finding | What the review proposed | What shipped | Commit |
+|---|---|---|---|---|
+| CR-01 | ✅ | ⛔ **breaks D-078-01** — reds two existing fences | largest protected group pays | `93058eb3e` |
+| CR-02 | ✅ | ⚠ half **inert**, `0 of 3024` outputs | exit sanitiser only | `3588bcc45` |
+| CR-03 | ✅ | ⚠ names Anthropic — thinking is **OFF by design** | OpenAI usage signal + 2 reworded arms | `c62b914ca` |
+| WR-01 | ✅ | ⚠ `zcard <= 1` — a count cannot tell *only me* from *only someone else* | MEMBERS comparison, fails open | `e9d6aef4e` |
+| WR-02 | ✅ | as proposed | facts accumulate; `"this turn"` removed | `ecb6e2a71` |
+| WR-03 | ✅ | as proposed | the real lint rule + a PostToolUse hook | `d57816c65` |
+| WR-04 | ✅ | as proposed | + one existing assertion **tightened** — it forbade the fix | `e10ca2b76` |
+| WR-05 | ✅ | as proposed | a log, never a raise | `ecb6e2a71` |
+| WR-06 | ✅ | *"soften the comment"* | ⛔ the claim is **FALSE, not merely unproven** → `BUG-260915-01` | `863a7b5c7` |
+| IN-01/02/04/05 | ✅ | IN-05's shape went stale in an hour | 62 dead lines gone; three fences un-vacuumed | `02364bfd8` |
+| IN-03 | ⏸ | deferred **with a reason** — the byte-locked finalizer | — | — |
+
+⭐ **FOUR of the ten proposed fixes were wrong, incomplete or inapplicable, and only DRIVING
+them showed it.** That is the durable result of this round, more than the defects themselves.
+⚠ Two findings ESCALATED on contact: WR-06 turned out to be a live defect rather than an
+untested claim, and CR-02's diagnosis was refuted while its symptom was confirmed.
+
+**Gates at close, every one RE-DERIVED rather than quoted:**
+
+| Gate | Result |
+|---|---|
+| backend unit | **71 failed / 4864 passed** — failing SET byte-identical to `250-backend-baseline-set.txt` |
+| frontend count gate | ⭐ **`count gate OK` — 287/287 pinned, 0 failing, exit 0** |
+| `check-claude-md-size` | OK — 99,021 chars, 66% of limit |
+| `check-hot-file-ledger 250` | OK — every watched file has a row |
+| `check-deploy-drift` | PASS |
+| `check-gap-closure-rounds 250` | G-7 clear |
+| `check-react-hooks-rules` | OK — **new gate, shipped by WR-03** |
+
+⚠ **The count gate reading GREEN contradicts this phase's own baseline**, which recorded it
+as *not reachable* here — and predicted this exact case: *"If a later run here reads green,
+that is the flake resolving, not this file being wrong."* It resolved. ⚠ `SEED-171` gained
+**two more suites** during this round: two consecutive runs on the same tree failed **3** both
+times with **zero overlap** in the set, which is that seed's central claim in its cleanest form.
+
+⚠ **One Info finding remains OPEN (IN-03) and one defect is FILED, NOT FIXED
+(`BUG-260915-01`)** — the latter needs a trigger change in `StreamsProvider.tsx`, a G-5-FIRING
+hot file, which is a phase rather than a review closure (G-7).
 
 ---
 
