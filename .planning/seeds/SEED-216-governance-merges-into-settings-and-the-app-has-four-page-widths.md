@@ -1,5 +1,5 @@
 ---
-id: SEED-216
+seed_id: SEED-216
 title: Governance merges into Settings — and the app carries FOUR page widths across six pages with no convention
 status: planted
 planted: 2026-08-28
@@ -21,6 +21,7 @@ re_open_trigger: >
   Either (a) the milestone that merges Governance into Settings is scoped, or (b) any phase
   that adds a page and has to choose a width — that phase should not have to invent a fourth
   answer, and picking one is cheap while only six pages exist.
+trigger_when: unset
 ---
 
 # SEED-216 — one page absorbing another, and the measure question underneath it

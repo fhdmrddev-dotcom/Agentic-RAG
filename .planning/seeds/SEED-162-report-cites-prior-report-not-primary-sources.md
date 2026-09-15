@@ -1,5 +1,5 @@
 ---
-id: SEED-162
+seed_id: SEED-162
 title: A produced deliverable cited a PRIOR deliverable (and the template itself) instead of primary sources
 status: open
 planted: 2026-08-14
@@ -12,6 +12,7 @@ re_open_trigger: >
   Any workflow whose produced output is itself ingested into the KB the workflow retrieves from
   (the feedback loop), OR the first recurring customer deliverable, OR any phase touching
   retrieval ranking / source selection for llm_emit. Whichever comes first.
+trigger_when: unset
 ---
 
 # The report cited a previous report

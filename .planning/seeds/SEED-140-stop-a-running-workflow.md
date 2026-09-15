@@ -1,5 +1,5 @@
 ---
-id: SEED-140
+seed_id: SEED-140
 title: A user cannot stop a workflow mid-run — the run surface has no stop control, though an owned cancel endpoint and a `cancelled` status already exist
 status: open
 planted: 2026-08-08
@@ -18,6 +18,7 @@ re_open_trigger: >
   (3) a run hangs in front of a user with no way out (the golden-run 7200 s hang recorded in Phase
   189 is the precedent — it was survivable only because no user was watching); (4) a business user
   asks how to cancel a run.
+trigger_when: unset
 ---
 
 # SEED-140 — there is no way to stop a running workflow

@@ -1,5 +1,6 @@
 ---
-id: SEED-128
+title: Claude.ai-style collapsible run/reasoning timeline
+seed_id: SEED-128
 status: planted
 folded_into: null
 planted: 2026-07-22
@@ -11,6 +12,7 @@ trigger_when: >
   Read the MEASURED STATE section below FIRST - most of the literal ask already ships.
 scope: Medium
 needs_scope_confirm: true
+surface: Agentic-RAG
 ---
 
 # SEED-128: Claude.ai-style collapsible run/reasoning timeline

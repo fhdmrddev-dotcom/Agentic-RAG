@@ -1,5 +1,5 @@
 ---
-id: SEED-231
+seed_id: SEED-231
 title: The BLOCKING decision-coverage gate is structurally blind to every decision id this repo has ever written
 status: planted
 planted: 2026-08-29

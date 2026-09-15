@@ -287,9 +287,18 @@ function literalBlock(key, lines) {
   return [`${key}: |`, ...lines.map((l) => (l === '' ? '' : `  ${l}`))];
 }
 
-/** A YAML bullet list. Emitted only when non-empty; an empty key is omitted, never written as `[]`. */
+/**
+ * A YAML bullet list. Emitted only when non-empty; an empty key is omitted, never written as `[]`.
+ *
+ * ⚠ THE QUOTES ARE LOAD-BEARING, and this was caught by reading the migration's own output rather
+ *   than by reasoning: an unquoted double-star glob opens with `*`, which is YAML's ALIAS indicator. Our
+ *   own tooling reads it fine (zero YAML dependency, by rule), but a bare glob would hand any other
+ *   reader of these files a parse error — the exact class of defect `check-verification-honesty.cjs`
+ *   already refuses a YAML library over. `unquote` in the imported reader strips them again, so the
+ *   matched value is unchanged.
+ */
 function bulletList(key, items) {
-  return [`${key}:`, ...items.map((v) => `  - ${v}`)];
+  return [`${key}:`, ...items.map((v) => `  - "${String(v).replace(/"/g, '\\"')}"`)];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────

@@ -27,6 +27,7 @@ trigger_when:
   - A second capability is wanted for any already-connected provider
   - Any "which apps do you integrate with?" conversation — the honest answer today is "three write verbs"
   - Before committing to the `connector_connections` table shape a second time — the migration cost compounds
+surface: Agentic-RAG
 ---
 
 # SEED-146: The full integration capability surface

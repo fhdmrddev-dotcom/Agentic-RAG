@@ -19,6 +19,8 @@ re_open_triggers:
   - "Phase 166/167 (org-admin / invitations — orgs gain real multiple members) lands: the `is_org_shared` skill-share toggle becomes meaningful across members, sharply widening this leak's blast radius. MUST be closed at or before that point."
 priority: high
 suggested_phase: "Dedicated security /gsd:quick (mirrors the SEED-124 folder fix pattern, skills-scoped) OR fold into 166/167 before orgs gain members"
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-125 — Skill load/read/execute tools leak skill instructions + files cross-org (service-role, org-blind)

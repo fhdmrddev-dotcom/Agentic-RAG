@@ -17,6 +17,7 @@ trigger_when:
   - Planning a milestone scoped to "API", "integration", "platform", "developer", "MCP", "webhook", "third-party", "embed", or "headless"
   - Going open-source or launching a hosted offering — the moment external developers can sign up, this seed becomes urgent
   - Any partnership / B2B conversation where the partner asks for programmatic access (not screen-share-the-UI)
+surface: Agentic-RAG
 ---
 
 # SEED-013: External Integrations — API + MCP + Webhooks + Service Accounts

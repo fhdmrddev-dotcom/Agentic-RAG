@@ -27,6 +27,8 @@ trigger_when: >
   Mechanical check, from the repo root:
     sed -n '/^SYSTEM_PROMPT = ($/,/^)$/p' backend/app/services/agent_loop.py | wc -c   # 12374
     grep -c "SYSTEM_PROMPT" backend/app/services/agent_loop.py
+trigger_paths:
+  - "backend/app/services/agent_loop.py"
 ---
 
 # One prompt, eight providers, and most of it is a routing table

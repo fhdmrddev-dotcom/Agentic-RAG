@@ -25,6 +25,10 @@ trigger_when: >
     grep -n "react-router|wouter|tanstack/router" frontend/package.json       # → nothing
     grep -n "ActiveView" frontend/src/App.tsx                                 # → 12 views, one useState
     grep -rn "history.pushState|popstate" frontend/src                        # → nothing
+trigger_paths:
+  - "frontend/package.json"
+  - "frontend/src/**"
+  - "frontend/src/App.tsx"
 ---
 
 # There is no router. The URL is decorative.

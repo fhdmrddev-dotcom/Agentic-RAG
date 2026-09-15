@@ -16,6 +16,8 @@ related_decisions:
 re_open_trigger: "The FIRST time a tenant, customer or operator is pinned to a single provider that is not OpenAI or Anthropic — specifically: a Google-only, Moonshot/Kimi-only, or local/Ollama-only deployment is scoped, OR anyone asks 'which model should I use for X?' about a workflow emit step or the publish judge, OR a publish/emit failure is triaged and the root cause turns out to be the model rather than the workflow. Any one of those means the fitness information is being discovered by burning a run instead of read at pick time."
 priority: high
 suggested_phase: "A dedicated small cross-provider phase, best co-scoped with SEED-088 (dynamic model registry) — see 'Why SEED-088 is a hard dependency for the real fix' below. A cheap 80% (surface the tier that already exists in the three pickers + validate the judge write against emit_tier) is independently shippable and does not need 088."
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-135 — per-role model fitness, surfaced at pick time

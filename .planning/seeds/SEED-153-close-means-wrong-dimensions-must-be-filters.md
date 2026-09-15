@@ -1,5 +1,5 @@
 ---
-id: SEED-153
+seed_id: SEED-153
 title: "Where close means WRONG — accounting period, legal entity, contract version, jurisdiction — the dimension must be a structured FILTER, never a prompt instruction, and an empty filter must FAIL the phase rather than fall back to unfiltered search"
 status: planted
 planted: 2026-08-12

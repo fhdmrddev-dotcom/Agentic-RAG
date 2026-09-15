@@ -1,10 +1,12 @@
 ---
-id: SEED-041
+title: Conversation Compaction — context-window management for long interactive chats (condense, don't discard)
+seed_id: SEED-041
 status: dormant
 planted: 2026-05-31
 planted_during: v2.8 (Harness Engine & Workflow Mode — surfaced during Phase 090 operator-testing-notes triage)
 trigger_when: A thread exceeds the smallest active model's context budget and context_truncated fires in normal use, OR per-turn input-token cost on long interactive threads becomes a complaint, OR the v3.4 checkpoint-compression deferral matures
 scope: Medium
+surface: Agentic-RAG
 ---
 
 # SEED-041: Conversation Compaction — context-window management for long interactive chats (condense, don't discard)

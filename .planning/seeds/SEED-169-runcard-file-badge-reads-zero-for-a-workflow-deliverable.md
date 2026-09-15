@@ -25,6 +25,11 @@ trigger_when: >
   `frontend/src/components/chat/ThreadRunLine.tsx`, OR a user reporting "chat says my workflow made
   nothing" / "the run card shows 0 files but the file is right there", OR any phase scoped to chat
   run receipts. ⚠ **G-5 fires on BOTH files — a refactor recommendation is owed FIRST.**
+trigger_paths:
+  - "frontend/src/components/chat/MessageItem.tsx"
+  - "frontend/src/components/chat/RunCard.tsx"
+  - "frontend/src/components/chat/ThreadRunLine.tsx"
+surface: Agentic-RAG
 ---
 
 # SEED-169: chat's run receipts say a workflow produced nothing, while a 38-40 KB `.docx` sits in the workspace

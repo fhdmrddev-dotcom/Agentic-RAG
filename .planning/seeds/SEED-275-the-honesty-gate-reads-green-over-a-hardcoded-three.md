@@ -3,7 +3,15 @@ seed_id: SEED-275
 title: The verification-honesty gate reads GREEN over a hardcoded three-path scan set while 20 VERIFICATION.md files exist — and the phase whose whole job was verification debt produced no VERIFICATION.md at all
 created: 2026-09-14
 planted_during: v4.2 / DEBT-06 groundwork, while measuring which phases actually owe an independent review
-status: closed   # ⭐ ANSWERED SAME DAY (2026-09-14) by operator ruling: "fix the gate, VERDICT.md counts as equivalent". Scan set now DERIVED (phases >= 238, live + archived, VERIFICATION.md and VERDICT.md), floor moved onto the derived set, header docstring synced in the same commit — it had explicitly forbidden a total-subject floor, an argument that was sound for the old design and void for this one. Driven RED on three arms incl. the counterfactual: the OLD 3-path set reports "honesty gate OK" over the exact planted defect the new one catches. Finding 2 fixed (239 marked). Finding 3 answered by the ruling.
+status: closed
+status_note: |
+  ORIGINAL `status:` line, verbatim — displaced by Phase 251's frontmatter migration (D-10):
+  status: closed   # ⭐ ANSWERED SAME DAY (2026-09-14) by operator ruling: "fix the gate, VERDICT.md counts as equivalent". Scan set now DERIVED (phases >= 238, live + archived, VERIFICATION.md and VERDICT.md), floor moved onto the derived set, header docstring synced in the same commit — it had explicitly forbidden a total-subject floor, an argument that was sound for the old design and void for this one. Driven RED on three arms incl. the counterfactual: the OLD 3-path set reports "honesty gate OK" over the exact planted defect the new one catches. Finding 2 fixed (239 marked). Finding 3 answered by the ruling.
+
+  The prose that followed the token, byte-for-byte:
+  # ⭐ ANSWERED SAME DAY (2026-09-14) by operator ruling: "fix the gate, VERDICT.md counts as equivalent". Scan set now DERIVED (phases >= 238, live + archived, VERIFICATION.md and VERDICT.md), floor moved onto the derived set, header docstring synced in the same commit — it had explicitly forbidden a total-subject floor, an argument that was sound for the old design and void for this one. Driven RED on three arms incl. the counterfactual: the OLD 3-path set reports "honesty gate OK" over the exact planted defect the new one catches. Finding 2 fixed (239 marked). Finding 3 answered by the ruling.
+
+  Mapped `closed` -> `closed`. Reason: clean 1:1.
 priority: high
 surface: Agentic-RAG
 relates_to:
@@ -27,6 +35,8 @@ trigger_when: >
   visible to any scan; (3) `check-verification-honesty.cjs` is edited for any reason; (4) a
   milestone is archived — archiving is precisely what removes a phase from the "active milestone"
   half of the subject set and drops it out of the gate.
+trigger_paths:
+  - "**/check-verification-honesty.cjs"
 ---
 
 # SEED-275 — the gate is green because it is not looking

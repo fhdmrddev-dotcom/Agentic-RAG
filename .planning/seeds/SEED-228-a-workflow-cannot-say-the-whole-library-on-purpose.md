@@ -1,5 +1,5 @@
 ---
-id: SEED-228
+seed_id: SEED-228
 title: A workflow cannot say "the whole library, on purpose" — unbound retrieval is treated as unfinished, never as an intent
 status: planted
 planted: 2026-08-28
@@ -20,6 +20,7 @@ relates_to:
 re_open_trigger: >
   Immediately — the operator raised it against a live workflow they cannot publish. Otherwise the
   next phase touching grounding, the KB picker, or the publish gate.
+trigger_when: unset
 ---
 
 # SEED-228 — the gate has no word for "everything, deliberately"

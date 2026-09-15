@@ -1,7 +1,12 @@
 ---
 seed_id: SEED-101
 title: Skill Creator reborn — platform-native built-in skill (read-only, seeded, deploy-safe) + eval-engine harvest from Anthropic's skill-creator
-status: promoted
+status: folded
+status_note: |
+  ORIGINAL `status:` line, verbatim — displaced by Phase 251's frontmatter migration (D-10):
+  status: promoted
+
+  Mapped `promoted` -> `folded`. Reason: READ SEED-100/101 — both carry promoted_to naming a real phase; became a requirement.
 planted: 2026-07-04
 promoted_to: "Phase 137.2 (CREATE-01); eval-engine harvest items promoted to Phase 137.1 (EVAL-05 / SEED-100)"
 phase_origin: "Operator, 2026-07-04: re-attached the Claude.ai skill-creator skill (manually recreated zip at screenshots/skill-creator.zip) and asked (a) did we ever implement a skill-creator — it should be read-only and undeletable; (b) full capability match vs what we built; (c) implement to a 'perfect skill feature' standard aligned with our app + RAG, complementing (never breaking) the shipped 132–137 Studio."
@@ -12,6 +17,8 @@ related_seeds:
   - SEED-099 (feature visibility by role — who sees advanced eval surfaces)
 related_memories: [project_skills_mime_known_gap, reference_js_skill_import_gap, feedback_iterate_leverage_existing, feedback_vibe_coder_communication]
 priority: high
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-101 — Skill Creator reborn: platform-native, built-in, protected

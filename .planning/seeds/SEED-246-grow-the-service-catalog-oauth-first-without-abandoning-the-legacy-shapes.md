@@ -21,6 +21,8 @@ trigger_when:
   - A second service in the same OAuth family is wanted (e.g. Outlook after Microsoft 365) — the family is already paid for, so the marginal row is nearly free
   - Anyone proposes ADDING a service by writing per-service code — that is the signal the shape is wrong, not that the service is hard
   - Anyone proposes DELETING the legacy capability rows (`jira`, `smtp`) — see the standing rule below
+trigger_surfaces:
+  - "connectors"
 ---
 
 # SEED-246: grow the catalog on purpose, not by accident

@@ -19,6 +19,7 @@ trigger_when:
   - The stale SUMMARY.md:88 routing is touched at any milestone gate (fix the line so the gap stops hiding behind "deferred to v3.2")
 priority: high — a hard enterprise-procurement blocker AND a real data-loss exposure for any co-tenant tier the company operates; currently invisible because the only routing that ever existed is provably unfulfilled, so no milestone gate will surface it on its own.
 suggested_phase: a future enterprise/compliance-readiness milestone (likely v3.1 operator-runbook scoping for the published per-tier matrix + responsibility split, with the per-org restore/export half co-designed alongside the v3.2 RLS rewrite). NOT v2.9.
+surface: Agentic-RAG
 ---
 
 # SEED-075 — Backup, Restore & Disaster Recovery

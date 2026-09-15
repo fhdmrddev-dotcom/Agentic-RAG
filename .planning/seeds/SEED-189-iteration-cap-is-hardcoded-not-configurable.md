@@ -18,6 +18,7 @@ trigger_when: >
 
   Discharged when an operator can change the iteration cap from the Settings UI (or the Model
   Registry, per-model) without editing source and restarting.
+surface: Agentic-RAG
 ---
 
 # SEED-189 — The iteration cap is hardcoded

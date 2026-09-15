@@ -1,3 +1,14 @@
+---
+seed_id: SEED-084
+title: Starter / seed workflow library (fork-a-starter)
+status: planted
+status_note: |
+  Phase 251 frontmatter migration: this file had NO frontmatter block at all, so no status was
+  ever recorded for it. `planted` here is a MIGRATION DEFAULT — it is a statement about the
+  absence, never a claim about the seed. Read the body and set it deliberately.
+surface: Agentic-RAG
+trigger_when: unset
+---
 # SEED-084: Starter / seed workflow library (fork-a-starter)
 
 **Planted:** 2026-06-14 (during Phase 103 discuss-phase, decision D-103-4)

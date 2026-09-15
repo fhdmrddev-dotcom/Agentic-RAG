@@ -1,7 +1,13 @@
 ---
-id: SEED-057
+seed_id: SEED-057
 title: Google 429 credit-depletion now reads as "rate limited — retry" — a deliberate Phase 095.1 trade-off that can under-warn on genuine Google billing exhaustion
-status: partially-folded
+status: folded
+partial: true
+status_note: |
+  ORIGINAL `status:` line, verbatim — displaced by Phase 251's frontmatter migration (D-10):
+  status: partially-folded
+
+  Mapped `partially-folded` -> `folded` + `partial: true`. Reason: D-16 — folded on one axis, pending on another.
 folded_into: 210
 planted: 2026-06-06
 planted_by: orchestrator (095.1 verify-work — found real historical Google 429 "prepayment credits are depleted" runs in the live DB while validating PROVIDER-ERR D-03)
@@ -9,6 +15,7 @@ trigger_when: a user reports a genuine Google credit/billing exhaustion that the
 priority: low
 tags: [provider-gateway, error-classification, google, billing, rate-limit, PROVIDER-ERR, cross-provider]
 related_seeds: []
+surface: Agentic-RAG
 ---
 
 # SEED-057: Google 429 credit-depletion reads as rate-limit

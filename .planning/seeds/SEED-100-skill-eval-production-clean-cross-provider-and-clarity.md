@@ -1,7 +1,12 @@
 ---
 seed_id: SEED-100
 title: Dedicated phase — make Skill Eval production-clean (cross-provider robustness for ALL providers + user-facing clarity)
-status: promoted
+status: folded
+status_note: |
+  ORIGINAL `status:` line, verbatim — displaced by Phase 251's frontmatter migration (D-10):
+  status: promoted
+
+  Mapped `promoted` -> `folded`. Reason: READ SEED-100/101 — both carry promoted_to naming a real phase; became a requirement.
 promoted_to: "Phase 137.1 (EVAL-05) — 2026-07-04, operator decision; paired with Phase 137.2 (SEED-101 skill-creator)"
 planted: 2026-07-01
 phase_origin: "Operator note after running live evals across the full native roster during/after Phase 133 (2026-06-30 → 2026-07-01). The eval engine + thin --skip-ui surface shipped and verified, but two gaps remain before it's something an end user can trust: (1) the WITHOUT-skill baseline arm trips provider-specific request-shape rules on several providers, and (2) the surface is confusing to a non-expert — it lives in the sidebar with very detailed information and the user doesn't know what 'eval' even means."
@@ -22,6 +27,8 @@ re_open_triggers:
   - "Any eval run 400s or returns empty on a provider's baseline arm — the cross-provider hardening below is the fix."
 priority: high
 suggested_phase: "A dedicated 'Skill Eval — production-clean' phase (after the Phase 133 engine; pairs with 134/137). Two halves: (1) CROSS-PROVIDER ROBUSTNESS — the WITH and WITHOUT arms both complete a clean A/B on all 8 native providers, with provider request-shape traps fixed at the gateway/adapter boundary (assistant-prefill removed for prefill-rejecting models, DeepSeek reasoning_content shape, empty-baseline handling), per the full-native-roster mandate; (2) USER-FACING CLARITY — a legible eval surface that says what it is and what with/without means, with verbose run detail behind progressive disclosure, gated to entitled roles (SEED-099)."
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-100 — Make Skill Eval production-clean (all providers + clarity)

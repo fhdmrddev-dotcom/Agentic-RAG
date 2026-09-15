@@ -1,5 +1,5 @@
 ---
-id: SEED-231
+seed_id: SEED-231
 title: Nobody is told an approval is waiting — an unattended run pauses for a person who is never notified, and this is the collection point for every notification need
 status: planted
 planted: 2026-08-29
@@ -50,6 +50,7 @@ deferred_options:
       gains an app-owned mailer for any other reason (this seed's own approval notifications being
       the likeliest cause). Two INDEPENDENT triggers, so the deferral cannot be orphaned by
       whichever arrives first.
+trigger_when: unset
 ---
 
 # SEED-231 — the run stopped and asked, and there was nobody in the room

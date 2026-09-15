@@ -1,5 +1,5 @@
 ---
-id: SEED-022
+seed_id: SEED-022
 title: Timeout settings UI with tier presets
 status: planted
 planted: 2026-05-25
@@ -11,6 +11,8 @@ re_open_trigger: |
   deep modes for the same task; A/B-comparing timeout ceilings; sharing
   configs across team members; CI/cloud deployments where .env is locked.
 target_milestone: Settings-overhaul (v3.x)
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-022 — Timeout Settings UI with Tier Presets

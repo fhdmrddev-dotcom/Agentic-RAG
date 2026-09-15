@@ -25,6 +25,11 @@ trigger_when: >
   files a ledger row + `docs/HOT-FILE-LEDGER.md` section update in the same commit. It fires
   EARLIER if a FOURTH formatter is about to be written: at four, "three near-duplicates" has
   stopped being a note and become a pattern.
+trigger_paths:
+  - "**/MessageList.tsx"
+  - "**/RunCard.tsx"
+  - "**/ThinkingBlock.tsx"
+  - "docs/HOT-FILE-LEDGER.md"
 ---
 
 # SEED-269 — one home for the elapsed formatter

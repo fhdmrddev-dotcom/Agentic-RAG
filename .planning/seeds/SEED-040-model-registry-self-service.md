@@ -1,11 +1,15 @@
 ---
-id: SEED-040
+title: Model Registry Self-Service — operator-facing model/capability management so new models work without code edits
+seed_id: SEED-040
 status: partially-answered
 planted: 2026-05-30
 planted_during: v2.8 (Harness Engine & Workflow Mode — surfaced during Phase 089/090 cross-provider debugging)
 trigger_when: A new model needs a config.py code edit (or manual DB insert) to get correct capabilities, OR provider_model_lists drifts from a provider's live /models, OR an admin/operator-UI / settings-unification milestone is scoped
+trigger_paths:
+  - "**/config.py"
 trigger_fired: 2026-07-22 (Phase 175 — gpt-5.6 reasoning models needed config.py `reasoning_first`/`reasoning_off` edits; the DB-override tier does NOT cover these flags and the routing seams bypass the DB entirely — see 2026-07-22 update)
 scope: Medium
+surface: Agentic-RAG
 ---
 
 # SEED-040: Model Registry Self-Service — operator-facing model/capability management so new models work without code edits

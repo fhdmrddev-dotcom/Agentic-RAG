@@ -1,5 +1,5 @@
 ---
-id: SEED-038
+seed_id: SEED-038
 title: Generated-Files / Artifacts Model — Unify workspace_files vs sandbox-outputs vs KB documents
 status: planted
 planted: 2026-05-29
@@ -7,6 +7,7 @@ planted_by: orchestrator (087 scenario-matrix round-3 testing)
 trigger_when: Users are confused about "where did my file go" — OR an agent produces an artifact that lands in the chat (sandbox output link) when the user expected it in the panel (or vice-versa) — OR demand emerges for a single coherent "artifacts" view — OR a WORKFLOW produces a final artifact with no panel/download home (093 re-UAT finding #4) — OR Phase 094/095 planning (confirm artifact + download coverage; the sub-agent-file-threading backend gap)
 priority: medium
 tags: [frontend/panel, artifacts, sandbox, execute_code, workspace, ux, design-question, phase-087]
+surface: Agentic-RAG
 ---
 
 # SEED-038: Generated-Files / Artifacts Model Unification

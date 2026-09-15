@@ -1,5 +1,5 @@
 ---
-id: SEED-036
+seed_id: SEED-036
 title: task() Global Concurrency Cap — Per-User Quota at Multi-Tenant Scale
 status: planted
 planted: 2026-05-28
@@ -14,6 +14,7 @@ related_memories:
 related_decisions: [D-085-22 (per-run + global concurrency caps), D-PRD-12 (multi-worker uvicorn default)]
 related_phases: [085 (Plan 02 task_service)]
 related_seeds: [SEED-002 (skill studio milestone — admin-tier global library), SEED-004 (org multi-tenancy — natural home for per-org admin), SEED-005 (document management — bulk admin operations)]
+surface: Agentic-RAG
 ---
 
 # SEED-036: task() Global Concurrency Cap — Per-User Quota at Multi-Tenant Scale

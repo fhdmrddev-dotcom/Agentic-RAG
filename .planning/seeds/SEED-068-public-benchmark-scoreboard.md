@@ -1,5 +1,5 @@
 ---
-seed_id: SEED-068  # renumbered from SEED-063 at v2.8 audit close-out 2026-06-07 (ID collision with SEED-063-execute-code-wallclock-timeout)
+seed_id: SEED-068
 title: Public benchmark scoreboard — root-level BENCHMARKS.md aggregating app-wide scores per release (industry/competitive credibility artifact)
 status: planted
 planted: 2026-06-07
@@ -19,6 +19,12 @@ re_open_triggers:
   - Any external-facing moment (demo, pitch, README polish, open-sourcing decision) where credibility numbers matter
 priority: medium — cheap, high competitive-credibility value, but data source must ship first (096)
 suggested_phase: v2.9 — small phase or /gsd:fast follow-up after 096 verifies; pairs naturally with the feature-fit routing decision pass
+surface: Agentic-RAG
+trigger_when: unset
+migration_note: |
+  the `seed_id:` key was normalised to `seed_id: SEED-068` (D-09 — the FILENAME is what a
+  reference resolves against). Its original line(s), verbatim:
+  seed_id: SEED-068  # renumbered from SEED-063 at v2.8 audit close-out 2026-06-07 (ID collision with SEED-063-execute-code-wallclock-timeout)
 ---
 
 # SEED-063 — Public benchmark scoreboard (BENCHMARKS.md)

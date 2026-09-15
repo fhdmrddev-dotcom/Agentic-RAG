@@ -1,5 +1,5 @@
 ---
-id: SEED-151
+seed_id: SEED-151
 title: Projects — a first-class configuration container (files + instructions + its own chats), as a separate top-level page, carrying a GOVERNANCE posture no competitor's Projects feature has
 status: planted
 planted: 2026-08-12

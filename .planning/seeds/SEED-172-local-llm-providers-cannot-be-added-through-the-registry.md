@@ -24,6 +24,7 @@ trigger_when: >
   Anyone needs to register, tune or time-out a local model (Ollama / LM Studio) through the UI;
   OR the add-model endpoint or the Model Registry provider picker is touched for any reason;
   OR someone needs an LLM call to run longer than 600 seconds.
+surface: Agentic-RAG
 ---
 
 # Four findings, one workaround already applied

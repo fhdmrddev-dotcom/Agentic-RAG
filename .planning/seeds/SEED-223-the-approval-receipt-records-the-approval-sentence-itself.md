@@ -1,5 +1,5 @@
 ---
-id: SEED-223
+seed_id: SEED-223
 title: "The governance approval receipt writes the approval SENTENCE into `metadata[\"finding\"]` — D-213-14's *shown once, recorded never* holds for the send receipt and FAILS for the approval receipt, and Phase 214 widened what that sentence contains"
 status: planted
 planted: 2026-08-28
@@ -28,6 +28,7 @@ re_open_trigger: >
   DISPLAYS — every such phase silently widens what this receipt RECORDS; (4) before
   `live_connectors` is flipped on for anyone, since a real outbound send makes the recorded
   sentence a record of real recipients.
+trigger_when: unset
 ---
 
 # SEED-223: the approval receipt records the sentence it was only supposed to show

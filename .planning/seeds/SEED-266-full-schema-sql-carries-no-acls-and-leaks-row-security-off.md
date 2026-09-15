@@ -23,6 +23,10 @@ trigger_when: >
       further statements on the SAME connection;
   (3) `scripts/regenerate-full-schema.sh` is changed, or the `--no-privileges` flag is revisited;
   (4) a phase touches the bootstrap path in docs/OPERATOR.md Step 3.
+trigger_paths:
+  - "**/full-schema.sql"
+  - "docs/OPERATOR.md"
+  - "scripts/regenerate-full-schema.sh"
 ---
 
 # What was measured

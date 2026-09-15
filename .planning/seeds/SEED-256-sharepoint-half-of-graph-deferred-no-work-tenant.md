@@ -3,7 +3,15 @@ seed_id: SEED-256
 title: SharePoint document libraries — the deferred half of Phase 238, blocked on having no Microsoft 365 work/school tenant (NOT on code)
 created: 2026-09-07
 planted_during: Phase 238 scoping — operator split (OneDrive ships, SharePoint defers)
-status: deferred   # ⛔ RETIRED IN WRITING at Phase 245 (D-07, 2026-09-13) — 238's S-1/S-2 moved from ⛔ BLOCKED to ⛔ RETIRED on this seed's ground, in ONE commit across three registers: 238-VERIFICATION.md's table, REQUIREMENTS.md DEBT-01, and this line. ⚠ The four trigger_when arms below are UNCHANGED and are the re-open path; a retirement held only by a seed is held by nothing (the seeds register is swept by nothing), which is why it has three homes.
+status: deferred
+status_note: |
+  ORIGINAL `status:` line, verbatim — displaced by Phase 251's frontmatter migration (D-10):
+  status: deferred   # ⛔ RETIRED IN WRITING at Phase 245 (D-07, 2026-09-13) — 238's S-1/S-2 moved from ⛔ BLOCKED to ⛔ RETIRED on this seed's ground, in ONE commit across three registers: 238-VERIFICATION.md's table, REQUIREMENTS.md DEBT-01, and this line. ⚠ The four trigger_when arms below are UNCHANGED and are the re-open path; a retirement held only by a seed is held by nothing (the seeds register is swept by nothing), which is why it has three homes.
+
+  The prose that followed the token, byte-for-byte:
+  # ⛔ RETIRED IN WRITING at Phase 245 (D-07, 2026-09-13) — 238's S-1/S-2 moved from ⛔ BLOCKED to ⛔ RETIRED on this seed's ground, in ONE commit across three registers: 238-VERIFICATION.md's table, REQUIREMENTS.md DEBT-01, and this line. ⚠ The four trigger_when arms below are UNCHANGED and are the re-open path; a retirement held only by a seed is held by nothing (the seeds register is swept by nothing), which is why it has three homes.
+
+  Mapped `deferred` -> `deferred`. Reason: clean 1:1.
 priority: medium
 surface: Agentic-RAG
 relates_to:

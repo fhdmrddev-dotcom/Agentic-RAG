@@ -1,5 +1,5 @@
 ---
-id: SEED-218
+seed_id: SEED-218
 title: The describe door's refusal offers a *connect* button that does nothing — `onOpenSettings` is threaded and lands on no handler
 status: planted
 planted: 2026-08-28
@@ -29,6 +29,7 @@ re_open_trigger: >
   Mechanical check that the gap is still real, from the repo root:
     grep -rn "onOpenSettings" frontend/src | grep -v "\.test\."
   If every hit is a declaration or a pass-through and none is a handler, the gap is live.
+trigger_when: unset
 ---
 
 # SEED-218: the refusal's connect button is a no-op

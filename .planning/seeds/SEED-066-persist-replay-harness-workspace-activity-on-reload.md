@@ -21,6 +21,8 @@ re_open_triggers:
   - v2.9 NL-workflow-authoring ships (authored workflows make post-run legibility more load-bearing)
 priority: low-medium — legibility/trust improvement, not a correctness bug
 suggested_phase: future workflow-legibility phase (not part of the SEED-063/064 fix phase)
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-066 — Persist + replay harness workspace activity on reload

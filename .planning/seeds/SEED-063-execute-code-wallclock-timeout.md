@@ -1,7 +1,15 @@
 ---
 seed_id: SEED-063
 title: execute_code needs a wall-clock timeout — runaway model code wedges a run forever (availability bug)
-status: DONE ✅ — backend implemented + unit-tested + LIVE-VERIFIED 2026-06-07 (operator set SANDBOX_EXEC_TIMEOUT_SECONDS=10, ran sleep(30): aborted at 10s, no hang)
+status: shipped
+status_note: |
+  ORIGINAL `status:` line, verbatim — displaced by Phase 251's frontmatter migration (D-10):
+  status: DONE ✅ — backend implemented + unit-tested + LIVE-VERIFIED 2026-06-07 (operator set SANDBOX_EXEC_TIMEOUT_SECONDS=10, ran sleep(30): aborted at 10s, no hang)
+
+  The prose that followed the token, byte-for-byte:
+  ✅ — backend implemented + unit-tested + LIVE-VERIFIED 2026-06-07 (operator set SANDBOX_EXEC_TIMEOUT_SECONDS=10, ran sleep(30): aborted at 10s, no hang)
+
+  Mapped `DONE` -> `shipped`. Reason: READ SEED-063/064 — both prose lines say code shipped and was live-verified.
 planted: 2026-06-07
 phase_origin: Phase 096 live UAT (Test 3 stream-cap storm) — operator-run, DB-verified
 category: B — real defect, slated for a small dedicated fix phase (operator-approved routing 2026-06-07)
@@ -18,6 +26,8 @@ re_open_triggers:
   - A sandbox-hardening pass (SEED-062) is opened — timeout belongs in the same runtime_configs surface
 priority: high (real availability bug; low blast radius to fix)
 suggested_phase: small dedicated fix phase alongside SEED-064 (stop button)
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-063 — execute_code wall-clock timeout

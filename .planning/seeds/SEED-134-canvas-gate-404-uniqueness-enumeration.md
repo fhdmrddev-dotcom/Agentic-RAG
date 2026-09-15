@@ -1,5 +1,5 @@
 ---
-id: SEED-134
+seed_id: SEED-134
 title: The canvas gate's uniform 404 is uniquely identifying — an anonymous method sweep enumerates the two gated routes
 status: open
 planted: 2026-07-25
@@ -16,6 +16,7 @@ re_open_trigger: >
   becomes sensitive (e.g. a customer-specific or unannounced-feature path); (4) Phase 181's
   REVERT-01/02 HARD gate is re-asserted as byte-identity for EVERY probe shape rather than for
   the body/status of a matched path.
+trigger_when: unset
 ---
 
 # SEED-134 — the flag-off 404 is uniform, and that is what makes it unique

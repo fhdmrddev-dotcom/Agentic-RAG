@@ -1,5 +1,5 @@
 ---
-id: SEED-155
+seed_id: SEED-155
 title: "The workflow card does not look like the sketch that was approved for it — and it structurally CANNOT, because the sketch drew atoms the card's own components hide. Four complaints, three phases, one visual pass."
 status: planted
 planted: 2026-08-13

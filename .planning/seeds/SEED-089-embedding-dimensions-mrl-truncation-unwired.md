@@ -17,6 +17,8 @@ re_open_triggers:
   - SEED-088 (dynamic model registry) is implemented — capability-aware embedding config is adjacent and a natural co-fix.
 priority: MINOR / non-blocking — the shipped OpenAI-1536 default and native-dim local (Ollama 768) / Google (3072) paths all work and were live-proven in 111.1 verify-work. This is a latent correctness gap for the non-default MRL path + a docs-vs-impl mismatch.
 suggested_phase: a /gsd:fast or /gsd:quick (≈1-3 line change at one call boundary) — or fold into SEED-088's capability work.
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-089 — embedding_dimensions / MRL truncation is not wired into the embed call

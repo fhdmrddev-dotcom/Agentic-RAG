@@ -1,11 +1,13 @@
 ---
-id: SEED-229
+seed_id: SEED-229
 title: Five suites run by the count gate and guarded by nothing
 status: planted
 surface: Agentic-RAG
 relates_to:
   - scripts/vitest-count-gate.cjs
 trigger_when: "The next phase that edits vitest-count-gate.cjs, or the next time a suite is found red-and-unseen."
+trigger_paths:
+  - "**/vitest-count-gate.cjs"
 planted: 2026-08-31
 ---
 

@@ -15,6 +15,9 @@ trigger_when: >
   A SEVENTH disagreement between the two ingest paths is found, or any phase that touches
   `email_attachments.py`, `ingest_splice.py` or the ingestion queue. Fires immediately if an
   attachment is reported as arriving with something the parent got and it did not.
+trigger_paths:
+  - "**/email_attachments.py"
+  - "**/ingest_splice.py"
 ---
 
 ## The pattern, stated once

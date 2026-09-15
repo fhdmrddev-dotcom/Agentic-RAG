@@ -1,5 +1,5 @@
 ---
-seed_id: SEED-092-remainder
+seed_id: SEED-092
 parent_seed: SEED-092
 title: App-wide WCAG 2.1 AA — the exhaustive remainder left after the Phase 155 net-new + worst-offender sweep
 status: planted
@@ -19,6 +19,12 @@ re_open_triggers:
   - "Playwright E2E revival (SEED-049) — would unlock @axe-core/playwright for a repeatable full-page live scan, the tool Phase 155 D-01a rejected because the harness is rotted."
 priority: medium
 suggested_phase: a dedicated app-wide accessibility-remediation pass (decide once, app-wide) — the exhaustive sibling of Phase 155's net-new + worst-offender pass. NOT folded into a feature phase.
+surface: Agentic-RAG
+trigger_when: unset
+migration_note: |
+  the `seed_id:` key was normalised to `seed_id: SEED-092` (D-09 — the FILENAME is what a
+  reference resolves against). Its original line(s), verbatim:
+  seed_id: SEED-092-remainder
 ---
 
 # SEED-092-remainder — the exhaustive WCAG 2.1 AA audit deferred by Phase 155

@@ -21,6 +21,8 @@ re_open_triggers:
   - "Any phase that adds another advanced/scale/admin-flavored feature to an end-user surface — route it through the role-visibility map instead of dropping it inline."
 priority: medium
 suggested_phase: "Future role-tier / admin-shell milestone (ROLE-01). Defines: (1) a user-type / role model (end-user vs admin vs privileged), (2) a per-feature visibility map so advanced/scale features (eval, model curation, provider management, cost/registry, run honesty internals, etc.) render only for entitled roles, (3) end-user-facing surfaces stay clean + jargon-free. Phase 137 should honor the gate for evals specifically."
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-099 — Feature visibility by role/user-type (advanced features are admin-only)

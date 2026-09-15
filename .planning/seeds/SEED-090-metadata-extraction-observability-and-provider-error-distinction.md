@@ -1,7 +1,13 @@
 ---
 seed_id: SEED-090
 title: Metadata-extraction failure observability — surface "extraction failed" vs "no metadata found", and distinguish provider_error (transport/down) from model_failed_to_emit (honest decline)
-status: partially-folded
+status: folded
+partial: true
+status_note: |
+  ORIGINAL `status:` line, verbatim — displaced by Phase 251's frontmatter migration (D-10):
+  status: partially-folded
+
+  Mapped `partially-folded` -> `folded` + `partial: true`. Reason: D-16 — folded on one axis, pending on another.
 folded_into: 210
 planted: 2026-06-17
 phase_origin: "Phase 111.1 verify-work — operator ingested a Word doc, saw NO metadata, no UI signal. Root cause was an OpenAI strict-400; the doc still completed with metadata=None, indistinguishable from a doc that legitimately has no metadata. The ultracode end-to-end integrity workflow (wf_bcee7c86) confirmed the gap at code + live-DB + UI layers and the adversarial pass upheld it."
@@ -17,6 +23,8 @@ re_open_triggers:
   - SEED-088 (dynamic model registry) ships — picker default-id health (see below) is adjacent.
 priority: MEDIUM — confirmed gap that caused a real blind backfill; not ingestion-breaking, but it hides genuine failures from the operator.
 suggested_phase: a small observability phase (1 nullable column + degrade-path write + a DocumentList badge), or fold into SEED-088 / a pre-production observability pass.
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-090 — Make metadata-extraction failure observable

@@ -1,5 +1,5 @@
 ---
-id: SEED-058
+seed_id: SEED-058
 title: Chat-surface UX polish — per-provider official logos next to provider/model attribution, + New-chat/folder-scope controls always present (incl. collapsed rail)
 status: planted
 planted: 2026-06-06
@@ -8,6 +8,7 @@ trigger_when: the v2.9 UX pass (workflows page + chat-surface cleanup), OR any p
 priority: low
 tags: [frontend, ux, branding, run-card, tool-panel, nav-panel, provider-logos, chat-organization]
 related_seeds: [SEED-051]
+surface: Agentic-RAG
 ---
 
 # SEED-058: Chat-surface UX polish (provider logos + nav presence)

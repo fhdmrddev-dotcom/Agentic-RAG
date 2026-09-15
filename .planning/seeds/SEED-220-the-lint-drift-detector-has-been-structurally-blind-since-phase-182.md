@@ -1,5 +1,5 @@
 ---
-id: SEED-220
+seed_id: SEED-220
 title: "`test_182`'s lint-drift detector has been structurally blind since Phase 182 — its regex matches only a STRING LITERAL first argument to `LintError(`, so any code minted from an expression was invisible"
 status: planted
 planted: 2026-08-28
@@ -30,6 +30,7 @@ re_open_trigger: >
   Mechanical check that the gap is still real, from the repo root:
     grep -rn "LintError(" backend/app | grep -v "LintError(\"" | grep -v "LintError('"
   Every hit is a construction site the detector cannot see.
+trigger_when: unset
 ---
 
 # SEED-220: a drift detector that has been blind since the phase that wrote it

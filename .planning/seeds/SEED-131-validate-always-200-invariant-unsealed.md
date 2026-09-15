@@ -29,6 +29,8 @@ re_open_triggers:
   - "Phase 185 extends the verdict with the per-node grounding-MODE verdict (GOVERN-01). That adds a THIRD DB-backed check category to the same envelope and makes an unsealed route strictly more likely to fail — and a grounding-mode verdict that silently disappears on a read error is a governance claim the product cannot make."
 priority: high
 suggested_phase: "A dedicated /gsd:quick immediately BEFORE or as the opening wave INSIDE Phase 184 — the canvas is the amplifier, so sealing must land no later than the code that starts hammering the route. Cheap in code terms (one handler-level guard plus the degraded-verdict shape), but it needs the canvas's error rendering decided alongside it, which is why it belongs adjacent to 184 rather than as a standalone backend patch now."
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-131 — the `/validate` ALWAYS-200 invariant is documented but not sealed

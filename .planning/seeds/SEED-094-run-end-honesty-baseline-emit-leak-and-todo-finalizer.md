@@ -20,6 +20,8 @@ re_open_triggers:
   - /gsd:new-milestone sweep of open surface:Agentic-RAG reports — promote this seed to a numbered backend run-end-honesty fix phase if not already scheduled.
 priority: low
 suggested_phase: A dedicated small backend run-end-honesty fix phase (candidate to schedule after CORE Phase 124, or fold into the next phase that opens agent_loop.py's emit/termination path). NOT a Phase 124 fold (124 is Workflow Studio UX / frontend). NOT a v3.1 CORE blocker — both are minor severity with honest data; the chat surface is not data-lossy.
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-094 — Run-end honesty pair (baseline-emit leak + todo finalizer)

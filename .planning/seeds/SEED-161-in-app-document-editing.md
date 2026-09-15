@@ -1,5 +1,5 @@
 ---
-id: SEED-161
+seed_id: SEED-161
 title: In-app document editing — a general capability, explicitly NOT this milestone
 status: open
 planted: 2026-08-14
@@ -12,6 +12,7 @@ re_open_trigger: >
   A milestone being scoped around document management or content authoring, OR [[SEED-158]]
   (plain templates) being picked up and its option 1/3 chosen — both need an editor and neither
   should build a private one. Whichever comes first.
+trigger_when: unset
 ---
 
 # Editing documents inside the app

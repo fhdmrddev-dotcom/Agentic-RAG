@@ -23,6 +23,8 @@ trigger_when: >
 
   Mechanical check that the gap is still real, from the repo root:
     grep -rn "skill_bundle\|skill_pack\|skill_collection" backend/app/   # -> nothing today
+trigger_paths:
+  - "backend/app/**"
 ---
 
 # Experts — the shape the idea was missing

@@ -1,5 +1,5 @@
 ---
-id: SEED-141
+seed_id: SEED-141
 title: The canvas has seven phase types and all seven are AI steps — investigate a class of deterministic, non-AI utility nodes (the n8n-style primitives) for the plumbing between them
 status: open
 planted: 2026-08-08
@@ -18,6 +18,7 @@ re_open_trigger: >
   immediately; (3) an eighth AI phase type is proposed — stop and ask whether the need is actually a
   utility node; (4) the competitive crawl is refreshed and n8n/Zapier-style primitives are again the
   visible gap; (5) any phase proposes adding conditional execution to the LINEAR spine.
+trigger_when: unset
 ---
 
 # SEED-141 — the missing half of the node vocabulary: deterministic utility nodes

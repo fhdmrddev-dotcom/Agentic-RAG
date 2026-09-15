@@ -1,7 +1,12 @@
 ---
 seed_id: SEED-024
 title: Settings & runtime-config architecture unification — eliminate settings_override.json, fold non-secret values into app_settings + user_settings + model_capabilities_overrides, expand admin scope to include title drafting, sub-agents, context window
-status: scheduled
+status: deferred
+status_note: |
+  ORIGINAL `status:` line, verbatim — displaced by Phase 251's frontmatter migration (D-10):
+  status: scheduled
+
+  Mapped `scheduled` -> `deferred`. Reason: named for a later slot.
 planted: 2026-05-17
 scheduled: 2026-05-17
 scheduled_phase: 081.1 (proposed — Settings Architecture Unification, inserted between Phase 081 OpenRouter UAT and Phase 082 cross-cutting verify)
@@ -29,6 +34,8 @@ re_open_triggers:
 
 priority: HIGH (security/architecture concern; affects v3.1 scope directly)
 suggested_phase: Fold into v3.1 plan-phase OR ship as a v2.6 polish phase before v3.0 starts (e.g., 081.x or 082.x). Cannot defer past v3.1 close.
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-024 — Settings & runtime-config architecture unification

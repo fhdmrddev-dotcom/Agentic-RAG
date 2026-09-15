@@ -14,6 +14,8 @@ related_phases:
   - v3.4 org-RBAC milestone — the full shape
 related_memories: [project_org_level_deferred, project_v33_milestone_started, project_target_scale]
 priority: high
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-115 — org access control: roles · departments · greenlists · doc-level permissions

@@ -1,5 +1,5 @@
 ---
-id: SEED-228
+seed_id: SEED-228
 title: read_doc on a .docx id returns a bare FAILED_PRECONDITION
 status: planted
 surface: Agentic-RAG

@@ -25,6 +25,8 @@ re_open_triggers:
   - The Phase 127 build adopts the icon convention — when the provider-logo helper (Phase 128 `providerLogo.tsx`) becomes the single source, plan to surface the provider list (with those marks) in Settings.
 priority: medium
 suggested_phase: v3.2 Operator UX (admin shell). Likely a 'Settings/Admin Control Center' phase that (a) reworks SettingsPage visuals, (b) makes it the functional admin home that controls every dynamic setting, (c) adds first-class provider + model management (enable/disable, defaults, per-provider config, model registry self-service, cost/rate), and (d) reflects the shared icon convention (canonical @lobehub/icons provider marks).
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-095 — Settings → Admin Control Center (provider/model management + icon convention)

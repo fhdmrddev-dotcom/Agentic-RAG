@@ -1,7 +1,16 @@
 ---
 seed_id: SEED-076
 title: Filtered-vector-search recall + pgvector index strategy at corpus scale (filtered-HNSW recall collapse)
-status: partially-shipped     # ⚠ NOT `closed`. Levers 1-3 and 5-adjacent shipped at Phase 241; lever 4 stays deferred with a NEW trigger below.
+status: shipped
+partial: true
+status_note: |
+  ORIGINAL `status:` line, verbatim — displaced by Phase 251's frontmatter migration (D-10):
+  status: partially-shipped     # ⚠ NOT `closed`. Levers 1-3 and 5-adjacent shipped at Phase 241; lever 4 stays deferred with a NEW trigger below.
+
+  The prose that followed the token, byte-for-byte:
+  # ⚠ NOT `closed`. Levers 1-3 and 5-adjacent shipped at Phase 241; lever 4 stays deferred with a NEW trigger below.
+
+  Mapped `partially-shipped` -> `shipped` + `partial: true`. Reason: D-16.
 folded_into: 241
 answered: 2026-09-10
 answered_by: "Phase 241 (QUEUE-06) — .planning/phases/241-recall-at-corpus-scale/241-VALIDATION.md"
@@ -31,6 +40,8 @@ re_open_triggers:
   - pgvector is upgraded to 0.8+ (iterative-scan becomes available — a candidate fix lever)
 priority: high — the single most product-shaping non-sandbox scale risk; core RAG grounding silently degrades exactly as the platform succeeds, and the gap is invisible in every current single-user UAT. Not load-bearing TODAY (single-operator dev = one user owns the whole table), but a HARD prereq for the next milestone (SEED-005) and the v3.2 RLS rewrite.
 suggested_phase: a "Scale Hardening" deliverable co-planned with SEED-005 (filtered search becomes primary) and validated as a GATE inside the v3.2 RLS rewrite. NOT v2.9 — Phase 101 does not touch retrieval.
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-076 — Filtered-vector-search recall + pgvector index strategy at corpus scale

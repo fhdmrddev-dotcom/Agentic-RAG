@@ -17,6 +17,8 @@ re_open_triggers:
 priority: low
 answered_by: "Phase 250 (HONEST-03 / HONEST-04), 2026-09-15 — items 1-3 SHIPPED; item 4 DECLINED with a reason"
 suggested_phase: A small dedicated frontend polish phase (or fold into the next phase that opens TodosSection.tsx / the Workspace panel). NOT a blocker — Phase 138 already meets the RUN-01b honesty requirement.
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-105 — Run-state-aware TODOS panel

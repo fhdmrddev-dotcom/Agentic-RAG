@@ -1,5 +1,5 @@
 ---
-id: SEED-147
+seed_id: SEED-147
 title: The two authoring doors exist but are not legible — an operator using the Builder for real work could not tell "Describe & run" from "Author & govern", or say what the third control does
 status: open
 planted: 2026-08-10
@@ -17,6 +17,7 @@ re_open_trigger: >
   any new user is observed hesitating at the door choice; (3) any phase adds a THIRD door or renames
   either existing one; (4) SEED-051's guided-authoring journey lands, which changes what the fast
   door even means.
+trigger_when: unset
 ---
 
 # SEED-147 — the doors are real, the difference is invisible

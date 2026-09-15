@@ -3,7 +3,15 @@ seed_id: SEED-177
 title: MCP connections both ways — user-level "just connect" integrations usable in chat AND workflows, plus the open-source leverage around them. Breadth is now asked for; re-open trigger #3 has fired.
 created: 2026-08-18
 planted_during: Operator direction, after a live test of n8n's MCP server and a scoping conversation about competitor connector breadth (Beam, Glean)
-status: partially-answered  # trigger #2 ANSWERED by Phase 206 (2026-08-25); triggers #1 and #4 have NOT fired
+status: partially-answered
+status_note: |
+  ORIGINAL `status:` line, verbatim — displaced by Phase 251's frontmatter migration (D-10):
+  status: partially-answered  # trigger #2 ANSWERED by Phase 206 (2026-08-25); triggers #1 and #4 have NOT fired
+
+  The prose that followed the token, byte-for-byte:
+  # trigger #2 ANSWERED by Phase 206 (2026-08-25); triggers #1 and #4 have NOT fired
+
+  Mapped `partially-answered` -> `partially-answered`. Reason: clean 1:1 — a first-class enum member, NOT the partially-* family.
 priority: high
 relates_to:
   - SEED-013 (External Integrations — public API, MCP server, webhooks) — the INBOUND twin; "expose us" is its second consumer mode
@@ -18,6 +26,10 @@ trigger_when:
   - Anyone proposes adding an MCP client to backend/app — retire the test_189_no_egress fence DELIBERATELY, never trip it by surprise
   - A user asks to pull from Slack / Jira / Monday / ClickUp / email / OneDrive
   - Anyone estimates connector work using the "OAuth is the hard part, once per vendor" framing — that framing is WRONG, see below
+trigger_paths:
+  - ".planning/ROADMAP.md"
+  - "backend/app/**"
+surface: Agentic-RAG
 ---
 
 # SEED-177 — connect, and be connected

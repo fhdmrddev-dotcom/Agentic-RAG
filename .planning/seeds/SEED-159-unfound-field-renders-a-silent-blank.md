@@ -1,5 +1,5 @@
 ---
-id: SEED-159
+seed_id: SEED-159
 title: A field with no evidence renders as an EMPTY CELL — "nothing happened" and "we never looked" are indistinguishable
 status: open
 planted: 2026-08-14
@@ -12,6 +12,7 @@ re_open_trigger: >
   A run producing a deliverable with any null leaf (check `null_leaf_count > 0` on the emit
   phase output), OR any phase touching `build_context` / `_cell` / the emit render path, OR the
   first customer-facing deliverable produced by this product. Whichever comes first.
+trigger_when: unset
 ---
 
 # An unfound field renders as a blank, and the blank lies

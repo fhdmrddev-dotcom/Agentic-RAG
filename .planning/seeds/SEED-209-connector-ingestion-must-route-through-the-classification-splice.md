@@ -1,7 +1,15 @@
 ---
-id: SEED-209
+seed_id: SEED-209
 title: Connector-ingested documents must enter through the SAME classification splice as an upload, and source facts must become first-class filterable fields
-status: folded            # FOLDED into Phase 237 (2026-09-06) -- RULES-01, RULES-02
+status: folded
+status_note: |
+  ORIGINAL `status:` line, verbatim — displaced by Phase 251's frontmatter migration (D-10):
+  status: folded            # FOLDED into Phase 237 (2026-09-06) -- RULES-01, RULES-02
+
+  The prose that followed the token, byte-for-byte:
+  # FOLDED into Phase 237 (2026-09-06) -- RULES-01, RULES-02
+
+  Mapped `folded` -> `folded`. Reason: clean 1:1.
 folded_into: Phase 237 (One Rule Engine, Not Two — RULES-01, RULES-02)
 closed_at: 2026-09-06
 planted: 2026-08-26
@@ -21,6 +29,7 @@ re_open_trigger: >
   any path other than the shared ingest splice; (4) a classification rule is asked to match on a
   fact the connector knows and the field whitelist does not (source path, site, library, sender,
   participants, channel).
+trigger_when: unset
 ---
 
 # SEED-209 — connector ingest must reuse the classification splice, and provenance must be filterable

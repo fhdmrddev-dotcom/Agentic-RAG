@@ -30,6 +30,8 @@ suggested_phase: post-v2.6 (likely early v2.7 — paired with Agent Workspace
   or as a dedicated retrieval phase). 2026-06-06 update: eval fixture rows land
   first in Phase 096 (v2.8 eval harness); the full audit is a v2.9+ sweep
   candidate, with SEED-059/SEED-060 as its first two work items.
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 ## Why this seed exists

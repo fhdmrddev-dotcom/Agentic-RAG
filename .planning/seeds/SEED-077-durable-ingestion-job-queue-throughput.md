@@ -21,6 +21,7 @@ re_open_triggers:
   - "First bulk-load (>50 docs in one batch) onboarding by any tenant"
 priority: high — bulk document onboarding is the first thing an enterprise buyer does, and the current in-process model silently drops work under exactly that load. Not load-bearing for single-operator dev (one upload at a time, no restarts mid-batch), but a hard prerequisite for the NEXT milestone.
 suggested_phase: a future scale-hardening deliverable, co-planned with SEED-005 bulk-load and the org-onboarding flow (SEED-004). Cheapest first cut reuses the existing Redis run-buffer infra. NOT v2.9.
+surface: Agentic-RAG
 ---
 
 # SEED-077 — Durable ingestion job queue + throughput at scale

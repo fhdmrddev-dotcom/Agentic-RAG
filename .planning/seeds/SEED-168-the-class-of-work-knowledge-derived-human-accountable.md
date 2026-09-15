@@ -22,6 +22,7 @@ trigger_when:
   - "/gsd:discuss-phase 198" — NODE-01 and NODE-02 both live here; read the axes table first
   - Planning the automations milestone (SEED-014) — use the axes as the milestone's coverage checklist
   - Any milestone-scoping conversation that asks "what is this product FOR?"
+surface: Agentic-RAG
 ---
 
 # SEED-168: The class of work — and the six axes that decide whether we cover it

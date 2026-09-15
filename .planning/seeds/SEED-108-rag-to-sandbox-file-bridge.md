@@ -1,5 +1,6 @@
 ---
-id: SEED-108
+title: The RAG↔sandbox file bridge (materialize a KB document's ORIGINAL bytes into the sandbox)
+seed_id: SEED-108
 status: planted
 planted: 2026-07-09
 planted_during: v3.2 STRETCH (cross-provider docx-conversion UAT, 2026-07-08/09 — operator asked to step back and check whether feature growth is eroding the RAG core)
@@ -7,6 +8,7 @@ trigger_when: Any task/skill/workflow that must OPERATE ON (convert, render, fai
 scope: Medium
 related: [[SEED-043]] (sandbox package mgmt — the tools half), [[SEED-106]] (sandbox binary parity — soffice/pandoc/pdftoppm), Phase 144 / SEED-104 (agent-driven skill file ATTACH — the inverse write direction), the docx/pptx skills, [[project_skills_mime_known_gap]]
 re_open_trigger: Next foundation/skills milestone OR any operator report of "work on my KB document" failing or being faked/reconstructed instead of faithfully processed
+surface: Agentic-RAG
 ---
 
 # SEED-108: The RAG↔sandbox file bridge (materialize a KB document's ORIGINAL bytes into the sandbox)

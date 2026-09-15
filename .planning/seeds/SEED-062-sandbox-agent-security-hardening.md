@@ -19,6 +19,8 @@ re_open_triggers:
   - A security review / gsd:secure-phase run flags sandbox escape or exfiltration paths
 priority: low now / critical at production+multi-user
 suggested_phase: post-production planned update — natural home is the deployment-hardening milestone (v3.1+ operator era) with the marketplace-verification slice waiting for v3.5+
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-062 — Sandbox & agent-security hardening

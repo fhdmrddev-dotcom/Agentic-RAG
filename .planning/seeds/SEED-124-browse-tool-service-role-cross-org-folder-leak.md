@@ -16,6 +16,8 @@ re_open_triggers:
   - "The xfail marker `test_browse_tools_cross_org_leak_KNOWN_OPEN_seed124` in test_v3_4_org_isolation.py flips to XPASS (strict) — the leak is closed; remove the marker and flip this seed to closed."
 priority: high
 suggested_phase: 165 (is_global Retirement Cleanup — the natural home; its scope already includes folder_utils.py)
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-124 — KB browse/read tools leak documents cross-org (service-role, org-blind folder helpers)

@@ -1,5 +1,5 @@
 ---
-id: SEED-247
+seed_id: SEED-247
 title: A file attached in chat should belong to the THREAD, not the Library — the data model cannot express "temporary" at all
 status: planted
 planted: 2026-09-05

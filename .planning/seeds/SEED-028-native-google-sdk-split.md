@@ -25,6 +25,8 @@ re_open_triggers:
 
 priority: MEDIUM (architectural cleanup; not blocking; the Phase 075.3 defensive chunk handler closes the functional gap)
 suggested_phase: v3.1 (alongside Provider key management UI) OR a v2.7 polish slot if Phase 075.3 ships unstable
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-028 — Native Google SDK split

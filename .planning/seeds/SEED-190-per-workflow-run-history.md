@@ -3,7 +3,13 @@ seed_id: SEED-190
 title: A run has no door except its own chat thread — there is nowhere to see the runs, and chat cannot tell a workflow run from a conversation
 created: 2026-08-20
 planted_during: Phase 200 run-surface re-port (operator, watching a run open from the chat thread list)
-status: shipped-in-part
+status: shipped
+partial: true
+status_note: |
+  ORIGINAL `status:` line, verbatim — displaced by Phase 251's frontmatter migration (D-10):
+  status: shipped-in-part
+
+  Mapped `shipped-in-part` -> `shipped` + `partial: true`. Reason: D-16 — same class as partially-shipped, different spelling.
 shipped: 2026-08-20
 surface: Agentic-RAG
 relates_to:
@@ -19,6 +25,8 @@ trigger_when: >
   workflow-run thread in the chat sidebar — which is unblocked, cheap, and where the
   operator's complaint actually started. Re-open on the next phase that touches the chat
   thread list, `ThreadRunLine.tsx`, or `threads.active_workflow_run_id`.
+trigger_paths:
+  - "**/ThreadRunLine.tsx"
 ---
 
 ## The complaint, in the operator's words

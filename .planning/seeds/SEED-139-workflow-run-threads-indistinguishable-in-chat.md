@@ -1,5 +1,5 @@
 ---
-id: SEED-139
+seed_id: SEED-139
 title: Workflow-run threads are indistinguishable from chats — 27% of the thread list has no type, because the only marker is a liveness pointer that clears on completion
 status: open
 planted: 2026-08-06
@@ -21,6 +21,7 @@ re_open_trigger: >
   provenance beyond chat / workflow-run / eval — the absence of a type field becomes a
   three-way ambiguity rather than a two-way one; (5) the "launching a workflow redirects
   into Chat" behaviour is revisited (see project_workflow_runs_leak_into_chat).
+trigger_when: unset
 ---
 
 # SEED-139 — the chat list cannot say what a thread is

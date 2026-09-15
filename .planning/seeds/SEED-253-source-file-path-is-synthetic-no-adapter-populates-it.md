@@ -3,7 +3,16 @@ seed_id: SEED-253
 title: A watch rule can filter on `path`, but no adapter populates it — production always substitutes `/<filename>`, so folder-shaped path rules silently never match
 created: 2026-09-06
 planted_during: Phase 237 reviewer re-review (claude, REVIEWER — did not build this phase)
-status: partial   # ⚠ Phase 238 took OPTION 1 for Graph. Drive is STILL unpopulated.
+status: folded
+partial: true
+status_note: |
+  ORIGINAL `status:` line, verbatim — displaced by Phase 251's frontmatter migration (D-10):
+  status: partial   # ⚠ Phase 238 took OPTION 1 for Graph. Drive is STILL unpopulated.
+
+  The prose that followed the token, byte-for-byte:
+  # ⚠ Phase 238 took OPTION 1 for Graph. Drive is STILL unpopulated.
+
+  Mapped `partial` -> `folded` + `partial: true`. Reason: READ SEED-253 — Graph half folded into Phase 238, Drive half still open.
 priority: medium
 surface: Agentic-RAG
 relates_to:

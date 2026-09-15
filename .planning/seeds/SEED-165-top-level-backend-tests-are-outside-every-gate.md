@@ -1,3 +1,15 @@
+---
+seed_id: SEED-165
+title: >
+  `backend/tests/*.py` is outside every gate, and 54 failures have been rotting there
+status: planted
+status_note: |
+  Phase 251 frontmatter migration: this file had NO frontmatter block at all, so no status was
+  ever recorded for it. `planted` here is a MIGRATION DEFAULT — it is a statement about the
+  absence, never a claim about the seed. Read the body and set it deliberately.
+surface: Agentic-RAG
+trigger_when: unset
+---
 # SEED-165 — `backend/tests/*.py` is outside every gate, and 54 failures have been rotting there
 
 **Planted:** 2026-08-15, during Phase 193.2's close-out, at the operator's direction

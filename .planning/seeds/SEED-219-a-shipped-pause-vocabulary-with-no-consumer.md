@@ -1,5 +1,5 @@
 ---
-id: SEED-219
+seed_id: SEED-219
 title: "`stepIdentityVocabulary`'s six PAUSE sentences are consumed by NOTHING — `PendingAskCard` still renders `Needs you`"
 status: planted
 planted: 2026-08-28
@@ -28,6 +28,7 @@ re_open_trigger: >
   Mechanical check that the gap is still real, from the repo root:
     grep -c "ASK_PAUSED" frontend/src/components/panel/PendingAskCard.tsx
   A count of 0 means the gap is live.
+trigger_when: unset
 ---
 
 # SEED-219: a shipped pause vocabulary with no consumer

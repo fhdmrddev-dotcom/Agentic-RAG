@@ -18,6 +18,8 @@ relates_to:
   - Phase 063 plan 1 verbatim copy of `_reset_redis_singleton` at `tests/integration/test_063_post_then_subscribe.py:45-62`
   - Phase 065 Plan 03 SUMMARY — verified pre-existing on `fa1e327` base via git-stash round-trip
 closure_note: "Fully consumed by Phase 074. test_059_disconnect.py 3/3 PASS without RuntimeError. POLISH-SEED-011-01 Validated."
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-011: test_059 fixture teardown loop-binding bug

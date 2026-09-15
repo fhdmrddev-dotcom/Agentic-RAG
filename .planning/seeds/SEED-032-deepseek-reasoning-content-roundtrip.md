@@ -1,7 +1,15 @@
 ---
-id: SEED-032
+seed_id: SEED-032
 title: DeepSeek full integration — thinking mode + real-time UI parity
-status: folded          # narrowed v4.1 -> 243 (CHAT-01) at /gsd:plan-phase 243, 2026-09-11
+status: folded
+status_note: |
+  ORIGINAL `status:` line, verbatim — displaced by Phase 251's frontmatter migration (D-10):
+  status: folded          # narrowed v4.1 -> 243 (CHAT-01) at /gsd:plan-phase 243, 2026-09-11
+
+  The prose that followed the token, byte-for-byte:
+  # narrowed v4.1 -> 243 (CHAT-01) at /gsd:plan-phase 243, 2026-09-11
+
+  Mapped `folded` -> `folded`. Reason: clean 1:1.
 folded_into: "243"
 
 planted: 2026-05-26

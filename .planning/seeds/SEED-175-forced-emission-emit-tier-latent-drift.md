@@ -19,6 +19,9 @@ relates_to:
 trigger_when: >
   `backend/tests/unit/test_196_forced_emission_drift_trigger.py` goes RED. That is the whole trigger —
   it is a gate, not a reminder, and it fires the day the drift stops being latent.
+trigger_paths:
+  - "backend/tests/unit/test_196_forced_emission_drift_trigger.py"
+surface: Agentic-RAG
 ---
 
 # The drift

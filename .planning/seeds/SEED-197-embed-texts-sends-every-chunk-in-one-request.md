@@ -3,7 +3,15 @@ seed_id: SEED-197
 title: embed_texts sends every chunk of a document in ONE request with no batching — pre-existing, and Phase 202's table chunks are the first path that can plausibly exceed the provider cap
 created: 2026-08-24
 planted_during: Post-execution review of Phases 202 and 203 (unattended, operator away)
-status: planted            # ⛔ DELIBERATELY still `planted` — Phase 241 REMOVED an exposure, it did not fix the ceiling. See the 2026-09-10 note at the end of this file.
+status: planted
+status_note: |
+  ORIGINAL `status:` line, verbatim — displaced by Phase 251's frontmatter migration (D-10):
+  status: planted            # ⛔ DELIBERATELY still `planted` — Phase 241 REMOVED an exposure, it did not fix the ceiling. See the 2026-09-10 note at the end of this file.
+
+  The prose that followed the token, byte-for-byte:
+  # ⛔ DELIBERATELY still `planted` — Phase 241 REMOVED an exposure, it did not fix the ceiling. See the 2026-09-10 note at the end of this file.
+
+  Mapped `planted` -> `planted`. Reason: clean 1:1.
 folded_into: 241           # folded by the ROADMAP; the fold was answered by REMOVING the new exposure (D-08), not by batching embed_texts
 answered: 2026-09-10
 answered_by: "Phase 241 (QUEUE-06) — D-08: the bench corpus perturbs real embeddings, so no bench path calls embed_texts at all"

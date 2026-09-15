@@ -1,10 +1,22 @@
 ---
-id: SEED-002
-status: queued (v3.1 — re-scoped)
+title: Skill Studio Milestone Preparation
+seed_id: SEED-002
+status: deferred
+status_note: |
+  ORIGINAL `status:` line, verbatim — displaced by Phase 251's frontmatter migration (D-10):
+  status: queued (v3.1 — re-scoped)
+
+  The prose that followed the token, byte-for-byte:
+  (v3.1 — re-scoped)
+
+  Mapped `queued` -> `deferred`. Reason: named for a later slot.
 planted: 2026-05-02
 planted_during: v2.5 (Phase 059 complete — SSE Architecture Refactor)
 trigger_when: planning a milestone scoped to "Skills" / "Skill Studio" / "Eval" / v3.0 / v3.1 — or any milestone that extends the existing skills system, agent tools, or sub-agent service
+trigger_surfaces:
+  - "skills"
 scope: Large
+surface: Agentic-RAG
 ---
 
 # SEED-002: Skill Studio Milestone Preparation

@@ -22,6 +22,8 @@ suggested_phase: 076 or 082 (whichever lands first); could also support a small
   decimal phase (e.g., 075.1 or 076.1) if the user wants precision fixed in
   isolation before recalibration runs
 priority: medium-high
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-022 — Camelot PDF Table-Precision Audit

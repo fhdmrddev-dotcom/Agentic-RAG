@@ -21,6 +21,7 @@ trigger_when: >
   `GSD_VITEST_MAX_WORKERS` as a remedy for red gate runs, OR `WorkflowsPage.test.tsx` /
   `WorkflowCard.test.tsx` / `WorkflowBuilderPage.session.test.tsx` / `WorkflowRunPage.test.tsx`
   are edited for any reason.
+surface: Agentic-RAG
 ---
 
 # The flake is in the suites, not in the cap

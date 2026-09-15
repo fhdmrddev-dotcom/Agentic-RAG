@@ -23,6 +23,7 @@ trigger_when: >
   (3) `resolve_authoring_model`, `resolve_skill_builder_model` or any of their call sites is edited
   for any reason;
   (4) a fourth resolver of this shape is added.
+surface: Agentic-RAG
 ---
 
 # The finding

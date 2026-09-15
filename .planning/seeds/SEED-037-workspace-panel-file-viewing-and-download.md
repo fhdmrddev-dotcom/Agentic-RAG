@@ -1,7 +1,13 @@
 ---
-id: SEED-037
+seed_id: SEED-037
 title: Workspace Panel — Full File-Type Viewing (Office/PDF) + Working File Download
-status: partially-shipped
+status: shipped
+partial: true
+status_note: |
+  ORIGINAL `status:` line, verbatim — displaced by Phase 251's frontmatter migration (D-10):
+  status: partially-shipped
+
+  Mapped `partially-shipped` -> `shipped` + `partial: true`. Reason: D-16.
 planted: 2026-05-29
 planted_by: orchestrator (087 scenario-matrix round-3 testing)
 updated: 2026-08-13
@@ -11,6 +17,7 @@ routed_to: "Phase 108 (file_preview half) — see REQUIREMENTS.md § Future Requ
 trigger_when: RUN-02 makes produced files visible on the run surface (the REQUIREMENTS.md trigger) — OR a user needs to OPEN (not download) a workspace file that is NOT markdown/code/csv/text/image — OR demand appears to view KB documents in the panel
 priority: medium
 tags: [frontend/panel, file-viewer, download, office, pdf, ux, phase-087]
+surface: Agentic-RAG
 ---
 
 # SEED-037: Workspace Panel — Full File-Type Viewing + Working Download

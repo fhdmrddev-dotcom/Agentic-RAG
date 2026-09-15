@@ -12,6 +12,8 @@ related_phases:
   - Phase 153 (inline-citations) — origin; D-06 (footer = full retrieval set), D-07 (markers = model's chosen subset), D-04 (no false-negative repair) are the exact decisions this seed proposes to make legible
 related_memories: [seamless-scroll-chat, feedback_uat_lived_experience_gap, feedback_business_value_framing, feedback_preserve_all_deferred_ideas]
 priority: medium
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-119 — Make the "footer ⊋ inline markers" gap legible

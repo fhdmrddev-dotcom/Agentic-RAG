@@ -1,10 +1,12 @@
 ---
-id: SEED-127
+title: reasoning-first STRUCTURED routing doesn't cover the forced-emission path
+seed_id: SEED-127
 status: dormant
 planted: 2026-07-22
 planted_during: v3.5 (UX Consolidation & Chat Polish — Phase 175 code review WR-03)
 trigger_when: gpt-5.6 (or any `reasoning_first: True` model) goes GA AND becomes reachable on a FORCED/STRUCTURED-emission path (title-gen, suggestions, workflow field-map/generation, or any `force_tool_name` caller) — i.e. the moment a reasoning-first model is used as anything other than a plain chat model
 scope: Small
+surface: Agentic-RAG
 ---
 
 # SEED-127: reasoning-first STRUCTURED routing doesn't cover the forced-emission path

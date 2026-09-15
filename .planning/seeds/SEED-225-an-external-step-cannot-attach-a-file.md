@@ -1,5 +1,5 @@
 ---
-id: SEED-225
+seed_id: SEED-225
 title: An external step cannot attach a file — and an attachment needs two facts the model must not conflate
 status: planted
 planted: 2026-08-28
@@ -23,6 +23,7 @@ re_open_trigger: >
   time a workflow is asked to deliver a produced document rather than a produced sentence. Also
   re-open if BUG-260828-02 ships the declared-input authoring surface, since the attachment source
   is the same surface with one more type.
+trigger_when: unset
 ---
 
 # SEED-225 — sending a file, and the two facts an attachment needs
