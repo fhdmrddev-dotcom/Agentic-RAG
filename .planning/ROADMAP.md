@@ -205,11 +205,11 @@ with `independent_review: owed` until a review actually runs.
 Plans:
 **Wave 1**
 
-- [ ] 251-01-PLAN.md — build `scripts/check-seeds-register.cjs`, the executable sweep, and drive D-04's four arms + the count assertion RED via a committed `--self-test` before the register is touched
+- [x] 251-01-PLAN.md — build `scripts/check-seeds-register.cjs`, the executable sweep, and drive D-04's four arms + the count assertion RED via a committed `--self-test` before the register is touched
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 251-02-PLAN.md — migrate all 283 seeds onto the D-09/D-10/D-16 frontmatter contract with every BODY proven md5-identical over raw Buffers, and write the contract down in TEMPLATE.md, plant-seed.md and CLAUDE.md
+- [ ] 251-02-PLAN.md — migrate all ~~283~~ **284** seeds (⚠ `SEED-285` was planted in 251-01's own base commit; re-derive, never transcribe — see `251-GATE-BASELINE.md` §0) onto the D-09/D-10/D-16 frontmatter contract with every BODY proven md5-identical over raw Buffers, and write the contract down in TEMPLATE.md, plant-seed.md and CLAUDE.md
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -256,7 +256,7 @@ with it in the phase STATUS.
 | 248. The Credential Boundary | 0/? | Not started (⚠ threat model mandatory) | - |
 | 249. The Model You Actually Run | 0/? | Not started (⚠ `MODEL-09` re-measurement owed) | - |
 | 250. Run Honesty — the residue | 3/3 | ✅ **CLOSED 2026-09-15** — built + self-verified by claude alone (operator instruction). ⚠ `HONEST-04`'s blocking measurement WAS taken first and the report's dichotomy was FALSE (both arms true, of different rows). ⛔ `independent_review: owed` | HONEST-01..04 |
-| 251. Register Integrity | 0/4 | Planned 2026-09-16 — 4 serial plans (G-8 target met) | - |
+| 251. Register Integrity | 1/4 | 251-01 shipped 2026-09-16 — the sweep exists, `--self-test 6/6 arms PASS`, arm 4 driven RED against a planted defect; register byte-unchanged | REG-02 (instrument) |
 
 **4 / 5 phases complete · 14 / 26 requirements delivered** (247, 248, 249, 250 closed; 251 remains).
 

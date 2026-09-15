@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v4.2
 milestone_name: The Connected Knowledge You Can Actually Run
 status: executing
-last_updated: "2026-09-15T21:15:56.071Z"
-last_activity: 2026-09-15 -- Phase 251 planning complete
+last_updated: "2026-09-16T00:00:00.000Z"
+last_activity: 2026-09-16 -- Phase 251 plan 01 executed (the seeds-register gate)
 progress:
   total_phases: 12
   completed_phases: 1
   total_plans: 19
-  completed_plans: 6
+  completed_plans: 7
   percent: 8
 ---
 
@@ -107,6 +107,24 @@ owed work at all.
    269`), so a reference by ID cannot be resolved.
 
 ## Current Position
+
+Phase: **251 — Register Integrity** (the last phase of v4.2). Plan **251-01 SHIPPED** at `b38bd8444`.
+Plan: 251-01 (the gate) done · **251-02 / 03 / 04 owed**, strictly serial — 02 migrates the register,
+03 renumbers the 8 duplicate ids, 04 wires the sweep into the two GSD touchpoints.
+Status: Ready to execute 251-02
+
+⚠ **`251-01` found the plan's own register size had rotted by one IN ITS BASE COMMIT** — `97bb24e4d`
+planted `SEED-285`, so the register is **284**, not the **283** that `251-01-PLAN.md`, `251-02-PLAN.md`
+and `251-RESEARCH.md` all state. The gate derives `registerSize` by `readdirSync` and needed no change;
+**a plan that hardcodes 283 does.** Pre-migration census (every figure from a named command):
+`.planning/phases/251-register-integrity/251-GATE-BASELINE.md`.
+
+⛔ **Baseline for 02/03 to be measured against:** `register 284 · parsed 284 · skipped 0` ·
+**8** `[duplicate-id]` · **5** `[no-frontmatter]` · **396** `[missing-key]` · **27** `[unknown-status]` ·
+**73/284** seeds carry all five required keys · unswept **126 / 158** (two figures, never summed) ·
+`--self-test 6/6 arms PASS`.
+
+### ⚠ The 2026-09-15 position below is STALE and is kept rather than overwritten
 
 Phase: **247 — Sources & Watches · CLOSED ON CODE** at `3d5f62dc6`. Next: **248 — The Credential Boundary**
 Plan: 247-01 .. 247-04 — **all 4 shipped across 3 waves**, every plan carrying a SUMMARY
