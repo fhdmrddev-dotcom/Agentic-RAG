@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v4.2
 milestone_name: The Connected Knowledge You Can Actually Run
 status: executing
-last_updated: "2026-09-16T00:00:00.000Z"
-last_activity: 2026-09-16 -- Phase 251 plan 01 executed (the seeds-register gate)
+last_updated: "2026-09-16T12:00:00.000Z"
+last_activity: 2026-09-16 -- Phase 251 plan 02 executed (284 seeds migrated to the frontmatter contract; 284 bodies proven byte-identical)
 progress:
   total_phases: 12
   completed_phases: 1
   total_plans: 19
-  completed_plans: 7
+  completed_plans: 8
   percent: 8
 ---
 
@@ -108,10 +108,40 @@ owed work at all.
 
 ## Current Position
 
-Phase: **251 — Register Integrity** (the last phase of v4.2). Plan **251-01 SHIPPED** at `b38bd8444`.
-Plan: 251-01 (the gate) done · **251-02 / 03 / 04 owed**, strictly serial — 02 migrates the register,
+Phase: **251 — Register Integrity** (the last phase of v4.2). Plans **251-01** at `b38bd8444` and
+**251-02 SHIPPED** at `eff1afa7e` (summary `b03c66441`).
+Plan: 251-01 (the gate) + 251-02 (the migration) done · **251-03 / 04 owed**, strictly serial —
 03 renumbers the 8 duplicate ids, 04 wires the sweep into the two GSD touchpoints.
-Status: Ready to execute 251-02
+Status: Ready to execute 251-03
+
+⛔ **Gate reading after 251-02 — this is what 03 is measured against, and it is deliberately not
+green:** `register 284 · parsed 284 · skipped 0` · **8** `[duplicate-id]` · **0** `[no-frontmatter]` ·
+**0** `[missing-key]` · **0** `[unknown-status]` · **284/284** seeds carry all five required keys ·
+**15** carry `partial: true` · unswept **126 / 114** (two figures, never summed) · exit **1**.
+A green gate here would mean the gate had stopped seeing the 8 collisions.
+
+⭐ **284/284 BODIES PROVEN BYTE-IDENTICAL by a digest set derived independently of the migration**
+(a byte scan, not the migration's regex reader), diffed both directions, empty both ways. ⛔ Not by
+a git-side content comparison, which was MEASURED blind: a whole-file line-ending rewrite of
+`SEED-171` destroyed **553 bytes** and `git diff --stat` printed **zero lines**. `git status
+--porcelain` DOES flag the file — so git can see THAT a file was touched, never WHAT changed.
+
+⚠ **`git checkout -- <dir>` IS NOT A RESTORE.** Run mid-plan to roll the register back, it
+re-materialised 242 files through `core.autocrlf=true` and moved **224 body digests** while
+`git status` reported the tree CLEAN. 280 of 284 were recovered byte-exact; the residual 4
+(`SEED-013/144/145/194`) lost a working-tree-only line-ending mixture git has never stored and that
+no clone reproduces. **Use a byte copy when you need bytes back.**
+
+⛔ **251-03's id space has ZERO headroom, measured:** 276 distinct ids, **highest is 285**, and
+`277-284` are free — **exactly eight, for eight renumbers**. A ninth must jump to **286**; the run is
+not contiguous. ⚠ And D-08's allocator is now `max(id)+1`: the OLD count-based form emits
+**`SEED-285`, which ALREADY EXISTS** — it produces the ninth collision on its very next use.
+
+⚠ **`SEED-001` carries NO date at all**, so `seedDate()` is not total. 251-02 never called it;
+**251-03's D-07/D-20 tie-break does, and `SEED-001` is not a duplicate pair member — but the gap is
+live for any pair whose members lack both `created:` and `planted:`.**
+
+### ⚠ The pre-migration position below is superseded and is kept rather than overwritten
 
 ⚠ **`251-01` found the plan's own register size had rotted by one IN ITS BASE COMMIT** — `97bb24e4d`
 planted `SEED-285`, so the register is **284**, not the **283** that `251-01-PLAN.md`, `251-02-PLAN.md`
