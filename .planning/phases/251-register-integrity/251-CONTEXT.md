@@ -34,6 +34,26 @@ corrections, never over them, because a plan written against the stale figure bu
 | `REG-02`: "161 planted seeds of 280" | ≈ **160 `status: planted` of 283** — close enough that the requirement is unaffected | Stands as written. |
 | `REG-03`: "**23 items** open `--to operator`, most 5-10 days old" | ⛔ **STALE.** **5** are open: `BUS-040, BUS-208, BUS-246, BUS-247, BUS-248` — and **four of those five are NEWER than BUS-171**. **22 of BUS-171's 23 named items are CLOSED.** The triage itself **already shipped** at commit **`88a9ff861` (2026-09-14)**, whose message records that it counted `2` with `grep -c` and that its **third arm found one true orphan** — a finding held by nothing for 14 days — and planted **`SEED-276`** | ⛔ **REG-03 IS RE-SCOPED — see D-10.** Planning it as written would re-do work that shipped yesterday. |
 
+### Per-id inbound reference load (measured 2026-09-15, repo-wide, excluding the seed files themselves)
+
+| dup id | inbound files | note for D-05/D-07 |
+|---|---|---|
+| `SEED-253` | **52** | the heaviest — the redirect stub matters most here |
+| `SEED-022` | 33 | |
+| `SEED-092` | 33 | |
+| `SEED-231` | 22 | |
+| `SEED-259` | 16 | |
+| `SEED-228` | 11 | |
+| `SEED-229` | 8 | |
+| `SEED-269` | 6 | the lightest |
+
+⚠ **These are FILE counts and they overlap** — one file can reference several of the eight — so they
+do not sum to the 130-file / 448-occurrence aggregate above. They size the work per pair, nothing
+more. ⛔ **They are NOT a tie-breaker:** D-07 rules that the **oldest** seed keeps the id, deliberately
+rejecting "most-referenced keeps it". The planner should still **report any pair where D-07 hands the
+id to the markedly less-referenced seed**, as an observation recorded beside the rule — not as a
+reason to depart from it.
+
 ⭐ **The third arm paid for itself exactly as BUS-171 predicted it would**, and that is recorded here
 so it is not re-litigated: `BUS-040` carried a measured finding (`localhost` resolves `::1` first
 while uvicorn binds IPv4 only → ~2 s per local Python call, 4 ms vs 2048 ms) held by **no register**
