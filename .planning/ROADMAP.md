@@ -114,7 +114,7 @@ with `independent_review: owed` until a review actually runs.
 - [x] **Phase 247: Sources & Watches — the surface you now live on** — Drive/Graph paths stored whole and actually used by classification, watch health reads its connection, "Sync now" answers in place, a missing file says when, labels match behaviour, 240's seven warnings dispositioned (WATCH-01..08)
 - [ ] **Phase 248: The Credential Boundary** — a secret pasted into a non-secret field is refused not stored, the grant marker claims only what is knowable, all 13 anon-executable SECDEF functions ruled on, `get_advisors(security)` in the deploy checklist (CRED-01..04)
 - [x] **Phase 249: The Model You Actually Run** — local / self-hosted models addable from the UI, unregistered ids say so at pick time, registry writes reach every worker, the hide control is the discoverable one, refused writes report failure, eval engines name their own cause (MODEL-04..09). **6/6 delivered · 2 with a NAMED limit.** ⭐ Two requirements were ALREADY BUILT and one defect no longer reproduced — measured before planning, so none was rebuilt. ⭐ 13 of the operator's configured models were measured to lose tool calling silently; the composer now says so at pick time, on the model they currently run. ⛔ `verification_mode: self-verified` by operator instruction (*"without gemini"*) — a FOURTH owed `DEBT-06` row. ⛔ Owed: `MODEL-04` end-to-end in chat (no live self-hosted endpoint), `MODEL-06` multi-worker observation (this box runs two single-worker `--reload` servers), `MODEL-09` cloud sweep (one operator click)
-- [ ] **Phase 250: Run Honesty — the residue** — trimming never eats your own question, a silent reasoning model says what happened, the panel stops working when the run ends, a finished task leaves no false todo (HONEST-01..04)
+- [x] **Phase 250: Run Honesty — the residue** — trimming never eats your own question, a silent reasoning model says what happened, the panel stops working when the run ends, a finished task leaves no false todo (HONEST-01..04)
 - [ ] **Phase 251: Register Integrity** — 8 duplicate seed ids resolved, an executable seeds sweep, `BUS-171`'s 23-item operator queue triaged into a decision list (REG-01..03)
 
 ### Phase Details
@@ -226,10 +226,20 @@ with it in the phase STATUS.
 | 247. Sources & Watches — the surface you now live on | 0/? | Not started (⚠ `/gsd:sketch` owed BEFORE planning) | - |
 | 248. The Credential Boundary | 0/? | Not started (⚠ threat model mandatory) | - |
 | 249. The Model You Actually Run | 0/? | Not started (⚠ `MODEL-09` re-measurement owed) | - |
-| 250. Run Honesty — the residue | 0/? | Not started (⚠ `HONEST-04` measurement owed at discuss) | - |
+| 250. Run Honesty — the residue | 3/3 | ✅ **CLOSED 2026-09-15** — built + self-verified by claude alone (operator instruction). ⚠ `HONEST-04`'s blocking measurement WAS taken first and the report's dichotomy was FALSE (both arms true, of different rows). ⛔ `independent_review: owed` | HONEST-01..04 |
 | 251. Register Integrity | 0/? | Not started | - |
 
-**0 / 5 phases complete · 0 / 26 requirements delivered.**
+**4 / 5 phases complete · 14 / 26 requirements delivered** (247, 248, 249, 250 closed; 251 remains).
+
+⚠ **CORRECTED 2026-09-15 AT PHASE 250'S CLOSE — this table read `0 / 5 phases complete · 0 / 26`
+while FOUR phases were closed**, which is the same rot the v4.1 ROADMAP carried to its own
+archive. ⚠ **AND THE REQUIREMENT TALLY IS DERIVED, NOT ASSERTED:** `REQUIREMENTS.md`'s checkboxes
+read `MODEL 6/6`, `HONEST 4/4`, but **`WATCH 0/8` and `CRED 0/4` — both phases closed with every
+box still unticked.** The `14` above counts 247's and 248's requirements as delivered on the
+authority of `STATE.md`'s closure records, **not** on the authority of the checkboxes, and
+⛔ **claude did not tick them**: flipping a box for work claude neither built nor reviewed would be
+a claim it cannot back. **Phase 251 (`REG-01..03`) is where that gets swept**, and this is a live
+example of exactly what `REG-02` exists for.
 
 **Guardrails firing (v4.2):**
 
