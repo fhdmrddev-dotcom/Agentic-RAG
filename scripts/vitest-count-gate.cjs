@@ -139,7 +139,10 @@ const BASELINE = {
   // live-run positive controls including the loading-but-not-streaming one, the
   // marker-never-rendered / marker-becomes-title pair, and the derived-row parity case.
   // Read from the gate's own printed row, never hand-counted.
-  "TodosSection.test.tsx": 21,
+  // 21 -> 22 at the 250 fix round: the +1 is the SOURCE fence "hooks are never
+  // short-circuited", added after `useStreamingForThread(id) || useLoadingForThread(id)`
+  // shipped, skipped the second hook the moment a run started, and crashed the page.
+  "TodosSection.test.tsx": 22,
   // 250 CLAIMS this suite because 250 CREATED it — the ?raw lockstep fence binding the
   // frontend marker copy to backend/app/services/todos_service.py.
   "todoRunHonesty.lockstep.test.ts": 4,

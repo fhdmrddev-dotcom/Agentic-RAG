@@ -92,7 +92,7 @@ is the row's `title`.
 | Gate | Result |
 |---|---|
 | backend unit | **71 failed / 4822 passed** — **SET identical** to `250-backend-baseline-set.txt` after the one deliberate fence update |
-| frontend count gate | ✅ **`count gate OK` — 285/285 pinned, 0 failing**, total 8370, pinned `7550 → 7563` (**+13 = 9 + 4, fully attributed**) |
+| frontend count gate | at the phase close: ✅ **OK — 285/285, 0 failing**, pinned `7550 → 7563`. ⚠ **At the FIX round (after A3 found the hook defect): `failed 1`, total 8375, pinned 7567 → 7572** (`TodosSection` 21→22 for the new source fence; `WorkspacePanel.derived` 4→4 newly adopted). The one failure is `src/pages/WorkflowBuilderPage.canvas.test.tsx` — **SEED-171's FIFTH named flaky suite, its recorded `AssertionError: expected 0 to be greater than 0` signature**, also red at this phase's own baseline and at Phase 249's gap-closure. **PROVABLY UNMODIFIED**: `git diff a801fca3c..HEAD -- frontend/src/pages frontend/src/components/workflows` is EMPTY. Captured from the gate's persisted JSON BEFORE any re-run; cap untouched at 2; ⛔ the run was NOT repeated to obtain a green. |
 | hot-file ledger | ✅ OK — 4 rows + same-commit sections added (3 were FIRING and had no row for their entire lives) |
 | CLAUDE.md size | ✅ OK — 99,021 chars, 66 % of limit |
 | `tsc -p tsconfig.app.json --noEmit` | 65 errors, **none naming this phase's files** (base 67) |
