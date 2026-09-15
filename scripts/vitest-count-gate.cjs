@@ -143,6 +143,8 @@ const BASELINE = {
   // short-circuited", added after `useStreamingForThread(id) || useLoadingForThread(id)`
   // shipped, skipped the second hook the moment a run started, and crashed the page.
   "TodosSection.test.tsx": 24,  // WR-04: +2 — the sr-only reason is reachable, and is NOT announced on an unmarked row
+  // WR-06 — CHARACTERIZATION of BUG-260915-01. Red here means the window CLOSED.
+  "streamsProvider_250_liveness_window.test.tsx": 2,
   // 250 CLAIMS this suite because 250 CREATED it — the ?raw lockstep fence binding the
   // frontend marker copy to backend/app/services/todos_service.py.
   "todoRunHonesty.lockstep.test.ts": 4,
@@ -5257,6 +5259,7 @@ const TARGETS = [
   // fourteen INHERITED failures documented above live in that folder and would turn the
   // shared gate red for a reason no plan here owns.
   "src/__tests__/providers/streamsProvider_244_settle_ask.test.tsx",
+  "src/__tests__/providers/streamsProvider_250_liveness_window.test.tsx",
   // ⚠ The scroll suite below is a SEPARATE FILE from `MessageList.test.tsx` on purpose:
   // that one stubs `scrollIntoView` to a NO-OP tree-wide (`:61-65`), so nothing mounted under it
   // can see the scroll effect at all. This is the ONLY behavioural coverage that effect has.

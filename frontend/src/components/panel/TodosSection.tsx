@@ -224,6 +224,32 @@ export function TodosSection() {
   // "not ticked" while the agent is working. Realtime is a hint, not truth (D-v2.5-03).
   // ⛔ Both selectors already ship (Phase 075.4) — StreamsProvider.tsx is NOT modified.
   //
+  // ⚠ CORRECTED 2026-09-15 (code review WR-06) — THE PARAGRAPH ABOVE CLAIMED THIS CLOSES
+  // THE WINDOW, AND IT IS KEPT RATHER THAN OVERWRITTEN BECAUSE THE CLAIM WAS FALSE AND
+  // UNTESTED, WHICH IS THIS PHASE'S OWN SUBJECT. Measured against the real store
+  // (`__tests__/providers/streamsProvider_250_liveness_window.test.tsx`):
+  //
+  //   during loadMessages' fetch  -> true      (loading is set)
+  //   after  loadMessages resolves-> ⛔ FALSE   (loading cleared, streaming never set)
+  //   after  reconcile()          -> true
+  //
+  // The two sets are written by paths that never meet: `loadingThreads` lives entirely
+  // inside `loadMessages`, while `streamingThreads` is written by the reconcile-derive,
+  // the send path and the SSE reattach — none of which `loadMessages` calls. And
+  // `reconcile()` is listener-driven (visibilitychange / focus / pageshow), so OPENING A
+  // THREAD TRIGGERS NEITHER. The false "dead" state therefore persists until the user
+  // tabs away and back; it is not a millisecond race.
+  //
+  // ⛔ So inside that window every open todo on a LIVE run reads "Not ticked" — the
+  // mirror-image failure this comment names as the thing it must not do. Filed as
+  // `BUG-260915-01`. The fix is a trigger change in `StreamsProvider.tsx` (102 commits /
+  // 37 phases, G-5 FIRING), which is a phase rather than a review closure — so what
+  // shipped here is the measurement and this correction, not a behaviour change.
+  //
+  // ⚠ `__tests__/TodosSection.test.tsx` cannot see any of this: it replaces both
+  // selectors with `vi.fn()`, so it pins the MOCK's ordering, never the provider's —
+  // the same blindness that let the hook-order defect ship from this very component.
+  //
   // ⛔⛔ THE TWO HOOKS ARE CALLED ON THEIR OWN LINES AND THE `||` COMBINES THEIR VALUES.
   // NEVER write `useStreamingForThread(threadId) || useLoadingForThread(threadId)`.
   // `||` SHORT-CIRCUITS: the moment the first selector returns true — i.e. the moment a
