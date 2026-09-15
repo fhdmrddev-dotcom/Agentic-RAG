@@ -27,7 +27,7 @@ migration_note: |
   seed_id: SEED-068  # renumbered from SEED-063 at v2.8 audit close-out 2026-06-07 (ID collision with SEED-063-execute-code-wallclock-timeout)
 ---
 
-# SEED-063 — Public benchmark scoreboard (BENCHMARKS.md)
+# SEED-068 — Public benchmark scoreboard (BENCHMARKS.md)
 
 ## The idea
 

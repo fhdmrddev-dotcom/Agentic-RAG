@@ -410,9 +410,19 @@ function readList(fm, key) {
  * least one file's frontmatter id disagrees with its name. The filename is what a reference resolves
  * against, so the filename is the authority.
  *
- * ⭐ A group is NOT a finding when exactly one member carries `status: superseded-id` — D-05's
- *    redirect stub is a legitimate resolution, and without this carve-out Plan 03's output would
- *    read as eight new regressions.
+ * ⭐ A group is NOT a finding when it is EXACTLY a keeper plus ONE `status: superseded-id` member —
+ *    D-05's redirect stub is a legitimate resolution, and without this carve-out Plan 03's output
+ *    would read as eight new regressions.
+ *
+ * ⛔ THE SHAPE CHECK IS `members.length === 2`, AND THAT HALF WAS MISSING UNTIL PLAN 04.
+ *    The carve-out shipped in Plan 01 read `if (stubs.length === 1) continue;` — a COUNT on the
+ *    stubs with NO constraint on the group. A **keeper + live squatter + stub** trio therefore
+ *    satisfied it (`members 3, stubs 1`) and was waved through as "resolved" while carrying an
+ *    entirely unresolved collision between the first two — the exact blindness this gate exists to
+ *    remove, one level down. Found by Plan 03's arm D, which was written expecting a pass;
+ *    fixed here because Plan 03 was forbidden to touch `scripts/` (D-17). Driven RED against a
+ *    planted trio before the fix (self-test arm `1c`): WITHOUT the `members.length === 2` half the
+ *    arm reports 0 findings on a group that contains a live duplicate.
  */
 function duplicateGroups(entries) {
   const byId = new Map();
@@ -424,7 +434,10 @@ function duplicateGroups(entries) {
   for (const [id, members] of [...byId.entries()].sort()) {
     if (members.length < 2) continue;
     const stubs = members.filter((m) => m.fm !== null && statusToken(m) === 'superseded-id');
-    if (stubs.length === 1) continue;    // resolved by a D-05 redirect stub
+    // D-05's resolution is a PAIR — one live seed and one redirect stub — never "a group that
+    // happens to contain a stub". A third member means a reference to this id still resolves to
+    // more than one live thing, which is the finding, stub or no stub.
+    if (members.length === 2 && stubs.length === 1) continue;
     dups.push({ id, members, stubs: stubs.length });
   }
   return dups;
@@ -450,11 +463,48 @@ function statusNote(entry) {
 }
 
 /**
+ * [id-in-heading] — the id a seed's own `# ` TITLE claims, or `null` when the title names none.
+ *
+ * ⛔ WHY THIS EXISTS, and it is a measured hole rather than a hypothetical one. Plan 03 renumbered
+ *    eight seeds and then found that FOUR of the eight movers still titled themselves with the OLD
+ *    id in their `# H1`. This gate greps `seed_id:` and never headings, so it read
+ *    `duplicate ids: 0` throughout and was STRUCTURALLY INCAPABLE of catching it — Plan 03 had to
+ *    correct all four by hand, and recorded that a gate is not a proof-reader. This closes that.
+ *
+ * ⚠ IT FIRES ONLY ON A DISAGREEMENT, never on an absence. Measured across the live register:
+ *    221 headings carry a matching id, **42 carry no `SEED-NNN` at all** and **28 files have no
+ *    `# ` heading at all** — none of those 70 is lying about anything, and failing them would be
+ *    70 findings bought for zero integrity. Exactly ONE file disagreed: `SEED-068`, whose title
+ *    read `# SEED-063 — …`, stale from a v2.8 renumber. Corrected in the same commit as this code.
+ *
+ * ⚠ The scan is limited to the first `# ` line AFTER the frontmatter block, so a `# ` inside the
+ *   frontmatter's own comments or migration notes can never be read as a title.
+ */
+function headingId(entry) {
+  const body = entry.text.slice(entry.fmEnd);
+  const m = body.match(/^#[ \t]+(.*)$/m);
+  if (!m) return null;
+  const h = m[1].match(/SEED-(\d{3})/);
+  return h ? h[1] : null;
+}
+
+/**
  * Every finding for one seed, as `[code, why]` tuples (the
  * `check-verification-honesty.cjs:364-397` shape — a code is never printed without a reason).
  */
 function findingsFor(entry) {
   const out = [];
+  // [id-in-heading] runs BEFORE the no-frontmatter early return on purpose: a heading that claims
+  // the wrong id lies to a reader whether or not the file has a `---` block.
+  const hid = headingId(entry);
+  if (hid !== null && hid !== entry.id) {
+    out.push([
+      'id-in-heading',
+      `the first \`# \` heading claims \`SEED-${hid}\` while the filename claims \`SEED-${entry.id}\` — `
+      + 'a reader who trusts the title is reading about a different seed. The FILENAME is the '
+      + 'authority (D-09); correct the heading.',
+    ]);
+  }
   if (entry.fm === null) {
     // ⛔ ONE code, not six. A file with no block at all is a different STATE from a file missing
     //    keys, and burying it under five `[missing-key]` lines hides which state it is in.
@@ -700,6 +750,21 @@ function runSelfTest() {
       const hit2 = a2.findings.filter((f) => f.code === 'duplicate-id');
       record('1b', 'a superseded-id stub is NOT a duplicate', hit2.length === 0,
         `expected 0 [duplicate-id], got ${hit2.length} — without this carve-out Plan 03's 8 stubs read as 8 regressions`);
+
+      // ⭐ ARM 1c — THE CARVE-OUT'S OWN COUNTERFACTUAL, and the arm that caught a real defect.
+      //    The carve-out must resolve a PAIR, not "any group containing a stub". A keeper + a LIVE
+      //    squatter + a stub is `members 3, stubs 1`; the shipped `stubs.length === 1` test passed
+      //    it and silenced a real collision. Driven RED before the `members.length === 2` half was
+      //    added: this arm reported `got 0` on a group with an unresolved duplicate in it.
+      const d3 = mkdir('arm1c');
+      writeFixture(d3, 'SEED-911-keeper.md', seed({ seed_id: 'SEED-911', title: 'keeper', status: 'planted', surface: 'Agentic-RAG', trigger_when: 'never', created: '2026-01-01' }));
+      writeFixture(d3, 'SEED-911-live-squatter.md', seed({ seed_id: 'SEED-911', title: 'live squatter', status: 'planted', surface: 'Agentic-RAG', trigger_when: 'never', created: '2026-02-02' }));
+      writeFixture(d3, 'SEED-911-superseded-id.md', seed({ seed_id: 'SEED-911', title: 'redirect stub', status: 'superseded-id', surface: 'Agentic-RAG', trigger_when: 'never', created: '2026-03-03' }));
+      const a3 = analyse({ dir: d3 });
+      const hit3 = a3.findings.filter((f) => f.code === 'duplicate-id');
+      record('1c', 'keeper + LIVE squatter + stub is STILL a duplicate (the carve-out is a SHAPE, not a count)',
+        hit3.length === 1 && hit3[0].id === '911',
+        `expected 1 [duplicate-id] on 911, got ${hit3.length} — a group of 3 with one stub still contains an unresolved collision`);
     }
 
     // ── ARM 2 — missing or unknown status must FAIL ─────────────────────────────────────────
@@ -715,6 +780,33 @@ function runSelfTest() {
       record(2, 'unknown status + no frontmatter FAIL, clean seed does not',
         unknown.length === 1 && noFm.length === 1 && onClean.length === 0,
         `expected 1/1/0, got unknown=${unknown.length} noFm=${noFm.length} onClean=${onClean.length}`);
+    }
+
+    // ── ARM 2b — [id-in-heading], WITH the absence counterfactual ───────────────────────────
+    //    ⚠ The second half of this arm is the load-bearing one. A check that fires on any heading
+    //      without a matching id would red 70 live files (42 titles name no id; 28 files have no
+    //      `# ` line), so "it caught the bad one" is not enough — it must LEAVE the innocent ones
+    //      alone, and that is asserted as an ABSENCE, not as a smaller count.
+    {
+      const d = mkdir('arm2b');
+      const withH1 = (o, h1) => {
+        const lines = ['---'];
+        for (const [k, v] of Object.entries(o)) lines.push(`${k}: ${v}`);
+        lines.push('---', '', h1, '', 'body prose', '');
+        return lines.join('\n');
+      };
+      const fmk = { status: 'planted', surface: 'Agentic-RAG', trigger_when: 'never', created: '2026-01-01' };
+      writeFixture(d, 'SEED-921-stale-title.md', withH1({ seed_id: 'SEED-921', title: 'stale title', ...fmk }, '# SEED-063 — renamed long ago and the title never moved'));
+      writeFixture(d, 'SEED-922-matching-title.md', withH1({ seed_id: 'SEED-922', title: 'matching title', ...fmk }, '# SEED-922 — the title agrees'));
+      writeFixture(d, 'SEED-923-title-names-no-id.md', withH1({ seed_id: 'SEED-923', title: 'no id in title', ...fmk }, '# a title that names no id at all'));
+      writeFixture(d, 'SEED-924-no-heading-at-all.md', withH1({ seed_id: 'SEED-924', title: 'no heading', ...fmk }, 'not a heading, just prose'));
+      const a = analyse({ dir: d });
+      const hits = a.findings.filter((f) => f.code === 'id-in-heading').map((f) => f.file);
+      record('2b', 'a heading claiming the WRONG id FAILS — and a heading claiming NO id does not',
+        hits.length === 1 && hits[0] === 'SEED-921-stale-title.md',
+        `expected exactly [SEED-921-stale-title.md], got [${hits.join(',') || 'none'}] — `
+        + 'firing on 923/924 would red 70 live files for zero integrity; missing 921 is the hole '
+        + 'that let four of Plan 03\'s eight movers keep the id they no longer claim');
     }
 
     // ── ARMS 3 + 4 — the match, and THE COUNTERFACTUAL ──────────────────────────────────────
@@ -760,7 +852,7 @@ function runSelfTest() {
     console.log(`\n${RED}self-test ${passed}/${arms.length} arms PASS${RST} — the gate cannot be trusted until every arm is green.`);
     return 1;
   }
-  console.log(`\n${GRN}self-test ${passed}/${arms.length} arms PASS${RST} — duplicate id, stub carve-out, bad status, match, counterfactual, empty-register floor.`);
+  console.log(`\n${GRN}self-test ${passed}/${arms.length} arms PASS${RST} — duplicate id, stub carve-out, the carve-out's SHAPE check, bad status, a heading that claims the wrong id, match, counterfactual, empty-register floor.`);
   return 0;
 }
 
@@ -913,6 +1005,9 @@ function main() {
    [unknown-status]  map the token onto the ${STATUS_ENUM.length}-value enum, with \`partial: true\` carrying a
                      "partially-*" qualifier on any axis (D-16).
    [no-frontmatter]  the file needs a \`---\` block, not a new value — it is a different STATE.
+   [id-in-heading]   correct the \`# \` TITLE to the id in the FILENAME. Plan 03 measured four of its
+                     eight renumbered seeds still titling themselves with the id they had given up —
+                     invisible to a gate that greps \`seed_id:\` and never headings.
 
    ⛔ Do NOT satisfy [unknown-status] by DELETING the prose after the token. That prose IS the
       deliverable: move it byte-for-byte into \`status_note:\`. The cheapest way to green this code is
