@@ -21,7 +21,26 @@ findings:
   warning: 6
   info: 5
   total: 14
+  critical_fixed: 3
+  critical_open: 0
 status: issues_found
+resolution:
+  # ⚠ `findings:` above is the AS-REVIEWED tally and is deliberately left alone — a
+  # register that rewrites its own history cannot show what was found vs what was done.
+  fixed:
+    - id: CR-01
+      commit: 93058eb3e
+      note: shipped rule differs from the one proposed; the proposal broke D-078-01
+    - id: CR-02
+      commit: 3588bcc45
+      note: one of the two proposed guards shipped; the other measured inert, 0/3024
+    - id: CR-03
+      commit: c62b914ca
+      note: Anthropic half of the proposal does not apply — thinking is OFF by design
+  open:
+    warning: 6
+    info: 5
+  gate_after: "71 failed / 4848 passed — failing set identical to 250-backend-baseline-set.txt"
 ---
 
 # Phase 250: Code Review Report
@@ -30,6 +49,31 @@ status: issues_found
 **Depth:** standard
 **Files Reviewed:** 12
 **Status:** issues_found
+
+## ⭐ Resolution log — added 2026-09-15, after the three Criticals were fixed
+
+**All three Criticals are fixed and committed. The findings above are left exactly as
+written**, because the most useful thing this review produced is not the three defects —
+it is that **every one of its three proposed fixes was wrong or incomplete, and only
+driving them revealed it.** Overwriting the originals would delete that.
+
+| | Finding | Proposed fix | What shipped | Commit |
+|---|---|---|---|---|
+| CR-01 | ✅ correct | ⛔ **breaks D-078-01** — reds two existing fences | largest protected group pays, ties to non-user | `93058eb3e` |
+| CR-02 | ✅ correct | ⚠ half inert — the `keep` guard changed **0 of 3024** outputs | exit sanitiser only | `3588bcc45` |
+| CR-03 | ✅ correct | ⚠ names Anthropic, whose thinking is **OFF by design** (D-05) | OpenAI usage signal + two reworded arms | `c62b914ca` |
+
+⭐ **The pattern is the finding: a review is a CLAIM about code, not the code.** Three
+findings were real and reproducible; three fixes were reasoned about rather than run. Each
+was driven before shipping, and each failed differently — one broke a floor it did not know
+about, one could not fire at all, one named a provider that has nothing to report.
+
+**Backend gate after all three:** `71 failed / 4848 passed`, failing set byte-identical to
+`250-backend-baseline-set.txt`. Zero new failures; `+23` passes from the new fences.
+
+⚠ **Six Warnings and five Info findings remain OPEN** and are untouched by the above.
+
+---
 
 ## Summary
 
@@ -128,6 +172,31 @@ current fences structurally exclude.
 
 ---
 
+#### ✅ FIXED — `93058eb3e`, 2026-09-15. ⛔ **The fix above is NOT the fix that shipped.**
+
+The finding reproduced exactly as written. The **proposed one-liner was driven and turns two
+existing fences red** — `test_trim_protected_overrun_preserves_last_message` and
+`test_trim_protected_overrun_trims_inward`, both D-078-01. Preferring the non-user group
+discards a 13-character `"Recent reply."` to keep the 1300-character user message that is the
+*actual* cause of the overflow.
+
+⭐ **Neither "user first" (what shipped) nor "non-user first" (proposed here) is correct —
+each protects one floor by breaking the other.** The floor was never *"the question always
+wins"* or *"the last message always wins"*: it is that **the group CAUSING the overflow
+pays.** Shipped rule — take the LARGEST protected group, ties to the non-user one, keeping
+HONEST-01's re-derivability asymmetry as the tiebreak. It also stops the cascade this finding
+describes: one removal is far likelier to suffice, so the `while` loop does not re-enter.
+
+**Fences, each RED against the implementation it exists to stop:**
+`test_1_2b` (×3 budgets) against the shipped code · `test_1_2c` against the fix proposed above.
+`1_2b` uses the single-dominant-payload shape this finding correctly identified as the one
+`_bug_shaped_history` structurally excludes.
+
+Three comments corrected, including the docstring's *"every realistic shape never reaches this
+arm"* — refuted directly by the repro.
+
+---
+
 ### CR-02: The trimmer can return an orphaned `tool` message — a hard provider 400
 
 **File:** `backend/app/services/context_window.py:647-659` (the `keep`-the-last-group rule), reachable from PASS 2 at `backend/app/services/context_window.py:416-419`
@@ -194,6 +263,31 @@ def _drop_orphan_tool_messages(msgs: list[dict]) -> list[dict]:
 
 and return `_drop_orphan_tool_messages(_build_candidate(...))` from `trim_messages_to_fit`.
 Pin it with the reproduction above (`reserve_recent` chosen to split an atomic group).
+
+---
+
+#### ✅ FIXED — `3588bcc45`, 2026-09-15. ⚠ **Only ONE of the two proposed guards shipped; the other is measured INERT.**
+
+The orphan reproduced: `rr=1 b=1500 ORPHANS=['z2']` and `rr=2 b=1500`. **Fix 2 (the exit
+sanitiser) shipped and is load-bearing** — disabling it turns the new fence red again.
+
+⛔ **Fix 1 — the `keep`-rule guard — was NOT shipped, and its diagnosis is refuted.** With the
+sanitiser removed from *both* arms, that guard changed **0 of 3024 outputs** across a sweep of
+turns × children × payload size × trailing reply × `reserve_recent` 0-8 × seven budgets:
+
+```
+cases=3024 outputs_differing=0
+```
+
+It cannot fire. This finding blames `keep` for protecting the orphan *for being last*; what
+actually strands it is **`while len(protected) > 1` on PASSES 2 and 4** — once the orphan is
+the only message left in the tail those loops never run, so `_remove_oldest_evictable` is never
+called and what `keep` holds is irrelevant. A guard nobody has seen fire is not a guard, and an
+inert one invites the next reader to trust a mechanism that does nothing. The refutation is
+recorded in `_drop_orphan_tool_messages`'s docstring, not only here.
+
+**Fence:** `test_1_3b` sweeps `reserve_recent` 1-4 × four budgets — RED on the two measured
+cases before the fix, and RED again with the sanitiser disabled.
 
 ---
 
@@ -264,6 +358,37 @@ the **user-facing sentence does not**, and a comment is not a mitigation.
 3. Add a fence that names the reachable provider set, so the gap cannot silently persist —
    e.g. assert that every provider in `MODEL_CAPABILITIES` either produces a `reasoning_delta`
    or is listed in an explicit, commented `_NO_REASONING_SIGNAL` set.
+
+---
+
+#### ✅ FIXED — `c62b914ca`, 2026-09-15. ⚠ **The Anthropic half of the proposed fix does not apply.**
+
+The reachability claim verified: `reasoning_delta` has exactly two producers, both in
+`openai_compat.py`; the Anthropic and Google adapters contain no reasoning handling at all
+(grep returns nothing).
+
+**Part 1 shipped for OpenAI, and the signal was already arriving.**
+`stream_options={"include_usage": True}` is set on every streaming call, so
+`usage.completion_tokens_details.reasoning_tokens` was reaching us and **nothing read it**.
+`_accumulate_chunk_usage` now carries a third total — with Google's cumulative branch
+**overwriting rather than summing**, the same trap that would 2-3× over-count billing.
+
+⛔ **Anthropic needs no signal, so that half of the proposal is not applicable.** The adapter
+**never enables thinking** by design (D-05 — `provider_gateway/anthropic.py:102`), so for
+Anthropic *"no reasoning observed"* and *"no reasoning happened"* genuinely coincide. The gap
+is four providers wide but only **Google** actually remains open, and that is now named in the
+code rather than left implicit.
+
+**Part 2 shipped with one addition this finding did not specify:** a token count must never be
+rendered through arm 1's `"{n:,} characters of reasoning"` sentence — different unit,
+different observation. Tokens get their own arm and their own wording, and `test_3_3` fails if
+a future edit ever routes the token tally through a sentence containing "characters".
+
+**Part 3 shipped as proposed** — arm 3 no longer enumerates `no reasoning` as observed fact.
+
+**Fences:** four, all driven RED against the stashed pre-fix source. The arity change broke
+`test_chunk_handler_provider_aware`'s wrapper (7 tests); the **wrapper alone** was adapted to
+slice the pair, so every assertion there still tests the Google-vs-OpenAI arithmetic unedited.
 
 ---
 
@@ -504,6 +629,20 @@ $ grep -rnE '_remove_oldest_atomic|_remove_oldest_evictable' backend --include=*
 direct unit tests for `_remove_oldest_evictable` covering each arm — in particular the step-3
 last-resort arm, which is where both Critical findings originate and which no existing test
 reaches on purpose.
+
+#### ⚠ PARTLY OVERTAKEN — 2026-09-15, by the CR-01/CR-02 fixes.
+
+Point 2 is **no longer true**: `_remove_oldest_evictable`'s last-resort arm now has three
+direct fences (`test_1_2b`, `test_1_2c`, `test_1_3b`), each driven RED against a specific
+wrong implementation. That arm was the one this finding correctly identified as reached by no
+test, and it is where both Criticals lived.
+
+Point 1 **stands, unchanged** — `_remove_oldest_atomic` is still dead, still 62 lines, still
+justified by a grep-refuted hazard. It was deliberately NOT deleted alongside the CR-01 fix:
+mixing a behaviour change with a 62-line deletion in one commit makes a bisect harder for no
+benefit. **Still owed.**
+
+---
 
 ### IN-02: Dead condition in `_build_candidate`
 
