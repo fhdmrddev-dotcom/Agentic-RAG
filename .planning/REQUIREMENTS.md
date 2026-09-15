@@ -46,35 +46,44 @@ measured-fixed above, minus `TEMPLATE.md`), of which **14 are `major`**. Cluster
 The v4.0 watch loop reached production for the first time on **2026-09-13**. These are the eight
 defects standing between "it shipped" and "you can rely on it".
 
-- [ ] **WATCH-01**: A file ingested from Google Drive carries `metadata.source.path`, so a watched
+- [x] **WATCH-01**: A file ingested from Google Drive carries `metadata.source.path`, so a watched
       document classifies and locates exactly like an uploaded one. *(`BUG-260913-01`, major — the
       adapter never writes it, so classification rules keyed on path silently never match.)*
-- [ ] **WATCH-02**: A OneDrive / SharePoint folder path is stored whole — no truncation and no
+      ⭐ **TICKED 2026-09-16 (251-04), evidence: `.planning/phases/247-sources-and-watches/247-VERIFICATION.md` → SC#1 ✅ PASSED** (`status: complete`, `verification_mode: peer-reviewed`, builder gemini / reviewer claude, 5/5 criteria). `google_drive.py:_resolve_folder_path` resolves parent breadcrumbs relative to the watched root; `test_google_drive_list_files_populates_source_file_path` in `backend/tests/unit/test_247_source_paths.py`.
+- [x] **WATCH-02**: A OneDrive / SharePoint folder path is stored whole — no truncation and no
       mismatch between the path shown and the path stored. *(`BUG-260910-04`, major — three defects
       found by the independent review of Phase 238, all shipped.)*
-- [ ] **WATCH-03**: A watch card reports the health of **the connection it rides**, not of its last
+      ⭐ **TICKED 2026-09-16 (251-04), evidence: `.planning/phases/247-sources-and-watches/247-VERIFICATION.md` → SC#1 ✅ PASSED.** `microsoft_graph.py`'s `_PATH_PREFIX` / `_folder_path` strip `/drive/root:`, `/drives/{id}/root:` and SharePoint site roots; `test_microsoft_graph_list_files_combines_path_cleanly`.
+- [x] **WATCH-03**: A watch card reports the health of **the connection it rides**, not of its last
       run — a healthy connection whose last run failed, and a broken connection whose last run
       happened to succeed, both read correctly. *(`BUG-260909-03`, major.)*
-- [ ] **WATCH-04**: "Sync now" reports its result **in place** — the section it writes into stays
+      ⭐ **TICKED 2026-09-16 (251-04), evidence: `.planning/phases/247-sources-and-watches/247-VERIFICATION.md` → SC#2 ✅ PASSED.** The discriminator is driven in BOTH directions — a healthy connection whose run 429'd reads `Connected` + `Run failed (429)`, a disabled connection whose run succeeded reads `Connection Off` — in `WatchedFoldersSection.test.tsx` plus the backend pair in `test_247_watch_missing_lifecycle.py`. ⭐ Both directions, which is the only shape that can catch the defect this requirement names.
+- [x] **WATCH-04**: "Sync now" reports its result **in place** — the section it writes into stays
       open and the answer is readable without re-navigating. *(`BUG-260909-04`, major.)*
-- [ ] **WATCH-05**: A file that has gone missing at the source says **when** it went missing.
+      ⭐ **TICKED 2026-09-16 (251-04), evidence: `.planning/phases/247-sources-and-watches/247-VERIFICATION.md` → SC#3 ✅ PASSED.** `loadWatches(initial = false)` confines `loading` to initial mount; the named test is *"does NOT unmount or collapse the card when Sync now is clicked"*.
+- [x] **WATCH-05**: A file that has gone missing at the source says **when** it went missing.
       *(`BUG-260909-05` — `missing_since` is declared and never written, so the column cannot answer
       the one question it exists for.)*
-- [ ] **WATCH-06**: An action labelled as a fix performs the fix; one that only navigates is labelled
+      ⭐ **TICKED 2026-09-16 (251-04), evidence: `.planning/phases/247-sources-and-watches/247-VERIFICATION.md` → SC#4 ✅ PASSED.** `missing_since` is written on disappearance and cleared on reappearance with the H-5 structural-completeness guard preserved; `test_missing_since_recorded_on_disappearance` / `_cleared_on_reappearance`.
+- [x] **WATCH-06**: An action labelled as a fix performs the fix; one that only navigates is labelled
       as navigation. *(`BUG-260909-06` — a button worded as a write that only changes page.)*
-- [ ] **WATCH-07**: A timestamp is either absolute or relative, never both concatenated.
+      ⭐ **TICKED 2026-09-16 (251-04), evidence: `.planning/phases/247-sources-and-watches/247-VERIFICATION.md` → SC#4 ✅ PASSED.** `sourceHealthVocabulary.ts`'s `connection_disabled` action now reads `"Open ${connectionName} in Settings ↗"` — labelled as the navigation it performs, not as a fix it does not do.
+- [x] **WATCH-07**: A timestamp is either absolute or relative, never both concatenated.
       *(`BUG-260909-07` — "Last read successfully on 8 min ago".)*
-- [ ] **WATCH-08**: Each of Phase 240's seven open build-review warnings is closed, or explicitly
+      ⭐ **TICKED 2026-09-16 (251-04), evidence: `.planning/phases/247-sources-and-watches/247-VERIFICATION.md` → SC#4 ✅ PASSED.** `COPY.lastGood` drops the preposition: *"Last read successfully 4m ago"*. `sourceHealthVocabulary.test.ts` 69/69.
+- [x] **WATCH-08**: Each of Phase 240's seven open build-review warnings is closed, or explicitly
       accepted **with the reason written down**. *(`BUG-260910-02` — a warning list with no
       disposition is a deferral nobody can re-open.)*
 
+      ⭐ **TICKED 2026-09-16 (251-04), evidence: `.planning/phases/247-sources-and-watches/247-VERIFICATION.md` → SC#5 ✅ PASSED**, with the dispositions written down in `.planning/phases/247-sources-and-watches/247-DISPOSITION.md` — WR-04/07/09 resolved in code, WR-02/05/06/08 accepted as debt **with reasons**, WR-01/03 already closed at Phase 240 by `9e83203a2`. ⭐ *"Accepted with the reason written down"* is exactly what this requirement asks for, and it is what the artifact contains.
 ### The Credential Boundary
 
-- [ ] **CRED-01**: A credential pasted into a field that is not a secret field is **refused, not
+- [x] **CRED-01**: A credential pasted into a field that is not a secret field is **refused, not
       stored** — and the refusal names which field takes a secret. *(`BUG-260907-02`, major, driven
       live 2026-09-13. `config` is `SELECT`-able by `authenticated` org-wide while `secret_ciphertext`
       is not; a secret written to `config` is readable by every org member.)*
-- [ ] **CRED-02**: The grant override marker claims only what the app can actually know — it does not
+      ⭐ **TICKED 2026-09-16 (251-04), evidence: `.planning/phases/248-the-credential-boundary/248-VERIFICATION.md`** (`status: complete`, `verification_mode: peer-reviewed`, builder gemini / reviewer claude, 4/4 requirements passed). The negative credential-smell rule is enforced across all three `custom_client_id` homes (`McpConfig`, `OAuthConnectionConfig`, `OAuthAuthorizeRequest`) — a smell is refused **422**, an RFC 7591 dynamic id is permitted — and the dual-role DB permissions were driven under `SET ROLE authenticated` and `SET ROLE anon`. ⚠ **ONE UAT ROW IS OWED AND IS NOT CLAIMED HERE**: G-4 scenario **S2** (the `McpAuthDoor` BYO-OAuth path, live) is recorded ⛔ owed in `248-G4-UAT.md` with the re-open trigger *"next touch to McpAuthDoor or first real BYO OAuth server connection"*; S1 and S3 passed in a real browser. **The requirement is delivered and a row is owed — saying both is the point.**
+- [x] **CRED-02**: The grant override marker claims only what the app can actually know — it does not
       assert a human author for a change the system cannot attribute.
       *(`.planning/reported-bugs/grant-override-marker-claims-a-person-changed-it.md`. ⚠ **CITATION
       CORRECTED 2026-09-14 at `/gsd:discuss-phase 248`** — this read `BUG-260828-02`, and **two
@@ -88,16 +97,19 @@ defects standing between "it shipped" and "you can rely on it".
       `ActionRow.tsx:95` still offers *"Use the default"* on rows migration 128's backfill wrote, and
       `grantsVocabulary.ts` states that the reset's *"mere presence carries exactly what the tag
       spelled out."* See `D-248-05`.
-- [ ] **CRED-03**: Every `SECURITY DEFINER` function in the exposed API schema is ruled on — each of
+      ⭐ **TICKED 2026-09-16 (251-04), evidence: `.planning/phases/248-the-credential-boundary/248-VERIFICATION.md`.** The reset affordance now reads *"Follow the default instead"* (`grantsVocabulary.ts`), so it no longer implies a human author the system cannot attribute; `ConnectionGrantsList.test.tsx` asserts the **rendered DOM text**, 9/9. ⭐ That assertion shape is deliberate — a presence assertion cannot see content drift, which is this project's own recorded finding.
+- [x] **CRED-03**: Every `SECURITY DEFINER` function in the exposed API schema is ruled on — each of
       the advisor's **13** anon-executable findings is either *intentionally public, with the reason
       recorded*, or revoked. ⛔ **Revoke from `PUBLIC`, then grant back the roles that need it** — a
       `REVOKE … FROM anon` is a **no-op** while the default `PUBLIC` grant stands, measured when
       migration 177's first version applied cleanly and verify still read `FAIL`.
-- [ ] **CRED-04**: `get_advisors(security)` runs as part of the deploy parity checklist at every
+      ⭐ **TICKED 2026-09-16 (251-04), evidence: `.planning/phases/248-the-credential-boundary/248-VERIFICATION.md`.** Migration `181_revoke_public_secdef_functions.sql` revokes **`PUBLIC`** and `anon` execute across all **13** SECURITY DEFINER functions (11 + 2), verified live on `:54322` — direct execution denied to `anon` and `authenticated`, triggers still firing on DML. `supabase/full-schema.sql` regenerated. ⭐ The `PUBLIC`-first ordering this requirement insisted on is the one that was executed, which is the half a naive `REVOKE … FROM anon` gets wrong.
+- [x] **CRED-04**: `get_advisors(security)` runs as part of the deploy parity checklist at every
       promotion. ⭐ It is the only thing that has ever caught this class: `BUG-260911-01` was
       invisible to every gate the project runs, because **every gate reads through the service role
       and nothing in the suite makes a request as `anon`.**
 
+      ⭐ **TICKED 2026-09-16 (251-04), evidence: `.planning/phases/248-the-credential-boundary/248-VERIFICATION.md`.** `scripts/check-security-advisors.sh` queries `GET /v1/projects/{ref}/advisors/security`, exits **1** on ERROR and **0** on WARN-or-clean; `backend/tests/unit/test_check_security_advisors.py` drives every exit code. `SUPABASE_ACCESS_TOKEN` registered in `backend/.env.example` and in `OMITTED_FROM_ONEBOX`; `docs/DEPLOYMENT-WORKFLOW.md` updated. ⚠ It is **operator-run**, not an unskippable CI hook — stated in the verification rather than implied by the tick.
 ### The Model You Actually Run
 
 - [x] **MODEL-04**: A local or self-hosted model — Ollama, LM Studio, vLLM, or any OpenAI-compatible
@@ -151,18 +163,20 @@ defects standing between "it shipped" and "you can rely on it".
       than deleted. All eight movers renumbered to `277-284` by the D-07/D-20 date rule; a
       `status: superseded-id` redirect stub stands at each original id naming BOTH resolutions.
       Gate: `register 292 · parsed 292 · skipped 0 · duplicate ids 0`, exit **0**.
-- [ ] **REG-02**: The seeds register is swept by something **executable**. ⚠ CLAUDE.md's rule says
+- [x] **REG-02**: The seeds register is swept by something **executable**. ⚠ CLAUDE.md's rule says
       `/gsd:new-milestone` reads every `trigger_when`; at **161 planted seeds of 280** that sweep is a
       phase of work, not a step in a command — and `grep -rln "SEED" .claude/commands/gsd/` returns
       only `capture.md`, the command that *writes* seeds. ⭐ The cost is measured, not theoretical:
       `SEED-172` sat reachable for four weeks and it took a person hitting the wall to surface it.
-- [ ] **REG-03**: `BUS-171`'s operator queue — **23 items** `--to operator`, most 5-10 days old — is
+      ⭐ **TICKED 2026-09-16 (251-04), evidence: `scripts/check-seeds-register.cjs` + `.planning/phases/251-register-integrity/251-04-SUMMARY.md`.** One command reads the register and prints the seeds whose trigger is already true (`--phase NNN`), and it is **CALLED** at both GSD touchpoints — `.claude/get-shit-done/workflows/discuss-phase.md` (`<step name="cross_reference_seeds">`) and `new-milestone.md` §2.5, which no longer instructs a human to read every seed by hand. ⛔ **Proven by execution, not by grep**: the fenced command was extracted from each file and run, and the counterfactual — the same file with the fence replaced by a prose mention — still satisfies `grep -rn "check-seeds-register"` while leaving **zero** runnable calls. ⚠ The register is still largely unswept **by design** (`134 carry no trigger_when at all · 114 carry prose but no structured trigger`) and the gate reports **both** figures, never their sum (D-18). This box means *the sweep exists and fires*, not *the backlog is gone*.
+- [x] **REG-03**: `BUS-171`'s operator queue — **23 items** `--to operator`, most 5-10 days old — is
       triaged into a decision list. ⛔ **Claude may not close them**; the deliverable is a list the
       operator can rule on. Each item is classified *superseded* (naming the evidence), *live decision*
       (one line), or *carries an unfixed finding* — and that last arm **must verify a durable register
       holds the finding, planting one if not.** The 2026-09-06 sweep found two findings held only by a
       bus item.
 
+      ⭐ **TICKED 2026-09-16 (251-04), evidence: `.planning/phases/251-register-integrity/251-BUS-TRIAGE.md`.** The **5 currently-open** `to:operator` items are classified with named evidence, every third-arm finding verified against a durable register, and `SEED-286` planted for the one held by nothing. `BUS-171` is discharged **in writing** naming `88a9ff861` — 22 of its 23 named items are closed and 4 of today's 5 open items are newer than it. ⛔ **Claude wrote nothing to the bus**: `git diff --name-only .agent-bus/` is EMPTY, and the `answer` / `close` commands ship pre-filled **for the operator to run**. ⚠ The stated count of 23 was stale; the re-scope is recorded as a decision (D-12), not a quiet narrowing.
 ### Verification Debt — a standing gate, not a phase
 
 - [ ] **DEBT-06**: Phases **238, 240, 241** and **242-246** each receive an independent §6.3 review,
@@ -266,10 +280,10 @@ milestone-wide standing gate. Coverage 26/26 — no orphans, no duplicates.**
 | WATCH-06 | Phase 247 — Sources & Watches | Complete |
 | WATCH-07 | Phase 247 — Sources & Watches | Complete |
 | WATCH-08 | Phase 247 — Sources & Watches | Complete |
-| CRED-01 | Phase 248 — The Credential Boundary | Pending |
-| CRED-02 | Phase 248 — The Credential Boundary | Pending |
-| CRED-03 | Phase 248 — The Credential Boundary | Pending (⛔ revoke from `PUBLIC`, not from `anon`) |
-| CRED-04 | Phase 248 — The Credential Boundary | Pending |
+| CRED-01 | Phase 248 — The Credential Boundary | ✅ **Complete (251-04 sweep)** — `248-VERIFICATION.md`, peer-reviewed 4/4. Smell rule enforced across all three `custom_client_id` homes, 422 on a smell, RFC 7591 ids permitted. ⚠ G-4 **S2** (`McpAuthDoor` BYO-OAuth, live) recorded ⛔ owed in `248-G4-UAT.md` |
+| CRED-02 | Phase 248 — The Credential Boundary | ✅ **Complete (251-04 sweep)** — `248-VERIFICATION.md`. *"Follow the default instead"*; `ConnectionGrantsList.test.tsx` asserts the RENDERED DOM TEXT, 9/9 — a presence assertion could not have seen this drift |
+| CRED-03 | Phase 248 — The Credential Boundary | ✅ **Complete (251-04 sweep)** — `248-VERIFICATION.md`. Migration `181` revokes **`PUBLIC`** and `anon` across all 13 SECURITY DEFINER functions, verified live on `:54322`; triggers still fire on DML. ⭐ The `PUBLIC`-first ordering is the half a naive `REVOKE … FROM anon` gets wrong, and it was executed |
+| CRED-04 | Phase 248 — The Credential Boundary | ✅ **Complete (251-04 sweep)** — `248-VERIFICATION.md`. `scripts/check-security-advisors.sh`, exit 1 on ERROR / 0 on WARN-or-clean, every code driven by `test_check_security_advisors.py`. ⚠ **operator-run**, not an unskippable CI hook |
 | MODEL-04 | Phase 249 — The Model You Actually Run | **Complete (partial)** — addable from the UI with no code edit or deploy, driven live for all 3 self-hosted providers. ⛔ *"then usable in chat"* NOT driven: no live self-hosted endpoint answered during the run (`249-UAT.md` §C) |
 | MODEL-05 | Phase 249 — The Model You Actually Run | **Complete** — the chip now renders at pick time (the composer), states the tool-loss consequence, and does not fire on an operator-added model. Driven on all **11** configured providers |
 | MODEL-06 | Phase 249 — The Model You Actually Run | **Complete by construction + fence** — the broadcast was ALREADY shipped (`BUG-260902-06`) and is now pinned in both directions. ⛔ the multi-worker arm is NOT observed: this box runs two single-worker `--reload` servers, so `WORKER_COUNT=2` does not exist here |
@@ -281,9 +295,10 @@ milestone-wide standing gate. Coverage 26/26 — no orphans, no duplicates.**
 | HONEST-03 | Phase 250 — Run Honesty | ✅ Complete (gate admits every TRUE terminal status + panel reads run state, so 53 legacy rows are honest with NO backfill) |
 | HONEST-04 | Phase 250 — Run Honesty | ✅ Complete — **the blocking measurement was TAKEN** (`250-MEASUREMENT.md`): marker PRESENT on the newest rows ⇒ the COPY arm, and the report's dichotomy was FALSE (both arms true of different rows). `NOT TICKED` badge; ⛔ nothing auto-completed |
 | REG-01 | Phase 251 — Register Integrity | ✅ Complete (251-03) — 8 movers renumbered to 277-284 by the D-07/D-20 date rule, 8 `status: superseded-id` redirect stubs at the original ids naming BOTH resolutions. Gate: `register 292 · parsed 292 · duplicate ids 0`, exit 0. ⛔ 91 product-source references across 35 files deliberately left on a stub under D-17, listed by file in `251-RENUMBER-LEDGER.md` |
-| REG-02 | Phase 251 — Register Integrity | Pending |
-| REG-03 | Phase 251 — Register Integrity | Pending (⛔ Claude may not close bus items — deliverable is a list the operator rules on) |
+| REG-02 | Phase 251 — Register Integrity | ✅ **Complete (251-04)** — `scripts/check-seeds-register.cjs` is CALLED at both GSD touchpoints (`discuss-phase.md` `<step name="cross_reference_seeds">`, `new-milestone.md` §2.5), and the by-hand read of every seed is gone. ⛔ Proven by EXECUTING the fence, not by grep: defanged to a prose mention the file still passes `grep` with **zero** runnable calls. ⚠ `134 / 114` unswept remains, reported as two figures and never summed |
+| REG-03 | Phase 251 — Register Integrity | ✅ **Complete (251-04)** — `251-BUS-TRIAGE.md`: 5 open `to:operator` items classified with named evidence, `SEED-286` planted for the one finding no register held, `BUS-171` discharged in writing naming `88a9ff861` (22 of 23 closed; 4 of today's 5 are newer than it). ⛔ **Claude closed nothing** — `git diff --name-only .agent-bus/` EMPTY; the `answer`/`close` commands ship pre-filled for the operator |
 | DEBT-06 | **Milestone-wide standing gate** (no phase) | Pending — discharged alongside the build: 238 / 240 / 241 beside 247-248, 242-246 beside 249-251, and each v4.2 phase reviewed at its own close. ⛔ Re-arming `OV-SOLO-01` retro-reviews nothing |
+| | ⛔ **LEFT UNTICKED at the 251-04 sweep, deliberately** | The other 25 boxes were ticked against a named artifact. This one has none: **no independent §6.3 review has run** for 238/240/241, and 249 and 250 each closed `self-verified` with `independent_review: owed` — `BUS-247` says so in its own body and makes the case (*"a code-review pass is not a peer review"*). ⛔ Ticking it would be exactly the claim ROADMAP:271 forbids. It becomes tickable when a review runs, not when the rule is re-armed |
 
 ⚠ **Re-derive this table from the phase directories at close, never from a summary line.** v4.1's own
 close found its ROADMAP Progress table reading `0 / 5 phases complete · 0 / 19 requirements delivered`
