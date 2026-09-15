@@ -151,6 +151,22 @@ function TodoRow({ todo, isRunLive }: { todo: Todo; isRunLive: boolean }) {
       >
         {STATUS_LABEL[status]}
       </span>
+      {/* ⚠ Phase 250 WR-04 — THE REASON HAD LEFT THE ACCESSIBLE TREE ENTIRELY.
+          HONEST-04 correctly moved the raw marker out of the task text and into the
+          row's `title`. But `title` on a plain <li> is announced by no major screen
+          reader, and an <li> is not focusable, so a keyboard user never sees the
+          tooltip either. Before this phase the reason was IN the text; after it the
+          accessible tree said only "Not ticked", which does not say why.
+
+          This is the same rule the status word above already follows (088-05): meaning
+          is carried by TEXT, not by a visual affordance. The tooltip stays for mouse
+          users; this span is the same sentence for everyone else.
+
+          ⛔ Scoped to `wasMarked` — announcing a cause on a row the backend never
+          marked would read out a reason that is not known to be true. */}
+      {wasMarked && status === "not_ticked" && (
+        <span className="sr-only">{RUN_ENDED_TITLE}</span>
+      )}
     </li>
   )
 }

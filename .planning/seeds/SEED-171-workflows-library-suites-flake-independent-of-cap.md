@@ -551,3 +551,39 @@ now has two data points behind it:
 
 > **The next phase that touches CLAUDE.md's `SEED-171` sentence re-derives the suite count from this
 > file.** Until it does, expect a third misclassification — the mechanism is intact.
+
+---
+
+## 2026-09-15 (Phase 250 code-review fixes, WR-04) — THE SET IS SEVEN, and two of the new ones are NOT workflow pages
+
+Two consecutive full-gate runs on the **same tree**, minutes apart, filenames read from each run's
+own persisted JSON **before** the next was started (the procedure this seed exists to enforce).
+The working diff was three files — `TodosSection.tsx`, `TodosSection.test.tsx`,
+`scripts/vitest-count-gate.cjs` — and **none of the four suites below is one of them.**
+
+| Run | failed | Suites |
+|---|---|---|
+| 1 | **3** | `WorkflowBuilderPage.canvas.test.tsx` ×1 · `src/components/library/__tests__/sketchComposition.test.tsx` ×2 |
+| 2 | **3** | `WorkflowBuilderPage.session.test.tsx` ×1 · `src/pages/__tests__/LibraryPage.test.tsx` ×2 |
+
+⭐ **The COUNT held at 3 across both runs while the SET rotated completely — zero overlap.** That
+is this seed's central claim reproduced in the cleanest form yet: *the failing set is never the
+same twice, so there is no number to pin and no per-file baseline can absorb it.* It also means a
+`failed 3` reading that MATCHES a recorded baseline can still be a different three suites —
+`250-GATE-BASELINE.md` recorded run 1's exact pair, and run 2 matched its count while sharing none
+of its names. **Comparing the count to a baseline is not comparing the set.**
+
+⚠ **Two of the four are outside the workflow surface**, which the previous five all shared:
+
+- **`src/components/library/__tests__/sketchComposition.test.tsx`** — failed its own **§2 POSITIVE
+  CONTROLS** (*"the page renders its heading — the mount harness works"*, *"the four shipped tab
+  triggers render"*), the `196-05` signature.
+- **`src/pages/__tests__/LibraryPage.test.tsx`** — never previously named here.
+
+**The flaky set is now SEVEN:** the five above · **`sketchComposition.test.tsx`** ·
+**`LibraryPage.test.tsx`**.
+
+⛔ **Recorded as an OBSERVATION, never as proof of innocence.** All four are provably unmodified by
+the change that was in the tree; that is not the same as proving the change is fine, and one green
+sample of a flaky suite proves nothing either. The cap was `2` throughout and was neither adjusted
+nor blamed.

@@ -277,6 +277,15 @@ describe("TodosSection — run honesty (Phase 250, HONEST-03 / HONEST-04)", () =
     expect(row).toHaveTextContent(/in progress/i)
   })
 
+  // ⚠ WR-04 TIGHTENED, NOT WEAKENED. This asserted `container.textContent` matched no
+  // /run ended/i ANYWHERE, which is broader than the decision it encodes and forbids the
+  // a11y fix outright: `RUN_ENDED_TITLE` ("The run ended before the agent marked this
+  // complete.") contains those two words, so putting the REASON in the accessible tree
+  // would have tripped a fence aimed at the MARKER SUFFIX on the task label.
+  //
+  // What HONEST-04 actually decided (SEED-105 item 3) is that the raw marker must never
+  // be appended to the task text. That is now asserted against the marker LITERAL, which
+  // is exactly the string the backend appends and is not a substring of the title.
   it("never renders the run-ended marker to the user", () => {
     ended()
     setTodos([
@@ -286,8 +295,38 @@ describe("TodosSection — run honesty (Phase 250, HONEST-03 / HONEST-04)", () =
       } as unknown as Todo,
     ])
     const { container } = render(<TodosSection />)
-    expect(container.textContent).not.toMatch(/run ended/i)
+    expect(container.textContent).not.toContain("(run ended — not completed)")
+    expect(container.textContent).not.toMatch(/not completed\)/i)
     expect(screen.getByText("Translate full document content to Arabic")).toBeInTheDocument()
+  })
+
+  // WR-04 — the reason must be in the ACCESSIBLE TREE, not only in a mouse tooltip.
+  it("puts the honest reason where a screen reader can reach it", () => {
+    ended()
+    setTodos([
+      {
+        ...OPEN_TODOS[0],
+        content: "Translate full document content to Arabic (run ended — not completed)",
+      } as unknown as Todo,
+    ])
+    render(<TodosSection />)
+    // `title` on a plain <li> is announced by no major screen reader and, because an
+    // <li> is not focusable, never appears for a keyboard user either. Before this
+    // phase the reason WAS in the text content; after it the accessible tree said only
+    // "Not ticked", which does not say why.
+    expect(
+      screen.getByText("The run ended before the agent marked this complete."),
+    ).toBeInTheDocument()
+  })
+
+  it("does not announce the reason on rows that were never marked", () => {
+    // ⛔ The sr-only sentence is scoped to a row the backend actually marked. Announcing
+    // it on every not-ticked row would make a screen reader read a false cause.
+    ended()
+    render(<TodosSection />)
+    expect(
+      screen.queryByText("The run ended before the agent marked this complete."),
+    ).not.toBeInTheDocument()
   })
 
   it("turns the marker into the row's title instead", () => {
