@@ -73,6 +73,19 @@ function fail(msg) {
   process.exit(2);
 }
 
+/**
+ * A harness error raised from INSIDE the analysis, so it is CATCHABLE.
+ * ⛔ `fail()` calls `process.exit(2)` and cannot be caught by anything — which would make D-04's
+ *    count assertion undrivable: `--self-test` arm 5 has to OBSERVE the harness condition, and a
+ *    guard nobody has seen fire is not a guard. The CLI's try/catch converts this back into `fail()`,
+ *    so the exit code contract (2 = harness error) is unchanged.
+ */
+class HarnessError extends Error {}
+
+function harness(msg) {
+  throw new HarnessError(msg);
+}
+
 function norm(p) {
   return String(p).split(path.sep).join('/').replace(/^\.\//, '');
 }
@@ -288,7 +301,7 @@ function skippedTotal(skipped) {
 function assertAccounting(reg, mode) {
   const skippedN = skippedTotal(reg.skipped);
   if (reg.entries.length + skippedN !== reg.registerSize) {
-    fail(
+    harness(
       `accounting does not balance: readdir found ${reg.registerSize} register file(s) but `
       + `${reg.entries.length} were parsed and ${skippedN} counted as skipped. `
       + 'Every skip must increment a printed counter — an uncounted `continue` is how a gate '
@@ -297,7 +310,7 @@ function assertAccounting(reg, mode) {
   }
   if (mode !== 'scan') return;
   if (reg.registerSize === 0) {
-    fail(
+    harness(
       `the register at ${norm(path.relative(root, reg.dir))} resolved ZERO files`
       + (reg.readError ? ` (${reg.readError})` : '')
       + '. A gate that passes over nothing is worse than absent — check-hot-file-ledger.cjs was '
@@ -305,7 +318,7 @@ function assertAccounting(reg, mode) {
     );
   }
   if (reg.entries.length !== reg.registerSize) {
-    fail(
+    harness(
       `parsed ${reg.entries.length} of ${reg.registerSize} register file(s) — the scan set collapsed `
       + `by ${reg.registerSize - reg.entries.length}. A gate that passes over nothing is worse than `
       + `absent. Skips counted: ${[...reg.skipped.entries()].map(([k, v]) => `${k}=${v.length}`).join(', ') || '(none)'}`
@@ -564,12 +577,201 @@ function matchTriggers(entries, blast) {
   return matched;
 }
 
+/**
+ * ⭐ THE PURE ANALYSIS — one implementation, driven by BOTH the CLI and `--self-test`.
+ *
+ * ⛔ This refactor is what makes D-04 ARM 4 ASSERTABLE AT ALL. Arm 4 is a COUNTERFACTUAL — a seed
+ *    whose trigger does not match must be ABSENT from the matched set — and an absence cannot be
+ *    asserted against scraped stdout without also asserting the exact shape of every other line.
+ *    Returning the matched set as DATA makes "not in it" a one-line assertion.
+ *
+ * `dir` is a parameter, never the module constant, so the self-test points EXACTLY this code at a
+ * temp fixture register rather than at a second implementation of it that would drift.
+ *
+ * Throws `HarnessError` (catchable) rather than exiting, so the count assertion can be OBSERVED.
+ */
+function analyse({ dir, filesModified = [], surfaces = [], selectFiles = null, mode = 'scan' }) {
+  const reg = readRegister(dir);
+  assertAccounting(reg, mode === 'files' ? 'files' : 'scan');
+
+  let entries = reg.entries;
+  if (selectFiles) {
+    const want = new Set(selectFiles.map((g) => path.basename(String(g))));
+    entries = entries.filter((e) => want.has(e.file));
+  }
+
+  const dups = duplicateGroups(entries);
+  const unswept = unsweptCounts(entries);
+  const results = entries.map((e) => ({ entry: e, findings: findingsFor(e) }));
+
+  const findings = [];
+  for (const d of dups) {
+    findings.push({
+      code: 'duplicate-id',
+      id: d.id,
+      rel: `SEED-${d.id}`,
+      members: d.members,
+      why: `${d.members.length} files claim this id; a reference to it resolves to more than one thing`,
+    });
+  }
+  for (const r of results) {
+    for (const [code, why] of r.findings) findings.push({ code, rel: r.entry.rel, file: r.entry.file, why });
+  }
+
+  const blast = { files: filesModified.map(norm), surfaces: surfaces.slice() };
+  const matched = matchTriggers(entries, blast);
+
+  return {
+    dir,
+    registerSize: reg.registerSize,
+    parsed: entries.length,
+    skipped: reg.skipped,
+    skippedCount: skippedTotal(reg.skipped),
+    entries,
+    results,
+    dups,
+    findings,
+    matched,
+    noTrigger: unswept.noTrigger,
+    proseOnly: unswept.proseOnly,
+    complete: results.filter((r) => !r.findings.some(([c]) => c === 'missing-key' || c === 'no-frontmatter')).length,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+// --self-test — D-04's four arms and the count assertion, made RE-RUNNABLE FOREVER
+//
+// ⚠ Measured at this phase's research: NO `check-*.cjs` in this repo has any test, runner or
+//   self-test mode. Every RED drive any of them ever had was executed once, by hand, and survives
+//   only as prose in a SUMMARY. A guard nobody has seen fire is not a guard — and a guard nobody
+//   can SEE fire AGAIN is one plausible refactor away from being decoration.
+//
+// ⛔ T-251-03: every write below goes under `fs.mkdtempSync(os.tmpdir())` and is asserted to be
+//    inside that root before it happens. `SEEDS_DIR` is unreachable from any write path in this
+//    file — a script that can write to the register by accident is this phase's own threat.
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+
+function runSelfTest() {
+  const os = require('os');
+  const rootTmp = fs.mkdtempSync(path.join(os.tmpdir(), 'seeds-selftest-'));
+  const arms = [];
+  const record = (n, name, pass, detail) => arms.push({ n, name, pass, detail });
+
+  /** ⛔ The containment guard. Boundary-safe (`root + sep`), never a bare prefix match. */
+  const writeFixture = (dir, file, body) => {
+    const target = path.resolve(dir, file);
+    if (target !== rootTmp && !target.startsWith(rootTmp + path.sep)) {
+      harness(`refusing to write ${target} — it is outside the self-test temp root ${rootTmp}`);
+    }
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, body);
+  };
+
+  const mkdir = (name) => {
+    const d = path.join(rootTmp, name);
+    fs.mkdirSync(d, { recursive: true });
+    return d;
+  };
+
+  const seed = (o) => {
+    const lines = ['---'];
+    for (const [k, v] of Object.entries(o)) lines.push(`${k}: ${v}`);
+    lines.push('---', '', `# ${o.title || 'fixture'}`, '', 'body prose', '');
+    return lines.join('\n');
+  };
+
+  try {
+    // ── ARM 1 — a planted duplicate id must FAIL ────────────────────────────────────────────
+    {
+      const d = mkdir('arm1');
+      writeFixture(d, 'SEED-901-first-claimant.md', seed({ seed_id: 'SEED-901', title: 'first claimant', status: 'planted', surface: 'Agentic-RAG', trigger_when: 'never', created: '2026-01-01' }));
+      writeFixture(d, 'SEED-901-second-claimant.md', seed({ seed_id: 'SEED-901', title: 'second claimant', status: 'planted', surface: 'Agentic-RAG', trigger_when: 'never', created: '2026-02-02' }));
+      writeFixture(d, 'SEED-902-innocent.md', seed({ seed_id: 'SEED-902', title: 'innocent', status: 'planted', surface: 'Agentic-RAG', trigger_when: 'never', created: '2026-01-01' }));
+      const a = analyse({ dir: d });
+      const hit = a.findings.filter((f) => f.code === 'duplicate-id');
+      record(1, 'duplicate id FAILS', hit.length === 1 && hit[0].id === '901',
+        `expected 1 [duplicate-id] on 901, got ${hit.length} (${hit.map((h) => h.id).join(',') || 'none'})`);
+
+      // …and the D-05 carve-out, driven rather than asserted in a comment.
+      const d2 = mkdir('arm1b');
+      writeFixture(d2, 'SEED-901-first-claimant.md', seed({ seed_id: 'SEED-901', title: 'first claimant', status: 'planted', surface: 'Agentic-RAG', trigger_when: 'never', created: '2026-01-01' }));
+      writeFixture(d2, 'SEED-901-redirect-stub.md', seed({ seed_id: 'SEED-901', title: 'redirect stub', status: 'superseded-id', surface: 'Agentic-RAG', trigger_when: 'never', created: '2026-02-02' }));
+      const a2 = analyse({ dir: d2 });
+      const hit2 = a2.findings.filter((f) => f.code === 'duplicate-id');
+      record('1b', 'a superseded-id stub is NOT a duplicate', hit2.length === 0,
+        `expected 0 [duplicate-id], got ${hit2.length} — without this carve-out Plan 03's 8 stubs read as 8 regressions`);
+    }
+
+    // ── ARM 2 — missing or unknown status must FAIL ─────────────────────────────────────────
+    {
+      const d = mkdir('arm2');
+      writeFixture(d, 'SEED-903-bad-status.md', seed({ seed_id: 'SEED-903', title: 'bad status', status: 'DONE', surface: 'Agentic-RAG', trigger_when: 'never', created: '2026-01-01' }));
+      writeFixture(d, 'SEED-904-no-block.md', '# SEED-904: no frontmatter at all\n\nbody prose\n');
+      writeFixture(d, 'SEED-905-clean.md', seed({ seed_id: 'SEED-905', title: 'clean', status: 'planted', surface: 'Agentic-RAG', trigger_when: 'never', created: '2026-01-01' }));
+      const a = analyse({ dir: d });
+      const unknown = a.findings.filter((f) => f.code === 'unknown-status');
+      const noFm = a.findings.filter((f) => f.code === 'no-frontmatter');
+      const onClean = a.findings.filter((f) => f.file === 'SEED-905-clean.md');
+      record(2, 'unknown status + no frontmatter FAIL, clean seed does not',
+        unknown.length === 1 && noFm.length === 1 && onClean.length === 0,
+        `expected 1/1/0, got unknown=${unknown.length} noFm=${noFm.length} onClean=${onClean.length}`);
+    }
+
+    // ── ARMS 3 + 4 — the match, and THE COUNTERFACTUAL ──────────────────────────────────────
+    {
+      const d = mkdir('arm34');
+      writeFixture(d, 'SEED-906-should-match.md', seed({ seed_id: 'SEED-906', title: 'should match', status: 'planted', surface: 'Agentic-RAG', trigger_when: 'when services change', trigger_paths: '["backend/app/services/**"]' }));
+      writeFixture(d, 'SEED-907-should-not-match.md', seed({ seed_id: 'SEED-907', title: 'should NOT match', status: 'planted', surface: 'Agentic-RAG', trigger_when: 'when pages change', trigger_paths: '["frontend/src/pages/**"]' }));
+      const a = analyse({ dir: d, filesModified: ['backend/app/services/agent_loop.py'] });
+      const ids = a.matched.map((m) => m.entry.id);
+      record(3, 'a matching trigger IS printed', ids.includes('906'),
+        `expected 906 in the matched set, got [${ids.join(',') || 'empty'}]`);
+      // ⭐ ARM 4 IS ASSERTED AS ABSENCE, NOT AS A SMALLER COUNT. A gate that prints everything
+      //    passes arms 1-3 and is useless; this is the only arm that can catch that.
+      record(4, 'a NON-matching trigger is ABSENT (the counterfactual)', !ids.includes('907'),
+        `907 must NOT appear in the matched set, got [${ids.join(',') || 'empty'}]`);
+    }
+
+    // ── ARM 5 — the count assertion over a collapsed scan set ───────────────────────────────
+    {
+      const d = mkdir('arm5-empty');
+      let raised = null;
+      try {
+        analyse({ dir: d });
+      } catch (e) {
+        raised = e;
+      }
+      // ⛔ Asserted by CATCHING the harness condition, never by reading an exit code — an exit 0
+      //    over zero files is the precise defect this arm exists to make impossible.
+      record(5, 'an EMPTY register raises a harness error', raised instanceof HarnessError,
+        raised ? `raised ${raised.constructor.name}` : 'NOTHING was raised — the gate would have reported a clean result over zero files');
+    }
+  } finally {
+    fs.rmSync(rootTmp, { recursive: true, force: true });
+  }
+
+  console.log(`\nseeds register — self-test (fixture register under ${norm(path.dirname(rootTmp))}, real register untouched)`);
+  for (const a of arms) {
+    console.log(`  arm ${a.n} ${a.name} … ${a.pass ? `${GRN}PASS${RST}` : `${RED}FAIL${RST}`}`);
+    if (!a.pass) console.log(`      ${a.detail}`);
+  }
+  const passed = arms.filter((a) => a.pass).length;
+  if (passed !== arms.length) {
+    console.log(`\n${RED}self-test ${passed}/${arms.length} arms PASS${RST} — the gate cannot be trusted until every arm is green.`);
+    return 1;
+  }
+  console.log(`\n${GRN}self-test ${passed}/${arms.length} arms PASS${RST} — duplicate id, stub carve-out, bad status, match, counterfactual, empty-register floor.`);
+  return 0;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 // CLI
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
 function main() {
   const argv = process.argv.slice(2);
+
+  if (argv.includes('--self-test')) return runSelfTest();
 
   let dir = SEEDS_DIR;
   let mode = 'scan';
@@ -596,29 +798,29 @@ function main() {
     mode = 'phase';
   }
 
-  const reg = readRegister(dir);
-  // ⚠ Accounting is asserted on the WHOLE register, BEFORE any per-file filtering — otherwise the
-  //   balance equation would be checked against a set the caller deliberately narrowed.
-  // ⚠ `--phase` reads the WHOLE register too, so it gets the full equality assertion — only
-  //   `--files` is carved out, because there one file is a legitimate resolution.
-  assertAccounting(reg, mode === 'files' ? 'files' : 'scan');
-  if (mode === 'files') {
-    const want = new Set(given.map((g) => path.basename(toRepoRel(g))));
-    reg.entries = reg.entries.filter((e) => want.has(e.file));
-    if (!reg.entries.length) {
-      fail(`none of the ${given.length} given path(s) resolved to a register entry under ${norm(path.relative(root, dir))}`);
-    }
+  // ⚠ The blast radius is resolved BEFORE the analysis, so the CLI is a printer over ONE pure call
+  //   and `--self-test` drives that same call with a fixture radius.
+  const blast = mode === 'phase' ? phaseBlastRadius(phaseArg) : { plans: [], files: [], surfaces: [] };
+
+  const a = analyse({
+    dir,
+    mode,
+    filesModified: blast.files,
+    surfaces: blast.surfaces,
+    selectFiles: mode === 'files' ? given.map((g) => toRepoRel(g)) : null,
+  });
+  if (mode === 'files' && !a.parsed) {
+    fail(`none of the ${given.length} given path(s) resolved to a register entry under ${norm(path.relative(root, dir))}`);
   }
 
-  const skippedN = skippedTotal(reg.skipped);
-  const dups = duplicateGroups(reg.entries);
-  const unswept = unsweptCounts(reg.entries);
-  const results = reg.entries.map((e) => ({ entry: e, findings: findingsFor(e) }));
+  const reg = { registerSize: a.registerSize, entries: a.entries, skipped: a.skipped };
+  const skippedN = a.skippedCount;
+  const dups = a.dups;
+  const unswept = { noTrigger: a.noTrigger, proseOnly: a.proseOnly };
+  const results = a.results;
   const violations = results.filter((r) => r.findings.length);
   const fileFindings = violations.reduce((n, r) => n + r.findings.length, 0);
-  const complete = results.filter(
-    (r) => !r.findings.some(([c]) => c === 'missing-key' || c === 'no-frontmatter')
-  ).length;
+  const complete = a.complete;
 
   console.log(`\nseeds register — ${norm(path.relative(root, dir))}`);
   if (mode === 'files') {
@@ -646,8 +848,7 @@ function main() {
   }
 
   if (mode === 'phase') {
-    const blast = phaseBlastRadius(phaseArg);
-    const matched = matchTriggers(reg.entries, blast);
+    const matched = a.matched;
     console.log(
       `\ntrigger sweep — phase ${phaseArg} (${blast.plans.length} plan file(s), `
       + `${blast.files.length} path(s) in files_modified)`
@@ -742,7 +943,8 @@ if (require.main === module) {
 }
 
 module.exports = {
-  frontmatter, readKey, keyValue, stripComment,
-  readRegister, assertAccounting, skippedTotal,
-  norm, unquote,
+  frontmatter, readKey, keyValue, readList, stripComment,
+  readRegister, assertAccounting, skippedTotal, analyse,
+  STATUS_ENUM, REQUIRED_KEYS, HarnessError,
+  norm, unquote, seedDate, statusToken, statusNote,
 };
