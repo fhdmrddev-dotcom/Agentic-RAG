@@ -87,7 +87,8 @@ def _accumulate_chunk_usage(
     provider: str,
     input_total: int | None,
     output_total: int | None,
-) -> tuple[int | None, int | None]:
+    reasoning_total: int | None = None,
+) -> tuple[int | None, int | None, int | None]:
     """Provider-aware usage accumulator for OpenAI-compat streaming chunks.
 
     Phase 075.3 D-075.3-03 + D-075.3-01-probe-locked (2026-05-22, verdict =
@@ -115,21 +116,47 @@ def _accumulate_chunk_usage(
     branches kept byte-for-byte even though this module is the OpenAI path — the
     unit test exercises both; re-deriving the Google branch would 2-3× over-count
     Google billing.
+
+    ⭐ **Phase 250 CR-03 — the third total is a REASONING signal, and it is the only one
+    this app has for the model family the bug was filed against.** ``reasoning_delta``
+    has two producers, both below in this file, and both are gated to providers that put
+    reasoning in the CONTENT channel (DeepSeek's ``reasoning_content`` field; the
+    ``<think>`` state machine for moonshot/deepseek/minimax/zhipu). Native OpenAI is on
+    Chat Completions and streams no reasoning text at all — so the HONEST-02 arm written
+    *"for exactly the gpt-5.6 reasoning family"* could never fire for it.
+
+    It does report ``usage.completion_tokens_details.reasoning_tokens``, and this app
+    already asks for it: ``stream_options={"include_usage": True}`` is set on EVERY
+    streaming call (``openai_service.py``). The signal was arriving and nothing read it.
+
+    ⛔ Tokens are not characters. This total must never be rendered through the
+    character-counting sentence — the consumer picks a different wording for it, because
+    reporting a token tally as characters is the same overclaim HONEST-02 removes.
+
+    ⚠ The Google branch overwrites this total too. Google's usage is CUMULATIVE per
+    chunk, so ``+=`` over-counts by 2-3× — a reasoning tally added with the wrong
+    arithmetic corrupts silently in exactly the way the billing figures would.
     """
     u = getattr(chunk, "usage", None)
     if u is None:
-        return input_total, output_total
+        return input_total, output_total, reasoning_total
     _i = getattr(u, "prompt_tokens", 0) or 0
     _o = getattr(u, "completion_tokens", 0) or 0
+    _details = getattr(u, "completion_tokens_details", None)
+    _r = (getattr(_details, "reasoning_tokens", 0) or 0) if _details is not None else 0
     if provider == "google":
         # D-075.3-01 probe-locked: cumulative running totals → overwrite-last-wins.
         # Re-flip to the ``+=`` branch ONLY if the probe verdict in
         # 075.3-01-PLAN.md <probe_result> changes to DELTA on a future re-run.
-        return _i, _o
+        return _i, _o, (_r if _r else reasoning_total)
     # OpenAI / OpenRouter / Ollama / Anthropic-via-compat / unknown → += sum.
     if input_total is None:
-        return _i, _o
-    return input_total + _i, (output_total or 0) + _o
+        return _i, _o, (_r or None)
+    return (
+        input_total + _i,
+        (output_total or 0) + _o,
+        ((reasoning_total or 0) + _r) if (_r or reasoning_total is not None) else None,
+    )
 
 
 # The char DeepSeek uses in its native tool-call markup is the fullwidth vertical
@@ -225,6 +252,7 @@ class _ClosableEventStream:
         # ONE 'usage' event at stream end so the consumer SUMs across iterations.
         input_tokens_total: int | None = None
         output_tokens_total: int | None = None
+        reasoning_tokens_total: int | None = None  # CR-03
 
         # BUG-260526-02: Kimi/Moonshot <think> tag state machine — adapter-local
         # stream state (one stream = one think-block tracker).
@@ -263,11 +291,12 @@ class _ClosableEventStream:
             # chunk. Branch inside ``_accumulate_chunk_usage``; DO NOT early-return
             # on ``chunk.usage`` — chunks with both ``usage`` and ``delta.content``
             # must flow through to delta processing below (Google's shape).
-            input_tokens_total, output_tokens_total = _accumulate_chunk_usage(
+            input_tokens_total, output_tokens_total, reasoning_tokens_total = _accumulate_chunk_usage(
                 chunk,
                 active_provider_name,
                 input_tokens_total,
                 output_tokens_total,
+                reasoning_tokens_total,
             )
             if not chunk.choices:
                 continue
@@ -458,6 +487,10 @@ class _ClosableEventStream:
                 "type": "usage",
                 "input_tokens": input_tokens_total or 0,
                 "output_tokens": output_tokens_total or 0,
+                # CR-03: the OpenAI reasoning signal. 0 for every provider that does not
+                # report one — which is NOT the same as "the model did not reason", and
+                # the consumer's wording is careful about that difference.
+                "reasoning_tokens": reasoning_tokens_total or 0,
             }
 
 

@@ -471,3 +471,111 @@ def test_2_5_no_provider_branch_entered_the_shared_fallback():
         "comments stripped: naming the provider in a SENTENCE the user reads is honest, "
         "BRANCHING on it here is the red line."
     )
+
+
+# ===========================================================================
+# §3 — CR-03: the reasoning arm must be REACHABLE, and arm 3 must not
+#      assert a negative the backend never observed
+# ===========================================================================
+
+class _Chunk:
+    """A minimal OpenAI-compat streaming chunk carrying only `usage`."""
+
+    def __init__(self, **usage):
+        self.usage = type("U", (), usage)() if usage else None
+        self.choices = []
+
+
+def test_3_1_openai_reasoning_tokens_are_accumulated_from_usage():
+    """CR-03 part 1 — the signal the app ALREADY receives must be read.
+
+    `stream_options={"include_usage": True}` is set on every streaming call
+    (`openai_service.py`), so a gpt-5.x Chat Completions stream delivers
+    `usage.completion_tokens_details.reasoning_tokens` on its final chunk. Before this
+    fix nothing read it, so `reasoning_chars_this_run` stayed 0 and the arm written *"for
+    exactly the gpt-5.6 reasoning family the bug is filed against"* could not fire for
+    that family.
+
+    ⚠ This is NOT `reasoning_delta`. Tokens are not characters, and the fix must not
+    pretend otherwise — that is what `test_3_3` pins.
+    """
+    from app.services.provider_gateway.openai_compat import _accumulate_chunk_usage
+
+    details = type("D", (), {"reasoning_tokens": 512})()
+    chunk = _Chunk(prompt_tokens=100, completion_tokens=900,
+                   completion_tokens_details=details)
+
+    result = _accumulate_chunk_usage(chunk, "openai", None, None)
+
+    assert len(result) == 3, (
+        "CR-03: _accumulate_chunk_usage must carry a reasoning-token total alongside "
+        "input/output, or the OpenAI reasoning signal has nowhere to go"
+    )
+    assert result[2] == 512, f"reasoning tokens not accumulated: {result!r}"
+
+
+def test_3_2_google_reasoning_tokens_overwrite_rather_than_sum():
+    """The Google cumulative-usage branch must treat reasoning the same way.
+
+    `D-075.3-01-probe-locked`: Google emits CUMULATIVE running totals every chunk, so
+    `+=` over-counts by 2-3x. A reasoning total added to that branch with the wrong
+    arithmetic silently corrupts the same way the billing figures would.
+    """
+    from app.services.provider_gateway.openai_compat import _accumulate_chunk_usage
+
+    details = type("D", (), {"reasoning_tokens": 300})()
+    chunk = _Chunk(prompt_tokens=10, completion_tokens=50,
+                   completion_tokens_details=details)
+
+    result = _accumulate_chunk_usage(chunk, "google", 10, 50, 300)
+
+    assert result[2] == 300, (
+        f"Google's branch must OVERWRITE the reasoning total (last-wins), got {result!r}"
+    )
+
+
+def test_3_3_the_token_arm_never_claims_characters_it_did_not_count():
+    """CR-03 — a token count must never be rendered as a character count.
+
+    Arm 1's precise sentence reports `{n:,} characters of reasoning`, counted from
+    `reasoning_delta` text. `usage.reasoning_tokens` is a different unit and a different
+    observation; rendering it through that sentence would be exactly the overclaim
+    HONEST-02 exists to remove.
+    """
+    src = _agent_loop_src()
+    block = _fallback_block(src)
+    code = _code_only(block)
+
+    assert "reasoning_tokens_this_run" in code, (
+        "CR-03: the fallback must be able to report reasoning observed as TOKENS"
+    )
+    for line in code.splitlines():
+        if "reasoning_tokens_this_run" in line and "characters" in line:
+            raise AssertionError(
+                f"CR-03: a token tally rendered as characters — {line.strip()!r}"
+            )
+
+
+def test_3_4_arm_three_does_not_assert_a_negative_it_cannot_observe():
+    """CR-03 part 2 — 'no reasoning' is a claim about the model's internals.
+
+    The Anthropic adapter runs with thinking OFF by design (D-05) and emits no reasoning
+    event; the Google adapter emits none either. For those paths the backend has observed
+    NOTHING about reasoning, so enumerating 'no reasoning' as a fact is the same overclaim
+    class arm 4 exists to avoid. The block comment already admits the limitation — a
+    comment is not a mitigation, because the user reads the sentence.
+    """
+    src = _agent_loop_src()
+    block = _fallback_block(src)
+
+    strings = re.findall(r'f"([^"]*)"', block)
+    joined = " ".join(strings)
+
+    assert "no reasoning" not in joined, (
+        "CR-03: the user-facing fallback still asserts 'no reasoning' for providers "
+        "whose reasoning the backend cannot see"
+    )
+    assert "may have been thinking" in joined or "do not report reasoning" in joined, (
+        "CR-03: having dropped the false certainty, the sentence must say WHY it cannot "
+        "tell — otherwise the user just loses information"
+    )

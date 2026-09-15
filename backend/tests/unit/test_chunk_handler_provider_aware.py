@@ -34,9 +34,16 @@ def _call(chunk, provider, input_total, output_total):
     """Lazy-import wrapper. Resolves ``_accumulate_chunk_usage`` from its
     Phase 092.5 home (``app.services.provider_gateway.openai_compat``) and
     forwards arguments verbatim.
+
+    ⚠ Phase 250 CR-03 widened the return to a 3-tuple (a reasoning-token total, the
+    only reasoning signal native OpenAI has). This wrapper keeps returning the
+    ``(input, output)`` PAIR so every assertion below still tests exactly the
+    arithmetic it was written to test — the Google cumulative-overwrite vs OpenAI
+    ``+=`` split — with no assertion edited. The reasoning total's own arithmetic is
+    pinned separately in ``test_250_run_honesty_agent_loop.py`` §3.
     """
     from app.services.provider_gateway.openai_compat import _accumulate_chunk_usage  # noqa: PLC0415
-    return _accumulate_chunk_usage(chunk, provider, input_total, output_total)
+    return _accumulate_chunk_usage(chunk, provider, input_total, output_total)[:2]
 
 
 # ── Fixture factory ───────────────────────────────────────────────────────

@@ -1756,6 +1756,13 @@ async def run_agent_loop(
     # is filed against. This counter answers a different question — *did this RUN reason
     # at all?* — and is initialised once, here, and incremented only.
     reasoning_chars_this_run = 0
+    # ⭐ CR-03 — the SECOND reasoning signal, and the only one native OpenAI has.
+    # `reasoning_delta` (which feeds the char tally above) is produced only by providers
+    # that put reasoning in the CONTENT channel. gpt-5.x on Chat Completions reports
+    # `usage.completion_tokens_details.reasoning_tokens` instead, which this app already
+    # asks for on every call. Run-scoped and never reset, for the same reason as the char
+    # tally: the per-iteration accumulator is zeroed inside the loop.
+    reasoning_tokens_this_run = 0
     persisted_tool_calls: list[dict] = []
     # Plan 075.4-03 D-075.4-E1 — closure-local per-run system warning
     # accumulator. Each entry: {kind: "context_truncated" |
@@ -2184,6 +2191,7 @@ async def run_agent_loop(
                         _on_chunk_google / _on_chunk_openai."""
                         nonlocal full_content, full_reasoning_content, finish_reason, input_tokens_total, output_tokens_total
                         nonlocal reasoning_chars_this_run  # HONEST-02 — run-scoped, never reset
+                        nonlocal reasoning_tokens_this_run  # CR-03 — likewise
                         _etype = _event.get("type")
                         # Phase 073 TOKEN-COL-01 (D-073-08): usage events. Anthropic
                         # yields message_start->"usage" + message_delta->"usage_delta";
@@ -2196,6 +2204,11 @@ async def run_agent_loop(
                         if _etype == "usage":
                             _i = _event.get("input_tokens", 0) or 0
                             _o = _event.get("output_tokens", 0) or 0
+                            # CR-03: absent for every provider that reports no reasoning
+                            # signal — which is NOT evidence the model did not reason.
+                            reasoning_tokens_this_run += (
+                                _event.get("reasoning_tokens", 0) or 0
+                            )
                             if input_tokens_total is None:
                                 input_tokens_total = _i
                                 output_tokens_total = _o
@@ -3103,11 +3116,24 @@ async def run_agent_loop(
             # latter is zeroed inside the loop, so it reports "no reasoning" for a model
             # that reasoned on every iteration.
             #
-            # ⚠ STATED LIMITATION, not an oversight: `reasoning_delta` is emitted by the
-            # OpenAI-compat path only (provider_gateway/events.py), so an Anthropic or
-            # Google run that thought silently registers zero here. That is why arm 3 is
-            # worded as an OBSERVATION — "nothing we could see" — and never as a claim
-            # about what the model did internally.
+            # ⚠ CR-03 — THE LIMITATION WAS WIDER THAN THIS COMMENT ADMITTED, AND THE
+            # COMMENT IS WHY IT SURVIVED. `reasoning_delta` has two producers, both gated
+            # to providers that put reasoning in the CONTENT channel, so arm 1 could not
+            # fire for native OpenAI EITHER — the very "gpt-5.6 reasoning family the bug
+            # is filed against" this code says it was written for. Four of the eight
+            # roster providers were unreachable, not two.
+            #
+            # Half of that is now fixed rather than documented: `reasoning_tokens_this_run`
+            # carries `usage.completion_tokens_details.reasoning_tokens`, which OpenAI
+            # already sends us. The remaining gap is Google (no reasoning signal over the
+            # compat path) — Anthropic runs with thinking OFF by design (D-05), so for it
+            # "no reasoning observed" and "no reasoning happened" genuinely coincide.
+            #
+            # ⛔ A COMMENT IS NOT A MITIGATION — the user reads the SENTENCE. Arm 3 used
+            # to enumerate "no text, no reasoning, no tool call" as observed fact; for any
+            # path with no reasoning signal that middle clause asserts a negative the
+            # backend never saw, which is precisely the overclaim HONEST-02 exists to
+            # remove. It now says what was seen and names its own blind spot.
             _steps = iteration + 1
             _n_tools = len(persisted_tool_calls)
             _tail = (
@@ -3120,6 +3146,19 @@ async def run_agent_loop(
                     f"{reasoning_chars_this_run:,} characters of reasoning across "
                     f"{_steps} step(s), and no visible reply.{_tail}*"
                 )
+            elif reasoning_tokens_this_run > 0:
+                # ⛔ TOKENS, NOT CHARACTERS. This arm exists because the provider reported
+                # a reasoning COUNT without sending the reasoning TEXT, so the precise
+                # sentence above cannot be used — rendering a token tally as characters
+                # would be a fabricated measurement, which is the failure mode this whole
+                # taxonomy is here to prevent.
+                fallback = (
+                    f"*The model spent this turn reasoning and never wrote an answer — "
+                    f"{reasoning_tokens_this_run:,} reasoning tokens across "
+                    f"{_steps} step(s), and no visible reply. The provider reported the "
+                    f"count but not the reasoning itself, so there is nothing to "
+                    f"show.{_tail}*"
+                )
             elif _n_tools > 0:
                 fallback = (
                     f"*The model ran {_n_tools} tool call(s) across {_steps} step(s) but "
@@ -3127,9 +3166,10 @@ async def run_agent_loop(
                 )
             elif finish_reason:
                 fallback = (
-                    f"*The model produced no answer. Nothing we could see came back over "
-                    f"{_steps} step(s) — no text, no reasoning, no tool call — and the "
-                    f"provider ended the turn with '{finish_reason}'.{_tail}*"
+                    f"*The model produced no answer. No text and no tool call came back "
+                    f"over {_steps} step(s), and the provider ended the turn with "
+                    f"'{finish_reason}'. Not every provider reports reasoning to us, so "
+                    f"the model may have been thinking without saying so.{_tail}*"
                 )
             else:
                 fallback = (
