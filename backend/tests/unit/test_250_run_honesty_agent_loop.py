@@ -579,3 +579,132 @@ def test_3_4_arm_three_does_not_assert_a_negative_it_cannot_observe():
         "CR-03: having dropped the false certainty, the sentence must say WHY it cannot "
         "tell — otherwise the user just loses information"
     )
+
+
+# ===========================================================================
+# §4 — WR-05: an exhausted trim that still overflows must SAY SO
+# ===========================================================================
+
+def _oversized_system_history() -> list[dict]:
+    """A budget no ordering can satisfy: the system prompt alone dwarfs it.
+
+    Reachable on a 32k local model with a large skill catalog — the configuration
+    CLAUDE.md documents — not a contrived shape.
+    """
+    return [
+        _sys("S" * 40_000),
+        _user("What is clause 3?"),
+        _assistant_tc([_tc("c1")]),
+        _tool("c1", "CHUNK " + ("x" * 5_000)),
+    ]
+
+
+def test_4_1_an_over_budget_return_is_logged_not_silent(caplog):
+    """WR-05 — D-078-02 promises a list that FITS, and sometimes none exists.
+
+    All four passes exhaust, the loops break correctly (termination is sound) and the
+    function returns an over-budget list. Downstream that surfaces as a provider
+    `400: request (N tokens) exceeds the available context size (M)` with nothing
+    pointing back at the trimmer.
+
+    ⛔ The fix is a log line, NOT an exception: `D-078-02` is explicit that this function
+    returns a list rather than raising, and raising here would turn a degraded answer
+    into a dead run. What is being removed is the SILENCE.
+    """
+    import logging
+
+    with caplog.at_level(logging.WARNING, logger="app.services.context_window"):
+        out = trim_messages_to_fit(
+            _oversized_system_history(), max_tokens=2_000, reserve_recent=10
+        )
+
+    final = estimate_messages_tokens(out)
+    assert final > 2_000, (
+        "precondition: this shape must still overflow, or the fence proves nothing"
+    )
+
+    warnings = [r for r in caplog.records if r.levelno >= logging.WARNING]
+    assert warnings, (
+        f"WR-05: returned {final} tokens against a 2000 budget and logged NOTHING — the "
+        "next provider 400 has no trace pointing at the trimmer"
+    )
+    msg = " ".join(r.getMessage() for r in warnings)
+    assert str(final) in msg and "2000" in msg, (
+        f"the warning must name BOTH figures so the gap is greppable — got: {msg!r}"
+    )
+
+
+def test_4_2_a_trim_that_fits_logs_nothing(caplog):
+    """⛔ The log must not fire on the normal path.
+
+    A warning on every successful trim is noise, and noise is how a real one gets
+    ignored. `D-14` also requires Deep Mode to stay byte-identical when nothing is
+    trimmed at all.
+    """
+    import logging
+
+    msgs = _bug_shaped_history(turns=6, chunk_chars=4_000)
+    budget = estimate_messages_tokens(msgs) // 2
+
+    with caplog.at_level(logging.WARNING, logger="app.services.context_window"):
+        out = trim_messages_to_fit(msgs, max_tokens=budget, reserve_recent=10)
+
+    assert estimate_messages_tokens(out) <= budget, "precondition: this one fits"
+    assert not [r for r in caplog.records if r.levelno >= logging.WARNING], (
+        "WR-05: a trim that met its budget must be silent"
+    )
+
+
+# ===========================================================================
+# §5 — WR-02: state BOTH facts when both are true, and do not say "this turn"
+#      about a RUN-scoped counter
+# ===========================================================================
+
+def test_5_1_reasoning_and_tools_are_reported_together_not_ranked(caplog):
+    """WR-02 part 1 — precedence must not swallow the more actionable fact.
+
+    `if reasoning > 0 ... elif tools > 0` means a run that reasoned AND executed six
+    tool calls AND wrote nothing is told only about the reasoning. The six tool calls
+    are the part an operator can act on, and for the providers where the reasoning arm
+    is reachable at all this is the COMMON shape — which makes the tools arm nearly
+    dead.
+    """
+    src = _agent_loop_src()
+    block = _code_only(_fallback_block(src))
+
+    assert "elif _n_tools > 0" not in block, (
+        "WR-02: the tool arm is still an `elif` under the reasoning arm, so a run that "
+        "did both reports only one of them"
+    )
+
+
+def test_5_2_the_sentence_does_not_say_this_turn_about_a_run_scoped_counter():
+    """WR-02 part 2 — 'this turn' is a claim the counter cannot support.
+
+    `reasoning_chars_this_run` is deliberately run-scoped and NEVER reset — that is the
+    entire reason it exists (the per-iteration accumulator is zeroed inside the loop,
+    which is the trap HONEST-02 was written to avoid). Saying "spent **this turn**
+    reasoning" while counting across every step asserts something about the final turn
+    that was never observed.
+    """
+    src = _agent_loop_src()
+    block = _fallback_block(src)
+    strings = " ".join(re.findall(r'f"([^"]*)"', block))
+
+    assert "this turn reasoning" not in strings, (
+        f"WR-02: a run-scoped tally described as 'this turn' — {strings!r}"
+    )
+
+
+def test_5_3_every_observed_signal_still_appears_in_the_message():
+    """⛔ Merging the arms must not DROP a fact — the point is to add, not replace."""
+    src = _agent_loop_src()
+    block = _code_only(_fallback_block(src))
+
+    for needle in (
+        "reasoning_chars_this_run",
+        "reasoning_tokens_this_run",
+        "_n_tools",
+        "finish_reason",
+    ):
+        assert needle in block, f"WR-02: {needle} no longer reaches the user's sentence"

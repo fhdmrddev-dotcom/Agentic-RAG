@@ -445,9 +445,36 @@ def trim_messages_to_fit(
             break
         trimmed_any = True
 
-    return _drop_orphan_tool_messages(
+    _out = _drop_orphan_tool_messages(
         _build_candidate(system_msg, trimmable, protected, trimmed_any, pinned_msgs)
     )
+
+    # ⚠ Phase 250 WR-05 — SOMETIMES NO LIST FITS, AND THIS USED TO BE SILENT.
+    # `D-078-02` promises a list rather than an exception, and the four passes above
+    # terminate correctly when there is nothing left they are allowed to remove — but a
+    # system prompt (or one pinned skill payload) larger than the whole budget means the
+    # list handed back is still over it. Reachable on a 32k local model with a large
+    # skill catalog, which is a configuration this project documents.
+    #
+    # Downstream that surfaces as a provider `400: request (N tokens) exceeds the
+    # available context size (M)` with NOTHING pointing back here. One line makes the
+    # next such 400 a single grep.
+    #
+    # ⛔ A LOG, NOT A RAISE. Raising would turn a degraded answer into a dead run and
+    # break D-078-02 outright. What is removed is the silence, not the behaviour.
+    _final = estimate_messages_tokens(_out)
+    if _final > max_tokens:
+        logger.warning(
+            "trim_messages_to_fit: EXHAUSTED and still over budget — %d > %d tokens "
+            "(system prompt alone: %d; pinned: %d). The provider will reject this "
+            "request; reduce the system prompt, the pinned skills, or raise the model's "
+            "context budget.",
+            _final,
+            max_tokens,
+            estimate_messages_tokens([system_msg]) if system_msg else 0,
+            estimate_messages_tokens(pinned_msgs) if pinned_msgs else 0,
+        )
+    return _out
 
 
 def _drop_orphan_tool_messages(msgs: list[dict]) -> list[dict]:
@@ -729,7 +756,10 @@ def _remove_oldest_evictable(
                 break
     # 3 — last resort: only the protected groups are left and they still do not fit, so
     # a protected group must go after all (D-078-02 — this function ALWAYS returns a list
-    # that fits, it never raises). `keep` holds at most two groups here: the newest user
+    # rather than raising. ⚠ WR-05: that is NOT the same as "a list that fits", which is
+    # what this comment used to say. When the system prompt or a pinned payload alone
+    # exceeds the budget, no ordering can satisfy it and the caller gets an over-budget
+    # list — now with a warning at the exit instead of in silence). `keep` holds at most two groups here: the newest user
     # turn and the last group.
     #
     # ⚠ CR-01 — GIVE UP THE BIGGEST ONE, and neither "user first" nor "non-user first"

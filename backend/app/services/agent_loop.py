@@ -3140,29 +3140,42 @@ async def run_agent_loop(
                 " Try breaking the request into smaller steps, or switching to a "
                 "different model."
             )
+            # ⚠ WR-02 — OBSERVED FACTS ACCUMULATE, THEY DO NOT COMPETE. This used to be
+            # an `if reasoning / elif tools` ladder, so a run that reasoned AND ran six
+            # tool calls AND wrote nothing reported only the reasoning — dropping the half
+            # an operator can actually act on. For every provider where the reasoning arm
+            # is reachable at all, "reasoned and called tools" is the COMMON shape, which
+            # made the tool arm nearly dead. Ranking two true facts is a quieter way of
+            # being wrong than stating a false one, and this taxonomy exists to do
+            # neither.
+            #
+            # ⛔ Reasoning is reported in whichever unit was actually MEASURED. Characters
+            # come from `reasoning_delta` text; tokens come from the provider's usage
+            # report with no text attached (CR-03). Both are never appended at once — a
+            # provider gives us one or the other — and a token tally must never be
+            # rendered as characters.
+            _observed: list[str] = []
             if reasoning_chars_this_run > 0:
-                fallback = (
-                    f"*The model spent this turn reasoning and never wrote an answer — "
-                    f"{reasoning_chars_this_run:,} characters of reasoning across "
-                    f"{_steps} step(s), and no visible reply.{_tail}*"
+                _observed.append(
+                    f"{reasoning_chars_this_run:,} characters of reasoning"
                 )
             elif reasoning_tokens_this_run > 0:
-                # ⛔ TOKENS, NOT CHARACTERS. This arm exists because the provider reported
-                # a reasoning COUNT without sending the reasoning TEXT, so the precise
-                # sentence above cannot be used — rendering a token tally as characters
-                # would be a fabricated measurement, which is the failure mode this whole
-                # taxonomy is here to prevent.
-                fallback = (
-                    f"*The model spent this turn reasoning and never wrote an answer — "
-                    f"{reasoning_tokens_this_run:,} reasoning tokens across "
-                    f"{_steps} step(s), and no visible reply. The provider reported the "
-                    f"count but not the reasoning itself, so there is nothing to "
-                    f"show.{_tail}*"
+                _observed.append(
+                    f"{reasoning_tokens_this_run:,} reasoning tokens (the provider "
+                    f"reported the count but not the reasoning itself)"
                 )
-            elif _n_tools > 0:
+            if _n_tools > 0:
+                _observed.append(f"{_n_tools} tool call(s)")
+
+            # ⛔ "over N step(s)", never "this turn". `reasoning_chars_this_run` is
+            # RUN-scoped and deliberately never reset — that is the whole reason it
+            # exists, because the per-iteration accumulator is zeroed inside the loop.
+            # A run-scoped tally described as "this turn" asserts something about the
+            # final iteration that was never observed.
+            if _observed:
                 fallback = (
-                    f"*The model ran {_n_tools} tool call(s) across {_steps} step(s) but "
-                    f"never wrote the answer they were for.{_tail}*"
+                    f"*The model produced {' and '.join(_observed)} over {_steps} "
+                    f"step(s) and never wrote an answer.{_tail}*"
                 )
             elif finish_reason:
                 fallback = (
