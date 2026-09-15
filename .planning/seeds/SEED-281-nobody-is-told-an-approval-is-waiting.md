@@ -64,7 +64,7 @@ renumbered_because: >
   THIS seed.
 ---
 
-# SEED-231 — the run stopped and asked, and there was nobody in the room
+# SEED-281 — the run stopped and asked, and there was nobody in the room
 
 ## What was measured, 2026-08-29
 

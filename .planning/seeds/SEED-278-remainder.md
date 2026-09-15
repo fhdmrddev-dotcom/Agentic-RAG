@@ -34,7 +34,7 @@ renumbered_because: >
   that rule by name.
 ---
 
-# SEED-092-remainder — the exhaustive WCAG 2.1 AA audit deferred by Phase 155
+# SEED-278 — the exhaustive WCAG 2.1 AA audit deferred by Phase 155
 
 Phase 155 (A11Y-01) closed the two named SEED-092 offender classes app-wide
 (muted-token contrast + unlabeled icon-only buttons), fixed **every** jsx-a11y

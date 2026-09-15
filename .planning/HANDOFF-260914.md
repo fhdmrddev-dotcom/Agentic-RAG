@@ -51,7 +51,7 @@ extraction stays un-triggered. The 18-importer vocabulary contract honoured with
 A **cross-tenant Gmail label leak** found in review and closed fail-closed on `(connection_id,
 label_id)`. `WatchRowCard.tsx` carries a ledger row **at creation**.
 
-⭐ **The SEED-253 fence was retired the RIGHT way** — `test_drive_path_is_the_real_folder` replaces
+⭐ **The SEED-282 fence was retired the RIGHT way** — `test_drive_path_is_the_real_folder` replaces
 `test_drive_path_is_none_not_fabricated` under **`D-247-01`**, with the reason in the test body and
 the NEW invariant asserted rather than the old one deleted. That is the Phase 206 precedent met.
 

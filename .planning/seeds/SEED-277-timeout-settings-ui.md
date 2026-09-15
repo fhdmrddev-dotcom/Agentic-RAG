@@ -23,7 +23,7 @@ renumbered_because: >
   weight — D-07 rejects that rule by name.
 ---
 
-# SEED-022 — Timeout Settings UI with Tier Presets
+# SEED-277 — Timeout Settings UI with Tier Presets
 
 ## Context
 

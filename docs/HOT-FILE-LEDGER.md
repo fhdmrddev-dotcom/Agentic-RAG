@@ -1701,11 +1701,11 @@ which is precisely the shape that reaches three phases before anyone notices.
 formatter in this folder (`RunCard.tsx:588-594`, `MessageList.tsx:49-58`). The extraction was
 **closed deliberately** — it would have edited two G-5-firing files that `243-04`'s `files_modified`
 does not name, and **the ledger gate reads `files_modified`, not the diff**, so it could not have
-caught the resulting unrecorded edits. Owed at `SEED-269`, with an acceptance criterion.
+caught the resulting unrecorded edits. Owed at `SEED-284`, with an acceptance criterion.
 
 **Named seam:** none yet. At 283 lines with one state concern, one measurement and one label, the
 first thing to leave should be the clamp — there are now three of them in this tree and no shared
-home, which is `SEED-269`'s shape one concern over.
+home, which is `SEED-284`'s shape one concern over.
 
 
 ## `frontend/src/components/chat/RunCard.tsx`
@@ -8302,7 +8302,7 @@ classifier the whole preview rests on.
 ⚠ **THIS ROW HAS NOW BEEN STALE TWICE, and the second staleness was LOAD-BEARING rather than
 cosmetic.** It read `1 / 1 / 549` (repaired to `5 / 3 / 772` at 238, itself already behind), and its
 disposition said ***"238: comment-only"*** — which is how a phase that added
-`source_path=item.path` at `confirm_preview` and re-opened SEED-253 by a new route was recorded as
+`source_path=item.path` at `confirm_preview` and re-opened SEED-282 by a new route was recorded as
 having touched nothing. **A row that is present and WRONG answers the auditor and stops the audit.**
 
 ⭐ **THE PREVIEW *IS* THE DIFF PASS.** `confirm_preview` calls `build_preview` rather than deriving
@@ -9250,7 +9250,7 @@ sentence.** So the cause is a VALUE here, and both the sentence and the repair c
    `asyncpg`. An import added here makes the classifier unusable from the one place it is most
    needed: a producer that has not opened a pool yet.
 3. **Hard vs soft is DATA, never an inline branch** (D-235-10), because the deferred email producer
-   (`SEED-231`) will need the same verdict when its trigger fires.
+   (`SEED-281`) will need the same verdict when its trigger fires.
 
 ⚠ Every token the old sniff matched — `403` / `permission` / `unauthorized` — stays reachable as a
 matcher input, **so no failure classified before this phase became unclassified by it.**
@@ -9429,7 +9429,7 @@ Measured with `git log --follow` at base `310b91e83`; phase buckets, verbatim: `
 author adding a tenant has to come here and argue with a number. *"Registering a second producer here
 is scope creep and is forbidden."*
 
-⭐ **THE SEAM EXISTS FOR `SEED-231`** (*nobody is told an approval is waiting*) so approval
+⭐ **THE SEAM EXISTS FOR `SEED-281`** (*nobody is told an approval is waiting*) so approval
 notifications can plug in **without a second surface growing beside this one** — the
 two-paths-one-outcome shape this codebase has been bitten by five measured times. It does not exist
 so a later phase can quietly acquire a second feature.
@@ -9460,10 +9460,10 @@ kind. The kind lives on `AttentionProducer.key`, and on `StoppedSource.cause`, w
 already exists: no second producer, `ATTENTION_PRODUCERS.length === 1` untouched, and `detail`
 byte-identical (asserted on the rendered sentences, not on a key).
 
-⛔ **THE FIELD IS OPTIONAL ON PURPOSE.** `SEED-231`'s waiting approval has no Library home, and a
+⛔ **THE FIELD IS OPTIONAL ON PURPOSE.** `SEED-281`'s waiting approval has no Library home, and a
 required field would force the next tenant to name a tab it does not have.
 
-⛔ **AND `SEED-231` ITSELF WAS CONSIDERED AND NOT TAKEN.** `SHELL-03` made it topical, which is
+⛔ **AND `SEED-281` ITSELF WAS CONSIDERED AND NOT TAKEN.** `SHELL-03` made it topical, which is
 exactly when a seam gets filled in by accident. It stays the registry's intended future tenant,
 re-openable only by a deliberate override with the count argued.
 
@@ -9825,7 +9825,7 @@ a file is never seen to change, silently, forever. When a server states no times
 falls back to `size:{n}` — derived from something that actually moves when the file does. ⛔ It
 stops there. The tempting third arm is a hash of the PATH: deterministic, looks exactly like a
 version, and NEVER CHANGES — so it would report "unchanged" for every future edit while appearing
-to work. That is SEED-253's fabrication failure one column over, and it is worse than absence
+to work. That is SEED-282's fabrication failure one column over, and it is worse than absence
 because absence is legible.
 
 ⭐ **BOTH STRUCTURAL FENCES WERE DRIVEN RED AGAINST DEFECTS PLANTED IN THIS FILE**, not merely
@@ -10571,7 +10571,7 @@ cells rot within days.
 | [`frontend/src/components/ui/tabs.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsuitabstsx) | 3 / 3 / 78 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent for its ENTIRE LIFE — it crossed the threshold in 217-06's OWN commit. A SHARED primitive: Library, Settings and Library Health are its three mounts |
 | [`frontend/src/components/panel/CsvTablePreview.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelcsvtablepreviewtsx) | 3 / 3 / 134 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent for its ENTIRE LIFE — crossed the threshold in 217-11's own commit. ✅ `DataTableView` EXTRACTED out of it (−67 L) at an UNCHANGED suite count |
 | [`frontend/src/components/workflows/verdictModel.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsverdictmodelts) | 6 / 3 / 355 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent for its ENTIRE LIFE — row added `BUG-260828-09`. ⭐ Its `structural_gate` docblock PREDICTED this bug and named the fix 11 days early; marked false, never overwritten |
-| [`backend/app/services/sources/preview_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcespreview_servicepy) | 8 / 4 / 826 | ⚠ **FIRES** | ⚠ row STALE TWICE and the 2nd said “238: comment-only” — 238 re-opened SEED-253 here (CR-01). 238-04: the walk no longer mutates `SourceFile.path`; display ≠ stored |
+| [`backend/app/services/sources/preview_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcespreview_servicepy) | 8 / 4 / 826 | ⚠ **FIRES** | ⚠ row STALE TWICE and the 2nd said “238: comment-only” — 238 re-opened SEED-282 here (CR-01). 238-04: the walk no longer mutates `SourceFile.path`; display ≠ stored |
 | [`backend/app/services/sources/import_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesimport_servicepy) | 3 / 3 / 277 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ row was STALE at `2/2/172`. 238 deleted a FOURTH provider leak found by the rewritten fence: it fell back to the Drive adapter on the DISPLAY NAME |
 | [`frontend/src/components/sources/SourcePreviewPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcessourcepreviewpaneltsx) | 1 / 1 / 453 | no (1 phase) | young (233) — 229-C at rest, 230-A on confirm. ⛔ Four sections, no removal control; collapse hides FILES, never the count |
 | [`frontend/src/components/sources/previewVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcespreviewvocabularyts) | 1 / 1 / 98 | no (1 phase) | young (233) — a strict leaf, zero imports. ⛔ No hash claim; the `here` qualifier is POSITIVE, not merely an absent overclaim |
@@ -10628,7 +10628,7 @@ cells rot within days.
 | [`backend/app/services/sources/mail/gmail.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesmailgmailpy) | 0 / 0 / 526 | no (new) | young (240) — the Gmail half. ⛔ `gmail_read`, never `drive_read`; reads only. ⚠ Metadata is BATCHED after a live measurement (see §)  |
 | [`backend/app/services/sources/mail/__init__.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesmail__init__py) | 0 / 0 / 44 | no (new) | young (240) — re-exports only. ⛔ Must never import an adapter: `sources/__init__.py` imports adapters eagerly, so the reverse edge is a cycle |
 | [`backend/app/services/sources/adapters/microsoft_graph.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesadaptersmicrosoft_graphpy) | 3 / 2 / 376 | no (2 phases) | ⚠ row was STALE at `0 / 0 / 352`. ⛔ The 302 dance is still sealed in here. SEED-258 removed its private `MAX_FILE_BYTES`; the ceiling is one setting now |
-| [`backend/app/services/sources/adapters/mock_source.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesadaptersmock_sourcepy) | 2 / 1 / 177 | no (1 phase) | ⚠ absent for its entire life — row added 238. It is where the SEED-253 invariant is ANCHORED: a `path` names a folder, never a filename |
+| [`backend/app/services/sources/adapters/mock_source.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesadaptersmock_sourcepy) | 2 / 1 / 177 | no (1 phase) | ⚠ absent for its entire life — row added 238. It is where the SEED-282 invariant is ANCHORED: a `path` names a folder, never a filename |
 | [`backend/app/services/sources/__init__.py`](docs/HOT-FILE-LEDGER.md#backendappservicessources__init__py) | 5 / 3 / 40 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ row was STALE at `2 / 1 / 26` and read `no (1 phase)`. The ONE eager-import site — an adapter absent here is unregistered, so the list is load-bearing |
 | [`frontend/src/components/sources/sourceCapability.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcessourcecapabilityts) | 3 / 2 / 160 | no (2 phases) | ⚠ row STALE THREE TIMES (`0/0/38`, `2/2/98`, `3/2/138`). **240**: the `is_enabled` refusal lands HERE, one predicate for both surfaces (BUG-260908-02) |
 | [`backend/app/services/sources/adapters/mcp_source.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesadaptersmcp_sourcepy) | 9 / 1 / 1271 | no (1 phase) | ⚠ STALE at every close so far (`2/1/643` → `6/1/1022` → `8/1/1259`). SEED-258 removed its `MAX_FILE_BYTES`; `_guard` reads the operator setting at each use |
@@ -10924,7 +10924,7 @@ written is the only kind that would have helped.
   states `users.messages.list` returns *"only an `id` and a `threadId`"*, so a page costs N+1
   requests. The number matches `service_tools.py`'s `search_email` cap rather than inventing a
   second one.
-- ⭐ **`path` is a REAL breadcrumb** (`/<label>`), not the fabricated `/<filename>` SEED-253
+- ⭐ **`path` is a REAL breadcrumb** (`/<label>`), not the fabricated `/<filename>` SEED-282
   recorded. Mail closes that seed's gap on arrival, because a message's folder IS its label.
 
 **Named seam for the next phase.** None yet. The seam this file IS — the provider/shape split —
@@ -13449,7 +13449,7 @@ since `d58fa43a0` — measured at this plan's base as `1 failed | 8 passed`, `ex
 retirement sentences it reads out of source. Pin superseded in place `737 → 837` (the chain
 `487 → 630 → 650 → 737 → 837` stays visible) and the suite adopted into **both** knobs — **only
 because all nine cases are green**; adopting a red suite turns the shared gate red. Thirteenth suite
-found in this state; `SEED-229` carries the structural fix.
+found in this state; `SEED-280` carries the structural fix.
 
 **Per G-5 the next phase touching this file owes a refactor recommendation FIRST. The seam is named
 rather than implied: `PendingAskCard` (the card's own render + countdown + submit) and

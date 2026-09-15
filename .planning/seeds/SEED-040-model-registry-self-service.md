@@ -45,7 +45,7 @@ This seed should be presented during `/gsd:new-milestone` when the milestone sco
 - `backend/app/models/user_settings.py:260` — `_load_model_overrides()` (reads `model_capabilities_overrides`, cached)
 - `supabase/migrations/053_settings_unification.sql` — the `model_capabilities_overrides` table (Phase 081.1, D-09/D-10)
 - `backend/app/api/settings.py:208` + `backend/app/main.py:122` — where `provider_model_lists` is written (Settings API + one-time migration; NOT auto-refreshed)
-- Related seeds: **SEED-012** (admin-operator-ui-completeness — natural parent), **SEED-024** (settings-architecture-unification), **SEED-022/023** (timeout settings UI / adaptive timeouts), **SEED-031** (direct-provider SDK integrations)
+- Related seeds: **SEED-012** (admin-operator-ui-completeness — natural parent), **SEED-024** (settings-architecture-unification), **SEED-277 / SEED-023** (timeout settings UI / adaptive timeouts), **SEED-031** (direct-provider SDK integrations)
 - STATE.md Blockers/Concerns: "Per-provider eval model list (EVAL-01 / Phase 096): needs a curation pass to current model IDs per native provider"
 
 ## Notes

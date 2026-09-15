@@ -8,7 +8,7 @@ status: open
 affected_areas: [backend/sources, backend/ingestion, backend/watches, classification, frontend/library]
 folded_into: null
 verified_closed_by: null
-related_seeds: [SEED-253]
+related_seeds: [SEED-282]
 re_open_trigger: null
 reproduces_on:
   branch: develop

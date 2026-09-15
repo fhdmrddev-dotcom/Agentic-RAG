@@ -40,7 +40,7 @@ renumbered_because: >
   that rule by name.
 ---
 
-# SEED-269 — one home for the elapsed formatter
+# SEED-284 — one home for the elapsed formatter
 
 ## What was decided, and by whom
 

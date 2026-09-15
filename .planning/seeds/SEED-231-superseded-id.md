@@ -38,9 +38,13 @@ A citation about the decision-coverage gate, `D-NN` parsing or a phase's DECISIO
 
 ## ⛔ If you got here from source code
 
-⛔ **If you arrived here from `frontend/src/components/layout/attentionConditions.ts`, you want
-`SEED-281-nobody-is-told-an-approval-is-waiting.md`.** All three references in that file (around lines 11, 104 and 145) name the
-seed that MOVED, by its own title — and that file's `ATTENTION_PRODUCERS` array is the registration seam that seed describes.
+⛔ **If you arrived here from a frontend layout module or its tests, you want
+`SEED-281-nobody-is-told-an-approval-is-waiting.md`.** All three references in
+`frontend/src/components/layout/attentionConditions.ts` (lines 11, 104 and 145) name the seed that MOVED, by its own
+title — and that file's `ATTENTION_PRODUCERS` array is the registration seam that seed describes. ⚠ **Re-measured at
+execution: it is FIVE references across THREE files, not three in one** —
+`frontend/src/components/layout/__tests__/attentionTab.test.ts:184` and
+`frontend/src/components/layout/__tests__/NavPanel.badge.test.tsx:24` carry one each, and both mean the mover too.
 
 They were deliberately left pointing here under **D-17**: the phase that renumbered these seeds touched no file under
 `frontend/`, `backend/` or `scripts/`.

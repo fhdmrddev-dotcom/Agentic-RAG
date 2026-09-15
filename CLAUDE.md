@@ -720,7 +720,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/McpToolPicker.tsx` | 5 / 5 / 601 | honoured by construction (211 / **214**) |
 | `backend/app/models/connector.py` | 26 / 14 / 835 | ⚠ row STALE for the 2nd close at `25/14/800`, and its own cell repeated the CLAIM that was false. honoured by construction (**244-07**): `folder_id` typed, not branched |
 | `backend/app/api/connectors.py` | 44 / 21 / 2140 | ⛔ **extraction OWED, SIXTH landing** (2051→2071→2091→2102→2113→2140). honoured by construction (**BUG-260912-01**): ONE `except` arm above the generic one, no new route, no new helper |
-| `backend/app/services/sources/preview_service.py` | 8 / 4 / 826 | ⚠ row STALE TWICE; the 2nd read “238: comment-only” while 238 re-opened SEED-253 here. **238-04: display ≠ stored; the walk no longer mutates `SourceFile.path`** |
+| `backend/app/services/sources/preview_service.py` | 8 / 4 / 826 | ⚠ row STALE TWICE; the 2nd read “238: comment-only” while 238 re-opened SEED-282 here. **238-04: display ≠ stored; the walk no longer mutates `SourceFile.path`** |
 | `backend/app/security/secret_cipher.py` | 4 / 2 / 256 | ⚠ absent for its ENTIRE LIFE — row added at **mig 180**, its SECOND phase. ⛔ `SECRET_COLUMNS` is the ONE encrypt-on-write set: a provider key column absent from it is stored PLAINTEXT and nothing says so |
 | `backend/app/security/egress.py` | 13 / 5 / 982 | honoured by construction (232): Google Drive read/export pins; docstri |
 | `backend/app/services/connector_service.py` | 25 / 9 / 1772 | honoured by construction (**239-06**): the write boundary knows a mapping KEY from a tool name by ALLOW-LIST — an unknown key is still read as a tool name and still refused |

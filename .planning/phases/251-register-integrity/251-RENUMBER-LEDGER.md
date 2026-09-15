@@ -157,6 +157,218 @@ session scratchpad *before* the first rename, and is the only rollback path this
 
 ---
 
-## 3 · ⛔ D-17 executed — the 33 product-source files deliberately left on a stub
+## 3 · ⛔ D-17 EXECUTED — the product-source files deliberately left on a stub
 
-*(populated by Task 3 — see §4 below)*
+> **This section is the ruling being carried out, not an oversight.** D-17 forbids touching any file
+> under `backend/`, `frontend/` or `scripts/` in this phase: all of these references are **comments
+> or test docstrings, and not one is an executing identifier**. Correcting them would put product
+> files in the blast radius of a planning-register phase for zero executable change, and the
+> alternative — departing from D-07 on the heaviest pair — is the one judgement call D-07 exists to
+> avoid. **The redirect stub (D-05) is the mechanism that keeps every one of them followable**, which
+> is exactly what D-05 is for.
+
+### 3a · Re-derived totals — larger than research measured, and the figure published is the new one
+
+```bash
+rg --hidden -o 'SEED-(022|092|228|229|231|253|259|269)' backend/ frontend/ scripts/ \
+   -g '!**/__pycache__/**' -g '!backend/venv/**'
+```
+
+| | `251-RESEARCH.md` §1.8 (2026-09-15) | **measured 2026-09-16, at execution** |
+|---|---|---|
+| product-source files | 33 | **35** |
+| product-source occurrences | 84 | **91** |
+
+⚠ **The plan's own phrase "the 33 files" had rotted by two files and seven occurrences in one day** —
+the same class of drift this phase exists to end, and the reason every figure here is re-derived
+rather than transcribed. The growth is Wave 1's and Wave 2's own scripts
+(`check-seeds-register.cjs`, `migrate-seeds-frontmatter.cjs`), which cite the collisions in comments.
+
+### 3b · The split that actually matters — WRONG vs still-correct
+
+| | occurrences | files |
+|---|---|---|
+| now land on a **stub** (the reference means the MOVER) | **54** | **25** |
+| still resolve correctly (the reference means the KEEPER) | **36** | 10 more |
+| genuinely **ambiguous**, left on the stub rather than guessed | **1** | 1 |
+| **total** | **91** | **35** |
+
+### 3c · Per-id, with what each reference means
+
+| id | occ | files | what they mean | lands on |
+|---|---|---|---|---|
+| `SEED-253` | **37** | 16 | ⛔ **ALL mean the MOVER** — the synthetic source path | `SEED-253-superseded-id.md` → `SEED-282` |
+| `SEED-259` | **32** | 8 | ⭐ **ALL mean the KEEPER** — tool argument shapes. **No edit needed, including the test FILENAME `test_259_argument_shapes_are_rows_too.py`** | unchanged |
+| `SEED-092` | **6** | 5 | ⛔ **ALL mean the MOVER** — every one spells it `SEED-092-remainder` | `SEED-092-superseded-id.md` → `SEED-278` |
+| `SEED-231` | **6** | 4 | ⛔ **ALL mean the MOVER** — "nobody is told an approval is waiting" | `SEED-231-superseded-id.md` → `SEED-281` |
+| `SEED-022` | **6** | 4 | **4 mean the KEEPER** (camelot precision floor) · 1 means the mover (a historical measurement in `check-seeds-register.cjs:373`, correct as written) · **1 AMBIGUOUS** | mixed |
+| `SEED-229` | **3** | 1 | ⛔ **ALL mean the MOVER** — five suites in neither count-gate knob | `SEED-229-superseded-id.md` → `SEED-280` |
+| `SEED-269` | **1** | 1 | ⛔ **means the MOVER**, and names the file by its FULL OLD FILENAME | `SEED-269-superseded-id.md` → `SEED-284` |
+| `SEED-228` | **0** | 0 | — | — |
+
+### 3d · ⛔ FOUR of the eight ids are read from product code, not one — and the fourth was found HERE
+
+D-17 names **`SEED-253`**. Planning added **`SEED-229`** and **`SEED-231`** and recorded that as
+extending the decision's class. **Execution found a fourth: `SEED-092`.**
+
+It was missed twice for a reason worth writing down: the four references are in a11y comments and
+a11y tests, and `SEED-092`'s KEEPER is *the app-wide WCAG AA seed* — so "an a11y comment means the
+a11y seed" is the natural inference and it is **wrong**. Every one of them spells the name out as
+**`SEED-092-remainder`**, i.e. the child, which is the seed that MOVED:
+
+| file:line | what it says |
+|---|---|
+| `frontend/src/components/ingestion/NavRow.tsx:127` | *"…is logged to `SEED-092-remainder`.)"* |
+| `frontend/src/components/skills/SkillCard.tsx:96` | *"…restructure is logged to `SEED-092-remainder`.)"* |
+| `frontend/src/components/chat/__tests__/CitationUI.a11y.test.tsx:73` | *"…already logged to `SEED-092-remainder`"* |
+| `frontend/src/pages/__tests__/SettingsPage.a11y.test.tsx:176` | *"…logged to `SEED-092-remainder`, explicitly NOT fixed"* |
+
+⭐ **Only reading each hit found this.** A per-id ruling would have marked all six `SEED-092`
+references "keeper" and left four comments pointing at the wrong seed forever.
+`SEED-092-superseded-id.md` now carries the sentence a developer arriving from any of those four
+needs, and says plainly that it is the fourth of the eight rather than pretending it was expected.
+
+### 3e · The full list, by file
+
+**⛔ These 25 files now reference a seed through a redirect stub. Deliberate, under D-17.**
+
+| file | id referenced | occ | means | lands on the stub at |
+|---|---|---|---|---|
+| `backend/app/services/sources/adapters/mcp_source.py` | `SEED-253` | 2 | `SEED-282` | `SEED-253` |
+| `backend/tests/unit/services/sources/test_source_adapter_conformance.py` | `SEED-253` | 6 | `SEED-282` | `SEED-253` |
+| `backend/app/services/sources/adapters/microsoft_graph.py` | `SEED-253` | 4 | `SEED-282` | `SEED-253` |
+| `backend/tests/unit/services/sources/test_238_source_path_honesty.py` | `SEED-253` | 4 | `SEED-282` | `SEED-253` |
+| `backend/app/services/sources/preview_service.py` | `SEED-253` | 3 | `SEED-282` | `SEED-253` |
+| `backend/app/services/ingest_enrich.py` | `SEED-253` | 2 | `SEED-282` | `SEED-253` |
+| `backend/app/services/sources/import_service.py` | `SEED-253` | 2 | `SEED-282` | `SEED-253` |
+| `backend/tests/unit/services/sources/test_238_04_stored_path_is_never_fabricated.py` | `SEED-253` | 2 | `SEED-282` | `SEED-253` |
+| `backend/tests/unit/services/sources/test_238_06_search_url_and_folder_path.py` | `SEED-253` | 2 | `SEED-282` | `SEED-253` |
+| `backend/tests/unit/services/sources/test_238_microsoft_graph_adapter.py` | `SEED-253` | 2 | `SEED-282` | `SEED-253` |
+| `backend/tests/unit/services/sources/test_239_mcp_source_adapter.py` | `SEED-253` | 2 | `SEED-282` | `SEED-253` |
+| `backend/app/services/sources/adapters/mock_source.py` | `SEED-253` | 1 | `SEED-282` | `SEED-253` |
+| `backend/app/services/sources/base.py` | `SEED-253` | 1 | `SEED-282` | `SEED-253` |
+| `backend/app/services/sources/mail/mailbox.py` | `SEED-253` | 1 | `SEED-282` | `SEED-253` |
+| `backend/app/services/watch_service.py` | `SEED-253` | 1 | `SEED-282` | `SEED-253` |
+| `frontend/src/components/layout/attentionConditions.ts` | `SEED-231` | 3 | `SEED-281` | `SEED-231` |
+| `frontend/src/components/layout/__tests__/attentionTab.test.ts` | `SEED-231` | 1 | `SEED-281` | `SEED-231` |
+| `frontend/src/components/layout/__tests__/NavPanel.badge.test.tsx` | `SEED-231` | 1 | `SEED-281` | `SEED-231` |
+| `scripts/vitest-count-gate.cjs` | `SEED-229` | 3 | `SEED-280` | `SEED-229` |
+| `frontend/src/components/ingestion/NavRow.tsx` | `SEED-092` | 1 | `SEED-278` | `SEED-092` |
+| `frontend/src/components/skills/SkillCard.tsx` | `SEED-092` | 1 | `SEED-278` | `SEED-092` |
+| `frontend/src/components/chat/__tests__/CitationUI.a11y.test.tsx` | `SEED-092` | 1 | `SEED-278` | `SEED-092` |
+| `frontend/src/pages/__tests__/SettingsPage.a11y.test.tsx` | `SEED-092` | 1 | `SEED-278` | `SEED-092` |
+| `frontend/src/components/chat/ThinkingBlock.tsx` | `SEED-269` | 1 | `SEED-284` | `SEED-269` |
+| `scripts/migrate-seeds-frontmatter.cjs` | `SEED-092`, `SEED-231`, `SEED-253` | 5 | `278` / `281` / `282` | the respective stubs |
+
+**✅ These 10 files reference a seed that KEPT its id and need no edit at all:**
+
+`backend/app/models/connector.py` · `backend/app/services/connector_service.py` ·
+`backend/app/services/sources/adapters/mcp_source.py` (its 11 `SEED-259` refs) ·
+`backend/tests/unit/services/sources/test_259_argument_shapes_are_rows_too.py` ·
+`frontend/src/components/settings/connectionFormCopy.ts` ·
+`frontend/src/components/settings/SourceToolsCard.tsx` ·
+`frontend/src/components/settings/__tests__/ConnectionFormPanel.argumentMapping.test.tsx` ·
+`backend/app/services/extractors/aspects/tables.py` ·
+`backend/tests/unit/test_aspect_engines_tables.py` · `scripts/check-seeds-register.cjs`
+
+⭐ **`SEED-259`'s 32 references are the biggest block in the whole list and every one of them stays
+correct**, because D-07's date rule happened to keep the id on the side the code meant — including
+the test **filename** `test_259_argument_shapes_are_rows_too.py`, the only place in the repository
+where one of these ids is load-bearing in a path.
+
+### 3f · ⚠ The one genuinely ambiguous reference — left on the stub rather than guessed
+
+`backend/tests/integration/test_pymupdf_in_process.py:5` —
+*"Plan 04 keeps the fence and plants `SEED-022` (in-process retry trigger)."*
+
+Neither resolution is *"an in-process retry trigger"*: the keeper is a Camelot table-precision audit
+and the mover is a timeout-settings UI. The plan's instruction for this case is explicit — **leave it
+pointing at the stub and list it here rather than guessing** — and that is what was done. The
+`SEED-022` stub names both resolutions, so a reader who follows it gets a choice rather than a wrong
+answer.
+
+---
+
+## 4 · Live references inside the permitted set — decided by READING, one at a time
+
+⛔ **There is no blanket find-and-replace in this plan (T-251-15).** A `sed -i` over the eight ids
+would have silently re-pointed every KEEPER reference at the wrong seed. Every hit was read in
+context and the rewriter **refuses** a line whose expected occurrence count does not match.
+
+**Enumeration** — ⚠ `--hidden` is load-bearing; without it `rg` skips `.planning/` entirely and
+returns a confident, wrong, near-zero (RESEARCH §8.11 published one):
+
+```bash
+rg --hidden -n 'SEED-(022|092|228|229|231|253|259|269)' \
+  -g '!.planning/milestones/**' -g '!**/node_modules/**' -g '!backend/venv/**' \
+  -g '!**/__pycache__/**' -g '!backend/logs/**' -g '!.git/**' .
+# 393 hits across 96 files
+```
+
+### 4a · What was rewritten — 37 lines across 18 files
+
+| file | lines | id → id |
+|---|---|---|
+| `docs/HOT-FILE-LEDGER.md` | 1704, 1708 | `269` → `284` (the third elapsed formatter; the one-home seed) |
+| | 8305, 9828, 10574, 10631, 10927 | `253` → `282` (the fabricated `/<filename>`) |
+| | 9253, 9432, 9463, 9466 | `231` → `281` (the notification tenant / the seam) |
+| | 13452 | `229` → `280` (thirteenth suite in neither knob) |
+| `CLAUDE.md` | 723 | `253` → `282` (the `preview_service.py` ledger row) |
+| `.planning/STATE.md` | 163 | `253` → `282` |
+| `.planning/HANDOFF.json` | 44, 138 | `253` → `282` |
+| `.planning/HANDOFF-260914.md` | 54 | `253` → `282` |
+| `.planning/phases/247-sources-and-watches/247-CONTEXT.md` | 31, **117** | `253` → `282`; line 117 names the **full filename** |
+| `.planning/phases/247-sources-and-watches/247-PREFLIGHT.md` | 19 | `253` → `282` |
+| `.planning/phases/247-sources-and-watches/.continue-here.md` | 24, 52, 78 | `253` → `282` |
+| `.planning/sketches/233-the-source-says-what-it-did/README.md` | 205 | `231` → `281` |
+| `.planning/reported-bugs/google-drive-adapter-never-writes-source-path.md` | 11 | `253` → `282` (`related_seeds`) |
+| `.planning/reported-bugs/onedrive-adapter-silently-truncates-and-mismatches-folder-paths.md` | 11, 68 | `253` → `282` |
+| `.planning/reported-bugs/inter-tool-narration-renders-in-the-message-body.md` | 11, 158 | `259` → `283` |
+| `.planning/seeds/SEED-256-…` | 19 | `253` → `282` |
+| `.planning/seeds/SEED-270-…` | 79 | `253` → `282` |
+| `.planning/seeds/SEED-235-…` | 15 | `231` → `281` |
+| `.planning/seeds/SEED-234-…` | 12, 59 | `228` → `279` |
+| `.planning/seeds/SEED-189-…` | 11, 16 | `022` → `277` |
+| `.planning/seeds/SEED-040-…` | 48 | `SEED-022/023` → `SEED-277 / SEED-023` |
+
+⭐ **36 of the 37 are provably PURE id swaps** — the `+` line with the new id mapped back to the old
+reproduces the `-` line byte-for-byte. The thirty-seventh is `SEED-040:48`, the one deliberate
+expansion: the shorthand `SEED-022/023` would have become `SEED-277/023`, which reads as a fraction.
+
+### 4b · What was deliberately LEFT — and why each class is correct
+
+| class | hits | why it is left byte-unchanged |
+|---|---|---|
+| `.planning/milestones/` (sealed) | — | **D-06.** Not scanned, not touched; `git diff --name-only .planning/milestones/` is EMPTY |
+| **`.planning/phases/251-register-integrity/`** | **123** across 10 files | ⛔ **This phase's own record IS the evidence of the collision.** `251-GATE-BASELINE.md` pastes the gate's verbatim pre-migration output; `251-RESEARCH.md` carries the measured 8-pair table; `251-CONTEXT.md` states D-05/D-07/D-17/D-20 about the ids as they were. **Rewriting a transcript makes it a lie about what the command printed.** Every `SEED-022` in that directory correctly means *the id as it stood* |
+| `.agent-bus/OPEN.md` | 13 | A historical message log outside `.planning/` and outside D-06's live list. Same class as an archive: it records what was said on a date |
+| references that mean the **KEEPER** | 55 | Already correct. Rewriting them is the exact spoofing failure T-251-15 names — among them `docs/HOT-FILE-LEDGER.md`'s eight `SEED-259` rows, four `reported-bugs` entries, `PROJECT.md:401`, and `SEED-230`'s three (*"it is NOT SEED-228… a separate live bind about whole-library intent"*, which says out loud which side it means) |
+| the 8 stubs + the 8 keepers' self-references | 75 | Correct by construction |
+
+### 4c · ⭐ ONE reference that LOOKS stale, is NOT, and must never be "fixed"
+
+`.planning/seeds/SEED-281-nobody-is-told-an-approval-is-waiting.md:162` quotes
+`attentionConditions.ts`'s own docblock **verbatim**:
+
+> *"The seam exists so `SEED-231` (nobody is told an approval is waiting) can plug in later **without
+> a second surface** growing beside this one."*
+
+⛔ **That quotation is accurate precisely because the source file still says `SEED-231`** — D-17
+leaves it there. Rewriting the quote to `SEED-281` would make the seed lie about what the module
+says. It stays, and this row is why.
+
+### 4d · ⛔ FOUR moved files still titled themselves with the OLD id — caught by the re-scan
+
+The renumber updated `seed_id:` and added `renumbered_from`, and **four of the eight moved files
+still carried the old id in their own `# H1` heading**:
+
+| file | was | now |
+|---|---|---|
+| `SEED-277-timeout-settings-ui.md:26` | `# SEED-022 — Timeout Settings UI with Tier Presets` | `# SEED-277 — …` |
+| `SEED-278-remainder.md:37` | `# SEED-092-remainder — the exhaustive WCAG 2.1 AA audit…` | `# SEED-278 — …` |
+| `SEED-281-nobody-is-told-an-approval-is-waiting.md:67` | `# SEED-231 — the run stopped and asked…` | `# SEED-281 — …` |
+| `SEED-284-one-home-for-the-elapsed-formatter.md:43` | `# SEED-269 — one home for the elapsed formatter` | `# SEED-284 — …` |
+
+⛔ **This is the `SEED-068` bad precedent one field over** — a file whose internal id disagrees with
+its filename, invisible to every scan. The gate greps `seed_id`, not `# H1`, so **it stayed green
+throughout and could never have caught this.** The re-scan of the permitted set did.

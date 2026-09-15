@@ -28,7 +28,7 @@ Specifically:
 <decisions>
 ## Implementation Decisions
 
-### 1. Remote Path Hierarchy & Ingest Propagation (`WATCH-01`, `WATCH-02`, `SEED-253`)
+### 1. Remote Path Hierarchy & Ingest Propagation (`WATCH-01`, `WATCH-02`, `SEED-282`)
 - **D-247-01: Full relative path hierarchy from watched folder root.**
   - For Google Drive (`google_drive.py`): Ingest builds and passes `path` on `SourceFile`. During listing, folder hierarchy relative to the watched root folder is resolved and formatted as `/Folder/Subfolder/filename.ext`.
   - For Microsoft Graph (`microsoft_graph.py`): `parentReference.path` is parsed cleanly, stripping the `/drive/root:` prefix to produce the clean relative hierarchy without truncation or prefix corruption.
@@ -114,7 +114,7 @@ Specifically:
 ### Governance, Bugs & Seeds
 - `.planning/phases/247-sources-and-watches/247-SKETCH-BRIEF.md` — Scope transfer brief and measured traps.
 - `.planning/reported-bugs/` — `BUG-260909-03`, `BUG-260909-04`, `BUG-260909-05`, `BUG-260909-06`, `BUG-260909-07`, `BUG-260910-02`, `BUG-260913-01`.
-- `.planning/seeds/SEED-253-source-file-path-is-synthetic-no-adapter-populates-it.md` — Path evaluation root cause.
+- `.planning/seeds/SEED-282-source-file-path-is-synthetic-no-adapter-populates-it.md` — Path evaluation root cause.
 - `docs/HOT-FILE-LEDGER.md` — Hot file scan records.
 
 </canonical_refs>

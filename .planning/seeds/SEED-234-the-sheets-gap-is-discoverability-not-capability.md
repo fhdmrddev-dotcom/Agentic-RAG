@@ -9,7 +9,7 @@ severity: medium
 category: tool-coverage / refusal-quality
 priority: medium
 relates_to:
-  - SEED-228 (read_doc refuses a .docx without saying why) — this is the SAME defect on the Sheets side, on three more tools
+  - SEED-279 (read_doc refuses a .docx without saying why) — this is the SAME defect on the Sheets side, on three more tools
   - SEED-146 (the full integration capability surface)
 trigger_when:
   - Anyone proposes adding a `create_spreadsheet` tool — read the first finding below first
@@ -56,7 +56,7 @@ list_sheet_tabs -> Google refused: HTTP 400 (FAILED_PRECONDITION)
 ```
 
 Nothing in that sentence says *"this is an Excel file, not a Google Sheet — convert it, or pick
-a different file"*, which is the only thing a person could act on. **This is SEED-228's defect
+a different file"*, which is the only thing a person could act on. **This is SEED-279's defect
 (`read_doc` on a `.docx`) on three more tools**, so it is a family rather than a one-off, and it
 should be fixed once at the `_http` refusal layer rather than three more times.
 

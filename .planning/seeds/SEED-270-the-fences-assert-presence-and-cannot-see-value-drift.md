@@ -76,6 +76,6 @@ each: does it read a VALUE, or does it read source text / a key / a testid? The 
 are the candidates. ⚠ **Do not mass-rewrite them** — a fence that is presence-only but whose
 subject genuinely is presence (a registry entry, an eager-import list) is correct as it stands.
 
-Related: [[reference_presence_assertions_cannot_see_content_drift]], [[SEED-253]] (whose re-open
+Related: [[reference_presence_assertions_cannot_see_content_drift]], [[SEED-282]] (whose re-open
 this pattern concealed), [[SEED-267]] (the same disease in the recall harness: a positive control
 that did not fire).

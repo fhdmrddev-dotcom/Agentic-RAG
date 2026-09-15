@@ -36,6 +36,22 @@ could read the same listing and write the same number. **Phase 251 resolved all 
 
 ⚠ These two are a PARENT and its CHILD, which is exactly why this collision is easy to mis-resolve — the remainder file still carries `parent_seed: SEED-092` in its own frontmatter. A citation predating Phase 155 means the KEEPER; one that says `remainder`, or that talks about what Phase 155 deliberately did NOT fix, means `SEED-278`.
 
+## ⛔ If you got here from source code
+
+⛔ **If you arrived here from a frontend comment or an a11y test, you want `SEED-278-remainder.md`.** All four such
+references spell the name out as **`SEED-092-remainder`**, which is unambiguous once you know what to look for:
+`frontend/src/components/ingestion/NavRow.tsx:127`, `frontend/src/components/skills/SkillCard.tsx:96`,
+`frontend/src/components/chat/__tests__/CitationUI.a11y.test.tsx:73` and
+`frontend/src/pages/__tests__/SettingsPage.a11y.test.tsx:176` all log a deferred a11y finding to the REMAINDER, never
+to the original gap.
+
+They were deliberately left pointing here under **D-17**: the phase that renumbered these seeds touched no file under
+`frontend/`, `backend/` or `scripts/`.
+
+⚠ **This id was NOT expected to be one of the source-read ones.** D-17 names `SEED-253`; planning added `SEED-229` and
+`SEED-231`; `SEED-092` was found at EXECUTION, by reading each hit instead of assuming the a11y references meant the
+contrast seed they are named after. **Four of the eight, not one.**
+
 ## How it was decided
 
 `planted: 2026-06-20` (the original gap) against `planted: 2026-07-16` (the remainder) — 26 days apart, no tie-break needed.

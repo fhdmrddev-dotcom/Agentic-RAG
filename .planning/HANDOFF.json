@@ -41,7 +41,7 @@
     },
     {
       "id": 6,
-      "name": "SEED-253 fence retired under D-247-01 (post-retraction)",
+      "name": "SEED-282 fence retired under D-247-01 (post-retraction)",
       "status": "done",
       "commit": "3d5f62dc6"
     },
@@ -135,7 +135,7 @@
       "phase": "247"
     },
     {
-      "decision": "SEED-253's Drive-path fence retired under D-247-01 rather than made green",
+      "decision": "SEED-282's Drive-path fence retired under D-247-01 rather than made green",
       "rationale": "WATCH-01 completed the behaviour the fence guarded; the replacement asserts the NEW invariant",
       "phase": "247"
     }

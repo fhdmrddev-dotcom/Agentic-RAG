@@ -12,7 +12,7 @@ relates_to:
   - D-v2.5-03 — "Realtime is a best-effort hint, NOT a source of truth; always reconcile via fetch on (re)connect". This is that rule being broken on the highest-stakes surface in the product.
   - project_chat_run_lifecycle_findings (memory) — "the iteration-cap Continue ALREADY EXISTS and did not render (live-SSE gate, no fetch reconcile)". Same mechanism, different control.
   - BUS-040 / the open dead-run investigation (thread c04c8245, run 6c2fe7ae, 2026-08-31 21:51) — "a chat run cancelled ITSELF 20 seconds into an ask_user pause, with error = NULL and an empty assistant message"
-  - SEED-231 (nobody is told an approval is waiting)
+  - SEED-281 (nobody is told an approval is waiting)
 trigger_when:
   - ANY work on the chat approval card, PendingAskCard, or the run event stream
   - The dead-run investigation is reopened — read this first, it is a reproduction

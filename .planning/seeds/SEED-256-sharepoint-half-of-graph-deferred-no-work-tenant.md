@@ -16,7 +16,7 @@ priority: medium
 surface: Agentic-RAG
 relates_to:
   - Phase 238 (SRC-03) — ships the OneDrive half; this is the row it records ⛔
-  - SEED-253 — its `path` forcing function was Phase 238; ⚠ that trigger was WIDENED to OneDrive
+  - SEED-282 — its `path` forcing function was Phase 238; ⚠ that trigger was WIDENED to OneDrive
     when this split landed, or it would have waited for a phase that already passed
   - Phase 232 — the source contract this was meant to test twice
 trigger_when: >

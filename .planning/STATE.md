@@ -160,7 +160,7 @@ Phase: **247 — Sources & Watches · CLOSED ON CODE** at `3d5f62dc6`. Next: **2
 Plan: 247-01 .. 247-04 — **all 4 shipped across 3 waves**, every plan carrying a SUMMARY
 Status: Ready to execute
 wave-by-wave by claude (`BUS-214` / `BUS-217` / `BUS-218` / `BUS-219`); five findings raised and fixed
-(`1f37737ae`); `SEED-253`'s Drive-path fence retired under **`D-247-01`** with the reason in the test
+(`1f37737ae`); `SEED-282`'s Drive-path fence retired under **`D-247-01`** with the reason in the test
 body (`3d5f62dc6`). Gates re-derived under claude's own runs: wider blast radius **460 passed / 0
 failed** · 247's own suites 37 · frontend 118/118 · standing red 16-33 with the **same membership** as
 the pinned baseline · honesty gate 10/10 · ledger gate OK.
