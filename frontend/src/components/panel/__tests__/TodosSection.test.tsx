@@ -374,6 +374,15 @@ describe("TodosSection — run honesty (Phase 250, HONEST-03 / HONEST-04)", () =
     // ⚠ A RENDERED TEST CANNOT CATCH IT HERE. The selectors are replaced by `vi.fn()`,
     // which consumes no hook slot, so React's hook accounting never sees the violation.
     // The only thing that can see it in this suite is the SOURCE.
+    //
+    // ⛔ THIS IS A BACKSTOP, NOT THE PRIMARY GUARD (WR-03). The primary guard is the real
+    // lint rule, which was ALREADY CONFIGURED in this repo and which nothing ran:
+    //   node scripts/check-react-hooks-rules.cjs        (+ the PostToolUse hook)
+    // Driven, it catches this line AND the three shapes the regex below structurally
+    // cannot see — a ternary hook, a block-guarded hook, and a hook added below the early
+    // `return null` that already exists in this very component. Keep this fence for the
+    // one-line message at the point of edit; do NOT widen the regex when the next shape
+    // appears — fix it in the lint gate, which understands the AST.
     const src: string = (
       await import("@/components/panel/TodosSection.tsx?raw")
     ).default
