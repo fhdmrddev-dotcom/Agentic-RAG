@@ -4,13 +4,23 @@ milestone: v4.2
 milestone_name: The Connected Knowledge You Can Actually Run
 status: executing
 last_updated: "2026-09-16T12:00:00.000Z"
-last_activity: 2026-09-16 -- Phase 251 plan 03 executed (8 duplicate ids resolved to 277-284 + 8 redirect stubs; the seeds register reads green for the first time)
+last_activity: 2026-09-16 -- Phase 251 plan 04 executed and the phase CLOSED (the seeds sweep is CALLED at both GSD touchpoints; the operator has a 5-item decision list; REQUIREMENTS.md swept 25/26)
+# ⚠ RECONCILED 2026-09-16 (251-04). Wave 1 flagged this block as internally inconsistent and
+#   Waves 2 and 3 carried the finding forward unfixed. The values it held were:
+#     total_phases: 12 · completed_phases: 1 · total_plans: 19 · completed_plans: 9 · percent: 8
+#   ⛔ EVERY ONE OF THOSE FIVE WAS WRONG, and they were wrong in DIFFERENT ways, which is why
+#   no single "off by one" reading explains them. v4.2 has FIVE phases (247-251), not 12 — the 12
+#   is inherited from an earlier milestone and was never reset. `completed_phases: 1` stood while
+#   FOUR phases carried a `*-VERIFICATION.md` on disk. And `percent: 8` agreed with neither its own
+#   numerator (1/12 = 8%) nor the ROADMAP, which read `4 / 5` at the same moment.
+#   ⭐ Re-derived from the phase directories, never from a summary line — the same rule the
+#   ROADMAP Progress table states about itself and had also stopped obeying.
 progress:
-  total_phases: 12
-  completed_phases: 1
+  total_phases: 5
+  completed_phases: 5
   total_plans: 19
-  completed_plans: 9
-  percent: 8
+  completed_plans: 19
+  percent: 100
 ---
 
 # Project State
@@ -32,7 +42,7 @@ See: `.planning/PROJECT.md` (updated 2026-09-13)
 can be taught new behaviors (skills) that persist and can be shared.
 
 **Current focus:** **v4.2 The Connected Knowledge You Can Actually Run** — started 2026-09-13.
-Phases **247+**. Phases 247, 248, **249** and **250** closed. Requirements: `.planning/REQUIREMENTS.md`. ⚠ Phase 250's CODE REVIEW round closed on 2026-09-15 (9 of 9 Critical+Warning fixed, 4 of 5 Info; see `250-REVIEW.md` → *Resolution log*) and left **`BUG-260915-01` filed but NOT fixed** — open todos read `Not ticked` on a LIVE run after a plain thread open, because nothing reconciles on thread-switch. Its fix is a trigger change in `StreamsProvider.tsx` (G-5 FIRING), so it is a PHASE, not a closure round. Next action: **Phase 251 (Register Integrity)** — the last phase of v4.2. ⚠ It is sequenced last on purpose so it sweeps this milestone's own output, and Phase 250 just produced two live examples for it: `REQUIREMENTS.md` still reads `WATCH 0/8` and `CRED 0/4` for two CLOSED phases, and `SEED-105` sat `planted` for ten weeks with all three triggers fired.
+Phases **247+**. Phases 247, 248, **249** and **250** closed. Requirements: `.planning/REQUIREMENTS.md`. ⚠ Phase 250's CODE REVIEW round closed on 2026-09-15 (9 of 9 Critical+Warning fixed, 4 of 5 Info; see `250-REVIEW.md` → *Resolution log*) and left **`BUG-260915-01` filed but NOT fixed** — open todos read `Not ticked` on a LIVE run after a plain thread open, because nothing reconciles on thread-switch. Its fix is a trigger change in `StreamsProvider.tsx` (G-5 FIRING), so it is a PHASE, not a closure round. ⭐ **Phase 251 (Register Integrity) is CLOSED 2026-09-16 and v4.2 is complete on code — all five phases.** Next action: **`/gsd:complete-milestone`**, after the operator rules on `251-BUS-TRIAGE.md`. ⚠ **Both of Phase 250's live examples were closed by 251-04**: `REQUIREMENTS.md`'s `WATCH 0/8` and `CRED 0/4` are now ticked against a named artifact each (25 of 26; `DEBT-06` left unticked **with its reason**), and the register is swept by something executable that is now CALLED at `/gsd:discuss-phase` and `/gsd:new-milestone`. ⛔ **`DEBT-06` is the one requirement outstanding and it is a real gap, not bookkeeping** — 238/240/241 plus 249 and 250 all carry `independent_review: owed`, and `BUS-247` records a self-verified close that shipped two blockers with every gate green.
 
 ## ✅ v4.1 IS DEPLOYED — 2026-09-13, and this closes three of the seven carried items below
 
@@ -107,6 +117,72 @@ owed work at all.
    269`), so a reference by ID cannot be resolved.
 
 ## Current Position
+
+Phase: **251 — Register Integrity** — ⭐ **CLOSED 2026-09-16**, and with it **v4.2 is complete on
+code, all five phases**. Plans **251-01** `b38bd8444` · **251-02** `eff1afa7e` · **251-03**
+`78c8cf010` · **251-04** `8458be004` → `f49b9d51b` → `e7cfc5a4e` → `134cb4ffa`.
+Plan: **4 / 4 done.** Status: **phase complete — next action `/gsd:complete-milestone`**, after the
+operator rules on `251-BUS-TRIAGE.md`.
+
+⭐ **THE REGISTER IS GREEN — verdict line verbatim, after 251-04:**
+```
+  register: 293 files · parsed: 293 · skipped: 0 · duplicate ids: 0
+  unswept:  134 carry no trigger_when at all · 114 carry prose but no structured trigger
+seeds register gate OK — 293/293 parsed, 0 duplicate ids, 293/293 carry all 5 required keys.
+```
+exit **0** · `--self-test` **8 / 8 arms PASS** (6/6 after 251-03; two arms added by 251-04, and
+**both had been SEEN to fail first**). ⚠ **`293`, up from 292 by exactly one** — `SEED-286`, planted
+by the bus triage's third arm. **No other file entered or left the register.**
+
+### What 251-04 decided, and the three findings it did not inherit quietly
+
+1. ⛔ **Plan 03's carried gate defect is FIXED.** The D-05 carve-out read `stubs.length === 1` — a
+   COUNT with no constraint on the group — so a **keeper + live squatter + stub** trio was waved
+   through as *resolved* while carrying an unresolved collision. Now `members.length === 2 &&
+   stubs.length === 1`. **Driven RED against a planted trio before the fix**, and the same drive is
+   now self-test arm `1c`. ⚠ This required editing `scripts/`, which Plan 03 was forbidden (D-17) —
+   recorded as a deviation rather than slipped in.
+2. ⛔ **`[id-in-heading]` ADDED, and it caught a real file on its first run.** Plan 03 found four
+   renumbered seeds still titling themselves with the old id and recorded that the gate greps
+   `seed_id:` and never headings. The new code fires **only on a disagreement**: measured across the
+   live register, **221 headings match, 42 name no id, 28 files have no `# ` line** — failing those
+   70 would buy nothing. **Exactly one disagreed: `SEED-068`, titled `# SEED-063` since a v2.8
+   renumber.** Corrected in the same commit, provably one line.
+3. ⛔ **The wiring was proven by EXECUTION, not by `grep`.** A step that merely NAMES the sweep
+   satisfies `grep -rn "check-seeds-register"` and fires nothing — driven: with the fence replaced by
+   a prose mention, the grep still hits and **zero runnable calls remain**. ⭐ **This is the third
+   consecutive wave in which the counterfactual arm was the only arm that worked.**
+
+### The mechanisms this phase leaves behind
+
+- **The sweep is CALLED**, not merely written: `discuss-phase.md` `<step name="cross_reference_seeds">`
+  and `new-milestone.md` §2.5, which no longer instructs a human to read every seed by hand.
+- **The operator's queue is a number they see at every session start.** The SessionStart hook prints
+  `5 open to:operator, oldest 15 days · 26 open to:gemini · 1 open to:claude`, and **prints nothing at
+  all when both queues are empty** — the silence contract was kept, not traded.
+- **`age_days` has ONE home** (`scripts/lib/bus-age.sh`). Two copies existed and had already diverged;
+  a third was not written.
+- ⚠ **Three VENDORED framework files now carry project edits** (`.claude/get-shit-done/` at v1.42.3):
+  `workflows/discuss-phase.md`, `workflows/new-milestone.md`, `workflows/plant-seed.md`. They are
+  recorded by path in CLAUDE.md beside the G-7 entry **so a future `chore(gsd)` update can re-apply
+  them as a set.** One precedent survived one update; that is a precedent, not a guarantee.
+
+### ⛔ What is OWED, stated as a decision rather than left to be discovered
+
+- **`DEBT-06` is the one v4.2 requirement outstanding**, and its box was **left unticked with the
+  reason written down** while the other 25 were ticked against a named artifact. No independent §6.3
+  review has run for 238/240/241, and 249 and 250 closed `self-verified`.
+- **Six bus items await the operator** — `BUS-040/208/246/247/248` and `BUS-171` itself.
+  ⛔ **Claude wrote nothing to the bus**; `git diff --name-only .agent-bus/` is EMPTY across the whole
+  plan. The `answer` / `close` commands ship pre-filled in `251-BUS-TRIAGE.md`.
+- ⚠ **`SEED-286` is new and unrouted** — a chat thread's KB folder scope cannot be changed once the
+  thread starts. Found in `BUS-040`, held by **nothing** for 16 days.
+- ⚠ **The register is still largely unswept, by design**: `134 carry no trigger_when at all · 114
+  carry prose but no structured trigger`. D-18 requires **both** figures and forbids summing them.
+  This phase built the instrument and wired it; **it did not shrink the backlog**, and the box means
+  the first thing, never the second.
+
+### ⚠ The pre-251-04 position below is superseded and is kept rather than overwritten
 
 Phase: **251 — Register Integrity** (the last phase of v4.2). Plans **251-01** at `b38bd8444`,
 **251-02** at `eff1afa7e`, and **251-03 SHIPPED** at `78c8cf010` (summary `f5125638b`).
