@@ -14,6 +14,8 @@ import { render, screen } from "@testing-library/react"
 import { axe } from "vitest-axe"
 import type { Todo } from "@/types"
 import { mockTodos } from "./fixtures"
+// ⚠ IN-04 — the ONE home of "a ?raw fence cannot tell code from a comment".
+import { stripComments } from "@/lib/stripComments.testutil"
 
 const useTodos = vi.fn()
 const useViewingThread = vi.fn()
@@ -388,7 +390,16 @@ describe("TodosSection — run honesty (Phase 250, HONEST-03 / HONEST-04)", () =
     ).default
 
     const shortCircuitedHook = /\buse[A-Z]\w*\([^)]*\)\s*(\|\||&&|\?\?)/
-    const offenders = src
+    // ⚠ IN-04 — THIS WAS A THIRD HAND-ROLLED COPY OF A RULE THIS REPO CENTRALISED,
+    // and it missed block comments entirely. The component's own docblock already quotes
+    // the forbidden pattern in line-comment form; the same sentence inside a JSDoc would
+    // have fired this fence falsely. `stripComments.testutil.ts` exists because *"the
+    // repair for two copies of a rule drift must not itself be two copies of a rule"*.
+    //
+    // ⚠ The shared util strips BLOCK comments and WHOLE-LINE line comments — not a
+    // TRAILING one on a line of code, which this fence also needs. So both run, in that
+    // order, and the local step is now a narrow SUPPLEMENT, not a reimplementation.
+    const offenders = stripComments(src)
       .split(/\r?\n/)
       .map((line, i) => [i + 1, line.replace(/\/\/.*$/, "")] as const)
       .filter(([, line]) => shortCircuitedHook.test(line))

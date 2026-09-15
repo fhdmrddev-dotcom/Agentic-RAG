@@ -388,6 +388,26 @@ def test_2_1_the_fallback_names_what_happened_not_just_a_count():
         "HONEST-02: the reasoning-only arm is the case BUG-260722-02 was filed for"
     )
     assert "tool" in lowered, "HONEST-02: the tools-ran-but-no-answer arm is missing"
+    # ⚠ IN-05 (review) — THE ASSERTION BELOW COUNTED STRING LITERALS AND ACCEPTED `>= 3`
+    # FOR A TAXONOMY ITS OWN DOCSTRING CALLS CLOSED AT FOUR. Deleting an arm kept it green.
+    # It is kept (a literal count still catches a collapse back to one message) and the
+    # STRUCTURE is pinned above it: every observable the taxonomy is built on must still
+    # reach the user's sentence.
+    #
+    # ⚠ The review's suggested shape — one `if`, two `elif`, one `else` — was right when
+    # written and went stale within the hour: WR-02 merged the reasoning and tool arms so a
+    # run that did BOTH reports both. Counting branches would now fail for the RIGHT code.
+    # What is pinned instead is the set of FACTS, which is what the taxonomy promises.
+    for observable in (
+        "reasoning_chars_this_run",   # reasoning TEXT was seen
+        "reasoning_tokens_this_run",  # a reasoning COUNT, no text (CR-03)
+        "_n_tools",                   # tools ran
+        "finish_reason",              # the provider said why it stopped
+    ):
+        assert observable in block, (
+            f"HONEST-02: {observable} no longer reaches any user-facing sentence — an arm "
+            "was deleted and the taxonomy silently narrowed"
+        )
     # Four distinct user-facing sentences, not one string with an f-string count in it.
     sentences = re.findall(r'"[^"\n]{25,}"', block)
     assert len(sentences) >= 3, (

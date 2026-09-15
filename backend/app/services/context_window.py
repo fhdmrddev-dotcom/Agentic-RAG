@@ -367,7 +367,7 @@ def trim_messages_to_fit(
     # protected class (kept like the protected tail, never entered into the trimmable
     # removal loop). This happens BEFORE the protected-tail split so a skill loaded
     # near the front of the conversation still survives. The atomic-group partition
-    # MIRRORS _remove_oldest_atomic's grouping rules so a pinned group always carries
+    # MIRRORS `_atomic_groups`' grouping rules so a pinned group always carries
     # its assistant+tool_calls parent alongside its tool-result (Pitfall 2 — never an
     # orphaned tool message). De-dupe to the latest group per skill, cap total pinned
     # at PIN_BUDGET_FRACTION * max_tokens, and evict the least-recently-loaded pinned
@@ -517,7 +517,7 @@ def _drop_orphan_tool_messages(msgs: list[dict]) -> list[dict]:
 
 
 def _atomic_groups(rest: list[dict]) -> list[list[dict]]:
-    """Partition `rest` into atomic message groups, MIRRORING _remove_oldest_atomic.
+    """Partition `rest` into atomic message groups — the ONE grouping rule.
 
     An atomic group is:
     - A single user/assistant message (without tool_calls), or
@@ -632,9 +632,11 @@ def _build_candidate(
     result: list[dict] = []
     if system_msg:
         result.append(system_msg)
-    if add_marker and trimmable is not None:
+    if add_marker:
         # Only add marker if there WAS something trimmed (trimmable can still have content
-        # but it was partially trimmed, or it was completely cleared)
+        # but it was partially trimmed, or it was completely cleared).
+        # ⚠ IN-02: this read `and trimmable is not None` — every call site passes a list, so
+        # the conjunct was always true. A guard that cannot fail reads like a real one.
         result.append({"role": "user", "content": _TRIM_MARKER})
     if pinned:
         result.extend(pinned)
@@ -651,8 +653,8 @@ def _remove_oldest_evictable(
 ) -> int:
     """Phase 250 HONEST-01 — remove the oldest atomic group that is safe to lose.
 
-    ``_remove_oldest_atomic`` removes strictly oldest-first, which is why
-    ``BUG-260906-01`` happened: a thread that had absorbed several large
+    The strictly-oldest-first door this replaced is why ``BUG-260906-01`` happened:
+    a thread that had absorbed several large
     ``search_documents`` payloads evicted the user's OWN question while keeping the tool
     results that question had produced, and the model then apologised for losing a
     question the person had just asked.
@@ -691,8 +693,8 @@ def _remove_oldest_evictable(
     hoisting it detaches it from the answer that follows it. This helper only changes
     WHICH group is removed, never WHERE the survivors sit.
 
-    ⛔ **Every removal is a COMPLETE atomic group** (``_atomic_groups``, the same
-    partition ``_remove_oldest_atomic`` mirrors), so an assistant with ``tool_calls``
+    ⛔ **Every removal is a COMPLETE atomic group** (``_atomic_groups`` — the ONE
+    partition, since IN-01 deleted the dead twin), so an assistant with ``tool_calls``
     always leaves with its results and a lone orphan tool result is removed as its own
     group rather than stranded.
 
@@ -795,67 +797,3 @@ def _remove_oldest_evictable(
     n = len(groups[target])
     del seq[start : start + n]
     return n
-
-
-def _remove_oldest_atomic(trimmable: list[dict]) -> int:
-    """Remove the oldest atomic message group from the start of trimmable (in-place).
-
-    ⚠ Phase 250: ``trim_messages_to_fit`` no longer calls this — it calls
-    ``_remove_oldest_evictable``, which prefers groups carrying no user turn (HONEST-01).
-    This strictly-oldest-first door is kept, byte-unchanged, because it is the primitive
-    the newer helper's contract is stated against and because deleting a shipped function
-    to tidy a diff is how a caller nobody grepped for breaks silently.
-
-    An atomic group is:
-    - A single user/assistant message (without tool_calls)
-    - An assistant message with tool_calls PLUS all immediately following tool-role
-      messages that reference those tool_call IDs
-    - A tool-role message PLUS its parent assistant+tool_calls message and any
-      sibling tool messages (to avoid orphaned tool results)
-
-    Returns the number of messages removed.
-    """
-    if not trimmable:
-        return 0
-
-    first = trimmable[0]
-    first_role = first.get("role", "")
-
-    # Case: assistant message with tool_calls → remove it plus all its tool results
-    if first_role == "assistant" and first.get("tool_calls"):
-        tool_ids = {tc.get("id") for tc in first["tool_calls"] if tc.get("id")}
-        # Collect the assistant message itself
-        to_remove = 1
-        # Collect immediately following tool messages that reference these IDs
-        for msg in trimmable[1:]:
-            if msg.get("role") == "tool" and msg.get("tool_call_id") in tool_ids:
-                to_remove += 1
-            else:
-                break
-        del trimmable[:to_remove]
-        return to_remove
-
-    # Case: tool message at the start (orphaned or parent already removed upstream)
-    # Remove it plus look backwards — but since we only trim from the start, we
-    # need to also pull the parent assistant+tool_calls block if it precedes this.
-    # In practice, since we process front-to-back, a tool message at index 0 means
-    # its parent was already removed (shouldn't happen in well-formed history).
-    # Just remove it to avoid orphan errors.
-    if first_role == "tool":
-        to_remove = 1
-        # Also remove any immediately following sibling tool messages with same parent.
-        # Guard: only match on non-None IDs — if tool_call_id is None we cannot
-        # reliably distinguish siblings from unrelated tool messages, so stop at one.
-        tool_call_id = first.get("tool_call_id")
-        if tool_call_id is not None:
-            for msg in trimmable[1:]:
-                if msg.get("role") == "tool" and msg.get("tool_call_id") == tool_call_id:
-                    to_remove += 1
-                else:
-                    break
-        del trimmable[:to_remove]
-        return to_remove
-
-    # Default: plain message, remove just the first one
-    del trimmable[0]
-    return 1
