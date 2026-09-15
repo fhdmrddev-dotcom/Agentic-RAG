@@ -27,9 +27,11 @@ import pytest
 # ---------------------------------------------------------------------------
 
 class _FakeRedis:
-    def __init__(self):
+    def __init__(self, zsets: dict | None = None):
         self.store: dict = {}
         self.xadds: list = []
+        # key -> list[member]; WR-01 models `runs_by_thread:{tid}` live membership.
+        self.zsets: dict = zsets or {}
 
     async def set(self, key, value, ex=None, nx=False, **kw):
         self.store[key] = value
@@ -51,6 +53,12 @@ class _FakeRedis:
     async def zrem(self, key, *members):
         return 1
 
+    # ⚠ WR-01 — this fake had NO sorted-set READ at all, which is exactly why the §1-4
+    # fences could not see that step 3 is thread-scoped: they asserted only WHETHER the
+    # reconciler was called, never against what live state.
+    async def zrange(self, key, start, end, **kw):
+        return list(self.zsets.get(key, []))
+
     async def publish(self, channel, data):
         return 1
 
@@ -59,7 +67,14 @@ async def _noop(*a, **kw):
     return None
 
 
-async def _drive(terminal_status: str, result_sink: dict | None = None) -> dict:
+async def _drive(
+    terminal_status: str,
+    result_sink: dict | None = None,
+    *,
+    also_live: int = 0,
+    self_registered: bool = True,
+    redis_raises: bool = False,
+) -> dict:
     """Run `_finalize_producer_run` once and report what step 3 and step 5 did.
 
     Returns ``{"reconciled": bool, "order": [...], "thread_id": UUID}``.
@@ -70,6 +85,16 @@ async def _drive(terminal_status: str, result_sink: dict | None = None) -> dict:
     order: list[str] = []
     thread_id = uuid.uuid4()
     seen_thread: list = []
+    run_id = uuid.uuid4()
+
+    # WR-01: step 3 runs BEFORE step 4's ZREM, so this run is still a member here.
+    _members: list = [str(run_id)] if self_registered else []
+    _members += [str(uuid.uuid4()) for _ in range(also_live)]
+    _redis = _FakeRedis({f"runs_by_thread:{thread_id}": _members})
+    if redis_raises:
+        async def _boom_zrange(*a, **kw):
+            raise RuntimeError("redis down")
+        _redis.zrange = _boom_zrange
 
     async def _fake_reconcile(pool, tid, **kw):
         order.append("reconcile")
@@ -96,9 +121,9 @@ async def _drive(terminal_status: str, result_sink: dict | None = None) -> dict:
         "app.api.threads._emit_terminal", new=_fake_emit_terminal
     ):
         await run_producer._finalize_producer_run(
-            run_id=uuid.uuid4(),
+            run_id=run_id,
             thread_id=thread_id,
-            redis=_FakeRedis(),
+            redis=_redis,
             result_sink=result_sink if result_sink is not None else {},
             terminal_status=terminal_status,
             terminal_error=None,
@@ -273,4 +298,84 @@ def test_8_the_gate_reuses_the_named_terminal_set():
     assert "cap_paused" not in _RUN_STATUS_TO_TERMINAL_TYPE, (
         "if cap_paused is ever added to this map, the step-3 gate silently starts "
         "marking resumable runs 'not completed' — add an explicit exclusion first"
+    )
+
+
+# ===========================================================================
+# §9 — WR-01: the gate is thread-scoped, so it must refuse while another
+#      run is still live on that thread
+# ===========================================================================
+
+@pytest.mark.asyncio
+async def test_9_1_a_second_live_run_on_the_thread_blocks_reconciliation():
+    """WR-01 — `cancelled` is exactly the status followed by an immediate re-prompt.
+
+    `reconcile_open_todos_on_run_end` selects `WHERE thread_id = $1`: it marks every
+    open todo on the THREAD, not the todos of the run that ended. Its docstring claims
+    *"Forward-only (D-06) — this only affects the run that just ended"*, and that is
+    false whenever a second run is live on the same thread.
+
+    Nothing refuses a second Deep run while one is live (the 409 in `threads.py` is the
+    workflow-anchor lock), and step 3 runs BEFORE step 4's `runs_by_thread` ZREM. So a
+    user who hits Stop and re-prompts can have the dying run append
+    `" (run ended — not completed)"` to the NEW run's still-open todos — `BUG-260913-02`
+    re-created by the fix for `BUG-260902-01`.
+    """
+    r = await _drive("cancelled", also_live=1)
+
+    assert r["reconciled"] is False, (
+        "WR-01: a run that ended while another run is still live on the thread must NOT "
+        "mark that thread's open todos — they may belong to the live run"
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status", ["completed", "failed", "cancelled", "timed_out"])
+async def test_9_2_the_block_applies_to_every_terminal_status(status: str):
+    """The hazard is thread scope, not a particular status — all four must refuse."""
+    r = await _drive(status, also_live=2)
+    assert r["reconciled"] is False, f"{status}: reconciled with 2 other live runs"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status", ["completed", "failed", "cancelled", "timed_out"])
+async def test_9_3_the_lone_run_still_reconciles(status: str):
+    """⛔ The guard must not silently undo HONEST-03.
+
+    When this run is the only member of `runs_by_thread`, every true terminal status
+    still reconciles — which is the whole point of the phase and what
+    `250-MEASUREMENT.md` measured 4 stuck todos against.
+    """
+    r = await _drive(status, also_live=0)
+    assert r["reconciled"] is True, f"{status}: the lone-run path must still reconcile"
+
+
+@pytest.mark.asyncio
+async def test_9_4_an_unregistered_self_with_a_live_sibling_refuses():
+    """Fail-closed on the ambiguous shape, and this is why the check is not `zcard <= 1`.
+
+    A count cannot tell "only me" from "only someone else". If this run is already gone
+    from the registry while a DIFFERENT run is live, `zcard` reads 1 and a count-based
+    guard would ALLOW the very write it exists to prevent. Comparing MEMBERS refuses.
+    """
+    r = await _drive("cancelled", also_live=1, self_registered=False)
+    assert r["reconciled"] is False, (
+        "WR-01: the set held one member and it was NOT this run — a count-based guard "
+        "would have read 1 and allowed the cross-run write"
+    )
+
+
+@pytest.mark.asyncio
+async def test_9_5_a_redis_failure_does_not_disable_honest_03():
+    """Stated trade-off, recorded rather than defaulted into.
+
+    Step 3 is best-effort by contract and must never raise into the byte-locked
+    finalizer. On a registry read failure the guard fails OPEN: a stuck todo is a
+    permanent honesty defect (`BUG-260902-01`), whereas a stray marker needs a
+    simultaneous second run AND a broken Redis, and is overwritten by that run's own
+    next todo write.
+    """
+    r = await _drive("cancelled", redis_raises=True)
+    assert r["reconciled"] is True, (
+        "a Redis outage must not silently switch HONEST-03 back off"
     )

@@ -158,9 +158,45 @@ async def _finalize_producer_run(
     # be marked "not completed". `test_250_reconciler_gate.py::test_5b` was written to
     # prove the equivalence and instead REFUTED it, before a line shipped. Two
     # independent facts, two clauses; do not collapse them again.
+    # ⚠ Phase 250 WR-01 — THE THIRD CLAUSE, AND IT IS ABOUT SCOPE, NOT STATUS.
+    # `reconcile_open_todos_on_run_end` selects `WHERE thread_id = $1`: it marks every
+    # open todo on the THREAD, not this run's. Its own docstring claims "Forward-only
+    # (D-06) — this only affects the run that just ended", and that is false the moment a
+    # second run is live on the same thread. Nothing refuses a concurrent Deep run (the
+    # 409 in threads.py is the workflow-anchor lock), and this step runs BEFORE step 4's
+    # `runs_by_thread` ZREM — so Stop-then-immediately-re-prompt, the single most likely
+    # sequence after `cancelled`, let the DYING run append "(run ended — not completed)"
+    # to the NEW run's still-open todos. That is BUG-260913-02 re-created by the fix for
+    # BUG-260902-01.
+    #
+    # ⛔ MEMBERS, NOT A COUNT. `zcard <= 1` cannot tell "only me" from "only someone
+    # else": if this run were already gone from the registry while another was live, the
+    # count reads 1 and the guard would ALLOW precisely the cross-run write it exists to
+    # prevent (test_9_4 drives that shape). Subtracting this run's id refuses it.
+    #
+    # ⚠ FAILS OPEN, deliberately. Step 3 is best-effort and must never raise into the
+    # byte-locked finalizer. A stuck todo is a PERMANENT honesty defect (BUG-260902-01,
+    # 4 rows measured); a stray marker needs a simultaneous second run AND a broken
+    # Redis, and the live run's own next todo write overwrites it. So a registry outage
+    # must not silently switch HONEST-03 back off (test_9_5).
+    _sibling_live = False
+    try:
+        _members = await redis.zrange(f"runs_by_thread:{thread_id}", 0, -1)
+        _others = {
+            (m.decode() if isinstance(m, (bytes, bytearray)) else str(m))
+            for m in (_members or [])
+        } - {str(run_id)}
+        _sibling_live = bool(_others)
+    except BaseException:
+        logger.exception(
+            "RUN-01b: runs_by_thread read failed for thread %s — reconciling anyway",
+            thread_id,
+        )
+
     if (
         terminal_status in _RUN_STATUS_TO_TERMINAL_TYPE
         and result_sink.get("cap_disposition") != "cap_paused"
+        and not _sibling_live
     ):
         try:
             from app.services.todos_service import reconcile_open_todos_on_run_end  # noqa: PLC0415
