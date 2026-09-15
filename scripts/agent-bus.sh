@@ -34,14 +34,11 @@ next_id() {
 
 valid_party() { case " $VALID_PARTIES " in *" $1 "*) return 0;; *) return 1;; esac; }
 
-# Age in days of a YYYY-MM-DD date, portable across GNU/BSD date.
-age_days() {
-  local d="$1" then now
-  then=$(date -u -d "$d" +%s 2>/dev/null || date -u -j -f %Y-%m-%d "$d" +%s 2>/dev/null || echo "")
-  [ -n "$then" ] || { echo "?"; return; }
-  now=$(date -u +%s)
-  echo $(( (now - then) / 86400 ))
-}
+# Age in days of a YYYY-MM-DD date. ⛔ ONE HOME, and this is not it — see scripts/lib/bus-age.sh.
+# The hook had a second, divergent copy (GNU-only, no "?" sentinel); a third would have been the
+# third. Sourced, never re-implemented.
+# shellcheck source=lib/bus-age.sh
+. "$ROOT/scripts/lib/bus-age.sh"
 
 cmd_open() {
   local to="" from="" body=""
