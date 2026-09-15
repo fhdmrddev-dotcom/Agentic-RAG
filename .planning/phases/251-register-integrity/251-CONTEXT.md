@@ -201,6 +201,122 @@ readable will build an evaluator over prose.
   **26 open `to:gemini`, 1 open `to:claude` (BUS-171 itself), 5 open `to:operator` — 32 open items
   total**, against 69 + 113 + 30 = **212 closed**.
 
+### ⚠ AMENDMENTS RULED AT PLAN-PHASE — 2026-09-16, by the operator, on measured research evidence
+
+⚠ **Five locked decisions were measured UNIMPLEMENTABLE AS WRITTEN by `251-RESEARCH.md`.** The
+originals above are preserved byte-unchanged, never overwritten, per this file's own convention. The
+amendments below **override** them where they conflict, and the planner is bound by the amended form.
+Every figure names the command that produced it in `251-RESEARCH.md`; all measured 2026-09-15 at `0fa2674cd`.
+
+- **D-16 (locked, amends D-10): `status` stays a 10-value closed enum; a NEW sibling key `partial:`
+  (boolean) carries the qualifier on ANY axis.** Measured: 9 tokens covering **251 of 278 files
+  (90.3%)** map 1:1 and need no judgement; **16 tokens covering 27 files fit no enum member**, and
+  **15 of those are a `partially-*` family on four axes D-10's enum has no slot for**
+  (`partially-folded` ×7, `partially-shipped` ×4, `shipped-in-part`, `partially-resolved`, `partial`,
+  `partial-consumed`). So `partially-folded` → `status: folded` + `partial: true`, and the discarded
+  prose still moves byte-for-byte to `status_note`. ⛔ **The remaining 12 orphans — `promoted` ×2,
+  `DONE`/`done` ×3, `routed`, `scheduled`, `queued`, `in_progress`, `active`, `resolved`, `fixed` —
+  each get an INDIVIDUALLY LISTED mapping in the plan**, per D-10's standing instruction that every
+  mapping is listed and none silently coerced. ⚠ `SEED-100`/`SEED-101`'s `promoted` must be READ
+  before mapping — it may mean *"became a requirement"*, which is `folded` to a different destination.
+  ⭐ Chosen over widening the enum by two, and over mapping down onto `status_note` alone: the latter
+  makes `status: folded` silently include half-open seeds, which is **REG-02's own failure mode in a
+  new costume**. The gate validates `status ∈ enum` **independently of** `partial`, so a
+  `partially-deferred` needs no re-open.
+
+- **D-17 (locked, amends the D-06 live-file list): the REDIRECT STUB carries the product-source
+  references, and NO product file is touched.** Measured: **84 of the 156 live duplicate-id
+  occurrences (54%), across 33 files**, sit in `backend/app`, `backend/tests`, `frontend/src` and
+  `scripts/` — which the phase boundary excludes and D-06's live list never named. **All 84 are
+  comments or test docstrings; none is an executing identifier.** ⭐ `SEED-259` is harmless — D-07
+  keeps the id on the seed the source code actually means, so `test_259_argument_shapes_are_rows_too.py`
+  stays correct. ⛔ **`SEED-253` is the live one:** every live source reference means
+  `source-file-path-is-synthetic-no-adapter-populates-it`, which D-07 makes the YOUNGER seed, so 25+
+  backend/frontend references land on the stub. **The plan MUST record IN WRITING that those 33 files
+  are deliberately left pointing at the stub**, and **the `SEED-253` stub's wording must be good enough
+  to serve a developer reading a code comment** — naming both resolutions and saying plainly which one
+  concerns source paths. ⛔ Rejected: a narrow exception to edit comment-only refs (puts product files
+  in the blast radius for zero executable change), and departing from D-07 on the 253 pair (D-07
+  rejects "most-referenced keeps it" by name, and one exception leaves no precedent for the ninth).
+
+- **D-18 (locked, amends D-02): the backfill is MECHANICAL ONLY, and the gate prints TWO numbers that
+  must BOTH shrink.** Measured across the 157 seeds carrying `trigger_when`: only **20 name a full
+  repo path** (a reliable glob), **45** if bare filenames count as `**/name.ext`, and **33 name
+  nothing extractable at all**. ⛔ **So after a fully-automated backfill roughly 238 of 283 (84%) are
+  still unswept — not the 126 D-02's gate message anticipates.** The gate therefore reports
+  **`N seeds carry no trigger_when at all`** and **`M seeds carry prose but no structured trigger`**
+  as two separate figures. **Conflating them hides the larger one, and a gate reporting `126` while
+  238 are unswept is the comfortable lie REG-02 exists to end.** ⭐ `trigger_paths` is the
+  LOAD-BEARING field — deterministic, matches `files_modified` directly, and the only one D-04's arms
+  3 and 4 can be driven against. `trigger_surfaces` is a **small controlled enum** seeded from the
+  ~15 domain words that actually repeat, NOT free extraction: measured, the quoted vocabulary is
+  bespoke — **the most frequent quoted term across the whole register appears TWICE**, so free
+  extraction yields ~53 seeds tagged with strings no other seed shares and no phase will declare.
+  ⛔ **`trigger_phase_touches` is NOT built as a third matching axis** — the 31 seeds naming a phase
+  number name it as *history*, not as a future trigger. ⛔ Rejected: an assisted hand-derivation pass
+  over the remaining 112 (the single biggest budget item in the phase, and it breaches G-8 on its own).
+
+- **D-19 (locked, amends D-03): the sweep call lands in `.claude/get-shit-done/workflows/`, where the
+  steps actually are — following the G-7 precedent at `9d3d887de`.** Measured: the two files D-03
+  names, `.claude/commands/gsd/discuss-phase.md` and `new-milestone.md`, are **76- and 45-line ROUTERS
+  with no steps in them** — a call added there lands where nothing executes it in order, which is this
+  project's own recorded *"a rule that exists and is not applied is the same as no rule"*. ⚠
+  `.claude/get-shit-done/` is a **VENDORED framework at v1.42.3**; the edit is recorded as a known
+  re-apply risk, and the one precedent (`9d3d887de`, the G-7 gate) **survived a later framework
+  update**. ⛔ **AND D-03 RESOLVES A CONTRADICTION, NOT A VOID:** `/gsd:new-milestone` already carries
+  a `## 2.5. Scan Planted Seeds` step that reads all 283 by hand **and explicitly forbids what
+  CLAUDE.md mandates** — *"never delete or modify seed files during this workflow."* That step is
+  **replaced** by the script call, and the prohibition is **scoped in writing**: the workflow itself
+  does not edit seeds, while *answering a seed by editing it* (CLAUDE.md) stays correct outside it.
+  ⛔ Rejected: the routers alone (wiring that reads correct and never fires), and a PostToolUse hook
+  (fires on file writes, not at the two GSD touchpoints REG-02 names).
+
+- **D-20 (locked, amends D-07): the date rule reads `created` IF PRESENT, ELSE `planted`, and ties
+  break on the git ADD-COMMIT timestamp.** Measured: **`created` is present in only 99 of 283 seeds**
+  (`planted:` 178; neither 6), and **five of the eight duplicate pairs carry only `planted:`** — so
+  D-07 as written cannot evaluate its own rule on 5 of 8 cases. **Two pairs tie on the day and D-07
+  gives no tie-break:** `SEED-231` (both `2026-08-29`) and `SEED-253` (both `2026-09-06`). Resolved by
+  `git log --diff-filter=A --format=%ad --date=iso`, which is derived rather than judged — exactly what
+  D-07 optimises for: `SEED-231` → `decision-coverage-gate-is-blind…` keeps it (older by 63 min);
+  `SEED-253` → `mobile-has-no-drawer-trigger…` keeps it (older by 13h 24m). ⚠ **The frontmatter date
+  is AUTHORITATIVE and the git timestamp is the tie-break ONLY** — they disagree on two pairs
+  (`SEED-022-timeout-settings-ui` reads `2026-05-25`, added `2026-05-24`; both `228`/`229` movers read
+  `2026-08-31`, added `2026-09-01`) without flipping any verdict, and the script must not pick silently.
+  **The gate encodes the `created`-else-`planted` fallback**, or it fails to evaluate its own rule.
+
+### ⚠ Research corrections the planner must carry (not operator decisions — measured facts)
+
+- ⛔ **`.planning/seeds/TEMPLATE.md` DOES NOT EXIST.** The canonical-refs block above lists it as a
+  file to *update*; it must be **CREATED**. The frontmatter contract has never had a written home —
+  which is a sufficient explanation, on its own, for 40+ status spellings.
+- ⛔ **`/gsd:capture`'s allocator is a live, quotable bug:** `plant-seed.md` allocates
+  **`count(files) + 1`, not `max(id) + 1`** — it would emit **`SEED-284`** today, not D-08's `277`.
+  D-08's stated cause (*"two agents each read 'highest is N'"*) is therefore **incomplete**; the
+  allocator has been wrong on its own, single-threaded, the whole time.
+- ⛔ **159 of 283 seeds contain CR and 6 have MIXED line endings inside one file.** With
+  `core.autocrlf=true` and no `.gitattributes`, a normalising rewrite changes every working-tree line
+  while producing **NO `git diff`** — so **`git diff` cannot verify D-11**. The md5 body proof must
+  hash **raw Buffers**.
+- ⛔ **102 bare `---` lines live inside seed BODIES** — a greedy frontmatter delimiter regex destroys
+  ~40% of the register. The boundary must be *first* `---` to *next* `---`, anchored at file start.
+- ⛔ **The 5 status-less seeds** (`SEED-084`, `163`, `164`, `165`, `166`) **have no frontmatter block
+  at all** — they need a different CODE PATH, not a different value.
+- ⛔ **The Phase-242 vacuity defect is guarded on the scan-set side and NOT the subject side** in
+  `check-hot-file-ledger.cjs` — it can still print `subject: 0 files` and `ledger gate OK`.
+  **`check-verification-honesty.cjs`'s `MIN_SUBJECT_FILES` is the pattern D-04's count assertion
+  copies.**
+- ⛔ **NO gate script has any test, runner, or self-test mode.** D-04's four RED arms are
+  *executed-and-recorded*, which is what makes the plan decomposition load-bearing.
+- ⭐ **`path.matchesGlob` is a Node built-in on v24.19.0** — D-01 needs no dependency. ⛔ **A YAML
+  dependency is forbidden with evidence:** `244-VERIFICATION.md`'s frontmatter does not parse as YAML,
+  so a parsing gate would exit `2`. Hand-rolled, as every sibling gate already does.
+- ⚠ **`rg` skips dot-directories without `--hidden`** — it produced a confidently wrong zero during
+  research. Every `.planning/` / `.agent-bus/` / `.claude/` scan needs the flag.
+- ⚠ **Two copies of the bus header parse already exist and have ALREADY DIVERGED** (`age_days` has a
+  BSD fallback in `agent-bus.sh`; the hook's inline copy is GNU-only). D-14 must not add a third.
+- ⚠ **`agent-bus.sh list` has NO 20-row cap** — CONTEXT.md's warning above is refuted by measurement.
+  The `grep -c` discipline still stands on its own merits.
+
 ### Claude's Discretion
 
 The user made an explicit ruling on every question asked — **no "you decide" answers were given**.
