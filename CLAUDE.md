@@ -491,10 +491,16 @@ User-observed bugs from manual testing live in `.planning/reported-bugs/`. Each 
 
 **Sweep the register at two touchpoints, the same way reported-bugs are swept:**
 
-| Touchpoint | What to do |
+⚠ **CORRECTED 2026-09-16 (Phase 251) — THE RULE BELOW DESCRIBED A FILTER THAT COULD NOT SEE HALF ITS OWN REGISTER, and the original is struck through rather than deleted, because the failure is the finding.** The instruction was: ~~*"List `.planning/seeds/*.md` with `status: planted` (or `dormant`) AND `surface: Agentic-RAG`"*~~. Measured before the fix: **`surface:` was present on 128 of 283 files**, so the rule was blind to **55%** of the register; **5 seeds carried no frontmatter block at all**, so no status scan could see them at any count; and `status` was spelled **25 different ways** across 278 files, including `DONE`, `done`, `promoted`, `routed`, `queued` and `partial-consumed` — none of which any `status: planted` grep matches. ⭐ **The cause was not carelessness: `.planning/seeds/TEMPLATE.md` did not exist and never had.** Phase 251 wrote the contract, backfilled all 284 files (bodies proven md5-identical), and replaced the grep with a gate.
+
+**Sweep the register with the SCRIPT, at two touchpoints:**
+
+| Touchpoint | What to run |
 |---|---|
-| `/gsd:new-milestone` | List `.planning/seeds/*.md` with `status: planted` (or `dormant`) AND `surface: Agentic-RAG`. Read each `trigger_when`; surface the ones whose trigger is ALREADY TRUE or fires within the proposed milestone as candidate REQ-IDs. Seeds explicitly gated on another seed must be sequenced, never listed flat. |
-| `/gsd:discuss-phase NNN` | Grep the register for seeds whose `relates_to` names a file in the phase's blast radius or whose `trigger_when` names this phase's surface. Fold / defer / leave — and write the routing back into the seed's frontmatter, exactly as reported-bugs require. |
+| `/gsd:new-milestone` | `node scripts/check-seeds-register.cjs` — it derives its own scan set (`readdirSync`, never a constant) and refuses to pass over a collapsed one. Read each surfaced `trigger_when`; propose the ones whose trigger is ALREADY TRUE or fires within the proposed milestone as candidate REQ-IDs. Seeds gated on another seed are sequenced, never listed flat. |
+| `/gsd:discuss-phase NNN` | `node scripts/check-seeds-register.cjs --phase NNN` — matches the phase's `files_modified` against each seed's `trigger_paths` and prints the matched token. Fold / defer / leave, and write the routing back into the seed's frontmatter, exactly as reported-bugs require. |
+
+⚠ **Read the gate's TWO unswept figures and never sum them** — `N carry no trigger_when at all` and `M carry prose but no structured trigger`. A structured backfill is mechanical only, so most of the register is still unswept; reporting the smaller number alone is the comfortable lie this rule exists to end. **The contract's home is `.planning/seeds/TEMPLATE.md`**, and its `status` enum is synced with the gate and with `plant-seed.md` in the SAME commit.
 
 **A seed is answered by editing the seed.** Flip `status` and record where it went; a seed that shipped but still reads `planted` will be re-proposed forever, and one that was consciously rejected must say so rather than staying silent. ⚠ **`status:` frontmatter IS the index — prose inside the body saying "still open" is invisible to the scan.**
 
