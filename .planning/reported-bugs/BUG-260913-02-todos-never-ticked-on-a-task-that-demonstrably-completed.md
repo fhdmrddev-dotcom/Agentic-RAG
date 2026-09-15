@@ -4,9 +4,9 @@ title: The task completes perfectly but the Todo list never ticks — the panel 
 reported: 2026-09-13
 surface: Agentic-RAG
 severity: minor
-status: open
+status: folded
 affected_areas: [frontend/panel, backend/agent-loop, backend/todos, run-honesty, cross-provider]
-folded_into: null
+folded_into: 250
 verified_closed_by: null
 related_seeds: [SEED-094]
 re_open_trigger: null
@@ -154,3 +154,48 @@ item"* — which would make the copy itself the defect.
   the adversarial root-cause workflow `wf_cf429301-479`.
 - `.planning/seeds/SEED-094-run-end-honesty-baseline-emit-leak-and-todo-finalizer.md` — closed by
   Phase 138.
+
+---
+
+## ✅ FOLDED INTO PHASE 250 — `HONEST-04` (2026-09-15). The open question is ANSWERED.
+
+**The measurement this report blocked on was taken before anything was planned** (full evidence:
+`.planning/phases/250-run-honesty-the-residue/250-MEASUREMENT.md`):
+
+| | |
+|---|---|
+| open todos (`pending` + `in_progress`) | **78** across **26** threads |
+| carrying `(run ended — not completed)` | **25** |
+| NOT carrying it | **53** — of which **49** predate the reconciler and **4** were gated out |
+| newest MARKED row | **2026-09-13 14:31:05** — this report's own date |
+
+⭐ **MARKER PRESENT → the YES row of this report's own table → the copy/UX arm.** The
+reconciler fired correctly and told a person that work they had watched finish was *"not
+completed"*.
+
+⭐ **AND THE DICHOTOMY WAS FALSE.** Both arms are true, of different rows: the newest items carry
+the marker (copy decision — `HONEST-04`), while every post-138 unmarked row sits behind a run
+that ended `timed_out` or `cancelled` and was excluded by the gate (backend defect —
+`HONEST-03`). One measurement answered two requirements.
+
+**What shipped — this report's candidate fix #1, taken further.** Rather than rewording the
+stored string, the marker is **stripped out of the label entirely** and the honesty moves to the
+STATUS slot: the row reads **`NOT TICKED`** with the sentence *"The run ended before the agent
+marked this complete."* as its `title`. ⭐ `NOT TICKED` is the operator's own vocabulary —
+*"the to dos is not up to date and ticked as completed"* — and it is a statement about the
+**agent's bookkeeping**, which is what the system actually knows, not about whether the person's
+job got done.
+
+⛔ **The marker STRING is byte-unchanged**, deliberately: rewording it would break the
+reconciler's no-stack guard against the 25 rows already carrying the old text and would force the
+backfill this phase rejected. A `?raw` lockstep fence now binds the frontend copy to
+`todos_service.py`, because a one-character drift makes the strip a silent no-op — and then the
+row shows the raw parenthetical AND the badge, which no other gate in this repo can see.
+
+⛔ **Candidate fix #3 (auto-complete on a clean run end) remains REJECTED**, for the third time
+on record. Nothing was auto-completed; `status` is untouched and a fence asserts it.
+
+⚠ **Candidate fix #2 (make the model close the list) was NOT built.** The model still drives
+the lifecycle, and a provider with a weaker emission tier will still drop the closing
+`write_todos`. This phase makes that outcome honest; it does not make it rare. `SEED-118` /
+`SEED-127` hold the capability half.

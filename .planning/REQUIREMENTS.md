@@ -127,14 +127,14 @@ defects standing between "it shipped" and "you can rely on it".
 
 ### Run Honesty — the residue
 
-- [ ] **HONEST-01**: Context trimming never drops the user's own question. *(`BUG-260906-01`, major —
+- [x] **HONEST-01**: Context trimming never drops the user's own question. *(`BUG-260906-01`, major —
       the agent announces that your question was trimmed, naming a question you asked eight turns in.)*
-- [ ] **HONEST-02**: A reasoning model that produces no text inside a tool loop says what happened
+- [x] **HONEST-02**: A reasoning model that produces no text inside a tool loop says what happened
       rather than returning "empty response after N iterations". *(`BUG-260722-02`, major,
       `cross-provider/openai`.)*
-- [ ] **HONEST-03**: The workspace panel never claims a run is in progress after that run has ended.
+- [x] **HONEST-03**: The workspace panel never claims a run is in progress after that run has ended.
       *(`BUG-260902-01`, major — a timed-out run leaves the panel working forever.)*
-- [ ] **HONEST-04**: A task that completed does not leave a todo list asserting unfinished work.
+- [x] **HONEST-04**: A task that completed does not leave a todo list asserting unfinished work.
       *(`BUG-260913-02`, reported by the operator 2026-09-13. ⚠ **Blocked on one measurement** — see
       that report: whether the stuck item carries `" (run ended — not completed)"` decides whether
       this is a backend defect or a copy decision, and the two arms lead to **opposite** fixes.
@@ -273,10 +273,10 @@ milestone-wide standing gate. Coverage 26/26 — no orphans, no duplicates.**
 | MODEL-07 | Phase 249 — The Model You Actually Run | **Complete** — the words went ON the two controls, not into a fourth passive column. `deprecated` semantics unchanged (D-149-04) |
 | MODEL-08 | Phase 249 — The Model You Actually Run | **Complete** — reproduced live, then fixed: a refused value is a 400 naming the column and rule; an unreachable DB is still a 500. Also closed a traceback that logged the whole row |
 | MODEL-09 | Phase 249 — The Model You Actually Run | **Closed by measurement, 2026-09-15** — fresh sweep **8/8 healthy, zero opaque `provider_error`**; the stale board's one failure named its cause verbatim. `BUG-260809-01` closed. ⛔ measured **LOCAL**; the cloud half is one operator click and is unmeasured |
-| HONEST-01 | Phase 250 — Run Honesty | Pending |
-| HONEST-02 | Phase 250 — Run Honesty | Pending |
-| HONEST-03 | Phase 250 — Run Honesty | Pending |
-| HONEST-04 | Phase 250 — Run Honesty | ⚠ **Blocked on one measurement** — does the stuck todo carry `" (run ended — not completed)"`? Present ⇒ copy decision; absent ⇒ backend defect (`run_producer.py:145` gate / `:155` swallow). **Opposite fixes — resolve at discuss-phase** |
+| HONEST-01 | Phase 250 — Run Honesty | ✅ Complete (eviction ORDER: non-user groups go first, across BOTH sections) |
+| HONEST-02 | Phase 250 — Run Honesty | ✅ Complete (4-arm taxonomy + honest `reason not captured`; never-reset reasoning counter) |
+| HONEST-03 | Phase 250 — Run Honesty | ✅ Complete (gate admits every TRUE terminal status + panel reads run state, so 53 legacy rows are honest with NO backfill) |
+| HONEST-04 | Phase 250 — Run Honesty | ✅ Complete — **the blocking measurement was TAKEN** (`250-MEASUREMENT.md`): marker PRESENT on the newest rows ⇒ the COPY arm, and the report's dichotomy was FALSE (both arms true of different rows). `NOT TICKED` badge; ⛔ nothing auto-completed |
 | REG-01 | Phase 251 — Register Integrity | Pending |
 | REG-02 | Phase 251 — Register Integrity | Pending |
 | REG-03 | Phase 251 — Register Integrity | Pending (⛔ Claude may not close bus items — deliverable is a list the operator rules on) |

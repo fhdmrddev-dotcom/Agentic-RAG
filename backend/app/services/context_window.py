@@ -385,34 +385,63 @@ def trim_messages_to_fit(
         protected = rest[:]
         trimmable = []
 
-    # Keep trimming until we fit or there's nothing left to trim
-    while trimmable:
-        candidate_messages = _build_candidate(
-            system_msg, trimmable, protected, trimmed_any, pinned_msgs
+    # Phase 250 HONEST-01 (BUG-260906-01) — FOUR ORDERED PASSES, and the order is the fix.
+    #
+    # The defect was not that the trimmer trimmed; it was WHAT it reached for first. A
+    # thread that had absorbed several large `search_documents` payloads evicted the
+    # user's own question while keeping the document chunks that question had produced,
+    # and the model then apologised for losing a question the person had just asked.
+    #
+    # ⭐ A tool result is re-derivable by re-running the tool. A user question is not.
+    # So every non-user group in BOTH sections goes before any user turn in EITHER —
+    # which is why this is four passes and not two. A protected tail fat with tool
+    # payloads must be allowed to shrink BEFORE `trimmable`'s questions are given up.
+    def _fits() -> bool:
+        return (
+            estimate_messages_tokens(
+                _build_candidate(system_msg, trimmable, protected, trimmed_any, pinned_msgs)
+            )
+            <= max_tokens
         )
-        if estimate_messages_tokens(candidate_messages) <= max_tokens:
-            break
 
-        # Remove oldest atomic unit from trimmable
-        n_removed = _remove_oldest_atomic(trimmable)
-        if n_removed == 0:
-            # Nothing left to remove
+    # PASS 1 — non-user groups out of the trimmable section.
+    while trimmable and not _fits():
+        if _remove_oldest_evictable(trimmable, allow_user=False) == 0:
+            break
+        trimmed_any = True
+
+    # PASS 2 — non-user groups out of the protected tail, inward from the oldest. The
+    # tail keeps the model's own final turn AND the newest user turn throughout
+    # (D-078-01, and the floor the old comment claimed but did not enforce).
+    while len(protected) > 1 and not _fits():
+        if _remove_oldest_evictable(protected, allow_user=False, protect_tail=True) == 0:
+            break
+        trimmed_any = True
+
+    # PASS 3 — only now may a user turn go, oldest first, out of trimmable.
+    while trimmable and not _fits():
+        if _remove_oldest_evictable(trimmable, allow_user=True) == 0:
             break
         trimmed_any = True
 
     # Phase 078 CQ-CTX-01 D-078-01: after trimmable is exhausted, progressively
-    # trim oldest protected messages inward. Hard floor: system_msg + last user msg.
+    # trim oldest protected messages inward.
     # Mirrors Claude.ai / ChatGPT behavior (silently drops older turns, never errors).
     # D-078-02: no error raised — always return a valid list that fits.
-    if not trimmable:
-        while len(protected) > 1:
-            candidate = _build_candidate(system_msg, [], protected, True, pinned_msgs)
-            if estimate_messages_tokens(candidate) <= max_tokens:
-                break
-            n_removed = _remove_oldest_atomic(protected)
-            if n_removed == 0:
-                break
-            trimmed_any = True
+    #
+    # ⚠ Phase 250 HONEST-01 — THIS COMMENT USED TO READ "Hard floor: system_msg + last
+    # user msg" AND THE CODE DID NOT DO THAT. `len(protected) > 1` protects the last
+    # MESSAGE, and because agent_loop re-trims at the top of EVERY iteration — after tool
+    # results have been appended — that last message is a tool result, not a question. The
+    # floor is now enforced where it belongs: `_remove_oldest_evictable` never evicts the
+    # group holding the newest user turn, so the claim and the code finally agree.
+    # PASS 4 — last resort inside the protected tail (see _remove_oldest_evictable's
+    # stated limitation: a question that alone exceeds the whole budget cannot be saved
+    # by any ordering, and D-078-02 promises a list that fits rather than an exception).
+    while len(protected) > 1 and not _fits():
+        if _remove_oldest_evictable(protected, allow_user=True, protect_tail=True) == 0:
+            break
+        trimmed_any = True
 
     return _build_candidate(system_msg, trimmable, protected, trimmed_any, pinned_msgs)
 
@@ -544,8 +573,127 @@ def _build_candidate(
     return result
 
 
+def _remove_oldest_evictable(
+    seq: list[dict],
+    *,
+    allow_user: bool = True,
+    protect_tail: bool = False,
+) -> int:
+    """Phase 250 HONEST-01 — remove the oldest atomic group that is safe to lose.
+
+    ``_remove_oldest_atomic`` removes strictly oldest-first, which is why
+    ``BUG-260906-01`` happened: a thread that had absorbed several large
+    ``search_documents`` payloads evicted the user's OWN question while keeping the tool
+    results that question had produced, and the model then apologised for losing a
+    question the person had just asked.
+
+    ⭐ The asymmetry that decides the order: **a tool result is re-derivable by re-running
+    the tool; a user question is not.** So the oldest group carrying no ``user`` message
+    goes first, and a user turn is only touched once nothing else is left.
+
+    ``allow_user`` is the FIRST-PASS switch. ``trim_messages_to_fit`` now runs four
+    ordered passes — non-user groups out of ``trimmable``, then non-user groups out of the
+    protected tail, and only THEN user turns — because the eviction order has to hold
+    ACROSS the two sections, not merely inside one. Without that, a protected tail fat
+    with tool payloads could never shrink until every question in ``trimmable`` had
+    already been thrown away, which is precisely the ``BUG-260906-01`` outcome.
+
+    ``protect_tail`` switches the two call sites apart, and the difference is not
+    cosmetic:
+
+      * ``False`` (the trimmable section) — every group is ultimately evictable. The
+        current question lives in the protected tail, so refusing to empty this section
+        would simply stall the loop while the context still overflows. Order still
+        prefers non-user groups.
+      * ``True`` (the protected tail, after trimmable is exhausted) — this is where the
+        floor lives. **Neither the LAST group nor the group holding the NEWEST user turn
+        is ever evicted.** The last group keeps the model's own final turn (D-078-01);
+        the newest-user group is the message the turn cannot proceed without, and is the
+        floor the old comment claimed while the code protected only the last *message*.
+
+    ⛔ **User turns are NEVER hoisted or reordered.** ``_build_candidate`` hoists pinned
+    ``load_skill`` groups because a skill payload is self-contained; a question is not —
+    hoisting it detaches it from the answer that follows it. This helper only changes
+    WHICH group is removed, never WHERE the survivors sit.
+
+    ⛔ **Every removal is a COMPLETE atomic group** (``_atomic_groups``, the same
+    partition ``_remove_oldest_atomic`` mirrors), so an assistant with ``tool_calls``
+    always leaves with its results and a lone orphan tool result is removed as its own
+    group rather than stranded.
+
+    ⚠ **Stated limitation, not an oversight.** When the protected tail has shrunk to the
+    current question plus the model's last reply and the pair STILL overflows, the
+    question is given up — because at that point the question alone exceeds the entire
+    budget and no ordering can save it, while ``D-078-02`` promises a list that fits
+    rather than an exception. ``_TRIM_MARKER`` remains the honest signal in that case.
+    Every realistic ``BUG-260906-01`` shape has many more groups than that and never
+    reaches this arm.
+
+    Returns the number of messages removed. ``0`` means "nothing left that may go", which
+    both callers already treat as their break condition — that is what guarantees the
+    ``while`` loops terminate rather than spinning inside a request.
+    """
+    if not seq:
+        return 0
+
+    groups = _atomic_groups(seq)
+    if not groups:
+        return 0
+
+    def _has_user(group: list[dict]) -> bool:
+        return any(m.get("role") == "user" for m in group)
+
+    keep: list[int] = []
+    if protect_tail:
+        newest_user_gi: int | None = None
+        for gi in range(len(groups) - 1, -1, -1):
+            if _has_user(groups[gi]):
+                newest_user_gi = gi
+                break
+        # Order matters: these are tried in REVERSE as the last resort below, so the
+        # newest user turn is given up BEFORE the model's own trailing reply only when
+        # nothing else remains at all (see the docstring's last-resort note).
+        if newest_user_gi is not None:
+            keep.append(newest_user_gi)
+        if (len(groups) - 1) not in keep:
+            keep.append(len(groups) - 1)
+
+    # 1 — the oldest group with no user turn at all.
+    target: int | None = None
+    for gi, group in enumerate(groups):
+        if gi not in keep and not _has_user(group):
+            target = gi
+            break
+    # 2 — the oldest group that may go. Guarantees progress.
+    if target is None and allow_user:
+        for gi in range(len(groups)):
+            if gi not in keep:
+                target = gi
+                break
+    # 3 — last resort: only the protected pair is left and it still does not fit, so a
+    # protected group must go after all (D-078-02 — this function ALWAYS returns a list
+    # that fits, it never raises). The newest user turn goes first, because by this point
+    # that turn ALONE exceeds the whole budget: keeping it would hand the provider a
+    # request it rejects, while `_TRIM_MARKER` still tells the model context was lost.
+    if target is None and allow_user and keep:
+        target = keep[0]
+    if target is None:
+        return 0
+
+    start = sum(len(g) for g in groups[:target])
+    n = len(groups[target])
+    del seq[start : start + n]
+    return n
+
+
 def _remove_oldest_atomic(trimmable: list[dict]) -> int:
     """Remove the oldest atomic message group from the start of trimmable (in-place).
+
+    ⚠ Phase 250: ``trim_messages_to_fit`` no longer calls this — it calls
+    ``_remove_oldest_evictable``, which prefers groups carrying no user turn (HONEST-01).
+    This strictly-oldest-first door is kept, byte-unchanged, because it is the primitive
+    the newer helper's contract is stated against and because deleting a shipped function
+    to tidy a diff is how a caller nobody grepped for breaks silently.
 
     An atomic group is:
     - A single user/assistant message (without tool_calls)

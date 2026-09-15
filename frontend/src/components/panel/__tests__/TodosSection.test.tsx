@@ -18,10 +18,18 @@ import { mockTodos } from "./fixtures"
 const useTodos = vi.fn()
 const useViewingThread = vi.fn()
 const useDerivedPanel = vi.fn()
+// Phase 250 HONEST-03 — the panel now asks whether anything is actually running on the
+// thread it is showing. ⚠ A mock factory that omits a newly-added export makes every suite
+// that mounts this component throw AT MOUNT (the Phase 196 `@/lib/api` lesson, 249 failing
+// tests in one run), so both selectors are declared here.
+const useStreamingForThread = vi.fn()
+const useLoadingForThread = vi.fn()
 vi.mock("@/providers/StreamsProvider", () => ({
   useTodos: (...a: unknown[]) => useTodos(...a),
   useViewingThread: (...a: unknown[]) => useViewingThread(...a),
   useDerivedPanel: (...a: unknown[]) => useDerivedPanel(...a),
+  useStreamingForThread: (...a: unknown[]) => useStreamingForThread(...a),
+  useLoadingForThread: (...a: unknown[]) => useLoadingForThread(...a),
 }))
 
 // eslint-disable-next-line import/first
@@ -38,6 +46,12 @@ describe("TodosSection (PANEL-02) — live todo list with status", () => {
     // Default: no derived items (Phase 095.1 — real todos win; derivation is the
     // empty-real fallback). Individual derived-fallback tests override this.
     useDerivedPanel.mockReturnValue([])
+    // ⭐ DEFAULT = A LIVE RUN, and that is a deliberate reading of the suite it precedes:
+    // every assertion below was written about a panel with something running, so the
+    // pre-250 expectations (`in progress`, the bouncing dot) are the LIVE expectations.
+    // The ended-run behaviour is asserted explicitly in the Phase 250 block at the bottom.
+    useStreamingForThread.mockReturnValue(true)
+    useLoadingForThread.mockReturnValue(false)
   })
 
   it("renders every todo from useTodos(threadId).data in order_index order", () => {
@@ -171,5 +185,153 @@ describe("TodosSection (D-095.1-01/02) — derived-panel precedence", () => {
     ])
     const { container } = render(<TodosSection />)
     expect(await axe(container)).toHaveNoViolations()
+  })
+})
+
+// ===========================================================================
+// Phase 250 — HONEST-03 / HONEST-04: what the row says once the run is over
+//
+// `BUG-260902-01` — a run that ended left `IN PROGRESS` and a bouncing dot on screen
+// forever. `BUG-260913-02` — a job that finished perfectly read
+// `(run ended — not completed)`. Both are this one row.
+// ===========================================================================
+
+describe("TodosSection — run honesty (Phase 250, HONEST-03 / HONEST-04)", () => {
+  const OPEN_TODOS: Todo[] = [
+    {
+      id: "t-1",
+      thread_id: "thread-1",
+      todo_id: "1",
+      content: "Translate full document content to Arabic",
+      status: "in_progress",
+      parent_id: null,
+      order_index: 0,
+    } as unknown as Todo,
+    {
+      id: "t-2",
+      thread_id: "thread-1",
+      todo_id: "2",
+      content: "Verify output and deliver",
+      status: "pending",
+      parent_id: null,
+      order_index: 1,
+    } as unknown as Todo,
+    {
+      id: "t-3",
+      thread_id: "thread-1",
+      todo_id: "3",
+      content: "Read the brief",
+      status: "completed",
+      parent_id: null,
+      order_index: 2,
+    } as unknown as Todo,
+  ]
+
+  function ended() {
+    useStreamingForThread.mockReturnValue(false)
+    useLoadingForThread.mockReturnValue(false)
+  }
+
+  beforeEach(() => {
+    useViewingThread.mockReturnValue("thread-1")
+    useDerivedPanel.mockReturnValue([])
+    setTodos(OPEN_TODOS)
+    useStreamingForThread.mockReturnValue(true)
+    useLoadingForThread.mockReturnValue(false)
+  })
+
+  // ⚠ THE SELECTOR IS `[class*="animate-dotBounce"]`, NOT `.animate-dotBounce`, AND THAT
+  // DISTINCTION WAS PAID FOR: the shipped class is `motion-safe:animate-dotBounce`, one
+  // class token, so the dotted selector matches NOTHING and every "no animation"
+  // assertion below would have passed vacuously. The positive control two tests down is
+  // what caught it — a fence nobody has seen fire is not a fence.
+  it("an ended run does not animate an open todo", () => {
+    ended()
+    const { container } = render(<TodosSection />)
+    expect(container.querySelector('[class*="animate-dotBounce"]')).toBeNull()
+  })
+
+  it("an ended run labels an open todo NOT TICKED", () => {
+    ended()
+    render(<TodosSection />)
+    const row = screen.getByText("Translate full document content to Arabic").closest("li")
+    expect(row).toHaveTextContent(/not ticked/i)
+    expect(row).not.toHaveTextContent(/in progress/i)
+  })
+
+  it("a live run still reads IN PROGRESS and still animates", () => {
+    const { container } = render(<TodosSection />)
+    const row = screen.getByText("Translate full document content to Arabic").closest("li")
+    expect(row).toHaveTextContent(/in progress/i)
+    expect(container.querySelector('[class*="animate-dotBounce"]')).not.toBeNull()
+  })
+
+  it("a loading-but-not-yet-streaming thread still reads IN PROGRESS", () => {
+    // ⛔ THE MIRROR-IMAGE FAILURE THIS GUARDS: `streamingThreads` can read empty during a
+    // reconnect/fetch window while a run IS live. A row must never flash "not ticked"
+    // while the agent is working.
+    useStreamingForThread.mockReturnValue(false)
+    useLoadingForThread.mockReturnValue(true)
+    render(<TodosSection />)
+    const row = screen.getByText("Translate full document content to Arabic").closest("li")
+    expect(row).toHaveTextContent(/in progress/i)
+  })
+
+  it("never renders the run-ended marker to the user", () => {
+    ended()
+    setTodos([
+      {
+        ...OPEN_TODOS[0],
+        content: "Translate full document content to Arabic (run ended — not completed)",
+      } as unknown as Todo,
+    ])
+    const { container } = render(<TodosSection />)
+    expect(container.textContent).not.toMatch(/run ended/i)
+    expect(screen.getByText("Translate full document content to Arabic")).toBeInTheDocument()
+  })
+
+  it("turns the marker into the row's title instead", () => {
+    ended()
+    setTodos([
+      {
+        ...OPEN_TODOS[0],
+        content: "Translate full document content to Arabic (run ended — not completed)",
+      } as unknown as Todo,
+    ])
+    render(<TodosSection />)
+    const row = screen.getByText("Translate full document content to Arabic").closest("li")
+    expect(row).toHaveAttribute(
+      "title",
+      "The run ended before the agent marked this complete.",
+    )
+  })
+
+  it("a pending todo on an ended run reads NOT TICKED too (Phase 138 D-02)", () => {
+    ended()
+    render(<TodosSection />)
+    const row = screen.getByText("Verify output and deliver").closest("li")
+    expect(row).toHaveTextContent(/not ticked/i)
+  })
+
+  it("a completed todo is untouched on an ended run — nothing is auto-completed", () => {
+    ended()
+    render(<TodosSection />)
+    const row = screen.getByText("Read the brief").closest("li")
+    expect(row).toHaveTextContent(/completed/i)
+    expect(row).not.toHaveTextContent(/not ticked/i)
+    // The sr-only progress line still counts only real completions.
+    expect(screen.getByText("1 of 3 todos complete")).toBeInTheDocument()
+  })
+
+  it("derived rows get the identical treatment from the same helper", () => {
+    ended()
+    setTodos([])
+    useDerivedPanel.mockReturnValue([
+      { label: "Searching the knowledge base", status: "in_progress" },
+    ])
+    const { container } = render(<TodosSection />)
+    const row = screen.getByText("Searching the knowledge base").closest("li")
+    expect(row).toHaveTextContent(/not ticked/i)
+    expect(container.querySelector('[class*="animate-dotBounce"]')).toBeNull()
   })
 })

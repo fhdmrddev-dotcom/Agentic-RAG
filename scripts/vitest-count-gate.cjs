@@ -134,7 +134,15 @@ const BASELINE = {
   "MessageInput.unverified.test.tsx": 9,
   "SettingsModelBadge.test.tsx": 9,
   "Seam.test.tsx": 8,
-  "TodosSection.test.tsx": 12,
+  // Phase 250 (HONEST-03 / HONEST-04) — 12 -> 21. The +9 is the run-honesty block: the
+  // ended-run states (no animation, NOT TICKED, pending too, completed untouched), the two
+  // live-run positive controls including the loading-but-not-streaming one, the
+  // marker-never-rendered / marker-becomes-title pair, and the derived-row parity case.
+  // Read from the gate's own printed row, never hand-counted.
+  "TodosSection.test.tsx": 21,
+  // 250 CLAIMS this suite because 250 CREATED it — the ?raw lockstep fence binding the
+  // frontend marker copy to backend/app/services/todos_service.py.
+  "todoRunHonesty.lockstep.test.ts": 4,
   "CitationList.test.tsx": 15,
   "RunCard.test.tsx": 29,
   "RunCard.timer.test.tsx": 7,
@@ -4180,6 +4188,14 @@ const TARGETS = [
   // every count was read from a real run AFTER the edits landed, never guessed.
   "src/components/panel/__tests__/Seam.test.tsx",
   "src/components/panel/__tests__/TodosSection.test.tsx",
+  // ── Phase 250 (HONEST-03 / HONEST-04) — the run-ended marker is cross-language ─────────
+  //
+  // 250 CLAIMS this suite on the ground that 250 CREATED it. It binds the frontend's copy of
+  // `_RUN_ENDED_MARKER` to `backend/app/services/todos_service.py` by `?raw`, and it is the
+  // only thing in the repo that can see a drift between the two: each side's own tests stay
+  // green while the pair is wrong, and the visible symptom is the raw parenthetical AND a
+  // `Not ticked` badge on the same row.
+  "src/components/panel/__tests__/todoRunHonesty.lockstep.test.ts",
   "src/components/chat/__tests__/CitationList.test.tsx",
   "src/components/chat/RunCard.test.tsx",
   "src/components/chat/RunCard.timer.test.tsx",

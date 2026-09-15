@@ -10557,7 +10557,12 @@ cells rot within days.
 | [`frontend/src/hooks/useDocuments.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusedocumentsts) | 8 / 3 / 120 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent at 3 phases. Realtime is a hint, not truth — it reconciles by fetch (D-v2.5-03), and `table_count`/`image_count`/`chunk_count` are server-side |
 | [`frontend/src/pages/KnowledgeHealthPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesknowledgehealthpagetsx) | 12 / 6 / **DELETED** | ⚠ **FIRES** | **RETIRED (217.1-14)** — the Library's Health tab absorbed it; `ChatLayout`'s fallback replaced by `UnknownViewFallback` (`:871`). ⚠ absent for its ENTIRE LIFE |
 | [`backend/app/api/knowledge_health.py`](docs/HOT-FILE-LEDGER.md#backendappapiknowledgehealthpy) | 11 / 6 / 737 | ⚠ **FIRES** | honoured by construction (**217.1-11**) — adds `could_not_search`; `retrieval_count` byte-unchanged. ⚠ absent at **6 phases**. Audit-analytics from `audit_log`. Service-role by exception |
-| [`backend/app/services/agent_loop.py`](docs/HOT-FILE-LEDGER.md#backendappservicesagent_looppy) | 44 / 21 / 3303 | ⚠ **FIRES** | ⚠ row STALE at `39/20/3154`. honoured by construction (**244-02**): a SIXTH conditional append in the shipped `memory_note` shape, gated General-mode-only |
+| [`backend/app/services/agent_loop.py`](docs/HOT-FILE-LEDGER.md#backendappservicesagent_looppy) | 45 / 21 / 3326 | ⚠ **FIRES** | ⚠ row STALE again (`44/21/3303`). honoured by construction (**250-01**): the empty-output branch gains a 4-arm taxonomy + ONE never-reset counter beside the existing reset. ⛔ no provider branch |
+| [`backend/app/services/context_window.py`](docs/HOT-FILE-LEDGER.md#backendappservicescontext_windowpy) | 10 / 5 / 602 | ⚠ **FIRES** | ⚠ absent for its ENTIRE LIFE at 5 phases — row added 250-01. honoured by construction: ONE removal-ORDER rule inside one private helper. ⛔ `_build_candidate` byte-unchanged |
+| [`backend/app/services/run_producer.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_producerpy) | 3 / 2 / 693 | below | ⚠ absent for its ENTIRE LIFE — row added 250-02 BELOW the threshold, since an absent row is invisible to G-5 at any count. honoured by construction: step 3's gate only |
+| [`backend/app/services/todos_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicestodos_servicepy) | 4 / 3 / 187 | ⚠ **FIRES** | ⚠ absent for its ENTIRE LIFE at 3 phases — row added 250-02, which leaves the file BYTE-UNCHANGED. ⛔ `_RUN_ENDED_MARKER` is now bound by a frontend `?raw` fence |
+| [`frontend/src/components/panel/TodosSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspaneltodossectiontsx) | 6 / 4 / 210 | ⚠ **FIRES** | ⚠ absent for its ENTIRE LIFE at 4 phases — row added 250-03. honoured by construction: a 4th DISPLAY status on the EXISTING row, derived in ONE module both renderers call |
+| [`frontend/src/components/panel/todoRunHonesty.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspaneltodorunhonestyts) | 1 / 1 / 104 | new | young (created 250-03). Row added AT CREATION. ⛔ the ONE home of *is this row still honest?*; its marker copy is `?raw`-fenced to `todos_service.py` or the strip silently no-ops |
 | [`backend/app/services/tool_dispatcher.py`](docs/HOT-FILE-LEDGER.md#backendappservicestool_dispatcherpy) | 85 / 35 / 5048 | ⚠ **FIRES** | ⚠ row STALE again (`84/35/4966`). honoured by construction (**244-14/WR-03**): `already` is written on SUCCESS or after a CAPPED give-up; every attempt is NAMED. Traversal fence byte-unchanged |
 | [`backend/app/api/document_governance.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentgovernancepy) | 5 / 3 / 416 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent at 3 phases. ⚠ Its low-confidence cutoff is the ConfidenceChip tier (**0.5**) — a DIFFERENT measure from `knowledge_health`'s **0.38** retrieval similarity |
 | [`frontend/src/pages/GovernancePage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesgovernancepagetsx) | 4 / 1 / 355 | no (1 phase) | young (119) — ⚠ row added because it is being MERGED into the Library (operator, 2026-08-28); it is feature-gated while Documents is not, so the gate must move with it |
@@ -14086,3 +14091,201 @@ worker. So the cross-REQUEST half was driven — one write, ten consecutive read
 and the cross-WORKER half rests on the source fence plus the shipped subscriber, not on
 observation. ⚠ The two-server condition is itself a live environment hazard worth the operator's
 attention (the stale-uvicorn trap).
+
+---
+
+### `backend/app/services/context_window.py` — Phase 250 (`HONEST-01`), row added at this fix
+
+**Measured 2026-09-15: `10 commits / 5 phases / 602 L`.** ⚠ **G-5 FIRES, and this file had NO
+ROW FOR ITS ENTIRE LIFE** — five phases invisible to its own guardrail, the same failure
+`config.py` suffered for the project's whole history.
+
+**What it owns.** `trim_messages_to_fit` is the single decision about what the model is allowed to
+forget. Three protected classes ship: the system message, the last `reserve_recent` (10) messages,
+and pinned `load_skill` groups (`_extract_pinned_skill_groups`, Phase 123-02 CTX-03).
+
+⛔ **THE USER'S OWN TURN WAS IN NONE OF THEM, AND THAT WAS THE DEFECT** (`BUG-260906-01`).
+`agent_loop.py` re-trims at the TOP of every iteration, *after* tool results have been appended,
+so by iteration 1 the newest messages are tool payloads and the question has drifted back into
+evictable range. The protected-tail floor's own comment read *"Hard floor: system_msg + last user
+msg"* while the code read `while len(protected) > 1` — which protects the last **message**, and
+by then that message is a tool result. **A comment that is wrong about its own code is how this
+survived five phases.**
+
+**What 250-01 changed, and the shape of it.** A removal-**ORDER** rule, not a fourth protected
+class: `_remove_oldest_evictable` partitions with the EXISTING `_atomic_groups` and removes the
+oldest group carrying no `user` message, falling through to a user group only when nothing else
+remains. ⛔ **User turns are NEVER hoisted.** `_build_candidate` places pinned skill groups
+before everything else because a skill payload is self-contained; **a question is not** — hoisting
+it detaches it from the answer that follows.
+
+**Invariants that bind the next editor:**
+1. ⛔ **Every removal must be a COMPLETE atomic group.** Skipping a user group must never strand
+   a `tool` result whose parent went, nor remove results whose parent stayed.
+2. ⛔ **The loop must make progress.** A rule that returns `0` while groups remain spins forever
+   inside a request. The fall-through arm is what guarantees termination and is not optional.
+3. ⛔ **The fast path is byte-locked (D-14).** A history that fits is returned unchanged.
+4. `_remove_oldest_atomic` stays in the file, byte-unchanged, as the oldest-first front door.
+
+**Named seam for the next refactor:** the **estimator** (`estimate_tokens` /
+`estimate_messages_tokens`), the **protection policy** (which classes survive, in what order) and
+the **removal mechanics** (`_atomic_groups` / the removal helpers) are three concerns in one
+module. A phase adding a fourth policy should take that seam first.
+
+---
+
+### `backend/app/services/agent_loop.py` — Phase 250 (`HONEST-02`), honoured by construction
+
+**Measured 2026-09-15: `45 commits / 21 phases / 3326 L`** (supersedes `44 / 21 / 3303`).
+
+The empty-output branch (`if not full_content:`) emitted ONE sentence for every possible cause —
+*"The model returned an empty response after N iteration(s)"* — naming a count and a workaround
+and saying nothing about what happened. It now names which of four things occurred, with an
+explicit `reason_unknown` arm that **admits the reason was not captured** rather than guessing
+(the `run-honesty.md` D2 pattern, which exists so a run is never shown as an empty success).
+
+⛔ **THE TRAP, AND IT WOULD HAVE SHIPPED A LIE.** `full_reasoning_content` is **reset to `""`
+inside the loop** (two sites). Reading it at the fallback reports *"no reasoning"* about a model
+that reasoned on every iteration — i.e. the honesty fix itself being dishonest, for exactly the
+`gpt-5.6` reasoning family `BUG-260722-02` is filed against. A **never-reset** counter is required,
+and both reset sites now carry a one-line comment saying why the new name is deliberately absent
+from them. ⛔ A later editor who "tidies" those two comments re-opens the defect silently.
+
+⚠ `persisted_tool_calls` accumulates across the whole loop and is safe to read at the fallback;
+anything named `full_*` in this file should be assumed per-turn until proven otherwise.
+
+⛔ **No provider branch was added.** The taxonomy reads shared accumulators only — red line D-14,
+Deep Mode byte-identical.
+
+---
+
+### `backend/app/services/run_producer.py` — Phase 250 (`HONEST-03`), row added at this fix
+
+**Measured 2026-09-15: `3 commits / 2 phases / 693 L`.** Below the G-5 threshold; the row is added
+anyway, because an absent row is invisible to G-5 at **any** count (the `settingsSearchPayload.ts`
+precedent) and this file will be touched again.
+
+**What it owns.** `_finalize_producer_run` is the ONE shared finalizer for both the Deep producer
+and the Deep-run continuation, and it performs **eight ordered invariants**. Step 3 is the RUN-01b
+todo reconciler; step 4 finalizes the runs row; step 5 emits the terminal sentinel. ⛔ **The order
+is byte-locked** — step 3 must stay above step 5 so the `todo_updated` emit reaches the live SSE
+consumer ahead of the sentinel (invariant S5).
+
+**What 250-02 changed.** The step-3 gate only:
+
+```
+- if terminal_status == "completed" and result_sink.get("cap_disposition") != "cap_paused":
++ if terminal_status in _RUN_STATUS_TO_TERMINAL_TYPE:
+```
+
+⭐ **The replacement predicate is the one step 5 already uses, eleven lines below**, and
+`cap_paused` is **absent from that map** — so the D-05 trap (never mark a cap-paused run, which is
+non-terminal and re-attachable) is now closed by **set membership** rather than by a second clause
+a later editor can drop while tidying. The measured consequence: a run that ended `timed_out`,
+`cancelled` or `failed` reconciled **nothing**, which is why `BUG-260902-01`'s thread still reads
+`IN PROGRESS` — see `250-MEASUREMENT.md`, 4 unmarked rows on 2 threads, none of whose runs ever
+reached `completed`.
+
+**Invariants that bind the next editor:**
+1. ⛔ The reconciler NEVER raises into the finalizer — the `except BaseException` wrapper stays.
+   ⚠ It is also what would HIDE a new failure now that three more statuses reach it, so a fence
+   must assert the CALL, not merely the absence of a crash.
+2. ⛔ Step ORDER is not negotiable; do not merge step 3 into step 4.
+3. ⛔ `cap_paused` must reconcile nothing, and the proof is a fence driven BOTH ways —
+   `completed` + `cap_disposition=cap_paused` (producer ordering) and `terminal_status=cap_paused`
+   (continuation ordering).
+
+**Named seam:** the **finalize ordering** and the **continuation shell** are two concerns in one
+module; a phase adding a third should take that seam first.
+
+---
+
+### `backend/app/services/todos_service.py` — Phase 250, row added; file BYTE-UNCHANGED
+
+**Measured 2026-09-15: `4 commits / 3 phases / 187 L`.** ⚠ **G-5 FIRES and there was no row for
+the file's entire life.**
+
+**What it owns.** `replace_todos` is the ONE mutation path for a thread's todo list (full-state
+replace), and `reconcile_open_todos_on_run_end` is the run-end honesty pass. Phase 138's design
+decisions still bind: **D-01** — `status` is NEVER flipped to `completed`, an open item is never
+silently auto-completed; **D-02** — `pending` and `in_progress` take the IDENTICAL suffix through
+one code path; **D-04** — the marker never stacks; **D-14** — the no-op path performs no
+`replace_todos` and no emit.
+
+⛔ **`_RUN_ENDED_MARKER` IS NOW A CROSS-LANGUAGE CONSTANT.** Phase 250-03 strips it in the panel
+and renders the honesty as a badge instead, bound by a `?raw` lockstep fence in
+`frontend/src/components/panel/__tests__/todoRunHonesty.lockstep.test.ts`. **Editing its text
+silently un-strips the 25 rows already carrying the old string** — they would show the raw
+parenthetical again — and would also break D-04's no-stack guard against those same rows. Change
+it only with a backfill decision made at the same time.
+
+⚠ **What this file does NOT do, and it is the most misread thing about it:** `BUG-260902-01`
+claimed *"there is no reconciliation at all"*. There is. It simply never changes `status`, by
+design — which is why a stale row still READS `in_progress` even after the reconciler has
+touched it, and why the honest fix was presentational (`250-03`) rather than a status flip.
+
+---
+
+### `frontend/src/components/panel/TodosSection.tsx` — Phase 250, row added at this fix
+
+**Measured 2026-09-15: `6 commits / 4 phases / 210 L`** (before this phase's edit; 259 L after).
+⚠ **G-5 FIRES and there was no row for the file's entire life** — four phases invisible to the
+guardrail, which is how a component carrying TWO open bug reports got edited repeatedly without
+anyone being asked for a refactor recommendation first.
+
+**The two reports it carried.** `BUG-260902-01` — a run that ended seven minutes ago still read
+`IN PROGRESS` with the spinner-dot bouncing. `BUG-260913-02` — a job that finished perfectly read
+`(run ended — not completed)`. ⭐ **`SEED-105` planted the fix for both on 2026-07-06**, at a live
+operator UAT, and all three of its `re_open_triggers` had fired by the time it shipped.
+
+**What 250-03 changed.** A fourth **display** status, `not_ticked`, derived in
+`todoRunHonesty.ts` and consumed by BOTH `TodoRow` and `DerivedRow`. `CircleDashed` with **no
+`animate-` class**, the dim tier of `run-state-honesty.md` D1, and the stored marker stripped out
+of the label into the row's `title`.
+
+**Invariants that bind the next editor:**
+1. ⛔ **A LIVE RUN MUST NEVER READ `NOT TICKED`** — the mirror image of the bug being fixed.
+   Liveness is `useStreamingForThread(tid) || useLoadingForThread(tid)`, and the `||` is
+   load-bearing: `streamingThreads` can read empty during a reconnect window.
+2. ⛔ **The rule has ONE home.** `DerivedRow` gets the identical derivation from the identical
+   module; two copies is the drift this phase exists to close.
+3. ⛔ **Nothing here flips `status`** (Phase 138 D-01). The `sr-only` progress line still counts
+   only genuine completions.
+4. ⛔ **Non-colour-only A11Y** (088-05) and the 224-05 wrap rule (the badge does not dictate the
+   wrap point) both still hold.
+5. ⛔ **`StreamsProvider.tsx` was NOT modified**, and a future change here should keep it that
+   way — both selectors have shipped since Phase 075.4.
+⚠ **A mock factory that omits the two new selectors makes every suite mounting this component
+throw AT MOUNT** (the Phase 196 `@/lib/api` lesson, 249 failures in one run).
+
+**Named seam:** **status vocabulary**, **row layout** and **section precedence** (real todos vs.
+derived fallback vs. empty) are three concerns in one file. A phase adding a fifth status or a
+second fallback source should take that seam first.
+
+---
+
+### `frontend/src/components/panel/todoRunHonesty.ts` — created by Phase 250-03
+
+**Measured 2026-09-15: `1 commit / 1 phase / 104 L`.** Row added **at creation** — an absent row
+is invisible to G-5 at any count, and this project has paid for that on `App.tsx` (23 phases),
+`NavPanel.tsx` (11) and `config.py` (its entire life).
+
+**What it owns.** The single answer to *"what does this todo row honestly say now?"*: the marker
+constant, the strip, and `deriveTodoDisplayStatus`.
+
+⭐ **Why it reads RUN STATE and not the marker — the measurement that decided it.** Of **78**
+open todos across **26** threads, **53 carry no marker**: 49 predate the reconciler and 4 were
+excluded by its gate. Deriving *"not ticked"* from the marker would have left all 53 still
+claiming `IN PROGRESS`. Reading run state makes every row honest **and is why this phase ships no
+migration and no backfill** — not one stored row is rewritten.
+
+⛔ **`RUN_ENDED_MARKER` is a CROSS-LANGUAGE COPY and is fenced as one.** The backend constant is
+`todos_service.py::_RUN_ENDED_MARKER`; a one-character drift (a hyphen for the em-dash, a lost
+leading space) makes the strip a silent no-op, so the row shows the raw parenthetical AND a
+`Not ticked` badge — two contradictory statements on one line, and **no other gate in this repo
+can see it**, because each side's own tests stay green. Bound by
+`__tests__/todoRunHonesty.lockstep.test.ts`.
+
+⛔ **The `title` sentence is only stated when the marker was actually present.** Without it we
+know the run is not live and the item is open; we do NOT know a run ever ended on this thread.
+Saying so anyway is the same class of overclaim this phase exists to remove.

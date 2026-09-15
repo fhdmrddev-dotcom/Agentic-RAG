@@ -1746,6 +1746,16 @@ async def run_agent_loop(
 
     full_content = ""
     full_reasoning_content = ""
+    # Phase 250 HONEST-02 (BUG-260722-02) — RUN-SCOPED, NEVER RESET.
+    # ⛔ `full_reasoning_content` above is a PER-TURN accumulator: it is zeroed inside
+    # the loop (arg-repair discard, and again at the top of each tool round), because
+    # providers such as DeepSeek require the CURRENT turn's reasoning round-tripped and
+    # nothing older. Reading it at the empty-output fallback therefore reports "the model
+    # produced no reasoning" about a model that reasoned on every single iteration — the
+    # honesty fix itself shipping a lie, for exactly the gpt-5.6 reasoning family the bug
+    # is filed against. This counter answers a different question — *did this RUN reason
+    # at all?* — and is initialised once, here, and incremented only.
+    reasoning_chars_this_run = 0
     persisted_tool_calls: list[dict] = []
     # Plan 075.4-03 D-075.4-E1 — closure-local per-run system warning
     # accumulator. Each entry: {kind: "context_truncated" |
@@ -2173,6 +2183,7 @@ async def run_agent_loop(
                         a verbatim collapse of the former _on_chunk_anthropic /
                         _on_chunk_google / _on_chunk_openai."""
                         nonlocal full_content, full_reasoning_content, finish_reason, input_tokens_total, output_tokens_total
+                        nonlocal reasoning_chars_this_run  # HONEST-02 — run-scoped, never reset
                         _etype = _event.get("type")
                         # Phase 073 TOKEN-COL-01 (D-073-08): usage events. Anthropic
                         # yields message_start->"usage" + message_delta->"usage_delta";
@@ -2215,6 +2226,8 @@ async def run_agent_loop(
                             _rtext = _event.get("content", "")
                             if _rtext:
                                 full_reasoning_content += _rtext
+                                # HONEST-02: run-scoped tally, never zeroed (see its init).
+                                reasoning_chars_this_run += len(_rtext)
                                 await _emit(redis, run_id, 'reasoning_delta', content=_rtext)
                         elif _etype == "tool_preparing":
                             # D-01 (Phase 56.1, corrected): fired when tool name is
@@ -2731,6 +2744,9 @@ async def run_agent_loop(
                 # with the bad turn (mirrors the reset at :2076-2081).
                 full_content = ""
                 full_reasoning_content = ""
+                # ⛔ HONEST-02: `reasoning_chars_this_run` is deliberately NOT reset here.
+                # It answers "did this RUN reason at all?", not "what must be round-tripped
+                # to the provider now". Adding it to this block re-opens BUG-260722-02.
                 continue
             elif _argrepair_decision == "honest_fail":
                 # Re-ask budget exhausted and still malformed: honest-fail with
@@ -2837,6 +2853,8 @@ async def run_agent_loop(
             # 2339 and 2447.
             full_content = ""
             full_reasoning_content = ""
+            # ⛔ HONEST-02: `reasoning_chars_this_run` is deliberately NOT reset here —
+            # see its initialisation. Adding it re-opens BUG-260722-02.
 
             # Phase 083 D-01: construct ToolContext once per iteration.
             # All tool-specific logic delegates through dispatch_tool().
@@ -3072,10 +3090,54 @@ async def run_agent_loop(
             # the chunk-handler), not after exhausting the cap. The
             # `iteration` loop variable is in scope from the
             # enclosing `for iteration in range(max_iterations):`.
-            fallback = (
-                f"*The model returned an empty response after {iteration + 1} iteration(s). "
-                "Try breaking the request into smaller steps or switching to a different model.*"
+            # Phase 250 HONEST-02 (BUG-260722-02) — a CLOSED TAXONOMY, not one sentence.
+            #
+            # The single message this replaces named a COUNT and a WORKAROUND and said
+            # nothing about what happened, so a whole newly-enabled model family read as
+            # "broken, try something else". These four arms each name a distinct thing
+            # that actually occurred, and the last one ADMITS IT DOES NOT KNOW rather
+            # than dressing a guess as a diagnosis (the run-honesty.md D2 pattern, which
+            # exists precisely so a run is never shown as an empty success).
+            #
+            # ⛔ Read `reasoning_chars_this_run`, NEVER `full_reasoning_content` — the
+            # latter is zeroed inside the loop, so it reports "no reasoning" for a model
+            # that reasoned on every iteration.
+            #
+            # ⚠ STATED LIMITATION, not an oversight: `reasoning_delta` is emitted by the
+            # OpenAI-compat path only (provider_gateway/events.py), so an Anthropic or
+            # Google run that thought silently registers zero here. That is why arm 3 is
+            # worded as an OBSERVATION — "nothing we could see" — and never as a claim
+            # about what the model did internally.
+            _steps = iteration + 1
+            _n_tools = len(persisted_tool_calls)
+            _tail = (
+                " Try breaking the request into smaller steps, or switching to a "
+                "different model."
             )
+            if reasoning_chars_this_run > 0:
+                fallback = (
+                    f"*The model spent this turn reasoning and never wrote an answer — "
+                    f"{reasoning_chars_this_run:,} characters of reasoning across "
+                    f"{_steps} step(s), and no visible reply.{_tail}*"
+                )
+            elif _n_tools > 0:
+                fallback = (
+                    f"*The model ran {_n_tools} tool call(s) across {_steps} step(s) but "
+                    f"never wrote the answer they were for.{_tail}*"
+                )
+            elif finish_reason:
+                fallback = (
+                    f"*The model produced no answer. Nothing we could see came back over "
+                    f"{_steps} step(s) — no text, no reasoning, no tool call — and the "
+                    f"provider ended the turn with '{finish_reason}'.{_tail}*"
+                )
+            else:
+                fallback = (
+                    f"*The model produced no answer, and the reason was not captured — "
+                    f"nothing we could see came back over {_steps} step(s), and the "
+                    f"provider gave no end reason. This is surfaced rather than hidden so "
+                    f"the run is never shown as a silent success.{_tail}*"
+                )
             full_content += fallback
             await _emit(redis, run_id, 'delta', content=fallback)
 

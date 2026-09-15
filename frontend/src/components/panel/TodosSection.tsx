@@ -15,11 +15,24 @@
  * No fetch logic here — the hook is reactive. Exported for WorkspacePanel to
  * place in the fixed-order accordion (Todos · Files · Pending · Versions).
  */
-import { Circle, CircleDot, CheckCircle2 } from "lucide-react"
+import { Circle, CircleDot, CircleDashed, CheckCircle2 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { useTodos, useViewingThread, useDerivedPanel } from "@/providers/StreamsProvider"
+import {
+  useTodos,
+  useViewingThread,
+  useDerivedPanel,
+  useStreamingForThread,
+  useLoadingForThread,
+} from "@/providers/StreamsProvider"
 import type { Todo } from "@/types"
 import type { DerivedPanelItem } from "@/lib/workspacePanel"
+import {
+  NOT_TICKED_LABEL,
+  RUN_ENDED_TITLE,
+  deriveTodoDisplayStatus,
+  stripRunEndedMarker,
+  type TodoDisplayStatus,
+} from "./todoRunHonesty"
 
 type TodoStatus = "pending" | "in_progress" | "completed"
 
@@ -29,10 +42,13 @@ function normalizeStatus(status: string): TodoStatus {
   return "pending"
 }
 
-const STATUS_LABEL: Record<TodoStatus, string> = {
+const STATUS_LABEL: Record<TodoDisplayStatus, string> = {
   pending: "Pending",
   in_progress: "In progress",
   completed: "Completed",
+  // Phase 250 HONEST-03/04 — the fourth value exists only for DISPLAY. `todos.status` still
+  // carries three values and no migration was needed (D-250-05).
+  not_ticked: NOT_TICKED_LABEL,
 }
 
 // Phase 088-05 (operator request) — per-status color for the STATUS-TEXT label.
@@ -41,13 +57,28 @@ const STATUS_LABEL: Record<TodoStatus, string> = {
 // themes; computed in index.css). Matches the icon hues in spirit: completed →
 // green (like the check icon), in_progress → amber active accent. Pending stays
 // the neutral muted-dim (not-started = no status color).
-const STATUS_TEXT_COLOR: Record<TodoStatus, string> = {
+const STATUS_TEXT_COLOR: Record<TodoDisplayStatus, string> = {
   pending: "text-panel-muted-foreground-dim",
   in_progress: "text-panel-status-active",
   completed: "text-panel-status-done",
+  // Phase 250 — the DIM tier of run-state-honesty.md D1 (dim → amber → red, loudness earned by
+  // severity). An abandoned todo is the quiet case: usually nobody's fault, often the user's own
+  // Stop. It must NOT borrow the amber the active state uses.
+  not_ticked: "text-panel-muted-foreground-dim",
 }
 
-function StatusIndicator({ status }: { status: TodoStatus }) {
+function StatusIndicator({ status }: { status: TodoDisplayStatus }) {
+  if (status === "not_ticked") {
+    // ⛔ NO `animate-` CLASS. The bouncing dot on a dead run is the loudest lie on this
+    // surface — BUG-260902-01 describes a person waiting for something that stopped seven
+    // minutes earlier.
+    return (
+      <CircleDashed
+        className="h-4 w-4 flex-none text-panel-muted-foreground-dim"
+        aria-hidden="true"
+      />
+    )
+  }
   if (status === "completed") {
     return (
       <CheckCircle2
@@ -83,10 +114,17 @@ function StatusIndicator({ status }: { status: TodoStatus }) {
  * the sentence genuinely needs the room. Nothing is truncated and nothing is hidden — the
  * status word stays in the accessible tree, which the 088-05 colour rule requires.
  */
-function TodoRow({ todo }: { todo: Todo }) {
-  const status = normalizeStatus(todo.status)
+function TodoRow({ todo, isRunLive }: { todo: Todo; isRunLive: boolean }) {
+  // Phase 250 HONEST-03/04 — ONE derivation, in ONE module, used by BOTH row renderers.
+  // The marker never reaches the screen: it becomes the row's title, and the STATUS slot
+  // carries the honesty instead of the task text (SEED-105 item 3).
+  const { label, wasMarked } = stripRunEndedMarker(todo.content)
+  const status = deriveTodoDisplayStatus(normalizeStatus(todo.status), isRunLive)
   return (
-    <li className="flex flex-wrap items-start gap-x-2 gap-y-0.5 px-3 py-1.5 text-[0.82rem] leading-relaxed">
+    <li
+      className="flex flex-wrap items-start gap-x-2 gap-y-0.5 px-3 py-1.5 text-[0.82rem] leading-relaxed"
+      title={wasMarked && status === "not_ticked" ? RUN_ENDED_TITLE : undefined}
+    >
       <span className="mt-0.5">
         <StatusIndicator status={status} />
       </span>
@@ -96,9 +134,10 @@ function TodoRow({ todo }: { todo: Todo }) {
           // Phase 088-05 (UAT SC#2): completed-todo text is meaningful content →
           // panel-scoped AA muted (light --muted-foreground was 4.01:1 on panel).
           status === "completed" && "text-panel-muted-foreground line-through",
+          status === "not_ticked" && "text-panel-muted-foreground",
         )}
       >
-        {todo.content}
+        {label}
       </span>
       {/* Status text — non-color-only A11Y; in the accessible tree (NOT
           aria-hidden) so the status is conveyed by text, not color alone. The
@@ -122,10 +161,13 @@ function TodoRow({ todo }: { todo: Todo }) {
 // control: a derived item mirrors a tool's status and the user cannot tick it.
 // The label is a model/sandbox-derived string → rendered as React text children
 // ONLY, never as raw/innerHTML markup (T-095.1-02-01 / Pattern E).
-function DerivedRow({ item }: { item: DerivedPanelItem }) {
+function DerivedRow({ item, isRunLive }: { item: DerivedPanelItem; isRunLive: boolean }) {
   // DerivedPanelItem.status is already the panel vocabulary
   // ("pending" | "in_progress" | "completed") — normalize defensively anyway.
-  const status = normalizeStatus(item.status)
+  // ⛔ Phase 250: the IDENTICAL derivation as TodoRow, from the SAME module. A derived
+  // in_progress row on a dead run is the identical lie, and two copies of the rule is the
+  // drift this phase exists to close.
+  const status = deriveTodoDisplayStatus(normalizeStatus(item.status), isRunLive)
   return (
     <li className="flex flex-wrap items-start gap-x-2 gap-y-0.5 px-3 py-1.5 text-[0.82rem] leading-relaxed">
       <span className="mt-0.5">
@@ -135,6 +177,7 @@ function DerivedRow({ item }: { item: DerivedPanelItem }) {
         className={cn(
           "min-w-[9rem] flex-1 text-foreground/90",
           status === "completed" && "text-panel-muted-foreground line-through",
+          status === "not_ticked" && "text-panel-muted-foreground",
         )}
       >
         {item.label}
@@ -159,6 +202,12 @@ export function TodosSection() {
   //   2. real todos empty + derived non-empty → derived read-only rows + marker.
   //   3. both empty → null (clean). A real plan is NEVER overwritten (Pitfall 2).
   const derived = useDerivedPanel(threadId)
+  // Phase 250 HONEST-03 (D-250-04) — is anything actually running on this thread?
+  // ⛔ `useLoadingForThread` is OR-ed in DELIBERATELY: during a reconnect/fetch window
+  // `streamingThreads` can read empty for a live run, and a row must never flash
+  // "not ticked" while the agent is working. Realtime is a hint, not truth (D-v2.5-03).
+  // ⛔ Both selectors already ship (Phase 075.4) — StreamsProvider.tsx is NOT modified.
+  const isRunLive = useStreamingForThread(threadId) || useLoadingForThread(threadId)
 
   // PRECEDENCE 2 + 3: no real write_todos plan for this thread.
   if (todos.length === 0) {
@@ -173,7 +222,7 @@ export function TodosSection() {
         </span>
         <ul className="flex flex-col gap-0.5">
           {derived.map((item, i) => (
-            <DerivedRow key={i} item={item} />
+            <DerivedRow key={i} item={item} isRunLive={isRunLive} />
           ))}
         </ul>
       </>
@@ -200,7 +249,7 @@ export function TodosSection() {
       </span>
       <ul className="flex flex-col gap-0.5">
         {ordered.map((todo) => (
-          <TodoRow key={todo.id} todo={todo} />
+          <TodoRow key={todo.id} todo={todo} isRunLive={isRunLive} />
         ))}
       </ul>
     </>

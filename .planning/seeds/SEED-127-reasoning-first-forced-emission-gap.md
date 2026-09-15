@@ -37,3 +37,19 @@ Re-open the moment a `reasoning_first` model becomes reachable on a forced/struc
 - `backend/app/config.py:253` — `MODEL_CAPABILITIES` gpt-5.6 rows (the `reasoning_first` + `forced_emission` co-marking)
 - Phase 175 review: `.planning/phases/175-cross-provider-streaming-fidelity/175-REVIEW.md` (WR-03)
 - Related: [[SEED-040]] (capabilities belong in the Registry, not code)
+
+---
+
+## ⚠ TOUCHED BUT NOT CLOSED BY PHASE 250 (2026-09-15)
+
+Phase 250 shipped `HONEST-02`: the agent loop's empty-output fallback now names **which of four
+things happened** instead of emitting one sentence for every cause, and says *"the reason was not
+captured"* when it cannot tell.
+
+⛔ **THAT MAKES THE FAILURE LEGIBLE. IT DOES NOT MAKE THE MODEL SUCCEED.** This seed's
+capability — getting a weak or reasoning-first model to actually drive the tool loop (forced
+emission, per-model budgets, early force-answer, dedup guards) — is **untouched**. `status` stays
+as it was.
+
+Recorded here explicitly so a later reader cannot mistake an honest error message for a fixed
+loop, and so this seed is not closed by citing `BUG-260722-02`'s requirement being met.

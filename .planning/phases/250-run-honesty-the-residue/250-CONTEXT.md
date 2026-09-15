@@ -176,9 +176,22 @@ absent from that map, so **the D-05 trap is closed by the set itself rather than
 clause a later editor can drop** — a cap-paused run is non-terminal and re-attachable and must
 never be marked.
 
-⚠ **The `cap_disposition` clause is REMOVED ONLY because the new predicate strictly subsumes it**,
+~~⚠ **The `cap_disposition` clause is REMOVED ONLY because the new predicate strictly subsumes it**,
 and the plan must prove that rather than assert it: a fence driving the cap-paused producer path
-and asserting **zero** reconciliation is mandatory, driven RED against the un-widened gate.
+and asserting **zero** reconciliation is mandatory, driven RED against the un-widened gate.~~
+
+⛔ **CORRECTED 2026-09-15 AT EXECUTION — REFUTED BY THE FENCE THIS PARAGRAPH DEMANDED, and the
+original is struck through rather than deleted, because the demand being RIGHT is the finding.**
+The subsumption claim is **false**. The PRODUCER ordering delivers a cap-paused run as
+`terminal_status == "completed"` — which **is** in `_RUN_STATUS_TO_TERMINAL_TYPE` — carrying the
+cap-paused fact only in `result_sink["cap_disposition"]`. Removing the clause let a **resumable**
+run be marked *"not completed"*. Measured by `test_250_reconciler_gate.py::test_5b`, which was
+written to prove the equivalence and instead **refuted it before a line shipped**.
+
+⭐ **The shipped gate keeps BOTH clauses**: `terminal_status in _RUN_STATUS_TO_TERMINAL_TYPE and
+result_sink.get("cap_disposition") != "cap_paused"`. The set widens *which statuses* reconcile; the
+clause carries a fact the status cannot. **Two independent facts, two clauses** — and the reason is
+now written at the gate so they are not collapsed again.
 
 This is what closes `HONEST-03`'s data half — the 2 threads in `D-250-01` and every future
 timed-out or cancelled run.
