@@ -288,7 +288,16 @@ parallelism here; a wave boundary that looks parallel and is not is this project
   4. **A comment cannot hide an ACL from the gate.** `aclsIn` is string-literal-aware: `COMMENT ON … IS '… -- verbatim';` followed by a `REVOKE EXECUTE ON FUNCTION …` still yields that signature. Migration **180 lines 30/32** already ship that construct, so this is live, not hypothetical (**CR-03**).
   5. **The ledger stops lying about this phase's own blast radius.** Two absent rows are added — `scripts/full-schema-supplement.sql` (**5 phases, G-5 FIRING, no row for its entire life**) and `scripts/check-schema-acl-parity.cjs` (row AT CREATION, the `settingsSearchPayload.ts` precedent) — and the twelve triples `252-REVIEW.md` CR-08 measured stale are re-derived with the CLAUDE.md recipe (**CR-08**).
 
-**Plans**: target **3** (G-8). SC#1+SC#2 are one plan (both are the supplement's table half); SC#3+SC#4 are one plan (both are the gate); SC#5 is a task on whichever plan lands last, not a plan.
+**Plans**: **2**, SERIAL — waves 1 and 2, `depends_on: [253-01]`. ⚠ The `target 3` written here at
+scoping is SUPERSEDED by `253-CONTEXT.md` **D-20**, which is the later and more specific decision;
+the original is kept rather than overwritten. Under G-8's 3-5 target, and a plan is a wave-sized
+unit of work, not a task. ⛔ **Serial is REQUIRED, not preferred:** CLAUDE.md worktree rule 4 —
+`253-01`'s harness CREATEs and DROPs a database on the shared local cluster, which no
+`files_modified` check can see. SC#5 (CR-08) is a TASK on `253-02`, the plan that lands last.
+
+Plans:
+- [ ] 253-01-PLAN.md — the artifact half (`CRED-03`): greenfield harness driven RED → the seven-table mirror into the supplement AND `full-schema.sql`'s tail (same commit) → the pytest column fence → harness GREEN
+- [ ] 253-02-PLAN.md — the gate half (`CRED-04`): tuple key, literal-aware lexer, TABLE/COLUMN regex, four `--self-test` arms, narrowed failure text, **plus WIRING the gate** (measured: nothing invokes it) and the D-23 ledger rows
 
 **Flags**:
 
