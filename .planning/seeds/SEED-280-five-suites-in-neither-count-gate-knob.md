@@ -15,6 +15,22 @@ status_note: |
   ~10 unpinned suites in one edit and move the shared gate for reasons unrelated to the phase.
   ⭐ TARGETS decides what RUNS; BASELINE decides what is GUARDED, and a file can be on the wrong side
   of exactly one — or, as here, of both.
+
+  ── 2026-09-16 · 252-05 CLOSED THE SIXTH CASE AND **STAYS PLANTED**, because the original five are
+  measured UNCHANGED. `WatchRowCard.test.tsx` went into BOTH knobs at 9 (commit `97174227b`), so the
+  sixth case above is answered. ⛔ The five are NOT. This plan's own pre-edit gate run printed them,
+  verbatim, still in the `new` column and therefore still guarded by nothing:
+  `PromptVariableChips.test.tsx — 3 new` · `RunHero.test.tsx — 18 new` · `automationFacts.test.ts —
+  11 new` · `nodeEffectBanner.test.ts — 8 new` · `toolReadOnlyMap.test.ts — 7 new`.
+  ⭐ **Every count is IDENTICAL to this seed's 2026-08-31 table, sixteen days later** — so the seed
+  has neither drifted nor decayed; it has simply not been acted on.
+  ⚠ **AND A SEVENTH CASE, found by this plan and worse than the five:**
+  `frontend/src/components/sources/bug260912AppCredentials.test.ts` is in **neither** knob, and
+  252-03 moved its occurrence pin `4 → 5` while the gate could not see the file at all. Not adopted
+  by 252-05, which was authorised for exactly one adoption — named in the gate's own TARGETS comment
+  so the omission reads as a decision.
+  ⛔ A `src/components/sources` directory entry remains DECLINED (it would adopt ~10 unpinned suites,
+  one of them the deliberately-red `sourceComposition.test.tsx`) — that is owed a seed of its own.
 surface: Agentic-RAG
 relates_to:
   - scripts/vitest-count-gate.cjs

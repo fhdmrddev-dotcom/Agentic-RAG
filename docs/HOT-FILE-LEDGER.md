@@ -10421,7 +10421,7 @@ cells rot within days.
 | [`backend/app/api/settings.py`](docs/HOT-FILE-LEDGER.md#backendappapisettingspy) | 41 / 21 / 1048 | ⚠ **FIRES** | honoured by construction (**249-02/03**): ONE `_verified_model_ids` helper w/ 2 callers; PUT gains a refusal arm → 400. ⛔ the 500 arm for an unreachable DB is unchanged |
 | [`backend/app/services/multimodal_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmultimodal_servicepy) | 14 / 7 / 984 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** — row added SEED-227, which is also where its silent truncation was found |
 | [`backend/app/api/documents.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentspy) | 87 / 34 / 2414 | ⚠ **FIRES** | ✅ **DISCHARGED AGAIN (240-03)** — the email-attachment loop extracted to `services/email_attachments.py`. 240-04 adds the conversation read |
-| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 215 / 47 / 5682 | ⚠ **FIRES** | ⚠ row STALE a 5th time (`211/46/5618`). **249**: FOUR suites into BOTH knobs — incl. `ModelRegistryTab.test.tsx`, which ran NOWHERE and asserted the defect (`toHaveLength(8)`) |
+| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 222 / 49 / 5787 | ⚠ **FIRES** | ⚠ row STALE a 6th time (`215/47/5682`). **252-05**: `WatchRowCard.test.tsx` into BOTH knobs — it ran NOWHERE. W-7 slack CLOSED: a RED drive kept it green on a deleted case; pins were mostly SLACK |
 | [`backend/app/services/eval_runner_service.py`](docs/HOT-FILE-LEDGER.md#backendappserviceseval_runner_servicepy) | 12 / 7 / 959 | ⚠ **FIRES** | ⚠ absent at 7 phases (added 196) |
 | [`frontend/src/components/panel/PhaseCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasecardtsx) | 16 / 10 / 755 | ⚠ **FIRES** | honoured by construction (200 / **214**) — the failure sentinel NARROWED to both-sources-empty |
 | [`frontend/src/components/panel/PhaseTimeline.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasetimelinetsx) | 9 / 7 / 385 | ⚠ **FIRES** | honoured by construction (**214**) — it mounts the shared identity; ⚠ absent from BOTH until 200 |
@@ -14301,3 +14301,78 @@ can see it**, because each side's own tests stay green. Bound by
 ⛔ **The `title` sentence is only stated when the marker was actually present.** Without it we
 know the run is not live and the item is open; we do NOT know a run ever ended on this thread.
 Saying so anyway is the same class of overclaim this phase exists to remove.
+
+---
+
+## Phase 252 Plan 05 — both knobs, and a slack closed after being SEEN (CRED-02 / W-7 / D-03)
+
+**Files:** `scripts/vitest-count-gate.cjs` (sole writer for the phase, by design — three wave-1
+plans would otherwise have contended on this one file).
+
+### `scripts/vitest-count-gate.cjs` — `222 / 49 / 5787`
+
+⚠ **RE-DERIVED, not incremented.** The row read `215 / 47 / 5682` and was **STALE a 6th time**; the
+one before it read `211 / 46 / 5618` and was stale a 5th. This file moves on nearly every phase, so
+a cell written at a close is wrong by the next commit — which is why the recipe is run rather than
+the number trusted. **Raw subject buckets: 52. Six-digit DATED QUICK-TASK buckets subtracted: three
+(`260807` · `260808` · `260814`). Phases = 52 − 3 = 49.** A count that skips the subtraction step
+inflates G-5, and this file's own cell has been corrected for exactly that error before.
+
+### ⭐ W-7: a slack that had stood since Phase 221, EXPLOITED before it was closed
+
+`ConnectionGrantsList.test.tsx` was pinned at **8** against a file carrying **9** cases — one unit of
+permanent slack, for the whole life of the entry. It was not closed on the arithmetic. The drive:
+
+| Step | Measured |
+|---|---|
+| before | `it(` count **9**, pin **8**, md5 `d8ec1ecbd8d2fbe715a1e847f1fc3fbc` |
+| delete one case (`Invariant 8: zero [title] attributes in the rendered output`) | `it(` count **8**, md5 `1a7142dd4d8955cdcb86b8d827e89074` |
+| re-run the suite, feed its report to **this script's own comparison code** via `--json` | `ConnectionGrantsList.test.tsx     8       8       0` — delta 0, ⛔ **no `[count-decrease]`** |
+| restore | md5 `d8ec1ecbd8d2fbe715a1e847f1fc3fbc` — **identical**, `git status --short` clean |
+
+⭐ **A deleted test kept the gate green, and it was watched doing it.** *A slack nobody has seen
+exploited is an assertion.* Pin raised `8 → 9` in the same commit.
+
+### ⛔ MOST OF THE `+88` IS SLACK, NOT NEW CASES — and reading it as growth is the drift this gate exists to catch
+
+| File | pin → pin | base actual | post actual | of which THIS phase's |
+|---|---|---|---|---|
+| `sourceHealthVocabulary.test.ts` | 42 → **74** | **69** | 74 | **+5** (27 was slack; the plan called it "a 42-case suite" and was stale by 27) |
+| `PhaseCard.test.tsx` | 41 → **60** | **55** | 60 | **+5** (14 was slack) |
+| `WatchedFoldersSection.test.tsx` | 27 → **49** | **49** | 49 | **0** — all 22 slack |
+| `PhaseTimeline.test.tsx` | 35 → **38** | **38** | 38 | **0** — all 3 slack, no case added |
+| `TodosSection.test.tsx` | 24 → **26** | 24 | 26 | **+2**, no slack at all |
+| `ConnectionGrantsList.test.tsx` | 8 → **9** | 9 | 9 | **0** — W-7, above |
+| `WatchRowCard.test.tsx` | — → **9** | not run | 9 | **+9**, a new suite |
+| `WorkspacePanel.derived.test.tsx` | 4 → 4 | 4 | 4 | **0** — checked and unmoved, recorded so it reads as measured rather than unexamined |
+
+⚠ **Where a plan SUMMARY and the gate disagreed, the gate won**, and it disagreed three times.
+
+### ⭐ THE ADOPTION IS THE PHASE'S FINDING, NOT ITS BOOKKEEPING
+
+`WatchRowCard.tsx` shipped three defects — a completion claim it could not justify, an invented
+`(0 changes)` literal, and a refusal and a success co-rendering on one card. It had **no test file
+at all**, and `src/components/sources` is a set of ~14 individually-named TARGETS entries and **not
+a directory entry**. So the suite plan 03 wrote would have run in **no gate** until its name was
+typed. **TARGETS decides what RUNS, BASELINE decides what is GUARDED, and this file was on the wrong
+side of both.** The fifth consecutive phase to record this fact about this one directory.
+
+⛔ **A `src/components/sources` directory entry was DECLINED.** One edit would adopt ~10 unpinned
+suites and move the shared gate for reasons unrelated to this phase — including
+`sourceComposition.test.tsx`, which is **red by a standing Phase 235 decision**. Deferred, with a
+seed owed at close.
+
+⚠ **AND A SIBLING FIND, NAMED RATHER THAN SILENTLY LEFT:**
+`frontend/src/components/sources/bug260912AppCredentials.test.ts` is in **neither knob** either —
+252-03 moved its occurrence pin `4 → 5` and the gate could not have seen it. **Not adopted**, because
+this plan was authorised for exactly one adoption; named so the omission reads as a decision.
+
+### ⚠ THE BASE WAS EXPECTED RED AND MEASURED GREEN — recorded, because the direction is the surprise
+
+`252-CONTEXT.md` D-44a recorded the base as `total 8379 · failed 2 · pinned 7572`, both failures
+being `sketchComposition.test.tsx`'s §2 positive controls (SEED-171's pair, fourth reproduction).
+On the merged wave-1 tree this plan measured **`count gate OK` — total 8391 · failed 0 · pinned
+7572 · 287/287**, with `sketchComposition.test.tsx 47 47 0`. ⛔ **That is NOT evidence the pair is
+fixed** — *one green sample of a flaky suite proves nothing*, and this is the inverse of the sample
+that produced D-44a. What it does establish is the thing the plan needed: **the failing SET was
+empty before the edit and empty after it, so this phase added no red.** Sets, never counts.
