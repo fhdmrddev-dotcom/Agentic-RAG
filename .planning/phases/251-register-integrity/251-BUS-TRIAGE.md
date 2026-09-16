@@ -326,3 +326,51 @@ the wrong question.
 and collided** — measured here, not assumed: `distinct ids: 284`, so `count+1 = 285`, **which exists.**
 That is the `max(id)+1` allocator Wave 2 shipped getting its first real exercise, and it was the right
 answer on the first seed planted after it.
+
+---
+
+## ✅ RULED ON BY THE OPERATOR — 2026-09-16. Three of the six are closed.
+
+The triage above is preserved as **the state it measured**; this section records what the operator
+did with it. ⛔ **D-13 held throughout the phase** — every item below was closed **after** the
+operator ruled, on their instruction, never by claude deciding.
+
+| Item | Class in the triage | Operator's ruling |
+|---|---|---|
+| **BUS-208** | ⚠ live decision | **ANSWERED + CLOSED.** History rewrite **DECLINED** — private repo, keys revoked 2026-09-14. The four owed actions recorded as operator console actions |
+| **BUS-040** | ✅ superseded | **CLOSED** — its live arms rode on BUS-208; its four findings verified held before the close |
+| **BUS-171** | ✅ premise discharged | **CLOSED** — 22 of its 23 named ids already closed; BUS-040, the survivor, closed the same day |
+| **BUS-246 · 247 · 248** | ⚠ live decisions | **STILL OPEN** — which owed rows to run · does `DEBT-06` stay a standing gate · the word + the declined G-2 sketch |
+
+**Queue: 5 → 3 `to:operator`, 1 → 0 `to:claude`.** Live hook line after the closes:
+
+```
+AGENT BUS — 3 open to:operator, oldest 2 days · 7 open to:gemini (gemini's to answer) · 0 open to:claude
+```
+
+⭐ **BUS-171's EXISTING ANSWER WAS NOT OVERWRITTEN, AND THE SCRIPT IS WHY.** It already carried the
+2026-09-14 triage answer, so `cmd_answer` **refused** — *"BUS-171 has no empty `**Answer:**` line —
+already answered?"* — and the item was closed with that record intact. That refusal is the
+`BUS-048` fix working: the verb is **gated on the write, not on reach**, so it cannot report success
+over a byte-identical file. Had it behaved as it did before that fix, the earlier triage would have
+been silently destroyed and the verb would have said `answered`.
+
+## ⚠ A FINDING THE BUS-208 CLOSE TURNED UP, AND IT WAS IN OUR OWN REGISTER
+
+Before recording the operator's ruling, its premise was driven against `e5977a244` rather than read
+from the seed that describes it. **`SEED-255` was wrong**, on a `priority: high` security seed:
+
+| | the seed said | **measured in the commit** |
+|---|---|---|
+| distinct keys | three | **TWO**, each used twice |
+| providers | Zhipu + **two OpenRouter** | `open.bigmodel.cn` (Zhipu) + **`api.moonshot.ai` (Moonshot)** |
+| `sk-or-v1-` — OpenRouter's real prefix | implied present | **ZERO occurrences** |
+
+`sk-ork6n2e…` is a **Moonshot** key; the seed was misled by a prefix that resembles OpenRouter's.
+⛔ **Why it was not cosmetic:** `BUS-040` and `BUS-208` name *Zhipu + Moonshot*; the seed named
+*Zhipu + two OpenRouter*. Side by side the overlap reads as **Zhipu only**, so anyone auditing the
+operator's ruling would conclude **two OpenRouter keys are still live in three pushed branches**.
+⭐ **The alarm was false and our register raised it, not the world.** The two keys in the commit are
+exactly the two revoked, so the ruling is sound **on measured evidence** rather than merely accepted.
+`SEED-255` is now `status: answered` — **not closed**, because the unpushed `sk-or-v1-` key is
+unrotated as far as any register records, and the seed is the only place that fact now lives.
