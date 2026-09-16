@@ -296,7 +296,12 @@ unit of work, not a task. ⛔ **Serial is REQUIRED, not preferred:** CLAUDE.md w
 `files_modified` check can see. SC#5 (CR-08) is a TASK on `253-02`, the plan that lands last.
 
 Plans:
+**Wave 1**
+
 - [ ] 253-01-PLAN.md — the artifact half (`CRED-03`): greenfield harness driven RED → the seven-table mirror into the supplement AND `full-schema.sql`'s tail (same commit) → the pytest column fence → harness GREEN
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 253-02-PLAN.md — the gate half (`CRED-04`): tuple key, literal-aware lexer, TABLE/COLUMN regex, four `--self-test` arms, narrowed failure text, **plus WIRING the gate** (measured: nothing invokes it) and the D-23 ledger rows
 
 **Flags**:

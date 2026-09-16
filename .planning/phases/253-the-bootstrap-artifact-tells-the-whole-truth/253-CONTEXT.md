@@ -358,6 +358,21 @@ phase's PLAN.md files, and no plans exist yet. ⛔ **REG-02's sweep must therefo
 `/gsd:plan-phase 253`, once the PLAN.md files exist.** The manual grep done instead surfaced
 `SEED-266` (folded, above) and `SEED-233` (already `closed`, `folded_into: 222`).
 
+✅ **RE-RUN AT `/gsd:plan-phase 253`, 2026-09-16 — the loop this note opened is now CLOSED.**
+With the two PLAN.md files on disk the sweep resolves `files_modified` (12 paths) and runs:
+`296/296 parsed · 0 duplicate ids · 296/296 carry all 5 required keys · gate OK`. **Three** seeds
+fire on paths — one more than the manual grep found:
+
+| Seed | status | matched on | Routing |
+|---|---|---|---|
+| `SEED-266` | `partially-answered` | `**/full-schema.sql` | **FOLDED** (arm (a)) — already recorded above; `253-02` Task 4F appends the arm-(a) `status_note`. Status and `partial: true` stay untouched; arms (b)/(c) stay open. |
+| `SEED-188` | `open` | `backend/tests/**` → the new `test_253_supplement_column_parity.py` | **NOT FOLDED — false positive.** It is about anti-prompt-injection discipline having no adversarial test; a cross-language column-parity fence is unrelated. Left `open` with its own trigger. |
+| `SEED-284` | `planted` | `docs/HOT-FILE-LEDGER.md` | **NOT FOLDED — false positive.** It is about three file-local elapsed formatters owing one home; this phase only adds ledger ROWS to that file. Left `planted`. |
+
+⚠ **The sweep also reported `the phase declares NO surfaces, so trigger_surfaces matched nothing`** —
+a fact about the phase, not the register, and it means this was a **path-only** sweep. Recorded
+rather than passed off as a clean one.
+
 </deferred>
 
 ---
