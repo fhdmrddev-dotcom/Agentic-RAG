@@ -589,17 +589,33 @@ const FIXTURE_SUPPLEMENT_PARTIAL_REVOKE = FIXTURE_SUPPLEMENT_COMPLETE
   .filter((l) => l.trim() !== 'REVOKE EXECUTE ON FUNCTION public.alpha() FROM PUBLIC;')
   .join('\n');
 
-/** ⭐ ARM 2 — the comment-swallow, plus the dollar-quote and doubled-quote variants (CR-03). */
+/**
+ * ⭐ ARM 2 — the comment-swallow, plus the dollar-quote and doubled-quote variants (CR-03).
+ *
+ * ⚠ THE DOLLAR-QUOTE CASE IS A FALSE-POSITIVE CONTROL, NOT A FALSE-NEGATIVE ONE, AND THAT IS A
+ *   CORRECTION. The first version of this arm wrapped an ordinary plpgsql body containing a `--`
+ *   and asserted that the ACL AFTER it was still found. Driving the arm against its own planted
+ *   defect — reverting `statements()` to `line.indexOf('--')` — showed it PASSING: the naive
+ *   splitter survives that fixture, because the body's `$$ … ;` terminator is on a line of its
+ *   own. An arm that cannot fail is the CR-02 defect one level up, so the fixture was changed
+ *   rather than the finding written off.
+ *
+ *   What IS dollar-specific: a body whose TEXT contains an ACL-shaped line sitting at a statement
+ *   boundary. A splitter that does not know about `$$` mines the body and counts a PHANTOM
+ *   revoke that no database will ever execute — inflating the expected set and reding the gate
+ *   against a CORRECT supplement, which is how a guard gets switched off. Quote-awareness alone
+ *   does not save it: there is not a quote in sight. This is the false-positive twin of the
+ *   commented VERIFY control below.
+ */
 const FIXTURE_MIGRATION_COMMENTS = `-- 998: literal-aware lexing
 COMMENT ON COLUMN public.t.c IS 'a value -- with a double dash inside the literal';
 REVOKE EXECUTE ON FUNCTION public.danger(integer) FROM PUBLIC;
 
-CREATE FUNCTION public.dollar_fn() RETURNS void AS $$
-BEGIN
-  -- this comment is INSIDE a dollar-quoted body
-  RAISE NOTICE 'not -- a comment either';
-END;
-$$ LANGUAGE plpgsql;
+CREATE FUNCTION public.dollar_fn() RETURNS text AS $$
+  SELECT 1;
+REVOKE EXECUTE ON FUNCTION public.phantom_from_body() FROM PUBLIC;
+  SELECT 'never -- executed'::text
+$$ LANGUAGE sql;
 REVOKE EXECUTE ON FUNCTION public.dollar_fn() FROM PUBLIC;
 
 COMMENT ON COLUMN public.t.d IS 'it''s got a doubled quote -- and a dash';
@@ -736,8 +752,10 @@ function runSelfTest() {
       supplementPath: supComplete,        // mirrors none of them — every one must show up as missing
     });
     const cLabels = [...cRes.expected.values()].map((v) => v.label);
-    check('NEW RED arm 2: the dollar-quoted body keeps its statement boundary',
+    check('NEW RED arm 2: the ACL AFTER a dollar-quoted body is still found',
       cLabels.some((l) => l.includes('public.dollar_fn()')), cLabels.join(' · '));
+    check('NEW RED arm 2 (FALSE-POSITIVE CONTROL): an ACL-shaped line INSIDE a dollar-quoted body is a PHANTOM and is NOT counted',
+      !cLabels.some((l) => l.includes('public.phantom_from_body()')), cLabels.join(' · '));
     check('NEW RED arm 2: a doubled single-quote escape does not end the literal',
       cLabels.some((l) => l.includes('public.escaped(text)')), cLabels.join(' · '));
     check('NEW RED arm 2 (CONTROL): the entirely-commented line is STILL not counted',

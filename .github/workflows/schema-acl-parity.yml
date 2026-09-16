@@ -1,0 +1,57 @@
+# CI backstop for the schema ACL mirror.
+#
+# `scripts/regenerate-full-schema.sh` dumps with `pg_dump --no-privileges`, so
+# `supabase/full-schema.sql` can NEVER carry a grant of its own. Every migration
+# that narrows a privilege is invisible to a greenfield bootstrap unless a human
+# mirrors it into `scripts/full-schema-supplement.sql`. That hand-mirror has
+# failed three times with the instruction in plain sight.
+#
+# ⛔ AND FOR ITS ENTIRE LIFE BEFORE THIS FILE EXISTED, THE GATE THAT CHECKS IT
+#    WAS INVOKED BY NOTHING. Measured at Phase 253 plan time: no hook entry, no
+#    CI workflow, no npm script named `check-schema-acl-parity` anywhere. Phase
+#    252's review (CR-02) had already proved the gate could not FAIL on the one
+#    deletion it exists to catch; a gate nobody runs cannot fail either way.
+#
+# This is the BACKSTOP, not the primary guard — the same split
+# `claude-md-size.yml` documents: `develop` ran 634 commits over 8 days without a
+# push, so an `on: push` gate could not have fired once in that window. The
+# primary guard is the local PostToolUse hook
+# `.claude/hooks/schema-acl-parity-guard.js`, which fires in the turn a migration
+# or the supplement is written. CI catches whatever reaches a shared branch anyway.
+#
+# `--self-test` runs FIRST and on every invocation: it drives the partial-revoke,
+# comment-swallow, table/column and counterfactual arms against planted defects.
+# A scan that passes because the gate has stopped being able to fail is exactly
+# the state CR-02 found, so the falsification runs before the verdict.
+#
+# No secrets, no actions beyond checkout — node is preinstalled on ubuntu-latest.
+name: schema-acl-parity
+
+on:
+  push:
+    branches: [master, main, develop, production, "release/**"]
+    paths:
+      - "supabase/migrations/**"
+      - "scripts/full-schema-supplement.sql"
+      - "supabase/full-schema.sql"
+      - "scripts/check-schema-acl-parity.cjs"
+      - ".github/workflows/schema-acl-parity.yml"
+  pull_request:
+    paths:
+      - "supabase/migrations/**"
+      - "scripts/full-schema-supplement.sql"
+      - "supabase/full-schema.sql"
+      - "scripts/check-schema-acl-parity.cjs"
+      - ".github/workflows/schema-acl-parity.yml"
+
+jobs:
+  schema-acl-parity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Falsify the gate before trusting it
+        run: node scripts/check-schema-acl-parity.cjs --self-test
+
+      - name: Check every migration ACL is mirrored into the bootstrap artifact
+        run: node scripts/check-schema-acl-parity.cjs
