@@ -138,3 +138,44 @@ zero non-header edits), and the operator's 5 and claude's 1 are **untouched**.
 reviewer that 249, 250 and 251 need is not hypothetical — **it is running right now.** `BUS-213`
 records the arrangement in gemini's own words: *"The operator has left me running autonomously while
 you execute."*
+
+---
+
+## ✅ APPLIED 2026-09-16 — the three index writes are done; the table above is the BEFORE state
+
+The audit's own recommendation ("cheap — index work, no review needed") was executed the same
+session. **The table above is preserved as the pre-write reading rather than edited**, because what it
+found is the point: *four of eight rows failed on the MARKER, not on the work.*
+
+Re-derived after the writes, by reading each verification file's frontmatter rather than a summary:
+
+| Phase | before | **after** | what changed |
+|---|---|---|---|
+| 238 | `complete` | `complete` | untouched — already correct |
+| **240** | `partial` ⚠ stale | **`complete`** | flipped; the prior value **preserved verbatim in a comment**, with the 10-hour staleness proof beside it |
+| 241 | absent | absent | ⛔ still UNMET |
+| 242 | `false` | `false` | ⛔ still UNMET — a bare `false` names neither who nor why |
+| **243** | absent | **`refused`** | the refusal was MADE at the time and lived only in prose; now indexed, quoting `243-REVIEW.md`'s own *"standing in for the absent §6.3 independent reviewer"* |
+| 244 | absent | absent | ⛔ still UNMET |
+| 245 | absent | absent | ⛔ still UNMET |
+| **246** | absent | **`done`** | the substance was always here — `builder: gemini`, `reviewer: claude` — only the index was missing |
+
+**4 of 8 accounted for · 4 genuinely unmet: `241` · `242` · `244` · `245`.**
+
+⛔ **Nothing was greened by forgetting.** Each write carries its evidence inline and none swallows a
+caveat:
+
+- **240** keeps its prior value verbatim **and** keeps the counting rule it invented — *`240-REVIEW.md`
+  does not count, it carries no `review_type`* — which is the rule this whole audit then applied to
+  all eight rows.
+- **243** is `refused`, **not** `done`. Its ground (OV-SOLO-01, then live) **no longer holds** —
+  OV-SOLO-01 was re-armed 2026-09-13 — so the marker carries a re-open trigger and says in its own
+  words that *the row is accounted for, never that the work was done.*
+- **246** carries `review_caveat` forward **unchanged and still binding**: commit `521f4a025` was
+  authored by the reviewer and is self-verified, with its own re-open trigger. ⭐ **A `done` that
+  swallowed that caveat would be the exact dishonesty this field exists to prevent.**
+
+⚠ **The structural finding is UNCHANGED and is the one thing here that still has no fix.** Nothing
+reads `independent_review` — `grep -rln` over `scripts/` and `.claude/hooks/` is still empty. These
+four writes make the index true **today**; they do not make it stay true. 240's marker proves how
+fast that decays: **ten hours.** A gate over this field is the durable answer, and it does not exist.

@@ -14,6 +14,7 @@ review_caveat: |
   Re-open trigger: the next phase touching `hnsw_ef_search` re-reviews that commit.
 builder: gemini
 reviewer: claude
+independent_review: done          # ⚠ WRITTEN 2026-09-16 by the DEBT-06 milestone-close audit. The substance was here all along; only the INDEX entry was missing, which is why this row read as unmet for three days. ⭐ THIS IS THE ONE ROW OF THE EIGHT WHERE CLAUDE DID NOT BUILD THE PHASE — `builder: gemini`, `reviewer: claude`, at three gates (context, plan, post-execution). AGENTS.md §6.3's two-agent separation is genuinely satisfied for the build. ROADMAP's DEBT-06 row 3 says of this phase: "246 already carries peer-reviewed; confirm it rather than re-run it" — this marker IS that confirmation. ⛔ NOT A BLANKET CLAIM: `review_caveat` above is carried forward UNCHANGED and remains binding — commit `521f4a025` (the ef_search revert, four code sites + help copy + the copy-pinning test) was authored by claude, the reviewer, and is SELF-VERIFIED, not reviewed. Its re-open trigger stands: the next phase touching `hnsw_ef_search` re-reviews that commit. A `done` that swallowed that caveat would be the exact dishonesty this field exists to prevent. Full audit: `.planning/DEBT-06-AUDIT.md`.
 score: "3 / 4 success criteria — SC#1 UNMET BY MEASUREMENT, and that is the phase's deliverable"
 ---
 

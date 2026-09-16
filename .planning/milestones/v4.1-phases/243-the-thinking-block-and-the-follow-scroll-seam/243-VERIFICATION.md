@@ -2,6 +2,7 @@
 phase: 243-the-thinking-block-and-the-follow-scroll-seam
 verified: 2026-09-11T02:58:20Z
 verification_mode: self-verified   # ⛔ OV-SOLO-01 / D-243-12 — NEVER "reviewed". No independent §6.3 reviewer exists.
+independent_review: refused       # ⚠ WRITTEN 2026-09-16 by the DEBT-06 milestone-close audit. The refusal was MADE at the time and recorded in prose; only the INDEX entry was missing — which is exactly why it read as an unmet row for five days. WHO DECIDED: OV-SOLO-01 (operator, 2026-09-11), which ruled that solo running continues while Gemini was unavailable. WHY: no second agent existed to review it. THE EVIDENCE, verbatim from `243-REVIEW.md`'s own frontmatter — "reviewer: Claude (gsd-code-reviewer) — solo, standing in for the absent §6.3 independent reviewer (OV-SOLO-01)". That review is `depth: deep`, `scope: frontend only`, 7 files, 13 findings (0 critical / 2 high / 4 medium / 7 low), `status: issues_found`. ⛔ IT IS NOT AN INDEPENDENT REVIEW AND DOES NOT CLAIM TO BE — it says "standing in for the absent" reviewer, which is a refusal naming its own cause, not a substitute. RE-OPEN TRIGGER: OV-SOLO-01 was RE-ARMED 2026-09-13 (Gemini returned), so the ground for this refusal no longer holds. A §6.3 review of 243 is now POSSIBLE and is drafted at `.planning/DEBT-06-BUS-DRAFTS.md`; this marker says the row is accounted for, never that the work was done. Full audit: `.planning/DEBT-06-AUDIT.md`.
 status: passed
 score: 5/5 success criteria verified MECHANICALLY · 0/20 UAT rows driven
 overrides_applied: 0

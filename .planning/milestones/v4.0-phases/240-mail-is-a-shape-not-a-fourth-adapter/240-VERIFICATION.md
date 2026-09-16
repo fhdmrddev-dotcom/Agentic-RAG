@@ -2,7 +2,19 @@
 phase: 240-mail-is-a-shape-not-a-fourth-adapter
 verified: 2026-09-09                # the date this file's own header already carries
 verification_mode: self-verified   # ⛔ OV-SOLO-01 / D-245-01 — NEVER "reviewed". No independent §6.3 reviewer exists.
-independent_review: partial       # ⚠ CORRECTED 2026-09-14 — was `owed # nobody who did not shape this build has looked at it`, and that was FALSE. `240-REVIEW-BUILD.md` carries `review_type: independent` over the BUILD range (50f66ec39..962dfdfce^, 21 files, 2 Critical + 8 Warning + 6 Info). ⛔ What is genuinely uncovered is the REVIEW-RESPONSE range — notably 9e83203a2, which changed sources/base.py (+23) and watch_service.py (+28/-1) AFTER both reviews. 240-REVIEW.md must NOT be counted: it carries no review_type field. Full measurement: 240-REVIEW-RECONCILIATION.md (measurement, NOT a review — claude built this phase).
+independent_review: complete      # ⚠ CORRECTED A SECOND TIME, 2026-09-16 (DEBT-06 milestone-close audit) — and the previous value is preserved below rather than overwritten, because HOW it went stale is the finding. It read `partial`, and the gap it named in its own words — "the REVIEW-RESPONSE range, notably 9e83203a2" — was closed TEN HOURS LATER THE SAME DAY by `240-REVIEW-RESPONSE-INDEPENDENT.md` (review_type: independent, reviewer Gemini, scope "review-response range: base.py +23, watch_service.py +28/-1, gmail.py +61/-12"). Proven by commit order, not by reading: the marker is 6267817c9 at 2026-09-14 08:07; the review is 6a0a3171b at 2026-09-14 18:23; `git merge-base --is-ancestor 6a0a3171b 6267817c9` returns FALSE. ⭐ BOTH RANGES ARE NOW INDEPENDENTLY REVIEWED — the BUILD range by `240-REVIEW-BUILD.md`, the RESPONSE range by `240-REVIEW-RESPONSE-INDEPENDENT.md` — so `complete` is earned, not asserted. Full audit: `.planning/DEBT-06-AUDIT.md`.
+# ⚠ THE PRESERVED PRIOR VALUE, 2026-09-14 — kept because a marker that goes stale in ten hours is
+#   the same failure Phase 251 spent four plans removing from the seeds register, one register over:
+#     independent_review: partial   # ⚠ CORRECTED 2026-09-14 — was `owed # nobody who did not shape
+#     this build has looked at it`, and that was FALSE. `240-REVIEW-BUILD.md` carries
+#     `review_type: independent` over the BUILD range (50f66ec39..962dfdfce^, 21 files, 2 Critical +
+#     8 Warning + 6 Info). ⛔ What is genuinely uncovered is the REVIEW-RESPONSE range — notably
+#     9e83203a2, which changed sources/base.py (+23) and watch_service.py (+28/-1) AFTER both
+#     reviews. 240-REVIEW.md must NOT be counted: it carries no review_type field. Full measurement:
+#     240-REVIEW-RECONCILIATION.md (measurement, NOT a review — claude built this phase).
+# ⛔ THE COUNTING RULE ABOVE STILL STANDS AND IS NOW THE PROJECT'S: `240-REVIEW.md` does NOT count as
+#   independent, because it carries no `review_type` field. The DEBT-06 audit adopted that rule from
+#   this very file and applied it to all eight rows.
 ---
 
 # Phase 240 — Verification
