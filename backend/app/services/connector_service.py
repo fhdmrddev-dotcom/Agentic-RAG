@@ -87,6 +87,7 @@ from app.models.connector import (
     ConnectorConnectionUpdate,
     McpConfig,
     _reject_config_capability_mismatch,
+    _validate_custom_client_id,
 )
 from app.security.secret_cipher import decrypt_secret, encrypt_secret, get_cipher, is_encrypted
 from app.utils.db import aexec
@@ -206,6 +207,27 @@ class ConnectorNothingToDiscover(ConnectorError):
     gives a service-only row a way to populate tools; OAuth (Phase 215) does. That is exactly
     why the refusal has to be WORDED: the honest sentence is *"not yet"*, and a 502 says
     *"something is broken"*.
+    """
+
+
+class ConnectorClientIdRefused(ConnectorError):
+    """Phase 252 (B-3 / TM-252-07) — the `client_id` offered fails the shipped boundary.
+
+    ⚠ WHY THIS IS ITS OWN CLASS RATHER THAN THE GENERIC `ConnectorError`. The only caller
+    that can produce it is the RFC 7591 dynamic-registration block, which must distinguish
+    *"this server minted something we will not store"* from every other refusal and answer
+    **422** — the generic arm answers 502, a remote-gateway error about a server that
+    answered us perfectly well. The person's next step differs: 502 says wait, 422 says
+    paste an application id.
+
+    ⚠ IT **IS** A `ConnectorError`, so a caller must catch it **AHEAD OF** any generic
+    `except ConnectorError` arm or that arm swallows it — the same sentence
+    `ConnectorNothingToDiscover` carries, for the same reason, in the same file.
+
+    ⛔ ITS MESSAGE NAMES THE RULE THAT FAILED AND NEVER THE VALUE. It wraps
+    `_validate_custom_client_id`, whose docstring promises exactly that (TM-248-06); a
+    refusal that echoed the offending value would re-create B-2 one register over
+    (TM-252-09).
     """
 
 
@@ -598,7 +620,18 @@ def _to_response(row: dict) -> ConnectorConnectionResponse:
         d_fallback = dict(d)
         d_fallback["config"] = McpConfig()
         d_fallback["status"] = "error"
-        d_fallback["error_message"] = "Connection configuration requires update (validation failed)"
+        # ⭐ D-13 (Phase 252, TM-252-08) — THE REPAIR PATH ALREADY EXISTED AND WAS SIMPLY
+        #   NEVER SAID, which to the person looking at the row is the same as not existing.
+        #   `store_oauth_client_credentials` is an UPDATE, and the BYO form's
+        #   `custom_client_id` IS `CustomClientId`-validated — so pasting a compliant
+        #   application id from a developer console replaces the stored bad one. The prior
+        #   sentence, *"Connection configuration requires update (validation failed)"*, named
+        #   nothing anybody could act on.
+        # ⛔ IT NEVER ECHOES THE STORED VALUE — that would be B-2 in a third register.
+        d_fallback["error_message"] = (
+            "The application id saved for this connection is not valid. Enter an "
+            "application id in this connection's settings to replace it."
+        )
         return ConnectorConnectionResponse.model_validate(d_fallback)
 
 
@@ -662,11 +695,29 @@ async def store_oauth_client_credentials(
     updates: dict[str, object] = {}
 
     if client_id and client_id.strip():
+        # ⛔ B-3 (Phase 252, TM-252-07) — THE BOUNDARY IS APPLIED AT THE WRITER, because this
+        #   is the only seam every writer passes through and the RFC 7591 value does not
+        #   arrive through a request at all. `CustomClientId` guards three REQUEST models
+        #   (`models/connector.py` :286, :393, :600); this function carried NONE, and its
+        #   dynamic-registration caller takes `client_id` straight out of a REMOTE SERVER'S
+        #   RESPONSE. A fourth request model would guard a door this value never comes
+        #   through.
+        # ⚠ AND THE CONSEQUENCE OF A BAD WRITE IS WORSE THAN THE BYPASS: once stored, every
+        #   later read of the row fails `model_validate`, falls into `_to_response`'s
+        #   degraded fallback, and the connection reads `status="error"` forever.
+        # ⛔ REUSED, NEVER RE-IMPLEMENTED. A second copy of the rules is a second thing to
+        #   keep in step, and the shipped one already keeps the no-echo promise.
+        try:
+            validated_client_id = _validate_custom_client_id(client_id)
+        except ValueError as exc:
+            raise ConnectorClientIdRefused(
+                f"the offered custom_client_id was refused: {exc}"
+            ) from None
         row = await _fetch_connection_row(connection_id, org_id)
         if row is None:
             raise ConnectorNotFound(f"no connection {connection_id}")
         config = dict(row.get("config") or {})
-        config["custom_client_id"] = client_id.strip()
+        config["custom_client_id"] = validated_client_id
         # ⚠ SWEPT ON EVERY WRITE, not only by the migration. A row that still carries the
         # old plaintext key gets it removed the next time anybody touches this connection,
         # so the exposure closes without waiting for a deploy of the migration everywhere.

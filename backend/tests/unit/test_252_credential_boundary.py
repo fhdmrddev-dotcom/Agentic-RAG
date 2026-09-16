@@ -105,6 +105,12 @@ def test_the_degraded_fallback_does_not_leak_the_credential_to_the_log(caplog):
         assert "custom_client_id" in caplog.text
         assert resp.id in caplog.text
 
+        # D-13 / TM-252-08 — the degraded row NAMES the repair. The path already existed
+        # structurally (`store_oauth_client_credentials` is an UPDATE and the BYO form's
+        # `custom_client_id` IS validated); it was simply never said, and an unnamed repair
+        # path is the same thing as none to the person looking at it.
+        assert "application id" in resp.error_message.lower()
+        assert "settings" in resp.error_message.lower()
         # ⛔ The value never reaches the rendered row either — a degraded `error_message` that
         #   echoed it would be this same leak one register over.
         assert value not in resp.error_message
@@ -204,3 +210,99 @@ async def test_a_compliant_client_id_writes_exactly_as_it_did_before(monkeypatch
     # D-14 — the scope. Removing this term is the leak.
     assert sink["eq"]["org_id"] == "o1"
     assert sink["eq"]["id"] == "c1"
+
+
+# ── B-3 · the route that carries the refusal ─────────────────────────────────────────────
+
+
+ACTIVE_ORG = "11111111-1111-1111-1111-111111111111"
+CONN_ID = "22222222-2222-2222-2222-222222222222"
+HEADERS = {"Authorization": "Bearer test-token", "X-Org-Id": ACTIVE_ORG}
+
+#: The existing `if not client_id: 422`. A server that DEMONSTRABLY offered to create an
+#: application must never be described with this sentence (D-12).
+DOES_NOT_OFFER = "does not offer to create one"
+
+
+@pytest.mark.asyncio
+async def test_the_dcr_route_refuses_a_server_minted_id_it_will_not_store(
+    monkeypatch, mock_asyncpg_pool
+):
+    """SC#3 at the route — 422 that names the server, points at BYO, and says nothing else.
+
+    ⛔ Drives the REAL DCR block. The decision to REGISTER rather than refuse (taken on a live
+    drive against `mcp.notion.com`) is untouched; what changes is what happens to the RESULT.
+    """
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from app import dependencies as deps
+    from app.api import connectors
+    from app.main import app as real_app
+    from app.services.mcp_auth_discovery import McpAuthProbe
+    from app.services.mcp_oauth import RegisteredClient
+
+    # — authorisation, copied from the shipped route suite —
+    monkeypatch.setattr("app.dependencies._pg_pool", mock_asyncpg_pool)
+    mock_asyncpg_pool.set_fetchrow_result({"role": "admin"})
+
+    async def _perm(request, current_user, org_id, permission_key):
+        return True
+
+    monkeypatch.setattr("app.dependencies._has_org_permission", _perm)
+    monkeypatch.setattr(deps, "is_operator", AsyncMock(return_value=False))
+    monkeypatch.setattr("app.models.user_settings.feature_audience", lambda f: "everyone")
+
+    # — the row the route reads: an MCP connection with NO stored application —
+    monkeypatch.setattr(
+        connectors,
+        "aexec",
+        AsyncMock(return_value=SimpleNamespace(data=[
+            {"id": CONN_ID, "mcp_server_url": "https://mcp.example.com/mcp", "config": {}}
+        ])),
+    )
+
+    async def _probe(server_url, **kw):
+        return McpAuthProbe(
+            kind="oauth",
+            authorization_host="auth.example.com",
+            authorization_endpoint="https://auth.example.com/authorize",
+            token_endpoint="https://auth.example.com/token",
+            registration_endpoint="https://auth.example.com/register",
+            code_challenge_methods=["S256"],
+            resource_status=401,
+        )
+
+    monkeypatch.setattr("app.services.mcp_auth_discovery.probe_mcp_auth", _probe)
+    monkeypatch.setattr(
+        connectors.connector_service,
+        "read_oauth_client_secret",
+        AsyncMock(return_value=None),
+    )
+
+    # — the server mints something we will not store —
+    async def _register(registration_endpoint, **kw):
+        return RegisteredClient(client_id=SECRET, client_secret="whatever")
+
+    monkeypatch.setattr("app.services.mcp_oauth.register_client", _register)
+
+    # — the REAL writer, against a fake table, so the refusal comes from the seam itself —
+    _wire_writer(monkeypatch)
+
+    probe_app = FastAPI()
+    probe_app.include_router(connectors.router)
+    probe_app.dependency_overrides = real_app.dependency_overrides
+    res = TestClient(probe_app).post(
+        "/connectors/mcp/oauth/authorize", json={"connection_id": CONN_ID}, headers=HEADERS
+    )
+
+    assert res.status_code == 422, res.text
+    detail = res.json()["detail"]
+    # ⛔ Not the `not client_id` message — that one would be a false statement about a server
+    #   that demonstrably DID offer to create an application.
+    assert DOES_NOT_OFFER not in detail
+    # It names the server and points at the repair.
+    assert "auth.example.com" in detail or "mcp.example.com" in detail
+    assert "application id" in detail.lower()
+    # TM-252-09 — the 422 carries the rule, never the value.
+    assert SECRET not in detail

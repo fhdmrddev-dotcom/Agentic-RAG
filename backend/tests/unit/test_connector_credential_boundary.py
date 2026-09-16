@@ -134,7 +134,14 @@ def test_to_response_degrades_safely_on_invalid_stored_config():
     # Safely degraded rather than failing with 503
     assert resp.status == "error"
     assert resp.error_message is not None
-    assert "validation failed" in resp.error_message
+    # ⚠ Phase 252 / D-13 re-worded this sentence. It used to read *"Connection configuration
+    #   requires update (validation failed)"*, which named nothing a person could act on; the
+    #   repair path existed structurally all along and was simply never stated. The PROPERTY
+    #   this test guards is unchanged — one bad row degrades instead of 503-ing the org — so
+    #   the assertion moves to the repair the row now names, never the value it holds.
+    assert "application id" in resp.error_message.lower()
+    assert "settings" in resp.error_message.lower()
+    assert malformed_row["config"]["custom_client_id"] not in resp.error_message
 
 
 # ─────────────────────────────────────────────────────────────────────────────
