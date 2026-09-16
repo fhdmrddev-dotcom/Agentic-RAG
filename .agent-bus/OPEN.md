@@ -3008,7 +3008,7 @@ Full detail: .planning/phases/249-the-model-you-actually-run/249-SUMMARY.md, 249
 
 **Answer:**
 
-### [OPEN] BUS-247 · to:operator · from:claude · 2026-09-14
+### [CLOSED] BUS-247 · to:operator · from:claude · 2026-09-14
 
 Follow-up to BUS-246. I ran /gsd:code-review 249 after closing the phase. It found TWO BLOCKERS, and both were regressions the phase itself introduced. I reproduced each by driving before changing anything, and both are now fixed and driven again.
 
@@ -3026,7 +3026,7 @@ One gate note, triaged by the rules rather than re-run: the count gate's final r
 
 Detail: .planning/phases/249-the-model-you-actually-run/249-GAP-CLOSURE.md and 249-REVIEW.md
 
-**Answer:**
+**Answer:** OPERATOR RULING 2026-09-16, relayed by claude in session: YES to independent review. A second agent reviews each phase before it closes. DEBT-06's per-phase arm stands and is not waived again; 249/250/251/252 each carry independent_review: owed and those rows are real. Gemini is back and OV-SOLO-01 is re-armed, so the default from here is builder != reviewer. ⚠ The 13-vs-16 discrepancy between BUS-246 and this item is NOT ruled on and must be settled by measurement before either number is quoted again.
 
 ### [OPEN] BUS-248 · to:operator · from:claude · 2026-09-15
 
@@ -3046,7 +3046,7 @@ SC#10 cross-provider was DRIVEN 8/8 at every provider's REAL context budget, ros
 
 Full record: .planning/phases/250-run-honesty-the-residue/ (MEASUREMENT, UAT, SUMMARY, VERIFICATION).
 
-**Answer:**
+**Answer:** OPERATOR RULING 2026-09-16, relayed by claude in session. ⛔ (1) THE WORD IS NOT THE PROBLEM AND CHANGING IT WAS NOT THE FIX. The operator rejects the framing of question (1) rather than picking one of its options: "if the task is actually completed it should be ticked anyway, so this is misleading the user... it should do a final round to check, if the agent finished then it should be ticked; otherwise the only way is to show that this task was actually not completed." ⭐ READ AGAINST BUG-260913-02, WHICH THIS PHASE CITES AS ITS OWN MOTIVATION: "the job finished perfectly and the row read (run ended - not completed). The surface adjudicated work it cannot see." Phase 250 answered that by softening the WORDS - "Not ticked" instead of "not completed" - and the operator has now reported the identical complaint against the new word. ⛔ A softer overclaim is still an overclaim: NOT TICKED beside a finished job misleads in exactly the way the original marker did. The defect is that NOTHING RECONCILES THE LIST AGAINST WHAT THE RUN ACTUALLY DID. ⚠ THIS IS NOT THE AUTO-COMPLETE THAT WAS REJECTED TWICE (2026-06-26, and again at 250 scoping under Phase 138 D-01). That rejection was of a SILENT status flip on a clean run end - ticking an item because the run ended, with no evidence. What is directed here is the opposite: a FINAL RECONCILIATION PASS that reads the run's own transcript and tool calls, ticks what the agent demonstrably did, and leaves genuinely-unfinished items open. Evidence-bearing, not blind. D-01's honesty guardrail is satisfied by it, not broken by it. ⭐ THE HONEST LIMIT, WHICH SURVIVES THE CHANGE: a run that CRASHED, was STOPPED or TIMED OUT never reaches a final pass, so its open items still cannot be adjudicated. NOT TICKED stays for exactly that case - where it is TRUE. The hook is reconcile_open_todos_on_run_end (run_producer.py:202), already gated on a genuinely-clean terminal status. ⛔ SCOPE: this is a new capability and therefore A PHASE, not a wording tweak and not a closure round (G-7). Captured as a requirement rather than built inline. (2) THE G-2 SKETCH SKIP IS NOT RULED ON - the operator did not answer it and it stays open.
 
 ### [OPEN] BUS-249 · to:gemini · from:claude · 2026-09-16
 
