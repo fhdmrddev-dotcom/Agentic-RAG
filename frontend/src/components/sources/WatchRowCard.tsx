@@ -6,9 +6,25 @@
  *
  * 1. Two-Tier Status Badge (WATCH-03):
  *    - Primary Pill: Connection Status (`● Connected` vs `⊙ Connection Off`)
- *    - Secondary Pill: Run Outcome (`● Reading` vs `⚠ Run failed (429)` vs `⚠ Stopped`)
+ *    - Primary Pill: read from `CONNECTION_PILL_FOR_CAUSE` — ⚠ CORRECTED in Phase 252
+ *      (W-1 / D-29): this line used to describe a two-value binary, and that binary rendered
+ *      `● Connected` for a revoked token. The pill is a TABLE LOOKUP now, not two hardcoded
+ *      pills behind one comparison.
+ *    - Secondary Pill: Run Outcome (`● Reading` vs `⚠ Stopped`). ⚠ CORRECTED in Phase 252
+ *      (W-2 / D-28): a rate-limit reading was listed here and is DELETED. No cause in the
+ *      taxonomy means rate-limited, so the claim could never be justified from evidence — and
+ *      the status number is not re-quoted here, because the acceptance greps count literals
+ *      over this source and cannot tell code from a comment.
  * 2. Non-Collapsing Row-Level Sync (WATCH-04):
- *    - Row-level spinner and inline feedback tag (`✓ Synced just now (0 changes)`)
+ *    - Row-level spinner and ONE inline outcome slot, rendering what the sync endpoint
+ *      actually said. ⚠ CORRECTED in Phase 252 plan 03 (SC#4 / D-15..D-18) — this line used to
+ *      quote a hardcoded success tag carrying a change count, and that literal WAS the defect:
+ *      it claimed completion where the parent only QUEUES, printed a count no response carries,
+ *      and could render beside the server's refusal. **Nothing replaces the count.**
+ *    - ⚠ The literal is NOT re-quoted anywhere in this file, not even to record its removal:
+ *      the plan's own acceptance greps and this file's `?raw` fences count occurrences over the
+ *      source and cannot tell code from a comment. The verbatim strings live in
+ *      `252-03-SUMMARY.md`, where no grep mistakes them for a live one.
  *    - Card and accordion do not unmount or collapse during or after sync.
  * 3. Missing Item Timestamp Lifecycle (WATCH-05):
  *    - Renders `Missing at source since [timestamp] · Retained in Library` using `item.missing_since`.
@@ -45,14 +61,17 @@ import { relativeBand } from "@/components/workflows/library/relativeChanged"
 import { RunHistoryList } from "./RunHistoryList"
 import { isQuiet } from "./runHistoryFold"
 import {
+  CONNECTION_PILL_FOR_CAUSE,
   CONTROL_FOR_CAUSE,
   COPY,
+  type ConnectionPillTone,
   FILE_FAILURE_HEADING,
   FILE_FAILURE_MORE,
   FILE_FAILURE_SCOPE_NOTE,
   FILE_FAILURE_SUMMARY,
   SENTENCE_FOR_CAUSE,
   SENTENCE_FOR_FILE_FAILURE,
+  UNKNOWN_SOURCE_FAILURE_SENTENCE,
   classifySourceFailure,
   fileFailureKind,
   instantPhrase,
@@ -96,6 +115,19 @@ export const STATE_PRESENTATION: Record<
   },
 }
 
+/**
+ * ⭐ W-1 (D-29) — the connection pill's TONE to its Tailwind classes.
+ *
+ * The WORDS live in `sourceHealthVocabulary` with every other sentence this surface says; only
+ * the styling lives here, beside `STATE_PRESENTATION` which is the same split. ⛔ Keyed by
+ * `ConnectionPillTone`, so a new tone cannot be added without a class — and a new CAUSE needs
+ * no edit here at all, which is the point.
+ */
+export const CONNECTION_PILL_CLASS: Record<ConnectionPillTone, string> = {
+  connected: "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+  attention: "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400",
+}
+
 export const COLLAPSIBLE_STATES: readonly SourceState[] = ["healthy", "waiting"]
 
 export const FILE_FAILURE_STATES: readonly string[] = ["failed", "skipped_size", "skipped_type"]
@@ -126,6 +158,26 @@ function outcomeSentence(
   return watch.item_count > 0 ? COPY.checkedAgo(ago, watch.item_count) : COPY.checkedNoChange(ago)
 }
 
+/**
+ * ⭐ D-15 / SC#4 — WHAT ONE "Sync now" CLICK ACTUALLY PRODUCED.
+ *
+ * The card used to invent its outcome from a literal while the PARENT already held the real
+ * verdict in its own `refusals` / `pendingAsks` state. This type is how the parent's truth
+ * reaches the card, and it is the ONLY thing the card renders about a click.
+ *
+ * ⛔ THERE IS NO `changes` FIELD, AND THERE MUST NOT BE ONE. `WatchSyncResponse`
+ * (`lib/api/sources.ts:117-126`) carries `status`, `message`, `next_run_at?`,
+ * `next_check_within_seconds?` and `reader_running?` — **no change count**. Any number this
+ * card printed would be invented, which is exactly what the deleted count literal was.
+ */
+export type WatchSyncOutcome =
+  /** The ask was recorded. `says` is the parent's shipped `COPY.asked(withinPhrase(...))`. */
+  | { kind: "queued"; says: string }
+  /** The server DECLINED. `says` is its own `res.message` — never reworded here. */
+  | { kind: "refused"; says: string }
+  /** The call threw. `says` is the caught message. */
+  | { kind: "failed"; says: string }
+
 export interface WatchRowProps {
   watch: ConnectorWatch
   state: SourceState
@@ -136,7 +188,11 @@ export interface WatchRowProps {
   refusal: string | null
   canReconnect: boolean
   onFix: (watch: ConnectorWatch, cause: SourceFailureCause) => void
-  onSyncNow: (watch: ConnectorWatch) => Promise<void> | void
+  /**
+   * ⛔ The card never calls the sync endpoint itself. `WatchedFoldersSection` owns the
+   * refusal/pending state, and a second caller would be a second writer of one slice.
+   */
+  onSyncNow: (watch: ConnectorWatch) => Promise<WatchSyncOutcome>
   onToggleActive: (watch: ConnectorWatch) => void
   onPurge: (watch: ConnectorWatch) => void
   onDelete: (watch: ConnectorWatch) => void
@@ -167,7 +223,7 @@ export function WatchRowCard({
   const [items, setItems] = useState<ConnectorWatchItem[] | null>(null)
   const [failuresOpen, setFailuresOpen] = useState(false)
   const [isSyncing, setIsSyncing] = useState(false)
-  const [syncOutcome, setSyncOutcome] = useState<string | null>(null)
+  const [syncOutcome, setSyncOutcome] = useState<WatchSyncOutcome | null>(null)
 
   const itemsAsked = useRef(false)
   const rowMounted = useRef(true)
@@ -236,31 +292,62 @@ export function WatchRowCard({
     setIsSyncing(true)
     setSyncOutcome(null)
     try {
-      await onSyncNow(watch)
-      setSyncOutcome("✓ Synced just now (0 changes)")
+      // ⭐ D-15 — the card RENDERS the parent's verdict. It no longer authors one.
+      setSyncOutcome(await onSyncNow(watch))
+    } catch (err: any) {
+      // ⚠ D-18, AND IT IS DELIBERATELY NOT THE FIX FOR TODAY'S CONTRADICTION — the parent's
+      //   widened return is. D-04 measured that `WatchedFoldersSection.handleSyncNow`
+      //   try/catches into `setError` and never rejects, so this arm cannot fire on the
+      //   shipped parent. It exists because that swallow is precisely what made the card's
+      //   optimism invisible: a FUTURE caller that does reject must not leave a stale reading
+      //   standing.
+      setSyncOutcome({ kind: "failed", says: err?.message || UNKNOWN_SOURCE_FAILURE_SENTENCE })
     } finally {
       setIsSyncing(false)
     }
   }
 
-  const isConnectionDisabled = stopped?.cause === "connection_disabled"
-  const isRateLimited =
-    cause === "unreachable" && Boolean(classifySourceFailure(watch.last_error) === "unreachable")
+  /**
+   * ⭐ D-16 — ONE OUTCOME SLOT, DERIVED FROM ONE VALUE.
+   *
+   * The card used to carry TWO independent renderers: `syncOutcome` in the toolbar and a
+   * separate refusal-guarded block near the foot. One click could therefore put a refusal and
+   * a success on the same card at once — B-4's headline, and the suite reproduced it verbatim.
+   * **Two slots with a rule is how the pair drifted apart; one slot cannot.**
+   *
+   * ⚠ The `refusal` prop is still read: it survives a re-render and a list reload, so a refusal
+   *   the parent recorded before this mount is still shown. It is a FALLBACK into the one slot,
+   *   never a second slot.
+   */
+  const syncLine: WatchSyncOutcome | null =
+    syncOutcome ?? (refusal ? { kind: "refused", says: refusal } : null)
 
   // ── Variant A Two-Tier Status Badge ────────────────────────────────────────────────
-  const connectionPill = isConnectionDisabled ? (
+  /**
+   * ⭐ W-1 (D-29) — THE PILL READS THE CAUSE, BY TABLE LOOKUP.
+   *
+   * This used to be a ONE-CAUSE BINARY — an equality test against the switched-off cause alone,
+   * with a ternary picking one of two hardcoded pills — so it rendered `● Connected` for a
+   * REVOKED token and for REJECTED app credentials, the two causes that mean the authorisation
+   * is gone. ⛔ There is deliberately no ternary on the cause here: a new cause adds a ROW to
+   * `CONNECTION_PILL_FOR_CAUSE`, never an `if` in this file.
+   * ⚠ The deleted expression is described and NOT quoted — the plan's acceptance greps count
+   *   literals over this source and cannot tell code from a comment. It is written out verbatim
+   *   in `252-03-SUMMARY.md` instead, where nothing mistakes it for a live one.
+   *
+   * ⚠ It reads the RESOLVED `cause` (`:184`), not `stopped?.cause`, so a watch carrying only a
+   *   `last_error` is read too — which is the case the binary could never see.
+   */
+  const pill = CONNECTION_PILL_FOR_CAUSE[cause]
+  const connectionPill = (
     <span
       data-testid="sources-connection-pill"
-      className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+      className={cn(
+        "inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded-full border",
+        CONNECTION_PILL_CLASS[pill.tone],
+      )}
     >
-      <span aria-hidden="true">⊙</span> Connection Off
-    </span>
-  ) : (
-    <span
-      data-testid="sources-connection-pill"
-      className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-    >
-      <span aria-hidden="true">●</span> Connected
+      <span aria-hidden="true">{pill.glyph}</span> {pill.label}
     </span>
   )
 
@@ -273,7 +360,29 @@ export function WatchRowCard({
       )}
     >
       <span aria-hidden="true">{state === "healthy" ? "●" : "○"}</span>
-      {isRateLimited ? "Run failed (429)" : presentation.label}
+      {/* ⭐ W-2 (D-28) — THE RATE-LIMIT CLAIM IS GONE, AND NOTHING REPLACES IT.
+          The deleted guard was a CONJUNCTION OF TWO IDENTICAL TESTS: it compared the resolved
+          cause to the catch-all transport cause, AND re-derived that same cause from the
+          watch's stored error string and compared it to the same value. But the resolved cause
+          ALREADY DEFAULTS to that second expression (see its declaration above), so when
+          `stopped`
+          was absent the two conjuncts were the same test and the guard collapsed to a single
+          comparison against the CATCH-ALL. A provider 5xx, a DNS failure and a socket timeout
+          therefore all rendered a rate-limit reading, sending an operator to the wrong remedy
+          for an outage.
+          ⛔ MEASURED, NOT ASSUMED — NO CAUSE IN THE TAXONOMY MEANS RATE-LIMITED. The backend
+          status table maps the rate-limit status onto the same catch-all transport cause as
+          408/500/502/503/504, and the client mirror holds the rate-limit tells in the SAME
+          regex alternation as timeouts and 5xx. A rate-limited failure is therefore
+          INDISTINGUISHABLE from an outage downstream of classification, so no vocabulary row
+          could be keyed on it honestly. The pin lives in `sourceHealthVocabulary.test.ts`.
+          ⛔ Do NOT invent a cause to bring the reading back: a label nothing can justify is
+          worse than no label. If the classifier ever gains a genuine rate-limit cause, the
+          reading returns as a ROW in `sourceHealthVocabulary`, never as a guard here.
+          ⚠ The deleted expression and the status number are described rather than quoted —
+            the plan's acceptance greps count literals over this source and cannot tell code
+            from a comment. Both are verbatim in `252-03-SUMMARY.md`. */}
+      {presentation.label}
     </span>
   )
 
@@ -377,12 +486,31 @@ export function WatchRowCard({
             {/* Actions toolbar */}
             {!isDegraded && (
               <div className="flex items-center gap-1.5 self-end sm:self-center flex-wrap">
-                {syncOutcome && (
+                {/* ⭐ D-16 — THE ONE OUTCOME SLOT. Styled by `kind`; there is no second
+                    renderer.
+                    ⚠ `sources-refusal` is kept as the testid of the REFUSED reading because
+                      `WatchedFoldersSection.history.test.tsx:329-330` scopes by it — measured
+                      with `grep -rn "sources-refusal" frontend/src`, not assumed.
+                    ⛔ `says` can be SERVER-CONTROLLED TEXT (`res.message`). It renders as a
+                      React child and is therefore auto-escaped — never through a raw-HTML
+                      injection prop (TM-252-15).
+                    ⚠ That prop is NOT NAMED here on purpose: this file's own `?raw` fence
+                      (`WatchedFoldersSection.test.tsx`) counts the literal over the source and
+                      cannot tell code from a comment. Writing it, even to forbid it, reds the
+                      guard — Pitfall 8, measured when this comment did exactly that. */}
+                {syncLine && (
                   <span
-                    data-testid="sources-sync-outcome"
-                    className="text-xs text-emerald-600 dark:text-emerald-400 font-medium px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20"
+                    data-testid={
+                      syncLine.kind === "refused" ? "sources-refusal" : "sources-sync-outcome"
+                    }
+                    className={cn(
+                      "text-xs font-medium px-2 py-0.5 rounded border",
+                      syncLine.kind === "queued"
+                        ? "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
+                        : "text-muted-foreground bg-muted/40 border-border/60",
+                    )}
                   >
-                    {syncOutcome}
+                    {syncLine.says}
                   </span>
                 )}
 
@@ -605,13 +733,6 @@ export function WatchRowCard({
                 </p>
               )}
             </div>
-          )}
-
-          {/* ⛔ The request was DECLINED, not queued — so it does not render as asked. */}
-          {refusal && (
-            <p data-testid="sources-refusal" className="text-[11px] text-muted-foreground">
-              {refusal}
-            </p>
           )}
 
           {/* ── THE HISTORY — every tick this source made, one click away ───────────── */}

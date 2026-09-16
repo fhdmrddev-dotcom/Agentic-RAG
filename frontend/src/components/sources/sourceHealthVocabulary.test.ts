@@ -29,6 +29,7 @@ import {
   classifySourceFailure,
   sourceFailureSentence,
   CHECKED_PREFIX,
+  CONNECTION_PILL_FOR_CAUSE,
   CONTROL_FOR_CAUSE,
   COPY,
   COUNT_ORDER,
@@ -279,14 +280,26 @@ describe("the connection name is a runtime value, never a baked fixture", () => 
   it("the token_revoked sentence and control are FUNCTIONS of the connection name", () => {
     expect(SENTENCE_FOR_CAUSE.token_revoked("Acme Drive")).toContain("Acme Drive")
     expect(SENTENCE_FOR_CAUSE.token_revoked("Other Drive")).toContain("Other Drive")
-    expect(CONTROL_FOR_CAUSE.token_revoked.label("Acme Drive")).toBe("Reconnect Acme Drive")
+    // ⚠ RE-BASELINED in Phase 252 (W-3 / D-30): the label gained `in Settings ↗`. What this
+    //   case asserts is UNCHANGED — the name is interpolated, never baked — and the pin still
+    //   reds on a baked fixture name.
+    expect(CONTROL_FOR_CAUSE.token_revoked.label("Acme Drive")).toBe(
+      "Reconnect Acme Drive in Settings ↗",
+    )
   })
 
   it("an empty or blank connection name degrades rather than printing a gap", () => {
     // `notAZipSentence`'s final rule: fall back rather than guess. A wrong instruction is
     // worse than a general one, and "Reconnect " with nothing after it is a wrong one.
-    expect(CONTROL_FOR_CAUSE.token_revoked.label("")).toBe("Reconnect the connection")
-    expect(CONTROL_FOR_CAUSE.token_revoked.label("   ")).toBe("Reconnect the connection")
+    // ⚠ RE-BASELINED in Phase 252 (W-3 / D-30) — the DEGRADATION is what this case is about
+    //   and it is unchanged: the fallback still names "the connection" rather than leaving a
+    //   gap after the verb.
+    expect(CONTROL_FOR_CAUSE.token_revoked.label("")).toBe(
+      "Reconnect the connection in Settings ↗",
+    )
+    expect(CONTROL_FOR_CAUSE.token_revoked.label("   ")).toBe(
+      "Reconnect the connection in Settings ↗",
+    )
     expect(SENTENCE_FOR_CAUSE.token_revoked("").length).toBeGreaterThan(20)
     expect(SENTENCE_FOR_CAUSE.token_revoked("")).toContain("the connection")
   })
@@ -298,7 +311,13 @@ describe("the connection name is a runtime value, never a baked fixture", () => 
 
 describe("V-07 — each cause maps to exactly ONE named control", () => {
   it("the three shipped labels are exactly what the BUILD-CONTRACT names", () => {
-    expect(CONTROL_FOR_CAUSE.token_revoked.label("Legal Drive")).toBe("Reconnect Legal Drive")
+    // ⚠ RE-BASELINED in Phase 252 (W-3 / D-30). ⭐ The VERB is deliberately still `Reconnect`,
+    //   unlike its two Settings-door siblings: for a revoked token reconnecting genuinely IS
+    //   the fix, and only the location was missing. `runFix` merely navigates for this action,
+    //   which is what the added words now admit.
+    expect(CONTROL_FOR_CAUSE.token_revoked.label("Legal Drive")).toBe(
+      "Reconnect Legal Drive in Settings ↗",
+    )
     expect(CONTROL_FOR_CAUSE.folder_gone.label("Legal Drive")).toBe("Pick a different folder")
     expect(CONTROL_FOR_CAUSE.unreachable.label("Legal Drive")).toBe("Retry now")
     expect(CONTROL_FOR_CAUSE.unknown.label("Legal Drive")).toBe("Retry now")
@@ -371,12 +390,86 @@ describe("V-07 — each cause maps to exactly ONE named control", () => {
     )
   })
 
-  it("⭐ D-235-11 PROVED ON THE FIFTH CAUSE — it appears in exactly three places, all of them tables", () => {
+  it("⭐ D-235-11 PROVED ON THE FIFTH CAUSE — it appears in exactly four places, all of them tables", () => {
     // A new cause must need a ROW, never a branch. Counted over the shipped source: the union,
-    // the sentence table, the control table. A fourth occurrence would mean somebody reached
-    // for special-casing, and this reds rather than waiting for a reviewer to notice.
+    // the sentence table, the control table — and now the connection-pill table. An occurrence
+    // beyond the tables would mean somebody reached for special-casing, and this reds rather
+    // than waiting for a reviewer to notice.
+    //
+    // ⚠ RE-BASELINED 3 → 4 in Phase 252 (W-1 / D-29), in the SAME commit that added the fourth
+    //   TABLE — the discipline this file already applied twice to the backend-cause pin
+    //   (4 → 5, then 5 → 6). **The invariant is unchanged and still holds: "all of them
+    //   tables".** Only the count of tables moved.
+    // ⛔ THIS IS A RE-BASELINE, NOT A LOOSENING. It is still an exact equality — never
+    //   `toBeGreaterThan`, which would make a pin that cannot fail. And the companion case
+    //   above still proves the absence of a `cause`-equality branch independently, so a
+    //   special-case smuggled in as a fourth occurrence would still red there.
+    // ⚠ MEASURED: the identifier is spelled in the four table positions and NOWHERE in the
+    //   prose, because a literal inside a comment is still a literal — the drive of this very
+    //   change reddened this case at 7 before the new docblock stopped quoting it.
     const occurrences = vocabularySource.split("connection_disabled").length - 1
-    expect(occurrences).toBe(3)
+    expect(occurrences).toBe(4)
+  })
+
+  // ══════════════════════════════════════════════════════════════════════════════════════
+  // W-1 (Phase 252 / D-29) · CAUSE → WHAT THE CONNECTION PILL SAYS
+  // ══════════════════════════════════════════════════════════════════════════════════════
+
+  it("⛔ W-1 — the two AUTHORISATION causes do not claim the connection is fine", () => {
+    // The shipped card rendered `● Connected` for both of these, because its binary asked about
+    // one cause only. A revoked token reading "Connected" is a misattribution of a
+    // security-relevant failure, not a wording slip.
+    expect(CONNECTION_PILL_FOR_CAUSE.token_revoked.label).not.toMatch(/connected/i)
+    expect(CONNECTION_PILL_FOR_CAUSE.app_credentials_invalid.label).not.toMatch(/connected/i)
+    expect(CONNECTION_PILL_FOR_CAUSE.token_revoked.tone).toBe("attention")
+    expect(CONNECTION_PILL_FOR_CAUSE.app_credentials_invalid.tone).toBe("attention")
+  })
+
+  it("⭐ W-1 CONTROL — a failure that is NOT connection-level still reads Connected", () => {
+    // ⚠ The other half of D-29, and it carries as much weight: flipping every cause to a
+    //   warning would make this pill a restatement of the run pill beside it. An unshared
+    //   folder and a server timeout say nothing about the authorisation.
+    expect(CONNECTION_PILL_FOR_CAUSE.folder_gone.label).toBe("Connected")
+    expect(CONNECTION_PILL_FOR_CAUSE.unreachable.label).toBe("Connected")
+    // ⭐ And the ordinary case: a healthy watch has no `last_error`, so the classifier returns
+    //   `unknown` and the card reads THIS row. If it said anything else, every healthy source
+    //   in the library would carry a warning.
+    expect(CONNECTION_PILL_FOR_CAUSE.unknown.label).toBe("Connected")
+    expect(CONNECTION_PILL_FOR_CAUSE.unknown.tone).toBe("connected")
+  })
+
+  it("W-1 — the shipped switched-off reading is preserved word for word", () => {
+    // The one reading that was already correct. It is the label the two-tier badge suite pins
+    // and the only one a person has actually seen; a re-word here would be gratuitous churn.
+    expect(CONNECTION_PILL_FOR_CAUSE.connection_disabled.label).toBe("Connection Off")
+  })
+
+  it("W-1 — every cause has a pill, so a new cause cannot render an empty one", () => {
+    expect(Object.keys(CONNECTION_PILL_FOR_CAUSE).sort()).toEqual(
+      Object.keys(SENTENCE_FOR_CAUSE).sort(),
+    )
+    for (const cause of Object.keys(CONNECTION_PILL_FOR_CAUSE) as SourceFailureCause[]) {
+      const row = CONNECTION_PILL_FOR_CAUSE[cause]
+      expect(row.label.trim().length, `"${cause}" has an empty pill label`).toBeGreaterThan(0)
+      expect(row.glyph.trim().length, `"${cause}" has an empty pill glyph`).toBeGreaterThan(0)
+      expect(["connected", "attention"]).toContain(row.tone)
+    }
+  })
+
+  it("⛔ W-2 — no cause in the taxonomy means RATE LIMITED, so none may be read as one", () => {
+    // ⭐ THE MEASUREMENT BEHIND D-28, PINNED SO IT CANNOT ROT INTO AN ASSUMPTION.
+    //   `failure_cause.py`'s status table maps 429 to `unreachable`, and the client matcher
+    //   below puts the rate-limit tells in the SAME alternation as timeouts and 5xx. A 429 is
+    //   therefore INDISTINGUISHABLE from a 503 after classification — which is why the card's
+    //   `Run failed (429)` reading was deleted outright rather than re-keyed onto a cause.
+    // ⛔ If this case ever reds because a genuine rate-limit cause was added, the reading may
+    //   come back — as a ROW, never as a guard in a component.
+    expect(classifySourceFailure("429 Too Many Requests: rate limit exceeded")).toBe("unreachable")
+    expect(classifySourceFailure("503 Service Unavailable")).toBe("unreachable")
+    expect(classifySourceFailure("Connection timed out")).toBe("unreachable")
+    // ⚠ NON-VACUITY — the union genuinely carries no rate-limit member, rather than the three
+    //   above merely agreeing by accident.
+    expect(Object.keys(SENTENCE_FOR_CAUSE).join(",")).not.toMatch(/rate|limit|throttl|quota/i)
   })
 
   it("⛔ ZERO IMPORTS — the leaf's own source has no import statement", () => {
