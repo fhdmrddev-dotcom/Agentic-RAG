@@ -6,7 +6,7 @@ independent_review: owed
 verified_by: claude (orchestrator)
 verified_at: 2026-09-16
 base: 53e2435b7
-head: (see §0)
+head: 1ee7903f0 (+ this commit)
 requirements: [CRED-01, CRED-03, CRED-04, WATCH-03, WATCH-04, WATCH-06, WATCH-07, HONEST-03, HONEST-04, MODEL-08, CRED-02]
 success_criteria: 5/5
 ---
@@ -181,7 +181,7 @@ named exactly one path. All four cited lines verified and quoted at this commit.
 |---|---|
 | `pytest tests/unit` | **71 failed · 4871 passed · 2 xfailed · 2 xpassed · 0 collection errors** — at the locked ceiling. ⭐ **Node-id set compared against the 71-id baseline file: identical, 0 new, 0 gone.** The `+7` passed is exactly plan 01's 2 and plan 02's 5. |
 | `tsc -p tsconfig.app.json --noEmit` | **65** (base 67), `TS2556` **0**, re-run independently by the orchestrator |
-| `vitest-count-gate.cjs` | see §3a |
+| `vitest-count-gate.cjs` | **`total 8400 · failed 0 · pinned total 7660`** · `count gate OK — 288/288 pinned files present, no per-file decrease, 0 failing.` Re-run **independently by the orchestrator** on the final tree, from the repo root, `GSD_VITEST_MAX_WORKERS=2`, verdict read verbatim. See §3a for why the base reading matters more than this one. |
 | `check-schema-acl-parity.cjs` | exit 0 · `16 / 16` · self-test **10/10** |
 | `check-hot-file-ledger.cjs 252` | `ledger gate OK` — 281 rows · subject **31** files · watched **13** (⛔ not vacuous) |
 | `check-gap-closure-rounds.cjs 252` | `G-7 clear` — 5 plans, **0** gap-closure |
@@ -204,6 +204,17 @@ identical trees.
 grepping each captured run's failure lines, ⛔ never `failed 0` vs `failed 0`. **∅ before, ∅ after.
 This phase added no red.** The cap held at `GSD_VITEST_MAX_WORKERS=2` on every invocation and was
 never touched.
+
+⚠ **The orchestrator then ran the gate a THIRD time, independently, on the final tree** —
+`total 8400 · failed 0 · pinned total 7660 · 288/288`, matching plan 05's post reading exactly. So
+the tally across this phase is **one red sample (D-44a) and three green ones**, all on a tree where
+`sketchComposition.test.tsx` is byte-unchanged. ⛔ **Three greens are still not a fix**, and SEED-171
+is not touched: its own record already shows cap 1 and cap 2 each producing clean *and* red runs on
+byte-identical trees, and one of its suites flaking in isolation with nothing else on the box.
+⭐ **What this does establish is the planning consequence:** `count gate OK` is **not reliably
+reachable on demand**, so an acceptance criterion of *"the gate is green"* can fail for reasons no
+plan controls — which is why every criterion in this phase was written against per-file deltas and
+an explicitly-compared failing SET instead.
 
 ⚠ **Four pre-existing units of count-gate slack were surfaced by the blast radius and closed**, each
 the same class as W-7 — a pin below the real count, so a deleted case keeps the gate green:
