@@ -297,10 +297,12 @@ GRANT INSERT, UPDATE, DELETE ON public.connector_connections TO authenticated;
 -- Runs at the END of full-schema.sql, so every function exists and Supabase's stock
 -- default privileges have already been applied.
 --
--- 13 functions · 30 REVOKEs · 20 GRANTs. The statements below are COPIED from
--- supabase/migrations/181_revoke_public_secdef_functions.sql lines 45-122, group
--- comments and order included — an argument list is part of a function's identity,
--- so nothing here is retyped.
+-- §6a below is migration 181: 13 functions · 30 REVOKEs · 20 GRANTs, COPIED from
+-- supabase/migrations/181_revoke_public_secdef_functions.sql lines 45-122, group comments
+-- and order included — an argument list is part of a function's identity, so nothing here
+-- is retyped — PLUS two `FROM PUBLIC` revokes copied from migration 106 and marked inline.
+-- §6b after it carries three further functions the parity gate found in migrations 012,
+-- 104 and 177. 16 functions in total; the gate, not this comment, is the authority.
 
 -- ═════════════════════════════════════════════════════════════════════════════════════════════
 -- 1 · GROUP A: TRIGGER FUNCTIONS (Revoke from PUBLIC, anon, authenticated; keep service_role)
@@ -331,10 +333,18 @@ GRANT EXECUTE ON FUNCTION public.stale_skill_embedding_from_case() TO service_ro
 -- 2 · GROUP B: TRIGGER FUNCTIONS (Explicit anon/authenticated grants; revoke both)
 -- ═════════════════════════════════════════════════════════════════════════════════════════════
 
+-- ⚠ THE TWO `FROM PUBLIC` LINES BELOW COME FROM MIGRATION 106 (106:146-147), NOT FROM 181.
+--    181 omits them because 106 had already revoked PUBLIC on every live DB. `pg_dump
+--    --no-privileges` loses 106's revoke too, so on a GREENFIELD database the default PUBLIC
+--    grant is still standing and the role revokes below are INERT while it does — migration
+--    177's measured trap, one register over. PUBLIC first, every time.
+REVOKE EXECUTE ON FUNCTION public.autofill_org_id_by_owner()    FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.autofill_org_id_by_owner() FROM anon;
 REVOKE EXECUTE ON FUNCTION public.autofill_org_id_by_owner() FROM authenticated;
 GRANT EXECUTE ON FUNCTION public.autofill_org_id_by_owner() TO service_role;
 
+-- ⚠ migration 106:147 — PUBLIC first (see the note above).
+REVOKE EXECUTE ON FUNCTION public.autofill_org_id_from_parent() FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.autofill_org_id_from_parent() FROM anon;
 REVOKE EXECUTE ON FUNCTION public.autofill_org_id_from_parent() FROM authenticated;
 GRANT EXECUTE ON FUNCTION public.autofill_org_id_from_parent() TO service_role;
@@ -380,3 +390,44 @@ REVOKE EXECUTE ON FUNCTION public.match_skills(vector, uuid, text) FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.match_skills(vector, uuid, text) FROM anon;
 GRANT EXECUTE ON FUNCTION public.match_skills(vector, uuid, text) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.match_skills(vector, uuid, text) TO service_role;
+
+
+-- ============================================================
+-- 6b. Function EXECUTE privileges the parity gate found OUTSIDE migration 181
+-- ============================================================
+-- ⭐ FOUND BY `node scripts/check-schema-acl-parity.cjs` ON ITS VERY FIRST RUN (2026-09-16,
+--    Phase 252 Plan 01 Task 2) — and recorded here rather than quietly folded into §6a, because
+--    the finding is that the mirror gap was WIDER than the migration that prompted it. The phase's
+--    research measured 181 and stopped; the gate scans every migration and named three more
+--    functions whose ACLs NO bootstrap artifact carried:
+--
+--      · public.create_org_with_default_dept(text, text, text)  — migration 104:233-236
+--      · public.resize_embedding_column(integer)                — migration 177:122-127
+--      · public.query_user_documents(text)                      — migration 012:32
+--
+-- ⛔ resize_embedding_column DELETES EVERY VECTOR in document_chunks and skill_embeddings.
+--    BUG-260911-01 found it callable UNAUTHENTICATED in production; migration 177 closed that on
+--    every database that ran it, and a greenfield bootstrap re-opened it. That is this file's
+--    whole failure class, one function over — which is the argument for the gate, not for a
+--    fourth prose note.
+--
+-- ⚠ 012's grant is a WIDENING, not a narrowing, and is mirrored anyway: the rule this file now
+--    enforces is "every function ACL in supabase/migrations/ appears here", with no exception
+--    list. An exception list is a thing that rots; a complete statement of the posture is not.
+--
+-- Copied from the migrations named above, not retyped. Idempotent, like everything else here.
+
+-- migration 104 — org creation RPC: service-role only.
+REVOKE EXECUTE ON FUNCTION public.create_org_with_default_dept(text, text, text) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.create_org_with_default_dept(text, text, text) FROM anon;
+REVOKE EXECUTE ON FUNCTION public.create_org_with_default_dept(text, text, text) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.create_org_with_default_dept(text, text, text) TO service_role;
+
+-- migration 177 — the re-embed path calls this on the service role; nothing else may.
+REVOKE EXECUTE ON FUNCTION public.resize_embedding_column(integer) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.resize_embedding_column(integer) FROM anon;
+REVOKE EXECUTE ON FUNCTION public.resize_embedding_column(integer) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.resize_embedding_column(integer) TO service_role;
+
+-- migration 012 — schema-qualified here; the migration relies on search_path.
+GRANT EXECUTE ON FUNCTION public.query_user_documents(text) TO authenticated;
