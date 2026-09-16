@@ -52,12 +52,31 @@ const useStreamActions = vi.fn((..._a: unknown[]) => ({ stopThread: vi.fn() }))
 // because THIS SUITE renders the REAL `TodosSection`, and that component now asks whether a run is
 // live on the thread it is showing. A mock factory that omits a newly-added export makes every
 // test in the file throw AT MOUNT — the Phase 196 `@/lib/api` lesson, 249 failures in one run.
-// ⚠ AND THIS SUITE IS IN NEITHER COUNT-GATE KNOB, so the gate read 0 failing while these three
-// were red. It was caught by running the panel directory by hand, not by a gate.
+// ⚠ ~~AND THIS SUITE IS IN NEITHER COUNT-GATE KNOB, so the gate read 0 failing while these three
+// were red. It was caught by running the panel directory by hand, not by a gate.~~
+//
+// ⚠ CORRECTED 2026-09-16 (Phase 252-04 / W-6b) — THAT SENTENCE IS MEASURABLY FALSE NOW, AND
+// IT IS STRUCK THROUGH RATHER THAN DELETED BECAUSE IT WAS TRUE WHEN IT WAS WRITTEN AND ITS
+// OWN COMMIT INVALIDATED IT. Measured at `53e2435b7`: `vitest-count-gate.cjs:152` pins this
+// file at `4` and `:4212` lists it in TARGETS — it is in BOTH knobs. And `git log -S` returns
+// ONE commit for both the TARGETS line and the two zero-arity stubs below: **`b0dd02f28`**
+// (*"fix(250): the liveness read short-circuited a hook and crashed the page"*). That commit
+// ADOPTED the suite in the same breath as it authored the errors, so the observation was
+// accurate at the instant of writing and stale by the end of the same diff.
+// ⭐ WHAT ROTTED WAS THE PROSE, NOT THE GATE. The gate did its job; this paragraph simply
+// stopped describing it. Re-derive rather than trust either version of this sentence:
+//   grep -n "WorkspacePanel.derived" scripts/vitest-count-gate.cjs
+//
 // Default is a LIVE run, matching how the rest of this file reads: derived rows mirror tool
 // activity, which only exists while something is running.
-const useStreamingForThread = vi.fn(() => true)
-const useLoadingForThread = vi.fn(() => false)
+//
+// ⚠ W-6 — THE REST PARAMETERS BELOW ARE LOAD-BEARING and were missing for the same reason:
+// the mock factory SPREADS its args into these fns, and a zero-arity stub is a real TS2556
+// spread-argument error. The correct shape was sitting THREE LINES ABOVE, on
+// `useStreamActions`, whose own comment says exactly this. Two of the 67 `tsc -p
+// tsconfig.app.json --noEmit` errors at base were these two lines.
+const useStreamingForThread = vi.fn((..._a: unknown[]) => true)
+const useLoadingForThread = vi.fn((..._a: unknown[]) => false)
 // ⛔ Phase 252-04 (D-21) — THE THIRD ONE, owed for exactly the reason the paragraph above
 // gives. `TodosSection` now also reads `useReconcilingForThread`, and this suite mounts the
 // REAL component: omitting the key throws every test in the file at mount. It was measured

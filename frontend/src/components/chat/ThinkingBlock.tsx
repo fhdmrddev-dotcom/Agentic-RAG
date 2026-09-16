@@ -155,7 +155,14 @@ function toParagraphs(reasoning: string | undefined): string[] {
  * (`formatFloatingElapsed`, whole seconds then `Nm Ns`, null-on-unparseable) are already two
  * near-duplicates, and NEITHER emits this unit — whole seconds with pluralisation, a floor of
  * one, and no minute form. The extraction is OWED, not forgotten:
- * `.planning/seeds/SEED-269-one-home-for-the-elapsed-formatter.md` names all three sites.
+ * `.planning/seeds/SEED-284-one-home-for-the-elapsed-formatter.md` names all three sites.
+ * ⚠ RE-POINTED 2026-09-16 (Phase 252-04 / W-8). This line cited a `SEED-269-…` path that
+ * DOES NOT EXIST: Phase 251's register renumber moved the seed to `SEED-284`, and nothing
+ * updated the one source file that cited it. ⛔ The bare id alone would not have been a fix
+ * — `SEED-269` resolves to an unrelated seed (`…explanations-are-noise…`) plus a
+ * `SEED-269-superseded-id.md`, so a partial repair that changed only the number would have
+ * pointed at the wrong document rather than at none. The whole filename was verified with
+ * `ls` before this edit.
  * ⛔ It is not taken HERE because extracting would edit `RunCard.tsx` and `MessageList.tsx`,
  * and neither is in this plan's `files_modified` — so neither would receive the ledger row +
  * section update D-243-07 requires in the same commit, and the ledger gate reads
