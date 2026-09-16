@@ -3,14 +3,42 @@ gsd_state_version: 1.0
 milestone: v4.2
 milestone_name: The Connected Knowledge You Can Actually Run
 status: executing
-last_updated: "2026-09-16T18:11:09.507Z"
-last_activity: 2026-09-15 -- Phase 251 planning complete
+last_updated: "2026-09-16T23:59:00.000Z"
+last_activity: 2026-09-16 -- /gsd:discuss-phase 253 complete. 253-CONTEXT.md + 253-DISCUSSION-LOG.md written (bb31214f1); 23 decisions over 4 areas. SEED-266 arm (a) FOLDED into 253, arms (b)/(c) left open; register re-run green (296/296). Next action: /gsd:plan-phase 253.
+# ⚠ RECONCILED 2026-09-16 (251-04). Wave 1 flagged this block as internally inconsistent and
+#   Waves 2 and 3 carried the finding forward unfixed. The values it held were:
+#     total_phases: 12 · completed_phases: 1 · total_plans: 19 · completed_plans: 9 · percent: 8
+#   ⛔ EVERY ONE OF THOSE FIVE WAS WRONG, and they were wrong in DIFFERENT ways, which is why
+#   no single "off by one" reading explains them. v4.2 has FIVE phases (247-251), not 12 — the 12
+#   is inherited from an earlier milestone and was never reset. `completed_phases: 1` stood while
+#   FOUR phases carried a `*-VERIFICATION.md` on disk. And `percent: 8` agreed with neither its own
+#   numerator (1/12 = 8%) nor the ROADMAP, which read `4 / 5` at the same moment.
+#   ⭐ Re-derived from the phase directories, never from a summary line — the same rule the
+#   ROADMAP Progress table states about itself and had also stopped obeying.
 progress:
-  total_phases: 14
-  completed_phases: 3
+  total_phases: 7
+  completed_phases: 6
   total_plans: 24
-  completed_plans: 15
-  percent: 21
+  completed_plans: 24
+  percent: 86
+# ⚠ MOVED 2026-09-16 (milestone audit). It read `5 / 5 · 100%` and that was TRUE of the phases
+#   as they existed. `.planning/v4.2-MILESTONE-AUDIT.md` closed `gaps_found` — 4 blockers,
+#   9 warnings, flows 1/3, integration 16/22 — and added **Phase 252** to close them, so the
+#   denominator is 6. ⛔ The five closed phases are NOT reopened; 252 is a new sixth phase.
+# ✅ UPDATED 2026-09-16 at Phase 252 close: 6 / 6 phases, 24 / 24 plans, 100%.
+#   ⚠ total_plans moved 19 -> 24, which is 252 own five -- not a re-count of the others.
+#   ⛔ 100% is a statement about PLANS EXECUTED, never about the milestone being closeable:
+#   DEBT-06 is the one requirement outstanding, BUS-246/247/248 are owed operator rulings,
+#   and 252 itself closed self-verified with independent_review: owed (BUS-256).
+# ✅ UPDATED 2026-09-16 at Phase 253 discuss: total_phases 6 -> 7. 253 is the code-review phase
+#   added from 252-REVIEW.md CR-01/02/03/08; completed_phases and the plan counts are UNCHANGED
+#   because 253 has no plans yet. ⛔ percent drops 100 -> 86 and that is the number MOVING IN THE
+#   HONEST DIRECTION -- 100% was only ever a statement about plans executed.
+# ⚠ THE state.* SDK VERBS CORRUPTED THIS FILE AGAIN, 2026-09-16, and the banner above predicted it.
+#   `state.record-session` returned `recorded: false` ("No session fields found") and then the
+#   `commit` verb rewrote the file anyway (57093cea7): last_activity reverted to 2026-09-15,
+#   progress reset to 14/3/24/15/21, and the RECONCILED comment block was DELETED. Restored from
+#   57093cea7^ and hand-edited. ⛔ Hand-edit. Do not call state.* -- this is the sixth occurrence.
 ---
 
 # Project State
@@ -37,6 +65,8 @@ Phases **247+**. Phases 247, 248, **249** and **250** closed. Requirements: `.pl
 ⭐ **PHASE 252 IS CLOSED — 2026-09-16, 5 / 5 success criteria, 21 commits, `252-VERIFICATION.md`.** The paragraph above is kept verbatim rather than rewritten, because two of its sentences were REFUTED by the phase they pointed at. ⛔ **It said `BUG-260915-01`'s fix is "a trigger change in `StreamsProvider.tsx`" — measured false**: `setViewingThread` already fires `reconcile` (`:1936-1942`), so candidate #1 was already shipped and building it would have been a no-op. The real hole was that `reconcile` set no loading signal at all, plus a **global** in-flight lock; the report is corrected and the fix is per-thread. ⛔ **And "v4.2 is complete on code" was true of every phase read alone and false of the five read together** — which is the finding the audit made and 252 discharged. ⭐ **252 refuted SEVEN inherited claims, three of them in its own planning documents**, including a B-2 test probe that was a **FALSE GREEN**: `logging_sink.py` redacts the `sk-` shape before `caplog` sees it, so the leak assertion passed *before* the fix. ⭐ Its new `check-schema-acl-parity.cjs` fired for real on run one and found `resize_embedding_column` — the RPC `BUG-260911-01` found callable unauthenticated in production, which NULLs every vector — unmirrored, so **every greenfield deploy re-opened it**. ⛔ **`DEBT-06` is NOT ticked by 252**, which the ROADMAP itself called a `DEBT-06` row: it closed `self-verified` with `independent_review: owed`, and the request is posted at **`BUS-256`**. **Next action: `/gsd:code-review 252`**, then `/gsd:complete-milestone` once the operator rules on `BUS-246` / `BUS-247` / `BUS-248`. ⛔ Still owed and named rather than omitted: the live **G-4 S2** row, migration **181 not applied to cloud** (`CRED-04`'s `get_advisors(security)` at promotion confirms it), and `connectors.py`'s extraction at its **seventh** landing.
 
 ⭐ **`/gsd:code-review 252` RAN 2026-09-16 — `252-REVIEW.md` (`86bed4d09`), 14 findings: 2 critical, 9 warning, 3 info.** The paragraph above is kept rather than rewritten. ⛔ **Its `Next action: /gsd:code-review 252` is DISCHARGED, and the review did not come back clean.** ⚠ **Both criticals were re-verified by the orchestrator by hand rather than relayed, and both hold.** **CR-01** — `grep -c connector_tokens scripts/full-schema-supplement.sql` → **0**, while `129:85` and `151:90` both carry `REVOKE ALL ON TABLE public.connector_tokens FROM anon, authenticated`; in `full-schema.sql` the table appears 27 times, **all `COMMENT ON`, zero `GRANT`/`REVOKE`** — so a **greenfield** deploy is born with the OAuth ciphertext readable by any org member. The supplement's `connector_connections` column grant is also **five columns behind** `_TABLE_SELECTABLE_KEYS` (16 vs 19 — `auth_type`, `status`, `error_message`, `default_approval_posture`, `default_ingest_visibility`), so every connector list read is `42501` on a fresh DB. ⭐ **Local and production are unaffected — they were built by replaying migrations.** **CR-02** — the parity gate 252 shipped **cannot fail on a partial revoke**: deleting one `REVOKE EXECUTE ON FUNCTION public.resize_embedding_column(integer) FROM PUBLIC;` line left the shipped `analyse()` printing `missing: 0 []`. ⛔ **CR-01 PRE-DATES 252 and is not its regression** — what 252 added is a §6 header claiming *"table OR function"* over a gate enforcing only functions. **Phase 253 is added to the ROADMAP for CR-01/CR-02/CR-03/CR-08** (`2c737c205`); G-7 was checked and is **clear** (252 ran zero gap-closure plans), so this is a phase, not a round. The nine behavioural findings (CR-04..07, CR-09..11) are **G-3 `/gsd:fast` sized** and are deliberately NOT in 253. **Next action: rule on `BUS-246` / `BUS-247` / `BUS-248`, then `/gsd:discuss-phase 253`.** ⛔ `/gsd:complete-milestone` is still blocked on those three rulings and on `DEBT-06`.
+
+⭐ **`/gsd:discuss-phase 253` COMPLETE — 2026-09-16, `253-CONTEXT.md` + `253-DISCUSSION-LOG.md` (`bb31214f1`).** 23 decisions across four areas, every option preserved in the log. ⛔ **Its `Next action: /gsd:discuss-phase 253` above is DISCHARGED; the `BUS-246`/`247`/`248` rulings are separately recorded as ruled and do not block 253.** ⭐ **The discussion MEASURED the blast radius rather than inheriting CR-01's, and it is WIDER than the review states**: only **7** tables carry table/column ACL statements across every migration (25 statements), and **six of the seven are mirrored in NEITHER bootstrap artifact** — `connector_tokens`, `connector_watches`, `connector_watch_items`, `connector_sync_runs`, `user_settings`, `app_settings`. ⛔ **The last two are the exact tables `BUG-260911-01` found in production with RLS disabled and `anon` holding all privileges.** All seven are mirrored, no exception list (D-16). ⭐ **SC#1's "as `authenticated`" arm gets a real database**: `scripts/check-greenfield-privileges.py` builds a scratch DB on the running local Postgres via asyncpg (never `supabase db reset`), replays the stock preamble **derived at runtime from `pg_default_acl`** — measured pristine, since **no migration anywhere runs `ALTER DEFAULT PRIVILEGES`** — and asserts as `authenticated`. ⚠ A harness that omits that preamble is a **FALSE GREEN** and is named in D-03 so it is rejected deliberately. ⛔ **Two plans, SERIAL** (D-20) — worktree rule 4 binds: the harness mutates the shared local cluster. ⛔ **`DEBT-06`: the gemini review item is filed AT PLAN TIME, not at close** (D-21) — gemini already holds 8 open items filed today, and a close-time item would be ninth in line and this would be the **fifth** consecutive `self-verified` close. ⚠ **REG-02's sweep could NOT run at discuss time** — `check-seeds-register.cjs --phase 253` exits `FATAL: no phase directory matches` because it matches against `files_modified` in PLAN.md files that do not exist yet; **it must be re-run at `/gsd:plan-phase 253`.** A manual grep was done instead and folded `SEED-266` arm (a). **Next action: `/gsd:plan-phase 253`.**
 
 ⭐ **AND THE SESSION THAT RAN THAT REVIEW FOUND TWO MORE, BOTH OPERATOR-DIRECTED AND BOTH ABOUT LOCAL MODELS.** `SEED-289` + `BUG-260916-01`, planted 2026-09-16. ⛔ **They are ONE story and belong in ONE phase: the app substitutes a GUESS for the operator's own configuration, on the same model set, twice.** (1) **`SEED-289` — tools OFF by default on a guess.** Measured through the shipped `_tools_lost_model_ids`: **15 of 94 configured models** run with native tool calling off, and **13 of them only because nothing has a registry row**, so `config.py:594` infers False from the provider. ⭐ **The operator's direction is *default ON unless we can know otherwise*, and we CAN know** — OpenRouter's `supported_parameters` is **already parsed** by `_extract_caps_openrouter` and simply never reaches the resolver; Ollama's `/api/show` returns `capabilities:["tools"]`; LM Studio's `/api/v0/models` returns `capabilities.trained_for_tool_use`. ⭐ **And `custom` is not a fourth server — it is Ollama or LM Studio behind a tunnel**, so the probe is by SHAPE and **no guessing tier remains**. ⛔ ON-by-default is safe ONLY with the third part: Ollama refuses with a specific catchable **400 `does not support tools`**, so catch it, retry once without tools, and write `native_tools=false` onto the row — asked once, never again. ⛔ The probe must NOT widen `PROVIDER_ENDPOINTS`; that is the SSRF allowlist and self-hosted providers are absent from it on purpose. (2) **`BUG-260916-01` — a timeout above 600s is accepted and cannot take effect.** `get_llm_client` (`openai_service.py:1251`) passes **no `timeout=` and no `max_retries=`**, so `openai==2.28.0`'s `DEFAULT_TIMEOUT(read=600)` and `DEFAULT_MAX_RETRIES=2` bind while admin accepts **`[1, 3600]`**. ⭐ **The operator had already hit it and worked around it** — three of their six LM Studio rows read **900** and get **600**; the other 13 local models have no row and run on the **300s** inferred default. ⚠ **`BUS-246` carried this as `SEED-172` #2 and blamed httpx — httpx's own default is 5s, the 600 is the SDK's.** A number right for a wrong reason stayed open either way. ⛔ **Neither is in Phase 253's scope** (253 is the schema-ACL gap and nothing else); both are sized as ONE phase after it.
 
@@ -143,13 +173,11 @@ cannot SEE line-ending damage; this is the same fact producing a **false positiv
 false negative. Recorded in `251-VERIFICATION.md` → *Method note*.
 
 ⭐ **THE REGISTER IS GREEN — verdict line verbatim, after 251-04:**
-
 ```
   register: 293 files · parsed: 293 · skipped: 0 · duplicate ids: 0
   unswept:  134 carry no trigger_when at all · 114 carry prose but no structured trigger
 seeds register gate OK — 293/293 parsed, 0 duplicate ids, 293/293 carry all 5 required keys.
 ```
-
 exit **0** · `--self-test` **8 / 8 arms PASS** (6/6 after 251-03; two arms added by 251-04, and
 **both had been SEEN to fail first**). ⚠ **`293`, up from 292 by exactly one** — `SEED-286`, planted
 by the bus triage's third arm. **No other file entered or left the register.**
@@ -162,14 +190,12 @@ by the bus triage's third arm. **No other file entered or left the register.**
    stubs.length === 1`. **Driven RED against a planted trio before the fix**, and the same drive is
    now self-test arm `1c`. ⚠ This required editing `scripts/`, which Plan 03 was forbidden (D-17) —
    recorded as a deviation rather than slipped in.
-
 2. ⛔ **`[id-in-heading]` ADDED, and it caught a real file on its first run.** Plan 03 found four
    renumbered seeds still titling themselves with the old id and recorded that the gate greps
    `seed_id:` and never headings. The new code fires **only on a disagreement**: measured across the
    live register, **221 headings match, 42 name no id, 28 files have no `# ` line** — failing those
    70 would buy nothing. **Exactly one disagreed: `SEED-068`, titled `# SEED-063` since a v2.8
    renumber.** Corrected in the same commit, provably one line.
-
 3. ⛔ **The wiring was proven by EXECUTION, not by `grep`.** A step that merely NAMES the sweep
    satisfies `grep -rn "check-seeds-register"` and fires nothing — driven: with the fence replaced by
    a prose mention, the grep still hits and **zero runnable calls remain**. ⭐ **This is the third
@@ -179,14 +205,11 @@ by the bus triage's third arm. **No other file entered or left the register.**
 
 - **The sweep is CALLED**, not merely written: `discuss-phase.md` `<step name="cross_reference_seeds">`
   and `new-milestone.md` §2.5, which no longer instructs a human to read every seed by hand.
-
 - **The operator's queue is a number they see at every session start.** The SessionStart hook prints
   `5 open to:operator, oldest 15 days · 26 open to:gemini · 1 open to:claude`, and **prints nothing at
   all when both queues are empty** — the silence contract was kept, not traded.
-
 - **`age_days` has ONE home** (`scripts/lib/bus-age.sh`). Two copies existed and had already diverged;
   a third was not written.
-
 - ⚠ **Three VENDORED framework files now carry project edits** (`.claude/get-shit-done/` at v1.42.3):
   `workflows/discuss-phase.md`, `workflows/new-milestone.md`, `workflows/plant-seed.md`. They are
   recorded by path in CLAUDE.md beside the G-7 entry **so a future `chore(gsd)` update can re-apply
@@ -197,14 +220,11 @@ by the bus triage's third arm. **No other file entered or left the register.**
 - **`DEBT-06` is the one v4.2 requirement outstanding**, and its box was **left unticked with the
   reason written down** while the other 25 were ticked against a named artifact. No independent §6.3
   review has run for 238/240/241, and 249 and 250 closed `self-verified`.
-
 - **Six bus items await the operator** — `BUS-040/208/246/247/248` and `BUS-171` itself.
   ⛔ **Claude wrote nothing to the bus**; `git diff --name-only .agent-bus/` is EMPTY across the whole
   plan. The `answer` / `close` commands ship pre-filled in `251-BUS-TRIAGE.md`.
-
 - ⚠ **`SEED-286` is new and unrouted** — a chat thread's KB folder scope cannot be changed once the
   thread starts. Found in `BUS-040`, held by **nothing** for 16 days.
-
 - ⚠ **The register is still largely unswept, by design**: `134 carry no trigger_when at all · 114
   carry prose but no structured trigger`. D-18 requires **both** figures and forbids summing them.
   This phase built the instrument and wired it; **it did not shrink the backlog**, and the box means
@@ -219,13 +239,11 @@ it wires the sweep into the two GSD touchpoints.
 Status: Ready to execute 251-04
 
 ⭐ **THE REGISTER IS GREEN FOR THE FIRST TIME — verdict line verbatim, after 251-03:**
-
 ```
   register: 292 files · parsed: 292 · skipped: 0 · duplicate ids: 0
   unswept:  134 carry no trigger_when at all · 114 carry prose but no structured trigger
 seeds register gate OK — 292/292 parsed, 0 duplicate ids, 292/292 carry all 5 required keys.
 ```
-
 exit **0** · `--self-test 6/6 arms PASS`. ⚠ **`134` is up from `126` by exactly the eight stubs, and
 that is CORRECT** — a stub carries `trigger_when: unset`, which the gate counts as no trigger.
 Reporting `126` would mean it had stopped counting eight real files.
