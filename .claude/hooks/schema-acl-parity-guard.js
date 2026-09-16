@@ -51,19 +51,50 @@ const SUBJECTS = [
   /supabase\/full-schema\.sql$/,
 ];
 
+/**
+ * Every path a PostToolUse payload can carry, not just the first one anybody thought of (WR-02).
+ *
+ * ⛔ A `MultiEdit` payload puts its path in `tool_input.edits[].file_path`. The shipped
+ *    extraction read `tool_input.file_path || tool_input.filePath` only, so a MultiEdit whose
+ *    top-level `file_path` is absent yielded `''` and the hook exited 0 in silence — and
+ *    silence from this hook reads as "the gate is clear".
+ *
+ * ⚠ MEASURED AT 253-03, AND IT CORRECTS THAT PLAN'S OWN CLAIM: the plan predicted BOTH
+ *   MultiEdit shapes were silent today. Driven with the defect planted, the shape carrying a
+ *   top-level `file_path` ALONGSIDE `edits[]` already fired (2615 bytes, gate_exit=1) — only
+ *   the `edits[]`-ONLY shape read 0 bytes. So the two halves of WR-02 have two independent
+ *   causes: this extraction, and the `.claude/settings.json` matcher that never dispatches
+ *   MultiEdit here at all. Fixing one without the other fixes nothing in a live session.
+ */
+function pathCandidates(toolInput) {
+  if (!toolInput || typeof toolInput !== 'object') return [];
+  const edits = Array.isArray(toolInput.edits) ? toolInput.edits : [];
+  return [
+    toolInput.file_path,
+    toolInput.filePath,
+    toolInput.notebook_path,
+    ...edits.map((e) => e && e.file_path),
+    ...edits.map((e) => e && e.filePath),
+  ].filter((p) => typeof p === 'string' && p.length > 0);
+}
+
 let raw = '';
 process.stdin.on('data', (d) => (raw += d));
 process.stdin.on('end', () => {
-  let filePath = '';
+  let candidates = [];
   try {
     const input = JSON.parse(raw || '{}');
-    filePath = (input.tool_input && (input.tool_input.file_path || input.tool_input.filePath)) || '';
+    candidates = pathCandidates(input.tool_input);
   } catch {
     process.exit(0); // never break the turn on a parse failure
   }
 
-  const norm = String(filePath).split(path.sep).join('/');
-  if (!SUBJECTS.some((re) => re.test(norm))) process.exit(0);
+  // Exit 0 only when NO candidate is a subject. `norm` reports the one that triggered the run,
+  // so the emitted payload still names what caused it.
+  const norm = candidates
+    .map((p) => String(p).split(path.sep).join('/'))
+    .find((p) => SUBJECTS.some((re) => re.test(p)));
+  if (!norm) process.exit(0);
 
   const root = process.env.CLAUDE_PROJECT_DIR || process.cwd();
   const gate = path.join(root, 'scripts', 'check-schema-acl-parity.cjs');
