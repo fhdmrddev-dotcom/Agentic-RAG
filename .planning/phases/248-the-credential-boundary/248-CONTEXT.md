@@ -379,6 +379,11 @@ production write. Cloud application of migration 181 is a separate operator-appr
   **REQUIREMENTS.md's CRED-02 citation resolves to the CLOSED, wrong one.** Two further duplicate ids
   exist: `BUG-260528-01`, `BUG-260906-01`. → **Phase 251 (Register Integrity, REG-01/REG-02)** is the
   natural home; fix the CRED-02 citation in-phase as a one-line correction since 248 depends on it.
+  ⭐ **RESOLVED AT PHASE 252 Plan 01 (D-36), two phases after this note found it** — the open
+  grant-override report is now `BUG-260828-11-grant-override-marker-claims-a-person-changed-it.md`
+  and the closed workflow-input report keeps `-02`, because it is the one that is cited (in
+  `v3.9-ROADMAP.md`, three `214.1-*` artifacts and eight source/test files). ⚠ `BUG-260528-01` and
+  `BUG-260906-01` are still duplicated — named here so they stay re-openable.
 - **The 3 `rls_enabled_no_policy` INFO findings** (`app_settings`, `operator_audit_log`,
   `operator_users`). ⚠ Migration 177 states the last two are deliberately fail-closed by Phase 146's
   design and that giving them policies would **weaken** them. Out of scope; if ever revisited, the

@@ -1,22 +1,46 @@
 ---
-id: BUG-260828-02
+id: BUG-260828-11
 title: "\"You changed this\" appears on grants written by migration 128's backfill, which no person can have set"
 reported: 2026-08-28
 surface: Agentic-RAG
 severity: minor
-status: open
+status: closed
 affected_areas: [frontend/settings, connections, migrations]
-folded_into: null
-verified_closed_by: null
+folded_into: 248
+verified_closed_by: 248
 related_seeds: []
 re_open_trigger: null
+previous_id: BUG-260828-02
 reproduces_on:
   branch: develop
   commit: 5bbfa24aa
   date: 2026-08-28
 ---
 
-# BUG-260828-02: The override marker claims authorship the app cannot know
+# BUG-260828-11: The override marker claims authorship the app cannot know
+
+> ⚠ **THIS REPORT PREVIOUSLY CARRIED `BUG-260828-02`, AND SO DOES ANOTHER ONE.** Two different bugs
+> shared the id. `248-CONTEXT.md:376` found the collision on 2026-09-14, routed it to Phase 251, and
+> it was still unfixed at the v4.2 audit — so `REQUIREMENTS.md`'s `CRED-02` citation had to be
+> rewritten to cite this file **by path** because the bare id resolved by filename to the wrong bug.
+> Renamed here at Phase 252 Plan 01 (D-36).
+>
+> ⭐ **THE OTHER REPORT KEEPS `-02`**
+> (`BUG-260828-02-no-authoring-surface-can-declare-a-workflow-input.md`) because it is the one that
+> is CITED: `verified_closed_by: 214.1`, named in `v3.9-ROADMAP.md`, in three `214.1-*` planning
+> artifacts and in eight source/test files. Renaming the cited one would have produced dangling
+> citations in code; renaming this one produced none — measured, before and after.
+>
+> ⛔ `BUG-260828-01` … `-10` are all taken, so `-11` is the next free id on that date.
+
+> ⭐ **CLOSED BY PHASE 248 (2026-09-16).** The headline defect — *"You changed this"* — was already
+> gone: `GRANTS_COPY.OVERRIDDEN_LABEL` is `""` (`grantsVocabulary.ts`, deleted at `e615c0dad`). What
+> this report also named, the **affordance** that framed a backfill as an undo of a human choice,
+> is closed too: the reset now reads *"Follow the default instead"*, and
+> `ConnectionGrantsList.test.tsx` asserts the **rendered DOM text** (9/9) rather than block
+> presence — a presence assertion cannot see content drift. Evidence:
+> `.planning/phases/248-the-credential-boundary/248-VERIFICATION.md` (`status: complete`,
+> `verification_mode: peer-reviewed`), and `REQUIREMENTS.md` `CRED-02`.
 
 ## What we observed
 
