@@ -26,9 +26,12 @@
 --   auth     -> migration 001 (on_auth_user_created)
 --   realtime -> migrations 002 (documents), 014 (folders), 032 (messages)
 --   ACLs     -> migration 118 (connector_connections.secret_ciphertext column grant,
---               CR-01). pg_dump runs with --no-privileges, so ANY migration that
---               narrows a table privilege must be mirrored here or it is absent from
---               every greenfield bootstrap.
+--               CR-01); migration 181 (function EXECUTE on 13 SECURITY DEFINER
+--               functions, CRED-03 -- guarded by scripts/check-schema-acl-parity.cjs,
+--               which FAILS when a migration's function ACL is not mirrored below).
+--               pg_dump runs with --no-privileges, so ANY migration that narrows a
+--               table OR function privilege must be mirrored here or it is absent
+--               from every greenfield bootstrap.
 -- ============================================================
 
 
@@ -257,3 +260,123 @@ GRANT SELECT (
 -- path runs on the user-JWT client and must be able to store an `enc:v1:` envelope.
 -- A role may INSERT into and UPDATE a column it can never SELECT.
 GRANT INSERT, UPDATE, DELETE ON public.connector_connections TO authenticated;
+
+
+-- ============================================================
+-- 6. Function EXECUTE privileges (migration 181 / Phase 248, CRED-03)
+-- ============================================================
+-- ⚠ WHY THIS LIVES HERE RATHER THAN IN THE DUMP: regenerate-full-schema.sh runs
+--    `pg_dump --no-privileges` (scripts/regenerate-full-schema.sh:104), so a dump
+--    can NEVER carry a function grant. Migration 181 is therefore INVISIBLE to the
+--    generated schema: its 13 functions survive, its 30 REVOKEs do not. A greenfield
+--    project bootstrapped from full-schema.sql alone ships every one of them with the
+--    default PUBLIC EXECUTE grant — anon-executable over PostgREST — which is exactly
+--    the advisor finding 181 exists to close.
+--
+-- ⭐ THIRD RECURRENCE OF ONE CLASS. full-schema.sql documents this failure verbatim
+--    for migration 118 (the §5 header directly above); §5 is that fix; and the
+--    MAINTENANCE note at the top of this file already told maintainers to mirror ACLs.
+--    181 reproduced it anyway.
+--    ⛔ So this section is guarded by `scripts/check-schema-acl-parity.cjs`, which FAILS
+--    when a migration grants or revokes EXECUTE on a function this file does not mirror.
+--    A prose instruction is what did not work twice; do not add a fourth.
+--
+-- ⚠ ORDER IS LOAD-BEARING: `anon` INHERITS from PUBLIC, so `REVOKE … FROM anon` changes
+--    nothing while the PUBLIC grant stands (measured in migration 177). PUBLIC is
+--    revoked first, every time.
+--
+-- ⚠ TRIGGER FUNCTIONS ARE SAFE TO REVOKE. PostgreSQL checks EXECUTE at CREATE TRIGGER
+--    time, not at trigger-execution time (empirically verified against local Postgres,
+--    BUS-235 / TM-248-03). Revoking does NOT break INSERT/UPDATE or signup; it blocks
+--    direct invocation via /rest/v1/rpc/<trigger_fn>.
+--
+-- ⛔ NO TRANSACTION WRAPPER HERE. The migration wraps itself; the supplement is pasted
+--    inside whatever transaction the operator is running and no other section opens one.
+--
+-- Idempotent, like everything else in this file: REVOKE and GRANT are.
+-- Runs at the END of full-schema.sql, so every function exists and Supabase's stock
+-- default privileges have already been applied.
+--
+-- 13 functions · 30 REVOKEs · 20 GRANTs. The statements below are COPIED from
+-- supabase/migrations/181_revoke_public_secdef_functions.sql lines 45-122, group
+-- comments and order included — an argument list is part of a function's identity,
+-- so nothing here is retyped.
+
+-- ═════════════════════════════════════════════════════════════════════════════════════════════
+-- 1 · GROUP A: TRIGGER FUNCTIONS (Revoke from PUBLIC, anon, authenticated; keep service_role)
+-- ═════════════════════════════════════════════════════════════════════════════════════════════
+
+REVOKE EXECUTE ON FUNCTION public.capture_skill_version() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.capture_skill_version() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.capture_skill_version() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.capture_skill_version() TO service_role;
+
+REVOKE EXECUTE ON FUNCTION public.handle_new_user() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.handle_new_user() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.handle_new_user() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.handle_new_user() TO service_role;
+
+REVOKE EXECUTE ON FUNCTION public.stale_skill_embedding() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.stale_skill_embedding() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.stale_skill_embedding() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.stale_skill_embedding() TO service_role;
+
+REVOKE EXECUTE ON FUNCTION public.stale_skill_embedding_from_case() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.stale_skill_embedding_from_case() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.stale_skill_embedding_from_case() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.stale_skill_embedding_from_case() TO service_role;
+
+
+-- ═════════════════════════════════════════════════════════════════════════════════════════════
+-- 2 · GROUP B: TRIGGER FUNCTIONS (Explicit anon/authenticated grants; revoke both)
+-- ═════════════════════════════════════════════════════════════════════════════════════════════
+
+REVOKE EXECUTE ON FUNCTION public.autofill_org_id_by_owner() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.autofill_org_id_by_owner() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.autofill_org_id_by_owner() TO service_role;
+
+REVOKE EXECUTE ON FUNCTION public.autofill_org_id_from_parent() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.autofill_org_id_from_parent() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.autofill_org_id_from_parent() TO service_role;
+
+
+-- ═════════════════════════════════════════════════════════════════════════════════════════════
+-- 3 · GROUP A: RLS HELPERS & APP RPCs (Revoke from PUBLIC & anon; grant authenticated & service_role)
+-- ═════════════════════════════════════════════════════════════════════════════════════════════
+
+-- RLS helpers
+REVOKE EXECUTE ON FUNCTION public.current_user_org_ids() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.current_user_org_ids() FROM anon;
+GRANT EXECUTE ON FUNCTION public.current_user_org_ids() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.current_user_org_ids() TO service_role;
+
+REVOKE EXECUTE ON FUNCTION public.connection_doc_is_visible(uuid, text) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.connection_doc_is_visible(uuid, text) FROM anon;
+GRANT EXECUTE ON FUNCTION public.connection_doc_is_visible(uuid, text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.connection_doc_is_visible(uuid, text) TO service_role;
+
+REVOKE EXECUTE ON FUNCTION public.current_user_has_permission(uuid, text) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.current_user_has_permission(uuid, text) FROM anon;
+GRANT EXECUTE ON FUNCTION public.current_user_has_permission(uuid, text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.current_user_has_permission(uuid, text) TO service_role;
+
+REVOKE EXECUTE ON FUNCTION public.folder_is_org_shared(uuid) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.folder_is_org_shared(uuid) FROM anon;
+GRANT EXECUTE ON FUNCTION public.folder_is_org_shared(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.folder_is_org_shared(uuid) TO service_role;
+
+-- App search RPCs
+REVOKE EXECUTE ON FUNCTION public.keyword_search_chunks(text, uuid, integer, jsonb, uuid[]) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.keyword_search_chunks(text, uuid, integer, jsonb, uuid[]) FROM anon;
+GRANT EXECUTE ON FUNCTION public.keyword_search_chunks(text, uuid, integer, jsonb, uuid[]) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.keyword_search_chunks(text, uuid, integer, jsonb, uuid[]) TO service_role;
+
+REVOKE EXECUTE ON FUNCTION public.match_document_chunks(vector, uuid, integer, double precision, jsonb, uuid[], text) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.match_document_chunks(vector, uuid, integer, double precision, jsonb, uuid[], text) FROM anon;
+GRANT EXECUTE ON FUNCTION public.match_document_chunks(vector, uuid, integer, double precision, jsonb, uuid[], text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.match_document_chunks(vector, uuid, integer, double precision, jsonb, uuid[], text) TO service_role;
+
+REVOKE EXECUTE ON FUNCTION public.match_skills(vector, uuid, text) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.match_skills(vector, uuid, text) FROM anon;
+GRANT EXECUTE ON FUNCTION public.match_skills(vector, uuid, text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.match_skills(vector, uuid, text) TO service_role;
