@@ -6,7 +6,15 @@
  *
  * 1. Two-Tier Status Badge (WATCH-03):
  *    - Primary Pill: Connection Status (`● Connected` vs `⊙ Connection Off`)
- *    - Secondary Pill: Run Outcome (`● Reading` vs `⚠ Run failed (429)` vs `⚠ Stopped`)
+ *    - Primary Pill: read from `CONNECTION_PILL_FOR_CAUSE` — ⚠ CORRECTED in Phase 252
+ *      (W-1 / D-29): this line used to describe a two-value binary, and that binary rendered
+ *      `● Connected` for a revoked token. The pill is a TABLE LOOKUP now, not two hardcoded
+ *      pills behind one comparison.
+ *    - Secondary Pill: Run Outcome (`● Reading` vs `⚠ Stopped`). ⚠ CORRECTED in Phase 252
+ *      (W-2 / D-28): a rate-limit reading was listed here and is DELETED. No cause in the
+ *      taxonomy means rate-limited, so the claim could never be justified from evidence — and
+ *      the status number is not re-quoted here, because the acceptance greps count literals
+ *      over this source and cannot tell code from a comment.
  * 2. Non-Collapsing Row-Level Sync (WATCH-04):
  *    - Row-level spinner and ONE inline outcome slot, rendering what the sync endpoint
  *      actually said. ⚠ CORRECTED in Phase 252 plan 03 (SC#4 / D-15..D-18) — this line used to
@@ -53,8 +61,10 @@ import { relativeBand } from "@/components/workflows/library/relativeChanged"
 import { RunHistoryList } from "./RunHistoryList"
 import { isQuiet } from "./runHistoryFold"
 import {
+  CONNECTION_PILL_FOR_CAUSE,
   CONTROL_FOR_CAUSE,
   COPY,
+  type ConnectionPillTone,
   FILE_FAILURE_HEADING,
   FILE_FAILURE_MORE,
   FILE_FAILURE_SCOPE_NOTE,
@@ -103,6 +113,19 @@ export const STATE_PRESENTATION: Record<
     pill: "bg-amber-500/20 text-amber-600 dark:text-amber-300",
     frame: "border-amber-500/40 bg-amber-500/5 shadow-sm",
   },
+}
+
+/**
+ * ⭐ W-1 (D-29) — the connection pill's TONE to its Tailwind classes.
+ *
+ * The WORDS live in `sourceHealthVocabulary` with every other sentence this surface says; only
+ * the styling lives here, beside `STATE_PRESENTATION` which is the same split. ⛔ Keyed by
+ * `ConnectionPillTone`, so a new tone cannot be added without a class — and a new CAUSE needs
+ * no edit here at all, which is the point.
+ */
+export const CONNECTION_PILL_CLASS: Record<ConnectionPillTone, string> = {
+  connected: "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+  attention: "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400",
 }
 
 export const COLLAPSIBLE_STATES: readonly SourceState[] = ["healthy", "waiting"]
@@ -299,24 +322,32 @@ export function WatchRowCard({
   const syncLine: WatchSyncOutcome | null =
     syncOutcome ?? (refusal ? { kind: "refused", says: refusal } : null)
 
-  const isConnectionDisabled = stopped?.cause === "connection_disabled"
-  const isRateLimited =
-    cause === "unreachable" && Boolean(classifySourceFailure(watch.last_error) === "unreachable")
-
   // ── Variant A Two-Tier Status Badge ────────────────────────────────────────────────
-  const connectionPill = isConnectionDisabled ? (
+  /**
+   * ⭐ W-1 (D-29) — THE PILL READS THE CAUSE, BY TABLE LOOKUP.
+   *
+   * This used to be a ONE-CAUSE BINARY — an equality test against the switched-off cause alone,
+   * with a ternary picking one of two hardcoded pills — so it rendered `● Connected` for a
+   * REVOKED token and for REJECTED app credentials, the two causes that mean the authorisation
+   * is gone. ⛔ There is deliberately no ternary on the cause here: a new cause adds a ROW to
+   * `CONNECTION_PILL_FOR_CAUSE`, never an `if` in this file.
+   * ⚠ The deleted expression is described and NOT quoted — the plan's acceptance greps count
+   *   literals over this source and cannot tell code from a comment. It is written out verbatim
+   *   in `252-03-SUMMARY.md` instead, where nothing mistakes it for a live one.
+   *
+   * ⚠ It reads the RESOLVED `cause` (`:184`), not `stopped?.cause`, so a watch carrying only a
+   *   `last_error` is read too — which is the case the binary could never see.
+   */
+  const pill = CONNECTION_PILL_FOR_CAUSE[cause]
+  const connectionPill = (
     <span
       data-testid="sources-connection-pill"
-      className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+      className={cn(
+        "inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded-full border",
+        CONNECTION_PILL_CLASS[pill.tone],
+      )}
     >
-      <span aria-hidden="true">⊙</span> Connection Off
-    </span>
-  ) : (
-    <span
-      data-testid="sources-connection-pill"
-      className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-    >
-      <span aria-hidden="true">●</span> Connected
+      <span aria-hidden="true">{pill.glyph}</span> {pill.label}
     </span>
   )
 
@@ -329,7 +360,29 @@ export function WatchRowCard({
       )}
     >
       <span aria-hidden="true">{state === "healthy" ? "●" : "○"}</span>
-      {isRateLimited ? "Run failed (429)" : presentation.label}
+      {/* ⭐ W-2 (D-28) — THE RATE-LIMIT CLAIM IS GONE, AND NOTHING REPLACES IT.
+          The deleted guard was a CONJUNCTION OF TWO IDENTICAL TESTS: it compared the resolved
+          cause to the catch-all transport cause, AND re-derived that same cause from the
+          watch's stored error string and compared it to the same value. But the resolved cause
+          ALREADY DEFAULTS to that second expression (see its declaration above), so when
+          `stopped`
+          was absent the two conjuncts were the same test and the guard collapsed to a single
+          comparison against the CATCH-ALL. A provider 5xx, a DNS failure and a socket timeout
+          therefore all rendered a rate-limit reading, sending an operator to the wrong remedy
+          for an outage.
+          ⛔ MEASURED, NOT ASSUMED — NO CAUSE IN THE TAXONOMY MEANS RATE-LIMITED. The backend
+          status table maps the rate-limit status onto the same catch-all transport cause as
+          408/500/502/503/504, and the client mirror holds the rate-limit tells in the SAME
+          regex alternation as timeouts and 5xx. A rate-limited failure is therefore
+          INDISTINGUISHABLE from an outage downstream of classification, so no vocabulary row
+          could be keyed on it honestly. The pin lives in `sourceHealthVocabulary.test.ts`.
+          ⛔ Do NOT invent a cause to bring the reading back: a label nothing can justify is
+          worse than no label. If the classifier ever gains a genuine rate-limit cause, the
+          reading returns as a ROW in `sourceHealthVocabulary`, never as a guard here.
+          ⚠ The deleted expression and the status number are described rather than quoted —
+            the plan's acceptance greps count literals over this source and cannot tell code
+            from a comment. Both are verbatim in `252-03-SUMMARY.md`. */}
+      {presentation.label}
     </span>
   )
 

@@ -821,8 +821,9 @@ describe("WatchedFoldersSection", () => {
   })
 
   it("discriminates connection health from run outcome in both directions (ROADMAP SC#2 / WATCH-03)", async () => {
-    // Discriminating Case A: Healthy connection whose last run failed (e.g. transient 429 rate limit).
-    // Connection pill MUST read "Connected", run pill MUST read "Error".
+    // Discriminating Case A: Healthy connection whose last run failed for a TRANSPORT reason.
+    // Connection pill MUST read "Connected"; the run pill MUST say something and must NOT
+    // claim rate limiting, which the taxonomy cannot distinguish from an outage (W-2 / D-28).
     const healthyConnFailedRun: ConnectorWatch = {
       id: "watch-disc-1",
       user_id: "user-1",
@@ -880,11 +881,24 @@ describe("WatchedFoldersSection", () => {
     const connPills = screen.getAllByTestId("sources-connection-pill")
     const runPills = screen.getAllByTestId("sources-run-pill")
 
-    // Case A: Healthy connection whose last run failed (e.g. 429 rate limit):
-    // Connection pill is Connected; Run pill indicates the run failure ("Run failed (429)").
+    // Case A: Healthy connection whose last run failed:
+    // Connection pill is Connected — the connection genuinely is (W-1 / D-29: `unreachable` is
+    // NOT a connection-level cause, and this case is the control that proves the new pill table
+    // did not flip everything to a warning).
     expect(connPills[0]).toHaveTextContent(/connected/i)
     expect(connPills[0]).not.toHaveTextContent(/connection off/i)
-    expect(runPills[0]).toHaveTextContent(/run failed \(429\)/i)
+    // ⚠ RE-BASELINED in Phase 252 (W-2 / D-28). This line USED TO ASSERT `run failed (429)`,
+    //   and it was pinning the DEFECT: the card's `isRateLimited` was a tautology over the
+    //   CATCH-ALL cause, so a Drive 503, a DNS failure and a socket timeout ALL rendered a
+    //   rate-limit reading. ⛔ And no cause in the taxonomy means rate-limited —
+    //   `failure_cause.py:97` maps `429: "unreachable"`, alongside 408/500/502/503/504 — so
+    //   this fixture's message is indistinguishable from an outage after classification.
+    //   The reading was deleted rather than re-keyed, and nothing replaced it: a label nothing
+    //   can justify is worse than no label.
+    // ⭐ What the case is ABOUT is unchanged and still driven — the two pills DISCRIMINATE:
+    //   a healthy connection whose run failed reads Connected, and never "Connection Off".
+    expect(runPills[0]).not.toHaveTextContent(/429/)
+    expect(runPills[0].textContent?.trim().length ?? 0).toBeGreaterThan(0)
 
     // Case B: Broken connection whose last run succeeded:
     // Connection pill is Connection Off; Run pill is not marked as run failed.
