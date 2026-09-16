@@ -94,7 +94,11 @@ import {
   type SourceFailureCause,
 } from "./sourceHealthVocabulary"
 import { cn } from "@/lib/utils"
-import { WatchRowCard as WatchRow, type SourceState } from "./WatchRowCard"
+import {
+  WatchRowCard as WatchRow,
+  type SourceState,
+  type WatchSyncOutcome,
+} from "./WatchRowCard"
 
 /**
  * ⭐ D-235-12 — THE INSTANCE-LEVEL TRUTH, SAID ONCE.
@@ -259,7 +263,16 @@ export function WatchedFoldersSection({
     return () => clearInterval(id)
   }, [pendingAsks])
 
-  const handleSyncNow = async (watch: ConnectorWatch) => {
+  /**
+   * ⭐ D-15 / SC#4 — IT NOW RETURNS WHAT IT ALREADY KNEW.
+   *
+   * ⚠ Every state write below is UNCHANGED, deliberately. D-04 measured that this function was
+   * already correct — it branches on `res.status === "refused"`, records the refusal or the
+   * queued sentence, and try/catches into `setError`. **Its only fault was that the card never
+   * heard the verdict**, so the card invented `✓ Synced just now (0 changes)` beside it.
+   * This is an addition to the RETURN TYPE, not a rewrite of the behaviour.
+   */
+  const handleSyncNow = async (watch: ConnectorWatch): Promise<WatchSyncOutcome> => {
     setActionInProgress(watch.id)
     try {
       const res = await triggerWatchSync(watch.id)
@@ -271,23 +284,26 @@ export function WatchedFoldersSection({
           delete next[watch.id]
           return next
         })
-      } else {
-        setRefusals((prev) => {
-          const next = { ...prev }
-          delete next[watch.id]
-          return next
-        })
-        setPendingAsks((prev) => ({
-          ...prev,
-          [watch.id]: {
-            at: Date.now(),
-            says: COPY.asked(withinPhrase(res.next_check_within_seconds)),
-          },
-        }))
+        await loadWatches(false)
+        // ⛔ The server's OWN words, never reworded here.
+        return { kind: "refused", says: res.message }
       }
+      setRefusals((prev) => {
+        const next = { ...prev }
+        delete next[watch.id]
+        return next
+      })
+      // ⚠ The queued sentence is built ONCE and used twice — the pending state and the card's
+      //   outcome slot read the same expression, so they cannot disagree. ⛔ Do not re-author
+      //   this sentence in the card.
+      const says = COPY.asked(withinPhrase(res.next_check_within_seconds))
+      setPendingAsks((prev) => ({ ...prev, [watch.id]: { at: Date.now(), says } }))
       await loadWatches(false)
+      return { kind: "queued", says }
     } catch (err: any) {
-      setError(err?.message || "Failed to trigger sync.")
+      const says = err?.message || "Failed to trigger sync."
+      setError(says)
+      return { kind: "failed", says }
     } finally {
       setActionInProgress(null)
     }
