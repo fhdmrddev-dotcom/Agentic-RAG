@@ -34,7 +34,7 @@ import type { EmitFailure, EmitSubStep, Phase } from "@/types"
 // WR-05 — the status vocabulary moved to its own module so `PhaseTimeline` can read the
 // SAME words instead of printing the raw union member. See the marker below, where the
 // table used to stand, and that module's header for why the split was forced.
-import { statusMeta } from "./phaseStatusMeta"
+import { statusMetaForRun } from "./phaseStatusMeta"
 // ── Phase 200-07 (DES-02 / D-06 / D-07 · `200-CHECKLIST.md` RS-MR-01 / RS-MR-02 /
 //    RS-MR-04) — THE PANEL READS THE ONE RESOLVER AND DERIVES NOTHING NEW.
 //
@@ -399,12 +399,44 @@ export interface PhaseCardProps {
    * derivation and the panel and the run page would eventually disagree.
    */
   timing?: PhaseRunFacts
+  /**
+   * Phase 252-04 (SC#5 hole 2 / D-25) — IS THE RUN ITSELF STILL ALIVE?
+   *
+   * ⛔ THE CARD DOES NOT DERIVE THIS, AND THE ARGUMENT IS THE ONE `timing`'s docblock
+   * makes three lines above: *"A local ternary here would be a second derivation and the
+   * panel and the run page would eventually disagree."* `PhaseTimeline` ALREADY computes
+   * `runTerminal` from `frame.run_status` — the AUTHORITATIVE fetched frame, not a
+   * Realtime hint (D-v2.5-03) — via the shared `TERMINAL_RUN_STATUSES` set, so this prop
+   * REUSES the shipped derivation rather than adding a rival one.
+   *
+   * ⛔ THE CARD ACQUIRES NO THREAD ID, NO STORE READ AND NO FETCH. It is G-5 FIRING at
+   * ten phases; it takes one prop, not a new dependency. ⚠ That identifier is NOT spelled
+   * here on purpose: its `grep -c` in this file is an acceptance criterion for exactly
+   * this claim, and prose that spells it makes the count unreadable (the 187-24 lesson).
+   *
+   * ⚠ **OPTIONAL, AND `undefined` IS NOT `false`.** `undefined` means the caller holds no
+   * answer — a mount before the frame resolves, or any of the existing callers that pass
+   * nothing — and the honest render of that is TODAY'S BEHAVIOUR. Only an explicit
+   * `false` moves the reading, which is why the guard below is `runLive !== false` and
+   * never a double-negation coercion of the raw value (spelled nowhere in this file, for
+   * the same counting reason).
+   */
+  runLive?: boolean
 }
 
-export function PhaseCard({ phase, position, timing }: PhaseCardProps) {
+export function PhaseCard({ phase, position, timing, runLive }: PhaseCardProps) {
   const meta = phaseTypeMeta(phase.phaseType)
-  const status = statusMeta(phase.status)
-  const isRunning = phase.status === "running"
+  // Phase 252-04 (D-26): the not-live reading is a ROW reached through a function, never
+  // an `if` at this call site — `sourceHealthVocabulary.ts:49`'s project rule, *a new cause
+  // adds a ROW*. `runLive === undefined` returns `statusMeta(phase.status)` unchanged.
+  const status = statusMetaForRun(phase.status, runLive)
+  // ⛔ `runLive !== false`, never a truthiness coercion — see the prop's docblock. Every consumer of
+  // `isRunning` (the spinner, `aria-busy`, the forced-open row, the BLOOM frame) falls out
+  // of this one line with no further edit.
+  const isRunning = phase.status === "running" && runLive !== false
+  // The OTHER status that asserts liveness, and it has to move with `isRunning` or the
+  // card would print "No outcome" (from the row above) beside a violet active frame.
+  const isRetrying = phase.status === "retrying" && runLive !== false
   // GAP-C (D-11): a typed emit-failure value is failed-as-failed even before the phase
   // status flips to "failed" — the closed taxonomy renders the reason, never a 'done'.
   const hasEmitFailure = phase.emitFailure != null
@@ -421,7 +453,7 @@ export function PhaseCard({ phase, position, timing }: PhaseCardProps) {
   // `isActive` carries the type one-liner (the active step's honest context); idle
   // (pending) and done fold quiet (no type-lecture). The running-only activity line
   // + engine chip live below; pending/done never show motion or the activity line.
-  const isActive = isRunning || phase.status === "retrying"
+  const isActive = isRunning || isRetrying
   // The shared 3D phase-type glyph (icon-convention §2 — ONE source). `phaseGlyph`
   // returns null on an unknown type → the unicode "•"/type fallback (meta.glyph).
   const Glyph = phaseGlyph(phase.phaseType)
@@ -445,10 +477,11 @@ export function PhaseCard({ phase, position, timing }: PhaseCardProps) {
   const panelId = useId()
 
   // The retrying pill reads "Attempt N" (N from gate_failed.attempt).
+  // Phase 252-04: `isRetrying`, not `phase.status === "retrying"` — on a dead run the row
+  // above already reads "No outcome", and an un-gated `Attempt 2` here would print the
+  // interrupted glyph beside a word that still claims the step is trying again.
   const statusText =
-    phase.status === "retrying" && phase.attempt != null
-      ? `Attempt ${phase.attempt}`
-      : status.text
+    isRetrying && phase.attempt != null ? `Attempt ${phase.attempt}` : status.text
 
   const forcedOpen = isRunning // forced-open active phase → aria-disabled
   const canToggle = isTerminal && !forcedOpen
@@ -490,7 +523,7 @@ export function PhaseCard({ phase, position, timing }: PhaseCardProps) {
             ? // BLOOM — the active step: amber wash + glowing left bar + soft glow.
               // The eye lands here instantly (SC#2 "unmistakably alive").
               "border-[hsl(var(--panel-status-active)/0.5)] border-l-[3px] border-l-[hsl(var(--panel-status-active))] bg-gradient-to-r from-[hsl(var(--panel-status-active)/0.12)] to-transparent shadow-[0_0_24px_hsl(var(--panel-status-active)/0.1)]"
-            : phase.status === "retrying"
+            : isRetrying
               ? "border-accent-violet/50 bg-accent-violet/5"
               : phase.status === "pending"
                 ? // QUIET idle — dim, still, no motion (SC#2 "quiet at rest").
