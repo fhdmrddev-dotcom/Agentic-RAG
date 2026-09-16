@@ -1500,7 +1500,14 @@ export function StreamsProvider({ children }: PropsWithChildren) {
   // for in-flight handles).
   const subscriptionsRef = useRef<Map<string, AbortController>>(new Map())
   const lastSeenOffsetRef = useRef<Map<string, string>>(new Map())
-  const reconcileInFlightRef = useRef(false)
+  // Phase 252-04 (SC#5 hole 1 / D-22) — PER-THREAD, not a global boolean.
+  // ⛔ It was `useRef(false)` from Phase 063.1 until 2026-09-16, and the global-ness was
+  // a real defect, not a simplification: a reconcile in flight on thread A made
+  // `reconcile(B)` early-return and DROP B's reconcile entirely, so B kept a stale
+  // liveness reading until the user navigated away and back. That is the *persistent*
+  // half of `BUG-260915-01`. The code already knew — see the note in reconcile's error
+  // arm, which names this flag as the blocker for a retry it could not take.
+  const reconcileInFlightRef = useRef<Set<string>>(new Set<string>())
   const activeThreadIdRef = useRef<string | null>(null)
   // Phase 096-05 (D-09): most-recently-viewed thread ids, most-recent first,
   // deduped, capped at ~10 entries. Feeds the LRU-3 keep-set (viewed thread +
@@ -1972,8 +1979,35 @@ export function StreamsProvider({ children }: PropsWithChildren) {
         // subscribeToRun call picks up the seeded cursor automatically.
         reconcile: async (threadId, surfaceId = "chat") => {
           // Phase 063.1 (D-063.1-11 / Gap-005): top-of-function in-flight guard.
-          if (reconcileInFlightRef.current) return
-          reconcileInFlightRef.current = true
+          // Phase 252-04 (D-22): keyed by thread — a reconcile on ANOTHER thread no
+          // longer drops this one.
+          if (reconcileInFlightRef.current.has(threadId)) return
+          reconcileInFlightRef.current.add(threadId)
+          // ── Phase 252-04 (SC#5 hole 1 / D-21) — SAY THAT WE ARE LOOKING.
+          //
+          // ⛔ THIS IS THE ACTUAL FIX FOR `BUG-260915-01`, and the report's own stated
+          // mechanism was false: `setViewingThread` has always fired this function on
+          // thread open (:1936-1942 above). What was missing is that reconcile set NO
+          // liveness signal, so for the whole `getSnapshot` round-trip BOTH of the
+          // liveness sets read empty and `TodosSection` rendered "Not ticked" on a LIVE
+          // run — on every thread open.
+          //
+          // ⚠ THE COLD-LOAD SLICE IS DELIBERATELY NOT WRITTEN HERE: it also drives
+          // MessageList's cold-load skeleton, so widening it would move a surface nobody
+          // is watching. One home per concern (D-21) — see the new slice's own docblock
+          // in `streamsStore.ts`, which names it. ⚠ It is named THERE and not here on
+          // purpose: `grep -c` on that field in this file is an acceptance criterion for
+          // "this change adds no writer", and prose that spells the token makes the count
+          // unreadable (the 187-24 lesson).
+          //
+          // ⛔ EVERY EXIT PATH BELOW MUST CLEAR THIS. A thread stuck in the set claims
+          // live FOREVER, which is the mirror image of the defect being fixed and
+          // strictly worse because it is silent. The `finally` at the bottom of this
+          // function is the single clear site, and it is why the `return` in the
+          // getSnapshot error arm is safe.
+          useStreamsStore.setState((s) => ({
+            reconcilingThreads: new Set(s.reconcilingThreads).add(threadId),
+          }))
           try {
             let snapshot: ThreadSnapshot
             try {
@@ -2025,13 +2059,25 @@ export function StreamsProvider({ children }: PropsWithChildren) {
               // ⚠ 244-14 (CR-01) — THE THIRD HALF OF THE COPIED WRITER IS DELIBERATELY NOT
               // TAKEN, and the reason is measured rather than stylistic. `loadMessages`
               // retries ONCE at 1s before it raises (:3243, D-068.5-09). Doing that here
-              // would hold `reconcileInFlightRef` — a GLOBAL flag, not a per-thread one
-              // (:1470/:1942) — for that whole second, and `reconcile` early-returns while it
-              // is held. A thread switch during the sleep would therefore DROP the new
+              // would hold `reconcileInFlightRef` — ~~a GLOBAL flag, not a per-thread one
+              // (:1470/:1942)~~ — for that whole second, and `reconcile` early-returns while
+              // it is held. A thread switch during the sleep would therefore DROP the new
               // thread's reconcile entirely: the person lands on a conversation that never
               // reconciles at all, which is a worse failure than a banner they can dismiss.
               // ⛔ So the banner raises on attempt 0, BY DECISION. Make the in-flight guard
               // per-thread first if a retry is ever wanted here — see deferred-items.md.
+              //
+              // ⚠ UPDATED 2026-09-16 (Phase 252-04 / D-22) — THE PRECONDITION IS NOW MET,
+              // AND THE RETRY IS STILL NOT TAKEN. The strikethrough above is kept rather
+              // than overwritten because the paragraph is a record of why a thing was not
+              // done, and half its reason has now expired: `reconcileInFlightRef` IS
+              // per-thread (a `Set<string>` keyed by threadId), so a sleep here would no
+              // longer drop a sibling thread's reconcile.
+              // ⛔ BUT ADDING THE RETRY IS A BEHAVIOUR CHANGE, NOT A GAP FIX, and this
+              // phase does not spend it. The banner still raises on attempt 0. Whoever
+              // takes it owns the new question this comment never had to answer: what a
+              // one-second sleep does to the `reconcilingThreads` liveness signal added
+              // below, which a person can SEE.
               useStreamsStore.setState((s) => ({
                 reconcileErrors: new Map(s.reconcileErrors).set(
                   threadId,
@@ -2503,7 +2549,19 @@ export function StreamsProvider({ children }: PropsWithChildren) {
             }
           } finally {
             // Phase 063.1 (D-063.1-11 / Gap-005): ALWAYS reset in finally.
-            reconcileInFlightRef.current = false
+            // Phase 252-04 (D-22): per-thread — delete THIS thread's entry only.
+            reconcileInFlightRef.current.delete(threadId)
+            // Phase 252-04 (D-21): and drop the liveness signal, on the SAME path that
+            // releases the lock. ⛔ This is the ONLY clear site, deliberately: an early
+            // `return` inside the try above still runs this, so no exit path can leave a
+            // thread claiming live forever. The `has` guard keeps the steady state free
+            // of a pointless setState.
+            useStreamsStore.setState((s) => {
+              if (!s.reconcilingThreads.has(threadId)) return {}
+              const next = new Set(s.reconcilingThreads)
+              next.delete(threadId)
+              return { reconcilingThreads: next }
+            })
           }
         },
 
@@ -4792,6 +4850,16 @@ export const getActiveRunStartMs = (threadId: string): number | null => {
 
 export const useLoadingForThread = (threadId: string | null): boolean =>
   useStreamsStore((s) => (threadId ? s.loadingThreads.has(threadId) : false))
+
+// Phase 252-04 (SC#5 hole 1 / D-21) — is a `/snapshot` reconcile in flight for this
+// thread? Shape copied verbatim from `useLoadingForThread` above.
+//
+// ⚠ IT MEANS "WE DO NOT KNOW YET", NOT "LIVE". `TodosSection` folds it into `isRunLive`
+// only because that value's sole job there is to SUPPRESS the `not_ticked` claim while
+// liveness is unknown — `deriveTodoDisplayStatus` asserts nothing positive from it.
+// ⛔ Do not read this to make a POSITIVE claim about a running agent (D-24).
+export const useReconcilingForThread = (threadId: string | null): boolean =>
+  useStreamsStore((s) => (threadId ? s.reconcilingThreads.has(threadId) : false))
 
 export const useReconcileErrorForThread = (threadId: string | null): Error | null =>
   useStreamsStore((s) => (threadId ? (s.reconcileErrors.get(threadId) ?? null) : null))

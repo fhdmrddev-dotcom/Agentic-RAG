@@ -220,6 +220,27 @@ export interface StreamsState {
    *  messages.length === 0` so new chats (or any thread without an active
    *  fetch) don't render misleading shimmer. */
   loadingThreads: Set<string>
+  /** Phase 252-04 (SC#5 hole 1 / D-21) — set of thread IDs whose `reconcile` is
+   *  currently in flight, i.e. whose `/snapshot` round-trip has not come back yet.
+   *
+   *  ⛔ WHY THIS IS NOT `loadingThreads`. `loadingThreads` has a SECOND consumer:
+   *  MessageList gates its cold-load skeleton on it (see the field above). Widening
+   *  that Set to cover reconcile would put shimmer on a surface nobody asked about,
+   *  and nobody would be looking. ONE HOME PER CONCERN — so this is its own slice,
+   *  mirroring the shipped per-thread pattern (`fallbackNotices`, `reconcileErrors`,
+   *  `failedSendDrafts`, `loadingThreads`), read through `useReconcilingForThread`.
+   *
+   *  ⚠ SEMANTICS: this means "we do not know yet", NOT "live". `TodosSection` folds
+   *  it into `isRunLive` only because `isRunLive`'s sole job there is to SUPPRESS the
+   *  `not_ticked` claim — `deriveTodoDisplayStatus` asserts nothing positive from it.
+   *  A consumer that wants to claim something POSITIVE about a live run needs its own
+   *  signal and must not read this one (D-24).
+   *
+   *  ⚠ TRANSIENT — never persisted. The localStorage write trigger is
+   *  `[bucketsBySurface, todosByThread, tasksByThread]` and the writer takes only
+   *  those, so this Set is correctly absent from both (StreamsProvider.tsx:4077-4100).
+   *  Rehydrating an in-flight fetch flag would claim a request that is not running. */
+  reconcilingThreads: Set<string>
   /** Per-thread set of active SSE run subscriptions. Replaces the old global
    *  `subscriptionsByRunId: Set<string>` flat set. Inner Set holds the
    *  runIds currently bound for that thread; an empty inner Set is GC'd via
@@ -470,6 +491,11 @@ export const useStreamsStore = create<StreamsState>()(subscribeWithSelector(() =
   failedSendDrafts: new Map<string, string>(),
   // Type: loadingThreads: Set<string>
   loadingThreads: new Set<string>(),
+  // Phase 252-04 (D-21): the reconcile-in-flight slice — a sibling of loadingThreads,
+  // deliberately NOT a reuse of it (see the interface docblock). Transient: absent from
+  // the persist trigger and from writeSnapshotToLocalStorage, by design.
+  // Type: reconcilingThreads: Set<string>
+  reconcilingThreads: new Set<string>(),
   // Type: subscriptionsByThread: Map<string, Set<string>>
   subscriptionsByThread: new Map<string, Set<string>>(),
   // Phase 086 Plan 01 (D-086-03): panel per-thread Map defaults. todos + tasks

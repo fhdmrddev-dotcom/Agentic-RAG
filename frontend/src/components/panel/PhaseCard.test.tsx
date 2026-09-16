@@ -1023,3 +1023,98 @@ describe("PhaseCard × the REAL reconcile seam  [owner: 214-11]", () => {
     )
   })
 })
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Phase 252-04 (SC#5 hole 2 / D-25 / D-26) — THE PANEL'S OTHER RUN-STATE SURFACE.
+//
+// `HONEST-03` says "the workspace panel". Phase 250 made ONE of its two run-state
+// surfaces honest: `TodosSection` stopped claiming a todo was open on a dead run.
+// This card was never in scope, and it derives `isRunning` from the SSE PHASE status
+// ALONE — so a run that dies without emitting its phase-terminal event leaves a card
+// spinning, `aria-busy`, forced open, forever. A `git grep` over Phase 250's artifacts
+// returns ZERO mentions of `PhaseCard` / `PhaseTimeline` / `phaseStatusMeta`.
+//
+// ⛔ THE DEFAULT CASE IS NOT CEREMONY. `runLive` is optional, and `undefined` must
+// behave EXACTLY as today — that is the whole reason every existing caller and every
+// pin above this block stays byte-unchanged. A fix written as `!!runLive` would pass
+// the lie case and silently retire the live reading for every caller that passes
+// nothing, which is most of them.
+// ═══════════════════════════════════════════════════════════════════════════════
+describe("PhaseCard — 252-04: a dead run's phase card stops claiming running", () => {
+  /** The three things `isRunning` drives, read off one render. */
+  function liveSignalsOf(container: HTMLElement) {
+    const region = container.querySelector('[role="region"]')
+    return {
+      atom: statusAtomOf(container),
+      ariaBusy: region?.getAttribute("aria-busy") ?? null,
+      // forced open → the accordion button is aria-disabled and the region is visible
+      ariaDisabled: container.querySelector("button")?.getAttribute("aria-disabled") ?? null,
+      hidden: region?.hasAttribute("hidden") ?? false,
+    }
+  }
+
+  it("THE LIE: status=running on a TERMINAL run no longer reads Running, is not busy, is not forced open", () => {
+    const { container } = render(
+      <PhaseCard phase={fillPhase({ status: "running" })} position={0} runLive={false} />,
+    )
+    const s = liveSignalsOf(container)
+    expect(s.atom[1]).not.toBe("Running")
+    expect(s.ariaBusy).toBeNull()
+    expect(s.ariaDisabled).not.toBe("true")
+    // …and the reading it DOES give is the quiet one, reached through the vocabulary
+    // table rather than an `if` at this call site (D-26).
+    expect(s.atom).toStrictEqual(["⊣", "No outcome"])
+  })
+
+  it("THE CONTROL: status=running with runLive={true} is IDENTICAL to today", () => {
+    const withProp = render(
+      <PhaseCard phase={fillPhase({ status: "running" })} position={0} runLive={true} />,
+    )
+    const a = liveSignalsOf(withProp.container)
+    withProp.unmount()
+    const baseline = render(<PhaseCard phase={fillPhase({ status: "running" })} position={0} />)
+    const b = liveSignalsOf(baseline.container)
+    expect(a).toStrictEqual(b)
+    expect(a.atom).toStrictEqual(["●", "Running"])
+    expect(a.ariaBusy).toBe("true")
+  })
+
+  it("THE DEFAULT: NO runLive prop is the live reading — every existing caller is unaffected", () => {
+    const { container } = render(
+      <PhaseCard phase={fillPhase({ status: "running" })} position={0} />,
+    )
+    const s = liveSignalsOf(container)
+    expect(s.atom).toStrictEqual(["●", "Running"])
+    expect(s.ariaBusy).toBe("true")
+    expect(s.ariaDisabled).toBe("true")
+    expect(s.hidden).toBe(false)
+  })
+
+  it("a TERMINAL phase status is untouched by runLive={false} — only the two live readings move", () => {
+    // ⛔ The scope fence. `runLive` answers "is the RUN alive", and a step that already
+    // reported `done` / `failed` / `skipped` has an outcome the run ending cannot revise.
+    const cases = [
+      ["done", ["✓", "Complete"]],
+      ["failed", ["✕", "Failed"]],
+      ["skipped", ["⤳", "Skipped"]],
+      ["pending", ["○", "Locked"]],
+    ] as const
+    for (const [status, atom] of cases) {
+      const r = render(
+        <PhaseCard phase={fillPhase({ status })} position={0} runLive={false} />,
+      )
+      expect(statusAtomOf(r.container)).toStrictEqual(atom)
+      r.unmount()
+    }
+  })
+
+  it("retrying is the OTHER live reading and moves with running", () => {
+    const dead = render(
+      <PhaseCard phase={fillPhase({ status: "retrying" })} position={0} runLive={false} />,
+    )
+    expect(statusAtomOf(dead.container)).toStrictEqual(["⊣", "No outcome"])
+    dead.unmount()
+    const live = render(<PhaseCard phase={fillPhase({ status: "retrying" })} position={0} />)
+    expect(statusAtomOf(live.container)).toStrictEqual(["↻", "Attempt"])
+  })
+})
