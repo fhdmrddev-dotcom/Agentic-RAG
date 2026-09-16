@@ -288,7 +288,12 @@ parallelism here; a wave boundary that looks parallel and is not is this project
   4. **A comment cannot hide an ACL from the gate.** `aclsIn` is string-literal-aware: `COMMENT ON … IS '… -- verbatim';` followed by a `REVOKE EXECUTE ON FUNCTION …` still yields that signature. Migration **180 lines 30/32** already ship that construct, so this is live, not hypothetical (**CR-03**).
   5. **The ledger stops lying about this phase's own blast radius.** Two absent rows are added — `scripts/full-schema-supplement.sql` (**5 phases, G-5 FIRING, no row for its entire life**) and `scripts/check-schema-acl-parity.cjs` (row AT CREATION, the `settingsSearchPayload.ts` precedent) — and the twelve triples `252-REVIEW.md` CR-08 measured stale are re-derived with the CLAUDE.md recipe (**CR-08**).
 
-**Plans**: **2**, SERIAL — waves 1 and 2, `depends_on: [253-01]`. ⚠ The `target 3` written here at
+**Plans**: **3** — waves 1 and 2 SERIAL, plus **wave 3, a GAP-CLOSURE ROUND added 2026-09-17**
+from `253-REVIEW.md` (`gap_closure_round: 1`; `node scripts/check-gap-closure-rounds.cjs 253` reads
+`rounds completed: 1 (cap is 2)`, G-7 clear). ⚠ The original `**2**, SERIAL — waves 1 and 2,
+`depends_on: [253-01]`` is kept rather than overwritten: it was true of the phase as planned, and the
+third plan exists because the phase's own VERIFICATION passed **14/14 with zero gaps** while the code
+review found **2 critical + 11 warning + 5 info** in the same tree. ⚠ The `target 3` written here at
 scoping is SUPERSEDED by `253-CONTEXT.md` **D-20**, which is the later and more specific decision;
 the original is kept rather than overwritten. Under G-8's 3-5 target, and a plan is a wave-sized
 unit of work, not a task. ⛔ **Serial is REQUIRED, not preferred:** CLAUDE.md worktree rule 4 —
@@ -303,6 +308,10 @@ Plans:
 **Wave 2** *(blocked on Wave 1 completion)*
 
 - [x] 253-02-PLAN.md — the gate half (`CRED-04`): tuple key, literal-aware lexer, TABLE/COLUMN regex, four `--self-test` arms, narrowed failure text, **plus WIRING the gate** (measured: nothing invokes it) and the D-23 ledger rows — ✅ **DONE 2026-09-17** (`253-02-SUMMARY.md`; 4 commits `b9067a904`, `8790c4119`, `22972ca6e`, `4df90a080`)
+
+**Wave 3** *(gap closure — `253-REVIEW.md`, round 1 of 2)*
+
+- [ ] 253-03-PLAN.md — the five locked review findings, each a *guard that cannot fail*: **CR-01** the parity gate never opens `supabase/full-schema.sql` · **CR-02** the greenfield harness's `line.find("--")` loses a REVOKE behind a string literal (a false GREEN in the **permissive** direction) · **WR-02** the PostToolUse matcher is `Write|Edit`, so a **MultiEdit** fires nothing · **WR-06** `check-greenfield-privileges.py` is invoked by nothing executable · **WR-08** the §5 column fence does not run in CI for the change that breaks it. ⛔ The other 8 warnings + 5 info items are OUT by operator lock and are recorded as deferred **with a re-open trigger each** inside the plan.
 
 **Flags**:
 
