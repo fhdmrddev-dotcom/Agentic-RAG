@@ -4,12 +4,12 @@ title: A model added via discovery or Settings appears only if the next request 
 reported: 2026-09-02
 surface: Agentic-RAG
 severity: major
-status: open
+status: folded
 affected_areas: [backend/settings, model-registry, caching, multi-worker, app_settings, control-room, SEED-258]
-folded_into: null
+folded_into: 249
 verified_closed_by: null
 related_seeds: [SEED-258]
-re_open_trigger: null
+re_open_trigger: "The first run under a real WORKER_COUNT=2 (not two --reload servers): add a model on one worker, then read the registry until a request is served by the other. Until that is observed, the cross-worker half rests on a fence, not on a measurement."
 reproduces_on:
   branch: develop
   commit: 34d442402
@@ -17,6 +17,25 @@ reproduces_on:
 ---
 
 # BUG-260902-06: the invalidation reaches one worker of two
+
+> ⚠ **FOLDED INTO PHASE 249 — DELIBERATELY NOT `closed`, AND PHASE 249'S OWN VERIFIER IS WHY.**
+> `.planning/phases/249-the-model-you-actually-run/249-VERIFICATION.md` § SC#3 reads, verbatim:
+> *"MET BY CONSTRUCTION AND BY FENCE. ⛔ NOT MET BY MULTI-WORKER OBSERVATION, and that is stated
+> rather than glossed."* `REQUIREMENTS.md` `MODEL-06` is ticked on that basis and says the same in
+> its traceability row.
+>
+> **What IS discharged:** the broadcast mechanism was measured present at all three registry write
+> seams plus the one `app_settings` write seam, with `SettingsCacheSubscriber` constructed at
+> lifespan; it is pinned in **both** directions — including the negative one, that the two WR-03
+> read-before-guard sites must *not* broadcast — **driven RED against a planted broadcast**. The
+> cross-**request** half was driven live: one write, ten consecutive reads, 10/10 unanimous.
+>
+> ⛔ **What is NOT discharged is the thing this report is named after.** `WORKER_COUNT=2` does not
+> exist in the environment that verified it: two independent `uvicorn --reload` servers were running
+> on port 8000, and `--reload` implies a single worker. A fence proves the code broadcasts; only a
+> second worker proves a second worker hears it. Flipping this to `closed` would claim an
+> observation nobody made — **a wrong `closed` is worse than a stale `open`, because it stops the
+> next reader looking.** See `re_open_trigger`.
 
 **Operator, 2026-09-02:** *"when I run the discover new models and I add new models from the
 model discovery — even from the settings itself — it is not added to the list, and also sometimes

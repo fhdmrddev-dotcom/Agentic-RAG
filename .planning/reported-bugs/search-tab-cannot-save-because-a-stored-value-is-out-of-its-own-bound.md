@@ -4,10 +4,10 @@ title: The whole Search settings tab is unsaveable because a STORED value sits o
 reported: 2026-09-10
 surface: Agentic-RAG
 severity: blocking
-status: open
+status: closed
 affected_areas: [frontend/settings, backend/settings-api, RAG/multimodal]
-folded_into: null
-verified_closed_by: null
+folded_into: 242
+verified_closed_by: 242
 related_seeds: [SEED-227]
 re_open_trigger: null
 reproduces_on:
@@ -15,6 +15,18 @@ reproduces_on:
   commit: d9c6b9c2f
   date: 2026-09-10
 ---
+
+> ⭐ **CLOSED BY PHASE 242 (flipped 2026-09-16, Phase 252 Plan 01 / D-35).** The closing artifact is
+> commit **`46292bb81`** — *"feat(242-02): the Search tab sends only what CHANGED, and a refusal
+> names the stored value"*. Both halves of this report are addressed by it: the tab no longer
+> re-submits an untouched stored value that is out of its own bound (so an unrelated control is
+> saveable again), and a refusal now names the value that is actually stored rather than describing
+> the rule in the abstract.
+>
+> Corroborated in two registers: `REQUIREMENTS.md:22` (*"Fixed by 46292bb81 (Phase 242-02)"*) and
+> `ROADMAP.md:289`, which records this report and `BUG-260911-01` as **measured fixed 2026-09-13**
+> and instructs the flip — *"bookkeeping, not work; leaving them open is what made two of three
+> registers stale at scoping."*
 
 # What happens
 
