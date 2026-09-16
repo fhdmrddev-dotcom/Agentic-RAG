@@ -37,6 +37,31 @@ status_note: |
   ⛔ Arms (1), (2) and (4) — a non-Supabase deployment target, a program continuing on the same
   connection, and `docs/OPERATOR.md` Step 3 — are UNCHANGED and remain the live re-open trigger.
   `BUG-260911-01` still lists this seed in `related_seeds`.
+
+  ── 2026-09-16 · ROUTED again at `/gsd:discuss-phase 253` (REG-02 sweep, run by hand — see below).
+  Status STAYS `partially-answered`; `folded_into` stays `null`, because only one more arm moves.
+
+  ⭐ ARM (a) — TABLE and COLUMN privileges — IS FOLDED INTO PHASE 253. It is that phase's SC#1
+  + SC#2 verbatim. 253 mirrors ALL SEVEN ACL-bearing tables into the supplement and into
+  `full-schema.sql`'s tail in the same commit, and extends `scripts/check-schema-acl-parity.cjs`
+  to compare table/column tuples so the §6 header's "table OR function" claim becomes true.
+  ⚠ MEASURED at 253's scoping, and WIDER than `252-REVIEW.md` CR-01 states: only 7 tables carry
+  table/column ACLs across every migration (25 statements), and SIX of the seven — `connector_tokens`,
+  `connector_watches`, `connector_watch_items`, `connector_sync_runs`, `user_settings`, `app_settings`
+  — are mirrored in NEITHER artifact. The last two are the exact tables `BUG-260911-01` found in
+  production with RLS disabled and `anon` holding all privileges.
+
+  ⛔ ARMS (b) and (c) ARE UNTOUCHED AND STAY OPEN. `SET row_security = off` is byte-unchanged by
+  253, and `--no-privileges` is not revisited — the reason recorded in `252-01-PLAN.md` still holds.
+  Splitting them into a new seed id was considered at 253's discuss and REJECTED: two legible arms
+  do not warrant a second register entry.
+
+  ⚠ AND THIS SEED'S OWN TRIGGER ARM (1) NOW HAS A NEW INSTANCE, recorded rather than silently
+  absorbed: Phase 253 ships `scripts/check-greenfield-privileges.py`, which builds a greenfield DB
+  with `CREATE DATABASE` on a plain connection and applies the artifact to it. That is arm (1)'s
+  wording exactly — but it is a TEST harness, not a supported deployment target, so arm (1) stays
+  live for its original meaning. The harness is, however, the first thing in this repo that would
+  MEASURE arm (b)'s `SET row_security = off` leak on demand.
 folded_into: null
 priority: medium
 surface: Agentic-RAG
