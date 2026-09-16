@@ -1343,12 +1343,34 @@ async def start_mcp_oauth(
         # four of those, and the first draft of this block called two helpers that DO NOT
         # EXIST — the Phase 212 D-2 defect, where a seam stub invented a parameter the real
         # function lacked. Checked against the real signature instead of assumed.
-        await connector_service.store_oauth_client_credentials(
-            str(payload.connection_id),
-            str(active_org),
-            client_id=client_id,
-            client_secret=client_secret,
-        )
+        #
+        # ⛔ B-3 (Phase 252) — THE REGISTRATION DECISION ABOVE IS UNCHANGED; WHAT CHANGES IS
+        # WHAT HAPPENS TO THE RESULT. `store_oauth_client_credentials` now applies the same
+        # boundary the three request models carry, so a server that mints something shaped
+        # like a secret is refused here instead of bricking every later read of this row.
+        # ⚠ CAUGHT BY NAME, AHEAD OF ANY GENERIC `except connector_service.ConnectorError`:
+        # `ConnectorClientIdRefused` IS a `ConnectorError`, and `:1060` records that exact
+        # ordering trap in this file for `ConnectorNothingToDiscover`.
+        try:
+            await connector_service.store_oauth_client_credentials(
+                str(payload.connection_id),
+                str(active_org),
+                client_id=client_id,
+                client_secret=client_secret,
+            )
+        except connector_service.ConnectorClientIdRefused:
+            # ⛔ NOT the `does not offer to create one` sentence below — that would be a false
+            # statement about a server that demonstrably DID. ⛔ And the offending value is
+            # never interpolated: the refusal carries the rule, never the credential.
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    f"{probe.authorization_host or server_url} created an application for "
+                    "this connection, but the identifier it returned does not look like a "
+                    "client id and was not saved. Enter an application id for this "
+                    "connection in its settings and try again."
+                ),
+            ) from None
 
     if not client_id:
         raise HTTPException(
