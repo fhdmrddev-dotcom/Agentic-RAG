@@ -36,6 +36,29 @@
 
 
 -- ============================================================
+-- 0. RESTORE search_path — MEASURED, and it is load-bearing (Phase 253 / 253-01)
+-- ============================================================
+-- ⛔ WITHOUT THIS LINE supabase/full-schema.sql DOES NOT APPLY AT ALL on a greenfield
+--    database. pg_dump emits `SELECT pg_catalog.set_config('search_path', '', false);` at
+--    full-schema.sql:29, that is a SESSION setting, and this supplement is appended to the
+--    SAME paste -- so §6's `... ON FUNCTION public.match_document_chunks(vector, uuid, ...)`
+--    cannot resolve the UNQUALIFIED type name `vector` and the whole bootstrap dies with
+--      ERROR:  type "vector" does not exist                       (SQLSTATE 42704)
+--    The SQL editor wraps a paste in one transaction, so the ENTIRE greenfield schema rolls
+--    back. Measured 2026-09-16 by scripts/check-greenfield-privileges.py on its first run
+--    against a real scratch database; introduced at a7efe17d1 (Phase 252-01), which mirrored
+--    migration 181 VERBATIM -- correctly, since §6's whole discipline is that an argument
+--    list is part of a function's identity and nothing may be retyped.
+--
+-- ⛔ SO THE FIX IS HERE AND NOT IN §6. Qualifying the type as `public.vector` would change
+--    the signature TEXT and therefore the key `scripts/check-schema-acl-parity.cjs` compares
+--    against the migrations -- a green gate would turn red over a correct artifact. The
+--    migrations resolve `vector` through search_path because a migration paste never resets
+--    it; this restores the environment they are written for, for the supplement only.
+SET search_path = public;
+
+
+-- ============================================================
 -- 1. pgvector — ensure the extension exists in public.
 --    (Belt-and-suspenders: the generator also injects this near the top so it
 --    precedes the public.vector column/index definitions. Harmless here.)
