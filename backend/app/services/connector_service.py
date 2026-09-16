@@ -575,10 +575,25 @@ def _to_response(row: dict) -> ConnectorConnectionResponse:
         # (e.g. legacy row violating a newly tightened model rule like custom_client_id smell),
         # do NOT allow a single bad row to fail list_connections with a 503 for the whole org.
         # Fall back to a degraded error representation:
+        #
+        # ⛔ B-2 (Phase 252, TM-252-06) — `%s` ON THE EXCEPTION OBJECT WAS WRITING THE REFUSED
+        #   CREDENTIAL TO DISK. Pydantic v2's `ValidationError.__str__` renders
+        #   `input_value='<the value>'` for EVERY union arm it tried, and `config` is a
+        #   five-member union — measured at FIVE copies of one refused `custom_client_id` in a
+        #   single message. And the population this handler exists for is precisely the legacy
+        #   rows that already hold a secret there (the line above says so), so Phase 248 had
+        #   moved the secret out of an org-readable column and into the application log, whose
+        #   shipping, retention and operator access RLS does not govern.
+        #   `include_input=False` is pydantic's documented switch: `type`/`loc`/`msg`/`url` and
+        #   no `input` key, so the FIELD and the RULE are still named and the VALUE is not.
+        # ⚠ `logging_sink._RedactingFilter` is NOT the fence here: it knows four shapes
+        #   (`sk-…`, URL creds, `Bearer …`, `eyJ…`) while `_validate_custom_client_id` refuses
+        #   thirteen prefixes plus `~` plus `len > 128`, and the sink that carries it is
+        #   opt-in (`LOG_FILE_PATH` unset → no filter at all).
         logger.warning(
             "connector_service._to_response: validation failed for connection %s: %s",
             d.get("id"),
-            e,
+            e.errors(include_input=False),
         )
         d_fallback = dict(d)
         d_fallback["config"] = McpConfig()
