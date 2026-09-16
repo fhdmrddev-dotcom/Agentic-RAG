@@ -488,12 +488,22 @@ REVOKE DELETE ON public.user_settings FROM authenticated;
 --    MAINTENANCE note at the top of this file already told maintainers to mirror ACLs.
 --    181 reproduced it anyway.
 --    ⛔ So this section is guarded by `scripts/check-schema-acl-parity.cjs`, which FAILS
---    when a migration grants or revokes EXECUTE on a function this file does not mirror.
+--    when a migration grants or revokes a privilege this file does not mirror — EXECUTE on
+--    a function AND, since Phase 253-02 (CR-01), SELECT/INSERT/UPDATE/DELETE/ALL on a table
+--    or a column. §5 above is inside its scan too, so "table OR function" is now a property
+--    of the code rather than of this sentence.
 --    A prose instruction is what did not work twice; do not add a fourth.
 --
--- ⚠ ORDER IS LOAD-BEARING: `anon` INHERITS from PUBLIC, so `REVOKE … FROM anon` changes
---    nothing while the PUBLIC grant stands (measured in migration 177). PUBLIC is
---    revoked first, every time.
+-- ⚠ ORDER IS LOAD-BEARING, AND NOTHING CHECKS IT. `anon` INHERITS from PUBLIC, so
+--    `REVOKE … FROM anon` changes nothing while the PUBLIC grant stands (measured in
+--    migration 177). PUBLIC is revoked first, every time, in the statements below.
+--    ⛔ BUT THAT IS A CONVENTION KEPT BY HAND, NOT AN ASSERTED ONE. `check-schema-acl-parity.cjs`
+--    compares tuples, not their order, and says so in its own failure text — out of scope BY
+--    DECISION (Phase 253, D-13), never by oversight. Re-open trigger: the next migration that
+--    revokes a role privilege WITHOUT revoking PUBLIC first (the migration 181 Group B class).
+--    ⛔ The gate likewise does NOT detect REVERSE DRIFT — this file GRANTING something the
+--    migrations REVOKE, i.e. a bootstrap MORE permissive than the migration history. Re-open
+--    trigger: any phase that edits this file's grants by hand rather than copying a migration.
 --
 -- ⚠ TRIGGER FUNCTIONS ARE SAFE TO REVOKE. PostgreSQL checks EXECUTE at CREATE TRIGGER
 --    time, not at trigger-execution time (empirically verified against local Postgres,

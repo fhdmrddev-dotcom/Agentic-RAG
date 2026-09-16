@@ -62,6 +62,43 @@ status_note: |
   wording exactly — but it is a TEST harness, not a supported deployment target, so arm (1) stays
   live for its original meaning. The harness is, however, the first thing in this repo that would
   MEASURE arm (b)'s `SET row_security = off` leak on demand.
+
+  ── 2026-09-17 · ANSWERED — ARM (a), by Phase 253 (plans 253-01 and 253-02). Status STAYS
+  `partially-answered` and `partial` STAYS `true`: arms (b) and (c) are untouched, so this seed is
+  not closed and must keep surfacing at the REG-02 sweep.
+
+  ⭐ ARM (a) — TABLE and COLUMN privileges — IS ANSWERED, AND IT WAS MEASURED, NOT ASSERTED.
+  `253-01` mirrored all seven ACL-bearing tables into `scripts/full-schema-supplement.sql` and into
+  `supabase/full-schema.sql`'s byte-identical tail in ONE commit (`c73463658`), and proved it by
+  BUILDING A REAL DATABASE from `full-schema.sql` alone and reading it **as `authenticated`**:
+  `SELECT access_token_ciphertext FROM connector_tokens` went from *the read SUCCEEDED* to
+  `InsufficientPrivilegeError`, `has_table_privilege('anon','public.app_settings','SELECT')` from
+  `True` to `False`, and the violation count from **1045** to **0**
+  (`scripts/check-greenfield-privileges.py`). `253-02` then made
+  `scripts/check-schema-acl-parity.cjs` compare `(verb, table, privilege, column, grantee)` tuples
+  beside the function tuples, so the §6 header's *"table OR function"* claim is now a property of
+  the code: `133/133` mirrored, 32 table/column statements across 12 files, re-derived at run time.
+
+  ⚠ THE FIGURES IN THE 2026-09-16 ENTRY ABOVE ARE CORRECTED HERE, BESIDE THEM, NEVER OVER THEM.
+  That entry says *"25 statements"*; the measured count is **32**, across **12** files
+  (118 · 126 · 127 · 128 · 129 · 150 · 151 · 156 · 168 · 169 · 172 · 177). Migrations 126, 127 and
+  150 each carry a `connector_connections` column grant and were named in NO register. The
+  *"7 tables"* half DOES reproduce.
+
+  ⛔ ARMS (b) AND (c) STAY OPEN, WITH THEIR EXISTING TRIGGERS UNCHANGED.
+  (b) `SET row_security = off` is **byte-unchanged** by Phase 253 — the leak this seed measured on a
+      plain Postgres connection is exactly as it was.
+  (c) `--no-privileges` is NOT revisited; the reason recorded in `252-01-PLAN.md` still holds —
+      dropping it would make a dump carry the local dev box's entire ACL state, including roles that
+      exist nowhere else.
+
+  ⚠ AND ONE NEW FACT THIS SEED SHOULD CARRY, found by arm (a)'s own harness rather than reasoned
+  about: `supabase/full-schema.sql` **did not apply at all** between `a7efe17d1` (Phase 252-01) and
+  `3192f480f` (Phase 253-01). `pg_dump` emits `set_config('search_path','',false)` at line 29, which
+  survives the whole paste, so §6's unqualified `ON FUNCTION … (vector, …)` could not resolve and
+  the Supabase SQL editor rolled the ENTIRE greenfield bootstrap back. Fixed by a §0
+  `SET search_path = public;`. ⭐ That is arm (b)'s shape one register over — **a SESSION setting the
+  dump leaks into everything appended after it** — and it strengthens, rather than answers, (b).
 folded_into: null
 priority: medium
 surface: Agentic-RAG
