@@ -56,6 +56,14 @@
  *              `verb | signature | grantee` function tuple and every
  *              `verb | table | privilege | column | grantee` table tuple appearing in
  *              `supabase/migrations/` ALSO appears in the supplement.
+ *   CHECKS   · ⭐ THE ARTIFACT TAIL (added 253-03, closing CR-01). That the last N lines of
+ *              `supabase/full-schema.sql` are BYTE-IDENTICAL to `scripts/full-schema-supplement.sql`
+ *              — D-11's same-commit rule, which for this gate's whole prior life was enforced by
+ *              nothing the hook or CI ran. Before this, deleting every `resize_embedding_column`
+ *              line from the deploy artifact left this gate at `mirrored: 133/133` and exit 0.
+ *              ⚠ It checks the artifact's TAIL, not its body: an ACL deleted from the pg_dump
+ *              section above the supplement is still invisible here (there are none to delete —
+ *              the dump runs `--no-privileges` — but a future dump flag change would break that).
  *   DOES NOT · ORDERING. That `REVOKE … FROM PUBLIC` precedes `REVOKE … FROM anon` is NOT
  *              asserted here — out of scope BY DECISION (D-13), not by oversight.
  *              Re-open trigger: the next migration that revokes a role privilege without
@@ -85,10 +93,22 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const crypto = require('crypto');
 
 const root = path.resolve(__dirname, '..');
 const MIGRATIONS_DIR = path.join(root, 'supabase', 'migrations');
 const SUPPLEMENT = path.join(root, 'scripts', 'full-schema-supplement.sql');
+/**
+ * ⭐ THE ARTIFACT. Added by plan 253-03 closing CR-01.
+ *
+ * For its whole life before that, this gate read the migrations and the supplement and NEVER
+ * OPENED THE FILE AN OPERATOR ACTUALLY PASTES INTO A GREENFIELD PROJECT. The reviewer drove it:
+ * deleting every `resize_embedding_column` line from `supabase/full-schema.sql` left the gate at
+ * `mirrored: 133/133` and exit 0, while `.claude/hooks/schema-acl-parity-guard.js` MATCHED that
+ * very file in `SUBJECTS[2]` — so editing the artifact triggered a gate that structurally could
+ * not read it, and the author got silence, which reads as a pass.
+ */
+const FULL_SCHEMA = path.join(root, 'supabase', 'full-schema.sql');
 
 const RED = '\x1b[31m';
 const YEL = '\x1b[33m';
@@ -445,6 +465,85 @@ function scanSupplement(file) {
   return new Set(aclsIn(sql, file).map((a) => a.key));
 }
 
+/**
+ * Split a Buffer into lines KEEPING their terminators — the Node equivalent of Python's
+ * `bytes.splitlines(keepends=True)`, which is the semantics `check-greenfield-privileges.py`
+ * `_tail_lines` already uses and which this function deliberately PORTS rather than reinvents.
+ *
+ * ⛔ IT MUST STAY BYTE-LEVEL. The obvious `text.split('\n').slice(-n).join('\n')` — which is what
+ *    253-REVIEW.md's proposed snippet does — round-trips through a string and therefore (a) loses
+ *    the distinction between a file that ends with a newline and one that does not, and (b) on
+ *    this box, where `core.autocrlf=true` leaves a `\r` inside every working-tree line, re-encodes
+ *    bytes that a same-commit rule exists to compare EXACTLY. A tail check that normalises is a
+ *    tail check that cannot see the drift it is for.
+ *
+ * Terminators recognised are `\r\n`, `\n` and a bare `\r` — the same three `bytes.splitlines`
+ * recognises. (Python's STR splitlines also splits on \v \f \x1c…; its BYTES form does not, and
+ * the harness reads bytes.)
+ */
+function splitLinesKeepEnds(buf) {
+  const lines = [];
+  let start = 0;
+  for (let i = 0; i < buf.length; i += 1) {
+    const b = buf[i];
+    if (b === 0x0a) {
+      lines.push(buf.subarray(start, i + 1));
+      start = i + 1;
+    } else if (b === 0x0d) {
+      if (i + 1 < buf.length && buf[i + 1] === 0x0a) {
+        lines.push(buf.subarray(start, i + 2));
+        i += 1;
+      } else {
+        lines.push(buf.subarray(start, i + 1));
+      }
+      start = i + 1;
+    }
+  }
+  if (start < buf.length) lines.push(buf.subarray(start));
+  return lines;
+}
+
+function md5(buf) {
+  return crypto.createHash('md5').update(buf).digest('hex');
+}
+
+/**
+ * D-11 / MC-1 — the supplement IS `supabase/full-schema.sql`'s byte tail.
+ *
+ * `scripts/regenerate-full-schema.sh` appends the supplement with a plain `cat`, so the two are
+ * identical by construction the moment the artifact is regenerated — and they DIVERGE the moment
+ * someone edits one of them alone. Until 253-03 the only executable enforcement of that rule was
+ * `check-greenfield-privileges.py::assert_supplement_is_the_artifact_tail`, which needs a live
+ * Postgres and is invoked by no hook and no CI job (WR-06). It now also lives here, where the
+ * PostToolUse hook and the `schema-acl-parity` CI job both already run.
+ *
+ * Returns `{ ok, lines, artifactMd5, supplementMd5 }`. A missing or unreadable file is a
+ * `VacuousScanError` (exit 2, harness error) — never a pass, matching `scanSupplement`'s shape.
+ */
+function assertTailIdentity(supplementPath, artifactPath) {
+  let sup;
+  let art;
+  try {
+    sup = fs.readFileSync(supplementPath);
+  } catch (e) {
+    throw new VacuousScanError(`cannot read the supplement ${supplementPath} (${e.code || e.message})`);
+  }
+  try {
+    art = fs.readFileSync(artifactPath);
+  } catch (e) {
+    throw new VacuousScanError(
+      `cannot read the bootstrap artifact ${artifactPath} (${e.code || e.message}) — `
+      + 'refusing to report a verdict on a greenfield bootstrap without reading the file an '
+      + 'operator actually pastes. A gate that passes over an absent artifact is worse than absent.',
+    );
+  }
+  const n = splitLinesKeepEnds(sup).length;
+  const tail = Buffer.concat(splitLinesKeepEnds(art).slice(-n));
+  const supplementMd5 = md5(sup);
+  const artifactMd5 = md5(tail);
+  return { ok: tail.equals(sup), lines: n, artifactMd5, supplementMd5 };
+}
+
 /** Distinct STATEMENTS (not tuples) of one kind, and the files they came from. */
 function statementStats(acls, kind) {
   const stmts = new Set();
@@ -460,9 +559,17 @@ function statementStats(acls, kind) {
 }
 
 /** The pure analysis — one implementation, driven by BOTH the CLI and `--self-test`. */
-function analyse({ migrationsDir, supplementPath, minFiles = MIN_MIGRATION_FILES }) {
+function analyse({
+  migrationsDir,
+  supplementPath,
+  artifactPath = FULL_SCHEMA,
+  minFiles = MIN_MIGRATION_FILES,
+}) {
   const { migrationCount, acls } = scanMigrations(migrationsDir, minFiles);
   const mirroredSet = scanSupplement(supplementPath);
+  // ⚠ AFTER the scan, so a collapsed migrations directory is still reported as the harness error
+  // it is rather than being masked by a tail verdict.
+  const tail = assertTailIdentity(supplementPath, artifactPath);
 
   const expected = new Map();          // key -> { label, kind, files: Set<file> }
   for (const a of acls) {
@@ -478,6 +585,9 @@ function analyse({ migrationsDir, supplementPath, minFiles = MIN_MIGRATION_FILES
     expected,
     missing,
     mirrored,
+    tail,
+    artifactPath,
+    supplementPath,
     fn: statementStats(acls, 'function'),
     tbl: statementStats(acls, 'table'),
   };
@@ -485,7 +595,7 @@ function analyse({ migrationsDir, supplementPath, minFiles = MIN_MIGRATION_FILES
 
 /** Print the verdict and return the exit code. `log` is injectable so --self-test can read it. */
 function report(result, log = console.log) {
-  const { migrationCount, expected, missing, mirrored, fn, tbl } = result;
+  const { migrationCount, expected, missing, mirrored, fn, tbl, tail } = result;
   const fnTuples = [...expected.values()].filter((v) => v.kind === 'function').length;
   const tblTuples = [...expected.values()].filter((v) => v.kind === 'table').length;
 
@@ -493,10 +603,39 @@ function report(result, log = console.log) {
     `schema ACL parity — migrations scanned: ${migrationCount}`
     + ` · FUNCTION: ${fn.statements} statement(s) in ${fn.files} file(s) → ${fnTuples} tuple(s)`
     + ` · TABLE/COLUMN: ${tbl.statements} statement(s) in ${tbl.files} file(s) → ${tblTuples} tuple(s)`
-    + ` · mirrored: ${mirrored.length}/${expected.size}`,
+    + ` · mirrored: ${mirrored.length}/${expected.size}`
+    + ` · tail: ${tail.lines} lines · md5 ${tail.artifactMd5}`,
   );
   if (tbl.perFile.size) {
     log(`  table/column statements per migration: ${[...tbl.perFile.entries()].sort().map(([f, c]) => `${f} (${c})`).join(' · ')}`);
+  }
+
+  // ⛔ THE TAIL VERDICT COMES FIRST, BEFORE THE TUPLE VERDICT, AND THAT ORDER IS LOAD-BEARING.
+  // An artifact that has lost its tail makes every tuple statement about it meaningless: the
+  // tuples are measured against the SUPPLEMENT, and the supplement is only interesting because it
+  // IS the artifact's tail. Report `mirrored: 133/133` over a mutilated artifact and the reader
+  // takes away a clean bill of health on the file that ships.
+  if (!tail.ok) {
+    log(`
+${RED}THE BOOTSTRAP ARTIFACT HAS LOST ITS SUPPLEMENT TAIL${RST} (D-11 / MC-1):
+  supabase/full-schema.sql       last ${tail.lines} lines → md5 ${tail.artifactMd5}
+  scripts/full-schema-supplement.sql              ${tail.lines} lines → md5 ${tail.supplementMd5}
+    artifact read: ${result.artifactPath}
+    supplement read: ${result.supplementPath}
+
+⛔ scripts/regenerate-full-schema.sh appends the supplement with a plain \`cat "\${SUPPLEMENT}"\`
+   (:137-151), so these two are identical BY CONSTRUCTION the moment the artifact is regenerated.
+   A divergence means one of them was edited alone — and whatever the artifact is missing is a
+   Postgres DEFAULT in every greenfield project bootstrapped from it, silently, in the permissive
+   direction.
+
+   Apply the SAME text to BOTH, in the SAME COMMIT, or re-run
+   \`bash scripts/regenerate-full-schema.sh\` (no --reset) to re-append it.
+
+⚠ The tuple verdict above is printed for context only and must NOT be read as a clean bill of
+   health: it compares the migrations to the SUPPLEMENT, which is exactly the file the artifact
+   has stopped agreeing with.`);
+    return 1;
   }
 
   if (!missing.length) {
@@ -527,7 +666,11 @@ function report(result, log = console.log) {
        role-level revoke changes nothing while the PUBLIC grant stands (measured in migration
        177) — it is simply not checked here.
      · REVERSE DRIFT. A supplement MORE permissive than the migration history is NOT detected
-       (D-13).`);
+       (D-13).
+⭐ WHAT THIS GATE *DOES* ALSO CHECK, and which passed on this run — so its silence is not
+   mistaken for absence: the last ${tail.lines} lines of supabase/full-schema.sql are
+   byte-identical to scripts/full-schema-supplement.sql (md5 ${tail.artifactMd5}). The artifact
+   an operator pastes into a greenfield project carries the mirror; only these tuples do not.`);
   return 1;
 }
 
@@ -676,6 +819,28 @@ function runSelfTest() {
     console.log(`  ${ok ? `${GRN}PASS${RST}` : `${RED}FAIL${RST}`}  ${name}${detail ? `  — ${detail}` : ''}`);
   };
 
+  /**
+   * Build a fixture bootstrap artifact for a fixture supplement: an ARBITRARY head (standing for
+   * the `pg_dump --no-privileges` body, which carries no ACL of its own) followed by the
+   * supplement's bytes VERBATIM — exactly what `regenerate-full-schema.sh` produces with `cat`.
+   *
+   * ⚠ Every `analyse()` call below MUST pass one. `artifactPath` defaults to the REAL
+   *   `supabase/full-schema.sql`, so a call that forgets compares a fixture supplement against the
+   *   repo's artifact and fails LOUDLY — a deliberate design choice over an opt-out flag, which
+   *   would be a hole a caller could silently take.
+   */
+  let artifactSeq = 0;
+  const FIXTURE_ARTIFACT_HEAD = '-- fixture bootstrap artifact (stands for the pg_dump --no-privileges body)\n'
+    + 'CREATE TABLE public.widgets (id uuid PRIMARY KEY);\n\n';
+  const artifactFor = (supPath, mutate = null) => {
+    artifactSeq += 1;
+    const out = path.join(tmp, `artifact-${artifactSeq}.sql`);
+    let sup = fs.readFileSync(supPath);
+    if (mutate) sup = mutate(sup);
+    fs.writeFileSync(out, Buffer.concat([Buffer.from(FIXTURE_ARTIFACT_HEAD, 'utf8'), sup]));
+    return out;
+  };
+
   try {
     const migDir = path.join(tmp, 'migrations');
     fs.mkdirSync(migDir);
@@ -701,7 +866,7 @@ function runSelfTest() {
 
     // ── GREEN arm ───────────────────────────────────────────────────────────────────────────
     const greenLines = [];
-    const greenRes = analyse({ migrationsDir: migDir, supplementPath: supComplete });
+    const greenRes = analyse({ migrationsDir: migDir, supplementPath: supComplete, artifactPath: artifactFor(supComplete) });
     const greenCode = report(greenRes, (l) => greenLines.push(l));
     check('GREEN: a complete supplement exits 0', greenCode === 0, `exit=${greenCode}, tuples=${greenRes.expected.size}`);
     check('GREEN: the commented VERIFY block is NOT counted',
@@ -710,7 +875,7 @@ function runSelfTest() {
 
     // ── RED arm: the WHOLE-FUNCTION omission (the gate's original arm, preserved) ────────────
     const redLines = [];
-    const redRes = analyse({ migrationsDir: migDir, supplementPath: supMissing });
+    const redRes = analyse({ migrationsDir: migDir, supplementPath: supMissing, artifactPath: artifactFor(supMissing) });
     const redCode = report(redRes, (l) => redLines.push(l));
     const redOut = redLines.join('\n');
     check('RED arm 1: a planted WHOLE-FUNCTION omission exits 1', redCode === 1, `exit=${redCode}`);
@@ -719,7 +884,7 @@ function runSelfTest() {
 
     // ── NEW RED arm 1 — THE PARTIAL REVOKE (CR-02; stands for resize_embedding_column) ───────
     const parLines = [];
-    const parRes = analyse({ migrationsDir: migDir, supplementPath: supPartial });
+    const parRes = analyse({ migrationsDir: migDir, supplementPath: supPartial, artifactPath: artifactFor(supPartial) });
     const parCode = report(parRes, (l) => parLines.push(l));
     const parOut = parLines.join('\n');
     check('NEW RED arm 1 (PARTIAL REVOKE — stands for `resize_embedding_column … FROM PUBLIC`): exits 1',
@@ -750,6 +915,7 @@ function runSelfTest() {
     const cRes = analyse({
       migrationsDir: commentMigDir,
       supplementPath: supComplete,        // mirrors none of them — every one must show up as missing
+      artifactPath: artifactFor(supComplete),
     });
     const cLabels = [...cRes.expected.values()].map((v) => v.label);
     check('NEW RED arm 2: the ACL AFTER a dollar-quoted body is still found',
@@ -787,7 +953,7 @@ function runSelfTest() {
     fs.writeFileSync(supTblNarrow, FIXTURE_SUPPLEMENT_TABLE_NARROW_COLUMNS);
 
     const tGreenLines = [];
-    const tGreenRes = analyse({ migrationsDir: tableMigDir, supplementPath: supTblComplete });
+    const tGreenRes = analyse({ migrationsDir: tableMigDir, supplementPath: supTblComplete, artifactPath: artifactFor(supTblComplete) });
     const tGreenCode = report(tGreenRes, (l) => tGreenLines.push(l));
     check('NEW RED arm 3 (TABLE): the gate SEES table and column privileges at all',
       tGreenRes.tbl.statements === 4 && tGreenRes.expected.size > 0,
@@ -796,7 +962,7 @@ function runSelfTest() {
       tGreenCode === 0, `exit=${tGreenCode}`);
 
     const tRedLines = [];
-    const tRedRes = analyse({ migrationsDir: tableMigDir, supplementPath: supTblMissing });
+    const tRedRes = analyse({ migrationsDir: tableMigDir, supplementPath: supTblMissing, artifactPath: artifactFor(supTblMissing) });
     const tRedCode = report(tRedRes, (l) => tRedLines.push(l));
     const tRedOut = tRedLines.join('\n');
     check('NEW RED arm 3 (TABLE): a missing table-level REVOKE exits 1', tRedCode === 1, `exit=${tRedCode}`);
@@ -809,7 +975,7 @@ function runSelfTest() {
       'the column-level statement IS mirrored and must not be reported');
 
     const tNarrowLines = [];
-    const tNarrowRes = analyse({ migrationsDir: tableMigDir, supplementPath: supTblNarrow });
+    const tNarrowRes = analyse({ migrationsDir: tableMigDir, supplementPath: supTblNarrow, artifactPath: artifactFor(supTblNarrow) });
     const tNarrowCode = report(tNarrowRes, (l) => tNarrowLines.push(l));
     const tNarrowOut = tNarrowLines.join('\n');
     check('NEW RED arm 3 (COLUMN-SET): mirroring (a) where the migration granted (a, b) exits 1',
@@ -832,12 +998,106 @@ function runSelfTest() {
       greenCode === 0 && greenRes.missing.length === 0,
       'the arm fails for the planted defect, not for the fixture');
 
+    // ── NEW RED arm 5 — THE ARTIFACT TAIL (CR-01, plan 253-03) ──────────────────────────────
+    //
+    // ⚠ The RED here could not even be EXPRESSED against the gate as it shipped: there was no
+    //   `artifactPath`, no FULL_SCHEMA constant, and `analyse()` never opened the deploy artifact
+    //   at all. Passing the option to the old gate was silently ignored and the reproduction
+    //   exited 0 — which is exactly the reviewer's finding, and why the arm is written against
+    //   the REAL supplement rather than a typed copy of one.
+    const realSupplement = fs.readFileSync(SUPPLEMENT);
+
+    // (a) RED — an artifact whose tail has lost the four `resize_embedding_column` ACL lines.
+    //     The real-world statement this stands for is the RPC BUG-260911-01 found callable
+    //     UNAUTHENTICATED in production; it NULLs every vector in the corpus.
+    const supRealCopy = path.join(tmp, 'supplement-real.sql');
+    fs.writeFileSync(supRealCopy, realSupplement);
+    const artStripped = artifactFor(supRealCopy, (buf) => Buffer.concat(
+      splitLinesKeepEnds(buf).filter((l) => !l.toString('utf8').includes('resize_embedding_column')),
+    ));
+    const strippedHits = (fs.readFileSync(artStripped, 'utf8').match(/resize_embedding_column/g) || []).length;
+    const tailStripRes = analyse({
+      migrationsDir: MIGRATIONS_DIR, supplementPath: supRealCopy, artifactPath: artStripped,
+    });
+    const tailStripLines = [];
+    const tailStripCode = report(tailStripRes, (l) => tailStripLines.push(l));
+    const tailStripOut = tailStripLines.join('\n');
+    check('NEW RED arm 5a (ARTIFACT TAIL): an artifact with the `resize_embedding_column` ACLs stripped exits 1',
+      tailStripCode === 1 && strippedHits === 0 && !tailStripRes.tail.ok,
+      `exit=${tailStripCode}, resize_embedding_column occurrences in the artifact=${strippedHits}`);
+    check('NEW RED arm 5a: the failure NAMES supabase/full-schema.sql, the line count and BOTH md5s',
+      tailStripOut.includes('supabase/full-schema.sql')
+      && tailStripOut.includes(String(tailStripRes.tail.lines))
+      && tailStripOut.includes(tailStripRes.tail.artifactMd5)
+      && tailStripOut.includes(tailStripRes.tail.supplementMd5),
+      `${tailStripRes.tail.lines} lines · artifact ${tailStripRes.tail.artifactMd5} · supplement ${tailStripRes.tail.supplementMd5}`);
+
+    // (b) RED — a ONE-BYTE divergence. The coarse arm above would survive a tail check that only
+    //     compared line COUNTS; this one would not.
+    const artOneByte = artifactFor(supRealCopy, (buf) => {
+      const b = Buffer.from(buf);
+      b[b.length - 2] = b[b.length - 2] === 0x20 ? 0x09 : 0x20;
+      return b;
+    });
+    const oneByteRes = analyse({
+      migrationsDir: MIGRATIONS_DIR, supplementPath: supRealCopy, artifactPath: artOneByte,
+    });
+    check('NEW RED arm 5b (ARTIFACT TAIL): a SINGLE-BYTE tail divergence exits 1',
+      report(oneByteRes, () => {}) === 1 && !oneByteRes.tail.ok,
+      `tail md5 ${oneByteRes.tail.artifactMd5} vs supplement ${oneByteRes.tail.supplementMd5}`);
+
+    // (c) HARNESS ERROR — a MISSING artifact is exit 2, never a pass. Phase 242 measured two
+    //     sibling gates exiting 0 over zero parsed files; an absent artifact is that shape.
+    let tailThrew = null;
+    try {
+      analyse({
+        migrationsDir: MIGRATIONS_DIR,
+        supplementPath: supRealCopy,
+        artifactPath: path.join(tmp, 'there-is-no-such-artifact.sql'),
+      });
+    } catch (e) {
+      tailThrew = e;
+    }
+    check('NEW RED arm 5c (ARTIFACT TAIL): a MISSING artifact is a harness error (exit 2), never a pass',
+      tailThrew instanceof VacuousScanError && /bootstrap artifact/.test(tailThrew.message),
+      tailThrew ? tailThrew.message.split('—')[0].trim() : 'nothing was thrown');
+
+    // (d) COUNTERFACTUAL — head + the REAL supplement, byte for byte, stays green. The arms above
+    //     must fail for the planted defect and not for the fixture.
+    const artIdentical = artifactFor(supRealCopy);
+    const identRes = analyse({
+      migrationsDir: MIGRATIONS_DIR, supplementPath: supRealCopy, artifactPath: artIdentical,
+    });
+    const identCode = report(identRes, () => {});
+    check('NEW RED arm 5d (COUNTERFACTUAL): head + the REAL supplement over the REAL migrations exits 0',
+      identRes.tail.ok && identRes.tail.artifactMd5 === identRes.tail.supplementMd5 && identCode === 0,
+      `exit=${identCode} · ${identRes.tail.lines} lines · md5 ${identRes.tail.artifactMd5}`);
+
+    // (e) COUNTERFACTUAL, CRLF — the same identical pair written with \r\n also stays green.
+    //     ⚠ On this box `core.autocrlf=true`, so the working-tree files ARE CRLF; a tail check
+    //     that normalised line endings would pass here for the wrong reason, and one that
+    //     mis-counted them would red on a correct pair. Both files are converted together.
+    const toCrlf = (buf) => Buffer.from(buf.toString('utf8').replace(/\r?\n/g, '\r\n'), 'utf8');
+    const supCrlf = path.join(tmp, 'supplement-crlf.sql');
+    const artCrlf = path.join(tmp, 'artifact-crlf.sql');
+    fs.writeFileSync(supCrlf, toCrlf(realSupplement));
+    fs.writeFileSync(artCrlf, Buffer.concat([
+      toCrlf(Buffer.from(FIXTURE_ARTIFACT_HEAD, 'utf8')),
+      toCrlf(realSupplement),
+    ]));
+    const crlfRes = analyse({
+      migrationsDir: MIGRATIONS_DIR, supplementPath: supCrlf, artifactPath: artCrlf,
+    });
+    check('NEW RED arm 5e (COUNTERFACTUAL, CRLF): an identical \\r\\n pair is tail-OK and its line count matches the \\n pair',
+      crlfRes.tail.ok && crlfRes.tail.lines === identRes.tail.lines,
+      `crlf ${crlfRes.tail.lines} lines vs lf ${identRes.tail.lines} lines`);
+
     // ── count assertion ─────────────────────────────────────────────────────────────────────
     const emptyDir = path.join(tmp, 'empty-migrations');
     fs.mkdirSync(emptyDir);
     let threw = null;
     try {
-      analyse({ migrationsDir: emptyDir, supplementPath: supComplete });
+      analyse({ migrationsDir: emptyDir, supplementPath: supComplete, artifactPath: artifactFor(supComplete) });
     } catch (e) {
       threw = e;
     }
@@ -851,7 +1111,7 @@ function runSelfTest() {
       console.log(`${RED}self-test FAILED${RST} — ${failed.length}/${results.length} assertion(s) did not hold.`);
       return 1;
     }
-    console.log(`${GRN}self-test OK${RST} — ${results.length}/${results.length} assertions: the partial-revoke, comment-swallow and table/column arms all fired, the counterfactual held for both halves, and the count assertion refused a collapsed set.`);
+    console.log(`${GRN}self-test OK${RST} — ${results.length}/${results.length} assertions: the partial-revoke, comment-swallow, table/column and ARTIFACT-TAIL arms all fired, the counterfactuals held (LF and CRLF, functions and tables), and both the collapsed-scan-set and missing-artifact cases were refused as harness errors rather than passed.`);
     return 0;
   } finally {
     // Non-recursive-safe cleanup of a directory this process created, outside the watched tree.
@@ -868,10 +1128,23 @@ function main() {
 
   if (argv.includes('--self-test')) return runSelfTest();
 
-  return report(analyse({ migrationsDir: MIGRATIONS_DIR, supplementPath: SUPPLEMENT }));
+  return report(analyse({
+    migrationsDir: MIGRATIONS_DIR,
+    supplementPath: SUPPLEMENT,
+    artifactPath: FULL_SCHEMA,
+  }));
 }
 
-module.exports = { normaliseSignature, statements, aclsIn, analyse, report, MIN_MIGRATION_FILES };
+module.exports = {
+  normaliseSignature,
+  statements,
+  aclsIn,
+  analyse,
+  report,
+  assertTailIdentity,
+  splitLinesKeepEnds,
+  MIN_MIGRATION_FILES,
+};
 
 if (require.main === module) {
   try {
