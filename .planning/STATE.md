@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v4.2
 milestone_name: The Connected Knowledge You Can Actually Run
 status: executing
-last_updated: "2026-09-17T01:05:00.000Z"
-last_activity: 2026-09-17 -- /gsd:execute-phase 253 complete. Both plans executed in worktrees and merged to develop (253-01 at a56d6fea1, 253-02 at e7200477d). All gates re-run ON THE MERGED TREE: greenfield harness exit 0, ACL parity 133/133 exit 0, self-test 29/29, CLAUDE.md size gate 104,538 chars, backend baseline 71 failed / 0 collection errors, D-11 md5 pair identical. Verification PASSED 14/14, 5/5 success criteria, 0 gaps, status human_needed (the CI job has never executed -- it cannot be driven locally). Next action: /gsd:code-review 253 to discharge BUS-257. SUPERSEDED: /gsd:plan-phase 253 complete. 253-01 + 253-02 PLAN.md written (a843be9cd), SERIAL (wave 1 -> wave 2), plan-checker VERIFICATION PASSED (0 blockers). REG-02 sweep RAN for the first time (296/296, 3 seeds, 1 folded 2 false positives). BUS-257 filed to gemini AT PLAN TIME per D-21. Next action: /gsd:execute-phase 253.
+last_updated: "2026-09-17T02:10:00.000Z"
+last_activity: 2026-09-17 -- /gsd:code-review 253 then /gsd:plan-phase 253 --gaps. REVIEW: issues_found, 2 critical / 11 warning / 5 info over 10 files, standard depth (cfe73e289). CR-01: the ACL parity gate never opens supabase/full-schema.sql -- the artifact it protects -- DRIVEN (ACL stripped from that file, gate printed OK exit 0). CR-02: check-greenfield-privileges.py _strip_sql_comments uses line.find("--"), so a REVOKE after a --bearing literal is invisible -> false GREEN in the PERMISSIVE direction. Operator locked the gap scope to five findings: CR-01, CR-02, WR-02 (hook matcher Write|Edit, MultiEdit fires nothing), WR-06 (greenfield harness invoked by nothing), WR-08 (backend-tests.yml paths miss the supplement). PLANNED: one plan 253-03-PLAN.md (cc28c98f6), wave 3, depends_on 253-02, gap_closure_round 1, autonomous FALSE (Task 3 edits .claude/settings.json). G-7 clear -- rounds completed 1, cap 2. plan-checker VERIFICATION PASSED, 0 blockers, every interface claim re-derived against the live files. ROADMAP SC#3 and SC#4 are the two the review showed unmet against the phase goal. Next action: /gsd:execute-phase 253 (wave 3). SUPERSEDED: 2026-09-17 -- /gsd:execute-phase 253 complete. Both plans executed in worktrees and merged to develop (253-01 at a56d6fea1, 253-02 at e7200477d). All gates re-run ON THE MERGED TREE: greenfield harness exit 0, ACL parity 133/133 exit 0, self-test 29/29, CLAUDE.md size gate 104,538 chars, backend baseline 71 failed / 0 collection errors, D-11 md5 pair identical. Verification PASSED 14/14, 5/5 success criteria, 0 gaps, status human_needed (the CI job has never executed -- it cannot be driven locally). Next action: /gsd:code-review 253 to discharge BUS-257. SUPERSEDED: /gsd:plan-phase 253 complete. 253-01 + 253-02 PLAN.md written (a843be9cd), SERIAL (wave 1 -> wave 2), plan-checker VERIFICATION PASSED (0 blockers). REG-02 sweep RAN for the first time (296/296, 3 seeds, 1 folded 2 false positives). BUS-257 filed to gemini AT PLAN TIME per D-21. Next action: /gsd:execute-phase 253.
 # ⚠ RECONCILED 2026-09-16 (251-04). Wave 1 flagged this block as internally inconsistent and
 #   Waves 2 and 3 carried the finding forward unfixed. The values it held were:
 #     total_phases: 12 · completed_phases: 1 · total_plans: 19 · completed_plans: 9 · percent: 8
@@ -18,9 +18,12 @@ last_activity: 2026-09-17 -- /gsd:execute-phase 253 complete. Both plans execute
 progress:
   total_phases: 7
   completed_phases: 7
-  total_plans: 26
+  total_plans: 27
   completed_plans: 26
   percent: 100
+# ✅ UPDATED 2026-09-17 at Phase 253 GAP-CLOSURE PLANNING: total_plans 26 -> 27 (253-03,
+#   round 1, from 253-REVIEW.md CR-01/CR-02/WR-02/WR-06/WR-08). completed_plans and percent are
+#   UNCHANGED -- planning is not execution. ⛔ Hand-edited. state.* was NOT called.
 # ✅ UPDATED 2026-09-16 at Phase 253 PLANNING: total_plans 24 -> 26 (253 has two plans, D-20).
 #   completed_plans and percent are UNCHANGED -- planning is not execution, and percent tracks
 #   completed_phases/total_phases (6/7), never plans. ⛔ Hand-edited. state.* was NOT called.
