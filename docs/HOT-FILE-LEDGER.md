@@ -10645,8 +10645,10 @@ cells rot within days.
 | [`frontend/src/stores/streamsStore.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcstoresstreamsstorets) | 22 / 14 / 572 | **FIRES** | ⚠ row STALE (`21/13/546`) — 252 touched it. NOT modified by 253; re-derived under CR-08. **244-13**: `WorkflowLock.mode` becomes a REAL discriminator |
 | [`frontend/src/lib/toolMeta.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibtoolmetats) | 10 / 6 / 218 | **FIRES** | ⚠ **absent for its ENTIRE LIFE at 6 phases — row added 244-13, which does NOT modify it.** ⛔ the ONE home of the harness activity string: a literal copied elsewhere makes its byte-pin vacuous |
 | [`scripts/full-schema-supplement.sql`](docs/HOT-FILE-LEDGER.md#scriptsfull-schema-supplementsql) | 11 / 6 / 653 | ⚠ **FIRES** | ⚠ absent for its ENTIRE LIFE at 6 phases — row added 253-02, and ⛔ NO GATE COULD EVER HAVE DEMANDED IT: `scripts/` is EXEMPT in check-hot-file-ledger.cjs. The ONE hand-mirror of every migration ACL |
-| [`scripts/check-schema-acl-parity.cjs`](docs/HOT-FILE-LEDGER.md#scriptscheck-schema-acl-paritycjs) | 3 / 2 / 883 | no (2 phases) | Row added at its SECOND phase, the `settingsSearchPayload.ts` precedent — an absent row is invisible to G-5 at any count, and `scripts/` is EXEMPT so no gate can ask for one |
-| [`scripts/check-greenfield-privileges.py`](docs/HOT-FILE-LEDGER.md#scriptscheck-greenfield-privilegespy) | 1 / 1 / 1157 | no (1 phase) | young (created 253-01). Row added AT CREATION. The ONE greenfield privilege harness; ⛔ a SKIP is exit 2, never 0 — a skip is not a pass. `scripts/` is EXEMPT: no gate can demand this row |
+| [`scripts/check-schema-acl-parity.cjs`](docs/HOT-FILE-LEDGER.md#scriptscheck-schema-acl-paritycjs) | 4 / 2 / 1156 | no (2 phases) | ⚠ row STALE at `3/2/883` ONE PLAN LATER, same day — lines rot faster than phases. **253-03**: it finally READS `full-schema.sql` (`assertTailIdentity`); 29 → 35 self-test arms |
+| [`scripts/check-greenfield-privileges.py`](docs/HOT-FILE-LEDGER.md#scriptscheck-greenfield-privilegespy) | 2 / 1 / 1312 | no (1 phase) | ⚠ row STALE at `1/1/1157` the same day it was written. **253-03**: `_statements` replaces `line.find("--")`; ⛔ a SKIP is exit 2, never 0 |
+| [`.claude/hooks/schema-acl-parity-guard.js`](docs/HOT-FILE-LEDGER.md#claudehooksschema-acl-parity-guardjs) | 2 / 1 / 145 | no (1 phase) | young (created 253-02). Row added AT CREATION — `.claude/` is EXEMPT, so no gate can ever demand it. ⛔ its SILENCE reads as "clear": every path a payload can carry must be extracted |
+| [`.github/workflows/backend-tests.yml`](docs/HOT-FILE-LEDGER.md#githubworkflowsbackend-testsyml) | 4 / 2 / 84 | no (2 phases) | ⚠ absent for its ENTIRE LIFE — row added 253-03. `.github/` is EXEMPT. ⛔ its `paths:` decide which fences a change is measured by; two `scripts/` files were read by unit tests and matched by none |
 
 
 
@@ -14412,8 +14414,21 @@ a migration's `REVOKE` and its silent absence from every greenfield bootstrap.
    `connector_service._TABLE_SELECTABLE_KEYS` in the three-part form: `keys - §5 == {}`,
    `§5 - keys == {created_by}` **by name**, and `secret_ciphertext ∉ §5`.
 3. **Its tail is BYTE-IDENTICAL to `supabase/full-schema.sql`'s**, same commit, no exceptions
-   (D-11). ⚠ **There is no gate behind that rule** — `check-greenfield-privileges.py` asserts it on
-   every run, but that harness needs a live Postgres and SKIPS (exit 2) without one.
+   (D-11). ~~⚠ **There is no gate behind that rule** — `check-greenfield-privileges.py` asserts it on
+   every run, but that harness needs a live Postgres and SKIPS (exit 2) without one.~~
+   ⚠ **CORRECTED 2026-09-17 (Phase 253-03, CR-01) — the original is struck through rather than
+   deleted, because "a row that is present and WRONG stops the audit" is this ledger's own finding
+   and this row was that row.** There IS a gate behind it now:
+   **`scripts/check-schema-acl-parity.cjs::assertTailIdentity`**, which needs **no database**, and
+   which BOTH runners of that gate already carry — `.claude/hooks/schema-acl-parity-guard.js`
+   (PostToolUse, the primary half, and its `SUBJECTS[2]` already matched `full-schema.sql`) and
+   `.github/workflows/schema-acl-parity.yml` (CI, the backstop). ⛔ **The claim was not merely
+   stale, it was load-bearing:** the reviewer stripped every `resize_embedding_column` ACL line
+   from the deploy artifact and the gate printed `mirrored: 133/133` and exited **0**, while the
+   hook matched the file it could not read. The scan line now prints
+   `tail: 653 lines · md5 <hex>`; a mismatch fails **before** the tuple verdict, and a MISSING
+   artifact is exit 2. The Python harness still asserts the same property and is the independent
+   cross-check (both read `653 lines · da9c5616…` on 2026-09-17).
    Current pair md5: `da9c561634d417ebd289bedf07b75f69`.
 4. ⛔ **§0's `SET search_path = public;` is load-bearing and was added under a blocking deviation
    (253-01, `3192f480f`).** `pg_dump` emits `set_config('search_path', '', false)` at
@@ -14442,7 +14457,13 @@ whose `files_modified` names a `scripts/` file.**
 
 ## scripts/check-schema-acl-parity.cjs
 
-**Re-derived 2026-09-17 (Phase 253-02, D-23):** `3 / 2 / 883`. Phase buckets: `252, 253`.
+~~**Re-derived 2026-09-17 (Phase 253-02, D-23):** `3 / 2 / 883`. Phase buckets: `252, 253`.~~
+**RE-DERIVED 2026-09-17 (Phase 253-03, D-23 again, on the gap-closure round): `4 / 2 / 1156`.
+Phase buckets: `252, 253`.** The original is struck through rather than overwritten because this
+row went stale **inside the same day, one plan later** — `883 → 1156` lines, `+273`, and the phase
+count did not move. ⚠ That is the pattern this ledger exists to make visible: the LINE figure rots
+faster than the phase figure, and `252-REVIEW.md` CR-08 has already proposed that the gate should
+fail a row whose line count disagrees with `wc -l` (still deferred — see the supplement's section).
 **Does not fire yet — 2 phases.** Row added at its SECOND phase on the
 `frontend/src/pages/settingsSearchPayload.ts` precedent: **an absent row is invisible to G-5 at any
 count, forever, silently**, and `scripts/` is EXEMPT so no gate will ever ask for one.
@@ -14483,6 +14504,23 @@ anything was rewritten:
    checked, by decision. Re-open triggers, respectively: the next migration that revokes a role
    privilege without revoking PUBLIC first; and any phase that edits the supplement's grants by
    hand. ⚠ A guard whose prose claims more than its code is precisely the defect CR-01 is.
+6. ⭐ **THE ARTIFACT TAIL IS NOW CHECKED HERE (`assertTailIdentity`, Phase 253-03 / CR-01), and it
+   MUST STAY BYTE-LEVEL.** It ports `check-greenfield-privileges.py::_tail_lines` — a
+   `splitlines(keepends=True)[-n:]` over BYTES, compared with `Buffer.equals` plus an md5 for the
+   message. ⛔ Do **not** "simplify" it to `text.split('\n').slice(-n).join('\n')`, which is what
+   `253-REVIEW.md` proposed: it round-trips through a string, loses the difference between a file
+   that ends with a newline and one that does not, and re-encodes the `\r` that `core.autocrlf=true`
+   leaves inside every working-tree line — normalising away exactly the drift a same-commit rule
+   exists to catch. A self-test arm pins the CRLF pair alongside the LF one for that reason.
+   ⛔ A **missing** artifact is `VacuousScanError` → exit **2**, never a pass, and the tail verdict
+   is printed and returned **before** the tuple verdict: a mutilated artifact makes every tuple
+   claim about it meaningless. ⚠ It checks the artifact's TAIL, not its body — an ACL deleted from
+   the `pg_dump` section above the supplement is still invisible (there are none to delete, because
+   the dump runs `--no-privileges`; a future dump-flag change would break that assumption).
+7. ⛔ **`--self-test` MUST pass an `artifactPath` at every `analyse()` call.** `artifactPath`
+   defaults to the REAL `supabase/full-schema.sql`, so a self-test call that forgets compares a
+   fixture supplement against the repository's artifact and fails LOUDLY. That is deliberate,
+   chosen over an opt-out flag — a flag is a hole a caller can silently take.
 
 ⭐ **THE SELF-TEST ARMS ARE THEMSELVES FALSIFIED, not merely present.** Three defects were planted
 in scratchpad COPIES of this file — signature-only keying, the table half switched off, and the
@@ -14490,6 +14528,14 @@ naive line stripper restored — and each made its arms FAIL. ⚠ **The first do
 against its own planted defect and was therefore VACUOUS**; it was replaced with a false-positive
 control (an ACL-shaped line inside a `$$` body is a PHANTOM and must not be counted), which does
 fail when the lexer is reverted. **An arm that cannot fail is the CR-02 defect one level up.**
+
+⭐ **Phase 253-03 added a fourth planted-defect drive and kept the same discipline.** With
+`assertTailIdentity` stubbed to a no-op — i.e. this file as it shipped — the self-test printed
+**`FAIL` for arms 5a, 5b and 5c** (5a reading `exit=0`, the reviewer's exact finding) while the two
+counterfactuals, LF and CRLF, correctly stayed green. **Arm total 29 → 35.** ⛔ The counterfactuals
+staying green under the stub is not a weakness: they assert the ABSENCE of a problem, so a stub
+that removes the check cannot make them red, and an arm set where every arm flips is an arm set
+with no control in it.
 
 **The named seam the next refactor should take.** `aclsIn` now carries two grammars and five
 normalisers in one function. The seam is a **`--emit-missing` mode** (see the supplement's section
@@ -14507,7 +14553,11 @@ with nothing to say so.
 
 ## scripts/check-greenfield-privileges.py
 
-**Derived 2026-09-17 (Phase 253-02, D-23):** `1 / 1 / 1157`. Phase bucket: `253`.
+~~**Derived 2026-09-17 (Phase 253-02, D-23):** `1 / 1 / 1157`. Phase bucket: `253`.~~
+**RE-DERIVED 2026-09-17 (Phase 253-03, D-23): `2 / 1 / 1312`. Phase bucket: `253`.** Struck
+through rather than overwritten: `1157 → 1312` the same day the row was written. The phase bucket
+is unchanged, so **a reader who audits only the phase count sees nothing move** — which is why the
+recipe prints three numbers and why CR-08's proposed line-count check is worth taking.
 **Does not fire — 1 phase.** Row added AT CREATION, which is the only moment that reliably happens:
 `scripts/` is EXEMPT from the ledger gate, so nothing will ever prompt for it later.
 
@@ -14536,9 +14586,30 @@ nothing in the suite ever makes a request as `anon`**.
 4. ⛔ **`has_table_privilege` / `has_column_privilege`, NEVER `information_schema.column_privileges`**
    — the view answers a different question and would have reported the pre-fix database as correct.
 5. **It re-asserts the D-11 tail identity before it touches a database at all**, so it doubles as
-   the same-commit checker for the supplement ↔ `full-schema.sql` pair.
+   the same-commit checker for the supplement ↔ `full-schema.sql` pair. ⚠ **It is no longer the
+   ONLY home of that rule (Phase 253-03 / CR-01):** `check-schema-acl-parity.cjs::assertTailIdentity`
+   carries the same check with **no database**, which is what puts it inside the PostToolUse hook
+   and the CI backstop. This one remains the **independent cross-check** — both read
+   `653 lines · md5 da9c561634d417ebd289bedf07b75f69` on 2026-09-17, in two languages.
 6. ⛔ **It is deliberately NOT in `backend/tests/unit`** (D-04). That suite sits at a **71-failure
    ceiling with zero headroom** and must not gain a live-database precondition.
+7. ⭐ **ITS PARSING HALF *IS* IN `backend/tests/unit` NOW, and that is not a contradiction of (6).**
+   `backend/tests/unit/test_253_greenfield_sql_lexer.py` (14 arms) imports this module with the
+   `test_241_bench_safety.py` importlib idiom and drives `_statements` / `_parse_statement`
+   directly. It is possible only because **`asyncpg` is imported lazily inside
+   `_require_asyncpg()`** — nothing at module level touches a driver, a socket or an env var.
+   ⛔ **Keep it that way.** A module-level `import asyncpg`, or any module-level DB/env read, turns
+   that fence into a collection error and costs the 71-failure ceiling its headroom.
+8. ⛔ **`_statements` IS THE ONE SPLITTER (Phase 253-03 / CR-02).** The old `_strip_sql_comments`
+   truncated at `line.find("--")`, including a `--` inside a string literal, which ate the
+   literal's closing quote AND its semicolon and hid the next statement. ⚠ **Its failure direction
+   is PERMISSIVE and that is what made it dangerous:** the REVOKE vanishes from the expectation
+   model, `PrivilegeModel` leaves `anon` with the stock `GRANT ALL`, and a greenfield database
+   *missing that same mirrored REVOKE* then MATCHES — expected == measured, exit 0. The stripper
+   is now rebuilt on the lexer rather than left beside it: a defect that survives behind a second
+   door is the same defect. ⚠ Remaining divergences from the `.cjs` twin are written into
+   `_statements`' docstring rather than left to be discovered (WR-09's `ON ALL TABLES IN SCHEMA`
+   disagreement lives in the PARSER, not the splitter).
 
 **The named seam the next refactor should take.** At 1157 lines it already holds three separable
 things: the target guard, the derive-then-replay expectation model, and the reporting. The **first
@@ -14547,3 +14618,94 @@ seam is the expectation model** — it duplicates, in Python, the tuple normalis
 languages is exactly how a pair of registers comes to disagree, and this ledger's recurring finding
 is that only one register ever gets updated. Extract it, or make one gate the authority and have
 the other consume its output.
+
+## .claude/hooks/schema-acl-parity-guard.js
+
+**Derived 2026-09-17 (Phase 253-03, D-23):** `2 / 1 / 145`. Phase bucket: `253`.
+**Does not fire — 1 phase.** Row added AT CREATION-plus-one, which is the only moment that
+reliably happens: `check-hot-file-ledger.cjs`'s `WATCHED` set is `backend/app/` + `frontend/src/`
+only, so `.claude/` is EXEMPT and **no gate will ever ask for this row**.
+
+**What it is.** The PRIMARY half of the two-guards rule for the ACL mirror: a PostToolUse hook that
+runs `scripts/check-schema-acl-parity.cjs` when the write touched a numbered migration,
+`scripts/full-schema-supplement.sql`, or `supabase/full-schema.sql`. CI is the backstop, and
+CLAUDE.md's reason for that ordering is measured: `develop` once ran **634 commits over 8 days
+without a push**, so an `on: push` gate could not have fired once in that window.
+
+**Invariants that bind it.**
+
+1. ⛔ **ITS SILENCE READS AS "THE GATE IS CLEAR", so every way it can be silent is a way it can
+   lie.** It exits 0 and prints nothing when the gate passes — which is correct and cheap — and
+   therefore a path it fails to EXTRACT is indistinguishable, to the author, from a clean tree.
+   ⚠ Measured at 253-03 (WR-02): a `MultiEdit` payload whose path lives only in
+   `tool_input.edits[].file_path` yielded `''` and **0 bytes of stdout with a real defect planted**.
+   Extraction is now a CANDIDATE LIST — `file_path`, `filePath`, `notebook_path`, and every
+   `edits[].file_path` / `edits[].filePath` — and exit 0 happens only when NO candidate is a
+   subject. ⛔ A new tool shape with a new path key belongs in that list on the day it appears.
+   ⭐ **AND THE MEASUREMENT CORRECTED THE PLAN THAT COMMISSIONED IT:** `253-03-PLAN.md` predicted
+   BOTH MultiEdit shapes were silent. Driven, the shape carrying a top-level `file_path` ALONGSIDE
+   `edits[]` **already fired** (2615 bytes, `acl_parity_gate_exit: 1`); only the `edits[]`-ONLY
+   shape read 0. WR-02 therefore had **two independent causes** — this extraction, and the
+   `.claude/settings.json` matcher that never dispatches `MultiEdit` here at all — and fixing
+   either one alone changes nothing in a live session.
+2. ⛔ **THE NEGATIVE CONTROL IS DRIVEN WITH THE DEFECT STILL PLANTED.** A non-subject payload must
+   be silent *while the supplement is genuinely broken*; silence over a clean tree proves nothing
+   about the path filter. Both 253-02's and 253-03's drives follow this, and both restore the
+   supplement and PROVE the restore by md5 (`da9c561634d417ebd289bedf07b75f69`).
+3. ⚠ **`SUBJECTS[2]` matches `supabase/full-schema.sql`, and until 253-03 the gate could not read
+   that file at all** — so editing the artifact triggered a guard that was structurally unable to
+   fail and the author got silence. That is now closed by `assertTailIdentity`; the pairing of a
+   hook subject with a gate capability is the thing to re-check whenever either moves.
+4. ⛔ **Not prefixed `gsd-`, and not inside `.claude/get-shit-done/`, on purpose** — it must survive
+   a framework update. ⚠ But its REGISTRATION lives in `.claude/settings.json`, which is an
+   operator config file: if a settings rewrite drops the entry, **this file keeps working and fires
+   NEVER, with nothing to say so.** Re-check the registration after any framework update.
+
+**The named seam the next refactor should take.** `pathCandidates` is now generic while the rest of
+the file is specific to one gate, and `hot-file-ledger-guard.js` / `landing-drift-guard.js` /
+`claude-md-size-guard.js` each re-implement the same stdin-read → path-extract → run-a-gate →
+emit-`hookSpecificOutput` shape. The seam is **a shared `runGateOnSubjects(SUBJECTS, gatePath)`
+helper**, and the trigger to take it is the NEXT hook that needs MultiEdit-shaped extraction — this
+fix would otherwise be applied a fourth time by hand, which is WR-11's complaint one directory over.
+⛔ Deferred at 253-03 by the operator's five-finding scope lock, not by judgement.
+
+## .github/workflows/backend-tests.yml
+
+**Derived 2026-09-17 (Phase 253-03, D-23):** `4 / 2 / 84`. Phase buckets: `061, 253`.
+**Does not fire — 2 phases.** ⚠ **Absent for its ENTIRE LIFE** until this row; `.github/` is EXEMPT
+from `check-hot-file-ledger.cjs`, so no gate could ever have demanded it.
+
+**What it is.** The CI job that runs `pytest tests -q` for the backend. Its `paths:` filters decide
+**which fences a change is measured by** — which makes this small file a trust boundary, not
+plumbing.
+
+**Invariants that bind it.**
+
+1. ⛔ **EVERY NON-`backend/` FILE A BACKEND UNIT TEST READS MUST BE IN BOTH TRIGGER ARMS.** Measured
+   at 253-03 (WR-08): `scripts/full-schema-supplement.sql` and `scripts/check-greenfield-privileges.py`
+   are read by `test_253_supplement_column_parity.py` and `test_253_greenfield_sql_lexer.py`, and
+   were matched by **no filter in either arm** — so the one change that breaks a fence was the one
+   change that did not run it. Held there by
+   `backend/tests/unit/test_253_ci_path_coverage.py`, which **DERIVES** the subject set by importing
+   those modules and collecting their out-of-`backend/` `pathlib.Path` constants. ⛔ Adding a path
+   here without a reader, or a reader without a path, is drift in one direction or the other.
+2. ⚠ **PyYAML PARSES THE BARE KEY `on` AS THE BOOLEAN `True`** (YAML 1.1). Any tool reading this
+   file must try `doc.get("on") or doc.get(True)` **and assert it found something**; `doc.get("on", {})`
+   silently tests nothing and passes. Named here so it is not rediscovered.
+3. ⚠ **THE WORKFLOW'S OWN FILE IS IN `push.paths` AND NOT IN `pull_request.paths`.** Pre-existing,
+   and deliberately NOT repaired at 253-03 (outside the operator's five-finding lock). It is PINNED
+   by `test_253_ci_path_coverage.py::test_the_workflows_own_file_is_in_the_push_arm_only`, so a
+   future reader meets a FACT rather than an accident and fixing it is a deliberate act that reds
+   that arm on purpose.
+4. ⛔ **The non-vacuity floor on the derived set is its own arm.** With the set emptied, the
+   coverage assertion passes **vacuously** — driven and observed at 253-03 — and only the floor goes
+   red. This is Phase 242's measured defect (two guards exiting 0 over zero parsed files) in a third
+   place; a derived-set fence without a floor is not a fence.
+
+**The named seam the next refactor should take.** None proposed — 84 lines, two phases. ⚠ What is
+OWED instead is WR-06's residue: the greenfield harness's **database** half still runs nowhere but
+on an operator's machine. It hardcodes `127.0.0.1:54322` (`ALLOWED_PORTS`), needs the `vector`
+extension and mutates a cluster, so it cannot go on `ubuntu-latest` as-is. **Re-open trigger: a CI
+runner that can host a pgvector-capable Postgres on 54322 (which would also require `ALLOWED_PORTS`
+to become a small derived set rather than a constant), or the next promotion where
+`get_advisors(security)` disagrees with a local run.**
