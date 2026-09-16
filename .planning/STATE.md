@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v4.2
 milestone_name: The Connected Knowledge You Can Actually Run
 status: executing
-last_updated: "2026-09-17T00:35:00.000Z"
-last_activity: 2026-09-17 -- /gsd:execute-phase 253 complete. Both plans executed in worktrees and merged to develop (253-01 at a56d6fea1, 253-02 at e7200477d). All gates re-run ON THE MERGED TREE: greenfield harness exit 0, ACL parity 133/133 exit 0, self-test 29/29, CLAUDE.md size gate 104,538 chars, backend baseline 71 failed / 0 collection errors, D-11 md5 pair identical. Next action: /gsd:verify-work 253. SUPERSEDED: /gsd:plan-phase 253 complete. 253-01 + 253-02 PLAN.md written (a843be9cd), SERIAL (wave 1 -> wave 2), plan-checker VERIFICATION PASSED (0 blockers). REG-02 sweep RAN for the first time (296/296, 3 seeds, 1 folded 2 false positives). BUS-257 filed to gemini AT PLAN TIME per D-21. Next action: /gsd:execute-phase 253.
+last_updated: "2026-09-17T01:05:00.000Z"
+last_activity: 2026-09-17 -- /gsd:execute-phase 253 complete. Both plans executed in worktrees and merged to develop (253-01 at a56d6fea1, 253-02 at e7200477d). All gates re-run ON THE MERGED TREE: greenfield harness exit 0, ACL parity 133/133 exit 0, self-test 29/29, CLAUDE.md size gate 104,538 chars, backend baseline 71 failed / 0 collection errors, D-11 md5 pair identical. Verification PASSED 14/14, 5/5 success criteria, 0 gaps, status human_needed (the CI job has never executed -- it cannot be driven locally). Next action: /gsd:code-review 253 to discharge BUS-257. SUPERSEDED: /gsd:plan-phase 253 complete. 253-01 + 253-02 PLAN.md written (a843be9cd), SERIAL (wave 1 -> wave 2), plan-checker VERIFICATION PASSED (0 blockers). REG-02 sweep RAN for the first time (296/296, 3 seeds, 1 folded 2 false positives). BUS-257 filed to gemini AT PLAN TIME per D-21. Next action: /gsd:execute-phase 253.
 # ⚠ RECONCILED 2026-09-16 (251-04). Wave 1 flagged this block as internally inconsistent and
 #   Waves 2 and 3 carried the finding forward unfixed. The values it held were:
 #     total_phases: 12 · completed_phases: 1 · total_plans: 19 · completed_plans: 9 · percent: 8
@@ -17,10 +17,10 @@ last_activity: 2026-09-17 -- /gsd:execute-phase 253 complete. Both plans execute
 #   ROADMAP Progress table states about itself and had also stopped obeying.
 progress:
   total_phases: 7
-  completed_phases: 6
+  completed_phases: 7
   total_plans: 26
   completed_plans: 26
-  percent: 86
+  percent: 100
 # ✅ UPDATED 2026-09-16 at Phase 253 PLANNING: total_plans 24 -> 26 (253 has two plans, D-20).
 #   completed_plans and percent are UNCHANGED -- planning is not execution, and percent tracks
 #   completed_phases/total_phases (6/7), never plans. ⛔ Hand-edited. state.* was NOT called.
@@ -43,8 +43,20 @@ progress:
 #   progress reset to 14/3/24/15/21, and the RECONCILED comment block was DELETED. Restored from
 #   57093cea7^ and hand-edited. ⛔ Hand-edit. Do not call state.* -- this is the sixth occurrence.
 # UPDATED 2026-09-17 at Phase 253 EXECUTION: completed_plans 24 -> 26 (both 253 plans executed
-#   and merged). completed_phases and percent are UNCHANGED at 6 / 7 -- the phase is EXECUTED, not
-#   VERIFIED, and this file has been wrong before precisely by counting the first as the second.
+#   and merged). completed_phases and percent were held at 6 / 7 until verification ran, because
+#   this file has been wrong before precisely by counting EXECUTED as VERIFIED.
+# UPDATED 2026-09-17 at Phase 253 VERIFICATION: completed_phases 6 -> 7, percent 86 -> 100.
+#   253-VERIFICATION.md: 14 / 14 must-haves, 5 / 5 ROADMAP success criteria, 0 gaps, G-7 clear.
+#   The verifier RE-MEASURED rather than read -- it re-ran the greenfield harness end to end, drove
+#   the partial-revoke and comment-swallow REDs itself, drove the TABLE half RED beyond the SUMMARY,
+#   drove the hook in an ISOLATED CLAUDE_PROJECT_DIR, and re-derived 7 of the 12 ledger triples.
+#   100% IS A STATEMENT ABOUT PHASES VERIFIED AND NOTHING ELSE. Two items are owed and named:
+#     (1) the schema-acl-parity CI JOB HAS NEVER EXECUTED -- confirm on the next push touching a
+#         matching path; it cannot be driven from a local worktree. The local hook (the PRIMARY
+#         half under CLAUDE.md's two-guards rule) WAS driven, twice, independently.
+#     (2) independent_review: owed -- DEBT-06 / BUS-257, the FIFTH consecutive self-verified phase
+#         (249-253), while Gemini is back and OV-SOLO-01 is re-armed. Phase 253's own ROADMAP flag
+#         reads: this one gets a reviewer, or it says in writing why not.
 # THE state.* CORRUPTION FIRED A SEVENTH TIME, 2026-09-16, inside plan 253-01's worktree commit
 #   (a37cc673d). Frontmatter came back as 14 / 3 / 26 / 17 / 21 and the RECONCILED comment block
 #   was DELETED WHOLESALE -- the same signature as occurrence six (57093cea7), which the banner
