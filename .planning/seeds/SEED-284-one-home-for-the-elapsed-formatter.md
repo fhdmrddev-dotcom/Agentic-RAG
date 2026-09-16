@@ -7,7 +7,18 @@ status: planted
 status_note: |
   ── 2026-09-16 · reviewed at `/gsd:discuss-phase 252`, LEFT PLANTED (REG-02 sweep).
   The extraction stays OWED. 252-04 Task 4 fixes only W-8 — `ThinkingBlock.tsx:158` cited the
-  non-existent path `SEED-269-one-home-for-the-elapsed-formatter.md`; it now cites THIS file. The
+  non-existent path `SEED-269-one-home-for-the-elapsed-formatter.md`; it now cites THIS file, as of
+  commit `4e982fe7b`.
+
+  ⚠ CORRECTED THE SAME DAY, and the original clause is kept above rather than overwritten, because
+  the slip is the finding. When this note was first written — at `/gsd:discuss-phase 252`, hours
+  before 252-04 ran — the words *"it now cites THIS file"* were **FALSE**: the citation was still
+  the dangling `SEED-269-…` path and the fix had not been built. A forward-looking claim written in
+  the present tense is indistinguishable, to every later reader, from a measured one. ⭐ That is the
+  exact class of defect W-8 IS, and the exact class of defect `BUG-260915-01`'s mechanism was —
+  committed, in this file, by the phase closing both. Caught by 252-04's executor while verifying
+  its own citation, not by review. The
+
   three formatters (`RunCard.tsx`, `MessageList.tsx`, `ThinkingBlock.tsx`) are unchanged, and the
   reason recorded in that comment — that extracting would edit two files outside the plan's
   `files_modified` and so skip the ledger row + section update D-243-07 requires in the same commit —
