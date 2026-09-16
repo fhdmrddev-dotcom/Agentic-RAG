@@ -11,10 +11,23 @@ on:
       - "backend/**"
       - "supabase/migrations/**"
       - ".github/workflows/backend-tests.yml"
+      # Phase 253-03 / WR-08. These two live under scripts/ but are READ by backend unit
+      # tests, so without them the one change that breaks a fence is the one change that
+      # does not run it. Held there by tests/unit/test_253_ci_path_coverage.py, which
+      # DERIVES this set from the test modules rather than trusting this list.
+      - "scripts/full-schema-supplement.sql"        # tests/unit/test_253_supplement_column_parity.py
+      - "scripts/check-greenfield-privileges.py"    # tests/unit/test_253_greenfield_sql_lexer.py
   pull_request:
     paths:
       - "backend/**"
       - "supabase/migrations/**"
+      # Phase 253-03 / WR-08 — see the push arm above. ⚠ `.github/workflows/backend-tests.yml`
+      # is deliberately NOT added here: that asymmetry is pre-existing and outside this
+      # gap-closure round's locked scope. It is PINNED by
+      # test_253_ci_path_coverage.py::test_the_workflows_own_file_is_in_the_push_arm_only
+      # so a future reader meets a fact rather than an accident.
+      - "scripts/full-schema-supplement.sql"        # tests/unit/test_253_supplement_column_parity.py
+      - "scripts/check-greenfield-privileges.py"    # tests/unit/test_253_greenfield_sql_lexer.py
 
 jobs:
   pytest:
