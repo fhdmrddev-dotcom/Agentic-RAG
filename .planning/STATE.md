@@ -4,7 +4,7 @@ milestone: v4.2
 milestone_name: The Connected Knowledge You Can Actually Run
 status: executing
 last_updated: "2026-09-16T12:00:00.000Z"
-last_activity: 2026-09-16 -- Phase 251 plan 04 executed and the phase CLOSED (the seeds sweep is CALLED at both GSD touchpoints; the operator has a 5-item decision list; REQUIREMENTS.md swept 25/26)
+last_activity: 2026-09-16 -- v4.2 MILESTONE AUDIT run; closed `gaps_found` (4 blockers, 9 warnings, flows 1/3, integration 16/22) and Phase 252 added to close them. Next action: `/gsd:discuss-phase 252`
 # ⚠ RECONCILED 2026-09-16 (251-04). Wave 1 flagged this block as internally inconsistent and
 #   Waves 2 and 3 carried the finding forward unfixed. The values it held were:
 #     total_phases: 12 · completed_phases: 1 · total_plans: 19 · completed_plans: 9 · percent: 8
@@ -16,11 +16,15 @@ last_activity: 2026-09-16 -- Phase 251 plan 04 executed and the phase CLOSED (th
 #   ⭐ Re-derived from the phase directories, never from a summary line — the same rule the
 #   ROADMAP Progress table states about itself and had also stopped obeying.
 progress:
-  total_phases: 5
+  total_phases: 6
   completed_phases: 5
   total_plans: 19
   completed_plans: 19
-  percent: 100
+  percent: 83
+# ⚠ MOVED 2026-09-16 (milestone audit). It read `5 / 5 · 100%` and that was TRUE of the phases
+#   as they existed. `.planning/v4.2-MILESTONE-AUDIT.md` closed `gaps_found` — 4 blockers,
+#   9 warnings, flows 1/3, integration 16/22 — and added **Phase 252** to close them, so the
+#   denominator is 6. ⛔ The five closed phases are NOT reopened; 252 is a new sixth phase.
 ---
 
 # Project State
@@ -42,7 +46,7 @@ See: `.planning/PROJECT.md` (updated 2026-09-13)
 can be taught new behaviors (skills) that persist and can be shared.
 
 **Current focus:** **v4.2 The Connected Knowledge You Can Actually Run** — started 2026-09-13.
-Phases **247+**. Phases 247, 248, **249** and **250** closed. Requirements: `.planning/REQUIREMENTS.md`. ⚠ Phase 250's CODE REVIEW round closed on 2026-09-15 (9 of 9 Critical+Warning fixed, 4 of 5 Info; see `250-REVIEW.md` → *Resolution log*) and left **`BUG-260915-01` filed but NOT fixed** — open todos read `Not ticked` on a LIVE run after a plain thread open, because nothing reconciles on thread-switch. Its fix is a trigger change in `StreamsProvider.tsx` (G-5 FIRING), so it is a PHASE, not a closure round. ⭐ **Phase 251 (Register Integrity) is CLOSED 2026-09-16 and v4.2 is complete on code — all five phases.** Next action: **`/gsd:complete-milestone`**, after the operator rules on `251-BUS-TRIAGE.md`. ⚠ **Both of Phase 250's live examples were closed by 251-04**: `REQUIREMENTS.md`'s `WATCH 0/8` and `CRED 0/4` are now ticked against a named artifact each (25 of 26; `DEBT-06` left unticked **with its reason**), and the register is swept by something executable that is now CALLED at `/gsd:discuss-phase` and `/gsd:new-milestone`. ⛔ **`DEBT-06` is the one requirement outstanding and it is a real gap, not bookkeeping** — 238/240/241 plus 249 and 250 all carry `independent_review: owed`, and `BUS-247` records a self-verified close that shipped two blockers with every gate green.
+Phases **247+**. Phases 247, 248, **249** and **250** closed. Requirements: `.planning/REQUIREMENTS.md`. ⚠ Phase 250's CODE REVIEW round closed on 2026-09-15 (9 of 9 Critical+Warning fixed, 4 of 5 Info; see `250-REVIEW.md` → *Resolution log*) and left **`BUG-260915-01` filed but NOT fixed** — open todos read `Not ticked` on a LIVE run after a plain thread open, because nothing reconciles on thread-switch. Its fix is a trigger change in `StreamsProvider.tsx` (G-5 FIRING), so it is a PHASE, not a closure round. ⭐ **Phase 251 (Register Integrity) is CLOSED 2026-09-16 and v4.2 is complete on code — all five phases.** ⚠ **SUPERSEDED THE SAME DAY, and the original is kept rather than overwritten because its claim was reasonable and wrong.** It read *"Next action: `/gsd:complete-milestone`, after the operator rules on `251-BUS-TRIAGE.md`."* **`/gsd:audit-milestone 4.2` ran first and closed `gaps_found`** — 4 blockers, 9 warnings, `flows 1/3`, `integration 16/22` — moving **`CRED-01`, `CRED-03`, `WATCH-04` and `HONEST-03`** from ✅ satisfied to ⛔ unsatisfied. ⭐ *"Complete on code"* was true of every phase read on its own terms and false of the five read together. **Next action: `/gsd:discuss-phase 252`** (`.planning/v4.2-MILESTONE-AUDIT.md` §8 is its scope). The operator's ruling on `251-BUS-TRIAGE.md` — `BUS-246` / `BUS-247` / `BUS-248` — is still owed and does not block 252. ⛔ **`BUG-260915-01`'s stated mechanism is measurably FALSE** — `setViewingThread` already fires `reconcile` (`StreamsProvider.tsx:1936-1942`), so the sentence above about *"nothing reconciles on thread-switch"* is wrong and its fix candidate #1 would ship a no-op; correct the report before building. ⚠ **Both of Phase 250's live examples were closed by 251-04**: `REQUIREMENTS.md`'s `WATCH 0/8` and `CRED 0/4` are now ticked against a named artifact each (25 of 26; `DEBT-06` left unticked **with its reason**), and the register is swept by something executable that is now CALLED at `/gsd:discuss-phase` and `/gsd:new-milestone`. ⛔ **`DEBT-06` is the one requirement outstanding and it is a real gap, not bookkeeping** — 238/240/241 plus 249 and 250 all carry `independent_review: owed`, and `BUS-247` records a self-verified close that shipped two blockers with every gate green.
 
 ## ✅ v4.1 IS DEPLOYED — 2026-09-13, and this closes three of the seven carried items below
 
@@ -121,8 +125,11 @@ owed work at all.
 Phase: **251 — Register Integrity** — ⭐ **CLOSED 2026-09-16**, and with it **v4.2 is complete on
 code, all five phases**. Plans **251-01** `b38bd8444` · **251-02** `eff1afa7e` · **251-03**
 `78c8cf010` · **251-04** `8458be004` → `f49b9d51b` → `e7cfc5a4e` → `134cb4ffa`.
-Plan: **4 / 4 done.** Status: **phase complete — next action `/gsd:complete-milestone`**, after the
-operator rules on `251-BUS-TRIAGE.md`.
+Plan: **4 / 4 done.** Status: **phase complete.** ⚠ **Its next-action was SUPERSEDED 2026-09-16 and the
+original is preserved here rather than overwritten:** it read *"next action `/gsd:complete-milestone`,
+after the operator rules on `251-BUS-TRIAGE.md`."* The audit ran first, closed **`gaps_found`**, and
+**Phase 252** now sits between this phase and the close. **Next action: `/gsd:discuss-phase 252`.**
+⛔ Nothing about Phase 251's own verdict changes — none of the audit's 4 blockers is in `REG-01/02/03`.
 
 ⭐ **VERIFIED 2026-09-16 — `251-VERIFICATION.md`, 3 / 3 ROADMAP success criteria, `gaps_found: none`.**
 `verification_mode: self-verified` · `independent_review: owed` (DEBT-06) — the verifier was a
@@ -607,6 +614,24 @@ remain the honest floor.
 | Backend unit | **71 failed / 4491 passed** — the project ceiling **exactly**, and the failing **SET** diffed identical in both directions, not merely an equal count |
 | Vitest count gate | RED on 3-4 **provably-unmodified** `SEED-171` flakes — captured before any re-run, per the triage procedure |
 | Hot-file ledger · CLAUDE.md size · G-7 | all clear |
+
+## Roadmap Evolution
+
+- **Phase 252 added 2026-09-16 — by the milestone audit, not by a feature request.**
+  `/gsd:audit-milestone 4.2` closed **`status: gaps_found`**: `requirements 15/26 satisfied · 6 partial
+  · 5 unsatisfied`, `integration 16/22`, `flows 1/3`, **4 blockers · 9 warnings**. Report:
+  `.planning/v4.2-MILESTONE-AUDIT.md`. Phase dir: `.planning/phases/252-close-the-v42-audit-gaps/`.
+  ⛔ It moved **`CRED-01`, `CRED-03`, `WATCH-04`, `HONEST-03`** from ✅ satisfied to ⛔ unsatisfied.
+  ⭐ **All five phases' own verifications read `passed` and every gate was green** — the four blockers
+  are each a seam between two things that are individually correct, which is `DEBT-06`'s argument
+  arriving from outside the registers.
+  ⚠ **`gsd-sdk query phase.add` was tried first and wrote the entry into the WRONG SECTION** — the
+  bottom of the file, inside the archived v2.5 block, touching **none** of v4.2's four registers
+  (Phase Table, Phase Checklist, Phase Details, Progress). It was reverted from a backup and the five
+  edits were made by hand. **Another instance of the recorded rule: hand-edit the planning registers,
+  do not trust the SDK write verbs.**
+  ⚠ The audit also corrected the ROADMAP **Phase Checklist** box for **248**, which read `[ ]` while
+  its Progress row read ✅ CLOSED 2026-09-15 with a peer-reviewed 4/4 verification on disk.
 
 ## Accumulated Context
 
