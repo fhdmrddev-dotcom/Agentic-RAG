@@ -309,6 +309,18 @@ fresh worktree false-failed every plan:
    and pinning it with an allowance makes a gate that cannot fail. It is invisible to the verdict
    line above, which is exactly why it is named here.
 
+   ⚠ **AND THE CORRECTION ITSELF ROTTED BACK — measured 2026-09-16 (Phase 252). Both figures stand;
+   neither is deleted, because the OSCILLATION is the finding.** Re-measured on a quiet tree,
+   `GSD_VITEST_MAX_WORKERS=2`: **`16 failed | 33 passed (49)`** — the ORIGINAL, struck-through
+   number, not the 2026-09-08 replacement. Confirmed independently by 252-03's executor, which
+   proved it inherited by **measurement rather than by unchangedness**: the suite mounts a component
+   that plan touched, so it checked those four source files out at the phase base (explicit paths
+   only — no blanket reset, no `git clean`), re-ran, read an identical 16/33, and restored.
+   ⭐ **The lesson is not "16 is right".** It is that this figure is **not stable**, so *"it matches
+   what CLAUDE.md says"* proves an inherited red no more than *"it does not"* proves a new one.
+   ⛔ **Establish inherited-vs-new by checking out the base and re-running — never by comparing
+   against a number written here.**
+
    ---
 
    ⚠ **THE CAP WAS NEITHER ADJUSTED NOR NEEDED, for the second consecutive close.** It held at `2`,
