@@ -4,6 +4,10 @@ title: The app has no client-side router at all — twelve views, zero addressab
 created: 2026-08-18
 planted_during: Phase 197 close — operator observation, after watching Claude navigate to localhost:5173/workflows and get the chat page
 status: planted
+status_note: |
+  ── 2026-09-16 · reviewed at `/gsd:discuss-phase 252`, LEFT PLANTED (REG-02 sweep).
+  Fired on `frontend/src/**` breadth only. 252 is scoped to the v4.2 milestone audit §8; a router is
+  a capability, and G-7 forbids one in a gap-closure phase.
 priority: high
 surface: Agentic-RAG
 relates_to:

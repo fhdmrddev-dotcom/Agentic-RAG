@@ -3,11 +3,44 @@ seed_id: SEED-266
 title: full-schema.sql carries no table ACLs and leaks `SET row_security = off` — benign for a Supabase paste, a live trap for a plain-Postgres bootstrap or any program that applies it
 created: 2026-09-10
 planted_during: Phase 241 (QUEUE-06), plan 241-04 — found by RUNNING the artifact, not by reading it
-status: planted
+status: partially-answered
+partial: true
+status_note: |
+  ── 2026-09-16 · ROUTED at `/gsd:discuss-phase 252` (REG-02 sweep). Status moved
+  `planted` -> `partially-answered`, `partial: true`, because exactly ONE of this seed's two
+  measured defects is answered and the other is untouched.
+
+  ⭐ ANSWERED — the missing-ACL half, for FUNCTIONS only. Phase 252 Plan 01 (SC#1, `CRED-03`/
+  `CRED-04`) adds section 6 to `scripts/full-schema-supplement.sql`, mirroring migration 181's
+  31 REVOKEs and 17 GRANTs over 13 SECURITY DEFINER functions into the bootstrap artifact, and
+  ships `scripts/check-schema-acl-parity.cjs` — a gate that FAILS when a migration grants or
+  revokes EXECUTE on a function the supplement does not mirror, driven RED against a planted
+  omission and against the counterfactual.
+
+  ⛔ STILL OPEN, and deliberately so:
+  (a) TABLE and COLUMN privileges. §6 covers function EXECUTE only. §5's mig-118 column grant is
+      still the sole table-level mirror, and it is still maintained by hand — this seed's arm 1 in
+      its original width.
+  (b) `SET row_security = off`. Byte-unchanged by 252; the leak this seed measured on a plain
+      Postgres connection is exactly as it was.
+  (c) `--no-privileges` itself (arm 3). NOT revisited, and the reason is recorded in
+      `252-01-PLAN.md`: dropping it would make a dump carry the local dev box's entire ACL state,
+      including roles that exist nowhere else — a larger and less reviewable artifact than the 31
+      lines actually owed.
+
+  ⚠ The trigger fired on `**/full-schema.sql` and this phase DID edit that file — by the one
+  sanctioned exception to *never hand-edit full-schema.sql*: `regenerate-full-schema.sh` cannot
+  run (Docker is denied in this environment), 181 changes no schema object, and the supplement was
+  MEASURED to be the artifact's byte-identical 259-line tail, so applying the identical edit to both
+  reproduces what the script would emit. The equivalence `diff` is the plan's required proof.
+
+  ⛔ Arms (1), (2) and (4) — a non-Supabase deployment target, a program continuing on the same
+  connection, and `docs/OPERATOR.md` Step 3 — are UNCHANGED and remain the live re-open trigger.
+  `BUG-260911-01` still lists this seed in `related_seeds`.
+folded_into: null
 priority: medium
 surface: Agentic-RAG
 severity: major            # Not currently reachable on the documented deploy path. It becomes a security-shaped defect the moment a non-Supabase target exists.
-folded_into: null
 relates_to:
   - `supabase/full-schema.sql` — the single-file bootstrap artifact. NEVER hand-edited; regenerated
     by `scripts/regenerate-full-schema.sh`.

@@ -2,6 +2,19 @@
 seed_id: SEED-280
 title: Five suites run by the count gate and guarded by nothing
 status: planted
+status_note: |
+  ── 2026-09-16 · reviewed at `/gsd:discuss-phase 252`, LEFT PLANTED — AND GIVEN A SIXTH CASE THAT IS
+  WORSE THAN THE FIVE (REG-02 sweep). Measured while scoping 252:
+  `frontend/src/components/sources/WatchRowCard.tsx` had NO TEST FILE AT ALL, and
+  `src/components/sources` is NOT a TARGETS directory entry — TARGETS names ten individual files
+  under it. So the component is in NEITHER knob, which is strictly worse than this seed's five
+  (run-but-unguarded): it could not be run and could not be guarded, at any total. It shipped three
+  defects under that blindness — B-4's completion claim, the `(0 changes)` literal and the
+  refusal/success contradiction — all closed by 252-03, whose new suite 252-05 adopts into BOTH knobs.
+  ⛔ 252 deliberately does NOT add the `src/components/sources` directory entry: that would adopt
+  ~10 unpinned suites in one edit and move the shared gate for reasons unrelated to the phase.
+  ⭐ TARGETS decides what RUNS; BASELINE decides what is GUARDED, and a file can be on the wrong side
+  of exactly one — or, as here, of both.
 surface: Agentic-RAG
 relates_to:
   - scripts/vitest-count-gate.cjs

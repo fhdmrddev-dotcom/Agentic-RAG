@@ -12,6 +12,14 @@ status_note: |
   # trigger #2 ANSWERED by Phase 206 (2026-08-25); triggers #1 and #4 have NOT fired
 
   Mapped `partially-answered` -> `partially-answered`. Reason: clean 1:1 — a first-class enum member, NOT the partially-* family.
+  ── 2026-09-16 · reviewed at `/gsd:discuss-phase 252`, LEFT OPEN (REG-02 sweep).
+  The trigger fired on `backend/app/**` breadth (`api/connectors.py`, `services/connector_service.py`),
+  not on substance: 252 is a gap-closure phase scoped to `.planning/v4.2-MILESTONE-AUDIT.md` §8 and
+  nothing else, and a new capability there is a phase, not a gap (G-7). Triggers #1 and #4 remain a
+  capability decision. ⚠ 252 DOES touch the RFC 7591 dynamic-registration writer (B-3), so anyone
+  reviving this seed should read `252-RESEARCH.md` §3 first — the DCR path now refuses a
+  server-issued `client_id` the inbound boundary would reject.
+
 priority: high
 relates_to:
   - SEED-013 (External Integrations — public API, MCP server, webhooks) — the INBOUND twin; "expose us" is its second consumer mode

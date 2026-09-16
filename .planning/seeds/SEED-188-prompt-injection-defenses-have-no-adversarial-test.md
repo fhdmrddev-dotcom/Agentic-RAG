@@ -9,6 +9,15 @@ status_note: |
   status: in_progress
 
   Mapped `in_progress` -> `open`. Reason: being worked now.
+  ── 2026-09-16 · reviewed at `/gsd:discuss-phase 252`, LEFT OPEN (REG-02 sweep).
+  Fired on `backend/app/**` / `backend/tests/**` breadth. ⭐ NEAR MISS WORTH RECORDING RATHER THAN
+  DISMISSING: 252's B-3 closes a real untrusted-content channel — `api/connectors.py:1326-1352` takes
+  a `client_id` from a REMOTE SERVER'S RESPONSE and, before 252, wrote it to `config` unvalidated,
+  bypassing the `CustomClientId` boundary that guards three request models. That is this seed's class
+  (a defense asserted in prose, unverified by any adversarial test) arriving from the outside. 252
+  drives it with a real case, but it does NOT build the adversarial suite this seed asks for, and the
+  gate on SEED-186 stands unchanged.
+
 folded_into: 236
 priority: high
 surface: Agentic-RAG

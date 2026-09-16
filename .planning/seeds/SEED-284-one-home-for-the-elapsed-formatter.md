@@ -4,6 +4,14 @@ title: Three file-local elapsed formatters now ship — one home is owed, and th
 created: 2026-09-11
 planted_during: Phase 243 (CHAT-01) — plan 243-04 task 3, at the moment the third one was written
 status: planted
+status_note: |
+  ── 2026-09-16 · reviewed at `/gsd:discuss-phase 252`, LEFT PLANTED (REG-02 sweep).
+  The extraction stays OWED. 252-04 Task 4 fixes only W-8 — `ThinkingBlock.tsx:158` cited the
+  non-existent path `SEED-269-one-home-for-the-elapsed-formatter.md`; it now cites THIS file. The
+  three formatters (`RunCard.tsx`, `MessageList.tsx`, `ThinkingBlock.tsx`) are unchanged, and the
+  reason recorded in that comment — that extracting would edit two files outside the plan's
+  `files_modified` and so skip the ledger row + section update D-243-07 requires in the same commit —
+  still stands.
 folded_into: null
 
 priority: low
