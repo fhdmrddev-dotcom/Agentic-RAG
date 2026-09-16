@@ -10,7 +10,7 @@ trigger_when: Any phase touching model capability resolution, model discovery, o
 trigger_paths: ["backend/app/config.py", "backend/app/services/model_discovery_service.py", "backend/app/api/admin.py", "backend/app/api/settings.py", "frontend/src/components/admin/ModelRegistryTab.tsx", "**/llm_service.py"]
 trigger_surfaces: ["settings", "admin", "chat", "provider-routing"]
 migration_note:
-relates_to: ["SEED-172", "SEED-040", "SEED-135", "249", "BUS-246", "BUS-247"]
+relates_to: ["SEED-172", "SEED-040", "SEED-135", "249", "BUS-246", "BUS-247", "BUG-260916-01"]
 folded_into: null
 renumbered_from: null
 renumbered_because: null
@@ -61,7 +61,32 @@ Verified against each vendor's own documentation (`provider-docs-first`), 2026-0
 | **OpenRouter** | **YES** | `GET /api/v1/models` → `supported_parameters` contains `"tools"` | ⭐ **ALREADY PARSED** — `_extract_caps_openrouter` (`model_discovery_service.py:215-235`) |
 | **Ollama** | **YES** | `POST /api/show` → `capabilities: ["completion","tools",…]` (ollama/ollama PR #10066) | ⛔ **NO** |
 | **LM Studio** | **YES** | `GET /api/v0/models` → `capabilities.trained_for_tool_use` (boolean) | ⛔ **NO** |
-| Custom / OpenAI-compatible | no standard field | — | n/a — this is the only true unknown |
+| Custom / OpenAI-compatible | ⭐ **YES, by SHAPE** — see below | probe both shapes against the operator's URL | ⛔ **NO** |
+
+⭐ **AND THE `custom` BUCKET IS NOT A TRUE UNKNOWN EITHER — OPERATOR, 2026-09-16.** The sentence
+that stood here (*"this is the only true unknown"*) is **corrected rather than deleted, because the
+correction changes the design.** The operator's `custom` endpoint is **Ollama or LM Studio behind a
+tunnel** — their configured `custom_base_url` was a `trycloudflare.com` address — exposed that way
+because the local box is not always reachable. ⛔ **So `custom` is not a fourth kind of server; it
+is one of the two known servers at a different address.**
+
+**Probe by SHAPE, not by provider name.** Against whatever base URL is configured, try
+`/api/show` (Ollama) and `/api/v0/models` (LM Studio); whichever answers identifies **both** the
+server and the model's tool support. ⭐ **This is the `sources/base.py` pattern this project already
+proved at Phase 240 — *"mail is a SHAPE, not a fourth adapter"*** — and it means the capability
+question is answerable for **every** provider the operator uses, with **no guessing tier left at
+all**.
+
+⚠ **NOT MEASURED, and recorded as unmeasured:** the tunnel was down when this was written
+(`trycloudflare` URLs are ephemeral and the operator confirmed it is not currently set up), so all
+three probes returned `ConnectError`. **The shape claim rests on the operator's statement and on the
+two vendor docs above, not on a live probe of that endpoint.** Drive it before building on it.
+
+⛔ **A TUNNELLED ENDPOINT LEAVES THE MACHINE, AND A LOCAL ONE DOES NOT.** A probe against
+`localhost:11434` and a probe against a public `https://` host are not the same security event.
+`app.security.egress.validate_mcp_destination` already exists for exactly this class of
+operator-supplied outbound destination; the probe belongs behind it, and that is a plan-time
+decision rather than an afterthought.
 
 ⛔ **AND OLLAMA'S REFUSAL IS LOUD, SPECIFIC AND CATCHABLE** — which is what makes ON-by-default
 safe rather than reckless. Sending `tools` to a model that cannot use them returns **HTTP 400**:
@@ -82,8 +107,11 @@ cannot.**
    `/api/show` for Ollama, `/api/v0/models` for LM Studio — and make OpenRouter's
    already-parsed `supported_parameters` answer reach the resolver rather than stopping at
    discovery. ⭐ This alone settles roughly 14 of the 15.
-2. **FLIP THE FALLBACK TO ON** for what remains genuinely unknowable (a bare OpenAI-compatible
-   `custom` endpoint). This is the operator's direction.
+2. **FLIP THE FALLBACK TO ON** for whatever the shape probe still cannot answer. This is the
+   operator's direction. ⚠ **After the `custom` correction above, this tier may be EMPTY in
+   practice** — every provider the operator actually uses is probe-answerable. Keep the tier
+   anyway: it is the behaviour for a server nobody has met yet, and *"no fallback was needed"* is a
+   measurement to report at the close, never an assumption to build on.
 3. **LEARN FROM THE REFUSAL.** On a `does not support tools` 400, catch it, retry once without
    tools so the turn still completes, and **write `native_tools=false` onto that model's registry
    row** so it is asked once and never again. ⛔ **Without part 3, part 2 converts a silent
@@ -109,10 +137,27 @@ Any phase touching `config.py`'s capability resolution, `model_discovery_service
 Registry admin surface, or the LLM client — **and at the next milestone scoping regardless**,
 since the operator directed the outcome and can see the 15 in their own picker.
 
+## The sibling finding — same phase, same model set
+
+⛔ **`BUG-260916-01` IS THE OTHER HALF OF THIS AND SHOULD SHIP WITH IT.** Measured the same day:
+`get_llm_client` (`openai_service.py:1251`) passes **no `timeout=` and no `max_retries=`**, so
+`openai==2.28.0`'s own `DEFAULT_TIMEOUT` (**read=600**) and `DEFAULT_MAX_RETRIES` (**2**) bind —
+while the admin surface accepts `llm_call_timeout_seconds` anywhere in **`[1, 3600]`**. **A value
+above 600 is stored, displayed back, and cannot take effect.**
+
+⭐ **The operator had already hit it and worked around it**: three of their six LM Studio rows are
+set to **900**, and all three get 600. The other 13 local models have no row and run on the 300s
+inferred default — *"it was timing out before it completes the task because it is slow on the GPU."*
+
+⭐ **The two findings are ONE story: the app substituting a guess for the operator's own
+configuration.** Tool support is guessed per provider; the timeout ceiling is imposed by an SDK
+default nobody chose. **Same models, same cause, same phase.**
+
 ## Scope estimate
 
-**Medium.** Two new capability probes, one resolver change, one retry-and-record path, and a
-migration-free registry write. ⛔ New capability → **a PHASE**, not a config tweak.
+**Medium.** Two capability probes (three URLs, two shapes), one resolver change, one
+retry-and-record path, a migration-free registry write, and the `timeout=` / `max_retries=` pass-
+through from `BUG-260916-01`. ⛔ New capability → **a PHASE**, not a config tweak.
 
 ⚠ **Two things to settle before planning, not after:** (1) whether the probe runs at
 add-model time, at discovery, or lazily on first use — a cold local server must not block a chat
