@@ -561,18 +561,170 @@ async def derive_default_privilege_preamble(maintenance_conn, log) -> list[str]:
 # ── the derived assertion set (D-05, no exception list) ───────────────────────
 
 
-def _strip_sql_comments(sql: str) -> str:
-    """⛔ COMMENTS MUST GO FIRST.
+#: A dollar-quote tag: `$$` or `$tag$`. Anchored with .match(src, i) at the scan position.
+_DOLLAR_TAG_RE = re.compile(r"\$([A-Za-z_][A-Za-z0-9_]*)?\$")
 
-    Migration tails carry entirely-commented VERIFY blocks that quote GRANT statements;
-    counting those would inflate the expected set and make this gate fail against a CORRECT
-    artifact -- and a false red is how a guard gets switched off.
+
+def _statements(sql: str) -> list[str]:
+    """Split SQL into statements, stripping comments -- with a lexer that knows what a string is.
+
+    ⛔ COMMENTS MUST GO FIRST. Migration tails carry entirely-commented VERIFY blocks that
+       quote GRANT statements; counting those would inflate the expected set and make this
+       harness fail against a CORRECT artifact -- and a false red is how a guard gets
+       switched off.
+
+    ⛔ AND A ``--`` INSIDE A STRING LITERAL IS NOT A COMMENT (CR-02, plan 253-03). What was
+       here before truncated each line at ``line.find("--")``, which on
+       ``supabase/migrations/180_app_settings_self_hosted_endpoints.sql`` ate the closing
+       quote AND the semicolon of a live ``COMMENT ON COLUMN ... IS '... -- ...';`` and
+       glued the next statement onto it. Measured on this tree::
+
+           COMMENT ON COLUMN public.t.c IS 'a value -- with a dash';
+           REVOKE ALL ON public.secrets FROM anon;
+
+       yielded ONE chunk, ``_parse_statement`` returned ``None`` for it, and the REVOKE
+       vanished from the expectation model. ``PrivilegeModel`` then leaves ``anon`` with
+       the stock ``GRANT ALL`` -- which is exactly what a greenfield database MISSING that
+       mirrored REVOKE has -- so expected == measured and this harness exited **0**.
+       ⛔ A false green in the PERMISSIVE direction, on the defect class it exists to close.
+
+    ⚠ THIS IS A PORT of ``scripts/check-schema-acl-parity.cjs::statements()`` (:194-283),
+      which fixed the identical defect in the same phase. WR-11 (three SQL-ACL extractors
+      over one corpus) is deferred precisely because these parsers already disagree in
+      measured ways, so the DIVERGENCES are written down here rather than left to be found:
+
+      · A line comment contributes NOTHING and its terminating newline survives as a
+        separator -- same as the ``.cjs``.
+      · A block comment contributes a single SPACE, so it separates tokens rather than
+        gluing them -- same as the ``.cjs``. (253-REVIEW.md's proposed snippet returned
+        comment text as a bare space too, but dropped NESTING.)
+      · Block comments NEST, as Postgres nests them, and the depth is tracked -- same as
+        the ``.cjs``, and the one place the review's proposed snippet was wrong.
+      · A carriage return is ordinary whitespace and the input is NEVER rewritten, so a
+        ``\\r\\n`` file yields the same parsed statements as a ``\\n`` one (pinned in
+        ``backend/tests/unit/test_253_greenfield_sql_lexer.py``).
+      · ⚠ REMAINING DIVERGENCE, NOT CLOSED HERE: the ``.cjs`` skips
+        ``ON ALL TABLES IN SCHEMA`` while ``_parse_statement`` invents ``public.public``
+        for it (WR-09, deferred). That lives in the PARSER, not in this splitter.
+
+    Tracks: single-quoted literals (doubled ``''`` is an escape, not a terminator),
+    double-quoted identifiers (``""`` likewise), dollar-quoted bodies (``$$...$$`` /
+    ``$tag$...$tag$``), line comments and nested block comments. A ``--`` opens a comment
+    and a ``;`` ends a statement ONLY at depth zero.
     """
-    out = []
-    for line in sql.split("\n"):
-        i = line.find("--")
-        out.append(line if i == -1 else line[:i])
-    return "\n".join(out)
+    src = sql
+    n = len(src)
+    out: list[str] = []
+    buf: list[str] = []
+    i = 0
+
+    while i < n:
+        c = src[i]
+        c2 = src[i + 1] if i + 1 < n else ""
+
+        # -- line comment ---------------------------------------------------------------
+        if c == "-" and c2 == "-":
+            i += 2
+            while i < n and src[i] != "\n":
+                i += 1
+            continue  # the newline itself survives, as a separator
+
+        # -- block comment (Postgres nests them) ----------------------------------------
+        if c == "/" and c2 == "*":
+            depth = 1
+            i += 2
+            while i < n and depth > 0:
+                if src[i] == "/" and i + 1 < n and src[i + 1] == "*":
+                    depth += 1
+                    i += 2
+                    continue
+                if src[i] == "*" and i + 1 < n and src[i + 1] == "/":
+                    depth -= 1
+                    i += 2
+                    continue
+                i += 1
+            buf.append(" ")  # a comment separates tokens, it never glues them
+            continue
+
+        # -- single-quoted literal ------------------------------------------------------
+        if c == "'":
+            buf.append(c)
+            i += 1
+            while i < n:
+                if src[i] == "'" and i + 1 < n and src[i + 1] == "'":
+                    buf.append("''")
+                    i += 2
+                    continue
+                if src[i] == "'":
+                    buf.append("'")
+                    i += 1
+                    break
+                buf.append(src[i])
+                i += 1
+            continue
+
+        # -- double-quoted identifier ---------------------------------------------------
+        if c == '"':
+            buf.append(c)
+            i += 1
+            while i < n:
+                if src[i] == '"' and i + 1 < n and src[i + 1] == '"':
+                    buf.append('""')
+                    i += 2
+                    continue
+                if src[i] == '"':
+                    buf.append('"')
+                    i += 1
+                    break
+                buf.append(src[i])
+                i += 1
+            continue
+
+        # -- dollar-quoted body; the tag may be empty ($$ ... $$) -----------------------
+        if c == "$":
+            m = _DOLLAR_TAG_RE.match(src, i)
+            if m:
+                tag = m.group(0)
+                end = src.find(tag, i + len(tag))
+                if end == -1:  # unterminated: keep it whole rather than guess
+                    buf.append(src[i:])
+                    i = n
+                    continue
+                buf.append(src[i : end + len(tag)])
+                i = end + len(tag)
+                continue
+            # a bare `$` (a `$1` placeholder, say) is an ordinary character -- fall through
+
+        if c == ";":
+            out.append("".join(buf))
+            buf = []
+            i += 1
+            continue
+
+        buf.append(c)
+        i += 1
+
+    out.append("".join(buf))
+    return out
+
+
+
+def _strip_sql_comments(sql: str) -> str:
+    """The comment-free text, rebuilt from :func:`_statements`.
+
+    ⛔ ITS OLD ``line.find("--")`` BODY IS GONE RATHER THAN LEFT BESIDE THE FIX. A defect
+       that survives behind a second door is the same defect. The two callers this had --
+       ``derive_expectations`` and ``supplement_section5_columns`` -- now share one lexer,
+       so a future SQL-shape fix lands for both at once.
+
+    ⚠ ``supplement_section5_columns`` regex-searches this text across newlines, so the
+      statements are rejoined with ``;``. For an input containing no ``--`` inside a
+      literal and no block comment the result is the old one; where they differ, the old
+      one was wrong. ``scripts/full-schema-supplement.sql``'s §5 extraction was captured
+      before and after this change and is byte-identical (20 columns, ``created_by``
+      present, ``secret_ciphertext`` absent).
+    """
+    return ";".join(_statements(sql))
 
 
 def _split_top_level(text: str) -> list[str]:
@@ -730,9 +882,12 @@ def derive_expectations(migrations_dir: pathlib.Path = MIGRATIONS_DIR, min_files
     per_file: dict[str, int] = {}
     total = 0
     for name in files:
-        sql = _strip_sql_comments((migrations_dir / name).read_text(encoding="utf-8", errors="replace"))
+        raw_sql = (migrations_dir / name).read_text(encoding="utf-8", errors="replace")
         # Statement order inside a file follows its own text order, which is line order.
-        for chunk in sql.split(";"):
+        # ⛔ `_statements` REPLACES `_strip_sql_comments(...).split(";")` (CR-02): the old pair
+        #    truncated at the first `--` on a line, including one inside a string literal, which
+        #    ate the literal's closing quote AND its semicolon and hid the NEXT statement.
+        for chunk in _statements(raw_sql):
             parsed = _parse_statement(chunk)
             if parsed is None:
                 continue
