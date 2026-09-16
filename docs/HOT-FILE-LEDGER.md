@@ -10366,7 +10366,7 @@ cells rot within days.
 | [`frontend/src/components/chat/ToolCallPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattoolcallpaneltsx) | 51 / 23 / 351 | **FIRES** | ✅ **G-5 DISCHARGED (227-02)** — extracted ToolCallDetails, StepRow, toolStepDerivation (1019 → 351 lines) |
 | [`frontend/src/components/chat/MessageItem.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageitemtsx) | 75 / 34 / 1000 | **FIRES** | ⚠ row STALE a FOURTH time (`74/34/981`). honoured by construction (**244-14 / WR-01**): the Continue card reads the lock's MODE, like the composer beside it. State 3→3, effects 0→0, props 5→5 |
 | [`backend/app/api/threads.py`](docs/HOT-FILE-LEDGER.md#backendappapithreadspy) | 245 / 82 / 1617 | **FIRES** | ⚠ row was STALE at `243 / 80 / 1590`. honoured by construction (**244-03**): ONE existing pure-read query loses a WHERE predicate and gains a Python guard. ⛔ no writer added |
-| [`frontend/src/providers/StreamsProvider.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcprovidersstreamsprovidertsx) | 101 / 37 / 4815 | **FIRES** | ⚠ row STALE a 7th time (`97/37/4660`). honoured by construction (**244-14**): reconcile CLEARS on success, ONE capPaused value, the dead abort arm deleted. ⛔ no retry — the in-flight ref is GLOBAL |
+| [`frontend/src/providers/StreamsProvider.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcprovidersstreamsprovidertsx) | 104 / 38 / 4948 | **FIRES** | ⚠ row STALE an 8th time (`101/37/4815`; CLAUDE.md read `102/37/4880`). NOT modified by 253 — re-derived under CR-08. honoured by construction (**244-14**) |
 | [`frontend/src/hooks/useMessages.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusemessagests) | 74 / 27 / 127 | ⚠ **FIRES** | extraction due |
 | [`backend/app/services/anthropic_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesanthropic_servicepy) | 11 / 10 / 354 | ⚠ **FIRES** | adapter-pattern audit due |
 | [`frontend/src/components/workflows/WorkflowCanvas.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsworkflowcanvastsx) | 31 / 9 / 1708 | **FIRES** | honoured by construction (199 / 200 / **214**) — 214-04 widened the panel and touched no node logic |
@@ -10403,7 +10403,7 @@ cells rot within days.
 | [`backend/app/api/runs.py`](docs/HOT-FILE-LEDGER.md#backendappapirunspy) | 35 / 16 / 1430 | **FIRES** | honoured by construction (194) |
 | [`backend/app/services/harness_engine.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharness_enginepy) | 54 / 20 / 3135 | **FIRES** | honoured by construction (194 / **214**) — 214-06 resolved the pause's service at ONE call site |
 | [`frontend/src/components/chat/RunCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatruncardtsx) | 28 / 14 / 710 | **FIRES** | ⭐ **G-5 DISCHARGED (243-02)** — the reasoning fold left for `ThinkingBlock.tsx`, `-39/+20`, one `useState` fewer. ⚠ row was STALE at `26/12/728`. State 2 stayed, by decision |
-| [`frontend/src/components/chat/ThinkingBlock.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatthinkingblocktsx) | 4 / 1 / 283 | no | ⚠ **row at ONE phase BY DESIGN**; `117 → 283` in one phase (**243-04**). Invariants: **one reasoning renderer**, and **no duration derived from length** |
+| [`frontend/src/components/chat/ThinkingBlock.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatthinkingblocktsx) | 6 / 2 / 320 | no (2 phases) | ⚠ row STALE (`4/1/283`; CLAUDE.md read `4/1/313`). NOT modified by 253 — re-derived under CR-08. Still ONE reasoning renderer; no duration derived from length |
 | [`frontend/src/components/chat/MessageInput.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageinputtsx) | 32 / 16 / 863 | **FIRES** | honoured by construction (**249-02**): ONE chip added beside the EXISTING `deprecated` badge, 3 optional props, no state. ⛔ the `ComposerChipsRow` seam stays OWED |
 | [`frontend/src/components/chat/MessageList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessagelisttsx) | 21 / 9 / 307 | **FIRES** | ⚠ row STALE a THIRD time (`19/8/267` → `20/8/292` → `20/8/300`). honoured by construction (**244-01**): `min-h-0` added to the ONE `<ScrollArea>` call site — a class token, no state, no prop |
 | [`frontend/src/hooks/useFollowScroll.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusefollowscrollts) | 4 / 2 / 314 | does not fire | ⛔ **NO ROW FOR ITS ENTIRE LIFE — added 243-03**, then STALE at `3/2/265` one phase on. **243-06:** the re-arm now asks whether the reader is STILL leaving, not what they last did |
@@ -10423,9 +10423,9 @@ cells rot within days.
 | [`backend/app/api/documents.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentspy) | 87 / 34 / 2414 | ⚠ **FIRES** | ✅ **DISCHARGED AGAIN (240-03)** — the email-attachment loop extracted to `services/email_attachments.py`. 240-04 adds the conversation read |
 | [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 222 / 49 / 5787 | ⚠ **FIRES** | ⚠ row STALE a 6th time (`215/47/5682`). **252-05**: `WatchRowCard.test.tsx` into BOTH knobs — it ran NOWHERE. W-7 slack CLOSED: a RED drive kept it green on a deleted case; pins were mostly SLACK |
 | [`backend/app/services/eval_runner_service.py`](docs/HOT-FILE-LEDGER.md#backendappserviceseval_runner_servicepy) | 12 / 7 / 959 | ⚠ **FIRES** | ⚠ absent at 7 phases (added 196) |
-| [`frontend/src/components/panel/PhaseCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasecardtsx) | 16 / 10 / 755 | ⚠ **FIRES** | honoured by construction (200 / **214**) — the failure sentinel NARROWED to both-sources-empty |
-| [`frontend/src/components/panel/PhaseTimeline.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasetimelinetsx) | 9 / 7 / 385 | ⚠ **FIRES** | honoured by construction (**214**) — it mounts the shared identity; ⚠ absent from BOTH until 200 |
-| [`frontend/src/components/panel/phaseStatusMeta.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasestatusmetats) | 3 / 3 / 236 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent; crossed the threshold in the commit that added its row (200) |
+| [`frontend/src/components/panel/PhaseCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasecardtsx) | 17 / 11 / 788 | ⚠ **FIRES** | ⚠ row STALE (`16/10/755`) — 252 touched it. NOT modified by 253; re-derived under CR-08. honoured by construction (200 / 214) |
+| [`frontend/src/components/panel/PhaseTimeline.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasetimelinetsx) | 10 / 8 / 404 | ⚠ **FIRES** | ⚠ row STALE (`9/7/385`) — 252 touched it. NOT modified by 253; re-derived under CR-08. honoured by construction (**214**); absent from BOTH until 200 |
+| [`frontend/src/components/panel/phaseStatusMeta.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasestatusmetats) | 4 / 4 / 291 | ⚠ **FIRES** | ⚠ row STALE (`3/3/236`) — 252 touched it. NOT modified by 253; re-derived under CR-08. It crossed the threshold in the very commit that added its row (200) |
 | [`backend/app/services/harness/validator_kinds.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessvalidator_kindspy) | 12 / 5 / 749 | ⚠ **FIRES** | ⚠ absent at 5 phases (added 196) |
 | [`frontend/src/components/admin/ModelRegistryTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminmodelregistrytabtsx) | 15 / 5 / 1640 | ⚠ **FIRES** | ⚠ row STALE at `10/4/1191` (+362 lines). honoured by construction (**249-01**): roster widened to 11 + words on 2 EXISTING controls. ⛔ `deprecated` semantics unchanged (D-149-04) |
 | [`frontend/src/components/workflows/soulData.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowssouldatats) | 12 / 10 / 499 | ⚠ **FIRES** | honoured by construction (214 / **214.1**); ⚠ absent until 197, at 7 phases |
@@ -10503,14 +10503,14 @@ cells rot within days.
 | [`frontend/src/components/workflows/McpToolPicker.reachability.test.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsmcptoolpickerreachabilitytesttsx) | 1 / 1 / 316 | no (1 phase) | young (206.2) |
 | [`backend/app/models/connector.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsconnectorpy) | 26 / 14 / 835 | ⚠ **FIRES** | ⚠ row was STALE at `24 / 13 / 772`. honoured by construction (**244-06**): a NEW request model, ⛔ no field added to an existing one — `folder_id: str` REQUIRED, so 422 fires before the handler |
 | [`backend/app/services/mcp_client.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmcp_clientpy) | 9 / 6 / 526 | ⚠ **FIRES** | ⚠ row STALE TWICE (`4/2/407` reading `no`, then `7/5/480`). honoured by construction (**SEED-258**): the body cap is DERIVED, so no envelope knob exists to disagree |
-| [`backend/app/api/connectors.py`](docs/HOT-FILE-LEDGER.md#backendappapiconnectorspy) | 43 / 20 / 2113 | ⚠ **FIRES** | ⛔ **extraction still OWED and the file GREW a THIRD time** (2051→2071→2091→2102). honoured by construction (**244-06**): ONE parameter, ONE forward; the refusal is the MODEL, not a branch here |
+| [`backend/app/api/connectors.py`](docs/HOT-FILE-LEDGER.md#backendappapiconnectorspy) | 45 / 21 / 2162 | ⚠ **FIRES** | ⚠ row STALE (`43/20/2113`; CLAUDE.md read `44/21/2140`) — a SEVENTH landing (…2113→2140→2162). ⛔ extraction still OWED. NOT modified by 253; re-derived under CR-08 |
 | [`backend/app/security/egress.py`](docs/HOT-FILE-LEDGER.md#backendappsecurityegresspy) | 13 / 5 / 982 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | honoured by construction (232): Google Drive read/export pins; docstrings updated to source contract |
 | [`backend/app/services/google/availability.py`](docs/HOT-FILE-LEDGER.md#backendappservicesgoogleavailabilitypy) | 0 / 0 / 277 | no (new) | young (221-02) — the per-application probe. ⚠ It imports `_http`'s parser and writes NO second one |
 | [`backend/app/services/google/writes.py`](docs/HOT-FILE-LEDGER.md#backendappservicesgooglewritespy) | 2 / 1 / 625 | no (1 phase) | ⚠ absent for its entire life — row added 221-02, which found `create_event` REFUSING every naive local time |
 | [`frontend/src/components/settings/applicationAvailability.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsapplicationavailabilityts) | 0 / 0 / 152 | no (new) | young (221-02) — server decides the STATE, this decides the WORDS. It classifies nothing |
 | [`frontend/src/components/settings/AvailabilityLine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsavailabilitylinetsx) | 0 / 0 / 74 | no (new) | young (221-02) — a `ready` application renders `null`, never an empty element |
 | [`frontend/src/components/settings/grantsVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsgrantsvocabularyts) | 3 / 2 / 115 | no (2 phases) | ⚠ absent for its entire life — row added 221-02. There is deliberately NO `READY` string in it |
-| [`backend/app/services/connector_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesconnector_servicepy) | 25 / 9 / 1772 | ⚠ **FIRES** | honoured by construction (**239-06**): the write boundary knows a mapping KEY from a tool name by ALLOW-LIST — an unknown key is still read as a tool name and still refused |
+| [`backend/app/services/connector_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesconnector_servicepy) | 28 / 11 / 1858 | ⚠ **FIRES** | ⚠ row STALE (`25/9/1772`) — 248 and 252 touched it. NOT modified by 253; re-derived under CR-08. honoured by construction (**239-06**) |
 | [`backend/app/models/message.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsmessagepy) | 17 / 10 / 124 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **8 phases** — row added 214; honoured by construction (214-16) |
 | [`backend/app/models/user_settings.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsuser_settingspy) | 55 / 34 / 1723 | ⚠ **FIRES** | ⚠ STALE for the SIXTH close running (`50/32/1561`). honoured by construction (**249-03**): ONE `except` split into two arms + one typed exception. ⛔ the unreachable-DB arm is byte-identical |
 | [`backend/app/api/setup.py`](docs/HOT-FILE-LEDGER.md#backendappapisetuppy) | 7 / 2 / 490 | no (1 phase) | ⚠ **absent for its ENTIRE LIFE — row added 249-03**. ⛔ it deliberately does NOT catch `SettingsWriteRefused`: a refused `setup_complete` reported as success is the bug one layer up |
@@ -10561,7 +10561,7 @@ cells rot within days.
 | [`backend/app/services/context_window.py`](docs/HOT-FILE-LEDGER.md#backendappservicescontext_windowpy) | 10 / 5 / 602 | ⚠ **FIRES** | ⚠ absent for its ENTIRE LIFE at 5 phases — row added 250-01. honoured by construction: ONE removal-ORDER rule inside one private helper. ⛔ `_build_candidate` byte-unchanged |
 | [`backend/app/services/run_producer.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_producerpy) | 3 / 2 / 693 | below | ⚠ absent for its ENTIRE LIFE — row added 250-02 BELOW the threshold, since an absent row is invisible to G-5 at any count. honoured by construction: step 3's gate only |
 | [`backend/app/services/todos_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicestodos_servicepy) | 4 / 3 / 187 | ⚠ **FIRES** | ⚠ absent for its ENTIRE LIFE at 3 phases — row added 250-02, which leaves the file BYTE-UNCHANGED. ⛔ `_RUN_ENDED_MARKER` is now bound by a frontend `?raw` fence |
-| [`frontend/src/components/panel/TodosSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspaneltodossectiontsx) | 6 / 4 / 210 | ⚠ **FIRES** | ⚠ absent for its ENTIRE LIFE at 4 phases — row added 250-03. honoured by construction: a 4th DISPLAY status on the EXISTING row, derived in ONE module both renderers call |
+| [`frontend/src/components/panel/TodosSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspaneltodossectiontsx) | 11 / 6 / 337 | ⚠ **FIRES** | ⚠ row STALE (`6/4/210`) — 250 and 252 touched it, +127 L. NOT modified by 253; re-derived under CR-08. Absent for its entire life until 250-03 |
 | [`frontend/src/components/panel/todoRunHonesty.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspaneltodorunhonestyts) | 1 / 1 / 104 | new | young (created 250-03). Row added AT CREATION. ⛔ the ONE home of *is this row still honest?*; its marker copy is `?raw`-fenced to `todos_service.py` or the strip silently no-ops |
 | [`backend/app/services/tool_dispatcher.py`](docs/HOT-FILE-LEDGER.md#backendappservicestool_dispatcherpy) | 85 / 35 / 5048 | ⚠ **FIRES** | ⚠ row STALE again (`84/35/4966`). honoured by construction (**244-14/WR-03**): `already` is written on SUCCESS or after a CAPPED give-up; every attempt is NAMED. Traversal fence byte-unchanged |
 | [`backend/app/api/document_governance.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentgovernancepy) | 5 / 3 / 416 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent at 3 phases. ⚠ Its low-confidence cutoff is the ConfidenceChip tier (**0.5**) — a DIFFERENT measure from `knowledge_health`'s **0.38** retrieval similarity |
@@ -10587,8 +10587,8 @@ cells rot within days.
 | [`backend/app/services/watch_service.py`](docs/HOT-FILE-LEDGER.md#backendappserviceswatch_servicepy) | 7 / 5 / 643 | **FIRES** | ⚠ row STALE at 4/2/608. 247-02: missing_since lifecycle on disappearance/restore; H-5 incomplete listing guard preserved. Seam 2 remains primary writer |
 | [`backend/app/db/watches.py`](docs/HOT-FILE-LEDGER.md#backendappdbwatchespy) | 4 / 3 / 709 | ⚠ **FIRES** | ⚠ row STALE at 2/2/696. 247-02: update_item_state & bulk_update record missing_since on missing; clear_missing_since resets to NULL on restore |
 | [`backend/app/api/sources.py`](docs/HOT-FILE-LEDGER.md#backendappapisourcespy) | 8 / 2 / 693 | no (2 phases) | ⚠ row STALE at 5/1/677. 247-02: immediate connection is_enabled health diagnostics (WATCH-03). Polled window preserved; last-good filled for stopped |
-| [`frontend/src/components/sources/WatchedFoldersSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourceswatchedfolderssectiontsx) | 9 / 3 / 470 | no (3 phases) | ✅ G-5 DISCHARGED (247-03): extracted WatchRowCard.tsx (1095 -> 470 lines). WatchedFoldersSection handles list mounting, CreateWatchModal, and non-collapsing refresh |
-| [`frontend/src/components/sources/WatchRowCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourceswatchrowcardtsx) | 2 / 1 / 649 | no (1 phase) | young (extracted in 247-03 from WatchedFoldersSection.tsx). Per-watch card layout, history fold, Variant A two-tier badges, missing_since remote disappearance feedback |
+| [`frontend/src/components/sources/WatchedFoldersSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourceswatchedfolderssectiontsx) | 10 / 4 / 486 | ⚠ **FIRES — STATE CHANGE** | ⚠ the row read `9/3/470` and **no**; 252 was the 4th phase, so G-5 FIRES now. 247-03's WatchRowCard extraction stands as the discharge — re-assert it on the next touch |
+| [`frontend/src/components/sources/WatchRowCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourceswatchrowcardtsx) | 3 / 2 / 770 | no (2 phases) | ⚠ row STALE (`2/1/649`) — 252-05 touched it (+121 L) and put it into BOTH count-gate knobs; it had run NOWHERE. NOT modified by 253; re-derived under CR-08 |
 | [`frontend/src/components/sources/watchProductMark.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourceswatchproductmarkts) | 0 / 0 / 38 | no (new) | young (240) — which PRODUCT a watched folder came from, read from its ADDRESS. ⛔ Never from `service_id`: Gmail and Drive share one connection |
 | [`frontend/src/components/sources/CreateWatchModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcescreatewatchmodaltsx) | 4 / 1 / 283 | no (1 phase) | honoured by construction (**240**): byte-unchanged. ⛔ Its auto-select of `capable[0]` is why BUG-260908-02 mattered most here |
 | [`frontend/src/components/layout/NavPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutnavpaneltsx) | 23 / 12 / 381 | ⚠ **FIRES** | ⚠ row STALE at `22/12/370`. **244-14**: WR-05 — the docblock stopped being false about itself (`min-h-0` read 2); IN-01 — `overflow-x-hidden`, since one axis makes the other compute to `auto` |
@@ -10604,7 +10604,7 @@ cells rot within days.
 | [`backend/app/services/email_extraction_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesemail_extraction_servicepy) | 4 / 1 / 511 | no (1 phase) | ⚠ **absent for its ENTIRE LIFE — row added 240.** Home of `parse_eml_bytes`, `strip_quoted_replies` and now `thread_key_for`. ⛔ Subject is never a thread input |
 | [`backend/app/services/sources/failure_cause.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesfailure_causepy) | 2 / 1 / 196 | no (1 phase) | young (235) — **THE ONE classifier of why a source stopped.** ⛔ 235-13: `connection_disabled` is WRITTEN by one seam and inferred by NOTHING — no matcher, no status row |
 | [`backend/app/services/sources/health_verdict.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourceshealth_verdictpy) | 1 / 1 / 149 | no (1 phase) | young (235) — the ONE stopped/not decision. ⭐ DERIVED from run history, never a counter column. Zero rows ≠ zero failures |
-| [`frontend/src/components/sources/sourceHealthVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcessourcehealthvocabularyts) | 2 / 1 / 454 | no (1 phase) | young (235) — ⛔ `Object.keys(COPY)` PINNED at 26, still: 235-13's five new exports are SIBLINGS of it. The cause union is now single-sourced — `lib/api/sources.ts` imports it |
+| [`frontend/src/components/sources/sourceHealthVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcessourcehealthvocabularyts) | 8 / 4 / 645 | ⛔ **FIRES — UNDISPOSITIONED** | ⚠ row STALE (`2/1/454`; CLAUDE.md read `6/3/560`). ⛔ G-5 FIRED AND NOBODY SAID SO: the row promised it would fire on the next touch and **252-03 WAS that touch**. Seam OWED |
 | [`frontend/src/components/sources/runHistoryFold.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcesrunhistoryfoldts) | 1 / 1 / 125 | no (1 phase) | young (235) — the pure quiet-run fold; separating it is what proved the fence's collapsed-3/expanded-17 red was a FIXTURE defect |
 | [`frontend/src/components/sources/RunHistoryList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcesrunhistorylisttsx) | 2 / 1 / 235 | no (1 phase) | young (235) — ✅ **G1a CLOSED (235-16)**: the summed one number replaced by the per-category breakdown. ⚠ It mounts BEHIND A CLICK; five fence reds are a harness finding |
 | [`frontend/src/components/layout/AttentionPopover.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutattentionpopovertsx) | 1 / 1 / 109 | no (1 phase) | young (235) — ⛔ it renders no verdict and derives no count; it is handed conditions and draws them |
@@ -10642,8 +10642,11 @@ cells rot within days.
 | [`frontend/src/components/chat/ConnectedFilePickerModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatconnectedfilepickermodaltsx) | 3 / 2 / 336 | no (2 phases) | ⚠ **absent for its ENTIRE LIFE — row added 244-06, and the ledger gate FAILED on it at this phase's base (C-8).** 244-06 REBUILT it: select-then-confirm, and the commit is the parent's |
 | [`frontend/src/components/chat/useComposerAttachments.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatusecomposerattachmentsts) | 2 / 1 / 183 | no (new) | young (created 244-06). Row added AT CREATION. ⭐ THE SEAM `244-05` NAMED AND OWED — both attach doors' state and verbs; `MessageInput.tsx` shrank `855 → 821` |
 | [`frontend/src/components/chat/ActiveConnectorChips.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatactiveconnectorchipstsx) | 2 / 2 / 82 | no (2 phases) | ⚠ absent for its entire life — row added 244-05 at its SECOND phase. **244**: the row container HOISTED out; it is bare chips now, `null` on empty (D-244-26) |
-| [`frontend/src/stores/streamsStore.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcstoresstreamsstorets) | 21 / 13 / 546 | **FIRES** | ⚠ **absent for its ENTIRE LIFE at 13 phases — row added 244-13, and the phase's ledger gate was RED on it at every prior commit.** **244-13**: `WorkflowLock.mode` becomes a REAL discriminator |
+| [`frontend/src/stores/streamsStore.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcstoresstreamsstorets) | 22 / 14 / 572 | **FIRES** | ⚠ row STALE (`21/13/546`) — 252 touched it. NOT modified by 253; re-derived under CR-08. **244-13**: `WorkflowLock.mode` becomes a REAL discriminator |
 | [`frontend/src/lib/toolMeta.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibtoolmetats) | 10 / 6 / 218 | **FIRES** | ⚠ **absent for its ENTIRE LIFE at 6 phases — row added 244-13, which does NOT modify it.** ⛔ the ONE home of the harness activity string: a literal copied elsewhere makes its byte-pin vacuous |
+| [`scripts/full-schema-supplement.sql`](docs/HOT-FILE-LEDGER.md#scriptsfull-schema-supplementsql) | 11 / 6 / 653 | ⚠ **FIRES** | ⚠ absent for its ENTIRE LIFE at 6 phases — row added 253-02, and ⛔ NO GATE COULD EVER HAVE DEMANDED IT: `scripts/` is EXEMPT in check-hot-file-ledger.cjs. The ONE hand-mirror of every migration ACL |
+| [`scripts/check-schema-acl-parity.cjs`](docs/HOT-FILE-LEDGER.md#scriptscheck-schema-acl-paritycjs) | 3 / 2 / 883 | no (2 phases) | Row added at its SECOND phase, the `settingsSearchPayload.ts` precedent — an absent row is invisible to G-5 at any count, and `scripts/` is EXEMPT so no gate can ask for one |
+| [`scripts/check-greenfield-privileges.py`](docs/HOT-FILE-LEDGER.md#scriptscheck-greenfield-privilegespy) | 1 / 1 / 1157 | no (1 phase) | young (created 253-01). Row added AT CREATION. The ONE greenfield privilege harness; ⛔ a SKIP is exit 2, never 0 — a skip is not a pass. `scripts/` is EXEMPT: no gate can demand this row |
 
 
 
@@ -14376,3 +14379,171 @@ On the merged wave-1 tree this plan measured **`count gate OK` — total 8391 ·
 fixed** — *one green sample of a flaky suite proves nothing*, and this is the inverse of the sample
 that produced D-44a. What it does establish is the thing the plan needed: **the failing SET was
 empty before the edit and empty after it, so this phase added no red.** Sets, never counts.
+
+---
+
+## scripts/full-schema-supplement.sql
+
+**Re-derived 2026-09-17 (Phase 253-02, CR-08 / D-23):** `11 / 6 / 653`. Phase buckets:
+`162, 165, 190, 211, 252, 253`. Non-phase buckets excluded: `schema`, `seed`. **G-5 FIRES at 6
+phases.**
+
+⚠ **ABSENT FROM BOTH REGISTERS FOR ITS ENTIRE LIFE — and this is the `App.tsx` finding one
+directory over.** `252-REVIEW.md` CR-08 named it at 5 phases with no row. ⛔ **No gate could ever
+have demanded one:** `scripts/check-hot-file-ledger.cjs:67` sets
+`WATCHED = [/^backend\/app\//, /^frontend\/src\//]` and `:51`'s `EXEMPT` additionally drops
+`/^scripts\//` plus the `.md` and `.sql` extensions. Measured at plan `253-01`'s close and again
+here: `node scripts/check-hot-file-ledger.cjs 253` prints `subject: 12 files · watched: 0` and
+exits **0** whether this row exists or not. **So this row is MANUAL and carries its own evidence;
+the ledger gate proves nothing about it.** That is a structural blindness, not an author's
+carelessness — see the finding at the end of this section.
+
+**What it is.** The ONE hand-mirror of every privilege the migrations narrow.
+`scripts/regenerate-full-schema.sh:104` runs `pg_dump --no-privileges`, so
+`supabase/full-schema.sql` **can never carry a grant of its own**. This file is appended verbatim
+to the dump (`regenerate-full-schema.sh:137-151`) and is therefore the only thing standing between
+a migration's `REVOKE` and its silent absence from every greenfield bootstrap.
+
+**Invariants that bind it.**
+
+1. **Every statement is IDEMPOTENT.** `GRANT` and `REVOKE` are; nothing here may stop being.
+2. **§5's column list is hand-maintained, ONE COLUMN PER LINE**, so an ABSENT column is visible in
+   a diff. `backend/tests/unit/test_253_supplement_column_parity.py` pins it to
+   `connector_service._TABLE_SELECTABLE_KEYS` in the three-part form: `keys - §5 == {}`,
+   `§5 - keys == {created_by}` **by name**, and `secret_ciphertext ∉ §5`.
+3. **Its tail is BYTE-IDENTICAL to `supabase/full-schema.sql`'s**, same commit, no exceptions
+   (D-11). ⚠ **There is no gate behind that rule** — `check-greenfield-privileges.py` asserts it on
+   every run, but that harness needs a live Postgres and SKIPS (exit 2) without one.
+   Current pair md5: `da9c561634d417ebd289bedf07b75f69`.
+4. ⛔ **§0's `SET search_path = public;` is load-bearing and was added under a blocking deviation
+   (253-01, `3192f480f`).** `pg_dump` emits `set_config('search_path', '', false)` at
+   `full-schema.sql:29`, which survives the whole paste; §6's
+   `ON FUNCTION public.match_document_chunks(vector, …)` then cannot resolve `vector` and the
+   Supabase SQL editor rolls the ENTIRE bootstrap back. ⛔ **The fix is NOT `public.vector`** —
+   qualifying the type changes the signature TEXT that `check-schema-acl-parity.cjs` compares
+   against the migrations, so a correct artifact would turn a green gate red.
+
+**The named seam the next refactor should take.** The file is now six sections deep
+(§0 · §5/§5b/§5c/§5d tables · §6a/§6b functions) and grew `456 → 653` lines in one phase. The seam
+is **generation, not extraction**: every statement here is a verbatim copy of a migration line, and
+`check-schema-acl-parity.cjs` already parses both sides into the same tuple space. A
+`--emit-missing` mode on that gate would make the mirror derivable rather than typed, which is the
+only change that removes the failure class instead of guarding it. ⛔ Until then, **copy, never
+retype** — an argument list is part of a function's identity and a column list is part of a column
+grant's.
+
+⭐ **THE FINDING THIS ROW EXISTS TO CARRY (planted, deliberately NOT acted on — Phase 253-02 Task
+4E).** `check-hot-file-ledger.cjs` cannot see `scripts/`, and `252-REVIEW.md` CR-08 separately
+proposes that the gate should also fail a row whose line count disagrees with `wc -l` — today a row
+that is merely PRESENT satisfies it, which is the same class of guard CR-02 proved this repo ships.
+Widening `WATCHED` / `EXEMPT` or adding the line-count check is a change to a **shared guardrail
+affecting every phase** and is outside Phase 253's fixed scope. **Re-open trigger: the next phase
+whose `files_modified` names a `scripts/` file.**
+
+## scripts/check-schema-acl-parity.cjs
+
+**Re-derived 2026-09-17 (Phase 253-02, D-23):** `3 / 2 / 883`. Phase buckets: `252, 253`.
+**Does not fire yet — 2 phases.** Row added at its SECOND phase on the
+`frontend/src/pages/settingsSearchPayload.ts` precedent: **an absent row is invisible to G-5 at any
+count, forever, silently**, and `scripts/` is EXEMPT so no gate will ever ask for one.
+
+**What it is.** The ONE executable check that the hand-mirror above actually happened. It compares
+TEXT, not a live database, and it is zero-dependency by rule (`fs`, `path`, `os` only).
+
+⛔ **IT SHIPPED UNABLE TO FAIL, AND THAT IS THE POINT OF THIS SECTION.** Phase 252's review drove it
+and found three structural defects; all three were REPRODUCED at Phase 253-02's base before
+anything was rewritten:
+
+| Finding | What it was | Reproduced as |
+|---|---|---|
+| CR-02 | `expected` keyed on the SIGNATURE alone; `aclsIn` discarded the verb and the grantee | deleting `REVOKE EXECUTE ON FUNCTION public.resize_embedding_column(integer) FROM PUBLIC;` from a copy of the supplement printed `missing: 0`, **exit 0** |
+| CR-03 | `statements()` truncated every line at the first `--`, inside string literals included | migration 180's **three** `COMMENT ON COLUMN` statements collapsed into **ONE** chunk |
+| CR-01 | only `EXECUTE ON FUNCTION` was matched | **ZERO** table/column entries across the twelve ACL-bearing migrations, which carry **32** such statements |
+
+**Invariants that bind it.**
+
+1. ⛔ **`normaliseSignature` MUST NOT DROP THE ARGUMENT LIST.** `f(uuid, text)` and `f(uuid)` are
+   different functions in Postgres; a normaliser that collapsed them would make the gate pass over
+   a real gap. It is byte-unchanged since the gate's first version and three `--self-test` arms
+   pin it.
+2. **`MIN_MIGRATION_FILES = 120` is a FLOOR, never an exact figure**, and a collapsed scan set
+   raises `VacuousScanError` → exit **2**, never a pass. Measured: the directory holds 148 files.
+   The table half inherits this for free and must not duplicate it.
+3. ⛔ **No hardcoded expected total outside a comment.** Every count the verdict line prints is
+   re-derived at run time.
+4. **Column grants are keyed PER COLUMN, not per column-SET** — a measured decision, not a
+   convenience. The migrations grew `connector_connections` across six migrations while the
+   supplement mirrors the final state; the whole-set model was implemented over this tree and
+   produced **7 false "missing" tuples**, with zero genuinely absent columns behind any of them.
+   ⛔ A table-level statement still carries the distinguished `<table-level>` column marker, so a
+   table-level `REVOKE ALL` can never collapse into a column-level `REVOKE ALL (c)`.
+5. ⛔ **THE D-13 SCOPE FENCE, and the gate says it in all three homes** (its docstring, its failure
+   text, and the supplement's §6 header): **ORDERING** (`FROM PUBLIC` before `FROM anon`) and
+   **REVERSE DRIFT** (the supplement more permissive than the migration history) are **NOT**
+   checked, by decision. Re-open triggers, respectively: the next migration that revokes a role
+   privilege without revoking PUBLIC first; and any phase that edits the supplement's grants by
+   hand. ⚠ A guard whose prose claims more than its code is precisely the defect CR-01 is.
+
+⭐ **THE SELF-TEST ARMS ARE THEMSELVES FALSIFIED, not merely present.** Three defects were planted
+in scratchpad COPIES of this file — signature-only keying, the table half switched off, and the
+naive line stripper restored — and each made its arms FAIL. ⚠ **The first dollar-quote arm PASSED
+against its own planted defect and was therefore VACUOUS**; it was replaced with a false-positive
+control (an ACL-shaped line inside a `$$` body is a PHANTOM and must not be counted), which does
+fail when the lexer is reverted. **An arm that cannot fail is the CR-02 defect one level up.**
+
+**The named seam the next refactor should take.** `aclsIn` now carries two grammars and five
+normalisers in one function. The seam is a **`--emit-missing` mode** (see the supplement's section
+above): the gate already parses both sides into one tuple space, so the same code that reports a
+gap could print the exact statements that close it. That turns the hand-mirror into a derivation
+and removes the failure class rather than guarding it.
+
+**Invoked by** — and ⛔ **for its entire life before Phase 253 it was invoked by NOTHING**:
+`grep -rln "check-schema-acl-parity" .claude .github package.json` returned zero at plan time. A
+gate nobody runs cannot fail either way. Now: `.claude/hooks/schema-acl-parity-guard.js`
+(PostToolUse, the PRIMARY half per CLAUDE.md's two-guards rule) and
+`.github/workflows/schema-acl-parity.yml` (CI, the backstop). ⚠ The hook's registration lives in
+`.claude/settings.json`; if a settings rewrite drops it, the hook keeps working and fires NEVER,
+with nothing to say so.
+
+## scripts/check-greenfield-privileges.py
+
+**Derived 2026-09-17 (Phase 253-02, D-23):** `1 / 1 / 1157`. Phase bucket: `253`.
+**Does not fire — 1 phase.** Row added AT CREATION, which is the only moment that reliably happens:
+`scripts/` is EXEMPT from the ledger gate, so nothing will ever prompt for it later.
+
+**What it is.** The ONE harness that answers *"does a database born from `supabase/full-schema.sql`
+alone carry the same privileges as one built by replaying `supabase/migrations/`?"* — by creating a
+real scratch database, applying the artifact, and then **measuring as the granted role**, not as
+the service role. That distinction is the whole point: `BUG-260911-01` and migration 156 both
+escaped every existing gate because **every gate in this project reads through the service role and
+nothing in the suite ever makes a request as `anon`**.
+
+**Invariants that bind it.**
+
+1. ⛔ **A SKIP IS EXIT 2, NEVER 0.** With no Postgres on the configured port the harness prints
+   `greenfield privileges SKIPPED` and exits **2**. A skip is not a pass, and a harness that
+   returned 0 when it measured nothing would be worse than absent.
+2. **The target-name grammar is ANCHORED.** Only a database this script GENERATED may be created or
+   dropped (`greenfield_acl_<digits>_<digits>`), and the guard also refuses a non-loopback host, a
+   comma-separated host LIST, and a `?host=`/`hostaddr=`/`port=`/`dbname=` query-parameter
+   override. ⚠ **An UNANCHORED match would accept `greenfield_acl_1_1_prod`** — that case is driven
+   as a refusal, ⭐ alongside a **positive control** (a name the script would really generate must
+   be ACCEPTED), because five refusals prove nothing if the guard refuses everything.
+3. **Expectations are DERIVED from the migrations by replay — derive-then-replay,
+   last-statement-wins, with NO exception list.** The preamble is built from `pg_default_acl` so a
+   stock Supabase grant is not mistaken for a migration's. ⛔ Nothing here is an allowlist: a table
+   the model does not know about is a finding, not an omission.
+4. ⛔ **`has_table_privilege` / `has_column_privilege`, NEVER `information_schema.column_privileges`**
+   — the view answers a different question and would have reported the pre-fix database as correct.
+5. **It re-asserts the D-11 tail identity before it touches a database at all**, so it doubles as
+   the same-commit checker for the supplement ↔ `full-schema.sql` pair.
+6. ⛔ **It is deliberately NOT in `backend/tests/unit`** (D-04). That suite sits at a **71-failure
+   ceiling with zero headroom** and must not gain a live-database precondition.
+
+**The named seam the next refactor should take.** At 1157 lines it already holds three separable
+things: the target guard, the derive-then-replay expectation model, and the reporting. The **first
+seam is the expectation model** — it duplicates, in Python, the tuple normalisation that
+`check-schema-acl-parity.cjs` performs in JavaScript. ⚠ Two implementations of one truth in two
+languages is exactly how a pair of registers comes to disagree, and this ledger's recurring finding
+is that only one register ever gets updated. Extract it, or make one gate the authority and have
+the other consume its output.
