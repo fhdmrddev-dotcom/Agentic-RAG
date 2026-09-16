@@ -58,9 +58,16 @@ const useStreamActions = vi.fn((..._a: unknown[]) => ({ stopThread: vi.fn() }))
 // activity, which only exists while something is running.
 const useStreamingForThread = vi.fn(() => true)
 const useLoadingForThread = vi.fn(() => false)
+// ⛔ Phase 252-04 (D-21) — THE THIRD ONE, owed for exactly the reason the paragraph above
+// gives. `TodosSection` now also reads `useReconcilingForThread`, and this suite mounts the
+// REAL component: omitting the key throws every test in the file at mount. It was measured
+// doing precisely that (3 failures here against a green base) before this line existed.
+// It defaults FALSE — this suite's scenario is a live run, not a thread mid-reconcile.
+const useReconcilingForThread = vi.fn((..._a: unknown[]) => false)
 vi.mock("@/providers/StreamsProvider", () => ({
   useStreamingForThread: (...a: unknown[]) => useStreamingForThread(...a),
   useLoadingForThread: (...a: unknown[]) => useLoadingForThread(...a),
+  useReconcilingForThread: (...a: unknown[]) => useReconcilingForThread(...a),
   useTodos: (...a: unknown[]) => useTodos(...a),
   useWorkspaceFiles: (...a: unknown[]) => useWorkspaceFiles(...a),
   useAskUserPrompt: (...a: unknown[]) => useAskUserPrompt(...a),

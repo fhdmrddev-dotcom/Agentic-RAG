@@ -26,12 +26,18 @@ const useDerivedPanel = vi.fn()
 // tests in one run), so both selectors are declared here.
 const useStreamingForThread = vi.fn()
 const useLoadingForThread = vi.fn()
+// Phase 252-04 (D-21) — the THIRD liveness selector. `reconcile` now marks its own
+// /snapshot round-trip, which is the window `BUG-260915-01` actually describes. Declared
+// here for the same reason as the two above: a mock factory that omits a newly-added
+// export makes every suite mounting this component throw AT MOUNT.
+const useReconcilingForThread = vi.fn()
 vi.mock("@/providers/StreamsProvider", () => ({
   useTodos: (...a: unknown[]) => useTodos(...a),
   useViewingThread: (...a: unknown[]) => useViewingThread(...a),
   useDerivedPanel: (...a: unknown[]) => useDerivedPanel(...a),
   useStreamingForThread: (...a: unknown[]) => useStreamingForThread(...a),
   useLoadingForThread: (...a: unknown[]) => useLoadingForThread(...a),
+  useReconcilingForThread: (...a: unknown[]) => useReconcilingForThread(...a),
 }))
 
 // eslint-disable-next-line import/first
@@ -54,6 +60,7 @@ describe("TodosSection (PANEL-02) — live todo list with status", () => {
     // The ended-run behaviour is asserted explicitly in the Phase 250 block at the bottom.
     useStreamingForThread.mockReturnValue(true)
     useLoadingForThread.mockReturnValue(false)
+    useReconcilingForThread.mockReturnValue(false)
   })
 
   it("renders every todo from useTodos(threadId).data in order_index order", () => {
@@ -232,6 +239,10 @@ describe("TodosSection — run honesty (Phase 250, HONEST-03 / HONEST-04)", () =
   function ended() {
     useStreamingForThread.mockReturnValue(false)
     useLoadingForThread.mockReturnValue(false)
+    // Phase 252-04 — "ended" now means all THREE liveness reads are false. Leaving the
+    // third one unset would make `ended()` mean "ended, and also we are mid-reconcile",
+    // which is a different state with a different honest reading.
+    useReconcilingForThread.mockReturnValue(false)
   }
 
   beforeEach(() => {
@@ -240,6 +251,7 @@ describe("TodosSection — run honesty (Phase 250, HONEST-03 / HONEST-04)", () =
     setTodos(OPEN_TODOS)
     useStreamingForThread.mockReturnValue(true)
     useLoadingForThread.mockReturnValue(false)
+    useReconcilingForThread.mockReturnValue(false)
   })
 
   // ⚠ THE SELECTOR IS `[class*="animate-dotBounce"]`, NOT `.animate-dotBounce`, AND THAT
@@ -277,6 +289,50 @@ describe("TodosSection — run honesty (Phase 250, HONEST-03 / HONEST-04)", () =
     render(<TodosSection />)
     const row = screen.getByText("Translate full document content to Arabic").closest("li")
     expect(row).toHaveTextContent(/in progress/i)
+  })
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Phase 252-04 (SC#5 hole 1 / D-21 / D-24) — THE THREAD-OPEN FLASH.
+  //
+  // `BUG-260915-01`'s SYMPTOM is real and these two cases are the drive for it. Its
+  // stated MECHANISM was measurably false and is corrected in the report itself:
+  // `setViewingThread` DOES fire `reconcile` (StreamsProvider.tsx:1936-1942). The actual
+  // hole is that `reconcile` set no liveness signal of its own, so for the entire
+  // `/snapshot` round-trip `streamingThreads` and `loadingThreads` were BOTH empty and
+  // every open todo on a live run read "Not ticked".
+  //
+  // ⛔ THESE TWO CASES ARE A PAIR AND NEITHER IS SUFFICIENT ALONE. A "fix" that made
+  // `isRunLive` unconditionally true would pass the first and DELETE `HONEST-03`; the
+  // idle control is the only thing standing between this change and that regression.
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  it("a reconciling thread still reads IN PROGRESS — the thread-open flash (BUG-260915-01)", () => {
+    // Exactly the thread-open window: nothing streaming yet (the snapshot has not come
+    // back to derive it), nothing loading (`loadMessages` is not on this path at all),
+    // but a reconcile IS in flight. Liveness is UNKNOWN here — and "we do not know yet"
+    // must never be rendered as the positive claim "not ticked" (D-24).
+    useStreamingForThread.mockReturnValue(false)
+    useLoadingForThread.mockReturnValue(false)
+    useReconcilingForThread.mockReturnValue(true)
+    render(<TodosSection />)
+    const row = screen.getByText("Translate full document content to Arabic").closest("li")
+    expect(row).toHaveTextContent(/in progress/i)
+    expect(row).not.toHaveTextContent(/not ticked/i)
+  })
+
+  it("a genuinely idle thread STILL reads NOT TICKED — the control that keeps HONEST-03", () => {
+    // ⛔ The counterfactual. Not streaming, not loading, AND not reconciling: the app has
+    // actually looked and there is nothing running. This must pass BEFORE and AFTER the
+    // fix — it is what proves the panel was made less willing to CLAIM, not more willing
+    // to REASSURE.
+    useStreamingForThread.mockReturnValue(false)
+    useLoadingForThread.mockReturnValue(false)
+    useReconcilingForThread.mockReturnValue(false)
+    const { container } = render(<TodosSection />)
+    const row = screen.getByText("Translate full document content to Arabic").closest("li")
+    expect(row).toHaveTextContent(/not ticked/i)
+    expect(row).not.toHaveTextContent(/in progress/i)
+    expect(container.querySelector('[class*="animate-dotBounce"]')).toBeNull()
   })
 
   // ⚠ WR-04 TIGHTENED, NOT WEAKENED. This asserted `container.textContent` matched no
@@ -399,12 +455,38 @@ describe("TodosSection — run honesty (Phase 250, HONEST-03 / HONEST-04)", () =
     // ⚠ The shared util strips BLOCK comments and WHOLE-LINE line comments — not a
     // TRAILING one on a line of code, which this fence also needs. So both run, in that
     // order, and the local step is now a narrow SUPPLEMENT, not a reimplementation.
-    const offenders = stripComments(src)
+    const code = stripComments(src)
       .split(/\r?\n/)
       .map((line, i) => [i + 1, line.replace(/\/\/.*$/, "")] as const)
-      .filter(([, line]) => shortCircuitedHook.test(line))
+
+    const offenders = code.filter(([, line]) => shortCircuitedHook.test(line))
 
     expect(offenders).toEqual([])
+
+    // ── Phase 252-04 (D-23) — THE FENCE IS EXTENDED TO THE THIRD HOOK, NOT MERELY LEFT
+    //    STANDING. `useReconcilingForThread` joined this component, and the regex above
+    //    is generic over `use[A-Z]…`, so it already covers the new call — but "already
+    //    covered" is an ARGUMENT, and this fence exists because an argument of exactly
+    //    that shape shipped a blank page. So the three calls are asserted POSITIVELY:
+    //    three liveness selectors, on three DISTINCT lines, each its own statement.
+    //
+    // ⚠ This still cannot be a rendered assertion. A `vi.fn()` standing in for a hook
+    // consumes no hook slot, so React's accounting never sees the violation — the source
+    // is the only witness available in this suite.
+    const LIVENESS_HOOKS = [
+      "useStreamingForThread",
+      "useLoadingForThread",
+      "useReconcilingForThread",
+    ] as const
+    const linesOf = (hook: string) =>
+      code.filter(([, line]) => line.includes(`${hook}(threadId)`)).map(([n]) => n)
+
+    const callLines = LIVENESS_HOOKS.map((h) => linesOf(h))
+    // Each selector is called exactly once…
+    expect(callLines.map((ls) => ls.length)).toEqual([1, 1, 1])
+    // …and no two of them share a line, which is what `||`-ing hook CALLS would look like.
+    const flat = callLines.flat()
+    expect(new Set(flat).size).toBe(3)
   })
 
   it("derived rows get the identical treatment from the same helper", () => {
