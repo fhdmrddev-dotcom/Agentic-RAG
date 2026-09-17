@@ -170,3 +170,11 @@ RED drive is what makes that a measurement instead of an assumption.
 (D-05 / `REG-03`). ⭐ And every one **voids itself if its bus ask is answered** — before or after
 2026-09-24 — because *a deadline is a completion condition, not a closed door*, and Gemini cannot be
 driven from here (M-5).
+
+## Self-Check: PASSED
+
+All six files claimed by this plan exist on disk, and all five `*-REVIEW-REFUSAL.md` files are
+tracked in `HEAD` (`git ls-tree -r --name-only HEAD | grep -c REVIEW-REFUSAL.md` returns **5**).
+All three commits resolve: `c551be798` (Task 1), `d2dc1358e` (Task 2), `260d7e0f4` (this summary).
+Task 3 changed no bytes, so it has no commit of its own — its evidence is the RED drive recorded
+above, and the byte-copy restore that proved the tree unchanged.
