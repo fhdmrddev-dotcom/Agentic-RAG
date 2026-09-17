@@ -37,12 +37,47 @@ const {
   mockCancelRun: vi.fn(),
 }))
 
+// ⚠ TWO SEPARATE DEFECTS LIVED HERE, both fixed 2026-09-18.
+//
+// 1. RECONCILE STOPPED CALLING `getActiveRuns`. Phase 075 (D-075-02) collapsed the
+//    `Promise.all([getActiveRuns, loadMessages])` chain into ONE `getSnapshot()` round-trip.
+//    This suite still primed only the two old mocks, so reconcile read a function this
+//    factory never declared and never reached `subscribeToRun` — which surfaced as
+//    "expected vi.fn() to be called at least once", i.e. "reconcile does not subscribe".
+//    ⭐ `getSnapshot` below is COMPOSED from the same two mocks rather than hard-coding a
+//    snapshot, so every per-thread `mockImplementation` this suite already sets keeps
+//    meaning exactly what it meant, and there is ONE place a thread’s data comes from.
+//
+// 2. A MOCK FACTORY REPLACES THE WHOLE MODULE. StreamsProvider imports ELEVEN runtime
+//    values from "@/lib/api"; this declared five, so the other six were `undefined` — a
+//    TypeError waiting on whichever branch reached one first. Same class as `196-08`,
+//    where nine suites threw at mount over one undeclared export.
 vi.mock("@/lib/api", () => ({
   postMessage: mockPostMessage,
   subscribeToRun: mockSubscribeToRun,
   getMessages: mockGetMessages,
   getActiveRuns: mockGetActiveRuns,
   cancelRun: mockCancelRun,
+  // The post-075 reconcile primitive. `since_cursors` is empty: this suite asserts
+  // placeholder/merge behaviour, not cursor seeding.
+  getSnapshot: vi.fn(async (threadId: string) => ({
+    messages: await mockGetMessages(threadId),
+    active_runs: await mockGetActiveRuns(threadId),
+    since_cursors: {},
+  })),
+  getThreadTodos: vi.fn().mockResolvedValue([]),
+  getThreadWorkspaceFiles: vi.fn().mockResolvedValue([]),
+  getThreadPendingAsks: vi.fn().mockResolvedValue([]),
+  getThreadTasks: vi.fn().mockResolvedValue([]),
+  getThreadWorkflow: vi.fn().mockResolvedValue(null),
+  // ⛔ A class, not a vi.fn(): the provider does `new ApiError(...)`.
+  ApiError: class ApiError extends Error {
+    status: number
+    constructor(message: string, status: number) {
+      super(message)
+      this.status = status
+    }
+  },
 }))
 
 // ── Mock Supabase auth ────────────────────────────────────────────────────────
