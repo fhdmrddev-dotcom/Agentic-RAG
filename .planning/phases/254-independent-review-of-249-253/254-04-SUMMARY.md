@@ -51,8 +51,8 @@ metrics:
   duration: ~1h40m
   completed: 2026-09-17
   tasks: 3
-  commits: 4
-  files_changed: 9
+  commits: 6
+  files_changed: 10
 ---
 
 # Phase 254 Plan 04: The registers say what is true — and the box is still empty
@@ -68,7 +68,8 @@ index in front of the operator with five `answer`+`close` pairs claude did not r
 | 1 | `3a531f796` | the five `*-VERIFICATION.md` frontmatters — **ADD** on 251, amend on four, **zero flips** |
 | 2 | `477c14098` | `ROADMAP.md` (7 rows) + `REQUIREMENTS.md` (`DEBT-06` text + 2 coverage rows) |
 | 3 | `97b5dc6ae` | `254-REVIEW-INDEX.md` — the operator's list, and the phase's own hygiene sweeps |
-| — | (this commit) | `254-04-SUMMARY.md`, `STATE.md` |
+| — | `05e6a9110` + `3017852ea` | `254-04-SUMMARY.md` and its self-check |
+| — | `c9db0cc84` | `STATE.md` — plan 4 / 4; plan counts 27 → 31 on BOTH sides (254 four plans had never been counted); phases HELD at 7 / 8 because 254 is executed, not verified |
 
 **The deliverable in one number: a sweep of the five registers returned `4` before this plan and
 returns `5` after.** `251-VERIFICATION.md` had carried no `independent_review` key for the phase's
@@ -395,3 +396,16 @@ radius — `git status --short backend/ frontend/` is empty.
 - **4 / 4 commits resolve** — `3a531f796` · `477c14098` · `97b5dc6ae` · `05e6a9110`.
 - **No deletions** in any commit — `git diff --diff-filter=D --name-only HEAD~1 HEAD` empty at each.
 - ⛔ **`.agent-bus/OPEN.md` and `.planning/seeds/` byte-unchanged** — `git status --short` empty for both.
+
+---
+
+## ⛔ Two register verbs deliberately NOT run
+
+- **`requirements mark-complete DEBT-06`** — ⛔ **not run, and running it would have been the exact
+  failure this plan exists to prevent.** The plan's frontmatter lists `requirements: [DEBT-06]`, but
+  D-02 / D-03 and `ROADMAP.md:271` all say the requirement is **amended, never ticked** at this close.
+  The box reads `- [ ]`.
+- **`roadmap update-plan-progress` / any `state.*` verb** — ⛔ not called. `ROADMAP.md` and `STATE.md`
+  were **hand-edited** and the diffs read, per this project's standing rule: `state.*` has corrupted
+  `STATE.md` seven times and `phase.add` wrote to the wrong ROADMAP section twice in two days.
+  `STATE.md`'s frontmatter was re-validated with `yaml.safe_load` after the edit.
