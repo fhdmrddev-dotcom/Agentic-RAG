@@ -74,7 +74,15 @@ jobs:
           done
           echo "Redis did not become ready in 30s"; exit 1
 
+      # R2-CR-02 follow-up (253, measured 2026-09-17): with collection no longer aborting,
+      # this step ran the integration tests for real and HUNG — 37 minutes, then cancelled,
+      # against 3m30s when it used to die at collection. It blocks on a Postgres/Supabase
+      # that does not exist on the runner. Bounded and marked non-failing: its baseline is 71
+      # failures (CLAUDE.md), so its exit code was NEVER a pass/fail signal — the fences step
+      # below is. Leaving it unbounded is what skipped that step.
       - name: Run pytest
+        timeout-minutes: 12
+        continue-on-error: true
         run: |
           cd backend
           source venv/bin/activate
@@ -89,7 +97,13 @@ jobs:
       # failures, so it can never exit 0 and can never be read as a signal. The two
       # scripts/ fences this phase added were widened into that job and were therefore
       # executed by nothing legible. This step runs them ALONE and MUST be green.
+      # ⛔ `if: always()` IS LOAD-BEARING AND WAS MISSING ON THE FIRST ATTEMPT. A step with no
+      # `if:` is SKIPPED once an earlier step fails, and the step above can never succeed — so
+      # this fence was structurally unreachable. Measured on run 35231275118: `Run pytest`
+      # cancelled, and this step reported `skipped`. A guard that cannot fire is not a guard;
+      # that is the defect class this phase exists to kill, shipped by the fix for it.
       - name: scripts/ parity fences (must pass)
+        if: always()
         run: |
           cd backend
           source venv/bin/activate
