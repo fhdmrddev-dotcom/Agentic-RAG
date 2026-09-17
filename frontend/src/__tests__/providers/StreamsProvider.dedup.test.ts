@@ -91,18 +91,29 @@ describe("StreamsProvider — BUG-260521-01 reducer dedup + WR-01 id-match", () 
     vi.clearAllMocks()
   })
 
+  // ⚠ This id was hard-coded four times and had been stale since `91accf0f3` (Phase 076.1,
+  // 2026-05-26), which made dedup ITERATION-AWARE for multi-batch runs — the id gained an
+  // iteration segment — and did not touch this file. The CODE is the correct side. Named once
+  // here so the next format change rots ONE line, not four.
+  //
+  // ⛔ TWO of the four uses PASSED the stale id to `onToolEnd`, which is why this read as a
+  // product defect: the id-match missed, the entry stayed "running", and the failure said
+  // onToolEnd no longer flips to done. One of those two asserts only content preservation, so
+  // it stayed GREEN while its "full sequence" silently contained no matching tool_end.
+  const PREPARING_ID = `preparing-0-0`
+
   it("D-075.2-01: replayed tool_start after preparing->running is a no-op (no duplicate entry)", () => {
     const { callbacks, current } = makeHarness()
     callbacks.onToolPreparing!("execute_code", 0)
     callbacks.onToolStart!("execute_code", { code: "x" })
     expect(current().tool_calls).toHaveLength(1)
     expect(current().tool_calls![0].status).toBe("running")
-    expect(current().tool_calls![0].id).toBe("preparing-0")
+    expect(current().tool_calls![0].id).toBe(PREPARING_ID)
     // Simulate WR-02 cursor-0 replay: tool_start fires again
     callbacks.onToolStart!("execute_code", { code: "x" })
     expect(current().tool_calls).toHaveLength(1)
     expect(current().tool_calls![0].status).toBe("running")
-    expect(current().tool_calls![0].id).toBe("preparing-0")
+    expect(current().tool_calls![0].id).toBe(PREPARING_ID)
   })
 
   it("D-075.2-01: second distinct tool index creates a separate entry (replay-idempotency does not collapse legitimate tools)", () => {
@@ -122,7 +133,7 @@ describe("StreamsProvider — BUG-260521-01 reducer dedup + WR-01 id-match", () 
     const { callbacks, current } = makeHarness()
     callbacks.onToolPreparing!("execute_code", 0)
     callbacks.onToolStart!("execute_code", { code: "x" })
-    callbacks.onToolEnd!("execute_code", "result-1", "preparing-0")
+    callbacks.onToolEnd!("execute_code", "result-1", PREPARING_ID)
     expect(current().tool_calls![0].status).toBe("done")
     expect(current().tool_calls![0].result).toBe("result-1")
   })
@@ -142,7 +153,7 @@ describe("StreamsProvider — BUG-260521-01 reducer dedup + WR-01 id-match", () 
     callbacks.onToolPreparing!("execute_code", 0)
     callbacks.onToolStart!("execute_code", { code: "x" })
     callbacks.onToolStart!("execute_code", { code: "x" })  // replay no-op
-    callbacks.onToolEnd!("execute_code", "result-1", "preparing-0")
+    callbacks.onToolEnd!("execute_code", "result-1", PREPARING_ID)
     // Every snapshot in the trace preserved m.content verbatim
     for (const snap of snapshots) {
       expect(snap[0].content).toBe(startingContent)
