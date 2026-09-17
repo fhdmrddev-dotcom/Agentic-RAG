@@ -10649,6 +10649,7 @@ cells rot within days.
 | [`scripts/check-greenfield-privileges.py`](docs/HOT-FILE-LEDGER.md#scriptscheck-greenfield-privilegespy) | 2 / 1 / 1312 | no (1 phase) | ⚠ row STALE at `1/1/1157` the same day it was written. **253-03**: `_statements` replaces `line.find("--")`; ⛔ a SKIP is exit 2, never 0 |
 | [`.claude/hooks/schema-acl-parity-guard.js`](docs/HOT-FILE-LEDGER.md#claudehooksschema-acl-parity-guardjs) | 2 / 1 / 145 | no (1 phase) | young (created 253-02). Row added AT CREATION — `.claude/` is EXEMPT, so no gate can ever demand it. ⛔ its SILENCE reads as "clear": every path a payload can carry must be extracted |
 | [`.github/workflows/backend-tests.yml`](docs/HOT-FILE-LEDGER.md#githubworkflowsbackend-testsyml) | 4 / 2 / 84 | no (2 phases) | ⚠ absent for its ENTIRE LIFE — row added 253-03. `.github/` is EXEMPT. ⛔ its `paths:` decide which fences a change is measured by; two `scripts/` files were read by unit tests and matched by none |
+| [`.claude/settings.json`](docs/HOT-FILE-LEDGER.md#claudesettingsjson) | 9 / 4 / 202 | ⚠ **FIRES** | ⚠ **absent from BOTH registers its ENTIRE LIFE at 4 phases — rows added 253-03.** `.claude/` is EXEMPT: no gate could ask. The ONE hook dispatch table; a too-narrow `matcher` fires NEVER, in silence |
 
 
 
@@ -14709,3 +14710,61 @@ extension and mutates a cluster, so it cannot go on `ubuntu-latest` as-is. **Re-
 runner that can host a pgvector-capable Postgres on 54322 (which would also require `ALLOWED_PORTS`
 to become a small derived set rather than a constant), or the next promotion where
 `get_advisors(security)` disagrees with a local run.**
+
+## .claude/settings.json
+
+**Derived 2026-09-17 (Phase 253-03, D-23):** `9 / 4 / 202`. Phase buckets: `226, 245, 250, 253`.
+⚠ **G-5 FIRES — 4 phases — and this file was absent from BOTH registers for its ENTIRE LIFE.**
+⛔ `check-hot-file-ledger.cjs`'s `WATCHED` set is `backend/app/` + `frontend/src/` only, so
+`.claude/` is EXEMPT and **no gate could ever have demanded this row**. It is the fourth file in
+this phase found invisible to its own guardrail for a structural reason rather than a careless one
+(after `full-schema-supplement.sql`, `schema-acl-parity-guard.js` and `backend-tests.yml`).
+
+**What it is.** The operator's Claude Code configuration, and — the part that matters here — **the
+ONE dispatch table for every hook in this repository.** A guard's code can be perfect and its
+registration is what decides whether it is ever handed anything.
+
+**Invariants that bind it.**
+
+1. ⛔ **A HOOK WITH NO ENTRY, OR A TOO-NARROW `matcher`, FIRES NEVER AND SAYS NOTHING.** Measured at
+   253-03 (WR-02, cause 2): `schema-acl-parity-guard` was registered `"Write|Edit"`, so Claude Code
+   **never handed it a `MultiEdit` at all** — and the hook's own silence is indistinguishable, to an
+   author, from a clean tree. ⭐ **This is why WR-02 turned out to be TWO findings and not one:**
+   the hook's `edits[].file_path` extraction (`b6dce5010`) and this matcher (`566978a57`) are
+   independent, and **fixing either alone changes nothing in a live session.**
+2. ⚠ **A `matcher` is a claim about which tools a guard watches, and nothing verifies it.** There is
+   no gate that reads this file and compares each entry against what its hook can actually handle.
+   The cheapest available check is the one 253-03 used: read the matcher out of the **parsed** JSON
+   and compare it, **derived**, against a sibling entry known to be correct
+   (`react-hooks-rules-guard` is the reference for `Write|Edit|MultiEdit`) — never a typed literal
+   and never a grep.
+3. ⛔ **EDIT IT BYTE-PRECISELY.** `"matcher": "Write|Edit"` occurs **9 times** in this file, so a
+   naive find-and-replace silently rewrites eight registrations nobody asked about. 253-03 anchored
+   on the unique hook command string and walked BACK to the nearest preceding matcher. ⚠ Line
+   endings are CRLF (`202 / 202`); check the byte delta after any scripted edit — a `+10` for
+   `|MultiEdit` is verifiable, a changed CR count is a silent rewrite `git diff` will not show.
+4. ⚠ **IT IS AN OPERATOR CONFIG FILE.** Every edit here is approval-gated: state the exact current
+   and proposed values, wait for a clear yes, change only what was approved. 253-03's one-line
+   change was approved on 2026-09-17 with the scope stated explicitly (entry 5 only; entries 4 and
+   6 untouched).
+5. ⛔ **IT IS NOT VENDORED, AND A FRAMEWORK UPDATE CAN STILL COST YOU A GUARD.** The hooks under
+   `.claude/hooks/` survive `/gsd:update` by design, but if a settings rewrite drops a PostToolUse
+   entry, **the hook file keeps working and fires NEVER, with nothing to say so.** Re-check the
+   registrations after any framework update — the same warning CLAUDE.md gives about
+   `.claude/get-shit-done/`, one directory over.
+
+⚠ **A KNOWN DEAD KEY, LEFT IN PLACE BY AN OPERATOR DECISION.** A top-level `"PostToolUse": []` sits
+**outside** `"hooks"`, where nothing reads it (`252-REVIEW.md` IN-02). Its re-open trigger is *"the
+next `.claude/settings.json` edit that is not scope-locked"* — that trigger **fired at 253-03**, the
+operator was shown it as an explicit option, and **declined it on 2026-09-17**. It therefore stays,
+`IN-02` stays open, and the trigger is unchanged. ⛔ Recorded rather than left silent: a deferral
+whose trigger fires and then goes unmentioned is a deletion wearing a decision's clothes.
+
+**The named seam the next refactor should take.** None inside this file — it is 202 lines of
+configuration and splitting it would only move the problem. The seam is **an executable check that
+does not exist**: a gate that reads every PostToolUse entry, resolves its hook file, and fails when
+a registered `matcher` omits a tool the hook demonstrably handles (or when a hook under
+`.claude/hooks/` has **no** entry at all). That is the only thing that would have caught WR-02's
+second cause without a human noticing it. ⛔ Deferred at 253-03 by the operator's five-finding scope
+lock, not by judgement; **trigger: the next hook whose registration is found narrower than its
+code, or the next `.claude/hooks/` file added without a matching entry.**

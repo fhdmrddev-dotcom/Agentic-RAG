@@ -797,6 +797,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/sources/sourceHealthVocabulary.ts` | 8 / 4 / 645 | ⛔ row STALE (`6/3/560`) AND ITS OWN PREDICTION CAME TRUE UNRECORDED: it said G-5 fires on the next touch, and **252-03 WAS that touch**. Seam OWED |
 | `backend/app/services/sources/failure_cause.py` | 3 / 2 / 227 | ⚠ absent for its entire life — row added **BUG-260912-01**. ⛔ its `Cause` union must stay ONE plain-text line: a frontend suite binds it by `?raw` and a computed union is invisible to that fence |
 | `scripts/full-schema-supplement.sql` | 11 / 6 / 653 | ⚠ **FIRES, and absent for its ENTIRE LIFE at 6 phases — row added 253-02.** ⛔ NO GATE COULD DEMAND IT: `scripts/` is EXEMPT in check-hot-file-ledger.cjs. The ONE hand-mirror of every migration ACL; its tail is byte-identical to `full-schema.sql` |
+| `.claude/settings.json` | 9 / 4 / 202 | ⚠ **FIRES, absent from BOTH registers its ENTIRE LIFE at 4 phases — rows added 253-03.** ⛔ `.claude/` is EXEMPT: no gate can ask. The ONE hook dispatch table; a dropped entry fires NEVER, in silence |
 
 When a new phase enters discuss-phase, the orchestrator must scan PLAN.md `files_modified` against this ledger. Any match against a G-5-firing row means the discuss-phase produces a refactor recommendation as the first option, not the planned feature — and the phase reads that file's section in `docs/HOT-FILE-LEDGER.md` before planning, because that is where the named seam and the binding invariants live.
 
