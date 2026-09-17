@@ -3822,6 +3822,16 @@ const BASELINE = {
   //   · that read count is **7**, not the 5 a first pass took from `grep -n` — one line carries
   //     three occurrences. ⛔ A LINE count is not an OCCURRENCE count.
   "LibraryPage.cloudImport.test.tsx": 8,
+  // ── 252-REVIEW.md CR-11 / 252-REVIEW-R2.md WR-05, taken 2026-09-17 ────────────────
+  // 252-03 hand-edited this suite's exact-equality occurrence pin 4 → 5, and 252-05
+  // recorded honestly that the file sat in NEITHER knob and declined to adopt it. The net
+  // effect was an exact-count assertion NO GATE EXECUTES: if the new number were wrong the
+  // suite would be red and nothing would report it. ⭐ The stated reason for declining the
+  // DIRECTORY-wide entry does not apply to this one FILE — it is a pure-source `?raw` suite
+  // with no mount, so it cannot drag `sourceComposition.test.tsx`'s standing red in with it
+  // (that suite oscillates 16/33 ↔ 18/31 and is in neither knob BY DECISION, Phase 235).
+  // ⚠ 14 MEASURED at GSD_VITEST_MAX_WORKERS=2 on 2026-09-17, not guessed: `14 passed (14)`.
+  "bug260912AppCredentials.test.ts": 14,
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -5507,6 +5517,13 @@ const TARGETS = [
   // sat in neither knob — so the assertion that catches a drift in that module was not executing
   // under the gate. `src/__tests__/components` has no bare-directory entry either.
   "src/__tests__/components/SettingsModelBadge.test.tsx",
+  // ── 252-REVIEW.md CR-11 / 252-REVIEW-R2.md WR-05 ─────────────────────────────────
+  // BOTH knobs, same commit — the pin above is inert without this entry, because TARGETS
+  // decides what RUNS and BASELINE decides what is GUARDED, and a suite can sit on the
+  // wrong side of exactly one. `src/components/sources` has no bare-directory entry, and
+  // deliberately so (Phase 235 kept the red `sourceComposition.test.tsx` out of both), so
+  // this file must be NAMED or it executes nowhere.
+  "src/components/sources/bug260912AppCredentials.test.ts",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
