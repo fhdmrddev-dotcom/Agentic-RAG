@@ -44,6 +44,10 @@ const SHIPPED_TECHNICAL: Record<string, string> = {
   "status.processing": "processing",
   "status.completed": "completed",
   "status.failed": "failed",
+  // ⚠ ADDED 2026-09-18. `status.paused` reached TERM_MAP at `0d2a98531` (Phase 230) and
+  // never reached this table, so this bidirectional guard had been RED ever since. It was
+  // working exactly as designed — it is the DRIFT that went unread, not the guard.
+  "status.paused": "paused",
   // Surface B — document detail (DocumentDetailPanel.tsx:230)
   "doc.metadata_section": "Metadata",
   // Surface C — chat composer (MessageInput.tsx:327,337,345)
