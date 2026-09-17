@@ -384,3 +384,14 @@ radius — `git status --short backend/ frontend/` is empty.
    measured decay rate is ten hours.
 5. ⚠ **Three vocabulary defects** (`complete` vs `done`; a bare `false`; a row with no file) are routed
    and unrepaired by design.
+
+---
+
+## Self-Check: PASSED
+
+- **9 / 9 files present on disk** — `254-REVIEW-INDEX.md`, `254-04-SUMMARY.md`, the five
+  `*-VERIFICATION.md`, `ROADMAP.md`, `REQUIREMENTS.md`.
+- **2 / 2 new files tracked in `HEAD`** (`git ls-tree -r --name-only HEAD`).
+- **4 / 4 commits resolve** — `3a531f796` · `477c14098` · `97b5dc6ae` · `05e6a9110`.
+- **No deletions** in any commit — `git diff --diff-filter=D --name-only HEAD~1 HEAD` empty at each.
+- ⛔ **`.agent-bus/OPEN.md` and `.planning/seeds/` byte-unchanged** — `git status --short` empty for both.
