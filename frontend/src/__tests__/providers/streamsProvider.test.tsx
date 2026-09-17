@@ -1100,7 +1100,14 @@ describe("Phase 068.5 — L-068.5-01 hydrate respects Branch D-3 (per-surface)",
 })
 
 describe("Phase 068.5 — L-068.5-02 MERGE 3-clause filter survives", () => {
-  it("loadMessages MERGE filter (temp- + runId + !dbRunIds.has) still pins live temp placeholders", async () => {
+  // ⚠ THE PREDICATE IN THE OLD TITLE IS NO LONGER THE PREDICATE. `BUG-260609-03` and
+  // `BUG-260626-01` added a FOURTH clause: a runId-bearing temp survives only while
+  // GENUINELY IN FLIGHT — a live SSE consumer is bound, OR `runStatus === "streaming"`.
+  // A terminated, unsubscribed temp is a stale duplicate of the answer just fetched and is
+  // now dropped on purpose (it was the persisted double-answer on reload for harness runs).
+  // This seeded a temp with neither mark, so the CODE was right and the test was asserting
+  // the pre-fix rule. Seeding `runStatus: "streaming"` restores the case it means to make.
+  it("loadMessages MERGE keeps an IN-FLIGHT temp and drops a terminated one", async () => {
     // Sanity-check that the existing Phase 068 L-068-06 behavior survives the
     // Plan 01 edits. Set up: server returns 1 message with runId "run-1";
     // bucket has a temp placeholder with runId "run-2" (live, no DB match yet).
@@ -1154,6 +1161,21 @@ describe("Phase 068.5 — L-068.5-02 MERGE 3-clause filter survives", () => {
           created_at: "2026-05-13T00:00:01Z",
           updated_at: "2026-05-13T00:00:01Z",
           runId: "run-2",
+          // ⛔ The fourth clause. Without this the temp is TERMINATED and correctly dropped.
+          runStatus: "streaming",
+        } as Message,
+        {
+          // ⭐ THE NEGATIVE HALF, and it is what makes this fence able to tell the narrowed
+          // rule from the old one: same shape, same absent-from-DB runId, but no live
+          // subscription and NOT streaming — so it must NOT survive.
+          id: "temp-dead",
+          thread_id: "thread-A",
+          user_id: "u",
+          role: "assistant",
+          content: "terminated duplicate",
+          created_at: "2026-05-13T00:00:02Z",
+          updated_at: "2026-05-13T00:00:02Z",
+          runId: "run-3",
         } as Message,
       ])
     })
@@ -1173,8 +1195,10 @@ describe("Phase 068.5 — L-068.5-02 MERGE 3-clause filter survives", () => {
       const ids = bucket!.map((m) => m.id)
       // db-msg-1 from server (overwrites any non-streaming non-temp).
       expect(ids).toContain("db-msg-1")
-      // temp-xyz (runId=run-2 not in dbRunIds) survived the filter.
+      // temp-xyz is in flight (runStatus streaming, run-2 not in dbRunIds) — survives.
       expect(ids).toContain("temp-xyz")
+      // temp-dead is terminated and unsubscribed — dropped, per BUG-260609-03.
+      expect(ids).not.toContain("temp-dead")
     })
   })
 })
@@ -1639,11 +1663,20 @@ describe("075.6 Req #5 — argsCodeText reducer slice", () => {
     return { cb, assistantId: assistantMsg!.id, threadId, sendPromise, result }
   }
 
-  function getPreparingTool(threadId: string, toolIndex = 0) {
+  // ⚠ THE ITERATION SEGMENT WAS MISSING HERE, and this is the THIRD file carrying that
+  // same stale id — `91accf0f3` (Phase 076.1, 2026-05-26) made the placeholder id
+  // iteration-aware and updated none of them. A lookup that misses returns `undefined`,
+  // so `?.argsCodeText` read `undefined` and three cases failed as though the provider had
+  // stopped setting the field. It had not; the FINDER was looking for a tool that could
+  // not exist. ⛔ An optional-chained find is silent about "no such tool" — it reports a
+  // missing ENTITY as a missing VALUE.
+  function getPreparingTool(threadId: string, toolIndex = 0, iteration = 0) {
     const bucket =
       useStreamsStore.getState().bucketsBySurface.get("chat")?.get(threadId) ?? []
     const assistantMsg = [...bucket].reverse().find((m) => m.role === "assistant")
-    return assistantMsg?.tool_calls?.find((tc) => tc.id === `preparing-${toolIndex}`)
+    return assistantMsg?.tool_calls?.find(
+      (tc) => tc.id === `preparing-${iteration}-${toolIndex}`,
+    )
   }
 
   it("CHUNK_A → CHUNK_A_PLUS_B sets argsCodeText to the longer string", async () => {
