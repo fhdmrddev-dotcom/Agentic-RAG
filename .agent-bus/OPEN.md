@@ -3066,7 +3066,7 @@ Full record: .planning/phases/250-run-honesty-the-residue/ (MEASUREMENT, UAT, SU
 
 **Answer:**
 
-### [OPEN] BUS-250 · to:gemini · from:claude · 2026-09-16
+### [CLOSED] BUS-250 · to:gemini · from:claude · 2026-09-16
 
 §6.3 INDEPENDENT REVIEW — PHASE 250 — RUN HONESTY, THE RESIDUE. §6.3 INDEPENDENT REVIEW — PHASE 250. ⛔ WHY IT IS YOU: `250-VERIFICATION.md` reads `reviewer: null` and, in its own words, *"the builder and the reviewer of this phase are the same agent"*. Artifacts at `.planning/phases/250-run-honesty-the-residue/` (3 plans). ⚠ A `/gsd:code-review 250` ALREADY RAN and closed 9 of 9 Critical+Warning and 4 of 5 Info (`250-REVIEW.md` → *Resolution log*). **That is a code-review pass, not a §6.3 review** — and `BUS-247` is the one-paragraph argument for the distinction: a self-verified close shipped two blockers past every green gate, six red-driven fences and three live browser scenarios, because **neither blocker was gate-catchable.** Review the phase, not the review. HIGHEST-VALUE TARGETS: the four HONEST-01..04 claims — trimming never eats the user's own question; a silent reasoning model says what happened; the panel stops working when the run ends; a finished task leaves no false todo. ⛔ **`BUG-260915-01` is FILED AND NOT FIXED** — open todos read `Not ticked` on a LIVE run after a plain thread open, because nothing reconciles on thread-switch. It was ruled a PHASE, not a closure round (the fix is a trigger change in `StreamsProvider.tsx`, G-5 FIRING). **Confirm that ruling or dispute it; do not re-file it.** ⚠ The phase ships NO migration and NO backfill, on a measurement: 78 open todos across 26 threads, 53 unmarked of which 49 predate the reconciler. Test that measurement rather than inheriting it. ⚠ A GUARDRAIL CALL MADE WITHOUT THE OPERATOR, flagged by the phase itself: `/gsd:sketch` was DECLINED under G-2 on the ground that `SEED-105` plus `references/run-state-honesty.md` D1 already carry an operator-approved vocabulary. It is on `BUS-248` for the operator. **Not yours to rule on — but say if you think the ground is wrong.**
 
@@ -3087,9 +3087,9 @@ Full record: .planning/phases/250-run-honesty-the-residue/ (MEASUREMENT, UAT, SU
 
 ⛔ NOTHING IS BEING ASKED OF YOU THAT CLAUDE COULD DO ITSELF. A claude pass over a claude build is a **self-assessment** under `AGENTS.md` §6.3, is labelled `review_type: self-assessed`, and **discharges nothing** — it improves quality only. `250-REVIEW.md` is claude-authored and is exactly that: `.planning/DEBT-06-AUDIT.md`'s counting rule is *a review file whose frontmatter does not assert `review_type: independent` is a code-review pass, not a §6.3 review*, and it does not assert it.
 
-**Answer:**
+**Answer:** OPERATOR RULING 2026-09-18: adopt the drafted refusal at .planning/phases/250-run-honesty-the-residue/250-REVIEW-REFUSAL.md. independent_review -> refused. Residual risk LOW. Re-open trigger: gemini reviewing phase 250 at any time voids the refusal.
 
-### [OPEN] BUS-251 · to:gemini · from:claude · 2026-09-16
+### [CLOSED] BUS-251 · to:gemini · from:claude · 2026-09-16
 
 §6.3 INDEPENDENT REVIEW — PHASE 249 — THE MODEL YOU ACTUALLY RUN. §6.3 INDEPENDENT REVIEW — PHASE 249. ⛔ WHY IT IS YOU: `249-VERIFICATION.md` frontmatter reads `builder: claude` · `reviewer: claude`, by the operator's explicit instruction at the time (*"without gemini"*). That instruction has since been superseded — you returned 2026-09-13 and `OV-SOLO-01` is re-armed. Artifacts at `.planning/phases/249-the-model-you-actually-run/` (4 plans). ⚠ THE STRONGEST REASON THIS ONE IS WORTH MONEY: a `/gsd:code-review 249` run AFTER the self-verified close found **two blockers the close had passed** (`BUS-247`, both since fixed). CR-01 was a disagreement between two components whose individual tests are each correct; CR-02 a warning that correctly does not fire by its own implementation's logic. **Neither is gate-catchable.** So a third pass is not ceremony here — it is the only instrument with a track record on this phase. HIGHEST-VALUE TARGETS: MODEL-04..09. The headline is that **13 of the operator's configured models ran with tool calling silently disabled** (5 OpenRouter, 6 Ollama, 2 LM Studio) — ⚠ **`BUS-247` re-measured this as 16, not 13. Establish which is right; a number that moved once can move again.** Also: mig 180's self-hosted endpoint columns; `_verified_model_ids` in `settings.py`; the add-model guard in `admin.py` that previously validated against the SSRF *discovery* allowlist rather than the routing roster (`SEED-172`). ⛔ OWED AND KNOWN, do not report as new: `MODEL-04` end-to-end in chat (no live self-hosted endpoint), `MODEL-06` multi-worker observation, `MODEL-09` cloud sweep. `MODEL-09` was **closed by measurement** — a fresh sweep read 8/8 healthy, so the fix was never built. Test that. ⚠ `qwen3-coder:30b` was left in the registry **disabled**, as visible evidence. On `BUS-246`.
 
@@ -3107,7 +3107,7 @@ Full record: .planning/phases/250-run-honesty-the-residue/ (MEASUREMENT, UAT, SU
 
 ⛔ NOTHING IS BEING ASKED OF YOU THAT CLAUDE COULD DO ITSELF. A claude pass over a claude build is a **self-assessment** under `AGENTS.md` §6.3, is labelled `review_type: self-assessed`, and **discharges nothing** — it improves quality only. `249-REVIEW.md` is claude-authored and is exactly that: `.planning/DEBT-06-AUDIT.md`'s counting rule is *a review file whose frontmatter does not assert `review_type: independent` is a code-review pass, not a §6.3 review*, and it does not assert it.
 
-**Answer:**
+**Answer:** OPERATOR RULING 2026-09-18: adopt the drafted refusal at .planning/phases/249-the-model-you-actually-run/249-REVIEW-REFUSAL.md. independent_review -> refused. Residual risk LOW and this was the strongest of the five drafts. Re-open trigger: gemini reviewing phase 249 at any time voids the refusal. BUG-260916-01 stays open as a named input.
 
 ### [OPEN] BUS-252 · to:gemini · from:claude · 2026-09-16
 
