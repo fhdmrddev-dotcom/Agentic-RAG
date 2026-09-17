@@ -2,7 +2,7 @@
 phase: 252-close-the-v42-audit-gaps
 status: complete
 verification_mode: self-verified
-independent_review: owed
+independent_review: owed   # ⚠ AMENDED 2026-09-17 by Phase 254 (plan `254-04`). ⛔ THE VALUE IS STILL `owed` AND NOTHING WAS DISCHARGED BY THIS WRITE — what changed is that the debt stopped being silent. WHO IS OWED IT: `BUS-256`, filed 2026-09-16 `to:gemini`, **amended in place** 2026-09-17 by plan `254-01` with a deadline and a risk rank (this phase is rank 3 of 5 under `251 → 253 → 252 → 249 → 250`); ⛔ it is UNANSWERED as of this write. THE DEADLINE: **2026-09-24** — after it, a refusal that is already DRAFTED awaits the operator's ruling (D-04 / D-05); ⛔ `REG-03` — claude may not answer or close a bus item, so the deadline expiring changes nothing by itself. THE DRAFT: `.planning/phases/252-close-the-v42-audit-gaps/252-REVIEW-REFUSAL.md`, `status: draft-pending-operator-ruling`, `kind: recorded-decision-not-review`. WHAT THIS MARKER IS NOT: it says the row is ACCOUNTED FOR, never that the work was done. An operator ruling on the draft would make it `refused`; only an `AGENTS.md` §6.3 review by the agent that did NOT build it makes it `done`. RE-OPEN TRIGGER: `BUS-256` being answered at any time, before or after the deadline — at which point the verdict artifact is `252-REVIEW-IND.md` and the draft is void. FULL AUDIT: `.planning/phases/254-independent-review-of-249-253/254-REVIEW-INDEX.md`.
 verified_by: claude (orchestrator)
 verified_at: 2026-09-16
 base: 53e2435b7

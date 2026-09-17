@@ -2,7 +2,7 @@
 phase: 250-run-honesty-the-residue
 verified: 2026-09-15
 verification_mode: self-verified   # ⛔ OV-SOLO-01 — NEVER "reviewed". No independent §6.3 reviewer exists.
-independent_review: owed
+independent_review: owed   # ⚠ AMENDED 2026-09-17 by Phase 254 (plan `254-04`). ⛔ THE VALUE IS STILL `owed` AND NOTHING WAS DISCHARGED BY THIS WRITE — what changed is that the debt stopped being silent. WHO IS OWED IT: `BUS-250`, filed 2026-09-16 `to:gemini`, **amended in place** 2026-09-17 by plan `254-01` with a deadline and a risk rank (this phase is rank 5 of 5 under `251 → 253 → 252 → 249 → 250`); ⛔ it is UNANSWERED as of this write. THE DEADLINE: **2026-09-24** — after it, a refusal that is already DRAFTED awaits the operator's ruling (D-04 / D-05); ⛔ `REG-03` — claude may not answer or close a bus item, so the deadline expiring changes nothing by itself. THE DRAFT: `.planning/phases/250-run-honesty-the-residue/250-REVIEW-REFUSAL.md`, `status: draft-pending-operator-ruling`, `kind: recorded-decision-not-review`. WHAT THIS MARKER IS NOT: it says the row is ACCOUNTED FOR, never that the work was done. An operator ruling on the draft would make it `refused`; only an `AGENTS.md` §6.3 review by the agent that did NOT build it makes it `done`. RE-OPEN TRIGGER: `BUS-250` being answered at any time, before or after the deadline — at which point the verdict artifact is `250-REVIEW-IND.md` and the draft is void. FULL AUDIT: `.planning/phases/254-independent-review-of-249-253/254-REVIEW-INDEX.md`.
 reviewer: null
 verdict: PASS
 owed:
@@ -10,6 +10,7 @@ owed:
   - "HONEST-02 behavioural per-provider rows — an empty-output run cannot be produced on demand"
   - "parallel-thread axis, live"
   - "independent review (DEBT-06) — WAIVED BY INSTRUCTION, NOT SATISFIED"
+  - "the 254 apparatus — `BUS-250` amended in place 2026-09-17 with the **2026-09-24** deadline and rank 5 of 5; a refusal is DRAFTED at `.planning/phases/250-run-honesty-the-residue/250-REVIEW-REFUSAL.md` and is NOT real until the operator rules (D-05 / REG-03). ⛔ This entry records the apparatus, not a discharge — `independent_review` still reads `owed`."
   - "the word NOT TICKED — claude's call from the operator's own vocabulary, G-2 sketch declined (D-250-12)"
 ---
 
