@@ -57,6 +57,30 @@ vi.mock("@/lib/api", async (importActual) => {
     getMessages: mockGetMessages,
     getActiveRuns: mockGetActiveRuns,
     cancelRun: mockCancelRun,
+    // ⚠ ADDED 2026-09-18. Phase 075 (D-075-02) collapsed reconcile’s
+    // `Promise.all([getActiveRuns, loadMessages])` into ONE `getSnapshot()` round-trip, and
+    // this factory never followed — so every reconcile assertion below was measuring a
+    // function that did not exist. ⭐ COMPOSED from the two mocks this suite already drives,
+    // so each `mockGetActiveRuns` / `mockGetMessages` setup keeps meaning what it meant and a
+    // thread’s data still has ONE source.
+    // ⚠ `setViewingThread` FIRES RECONCILE, so this consumes one entry from any
+    // `mockImplementationOnce` queue — measured, when it silently ate the slow `once`
+    // promise belonging to the post-await-guard test below. A test that queues a `once`
+    // for a DELIBERATE later call must queue it AFTER the reconcile that thread open
+    // triggers. Reading `getMockImplementation()` instead was tried and is WORSE: it
+    // ignores every `...Once` value, which six reconcile cases here depend on (10 failed
+    // vs 5). Composing from the mocks is the behaviour those cases were written against.
+    getSnapshot: vi.fn(async (threadId: string) => ({
+      messages: await mockGetMessages(threadId),
+      active_runs: await mockGetActiveRuns(threadId),
+      since_cursors: {},
+    })),
+    // The provider imports these too; an undeclared export is a TypeError, not a no-op.
+    getThreadTodos: vi.fn().mockResolvedValue([]),
+    getThreadWorkspaceFiles: vi.fn().mockResolvedValue([]),
+    getThreadPendingAsks: vi.fn().mockResolvedValue([]),
+    getThreadTasks: vi.fn().mockResolvedValue([]),
+    getThreadWorkflow: vi.fn().mockResolvedValue(null),
   }
 })
 
@@ -399,12 +423,6 @@ describe("Phase 068 — L-068-03 sole writer (mid-await navigation discards stal
   it("loadMessages's post-await guard discards a write to the previous thread when user navigated away", async () => {
     // Slow-resolving getMessages so we can fire setViewingThread mid-await.
     let resolveLoad!: (v: never[]) => void
-    mockGetMessages.mockImplementationOnce(
-      () =>
-        new Promise((resolve) => {
-          resolveLoad = resolve
-        }),
-    )
 
     const { result } = renderProvider()
 
@@ -412,6 +430,17 @@ describe("Phase 068 — L-068-03 sole writer (mid-await navigation discards stal
     await act(async () => {
       result.current.setViewingThread("thread-A")
     })
+
+    // ⛔ QUEUED HERE, NOT BEFORE `renderProvider()`. Thread open fires reconcile, which
+    // reads `getMessages` through `getSnapshot` — so a `once` queued earlier is consumed by
+    // THAT call and this test’s hand-resolved promise would belong to the wrong caller.
+    // The slow promise must be the one `loadMessages` below picks up.
+    mockGetMessages.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveLoad = resolve
+        }),
+    )
 
     let loadPromise!: Promise<void>
     act(() => {
