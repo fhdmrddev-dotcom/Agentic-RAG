@@ -240,6 +240,35 @@ the ten files at execution time — **driven RED on the current tree, exit 1** �
 barred from `scripts/`, because a committed script reading `independent_review` is the gate `M-7`
 says must not be built inside a review phase.
 
+⭐ **EXECUTING 2026-09-17 — waves 1 and 2 done, `254-03` closed. Plan: 3 / 4. Next action:
+`/gsd:execute-phase 254` (wave 3 — `254-04`, the three registers claude owns + `254-REVIEW-INDEX.md`).**
+`254-01` `57df2665e` (five bus asks amended in place — deadline **2026-09-24**, rank
+`251 → 253 → 252 → 249 → 250`; nothing opened, answered, closed or archived) · `254-02` `5040048e6`
+(`251-REVIEW.md`, the quality floor, **2 critical · 2 warning · 3 info**, `still_live: 4`,
+`discharges_debt_06: false`) · **`254-03`** `c551be798` → `d2dc1358e` → `260d7e0f4` → `636efd593`
+(**five `*-REVIEW-REFUSAL.md` drafts**, one per reviewed phase, each
+`status: draft-pending-operator-ruling`).
+⛔ **NOTHING IS RULED AND NO REGISTER MOVED BY `254-03`.** All five drafts name the **operator** as
+the decider (D-05 / `REG-03`), and each **voids itself if its bus ask is answered** — before or after
+the deadline. The M-8 adopted reading is fenced **byte-identical across all five** (section-body md5,
+`sort -u` == 1) and the fence was **driven RED** on a one-word change, then restored to an identical
+md5 pair.
+⭐ **TWO CLAIMS THIS PLAN WAS TOLD TO WRITE WERE DRIVEN FIRST AND REFUTED, and both corrections are
+recorded beside their originals rather than over them:**
+**(1) `schema-acl-parity.yml` HAS now executed** — `gh run list` returns `completed success` on
+`develop`, 2026-09-17T14:05:28Z, where 253's verification recorded `HTTP 404 / never run`; and
+**`backend-tests` is GREEN for the first time in this repository's history** (two successes the same
+day, after 40 consecutive failures). ⚠ Still owed: **one green run proves the job executes, not that
+it can fail** — the deliberately-unmirrored-REVOKE and neutered-regex RED pushes are unrun.
+**(2) A raw whole-file `md5sum` against `git show HEAD:<path>` is UNSOUND on this box** — it reports a
+**false tamper** on `251-REVIEW.md` (worktree `27789` bytes vs blob `27327`, a difference of exactly
+**462** = its line count; blob LF, worktree CRLF via the wave-1 checkout's `core.autocrlf` smudge).
+`git status` is clean and `cmp` after `tr -d '\r'` is identical. **Fence register files on
+CR-normalised CONTENT, never on a raw blob md5.**
+⚠ **`251-VERIFICATION.md` still carries NO `independent_review` key** —
+`grep -c` returns **0** — so a sweep of owed rows returns 4 and silently omits 251. `254-04` **ADDS**
+the key; `254-03` deliberately did not.
+
 
 Phase: **251 — Register Integrity** — ⭐ **CLOSED 2026-09-16**, and with it **v4.2 is complete on
 code, all five phases**. Plans **251-01** `b38bd8444` · **251-02** `eff1afa7e` · **251-03**
