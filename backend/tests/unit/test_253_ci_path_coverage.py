@@ -181,3 +181,85 @@ def test_the_workflows_own_file_is_in_the_push_arm_only():
         "the asymmetry this arm pins has been repaired — good; delete this arm in the "
         "same commit and say so, rather than leaving a fence that asserts a defect."
     )
+
+
+# ── the must-pass fence step itself — 252-REVIEW-R2.md WR-09 ──────────────────
+
+
+_FENCE_STEP_NAME = "scripts/ parity fences (must pass)"
+
+_FENCE_SUITES = (
+    "tests/unit/test_253_supplement_column_parity.py",
+    "tests/unit/test_253_greenfield_sql_lexer.py",
+    "tests/unit/test_253_ci_path_coverage.py",
+)
+
+
+def _fence_step() -> dict:
+    """The one step in ``backend-tests.yml`` that is allowed to be read as a signal."""
+    doc = yaml.safe_load(_WORKFLOW.read_text(encoding="utf-8"))
+    steps = doc["jobs"]["pytest"]["steps"]
+    named = [s for s in steps if s.get("name") == _FENCE_STEP_NAME]
+    assert len(named) == 1, (
+        f"expected exactly one {_FENCE_STEP_NAME!r} step, found {len(named)}. "
+        f"steps present: {[s.get('name') for s in steps]}"
+    )
+    return named[0]
+
+
+def test_the_fence_step_survives_a_red_predecessor():
+    """⛔ ``if: always()`` IS LOAD-BEARING AND WAS MISSING WHEN THE STEP WAS FIRST ADDED.
+
+    A GitHub step with no ``if:`` is SKIPPED once an earlier step fails. ``Run pytest``
+    above it can NEVER succeed — the project baseline is 71 failures (CLAUDE.md) — so
+    without a condition this fence is structurally unreachable. Measured on run
+    ``35231275118``: ``Run pytest`` cancelled and this step reported ``skipped``, which is
+    the "guard that cannot fire" defect shipped by the fix for that same defect class.
+
+    Nothing pinned the repair (``grep -rn "always()"`` over ``backend/tests/`` and
+    ``scripts/`` returned ZERO), so the next workflow edit could silently delete it.
+    """
+    cond = _fence_step().get("if")
+    assert cond is not None, (
+        "the fence step has no `if:` — it will be SKIPPED whenever `Run pytest` fails, "
+        "and `Run pytest` can never pass. Restore `if: always()`."
+    )
+    assert "always()" in str(cond), (
+        f"the fence step's condition is {cond!r}, which does not survive a failed "
+        "predecessor. `success()` and a bare condition both skip after a red step."
+    )
+
+
+def test_the_fence_step_actually_names_the_three_suites():
+    """A condition on a step that runs the wrong thing is not a fence.
+
+    ⚠ This asserts the step's rendered CONTENT, not merely that the step is PRESENT —
+    CLAUDE.md: *presence assertions cannot see content drift*.
+    """
+    run = _fence_step().get("run") or ""
+    missing = [s for s in _FENCE_SUITES if s not in run]
+    assert not missing, (
+        f"the fence step no longer runs {missing} — its `run:` block is:\n{run}"
+    )
+
+
+def test_the_full_suite_step_cannot_hang_the_job():
+    """``--continue-on-collection-errors`` let the integration tests actually START.
+
+    Measured: the step then blocked on a Postgres/Supabase that does not exist on the
+    runner and ran 37 minutes before being cancelled, against 3m30s when it used to die
+    at collection. A bound is what stops that, and ``continue-on-error`` is what stops an
+    unbounded baseline-red step deciding the job.
+    """
+    doc = yaml.safe_load(_WORKFLOW.read_text(encoding="utf-8"))
+    steps = doc["jobs"]["pytest"]["steps"]
+    pytest_steps = [s for s in steps if s.get("name") == "Run pytest"]
+    assert len(pytest_steps) == 1, f"expected one 'Run pytest' step, found {len(pytest_steps)}"
+    step = pytest_steps[0]
+    assert step.get("timeout-minutes"), (
+        "'Run pytest' has no timeout-minutes — it hung for 37 minutes once already."
+    )
+    assert step.get("continue-on-error") is True, (
+        "'Run pytest' must be continue-on-error: its baseline is 71 failures, so its exit "
+        "code was never a pass/fail signal and letting it fail the job hides the fence below."
+    )
