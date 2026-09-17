@@ -190,6 +190,33 @@ defects standing between "it shipped" and "you can rely on it".
       stay `verification_mode: self-verified` with `independent_review: owed` until a review actually
       runs. ⚠ `/code-review ultra` stays ruled out on cost; the normal `/gsd:code-review <phase>` is
       the instrument, and it is what caught 241's shipped HTTP 500.
+      ⭐ **AMENDED 2026-09-17 (`254-04`) — THE SENTENCE ABOVE IS PRESERVED RATHER THAN REWRITTEN, BECAUSE
+      IT NAMES NOT ONE PHASE THIS MILESTONE BUILT AND THAT IS THE FINDING.** Measured, never re-typed: its
+      wording covers **none** of 249-253, so reviewing all five would have ticked nothing at all. The two
+      clauses below are RE-DERIVED from the `independent_review:` key of each `*-VERIFICATION.md` (the command
+      and its verbatim output are in `254-04-SUMMARY.md` §Task 2A), and they are deliberately **split**,
+      because one undifferentiated clause naming every id would write a FALSE sentence into the very
+      requirement this phase exists to make true — several rows the original wording calls owed are already
+      discharged, and naming them as owed again is the drift, not the bookkeeping.
+      **Still unmet (re-derived 2026-09-17):** 239 `owed` · 241 key absent · 242 `false` · 244 key absent · 245 has no verification file · 249 `owed` · 250 `owed` · 251 `owed` (the key was ABSENT and was ADDED by `254-04`) · 252 `owed` · 253 `owed` — **ten rows**.
+      **Already accounted for (re-derived 2026-09-17):** 238 `complete` · 240 `complete` · 243 `refused` · 246 `done` — **four rows**, and ⛔ not one of them may be named as owed again.
+      ⛔ **245 carries no `*-VERIFICATION.md` at all**, so it holds no value in any state: it is unmet
+      because *nothing records it*, which is a different fact from a row that reads `owed`, and no key-value
+      sweep can ever see it. ⚠ **`239` appears in the unmet clause and the original wording never named it**
+      — it reads `independent_review: owed` on disk and belongs to neither arm as written. A hand-typed list
+      is the defect this family keeps re-paying.
+      ⛔ **THE AMENDMENT WIDENS THIS REQUIREMENT; IT DOES NOT TICK IT.** It now covers **fourteen** rows (ten
+      unmet + four accounted) where the original wording covered eight. Phase 254 closes only the **249-253
+      arm**, and it closes that arm with *drafted refusals awaiting an operator ruling* rather than with
+      reviews — so `DEBT-06` becomes tickable when **both** arms are, which is not at this close (D-03 as
+      corrected by M-11). ⛔ **The box stays `- [ ]`**, quoting `ROADMAP.md:271` verbatim: *"`DEBT-06` is NOT
+      in this phase's scope and must not be quietly ticked by it."*
+      ⚠ **The 254 apparatus, for whoever has to rule on it:** five bus asks amended in place with a
+      **2026-09-24** deadline and the risk rank `251 → 253 → 252 → 249 → 250` (`254-01`, nothing
+      opened / answered / closed); a self-assessed quality-floor review of the one phase that had none
+      (`251-REVIEW.md`, `discharges_debt_06: false`); five `*-REVIEW-REFUSAL.md` drafts, every one
+      `draft-pending-operator-ruling` and every one **void** if its ask is answered; and the index the
+      operator rules on, with the `answer` and `close` commands pre-filled and unrun: `.planning/phases/254-independent-review-of-249-253/254-REVIEW-INDEX.md`.
 
 ---
 
@@ -300,8 +327,9 @@ milestone-wide standing gate. Coverage 26/26 — no orphans, no duplicates.**
 | REG-01 | Phase 251 — Register Integrity | ✅ Complete (251-03) — 8 movers renumbered to 277-284 by the D-07/D-20 date rule, 8 `status: superseded-id` redirect stubs at the original ids naming BOTH resolutions. Gate: `register 292 · parsed 292 · duplicate ids 0`, exit 0. ⛔ 91 product-source references across 35 files deliberately left on a stub under D-17, listed by file in `251-RENUMBER-LEDGER.md` |
 | REG-02 | Phase 251 — Register Integrity | ✅ **Complete (251-04)** — `scripts/check-seeds-register.cjs` is CALLED at both GSD touchpoints (`discuss-phase.md` `<step name="cross_reference_seeds">`, `new-milestone.md` §2.5), and the by-hand read of every seed is gone. ⛔ Proven by EXECUTING the fence, not by grep: defanged to a prose mention the file still passes `grep` with **zero** runnable calls. ⚠ `134 / 114` unswept remains, reported as two figures and never summed |
 | REG-03 | Phase 251 — Register Integrity | ✅ **Complete (251-04)** — `251-BUS-TRIAGE.md`: 5 open `to:operator` items classified with named evidence, `SEED-286` planted for the one finding no register held, `BUS-171` discharged in writing naming `88a9ff861` (22 of 23 closed; 4 of today's 5 are newer than it). ⛔ **Claude closed nothing** — `git diff --name-only .agent-bus/` EMPTY; the `answer`/`close` commands ship pre-filled for the operator |
-| DEBT-06 | **Milestone-wide standing gate** (no phase) | Pending — discharged alongside the build: 238 / 240 / 241 beside 247-248, 242-246 beside 249-251, and each v4.2 phase reviewed at its own close. ⛔ Re-arming `OV-SOLO-01` retro-reviews nothing |
+| DEBT-06 | **Milestone-wide standing gate** (no phase) | Pending — discharged alongside the build: 238 / 240 / 241 beside 247-248, 242-246 beside 249-251, and each v4.2 phase reviewed at its own close. ⛔ Re-arming `OV-SOLO-01` retro-reviews nothing ⚠ **STILL PENDING after Phase 254 (`254-04`, 2026-09-17), and the requirement TEXT was AMENDED rather than ticked (D-02 / D-03).** Re-derived at that close: **ten rows unmet · four already accounted for** — two figures, reported separately and never summed. 254 built the apparatus for its own arm only: `BUS-249/250/251/256/257` amended in place with a **2026-09-24** deadline, `251-REVIEW.md` as a self-assessed quality floor that `discharges_debt_06: false`, five `*-REVIEW-REFUSAL.md` drafts pending an operator ruling, and `.planning/phases/254-independent-review-of-249-253/254-REVIEW-INDEX.md`. ⛔ Not one `independent_review` reads `done` or `refused` as a result |
 | | ⛔ **LEFT UNTICKED at the 251-04 sweep, deliberately** | The other 25 boxes were ticked against a named artifact. This one has none: **no independent §6.3 review has run** for 238/240/241, and 249 and 250 each closed `self-verified` with `independent_review: owed` — `BUS-247` says so in its own body and makes the case (*"a code-review pass is not a peer review"*). ⛔ Ticking it would be exactly the claim ROADMAP:271 forbids. It becomes tickable when a review runs, not when the rule is re-armed |
+| | ⛔ **STILL UNTICKED at the 254-04 sweep, and now for a SECOND, DIFFERENT reason** | The 251-04 row above is preserved verbatim and still holds. What 254 adds: an independent §6.3 review has *still* not run for any of the fourteen rows this requirement now covers, and the five 249-253 asks were **amended, not answered** — `BUS-249` / `BUS-250` / `BUS-251` / `BUS-256` / `BUS-257` are all still `[OPEN]`. The five refusals `254-03` drafted are `draft-pending-operator-ruling`; ⛔ **a draft is not a decision, and `REG-03` forbids claude from making it one.** ⭐ 254 did move this row in the honest direction: `251-VERIFICATION.md` gained the `independent_review` key it had lacked for its whole life, so a sweep that returned **4** now returns **5**. ⛔ Tickable when BOTH arms close, not when the apparatus exists |
 
 ⚠ **Re-derive this table from the phase directories at close, never from a summary line.** v4.1's own
 close found its ROADMAP Progress table reading `0 / 5 phases complete · 0 / 19 requirements delivered`
