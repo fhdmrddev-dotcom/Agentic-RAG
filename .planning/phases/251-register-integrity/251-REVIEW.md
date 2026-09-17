@@ -12,6 +12,11 @@ findings:
   warning: 2
   info: 3
   resolved_in_phase: 0
+verdicts:
+  still_live: 4
+  fixed_since: 0
+  refuted: 0
+  not_driven: 0
 ---
 
 # Phase 251: Register Integrity — standard-depth code-review pass
@@ -76,6 +81,51 @@ Two things make it worse than a bare gap in coverage:
 driven red and all fired (see `## Verified clean`). The finding is that the guard protecting D-09
 has no counterfactual, so its removal or defanging is undetectable by anything this phase shipped.
 
+**Drive evidence, verbatim** — RED drive. The `[missing-key]` push at
+`check-seeds-register.cjs:518` was short-circuited with `false &&`, both entry points were run, and
+the file was then restored from a byte-copy taken before the edit.
+
+```
+$ md5sum scripts/check-seeds-register.cjs
+5a47ce99716814d9ef09f0358b6b0586 *scripts/check-seeds-register.cjs
+
+$ sed -i "s/    if (!keyValue(entry.fm, key)) out.push(\['missing-key'/    if (false \&\& !keyValue(entry.fm, key)) out.push(['missing-key'/" scripts/check-seeds-register.cjs
+$ grep -n "if (false && !keyValue" scripts/check-seeds-register.cjs
+518:    if (false && !keyValue(entry.fm, key)) out.push(['missing-key', `\`${key}\` — ${KEY_WHY[key]}`]);
+
+$ node scripts/check-seeds-register.cjs --self-test; echo "EXIT=$?"
+  arm 1 duplicate id FAILS … PASS
+  arm 1b a superseded-id stub is NOT a duplicate … PASS
+  arm 1c keeper + LIVE squatter + stub is STILL a duplicate (the carve-out is a SHAPE, not a count) … PASS
+  arm 2 unknown status + no frontmatter FAIL, clean seed does not … PASS
+  arm 2b a heading claiming the WRONG id FAILS — and a heading claiming NO id does not … PASS
+  arm 3 a matching trigger IS printed … PASS
+  arm 4 a NON-matching trigger is ABSENT (the counterfactual) … PASS
+  arm 5 an EMPTY register raises a harness error … PASS
+
+self-test 8/8 arms PASS — duplicate id, stub carve-out, the carve-out's SHAPE check, bad status, a heading that claims the wrong id, match, counterfactual, empty-register floor.
+EXIT=0
+
+$ node scripts/check-seeds-register.cjs; echo "EXIT=$?"
+seeds register — .planning/seeds
+  register: 297 files · parsed: 297 · skipped: 0 · duplicate ids: 0
+  unswept:  134 carry no trigger_when at all · 114 carry prose but no structured trigger
+
+seeds register gate OK — 297/297 parsed, 0 duplicate ids, 297/297 carry all 5 required keys.
+EXIT=0
+
+$ cp <byte-copy taken before the edit> scripts/check-seeds-register.cjs
+$ md5sum scripts/check-seeds-register.cjs
+5a47ce99716814d9ef09f0358b6b0586 *scripts/check-seeds-register.cjs
+```
+
+⭐ **`8/8 arms PASS` and `297/297 carry all 5 required keys`, both in green, both exit 0, over a
+dead check.** The md5 pair above and below the drive is **identical**, so the restore is proven
+rather than asserted. The only other occurrences of `missing-key` in the file are the completeness
+count at `:687` and a remediation hint at `:1003` — there is no arm.
+
+**Disposition:** next phase
+
 ### CR-02: the `status` enum's "change all three, or change none" rule is prose with zero executable enforcement — a drifted `TEMPLATE.md` leaves the gate green — CRITICAL
 
 `.planning/seeds/TEMPLATE.md:57-67` declares the enum a **TRIPLE** whose three homes
@@ -93,6 +143,39 @@ The consequence is the exact failure this phase was built to end, one register o
 exists and is not applied is the same as no rule. `CLAUDE.md` pays for this finding twice already
 (*"a fact in a register nobody re-reads is the same as no fact"*), and the seeds sweep itself was
 added because `CLAUDE.md`'s filter rule had silently gone blind to 55% of its own input.
+
+**Drive evidence, verbatim** — RED drive. The template's enum comment was drifted to a four-value
+list that shares only three tokens with `STATUS_ENUM`, the gate was run, and the file was restored
+from a byte-copy taken before the edit.
+
+```
+$ md5sum .planning/seeds/TEMPLATE.md
+0bd61113cf504604b897e4b9d91e702d *.planning/seeds/TEMPLATE.md
+
+$ sed -i 's/# planted | dormant | open | partially-answered | answered | folded | shipped | closed | deferred | superseded-id/# planted | dormant | open | ARCHIVED-BY-A-PLANTED-DEFECT/' .planning/seeds/TEMPLATE.md
+$ grep -n "^status:" .planning/seeds/TEMPLATE.md
+6:status: planted                   # planted | dormant | open | ARCHIVED-BY-A-PLANTED-DEFECT
+
+$ node scripts/check-seeds-register.cjs; echo "EXIT=$?"
+seeds register — .planning/seeds
+  register: 297 files · parsed: 297 · skipped: 0 · duplicate ids: 0
+  unswept:  134 carry no trigger_when at all · 114 carry prose but no structured trigger
+
+seeds register gate OK — 297/297 parsed, 0 duplicate ids, 297/297 carry all 5 required keys.
+EXIT=0
+
+$ cp <byte-copy taken before the edit> .planning/seeds/TEMPLATE.md
+$ md5sum .planning/seeds/TEMPLATE.md
+0bd61113cf504604b897e4b9d91e702d *.planning/seeds/TEMPLATE.md
+```
+
+⭐ **Seven of the ten enum values deleted from the contract's only written home, and the gate is
+green with exit 0.** The md5 pair is identical, so the restore is proven. Nothing in `scripts/`,
+`.claude/hooks/`, `.claude/settings.json` or `.github/workflows/` reads `TEMPLATE.md` at all —
+checked, and the only non-seed mentions of `check-seeds-register` outside the scripts themselves are
+two prose comments.
+
+**Disposition:** next phase
 
 ## Warnings
 
@@ -112,6 +195,39 @@ the git add-commit tie-break, or to a human. **And the gate raises no finding**,
 collision involving one of them would be reported as a duplicate with no indication that the
 resolution rule cannot be applied mechanically.
 
+**Drive evidence, verbatim** — set diff, not a count. The register was listed, the seeds carrying a
+key `seedDate()` can read were listed, and the two sets were differenced.
+
+```
+$ ls .planning/seeds | grep -c "^SEED-"
+297
+
+$ grep -lE "^(created|planted):" .planning/seeds/SEED-*.md | wc -l
+291
+
+$ grep -LE "^(created|planted):" .planning/seeds/SEED-*.md
+.planning/seeds/SEED-001-scale-readiness.md
+.planning/seeds/SEED-084-starter-workflow-library.md
+.planning/seeds/SEED-163-authoring-does-not-propose-the-business-requirement.md
+.planning/seeds/SEED-164-a-workflow-that-legitimately-pauses-for-a-person.md
+.planning/seeds/SEED-165-top-level-backend-tests-are-outside-every-gate.md
+.planning/seeds/SEED-166-settings-operator-admin-information-architecture.md
+
+$ sed -n '1,4p' .planning/seeds/SEED-001-scale-readiness.md
+---
+seed_id: SEED-001
+title: Scale Readiness — multi-user concurrent load
+planted_during: v2.5 SSE Concurrency & Reconnect Stability (2026-05-01)
+```
+
+⚠ `SEED-001` does carry a date — inside `planted_during:`, which no key reads. **The information is
+present and the index cannot see it**, which is this phase's own thesis in miniature. Null-safety at
+the one call site was read rather than assumed: `check-seeds-register.cjs:969-980` prints
+`dates[i] || 'NO DATE'` and its tie predicate is `dates.every((x) => x && x === dates[0])`, so a
+`null` can neither crash nor silently win a tie-break. **No file was modified by this drive.**
+
+**Disposition:** next phase
+
 ### WR-02: both GSD wirings live in a vendored framework directory that a framework update can revert, and nothing executable would notice
 
 The deliverable of `251-04` is the **wiring**, not the script — `D-03` says so in its own words.
@@ -130,6 +246,51 @@ replacing that table with `check-hot-file-ledger.cjs`.
 ⚠ The analogous gate does not exist here, and `grep` cannot be it: Phase 251 drove that
 counterfactual itself, proving a prose mention still satisfies `grep -rn "check-seeds-register"`
 while zero runnable calls remain. The check would have to **extract the fence and run it**.
+
+**Drive evidence, verbatim** — the positive half (the fences are real and run) and the negative half
+(nothing executable guards them) were both driven. No file was modified.
+
+```
+$ awk 'NR>=284 && NR<=285' .claude/get-shit-done/workflows/discuss-phase.md > <scratch>/fence-discuss.sh
+$ cat <scratch>/fence-discuss.sh
+node scripts/check-seeds-register.cjs --phase "${PHASE_NUMBER}"
+SEEDS_EXIT=$?
+
+$ PHASE_NUMBER=251 bash <scratch>/fence-discuss.sh; echo "EXIT=$?"
+trigger sweep — phase 251 (4 plan file(s), 17 path(s) in files_modified)
+  2 seed(s) matched:
+  [trigger-fires] SEED-177 (status: partially-answered) …
+      path ".planning/ROADMAP.md"  matched  ".planning/ROADMAP.md"
+  [trigger-fires] SEED-284 (status: planted) …
+      path "docs/HOT-FILE-LEDGER.md"  matched  "docs/HOT-FILE-LEDGER.md"
+seeds register gate OK — 297/297 parsed, 0 duplicate ids, 297/297 carry all 5 required keys.
+EXIT=0
+
+$ awk 'NR>=54 && NR<=55' .claude/get-shit-done/workflows/new-milestone.md > <scratch>/fence-newmilestone.sh
+$ bash <scratch>/fence-newmilestone.sh; echo "EXIT=$?"
+seeds register gate OK — 297/297 parsed, 0 duplicate ids, 297/297 carry all 5 required keys.
+EXIT=0
+
+$ grep -rn "check-seeds-register" .claude/commands/gsd/ ; echo "EXIT=$?"
+EXIT=1
+
+$ grep -rln "check-seeds-register" scripts/ .github/ .claude/hooks/ .claude/settings.json
+scripts/check-schema-acl-parity.cjs        <- a prose comment (:85)
+scripts/check-seeds-register.cjs           <- itself
+scripts/migrate-seeds-frontmatter.cjs      <- the importer
+.claude/hooks/agent-bus-check.sh           <- a prose comment (:16)
+
+$ ls .github/workflows/
+backend-tests.yml  claude-md-size.yml  deploy-artifacts.yml
+frontend-tests.yml landing-drift.yml   schema-acl-parity.yml
+```
+
+⭐ **Both fences are genuine, executable ` ```bash ` blocks and both ran to exit 0 — the wiring is
+real.** And there is **no hook, no CI workflow and no gate** whose failure would follow from their
+removal: the four `grep -rln` hits are the two scripts themselves plus two prose comments, and
+`.claude/settings.json` contains no `seeds` entry at all.
+
+**Disposition:** next phase
 
 ## Info
 
@@ -206,6 +367,34 @@ comparison reads `284/284 identical`. **Phase 251's verification records falling
 structurally identical trap from the other direction** (`core.autocrlf` on a working-tree read,
 153/276 false drift). Two different wrong instruments, one correct answer; the method note in
 `251-VERIFICATION.md` earned its place.
+
+## What this pass did NOT do
+
+1. **It fixed nothing.** Not one line of Phase 251's code, workflows, hooks or seeds was changed.
+   Five defects were PLANTED to drive arms red and every one was restored from a byte-copy taken
+   before the edit, each proven by an `md5sum` pair that is identical before and after.
+   `git status --short` is empty for `scripts/`, `.claude/` and `.planning/seeds/` — asserted at
+   every commit of this plan. This is `D-11`: findings are TRIAGED, never fixed here, because a
+   reviewer that fixes what it found stops being an independent verifier of that fix
+   (`AGENTS.md` §6.3), and fixing inside a review phase is the G-7 runaway that took Phase 187 from
+   15 plans to 29.
+2. **It did not re-litigate Phase 251's deliberate boundaries** — `D-06`'s sealed milestone
+   references, `D-17`'s 35 product-source files left pointing at stubs, the untouched
+   `251-register-integrity/` directory, and `D-18`'s mechanical-only backfill. They are listed
+   under `## Boundaries not re-litigated` as decisions, not defects.
+3. ⛔ **It is not an independent review, and it flips no register.** See the disclaimer at the top
+   of this file. `251-VERIFICATION.md` is byte-unchanged by this plan.
+
+**Also out of scope, named rather than left silent:**
+
+- The register has grown from **293** files at the phase's close to **297** today. Every figure in
+  this file is measured at today's tree unless a commit is named beside it; a figure here that
+  disagrees with `251-VERIFICATION.md` by a few files is growth, not drift.
+- `scripts/agent-bus.sh`'s verb set, the bus queue's contents, and the operator decisions listed in
+  `251-BUS-TRIAGE.md` were **not** re-audited. The only bus artifact touched was
+  `.claude/hooks/agent-bus-check.sh`, which was run read-only.
+- No product source file under `backend/` or `frontend/` was read or run. Phase 251 touched none,
+  and neither did this pass.
 
 ## Boundaries not re-litigated
 
