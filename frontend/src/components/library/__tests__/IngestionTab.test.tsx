@@ -29,7 +29,7 @@ vi.mock("@/lib/supabase", () => ({
         data: { session: { user: { id: "user-1" }, access_token: "token" } },
       }),
     },
-    channel: vi.fn(),
+    channel: vi.fn().mockReturnValue({ on: vi.fn().mockReturnThis(), subscribe: vi.fn() }),
     removeChannel: vi.fn(),
   },
 }))
