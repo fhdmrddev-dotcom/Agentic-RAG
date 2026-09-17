@@ -6,6 +6,8 @@ reviewer: claude (the BUILDER — NOT an AGENTS.md §6.3 independent reviewer)
 builder: claude
 range: 600e28dde..de6986fa2
 status: findings
+discharges_debt_06: false
+bus_item: BUS-249
 findings:
   critical: 2
   blocker: 0
@@ -23,6 +25,31 @@ verdicts:
 
 **Depth:** `standard` · **Scope:** 9 files, re-derived from Phase 251's four `*-PLAN.md`
 `files_modified` blocks · **Range:** `600e28dde..de6986fa2` (2026-09-16, both ends)
+
+## ⛔ READ THIS FIRST — what this file is, and what it is not
+
+**Claude planned Phase 251, executed all four of its plans, and verified it, in one session.** The
+verifier was a subagent of the session that orchestrated the build. That is precisely the
+arrangement `AGENTS.md` §6.3 forbids — *whoever built it does not verify it* — so a claude-authored
+pass over a claude build is a **self-assessment**, and this file is written by claude too.
+
+⛔ **This is therefore a code-review pass. It is not an independent review, and it does not claim to
+be one.** `.planning/DEBT-06-AUDIT.md` adopts Phase 240's own counting rule verbatim: a review file
+whose frontmatter does not assert the `independent` marker is a code-review pass, not an
+`AGENTS.md` §6.3 review. This file's frontmatter deliberately does not carry that marker, and
+carries `discharges_debt_06: false` as an explicit key rather than as an omission.
+
+⛔ **It flips no register.** `251-VERIFICATION.md` keeps `verification_mode: self-verified`, its
+`independent_review` key stays `owed`, the ROADMAP Progress row is untouched by this file, and
+**`BUS-249` — the ask that a second agent read this phase — stays OPEN**. Nothing here answers it.
+
+⭐ **The positive case, because it is the reason the pass exists at all.** `D-08` asks for a quality
+floor: **no phase of v4.2 ships wholly unread**, and Phase 251 was the only one of 249-253 with no
+review artifact of any kind. This instrument has a measured catch rate on this very set — **2
+blockers on 249 and 2 criticals on 253, each past a green, self-verified close** — because neither
+was gate-catchable. *Not gate-catchable* is the defect class a reading reaches, and a reading by the
+builder reaches it too. It reaches it less reliably than a stranger would; that is the trade, and
+it is why this pass improves quality and changes no register.
 
 ## Scope, re-derived rather than inherited
 
@@ -301,6 +328,10 @@ matches zero files."* True when Plan 01 wrote it; **false from Plan 03 onward** 
 stubs, and `grep -c "status: superseded-id"` names eight files. A comment that is wrong is the class
 of defect this phase exists to remove, and this one is inside the gate that removes it.
 
+A one-line comment edit — no behaviour, no schema, no API surface. G-3's `/gsd:fast` shape exactly.
+
+**Disposition:** fast-fix
+
 ### IN-02: `251-VERIFICATION.md`'s "independently re-counted as 90" is the figure that is off — the ledger's 91 is correct, and the gap is an instrument mismatch, not rounding
 
 The verification hedges the renumber ledger's product-source count as *"91 (independently
@@ -309,6 +340,21 @@ close commit: the ledger's published recipe returns **91 occurrences across 35 f
 the ledger states. `90` is what `git grep -c` returns — **matching LINES, not occurrences** — so the
 two numbers are measuring different things and *"within rounding"* mischaracterises a one-line,
 two-match file as noise. The ledger needs no correction; the verification's parenthetical does.
+
+```
+$ git grep -cE "SEED-(022|092|228|229|231|253|259|269)" de6986fa2 -- backend/ frontend/ scripts/ | awk -F: '{s+=$NF} END {print "lines:", s, "files:", NR}'
+lines: 90 files: 35
+
+$ git grep -oE "SEED-(022|092|228|229|231|253|259|269)" de6986fa2 -- backend/ frontend/ scripts/ | wc -l
+91
+```
+
+⛔ **This is an accept, not a fix.** `251-VERIFICATION.md` is a closed record of what was believed at
+the close, and this project's house style is that a correction sits beside its original rather than
+over it. The correction is here; editing the verification would be rewriting the transcript. (Plan
+`254-04` owns that file's frontmatter and must not touch its body either.)
+
+**Disposition:** accept
 
 ### IN-03: the four real body diffs the verification counted were never named — they are recorded here so the next reader does not re-derive them
 
@@ -328,6 +374,12 @@ skipped: 8 }` and describes the four as *"the documented D-06/D-17 live-citation
 away at head), so a reader who took the verification's phrasing as a file list would be looking for
 diffs in three files that could not, by construction, be in the diff set. The claim is defensible as
 written; the file identities were simply never published. They are now.
+
+⭐ **Nothing needs doing.** This entry exists so the next reader inherits the four filenames instead
+of spending a drive re-deriving them — which is the whole point of a `## Verified clean` section,
+applied to a figure rather than to a check.
+
+**Disposition:** accept
 
 ## Verified clean (recorded so a later reader does not re-derive it)
 
