@@ -46,6 +46,12 @@ jobs:
           python -m venv venv
           source venv/bin/activate
           pip install -r requirements.txt
+          # R2-CR-02 (253): psycopg2 is imported by tests/integration and by two
+          # tests/fixtures modules, but is NOT in requirements.txt — it was only ever
+          # installed ad-hoc in the operator's local venv. CI therefore died in
+          # COLLECTION, and all 40 runs of this workflow have failed. Test-only dep,
+          # so it is installed here rather than added to the app's requirements.
+          pip install psycopg2-binary
 
       # Phase 061 (D-061-14): boot Redis from docker-compose.dev.yml.
       # Streams semantics drift between Redis and fakeredis; tests run
@@ -72,12 +78,24 @@ jobs:
         run: |
           cd backend
           source venv/bin/activate
-          pytest tests -q
+          pytest tests -q --continue-on-collection-errors
         env:
           REDIS_URL: redis://localhost:6379
           # Supabase test substrate: integration tests that hit real
           # Postgres are conditionally skipped if SUPABASE_URL is unset.
           # CI baseline runs unit + mock-Supabase integration tests only.
+
+      # R2-CR-02 (253): the step above runs the WHOLE suite, whose baseline is 71
+      # failures, so it can never exit 0 and can never be read as a signal. The two
+      # scripts/ fences this phase added were widened into that job and were therefore
+      # executed by nothing legible. This step runs them ALONE and MUST be green.
+      - name: scripts/ parity fences (must pass)
+        run: |
+          cd backend
+          source venv/bin/activate
+          pytest tests/unit/test_253_supplement_column_parity.py \
+                 tests/unit/test_253_greenfield_sql_lexer.py \
+                 tests/unit/test_253_ci_path_coverage.py -q
 
       - name: Stop Redis
         if: always()
