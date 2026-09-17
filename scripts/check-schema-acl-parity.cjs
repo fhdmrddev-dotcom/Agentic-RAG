@@ -127,6 +127,21 @@ const RST = '\x1b[0m';
  */
 const MIN_MIGRATION_FILES = 120;
 
+/**
+ * Non-vacuity floor on TUPLES PARSED — the second half of the same idea, added by 253's
+ * round-1 review (R2-CR-01) after the first half was measured insufficient.
+ *
+ * ⛔ DRIVEN, NOT REASONED: with both ACL regexes neutered, the gate printed
+ *   `migrations scanned: 148 · FUNCTION: 0 tuple(s) · TABLE/COLUMN: 0 tuple(s) · mirrored: 0/0`
+ *   followed by `schema ACL parity OK`, and EXITED 0. A parser regression is invisible to a
+ *   floor that counts FILES: 148 files were read and every one of them yielded nothing.
+ *
+ * ⚠ MEASURED 2026-09-17: 61 FUNCTION + 72 TABLE/COLUMN = **133** tuples. 100 leaves headroom
+ *   under the true count (a migration may legitimately be deleted) while still refusing a scan
+ *   that has collapsed. Same rule as the file floor: a FLOOR, never an exact figure.
+ */
+const MIN_ACL_TUPLES = 100;
+
 /** Phase 242 measured a sibling gate exiting 0 over ZERO parsed files, twice. */
 class VacuousScanError extends Error {}
 
@@ -564,8 +579,20 @@ function analyse({
   supplementPath,
   artifactPath = FULL_SCHEMA,
   minFiles = MIN_MIGRATION_FILES,
+  minTuples = MIN_ACL_TUPLES,
 }) {
   const { migrationCount, acls } = scanMigrations(migrationsDir, minFiles);
+  // R2-CR-01: the file floor above proves the directory was READ, never that anything was
+  // PARSED out of it. Neutering either ACL regex kept migrationCount at 148 and drove acls to
+  // [], and the gate then reported `mirrored: 0/0` as a PASS, exit 0. Refuse that here.
+  if (acls.length < minTuples) {
+    throw new VacuousScanError(
+      `only ${acls.length} ACL tuple(s) parsed from ${migrationCount} migration file(s) in `
+      + `${migrationsDir}, below the floor of ${minTuples} — the directory was read but nothing `
+      + 'came out of it, which is a PARSER regression, not an empty repository. '
+      + 'Refusing to report a verdict over a collapsed parse.',
+    );
+  }
   const mirroredSet = scanSupplement(supplementPath);
   // ⚠ AFTER the scan, so a collapsed migrations directory is still reported as the harness error
   // it is rather than being masked by a tail verdict.
@@ -866,7 +893,7 @@ function runSelfTest() {
 
     // ── GREEN arm ───────────────────────────────────────────────────────────────────────────
     const greenLines = [];
-    const greenRes = analyse({ migrationsDir: migDir, supplementPath: supComplete, artifactPath: artifactFor(supComplete) });
+    const greenRes = analyse({ minTuples: 1, migrationsDir: migDir, supplementPath: supComplete, artifactPath: artifactFor(supComplete) });
     const greenCode = report(greenRes, (l) => greenLines.push(l));
     check('GREEN: a complete supplement exits 0', greenCode === 0, `exit=${greenCode}, tuples=${greenRes.expected.size}`);
     check('GREEN: the commented VERIFY block is NOT counted',
@@ -875,7 +902,7 @@ function runSelfTest() {
 
     // ── RED arm: the WHOLE-FUNCTION omission (the gate's original arm, preserved) ────────────
     const redLines = [];
-    const redRes = analyse({ migrationsDir: migDir, supplementPath: supMissing, artifactPath: artifactFor(supMissing) });
+    const redRes = analyse({ minTuples: 1, migrationsDir: migDir, supplementPath: supMissing, artifactPath: artifactFor(supMissing) });
     const redCode = report(redRes, (l) => redLines.push(l));
     const redOut = redLines.join('\n');
     check('RED arm 1: a planted WHOLE-FUNCTION omission exits 1', redCode === 1, `exit=${redCode}`);
@@ -884,7 +911,7 @@ function runSelfTest() {
 
     // ── NEW RED arm 1 — THE PARTIAL REVOKE (CR-02; stands for resize_embedding_column) ───────
     const parLines = [];
-    const parRes = analyse({ migrationsDir: migDir, supplementPath: supPartial, artifactPath: artifactFor(supPartial) });
+    const parRes = analyse({ minTuples: 1, migrationsDir: migDir, supplementPath: supPartial, artifactPath: artifactFor(supPartial) });
     const parCode = report(parRes, (l) => parLines.push(l));
     const parOut = parLines.join('\n');
     check('NEW RED arm 1 (PARTIAL REVOKE — stands for `resize_embedding_column … FROM PUBLIC`): exits 1',
@@ -912,7 +939,7 @@ function runSelfTest() {
     fs.mkdirSync(commentMigDir);
     padToFloor(commentMigDir);
     fs.writeFileSync(path.join(commentMigDir, '998_fixture_comments.sql'), FIXTURE_MIGRATION_COMMENTS);
-    const cRes = analyse({
+    const cRes = analyse({ minTuples: 1,
       migrationsDir: commentMigDir,
       supplementPath: supComplete,        // mirrors none of them — every one must show up as missing
       artifactPath: artifactFor(supComplete),
@@ -953,7 +980,7 @@ function runSelfTest() {
     fs.writeFileSync(supTblNarrow, FIXTURE_SUPPLEMENT_TABLE_NARROW_COLUMNS);
 
     const tGreenLines = [];
-    const tGreenRes = analyse({ migrationsDir: tableMigDir, supplementPath: supTblComplete, artifactPath: artifactFor(supTblComplete) });
+    const tGreenRes = analyse({ minTuples: 1, migrationsDir: tableMigDir, supplementPath: supTblComplete, artifactPath: artifactFor(supTblComplete) });
     const tGreenCode = report(tGreenRes, (l) => tGreenLines.push(l));
     check('NEW RED arm 3 (TABLE): the gate SEES table and column privileges at all',
       tGreenRes.tbl.statements === 4 && tGreenRes.expected.size > 0,
@@ -962,7 +989,7 @@ function runSelfTest() {
       tGreenCode === 0, `exit=${tGreenCode}`);
 
     const tRedLines = [];
-    const tRedRes = analyse({ migrationsDir: tableMigDir, supplementPath: supTblMissing, artifactPath: artifactFor(supTblMissing) });
+    const tRedRes = analyse({ minTuples: 1, migrationsDir: tableMigDir, supplementPath: supTblMissing, artifactPath: artifactFor(supTblMissing) });
     const tRedCode = report(tRedRes, (l) => tRedLines.push(l));
     const tRedOut = tRedLines.join('\n');
     check('NEW RED arm 3 (TABLE): a missing table-level REVOKE exits 1', tRedCode === 1, `exit=${tRedCode}`);
@@ -975,7 +1002,7 @@ function runSelfTest() {
       'the column-level statement IS mirrored and must not be reported');
 
     const tNarrowLines = [];
-    const tNarrowRes = analyse({ migrationsDir: tableMigDir, supplementPath: supTblNarrow, artifactPath: artifactFor(supTblNarrow) });
+    const tNarrowRes = analyse({ minTuples: 1, migrationsDir: tableMigDir, supplementPath: supTblNarrow, artifactPath: artifactFor(supTblNarrow) });
     const tNarrowCode = report(tNarrowRes, (l) => tNarrowLines.push(l));
     const tNarrowOut = tNarrowLines.join('\n');
     check('NEW RED arm 3 (COLUMN-SET): mirroring (a) where the migration granted (a, b) exits 1',
@@ -1016,7 +1043,7 @@ function runSelfTest() {
       splitLinesKeepEnds(buf).filter((l) => !l.toString('utf8').includes('resize_embedding_column')),
     ));
     const strippedHits = (fs.readFileSync(artStripped, 'utf8').match(/resize_embedding_column/g) || []).length;
-    const tailStripRes = analyse({
+    const tailStripRes = analyse({ minTuples: 1,
       migrationsDir: MIGRATIONS_DIR, supplementPath: supRealCopy, artifactPath: artStripped,
     });
     const tailStripLines = [];
@@ -1039,7 +1066,7 @@ function runSelfTest() {
       b[b.length - 2] = b[b.length - 2] === 0x20 ? 0x09 : 0x20;
       return b;
     });
-    const oneByteRes = analyse({
+    const oneByteRes = analyse({ minTuples: 1,
       migrationsDir: MIGRATIONS_DIR, supplementPath: supRealCopy, artifactPath: artOneByte,
     });
     check('NEW RED arm 5b (ARTIFACT TAIL): a SINGLE-BYTE tail divergence exits 1',
@@ -1050,7 +1077,7 @@ function runSelfTest() {
     //     sibling gates exiting 0 over zero parsed files; an absent artifact is that shape.
     let tailThrew = null;
     try {
-      analyse({
+      analyse({ minTuples: 1,
         migrationsDir: MIGRATIONS_DIR,
         supplementPath: supRealCopy,
         artifactPath: path.join(tmp, 'there-is-no-such-artifact.sql'),
@@ -1065,7 +1092,7 @@ function runSelfTest() {
     // (d) COUNTERFACTUAL — head + the REAL supplement, byte for byte, stays green. The arms above
     //     must fail for the planted defect and not for the fixture.
     const artIdentical = artifactFor(supRealCopy);
-    const identRes = analyse({
+    const identRes = analyse({ minTuples: 1,
       migrationsDir: MIGRATIONS_DIR, supplementPath: supRealCopy, artifactPath: artIdentical,
     });
     const identCode = report(identRes, () => {});
@@ -1085,7 +1112,7 @@ function runSelfTest() {
       toCrlf(Buffer.from(FIXTURE_ARTIFACT_HEAD, 'utf8')),
       toCrlf(realSupplement),
     ]));
-    const crlfRes = analyse({
+    const crlfRes = analyse({ minTuples: 1,
       migrationsDir: MIGRATIONS_DIR, supplementPath: supCrlf, artifactPath: artCrlf,
     });
     check('NEW RED arm 5e (COUNTERFACTUAL, CRLF): an identical \\r\\n pair is tail-OK and its line count matches the \\n pair',
@@ -1097,10 +1124,42 @@ function runSelfTest() {
     fs.mkdirSync(emptyDir);
     let threw = null;
     try {
-      analyse({ migrationsDir: emptyDir, supplementPath: supComplete, artifactPath: artifactFor(supComplete) });
+      analyse({ minTuples: 1, migrationsDir: emptyDir, supplementPath: supComplete, artifactPath: artifactFor(supComplete) });
     } catch (e) {
       threw = e;
     }
+    // R2-CR-01: the FILE floor above says the directory was read. It says nothing about
+    // whether anything was PARSED. Driven on the real tree: neutering both ACL regexes left
+    // migrationCount at 148 and drove acls to [], and the gate printed `mirrored: 0/0` then
+    // `schema ACL parity OK` and EXITED 0. This arm is that defect, as a fixture.
+    let tupleThrew = null;
+    try {
+      // A real, full-size migrations directory — so the FILE floor is satisfied and only the
+      // TUPLE floor can be what fires. minTuples is raised above the true count rather than
+      // the parser being broken, which drives the same predicate without mutating the regex.
+      analyse({
+        minTuples: 100000,
+        migrationsDir: MIGRATIONS_DIR,
+        supplementPath: SUPPLEMENT,
+        artifactPath: FULL_SCHEMA,
+      });
+    } catch (e) {
+      tupleThrew = e;
+    }
+    check('TUPLES: a collapsed PARSE is a harness error, never a pass',
+      tupleThrew instanceof VacuousScanError && /ACL tuple\(s\) parsed/.test(tupleThrew.message));
+
+    // Counterfactual: the shipped floor must NOT fire on the real tree, or the gate would be
+    // one that can only fail — as useless as one that can only pass.
+    let tupleFalsePositive = null;
+    try {
+      analyse({ migrationsDir: MIGRATIONS_DIR, supplementPath: SUPPLEMENT, artifactPath: FULL_SCHEMA });
+    } catch (e) {
+      tupleFalsePositive = e;
+    }
+    check('TUPLES: the shipped floor does NOT fire on the real tree (counterfactual)',
+      tupleFalsePositive === null);
+
     check('COUNT: a collapsed scan set is a harness error, never a pass',
       threw instanceof VacuousScanError && threw.message.includes(String(MIN_MIGRATION_FILES)),
       threw ? threw.message.split('—')[0].trim() : 'nothing was thrown');
@@ -1144,6 +1203,7 @@ module.exports = {
   assertTailIdentity,
   splitLinesKeepEnds,
   MIN_MIGRATION_FILES,
+  MIN_ACL_TUPLES,
 };
 
 if (require.main === module) {
