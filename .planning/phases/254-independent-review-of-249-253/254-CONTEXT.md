@@ -102,6 +102,57 @@ not ship fixes, and it does not ship a new user-facing capability — that is a 
 - **M-4:** `253-VERIFICATION.md` frontmatter reads `status: gaps_found` while the ROADMAP Progress
   row reads **COMPLETE** (the gap-closure round landed after the verification). Both are defensible;
   **a plan must not cite one as refuting the other.**
+- **M-11 (added 2026-09-17 at plan-CHECK time — it CORRECTS D-03 above, which is preserved rather
+  than rewritten because its over-claim is the finding): THE OLDER ARM IS NOT UNIFORMLY OWED, AND
+  `independent_review` HAS SIX DISTINCT STATES ACROSS THE TEN PHASES.** Measured directly with
+  `grep -m1 "independent_review:"` over each `*-VERIFICATION.md`, 2026-09-17:
+
+  | Phase | value | Phase | value |
+  |---|---|---|---|
+  | 238 | `complete` (by Gemini, 2026-09-14) | 243 | `refused` (written 2026-09-16) |
+  | 240 | `complete` | 244 | **key absent** |
+  | 241 | **key absent** | 245 | **no `*-VERIFICATION.md` at all** |
+  | 242 | **`false`** | 246 | `done` (written 2026-09-16) |
+
+  ⛔ **`D-03`'s sentence *"the 238/240/241 + 242-246 arm stays owed"* is therefore FALSE for four of
+  those rows** — 238, 240, 243 and 246 are already discharged, refused or done. `DEBT-06-AUDIT.md`
+  independently reaches the same set: *"4 genuinely unmet: 241 · 242 · 244 · 245."*
+  ⛔ **D-02's amendment must therefore RE-DERIVE the list and distinguish the two states in its own
+  wording** — naming ten phase numbers in one undifferentiated clause would write a false sentence
+  into the requirement this phase exists to make true.
+  ⚠ **Three separate vocabulary defects are visible in that table and none is this phase's to fix:**
+  `complete` and `done` are two spellings of one state; `242`'s `false` is in **no** register's
+  vocabulary; and `245` has no verification file to carry any value. **Record them as findings**
+  (D-11 routing), do not repair them here — a vocabulary fix across ten phase files is a phase.
+- **M-6 (added 2026-09-17 at plan time — the discussion did not know this): THREE `DEBT-06`
+  ARTIFACTS ALREADY EXIST**, and they change what 254 has to invent:
+  - `.planning/DEBT-06-REFUSALS.md` (2026-09-14, `decided_by: operator`, `phases: [241,242,243,244,245]`)
+    — **the refusal format and the operator ruling that produced it already exist.** D-04's refusals
+    follow this precedent; they do not invent one. ⛔ Its own rule: *"a refusal is not a pass"* — the
+    phase keeps `verification_mode: self-verified` and `independent_review: owed`; what changes is
+    that the debt stops being **silent**.
+  - `.planning/DEBT-06-AUDIT.md` (2026-09-16) — **the counting rule, adopted from Phase 240's own
+    verification, not invented here: a review file whose frontmatter does not assert
+    `review_type: independent` is a CODE-REVIEW PASS, not a §6.3 review.** ⛔ This binds D-08
+    directly: the claude floor pass on 251 must **not** carry `review_type: independent`.
+    Its result line: *"2 discharged · 2 hold the substance but not the marker · 4 genuinely unmet."*
+  - `.planning/DEBT-06-BUS-DRAFTS.md` (2026-09-16) — the drafted asks behind `BUS-249`..`257`.
+- **M-7: NOTHING outside `.planning/` reads `independent_review`.** Measured:
+  `grep -rn independent_review scripts/ .claude/ .github/ docs/ AGENTS.md CLAUDE.md` → **no matches**.
+  ⛔ **The register flip is DOCUMENTATION, not an enforced state.** A plan may NOT write an acceptance
+  criterion of the form *"the gate confirms `independent_review: done`"*, and **building** such a gate
+  is a new capability inside a review phase — rejected by D-11 / G-7. Record the absence as a finding.
+- **M-8: a two-register disagreement 254 inherits.** `ROADMAP.md:271` records `DEBT-06-AUDIT.md`
+  calling four rows *"genuinely unmet"* — and the audit **never reads** `DEBT-06-REFUSALS.md`, which
+  covers exactly those rows. ⛔ **A 254 refusal that does not state which reading it adopts
+  re-creates the same conflict one milestone on.**
+- **M-9:** a PostToolUse hook fires on any `*-VERIFICATION.md` edit —
+  `.claude/settings.json` → `verification-honesty-guard.js` → `check-verification-honesty.cjs`. It
+  reads **`verification_mode` only**, never `independent_review`, and **never blocks** (exit 0,
+  `honesty gate OK`). Expect it in the transcript; do not plan around it.
+- **M-10:** `node scripts/check-hot-file-ledger.cjs 254` **cannot be cited by this phase** — its
+  `WATCHED` set is `backend/app` + `frontend/src` only, so once plans exist it watches **0** of this
+  phase's files. ⛔ A green ledger gate here means *"nothing to see"*, never *"clear"*.
 - **M-5:** The reviewer cannot be driven from here. Gemini runs in Antigravity and neither agent can
   wake the other — the bus is the only channel, and `scripts/agent-bus-watch.sh` dies with its
   session. ⛔ **No plan may have an acceptance criterion that depends on Gemini acting.**
@@ -141,6 +192,15 @@ not ship fixes, and it does not ship a new user-facing capability — that is a 
 - Existing review artifacts, **not to be overwritten**: `249-REVIEW.md`, `250-REVIEW.md`,
   `252-REVIEW.md`, `252-REVIEW-R2.md`, `253-REVIEW.md`, `253-REVIEW-R2.md`.
 
+### The `DEBT-06` artifacts that already exist (added at plan time — see M-6)
+- `.planning/DEBT-06-REFUSALS.md` — the refusal FORMAT and the 2026-09-14 operator ruling behind it.
+- `.planning/DEBT-06-AUDIT.md` — the counting rule (`review_type: independent` or it is a code-review
+  pass), row-by-row, plus the *"2 discharged · 2 hold the substance but not the marker · 4 genuinely
+  unmet"* verdict this phase must not contradict silently.
+- `.planning/DEBT-06-BUS-DRAFTS.md` — the drafted asks behind `BUS-249`..`BUS-257`.
+- `.planning/milestones/v4.0-phases/238-microsoft-graph-onedrive/238-INDEPENDENT-REVIEW.md` — the
+  repo's ONLY file carrying `review_type: independent`; the shape a real §6.3 verdict takes here.
+
 ### The coordination channel
 - `.agent-bus/OPEN.md` — `BUS-249` (251), `BUS-250` (250), `BUS-251` (249), `BUS-256` (252),
   `BUS-257` (253) are the five items D-06 amends; `BUS-252`..`BUS-255` are the older arm, out of
@@ -164,8 +224,16 @@ not ship fixes, and it does not ship a new user-facing capability — that is a 
 - **`/gsd:code-review <phase>`** — the instrument named by the ROADMAP and by the operator's
   standing decision; `/code-review ultra` stays ruled out on cost. Measured catch rate on this very
   set: 2 blockers on 249, 2 criticals on 253, 2 more blockers on 253's gap-closure round.
-- **`scripts/agent-bus.sh`** — already supports amend-in-place by editing `.agent-bus/OPEN.md`
-  bodies; `list --to <agent>` is what the SessionStart hook runs.
+- ~~**`scripts/agent-bus.sh`** — already supports amend-in-place by editing `.agent-bus/OPEN.md`
+  bodies; `list --to <agent>` is what the SessionStart hook runs.~~
+  ⚠ **CORRECTED 2026-09-17 at plan time — the original is struck through rather than deleted, because
+  a plan written against it would have called a verb that does not exist.** `scripts/agent-bus.sh`'s
+  dispatch (`:168-172`) is exactly **`open | list | answer | close | archive`** — **there is no
+  `amend` verb.** D-06's amend is therefore a **hand `Edit` of the item BODY**, which is legal only
+  because `.agent-bus/OPEN.md:4-5` restricts its prohibition to the `###` header lines. Three
+  mechanical constraints follow: ⛔ never touch the `### [OPEN] BUS-NNN · to:X · from:Y · DATE`
+  header; ⛔ leave `**Answer:**` as an exact bare line or `cmd_answer` exits 3 on that item forever;
+  ⛔ `close` stays the operator's verb. `list --to <agent>` is still what the SessionStart hook runs.
 - **`251-BUS-TRIAGE.md`** — the shape D-11's triage list should follow.
 - **`scripts/check-seeds-register.cjs --phase 254`** — ran clean at discuss time
   (`297/297 parsed · 0 duplicate ids · exit 0`) but matched **0 triggers, because the phase has no
