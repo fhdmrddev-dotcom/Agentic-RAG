@@ -264,7 +264,10 @@ describe("ConnectionGrantsList Component (BUILD-CONTRACT §3 Invariants)", () =>
     if (denyBtn) await user.click(denyBtn)
     expect(onChangeToolGrant).toHaveBeenCalledWith("search_code", "deny")
 
-    // Click Reset on read_repository_metadata
+    // Click Reset on read_repository_metadata (CRED-02: forward action wording)
+    expect(GRANTS_COPY.OVERRIDDEN_RESET).toBe("Follow the default instead")
+    expect(screen.getByText("Follow the default instead")).toBeInTheDocument()
+    expect(screen.queryByText("Use the default")).toBeNull()
     const resetBtn = screen.getByText(GRANTS_COPY.OVERRIDDEN_RESET)
     await user.click(resetBtn)
     expect(onResetToolGrant).toHaveBeenCalledWith("read_repository_metadata")

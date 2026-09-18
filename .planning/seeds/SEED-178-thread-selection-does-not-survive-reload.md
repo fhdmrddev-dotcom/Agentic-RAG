@@ -33,6 +33,7 @@ trigger_when: >
   As measured 2026-08-18 this returns `url: "http://localhost:5173/"` (bare — NO thread id),
   `ls: ["chat_history_collapsed"]`, `ss: []`. **The seed is discharged when the url carries a thread
   identifier (or a persisted key holds one) and an F5 lands the user back in the same conversation.**
+surface: Agentic-RAG
 ---
 
 # SEED-178 — the open thread does not survive F5

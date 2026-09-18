@@ -19,6 +19,7 @@ trigger_when: >
   The first `workflow_definitions` row observed carrying a `config.model` absent from
   `build_model_registry_rows()`. The detecting query is below; a non-zero `unknown_phases` is the
   signal.
+surface: Agentic-RAG
 ---
 
 # The gap, stated plainly

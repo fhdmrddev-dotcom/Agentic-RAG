@@ -14,14 +14,30 @@ import { render, screen } from "@testing-library/react"
 import { axe } from "vitest-axe"
 import type { Todo } from "@/types"
 import { mockTodos } from "./fixtures"
+// ⚠ IN-04 — the ONE home of "a ?raw fence cannot tell code from a comment".
+import { stripComments } from "@/lib/stripComments.testutil"
 
 const useTodos = vi.fn()
 const useViewingThread = vi.fn()
 const useDerivedPanel = vi.fn()
+// Phase 250 HONEST-03 — the panel now asks whether anything is actually running on the
+// thread it is showing. ⚠ A mock factory that omits a newly-added export makes every suite
+// that mounts this component throw AT MOUNT (the Phase 196 `@/lib/api` lesson, 249 failing
+// tests in one run), so both selectors are declared here.
+const useStreamingForThread = vi.fn()
+const useLoadingForThread = vi.fn()
+// Phase 252-04 (D-21) — the THIRD liveness selector. `reconcile` now marks its own
+// /snapshot round-trip, which is the window `BUG-260915-01` actually describes. Declared
+// here for the same reason as the two above: a mock factory that omits a newly-added
+// export makes every suite mounting this component throw AT MOUNT.
+const useReconcilingForThread = vi.fn()
 vi.mock("@/providers/StreamsProvider", () => ({
   useTodos: (...a: unknown[]) => useTodos(...a),
   useViewingThread: (...a: unknown[]) => useViewingThread(...a),
   useDerivedPanel: (...a: unknown[]) => useDerivedPanel(...a),
+  useStreamingForThread: (...a: unknown[]) => useStreamingForThread(...a),
+  useLoadingForThread: (...a: unknown[]) => useLoadingForThread(...a),
+  useReconcilingForThread: (...a: unknown[]) => useReconcilingForThread(...a),
 }))
 
 // eslint-disable-next-line import/first
@@ -38,6 +54,13 @@ describe("TodosSection (PANEL-02) — live todo list with status", () => {
     // Default: no derived items (Phase 095.1 — real todos win; derivation is the
     // empty-real fallback). Individual derived-fallback tests override this.
     useDerivedPanel.mockReturnValue([])
+    // ⭐ DEFAULT = A LIVE RUN, and that is a deliberate reading of the suite it precedes:
+    // every assertion below was written about a panel with something running, so the
+    // pre-250 expectations (`in progress`, the bouncing dot) are the LIVE expectations.
+    // The ended-run behaviour is asserted explicitly in the Phase 250 block at the bottom.
+    useStreamingForThread.mockReturnValue(true)
+    useLoadingForThread.mockReturnValue(false)
+    useReconcilingForThread.mockReturnValue(false)
   })
 
   it("renders every todo from useTodos(threadId).data in order_index order", () => {
@@ -171,5 +194,310 @@ describe("TodosSection (D-095.1-01/02) — derived-panel precedence", () => {
     ])
     const { container } = render(<TodosSection />)
     expect(await axe(container)).toHaveNoViolations()
+  })
+})
+
+// ===========================================================================
+// Phase 250 — HONEST-03 / HONEST-04: what the row says once the run is over
+//
+// `BUG-260902-01` — a run that ended left `IN PROGRESS` and a bouncing dot on screen
+// forever. `BUG-260913-02` — a job that finished perfectly read
+// `(run ended — not completed)`. Both are this one row.
+// ===========================================================================
+
+describe("TodosSection — run honesty (Phase 250, HONEST-03 / HONEST-04)", () => {
+  const OPEN_TODOS: Todo[] = [
+    {
+      id: "t-1",
+      thread_id: "thread-1",
+      todo_id: "1",
+      content: "Translate full document content to Arabic",
+      status: "in_progress",
+      parent_id: null,
+      order_index: 0,
+    } as unknown as Todo,
+    {
+      id: "t-2",
+      thread_id: "thread-1",
+      todo_id: "2",
+      content: "Verify output and deliver",
+      status: "pending",
+      parent_id: null,
+      order_index: 1,
+    } as unknown as Todo,
+    {
+      id: "t-3",
+      thread_id: "thread-1",
+      todo_id: "3",
+      content: "Read the brief",
+      status: "completed",
+      parent_id: null,
+      order_index: 2,
+    } as unknown as Todo,
+  ]
+
+  function ended() {
+    useStreamingForThread.mockReturnValue(false)
+    useLoadingForThread.mockReturnValue(false)
+    // Phase 252-04 — "ended" now means all THREE liveness reads are false. Leaving the
+    // third one unset would make `ended()` mean "ended, and also we are mid-reconcile",
+    // which is a different state with a different honest reading.
+    useReconcilingForThread.mockReturnValue(false)
+  }
+
+  beforeEach(() => {
+    useViewingThread.mockReturnValue("thread-1")
+    useDerivedPanel.mockReturnValue([])
+    setTodos(OPEN_TODOS)
+    useStreamingForThread.mockReturnValue(true)
+    useLoadingForThread.mockReturnValue(false)
+    useReconcilingForThread.mockReturnValue(false)
+  })
+
+  // ⚠ THE SELECTOR IS `[class*="animate-dotBounce"]`, NOT `.animate-dotBounce`, AND THAT
+  // DISTINCTION WAS PAID FOR: the shipped class is `motion-safe:animate-dotBounce`, one
+  // class token, so the dotted selector matches NOTHING and every "no animation"
+  // assertion below would have passed vacuously. The positive control two tests down is
+  // what caught it — a fence nobody has seen fire is not a fence.
+  it("an ended run does not animate an open todo", () => {
+    ended()
+    const { container } = render(<TodosSection />)
+    expect(container.querySelector('[class*="animate-dotBounce"]')).toBeNull()
+  })
+
+  it("an ended run labels an open todo NOT TICKED", () => {
+    ended()
+    render(<TodosSection />)
+    const row = screen.getByText("Translate full document content to Arabic").closest("li")
+    expect(row).toHaveTextContent(/not ticked/i)
+    expect(row).not.toHaveTextContent(/in progress/i)
+  })
+
+  it("a live run still reads IN PROGRESS and still animates", () => {
+    const { container } = render(<TodosSection />)
+    const row = screen.getByText("Translate full document content to Arabic").closest("li")
+    expect(row).toHaveTextContent(/in progress/i)
+    expect(container.querySelector('[class*="animate-dotBounce"]')).not.toBeNull()
+  })
+
+  it("a loading-but-not-yet-streaming thread still reads IN PROGRESS", () => {
+    // ⛔ THE MIRROR-IMAGE FAILURE THIS GUARDS: `streamingThreads` can read empty during a
+    // reconnect/fetch window while a run IS live. A row must never flash "not ticked"
+    // while the agent is working.
+    useStreamingForThread.mockReturnValue(false)
+    useLoadingForThread.mockReturnValue(true)
+    render(<TodosSection />)
+    const row = screen.getByText("Translate full document content to Arabic").closest("li")
+    expect(row).toHaveTextContent(/in progress/i)
+  })
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Phase 252-04 (SC#5 hole 1 / D-21 / D-24) — THE THREAD-OPEN FLASH.
+  //
+  // `BUG-260915-01`'s SYMPTOM is real and these two cases are the drive for it. Its
+  // stated MECHANISM was measurably false and is corrected in the report itself:
+  // `setViewingThread` DOES fire `reconcile` (StreamsProvider.tsx:1936-1942). The actual
+  // hole is that `reconcile` set no liveness signal of its own, so for the entire
+  // `/snapshot` round-trip `streamingThreads` and `loadingThreads` were BOTH empty and
+  // every open todo on a live run read "Not ticked".
+  //
+  // ⛔ THESE TWO CASES ARE A PAIR AND NEITHER IS SUFFICIENT ALONE. A "fix" that made
+  // `isRunLive` unconditionally true would pass the first and DELETE `HONEST-03`; the
+  // idle control is the only thing standing between this change and that regression.
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  it("a reconciling thread still reads IN PROGRESS — the thread-open flash (BUG-260915-01)", () => {
+    // Exactly the thread-open window: nothing streaming yet (the snapshot has not come
+    // back to derive it), nothing loading (`loadMessages` is not on this path at all),
+    // but a reconcile IS in flight. Liveness is UNKNOWN here — and "we do not know yet"
+    // must never be rendered as the positive claim "not ticked" (D-24).
+    useStreamingForThread.mockReturnValue(false)
+    useLoadingForThread.mockReturnValue(false)
+    useReconcilingForThread.mockReturnValue(true)
+    render(<TodosSection />)
+    const row = screen.getByText("Translate full document content to Arabic").closest("li")
+    expect(row).toHaveTextContent(/in progress/i)
+    expect(row).not.toHaveTextContent(/not ticked/i)
+  })
+
+  it("a genuinely idle thread STILL reads NOT TICKED — the control that keeps HONEST-03", () => {
+    // ⛔ The counterfactual. Not streaming, not loading, AND not reconciling: the app has
+    // actually looked and there is nothing running. This must pass BEFORE and AFTER the
+    // fix — it is what proves the panel was made less willing to CLAIM, not more willing
+    // to REASSURE.
+    useStreamingForThread.mockReturnValue(false)
+    useLoadingForThread.mockReturnValue(false)
+    useReconcilingForThread.mockReturnValue(false)
+    const { container } = render(<TodosSection />)
+    const row = screen.getByText("Translate full document content to Arabic").closest("li")
+    expect(row).toHaveTextContent(/not ticked/i)
+    expect(row).not.toHaveTextContent(/in progress/i)
+    expect(container.querySelector('[class*="animate-dotBounce"]')).toBeNull()
+  })
+
+  // ⚠ WR-04 TIGHTENED, NOT WEAKENED. This asserted `container.textContent` matched no
+  // /run ended/i ANYWHERE, which is broader than the decision it encodes and forbids the
+  // a11y fix outright: `RUN_ENDED_TITLE` ("The run ended before the agent marked this
+  // complete.") contains those two words, so putting the REASON in the accessible tree
+  // would have tripped a fence aimed at the MARKER SUFFIX on the task label.
+  //
+  // What HONEST-04 actually decided (SEED-105 item 3) is that the raw marker must never
+  // be appended to the task text. That is now asserted against the marker LITERAL, which
+  // is exactly the string the backend appends and is not a substring of the title.
+  it("never renders the run-ended marker to the user", () => {
+    ended()
+    setTodos([
+      {
+        ...OPEN_TODOS[0],
+        content: "Translate full document content to Arabic (run ended — not completed)",
+      } as unknown as Todo,
+    ])
+    const { container } = render(<TodosSection />)
+    expect(container.textContent).not.toContain("(run ended — not completed)")
+    expect(container.textContent).not.toMatch(/not completed\)/i)
+    expect(screen.getByText("Translate full document content to Arabic")).toBeInTheDocument()
+  })
+
+  // WR-04 — the reason must be in the ACCESSIBLE TREE, not only in a mouse tooltip.
+  it("puts the honest reason where a screen reader can reach it", () => {
+    ended()
+    setTodos([
+      {
+        ...OPEN_TODOS[0],
+        content: "Translate full document content to Arabic (run ended — not completed)",
+      } as unknown as Todo,
+    ])
+    render(<TodosSection />)
+    // `title` on a plain <li> is announced by no major screen reader and, because an
+    // <li> is not focusable, never appears for a keyboard user either. Before this
+    // phase the reason WAS in the text content; after it the accessible tree said only
+    // "Not ticked", which does not say why.
+    expect(
+      screen.getByText("The run ended before the agent marked this complete."),
+    ).toBeInTheDocument()
+  })
+
+  it("does not announce the reason on rows that were never marked", () => {
+    // ⛔ The sr-only sentence is scoped to a row the backend actually marked. Announcing
+    // it on every not-ticked row would make a screen reader read a false cause.
+    ended()
+    render(<TodosSection />)
+    expect(
+      screen.queryByText("The run ended before the agent marked this complete."),
+    ).not.toBeInTheDocument()
+  })
+
+  it("turns the marker into the row's title instead", () => {
+    ended()
+    setTodos([
+      {
+        ...OPEN_TODOS[0],
+        content: "Translate full document content to Arabic (run ended — not completed)",
+      } as unknown as Todo,
+    ])
+    render(<TodosSection />)
+    const row = screen.getByText("Translate full document content to Arabic").closest("li")
+    expect(row).toHaveAttribute(
+      "title",
+      "The run ended before the agent marked this complete.",
+    )
+  })
+
+  it("a pending todo on an ended run reads NOT TICKED too (Phase 138 D-02)", () => {
+    ended()
+    render(<TodosSection />)
+    const row = screen.getByText("Verify output and deliver").closest("li")
+    expect(row).toHaveTextContent(/not ticked/i)
+  })
+
+  it("a completed todo is untouched on an ended run — nothing is auto-completed", () => {
+    ended()
+    render(<TodosSection />)
+    const row = screen.getByText("Read the brief").closest("li")
+    expect(row).toHaveTextContent(/completed/i)
+    expect(row).not.toHaveTextContent(/not ticked/i)
+    // The sr-only progress line still counts only real completions.
+    expect(screen.getByText("1 of 3 todos complete")).toBeInTheDocument()
+  })
+
+  it("hooks are never short-circuited — the source fence a mocked-hook test cannot be", async () => {
+    // ⛔ THIS FENCE EXISTS BECAUSE THE BUG IT GUARDS SHIPPED, AND EVERY TEST ABOVE STAYED
+    // GREEN THROUGH IT. `useStreamingForThread(id) || useLoadingForThread(id)` looks
+    // harmless and is fatal: `||` short-circuits, so the moment a run actually starts the
+    // first selector returns true and the SECOND HOOK IS NEVER CALLED. React counts fewer
+    // hooks than the previous render, throws "Rendered fewer hooks than expected", and the
+    // page goes blank — found by DRIVING the app, on the very scenario this phase was
+    // built for.
+    //
+    // ⚠ A RENDERED TEST CANNOT CATCH IT HERE. The selectors are replaced by `vi.fn()`,
+    // which consumes no hook slot, so React's hook accounting never sees the violation.
+    // The only thing that can see it in this suite is the SOURCE.
+    //
+    // ⛔ THIS IS A BACKSTOP, NOT THE PRIMARY GUARD (WR-03). The primary guard is the real
+    // lint rule, which was ALREADY CONFIGURED in this repo and which nothing ran:
+    //   node scripts/check-react-hooks-rules.cjs        (+ the PostToolUse hook)
+    // Driven, it catches this line AND the three shapes the regex below structurally
+    // cannot see — a ternary hook, a block-guarded hook, and a hook added below the early
+    // `return null` that already exists in this very component. Keep this fence for the
+    // one-line message at the point of edit; do NOT widen the regex when the next shape
+    // appears — fix it in the lint gate, which understands the AST.
+    const src: string = (
+      await import("@/components/panel/TodosSection.tsx?raw")
+    ).default
+
+    const shortCircuitedHook = /\buse[A-Z]\w*\([^)]*\)\s*(\|\||&&|\?\?)/
+    // ⚠ IN-04 — THIS WAS A THIRD HAND-ROLLED COPY OF A RULE THIS REPO CENTRALISED,
+    // and it missed block comments entirely. The component's own docblock already quotes
+    // the forbidden pattern in line-comment form; the same sentence inside a JSDoc would
+    // have fired this fence falsely. `stripComments.testutil.ts` exists because *"the
+    // repair for two copies of a rule drift must not itself be two copies of a rule"*.
+    //
+    // ⚠ The shared util strips BLOCK comments and WHOLE-LINE line comments — not a
+    // TRAILING one on a line of code, which this fence also needs. So both run, in that
+    // order, and the local step is now a narrow SUPPLEMENT, not a reimplementation.
+    const code = stripComments(src)
+      .split(/\r?\n/)
+      .map((line, i) => [i + 1, line.replace(/\/\/.*$/, "")] as const)
+
+    const offenders = code.filter(([, line]) => shortCircuitedHook.test(line))
+
+    expect(offenders).toEqual([])
+
+    // ── Phase 252-04 (D-23) — THE FENCE IS EXTENDED TO THE THIRD HOOK, NOT MERELY LEFT
+    //    STANDING. `useReconcilingForThread` joined this component, and the regex above
+    //    is generic over `use[A-Z]…`, so it already covers the new call — but "already
+    //    covered" is an ARGUMENT, and this fence exists because an argument of exactly
+    //    that shape shipped a blank page. So the three calls are asserted POSITIVELY:
+    //    three liveness selectors, on three DISTINCT lines, each its own statement.
+    //
+    // ⚠ This still cannot be a rendered assertion. A `vi.fn()` standing in for a hook
+    // consumes no hook slot, so React's accounting never sees the violation — the source
+    // is the only witness available in this suite.
+    const LIVENESS_HOOKS = [
+      "useStreamingForThread",
+      "useLoadingForThread",
+      "useReconcilingForThread",
+    ] as const
+    const linesOf = (hook: string) =>
+      code.filter(([, line]) => line.includes(`${hook}(threadId)`)).map(([n]) => n)
+
+    const callLines = LIVENESS_HOOKS.map((h) => linesOf(h))
+    // Each selector is called exactly once…
+    expect(callLines.map((ls) => ls.length)).toEqual([1, 1, 1])
+    // …and no two of them share a line, which is what `||`-ing hook CALLS would look like.
+    const flat = callLines.flat()
+    expect(new Set(flat).size).toBe(3)
+  })
+
+  it("derived rows get the identical treatment from the same helper", () => {
+    ended()
+    setTodos([])
+    useDerivedPanel.mockReturnValue([
+      { label: "Searching the knowledge base", status: "in_progress" },
+    ])
+    const { container } = render(<TodosSection />)
+    const row = screen.getByText("Searching the knowledge base").closest("li")
+    expect(row).toHaveTextContent(/not ticked/i)
+    expect(container.querySelector('[class*="animate-dotBounce"]')).toBeNull()
   })
 })

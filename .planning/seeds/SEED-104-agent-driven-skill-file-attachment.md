@@ -10,6 +10,8 @@ related_seeds:
   - SEED-096 (skill bundle-tree fidelity — a related but distinct gap: imported non-Python skill scripts are inert; this seed is about the agent's ability to CREATE/ATTACH files at all, not about executing every file type)
 related_memories: [reference_js_skill_import_gap, feedback_separate_per_feature_safe_by_construction]
 priority: medium
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-104 — agent-driven skill file attachment (comprehensive, deferred)

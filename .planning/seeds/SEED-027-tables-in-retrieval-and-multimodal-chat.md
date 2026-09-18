@@ -27,6 +27,8 @@ suggested_phase: |
   Two-track strategy:
   1. **Quick win — fold into Phase 075 or new Phase 076.5** — track A only: add a `tables_to_chunks` step at ingestion time that renders each `document_tables` row as a structured markdown block (`Table p.X t.Y: headers | rows...` or LLM-generated 1-2 sentence summary + headers) and inserts it as a `document_chunks` row. Mirrors the existing `[Image p.X]: {description}` pattern that already works. Low-risk lift, big retrieval-quality win for content already in the DB. Estimated 1 plan.
   2. **Full lift — dedicated v2.7 phase** — track B: multimodal chat injection. When chat is on a vision-capable model AND retrieved chunks reference image pages (via the `[Image p.X]:` prefix), look up the corresponding `document_images` row, fetch/regenerate the b64_png, and attach as an `{type: "image_url"}` content block. Requires: (a) decide whether to re-store b64_png or regenerate from source PDF on-demand, (b) cost-control for token usage on vision blocks, (c) per-model capability gate (similar to Phase 074's `max_output_tokens` registry — add a `vision: bool` field). Estimated 2-3 plans.
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-027 — Tables-in-retrieval + multimodal chat injection

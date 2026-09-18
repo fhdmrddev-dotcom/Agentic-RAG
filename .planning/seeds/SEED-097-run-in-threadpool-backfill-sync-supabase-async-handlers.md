@@ -1,5 +1,6 @@
 ---
-id: SEED-097
+title: Backfill `run_in_threadpool` across sync-supabase-in-async handlers
+seed_id: SEED-097
 status: planted
 planted: 2026-06-29
 planted_during: v3.2 Phase 132 plan-phase (plan-checker Dimension 10 warning on the new skill_test_cases router)
@@ -7,6 +8,7 @@ trigger_when: A perf/scaling pass on the FastAPI backend, OR any phase that adds
 scope: Medium
 related: [[feedback_separate_per_feature_safe_by_construction]] (root-cause over band-aid)
 re_open_trigger: v3.3 Operator UX / scale-hardening, or first observed async-handler latency spike
+surface: Agentic-RAG
 ---
 
 # SEED-097: Backfill `run_in_threadpool` across sync-supabase-in-async handlers

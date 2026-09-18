@@ -27,6 +27,8 @@ re_open_triggers:
   - "A future `WorkflowDefinition` schema change that ships a data migration touching stored definitions — it must handle both shapes or it silently skips 81% of rows."
 priority: medium
 suggested_phase: "Unassigned — deliberately. This is a data-hygiene finding with no live user impact, so it should NOT displace roadmap work. Cheapest honest close is (1) identify the string-producing writer, (2) make it agree with `db/workflows.py`, (3) delete + reseed the fixture rows rather than migrate them. Natural pickup alongside any phase that adds SQL-side querying over definitions (a Control-Room workflows view, or an admin filter) — that is the moment the cost becomes real."
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-138 — `workflow_definitions.definition` has two encodings in one column

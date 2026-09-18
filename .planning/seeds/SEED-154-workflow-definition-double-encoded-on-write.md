@@ -1,5 +1,5 @@
 ---
-id: SEED-154
+seed_id: SEED-154
 title: "Every workflow definition the app writes is DOUBLE-ENCODED — `json.dumps()` is handed to a connection that already has `encoder=json.dumps`, so `definition` lands as a jsonb STRING scalar and every `definition->…` query silently sees nothing"
 status: planted
 planted: 2026-08-12

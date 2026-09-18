@@ -3,7 +3,8 @@ seed_id: SEED-255
 title: Three plaintext API keys are still in PUSHED git history on origin/develop, origin/master AND origin/production — the file was untracked but the keys were never evidenced as rotated
 created: 2026-09-06
 planted_during: BUS-171 operator-queue triage (claude, REVIEWER)
-status: planted
+status: answered
+status_note: "ANSWERED 2026-09-16 by operator ruling on BUS-208 — both keys revoked 2026-09-14, history rewrite DECLINED (private repo + dead keys). ⚠ This seed's OWN provider attribution was measured WRONG at the same time: it says THREE keys incl. two OpenRouter; the pushed commit contains exactly TWO, Zhipu and MOONSHOT. See the 2026-09-16 correction in the body. The unpushed third key is the one residual and it is NOT a history exposure."
 priority: high
 surface: Agentic-RAG
 relates_to:
@@ -85,3 +86,57 @@ the request dying with them.
 ⛔ **The five items are being CLOSED with a pointer to this seed.** If this seed is ever closed
 without evidence of rotation at the provider consoles, the finding is gone for good — there is
 nothing else holding it.
+
+---
+
+## ⚠ CORRECTED 2026-09-16 — THIS SEED MISATTRIBUTED A PROVIDER, AND THE ORIGINAL IS KEPT ABOVE
+
+The operator ruled on `BUS-208` today: **history rewrite DECLINED** (private repo, keys dead),
+**revocation DONE 2026-09-14**. Before recording that as an answer, the premise was driven against the
+commit rather than read from this seed — and **this seed was wrong.**
+
+### What is actually in `e5977a244`, measured (values never printed)
+
+| | |
+|---|---|
+| distinct key values in `litellm-config.yaml` | **TWO**, each used twice — md5-prefix `69f7dfd7…` and `c8965fef…` |
+| `api_base` hosts, which is what identifies a provider | `open.bigmodel.cn/api/paas/v4` ×2 · **`api.moonshot.ai/v1` ×2** |
+| `sk-or-v1-` (OpenRouter's real prefix) occurrences | **ZERO** |
+
+⛔ **`sk-ork6n2e…` IS A MOONSHOT KEY, NOT AN OPENROUTER KEY.** This seed calls it OpenRouter, misled
+by a prefix that *looks* like OpenRouter's — but its `api_base` is `api.moonshot.ai` and it is the
+`api_key` for the `kimi-k3` / `kimi-k2.6` model entries. **OpenRouter's real prefix is `sk-or-v1-`,
+which appears zero times in this commit.**
+
+### Why the misattribution mattered, and it was not cosmetic
+
+`BUS-040` and `BUS-208` both name **"Zhipu/GLM and Moonshot/Kimi"**. This seed named **"Zhipu and two
+OpenRouter"**. Read side by side, the overlap looks like *Zhipu only* — so a reader checking whether
+the operator's ruling was safe would conclude **two OpenRouter keys are still live in three pushed
+branches and nobody revoked them.** ⭐ **That alarm is FALSE, and it was raised by this register
+rather than by the world.** The two keys in the commit are exactly the two the operator revoked.
+
+### The one genuine residual — and it is NOT a history exposure
+
+`sk-or-v1-f9dd28…86145`. This seed's own text says it *"was an uncommitted edit at the time BUS-034
+was written"*, yet lists it under **"Revoke/rotate all three"**, which reads as though all three sit
+in history. **It is not in `e5977a244` and it is not in any pushed branch.** It is a real OpenRouter
+key that existed locally, so rotating it is ordinary hygiene — **not** the emergency this seed is
+about, and not covered by the operator's ruling, which was scoped to pushed history.
+
+### Disposition
+
+- ✅ **The pushed-history exposure is CLOSED.** Two keys, both revoked 2026-09-14. The operator's
+  *"private repo + revoked keys, no rewrite"* is sound **on the measured evidence**, not merely
+  accepted.
+- ⚠ **`status: answered`, not `closed`** — the unpushed OpenRouter key is unrotated as far as any
+  register records, and this seed is the only place that fact now lives.
+- **Re-open trigger (replaces the original):** the repository being made public, a collaborator or CI
+  integration being added, **or** any evidence that `sk-or-v1-f9dd28…86145` is still accepted by
+  OpenRouter. ⛔ The original `trigger_when` arm *"any decision to scrub history"* is **spent** — that
+  decision was made and was NO.
+
+⭐ **The method note, because it is the transferable part.** This seed was written during the
+`BUS-171` triage by an agent reading two other bus items, and it inherited their framing without
+opening the commit. Three registers agreed with each other and **all three were downstream of the
+same unread artifact.** The commit is the bottom; every register above it only knows the one below.

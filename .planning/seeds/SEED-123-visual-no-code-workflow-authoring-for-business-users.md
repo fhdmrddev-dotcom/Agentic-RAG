@@ -11,6 +11,8 @@ operator_preference: "Operator wants this on the UX/end-user-experience track pr
 related_seeds: [SEED-051, SEED-086, SEED-045, SEED-085, SEED-052, SEED-113, SEED-058]
 related_memories: [project_v34_milestone_started, project_target_scale, feedback_vibe_coder_communication, feedback_iterate_leverage_existing, feedback_business_value_framing]
 re_open_trigger: "When the Workflow track reopens post-v3.4 (a dedicated 'Workflow Studio — Visual / No-Code Authoring' milestone), OR a customer/end-user needs to self-author workflows from their business process without technical vocabulary, OR any phase proposes touching the workflow Builder / phase-spine graph / run surface (build ON this direction, don't fork it)."
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-123 — Visual / no-code workflow authoring for business end-users

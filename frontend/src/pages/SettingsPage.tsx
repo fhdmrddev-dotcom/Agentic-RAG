@@ -26,6 +26,7 @@ import { Check, Eye, EyeOff, Save, RotateCcw, Download, ChevronLeft, ChevronRigh
 import { cn } from "@/lib/utils"
 import { MemorySection } from "@/components/settings/MemorySection"
 import { ModelPillRow } from "@/components/settings/ModelPillRow"
+import { unverifiedDescription } from "@/lib/unverifiedModelCopy"
 import {
   ProviderPicker,
   EMBEDDING_PRESETS,
@@ -756,6 +757,11 @@ export function SettingsPage() {
   // Used by ModelPillRow + selected-label badge to flag unregistered models.
   const [verifiedModels, setVerifiedModels] = useState<Set<string>>(new Set())
   const [inferredProviderFor, setInferredProviderFor] = useState<Record<string, string>>({})
+  // ⛔ Phase 249 gap-closure (CR-01): the JUDGE picker's set is built-ins ONLY and is NOT
+  // `verifiedModels`. Feeding the union offered options PUT /settings refuses with 400.
+  const [registryModels, setRegistryModels] = useState<string[]>([])
+  // ⭐ CR-02: resolved-capability tool loss, which a REGISTERED model can also have.
+  const [toolsLostModels, setToolsLostModels] = useState<Set<string>>(new Set())
   // Phase 149 (D-149-05): model_ids flagged `deprecated` in the registry. Plan 05
   // supplies `deprecated_models` in the settings payload; the picker lights up the
   // `deprecated` badge for these. Defensive default (absent → empty set → no badge).
@@ -837,6 +843,10 @@ export function SettingsPage() {
     // Phase 075.3 D-075.3-13: defensive ?? so an old backend response without
     // the fields doesn't crash the frontend; the badge simply won't render.
     setVerifiedModels(new Set(data.verified_models ?? []))
+    // CR-01 / CR-02 — defensive defaults: an older backend omits both and the page renders
+    // exactly as before (empty judge list falls back below; empty tools-lost claims nothing).
+    setRegistryModels(data.registry_models ?? [])
+    setToolsLostModels(new Set(data.tools_lost_models ?? []))
     setInferredProviderFor(data.inferred_provider_for ?? {})
     // Phase 149 (D-149-05): seed the deprecated set defensively (Plan 05 payload).
     setDeprecatedModels(new Set(data.deprecated_models ?? []))
@@ -1221,7 +1231,17 @@ export function SettingsPage() {
                   {llmModel && !verifiedModels.has(llmModel) && (
                     <span
                       className="ml-2 text-[10px] font-medium text-amber-600 bg-amber-500/10 px-2 py-0.5 rounded-full ghost-border"
-                      title={`This model isn't in our verified registry. Using inferred provider: ${inferredProviderFor[llmModel] ?? "ollama"}. Safe defaults applied (max_tokens=${(inferredProviderFor[llmModel] ?? "") === "openrouter" ? 4096 : 8192}, timeout=90s).`}
+                      /* ⛔ Phase 249 gap-closure (WR-06): this was a THIRD hand-written copy of
+                         the unverified tooltip, two elements above the one the phase corrected —
+                         and it still said `timeout=90s` against a real default of 300. A phase
+                         that claims to have fixed a false number must fix every copy of it, or
+                         the claim is the drift. Now reads the shared module like the other two. */
+                      title={unverifiedDescription(
+                        llmModel,
+                        inferredProviderFor,
+                        toolsLostModels,
+                        verifiedModels.has(llmModel),
+                      )}
                     >
                       unverified
                     </span>
@@ -1236,6 +1256,7 @@ export function SettingsPage() {
                       verifiedModels={verifiedModels}
                       inferredProviderFor={inferredProviderFor}
                       deprecatedModels={deprecatedModels}
+                      toolsLostModels={toolsLostModels}
                       providerId={activeProvider}
                       onSelect={setLlmModel}
                     />
@@ -1448,7 +1469,13 @@ export function SettingsPage() {
                   self-persists via setJudgeModel. Registry-only judge options come from
                   the verified-models registry the page already loads. */}
               <EngineHealthCard />
-              <JudgeModelPicker registryModels={[...verifiedModels]} />
+              {/* ⛔ CR-01: built-ins only. `verifiedModels` is a UNION and every override-only
+                  entry in it is a guaranteed 400 from the judge validator. Falls back to the
+                  union only when an older backend sends no `registry_models`, which is strictly
+                  no worse than the pre-249 behaviour. */}
+              <JudgeModelPicker
+                registryModels={registryModels.length > 0 ? registryModels : [...verifiedModels]}
+              />
             </div>
           </TabsContent>
 

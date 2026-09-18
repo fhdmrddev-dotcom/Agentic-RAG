@@ -1,5 +1,5 @@
 ---
-id: SEED-039
+seed_id: SEED-039
 title: Workspace Panel — Reliability (fast-switch race) + Interaction Polish Bundle
 status: planted
 planted: 2026-05-29
@@ -7,6 +7,7 @@ planted_by: orchestrator (087 scenario-matrix round-3 testing)
 trigger_when: A user hits the "No preview available / Could not load versions" stuck state at human pace — OR confusion over the two-click diff picker / a failed-write chat link — OR any future workspace-panel refactor phase (good time to batch these)
 priority: low
 tags: [frontend/panel, reliability, race-condition, ux-polish, diff, ask_user, phase-087, phase-086]
+surface: Agentic-RAG
 ---
 
 # SEED-039: Workspace Panel Reliability + Interaction Polish Bundle

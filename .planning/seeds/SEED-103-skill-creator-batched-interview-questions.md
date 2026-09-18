@@ -9,6 +9,8 @@ related_seeds:
   - SEED-101-skill-creator-native-builtin-protected (the phase that shipped the current interview approach)
 related_memories: [feedback_vibe_coder_communication, feedback_separate_per_feature_safe_by_construction]
 priority: low
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-103 — a batched, paginated interview tool for skill-creator (maybe), never a change to shared ask_user

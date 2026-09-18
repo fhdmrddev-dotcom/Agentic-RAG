@@ -20,6 +20,8 @@ re_open_triggers:
 
 priority: medium
 suggested_phase: v3.0 (Skill Studio) primary owner — exec telemetry is a prerequisite for skill quality eval. Could pre-stage in v2.6 Phase 077 (Multi-Worker Validation Harness — natural pair with backpressure telemetry) if Skill Studio scope grows.
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-025 — Sandbox execution telemetry

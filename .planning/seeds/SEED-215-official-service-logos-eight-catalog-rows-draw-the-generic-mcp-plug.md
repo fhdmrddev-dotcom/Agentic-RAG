@@ -1,5 +1,5 @@
 ---
-id: SEED-215
+seed_id: SEED-215
 title: Eight catalog services draw the GENERIC MCP plug instead of their own official logo — the icon convention is honoured for providers/models and unhonoured for services
 status: shipped
 planted: 2026-08-27
@@ -25,6 +25,7 @@ blocked_by: >
 re_open_trigger: >
   The moment Phase 213's tree is committed and its gates are green. This is a /gsd:quick-sized
   change (2 source files + 1 test file) and needs no phase of its own.
+trigger_when: unset
 ---
 
 > ✅ **SHIPPED 2026-08-27.** All eight vendors carry their own mark; `intercom` took the

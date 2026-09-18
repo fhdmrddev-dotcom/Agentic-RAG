@@ -202,5 +202,5 @@ say?"* does not exist at four rows. It exists at twelve, where two need you and 
   name **this file** as the reference.
 - **The exact retention `N`** and the health-verdict endpoint shape — planner's discretion.
 - **Whether a second notification producer belongs in the shell surface.** The seam is drawn; the
-  tenant is not. `SEED-231` owns that, and registering one inside Phase 235 is scope creep
+  tenant is not. `SEED-281` owns that, and registering one inside Phase 235 is scope creep
   (`D-235-03`).

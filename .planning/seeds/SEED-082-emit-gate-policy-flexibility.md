@@ -1,7 +1,16 @@
 ---
 seed_id: SEED-082
 title: Emit-gate policy flexibility — per-workflow citation/integrity strictness (strict | flag | partial | draft) + model-fit routing + failure-UX escalation
-status: partially-folded (102 half folded at Phase 102 discuss-phase 2026-06-12 — engine-side policy enum strict|flag|partial|draft + integrity strict|documented_limit + judge-verdict co-design captured as D-01/D-02 in 102-CONTEXT.md; 103 half — builder UX, model-fit routing, per-run override — stays pending its own trigger)
+status: folded
+partial: true
+status_note: |
+  ORIGINAL `status:` line, verbatim — displaced by Phase 251's frontmatter migration (D-10):
+  status: partially-folded (102 half folded at Phase 102 discuss-phase 2026-06-12 — engine-side policy enum strict|flag|partial|draft + integrity strict|documented_limit + judge-verdict co-design captured as D-01/D-02 in 102-CONTEXT.md; 103 half — builder UX, model-fit routing, per-run override — stays pending its own trigger)
+
+  The prose that followed the token, byte-for-byte:
+  (102 half folded at Phase 102 discuss-phase 2026-06-12 — engine-side policy enum strict|flag|partial|draft + integrity strict|documented_limit + judge-verdict co-design captured as D-01/D-02 in 102-CONTEXT.md; 103 half — builder UX, model-fit routing, per-run override — stays pending its own trigger)
+
+  Mapped `partially-folded` -> `folded` + `partial: true`. Reason: D-16 — folded on one axis, pending on another.
 planted: 2026-06-12
 phase_origin: "Phase 101.1 gaps-only live re-verify 2026-06-12 — operator direction after observing 4 weak-model honest failures"
 category: workflow engine product semantics — what the citation/integrity gates DO with their verdict, per workflow; NOT a change to how the verdict is computed
@@ -18,6 +27,8 @@ re_open_triggers:
   - EVAL-01 provider-feature-fit measurement lands — capability badges ("document-grade" vs "best-effort") become data-backed.
 priority: high
 suggested_phase: split across 102 (policy enum semantics + receipts) and 103 (builder UX + model routing); failure-UX escalation can ride either.
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-082 — Emit-gate policy flexibility (operator-directed, 2026-06-12)

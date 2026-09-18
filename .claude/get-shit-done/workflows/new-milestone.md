@@ -46,22 +46,30 @@ If the flag is absent, keep the current behavior of continuing phase numbering f
 - Wait for their response, then use AskUserQuestion to probe specifics
 - If user selects "Other" at any point to provide freeform input, ask follow-up as plain text — not another AskUserQuestion
 
-## 2.5. Scan Planted Seeds
+## 2.5. PROJECT GATE — REG-02 seeds sweep (Scan Planted Seeds)
 
-Check `.planning/seeds/` for seed files that match the milestone goals gathered in step 2.
+Check `.planning/seeds/` for seed files whose trigger is already true against the milestone goals gathered in step 2.
 
 ```bash
-ls .planning/seeds/SEED-*.md 2>/dev/null
+node scripts/check-seeds-register.cjs
+SEEDS_EXIT=$?
 ```
 
-**If no seed files exist:** Skip this step silently — do not print any message or prompt.
+The sweep prints the register's size, its parsed count, any colliding ids, and **two unswept figures that are never summed** — `N carry no trigger_when at all` and `M carry prose but no structured trigger`. ⛔ Read both. Reporting the smaller one alone is the comfortable lie this gate exists to end.
 
-**If seed files exist:** Read each `SEED-*.md` file and extract from its frontmatter and body:
-- **Idea** — the seed title (heading after frontmatter, e.g. `# SEED-001: <idea>`)
-- **Trigger conditions** — the `trigger_when` frontmatter field and the "When to Surface" section's bullet list
-- **Planted during** — the `planted_during` frontmatter field (for context)
+**If the register directory does not exist:** Skip this step silently — do not print any message or prompt.
 
-Compare each seed's trigger conditions against the milestone goals from step 2. A seed matches when its trigger conditions are relevant to any of the milestone's target features or goals.
+**If `SEEDS_EXIT` is 1:** Print the gate's output verbatim and CONTINUE. A register-hygiene finding — a colliding id, a missing required key, a status outside the enum, a heading claiming an id the filename does not — informs the milestone; it does not block one. The gate names its own remediation in its output.
+
+**To select candidates**, run the sweep once per proposed phase scope you are weighing, and read the `[trigger-fires]` lines:
+
+```bash
+node scripts/check-seeds-register.cjs --phase "<NNN>"
+```
+
+⛔ **Do NOT read the register by hand.** This section used to instruct a human to open and read every `SEED-NNN-*.md` file in the register — all of them, every milestone — and that instruction is the reason `REQUIREMENTS.md` records the sweep as *"a phase of work, not a step in a command"*. The register is now in the hundreds of files; the script is what makes this a step. A seed the sweep does not surface but whose prose is obviously relevant may still be included by name — the sweep is a floor, not a ceiling.
+
+⚠ **The two blindnesses here are DIFFERENT defects and must not be conflated.** `CLAUDE.md`'s *rule* was blind because it filtered on `surface: Agentic-RAG`, a key present on under half the register — a **partial** read, fixed in Phase 251. This *workflow* was blind differently: it read everything and judged prose by hand, which is **unbounded** rather than partial. The script fixes the second; the CLAUDE.md correction fixed the first.
 
 **If no seeds match:** Skip silently — do not prompt the user.
 
@@ -85,7 +93,7 @@ AskUserQuestion(
   question: "These planted seeds match your milestone goals. Include any in this milestone's scope?",
   multiSelect: true,
   options: [
-    { label: "SEED-001: <idea>", description: "Trigger: <trigger_when> | Planted during: <planted_during>" },
+    { label: "SEED-001: <idea>", description: "Trigger: <trigger_when> | Status: <status>" },
     ...
   ]
 )
@@ -94,6 +102,12 @@ AskUserQuestion(
 **After selection:**
 - Selected seeds become additional context for requirement definition in step 9. Store them in an accumulator (e.g. `$SELECTED_SEEDS`) so step 9 can reference the ideas and their "Why This Matters" sections when defining requirements.
 - Unselected seeds remain untouched in `.planning/seeds/` — never delete or modify seed files during this workflow.
+
+  ⚠ **THAT PROHIBITION IS SCOPED, AND THE SCOPE IS THE WHOLE POINT.** It binds **this workflow only**, while it is *selecting* seeds for a milestone: a selection pass must not mutate the set it is reading, and an unselected seed is not thereby answered. **It does NOT bind the project.** `CLAUDE.md` § Seeds register cross-check (MANDATORY) states the opposite obligation for every other context — ***"A seed is answered by editing the seed"*** — and `/gsd:discuss-phase`'s `<step name="cross_reference_seeds">` is REQUIRED to flip `status` and record where a folded seed went. Both are correct; neither overrides the other; each says which one it is.
+
+  ⭐ **Read unscoped, this line is very likely a real cause of the several-hundred-strong `planted` backlog:** the one workflow that surfaces seeds at the moment they are most likely to be answered was forbidden from answering any of them, so every milestone re-proposed the same ideas and left them all reading `planted`.
+
+Rationale: `CLAUDE.md` § Seeds register cross-check (MANDATORY). Measured cost of the register going unswept — `SEED-172` sat reachable for four weeks.
 
 ## 3. Determine Milestone Version
 

@@ -1,6 +1,8 @@
 ---
 phase: 239-any-mcp-server-with-files
 verified: 2026-09-10T00:00:00Z
+verification_mode: self-verified   # ⛔ OV-SOLO-01 / D-245-01 — NEVER "reviewed". Added 2026-09-14 (SEED-275): this file's own body already said so twice — line 30, "no independent §6.3 reviewer exists", and its footer, "Verifier: Claude (gsd-verifier) — SELF-VERIFICATION, no independent reviewer available (OV-239-01)". The marker INDEXES an existing claim; it does not make a new one. 239 was omitted when Phase 245 marked 238/240/241 because that plan named three files by hand.
+independent_review: owed          # the dispatched code review returned 19 findings incl. 2 Criticals — that is NOT a §6.3 independent review, and DEBT-06 still covers this phase.
 status: human_needed
 score: 5/8 must-haves verified (3 require a human/live drive, none refused)
 overrides_applied: 0

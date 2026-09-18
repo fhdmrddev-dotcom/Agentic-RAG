@@ -15,11 +15,25 @@
  * No fetch logic here — the hook is reactive. Exported for WorkspacePanel to
  * place in the fixed-order accordion (Todos · Files · Pending · Versions).
  */
-import { Circle, CircleDot, CheckCircle2 } from "lucide-react"
+import { Circle, CircleDot, CircleDashed, CheckCircle2 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { useTodos, useViewingThread, useDerivedPanel } from "@/providers/StreamsProvider"
+import {
+  useTodos,
+  useViewingThread,
+  useDerivedPanel,
+  useStreamingForThread,
+  useLoadingForThread,
+  useReconcilingForThread,
+} from "@/providers/StreamsProvider"
 import type { Todo } from "@/types"
 import type { DerivedPanelItem } from "@/lib/workspacePanel"
+import {
+  NOT_TICKED_LABEL,
+  RUN_ENDED_TITLE,
+  deriveTodoDisplayStatus,
+  stripRunEndedMarker,
+  type TodoDisplayStatus,
+} from "./todoRunHonesty"
 
 type TodoStatus = "pending" | "in_progress" | "completed"
 
@@ -29,10 +43,13 @@ function normalizeStatus(status: string): TodoStatus {
   return "pending"
 }
 
-const STATUS_LABEL: Record<TodoStatus, string> = {
+const STATUS_LABEL: Record<TodoDisplayStatus, string> = {
   pending: "Pending",
   in_progress: "In progress",
   completed: "Completed",
+  // Phase 250 HONEST-03/04 — the fourth value exists only for DISPLAY. `todos.status` still
+  // carries three values and no migration was needed (D-250-05).
+  not_ticked: NOT_TICKED_LABEL,
 }
 
 // Phase 088-05 (operator request) — per-status color for the STATUS-TEXT label.
@@ -41,13 +58,28 @@ const STATUS_LABEL: Record<TodoStatus, string> = {
 // themes; computed in index.css). Matches the icon hues in spirit: completed →
 // green (like the check icon), in_progress → amber active accent. Pending stays
 // the neutral muted-dim (not-started = no status color).
-const STATUS_TEXT_COLOR: Record<TodoStatus, string> = {
+const STATUS_TEXT_COLOR: Record<TodoDisplayStatus, string> = {
   pending: "text-panel-muted-foreground-dim",
   in_progress: "text-panel-status-active",
   completed: "text-panel-status-done",
+  // Phase 250 — the DIM tier of run-state-honesty.md D1 (dim → amber → red, loudness earned by
+  // severity). An abandoned todo is the quiet case: usually nobody's fault, often the user's own
+  // Stop. It must NOT borrow the amber the active state uses.
+  not_ticked: "text-panel-muted-foreground-dim",
 }
 
-function StatusIndicator({ status }: { status: TodoStatus }) {
+function StatusIndicator({ status }: { status: TodoDisplayStatus }) {
+  if (status === "not_ticked") {
+    // ⛔ NO `animate-` CLASS. The bouncing dot on a dead run is the loudest lie on this
+    // surface — BUG-260902-01 describes a person waiting for something that stopped seven
+    // minutes earlier.
+    return (
+      <CircleDashed
+        className="h-4 w-4 flex-none text-panel-muted-foreground-dim"
+        aria-hidden="true"
+      />
+    )
+  }
   if (status === "completed") {
     return (
       <CheckCircle2
@@ -83,10 +115,17 @@ function StatusIndicator({ status }: { status: TodoStatus }) {
  * the sentence genuinely needs the room. Nothing is truncated and nothing is hidden — the
  * status word stays in the accessible tree, which the 088-05 colour rule requires.
  */
-function TodoRow({ todo }: { todo: Todo }) {
-  const status = normalizeStatus(todo.status)
+function TodoRow({ todo, isRunLive }: { todo: Todo; isRunLive: boolean }) {
+  // Phase 250 HONEST-03/04 — ONE derivation, in ONE module, used by BOTH row renderers.
+  // The marker never reaches the screen: it becomes the row's title, and the STATUS slot
+  // carries the honesty instead of the task text (SEED-105 item 3).
+  const { label, wasMarked } = stripRunEndedMarker(todo.content)
+  const status = deriveTodoDisplayStatus(normalizeStatus(todo.status), isRunLive)
   return (
-    <li className="flex flex-wrap items-start gap-x-2 gap-y-0.5 px-3 py-1.5 text-[0.82rem] leading-relaxed">
+    <li
+      className="flex flex-wrap items-start gap-x-2 gap-y-0.5 px-3 py-1.5 text-[0.82rem] leading-relaxed"
+      title={wasMarked && status === "not_ticked" ? RUN_ENDED_TITLE : undefined}
+    >
       <span className="mt-0.5">
         <StatusIndicator status={status} />
       </span>
@@ -96,9 +135,10 @@ function TodoRow({ todo }: { todo: Todo }) {
           // Phase 088-05 (UAT SC#2): completed-todo text is meaningful content →
           // panel-scoped AA muted (light --muted-foreground was 4.01:1 on panel).
           status === "completed" && "text-panel-muted-foreground line-through",
+          status === "not_ticked" && "text-panel-muted-foreground",
         )}
       >
-        {todo.content}
+        {label}
       </span>
       {/* Status text — non-color-only A11Y; in the accessible tree (NOT
           aria-hidden) so the status is conveyed by text, not color alone. The
@@ -112,6 +152,22 @@ function TodoRow({ todo }: { todo: Todo }) {
       >
         {STATUS_LABEL[status]}
       </span>
+      {/* ⚠ Phase 250 WR-04 — THE REASON HAD LEFT THE ACCESSIBLE TREE ENTIRELY.
+          HONEST-04 correctly moved the raw marker out of the task text and into the
+          row's `title`. But `title` on a plain <li> is announced by no major screen
+          reader, and an <li> is not focusable, so a keyboard user never sees the
+          tooltip either. Before this phase the reason was IN the text; after it the
+          accessible tree said only "Not ticked", which does not say why.
+
+          This is the same rule the status word above already follows (088-05): meaning
+          is carried by TEXT, not by a visual affordance. The tooltip stays for mouse
+          users; this span is the same sentence for everyone else.
+
+          ⛔ Scoped to `wasMarked` — announcing a cause on a row the backend never
+          marked would read out a reason that is not known to be true. */}
+      {wasMarked && status === "not_ticked" && (
+        <span className="sr-only">{RUN_ENDED_TITLE}</span>
+      )}
     </li>
   )
 }
@@ -122,10 +178,13 @@ function TodoRow({ todo }: { todo: Todo }) {
 // control: a derived item mirrors a tool's status and the user cannot tick it.
 // The label is a model/sandbox-derived string → rendered as React text children
 // ONLY, never as raw/innerHTML markup (T-095.1-02-01 / Pattern E).
-function DerivedRow({ item }: { item: DerivedPanelItem }) {
+function DerivedRow({ item, isRunLive }: { item: DerivedPanelItem; isRunLive: boolean }) {
   // DerivedPanelItem.status is already the panel vocabulary
   // ("pending" | "in_progress" | "completed") — normalize defensively anyway.
-  const status = normalizeStatus(item.status)
+  // ⛔ Phase 250: the IDENTICAL derivation as TodoRow, from the SAME module. A derived
+  // in_progress row on a dead run is the identical lie, and two copies of the rule is the
+  // drift this phase exists to close.
+  const status = deriveTodoDisplayStatus(normalizeStatus(item.status), isRunLive)
   return (
     <li className="flex flex-wrap items-start gap-x-2 gap-y-0.5 px-3 py-1.5 text-[0.82rem] leading-relaxed">
       <span className="mt-0.5">
@@ -135,6 +194,7 @@ function DerivedRow({ item }: { item: DerivedPanelItem }) {
         className={cn(
           "min-w-[9rem] flex-1 text-foreground/90",
           status === "completed" && "text-panel-muted-foreground line-through",
+          status === "not_ticked" && "text-panel-muted-foreground",
         )}
       >
         {item.label}
@@ -159,6 +219,73 @@ export function TodosSection() {
   //   2. real todos empty + derived non-empty → derived read-only rows + marker.
   //   3. both empty → null (clean). A real plan is NEVER overwritten (Pitfall 2).
   const derived = useDerivedPanel(threadId)
+  // Phase 250 HONEST-03 (D-250-04) — is anything actually running on this thread?
+  // ⛔ `useLoadingForThread` is OR-ed in DELIBERATELY: during a reconnect/fetch window
+  // `streamingThreads` can read empty for a live run, and a row must never flash
+  // "not ticked" while the agent is working. Realtime is a hint, not truth (D-v2.5-03).
+  // ⛔ Both selectors already ship (Phase 075.4) — StreamsProvider.tsx is NOT modified.
+  //
+  // ⚠ CORRECTED 2026-09-15 (code review WR-06) — THE PARAGRAPH ABOVE CLAIMED THIS CLOSES
+  // THE WINDOW, AND IT IS KEPT RATHER THAN OVERWRITTEN BECAUSE THE CLAIM WAS FALSE AND
+  // UNTESTED, WHICH IS THIS PHASE'S OWN SUBJECT. Measured against the real store
+  // (`__tests__/providers/streamsProvider_250_liveness_window.test.tsx`):
+  //
+  //   during loadMessages' fetch  -> true      (loading is set)
+  //   after  loadMessages resolves-> ⛔ FALSE   (loading cleared, streaming never set)
+  //   after  reconcile()          -> true
+  //
+  // The two sets are written by paths that never meet: `loadingThreads` lives entirely
+  // inside `loadMessages`, while `streamingThreads` is written by the reconcile-derive,
+  // the send path and the SSE reattach — none of which `loadMessages` calls. ~~And
+  // `reconcile()` is listener-driven (visibilitychange / focus / pageshow), so OPENING A
+  // THREAD TRIGGERS NEITHER.~~ The false "dead" state therefore persists until the user
+  // tabs away and back; it is not a millisecond race.
+  //
+  // ⛔ So inside that window every open todo on a LIVE run reads "Not ticked" — the
+  // mirror-image failure this comment names as the thing it must not do. Filed as
+  // `BUG-260915-01`. ~~The fix is a trigger change in `StreamsProvider.tsx` (102 commits /
+  // 37 phases, G-5 FIRING)~~, which is a phase rather than a review closure — so what
+  // shipped here is the measurement and this correction, not a behaviour change.
+  //
+  // ⚠ CORRECTED AGAIN 2026-09-16 (Phase 252-04 / D-20), AND THE STRIKETHROUGHS ABOVE ARE
+  // KEPT RATHER THAN OVERWRITTEN, BECAUSE THIS PARAGRAPH WAS RIGHT ABOUT THE SYMPTOM AND
+  // WRONG ABOUT THE TRIGGER FOR A SECOND TIME. Measured at `53e2435b7`:
+  // `setViewingThread` has ALWAYS fired `actions.reconcile(threadId)`
+  // (`StreamsProvider.tsx:1936-1942`), called from `ChatArea.tsx:323-325`. So opening a
+  // thread triggers reconcile — the "missing trigger" was never missing, and the fix was
+  // never a trigger change. ⛔ `BUG-260915-01`'s fix candidate #1 was already implemented;
+  // building it would have shipped a no-op.
+  //
+  // What was actually missing: `reconcile` set NO liveness signal of its own, so the OR
+  // above read false for the entire `/snapshot` round-trip. The fix is the third selector
+  // below — `reconcile` now marks its own thread while it is looking.
+  //
+  // ⚠ AND THE SEMANTIC LIMIT, which is the part a future reader must not lose (D-24):
+  // reconciling means "WE DO NOT KNOW YET", not "live". It belongs in `isRunLive` here
+  // ONLY because `deriveTodoDisplayStatus` uses `isRunLive` solely to SUPPRESS the
+  // `not_ticked` claim, and asserts nothing positive from it. ⛔ A future consumer that
+  // wants to claim a run IS running needs its own signal, not this one.
+  //
+  // ⚠ `__tests__/TodosSection.test.tsx` cannot see any of this: it replaces both
+  // selectors with `vi.fn()`, so it pins the MOCK's ordering, never the provider's —
+  // the same blindness that let the hook-order defect ship from this very component.
+  //
+  // ⛔⛔ THE THREE HOOKS ARE CALLED ON THEIR OWN LINES AND THE `||` COMBINES THEIR VALUES.
+  // NEVER write `useStreamingForThread(threadId) || useLoadingForThread(threadId)`, and
+  // ⚠ 252-04 — THAT NOW COVERS A THIRD SELECTOR, `useReconcilingForThread`. One warning,
+  // three hooks: a second warning beside this one would be a second copy of a rule.
+  // `||` SHORT-CIRCUITS: the moment the first selector returns true — i.e. the moment a
+  // run actually starts — the later hooks are never called, React counts fewer hooks than
+  // the previous render, throws "Rendered fewer hooks than expected", and THE WHOLE PAGE
+  // GOES BLANK. Shipped that way for one commit in Phase 250 and found by DRIVING the app,
+  // not by a test: every unit fence passed, because a `vi.fn()` standing in for a hook
+  // consumes no hook slot, so the violation is structurally invisible to them.
+  // Pinned by `__tests__/TodosSection.test.tsx` → "hooks are never short-circuited", whose
+  // source fence now also asserts THREE calls on THREE DISTINCT LINES.
+  const isStreaming = useStreamingForThread(threadId)
+  const isLoading = useLoadingForThread(threadId)
+  const isReconciling = useReconcilingForThread(threadId)
+  const isRunLive = isStreaming || isLoading || isReconciling
 
   // PRECEDENCE 2 + 3: no real write_todos plan for this thread.
   if (todos.length === 0) {
@@ -173,7 +300,7 @@ export function TodosSection() {
         </span>
         <ul className="flex flex-col gap-0.5">
           {derived.map((item, i) => (
-            <DerivedRow key={i} item={item} />
+            <DerivedRow key={i} item={item} isRunLive={isRunLive} />
           ))}
         </ul>
       </>
@@ -200,7 +327,7 @@ export function TodosSection() {
       </span>
       <ul className="flex flex-col gap-0.5">
         {ordered.map((todo) => (
-          <TodoRow key={todo.id} todo={todo} />
+          <TodoRow key={todo.id} todo={todo} isRunLive={isRunLive} />
         ))}
       </ul>
     </>

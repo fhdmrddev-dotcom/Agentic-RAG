@@ -26,6 +26,9 @@ trigger_when:
   - Onboarding a non-developer co-maintainer or first paying customer's IT operator
   - Any "configure once at install, then it just works" promise gets made
   - Cross-trigger from SEED-003 milestone planning — install/config UX naturally extends into runtime operator UX
+trigger_surfaces:
+  - "admin"
+surface: Agentic-RAG
 ---
 
 # SEED-012: Admin / Operator UI Completeness

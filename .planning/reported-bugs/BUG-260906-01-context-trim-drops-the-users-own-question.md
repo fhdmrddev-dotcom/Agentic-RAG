@@ -4,9 +4,9 @@ title: Context trimming drops the user's OWN question while keeping tool results
 reported: 2026-09-06
 surface: Agentic-RAG
 severity: major
-status: open
+status: folded
 affected_areas: [backend/agent-loop, chat/context-window, chat/retry]
-folded_into: null
+folded_into: 250
 verified_closed_by: null
 related_seeds: []
 re_open_trigger: null
@@ -76,3 +76,34 @@ rather than starting from the user's message.
 Found during the Phase 236 SC#1 live cross-provider drive (2026-09-06), not by a test. Related in
 spirit to the Resume/Continue cluster in `DEBT-02` (a retry that replays the wrong thing), though
 the mechanism here is context eviction rather than resume semantics.
+
+---
+
+## ✅ FOLDED INTO PHASE 250 — `HONEST-01` (2026-09-15)
+
+**Root cause, located exactly where this report pointed.** `trim_messages_to_fit`
+(`backend/app/services/context_window.py`) had three protected classes — the system message, the
+last `reserve_recent` (10) messages, and pinned `load_skill` groups — and **the user's own turn
+was in none of them**. `agent_loop.py` re-trims at the TOP of every iteration, *after* tool
+results have been appended, so by iteration 1 the newest messages are tool payloads and the
+question has drifted back into evictable range.
+
+⭐ **The protected-tail floor's own comment read *"Hard floor: system_msg + last user msg"*
+while the code read `len(protected) > 1`** — which protects the last MESSAGE, and by then that
+message is a tool result. **A comment that was wrong about its own code is how this survived five
+phases.**
+
+**The fix is this report's own expected behaviour #2, verbatim.** Eviction is now ordered, in
+four passes: non-user groups out of the trimmable section, then non-user groups out of the
+protected tail, and only THEN user turns. The order had to hold ACROSS both sections — without
+that, a protected tail fat with tool payloads could never shrink until every question had already
+been thrown away, which is exactly this bug.
+
+⚠ **Expected behaviour #3 — *"say so in the product's own voice"* when a turn genuinely cannot
+fit — is NOT built.** The `_TRIM_MARKER` + `context_truncated` system warning remain the signal.
+One stated limitation survives and is written into the code: when the tail has shrunk to the
+current question plus the model's last reply and the pair still overflows, the question is given
+up, because at that point it alone exceeds the whole budget and `D-078-02` promises a list that
+fits rather than an exception.
+
+Fences: `backend/tests/unit/test_250_run_honesty_agent_loop.py` §1 (five, two driven RED).

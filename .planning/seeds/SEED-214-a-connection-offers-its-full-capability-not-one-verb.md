@@ -1,7 +1,13 @@
 ---
-id: SEED-214
+seed_id: SEED-214
 title: A connection offers the FULL capability the service publishes, not one hand-written verb — break the 1:1 lock between a connection and its single action
-status: partially-folded
+status: folded
+partial: true
+status_note: |
+  ORIGINAL `status:` line, verbatim — displaced by Phase 251's frontmatter migration (D-10):
+  status: partially-folded
+
+  Mapped `partially-folded` -> `folded` + `partial: true`. Reason: D-16 — folded on one axis, pending on another.
 planted: 2026-08-27
 planted_by: Claude, 2026-08-27, from the operator's question at Phase 212's close — "each connection that we are going to have the full capability that it is offering, how to achieve this"
 surface: Agentic-RAG
@@ -24,6 +30,7 @@ re_open_trigger: >
   (3) an MCP server is adopted for a service that today has a thin adapter (Phase 215 / OAuth makes
   Atlassian Rovo reachable); (4) a generic OpenAPI/REST tool ingester is proposed — this seed is its
   prerequisite, not its sibling.
+trigger_when: unset
 ---
 
 > ⚠ **ROUTING, 2026-08-27 (Phase 213 discuss-phase).** The **UNLOCK half is FOLDED into Phase 213**

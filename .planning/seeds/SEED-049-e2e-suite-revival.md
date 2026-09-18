@@ -1,13 +1,22 @@
 ---
-id: SEED-049
+seed_id: SEED-049
 title: E2E Playwright suite revival — tests can't drive the current composer/streaming UI (075.x/087/088 drift)
-status: deferred        # ⚠ TRIGGER FIRED at v4.1 scoping 2026-09-11 (CHAT-01..05 IS "a chat-surface / streaming / RunCard phase") and was DEFERRED BY DECISION, not oversight: reviving a rotted E2E suite is a phase of its own. Re-open at the first chat phase that cannot be verified without it.
+status: deferred
+status_note: |
+  ORIGINAL `status:` line, verbatim — displaced by Phase 251's frontmatter migration (D-10):
+  status: deferred        # ⚠ TRIGGER FIRED at v4.1 scoping 2026-09-11 (CHAT-01..05 IS "a chat-surface / streaming / RunCard phase") and was DEFERRED BY DECISION, not oversight: reviving a rotted E2E suite is a phase of its own. Re-open at the first chat phase that cannot be verified without it.
+
+  The prose that followed the token, byte-for-byte:
+  # ⚠ TRIGGER FIRED at v4.1 scoping 2026-09-11 (CHAT-01..05 IS "a chat-surface / streaming / RunCard phase") and was DEFERRED BY DECISION, not oversight: reviving a rotted E2E suite is a phase of its own. Re-open at the first chat phase that cannot be verified without it.
+
+  Mapped `deferred` -> `deferred`. Reason: clean 1:1.
 fired_not_folded: "v4.1 / 243"   # re-affirmed at /gsd:plan-phase 243 (2026-09-11): STILL deferred by decision. The concrete re-open condition is named in 243-CONTEXT.md D-243-09 — criteria 3 (scroll survives a tool call, on a >=50-message thread) and 5 (navigate away and back, no reload) are the two that may prove unverifiable without a live drive. Phase 243 must ANSWER this in VERIFICATION.md rather than leave it silent.
 planted: 2026-06-02
 planted_by: orchestrator (092.5-06 close — E2E de-rot follow-up)
 trigger_when: any phase that wants the Playwright E2E backstop to gate (esp. a chat-surface / streaming / RunCard / workspace phase), OR before a milestone close that claims E2E coverage, OR when CI frontend-tests.yml is turned on for real
 priority: medium
 tags: [frontend/e2e, playwright, test-debt, chat-ui, streaming, runcard, 075.x, 087, 088]
+surface: Agentic-RAG
 ---
 
 # SEED-049: E2E Playwright Suite Revival

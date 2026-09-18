@@ -17,6 +17,7 @@ trigger_when: >
 
   The seed is discharged when a user can see, from inside a thread, which skills are currently
   loaded for it.
+surface: Agentic-RAG
 ---
 
 # SEED-181 — you cannot see which skills a thread is using

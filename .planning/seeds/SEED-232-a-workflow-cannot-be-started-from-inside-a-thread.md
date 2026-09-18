@@ -1,5 +1,5 @@
 ---
-id: SEED-232
+seed_id: SEED-232
 title: A workflow cannot be started from inside a thread — the launch form was built for it and nothing calls it
 status: planted
 planted: 2026-08-29
@@ -26,6 +26,7 @@ re_open_trigger: >
   The next phase touching the chat composer, `ChatLayout`'s launch path, or any roadmap
   criterion that names launching a workflow from a thread. Also: an operator asking how to run
   a workflow without leaving chat.
+trigger_when: unset
 ---
 
 # SEED-232 — the form exists, the door does not

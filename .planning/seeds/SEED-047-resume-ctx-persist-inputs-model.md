@@ -1,5 +1,5 @@
 ---
-id: SEED-047
+seed_id: SEED-047
 title: Resume context must rehydrate run inputs + model — persist them at workflow_runs creation
 status: closed
 closed: 2026-06-07 (v2.8 milestone audit close-out)
@@ -9,6 +9,7 @@ planted_by: orchestrator (091-08 gap-closure — 091-REVIEW WR-01/WR-02 deferral
 trigger_when: Phase 092 wires workflow-run creation — persist run inputs + model on the workflow_runs row so the resume ctx can rehydrate them; Phase 096 EVAL-02 (live kill-and-resume) is the proof gate
 priority: medium
 tags: [backend/harness, resumability, phase-091, phase-092, phase-096, workflow_runs]
+surface: Agentic-RAG
 ---
 
 # SEED-047: Resume Context — Persist Run Inputs + Model at Run Creation

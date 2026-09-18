@@ -15,6 +15,8 @@ re_open_triggers:
   - A privacy/security audit or pen-test flags cross-user identifier disclosure on `GET /folders`, `GET /skills`, or `GET /document-views`.
 priority: low
 suggested_phase: a future security-hardening or v3.2 Multi-Tenancy phase (decide once, app-wide). NOT folded into v3.0 Document Management — fixing only views while folders + skills leak identically would be inconsistent.
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-091 — Global-resource owner-identity disclosure (folders / skills / views)

@@ -19,6 +19,8 @@ re_open_triggers:
   - Production / multi-user scale work (real users WILL accumulate hundreds of threads)
 priority: low now (dev-debris-amplified) / medium at scale
 suggested_phase: fold into the SEED-065 diagnosis spike (frontend perf trace) — or a focused thread-list virtualization/perf phase if confirmed
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-067 — New-chat / thread-select frontend latency

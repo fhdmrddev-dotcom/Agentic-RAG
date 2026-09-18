@@ -12,6 +12,8 @@ re_open_triggers:
   - Any new authoring/config surface is specced (it should inherit the plain-language default + an admin/technical reveal).
   - A real (non-builder) end user is onboarded and trips on jargon.
 priority: high
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 ## The idea

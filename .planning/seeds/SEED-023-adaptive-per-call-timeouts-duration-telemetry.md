@@ -23,6 +23,8 @@ re_open_triggers:
   - When v3.4 spend caps milestone opens — duration telemetry is a prerequisite for cost-per-second budgets
 priority: medium
 suggested_phase: 076-079 range (after v2.6 closes); could fold into Phase 077's telemetry scope OR ship as a standalone polish phase (e.g., 077.1 or 078.1)
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-023 — Adaptive per-call LLM timeouts + duration telemetry

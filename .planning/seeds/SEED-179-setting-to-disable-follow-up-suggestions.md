@@ -23,6 +23,10 @@ trigger_when: >
   As measured 2026-08-18 the first returns a `FieldRow` whose body is a `<span>` (a label, not a
   control) and the second returns `questions={message.suggestions}`. **The seed is discharged when a
   user-scoped setting exists that suppresses generation — not merely hides the pills.**
+trigger_paths:
+  - "frontend/src/components/chat/MessageItem.tsx"
+  - "frontend/src/pages/SettingsPage.tsx"
+surface: Agentic-RAG
 ---
 
 # SEED-179 — no way to turn follow-up suggestions off

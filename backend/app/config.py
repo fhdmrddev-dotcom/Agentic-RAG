@@ -21,6 +21,26 @@ _PROVIDER_BASE_URLS: dict[str, str] = {
     "zhipu": "https://api.z.ai/api/paas/v4",        # INTERNATIONAL z.ai host — matches docs.z.ai key (D-089 docs curation 2026-05-30; open.bigmodel.cn is the China host, separate key namespace)
 }
 
+# Phase 249 (MODEL-04 / SEED-172) — THE PUBLIC ROUTING ROSTER: every provider a chat completion
+# can be routed through. DERIVED from the table above rather than re-typed, because this project's
+# measured failure mode is a list that exists twice.
+#
+# ⚠ WHY THIS EXISTS AT ALL. `POST /admin/models` used to validate its `provider` argument against
+# `model_discovery_service.PROVIDER_ENDPOINTS` — the SSRF DISCOVERY allowlist, which holds 8 clouds.
+# The gap between the two lists is exactly `ollama` / `lmstudio` / `custom`, so every self-hosted
+# model was answered `422 Unknown provider` and was unaddable from the Model Registry UI for its
+# entire life. The operator hit that wall on 2026-09-13 and said so.
+#
+# ⛔ THIS IS NOT AN EGRESS ALLOWLIST, and the distinction is the whole point. It answers
+# "may a model route through this provider?" — never "may the server fetch this URL?". That second
+# question is `PROVIDER_ENDPOINTS`, which is hardcoded so no caller-supplied URL reaches the HTTP
+# client (T-149-03). Widening THIS must never widen THAT: a self-hosted provider's base URL comes
+# from the operator's own app_settings column (`_SELF_HOSTED_PROVIDERS` below, migration 180), so
+# the server never discovers it and it has no business in a discovery allowlist.
+# `backend/tests/unit/test_249_add_model_routing_roster.py` fences both directions, and
+# `frontend/src/components/admin/__tests__/addProviderRoster.lockstep.test.ts` pins the UI to it.
+ROUTING_PROVIDERS: frozenset[str] = frozenset(_PROVIDER_BASE_URLS)
+
 
 # SEED-173 — providers whose endpoint is supplied by the OPERATOR, not fixed by a vendor.
 # Every one of them has an empty string in _PROVIDER_BASE_URLS above; this table says which
@@ -215,7 +235,12 @@ class ModelCapability(TypedDict, total=False):
     provider: str  # documentation only; actual provider from user settings
     llm_call_timeout_seconds: int  # Phase 066 D-066-03 — per-LLM-call deadline
     max_output_tokens: int  # Phase 074 D-074-06 — hard API cap (vendor docs); clamp ceiling
-    capability_source: Literal["registry", "inferred"]  # Phase 075.3 D-075.3-08
+    # ⚠ Phase 249 (MODEL-05): `db_override` was MISSING from this Literal while
+    # `get_model_capability_async` had been returning it since Phase 081.1 — the type said two
+    # values and the code produced three. It means THE OPERATOR ENTERED THIS ROW, which is why a
+    # pick-time "unverified" chip must NOT fire on such a model: a registry-added model is the
+    # opposite of an unverified one.
+    capability_source: Literal["registry", "inferred", "db_override"]  # Phase 075.3 D-075.3-08
     # Plan 075.4-02 D-075.4-NN — registry-or-inference fields that subsume the
     # hardcoded startswith / frozenset heuristics in openai_service.py. Optional
     # by ``total=False``; lookup callers fall back to inferred defaults when

@@ -20,6 +20,8 @@ re_open_triggers:
   - cross_tab_latency or Redis-timeout symptoms recur on a production-config run
 priority: medium — investigate before committing to a fix; do NOT band-aid
 suggested_phase: diagnosis spike first (re-run on WORKER_COUNT=2, no --reload, bounded sandboxes), THEN a fix phase only for the confirmed-real portion
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-065 — Load degradation (diagnose before fixing)

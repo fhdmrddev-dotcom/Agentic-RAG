@@ -8,16 +8,17 @@ priority: medium
 relates_to:
   - SEED-180 — continue PAST the cap (compaction / indefinite continuation). Adjacent but different:
     180 is about escaping the cap, this is about CHOOSING it.
-  - SEED-022 — timeout settings UI with tier presets. Same "operator should not edit source/.env"
+  - SEED-277 — timeout settings UI with tier presets. Same "operator should not edit source/.env"
     complaint, different knob (timeouts, not iteration count).
   - BUG-260818-03 — the Continue affordance did not surface at the iteration cap.
 trigger_when: >
   Plan it with the chat run-lifecycle phase, or with the Settings-overhaul milestone that
-  carries SEED-022 — whichever lands first. Raise to a requirement if an operator running a
+  carries SEED-277 — whichever lands first. Raise to a requirement if an operator running a
   local model reports a task that cannot finish because the cap fires before the work does.
 
   Discharged when an operator can change the iteration cap from the Settings UI (or the Model
   Registry, per-model) without editing source and restarting.
+surface: Agentic-RAG
 ---
 
 # SEED-189 — The iteration cap is hardcoded

@@ -1,6 +1,12 @@
 ---
-id: SEED-098
-status: done
+title: Chat tool-card de-duplication — one unified essence line, live and finished
+seed_id: SEED-098
+status: shipped
+status_note: |
+  ORIGINAL `status:` line, verbatim — displaced by Phase 251's frontmatter migration (D-10):
+  status: done
+
+  Mapped `done` -> `shipped`. Reason: READ SEED-098 — carries a shipped: date and two commit hashes.
 planted: 2026-06-30
 shipped: 2026-06-30 (quick task 260630-226; commits e3ff8623 + 37bd6d5c; G-4 lived UAT PASSED cross-provider DeepSeek+Anthropic, both themes)
 planted_during: v3.2 Phase 132 execution (separate investigation — operator-recorded a DeepSeek run, asked to unify the chat tool-call surface)

@@ -1,5 +1,5 @@
 ---
-id: SEED-224
+seed_id: SEED-224
 title: Document space redesign — the Stitch "RAG Document Manager" journey as a five-tab Documents section, RAG-honesty first
 status: planted
 planted: 2026-08-28
@@ -32,6 +32,7 @@ re_open_trigger: >
   observability — OR any /gsd:new-milestone sweep (the seed register sweep rule). Also re-open
   if retrieval events get logged for any other reason: that substrate makes three of the five
   tabs non-decorative and changes this seed's cost estimate.
+trigger_when: unset
 ---
 
 # SEED-224 — the document space redesign, kept honest

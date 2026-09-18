@@ -271,19 +271,55 @@ const SAMPLE_WATCHES: ConnectorWatch[] = [
     source_folder_name: "Archive",
     last_status: "paused",
     is_active: false,
+    // ⚠ THE FIXTURE NAMED THIS ROW `watch-degraded` AND NEVER MARKED IT ONE.
+    // `classifyWatch` reads `watch.degraded` (WatchedFoldersSection.tsx:159) and nothing
+    // else; `last_status: "paused"` is a different field with a different meaning. So the
+    // `degraded` branch never rendered and §4 could not find `sources-report-source` — a
+    // block that IS built, gated on a flag no fixture ever set. Set here rather than by
+    // adding a 13th watch, because §5 pins the roster at 12 / 9 lines / 3 cards.
+    degraded: true,
   }),
 ]
 
 /** 17 ticks, 14 of them quiet — the sketch's own run fixture, so §5's collapsed-3 /
  *  expanded-17 pair is the design's number rather than a remembered one. */
+// ⚠ THE `quiet` / `added` / `updated` / `removed` FIELDS WERE INVENTED AND READ BY NOTHING.
+// `isQuiet` (runHistoryFold.ts:77) asks three questions and none of them touched this
+// fixture: `status === "success"`, `listing_complete`, and all SIX `count_*` keys zero.
+// Every run therefore answered "not quiet", nothing folded, `sources-quiet-fold` never
+// rendered, and §5 saw 17 rows where the contract says a collapsed history shows 3.
+// ⛔ THE FOLDING CODE WAS CORRECT THROUGHOUT — it was never given a quiet tick to fold.
+// The descriptive fields are kept so the intent of each row is still readable.
+const ZERO_COUNTS = {
+  count_new: 0,
+  count_modified: 0,
+  count_renamed: 0,
+  count_missing: 0,
+  count_restored: 0,
+  count_errors: 0,
+}
 const SAMPLE_RUNS = [
-  { id: "run-1", quiet: false, added: 3, updated: 1, started_at: "2026-09-06T14:32:00Z" },
+  {
+    id: "run-1",
+    quiet: false,
+    added: 3,
+    updated: 1,
+    started_at: "2026-09-06T14:32:00Z",
+    status: "success",
+    listing_complete: true,
+    ...ZERO_COUNTS,
+    count_new: 3,
+    count_modified: 1,
+  },
   ...Array.from({ length: 14 }, (_, i) => ({
     id: `run-quiet-${i + 1}`,
     quiet: true,
     added: 0,
     updated: 0,
     started_at: `2026-09-06T${String(13 - Math.floor(i / 2)).padStart(2, "0")}:02:00Z`,
+    status: "success" as const,
+    listing_complete: true,
+    ...ZERO_COUNTS,
   })),
   {
     id: "run-16",
@@ -293,8 +329,28 @@ const SAMPLE_RUNS = [
     fail_name: "Invoice_8841.pdf",
     fail_kind: "password",
     started_at: "2026-09-05T09:14:00Z",
+    // ⛔ `failed` IS `status !== "success"` (RunHistoryList.tsx:166), nothing else. This
+    // row was passing only because `status` was ABSENT and `undefined !== "success"` is
+    // true — the right answer for the wrong reason. The contract draws a `fail-reason`
+    // block, so the fixture owes it one genuinely failed tick.
+    status: "failed",
+    listing_complete: true,
+    ...ZERO_COUNTS,
+    count_new: 1,
+    count_errors: 1,
   },
-  { id: "run-17", quiet: false, added: 12, removed: 2, started_at: "2026-09-05T08:44:00Z" },
+  {
+    id: "run-17",
+    quiet: false,
+    added: 12,
+    removed: 2,
+    started_at: "2026-09-05T08:44:00Z",
+    status: "success",
+    listing_complete: true,
+    ...ZERO_COUNTS,
+    count_new: 12,
+    count_missing: 2,
+  },
 ]
 
 const sampleFolders: Folder[] = [
@@ -402,7 +458,12 @@ function primeMocks() {
   mockListWatches.mockResolvedValue(SAMPLE_WATCHES)
   mockListSyncRuns.mockResolvedValue(SAMPLE_RUNS)
   mockGetSourceHealth.mockResolvedValue({
-    reader_running: true,
+    // ⚠ READER-OFF IS THE ONLY FIXTURE THIS CONTRACT CAN BE CHECKED AGAINST, and it read
+    // `true` until 2026-09-18. §3 demands the `instance-statement` block and §5 demands it
+    // appear EXACTLY ONCE — but `SourceReaderStatement` renders NOTHING while the reader is
+    // running, so the fixture was asserting the presence of a block it had switched off.
+    // Measured: flipping it fixes those two cases and breaks none.
+    reader_running: false,
     stopped: [
       { watch_id: "watch-stopped-token", connection_name: "Legal SharePoint", cause: "token_revoked" },
       { watch_id: "watch-stopped-folder", connection_name: "Ops Drive", cause: "folder_gone" },
@@ -421,6 +482,77 @@ function primeMocks() {
  * THEN the sub-tab. Radix Tabs needs pointer events — `userEvent.click`, never
  * `fireEvent.click` (measured).
  */
+// ⭐ THE SKETCH DRAWS A SURFACE IN MORE THAN ONE STATE, AND §3 MOUNTS ONE STATE.
+//
+// Ten of this file’s cases failed for that reason alone, not because a block was missing:
+// `history`, `run`, `quiet-fold`, `fail-reason` and `toggle-quiet` live in
+// `RunHistoryList`, which mounts only once a watch card’s history is EXPANDED;
+// `rail-popover`, `rail-pop-item` and `rail-open-health` live in `AttentionPopover`,
+// which mounts only once the rail badge is OPENED. A default render can never show them.
+//
+// ⛔ THE SURFACE WAS NOT DEFORMED TO SATISFY THE QUERY — the same rule the §3 docblock
+// states about its own `>= 1` relaxation. Nothing was made to render eagerly; the harness
+// performs the interaction the design says reveals the block, then asserts.
+const REVEAL: Record<string, (u: ReturnType<typeof userEvent.setup>) => Promise<void>> = {
+  // Expand the first watch card’s run history.
+  "sources-history": async (u) => u.click(screen.getAllByTestId("sources-toggle-history")[0]),
+  // Open the rail’s attention popover.
+  "rail-popover": async (u) => u.click(screen.getByTestId("rail-attention-trigger")),
+}
+REVEAL["sources-run"] = REVEAL["sources-history"]
+REVEAL["sources-quiet-fold"] = REVEAL["sources-history"]
+REVEAL["sources-fail-reason"] = REVEAL["sources-history"]
+REVEAL["sources-toggle-quiet"] = REVEAL["sources-history"]
+REVEAL["rail-pop-item"] = REVEAL["rail-popover"]
+REVEAL["rail-open-health"] = REVEAL["rail-popover"]
+REVEAL["rail-badge"] = async () => {}
+
+// ⚠ TWO BLOCKS ARE BUILT BUT NOT ADDRESSABLE AS `${screen}-${kind}`.
+//
+// The sources screen’s Ingestion and Health tabs are real, and §2 already CLICKS them by
+// role and name to navigate. They live in `LibraryHeaderBar`, a control shared by all five
+// Library tabs, where a `sources-` prefixed hook would be wrong for the other three — so
+// they carry `data-tab` instead. ⛔ The product is not renamed to satisfy a naming
+// convention: what was wrong is the fence’s assumption that EVERY block is reachable by a
+// screen-prefixed testid. `LibraryHeaderBar.tsx` also records that a duplicate hook on this
+// exact control broke 41 cases, so adding a second addressable copy is the wrong direction.
+const SELECTOR: Record<string, string> = {
+  "sources-tab-ingestion": '[role="tab"][data-tab="ingestion"]',
+  "sources-tab-health": '[role="tab"][data-tab="health"]',
+}
+
+/** How many times a block appears, by testid or by its documented selector. */
+function countBlocks(testId: string): number {
+  const sel = SELECTOR[testId]
+  if (sel) return document.querySelectorAll(sel).length
+  return screen.queryAllByTestId(testId).length
+}
+
+/** Runs the reveal step for a hook, if that block is state-gated. */
+async function reveal(testId: string) {
+  const step = REVEAL[testId]
+  if (!step) return
+  const u = userEvent.setup()
+  await step(u)
+}
+
+// The rail’s attention list. Two entries so `rail-pop-item` is plural in the popover,
+// matching the two stopped sources the `getSourceHealth` fixture above already reports.
+const RAIL_ATTENTION = [
+  {
+    id: "watch-stopped-token",
+    title: "Legal SharePoint stopped",
+    detail: "Sign-in expired.",
+    onOpen: vi.fn(),
+  },
+  {
+    id: "watch-stopped-folder",
+    title: "Ops Drive stopped",
+    detail: "The folder is gone.",
+    onOpen: vi.fn(),
+  },
+] as const
+
 async function mountScreen(screenName: string) {
   if (screenName === "rail") {
     const { NavPanel } = await import("@/components/layout/NavPanel")
@@ -436,6 +568,14 @@ async function mountScreen(screenName: string) {
         onToggleTheme={vi.fn()}
         expanded={false}
         onToggleExpanded={vi.fn()}
+        // ⚠ BOTH OF THESE ARE REQUIRED OR THE RAIL HAS NO BADGE.
+        // `showAttention = attention.length > 0 && Boolean(onOpenLibraryHealth)`
+        // (NavPanel.tsx:166), and this harness passed NEITHER — so §3 demanded
+        // `rail-badge`, `rail-popover`, `rail-pop-item` and `rail-open-health` from a rail
+        // mounted in its no-attention state, where the contract says they do not appear.
+        // The blocks were built; the HARNESS could not reach them.
+        attentionConditions={RAIL_ATTENTION}
+        onOpenLibraryHealth={vi.fn()}
       />,
     )
     return
@@ -548,9 +688,10 @@ describe("source-composition fence — §3 every block the sketch draws", () => 
       for (const block of blocks) {
         it(`renders the \`${block.kind}\` block as [data-testid="${hook(screenName, block.kind)}"]`, async () => {
           await mountScreen(screenName)
-          expect(
-            screen.queryAllByTestId(hook(screenName, block.kind)).length,
-          ).toBeGreaterThanOrEqual(1)
+          // State-gated blocks are revealed by the interaction the design names; the rest
+          // are no-ops. See REVEAL above for why this is not a relaxation.
+          await reveal(hook(screenName, block.kind))
+          expect(countBlocks(hook(screenName, block.kind))).toBeGreaterThanOrEqual(1)
         })
       }
     })
@@ -574,6 +715,9 @@ describe("source-composition fence — §4 every named control", () => {
     for (const action of buttons) {
       it(`${screenName} · offers the \`${action}\` control as [data-testid="${hook(screenName, action)}"]`, async () => {
         await mountScreen(screenName)
+        // §4 needs the SAME reveal §3 does: a control inside a fold or a popover is not
+        // reachable in the default render either.
+        await reveal(hook(screenName, action))
         expect(screen.getAllByTestId(hook(screenName, action)).length).toBeGreaterThan(0)
       })
     }

@@ -407,7 +407,7 @@ class WatchService:
                     # Re-appearance check: if previously missing/unauthorized, restore to present
                     if existing.get("state") in ("missing", "unauthorized"):
                         counts["restored"] += 1
-                        await update_item_state(self.pool, existing["id"], state="present")
+                        await update_item_state(self.pool, existing["id"], state="present", clear_missing_since=True)
                         if existing.get("document_id"):
                             await run_in_threadpool(
                                 lambda doc_id=existing["document_id"]: supabase.table("documents")
@@ -553,9 +553,10 @@ class WatchService:
                     watch_id, len(deleted_candidates),
                 )
         else:
+            missing_now = datetime.now(timezone.utc)
             for it in deleted_candidates:
                 counts["missing"] += 1
-                await update_item_state(self.pool, it["id"], state="missing")
+                await update_item_state(self.pool, it["id"], state="missing", missing_since=missing_now)
                 if it.get("document_id"):
                     await run_in_threadpool(
                         lambda doc_id=it["document_id"]: supabase.table("documents")

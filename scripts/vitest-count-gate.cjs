@@ -120,8 +120,44 @@ const path = require("node:path")
 
 // ── The pin. Keyed by BARE filename (testResults[].name is an absolute path). ──
 const BASELINE = {
+  // ── Phase 249 (MODEL-04 / MODEL-07) ───────────────────────────────────────────────
+  // Adopted with their measured `— N new` figures from the gate's own run, not guessed.
+  // ⭐ `ModelRegistryTab.test.tsx` is adopted because it was RUNNING NOWHERE and asserting
+  // the defect: `expect(...getAllByRole("option")).toHaveLength(8)` pinned the 8-cloud roster
+  // that made every self-hosted model unaddable (SEED-172). A fence outside the gate that
+  // pins a bug is worse than no fence — it reads as coverage.
+  "ModelRegistryTab.test.tsx": 29,
+  "addProviderRoster.lockstep.test.ts": 4,
+  "hideControlLegibility.test.tsx": 6,
+  // Phase 249 Plan 02 (MODEL-05) — the pick-time chip, its negative arm, its consequence text,
+  // and the ⛔ still-selectable pin that stops a future "improvement" turning it into a refusal.
+  "MessageInput.unverified.test.tsx": 9,
+  "SettingsModelBadge.test.tsx": 9,
   "Seam.test.tsx": 8,
-  "TodosSection.test.tsx": 12,
+  // Phase 250 (HONEST-03 / HONEST-04) — 12 -> 21. The +9 is the run-honesty block: the
+  // ended-run states (no animation, NOT TICKED, pending too, completed untouched), the two
+  // live-run positive controls including the loading-but-not-streaming one, the
+  // marker-never-rendered / marker-becomes-title pair, and the derived-row parity case.
+  // Read from the gate's own printed row, never hand-counted.
+  // 21 -> 22 at the 250 fix round: the +1 is the SOURCE fence "hooks are never
+  // short-circuited", added after `useStreamingForThread(id) || useLoadingForThread(id)`
+  // shipped, skipped the second hook the moment a run started, and crashed the page.
+  // ⚠ 24 → 26 at Phase 252 (252-05). ⭐ NO SLACK HERE — the gate measured 24 at base and 26
+  // after, so the `+2` is exactly 252-04's two cases and there is no residual: "a reconciling
+  // thread still reads IN PROGRESS" (the thread-open flash, BUG-260915-01) and "a genuinely
+  // idle thread STILL reads NOT TICKED" (the control that keeps HONEST-03 honest). The
+  // hook-order fence was EXTENDED in place and therefore adds 0.
+  "TodosSection.test.tsx": 26,  // WR-04: +2 — the sr-only reason is reachable, and is NOT announced on an unmarked row
+  // WR-06 — CHARACTERIZATION of BUG-260915-01. Red here means the window CLOSED.
+  "streamsProvider_250_liveness_window.test.tsx": 2,
+  // 250 CLAIMS this suite because 250 CREATED it — the ?raw lockstep fence binding the
+  // frontend marker copy to backend/app/services/todos_service.py.
+  "todoRunHonesty.lockstep.test.ts": 4,
+  // Phase 250 — adopted after this phase broke it invisibly (see the TARGETS note).
+  // 252-05: CHECKED and UNCHANGED at 4 — 252-04 added `useReconcilingForThread` to this
+  // suite's mock factory (it mounts the REAL TodosSection) and added no case. Recorded
+  // rather than omitted, so a reader can tell "measured, unmoved" from "not looked at".
+  "WorkspacePanel.derived.test.tsx": 4,
   "CitationList.test.tsx": 15,
   "RunCard.test.tsx": 29,
   "RunCard.timer.test.tsx": 7,
@@ -1121,7 +1157,12 @@ const BASELINE = {
   //
   // Read from this script's own `actual` column across two agreeing runs, never hand-counted
   // from `it(` — this suite carries `it.each` blocks whose case count is not its `it(` count.
-  "PhaseTimeline.test.tsx": 35,
+  // ⚠ 35 → 38 at Phase 252 (252-05). ⛔ 252 ADDED NO CASE TO THIS FILE. All +3 is
+  // PRE-EXISTING SLACK, measured identical at 38 before and after the phase, and it is closed
+  // here only because the file sits inside 252-04's blast radius and the wave was already
+  // reading every `actual` in that radius. Recorded rather than quietly re-pinned: an
+  // unexplained `+n` turns a working gate into a rubber stamp.
+  "PhaseTimeline.test.tsx": 38,
   // 188 code-review fix pass (CR-06): 12 → 17. An EXTENSION, not a lowering. The five
   // added cases falsify the fail-open that survived ONE FUNCTION AWAY from the one 188-02
   // closed: the live branch's `i < current ? "done"` painted a `skipped` row Complete (or
@@ -2433,7 +2474,14 @@ const BASELINE = {
   // moving the new thing rather than by re-baselining the old one (199-03's precedent, and
   // 200-06's icon-well decline). The pin passed UNEDITED, and that is asserted rather than
   // assumed.
-  "PhaseCard.test.tsx": 41,
+  // ⚠ 41 → 60 at Phase 252 (252-05). ⛔ THE `+19` IS NOT 19 NEW CASES. The gate measured this
+  // file at **55** before the phase's first edit — `55 − 41 = 14` UNITS OF PRE-EXISTING SLACK,
+  // none of it 252's, and a deleted case would have kept the gate green exactly as W-7's did
+  // one file over. Re-baselined to the measured `actual` of 60, ⛔ never to `41 + 5`.
+  // The real move is **55 → 60, +5, all 252-04's**: *THE LIE* · *THE CONTROL* · *THE DEFAULT* ·
+  // "a TERMINAL phase status is untouched by `runLive={false}`" · "retrying is the OTHER live
+  // reading". Read from this script's own printed `41  60  +19` row.
+  "PhaseCard.test.tsx": 60,
   // ── Added in 200-07 (DES-02, `200-CHECKLIST.md` §4), in the SAME COMMIT that creates the
   //    file — and it needs BOTH KNOBS, which is the ELEVENTH occurrence of the two-knob trap
   //    this script records as a rule ──────────────────────────────────────────────────────
@@ -2856,7 +2904,17 @@ const BASELINE = {
   // from this gate's own printed `3 -> 5 +2` row, with no residual.
   "apiBarrel.test.ts": 5,
   // ── Added in Phase 213 (213-05 / GATE-1) — per-tool grants list invariants ──
-  "ConnectionGrantsList.test.tsx": 8,
+  // ⚠ 8 → 9 at Phase 252 (252-05 / W-7 / D-33). The pin read `8` against a file that has
+  // carried NINE cases since Phase 221 — one unit of PERMANENT SLACK, standing for the whole
+  // life of the entry, and it was CLOSED AFTER BEING SEEN rather than on the arithmetic.
+  // The RED drive, run before this line was touched: `it(` count 9, pin 8; case
+  // "Invariant 8: zero [title] attributes in the rendered output" DELETED; the suite re-run
+  // and its report fed to THIS script's own comparison code via `--json`, which printed
+  //     ConnectionGrantsList.test.tsx                 8       8       0
+  // — delta 0, **no `[count-decrease]`**, a deleted test keeping the gate green. The file was
+  // then restored and proved md5-identical (`d8ec1ecbd8d2fbe715a1e847f1fc3fbc` both sides).
+  // ⭐ A slack nobody has seen exploited is an assertion; this one was exploited on purpose.
+  "ConnectionGrantsList.test.tsx": 9,
   "ingestVisibility.test.tsx": 16,
   // ── Added in Phase 221 (221-01 / T7), every value read from THIS script's own printed
   // ── `— N new` column in the same run that adopted them. Not booked ahead: an unpinned
@@ -3445,7 +3503,18 @@ const BASELINE = {
   // ── Phase 234 (234-05 / LIB-08 / SURF-01 / VIS-05) — Watched folders surface ──
   // 6 → 27 at Phase 235: the card gained the outcome line, the stopped sentence, the
   // degraded/report row and the history disclosure, each with its own case (235-10).
-  "WatchedFoldersSection.test.tsx": 27,
+  // ⚠ 27 → 49 at Phase 252 (252-05). NONE of the +22 is this phase's: the gate measured this
+  // file at 49 BEFORE the phase's first edit, so 22 units of slack had stood since 235-10.
+  // 252-03 edited the file (it deleted an SC#2 discrimination line that was PINNING W-2's
+  // rate-limit defect) and its case count did not move — 49 at base, 49 after. Re-pinned to
+  // the gate's measured `actual`, not to `27 + 0`, because a pin below the real count is the
+  // W-7 slack one file over. Read from this script's own printed `27  49  +22` row.
+  "WatchedFoldersSection.test.tsx": 49,
+  // ── Phase 252 (252-05 / D-03 / SC#4) — the first suite `WatchRowCard.tsx` has ever had ──
+  // 9 cases, measured by vitest's own JSON reporter in the same run that measured W-7, never
+  // hand-counted. BOTH knobs in this commit; see the TARGETS block for why this file was
+  // structurally invisible to the gate at any total, which is how its three defects shipped.
+  "WatchRowCard.test.tsx": 9,
   // ══ Phase 235 (235-12 / SURF-02 / SURF-03 / LIB-10) — "the source says what it did" ════
   //
   // ⚠ EVERY NUMBER BELOW IS THE GATE'S OWN PRINTED `— N new` FIGURE at this commit, read
@@ -3464,7 +3533,16 @@ const BASELINE = {
   // KNOB, DELIBERATELY, BECAUSE IT IS RED (16 failed / 33 passed of 49). Full reasoning in
   // the TARGETS block. This is stated in both places because a reader who greps one knob
   // must not conclude the omission was an oversight.
-  "sourceHealthVocabulary.test.ts": 42,
+  // ⚠ 42 → 74 at Phase 252 (252-05). ⛔ THE `+32` IS NOT 32 NEW CASES, and reading it as one
+  // would be the drift this column exists to catch. The gate measured this file at **69**
+  // before the phase's first edit, so 27 of the 32 is slack that has stood since 235-12 — the
+  // 252-03 PLAN itself called this "a 42-case suite" and was stale by 27. Where a summary and
+  // the gate disagree, the gate wins.
+  // The real move is **69 → 74, +5, all 252-03's**: the three `token_revoked` label cases, the
+  // `connection_disabled` occurrence pin, and ⛔ W-2's own measurement — that 429 / 503 /
+  // timeout all classify to `unreachable` and the cause union carries NO rate-limit member,
+  // pinned so it cannot rot back into the assumption that shipped `Rate limited`.
+  "sourceHealthVocabulary.test.ts": 74,
   "runHistoryFold.test.ts": 17,
   "RunHistoryList.test.tsx": 18,
   "WatchedFoldersSection.history.test.tsx": 17,
@@ -3744,6 +3822,16 @@ const BASELINE = {
   //   · that read count is **7**, not the 5 a first pass took from `grep -n` — one line carries
   //     three occurrences. ⛔ A LINE count is not an OCCURRENCE count.
   "LibraryPage.cloudImport.test.tsx": 8,
+  // ── 252-REVIEW.md CR-11 / 252-REVIEW-R2.md WR-05, taken 2026-09-17 ────────────────
+  // 252-03 hand-edited this suite's exact-equality occurrence pin 4 → 5, and 252-05
+  // recorded honestly that the file sat in NEITHER knob and declined to adopt it. The net
+  // effect was an exact-count assertion NO GATE EXECUTES: if the new number were wrong the
+  // suite would be red and nothing would report it. ⭐ The stated reason for declining the
+  // DIRECTORY-wide entry does not apply to this one FILE — it is a pure-source `?raw` suite
+  // with no mount, so it cannot drag `sourceComposition.test.tsx`'s standing red in with it
+  // (that suite oscillates 16/33 ↔ 18/31 and is in neither knob BY DECISION, Phase 235).
+  // ⚠ 14 MEASURED at GSD_VITEST_MAX_WORKERS=2 on 2026-09-17, not guessed: `14 passed (14)`.
+  "bug260912AppCredentials.test.ts": 14,
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -4167,6 +4255,21 @@ const TARGETS = [
   // every count was read from a real run AFTER the edits landed, never guessed.
   "src/components/panel/__tests__/Seam.test.tsx",
   "src/components/panel/__tests__/TodosSection.test.tsx",
+  // ── Phase 250 (HONEST-03 / HONEST-04) — the run-ended marker is cross-language ─────────
+  //
+  // 250 CLAIMS this suite on the ground that 250 CREATED it. It binds the frontend's copy of
+  // `_RUN_ENDED_MARKER` to `backend/app/services/todos_service.py` by `?raw`, and it is the
+  // only thing in the repo that can see a drift between the two: each side's own tests stay
+  // green while the pair is wrong, and the visible symptom is the raw parenthetical AND a
+  // `Not ticked` badge on the same row.
+  "src/components/panel/__tests__/todoRunHonesty.lockstep.test.ts",
+  // ⛔ Phase 250 ADOPTS `WorkspacePanel.derived.test.tsx` BECAUSE 250 BROKE IT AND THIS GATE
+  // COULD NOT SEE IT. It was in NEITHER knob, so when the run-honesty change added two selectors
+  // to `TodosSection` and this suite's mock factory did not declare them, all four of its tests
+  // threw AT MOUNT while the gate reported `0 failing`. It is the ONLY suite outside
+  // TodosSection.test.tsx that renders the REAL TodosSection, which is exactly what makes it
+  // worth guarding rather than leaving declined.
+  "src/components/panel/__tests__/WorkspacePanel.derived.test.tsx",
   "src/components/chat/__tests__/CitationList.test.tsx",
   "src/components/chat/RunCard.test.tsx",
   "src/components/chat/RunCard.timer.test.tsx",
@@ -5139,6 +5242,25 @@ const TARGETS = [
   "src/components/metadata/DocumentConversationSection.test.tsx",
   // ⚠ Named, not a directory: `src/components/sources` is STILL not a TARGETS directory entry.
   "src/components/sources/watchProductMark.test.ts",
+  // ── Phase 252 (252-05 / D-03 / SC#4) — the watched-source card's FIRST suite ───────────
+  // ⭐ THIS ADOPTION IS THE PHASE'S FINDING, not its bookkeeping. `WatchRowCard.tsx` shipped
+  // three defects — WATCH-04's completion claim, the invented `(0 changes)` literal, and a
+  // refusal and a success co-rendering on one card — and it had NO TEST FILE AT ALL, while
+  // `src/components/sources` is a set of ~14 individually-named files and NOT a directory
+  // entry. So the suite 252-03 wrote would have run in NO gate until its name was typed here.
+  // TARGETS decides what RUNS, BASELINE decides what is GUARDED, and this file was on the
+  // wrong side of BOTH. Both knobs, same commit — the fifth phase in a row to record it.
+  //
+  // ⛔ NOT a `src/components/sources` directory entry, deliberately: that one edit would adopt
+  // ~10 unpinned suites at once and move the shared gate for reasons unrelated to this phase.
+  // Recorded as a deferred idea in `252-CONTEXT.md`.
+  //
+  // ⚠ AND A SIBLING FIND, NAMED RATHER THAN SILENTLY LEFT: `bug260912AppCredentials.test.ts`
+  // is in NEITHER knob either — 252-03 edited its occurrence pin (`4 → 5`) and the gate could
+  // not have seen it. NOT adopted here, because this plan is authorised for exactly one
+  // adoption and an unrequested one moves the shared gate for an unrelated reason. Named so
+  // the omission reads as a decision rather than as an oversight.
+  "src/components/sources/__tests__/WatchRowCard.test.tsx",
   "src/lib/__tests__/navItemsUnknownIsNotDenied.test.ts",
   // ── Phase 243 (243-01 / CHAT-01 / CHAT-04 / D-243-16) — the thinking block's ────────────
   // ── PRE-EXTRACTION characterization net. ────────────────────────────────────────────────
@@ -5216,6 +5338,7 @@ const TARGETS = [
   // fourteen INHERITED failures documented above live in that folder and would turn the
   // shared gate red for a reason no plan here owns.
   "src/__tests__/providers/streamsProvider_244_settle_ask.test.tsx",
+  "src/__tests__/providers/streamsProvider_250_liveness_window.test.tsx",
   // ⚠ The scroll suite below is a SEPARATE FILE from `MessageList.test.tsx` on purpose:
   // that one stubs `scrollIntoView` to a NO-OP tree-wide (`:61-65`), so nothing mounted under it
   // can see the scroll effect at all. This is the ONLY behavioural coverage that effect has.
@@ -5370,6 +5493,37 @@ const TARGETS = [
   // the panel must NOT list an expired row — because "the transcript can see expired files"
   // and "expired files came back everywhere" are otherwise the same green.
   "src/providers/__tests__/expiredAttachmentTombstone.test.tsx",
+  // ── Phase 249 (MODEL-04 / MODEL-07) ───────────────────────────────────────────────
+  // ⚠ `src/components/admin/` was reached by exactly ONE named entry
+  // (`revertByteIdentical.test.tsx`) and by no directory entry, so the whole Control-Room
+  // Model Registry estate sat outside the gate. That is not "lightly guarded", it is
+  // unguarded — and it had a consequence, not just a shape:
+  //
+  // ⭐ `ModelRegistryTab.test.tsx` asserted the provider select had EXACTLY 8 options. The
+  // 8 were the defect. A green fence pinned SEED-172 in place for the component's whole
+  // life, and nothing ran it under the gate. It is adopted here alongside the two new
+  // suites, and its assertion is now DERIVED from the exported roster rather than typed.
+  //
+  // Added in the SAME COMMIT that creates the two new files — an entry pointing at a path
+  // that does not yet exist makes the gate ERROR (exit 2) rather than fail.
+  "src/components/admin/__tests__/ModelRegistryTab.test.tsx",
+  "src/components/admin/__tests__/addProviderRoster.lockstep.test.ts",
+  "src/components/admin/__tests__/hideControlLegibility.test.tsx",
+  // ── Phase 249 Plan 02 (MODEL-05) ──────────────────────────────────────────────────
+  // ⚠ `src/components/chat` has NO bare-directory entry (BUG-260912-01 recorded the same
+  // thing), so this suite must be named or it never executes under the gate.
+  "src/components/chat/__tests__/MessageInput.unverified.test.tsx",
+  // WR-10 (gap-closure): this suite was EDITED by 249-02 to bind the new shared copy module and
+  // sat in neither knob — so the assertion that catches a drift in that module was not executing
+  // under the gate. `src/__tests__/components` has no bare-directory entry either.
+  "src/__tests__/components/SettingsModelBadge.test.tsx",
+  // ── 252-REVIEW.md CR-11 / 252-REVIEW-R2.md WR-05 ─────────────────────────────────
+  // BOTH knobs, same commit — the pin above is inert without this entry, because TARGETS
+  // decides what RUNS and BASELINE decides what is GUARDED, and a suite can sit on the
+  // wrong side of exactly one. `src/components/sources` has no bare-directory entry, and
+  // deliberately so (Phase 235 kept the red `sourceComposition.test.tsx` out of both), so
+  // this file must be NAMED or it executes nowhere.
+  "src/components/sources/bug260912AppCredentials.test.ts",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")

@@ -17,6 +17,8 @@ re_open_triggers:
   - A model is selected whose real context window differs from the inferred default and a request truncates/over-runs (capabilities need to be real, not guessed)
 priority: HIGH — operator-confirmed next phase after 111.1; directly serves the stated product principle ("everything manageable from the UI dynamically; only API keys stay as env secrets")
 suggested_phase: a dedicated "Dynamic Model Registry" phase immediately after Phase 111.1. ~70% of the storage substrate already exists (see below), so the net-new is the discovery service + capability auto-ingest + a capabilities-editing UI.
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-088 — Dynamic model registry (live discovery + DB-backed, UI-managed)

@@ -12,6 +12,8 @@ related_phases:
   - Phase 153 (inline-citations) — origin context; weak models that loop also UNDER-cite (retrieve 21 chunks, mark 0), so this and citation density share a root cause
 related_memories: [feedback_multi_provider_behavior_variance, feedback_no_cross_provider_regressions, feedback_separate_per_feature_safe_by_construction, feedback_provider_uniform_ux, feedback_openrouter_is_experimental]
 priority: medium
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-118 — Harness weak models against wasted tool-call loops
@@ -73,3 +75,19 @@ which is real design work:
 - `backend/app/services/agent_loop.py:1241` (`max_iterations = 15`), `:1745` (loop), `:1795-1796`
   (`force_no_tools` on final iteration → `tool_choice="none"`), `:2706` (empty-response fallback).
 - Related: SEED-119 (citation footer noise) shares the "weak model under-attributes" root cause.
+
+---
+
+## ⚠ TOUCHED BUT NOT CLOSED BY PHASE 250 (2026-09-15)
+
+Phase 250 shipped `HONEST-02`: the agent loop's empty-output fallback now names **which of four
+things happened** instead of emitting one sentence for every cause, and says *"the reason was not
+captured"* when it cannot tell.
+
+⛔ **THAT MAKES THE FAILURE LEGIBLE. IT DOES NOT MAKE THE MODEL SUCCEED.** This seed's
+capability — getting a weak or reasoning-first model to actually drive the tool loop (forced
+emission, per-model budgets, early force-answer, dedup guards) — is **untouched**. `status` stays
+as it was.
+
+Recorded here explicitly so a later reader cannot mistake an honest error message for a fixed
+loop, and so this seed is not closed by citing `BUG-260722-02`'s requirement being met.

@@ -18,6 +18,8 @@ re_open_triggers:
   - Deployment-shape work (SEED-003) — on-prem/dedicated vs hosted-SaaS shapes may ship different capability bundles (an on-prem buyer may license all capabilities; a SaaS Standard seat may get RAG-only). The published-requirements matrix names which capabilities apply per shape.
 priority: medium-high
 suggested_phase: the future licensing/packaging milestone (co-planned with SEED-080 in v3.1 Operator UX). The DISCIPLINE half applies NOW to every capability-bearing phase (v2.9 workflows, v3.0 Skill Studio) — it is a scope-time checklist item, not a build. NOT a v2.9 deliverable.
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-083 — Capability-tier packaging + the feature-independence discipline

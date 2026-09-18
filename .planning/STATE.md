@@ -1,463 +1,223 @@
 ---
 gsd_state_version: 1.0
-milestone: v4.1
-milestone_name: Ship It & Feel It
+milestone: v4.2
+milestone_name: The Connected Knowledge You Can Actually Run
 status: Awaiting next milestone
-last_updated: "2026-09-13T13:34:20.428Z"
-last_activity: 2026-09-13 — Milestone v4.1 completed and archived
+last_updated: "2026-09-18T00:00:00.000Z"
+last_activity: '2026-09-18 -- MILESTONE v4.2 CLOSED AND ARCHIVED, git tag v4.2. 8 phases (247-254), 31 plans, 237 commits, 559 files, migration 181, 6 days. RE-AUDITED FIRST rather than closed on the stale reading: the 2026-09-16 audit was gaps_found at head 46cf36bf6 over phases 247-251, and 124 commits plus three phases had landed since, so its verdict described a tree that no longer existed. Re-driven at bb474e5cc: requirements 15/26 -> 25/26, blockers 4 -> 0, integration 16/22 -> 19/19, flows 1/3 -> 3/3. All four blockers re-measured by the orchestrator independently of the integration checker, with no line number quoted from the stale audit. CLOSED WITH ONE REQUIREMENT UNSATISFIED, AS AN OPERATOR DECISION: DEBT-06, 8 of 14 rows unmet (239, 241, 242, 244, 245, 251, 252, 253), re-derived with yaml.safe_load rather than from a hand-typed list. No plan can close it -- done needs gemini answering BUS-249/256/257, refused needs an operator ruling (REG-03). A REFUSAL IS NOT A PASS. 41 open artifacts acknowledged and deferred (see Deferred Items). THE SDK WROTE FALSE RECORDS AGAIN, the eighth occurrence: gsd-sdk query milestone.complete archived correctly but (a) wrote thirteen garbage accomplishments into MILESTONES.md harvested from section LABELS not values ("Delivered:", "One-liner:"), (b) reset progress to 15/5/31/22/33, every figure wrong, (c) DELETED the whole Current Position narrative and every frontmatter audit comment, and (d) converted the file CRLF -> LF. STATE.md was restored byte-identical from a pre-call backup (md5 6efe33f00c0117c4d484eb67bba4e32c) and then hand-written. Hand-edit this file. Do not call state.*. Next action: /gsd:new-milestone.'
 progress:
-  # ⚠ HAND-WRITTEN, TWICE. `gsd-sdk query milestone.complete` overwrote this block at the v4.1 close
-  # with `total_phases: 12 · completed_plans: 30 · percent: 42` — three wrong numbers, against a
-  # milestone of 5 phases and 25 plans, all complete. The SDK's state writers are known to publish
-  # false records (see the banner below); this block is the measured truth.
-  total_phases: 5       # v4.1 = phases 242-246
-  completed_phases: 5   # all closed
-  total_plans: 25       # 242:2 · 243:5 · 244:12 · 245:3 · 246:3
-  completed_plans: 25
+  total_phases: 8
+  completed_phases: 8
+  total_plans: 31
+  completed_plans: 31
   percent: 100
+# ⛔ Hand-edited at the v4.2 close. `state.*` was NOT called, and `milestone.complete`'s own
+#   write was REVERTED: it set `total_phases: 15 · completed_phases: 5 · completed_plans: 22 ·
+#   percent: 33`. Every one of those four was wrong, in four different ways — the same signature
+#   recorded seven times in the v4.2-at-close archive. Re-derived from the phase directories:
+#   247-254 is EIGHT phases, all eight carry a `*-VERIFICATION.md`, and 31 PLAN.md files exist
+#   with 31 executed. 100% is a statement about PHASES VERIFIED and nothing else — `DEBT-06` is
+#   unsatisfied and the milestone closed on an operator decision to accept it as debt.
 ---
 
 # Project State
 
-> ⚠ **This file was RESET at the v4.0 close (2026-09-10)** — the fourth reset, and the reason is the
-> same each time. The previous STATE.md had reached **1,893 lines**. **Nothing was deleted:** the
-> full v4.0 file is archived verbatim at `.planning/milestones/v4.0-STATE-at-close.md`, including
-> every per-phase position entry, the Phase 240 and 241 debt banners, the *Inherited from v3.9*
-> section, the register-integrity sweep, the Deferred Items table and both guardrail overrides.
+> ⚠ **This file was RESET at the v4.2 close (2026-09-18)** — the fifth reset, same reason each time.
+> The previous file had reached **1,022 lines**. **Nothing was deleted:** the full v4.2 file is
+> archived verbatim at [`.planning/milestones/v4.2-STATE-at-close.md`](milestones/v4.2-STATE-at-close.md)
+> (md5 `6efe33f00c0117c4d484eb67bba4e32c`), including every per-phase position entry, both guardrail
+> overrides in full, the Roadmap Evolution log, the Accumulated Context section and the Phase 244
+> owed-verification block. Earlier resets: `v3.6` · `v3.8` · `v3.9` · `v4.0-STATE-at-close.md`.
 >
-> ⚠ **Hand-edit this file. Do NOT call the `state.*` SDK verbs** — seven of them write false records
-> and corrupted this file five times during Phase 190 alone while reporting success.
+> ⚠ **Hand-edit this file. Do NOT call the `state.*` SDK verbs.** Seven occurrences are recorded in
+> the v4.0 and v4.2 archives; **the eighth was `milestone.complete` at this very close** — see the
+> frontmatter comment. It reported success in JSON while deleting the narrative it claimed to update.
+
+---
 
 ## Project Reference
 
-See: `.planning/PROJECT.md` (updated 2026-09-13)
+See: `.planning/PROJECT.md` (updated 2026-09-18)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
-can be taught new behaviors (skills) that persist and can be shared.
-
-**Current focus:** **none — v4.1 CLOSED and archived 2026-09-13 (git tag `v4.1`).**
-Next action is `/gsd:new-milestone`; phase numbering resumes at **247**.
-
-## ⛔ Carried out of the v4.1 close — read before scoping anything
-
-Written at the close, 2026-09-13. **These are the input to the next milestone, not history.**
-
-1. ⛔ **`RECALL-01` is UNMET and that is a finished decision, not owed work.** Phase 246 proved by
-   `EXPLAIN (ANALYZE)` that no `hnsw_ef_search` value fixes the small-tenant recall cliff *through
-   the index*: 40/60/80 → **Index Scan, ONE row**, ~0.05 recall, ~4 ms; 100/150/200 → **Seq Scan**,
-   recall 1.000, **~1,100 ms**. Default reverted to 40. **Re-open path: `SEED-273`
-   (`hnsw.iterative_scan`)** — and any future attempt must inspect a PLAN, not only a recall number,
-   because measuring recall alone is exactly how Phase 241 reached the opposite conclusion.
-2. ⛔ **Migrations `179` and `180` are NOT in cloud — measured at the close**, not read from a
-   record (`model_capabilities_overrides.removed` absent; all four self-hosted endpoint columns
-   absent). `176 / 177 / 178` ARE present. **A promotion that carries the code without 179 and 180
-   breaks on arrival.**
-3. ⛔ **`origin/production` is 287 commits behind `develop`.** v4.1's entire output is undeployed —
-   **the state v4.1 was opened to end for v4.0.** Also still owed from 242: the **non-code** deploy
-   parity half (env vars, seed rows, provider keys, `SANDBOX_IMAGE`), and 242's UAT row 5, whose
-   re-open trigger IS the next promotion.
-4. ⭐ **`SEED-172`'s trigger FIRED at this close, reported by the operator as lived friction:** a
-   local Ollama / LM Studio model must be added **by hand**, with its **timeout** and **context
-   window** configured by hand, because `POST /admin/models` validates its provider argument against
-   the 8-cloud **SSRF discovery allowlist** rather than the routing roster. ⛔ **Skipping the manual
-   step is not cosmetic** — an id absent from `MODEL_CAPABILITIES` resolves `capability_source =
-   inferred` and silently loses `native_tools`, which short-circuits above every tool gate.
-   **Leading candidate for the next milestone**, with `SEED-040` and `SEED-135`.
-5. ⛔ **The independent §6.3 review is still owed by 238, 240 and 241** — `DEBT-03` was always
-   *"say so in the record"*, never *"do it"*, and 245 did not do it. Gemini is available again, so
-   the blocker that justified the deferral is gone.
-6. ⚠ Named residues with triggers: `SEED-272` (a failed attachment copy never gives up or
-   recovers) · 245's `238-M-9-microsoft-arm`, `233-row-3-refusal-arm`, `240-five-mail-rows` ·
-   `SHELL-03`'s fail-closed arm and Deep-mode `ask_user` path, both undriven.
-7. ⚠ **Register integrity is the recurring defect, now twice in consecutive milestones.** The
-   ROADMAP Progress table read `0 / 5 phases complete` with all five phases closed; v4.0 shipped the
-   same class in the requirement COUNT. **Re-derive from the phase directories, never from a summary
-   line.** Also open: **8 duplicate seed IDs** across 280 seeds (`022, 092, 228, 229, 231, 253, 259,
-   269`), so a reference by ID cannot be resolved.
-
-## Current Position
-
-Phase: Milestone v4.1 complete
-Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-09-13 — Milestone v4.1 completed and archived
-
-## Carried into v4.1 from the v4.0 close
-
-The nine sections below were written at the v4.0 close. **They are the input to this milestone, not
-history** — items 1, 2, 3, 4, 5 and 6 are now scoped into v4.1 phases; items 7, 8 and 9 remain live
-constraints on how it is built.
+can be taught new behaviours (skills) that persist and can be shared.
+**Current focus:** Planning the next milestone. Run `/gsd:new-milestone`.
 
 ---
 
-## ✅ v4.0 CONNECTED KNOWLEDGE — CLOSED 2026-09-10
+## ✅ v4.2 CLOSED — 2026-09-18, git tag `v4.2`
 
-**The premise came true.** A source is connected once and then read by itself: Google Drive,
-OneDrive/SharePoint via Microsoft Graph, **any** MCP file server, and mail — four families over ONE
-`browse / list / read / check` contract, with connection-scoped visibility enforced at all four RLS
-sites and a durable queue underneath.
+**8 phases** (247-254) · **31 plans** · **237 commits** · **559 files** (+79,321 / −4,197) ·
+**migration 181** · 2026-09-13 → 2026-09-18.
+**25 / 26 requirements satisfied** · integration **19/19** · flows **3/3**.
+Audit: [`milestones/v4.2-MILESTONE-AUDIT.md`](milestones/v4.2-MILESTONE-AUDIT.md) — the superseded
+2026-09-16 reading is preserved beside it, byte-identical, at `v4.2-MILESTONE-AUDIT-260916.md`.
 
-**Record:** [`MILESTONES.md`](MILESTONES.md) · roadmap archive
-[`milestones/v4.0-ROADMAP.md`](milestones/v4.0-ROADMAP.md) · requirements
-[`milestones/v4.0-REQUIREMENTS.md`](milestones/v4.0-REQUIREMENTS.md) · audit
-[`milestones/v4.0-MILESTONE-AUDIT.md`](milestones/v4.0-MILESTONE-AUDIT.md) · state at close
-[`milestones/v4.0-STATE-at-close.md`](milestones/v4.0-STATE-at-close.md).
+⚠⚠ **THE MILESTONE'S FINDING, and the reason it needed eight phases for five phases of scope:**
+247-251 all closed with **passing** verifications, every gate green, the backend at its locked
+baseline — and one cross-phase read then found **four blockers and nine warnings**, every one a
+**seam between two individually-correct things**. 252 closed them; 253 closed 252's own review;
+254 was the review phase. ⭐ **The pattern repeated at every depth** — 253's gap-closure round was
+itself reviewed and produced two more blockers, both the same vacuity class that phase existed to kill.
 
-⚠ **All fourteen phase directories moved to `.planning/milestones/v4.0-phases/` at this close**, so every `NNN-*.md` named below lives there — e.g. `.planning/milestones/v4.0-phases/238-microsoft-graph-onedrive/238-UAT.md`. `.planning/phases/` is now empty of v4.0 work. ⚠ One stray remains there: `206-mcp-connector-client-workflow-scoped/206-01-PLAN.md`, an **older draft** of a file already archived complete under `milestones/v3.8-phases/` (it reappeared at `ba59d36b0`, after the v3.8 archive). Left in place rather than deleted — it is not this milestone's to remove.
+⭐ **The close re-audited rather than trusting its own audit.** The on-disk verdict read `gaps_found`
+over a tree 124 commits and three phases old. Re-driving it moved four blockers to zero. **An audit
+is a claim about a tree, and it goes stale the moment the tree moves.**
 
 ---
 
-## ⛔ CARRIED PAST THE CLOSE — decisions, not oversights
+## ⛔ Carried past the close — decisions, not oversights
 
-Each of these was **stated at the close rather than absorbed into it.** A closing milestone that
-lists only what passed is not a record.
+### `DEBT-06` — the one unsatisfied requirement
 
-### 1. ⚠⚠ ONE OWED ITEM HAS AN EXPIRY DATE — read this before any production push
+**8 of 14 rows unmet:** `239` `owed` · `241` key ABSENT · `242` bare `False` (in no register's
+vocabulary) · `244` frontmatter **UNPARSEABLE YAML** · `245` **no verification file anywhere** ·
+`251` · `252` · `253` `owed`.
+**6 accounted:** `238` `complete` · `240` `complete` · `243` `refused` · `246` `done` · `249`
+`refused` · `250` `refused`.
+⛔ Re-derived with `yaml.safe_load` over each `*-VERIFICATION.md`, **never from a hand-typed list**.
+⛔ **Never sum the two figures.**
 
-**Phase 241's UAT row 5 must run on CLOUD *before* migration 176 is applied there.** After 176
-lands, the "no columns" arm it exists to prove is unreproducible **forever**. Five of 241's six rows
-are driven and passed; row 5 is the one that dies. File: `.planning/milestones/v4.0-phases/241-recall-at-corpus-scale/241-HUMAN-UAT.md`.
+**No plan can close it.** `done` needs Gemini answering `BUS-249` / `BUS-256` / `BUS-257` — which
+cannot be driven from a Claude session. `refused` needs an **operator ruling**: `REG-03` forbids
+Claude answering or closing a bus item, and `AGENTS.md` §6.3 forbids a builder ruling on its own work.
+Three refusal drafts are written and pending at `25{1,2,3}-REVIEW-REFUSAL.md`; the deadline in the
+bus items is **2026-09-24**.
+⛔ **A refusal is not a pass.** `verification_mode` stays `self-verified` and the accepted risk is
+that a builder read its own work — six closes running.
+**Re-open trigger:** Gemini answering any of the three bus items, at any time, before or after the
+deadline. The verdict artifact is then `<phase>-REVIEW-IND.md` and the draft is void.
 
-⚠ It collides with the item directly below: **applying the pending migrations is exactly what kills
-it.** Row 5 first, then the migrations — in that order, or not at all.
+### Four register repairs, each one line (`F-1`..`F-4` in the audit)
 
-### 2. ⛔ Cloud is 15 migrations behind
+- **`F-1`** — `254-VERIFICATION.md`'s **own** frontmatter is unparseable YAML (a bare `: ` inside the
+  unquoted `score:` value). ⭐ **That is the exact defect Phase 254 reported against Phase 244, in the
+  same week, and no gate caught either.** Fix is one pair of quotes.
+- **`F-2`** — `.planning/reported-bugs/` carries **two live duplicate-id clusters**: `BUG-260528-01`
+  is the `id:` of **three** files, `BUG-260906-01` of **two**. `check-seeds-register.cjs` sweeps
+  `.planning/seeds/` only; **no gate sweeps reported-bugs at all.** This is `REG-01`'s defect class
+  one register over.
+- **`F-3`** — `BUG-260915-01` reads `verified_closed_by: null` while its fix is live in
+  `TodosSection.tsx`. Fix and register out of sync by one field.
+- **`F-4`** — `253-VERIFICATION.md` still reads `status: gaps_found` over a gap that **is** closed
+  (`SEED-290` exists with a re-open trigger per finding).
 
-`153, 154, 155, 156, 166..176` are all pending; **v4.0 has not deployed.** Operator decision
-2026-09-10: they are applied immediately **before** the next push, not now. Run
-`bash scripts/pending-cloud-migrations.sh` and apply the printed set in NUMERIC ORDER, once each,
-by pasting into the cloud Supabase SQL editor.
+### Undriven, not passing
 
-### 3. ⛔ Three phases owe an independent §6.3 review — 238, 240, 241
+- **Migration 181 is NOT in cloud.** `CRED-04` discharges at the next promotion, and ⛔ **its code
+  half and its SQL half must reach cloud in ONE operation** — it is security-bearing.
+- `MODEL-04` end-to-end in chat — needs a live self-hosted endpoint.
+- Phase 248's **G-4 scenario S2** (live `McpAuthDoor` BYO-OAuth) — needs a browser and a third-party
+  account. It is **B-3's own scenario**.
+- The `schema-acl-parity` CI job has never executed against this code.
 
-No independent reviewer exists: Gemini has been unavailable since 2026-09-09 and the operator has
-ruled out `/code-review ultra` on cost. **Their verdicts are the builder's own, and the v4.0
-milestone audit is a self-audit for the same reason.** What that does not weaken is the mechanical
-evidence — a hash, a byte-identical file, a driven function. What it weakens is every judgement call
-about whether an owed item was acceptable. ⚠ See `OV-SOLO-01` below: **its re-arm trigger has now
-fired and the condition it described is still true.**
+### Two live criticals, triaged and unfixed (`251-REVIEW.md`)
 
-### 4. ⛔ Two UAT sets are credential-blocked
+- **CR-01** — the seeds gate's `--self-test` passes **8/8** and **none of the eight arms** exercises
+  the missing-key check its main verdict line asserts. *A guard with no RED arm for itself.*
+- **CR-02** — the `status:` enum's *change-all-three-or-none* rule has **zero executable enforcement**.
 
-| Phase | Rows | Blocked on |
-|---|---|---|
-| 238 | **9** | one Azure app registration (`MICROSOFT_OAUTH_CLIENT_ID/SECRET`) — **run M-1 first, it unblocks the other 8**; SharePoint rows S-1/S-2 separately on `SEED-256` (no work/school tenant) |
-| 238 | **ELEVEN — 9 M rows + S-1/S-2** | ⚠ **CORRECTED 2026-09-13 (Phase 245) — the row above is preserved, not deleted. NOT BLOCKED: ✅ SC#1 CLOSED.** All nine of 238's M rows were **DRIVEN LIVE on 2026-09-07** (`238-VERIFICATION.md:213-231` — 7 full pass, 2 half at the time; **four defects found by driving and NONE by the 15-case unit suite**). The operator completed the Azure registration *hours after* `238-SUMMARY.md` was written. ⚠ **And the "9" above was ambiguous** — it read as though S-1/S-2 were included, while `REQUIREMENTS.md` read as though they were not. **Resolved at the anchor: `238-VERIFICATION.md`'s footer now states ELEVEN rows and defines "nine" as the M rows only.** Terminal state: **8 ✅ PASS · 1 ⛔ BLOCKED (M-9 — no `/Finance/` folder in the OneDrive account, an operator action; blocking id `BUG-260913-01`; trigger: that folder existing, or the next phase touching Graph ingestion) · 2 ⛔ RETIRED (S-1/S-2 — `SEED-256`, ground `drive_type: personal`)** |
-| 241 | **1** (row 5 of 6) | a read-capable cloud DSN — ⚠ **and it expires, see item 1** |
+---
 
-Also owed from earlier in the milestone and never driven: **233's five G-4 rows**, **236's live
-SC#1 was driven** (2026-09-06, 8/8 providers — this one is DONE), **237's rule-builder surface was
-never manually clicked** (owed by decision).
+## Guardrail overrides
 
-### 5. ⛔ `QUEUE-06` is not met out of the box
+⚠ **Both v4.2 overrides are preserved in full at
+[`.planning/milestones/v4.2-STATE-at-close.md`](milestones/v4.2-STATE-at-close.md) →
+*Guardrail overrides*.** The two **indexed markers** are carried forward verbatim below, because a
+gate reads them from this file by regex and ⛔ **an absent marker reads as an absent decision.**
 
-241 measured the defect and shipped the remedy, but **the default is unchanged**: at
-`hnsw.ef_search = 40` a tenant owning 0.2% of a 100k-chunk corpus scores `recall@20` **0.040**.
-`ef_search = 200` restores **1.000**. ⚠ The degradation is a **cliff, not a slope** — an install can
-cross it with **no deploy and no setting change**. `D-v4.0-EF-DEFAULT` records why the default was
-left alone; the cost is that the requirement is honestly unticked.
+OV-248-01-status: live   # flip to `retired-<YYYY-MM-DD>` when 248 closes or an independent reviewer takes it. ⛔ do not delete it — an absent marker reads as an absent decision.
 
-### 6. ⛔ `SURF-03`'s home is an open SCOPING decision, not a build
+⚠ **`OV-248-01` IS CONTRADICTED BY ITS OWN PHASE'S VERDICT, AND THE MARKER IS LEFT `live` RATHER
+THAN FLIPPED BY ME.** The override records the operator instruction *"you will handle next phase end
+to end yourself"*, and states that 248 would therefore close `self-verified`. **Measured 2026-09-18:
+`248-VERIFICATION.md` reads `verification_mode: peer-reviewed` (builder gemini / reviewer claude)** —
+so the override's own re-open trigger (*"if an independent reviewer becomes available before 248
+closes, this override lapses and the review is taken"*) appears to have **fired and been honoured**.
+⛔ Flipping a governance marker on my own reading is the thing this project's registers exist to
+prevent. **Operator decision:** retire it (`retired-2026-09-18`) or record why it stays live.
 
-There is no in-app notification surface in this product. The recommendation is an app-shell signal
-**plus** the Health-tab row; **closing it against the Health tab alone does not satisfy it.** This
-is a product question for the operator at the next `/gsd:new-milestone`.
-
-### 7. ⚠ `retrieval_service.py`'s G-5 extraction, owed since 231
-
-241 was the deliberate **second** landing (11 non-comment lines, fence driven RED at 13).
-**A third landing must propose the extraction FIRST.**
-
-### 8. ⚠ Register debt that the next milestone opens against
-
-| | |
-|---|---|
-| Planted seeds | **161** of 275 — ⚠ CLAUDE.md's sweep rule says `/gsd:new-milestone` reads every `trigger_when`. **At 161 that sweep is a phase of work, not a step in a command**, and a `trigger_when` nobody reads is a deferral with no re-open, which is a deletion that looks like a decision |
-| Open reported bugs (`surface: Agentic-RAG`) | **34** |
-| New seeds from 241 | `SEED-265` (connection-by-id / saved-View recall axes were never built) · `SEED-266` (`full-schema.sql` ACL + `row_security`) · `SEED-267` / `SEED-268` (WR-02/03/04/06, and the harness's unproven exact arm) |
-| ⚠ `SEED-177` | still reads `status: planted` while its retire-the-egress-fence trigger **already fired** |
-| Plans with no SUMMARY.md | `232-04` (landed `1ae6defbb`) and `235-17` (landed `29858f01f`) — in git, absent from the phase record |
-| `BUS-171` | the operator-queue triage (23 items `--to operator`) is **parked, not dropped** |
-| `SEED-242` | still armed — `app.<domain>` at the next production push |
-
-### 9. ⭐ The method finding worth carrying into the next milestone
-
-**A review is a CLAIM about code, not the code.** Measured three times in one hour by the audit
-written to catch it: the audit asked *"is a VERIFICATION file present?"* and never opened the review
-that was there; the correction opened the review and escalated its two CRITICALs to *"open, data
-loss"* and never opened the code — they had been fixed two days earlier, in an ancestor of the
-auditing commit. **Each register only knows the one below it, and the code is the bottom. Drive it,
-or do not report it.**
+OV-SOLO-01-status: retired-2026-09-13   # RE-ARMED — Gemini returned 2026-09-13, the trigger's first arm. Flip back to `live` ONLY with a dated entry naming why. ⛔ do not delete it — an absent marker reads as an absent decision.
 
 ---
 
 ## Deferred Items
 
-Acknowledged and deferred at the v4.0 close (`gsd-sdk query audit-open` → **48 open items**). None
-is engineering; **the verification debt listed above is the part that matters.** Full item-level
-table: `.planning/milestones/v4.0-STATE-at-close.md` is the pre-close snapshot; the live list is
-re-derivable at any time with `gsd-sdk query audit-open`.
+Items acknowledged and deferred at the v4.2 milestone close on **2026-09-18**, per the pre-close open
+artifact audit (`gsd-sdk query audit-open`). ⚠ **28 of the 29 quick tasks read `missing`** — the
+directory exists with no status file, so these are stale shells from as far back as 2026-03, not live
+work. They are listed rather than summarised because a count is not a set.
 
-| Category | Count | Detail |
-|---|---|---|
-| quick_tasks | **29** | 28 `missing` + 1 `unknown` — historical records whose files no longer exist (was 28 at the v3.9 close; one added) |
-| seeds | **14** | all `dormant`: 003, 004, 040, 041, 042, 043, 045, 046, 084, 127, 163, 164, 165, 166 — ⚠ unchanged for two milestones running |
-| todos | **1** | `spike-nl-workflow-authoring.md` — largely satisfied by the Phase 097 spike answer |
-| uat_gaps | **2** | 233 (`unknown`, 5 rows) · 241 (`partial`, 5/6 driven) |
-| verification_gaps | **2** | 239 (`human_needed`, **no code defects** — its 2 CRITICALs and 4 HIGHs are closed and were independently re-driven) · 241 (`human_needed`) |
-| debug_sessions / threads / context_questions | **0** | clear |
+| Category | Item | Status |
+|----------|------|--------|
+| quick_task | 260322-26g-improve-tool-call-display-for-ls-tree-gr | missing |
+| quick_task | 260328-v6n-investigate-and-plan-fixes-for-duplicate | missing |
+| quick_task | 260328-wqj-fix-folder-scoped-chat-returning-results | missing |
+| quick_task | 260328-x6n-fix-bug-folder-not-created-when-pressing | missing |
+| quick_task | 260404-vel-fix-streaming-cursor-bug-and-add-meaning | missing |
+| quick_task | 260405-rgy-fix-folder-public-visibility-files-and-s | missing |
+| quick_task | 260405-s1e-hide-toggle-global-from-non-owners-and-b | missing |
+| quick_task | 260405-stg-add-chat-references-cascade-deletions-an | missing |
+| quick_task | 260407-vqw-review-and-fix-context-window-management | missing |
+| quick_task | 260411-wj5-fix-skill-file-upload-bug-files-not-save | missing |
+| quick_task | 260412-dqu-fix-four-issues-in-backend-app-api-skill | missing |
+| quick_task | 260412-jnc-import-skill-return-202-backgroundtask-f | missing |
+| quick_task | 260522-gdg-google-15-iter-loop-diagnostic | missing |
+| quick_task | 260529-0sc-fix-phase-086-wr-04-persist-panel-todo-t | missing |
+| quick_task | 260529-1wb-fix-bug-260529-01-write-todos-crashes-on | missing |
+| quick_task | 260530-wjp-infer-native-tools-for-deepseek-moonshot | missing |
+| quick_task | 260530-wvt-fix-title-gen-stuck-on-new-chat-strip-th | missing |
+| quick_task | 260531-00x-add-reportlab-to-sandbox-image-pdf-writi | missing |
+| quick_task | 260611-irx-worker-log-rotation-pid | missing |
+| quick_task | 260630-226-chat-tool-card-live-state-de-duplication | missing |
+| quick_task | 260705-hz1-fix-seed-102-reverse-the-name-collision- | missing |
+| quick_task | 260705-nfu-fix-a-silent-data-loss-bug-in-skill-zip- | missing |
+| quick_task | 260731-3y4-armed-approval-allow-list | missing |
+| quick_task | 260807-x9p-bound-steptypepicker-height-to-measured- | missing |
+| quick_task | 260808-148-steptypepicker-keyboard-navigation-rovin | missing |
+| quick_task | 260809-klo-fix-bug-260809-02-add-a-business-require | missing |
+| quick_task | 260814-q5r-show-a-template-s-placeholders-when-it-i | missing |
+| quick_task | 260830-lib-address-4-library-uat-observations | unknown |
+| quick_task | 260906-5qd-fix-bug-260906-01 | missing |
+| todo | spike-nl-workflow-authoring.md | — |
+| seed | 003-deployment-flexibility-install-ux | dormant |
+| seed | 004-org-multi-tenancy | dormant |
+| seed | 041-conversation-compaction | dormant |
+| seed | 043-sandbox-package-management | dormant |
+| seed | 046-library-health-dashboard-enrichment | dormant |
+| seed | 127-reasoning-first-forced-emission-gap | dormant |
+| uat_gap | 248-G4-UAT.md | unknown |
+| uat_gap | 249-UAT.md | unknown |
+| uat_gap | 250-UAT.md | unknown |
+| uat_gap | 254-HUMAN-UAT.md | passed |
+| verification_gap | 253-VERIFICATION.md | gaps_found |
 
-## Guardrail overrides
-
-Both v4.0 overrides are preserved verbatim in `.planning/milestones/v4.0-STATE-at-close.md` →
-*Guardrail overrides*. Record every new override here, per the CLAUDE.md orchestrator protocol.
-
-### G-7 (gap-closure round cap) — Phase 244, round 2 → plan `244-15`
-
-`node scripts/check-gap-closure-rounds.cjs 244` reads `rounds completed: 2 (cap is 2)` and prints
-`G-7 fires`. **Re-derived by the orchestrator at the merge of `244-15`, not inherited from the
-executor's claim** — the gate's own derivation names both rounds (`8cd9d8119` → 244-09..13,
-`8a27ab7f8` → 244-15).
-
-Waved through on the gate's **worded** escape hatch, with the criterion:
-
-> *"SC#3: an approval answered in one home does not settle it in the other, and the run line +
-> composer keep a lock the server has already dropped."*
-
-Verdict: **`G-7 passed WITH OVERRIDES`** — never `clear`. Rests on the operator's recorded ruling at
-the close of round 2 (`244-UAT.md` § *Operator rulings — 2026-09-12*). The
-`[new-capability-in-closure]` arm stayed clear on its own merits.
-
-⛔ **This is the last round available.** A third gap-closure round needs the operator, not a flag —
-if verification returns `gaps_found` on this phase again, triage (fast-fix / defer / accept) is the
-only door, and `/gsd:plan-phase 244 --gaps` must NOT be routed to.
-
-### ⭐ OV-SOLO-01 — RE-ARMED 2026-09-13. ITS TRIGGER FIRED AND WAS ACTED ON THE SAME DAY.
-
-⭐⭐ **THE TRIGGER FIRED: Gemini is available again (operator, 2026-09-13).** The ruling's own
-re-arm trigger read *"Gemini's quota returns, or the v4.1 close, whichever is first"* — the first
-arm arrived. **The two-agent separation of `AGENTS.md` §3 / §6.3 is BACK IN FORCE from this moment:**
-a phase's builder may not be its reviewer, and a solo run is no longer authorised for new phases.
-
-⚠ **This is the whole reason the trigger was written down.** The PREVIOUS version of this override
-carried a date-based trigger that arrived and went unacted-on for a day, and Phase 245's SC#4 exists
-because of that lapse. **It did not lapse a second time: the trigger fired and was honoured in the
-same session**, before any work was handed out under the old regime.
-
-⛔ **What does NOT change retroactively.** Every phase already closed under the ruling (238, 240,
-241, 242, 243, 244, 245) stays **`verification_mode: self-verified`** and keeps
-**`independent_review: owed`**. Re-arming the rule does not retro-review anything; those debts are
-still owed and are still listed where they were. **The honesty gate
-(`scripts/check-verification-honesty.cjs`) and its PostToolUse hook stay in force permanently** —
-they are not an artefact of solo running, they are how any future self-verification stays visible.
-
-**Next re-arm trigger (for the re-armed state):** if Gemini becomes unavailable again, this flips
-back to `live` **with a dated entry and a named expected-return**, never silently.
-
-OV-SOLO-01-status: retired-2026-09-13   # RE-ARMED — Gemini returned 2026-09-13, the trigger's first arm. Flip back to `live` ONLY with a dated entry naming why. ⛔ do not delete it — an absent marker SKIPS the claims-review arm.
-
-#### ⬇ The ruling as it stood while solo running was authorised (2026-09-11 → 2026-09-13) — preserved, not overwritten
-
-OV-SOLO-01-status-historical: live   # machine-readable index for scripts/check-verification-honesty.cjs. Flip to `retired-<YYYY-MM-DD>` when the ruling is re-armed; ⛔ do not delete it — an absent marker SKIPS the claims-review arm.
-
-**Ruling (operator, 2026-09-11, at v4.1 scoping):** **solo running continues.** The substitute for the
-independent gate is the **dispatched code-review subagent**, which is **MANDATORY** on any phase
-touching a trust boundary. ⛔ **It is NOT an independent gate**, and every phase closed under it must
-read **"self-verified"** in its own VERIFICATION.md — never "reviewed". `/code-review ultra` stays
-**ruled out on cost**.
-
-⭐ **It is also not worthless, and that is measured rather than assumed:** on Phase 239 exactly this
-arrangement returned **19 findings including 2 Criticals**, one being a destructive tool bindable as
-the file *reader* and then called by the watch loop on every file, unattended.
-
-**What does NOT lapse either way:** decisions still go to the operator, never self-settled. Baselines
-are still captured before source work. RED-first still holds. The mechanical gates — backend ceiling,
-count gate, hot-file ledger, CLAUDE.md size — are unaffected by who is at the keyboard and remain the
-honest floor.
-
-**Re-arm trigger:** Gemini's quota returns, **or the v4.1 close, whichever is first.** ⚠ The previous
-version of this override carried a date-based trigger that arrived and was not acted on for a day —
-which is precisely how a self-verification comes to read like a review. **`DEBT-03` (Phase 245) exists
-to close that gap in writing**, on phases 238, 240 and 241.
-
-**Applies to:** every phase in v4.1 (242-246).
-
-**Confirmed by Phase 245 (DEBT-03 / SC#4), 2026-09-13:** measured **complete at HEAD before the phase
-began** — all four elements and the re-arm trigger present. Cited verbatim in `245-VERDICT.md` §SC#4.
-⛔ Nothing here was re-derived, reordered or rewritten. ⚠ The register said `pending`; the artifact
-said `done`. **Three registers can be wrong in the direction of "still owed" too** — the same class of
-error as the stale Azure claim `245-03` corrects, running the other way.
+**Total: 41**
 
 ---
 
-#### ⚠ The original entry, preserved — OV-SOLO-01 before the ruling
+## Roadmap Evolution
 
-`OV-SOLO-01` (operator, 2026-09-08) set aside `AGENTS.md` §3 / §6.3 — the two-agent separation
-itself — for 2026-09-08 and 2026-09-09, with the re-arm trigger *"Gemini's quota returns, or
-**2026-09-10**, whichever is first."*
+- **2026-09-16** — `.planning/v4.2-MILESTONE-AUDIT.md` closed `gaps_found` (4 blockers, 9 warnings,
+  integration 16/22, flows 1/3) and **added Phase 252** to close them.
+- **2026-09-16** — Phase **253** added from 252's own code review (`CR-01/02/03/08`).
+- **2026-09-17** — Phase **254** added by operator instruction: the independent review of 249-253.
+- **2026-09-18** — the audit was **re-driven** before the close and moved to 25/26 · 19/19 · 3/3,
+  with the 2026-09-16 reading preserved rather than overwritten.
 
-⛔ **2026-09-10 has arrived and Gemini is still unavailable.** The override is therefore **neither
-expired-and-honoured nor silently extended** — it is recorded here as an **open operator decision**,
-because letting it lapse unnoticed is exactly how a self-verification comes to read like a review.
-Three phases (238, 240, 241) already closed under it.
-
-**The operator's ruling is needed on one question:** does solo running continue into the next
-milestone, and if so, what stands in for the independent gate? `/code-review ultra` is ruled out on
-cost, and a code-review subagent that claude dispatches is claude's own work checking itself —
-⭐ **though not worthless: on Phase 239 exactly that arrangement returned 19 findings including 2
-Criticals**, one of which (a destructive tool bindable as the file *reader*, then called by the
-watch loop on every file, unattended) would otherwise have shipped.
-
-**What does NOT lapse either way:** decisions still go to the operator, never self-settled.
-Baselines are still captured before source work. RED-first still holds. The mechanical gates —
-backend ceiling, count gate, ledger, CLAUDE.md size — are unaffected by who is at the keyboard and
-remain the honest floor.
-
-## Gates at the v4.0 close
-
-| Gate | Reading |
-|---|---|
-| Backend unit | **71 failed / 4491 passed** — the project ceiling **exactly**, and the failing **SET** diffed identical in both directions, not merely an equal count |
-| Vitest count gate | RED on 3-4 **provably-unmodified** `SEED-171` flakes — captured before any re-run, per the triage procedure |
-| Hot-file ledger · CLAUDE.md size · G-7 | all clear |
-
-## Accumulated Context
-
-Cleared at the v4.0 close. The decision log lives in `.planning/PROJECT.md` (`## Key Decisions`) —
-eight v4.0 decisions were added there at this close. The pre-reset snapshot is
-`.planning/milestones/v4.0-STATE-at-close.md`. **Open items carried forward are the nine sections
-above — nothing else survives the reset silently.**
-
-## Phase 244 — owed verification (recorded 2026-09-12)
-
-⚠⚠ **SUPERSEDED AT THE ROUND-2 CLOSE, 2026-09-12 — the original text is preserved below, never
-overwritten, because what it got WRONG is the useful part.** It reads *"zero `244-VALIDATION.md` rows
-have been driven"* and lists L-2 / L-7 / L-1 / L-3 / L-4 / L-5 / L-6 as owed. **Two full browser
-rounds have since run** (`244-UAT.md` § R1, § R2), and re-verification measures **4 of 5 ROADMAP
-success criteria DRIVEN AND CLOSED** — SHELL-01, SHELL-02, SHELL-04's headline, SHELL-05. The
-owed-list below is therefore not merely out of date, it names as owed several rows that have since
-passed. ⛔ **A stale owed-list is worse than no list: it sends the next session to re-drive work that
-is done and lets the one genuinely owed row hide inside seven.**
-
-### ✅ CLOSED 2026-09-13 — the owed row was DRIVEN and it PASSED
-
-⭐ **`244-15-UAT-ROW.md` was driven in a real browser on 2026-09-13 (attempt 2) and PASSES.**
-`SHELL-03` closes; re-verification reads **`passed`, 5/5 driven-and-closed**. The text below this
-block described the position when ONE row was still owed, and is kept because its checklist is what
-made attempt 2 work.
-
-| arm | verdict | the measurement |
-|---|---|---|
-| 1 — chat → panel | **PASS** | panel controls gone at **+12.6 s**, still gone at **+48.3 s**, no refresh. `R2-4` still showed *"NEEDS YOU"* **three minutes** after answering |
-| 2 — panel → chat | **PASS** | chat controls gone at **+2.0 s**, still gone at **+56.3 s**. `R2-4` had all three still at 546.8 / 988.4 at +20 s |
-| 3 — run line + composer | **PASS** | `data-run-line-state` `"live"` → gone; composer usable by **+12.6 s** / **+13.3 s**, re-read usable at +31.3 s and +56.3 s |
-| 4 — the receipt | **measured** | card unmounts; the stream carries *"— aborted by user · phase: act · reason recorded by the step"*. ⚠ whether that is an acceptable receipt is an **operator judgement**, left open |
-| 5 — third home | **PASS** | 1237.6 / 1237.6 / 1382 against `aside.left` 1156, spine climbing |
-
-Two runs on two threads (`34117b9f` answered in CHAT, `25279958` answered in PANEL), so neither arm is
-passed by a one-way fix. Both reached **`run=failed` / `act=failed`** server-side, so the UI was not
-clearing itself optimistically. ⛔ **Safety held:** `to:` was `uat-do-not-send@example.invalid`
-(RFC-unroutable), both settled with **"Do not run it"**, *"Approve this step"* was never clicked, no
-email sent.
-
-⛔ **What the PASS does NOT cover, recorded so it is not later assumed:**
-
-- the **fail-closed** arms never ran — `wire_reported_live_at_settle` was **false** both times, so the
-  `liveAnchor || capPaused` refusal was never exercised. jsdom Tests 3/4/5 remain its only evidence;
-
-- the **Deep-mode** `ask_user` path is still **undriven**;
-- `WR-02` / `WR-03` stay deferred with triggers (`deferred-items.md` §§ 12-13), and `SEED-272` still
-  holds SHELL-04's second gap.
-
-⚠ **A METHOD FINDING WORTH MORE THAN THE ROW — attempt 1 produced a defect-shaped reading that was
-WITHDRAWN, not published.** The chat column said *"The run was stopped"* and re-enabled the composer
-while the DB still read `active` with the ask pending — the exact inverse of the fail-closed
-invariant, and one sentence from being written up as critical. The process table killed it: the
-backend runs **`uvicorn --reload`**, and **this session's own `git merge` calls rewrote tracked files
-underneath it**, restarting the workers mid-run. The client was rendering a dead stream.
-⭐ **A UAT driven against a `--reload` backend while the driver is merging branches is measuring its
-own tooling.** Establish the box is quiet FIRST, and treat any mid-drive worker restart as
-invalidating every observation after it.
+⚠ **`gsd-sdk query phase.add` wrote its ROADMAP entry into the WRONG SECTION twice in two days**
+(Phase 252 on 2026-09-16, Phase 254 on 2026-09-17) — a `### Phase NNN:` block at the wrong heading
+level, appended after an archived milestone's `<details>` block, touching none of the live registers.
+Both were reverted from a pre-call backup and hand-edited. **Back up before calling an SDK write verb,
+and verify what it did on disk rather than trusting its JSON.**
 
 ---
-
-### ⚠ The position while the row was still owed (kept — its checklist is what made attempt 2 work)
-
-### The CURRENT position — ONE row owed, and it is named
-
-⛔ **Phase 244 is BUILT + REVIEWED, NOT CLOSED.** Re-verification (`244-VERIFICATION.md`,
-`re_verification: true`) returns **`human_needed`**, score **4/5 driven-and-closed**.
-
-**The single blocking item:**
-
-> **Drive `.planning/phases/244-the-chat-shell-and-the-composer/244-15-UAT-ROW.md`** — five arms, all
-> `pending`. It scores **SC#3's second clause**: *answering an approval in either home settles it in
-> both*, plus the run-line and composer readings.
-
-**Why it cannot be waved through on the fences.** `G-8` was driven **FALSE in a real browser on two
-real workflow runs**. Round 2 (`244-15`, merged `6acc0bf28`) built the settle path for it, and the
-code is real — ten load-bearing claims were spot-checked against the live tree and all held. But
-**every assertion added is a jsdom mount over a mocked `@/lib/api`**, and this phase has been burned
-by exactly that twice: `244-03` shipped a green mount fence over this same blocker and the operator
-found it live nineteen plans later; `244-12` shipped fences proving the approval MOUNTS when the half
-that broke was whether it ANSWERS. `D-244-14` binds — *`BUG-260828-07` is severity HIGH and closes on
-a DRIVEN row, not a fence.*
-
-**Round-2 gates, measured by the orchestrator on the merged tree (not inherited from an executor):**
-count gate `total 8270 · failed 0 · pinned 7480 · 277/277` · ledger gate OK (66 files parsed, 30
-watched — not the Phase-242 vacuous-CRLF shape) · CLAUDE.md 97k OK · `tsc -p tsconfig.app.json` 67 → 67,
-zero new · **backend untouched by round 2**, so the locked 71-failed ceiling is unaffected.
-
-**Round-2 review dispositions** (`244-REVIEW-gap-round-2.md`, 0 critical / 3 warning):
-
-- **`WR-01` FIXED** as a G-3 fast-fix (`f0398f045`) — it was a regression `244-15` itself introduced:
-  the settle ran on **every** answered ask, so answering a prompt on a Deep chat run disarmed the 8s
-  stop-confirmation timer and `StopControl` re-rendered a pressable **Stop** over a still-streaming
-  run. Driven RED first, pressing Stop for real rather than hand-seeding the slice.
-
-- **`WR-02` / `WR-03` DEFERRED** as decisions with fireable triggers — `deferred-items.md` §§ 12-13.
-
-⛔ **G-7's round cap is SPENT (2 of 2, overridden — see § Guardrail overrides).** If the owed drive
-finds a defect, `/gsd:plan-phase 244 --gaps` is **NOT available**. Triage is the only door: fast-fix
-(G-3) / defer with a trigger / accept. A third round needs the operator, not a flag.
-
-⚠ **Also new, and not this round's scope:** SHELL-04 gained a second gap in round 2 — a failed
-cloud-attachment copy never gives up and never recovers — deferred to **`SEED-272`** by explicit
-operator ruling.
-
----
-
-### ⚠ ORIGINAL TEXT, 2026-09-12 (stale — kept for the record, do NOT act on its owed-list)
-
-Phase 244 is **BUILT, NOT VERIFIED**. Verification returned `human_needed`: 5/5 success
-criteria have real wired code (8 load-bearing claims spot-checked against the live tree,
-all held), and **zero `244-VALIDATION.md` rows have been driven**. The ROADMAP states
-verbatim: *"No success criterion closes on a unit test."*
-
-⛔ Do NOT mark 244 complete until these are driven and written back into
-`.planning/phases/244-the-chat-shell-and-the-composer/244-VALIDATION.md`:
-
-1. **L-2 FIRST** — the cap-paused composer still lets the operator act **after a reload**.
-   This is the one claim the phase's own authors flagged as unsettleable by reasoning;
-   Phase 228 removed the reload that used to free them.
-
-2. **L-7** — the app-shell attention signal, **both directions** (fires for a stopped
-   source, stays silent for a healthy one). Never driven end-to-end since Phase 235
-   shipped the mechanism — oldest code, highest residual risk.
-
-3. L-1, L-3, L-4, L-5, L-6, then the 8-row cross-provider board (D-244-02).
-
-Also owed, one line each:
-
-- `REQUIREMENTS.md:207-208` carries a SHELL-04/SHELL-05 traceability note that
-  **contradicts locked D-244-18 / finding F-1**. Record the correction beside it, not over it.
-
-- 12 of 18 code-review findings remain open — `deferred-items.md`, each with a re-open
-  trigger. `WR-08` is *worse-shaped* after the 244-07 fix round.
-
-- `connectors.py` took its FIFTH landing; the split is proposed in writing and declined
-  once more. A sixth propose-and-decline is the pattern that deferral exists to stop.
 
 ## Operator Next Steps
 
-- Start the next milestone with /gsd-new-milestone
+1. **Start the next milestone** — `/gsd:new-milestone`.
+2. **Rule on `OV-248-01`** (above) — retire the marker or record why it stays live.
+3. **Rule on `DEBT-06`'s three open rows** — adopt the drafted refusals for 251 / 252 / 253, or leave
+   them open for Gemini until **2026-09-24**. `BUS-246` and `BUS-248` are also open `to:operator`.
+4. **Promote migration 181 to cloud** when the next deploy is authorised — code half and SQL half in
+   **one operation**, with `get_advisors(security)` in the same promotion (`CRED-04`).

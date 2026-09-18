@@ -1,5 +1,5 @@
 ---
-id: SEED-158
+seed_id: SEED-158
 title: A real client template has no {{ placeholders }} — and the app cannot use it at all
 status: open
 planted: 2026-08-14
@@ -12,6 +12,7 @@ re_open_trigger: >
   A real (non-fixture) customer template failing to bind because it carries no Jinja tokens, OR
   any phase that proposes authoring/editing placeholders into a document, OR the document-editing
   capability of [[SEED-161]] being scheduled. Whichever comes first.
+trigger_when: unset
 ---
 
 # The plain-template case — the common one, and the one we cannot serve

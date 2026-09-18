@@ -19,6 +19,9 @@ trigger_when: >
   `backend/app/services/retrieval_service.py` — **or** Phase 246, whichever comes first. Phase 246
   is the natural home: `retrieval_top_k`'s ceiling interacts with `hnsw_ef_search`, which is that
   phase's subject, and both knobs live on the same Settings → Search card.
+trigger_paths:
+  - "backend/app/api/settings.py"
+  - "backend/app/services/retrieval_service.py"
 ---
 
 ## What was measured, and what it refutes

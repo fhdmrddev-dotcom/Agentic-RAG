@@ -1,5 +1,5 @@
 ---
-id: SEED-152
+seed_id: SEED-152
 title: Workflow phase outputs carry NO confidence score — chat messages carry three. The operator's own "citation AND confidence" rule is satisfied in chat and silently unmet in workflows
 status: planted
 planted: 2026-08-12

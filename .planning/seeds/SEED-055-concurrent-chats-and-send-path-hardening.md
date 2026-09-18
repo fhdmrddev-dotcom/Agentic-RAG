@@ -1,7 +1,13 @@
 ---
-id: SEED-055
+seed_id: SEED-055
 title: True concurrent chats (parallel sends, Claude.ai/ChatGPT-class) + send-path hardening — per-thread send mutex, composer-clear safety net, and the fresh-thread reconcile-vs-send race
-status: partially-shipped
+status: shipped
+partial: true
+status_note: |
+  ORIGINAL `status:` line, verbatim — displaced by Phase 251's frontmatter migration (D-10):
+  status: partially-shipped
+
+  Mapped `partially-shipped` -> `shipped` + `partial: true`. Reason: D-16.
 planted: 2026-06-06
 planted_by: orchestrator (post-095.1 — operator report of silent send-drop on fast chat-nav; investigation wf_b4755523-73b)
 shipped_note: "PART 1 (true concurrent chats / per-thread send mutex) SHIPPED 2026-06-06 — StreamsProvider isSendingRef(global bool)+streamingThreadIdRef(slot) → sendingThreadsRef(Set); busyElsewhere stopgap gate removed. Verified: live two-concurrent-streams, 4-lens adversarial review (0 defects), git-stash test parity (17/17 baseline, zero net-new), tsc baseline 37. RESIDUALS STILL OPEN: (2) fresh-thread reconcile-vs-send race [mechanism #2], (3) composer-clear text safety net, (4) stoppedByUserRef single-global → 'cancelled' mislabel under 2 concurrent stops [pre-existing, surfaced by review], (5) optional title-gen off critical path."
@@ -9,6 +15,7 @@ trigger_when: A chat-surface reliability/UX milestone or polish phase (pairs wit
 priority: medium
 tags: [chat, composer, send-path, parallel-sends, concurrency, run-honesty, professional-ux, StreamsProvider, BUG-260603-01, v2.9]
 related_bugs: [BUG-260603-01]
+surface: Agentic-RAG
 ---
 
 # SEED-055: True concurrent chats + send-path hardening

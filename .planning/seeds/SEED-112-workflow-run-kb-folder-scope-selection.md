@@ -14,6 +14,8 @@ related_phases:
   - Phase 143 (Starter Workflow Library) — surfaced this gap; starters are intentionally unscoped
 related_memories: [reference_render_template_workflow_only, feedback_iterate_leverage_existing]
 priority: medium
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-112 — per-workflow / per-run KB folder-scope selection (deferred, v3.3 workflow-UX cluster)

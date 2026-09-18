@@ -222,25 +222,47 @@ class TestGoogleDriveFiles:
             AsyncMock(return_value="token_123"),
         )
 
-        recorded_params = {}
+        recorded_list_params = {}
 
         async def _mock_send_pinned(capability: str, method: str, url: str, **kwargs):
-            nonlocal recorded_params
-            recorded_params = kwargs.get("params", {})
+            nonlocal recorded_list_params
+            params = kwargs.get("params", {})
+            if "q" in params:
+                recorded_list_params = params
+                return PinnedResponse(
+                    status_code=200,
+                    headers={"content-type": "application/json"},
+                    body=jsonlib.dumps({
+                        "files": [
+                            {
+                                "id": "file-doc-1",
+                                "name": "Q4 Roadmap",
+                                "mimeType": "application/vnd.google-apps.document",
+                                "modifiedTime": "2026-09-04T10:00:00Z",
+                                "driveId": "drive-alpha",
+                            }
+                        ],
+                        "nextPageToken": None,
+                    }).encode("utf-8"),
+                )
+            # WATCH-01: _resolve_folder_path resolves folder hierarchy
+            if url.endswith("/drive-alpha"):
+                return PinnedResponse(
+                    status_code=200,
+                    headers={"content-type": "application/json"},
+                    body=jsonlib.dumps({
+                        "id": "drive-alpha",
+                        "name": "Alpha Team Drive",
+                        "parents": ["root"],
+                    }).encode("utf-8"),
+                )
             return PinnedResponse(
                 status_code=200,
                 headers={"content-type": "application/json"},
                 body=jsonlib.dumps({
-                    "files": [
-                        {
-                            "id": "file-doc-1",
-                            "name": "Q4 Roadmap",
-                            "mimeType": "application/vnd.google-apps.document",
-                            "modifiedTime": "2026-09-04T10:00:00Z",
-                            "driveId": "drive-alpha",
-                        }
-                    ],
-                    "nextPageToken": None,
+                    "id": "subfolder-xyz",
+                    "name": "Project Specifications",
+                    "parents": ["drive-alpha"],
                 }).encode("utf-8"),
             )
 
@@ -254,8 +276,9 @@ class TestGoogleDriveFiles:
         assert f.name == "Q4 Roadmap"
         assert f.mime_type == "application/vnd.google-apps.document"
         assert f.drive_id == "drive-alpha"
-        assert recorded_params.get("supportsAllDrives") == "true"
-        assert recorded_params.get("includeItemsFromAllDrives") == "true"
+        assert f.path == "/Alpha Team Drive/Project Specifications/Q4 Roadmap"
+        assert recorded_list_params.get("supportsAllDrives") == "true"
+        assert recorded_list_params.get("includeItemsFromAllDrives") == "true"
 
     @pytest.mark.asyncio
     async def test_read_google_doc_exports_to_pdf(

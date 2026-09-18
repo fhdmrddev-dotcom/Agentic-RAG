@@ -1,7 +1,13 @@
 ---
 seed_id: SEED-078
 title: Unified runtime feature-flag / kill-switch / maintenance-mode system (no operator off-switch for a misbehaving capability)
-status: partially-folded
+status: folded
+partial: true
+status_note: |
+  ORIGINAL `status:` line, verbatim — displaced by Phase 251's frontmatter migration (D-10):
+  status: partially-folded
+
+  Mapped `partially-folded` -> `folded` + `partial: true`. Reason: D-16 — folded on one axis, pending on another.
 folded_into: 210
 planted: 2026-06-10
 phase_origin: "Phase 101 plan-phase — future-milestone alignment sweep 2026-06-10 (workflow wf_13ed5033)"
@@ -20,6 +26,7 @@ trigger_when:
   - The hosted multi-tenant SaaS line is scoped — blast radius of a broken capability rises sharply across co-tenants
 priority: high — DECISIONS.md itself flags it as homeless and four locked milestones (v3.0/v3.2 tier gating, v3.4 routine governance, plus v2.9 Phase 102) assume the primitive exists; not load-bearing for v2.9 CORE, but an operational-credibility gap that compounds with every blast-radius increase.
 suggested_phase: v3.1 Operator UX is the build home (co-planned with SEED-080 entitlement gating — shared flag substrate). NOT v2.9 — Phase 102 only needs to know the off-switch is coming. First consumers are v3.0 / v3.2 entitlement checks.
+surface: Agentic-RAG
 ---
 
 # SEED-078 — Unified runtime feature-flag / kill-switch / maintenance-mode system

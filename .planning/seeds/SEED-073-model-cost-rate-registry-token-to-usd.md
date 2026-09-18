@@ -19,6 +19,7 @@ trigger_when:
   - A B2B customer or the hosted-SaaS line needs per-tenant / per-run spend visibility in dollars
 priority: high — the single least-captured item in the least-captured (monetization) dimension; a clean, concrete, blocking gap that a v2.9 STRETCH phase (105) and a locked v3.4 milestone both assume as already-present infrastructure.
 suggested_phase: resolve at Phase 105 SCHED-01 spec-time (it is the hard shared prerequisite), then formalize in v3.4 spend_caps. NOT new v2.9 CORE work — but the dependency MUST be confronted before the 101→105 path reaches 105.
+surface: Agentic-RAG
 ---
 
 # SEED-073 — Per-model cost-rate registry + token-to-USD conversion

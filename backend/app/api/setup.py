@@ -46,7 +46,7 @@ from app.services.setup_store import (
 
 # The auditable-DB-flag write seam (Phase-150 encrypt-on-write is inherited for free) — bound at
 # module scope so the finalize proof monkeypatches the boundary (no live DB in a unit test).
-from app.models.user_settings import save_app_settings
+from app.models.user_settings import SettingsWriteRefused, save_app_settings
 
 # Service seams (158-05) — the pure, unit-testable logic the router orchestrates (never forked).
 # Bound at module scope so the endpoint proofs monkeypatch the boundary (save-False, dup, etc.).
@@ -381,8 +381,26 @@ async def operator(body: OperatorBody) -> dict:
 async def provider_key(body: ProviderKeyBody) -> dict:
     """D-12: persist the provider key through the SINGLE ``save_app_settings`` seam
     (encrypt-on-write inherited for free). A False return is a REAL 500 (honest write-through,
-    mirrors PUT /admin/flags) — never a false 'saved'."""
-    if not await save_provider_key(body.provider, body.api_key, body.embedding_key):
+    mirrors PUT /admin/flags) — never a false 'saved'.
+
+    ⭐ Phase 252 (W-4 / D-31): TWO failures, TWO answers. This was the ONE ``save_app_settings``
+    seam of six with no ``except SettingsWriteRefused`` arm — Phase 249 gave the other five one
+    and missed this. ``setup_service.persist_provider_key`` states the exception PROPAGATES by
+    design (it must not be swallowed *there*), which only works if it is CAUGHT *here*; uncaught,
+    it left the ASGI stack as an unhandled exception and the operator saw a bare 500 with no
+    sentence. A refusal is the *knob shipped without its migration* signature, and a setup wizard
+    is the first thing to run against a database whose migrations may not all be applied."""
+    try:
+        persisted = await save_provider_key(body.provider, body.api_key, body.embedding_key)
+    except SettingsWriteRefused as refused:
+        # ⛔ `refused.detail()` carries COLUMN and CONSTRAINT names only — never the key value
+        # (TM-252-05). Same wording as the four sibling seams, by construction: the sentence
+        # lives on the exception so the call sites cannot word it five ways.
+        raise HTTPException(status_code=400, detail=refused.detail()) from refused
+    # ⚠ UNCHANGED, and it means a DIFFERENT thing: a False return is an honest write-through
+    # failure (a pool blip, a reset connection), not a caller error. Status, message and
+    # condition are byte-identical to before W-4.
+    if not persisted:
         raise HTTPException(
             status_code=500,
             detail="Could not persist the provider key — it was not saved.",
@@ -466,6 +484,16 @@ async def finalize_setup(body: FinalizeBody) -> dict:
     # 3. Auditable DB flag — best-effort + honestly reported (see the docstring rationale).
     setup_complete_persisted = False
     try:
+        # ⚠ Phase 249 gap-closure (WR-03) — THIS COMMENT WAS FACTUALLY WRONG AND IS CORRECTED
+        # RATHER THAN DELETED. It previously claimed `SettingsWriteRefused` "propagates… Do not
+        # fix it", while the `except Exception:` three lines below catches it like anything else.
+        # A comment that describes the opposite of the code it annotates is worse than none.
+        #
+        # ⭐ THE CODE IS ALREADY RIGHT, which is why only the comment moves. This write is
+        # best-effort and auditable-only by design (see the docstring): the file is authoritative,
+        # so a failed flag write must not fail finalize. Crucially it does NOT report success —
+        # `setup_complete_persisted` stays False and the caller logs "not persisted yet". A
+        # REFUSAL is therefore reported honestly, which is all MODEL-08 asks of this site.
         setup_complete_persisted = bool(await save_app_settings({"setup_complete": True}))
     except Exception:  # noqa: BLE001 — auditable-only; never fail the (file-authoritative) finalize
         logger.warning(

@@ -1,5 +1,5 @@
 ---
-id: SEED-222
+seed_id: SEED-222
 title: "Three verification blind spots, each measured at Phase 214's close — a named-but-nonexistent test path exits 0; a failure-count baseline scoped to one directory cannot see a global-default change; five gate suites run and guard nothing"
 status: planted
 planted: 2026-08-28
@@ -32,6 +32,7 @@ re_open_trigger: >
     (a) cd frontend && npx vitest run src/does/not/exist.test.ts src/lib/apiBarrel.test.ts; echo $?
         --> exit 0 while one named path ran zero cases
     (c) GSD_VITEST_MAX_WORKERS=2 node scripts/vitest-count-gate.cjs | grep " new"
+trigger_when: unset
 ---
 
 # SEED-222: three verification blind spots

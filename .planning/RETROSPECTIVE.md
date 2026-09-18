@@ -939,6 +939,95 @@ v4.0's verification debt got written verdicts plus a greppable `verification_mod
 
 ---
 
+## Milestone: v4.2 — The Connected Knowledge You Can Actually Run
+
+**Shipped:** 2026-09-18 · **Phases:** 8 (247-254) · **Plans:** 31 · **Commits:** 237 · **6 days**
+**Audit:** `gaps_found` — 25/26 requirements · integration 19/19 · flows 3/3.
+
+### What Was Built
+
+A watched source that tells the truth about itself — the health of the connection it rides, the
+result of the sync you pressed, the date a file went missing. A credential boundary that holds:
+migration 181 revokes the default **`PUBLIC`** `EXECUTE` on all 13 `SECURITY DEFINER` functions, and
+a secret pasted into a non-secret field is refused rather than stored. A model registry a person can
+actually add to — local, LM Studio, vLLM, any OpenAI-compatible endpoint — with the composer saying
+at pick time when a model will silently lose tool calling. A run that stops claiming what did not
+happen. And a seeds register swept by something **executable** rather than by a `grep` blind to more
+than half of it.
+
+Then three phases nobody scoped: **252** closed the audit's four blockers, **253** closed 252's own
+code review, **254** was the review phase.
+
+### What Worked
+
+- ⭐ **The cross-phase read found what five green verifications could not, and that is the
+  milestone's one transferable lesson.** 247-251 each closed passing, every gate green, backend at
+  its locked baseline — and the audit found **four blockers and nine warnings**, every one a **seam
+  between two individually-correct things**. Phase-level verification is structurally blind to seams;
+  nothing in a phase's own scope looks at them.
+- ⭐ **Re-auditing before the close changed the verdict.** The on-disk audit read `gaps_found` over a
+  tree **124 commits and three phases** old. Re-driving it moved four blockers to zero. **An audit is
+  a claim about a tree, and it goes stale the moment the tree moves** — closing on the old reading
+  would have recorded four live blockers that had been fixed two days earlier.
+- ⭐ **Driving a gate RED before trusting it caught vacuity twice.** 253's parity gate counted
+  migration FILES, not tuples PARSED — neutering both regexes printed `mirrored: 0/0 … OK`, exit 0.
+  The greenfield harness was driven against a **real scratch database** with a control read proving
+  the refusal was not a false green. *A guard nobody has seen fail is not a guard.*
+- **Measuring before planning stopped work that did not need doing.** `MODEL-09` collapsed to a
+  written closure when a fresh sweep read 8/8 healthy against a month-old 0/8 register entry. Two
+  249 requirements were already built. Three register entries were wrong at scoping — two stale
+  toward *"still broken"*, one toward *"fine"*.
+- **G-8 held.** The five scoped phases ran 4 · 4 · 4 · 3 · 4 plans, inside the 3-5 target every time.
+
+### What Was Inefficient
+
+- **Eight phases for five phases of scope.** The overrun was not plan inflation — it was three
+  phases the audit added. That is the honest cost of finding seams late rather than never, but a
+  cross-phase read at the **midpoint** would have cost less than three phases at the end.
+- **The same defect class kept surviving one register over.** REG-01 fixed duplicate ids in
+  `.planning/seeds/` and `.planning/reported-bugs/` still carries two duplicate clusters that **no
+  gate sweeps**. 253 fixed a lexer that could not see a comment inside a SQL literal, and `E'...'`
+  escape strings still defeat both lexers. 253 fixed a hook matcher blind to `MultiEdit`, and the
+  same hook then failed to fire on script-driven edits.
+- ⚠ **Phase 254's own verification frontmatter is unparseable YAML — the exact defect it reported
+  against Phase 244, in the same week.** Writing the finding down did not make the author immune to
+  it, because nothing executable checks the shape.
+
+### Patterns Established
+
+- **Re-audit at the close, never close on a stored audit.** Record the superseded reading beside the
+  new one; do not overwrite it.
+- **Re-derive a register figure with a parser, never from a hand-typed list.** `DEBT-06`'s unmet
+  count was re-derived with `yaml.safe_load` over each `*-VERIFICATION.md`; the hand-typed list in
+  `REQUIREMENTS.md` had already gone stale twice within the phase that wrote it.
+- **A refusal is a recorded decision, never a pass.** An operator ruling moves `independent_review`
+  to `refused` and leaves `verification_mode: self-verified` untouched, with the accepted risk named.
+- **Back up before an SDK write verb, and verify what it did on disk.**
+
+### Key Lessons
+
+1. **Phase verification cannot see seams.** Budget a cross-phase read, and put it in the middle of a
+   milestone rather than only at its end.
+2. **An audit is perishable.** Its verdict describes one tree. Three phases later it is a historical
+   document, not a gate.
+3. **`grep` cannot audit a gate.** Extract the fenced command and run it. A step that merely *names*
+   a script fires nothing — proven again this milestone by a review that passed while zero runnable
+   calls remained.
+4. **Documenting a defect class does not immunise you against it.** `F-1` is the proof. Only an
+   executable check does.
+5. **The SDK's success JSON is not evidence.** `milestone.complete` reported `state_updated: true`
+   while deleting the narrative it claimed to update — the eighth occurrence of that class.
+
+### Cost Observations
+
+- Model mix: overwhelmingly Opus for orchestration and verification; Sonnet for the integration
+  checker and most executors.
+- Notable: the three audit-driven phases (252/253/254) cost roughly as much as the five scoped ones,
+  and produced **zero new user-facing capability** — by design (G-7). The lever that would have cut
+  it is an earlier cross-phase read, not a smaller phase.
+
+---
+
 ## Cross-Milestone Trends
 
 | Milestone | Phases | Plans | Avg Plans/Phase | Timeline |

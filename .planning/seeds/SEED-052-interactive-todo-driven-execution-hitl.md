@@ -1,12 +1,15 @@
 ---
-id: SEED-052
+seed_id: SEED-052
 title: Interactive todo-driven execution with proactive HITL — a "let's do this together, step-by-step" guided mode in Deep chat (work the todo list one item at a time, ask_user per step, mark complete on answer, advance, produce the final artifact)
 status: planted
 planted: 2026-06-04
 planted_by: orchestrator (/gsd:discuss-phase 094 — operator surfaced the gap from a live "plan a trip to Paris" thread)
 trigger_when: v2.9 milestone kickoff (/gsd:new-milestone), OR any phase that touches the Deep agent-loop system prompt (agent_loop.py interactivity guidance), the ask_user round-trip in Deep mode, or todo-driven execution. Pairs naturally with SEED-051 (NL→workflow authoring) as the "un-authored / ad-hoc" sibling of the harness.
+trigger_paths:
+  - "**/agent_loop.py"
 priority: high
 tags: [agent-loop, interactivity, human-in-the-loop, ask_user, write_todos, guided-execution, deep-mode, cross-provider, v2.9, SEED-051, SEED-034, BUG-260604-01]
+surface: Agentic-RAG
 ---
 
 # SEED-052: Interactive Todo-Driven Execution with Proactive HITL

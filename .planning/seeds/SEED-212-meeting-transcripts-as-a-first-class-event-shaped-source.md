@@ -1,5 +1,5 @@
 ---
-id: SEED-212
+seed_id: SEED-212
 title: Meeting transcripts are a first-class knowledge source and are shaped like EVENTS, not documents — nothing in the register covers them
 status: planted
 planted: 2026-08-26
@@ -18,6 +18,7 @@ re_open_trigger: >
   ingestion (interaction mode E) is specified — transcripts are its primary case; (4) a workflow or
   report is observed citing stale evidence because the current state lives in meetings nobody
   uploaded; (5) chunking strategy is revisited for any non-page-shaped source.
+trigger_when: unset
 ---
 
 # SEED-212 — transcripts are events, and the register has never covered them

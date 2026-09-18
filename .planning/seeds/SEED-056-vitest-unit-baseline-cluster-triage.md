@@ -1,5 +1,5 @@
 ---
-id: SEED-056
+seed_id: SEED-056
 title: Vitest unit-test baseline cluster — 17 pre-existing failures across 7 files are rotted tests (test drift), not app bugs; triage (fix-or-delete) to get the suite green
 status: planted
 planted: 2026-06-06
@@ -8,6 +8,7 @@ trigger_when: before any milestone close that claims unit-test coverage, OR when
 priority: low
 tags: [frontend/unit-tests, vitest, test-debt, chat-ui, streaming, test-drift]
 related_seeds: [SEED-049]
+surface: Agentic-RAG
 ---
 
 # SEED-056: Vitest unit baseline cluster triage

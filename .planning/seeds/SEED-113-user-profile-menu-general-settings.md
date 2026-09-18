@@ -13,6 +13,8 @@ related_phases:
   - v3.4 multi-tenancy milestone — tiers/tenants/user types decide the FULL shape (org switcher, role badge, per-tier settings)
 related_memories: [project_org_level_deferred, project_dynamic_settings_direction, project_settings_design_guidance]
 priority: medium
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-113 — user profile menu + general-settings entry point (identity anchor in the app shell)

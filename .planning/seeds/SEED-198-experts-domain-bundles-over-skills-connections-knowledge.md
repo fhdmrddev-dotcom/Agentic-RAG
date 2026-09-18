@@ -4,6 +4,10 @@ title: "Experts — a domain bundle over skills + connections + KNOWLEDGE SCOPE,
 created: 2026-08-24
 planted_during: Operator direction, 2026-08-24 — "including experts that are expert in some domain, maybe financial analyzer, maybe a strategy writer… the idea is not mature enough in my head"
 status: planted
+status_note: |
+  ── 2026-09-16 · reviewed at `/gsd:discuss-phase 252`, LEFT PLANTED (REG-02 sweep).
+  Fired on `backend/app/**` breadth only. Experts is a capability; 252 is scoped to the v4.2
+  milestone audit §8 and adds no requirement id.
 priority: high
 surface: Agentic-RAG
 relates_to:
@@ -23,6 +27,8 @@ trigger_when: >
 
   Mechanical check that the gap is still real, from the repo root:
     grep -rn "skill_bundle\|skill_pack\|skill_collection" backend/app/   # -> nothing today
+trigger_paths:
+  - "backend/app/**"
 ---
 
 # Experts — the shape the idea was missing

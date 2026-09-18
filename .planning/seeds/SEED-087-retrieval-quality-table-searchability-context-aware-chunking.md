@@ -18,6 +18,8 @@ re_open_triggers:
   - A retrieval-quality audit (SEED-020) or eval shows recall/grounding leaving measurable accuracy on the table on table/section-heavy corpora
 priority: MEDIUM-HIGH for the table-searchability gap (a genuine functional hole — extracted PDF/DOCX tables are invisible to the main search surface, worst on the financial/compliance docs where citation accuracy matters most); MEDIUM/defer for the broader context-aware-chunking upgrades (the existing recursive splitter already captures ~90% of the achievable win)
 suggested_phase: a "Retrieval Quality" deliverable, OR fold the cheap/additive items (table-embed + neighbor/parent-document expansion) into the Phase 111.1 re-embed pass. NOT now — assessed-and-deferred per operator ("works great, don't break it; not needed now").
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-087 — Retrieval quality & table searchability

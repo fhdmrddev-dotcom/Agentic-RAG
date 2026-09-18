@@ -22,6 +22,9 @@ trigger_when: >
   (a) the landing page is ported from the design canvas into a real route — build the drift guard IN THE SAME PHASE, never after;
   (b) any commit changes acceptedFormats.ts, PublishGauntlet STAGES, _TOOL_REGISTRY, the MODEL_CAPABILITIES provider set, or servicesCatalog.ts — the guard must go red until the landing manifest is updated;
   (c) /gsd:complete-milestone — the close checklist gains a "landing-worthy?" line per shipped phase.
+trigger_paths:
+  - "**/acceptedFormats.ts"
+  - "**/servicesCatalog.ts"
 ---
 
 # SEED-241 — the living landing page

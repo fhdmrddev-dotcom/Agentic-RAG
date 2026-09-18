@@ -234,3 +234,58 @@ export function statusMeta(status: Phase["status"]): StatusMeta {
 export function statusWord(status: Phase["status"]): string {
   return statusMeta(status).text
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 252-04 (SC#5 hole 2 / D-26) — THE RUN ENDED AND THIS STEP NEVER REPORTED.
+//
+// ⛔ THIS IS DELIBERATELY *NOT* A KEY IN `STATUS_META`, and the distinction is the whole
+// design. `STATUS_META` is `Record<Phase["status"], …>` and `Phase["status"]` is a WIRE
+// TYPE — every row above exists because the backend can emit that member and the compiler
+// then demanded the panel state it. This state is not on the wire and never will be: the
+// backend emits nothing at all here, which is precisely the failure. Adding a tenth key
+// would claim the server can send a status it cannot, and would make the next reader
+// hunt for the emitter. So this is a PRESENTATION OVERRIDE, applied at read time by the
+// function below, over a status the wire DID send (`running` / `retrying`) which has
+// simply stopped being true.
+//
+// ⛔ WHY NOT REUSE A SHIPPED WORD: none of the nine is true of this state. `Failed` claims
+// something went wrong — nothing did, on this step's own terms. `Skipped` claims it did not
+// run; it DID. `Complete` claims it finished. `Stopped` is 194's word for a person ending
+// the run, and nobody necessarily did. `Not sent` is 189's governed external-action
+// terminal. `Unknown` claims we cannot tell which status it is — we can, we just never
+// heard how it ended. "No outcome" says exactly that and claims nothing further.
+//
+// ⚠ THE GLYPH WAS CHOSEN BY MEASUREMENT, exactly as the `recorded-not-sent` row's was:
+// it appears ZERO times across `frontend/src` today, so it arrives carrying no other
+// meaning. It is inherited from the mathematical-operator block rather than invented — a
+// line running into a bar. Its occurrence COUNT is the evidence, so no rejected candidate
+// is spelled here: prose that spells one makes the count unreadable (the 187-24 lesson).
+//
+// `text-panel-muted-foreground` is the same AA-cleared muted token
+// `pending`/`skipped`/`unknown`/`recorded-not-sent` already share. ⛔ NO WARNING COLOUR:
+// the run ending is not this step's fault, and spending an alarm here would read as a
+// fault nothing raised.
+const INTERRUPTED_META: StatusMeta = {
+  glyph: "⊣",
+  text: "No outcome",
+  textClass: "text-panel-muted-foreground",
+}
+
+/** The two wire statuses that ASSERT LIVENESS, and are therefore the only two a dead run
+ *  can falsify. Every other member describes an outcome the run ending cannot revise. */
+const LIVE_CLAIMING_STATUSES: ReadonlySet<string> = new Set(["running", "retrying"])
+
+/**
+ * The status reading for a phase, given what the CALLER knows about the run.
+ *
+ * ⛔ `runLive === undefined` means the caller holds no answer, and the honest render of
+ * that is TODAY'S BEHAVIOUR — not the interrupted row. `PhaseTimeline` passes `undefined`
+ * before its frame fetch resolves, and every other caller passes nothing at all; both must
+ * be byte-unchanged. So the override fires ONLY on an explicit `false`.
+ *
+ * ⚠ It is a strict `=== false` rather than a falsy test for that exact reason.
+ */
+export function statusMetaForRun(status: Phase["status"], runLive?: boolean): StatusMeta {
+  if (runLive === false && LIVE_CLAIMING_STATUSES.has(status)) return INTERRUPTED_META
+  return statusMeta(status)
+}

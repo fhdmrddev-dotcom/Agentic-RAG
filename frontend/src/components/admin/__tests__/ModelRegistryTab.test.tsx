@@ -18,7 +18,7 @@ import userEvent from "@testing-library/user-event"
 
 import type { ReactElement } from "react"
 
-import { ModelRegistryTab } from "../ModelRegistryTab"
+import { ADD_PROVIDER_ROSTER, ModelRegistryTab } from "../ModelRegistryTab"
 import { ApiError, type ModelRegistryRow } from "@/lib/api"
 
 afterEach(() => {
@@ -457,11 +457,22 @@ describe("ModelRegistryTab (070-A) — the + Add model by ID form (D-159-02 / D-
     expect(screen.queryByRole("button", { name: /add model by id/i })).not.toBeInTheDocument()
   })
 
-  it("opening the form shows model_id + a provider select with the 8-cloud roster + the 3 capability inputs", async () => {
+  // ⚠ Phase 249 (MODEL-04 / SEED-172): this case asserted a LITERAL 8 and was GREEN over the
+  // defect — the roster omitted `ollama` / `lmstudio` / `custom`, so no self-hosted model could
+  // be registered from the UI, and this fence pinned that in place. The count is now DERIVED from
+  // the exported constant, which `addProviderRoster.lockstep.test.ts` in turn pins to
+  // `backend/app/config.py::_PROVIDER_BASE_URLS`. ⛔ Do not put a literal back here: a number
+  // typed into a test is the fourth copy of the roster.
+  it("opening the form shows model_id + a provider select with the FULL routing roster + the 3 capability inputs", async () => {
     await openForm()
     expect(screen.getByRole("textbox", { name: /model id/i })).toBeInTheDocument()
     const providerSelect = screen.getByRole("combobox", { name: /provider/i })
-    expect(within(providerSelect).getAllByRole("option")).toHaveLength(8)
+    expect(within(providerSelect).getAllByRole("option")).toHaveLength(ADD_PROVIDER_ROSTER.length)
+    // …and it genuinely offers the three the seed was about, not merely "some number of options".
+    const names = within(providerSelect)
+      .getAllByRole("option")
+      .map((o) => o.getAttribute("value"))
+    expect(names).toEqual(expect.arrayContaining(["ollama", "lmstudio", "custom"]))
     expect(screen.getByRole("spinbutton", { name: /context window tokens/i })).toBeInTheDocument()
     expect(screen.getByRole("spinbutton", { name: /max output tokens/i })).toBeInTheDocument()
     expect(screen.getByRole("combobox", { name: /native tools/i })).toBeInTheDocument()

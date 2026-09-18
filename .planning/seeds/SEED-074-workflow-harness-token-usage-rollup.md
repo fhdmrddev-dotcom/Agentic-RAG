@@ -18,6 +18,7 @@ trigger_when:
   - SEED-073 (per-model cost-rate registry) is promoted — a price table without per-run tokens still cannot compute a per-workflow dollar figure; these two ship together
 priority: high — a HARD, load-bearing prerequisite for Phase 105 (the v2.9 STRETCH phase that ships FIRST as the SCHED-01 budget gate). Phase 105's entire premise is structurally impossible against workflow runs that record NULL tokens, regardless of any price table.
 suggested_phase: confront at Phase 105 spec time (re-confirm at REQUIREMENTS.md:99) and resolve BEFORE executing toward 105 — co-planned with SEED-073 (price table) and SEED-080 (entitlement gate) as the cost/entitlement triad. NOT a v2.9 CORE phase; a STRETCH-105 enabler.
+surface: Agentic-RAG
 ---
 
 # SEED-074 — Workflow/harness + sub-agent token-usage rollup to the producer run

@@ -1,5 +1,5 @@
 ---
-id: SEED-035
+seed_id: SEED-035
 title: Tool Count Budget — Investigate >20 Tools on Google + Smaller-Model Tool Selection Accuracy
 status: planted
 planted: 2026-05-28
@@ -7,6 +7,7 @@ planted_by: orchestrator (discuss-phase 085)
 trigger_when: Google or DeepSeek/Moonshot tool-selection accuracy on the 24-tool toolbox drops below 90% in UAT (measured by failed-tool-pick / wrong-tool-pick events in LangSmith)
 priority: medium
 tags: [tool-calling, cross-provider, google, deepseek, moonshot, system-prompt]
+surface: Agentic-RAG
 ---
 
 # SEED-035: Tool Count Budget — Investigate >20 Tools

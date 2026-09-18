@@ -1,5 +1,5 @@
 ---
-id: SEED-210
+seed_id: SEED-210
 title: The connector track has a rigorous envelope for what LEAVES and none for what ENTERS — synced documents flatten source ACLs, and source deletions never propagate
 status: planted
 planted: 2026-08-26
@@ -18,6 +18,7 @@ re_open_trigger: >
   who could not open it at its source system; (4) a file is deleted, unshared or moved at a source
   system and the ingested copy keeps answering questions; (5) anyone proposes ingesting a shared
   drive, a SharePoint site, a mailbox or a channel wholesale.
+trigger_when: unset
 ---
 
 # SEED-210 — the inbound half of the security envelope does not exist

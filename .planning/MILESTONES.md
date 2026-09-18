@@ -1,5 +1,74 @@
 # Milestones
 
+## v4.2 The Connected Knowledge You Can Actually Run (Shipped: 2026-09-18)
+
+**Phases:** 8 (247-254) · **Plans:** 31 · **Commits:** 237 since `v4.1` · **Files:** 559
+(+79,321 / −4,197; product code 116 files, +17,304 / −1,195) · **Migration:** 181 ·
+**Timeline:** 2026-09-13 → 2026-09-18 (6 days)
+**Audit:** [`v4.2-MILESTONE-AUDIT.md`](milestones/v4.2-MILESTONE-AUDIT.md) — **re-audited 2026-09-18**,
+`gaps_found` on **one** requirement · **25 / 26** satisfied · integration **19/19** · flows **3/3**.
+
+The milestone that turned v4.0's capability and v4.1's deployment into a surface you can **live on**:
+the watch loop tells the truth about itself, a credential cannot come to rest where it can be read,
+and the model you want to run registers itself from the UI.
+
+⚠ **It took three phases more than it was scoped for, and that is the honest headline.** 247-251 all
+closed green — and a cross-phase audit then found **four blockers and nine warnings**, every one a
+seam between two individually-correct things. **252** closed them, **253** closed 252's own review
+findings, **254** was the review phase. *Five green phase verifications could not see what one
+cross-phase read did.*
+
+**Key accomplishments:**
+
+- **A watched source now tells the truth about itself** (247). Drive/Graph paths are stored whole and
+  are actually used by classification; a watch card reports the health of **the connection it rides**,
+  not of its last run; a missing file says **when** it went missing; every action label matches what
+  the action does.
+- **A credential cannot come to rest where a reader who should not see it can read it** (248 + 252).
+  Migration **181** revokes the default `PUBLIC EXECUTE` — never just `anon` — on all 13
+  `SECURITY DEFINER` functions. A secret pasted into a non-secret field is **refused, not stored**,
+  the refusal names the field that takes one, and — the audit's B-2 — it no longer reaches the
+  backend log. A fourth writer (RFC 7591 dynamic client registration) was found bypassing the
+  boundary entirely and now crosses the same validated seam.
+- **A greenfield database now has the same privileges as a migrated one** (253). `pg_dump
+  --no-privileges` structurally cannot carry a grant, so `supabase/full-schema.sql` shipped every
+  function to a new deployment wide open. It now carries **61 REVOKEs**, mirrored from the migrations
+  and gated at **133/133** by `check-schema-acl-parity.cjs` — **tables included, not just
+  functions** — and the gate was driven RED against a real scratch database before it was trusted.
+- **The model you want to run registers itself** (249). Local and self-hosted models — Ollama,
+  LM Studio, vLLM, any OpenAI-compatible endpoint — are addable from the Model Registry UI with **no
+  code edit and no deploy**. ⭐ **13 of the operator's configured models were measured to lose tool
+  calling silently**; the composer now says so at pick time, on the model they actually run.
+- **A run stopped claiming what did not happen** (250 + 252). Context trimming never eats your own
+  question, a reasoning model that produces no text says what happened instead of "empty response
+  after N iterations", and the workspace panel stops calling a live run finished — both holes, the
+  todo reconciliation window **and** the phase timeline reading SSE status instead of run liveness.
+- **The registers became an index you can trust** (251). Eight duplicate seed ids resolved, a
+  `.planning/seeds/TEMPLATE.md` contract written for the first time, and an **executable** sweep
+  wired at both GSD touchpoints — **297/297 parsed, 0 duplicate ids** — replacing a `grep` that was
+  blind to 55% of its own register.
+
+### Known Gaps — accepted as documented debt at close
+
+- **`DEBT-06`** (the only unsatisfied requirement): phases **239, 241, 242, 244, 245, 251, 252, 253**
+  read neither `independent_review: done` nor a written refusal — **8 of 14 rows unmet**, re-derived
+  from disk with `yaml.safe_load`. ⛔ **No plan can close it.** `done` needs Gemini answering
+  `BUS-249` / `BUS-256` / `BUS-257`; `refused` needs an operator ruling (`REG-03` forbids Claude
+  closing a bus item). Three refusal drafts are written and pending. **A refusal is not a pass** —
+  the accepted risk is that a builder read its own work.
+- **Four register-drift findings** (`F-1`..`F-4` in the audit), each a one-line fix: `254`'s own
+  verification frontmatter is unparseable YAML — *the exact defect `254` reported against `244`* ·
+  two duplicate-id clusters in `.planning/reported-bugs/`, a register no gate sweeps ·
+  `BUG-260915-01` fixed in code but never flipped to `closed` · `253-VERIFICATION.md` still reads
+  `gaps_found` over a gap that is closed.
+- **Undriven, not passing:** migration **181 is not in cloud** (CRED-04 discharges at the next
+  promotion) · `MODEL-04` end-to-end needs a live self-hosted endpoint · `248`'s G-4 scenario **S2**
+  (live BYO-OAuth) · the `schema-acl-parity` CI job.
+
+**Known deferred items at close: 41** (see `STATE.md` → Deferred Items).
+
+---
+
 ## v4.1 Ship It & Feel It (Shipped: 2026-09-13)
 
 **Phases:** 5 (242-246) · **Plans:** 25 · **Commits:** 290 since `v4.0` · **Files:** 309
@@ -20,24 +89,29 @@ stopped the chat surface feeling busier than the bar it aims at.
   FALSE FAILs and was repaired first** — `information_schema.column_privileges` shows only grants
   visible to the connecting role, so a checker that fails closed on its own blind spot is worse than
   no checker.
+
 - **The reasoning stream became a calm surface, and the scroll finally holds.** One unconditional
   thinking renderer; a 60 ms leading-edge coalescer (60 deltas → 61 scrolls before, ≤14 after); and
   `CHAT-03` driven with a **real wheel** on a 60-message thread — **0 px drift, 0 app scrolls**,
   closing `BUG-260823-01` after two prior fixes that had measured clean on synthetic events and were
   refuted by a real mouse.
+
 - **The chat shell stopped getting in the way.** All five `SHELL` criteria **driven in a browser**,
   not asserted in jsdom — including `SHELL-03`, which was driven **FALSE** first (answering an
   approval in one home left the other stale in both directions) and closed only on the second
   attempt, on two real runs, server-verified.
+
 - **v4.0's verification debt got verdicts instead of silence.** Phase 245 discharged or retired
   every owed row **in writing**, drove Phase 233's five rows live, and shipped a **greppable
   `verification_mode` marker with zero prose deleted** — so a self-verification can no longer read as
   a review. Its gate and PostToolUse hook were driven RED on both arms.
+
 - ⭐ **The recall cliff was measured, and the fix was REFUSED.** Phase 246 set out to raise
   `hnsw_ef_search` to 200 and proved by `EXPLAIN (ANALYZE)` that no value fixes the cliff *through
   the index*: 40/60/80 walk the index and return **ONE row** (~0.05 recall, ~4 ms); 100/150/200 reach
   recall 1.000 by **sequential scan** (~1,100 ms). Shipping 200 would have cost **every** tenant
   ~1.1 s a query to fix a cliff only small tenants have. Default reverted to 40.
+
 - ⭐ **The two-agent separation came back.** Phase 246 is the **first phase since `OV-SOLO-01` was
   re-armed to carry `verification_mode: peer-reviewed`** — gemini built, claude reviewed at three
   gates — and the one commit inside it that was the reviewer's own is **named** as self-verified
@@ -50,10 +124,13 @@ stopped the chat surface feeling busier than the bar it aims at.
   of the box. The knob cannot deliver it; `SEED-273` (`hnsw.iterative_scan`) is the remaining path.
   ⚠ Phase 241's contrary conclusion **never inspected an execution plan** — it measured recall alone
   and was right about the number and wrong about the cause.
+
 - ⚠ **Migrations 179 and 180 are NOT in cloud** (measured at the close). v4.1 authored four
   migrations; a promotion that carries the code without these two breaks on arrival.
+
 - ⚠ **`origin/production` is 287 commits behind `develop`** — v4.1's own output is undeployed, which
   is the state v4.1 was opened to end for v4.0.
+
 - Carried with named triggers: `SEED-272` (a failed attachment copy never recovers), `SEED-273`,
   `SEED-172` (**its trigger fired at this close** — local models still cannot be registered, timed
   out or given a context window through the UI), and 245's four named residues including the

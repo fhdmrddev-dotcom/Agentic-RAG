@@ -1,5 +1,5 @@
 ---
-id: SEED-142
+seed_id: SEED-142
 title: Connectors must be TWO-WAY — read/pull from external systems inside a workflow, and auto-ingest from a connected drive; today every planned connector is send-only
 status: open
 planted: 2026-08-08
@@ -22,6 +22,7 @@ re_open_trigger: >
   drive/cloud-storage sync is requested for the knowledge base, which fires the CLAUDE.md
   manual-upload-only rule below; (5) the app becomes an MCP CLIENT for any reason, since a read tool
   is the first thing an MCP server offers.
+trigger_when: unset
 ---
 
 # SEED-142 — connectors are one-way today; the operator's direction is two-way

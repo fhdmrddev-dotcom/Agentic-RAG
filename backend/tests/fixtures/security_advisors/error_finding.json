@@ -1,0 +1,11 @@
+{
+  "lints": [
+    {
+      "name": "anon_executable_function",
+      "title": "Anon role can execute function",
+      "level": "ERROR",
+      "detail": "Function public.dangerous() is executable by anon",
+      "remediation": "REVOKE EXECUTE ON FUNCTION public.dangerous() FROM anon"
+    }
+  ]
+}

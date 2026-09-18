@@ -1,5 +1,6 @@
 ---
-id: SEED-017
+title: PyMuPDF4LLM as opt-in AGPL-fenced text engine
+seed_id: SEED-017
 status: planted
 planted: 2026-05-15
 planted_during: v2.6 (Phase 071.2 — Per-Aspect Extraction Dispatcher)
@@ -7,6 +8,7 @@ trigger_when: CPU-time budget for text extraction tightens below 2s/page on the 
 scope: Small (single adapter + subprocess child + 1-column constraint update)
 parent_phase: 071.2
 related_phases: [071.2, 076 (potential)]
+surface: Agentic-RAG
 ---
 
 # SEED-017 — PyMuPDF4LLM as opt-in AGPL-fenced text engine

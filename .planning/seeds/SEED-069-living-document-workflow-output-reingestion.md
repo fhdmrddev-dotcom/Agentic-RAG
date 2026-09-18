@@ -21,6 +21,8 @@ re_open_triggers:
   - Any workflow that produces a recurring/evolving artifact (weekly risk register, status report, rolling summary) reaches build
 priority: medium — high durable-value (turns one-shot file production into a living automation engine), low cost (leverages shipped ingestion infra)
 suggested_phase: v2.9 Phase 100/101 (output target wiring) + Phase 098 (optional output schema dimension); the source-vs-derived provenance flag pairs with SEED-005 / GOV-02
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-069 — Living-document feedback loop (workflow output → versioned KB re-ingestion)

@@ -3,7 +3,12 @@ seed_id: SEED-238
 title: "MCP OAuth tokens NEVER refresh — `resolve_connection` reads the ciphertext straight out of storage; and the shipped refresh engine cannot be reused as-is, because its provider inference DEFAULTS TO GOOGLE and would POST Notion's refresh token to accounts.google.com"
 created: 2026-09-01
 planted_during: Phase 222 crypto half — diagnosing an operator-reported Notion 403 that turned out to be a stale uvicorn, and reading the token path properly while there
-status: fixed
+status: closed
+status_note: |
+  ORIGINAL `status:` line, verbatim — displaced by Phase 251's frontmatter migration (D-10):
+  status: fixed
+
+  Mapped `fixed` -> `closed`. Reason: a defect that stopped reproducing is closed.
 folded_into: 222
 surface: Agentic-RAG
 severity: high
@@ -19,6 +24,8 @@ trigger_when:
   - Anyone wires MCP refresh — read finding 2 BEFORE routing it through `get_fresh_access_token`
   - Any NON-Google, NON-Microsoft service_id is given a `connector_tokens` row
   - `oauth_refresh_service.py:158`'s provider ladder is edited for any reason
+trigger_paths:
+  - "**/oauth_refresh_service.py"
 ---
 
 # SEED-238 — the token is read, never renewed; and the obvious reuse is a credential leak

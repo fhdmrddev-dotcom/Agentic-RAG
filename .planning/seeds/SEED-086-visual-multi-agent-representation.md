@@ -12,6 +12,8 @@ re_open_triggers:
   - Any phase that reworks the workflow RUN surface (the live execution view) or the Builder graph.
   - When llm_batch_agents (parallel fan-out) becomes a common authored pattern and the linear spine can't show "a team working at once".
 priority: medium
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 ## The idea (operator's words)

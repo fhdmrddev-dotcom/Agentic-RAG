@@ -3,7 +3,15 @@ seed_id: SEED-208
 title: "Let the author pick the connections/tools a workflow needs AT THE DESCRIBE DOOR, before the AI drafts — the generator's vocabulary becomes the connected services and their granted tools, and a named-but-absent service produces a stated REFUSAL, never a step that fails at 03:00."
 created: 2026-08-26
 planted_during: conversation with the operator, 2026-08-26, while Gemini executed Phase 209 — offered as "just an idea… for you to assess"
-status: folded            # FOLDED at /gsd:discuss-phase 214 (2026-08-28) -- STEP-06 / D-214-20 / D-214-21. SEED-207 gate discharged by Phase 211.
+status: folded
+status_note: |
+  ORIGINAL `status:` line, verbatim — displaced by Phase 251's frontmatter migration (D-10):
+  status: folded            # FOLDED at /gsd:discuss-phase 214 (2026-08-28) -- STEP-06 / D-214-20 / D-214-21. SEED-207 gate discharged by Phase 211.
+
+  The prose that followed the token, byte-for-byte:
+  # FOLDED at /gsd:discuss-phase 214 (2026-08-28) -- STEP-06 / D-214-20 / D-214-21. SEED-207 gate discharged by Phase 211.
+
+  Mapped `folded` -> `folded`. Reason: clean 1:1.
 folded_into: 214
 priority: high
 surface: Agentic-RAG

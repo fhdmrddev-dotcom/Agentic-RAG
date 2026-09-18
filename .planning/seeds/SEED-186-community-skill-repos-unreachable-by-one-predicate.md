@@ -41,6 +41,8 @@ trigger_when: >
     sed -n '84,95p' backend/app/api/skills.py          # the predicate: len(parts) == 2, and only 2
     sed -n '68,81p' backend/app/api/skills.py          # the parser: requires `name`, reads `description`, drops the rest
     grep -n "response\|insert" backend/app/api/skills.py | sed -n '1,20p'   # confirm no other frontmatter key is persisted
+trigger_paths:
+  - "backend/app/api/skills.py"
 ---
 
 # We are one predicate away from a stocked shelf, and we are throwing away the label on the tin

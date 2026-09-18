@@ -526,8 +526,17 @@ function ModelRow({
             busy={busy}
             label={`Enabled for ${id}`}
             tone="success"
+            describedBy={`enabled-note-${id}`}
             onToggle={() => void write({ enabled: !row.enabled })}
           />
+          {/* MODEL-07: this switch's VISIBLE partner is the `Users see` chip in the next cell,
+              which already reads ✓ in picker / ✕ hidden. What was missing is the sentence for a
+              screen reader — and a rendered string the fence can bind to. The column is 9% wide;
+              a visible sentence here would wreck the table, and the loud half of this fix belongs
+              on `deprecated`, which is the control actually being misread. */}
+          <span id={`enabled-note-${id}`} className="sr-only">
+            {HIDE_CONTROL_COPY.ENABLED}
+          </span>
         </td>
 
         {/* The derived enabled→picker coupling chip (the two-layer pattern made visible). */}
@@ -1038,6 +1047,7 @@ function DeprecatedControl({
         label={`Deprecated for ${row.model_id}`}
         tone="warning"
         size="sm"
+        describedBy={`deprecated-note-${row.model_id}`}
         onToggle={() =>
           void onWrite(
             row.deprecated
@@ -1053,6 +1063,16 @@ function DeprecatedControl({
         )}
       >
         deprecated
+      </span>
+      {/* MODEL-07 / BUG-260908-03 — the redirect, ON the control being misread rather than in a
+          neighbouring column (that column exists, and was still missed). VISIBLE, not a tooltip:
+          the operator arriving with "how do I get rid of this?" must not have to hover to be
+          told they are holding the wrong switch. */}
+      <span
+        id={`deprecated-note-${row.model_id}`}
+        className="basis-full text-[10px] leading-snug text-muted-foreground"
+      >
+        {HIDE_CONTROL_COPY.DEPRECATED}
       </span>
       {row.deprecated && (
         <input
@@ -1167,6 +1187,7 @@ function RowToggle({
   size = "md",
   gated = false,
   gatedTitle,
+  describedBy,
   onToggle,
 }: {
   on: boolean
@@ -1180,6 +1201,9 @@ function RowToggle({
    *  native_tools on a native-SDK-served provider). */
   gated?: boolean
   gatedTitle?: string
+  /** Phase 249 (MODEL-07): id of the element that SAYS WHAT THIS SWITCH DOES. Optional, so
+   *  every existing call site renders byte-identically. */
+  describedBy?: string
   onToggle: () => void
 }) {
   const dims = size === "sm" ? "h-4 w-7" : "h-5 w-9"
@@ -1193,6 +1217,7 @@ function RowToggle({
       role="switch"
       aria-checked={on}
       aria-label={label}
+      aria-describedby={describedBy}
       disabled={busy}
       aria-disabled={gated || busy}
       title={gated ? gatedTitle : undefined}
@@ -1231,12 +1256,23 @@ function RowToggle({
 // in-form; never a silent failure.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** The 8-cloud provider roster the operator picks from — the native-7 + OpenRouter,
- *  matching the backend add-by-ID allowlist + the setup wizard's OTHER_PROVIDER_ROWS
- *  order (openrouter last). A native `<option>` can only hold text, so the SELECTED
- *  provider's `@lobehub` mark renders beside the select (the icon convention realized
- *  for a native picker — an SVG can't live inside an `<option>`). */
-const ADD_PROVIDER_ROSTER = [
+/** The provider roster the operator picks from — the native-7 + OpenRouter, then the three
+ *  SELF-HOSTED providers whose endpoint the operator supplies. A native `<option>` can only hold
+ *  text, so the SELECTED provider's `@lobehub` mark renders beside the select (the icon convention
+ *  realized for a native picker — an SVG can't live inside an `<option>`).
+ *
+ *  ⚠ Phase 249 (MODEL-04 / SEED-172): this list was EIGHT and hand-typed to match the backend's
+ *  add-by-ID guard — which was itself reading the SSRF DISCOVERY allowlist rather than the ROUTING
+ *  roster. So `ollama`, `lmstudio` and `custom` were absent from the dropdown AND refused by the
+ *  API, and no self-hosted model could be registered from the UI for this component's whole life.
+ *
+ *  ⛔ IT IS NOW PINNED, not merely corrected. `__tests__/addProviderRoster.lockstep.test.ts` reads
+ *  `_PROVIDER_BASE_URLS` out of `backend/app/config.py` at test time and fails if the two
+ *  disagree in either direction. Adding a provider is a TWO-FILE edit by design — a hand-typed
+ *  list that nothing pins is how this broke the first time.
+ *
+ *  ⛔ Exported for that fence. Do not inline it back. */
+export const ADD_PROVIDER_ROSTER = [
   "openai",
   "anthropic",
   "google",
@@ -1245,7 +1281,47 @@ const ADD_PROVIDER_ROSTER = [
   "zhipu",
   "minimax",
   "openrouter",
+  // Self-hosted: no vendor endpoint. The base URL + key come from the operator's own
+  // app_settings columns (migration 180) — see SELF_HOSTED_PROVIDERS below.
+  "ollama",
+  "lmstudio",
+  "custom",
 ] as const
+
+/** Phase 249 (MODEL-07 / BUG-260908-03) — THE WORDS ON THE HIDE-ISH CONTROLS.
+ *
+ *  ⚠ THE DEFECT WAS NOT A MISSING CAPABILITY. An operator who wanted a model gone from the chat
+ *  picker reached for `deprecated`, which deliberately keeps it selectable, while `Enabled` — the
+ *  control that actually hides it — went unnoticed one column away. Their words, verbatim:
+ *  *"It is actually called deprecated and when toggled, it is still showing in the selector but
+ *  with a deprecated tag."*
+ *
+ *  ⚠ AND THE OBVIOUS FIX HAD ALREADY BEEN BUILT AND HAD ALREADY FAILED. The `Users see` column +
+ *  `CouplingChip` are exactly the "enabled→picker coupling made visible" affordance, and the row
+ *  was still misread in real use. So this does NOT add a third passive affordance: it puts the
+ *  sentence ON the control the operator actually touches, where the redirect cannot be missed.
+ *
+ *  ⛔ `deprecated`'s SEMANTICS are unchanged (D-149-04): a deprecated row stays enabled and
+ *  selectable, and flipping it never moves the coupling chip. The report itself says the
+ *  behaviour is correct — what failed was the reading. Fix the reading.
+ *
+ *  ⚠ There are now THREE answers to "get rid of this model", and the report predates one of them:
+ *  `Remove` arrived with migration 179. The copy names all three so the operator picks, rather
+ *  than discovering the third later. */
+const HIDE_CONTROL_COPY = {
+  /** Visible, under the model id — the loud half, because this is the control being misread. */
+  DEPRECATED: "Marks it old. It stays in the picker — use Enabled to take it out, Remove to delete it.",
+  /** Screen-reader description for the Enabled switch. Its VISIBLE partner is the `Users see`
+   *  chip immediately to its right, which already reads ✓ in picker / ✕ hidden. */
+  ENABLED: "On: users can pick this model in chat. Off: it disappears from the picker.",
+} as const
+
+/** The subset of the roster whose endpoint the OPERATOR supplies rather than a vendor.
+ *  Mirrors `backend/app/config.py::_SELF_HOSTED_PROVIDERS`. Used only to decide whether to show
+ *  the "you must set its base URL first" note — adding a model for one of these succeeds even
+ *  with no endpoint configured (the registry is a DB row, not a liveness probe), and a control
+ *  that can succeed and still leave you with nothing must say so. */
+const SELF_HOSTED_PROVIDERS: ReadonlySet<string> = new Set(["ollama", "lmstudio", "custom"])
 
 /** The three honest capability sources (D-159-03). */
 type CapSource = "default" | "operator" | "blank"
@@ -1454,6 +1530,17 @@ function AddModelForm({
               ))}
             </select>
           </div>
+          {/* MODEL-04: adding a self-hosted model SUCCEEDS with no endpoint configured — the
+              registry is a DB row, not a liveness probe. A control that can succeed and still
+              leave you with nothing must say so, which is the same doctrine MODEL-07 applies to
+              the hide controls one table up. */}
+          {SELF_HOSTED_PROVIDERS.has(provider) && (
+            <span className="max-w-[26rem] text-[10px] leading-snug text-muted-foreground">
+              Self-hosted: this provider runs at the base URL you set in Settings → Providers.
+              Adding the model here works either way — but it has nowhere to run until that URL
+              is set.
+            </span>
+          )}
         </label>
       </div>
 

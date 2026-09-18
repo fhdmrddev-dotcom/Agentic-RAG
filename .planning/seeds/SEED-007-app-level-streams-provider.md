@@ -1,5 +1,6 @@
 ---
-id: SEED-007
+title: App-level Streams Provider
+seed_id: SEED-007
 status: closed
 closed: 2026-05-27
 closed_by: 082-cross-cutting-verification-extraction-telemetry
@@ -8,6 +9,7 @@ planted_during: v2.5 (Phase 063.1 discuss-phase — Frontend Stream Decoupling G
 trigger_when: planning a milestone that introduces split-view, multi-pane, or background-thread UI surfaces — OR any milestone that keys ChatArea on something other than thread.id — OR Skill Studio (concurrent eval-run streaming next to a thread)
 scope: Medium
 closure_note: "Fully consumed by Phase 068 (StreamsProvider Context Lift). SSE subscriptions, per-thread message buckets, and streamingThreadIdRef all lifted to top-level StreamsProvider. Multiple consumers can read the same run buffer. Branch D-3 guard preserved verbatim."
+surface: Agentic-RAG
 ---
 
 # SEED-007: App-level Streams Provider

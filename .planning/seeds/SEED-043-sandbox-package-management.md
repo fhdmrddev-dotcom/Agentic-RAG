@@ -1,11 +1,13 @@
 ---
-id: SEED-043
+title: Managed/Extensible Sandbox Package Set + Hardened Missing-Package Fallback
+seed_id: SEED-043
 status: dormant
 planted: 2026-05-31
 planted_during: v2.8 (Harness Engine & Workflow Mode — surfaced during Phase 090 operator-testing-notes triage)
 trigger_when: Any user report of "the agent failed because a package was missing" OR Skill Studio (v3.0) needing per-skill declared dependencies
 scope: Medium
 last_assessed: 2026-07-08 (thread 5a86a9fd investigation — see "2026-07-08 Assessment" below)
+surface: Agentic-RAG
 ---
 
 # SEED-043: Managed/Extensible Sandbox Package Set + Hardened Missing-Package Fallback

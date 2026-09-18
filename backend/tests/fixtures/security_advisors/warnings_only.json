@@ -1,0 +1,9 @@
+[
+  {
+    "name": "unindexed_foreign_keys",
+    "title": "Unindexed foreign keys",
+    "level": "WARN",
+    "detail": "Table has unindexed foreign key",
+    "remediation": "Create an index on the foreign key column"
+  }
+]

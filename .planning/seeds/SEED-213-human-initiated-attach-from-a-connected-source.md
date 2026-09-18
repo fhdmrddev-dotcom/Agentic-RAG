@@ -1,5 +1,5 @@
 ---
-id: SEED-213
+seed_id: SEED-213
 title: Human-initiated attach from a connected source (interaction mode C) — the one connector scenario that dodges every hard problem, and it is named nowhere
 status: planted
 planted: 2026-08-26
@@ -18,6 +18,7 @@ re_open_trigger: >
   (3) any OAuth read scope for a storage provider is obtained for another reason — the picker is then
   nearly free; (4) a sync connector is proposed WITHOUT this existing, since a picker is how a user
   learns what a connection is before trusting it with a background sync.
+trigger_when: unset
 ---
 
 # SEED-213 — the connector scenario that needs none of the hard parts

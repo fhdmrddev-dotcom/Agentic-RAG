@@ -1,12 +1,17 @@
 ---
-id: SEED-107
+title: Skill trigger-overlap detection + explicit skill composition
+seed_id: SEED-107
 status: planted
 planted: 2026-07-08
 planted_during: v3.2 STRETCH (thread 5a86a9fd investigation — operator asked how a skill that internally generates a PDF interacts with a SEPARATE dedicated PDF-generation skill's triggering)
 trigger_when: Operator report of the wrong skill firing / two skills firing for one request / a skill not firing because a broader one shadowed it — OR a skills-quality milestone that scopes multi-skill reliability — OR any phase that re-touches skill_catalog_filter.py / skill_lint.py / the Trigger Tuner
+trigger_paths:
+  - "**/skill_catalog_filter.py"
+  - "**/skill_lint.py"
 scope: Medium
 related: [[SEED-106]] (sandbox capability parity — the "what's installed" half; this seed is the "which skill fires + how skills compose" half), [[SEED-043]] (sandbox package SSOT), Trigger Tuner (Phase 123/123.1 — sharpens ONE description against held-out examples), skill_catalog_filter.py (the ## Available Skills builder), skill_lint.py (LOAD_SKILL_POLICY + description lint), skill_embedding_service.py / match_skills (already embeds skill descriptions — reusable for overlap detection)
 re_open_trigger: Next skills-focused milestone OR any operator report of skill mis-triggering with ≥2 skills whose descriptions overlap
+surface: Agentic-RAG
 ---
 
 # SEED-107: Skill trigger-overlap detection + explicit skill composition

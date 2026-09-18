@@ -138,7 +138,13 @@ async def reconcile_open_todos_on_run_end(
         detected and skipped.
       * No-op is byte-clean (D-14): when nothing is open (or every open item is
         already marked) there is NO ``replace_todos`` call and NO emit.
-      * Forward-only (D-06) — this only affects the run that just ended.
+      * ⚠ Forward-only (D-06), but NOT run-scoped — and saying it was is WR-01. The
+        SELECT below is ``WHERE thread_id = $1``: every open todo on the THREAD is
+        marked, and `todos` carries no run id to narrow it by. That is harmless only
+        while this thread has exactly one live run, which is NOT an invariant the app
+        enforces — so the CALLER checks `runs_by_thread:{tid}` for a live sibling and
+        refuses (`run_producer.py` step 3). ⛔ Any new caller owes the same check; this
+        function cannot make it for itself.
       * Best-effort by contract: the caller additionally wraps this so it can never
         raise into the byte-locked finalizer; the no-op path here does not raise.
 

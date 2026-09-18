@@ -4,9 +4,9 @@ title: A todo abandoned mid-run stays `in_progress` FOREVER — 25 threads affec
 reported: 2026-09-02
 surface: Agentic-RAG
 severity: major
-status: open
+status: folded
 affected_areas: [frontend/panel, frontend/chat, run-honesty]
-folded_into: null
+folded_into: 250
 verified_closed_by: null
 related_seeds: [SEED-128, SEED-240]
 re_open_trigger: null
@@ -95,3 +95,39 @@ and marking it `completed`, that row stays `in_progress` forever.
   state — *abandoned* / *not finished* — and inventing it is a design decision, not a patch.
 - **The 25 existing rows** are already wrong and would need a backfill under whatever rule is
   chosen.
+
+---
+
+## ✅ FOLDED INTO PHASE 250 — `HONEST-03` (2026-09-15)
+
+⛔ **THIS REPORT'S MECHANISM CLAIM IS REFUTED, and the original is left above rather than
+overwritten because being wrong in a specific way is what located the fix.** It states *"The
+mechanism is therefore NOT 'terminal runs fail to reconcile'. There is no reconciliation at
+all."* There is: `reconcile_open_todos_on_run_end` (`todos_service.py:117`) ships and has
+**exactly one** call site, step 3 of `run_producer._finalize_producer_run`. What was true is
+narrower — **its gate admitted only `terminal_status == "completed"`**, so a run that timed out,
+was cancelled or failed reconciled nothing. Measured: 4 unmarked open todos on 2 threads, and not
+one of those threads' runs ever reached `completed` (`250-MEASUREMENT.md`).
+
+**Two halves shipped:**
+
+1. **Data** — the gate now admits every TRUE terminal status
+   (`terminal_status in _RUN_STATUS_TO_TERMINAL_TYPE`). ⭐ The phase's own plan argued that this
+   set membership *subsumed* the old `cap_disposition != "cap_paused"` clause and that the clause
+   could go. **A fence written to prove that equivalence REFUTED it before a line shipped**: the
+   producer ordering delivers a cap-paused run as `terminal_status == "completed"`, so dropping
+   the clause let a **resumable** run be marked *"not completed"*. Both clauses ship.
+2. **Render** — and this is what fixes the 25 threads this report counted, including its own.
+   `TodosSection` now derives a fourth DISPLAY status from **whether a run is live on the
+   thread** (`useStreamingForThread || useLoadingForThread`): the spinner stops, the row dims, and
+   the status word becomes `NOT TICKED`.
+
+⭐ **NO BACKFILL WAS NEEDED, which this report expected to be unavoidable.** Because the render
+half reads run state rather than the stored marker, all **53** unmarked rows — 49 of them
+predating the reconciler entirely — read honestly **without one stored row being rewritten**.
+`todos.status` keeps its three-value CHECK constraint; the fourth state is display-only, so the
+phase ships **no migration**.
+
+⚠ What this report asked and 250 deliberately did NOT do: invent an `abandoned` status in the
+database. Re-open trigger for that: a SERVER-side consumer (an API, an export, an eval) needing
+to distinguish abandoned from pending.

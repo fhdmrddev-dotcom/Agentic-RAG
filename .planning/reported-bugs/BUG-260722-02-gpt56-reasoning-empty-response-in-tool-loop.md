@@ -4,9 +4,9 @@ title: gpt-5.6 reasoning models (Sol/Terra/Luna) return "empty response after N 
 reported: 2026-07-22
 surface: Agentic-RAG
 severity: major
-status: open
+status: folded
 affected_areas: [backend/agent-loop, cross-provider/openai, streaming]
-folded_into: null
+folded_into: 250
 verified_closed_by: null
 related_seeds: [SEED-118, SEED-127]
 re_open_trigger: null
@@ -50,3 +50,36 @@ Candidate root causes to distinguish during the fix:
 ## Routing note
 
 **Not a Phase 175 regression.** XPROV-01's acceptance bar was "no 400 on chat or with tools" — that is met (confirmed live: Luna runs instead of rejecting). This empty-response behavior is an **agent-loop / reasoning-model output** concern whose natural home is **Phase 180 (Agent-Loop Behavior Honesty, LOOP-01/02/03 — STRETCH, touches `agent_loop.py`)** and/or [[SEED-118]] (weak-model tool-loop harness). Related: [[SEED-127]] (reasoning-first forced-emission gap — a sibling reasoning-first edge). Fold candidate when Phase 180 is scoped; this operator repro strengthens the case for prioritizing it.
+
+---
+
+## ✅ FOLDED INTO PHASE 250 — `HONEST-02` (2026-09-15)
+
+**What shipped:** the single fallback sentence is replaced by a closed four-arm taxonomy —
+reasoning-only / tools-ran-but-no-answer / nothing-we-could-see / **reason-not-captured**. The
+last arm is load-bearing for the same reason it is in `run-honesty.md` D2: it proves a guess is
+never dressed as a diagnosis.
+
+⛔ **THIS DOES NOT PICK BETWEEN THIS REPORT'S THREE CANDIDATE ROOT CAUSES.** It makes the run
+SAY which of them it looks like, which is what the requirement asked for. The capability half —
+making a reasoning-first model actually complete the loop — remains `SEED-118` / `SEED-127`, and
+both seeds were annotated at this phase so neither can be closed by citing this fix.
+
+⭐ **A TRAP FOUND WHILE BUILDING IT, AND IT WOULD HAVE SHIPPED A LIE.**
+`full_reasoning_content` is **reset inside the loop** (two sites — providers such as DeepSeek
+need the CURRENT turn's reasoning round-tripped and nothing older). Reading it at the fallback
+would report *"the model produced no reasoning"* about a model that reasoned on every iteration
+— the honesty fix itself being dishonest, for exactly this model family. A never-reset
+`reasoning_chars_this_run` counter was added instead, both reset sites carry a comment saying why
+it is deliberately absent from them, and a fence fails if the fallback ever reads the per-turn
+name again.
+
+⚠ **STATED LIMITATION:** `reasoning_delta` is emitted by the OpenAI-compat path only, so an
+Anthropic or Google run that thought silently registers zero reasoning. That is why the third arm
+is worded as an OBSERVATION — *"nothing we could see"* — and never as a claim about what the
+model did internally.
+
+Fences: `test_250_run_honesty_agent_loop.py` §2 (five; three driven RED against a plant).
+`test_075_4_empty_response_iter_count.py` was **updated deliberately**, not tripped by surprise:
+`BUG-260522-01`'s real claim (report the iterations that RAN, never the cap) survives the
+rewording and is now pinned as a claim rather than as a sentence.

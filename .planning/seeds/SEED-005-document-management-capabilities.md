@@ -1,10 +1,22 @@
 ---
-id: SEED-005
-status: active (v3.0 — in progress)
+title: Document Management Capabilities (M-Files-aligned subset)
+seed_id: SEED-005
+status: open
+status_note: |
+  ORIGINAL `status:` line, verbatim — displaced by Phase 251's frontmatter migration (D-10):
+  status: active (v3.0 — in progress)
+
+  The prose that followed the token, byte-for-byte:
+  (v3.0 — in progress)
+
+  Mapped `active` -> `open`. Reason: being worked now.
 planted: 2026-05-02
 planted_during: v2.5 (after Phase 059 ship, before Phase 060 kickoff)
 trigger_when: planning a milestone scoped to "document management", "DM", "DMS", "lifecycle", "workflow", "approvals", "metadata views", "retention", or when users start asking for features beyond the current basic folder + version + audit capabilities
+trigger_surfaces:
+  - "workflow"
 scope: Large (split across 2–3 milestones likely)
+surface: Agentic-RAG
 ---
 
 # SEED-005: Document Management Capabilities (M-Files-aligned subset)

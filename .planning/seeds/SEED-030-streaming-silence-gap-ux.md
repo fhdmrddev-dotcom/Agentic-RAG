@@ -1,10 +1,12 @@
 ---
-id: SEED-030
+seed_id: SEED-030
 title: Streaming Silence Gap UX
 planted: 2026-05-25
 status: open
 trigger: next milestone touching streaming, agent loop, or UI state
 origin: SESSION-20260525-streaming-timeout-investigation.md
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-030: Streaming Silence Gap UX

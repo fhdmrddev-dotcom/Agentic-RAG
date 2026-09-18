@@ -19,6 +19,7 @@ from app.models.user_settings import (
     KNOWN_PROVIDERS,
     SOURCE_MAX_FILE_SIZE_MB_CEILING,
     SOURCE_MAX_FILE_SIZE_MB_FLOOR,
+    SettingsWriteRefused,
     load_app_settings,
     load_app_settings_async,
     save_app_settings,
@@ -172,6 +173,19 @@ class FullSettingsResponse(BaseModel):
     # to decide whether to render the "unverified" badge inline next to each
     # model in the main LLM dropdown + selected-label).
     verified_models: list[str]
+    # ⛔ Phase 249 gap-closure (CR-01) — THE JUDGE PICKER'S SET, WHICH IS NOT THE CHIP'S SET.
+    # `verified_models` above became a UNION (built-ins + operator-entered rows) so the pick-time
+    # chip would not fire on a model the operator registered themselves. But `SettingsPage` was
+    # ALSO feeding that set to `JudgeModelPicker`, and the judge validator on PUT /settings is
+    # unchanged: it uses the SYNC `get_model_capability`, which NEVER reads the DB, so every
+    # operator-added option resolved `inferred` and was a GUARANTEED 400 "Unknown judge model".
+    # Driven: `glm-4.7-flash` was offered and refused.
+    # ⛔ THIS FIELD IS THE VALIDATOR'S EXACT SET — built-ins only. Keep them in step: if the judge
+    # validator is ever widened to accept `db_override`, widen THIS, not the picker's feed.
+    registry_models: list[str]
+    # ⭐ CR-02 / WR-05 — resolved-capability tool loss, for the Settings chip. A REGISTERED model
+    # can be tool-less; `verified_models` cannot express that and must not be asked to.
+    tools_lost_models: list[str]
     # Phase 075.3 D-075.3-13 + D-075.3-12: per-unknown-model inferred provider
     # mapping (frontend reads this to substitute {provider} in the tooltip text
     # without mirroring the inference table client-side — RESEARCH.md §6
@@ -182,6 +196,83 @@ class FullSettingsResponse(BaseModel):
     # light the informational "deprecated" badge — deprecated ≠ disabled, the model
     # stays selectable (only `enabled` controls availability). Sorted for stable diffs.
     deprecated_models: list[str]
+
+
+def _verified_model_ids(overrides: dict[str, dict]) -> list[str]:
+    """Every model id the platform considers REGISTERED — built-in OR operator-entered.
+
+    ⚠ Phase 249 (MODEL-05). This was ``sorted(MODEL_CAPABILITIES.keys())`` — BUILT-INS ONLY — and
+    that made MODEL-04's success light MODEL-05's warning: a model added through the Model
+    Registry UI lands in ``model_capabilities_overrides`` and resolves
+    ``capability_source="db_override"``, i.e. THE OPERATOR TYPED ITS CAPABILITIES. Calling such a
+    model "not in our verified registry" is the opposite of the truth.
+
+    ⛔ ONE helper, TWO callers (``GET /settings`` and ``GET /settings/providers``). Two surfaces
+    answering the same question about the same model must not be able to disagree — that is the
+    whole shape of the defect this phase exists to close.
+    """
+    return sorted(set(MODEL_CAPABILITIES) | set(overrides))
+
+
+def _tools_lost_model_ids(
+    configured_ids: set[str],
+    overrides: dict[str, dict],
+    inferred_provider_for: dict[str, str],
+) -> list[str]:
+    """Model ids that will run with NATIVE TOOL CALLING OFF — a claim about RESOLVED capability.
+
+    ⛔ Phase 249 gap-closure (CR-02). The first version of this computed tool loss only over
+    UNREGISTERED ids, i.e. it asked *"is this model in the registry?"* and answered a different
+    question with it. Those are two questions:
+
+        registered?   -> drives the `unverified` chip
+        calls tools?  -> drives the CONSEQUENCE
+
+    An operator-added row is REGISTERED and can still be tool-less, and that is not an edge case —
+    it is the DEFAULT for the models MODEL-04 newly unblocked. The Add-model form leaves its
+    tri-state on `unknown` whenever `familyDefaults` matches nothing (and it matches nothing for
+    `lmstudio` / `custom`), so `native_tools` is OMITTED, stored NULL, and
+    `get_model_capability_async` then falls back to `_build_inferred_defaults(id, provider)` —
+    which reads False for any provider outside `_NATIVE_TOOL_PROVIDERS`.
+
+    ⚠ MEASURED, not reasoned: a row added as `{model_id: "cr02-probe-local", provider: "lmstudio"}`
+    resolved `capability_source="db_override", native_tools=False` while sitting INSIDE
+    `verified_models` — so the union silenced the warning on exactly the models the same phase
+    made addable. **The phase would have removed the only announcement for its own headline case.**
+
+    Mirrors `get_model_capability_async`'s overlay precedence deliberately: an explicit stored
+    value wins, NULL falls through to the provider inference. ⛔ Keep the two in step.
+    """
+    from app.config import (  # function-local (Pitfall 4)
+        _INFERENCE_FALLBACK_PROVIDER,
+        _NATIVE_TOOL_PROVIDERS,
+        MODEL_CAPABILITIES,
+    )
+
+    lost: set[str] = set()
+    for mid in configured_ids:
+        row = overrides.get(mid)
+        if row is not None and row.get("native_tools") is not None:
+            # the operator SAID so — believe them, either way
+            if row.get("native_tools") is False:
+                lost.add(mid)
+            continue
+        if row is not None:
+            # a registered row with NULL native_tools: the provider decides, exactly as the
+            # runtime overlay does
+            prov = row.get("provider") or _INFERENCE_FALLBACK_PROVIDER
+            if prov not in _NATIVE_TOOL_PROVIDERS:
+                lost.add(mid)
+            continue
+        builtin = MODEL_CAPABILITIES.get(mid)
+        if builtin is not None:
+            if builtin.get("native_tools") is False:
+                lost.add(mid)
+            continue
+        # unregistered: the inference table decides
+        if inferred_provider_for.get(mid, _INFERENCE_FALLBACK_PROVIDER) not in _NATIVE_TOOL_PROVIDERS:
+            lost.add(mid)
+    return sorted(lost)
 
 
 # ── Request models ────────────────────────────────────────────────────────────
@@ -271,9 +362,16 @@ async def _build_response(s=None) -> FullSettingsResponse:
     # Phase 149 (MODEL-01 / D-149-05) — the enabled deprecated models for the picker badge.
     # Reads the enabled-only hot cache (deprecated ≠ disabled — a deprecated model stays
     # enabled); _load_model_overrides never raises (returns the stale/empty cache on a blip).
-    from app.models.user_settings import _load_model_overrides
+    from app.models.user_settings import _load_model_overrides, load_all_model_overrides
     _overrides = await _load_model_overrides()
     deprecated_models = sorted(mid for mid, cap in _overrides.items() if cap.get("deprecated"))
+    # Phase 249 (MODEL-05) — the verified UNION reads ALL override rows, not the enabled-only hot
+    # cache above. ⚠ The distinction is load-bearing: a model the operator added and then DISABLED
+    # is still REGISTERED (they typed its capabilities), so sourcing the union from the
+    # enabled-only cache would report it "unverified" the moment it was hidden from the picker.
+    # Both reads are fail-soft and cached; neither raises.
+    _all_overrides = await load_all_model_overrides()
+    _verified_set = set(_verified_model_ids(_all_overrides))
     return FullSettingsResponse(
         active_provider=s.active_provider,
         llm_model=s.llm_model,
@@ -350,7 +448,17 @@ async def _build_response(s=None) -> FullSettingsResponse:
         resolved_harness_judge_model=resolve_judge_model(s),
         # Phase 075.3 D-075.3-13: snapshot of registry-known model_ids
         # (sorted for stable client diffs / test assertions).
-        verified_models=sorted(MODEL_CAPABILITIES.keys()),
+        # Phase 249 (MODEL-05): the UNION — built-ins PLUS operator-entered override rows.
+        verified_models=sorted(_verified_set),
+        # CR-01: built-ins ONLY — mirrors `get_model_capability`'s sync path exactly.
+        registry_models=sorted(MODEL_CAPABILITIES.keys()),
+        # CR-02 / WR-05: the Settings surface needs the same consequence claim the composer has.
+        tools_lost_models=_tools_lost_model_ids(
+            {m for p in s.providers for m in p.models if m},
+            _all_overrides,
+            {m: _infer_provider_for(m) for p in s.providers for m in p.models
+             if m and m not in _verified_set},
+        ),
         # Phase 075.3 D-075.3-13 + D-075.3-12: build the inferred-provider map
         # only for model_ids the user has configured (via providers[*].models)
         # that are NOT in the registry. Keeps the payload small (one entry per
@@ -360,7 +468,9 @@ async def _build_response(s=None) -> FullSettingsResponse:
             m: _infer_provider_for(m)
             for p in s.providers
             for m in p.models
-            if m and m not in MODEL_CAPABILITIES
+            # Phase 249: keyed off the UNION, so an operator-added model has no inferred
+            # provider and therefore nothing for the chip to render.
+            if m and m not in _verified_set
         },
         # Phase 149 (MODEL-01 / D-149-05) — enabled deprecated models for the badge.
         deprecated_models=deprecated_models,
@@ -832,7 +942,15 @@ async def update_settings(
     # below, so a failed save never emits a false settings.update audit row or a spurious
     # re-embed (Phase 147 CR-02 precedent; RESEARCH §Round-trip verification). Round-trip
     # meaning (SC#2): save_app_settings encrypts-then-writes; the one read seam decrypts back.
-    if not await save_app_settings(updates):
+    # Phase 249 (MODEL-08 / BUG-260909-01) — TWO failures, TWO answers. A write the DATABASE
+    # REFUSES is a caller error and now answers 400 naming the column and the rule; a write that
+    # could not REACH the database is still a 500, unchanged. Both still sit BEFORE the audit
+    # write and the re-embed kick below, so neither emits a false settings.update row.
+    try:
+        _persisted = await save_app_settings(updates)
+    except SettingsWriteRefused as refused:
+        raise HTTPException(status_code=400, detail=refused.detail())
+    if not _persisted:
         raise HTTPException(status_code=500, detail="Failed to save settings")
     sanitized = {k: ("[REDACTED]" if "_key" in k or "_secret" in k else v) for k, v in updates.items()}
     background_tasks.add_task(
@@ -971,10 +1089,49 @@ async def get_providers(current_user: dict = Depends(get_current_user)):
     disabled_models = sorted(
         mid for mid, cap in _overrides.items() if cap.get("enabled") is False
     )
+    # Phase 249 (MODEL-05) — WHAT THE COMPOSER NEEDS TO WARN AT PICK TIME.
+    #
+    # The `unverified` chip already existed, in `ModelPillRow` on the SETTINGS page, driven by
+    # these same two fields on the `GET /settings` response. The chat composer's dropdown — the
+    # surface where a model is actually PICKED — had no marker at all, so the warning lived on the
+    # screen where you configure and was absent on the screen where you choose.
+    #
+    # ⛔ ALL THREE REUSE `_overrides`, ALREADY FETCHED ABOVE for deprecated/disabled. No second
+    # read, no new import, no new cache — this is the end-user picker feed (the VIS-01 run
+    # carve-out), and a second thing that can be slow here is a second way for it to break.
+    _verified = _verified_model_ids(_overrides)
+    _verified_set = set(_verified)
+    # Keyed only by CONFIGURED ids that are not registered — one entry per unknown, so the
+    # payload stays small. `_infer_provider_for` is the SERVER's inference; the client never
+    # mirrors the pattern table (RESEARCH §6 Approach b).
+    _inferred = {
+        m: _infer_provider_for(m)
+        for p in s.providers
+        for m in p.models
+        if m and m not in _verified_set
+    }
+    # ⭐ THE CONSEQUENCE, not the mechanism. A model whose resolved `native_tools` is False runs in
+    # STRUCTURED mode: the `tools` param is never sent, and any tool call it attempts arrives as
+    # unparseable prose — the agent loop then breaks after one iteration with no error anywhere.
+    # `config.py` learned to say this out loud on 2026-08-18, after that exact failure stayed
+    # invisible for a day behind the words `safe_defaults_applied=True`.
+    #
+    # ⛔ CR-02: this asks about RESOLVED CAPABILITY, not registry membership. The first version
+    # computed it over unregistered ids only, which silenced it on every operator-added
+    # self-hosted model — i.e. on exactly the models MODEL-04 made addable. See
+    # `_tools_lost_model_ids`.
+    _configured_ids = {m for p in s.providers for m in p.models if m}
+    _tools_lost = _tools_lost_model_ids(_configured_ids, _overrides, _inferred)
     return {
         "active": s.active_provider,
         "active_model": s.llm_model,
         "providers": configured,
         "deprecated_models": deprecated_models,
         "disabled_models": disabled_models,
+        "verified_models": _verified,
+        "inferred_provider_for": _inferred,
+        # ⚠ RENAMED from `inferred_tools_lost` in the same phase that introduced it: the old name
+        # asserted the claim was about INFERRED models, which was the bug. Nothing outside this
+        # repo consumed it.
+        "tools_lost_models": _tools_lost,
     }

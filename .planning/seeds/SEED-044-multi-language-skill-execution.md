@@ -1,12 +1,20 @@
 ---
-id: SEED-044
-status: partially-folded
+title: Multi-Language Skill Execution — Sandbox Runtimes Beyond Python
+seed_id: SEED-044
+status: folded
+partial: true
+status_note: |
+  ORIGINAL `status:` line, verbatim — displaced by Phase 251's frontmatter migration (D-10):
+  status: partially-folded
+
+  Mapped `partially-folded` -> `folded` + `partial: true`. Reason: D-16 — folded on one axis, pending on another.
 planted: 2026-05-31
 planted_during: v2.8 (Harness Engine & Workflow Mode — surfaced during Phase 090 operator-testing-notes triage)
 trigger_when: A user imports or runs a skill whose scripts are not Python (e.g. a marketplace skill with .js), OR a skill manifest declares a non-Python runtime, OR Skill Studio (v3.0) adds per-skill dependency/runtime declarations
 scope: Large
 folded_into: v3.1 Phase 131 (Layer 1 only — SRH-01)
 re_open_trigger: v3.2 planning (Layers 2-4 = DISC-01 + STD-01 — Node runtime, skill-declared runtime, language routing)
+surface: Agentic-RAG
 ---
 
 # SEED-044: Multi-Language Skill Execution — Sandbox Runtimes Beyond Python

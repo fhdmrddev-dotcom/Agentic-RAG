@@ -52,11 +52,27 @@ mkdir -p .planning/seeds
 
 <step name="generate-seed-id">
 ```bash
-# Find next seed number
-EXISTING=$( (ls .planning/seeds/SEED-*.md 2>/dev/null || true) | wc -l )
-NEXT=$((EXISTING + 1))
+# Highest existing SEED-NNN in the register, +1. ⛔ max(id), NEVER count(files).
+#
+# THE DEFECT THIS REPLACES WAS MEASURED, not suspected. The old form COUNTED THE
+# FILES and added one. Measured 2026-09-16: 284 files, 276 distinct ids, highest
+# id 285 — so it would have emitted SEED-285, WHICH ALREADY EXISTS. The old
+# allocator produces the ninth collision on its very next use, today. Ids stop
+# lining up with a count the moment ANY id is renumbered, and this register
+# carries eight collisions and two prior renumbers on record.
+#
+# `10#` is load-bearing and must not be tidied away: seed ids are zero-padded and
+# bash reads `022` / `092` as INVALID OCTAL, so `$(( 092 + 1 ))` is a hard error
+# without it. Same allocator as `scripts/agent-bus.sh:26-33` next_id().
+MAX=$( (ls .planning/seeds/SEED-*.md 2>/dev/null || true) \
+  | grep -oE 'SEED-[0-9]{3}' | grep -oE '[0-9]{3}' | sort -n | tail -1 )
+NEXT=$(( 10#${MAX:-0} + 1 ))
 PADDED=$(printf "%03d" $NEXT)
 ```
+
+⚠ A gate arm and an allocator are COMPLEMENTARY, not redundant. This prevents the ordinary
+single-agent case; `scripts/check-seeds-register.cjs`'s `[duplicate-id]` catches the parallel-agent
+case an allocator structurally cannot — two agents can each read the same max and both write max+1.
 
 Generate slug from idea summary.
 </step>
@@ -64,17 +80,33 @@ Generate slug from idea summary.
 <step name="write-seed">
 Write `.planning/seeds/SEED-{PADDED}-{slug}.md` immediately with sensible defaults:
 
-- `trigger_when`: default is `"when relevant"` — the seed will surface during any
-  new-milestone scan; the user can narrow it later via `--enrich`
+- `trigger_when`: default is `unset` — ⛔ **NOT `"when relevant"`, which was the old default and is
+  a mood rather than a condition.** `unset` makes the seed count as UNSWEPT in
+  `scripts/check-seeds-register.cjs`'s output, which is a number someone can shrink; `"when
+  relevant"` reads like a trigger and fires on nothing. Narrow it via `--enrich`.
+- `trigger_paths`: default is `[]` — the LOAD-BEARING trigger. A glob here is what actually fires
+  when a phase's `files_modified` touches it.
 - `scope`: default is `"unknown"` — the user can update it via `--enrich`
+
+⛔ **The block below is the D-09 contract and it is SYNCED with two other files.** It used to write
+`id:` (not `seed_id:`), no `surface:`, no `title:`, and `trigger_when: when relevant` — which is the
+mechanism that re-introduces the defect Phase 251's 284-file migration removed, one seed at a time,
+with nothing saying so. Its keys and comments match `.planning/seeds/TEMPLATE.md` exactly, with ONE
+deliberate exception: `trigger_surfaces` carries a POINTER rather than the vocabulary inline,
+because this block is stamped into every seed authored from here on and a third copy of those
+fifteen words is a third thing to drift.
 
 ```markdown
 ---
-id: SEED-{PADDED}
-status: dormant
-planted: {ISO date}
-planted_during: {current milestone/phase from STATE.md, or "unknown" if not in a GSD project}
-trigger_when: when relevant
+seed_id: SEED-{PADDED}            # ⚠ MUST match the filename
+title: {one-line summary of $IDEA}
+created: {ISO date}               # absolute date, never relative
+surface: Agentic-RAG              # Agentic-RAG | Claude.ai | Anthropic-API | OpenAI | OpenRouter | Other
+status: planted                   # planted | dormant | open | partially-answered | answered | folded | shipped | closed | deferred | superseded-id
+partial: false                    # true when the status is settled on ONE AXIS ONLY
+trigger_when: unset               # PROSE, for a human. `unset` until it says a CONDITION, not a mood
+trigger_paths: []                 # globs matched against a phase's files_modified — the LOAD-BEARING trigger
+trigger_surfaces: []              # controlled enum — see .planning/seeds/TEMPLATE.md
 scope: unknown
 ---
 
@@ -86,9 +118,12 @@ _To be filled in. Run `/gsd:capture --seed --enrich SEED-{PADDED}` to add contex
 
 ## When to Surface
 
-**Trigger:** when relevant
+**Trigger:** _unset — run `/gsd:capture --seed --enrich SEED-{PADDED}` and write a CONDITION here,
+then mirror it into `trigger_paths` so a sweep can actually fire on it._
 
-This seed will surface during `/gsd:new-milestone` when the milestone scope matches.
+This seed is surfaced by `node scripts/check-seeds-register.cjs --phase NNN` at
+`/gsd:discuss-phase` and by the register sweep at `/gsd:new-milestone`. ⚠ Until `trigger_paths` or
+`trigger_surfaces` is filled in, it matches NOTHING and is counted as unswept.
 
 ## Scope Estimate
 

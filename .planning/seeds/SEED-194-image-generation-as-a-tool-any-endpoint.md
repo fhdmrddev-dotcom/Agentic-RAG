@@ -27,6 +27,8 @@ trigger_when: >
 
   Mechanical check that the blocker is still real, from the repo root:
     grep -n "modality\|image_generation\|supports_image_output" backend/app/config.py   # → nothing today
+trigger_paths:
+  - "backend/app/config.py"
 ---
 
 # The delivery path already exists. The registry is what says no.

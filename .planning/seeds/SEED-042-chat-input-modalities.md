@@ -1,12 +1,22 @@
 ---
-id: SEED-042
-status: folded          # folded_into v4.1 (SHELL-04) at /gsd:new-milestone 2026-09-11
+title: Chat Input Modalities — Ephemeral File Attach + Voice/STT
+seed_id: SEED-042
+status: folded
+status_note: |
+  ORIGINAL `status:` line, verbatim — displaced by Phase 251's frontmatter migration (D-10):
+  status: folded          # folded_into v4.1 (SHELL-04) at /gsd:new-milestone 2026-09-11
+
+  The prose that followed the token, byte-for-byte:
+  # folded_into v4.1 (SHELL-04) at /gsd:new-milestone 2026-09-11
+
+  Mapped `folded` -> `folded`. Reason: clean 1:1.
 folded_into: "v4.1"
 
 planted: 2026-05-31
 planted_during: v2.8 (Harness Engine & Workflow Mode — surfaced during Phase 090 operator-testing-notes triage)
 trigger_when: Operator wants to attach a non-KB file to a single chat/task (e.g. a skill template, a one-off doc) WITHOUT it landing in the knowledge base, OR wants to dictate a prompt by voice
 scope: Medium
+surface: Agentic-RAG
 ---
 
 # SEED-042: Chat Input Modalities — Ephemeral File Attach + Voice/STT

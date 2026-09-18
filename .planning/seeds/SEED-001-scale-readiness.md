@@ -7,7 +7,13 @@ trigger_when:
   - Concurrent-user load reported by >10 simultaneous active users in production
   - Latency or queueing complaints from users (P95 response time degradation, "spinner stuck" reports)
   - Backend logs show AnyIO threadpool saturation (queueing at the limiter)
-status: partial-consumed
+status: folded
+partial: true
+status_note: |
+  ORIGINAL `status:` line, verbatim — displaced by Phase 251's frontmatter migration (D-10):
+  status: partial-consumed
+
+  Mapped `partial-consumed` -> `folded` + `partial: true`. Reason: READ SEED-001 — consumed_by Phase 073 + 079, load testing still owed.
 consumed_by:
   - Phase 073 (asyncpg hot-path integration)
   - Phase 079 (multi-worker enable + D-PRD-12 ADR)
@@ -21,6 +27,7 @@ related_seeds:
   - SEED-076
   - SEED-077
   - SEED-081
+surface: Agentic-RAG
 ---
 
 # SEED-001: Scale Readiness — multi-user concurrent load

@@ -3,7 +3,15 @@ seed_id: SEED-268
 title: The Settings screen can show a search breadth that is not in effect — the no-op shortcut compares against a hardcoded 40 the server may not have
 created: 2026-09-10
 planted_during: Phase 241 (QUEUE-06) — raised by 241-REVIEW.md WR-06, left OPEN at the phase close
-status: folded          # folded_into v4.1 (RECALL-02) at /gsd:new-milestone 2026-09-11
+status: folded
+status_note: |
+  ORIGINAL `status:` line, verbatim — displaced by Phase 251's frontmatter migration (D-10):
+  status: folded          # folded_into v4.1 (RECALL-02) at /gsd:new-milestone 2026-09-11
+
+  The prose that followed the token, byte-for-byte:
+  # folded_into v4.1 (RECALL-02) at /gsd:new-milestone 2026-09-11
+
+  Mapped `folded` -> `folded`. Reason: clean 1:1.
 folded_into: "v4.1"
 
 priority: medium
@@ -24,6 +32,8 @@ trigger_when: >
   (3) anyone adds a THIRD landing to `retrieval_service.py` — at which point the G-5 extraction must
       be proposed first anyway, and this is cheap to fix in the same pass;
   (4) a support question needs the answer to "what is actually in force right now?".
+trigger_paths:
+  - "**/retrieval_service.py"
 ---
 
 # The finding

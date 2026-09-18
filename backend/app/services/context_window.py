@@ -367,7 +367,7 @@ def trim_messages_to_fit(
     # protected class (kept like the protected tail, never entered into the trimmable
     # removal loop). This happens BEFORE the protected-tail split so a skill loaded
     # near the front of the conversation still survives. The atomic-group partition
-    # MIRRORS _remove_oldest_atomic's grouping rules so a pinned group always carries
+    # MIRRORS `_atomic_groups`' grouping rules so a pinned group always carries
     # its assistant+tool_calls parent alongside its tool-result (Pitfall 2 — never an
     # orphaned tool message). De-dupe to the latest group per skill, cap total pinned
     # at PIN_BUDGET_FRACTION * max_tokens, and evict the least-recently-loaded pinned
@@ -385,40 +385,139 @@ def trim_messages_to_fit(
         protected = rest[:]
         trimmable = []
 
-    # Keep trimming until we fit or there's nothing left to trim
-    while trimmable:
-        candidate_messages = _build_candidate(
-            system_msg, trimmable, protected, trimmed_any, pinned_msgs
+    # Phase 250 HONEST-01 (BUG-260906-01) — FOUR ORDERED PASSES, and the order is the fix.
+    #
+    # The defect was not that the trimmer trimmed; it was WHAT it reached for first. A
+    # thread that had absorbed several large `search_documents` payloads evicted the
+    # user's own question while keeping the document chunks that question had produced,
+    # and the model then apologised for losing a question the person had just asked.
+    #
+    # ⭐ A tool result is re-derivable by re-running the tool. A user question is not.
+    # So every non-user group in BOTH sections goes before any user turn in EITHER —
+    # which is why this is four passes and not two. A protected tail fat with tool
+    # payloads must be allowed to shrink BEFORE `trimmable`'s questions are given up.
+    def _fits() -> bool:
+        return (
+            estimate_messages_tokens(
+                _build_candidate(system_msg, trimmable, protected, trimmed_any, pinned_msgs)
+            )
+            <= max_tokens
         )
-        if estimate_messages_tokens(candidate_messages) <= max_tokens:
-            break
 
-        # Remove oldest atomic unit from trimmable
-        n_removed = _remove_oldest_atomic(trimmable)
-        if n_removed == 0:
-            # Nothing left to remove
+    # PASS 1 — non-user groups out of the trimmable section.
+    while trimmable and not _fits():
+        if _remove_oldest_evictable(trimmable, allow_user=False) == 0:
+            break
+        trimmed_any = True
+
+    # PASS 2 — non-user groups out of the protected tail, inward from the oldest. The
+    # tail keeps the model's own final turn AND the newest user turn throughout
+    # (D-078-01, and the floor the old comment claimed but did not enforce).
+    while len(protected) > 1 and not _fits():
+        if _remove_oldest_evictable(protected, allow_user=False, protect_tail=True) == 0:
+            break
+        trimmed_any = True
+
+    # PASS 3 — only now may a user turn go, oldest first, out of trimmable.
+    while trimmable and not _fits():
+        if _remove_oldest_evictable(trimmable, allow_user=True) == 0:
             break
         trimmed_any = True
 
     # Phase 078 CQ-CTX-01 D-078-01: after trimmable is exhausted, progressively
-    # trim oldest protected messages inward. Hard floor: system_msg + last user msg.
+    # trim oldest protected messages inward.
     # Mirrors Claude.ai / ChatGPT behavior (silently drops older turns, never errors).
     # D-078-02: no error raised — always return a valid list that fits.
-    if not trimmable:
-        while len(protected) > 1:
-            candidate = _build_candidate(system_msg, [], protected, True, pinned_msgs)
-            if estimate_messages_tokens(candidate) <= max_tokens:
-                break
-            n_removed = _remove_oldest_atomic(protected)
-            if n_removed == 0:
-                break
-            trimmed_any = True
+    #
+    # ⚠ Phase 250 HONEST-01 — THIS COMMENT USED TO READ "Hard floor: system_msg + last
+    # user msg" AND THE CODE DID NOT DO THAT. `len(protected) > 1` protects the last
+    # MESSAGE, and because agent_loop re-trims at the top of EVERY iteration — after tool
+    # results have been appended — that last message is a tool result, not a question. The
+    # floor is now enforced where it belongs: passes 1-2 strip every other group in both
+    # sections before `_remove_oldest_evictable` will touch the newest-user group, and
+    # when only it and the last group remain the LARGER one pays (⚠ CR-01 — this pass used
+    # to give up the question FIRST, whatever its size; see that helper's docstring).
+    # PASS 4 — last resort inside the protected tail (see _remove_oldest_evictable's
+    # stated limitation: a question that alone exceeds the whole budget cannot be saved
+    # by any ordering, and D-078-02 promises a list that fits rather than an exception).
+    while len(protected) > 1 and not _fits():
+        if _remove_oldest_evictable(protected, allow_user=True, protect_tail=True) == 0:
+            break
+        trimmed_any = True
 
-    return _build_candidate(system_msg, trimmable, protected, trimmed_any, pinned_msgs)
+    _out = _drop_orphan_tool_messages(
+        _build_candidate(system_msg, trimmable, protected, trimmed_any, pinned_msgs)
+    )
+
+    # ⚠ Phase 250 WR-05 — SOMETIMES NO LIST FITS, AND THIS USED TO BE SILENT.
+    # `D-078-02` promises a list rather than an exception, and the four passes above
+    # terminate correctly when there is nothing left they are allowed to remove — but a
+    # system prompt (or one pinned skill payload) larger than the whole budget means the
+    # list handed back is still over it. Reachable on a 32k local model with a large
+    # skill catalog, which is a configuration this project documents.
+    #
+    # Downstream that surfaces as a provider `400: request (N tokens) exceeds the
+    # available context size (M)` with NOTHING pointing back here. One line makes the
+    # next such 400 a single grep.
+    #
+    # ⛔ A LOG, NOT A RAISE. Raising would turn a degraded answer into a dead run and
+    # break D-078-02 outright. What is removed is the silence, not the behaviour.
+    _final = estimate_messages_tokens(_out)
+    if _final > max_tokens:
+        logger.warning(
+            "trim_messages_to_fit: EXHAUSTED and still over budget — %d > %d tokens "
+            "(system prompt alone: %d; pinned: %d). The provider will reject this "
+            "request; reduce the system prompt, the pinned skills, or raise the model's "
+            "context budget.",
+            _final,
+            max_tokens,
+            estimate_messages_tokens([system_msg]) if system_msg else 0,
+            estimate_messages_tokens(pinned_msgs) if pinned_msgs else 0,
+        )
+    return _out
+
+
+def _drop_orphan_tool_messages(msgs: list[dict]) -> list[dict]:
+    """Phase 250 CR-02 — drop `tool` messages no preceding assistant asked for.
+
+    This is the BELT to the `keep` rule's braces, and it is deliberately redundant. The
+    group partition, the raw `reserve_recent` index slice and four eviction passes all
+    have to agree for the output to be valid; this function makes the INVALID SHAPE
+    unrepresentable at the exit instead of trusting that agreement.
+
+    ⛔ The cost of being wrong here is not a degraded answer — it is the run dying.
+    OpenAI: *"messages with role 'tool' must be a response to a preceding message with
+    'tool_calls'"*; Anthropic rejects an unmatched `tool_result` block the same way.
+
+    Order is load-bearing: `live` is filled as the list is walked, so a tool result is
+    kept only when its parent has ALREADY been seen. A tool message that precedes its own
+    assistant is as invalid to a provider as one with no assistant at all.
+
+    ⭐ **THIS IS THE WHOLE FIX, AND THE REVIEW'S OTHER HALF WAS MEASURED INERT.** CR-02
+    proposed a second guard — never `keep` a last group that is a headless `tool` — on the
+    diagnosis that `keep` was protecting the orphan *for being last*. Driven: with the
+    sanitiser removed from both arms, that guard changed **0 of 3024** outputs across the
+    shape sweep (turns × children × payload size × trailing reply × `reserve_recent` 0-8 ×
+    seven budgets). It cannot fire, because what actually strands the orphan is the
+    `while len(protected) > 1` guard on PASSES 2 and 4: once the orphan is the ONLY
+    message left in the tail those loops never run, so `_remove_oldest_evictable` is never
+    called and what `keep` holds is irrelevant. It was therefore NOT shipped — a guard
+    nobody has seen fire is not a guard, and an inert one invites the next reader to trust
+    a mechanism that does nothing.
+    """
+    live: set = set()
+    out: list[dict] = []
+    for m in msgs:
+        if m.get("role") == "assistant" and m.get("tool_calls"):
+            live |= {tc.get("id") for tc in m["tool_calls"] if tc.get("id")}
+        if m.get("role") == "tool" and m.get("tool_call_id") not in live:
+            continue  # headless — its parent was trimmed away
+        out.append(m)
+    return out
 
 
 def _atomic_groups(rest: list[dict]) -> list[list[dict]]:
-    """Partition `rest` into atomic message groups, MIRRORING _remove_oldest_atomic.
+    """Partition `rest` into atomic message groups — the ONE grouping rule.
 
     An atomic group is:
     - A single user/assistant message (without tool_calls), or
@@ -533,9 +632,11 @@ def _build_candidate(
     result: list[dict] = []
     if system_msg:
         result.append(system_msg)
-    if add_marker and trimmable is not None:
+    if add_marker:
         # Only add marker if there WAS something trimmed (trimmable can still have content
-        # but it was partially trimmed, or it was completely cleared)
+        # but it was partially trimmed, or it was completely cleared).
+        # ⚠ IN-02: this read `and trimmable is not None` — every call site passes a list, so
+        # the conjunct was always true. A guard that cannot fail reads like a real one.
         result.append({"role": "user", "content": _TRIM_MARKER})
     if pinned:
         result.extend(pinned)
@@ -544,59 +645,155 @@ def _build_candidate(
     return result
 
 
-def _remove_oldest_atomic(trimmable: list[dict]) -> int:
-    """Remove the oldest atomic message group from the start of trimmable (in-place).
+def _remove_oldest_evictable(
+    seq: list[dict],
+    *,
+    allow_user: bool = True,
+    protect_tail: bool = False,
+) -> int:
+    """Phase 250 HONEST-01 — remove the oldest atomic group that is safe to lose.
 
-    An atomic group is:
-    - A single user/assistant message (without tool_calls)
-    - An assistant message with tool_calls PLUS all immediately following tool-role
-      messages that reference those tool_call IDs
-    - A tool-role message PLUS its parent assistant+tool_calls message and any
-      sibling tool messages (to avoid orphaned tool results)
+    The strictly-oldest-first door this replaced is why ``BUG-260906-01`` happened:
+    a thread that had absorbed several large
+    ``search_documents`` payloads evicted the user's OWN question while keeping the tool
+    results that question had produced, and the model then apologised for losing a
+    question the person had just asked.
 
-    Returns the number of messages removed.
+    ⭐ The asymmetry that decides the order: **a tool result is re-derivable by re-running
+    the tool; a user question is not.** So the oldest group carrying no ``user`` message
+    goes first, and a user turn is only touched once nothing else is left.
+
+    ``allow_user`` is the FIRST-PASS switch. ``trim_messages_to_fit`` now runs four
+    ordered passes — non-user groups out of ``trimmable``, then non-user groups out of the
+    protected tail, and only THEN user turns — because the eviction order has to hold
+    ACROSS the two sections, not merely inside one. Without that, a protected tail fat
+    with tool payloads could never shrink until every question in ``trimmable`` had
+    already been thrown away, which is precisely the ``BUG-260906-01`` outcome.
+
+    ``protect_tail`` switches the two call sites apart, and the difference is not
+    cosmetic:
+
+      * ``False`` (the trimmable section) — every group is ultimately evictable. The
+        current question lives in the protected tail, so refusing to empty this section
+        would simply stall the loop while the context still overflows. Order still
+        prefers non-user groups.
+      * ``True`` (the protected tail, after trimmable is exhausted) — this is where the
+        floor lives. Passes 1-2 never touch either the last group or the group holding
+        the newest user turn, so **both outlast every other group in both sections.**
+        ⚠ Neither is protected UNCONDITIONALLY, and claiming that was CR-01: when only
+        those two are left and they still overflow, the LARGER of them goes, because
+        ``D-078-02`` promises a list that fits rather than an exception. That rule is
+        what keeps both floors — the question survives an oversized tool result, and the
+        model's final turn survives an oversized question (D-078-01);
+        the newest-user group is the message the turn cannot proceed without, and is the
+        floor the old comment claimed while the code protected only the last *message*.
+
+    ⛔ **User turns are NEVER hoisted or reordered.** ``_build_candidate`` hoists pinned
+    ``load_skill`` groups because a skill payload is self-contained; a question is not —
+    hoisting it detaches it from the answer that follows it. This helper only changes
+    WHICH group is removed, never WHERE the survivors sit.
+
+    ⛔ **Every removal is a COMPLETE atomic group** (``_atomic_groups`` — the ONE
+    partition, since IN-01 deleted the dead twin), so an assistant with ``tool_calls``
+    always leaves with its results and a lone orphan tool result is removed as its own
+    group rather than stranded.
+
+    ⚠ **Stated limitation, not an oversight.** When the protected tail has shrunk to the
+    newest user group ALONE and it still overflows, the question is given up — at that
+    point the question alone exceeds the entire budget and no ordering can save it, while
+    ``D-078-02`` promises a list that fits rather than an exception. ``_TRIM_MARKER``
+    remains the honest signal in that case.
+
+    ⚠ **CR-01 — this limitation used to be much wider than the sentence above admitted,
+    and the sentence is what hid it.** The give-up arm took ``keep[0]``, the newest user
+    turn, so it fired whenever the PROTECTED TAIL held the oversized group — not only
+    when the question itself was oversized. A 52-character question against a
+    20,000-token budget was evicted by one 200 KB tool result. The claim *"every
+    realistic shape never reaches this arm"* was false: the agent loop appends tool
+    results into exactly that position and re-trims every iteration, so it is the loop's
+    steady state. The arm now gives up the LARGER protected group — see the inline note,
+    which records why the obvious inverse (prefer the non-user group) breaks ``D-078-01``
+    and is not the fix either.
+
+    Returns the number of messages removed. ``0`` means "nothing left that may go", which
+    both callers already treat as their break condition — that is what guarantees the
+    ``while`` loops terminate rather than spinning inside a request.
     """
-    if not trimmable:
+    if not seq:
         return 0
 
-    first = trimmable[0]
-    first_role = first.get("role", "")
+    groups = _atomic_groups(seq)
+    if not groups:
+        return 0
 
-    # Case: assistant message with tool_calls → remove it plus all its tool results
-    if first_role == "assistant" and first.get("tool_calls"):
-        tool_ids = {tc.get("id") for tc in first["tool_calls"] if tc.get("id")}
-        # Collect the assistant message itself
-        to_remove = 1
-        # Collect immediately following tool messages that reference these IDs
-        for msg in trimmable[1:]:
-            if msg.get("role") == "tool" and msg.get("tool_call_id") in tool_ids:
-                to_remove += 1
-            else:
+    def _has_user(group: list[dict]) -> bool:
+        return any(m.get("role") == "user" for m in group)
+
+    keep: list[int] = []
+    if protect_tail:
+        newest_user_gi: int | None = None
+        for gi in range(len(groups) - 1, -1, -1):
+            if _has_user(groups[gi]):
+                newest_user_gi = gi
                 break
-        del trimmable[:to_remove]
-        return to_remove
+        # This list is only ever consulted by the last-resort arm below, which picks a
+        # NON-USER entry before any user one — so the order entries are appended in does
+        # not decide who is given up first (it did until CR-01, and it was wrong).
+        if newest_user_gi is not None:
+            keep.append(newest_user_gi)
+        if (len(groups) - 1) not in keep:
+            keep.append(len(groups) - 1)
 
-    # Case: tool message at the start (orphaned or parent already removed upstream)
-    # Remove it plus look backwards — but since we only trim from the start, we
-    # need to also pull the parent assistant+tool_calls block if it precedes this.
-    # In practice, since we process front-to-back, a tool message at index 0 means
-    # its parent was already removed (shouldn't happen in well-formed history).
-    # Just remove it to avoid orphan errors.
-    if first_role == "tool":
-        to_remove = 1
-        # Also remove any immediately following sibling tool messages with same parent.
-        # Guard: only match on non-None IDs — if tool_call_id is None we cannot
-        # reliably distinguish siblings from unrelated tool messages, so stop at one.
-        tool_call_id = first.get("tool_call_id")
-        if tool_call_id is not None:
-            for msg in trimmable[1:]:
-                if msg.get("role") == "tool" and msg.get("tool_call_id") == tool_call_id:
-                    to_remove += 1
-                else:
-                    break
-        del trimmable[:to_remove]
-        return to_remove
+    # 1 — the oldest group with no user turn at all.
+    target: int | None = None
+    for gi, group in enumerate(groups):
+        if gi not in keep and not _has_user(group):
+            target = gi
+            break
+    # 2 — the oldest group that may go. Guarantees progress.
+    if target is None and allow_user:
+        for gi in range(len(groups)):
+            if gi not in keep:
+                target = gi
+                break
+    # 3 — last resort: only the protected groups are left and they still do not fit, so
+    # a protected group must go after all (D-078-02 — this function ALWAYS returns a list
+    # rather than raising. ⚠ WR-05: that is NOT the same as "a list that fits", which is
+    # what this comment used to say. When the system prompt or a pinned payload alone
+    # exceeds the budget, no ordering can satisfy it and the caller gets an over-budget
+    # list — now with a warning at the exit instead of in silence). `keep` holds at most two groups here: the newest user
+    # turn and the last group.
+    #
+    # ⚠ CR-01 — GIVE UP THE BIGGEST ONE, and neither "user first" nor "non-user first"
+    # is the right rule. Both were driven and both break a floor:
+    #
+    #   * `keep[0]` (the newest user turn — what shipped) evicts a 52-character question
+    #     to keep a 200 KB tool result sitting in the last group, then re-enters and eats
+    #     the rest. Measured at a 20,000-token budget: `[system, trim_marker]`. That is
+    #     the `BUG-260906-01` inversion this phase exists to remove.
+    #   * The obvious inverse — prefer the non-user group — breaks `D-078-01` instead:
+    #     `test_trim_protected_overrun_preserves_last_message` and `..._trims_inward` both
+    #     go red, because it throws away a 13-character `"Recent reply."` to keep the
+    #     1300-character user message that is the ACTUAL cause of the overflow.
+    #
+    # The floor was never "the question always wins" or "the last message always wins" —
+    # it is that the group CAUSING the overflow is the one that should pay for it. Taking
+    # the largest group is also what stops the cascade: one removal is far more likely to
+    # suffice, so the `while` loop does not re-enter and strip the tail down to nothing.
+    # Ties go to the group carrying no user turn, because a tool result is re-derivable by
+    # re-running the tool and a question is not (HONEST-01's asymmetry, as the tiebreak).
+    if target is None and allow_user and keep:
+        target = max(
+            keep,
+            key=lambda gi: (
+                estimate_messages_tokens(groups[gi]),
+                _has_user(groups[gi]) is False,
+            ),
+        )
+    if target is None:
+        return 0
 
-    # Default: plain message, remove just the first one
-    del trimmable[0]
-    return 1
+    start = sum(len(g) for g in groups[:target])
+    n = len(groups[target])
+    del seq[start : start + n]
+    return n

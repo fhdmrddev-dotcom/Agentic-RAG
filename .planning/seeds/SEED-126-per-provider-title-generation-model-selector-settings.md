@@ -13,6 +13,8 @@ related_seeds:
   - SEED-117 (config consolidation — revive user_settings.preferences) — natural home for a per-provider title-model preference.
 related_memories: [project_dynamic_settings_direction, project_admin_panel_plan, project_settings_control_room_boundary, feedback_provider_uniform_ux]
 priority: low
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-126 — Per-provider title-generation model selector + fallback (Settings)

@@ -34,14 +34,11 @@ next_id() {
 
 valid_party() { case " $VALID_PARTIES " in *" $1 "*) return 0;; *) return 1;; esac; }
 
-# Age in days of a YYYY-MM-DD date, portable across GNU/BSD date.
-age_days() {
-  local d="$1" then now
-  then=$(date -u -d "$d" +%s 2>/dev/null || date -u -j -f %Y-%m-%d "$d" +%s 2>/dev/null || echo "")
-  [ -n "$then" ] || { echo "?"; return; }
-  now=$(date -u +%s)
-  echo $(( (now - then) / 86400 ))
-}
+# Age in days of a YYYY-MM-DD date. ⛔ ONE HOME, and this is not it — see scripts/lib/bus-age.sh.
+# The hook had a second, divergent copy (GNU-only, no "?" sentinel); a third would have been the
+# third. Sourced, never re-implemented.
+# shellcheck source=lib/bus-age.sh
+. "$ROOT/scripts/lib/bus-age.sh"
 
 cmd_open() {
   local to="" from="" body=""
@@ -134,7 +131,24 @@ cmd_close() {
   local id="${1:-}"
   [ -n "$id" ] || die "close needs <BUS-NNN>"
   grep -q "$id" "$BUS" || die "$id not found in OPEN.md"
-  sed -i.bak "s/^### \[OPEN\] $id /### [CLOSED] $id /" "$BUS" && rm -f "$BUS.bak"
+
+  # ⚠ MATCH [OPEN] **OR** [ANSWERED], and gate the success line on the WRITE.
+  # What stood here: `sed -i "s/^### \[OPEN\] $id /.../"` followed by an unconditional
+  # `echo "closed $id"`. Two defects, driven RED on BUS-048 (2026-09-14):
+  #   1. An item answered via `cmd_answer` keeps its `[ANSWERED]` header, so `close` could
+  #      NEVER close one — the single state a finished item is most likely to be in.
+  #   2. `sed` exits 0 whether or not it substituted, so the verb printed "closed BUS-048"
+  #      over a byte-identical file.
+  # ⭐ `cmd_answer` directly above carries the comment this function ignored — *"A verb that
+  # writes a false record is the defect this project keeps paying for, so the success line
+  # is gated on the write, not on reach."* Same file, four lines apart.
+  # ⚠ `cmd_archive` sweeps `^### \[CLOSED\]` and resets on `^### \[OPEN\]`, so an ANSWERED
+  # header was invisible to it too — a stuck item could never be archived either.
+  local before after
+  before=$(md5sum < "$BUS")
+  sed -i.bak -E "s/^### \[(OPEN|ANSWERED)\] $id /### [CLOSED] $id /" "$BUS" && rm -f "$BUS.bak"
+  after=$(md5sum < "$BUS")
+  [ "$before" != "$after" ] || die "$id was NOT closed — it is already [CLOSED], or its header is malformed. Nothing was written."
   echo "closed $id"
 }
 

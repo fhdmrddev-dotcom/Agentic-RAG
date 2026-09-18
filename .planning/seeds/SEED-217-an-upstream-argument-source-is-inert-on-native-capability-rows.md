@@ -1,5 +1,5 @@
 ---
-id: SEED-217
+seed_id: SEED-217
 title: An `upstream` argument source is INERT on native capability rows — `send_email`'s `subject` sourced from an earlier step is silently DROPPED, and `body` falls back to the LATEST phase's text
 status: planted
 planted: 2026-08-28
@@ -33,6 +33,7 @@ re_open_trigger: >
   Mechanical check that the gap is still real, from the repo root:
     grep -n "upstream" backend/app/services/harness/phase_types.py
   If the native arm still has no per-argument `upstream` read, the gap is live.
+trigger_when: unset
 ---
 
 # SEED-217: an `upstream` argument source is inert on native capability rows

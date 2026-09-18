@@ -1,7 +1,13 @@
 ---
-id: SEED-226
+seed_id: SEED-226
 title: Engineering-drawing ingestion — the app already TELLS the user a PDF needs OCR, and then has no OCR to run
-status: partially-shipped
+status: shipped
+partial: true
+status_note: |
+  ORIGINAL `status:` line, verbatim — displaced by Phase 251's frontmatter migration (D-10):
+  status: partially-shipped
+
+  Mapped `partially-shipped` -> `shipped` + `partial: true`. Reason: D-16.
 planted: 2026-08-28
 shipped_layers: "L1 (OCR-substitute) + L2 (full-page drawing vision) 2026-09-05 · L3 (DXF takeoff) Phase 220"
 planted_by: Claude, 2026-08-28, operator direction — "we need to support this business case and similar business cases"
@@ -34,6 +40,7 @@ re_open_trigger: >
   searched" sentence — that sentence IS the trigger and it already ships; (b) a business case
   asks the agent to quantify, measure, count or price anything drawn rather than written;
   (c) a `.dxf` or `.dwg` upload is attempted; (d) SEED-006 is picked up for any reason.
+trigger_when: unset
 ---
 
 # Engineering-drawing ingestion

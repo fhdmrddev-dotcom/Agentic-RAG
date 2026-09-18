@@ -564,7 +564,7 @@ def enrich_for_ingest(
     #
     # Absent is now absent. A folder-shaped rule against an unknown path does not match, and
     # `watch_service` supplies the real one wherever the adapter knows it (Graph returns
-    # `parentReference.path`; Drive does not, so SEED-253 stays open, narrowed, for Drive).
+    # `parentReference.path`; Phase 247 WATCH-01 resolves Drive folder hierarchy, closing SEED-253).
     src_path = source_info.get("path")
     if src_path:
         eval_facts.setdefault("path", src_path)

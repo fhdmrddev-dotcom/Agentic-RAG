@@ -10,6 +10,8 @@ scope: Medium
 related_seeds: [SEED-117, SEED-081, SEED-121, SEED-122, SEED-115, SEED-080, SEED-003]
 related_memories: [project_settings_control_room_boundary, project_dynamic_settings_direction, project_v34_milestone_started, project_provider_feature_fit_routing, project_target_scale]
 re_open_trigger: "At v3.5 (Open Platform / config-consolidation), OR the moment a customer needs (a) their own provider billing/keys, (b) a single-provider-only org, or (c) to point an org at their own local/self-hosted model. v3.4 must leave the org-settings schema forward-compatible so this lands with NO rewrite."
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-120 — Per-org provider config + BYO API keys

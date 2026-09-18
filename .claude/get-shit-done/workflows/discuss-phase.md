@@ -277,6 +277,29 @@ Parse JSON for: `todo_count`, `matches[]` (each with `file`, `title`, `area`, `s
 **Auto mode (`--auto`):** Fold all todos with score >= 0.4 automatically. Log the selection.
 </step>
 
+<step name="cross_reference_seeds">
+**PROJECT GATE — REG-02 seeds sweep. Run this BEFORE gray-area analysis, so a fired trigger can shape the phase rather than arrive after it is scoped:**
+
+```bash
+node scripts/check-seeds-register.cjs --phase "${PHASE_NUMBER}"
+SEEDS_EXIT=$?
+```
+
+The sweep reads every file in `.planning/seeds/`, matches each seed's structured `trigger_paths` / `trigger_surfaces` against this phase's declared blast radius (`files_modified` across its PLAN.md files), and prints one `[trigger-fires]` line per hit with the matched glob quoted beside the path that satisfied it. It also prints two unswept figures which are never summed — how many seeds carry no `trigger_when` at all, and how many carry prose a sweep cannot match on.
+
+**If the sweep printed `0 seeds matched`:** Skip silently — do not prompt the user. A register with nothing to say about this phase is the normal case, and a step that speaks every time is noise.
+
+**If matching seeds found:** Present each match (id, status, title, and the glob that matched). AskUserQuestion (multiSelect) asking which to fold into this phase. Folded → `<folded_seeds>` for CONTEXT.md `<decisions>`. Reviewed but not folded → `<reviewed_seeds>` for CONTEXT.md `<deferred>`, each with the reason it was left.
+
+**⛔ Then write the routing BACK INTO THE SEED — this step's obligation, and the one its `cross_reference_todos` sibling does not have.** For every seed presented, edit the seed file: flip `status` to reflect what was decided (`folded` when this phase claims it, `deferred` when it was reviewed and left) and record where it went in `status_note`. `CLAUDE.md` § Seeds register cross-check states the rule this discharges — *a seed is answered by editing the seed* — and its reason: **a seed that shipped and still reads `planted` will be re-proposed forever.** ⚠ `status:` frontmatter IS the index; prose in the body saying "handled" is invisible to the scan.
+
+**If `SEEDS_EXIT` is 1: print the gate's output verbatim and CONTINUE the discussion.** ⛔ This is a register-hygiene finding — a duplicate id, a missing required key, a status outside the enum, a heading claiming an id the filename does not — **not** a gap-closure cap. It informs the phase; it does not stop it. The gate names its own remediation in its output. **Do NOT "harden" this into a blocker:** an unrelated register defect must never be able to prevent a phase from being discussed, and a later reader tidying this into an `exit 1 → STOP` arm would be introducing exactly that failure.
+
+**Auto mode (`--auto`):** Fold every matched seed automatically, and still write the routing back into each seed file. Log: `[auto] Folded N seed(s) whose trigger fired: [ids]`.
+
+Rationale and the measured cost of the register going unswept: `CLAUDE.md` § Seeds register cross-check (MANDATORY). `SEED-172` sat reachable for four weeks because nothing swept this folder at all.
+</step>
+
 <step name="scout_codebase">
 Lightweight scan of existing code to inform gray area identification (~10% context).
 

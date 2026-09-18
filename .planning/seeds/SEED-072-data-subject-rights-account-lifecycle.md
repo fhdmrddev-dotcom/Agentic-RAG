@@ -19,6 +19,8 @@ re_open_triggers:
   - A SEED-005 / DM document-lifecycle or retention-policy phase is scoped — per-document retention is meaningless without the per-user/per-org erasure + export primitive underneath it.
 priority: high — a genuinely homeless, cross-hunter-confirmed compliance gap (raised independently by the Multi-tenancy, Security, and Deployment hunters — the strongest cross-hunter signal in the 2026-06-10 register) with an unreconciled tension against the immutable-audit model. Not load-bearing for v2.9, but a hard enterprise-procurement blocker the moment a co-tenant or EU customer exists.
 suggested_phase: v3.2 Multi-Tenancy scope candidate, co-designed WITH the membership-keyed RLS rewrite (migrations 081-085). Possibly bundled into an "Enterprise / Compliance Readiness" milestone between v3.1 and v3.2 alongside SEED-075 (backup/DR) and SEED-079 (PII/DLP). NOT v2.9.
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-072 — Data-Subject Rights & Account Lifecycle

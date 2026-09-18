@@ -1,5 +1,5 @@
 ---
-id: SEED-227
+seed_id: SEED-227
 title: The extraction knobs are not operator-controllable — one is a DB row with no UI, and the vision model is an env var
 status: planted
 planted: 2026-08-28
@@ -27,6 +27,7 @@ re_open_trigger: >
   reach `config.py`; (b) an operator asks to change a cap, model or threshold and the answer
   involves editing `.env` and restarting; (c) SEED-226 is picked up (it adds several such
   knobs and would otherwise widen this gap); (d) the Settings UI is next opened for edit.
+trigger_when: unset
 ---
 
 # The extraction knobs are not operator-controllable

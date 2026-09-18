@@ -3,11 +3,106 @@ seed_id: SEED-266
 title: full-schema.sql carries no table ACLs and leaks `SET row_security = off` — benign for a Supabase paste, a live trap for a plain-Postgres bootstrap or any program that applies it
 created: 2026-09-10
 planted_during: Phase 241 (QUEUE-06), plan 241-04 — found by RUNNING the artifact, not by reading it
-status: planted
+status: partially-answered
+partial: true
+status_note: |
+  ── 2026-09-16 · ROUTED at `/gsd:discuss-phase 252` (REG-02 sweep). Status moved
+  `planted` -> `partially-answered`, `partial: true`, because exactly ONE of this seed's two
+  measured defects is answered and the other is untouched.
+
+  ⭐ ANSWERED — the missing-ACL half, for FUNCTIONS only. Phase 252 Plan 01 (SC#1, `CRED-03`/
+  `CRED-04`) adds section 6 to `scripts/full-schema-supplement.sql`, mirroring migration 181's
+  31 REVOKEs and 17 GRANTs over 13 SECURITY DEFINER functions into the bootstrap artifact, and
+  ships `scripts/check-schema-acl-parity.cjs` — a gate that FAILS when a migration grants or
+  revokes EXECUTE on a function the supplement does not mirror, driven RED against a planted
+  omission and against the counterfactual.
+
+  ⛔ STILL OPEN, and deliberately so:
+  (a) TABLE and COLUMN privileges. §6 covers function EXECUTE only. §5's mig-118 column grant is
+      still the sole table-level mirror, and it is still maintained by hand — this seed's arm 1 in
+      its original width.
+  (b) `SET row_security = off`. Byte-unchanged by 252; the leak this seed measured on a plain
+      Postgres connection is exactly as it was.
+  (c) `--no-privileges` itself (arm 3). NOT revisited, and the reason is recorded in
+      `252-01-PLAN.md`: dropping it would make a dump carry the local dev box's entire ACL state,
+      including roles that exist nowhere else — a larger and less reviewable artifact than the 31
+      lines actually owed.
+
+  ⚠ The trigger fired on `**/full-schema.sql` and this phase DID edit that file — by the one
+  sanctioned exception to *never hand-edit full-schema.sql*: `regenerate-full-schema.sh` cannot
+  run (Docker is denied in this environment), 181 changes no schema object, and the supplement was
+  MEASURED to be the artifact's byte-identical 259-line tail, so applying the identical edit to both
+  reproduces what the script would emit. The equivalence `diff` is the plan's required proof.
+
+  ⛔ Arms (1), (2) and (4) — a non-Supabase deployment target, a program continuing on the same
+  connection, and `docs/OPERATOR.md` Step 3 — are UNCHANGED and remain the live re-open trigger.
+  `BUG-260911-01` still lists this seed in `related_seeds`.
+
+  ── 2026-09-16 · ROUTED again at `/gsd:discuss-phase 253` (REG-02 sweep, run by hand — see below).
+  Status STAYS `partially-answered`; `folded_into` stays `null`, because only one more arm moves.
+
+  ⭐ ARM (a) — TABLE and COLUMN privileges — IS FOLDED INTO PHASE 253. It is that phase's SC#1
+  + SC#2 verbatim. 253 mirrors ALL SEVEN ACL-bearing tables into the supplement and into
+  `full-schema.sql`'s tail in the same commit, and extends `scripts/check-schema-acl-parity.cjs`
+  to compare table/column tuples so the §6 header's "table OR function" claim becomes true.
+  ⚠ MEASURED at 253's scoping, and WIDER than `252-REVIEW.md` CR-01 states: only 7 tables carry
+  table/column ACLs across every migration (25 statements), and SIX of the seven — `connector_tokens`,
+  `connector_watches`, `connector_watch_items`, `connector_sync_runs`, `user_settings`, `app_settings`
+  — are mirrored in NEITHER artifact. The last two are the exact tables `BUG-260911-01` found in
+  production with RLS disabled and `anon` holding all privileges.
+
+  ⛔ ARMS (b) and (c) ARE UNTOUCHED AND STAY OPEN. `SET row_security = off` is byte-unchanged by
+  253, and `--no-privileges` is not revisited — the reason recorded in `252-01-PLAN.md` still holds.
+  Splitting them into a new seed id was considered at 253's discuss and REJECTED: two legible arms
+  do not warrant a second register entry.
+
+  ⚠ AND THIS SEED'S OWN TRIGGER ARM (1) NOW HAS A NEW INSTANCE, recorded rather than silently
+  absorbed: Phase 253 ships `scripts/check-greenfield-privileges.py`, which builds a greenfield DB
+  with `CREATE DATABASE` on a plain connection and applies the artifact to it. That is arm (1)'s
+  wording exactly — but it is a TEST harness, not a supported deployment target, so arm (1) stays
+  live for its original meaning. The harness is, however, the first thing in this repo that would
+  MEASURE arm (b)'s `SET row_security = off` leak on demand.
+
+  ── 2026-09-17 · ANSWERED — ARM (a), by Phase 253 (plans 253-01 and 253-02). Status STAYS
+  `partially-answered` and `partial` STAYS `true`: arms (b) and (c) are untouched, so this seed is
+  not closed and must keep surfacing at the REG-02 sweep.
+
+  ⭐ ARM (a) — TABLE and COLUMN privileges — IS ANSWERED, AND IT WAS MEASURED, NOT ASSERTED.
+  `253-01` mirrored all seven ACL-bearing tables into `scripts/full-schema-supplement.sql` and into
+  `supabase/full-schema.sql`'s byte-identical tail in ONE commit (`c73463658`), and proved it by
+  BUILDING A REAL DATABASE from `full-schema.sql` alone and reading it **as `authenticated`**:
+  `SELECT access_token_ciphertext FROM connector_tokens` went from *the read SUCCEEDED* to
+  `InsufficientPrivilegeError`, `has_table_privilege('anon','public.app_settings','SELECT')` from
+  `True` to `False`, and the violation count from **1045** to **0**
+  (`scripts/check-greenfield-privileges.py`). `253-02` then made
+  `scripts/check-schema-acl-parity.cjs` compare `(verb, table, privilege, column, grantee)` tuples
+  beside the function tuples, so the §6 header's *"table OR function"* claim is now a property of
+  the code: `133/133` mirrored, 32 table/column statements across 12 files, re-derived at run time.
+
+  ⚠ THE FIGURES IN THE 2026-09-16 ENTRY ABOVE ARE CORRECTED HERE, BESIDE THEM, NEVER OVER THEM.
+  That entry says *"25 statements"*; the measured count is **32**, across **12** files
+  (118 · 126 · 127 · 128 · 129 · 150 · 151 · 156 · 168 · 169 · 172 · 177). Migrations 126, 127 and
+  150 each carry a `connector_connections` column grant and were named in NO register. The
+  *"7 tables"* half DOES reproduce.
+
+  ⛔ ARMS (b) AND (c) STAY OPEN, WITH THEIR EXISTING TRIGGERS UNCHANGED.
+  (b) `SET row_security = off` is **byte-unchanged** by Phase 253 — the leak this seed measured on a
+      plain Postgres connection is exactly as it was.
+  (c) `--no-privileges` is NOT revisited; the reason recorded in `252-01-PLAN.md` still holds —
+      dropping it would make a dump carry the local dev box's entire ACL state, including roles that
+      exist nowhere else.
+
+  ⚠ AND ONE NEW FACT THIS SEED SHOULD CARRY, found by arm (a)'s own harness rather than reasoned
+  about: `supabase/full-schema.sql` **did not apply at all** between `a7efe17d1` (Phase 252-01) and
+  `3192f480f` (Phase 253-01). `pg_dump` emits `set_config('search_path','',false)` at line 29, which
+  survives the whole paste, so §6's unqualified `ON FUNCTION … (vector, …)` could not resolve and
+  the Supabase SQL editor rolled the ENTIRE greenfield bootstrap back. Fixed by a §0
+  `SET search_path = public;`. ⭐ That is arm (b)'s shape one register over — **a SESSION setting the
+  dump leaks into everything appended after it** — and it strengthens, rather than answers, (b).
+folded_into: null
 priority: medium
 surface: Agentic-RAG
 severity: major            # Not currently reachable on the documented deploy path. It becomes a security-shaped defect the moment a non-Supabase target exists.
-folded_into: null
 relates_to:
   - `supabase/full-schema.sql` — the single-file bootstrap artifact. NEVER hand-edited; regenerated
     by `scripts/regenerate-full-schema.sh`.
@@ -23,6 +118,10 @@ trigger_when: >
       further statements on the SAME connection;
   (3) `scripts/regenerate-full-schema.sh` is changed, or the `--no-privileges` flag is revisited;
   (4) a phase touches the bootstrap path in docs/OPERATOR.md Step 3.
+trigger_paths:
+  - "**/full-schema.sql"
+  - "docs/OPERATOR.md"
+  - "scripts/regenerate-full-schema.sh"
 ---
 
 # What was measured

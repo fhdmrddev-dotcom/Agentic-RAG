@@ -1,5 +1,5 @@
 ---
-id: SEED-157
+seed_id: SEED-157
 title: The AI drafts a workflow BLIND to the template it will have to fill
 status: open
 planted: 2026-08-14
@@ -12,6 +12,7 @@ re_open_trigger: >
   Any phase touching the describe door's pre-draft screen, OR any phase touching
   POST /workflows/generate or its client, OR the next phase that claims AUTH-03 is satisfied.
   Whichever comes first.
+trigger_when: unset
 ---
 
 # The AI drafts blind to the template
