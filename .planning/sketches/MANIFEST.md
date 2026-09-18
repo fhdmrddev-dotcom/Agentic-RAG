@@ -2799,7 +2799,7 @@ already approved. `SHELL-01/02/03` are bug fixes on shipped surfaces with named 
 |---|------|----------------|--------|------|
 | 236 | the-file-that-belongs-to-this-chat | How does a person know a file is HERE, not in the Library? | ✅ **A — Scope on the chip** ★ (operator, 2026-09-11) · the `+` menu stays plain; the chip is the only place that says *"this chat only · 24h"*, and it rides into the sent message | phase-244, shell-04, chat, composer, attach, scope, g2-sketch-gate |
 | 247 | sources-and-watches | How does a watched-source card honestly report its connection health separately from its run outcome, and where does 'Sync now' put its answer without destroying the screen? | ✅ **A — Two-Tier Status Pill + Inline Sync** ★ (operator, 2026-09-14) · dual connection/run status pills + row-level non-collapsing sync tag | phase-247, watch-03, watch-04, watch-05, watch-06, watch-07, g2-sketch-gate, sources-and-watches |
-| 248 | the-calmer-phase-card | Can the canvas feel calmer without re-opening UAT row U-2 — is the tension ORNAMENT or DENSITY? | *pending* | phase-tbd, canvas, node-anatomy, density, u-2, g2-sketch-gate |
+| 248 | the-calmer-phase-card | Can the canvas feel calmer without re-opening UAT row U-2 — is the tension ORNAMENT or DENSITY? | ⛔ **C picked then measured VOID** (breaks the Phase 188 ring) · live candidates **C2 / C3** | phase-tbd, canvas, node-anatomy, density, u-2, g2-sketch-gate |
 
 - **Why A over B** — a menu is read once and closed; **a chip is still on screen while the person types
   and survives into the transcript.** Reopening the chat tomorrow, A still says `this chat only`;
@@ -2858,3 +2858,20 @@ but sits it *in* the card rather than *over* it — **if that float is the point
 answer is B plus a DELIBERATE U-2 retirement**, recorded as a decision rather than tripped by a stylesheet.
 
 ⛔ Branching / named outcomes is **out of scope here** and is explicitly not what makes this canvas tense.
+
+⛔ **CORRECTION — C WAS PICKED, THEN MEASURED VOID (same day).** The operator picked C on the numbers, then
+asked whether the accretion audit had actually happened, since C relocates the mark and removes nothing. **It
+had not**, and running it refuted this sketch's own brief: (1) there is **no ornament to remove at rest** —
+`NodeRunOverlay` is *"completely still"* with no reading and `NodeCornerMarks` returns `null` when not
+grounded, so the tension is GEOMETRY not accumulation; (2) **badge slot 1 is NOT reserved — Phase 188 SHIPPED**
+and `PhaseNode.tsx:352` passes `status={run?.reading}`, so the findings file's *"do not fill"* is stale prose;
+(3) ⛔ **C breaks the shipped run ring** — `NodeRunOverlay` is `left-1/2 top-[-31px] h-[72px] w-[72px]` and its
+own comment derives that from the mark (*"(72 − 62) / 2 = 5"*), so **the ring is concentric with the
+overhang**. C is kept in the sketch marked ✗ VOID; the failure is the finding.
+
+⭐ **The surviving insight is real** — 42px of top padding is rent for the overhang — so **C2** (trim below the
+line only; mark/ring/seal byte-identical; 130 → 110px, −15%) and **C3** (mark 62→52, ring 72→62 with the 5px
+clearance reproduced exactly, plus the trim; 130 → 98px, −25%) collect it without detaching the ring.
+⚠ **Horizontal is the wrong axis, by arithmetic:** B buys 80px/gap and breaks U-2 by 260px, and any
+compromise under 1600px leaves ~15px/gap, which nobody perceives. ⛔ **U-2 is not retired to make a card look
+nicer** — only after C2 and C3 are rejected on their merits, and then as a recorded decision.

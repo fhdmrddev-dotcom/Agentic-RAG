@@ -40,6 +40,24 @@
   #density-row .lbl { font: 600 11px/1 var(--font-mono); color: var(--color-text-dim);
     letter-spacing: .08em; text-transform: uppercase; margin-right: 4px; }
 
+  .variant-tab.void { border-color: hsl(0 72% 51% / .5); color: var(--color-danger); }
+  .variant-tab.void.active { background: var(--color-danger-dim); color: var(--color-danger); }
+
+  /* the Phase 188 run ring — 72px at top -31px, concentric with the 62px mark at -26px */
+  .ring {
+    position: absolute; left: 50%; top: -31px; width: 72px; height: 72px;
+    transform: translateX(-50%); pointer-events: none; z-index: 5;
+  }
+  .ring svg { display: block; overflow: visible; }
+  .ring .track { fill: none; stroke: hsl(220 16% 65% / .35); stroke-width: 2.5; }
+  .ring .arc   { fill: none; stroke: var(--color-primary); stroke-width: 2.5;
+                 stroke-linecap: round; stroke-dasharray: 150 214;
+                 transform: rotate(-90deg); transform-origin: 50% 50%; }
+  body[data-state="rest"] .ring { display: none; }
+  body[data-state="rest"] .badge.slot1 { display: none; }
+  .badge.slot1 { background: var(--color-primary-dim); color: var(--color-primary);
+                 border: 1px solid var(--color-primary-glow); }
+
   .variant { display: none; }
   .variant.active { display: block; }
 
@@ -190,6 +208,27 @@
   .faceC .node:not(:last-child) .box::after { width: 60px; top: 38px; }
   .faceC .node:not(:last-child) { margin-right: 60px; }   /* pitch stays 320 — card is narrower */
 
+  /* ══ FACE C2 — overhang and ring UNTOUCHED; height reclaimed BELOW ══ */
+  .faceD .node        { width: 260px; }
+  .faceD .card        { width: 248px; margin: 0 auto; min-height: 84px;
+                        padding: 42px 20px 12px; text-align: center; }
+  .faceD .sub         { margin-top: 3px; }
+  .faceD .badges      { justify-content: center; margin-top: 7px; }
+  .faceD .node:not(:last-child) .box::after { width: 60px; }
+  .faceD .node:not(:last-child) { margin-right: 60px; }
+
+  /* ══ FACE C3 — mark 52 + ring 62, concentricity PRESERVED, plus trim ══ */
+  .faceE .node        { width: 260px; }
+  .faceE .card        { width: 248px; margin: 0 auto; min-height: 76px;
+                        padding: 34px 20px 12px; text-align: center; }
+  .faceE .mark        { width: 52px; height: 52px; top: -22px; }
+  .faceE .mark .glyph { font-size: 23px; }
+  .faceE .ring        { width: 62px; height: 62px; top: -27px; }  /* (62-52)/2 = 5, preserved */
+  .faceE .sub         { margin-top: 3px; }
+  .faceE .badges      { justify-content: center; margin-top: 7px; }
+  .faceE .node:not(:last-child) .box::after { width: 60px; }
+  .faceE .node:not(:last-child) { margin-right: 60px; }
+
   /* ── the measurement strip under each plane ───────────────────── */
   .metrics {
     max-width: 1180px; margin: 0 auto; padding: 22px 24px 40px;
@@ -219,9 +258,11 @@
 <body>
 
 <div id="variant-nav">
-  <button class="variant-tab active" data-v="a" onclick="showVariant('a')">A: As shipped (137-B)</button>
+  <button class="variant-tab active" data-v="a" onclick="showVariant('a')">A: As shipped</button>
   <button class="variant-tab" data-v="b" onclick="showVariant('b')">B: More air</button>
-  <button class="variant-tab" data-v="c" onclick="showVariant('c')">C: Repay the mark's cost</button>
+  <button class="variant-tab void" data-v="c" onclick="showVariant('c')">C: ✗ VOID — breaks the ring</button>
+  <button class="variant-tab" data-v="d" onclick="showVariant('d')">C2: Trim below the line</button>
+  <button class="variant-tab" data-v="e" onclick="showVariant('e')">C3: Scale mark + ring</button>
   <span id="nav-note">U-2 budget = 1600px for 5 phases</span>
 </div>
 
@@ -229,8 +270,11 @@
   <span class="lbl">Phases</span>
   <button class="variant-tab active" data-d="3" onclick="showDensity(3)">3</button>
   <button class="variant-tab" data-d="5" onclick="showDensity(5)">5</button>
-  <span id="nav-note" style="margin-left:14px;font-family:var(--font-mono);font-size:12px;color:var(--color-text-dim)">
-    Type tint is icon-well only. Badge slot 1 is drawn as a ghost — reserved for Phase 188.
+  <span class="lbl" style="margin-left:18px">State</span>
+  <button class="variant-tab" data-s="rest" onclick="showState('rest')">Rest</button>
+  <button class="variant-tab active" data-s="run" onclick="showState('run')">Running</button>
+  <span style="margin-left:14px;font-family:var(--font-mono);font-size:12px;color:var(--color-warning)">
+    ⚠ Phase 188 SHIPPED — slot 1 is live today. Default view is Running, deliberately.
   </span>
 </div>
 
@@ -293,7 +337,7 @@
     <div class="spine faceC" data-spine="c"></div>
   </div>
   <div class="metrics">
-    <h3>Face C — keep the mark, repay its padding</h3>
+    <h3 style="color:var(--color-danger)">Face C — ✗ VOID. Kept visible because the failure is the finding.</h3>
     <table>
       <tr><th>Measure</th><th>Value</th><th>vs A</th></tr>
       <tr><td>Card</td><td class="n">236 × min 76, radius 18</td><td>−28px tall</td></tr>
@@ -308,6 +352,14 @@
     deleted once in the Phase 200 port and you restored it, so deleting it again is not on the table. What
     changes is that it stops overflowing upward, so the card stops reserving 42px of empty top padding to
     clear it. That reclaimed height is the calm, and the pitch never moves.</p>
+    <div class="verdict" style="border-color:hsl(0 72% 51% / .45)">⛔ <strong>WHY C IS VOID — measured
+    2026-09-18, after the sketch was built and after the operator picked it.</strong> Switch this pane to
+    <strong>Running</strong> and watch the ring: it stays at <code>left-1/2 top-[-31px]</code> while the mark
+    has gone to the gutter, so it floats over an empty card top. <code>NodeRunOverlay</code>'s own comment
+    derives that box from the mark — <em>"well is 62px at top-[-26px], this is 72px, and (72 − 62) / 2 = 5"</em>.
+    <strong>The ring is concentric with the overhang.</strong> C relocated the mark without auditing what
+    depended on the space it occupied. ⭐ The surviving insight — that 42px of top padding is rent for the
+    overhang — is real, and C2 / C3 collect it without detaching the ring.</div>
     <div class="verdict">⚠ <strong>What C gives up, stated rather than hidden.</strong> The mark no longer
     floats above the silhouette — the specific quality you named when you chose the icon well over the
     Phase 200 compact row. C keeps the disc, the tint well and the contact shadow, but it sits <em>in</em>
@@ -316,23 +368,82 @@
   </div>
 </div>
 
+
+<!-- ══════════════════ VARIANT C2 ══════════════════ -->
+<div id="variant-d" class="variant">
+  <div class="plane">
+    <div class="budget"><div class="bar"></div>
+      <span class="lbl">0</span><span class="cap">1600px — U-2 ceiling</span></div>
+    <div class="spine faceD" data-spine="d"></div>
+  </div>
+  <div class="metrics">
+    <h3>Face C2 — overhang and ring untouched, height reclaimed BELOW the line</h3>
+    <table>
+      <tr><th>Measure</th><th>Value</th><th>vs A</th></tr>
+      <tr><td>Mark + ring</td><td class="n">62 @ −26 · ring 72 @ −31</td><td><span class="ok">byte-identical</span></td></tr>
+      <tr><td>Card</td><td class="n">248 × min 84</td><td>−20px</td></tr>
+      <tr><td>Padding</td><td class="n">42 / 20 / <span class="ok">12</span></td><td>top rent still paid</td></tr>
+      <tr><td>Pitch</td><td class="n">320 unchanged</td><td><span class="ok">U-2 passes</span></td></tr>
+      <tr><td>Vertical footprint</td><td class="n">110px</td><td><span class="ok">−20px (−15%)</span></td></tr>
+    </table>
+    <p class="note"><strong>The structurally safe floor.</strong> It touches nothing above the card's top
+    edge, so the Phase 188 ring, the mark, the seal and the verdict all keep their derivations. The whole
+    saving comes from bottom padding and the gaps between title, subtitle and badges.</p>
+    <div class="verdict">⚠ <strong>15% is not 41%.</strong> C promised a 41% cut and could not pay for it.
+    This is what the same idea is worth once the ring is respected. If 15% does not read as calmer, the
+    honest answer is C3 or B — not a quiet re-introduction of C.</div>
+  </div>
+</div>
+
+<!-- ══════════════════ VARIANT C3 ══════════════════ -->
+<div id="variant-e" class="variant">
+  <div class="plane">
+    <div class="budget"><div class="bar"></div>
+      <span class="lbl">0</span><span class="cap">1600px — U-2 ceiling</span></div>
+    <div class="spine faceE" data-spine="e"></div>
+  </div>
+  <div class="metrics">
+    <h3>Face C3 — scale the mark AND the ring together, then trim</h3>
+    <table>
+      <tr><th>Measure</th><th>Value</th><th>vs A</th></tr>
+      <tr><td>Mark</td><td class="n">52 @ −22</td><td>−10px</td></tr>
+      <tr><td>Ring</td><td class="n">62 @ −27</td><td><span class="ok">(62−52)/2 = 5 — preserved</span></td></tr>
+      <tr><td>Card</td><td class="n">248 × min 76</td><td>−28px</td></tr>
+      <tr><td>Padding</td><td class="n"><span class="ok">34</span> / 20 / <span class="ok">12</span></td><td>rent reduced, not abolished</td></tr>
+      <tr><td>Pitch</td><td class="n">320 unchanged</td><td><span class="ok">U-2 passes</span></td></tr>
+      <tr><td>Vertical footprint</td><td class="n">98px</td><td><span class="ok">−32px (−25%)</span></td></tr>
+    </table>
+    <p class="note"><strong>The float survives — it just gets smaller.</strong> The mark still overhangs,
+    still has its tint well and contact shadow, and the ring still wraps it concentrically because the
+    5px clearance the overlay derives is reproduced exactly at the new sizes. This is the variant that
+    tests whether you wanted <em>the overhang</em> or <em>the overhang at 62px</em>.</p>
+    <div class="verdict">⛔ <strong>The one thing to check here.</strong> `NodeRunOverlay`'s five RING_*
+    constants are <em>module-private</em>. C3 changes two of them, so it is a real code change in a file
+    with a G-5 history — not a stylesheet tweak. It is cheap, but it is not free.</div>
+  </div>
+</div>
+
 <script>
 const PHASES = [
-  { type:'llm_agent',        glyph:'◈', title:'Gather the evidence',  sub:'Agent step · 6 tools',      badges:[] },
-  { type:'programmatic',     glyph:'▣', title:'Split by topic',       sub:'Deterministic · split_topic', badges:[] },
-  { type:'llm_human_input',  glyph:'◉', title:'Confirm the shortlist',sub:'Asks you · 2 options',      badges:['Waits for you'] },
-  { type:'llm_batch_agents', glyph:'⬢', title:'Draft each section',   sub:'Fan-out · max 5 parallel',  badges:[] },
-  { type:'llm_emit',         glyph:'◆', title:'Produce the report',   sub:'Sealed emit · .docx',       badges:[] },
+  { type:'llm_agent',        glyph:'◈', title:'Gather the evidence',  sub:'Agent step · 6 tools',      badges:[], reading:'Done' },
+  { type:'programmatic',     glyph:'▣', title:'Split by topic',       sub:'Deterministic · split_topic', badges:[], reading:'Done' },
+  { type:'llm_human_input',  glyph:'◉', title:'Confirm the shortlist',sub:'Asks you · 2 options',      badges:['Waits for you'], reading:'Running' },
+  { type:'llm_batch_agents', glyph:'⬢', title:'Draft each section',   sub:'Fan-out · max 5 parallel',  badges:[], reading:'Queued' },
+  { type:'llm_emit',         glyph:'◆', title:'Produce the report',   sub:'Sealed emit · .docx',       badges:[], reading:'Queued' },
 ];
 
 function nodeHTML(p) {
   const badges = [
-    '<span class="badge slot1-ghost">slot 1 · 188</span>',
+    `<span class="badge slot1">${p.reading}</span>`,
     ...p.badges.map(b => `<span class="badge">${b}</span>`)
   ].join('');
   return `<div class="node" data-type="${p.type}">
     <div class="box">
       <div class="card">
+        <div class="ring"><svg viewBox="0 0 72 72" width="100%" height="100%">
+          <circle class="track" cx="36" cy="36" r="34"></circle>
+          <circle class="arc"   cx="36" cy="36" r="34"></circle>
+        </svg></div>
         <div class="mark"><span class="glyph">${p.glyph}</span></div>
         <div class="seal">⛨</div>
         <div class="title">${p.title}</div>
@@ -344,6 +455,13 @@ function nodeHTML(p) {
 }
 
 let density = 3;
+document.body.dataset.state = 'run';
+
+function showState(st) {
+  document.body.dataset.state = st;
+  document.querySelectorAll('#density-row .variant-tab[data-s]').forEach(t => t.classList.remove('active'));
+  document.querySelector(`#density-row .variant-tab[data-s="${st}"]`).classList.add('active');
+}
 
 function render() {
   const set = PHASES.slice(0, density);

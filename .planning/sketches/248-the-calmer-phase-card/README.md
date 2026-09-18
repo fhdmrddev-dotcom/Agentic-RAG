@@ -2,7 +2,7 @@
 sketch: 248
 name: the-calmer-phase-card
 question: "Can the canvas feel calmer without re-opening UAT row U-2 — i.e. is the tension ornament, or is it density?"
-winner: null
+winner: null   # C was picked, then measured VOID. Live candidates: C2, C3.
 tags: [canvas, workflow, node-anatomy, density, u-2]
 ---
 
@@ -25,7 +25,7 @@ branch, so every node has to carry too much.
 | "Config is crammed into the node" | ❌ Config already lives in a side panel — `PhaseFormPanel.tsx`, 1,566 lines |
 | "Cards are full-width" | ❌ Already 260px fixed box / 248px card |
 | "The canvas can only draw one lane" | ❌ `SKIP_LANE_Y: 200` already draws a second lane |
-| "Nodes are heavy by accident" | ❌ **Every slot has a recorded owner.** Badge slot 1 is *deliberately empty* (reserved for Phase 188); badges are capped at 2 by a tuple union so a third will not compile; the top-right corner is permanently claimed by the governance seal |
+| "Nodes are heavy by accident" | ⚠ **PARTLY REFUTED — see the correction below.** Badges are capped at 2 by a tuple union (true) and the top-right corner is permanently the governance seal (true). But ~~"slot 1 is deliberately empty, reserved for Phase 188"~~ is **FALSE — 188 shipped**, and *"every slot has a recorded owner"* was quoted from the findings file as a conclusion **instead of being tested**. The struck text is kept because believing it is what produced a void variant |
 
 ⭐ **So the card is not accidentally heavy — it is heavy by a chain of individually-correct
 decisions.** That is the v4.2 milestone's own headline finding, one surface over.
@@ -55,6 +55,29 @@ start .planning/sketches/248-the-calmer-phase-card/index.html
 Toggle **3 / 5 phases** in the second bar. Watch where the fifth card lands against the dashed
 1600px U-2 ceiling.
 
+## ⛔ CORRECTION 2026-09-18 — C WAS PICKED, THEN MEASURED VOID
+
+The operator picked **C** on the numbers (130px → 76px, a 41% cut) and then asked the right question:
+*"C relocates the mark. It does not appear to remove anything. Did the accretion audit actually happen?"*
+
+**It had not.** The audit was run in response, and it refuted the brief this sketch was built from:
+
+1. **There is no ornament to remove at rest.** `NodeRunOverlay`'s docblock: *"A card with no reading is
+   still completely still."* `NodeCornerMarks` early-returns `null` when not grounded. **The tension at
+   rest is geometry, not accumulation** — the "ornament accretion" diagnosis was wrong.
+2. **Badge slot 1 is NOT reserved — Phase 188 SHIPPED.** `PhaseNode.tsx:352` passes
+   `status={run?.reading}`. The findings file's *"reserved for 188, do not fill"* is **stale prose**.
+   The sketch now defaults to the **Running** state for exactly this reason.
+3. ⛔ **C breaks the shipped run ring.** `NodeRunOverlay` is `left-1/2 top-[-31px] h-[72px] w-[72px]`, and
+   its own comment derives that from the mark: *"well is 62px at top-[-26px], this is 72px, and
+   (72 − 62) / 2 = 5"*. **The ring is concentric with the overhang.** C moves the mark to a left gutter,
+   so the ring detaches and floats above an empty card top.
+
+⭐ **The surviving insight is real:** 42px of top padding is rent paid for the overhang. But the overhang
+is load-bearing for run status, so the height must come from elsewhere — which is C2 and C3.
+
+**C is kept in the sketch, marked ✗ VOID, rather than deleted. The failure is the finding.**
+
 ## Variants
 
 - **A: As shipped (137-B)** — the control. Card 248 × min 104, padding 42/20/20, mark floating at
@@ -67,23 +90,36 @@ Toggle **3 / 5 phases** in the second bar. Watch where the fifth card lands agai
   Card 236 × min 76, text left-aligned. **Pitch never moves — U-2 still passes** — and the visible
   card gap grows to 84px for free. Vertical footprint drops 130px → 76px.
 
+- **C2: Trim below the line** — mark, ring, seal and verdict **byte-identical**; `min-height` 104 → 84 and
+  bottom padding 20 → 12. Footprint 130 → **110px (−15%)**. Pitch unchanged, U-2 passes. The structurally
+  safe floor: it touches nothing above the card's top edge.
+- **C3: Scale mark and ring together** — mark 62 → 52 at −22, ring 72 → 62 at −27, so the overlay's own
+  5px clearance derivation is **reproduced exactly**. Plus C2's trim. Footprint 130 → **98px (−25%)**.
+  The float survives; it just gets smaller. ⛔ This edits two module-private `RING_*` constants, so it is
+  a real code change in a G-5 file — cheap, not free.
+
 ## What to Look For
 
-1. **Does C actually feel calmer, or just shorter?** If it only reads as "smaller", the tension was
-   density and the honest answer is B plus a deliberate U-2 retirement.
-2. **The floating quality.** `NodeIconWell` was deleted in the Phase 200 port and you **restored it
-   verbatim**, naming the ring around the mark and the card silhouette. C keeps the disc, the tint
-   well and the contact shadow — but it sits *in* the card rather than *over* it. **If that float is
-   the point, C is wrong.** Deleting the mark is not on the table in any variant.
-3. **Left-aligned vs centred text (C vs A/B).** At 236px with a truncating title, does left-aligned
-   read as a calm margin or as a cut?
-4. **The ghost badge.** Slot 1 is drawn dashed in every variant as a reminder that Phase 188 owns
-   it. Judge each face with that slot eventually **full**, not empty.
+1. ⛔ **Look at C2 and C3 ALONE first, before comparing to A.** Side-by-side against what you already
+   know biases toward the familiar, and the shipped face wins that comparison whether or not it
+   deserves to.
+2. **Then ask the narrower question: is it the disc, the tint and the shadow you wanted back — or the
+   OVERHANG specifically?** C2 keeps all four unchanged. C3 keeps all four and shrinks them. If the
+   answer is "the disc", both work. If it is genuinely "the overhang at 62px", only C2 qualifies.
+3. **Is 15% (C2) or 25% (C3) enough?** C promised 41% and could not pay for it. If neither reads as
+   calmer, the honest answer is **B plus a deliberate, recorded U-2 retirement** — ⛔ reached only
+   after C2 and C3 are rejected on their merits, never as a way around the harder judgement.
+4. **Judge every face in the RUNNING state, which is now the default.** Slot 1 is live today
+   (`PhaseNode.tsx:352`), and the ring only exists when a run does. ⚠ A face that looks calm at rest
+   and crowded mid-run is a face you will be redoing in two milestones.
+5. **The vertical axis is the only one that pays.** B buys 80px of pitch per gap and breaks U-2 by
+   260px; a compromise that stays under 1600 leaves ~15px per gap, which nobody perceives.
+   **Horizontal is the wrong axis** — that is settled by arithmetic, not taste.
 
 ## Constraints honoured (from `canvas-frame-and-node-anatomy.md`)
 
 - No per-step-type colour on the card — tint is icon-well only; Phase 188 owns the strong colours.
-- No third badge, and slot 1 left unfilled.
+- No third badge. ⚠ ~~slot 1 left unfilled~~ — **corrected: 188 shipped and slot 1 is live**, so it is drawn FULL.
 - No focusable control inside the card — one tab stop per node.
 - Nothing takes `overflow: hidden` in the node subtree.
 - Horizontal left → right linear spine. No DAG implied, no parallel lanes.
