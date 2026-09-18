@@ -685,12 +685,16 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/harness/grounding.py` | 21 / 8 / 1414 | honoured by construction (193.1 / 211 / **214**) |
 | `frontend/src/components/workflows/PhaseFormPanel.tsx` | 30 / 14 / 1566 | honoured by construction ×6 (185 / 193 / 193.1 / 199 / 200 / **214**) |
 | `backend/app/db/workflows.py` | 48 / 25 / 2585 | honoured by construction (193.2 / 194 / 192.2 / 200.1 / **214**) |
-| `backend/app/services/harness/publish_service.py` | 25 / 11 / 1810 | honoured by construction (193.2 / 214 / **BUG-260828-09**) |
+| `backend/app/services/harness/publish_service.py` | 26 / 11 / 1810 | ⚠ row STALE at `25/11/1810` (+1 commit) — re-derived 256-02; NOT modified by 256-02. honoured by construction (193.2 / 214 / **BUG-260828-09**) |
 | `backend/app/services/workflow_authoring.py` | 15 / 9 / 989 | honoured by construction (193.2 / 197 / 214 / **214.1**) |
 | `backend/app/models/harness.py` | 20 / 19 / 766 | honoured by construction (193.2 / **214**) |
 | `frontend/src/components/workflows/builderStore.ts` | 14 / 8 / 968 | honoured by construction (193.2 / 197 / **214.1**) |
 | `frontend/src/components/panel/WorkspacePanel.tsx` | 16 / 10 / 646 | honoured by construction (194 / 194.1) |
-| `backend/app/services/run_lifecycle.py` | 6 / 3 / 459 | honoured by construction (194) |
+| `backend/app/services/run_lifecycle.py` | 8 / 4 / 748 | ⚠ row STALE at `6/3/459` — re-derived 256-02; +289 L unrecorded. NOT modified by 256 and ⛔ NOT the shape to copy (C-5): its `input_tokens=None` is a DEFAULT PARAM, not a site |
+| `backend/app/services/run_producer.py` | 5 / 3 / 749 | ⛔ row STALE at `3/2/693` AND its verdict `below` is now WRONG: 3 phases, so G-5 FIRES. Re-derived 256-02; NOT modified by it — it is the shape METER-03 COPIES |
+| `backend/app/services/task_service.py` | 19 / 10 / 958 | ⛔ **FIRES at 10 phases and absent from BOTH registers its ENTIRE LIFE — row added 256-02, which does NOT modify it.** The canonical two-arm usage reader METER-06 mirrors |
+| `backend/app/services/run_reconciler.py` | 3 / 2 / 325 | ⚠ absent its ENTIRE LIFE — row added 256-02; NOT modified by 256 (D-256-08 site #7 is REGISTERED, not fixed). ⛔ its BOOT sweep NULLs a `cap_paused` run's real totals — `SEED-297` |
+| `backend/app/services/circuit_breaker.py` | 1 / 1 / 331 | ⚠ absent its ENTIRE LIFE — row added 256-02 at 256-01's touch, BELOW threshold. ⛔ the `max(0,…)` clamp stays on the RETURNED delta, or a reset box SUBTRACTS real spend |
 | `backend/app/api/runs.py` | 38 / 17 / 1695 | ⚠ row STALE at `35/16/1430` — re-derived 256 baseline. ⛔ Carries the TWO `input_tokens=None` finalize sites (`:677` ask_user re-drive, `:1331` continuation) that `METER-05` must close |
 | `backend/app/services/harness_engine.py` | 54 / 20 / 3135 | honoured by construction (194 / **214**) |
 | `frontend/src/components/chat/ThinkingBlock.tsx` | 6 / 2 / 320 | ⚠ row STALE (`4/1/313`) and it does NOT fire yet — 2 phases, not 1. NOT modified by 253. ⛔ the ONE renderer of the model's process prose, now from TWO sources |
