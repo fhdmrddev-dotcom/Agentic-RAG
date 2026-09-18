@@ -67,7 +67,24 @@ describe("Chat↔Panel Seam (D-05) — live pointer vs reload card", () => {
     render(<PausedRunCue />)
     expect(screen.getByText(/awaiting your answer/i)).toBeInTheDocument()
     expect(screen.getByText(/agent is paused/i)).toBeInTheDocument()
-    expect(screen.getByRole("button", { name: /answer in panel/i })).toBeInTheDocument()
+  })
+
+  // ⛔ THE CUE IS A MARKER AND CARRIES NO CONTROL — asserted as an ABSENCE, and the
+  // absence is the point. This case previously read
+  // `expect(screen.getByRole("button", { name: /answer in panel/i })).toBeInTheDocument()`
+  // and it PASSED over a DEAD BUTTON for the whole of its life: the sole production
+  // mount (`MessageItem.tsx:624`) renders `<PausedRunCue />` with no `onSeePanel`, so
+  // `onClick` was `undefined`. A presence assertion cannot see that a control does
+  // nothing — the project's own recurring finding, one register over.
+  //
+  // ⚠ `queryAllByRole("button")` OVER THE WHOLE RENDER, not a name-scoped query. A
+  // name-scoped absence check (`queryByRole("button", { name: /answer in panel/i })`)
+  // would pass the instant the copy changed, while a live button survived under a new
+  // label — which is the same false green in a new costume.
+  it("PausedRunCue renders NO button — it marks the row that paused, it does not act", () => {
+    render(<PausedRunCue />)
+    expect(screen.queryAllByRole("button")).toHaveLength(0)
+    expect(screen.queryByText(/answer in panel/i)).not.toBeInTheDocument()
   })
 
   // Phase 088-01 (D-13a) — structural a11y regression gate across all three seam
