@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sketch 248 — The Calmer Phase Card</title>
+<link rel="stylesheet" href="../themes/default.css">
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding-top: 104px;
+    background: var(--color-bg); color: var(--color-text);
+    font-family: var(--font-sans);
+  }
+
+  /* ── variant nav ─────────────────────────────────────────────── */
+  #variant-nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 9998;
+    background: var(--color-bg-elev1); border-bottom: 1px solid var(--color-border);
+    padding: 10px 18px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+  }
+  .variant-tab {
+    background: transparent; color: var(--color-text-muted);
+    border: 1px solid var(--color-border); border-radius: 999px;
+    padding: 6px 14px; font: 500 13px/1 var(--font-sans); cursor: pointer;
+  }
+  .variant-tab.active {
+    background: var(--color-primary-dim); color: var(--color-primary);
+    border-color: var(--color-primary-glow);
+  }
+  #nav-note {
+    margin-left: auto; font: 500 12px/1.4 var(--font-mono); color: var(--color-text-dim);
+  }
+  #density-row {
+    position: fixed; top: 52px; left: 0; right: 0; z-index: 9997;
+    background: var(--color-bg-elev1); border-bottom: 1px solid var(--color-border);
+    padding: 8px 18px; display: flex; gap: 8px; align-items: center;
+  }
+  #density-row .variant-tab { padding: 4px 12px; font-size: 12px; }
+  #density-row .lbl { font: 600 11px/1 var(--font-mono); color: var(--color-text-dim);
+    letter-spacing: .08em; text-transform: uppercase; margin-right: 4px; }
+
+  .variant { display: none; }
+  .variant.active { display: block; }
+
+  /* ── the canvas plane (137-B ambient depth) ───────────────────── */
+  .plane {
+    position: relative; overflow: hidden;
+    border-bottom: 1px solid var(--color-border);
+    background: var(--color-bg);
+    padding: 64px 0 56px;
+  }
+  .plane::before, .plane::after {
+    content: ''; position: absolute; border-radius: 50%; pointer-events: none;
+    filter: blur(90px);
+  }
+  .plane::before { width: 520px; height: 520px; left: 6%;  top: -14%;
+                   background: hsl(239 84% 45% / .22); }
+  .plane::after  { width: 460px; height: 460px; right: 4%; bottom: -18%;
+                   background: hsl(258 90% 50% / .16); }
+
+  /* the 1600px U-2 budget, drawn rather than asserted */
+  .budget {
+    position: relative; margin: 0 auto 28px; width: 1600px; max-width: calc(100% - 48px);
+    height: 22px;
+  }
+  .budget .bar {
+    position: absolute; inset: 0; border-left: 1px dashed var(--color-warning);
+    border-right: 1px dashed var(--color-warning);
+  }
+  .budget .cap {
+    position: absolute; right: 0; top: -2px; transform: translateX(calc(100% + 8px));
+    font: 600 10px/1 var(--font-mono); color: var(--color-warning);
+    letter-spacing: .06em; white-space: nowrap;
+  }
+  .budget .lbl {
+    position: absolute; left: 0; top: -2px; transform: translateX(calc(-100% - 8px));
+    font: 600 10px/1 var(--font-mono); color: var(--color-warning); white-space: nowrap;
+  }
+
+  .spine {
+    position: relative; display: flex; align-items: flex-start;
+    padding: 34px 24px 0; overflow-x: auto;
+  }
+
+  /* ── the node box ─────────────────────────────────────────────── */
+  .node { position: relative; flex: 0 0 auto; }
+  .node .box { position: relative; }
+
+  /* the connector, drawn in the pitch gap */
+  .node:not(:last-child) .box::after {
+    content: ''; position: absolute; top: 52px; left: 100%;
+    height: 1.5px; background: linear-gradient(90deg,
+      var(--color-border) 0%, var(--color-primary-glow) 50%, var(--color-border) 100%);
+  }
+
+  .card {
+    position: relative;
+    border-radius: 22px;
+    background: hsl(220 30% 100% / .045);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--color-border-soft);
+    box-shadow: 0 1px 0 hsl(220 30% 100% / .06) inset,
+                0 18px 36px -22px rgba(0,0,0,.95);
+  }
+
+  .title {
+    font: 600 14px/1.25 var(--font-headline); color: var(--color-text);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .sub {
+    font: 400 12px/1.35 var(--font-sans); color: var(--color-text-muted);
+    margin-top: 5px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .badges { display: flex; gap: 6px; margin-top: 10px; }
+  .badge {
+    font: 500 10.5px/1 var(--font-sans); padding: 4px 8px; border-radius: 999px;
+    background: var(--color-warning-dim); color: var(--color-warning);
+    border: 1px solid hsl(38 92% 60% / .28); white-space: nowrap;
+  }
+  .badge.slot1-ghost {
+    background: transparent; color: var(--color-text-dim);
+    border: 1px dashed var(--color-border);
+  }
+
+  /* the governance seal — top-right, permanently claimed */
+  .seal {
+    position: absolute; width: 21px; height: 21px; top: 11px; right: 17px;
+    display: grid; place-items: center; border-radius: 6px;
+    background: hsl(142 71% 45% / .14); border: 1px solid hsl(142 71% 45% / .35);
+    color: var(--color-success); font-size: 11px; line-height: 1;
+  }
+
+  /* the 3D mark — floats above, contact shadow, upward overflow */
+  .mark {
+    position: absolute; width: 62px; height: 62px; left: 50%; top: -26px;
+    transform: translateX(-50%); display: grid; place-items: center;
+  }
+  .mark::before {
+    content: ''; position: absolute; inset: -3px; border-radius: 50%;
+    background: radial-gradient(circle, var(--t, hsl(220 30% 100% / .18)), transparent 68%);
+  }
+  .mark::after {
+    content: ''; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
+    width: 36px; height: 8px; border-radius: 50%;
+    background: rgba(0,0,0,.5); filter: blur(5px);
+  }
+  .mark .glyph {
+    position: relative; font-size: 27px; line-height: 1;
+    filter: drop-shadow(0 9px 13px rgba(0,0,0,.8));
+  }
+
+  /* per-type tint — ICON WELL ONLY, never the card */
+  [data-type="llm_agent"]        { --t: hsl(239 90% 70% / .40); }
+  [data-type="llm_emit"]         { --t: hsl(258 90% 70% / .40); }
+  [data-type="programmatic"]     { --t: hsl(200 85% 62% / .36); }
+  [data-type="llm_batch_agents"] { --t: hsl(170 80% 55% / .34); }
+  [data-type="llm_human_input"]  { --t: hsl(38 92% 62% / .38); }
+  [data-type="llm_single"]       { --t: hsl(220 30% 100% / .22); }
+
+  /* ══ FACE A — as shipped (137-B). The control. ══════════════════ */
+  .faceA .node        { width: 260px; }
+  .faceA .card        { width: 248px; margin: 0 auto; min-height: 104px;
+                        padding: 42px 20px 20px; text-align: center; }
+  .faceA .badges      { justify-content: center; }
+  .faceA .node:not(:last-child) .box::after { width: 60px; }
+  .faceA .node:not(:last-child) { margin-right: 60px; }   /* 260 + 60 = PITCH_X 320 */
+
+  /* ══ FACE B — same ornament, more air. Breaks U-2. ═════════════ */
+  .faceB .node        { width: 260px; }
+  .faceB .card        { width: 248px; margin: 0 auto; min-height: 104px;
+                        padding: 42px 20px 20px; text-align: center; }
+  .faceB .badges      { justify-content: center; }
+  .faceB .node:not(:last-child) .box::after { width: 140px; }
+  .faceB .node:not(:last-child) { margin-right: 140px; }  /* 260 + 140 = pitch 400 */
+
+  /* ══ FACE C — mark kept, its padding cost repaid. Holds U-2. ═══ */
+  .faceC .node        { width: 260px; }
+  .faceC .card        { width: 236px; margin: 0 auto; min-height: 76px;
+                        padding: 14px 16px 14px 62px; text-align: left;
+                        border-radius: 18px; }
+  .faceC .mark        { width: 44px; height: 44px; left: 12px; top: 50%;
+                        transform: translateY(-50%); }
+  .faceC .mark .glyph { font-size: 20px; }
+  .faceC .mark::after { width: 24px; height: 6px; }
+  .faceC .seal        { top: 9px; right: 11px; width: 18px; height: 18px; font-size: 10px; }
+  .faceC .title       { padding-right: 22px; }
+  .faceC .badges      { justify-content: flex-start; margin-top: 8px; }
+  .faceC .node:not(:last-child) .box::after { width: 60px; top: 38px; }
+  .faceC .node:not(:last-child) { margin-right: 60px; }   /* pitch stays 320 — card is narrower */
+
+  /* ── the measurement strip under each plane ───────────────────── */
+  .metrics {
+    max-width: 1180px; margin: 0 auto; padding: 22px 24px 40px;
+  }
+  .metrics h3 {
+    font: 600 13px/1 var(--font-mono); letter-spacing: .1em; text-transform: uppercase;
+    color: var(--color-text-dim); margin: 0 0 12px;
+  }
+  table { width: 100%; border-collapse: collapse; font: 13px/1.5 var(--font-sans); }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--color-border); }
+  th { font: 600 11px/1 var(--font-mono); letter-spacing: .06em; text-transform: uppercase;
+       color: var(--color-text-dim); }
+  td.n { font-family: var(--font-mono); color: var(--color-text); white-space: nowrap; }
+  .ok   { color: var(--color-success); font-weight: 600; }
+  .bad  { color: var(--color-danger);  font-weight: 600; }
+  .warn { color: var(--color-warning); font-weight: 600; }
+  .note { font: 13px/1.6 var(--font-sans); color: var(--color-text-muted);
+          max-width: 76ch; margin: 14px 0 0; }
+  .note strong { color: var(--color-text); }
+  .verdict {
+    margin: 18px 0 0; padding: 14px 16px; border-radius: 12px;
+    border: 1px solid var(--color-border); background: var(--color-surface);
+    font: 13px/1.6 var(--font-sans); color: var(--color-text-muted); max-width: 84ch;
+  }
+</style>
+</head>
+<body>
+
+<div id="variant-nav">
+  <button class="variant-tab active" data-v="a" onclick="showVariant('a')">A: As shipped (137-B)</button>
+  <button class="variant-tab" data-v="b" onclick="showVariant('b')">B: More air</button>
+  <button class="variant-tab" data-v="c" onclick="showVariant('c')">C: Repay the mark's cost</button>
+  <span id="nav-note">U-2 budget = 1600px for 5 phases</span>
+</div>
+
+<div id="density-row">
+  <span class="lbl">Phases</span>
+  <button class="variant-tab active" data-d="3" onclick="showDensity(3)">3</button>
+  <button class="variant-tab" data-d="5" onclick="showDensity(5)">5</button>
+  <span id="nav-note" style="margin-left:14px;font-family:var(--font-mono);font-size:12px;color:var(--color-text-dim)">
+    Type tint is icon-well only. Badge slot 1 is drawn as a ghost — reserved for Phase 188.
+  </span>
+</div>
+
+<!-- ══════════════════ VARIANT A ══════════════════ -->
+<div id="variant-a" class="variant active">
+  <div class="plane">
+    <div class="budget"><div class="bar"></div>
+      <span class="lbl">0</span><span class="cap">1600px — U-2 ceiling</span></div>
+    <div class="spine faceA" data-spine="a"></div>
+  </div>
+  <div class="metrics">
+    <h3>Face A — as shipped</h3>
+    <table>
+      <tr><th>Measure</th><th>Value</th><th>Source</th></tr>
+      <tr><td>Card</td><td class="n">248 × min 104, radius 22</td><td>PhaseNodeCard.tsx</td></tr>
+      <tr><td>Padding</td><td class="n">42 / 20 / 20</td><td>the 42 exists to clear the mark</td></tr>
+      <tr><td>Mark</td><td class="n">62 × 62 at top −26</td><td>NodeIconWell.tsx</td></tr>
+      <tr><td>Pitch / gap</td><td class="n">320 / <span class="warn">72</span></td><td>320 − card 248</td></tr>
+      <tr><td>5-phase span</td><td class="n">1540px</td><td><span class="ok">U-2 passes</span></td></tr>
+      <tr><td>Background share</td><td class="n">~23%</td><td>72 ÷ 320</td></tr>
+    </table>
+    <p class="note"><strong>This is the control.</strong> Nothing here is a mistake — every element has a
+    recorded owner. The 42px top padding is the mark's rent, paid on every card whether or not the run
+    is live. Background is ~19% of the plane; the reference feel that prompted this sketch is ~50%.</p>
+  </div>
+</div>
+
+<!-- ══════════════════ VARIANT B ══════════════════ -->
+<div id="variant-b" class="variant">
+  <div class="plane">
+    <div class="budget"><div class="bar"></div>
+      <span class="lbl">0</span><span class="cap">1600px — U-2 ceiling</span></div>
+    <div class="spine faceB" data-spine="b"></div>
+  </div>
+  <div class="metrics">
+    <h3>Face B — same card, more air</h3>
+    <table>
+      <tr><th>Measure</th><th>Value</th><th>vs A</th></tr>
+      <tr><td>Card</td><td class="n">248 × min 104</td><td>unchanged</td></tr>
+      <tr><td>Padding</td><td class="n">42 / 20 / 20</td><td>unchanged</td></tr>
+      <tr><td>Pitch / gap</td><td class="n">400 / <span class="ok">152</span></td><td>+80px of air</td></tr>
+      <tr><td>5-phase span</td><td class="n">1860px</td><td><span class="bad">U-2 FAILS by 260px</span></td></tr>
+      <tr><td>Background share</td><td class="n">~38%</td><td>+15pp</td></tr>
+      <tr><td>Phases visible at 1600px</td><td class="n">4</td><td><span class="bad">−1</span></td></tr>
+    </table>
+    <p class="note"><strong>This is the price, drawn rather than argued.</strong> The card is byte-identical
+    to A. Only the pitch moved. It does feel calmer — and the fifth step is off-screen at the budget width,
+    which is exactly the criterion U-2 was written to protect.</p>
+    <div class="verdict">⛔ <strong>Do not pick B casually.</strong> Choosing it re-opens a passed UAT row.
+    That is legitimate — a criterion can be retired deliberately — but it must be retired by decision and
+    recorded, never tripped by a stylesheet edit.</div>
+  </div>
+</div>
+
+<!-- ══════════════════ VARIANT C ══════════════════ -->
+<div id="variant-c" class="variant">
+  <div class="plane">
+    <div class="budget"><div class="bar"></div>
+      <span class="lbl">0</span><span class="cap">1600px — U-2 ceiling</span></div>
+    <div class="spine faceC" data-spine="c"></div>
+  </div>
+  <div class="metrics">
+    <h3>Face C — keep the mark, repay its padding</h3>
+    <table>
+      <tr><th>Measure</th><th>Value</th><th>vs A</th></tr>
+      <tr><td>Card</td><td class="n">236 × min 76, radius 18</td><td>−28px tall</td></tr>
+      <tr><td>Padding</td><td class="n">14 / 16 / 14 / 62</td><td><span class="ok">no 42px top rent</span></td></tr>
+      <tr><td>Mark</td><td class="n">44 × 44, left gutter, vertically centred</td><td>kept, not deleted</td></tr>
+      <tr><td>Text</td><td class="n">left-aligned</td><td>truncation reads as a margin, not a cut</td></tr>
+      <tr><td>Pitch / gap</td><td class="n"><span class="ok">320 unchanged</span> / 84</td><td>320 − card 236</td></tr>
+      <tr><td>5-phase span</td><td class="n">1540px</td><td><span class="ok">U-2 still passes</span></td></tr>
+      <tr><td>Vertical footprint</td><td class="n">76px</td><td><span class="ok">−54px</span> (A is 104+26)</td></tr>
+    </table>
+    <p class="note"><strong>The hypothesis: calm without paying U-2.</strong> The mark survives — it was
+    deleted once in the Phase 200 port and you restored it, so deleting it again is not on the table. What
+    changes is that it stops overflowing upward, so the card stops reserving 42px of empty top padding to
+    clear it. That reclaimed height is the calm, and the pitch never moves.</p>
+    <div class="verdict">⚠ <strong>What C gives up, stated rather than hidden.</strong> The mark no longer
+    floats above the silhouette — the specific quality you named when you chose the icon well over the
+    Phase 200 compact row. C keeps the disc, the tint well and the contact shadow, but it sits <em>in</em>
+    the card rather than <em>over</em> it. If that floating quality is the point, C is wrong and the honest
+    answer is B plus a deliberate U-2 retirement.</div>
+  </div>
+</div>
+
+<script>
+const PHASES = [
+  { type:'llm_agent',        glyph:'◈', title:'Gather the evidence',  sub:'Agent step · 6 tools',      badges:[] },
+  { type:'programmatic',     glyph:'▣', title:'Split by topic',       sub:'Deterministic · split_topic', badges:[] },
+  { type:'llm_human_input',  glyph:'◉', title:'Confirm the shortlist',sub:'Asks you · 2 options',      badges:['Waits for you'] },
+  { type:'llm_batch_agents', glyph:'⬢', title:'Draft each section',   sub:'Fan-out · max 5 parallel',  badges:[] },
+  { type:'llm_emit',         glyph:'◆', title:'Produce the report',   sub:'Sealed emit · .docx',       badges:[] },
+];
+
+function nodeHTML(p) {
+  const badges = [
+    '<span class="badge slot1-ghost">slot 1 · 188</span>',
+    ...p.badges.map(b => `<span class="badge">${b}</span>`)
+  ].join('');
+  return `<div class="node" data-type="${p.type}">
+    <div class="box">
+      <div class="card">
+        <div class="mark"><span class="glyph">${p.glyph}</span></div>
+        <div class="seal">⛨</div>
+        <div class="title">${p.title}</div>
+        <div class="sub">${p.sub}</div>
+        <div class="badges">${badges}</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+let density = 3;
+
+function render() {
+  const set = PHASES.slice(0, density);
+  document.querySelectorAll('.spine').forEach(s => {
+    s.innerHTML = set.map(nodeHTML).join('');
+  });
+}
+
+function showVariant(id) {
+  document.querySelectorAll('.variant').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('#variant-nav .variant-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('variant-' + id).classList.add('active');
+  document.querySelector(`#variant-nav .variant-tab[data-v="${id}"]`).classList.add('active');
+}
+
+function showDensity(n) {
+  density = n;
+  document.querySelectorAll('#density-row .variant-tab').forEach(t => t.classList.remove('active'));
+  document.querySelector(`#density-row .variant-tab[data-d="${n}"]`).classList.add('active');
+  render();
+}
+
+render();
+</script>
+</body>
+</html>

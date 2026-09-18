@@ -2799,6 +2799,7 @@ already approved. `SHELL-01/02/03` are bug fixes on shipped surfaces with named 
 |---|------|----------------|--------|------|
 | 236 | the-file-that-belongs-to-this-chat | How does a person know a file is HERE, not in the Library? | ✅ **A — Scope on the chip** ★ (operator, 2026-09-11) · the `+` menu stays plain; the chip is the only place that says *"this chat only · 24h"*, and it rides into the sent message | phase-244, shell-04, chat, composer, attach, scope, g2-sketch-gate |
 | 247 | sources-and-watches | How does a watched-source card honestly report its connection health separately from its run outcome, and where does 'Sync now' put its answer without destroying the screen? | ✅ **A — Two-Tier Status Pill + Inline Sync** ★ (operator, 2026-09-14) · dual connection/run status pills + row-level non-collapsing sync tag | phase-247, watch-03, watch-04, watch-05, watch-06, watch-07, g2-sketch-gate, sources-and-watches |
+| 248 | the-calmer-phase-card | Can the canvas feel calmer without re-opening UAT row U-2 — is the tension ORNAMENT or DENSITY? | *pending* | phase-tbd, canvas, node-anatomy, density, u-2, g2-sketch-gate |
 
 - **Why A over B** — a menu is read once and closed; **a chip is still on screen while the person types
   and survives into the transcript.** Reopening the chat tomorrow, A still says `this chat only`;
@@ -2828,3 +2829,32 @@ already approved. `SHELL-01/02/03` are bug fixes on shipped surfaces with named 
   chip, not a new region.
 - **Scenario deliberately authored** (*Q4 supplier pricing review*, Meridian) per the
   realistic-not-fixture rule; every engine fact in `COPY.engine` is read from shipped source.
+
+## 248 · The calmer phase card — the tension is ornament, or it costs U-2
+
+Raised by the operator (2026-09-18) as *"nodes feel heavy, the canvas feels tense"*, and prompted by an
+outside comparison document that blamed the **linear phase model**. ⚠ **That diagnosis was measured and is
+wrong about the canvas:** config already lives in a side panel (`PhaseFormPanel.tsx`, 1,566 L), cards are
+already 260/248px rather than full-width, and `SKIP_LANE_Y: 200` already draws a second lane.
+
+⭐ **The card is not accidentally heavy — it is heavy by a chain of individually-correct decisions.** Every
+slot has a recorded owner: badge slot 1 is deliberately empty for Phase 188, a third badge will not compile
+(max-2 tuple union), the top-right corner is permanently the governance seal. **The measurable cost is the
+mark:** 62px floating at `top: -26px` is why every card carries `padding: 42px 20px 20px`, running or not.
+
+⛔ **The load-bearing constraint is UAT row U-2**, stated in `canvasModel.ts:67` — `PITCH_X` is chosen so the
+5-phase maximum spans `4*320 + 260 = 1540px` inside sketch 136-B's ~1600px budget. **Density is an accepted
+criterion, not an accident**, so all three faces are drawn at **3 AND 5 phases** with the 1600px ceiling
+rendered on the plane — the trade is shown, never asserted.
+
+- **A** as shipped (137-B) — 1540px, U-2 passes, background ~23%.
+- **B** byte-identical card at pitch 400 — calmer, **1860px, U-2 fails by 260px**, 5th step off-screen.
+- **C** the mark survives at 44px in a left gutter but stops overflowing upward, so the 42px top padding is
+  repaid — **pitch never moves, U-2 still passes**, vertical footprint 130px → 76px, card gap 72 → 84.
+
+⚠ **`NodeIconWell` is never deleted in any variant.** It was cut once by the Phase 200 port and the operator
+**restored it verbatim**, naming the ring and the silhouette. C keeps the disc, tint well and contact shadow
+but sits it *in* the card rather than *over* it — **if that float is the point, C is wrong and the honest
+answer is B plus a DELIBERATE U-2 retirement**, recorded as a decision rather than tripped by a stylesheet.
+
+⛔ Branching / named outcomes is **out of scope here** and is explicitly not what makes this canvas tense.
