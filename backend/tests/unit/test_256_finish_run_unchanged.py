@@ -49,13 +49,28 @@ _WORKFLOWS_DB = _BACKEND_APP / "db" / "workflows.py"
 # stable across checkouts with different line endings.
 _FINISH_RUN_MD5 = "2a3a1c4543f5a80c55d25a8d0e1bd1e0"
 
-# file:line of every `await finish_run(` under backend/app/, re-derived at this
-# plan's base. Sorted; compared as a SET so ordering cannot cause a false red.
+# The CONTRACT: which files call ``finish_run``, and how many times each. This is
+# the assertion that actually guards D-256-05, and it is stable under edits
+# elsewhere in the same file.
+_EXPECTED_CALL_COUNTS = {
+    "api/workflows.py": 1,
+    "services/harness_engine.py": 3,
+    "services/run_lifecycle.py": 1,
+}
+
+# The POSITIONS, pinned as well because the plan asks for the file:line set.
+# ⚠ THESE ROT, AND THEY ROTTED INSIDE THE PLAN THAT WROTE THEM. Pinned first at
+# ``harness_engine.py`` :2257 / :2298 / :2580; this plan's own ``_enforce_budget``
+# reorder and site-3 fix then added 38 lines above them and moved all three to
+# :2295 / :2336 / :2618. The original numbers are recorded here rather than
+# silently replaced, because that is the honest shape of this pin: a LINE SHIFT
+# is bookkeeping, and the counts above are what make the difference visible in
+# the failure output instead of leaving the next reader to guess.
 _EXPECTED_CALL_SITES = {
     "api/workflows.py:1802",
-    "services/harness_engine.py:2257",
-    "services/harness_engine.py:2298",
-    "services/harness_engine.py:2580",
+    "services/harness_engine.py:2295",
+    "services/harness_engine.py:2336",
+    "services/harness_engine.py:2618",
     "services/run_lifecycle.py:521",
 }
 
@@ -116,13 +131,29 @@ def test_the_finish_run_call_site_set_is_unchanged():
             if _CALL_RE.search(line):
                 found.add(f"{rel}:{lineno}")
 
+    # (a) THE CONTRACT — which files call it, and how many times. A failure here
+    #     is a real change: a new caller, or a terminal write removed.
+    counts: dict[str, int] = {}
+    for entry in found:
+        counts[entry.rsplit(":", 1)[0]] = counts.get(entry.rsplit(":", 1)[0], 0) + 1
+    assert counts == _EXPECTED_CALL_COUNTS, (
+        "the set of FILES calling `await finish_run(` changed, or one of them "
+        f"gained/lost a call.\n  measured: {counts}\n  expected: "
+        f"{_EXPECTED_CALL_COUNTS}\nA new caller means finish_run's contract is "
+        "being relied on somewhere new; a vanished one means a terminal write was "
+        "removed. Neither is a digest change, and neither may pass silently."
+    )
+
+    # (b) THE POSITIONS. ⚠ If (a) passed and this fails, ONLY line numbers moved —
+    #     an edit elsewhere in one of those files. That is a bookkeeping update:
+    #     re-derive with `grep -rn "await finish_run(" backend/app/`, update
+    #     _EXPECTED_CALL_SITES, and say so in the commit.
     assert found == _EXPECTED_CALL_SITES, (
-        "the `await finish_run(` call-site set moved.\n"
+        "the `await finish_run(` call-site POSITIONS moved.\n"
         f"  appeared: {sorted(found - _EXPECTED_CALL_SITES)}\n"
         f"  vanished: {sorted(_EXPECTED_CALL_SITES - found)}\n"
-        "A new caller means finish_run's contract is being relied on somewhere "
-        "new; a vanished one means a terminal write was removed. Neither is a "
-        "digest change, and neither may pass silently."
+        "The per-file counts above are unchanged, so this is a line shift rather "
+        "than a contract change — but re-derive and confirm that before updating."
     )
 
 
