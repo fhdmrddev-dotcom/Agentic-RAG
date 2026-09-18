@@ -258,6 +258,15 @@ $$;
 
 
 --
+-- Name: dummy_test_fn(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.dummy_test_fn() RETURNS text
+    LANGUAGE sql
+    AS $$SELECT 'hello'::text$$;
+
+
+--
 -- Name: folder_is_org_shared(uuid); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -2682,6 +2691,9 @@ CREATE TABLE public.workflow_runs (
     is_golden_run boolean DEFAULT false,
     definition_snapshot jsonb,
     metadata jsonb,
+    input_tokens integer,
+    output_tokens integer,
+    token_coverage text[],
     CONSTRAINT workflow_runs_status_check CHECK ((status = ANY (ARRAY['active'::text, 'paused'::text, 'cap_paused'::text, 'completed'::text, 'failed'::text, 'cancelled'::text])))
 );
 
@@ -2748,6 +2760,27 @@ COMMENT ON COLUMN public.workflow_runs.definition_snapshot IS 'Phase 200 follow-
 --
 
 COMMENT ON COLUMN public.workflow_runs.metadata IS 'Phase 204 (SCHED-02): run-level operational metadata. Today it carries exactly one key, "circuit_breaker", written by CircuitBreaker.trip_breaker with the trip reason and the exact token/timing measurements. Merged with ||, never replaced.';
+
+
+--
+-- Name: COLUMN workflow_runs.input_tokens; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.workflow_runs.input_tokens IS 'Phase 256 (METER-03). Cumulative input tokens for this harness run, ACCUMULATED BY ADDITION at every phase boundary by db.workflows.persist_run_usage — never SET, because ctx.run_usage_box is reset per run SEGMENT at harness_engine.py:1844 and a SET would make the last segment''s spend the whole run''s total (D-256-09). Nullable, deliberately: NULL means never measured, 0 means measured as zero, and the two are different facts — do not coalesce (D-256-06). This is the WORKFLOW grain; runs.input_tokens on the per-segment producer shell is the SEGMENT grain — NEVER SUM ACROSS public.runs AND public.workflow_runs (D-256-03). Read rule for public.runs (D-256-01): any org-level or thread-level total sums only rows WHERE parent_run_id IS NULL, because a parent row is INCLUSIVE of its descendants.';
+
+
+--
+-- Name: COLUMN workflow_runs.output_tokens; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.workflow_runs.output_tokens IS 'Phase 256 (METER-03). See input_tokens: same writer (db.workflows.persist_run_usage), same ADD-not-SET accumulation and the same reason for it (D-256-09), same WORKFLOW grain with the same prohibition on summing across public.runs and public.workflow_runs (D-256-03), same NULL-means-never-measured / 0-means-measured-as-zero rule (D-256-06), and the same read rule over public.runs — sum only rows WHERE parent_run_id IS NULL (D-256-01).';
+
+
+--
+-- Name: COLUMN workflow_runs.token_coverage; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.workflow_runs.token_coverage IS 'Phase 256 (D-256-07 / SC#4). WHICH COUNTING LEGS this run''s totals actually include, e.g. {agent,single,batch,emit}. Written from ONE module-level constant, db.workflows.TOKEN_COVERAGE_LEGS, in the same commit as the leg it names — so a run persisted before a leg shipped reads honestly as NOT covering it, forever, with no memory required. Coverage is RECORDED, never INFERRED: deriving it from created_at against a ship date is "someone''s memory" encoded as a comparison, which SC#4 forbids. Phase 257''s METER-07 "what it cannot see" view reads THIS COLUMN, never hand-written prose. THREE states and all three are distinct: NULL = no instrumented leg ever reported usage for this run (a pre-182 row, or a run whose every leg was silent) · {} = reported, but covering nothing · a populated array = exactly the legs listed. Same grain rule as input_tokens (D-256-03) and same read rule over public.runs — sum only rows WHERE parent_run_id IS NULL (D-256-01).';
 
 
 --
@@ -4284,6 +4317,13 @@ CREATE INDEX idx_workflow_definitions_slug ON public.workflow_definitions USING 
 --
 
 CREATE INDEX idx_workflow_phases_run ON public.workflow_phases USING btree (workflow_run_id, phase_index);
+
+
+--
+-- Name: idx_workflow_runs_org_coverage_incomplete; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_runs_org_coverage_incomplete ON public.workflow_runs USING btree (org_id, created_at DESC) WHERE ((token_coverage IS NULL) OR (NOT (token_coverage @> ARRAY['agent'::text, 'single'::text, 'batch'::text, 'emit'::text])));
 
 
 --
