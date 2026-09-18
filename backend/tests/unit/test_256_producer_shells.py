@@ -638,14 +638,21 @@ def test_the_warning_literal_appears_once_per_shell():
     assert _read("app/services/scheduler_service.py").count(_WARNING_FORMAT) == 1
 
 
-def test_no_shell_started_writing_the_workflow_grain():
-    """T-256-16 / D-256-03 — a segment shell must never write the cumulative total."""
-    text = _read("app/api/runs.py")
-    assert "persist_run_usage" not in text, (
-        "a producer shell reached for the workflow_runs cumulative writer; the two "
-        "grains must never be summed (D-256-03)"
-    )
-    for rel in _SUBJECT_FILES[1:]:
-        assert "persist_run_usage" not in _read(rel), (
-            f"{rel} reached for the workflow_runs cumulative writer (D-256-03)"
+@pytest.mark.parametrize("rel", _SUBJECT_FILES)
+def test_no_shell_started_writing_the_workflow_grain(rel):
+    """T-256-16 / D-256-03 — a segment shell must never write the cumulative total.
+
+    ⚠ The fence is over a CALL or an IMPORT, not over the identifier: every one of the
+    three files now NAMES ``persist_run_usage`` in a comment, precisely to say it is the
+    other grain's writer. A bare substring check would fire on the sentence that exists
+    to prevent the defect — a guard that reds on its own warning label.
+    """
+    for i, line in enumerate(_read(rel).splitlines(), start=1):
+        code = line.split("#", 1)[0]
+        assert "persist_run_usage(" not in code, (
+            f"{rel}:{i} CALLS the workflow_runs cumulative writer from a segment shell; "
+            "the two grains must never be summed (D-256-03 / T-256-16)"
+        )
+        assert not ("import" in code and "persist_run_usage" in code), (
+            f"{rel}:{i} imports the workflow_runs cumulative writer (D-256-03)"
         )
