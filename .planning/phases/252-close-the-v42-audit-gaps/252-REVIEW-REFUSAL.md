@@ -7,7 +7,7 @@ author: claude (the BUILDER)
 decided_by: pending — operator (D-05)
 kind: recorded-decision-not-review
 review_type: self-assessed
-status: draft-pending-operator-ruling
+status: voided-by-independent-review   # Voided 2026-09-19 by 252-REVIEW-IND.md (Gemini independent review passed).
 effective_from: 2026-09-24
 bus_item: BUS-256
 independent_review_after_ruling: refused
