@@ -691,7 +691,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/builderStore.ts` | 14 / 8 / 968 | honoured by construction (193.2 / 197 / **214.1**) |
 | `frontend/src/components/panel/WorkspacePanel.tsx` | 16 / 10 / 646 | honoured by construction (194 / 194.1) |
 | `backend/app/services/run_lifecycle.py` | 6 / 3 / 459 | honoured by construction (194) |
-| `backend/app/api/runs.py` | 35 / 16 / 1430 | honoured by construction (194) |
+| `backend/app/api/runs.py` | 38 / 17 / 1695 | ⚠ row STALE at `35/16/1430` — re-derived 256 baseline. ⛔ Carries the TWO `input_tokens=None` finalize sites (`:677` ask_user re-drive, `:1331` continuation) that `METER-05` must close |
 | `backend/app/services/harness_engine.py` | 54 / 20 / 3135 | honoured by construction (194 / **214**) |
 | `frontend/src/components/chat/ThinkingBlock.tsx` | 6 / 2 / 320 | ⚠ row STALE (`4/1/313`) and it does NOT fire yet — 2 phases, not 1. NOT modified by 253. ⛔ the ONE renderer of the model's process prose, now from TWO sources |
 | `frontend/src/components/chat/RunCard.tsx` | 29 / 14 / 723 | ⭐ G-5 DISCHARGED (243-02). ⚠ row STALE at `28/14/710`. **BUG-260912-01**: its state-2 guard asked `!reasoningContent` ALONE and shipped a VISIBLE mid-stream double once the fold gained a 2nd input |

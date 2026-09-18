@@ -2,22 +2,15 @@
 gsd_state_version: 1.0
 milestone: v4.3
 milestone_name: What You Can Actually Sell
-status: in-progress
-last_updated: "2026-09-18T15:00:00.000Z"
-last_activity: '2026-09-18 -- PHASE 256 (Every Token Is Counted And Kept) PLANNED. 4 plans / 2 waves at 76304da8b; plan-checker VERIFICATION PASSED with 2 non-blocking warnings. Requirements 4/4 and all 16 D-256-NN cited literally. FOUR MEASURED CORRECTIONS TO THE LOCKED DECISIONS, each recorded beside its original. (1) D-256-04 chose an UNREACHABLE write point: harness_engine.py:1873 is `if not breaker.armed: return` ABOVE the :1875 absorb point, and armed means a ceiling is configured -- so an INTERACTIVE harness run returns early and METER-03/SC#1 would have persisted NOTHING for nearly every run. Verified in source by the orchestrator; the reorder is provably behaviour-preserving (check_limits guards both arms on `is not None`) and ships in the SAME plan as the writer, with the headline test driving a DISARMED run. (2) Q3's landmine DOES NOT EXIST -- nothing in the backend aggregates runs.input_tokens at all -- so no ordering is imposed, but D-256-02's fence now has an EMPTY SUBJECT SET and its vacuity control is mandatory, md5-proven, never timing-proven. (3) D-256-05's `7 call sites across 4 files` is WRONG and RESEARCH.md repeated it: re-derived, 5 sites across 3 files; the decision stands, the fence now asserts the re-derived SET. (4) D-256-13 is wrong in two directions, found by RUNNING the gate: scheduler_service.py ALREADY has a row, and a FOURTH firing no-row file no register names exists -- task_service.py at 19/10/958, invisible to its own guardrail at ten phases. FIFTH FINDING, about this workflow's own gate: check.decision-coverage-plan returned `total: 0 / no trackable decisions` over sixteen of them, because it matches a literal D-NN and this project writes D-256-NN -- step 13a PASSED VACUOUSLY and the coverage claim rests on a hand grep, never on that green. Seeds sweep's discuss-time 0 matched CONFIRMED an artefact: 10 matched with plans on disk, 2 genuine overlaps (SEED-266, SEED-291), both LEAVE. 256-01 is autonomous:false -- execution pauses for the operator to paste migration 182 into the Supabase SQL editor -- and is the only DB mutator. Next action: /clear then /gsd:execute-phase 256.'
+status: executing
+last_updated: "2026-09-18T18:47:16.465Z"
+last_activity: 2026-09-18 -- Phase 256 execution started
 progress:
-  total_phases: 6
+  total_phases: 13
   completed_phases: 1
   total_plans: 7
   completed_plans: 3
-  percent: 17
-# ⛔ Hand-edited at the v4.2 close. `state.*` was NOT called, and `milestone.complete`'s own
-#   write was REVERTED: it set `total_phases: 15 · completed_phases: 5 · completed_plans: 22 ·
-#   percent: 33`. Every one of those four was wrong, in four different ways — the same signature
-#   recorded seven times in the v4.2-at-close archive. Re-derived from the phase directories:
-#   247-254 is EIGHT phases, all eight carry a `*-VERIFICATION.md`, and 31 PLAN.md files exist
-#   with 31 executed. 100% is a statement about PHASES VERIFIED and nothing else — `DEBT-06` is
-#   unsatisfied and the milestone closed on an operator decision to accept it as debt.
+  percent: 8
 ---
 
 # Project State
@@ -41,17 +34,16 @@ See: `.planning/PROJECT.md` (updated 2026-09-18)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** **Milestone v4.3 — What You Can Actually Sell.** Defining requirements, then the roadmap. Phase numbering resumes at **255**.
-
+**Current focus:** Phase 256 — every-token-is-counted-and-kept
 
 ---
 
 ## Current Position
 
-Phase: 256 — Every Token Is Counted And Kept · PLANNED (76304da8b)
-Plan: 0 / 4 — wave 1 `{256-01, 256-02}` · wave 2 `{256-03, 256-04}`
-Status: Ready to execute Phase 256 — `/gsd:execute-phase 256`
-Last activity: 2026-09-18 — Phase 256 planned. 4 plans, 2 waves, `## VERIFICATION PASSED`
+Phase: 256 (every-token-is-counted-and-kept) — EXECUTING
+Plan: 1 of 4
+Status: Executing Phase 256
+Last activity: 2026-09-18 -- Phase 256 execution started
 (2 non-blocking warnings). Requirements 4/4 (METER-03 → 01 · METER-04 → 01,02 · METER-05 → 01,03 ·
 METER-06 → 02,04); all 16 `D-256-NN` cited literally (verified by my own grep — see the gate warning
 below). RESEARCH.md + PATTERNS.md written. ⛔ `256-01` is **`autonomous: false`**: execution PAUSES
@@ -159,6 +151,7 @@ client — **without touching the trust boundary**.
    ⭐ **This is the milestone's first DECISION, not one of its requirements.** All three mechanisms
    already ship (skills/definitions/templates · `mcp_client` · `sandbox_service`); what is missing is
    the written rule, so the first plausible exception wins an argument it should lose.
+
 2. **Cost is attributable** (`SEED-073` + `SEED-074`).
 3. **A tier is enforceable** (`SEED-080` + `SEED-083`).
 4. **A pack is a thing** (`SEED-198` Experts — the SKU).
@@ -199,6 +192,7 @@ anyone**, and they get harder to unwind as the work compounds.
 
 - **`SEED-292` assurance export** — ~106 KB of eval machinery and no artifact a buyer can file.
   Offered at intake and declined for this milestone. Small build, strongest procurement asset.
+
 - **`SEED-293` competitive re-crawl** — the record is 40 days stale and **missed Airia**, which
   markets our exact claim. ⛔ **Nothing in this milestone may write "nobody else does this"** until
   it is re-run.
@@ -208,7 +202,6 @@ anyone**, and they get harder to unwind as the work compounds.
 `node scripts/check-seeds-register.cjs` → **gate OK**, `301/301 parsed`, `0 duplicate ids`,
 301/301 carry all 5 required keys. ⛔ **The two unswept figures, reported separately and never
 summed:** **134 carry no `trigger_when` at all** · **114 carry prose the sweep cannot match.**
-
 
 ## ✅ v4.2 CLOSED — 2026-09-18, git tag `v4.2`
 
@@ -258,12 +251,15 @@ deadline. The verdict artifact is then `<phase>-REVIEW-IND.md` and the draft is 
 - **`F-1`** — `254-VERIFICATION.md`'s **own** frontmatter is unparseable YAML (a bare `: ` inside the
   unquoted `score:` value). ⭐ **That is the exact defect Phase 254 reported against Phase 244, in the
   same week, and no gate caught either.** Fix is one pair of quotes.
+
 - **`F-2`** — `.planning/reported-bugs/` carries **two live duplicate-id clusters**: `BUG-260528-01`
   is the `id:` of **three** files, `BUG-260906-01` of **two**. `check-seeds-register.cjs` sweeps
   `.planning/seeds/` only; **no gate sweeps reported-bugs at all.** This is `REG-01`'s defect class
   one register over.
+
 - **`F-3`** — `BUG-260915-01` reads `verified_closed_by: null` while its fix is live in
   `TodosSection.tsx`. Fix and register out of sync by one field.
+
 - **`F-4`** — `253-VERIFICATION.md` still reads `status: gaps_found` over a gap that **is** closed
   (`SEED-290` exists with a re-open trigger per finding).
 
@@ -283,15 +279,18 @@ deadline. The verdict artifact is then `<phase>-REVIEW-IND.md` and the draft is 
   code half.** The phrasing was inherited from the mig-118 precedent, where it was true.
   ⛔ The lesson is not *"the rule was wrong"* — it is that a security-bearing claim is worth
   **re-measuring against the tree** before it gates a push, exactly like an audit.
+
 - `MODEL-04` end-to-end in chat — needs a live self-hosted endpoint.
 - Phase 248's **G-4 scenario S2** (live `McpAuthDoor` BYO-OAuth) — needs a browser and a third-party
   account. It is **B-3's own scenario**.
+
 - The `schema-acl-parity` CI job has never executed against this code.
 
 ### Two live criticals, triaged and unfixed (`251-REVIEW.md`)
 
 - **CR-01** — the seeds gate's `--self-test` passes **8/8** and **none of the eight arms** exercises
   the missing-key check its main verdict line asserts. *A guard with no RED arm for itself.*
+
 - **CR-02** — the `status:` enum's *change-all-three-or-none* rule has **zero executable enforcement**.
 
 ---
@@ -377,6 +376,7 @@ work. They are listed rather than summarised because a count is not a set.
 
 - **2026-09-16** — `.planning/v4.2-MILESTONE-AUDIT.md` closed `gaps_found` (4 blockers, 9 warnings,
   integration 16/22, flows 1/3) and **added Phase 252** to close them.
+
 - **2026-09-16** — Phase **253** added from 252's own code review (`CR-01/02/03/08`).
 - **2026-09-17** — Phase **254** added by operator instruction: the independent review of 249-253.
 - **2026-09-18** — the audit was **re-driven** before the close and moved to 25/26 · 19/19 · 3/3,
@@ -396,6 +396,7 @@ and verify what it did on disk rather than trusting its JSON.**
 2. **Rule on `OV-248-01`** (above) — retire the marker or record why it stays live.
 3. **Rule on `DEBT-06`'s three open rows** — adopt the drafted refusals for 251 / 252 / 253, or leave
    them open for Gemini until **2026-09-24**. `BUS-246` and `BUS-248` are also open `to:operator`.
+
 4. ~~**Promote migration 181 to cloud**~~ ✅ **DONE 2026-09-18 — v4.2 IS LIVE.**
    `master 84e3b020f → 5ff8c5846` · `production eebc4c42f → 65f7e8f30`, both merged `--no-ff`, each
    promotion's tree proven **byte-identical to `develop`** before pushing. Migration 181 applied and
