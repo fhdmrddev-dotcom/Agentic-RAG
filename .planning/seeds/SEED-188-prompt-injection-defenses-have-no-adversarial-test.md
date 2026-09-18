@@ -3,7 +3,21 @@ seed_id: SEED-188
 title: Four modules carry a written anti-prompt-injection discipline and NOTHING tries to break it — every "injection" test in the backend suite is SQL/SSTI/fault injection, so the defense that guards the agent's untrusted-content channels is asserted in prose and verified by nobody
 created: 2026-08-19
 planted_during: Phase 200 execution — audit of the GitHub Top-100 ranking (`promptfoo`, 24k stars, MIT) prompted a check of whether we already test what it tests. We do not.
-status: in_progress
+status: open
+status_note: |
+  ORIGINAL `status:` line, verbatim — displaced by Phase 251's frontmatter migration (D-10):
+  status: in_progress
+
+  Mapped `in_progress` -> `open`. Reason: being worked now.
+  ── 2026-09-16 · reviewed at `/gsd:discuss-phase 252`, LEFT OPEN (REG-02 sweep).
+  Fired on `backend/app/**` / `backend/tests/**` breadth. ⭐ NEAR MISS WORTH RECORDING RATHER THAN
+  DISMISSING: 252's B-3 closes a real untrusted-content channel — `api/connectors.py:1326-1352` takes
+  a `client_id` from a REMOTE SERVER'S RESPONSE and, before 252, wrote it to `config` unvalidated,
+  bypassing the `CustomClientId` boundary that guards three request models. That is this seed's class
+  (a defense asserted in prose, unverified by any adversarial test) arriving from the outside. 252
+  drives it with a real case, but it does NOT build the adversarial suite this seed asks for, and the
+  gate on SEED-186 stands unchanged.
+
 folded_into: 236
 priority: high
 surface: Agentic-RAG
@@ -34,6 +48,9 @@ trigger_when: >
       → 4 source modules carry the discipline
     grep -rniE "injection|adversarial|jailbreak|red.?team" backend/tests --include=*.py
       → every hit is SQL injection, SSTI, or fault injection. Zero prompt-injection attempts.
+trigger_paths:
+  - "backend/app/**"
+  - "backend/tests/**"
 ---
 
 # We wrote the defense down four times and never once attacked it

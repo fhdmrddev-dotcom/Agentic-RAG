@@ -1,10 +1,14 @@
 ---
-id: SEED-004
+title: Org / Department / Role Multi-Tenancy
+seed_id: SEED-004
 status: dormant
 planted: 2026-05-02
 planted_during: v2.5 (after Phase 059 ship, before Phase 060 kickoff)
 trigger_when: planning a v3.x or later milestone scoped to "tenancy", "organizations", "teams", "departments", "RBAC", "roles", "enterprise", or any milestone that touches the per-user data model or the global-vs-private folder visibility model
+trigger_surfaces:
+  - "auth"
 scope: Large
+surface: Agentic-RAG
 ---
 
 # SEED-004: Org / Department / Role Multi-Tenancy

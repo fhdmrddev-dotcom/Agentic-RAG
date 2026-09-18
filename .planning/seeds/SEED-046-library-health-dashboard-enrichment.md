@@ -1,10 +1,12 @@
 ---
-id: SEED-046
+title: Library Health Dashboard Enrichment — leverage the new data sources
+seed_id: SEED-046
 status: dormant
 planted: 2026-05-31
 planted_during: v2.8 (Harness Engine & Workflow Mode — surfaced during Phase 090 operator-testing-notes triage)
 trigger_when: A dashboard / observability / RAG-quality milestone is scoped, OR the operator wants richer knowledge-base insights than the current 3-source health view
 scope: Medium
+surface: Agentic-RAG
 ---
 
 # SEED-046: Library Health Dashboard Enrichment — leverage the new data sources

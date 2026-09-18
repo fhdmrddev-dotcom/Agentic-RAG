@@ -19,6 +19,7 @@ trigger_when: >
 
   The seed is discharged when a user can carry ONE task to completion without being forced to start
   a new message, in both of the two dead ends below.
+surface: Agentic-RAG
 ---
 
 # SEED-180 — continue as many times as needed

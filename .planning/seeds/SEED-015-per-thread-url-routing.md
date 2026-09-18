@@ -16,6 +16,8 @@ relates_to:
   - Phase 068.5 D-068.5-01..04 — localStorage cache decisions
   - .planning/PRDs/v2.7.md (Agent Workspace milestone — likely owner if this lands then)
   - .planning/PRDs/v3.0.md (Skill Studio milestone — surface-agnostic story)
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # Per-thread URL routing — F5/deep-link returns to the same thread

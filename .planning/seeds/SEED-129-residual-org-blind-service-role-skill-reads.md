@@ -25,6 +25,8 @@ re_open_triggers:
   - "A `grep -rn 'or_(f\"user_id.eq.' backend/app/services --include=*.py` returns a hit that runs on a service-role client and is not routed through `app/utils/skill_visibility.py`. NOTE: the bare repo-wide grep returns ~10 hits and most are LEGITIMATE — `app/api/*` sites run on the per-request user-JWT client where membership RLS supplies the org gate. The invariant is 'no org-blind predicate on a SERVICE-ROLE client', not 'no occurrences of this predicate'."
 priority: high
 suggested_phase: "Dedicated security /gsd:quick (mirrors the SEED-125 pattern, now much cheaper — reuse `app.utils.skill_visibility`). Should land before any phase widens org membership or ships the Trigger Tuner / harness runs to a multi-member org."
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-129 — Residual org-blind service-role skill reads (the SEED-125 tail)

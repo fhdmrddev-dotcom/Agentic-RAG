@@ -47,7 +47,14 @@ describe("ModelPillRow / unverified badge", () => {
     expect(screen.queryByText(/^unverified$/i)).toBeNull()
   })
 
-  it("renders the tooltip text containing 'verified registry' / 'Safe defaults applied'", () => {
+  // ⚠ Phase 249 (MODEL-05): the tooltip text MOVED to `@/lib/unverifiedModelCopy`, shared with
+  // the chat composer's dropdown — the warning belongs at PICK time and Settings is not where a
+  // model is picked. Two copies of one warning drift, which is this phase's whole subject.
+  // ⭐ AND THE OLD TEXT WAS WRONG: it said `timeout=90s`; the inferred default is 300 s
+  // (`_INFERRED_DEFAULT_TIMEOUT_S`, revised 2026-05-24). This suite asserted the false number,
+  // so it was GREEN over a surface that was lying about a capability. The assertions below are
+  // re-pointed at the shared copy rather than re-typed, so they cannot drift from it again.
+  it("renders the tooltip text containing 'verified registry' and the safe defaults", () => {
     const { container } = render(
       <ModelPillRow
         models={["gemini-99-flash"]}
@@ -59,8 +66,10 @@ describe("ModelPillRow / unverified badge", () => {
     )
     const badge = container.querySelector("[title*='verified registry']") as HTMLElement | null
     expect(badge).not.toBeNull()
-    expect(badge?.getAttribute("title")).toContain("Safe defaults applied")
-    expect(badge?.getAttribute("title")).toContain("inferred provider: google")
+    expect(badge?.getAttribute("title")).toContain("safe defaults")
+    // ⭐ the CORRECTED figure — 300, not the 90 this line used to pin
+    expect(badge?.getAttribute("title")).toContain("timeout=300s")
+    expect(badge?.getAttribute("title")).toContain("as a google model")
     expect(badge?.getAttribute("title")).toContain("max_tokens=8192")
   })
 
@@ -89,8 +98,8 @@ describe("ModelPillRow / unverified badge", () => {
         onSelect={vi.fn()}
       />,
     )
-    const badge = container.querySelector("[title*='Safe defaults applied']") as HTMLElement | null
-    expect(badge?.getAttribute("title")).toContain("inferred provider: openrouter")
+    const badge = container.querySelector("[title*='safe defaults']") as HTMLElement | null
+    expect(badge?.getAttribute("title")).toContain("as a openrouter model")
     expect(badge?.getAttribute("title")).toContain("max_tokens=4096")
   })
 

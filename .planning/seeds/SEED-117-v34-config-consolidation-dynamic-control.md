@@ -1,5 +1,5 @@
 ---
-id: SEED-117
+seed_id: SEED-117
 title: v3.4 config-consolidation — retrofit every remaining dynamic knob into the Control Room + revive the per-user preference layer
 planted: 2026-07-13
 status: open
@@ -7,6 +7,8 @@ related_seeds: [SEED-116, SEED-115, SEED-113, SEED-014, SEED-023]
 related_memory: [project_settings_control_room_boundary, project_dynamic_settings_direction, project_admin_panel_plan, project_target_scale, project_org_level_deferred]
 source_of_truth: ".planning/notes/dynamic-control-inventory.md (the LIVING master registry — every knob + home + milestone). The boundary RULE it applies lives in .planning/notes/settings-control-room-boundary.md."
 re_open_trigger: "At /gsd:new-milestone for v3.4 (i.e. once v3.3 CORE 146–155 closes). This is the milestone that executes the ➡️MOVE / 🔴GAP rows the SEED-116 inventory deferred out of v3.3. Sweep dynamic-control-inventory.md and promote each deferred row to a REQ-ID."
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 > **Why this exists:** SEED-116 mapped *every* controllable element in the app and decided its home

@@ -4,11 +4,11 @@ title: Cloud skill-eval engine is 0/8 healthy — sweep fails on every provider,
 reported: 2026-08-09
 surface: Agentic-RAG
 severity: major
-status: open
+status: closed
 h1_refuted: 2026-08-09    # cloud provider keys are ALL present (has_key=true ×8) — not config drift
 affected_areas: [skills/eval-engine, settings/engine-health, cloud-config, observability/error-honesty]
 folded_into: null
-verified_closed_by: null
+verified_closed_by: Phase 249 (2026-09-15) — re-measured LOCAL, 8/8 healthy, 0 opaque provider_error; see the section at the end of this file for the limit
 related_seeds: [SEED-040]
 re_open_trigger: "Reviewed at /gsd:discuss-phase 196 (2026-08-17) — left OPEN, NOT folded
   (196-CONTEXT.md D-19), while its two model-control siblings BUG-260731-01 and BUG-260718-04 WERE
@@ -162,3 +162,45 @@ prepared (production is 1,563 commits and 15 migrations behind). The deploy will
 eval engine wholesale with the v3.4/v3.5/v3.6 version, so **re-observe this after the deploy before
 investing in a fix** — the shipped behaviour may differ. The provider keys, however, will NOT be
 fixed by the deploy; they are Coolify config and must be set by hand.
+
+
+---
+
+## ⭐ RE-MEASURED 2026-09-15 — Phase 249 (MODEL-09). CLOSED, and the limit is stated in the same breath.
+
+The ROADMAP made this phase's treatment of `MODEL-09` **conditional on a measurement** rather than
+on a plan: *"If the sweep now reads healthy, `MODEL-09` collapses to a written closure."* Engine
+health is a **live sweep and is not persisted**, so it cannot be re-derived from the database, a
+log, or the Supabase MCP read path. It was therefore **driven**: `POST /evals/engine-sweep`
+followed by `GET /evals/engine-health`, as the signed-in operator, against the running app.
+
+| Board | Result |
+|---|---|
+| Stale, swept `2026-08-27T20:13:28Z` | **7 / 8 healthy.** The one failure — `moonshot / kimi-k2.6` — carried `RateLimitError: Error code: 429 - {'error': {'message': 'Your account org-e5ea… is suspended due to insufficient balance…'}` **verbatim** |
+| Fresh, swept `2026-09-14T21:57:24Z` | **8 / 8 healthy · zero errors · zero `provider_error`** |
+
+**Both halves of this report are refuted on this tree.**
+
+- *"0/8 healthy"* → **8/8**.
+- *"6 of 8 hide why"* → **zero hide why.** Even the stale board's single failure named a real vendor
+  billing condition, in the vendor's own words. ⭐ That is the property the report asked for, and it
+  is the one worth keeping: the two engines that surfaced their real error in 2026-08 were *"the
+  only two anyone can act on"*, and now every engine is in that state.
+
+### ⛔ THE LIMIT — this closure claims exactly one thing, and not the other
+
+This measurement is **LOCAL, at `develop` HEAD**. The original was **cloud production at
+`4c9b487a`, 2026-08-09**, and **292+ commits have landed since**. They are not the same system.
+
+- ✅ **Proven:** the application does not MANUFACTURE an opaque cause. An unhealthy tile carries the
+  verbatim provider/arm error; the one engine-shaped sentence
+  (`"The engine did not complete this arm."`) is a last resort for a terminal-but-failed run with
+  no error at all. That property is now **fenced** —
+  `backend/tests/unit/test_249_worker_broadcast_and_engine_cause.py`, driven RED against a plant
+  that moved the sentence one branch higher, then restored byte-identical.
+- ⛔ **NOT proven:** that cloud's eight engines are healthy today. The 2026-08 report's own reading
+  of its two visible failures was *cloud configuration* (a billing balance, a bad model id) — i.e.
+  not application logic — and nothing here speaks to cloud's current keys or balances.
+
+**To close the cloud half:** one operator click on the deployed app, Settings → Eval engine health →
+**Run sweep**. It is not owed work and not a phase; it is a click whose result nobody has taken.

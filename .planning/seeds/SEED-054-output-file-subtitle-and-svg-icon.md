@@ -1,12 +1,16 @@
 ---
-id: SEED-054
+seed_id: SEED-054
 title: Output-file descriptive subtitle (needs a backend description/role field) + folded-page SVG file icon — the two Phase-095 design-fidelity items deferred from gap closure
 status: planted
 planted: 2026-06-06
 planted_by: orchestrator (/gsd:execute-phase 095 — operator live-UAT gap triage; full-fidelity scope chose to defer these two LOW/data-contract items)
 trigger_when: Phase 095 gap closure has shipped AND we want the output-files area to fully match sketch 016, OR any phase that adds a structured field to the `final_output_files` wire shape (backend agent_loop.py emit + persist + frontend api.ts + types/index.ts `OutputFile`), OR a v2.9 chat-surface polish pass.
+trigger_paths:
+  - "**/agent_loop.py"
+  - "**/api.ts"
 priority: low
 tags: [chat-surface, output-files, sketch-016, file-axis, data-contract, 095, design-fidelity]
+surface: Agentic-RAG
 ---
 
 # SEED-054: Output-file subtitle + folded-page SVG icon (deferred 095 design items)

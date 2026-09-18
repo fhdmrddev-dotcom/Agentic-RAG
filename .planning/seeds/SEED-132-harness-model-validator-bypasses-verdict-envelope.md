@@ -27,6 +27,8 @@ re_open_triggers:
   - "A third `@model_validator` is added to `WorkflowDefinition` or `PhaseConfig`. Each one silently widens the set of rules that cannot be expressed as a verdict; decide the mapping BEFORE adding it rather than growing the bypass set."
 priority: high
 suggested_phase: "Phase 184, alongside the per-node badge work (VALID-03) — the badge cannot be honest about a node the server refuses to describe, so the two land together. Cheap if done with the 182-04 typed-exception precedent (Option B); expensive if deferred until the canvas has already grown a second error-rendering path around it."
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-132 — two `@model_validator` rules bypass the `{ok, verdicts}` envelope

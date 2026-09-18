@@ -10,6 +10,8 @@ scope: Medium
 related_seeds: [SEED-118, SEED-120, SEED-003, SEED-089]
 related_memories: [project_v34_milestone_started, project_target_scale, project_provider_feature_fit_routing, project_embeddings_openai_spof]
 re_open_trigger: "When a local-first / on-prem / air-gapped deployment is scoped, OR a customer requires validated small-model quality, OR the operator wants to certify a specific local model (Ollama/LM Studio) for production. Use the shipped Skill Eval Studio + cross-provider eval to run it."
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-122 — Local / small-model capability validation

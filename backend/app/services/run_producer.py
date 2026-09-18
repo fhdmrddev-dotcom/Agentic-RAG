@@ -133,15 +133,71 @@ async def _finalize_producer_run(
     # trimmed by EXPIRE (S5 — no existing step is reordered). Best-effort: the
     # reconciler NEVER raises into the byte-locked finalizer.
     #
-    # LOCK-2 / S6 SUPERSET gate: `completed AND cap_disposition != cap_paused`
-    # reproduces BOTH orderings. Producer path: a fresh Deep run that hit the
-    # iteration cap arrives as terminal_status == "completed" with
-    # result_sink["cap_disposition"] == "cap_paused" — gating on status alone
-    # would WRONGLY mark a cap-paused run (the D-05 trap), so the cap_paused
-    # clause is load-bearing. Continuation path: its own finally already set
-    # terminal_status = "cap_paused" when the cap re-fired, so `== "completed"`
-    # is already False and the block skips regardless of the second clause.
-    if terminal_status == "completed" and result_sink.get("cap_disposition") != "cap_paused":
+    # LOCK-2 / S6 gate — HISTORY KEPT, because the reason the old shape existed is the
+    # reason the new one is safe. It read `completed AND cap_disposition != cap_paused`
+    # to reproduce BOTH orderings: the producer path arrives as terminal_status ==
+    # "completed" carrying result_sink["cap_disposition"] == "cap_paused" (gating on
+    # status alone would WRONGLY mark a cap-paused run — the D-05 trap), while the
+    # continuation path already set terminal_status = "cap_paused" in its own finally.
+    #
+    # ⚠ Phase 250 HONEST-03 (BUG-260902-01) — THAT GATE ADMITTED ONLY ONE OF FOUR TRUE
+    # TERMINAL STATUSES. A run that timed out, was cancelled or failed reconciled
+    # NOTHING, so its open todos kept reading `IN PROGRESS` forever. Measured, not
+    # argued: 250-MEASUREMENT.md found 4 unmarked open todos on 2 threads, and not one
+    # of those threads' runs ever reached `completed`. The report's own diagnosis —
+    # "there is no reconciliation at all" — was wrong; the gate was the defect.
+    #
+    # The status half now reads the named set STEP 5 BELOW ALREADY USES, so every TRUE
+    # terminal status reconciles and `cap_paused` — absent from that map — still cannot.
+    #
+    # ⛔ THE `cap_disposition` CLAUSE STAYS, AND THE PHASE'S OWN PLAN WAS WRONG ABOUT
+    # THIS. 250-02's D-250-08 argued the set membership "strictly subsumes" the second
+    # clause, so the clause could go. It does NOT: the PRODUCER ordering delivers a
+    # cap-paused run as terminal_status == "completed" — which IS in the map — carrying
+    # the cap-paused fact only in `result_sink`. Dropping the clause let a resumable run
+    # be marked "not completed". `test_250_reconciler_gate.py::test_5b` was written to
+    # prove the equivalence and instead REFUTED it, before a line shipped. Two
+    # independent facts, two clauses; do not collapse them again.
+    # ⚠ Phase 250 WR-01 — THE THIRD CLAUSE, AND IT IS ABOUT SCOPE, NOT STATUS.
+    # `reconcile_open_todos_on_run_end` selects `WHERE thread_id = $1`: it marks every
+    # open todo on the THREAD, not this run's. Its own docstring claims "Forward-only
+    # (D-06) — this only affects the run that just ended", and that is false the moment a
+    # second run is live on the same thread. Nothing refuses a concurrent Deep run (the
+    # 409 in threads.py is the workflow-anchor lock), and this step runs BEFORE step 4's
+    # `runs_by_thread` ZREM — so Stop-then-immediately-re-prompt, the single most likely
+    # sequence after `cancelled`, let the DYING run append "(run ended — not completed)"
+    # to the NEW run's still-open todos. That is BUG-260913-02 re-created by the fix for
+    # BUG-260902-01.
+    #
+    # ⛔ MEMBERS, NOT A COUNT. `zcard <= 1` cannot tell "only me" from "only someone
+    # else": if this run were already gone from the registry while another was live, the
+    # count reads 1 and the guard would ALLOW precisely the cross-run write it exists to
+    # prevent (test_9_4 drives that shape). Subtracting this run's id refuses it.
+    #
+    # ⚠ FAILS OPEN, deliberately. Step 3 is best-effort and must never raise into the
+    # byte-locked finalizer. A stuck todo is a PERMANENT honesty defect (BUG-260902-01,
+    # 4 rows measured); a stray marker needs a simultaneous second run AND a broken
+    # Redis, and the live run's own next todo write overwrites it. So a registry outage
+    # must not silently switch HONEST-03 back off (test_9_5).
+    _sibling_live = False
+    try:
+        _members = await redis.zrange(f"runs_by_thread:{thread_id}", 0, -1)
+        _others = {
+            (m.decode() if isinstance(m, (bytes, bytearray)) else str(m))
+            for m in (_members or [])
+        } - {str(run_id)}
+        _sibling_live = bool(_others)
+    except BaseException:
+        logger.exception(
+            "RUN-01b: runs_by_thread read failed for thread %s — reconciling anyway",
+            thread_id,
+        )
+
+    if (
+        terminal_status in _RUN_STATUS_TO_TERMINAL_TYPE
+        and result_sink.get("cap_disposition") != "cap_paused"
+        and not _sibling_live
+    ):
         try:
             from app.services.todos_service import reconcile_open_todos_on_run_end  # noqa: PLC0415
             await reconcile_open_todos_on_run_end(

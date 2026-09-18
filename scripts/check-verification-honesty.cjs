@@ -32,43 +32,65 @@
  * carries the marker perfectly. The refused dependency is why this gate can read that file at all.
  *
  * ─────────────────────────────────────────────────────────────────────────────────────────────
- * THE BOUNDARY — stated here rather than left to be discovered
+ * THE BOUNDARY — DERIVED, NEVER LISTED (rewritten 2026-09-14, SEED-275, operator ruling)
  * ─────────────────────────────────────────────────────────────────────────────────────────────
- * Measured 2026-09-13: there are **218** `*-VERIFICATION.md` files under `.planning/`, and
- * exactly **one** carried `verification_mode` before Phase 245 (`243-VERIFICATION.md`).
- * A repo-wide "every one of them must carry the field" gate therefore **fails 217 of 218 files on
- * its first run**, back to `01-VERIFICATION.md`. ⛔ A gate that reds 217 files on day one is a gate
- * everyone learns to ignore, which is a gate.
+ *   SUBJECT SET = every `*-VERIFICATION.md` **and** `*-VERDICT.md` one directory below
+ *                 `.planning/phases/<phase>/` (the LIVE milestone)
+ *               + the same under every `.planning/milestones/<vX.Y>-phases/<phase>/` (ARCHIVED),
+ *                 filtered to phase number >= DEBT_FLOOR_PHASE (238).
  *
- *   SUBJECT SET = every `*-VERIFICATION.md` under `.planning/phases/<phase>/`  (the ACTIVE milestone)
- *               + the three PINNED archived paths DEBT-03 names by requirement (see PINNED below).
+ * ⚠ WHAT THIS REPLACED, AND WHY — the original is not preserved because it was WRONG, it is
+ *   summarised because its REASONING was right and its MECHANISM rotted. It read:
+ *   `SUBJECT SET = the active milestone + three PINNED archived paths`, and it was correct on the
+ *   day it was written. Measured 2026-09-14: the gate printed `subject: 3 files` and
+ *   `honesty gate OK` while **twenty** verdict files existed.
  *
- *   OUTSIDE THE BOUNDARY: the other 212 archived `*-VERIFICATION.md` under `.planning/milestones/`.
- *   Retrospectively re-marking closed milestones back to v1.0 is a 212-file audit — the exact
- *   *"a two-line honesty fix becomes the largest phase in the milestone"* failure mode the ROADMAP
- *   names for this very phase. DEBT-03 names three files; the active milestone is added on top
- *   because a LIVE directory with unmarked siblings is a hole that goes silent, which is the failure
- *   mode this whole requirement family exists to prevent.
+ *   ⛔ THE MECHANISM WAS MILESTONE ARCHIVAL, NOT NEGLECT. The old header said archival was safe —
+ *   *"when a milestone is archived its phases leave the boundary CARRYING the marker — the
+ *   direction that costs nothing and loses nothing."* **That is true of the FILES and false of the
+ *   GATE.** The moment v4.1 closed, 242/243/244/246 left the active half and nothing put them in
+ *   the pinned half, so every milestone close silently shrank the scan set. Two phases were then
+ *   found unmarked (239) or unscannable (245) with the gate reading green.
  *
- *   ⚠ When a milestone is archived its phases leave the boundary **carrying** the marker — the
- *   direction that costs nothing and loses nothing.
+ *   ⭐ A longer hardcoded list is the same defect with a later expiry date. This project cured this
+ *   exact disease once already: the hot-file ledger was a COMPLETE 214-row table and `App.tsx`
+ *   still went 23 phases without a row. The cure was to make the gate DERIVE its scan set.
+ *
+ * ⭐ `VERDICT.md` COUNTS (operator ruling, 2026-09-14). Phase 245 — *"the verification debt
+ *   discharged or retired in writing"* — produced `245-VERDICT.md` and no `245-VERIFICATION.md`,
+ *   so the phase that invented this marker and wrote this gate was invisible to both. Keying on
+ *   one filename made the instrument blind to its own author.
+ *
+ * ⚠ THE `DEBT_FLOOR_PHASE = 238` FLOOR IS WHAT KEEPS THE ORIGINAL WARNING SATISFIED. The old
+ *   header's objection to a repo-wide scan stands and is honoured: there are ~218
+ *   `*-VERIFICATION.md` under `.planning/`, and exactly ONE carried the marker before Phase 245.
+ *   **A gate that reds 217 files on day one is a gate everyone learns to ignore, which is a gate.**
+ *   The floor is 238 because DEBT-06 names *"238, 240, 241 and 242-246"* — 238 is where the
+ *   obligation starts. Phases below it predate the entire verification-debt conversation and are
+ *   deliberately OUT of scope; a sweep that "fixed" them would be inventing records, not indexing
+ *   existing ones.
  *
  * ─────────────────────────────────────────────────────────────────────────────────────────────
- * NON-VACUITY — THE FLOOR IS ON THE INVARIANT PART, NEVER ON THE TRANSIENT PART
+ * NON-VACUITY — THE FLOOR IS NOW LEGITIMATE, AND THE OLD PROHIBITION IS OBSOLETE
  * ─────────────────────────────────────────────────────────────────────────────────────────────
- * `MIN_PINNED_FILES = 3`, asserted against the three PINNED paths **resolving on disk**. That is the
- * true analog of `check-hot-file-ledger.cjs`'s `MIN_SCAN_ROWS = 150`, which floors the **reference
- * corpus** and never the subject count.
+ * ⚠ THE PREVIOUS HEADER FORBADE EXACTLY THIS, IN CAPITALS: *"DO NOT ADD A FLOOR ON THE TOTAL
+ *   SUBJECT COUNT … a `MIN_SUBJECT_FILES = 6` floor would exit 2 FOREVER."* **That argument was
+ *   correct for the OLD design and is void for this one, and the difference is the whole point.**
+ *   It rested on `.planning/phases/` being *"a directory designed to empty"* — true, and the reason
+ *   the old subject set collapsed at every milestone close. This set includes the ARCHIVED
+ *   milestones, so it never empties: it grows monotonically and can only shrink if the archive
+ *   layout itself changes, which is precisely the condition worth exiting `2` over.
  *
- * ⛔ DO NOT ADD A FLOOR ON THE TOTAL SUBJECT COUNT. `.planning/phases/` is a directory *designed to
- *    empty*: at the v4.1 close, 242-246 archive to `.planning/milestones/v4.1-phases/` exactly as
- *    238/240/241 already did, the active set drops from 3 to 0, and a `MIN_SUBJECT_FILES = 6` floor
- *    would exit `2` **forever** — on the gate and on every hook invocation. A guard reporting
- *    `harness error` on every run within weeks of shipping is precisely the lapse DEBT-03 exists to
- *    prevent (*"so it cannot lapse unnoticed a second time"*).
+ * `MIN_SUBJECT_FILES = 6` against 9 resolved at the time of writing (238-246). It floors the whole
+ * derived set, which is now the invariant part rather than the transient part.
  *
- * `subject: N files (P pinned + A active)` prints on every run, so **a shrinking active set is
- * VISIBLE without being FATAL**.
+ * `subject: N files (A archived + L live)` prints on every run.
+ *
+ * Modes, and the floor applies to exactly one of them:
+ *   · scan mode    — fail `2` if the derived set resolves fewer than MIN_SUBJECT_FILES.
+ *   · `--files`    — fail `2` only on ZERO arguments. ⛔ ONE file is a legitimate resolution: this
+ *                    is the mode the hook uses, and a floor here would make the hook report a
+ *                    harness error on every single VERIFICATION.md write.
  *
  * Modes, and the floor applies to exactly one of them:
  *   · scan mode    — fail `2` if fewer than MIN_PINNED_FILES pinned paths resolve.
@@ -160,18 +182,47 @@ const root = path.resolve(__dirname, '..');
 const STATE = path.join(root, '.planning', 'STATE.md');
 const ACTIVE_DIR = path.join(root, '.planning', 'phases');
 
-/** The three archived files DEBT-03 names by requirement. Repo-relative, `/`-separated. */
-const PINNED = [
-  '.planning/milestones/v4.0-phases/238-microsoft-graph-onedrive/238-VERIFICATION.md',
-  '.planning/milestones/v4.0-phases/240-mail-is-a-shape-not-a-fourth-adapter/240-VERIFICATION.md',
-  '.planning/milestones/v4.0-phases/241-recall-at-corpus-scale/241-VERIFICATION.md',
-];
+/**
+ * ⚠ THE SCAN SET IS DERIVED, NEVER LISTED — SEED-275, operator ruling 2026-09-14.
+ *
+ * What stood here: `const PINNED = [...]`, three literal paths (238 / 240 / 241 VERIFICATION.md),
+ * unioned with the ACTIVE milestone's `.planning/phases/`. Measured 2026-09-14: the gate printed
+ * `subject: 3 files` and `honesty gate OK` while **twenty** verdict files existed.
+ *
+ * ⛔ The mechanism was not neglect, it was MILESTONE ARCHIVAL. The moment v4.1 closed, 242/243/244/246
+ * left the "active" half and were never added to the "pinned" half — so every milestone close
+ * silently shrank the gate. A longer hardcoded list is the same defect with a later expiry date.
+ *
+ * ⭐ This project already cured this disease once: the hot-file ledger was a COMPLETE 214-row table
+ * and `App.tsx` still went 23 phases without a row, `config.py` its entire life. The cure was to make
+ * the gate DERIVE what it must check. This is that cure, applied to the instrument that checks
+ * whether a self-verification is visible.
+ *
+ * Scope floor is `DEBT_FLOOR_PHASE`, not the phase that introduced the marker: DEBT-06 names
+ * "238, 240, 241 and 242-246", so 238 is where the obligation starts. Phases below it predate the
+ * whole verification-debt conversation and are deliberately out of scope — a sweep that "fixed"
+ * them would be inventing records, not indexing them.
+ */
+const DEBT_FLOOR_PHASE = 238;
 
-/** Floor on the INVARIANT part of the subject set. See the header — never floor the active set. */
-const MIN_PINNED_FILES = 3;
+/**
+ * ⭐ `VERDICT.md` COUNTS AS A VERIFICATION FILE — operator ruling, 2026-09-14.
+ * Phase 245 — *"the verification debt discharged or retired in writing"* — produced `245-VERDICT.md`
+ * and no `245-VERIFICATION.md`, so the phase that invented this marker and wrote this gate was
+ * invisible to both. Keying on one filename made the instrument blind to its own author.
+ */
+const VERDICT_FILE_RE = /-(?:VERIFICATION|VERDICT)\.md$/;
 
-/** The active-milestone half of the boundary. ONE directory level, matching the hook's regex. */
-const ACTIVE_RE = /^\.planning\/phases\/[^/]+\/[^/]*-VERIFICATION\.md$/;
+/** A phase directory: `NNN-name` or `NNN.N-name`. Capture group 1 is the integer phase. */
+const PHASE_DIR_RE = /^(\d+)(?:\.\d+)?-/;
+
+/**
+ * Floor on the DERIVED set. A gate that passes over nothing is worse than absent —
+ * `check-hot-file-ledger.cjs` was measured exiting 0 over `subject: 0 files` at Phase 242.
+ * Nine files resolved when this floor was written (238-246); 6 leaves room for archival
+ * reorganisation without leaving room for the set silently collapsing.
+ */
+const MIN_SUBJECT_FILES = 6;
 
 const RED = '\x1b[31m';
 const YEL = '\x1b[33m';
@@ -193,12 +244,28 @@ function toRepoRel(arg) {
   return norm(path.relative(root, abs));
 }
 
-function inBoundary(rel) {
-  return PINNED.includes(rel) || ACTIVE_RE.test(rel);
+/**
+ * The phase number a repo-relative verdict path belongs to, or `null` when the path is not a
+ * verdict file inside a phase directory. Shape-based on purpose: `--files` must accept any path the
+ * derived scan would have found, without the caller having to be in a list.
+ */
+function phaseOf(rel) {
+  if (!VERDICT_FILE_RE.test(rel)) return null;
+  const parts = rel.split('/');
+  const dir = parts[parts.length - 2];
+  if (!dir) return null;
+  const m = PHASE_DIR_RE.exec(dir);
+  return m ? Number(m[1]) : null;
 }
 
-function isPinned(rel) {
-  return PINNED.includes(rel);
+function inBoundary(rel) {
+  const n = phaseOf(rel);
+  return n !== null && n >= DEBT_FLOOR_PHASE;
+}
+
+/** Archived (a closed milestone) vs live (`.planning/phases/`) — reporting only, not a gate. */
+function isArchived(rel) {
+  return rel.startsWith('.planning/milestones/');
 }
 
 /**
@@ -249,12 +316,12 @@ function flagValue(name) {
   return v;
 }
 
-/** Every `*-VERIFICATION.md` one directory below `.planning/phases/`. */
-function activeSubjects() {
-  if (!fs.existsSync(ACTIVE_DIR)) return [];
+/** Every verdict file one directory below `container`, phase-floored. */
+function subjectsUnder(container) {
+  if (!fs.existsSync(container)) return [];
   const out = [];
-  for (const d of fs.readdirSync(ACTIVE_DIR)) {
-    const dir = path.join(ACTIVE_DIR, d);
+  for (const d of fs.readdirSync(container)) {
+    const dir = path.join(container, d);
     let st;
     try {
       st = fs.statSync(dir);
@@ -263,10 +330,29 @@ function activeSubjects() {
     }
     if (!st.isDirectory()) continue;
     for (const f of fs.readdirSync(dir)) {
-      if (/-VERIFICATION\.md$/.test(f)) out.push(norm(path.relative(root, path.join(dir, f))));
+      if (!VERDICT_FILE_RE.test(f)) continue;
+      const rel = norm(path.relative(root, path.join(dir, f)));
+      if (inBoundary(rel)) out.push(rel);
     }
   }
-  return out.sort();
+  return out;
+}
+
+/**
+ * ⭐ THE DERIVED SUBJECT SET — the live milestone AND every archived one.
+ * Walking `.planning/milestones/&ast;-phases/` is the half the old `PINNED` list stood in for, and it is
+ * the half that went stale: archival moved phases OUT of `.planning/phases/` and nothing put them back.
+ */
+function discoverSubjects() {
+  const out = [...subjectsUnder(ACTIVE_DIR)];
+  const milestones = path.join(root, '.planning', 'milestones');
+  if (fs.existsSync(milestones)) {
+    for (const d of fs.readdirSync(milestones)) {
+      if (!/-phases$/.test(d)) continue;
+      out.push(...subjectsUnder(path.join(milestones, d)));
+    }
+  }
+  return [...new Set(out)].sort();
 }
 
 function inspect(rel, claimsArmLive) {
@@ -341,22 +427,23 @@ function main() {
     subject = given.map(toRepoRel);
     label = `${subject.length} path(s) from the command line`;
   } else {
-    const resolved = PINNED.filter((p) => fs.existsSync(path.join(root, p)));
-    if (resolved.length < MIN_PINNED_FILES) {
-      fail(`only ${resolved.length} of ${PINNED.length} PINNED paths resolve on disk (floor `
-        + `${MIN_PINNED_FILES}) — refusing to pass over a scan set this small. The pinned list has `
-        + `almost certainly gone stale against a moved or renamed archive directory:\n`
-        + PINNED.map((p) => `    ${fs.existsSync(path.join(root, p)) ? 'ok     ' : 'MISSING'} ${p}`).join('\n'));
+    subject = discoverSubjects();
+    if (subject.length < MIN_SUBJECT_FILES) {
+      fail(`the derived scan set resolved only ${subject.length} file(s) (floor ${MIN_SUBJECT_FILES}) `
+        + `— refusing to pass over a set this small. A gate that passes over nothing is worse than `
+        + `absent. Likely causes: .planning/milestones/*-phases/ was renamed or moved, or a phase `
+        + `directory stopped matching NNN-name. Found:\n`
+        + (subject.length ? subject.map((p) => `    ${p}`).join('\n') : '    (nothing)'));
     }
-    subject = [...PINNED, ...activeSubjects()];
-    label = 'pinned scan set + active milestone';
+    label = `derived scan set — phases >= ${DEBT_FLOOR_PHASE}, live + archived, `
+      + `VERIFICATION.md and VERDICT.md`;
   }
 
   console.log(`verification honesty — ${label}`);
 
   const results = [];
-  let pinnedCount = 0;
-  let activeCount = 0;
+  let archivedCount = 0;
+  let liveCount = 0;
   let outsideCount = 0;
 
   for (const rel of subject) {
@@ -366,8 +453,8 @@ function main() {
       console.log(`      outside boundary — skipped (see the BOUNDARY note in this script's header)`);
       continue;
     }
-    if (isPinned(rel)) pinnedCount++;
-    else activeCount++;
+    if (isArchived(rel)) archivedCount++;
+    else liveCount++;
 
     const r = inspect(rel, claimsArmLive);
     results.push(r);
@@ -390,9 +477,9 @@ function main() {
       + missingOnDisk.map((r) => r.rel).join(', '));
   }
 
-  const parts = [`${pinnedCount} pinned + ${activeCount} active`];
+  const parts = [`${archivedCount} archived + ${liveCount} live`];
   if (outsideCount) parts.push(`${outsideCount} outside boundary — skipped`);
-  console.log(`subject: ${pinnedCount + activeCount} files (${parts.join(' + ')})`);
+  console.log(`subject: ${archivedCount + liveCount} files (${parts.join(' + ')})`);
 
   // ⛔ A skip is ALWAYS printed.
   if (ov.state === 'live') {

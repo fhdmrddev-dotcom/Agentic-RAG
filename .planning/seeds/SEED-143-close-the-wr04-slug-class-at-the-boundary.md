@@ -1,5 +1,5 @@
 ---
-id: SEED-143
+seed_id: SEED-143
 title: Seven WR-04 prototype-key sinks have now been guarded one at a time — close the CLASS at the boundary instead (constrain the phase slug, or stop keying plain objects by it)
 status: open
 planted: 2026-08-08
@@ -20,6 +20,7 @@ re_open_trigger: >
   the same commit; (4) a slug becomes author-editable in the UI, which today it is NOT (`D-184-11`:
   there is no slug field and the caller derives the slug from the phase type) — that flips the
   reachability argument and raises severity immediately.
+trigger_when: unset
 ---
 
 # SEED-143 — stop guarding WR-04 sinks one at a time

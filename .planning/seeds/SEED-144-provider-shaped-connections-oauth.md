@@ -16,6 +16,7 @@ trigger_when:
   - Credential rotation is raised: today rotating one Slack token means editing N rows by hand
   - SEED-142 (connected-drive ingest) is picked up — do NOT let it build a second credential store
   - Any customer/partner asks "which apps do you integrate with?" — the answer's SHAPE is this seed
+surface: Agentic-RAG
 ---
 
 # SEED-144: Outbound connections are ACTION-shaped and should be PROVIDER-shaped

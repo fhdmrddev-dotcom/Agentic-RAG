@@ -373,7 +373,26 @@ export function PhaseTimeline({ threadId }: PhaseTimelineProps) {
         <ol aria-label="Phases" aria-busy={isBusy || undefined} className="flex flex-col gap-1.5">
           {phases.map((phase, i) => (
             <li key={`${phase.phaseIndex}-${phase.slug}`}>
-              <PhaseCard phase={phase} position={i} timing={factsOf(phase.slug)} />
+              {/* ── Phase 252-04 (SC#5 hole 2 / D-25) — REUSE, NOT A SECOND DERIVATION.
+                     `runTerminal` is computed once above from `frame.run_status` via the
+                     shared `TERMINAL_RUN_STATUSES` set, and `frame` is the AUTHORITATIVE
+                     FETCHED frame (see the `:65-76` docblock; D-v2.5-03 — Realtime is a
+                     hint, not truth). `PhaseCard`'s own `timing` docblock warns that a
+                     local ternary inside the card would be a second derivation and the
+                     panel and the run page would eventually disagree — so the card is
+                     TOLD, never left to work it out.
+
+                     ⚠ BEFORE THE FETCH RESOLVES `frame` is null, so `runTerminal` is
+                     false and `runLive` is `true` — i.e. THE PRE-FETCH DEFAULT IS TODAY'S
+                     BEHAVIOUR. That is why this cannot flash an interrupted reading on
+                     mount: the quiet row appears only once the frame has actually said the
+                     run is over. */}
+              <PhaseCard
+                phase={phase}
+                position={i}
+                timing={factsOf(phase.slug)}
+                runLive={!runTerminal}
+              />
             </li>
           ))}
         </ol>

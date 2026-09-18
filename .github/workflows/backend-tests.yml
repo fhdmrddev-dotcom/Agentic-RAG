@@ -11,10 +11,23 @@ on:
       - "backend/**"
       - "supabase/migrations/**"
       - ".github/workflows/backend-tests.yml"
+      # Phase 253-03 / WR-08. These two live under scripts/ but are READ by backend unit
+      # tests, so without them the one change that breaks a fence is the one change that
+      # does not run it. Held there by tests/unit/test_253_ci_path_coverage.py, which
+      # DERIVES this set from the test modules rather than trusting this list.
+      - "scripts/full-schema-supplement.sql"        # tests/unit/test_253_supplement_column_parity.py
+      - "scripts/check-greenfield-privileges.py"    # tests/unit/test_253_greenfield_sql_lexer.py
   pull_request:
     paths:
       - "backend/**"
       - "supabase/migrations/**"
+      # Phase 253-03 / WR-08 — see the push arm above. ⚠ `.github/workflows/backend-tests.yml`
+      # is deliberately NOT added here: that asymmetry is pre-existing and outside this
+      # gap-closure round's locked scope. It is PINNED by
+      # test_253_ci_path_coverage.py::test_the_workflows_own_file_is_in_the_push_arm_only
+      # so a future reader meets a fact rather than an accident.
+      - "scripts/full-schema-supplement.sql"        # tests/unit/test_253_supplement_column_parity.py
+      - "scripts/check-greenfield-privileges.py"    # tests/unit/test_253_greenfield_sql_lexer.py
 
 jobs:
   pytest:
@@ -33,6 +46,12 @@ jobs:
           python -m venv venv
           source venv/bin/activate
           pip install -r requirements.txt
+          # R2-CR-02 (253): psycopg2 is imported by tests/integration and by two
+          # tests/fixtures modules, but is NOT in requirements.txt — it was only ever
+          # installed ad-hoc in the operator's local venv. CI therefore died in
+          # COLLECTION, and all 40 runs of this workflow have failed. Test-only dep,
+          # so it is installed here rather than added to the app's requirements.
+          pip install psycopg2-binary
 
       # Phase 061 (D-061-14): boot Redis from docker-compose.dev.yml.
       # Streams semantics drift between Redis and fakeredis; tests run
@@ -55,16 +74,42 @@ jobs:
           done
           echo "Redis did not become ready in 30s"; exit 1
 
+      # R2-CR-02 follow-up (253, measured 2026-09-17): with collection no longer aborting,
+      # this step ran the integration tests for real and HUNG — 37 minutes, then cancelled,
+      # against 3m30s when it used to die at collection. It blocks on a Postgres/Supabase
+      # that does not exist on the runner. Bounded and marked non-failing: its baseline is 71
+      # failures (CLAUDE.md), so its exit code was NEVER a pass/fail signal — the fences step
+      # below is. Leaving it unbounded is what skipped that step.
       - name: Run pytest
+        timeout-minutes: 12
+        continue-on-error: true
         run: |
           cd backend
           source venv/bin/activate
-          pytest tests -q
+          pytest tests -q --continue-on-collection-errors
         env:
           REDIS_URL: redis://localhost:6379
           # Supabase test substrate: integration tests that hit real
           # Postgres are conditionally skipped if SUPABASE_URL is unset.
           # CI baseline runs unit + mock-Supabase integration tests only.
+
+      # R2-CR-02 (253): the step above runs the WHOLE suite, whose baseline is 71
+      # failures, so it can never exit 0 and can never be read as a signal. The two
+      # scripts/ fences this phase added were widened into that job and were therefore
+      # executed by nothing legible. This step runs them ALONE and MUST be green.
+      # ⛔ `if: always()` IS LOAD-BEARING AND WAS MISSING ON THE FIRST ATTEMPT. A step with no
+      # `if:` is SKIPPED once an earlier step fails, and the step above can never succeed — so
+      # this fence was structurally unreachable. Measured on run 35231275118: `Run pytest`
+      # cancelled, and this step reported `skipped`. A guard that cannot fire is not a guard;
+      # that is the defect class this phase exists to kill, shipped by the fix for it.
+      - name: scripts/ parity fences (must pass)
+        if: always()
+        run: |
+          cd backend
+          source venv/bin/activate
+          pytest tests/unit/test_253_supplement_column_parity.py \
+                 tests/unit/test_253_greenfield_sql_lexer.py \
+                 tests/unit/test_253_ci_path_coverage.py -q
 
       - name: Stop Redis
         if: always()

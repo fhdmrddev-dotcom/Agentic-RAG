@@ -53,7 +53,13 @@ const FRONTEND = (() => {
 
 const SKETCH_DIR = `${FRONTEND}/sketch`
 const SKETCH_TSCONFIG = `${FRONTEND}/tsconfig.sketch.json`
-const PHASES_DIR = `${FRONTEND.replace(/\/frontend$/, "")}/.planning/phases`
+const REPO = FRONTEND.replace(/\/frontend$/, "")
+const PHASES_DIR = `${REPO}/.planning/phases`
+// ⚠ ADDED 2026-09-18. `.planning/phases/` holds only the ACTIVE milestone. At
+// `/gsd:complete-milestone` a phase directory MOVES to `.planning/milestones/<ver>-phases/`,
+// and a scan of the active dir alone then reports a phase that DID execute as un-executed.
+// That is not hypothetical: it is why this suite was red — see the expiry test below.
+const MILESTONES_DIR = `${REPO}/.planning/milestones`
 
 const OWNING_SKETCH = "202"
 const RETIRING_PHASE = "200.2"
@@ -64,15 +70,34 @@ const RETIRING_PHASE = "200.2"
  * sketch has been consumed rather than when it is merely scheduled.
  */
 function phaseHasExecuted(phase: string): boolean {
-  if (!nodeFs.existsSync(PHASES_DIR)) return false
-  const dirs = nodeFs.readdirSync(PHASES_DIR).filter((d: string) => d.startsWith(`${phase}-`))
-  for (const d of dirs) {
-    try {
-      if (nodeFs.readdirSync(`${PHASES_DIR}/${d}`).some((e: string) => e.endsWith("-SUMMARY.md"))) {
-        return true
+  // Every root a phase directory can live in — the active milestone, and each archived one.
+  const roots: string[] = []
+  if (nodeFs.existsSync(PHASES_DIR)) roots.push(PHASES_DIR)
+  if (nodeFs.existsSync(MILESTONES_DIR)) {
+    for (const m of nodeFs.readdirSync(MILESTONES_DIR)) {
+      const archived = `${MILESTONES_DIR}/${m}`
+      try {
+        if (nodeFs.readdirSync(archived).length > 0) roots.push(archived)
+      } catch {
+        // A path we cannot read is not evidence of execution.
       }
+    }
+  }
+  for (const root of roots) {
+    let dirs: string[]
+    try {
+      dirs = nodeFs.readdirSync(root).filter((d: string) => d.startsWith(`${phase}-`))
     } catch {
-      // A path we cannot read is not evidence of execution.
+      continue
+    }
+    for (const d of dirs) {
+      try {
+        if (nodeFs.readdirSync(`${root}/${d}`).some((e: string) => e.endsWith("-SUMMARY.md"))) {
+          return true
+        }
+      } catch {
+        // A path we cannot read is not evidence of execution.
+      }
     }
   }
   return false

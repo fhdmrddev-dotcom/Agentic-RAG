@@ -969,6 +969,66 @@ export interface ConnectionDraft {
   status?: "active" | "revoked" | "error"
 }
 
+/** CRED-01: Explicit guidance on custom_client_id field to prevent credential pasting. */
+export const CUSTOM_CLIENT_ID_HINT = "OAuth Application ID or GUID (not a client secret or API key)"
+
+const KNOWN_SECRET_PREFIXES = [
+  "sk-",
+  "ghp_",
+  "gho_",
+  "ghu_",
+  "ghs_",
+  "ghr_",
+  "xoxb-",
+  "xoxp-",
+  "xapp-",
+  "secret_",
+  "whsec_",
+  "client_secret",
+  "bearer ",
+]
+
+const ENTRA_SECRET_RE = /^[A-Za-z0-9_-]{2,32}~[A-Za-z0-9_.~-]{4,}$/
+
+/**
+ * CRED-01: Check if a custom_client_id value matches known credential or secret patterns.
+ */
+export function customClientIdLooksLikeSecret(val: string | null | undefined): boolean {
+  if (!val) return false
+  const trimmed = val.trim()
+  if (!trimmed) return false
+  if (trimmed.length > 128) return true
+  if (trimmed.includes("~") || ENTRA_SECRET_RE.test(trimmed)) return true
+  const lower = trimmed.toLowerCase()
+  return KNOWN_SECRET_PREFIXES.some((prefix) => lower.startsWith(prefix))
+}
+
+/**
+ * CRED-01: Return an inline error message if custom_client_id contains a secret or is invalid.
+ */
+export function customClientIdError(val: string | null | undefined): string | null {
+  if (!val) return null
+  const trimmed = val.trim()
+  if (!trimmed) return null
+
+  if (trimmed.length > 128) {
+    return "Custom Client ID exceeds 128 characters; client IDs must not be tokens or secrets"
+  }
+
+  if (trimmed.includes("~")) {
+    return "This looks like an Entra client secret containing '~', not a Client ID. Enter the Application (client) ID (GUID). Put the secret into Custom Client Secret."
+  }
+
+  const lower = trimmed.toLowerCase()
+  for (const prefix of KNOWN_SECRET_PREFIXES) {
+    if (lower.startsWith(prefix)) {
+      return `This looks like a secret or token (${prefix}), not a Client ID. Put credentials into Custom Client Secret or API Key.`
+    }
+  }
+
+  return null
+}
+
 export const EMPTY_DRAFT: ConnectionDraft = {
   capability: "service",
   serviceId: "",

@@ -1,5 +1,5 @@
 ---
-id: SEED-050
+seed_id: SEED-050
 title: Workflow result-quality measurement — seed-prompt redesign + golden-output/rubric eval (functionality ≠ quality)
 status: planted
 planted: 2026-06-02
@@ -7,6 +7,7 @@ planted_by: orchestrator (093 plan-phase — operator-raised "workflows trigger 
 trigger_when: Phase 096 (eval + verify — the natural home for a workflow-output rubric), OR any phase that adds/edits a seed workflow's prompts, OR the v2.9 workflow-authoring/builder work (NL-generate needs an output-quality gate), OR a milestone close that claims workflows "work"
 priority: high
 tags: [harness, workflows, seed-prompts, eval, quality, 096, EVAL-01, EVAL-02]
+surface: Agentic-RAG
 ---
 
 # SEED-050: Workflow Result-Quality Measurement

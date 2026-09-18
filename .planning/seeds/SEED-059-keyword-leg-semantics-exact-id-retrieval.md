@@ -30,6 +30,8 @@ suggested_phase: |
      fix — see options below — verified green against eval rows. Single
      SQL-function migration + small service-layer change; Deep/provider paths
      untouched (retrieval is shared but provider-agnostic by construction).
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-059 — Keyword-leg semantics + exact-identifier retrieval robustness

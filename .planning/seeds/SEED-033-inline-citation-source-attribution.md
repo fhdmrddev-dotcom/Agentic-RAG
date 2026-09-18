@@ -1,5 +1,5 @@
 ---
-id: SEED-033
+seed_id: SEED-033
 title: Inline citation & source attribution — grounded vs. general knowledge transparency
 status: planted
 planted: 2026-05-27

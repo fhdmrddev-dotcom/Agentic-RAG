@@ -1,5 +1,5 @@
 ---
-id: SEED-149
+seed_id: SEED-149
 title: A CSV is never table-extracted, so query_table is dead on the one format that IS a table — and separately, extracted tables are stored but largely never reach the chunks retrieval searches
 status: open
 planted: 2026-08-10
@@ -16,6 +16,7 @@ re_open_trigger: >
   there; (2) any user uploads a spreadsheet or CSV and asks a question about its rows; (3) any phase
   touches `_fetch_document_tables`, the chunker, or `query_table`; (4) SEED-087's table-searchability
   work is picked up — these are the same subject and should merge.
+trigger_when: unset
 ---
 
 # SEED-149 — structured data is extracted, then stranded

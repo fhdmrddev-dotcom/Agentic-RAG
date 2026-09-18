@@ -1,12 +1,16 @@
 ---
-id: SEED-106
+title: Sandbox image parity with the big providers' skill runtimes
+seed_id: SEED-106
 status: planted
 planted: 2026-07-07
 planted_during: v3.2 STRETCH (Phase 140 in flight — operator asked after the BUG-260707-02 pptx-skill fix "should the sandbox be up to the standard of the big providers' skill runtimes?")
 trigger_when: A user imports/runs any OFFICIAL provider skill (Anthropic pptx/docx/xlsx/pdf, Google, OpenAI) that calls a document-conversion binary or a non-baked Python lib — OR the "official skills work out of the box, without missing anything" reliability goal is scoped — OR any sandbox-image (`backend/Dockerfile.sandbox`) rebuild is on the table
+trigger_paths:
+  - "backend/Dockerfile.sandbox"
 scope: Medium-Large
 related: [[SEED-096]] (this seed IS the focused execution of its G-C "system binaries" gap), [[SEED-044]] (the SEPARATE non-Python/JS runtime gap — G-B), [[project_skills_mime_known_gap]] (MIME/flatten loss on import), [[SEED-093]] (skill residuals), BUG-260707-02 (the worked example that motivated this)
 re_open_trigger: Next milestone planning (v3.3+ / a skills-hardening milestone) OR any operator report of an official skill looping/failing on a missing binary or library
+surface: Agentic-RAG
 ---
 
 # SEED-106: Sandbox image parity with the big providers' skill runtimes

@@ -26,6 +26,8 @@ trigger_when: >
 
   Mechanical check that the gap is still real, from the repo root:
     grep -c "^const nodeTypes" -A 6 frontend/src/components/workflows/WorkflowCanvas.tsx  # ONE entry today
+trigger_paths:
+  - "frontend/src/components/workflows/WorkflowCanvas.tsx"
 ---
 
 # What xyOps does that our canvas does not

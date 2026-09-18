@@ -14,6 +14,8 @@ related_phases:
   - v3.3 milestone sweep — candidate CORE/STRETCH item
 related_memories: [project_gpt56_hand_added_seed088, feedback_provider_docs_first, feedback_multi_provider_behavior_variance, feedback_no_cross_provider_regressions, feedback_separate_per_feature_safe_by_construction]
 priority: medium
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-114 — OpenAI Responses-API adapter for reasoning-first tool-using models

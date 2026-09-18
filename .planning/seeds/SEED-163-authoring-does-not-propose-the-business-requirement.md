@@ -1,3 +1,14 @@
+---
+seed_id: SEED-163
+title: NL authoring writes the whole workflow but leaves the one field that blocks publish blank
+status: planted
+status_note: |
+  Phase 251 frontmatter migration: this file had NO frontmatter block at all, so no status was
+  ever recorded for it. `planted` here is a MIGRATION DEFAULT — it is a statement about the
+  absence, never a claim about the seed. Read the body and set it deliberately.
+surface: Agentic-RAG
+trigger_when: unset
+---
 # SEED-163 — NL authoring writes the whole workflow but leaves the one field that blocks publish blank
 
 **Planted:** 2026-08-15, by the operator during Phase 193.1 end-to-end UAT

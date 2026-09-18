@@ -1,5 +1,5 @@
 ---
-id: SEED-160
+seed_id: SEED-160
 title: What happens when the template changes after the workflow is published — untested
 status: open
 planted: 2026-08-14
@@ -12,6 +12,7 @@ re_open_trigger: >
   The first time a published workflow's template needs replacing (a format change, a rebrand, a
   new reporting period), OR any phase touching `version_policy` / `supersede-by-filename`, OR a
   run failing because its bound template no longer matches its steps. Whichever comes first.
+trigger_when: unset
 ---
 
 # Template supersession after publish — an open question, not a known defect

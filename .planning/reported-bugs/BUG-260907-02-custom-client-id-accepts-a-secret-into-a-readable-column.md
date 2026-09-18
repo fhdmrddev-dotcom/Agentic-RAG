@@ -4,9 +4,9 @@ title: custom_client_id accepts any string into config — a client SECRET paste
 reported: 2026-09-07
 surface: Agentic-RAG
 severity: major
-status: open
+status: folded
 affected_areas: [backend/models/connector, connections, oauth, security, frontend/settings]
-folded_into: null
+folded_into: 252
 verified_closed_by: null
 related_seeds: []
 re_open_trigger: null
@@ -17,6 +17,31 @@ reproduces_on:
 ---
 
 # BUG-260907-02: A client secret pasted into the client-ID field is stored in plaintext, readable org-wide
+
+> ⚠ **FOLDED INTO PHASE 252 — NOT CLOSED, AND THE DISTINCTION IS THE POINT.** `REQUIREMENTS.md`
+> `CRED-01` is ticked against `.planning/phases/248-the-credential-boundary/248-VERIFICATION.md`
+> (peer-reviewed, 4/4), and that tick is honest as far as it goes: Phase 248 shipped the
+> credential-smell rule on all three **declared** `custom_client_id` homes — `McpConfig`,
+> `OAuthConnectionConfig`, `OAuthAuthorizeRequest` — where a smell is refused **422** and an
+> RFC 7591 dynamic id is permitted, with the dual-role DB permissions driven under `SET ROLE
+> authenticated` and `SET ROLE anon`.
+>
+> ⛔ **A REQUIREMENT CAN BE DISCHARGED WHILE THE REPORT IS NOT.** Phase 252's research (§3, B-3)
+> measured a **writer that reaches the same column without crossing any of those three models**:
+> `connectors.py:1323-1352` takes `registered.client_id` straight from a remote server's dynamic
+> client-registration response and `connector_service.store_oauth_client_credentials` persists it
+> into `config["custom_client_id"]` with no validation at all. So the boundary exists and there is
+> a door beside it.
+>
+> ⚠ And the consequence is worse than the bypass: once a non-compliant server-issued id is stored,
+> every subsequent read fails `model_validate`, degrades, and the connection reads `status="error"`
+> permanently, behind the sentence *"Connection configuration requires update (validation
+> failed)"* — which names nothing the operator can act on. ⭐ **The repair path does exist** (the BYO
+> form's `custom_client_id` IS `CustomClientId`-validated, and `store_oauth_client_credentials` is
+> an `UPDATE`); what does not exist is any statement of it.
+>
+> Plan `252-02` owns B-2 and B-3. ⛔ This report is closed by **Phase 252's verification**, not by
+> Plan 01 — Plan 01 only records the routing.
 
 ## What we observed
 

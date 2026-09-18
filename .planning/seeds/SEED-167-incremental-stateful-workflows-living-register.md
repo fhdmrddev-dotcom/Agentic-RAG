@@ -24,6 +24,7 @@ trigger_when:
   - Any phase proposing "run this workflow on a schedule", "recurring report", "keep X up to date"
   - Any second operator request of the shape "update the existing document" rather than "produce a document"
   - Planning NODE-01 (phase 198) — bring this seed as the worked example
+surface: Agentic-RAG
 ---
 
 # SEED-167: Incremental / stateful workflows — the "living risk register"

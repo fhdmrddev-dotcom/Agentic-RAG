@@ -1,5 +1,5 @@
 ---
-id: SEED-133
+seed_id: SEED-133
 title: NL workflow generation ignores GroundingBundle.degraded — a folder-blind draft is presented as ok
 status: open
 planted: 2026-07-25
@@ -13,6 +13,7 @@ re_open_trigger: >
   into "the canvas seeds nodes against a registry we could not read". Also re-open if a support
   report describes an NL-generated workflow whose folder_scope or skill_ref came back empty for
   no apparent reason.
+trigger_when: unset
 ---
 
 # SEED-133 — NL generation is the one grounding consumer that does not branch on `degraded`

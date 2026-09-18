@@ -16,6 +16,8 @@ relates_to:
   - D-063-04 Resume path — worked cleanly when this error surfaced (user clicked Resume → new run `53ee4e5a-692a-4c0d-bfe9-874248da6d31` succeeded)
   - MODEL_CAPABILITIES registry pattern (already used for `provider`, `supports_tools`, `default_temperature`, etc. in `backend/app/config.py`)
 closure_note: "Fully consumed by Phase 074. MODEL_CAPABILITIES.max_output_tokens populated for all Anthropic models. POLISH-SEED-009-01 Validated."
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-009: claude-haiku-4-5 max_tokens default exceeds 64K model cap

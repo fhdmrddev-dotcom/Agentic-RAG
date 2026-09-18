@@ -4,10 +4,10 @@ title: "Phase 240 build review — seven open warnings routed as debt after WR-0
 reported: 2026-09-10
 surface: Agentic-RAG
 severity: minor
-status: open
+status: closed
 affected_areas: [backend/sources, backend/watches, frontend/sources, frontend/library]
 folded_into: null
-verified_closed_by: null
+verified_closed_by: Phase 247 (247-DISPOSITION.md)
 related_seeds: [SEED-260, SEED-264]
 re_open_trigger: "Any phase touching services/sources/mail/, watch_service listing semantics, the boundary fence, or the watched-folder mark. WR-02 fires on its own the first time a watched label exceeds ~5,000 messages."
 reproduces_on:

@@ -14,8 +14,11 @@ trigger_when:
   - v3.3 Open Platform exposes retrieval/agent calls programmatically — API consumers ship arbitrary regulated context through the same un-gated egress path at higher volume
   - LangSmith tracing is turned on for a SHARED or production deployment (it is on by default — `langsmith_tracing="true"`, config.py:932) — full prompts including retrieved PII land in a third-party trace store
   - The compliance cluster (SEED-072 data-subject rights, SEED-075 backup/DR) is scoped — DLP belongs in the same Enterprise/Compliance Readiness body of work
+trigger_paths:
+  - "**/config.py"
 priority: high — a genuinely-homeless governance gap with no detection/redaction layer anywhere in the codebase; the single riskiest uncaptured egress surface because LangSmith is on by default and prompts carry full retrieved context. Not load-bearing for single-operator dev, but a primary procurement-security blocker the moment a regulated customer or the co-tenant SaaS tier exists.
 suggested_phase: a future Enterprise / Compliance Readiness body of work (co-design with SEED-072 + SEED-075 alongside the v3.2 RLS rewrite, since the per-org policy hook is org-scoped); the ingestion-detection half folds into SEED-005. NOT v2.9.
+surface: Agentic-RAG
 ---
 
 # SEED-079 — PII detection / redaction (DLP) across retrieval, prompts, provider egress, and logs

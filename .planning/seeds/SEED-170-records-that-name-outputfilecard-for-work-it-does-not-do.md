@@ -22,6 +22,10 @@ trigger_when: >
   docblock as evidence that its chip already shares the file presentation, OR any phase proposing to
   extend SC#2's "one file presentation" claim to a FIFTH surface. Both fixes are one-line comment
   corrections and are legitimate `/gsd:fast` (G-3) candidates on sight.
+trigger_paths:
+  - "backend/app/services/tool_dispatcher.py"
+  - "frontend/src/components/panel/SeamCard.tsx"
+surface: Agentic-RAG
 ---
 
 # SEED-170: two shipped records name `OutputFileCard` for work it does not do

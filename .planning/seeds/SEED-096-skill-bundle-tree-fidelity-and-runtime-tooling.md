@@ -1,6 +1,12 @@
 ---
-id: SEED-096
-status: routed
+title: Skill Bundle File-Tree Fidelity + Runtime Tooling — why Anthropic's `docx` skill is inert today
+seed_id: SEED-096
+status: folded
+status_note: |
+  ORIGINAL `status:` line, verbatim — displaced by Phase 251's frontmatter migration (D-10):
+  status: routed
+
+  Mapped `routed` -> `folded`. Reason: routed to a destination is folding.
 routed: 2026-06-29 — OPERATOR DECISION (during Phase 132 plan-phase). HONESTY slice → broaden v3.2 Phase 142 (SRH-01) at its discuss-phase to fire the "can't execute this" signal on missing-bundled-file (G-A) + missing-binary (G-C) cases, not only non-Python (G-B). CAPABILITY fix (real tree-fidelity + Node + system binaries) stays DISC-01 / v3.3+. v3.2 scope otherwise UNCHANGED.
 planted: 2026-06-29
 planted_during: v3.2 (Phase 132 plan-phase — operator asked to evaluate whether the imported Anthropic `docx` skill is triggered + executable end-to-end)
@@ -8,6 +14,7 @@ trigger_when: A user imports/runs an Anthropic (or marketplace) skill that ships
 scope: Large
 related: [[SEED-044]] (multi-language exec — the LANGUAGE slice), [[SEED-043]] (sandbox package mgmt), [[project_skills_mime_known_gap]] (MIME loss on import)
 re_open_trigger: v3.2 Phase 142 (SRH-01) scoping — decide whether SRH-01's honesty gate covers ALL "runtime can't do this" cases (missing bundled file, missing binary) or only non-Python; AND v3.3+ DISC-01 (full runtime)
+surface: Agentic-RAG
 ---
 
 # SEED-096: Skill Bundle File-Tree Fidelity + Runtime Tooling — why Anthropic's `docx` skill is inert today

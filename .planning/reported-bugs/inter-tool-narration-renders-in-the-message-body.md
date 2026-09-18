@@ -8,7 +8,7 @@ status: closed
 affected_areas: [frontend/streaming, backend/agent-loop, chat/message-rendering]
 folded_into: null
 verified_closed_by: "live browser drive 2026-09-13 (c6a6b46d4)"
-related_seeds: [SEED-173, SEED-172, SEED-259]
+related_seeds: [SEED-173, SEED-172, SEED-283]
 re_open_trigger: null
 reproduces_on:
   branch: develop
@@ -155,6 +155,6 @@ empty until the answer, which then renders alone; on completion the label settle
   the body. The likely reading is the real window between the last tool finishing and the answer
   starting — long on a slow local model, and it read as noise while the duplicate badge was there.
   **Recorded as not-reproduced, not as fixed.**
-- ⛔ **The REPETITION in the original screenshot remains UNATTRIBUTED and is now SEED-259.** The fold
+- ⛔ **The REPETITION in the original screenshot remains UNATTRIBUTED and is now SEED-283.** The fold
   hides it; it does not explain it. **Do not read a clean body as evidence the repetition is gone.**
 

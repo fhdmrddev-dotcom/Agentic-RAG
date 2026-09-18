@@ -112,6 +112,8 @@ environment. When a change touches the left column, do the right column **in clo
 | **A model / provider** | The cloud provider **key** (env) must serve the chosen model. Local and cloud keys can differ — a model that works locally can 404 on cloud (this caused the metadata-extraction bug: extraction defaulted to `gpt-4o`, which the cloud key couldn't serve). Pin known-good models. |
 | **The code sandbox** | Cloud needs the Docker socket mounted into the backend container **and** the sandbox image built **on the VPS host** (`agentic-rag-sandbox:<tag>`). Local just uses your laptop's Docker. **⚠️ Coolify's Docker cleanup prunes the host-built image** (it did on 2026-07-12 — sandbox 404'd right after a routine push): the image must stay pinned by the `sandbox-image-keeper` container (`docker create --name sandbox-image-keeper agentic-rag-sandbox:<tag>`). After ANY production push, a 30-second smoke test of code execution in a NEW chat is cheap insurance; if the tag ever bumps, rebuild on the host + `docker rm sandbox-image-keeper` + recreate the keeper on the new tag (full recipe: `DEPLOYMENT-LESSONS.md` B2). |
 | **CORS / allowed origins** | `FRONTEND_URL` (Coolify) must list every live frontend origin, comma-separated. |
+| **Security advisors check** | Run `scripts/check-security-advisors.sh` against the cloud project using `SUPABASE_ACCESS_TOKEN`. Must exit 0 (no ERROR-level findings). |
+| **Anything that touches a table/column GRANT or REVOKE, or `supabase/full-schema.sql`** | Run `backend/venv/Scripts/python scripts/check-greenfield-privileges.py` (local, no flags, no DSN, no env var). It builds a throwaway scratch database on the local cluster, applies `supabase/full-schema.sql` **alone**, and proves a greenfield bootstrap carries the same TABLE and COLUMN privileges as a replayed migration history — measured as the **`authenticated` role**, never through the service role. Exit **0** = clear · **1** = a privilege violation · **2** = harness error, ⛔ **and a SKIP is exit 2, never a pass** (an unreachable database prints `SKIPPED` and names `scripts/start-local-infra.ps1`). ⚠ This is the TABLE half; `node scripts/check-schema-acl-parity.cjs` is the FUNCTION half. `pg_dump --no-privileges` means a REVOKE a migration issues is absent from every greenfield deploy unless it is mirrored into `scripts/full-schema-supplement.sql` — silently, and in the permissive direction. |
 | **Subdomain routing (`app.<domain>`)** | Attach `app.<domain>` to Vercel project, set `VITE_APP_URL=https://app.<domain>`, add to Coolify `FRONTEND_URL`, and update Cloud Supabase Auth Site URL & redirect allowlist (full 7-step runbook in `docs/OPERATOR.md`). |
 
 **Settings drift is the #1 cloud gotcha.** Many settings columns exist in the DB but some are
@@ -130,6 +132,12 @@ Before `master → production`:
 - [ ] Any new env var is set in **both** local `.env` **and** the cloud dashboard.
 - [ ] Any DB migration is applied to **both** local and cloud Supabase, and `full-schema.sql`
       is regenerated.
+- [ ] Ran `scripts/check-security-advisors.sh` with `SUPABASE_ACCESS_TOKEN` against cloud project ref — zero ERROR-level security advisor findings.
+- [ ] Ran `backend/venv/Scripts/python scripts/check-greenfield-privileges.py` — **exit 0**.
+      ⛔ Exit **2** is a harness error OR a SKIP (unreachable database) and is **never** a pass;
+      exit **1** means a greenfield deploy would ship a privilege these migrations narrowed.
+      Pair it with `node scripts/check-schema-acl-parity.cjs` (the function half), which must
+      also exit 0.
 - [ ] Cross-provider: the change works across providers, not just the one you tested
       (provider-specific handling stays at the service boundary, never breaks the shared path).
 - [ ] **Landing-page CTAs point somewhere real — set `VITE_APP_URL` and `VITE_DEMO_URL` in
@@ -163,6 +171,8 @@ Before `master → production`:
 ---
 
 ## Changelog
+- **2026-09-16** — Added the greenfield privilege gate (`scripts/check-greenfield-privileges.py`) to the parity checklist (§5) and the pre-promotion checklist (§6) (Phase 253 CRED-03). It measures the TABLE half of the bootstrap artifact's privilege posture on a real scratch database, as `authenticated`; a SKIP is exit 2, never a pass. ⚠ Its first run found `supabase/full-schema.sql` **unappliable** on a greenfield database (`type "vector" does not exist`, 42704, introduced at `a7efe17d1`) and `connector_tokens.access_token_ciphertext` readable by `authenticated` on every new deployment — both fixed in the same phase.
+- **2026-09-14** — Added security advisor verification check (`scripts/check-security-advisors.sh`) using `SUPABASE_ACCESS_TOKEN` to parity checklist (§5) and pre-promotion checklist (§6) (Phase 248 CRED-04).
 - **2026-07-11** — Parity checklist: noted migration 097 (`097_operator_flags.sql`, three
   additive `app_settings` operator-flag booleans) must be pasted into the cloud SQL editor at
   promotion (Phase 147 FLAG-01 substrate).

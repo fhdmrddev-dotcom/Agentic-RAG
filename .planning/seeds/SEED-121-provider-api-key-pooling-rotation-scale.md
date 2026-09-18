@@ -10,6 +10,8 @@ scope: Medium
 related_seeds: [SEED-081, SEED-120, SEED-001, SEED-036, SEED-073]
 related_memories: [project_target_scale, project_provider_feature_fit_routing, project_v34_milestone_started]
 re_open_trigger: "When single-key provider rate limits (RPM/TPM 429s) are observed under real load, OR at a dedicated scale/ops milestone, OR when a co-tenant SaaS deployment fans thousands of concurrent users onto one shared provider key. Pairs with SEED-081."
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-121 — Provider API-key pooling + rotation at scale

@@ -1,9 +1,17 @@
 ---
-id: SEED-148
+seed_id: SEED-148
 title: A workflow that produces a file has nowhere to show it — the run surface, the canvas and the workflow panel render no output files, though the chat surface has had an OutputFileCard for three milestones
-status: open   # PARTIALLY CLOSED -- the RUN-SURFACE half shipped in Phase 195; see the 2026-08-19
-               # correction in the body. The CANVAS half, the WORKFLOW-PANEL half and the
-               # PendingAskCard case remain genuinely open, which is why this stays open.
+status: open
+status_note: |
+  ORIGINAL `status:` line, verbatim — displaced by Phase 251's frontmatter migration (D-10):
+  status: open   # PARTIALLY CLOSED -- the RUN-SURFACE half shipped in Phase 195; see the 2026-08-19
+                 # correction in the body. The CANVAS half, the WORKFLOW-PANEL half and the
+                 # PendingAskCard case remain genuinely open, which is why this stays open.
+
+  The prose that followed the token, byte-for-byte:
+  # PARTIALLY CLOSED -- the RUN-SURFACE half shipped in Phase 195; see the 2026-08-19
+
+  Mapped `open` -> `open`. Reason: clean 1:1.
 planted: 2026-08-10
 planted_by: Operator, reviewing the workflow product after the v3.6 deploy (2026-08-10) — "if the workflow produces a file at the end, this output is not shown in the output of the workflow in the canvas, also even in the chat area and the workflow panel"
 surface: Agentic-RAG
@@ -19,6 +27,7 @@ re_open_trigger: >
   "where is my document?" after a run completes; (3) any phase touches `llm_emit` or the run
   surface's phase spine; (4) SEED-069 (living-document re-ingestion) is picked up — it cannot start
   from an output nobody can reach.
+trigger_when: unset
 ---
 
 # SEED-148 — the workflow produces the deliverable and then hides it

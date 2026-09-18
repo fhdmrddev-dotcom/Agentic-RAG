@@ -20,6 +20,7 @@ trigger_when: >
   Any customer or prospect asks about running models on their own hardware, air-gapped operation, or
   data never leaving their network; OR a self-hosted / on-prem deployment tier is scoped; OR the
   provider roster, `_INFERENCE_FALLBACK_PROVIDER`, or the capability-inference patterns are touched.
+surface: Agentic-RAG
 ---
 
 # The requirement, in the operator's words

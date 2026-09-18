@@ -1,5 +1,5 @@
 ---
-id: SEED-034
+seed_id: SEED-034
 title: Per-Provider Prompt Strategy & New-Model Compatibility Assurance (cross-provider tool-use quality)
 status: planted
 planted: 2026-05-27
@@ -15,6 +15,7 @@ priority: high
 tags: [system-prompt, tool-use, cross-provider, provider-compat, model-onboarding, agent-quality, competitive-advantage, provider-docs-first, evidence-based, RAG]
 related_seeds: [SEED-028, SEED-031, SEED-032, SEED-009, SEED-010, SEED-035]
 related_bugs: [BUG-260529-01]
+surface: Agentic-RAG
 ---
 
 # SEED-034: Per-Provider Prompt Strategy & New-Model Compatibility Assurance

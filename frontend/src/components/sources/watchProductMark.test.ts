@@ -38,6 +38,19 @@ describe("watchProductMarkKey", () => {
     expect(watchProductMarkKey("mailbox_root", "google")).toBe("google-gmail")
     expect(watchProductMarkKey("mailbox:Label_9", "google_workspace")).toBe("google-gmail")
   })
+
+  it("resolves Microsoft Graph, OneDrive, and SharePoint watched folders to microsoft", () => {
+    // WR-09 fix: Microsoft Graph folders wear the official Microsoft mark
+    expect(watchProductMarkKey("01ABCDEF123456", "microsoft")).toBe("microsoft")
+    expect(watchProductMarkKey("root", "microsoft_graph")).toBe("microsoft")
+    expect(watchProductMarkKey("folder-abc", "onedrive")).toBe("microsoft")
+    expect(watchProductMarkKey("docs-site", "sharepoint")).toBe("microsoft")
+  })
+
+  it("does not borrow mail marks for Microsoft mailboxes", () => {
+    expect(watchProductMarkKey("mailbox:Inbox", "microsoft")).toBeNull()
+    expect(watchProductMarkKey("mailbox_root", "microsoft_graph")).toBeNull()
+  })
 })
 
 // ── the half that reading the source did NOT catch ──────────────────────────────────────────
@@ -65,11 +78,18 @@ describe("the key this module returns actually resolves to a product mark", () =
     expect(connectionMark({ service_id: key }).key).toBe("google-drive")
   })
 
+  it("a Microsoft Graph / OneDrive watch resolves to the Microsoft mark, not the neutral plug", () => {
+    const key = watchProductMarkKey("01ABCDEF123456", "microsoft_graph")
+    expect(connectionMark({ service_id: key }).key).toBe("microsoft")
+  })
+
   it("neither resolves to the neutral 'unknown' mark", () => {
     // The assertion that would have failed on the shipped-and-wrong version.
     for (const folder of ["mailbox:INBOX", "some-drive-folder"]) {
       const key = watchProductMarkKey(folder, "google")
       expect(connectionMark({ service_id: key }).key).not.toBe("unknown")
     }
+    const msKey = watchProductMarkKey("01ABCDEF", "onedrive")
+    expect(connectionMark({ service_id: msKey }).key).not.toBe("unknown")
   })
 })

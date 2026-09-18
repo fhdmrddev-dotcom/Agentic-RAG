@@ -1,5 +1,5 @@
 ---
-id: SEED-229
+seed_id: SEED-229
 title: Does the golden run hang on an armed approval checkpoint? Two pause kinds are handled and a third is unaccounted for
 status: planted
 planted: 2026-08-28
@@ -20,6 +20,7 @@ relates_to:
 re_open_trigger: >
   The next phase touching the publish golden run, the approval checkpoint, or external-action
   governance — OR the first report of a publish that never returns.
+trigger_when: unset
 ---
 
 # SEED-229 — two pause kinds are accounted for, and a third is not

@@ -4,11 +4,11 @@ title: The Google Drive adapter never writes `metadata.source.path` — on EITHE
 reported: 2026-09-13
 surface: Agentic-RAG
 severity: major
-status: open
+status: closed
 affected_areas: [backend/sources, backend/ingestion, backend/watches, classification, frontend/library]
-folded_into: null
-verified_closed_by: null
-related_seeds: [SEED-253]
+folded_into: 247
+verified_closed_by: 247
+related_seeds: [SEED-282]
 re_open_trigger: null
 reproduces_on:
   branch: develop
@@ -17,6 +17,21 @@ reproduces_on:
 ---
 
 # BUG-260913-01: The Google Drive adapter never writes `metadata.source.path`
+
+> ⭐ **CLOSED BY PHASE 247 (flipped 2026-09-16, Phase 252 Plan 01 / D-35).** The closing artifact is
+> **`google_drive.py:_resolve_folder_path`**, which resolves parent breadcrumbs relative to the
+> watched root so an ingested Drive file carries `metadata.source.path`, pinned by
+> `test_google_drive_list_files_populates_source_file_path` in
+> `backend/tests/unit/test_247_source_paths.py`.
+>
+> Verifier: `.planning/phases/247-sources-and-watches/247-VERIFICATION.md` → **SC#1 ✅ PASSED**
+> (`status: complete`, `verification_mode: peer-reviewed`, builder gemini / reviewer claude, 5/5
+> criteria), and `REQUIREMENTS.md` `WATCH-01`, ticked 2026-09-16 against that artifact.
+>
+> ⚠ The half this report emphasised — *"on EITHER door"* — is what makes the fix load-bearing:
+> a path written on one ingest door only leaves path-keyed classification rules silently inert for
+> everything that arrives through the other. Re-open trigger: any Drive document whose
+> `metadata.source.path` is absent or root-relative on either the manual-import or the watch door.
 
 ## What we observed
 

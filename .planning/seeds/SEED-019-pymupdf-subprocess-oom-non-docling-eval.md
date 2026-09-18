@@ -15,6 +15,8 @@ re_open_trigger: |
   - SEED-020 (retrieval-quality audit — embedding-model + re-ranker + hybrid retrieval)
   - SEED-021 (table/image recall lift — image recall stayed at 20/59 on the thesis)
 suggested_phase: closed
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 ## Why this seed exists

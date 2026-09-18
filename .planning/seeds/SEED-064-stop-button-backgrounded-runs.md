@@ -1,7 +1,15 @@
 ---
 seed_id: SEED-064
 title: Stop control missing for backgrounded / capped-out in-flight runs — user can't reach the working cancel path
-status: DONE — VERIFIED LIVE 2026-06-07 at v2.8 audit close-out. Operator: pulsing sidebar dots rendered for running threads; active-runs tray reachable; Stop stopped a fresh openai (gpt-5.4) run AND a moonshot (kimi-k2.6) run cleanly mid-stream. DB cross-check (runs table): both runs status='cancelled', no wedged threads, no dangling anchors. Sketch 017 option C shipped (sidebar dots + hover-Stop + active-runs tray w/ Stop-all); tsc/build clean, net-new test failures 0.
+status: shipped
+status_note: |
+  ORIGINAL `status:` line, verbatim — displaced by Phase 251's frontmatter migration (D-10):
+  status: DONE — VERIFIED LIVE 2026-06-07 at v2.8 audit close-out. Operator: pulsing sidebar dots rendered for running threads; active-runs tray reachable; Stop stopped a fresh openai (gpt-5.4) run AND a moonshot (kimi-k2.6) run cleanly mid-stream. DB cross-check (runs table): both runs status='cancelled', no wedged threads, no dangling anchors. Sketch 017 option C shipped (sidebar dots + hover-Stop + active-runs tray w/ Stop-all); tsc/build clean, net-new test failures 0.
+
+  The prose that followed the token, byte-for-byte:
+  — VERIFIED LIVE 2026-06-07 at v2.8 audit close-out. Operator: pulsing sidebar dots rendered for running threads; active-runs tray reachable; Stop stopped a fresh openai (gpt-5.4) run AND a moonshot (kimi-k2.6) run cleanly mid-stream. DB cross-check (runs table): both runs status='cancelled', no wedged threads, no dangling anchors. Sketch 017 option C shipped (sidebar dots + hover-Stop + active-runs tray w/ Stop-all); tsc/build clean, net-new test failures 0.
+
+  Mapped `DONE` -> `shipped`. Reason: READ SEED-063/064 — both prose lines say code shipped and was live-verified.
 planted: 2026-06-07
 phase_origin: Phase 096 live UAT (Test 3 stream-cap storm) — operator-run, DB-verified
 category: B — real defect (frontend UX), slated for the same dedicated fix phase as SEED-063 (operator-approved 2026-06-07)
@@ -18,6 +26,8 @@ re_open_triggers:
   - Stream-cap / LRU-3 pool behavior is revisited
 priority: high (pairs with SEED-063 — together they were the "stuck with no way out" incident)
 suggested_phase: same small dedicated fix phase as SEED-063
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-064 — Stop button for backgrounded runs

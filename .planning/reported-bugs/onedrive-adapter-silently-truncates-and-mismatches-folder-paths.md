@@ -8,7 +8,7 @@ status: open   # ALL THREE FIXED 2026-09-10 (45b4fb9dc, db7a083a2). Open only fo
 affected_areas: [backend/connectors, backend/ingestion, RAG/classification]
 folded_into: null
 verified_closed_by: null
-related_seeds: [SEED-253]
+related_seeds: [SEED-282]
 re_open_trigger: null
 reproduces_on:
   branch: develop
@@ -65,7 +65,7 @@ the same value in `params`, where the client escapes it. The Graph adapter build
 /Team%20Docs/Q3%20Plans/Q3 Plans.pdf
 ```
 
-So a rule `path contains '/Team Docs/'` **never matches**. ⭐ That is `SEED-253`'s exact failure
+So a rule `path contains '/Team Docs/'` **never matches**. ⭐ That is `SEED-282`'s exact failure
 arriving by a new route — a path that looks real and cannot be matched. It also passes drive-internal
 ids through as folder paths (`/drives/b!abc/items/01XYZ`).
 

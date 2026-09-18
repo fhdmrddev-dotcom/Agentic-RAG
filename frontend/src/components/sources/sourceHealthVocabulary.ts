@@ -166,8 +166,25 @@ export const CONTROL_FOR_CAUSE: Record<
   SourceFailureCause,
   { label: (connectionName: string) => string; action: "reconnect" | "repick_folder" | "retry" }
 > = {
+  // ⭐ W-3 (Phase 252 / D-30) — THE VERB SURVIVES HERE AND DID NOT FOR ITS TWO SIBLINGS, AND
+  // THAT DISTINCTION IS THE FINDING. The switched-off row lost "Reconnect" because an OAuth
+  // dance cannot switch a connection back on, and the rejected-credentials row lost it because
+  // the exchange re-presents the same rejected secret. **For a REVOKED token, reconnecting
+  // genuinely IS the fix** — the label was never wrong about WHAT to do, only silent about
+  // WHERE.
+  // ⛔ Do not "consistency-fix" the verb away: a later reader seeing three Settings labels will
+  // be tempted to make them read alike, and that would replace a correct instruction with a
+  // vaguer one.
+  // ⚠ The two siblings DISAGREE about the arrow — one ends `in Settings ↗` and the other ends
+  // `in Settings`. The arrow is taken here because it marks a control that LEAVES this surface,
+  // and `runFix` for `reconnect` does exactly that (it only navigates). Recorded rather than
+  // silently picked.
+  // ⚠ The ACTION is unchanged and stays `reconnect`. No fourth action is invented; the
+  // three-named-actions pin stays green BY CONSTRUCTION, exactly as the two rows below.
+  // ⚠ Neither sibling's identifier is spelled in this comment — the suite counts occurrences
+  // over this file's source and a literal inside a comment is still a literal (Pitfall 8).
   token_revoked: {
-    label: (connectionName) => `Reconnect ${named(connectionName)}`,
+    label: (connectionName) => `Reconnect ${named(connectionName)} in Settings ↗`,
     action: "reconnect",
   },
   folder_gone: { label: () => "Pick a different folder", action: "repick_folder" },
@@ -182,7 +199,10 @@ export const CONTROL_FOR_CAUSE: Record<
   //     shipped "every cause carries exactly one action, drawn from the three named actions"
   //     pin therefore stays green BY CONSTRUCTION, not by being loosened.
   connection_disabled: {
-    label: (connectionName) => `Turn ${named(connectionName)} back on`,
+    label: (connectionName) => {
+      const n = named(connectionName)
+      return n === UNNAMED_CONNECTION ? "Open Connection Settings ↗" : `Open ${n} in Settings ↗`
+    },
     action: "reconnect",
   },
   // ⭐ THE SIXTH ROW (BUG-260912-01). ⚠ The label is NOT "Reconnect": the operator on the
@@ -198,6 +218,71 @@ export const CONTROL_FOR_CAUSE: Record<
     action: "reconnect",
   },
   unknown: { label: () => "Retry now", action: "retry" },
+}
+
+/**
+ * ⭐ W-1 (Phase 252 / D-29) — `cause → WHAT THE CONNECTION PILL SAYS`. DATA, never a branch.
+ *
+ * ── ⛔ THE DEFECT THIS EXISTS TO CLOSE ────────────────────────────────────────────────
+ *
+ * `WatchRowCard.tsx` held a ONE-CAUSE BINARY — an equality test against the switched-off cause
+ * alone — and rendered `● Connected` on **every other cause**, including the revoked-token and
+ * rejected-credentials rows, which are the two that mean the authorisation is **gone**. A
+ * person looking at a source whose token had been revoked was told the connection was fine.
+ * That is a misattribution of a security-relevant failure, not a wording slip.
+ *
+ * ⚠ THAT BINARY IS DESCRIBED AND NOT QUOTED, DELIBERATELY. This file's own no-branch fence
+ * matches `cause`-equality syntax over the source and cannot tell code from a comment, so
+ * writing the expression — even to record that it was deleted — reds the guard. Measured: it
+ * did, on the first drive of this very docblock. Pitfall 8, third occurrence in this file.
+ *
+ * ⚠ A binary in a CALL SITE is how it got there, so the fix is a table here rather than a
+ * better ternary there — the same rule the docblock states at the top of this file: **a new
+ * cause adds a ROW, never an `if`.**
+ *
+ * ── ⚠ NOT EVERY FAILURE IS A CONNECTION FAILURE, AND THAT HALF MATTERS AS MUCH ───────
+ *
+ * `folder_gone` and `unreachable` keep reading **Connected**, because the connection genuinely
+ * is: a folder that was unshared and a server that timed out say nothing about the
+ * authorisation. Flipping every cause to a warning would be the mirror overclaim — it would
+ * make the pill a restatement of the run pill beside it, carrying no information at all.
+ *
+ * `tone` is the SEMANTICS the card styles from; the Tailwind classes stay in the component,
+ * beside the rest of its presentation.
+ *
+ * ⚠ THIS TABLE SPENDS EXACTLY ONE NEW OCCURRENCE OF EACH CAUSE IDENTIFIER — its own row — and
+ * the identifiers are spelled nowhere in the prose above, for the same reason the fifth and
+ * sixth causes' docblocks already record. The occurrence pin re-baselines 3 → 4 by ONE, and
+ * that ONE is a TABLE, which is precisely what the pin's own wording permits.
+ */
+export type ConnectionPillTone = "connected" | "attention"
+
+export const CONNECTION_PILL_FOR_CAUSE: Record<
+  SourceFailureCause,
+  { glyph: string; label: string; tone: ConnectionPillTone }
+> = {
+  // The authorisation was withdrawn or expired. ⚠ It says the connection is not usable and
+  // does NOT name the remedy — the control below the row is the one place that does, and two
+  // instructions on one card is how a person ends up following the weaker one.
+  token_revoked: { glyph: "⊙", label: "Authorisation withdrawn", tone: "attention" },
+  // ⚠ NOT connection-level. The folder is gone; the connection is fine and still reading
+  // everything else it watches.
+  folder_gone: { glyph: "●", label: "Connected", tone: "connected" },
+  // ⚠ NOT connection-level. A timeout or a 5xx is the SERVER not answering, and the run pill
+  // beside this one already says so.
+  unreachable: { glyph: "●", label: "Connected", tone: "connected" },
+  // ⭐ The one reading that shipped correctly — preserved WORD FOR WORD, because it is the
+  // label the two-tier badge suite already pins and the only one a person has seen.
+  connection_disabled: { glyph: "⊙", label: "Connection Off", tone: "attention" },
+  // The credentials this deployment uses were rejected. Connection-level, and the fix belongs
+  // to an operator rather than to the person reading the row.
+  app_credentials_invalid: { glyph: "⊙", label: "Credentials rejected", tone: "attention" },
+  // ⚠ DENY BY DEFAULT, INVERTED — and this is deliberate. An unrecognised failure is NOT
+  // evidence that the authorisation is gone, and claiming it would be the guess the default arm
+  // of `classifySourceFailure` exists to refuse. A healthy source reaches this row too: with no
+  // `last_error` the classifier returns `unknown`, so `Connected` here is what makes the
+  // ordinary case ordinary.
+  unknown: { glyph: "●", label: "Connected", tone: "connected" },
 }
 
 /**
@@ -397,7 +482,7 @@ export const COPY = {
 
   // ── stopped. Says THAT it stopped, and WHEN it last succeeded.
   stopped: (ago: string) => `Stopped reading ${ago}`,
-  lastGood: (when: string) => `Last read successfully on ${when}`,
+  lastGood: (when: string) => `Last read successfully ${when}`,
   neverRead: "It has not read successfully yet.",
 
   // ── quiet runs collapse. Density is RENDERING, never storage — every tick has a row

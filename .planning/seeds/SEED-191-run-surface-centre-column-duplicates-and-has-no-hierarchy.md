@@ -3,7 +3,15 @@ seed_id: SEED-191
 title: The run surface's centre column repeats the right panel and carries no visual hierarchy — the answer is unreadable at 208 chars/line, the produced file is buried, and the whole main area is one grey
 created: 2026-08-21
 planted_during: Phase 200.1 execution (operator, watching real runs in the browser between wave 1 and wave 2)
-status: folded            # ROUTED at /gsd:discuss-phase 200.2 (2026-08-23) -- see folded_into.
+status: folded
+status_note: |
+  ORIGINAL `status:` line, verbatim — displaced by Phase 251's frontmatter migration (D-10):
+  status: folded            # ROUTED at /gsd:discuss-phase 200.2 (2026-08-23) -- see folded_into.
+
+  The prose that followed the token, byte-for-byte:
+  # ROUTED at /gsd:discuss-phase 200.2 (2026-08-23) -- see folded_into.
+
+  Mapped `folded` -> `folded`. Reason: clean 1:1.
 folded_into: 200.2        # The centre-column redesign. CONTEXT.md carries D-01..D-16 and R-1..R-4.
                           # NOT the whole seed: R-1 (a stored thinking trace) is explicitly DEFERRED
                           # as a backend persistence phase and is recorded in 200.2-CONTEXT.md
@@ -42,6 +50,8 @@ trigger_when: >
   run surface's readability / hierarchy. Run `/gsd:sketch` FIRST — G-2 fires (live UI, visual,
   "feels like"). The Stitch language pass is already done and is named below, so the sketch does
   not start from nothing.
+trigger_paths:
+  - "**/WorkflowRunPage.tsx"
 ---
 
 ## What the operator saw

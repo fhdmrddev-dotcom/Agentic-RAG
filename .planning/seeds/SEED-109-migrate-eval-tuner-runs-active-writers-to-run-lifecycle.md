@@ -1,5 +1,6 @@
 ---
-id: SEED-109
+title: Migrate the eval / tuner / eval_runner `runs:active` writers onto the shared `run_lifecycle` owner
+seed_id: SEED-109
 status: planted
 planted: 2026-07-09
 planted_during: v3.2 STRETCH (Phase 145 — Run-Lifecycle Honesty + threads.py extraction)
@@ -7,6 +8,7 @@ trigger_when: The eval / tuner / eval_runner run-lifecycle writers still ZADD/ZR
 scope: Medium
 related: [[Phase 145]], run_lifecycle.py, [[project_foundation_pass_cross_provider_uat]], [[SEED-096]] (bundle-fidelity lineage — same shared-owner adopt-later shape), api/evals.py, skill_tuner.py, eval_runner_service.py
 re_open_trigger: "any future `runs:active` drift observed on eval or tuner runs, OR the next G-5 touch of evals.py / skill_tuner.py"
+surface: Agentic-RAG
 ---
 
 # SEED-109: Migrate the eval / tuner / eval_runner `runs:active` writers onto the shared `run_lifecycle` owner

@@ -76,10 +76,10 @@ SELECT_ITEM_FIELDS = (
 #: one. Shared/SharePoint drives would be siblings of this node, not a contract change.
 VIRTUAL_ROOT_IDS = (None, "", "virtual_root", "onedrive")
 
-#: `parentReference.path` arrives as `/drive/root:/Documents/Finance` or
-#: `/drives/{drive-id}/root:/Documents/Finance`. Only the part after `root:` is a path a
-#: person would recognise or write a rule against.
-_PATH_PREFIX = re.compile(r"^/drives?/[^/]*/?root:|^/drive/root:")
+#: `parentReference.path` arrives as `/drive/root:/Documents/Finance`,
+#: `/drives/{drive-id}/root:/Documents/Finance`, or `/sites/{site-id}/drives/{drive-id}/root:...`.
+#: Only the part after `root:` is a path a person would recognise or write a rule against.
+_PATH_PREFIX = re.compile(r"^.*?(?:/root:|/root(?=/|$))")
 
 #: Enum-ish codes only. Graph error MESSAGES quote the caller's own search text back, so a
 #: message must never reach a log line or a raised string — the `_google_error_reason` rule.
@@ -125,6 +125,9 @@ def _folder_path(item: dict[str, Any]) -> str | None:
     stripped = _PATH_PREFIX.sub("", raw)
     if stripped == raw:
         return None
+
+    if stripped and not stripped.startswith("/"):
+        stripped = "/" + stripped
 
     # ⛔ WR-03 — DECODE. `parentReference.path` is Graph's NAVIGABLE path and is URL-encoded,
     #   while `name` (concatenated onto it by `list_files`) is not. Returning it verbatim put

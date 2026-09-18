@@ -18,6 +18,9 @@ trigger_when:
   - SEED-142 (drive ingest) or SEED-014 (automations) is scoped — each adds a surface
   - A competitor comparison is run on "connectors" / "apps" / "integrations" — the industry shape is account-level, surface-agnostic
   - Any proposal to add an outbound capability to the chat tool registry — that proposal MUST answer the governance question in this seed first
+trigger_surfaces:
+  - "connectors"
+surface: Agentic-RAG
 ---
 
 # SEED-145: Connections are platform assets, not workflow assets

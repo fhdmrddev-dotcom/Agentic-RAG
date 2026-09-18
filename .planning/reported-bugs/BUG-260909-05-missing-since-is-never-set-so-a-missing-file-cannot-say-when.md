@@ -4,10 +4,10 @@ title: "missing_since is never written, so a file that vanished at source can be
 reported: 2026-09-09
 surface: Agentic-RAG
 severity: minor
-status: open
+status: closed
 affected_areas: [backend/watches]
 folded_into: null
-verified_closed_by: null
+verified_closed_by: Phase 247
 related_seeds: []
 re_open_trigger: null
 reproduces_on:

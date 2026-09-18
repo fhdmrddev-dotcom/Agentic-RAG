@@ -1,7 +1,13 @@
 ---
 seed_id: SEED-021
 title: Table + Image Recall Lift — GPU-fenced or alternative engines
-status: partially-resolved
+status: answered
+partial: true
+status_note: |
+  ORIGINAL `status:` line, verbatim — displaced by Phase 251's frontmatter migration (D-10):
+  status: partially-resolved
+
+  Mapped `partially-resolved` -> `answered` + `partial: true`. Reason: D-16 — "resolved" here means a question was settled.
 planted: 2026-05-16
 image_axis_resolved: 2026-05-16 (via .planning/spikes/001-005 — storage cap, not extraction)
 table_axis_status: open (trigger #1 — user-observed missed tables — still active)
@@ -31,6 +37,8 @@ suggested_phase: post-v2.6 spike via `/gsd:spike` first; ship phase
   contingent on spike-positive evidence (likely v3.x — depends on whether
   the OSS landscape closes enough of the gap without vision-LLM-per-page
   costs; see SEED-018 for GPU candidates if a GPU path is needed)
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 ## 2026-05-16 update — image-axis RESOLVED via spike series

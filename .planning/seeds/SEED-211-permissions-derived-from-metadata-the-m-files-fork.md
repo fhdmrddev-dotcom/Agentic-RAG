@@ -1,5 +1,5 @@
 ---
-id: SEED-211
+seed_id: SEED-211
 title: Permissions derived from METADATA (the M-Files model) — one mechanism that answers both document placement and source-ACL mirroring
 status: planted
 planted: 2026-08-26
@@ -19,6 +19,7 @@ re_open_trigger: >
   arriving through the back door and must not be answered incrementally; (4) SEED-115's roles /
   departments / greenlists work is scheduled, since that is the other half of the identity model
   this needs.
+trigger_when: unset
 ---
 
 # SEED-211 — should visibility be COMPUTED from metadata rather than stored per row?

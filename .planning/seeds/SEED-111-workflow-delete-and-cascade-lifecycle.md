@@ -9,6 +9,8 @@ related_seeds:
   - SEED-084-starter-workflow-library (the phase that surfaced this gap)
 related_memories: []
 priority: low
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-111 — workflow delete + cascade lifecycle (deferred)

@@ -1,7 +1,15 @@
 ---
-id: SEED-230
+seed_id: SEED-230
 title: A step that reads STRUCTURE is gated as if it read CONTENT — owning a search tool synthesizes a citation gate the author never declared and cannot see
-status: partially-answered  # option 2 SHIPPED 2026-08-29; option 3 is the OPERATOR-STATED DESTINATION
+status: partially-answered
+status_note: |
+  ORIGINAL `status:` line, verbatim — displaced by Phase 251's frontmatter migration (D-10):
+  status: partially-answered  # option 2 SHIPPED 2026-08-29; option 3 is the OPERATOR-STATED DESTINATION
+
+  The prose that followed the token, byte-for-byte:
+  # option 2 SHIPPED 2026-08-29; option 3 is the OPERATOR-STATED DESTINATION
+
+  Mapped `partially-answered` -> `partially-answered`. Reason: clean 1:1 — a first-class enum member, NOT the partially-* family.
 planted: 2026-08-29
 planted_by: Claude, from six measured golden runs after closing BUG-260828-09
 surface: Agentic-RAG
@@ -26,6 +34,7 @@ relates_to:
 re_open_trigger: >
   Immediately for the DECISION (the operator has two workflows in this state). Otherwise the next
   phase touching grounding, the phase form panel's tool picker, or the citation gate.
+trigger_when: unset
 ---
 
 # SEED-230 — the gate fires on the TOOLBOX, and the job is not in the toolbox

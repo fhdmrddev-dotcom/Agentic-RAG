@@ -4,7 +4,7 @@ title: "HNSW iterative scan: Postgres planner cost inflection on selective filte
 created: 2026-09-13
 planted_during: Phase 246 post-execution review (BUS-204)
 status: planted
-surface: Agentic-RAG / retrieval / database
+surface: Agentic-RAG
 severity: major
 category: database / pgvector / retrieval-quality / performance
 priority: high
@@ -22,6 +22,12 @@ trigger_when: >
   `EXPLAIN (ANALYZE, BUFFERS)` inspected at EVERY point to verify index usage vs sequential scan —
   because SEED-076's "refuted" ordering (0.494–0.684) may itself have crossed the planner's cost
   inflection, leaving that refutation suspect.
+trigger_paths:
+  - "backend/app/config.py"
+  - "backend/app/services/retrieval_tuning.py"
+migration_note: |
+  `surface:` was normalised to `Agentic-RAG`. Its original line(s), verbatim:
+  surface: Agentic-RAG / retrieval / database
 ---
 
 # The Discovery (Phase 246)

@@ -56,15 +56,24 @@ describe("MODEL_INFO", () => {
     // High cost tier
     expect(MODEL_INFO["gpt-4o"]?.costTier).toBe("high")
     expect(MODEL_INFO["gpt-4.1"]?.costTier).toBe("high")
-    expect(MODEL_INFO["claude-sonnet-4-6"]?.costTier).toBe("high")
     expect(MODEL_INFO["claude-opus-4-6"]?.costTier).toBe("high")
     expect(MODEL_INFO["gemini-2.5-pro"]?.costTier).toBe("high")
     // Mid cost tier
+    // ⚠ `claude-sonnet-4-6` was asserted "high" here until 2026-09-18, and had been RED
+    // since 2026-04-26 (`47a6294bd`), which demoted it high -> mid without touching this file.
+    // The CODE is the correct side: Sonnet is the mid tier between Haiku and Opus, and the
+    // taxonomy is applied uniformly — every *-mini / *-flash / sonnet entry reads mid.
+    expect(MODEL_INFO["claude-sonnet-4-6"]?.costTier).toBe("mid")
     expect(MODEL_INFO["gpt-4.1-mini"]?.costTier).toBe("mid")
     expect(MODEL_INFO["gemini-2.5-flash"]?.costTier).toBe("mid")
+    expect(MODEL_INFO["gpt-4o-mini"]?.costTier).toBe("mid")
     // Low cost tier
-    expect(MODEL_INFO["gpt-4o-mini"]?.costTier).toBe("low")
-    expect(MODEL_INFO["gpt-4.1-nano"]?.costTier).toBe("low")
+    // ⚠ `gpt-4.1-nano` was asserted here and has been ABSENT from MODEL_INFO since
+    // `792769333`. Optional chaining made the deletion SILENT — `undefined?.costTier` is
+    // `undefined`, so a missing MODEL reported as a wrong VALUE. `gpt-5.4-nano` is the
+    // current low-tier nano; its PRESENCE is asserted so the next deletion fails loudly.
+    expect(MODEL_INFO["gpt-5.4-nano"]).toBeDefined()
+    expect(MODEL_INFO["gpt-5.4-nano"]?.costTier).toBe("low")
     expect(MODEL_INFO["claude-haiku-4-5-20251001"]?.costTier).toBe("low")
     expect(MODEL_INFO["gemini-2.5-flash-lite"]?.costTier).toBe("low")
   })

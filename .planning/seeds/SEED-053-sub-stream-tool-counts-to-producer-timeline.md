@@ -1,12 +1,15 @@
 ---
-id: SEED-053
+seed_id: SEED-053
 title: Thread sub-agent tool/search events up to the harness producer stream — per-phase tool drill-down + honest "N searches / N tool calls" counts on the panel timeline (UI-SPEC Build Prerequisite B)
 status: planted
 planted: 2026-06-04
 planted_by: orchestrator (/gsd:discuss-phase 094 — Area ③ count-honesty decision: ship honest subset, defer B)
 trigger_when: Phase 094 panel timeline has shipped AND we want per-phase tool/search granularity, OR v2.9 kickoff, OR any phase that touches the sub-agent streaming path (task_service.py sub_run_id emits) or the harness producer event vocabulary.
+trigger_paths:
+  - "**/task_service.py"
 priority: medium
 tags: [harness, panel-timeline, sub-agent-stream, tool-counts, legibility, 094, v2.9, BUILD-PREREQ-B]
+surface: Agentic-RAG
 ---
 
 # SEED-053: Sub-stream tool/search events → producer timeline (Build-Prereq B)

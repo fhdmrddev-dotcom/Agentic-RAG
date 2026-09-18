@@ -19,6 +19,8 @@ re_open_triggers:
   - A SECOND ad-hoc tier check is about to be written anywhere in the backend (the fragmentation trigger — one home before two implementations exist).
 priority: high
 suggested_phase: a future licensing/operator milestone. Build home is v3.1 Operator UX (co-located with the admin shell + SEED-078 flag substrate); first consumers are v3.0 Skill Studio (Pro gating) and v3.2 Multi-Tenancy (Enterprise + org-creation quota). NOT v2.9 — Phase 101 has no tier-gated surface.
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-080 — Entitlement / feature-gating primitive (reusable tier + add-on enforcement check)

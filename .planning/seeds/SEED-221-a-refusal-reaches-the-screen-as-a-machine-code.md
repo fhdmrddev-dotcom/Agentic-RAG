@@ -1,5 +1,5 @@
 ---
-id: SEED-221
+seed_id: SEED-221
 title: "The describe door's refusal reaches a real screen as a MACHINE CODE — *\"Couldn't generate — connection_not_allowed\"*. One plan owns the code, another owns the page, neither owns the translation"
 status: planted
 planted: 2026-08-28
@@ -32,6 +32,7 @@ re_open_trigger: >
   Mechanical check that the gap is still real, from the repo root:
     grep -rn "connection_not_allowed" frontend/src --include=*.ts --include=*.tsx | grep -v "\.test\."
   If the only hits are pass-throughs and none is a translation, the gap is live.
+trigger_when: unset
 ---
 
 # SEED-221: a refusal that reaches the user as a machine code

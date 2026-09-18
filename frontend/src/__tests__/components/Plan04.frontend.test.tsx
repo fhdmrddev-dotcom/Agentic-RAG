@@ -3,7 +3,7 @@
  *
  * Covers 6 atoms (A is verified by Task 4 UAT; G is a frontmatter file change):
  *   - Atom B: ToolCallPanel dedup keyed on tool_call_id (B-260519-10)
- *   - Atom C: code_stdout vs code_stderr styling routes by channel
+ *   - Atom C: code_stdout vs code_stderr routes by channel into LABELED REGIONS
  *     (B-260519-07 stdout portion — successful stdout no longer rendered red)
  *   - Atom D: tool-card renders "Sub-agent: {model_id}" line when present
  *     (B-260519-05 frontend metadata)
@@ -95,7 +95,14 @@ describe("Atom B — ToolCallPanel dedup", () => {
 
 
 describe("Atom C — stdout/stderr terminal-output styling routes by channel", () => {
-  it("stdout lines use the emerald-400 class; stderr lines use red-400", () => {
+  // ⚠ REWRITTEN 2026-09-18. This asserted per-line `text-emerald-400` / `text-red-400`
+  // until today and had been RED since Phase 075.8 Task 7, which REPLACED that design per
+  // sketch 002 D3: lines are partitioned into two LABELED REGIONS (`tc-divider-stdout` /
+  // `tc-divider-stderr`) and the colour moved to the region body — a line div now carries no
+  // class at all. The CODE is the correct side; the old assertion described a shipped design
+  // that was deliberately retired. The INTENT is unchanged and still guarded: a line reaches
+  // the region for its channel, and the two regions stay visually distinct.
+  it("routes each line into its channel's labeled region, and the regions stay distinct", () => {
     const tc: ToolCall = makeToolCall({
       id: "exec-1",
       name: "execute_code",
@@ -119,19 +126,34 @@ describe("Atom C — stdout/stderr terminal-output styling routes by channel", (
 
     const { container } = renderWithTooltip(<ExecuteCodeBody tc={tc} />)
 
-    // Verify that each line's parent div has the expected class for its channel.
-    // Map text → expected channel + class.
-    const expectations = [
-      { text: "ok line 1", channel: "stdout", cls: "text-emerald-400" },
-      { text: "warning line", channel: "stderr", cls: "text-red-400" },
-      { text: "ok line 2", channel: "stdout", cls: "text-emerald-400" },
-    ]
-    for (const { text, channel: _channel, cls } of expectations) {
-      const node = Array.from(container.querySelectorAll("div"))
-        .find((d) => d.textContent === text)
-      expect(node, `Could not find rendered line "${text}"`).toBeTruthy()
-      expect(node!.className).toContain(cls)
-    }
+    // Both regions are LABELED — without these, a colour assertion below could pass on a
+    // single undifferentiated block.
+    expect(container.querySelector('[data-testid="tc-divider-stdout"]')).toBeTruthy()
+    expect(container.querySelector('[data-testid="tc-divider-stderr"]')).toBeTruthy()
+
+    // The colour lives on the REGION BODY. ⚠ Do NOT locate a line by `textContent ===`
+    // and walk UP: a region holding exactly one line has the SAME textContent as that line,
+    // and document order returns the region first — which is how the first rewrite of this
+    // test failed against correct markup. Select the region, then read its lines.
+    const STDOUT_BODY = "text-[#c9d1d9]"
+    const STDERR_BODY = "text-[#ffa198]"
+    const bodyFor = (cls: string) =>
+      Array.from(container.querySelectorAll("div")).find((d) => d.className.includes(cls))
+    const stdoutBody = bodyFor(STDOUT_BODY)
+    const stderrBody = bodyFor(STDERR_BODY)
+    expect(stdoutBody, "no stdout region body").toBeTruthy()
+    expect(stderrBody, "no stderr region body").toBeTruthy()
+
+    const linesIn = (el: Element) =>
+      Array.from(el.querySelectorAll("div")).map((d) => d.textContent)
+    // Channel routing AND within-channel order, both in one reading.
+    expect(linesIn(stdoutBody!)).toEqual(["ok line 1", "ok line 2"])
+    expect(linesIn(stderrBody!)).toEqual(["warning line"])
+
+    // ⛔ NON-VACUITY: the regions must be DISTINCT elements with DISTINCT classes, or
+    // every assertion above would pass against one merged block.
+    expect(STDOUT_BODY).not.toBe(STDERR_BODY)
+    expect(stdoutBody).not.toBe(stderrBody)
   })
 })
 

@@ -1,5 +1,5 @@
 ---
-id: SEED-136
+seed_id: SEED-136
 title: The Workflows page needs an information architecture, not a card restyle — three shelves that are not a taxonomy, no search, and the create affordance buried in section three
 status: open
 planted: 2026-07-31
@@ -20,6 +20,7 @@ re_open_trigger: >
   cards, or headings — do the IA question FIRST, do not restyle underneath it; (4) the workflow
   count on one account passes the point where the "Build a workflow" card leaves the first
   viewport (already true for the operator on 2026-07-31).
+trigger_when: unset
 ---
 
 # SEED-136 — the Workflows page taxonomy is the root issue; the card design is downstream of it

@@ -1,7 +1,15 @@
 ---
 seed_id: SEED-029
 title: "Continue" button on iteration-cap stop — user-confirmed escape valve to resume agent loop with a fresh budget (Claude.ai-style)
-status: folded          # folded_into v4.1 (SHELL-02) at /gsd:new-milestone 2026-09-11
+status: folded
+status_note: |
+  ORIGINAL `status:` line, verbatim — displaced by Phase 251's frontmatter migration (D-10):
+  status: folded          # folded_into v4.1 (SHELL-02) at /gsd:new-milestone 2026-09-11
+
+  The prose that followed the token, byte-for-byte:
+  # folded_into v4.1 (SHELL-02) at /gsd:new-milestone 2026-09-11
+
+  Mapped `folded` -> `folded`. Reason: clean 1:1.
 folded_into: "v4.1"
 
 planted: 2026-05-23
@@ -22,6 +30,8 @@ re_open_triggers:
 
 priority: MEDIUM (value-add UX, not urgent — Phase 075.4 ships the warning; this seed adds the affordance)
 suggested_phase: v2.7 Harness Engine (preferred) OR focused v2.6 polish phase if real-world friction surfaces post-075.4
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-029 — Iteration-cap "Continue" affordance

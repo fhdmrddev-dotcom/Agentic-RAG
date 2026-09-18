@@ -20,6 +20,9 @@ trigger_when: >
   showed up" in a chat, whichever comes first. ⛔ Also fires immediately if anyone proposes
   RAISING `_ATTACHMENT_HYDRATION_MAX_ATTEMPTS`: the cap is not being hit, so tuning it is a no-op
   that would look like a fix.
+trigger_paths:
+  - "backend/app/services/sandbox_service.py"
+  - "backend/app/services/tool_dispatcher.py"
 ---
 
 # The finding

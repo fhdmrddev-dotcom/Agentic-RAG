@@ -1,5 +1,5 @@
 ---
-id: SEED-031
+seed_id: SEED-031
 title: Direct Provider SDK Integrations (DeepSeek, Kimi, MiniMax, GLM)
 status: folded
 folded_into: "076.1"

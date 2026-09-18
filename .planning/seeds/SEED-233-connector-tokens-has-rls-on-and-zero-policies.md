@@ -3,7 +3,15 @@ seed_id: SEED-233
 title: "`connector_tokens` has RLS ENABLED and ZERO POLICIES, so every user-JWT read of it returns empty — the OAuth token endpoint 404s on rows that exist"
 created: 2026-09-01
 planted_during: Phase 221 plan 02 — while wiring the per-application availability probe onto the Check action
-status: fixed_local_only
+status: closed
+status_note: |
+  ORIGINAL `status:` line, verbatim — displaced by Phase 251's frontmatter migration (D-10):
+  status: closed   # ⚠ was `fixed_local_only` until 2026-09-14. MEASURED IN PRODUCTION that day over the Supabase MCP (read-only): public.connector_tokens reads relrowsecurity = true with pg_policy count = 1. The cloud half this status existed to flag is DONE; the stale status was found by driving BUS-041's carried findings rather than by any sweep.
+
+  The prose that followed the token, byte-for-byte:
+  # ⚠ was `fixed_local_only` until 2026-09-14. MEASURED IN PRODUCTION that day over the Supabase MCP (read-only): public.connector_tokens reads relrowsecurity = true with pg_policy count = 1. The cloud half this status existed to flag is DONE; the stale status was found by driving BUS-041's carried findings rather than by any sweep.
+
+  Mapped `closed` -> `closed`. Reason: clean 1:1.
 folded_into: 222
 surface: Agentic-RAG
 severity: high

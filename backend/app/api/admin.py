@@ -50,6 +50,7 @@ from app.models.user_settings import (
     broadcast_model_overrides_change,
     invalidate_model_overrides_cache,
     save_app_settings,
+    SettingsWriteRefused,
     set_feature_visibility,
 )
 from app.services import governance_service
@@ -608,7 +609,19 @@ async def set_flag(
     # write entirely on this path and records nothing. Stamping the error state is
     # belt-and-braces: if the floor is ever changed to record on exceptions, it records a
     # truthful "failed to persist" row, never a false success.
-    if not await save_app_settings({body.key: body.value}):
+    # Phase 249 (MODEL-08 / BUG-260909-01): a write the DATABASE REFUSES is a caller error, not
+    # a server fault, and it now says which column and which rule. For a boolean flag the
+    # realistic refusal is UndefinedColumn — a flag shipped in CODE without its migration — which
+    # is precisely the case a bare 500 made undiagnosable (mig 078 hid ~10 days).
+    try:
+        _persisted = await save_app_settings({body.key: body.value})
+    except SettingsWriteRefused as refused:
+        request.state.audit_action = "flag.write_refused"
+        request.state.audit_label = (
+            f"Flag change for {_FLAG_HUMAN_NAMES[body.key]} was refused by the database"
+        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=refused.detail())
+    if not _persisted:
         request.state.audit_action = "flag.write_failed"
         request.state.audit_label = (
             f"Flag change for {_FLAG_HUMAN_NAMES[body.key]} failed to persist"
@@ -1138,8 +1151,10 @@ class AddModelRequest(BaseModel):
     """Body for POST /admin/models — add ONE model by EXPLICIT id + provider (D-159-02).
 
     Unlike the capability PATCH (which INFERS provider from the id/registry), add-by-ID takes
-    the operator's EXPLICIT provider pick, validated against the native-7 + openrouter roster
-    (``PROVIDER_ENDPOINTS``) before any DB touch. There is deliberately NO ``enabled`` field:
+    the operator's EXPLICIT provider pick, validated against the ROUTING roster
+    (``config.ROUTING_PROVIDERS`` — 11 providers) before any DB touch. ⚠ WR-08: this docstring
+    said ``PROVIDER_ENDPOINTS`` (the 8-cloud SSRF DISCOVERY allowlist) and was left saying it by
+    the very phase that stopped reading it — the exact register rot this repo keeps paying for. There is deliberately NO ``enabled`` field:
     the row is forced ``enabled=false`` server-side (the 149 opt-in-enable rule / SC#3 — an add
     never auto-enables; the operator flips it on from the registry table afterward). The
     capability fields are optional pre-fills (every column is null-safe on the table).
@@ -1186,7 +1201,8 @@ async def add_model_by_id(
     binds — no client identifier/value ever reaches a SET clause (T-159-02).
 
     Validation runs BEFORE any DB touch (allowlist-before-touch): a blank id → 422; a provider
-    outside ``PROVIDER_ENDPOINTS`` → 422; a wrong-typed cap → 422; a model already in the
+    outside ``config.ROUTING_PROVIDERS`` → 422 (⚠ the ROUTING roster, NOT the SSRF discovery
+    allowlist it used to read — Phase 249 / SEED-172); a wrong-typed cap → 422; a model already in the
     registry (built-in OR override, CASE-FOLDED per the WR-02 precedent so ``GLM-4.5`` can't
     phantom-duplicate ``glm-4.5``) → 409. On success: ``invalidate_model_overrides_cache()`` + a
     ✎ ``model.added`` receipt. On a persistence failure: a ``model.add_failed`` stamp + a real
@@ -1202,11 +1218,22 @@ async def add_model_by_id(
             detail="model_id must be non-empty.",
         )
 
-    # (2) Provider roster allowlist BEFORE any DB touch (function-local import — Pitfall 4). The
-    # SAME hardcoded roster the SSRF discovery gate validates against; an EXPLICIT pick (never
-    # inferred) so the operator owns the provider a DB-only model routes through.
-    from app.services.model_discovery_service import PROVIDER_ENDPOINTS
-    if body.provider not in set(PROVIDER_ENDPOINTS):
+    # (2) Provider ROUTING-roster allowlist BEFORE any DB touch (function-local import —
+    # Pitfall 4). An EXPLICIT pick (never inferred) so the operator owns the provider a DB-only
+    # model routes through.
+    #
+    # ⚠ Phase 249 (MODEL-04 / SEED-172): this used to read
+    # `model_discovery_service.PROVIDER_ENDPOINTS` — the SSRF DISCOVERY allowlist. That is a
+    # DIFFERENT LIST FOR A DIFFERENT REASON, and it omits `ollama` / `lmstudio` / `custom`, so
+    # every self-hosted model was refused here and was unaddable from the registry UI for its
+    # entire life. Their base URL comes from the operator's own app_settings column
+    # (`_SELF_HOSTED_PROVIDERS`, migration 180); the server never DISCOVERS them, so they belong
+    # in the routing roster and NOT in a discovery allowlist.
+    # ⛔ Do not "simplify" this back to one list. `test_249_add_model_routing_roster.py` fails
+    # if a self-hosted provider ever reaches PROVIDER_ENDPOINTS — that would be a new egress
+    # surface pointed at an operator-supplied URL, not a roster tidy-up.
+    from app.config import ROUTING_PROVIDERS
+    if body.provider not in ROUTING_PROVIDERS:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"Unknown provider: {body.provider}",
@@ -1752,7 +1779,13 @@ async def set_model_lock(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="This model is disabled — enable it first.",
             )
-        if not await save_app_settings({"llm_model": model_id, "llm_model_locked": True}):
+        try:
+            _persisted = await save_app_settings({"llm_model": model_id, "llm_model_locked": True})
+        except SettingsWriteRefused as refused:  # Phase 249 (MODEL-08)
+            request.state.audit_action = "model.lock.write_refused"
+            request.state.audit_label = f"Locking {model_id} was refused by the database"
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=refused.detail())
+        if not _persisted:
             request.state.audit_action = "model.lock.write_failed"
             request.state.audit_label = f"Locking {model_id} as the org default failed to persist"
             raise HTTPException(
@@ -1762,7 +1795,13 @@ async def set_model_lock(
         request.state.audit_action = "model.lock"
         request.state.audit_label = f"Locked {model_id} as the org default"
     else:
-        if not await save_app_settings({"llm_model_locked": False}):
+        try:
+            _persisted = await save_app_settings({"llm_model_locked": False})
+        except SettingsWriteRefused as refused:  # Phase 249 (MODEL-08)
+            request.state.audit_action = "model.unlock.write_refused"
+            request.state.audit_label = f"Unlocking {model_id} was refused by the database"
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=refused.detail())
+        if not _persisted:
             request.state.audit_action = "model.unlock.write_failed"
             request.state.audit_label = f"Unlocking {model_id} failed to persist"
             raise HTTPException(

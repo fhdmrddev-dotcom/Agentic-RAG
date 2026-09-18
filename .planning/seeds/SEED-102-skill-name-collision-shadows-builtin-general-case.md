@@ -11,6 +11,8 @@ related_seeds:
   - SEED-101-skill-creator-native-builtin-protected (the phase that shipped the built-in this gap applies to)
 related_memories: []
 priority: medium
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 ## Resolution (2026-07-05)

@@ -36,6 +36,13 @@ trigger_when: >
   silently. Two commands:
     grep -n "search_documents\|read_document\|fetch_full_document" supabase/migrations/087_skill_creator_reborn.sql
     grep -rni "skill" frontend/src/components/documents/ frontend/src/pages/DocumentsPage.tsx
+trigger_paths:
+  - "frontend/src/components/documents/**"
+  - "frontend/src/pages/DocumentsPage.tsx"
+  - "supabase/migrations/*skill_creator*"
+  - "supabase/migrations/087_skill_creator_reborn.sql"
+trigger_surfaces:
+  - "skills"
 ---
 
 # The document→skill path exists, is retrieval-shaped, and starts in the wrong place

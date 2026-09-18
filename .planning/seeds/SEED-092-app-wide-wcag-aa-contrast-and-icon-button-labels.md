@@ -15,6 +15,8 @@ re_open_triggers:
   - A design-system refresh / token pass that is touching color tokens anyway — cheapest moment to raise the muted-foreground contrast.
 priority: medium
 suggested_phase: a dedicated app-wide accessibility-remediation pass (decide once, app-wide). NOT folded into a single feature phase — fixing only one surface while the shared token + other pages fail identically would be inconsistent and give a false "AA-clean" signal.
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-092 — App-wide WCAG 2.1 AA: muted-token contrast + unlabeled icon buttons

@@ -1,5 +1,5 @@
 ---
-id: SEED-150
+seed_id: SEED-150
 title: Emails cannot be ingested — no `.msg` / `.eml` path exists, so the single most common business document type is the one the knowledge base cannot read
 status: open
 planted: 2026-08-10
@@ -16,6 +16,7 @@ re_open_trigger: >
   decide THEN whether ingestion is file-upload, connector-pull, or both, so the parser is not built
   twice; (2) an ingestion milestone opens; (3) any user uploads a `.msg` or `.eml` and gets a
   rejection; (4) SEED-142 (two-way connectors / auto-ingest) is picked up.
+trigger_when: unset
 ---
 
 # SEED-150 — the knowledge base cannot read email

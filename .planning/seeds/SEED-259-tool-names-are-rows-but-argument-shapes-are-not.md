@@ -3,7 +3,15 @@ seed_id: SEED-259
 title: SC#2 driven on a real second MCP server — tool NAMES are rows, but tool ARGUMENT SHAPES are not, and a server whose reader needs three arguments returns an empty listing with HTTP 200
 created: 2026-09-08
 planted_during: Phase 239 SC#2, driven live against GitHub MCP as the second file server
-status: answered  # OPERATOR RULED 2026-09-08 — OPTION 2 (argument mapping as data), with OPTION 1 shipping alongside as the safety half
+status: answered
+status_note: |
+  ORIGINAL `status:` line, verbatim — displaced by Phase 251's frontmatter migration (D-10):
+  status: answered  # OPERATOR RULED 2026-09-08 — OPTION 2 (argument mapping as data), with OPTION 1 shipping alongside as the safety half
+
+  The prose that followed the token, byte-for-byte:
+  # OPERATOR RULED 2026-09-08 — OPTION 2 (argument mapping as data), with OPTION 1 shipping alongside as the safety half
+
+  Mapped `answered` -> `answered`. Reason: clean 1:1.
 priority: high
 surface: Agentic-RAG
 relates_to:

@@ -19,6 +19,9 @@ trigger_when:
   - Competitive pressure from ChatGPT Tasks, Claude scheduled actions, Copilot Studio, n8n, or Glean Workflows
   - Planning a milestone scoped to "automation", "routines", "schedules", "workflow", "trigger", "reactive", "ETL", or "scheduled run"
   - First request for **confidence-gated escalation / human-in-the-loop (HITL)** — e.g. "when the agent isn't sure, send it to a human", "route low-confidence answers to a review queue", "auto-reply only when confident, else escalate". Especially via **n8n + customer-support ticket triage** (see `## Update 2026-05-31`); cross-ref SEED-013 for the API/MCP surface that exposes the answer+confidence the escalation gates on
+trigger_surfaces:
+  - "workflow"
+surface: Agentic-RAG
 ---
 
 # SEED-014: Automations & Routines

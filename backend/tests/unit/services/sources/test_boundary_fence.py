@@ -363,17 +363,55 @@ def test_every_registered_adapter_is_covered_by_the_list_above():
         assert issubclass(adapter_cls, SourceAdapter), adapter_cls
 
 
+#: Provider-specific half modules that live under sources/ (e.g. mail provider implementations)
+#: that are exempt from the vendor-neutral boundary fence, mirroring modules under adapters/.
+PROVIDER_HALF_MODULES = (
+    "app/services/sources/mail/gmail.py",
+)
+
+#: Shared leaf type/schema definitions under sources/ that define pure data shapes without routing.
+LEAF_SHARED_MODULES = (
+    "app/services/sources/failure_cause.py",
+    "app/services/sources/health_verdict.py",
+)
+
+
+def test_provider_half_and_leaf_modules_are_guarded():
+    """Guard against exemption drift (F-2): exemptions must exist on disk and be strictly bounded.
+
+    Every provider-half module must live in a provider subpackage (e.g. sources/mail/),
+    never at the root of sources/, so root orchestrators cannot silently escape the fence.
+    """
+    for rel in PROVIDER_HALF_MODULES:
+        p = BACKEND / rel
+        assert p.exists(), f"Exempted provider module {rel} does not exist on disk"
+        # Must be in a provider sub-directory (e.g. mail/), never a direct child of services/sources/
+        parts = Path(rel).parts
+        assert len(parts) > 4, f"Provider-half module {rel} cannot be at the root of sources/"
+        assert parts[3] in ("mail",), f"Unexpected provider-half subpackage: {parts[3]}"
+
+    for rel in LEAF_SHARED_MODULES:
+        p = BACKEND / rel
+        assert p.exists(), f"Exempted leaf module {rel} does not exist on disk"
+        # Leaf modules must define pure types/enums and not import adapters
+        content = p.read_text(encoding="utf-8")
+        assert "app.services.sources.adapters" not in content
+
+
 def test_the_fenced_module_list_covers_the_sources_package():
     """A module added to `services/sources/` and forgotten here is silently unfenced — the
-    same class of gap as a hot file with no ledger row."""
+    same class of gap as a hot file with no ledger row (WR-07 recursive check)."""
     package = BACKEND / "app" / "services" / "sources"
     on_disk = {
-        f"app/services/sources/{p.name}"
-        for p in package.glob("*.py")
-        if p.name not in ("__init__.py", "failure_cause.py", "health_verdict.py")
+        "app/services/sources/" + str(p.relative_to(package)).replace("\\", "/")
+        for p in package.rglob("*.py")
+        if p.name != "__init__.py"
+        and "adapters/" not in str(p.relative_to(package)).replace("\\", "/")
     }
-    missing = on_disk - set(FENCED_MODULES)
+    missing = on_disk - set(FENCED_MODULES) - set(PROVIDER_HALF_MODULES) - set(LEAF_SHARED_MODULES)
     assert not missing, (
         f"unfenced modules in services/sources/: {sorted(missing)} — add them to "
         "FENCED_MODULES, or state here why they carry no source routing"
     )
+
+

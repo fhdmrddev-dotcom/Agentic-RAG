@@ -151,8 +151,57 @@ def _scope_hint(status_code: int, reason: str) -> str:
     return reason
 
 
-async def list_labels(token: str) -> list[SourceNode]:
-    """Mail labels, as folders. System labels first, then user labels alphabetically."""
+# Multi-tenant cache: keyed by (connection_id, label_id) because Gmail user label IDs
+# (e.g. 'Label_9', 'Label_10') are per-mailbox, NOT globally unique across accounts.
+# Keying by connection_id prevents cross-tenant label name leaking and path corruption (F-1).
+_LABEL_NAME_CACHE: dict[tuple[str, str], str] = {}
+
+
+async def get_label_name(token: str, label_id: str, connection_id: str) -> str:
+    """Resolve human-readable label name (e.g. 'Finance' for 'Label_9') for WR-04.
+
+    System labels have id == name. User labels query /labels/{id} and cache the result.
+    Keyed by (connection_id, label_id) to prevent cross-tenant collisions (F-1, V-5).
+    connection_id is REQUIRED (fail-closed) to prevent silent cross-tenant leakage.
+    """
+    if not connection_id:
+        raise ValueError("connection_id is required for multi-tenant label name resolution")
+    if not label_id:
+        return ""
+    if label_id in ("INBOX", "SENT", "DRAFT", "TRASH", "SPAM", "STARRED", "UNREAD", "IMPORTANT"):
+        return label_id
+    cache_key = (connection_id, label_id)
+    if cache_key in _LABEL_NAME_CACHE:
+        return _LABEL_NAME_CACHE[cache_key]
+
+    try:
+        resp = await send_pinned_http(
+            EGRESS_KEY,
+            "GET",
+            f"{GMAIL_API_BASE}/labels/{label_id}",
+            headers=_headers(token),
+            timeout=15.0,
+            max_bytes=_LABEL_LIST_MAX_BYTES,
+        )
+        if resp.status_code == 200:
+            data = jsonlib.loads(resp.body)
+            name = str(data.get("name") or label_id)
+            if len(_LABEL_NAME_CACHE) > 5000:
+                _LABEL_NAME_CACHE.clear()
+            _LABEL_NAME_CACHE[cache_key] = name
+            return name
+    except Exception:
+        pass
+    return label_id
+
+
+async def list_labels(token: str, connection_id: str) -> list[SourceNode]:
+    """Mail labels, as folders. System labels first, then user labels alphabetically.
+
+    connection_id is REQUIRED (fail-closed) to prevent silent cross-tenant leakage.
+    """
+    if not connection_id:
+        raise ValueError("connection_id is required for multi-tenant label listing")
     resp = await send_pinned_http(
         EGRESS_KEY,
         "GET",
@@ -171,6 +220,10 @@ async def list_labels(token: str) -> list[SourceNode]:
 
     data = jsonlib.loads(resp.body)
     labels = [lbl for lbl in data.get("labels", []) if isinstance(lbl, dict) and lbl.get("id")]
+    if len(_LABEL_NAME_CACHE) > 5000:
+        _LABEL_NAME_CACHE.clear()
+    for lbl in labels:
+        _LABEL_NAME_CACHE[(connection_id, str(lbl["id"]))] = str(lbl.get("name") or lbl["id"])
 
     def sort_key(lbl: dict[str, Any]) -> tuple[int, str]:
         is_user = 1 if str(lbl.get("type", "")).lower() == "user" else 0
@@ -184,6 +237,7 @@ async def list_labels(token: str) -> list[SourceNode]:
         mailbox.label_to_node(str(lbl["id"]), str(lbl.get("name") or lbl["id"]), anchor)
         for lbl in sorted(labels, key=sort_key)
     ]
+
 
 
 def _subject_of(meta: dict[str, Any]) -> str | None:

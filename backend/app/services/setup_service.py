@@ -339,6 +339,9 @@ async def persist_provider_key(
     updates: dict[str, Any] = {f"{provider}_api_key": api_key}
     if embedding_key:
         updates["embedding_api_key"] = embedding_key
+    # ⛔ Phase 249 (MODEL-08): `SettingsWriteRefused` PROPAGATES from here by design. The
+    # bool this returns cannot express "the database refused the value", and a setup step that
+    # reports success over a refused write is the bug this phase exists to close. Do not catch.
     return await save_app_settings(updates)
 
 

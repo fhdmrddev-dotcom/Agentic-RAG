@@ -86,6 +86,13 @@ function makeHarness() {
 }
 
 describe("StreamsProvider — Phase 075.9 T2 clientKey stamping", () => {
+  // ⚠ Same stale literal as `StreamsProvider.dedup.test.ts`: the placeholder id gained an
+  // iteration segment at `91accf0f3` (Phase 076.1, 2026-05-26) and neither file followed. The
+  // CODE is the correct side.
+  //
+  // ⛔ Of the two uses, one FAILED loudly ("expected running to be done") and one stayed GREEN:
+  // the distinct-clientKeys test compares only keys, so its tool 0 never actually reached done.
+  const PREPARING_ID = `preparing-0-0`
   beforeEach(() => {
     vi.clearAllMocks()
   })
@@ -130,7 +137,7 @@ describe("StreamsProvider — Phase 075.9 T2 clientKey stamping", () => {
     callbacks.onToolPreparing!("search_documents", 0)
     const keyAtPreparing = current().tool_calls![0].clientKey
     callbacks.onToolStart!("search_documents", { query: "hello" })
-    callbacks.onToolEnd!("search_documents", "[]", "preparing-0")
+    callbacks.onToolEnd!("search_documents", "[]", PREPARING_ID)
     expect(current().tool_calls![0].status).toBe("done")
     expect(current().tool_calls![0].clientKey).toBe(keyAtPreparing)
   })
@@ -152,7 +159,7 @@ describe("StreamsProvider — Phase 075.9 T2 clientKey stamping", () => {
     const { callbacks, current } = makeHarness()
     callbacks.onToolPreparing!("execute_code", 0)
     callbacks.onToolStart!("execute_code", { code: "a" })
-    callbacks.onToolEnd!("execute_code", "ok-a", "preparing-0")
+    callbacks.onToolEnd!("execute_code", "ok-a", PREPARING_ID)
     callbacks.onToolPreparing!("execute_code", 1)
     const k0 = current().tool_calls![0].clientKey
     const k1 = current().tool_calls![1].clientKey

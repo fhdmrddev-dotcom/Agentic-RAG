@@ -1,13 +1,20 @@
 ---
-id: SEED-116
+seed_id: SEED-116
 title: Control Room ↔ Settings boundary + full dynamic-control inventory
 planted: 2026-07-12
-status: resolved
+status: answered
+status_note: |
+  ORIGINAL `status:` line, verbatim — displaced by Phase 251's frontmatter migration (D-10):
+  status: resolved
+
+  Mapped `resolved` -> `answered`. Reason: READ SEED-116 — settled by a note + operator ruling, no code.
 resolved: 2026-07-12
 resolved_by: ".planning/notes/settings-control-room-boundary.md (/gsd:explore session, operator-affirmed)"
 related_seeds: [SEED-115, SEED-112, SEED-113, SEED-117]
 related_memory: [project_admin_panel_plan, project_dynamic_settings_direction, project_settings_design_guidance, project_target_scale]
 re_open_trigger: "Before or at the start of Phase 149 (Model Registry & Discovery) — the first phase whose scope concretely straddles the Settings↔Control-Room line (a user picking a model vs an operator governing the registry). Resolve the boundary rule before 149 wires a model-management surface, so we don't build the split twice."
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 > **RESOLVED 2026-07-12** via `/gsd:explore` (operator-affirmed). The boundary RULE lives in

@@ -4,10 +4,10 @@ title: In PRODUCTION, `app_settings` and `user_settings` have RLS disabled and t
 reported: 2026-09-11
 surface: Agentic-RAG
 severity: blocking
-status: open
+status: closed
 affected_areas: [security/rls, backend/settings, supabase/migrations, production-parity]
-folded_into: null
-verified_closed_by: null
+folded_into: 242
+verified_closed_by: 242
 related_seeds: [SEED-266]
 re_open_trigger: null
 reproduces_on:
@@ -15,6 +15,22 @@ reproduces_on:
   measured_at: 2026-09-11
   method: read-only SQL over the Supabase MCP (OAuth, read-only scopes)
 ---
+
+> ⭐ **CLOSED BY PHASE 242 (flipped 2026-09-16, Phase 252 Plan 01 / D-35).** The closing artifact is
+> **`supabase/migrations/177_rls_app_settings_user_settings.sql`**, applied to production: it enables
+> RLS on both tables, strips the `anon` grants, and revokes `EXECUTE` on `resize_embedding_column`
+> from `PUBLIC` **first** (a `REVOKE … FROM anon` alone is a no-op while the `PUBLIC` grant stands —
+> 177's own first version applied cleanly and verify still read `FAIL`).
+>
+> **Two independent production reads verify it, both read-only over the Supabase MCP:**
+> `.planning/phases/248-the-credential-boundary/248-MEASUREMENTS.md` (`source: production`,
+> 2026-09-14) puts `resize_embedding_column` in Group C — *already locked down*, ACL
+> `postgres=X | service_role=X`, `anon` false **and** `authenticated` false — and
+> `248-CONTEXT.md:221` records *"Production currently has zero ERROR"* from `get_advisors(security)`,
+> which is the `rls_disabled_in_public` half and the only instrument that ever caught this class.
+>
+> ⚠ The **standing** obligation survives the close and is `CRED-04`, not this report:
+> `get_advisors(security)` runs at every promotion. Re-open trigger: a non-zero ERROR count there.
 
 # What is true, measured
 

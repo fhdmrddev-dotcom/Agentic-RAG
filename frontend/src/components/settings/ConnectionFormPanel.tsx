@@ -113,6 +113,9 @@ import { McpAuthDoor } from "@/components/settings/McpAuthDoor"
 import { SourceToolsCard } from "@/components/settings/SourceToolsCard"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import {
+  CUSTOM_CLIENT_ID_HINT,
+  customClientIdError,
+  customClientIdLooksLikeSecret,
   EMPTY_DRAFT,
   FIELD_JIRA_EMAIL_HELP,
   FIELD_JIRA_EMAIL_LABEL,
@@ -885,6 +888,7 @@ export function ConnectionFormPanel({
    */
   const saveBlocked = saveRefusal?.kind === "cipher"
   const saveDisabledReasonId = `${fieldId}-save-disabled-reason`
+  const customClientIdErr = customClientIdError(draft.customClientId)
 
   /** One write, its receipt, and a retry on failure — `ConnectionsTab.tsx:533`'s idiom,
    *  reused rather than re-invented so the panel and the row report a write identically.
@@ -967,6 +971,10 @@ export function ConnectionFormPanel({
   const [oauthError, setOauthError] = useState<string | null>(null)
 
   async function handleOAuthAuthorize() {
+    if (customClientIdLooksLikeSecret(draft.customClientId)) {
+      setOauthError(customClientIdErr || "Custom Client ID cannot be a secret or API key")
+      return
+    }
     setAuthorizingOAuth(true)
     setOauthError(null)
     try {
@@ -1006,7 +1014,7 @@ export function ConnectionFormPanel({
   }
 
   async function handleSave() {
-    if (saving) return
+    if (saving || customClientIdLooksLikeSecret(draft.customClientId)) return
     setSaving(true)
     setSaveRefusal(null)
     try {
@@ -1735,7 +1743,7 @@ export function ConnectionFormPanel({
 
             <button
               type="button"
-              disabled={authorizingOAuth || readOnly}
+              disabled={authorizingOAuth || readOnly || Boolean(customClientIdErr)}
               onClick={() => void handleOAuthAuthorize()}
               data-testid="connection-oauth-authorize-btn"
               className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-primary px-3 py-2 text-xs font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:opacity-50"
@@ -1761,8 +1769,17 @@ export function ConnectionFormPanel({
                       value={draft.customClientId || ""}
                       onChange={(e) => set({ customClientId: e.target.value })}
                       placeholder="e.g. 12345-abcde.apps.googleusercontent.com"
-                      className="mt-0.5 w-full rounded border border-border bg-background px-2 py-1 text-xs"
+                      className={`mt-0.5 w-full rounded border ${
+                        customClientIdErr ? "border-destructive focus:border-destructive" : "border-border"
+                      } bg-background px-2 py-1 text-xs`}
                     />
+                    {customClientIdErr ? (
+                      <p data-testid="custom-client-id-error" className="mt-0.5 text-[10px] text-destructive">
+                        {customClientIdErr}
+                      </p>
+                    ) : (
+                      <p className="mt-0.5 text-[10px] text-muted-foreground">{CUSTOM_CLIENT_ID_HINT}</p>
+                    )}
                   </div>
                   <div>
                     <label className="block text-[10px] font-medium text-foreground">Custom Client Secret</label>
@@ -2360,7 +2377,7 @@ export function ConnectionFormPanel({
           {showSave && (
             <button
               type="button"
-              disabled={saving || saveBlocked || mcpUrlUnusable || serviceIncomplete}
+              disabled={saving || saveBlocked || mcpUrlUnusable || serviceIncomplete || Boolean(customClientIdErr)}
               // ⚠ SELECTS BETWEEN TWO DISTINCT IDS, never shares one. The cipher refusal wins
               // when both hold: it is the one thing on this surface nothing the person types
               // can fix, so it is the reason worth reading first.

@@ -1,11 +1,15 @@
 ---
-id: SEED-003
+title: Deployment Flexibility & Install/Config UX
+seed_id: SEED-003
 status: dormant
 planted: 2026-05-02
 planted_during: v2.5 (after Phase 059 ship, before Phase 060 kickoff)
 trigger_when: planning a milestone scoped to "distribution", "self-host", "packaging", "install", "deployment", "one-click setup", "enterprise install", or any milestone where the install/config experience for a non-developer operator becomes the bottleneck
+trigger_surfaces:
+  - "deployment"
 scope: Large
 related_seeds: [SEED-001, SEED-004, SEED-005, SEED-065, SEED-071, SEED-072, SEED-075, SEED-076, SEED-077, SEED-079]
+surface: Agentic-RAG
 ---
 
 # SEED-003: Deployment Flexibility & Install/Config UX

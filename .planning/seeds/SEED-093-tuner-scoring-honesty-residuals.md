@@ -16,6 +16,8 @@ re_open_triggers:
   - `StartTunerRunResponse.n` ever becomes user-rendered — fix WR-04 (echo the real scored count) before shipping that surface.
 priority: low
 suggested_phase: Phase 126 (TRIG-02) or a dedicated tuner-polish follow-up — decide WR-06's score semantics deliberately (it changes the displayed/persisted cell score). NOT a 123.1 blocker.
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-093 — Skill Trigger Tuner scoring/UX honesty residuals

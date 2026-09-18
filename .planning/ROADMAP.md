@@ -25,6 +25,82 @@
 - ✅ **v3.9 Connections: Any Service, Any Tool** — Phases **210-227** (shipped 2026-09-04, git tag `v3.9`). 16 phases (210-217 CORE + inserts 214.1 / 217.1 + 220-227; **218 absorbed** into 217.1; **219 deferred**), **111 plans**, migrations **127-129 / 140-141 / 150-152**, 9 days. **34/39 requirements delivered · 3 partial · 2 shipped-but-never-driven.** A connection became `{service identity, auth, discovered tools, per-tool grants}` — so adding a service adds **rows, not code**: Notion connects by OAuth with no developer console and returns **41 tools for zero lines of tool code**, and six Google applications sit under one token with **11/11 live writes**. Per-tool grants, an approval moment that stops a real run, an audit receipt per outbound call, connections usable by name in chat, and the Library as one home for documents. ⚠ **Phase 219 DEFERRED to the Connected Knowledge milestone** with `LIB-08/09/10` and `SEED-209/210/211/212` — its SC#1 *“watched on a schedule”* IS this milestone's own binding security re-open trigger ([`audit`](milestones/v3.9-MILESTONE-AUDIT.md)).
 - ✅ **v4.0 Connected Knowledge** — Phases **228-241** (shipped 2026-09-10, git tag `v4.0`). 14 phases, **62 plans**, migrations **153-156 / 166-176**, 6 days. **33/38 requirements delivered · 5 ⛔ not ticked** (`SRC-03` Azure-blocked · `QUEUE-06` remedy shipped but the DEFAULT is unchanged · `SURF-03` home still an open decision · `DEBT-03` ultra ruled out · `DEBT-04` gated on a production push). The knowledge base stopped depending on somebody remembering to upload: a source is connected **once**, previewed before it brings anything in, and then watched on the **shipped** scheduler. Four families as thin adapters over ONE contract — Google Drive · OneDrive/SharePoint via Graph · **any** MCP file server · mail — with **239 proving zero-code by HASH** against GitHub MCP and **240 proving mail is a SHAPE, not a fourth adapter** (`sources/base.py` byte-identical). Connection-scoped visibility at all four RLS sites, a durable queue with cap/retry/resume, and the anti-injection discipline **actually attacked** (13/13 refused · 8/8 mutations caught · live drive refused by 8/8 native providers). ⚠ **241 measured a REAL recall defect at customer scale** — `recall@20` **0.040** at the shipped `ef_search = 40`, a **cliff not a slope**. ⛔ **238, 240 and 241 closed WITHOUT an independent §6.3 review**; two UAT sets owed on credentials ([`audit`](milestones/v4.0-MILESTONE-AUDIT.md)).
 - ✅ **v4.1 Ship It & Feel It** — Phases **242-246** (shipped 2026-09-13, git tag `v4.1`). 5 phases, **25 plans**, migrations **177-180**, 3 days. **18/19 requirements delivered · 1 ⛔ unmet BY MEASUREMENT.** A deliberate **CONSOLIDATION** milestone — no new capability axis; every requirement closed something already in a register. The ship claims closed against the **database and the branch** rather than the deploy record; the chat surface stopped getting in the way (follow-scroll driven with a **real wheel** — 0 px drift, closing `BUG-260823-01` after two fixes that had passed on synthetic events; all five `SHELL` criteria driven in a browser); and v4.0's verification debt got **written verdicts** plus a greppable marker so a self-verification can no longer read as a review. ⭐ **Its best work is the requirement it did NOT deliver:** 246 proved by `EXPLAIN (ANALYZE)` that no `hnsw_ef_search` value fixes the small-tenant recall cliff through the index — every index walk returns **ONE row**, every good recall figure is a **~1.1 s sequential scan** — so the 200 default was **refused and reverted to 40**, with `RECALL-01` left open on `SEED-273`. ⭐ 246 is also the **first peer-reviewed phase since `OV-SOLO-01` was re-armed**. ⚠ Migrations **179/180 are not in cloud** and `production` is **287 commits behind**, so v4.1's own output is undeployed ([`audit`](milestones/v4.1-MILESTONE-AUDIT.md)).
+- ✅ **v4.2 The Connected Knowledge You Can Actually Run** — Phases **247-254** (shipped 2026-09-18, git tag `v4.2`). 8 phases (247-251 scoped; **252 / 253 / 254 inserted by audit**), **31 plans**, migration **181**, 6 days. **25/26 requirements satisfied · 1 ⛔ unsatisfied (`DEBT-06`).** Integration **19/19** · flows **3/3**. **26 requirements in 6 categories**, 25 mapped to the five scoped phases and `DEBT-06` held as a **milestone-wide standing gate** that ends the milestone **unmet, by measurement**. ⚠ **The bullet above is CORRECTED, not rewritten: its closing claim — *"migrations 179/180 are not in cloud and `production` is 287 commits behind, so v4.1's own output is undeployed"* — was true when written and is now FALSE.** Measured at this scoping: `production` moved `e65610ac2 → eebc4c42f` (**292 commits**), `production..develop` is **0**, migrations **179 and 180 are applied and verified in cloud** (177/178 measured **already present** — `scripts/pending-cloud-migrations.sh` diffs git refs, not the live database, and over-reported by two), and `get_advisors(security)` returns **zero ERROR findings**. **v4.1 IS deployed.** v4.2 is therefore the SECOND consecutive **consolidation** milestone — no new capability axis, every requirement closes something already in a register, and each was **DRIVEN against the tree on 2026-09-13 rather than read from a `status:` field**, a method that caught three wrong register entries (two stale toward *"still broken"*, one toward *"fine"*). Watch-loop honesty (247) · the credential boundary (248) · the model you actually run (249) · run-honesty residue (250) · register integrity (251) — then **three phases the audit added**: the four blockers five green verifications could not see (252) · the bootstrap artifact that shipped every function wide open (253) · the independent review of 249-253 (254). **v4.2 opened on deployed code for the first time in three milestones, and closed on it.**
+
+---
+
+## v4.2 The Connected Knowledge You Can Actually Run — SHIPPED 2026-09-18
+
+**8 phases** (247-254 — 251 scoped, **252/253/254 inserted by audit**), **31 plans**, migration
+**181**, 6 days, git tag `v4.2`.
+**25 ✅ satisfied · 1 ⛔ unsatisfied, of 26 requirements.** Integration **19/19** · flows **3/3**.
+Full detail: [`milestones/v4.2-ROADMAP.md`](milestones/v4.2-ROADMAP.md) ·
+requirements: [`milestones/v4.2-REQUIREMENTS.md`](milestones/v4.2-REQUIREMENTS.md) ·
+audit: [`milestones/v4.2-MILESTONE-AUDIT.md`](milestones/v4.2-MILESTONE-AUDIT.md)
+(the superseded 2026-09-16 reading is preserved beside it at
+[`v4.2-MILESTONE-AUDIT-260916.md`](milestones/v4.2-MILESTONE-AUDIT-260916.md)) ·
+phases: `.planning/phases/25{1,2,3,4}-*`, `.planning/phases/24{7,8,9}-*`
+
+The **second consecutive consolidation** milestone, and the one that turned v4.0's capability and
+v4.1's deployment into a surface you can **live on**. Every requirement closed something already in a
+register, and each was **DRIVEN against the tree at scoping rather than read from a `status:` field**
+— a method that immediately caught three wrong register entries, two stale toward *"still broken"*
+and one toward *"fine"*.
+
+**What shipped.** A watched source now tells the truth about itself — Drive/Graph paths stored whole
+and actually used by classification, a card reporting the health of **the connection it rides** rather
+than of its last run, a missing file saying **when** (247). A credential cannot come to rest where it
+can be read: migration **181** revokes the default **`PUBLIC`** `EXECUTE` — never just `anon` — on all
+13 `SECURITY DEFINER` functions, and a secret pasted into a non-secret field is **refused, not stored**
+(248). The model you want to run **registers itself** from the UI with no code edit and no deploy, and
+⭐ **13 of the operator's configured models were measured to lose tool calling silently** — the composer
+now says so at pick time (249). A run stopped claiming what did not happen (250). And the registers
+became an index you can trust: 8 duplicate seed ids resolved, a `TEMPLATE.md` contract written for the
+first time, and an **executable** sweep wired at both GSD touchpoints — **297/297 · 0 duplicates** —
+replacing a `grep` that was blind to **55%** of its own register (251).
+
+⚠⚠ **THE MILESTONE'S REAL FINDING: five green phase verifications could not see what one cross-phase
+read did.** 247-251 all closed with passing verifications, every gate green, the backend at its locked
+baseline — and the milestone audit then found **four blockers and nine warnings**, every one of them a
+**seam between two individually-correct things**. That is `DEBT-06`'s argument restated from the
+outside, and it cost three unplanned phases: **252** closed the four blockers, **253** closed 252's own
+code review, **254** was the review phase. ⭐ **The pattern repeated at every depth** — 253's
+gap-closure round was itself reviewed and produced two more blockers, both the same vacuity class the
+phase existed to kill.
+
+⭐ **A greenfield database now has the same privileges as a migrated one (253).** `pg_dump
+--no-privileges` structurally cannot carry a grant, so `supabase/full-schema.sql` had been shipping
+every function to a new deployment wide open — migration 181 was **unreachable by a bootstrap**.
+`scripts/full-schema-supplement.sql` now mirrors **61 REVOKEs**, gated at **133/133** by
+`check-schema-acl-parity.cjs`, **tables included, not just functions**, and the gate was **driven RED**
+against a real scratch database before it was trusted: stripping three REVOKEs makes it exit 1.
+⚠ Its own first floor was vacuous — it counted migration FILES, not tuples PARSED, so neutering both
+regexes printed `mirrored: 0/0 … OK`, exit 0.
+
+⛔ **Open at close — accepted as documented debt, never as a claim the work was done:**
+
+- **`DEBT-06`** is the one unsatisfied requirement: **8 of 14 rows** (239 · 241 · 242 · 244 · 245 ·
+  251 · 252 · 253) read neither `independent_review: done` nor a written refusal, re-derived with
+  `yaml.safe_load` rather than from a hand-typed list. **No plan can close it** — `done` needs Gemini
+  answering `BUS-249`/`BUS-256`/`BUS-257`, `refused` needs an operator ruling (`REG-03`). Three
+  refusal drafts are written and pending. ⛔ **A refusal is not a pass:** the accepted risk is that a
+  builder read its own work, six closes running.
+- **Four one-line register repairs** (`F-1`..`F-4`): `254`'s own verification frontmatter is
+  **unparseable YAML** — *the exact defect `254` reported against `244`, the same week, caught by no
+  gate* · two duplicate-id clusters in `.planning/reported-bugs/`, a register **no gate sweeps** ·
+  `BUG-260915-01` fixed in code but never flipped to `closed` · `253-VERIFICATION.md` still reading
+  `gaps_found` over a gap that is closed.
+- **Undriven, not passing:** migration **181 is not in cloud** — `CRED-04` discharges at the next
+  promotion, and its code half and SQL half must reach cloud in **one operation** · `MODEL-04`
+  end-to-end needs a live self-hosted endpoint · 248's G-4 scenario **S2** (live BYO-OAuth) · the
+  `schema-acl-parity` CI job.
+- **Two live criticals triaged and unfixed** (`251-REVIEW.md` CR-01/CR-02): the seeds gate's own
+  self-test has **no RED arm** for its missing-key check, and the `status:` enum's
+  change-all-three rule has **zero executable enforcement**.
+
+⚠ **G-8 held where v4.1's close predicted it would not.** The scoped five phases ran 4 · 4 · 4 · 3 · 4
+plans — inside the 3-5 target every time. The overrun was **three extra PHASES found by audit**, not
+plan inflation inside one, which is the failure mode the governor was written against.
 
 ---
 
@@ -934,7 +1010,3 @@ Full details: `.planning/milestones/v2.5-ROADMAP.md`
 - [x] Phase 096: Eval Harness + Cross-Provider Verification + Concurrency (9/9 plans) -- completed 2026-06-07
 
 </details>
-
----
-
-*Milestones v1.0–v3.1 shipped and archived under `.planning/milestones/`. **Next milestone: v3.2** — run `/gsd:new-milestone` to define scope. Re-sequenced PRD roadmap: see `.planning/PRDs/SEQUENCE.md`. v2.9 STRETCH 105–109 + v3.1 STRETCH 125/126/130/131 remain backlog carry-forwards.*

@@ -120,14 +120,22 @@ describe("BUG-260912-01 — the deployment's own credentials are their own cause
     expect(backendCauses).toContain("app_credentials_invalid")
   })
 
-  it("⭐ PROVED over the shipped source — FOUR occurrences, and every one is a table", () => {
-    // ⚠ FOUR, not the THREE that `connection_disabled` is pinned at, and the difference is
-    //   the point rather than a loosening: `connection_disabled` is WRITTEN ONLY and has no
-    //   matcher by decision, while this cause is RECOGNISED FROM A MESSAGE and so needs a
-    //   row in `MATCHERS` too. The union, the sentence table, the control table, the matcher
-    //   list. A fifth occurrence would mean somebody reached for a branch.
+  it("⭐ PROVED over the shipped source — FIVE occurrences, and every one is a table", () => {
+    // ⚠ ONE MORE than the count `connection_disabled` is pinned at, and the difference is
+    //   the point rather than a loosening: that cause is WRITTEN ONLY and has no matcher by
+    //   decision, while this cause is RECOGNISED FROM A MESSAGE and so needs a row in
+    //   `MATCHERS` too. The union, the sentence table, the control table, the matcher list —
+    //   and now the connection-pill table. An occurrence beyond the tables would mean
+    //   somebody reached for a branch.
+    //
+    // ⚠ RE-BASELINED 4 → 5 in Phase 252 (W-1 / D-29), in the SAME commit that added the fifth
+    //   TABLE. **The invariant is unchanged and still holds: "every one is a table".** This
+    //   cause is one of the two the new table exists for — it used to render `● Connected`
+    //   while the credentials this deployment uses had been rejected.
+    // ⛔ A RE-BASELINE, NOT A LOOSENING: still an exact equality, and the `case`-literal fence
+    //   on the next line still proves no branch was smuggled in as the extra occurrence.
     const occurrences = vocabularySource.split("app_credentials_invalid").length - 1
-    expect(occurrences).toBe(4)
+    expect(occurrences).toBe(5)
     expect(vocabularySource).not.toMatch(/case\s+["']app_credentials_invalid["']/)
   })
 })

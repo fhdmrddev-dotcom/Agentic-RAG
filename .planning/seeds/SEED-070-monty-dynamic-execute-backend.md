@@ -18,6 +18,8 @@ re_open_triggers:
   - A lightweight deterministic-compute path (e.g. worded→ordinal mappings, simple data transforms) needs to run without paying the Docker spin-up tax
 priority: low — high potential perf upside (microsecond vs ~195ms startup) but blocked on monty maturity + a no-deps use-case; render path is permanently Docker-only (library dependency)
 suggested_phase: a future sandbox/perf phase (v3.x); NOT v2.9 — Phase 101 only preserves the swappable seam (D-13)
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-070 — Dynamic execute-backend selector (monty vs Docker)

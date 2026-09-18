@@ -21,6 +21,8 @@ trigger_when: >
   `egress.py` — read the refusal comment FIRST, it names itself as the production hole; (d) the
   reference MCP servers the ecosystem ships move to a remote/HTTPS transport by default, which would
   dissolve this without any work on our side.
+trigger_paths:
+  - "**/egress.py"
 ---
 
 # SEED-257 — the MCP source that cannot be tested on this machine

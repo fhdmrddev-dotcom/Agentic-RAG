@@ -15,6 +15,8 @@ related_phases:
   - Phase 144 (Agent-Driven Skill File Attachment / FILE-01) — adjacent file-attach surface; cross-check for a shared upload/storage/threat-model pattern
 related_memories: [reference_render_template_workflow_only]
 priority: medium
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-110 — run-time template / file upload as a workflow run input (SHIPPED — closed 2026-07-31)

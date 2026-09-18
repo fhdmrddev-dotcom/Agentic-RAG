@@ -18,6 +18,8 @@ re_open_triggers:
   - Any phase adds long-running autonomous workflows where threads routinely exceed the trim window
 priority: low now / high post-production
 suggested_phase: post-production planned update — candidate for a "production hardening" or cost-optimization milestone; NOT for v2.8/v2.9
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-061 — Context engineering lift

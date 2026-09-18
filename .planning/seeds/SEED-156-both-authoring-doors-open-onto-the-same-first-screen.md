@@ -1,5 +1,5 @@
 ---
-id: SEED-156
+seed_id: SEED-156
 title: Both authoring doors open onto the SAME first screen, word for word
 status: open
 planted: 2026-08-14
@@ -12,6 +12,7 @@ re_open_trigger: >
   UAT rows U1/U2 being driven (a person who has not used the Builder predicting what each door
   does), OR any phase touching the pre-draft describe screen of either door, OR any sketch of the
   authoring chooser. Whichever comes first.
+trigger_when: unset
 ---
 
 # Both authoring doors open onto the same first screen

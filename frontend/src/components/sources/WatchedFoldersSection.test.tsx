@@ -52,6 +52,8 @@ import {
 
 // @ts-ignore — Vite `?raw` import, typed by vite/client at build time only.
 import watchedFoldersSource from "./WatchedFoldersSection.tsx?raw"
+// @ts-ignore — Vite `?raw` import, typed by vite/client at build time only.
+import watchRowCardSource from "./WatchRowCard.tsx?raw"
 
 vi.mock("@/lib/api/sources", () => ({
   listWatches: vi.fn(),
@@ -705,12 +707,14 @@ describe("WatchedFoldersSection", () => {
 
   // ══ SOURCE FENCES — properties of the SHIPPED file, read as text ═════════════════
   describe("the invariants a later edit must not break", () => {
+    it("non-vacuity — WatchRowCard source is loaded", () => {
+      expect(watchRowCardSource.length).toBeGreaterThan(3000)
+      expect(watchRowCardSource).toContain("WatchRowCard")
+    })
+
     it("⛔ the raw `last_error` is only ever handed to the vocabulary leaf", () => {
-      // ⚠ WIDENED BY PLAN 17, deliberately and with the reason recorded rather than by
-      //   loosening the regex to nothing. `fileFailureKind` is the SAME leaf, and its whole
-      //   return type is a three-value key — a message cannot survive it. The render-level
-      //   proof that nothing leaks is the planted-URL case above, not this grep.
-      const codeHits = watchedFoldersSource
+      // ⚠ WIDENED BY PLAN 17, and updated for Phase 247 WatchRowCard extraction.
+      const codeHits = (watchedFoldersSource + "\n" + watchRowCardSource)
         .split("\n")
         .filter((line: string) => !line.trim().startsWith("*") && line.includes("last_error"))
       expect(codeHits.length).toBeGreaterThan(0) // non-vacuity
@@ -722,43 +726,31 @@ describe("WatchedFoldersSection", () => {
     })
 
     it("⛔ the scope note ships WITH the block — a silent list would overclaim", () => {
-      // ⭐ The licence for this surface to exist. If a later edit removes the note but keeps
-      //   the list, THIS reds — the rendered case above proves it is drawn, and this proves
-      //   the two cannot be separated by an edit that only touches markup.
-      // ⛔ RESTORED TO A TIGHT WINDOW, AND THE RELAXATION IS THE FINDING (code review WR-08).
-      //    The disclosure commit widened this 800 → 2600 — a 3.25× relaxation of the only
-      //    structural guarantee that the scope note lives INSIDE the failures block — in the
-      //    same diff whose new docstring says "if any of them had had to be WEAKENED, that
-      //    would have been the failure." It had been, by me, in that commit.
-      // ⭐ The window did not need to grow: almost all of the new distance was COMMENT PROSE,
-      //    which the fence never stripped. Stripping comments first (the shape
-      //    `RunHistoryList.test.tsx` already uses) restores a bound near the original AND
-      //    makes it stronger than before, because a comment can no longer pad the gap.
-      const code = watchedFoldersSource
+      // ⭐ The licence for this surface to exist.
+      const code = watchRowCardSource
         .replace(/\/\*[\s\S]*?\*\//g, "")
         .replace(/^\s*\/\/.*$/gm, "")
       expect(code).toContain("sources-file-failures") // non-vacuity
-      // ⚠ 1300, MEASURED — not guessed and not flattering. The comment-stripped distance is
-      //   1249 characters of genuine JSX (the disclosure button), against 1679 raw. So the
-      //   real relaxation this commit needed was ~1300, and 2600 was twice what the change
-      //   actually cost. The bound is now the code, and a comment can no longer pad it.
       expect(code).toMatch(/sources-file-failures[\s\S]{0,1300}?FILE_FAILURE_SCOPE_NOTE/)
     })
 
     it("⛔ no per-file row is built with raw HTML", () => {
-      // T-235c-12 — a hostile external FILE NAME is rendered as a text child and React escapes
-      // it. Nothing in this file may opt out of that.
       expect(watchedFoldersSource).not.toContain("dangerouslySetInnerHTML")
+      expect(watchRowCardSource).not.toContain("dangerouslySetInnerHTML")
     })
 
     it("⛔ no full page load survives — this app has no router (SEED-185)", () => {
       expect(watchedFoldersSource).toContain("onNavigateToConnections") // non-vacuity
       expect(watchedFoldersSource).not.toContain("window.location")
+      expect(watchRowCardSource).not.toContain("window.location")
     })
 
     it("⛔ the alarm token is never applied to a source state", () => {
       expect(watchedFoldersSource).toContain("last_status") // the anchor
       expect(watchedFoldersSource).not.toMatch(
+        /last_status\s*===\s*"failed"[\s\S]{0,200}?destructive/,
+      )
+      expect(watchRowCardSource).not.toMatch(
         /last_status\s*===\s*"failed"[\s\S]{0,200}?destructive/,
       )
     })
@@ -781,6 +773,159 @@ describe("WatchedFoldersSection", () => {
     await user.click(screen.getAllByTestId("sources-sync-now")[0])
 
     expect(mockTriggerWatchSync).toHaveBeenCalledWith("watch-1")
+  })
+
+  it("does NOT unmount or collapse the card when Sync now is clicked (WATCH-04)", async () => {
+    mockListWatches.mockResolvedValue(only({}))
+    mockTriggerWatchSync.mockResolvedValue({
+      status: "asked",
+      message: "ok",
+      next_check_within_seconds: 60,
+    })
+    render(<WatchedFoldersSection />)
+    const user = userEvent.setup()
+
+    await waitFor(() => expect(screen.getByText("Q3 Vendor Bills")).toBeInTheDocument())
+    await user.click(screen.getByTestId("sources-source-line").querySelector("button")!)
+    expect(screen.getByTestId("sources-source-card")).toBeInTheDocument()
+
+    await user.click(screen.getAllByTestId("sources-sync-now")[0])
+    // Assert the global loading state was NOT triggered (never unmounts into "Loading watched folders...")
+    expect(screen.queryByText(/loading watched folders\.\.\./i)).not.toBeInTheDocument()
+    expect(screen.getByTestId("sources-source-card")).toBeInTheDocument()
+    expect(screen.getByTestId("sources-sync-outcome")).toBeInTheDocument()
+  })
+
+  it("renders Variant A two-tier status badges (WATCH-03)", async () => {
+    mockListWatches.mockResolvedValue(SAMPLE_WATCHES)
+    render(
+      <WatchedFoldersSection
+        stoppedSources={[
+          {
+            watch_id: "watch-2",
+            source_folder_name: "Vendor Contracts 2026",
+            connection_name: "Google Drive (Procurement)",
+            cause: "connection_disabled",
+            hard: true,
+            stopped_since: new Date().toISOString(),
+            last_good_at: null,
+          },
+        ]}
+      />,
+    )
+
+    await waitFor(() => expect(screen.getAllByTestId("sources-connection-pill")).toHaveLength(2))
+    const pills = screen.getAllByTestId("sources-connection-pill")
+    expect(pills[0]).toHaveTextContent(/connected/i)
+    expect(pills[1]).toHaveTextContent(/connection off/i)
+  })
+
+  it("discriminates connection health from run outcome in both directions (ROADMAP SC#2 / WATCH-03)", async () => {
+    // Discriminating Case A: Healthy connection whose last run failed for a TRANSPORT reason.
+    // Connection pill MUST read "Connected"; the run pill MUST say something and must NOT
+    // claim rate limiting, which the taxonomy cannot distinguish from an outage (W-2 / D-28).
+    const healthyConnFailedRun: ConnectorWatch = {
+      id: "watch-disc-1",
+      user_id: "user-1",
+      connection_id: "conn-healthy",
+      connection_name: "Google Drive (Healthy)",
+      service_id: "google",
+      source_folder_id: "gdrive-fld-1",
+      source_folder_name: "Invoices",
+      library_folder_id: "lib-folder-1",
+      interval_minutes: 30,
+      is_active: true,
+      last_run_at: new Date(Date.now() - 5 * 60_000).toISOString(),
+      last_status: "failed",
+      last_error: "429 Too Many Requests: Rate limit exceeded",
+      item_count: 10,
+    }
+
+    // Discriminating Case B: Broken/disabled connection whose last run happened to succeed before it was shut off.
+    // Connection pill MUST read "Connection Off", run pill MUST reflect run status ("Active").
+    const brokenConnSuccessRun: ConnectorWatch = {
+      id: "watch-disc-2",
+      user_id: "user-1",
+      connection_id: "conn-broken",
+      connection_name: "Google Drive (Disabled)",
+      service_id: "google",
+      source_folder_id: "gdrive-fld-2",
+      source_folder_name: "Contracts",
+      library_folder_id: "lib-folder-2",
+      interval_minutes: 30,
+      is_active: true,
+      last_run_at: new Date(Date.now() - 10 * 60_000).toISOString(),
+      last_status: "success",
+      last_error: null,
+      item_count: 5,
+    }
+
+    mockListWatches.mockResolvedValue([healthyConnFailedRun, brokenConnSuccessRun])
+    render(
+      <WatchedFoldersSection
+        stoppedSources={[
+          {
+            watch_id: "watch-disc-2",
+            source_folder_name: "Contracts",
+            connection_name: "Google Drive (Disabled)",
+            cause: "connection_disabled",
+            hard: true,
+            stopped_since: new Date().toISOString(),
+            last_good_at: new Date(Date.now() - 10 * 60_000).toISOString(),
+          },
+        ]}
+      />,
+    )
+
+    await waitFor(() => expect(screen.getAllByTestId("sources-connection-pill")).toHaveLength(2))
+    const connPills = screen.getAllByTestId("sources-connection-pill")
+    const runPills = screen.getAllByTestId("sources-run-pill")
+
+    // Case A: Healthy connection whose last run failed:
+    // Connection pill is Connected — the connection genuinely is (W-1 / D-29: `unreachable` is
+    // NOT a connection-level cause, and this case is the control that proves the new pill table
+    // did not flip everything to a warning).
+    expect(connPills[0]).toHaveTextContent(/connected/i)
+    expect(connPills[0]).not.toHaveTextContent(/connection off/i)
+    // ⚠ RE-BASELINED in Phase 252 (W-2 / D-28). This line USED TO ASSERT `run failed (429)`,
+    //   and it was pinning the DEFECT: the card's `isRateLimited` was a tautology over the
+    //   CATCH-ALL cause, so a Drive 503, a DNS failure and a socket timeout ALL rendered a
+    //   rate-limit reading. ⛔ And no cause in the taxonomy means rate-limited —
+    //   `failure_cause.py:97` maps `429: "unreachable"`, alongside 408/500/502/503/504 — so
+    //   this fixture's message is indistinguishable from an outage after classification.
+    //   The reading was deleted rather than re-keyed, and nothing replaced it: a label nothing
+    //   can justify is worse than no label.
+    // ⭐ What the case is ABOUT is unchanged and still driven — the two pills DISCRIMINATE:
+    //   a healthy connection whose run failed reads Connected, and never "Connection Off".
+    expect(runPills[0]).not.toHaveTextContent(/429/)
+    expect(runPills[0].textContent?.trim().length ?? 0).toBeGreaterThan(0)
+
+    // Case B: Broken connection whose last run succeeded:
+    // Connection pill is Connection Off; Run pill is not marked as run failed.
+    expect(connPills[1]).toHaveTextContent(/connection off/i)
+    expect(runPills[1]).not.toHaveTextContent(/run failed/i)
+  })
+
+  it("renders missing items with missing_since timestamp (WATCH-05)", async () => {
+    const MISSING_ITEM = item({
+      id: "miss-1",
+      name: "Q3_Cashflow_Forecast.xlsx",
+      state: "missing",
+      missing_since: new Date(Date.now() - 9 * 24 * 3600_000).toISOString(),
+    })
+    mockListWatches.mockResolvedValue(only({}))
+    mockGetWatch.mockResolvedValue(detail([MISSING_ITEM]))
+    render(<WatchedFoldersSection />)
+    const user = userEvent.setup()
+
+    await waitFor(() => expect(screen.getByTestId("sources-source-line")).toBeInTheDocument())
+    await user.click(screen.getByTestId("sources-source-line").querySelector("button")!)
+
+    await waitFor(() => expect(screen.getByTestId("sources-missing-file")).toBeInTheDocument())
+    const row = screen.getByTestId("sources-missing-file")
+    expect(row).toHaveTextContent("Q3_Cashflow_Forecast.xlsx")
+    expect(row).toHaveTextContent(/missing at source/i)
+    expect(row).toHaveTextContent(/retained in library/i)
   })
 
   it("triggers purge missing files on user action (VIS-05 / SC#3)", async () => {

@@ -16,6 +16,8 @@ relates_to:
   - SEED-001 scale-readiness (multi-user perf is the upstream constraint)
   - useMessages.ts:384-450 (ref-mirror sites flagged in Phase 067.4 RESEARCH.md)
 closure_note: "Fully consumed by Phase 075 (thread-switch latency via /snapshot endpoint) + Phase 075.1 (line-by-line stdout streaming fix). POLISH-SEED-008-01 and POLISH-SEED-008-02 both Validated."
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # Streaming UX polish — two gaps surfaced during Phase 067.4 closing UAT

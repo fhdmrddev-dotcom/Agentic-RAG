@@ -20,6 +20,7 @@ trigger_when:
   - The "Setting up agent…" warm-up phase (BUG-260607-02 / SEED-070) is scoped — pre-warm + pooling overlap with the admission-control work here
 priority: medium — a real, pre-existing production gap, but not load-bearing until a shared/multi-tenant deployment exists or telemetry shows host saturation. Single-operator and small-team-on-one-host work fine today.
 suggested_phase: a future platform/infrastructure milestone (v3.x), co-planned with SEED-003 (deployment shapes) + SEED-004 (tenancy). NOT v2.9 — Phase 101 only preserves the swappable seam (D-13).
+surface: Agentic-RAG
 ---
 
 # SEED-071 — Sandbox execution fleet: scaling, admission control & deployment-flexible topology

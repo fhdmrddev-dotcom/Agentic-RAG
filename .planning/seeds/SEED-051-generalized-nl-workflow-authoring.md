@@ -1,5 +1,5 @@
 ---
-id: SEED-051
+seed_id: SEED-051
 title: Generalized NL→Workflow authoring — describe-it + upload-assets → AI-derived inputs/phases/tools, KB-grounded, human-refined, lint-safe, locked-on-publish
 status: planted
 planted: 2026-06-03
@@ -7,6 +7,7 @@ planted_by: orchestrator (/gsd:explore session with operator — "create workflo
 trigger_when: v2.9 milestone kickoff (/gsd:new-milestone), OR D-092-AUTHOR Authoring Phase B (NL-to-draft) / Phase C (guided form editor), OR any phase that touches WorkflowDefinition input/asset shape, OR **Phase 094 (Workflow Legibility + Mode Clarity) discuss/sketch** — the "Authoring surface & builder UX" section below carries a 094-relevant subset (composer simplification, Deep-not-a-toggle/mode-clarity, and the workflows-as-a-page-vs-launch-from-panel refinement to D-092-UX) that this CURRENT-milestone phase needs, not just v2.9
 priority: high
 tags: [harness, workflows, authoring, nl-generate, templates, dynamic-inputs, rag, kb-grounding, plugin-contract, v2.9, D-092-AUTHOR, SEED-050]
+surface: Agentic-RAG
 ---
 
 # SEED-051: Generalized NL→Workflow Authoring

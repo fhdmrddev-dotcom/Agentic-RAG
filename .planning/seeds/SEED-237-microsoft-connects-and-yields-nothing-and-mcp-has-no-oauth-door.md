@@ -19,6 +19,8 @@ trigger_when:
   - Anyone estimates a new vendor as "an OAuth integration" — read the cost anchors below first
   - A user asks for OneDrive, SharePoint or Outlook
   - Anyone proposes adding a fourth entry to `oauth_service.py`'s provider registry
+trigger_paths:
+  - "**/oauth_service.py"
 ---
 
 # SEED-237 — two doors, and one of them has no handle

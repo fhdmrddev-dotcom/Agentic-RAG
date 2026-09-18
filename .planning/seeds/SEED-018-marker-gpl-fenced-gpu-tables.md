@@ -1,5 +1,6 @@
 ---
-id: SEED-018
+title: Marker as opt-in GPL-fenced GPU table engine
+seed_id: SEED-018
 status: planted
 planted: 2026-05-15
 planted_during: v2.6 (Phase 071.2 — Per-Aspect Extraction Dispatcher)
@@ -7,6 +8,7 @@ trigger_when: GPU compute provisioned for the deployment — OR — Phase 071.2 
 scope: Medium (subprocess fence + GPU opt-in + adapter + constraint update)
 parent_phase: 071.2
 related_phases: [071.2]
+surface: Agentic-RAG
 ---
 
 # SEED-018 — Marker as opt-in GPL-fenced GPU table engine

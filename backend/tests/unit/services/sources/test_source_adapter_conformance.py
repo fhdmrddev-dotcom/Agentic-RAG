@@ -86,6 +86,17 @@ def google_adapter(monkeypatch: pytest.MonkeyPatch) -> GoogleDriveSourceAdapter:
                 headers={"content-type": "application/pdf"},
                 body=b"%PDF-1.4 Mock Binary Content",
             )
+        if "/files/folder-123" in url:
+            return PinnedResponse(
+                status_code=200,
+                headers={"content-type": "application/json"},
+                body=jsonlib.dumps({
+                    "id": "folder-123",
+                    "name": "Documents",
+                    "mimeType": "application/vnd.google-apps.folder",
+                    "parents": [],
+                }).encode("utf-8"),
+            )
         if "/files/" in url and "fields" in params:
             return PinnedResponse(
                 status_code=200,
@@ -675,14 +686,21 @@ class TestSourceFilePathIsNeverFabricated:
         assert page.files[0].path == "docs/Design.pdf"
 
     @pytest.mark.asyncio
-    async def test_drive_path_is_none_not_fabricated(self, google_adapter: SourceAdapter):
-        """Drive has NO path in `files.list` and SEED-253 stays open for it. None is the honest
-        answer; `preview_service`'s walk supplies a breadcrumb where it can."""
+    async def test_drive_path_is_the_real_folder(self, google_adapter: SourceAdapter):
+        """Phase 247 (D-247-01 / WATCH-01) deliberately retired the Phase 238 fence
+        `test_drive_path_is_none_not_fabricated`.
+
+        SEED-253 (D-238-07) guarded against fabricating `/<filename>` when folder hierarchy
+        resolution was not yet implemented for Drive. WATCH-01 completed the Drive adapter by
+        resolving folder hierarchy via `_resolve_folder_path`, so `path` is now a real
+        folder-scoped path (e.g. `/Documents/Design.pdf`), never None and never a bare
+        filename `/<filename>`."""
         page = await google_adapter.list_files(
             connection={"id": "conn-google", "service_id": "google"},
             folder_id="folder-123",
         )
-        assert page.files[0].path is None
+        assert page.files[0].path == "/Documents/Design.pdf"
+        assert page.files[0].path.startswith("/") and page.files[0].path.count("/") >= 2
 
 
 class TestRegistryResolution:

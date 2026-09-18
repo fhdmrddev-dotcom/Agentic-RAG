@@ -16,6 +16,8 @@ relates_to:
   - Phase 067.4 carry-forward — OpenRouter creds present but rows explicitly user-retained
   - Phase 066 D-066-11 `stream.close()` invariant + per-LLM-call timeout (`LLM_CALL_TIMEOUT_OVERRIDES`)
 closure_note: "Fully consumed by Phase 081 (SEED-010 OpenRouter UAT). Kimi-k2.5 + MiniMax-m2.7 both produce clean timed_out status. POLISH-SEED-010-01 Validated."
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-010: OpenRouter synthetic-timeout protocol verification

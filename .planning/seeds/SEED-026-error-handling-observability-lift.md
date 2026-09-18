@@ -1,7 +1,13 @@
 ---
 seed_id: SEED-026
 title: Error handling, surfacing & observability lift — global handler + structured ErrorResponse + log sink + frontend toast + admin error inspector
-status: partially-folded
+status: folded
+partial: true
+status_note: |
+  ORIGINAL `status:` line, verbatim — displaced by Phase 251's frontmatter migration (D-10):
+  status: partially-folded
+
+  Mapped `partially-folded` -> `folded` + `partial: true`. Reason: D-16 — folded on one axis, pending on another.
 folded_into: 210
 planted: 2026-05-18
 phase_origin: 074-seed-009-seed-011-polish-bundle (user-flagged 2026-05-18 between phases — "we need to give real error messages and handle errors more efficiently, user should see customized errors but admin should know exactly what is the error. also error logs should be monitored and recorded")
@@ -27,6 +33,8 @@ suggested_phase: |
   Two-phase strategy:
   1. **Phase 082.5 (Error Handler Foundation)** — already inserted into v2.6 roadmap 2026-05-18 as the urgent slice. Ships the bottom 3 pillars: global FastAPI exception handler, structured ErrorResponse model with `{code, user_message, admin_message, trace_id, timestamp}`, and `logging.basicConfig` (closes D-074-01-DEFER-1 in the same stroke). One-phase deliverable, no UI work.
   2. **Full lift — v2.7 dedicated phase** — adds the remaining 2 pillars: frontend toast library + error code → user_message mapping in `lib/api.ts`, and admin-only error inspector route (depends on admin auth layer landing first — likely paired with SEED-012).
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-026 — Error handling, surfacing & observability lift

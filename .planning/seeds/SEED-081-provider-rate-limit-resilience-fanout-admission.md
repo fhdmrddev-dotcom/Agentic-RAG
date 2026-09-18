@@ -22,6 +22,7 @@ priority: medium — a real, pre-existing availability gap that bites only under
 suggested_phase: a future scale-hardening milestone (v3.x), co-planned with SEED-001/065/076/077 (the datastore + concurrency scale cluster) and SEED-004 tenancy. A soft prereq to flag at Phase 106 spec time. NOT v2.9 core.
 re_open_triggers:
   - same as trigger_when above
+surface: Agentic-RAG
 ---
 
 # SEED-081 — Provider rate-limit resilience + fan-out admission control under load

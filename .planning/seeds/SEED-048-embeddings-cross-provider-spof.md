@@ -1,5 +1,5 @@
 ---
-id: SEED-048
+seed_id: SEED-048
 title: Document search is a cross-provider single point of failure — embeddings hardwired to OpenAI with no fallback
 status: planted
 planted: 2026-06-01
@@ -7,6 +7,7 @@ planted_by: orchestrator (092.5-06 FINAL PROOF GATE — BLOCK triage)
 trigger_when: a resilience/availability hardening pass on retrieval, OR the next time an OpenAI outage blocks cross-provider work (incl. the 092.5-06 gate re-run), OR a milestone that promises provider independence / production SLA
 priority: medium
 tags: [backend/retrieval, embeddings, resilience, cross-provider, openai, ingestion, production-scale]
+surface: Agentic-RAG
 ---
 
 # SEED-048: Embeddings Cross-Provider Single Point of Failure

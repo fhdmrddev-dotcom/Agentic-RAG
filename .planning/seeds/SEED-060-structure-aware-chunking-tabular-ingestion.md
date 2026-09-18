@@ -26,6 +26,8 @@ suggested_phase: |
   bench infra (measure before building — it's the heaviest article pillar).
   Re-ingestion note: fixes apply to NEW uploads; existing docs need /reingest
   (lazy backfill per SEED-027's recommendation).
+surface: Agentic-RAG
+trigger_when: unset
 ---
 
 # SEED-060 — Structure-aware chunking for tabular/structured files
