@@ -2,11 +2,11 @@
 gsd_state_version: 1.0
 milestone: v4.3
 milestone_name: What You Can Actually Sell
-status: planning
+status: ready
 last_updated: "2026-09-18T13:30:00.000Z"
 last_activity: '2026-09-18 -- MILESTONE v4.3 "What You Can Actually Sell" STARTED via /gsd:new-milestone. Phase numbering resumes at 255. Scope set by the operator at intake on the ecosystem + commercial direction given the same day (SEED-291/292/293/294): (1) the EXTENSION CONTRACT, SEED-291, written FIRST and cheaply as binding law plus a mechanical guard -- a plugin is DATA, an EXTERNAL PROCESS, or SANDBOXED CODE, never engine code; (2) COST MADE ATTRIBUTABLE, SEED-073 + SEED-074; (3) A TIER MADE ENFORCEABLE, SEED-080 + SEED-083; (4) A PACK MADE A THING, SEED-198 Experts, the SKU. THE SCOPE WAS MEASURED BEFORE IT WAS WRITTEN, and one claim was corrected mid-measurement: max_tokens_per_run was about to be recorded as a cap that cannot bind, and it CAN -- harness_engine.py:1818 wires a real token source into the CircuitBreaker. The gap is PERSISTENCE and USD, not counting: workflow_runs carries ZERO token columns, forced_emit phases are uncounted (named at harness_engine.py:1833), and 0 files match cost_usd / token_to_usd / spend_ledger / spend_cap. organizations.subscription_tier + add_ons jsonb have existed since migration 104 and nothing reads them. CARRIED OPEN AS AN OPERATOR DECISION, NOT RESOLVED: PRDs/SEQUENCE.md next unbuilt slot is Open Platform (SEED-013), the external-process arm of this milestone own contract -- it sequences inside or after, not against, but it is NOT in scope unless the operator puts it there. TWO OPERATOR BLOCKERS gate every commercial route and neither is engineering (SEED-294): no legal entity exists, and the employment / IP position is unsettled. Both block APPROACHING anyone; neither blocks a requirement here. Declined at intake with triggers intact: SEED-292 (assurance export) and SEED-293 (the competitive record missed Airia). Seeds register gate GREEN at intake: 301/301 parsed, 0 duplicate ids; unswept reported as TWO figures never summed -- 134 carry no trigger_when at all, 114 carry prose the sweep cannot match. STATE.md WAS HAND-EDITED, FRONTMATTER AND BODY, and state.milestone-switch was NOT called, against the vendored workflow own instruction -- eight SDK false-write occurrences are on record, the most recent being milestone.complete at the v4.2 close. A pre-call backup was taken first. Next action: define REQUIREMENTS.md, then the roadmap.'
 progress:
-  total_phases: 0
+  total_phases: 6
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -48,10 +48,10 @@ can be taught new behaviours (skills) that persist and can be shared.
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 255 — The Extension Contract (not started)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-09-18 — Milestone v4.3 started
+Status: Roadmap approved — ready to discuss Phase 255
+Last activity: 2026-09-18 — v4.3 roadmap created and approved (6 phases, 255-260)
 
 ---
 
@@ -300,7 +300,7 @@ and verify what it did on disk rather than trusting its JSON.**
 
 ## Operator Next Steps
 
-1. ~~**Start the next milestone**~~ ✅ **DONE 2026-09-18 — v4.3 *What You Can Actually Sell* is open.** Next: define `REQUIREMENTS.md`, then the roadmap. Phases resume at **255**.
+1. ~~**Start the next milestone**~~ ✅ **DONE 2026-09-18 — v4.3 *What You Can Actually Sell* is open and roadmapped: 6 phases (255-260), 21/21 requirements mapped, migrations 182-185.** Next: `/gsd:discuss-phase 255`. ⛔ **255's discuss is where operator decisions #2 (Open Platform sequencing) and #6 (`OV-248-01` retire-or-record) must be put to the operator** — a third silent deferral of #2 needs a written reason, not silence.
 2. **Rule on `OV-248-01`** (above) — retire the marker or record why it stays live.
 3. **Rule on `DEBT-06`'s three open rows** — adopt the drafted refusals for 251 / 252 / 253, or leave
    them open for Gemini until **2026-09-24**. `BUS-246` and `BUS-248` are also open `to:operator`.
