@@ -10416,13 +10416,13 @@ cells rot within days.
 | [`backend/app/services/harness/grounding.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessgroundingpy) | 21 / 8 / 1414 | **FIRES** | honoured by construction (193.1 / 211 / **214**) — ⚠ **extraction still OWED**; 214 changed no capability set |
 | [`frontend/src/components/workflows/PhaseFormPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsphaseformpaneltsx) | 30 / 14 / 1566 | **FIRES** | honoured by construction ×6 (185 / 193 / 193.1 / 199 / 200 / **214**) |
 | [`backend/app/db/workflows.py`](docs/HOT-FILE-LEDGER.md#backendappdbworkflowspy) | 48 / 25 / 2585 | **FIRES** | honoured by construction (193.2 / 194 / 192.2 / 200.1 / **214**) |
-| [`backend/app/services/harness/publish_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnesspublish_servicepy) | 26 / 11 / 1810 | **FIRES** | ⚠ row STALE at `25/11/1810` (+1 commit) — re-derived 256-02; NOT modified by 256-02. honoured by construction (193.2 / 214 / **BUG-260828-09**): harvest loop EXTRACTED to a pure helper |
+| [`backend/app/services/harness/publish_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnesspublish_servicepy) | 27 / 12 / 1830 | **FIRES** | ⚠ row STALE a 3rd time (`26/11/1810`) — re-derived by 256-04 at 256-03's head. honoured by construction (193.2 / 214 / **BUG-260828-09** / **256-03**) |
 | [`backend/app/services/workflow_authoring.py`](docs/HOT-FILE-LEDGER.md#backendappservicesworkflow_authoringpy) | 15 / 9 / 989 | **FIRES** | honoured by construction (193.2 / 197 / 214 / **214.1**) — ⚠ the extraction it may be owed is neither taken nor obstructed |
 | [`backend/app/models/harness.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsharnesspy) | 20 / 19 / 766 | **FIRES** | honoured by construction (193.2 / **214**) |
 | [`frontend/src/components/workflows/builderStore.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsbuilderstorets) | 14 / 8 / 968 | **FIRES** | honoured by construction (193.2 / 197 / **214.1**) — `setDeclaredInputs` is the sixth `meta` writer, the shape the five before it take |
 | [`frontend/src/components/panel/WorkspacePanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelworkspacepaneltsx) | 16 / 10 / 646 | **FIRES** | honoured by construction (194 / 194.1) |
 | [`backend/app/services/run_lifecycle.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_lifecyclepy) | 8 / 4 / 748 | **FIRES** | ⚠ row STALE at `6/3/459` — re-derived 256-02; +289 L unrecorded. NOT modified by 256 and ⛔ NOT the shape to copy (RESEARCH C-5): its `input_tokens=None` is a DEFAULT PARAM, not a site |
-| [`backend/app/api/runs.py`](docs/HOT-FILE-LEDGER.md#backendappapirunspy) | 35 / 16 / 1430 | **FIRES** | honoured by construction (194) |
+| [`backend/app/api/runs.py`](docs/HOT-FILE-LEDGER.md#backendappapirunspy) | 39 / 18 / 1736 | **FIRES** | ⚠ row STALE a 3rd time (`35/16/1430`, then `38/17/1695`). **256-03 closed METER-05 here** — the two `input_tokens=None` finalize sites now carry real totals |
 | [`backend/app/services/harness_engine.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharness_enginepy) | 54 / 20 / 3135 | **FIRES** | honoured by construction (194 / **214**) — 214-06 resolved the pause's service at ONE call site |
 | [`frontend/src/components/chat/RunCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatruncardtsx) | 28 / 14 / 710 | **FIRES** | ⭐ **G-5 DISCHARGED (243-02)** — the reasoning fold left for `ThinkingBlock.tsx`, `-39/+20`, one `useState` fewer. ⚠ row was STALE at `26/12/728`. State 2 stayed, by decision |
 | [`frontend/src/components/chat/ThinkingBlock.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatthinkingblocktsx) | 6 / 2 / 320 | no (2 phases) | ⚠ row STALE (`4/1/283`; CLAUDE.md read `4/1/313`). NOT modified by 253 — re-derived under CR-08. Still ONE reasoning renderer; no duration derived from length |
@@ -10444,7 +10444,7 @@ cells rot within days.
 | [`backend/app/services/multimodal_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmultimodal_servicepy) | 14 / 7 / 984 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** — row added SEED-227, which is also where its silent truncation was found |
 | [`backend/app/api/documents.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentspy) | 87 / 34 / 2414 | ⚠ **FIRES** | ✅ **DISCHARGED AGAIN (240-03)** — the email-attachment loop extracted to `services/email_attachments.py`. 240-04 adds the conversation read |
 | [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 222 / 49 / 5787 | ⚠ **FIRES** | ⚠ row STALE a 6th time (`215/47/5682`). **252-05**: `WatchRowCard.test.tsx` into BOTH knobs — it ran NOWHERE. W-7 slack CLOSED: a RED drive kept it green on a deleted case; pins were mostly SLACK |
-| [`backend/app/services/eval_runner_service.py`](docs/HOT-FILE-LEDGER.md#backendappserviceseval_runner_servicepy) | 12 / 7 / 959 | ⚠ **FIRES** | ⚠ absent at 7 phases (added 196) |
+| [`backend/app/services/eval_runner_service.py`](docs/HOT-FILE-LEDGER.md#backendappserviceseval_runner_servicepy) | 13 / 8 / 1040 | ⚠ **FIRES** | ⚠ STALE at `12/7/959`, and absent until 196 at 7 phases. **256-03**: its finalize stopped passing `input_tokens=None`. Re-derived by 256-04 |
 | [`frontend/src/components/panel/PhaseCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasecardtsx) | 17 / 11 / 788 | ⚠ **FIRES** | ⚠ row STALE (`16/10/755`) — 252 touched it. NOT modified by 253; re-derived under CR-08. honoured by construction (200 / 214) |
 | [`frontend/src/components/panel/PhaseTimeline.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasetimelinetsx) | 10 / 8 / 404 | ⚠ **FIRES** | ⚠ row STALE (`9/7/385`) — 252 touched it. NOT modified by 253; re-derived under CR-08. honoured by construction (**214**); absent from BOTH until 200 |
 | [`frontend/src/components/panel/phaseStatusMeta.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasestatusmetats) | 4 / 4 / 291 | ⚠ **FIRES** | ⚠ row STALE (`3/3/236`) — 252 touched it. NOT modified by 253; re-derived under CR-08. It crossed the threshold in the very commit that added its row (200) |
@@ -10604,7 +10604,7 @@ cells rot within days.
 | [`backend/app/services/extractors/aspects/dxf.py`](docs/HOT-FILE-LEDGER.md#backendappservicesextractorsaspectsdxfpy) | 2 / 0 / 180 | no (0 phases) | ⚠ absent for its entire life — row added `SEED-226`. It is the only path that READS measurements rather than inferring them (`DIMENSION` values the CAD software computed) |
 | [`frontend/src/components/workflows/publishBlockedStep.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowspublishblockedstepts) | 0 / 0 / 176 | no (new) | young (`BUG-260828-09`) — the step-face resolver. ⚠ It derives NO second name ladder: `nodeTitle` is called, and `name ?? slug` is the one forbidden edit |
 | [`frontend/src/components/workflows/PublishBlockedStepCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowspublishblockedstepcardtsx) | 0 / 0 / 101 | no (new) | young (`BUG-260828-09`) — the card a failed publish leads with. ⚠ **G-2 OVERRIDDEN, not satisfied**; jsdom cannot prove what it is for |
-| [`backend/app/services/scheduler_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesscheduler_servicepy) | 5 / 2 / 399 | no (2 phases) | background poll loop + launcher; honoured by construction (204 / 210); watch loop binds to it |
+| [`backend/app/services/scheduler_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesscheduler_servicepy) | 6 / 3 / 421 | ⚠ **FIRES** | ⚠ **the row read `5 / 2 / 399 · no (2 phases)` — present and WRONG, the state that stops an audit.** 256 is the THIRD phase; row promoted into CLAUDE.md's firing table by 256-04 |
 | [`backend/app/db/schedules.py`](docs/HOT-FILE-LEDGER.md#backendappdbschedulespy) | 1 / 1 / 359 | no (1 phase) | single data-access home for workflow_schedules; claim_due_schedules SKIP LOCKED claim; young (204) |
 | [`backend/app/services/watch_service.py`](docs/HOT-FILE-LEDGER.md#backendappserviceswatch_servicepy) | 7 / 5 / 643 | **FIRES** | ⚠ row STALE at 4/2/608. 247-02: missing_since lifecycle on disappearance/restore; H-5 incomplete listing guard preserved. Seam 2 remains primary writer |
 | [`backend/app/db/watches.py`](docs/HOT-FILE-LEDGER.md#backendappdbwatchespy) | 4 / 3 / 709 | ⚠ **FIRES** | ⚠ row STALE at 2/2/696. 247-02: update_item_state & bulk_update record missing_since on missing; clear_missing_since resets to NULL on restore |
@@ -10675,6 +10675,7 @@ cells rot within days.
 | [`backend/app/services/circuit_breaker.py`](docs/HOT-FILE-LEDGER.md#backendappservicescircuit_breakerpy) | 1 / 1 / 331 | no (1 phase) | ⚠ absent its ENTIRE LIFE — row added 256-02 at 256-01's touch, BELOW threshold. ⛔ the `max(0,…)` clamp stays on the RETURNED delta, or a reset box hands the DB a negative and SUBTRACTS real spend |
 | [`backend/app/services/task_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicestask_servicepy) | 19 / 10 / 958 | ⚠ **FIRES** | ⛔ **FIRES at 10 phases and absent from BOTH registers its ENTIRE LIFE — row added 256-02, which does NOT modify it.** The canonical two-arm usage reader METER-06 mirrors; no gate could demand it |
 | [`backend/app/services/run_reconciler.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_reconcilerpy) | 3 / 2 / 325 | no (2 phases) | ⚠ absent its ENTIRE LIFE — row added 256-02; NOT modified by 256 (D-256-08 site #7 is REGISTERED, not fixed). ⛔ its BOOT sweep NULLs a `cap_paused` run's real totals — `SEED-297` |
+| [`backend/app/services/forced_emit.py`](docs/HOT-FILE-LEDGER.md#backendappservicesforced_emitpy) | 10 / 6 / 705 | ⚠ **FIRES** | ⚠ **FIRES at 5 phases, absent from BOTH registers its ENTIRE LIFE — row added 256-04, in its FIRST edit's commit (O-6).** honoured by construction. ⛔ accumulators init `None` never `0`, above the loop |
 
 
 
@@ -14986,3 +14987,178 @@ D-256-05's posture of leaving `finish_run` byte-unchanged. A named hole beats a 
 3. ⚠ A stranded Deep chat run's count is **genuinely unknowable** — the producer process is gone and
    the in-memory usage box died with it (`SEED-299`). Only mid-stream persistence would make it
    knowable, which is that seed's `trigger_when`.
+
+---
+
+## `backend/app/services/forced_emit.py` — row added 2026-09-19 (Phase 256, plan `256-04`)
+
+**Re-derived 2026-09-19 at the plan's own edit, with CLAUDE.md's recipe rather than by copying a
+figure forward:**
+
+```
+git log --oneline -- backend/app/services/forced_emit.py | wc -l   → 8  (9 with this commit)
+git log --format=%s -- … | sed … | grep -E '^[0-9]+(\.[0-9]+)?$' | sort -u
+                                                                   → 101.1 · 102 · 103 · 111.1 · 122
+                                                                     = 5 phases (6 with 256)
+wc -l backend/app/services/forced_emit.py                          → 701 (578 before this plan)
+```
+
+⚠ **No six-digit dated quick-task bucket appears in the list**, so nothing was subtracted; the
+recipe's filter is a no-op here, and that is recorded rather than left ambiguous.
+
+**Against `256-CONTEXT.md`'s `8 / 5 / 578`: commits CONFIRMED, phases CONFIRMED, lines CORRECTED.**
+The line figure was right when CONTEXT was written and rotted *inside this plan's own execution*
+(`+123`, all of it this plan's arms, accumulators and the prose explaining them). That is the ledger's
+own recurring finding observed at a resolution of **hours** rather than phases — which is exactly why
+the recipe exists and why a copied triple is never acceptable.
+
+⚠ **AND THE ROW ROTTED AGAIN BEFORE THE PLAN ENDED — the third value for this file in one session,
+recorded rather than quietly overwritten because it is the cleanest demonstration this ledger has of
+its own thesis.** The row was first written **`9 / 6 / 701`**, derived correctly at that moment. A
+LATER commit in the same plan — comment-only, rewording two sentences that had inflated their own
+grep — added 4 lines and a second commit to this file. Re-derived on the shipping HEAD, the row is
+**`10 / 6 / 705`**.
+
+⭐ **Nothing was wrong with the first derivation; the file moved underneath it.** The rot interval was
+**minutes**, inside a single plan, by an author who knew the rule and was actively applying it. ⛔ So
+the instruction is not *"derive carefully"* — it is **derive LAST, on the tree you are shipping**, and
+treat any triple written before the final commit as provisional.
+
+### ⛔ THE ROW BEING ABSENT IS THE FINDING, NOT THE PAPERWORK
+
+`forced_emit.py` has been **FIRING G-5 since Phase 122** — five phases, eight commits — and has had
+**no row in either register for its entire life.** G-5 was therefore ABSENT on this file at any commit
+count, forever, silently: the identical failure `App.tsx` suffered for 23 phases and `config.py` for
+the project's whole history.
+
+⭐ **The gate is what found it.** `node scripts/check-hot-file-ledger.cjs 256` printed exactly one
+`[no-row]` line naming this file, unprompted, derived from the plan's own `files_modified`. The
+290-row scan list had been complete and readable the whole time and nobody had read it end to end —
+which is the measured reason the table moved out of `CLAUDE.md` and became a gate.
+
+### What plan `256-04` did, and why it is *honoured by construction*
+
+The module made real, billed provider calls through the same `open_stream` gateway as every other LLM
+leg, received the same `usage` / `usage_delta` frames, and dropped both. **Every `llm_emit` phase in
+every published workflow was spend no column in this product could see.** METER-06 closes that.
+
+The arithmetic, recorded rather than an adjective (D-256-13):
+
+| | before | after |
+|---|---|---|
+| `_drain` `elif` arms | 6 | **8** (`usage`, `usage_delta`) |
+| `return` statements in `forced_emit` itself | 2 | **2** |
+| new functions | — | **0** |
+| new `try` / `except` blocks | — | **0** |
+| new state | — | **exactly 2 function-local ints** |
+| `_failure(` call sites | 1 | **1** |
+| module-level accumulators | 0 | **0** |
+
+`_drain`'s two arms are **mirrored in shape from `task_service._drain:414-430`**, itself verbatim
+`agent_loop.py:1399-1416`. Nothing was invented; the canonical reader was copied into the one drain
+that never had it.
+
+### ⚠ CORRECTION recorded beside its original — `_failure()` has ONE call site, not two
+
+`256-RESEARCH.md` §Q4 states, verbatim, that `_failure` is reached *"from the exhausted-ladder floor
+AND from a raised-exception backstop"*. **Measured:** `grep -rn "[^_a-z]_failure(" backend/app/`
+returns the `def` at `:179` and **one** call, at `:507`. The raised-exception arm sets `last_failure`
+and `continue`s — it never calls the helper. The original claim is preserved here rather than deleted,
+because a reader who trusted it would thread the ladder totals twice and then hunt for a second site
+that does not exist. **The change was cheaper than RESEARCH implied**, and saying so is the point.
+
+### The invariants that bind the next editor
+
+1. ⛔ **The accumulators initialise to `None`, NEVER `0`** — in `_drain` and at the ladder level. A
+   shot that completes with no usage payload is the **common** path, not an edge case:
+   `provider_gateway/openai_compat.py:482-494` emits a `usage` event *"only when a usage payload was
+   seen"*, and that adapter serves **six of the eight providers** and emits **no `usage_delta` at
+   all**. A `0` written here is an invented measurement that reads as a real one forever (T-256-20).
+   ⭐ Driven RED: planting `in_tok: int | None = 0` turned four cases red, including both no-usage
+   cases; the file was restored **md5-identical**.
+2. ⛔ **The ladder accumulators are declared ABOVE the rung loop**, mirroring `last_failure` /
+   `last_truncated` in the same function. A FAILED rung's spend still counts — you were billed for
+   every shot the provider served (D-256-12). Counting only the winning rung under-reports a
+   three-rung descent by up to 3×, on **precisely the runs that cost the most**, and the bias is
+   invisible because a biased total still looks like a total. ⭐ Driven RED: moving the two
+   declarations inside the loop turned four multi-rung cases red; restored md5-identical.
+3. ⛔ **`_failure()` has exactly ONE call site (`:507`) and it passes both totals EXPLICITLY.** A
+   second call site would have to thread them again; adding one without doing so silently re-opens
+   the hole on the most expensive outcome this module produces — an exhausted ladder that served
+   every rung and delivered nothing.
+4. ⛔ **Run-LOCAL, never a module global.** `WORKER_COUNT=2` is the shipped default and these
+   coroutines interleave; a module-level total would make run N report the cumulative spend of runs
+   1..N. Pinned both behaviourally (two sequential calls must not accumulate) and structurally
+   (`hasattr` on the module object, not a source grep).
+5. ⚠ **A measured `0` must survive as `0`.** This module is the MEASURER: *"we counted, and it was
+   zero"* and *"we never counted"* are different facts, and this is the last layer at which the
+   difference still exists. The summer one frame up (`harness/phase_types._record_run_usage`)
+   collapses both to "add nothing" — correct THERE, a lie HERE.
+6. ⚠ **No log format string may carry a token VALUE** (T-073-04 / T-256-24). This plan added none, and
+   a negative fence asserts it.
+
+### The seam, if a next phase needs one
+
+None is proposed. At 701 lines with one public entry point (`forced_emit`), one private drain and one
+failure constructor, the module is coherent. ⚠ **The thing to watch is not size but the rung loop's
+responsibility count**: it now resolves the tier, builds the request, drives the gateway, catches
+provider raises, guards truncation, extracts/recovers, logs telemetry *and* accumulates tokens. A
+**seventh** responsibility landing in that loop is the signal to extract a per-rung `_run_one_rung()`
+returning a small result object — at which point invariants 1-3 above must move with it, or they are
+lost.
+
+---
+
+## ⚠ CROSS-PLAN RE-DERIVATION 2026-09-19 — FOUR ROWS PLAN `256-03` COULD NOT UPDATE
+
+Plan `256-03` ran in a parallel worktree in the same wave as `256-04`. It modified four files and
+had **neither `CLAUDE.md` nor this file in its `files_modified`** — both registers belong to
+`256-04`. It therefore re-derived the four triples itself, after committing, and handed them across
+the wave rather than letting them rot silently. **This section records what `256-04` did with that
+hand-off, and — more importantly — the one thing that makes it trustworthy.**
+
+⛔ **THE FIGURES BELOW WERE RE-DERIVED, NOT COPIED, AND THAT DISTINCTION IS THE WHOLE POINT.** The
+hand-off arrived with numbers attached; accepting them on trust is exactly the failure this ledger
+exists to prevent. `256-03`'s commits are reachable from `256-04`'s worktree (linked worktrees share
+one object store), so each triple was re-measured independently with CLAUDE.md's own recipe against
+`256-03`'s head `b3729994b` — `git log --oneline <sha> -- <file>`, the phase-bucket pipeline, and
+`git show <sha>:<file> | wc -l`. **All four matched the hand-off exactly.** Agreement is the
+evidence; had any disagreed, the re-derivation would have won.
+
+| file | row said | **re-derived** | phases |
+|---|---|---|---|
+| `backend/app/api/runs.py` | 38 / 17 / 1695 | **39 / 18 / 1736** | +1 |
+| `backend/app/services/harness/publish_service.py` | 26 / 11 / 1810 | **27 / 12 / 1830** | +1 |
+| `backend/app/services/eval_runner_service.py` | 12 / 7 / 959 | **13 / 8 / 1040** | +1 |
+| `backend/app/services/scheduler_service.py` | 5 / 2 / 399 | **6 / 3 / 421** | +1, **crosses the G-5 threshold** |
+
+### ⛔ `scheduler_service.py` is the one that mattered, and it was PRESENT AND WRONG
+
+Its scan-list row read **`5 / 2 / 399 · no (2 phases)`**. At three phases it **FIRES**, and it had no
+row at all in `CLAUDE.md`'s abridged firing table — because the disposition said it did not need one.
+**A row that is present and wrong answers the auditor with `no` and stops the audit**, which this
+ledger has recorded as strictly worse than an absent row (an absent row at least fails a gate).
+`256-04` corrected the triple, flipped the verdict to **FIRES**, and promoted the row into
+`CLAUDE.md`'s firing table so the next phase that names this file meets a refactor recommendation
+rather than a reassurance.
+
+⭐ **Nothing mechanical could have caught this.** `check-hot-file-ledger.cjs` fails on a MISSING row;
+it does not re-derive a PRESENT one, so a stale `no (2 phases)` passes the gate forever. The only
+thing that found it was a sibling plan re-deriving the triples of files it had just edited and saying
+so out loud.
+
+### ⚠ The caveat, stated rather than buried
+
+These four were measured at `256-03`'s head, **not at the merged tree**, which does not exist yet.
+`256-04` modifies none of these four files, so the merged content is `256-03`'s content and the
+triples carry over — **except** that the merge commit itself may add one to a commit count. ⛔ The
+next phase to touch any of the four must RE-DERIVE on the merged trunk rather than trust this table;
+that is the standing rule and this paragraph does not exempt anyone from it.
+
+### What `256-03` did to each (its own claim, recorded as its claim)
+
+`256-03` closed `METER-05`: the `input_tokens=None` finalize sites in `runs.py` (`:677` ask_user
+re-drive, `:1331` continuation), `publish_service.py`, `scheduler_service.py` and
+`eval_runner_service.py` now carry real totals instead of writing a `None` over a measured value.
+⚠ Recorded here as **`256-03`'s claim, verified only to the extent that its triples re-derive** —
+`256-04` did not read those diffs, and a ledger note is not a review.

@@ -685,7 +685,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/harness/grounding.py` | 21 / 8 / 1414 | honoured by construction (193.1 / 211 / **214**) |
 | `frontend/src/components/workflows/PhaseFormPanel.tsx` | 30 / 14 / 1566 | honoured by construction ×6 (185 / 193 / 193.1 / 199 / 200 / **214**) |
 | `backend/app/db/workflows.py` | 48 / 25 / 2585 | honoured by construction (193.2 / 194 / 192.2 / 200.1 / **214**) |
-| `backend/app/services/harness/publish_service.py` | 26 / 11 / 1810 | ⚠ row STALE at `25/11/1810` (+1 commit) — re-derived 256-02; NOT modified by 256-02. honoured by construction (193.2 / 214 / **BUG-260828-09**) |
+| `backend/app/services/harness/publish_service.py` | 27 / 12 / 1830 | ⚠ row STALE a 3rd time (`26/11/1810`) — re-derived by 256-04 at 256-03's head, which is where the landing was. honoured by construction (193.2 / 214 / **BUG-260828-09** / **256-03**) |
 | `backend/app/services/workflow_authoring.py` | 15 / 9 / 989 | honoured by construction (193.2 / 197 / 214 / **214.1**) |
 | `backend/app/models/harness.py` | 20 / 19 / 766 | honoured by construction (193.2 / **214**) |
 | `frontend/src/components/workflows/builderStore.ts` | 14 / 8 / 968 | honoured by construction (193.2 / 197 / **214.1**) |
@@ -695,7 +695,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/task_service.py` | 19 / 10 / 958 | ⛔ **FIRES at 10 phases and absent from BOTH registers its ENTIRE LIFE — row added 256-02, which does NOT modify it.** The canonical two-arm usage reader METER-06 mirrors |
 | `backend/app/services/run_reconciler.py` | 3 / 2 / 325 | ⚠ absent its ENTIRE LIFE — row added 256-02; NOT modified by 256 (D-256-08 site #7 is REGISTERED, not fixed). ⛔ its BOOT sweep NULLs a `cap_paused` run's real totals — `SEED-297` |
 | `backend/app/services/circuit_breaker.py` | 1 / 1 / 331 | ⚠ absent its ENTIRE LIFE — row added 256-02 at 256-01's touch, BELOW threshold. ⛔ the `max(0,…)` clamp stays on the RETURNED delta, or a reset box SUBTRACTS real spend |
-| `backend/app/api/runs.py` | 38 / 17 / 1695 | ⚠ row STALE at `35/16/1430` — re-derived 256 baseline. ⛔ Carries the TWO `input_tokens=None` finalize sites (`:677` ask_user re-drive, `:1331` continuation) that `METER-05` must close |
+| `backend/app/api/runs.py` | 39 / 18 / 1736 | ⚠ row STALE a 3rd time (`38/17/1695`). **256-03 closed METER-05 here** — the two `input_tokens=None` finalize sites (`:677` ask_user re-drive, `:1331` continuation) now carry real totals |
 | `backend/app/services/harness_engine.py` | 54 / 20 / 3135 | honoured by construction (194 / **214**) |
 | `frontend/src/components/chat/ThinkingBlock.tsx` | 6 / 2 / 320 | ⚠ row STALE (`4/1/313`) and it does NOT fire yet — 2 phases, not 1. NOT modified by 253. ⛔ the ONE renderer of the model's process prose, now from TWO sources |
 | `frontend/src/components/chat/RunCard.tsx` | 29 / 14 / 723 | ⭐ G-5 DISCHARGED (243-02). ⚠ row STALE at `28/14/710`. **BUG-260912-01**: its state-2 guard asked `!reasoningContent` ALONE and shipped a VISIBLE mid-stream double once the fold gained a 2nd input |
@@ -718,7 +718,8 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/multimodal_service.py` | 14 / 7 / 984 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
 | `backend/app/api/documents.py` | 85 / 33 / 2437 | ✅ **DISCHARGED (229)** |
 | `scripts/vitest-count-gate.cjs` | 222 / 49 / 5787 | ⚠ STALE a 6th time (`215/47/5682`). **252-05**: `WatchRowCard.test.tsx` into BOTH knobs — it ran NOWHERE. W-7 slack CLOSED: a RED drive kept it green on a deleted case; pins were mostly SLACK |
-| `backend/app/services/eval_runner_service.py` | 12 / 7 / 959 | ⚠ absent at 7 phases (added 196) |
+| `backend/app/services/eval_runner_service.py` | 13 / 8 / 1040 | ⚠ STALE at `12/7/959`, and absent until 196 at 7 phases. **256-03**: its finalize stopped passing `input_tokens=None`. Re-derived by 256-04 at 256-03's head |
+| `backend/app/services/scheduler_service.py` | 6 / 3 / 421 | ⚠ **NOW FIRES at 3 phases, and its detail row still read `no (2 phases)` — present and WRONG, which stops an audit harder than absent.** Promoted here by 256-04; **256-03** closed its `None` finalize |
 | `frontend/src/components/panel/PhaseCard.tsx` | 17 / 11 / 788 | ⚠ row STALE (`16/10/755`) — 252 touched it. NOT modified by 253. honoured by construction (200 / **214**) |
 | `frontend/src/components/panel/PhaseTimeline.tsx` | 10 / 8 / 404 | ⚠ row STALE (`9/7/385`) — 252 touched it. NOT modified by 253. honoured by construction (**214**) |
 | `frontend/src/components/panel/phaseStatusMeta.ts` | 4 / 4 / 291 | ⚠ row STALE (`3/3/236`) — 252 touched it. NOT modified by 253. It crossed the threshold in the commit that added its row (200) |
@@ -805,6 +806,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/sources/failure_cause.py` | 3 / 2 / 227 | ⚠ absent for its entire life — row added **BUG-260912-01**. ⛔ its `Cause` union must stay ONE plain-text line: a frontend suite binds it by `?raw` and a computed union is invisible to that fence |
 | `scripts/full-schema-supplement.sql` | 11 / 6 / 653 | ⚠ **FIRES, and absent for its ENTIRE LIFE at 6 phases — row added 253-02.** ⛔ NO GATE COULD DEMAND IT: `scripts/` is EXEMPT in check-hot-file-ledger.cjs. The ONE hand-mirror of every migration ACL; its tail is byte-identical to `full-schema.sql` |
 | `.claude/settings.json` | 9 / 4 / 202 | ⚠ **FIRES, absent from BOTH registers its ENTIRE LIFE at 4 phases — rows added 253-03.** ⛔ `.claude/` is EXEMPT: no gate can ask. The ONE hook dispatch table; a dropped entry fires NEVER, in silence |
+| `backend/app/services/forced_emit.py` | 10 / 6 / 705 | ⚠ **FIRES, absent from BOTH registers its ENTIRE LIFE at 5 phases — row added 256-04, in its FIRST edit's commit.** ⛔ accumulators init `None` never `0`, ABOVE the rung loop so a FAILED rung counts |
 
 When a new phase enters discuss-phase, the orchestrator must scan PLAN.md `files_modified` against this ledger. Any match against a G-5-firing row means the discuss-phase produces a refactor recommendation as the first option, not the planned feature — and the phase reads that file's section in `docs/HOT-FILE-LEDGER.md` before planning, because that is where the named seam and the binding invariants live.
 

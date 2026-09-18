@@ -183,6 +183,8 @@ def _failure(
     forced: bool,
     truncated: bool = False,
     failure_override: str | None = None,
+    input_tokens: int | None = None,
+    output_tokens: int | None = None,
 ) -> dict:
     """The honest-failure result shape (D-08 layer 4 boundary → executor layers 5-6).
 
@@ -190,6 +192,28 @@ def _failure(
     distinguish a provider call that *threw* (``"provider_error"``) from a model that
     simply failed to emit (``"model_failed_to_emit"``) — the happy-failure values
     (model_failed_to_emit / truncated) are unchanged.
+
+    ``input_tokens`` / ``output_tokens`` (Phase 256 / METER-06 / D-256-12): the LADDER
+    totals — every rung the provider actually served, failed rungs included. ⛔ An
+    exhausted ladder is the most expensive outcome this module produces, so a floor
+    that reported no spend would under-report exactly the runs that cost the most,
+    invisibly. The sole call site (the exhausted-ladder floor) passes both EXPLICITLY;
+    the ``None`` defaults exist only so the shape stays constructible, never as a
+    stand-in for a measurement.
+
+    ⚠ **CORRECTION, recorded rather than silently applied (Phase 256 / S-5).**
+    ``256-RESEARCH.md`` §Q4 states this helper is reached *"from the exhausted-ladder
+    floor AND from a raised-exception backstop"*. **Measured** by grepping
+    ``backend/app/`` for this helper's name preceded by a non-identifier character and
+    followed by an open paren: **the result is this ``def`` and exactly ONE call
+    site.** (⚠ The pattern is DESCRIBED rather than written out, deliberately: a
+    literal copy of it inside this docstring would match itself and inflate the very
+    count the sentence reports.) The raised-exception arm sets ``last_failure`` and
+    ``continue``s — it never calls this function. The original claim is quoted rather
+    than deleted because
+    a reader who trusted it would thread the totals twice and look for a second site
+    that does not exist. ⛔ A SECOND call site would have to thread the totals again;
+    adding one without doing so silently re-opens the hole.
     """
     return {
         "emitted": None,
@@ -200,6 +224,8 @@ def _failure(
         "truncated": truncated,
         "failure": failure_override or "model_failed_to_emit",
         "emit_rung": None,  # Phase 122 (MP-01): no rung won — the honest-fail floor.
+        "input_tokens": input_tokens,
+        "output_tokens": output_tokens,
     }
 
 
@@ -355,7 +381,20 @@ async def forced_emit(
                                             # (NATIVE or — WR-04 — STRUCTURED mode)
           "truncated": bool,                # was the last rung cut off (D-08 layer 4)?
           "failure": None | "model_failed_to_emit" | "provider_error",
+          "input_tokens": int | None,       # Phase 256 (METER-06) — see below
+          "output_tokens": int | None,
         }
+
+    ⚠ **``input_tokens`` / ``output_tokens`` ARE LADDER TOTALS, NOT WINNING-RUNG
+    TOTALS** (Phase 256 / METER-06 / D-256-12). They sum EVERY shot the provider
+    actually served, failed and truncated rungs included, because you were billed for
+    each one. They are present on BOTH exits — the success return and the
+    exhausted-ladder ``_failure`` floor. ⛔ ``None`` means *no rung reported a usage
+    payload at all* — which is the COMMON case for the six providers served by
+    ``openai_compat`` (``:482-494``: *"Only emit when a usage payload was seen"*) — and
+    it is a DIFFERENT fact from a measured ``0``. The consumer
+    (``harness/phase_types._exec_llm_emit``) folds these into the run-level box via
+    ``_record_run_usage``, whose guards make ``None`` and ``0`` both add nothing.
 
     The caller (``_exec_llm_emit``, Plan 03) runs the D-08 layers 5-6 (bounded retry /
     honest-fail surface) on a non-None ``failure``; this substrate never falls back to
@@ -432,6 +471,22 @@ async def forced_emit(
     # existing honest ``_failure`` floor (emitted=None — never silent, never fabricated).
     last_failure: str | None = None
     last_truncated = False
+    # Phase 256 (METER-06 / D-256-12) — THE LADDER-LEVEL TOKEN ACCUMULATORS, declared
+    # HERE and not inside the loop, mirroring ``last_failure`` / ``last_truncated``
+    # directly above.
+    #
+    # ⛔ **EVERY RUNG COUNTS, INCLUDING THE RUNGS THAT FAILED.** You were billed for
+    # each shot the provider actually served, whether or not it validated. Counting
+    # only the winning rung would under-report a three-rung descent by up to 3× — and
+    # it would do so on precisely the runs that cost the MOST (a force_strict model
+    # that 400s twice before recovering), while the number downstream still looks like
+    # a number. That is the invisible under-report D-256-12 forbids.
+    #
+    # ⛔ FUNCTION-LOCAL, NEVER A MODULE GLOBAL. ``WORKER_COUNT=2`` is the shipped
+    # default and these coroutines interleave; a module-level total would make run N
+    # report the cumulative spend of runs 1..N.
+    ladder_in_tok: int | None = None
+    ladder_out_tok: int | None = None
     for rung_name, forced, rung_strict in _RUNGS_BY_TIER[emit_tier]:
         # Phase 103 strict override: an explicit ``strict=False`` demotes the
         # strict_force rung (skip it — it would be a redundant non-strict duplicate);
@@ -462,7 +517,9 @@ async def forced_emit(
         # (T-073-04 — never the message/args content).
         try:
             stream, calling_mode = await open_stream(provider, req)
-            content, tool_calls, finish_reason = await run_in_threadpool(_drain, stream)
+            content, tool_calls, finish_reason, _rung_in, _rung_out = (
+                await run_in_threadpool(_drain, stream)
+            )
         except Exception:  # noqa: BLE001 — a provider raise → descend to the next rung
             logger.info(
                 "forced_emit: rung=%s raised; descending emit_tier=%s provider=%s",
@@ -471,6 +528,16 @@ async def forced_emit(
             last_failure = "provider_error"
             last_truncated = False
             continue
+
+        # Phase 256 (METER-06 / D-256-12): fold THIS rung's spend in, BEFORE the
+        # truncation guard and the validation below — both of which ``continue``. A
+        # rejected emission is still a served, billed shot. Mirrored in shape from
+        # ``task_service.py:451-455``: a measured ``0`` is written, an ABSENT
+        # measurement is not, and ``None`` stays ``None`` until something real arrives.
+        if _rung_in is not None:
+            ladder_in_tok = (ladder_in_tok or 0) + _rung_in
+        if _rung_out is not None:
+            ladder_out_tok = (ladder_out_tok or 0) + _rung_out
 
         # D-08 layer 4: a truncated half-object is rejected — descend to the next rung.
         if is_truncated(finish_reason=finish_reason):
@@ -497,6 +564,10 @@ async def forced_emit(
                 "truncated": False,
                 "failure": None,
                 "emit_rung": rung_name,
+                # Phase 256 (METER-06): the LADDER total — every rung served, not just
+                # this winning one. ``None`` when no rung reported a usage payload.
+                "input_tokens": ladder_in_tok,
+                "output_tokens": ladder_out_tok,
             }
         last_failure = "model_failed_to_emit"
         last_truncated = False
@@ -510,18 +581,49 @@ async def forced_emit(
         forced=False,
         truncated=last_truncated,
         failure_override=last_failure,
+        # Phase 256 (METER-06 / D-256-12): ⛔ A FAILURE THAT REPORTS NO SPEND IS THE
+        # INVISIBLE UNDER-REPORT. An exhausted ladder is the MOST expensive outcome
+        # this function has — every rung served and nothing delivered — so the floor
+        # must carry the totals explicitly rather than defaulting them away.
+        input_tokens=ladder_in_tok,
+        output_tokens=ladder_out_tok,
     )
 
 
-def _drain(stream) -> tuple[str, list[dict], str | None]:
+def _drain(stream) -> tuple[str, list[dict], str | None, int | None, int | None]:
     """Drain ONE forced shot's gateway event stream into ``(content, tool_calls,
-    finish_reason)``. Mirrors ``task_service._stream_one_iteration._drain`` (the
-    canonical single-call drain) — but it is a SEALED single shot, never the open
-    loop (D-01). Drives the bare sync generator inside a threadpool; closes it after.
+    finish_reason, input_tokens, output_tokens)``. Mirrors
+    ``task_service._stream_one_iteration._drain`` (the canonical single-call drain) —
+    but it is a SEALED single shot, never the open loop (D-01). Drives the bare sync
+    generator inside a threadpool; closes it after.
+
+    ⚠ **THE TWO USAGE ARMS ARE PHASE 256 (METER-06 / D-256-11), AND THEY ARE MIRRORED
+    IN SHAPE FROM ``task_service._drain:414-430``** — which is itself verbatim
+    ``agent_loop.py:1399-1416``. The events were arriving here the whole time: this
+    module drives the SAME ``open_stream`` gateway as every other LLM leg, so it
+    receives the same ``usage`` / ``usage_delta`` frames, and it dropped both. Every
+    ``llm_emit`` phase was a real, billed provider call that no column could see.
+
+    ⛔ **THE ACCUMULATORS INITIALISE TO ``None``, NEVER ``0``.** The two facts are
+    different and only this function can tell them apart:
+
+      - ``None`` = the provider emitted no usage payload at all. Source-proven
+        reachable at ``provider_gateway/openai_compat.py:482-494`` — *"Only emit when a
+        usage payload was seen"* — an adapter serving SIX of the eight providers, which
+        also emits no ``usage_delta`` whatsoever. This is the COMMON path, not an edge
+        case, and a ``0`` written here is an invented measurement that reads as a real
+        one forever (T-256-20).
+      - ``0`` = the provider counted, and the count was zero.
+
+    The summer one layer up (``harness/phase_types._record_run_usage``) collapses both
+    to "add nothing", which is correct THERE. Collapsing them HERE would destroy the
+    only place the distinction still exists.
     """
     content_parts: list[str] = []
     buffer: dict[int, dict] = {}
     finish_reason: str | None = None
+    in_tok: int | None = None
+    out_tok: int | None = None
     try:
         for event in stream:
             et = event.get("type")
@@ -567,6 +669,25 @@ def _drain(stream) -> tuple[str, list[dict], str | None]:
                         b["name"] = _ftc["name"]
                     if _args:
                         b["arguments"] = _args
+            elif et == "usage":
+                # Phase 256 (METER-06) — mirrored in shape from task_service._drain:414-422
+                # (itself verbatim agent_loop.py:1399-1408): SUM usage.
+                _i = event.get("input_tokens", 0) or 0
+                _o = event.get("output_tokens", 0) or 0
+                if in_tok is None:
+                    in_tok = _i
+                    out_tok = _o
+                else:
+                    in_tok += _i
+                    out_tok = (out_tok or 0) + _o
+            elif et == "usage_delta":
+                # Phase 256 — mirrored from task_service._drain:423-430 (verbatim
+                # agent_loop.py:1409-1416): incremental output only.
+                _o = event.get("output_tokens", 0) or 0
+                if out_tok is None:
+                    out_tok = _o
+                else:
+                    out_tok += _o
     finally:
         close = getattr(stream, "close", None)
         if close is not None:
@@ -575,4 +696,10 @@ def _drain(stream) -> tuple[str, list[dict], str | None]:
             except Exception:  # noqa: BLE001
                 logger.debug("forced_emit: stream close failed; ignoring", exc_info=True)
 
-    return "".join(content_parts), [buffer[i] for i in sorted(buffer)], finish_reason
+    return (
+        "".join(content_parts),
+        [buffer[i] for i in sorted(buffer)],
+        finish_reason,
+        in_tok,
+        out_tok,
+    )

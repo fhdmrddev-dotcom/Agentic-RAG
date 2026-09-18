@@ -1567,6 +1567,23 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
                 user_settings=getattr(ctx, "user_settings", None),
                 system_prompt=system_prompt + citation_feedback,
             )
+            # Phase 256 (METER-06 / D-256-11/12): fold the forced ladder's spend into
+            # the run-level box. Same shape as the two existing hand-offs at :917 and
+            # :1028 — a fact the substrate already produced, threaded up to the one
+            # scope that can act on it.
+            #
+            # ⚠ PLACED IMMEDIATELY AFTER THE CALL, AND THE PLACEMENT IS THE WHOLE
+            # POINT. Every arm below this line — the state-(a) early
+            # ``return _emit_failure_output(...)``, the citation-gate reject, the
+            # render failure, the success — flows THROUGH here, so the recording needs
+            # no branch of its own (new branches: 0). ⛔ Below the failure return it
+            # would count the cheap outcomes and skip the expensive one: an exhausted
+            # ladder served and paid for EVERY rung and delivered nothing. That bias is
+            # invisible downstream, because a biased total still looks like a total.
+            #
+            # ⚠ It is also inside the per-attempt retry loop, which is correct: each
+            # attempt is a fresh, separately-billed ladder.
+            _record_run_usage(ctx, result.get("input_tokens"), result.get("output_tokens"))
 
             if result.get("recovered_from_narration"):
                 # D-06 fired — record the degraded-but-honest NATIVE recovery transition.
