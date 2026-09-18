@@ -166,14 +166,28 @@ conversion, any operator-facing spend view. This phase produces **numbers**, not
   replaced by a value. **No new branch, no new state, no extraction.** State/call-site counts before
   and after go in the SUMMARY.
 
-- **D-256-14: The frontend count gate is RED AT BASE and its failing SET must be captured and
-  committed BEFORE the first source edit.** Measured at `772f53354`:
-  `total 8414 · failed 3 · pinned total 7674 · COUNT GATE VIOLATED (1 reason)`.
-  ⛔ **Counts alone are not a baseline.** CLAUDE.md records publishing a backend baseline of 71 when
-  the truth was 72 because a `tail` kept the count and threw the set away; counts can match while
-  sets differ. This is a backend-only phase, so the frontend gate exists purely to prove any red is
-  **inherited** — and without filenames that proof is impossible. Commit the set beside
-  `256-BASELINE-backend-failing-set.txt`.
+- **D-256-14: ✅ DISCHARGED — the frontend baseline is captured, and it is NON-DETERMINISTIC.**
+  Full evidence: `256-BASELINE-frontend.md`. Two runs on a **byte-identical** tree
+  (`git log --since="2026-09-18 20:00" -- frontend/` returns nothing; `git status --short frontend/`
+  clean), both at `GSD_VITEST_MAX_WORKERS=2`:
+
+  | | Run A 20:11 | Run B 20:36 |
+  |---|---|---|
+  | total / pinned / files | 8414 / 7674 / 289 | 8414 / 7674 / 289 |
+  | **failed** | **3** | **0** |
+  | verdict | `COUNT GATE VIOLATED (1 reason)` | `count gate OK` |
+
+  Run A's set, recovered from the gate's **own persisted JSON** before anything was re-run:
+  `WorkflowBuilderPage.canvas.test.tsx` (one of `SEED-171`'s five) and `sketchComposition.test.tsx`
+  ×2 — ⚠ **both of the latter are that suite's OWN POSITIVE CONTROLS**, the `196-05` mount-died
+  signature, and ⚠ **`sketchComposition.test.tsx` is NOT in SEED-171's set — it is a sixth.**
+
+  ⛔ **Do NOT quote `failed 0` as "green at base."** The honest statement is that `count gate OK` is
+  **not reliably reachable on demand** here — CLAUDE.md's own standing finding. ⛔ **Do NOT reach for
+  the worker cap** on a red run: the cap was 2 on both runs. Read the persisted JSON, check each name
+  against `git diff --numstat 772f53354 HEAD`, and say **"provably unmodified"**, never "fine".
+  ⚠ Also measured: the published count-gate figures have **rotted a seventh time** — CLAUDE.md's
+  2026-09-07 row reads `7816 / 7020 / 241`. `+48` pinned files is **adoption**, not drift.
 
 - **D-256-15: Backend baseline is 71 with ZERO headroom, and the SET is committed.**
   `.planning/phases/256-every-token-is-counted-and-kept/256-BASELINE-backend-failing-set.txt`
