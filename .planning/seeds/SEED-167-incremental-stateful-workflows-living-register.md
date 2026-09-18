@@ -3,7 +3,44 @@ seed_id: SEED-167
 title: Incremental / stateful workflows — a run that reads its OWN last output, diffs it against the knowledge base, and updates it in place (the "living risk register")
 created: 2026-08-16
 planted_during: Phase 194.1 UAT (operator, mid-session)
-status: planted
+status: partially-answered
+partial: true
+status_note: |
+  AXIS: settled on the STATE-READ axis (Phase 205); OPEN on the UPDATE-IN-PLACE axis. That split is what
+  `partial: true` above is asserting.
+
+  ── 2026-09-18 · RE-MEASURED AGAINST THE TREE, not against a directory listing, and the status moved
+  `planted` -> `partially-answered`. Prompted by an outside comparison document (archived under
+  `screenshots/AGENTIC-RAG-VS-AIRIA-AND-THE-WORKFLOW-ENGINE-2026-09-18.md`) whose B5 row read
+  "no durable state across runs" — that is FALSE, and it was reached by reading this file's TITLE from a
+  directory listing rather than opening it. ⚠ Two sibling seeds it called unbuilt the same way,
+  `SEED-191` and `SEED-201`, were ALREADY correctly recorded as `folded` and `answered`. **The register
+  was right; the reading method was wrong.** Recorded here because the remedy for that is not a register
+  repair.
+
+  SHIPPED by Phase 205 (STATE-01 / D-01..D-04), measured in the tree:
+    * `WorkflowDefinition.is_stateful` (`models/harness.py:693`).
+    * `run_workflow` resolves `ctx.prior_run = get_latest_completed_workflow_run(slug, user, org)`
+      (`harness_engine.py:~1697`).
+    * `{{prior_run.output}}` / `{{prior_run.id}}` / `{{prior_run.created_at}}` interpolate into prompt
+      text, with a BASELINE NOTICE on cold start (`harness/phase_types.py:215-244`).
+  Against this seed's own 7-row decomposition table below: **#2 READ current state is CLOSED**, and
+  **#3 gains the "since" anchor it lacked**. #7 (schedule) is served by `workflow_schedules` (mig 124).
+
+  ⛔ STILL OPEN, and it is the load-bearing half: **#4 close/remove resolved entries** and **#5 append
+  preserving what was untouched** have NO primitive. `PROGRAMMATIC_PHASE_REGISTRY` holds exactly two
+  functions — `split_topic` and `eval_slow_step` — and neither diffs or merges. So today the read-modify-
+  write is performed BY THE MODEL, inside prompt text.
+
+  ⭐ THAT IS THE GOVERNANCE FINDING, NOT A CONVENIENCE GAP. A merge carried in prompt text is invisible
+  to the publish gate, to `reachability.lint_workflow`, and to the audit trail — the same class of defect
+  as a branch decision written into a prompt. This seed's own `relates_to` predicted the remedy before the
+  problem was named: *"a deterministic step is the right home for the diff/merge"* (NODE-01 / `SEED-141`).
+  ⛔ Do not close this seed on the strength of #2 shipping. The axis that makes it a LIVING register — that
+  a run may UPDATE its own prior output under a gate that can see the update — is untouched.
+
+  Re-open trigger unchanged, plus: any phase that proposes a deterministic diff/merge step, and any phase
+  that scopes `SEED-141` utility nodes.
 priority: high
 relates_to:
   - SEED-014 (Automations & Routines) — the SCHEDULING half of this seed. Phase 105, explicitly deferred to a
