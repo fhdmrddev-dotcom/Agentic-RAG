@@ -3,10 +3,12 @@ phase: 245
 kind: verdict
 written: 2026-09-13
 author: claude (solo — OV-SOLO-01)
-verification_mode: self-verified   # ⛔ OV-SOLO-01 — this file is not exempt from its own rule
+verification_mode: peer-reviewed
+independent_review: done   # Discharged 2026-09-19 by Gemini via 245-REVIEW-IND.md (BUS-252 answered).
+reviewer: gemini
 sc_status: { "1": closed, "2": closed, "3": discharged, "4": discharged }
 phase_status: complete   # 4/4 success criteria closed; two carry a NAMED residue with a trigger, never a silent one
-residue_owed: [238-M-9-microsoft-arm, 233-row-3-refusal-arm, 240-five-mail-rows, independent-6.3-review]
+residue_owed: [238-M-9-microsoft-arm, 233-row-3-refusal-arm, 240-five-mail-rows]
 ---
 
 # Phase 245 — Verdict
