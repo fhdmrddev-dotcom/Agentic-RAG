@@ -1661,6 +1661,26 @@ async def _drive_golden_run(
         raise
     finally:
         try:
+            # METER-05 site 4 (Phase 256 / D-256-08). ⭐ A GOLDEN RUN IS REAL MONEY — it
+            # drives the whole workflow against the live KB — and its segment read as
+            # "never measured" because this shell hardcoded a NULL usage. The box was on
+            # `ctx` the entire time (`run_workflow` sets it, harness_engine.py:1864).
+            # ⚠ GRAIN (D-256-03): segment box onto a per-segment `runs` row; the
+            # cumulative `workflow_runs` figure belongs to `persist_run_usage`.
+            # ⛔ No default and no `or 0` — NULL means never measured, 0 means measured
+            # as zero, and a publish validation that cost nothing is a real possibility
+            # worth being able to tell apart (D-256-06).
+            _box = getattr(ctx, "run_usage_box", None) or {}
+            _in_tok = _box.get("input_tokens")
+            _out_tok = _box.get("output_tokens")
+            if _in_tok is None and _out_tok is None:
+                # db/runs.py:93-99's contract. IDENTIFIERS ONLY (T-073-04 / T-256-14).
+                logger.warning(
+                    "runs.usage missing for run=%s provider=%s model=%s",
+                    _producer_id,
+                    getattr(ctx, "provider", None),
+                    getattr(ctx, "model", None),
+                )
             await finalize_run(
                 pool,
                 run_id=_producer_id,
@@ -1668,8 +1688,8 @@ async def _drive_golden_run(
                 error=None,
                 completed_at=datetime.now(timezone.utc),
                 message_id=None,
-                input_tokens=None,
-                output_tokens=None,
+                input_tokens=_in_tok,
+                output_tokens=_out_tok,
             )
         except Exception:  # noqa: BLE001 — shell cleanup never masks the run's own outcome
             logger.warning(

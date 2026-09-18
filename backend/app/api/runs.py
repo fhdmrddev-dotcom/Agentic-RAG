@@ -667,6 +667,29 @@ async def _redrive_paused_workflow_run(run_id: UUID, tool_call_id: str, redis) -
                     from app.db.runs import finalize_run  # noqa: PLC0415
                     from datetime import datetime as _dt, timezone as _tz  # noqa: PLC0415
 
+                    # METER-05 site 1 (Phase 256 / D-256-08). This shell hardcoded a NULL
+                    # usage, so an ask_user answer's whole re-driven segment read as
+                    # "never measured" — while the box on `ctx` had been measuring it the
+                    # entire time (`run_workflow` sets it, harness_engine.py:1864).
+                    # ⚠ GRAIN (D-256-03): the box carries THIS SEGMENT's spend and this is
+                    # a per-segment `runs` row, so segment-onto-segment is correct here.
+                    # ⛔ The cumulative `workflow_runs` figure is NOT written from this
+                    # site — `persist_run_usage` owns it, at the phase boundary.
+                    # ⛔ `.get()` with NO default and NO `or 0`: an absent key stays `None`
+                    # all the way to the column, because NULL means never measured and 0
+                    # means measured as zero (D-256-06).
+                    _box = getattr(ctx, "run_usage_box", None) or {}
+                    _in_tok = _box.get("input_tokens")
+                    _out_tok = _box.get("output_tokens")
+                    if _in_tok is None and _out_tok is None:
+                        # The warning CONTRACT from db/runs.py:93-99, honoured here.
+                        # IDENTIFIERS ONLY — never token values (T-073-04 / T-256-14).
+                        logger.warning(
+                            "runs.usage missing for run=%s provider=%s model=%s",
+                            _pid,
+                            getattr(ctx, "provider", None),
+                            getattr(ctx, "model", None),
+                        )
                     await finalize_run(
                         pool,
                         run_id=_pid,
@@ -674,8 +697,8 @@ async def _redrive_paused_workflow_run(run_id: UUID, tool_call_id: str, redis) -
                         error="ask_user re-drive failed" if _failed else None,
                         completed_at=_dt.now(_tz.utc),
                         message_id=None,
-                        input_tokens=None,
-                        output_tokens=None,
+                        input_tokens=_in_tok,
+                        output_tokens=_out_tok,
                     )
                 except Exception:
                     logger.exception(
@@ -1321,6 +1344,24 @@ async def continue_run(
                 # (no stranded streaming row → the F2 self-heal is never defeated),
                 # BEFORE the _RUN_TASKS.pop.
                 try:
+                    # METER-05 site 2 (Phase 256 / D-256-08). Same defect as site 1: the
+                    # continuation's fresh producer shell threw away a number `run_workflow`
+                    # had just finished measuring onto `wf_ctx.run_usage_box`. A Continue is
+                    # a SECOND paid budget by construction (CONT-01), so this was the site
+                    # most likely to be under-reporting real spend.
+                    # ⚠ GRAIN (D-256-03): segment box onto a per-segment `runs` row.
+                    # ⛔ No default and no `or 0` — NULL is "never measured" (D-256-06).
+                    _box = getattr(wf_ctx, "run_usage_box", None) or {}
+                    _in_tok = _box.get("input_tokens")
+                    _out_tok = _box.get("output_tokens")
+                    if _in_tok is None and _out_tok is None:
+                        # db/runs.py:93-99's contract. IDENTIFIERS ONLY (T-073-04).
+                        logger.warning(
+                            "runs.usage missing for run=%s provider=%s model=%s",
+                            _producer_id,
+                            getattr(wf_ctx, "provider", None),
+                            getattr(wf_ctx, "model", None),
+                        )
                     await _finalize_run(
                         pool,
                         run_id=_producer_id,
@@ -1328,8 +1369,8 @@ async def continue_run(
                         error="continuation failed" if _failed else None,
                         completed_at=_dt.now(_tz.utc),
                         message_id=None,
-                        input_tokens=None,
-                        output_tokens=None,
+                        input_tokens=_in_tok,
+                        output_tokens=_out_tok,
                     )
                 except Exception:
                     logger.exception(
