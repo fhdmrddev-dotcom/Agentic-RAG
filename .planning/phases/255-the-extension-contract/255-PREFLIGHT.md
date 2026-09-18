@@ -33,7 +33,7 @@ plan's fault. Cap vitest at `GSD_VITEST_MAX_WORKERS=2`.
 | Gate | Baseline at `fee85754a` |
 |---|---|
 | Backend unit (`pytest tests/unit -q --continue-on-collection-errors`) | ✅ **71 failed · 4900 passed · 2 xfailed · 2 xpassed · 0 collection errors** (246.9s) — **exactly the locked ceiling, zero headroom.** The full 71-name SET is at `255-BASELINE-backend-failing-set.txt` beside this file |
-| Frontend count gate (`GSD_VITEST_MAX_WORKERS=2 node scripts/vitest-count-gate.cjs`, repo root) | ⏳ **re-capturing — the first attempt was run from `frontend/` and discarded unread; CLAUDE.md requires the repo root. Posted to the bus when it lands** |
+| Frontend count gate (`GSD_VITEST_MAX_WORKERS=2 node scripts/vitest-count-gate.cjs`, repo root) | ⛔ **RED AT BASE — `COUNT GATE VIOLATED`.** `total 8414 · failed 1 · pinned total 7674`. **One reason only: `[failing-tests]`.** No per-file decrease. Full output committed beside this file as `255-BASELINE-frontend-gate.txt` |
 
 ⚠ **The backend ceiling is 71 and has ZERO headroom** (CLAUDE.md). It is also **STALE against suite
 growth** — set at `3497 passed`, now ~4900 — and was left untouched by operator decision. Any new
@@ -49,6 +49,35 @@ retained **2** `FAILED` lines out of 71. The count was right and the set was gon
 because the command ALSO redirected to a file. **Diff the committed set — never a count, and never
 a buffer.** Top concentrations in the 71: `test_retrieval_service.py` **15** · `test_sql_service.py`
 **12** · `test_explorer_agent.py` **6** · `test_multimodal_query.py` **5**.
+
+### ⛔ THE FRONTEND GATE IS RED BEFORE YOU START, AND THE REASON IS NOT YOURS
+
+**The single failing test, pulled from the gate's own persisted JSON report BEFORE anything was
+re-run** (CLAUDE.md's triage order, and it is the order because a re-run destroys the evidence):
+
+```
+FILE : src/pages/WorkflowRunPage.test.tsx
+TEST : WorkflowRunPage — a reconcile leaves every visible node reading identical …
+MSG  : AssertionError: expected "vi.fn()" to be called at least once
+```
+
+⭐ **It is one of `SEED-171`'s five cap-independent flaky suites**, and it fails with an
+**`AssertionError`, not a `STACK_TRACE_ERROR`** — which is exactly the evidence CLAUDE.md records as
+refuting the "slow suite near a timeout" hypothesis. Three of the five fail this way.
+
+`git status` on `WorkflowRunPage.test.tsx` and `WorkflowRunPage.tsx` at base: **byte-unchanged**.
+So it is **provably unmodified** — ⛔ not *"fine"*. One sample of a flaky suite proves nothing in
+either direction, and it was deliberately **NOT re-run to obtain a green**.
+
+⛔ **What this means for you, and it is the useful part:** a red gate after your work does **not**
+by itself mean you broke something. **Diff against this baseline.** If the only failure is still
+`WorkflowRunPage.test.tsx`, you are where you started. ⛔ Do NOT reach for
+`GSD_VITEST_MAX_WORKERS` — CLAUDE.md measured that the cap does not fix these.
+
+⚠ **Growth, so a bigger number is not drift.** CLAUDE.md's last recorded figures (2026-09-07) were
+grand **7816** / pinned **7020**. Measured today: grand **8414** / pinned **7674** — the **seventh**
+re-derivation, +598 and +654 in eleven days. The gate's contract is *no per-file DECREASE* and
+*zero failing*, **never a fixed grand total**.
 
 ⚠ **`npx tsc --noEmit` type-checks ZERO files** — `frontend/tsconfig.json` is solution-style
 (`{"files": [], "references": [...]}`). Use `npx tsc -p tsconfig.app.json --noEmit`, and measure a

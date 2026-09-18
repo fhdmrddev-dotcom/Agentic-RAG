@@ -1,0 +1,360 @@
+running: npx vitest run src/landing src/components/workflows src/pages/WorkflowBuilderPage.test.tsx src/pages/WorkflowBuilderPage.canvas.test.tsx src/components/admin/revertByteIdentical.test.tsx src/pages/WorkflowBuilderPage.header.test.tsx src/pages/WorkflowBuilderPage.describe.test.tsx src/pages/WorkflowBuilderPage.preDraft.baseline.test.tsx src/components/panel/__tests__/Seam.test.tsx src/components/panel/__tests__/TodosSection.test.tsx src/components/panel/__tests__/todoRunHonesty.lockstep.test.ts src/components/panel/__tests__/WorkspacePanel.derived.test.tsx src/components/chat/__tests__/CitationList.test.tsx src/components/chat/RunCard.test.tsx src/components/chat/RunCard.timer.test.tsx src/components/chat/__tests__/ChatArea.approval.test.tsx src/components/chat/__tests__/ThinkingBlock.narration.test.tsx src/pages/WorkflowBuilderPage.declaredInputs.test.tsx src/components/panel/__tests__/PhaseReconcile.test.tsx src/components/panel/__tests__/PhaseTimeline.test.tsx src/lib/phaseState.test.ts src/lib/__tests__/fileTypeMark.test.tsx src/pages/WorkflowRunPage.test.tsx src/components/layout/ChatLayout.launch.test.tsx src/pages/SettingsPage.test.tsx src/pages/__tests__/SettingsPage.a11y.test.tsx src/pages/__tests__/SettingsPage.sourceCeiling.test.tsx src/pages/__tests__/SettingsPage.changedFields.test.tsx src/components/panel/__tests__/WorkspacePanel.test.tsx src/hooks/useDraftPersistence.test.tsx src/components/settings/__tests__/ConnectionsTab.test.tsx src/components/settings/__tests__/ConnectionFormPanel.test.tsx src/components/settings/__tests__/ReembedConfirmModal.test.tsx src/lib/__tests__/connectionMark.test.tsx src/components/settings/__tests__/connectionVerbFence.test.ts src/pages/WorkflowsPage.test.tsx src/pages/__tests__/RunModal.test.tsx src/pages/__tests__/RunModal.a11y.test.tsx src/pages/__tests__/PublishedCardDelete.test.tsx src/pages/WorkflowBuilderPage.session.test.tsx src/components/chat/__tests__/OutputFileCard.baseline.test.tsx src/components/chat/__tests__/StopControl.baseline.test.tsx src/components/panel/__tests__/FilesSection.test.tsx src/lib/__tests__/fileIcon.test.tsx src/__tests__/components/MessageItem.finalOutputs.test.tsx src/components/files/__tests__/fileRowUtils.test.ts src/components/files/__tests__/FileRow.test.tsx src/components/files/__tests__/FileRow.sweep.test.ts src/components/panel/PhaseCard.test.tsx src/components/panel/phaseStatusMeta.test.ts src/hooks/__tests__/useModelRegistry.test.ts src/hooks/__tests__/useComposerModel.test.ts src/components/chat/__tests__/ChatArea.model.test.tsx src/components/chat/__tests__/MessageInput.connectors.test.tsx src/components/chat/__tests__/ToolApproval.test.tsx src/components/chat/__tests__/MessageInputDrafts.test.tsx src/lib/apiRunFields.fences.test.ts src/components/settings/__tests__/servicesCatalog.test.ts src/lib/__tests__/apiBarrel.test.ts src/components/settings/__tests__/ConnectionGrantsList.test.tsx src/components/settings/__tests__/ConnectionFormPanel.oauth.test.tsx src/components/settings/__tests__/ingestVisibility.test.tsx src/components/settings/toolGroups.test.ts src/components/settings/ConnectionGrantsList.grouping.test.tsx src/components/settings/connectionRowVerdict.test.ts src/components/settings/applicationAvailability.test.ts src/components/settings/ApplicationGroup.availability.test.tsx src/components/chat/__tests__/statusWord.honesty.test.ts src/components/panel/__tests__/PendingAskCard.test.tsx src/components/panel/__tests__/PendingAskCard.retired.baseline.test.tsx src/components/metadata/DocumentDetailPanel.images.test.tsx src/__tests__/library/renameFence.test.ts src/components/ingestion/__tests__/acceptFormats.test.ts src/components/ingestion/__tests__/IngestionStrip.test.tsx src/components/metadata/__tests__/DetailSections.lazy.test.tsx src/components/metadata/__tests__/CR01.reset.test.tsx src/components/metadata/__tests__/DetailSections.tables.test.tsx src/components/ui/__tests__/tabsContrast.test.ts src/pages/__tests__/LibraryPage.test.tsx src/pages/__tests__/librarySelection.test.ts src/__tests__/hooks/useDocuments.test.ts src/__tests__/components/DocumentList.moveToFolder.test.tsx src/components/ingestion/DocumentList.test.tsx src/components/ingestion/ViewsGroup.test.tsx src/components/metadata/DocumentDetailPanel.a11y.test.tsx src/components/panel/__tests__/CsvTablePreview.test.tsx src/components/library/__tests__/LibraryHeaderBar.test.tsx src/components/library/__tests__/sketchComposition.test.tsx src/components/library/__tests__/ingestionFailureCopy.test.ts src/components/library/__tests__/IngestionTab.test.tsx src/components/library/ingestion/__tests__/pipelineGroups.test.ts src/components/library/__tests__/LibraryStatTiles.test.tsx src/components/library/__tests__/viewRulePhrase.test.ts src/components/library/__tests__/ViewCardGrid.test.tsx src/components/library/__tests__/IndexFoldersTable.test.tsx src/components/library/__tests__/IndexingTab.gate.test.tsx src/components/library/__tests__/HealthTiles.test.tsx src/components/library/__tests__/HealthSignalChips.test.tsx src/components/library/__tests__/CheckedQueriesSection.test.tsx src/components/layout/__tests__/ChatLayout.fallback.test.tsx src/components/metadata/__tests__/DocumentQueriesSection.test.tsx src/components/ingestion/FilterBar.test.tsx src/__tests__/components/DocumentStatusBadge.test.tsx src/components/ingestion/__tests__/DocumentStatusBadge.a11y.test.tsx src/lib/api/__tests__/connectors.mcp_auth.test.ts src/components/settings/__tests__/connectionFormCopy.mcp.test.ts src/components/settings/McpAuthDoor.test.tsx src/components/settings/McpAuthDoor.byo.test.tsx src/components/settings/__tests__/ConnectionFormPanel.sourceTools.test.tsx src/components/settings/__tests__/ConnectionFormPanel.refreshReceipt.test.tsx src/components/ui/__tests__/scrollAreaViewportWidth.test.tsx src/__tests__/hooks/useFollowScroll.test.ts src/components/chat/__tests__/MessageItem.continueButton.test.tsx src/components/chat/__tests__/MessageItem.cancelledRun.test.tsx src/components/chat/__tests__/MessageItem.blockedNotice.test.tsx src/components/chat/__tests__/MessageItem.harnessBanner.test.tsx src/components/chat/__tests__/ChatAreaBanner.test.tsx src/components/chat/__tests__/ChatAreaMode.test.tsx src/components/chat/__tests__/RunCard.characterization.test.tsx src/__tests__/components/MessageItem.test.tsx src/__tests__/components/MessageItem.clamp.test.tsx src/__tests__/components/MessageItem.fallbackNotice.test.tsx src/__tests__/components/MessageItem.memo.test.tsx src/__tests__/components/MessageItem.sticky.test.tsx src/__tests__/components/RunCard.logo.test.tsx src/__tests__/components/ToolCallPanel.test.tsx src/__tests__/components/chat/MessageList.test.tsx src/__tests__/components/chat/MessageList.dedup.test.tsx src/__tests__/components/chat/MessageList.runline.baseline.test.tsx src/components/chat/__tests__/MessageItem.retry.test.tsx src/components/chat/__tests__/MessageItem.capPaused.test.tsx src/__tests__/routing/vercelRouting.test.ts src/components/sources/SourceFolderPicker.test.tsx src/components/sources/previewVocabulary.test.ts src/components/sources/SourcePreviewPanel.test.tsx src/components/sources/WatchedFoldersSection.test.tsx src/components/sources/sourceHealthVocabulary.test.ts src/components/sources/runHistoryFold.test.ts src/components/sources/RunHistoryList.test.tsx src/components/sources/WatchedFoldersSection.history.test.tsx src/components/library/__tests__/IngestionTab.readerOff.test.tsx src/components/library/__tests__/IngestionTab.reconnectControl.test.tsx src/components/library/__tests__/SourcesAttentionSection.test.tsx src/components/layout/__tests__/NavPanel.badge.test.tsx src/components/layout/__tests__/ChatLayout.badge.test.tsx src/hooks/__tests__/useSourceAttention.test.tsx src/pages/__tests__/LibraryPage.initialTab.test.tsx src/components/classification/ClassificationRulesPage.test.tsx src/components/classification/ClassificationSection.test.tsx src/components/classification/RuleBuilderPanel.test.tsx src/components/sources/__tests__/sourceCapability.test.ts src/components/sources/__tests__/ConnectedSourceSection.test.tsx src/components/sources/__tests__/CreateWatchModal.test.tsx src/components/metadata/DocumentConversationSection.test.tsx src/components/sources/watchProductMark.test.ts src/components/sources/__tests__/WatchRowCard.test.tsx src/lib/__tests__/navItemsUnknownIsNotDenied.test.ts src/components/chat/__tests__/ThinkingBlock.characterization.test.tsx src/components/chat/__tests__/ThinkingBlock.clamp.test.tsx src/components/chat/__tests__/MessageItem.answerOutOfFold.test.tsx src/__tests__/providers/streamsProvider_243_cadence.test.tsx src/__tests__/providers/streamsProvider_bug_260707_03_final_answer_resolve.test.tsx src/__tests__/providers/streamsProvider_244_snapshot_failure.test.tsx src/__tests__/providers/streamsProvider_bug260912_turnfold.test.tsx src/__tests__/providers/workflowLockWriters.lockstep.test.ts src/__tests__/providers/streamsProvider_244_settle_ask.test.tsx src/__tests__/providers/streamsProvider_250_liveness_window.test.tsx src/__tests__/components/chat/MessageList.scroll.test.tsx src/__tests__/lib/throttle.test.ts src/components/layout/__tests__/ChatLayout.scrollFrame.test.tsx src/components/layout/__tests__/ChatHistoryColumn.clickPath.test.tsx src/components/layout/__tests__/ChatHistoryColumn.rowIdentity.test.tsx src/lib/__tests__/workspaceAllowedExt.lockstep.test.ts src/components/chat/__tests__/ChatArea.capPausedComposer.test.tsx src/components/chat/__tests__/ThreadRunLineKickoff.test.tsx src/components/chat/__tests__/MessageItem.inlineApproval.test.tsx src/components/layout/__tests__/attentionTab.test.ts src/pages/__tests__/LibraryPage.tabAttention.test.tsx src/components/chat/__tests__/ChatAttachmentChip.states.test.tsx src/components/chat/__tests__/ComposerAttach.composition.test.tsx src/components/chat/__tests__/ConnectedFilePickerModal.thread.test.tsx src/pages/__tests__/LibraryPage.cloudImport.test.tsx src/providers/__tests__/expiredAttachmentTombstone.test.tsx src/components/admin/__tests__/ModelRegistryTab.test.tsx src/components/admin/__tests__/addProviderRoster.lockstep.test.ts src/components/admin/__tests__/hideControlLegibility.test.tsx src/components/chat/__tests__/MessageInput.unverified.test.tsx src/__tests__/components/SettingsModelBadge.test.tsx src/components/sources/bug260912AppCredentials.test.ts --reporter=json --outputFile=C:\Users\fhdmr\AppData\Local\Temp\vitest-count-gate-19092-1789740217487.json --maxWorkers=2
+   via: node.exe C:\Vibe Apps\Agentic RAG\frontend\node_modules\vitest\vitest.mjs (no shell — see above)
+   cwd: C:\Vibe Apps\Agentic RAG\frontend
+report: C:\Users\fhdmr\AppData\Local\Temp\vitest-count-gate-19092-1789740217487.json
+
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Browserslist: browsers data (caniuse-lite) is 6 months old. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+JSON report written to C:/Users/fhdmr/AppData/Local/Temp/vitest-count-gate-19092-1789740217487.json
+==============================================================
+ D-184-08 per-file vitest COUNT gate (Phase 184 Wave 0)
+ report: C:\Users\fhdmr\AppData\Local\Temp\vitest-count-gate-19092-1789740217487.json
+==============================================================
+  file                                     pinned  actual   delta
+  -------------------------------------------------------------
+  canvasModel.roundtrip.test.ts               517     517       0
+  definitionOps.test.ts                       243     243       0
+  [33mWorkflowRunPage.test.tsx                    148     173     +25[0m
+  canvasModel.purity.test.ts                  143     143       0
+  [33mPhaseNodeCard.test.tsx                      132     154     +22[0m
+  [33mWorkflowBuilderPage.canvas.test.tsx         128     154     +26[0m
+  [33mWorkflowCard.test.tsx                       128     130      +2[0m
+  [33mlibrarySubtree.fences.test.ts               118     128     +10[0m
+  [33mphaseVocabulary.test.ts                     117     122      +5[0m
+  WorkflowCanvas.test.tsx                     105     105       0
+  [33mConnectionsTab.test.tsx                     102     104      +2[0m
+  canvasModel.fixtures.test.ts                100     100       0
+  libraryFilter.test.ts                        96      96       0
+  PublishGauntlet.test.tsx                     83      83       0
+  builderStore.test.ts                         77      77       0
+  connectionMark.test.tsx                      75      75       0
+  PhaseFormPanel.test.tsx                      74      74       0
+  sourceHealthVocabulary.test.ts               74      74       0
+  rowIdentity.test.ts                          72      72       0
+  SeedReceipt.test.tsx                         68      68       0
+  [33mStepTypePicker.test.tsx                      68      72      +4[0m
+  runFacts.test.ts                             65      65       0
+  WorkflowCanvas.editing.test.tsx              65      65       0
+  [33mConnectionFormPanel.test.tsx                 63     164    +101[0m
+  editAffordance.test.ts                       63      63       0
+  PhaseCard.test.tsx                           60      60       0
+  useDraftPersistence.test.tsx                 59      59       0
+  WorkflowsPage.test.tsx                       59      59       0
+  [33mConnectionPicker.test.tsx                    58      63      +5[0m
+  soulData.test.ts                             58      58       0
+  [33museTemplateFirstDraft.test.tsx               58      65      +7[0m
+  [33mWorkspacePanel.test.tsx                      58      62      +4[0m
+  fileTypeMark.test.tsx                        55      55       0
+  [33mDecisionsList.test.tsx                       54      73     +19[0m
+  [33mcanvasModel.test.ts                          52      64     +12[0m
+  [33mGovernanceSection.test.tsx                   49      60     +11[0m
+  WatchedFoldersSection.test.tsx               49      49       0
+  sketchComposition.test.tsx                   47      47       0
+  PendingAskCard.test.tsx                      45      45       0
+  phaseVocabulary.corpus.test.ts               45      45       0
+  argumentVocabulary.test.ts                   44      44       0
+  [33mWorkflowDoorSwitch.test.tsx                  44      81     +37[0m
+  [33mphaseDuration.test.ts                        43      44      +1[0m
+  TemplateAttachSection.test.tsx               43      43       0
+  [33mDescribeTemplateRow.test.tsx                 42      45      +3[0m
+  PhaseSpineGraph.test.tsx                     42      42       0
+  [33mdoorVocabulary.test.ts                       41      60     +19[0m
+  fileIcon.test.tsx                            41      41       0
+  publishRefusalVocabulary.test.ts             41      41       0
+  StepIdentity.test.tsx                        41      41       0
+  [33mFileRow.test.tsx                             40      45      +5[0m
+  IngestionTab.test.tsx                        40      40       0
+  [33mphaseState.test.ts                           40      48      +8[0m
+  [33mRunModal.test.tsx                            40      54     +14[0m
+  StarterTemplatePicker.test.tsx               40      40       0
+  PhaseTimeline.test.tsx                       38      38       0
+  [33mconnectionRowVerdict.test.ts                 37      42      +5[0m
+  [33mDescribeKbPicker.test.tsx                    37      42      +5[0m
+  relativeChanged.test.ts                      37      37       0
+  [33mLibraryToolbar.test.tsx                      36      50     +14[0m
+  [33mDraftArrivalCard.test.tsx                    35      56     +21[0m
+  cardFace.test.ts                             34      34       0
+  FlowEdge.test.tsx                            34      34       0
+  stepIdentityVocabulary.test.ts               34      34       0
+  ArgumentEditor.test.tsx                      33      33       0
+  ThinkingBlock.characterization.test.tsx      33      33       0
+  [33mModelField.test.tsx                          32      42     +10[0m
+  PhaseFormPanel.rails.test.tsx                32      32       0
+  [33mPublishedCardDelete.test.tsx                 32      42     +10[0m
+  [33mWorkflowBuilderPage.header.test.tsx          32      71     +39[0m
+  canvasNudge.test.ts                          31      31       0
+  IngestionStrip.test.tsx                      31      31       0
+  [33mPhaseNode.test.tsx                           31      34      +3[0m
+  governanceVocabulary.test.ts                 30      30       0
+  MessageList.test.tsx                         30      30       0
+  [33mProblemsTray.test.tsx                        30      35      +5[0m
+  SourcePreviewPanel.test.tsx                  30      30       0
+  WorkflowBuilderPage.describe.test.tsx        30      30       0
+  [33mMcpToolPicker.test.tsx                       29      40     +11[0m
+  ModelRegistryTab.test.tsx                    29      29       0
+  RunCard.test.tsx                             29      29       0
+  StepPanelPort.test.tsx                       29      29       0
+  templateNameBuckets.test.ts                  29      29       0
+  [33mTemplateNameCheck.test.tsx                   29      34      +5[0m
+  verdictModel.test.ts                         29      29       0
+  WorkflowCard.baseline.test.tsx               29      29       0
+  [33mRunTranscript.test.tsx                       28      44     +16[0m
+  argumentModel.test.ts                        26      26       0
+  RunReceipt.test.tsx                          26      26       0
+  TodosSection.test.tsx                        26      26       0
+  declaredInputs.test.ts                       25      25       0
+  [33mExternalActionSection.test.tsx               25      36     +11[0m
+  ingestionFailureCopy.test.ts                 25      25       0
+  librarySelection.test.ts                     25      25       0
+  PublishRefusalList.test.tsx                  25      25       0
+  MessageItem.test.tsx                         24      24       0
+  SettingsPage.test.tsx                        24      24       0
+  [33mrunVocabulary.test.ts                        23      32      +9[0m
+  StepIdentity.coverage.test.tsx               23      23       0
+  WorkflowBuilderPage.session.test.tsx         23      23       0
+  decisionsVocabulary.test.ts                  22      22       0
+  [33mfileRowUtils.test.ts                         22      26      +4[0m
+  [33mFilesSection.test.tsx                        22      28      +6[0m
+  WorkflowBuilderPage.preDraft.baseline.test.tsx     22      22       0
+  [33mconnectionVerbFence.test.ts                  21      22      +1[0m
+  OutputFileCard.baseline.test.tsx             21      21       0
+  previewVocabulary.test.ts                    21      21       0
+  runLogRow.test.ts                            21      21       0
+  templateFirstVocabulary.test.ts              21      21       0
+  toolGroups.test.ts                           21      21       0
+  [33macceptFormats.test.ts                        20      23      +3[0m
+  DescribeServicePicker.test.tsx               20      20       0
+  FileRow.sweep.test.ts                        20      20       0
+  LaunchInputFields.test.tsx                   20      20       0
+  RunLogPanel.test.tsx                         20      20       0
+  [33mRunModal.a11y.test.tsx                       20      24      +4[0m
+  WorkflowCanvas.composition.test.tsx          20      20       0
+  [33mComposerAttach.composition.test.tsx          19      21      +2[0m
+  DocumentStatusBadge.a11y.test.tsx            19      19       0
+  DocumentStatusBadge.test.tsx                 19      19       0
+  [33mPhaseReconcile.test.tsx                      19      24      +5[0m
+  [33mToolApproval.test.tsx                        19      24      +5[0m
+  applicationAvailability.test.ts              18      18       0
+  ConnectionGrantsList.grouping.test.tsx       18      18       0
+  [33mForkNameDialog.test.tsx                      18      25      +7[0m
+  modelFitness.test.ts                         18      18       0
+  [33mRunHistoryList.test.tsx                      18      30     +12[0m
+  streamsProvider_243_cadence.test.tsx         18      18       0
+  [33mChatLayout.launch.test.tsx                   17      35     +18[0m
+  runHistoryFold.test.ts                       17      17       0
+  RunStepList.test.tsx                         17      17       0
+  [33mSettingsPage.changedFields.test.tsx          17      23      +6[0m
+  useComposerModel.test.ts                     17      17       0
+  useFollowScroll.test.ts                      17      17       0
+  WatchedFoldersSection.history.test.tsx       17      17       0
+  [33mWorkflowDoorSwitch.baseline.test.tsx         17      19      +2[0m
+  DeclaredInputsEditor.test.tsx                16      16       0
+  [33mDoorHeaderStrip.test.tsx                     16      20      +4[0m
+  ingestVisibility.test.tsx                    16      16       0
+  receiptVocabulary.test.ts                    16      16       0
+  streamsProvider_244_settle_ask.test.tsx      16      16       0
+  ToolCallPanel.test.tsx                       16      16       0
+  CitationList.test.tsx                        15      15       0
+  cronPlain.test.ts                            15      15       0
+  describeServiceMatch.test.ts                 15      15       0
+  DetailSections.tables.test.tsx               15      15       0
+  LibraryPage.tabAttention.test.tsx            15      15       0
+  renameFence.test.ts                          15      15       0
+  StopControl.baseline.test.tsx                15      15       0
+  [33mWorkflowBuilderPage.test.tsx                 15      16      +1[0m
+  bug260912AppCredentials.test.ts              14      14       0
+  [33mCanvasToolbar.test.tsx                       14      18      +4[0m
+  [33mConnectionFormPanel.sourceTools.test.tsx     14      28     +14[0m
+  DetailSections.lazy.test.tsx                 14      14       0
+  [33mNavPanel.badge.test.tsx                      14      15      +1[0m
+  tabsContrast.test.ts                         14      14       0
+  ViewCardGrid.test.tsx                        14      14       0
+  ClassificationSection.test.tsx               13      13       0
+  connectionState.test.ts                      13      13       0
+  HealthSignalChips.test.tsx                   13      13       0
+  LibraryStatTiles.test.tsx                    13      13       0
+  MessageItem.answerOutOfFold.test.tsx         13      13       0
+  MessageItem.inlineApproval.test.tsx          13      13       0
+  publishBlockedStep.test.ts                   13      13       0
+  SourcesAttentionSection.test.tsx             13      13       0
+  useSourceAttention.test.tsx                  13      13       0
+  [33mapiRunFields.fences.test.ts                  12      25     +13[0m
+  [33mLibraryPage.test.tsx                         12      17      +5[0m
+  [33msourceCapability.test.ts                     12      19      +7[0m
+  [33mBuilderSaveRegion.test.tsx                   11      14      +3[0m
+  CheckedQueriesSection.test.tsx               11      11       0
+  gutterTokens.fences.test.ts                  11      11       0
+  libraryFork.test.ts                          11      11       0
+  [33mMcpToolPicker.reachability.test.tsx          11      13      +2[0m
+  MessageItem.finalOutputs.test.tsx            11      11       0
+  MessageItem.harnessBanner.test.tsx           11      11       0
+  MessageList.scroll.test.tsx                  11      11       0
+  PhaseSpine.test.tsx                          11      11       0
+  RunSpine.test.tsx                            11      11       0
+  throttle.test.ts                             11      11       0
+  useModelRegistry.test.ts                     11      11       0
+  ApplicationGroup.availability.test.tsx       10      10       0
+  attentionTab.test.ts                         10      10       0
+  ChatAttachmentChip.states.test.tsx           10      10       0
+  ChatHistoryColumn.clickPath.test.tsx         10      10       0
+  connectionCardReachability.test.tsx          10      10       0
+  FilterBar.test.tsx                           10      10       0
+  runLogTone.mirror.test.ts                    10      10       0
+  ThreadRunLineKickoff.test.tsx                10      10       0
+  toolNames.test.ts                            10      10       0
+  ViewsGroup.test.tsx                          10      10       0
+  ChatAreaBanner.test.tsx                       9       9       0
+  [33mConnectedFilePickerModal.thread.test.tsx      9      12      +3[0m
+  ConnectionGrantsList.test.tsx                 9       9       0
+  deriveTier.test.ts                            9       9       0
+  LibraryHeaderBar.test.tsx                     9       9       0
+  McpAuthDoor.test.tsx                          9       9       0
+  MessageInput.unverified.test.tsx              9       9       0
+  PendingAskCard.retired.baseline.test.tsx      9       9       0
+  scenes.test.tsx                               9       9       0
+  SettingsModelBadge.test.tsx                   9       9       0
+  SettingsPage.sourceCeiling.test.tsx           9       9       0
+  WatchRowCard.test.tsx                         9       9       0
+  WorkflowBuilderPage.declaredInputs.test.tsx      9       9       0
+  WorkflowScheduleModal.test.tsx                9       9       0
+  [33mChatArea.capPausedComposer.test.tsx           8       9      +1[0m
+  ClassificationRulesPage.test.tsx              8       8       0
+  [33mConnectionFormPanel.oauth.test.tsx            8      11      +3[0m
+  connectors.mcp_auth.test.ts                   8       8       0
+  CsvTablePreview.test.tsx                      8       8       0
+  DocumentConversationSection.test.tsx          8       8       0
+  DocumentQueriesSection.test.tsx               8       8       0
+  LibraryPage.cloudImport.test.tsx              8       8       0
+  MessageItem.cancelledRun.test.tsx             8       8       0
+  MessageList.runline.baseline.test.tsx         8       8       0
+  phaseStatusMeta.test.ts                       8       8       0
+  PublishBlockedStepCard.test.tsx               8       8       0
+  RuleBuilderPanel.test.tsx                     8       8       0
+  RunCard.characterization.test.tsx             8       8       0
+  Seam.test.tsx                                 8       8       0
+  [33mWorkflowSoul.test.tsx                         8      18     +10[0m
+  ChatHistoryColumn.rowIdentity.test.tsx        7       7       0
+  DocumentDetailPanel.a11y.test.tsx             7       7       0
+  [33mDocumentList.test.tsx                         7      17     +10[0m
+  LandingPage.test.tsx                          7       7       0
+  MessageList.dedup.test.tsx                    7       7       0
+  pipelineGroups.test.ts                        7       7       0
+  ReembedConfirmModal.test.tsx                  7       7       0
+  revertByteIdentical.test.tsx                  7       7       0
+  RunCard.timer.test.tsx                        7       7       0
+  [33mSourceFolderPicker.test.tsx                   7      15      +8[0m
+  ThinkingBlock.clamp.test.tsx                  7       7       0
+  ThinkingBlock.narration.test.tsx              7       7       0
+  transcriptVocabulary.test.ts                  7       7       0
+  useDocuments.test.ts                          7       7       0
+  [33mwatchProductMark.test.ts                      7      10      +3[0m
+  ChatLayout.scrollFrame.test.tsx               6       6       0
+  connectionFormCopy.mcp.test.ts                6       6       0
+  HealthTiles.test.tsx                          6       6       0
+  hideControlLegibility.test.tsx                6       6       0
+  [33mIndexFoldersTable.test.tsx                    6       7      +1[0m
+  [33mIndexingTab.gate.test.tsx                     6       7      +1[0m
+  IngestionTab.reconnectControl.test.tsx        6       6       0
+  [33mLibraryPage.initialTab.test.tsx               6      15      +9[0m
+  RunCard.logo.test.tsx                         6       6       0
+  streamsProvider_bug_260707_03_final_answer_resolve.test.tsx      6       6       0
+  streamsProvider_bug260912_turnfold.test.tsx      6       6       0
+  vercelRouting.test.ts                         6       6       0
+  workspaceAllowedExt.lockstep.test.ts          6       6       0
+  apiBarrel.test.ts                             5       5       0
+  ChatAreaMode.test.tsx                         5       5       0
+  [33mChatLayout.badge.test.tsx                     5      10      +5[0m
+  ConnectedSourceSection.test.tsx               5       5       0
+  CreateWatchModal.test.tsx                     5       5       0
+  expiredAttachmentTombstone.test.tsx           5       5       0
+  facts.test.ts                                 5       5       0
+  IngestionTab.readerOff.test.tsx               5       5       0
+  [33mMessageInput.connectors.test.tsx              5       9      +4[0m
+  MessageInputDrafts.test.tsx                   5       5       0
+  MessageItem.capPaused.test.tsx                5       5       0
+  MessageItem.clamp.test.tsx                    5       5       0
+  statusWord.honesty.test.ts                    5       5       0
+  streamsProvider_244_snapshot_failure.test.tsx      5       5       0
+  workflowLockWriters.lockstep.test.ts          5       5       0
+  addProviderRoster.lockstep.test.ts            4       4       0
+  ChatLayout.fallback.test.tsx                  4       4       0
+  ConnectionFormPanel.refreshReceipt.test.tsx      4       4       0
+  DocumentList.moveToFolder.test.tsx            4       4       0
+  MessageItem.blockedNotice.test.tsx            4       4       0
+  MessageItem.retry.test.tsx                    4       4       0
+  MessageItem.sticky.test.tsx                   4       4       0
+  navItemsUnknownIsNotDenied.test.ts            4       4       0
+  SettingsPage.a11y.test.tsx                    4       4       0
+  todoRunHonesty.lockstep.test.ts               4       4       0
+  viewRulePhrase.test.ts                        4       4       0
+  WorkspacePanel.derived.test.tsx               4       4       0
+  ChatArea.approval.test.tsx                    3       3       0
+  DocumentDetailPanel.images.test.tsx           3       3       0
+  McpAuthDoor.byo.test.tsx                      3       3       0
+  MessageItem.fallbackNotice.test.tsx           3       3       0
+  MessageItem.memo.test.tsx                     3       3       0
+  servicesCatalog.test.ts                       3       3       0
+  ChatArea.model.test.tsx                       2       2       0
+  CR01.reset.test.tsx                           2       2       0
+  landingBundleFence.test.ts                    2       2       0
+  MessageItem.continueButton.test.tsx           2       2       0
+  scrollAreaViewportWidth.test.tsx              2       2       0
+  streamsProvider_250_liveness_window.test.tsx      2       2       0
+  cssClasses.test.ts                            1       1       0
+  [33mPromptVariableChips.test.tsx                  —       3     new[0m
+  [33mRunHero.test.tsx                              —      18     new[0m
+  [33mautomationFacts.test.ts                       —      11     new[0m
+  [33mnodeEffectBanner.test.ts                      —       8     new[0m
+  [33mtoolReadOnlyMap.test.ts                       —       7     new[0m
+  -------------------------------------------------------------
+  total                                      7674    8414    +740
+  total 8414  ·  failed 1  ·  pinned total 7674
+--------------------------------------------------------------
+[31mRESULT: COUNT GATE VIOLATED (1 reason(s))[0m
+  [31mFAIL[0m  [failing-tests] 1 test(s) failed — the gate requires 0.
+
+        D-184-08 pins per-FILE counts because a failures-only
+        differential cannot see a DELETED test (the Phase-177 lesson).
