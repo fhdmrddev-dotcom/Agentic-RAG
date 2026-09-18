@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v4.3
 milestone_name: What You Can Actually Sell
 status: executing
-last_updated: "2026-09-18T18:47:16.465Z"
-last_activity: 2026-09-18 -- Phase 256 execution started
+last_updated: "2026-09-19T00:00:00.000Z"
+last_activity: 2026-09-19 -- Phase 256 gap-closure round 1 PLANNED (256-05), plan-checker PASSED
 progress:
   total_phases: 13
   completed_phases: 1
-  total_plans: 7
-  completed_plans: 3
+  total_plans: 8
+  completed_plans: 4
   percent: 8
 ---
 
@@ -40,10 +40,45 @@ can be taught new behaviours (skills) that persist and can be shared.
 
 ## Current Position
 
-Phase: 256 (every-token-is-counted-and-kept) — EXECUTING
-Plan: 1 of 4
-Status: Executing Phase 256
-Last activity: 2026-09-18 -- Phase 256 execution started
+Phase: 256 (every-token-is-counted-and-kept) — GAP CLOSURE ROUND 1 PLANNED, ready to execute
+Plan: 5 of 5 (`256-05` — the only unexecuted plan; 01-04 are merged)
+Status: Phase 256 gap-closure round 1 planned and plan-checker PASSED. Next: `/gsd:execute-phase 256`
+Last activity: 2026-09-19 -- 256-05-PLAN.md written + verified (plan commit `6dbe7d50e`)
+
+### ⭐ GAP-CLOSURE ROUND 1 — planned 2026-09-19, and the REVIEWER agreed the gaps were real
+
+Verification closed at **2/4 SC** (`gaps_found`). ⭐ **Gemini answered `BUS-271` with `VERDICT: REVISE`
+and re-measured BOTH gaps independently at `a0bfb43f6`** — same three unwired returns, same
+unconditional 4-leg stamp, and it named the `idx_workflow_runs_org_coverage_incomplete` consequence
+on its own. It agreed SC#2 / SC#3 are verified and left ROUTING to the operator, who ruled
+`D-256-17` / `D-256-18` (commit `146596399`). ⛔ **This is the independent review 256 owed** — the
+builder's own 2/4 was NOT the evidence.
+
+**ONE plan, `256-05` (G-8): `gap_closure_round: 1` of the 2 G-7 allows · `autonomous: true` · 3 tasks.**
+G-7 clear · ledger gate `watched: 10` (non-vacuous) · seeds 308/308 · plan-checker **PASSED** having
+re-measured every claim against source rather than reading the plan's prose.
+
+**Three shapes decided, each with its reason in source:**
+1. **ONE flush site, not three, and NOT `try/finally`.** `_flush_run_usage()` keeps the persist at one
+   home; the extra call sits at `:2246` — above the outcome dispatch, so all four arms *and any fifth
+   arm nobody has written* flow through it. ⛔ `try/finally` REJECTED: a `finally` also runs on
+   `asyncio.CancelledError` and would change which exception leaves the engine on a user Stop.
+2. ⭐ **NO NEW MIGRATION, measured not assumed.** Mig 182's `COMMENT ON COLUMN` delegates the legs to
+   `db.workflows.TOKEN_COVERAGE_LEGS` **verbatim** (1 hit in the migration, 1 in `full-schema.sql`), so
+   counting the judge spend makes the comment TRUE. ⛔ The tuple stays FOUR — a 5th `"judge"` leg is
+   the REJECTED Option B by another name.
+3. **The two judge sites are NOT symmetric.** `validator_kinds.py:592` has a live `ctx`;
+   `publish_service.py:1779` has none — `_drive_golden_run`'s `finally` closed and finalized the box
+   before the judge shot runs — so it takes a caller-supplied `usage_box` persisted at `:424` against
+   `golden_run_id`, above the `_block` return, covering all **3** billed shots.
+
+⚠ **Two line-number drifts found, recorded not fixed silently:** `256-VERIFICATION.md` says
+`run_reconciler.py:236`, measured **`:245`** (CONTEXT was right); gemini cited the box reset at
+`:1884` where the source comment reads `:1844`. ⚠ **A fence the brief missed:**
+`backend/tests/test_200_human_gate_pause.py:302` slices the pause arm's source — and lives under
+`backend/tests/`, **invisible to the `pytest tests/unit` baseline**, so 256-05 runs it explicitly.
+⚠ **Three ledger rows re-derived STALE:** `harness_engine.py` **57/21/3215** · `phase_types.py`
+**54/27/2954** (untouched — observation only) · `db/workflows.py` **50/26/2677**.
 (2 non-blocking warnings). Requirements 4/4 (METER-03 → 01 · METER-04 → 01,02 · METER-05 → 01,03 ·
 METER-06 → 02,04); all 16 `D-256-NN` cited literally (verified by my own grep — see the gate warning
 below). RESEARCH.md + PATTERNS.md written. ⛔ `256-01` is **`autonomous: false`**: execution PAUSES
