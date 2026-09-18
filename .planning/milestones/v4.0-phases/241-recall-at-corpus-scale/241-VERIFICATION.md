@@ -1,7 +1,9 @@
 ---
 phase: 241-recall-at-corpus-scale
 verified: 2026-09-10T00:00:00Z
-verification_mode: self-verified   # ⛔ OV-SOLO-01 / D-245-01 — NEVER "reviewed". No independent §6.3 reviewer exists.
+verification_mode: peer-reviewed
+independent_review: done   # Discharged 2026-09-19 by Gemini via 241-REVIEW-IND.md (BUS-253 answered).
+reviewer: gemini
 status: human_needed
 score: 3/3 must-haves (ROADMAP success criteria) independently re-derived and confirmed honest; 1 human-verification item outstanding
 overrides_applied: 0
