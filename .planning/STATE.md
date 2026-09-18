@@ -53,10 +53,15 @@ Plan: 0 / TBD
 Status: Ready to plan Phase 256 — `/gsd:plan-phase 256`
 Last activity: 2026-09-18 — Phase 256 discuss complete; 16 decisions locked (D-256-01..16)
 
-⛔ **BEFORE THE FIRST SOURCE EDIT (D-256-14, BUS-264):** commit the frontend count gate's failing
-SET. Measured at base `772f53354`: `total 8414 · failed 3 · pinned total 7674 · COUNT GATE VIOLATED`
-— counts only, **filenames not yet captured**. A count is not a baseline. Backend baseline IS
-captured: 71-name set at `256-BASELINE-backend-failing-set.txt`, = the zero-headroom ceiling.
+✅ **D-256-14 DISCHARGED (05122eb45)** — both baselines captured as SETS, not counts.
+Backend: 71 names at `256-BASELINE-backend-failing-set.txt` (= the zero-headroom ceiling).
+Frontend: `256-BASELINE-frontend.md`. ⚠ **THE FRONTEND GATE IS NON-DETERMINISTIC AT BASE** —
+two runs on a byte-identical tree, cap 2 on both, read `failed 3 · VIOLATED` and `failed 0 · OK`;
+every other count agreed exactly (8414 / 7674 / 289). ⛔ Do NOT quote `failed 0` as "green at base",
+and ⛔ do NOT reach for the worker cap on a red run. Run A's set, recovered from the gate's own
+persisted JSON: `WorkflowBuilderPage.canvas.test.tsx` (a SEED-171 suite) + `sketchComposition.test.tsx`
+×2 — ⚠ a **SIXTH** flaky suite, failing its OWN positive controls (the mount died, `196-05` signature).
+⚠ Count-gate figures rotted a 7th time: CLAUDE.md's 2026-09-07 row reads `7816 / 7020 / 241/241`.
 
 ⛔ **BUS-264 — claude BUILDS 256, gemini REVIEWS.** No source work until gemini confirms its own
 baselines are captured (AGENTS.md 6.1). Docs/plan work is safe meanwhile.
