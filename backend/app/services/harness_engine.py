@@ -1811,7 +1811,12 @@ async def run_workflow(
     # ⚠ THE READ FAILS OPEN. See ``load_run_budget``'s docstring: a database blip must not
     # kill every in-flight run on every worker at once. The named cost is that an
     # unapplied migration 125 silently disarms the cap.
-    from app.db.workflows import load_run_budget  # noqa: PLC0415 — module load-path rule
+    # ``persist_run_usage`` (Phase 256 / METER-03) rides the same local import: it is the
+    # ONE home of the token write (D-256-05), so this file gains a CALL and no SQL.
+    from app.db.workflows import (  # noqa: PLC0415 — module load-path rule
+        load_run_budget,
+        persist_run_usage,
+    )
 
     _budget = await load_run_budget(pool, run_id)
     breaker = CircuitBreaker(
@@ -1821,9 +1826,24 @@ async def run_workflow(
         or _budget["max_duration_seconds"],
         started_at=_budget["started_at"],
     )
-    # THE TOKEN SOURCE, AND IT IS THE HALF THAT DID NOT EXIST BEFORE THIS PHASE. The
-    # harness had NO per-call token counts at all: ``harness/`` contained two ``usage``
-    # references in total, both ``input_tokens=None``. The counts were being measured the
+    # THE TOKEN SOURCE, AND IT IS THE HALF THAT DID NOT EXIST BEFORE PHASE 204. The
+    # harness had NO per-call token counts at all.
+    #
+    # ⚠ CORRECTED (Phase 256 / D-256-08). This sentence previously read, verbatim apart
+    # from the spaces added around the ``=`` so the literal itself is no longer in this
+    # file:
+    #   "``harness/`` contained two ``usage`` references in total, both
+    #    ``input_tokens = None``."
+    # It is quoted here rather than deleted, because the FIGURE was wrong and a reader
+    # who trusted it would have believed METER-05 had two holes to close. MEASURED with
+    # ``grep -rn "input_tokens=" backend/app | grep None``: SEVEN argument sites plus one
+    # default parameter — api/runs.py:677 and :1331, this module's resume shell,
+    # harness/publish_service.py, scheduler_service.py, eval_runner_service.py and
+    # run_reconciler.py. Phase 256 closes this module's; the others belong to its other
+    # plans, and run_reconciler's is REGISTERED rather than fixed (the process is gone, so
+    # a stranded run's count is genuinely unknowable in memory).
+    #
+    # The counts were being measured the
     # whole time one layer down — ``task_service._stream_one_iteration`` has SUMMED every
     # turn's usage into a caller-supplied box since Phase 093 (D-17) — but nothing handed
     # a box to the harness and ``run_task_sub_agent`` did not return its total. Setting
@@ -1869,10 +1889,28 @@ async def run_workflow(
         ⚠ THE TRIP RECORD AND THE CANCEL HAPPEN BEFORE THE RAISE, inside ``trip_breaker``.
         By the time this propagates the run is already durably ``cancelled`` with its
         audit row written, so no handler upstream has to know what a breaker is.
+
+        ⚠ THE ABSORB AND THE DURABLE WRITE SIT **ABOVE** THE ``armed`` GUARD, AND THAT
+        ORDER IS THE WHOLE OF METER-03 (Phase 256, D-256-04 as corrected). ``armed`` is
+        *"is either ceiling configured?"* — an INTERACTIVE harness run configures
+        neither, so a persist written below this guard would run for scheduled runs only
+        and measure nearly every harness run in the product at zero.
+        ⛔ IT IS BEHAVIOUR-PRESERVING FOR THE TRIP, and the proof is arithmetic rather
+        than empirical: on a disarmed breaker ``max_tokens`` and ``max_duration_seconds``
+        are both ``None``, and BOTH arms of ``check_limits`` guard on ``is not None``, so
+        it returns ``(False, None)`` unconditionally. The guard is a SHORT-CIRCUIT, never
+        a semantic. ``absorb_usage_box`` mutates only the breaker's own counters, which a
+        disarmed breaker never reads.
+        ⛔ NO ``try`` AROUND THE PERSIST. This function's contract above is that it
+        raises ``CircuitBreakerTrippedError`` and not ``CancelledError``; a ``try/except``
+        here would add a branch to a function whose branch count is itself fenced.
         """
+        _d_in, _d_out = breaker.absorb_usage_box(getattr(ctx, "run_usage_box", None))
+        await persist_run_usage(
+            pool, run_id, input_delta=_d_in, output_delta=_d_out
+        )
         if not breaker.armed:
             return
-        breaker.absorb_usage_box(getattr(ctx, "run_usage_box", None))
         _tripped, _reason = breaker.check_limits()
         if not _tripped:
             return
@@ -3041,6 +3079,28 @@ async def resume_stranded_workflows(*, pool, redis) -> int:
             if _pid is not None:
                 try:
                     from app.db.runs import finalize_run
+                    # METER-05 site 3 (Phase 256 / D-256-08). This shell used to hardcode
+                    # a NULL usage, so EVERY resumed run's segment read as "never
+                    # measured" even when the box on ctx had been measuring it all along.
+                    # ⚠ GRAIN (D-256-03): the box carries THIS SEGMENT's spend and this is
+                    # a per-segment ``runs`` row, so segment-onto-segment is correct here.
+                    # ⛔ The cumulative ``workflow_runs`` figure is NOT written from this
+                    # site — ``persist_run_usage`` owns it, at the phase boundary.
+                    # ⛔ ``.get()`` with NO default and NO ``or 0``: an absent key stays
+                    # ``None`` all the way to the column, because NULL means never
+                    # measured and 0 means measured as zero (D-256-06).
+                    _box = getattr(ctx, "run_usage_box", None) or {}
+                    _in_tok = _box.get("input_tokens")
+                    _out_tok = _box.get("output_tokens")
+                    if _in_tok is None and _out_tok is None:
+                        # The warning CONTRACT from db/runs.py:93-99, honoured here.
+                        # IDENTIFIERS ONLY — never token values (T-073-04 / T-256-07).
+                        logger.warning(
+                            "runs.usage missing for run=%s provider=%s model=%s",
+                            _pid,
+                            getattr(ctx, "provider", None),
+                            getattr(ctx, "model", None),
+                        )
                     await finalize_run(
                         pool,
                         run_id=_pid,
@@ -3048,8 +3108,8 @@ async def resume_stranded_workflows(*, pool, redis) -> int:
                         error="resume re-drive failed" if _redrive_failed else None,
                         completed_at=datetime.now(timezone.utc),
                         message_id=None,
-                        input_tokens=None,
-                        output_tokens=None,
+                        input_tokens=_in_tok,
+                        output_tokens=_out_tok,
                     )
                 except Exception:
                     logger.exception(
