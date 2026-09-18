@@ -421,12 +421,46 @@ async def publish_workflow(
         logger.warning(
             "publish: owner settings load failed for %s (judge shot)", user_id, exc_info=True
         )
+    # Phase 256 round 1 (METER-06 / SC#4, D-256-18 Option A) — the judge shot's spend.
+    _judge_usage: dict = {}
     verdict = await _judge_golden_output(
         definition=definition,
         final_output=final_output,
         pool=pool,
         owner_settings=owner_settings,
+        usage_box=_judge_usage,
     )
+    # ⭐ THE JUDGE'S SPEND BECOMES DURABLE HERE, AND THIS IS THE ONLY PLACE IT CAN.
+    # ``_judge_golden_output`` has no ctx and no live ``run_usage_box``: the golden run's
+    # box was read and finalized by ``_drive_golden_run``'s own ``finally`` BEFORE this
+    # stage runs, so the in-run validator's ``_record_run_usage`` shape is unavailable
+    # here. ``pool`` and ``golden_run_id`` are in scope; nothing else is.
+    #
+    # ⛔ ``golden_run_id``, NEVER ``_producer_id``. ``golden_run_id`` is a
+    # ``workflow_runs`` row (created by ``create_workflow_run`` in ``_drive_golden_run``)
+    # — the grain ``persist_run_usage`` writes and the grain ``token_coverage`` lives on.
+    # ``_producer_id`` is the separate ``runs`` shell, and D-256-03 forbids mixing the
+    # two: a workflow figure written onto a ``runs`` row can never afterwards be summed
+    # honestly against either grain.
+    #
+    # ⚠ ABOVE THE ``_safe_audit`` AND ABOVE THE ``_block`` RETURN ~15 LINES DOWN. A
+    # BLOCKED publish is precisely the one whose money is most worth recording — nothing
+    # else about that run became durable — so a persist placed below the block would
+    # lose the judge spend of every publish the gauntlet refused.
+    #
+    # ⚠ NEW BRANCHES: 1, and it is ``persist_run_usage``'s own falsy-delta guard
+    # reached through a local ``if`` rather than a new code path — a judge that reported
+    # no usage issues NO statement, because ``NULL`` means never measured and ``0``
+    # means measured as zero (D-256-06).
+    if _judge_usage:
+        from app.db.workflows import persist_run_usage  # function-local (file convention)
+
+        await persist_run_usage(
+            pool,
+            golden_run_id,
+            input_delta=_judge_usage.get("input_tokens"),
+            output_delta=_judge_usage.get("output_tokens"),
+        )
     # The verdict is recorded REGARDLESS of pass/fail (governance — Phase 107).
     await _safe_audit(
         pool,
@@ -1698,7 +1732,7 @@ async def _drive_golden_run(
 
 
 async def _judge_golden_output(
-    *, definition, final_output: dict, pool, owner_settings=None
+    *, definition, final_output: dict, pool, owner_settings=None, usage_box: dict | None = None
 ) -> dict:
     """Run the forced judge shot over the golden run's final output (the QUAL-01 gate).
 
@@ -1710,6 +1744,21 @@ async def _judge_golden_output(
     ``owner_settings`` (IN-04) is the run owner's effective settings forwarded into the
     judge shot's ``forced_emit`` (the gateway key/config resolution) — consistent with
     the in-run validator's ``ctx.user_settings`` forwarding; ``None`` degrades gracefully.
+
+    ``usage_box`` (Phase 256 round 1 / METER-06 / SC#4, D-256-18 Option A) is the
+    CALLER-SUPPLIED accumulator this judge shot's spend is folded into — the house
+    pattern (``task_service._stream_one_iteration``, ``eval_runner_service``'s
+    ``usage_acc``). ⭐ IT IS A PARAMETER RATHER THAN A ``ctx`` RECORDING, AND THAT IS A
+    MEASUREMENT RATHER THAN A PREFERENCE: this function has **no ctx and no live usage
+    box**, because ``_drive_golden_run``'s own ``finally`` already read
+    ``ctx.run_usage_box`` and finalized the producer shell BEFORE the QUAL-01 stage runs
+    the judge. The box is closed; there is nothing here to record into. So the CALLER —
+    which holds ``pool`` and ``golden_run_id`` — owns the durable write, and it is the
+    only place that can. ``None`` keeps every pre-existing caller byte-identical.
+
+    ⛔ THE RETURNED VERDICT DICT GAINS NO TOKEN KEYS. ``JudgeVerdict`` is
+    ``extra="forbid"``, so ``model_validate`` would reject them; the verdict's shape is
+    not this concern's carrier.
 
     Returns the JudgeVerdict dict, or ``{"failure": <reason>}`` on an honest failure.
     """
@@ -1774,6 +1823,19 @@ async def _judge_golden_output(
     # is honored — this never re-judges or softens a real verdict.
     result: dict | None = None
     last_failure = "the judge produced no verdict"
+    # Phase 256 round 1 (METER-06 / SC#4) — the ladder-accumulator shape from
+    # ``forced_emit.py`` (S-4), and both halves of it are load-bearing:
+    #
+    #   · DECLARED ABOVE THE LOOP, so a FAILED attempt still counts. Up to THREE billed
+    #     shots happen in the retry below and EVERY SERVED SHOT WAS PAID FOR
+    #     (D-256-12). Declared inside, they would reset each attempt and only the
+    #     winning shot would ever be counted — a number that looks like a total and is
+    #     a third of one.
+    #   · INITIALISED TO ``None``, NEVER ``0``. A judge that reported no usage at all
+    #     must stay "never measured"; a ``0`` would read as "measured as zero" and make
+    #     a billed-but-unreported shot look free (D-256-06).
+    _judge_in: int | None = None
+    _judge_out: int | None = None
     for _attempt in range(3):
         try:
             result = await forced_emit(
@@ -1789,10 +1851,57 @@ async def _judge_golden_output(
         except Exception as e:  # noqa: BLE001 — a judge-shot crash is an honest failure, never a pass
             logger.warning("publish: judge forced_emit raised (attempt %d/3): %s", _attempt + 1, e)
             last_failure = f"judge shot raised: {e}"
+            # ⚠ NOTHING TO ACCUMULATE HERE, AND THAT IS A NAMED RESIDUAL RATHER THAN AN
+            # OVERSIGHT (IN-03). ``forced_emit`` raised, so it returned no dict — the
+            # tokens the provider may already have billed are unreachable from this
+            # scope. ⛔ Do NOT manufacture a number for it. Registered in ``SEED-300``
+            # with a concrete trigger: any phase that gives ``forced_emit`` a raise-path
+            # usage channel, or any per-rung cost breakdown.
             continue
+        # ⚠ ACCUMULATED IMMEDIATELY AFTER THE CALL AND **ABOVE** THE VERDICT CHECKS
+        # BELOW. A shot that produced no verdict was still served and billed; recording
+        # after the ``break`` would count the winning attempt only.
+        #
+        # ⛔ NOTE THE SPELLING: ``x if acc is None else acc + x``, never a truthiness
+        # fallback or a dict-get default on a token key.
+        # ``test_256_producer_shells.py::test_no_token_read_uses_a_default_or_an_or_zero``
+        # forbids both of those spellings in this file, and it is RIGHT to: ``NULL`` means
+        # never measured and ``0`` means measured as zero (D-256-06). The explicit
+        # ``is None`` test keeps the two distinct while still summing every served shot.
+        #
+        # ⚠ MEASURED, NOT ANTICIPATED, TWICE OVER. The first draft of this block used the
+        # truthiness fallback and that shipped fence caught it; the SECOND draft cleared
+        # the code and still failed, because a COMMENT here quoted the forbidden spelling
+        # verbatim and the fence is pure text with NO comment stripping. ⛔ So the rule
+        # for this file is stronger than "do not write it" — it is "do not SPELL it",
+        # prose included. (Its sibling grain fence three tests down does
+        # ``line.split("#", 1)[0]``; this one does not, and that asymmetry is real.)
+        _shot_in = result.get("input_tokens")
+        if _shot_in:
+            _judge_in = int(_shot_in) if _judge_in is None else _judge_in + int(_shot_in)
+        _shot_out = result.get("output_tokens")
+        if _shot_out:
+            _judge_out = int(_shot_out) if _judge_out is None else _judge_out + int(_shot_out)
         if not result.get("failure") and result.get("emitted") is not None:
             break  # a valid verdict — accept it (pass OR fail), do not retry
         last_failure = result.get("failure") or last_failure
+
+    # ⭐ THE FOLD SITS HERE, ONCE, ABOVE ALL THREE REMAINING RETURN PATHS — the
+    # all-attempts-failed ``{"failure": last_failure}`` below, the successful verdict,
+    # and the not-a-valid-verdict catch. The placement is the same discipline as
+    # ``harness_engine``'s ``_flush_run_usage`` call: every arm below flows THROUGH
+    # here, so the hand-off needs no branch of its own and a fourth return added later
+    # is covered by construction. (The two earlier returns — no judge model, no provider
+    # — are ABOVE the loop, where nothing was served and there is nothing to hand over.)
+    # ⛔ Same spelling discipline as the accumulators above: a PRIOR value of ``None`` is
+    # replaced, never added to as a zero (D-256-06 / the shipped producer-shell fence).
+    if usage_box is not None:
+        if _judge_in:
+            _prior = usage_box.get("input_tokens")
+            usage_box["input_tokens"] = _judge_in if _prior is None else int(_prior) + _judge_in
+        if _judge_out:
+            _prior = usage_box.get("output_tokens")
+            usage_box["output_tokens"] = _judge_out if _prior is None else int(_prior) + _judge_out
 
     if result is None or result.get("failure") or result.get("emitted") is None:
         return {"failure": last_failure}

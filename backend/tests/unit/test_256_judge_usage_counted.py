@@ -645,15 +645,44 @@ def test_this_round_shipped_no_migration():
 # ===========================================================================
 
 def test_the_validator_records_above_its_failure_arm():
-    """⛔ ORDERING, not presence — the whole point of the placement."""
+    """⛔ ORDERING, not presence — the whole point of the placement.
+
+    ⚠ MEASURED VIA ``ast``, NOT VIA A SOURCE SLICE, AND THE REASON IS THAT THE FIRST
+    DRAFT OF THIS FENCE FIRED ON ITS OWN SUBJECT'S COMMENT. The implementation's comment
+    block legitimately QUOTES the failure arm (*"recording below the
+    ``if result.get("failure") ...: return GateResult(False, …)`` two lines down would
+    count the cheap outcomes"*), so ``str.index`` found that quotation — which sits
+    ABOVE the recording — and reported the ordering backwards on correct code. That is
+    the ``PhaseFormPanel.test.tsx`` / ``stripComments.testutil.ts`` trap on the backend:
+    **a text fence cannot tell code from a comment.** ``ast`` parses statements only, so
+    prose about the code is invisible to it.
+    """
     src = Path(vk.__file__).read_text(encoding="utf-8")
-    fn = src[src.index("async def _validate_llm_judge_rubric") :]
-    fn = fn[: fn.index("\ndef ", 1)] if "\ndef " in fn[1:] else fn
-    record_at = fn.index("_record_run_usage(ctx,")
-    failure_at = fn.index('if result.get("failure")')
-    assert record_at < failure_at, (
-        "the recording sits BELOW the failure arm, so a judge shot that produced no "
-        "verdict — the expensive outcome — is never counted"
+    fn = next(
+        n
+        for n in ast.walk(ast.parse(src))
+        if isinstance(n, ast.AsyncFunctionDef) and n.name == "_validate_llm_judge_rubric"
+    )
+    record_lines = [
+        n.lineno
+        for n in ast.walk(fn)
+        if isinstance(n, ast.Call)
+        and isinstance(n.func, ast.Name)
+        and n.func.id == "_record_run_usage"
+    ]
+    assert record_lines, "no `_record_run_usage` CALL in the validator"
+    failure_lines = [
+        n.lineno
+        for n in ast.walk(fn)
+        # ⚠ ``ast.unparse`` NORMALISES STRING LITERALS TO SINGLE QUOTES, so matching the
+        # source's own double-quoted spelling finds nothing. Measured, not reasoned about.
+        if isinstance(n, ast.If) and "result.get('failure')" in ast.unparse(n.test)
+    ]
+    assert failure_lines, "the `result.get('failure')` arm moved — re-derive"
+    assert min(record_lines) < min(failure_lines), (
+        f"the recording (line {min(record_lines)}) sits BELOW the failure arm (line "
+        f"{min(failure_lines)}), so a judge shot that produced no verdict — the "
+        "expensive outcome — is never counted"
     )
 
 

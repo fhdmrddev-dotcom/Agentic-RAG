@@ -638,6 +638,30 @@ def test_the_warning_literal_appears_once_per_shell():
     assert _read("app/services/scheduler_service.py").count(_WARNING_FORMAT) == 1
 
 
+#: The SHELL functions this fence guards — the ``finally`` blocks that mint and
+#: terminalize a per-segment ``runs`` row. ⚠ THE UNIT IS THE FUNCTION, NOT THE FILE;
+#: see the docstring below for why that was narrowed.
+_SHELL_FUNCTIONS = {
+    "app/api/runs.py": ("_redrive_paused_workflow_run", "continue_run"),
+    "app/services/harness/publish_service.py": ("_drive_golden_run",),
+    "app/services/scheduler_service.py": ("_drive_run",),
+}
+
+
+def _shell_function_nodes(rel: str):
+    """The AST nodes of the shell functions in ``rel``, with the file's source."""
+    import ast
+
+    src = _read(rel)
+    tree = ast.parse(src)
+    wanted = _SHELL_FUNCTIONS[rel]
+    return src, [
+        n
+        for n in ast.walk(tree)
+        if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name in wanted
+    ]
+
+
 @pytest.mark.parametrize("rel", _SUBJECT_FILES)
 def test_no_shell_started_writing_the_workflow_grain(rel):
     """T-256-16 / D-256-03 — a segment shell must never write the cumulative total.
@@ -646,13 +670,51 @@ def test_no_shell_started_writing_the_workflow_grain(rel):
     three files now NAMES ``persist_run_usage`` in a comment, precisely to say it is the
     other grain's writer. A bare substring check would fire on the sentence that exists
     to prevent the defect — a guard that reds on its own warning label.
+
+    ⚠ NARROWED FROM FILE SCOPE TO SHELL-FUNCTION SCOPE AT PHASE 256 ROUND 1 (plan
+    256-05 / CR-02), and the original is described here rather than deleted because the
+    narrowing is a judgement a reviewer must be able to overturn.
+
+    THE ORIGINAL scanned every line of each SUBJECT FILE. THE PROPERTY it states —
+    verbatim, in its own first line and in this module's header (*"no shell may start
+    writing the workflow grain"*) — is about a **SEGMENT SHELL**, not about a file. In
+    two of the three files those are the same thing. In ``publish_service.py`` they are
+    NOT: that file hosts BOTH a segment shell (``_drive_golden_run``, whose ``finally``
+    terminalizes the per-segment ``runs`` row ``_producer_id``) AND the QUAL-01 stage,
+    which legitimately OWNS a ``workflow_runs`` row — ``golden_run_id``, created by
+    ``create_workflow_run`` inside that same shell.
+
+    ⭐ SO THE FILE-SCOPED FENCE FORBADE THE CORRECT WRITE. D-256-18 (operator ruling,
+    Option A) requires the publish-gauntlet judge shot's tokens to be COUNTED, and
+    measurement says the QUAL-01 stage is the ONLY place that can write them: by the
+    time the judge runs, ``_drive_golden_run`` has returned and its ``finally`` has
+    already read ``ctx.run_usage_box`` and finalized the producer shell, so there is no
+    ctx and no live box to record into. The stage writes onto ``golden_run_id`` — the
+    ``workflow_runs`` grain, additively, the same grain and the same row the phase
+    boundary already wrote to. ⛔ **NO GRAIN IS MIXED AND NOTHING IS SUMMED ACROSS THE
+    TWO TABLES**, which is the whole of what D-256-03 forbids; ``_producer_id`` is not
+    touched, and ``test_256_judge_usage_counted.py::
+    test_the_persist_targets_the_workflow_runs_grain_and_not_the_producer_shell`` pins
+    that separately.
+
+    ⚠ THE NARROWING IS NOT A WEAKENING, AND THAT WAS DRIVEN RATHER THAN ASSERTED: a
+    ``persist_run_usage`` call planted inside ``_drive_golden_run``'s body — the actual
+    defect this fence was built for — still turns it RED, naming the shell. Recorded in
+    ``256-05-SUMMARY.md`` with the plant's output and its md5-proved removal.
     """
-    for i, line in enumerate(_read(rel).splitlines(), start=1):
-        code = line.split("#", 1)[0]
-        assert "persist_run_usage(" not in code, (
-            f"{rel}:{i} CALLS the workflow_runs cumulative writer from a segment shell; "
-            "the two grains must never be summed (D-256-03 / T-256-16)"
-        )
-        assert not ("import" in code and "persist_run_usage" in code), (
-            f"{rel}:{i} imports the workflow_runs cumulative writer (D-256-03)"
-        )
+    src, shells = _shell_function_nodes(rel)
+    assert shells, f"{rel}: none of {_SHELL_FUNCTIONS[rel]} found — re-derive the set"
+    lines = src.splitlines()
+    for shell in shells:
+        # ``end_lineno`` is inclusive and 1-based; slice the shell's own body only.
+        for i in range(shell.lineno, (shell.end_lineno or shell.lineno) + 1):
+            code = lines[i - 1].split("#", 1)[0]
+            assert "persist_run_usage(" not in code, (
+                f"{rel}:{i} CALLS the workflow_runs cumulative writer from inside the "
+                f"segment shell `{shell.name}`; the two grains must never be summed "
+                "(D-256-03 / T-256-16)"
+            )
+            assert not ("import" in code and "persist_run_usage" in code), (
+                f"{rel}:{i} imports the workflow_runs cumulative writer inside the "
+                f"segment shell `{shell.name}` (D-256-03)"
+            )
