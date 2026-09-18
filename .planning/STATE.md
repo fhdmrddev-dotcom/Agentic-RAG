@@ -104,8 +104,20 @@ deadline. The verdict artifact is then `<phase>-REVIEW-IND.md` and the draft is 
 
 ### Undriven, not passing
 
-- **Migration 181 is NOT in cloud.** `CRED-04` discharges at the next promotion, and ⛔ **its code
-  half and its SQL half must reach cloud in ONE operation** — it is security-bearing.
+- ~~**Migration 181 is NOT in cloud.**~~ ✅ **DISCHARGED 2026-09-18 at the v4.2 production push** —
+  the original is struck through rather than deleted. Applied by the operator and **verified by a
+  live read, not by a status field**: all 15 SECURITY DEFINER functions `anon=false`, the 7 RLS
+  helpers/RPCs keeping `authenticated` exactly as the migration's Group design intends. Advisor
+  `anon_security_definer_function_executable` **13 → 0**, `authenticated_…` 13 → 7 (by design),
+  **0 ERROR**. `CRED-04` discharged.
+  ⚠ **AND ITS "ONE OPERATION" RULE WAS MEASURED NOT TO BIND, which is why the SQL shipped first.**
+  The rule read *"its code half and its SQL half must reach cloud in ONE operation."* Measured before
+  acting: 181 **grants back** `authenticated` + `service_role` on everything that needs it, the 6
+  trigger functions are privilege-checked at `CREATE TRIGGER` time not execution time, and the
+  frontend makes **zero direct `.rpc()` calls** — every DB hit goes through the backend. **There is no
+  code half.** The phrasing was inherited from the mig-118 precedent, where it was true.
+  ⛔ The lesson is not *"the rule was wrong"* — it is that a security-bearing claim is worth
+  **re-measuring against the tree** before it gates a push, exactly like an audit.
 - `MODEL-04` end-to-end in chat — needs a live self-hosted endpoint.
 - Phase 248's **G-4 scenario S2** (live `McpAuthDoor` BYO-OAuth) — needs a browser and a third-party
   account. It is **B-3's own scenario**.
@@ -219,5 +231,32 @@ and verify what it did on disk rather than trusting its JSON.**
 2. **Rule on `OV-248-01`** (above) — retire the marker or record why it stays live.
 3. **Rule on `DEBT-06`'s three open rows** — adopt the drafted refusals for 251 / 252 / 253, or leave
    them open for Gemini until **2026-09-24**. `BUS-246` and `BUS-248` are also open `to:operator`.
-4. **Promote migration 181 to cloud** when the next deploy is authorised — code half and SQL half in
-   **one operation**, with `get_advisors(security)` in the same promotion (`CRED-04`).
+4. ~~**Promote migration 181 to cloud**~~ ✅ **DONE 2026-09-18 — v4.2 IS LIVE.**
+   `master 84e3b020f → 5ff8c5846` · `production eebc4c42f → 65f7e8f30`, both merged `--no-ff`, each
+   promotion's tree proven **byte-identical to `develop`** before pushing. Migration 181 applied and
+   verified first (see *Undriven, not passing* above). `get_advisors(security)` in the same
+   operation: **0 ERROR**.
+   **Driven live after the push:** `/health` 200 `{"status":"ok","redis":"ok","maintenance":false}` ·
+   `superrag.cloud/app` **308 → `app.superrag.cloud/app`** ·
+   `Access-Control-Allow-Origin: https://app.superrag.cloud` · operator confirmed **sandbox code
+   execution in a NEW chat** and **login → chat stream → doc ingest**.
+   ⭐ **BOTH TEST GATES WENT RED AND NEITHER BLOCKED, because each was proven INHERITED by running at
+   the base commit `eebc4c42f` — never by comparing against a number written in a register.**
+   Backend read `72` vs the `71` ceiling and **that was a flake**: re-run on the same tree read `71`,
+   and head-vs-base is **71 / 71 with identical failing sets** (4900 vs 4712 passed). Vitest read
+   `failed 3`: `sketchComposition.test.tsx` fails **3 at base and 2 at head** — same
+   `Found multiple elements with the role "tab" and name "Documents"`, already live — and
+   `WorkflowBuilderPage.canvas.test.tsx` is one of `SEED-171`'s five flaky suites, **provably
+   unmodified**. All implicated files are byte-unchanged `production..develop`.
+   ⛔ **The first backend run was piped through `tail -25`, which kept the count and threw away 60 of
+   the 72 names.** It had to be re-run with full capture. *A count is not a set* — the same finding
+   this project has already paid for once.
+   ⚠ **The `71` ceiling is STALE against suite growth** — set at `3497 passed`, now `4900` (+40%) —
+   and was **left untouched**, per the standing rule that it needs explicit operator authorisation.
+   ⛔ **No agent here can watch either build.** The Vercel MCP is bound to a different account (only
+   project `fhdautomation/rag-app`, last deploy 2026-02) and there is no Coolify MCP. Build logs are
+   **operator-eyeball only** — never record a build as green from this session.
+
+5. **Set `VITE_DEMO_URL` in Vercel** when a demo booking link exists — deliberately skipped at this
+   push. ⛔ It and `VITE_APP_URL` fall back **silently** (`#start`, `/app`), so a wrong value never
+   errors, and `VITE_*` is baked at **build** time — setting it later needs a redeploy.
