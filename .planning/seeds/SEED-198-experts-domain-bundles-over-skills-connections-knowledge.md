@@ -8,6 +8,16 @@ status_note: |
   ── 2026-09-16 · reviewed at `/gsd:discuss-phase 252`, LEFT PLANTED (REG-02 sweep).
   Fired on `backend/app/**` breadth only. Experts is a capability; 252 is scoped to the v4.2
   milestone audit §8 and adds no requirement id.
+
+  ── 2026-09-18 · RE-READ against operator direction, STILL PLANTED — but its STANDING CHANGED.
+  ⭐ THIS SEED IS THE SKU. Operator direction the same day ("an ecosystem that has plugins …
+  that could be sold to clients on a commercial basis") makes an Expert the unit of sale, not
+  just a capability. An outside architecture read independently proposed a "vertical pack
+  format" as "the SKU everything else hangs from" — that is this seed, planted 25 days earlier.
+  Two seeds now sit around it: SEED-291 (the extension contract — WHY a pack is allowed to be
+  data and never engine code) is its PREREQUISITE DECISION, and SEED-294 (go-to-market) is the
+  commercial umbrella that names what still blocks a sale. ⛔ An Expert is not sellable until
+  SEED-080 / SEED-083 exist — without entitlement a pack is a folder anyone can copy.
 priority: high
 surface: Agentic-RAG
 relates_to:
