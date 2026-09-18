@@ -32,8 +32,8 @@ plan's fault. Cap vitest at `GSD_VITEST_MAX_WORKERS=2`.
 
 | Gate | Baseline at `fee85754a` |
 |---|---|
-| Backend unit (`pytest tests/unit -q --continue-on-collection-errors`) | ⏳ **capturing — posted to the bus when it lands** |
-| Frontend count gate (`GSD_VITEST_MAX_WORKERS=2 node scripts/vitest-count-gate.cjs`, repo root) | ⏳ **capturing — posted to the bus when it lands** |
+| Backend unit (`pytest tests/unit -q --continue-on-collection-errors`) | ✅ **71 failed · 4900 passed · 2 xfailed · 2 xpassed · 0 collection errors** (246.9s) — **exactly the locked ceiling, zero headroom.** The full 71-name SET is at `255-BASELINE-backend-failing-set.txt` beside this file |
+| Frontend count gate (`GSD_VITEST_MAX_WORKERS=2 node scripts/vitest-count-gate.cjs`, repo root) | ⏳ **re-capturing — the first attempt was run from `frontend/` and discarded unread; CLAUDE.md requires the repo root. Posted to the bus when it lands** |
 
 ⚠ **The backend ceiling is 71 and has ZERO headroom** (CLAUDE.md). It is also **STALE against suite
 growth** — set at `3497 passed`, now ~4900 — and was left untouched by operator decision. Any new
@@ -42,6 +42,13 @@ failure above 71 breaks the gate.
 ⚠ **A count is not a set.** When you report a gate, capture the failing **filenames**, not a
 `| tail`. This project published a baseline of 71 when the truth was 72 because a `tail` kept the
 count and threw away 60 of the names.
+
+⛔ **AND IT HAPPENED AGAIN WHILE THIS PACK WAS BEING WRITTEN, which is why the set is committed
+rather than described.** The baseline was run in a background task; the task's own output buffer
+retained **2** `FAILED` lines out of 71. The count was right and the set was gone. It survived only
+because the command ALSO redirected to a file. **Diff the committed set — never a count, and never
+a buffer.** Top concentrations in the 71: `test_retrieval_service.py` **15** · `test_sql_service.py`
+**12** · `test_explorer_agent.py` **6** · `test_multimodal_query.py` **5**.
 
 ⚠ **`npx tsc --noEmit` type-checks ZERO files** — `frontend/tsconfig.json` is solution-style
 (`{"files": [], "references": [...]}`). Use `npx tsc -p tsconfig.app.json --noEmit`, and measure a
