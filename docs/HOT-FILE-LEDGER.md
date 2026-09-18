@@ -10675,7 +10675,7 @@ cells rot within days.
 | [`backend/app/services/circuit_breaker.py`](docs/HOT-FILE-LEDGER.md#backendappservicescircuit_breakerpy) | 1 / 1 / 331 | no (1 phase) | ⚠ absent its ENTIRE LIFE — row added 256-02 at 256-01's touch, BELOW threshold. ⛔ the `max(0,…)` clamp stays on the RETURNED delta, or a reset box hands the DB a negative and SUBTRACTS real spend |
 | [`backend/app/services/task_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicestask_servicepy) | 19 / 10 / 958 | ⚠ **FIRES** | ⛔ **FIRES at 10 phases and absent from BOTH registers its ENTIRE LIFE — row added 256-02, which does NOT modify it.** The canonical two-arm usage reader METER-06 mirrors; no gate could demand it |
 | [`backend/app/services/run_reconciler.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_reconcilerpy) | 3 / 2 / 325 | no (2 phases) | ⚠ absent its ENTIRE LIFE — row added 256-02; NOT modified by 256 (D-256-08 site #7 is REGISTERED, not fixed). ⛔ its BOOT sweep NULLs a `cap_paused` run's real totals — `SEED-297` |
-| [`backend/app/services/forced_emit.py`](docs/HOT-FILE-LEDGER.md#backendappservicesforced_emitpy) | 9 / 6 / 701 | ⚠ **FIRES** | ⚠ **FIRES at 5 phases, absent from BOTH registers its ENTIRE LIFE — row added 256-04, in its FIRST edit's commit (O-6).** honoured by construction. ⛔ accumulators init `None` never `0`, above the loop |
+| [`backend/app/services/forced_emit.py`](docs/HOT-FILE-LEDGER.md#backendappservicesforced_emitpy) | 10 / 6 / 705 | ⚠ **FIRES** | ⚠ **FIRES at 5 phases, absent from BOTH registers its ENTIRE LIFE — row added 256-04, in its FIRST edit's commit (O-6).** honoured by construction. ⛔ accumulators init `None` never `0`, above the loop |
 
 
 
@@ -15003,15 +15003,26 @@ git log --format=%s -- … | sed … | grep -E '^[0-9]+(\.[0-9]+)?$' | sort -u
 wc -l backend/app/services/forced_emit.py                          → 701 (578 before this plan)
 ```
 
-The row reads **`9 / 6 / 701`** — the value a future auditor re-deriving *after* this commit will
-measure. ⚠ **No six-digit dated quick-task bucket appears in the list**, so nothing was subtracted;
-the recipe's filter is a no-op here, and that is recorded rather than left ambiguous.
+⚠ **No six-digit dated quick-task bucket appears in the list**, so nothing was subtracted; the
+recipe's filter is a no-op here, and that is recorded rather than left ambiguous.
 
 **Against `256-CONTEXT.md`'s `8 / 5 / 578`: commits CONFIRMED, phases CONFIRMED, lines CORRECTED.**
 The line figure was right when CONTEXT was written and rotted *inside this plan's own execution*
 (`+123`, all of it this plan's arms, accumulators and the prose explaining them). That is the ledger's
 own recurring finding observed at a resolution of **hours** rather than phases — which is exactly why
 the recipe exists and why a copied triple is never acceptable.
+
+⚠ **AND THE ROW ROTTED AGAIN BEFORE THE PLAN ENDED — the third value for this file in one session,
+recorded rather than quietly overwritten because it is the cleanest demonstration this ledger has of
+its own thesis.** The row was first written **`9 / 6 / 701`**, derived correctly at that moment. A
+LATER commit in the same plan — comment-only, rewording two sentences that had inflated their own
+grep — added 4 lines and a second commit to this file. Re-derived on the shipping HEAD, the row is
+**`10 / 6 / 705`**.
+
+⭐ **Nothing was wrong with the first derivation; the file moved underneath it.** The rot interval was
+**minutes**, inside a single plan, by an author who knew the rule and was actively applying it. ⛔ So
+the instruction is not *"derive carefully"* — it is **derive LAST, on the tree you are shipping**, and
+treat any triple written before the final commit as provisional.
 
 ### ⛔ THE ROW BEING ABSENT IS THE FINDING, NOT THE PAPERWORK
 
