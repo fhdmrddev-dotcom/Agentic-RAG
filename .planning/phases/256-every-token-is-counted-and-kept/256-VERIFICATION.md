@@ -173,3 +173,56 @@ judge/validator-bearing run.
 
 _Verified: 2026-09-19_
 _Verifier: Claude (gsd-verifier)_
+
+---
+
+## Operator ruling — 2026-09-19 (recorded at the close of `/gsd:execute-phase 256`)
+
+Both decisions were put to the operator with the alternatives named, and both were answered.
+
+### D-256-17 — ROUTING: one gap-closure round now, not a fold into 257
+
+Phase 256 does **not** ship at 2/4. The two unmet criteria are closed in a single gap-closure
+plan against this phase, while the context that produced them is live.
+
+**Why this over folding into 257:** Phase 257's `METER-07` "what it cannot see" view reads
+`idx_workflow_runs_org_coverage_incomplete`, and CR-02 is precisely what makes that index exclude
+runs it should list. Folding forward would mean 257 builds its headline surface on a marker already
+known to over-claim. ⛔ That is the failure this phase exists to prevent, one phase later.
+
+**G-7 status at the time of the ruling:** `node scripts/check-gap-closure-rounds.cjs 256` →
+**clear, 0 gap-closure plans**. This is therefore **round 1 of the 2 G-7 allows**. A round 2 would
+need a genuinely unmet ROADMAP success criterion, not cleanup of round 1's own output.
+
+⛔ **G-8 binds the shape:** this is **ONE plan**, not four. Both gaps are small and localized, and
+two plans touching adjacent files in one wave are one plan with two tasks. A closure round may never
+introduce a new user-facing capability — neither of these does; both restore a criterion already
+written.
+
+### D-256-18 — CR-02 is fixed by **Option A: count the judge spend**
+
+Wire `validator_kinds.py:592` (the registered `llm_judge_rubric` in-run validator) and
+`publish_service.py:1779` (the publish-gauntlet judge, up to 3 billed shots) into
+`_record_run_usage`, mirroring the single call site already wired at `phase_types.py`. Roughly two
+lines at each site.
+
+**Option B — narrowing `TOKEN_COVERAGE_LEGS` and the index predicate to name a separate judge leg —
+was considered and REJECTED**, and is recorded here rather than dropped so the choice is auditable.
+Its costs: it needs a *second migration* to alter the index predicate, and it answers "the marker
+over-claims" by lowering the claim rather than by counting the spend. ⭐ The operator's reason for A
+is the phase's own premise: **every token is counted**. A marker that is honest about not counting
+is a weaker deliverable than a marker that has nothing left to omit.
+
+⚠ **Say which option was taken in the column's own comment.** `token_coverage`'s `COMMENT ON COLUMN`
+body currently describes the four legs; after this round it must not read as though the judge legs
+were always included. ⛔ The comment lives in the applied migration and in `full-schema.sql`, so
+changing it needs another numbered migration — decide deliberately whether the comment moves or
+whether the record lives here and in `docs/`.
+
+### Still owed, and NOT part of this round's scoring
+
+- `SEED-300`'s hole #2 (the eval WITHOUT-arm's spend) was **fixed** by plan 256-03 at
+  `eval_runner_service.py:971`, but the seed still reads `status: planted`. A seed is answered by
+  editing the seed; left unflipped it is re-proposed forever.
+- `SEED-301` (the unit suite's real billed provider calls) is deliberately out of scope here and
+  must not be absorbed by raising the 71 ceiling.
