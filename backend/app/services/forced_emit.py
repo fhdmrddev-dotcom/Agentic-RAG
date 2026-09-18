@@ -203,10 +203,14 @@ def _failure(
 
     ⚠ **CORRECTION, recorded rather than silently applied (Phase 256 / S-5).**
     ``256-RESEARCH.md`` §Q4 states this helper is reached *"from the exhausted-ladder
-    floor AND from a raised-exception backstop"*. **Measured:
-    ``grep -rn "[^_a-z]_failure(" backend/app/`` returns this ``def`` and ONE call
-    site.** The raised-exception arm sets ``last_failure`` and ``continue``s — it never
-    calls this function. The original claim is quoted here rather than deleted because
+    floor AND from a raised-exception backstop"*. **Measured** by grepping
+    ``backend/app/`` for this helper's name preceded by a non-identifier character and
+    followed by an open paren: **the result is this ``def`` and exactly ONE call
+    site.** (⚠ The pattern is DESCRIBED rather than written out, deliberately: a
+    literal copy of it inside this docstring would match itself and inflate the very
+    count the sentence reports.) The raised-exception arm sets ``last_failure`` and
+    ``continue``s — it never calls this function. The original claim is quoted rather
+    than deleted because
     a reader who trusted it would thread the totals twice and look for a second site
     that does not exist. ⛔ A SECOND call site would have to thread the totals again;
     adding one without doing so silently re-opens the hole.

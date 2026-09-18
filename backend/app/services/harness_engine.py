@@ -1870,7 +1870,7 @@ async def run_workflow(
     #   ``forced_emit._drain``'s two usage arms (mirrored from ``task_service``)
     #     → ``forced_emit``'s LADDER accumulator, declared above the rung loop so a
     #       FAILED rung's spend counts too — you were billed for every shot served
-    #     → the token keys on BOTH exits (the success return and ``_failure()``)
+    #     → the token keys on BOTH exits (the success return and the honest-fail floor)
     #     → ``harness/phase_types._exec_llm_emit``'s ``_record_run_usage`` call
     #     → ``ctx.run_usage_box`` (set below)
     #     → the breaker's ``absorb_usage_box`` → ``persist_run_usage``.
