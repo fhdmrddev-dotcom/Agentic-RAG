@@ -204,8 +204,45 @@ Per `SEED-294`, stated here because they get harder to unwind as the work compou
 
 ## Traceability
 
-*Filled by the roadmapper — every REQ-ID maps to exactly one phase.*
+*Filled by the roadmapper 2026-09-18 — every REQ-ID maps to exactly one phase.*
+**Coverage: 21 / 21 mapped · 0 orphans · 0 duplicates.** Phase detail: `.planning/ROADMAP.md` →
+*v4.3 What You Can Actually Sell*.
 
-| REQ-ID | Phase |
-|---|---|
-| — | — |
+| REQ-ID | Phase | Status |
+|---|---|---|
+| EXT-01 | Phase 255 — The Extension Contract | Pending |
+| EXT-02 | Phase 255 — The Extension Contract | Pending |
+| EXT-03 | Phase 255 — The Extension Contract | Pending |
+| METER-03 | Phase 256 — Every Token Is Counted And Kept | Pending |
+| METER-04 | Phase 256 — Every Token Is Counted And Kept | Pending |
+| METER-05 | Phase 256 — Every Token Is Counted And Kept | Pending |
+| METER-06 | Phase 256 — Every Token Is Counted And Kept | Pending |
+| METER-01 | Phase 257 — Cost in Dollars, and What It Cannot See | Pending |
+| METER-02 | Phase 257 — Cost in Dollars, and What It Cannot See | Pending |
+| METER-07 | Phase 257 — Cost in Dollars, and What It Cannot See | Pending |
+| TIER-01 | Phase 258 — A Tier Becomes Enforceable | Pending |
+| TIER-02 | Phase 258 — A Tier Becomes Enforceable | Pending |
+| TIER-03 | Phase 258 — A Tier Becomes Enforceable | Pending |
+| TIER-04 | Phase 258 — A Tier Becomes Enforceable | Pending |
+| TIER-05 | Phase 258 — A Tier Becomes Enforceable | Pending |
+| PACK-01 | Phase 259 — An Expert Is a Bundle, Not a Runtime | Pending |
+| PACK-04 | Phase 259 — An Expert Is a Bundle, Not a Runtime | Pending |
+| PACK-06 | Phase 259 — An Expert Is a Bundle, Not a Runtime | Pending |
+| PACK-02 | Phase 260 — The Expert You Can Actually Use | Pending |
+| PACK-03 | Phase 260 — The Expert You Can Actually Use | Pending |
+| PACK-05 | Phase 260 — The Expert You Can Actually Use | Pending |
+
+⚠ **The `METER-*` rows are NOT in id order, and that is deliberate.** `METER-03/04/05/06` are one
+delivery boundary — *a token that was spent is written down* — and `METER-01/02/07` are another — *a
+written-down token has a price someone can read*. Mapping by id order would have put the rate registry
+in a phase with nothing persisted to price.
+
+⛔ **The six open decisions above are NOT requirements and appear in no row.** Each is surfaced at a
+named phase — #1 pricing metric → **258** (`TIER-02`, the one-way door) · #2 Open Platform → **255** ·
+#3 restrict-vs-bias and #4 two-at-once → **259** · #5 install-vs-author → **260** · #6 `OV-248-01` →
+**255**.
+
+⛔ **The v4.2 carry-ins (`DEBT-06`, `F-1`..`F-4`, the two `251-REVIEW.md` criticals, `SEED-290`,
+`SEED-287`, the unswept seeds) are mapped to NO phase, deliberately.** They are not v4.3 requirements,
+and mapping them would let this milestone's success criteria absorb another milestone's debt. They stay
+open on their own registers with their own triggers.

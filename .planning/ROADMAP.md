@@ -26,6 +26,237 @@
 - ✅ **v4.0 Connected Knowledge** — Phases **228-241** (shipped 2026-09-10, git tag `v4.0`). 14 phases, **62 plans**, migrations **153-156 / 166-176**, 6 days. **33/38 requirements delivered · 5 ⛔ not ticked** (`SRC-03` Azure-blocked · `QUEUE-06` remedy shipped but the DEFAULT is unchanged · `SURF-03` home still an open decision · `DEBT-03` ultra ruled out · `DEBT-04` gated on a production push). The knowledge base stopped depending on somebody remembering to upload: a source is connected **once**, previewed before it brings anything in, and then watched on the **shipped** scheduler. Four families as thin adapters over ONE contract — Google Drive · OneDrive/SharePoint via Graph · **any** MCP file server · mail — with **239 proving zero-code by HASH** against GitHub MCP and **240 proving mail is a SHAPE, not a fourth adapter** (`sources/base.py` byte-identical). Connection-scoped visibility at all four RLS sites, a durable queue with cap/retry/resume, and the anti-injection discipline **actually attacked** (13/13 refused · 8/8 mutations caught · live drive refused by 8/8 native providers). ⚠ **241 measured a REAL recall defect at customer scale** — `recall@20` **0.040** at the shipped `ef_search = 40`, a **cliff not a slope**. ⛔ **238, 240 and 241 closed WITHOUT an independent §6.3 review**; two UAT sets owed on credentials ([`audit`](milestones/v4.0-MILESTONE-AUDIT.md)).
 - ✅ **v4.1 Ship It & Feel It** — Phases **242-246** (shipped 2026-09-13, git tag `v4.1`). 5 phases, **25 plans**, migrations **177-180**, 3 days. **18/19 requirements delivered · 1 ⛔ unmet BY MEASUREMENT.** A deliberate **CONSOLIDATION** milestone — no new capability axis; every requirement closed something already in a register. The ship claims closed against the **database and the branch** rather than the deploy record; the chat surface stopped getting in the way (follow-scroll driven with a **real wheel** — 0 px drift, closing `BUG-260823-01` after two fixes that had passed on synthetic events; all five `SHELL` criteria driven in a browser); and v4.0's verification debt got **written verdicts** plus a greppable marker so a self-verification can no longer read as a review. ⭐ **Its best work is the requirement it did NOT deliver:** 246 proved by `EXPLAIN (ANALYZE)` that no `hnsw_ef_search` value fixes the small-tenant recall cliff through the index — every index walk returns **ONE row**, every good recall figure is a **~1.1 s sequential scan** — so the 200 default was **refused and reverted to 40**, with `RECALL-01` left open on `SEED-273`. ⭐ 246 is also the **first peer-reviewed phase since `OV-SOLO-01` was re-armed**. ⚠ Migrations **179/180 are not in cloud** and `production` is **287 commits behind**, so v4.1's own output is undeployed ([`audit`](milestones/v4.1-MILESTONE-AUDIT.md)).
 - ✅ **v4.2 The Connected Knowledge You Can Actually Run** — Phases **247-254** (shipped 2026-09-18, git tag `v4.2`). 8 phases (247-251 scoped; **252 / 253 / 254 inserted by audit**), **31 plans**, migration **181**, 6 days. **25/26 requirements satisfied · 1 ⛔ unsatisfied (`DEBT-06`).** Integration **19/19** · flows **3/3**. **26 requirements in 6 categories**, 25 mapped to the five scoped phases and `DEBT-06` held as a **milestone-wide standing gate** that ends the milestone **unmet, by measurement**. ⚠ **The bullet above is CORRECTED, not rewritten: its closing claim — *"migrations 179/180 are not in cloud and `production` is 287 commits behind, so v4.1's own output is undeployed"* — was true when written and is now FALSE.** Measured at this scoping: `production` moved `e65610ac2 → eebc4c42f` (**292 commits**), `production..develop` is **0**, migrations **179 and 180 are applied and verified in cloud** (177/178 measured **already present** — `scripts/pending-cloud-migrations.sh` diffs git refs, not the live database, and over-reported by two), and `get_advisors(security)` returns **zero ERROR findings**. **v4.1 IS deployed.** v4.2 is therefore the SECOND consecutive **consolidation** milestone — no new capability axis, every requirement closes something already in a register, and each was **DRIVEN against the tree on 2026-09-13 rather than read from a `status:` field**, a method that caught three wrong register entries (two stale toward *"still broken"*, one toward *"fine"*). Watch-loop honesty (247) · the credential boundary (248) · the model you actually run (249) · run-honesty residue (250) · register integrity (251) — then **three phases the audit added**: the four blockers five green verifications could not see (252) · the bootstrap artifact that shipped every function wide open (253) · the independent review of 249-253 (254). **v4.2 opened on deployed code for the first time in three milestones, and closed on it.**
+- 🚧 **v4.3 What You Can Actually Sell** — Phases **255-260** (started 2026-09-18). **21 requirements** in 4 categories (`EXT` · `METER` · `TIER` · `PACK`), all 21 mapped to six phases; **numbering continues at 255**, nothing resets. Migration head at open = **181**; next free slot = **182**. The milestone that turns a product which works into one that can be **packaged, priced and shipped to a client — without touching the trust boundary**. ⭐ **Its first work item is a DECISION, not a feature:** `SEED-291`'s extension contract — *a plugin is DATA, an EXTERNAL PROCESS, or SANDBOXED CODE, and never engine code* — written as binding law **before** the first plausible exception is proposed, because a claim about what is structurally impossible survives exactly zero exceptions. Then cost becomes attributable (persistence and USD — ⚠ **not** instrumentation: `harness_engine.py:1818` was measured to already count, correcting a claim mid-scoping), a tier becomes enforceable over the migration-104 columns that have sat unread since v3.4 (⚠ `SEED-080`'s *"stub that returns True"* was measured **never built** — greenfield, no stub to replace), and an Expert becomes a **bundle over four shipped subsystems** rather than a new agent type. ⛔ **The `v3.6 D-14` red line is borrowed verbatim one subsystem over: no new executor, no expert-specific agent loop, no parallel dispatcher.** ⛔ **Six open decisions are surfaced at named phases and resolved by the operator, not by the roadmap** — `TIER-02` in Phase 258 is the **pricing-metric one-way door** and must ask before it encodes. ⛔ **Two operator blockers gate every commercial route and neither is engineering** (no legal entity; the employment / IP position unsettled): neither blocks a requirement, **both block approaching anyone**.
+
+---
+
+## v4.3 What You Can Actually Sell — IN PROGRESS (started 2026-09-18)
+
+**6 phases** (255-260, no inserts planned), **21 requirements** in 4 categories.
+**Scope source:** `.planning/REQUIREMENTS.md` · **scoping record:** `PROJECT.md` → *Current Milestone: v4.3*.
+**Numbering continues at 255** — v4.2 ended at 254; nothing resets, `--reset-phase-numbers` is not active.
+**Migration head at open = `181`; next free slot = `182`.** Expected consumers: **256** (`workflow_runs`
+token columns) · **257** (the effective-dated rate registry) · **258** (the tier→capability map as
+data) · **259** (the Expert bundle + members). 255 needs none; 260 should need none.
+⛔ Filenames must match `<digits>_name.sql` — a letter suffix like `182b` is **silently skipped** by
+the Supabase CLI.
+
+**Goal:** turn a product that works into a product that can be **packaged, priced and shipped to a
+client** — without touching the trust boundary.
+
+### The dependency order is load-bearing, and it was set at intake
+
+`EXT` → `METER` → `TIER` → `PACK`, and each arrow is a real constraint rather than a preference:
+
+- **`EXT` is first because it is a DECISION, not a feature.** Its entire value is being written down
+  **before** the first plausible exception is proposed (`SEED-291`'s own trigger says so). A contract
+  authored after the exception has already been argued for is not a contract, it is a concession.
+- **`METER` before `TIER`** — nothing is priceable until cost is attributable, and this is the
+  cheapest it will ever be. Retrofitting cost attribution across a shipped pack surface is materially
+  harder than building it before one exists.
+- **`TIER` before `PACK`** — `PACK-06` gates an Expert behind `TIER-01`. ⭐ **That gate is what makes
+  a pack a SKU rather than a folder anyone can copy**, so building packs first would ship the folder.
+
+### Two scoping facts carried in, so they are not rediscovered
+
+⭐ **`METER-*` is PERSISTENCE and USD, not instrumentation.** A claim that `max_tokens_per_run` is a
+cap that cannot bind was corrected mid-measurement on 2026-09-18: `harness_engine.py:1818` wires a
+**real** token source into `CircuitBreaker` and the code's own comment says so. ⛔ **No phase here may
+be scoped to build counting that already exists** — what is missing is that the count is never
+written down, and that a token has no price.
+
+⭐ **`TIER-*` is greenfield over columns that already exist.** `organizations.subscription_tier` +
+`add_ons` have shipped since migration **104** and measure **zero** matches anywhere in `backend/app`.
+⚠ `SEED-080`'s *"the v3.0 stub `_is_tier_pro_or_higher(user)` that returns True"* was measured
+**never built** — it is a PRD artifact. **There is no stub to replace**; `TIER-01` writes the first one.
+
+### Six open decisions — surfaced at a named phase, never resolved by this roadmap
+
+⛔ **None of these is a requirement, and none is a Claude decision.** Each is an operator decision that
+must be **asked at the phase named below, before that phase encodes an answer**.
+
+| # | Decision | Surfaces at | Why there |
+|---|---|---|---|
+| 1 | **The pricing metric is a one-way door** (`SEED-294`) — per-seat / per-run / per-token / per-capability | **258** (`TIER-02`) | ⚠ `SEED-294` warns metrics get picked **by accident when nobody names the moment**. `TIER-02` **is** that moment: the capability map encodes the metric. **It must ask before it encodes.** |
+| 2 | **Open Platform sequencing** (`SEED-013`) — REST API + MCP + service accounts | **255** (`EXT-03`) | It is the **external-process arm of `EXT-01`'s own contract** and `PRDs/SEQUENCE.md`'s next unbuilt slot, so it sequences **inside or immediately after** this milestone, never against it. ⛔ Not in scope unless the operator puts it there. A **third** deferral needs a written reason, not silence. |
+| 3 | **Does selecting an Expert RESTRICT the agent or merely BIAS it?** (`SEED-198` Q1) | **259** (`PACK-01`) | Restriction is more honest in finance; bias is friendlier in general chat. This may be the strict/loose door again (Phase 124) — in which case the answer is **both, declared**. It decides what the bundle row *means*, so it is asked before the row is written. |
+| 4 | **Can two Experts be active at once?** (`SEED-198` Q2) | **259** (`PACK-01`) | Suspected **no**, and that "no" is a feature rather than a limitation — but it is a schema shape (one `expert_id` on a thread, or many), so it cannot be discovered later. |
+| 5 | **Is an Expert a thing you INSTALL or a thing you AUTHOR?** (`SEED-198` Q3) | **260** (`PACK-05`) | Probably both — but **which ships first decides the whole UI**. ⚠ If the answer would change the bundle row, it must be pulled forward into 259's discuss rather than answered by 260's first sketch. |
+| 6 | **`OV-248-01`** is contradicted by its own phase's verdict and left `live` | **255** | A register ruling — retire it or record why it stays. 255 is the phase that writes law down, so it is the cheapest place to carry one more ruling. ⛔ Not a Claude decision. |
+
+### Known shape-risk, stated at scoping rather than discovered later
+
+⚠ **G-8 IS THE GOVERNOR.** Target **3-5 plans per phase**; above **6**, CONTEXT.md must name what
+genuinely **cannot share a worktree** — adjacency is not a reason for a second plan. v4.2 held this on
+all five scoped phases (4·4·4·3·4) and still overran by **three audit-inserted phases**; that is the
+failure mode to watch here, not plan inflation.
+
+⚠ **`METER-03`/`04`/`05`/`06` land on FIVE G-5-firing files at once** (`harness_engine.py`,
+`agent_loop.py`, `tool_dispatcher.py`, `api/runs.py`, `harness/phase_types.py`). Phase **256** is the
+highest G-5 exposure in this milestone and must run `node scripts/check-hot-file-ledger.cjs 256` and
+read `docs/HOT-FILE-LEDGER.md` **before** planning, not after.
+
+⚠ **`PACK-*` carries a red line borrowed verbatim from `v3.6 D-14`, one subsystem over:** ⛔ **no new
+executor, no expert-specific agent loop, no parallel dispatcher.** An Expert is a **manifest over four
+subsystems that already ship**. The moment an Expert has its own execution path, `PACK-01` has failed —
+and so has `EXT-01`, three phases earlier, which is why 255 sequences first.
+
+⚠ **Nothing in this milestone may write *"nobody else does this"*.** `SEED-293`'s competitive record is
+40+ days stale and **missed Airia**, which markets our exact claim. The re-crawl is deferred; the
+prohibition is not.
+
+⚠ **Two operator blockers gate every commercial route and neither is engineering** (`SEED-294`): **no
+legal entity exists**, and **the employment / IP position is unsettled**. ⚠ Neither blocks a single
+requirement below. **Both block approaching anyone** — so no phase here may treat shipping as
+permission to pitch.
+
+### Phase Table
+
+| Phase | Name | Goal | Requirements | SC# | Flags |
+|-------|------|------|--------------|-----|-------|
+| 255 | The Extension Contract | What a plugin is permitted to be is written down as binding project law and mechanically enforced, before the first plausible exception is proposed | EXT-01, EXT-02, EXT-03 | 3 | ⭐ **FIRST and SMALL — this is a DECISION, not a feature.** ⛔ **`EXT-02` must be driven RED against a planted violation** on each of `SEED-291`'s six `trigger_paths`; a guard nobody has seen fire is not a guard. ⛔ The guard must land where it **executes in order** — CLAUDE.md's measured finding is that a gate named in prose but never invoked fires never. **G-5:** the guard *reads* `harness/phase_types.py`, `tool_dispatcher.py`, `agent_loop.py`, `harness/validator_kinds.py` — if any plan **modifies** one, G-5 fires and a refactor recommendation is owed first. **Operator decisions: #2 (Open Platform sequencing), #6 (`OV-248-01`).** No migration. UI hint: no |
+| 256 | Every Token Is Counted And Kept | No run loses its token count — harness, sub-agent, and paused-or-continued chat — and any remaining hole is named in a register rather than left silent | METER-03, METER-04, METER-05, METER-06 | 4 | ⛔ **The counting EXISTS — do not rebuild it** (`harness_engine.py:1818`). This phase persists and rolls up. **Migration 182** — `workflow_runs` gains token columns (migration 057 has none and no later `ALTER` adds any). **G-5 — HIGHEST EXPOSURE IN THE MILESTONE, five firing files:** `backend/app/services/harness_engine.py`, `backend/app/services/agent_loop.py`, `backend/app/services/tool_dispatcher.py`, `backend/app/api/runs.py` (the two `input_tokens=None` sites at `:677` and `:1331`), `backend/app/services/harness/phase_types.py`. Run `check-hot-file-ledger.cjs 256` and read the detail file **before** planning. ⛔ `METER-06` may be **counted OR registered with a re-open trigger** — never silently dropped. UI hint: no |
+| 257 | Cost in Dollars, and What It Cannot See | An operator reads spend in dollars per run and per org, through exactly one conversion, and the view states its own blind spots | METER-01, METER-02, METER-07 | 4 | **Migration 183** — the effective-dated rate registry. ⛔ **It cannot be derived from `MODEL_CAPABILITIES`**: measured, there is **no structured cost field**, only one prose comment (`"$3-5/1M"`, `config.py:121`). ⛔ **A model with no rate is VISIBLE AS UNRATED, never silently free** — a `$0.00` for an unrated model is the defect this phase exists to prevent. ⛔ **`METER-02` is a one-home rule**: a second conversion site anywhere is the fragmentation failure, so the fence comes with the function. **G-2 FIRES** — `/gsd:sketch` before `/gsd:plan-phase 257` (a new operator-facing spend surface). **G-4** lived-experience UAT, scenarios defined at scope-time. **G-5 likely:** `backend/app/config.py`, `frontend/src/types/index.ts`. **UI hint: yes** |
+| 258 | A Tier Becomes Enforceable | What an org has paid for decides what it can do, from ONE place, and a refusal names the tier that would allow it | TIER-01, TIER-02, TIER-03, TIER-04, TIER-05 | 5 | ⛔ **OPERATOR DECISION #1 LANDS HERE AND IS THE MILESTONE'S ONE-WAY DOOR** — `TIER-02` encodes the pricing metric. **It must ASK before it encodes.** **Migration 184** — the tier→capability map as **data, not branches**, so re-packaging is a row change and not a deploy. ⛔ **Greenfield: there is no stub to replace** (`_is_tier_pro_or_higher` was measured never built). ⛔ **`TIER-04` must be driven RED against a planted second check.** ⚠ **`TIER-05` fails CLOSED and `load_run_budget` fails OPEN — opposite choices for opposite reasons, and the difference is RECORDED, not inherited.** **G-5 plausible:** `backend/app/config.py`, `backend/app/models/user_settings.py`. UI hint: no |
+| 259 | An Expert Is a Bundle, Not a Runtime | An Expert exists as DATA — members, connections, knowledge scope, prompts, visibility — gated by tier and safe under RLS, with no execution path of its own | PACK-01, PACK-04, PACK-06 | 3 | ⛔ **THE RED LINE, `v3.6 D-14` one subsystem over: no new executor, no expert-specific agent loop, no parallel dispatcher.** The existing agent loop executes; the Expert only decides what is in scope. Prove the executor inventory is **unchanged** at close. ⚠ **`SEED-125` was a REAL cross-org skill leak, not a hypothetical** — `PACK-04` must check **every member** and must NOT skip the member check because the bundle passed; a bundle can leak a **folder reference** while every skill in it is clean. **Migration 185** — bundle + members + RLS. **`PACK-06` calls `TIER-01`, never a second check** (that is `TIER-04`'s fence firing if it does). **Operator decisions: #3 (restrict vs bias), #4 (two Experts at once).** **G-5 plausible:** `frontend/src/types/index.ts`. UI hint: no |
+| 260 | The Expert You Can Actually Use | Selecting an Expert scopes a chat thread and tells a new user what to ask — and one first-party Expert proves the whole slice end to end | PACK-02, PACK-03, PACK-05 | 3 | ⛔ **`PACK-05` is the proof the slice is worth anything: if it is not valuable with ONE Expert, the feature is wrong and a directory of twelve will not save it.** Financial Analyzer, because finance is where *answer from the documents or refuse* is most obviously correct. ⛔ **Driven as a real conversation, not a fixture** — `feedback_uat_lived_experience_gap` and CLAUDE.md's *"presence assertions cannot see content drift"* both apply: assert the rendered **content**, not the presence of a block. **G-2 FIRES** — `/gsd:sketch` before `/gsd:plan-phase 260`; the operator-approved mockup is the acceptance bar. **G-4** lived-experience UAT. **Operator decision: #5 (install vs author — it decides the whole UI).** **G-5 likely:** `frontend/src/components/chat/MessageInput.tsx`, `frontend/src/components/chat/ChatArea.tsx`, `frontend/src/types/index.ts`, and `backend/app/services/agent_loop.py` **if** scoping is enforced in the loop — ⛔ which would be the red line, so propose the seam first. **UI hint: yes** |
+
+### Phase Checklist
+
+- [ ] **Phase 255: The Extension Contract** — a plugin is DATA, an EXTERNAL PROCESS, or SANDBOXED CODE and never engine code, written as binding law, with a guard driven RED and three worked examples a third party could follow without seeing engine code (EXT-01..03)
+- [ ] **Phase 256: Every Token Is Counted And Kept** — harness totals persisted to `workflow_runs`, sub-agent usage rolled up to its producer, a paused-or-continued chat run keeping its count, and the `forced_emit` blind spot counted or named (METER-03..06)
+- [ ] **Phase 257: Cost in Dollars, and What It Cannot See** — an effective-dated rate registry, ONE token→USD conversion, and an operator view of spend per run and per org that states what it cannot see (METER-01, METER-02, METER-07)
+- [ ] **Phase 258: A Tier Becomes Enforceable** — ONE entitlement check over the migration-104 columns, a capability map as data, a refusal that names the tier, a fence against a second check, and a fail-closed arm that is driven (TIER-01..05)
+- [ ] **Phase 259: An Expert Is a Bundle, Not a Runtime** — an Expert as a row over four shipped subsystems, RLS on the bundle AND every member, gated by `TIER-01`, with the executor inventory unchanged (PACK-01, PACK-04, PACK-06)
+- [ ] **Phase 260: The Expert You Can Actually Use** — an Expert selectable in chat that visibly scopes the thread, ships its "Try asking…" prompts, and one first-party Financial Analyzer driven end to end as a real conversation (PACK-02, PACK-03, PACK-05)
+
+### Phase Details
+
+#### Phase 255: The Extension Contract
+
+**Goal**: What a plugin is permitted to be is written down as binding project law and mechanically enforced — **before** the first plausible exception is proposed. The closed core (workflow executors, emitters, validators, programmatic functions, agent tools) **is** the graded-governance product claim; a claim about what is structurally impossible survives exactly zero exceptions, so a third-party executor does not weaken it, it **deletes** it.
+**Depends on**: Nothing (first phase of v4.3). Everything after it inherits its refusals.
+**Requirements**: EXT-01, EXT-02, EXT-03
+**Success Criteria** (what must be TRUE):
+
+  1. One durable home states the contract — *a plugin is DATA, an EXTERNAL PROCESS, or SANDBOXED CODE, and never engine code* — naming the three permitted mechanisms and, explicitly, the things it **refuses**: third-party executors / emitters / validators, a generic HTTP egress node, and branching-or-looping workflow graphs as a plugin concern (EXT-01).
+  2. Planting a violation — an executor, emitter, validator, programmatic function or agent tool made resolvable from data, config, a database row or a user-supplied name — on any of `SEED-291`'s six `trigger_paths` makes the guard **exit non-zero**; removing the plant makes it pass; and the guard runs from a place that invokes it in order rather than only by hand (EXT-02).
+  3. A third party who has never seen engine code can follow each of the three permitted mechanisms to a **named home and one worked example**: data → a skill / workflow definition / template; external process → `mcp_client.py`; sandboxed code → `sandbox_service.py` (EXT-03).
+
+**Plans**: TBD
+**Flags**: ⭐ **Small and early is the point** — this costs a page and its whole value is arriving before the argument does. ⛔ **`EXT-02` is driven RED against a planted violation** on each trigger path; a guard nobody has seen fire is not a guard, and CLAUDE.md records two separate occasions where a green fence coexisted with the defect it named. ⛔ **The call must land where it executes** — a step that merely *names* a script satisfies `grep` and fires nothing; audit by extracting the command and **running** it. **G-5:** the guard reads `harness/phase_types.py`, `harness/validator_kinds.py`, `harness/emitters.py`, `harness/programmatic.py`, `tool_dispatcher.py`, `agent_loop.py` — four of those carry G-5-firing rows, so any plan that **modifies** one owes a refactor recommendation first. **Operator decision #2** (Open Platform sequencing — the external-process arm of this very contract) and **#6** (`OV-248-01` retire-or-record) surface here. No migration. **UI hint**: no
+
+#### Phase 256: Every Token Is Counted And Kept
+
+**Goal**: No run loses its token count. A harness run, a run that spawned sub-agents, and a chat run that paused for `ask_user` or was continued all finish with real, persisted totals — and any remaining hole is **named in a register** rather than left silent, because a spend figure with an unnamed hole in it is worse than no figure.
+**Depends on**: Phase 255 (the contract that says what may be extended is written before anything is instrumented for sale). Independent of it technically; ordered by the milestone's own sequencing rule.
+**Requirements**: METER-03, METER-04, METER-05, METER-06
+**Success Criteria** (what must be TRUE):
+
+  1. A completed workflow / harness run has its token totals **persisted** — `workflow_runs` carries them, and re-reading the run after the process restarts returns the same totals the in-memory ceiling saw during the run (METER-03).
+  2. A run that spawned sub-agents reports totals that **include** the sub-agent usage: the producer run's number accounts for its children, and a sub-agent's tokens appear in exactly one place rather than twice or nowhere (METER-04).
+  3. A chat run that paused for `ask_user` and was answered, and a chat run that was continued, both finish carrying real token counts — neither finalize site writes `input_tokens=None` (METER-05).
+  4. The `llm_emit` / `forced_emit` usage is **either** included in the persisted totals **or** named in a register entry with a concrete re-open trigger — and which of the two is true is discoverable from the run's own totals, not from someone's memory (METER-06).
+
+**Plans**: TBD
+**Flags**: ⛔ **DO NOT BUILD COUNTING THAT EXISTS.** `harness_engine.py:1818` already wires a real token source into `CircuitBreaker` — measured 2026-09-18, correcting a claim that was about to be recorded the other way. **The gap is persistence and rollup.** **Migration 182** — `workflow_runs` token columns (migration 057 has none; no later `ALTER` adds any). ⚠ **G-5 — the highest exposure in this milestone, five firing files at once:** `backend/app/services/harness_engine.py` · `backend/app/services/agent_loop.py` · `backend/app/services/tool_dispatcher.py` · `backend/app/api/runs.py` (the two `input_tokens=None` sites, `:677` and `:1331`) · `backend/app/services/harness/phase_types.py`. Run `node scripts/check-hot-file-ledger.cjs 256` and read each file's section in `docs/HOT-FILE-LEDGER.md` **before** planning — the CLAUDE.md row carries the verdict only; the named seam lives in the detail file. ⚠ **`METER-06` may close either way, but never silently** — an uncounted blind spot with no register entry fails this phase. **UI hint**: no
+
+#### Phase 257: Cost in Dollars, and What It Cannot See
+
+**Goal**: An operator can read spend **in dollars** per run and per org, through exactly one conversion, and the view states its own blind spots — so the first number anyone quotes is one that says what it does not include.
+**Depends on**: Phase 256 (a dollar figure over totals that are not persisted would be a figure about nothing).
+**Requirements**: METER-01, METER-02, METER-07
+**Success Criteria** (what must be TRUE):
+
+  1. Every model the product can run has an **input and output rate with an effective date**, and repricing a model adds a new effective-dated row — a past run's cost does not change when today's price does (METER-01).
+  2. A model with **no** rate reads as **unrated** wherever cost is shown — never as `$0.00`, never silently omitted from a total (METER-01).
+  3. Exactly **one** token→USD conversion exists, in one home; every caller goes through it, and a second conversion site added anywhere makes a fence fail (METER-02).
+  4. An operator can see spend in dollars for a **single run** and totalled **per org**, and the same view states **what it cannot see** — which runs used unrated models, and any gap left open by `METER-06` (METER-07).
+
+**Plans**: TBD
+**Flags**: **Migration 183** — the effective-dated rate registry. ⛔ **It cannot be derived from `MODEL_CAPABILITIES`:** measured, the roster carries **no structured cost field** — one prose comment (`"$3-5/1M"`, `config.py:121`) and nothing else. ⛔ **An unrated model must be VISIBLE, not free.** ⛔ **`METER-02` is a one-home rule and the fence ships with the function**, not in a later phase — this is `TIER-04`'s shape one category over. **G-2 FIRES**: `/gsd:sketch` before `/gsd:plan-phase 257`, and the operator-approved mockup is the acceptance bar — a spend view that is wire-correct and unreadable has not satisfied `METER-07`. **G-4**: three operator-defined *"I'd recognize failure here"* scenarios, defined at scope-time and driven in a browser. **G-5 likely:** `backend/app/config.py` (⛔ its `MODEL_CAPABILITIES` seam is already OWED — propose it before a second landing), `frontend/src/types/index.ts`. ⚠ **Out of scope by milestone decision:** dollar amounts / a published price list (`D-PRD-10`), and any billing or payment integration. This builds the machinery, not the number. **UI hint**: yes
+
+#### Phase 258: A Tier Becomes Enforceable
+
+**Goal**: What an org has paid for decides what it can do, from **one** place, and a refusal names the tier that would allow it — so re-packaging is a row change and a refusal is something a buyer can act on rather than a support ticket.
+**Depends on**: Phase 257 (nothing is priceable until cost is attributable — the milestone's own ordering rule, and the reason `SEED-120` per-org BYO keys is gated on `METER-07`).
+**Requirements**: TIER-01, TIER-02, TIER-03, TIER-04, TIER-05
+**Success Criteria** (what must be TRUE):
+
+  1. **One** entitlement check, in one home, answers from `organizations.subscription_tier` + `add_ons`; every gated capability calls it, and nothing else reads those two columns directly (TIER-01).
+  2. What a tier contains is **data**: moving a capability from one tier to another is a row change, with no code edit and no deploy (TIER-02).
+  3. A refusal **names the tier that would allow the action** — a bare 403 with no named tier is produced nowhere (TIER-03).
+  4. Adding a **second ad-hoc tier check** anywhere in the backend makes a guard fail, driven RED against a planted one before it is trusted (TIER-04).
+  5. An org whose tier **cannot be read** is refused rather than admitted, that arm is driven, and the contrast with `load_run_budget`'s deliberate fail-**open** is written down as a choice rather than inherited as an accident (TIER-05).
+
+**Plans**: TBD
+**Flags**: ⛔⛔ **OPERATOR DECISION #1 LANDS HERE AND IS THIS MILESTONE'S ONE-WAY DOOR.** `TIER-02` **is** the moment the pricing metric gets chosen — per-seat, per-run, per-token, per-capability — and `SEED-294`'s whole warning is that **metrics get picked by accident when nobody names the moment**. ⛔ **This phase must ASK before it encodes**, and record the answer as a decision with its reasoning. **Migration 184** — the tier→capability map as data, not branches. ⛔ **Greenfield**: `_is_tier_pro_or_higher` was measured **never built** (zero matches in `backend/app`; it is a `PRDs/v3.0.md` artifact), so there is no stub to replace and no prior behaviour to preserve. ⛔ **`TIER-04` driven RED against a planted second check** — the one-home rule enforced **before** two implementations exist is the cheap version; after is a refactor. **G-5 plausible:** `backend/app/config.py`, `backend/app/models/user_settings.py`. ⚠ A billing integration / payment processor is **out of scope** — this makes a tier enforceable, not chargeable. **UI hint**: no
+
+#### Phase 259: An Expert Is a Bundle, Not a Runtime
+
+**Goal**: An Expert exists as **data** — name, description, member skills, required connections, knowledge scope, prompt suggestions, visibility — tier-gated and safe under RLS, with **no execution path of its own**. An Expert is a manifest over four subsystems that already ship, not a new agent type.
+**Depends on**: Phase 258 (`PACK-06` gates an Expert behind `TIER-01` — that gate is what makes a pack a SKU rather than a folder anyone can copy) and Phase 255 (an Expert is the first thing the extension contract makes possible, and it is legal precisely because it is data).
+**Requirements**: PACK-01, PACK-04, PACK-06
+**Success Criteria** (what must be TRUE):
+
+  1. An Expert can be created, read and listed as a **row** carrying name, description, member skills, required connections, knowledge scope, prompt suggestions and visibility — and **nothing executes it**: the executor / emitter / dispatcher inventory is measurably unchanged from the phase's own base commit (PACK-01).
+  2. A user from another org cannot read the bundle **and** cannot reach any member of a bundle they can read — the member check is evaluated on its own merits and is **not** skipped because the bundle passed, proven against a bundle whose row is clean while a member reference would leak (PACK-04).
+  3. An Expert is unavailable to an org whose tier does not include it, and the refusal comes from the **Phase 258 entitlement check** — not from a second check written here (PACK-06).
+
+**Plans**: TBD
+**Flags**: ⛔⛔ **THE RED LINE, `v3.6 D-14` verbatim one subsystem over: NO new executor, NO expert-specific agent loop, NO parallel dispatcher.** The existing agent loop executes; the Expert only decides what is in scope. **The moment an Expert has its own execution path, `PACK-01` has failed — and so has `EXT-01`, four phases earlier.** Prove the inventory unchanged, the way v3.6 proved *"7 harness executors at close, exactly as at open"*. ⚠ **`SEED-125` was a REAL cross-org skill leak, not a hypothetical** — and a bundle can leak a **folder reference** even when every skill in it is clean, which is exactly why `PACK-04` names the member check separately. **Migration 185** — bundle + members + RLS on both. ⛔ **`PACK-06` calls `TIER-01`**; writing a second tier check here is precisely what `TIER-04`'s fence exists to catch, and it should catch it. **Operator decisions #3** (does an Expert RESTRICT or merely BIAS? — it decides what the row *means*, and may be the strict/loose door again, in which case the answer is *both, declared*) and **#4** (can two be active at once? — suspected **no**, and that "no" is a schema shape, not a later discovery). ⚠ **Decision #5 (install vs author) must be pulled forward into this phase's discuss if it would change the bundle row** — otherwise it waits for 260. **G-5 plausible:** `frontend/src/types/index.ts`. **UI hint**: no
+
+#### Phase 260: The Expert You Can Actually Use
+
+**Goal**: Selecting an Expert in a chat thread **visibly scopes that thread** and tells a new user what to ask — and one first-party Expert proves the whole slice end to end, because if the slice is not valuable with **one** Expert, the feature is wrong and a directory of twelve will not save it.
+**Depends on**: Phase 259 (the bundle must exist, be tier-gated and be RLS-safe before anything selects it).
+**Requirements**: PACK-02, PACK-03, PACK-05
+**Success Criteria** (what must be TRUE):
+
+  1. Selecting an Expert in a chat thread **scopes that thread** — the skills, connections and knowledge the agent works from match the bundle, the thread states which Expert is active, and the scoping is legible to the person in the chat rather than only true in the wire format (PACK-02).
+  2. A thread with an Expert selected offers that Expert's **"Try asking…"** prompts as the onboarding affordance, and using one starts a real run (PACK-03).
+  3. The **Financial Analyzer** ships end to end — selectable, scoped, prompted, and answering **from the documents or refusing** — driven as a real conversation against real documents, not a fixture (PACK-05).
+
+**Plans**: TBD
+**Flags**: ⛔ **`PACK-05` is the proof the whole slice is worth anything.** Finance is chosen because *answer from the documents or refuse* is most obviously correct there. ⛔ **Driven as a REAL conversation** — CLAUDE.md's measured lesson applies twice over: *"presence assertions cannot see content drift"* (assert the rendered **content**, never the presence of a block by `data-testid`), and BUG-260912-01, where **thirteen green tests** missed a defect that one live run caught. **G-2 FIRES**: `/gsd:sketch` before `/gsd:plan-phase 260`; the operator-approved mockup is the acceptance bar. **G-4**: three operator-defined *"I'd recognize failure here"* scenarios, defined at scope-time. **Operator decision #5** — INSTALL or AUTHOR? Probably both, but **which ships first decides the whole UI**, so it is asked before the first sketch. **G-5 likely:** `frontend/src/components/chat/MessageInput.tsx` (⛔ its `ComposerChipsRow` seam is already OWED), `frontend/src/components/chat/ChatArea.tsx`, `frontend/src/types/index.ts` — and `backend/app/services/agent_loop.py` **only if** scoping is enforced inside the loop, ⛔ which is the 259 red line reappearing: propose the seam first, and prefer scoping resolved as data handed **to** the loop rather than a branch **inside** it. **UI hint**: yes
+
+### Coverage
+
+✓ **All 21 v4.3 requirements mapped to exactly one phase. No orphans, no duplicates.**
+
+| Phase | Requirements | Count |
+|-------|--------------|-------|
+| 255 | EXT-01, EXT-02, EXT-03 | 3 |
+| 256 | METER-03, METER-04, METER-05, METER-06 | 4 |
+| 257 | METER-01, METER-02, METER-07 | 3 |
+| 258 | TIER-01, TIER-02, TIER-03, TIER-04, TIER-05 | 5 |
+| 259 | PACK-01, PACK-04, PACK-06 | 3 |
+| 260 | PACK-02, PACK-03, PACK-05 | 3 |
+| **Total** | | **21 / 21** |
+
+⚠ **The `METER-*` split is by DELIVERY BOUNDARY, not by numbering.** `METER-03/04/05/06` are one
+capability — *a token that was spent is written down* — and `METER-01/02/07` are another — *a written-down
+token has a price someone can read*. Splitting them by id order would have put the rate registry in a
+phase that had nothing persisted to price.
+
+⛔ **Carried in from v4.2 and deliberately NOT mapped to a v4.3 phase**, because they are not v4.3
+requirements and mapping them would let this milestone's success criteria absorb another milestone's
+debt: `DEBT-06` (three drafted refusals awaiting an operator ruling or a Gemini review by
+**2026-09-24**) · `F-1`..`F-4` (four one-line register repairs, including `254`'s own unparseable
+verification frontmatter) · the two live criticals in `251-REVIEW.md` · `SEED-290` · `SEED-287` · the
+unswept seeds (**134** carry no `trigger_when` at all · **114** carry prose the sweep cannot match —
+⛔ **never summed**). These remain open on their own registers with their own triggers.
+
+### Progress
+
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 255. The Extension Contract | 0/? | Not started | - |
+| 256. Every Token Is Counted And Kept | 0/? | Not started | - |
+| 257. Cost in Dollars, and What It Cannot See | 0/? | Not started | - |
+| 258. A Tier Becomes Enforceable | 0/? | Not started | - |
+| 259. An Expert Is a Bundle, Not a Runtime | 0/? | Not started | - |
+| 260. The Expert You Can Actually Use | 0/? | Not started | - |
 
 ---
 
