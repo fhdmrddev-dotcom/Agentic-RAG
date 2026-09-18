@@ -10,9 +10,27 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 
 ---
 
-## Current Milestone: v4.2 The Connected Knowledge You Can Actually Run
+## Last Shipped: v4.2 The Connected Knowledge You Can Actually Run (2026-09-18)
 
-**Started:** 2026-09-13 · Phase numbering continues at **247**.
+**Started:** 2026-09-13 · **Shipped:** 2026-09-18, git tag `v4.2` · 8 phases (247-254 — 251 scoped,
+**252 / 253 / 254 inserted by audit**), 31 plans, migration 181, 6 days.
+**25 / 26 requirements satisfied · 1 ⛔ unsatisfied (`DEBT-06`).** Integration 19/19 · flows 3/3.
+Phase numbering continues at **255**.
+
+⚠⚠ **THE CLOSING FINDING: five green phase verifications could not see what one cross-phase read
+did.** 247-251 all closed passing, every gate green — and the milestone audit then found **four
+blockers and nine warnings**, every one a **seam between two individually-correct things**. That cost
+three unplanned phases, and it is `DEBT-06`'s own argument restated from the outside.
+
+⭐ **The close re-audited rather than trusting its own audit.** The on-disk verdict read `gaps_found`
+over a tree **124 commits and three phases** old; re-driving it moved four blockers to zero.
+**An audit is a claim about a tree, and it goes stale the moment the tree moves.**
+
+⛔ **`DEBT-06` closed UNSATISFIED, as an operator decision** — 8 of 14 rows read neither
+`independent_review: done` nor a written refusal. No plan can close it: `done` needs Gemini,
+`refused` needs an operator ruling (`REG-03`). **A refusal is not a pass.**
+
+The full scoping record below is preserved verbatim as written at the open.
 
 **Goal:** the capability v4.0 built and v4.1 deployed becomes the surface you can live on — the watch
 loop tells the truth, a credential cannot land in a readable column, and the model you want to run
@@ -554,14 +572,39 @@ been scheduled.** This milestone schedules them.
 
 ## Current State
 
-**Shipped:** **v4.1 Ship It & Feel It** — 2026-09-13 (5 phases, **25 plans**, 290 commits, 3 days; git tag `v4.1`). A deliberate consolidation milestone: no new capability axis, every requirement closing something already in a register. The `SHIP` claims closed against the **database and the branch** rather than the deploy record; the chat surface's follow-scroll was finally driven with a **real wheel** (0 px drift — closing `BUG-260823-01` after two fixes that had passed on synthetic events) and all five `SHELL` criteria driven in a browser; v4.0's verification debt got **written verdicts** plus a greppable marker so a self-verification can no longer read as a review. ⭐ **The milestone's best work is `RECALL-01`, which it did NOT deliver:** Phase 246 proved by `EXPLAIN (ANALYZE)` that no `hnsw_ef_search` value fixes the small-tenant recall cliff *through the index* — every index walk returns **ONE row**, every good recall figure is a **~1.1 s sequential scan** — so the 200 default was **refused and reverted to 40**, with `SEED-273` as the remaining path. ⚠ Phase 241's contrary conclusion never inspected a plan. ⭐ 246 is also the **first peer-reviewed phase since `OV-SOLO-01` was re-armed**. ⛔ Migrations **179/180 are not in cloud** and `production` is **287 commits behind `develop`** — v4.1's own output is undeployed, the state it was opened to end for v4.0.
+**Shipped:** **v4.2 The Connected Knowledge You Can Actually Run** — 2026-09-18 (8 phases, **31
+plans**, 237 commits, 6 days; git tag `v4.2`). The second consecutive consolidation milestone, and the
+one that made v4.0's capability and v4.1's deployment a surface you can live on: a watched source
+tells the truth about itself, migration **181** revokes the default **`PUBLIC`** `EXECUTE` on all 13
+`SECURITY DEFINER` functions, a self-hosted model registers itself from the UI with no code edit, and
+the seeds register became an **executable** sweep (297/297, 0 duplicates) instead of a `grep` blind to
+55% of itself. ⭐ **Its hardest finding was structural**: `pg_dump --no-privileges` meant
+`supabase/full-schema.sql` shipped every function to a greenfield deployment **wide open** — now
+mirrored at 61 REVOKEs and gated at 133/133, driven RED against a real scratch database.
+⛔ Closed with `DEBT-06` unsatisfied by operator decision, plus four one-line register repairs and
+migration 181 not yet in cloud.
+
+**Prior:** **v4.1 Ship It & Feel It** — 2026-09-13 (5 phases, **25 plans**, 290 commits, 3 days; git tag `v4.1`). A deliberate consolidation milestone: no new capability axis, every requirement closing something already in a register. The `SHIP` claims closed against the **database and the branch** rather than the deploy record; the chat surface's follow-scroll was finally driven with a **real wheel** (0 px drift — closing `BUG-260823-01` after two fixes that had passed on synthetic events) and all five `SHELL` criteria driven in a browser; v4.0's verification debt got **written verdicts** plus a greppable marker so a self-verification can no longer read as a review. ⭐ **The milestone's best work is `RECALL-01`, which it did NOT deliver:** Phase 246 proved by `EXPLAIN (ANALYZE)` that no `hnsw_ef_search` value fixes the small-tenant recall cliff *through the index* — every index walk returns **ONE row**, every good recall figure is a **~1.1 s sequential scan** — so the 200 default was **refused and reverted to 40**, with `SEED-273` as the remaining path. ⚠ Phase 241's contrary conclusion never inspected a plan. ⭐ 246 is also the **first peer-reviewed phase since `OV-SOLO-01` was re-armed**. ⛔ Migrations **179/180 are not in cloud** and `production` is **287 commits behind `develop`** — v4.1's own output is undeployed, the state it was opened to end for v4.0.
 
 **Prior:** **v4.0 Connected Knowledge** — 2026-09-10 (14 phases, **62 plans**, 571 commits, 6 days; git tag `v4.0`). Four source families as thin adapters over ONE `browse / list / read / check` contract, and the contract was **tested rather than asserted** — 239 bound GitHub MCP through the UI alone, proven zero-code **by hash**, and 240 proved mail is a **shape, not a fourth adapter** (`sources/base.py` byte-identical). A file arrived by itself on the shipped scheduler; connection-scoped visibility is enforced at all four RLS sites; the anti-injection discipline was **actually attacked** (13/13 refused · 8/8 mutations caught · live drive refused by 8/8 native providers). ⚠ **241 measured a REAL recall defect at customer scale** — `recall@20` **0.040** at the shipped `ef_search = 40`, a **cliff not a slope** — and the remedy shipped as an operator setting with **the default unchanged**, which is why `QUEUE-06` is not ticked. 33/38 requirements delivered. Migrations 153-156 / 166-176. ⛔ **238, 240 and 241 have no independent §6.3 review.**
 
 **Earlier:** **v3.9 Connections: Any Service, Any Tool** — 2026-09-04 (16 phases, **111 plans**, 695 commits, 9 days; git tag `v3.9`). A connection became `{service identity, auth, discovered tools, per-tool grants}`, so **adding a service adds rows, not code** — Notion connects by OAuth with no developer console and returns 41 tools for zero lines of tool code; six Google applications sit under one token with 11/11 live writes. Per-tool grants, an approval moment that stops a real run, an audit receipt per outbound call, connections usable by name in chat, and the Library as one home for documents. 34/39 requirements delivered, 3 partial, 2 shipped-but-never-driven. Migrations 127-129 / 140-141 / 150-152.
 
+**Current:** **no milestone active** — v4.2 closed 2026-09-18. Next: `/gsd:new-milestone`, resuming
+phase numbering at **255**. ⚠ **Four things are owed at this close and none is new feature work:**
+(1) `DEBT-06` — three drafted refusals awaiting an operator ruling, or a Gemini review, by
+**2026-09-24**; (2) **migration 181 is not in cloud**, and its code half and SQL half must promote in
+**one operation**; (3) four one-line register repairs (`F-1`..`F-4` in the audit), one of which is
+`254`'s own unparseable verification frontmatter; (4) two live criticals in `251-REVIEW.md`, both
+guards that cannot fail. **Superseded v4.1-era entry follows.**
+
+<details>
+<summary>Superseded Current entry (v4.1 close, 2026-09-13 — preserved)</summary>
+
 **Current:** **no milestone active** — v4.1 closed 2026-09-13. Next: `/gsd:new-milestone`, resuming
 phase numbering at **247**. ⚠ **Before scoping anything, three things are owed and none of them is new work on a feature:** (1) the **161 planted seeds** of 275 — CLAUDE.md's sweep rule says every `trigger_when` is read at `/gsd:new-milestone`, and at 161 that is a phase of work, not a step in a command; (2) the **two credential-blocked UAT sets**, one of which (241 row 5) **expires the moment migration 176 reaches cloud**; (3) an **independent review for 238, 240 and 241**, which cannot happen while no independent reviewer exists — that constraint is itself a scoping input, not a footnote.
+
+</details>
 
 <details>
 <summary>Superseded Current entry (v4.0 open, 2026-09-04 — preserved)</summary>
@@ -979,9 +1022,42 @@ All 20 v3.3 requirements delivered (16 CORE + 4 STRETCH).
 - ⛔ `DEBT-03` — `/code-review ultra review-base-225`, ruled out by the operator on cost
 - ⛔ `DEBT-04` — `app.<domain>`, gated on a production push (`SEED-242`)
 
+### Validated (v4.2 — The Connected Knowledge You Can Actually Run)
+
+- ✓ Drive / Graph source paths stored whole and used by classification; no truncation — WATCH-01, WATCH-02, v4.2 (Phase 247)
+- ✓ A watch card reports the health of **the connection it rides**, not of its last run — WATCH-03, v4.2 (247)
+- ✓ "Sync now" reports its real result **in place** — WATCH-04, v4.2 (247; re-closed 252 — `onSyncNow` now returns a typed `WatchSyncOutcome`)
+- ✓ A missing file says **when**; labels match what the action does; a timestamp is absolute or relative, never both — WATCH-05..07, v4.2 (247)
+- ✓ Phase 240's seven build-review warnings each closed or explicitly accepted — WATCH-08, v4.2 (247)
+- ✓ A credential pasted into a non-secret field is **refused, not stored**, and the refusal names the field that takes one — CRED-01, v4.2 (248; re-closed 252 — the refusal no longer reaches the log, and a fourth RFC 7591 writer now crosses the same seam)
+- ✓ The grant override marker claims only what the app can know — CRED-02, v4.2 (248)
+- ✓ All 13 anon-executable `SECURITY DEFINER` functions ruled on — migration 181 revokes from **`PUBLIC`**, not just `anon` — CRED-03, v4.2 (248; extended to TABLES and to the bootstrap artifact by 253)
+- ✓ `get_advisors(security)` is a step of the deploy parity checklist — CRED-04, v4.2 (248 + 253's parity gate)
+- ✓ A local / self-hosted model is addable from the Model Registry UI with no code edit and no deploy — MODEL-04, v4.2 (249) ⛔ end-to-end in chat needs a live endpoint
+- ✓ A model absent from the capability registry **says so at pick time** — MODEL-05, v4.2 (249). ⭐ 13 configured models were measured to lose tool calling silently
+- ✓ A registry / settings change reaches every worker — MODEL-06, v4.2 (249, complete by construction + fence)
+- ✓ The hide-from-picker control is the discoverable one — MODEL-07, v4.2 (249)
+- ✓ A settings write the DB refuses reports **failure**, not 200 "Saved" — MODEL-08, v4.2 (249)
+- ✓ Every configured eval engine reports healthy or names its own cause — MODEL-09, v4.2 (249, **closed by measurement** — fresh sweep 8/8 healthy)
+- ✓ Context trimming never drops the user's own question — HONEST-01, v4.2 (250)
+- ✓ A reasoning model producing no text inside a tool loop says what happened — HONEST-02, v4.2 (250)
+- ✓ The workspace panel never claims a run is in progress after it ended — HONEST-03, v4.2 (250; **both** holes closed by 252 — the reconciliation window *and* the phase timeline reading SSE status instead of run liveness)
+- ✓ A completed task leaves no todo asserting unfinished work, with nothing auto-completed — HONEST-04, v4.2 (250)
+- ✓ No two seeds share an id — REG-01, v4.2 (251; 8 movers renumbered to 277-284 with redirect stubs)
+- ✓ The seeds register is swept by something **executable**, called at both GSD touchpoints — REG-02, v4.2 (251; `.planning/seeds/TEMPLATE.md` written for the first time, 297/297 parsed)
+- ✓ `BUS-171`'s operator queue is a decision list — REG-03, v4.2 (251)
+- ⛔ `DEBT-06` — **8 of 14 rows unmet** (239, 241, 242, 244, 245, 251, 252, 253). Accepted as documented debt at close by operator decision; `done` needs Gemini, `refused` needs an operator ruling (`REG-03`). **A refusal is not a pass.**
+
 ### Active (current milestone)
 
+*v4.2 The Connected Knowledge You Can Actually Run SHIPPED (2026-09-18; git tag `v4.2`). **No milestone active.** Next: `/gsd:new-milestone`, resuming phase numbering at **255**. ⚠ **Carried into scoping, and none of it is new feature work:** `DEBT-06`'s three drafted refusals await an operator ruling or a Gemini review by **2026-09-24** · **migration 181 is not in cloud** and promotes as one operation with `get_advisors(security)` · four one-line register repairs (`F-1`..`F-4`), including `254`'s own unparseable verification frontmatter and two duplicate-id clusters in a register **no gate sweeps** · two live criticals in `251-REVIEW.md`, both guards that cannot fail · `SEED-290` (253's 13 unfixed review findings) · `SEED-287` · the unswept seeds, reported as two figures never summed: **134 carry no `trigger_when` at all, 114 carry prose the sweep cannot match**.*
+
+<details>
+<summary>Superseded Active note (v4.0-era, preserved)</summary>
+
 *v4.0 Connected Knowledge SHIPPED (2026-09-10; git tag `v4.0`). **No milestone active.** Next: `/gsd:new-milestone`. ⚠ **Carried into scoping, and the first two are not features:** the **161 planted seeds** whose `trigger_when` the sweep rule says must each be read (at 161 that sweep is a phase, not a step); the **two credential-blocked UAT sets** — 238's nine Azure rows and 241's row 5, which **expires the moment migration 176 reaches cloud**; **three phases owing an independent §6.3 review** (238, 240, 241) with no independent reviewer in existence; **15 cloud migrations pending** before the next push; `SEED-242` still armed for `app.<domain>`; **34 open reported bugs**; `retrieval_service.py`'s G-5 extraction, owed since 231, where a **third** landing must propose the extraction first; and `SURF-03`'s open scoping decision, which is a product question rather than a build.*
+
+</details>
 
 <details>
 <summary>Superseded Active note (v3.9-era, preserved)</summary>
@@ -1205,6 +1281,8 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
+*Last updated: 2026-09-18 — **milestone v4.2 The Connected Knowledge You Can Actually Run COMPLETED** via /gsd:complete-milestone (git tag `v4.2`; 8 phases 247-254, 31 plans, 25/26 requirements, integration 19/19, flows 3/3). ⭐ **The close RE-AUDITED first**: the on-disk audit read `gaps_found` over a tree 124 commits and three phases old, and re-driving it moved its four blockers to **zero** — an audit is a claim about a tree, and it goes stale the moment the tree moves. ⛔ `DEBT-06` closed **UNSATISFIED by operator decision** — 8 of 14 rows read neither `independent_review: done` nor a written refusal, re-derived with `yaml.safe_load` rather than from a hand-typed list; no plan can close it (`done` needs Gemini, `refused` needs an operator ruling under `REG-03`), and **a refusal is not a pass**. Also carried: **migration 181 not in cloud** (promotes as ONE operation, security-bearing), four one-line register repairs `F-1`..`F-4` — one of them `254`'s **own** unparseable verification frontmatter, the exact defect `254` reported against `244` in the same week — two duplicate-id clusters in `.planning/reported-bugs/`, a register **no gate sweeps**, two live criticals in `251-REVIEW.md` (both guards with no RED arm for themselves), and 41 open artifacts acknowledged as deferred. ⚠ The close's own finding, the eighth of its kind: `gsd-sdk query milestone.complete` archived correctly and then wrote **false records** — thirteen garbage "accomplishments" harvested from section LABELS, a progress block wrong in four different ways, and the deletion of `STATE.md`'s entire narrative — while reporting success in JSON. Restored from a pre-call backup and hand-written. **Back up before an SDK write verb; verify what it did on disk, never its JSON.** Prior entry follows.*
+
 *Last updated: 2026-09-13 — **milestone v4.1 Ship It & Feel It COMPLETED** via /gsd:complete-milestone (git tag `v4.1`; 5 phases, 25 plans, 18/19 requirements). ⛔ `RECALL-01` carried open **BY MEASUREMENT, deliberately** — the knob cannot fix the recall cliff and 246 proved it; re-open on `SEED-273` (`hnsw.iterative_scan`). Also carried: **migrations 179 and 180 not in cloud** (measured at close), `production` **287 commits behind `develop`**, 245's four named residues including the independent §6.3 review still owed by 238 / 240 / 241, `SEED-272`, and `SEED-172` whose trigger **fired at this close** (local Ollama / LM Studio models still cannot be registered, timed out or given a context window through the UI — an operator-reported blocker and the leading candidate for the next milestone). ⚠ The close's own finding: the ROADMAP Progress table read `0 / 5 phases complete · 0 / 19 requirements delivered` with all five phases closed — the same wrong-denominator class v4.0 shipped with, one milestone later in a different column. Prior entry follows.*
 
 <details>
