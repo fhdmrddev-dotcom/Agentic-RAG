@@ -85,3 +85,20 @@ Not a reorganisation first. **A written rule first**, then whatever moves follow
 obvious drawing and it hides the actual problem, which is that *nobody has said what the
 categories mean.* Four surfaces with a written rule is a better product than one surface with
 five tabs and the same ambiguity inside it.
+
+---
+
+## ⚠ CONFIRMED FROM THE NAV, AND THE CAUSE IS NAMED ELSEWHERE — added 2026-09-18
+
+This seed already names **classification rules** as one of its four homes. Measured 2026-09-18,
+that home is **top-level in the primary rail**, sitting beside Chat as a peer
+(`nav-items.ts` — `{ view: "classification-rules", label: "Classification" }`).
+
+**Operator framing:** *"Classification sits top-level beside Chat, but it's a setting for how
+ingestion behaves, not a place you go to work."* ⭐ **That is this seed's boundary problem with a
+visual tell** — a configuration surface had nowhere to live except as a destination, because the
+app has exactly one navigation axis and every axis member is a destination.
+
+⛔ **The cause is recorded in `SEED-151`, not here.** This seed says configuration has no boundary;
+`SEED-151` says there is no container for a boundary to be drawn inside. **Sequence 151 first** —
+reorganising configuration before a second axis exists just renames the four homes.

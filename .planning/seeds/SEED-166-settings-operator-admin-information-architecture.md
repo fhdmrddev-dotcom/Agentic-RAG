@@ -129,3 +129,26 @@ drawing, not an acceptance bar.
   feature-visibility audience map, all of which any IA work must consume rather than replace
 - Phase 137.1 — the Settings engine-health tile board + judge-model knob, the surface this touches
 - `docs/` memory *settings ↔ control-room boundary* — the boundary question this seed formalises
+
+---
+
+## ⚠ THE SYMPTOM IS NOW VISIBLE IN THE SIDEBAR — added 2026-09-18
+
+This seed's title says *"three configuration homes"*. **The sidebar renders exactly three**,
+measured 2026-09-18:
+
+| Entry | Where it is declared |
+|---|---|
+| **Settings** | `nav-items.ts` `NAV_ITEMS`, tagged `model_management` |
+| **Organization admin** | `NavPanel.tsx:338` — **outside** `navItems` (Phase 166 / D-166-05) |
+| **Control Room** | `NavPanel.tsx:357` — **outside** `navItems`, operator-only |
+
+⭐ **Two of the three are rendered outside the shared nav array**, which is itself the finding: the
+one source of truth for navigation could not express them, so they were appended by hand. An IA
+problem that has already escaped its own data structure is past the point where a convention fixes
+it.
+
+**Operator framing, 2026-09-18:** *"Three admin entries in one sidebar is the four-homes-for-
+configuration problem rendered visually."* ⛔ It is recorded here as a **symptom**, not as a
+work item — a nav redesign is refused as standalone work until `SEED-151` (Projects) gives the
+second axis something to be about.
