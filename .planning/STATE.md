@@ -4,11 +4,11 @@ milestone: v4.3
 milestone_name: What You Can Actually Sell
 status: in-progress
 last_updated: "2026-09-18T15:00:00.000Z"
-last_activity: '2026-09-18 -- PHASE 256 (Every Token Is Counted And Kept) DISCUSS COMPLETE. CONTEXT.md + DISCUSSION-LOG.md at a392a6389; 16 decisions D-256-01..16. FOUR MEASUREMENTS CORRECTED INHERITED CLAIMS. (1) METER-05 names TWO input_tokens=None sites and 256-PREFLIGHT.md repeated it; grep -rn returns SEVEN argument sites plus one default parameter. Five are the identical producer-shell shape with a live ctx.run_usage_box and are IN SCOPE (runs.py:677, runs.py:1331, harness_engine.py:3051, publish_service.py:1671, scheduler_service.py:296); eval_runner_service.py:946 is measured at plan time; run_reconciler.py:245 is REGISTERED (process gone, a stranded Deep chat run is genuinely unknowable). (2) G-5 fires on SEVEN files, not the ROADMAP's five -- and backend/app/services/forced_emit.py (8/5/578) has NO LEDGER ROW AT ALL, absent its entire life, the config.py failure repeating. The ledger gate will fail [no-row] on it; the row is added in THIS phase. (3) METER-06 is CHEAP TO COUNT, not merely registerable: forced_emit._drain (:516) already receives the gateway's usage / usage_delta events and drops both, while task_service._drain:414-427 reads exactly those two arms -- ~10 lines mirroring an existing drain. Every ladder rung counts, including failed ones. (4) METER-04's rollup ALREADY EXISTS -- phase_types.py:768 _record_run_usage sums each sub-agent into ctx.run_usage_box while task_service.py:897 persists the same tokens to the sub-agent's own runs row. LOCKED: producer numbers are INCLUSIVE, and SC#2's 'exactly one place' is discharged as a HIERARCHY with a fence on the parent_run_id IS NULL narrowing, driven RED against a planted un-narrowed SUM. workflow_runs is AUTHORITATIVE and cumulative; the producer shell carries ITS SEGMENT -- never sum across the two tables. Persistence is PER PHASE at the existing breaker absorb point (harness_engine.py:1875) so a kill -9, an OOM and a BREAKER TRIP all keep their count; the write lands in a NEW one-home persist_run_usage() in db/workflows.py with finish_run BYTE-UNCHANGED (7 callers, 3 with no box). Migration 182: input_tokens / output_tokens integer NULL-able -- NOT NOT-NULL-DEFAULT-0, because NULL != 0 is deliberately preserved. SC#4 discharged by a COVERAGE MARKER COLUMN, so 257's METER-07 reads a column rather than someone's memory. ADD at the DB, never SET (the box resets per _resume_run), so the per-phase write must be a DELTA. CONSEQUENCE NAMED NOT FIXED: max_tokens_per_run is really per-SEGMENT -- a run resumed 5x can spend 5x its ceiling -- registered with a re-open trigger rather than changing a shipped safety cap. Seeds sweep 0 matched and that ZERO IS AN ARTEFACT (no PLAN.md exists, so the phase declares no surfaces) -- re-run after plan 01. 1 todo and 8 reported bugs reviewed, NONE folded. Next action: capture the frontend failing SET, then /gsd:plan-phase 256.'
+last_activity: '2026-09-18 -- PHASE 256 (Every Token Is Counted And Kept) PLANNED. 4 plans / 2 waves at 76304da8b; plan-checker VERIFICATION PASSED with 2 non-blocking warnings. Requirements 4/4 and all 16 D-256-NN cited literally. FOUR MEASURED CORRECTIONS TO THE LOCKED DECISIONS, each recorded beside its original. (1) D-256-04 chose an UNREACHABLE write point: harness_engine.py:1873 is `if not breaker.armed: return` ABOVE the :1875 absorb point, and armed means a ceiling is configured -- so an INTERACTIVE harness run returns early and METER-03/SC#1 would have persisted NOTHING for nearly every run. Verified in source by the orchestrator; the reorder is provably behaviour-preserving (check_limits guards both arms on `is not None`) and ships in the SAME plan as the writer, with the headline test driving a DISARMED run. (2) Q3's landmine DOES NOT EXIST -- nothing in the backend aggregates runs.input_tokens at all -- so no ordering is imposed, but D-256-02's fence now has an EMPTY SUBJECT SET and its vacuity control is mandatory, md5-proven, never timing-proven. (3) D-256-05's `7 call sites across 4 files` is WRONG and RESEARCH.md repeated it: re-derived, 5 sites across 3 files; the decision stands, the fence now asserts the re-derived SET. (4) D-256-13 is wrong in two directions, found by RUNNING the gate: scheduler_service.py ALREADY has a row, and a FOURTH firing no-row file no register names exists -- task_service.py at 19/10/958, invisible to its own guardrail at ten phases. FIFTH FINDING, about this workflow's own gate: check.decision-coverage-plan returned `total: 0 / no trackable decisions` over sixteen of them, because it matches a literal D-NN and this project writes D-256-NN -- step 13a PASSED VACUOUSLY and the coverage claim rests on a hand grep, never on that green. Seeds sweep's discuss-time 0 matched CONFIRMED an artefact: 10 matched with plans on disk, 2 genuine overlaps (SEED-266, SEED-291), both LEAVE. 256-01 is autonomous:false -- execution pauses for the operator to paste migration 182 into the Supabase SQL editor -- and is the only DB mutator. Next action: /clear then /gsd:execute-phase 256.'
 progress:
   total_phases: 6
   completed_phases: 1
-  total_plans: 3
+  total_plans: 7
   completed_plans: 3
   percent: 17
 # ⛔ Hand-edited at the v4.2 close. `state.*` was NOT called, and `milestone.complete`'s own
@@ -48,10 +48,89 @@ can be taught new behaviours (skills) that persist and can be shared.
 
 ## Current Position
 
-Phase: 256 — Every Token Is Counted And Kept · CONTEXT CAPTURED (a392a6389)
-Plan: 0 / TBD
-Status: Ready to plan Phase 256 — `/gsd:plan-phase 256`
-Last activity: 2026-09-18 — Phase 256 discuss complete; 16 decisions locked (D-256-01..16)
+Phase: 256 — Every Token Is Counted And Kept · PLANNED (76304da8b)
+Plan: 0 / 4 — wave 1 `{256-01, 256-02}` · wave 2 `{256-03, 256-04}`
+Status: Ready to execute Phase 256 — `/gsd:execute-phase 256`
+Last activity: 2026-09-18 — Phase 256 planned. 4 plans, 2 waves, `## VERIFICATION PASSED`
+(2 non-blocking warnings). Requirements 4/4 (METER-03 → 01 · METER-04 → 01,02 · METER-05 → 01,03 ·
+METER-06 → 02,04); all 16 `D-256-NN` cited literally (verified by my own grep — see the gate warning
+below). RESEARCH.md + PATTERNS.md written. ⛔ `256-01` is **`autonomous: false`**: execution PAUSES
+for the operator to paste `182_workflow_runs_token_totals.sql` into the local Supabase SQL editor,
+and it is the phase's ONLY DB mutator — never run it beside another.
+
+⛔ **FOUR MEASURED CORRECTIONS TO THE LOCKED DECISIONS. Each is recorded beside its original, never
+over it, because being wrong in a register is the finding.**
+
+1. ⛔ **D-256-04's WRITE POINT IS UNREACHABLE AS SPECIFIED, and this is the correction that changes
+   the build.** `harness_engine.py:1873` is `if not breaker.armed: return`, sitting **ABOVE** the
+   `:1875` absorb point the decision chose; `circuit_breaker.py:129` defines `armed` as *"is either
+   ceiling configured?"*, so an **interactive** harness run is disarmed and returns early. As
+   written, **METER-03 / SC#1 would have persisted NOTHING for nearly every harness run.** Verified
+   independently in source by the orchestrator, not inherited: `check_limits` guards both arms on
+   `is not None`, so a disarmed breaker returns `(False, None)` unconditionally and the reorder is
+   **provably behaviour-preserving**. It ships in the SAME plan as the writer (`256-01`, O-2), and
+   the headline test drives a **DISARMED** run — a scheduled-run-only fixture would pass over the
+   defect, which is this project's recorded *"green fence beside the shipped defect"* shape.
+
+2. ⭐ **Q3's LANDMINE DOES NOT EXIST — and that makes a fence weaker, not the phase easier.**
+   Measured over seven search strategies: **nothing in the backend aggregates `runs.input_tokens` /
+   `output_tokens` at all**, in SQL or Python. So filling the five producer shells cannot double-count
+   anything and **imposes no plan ordering** (O-1). ⛔ But D-256-02's narrowing fence therefore has an
+   **EMPTY SUBJECT SET** and is green from birth, so its vacuity control is **mandatory, not
+   advisable**: authored in wave 1, RED-driven entirely against a planted violation, plant removal
+   proven by md5 — ⛔ never by timing (Phase 255's planted `eval()` sat live).
+
+3. ⛔ **D-256-05's "7 call sites across 4 files" is WRONG, and RESEARCH.md repeated it.** Re-derived:
+   `grep -rn "await finish_run(" backend/app/` → **5 call sites across 3 files**
+   (`api/workflows.py:1802`, `harness_engine.py:2257`/`:2298`/`:2580`, `run_lifecycle.py:521`). The
+   decision it supports — leave `finish_run` **byte-unchanged** — is unaffected; the fence now asserts
+   the **re-derived SET** rather than an inherited count.
+
+4. ⛔ **D-256-13 is wrong in two directions, measured by RUNNING the gate rather than reading the
+   table.** `node scripts/check-hot-file-ledger.cjs 256` → **exit 1**, `watched: 9` (non-vacuous),
+   exactly TWO `[no-row]`: `circuit_breaker.py` (1/1/331, owed by `256-01`) and `forced_emit.py`
+   (8/5/578, **FIRES**, owed by `256-04` per O-6). ⚠ **`scheduler_service.py` ALREADY HAS a row** —
+   D-256-13 says it needs one added. ⚠ And a **FOURTH** firing no-row file exists that no register
+   names: **`task_service.py` at 19/10/958** — invisible to its own guardrail at ten phases, the
+   `config.py` failure repeating.
+
+⚠ **A FIFTH FINDING, ABOUT THIS WORKFLOW'S OWN GATE — IT PASSED VACUOUSLY.**
+`gsd-sdk query check.decision-coverage-plan` returned `passed: true · skipped: true · total: 0 ·
+"No trackable decisions in CONTEXT.md."` over a CONTEXT.md carrying **sixteen** of them. The gate
+matches a literal `D-NN` id; **this project's convention is `D-256-NN`, which it cannot see.** So
+step 13a proved nothing, and the coverage claim above rests on a hand-run grep (16/16 cited, 0
+missing) — never on that green. ⛔ Do not quote this gate as evidence on any phase.
+
+⚠ **THREE `NO IN-REPO ANALOG` GAPS — answered with a stated property, never assumed away.**
+(a) **Nothing in this repo proves a DB value survives a PROCESS RESTART** — which is SC#1 verbatim.
+`256-01` T4 builds the combination that does not exist (`test_239`'s real `subprocess.Popen` child,
+but with the child's pool **REAL**, not the stub `test_239` itself discloses), and must state in both
+the module docstring and the SUMMARY what it does **not** prove (a `kill -9` mid-phase) — plus that
+`tests/integration/` is invisible to the 71-name baseline and cannot be the only proof.
+(b) **No precedent for an array op in an index predicate** — `[ASSUMED]` became paste-and-verify with
+a named weaker fallback. (c) **No precedent for a three-state `text[]`**; the schema's only array
+column is the exact two-state collapse D-256-07 must avoid, so all three states are pinned by test.
+
+⚠ **A stale SOURCE comment that METER-06 makes FALSE, which no register named:**
+`harness_engine.py:1837-1842` reads *"`llm_emit` PHASES ARE NOT COUNTED, AND THAT IS NAMED RATHER
+THAN HIDDEN … a different file and a different plan."* **This is that plan.** `256-04` corrects it in
+the same commit as the drain arms; `256-01` is explicitly forbidden from touching it and asserts the
+string survives to wave 2.
+
+✅ **The seeds sweep's discuss-time `0 matched` is CONFIRMED AN ARTEFACT** (the gate said so itself).
+Re-run with plans on disk: **`10 matched`** over 303/303 parsed, 0 duplicate ids, gate OK. Only two
+are genuine overlaps (`SEED-266` full-schema ACLs, `SEED-291` the Extension Contract) — both LEAVE,
+neither folded. ⛔ **Routing must be written back into each seed's own frontmatter**, not only into
+`256-02`'s table: `status:` IS the index, and body prose is invisible to the scan.
+Unswept, ⛔ never summed: **134** carry no `trigger_when` · **114** carry prose a sweep cannot match.
+
+**Five discretionary decisions taken so Phase 257 cannot guess:** coverage marker is `text[]` written
+from ONE `TOKEN_COVERAGE_LEGS` in `db/workflows.py` · ⭐ a run where no leg reported usage reads
+`input_tokens IS NULL · output_tokens IS NULL · token_coverage IS NULL`, and **257 must read that
+triple as "no instrumented leg reported usage" — never `$0.00`, never "unrated"** · Fence 1 is a real
+`ast.parse` conjunction fence (SQL is assembled across concatenated literals here, so a line matcher
+cannot see `SUM(` and a missing `WHERE` four lines apart) · **R-1 → REGISTER, not fix** · the eval
+**WITHOUT arm IS counted** (billed for both) and the **judge shot is NOT** — decided, not forgotten.
 
 ✅ **D-256-14 DISCHARGED (05122eb45)** — both baselines captured as SETS, not counts.
 Backend: 71 names at `256-BASELINE-backend-failing-set.txt` (= the zero-headroom ceiling).
