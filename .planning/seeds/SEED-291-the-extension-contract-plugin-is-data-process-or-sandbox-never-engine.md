@@ -3,9 +3,40 @@ seed_id: SEED-291
 title: "The extension contract — a plugin is DATA, an EXTERNAL PROCESS, or SANDBOXED CODE, and never engine code. The rule that lets an ecosystem exist without dissolving the governance claim."
 created: 2026-09-18
 surface: Agentic-RAG
-status: planted
-partial: false
-status_note: "Planted from the outside architecture read of 2026-09-18 (archived under `.planning/external-reviews/`), reconciled against the tree the same day. The RULE is new as a written contract; every MECHANISM it names already ships."
+status: partially-answered
+partial: true
+status_note: |
+  AXIS: the CONTRACT half is answered by Phase 255. The PROGRAMME half it unblocks (SEED-198 packs,
+  entitlement, a partner surface) is untouched — which is why this is `partially-answered` and not
+  `answered`. The seed itself said so: *"Small as a decision, Large as a programme."*
+
+  ── 2026-09-18 · ANSWERED ON THE DECISION AXIS BY PHASE 255 (EXT-01 / EXT-02 / EXT-03).
+  * **EXT-01** — `docs/EXTENSION-CONTRACT.md` states the rule as binding project law and names all
+    three refusals verbatim: third-party executors/emitters/validators, a generic HTTP egress node,
+    and branching/looping graphs as a plugin concern. Cross-referenced from `CLAUDE.md`.
+  * **EXT-02** — `scripts/check-extension-contract.cjs` audits all six `trigger_paths` above, wired
+    into a PostToolUse hook (`.claude/settings.json`, 34 -> 36 entries, additive) and a pytest unit
+    (`test_255_extension_contract_guard.py`, 6 passed). ⭐ **Driven RED on all six paths in
+    isolation** — guard exit 1 with a planted violation, exit 0 without; evidence at
+    `.planning/phases/255-the-extension-contract/255-RED-DRIVE-evidence.txt`. 5/6 restored
+    md5-identical; `phase_types.py` restored **content**-identical only, because `git checkout --`
+    rewrote its line endings under autocrlf — recorded as the weaker claim rather than rounded up.
+  * **EXT-03** — `docs/extensions/` carries a README plus four worked examples, one per permitted
+    mechanism.
+
+  ⛔ STILL OPEN, and none of it is bookkeeping: the pack format (`SEED-198`, the SKU), entitlement
+  (`SEED-080` / `SEED-083`), and the external-process arm (`SEED-013` Open Platform) whose
+  sequencing is an OPERATOR decision that was raised at 255 discuss and **is not settled** — a
+  builder recorded it as ruled and that was reverted on operator instruction (BUS-262).
+
+  ⭐ WHAT THE CONTRACT IMMEDIATELY PROVED: `SEED-295` (named outcomes / forward-only edges) exists
+  because this seed's refusal list named *"forward-only jumps are the minimal move"*. The contract
+  is already doing its job — governing a proposal rather than being argued with after the fact.
+
+  ── ORIGINAL PLANTING NOTE, PRESERVED VERBATIM (2026-09-18, earlier the same day):
+  "Planted from the outside architecture read of 2026-09-18 (archived under
+  `.planning/external-reviews/`), reconciled against the tree the same day. The RULE is new as a
+  written contract; every MECHANISM it names already ships."
 trigger_when: >
   Fire at the /gsd:new-milestone that first scopes an ecosystem, plugin, pack, marketplace,
   partner or third-party-extension surface — this seed is that milestone's FIRST decision, not one
@@ -36,7 +67,7 @@ relates_to:
   - SEED-294 — go-to-market. This contract is what that seed is allowed to SELL.
   - v3.6 D-14 red line — "the canvas never became a second runtime". The precedent this seed generalises.
   - Phase 185 — graded governance. The claim this contract protects.
-folded_into: null
+folded_into: 255
 renumbered_from: null
 renumbered_because: null
 ---

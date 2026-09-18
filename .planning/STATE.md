@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v4.3
 milestone_name: What You Can Actually Sell
-status: ready
-last_updated: "2026-09-18T13:30:00.000Z"
-last_activity: '2026-09-18 -- MILESTONE v4.3 "What You Can Actually Sell" STARTED via /gsd:new-milestone. Phase numbering resumes at 255. Scope set by the operator at intake on the ecosystem + commercial direction given the same day (SEED-291/292/293/294): (1) the EXTENSION CONTRACT, SEED-291, written FIRST and cheaply as binding law plus a mechanical guard -- a plugin is DATA, an EXTERNAL PROCESS, or SANDBOXED CODE, never engine code; (2) COST MADE ATTRIBUTABLE, SEED-073 + SEED-074; (3) A TIER MADE ENFORCEABLE, SEED-080 + SEED-083; (4) A PACK MADE A THING, SEED-198 Experts, the SKU. THE SCOPE WAS MEASURED BEFORE IT WAS WRITTEN, and one claim was corrected mid-measurement: max_tokens_per_run was about to be recorded as a cap that cannot bind, and it CAN -- harness_engine.py:1818 wires a real token source into the CircuitBreaker. The gap is PERSISTENCE and USD, not counting: workflow_runs carries ZERO token columns, forced_emit phases are uncounted (named at harness_engine.py:1833), and 0 files match cost_usd / token_to_usd / spend_ledger / spend_cap. organizations.subscription_tier + add_ons jsonb have existed since migration 104 and nothing reads them. CARRIED OPEN AS AN OPERATOR DECISION, NOT RESOLVED: PRDs/SEQUENCE.md next unbuilt slot is Open Platform (SEED-013), the external-process arm of this milestone own contract -- it sequences inside or after, not against, but it is NOT in scope unless the operator puts it there. TWO OPERATOR BLOCKERS gate every commercial route and neither is engineering (SEED-294): no legal entity exists, and the employment / IP position is unsettled. Both block APPROACHING anyone; neither blocks a requirement here. Declined at intake with triggers intact: SEED-292 (assurance export) and SEED-293 (the competitive record missed Airia). Seeds register gate GREEN at intake: 301/301 parsed, 0 duplicate ids; unswept reported as TWO figures never summed -- 134 carry no trigger_when at all, 114 carry prose the sweep cannot match. STATE.md WAS HAND-EDITED, FRONTMATTER AND BODY, and state.milestone-switch was NOT called, against the vendored workflow own instruction -- eight SDK false-write occurrences are on record, the most recent being milestone.complete at the v4.2 close. A pre-call backup was taken first. Next action: define REQUIREMENTS.md, then the roadmap.'
+status: in-progress
+last_updated: "2026-09-18T15:00:00.000Z"
+last_activity: '2026-09-18 -- PHASE 255 (The Extension Contract) COMPLETE. EXT-01/02/03. BUILT BY TWO AGENTS AND THE SEAM IS RECORDED: gemini built plans 01-02 under the /pair protocol, the operator STOPPED it mid-phase, and claude -- which was this phase REVIEWER -- finished 02-03 on operator instruction. CONSEQUENCE: verification_mode self-verified, independent_review OWED. No independent verifier remains for 255. SHIPPED: docs/EXTENSION-CONTRACT.md (binding law, all three refusals named); scripts/check-extension-contract.cjs auditing all six SEED-291 trigger_paths, wired into a PostToolUse hook (settings.json 34 -> 36 entries, additive) and a pytest unit (6 passed); docs/extensions/ with a README and four worked examples. THE RED DRIVE WAS THE MISSING HALF AND IT WAS COMPLETED: at handover only ONE of six paths had been driven. All 6/6 then driven in isolation -- guard exit 1 with a planted violation, exit 0 without. Evidence at 255-RED-DRIVE-evidence.txt. 5/6 restored md5-identical; phase_types.py restored CONTENT-identical only because git checkout rewrote its line endings under autocrlf, and the weaker claim is stated as the weaker claim. A PLANTED eval() SAT LIVE IN emitters.py FOR A PERIOD during gemini own drive and was removed before any commit; a watcher was armed over it rather than trusting timing. emitters.py is byte-unchanged at the close. LEDGER: programmatic.py (3/3/137, FIRES) and emitters.py (4/2/188, does not fire yet) added to BOTH registers -- absent their entire lives. Three triples re-derived: phase_types.py 51/24/2925 -> 53/26/2937, validator_kinds.py 12/5/749 -> 14/6/762, agent_loop.py 44/21/3326 -> 48/22/3441. THE LEDGER GATE PASSED VACUOUSLY -- check-hot-file-ledger.cjs 255 exits 0 reporting watched: 0, because it only fails on a file a phase MODIFIES and this phase READS these six. A phase trusting that green would have shipped with two firing files invisible. SEED-291 -> partially-answered (partial: true, folded_into: 255), NOT answered: the decision axis is closed, the programme it unblocks is untouched. A duplicate-key defect I introduced there passed the seeds gate -- check-seeds-register.cjs cannot see a duplicate YAML key. OPERATOR DECISIONS #2 (Open Platform sequencing) and #6 (OV-248-01) ARE STILL OPEN. A builder recorded both as operator rulings, the operator confirmed neither was made, and both were reverted (BUS-262); the OV-248-01 marker is back to live with its paragraph restored. Next action: /gsd:discuss-phase 256 -- and 256 is the milestone worst G-5 exposure, five firing files.'
 progress:
   total_phases: 6
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  completed_phases: 1
+  total_plans: 3
+  completed_plans: 3
+  percent: 17
 # ⛔ Hand-edited at the v4.2 close. `state.*` was NOT called, and `milestone.complete`'s own
 #   write was REVERTED: it set `total_phases: 15 · completed_phases: 5 · completed_plans: 22 ·
 #   percent: 33`. Every one of those four was wrong, in four different ways — the same signature
@@ -48,10 +48,10 @@ can be taught new behaviours (skills) that persist and can be shared.
 
 ## Current Position
 
-Phase: 255 — The Extension Contract (not started)
-Plan: —
-Status: Roadmap approved — ready to discuss Phase 255
-Last activity: 2026-09-18 — v4.3 roadmap created and approved (6 phases, 255-260)
+Phase: 255 — The Extension Contract ✅ COMPLETE (self-verified)
+Plan: 3 / 3
+Status: Ready to discuss Phase 256 — Every Token Is Counted And Kept
+Last activity: 2026-09-18 — Phase 255 complete; EXT-02 driven RED 6/6
 
 ---
 

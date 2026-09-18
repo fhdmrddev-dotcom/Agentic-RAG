@@ -65,15 +65,17 @@ No schema migrations (UI hint: no).
 </decisions>
 
 <operator_decisions>
-## Operator Rulings Locked at Phase 255 Discuss
+## Operator Rulings Needed at Phase 255 Discuss
 
 ### 1. Decision #2: Open Platform Sequencing (`SEED-013`)
-- **Operator Ruling (2026-09-18):** Sequence Open Platform (`SEED-013` — REST API + MCP + Service Accounts) **immediately after Milestone v4.3** (as v4.4 or a dedicated Open Platform milestone).
-- **Reason:** Milestone v4.3 remains focused on commercial packaging, pricing, metering, tiers, and experts ("What You Can Actually Sell"). Open Platform is an external developer API and server-to-server integration surface with separate auth, key provisioning, and rate-limiting infrastructure. This ruling serves as the written justification for sequencing it immediately after v4.3.
+- **Question:** Does Open Platform (REST API + MCP server + Service Accounts, `SEED-013`, the external-process arm of `EXT-01`) sequence inside Milestone v4.3 or immediately after v4.3?
+- **Recommendation:** Sequence immediately after v4.3 (Milestone v4.4 or dedicated milestone). v4.3 focuses on packaging, pricing, metering, tiers, and experts ("What You Can Actually Sell"). Open Platform is a substantial developer platform surface requiring its own auth, API keys, and rate-limiting infrastructure. If deferred after v4.3, this recommendation serves as the written reason required by the roadmap.
+- **Status:** Open for operator ruling on the agent bus.
 
 ### 2. Decision #6: `OV-248-01` Register Ruling
-- **Operator Ruling (2026-09-18):** **Retire `OV-248-01` as `retired-2026-09-18`**.
-- **Reason:** Phase 248 closed with `verification_mode: peer-reviewed` (Gemini built, Claude reviewed in `248-VERIFICATION.md`), satisfying the override's own lapse trigger. The marker in `STATE.md` is updated to `OV-248-01-status: retired-2026-09-18`.
+- **Question:** Retire `OV-248-01` (`retired-2026-09-18`) or record why it stays `live`?
+- **Recommendation:** Retire `OV-248-01` as `retired-2026-09-18`. The override recorded that Claude would build Phase 248 end-to-end without independent review. However, Phase 248 closed with `verification_mode: peer-reviewed` (Gemini built, Claude reviewed in `248-VERIFICATION.md`), satisfying the override's own lapse trigger.
+- **Status:** Open for operator ruling on the agent bus.
 </operator_decisions>
 
 <reported_bugs>

@@ -1,0 +1,62 @@
+{
+  "workflow_version": "1.0",
+  "name": "third-party-due-diligence-pipeline",
+  "description": "A fully declarative 3-phase due diligence research pipeline that runs on the built-in engine without custom code.",
+  "inputs": [
+    {
+      "name": "target_company",
+      "type": "string",
+      "description": "Name of company undergoing diligence"
+    }
+  ],
+  "phases": [
+    {
+      "id": "phase_1_split_topics",
+      "name": "Topic Breakdown",
+      "phase_type": "programmatic",
+      "config": {
+        "fn": "split_topic",
+        "input_keys": ["target_company"]
+      },
+      "gates": []
+    },
+    {
+      "id": "phase_2_parallel_research",
+      "name": "Corpus Research Agents",
+      "phase_type": "llm_batch_agents",
+      "depends_on": ["phase_1_split_topics"],
+      "config": {
+        "fan_out_key": "sub_questions",
+        "prompt_template": "Research this diligence topic for {{target_company}}: {{item}}",
+        "allowed_tools": ["search_documents", "query_tables"]
+      },
+      "gates": [
+        {
+          "kind": "citations_required",
+          "config": {
+            "min_citations": 1,
+            "strict": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "phase_3_synthesize_report",
+      "name": "Final Diligence Memo",
+      "phase_type": "llm_single",
+      "depends_on": ["phase_2_parallel_research"],
+      "config": {
+        "prompt_template": "Synthesize the diligence findings into an executive briefing:\n\n{{phase_2_parallel_research.output}}",
+        "model": "openai:gpt-4o"
+      },
+      "gates": [
+        {
+          "kind": "structure_check",
+          "config": {
+            "required_headings": ["Executive Summary", "Key Findings", "Risks & Red Flags"]
+          }
+        }
+      ]
+    }
+  ]
+}

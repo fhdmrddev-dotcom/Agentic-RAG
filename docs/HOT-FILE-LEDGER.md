@@ -14768,3 +14768,54 @@ a registered `matcher` omits a tool the hook demonstrably handles (or when a hoo
 second cause without a human noticing it. ⛔ Deferred at 253-03 by the operator's five-finding scope
 lock, not by judgement; **trigger: the next hook whose registration is found narrower than its
 code, or the next `.claude/hooks/` file added without a matching entry.**
+
+## `backend/app/services/harness/programmatic.py`
+
+**`3 commits / 3 phases / 137 L`** — re-derived 2026-09-18 at Phase 255.
+
+⚠ **ABSENT FROM BOTH REGISTERS FOR ITS ENTIRE LIFE, AND IT FIRES.** Three phases is the G-5
+threshold, so this file has been over the line and invisible to its own guardrail the whole time.
+⛔ **No gate could have demanded it, either** — `check-hot-file-ledger.cjs` only fails on a file a
+phase actually MODIFIES, and Phase 255 does not modify this one: it *reads* it. The row exists
+because the `SEED-291` preflight re-derived the triple by hand, not because anything fired.
+
+**What it is.** The `PROGRAMMATIC_PHASE_REGISTRY` — a **closed dict**, mirroring
+`tool_dispatcher._TOOL_REGISTRY`. An unknown `fn` name raises; it is never `eval`'d or dynamically
+imported (T-091-12). Measured at Phase 255: **exactly two** registered functions, `split_topic` and
+`eval_slow_step`.
+
+⛔ **THE BINDING INVARIANT — the idempotency contract, and it is load-bearing rather than stylistic.**
+Every registered fn MUST be **pure and idempotent**, because a `programmatic` phase that crashes
+mid-work is **re-run from the top** on resume (the crash-leaves-active invariant). A non-idempotent
+fn corrupts state on the second run. ⚠ This is exactly why `SEED-291` §6's "sandbox as a programmatic
+phase" idea carries two non-negotiable conditions: author code satisfies neither by default, so such
+a phase needs an idempotency key or an explicit may-re-run declaration.
+
+**Phase 255 (EXT-02).** Driven RED against a planted `PROGRAMMATIC_PHASE_REGISTRY["custom_fn"] = _f`
+— guard exit 1 with the plant, exit 0 without, file restored **md5-identical**. File byte-unchanged
+at the close. ⛔ **The named seam for the next phase that touches it:** a third registered fn is the
+moment to ask whether the registry needs a declared purity assertion rather than a docstring
+promise — today the contract is prose in a module header and nothing executable checks it.
+
+---
+
+## `backend/app/services/harness/emitters.py`
+
+**`4 commits / 2 phases / 188 L`** — re-derived 2026-09-18 at Phase 255.
+
+⚠ **IT DOES NOT FIRE YET — 2 phases against a threshold of 3 — AND THE ROW IS ADDED ANYWAY, ON
+PURPOSE.** This ledger's own repeated finding is that a file absent from the scan list is
+permanently invisible to its guardrail *at any count*: `App.tsx` went 23 phases, `NavPanel.tsx` 11,
+`config.py` its entire life. **Adding the row one phase early costs nothing and closes that window.**
+
+**What it is.** The `EMITTER_REGISTRY` — closed-dict resolved from `LlmEmitPhaseConfig.emitter`
+(default `render_template`). ⛔ `llm_emit` is the **only** path that produces a typed deliverable,
+which is what makes this registry a governance surface and not a convenience.
+
+**Phase 255 (EXT-02).** Driven RED against a planted `EMITTER_REGISTRY["custom_emitter"] = _e` —
+guard exit 1 with the plant, exit 0 without, restored **md5-identical**. ⚠ An earlier RED drive in
+this phase left `EMITTER_REGISTRY["dynamic_custom_emitter"] = eval("None")` live in the working tree
+for a period; it was removed before any commit, and the file is byte-unchanged at the close.
+⛔ **The named seam:** a second emitter is the moment to ask whether `citation_policy` /
+`integrity_policy` are per-emitter rather than per-phase — today they sit on the phase config and
+every emitter inherits them silently.

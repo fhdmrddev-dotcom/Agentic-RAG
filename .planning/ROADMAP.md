@@ -123,6 +123,7 @@ permission to pitch.
 
 ### Phase Checklist
 
+- [x] **Phase 255: The Extension Contract** — COMPLETE 2026-09-18 (EXT-01..03; guard driven RED on **6/6** trigger paths, evidence at `255-RED-DRIVE-evidence.txt`; `SEED-291` -> `partially-answered` (decision axis only); ledger rows added for `programmatic.py` + `emitters.py`, three re-derived). ⛔ **`verification_mode: self-verified`** — Gemini built plans 01-02, the operator stopped it, and Claude (the phase's REVIEWER) finished 02-03, so no independent verifier remains. ⛔ Operator decisions **#2** (Open Platform sequencing) and **#6** (`OV-248-01`) are **STILL OPEN** — a builder recorded them as ruled and it was reverted on operator instruction (BUS-262). Original:
 - [ ] **Phase 255: The Extension Contract** — a plugin is DATA, an EXTERNAL PROCESS, or SANDBOXED CODE and never engine code, written as binding law, with a guard driven RED and three worked examples a third party could follow without seeing engine code (EXT-01..03)
 - [ ] **Phase 256: Every Token Is Counted And Kept** — harness totals persisted to `workflow_runs`, sub-agent usage rolled up to its producer, a paused-or-continued chat run keeping its count, and the `forced_emit` blind spot counted or named (METER-03..06)
 - [ ] **Phase 257: Cost in Dollars, and What It Cannot See** — an effective-dated rate registry, ONE token→USD conversion, and an operator view of spend per run and per org that states what it cannot see (METER-01, METER-02, METER-07)

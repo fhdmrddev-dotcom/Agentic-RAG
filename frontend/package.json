@@ -11,7 +11,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "check:extension-contract": "node ../scripts/check-extension-contract.cjs"
   },
   "dependencies": {
     "@lobehub/icons": "^5.10.0",
