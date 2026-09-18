@@ -1854,12 +1854,32 @@ async def run_workflow(
     # ⚠ THE BOX IS CUMULATIVE AND ``record_tokens`` IS ADDITIVE — the breaker's
     # ``absorb_usage_box`` owns the subtraction so this file carries no delta bookkeeping.
     #
-    # ⚠ ``llm_emit`` PHASES ARE NOT COUNTED, AND THAT IS NAMED RATHER THAN HIDDEN.
-    # ``forced_emit`` measures no usage anywhere in its own module, so its spend is
-    # invisible to any box. Wiring it means instrumenting the forcing seam, which is a
-    # different file and a different plan. The three counted types are the three that
-    # loop (``llm_agent``, ``llm_batch_agents``) or stream (``llm_single``); a sealed
-    # single shot is the one that cannot run away.
+    # ⚠ CORRECTED (Phase 256 / METER-06 / plan 256-04 / F-4). ``llm_emit`` PHASES ARE
+    # NOW COUNTED. The original text is QUOTED rather than deleted, because it was a
+    # hole NAMED rather than hidden — and it named its own re-open condition, which
+    # then came true:
+    #
+    #   "⚠ ``llm_emit`` PHASES ARE NOT COUNTED, AND THAT IS NAMED RATHER THAN HIDDEN.
+    #    ``forced_emit`` measures no usage anywhere in its own module, so its spend is
+    #    invisible to any box. Wiring it means instrumenting the forcing seam, which
+    #    is a different file and a different plan. The three counted types are the
+    #    three that loop (``llm_agent``, ``llm_batch_agents``) or stream
+    #    (``llm_single``); a sealed single shot is the one that cannot run away."
+    #
+    # THAT DIFFERENT PLAN WAS 256-04, and the leg now counts end to end:
+    #   ``forced_emit._drain``'s two usage arms (mirrored from ``task_service``)
+    #     → ``forced_emit``'s LADDER accumulator, declared above the rung loop so a
+    #       FAILED rung's spend counts too — you were billed for every shot served
+    #     → the token keys on BOTH exits (the success return and ``_failure()``)
+    #     → ``harness/phase_types._exec_llm_emit``'s ``_record_run_usage`` call
+    #     → ``ctx.run_usage_box`` (set below)
+    #     → the breaker's ``absorb_usage_box`` → ``persist_run_usage``.
+    #
+    # ⚠ THE ORIGINAL'S CLOSING REASONING STILL HOLDS AND IS NOT RETIRED WITH IT: a
+    # sealed single shot is indeed the phase type that cannot RUN AWAY. What it could
+    # do — and did — is spend real money invisibly, which is a different failure and
+    # the one METER-06 closes. ⛔ ``TOKEN_COVERAGE_LEGS`` in ``db/workflows.py`` gained
+    # ``"emit"`` in the SAME commit as those drain arms (O-4).
     try:
         ctx.run_usage_box = {}
     except (AttributeError, TypeError):

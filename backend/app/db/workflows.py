@@ -63,13 +63,35 @@ logger = logging.getLogger(__name__)
 # happened to use. Written verbatim into ``workflow_runs.token_coverage`` by
 # ``persist_run_usage`` below, so a run persisted before a leg shipped reads
 # honestly as not covering it, FOREVER, with no date arithmetic and no memory.
-# ⛔ Plan 256-04 (METER-06) appends ``"emit"`` HERE, in the SAME commit as the
-#    forced-emit drain arms (O-4). A marker that claims a leg which has not
-#    shipped is a lie in a column built to prevent lies.
 # ⛔ This is a DATA VALUE written into a column. It never resolves a writer,
 #    emitter, executor or validator — the Phase 255 Extension Contract is
 #    untouched by it.
-TOKEN_COVERAGE_LEGS: tuple[str, ...] = ("agent", "single", "batch")
+#
+# ⭐ ``"emit"`` LANDED IN PLAN 256-04 (METER-06 / O-4), in the SAME COMMIT as the
+#    ``forced_emit._drain`` usage arms that earn it. Before that commit the
+#    ``llm_emit`` leg was a real, billed provider call that no column could see;
+#    claiming it one commit early would have been a lie in a column built
+#    specifically to prevent lies.
+#
+# ⚠ WHAT THIS COLUMN MEANS, STATED HERE SO PHASE 257 DOES NOT HAVE TO GUESS (U-5).
+# ``token_coverage`` records what the INSTRUMENTATION covers, and it is written
+# ONLY when a real, non-zero delta is persisted. Consequences, all four of them
+# deliberate:
+#   · A run whose LLM phases ran but whose provider emitted no usage payload, AND
+#     an all-``programmatic`` run with no LLM phase at all, BOTH read
+#     ``input_tokens IS NULL · output_tokens IS NULL · token_coverage IS NULL``.
+#   · ⛔ PHASE 257 MUST READ THAT NULL TRIPLE AS "no instrumented leg reported
+#     usage for this run" — NEVER as ``$0.00``, and never as "unrated". A run that
+#     was never measured did not cost nothing; it cost an unknown amount, and the
+#     two must not render the same.
+#   · WHY THIS READING RATHER THAN WRITING A FULL MARKER WITH A REAL 0/0: it
+#     preserves the delta-derived idempotency that makes ``persist_run_usage`` safe
+#     with NO key, NO lock and NO upsert, and it adds ZERO branches. ``NULL`` is
+#     already the "never measured" state under D-256-06, and a run with nothing to
+#     measure genuinely measured nothing.
+#   · The migration-182 partial index treats a NULL marker as NOT fully covered,
+#     which is correct under this reading.
+TOKEN_COVERAGE_LEGS: tuple[str, ...] = ("agent", "single", "batch", "emit")
 
 # ── Phase 186 (CONCUR-02 / D-186-07) — the optimistic concurrency token ───────
 # ONE canonical expression, referenced by every read AND by the guard, so the value the

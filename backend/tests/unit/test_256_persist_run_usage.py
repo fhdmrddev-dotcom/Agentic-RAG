@@ -205,8 +205,23 @@ def test_token_coverage_legs_claims_only_the_legs_that_have_shipped():
     to prevent lies (D-256-07 / SC#4). This assertion is expected to be UPDATED
     by 256-04 — and updating it is the point: the change is visible in a diff
     rather than silent.
+
+    ⭐ **UPDATED BY PLAN 256-04 (O-4), and the original is recorded here rather than
+    overwritten in silence:** this line read
+    ``assert TOKEN_COVERAGE_LEGS == ("agent", "single", "batch")`` until the commit
+    that added ``forced_emit._drain``'s two usage arms, ``forced_emit``'s ladder
+    accumulator and ``_exec_llm_emit``'s ``_record_run_usage`` call. The leg and the
+    claim shipped together; neither preceded the other by a single commit.
+
+    ⛔ The next leg to be claimed here follows the same rule. Appending a name before
+    the counting exists would make every run persisted in between assert coverage it
+    never had — and, because ``token_coverage`` is written verbatim and never
+    recomputed, that lie would be permanent and undetectable by date arithmetic.
     """
-    assert TOKEN_COVERAGE_LEGS == ("agent", "single", "batch")
+    assert TOKEN_COVERAGE_LEGS == ("agent", "single", "batch", "emit")
+    assert len(TOKEN_COVERAGE_LEGS) == 4, (
+        "exactly four legs have shipped — agent, single, batch (256-01) and emit (256-04)"
+    )
     assert isinstance(TOKEN_COVERAGE_LEGS, tuple), (
         "a tuple, so a caller cannot mutate the shared marker in place"
     )

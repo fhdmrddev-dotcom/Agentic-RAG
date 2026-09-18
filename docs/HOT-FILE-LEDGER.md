@@ -10675,6 +10675,7 @@ cells rot within days.
 | [`backend/app/services/circuit_breaker.py`](docs/HOT-FILE-LEDGER.md#backendappservicescircuit_breakerpy) | 1 / 1 / 331 | no (1 phase) | ⚠ absent its ENTIRE LIFE — row added 256-02 at 256-01's touch, BELOW threshold. ⛔ the `max(0,…)` clamp stays on the RETURNED delta, or a reset box hands the DB a negative and SUBTRACTS real spend |
 | [`backend/app/services/task_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicestask_servicepy) | 19 / 10 / 958 | ⚠ **FIRES** | ⛔ **FIRES at 10 phases and absent from BOTH registers its ENTIRE LIFE — row added 256-02, which does NOT modify it.** The canonical two-arm usage reader METER-06 mirrors; no gate could demand it |
 | [`backend/app/services/run_reconciler.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_reconcilerpy) | 3 / 2 / 325 | no (2 phases) | ⚠ absent its ENTIRE LIFE — row added 256-02; NOT modified by 256 (D-256-08 site #7 is REGISTERED, not fixed). ⛔ its BOOT sweep NULLs a `cap_paused` run's real totals — `SEED-297` |
+| [`backend/app/services/forced_emit.py`](docs/HOT-FILE-LEDGER.md#backendappservicesforced_emitpy) | 9 / 6 / 701 | ⚠ **FIRES** | ⚠ **FIRES at 5 phases, absent from BOTH registers its ENTIRE LIFE — row added 256-04, in its FIRST edit's commit (O-6).** honoured by construction. ⛔ accumulators init `None` never `0`, above the loop |
 
 
 
@@ -14986,3 +14987,111 @@ D-256-05's posture of leaving `finish_run` byte-unchanged. A named hole beats a 
 3. ⚠ A stranded Deep chat run's count is **genuinely unknowable** — the producer process is gone and
    the in-memory usage box died with it (`SEED-299`). Only mid-stream persistence would make it
    knowable, which is that seed's `trigger_when`.
+
+---
+
+## `backend/app/services/forced_emit.py` — row added 2026-09-19 (Phase 256, plan `256-04`)
+
+**Re-derived 2026-09-19 at the plan's own edit, with CLAUDE.md's recipe rather than by copying a
+figure forward:**
+
+```
+git log --oneline -- backend/app/services/forced_emit.py | wc -l   → 8  (9 with this commit)
+git log --format=%s -- … | sed … | grep -E '^[0-9]+(\.[0-9]+)?$' | sort -u
+                                                                   → 101.1 · 102 · 103 · 111.1 · 122
+                                                                     = 5 phases (6 with 256)
+wc -l backend/app/services/forced_emit.py                          → 701 (578 before this plan)
+```
+
+The row reads **`9 / 6 / 701`** — the value a future auditor re-deriving *after* this commit will
+measure. ⚠ **No six-digit dated quick-task bucket appears in the list**, so nothing was subtracted;
+the recipe's filter is a no-op here, and that is recorded rather than left ambiguous.
+
+**Against `256-CONTEXT.md`'s `8 / 5 / 578`: commits CONFIRMED, phases CONFIRMED, lines CORRECTED.**
+The line figure was right when CONTEXT was written and rotted *inside this plan's own execution*
+(`+123`, all of it this plan's arms, accumulators and the prose explaining them). That is the ledger's
+own recurring finding observed at a resolution of **hours** rather than phases — which is exactly why
+the recipe exists and why a copied triple is never acceptable.
+
+### ⛔ THE ROW BEING ABSENT IS THE FINDING, NOT THE PAPERWORK
+
+`forced_emit.py` has been **FIRING G-5 since Phase 122** — five phases, eight commits — and has had
+**no row in either register for its entire life.** G-5 was therefore ABSENT on this file at any commit
+count, forever, silently: the identical failure `App.tsx` suffered for 23 phases and `config.py` for
+the project's whole history.
+
+⭐ **The gate is what found it.** `node scripts/check-hot-file-ledger.cjs 256` printed exactly one
+`[no-row]` line naming this file, unprompted, derived from the plan's own `files_modified`. The
+290-row scan list had been complete and readable the whole time and nobody had read it end to end —
+which is the measured reason the table moved out of `CLAUDE.md` and became a gate.
+
+### What plan `256-04` did, and why it is *honoured by construction*
+
+The module made real, billed provider calls through the same `open_stream` gateway as every other LLM
+leg, received the same `usage` / `usage_delta` frames, and dropped both. **Every `llm_emit` phase in
+every published workflow was spend no column in this product could see.** METER-06 closes that.
+
+The arithmetic, recorded rather than an adjective (D-256-13):
+
+| | before | after |
+|---|---|---|
+| `_drain` `elif` arms | 6 | **8** (`usage`, `usage_delta`) |
+| `return` statements in `forced_emit` itself | 2 | **2** |
+| new functions | — | **0** |
+| new `try` / `except` blocks | — | **0** |
+| new state | — | **exactly 2 function-local ints** |
+| `_failure(` call sites | 1 | **1** |
+| module-level accumulators | 0 | **0** |
+
+`_drain`'s two arms are **mirrored in shape from `task_service._drain:414-430`**, itself verbatim
+`agent_loop.py:1399-1416`. Nothing was invented; the canonical reader was copied into the one drain
+that never had it.
+
+### ⚠ CORRECTION recorded beside its original — `_failure()` has ONE call site, not two
+
+`256-RESEARCH.md` §Q4 states, verbatim, that `_failure` is reached *"from the exhausted-ladder floor
+AND from a raised-exception backstop"*. **Measured:** `grep -rn "[^_a-z]_failure(" backend/app/`
+returns the `def` at `:179` and **one** call, at `:507`. The raised-exception arm sets `last_failure`
+and `continue`s — it never calls the helper. The original claim is preserved here rather than deleted,
+because a reader who trusted it would thread the ladder totals twice and then hunt for a second site
+that does not exist. **The change was cheaper than RESEARCH implied**, and saying so is the point.
+
+### The invariants that bind the next editor
+
+1. ⛔ **The accumulators initialise to `None`, NEVER `0`** — in `_drain` and at the ladder level. A
+   shot that completes with no usage payload is the **common** path, not an edge case:
+   `provider_gateway/openai_compat.py:482-494` emits a `usage` event *"only when a usage payload was
+   seen"*, and that adapter serves **six of the eight providers** and emits **no `usage_delta` at
+   all**. A `0` written here is an invented measurement that reads as a real one forever (T-256-20).
+   ⭐ Driven RED: planting `in_tok: int | None = 0` turned four cases red, including both no-usage
+   cases; the file was restored **md5-identical**.
+2. ⛔ **The ladder accumulators are declared ABOVE the rung loop**, mirroring `last_failure` /
+   `last_truncated` in the same function. A FAILED rung's spend still counts — you were billed for
+   every shot the provider served (D-256-12). Counting only the winning rung under-reports a
+   three-rung descent by up to 3×, on **precisely the runs that cost the most**, and the bias is
+   invisible because a biased total still looks like a total. ⭐ Driven RED: moving the two
+   declarations inside the loop turned four multi-rung cases red; restored md5-identical.
+3. ⛔ **`_failure()` has exactly ONE call site (`:507`) and it passes both totals EXPLICITLY.** A
+   second call site would have to thread them again; adding one without doing so silently re-opens
+   the hole on the most expensive outcome this module produces — an exhausted ladder that served
+   every rung and delivered nothing.
+4. ⛔ **Run-LOCAL, never a module global.** `WORKER_COUNT=2` is the shipped default and these
+   coroutines interleave; a module-level total would make run N report the cumulative spend of runs
+   1..N. Pinned both behaviourally (two sequential calls must not accumulate) and structurally
+   (`hasattr` on the module object, not a source grep).
+5. ⚠ **A measured `0` must survive as `0`.** This module is the MEASURER: *"we counted, and it was
+   zero"* and *"we never counted"* are different facts, and this is the last layer at which the
+   difference still exists. The summer one frame up (`harness/phase_types._record_run_usage`)
+   collapses both to "add nothing" — correct THERE, a lie HERE.
+6. ⚠ **No log format string may carry a token VALUE** (T-073-04 / T-256-24). This plan added none, and
+   a negative fence asserts it.
+
+### The seam, if a next phase needs one
+
+None is proposed. At 701 lines with one public entry point (`forced_emit`), one private drain and one
+failure constructor, the module is coherent. ⚠ **The thing to watch is not size but the rung loop's
+responsibility count**: it now resolves the tier, builds the request, drives the gateway, catches
+provider raises, guards truncation, extracts/recovers, logs telemetry *and* accumulates tokens. A
+**seventh** responsibility landing in that loop is the signal to extract a per-rung `_run_one_rung()`
+returning a small result object — at which point invariants 1-3 above must move with it, or they are
+lost.
