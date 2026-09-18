@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v4.2
-milestone_name: The Connected Knowledge You Can Actually Run
-status: Awaiting next milestone
-last_updated: "2026-09-18T00:00:00.000Z"
-last_activity: '2026-09-18 -- MILESTONE v4.2 CLOSED AND ARCHIVED, git tag v4.2. 8 phases (247-254), 31 plans, 237 commits, 559 files, migration 181, 6 days. RE-AUDITED FIRST rather than closed on the stale reading: the 2026-09-16 audit was gaps_found at head 46cf36bf6 over phases 247-251, and 124 commits plus three phases had landed since, so its verdict described a tree that no longer existed. Re-driven at bb474e5cc: requirements 15/26 -> 25/26, blockers 4 -> 0, integration 16/22 -> 19/19, flows 1/3 -> 3/3. All four blockers re-measured by the orchestrator independently of the integration checker, with no line number quoted from the stale audit. CLOSED WITH ONE REQUIREMENT UNSATISFIED, AS AN OPERATOR DECISION: DEBT-06, 8 of 14 rows unmet (239, 241, 242, 244, 245, 251, 252, 253), re-derived with yaml.safe_load rather than from a hand-typed list. No plan can close it -- done needs gemini answering BUS-249/256/257, refused needs an operator ruling (REG-03). A REFUSAL IS NOT A PASS. 41 open artifacts acknowledged and deferred (see Deferred Items). THE SDK WROTE FALSE RECORDS AGAIN, the eighth occurrence: gsd-sdk query milestone.complete archived correctly but (a) wrote thirteen garbage accomplishments into MILESTONES.md harvested from section LABELS not values ("Delivered:", "One-liner:"), (b) reset progress to 15/5/31/22/33, every figure wrong, (c) DELETED the whole Current Position narrative and every frontmatter audit comment, and (d) converted the file CRLF -> LF. STATE.md was restored byte-identical from a pre-call backup (md5 6efe33f00c0117c4d484eb67bba4e32c) and then hand-written. Hand-edit this file. Do not call state.*. Next action: /gsd:new-milestone.'
+milestone: v4.3
+milestone_name: What You Can Actually Sell
+status: planning
+last_updated: "2026-09-18T13:30:00.000Z"
+last_activity: '2026-09-18 -- MILESTONE v4.3 "What You Can Actually Sell" STARTED via /gsd:new-milestone. Phase numbering resumes at 255. Scope set by the operator at intake on the ecosystem + commercial direction given the same day (SEED-291/292/293/294): (1) the EXTENSION CONTRACT, SEED-291, written FIRST and cheaply as binding law plus a mechanical guard -- a plugin is DATA, an EXTERNAL PROCESS, or SANDBOXED CODE, never engine code; (2) COST MADE ATTRIBUTABLE, SEED-073 + SEED-074; (3) A TIER MADE ENFORCEABLE, SEED-080 + SEED-083; (4) A PACK MADE A THING, SEED-198 Experts, the SKU. THE SCOPE WAS MEASURED BEFORE IT WAS WRITTEN, and one claim was corrected mid-measurement: max_tokens_per_run was about to be recorded as a cap that cannot bind, and it CAN -- harness_engine.py:1818 wires a real token source into the CircuitBreaker. The gap is PERSISTENCE and USD, not counting: workflow_runs carries ZERO token columns, forced_emit phases are uncounted (named at harness_engine.py:1833), and 0 files match cost_usd / token_to_usd / spend_ledger / spend_cap. organizations.subscription_tier + add_ons jsonb have existed since migration 104 and nothing reads them. CARRIED OPEN AS AN OPERATOR DECISION, NOT RESOLVED: PRDs/SEQUENCE.md next unbuilt slot is Open Platform (SEED-013), the external-process arm of this milestone own contract -- it sequences inside or after, not against, but it is NOT in scope unless the operator puts it there. TWO OPERATOR BLOCKERS gate every commercial route and neither is engineering (SEED-294): no legal entity exists, and the employment / IP position is unsettled. Both block APPROACHING anyone; neither blocks a requirement here. Declined at intake with triggers intact: SEED-292 (assurance export) and SEED-293 (the competitive record missed Airia). Seeds register gate GREEN at intake: 301/301 parsed, 0 duplicate ids; unswept reported as TWO figures never summed -- 134 carry no trigger_when at all, 114 carry prose the sweep cannot match. STATE.md WAS HAND-EDITED, FRONTMATTER AND BODY, and state.milestone-switch was NOT called, against the vendored workflow own instruction -- eight SDK false-write occurrences are on record, the most recent being milestone.complete at the v4.2 close. A pre-call backup was taken first. Next action: define REQUIREMENTS.md, then the roadmap.'
 progress:
-  total_phases: 8
-  completed_phases: 8
-  total_plans: 31
-  completed_plans: 31
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 # ⛔ Hand-edited at the v4.2 close. `state.*` was NOT called, and `milestone.complete`'s own
 #   write was REVERTED: it set `total_phases: 15 · completed_phases: 5 · completed_plans: 22 ·
 #   percent: 33`. Every one of those four was wrong, in four different ways — the same signature
@@ -41,9 +41,82 @@ See: `.planning/PROJECT.md` (updated 2026-09-18)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Planning the next milestone. Run `/gsd:new-milestone`.
+**Current focus:** **Milestone v4.3 — What You Can Actually Sell.** Defining requirements, then the roadmap. Phase numbering resumes at **255**.
+
 
 ---
+
+## Current Position
+
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-09-18 — Milestone v4.3 started
+
+---
+
+## 🚧 v4.3 STARTED — 2026-09-18 · *What You Can Actually Sell*
+
+**Goal:** turn a product that works into a product that can be packaged, priced and shipped to a
+client — **without touching the trust boundary**.
+
+**Four features, in this order, and the order is load-bearing:**
+
+1. **The extension contract** (`SEED-291`) — *a plugin is DATA, an EXTERNAL PROCESS, or SANDBOXED
+   CODE, never engine code.* Written FIRST and cheaply, as binding law **plus a mechanical guard**.
+   ⭐ **This is the milestone's first DECISION, not one of its requirements.** All three mechanisms
+   already ship (skills/definitions/templates · `mcp_client` · `sandbox_service`); what is missing is
+   the written rule, so the first plausible exception wins an argument it should lose.
+2. **Cost is attributable** (`SEED-073` + `SEED-074`).
+3. **A tier is enforceable** (`SEED-080` + `SEED-083`).
+4. **A pack is a thing** (`SEED-198` Experts — the SKU).
+
+### ⭐ The scope was MEASURED before it was written, and one claim was corrected mid-measurement
+
+| Piece | State at milestone start (2026-09-18) |
+|---|---|
+| Chat token capture | ✅ counted and persisted to `runs.input_tokens` / `output_tokens` |
+| Harness token capture | ⚠ **in-memory only** — `CircuitBreaker` (`harness_engine.py:1818`) trips a live ceiling, but nothing is persisted |
+| `workflow_runs` token columns | ⛔ **zero** — migration 057 has none and no later `ALTER` adds any |
+| `llm_emit` / `forced_emit` phases | ⛔ **uncounted**, already named at `harness_engine.py:1833` |
+| Token → USD | ⛔ **nothing** — 0 files match `cost_usd`, `token_to_usd`, `spend_ledger`, `spend_cap` |
+| Tier columns | ✅ `organizations.subscription_tier` + `add_ons jsonb` since **migration 104** |
+| Entitlement check | ⛔ **none** — those columns have sat unread for a milestone |
+
+⚠ **`max_tokens_per_run` was about to be recorded as a cap that cannot bind. It CAN.**
+`harness_engine.py:1818` wires a real token source into the breaker, and the code's own comment says
+so. **The gap is PERSISTENCE and USD, not counting.** ⛔ The lesson is the one this project keeps
+paying for: *measure the claim against the tree before it gates a scope.*
+
+### ⛔ Carried OPEN as an operator decision — deliberately NOT resolved here
+
+**`PRDs/SEQUENCE.md`'s next unbuilt slot is Open Platform** (REST API + MCP + service accounts,
+`SEED-013`). It is the **external-process arm of `SEED-291`'s own contract**, so it sequences
+*inside or immediately after* this milestone rather than against it — **but it is not in scope
+unless the operator puts it there.** Surfaced at intake; not resolved silently.
+
+### ⛔ Two operator blockers gate every commercial route, and neither is engineering
+
+Per `SEED-294`: **(1) no legal entity exists** — no accelerator, sponsor or client contract is
+reachable without one; **(2) the employment / IP position is unsettled** — ownership, permission to
+commercialise and customer overlap need **written** certainty from a lawyer before anyone is
+approached. ⚠ **Neither blocks a single requirement in this milestone; both block approaching
+anyone**, and they get harder to unwind as the work compounds.
+
+### Declined at intake, triggers intact
+
+- **`SEED-292` assurance export** — ~106 KB of eval machinery and no artifact a buyer can file.
+  Offered at intake and declined for this milestone. Small build, strongest procurement asset.
+- **`SEED-293` competitive re-crawl** — the record is 40 days stale and **missed Airia**, which
+  markets our exact claim. ⛔ **Nothing in this milestone may write "nobody else does this"** until
+  it is re-run.
+
+### Seeds register at intake
+
+`node scripts/check-seeds-register.cjs` → **gate OK**, `301/301 parsed`, `0 duplicate ids`,
+301/301 carry all 5 required keys. ⛔ **The two unswept figures, reported separately and never
+summed:** **134 carry no `trigger_when` at all** · **114 carry prose the sweep cannot match.**
+
 
 ## ✅ v4.2 CLOSED — 2026-09-18, git tag `v4.2`
 
@@ -227,7 +300,7 @@ and verify what it did on disk rather than trusting its JSON.**
 
 ## Operator Next Steps
 
-1. **Start the next milestone** — `/gsd:new-milestone`.
+1. ~~**Start the next milestone**~~ ✅ **DONE 2026-09-18 — v4.3 *What You Can Actually Sell* is open.** Next: define `REQUIREMENTS.md`, then the roadmap. Phases resume at **255**.
 2. **Rule on `OV-248-01`** (above) — retire the marker or record why it stays live.
 3. **Rule on `DEBT-06`'s three open rows** — adopt the drafted refusals for 251 / 252 / 253, or leave
    them open for Gemini until **2026-09-24**. `BUS-246` and `BUS-248` are also open `to:operator`.
