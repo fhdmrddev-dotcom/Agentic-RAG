@@ -66,11 +66,25 @@ _EXPECTED_CALL_COUNTS = {
 # silently replaced, because that is the honest shape of this pin: a LINE SHIFT
 # is bookkeeping, and the counts above are what make the difference visible in
 # the failure output instead of leaving the next reader to guess.
+#
+# ⚠ AND THEY ROTTED AGAIN ONE WAVE LATER — plan ``256-04``, two days after the pin
+# was written. Its F-4 correction to the ``llm_emit``-not-counted comment added
+# **20 lines** above all three ``harness_engine.py`` sites, moving them
+# :2295 / :2336 / :2618 → :2315 / :2356 / :2638. Every earlier number is kept
+# above rather than overwritten, because the ROT RATE is the finding: three
+# distinct values for the same three call sites inside one phase.
+#
+# ⭐ THE PIN BEHAVED EXACTLY AS DESIGNED AND THAT IS WHY THE UPDATE IS SAFE.
+# Part (a) — the per-file COUNTS — stayed green through both shifts, which is what
+# proves this was a line shift and not a new caller. ⛔ Had (a) gone red too, this
+# constant must NOT be re-baselined: that would be a contract change wearing a
+# bookkeeping costume. Re-derive with ``grep -rn "await finish_run(" backend/app/``
+# and confirm (a) is green BEFORE touching the set below.
 _EXPECTED_CALL_SITES = {
     "api/workflows.py:1802",
-    "services/harness_engine.py:2295",
-    "services/harness_engine.py:2336",
-    "services/harness_engine.py:2618",
+    "services/harness_engine.py:2315",
+    "services/harness_engine.py:2356",
+    "services/harness_engine.py:2638",
     "services/run_lifecycle.py:521",
 }
 
