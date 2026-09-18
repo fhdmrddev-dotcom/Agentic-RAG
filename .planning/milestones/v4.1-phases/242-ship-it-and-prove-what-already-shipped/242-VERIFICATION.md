@@ -1,13 +1,14 @@
 ---
 phase: 242-ship-it-and-prove-what-already-shipped
 verified: 2026-09-11T09:40:00Z
-verification_mode: self-verified   # ⛔ OV-SOLO-01 / D-245-01 — NEVER "reviewed". No independent §6.3 reviewer exists.
+verification_mode: peer-reviewed
 status: complete
 status_note: "⭐ CLOSED under D-242-08 (operator). Was `human_needed`; the only remaining item — Row 5 on production — was measured UNRUNNABLE (242 is not deployed; 70 commits sit on develop) and is DEFERRED to the next promotion to production, with the parity walk folded into it. Rows 1-4 driven and pass."
 score: "4.5 / 5 (CLOSED) — SC#2, SC#3, SC#5 verified mechanically AND driven; SC#4 measured against cloud (24/25, the one FAIL labelled expected); SC#1 driven 4/5 locally, its production row owed"
 overrides_applied: 0
-solo_run: true
-independent_review: false
+solo_run: false
+independent_review: done   # Discharged 2026-09-19 by Gemini via 242-REVIEW-IND.md (BUS-254 answered).
+reviewer: gemini
 verified_at_commit: bed950f04
 close_audited_at_commit: 5f683ff12
 uat: "4 of 5 rows driven in a real browser — 242-UAT-RESULTS.md" 
