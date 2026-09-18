@@ -1383,6 +1383,16 @@ carries the verdict — **honoured by construction (193.2 / 194 / 192.2 / **200.
 
 **Re-derived 2026-08-17 (extraction):** `19 commits / 7 phases / 1243 L` · **G-5 FIRES** (7 phases vs threshold 3) — honoured by construction (193.2).
 
+> ⚠ **CORRECTED 2026-09-18 (Phase 256, plan `256-02`) — the original is kept above, never
+> overwritten.** Re-derived at `902701e89`: **`26 commits / 11 phases / 1810 L`**. The scan-list row
+> read `25 / 11 / 1810`; the commit count was short by **one**. Buckets: `102 163 182 186 189 190
+> 193.2 196 200.3 214 214.1` — eleven, with the historical `quick` bucket already counted OUT.
+>
+> ⚠ **Phase 256 does not modify this file.** It is one of `METER-05`'s `input_tokens=None` finalize
+> sites and was re-derived while enumerating them. ⭐ **Recorded because a ONE-commit drift is the
+> interesting case**: it is small enough to look like noise and is exactly the size at which a cell
+> stops being re-checked. *A row that is present and slightly wrong still answers the auditor.*
+
 ### Phases touched (verbatim)
 
 102 (×7) / 163 / 182 (×4) / 186 / 189 / 190 / **193.2 (193.2-06 `939b5c9f`)**, **plus the quick task `260809-klo`** (`3781a3fe`) — **17 commits across 7 phases**, **1047 → 1158 lines**. ⚠ **ADDED 2026-08-15 by plan `193.2-10`. THIS FILE WAS ABSENT FROM THIS TABLE UNTIL PHASE 193.2. Seven phases touched it and G-5 never fired once, because the discuss-phase audit scans PLAN.md `files_modified` *against this table*. A hot file missing from the table is permanently invisible to its own guardrail** — the same failure as the row above and as the three rows it names. ⚠ **The phase count is 7, not the 8 the raw recipe returns**, and the eighth bucket is `quick` (from `fix(quick-260809-klo)`), a QUICK TASK and not a phase — counted OUT here exactly as the `WorkflowBuilderPage.tsx` row already documents about its own recipe. ⚠ Corrections on measurement: `193.2-CONTEXT.md` D-01 and `193.2-BASELINE.md` §5 both read `16 / 6 / 1047`; both moved on this phase's commit. Re-derive with: `git log --oneline -- backend/app/services/harness/publish_service.py | wc -l` → 17; `git log --format=%s -- <file> | sed -E 's/^[a-z]+\(([^)]+)\).*/\1/' | sed -E 's/-.*//' | sort -u` → `102 163 182 186 189 190 193.2 quick`; `wc -l <file>` → 1158; `git show c1a6c122:<file> | wc -l` → 1047.
@@ -1573,6 +1583,18 @@ carries the verdict — **honoured by construction (194 / 194.1)** — and this 
 ## `backend/app/services/run_lifecycle.py`
 
 **Re-derived 2026-08-17 (extraction):** `6 commits / 3 phases / 459 L` · **G-5 FIRES** (3 phases vs threshold 3) — at threshold — honoured by construction (194).
+
+> ⚠ **CORRECTED 2026-09-18 (Phase 256, plan `256-02`) — the original is kept above, never
+> overwritten.** Re-derived at `902701e89`: **`8 commits / 4 phases / 748 L`** (buckets `145`,
+> `147`, `194`, `204` — again zero quick-task buckets). The row had drifted by **+2 commits,
+> +1 phase and +289 lines**; the line count had grown by 63% while the cell read `459`.
+>
+> ⚠ **Phase 256 does NOT modify this file, and it is deliberately NOT the shape to copy**
+> (RESEARCH.md C-5). Its `input_tokens=None` at `:369` is a **default parameter**, with `:386-395` a
+> pass-through — it is *not* one of `METER-05`'s finalize sites and must not be counted as one. The
+> triple was re-derived because the file was READ while enumerating those sites, which is exactly the
+> case `check-hot-file-ledger.cjs` cannot see: it reads `files_modified`, and a read leaves no trace
+> there.
 
 ### Phases touched (verbatim)
 
@@ -10394,12 +10416,12 @@ cells rot within days.
 | [`backend/app/services/harness/grounding.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessgroundingpy) | 21 / 8 / 1414 | **FIRES** | honoured by construction (193.1 / 211 / **214**) — ⚠ **extraction still OWED**; 214 changed no capability set |
 | [`frontend/src/components/workflows/PhaseFormPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsphaseformpaneltsx) | 30 / 14 / 1566 | **FIRES** | honoured by construction ×6 (185 / 193 / 193.1 / 199 / 200 / **214**) |
 | [`backend/app/db/workflows.py`](docs/HOT-FILE-LEDGER.md#backendappdbworkflowspy) | 48 / 25 / 2585 | **FIRES** | honoured by construction (193.2 / 194 / 192.2 / 200.1 / **214**) |
-| [`backend/app/services/harness/publish_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnesspublish_servicepy) | 25 / 11 / 1810 | **FIRES** | honoured by construction (193.2 / 214 / **BUG-260828-09**) — the harvest loop EXTRACTED to a pure helper; three helpers added beside `_structural_failures` |
+| [`backend/app/services/harness/publish_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnesspublish_servicepy) | 26 / 11 / 1810 | **FIRES** | ⚠ row STALE at `25/11/1810` (+1 commit) — re-derived 256-02; NOT modified by 256-02. honoured by construction (193.2 / 214 / **BUG-260828-09**): harvest loop EXTRACTED to a pure helper |
 | [`backend/app/services/workflow_authoring.py`](docs/HOT-FILE-LEDGER.md#backendappservicesworkflow_authoringpy) | 15 / 9 / 989 | **FIRES** | honoured by construction (193.2 / 197 / 214 / **214.1**) — ⚠ the extraction it may be owed is neither taken nor obstructed |
 | [`backend/app/models/harness.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsharnesspy) | 20 / 19 / 766 | **FIRES** | honoured by construction (193.2 / **214**) |
 | [`frontend/src/components/workflows/builderStore.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsbuilderstorets) | 14 / 8 / 968 | **FIRES** | honoured by construction (193.2 / 197 / **214.1**) — `setDeclaredInputs` is the sixth `meta` writer, the shape the five before it take |
 | [`frontend/src/components/panel/WorkspacePanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelworkspacepaneltsx) | 16 / 10 / 646 | **FIRES** | honoured by construction (194 / 194.1) |
-| [`backend/app/services/run_lifecycle.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_lifecyclepy) | 6 / 3 / 459 | **FIRES** | honoured by construction (194) — at threshold |
+| [`backend/app/services/run_lifecycle.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_lifecyclepy) | 8 / 4 / 748 | **FIRES** | ⚠ row STALE at `6/3/459` — re-derived 256-02; +289 L unrecorded. NOT modified by 256 and ⛔ NOT the shape to copy (RESEARCH C-5): its `input_tokens=None` is a DEFAULT PARAM, not a site |
 | [`backend/app/api/runs.py`](docs/HOT-FILE-LEDGER.md#backendappapirunspy) | 35 / 16 / 1430 | **FIRES** | honoured by construction (194) |
 | [`backend/app/services/harness_engine.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharness_enginepy) | 54 / 20 / 3135 | **FIRES** | honoured by construction (194 / **214**) — 214-06 resolved the pause's service at ONE call site |
 | [`frontend/src/components/chat/RunCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatruncardtsx) | 28 / 14 / 710 | **FIRES** | ⭐ **G-5 DISCHARGED (243-02)** — the reasoning fold left for `ThinkingBlock.tsx`, `-39/+20`, one `useState` fewer. ⚠ row was STALE at `26/12/728`. State 2 stayed, by decision |
@@ -10559,7 +10581,7 @@ cells rot within days.
 | [`backend/app/api/knowledge_health.py`](docs/HOT-FILE-LEDGER.md#backendappapiknowledgehealthpy) | 11 / 6 / 737 | ⚠ **FIRES** | honoured by construction (**217.1-11**) — adds `could_not_search`; `retrieval_count` byte-unchanged. ⚠ absent at **6 phases**. Audit-analytics from `audit_log`. Service-role by exception |
 | [`backend/app/services/agent_loop.py`](docs/HOT-FILE-LEDGER.md#backendappservicesagent_looppy) | 45 / 21 / 3326 | ⚠ **FIRES** | ⚠ row STALE again (`44/21/3303`). honoured by construction (**250-01**): the empty-output branch gains a 4-arm taxonomy + ONE never-reset counter beside the existing reset. ⛔ no provider branch |
 | [`backend/app/services/context_window.py`](docs/HOT-FILE-LEDGER.md#backendappservicescontext_windowpy) | 10 / 5 / 602 | ⚠ **FIRES** | ⚠ absent for its ENTIRE LIFE at 5 phases — row added 250-01. honoured by construction: ONE removal-ORDER rule inside one private helper. ⛔ `_build_candidate` byte-unchanged |
-| [`backend/app/services/run_producer.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_producerpy) | 3 / 2 / 693 | below | ⚠ absent for its ENTIRE LIFE — row added 250-02 BELOW the threshold, since an absent row is invisible to G-5 at any count. honoured by construction: step 3's gate only |
+| [`backend/app/services/run_producer.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_producerpy) | 5 / 3 / 749 | ⚠ **FIRES — STATE CHANGE** | ⛔ row STALE at `3/2/693` AND its verdict `below` is now WRONG: 3 phases, so G-5 FIRES. Re-derived 256-02; NOT modified by 256-02 — it is the shape METER-03 COPIES |
 | [`backend/app/services/todos_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicestodos_servicepy) | 4 / 3 / 187 | ⚠ **FIRES** | ⚠ absent for its ENTIRE LIFE at 3 phases — row added 250-02, which leaves the file BYTE-UNCHANGED. ⛔ `_RUN_ENDED_MARKER` is now bound by a frontend `?raw` fence |
 | [`frontend/src/components/panel/TodosSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspaneltodossectiontsx) | 11 / 6 / 337 | ⚠ **FIRES** | ⚠ row STALE (`6/4/210`) — 250 and 252 touched it, +127 L. NOT modified by 253; re-derived under CR-08. Absent for its entire life until 250-03 |
 | [`frontend/src/components/panel/todoRunHonesty.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspaneltodorunhonestyts) | 1 / 1 / 104 | new | young (created 250-03). Row added AT CREATION. ⛔ the ONE home of *is this row still honest?*; its marker copy is `?raw`-fenced to `todos_service.py` or the strip silently no-ops |
@@ -10650,6 +10672,9 @@ cells rot within days.
 | [`.claude/hooks/schema-acl-parity-guard.js`](docs/HOT-FILE-LEDGER.md#claudehooksschema-acl-parity-guardjs) | 2 / 1 / 145 | no (1 phase) | young (created 253-02). Row added AT CREATION — `.claude/` is EXEMPT, so no gate can ever demand it. ⛔ its SILENCE reads as "clear": every path a payload can carry must be extracted |
 | [`.github/workflows/backend-tests.yml`](docs/HOT-FILE-LEDGER.md#githubworkflowsbackend-testsyml) | 4 / 2 / 84 | no (2 phases) | ⚠ absent for its ENTIRE LIFE — row added 253-03. `.github/` is EXEMPT. ⛔ its `paths:` decide which fences a change is measured by; two `scripts/` files were read by unit tests and matched by none |
 | [`.claude/settings.json`](docs/HOT-FILE-LEDGER.md#claudesettingsjson) | 9 / 4 / 202 | ⚠ **FIRES** | ⚠ **absent from BOTH registers its ENTIRE LIFE at 4 phases — rows added 253-03.** `.claude/` is EXEMPT: no gate could ask. The ONE hook dispatch table; a too-narrow `matcher` fires NEVER, in silence |
+| [`backend/app/services/circuit_breaker.py`](docs/HOT-FILE-LEDGER.md#backendappservicescircuit_breakerpy) | 1 / 1 / 331 | no (1 phase) | ⚠ absent its ENTIRE LIFE — row added 256-02 at 256-01's touch, BELOW threshold. ⛔ the `max(0,…)` clamp stays on the RETURNED delta, or a reset box hands the DB a negative and SUBTRACTS real spend |
+| [`backend/app/services/task_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicestask_servicepy) | 19 / 10 / 958 | ⚠ **FIRES** | ⛔ **FIRES at 10 phases and absent from BOTH registers its ENTIRE LIFE — row added 256-02, which does NOT modify it.** The canonical two-arm usage reader METER-06 mirrors; no gate could demand it |
+| [`backend/app/services/run_reconciler.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_reconcilerpy) | 3 / 2 / 325 | no (2 phases) | ⚠ absent its ENTIRE LIFE — row added 256-02; NOT modified by 256 (D-256-08 site #7 is REGISTERED, not fixed). ⛔ its BOOT sweep NULLs a `cap_paused` run's real totals — `SEED-297` |
 
 
 
@@ -14171,6 +14196,26 @@ Deep Mode byte-identical.
 anyway, because an absent row is invisible to G-5 at **any** count (the `settingsSearchPayload.ts`
 precedent) and this file will be touched again.
 
+> ⚠ **CORRECTED 2026-09-18 (Phase 256, plan `256-02`) — the original figure and verdict are kept
+> above rather than overwritten, because the ROT is the finding and it took THREE DAYS.**
+> Re-derived at `902701e89` with CLAUDE.md's own recipe: **`5 commits / 3 phases / 749 L`**
+> (buckets `162.5`, `204`, `250` — no six-digit dated quick tasks).
+>
+> ⛔ **It is not only the number that rotted — the VERDICT is now WRONG.** The cell read `below`;
+> the file measures **3 phases**, so **G-5 FIRES**. *"A row that is present and WRONG answers the
+> auditor and stops the audit, which is worse than an absent row"* — this ledger's own recurring
+> finding, and the sentence immediately above ("this file will be touched again") predicted it
+> correctly three days before it happened.
+>
+> ⚠ **Phase 256 does NOT modify this file.** It is the shape `METER-03` **copies**: `:230-247` reads
+> its own in-memory totals and passes them to `finalize_run_terminal` / `finalize_run`, which is the
+> pattern the new `workflow_runs` writer mirrors. The triple was re-derived because the file was
+> READ, not because it was touched — and a read-only file is invisible to
+> `check-hot-file-ledger.cjs`, so nothing mechanical would have caught this.
+>
+> ⛔ `:249-257` is also step 1 of the **R-1 defect chain** (`SEED-297`): it finalizes a `cap_paused`
+> run with REAL totals, which the boot reconciler can later NULL. Registered, not fixed.
+
 **What it owns.** `_finalize_producer_run` is the ONE shared finalizer for both the Deep producer
 and the Deep-run continuation, and it performs **eight ordered invariants**. Step 3 is the RUN-01b
 todo reconciler; step 4 finalizes the runs row; step 5 emits the terminal sentinel. ⛔ **The order
@@ -14819,3 +14864,125 @@ for a period; it was removed before any commit, and the file is byte-unchanged a
 ⛔ **The named seam:** a second emitter is the moment to ask whether `citation_policy` /
 `integrity_policy` are per-emitter rather than per-phase — today they sit on the phase config and
 every emitter inherits them silently.
+
+---
+
+## `backend/app/services/circuit_breaker.py` — row added 2026-09-18 (Phase 256, plan `256-02`)
+
+**Re-derived 2026-09-18 at `902701e89`: `1 commit / 1 phase / 331 L`.** Created in Phase 204 and
+never touched since. **BELOW the G-5 threshold, and the row is added anyway** — the
+`settingsSearchPayload.ts` / `LibraryCloudImport.tsx` precedent: *an absent row is invisible to G-5
+at ANY count, forever, silently*. Plan `256-01` (wave 1, the same wave as the plan adding this row)
+is its second touch.
+
+⚠ **This row was added by `256-02`, which does NOT modify the file.** The plan that modifies it is
+`256-01`, running concurrently in its own worktree; the row is authored here so the obligation is
+discharged in the wave rather than deferred to whoever merges.
+
+**What it owns.** The per-run token/duration ceiling for scheduled workflow runs.
+`absorb_usage_box` folds the harness's in-memory usage box into the breaker's own counters;
+`check_limits` decides the trip; `trip_breaker` records it.
+
+**What `256-01` changes (D-256-04).** `absorb_usage_box` returns the **delta it already computed**
+rather than recomputing it at the call site, so `_enforce_budget` can hand that delta to
+`persist_run_usage`. Arithmetic the SUMMARY must carry: methods **9 → 9**, `absorb_usage_box`
+branches **1 → 1**, new state fields **0**, return type `None → tuple[int, int]`.
+
+**Invariants that bind the next editor:**
+
+1. ⛔ **The `max(0, …)` clamp stays on the RETURNED delta.** The usage box is reset per resumed
+   segment (`harness_engine.py:1844`), so a box that has gone *backwards* is a normal event, not a
+   bug. If the clamp moves off the returned value, a reset box hands `persist_run_usage` a negative
+   and the run's persisted total **subtracts real spend** — the exact class of silent loss Phase 256
+   exists to end.
+2. ⛔ **A disarmed breaker must stay a short-circuit, never a semantic.** With
+   `max_tokens=None, max_duration_seconds=None`, `check_limits` returns `(False, None)`
+   unconditionally (`:188-193`). The `armed` guard reorder in `_enforce_budget` is only safe because
+   of that; a future edit that gives a disarmed breaker behaviour turns the reorder into a real
+   control-flow change.
+3. ⚠ **Its ceiling is per-SEGMENT, not per-run, and it only exists on a SCHEDULE.** Named, not
+   fixed — `SEED-298` / D-256-10. A run resumed five times can spend 5× its configured ceiling, and
+   no interactive run can configure one at all.
+
+---
+
+## `backend/app/services/task_service.py` — row added 2026-09-18 (Phase 256, plan `256-02`)
+
+**Re-derived 2026-09-18 at `902701e89`: `19 commits / 10 phases / 958 L`.**
+⛔ **G-5 FIRES at 10 phases, and this file was absent from BOTH registers for its ENTIRE LIFE.**
+
+⚠ **It was not named by `D-256-13` either.** It was found by *running* the gate and the recipe over
+the phase's read set rather than by reading the scan list — RESEARCH.md C-4. That is `config.py`'s
+failure repeating for at least the fourth time in this ledger (`App.tsx` 23 phases, `NavPanel.tsx`
+11, `config.py` its entire life), and it is the reason the completeness rule is enforced by a script
+rather than by attention.
+
+⚠ **NO PLAN IN PHASE 256 MODIFIES THIS FILE**, so `check-hot-file-ledger.cjs` could never have
+demanded the row: the gate reads `files_modified`, and a file that is only *read* is invisible to it.
+**The row is added anyway**, because the count is 10 and the next phase that does touch it would
+otherwise start from an absent row.
+
+**What it owns.** The chat agent-loop turn driver. `:414-455` is **the canonical two-arm usage
+reader** — the shape that handles both a cumulative `usage` event and an incremental `usage_delta`,
+accumulating `int | None` so that a stream which never surfaced usage yields `None`, never `0`.
+`METER-06`'s `forced_emit._drain` mirror is copied **from here**.
+
+**Invariants that bind the next editor:**
+
+1. ⛔ **`None` and `0` are different answers.** `None` means *the provider never told us*; `0` means
+   *it told us nothing was spent*. Collapsing them makes an unknown look like a free run, which is
+   the failure `SEED-299` registers one module over.
+2. ⛔ **Both arms, or neither.** A provider emitting only `usage_delta` and a provider emitting only
+   a terminal `usage` are both shipped realities (`openai_compat.py:485` emits nothing at all when no
+   usage payload was seen). A mirror that implements one arm is silently correct for half the roster.
+3. ⚠ **Sub-agent runs are written here** — `insert_run` sets `parent_run_id=parent_ctx.run_id`, which
+   is precisely why every roll-up over the `runs` table needs the `parent_run_id IS NULL` narrowing
+   that `backend/tests/unit/test_256_token_sum_narrowing.py` fences (D-256-02).
+
+---
+
+## `backend/app/services/run_reconciler.py` — row added 2026-09-18 (Phase 256, plan `256-02`)
+
+**Re-derived 2026-09-18 at `902701e89`: `3 commits / 2 phases / 325 L`.** Below the G-5 threshold;
+the row is added anyway, for the reason given above — and because this file carries a **measured
+defect that Phase 256 deliberately does not fix**.
+
+⚠ **NOT MODIFIED BY PHASE 256, and that is a decision rather than an oversight** (D-256-08 site #7,
+registered rather than closed).
+
+**The R-1 chain, source-measured, end to end (`SEED-297`):**
+
+1. `run_producer.py:249-257` finalizes a **`cap_paused`** run with its **real totals** via
+   `finalize_run` — deliberately not `finalize_run_terminal`, so the row stays in `runs:active`.
+2. `db/runs.py:104-122` — `finalize_run` performs an **unconditional** `SET input_tokens = $6`.
+   A second call carrying `None` therefore **NULLs the column**.
+3. `run_reconciler.py:84` — `_NON_TERMINAL_CHAT_STATUSES = ["streaming", "cap_paused"]`;
+   `:217` uses the full list when `include_cap_paused` is true.
+4. `run_reconciler.py:101` — `include_cap_paused: bool = True` is the **default**.
+5. `main.py:434-436` — the **BOOT** sweep calls `reconcile_orphaned_runs(...)` with no
+   `include_cap_paused` argument, i.e. `True`. (The periodic sweep at `:490` correctly passes
+   `False`.)
+6. `run_reconciler.py:236-247` then calls `finalize_run_terminal(..., input_tokens=None,
+   output_tokens=None)`.
+
+⇒ **A `cap_paused` chat run carrying real totals loses them at the next backend restart.** That is
+literally *"a run loses its token count"* — the sentence this phase is named for — and no decision
+covered it before `SEED-297`.
+
+**Why REGISTER and not FIX.** The two-line repair (`input_tokens = COALESCE($6, input_tokens)`)
+changes a **shipped writer with multiple callers** and would silently make a genuine
+`None`-after-a-value un-writable. That is a semantic change, not a patch, and it is inconsistent with
+D-256-05's posture of leaving `finish_run` byte-unchanged. A named hole beats a silent one.
+
+**Invariants that bind the next editor:**
+
+1. ⭐ **`:217-247` only touches NON-TERMINAL rows**, which is what makes site #7's `input_tokens=None`
+   *honest* rather than destructive: it can never overwrite a COMPLETED run's real total. A future
+   edit that widens the candidate status set to include terminal rows converts an honest unknown into
+   data loss.
+2. ⛔ **The BOOT call and the PERIODIC call disagree about `include_cap_paused` today** (`True` vs
+   `False`). Any edit to either call site must state which behaviour it intends; the asymmetry is the
+   defect's carrier and it is currently undocumented at the call sites themselves.
+3. ⚠ A stranded Deep chat run's count is **genuinely unknowable** — the producer process is gone and
+   the in-memory usage box died with it (`SEED-299`). Only mid-stream persistence would make it
+   knowable, which is that seed's `trigger_when`.
