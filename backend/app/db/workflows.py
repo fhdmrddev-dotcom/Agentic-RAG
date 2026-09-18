@@ -58,6 +58,19 @@ from app.models.harness import WorkflowDefinition
 
 logger = logging.getLogger(__name__)
 
+# ── Phase 256 (D-256-07 / SC#4) — the coverage marker ─────────────────────────
+# WHICH COUNTING LEGS the instrumentation covers — NOT which legs a given run
+# happened to use. Written verbatim into ``workflow_runs.token_coverage`` by
+# ``persist_run_usage`` below, so a run persisted before a leg shipped reads
+# honestly as not covering it, FOREVER, with no date arithmetic and no memory.
+# ⛔ Plan 256-04 (METER-06) appends ``"emit"`` HERE, in the SAME commit as the
+#    forced-emit drain arms (O-4). A marker that claims a leg which has not
+#    shipped is a lie in a column built to prevent lies.
+# ⛔ This is a DATA VALUE written into a column. It never resolves a writer,
+#    emitter, executor or validator — the Phase 255 Extension Contract is
+#    untouched by it.
+TOKEN_COVERAGE_LEGS: tuple[str, ...] = ("agent", "single", "batch")
+
 # ── Phase 186 (CONCUR-02 / D-186-07) — the optimistic concurrency token ───────
 # ONE canonical expression, referenced by every read AND by the guard, so the value the
 # client is handed and the value the WHERE clause compares can never drift apart.
@@ -2031,6 +2044,63 @@ async def advance_current_phase(
         "UPDATE workflow_runs SET current_phase_id = $2 WHERE id = $1",
         run_id,
         next_phase_id,
+    )
+
+
+async def persist_run_usage(
+    pool: asyncpg.Pool,
+    run_id: UUID,
+    *,
+    input_delta: int | None,
+    output_delta: int | None,
+) -> None:
+    """ADD a phase's token DELTA to a run's durable totals (Phase 256 / METER-03).
+
+    workflow_runs table, keyed by its own ``id``. The ONE home of the token write
+    (D-256-05) — ``finish_run`` is deliberately left byte-unchanged.
+
+    ⛔ ADD, NEVER SET (D-256-09). ``ctx.run_usage_box`` is reset to ``{}`` on every
+    ``_resume_run`` (``harness_engine.py:1844``), so the box only ever carries ONE run
+    SEGMENT's spend. A SET would report the last segment's spend as the whole run's
+    total, and a run resumed five times would read as costing a fifth of what it did.
+
+    ⛔ A ``(0, 0)`` or ``(None, None)`` delta writes NOTHING, and that guard is
+    LOAD-BEARING rather than an optimisation. ``_enforce_budget`` is invoked twice per
+    phase iteration (``harness_engine.py:1978`` and ``:2547``), and unlike ``finish_run``
+    — whose cross-worker interleave is benign BY VALUE-IDENTITY
+    (``db/workflows.py`` ``finish_run``'s own docstring) — a second ADD of the same
+    number is not the same write, it is double the money. The delta is derived from
+    ``CircuitBreaker``'s watermark, so an unchanged box yields ``(0, 0)`` and this
+    returns before touching the database.
+
+    ⭐ Under a GENUINE double-drive — two producers that each really ran the phase —
+    BOTH paid the provider, so two ADDs of two real deltas is the TRUTHFUL total. A SET
+    would report half the money actually spent. The write is shaped for the honest case,
+    not the convenient one.
+
+    ⛔ NO RETRY LOOP HERE. A retry after an ``UPDATE`` that already committed would
+    re-add. Let the exception propagate, exactly as every other writer in this module
+    does.
+
+    ⛔ Parameterised ``$1..$4`` only (T-091-03), and ``WHERE id = $1`` is the ENTIRE
+    access boundary — this runs on the service-role pool, which bypasses RLS. Never add
+    an org-less ``WHERE thread_id`` variant.
+
+    ``NULL`` means never measured and ``0`` means measured as zero (D-256-06); the two
+    are different facts and this writer never coalesces one into the other.
+    """
+    if not input_delta and not output_delta:
+        return
+    await pool.execute(
+        "UPDATE workflow_runs SET "
+        "input_tokens = COALESCE(input_tokens, 0) + $2, "
+        "output_tokens = COALESCE(output_tokens, 0) + $3, "
+        "token_coverage = $4 "
+        "WHERE id = $1",
+        run_id,
+        int(input_delta or 0),
+        int(output_delta or 0),
+        list(TOKEN_COVERAGE_LEGS),
     )
 
 
