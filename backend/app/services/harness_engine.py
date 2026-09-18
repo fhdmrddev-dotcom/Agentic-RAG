@@ -1885,6 +1885,39 @@ async def run_workflow(
     except (AttributeError, TypeError):
         pass  # immutable stub ctx in some unit tests — the breaker simply sees no tokens
 
+    async def _flush_run_usage() -> None:
+        """THE ONE HOME of the durable token write (Phase 256 round 1 / CR-01).
+
+        ⭐ IT EXISTS SO THE ABSORB AND THE PERSIST CANNOT DRIFT APART. ``_enforce_budget``
+        used to carry both lines inline, which made them reachable from exactly the two
+        loop-boundary sites that function is called from — and ``256-VERIFICATION.md``
+        scored SC#1 at 2/4 because THREE ordinary returns sit between those two sites and
+        reach neither: the ``pause_run`` arm (a human gate elapsed unanswered), the
+        ``fail_run`` arm (gates exhausted / wall-clock timeout) and the dangling
+        ``skip_to`` target. Extracting the pair lets the third caller be one line.
+
+        ⚠ IT IS SAFE TO CALL MORE THAN ONCE, AND THAT PROPERTY IS BORROWED, NOT ASSUMED.
+        ``CircuitBreaker.absorb_usage_box`` derives its ``(d_in, d_out)`` from the
+        breaker's OWN watermark and mutates it, so a second call on an unchanged box
+        returns ``(0, 0)``; ``persist_run_usage`` then returns before touching the
+        database on a falsy delta. That is why N phases still produce N writes with a
+        THIRD call site in the loop — driven in
+        ``tests/unit/test_256_run_exit_usage_flush.py``, not asserted here.
+
+        ⚠ IT WRITES NOTHING WHEN THE CTX CARRIES NO BOX. ``getattr(..., None)`` →
+        ``absorb_usage_box(None)`` → ``(0, 0)`` → no statement. A ``(0, 0)`` write would
+        read as *"measured as zero"* and make an uninstrumented run look free (D-256-06).
+
+        ⛔ NO ``try`` HERE, for the same reason ``_enforce_budget``'s docstring gives
+        below: a failure of the durable write must propagate exactly as every other
+        writer in ``db/workflows.py`` does, and a swallow would report a run as metered
+        when it is not.
+        """
+        _d_in, _d_out = breaker.absorb_usage_box(getattr(ctx, "run_usage_box", None))
+        await persist_run_usage(
+            pool, run_id, input_delta=_d_in, output_delta=_d_out
+        )
+
     async def _enforce_budget(where: str) -> None:
         """Absorb the run's spend, and raise if either ceiling is now breached.
 
@@ -1924,11 +1957,15 @@ async def run_workflow(
         ⛔ NO ``try`` AROUND THE PERSIST. This function's contract above is that it
         raises ``CircuitBreakerTrippedError`` and not ``CancelledError``; a ``try/except``
         here would add a branch to a function whose branch count is itself fenced.
+
+        ⚠ THE ABSORB+PERSIST PAIR MOVED INTO ``_flush_run_usage`` ABOVE (Phase 256
+        round 1 / CR-01) AND IS CALLED AS THIS FUNCTION'S FIRST STATEMENT. Nothing about
+        the ordering changed — the flush is still ABOVE the ``armed`` guard — and no
+        branch was added here: ``if`` count 2 before, 2 after,
+        ``tests/unit/test_256_run_exit_usage_flush.py::test_enforce_budget_gained_no_branch``
+        pins it.
         """
-        _d_in, _d_out = breaker.absorb_usage_box(getattr(ctx, "run_usage_box", None))
-        await persist_run_usage(
-            pool, run_id, input_delta=_d_in, output_delta=_d_out
-        )
+        await _flush_run_usage()
         if not breaker.armed:
             return
         _tripped, _reason = breaker.check_limits()
@@ -2243,6 +2280,44 @@ async def run_workflow(
                             phase_id,
                         )
             raise
+
+        # ── the run's spend becomes durable HERE, before any outcome arm ────────
+        #
+        # ⭐ THE PLACEMENT IS THE WHOLE POINT, and it is the ``phase_types.py:1586``
+        # precedent applied one layer up. EVERY outcome arm below this line flows
+        # THROUGH here — ``pause_run``, ``fail_run``, the dangling-``skip_to`` guard, a
+        # taken ``skip_to`` and the ordinary completed path — so the recording needs no
+        # branch of its own, and a FIFTH arm added later is covered by construction
+        # rather than by whoever writes it remembering.
+        #
+        # ⚠ CR-01 (Phase 256 round 1) found the three arms this covers that
+        # ``_enforce_budget`` could not reach: the pause arm and the ``fail_run`` arm
+        # both ``return`` before ``_enforce_budget("phase_completed")``, and the
+        # missing-skip-target guard terminalizes the run inside the ``skip_to`` arm. The
+        # loss was PERMANENT — the next segment starts with ``ctx.run_usage_box = {}``
+        # and a breaker at zero, and D-256-03 forbids recovering the figure by summing
+        # across ``runs`` and ``workflow_runs`` (different grains).
+        #
+        # ⚠ IT DOES NOT DOUBLE-BOOK, and the reason is the breaker's watermark rather
+        # than a guard here: ``absorb_usage_box`` returns a DELTA derived from its own
+        # mutated counters, so on the completed path — where
+        # ``_enforce_budget("phase_completed")`` has already absorbed the box — this
+        # yields ``(0, 0)`` and ``persist_run_usage`` returns before the database. N
+        # phases still produce N writes.
+        #
+        # ⛔ A ``try:``/``finally:`` AROUND THE ``while`` LOOP WAS CONSIDERED AND
+        # REJECTED, and the rejection is recorded here rather than left silent. A
+        # ``finally`` also runs on ``asyncio.CancelledError``, where an UNSHIELDED
+        # ``await`` is itself cancelled — that would change which exception leaves this
+        # engine on a user Stop, which is precisely what ``_enforce_budget``'s docstring
+        # and the Phase-194 ``cancel_phase`` single-call-site fence exist to protect (the
+        # escape arm's own cleanup is ``asyncio.shield``-wrapped for exactly this
+        # reason). ⚠ THE CONSEQUENCE IS A RESIDUAL AND IT IS NAMED, NOT HIDDEN: a phase
+        # that CRASHES or is CANCELLED mid-work still loses its delta from
+        # ``workflow_runs``. That is outside CR-01's three ORDINARY returns and outside
+        # SC#1's *"after the process restarts"* wording; it is registered in
+        # ``SEED-300`` with a concrete trigger.
+        await _flush_run_usage()
 
         # ── pause_run: a human gate elapsed unanswered (200 / D-10) ─────────────
         #

@@ -2082,13 +2082,19 @@ async def persist_run_usage(
     (D-256-05) — ``finish_run`` is deliberately left byte-unchanged.
 
     ⛔ ADD, NEVER SET (D-256-09). ``ctx.run_usage_box`` is reset to ``{}`` on every
-    ``_resume_run`` (``harness_engine.py:1844``), so the box only ever carries ONE run
-    SEGMENT's spend. A SET would report the last segment's spend as the whole run's
-    total, and a run resumed five times would read as costing a fifth of what it did.
+    ``_resume_run`` (~~``harness_engine.py:1844``~~ → measured ``:1884`` at Phase 256
+    round 1; the original is kept beside the correction, never over it, per S-5), so the
+    box only ever carries ONE run SEGMENT's spend. A SET would report the last segment's
+    spend as the whole run's total, and a run resumed five times would read as costing a
+    fifth of what it did.
 
     ⛔ A ``(0, 0)`` or ``(None, None)`` delta writes NOTHING, and that guard is
     LOAD-BEARING rather than an optimisation. ``_enforce_budget`` is invoked twice per
-    phase iteration (``harness_engine.py:1978`` and ``:2547``), and unlike ``finish_run``
+    phase iteration (~~``harness_engine.py:1978`` and ``:2547``~~ → measured ``:2073``
+    and ``:2680``), and — SINCE PHASE 256 ROUND 1 — a THIRD caller reaches this writer
+    through ``_flush_run_usage`` once per loop iteration, unconditionally, above every
+    outcome arm. So the idempotency guard below carries three callers, not two, and
+    unlike ``finish_run``
     — whose cross-worker interleave is benign BY VALUE-IDENTITY
     (``db/workflows.py`` ``finish_run``'s own docstring) — a second ADD of the same
     number is not the same write, it is double the money. The delta is derived from
