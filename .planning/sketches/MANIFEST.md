@@ -2800,6 +2800,7 @@ already approved. `SHELL-01/02/03` are bug fixes on shipped surfaces with named 
 | 236 | the-file-that-belongs-to-this-chat | How does a person know a file is HERE, not in the Library? | ✅ **A — Scope on the chip** ★ (operator, 2026-09-11) · the `+` menu stays plain; the chip is the only place that says *"this chat only · 24h"*, and it rides into the sent message | phase-244, shell-04, chat, composer, attach, scope, g2-sketch-gate |
 | 247 | sources-and-watches | How does a watched-source card honestly report its connection health separately from its run outcome, and where does 'Sync now' put its answer without destroying the screen? | ✅ **A — Two-Tier Status Pill + Inline Sync** ★ (operator, 2026-09-14) · dual connection/run status pills + row-level non-collapsing sync tag | phase-247, watch-03, watch-04, watch-05, watch-06, watch-07, g2-sketch-gate, sources-and-watches |
 | 248 | the-calmer-phase-card | Can the canvas feel calmer without re-opening UAT row U-2 — is the tension ORNAMENT or DENSITY? | ⛔ **C picked then measured VOID** (breaks the Phase 188 ring) · live candidates **C2 / C3** | phase-tbd, canvas, node-anatomy, density, u-2, g2-sketch-gate |
+| 257 | spend-and-metering | How should the /admin/spend view present dollar spend while maintaining radical honesty about unrated models and uncounted token blind spots? | Awaiting operator review · live candidates **A (Instrument Cockpit) / B (Deep Formula Inspector) / C (Rate Registry & Reprice)** | phase-257, meter-01, meter-02, meter-07, spend, rate-registry, blind-spots, g2-sketch-gate |
 
 - **Why A over B** — a menu is read once and closed; **a chip is still on screen while the person types
   and survives into the transcript.** Reopening the chat tomorrow, A still says `this chat only`;
@@ -2875,3 +2876,12 @@ clearance reproduced exactly, plus the trim; 130 → 98px, −25%) collect it wi
 ⚠ **Horizontal is the wrong axis, by arithmetic:** B buys 80px/gap and breaks U-2 by 260px, and any
 compromise under 1600px leaves ~15px/gap, which nobody perceives. ⛔ **U-2 is not retired to make a card look
 nicer** — only after C2 and C3 are rejected on their merits, and then as a recorded decision.
+
+## 257 · Spend in dollars, and what it cannot see — the Free Lie vs Radical Honesty
+
+G-2 sketch for Phase 257 (METER-01, METER-02, METER-07). Tested at `.planning/sketches/257-spend-and-metering/index.html` and `.planning/sketches/257-spend-and-metering.html`. Grounded in Migration 182 (`workflow_runs.input_tokens`, `output_tokens`, `token_coverage text[]`, `idx_workflow_runs_org_coverage_incomplete`), Migration 183 (`model_rates` table), and the 16 locked decisions in `257-CONTEXT.md`.
+
+- **Variant A (Instrument Cockpit)** — High density dashboard: metrics cards (Total Spend with unrated footnote, Total Tokens, Priced Ratio, Blind Spot count), prominent amber honesty card (`D-257-07`) stating *"What This View Cannot See"*, and runs table featuring the `⚠️ Unrated` chip (D-257-05) and `Incomplete Coverage` tag (D-257-08).
+- **Variant B (Deep Formula Inspector)** — Master-detail split drawer: clicking any run shows exact canonical conversion formula (`METER-02`: `input_tokens * rate_in + output_tokens * rate_out`), effective date active for that run, and accounting breakdown across the four counting legs (`agent, single, batch, emit`).
+- **Variant C (Rate Registry & Repricing View)** — Dedicated `model_rates` management view (`D-257-11`): displays active and historical rates per 1,000,000 tokens (`numeric(12, 6)` per `D-257-01`), and includes interactive "Reprice Model" modal dialog inserting a new effective-dated row without altering historical run costs (`D-257-03`).
+

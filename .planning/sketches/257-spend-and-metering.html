@@ -1,0 +1,875 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sketch 257 — Spend in Dollars, and What It Cannot See</title>
+<link rel="stylesheet" href="../themes/default.css">
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding-top: 108px;
+    padding-bottom: 60px;
+    background: var(--color-bg);
+    color: var(--color-text);
+    font-family: var(--font-sans);
+    min-height: 100vh;
+  }
+
+  /* ── Fixed Control Bars ─────────────────────────────────────── */
+  #variant-nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 9998;
+    background: var(--color-bg-elev1); border-bottom: 1px solid var(--color-border);
+    padding: 10px 24px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+  }
+  .variant-tab {
+    background: transparent; color: var(--color-text-muted);
+    border: 1px solid var(--color-border); border-radius: 999px;
+    padding: 6px 16px; font: 500 13px/1 var(--font-sans); cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .variant-tab:hover { color: var(--color-text); border-color: var(--color-text-dim); }
+  .variant-tab.active {
+    background: var(--color-primary-dim); color: var(--color-primary);
+    border-color: var(--color-primary-glow);
+  }
+  #nav-note {
+    margin-left: auto; font: 500 12px/1.4 var(--font-mono); color: var(--color-text-dim);
+  }
+
+  #sub-nav {
+    position: fixed; top: 52px; left: 0; right: 0; z-index: 9997;
+    background: hsl(220 35% 6%); border-bottom: 1px solid var(--color-border);
+    padding: 8px 24px; display: flex; gap: 16px; align-items: center;
+  }
+  .filter-group { display: flex; align-items: center; gap: 6px; }
+  .filter-lbl {
+    font: 600 11px/1 var(--font-mono); color: var(--color-text-dim);
+    letter-spacing: .08em; text-transform: uppercase; margin-right: 4px;
+  }
+  .filter-chip {
+    background: var(--color-surface); color: var(--color-text-muted);
+    border: 1px solid var(--color-border); border-radius: 6px;
+    padding: 4px 10px; font: 500 12px/1.2 var(--font-sans); cursor: pointer;
+  }
+  .filter-chip:hover { color: var(--color-text); }
+  .filter-chip.active {
+    background: var(--color-secondary); color: var(--color-text);
+    border-color: var(--color-text-dim); font-weight: 600;
+  }
+
+  /* ── Layout Shell ───────────────────────────────────────────── */
+  .container { max-width: 1440px; margin: 0 auto; padding: 24px; }
+  .page-header {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    margin-bottom: 24px;
+  }
+  .page-title { font: 700 24px/1.2 var(--font-headline); margin: 0 0 6px; }
+  .page-desc { color: var(--color-text-muted); font-size: 14px; margin: 0; }
+  .action-btn {
+    background: var(--color-primary); color: hsl(220 40% 5%);
+    border: none; border-radius: 8px; padding: 8px 16px;
+    font: 600 13px/1 var(--font-sans); cursor: pointer;
+    display: inline-flex; align-items: center; gap: 6px;
+    transition: transform 0.1s ease, filter 0.15s ease;
+  }
+  .action-btn:hover { filter: brightness(1.1); transform: translateY(-1px); }
+  .action-btn.secondary {
+    background: var(--color-surface); color: var(--color-text);
+    border: 1px solid var(--color-border);
+  }
+
+  /* ── Metric Summary Cards ───────────────────────────────────── */
+  .metrics-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;
+    margin-bottom: 24px;
+  }
+  .metric-card {
+    background: var(--color-surface); border: 1px solid var(--color-border);
+    border-radius: 12px; padding: 18px 20px; position: relative;
+  }
+  .metric-label {
+    font: 600 12px/1 var(--font-mono); color: var(--color-text-dim);
+    letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 10px;
+    display: flex; justify-content: space-between;
+  }
+  .metric-value {
+    font: 700 28px/1.1 var(--font-mono); color: var(--color-text);
+    letter-spacing: -0.02em; margin-bottom: 6px;
+  }
+  .metric-footnote {
+    font: 400 12px/1.4 var(--font-sans); color: var(--color-text-muted);
+  }
+  .metric-footnote.warning { color: var(--color-warning); font-weight: 500; }
+  .metric-badge {
+    background: var(--color-warning-dim); color: var(--color-warning);
+    border: 1px solid hsl(38 92% 60% / 0.3); border-radius: 4px;
+    padding: 2px 6px; font: 600 10px/1 var(--font-mono);
+  }
+
+  /* ── Honesty / Blind Spot Banner (METER-07) ─────────────────── */
+  .blind-spot-card {
+    background: hsl(38 92% 60% / 0.06);
+    border: 1px solid hsl(38 92% 60% / 0.25);
+    border-left: 4px solid var(--color-warning);
+    border-radius: 10px; padding: 16px 20px;
+    margin-bottom: 24px;
+  }
+  .blind-spot-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 10px;
+  }
+  .blind-spot-title {
+    font: 700 14px/1.2 var(--font-sans); color: var(--color-warning);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .blind-spot-desc {
+    color: var(--color-text-muted); font-size: 13px; line-height: 1.5; margin: 0 0 12px;
+  }
+  .blind-spot-pills { display: flex; gap: 10px; flex-wrap: wrap; }
+  .blind-spot-action {
+    background: hsl(38 92% 60% / 0.12); color: var(--color-warning);
+    border: 1px solid hsl(38 92% 60% / 0.3); border-radius: 6px;
+    padding: 6px 12px; font: 600 12px/1 var(--font-mono); cursor: pointer;
+    transition: all 0.15s;
+  }
+  .blind-spot-action:hover {
+    background: hsl(38 92% 60% / 0.22); color: hsl(38 100% 70%);
+  }
+
+  /* ── Spend Table ────────────────────────────────────────────── */
+  .table-shell {
+    background: var(--color-surface); border: 1px solid var(--color-border);
+    border-radius: 12px; overflow: hidden;
+  }
+  .table-toolbar {
+    padding: 14px 20px; border-bottom: 1px solid var(--color-border);
+    display: flex; justify-content: space-between; align-items: center;
+    background: hsl(220 30% 6%);
+  }
+  .table-count { font: 500 13px/1 var(--font-mono); color: var(--color-text-dim); }
+  table { width: 100%; border-collapse: collapse; text-align: left; }
+  th {
+    padding: 12px 18px; font: 600 11px/1 var(--font-mono);
+    color: var(--color-text-dim); letter-spacing: 0.05em; text-transform: uppercase;
+    background: hsl(220 30% 6.5%); border-bottom: 1px solid var(--color-border);
+  }
+  td {
+    padding: 14px 18px; font-size: 13px; border-bottom: 1px solid var(--color-border-soft);
+    vertical-align: middle;
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: hsl(220 25% 9%); }
+  tr.clickable { cursor: pointer; }
+  tr.selected td { background: hsl(239 100% 82% / 0.08); }
+
+  /* ── Cell Types ─────────────────────────────────────────────── */
+  .run-title { font-weight: 600; color: var(--color-text); margin-bottom: 3px; }
+  .run-meta { font: 400 11px/1.2 var(--font-mono); color: var(--color-text-dim); }
+  .cost-cell { font: 700 14px/1 var(--font-mono); color: var(--color-text); }
+  .tokens-cell { font: 500 13px/1.2 var(--font-mono); color: var(--color-text-muted); }
+  .tokens-sub { font-size: 11px; color: var(--color-text-dim); }
+
+  /* ── Status Badges & Chips ──────────────────────────────────── */
+  .chip {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 8px; border-radius: 4px; font: 600 11px/1 var(--font-mono);
+  }
+  .chip.unrated {
+    background: hsl(38 92% 60% / 0.12); color: var(--color-warning);
+    border: 1px solid hsl(38 92% 60% / 0.35); cursor: pointer;
+  }
+  .chip.partial {
+    background: hsl(215 25% 20%); color: hsl(215 70% 75%);
+    border: 1px solid hsl(215 30% 35%);
+  }
+  .chip.complete {
+    background: var(--color-success-dim); color: var(--color-success);
+    border: 1px solid hsl(142 71% 45% / 0.3);
+  }
+  .chip.paused {
+    background: hsl(280 65% 60% / 0.15); color: hsl(280 85% 75%);
+    border: 1px solid hsl(280 65% 60% / 0.3);
+  }
+
+  /* ── Split Plane Inspector (Variant B) ──────────────────────── */
+  .split-layout { display: grid; grid-template-columns: 1fr 420px; gap: 20px; align-items: start; }
+  .inspector-card {
+    background: var(--color-surface); border: 1px solid var(--color-border);
+    border-radius: 12px; padding: 22px; position: sticky; top: 128px;
+  }
+  .inspector-title { font: 700 16px/1.2 var(--font-headline); margin: 0 0 16px; }
+  .formula-box {
+    background: hsl(220 35% 4.5%); border: 1px solid var(--color-border);
+    border-radius: 8px; padding: 14px; font: 500 12px/1.6 var(--font-mono);
+    color: var(--color-text-muted); margin: 12px 0 16px;
+  }
+  .formula-highlight { color: var(--color-primary); font-weight: 700; }
+  .formula-math { color: var(--color-text); }
+  .audit-row {
+    display: flex; justify-content: space-between; padding: 8px 0;
+    border-bottom: 1px solid var(--color-border-soft); font-size: 12px;
+  }
+  .audit-row:last-child { border-bottom: none; }
+  .audit-key { color: var(--color-text-dim); font-family: var(--font-mono); }
+  .audit-val { color: var(--color-text); font-weight: 500; }
+
+  /* ── Modal Dialog (Reprice & Popovers) ──────────────────────── */
+  .modal-backdrop {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(4px); z-index: 99999;
+    display: none; align-items: center; justify-content: center;
+  }
+  .modal-backdrop.open { display: flex; }
+  .modal-box {
+    background: var(--color-surface); border: 1px solid var(--color-border);
+    border-radius: 14px; width: 100%; max-width: 520px; padding: 24px;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+  }
+  .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
+  .modal-title { font: 700 18px/1.2 var(--font-headline); margin: 0; }
+  .close-btn { background: none; border: none; color: var(--color-text-dim); font-size: 20px; cursor: pointer; }
+  .form-group { margin-bottom: 16px; }
+  .form-label {
+    display: block; font: 600 12px/1 var(--font-mono); color: var(--color-text-dim);
+    letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 6px;
+  }
+  .form-input, .form-select {
+    width: 100%; background: var(--color-bg); border: 1px solid var(--color-border);
+    border-radius: 8px; padding: 10px 12px; color: var(--color-text);
+    font: 500 13px/1.2 var(--font-mono);
+  }
+  .form-input:focus, .form-select:focus {
+    outline: none; border-color: var(--color-primary);
+  }
+  .modal-footer {
+    display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px;
+  }
+
+  /* ── Popover Tooltip ────────────────────────────────────────── */
+  .popover-card {
+    position: absolute; background: hsl(220 30% 9%); border: 1px solid var(--color-warning);
+    border-radius: 8px; padding: 12px 14px; box-shadow: 0 10px 25px rgba(0,0,0,0.6);
+    z-index: 1000; width: 280px; display: none;
+  }
+  .popover-card.open { display: block; }
+</style>
+</head>
+<body>
+
+<!-- ── Fixed Variant Control Bar ── -->
+<header id="variant-nav">
+  <span class="filter-lbl" style="margin-right:8px;">G-2 Sketch 257:</span>
+  <button class="variant-tab active" data-variant="A" onclick="setVariant('A')">Variant A: Instrument Cockpit</button>
+  <button class="variant-tab" data-variant="B" onclick="setVariant('B')">Variant B: Deep Formula Inspector</button>
+  <button class="variant-tab" data-variant="C" onclick="setVariant('C')">Variant C: Rate Registry & Reprice</button>
+  <div id="nav-note">METER-01 · METER-02 · METER-07 · AETHER DIGITAL CURATOR</div>
+</header>
+
+<!-- ── Sub Filter Bar ── -->
+<div id="sub-nav">
+  <div class="filter-group">
+    <span class="filter-lbl">Time:</span>
+    <button class="filter-chip" onclick="setTime('today', this)">Today</button>
+    <button class="filter-chip" onclick="setTime('7d', this)">7D</button>
+    <button class="filter-chip active" onclick="setTime('30d', this)">Last 30D</button>
+    <button class="filter-chip" onclick="setTime('all', this)">All Time</button>
+  </div>
+  <div style="width:1px; height:20px; background:var(--color-border);"></div>
+  <div class="filter-group">
+    <span class="filter-lbl">Status:</span>
+    <button class="filter-chip active" id="chip-all" onclick="filterStatus('all', this)">All (100)</button>
+    <button class="filter-chip" id="chip-rated" onclick="filterStatus('rated', this)">Priced (92)</button>
+    <button class="filter-chip" id="chip-unrated" onclick="filterStatus('unrated', this)">Unrated (8)</button>
+    <button class="filter-chip" id="chip-partial" onclick="filterStatus('partial', this)">Incomplete Coverage (5)</button>
+  </div>
+  <div style="margin-left:auto;">
+    <button class="action-btn secondary" onclick="openRepriceModal()">+ Reprice / Add Rate</button>
+  </div>
+</div>
+
+<main class="container">
+
+  <!-- ── Page Header ── -->
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Spend & Metering</h1>
+      <p class="page-desc">Attributable dollar spend across workflows and chat runs, with strict blind-spot honesty.</p>
+    </div>
+    <div style="display:flex; gap:10px;">
+      <button class="action-btn secondary" onclick="alert('Exporting attributable spend receipt...')">Export Receipt (CSV)</button>
+      <button class="action-btn" onclick="openRepriceModal()">Reprice Model</button>
+    </div>
+  </div>
+
+  <!-- ── Metric Cards Row ── -->
+  <section class="metrics-grid">
+    <div class="metric-card">
+      <div class="metric-label">
+        <span>Total Org Spend (30D)</span>
+        <span class="metric-badge">METER-07</span>
+      </div>
+      <div class="metric-value">$148.62<span style="color:var(--color-warning);">*</span></div>
+      <div class="metric-footnote warning">
+        * 92 runs priced · <strong>8 unrated runs excluded</strong>
+      </div>
+    </div>
+
+    <div class="metric-card">
+      <div class="metric-label">
+        <span>Total Tokens Counted</span>
+        <span style="color:var(--color-text-dim);">METER-03</span>
+      </div>
+      <div class="metric-value">48.2M</div>
+      <div class="metric-footnote">
+        41.5M input · 6.7M output (persisted)
+      </div>
+    </div>
+
+    <div class="metric-card">
+      <div class="metric-label">
+        <span>Runs Priced Ratio</span>
+        <span style="color:var(--color-success);">92.0%</span>
+      </div>
+      <div class="metric-value">92 / 100</div>
+      <div class="metric-footnote">
+        8 runs have no rate in model_rates
+      </div>
+    </div>
+
+    <div class="metric-card">
+      <div class="metric-label">
+        <span>Blind Spots & Residues</span>
+        <span class="metric-badge" style="background:hsl(0 72% 51% / 0.15); color:var(--color-danger); border-color:hsl(0 72% 51% / 0.3);">SEED-300</span>
+      </div>
+      <div class="metric-value" style="color:var(--color-warning);">13 runs</div>
+      <div class="metric-footnote">
+        8 unrated models · 5 partial token_coverage
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Honesty Card: "What This View Cannot See" (METER-07) ── -->
+  <section class="blind-spot-card" id="honesty-banner">
+    <div class="blind-spot-header">
+      <div class="blind-spot-title">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8" x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+        What This View Cannot See — System Blind Spots & Coverage Residues
+      </div>
+      <span style="font:600 11px/1 var(--font-mono); color:var(--color-warning); text-transform:uppercase;">D-257-07 Honesty Disclosure</span>
+    </div>
+    <p class="blind-spot-desc">
+      The total <strong>$148.62</strong> above is honest but incomplete. It excludes <strong>8 runs</strong> executed against models with no registered rates (e.g. <code>qwen-2.5-72b</code>, <code>local/llama-3-8b</code>) and cannot account for uncounted judge/eval shots on <strong>5 runs</strong> with incomplete <code>token_coverage</code>.
+    </p>
+    <div class="blind-spot-pills">
+      <button class="blind-spot-action" onclick="filterStatus('unrated', document.getElementById('chip-unrated'))">
+        View 8 Unrated Runs →
+      </button>
+      <button class="blind-spot-action" onclick="filterStatus('partial', document.getElementById('chip-partial'))">
+        View 5 Incomplete Coverage Runs →
+      </button>
+      <button class="blind-spot-action" style="margin-left:auto; background:transparent; color:var(--color-text-dim); border-color:var(--color-border);" onclick="setVariant('C')">
+        Open Rate Registry (Migration 183) →
+      </button>
+    </div>
+  </section>
+
+  <!-- ── Dynamic Content Switching between Variants A, B, C ── -->
+
+  <!-- VARIANT A & B WRAPPER -->
+  <div id="view-dashboard">
+    <div id="layout-container">
+
+      <!-- Runs Table Shell -->
+      <div class="table-shell">
+        <div class="table-toolbar">
+          <div style="font-weight:600; font-size:14px; color:var(--color-text);">Recent Workflow & Chat Runs</div>
+          <div class="table-count" id="table-filter-count">Showing 6 sample runs (filtered: all)</div>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Run / Workflow</th>
+              <th>Model / Provider</th>
+              <th>Status</th>
+              <th>Tokens (In / Out)</th>
+              <th>Attributable Spend</th>
+              <th>Coverage (METER-06)</th>
+            </tr>
+          </thead>
+          <tbody id="runs-tbody">
+            <!-- Row 1: Fully Priced Paused Run (real from Phase 256 UAT row 1) -->
+            <tr class="clickable run-row" data-type="rated" onclick="inspectRun('a77ed2c0', this)">
+              <td>
+                <div class="run-title">Knowledge Base Library Structure Summary</div>
+                <div class="run-meta">run a77ed2c0 · definition 4ddadece · 2 mins ago</div>
+              </td>
+              <td>
+                <div style="font-weight:500;">deepseek-chat</div>
+                <div class="run-meta">deepseek-v4-flash</div>
+              </td>
+              <td><span class="chip paused">Needs Approval</span></td>
+              <td class="tokens-cell">
+                <div>145,459 total</div>
+                <div class="tokens-sub">135.1k in · 10.3k out</div>
+              </td>
+              <td class="cost-cell" style="color:var(--color-success);">$0.0385</td>
+              <td><span class="chip complete">4 / 4 legs</span></td>
+            </tr>
+
+            <!-- Row 2: Fully Priced Completed Run -->
+            <tr class="clickable run-row" data-type="rated" onclick="inspectRun('902701e8', this)">
+              <td>
+                <div class="run-title">Automated Code Security Triage</div>
+                <div class="run-meta">run 902701e8 · definition b18ef72a · 1 hour ago</div>
+              </td>
+              <td>
+                <div style="font-weight:500;">gpt-4o</div>
+                <div class="run-meta">openai (native)</div>
+              </td>
+              <td><span class="chip complete">Completed</span></td>
+              <td class="tokens-cell">
+                <div>441,200 total</div>
+                <div class="tokens-sub">412.8k in · 28.4k out</div>
+              </td>
+              <td class="cost-cell" style="color:var(--color-success);">$1.3160</td>
+              <td><span class="chip complete">4 / 4 legs</span></td>
+            </tr>
+
+            <!-- Row 3: UNRATED MODEL RUN (THE FREE LIE CURE, D-257-05) -->
+            <tr class="clickable run-row" data-type="unrated" onclick="inspectRun('c908161f', this)">
+              <td>
+                <div class="run-title">Client Deliverable PDF Pipeline</div>
+                <div class="run-meta">run c908161f · definition f81a0392 · 3 hours ago</div>
+              </td>
+              <td>
+                <div style="font-weight:500; color:var(--color-warning);">qwen-2.5-72b</div>
+                <div class="run-meta">openrouter (unrated)</div>
+              </td>
+              <td><span class="chip complete">Completed</span></td>
+              <td class="tokens-cell">
+                <div>97,300 total</div>
+                <div class="tokens-sub">85.2k in · 12.1k out</div>
+              </td>
+              <td>
+                <span class="chip unrated" onclick="openPopover(event, 'qwen-2.5-72b')">
+                  ⚠️ Unrated
+                </span>
+              </td>
+              <td><span class="chip complete">4 / 4 legs</span></td>
+            </tr>
+
+            <!-- Row 4: INCOMPLETE COVERAGE RUN (D-257-08 / METER-06) -->
+            <tr class="clickable run-row" data-type="partial" onclick="inspectRun('76eff4dd', this)">
+              <td>
+                <div class="run-title">Weekly Evaluation Benchmark</div>
+                <div class="run-meta">run 76eff4dd · definition d89301aa · 5 hours ago</div>
+              </td>
+              <td>
+                <div style="font-weight:500;">claude-3-5-sonnet</div>
+                <div class="run-meta">anthropic</div>
+              </td>
+              <td><span class="chip complete">Completed</span></td>
+              <td class="tokens-cell">
+                <div>565,000 total</div>
+                <div class="tokens-sub">520.0k in · 45.0k out</div>
+              </td>
+              <td>
+                <span class="cost-cell">$2.2350*</span>
+                <div style="font-size:10px; color:var(--color-warning); font-family:var(--font-mono);">lower bound</div>
+              </td>
+              <td>
+                <span class="chip partial" title="Missing llm_emit/judge counting leg">
+                  3 / 4 [missing emit]
+                </span>
+              </td>
+            </tr>
+
+            <!-- Row 5: UNRATED LOCAL MODEL RUN -->
+            <tr class="clickable run-row" data-type="unrated" onclick="inspectRun('b6e419a1', this)">
+              <td>
+                <div class="run-title">Contract Data Extraction (Private Node)</div>
+                <div class="run-meta">run b6e419a1 · definition a11039bc · yesterday</div>
+              </td>
+              <td>
+                <div style="font-weight:500; color:var(--color-warning);">local/llama-3-8b</div>
+                <div class="run-meta">lmstudio (localhost:1234)</div>
+              </td>
+              <td><span class="chip complete">Completed</span></td>
+              <td class="tokens-cell">
+                <div>184,000 total</div>
+                <div class="tokens-sub">170.0k in · 14.0k out</div>
+              </td>
+              <td>
+                <span class="chip unrated" onclick="openPopover(event, 'local/llama-3-8b')">
+                  ⚠️ Unrated
+                </span>
+              </td>
+              <td><span class="chip complete">4 / 4 legs</span></td>
+            </tr>
+
+            <!-- Row 6: HISTORICAL PRE-256 RUN (token_coverage IS NULL) -->
+            <tr class="clickable run-row" data-type="partial" onclick="inspectRun('e2049182', this)">
+              <td>
+                <div class="run-title">Corpus Embeddings Ingestion</div>
+                <div class="run-meta">run e2049182 · definition c1928374 · 2026-09-12</div>
+              </td>
+              <td>
+                <div style="font-weight:500;">deepseek-chat</div>
+                <div class="run-meta">deepseek-v4-flash</div>
+              </td>
+              <td><span class="chip complete">Completed</span></td>
+              <td class="tokens-cell">
+                <span style="color:var(--color-text-dim);">NULL / unmeasured</span>
+              </td>
+              <td class="cost-cell" style="color:var(--color-text-dim);">—</td>
+              <td>
+                <span class="chip partial" style="background:hsl(220 20% 12%); color:var(--color-text-dim); border-color:var(--color-border);">
+                  NULL (pre-256)
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Live Inspector Drawer (Variant B only) -->
+      <div id="inspector-pane" style="display:none;">
+        <div class="inspector-card">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <span style="font:600 11px/1 var(--font-mono); color:var(--color-primary); text-transform:uppercase;">Run Spend Inspector</span>
+            <span style="font:500 11px/1 var(--font-mono); color:var(--color-text-dim);" id="inspect-id">run a77ed2c0</span>
+          </div>
+
+          <h3 class="inspector-title" id="inspect-title">Knowledge Base Library Structure Summary</h3>
+
+          <div class="formula-box">
+            <div style="font-size:11px; color:var(--color-text-dim); margin-bottom:6px;">CANONICAL CONVERSION (METER-02):</div>
+            <div class="formula-math">
+              cost = (<span id="f-in">135,142</span> × $<span id="r-in">0.140</span>/1M) + (<span id="f-out">10,317</span> × $<span id="r-out">0.280</span>/1M)
+            </div>
+            <div style="margin-top:8px; font-size:14px; color:var(--color-text);">
+              Total Attributable Spend: <span class="formula-highlight" id="inspect-cost">$0.0385 USD</span>
+            </div>
+          </div>
+
+          <div style="font:600 11px/1 var(--font-mono); color:var(--color-text-dim); text-transform:uppercase; margin-bottom:8px;">Pricing Audit Trace</div>
+          <div class="audit-row">
+            <span class="audit-key">Resolved Model:</span>
+            <span class="audit-val" id="inspect-model">deepseek-chat</span>
+          </div>
+          <div class="audit-row">
+            <span class="audit-key">Resolved Provider:</span>
+            <span class="audit-val" id="inspect-provider">deepseek-v4-flash</span>
+          </div>
+          <div class="audit-row">
+            <span class="audit-key">Effective Date Applied:</span>
+            <span class="audit-val" id="inspect-date">2026-08-01 00:00:00Z</span>
+          </div>
+          <div class="audit-row">
+            <span class="audit-key">Rate Lookup Match:</span>
+            <span class="audit-val" style="color:var(--color-success);">Exact (model_id, provider)</span>
+          </div>
+          <div class="audit-row">
+            <span class="audit-key">Counting Legs:</span>
+            <span class="audit-val" id="inspect-legs">agent, single, batch, emit (4/4)</span>
+          </div>
+          <div class="audit-row">
+            <span class="audit-key">Database Grain:</span>
+            <span class="audit-val">workflow_runs (authoritative)</span>
+          </div>
+
+          <div style="margin-top:20px; padding-top:14px; border-top:1px solid var(--color-border); display:flex; gap:8px;">
+            <button class="action-btn secondary" style="width:100%; justify-content:center;" onclick="alert('Viewing JSON trace...')">View Raw Trace</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- VARIANT C: MODEL RATE REGISTRY & REPRICING VIEW -->
+  <div id="view-registry" style="display:none;">
+    <div class="table-shell">
+      <div class="table-toolbar">
+        <div>
+          <div style="font-weight:600; font-size:15px; color:var(--color-text);">Model Rate Registry (Migration 183)</div>
+          <div style="font-size:12px; color:var(--color-text-dim); margin-top:2px;">
+            Effective-dated input and output costs per 1,000,000 tokens (D-257-01). Repricing is append-only.
+          </div>
+        </div>
+        <button class="action-btn" onclick="openRepriceModal()">+ Reprice / Add Model Rate</button>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Model ID</th>
+            <th>Provider</th>
+            <th>Effective From</th>
+            <th>Input Cost / 1M</th>
+            <th>Output Cost / 1M</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="font-weight:600; font-family:var(--font-mono);">deepseek-chat</td>
+            <td>deepseek (native)</td>
+            <td style="font-family:var(--font-mono); color:var(--color-text-muted);">2026-08-01 00:00:00Z</td>
+            <td style="font-family:var(--font-mono); color:var(--color-success); font-weight:700;">$0.140000</td>
+            <td style="font-family:var(--font-mono); color:var(--color-success); font-weight:700;">$0.280000</td>
+            <td><span class="chip complete">Active</span></td>
+            <td><button class="action-btn secondary" style="padding:4px 8px; font-size:11px;" onclick="openRepriceModal('deepseek-chat', '0.14', '0.28')">Reprice</button></td>
+          </tr>
+          <tr>
+            <td style="font-weight:600; font-family:var(--font-mono);">gpt-4o</td>
+            <td>openai (native)</td>
+            <td style="font-family:var(--font-mono); color:var(--color-text-muted);">2026-08-06 00:00:00Z</td>
+            <td style="font-family:var(--font-mono); color:var(--color-success); font-weight:700;">$2.500000</td>
+            <td style="font-family:var(--font-mono); color:var(--color-success); font-weight:700;">$10.000000</td>
+            <td><span class="chip complete">Active</span></td>
+            <td><button class="action-btn secondary" style="padding:4px 8px; font-size:11px;" onclick="openRepriceModal('gpt-4o', '2.50', '10.00')">Reprice</button></td>
+          </tr>
+          <tr>
+            <td style="font-weight:600; font-family:var(--font-mono);">gpt-4o-mini</td>
+            <td>openai (native)</td>
+            <td style="font-family:var(--font-mono); color:var(--color-text-muted);">2026-07-18 00:00:00Z</td>
+            <td style="font-family:var(--font-mono); color:var(--color-success); font-weight:700;">$0.150000</td>
+            <td style="font-family:var(--font-mono); color:var(--color-success); font-weight:700;">$0.600000</td>
+            <td><span class="chip complete">Active</span></td>
+            <td><button class="action-btn secondary" style="padding:4px 8px; font-size:11px;" onclick="openRepriceModal('gpt-4o-mini', '0.15', '0.60')">Reprice</button></td>
+          </tr>
+          <tr>
+            <td style="font-weight:600; font-family:var(--font-mono);">claude-3-5-sonnet-20241022</td>
+            <td>anthropic</td>
+            <td style="font-family:var(--font-mono); color:var(--color-text-muted);">2026-08-15 00:00:00Z</td>
+            <td style="font-family:var(--font-mono); color:var(--color-success); font-weight:700;">$3.000000</td>
+            <td style="font-family:var(--font-mono); color:var(--color-success); font-weight:700;">$15.000000</td>
+            <td><span class="chip complete">Active</span></td>
+            <td><button class="action-btn secondary" style="padding:4px 8px; font-size:11px;" onclick="openRepriceModal('claude-3-5-sonnet-20241022', '3.00', '15.00')">Reprice</button></td>
+          </tr>
+          <tr style="background:hsl(38 92% 60% / 0.04);">
+            <td style="font-weight:600; font-family:var(--font-mono); color:var(--color-warning);">qwen-2.5-72b</td>
+            <td style="color:var(--color-text-dim);">openrouter</td>
+            <td style="color:var(--color-warning); font-style:italic;">None (unregistered)</td>
+            <td style="color:var(--color-warning); font-family:var(--font-mono);">—</td>
+            <td style="color:var(--color-warning); font-family:var(--font-mono);">—</td>
+            <td><span class="chip unrated">Missing Rate</span></td>
+            <td><button class="action-btn" style="padding:4px 10px; font-size:11px;" onclick="openRepriceModal('qwen-2.5-72b', '', '')">+ Add Rate</button></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</main>
+
+<!-- ── Reprice Model Dialog Modal (D-257-11) ── -->
+<div class="modal-backdrop" id="reprice-modal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3 class="modal-title">Reprice / Register Model Rate</h3>
+      <button class="close-btn" onclick="closeRepriceModal()">&times;</button>
+    </div>
+    <div style="font-size:13px; color:var(--color-text-muted); margin-bottom:16px; line-height:1.5;">
+      Inserting a rate takes effect for new runs at <code>effective_from = now()</code>. Past runs will continue evaluating against their historical rate (D-257-03).
+    </div>
+
+    <form id="reprice-form" onsubmit="handleRepriceSubmit(event)">
+      <div class="form-group">
+        <label class="form-label">Model Identifier (model_id)</label>
+        <input class="form-input" id="modal-model-id" required placeholder="e.g. qwen-2.5-72b or gpt-4o">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Provider (Optional Fallback)</label>
+        <select class="form-select" id="modal-provider">
+          <option value="">Default (Any Provider)</option>
+          <option value="openai">openai</option>
+          <option value="anthropic">anthropic</option>
+          <option value="deepseek">deepseek</option>
+          <option value="openrouter">openrouter</option>
+          <option value="google">google</option>
+        </select>
+      </div>
+
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+        <div class="form-group">
+          <label class="form-label">Input Rate ($ / 1M tok)</label>
+          <input class="form-input" id="modal-input-rate" required type="number" step="0.000001" placeholder="e.g. 0.350000">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Output Rate ($ / 1M tok)</label>
+          <input class="form-input" id="modal-output-rate" required type="number" step="0.000001" placeholder="e.g. 1.200000">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Effective From</label>
+        <input class="form-input" value="2026-09-19 07:24:00Z (Immediate)" disabled style="opacity:0.75;">
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="action-btn secondary" onclick="closeRepriceModal()">Cancel</button>
+        <button type="submit" class="action-btn">Insert Effective Rate</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ── Unrated Model Popover ── -->
+<div class="popover-card" id="unrated-popover">
+  <div style="font:600 13px/1.2 var(--font-sans); color:var(--color-warning); margin-bottom:4px;">
+    ⚠️ Missing Model Rate
+  </div>
+  <div style="font-size:12px; color:var(--color-text-muted); margin-bottom:10px; line-height:1.4;" id="popover-desc">
+    Model <strong id="popover-model-name">qwen-2.5-72b</strong> has no price in <code>model_rates</code>. Displaying $0.00 is strictly prohibited by METER-01.
+  </div>
+  <button class="action-btn" style="width:100%; justify-content:center; font-size:12px; padding:6px 10px;" onclick="popoverAddRate()">
+    + Register Rate for this Model
+  </button>
+</div>
+
+<script>
+  let currentVariant = 'A';
+  let currentTargetModel = '';
+
+  function setVariant(variant) {
+    currentVariant = variant;
+    document.querySelectorAll('.variant-tab').forEach(el => {
+      el.classList.toggle('active', el.getAttribute('data-variant') === variant);
+    });
+
+    const dashboard = document.getElementById('view-dashboard');
+    const registry = document.getElementById('view-registry');
+    const layout = document.getElementById('layout-container');
+    const inspector = document.getElementById('inspector-pane');
+
+    if (variant === 'A') {
+      dashboard.style.display = 'block';
+      registry.style.display = 'none';
+      layout.className = '';
+      inspector.style.display = 'none';
+    } else if (variant === 'B') {
+      dashboard.style.display = 'block';
+      registry.style.display = 'none';
+      layout.className = 'split-layout';
+      inspector.style.display = 'block';
+    } else if (variant === 'C') {
+      dashboard.style.display = 'none';
+      registry.style.display = 'block';
+    }
+  }
+
+  function setTime(range, btn) {
+    btn.parentElement.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+    btn.classList.add('active');
+  }
+
+  function filterStatus(status, btn) {
+    if (btn) {
+      btn.parentElement.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+      btn.classList.add('active');
+    }
+
+    const rows = document.querySelectorAll('.run-row');
+    let visibleCount = 0;
+    rows.forEach(row => {
+      const type = row.getAttribute('data-type');
+      if (status === 'all' || type === status) {
+        row.style.display = '';
+        visibleCount++;
+      } else {
+        row.style.display = 'none';
+      }
+    });
+
+    document.getElementById('table-filter-count').innerText = `Showing ${visibleCount} sample runs (filtered: ${status})`;
+  }
+
+  function inspectRun(id, tr) {
+    document.querySelectorAll('.run-row').forEach(r => r.classList.remove('selected'));
+    tr.classList.add('selected');
+
+    if (currentVariant !== 'B') {
+      setVariant('B');
+    }
+
+    if (id === 'a77ed2c0') {
+      document.getElementById('inspect-id').innerText = 'run a77ed2c0';
+      document.getElementById('inspect-title').innerText = 'Knowledge Base Library Structure Summary';
+      document.getElementById('f-in').innerText = '135,142';
+      document.getElementById('f-out').innerText = '10,317';
+      document.getElementById('r-in').innerText = '0.140';
+      document.getElementById('r-out').innerText = '0.280';
+      document.getElementById('inspect-cost').innerText = '$0.0385 USD';
+      document.getElementById('inspect-model').innerText = 'deepseek-chat';
+      document.getElementById('inspect-provider').innerText = 'deepseek-v4-flash';
+      document.getElementById('inspect-date').innerText = '2026-08-01 00:00:00Z';
+      document.getElementById('inspect-legs').innerText = 'agent, single, batch, emit (4/4)';
+    } else if (id === 'c908161f') {
+      document.getElementById('inspect-id').innerText = 'run c908161f';
+      document.getElementById('inspect-title').innerText = 'Client Deliverable PDF Pipeline';
+      document.getElementById('f-in').innerText = '85,200';
+      document.getElementById('f-out').innerText = '12,100';
+      document.getElementById('r-in').innerText = '—';
+      document.getElementById('r-out').innerText = '—';
+      document.getElementById('inspect-cost').innerText = 'UNRATED (Missing Price Row)';
+      document.getElementById('inspect-cost').style.color = 'var(--color-warning)';
+      document.getElementById('inspect-model').innerText = 'qwen-2.5-72b';
+      document.getElementById('inspect-provider').innerText = 'openrouter';
+      document.getElementById('inspect-date').innerText = 'None';
+      document.getElementById('inspect-legs').innerText = 'agent, single, batch, emit (4/4)';
+    }
+  }
+
+  function openPopover(e, model) {
+    e.stopPropagation();
+    currentTargetModel = model;
+    const pop = document.getElementById('unrated-popover');
+    document.getElementById('popover-model-name').innerText = model;
+    pop.style.top = (e.pageY + 12) + 'px';
+    pop.style.left = (e.pageX - 100) + 'px';
+    pop.classList.add('open');
+  }
+
+  document.addEventListener('click', () => {
+    document.getElementById('unrated-popover').classList.remove('open');
+  });
+
+  function popoverAddRate() {
+    document.getElementById('unrated-popover').classList.remove('open');
+    openRepriceModal(currentTargetModel);
+  }
+
+  function openRepriceModal(model = '', inRate = '', outRate = '') {
+    document.getElementById('modal-model-id').value = model;
+    document.getElementById('modal-input-rate').value = inRate;
+    document.getElementById('modal-output-rate').value = outRate;
+    document.getElementById('reprice-modal').classList.add('open');
+  }
+
+  function closeRepriceModal() {
+    document.getElementById('reprice-modal').classList.remove('open');
+  }
+
+  function handleRepriceSubmit(e) {
+    e.preventDefault();
+    const mid = document.getElementById('modal-model-id').value;
+    const inRate = document.getElementById('modal-input-rate').value;
+    const outRate = document.getElementById('modal-output-rate').value;
+    alert(`Success: Inserted new effective-dated rate for ${mid} at $${inRate} in / $${outRate} out per 1M tokens. Historical runs remain unaffected.`);
+    closeRepriceModal();
+  }
+</script>
+
+</body>
+</html>
