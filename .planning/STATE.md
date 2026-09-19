@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v4.3
 milestone_name: What You Can Actually Sell
 status: executing
-last_updated: "2026-09-19T08:50:00.000Z"
-last_activity: 2026-09-19 -- Phase 257 executed 4/4 plans; independent review returned REVISE (257-REVIEW.md). 7 reviewer fixes landed at 469dd2826 and BOTH gates are green (backend 71, vitest 8426/0/7685). SC#2 and SC#3 hold; SC#1 and SC#4 do NOT -- 1 of 78 models in real runs has a rate, and the run-level badge never mounts because no route outside /admin/spend emits cost_usd. Phase 258 is BLOCKED on SC#1 by its own dependency line.
+last_updated: "2026-09-19T20:30:00.000Z"
+last_activity: 2026-09-19 -- Phase 257 CLOSED after three review rounds. SC#2 and SC#4 HOLD and are driven; SC#1 is PARTIAL (effective dating works; 14 of 82 roster models stay unrated BY DECISION -- 7 OpenRouter, 7 self-hosted) and SC#3 is NOT MET (F-13: five conversion sites, fence allowlists rates.py wholesale -- an architecture decision for the operator). Gates: backend 71 failed / 5100 passed at ceiling; vitest 8464 / failed 0 / 293-293; tsc 65 = base. ⛔ Migration 185 is WRITTEN AND VERIFIED BUT NOT APPLIED -- the operator pastes it into the SQL editor, then regenerates full-schema.sql.
 progress:
   total_phases: 13
   completed_phases: 2
@@ -34,16 +34,48 @@ See: `.planning/PROJECT.md` (updated 2026-09-18)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 257 complete — ready for reviewer verification (BUS-275 / Claude)
+**Current focus:** Phase 257 CLOSED with two criteria owed to operator decisions. Next: apply migration 185, then Phase 258 (A Tier Becomes Enforceable).
 
 ---
 
 ## Current Position
 
-Phase: 257 (cost-in-dollars-and-what-it-cannot-see) — **COMPLETE**
-Plan: 4 of 4 complete
-Status: Phase 257 executed and verified across all 4 plans (257-01 through 257-04). G-4 failure scenarios verified against live Postgres (:54322). AST single-home fence green. Zero TypeScript errors introduced. Count gate preserved.
-Last activity: 2026-09-19 -- Phase 257 execution complete; all 4 plans committed; ready for reviewer review
+Phase: 257 (cost-in-dollars-and-what-it-cannot-see) — **CLOSED, 2 of 4 SC fully met**
+Plan: 4 of 4 executed, plus three review rounds and two operator-directed fix rounds
+Status: CLOSED as a DECISION, not as a claim that everything passed. ⛔ The two gaps are
+operator decisions, not defects, which is the only legitimate reason to close on them.
+Last activity: 2026-09-19 -- migration 185 written and verified; SEED-302 planted
+
+### ⭐ PHASE 257 CLOSE — 2026-09-19. Read the four verdicts, not the word "closed".
+
+| SC | verdict | evidence |
+|---|---|---|
+| **#1** every model has an effective-dated rate | ⚠ **PARTIAL** | Effective dating WORKS and is driven (CR-01: one June run read $0.0108 in the ledger and $0.1076 on its own page; now identical, and all 1183 org runs agree SQL↔Python with 0 mismatches). Coverage: the real roster is `MODEL_CAPABILITIES` (61, code) ∪ `model_capabilities_overrides` (51, DB) = **82**. Mig 184 closed the code half; mig 185 prices the 6 first-party DB-only ids. **14 stay unrated BY DECISION** — 7 OpenRouter (a router has no single honest rate), 7 self-hosted (no API fee). |
+| **#2** unrated never reads as $0.00 | ✅ **HOLDS** | CR-02 stopped `COALESCE(tokens,0)` pricing 343 unmeasured runs at `$0.0000`. CR-06 made the summary and ledger count the same way (851/332 on both). The gauge's three segments sum to exactly 100 (was 101 on 34 combinations). CR-07: a failed load answers "Unavailable", not zero. |
+| **#3** exactly one token→USD conversion | ⛔ **NOT MET** | F-13: the expression is written verbatim **4× in `rates.py`'s SQL plus 1× in Python**, and the METER-02 fence allowlists `rates.py` wholesale so none fire. One-home vs two-plus-a-parity-bridge is an **architecture decision → operator**. |
+| **#4** spend per run and per org | ✅ **HOLDS** | Producers wired on `workflow_runs.py` and `threads.py` in three-place lockstep (declared, selected, populated), snake→camel mapped, mounts reachable. Driven end-to-end. |
+
+**Gates at close:** backend `71 failed / 5100 passed` (ceiling 71, zero headroom) ·
+vitest `8464 · failed 0 · pinned 7723 · 293/293` · `tsc -p tsconfig.app.json` 65 = base.
+
+⛔ **OWED TO THE OPERATOR, blocking nothing else:**
+- **Apply migration 185** by pasting it into the Supabase SQL editor (never `db push`), then
+  `bash scripts/regenerate-full-schema.sh`. Verified idempotent in a rolled-back transaction
+  (53 → 59 → 59 rows); the live DB is unchanged.
+- **SC#3 / F-13** — the conversion-site architecture decision.
+- **SEED-302** — void and end-date a rate from the product. ⚠ It also records a bug that
+  exists today: `rates.py:267` emits `effective_to: None` as a hardcoded literal with no
+  column behind it.
+- **The third roster.** Nothing checks **runs → rate**, only roster → rate. Two models appear
+  in real runs and in neither roster (`deepseek-v4-pro-qwen3.5-9b-mtp`,
+  `DeepSeek-V4-Flash-Vision-Exp`). Same class as the `claude-haiku-4-5` alias mismatch.
+
+⚠ **Process note, recorded because it is the phase's most reusable finding.** The operator
+directed direct fixes twice rather than handbacks, which silently converted the REVIEWER into
+the BUILDER. An independent pass then found **14 of 17 findings were against claude's own
+fixes**, not gemini's build. The separation was restored on BUS-278/279, and gemini's review
+of claude's CR-06 fix immediately found a real defect (the 101% gauge). **Reciprocal review
+paid for itself the first time it was actually run.**
 
 ### ⭐ PHASE 257 CLOSE — 2026-09-19, 4/4 SC
 - **METER-01**: Migration 183 implemented `model_rates` table with effective-dated append-only pricing, compound index `idx_model_rates_lookup`, and org RLS. Unrated models strictly display as `▲ Unrated` with hover tooltip naming the model, never `$0.00`.
