@@ -2538,6 +2538,61 @@ COMMENT ON COLUMN public.threads.org_id IS 'Forward-compat (D-PRD-02/D-11): org-
 
 
 --
+-- Name: tier_capabilities; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.tier_capabilities (
+    tier text NOT NULL,
+    capability text NOT NULL,
+    enabled boolean DEFAULT true NOT NULL,
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: TABLE tier_capabilities; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.tier_capabilities IS 'Relational capability matrix declaring which functional capabilities belong to each subscription tier (TIER-02, Phase 258).';
+
+
+--
+-- Name: COLUMN tier_capabilities.tier; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.tier_capabilities.tier IS 'Subscription tier slug (e.g. standard, pro, enterprise).';
+
+
+--
+-- Name: COLUMN tier_capabilities.capability; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.tier_capabilities.capability IS 'Functional capability slug (e.g. basic_rag, chat, skills, code_execution, custom_models, workflows, connectors, experts, audit_export).';
+
+
+--
+-- Name: COLUMN tier_capabilities.enabled; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.tier_capabilities.enabled IS 'Whether this capability is currently active for this tier.';
+
+
+--
+-- Name: COLUMN tier_capabilities.metadata; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.tier_capabilities.metadata IS 'Optional configuration or entitlement parameters for this capability in this tier.';
+
+
+--
+-- Name: COLUMN tier_capabilities.created_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.tier_capabilities.created_at IS 'Timestamp when the tier-capability mapping was created.';
+
+
+--
 -- Name: todos; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -3408,6 +3463,14 @@ ALTER TABLE ONLY public.sso_configs
 
 ALTER TABLE ONLY public.threads
     ADD CONSTRAINT threads_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: tier_capabilities tier_capabilities_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.tier_capabilities
+    ADD CONSTRAINT tier_capabilities_pkey PRIMARY KEY (tier, capability);
 
 
 --
@@ -4328,6 +4391,13 @@ CREATE INDEX idx_threads_active_workflow_run ON public.threads USING btree (acti
 --
 
 CREATE INDEX idx_threads_user_visible ON public.threads USING btree (user_id, updated_at DESC) WHERE (is_eval = false);
+
+
+--
+-- Name: idx_tier_capabilities_lookup; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_tier_capabilities_lookup ON public.tier_capabilities USING btree (tier, capability) WHERE (enabled = true);
 
 
 --
@@ -7125,6 +7195,26 @@ CREATE POLICY sso_configs_update ON public.sso_configs FOR UPDATE TO authenticat
 --
 
 ALTER TABLE public.threads ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: tier_capabilities; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.tier_capabilities ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: tier_capabilities tier_capabilities_read_all; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY tier_capabilities_read_all ON public.tier_capabilities FOR SELECT TO authenticated, anon, service_role USING (true);
+
+
+--
+-- Name: tier_capabilities tier_capabilities_service_write; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY tier_capabilities_service_write ON public.tier_capabilities TO service_role USING (true) WITH CHECK (true);
+
 
 --
 -- Name: todos; Type: ROW SECURITY; Schema: public; Owner: -
