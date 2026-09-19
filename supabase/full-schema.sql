@@ -1957,6 +1957,51 @@ COMMENT ON COLUMN public.model_capabilities_overrides.removed IS 'Tombstone. TRU
 
 
 --
+-- Name: model_rates; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.model_rates (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    model_id text NOT NULL,
+    provider text,
+    input_cost_per_million numeric(12,6) NOT NULL,
+    output_cost_per_million numeric(12,6) NOT NULL,
+    effective_from timestamp with time zone DEFAULT now() NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    created_by uuid,
+    org_id uuid
+);
+
+
+--
+-- Name: TABLE model_rates; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.model_rates IS 'Phase 257 (METER-01). Effective-dated token cost rate registry in USD per 1M tokens.';
+
+
+--
+-- Name: COLUMN model_rates.input_cost_per_million; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.model_rates.input_cost_per_million IS 'Cost in USD per 1,000,000 input prompt tokens (numeric(12, 6)).';
+
+
+--
+-- Name: COLUMN model_rates.output_cost_per_million; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.model_rates.output_cost_per_million IS 'Cost in USD per 1,000,000 output completion tokens (numeric(12, 6)).';
+
+
+--
+-- Name: COLUMN model_rates.effective_from; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.model_rates.effective_from IS 'Timestamp from which this rate applies. Past runs match effective_from <= run.created_at.';
+
+
+--
 -- Name: operator_audit_log; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -3174,6 +3219,14 @@ ALTER TABLE ONLY public.model_capabilities_overrides
 
 
 --
+-- Name: model_rates model_rates_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.model_rates
+    ADD CONSTRAINT model_rates_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: operator_audit_log operator_audit_log_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -4044,6 +4097,27 @@ CREATE INDEX idx_metadata_field_definitions_org_id ON public.metadata_field_defi
 --
 
 CREATE INDEX idx_metadata_field_definitions_user_id ON public.metadata_field_definitions USING btree (user_id);
+
+
+--
+-- Name: idx_model_rates_fallback; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_model_rates_fallback ON public.model_rates USING btree (model_id, effective_from DESC) WHERE (provider IS NULL);
+
+
+--
+-- Name: idx_model_rates_lookup; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_model_rates_lookup ON public.model_rates USING btree (model_id, provider, effective_from DESC);
+
+
+--
+-- Name: idx_model_rates_org; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_model_rates_org ON public.model_rates USING btree (org_id, model_id, effective_from DESC);
 
 
 --
@@ -5402,6 +5476,22 @@ ALTER TABLE ONLY public.metadata_field_definitions
 
 
 --
+-- Name: model_rates model_rates_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.model_rates
+    ADD CONSTRAINT model_rates_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL;
+
+
+--
+-- Name: model_rates model_rates_org_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.model_rates
+    ADD CONSTRAINT model_rates_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
 -- Name: operator_users operator_users_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -6743,6 +6833,30 @@ ALTER TABLE public.model_capabilities_overrides ENABLE ROW LEVEL SECURITY;
 --
 
 CREATE POLICY model_overrides_read_all ON public.model_capabilities_overrides FOR SELECT TO authenticated USING (true);
+
+
+--
+-- Name: model_rates; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.model_rates ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: model_rates model_rates_insert_policy; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY model_rates_insert_policy ON public.model_rates FOR INSERT TO authenticated, service_role WITH CHECK (((auth.role() = 'service_role'::text) OR ((org_id IS NOT NULL) AND (org_id IN ( SELECT m.org_id
+   FROM public.org_members m
+  WHERE ((m.user_id = auth.uid()) AND (m.role = ANY (ARRAY['admin'::text, 'owner'::text]))))))));
+
+
+--
+-- Name: model_rates model_rates_select_policy; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY model_rates_select_policy ON public.model_rates FOR SELECT TO authenticated, service_role USING (((org_id IS NULL) OR (org_id IN ( SELECT m.org_id
+   FROM public.org_members m
+  WHERE (m.user_id = auth.uid())))));
 
 
 --
