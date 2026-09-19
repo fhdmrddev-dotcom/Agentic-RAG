@@ -1977,7 +1977,7 @@ CREATE TABLE public.model_rates (
 -- Name: TABLE model_rates; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON TABLE public.model_rates IS 'Phase 257 (METER-01). Effective-dated token cost rate registry in USD per 1M tokens.';
+COMMENT ON TABLE public.model_rates IS 'Effective-dated token prices. Append-only: a past run is priced by the row in force at its started_at, so repricing never rewrites history (METER-01). Seeded by migrations 183 (5 rows), 184 (48, the MODEL_CAPABILITIES roster) and 185 (6, the model_capabilities_overrides roster). NOTE: no effective_to column exists yet - see SEED for phase 186 (void and end-date a rate from the product).';
 
 
 --
@@ -4524,6 +4524,20 @@ CREATE UNIQUE INDEX sso_configs_email_domain_lower_unique ON public.sso_configs 
 --
 
 CREATE INDEX threads_folder_id_idx ON public.threads USING btree (folder_id);
+
+
+--
+-- Name: uq_model_rates_identity; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_model_rates_identity ON public.model_rates USING btree (model_id, COALESCE(provider, ''::text), effective_from);
+
+
+--
+-- Name: INDEX uq_model_rates_identity; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON INDEX public.uq_model_rates_identity IS 'Phase 257.1. Makes ON CONFLICT DO NOTHING actually fire. Migration 183 had no unique constraint, so re-pasting it duplicated every seed rate (driven: gpt-4o 1 -> 2).';
 
 
 --
