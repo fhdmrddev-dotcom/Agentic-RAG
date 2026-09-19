@@ -82,9 +82,18 @@ _EXPECTED_CALL_COUNTS = {
 # and confirm (a) is green BEFORE touching the set below.
 _EXPECTED_CALL_SITES = {
     "api/workflows.py:1802",
-    "services/harness_engine.py:2315",
-    "services/harness_engine.py:2356",
-    "services/harness_engine.py:2638",
+    # ⚠ RE-DERIVED at Phase 256 round 1 (plan 256-05), and the originals are recorded
+    # beside the new values rather than over them, because this fence's own docstring
+    # asks for exactly that: check (a) — the per-file COUNTS — stayed identical, so no
+    # caller appeared and none vanished. Only the POSITIONS shifted, by +75 lines, when
+    # `_flush_run_usage` and its commented call site landed above them in the `while`
+    # body. Re-derived with `grep -n "await finish_run(" backend/app/services/harness_engine.py`.
+    #   harness_engine.py:2315 → 2390   (the fail_run arm)
+    #   harness_engine.py:2356 → 2431   (the dangling-skip-target guard)
+    #   harness_engine.py:2638 → 2713   (the completed path, after the while loop)
+    "services/harness_engine.py:2390",
+    "services/harness_engine.py:2431",
+    "services/harness_engine.py:2713",
     "services/run_lifecycle.py:521",
 }
 

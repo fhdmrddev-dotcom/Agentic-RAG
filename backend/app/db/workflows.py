@@ -91,6 +91,47 @@ logger = logging.getLogger(__name__)
 #     measure genuinely measured nothing.
 #   · The migration-182 partial index treats a NULL marker as NOT fully covered,
 #     which is correct under this reading.
+#
+# ⭐ WHAT ``"emit"`` COVERS, WRITTEN HERE BECAUSE THIS IS WHERE THE DURABLE COLUMN
+# COMMENT POINTS (Phase 256 round 1 / CR-02 / SC#4). The leg covers EVERY
+# ``forced_emit``-borne shot inside a harness run — which, as of this round, includes
+# BOTH in-run judge shots:
+#   · ``harness/phase_types.py``'s emit ladder (the leg's original earner, 256-04);
+#   · ``harness/validator_kinds.py``'s in-run ``llm_judge_rubric`` judge shot, folded
+#     into ``ctx.run_usage_box`` and persisted by the engine's ``_flush_run_usage``;
+#   · ``harness/publish_service.py``'s publish-gauntlet judge shot, accumulated across
+#     ALL served attempts into a caller-supplied box and persisted by the QUAL-01 stage
+#     onto the GOLDEN RUN's ``workflow_runs`` row — including on the blocked path.
+# Before this round those two were real, billed provider calls whose reported tokens
+# were dropped on the floor while this array claimed to cover them.
+#
+# ⚠ OPTION A WAS TAKEN (D-256-18, operator ruling): COUNT the judge spend, so the
+# four-leg claim stops over-claiming by becoming TRUE. ⛔ OPTION B WAS CONSIDERED AND
+# **REJECTED** — narrowing this tuple and shipping a second migration to alter
+# ``idx_workflow_runs_org_coverage_incomplete``'s predicate. Do not silently revisit it.
+# The operator's reason is the phase's own premise, *every token is counted*: a marker
+# that is HONEST ABOUT NOT COUNTING is a weaker deliverable than a marker with nothing
+# left to omit.
+#
+# ⛔ NO FIFTH LEG AND NO SECOND MIGRATION SHIP, and both are measured answers rather
+# than conveniences. A ``"judge"`` leg would be Option B's index-predicate migration by
+# another name: the judge shot is NOT a fifth instrumentation mechanism, it is the SAME
+# ``forced_emit`` drain the ``"emit"`` leg already names. And migration 182's durable
+# ``COMMENT ON COLUMN public.workflow_runs.token_coverage`` delegates the legs' meaning
+# to THIS constant verbatim — *"Written from ONE module-level constant,
+# db.workflows.TOKEN_COVERAGE_LEGS"* — so growing what a leg COVERS cannot falsify the
+# durable comment, because the comment never spelled the coverage out itself.
+# ⚠ Verify that phrase with the SQL literals normalised, not with a bare grep: the
+# migration splits the sentence across two adjacent string literals which Postgres
+# concatenates on apply, so a naive grep reads 0 hits there and 1 in
+# ``supabase/full-schema.sql``. Pinned in
+# ``tests/unit/test_256_judge_usage_counted.py::test_the_durable_column_comment_still_delegates_to_the_constant``.
+#
+# ⚠ ONE RESIDUAL IS NAMED RATHER THAN HIDDEN: a ``forced_emit`` shot that RAISES
+# (``publish_service.py``'s ``except Exception … continue``) returns no dict, so the
+# tokens the provider may already have billed are unreachable — IN-03, registered in
+# ``SEED-300`` with a concrete trigger. The leg therefore covers every shot that was
+# SERVED AND RETURNED, which is every shot whose usage is observable at all.
 TOKEN_COVERAGE_LEGS: tuple[str, ...] = ("agent", "single", "batch", "emit")
 
 # ── Phase 186 (CONCUR-02 / D-186-07) — the optimistic concurrency token ───────
@@ -2082,13 +2123,19 @@ async def persist_run_usage(
     (D-256-05) — ``finish_run`` is deliberately left byte-unchanged.
 
     ⛔ ADD, NEVER SET (D-256-09). ``ctx.run_usage_box`` is reset to ``{}`` on every
-    ``_resume_run`` (``harness_engine.py:1844``), so the box only ever carries ONE run
-    SEGMENT's spend. A SET would report the last segment's spend as the whole run's
-    total, and a run resumed five times would read as costing a fifth of what it did.
+    ``_resume_run`` (~~``harness_engine.py:1844``~~ → measured ``:1884`` at Phase 256
+    round 1; the original is kept beside the correction, never over it, per S-5), so the
+    box only ever carries ONE run SEGMENT's spend. A SET would report the last segment's
+    spend as the whole run's total, and a run resumed five times would read as costing a
+    fifth of what it did.
 
     ⛔ A ``(0, 0)`` or ``(None, None)`` delta writes NOTHING, and that guard is
     LOAD-BEARING rather than an optimisation. ``_enforce_budget`` is invoked twice per
-    phase iteration (``harness_engine.py:1978`` and ``:2547``), and unlike ``finish_run``
+    phase iteration (~~``harness_engine.py:1978`` and ``:2547``~~ → measured ``:2073``
+    and ``:2680``), and — SINCE PHASE 256 ROUND 1 — a THIRD caller reaches this writer
+    through ``_flush_run_usage`` once per loop iteration, unconditionally, above every
+    outcome arm. So the idempotency guard below carries three callers, not two, and
+    unlike ``finish_run``
     — whose cross-worker interleave is benign BY VALUE-IDENTITY
     (``db/workflows.py`` ``finish_run``'s own docstring) — a second ADD of the same
     number is not the same write, it is double the money. The delta is derived from

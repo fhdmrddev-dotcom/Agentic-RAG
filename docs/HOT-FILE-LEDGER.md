@@ -1313,6 +1313,46 @@ carries the verdict — **young (200)** — and this is the cell it carried befo
 
 ## `backend/app/db/workflows.py`
 
+### ⚠ Re-derived 2026-09-19 (Phase 256 gap-closure round 1, plan `256-05`) — the row was STALE
+
+| | the row said | measured at this landing |
+|---|---|---|
+| commits / phases / lines | `48 / 25 / 2585` | **`52 / 26 / 2724`** |
+
+The plan's pre-flight measured `50 / 26 / 2677`; the `+2` commits are this plan's two comment-only
+landings. All three readings stand.
+
+**G-5 FIRES (26 phases) — honoured BY CONSTRUCTION, and here the arithmetic is the strongest kind:
+the change is COMMENT-ONLY.**
+
+* `persist_run_usage`'s **body is byte-unchanged** — its SQL, its `$1..$4` parameters, its
+  `WHERE id = $1`, and the unconditional `token_coverage = $4` write. AST-pinned in
+  `tests/unit/test_256_judge_usage_counted.py::test_persist_run_usage_body_is_untouched_by_this_round`.
+  ⭐ Leaving that write unconditional is CORRECT once the claim is true: the column records *which
+  counting legs the INSTRUMENTATION covers — NOT which legs a given run happened to use*. The defect
+  CR-02 found was a FALSE claim, not a conditional one.
+* `TOKEN_COVERAGE_LEGS` is **still the same 4-tuple** `("agent", "single", "batch", "emit")`.
+  ⛔ A fifth `"judge"` leg was NOT added: it would be the REJECTED Option B's index-predicate
+  migration by another name, and the judge shot is not a fifth instrumentation mechanism — it is the
+  SAME `forced_emit` drain the `"emit"` leg already names.
+* What DID change: the `TOKEN_COVERAGE_LEGS` comment block now records what `"emit"` COVERS (both
+  in-run judge shots, named individually), that **Option A was taken per D-256-18** and Option B
+  **considered and REJECTED** with the operator's reason, why no fifth leg and no second migration
+  ship, and the IN-03 raised-rung residual. Plus three stale `file:line` pins corrected **beside**
+  their originals (`:1844`→`:1884`, `:1978`/`:2547`→`:2073`/`:2680`) and the fact that this writer
+  now has THREE callers rather than two.
+
+⚠ **A MEASURED CORRECTION TO THE PLAN, recorded beside the original.** The plan stated that
+migration 182's delegating phrase — *"Written from ONE module-level constant,
+db.workflows.TOKEN_COVERAGE_LEGS"* — is *"grep-verified, 1 hit each"* in both
+`supabase/migrations/182_workflow_runs_token_totals.sql` and `supabase/full-schema.sql`. Measured:
+**0 hits in the migration and 1 in `full-schema.sql`**, because the migration splits the sentence
+across two adjacent SQL string literals which Postgres concatenates on apply. **The FACT the
+argument rests on is true; the stated verification method was not.** The fence in
+`test_256_judge_usage_counted.py` normalises the literals before matching.
+
+---
+
 **Re-derived 2026-08-17 (extraction):** `36 commits / 18 phases / 1656 L` · **G-5 FIRES** (18 phases vs threshold 3) — honoured by construction (193.2 / 194) — hottest backend module by phase.
 
 **⚠ RE-DERIVED AT PHASE 192.2's CLOSE (2026-08-19, plan `192.2-06`): `36 / 18 / 1656` → `37 commits / 19 phases / 1811 L`.** Recorded beside, not over. ⚠ **The header's superlative also needs a qualifier now rather than later:** at 19 phases this file is **TIED** with `backend/app/api/workflows.py` (also 19), so *"hottest backend module by phase"* is no longer a strict maximum. It is left standing and qualified rather than rewritten — a superlative derived from a scan list is precisely the class of claim this ledger has already had to refute once (see the `threads.py` correction).
@@ -1380,6 +1420,59 @@ carries the verdict — **honoured by construction (193.2 / 194 / 192.2 / **200.
 **⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `43 / 21 / 2194` → `48 / 25 / 2585`.** 214 read and wrote the same rows through the same accessors; no second persistence concern entered. Phase buckets gain `214`.
 
 ## `backend/app/services/harness/publish_service.py`
+
+### ⚠ Re-derived 2026-09-19 (Phase 256 gap-closure round 1, plan `256-05`) — the row was STALE a FOURTH time
+
+| | the row said | measured at this landing |
+|---|---|---|
+| commits / phases / lines | `27 / 12 / 1830` | **`28 / 12 / 1939`** |
+
+Prior readings preserved: `26 / 11 / 1810` (256-04's derivation). The phase count did not move —
+`256` was already in this file's bucket list from `256-03`.
+
+**G-5 FIRES (12 phases) — honoured BY CONSTRUCTION, by arithmetic:**
+
+* `_judge_golden_output` gains **ONE additive keyword-only parameter**, `usage_box: dict | None =
+  None`. AST-pinned keyword-only with a `None` default, so **every pre-existing caller is
+  byte-identical** (re-derived: the only other caller is `tests/unit/test_196_judge_model_db_backed.py`).
+* **TWO accumulators** declared ABOVE the existing `for _attempt in range(3)` loop, initialised to
+  `None` never `0` (the `forced_emit.py` ladder precedent, S-4). No new loop, no new branch inside it.
+* **ONE persist** at an existing call site (the QUAL-01 stage), keyed on `golden_run_id`.
+* ⛔ **No new stage word, no new `blocked_stage`, no new audit kind, no migration.** The returned
+  verdict dict gains **no token keys** — `JudgeVerdict` is `extra="forbid"`.
+
+⭐ **WHY THE RECORDING COULD NOT LIVE INSIDE `_judge_golden_output` THE WAY THE VALIDATOR'S DOES —
+this is the measurement that shaped the whole publish half, and it refutes the review's *"roughly two
+lines at each site"*.** By the time the QUAL-01 stage runs the judge, `_drive_golden_run` has already
+RETURNED and its own `finally` has already read `ctx.run_usage_box` and called `finalize_run` on the
+producer shell. **There is no ctx and no live box.** So the caller — the only scope holding `pool`
+and `golden_run_id` — owns the durable write, and it is placed ABOVE the `_safe_audit` and ABOVE the
+failing-verdict `_block` return, because a BLOCKED publish is precisely the one whose money is most
+worth recording: nothing else about that run became durable.
+
+⚠ **TWO SHIPPED FENCES FIRED ON THIS FILE, AND THEY WERE ANSWERED DIFFERENTLY — the asymmetry is the
+finding.** Both live in `tests/unit/test_256_producer_shells.py`, which this plan never mentioned.
+
+1. `test_no_token_read_uses_a_default_or_an_or_zero` — **answered in the CODE, fence untouched.**
+   The first draft used a truthiness fallback on a token key; the rule is right (`NULL` means never
+   measured, `0` means measured as zero — D-256-06) and the accumulators were respelled as
+   `x if acc is None else acc + x`. ⚠ **The SECOND draft still failed, because a COMMENT quoted the
+   forbidden spelling verbatim and that fence is pure text with NO comment stripping** — so the rule
+   for this file is *do not SPELL it*, prose included. Its sibling three tests down DOES strip
+   comments (`line.split("#", 1)[0]`); the asymmetry is real and now documented in source.
+2. `test_no_shell_started_writing_the_workflow_grain` — **the fence was NARROWED, from FILE scope to
+   SHELL-FUNCTION scope, and this is the round's ONE judgement call.** Its own stated property is
+   about a *segment shell*, not a file. In two of its three subject files those coincide; in THIS
+   file they do not — it hosts both a segment shell (`_drive_golden_run`, terminalizing the
+   per-segment `runs` row `_producer_id`) AND the workflow-grain owner (the QUAL-01 stage, holding
+   `golden_run_id`). **The file-scoped form therefore forbade the CORRECT write** that D-256-18
+   Option A requires. The narrowed form was **driven RED against a `persist_run_usage` call planted
+   inside `_drive_golden_run`'s body** — the actual defect the fence was built for — and it still
+   fires, naming the shell; the plant's removal is md5-proved
+   (`355987c1cffb5f135c9d63cc841e8f21`, identical before and after). ⛔ **No grain is mixed and
+   nothing is summed across the two tables**, which is the whole of what D-256-03 forbids.
+
+---
 
 **Re-derived 2026-08-17 (extraction):** `19 commits / 7 phases / 1243 L` · **G-5 FIRES** (7 phases vs threshold 3) — honoured by construction (193.2).
 
@@ -1633,6 +1726,47 @@ carries the verdict — **honoured by construction (194)** — and this is the c
 > honoured by construction (194)
 
 ## `backend/app/services/harness_engine.py`
+
+### ⚠ Re-derived 2026-09-19 (Phase 256 gap-closure round 1, plan `256-05`) — the row was STALE
+
+| | the row said | measured at this landing |
+|---|---|---|
+| commits / phases / lines | `54 / 20 / 3135` | **`58 / 21 / 3290`** |
+
+The plan's own pre-flight measured `57 / 21 / 3215` on 2026-09-19 before its first edit; the `+1`
+commit and `+75` lines are this plan's. Both readings are published so the drift is visible rather
+than overwritten.
+
+**G-5 FIRES (21 phases vs threshold 3) — honoured BY CONSTRUCTION, and the claim is ARITHMETIC
+rather than an adjective** (the `249-02` precedent, *"state hooks 9→9, effect hooks 10→10"*):
+
+* `_enforce_budget`'s branch shape, AST-measured before and after: **`if` 2 → 2 · `try` 0 → 0 ·
+  `for`/`while` 0 → 0.** ⚠ The plan predicted **3** `if`s; the measurement is **2** (the `armed`
+  short-circuit and the `_tripped` short-circuit), and the correction is recorded beside the
+  prediction, never over it.
+* `_flush_run_usage`: **1 `def` + 2 calls**, AST-derived (`defs: [1888] calls: [1968, 2320]`).
+  ⚠ `grep -c` reads **4**, not the 3 the plan's acceptance criterion predicted, because one hit is
+  a DOCSTRING MENTION. The executable count is 3; a grep cannot tell code from prose, which is this
+  round's recurring lesson in three separate places.
+* `persist_run_usage` is reachable from **exactly one** place in the module (AST-asserted as a SET,
+  not a count) — the one-home property.
+* Nothing in the escape handler, `cancel_phase`, `finish_run` or the pause arm's source-sliced
+  region was touched. The new call sits at `:2320`, **outside** `test_200_human_gate_pause.py`'s
+  pause-arm slice entirely, which is one more reason the single-site shape was chosen.
+
+**⛔ THE SEAM THAT WAS REJECTED, AND WHY IT IS RECORDED IN SOURCE RATHER THAN LEFT SILENT.** A
+`try:`/`finally:` around the `while` loop would have covered the crash and cancel paths too. It was
+rejected because a `finally` also runs on `asyncio.CancelledError`, where an **unshielded `await` is
+itself cancelled** — that changes which exception leaves the engine on a user Stop, which is exactly
+what `_enforce_budget`'s docstring and the Phase-194 `cancel_phase` single-call-site fence exist to
+protect. **The consequence is a named residual, registered in `SEED-300` §5 with a concrete
+trigger:** a phase that CRASHES or is CANCELLED mid-work still loses its delta from `workflow_runs`.
+
+**The named seam is unchanged and still OWED:** `run_workflow`'s ~500-line phase loop versus
+`_run_phase_with_gates`' retry/gate machinery versus the armed-checkpoint block versus
+`resume_stranded_workflows`. It inherits `58 / 21 / 3290`.
+
+---
 
 **Re-derived 2026-08-17 (extraction):** `46 commits / 16 phases / 2567 L` · **G-5 FIRES** (16 phases vs threshold 3) — honoured by construction (194).
 
@@ -2696,6 +2830,48 @@ chunk INSERT (`:2296-2308`) — ONE of the four BE-1 write sites (`multimodal_se
 ---
 
 ### `backend/app/services/harness/validator_kinds.py`
+
+#### ⚠ Re-derived 2026-09-19 (Phase 256 gap-closure round 1, plan `256-05`) — STALE in BOTH registers, at DIFFERENT values
+
+| | this detail file said | CLAUDE.md said | measured at this landing |
+|---|---|---|---|
+| commits / phases / lines | `12 / 5 / 749` | `14 / 6 / 762` | **`15 / 7 / 791`** |
+
+⚠ **The two registers disagreed with each other AND both were wrong** — which is worse than one
+stale row, because a reader who cross-checks gets two confident answers and no correct one.
+
+**G-5 FIRES (7 phases) — honoured BY CONSTRUCTION, by arithmetic:**
+
+* **ONE function-local import** + **ONE call**, `_record_run_usage(ctx, result.get("input_tokens"),
+  result.get("output_tokens"))`. `grep -n` reads three hits; the third is a comment. **New branches:
+  0.**
+* ⛔ The import is function-local for **two independent reasons**, either sufficient alone:
+  `phase_types.py:84` imports THIS module (`CITATION_MARKER_GUIDANCE`), so a module-level import
+  back is an **import CYCLE**; and this module's own Pitfall-4 contract already makes `forced_emit`,
+  `template_render_service` and `docxtpl` function-local. AST-pinned at module level.
+* ⛔ `PROGRAMMATIC_VALIDATOR_REGISTRY`, `EMITTER_REGISTRY` and `@register_validator` are **untouched**
+  — nothing here makes a validator, emitter, executor or counter resolvable from data, config, a
+  database row or a user-supplied name, so the Phase 255 Extension Contract (`SEED-291`, for which
+  this file is a trigger path) is unaffected.
+
+⭐ **THE PLACEMENT IS THE DELIVERABLE, and it is pinned as an ORDERING rather than as presence.** The
+recording sits immediately after the `forced_emit` call and **ABOVE** the
+`if result.get("failure") or result.get("emitted") is None: return GateResult(False, …)` arm two
+lines below. A judge shot that produced no verdict was still SERVED and BILLED — it is the
+**expensive** outcome — so a recording below that arm would count the cheap outcomes and skip it,
+and the bias would be invisible downstream because a biased total still looks like a total. Driven
+RED against a plant that moved the call below the arm: both the behavioural case and the ordering
+fence fired, and the file was restored **md5-identical** (`93fe383607db0e6130933988531869ce`).
+
+⚠ **THE ORDERING FENCE'S FIRST DRAFT FIRED ON ITS OWN SUBJECT'S COMMENT** — the implementation
+legitimately QUOTES the failure arm in prose, so a `str.index` slice found the quotation (which sits
+ABOVE the recording) and reported the ordering backwards on CORRECT code. Rewritten to use `ast`,
+which sees statements only. **A text fence cannot tell code from a comment** — the
+`stripComments.testutil.ts` / `PhaseFormPanel.test.tsx` trap, on the backend, for the second time in
+one plan. ⚠ And a second measured trap in the same fence: **`ast.unparse` normalises string literals
+to SINGLE quotes**, so matching the source's own double-quoted spelling found nothing.
+
+---
 
 **Re-derived 2026-08-18 (plan `196-09`): `12 commits / 5 phases / 749 L`** · six-digit dated quick-task
 buckets: **checked, none exist** · **G-5 FIRES** (5 phases vs threshold 3) — absent from this ledger until now.
@@ -10394,7 +10570,7 @@ cells rot within days.
 | [`frontend/src/components/workflows/WorkflowCanvas.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsworkflowcanvastsx) | 31 / 9 / 1708 | **FIRES** | honoured by construction (199 / 200 / **214**) — 214-04 widened the panel and touched no node logic |
 | [`frontend/src/components/workflows/FlowEdge.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsflowedgetsx) | 3 / 3 / 462 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | honoured by construction (200) — ⚠ absent, and it crossed the threshold in the commit that added its row |
 | [`frontend/src/components/workflows/PhaseNodeCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsphasenodecardtsx) | 17 / 8 / 489 | **FIRES** | honoured by construction (199) — ⚠ the 200 canvas port is REVERTED here (2026-08-20) |
-| [`backend/app/services/harness/phase_types.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessphase_typespy) | 51 / 24 / 2925 | **FIRES** | extraction TAKEN (200-03) · honoured by construction (211 / 214 / **214.1**) — ⚠ the G-5 obligation stays **OWED** |
+| [`backend/app/services/harness/phase_types.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessphase_typespy) | 54 / 27 / 2954 | **FIRES** | ⚠ row was STALE at `51 / 24 / 2925`; **256-05 does NOT modify it**. extraction TAKEN (200-03) · honoured by construction (211 / 214 / **214.1**) — ⚠ G-5 obligation stays **OWED** |
 | [`frontend/src/pages/WorkflowsPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowspagetsx) | 43 / 17 / 1415 | **FIRES** | the 192 / 192.1 extraction is TAKEN — ⚠ **not a standing `satisfied`**; and `onOpenSettings` is UNWIRED here (`SEED-218`) |
 | [`frontend/src/components/workflows/library/WorkflowCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryworkflowcardtsx) | 19 / 6 / 1616 | **FIRES** | ✅ **G-5 DISCHARGED (192.2-02)** |
 | [`frontend/src/components/workflows/library/libraryVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibrarylibraryvocabularyts) | 10 / 4 / 727 | ⚠ **FIRES** | no seam proposed |
@@ -10415,15 +10591,15 @@ cells rot within days.
 | [`frontend/src/hooks/useThreads.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusethreadsts) | 4 / 2 / 64 | below threshold | ⚠ **ABSENT from BOTH registers for its entire life — row added 244-01.** The app's ONE thread-selection owner; `selectThread` is a bare `setState`, so "first click does not open" cannot originate here |
 | [`backend/app/services/harness/grounding.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessgroundingpy) | 21 / 8 / 1414 | **FIRES** | honoured by construction (193.1 / 211 / **214**) — ⚠ **extraction still OWED**; 214 changed no capability set |
 | [`frontend/src/components/workflows/PhaseFormPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsphaseformpaneltsx) | 30 / 14 / 1566 | **FIRES** | honoured by construction ×6 (185 / 193 / 193.1 / 199 / 200 / **214**) |
-| [`backend/app/db/workflows.py`](docs/HOT-FILE-LEDGER.md#backendappdbworkflowspy) | 48 / 25 / 2585 | **FIRES** | honoured by construction (193.2 / 194 / 192.2 / 200.1 / **214**) |
-| [`backend/app/services/harness/publish_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnesspublish_servicepy) | 27 / 12 / 1830 | **FIRES** | ⚠ row STALE a 3rd time (`26/11/1810`) — re-derived by 256-04 at 256-03's head. honoured by construction (193.2 / 214 / **BUG-260828-09** / **256-03**) |
+| [`backend/app/db/workflows.py`](docs/HOT-FILE-LEDGER.md#backendappdbworkflowspy) | 52 / 26 / 2724 | **FIRES** | ⚠ row was STALE at `48 / 25 / 2585`. honoured by construction (193.2 / 194 / 192.2 / 200.1 / 214 / **256-05**) — 256-05 is **COMMENT-ONLY** |
+| [`backend/app/services/harness/publish_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnesspublish_servicepy) | 28 / 12 / 1939 | **FIRES** | ⚠ row STALE a 4th time (`27 / 12 / 1830`, and `26/11/1810` before). honoured by construction (193.2 / 214 / **BUG-260828-09** / 256-03 / **256-05**) |
 | [`backend/app/services/workflow_authoring.py`](docs/HOT-FILE-LEDGER.md#backendappservicesworkflow_authoringpy) | 15 / 9 / 989 | **FIRES** | honoured by construction (193.2 / 197 / 214 / **214.1**) — ⚠ the extraction it may be owed is neither taken nor obstructed |
 | [`backend/app/models/harness.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsharnesspy) | 20 / 19 / 766 | **FIRES** | honoured by construction (193.2 / **214**) |
 | [`frontend/src/components/workflows/builderStore.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsbuilderstorets) | 14 / 8 / 968 | **FIRES** | honoured by construction (193.2 / 197 / **214.1**) — `setDeclaredInputs` is the sixth `meta` writer, the shape the five before it take |
 | [`frontend/src/components/panel/WorkspacePanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelworkspacepaneltsx) | 16 / 10 / 646 | **FIRES** | honoured by construction (194 / 194.1) |
 | [`backend/app/services/run_lifecycle.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_lifecyclepy) | 8 / 4 / 748 | **FIRES** | ⚠ row STALE at `6/3/459` — re-derived 256-02; +289 L unrecorded. NOT modified by 256 and ⛔ NOT the shape to copy (RESEARCH C-5): its `input_tokens=None` is a DEFAULT PARAM, not a site |
 | [`backend/app/api/runs.py`](docs/HOT-FILE-LEDGER.md#backendappapirunspy) | 39 / 18 / 1736 | **FIRES** | ⚠ row STALE a 3rd time (`35/16/1430`, then `38/17/1695`). **256-03 closed METER-05 here** — the two `input_tokens=None` finalize sites now carry real totals |
-| [`backend/app/services/harness_engine.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharness_enginepy) | 54 / 20 / 3135 | **FIRES** | honoured by construction (194 / **214**) — 214-06 resolved the pause's service at ONE call site |
+| [`backend/app/services/harness_engine.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharness_enginepy) | 58 / 21 / 3290 | **FIRES** | ⚠ row was STALE at `54 / 20 / 3135`. honoured by construction (194 / 214 / **256-05**) — 214-06 resolved the pause's service at ONE call site; 256-05 added ONE nested helper + ONE loop call |
 | [`frontend/src/components/chat/RunCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatruncardtsx) | 28 / 14 / 710 | **FIRES** | ⭐ **G-5 DISCHARGED (243-02)** — the reasoning fold left for `ThinkingBlock.tsx`, `-39/+20`, one `useState` fewer. ⚠ row was STALE at `26/12/728`. State 2 stayed, by decision |
 | [`frontend/src/components/chat/ThinkingBlock.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatthinkingblocktsx) | 6 / 2 / 320 | no (2 phases) | ⚠ row STALE (`4/1/283`; CLAUDE.md read `4/1/313`). NOT modified by 253 — re-derived under CR-08. Still ONE reasoning renderer; no duration derived from length |
 | [`frontend/src/components/chat/MessageInput.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageinputtsx) | 32 / 16 / 863 | **FIRES** | honoured by construction (**249-02**): ONE chip added beside the EXISTING `deprecated` badge, 3 optional props, no state. ⛔ the `ComposerChipsRow` seam stays OWED |
@@ -10448,7 +10624,7 @@ cells rot within days.
 | [`frontend/src/components/panel/PhaseCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasecardtsx) | 17 / 11 / 788 | ⚠ **FIRES** | ⚠ row STALE (`16/10/755`) — 252 touched it. NOT modified by 253; re-derived under CR-08. honoured by construction (200 / 214) |
 | [`frontend/src/components/panel/PhaseTimeline.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasetimelinetsx) | 10 / 8 / 404 | ⚠ **FIRES** | ⚠ row STALE (`9/7/385`) — 252 touched it. NOT modified by 253; re-derived under CR-08. honoured by construction (**214**); absent from BOTH until 200 |
 | [`frontend/src/components/panel/phaseStatusMeta.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasestatusmetats) | 4 / 4 / 291 | ⚠ **FIRES** | ⚠ row STALE (`3/3/236`) — 252 touched it. NOT modified by 253; re-derived under CR-08. It crossed the threshold in the very commit that added its row (200) |
-| [`backend/app/services/harness/validator_kinds.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessvalidator_kindspy) | 12 / 5 / 749 | ⚠ **FIRES** | ⚠ absent at 5 phases (added 196) |
+| [`backend/app/services/harness/validator_kinds.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessvalidator_kindspy) | 15 / 7 / 791 | ⚠ **FIRES** | ⚠ row STALE a 2nd time (`12 / 5 / 749`; CLAUDE.md read `14/6/762`). ⚠ absent at 5 phases (added 196). honoured by construction (255 / **256-05**) |
 | [`frontend/src/components/admin/ModelRegistryTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminmodelregistrytabtsx) | 15 / 5 / 1640 | ⚠ **FIRES** | ⚠ row STALE at `10/4/1191` (+362 lines). honoured by construction (**249-01**): roster widened to 11 + words on 2 EXISTING controls. ⛔ `deprecated` semantics unchanged (D-149-04) |
 | [`frontend/src/components/workflows/soulData.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowssouldatats) | 12 / 10 / 499 | ⚠ **FIRES** | honoured by construction (214 / **214.1**); ⚠ absent until 197, at 7 phases |
 | [`frontend/src/components/workflows/PublishGauntlet.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowspublishgauntlettsx) | 17 / 9 / 1289 | ⚠ **FIRES** | honoured by construction (214 / **BUG-260828-09**) — one child card mounted in the slot `PublishRefusalList` already owns; ⚠ absent until 199 |

@@ -667,7 +667,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/WorkflowCanvas.tsx` | 31 / 9 / 1708 | honoured by construction (199 / 200 / **214**) |
 | `frontend/src/components/workflows/FlowEdge.tsx` | 3 / 3 / 462 | honoured by construction (200) |
 | `frontend/src/components/workflows/PhaseNodeCard.tsx` | 17 / 8 / 489 | honoured by construction (199) |
-| `backend/app/services/harness/phase_types.py` | 53 / 26 / 2937 | extraction TAKEN (200-03) · honoured by construction (211 / 214 / **21 |
+| `backend/app/services/harness/phase_types.py` | 54 / 27 / 2954 | ⚠ row was STALE at `53/26/2937` and **256-05 does NOT modify it** — re-derived as an observation. extraction TAKEN (200-03). Its `:1586` recording is the shape 256-05 mirrored |
 | `frontend/src/pages/WorkflowsPage.tsx` | 43 / 17 / 1415 | the 192 / 192.1 extraction is TAKEN |
 | `frontend/src/components/workflows/library/WorkflowCard.tsx` | 19 / 6 / 1616 | ✅ **G-5 DISCHARGED (192.2-02)** |
 | `frontend/src/components/workflows/library/libraryVocabulary.ts` | 10 / 4 / 727 | no seam proposed |
@@ -684,8 +684,8 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/hooks/useThreads.ts` | 4 / 2 / 64 | ⚠ absent from BOTH for its ENTIRE LIFE — row added 244-01. The app's ONE thread-selection owner; `selectThread` is a bare `setState`, so BUG-260911-02 cannot originate here |
 | `backend/app/services/harness/grounding.py` | 21 / 8 / 1414 | honoured by construction (193.1 / 211 / **214**) |
 | `frontend/src/components/workflows/PhaseFormPanel.tsx` | 30 / 14 / 1566 | honoured by construction ×6 (185 / 193 / 193.1 / 199 / 200 / **214**) |
-| `backend/app/db/workflows.py` | 48 / 25 / 2585 | honoured by construction (193.2 / 194 / 192.2 / 200.1 / **214**) |
-| `backend/app/services/harness/publish_service.py` | 27 / 12 / 1830 | ⚠ row STALE a 3rd time (`26/11/1810`) — re-derived by 256-04 at 256-03's head, which is where the landing was. honoured by construction (193.2 / 214 / **BUG-260828-09** / **256-03**) |
+| `backend/app/db/workflows.py` | 52 / 26 / 2724 | ⚠ row was STALE at `48/25/2585`. honoured by construction (**256-05**): **COMMENT-ONLY** — `persist_run_usage`'s body and `TOKEN_COVERAGE_LEGS` byte-unchanged; 3 stale pins corrected beside originals |
+| `backend/app/services/harness/publish_service.py` | 28 / 12 / 1939 | ⚠ row STALE a 4th time (`27/12/1830`). honoured by construction (**256-05**): ONE additive kw-only `usage_box=None`, 2 accumulators above an existing loop, 1 persist at an existing call site; no new stage word |
 | `backend/app/services/workflow_authoring.py` | 15 / 9 / 989 | honoured by construction (193.2 / 197 / 214 / **214.1**) |
 | `backend/app/models/harness.py` | 20 / 19 / 766 | honoured by construction (193.2 / **214**) |
 | `frontend/src/components/workflows/builderStore.ts` | 14 / 8 / 968 | honoured by construction (193.2 / 197 / **214.1**) |
@@ -696,7 +696,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/run_reconciler.py` | 3 / 2 / 325 | ⚠ absent its ENTIRE LIFE — row added 256-02; NOT modified by 256 (D-256-08 site #7 is REGISTERED, not fixed). ⛔ its BOOT sweep NULLs a `cap_paused` run's real totals — `SEED-297` |
 | `backend/app/services/circuit_breaker.py` | 1 / 1 / 331 | ⚠ absent its ENTIRE LIFE — row added 256-02 at 256-01's touch, BELOW threshold. ⛔ the `max(0,…)` clamp stays on the RETURNED delta, or a reset box SUBTRACTS real spend |
 | `backend/app/api/runs.py` | 39 / 18 / 1736 | ⚠ row STALE a 3rd time (`38/17/1695`). **256-03 closed METER-05 here** — the two `input_tokens=None` finalize sites (`:677` ask_user re-drive, `:1331` continuation) now carry real totals |
-| `backend/app/services/harness_engine.py` | 54 / 20 / 3135 | honoured by construction (194 / **214**) |
+| `backend/app/services/harness_engine.py` | 58 / 21 / 3290 | ⚠ row was STALE at `54/20/3135`. honoured by construction (**256-05**): ONE nested `_flush_run_usage` + ONE unconditional loop call; `_enforce_budget` if/try/loop **2/0/0 → 2/0/0**. ⛔ `try`/`finally` REJECTED |
 | `frontend/src/components/chat/ThinkingBlock.tsx` | 6 / 2 / 320 | ⚠ row STALE (`4/1/313`) and it does NOT fire yet — 2 phases, not 1. NOT modified by 253. ⛔ the ONE renderer of the model's process prose, now from TWO sources |
 | `frontend/src/components/chat/RunCard.tsx` | 29 / 14 / 723 | ⭐ G-5 DISCHARGED (243-02). ⚠ row STALE at `28/14/710`. **BUG-260912-01**: its state-2 guard asked `!reasoningContent` ALONE and shipped a VISIBLE mid-stream double once the fold gained a 2nd input |
 | `frontend/src/components/chat/MessageInput.tsx` | 32 / 16 / 863 | honoured by construction (**249-02**): ONE chip beside the EXISTING `deprecated` badge, 3 optional props, no state. ⛔ the `ComposerChipsRow` half of the seam stays OWED |
@@ -723,7 +723,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/panel/PhaseCard.tsx` | 17 / 11 / 788 | ⚠ row STALE (`16/10/755`) — 252 touched it. NOT modified by 253. honoured by construction (200 / **214**) |
 | `frontend/src/components/panel/PhaseTimeline.tsx` | 10 / 8 / 404 | ⚠ row STALE (`9/7/385`) — 252 touched it. NOT modified by 253. honoured by construction (**214**) |
 | `frontend/src/components/panel/phaseStatusMeta.ts` | 4 / 4 / 291 | ⚠ row STALE (`3/3/236`) — 252 touched it. NOT modified by 253. It crossed the threshold in the commit that added its row (200) |
-| `backend/app/services/harness/validator_kinds.py` | 14 / 6 / 762 | ⚠ row STALE at `12/5/749`. NOT modified by 255 — re-derived under EXT-02, whose guard READS it. Driven RED against a planted `PROGRAMMATIC_VALIDATOR_REGISTRY[..]=` and restored md5-identical |
+| `backend/app/services/harness/validator_kinds.py` | 15 / 7 / 791 | ⚠ row STALE a 2nd time (`14/6/762`, and `12/5/749` before). honoured by construction (**256-05**): ONE function-local import + ONE call above the failure arm; branches 0 new; registries untouched |
 | `backend/app/services/harness/programmatic.py` | 3 / 3 / 137 | ⚠ **FIRES, and absent from BOTH registers its ENTIRE LIFE — row added 255.** ⛔ The closed `PROGRAMMATIC_PHASE_REGISTRY` (2 fns). Its idempotency contract is load-bearing: a crashed phase re-runs from the top |
 | `backend/app/services/harness/emitters.py` | 4 / 2 / 188 | ⚠ absent its ENTIRE LIFE — row added 255 AT 2 PHASES, before it fires, deliberately. ⛔ The closed `EMITTER_REGISTRY`; `llm_emit` is the ONLY path producing a typed deliverable |
 | `frontend/src/components/admin/ModelRegistryTab.tsx` | 15 / 5 / 1640 | ⚠ **FIRES**. honoured by construction (**249-01**): roster widened 8→11 + words on 2 EXISTING controls. ⛔ `deprecated` semantics unchanged (D-149-04); `AddModelForm` seam OWED |
