@@ -10571,8 +10571,8 @@ cells rot within days.
 
 | File | commits / phases / lines | G-5 | Disposition |
 |---|---|---|---|
-| [`backend/app/db/entitlements.py`](docs/HOT-FILE-LEDGER.md#backendappdbentitlementspy) | 1 / 1 / 169 | no (new) | young (created Phase 258). Row added AT CREATION — absent row is invisible to G-5 (TIER-01/02). |
-| [`backend/app/services/entitlement_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesentitlement_servicepy) | 1 / 1 / 130 | no (new) | young (created Phase 258). Row added AT CREATION. Single commercial boundary home (TIER-01/03/04/05). |
+| [`backend/app/db/entitlements.py`](docs/HOT-FILE-LEDGER.md#backendappdbentitlementspy) | 2 / 1 / 169 | no (new) | young (created Phase 258). Row added AT CREATION — absent row is invisible to G-5 (TIER-01/02). |
+| [`backend/app/services/entitlement_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesentitlement_servicepy) | 2 / 1 / 130 | no (new) | young (created Phase 258). Row added AT CREATION. Single commercial boundary home (TIER-01/03/04/05). |
 | [`frontend/src/components/chat/ToolCallPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattoolcallpaneltsx) | 51 / 23 / 351 | **FIRES** | ✅ **G-5 DISCHARGED (227-02)** — extracted ToolCallDetails, StepRow, toolStepDerivation (1019 → 351 lines) |
 | [`frontend/src/components/chat/MessageItem.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageitemtsx) | 75 / 34 / 1000 | **FIRES** | ⚠ row STALE a FOURTH time (`74/34/981`). honoured by construction (**244-14 / WR-01**): the Continue card reads the lock's MODE, like the composer beside it. State 3→3, effects 0→0, props 5→5 |
 | [`backend/app/api/threads.py`](docs/HOT-FILE-LEDGER.md#backendappapithreadspy) | 245 / 82 / 1617 | **FIRES** | ⚠ row was STALE at `243 / 80 / 1590`. honoured by construction (**244-03**): ONE existing pure-read query loses a WHERE predicate and gains a Python guard. ⛔ no writer added |
