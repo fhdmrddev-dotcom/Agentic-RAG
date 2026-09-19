@@ -1,7 +1,8 @@
 ---
 seed_id: SEED-080
 title: Entitlement / feature-gating primitive — reusable tier + add-on enforcement check (one home, not N ad-hoc gates)
-status: planted
+status: folded
+status_note: "Folded into Phase 258 (A Tier Becomes Enforceable) on 2026-09-19. Implemented by TIER-01, TIER-03, TIER-04, TIER-05."
 planted: 2026-06-10
 phase_origin: "Phase 101 plan-phase — future-milestone alignment sweep 2026-06-10 (workflow wf_13ed5033)"
 category: licensing / billing / monetization — a cross-cutting enforcement primitive (the layer that READS the locked tier + add-on columns to gate features), NOT a new product feature

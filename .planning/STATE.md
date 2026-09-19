@@ -3,11 +3,11 @@ gsd_state_version: 1.0
 milestone: v4.3
 milestone_name: What You Can Actually Sell
 status: executing
-last_updated: "2026-09-19T20:30:00.000Z"
-last_activity: 2026-09-19 -- Phase 257 CLOSED after three review rounds. SC#2 and SC#4 HOLD and are driven; SC#1 is PARTIAL (effective dating works; 14 of 82 roster models stay unrated BY DECISION -- 7 OpenRouter, 7 self-hosted) and SC#3 is NOT MET (F-13: five conversion sites, fence allowlists rates.py wholesale -- an architecture decision for the operator). Gates: backend 71 failed / 5100 passed at ceiling; vitest 8464 / failed 0 / 293-293; tsc 65 = base. ⛔ Migration 185 is WRITTEN AND VERIFIED BUT NOT APPLIED -- the operator pastes it into the SQL editor, then regenerates full-schema.sql.
+last_updated: "2026-09-19T21:45:00.000Z"
+last_activity: 2026-09-19 -- Phase 258 context gathered; Operator Decision #1 resolved (Ascending Capability Bundles); TIER-01..05 locked
 progress:
   total_phases: 13
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 12
   completed_plans: 9
   percent: 25
@@ -34,17 +34,26 @@ See: `.planning/PROJECT.md` (updated 2026-09-18)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 257 CLOSED with two criteria owed to operator decisions. Next: apply migration 185, then Phase 258 (A Tier Becomes Enforceable).
+**Current focus:** Phase 258 (A Tier Becomes Enforceable) -- context gathered, decisions locked. Ready for planning.
 
 ---
 
 ## Current Position
 
-Phase: 257 (cost-in-dollars-and-what-it-cannot-see) — **CLOSED, 2 of 4 SC fully met**
-Plan: 4 of 4 executed, plus three review rounds and two operator-directed fix rounds
-Status: CLOSED as a DECISION, not as a claim that everything passed. ⛔ The two gaps are
-operator decisions, not defects, which is the only legitimate reason to close on them.
-Last activity: 2026-09-19 -- migration 185 written and verified; SEED-302 planted
+Phase: 258 (a-tier-becomes-enforceable)
+Plan: 0 of TBD (discuss complete, ready for planning)
+Status: ready for planning
+Last activity: 2026-09-19 -- Phase 258 context gathered; Operator Decision #1 resolved (Ascending Capability Bundles); TIER-01..05 locked
+
+### ⭐ PHASE 258 CONTEXT GATHERED — 2026-09-19
+- **Operator Decision #1**: Resolved as Ascending Capability Bundles (`standard` -> `pro` -> `enterprise`), with `organizations.add_ons` for modular overrides (`D-258-01`).
+- **TIER-02 Data Storage**: Migration 186 creates `tier_capabilities` table (`D-258-02`, `D-258-07`).
+- **TIER-01 Single Home**: Dedicated `backend/app/services/entitlement_service.py` (`D-258-03`).
+- **TIER-04 Guard**: AST single-home fence `test_258_single_entitlement_home.py` driven RED against planted check (`D-258-04`).
+- **TIER-03 Refusal**: Structured HTTP 403 naming required tier and upgrade hint (`D-258-05`).
+- **TIER-05 Fail-Closed**: Strict fail-closed on unreadable tier/DB blips, recorded in contrast to `load_run_budget` (`D-258-06`).
+- **Proof Slice**: `POST /workflows` and `POST /workflow-runs` wired with `require_capability('workflows')` (`D-258-09`).
+- **Folded Seeds**: `SEED-080` (folded), `SEED-083` (folded).
 
 ### ⭐ PHASE 257 CLOSE — 2026-09-19. Read the four verdicts, not the word "closed".
 
