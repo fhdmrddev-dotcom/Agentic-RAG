@@ -10561,6 +10561,8 @@ cells rot within days.
 
 | File | commits / phases / lines | G-5 | Disposition |
 |---|---|---|---|
+| [`backend/app/db/entitlements.py`](docs/HOT-FILE-LEDGER.md#backendappdbentitlementspy) | 0 / 0 / 0 | no (new) | young (created Phase 258). Row added AT CREATION. Entitlement database queries over tier_capabilities and organizations.add_ons (TIER-01/02). |
+| [`backend/app/services/entitlement_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesentitlement_servicepy) | 0 / 0 / 0 | no (new) | young (created Phase 258). Row added AT CREATION. Single home for entitlement evaluation and FastAPI require_capability dependency (TIER-01/03/04/05). |
 | [`frontend/src/components/chat/ToolCallPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattoolcallpaneltsx) | 51 / 23 / 351 | **FIRES** | ✅ **G-5 DISCHARGED (227-02)** — extracted ToolCallDetails, StepRow, toolStepDerivation (1019 → 351 lines) |
 | [`frontend/src/components/chat/MessageItem.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageitemtsx) | 75 / 34 / 1000 | **FIRES** | ⚠ row STALE a FOURTH time (`74/34/981`). honoured by construction (**244-14 / WR-01**): the Continue card reads the lock's MODE, like the composer beside it. State 3→3, effects 0→0, props 5→5 |
 | [`backend/app/api/threads.py`](docs/HOT-FILE-LEDGER.md#backendappapithreadspy) | 245 / 82 / 1617 | **FIRES** | ⚠ row was STALE at `243 / 80 / 1590`. honoured by construction (**244-03**): ONE existing pure-read query loses a WHERE predicate and gains a Python guard. ⛔ no writer added |
@@ -15349,3 +15351,19 @@ re-drive, `:1331` continuation), `publish_service.py`, `scheduler_service.py` an
 `eval_runner_service.py` now carry real totals instead of writing a `None` over a measured value.
 ⚠ Recorded here as **`256-03`'s claim, verified only to the extent that its triples re-derive** —
 `256-04` did not read those diffs, and a ledger note is not a review.
+
+---
+
+## `backend/app/db/entitlements.py` — row added 2026-09-19 (Phase 258)
+
+**`0 / 0 / 0`** — created by Phase 258 (`258-01`). Row added **at creation**.
+
+**What it owns.** The database access layer for commercial capability matrix queries (`public.tier_capabilities`) and additive `organizations.add_ons` overrides. Provides `get_tier_capabilities()`, `is_capability_enabled_for_tier()`, and `resolve_org_entitlement()`. Fails closed on database connectivity errors or unresolvable organizations.
+
+---
+
+## `backend/app/services/entitlement_service.py` — row added 2026-09-19 (Phase 258)
+
+**`0 / 0 / 0`** — created by Phase 258 (`258-02`). Row added **at creation**.
+
+**What it owns.** The single canonical service home for entitlement evaluation across the backend (TIER-01). Exposes `check_entitlement()`, `require_capability()`, and `EntitlementDeniedException` (HTTP 403 Forbidden with structured refusal JSON naming the required tier, current tier, capability, and upgrade hint per TIER-03). Guarded by an AST single-home fence (`test_258_single_entitlement_home.py`, TIER-04). Fails closed on unreadable tiers or database blips (TIER-05).
