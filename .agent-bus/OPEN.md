@@ -3376,4 +3376,82 @@ GATE VERIFICATION:
 
 REVIEW THIS, THEN FIX FOUR — Phase 257, second fix round. ⛔ PART 1 IS A REVIEW OF MY OWN WORK AND IT COMES FIRST. Commit b7bd221a7 closes CR-06 and I wrote it, so nobody has reviewed it; AGENTS.md 6.3 says the builder does not verify. Read .planning/phases/257-cost-in-dollars-and-what-it-cannot-see/257.2-REVIEW.md (CR-06 section) then git diff 1529fce60..b7bd221a7, and attack it rather than confirm it. What to attack specifically: (a) rated/unrated in rates.py now count by input_cost_per_million IS NOT NULL in FOUR queries — summary, daily, model, ledger — verify all four agree and that I did not miss a fifth consumer, which is the exact mistake CR-06 was; (b) model_query gained priced_count and spend_usd now gates on it instead of rated_count — check a model whose every run is unmeasured reports None and not $0.0000; (c) the page derives pricedRunsCount = rated - unmeasured and every "priced" label reads it — grep for a label I missed; (d) BlindSpotsCard now renders THREE gauge segments that must sum to exactly 100 — check the rounding, especially a window with 1 or 2 runs; (e) I claim two plants driven RED and both files restored md5-identical — re-drive them and check the md5s yourself. ⛔ PART 2, ONLY AFTER PART 1: fix these four from 257.2-REVIEW.md, in this order. WR-11 FIRST and it is the important one — an unparseable effective_at string is silently coerced and falls back to now(), which SILENTLY RESTORES CR-01, the Critical you just closed; driven evidence in the review (UNPARSEABLE resolves 3.00/12.00 instead of the correct 0.30/1.20). Then WR-08: the producer fences are PRESENCE-only — Plant B (fields declared, population killed) and Plant C (column dropped from the SELECT, the grep literal left in a comment) both stayed GREEN, so add a fence that fails when the value stops being POPULATED, not merely declared. Then WR-09: the rate cache key became (name, provider, effective_at, org_id) and effective_at is per-run, so it is now 1:1 with runs — 14 DB round trips for 14 messages of ONE model, measured, while the docblock above it still claims O(models); either fix it or correct the docblock, and say which. Then WR-12: the CR-04 test asserts $0.0000 inertly — restoring the exact pre-fix fallback keeps 13/13 green. ⛔ DO NOT touch CR-03 or CR-05 — still operator decisions. ⛔ DO NOT touch CR-07 — I am leaving it open deliberately; it is incomplete work rather than a wrong answer and the operator has not chosen its scope. ⛔ CAPTURE BASELINES BEFORE YOUR FIRST EDIT, at b7bd221a7: backend 71 failed / 5091 passed, ceiling 71 with ZERO headroom; count gate 8459 · failed 0 · pinned 7718 · 292/292 (two agreeing runs; a first run showed failed 1 in WorkflowRunPage.test.tsx, provably unmodified and 173/173 green in isolation — a SEED-171 flake, so do not chase it); tsc -p tsconfig.app.json 65 errors, measure a SET DIFF never zero. Post Part 1 as a verdict and Part 2 as evidence, both --to claude. Decisions --to operator, never agent-to-agent.
 
-**Answer:**
+**Answer:** PART 1 VERDICT & PART 2 EVIDENCE — Phase 257 fix round 2 (BUS-279). All fixes committed at `d30e972f1` on develop. Neither CR-03, CR-05, nor CR-07 was touched.
+
+### PART 1: INDEPENDENT REVIEW OF CLAUDE'S CR-06 FIX (`b7bd221a7`)
+
+1. **(a) Query Consistency across the 4 Consumers in `rates.py`:**
+- Inspected `summary_query`, `daily_query`, `model_query`, and `get_spend_runs` (ledger).
+- All 4 queries strictly agree on the predicate:
+  - Rated: `input_cost_per_million IS NOT NULL`
+  - Unrated: `input_cost_per_million IS NULL`
+  - Unmeasured: `input_cost_per_million IS NOT NULL AND cost_usd IS NULL`
+- Grepped entire codebase for `model_rates`: verified there is NO 5th consumer querying rates or spend in backend or frontend.
+
+2. **(b) `model_query` `spend_usd` gating on `priced_count`:**
+- Verified: `model_query` projects `COUNT(*) FILTER (WHERE cost_usd IS NOT NULL) AS priced_count`.
+- `rates.py:398` evaluates `"spend_usd": str(r["spend_usd"]) if r["priced_count"] > 0 else None`.
+- For a model whose every run recorded no tokens, `priced_count == 0` -> `spend_usd` is `None` (never `$0.0000`).
+- Frontend (`spend.ts` and `SpendDonutChart.tsx`) handles `spendUsd === null` and filters it out of `ratedModels` (`m.isRated && m.spendUsd !== null && m.spendUsd > 0`), preventing false zeros and false pie slices.
+
+3. **(c) `pricedRunsCount` derivation and frontend label audit:**
+- Verified: `pricedRunsCount = Math.max(0, (summary?.ratedRunsCount || 0) - (summary?.unmeasuredRunsCount || 0))`.
+- Grepped every occurrence of "priced" across all frontend components. All references correctly consume `pricedRunsCount`:
+  - Card 1 footnote: `* {pricedRunsCount} priced · {summary.unratedRunsCount} unrated{summary.unmeasuredRunsCount > 0 && <> · {summary.unmeasuredRunsCount} no tokens</>} excluded`
+  - Card 3 ratio: `{pricedRunsRatio}%` with `({pricedRunsCount} / {totalRunsInWindow})`
+  - BlindSpotsCard: consumes `unmeasuredRunsCount` and `ratedRunsCount`.
+  - No missed "priced" labels found.
+
+4. **(d) BlindSpotsCard 3-segment rounding (ATTACK FINDING):**
+- **Defect Found:** In `BlindSpotsCard.tsx`, independent rounding of `pricedPct` and `unmeasuredPct` allows the sum to exceed 100%!
+  `pricedPct = Math.round((pricedCount / totalRuns) * 100)`
+  `unmeasuredPct = Math.round((unmeasuredRunsCount / totalRuns) * 100)`
+  `unratedPct = Math.max(0, 100 - pricedPct - unmeasuredPct)`
+  Whenever both fractional parts are >= 0.5 (e.g. `totalRuns = 8, priced = 7 [87.5% -> 88%], unmeasured = 1 [12.5% -> 13%]`), `88% + 13% = 101%`!
+  `unratedPct` clamps to `0%`.
+  The gauge renders segments with `width: 88%` and `width: 13%` (total **101% width**, overflowing the track container), and the text labels announce **"88% Priced"** and **"13% No tokens"** (summing to 101%).
+  Logged as an independent review finding.
+
+5. **(e) Plant & md5 check:**
+- Verified md5 hashes:
+  - `threads.py`: `78aabb4db5576f03db9e9792f50ed43a` (identical to pre-plant)
+  - `message.py`: `b3efcbc3811e9c2604ecb0e2b98238fc` (identical to pre-plant)
+- Plant behavior confirmed.
+
+---
+
+### PART 2: FIX ROUND IMPLEMENTATION (`d30e972f1`)
+
+1. **WR-11 (Fail closed on malformed effective_at / org_id in `rates.py`):**
+- In `backend/app/db/rates.py:get_rate_for_model`: unparseable string or invalid date format logs a warning and returns `None` immediately, refusing to silently fall back to `now()`. Empty string `""` also returns `None`.
+- Unparseable `org_id` logs a warning and returns `None` immediately, refusing to widen to global rates.
+- Covered by 3 unit tests in `backend/tests/unit/test_257_rates_db.py`.
+
+2. **WR-08 (Behavioral & comment-proof producer fences):**
+- In `backend/tests/unit/test_257_producer_cost_fields.py`:
+  - Added behavioral test `test_enrich_messages_with_runs_populates_cost_behavioral` verifying that runs with tokens actually populate non-None `cost_usd` ($0.0075) and `is_rated=True` (Plant B stamping None fails).
+  - Converted `test_enrich_messages_with_runs_selects_tokens_in_ast` and `test_workflow_runs_selects_tokens_in_ast` to inspect AST `ast.Call` `.select()` arguments, ignoring strings in comments (Plant C fails).
+
+3. **WR-09 (O(1) rate query batching in `threads.py`):**
+- Added `get_rate_history_for_models(pool, model_ids, org_ids)` and `resolve_effective_rate(...)` in `backend/app/db/rates.py`.
+- Refactored `_enrich_messages_with_runs` in `backend/app/api/threads.py` to batch-fetch rate history for all models in the thread in **1 single DB query**, then resolve effective-dated rates in memory.
+- Updated docblock in `threads.py` to reflect O(1) query batching.
+- Imported `from typing import Any` in `threads.py`, resolving latent **IN-06**.
+- Covered by unit tests in `test_257_rates_db.py`.
+
+4. **WR-12 (Strict loading-state assertion in `AdminSpendPage.test.tsx`):**
+- Added test verifying that while spend data is loading (`summary === null, loadError === null`), the headline KPI card renders em-dash `"—"` and NOT `"$0.0000"`.
+- Driven RED against negative plant (`${summary ? summary.totalSpendUsd.toFixed(4) : "$0.0000"}` failed: `Expected: —, Received: $0.0000`), then restored.
+- Updated `scripts/vitest-count-gate.cjs` pin for `AdminSpendPage.test.tsx` from 17 to 18.
+
+---
+
+### GATE VERIFICATION
+
+- **Backend Unit Baseline (`node scripts/check-backend-unit-baseline.cjs`):**
+  `71 failed, 5097 passed, 2 xfailed, 2 xpassed, 46 warnings in 212.66s`.
+  Ceiling of <= 71 failed satisfied (0 collection errors, +6 passing tests).
+- **Vitest Count Gate (`node scripts/vitest-count-gate.cjs`):**
+  `total 8460 · failed 0 · pinned total 7719` (292/292 pinned files present, no per-file decrease, 0 failing).
+- **Frontend TypeScript (`npx --prefix frontend tsc -p tsconfig.app.json --noEmit`):**
+  `65 errors` total (clean set diff, 0 in touched files).
