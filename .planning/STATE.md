@@ -72,14 +72,38 @@ cannot see content drift*, paid for again. Closed test-only at `c908161f4`; `per
 REAL with an `AsyncMock` pool as recorder, so what is pinned is the statement the DB would receive,
 arguments and all.
 
-⚠ **TWO UAT ROWS ARE OWED, recorded as a DECISION and not as a claim that everything ran.**
-1. **RUN THIS FIRST** — a real harness run that pauses on a human gate, **restart the backend**, then
-   `SELECT input_tokens, output_tokens, token_coverage FROM workflow_runs`. SC#1's *"after the process
-   restarts"* clause is unprovable by unit test, and the suite's own docstring disclaims it: it asserts
-   the statement the pool was **handed**, never the one Postgres **accepted** — in particular a Python
-   list binding to `token_coverage`'s `text[]` **has never run live**.
-2. One publish gauntlet to the QUAL-01 judge against a **real provider** (no `forced_emit` patch).
-   Every judge case patches `forced_emit`, so the wiring is proven and the number's fidelity is not.
+⭐ **UAT ROW 1 IS CLOSED LIVE — PASS, 2026-09-19, on a genuinely paused run.** Workflow *Knowledge Base
+Library Structure Summary* (`4ddadece`) driven through the real app; it completed two phases and PAUSED on
+its stage-3 external-action human gate, the UI reading *"NEEDS YOU — No deadline — the run is waiting for
+your answer and will not continue on its own"*. **That is exactly the arm CR-01 found unreachable.** Run
+`a77ed2c0-0b0f-42db-86a3-51e12513e394` reads **`input_tokens=135142` · `output_tokens=10317` ·
+`token_coverage=[agent, single, batch, emit]`**. ⭐ **Before this phase that row would have read
+`NULL/NULL/NULL` PERMANENTLY** — the pause arm returns at `:2383`, **297 lines above** the only other
+persist — and the pre-run baseline makes it unambiguous: **0 of 283** existing rows carried
+`input_tokens` or `token_coverage`, newest `09-12`.
+
+⚠ **THE PROCESS-BOUNDARY HALF WAS PROVEN BY A STRONGER METHOD THAN THE ROW ASKED FOR, AND THE
+SUBSTITUTION IS STATED RATHER THAN HIDDEN** (operator decision, 2026-09-19). The value was read by a
+**separate OS process** making a direct `asyncpg` connection to Postgres on 54322 — bypassing uvicorn's
+memory **and** the app's API layer. A restart-then-read-via-API could have been served from a cache; this
+could not. ⛔ **The literal `kill uvicorn` was OFFERED AND DECLINED** as low marginal information; the
+backend was **NOT** restarted by that session, and nobody should later read this as proving process death.
+
+⭐ **AND THE PART NO TEST COULD REACH WAS PROVEN SEPARATELY, against the real local Postgres.** The REAL
+`persist_run_usage` called three times on a scratch row — `(1200,340)`, `(55,7)`, `(0,0)` — read back on a
+**brand-new connection** as `1255 / 347 / [agent, single, batch, emit]`. So the **ADD** semantics hold
+across calls, the falsy third call was correctly a **NO-OP** rather than a `0` write (D-256-06), and the
+**Python-list-to-`text[]` binding that had never run live WORKS**. Scratch row deleted, 283 → 283, CLEAN.
+
+⚠ **ONE UAT ROW REMAINS OWED, and closing the phase with it owed is a stated DECISION.** One publish
+gauntlet to the QUAL-01 judge against a **real provider** (no `forced_emit` patch), comparing the
+provider's reported usage to the persisted delta. Every judge case patches `forced_emit`, so **the wiring
+is proven and the number's FIDELITY is not** — and CLAUDE.md's cross-provider rule says conventions do not
+transfer 1:1 between providers.
+
+⚠ **A REAL PAUSED RUN IS LIVE IN THE OPERATOR'S LOCAL DB** — `a77ed2c0` sits at its email-approval gate
+with **no deadline**, left deliberately unanswered as the evidence for this row. Answering or killing it
+is the operator's call; it is not orphaned state to sweep.
 
 ⚠ **FOUR REVIEW FINDINGS DEFERRED TO PHASE 257 UNDER G-7 — not fixed, not waived.** All four live in
 code written this round, and a round 2 of pure round-1 cleanup is the runaway G-7 exists to stop.

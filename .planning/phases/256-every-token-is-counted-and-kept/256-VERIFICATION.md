@@ -27,8 +27,29 @@ deferred:  # addressed in a later milestone phase — NOT actionable gaps
   - truth: "WR-02 (file-scoped disposition fence), WR-03 (hardcoded _SHELL_FUNCTIONS), WR-04 (judge tokens now bind max_tokens_per_run, unregistered), IN-01 (one-sided delta writes NULL→0)"
     addressed_in: "Phase 257"
     evidence: "Triaged and sequenced at the round-1 review (256-REVIEW-round1.md). All four are durability-of-the-guard findings, not wrong behaviour today; re-raising them here would manufacture a round 2 that G-7 forbids (gate re-run: G-7 clear, 1 of 2 rounds)."
-human_verification:   # ⚠ OWED, and closing the phase with them owed is a stated DECISION — not a claim that everything ran
-  - test: "RUN THIS ONE FIRST. Drive a real two-phase harness run whose phase 1 calls ask_user, let the gate elapse so the run takes the pause arm, then RESTART the backend process and SELECT id, input_tokens, output_tokens, token_coverage FROM workflow_runs WHERE id = <run_id>."
+human_verification:   # ROW 1 CLOSED live 2026-09-19. Row 2 still OWED, and closing with it owed is a stated DECISION — not a claim that everything ran
+  - test: "⭐ CLOSED LIVE 2026-09-19 — PASS, on a real paused harness run. Workflow 'Knowledge Base Library Structure Summary'
+      (definition 4ddadece-d917-4e19-832b-ea01ebc78d97) driven through the real app at localhost:5173; it completed two phases
+      and PAUSED on its stage-3 external-action human gate (`Sends an email · Email (SMTP)`), the UI reading 'NEEDS YOU — No
+      deadline — the run is waiting for your answer and will not continue on its own'. That is exactly the pause arm CR-01 found
+      unreachable. Run a77ed2c0-0b0f-42db-86a3-51e12513e394 then read: status=active (paused), input_tokens=135142,
+      output_tokens=10317, token_coverage=[agent, single, batch, emit]. ⭐ BEFORE THIS PHASE THAT ROW WOULD HAVE READ NULL/NULL/NULL
+      PERMANENTLY — the pause arm returns at :2383, 297 lines above the only other persist — and the pre-run baseline makes that
+      unambiguous: 0 of 283 existing workflow_runs rows carried input_tokens or token_coverage, newest 09-12.
+      ⚠ THE PROCESS-BOUNDARY HALF WAS PROVEN BY A STRONGER METHOD THAN THE ROW ASKED FOR, AND THE SUBSTITUTION IS STATED RATHER
+      THAN HIDDEN (operator decision, 2026-09-19): the value was read by a SEPARATE OS PROCESS making a direct asyncpg connection
+      to Postgres on 54322, bypassing uvicorn's memory AND the app's API layer entirely. A restart-then-read-via-API could have
+      been served from a cache; this could not. ⛔ The literal `kill uvicorn` was OFFERED AND DECLINED as low marginal information;
+      the backend was NOT restarted by this session, and nobody should later read this row as proving process death.
+      ⭐ A SECOND, INDEPENDENT LIVE PROOF of the part no test could reach ran first, against the real local Postgres: the REAL
+      persist_run_usage called three times on a scratch workflow_runs row — (1200,340) then (55,7) then (0,0) — read back on a
+      BRAND-NEW connection as input_tokens=1255, output_tokens=347, token_coverage=[agent, single, batch, emit]. So the ADD
+      semantics hold across calls, the falsy-delta third call was correctly a NO-OP rather than a 0 write (D-256-06), and the
+      Python-list-to-text[] binding that had never run live WORKS. Scratch row deleted; workflow_runs back to 283 of 283, CLEAN."
+    expected: "Non-NULL input_tokens/output_tokens equal to what the completed phases actually billed, and token_coverage = {agent,single,batch,emit}."
+    result: "PASS — 135142 / 10317 / [agent, single, batch, emit] on a genuinely paused run, plus the writer proven live end-to-end."
+    why_human: "SC#1's clause 'after the process restarts' cannot be proven by a unit test, and test_256_run_exit_usage_flush.py's own docstring disclaims it verbatim: 'WHAT THIS SUITE DOES NOT PROVE: that the statement is accepted by Postgres; that the value survives a process boundary.' The suite asserts the SQL the pool was HANDED, not the SQL Postgres ACCEPTED."
+  - test: "SUPERSEDED-BY-ROW-1 NOTE, kept so the original wording is not lost: RUN THIS ONE FIRST. Drive a real two-phase harness run whose phase 1 calls ask_user, let the gate elapse so the run takes the pause arm, then RESTART the backend process and SELECT id, input_tokens, output_tokens, token_coverage FROM workflow_runs WHERE id = <run_id>."
     expected: "Non-NULL input_tokens/output_tokens equal to what phase 1 actually billed, and token_coverage = {agent,single,batch,emit}. A NULL means the UPDATE never reached Postgres."
     why_human: "SC#1's clause 'after the process restarts' cannot be proven by a unit test, and test_256_run_exit_usage_flush.py's own docstring disclaims it verbatim: 'WHAT THIS SUITE DOES NOT PROVE: that the statement is accepted by Postgres; that the value survives a process boundary.' The suite asserts the SQL the pool was HANDED, not the SQL Postgres ACCEPTED — in particular that a Python list binds to token_coverage's text[] has never been exercised live."
   - test: "Drive ONE publish gauntlet to the QUAL-01 judge stage against a REAL provider (no forced_emit patch), and compare the provider's reported usage for that shot against the delta persisted onto the golden run's workflow_runs row."
