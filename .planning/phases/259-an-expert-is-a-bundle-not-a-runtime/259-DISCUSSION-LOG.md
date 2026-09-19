@@ -70,6 +70,27 @@
 
 ---
 
+## Operator Decision #5: Install vs Author (RAISED AT REVIEW, ANSWERED 2026-09-20)
+
+⚠ **This decision was never asked during discuss-phase** — it appears nowhere above, neither
+asked nor deferred. **Migration 187 had already answered it implicitly** (`is_system` + `org_id`,
+a reference model with no install or copy path). Surfaced by the independent review and put to the
+operator rather than left encoded by accident — the same failure mode `SEED-294` describes for
+pricing metrics, one subsystem over.
+
+| Option | Description | Selected |
+|--------|-------------|----------|
+| Read-only reference | A client org points at the first-party Expert and cannot change it. Updates are pushed centrally and reach everyone. What migration 187 already built. | ✓ |
+| Editable copy on install | The org receives its own copy to edit; needs a copy-on-install mechanism plus a `source_bundle_id` column. Your later updates stop reaching anyone who customised. | |
+| Defer to Phase 260 | Leave open but written down as deliberately deferred. | |
+
+**User's choice:** Read-only reference — decided now, not deferred.
+**Notes:** D-259-06 locked. Confirms the shape migration 187 already carries, so **no schema change
+is owed**. ⚠ If customisation is ever wanted, it is an **additive** migration (a copy mechanism
+plus provenance column), not a rewrite — recorded so a future phase does not treat it as blocked.
+
+---
+
 ## Claude's Discretion
 
 - First-party Financial Analyzer seed details: Prompt suggestions and schema parameters configured in Migration 187 (`is_system = true`).
