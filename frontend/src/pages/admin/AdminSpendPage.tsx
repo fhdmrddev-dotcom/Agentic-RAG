@@ -35,6 +35,49 @@ const PROVIDER_BADGES: Record<string, { label: string; className: string }> = {
   google: { label: "GO", className: "bg-red-500/10 text-red-400 border-red-500/20" },
 }
 
+/**
+ * ⛔ THE ONE PLACE THE TIME CHIP BECOMES A TIMESTAMP. Phase 257.1.
+ *
+ * Operator: *"the filter is working but it is not working on the charts and visuals, it is
+ * working on the entries below it."* Exactly right, and the cause was that the two endpoints
+ * speak DIFFERENT DIALECTS of the same filter:
+ *
+ *   GET /admin/spend/runs     takes `time_range`  — a string: "today" | "7d" | "30d"
+ *   GET /admin/spend/summary  takes `start_time`  — an ISO timestamp
+ *
+ * The ledger passed its chip straight through and filtered correctly. The summary call was
+ * `getSpendSummary()` — no arguments at all — so every region fed by `summary` (all four KPI
+ * cards, the daily chart, the donut, the blind-spots gauge) stayed pinned to all-time while
+ * the rows underneath moved. Two halves of one page answering about different populations.
+ *
+ * ⚠ The backend supported this the whole time; nothing was missing there. Measured on the
+ * live dev DB, org 22f9c615 — the figures the charts SHOULD have been showing:
+ *     all   $24.9083 · 851 rated · 332 unrated · 89 daily buckets
+ *     30d   $ 4.3543 · 171 rated ·  97 unrated · 28 buckets
+ *     7d    $ 1.5233 ·  40 rated ·  16 unrated ·  6 buckets
+ *     today $ 0.0000 ·   1 rated ·   0 unrated ·  1 bucket
+ *
+ * A single helper, so the two dialects are reconciled in ONE place rather than at each call
+ * site — the next endpoint that wants a window converts here, not inline.
+ */
+export function timeRangeToStartTime(range: TimeRangeFilter, now: Date = new Date()): string | undefined {
+  if (range === "all") return undefined
+  if (range === "today") {
+    // ⚠ The BROWSER's midnight, which is not necessarily the ledger's. `get_spend_runs`
+    // filters "today" with `r.started_at >= CURRENT_DATE`, evaluated in the DATABASE's
+    // timezone. On a box where both agree (local dev, and a UTC server with a UTC operator)
+    // these are the same instant; for an operator in a different zone from the server they
+    // differ by the offset, so the charts and the ledger can disagree by a few hours of runs
+    // at the boundary. Named rather than papered over: closing it properly means the ledger
+    // taking an explicit window too, which is an API change, not a client-side rounding.
+    const midnight = new Date(now)
+    midnight.setHours(0, 0, 0, 0)
+    return midnight.toISOString()
+  }
+  const days = range === "7d" ? 7 : 30
+  return new Date(now.getTime() - days * 24 * 60 * 60 * 1000).toISOString()
+}
+
 export const AdminSpendPage: React.FC<AdminSpendPageProps> = ({ onBack }) => {
   const [timeRange, setTimeRange] = useState<TimeRangeFilter>("30d")
   const [coverageFilter, setCoverageFilter] = useState<CoverageFilter>("all")
@@ -46,49 +89,66 @@ export const AdminSpendPage: React.FC<AdminSpendPageProps> = ({ onBack }) => {
   const [isRepriceModalOpen, setIsRepriceModalOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<"ledger" | "rates">("ledger")
 
-  const fetchData = React.useCallback(async () => {
-    setIsLoading(true)
-    try {
-      const [sumData, runsData, ratesData] = await Promise.all([
-        getSpendSummary(),
-        getSpendRuns({
-          timeRange: timeRange === "all" ? undefined : timeRange,
-          filterStatus: coverageFilter === "all" ? undefined : coverageFilter,
-          limit: 50,
-        }),
-        getModelRates(),
-      ])
+  // ── ONE place builds the three requests; TWO consumers run them. Phase 257.1. ────────
+  //
+  // ⛔ THE ARGUMENT TO `getSpendSummary` IS THE WHOLE FIX, and it was missing TWICE.
+  // Both the mount effect and the `fetchData` callback below called `getSpendSummary()`
+  // BARE, so every summary-fed region (four KPI cards, the daily chart, the donut, the
+  // blind-spots gauge) answered about all-time while the ledger answered about the chip.
+  // The second copy is why this is now a shared callback rather than two literal bodies:
+  // the duplicate was byte-identical, so fixing one and missing the other would have left
+  // the page correct on load and wrong again after a reprice — the hardest kind to see.
+  //
+  // ⚠ `fetchData` is NOT dead code. A first pass at this fix deleted it on that assumption
+  // and broke the page (`ReferenceError: fetchData is not defined`); it drives the refresh
+  // control and `RepriceModal`'s `onSuccess`. The suite caught it immediately, which is the
+  // argument for the suite, not for the assumption.
+  //
+  // ⚠ Only the TIME window reaches the summary: `/admin/spend/summary` has no status
+  // parameter, so the coverage chips scope the LEDGER only — said out loud in the ledger
+  // header rather than left for the operator to infer from two numbers that disagree.
+  const loadAll = React.useCallback(async () => {
+    return Promise.all([
+      getSpendSummary({ startTime: timeRangeToStartTime(timeRange) }),
+      getSpendRuns({
+        timeRange: timeRange === "all" ? undefined : timeRange,
+        filterStatus: coverageFilter === "all" ? undefined : coverageFilter,
+        limit: 50,
+      }),
+      getModelRates(),
+    ] as const)
+  }, [timeRange, coverageFilter])
+
+  const applyAll = React.useCallback(
+    ([sumData, runsData, ratesData]: Awaited<ReturnType<typeof loadAll>>) => {
       setSummary(sumData)
       setRuns(runsData.runs)
       setTotalRunsCount(runsData.totalCount)
       setRates(ratesData)
+    },
+    [],
+  )
+
+  // The imperative door: the refresh control and RepriceModal's onSuccess.
+  const fetchData = React.useCallback(async () => {
+    setIsLoading(true)
+    try {
+      applyAll(await loadAll())
     } catch (err) {
       console.error("Failed to load spend data:", err)
     } finally {
       setIsLoading(false)
     }
-  }, [timeRange, coverageFilter])
+  }, [loadAll, applyAll])
 
+  // The declarative door: mount, and every filter change.
   useEffect(() => {
     let alive = true
     setIsLoading(true)
     ;(async () => {
       try {
-        const [sumData, runsData, ratesData] = await Promise.all([
-          getSpendSummary(),
-          getSpendRuns({
-            timeRange: timeRange === "all" ? undefined : timeRange,
-            filterStatus: coverageFilter === "all" ? undefined : coverageFilter,
-            limit: 50,
-          }),
-          getModelRates(),
-        ])
-        if (alive) {
-          setSummary(sumData)
-          setRuns(runsData.runs)
-          setTotalRunsCount(runsData.totalCount)
-          setRates(ratesData)
-        }
+        const result = await loadAll()
+        if (alive) applyAll(result)
       } catch (err) {
         if (alive) console.error("Failed to load spend data:", err)
       } finally {
@@ -99,7 +159,7 @@ export const AdminSpendPage: React.FC<AdminSpendPageProps> = ({ onBack }) => {
     return () => {
       alive = false
     }
-  }, [timeRange, coverageFilter])
+  }, [loadAll, applyAll])
 
   const totalTokens = (summary?.totalInputTokens || 0) + (summary?.totalOutputTokens || 0)
   const inputTokenPct = totalTokens > 0
@@ -395,8 +455,22 @@ export const AdminSpendPage: React.FC<AdminSpendPageProps> = ({ onBack }) => {
             </button>
           </div>
 
-          <div className="text-xs text-muted-foreground font-mono">
+          <div className="text-xs text-muted-foreground font-mono flex items-center gap-2">
             {activeTab === "ledger" ? "Ordered by start time DESC" : "Ordered by effective date"}
+            {/* ⛔ SAY WHICH REGION A FILTER MOVES. Phase 257.1. The time chip now scopes the
+                whole page, but `/admin/spend/summary` has no status parameter, so a coverage
+                chip scopes the LEDGER ONLY. Leaving that unsaid is how an operator reads two
+                honest numbers, sees them disagree, and concludes the page is broken — which
+                is precisely what happened when the charts silently ignored the time chip. */}
+            {activeTab === "ledger" && coverageFilter !== "all" && (
+              <span
+                className="px-2 py-0.5 rounded bg-indigo-500/15 text-indigo-300 border border-indigo-500/30"
+                data-testid="coverage-scope-note"
+                title="The coverage filter narrows this ledger only. The charts and KPI cards above follow the time range, and always cover every run in it."
+              >
+                coverage filter applies to this ledger only
+              </span>
+            )}
           </div>
         </div>
 

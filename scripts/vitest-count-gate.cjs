@@ -3851,7 +3851,10 @@ const BASELINE = {
   // before adoption, so adoption cannot red the gate.
   // 6 -> 7 in Phase 257.1: the root-scroll fence. Driven RED against the exact class string
   // that shipped (`flex-1 overflow-y-auto`, no `h-full`/`min-h-0`), file restored md5-identical.
-  "AdminSpendPage.test.tsx": 7,
+  // 7 -> 10 in 257.1: the filter-scope cases. The time chip reached the ledger but NOT the
+  // charts (`getSpendSummary()` was called bare, in TWO places). Two of the three driven RED
+  // against that exact bare call; file restored md5-identical.
+  "AdminSpendPage.test.tsx": 10,
   // 5 -> 7 in Phase 257.1: two cases added for the badge's THIRD state ("No tokens
   // recorded" for a rated model whose run measured nothing) and for the undefined-vs-null
   // coverage distinction. Both were introduced by the review's own fixes and covered by

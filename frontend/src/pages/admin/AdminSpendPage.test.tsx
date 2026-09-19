@@ -229,6 +229,63 @@ describe("AdminSpendPage (METER-07)", () => {
   // jsdom has no layout engine to measure a real scroll with. So the classes are the only
   // honest thing to bind, and `h-full` + `min-h-0` are named individually rather than as a
   // whole className string, so reordering or adding a utility does not false-fail.
+  // ── Phase 257.1 — the time chip must reach the CHARTS, not only the ledger. ──────────
+  // Operator: *"the filter is working but it is not working on the charts and visuals, it
+  // is working on the entries below it."* The two endpoints speak different dialects of the
+  // same filter (`/runs` takes `time_range`, `/summary` takes `start_time`) and the page
+  // called `getSpendSummary()` bare, so every summary-fed region answered about all-time.
+  // These cases bind the ARGUMENT, because that is the whole defect — the rendering was
+  // always correct, it was being handed the wrong population.
+
+  it("passes a start_time window to the SUMMARY, not just a time_range to the ledger", async () => {
+    render(<AdminSpendPage />)
+    await waitFor(() => {
+      expect(spendApi.getSpendSummary).toHaveBeenCalled()
+    })
+    // default chip is 30d → the summary must be scoped, never called bare
+    const arg = vi.mocked(spendApi.getSpendSummary).mock.calls[0]?.[0]
+    expect(arg).toBeDefined()
+    expect(arg?.startTime).toEqual(expect.any(String))
+    expect(Number.isNaN(Date.parse(arg!.startTime!))).toBe(false)
+  })
+
+  it("re-scopes the summary when the time chip changes, and drops the window on All Time", async () => {
+    const user = userEvent.setup()
+    render(<AdminSpendPage />)
+    await waitFor(() => expect(spendApi.getSpendSummary).toHaveBeenCalled())
+
+    await user.click(screen.getByRole("button", { name: /^7D$/ }))
+    await waitFor(() => {
+      const last = vi.mocked(spendApi.getSpendSummary).mock.calls.at(-1)?.[0]
+      expect(last?.startTime).toEqual(expect.any(String))
+    })
+    const sevenDay = vi.mocked(spendApi.getSpendSummary).mock.calls.at(-1)![0]!.startTime!
+
+    await user.click(screen.getByRole("button", { name: /All Time/i }))
+    await waitFor(() => {
+      const last = vi.mocked(spendApi.getSpendSummary).mock.calls.at(-1)?.[0]
+      // ⛔ undefined, not a very old date — "all time" must send NO lower bound, so the
+      // server decides the horizon rather than the client guessing one.
+      expect(last?.startTime).toBeUndefined()
+    })
+
+    // and 7d is a tighter window than the 30d default it replaced
+    const firstCall = vi.mocked(spendApi.getSpendSummary).mock.calls[0]![0]!.startTime!
+    expect(Date.parse(sevenDay)).toBeGreaterThan(Date.parse(firstCall))
+  })
+
+  it("names the coverage filter's scope, because /summary has no status parameter", async () => {
+    const user = userEvent.setup()
+    render(<AdminSpendPage />)
+    await waitFor(() => expect(screen.getByText("$148.6200")).toBeInTheDocument())
+
+    expect(screen.queryByTestId("coverage-scope-note")).not.toBeInTheDocument()
+    await user.click(screen.getByRole("button", { name: /Has Unrated/i }))
+    await waitFor(() => {
+      expect(screen.getByTestId("coverage-scope-note")).toBeInTheDocument()
+    })
+  })
+
   it("gives its root a constrained height so the page can actually scroll", async () => {
     const { container } = render(<AdminSpendPage />)
     await waitFor(() => {
