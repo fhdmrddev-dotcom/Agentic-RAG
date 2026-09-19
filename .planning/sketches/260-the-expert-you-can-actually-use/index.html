@@ -1,0 +1,2005 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sketch 260: The Expert You Can Actually Use (Consultant Model)</title>
+  <link rel="stylesheet" href="../themes/default.css">
+  <style>
+    /* Reset & Base Setup */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--color-bg, #080c14);
+      color: var(--color-text, #f1f5f9);
+      font-family: var(--font-sans, system-ui, -apple-system, sans-serif);
+      line-height: 1.5;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+
+    /* ── Sketch Header & Toolbar ─────────────────────────────── */
+    .sketch-header {
+      background: var(--color-surface, #0f172a);
+      border-bottom: 1px solid var(--color-border, #1e293b);
+      padding: 12px 24px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .sketch-title-block {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .sketch-badge {
+      background: var(--color-primary-dim, rgba(163, 165, 255, 0.15));
+      color: var(--color-primary, #a3a5ff);
+      border: 1px solid var(--color-primary-glow, rgba(163, 165, 255, 0.3));
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 9999px;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .sketch-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--color-text, #f8fafc);
+    }
+
+    .sketch-controls {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .control-group {
+      display: flex;
+      align-items: center;
+      background: var(--color-bg, #080c14);
+      border: 1px solid var(--color-border, #1e293b);
+      border-radius: 8px;
+      padding: 3px;
+      gap: 2px;
+    }
+
+    .control-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--color-text-dim, #64748b);
+      text-transform: uppercase;
+      margin-right: 6px;
+      padding-left: 6px;
+      letter-spacing: 0.04em;
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--color-text-muted, #94a3b8);
+      font-size: 12px;
+      font-weight: 500;
+      padding: 5px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .tab-btn:hover {
+      color: var(--color-text, #f8fafc);
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .tab-btn.active {
+      background: var(--color-primary-dim, rgba(163, 165, 255, 0.15));
+      color: var(--color-primary, #a3a5ff);
+      font-weight: 600;
+    }
+
+    .action-btn {
+      background: var(--color-surface, #0f172a);
+      border: 1px solid var(--color-border, #1e293b);
+      color: var(--color-text-muted, #94a3b8);
+      font-size: 12px;
+      padding: 5px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .action-btn:hover {
+      color: var(--color-text, #fff);
+      border-color: var(--color-primary, #a3a5ff);
+    }
+
+    /* ── Main Workspace Frame ────────────────────────────────── */
+    .workspace-container {
+      display: flex;
+      flex: 1;
+      height: calc(100vh - 65px);
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* ── App Sidebar Rail (Realistic Context) ─────────────────── */
+    .app-sidebar {
+      width: 260px;
+      background: var(--color-bg-elev1, #0b1120);
+      border-right: 1px solid var(--color-border, #1e293b);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+
+    .sidebar-header {
+      padding: 16px;
+      border-bottom: 1px solid var(--color-border, #1e293b);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .sidebar-brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 700;
+      font-size: 13px;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--color-text, #f8fafc);
+    }
+
+    .brand-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--color-primary, #a3a5ff);
+      box-shadow: 0 0 10px var(--color-primary-glow, rgba(163, 165, 255, 0.5));
+    }
+
+    .new-thread-btn {
+      margin: 12px 16px;
+      padding: 8px 12px;
+      background: var(--color-surface, #0f172a);
+      border: 1px solid var(--color-border, #1e293b);
+      border-radius: 8px;
+      color: var(--color-text, #f8fafc);
+      font-size: 12px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .new-thread-btn:hover {
+      border-color: var(--color-primary-glow, rgba(163, 165, 255, 0.4));
+      background: var(--color-surface-hi, #1e293b);
+    }
+
+    .thread-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .thread-item {
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      color: var(--color-text-muted, #94a3b8);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .thread-item:hover {
+      background: rgba(255, 255, 255, 0.03);
+      color: var(--color-text, #f8fafc);
+    }
+    .thread-item.active {
+      background: var(--color-surface, #0f172a);
+      color: var(--color-text, #f8fafc);
+      border: 1px solid var(--color-border, #1e293b);
+      font-weight: 500;
+    }
+
+    /* ── Chat Stage / Main Surface ───────────────────────────── */
+    .chat-stage {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: var(--color-bg, #080c14);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .chat-topbar {
+      height: 52px;
+      border-bottom: 1px solid var(--color-border, #1e293b);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      background: var(--color-bg, #080c14);
+      z-index: 10;
+    }
+
+    .thread-meta {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .thread-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--color-text, #f8fafc);
+    }
+
+    .header-expert-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(163, 165, 255, 0.12);
+      border: 1px solid rgba(163, 165, 255, 0.3);
+      color: var(--color-primary, #a3a5ff);
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 9999px;
+      animation: fadeIn 0.2s ease;
+    }
+
+    .header-expert-badge button {
+      background: transparent;
+      border: none;
+      color: var(--color-primary, #a3a5ff);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      padding: 0;
+      opacity: 0.7;
+    }
+    .header-expert-badge button:hover {
+      opacity: 1;
+    }
+
+    /* ── Messages Scroll Area ────────────────────────────────── */
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px 32px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      max-width: 880px;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    .empty-state-hero {
+      margin: auto;
+      text-align: center;
+      max-width: 500px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      padding: 40px 0;
+    }
+
+    .empty-hero-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      background: var(--color-primary-dim, rgba(163, 165, 255, 0.12));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--color-primary, #a3a5ff);
+      font-size: 20px;
+    }
+
+    .empty-hero-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--color-text, #f8fafc);
+    }
+
+    .empty-hero-desc {
+      font-size: 13px;
+      color: var(--color-text-muted, #94a3b8);
+      line-height: 1.6;
+    }
+
+    /* Message Bubbles */
+    .message-row {
+      display: flex;
+      gap: 14px;
+      width: 100%;
+    }
+
+    .message-row.user {
+      justify-content: flex-end;
+    }
+
+    .avatar {
+      width: 30px;
+      height: 30px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+
+    .avatar.assistant {
+      background: var(--color-surface-hi, #1e293b);
+      color: var(--color-primary, #a3a5ff);
+      border: 1px solid var(--color-border, #1e293b);
+    }
+
+    .avatar.expert-avatar {
+      background: linear-gradient(135deg, rgba(163, 165, 255, 0.25), rgba(168, 85, 247, 0.25));
+      color: #c4b5fd;
+      border: 1px solid rgba(168, 85, 247, 0.4);
+    }
+
+    .message-bubble {
+      max-width: 80%;
+      padding: 12px 16px;
+      border-radius: 12px;
+      font-size: 13.5px;
+      line-height: 1.6;
+    }
+
+    .message-bubble.user {
+      background: var(--color-surface-hi, #1e293b);
+      color: var(--color-text, #f8fafc);
+      border: 1px solid var(--color-border, #1e293b);
+      border-top-right-radius: 2px;
+    }
+
+    .message-bubble.assistant {
+      background: transparent;
+      color: var(--color-text, #f8fafc);
+      padding-left: 0;
+      width: 100%;
+    }
+
+    /* Citations */
+    .citation-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--color-primary, #a3a5ff);
+      background: rgba(163, 165, 255, 0.1);
+      border: 1px solid rgba(163, 165, 255, 0.2);
+      padding: 1px 6px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-left: 4px;
+      vertical-align: baseline;
+    }
+    .citation-tag:hover {
+      background: rgba(163, 165, 255, 0.2);
+    }
+
+    /* ── System Event Announcements ──────────────────────────── */
+    /* Variant A: In-Flow Calm Divider Notice */
+    .variant-a-announcement {
+      margin: 12px 0;
+      padding: 16px 20px;
+      background: linear-gradient(180deg, rgba(163, 165, 255, 0.06) 0%, rgba(163, 165, 255, 0.02) 100%);
+      border: 1px solid rgba(163, 165, 255, 0.2);
+      border-radius: 12px;
+      position: relative;
+    }
+
+    .announcement-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+
+    .announcement-title {
+      font-size: 13.5px;
+      font-weight: 600;
+      color: var(--color-primary, #a3a5ff);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .announcement-sub {
+      font-size: 12px;
+      color: var(--color-text-muted, #94a3b8);
+      margin-bottom: 12px;
+    }
+
+    .announcement-meta-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      color: var(--color-text-dim, #64748b);
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+
+    .meta-pill {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--color-border, #1e293b);
+      padding: 2px 7px;
+      border-radius: 4px;
+      color: var(--color-text-muted, #94a3b8);
+    }
+
+    /* Suggestion Pills */
+    .suggestions-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .suggestions-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--color-text-dim, #64748b);
+    }
+
+    .pills-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .suggestion-pill {
+      background: var(--color-surface, #0f172a);
+      border: 1px solid var(--color-border, #1e293b);
+      color: var(--color-text, #f8fafc);
+      font-size: 12px;
+      padding: 6px 12px;
+      border-radius: 9999px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .suggestion-pill:hover {
+      background: var(--color-primary-dim, rgba(163, 165, 255, 0.15));
+      border-color: var(--color-primary, #a3a5ff);
+      color: var(--color-primary, #a3a5ff);
+      transform: translateY(-1px);
+    }
+
+    /* Variant B: Structured Specialist Card with Scope Peek */
+    .variant-b-announcement {
+      margin: 12px 0;
+      background: var(--color-surface, #0f172a);
+      border: 1px solid var(--color-border, #1e293b);
+      border-left: 3px solid #8b5cf6;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .specialist-card-bar {
+      padding: 14px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .specialist-title-area {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .specialist-icon-box {
+      width: 32px;
+      height: 32px;
+      background: rgba(139, 92, 246, 0.15);
+      color: #a78bfa;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+    }
+
+    .specialist-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--color-text, #f8fafc);
+    }
+
+    .specialist-scope-summary {
+      font-size: 11.5px;
+      color: var(--color-text-muted, #94a3b8);
+    }
+
+    .peek-toggle-btn {
+      background: transparent;
+      border: 1px solid var(--color-border, #1e293b);
+      color: var(--color-text-muted, #94a3b8);
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 11.5px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.15s;
+    }
+    .peek-toggle-btn:hover {
+      color: var(--color-text, #f8fafc);
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .scope-drawer {
+      background: var(--color-bg, #080c14);
+      border-top: 1px solid var(--color-border, #1e293b);
+      padding: 14px 18px;
+      font-size: 12px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+    }
+
+    .drawer-col-title {
+      font-size: 10.5px;
+      text-transform: uppercase;
+      font-weight: 700;
+      color: var(--color-text-dim, #64748b);
+      margin-bottom: 6px;
+    }
+
+    .drawer-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--color-text, #f8fafc);
+      font-size: 12px;
+      margin-bottom: 4px;
+    }
+
+    /* Variant C: Specialist Direct Briefing Message */
+    .variant-c-announcement {
+      display: flex;
+      gap: 14px;
+      margin: 16px 0;
+      padding: 16px;
+      background: var(--color-surface, #0f172a);
+      border: 1px solid var(--color-border, #1e293b);
+      border-radius: 12px;
+    }
+
+    .briefing-cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .briefing-card {
+      background: var(--color-bg, #080c14);
+      border: 1px solid var(--color-border, #1e293b);
+      border-radius: 8px;
+      padding: 12px;
+      cursor: pointer;
+      transition: all 0.15s;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .briefing-card:hover {
+      border-color: var(--color-primary, #a3a5ff);
+      background: rgba(163, 165, 255, 0.04);
+      transform: translateY(-2px);
+    }
+
+    .briefing-card-prompt {
+      font-size: 12.5px;
+      font-weight: 500;
+      color: var(--color-text, #f8fafc);
+    }
+
+    .briefing-card-arrow {
+      align-self: flex-end;
+      font-size: 11px;
+      color: var(--color-primary, #a3a5ff);
+    }
+
+    /* Dismissed Event Notice */
+    .dismissed-notice {
+      margin: 12px auto;
+      text-align: center;
+      font-size: 11.5px;
+      color: var(--color-text-dim, #64748b);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      justify-content: center;
+      padding: 6px 12px;
+      background: rgba(255, 255, 255, 0.02);
+      border-radius: 9999px;
+      border: 1px dashed var(--color-border, #1e293b);
+    }
+
+    /* ── Composer Container ──────────────────────────────────── */
+    .composer-wrapper {
+      max-width: 880px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 0 24px 20px;
+      position: relative;
+    }
+
+    /* Variant B: Floating Suggestion Strip Above Composer */
+    .floating-suggestions-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+      overflow-x: auto;
+      padding-bottom: 2px;
+    }
+
+    .floating-pill {
+      background: var(--color-surface, #0f172a);
+      border: 1px solid var(--color-border, #1e293b);
+      color: var(--color-text-muted, #94a3b8);
+      font-size: 11.5px;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      white-space: nowrap;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .floating-pill:hover {
+      color: var(--color-primary, #a3a5ff);
+      border-color: var(--color-primary, #a3a5ff);
+    }
+
+    .composer-card {
+      background: var(--color-surface, #0f172a);
+      border: 1px solid var(--color-border, #1e293b);
+      border-radius: 14px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+      transition: border-color 0.15s ease;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    .composer-card:focus-within {
+      border-color: rgba(163, 165, 255, 0.4);
+    }
+
+    /* Active Chips Row (Hoisted Row Container from Phase 244) */
+    .composer-chips-row {
+      padding: 8px 12px 0;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .chips-container {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--color-border, #1e293b);
+      border-radius: 8px;
+      padding: 4px 10px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+      width: 100%;
+    }
+
+    .chips-label {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--color-text-dim, #64748b);
+      margin-right: 2px;
+    }
+
+    /* The Shipped Connector Chip */
+    .connector-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: var(--color-bg, #080c14);
+      border: 1px solid var(--color-border, #1e293b);
+      border-radius: 9999px;
+      padding: 2px 8px;
+      font-size: 11px;
+      color: var(--color-text, #f8fafc);
+    }
+
+    /* ⭐ The Net-New Expert Chip */
+    .expert-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(163, 165, 255, 0.12);
+      border: 1px solid rgba(163, 165, 255, 0.35);
+      border-radius: 9999px;
+      padding: 2px 8px;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--color-primary, #a3a5ff);
+      transition: all 0.15s;
+    }
+
+    .expert-chip:hover {
+      border-color: var(--color-primary, #a3a5ff);
+    }
+
+    .expert-chip-badge {
+      font-size: 9.5px;
+      text-transform: uppercase;
+      font-weight: 700;
+      background: rgba(163, 165, 255, 0.2);
+      padding: 1px 4px;
+      border-radius: 3px;
+      letter-spacing: 0.03em;
+    }
+
+    .chip-close-btn {
+      background: transparent;
+      border: none;
+      color: var(--color-primary, #a3a5ff);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1px;
+      border-radius: 50%;
+      opacity: 0.75;
+      transition: opacity 0.15s;
+    }
+
+    .chip-close-btn:hover {
+      opacity: 1;
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    /* Composer Textarea */
+    .composer-textarea {
+      width: 100%;
+      min-height: 44px;
+      max-height: 180px;
+      background: transparent;
+      border: none;
+      padding: 10px 14px;
+      color: var(--color-text, #f8fafc);
+      font-family: inherit;
+      font-size: 13.5px;
+      resize: none;
+      outline: none;
+    }
+    .composer-textarea::placeholder {
+      color: var(--color-text-dim, #64748b);
+    }
+
+    /* Composer Bottom Toolbar */
+    .composer-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 4px 10px 10px;
+    }
+
+    .toolbar-left {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .toolbar-btn {
+      background: transparent;
+      border: none;
+      color: var(--color-text-muted, #94a3b8);
+      padding: 5px 8px;
+      border-radius: 6px;
+      font-size: 11.5px;
+      font-weight: 500;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.15s;
+    }
+    .toolbar-btn:hover {
+      color: var(--color-text, #f8fafc);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .plus-btn {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      font-size: 15px;
+    }
+    .plus-btn.open {
+      background: var(--color-surface-hi, #1e293b);
+      color: var(--color-text, #f8fafc);
+    }
+
+    .send-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: var(--color-primary, #a3a5ff);
+      color: #0b1120;
+      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s;
+      font-weight: bold;
+    }
+    .send-btn:hover {
+      background: #c4b5fd;
+      transform: scale(1.04);
+    }
+
+    /* ── Plus Menu Dropdown / Popover ────────────────────────── */
+    .plus-menu-dropdown {
+      position: absolute;
+      bottom: calc(100% + 6px);
+      left: 10px;
+      width: 320px;
+      background: var(--color-surface, #0f172a);
+      border: 1px solid var(--color-border, #1e293b);
+      border-radius: 10px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      z-index: 50;
+      overflow: hidden;
+      animation: popoverIn 0.15s ease-out;
+    }
+
+    @keyframes popoverIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .menu-group {
+      padding: 4px;
+      border-bottom: 1px solid var(--color-border, #1e293b);
+    }
+
+    .menu-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      padding: 8px 12px;
+      font-size: 12.5px;
+      color: var(--color-text, #f8fafc);
+      background: transparent;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.15s;
+    }
+    .menu-item:hover {
+      background: var(--color-surface-hi, #1e293b);
+    }
+
+    .menu-item-icon {
+      color: var(--color-primary, #a3a5ff);
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+    }
+
+    .menu-item-badge {
+      margin-left: auto;
+      font-size: 10px;
+      padding: 2px 6px;
+      background: rgba(163, 165, 255, 0.15);
+      color: var(--color-primary, #a3a5ff);
+      border-radius: 9999px;
+      font-weight: 600;
+    }
+
+    .menu-section-header {
+      padding: 8px 12px 4px;
+      font-size: 10px;
+      text-transform: uppercase;
+      font-weight: 700;
+      color: var(--color-text-dim, #64748b);
+      letter-spacing: 0.05em;
+    }
+
+    /* Inlined Expert List for Variant B */
+    .flyout-expert-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      border-radius: 6px;
+      transition: background 0.15s;
+    }
+    .flyout-expert-row:hover {
+      background: var(--color-surface-hi, #1e293b);
+    }
+
+    .flyout-expert-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .flyout-expert-name {
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--color-text, #f8fafc);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .flyout-expert-scope {
+      font-size: 10.5px;
+      color: var(--color-text-muted, #94a3b8);
+    }
+
+    .flyout-invite-btn {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 4px 8px;
+      border-radius: 5px;
+      background: var(--color-primary-dim, rgba(163, 165, 255, 0.15));
+      color: var(--color-primary, #a3a5ff);
+      border: 1px solid var(--color-primary-glow, rgba(163, 165, 255, 0.3));
+      cursor: pointer;
+    }
+    .flyout-invite-btn:hover {
+      background: var(--color-primary, #a3a5ff);
+      color: #0b1120;
+    }
+
+    /* ── Modal Dialog (Variant A) ────────────────────────────── */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(4px);
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      animation: fadeIn 0.15s ease-out;
+    }
+
+    .modal-card {
+      width: 100%;
+      max-width: 520px;
+      background: var(--color-surface, #0f172a);
+      border: 1px solid var(--color-border, #1e293b);
+      border-radius: 14px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+      overflow: hidden;
+      animation: modalSlide 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes modalSlide {
+      from { opacity: 0; transform: translateY(12px) scale(0.98); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    .modal-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--color-border, #1e293b);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .modal-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--color-text, #f8fafc);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .modal-close-btn {
+      background: transparent;
+      border: none;
+      color: var(--color-text-muted, #94a3b8);
+      font-size: 16px;
+      cursor: pointer;
+      padding: 4px;
+    }
+
+    .modal-search-bar {
+      padding: 12px 20px;
+      border-bottom: 1px solid var(--color-border, #1e293b);
+    }
+
+    .modal-search-input {
+      width: 100%;
+      background: var(--color-bg, #080c14);
+      border: 1px solid var(--color-border, #1e293b);
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 13px;
+      color: var(--color-text, #f8fafc);
+      outline: none;
+    }
+
+    .modal-expert-list {
+      max-height: 340px;
+      overflow-y: auto;
+      padding: 12px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .expert-card-item {
+      background: var(--color-bg, #080c14);
+      border: 1px solid var(--color-border, #1e293b);
+      border-radius: 10px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      transition: all 0.15s;
+    }
+
+    .expert-card-item:hover {
+      border-color: rgba(163, 165, 255, 0.4);
+    }
+
+    .expert-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .expert-name-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .expert-card-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--color-text, #f8fafc);
+    }
+
+    .system-pill {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 6px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 4px;
+      color: var(--color-text-muted, #94a3b8);
+    }
+
+    .restricted-pill {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 6px;
+      background: rgba(239, 68, 68, 0.12);
+      color: #f87171;
+      border: 1px solid rgba(239, 68, 68, 0.25);
+      border-radius: 4px;
+    }
+
+    .expert-card-desc {
+      font-size: 12px;
+      color: var(--color-text-muted, #94a3b8);
+      line-height: 1.5;
+    }
+
+    .expert-card-scope-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 4px;
+      padding-top: 8px;
+      border-top: 1px solid rgba(255, 255, 255, 0.04);
+      font-size: 11px;
+      color: var(--color-text-dim, #64748b);
+    }
+
+    .invite-cta-btn {
+      background: var(--color-primary, #a3a5ff);
+      color: #0b1120;
+      font-size: 12px;
+      font-weight: 600;
+      border: none;
+      padding: 5px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .invite-cta-btn:hover {
+      background: #c4b5fd;
+    }
+
+    /* ── Popover Scope Inspector (Variant B) ─────────────────── */
+    .chip-scope-popover {
+      position: absolute;
+      bottom: calc(100% + 8px);
+      left: 24px;
+      width: 290px;
+      background: var(--color-surface, #0f172a);
+      border: 1px solid var(--color-border, #1e293b);
+      border-radius: 10px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      padding: 12px;
+      font-size: 12px;
+      z-index: 60;
+    }
+
+    /* ── Comparison Analysis Drawer (Bottom) ─────────────────── */
+    .analysis-section {
+      background: var(--color-surface, #0f172a);
+      border-top: 1px solid var(--color-border, #1e293b);
+      padding: 24px 32px;
+    }
+
+    .analysis-container {
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+
+    .analysis-heading {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--color-text, #f8fafc);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .comparison-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12.5px;
+      margin-bottom: 24px;
+    }
+
+    .comparison-table th,
+    .comparison-table td {
+      border: 1px solid var(--color-border, #1e293b);
+      padding: 10px 14px;
+      text-align: left;
+    }
+
+    .comparison-table th {
+      background: var(--color-bg, #080c14);
+      color: var(--color-text-dim, #64748b);
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 11px;
+      letter-spacing: 0.04em;
+    }
+
+    .table-winner {
+      color: var(--color-success, #4ade80);
+      font-weight: 600;
+    }
+
+    .code-tag {
+      font-family: var(--font-mono, monospace);
+      font-size: 11px;
+      background: rgba(255, 255, 255, 0.05);
+      padding: 1px 4px;
+      border-radius: 3px;
+      color: var(--color-primary, #a3a5ff);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── Top Header Toolbar ──────────────────────────────────── -->
+  <header class="sketch-header">
+    <div class="sketch-title-block">
+      <span class="sketch-badge">Sketch 260</span>
+      <h1 class="sketch-title">The Expert You Can Actually Use — Consultant Model</h1>
+    </div>
+
+    <div class="sketch-controls">
+      <!-- Variant Selector -->
+      <div class="control-group">
+        <span class="control-label">Variant:</span>
+        <button class="tab-btn active" id="btn-var-a" onclick="switchVariant('A')">
+          <span>A: In-Flow Consultant</span>
+        </button>
+        <button class="tab-btn" id="btn-var-b" onclick="switchVariant('B')">
+          <span>B: Flyout Specialist</span>
+        </button>
+        <button class="tab-btn" id="btn-var-c" onclick="switchVariant('C')">
+          <span>C: Specialist Briefing</span>
+        </button>
+      </div>
+
+      <!-- State Toggle -->
+      <div class="control-group">
+        <span class="control-label">Thread:</span>
+        <button class="tab-btn active" id="btn-mode-mid" onclick="setThreadMode('mid')">Mid-Thread (History)</button>
+        <button class="tab-btn" id="btn-mode-new" onclick="setThreadMode('new')">Empty Thread</button>
+      </div>
+
+      <div class="control-group">
+        <span class="control-label">Expert:</span>
+        <button class="tab-btn active" id="btn-state-active" onclick="setExpertState('active')">✨ Active</button>
+        <button class="tab-btn" id="btn-state-none" onclick="setExpertState('none')">Uninvited</button>
+        <button class="tab-btn" id="btn-state-dismissed" onclick="setExpertState('dismissed')">Dismissed</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── Main Mockup Workspace ───────────────────────────────── -->
+  <div class="workspace-container">
+    
+    <!-- Sidebar Rail -->
+    <aside class="app-sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-brand">
+          <span class="brand-dot"></span>
+          <span>Aether Studio</span>
+        </div>
+      </div>
+      <button class="new-thread-btn" onclick="setThreadMode('new')">
+        <span>＋</span>
+        <span>New Thread</span>
+      </button>
+      <div class="thread-list">
+        <div class="thread-item active" id="sidebar-thread-title">
+          <span>💬</span>
+          <span style="overflow:hidden; text-overflow:ellipsis;">Q3 Financial Review & Structure</span>
+        </div>
+        <div class="thread-item">
+          <span>💬</span>
+          <span>Q2 Operating Runbook Analysis</span>
+        </div>
+        <div class="thread-item">
+          <span>💬</span>
+          <span>Customer Retention Synthesis</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Chat Stage -->
+    <main class="chat-stage">
+      
+      <!-- Topbar -->
+      <div class="chat-topbar">
+        <div class="thread-meta">
+          <span class="thread-title" id="stage-thread-title">Q3 Financial Review & Structure</span>
+          <!-- Variant C Topbar Consultant Badge -->
+          <div id="var-c-topbar-badge" class="header-expert-badge" style="display: none;">
+            <span>✨</span>
+            <span>Financial Analyzer</span>
+            <button type="button" title="Dismiss expert" onclick="setExpertState('dismissed')">✕</button>
+          </div>
+        </div>
+        <div style="font-size: 12px; color: var(--color-text-dim);">
+          <span>DeepSeek · deepseek-chat</span>
+        </div>
+      </div>
+
+      <!-- Messages Area -->
+      <div class="chat-messages" id="chat-messages-container">
+        
+        <!-- Prior Conversation History (When in Mid-Thread mode) -->
+        <div id="prior-history-block" style="display: flex; flex-direction: column; gap: 20px;">
+          <!-- Turn 1 User -->
+          <div class="message-row user">
+            <div class="message-bubble user">
+              Can you give me a summary of our company's corporate structure and operational divisions?
+            </div>
+          </div>
+          <!-- Turn 1 Assistant -->
+          <div class="message-row">
+            <div class="avatar assistant">✦</div>
+            <div class="message-bubble assistant">
+              Acme Holdings operates across three principal subsidiaries: <strong>Acme Enterprise Software</strong> (B2B SaaS), <strong>Acme Infrastructure</strong> (hosting and hardware), and <strong>Acme Logistics</strong> (supply chain solutions). Would you like to review their financial statements or operational margins?
+            </div>
+          </div>
+        </div>
+
+        <!-- Empty State Hero (When in Empty-Thread mode and no expert active) -->
+        <div id="empty-state-hero" class="empty-state-hero" style="display: none;">
+          <div class="empty-hero-icon">✦</div>
+          <h2 class="empty-hero-title">Start a new conversation</h2>
+          <p class="empty-hero-desc">
+            Ask questions across your company's documents, run workflows, or invite a domain expert to focus retrieval on specialized tools and folders.
+          </p>
+        </div>
+
+        <!-- ── Expert Announcement Blocks ──────────────────────── -->
+        
+        <!-- VARIANT A Announcement -->
+        <div id="variant-a-block" class="variant-a-announcement" style="display: none;">
+          <div class="announcement-header">
+            <div class="announcement-title">
+              <span>✨</span>
+              <span>Financial Analyzer joined the thread</span>
+            </div>
+            <span class="restricted-pill">Restricted Scope</span>
+          </div>
+          <p class="announcement-sub">
+            The model retains conversation history and now restricts retrieval and tools exclusively to financial members.
+          </p>
+          <div class="announcement-meta-row">
+            <span class="meta-pill">📁 SEC 10-K & 10-Q Filings</span>
+            <span class="meta-pill">🧰 ratio_calculator</span>
+            <span class="meta-pill">🧰 financial_modeler</span>
+          </div>
+          <div class="suggestions-group">
+            <span class="suggestions-label">Try asking:</span>
+            <div class="pills-container">
+              <button class="suggestion-pill" onclick="sendPrompt('What was our Q3 revenue growth YoY?')">
+                <span>What was our Q3 revenue growth YoY?</span>
+              </button>
+              <button class="suggestion-pill" onclick="sendPrompt('Compare gross margins between software and logistics')">
+                <span>Compare gross margins between software and logistics</span>
+              </button>
+              <button class="suggestion-pill" onclick="sendPrompt('Summarize operating cash flow trends for 2025')">
+                <span>Summarize operating cash flow trends for 2025</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- VARIANT B Announcement -->
+        <div id="variant-b-block" class="variant-b-announcement" style="display: none;">
+          <div class="specialist-card-bar">
+            <div class="specialist-title-area">
+              <div class="specialist-icon-box">📊</div>
+              <div>
+                <div class="specialist-name">Financial Analyzer Active</div>
+                <div class="specialist-scope-summary">Scoped to 1 knowledge folder · 2 analysis skills · Restricted mode</div>
+              </div>
+            </div>
+            <button class="peek-toggle-btn" onclick="toggleScopeDrawer()">
+              <span id="peek-toggle-text">Show Scope</span>
+              <span>▾</span>
+            </button>
+          </div>
+          <div class="scope-drawer" id="scope-drawer-panel" style="display: none;">
+            <div>
+              <div class="drawer-col-title">Knowledge Folders</div>
+              <div class="drawer-item">📁 SEC 10-K & 10-Q Filings (2024-2025)</div>
+            </div>
+            <div>
+              <div class="drawer-col-title">Member Skills</div>
+              <div class="drawer-item">🧰 ratio_calculator</div>
+              <div class="drawer-item">🧰 financial_modeler</div>
+            </div>
+            <div>
+              <div class="drawer-col-title">Enforcement Mode</div>
+              <div class="drawer-item" style="color: #f87171;">⛔ Out-of-scope retrieval refused</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- VARIANT C Announcement -->
+        <div id="variant-c-block" class="variant-c-announcement" style="display: none;">
+          <div class="avatar expert-avatar">✨</div>
+          <div style="flex: 1;">
+            <div style="font-weight: 600; font-size: 14px; margin-bottom: 4px; color: #c4b5fd;">
+              Financial Analyzer Consultation Started
+            </div>
+            <p style="font-size: 13px; color: var(--color-text-muted); margin-bottom: 12px;">
+              I'm scoped to your audited SEC filings, financial ratio calculators, and market data. You can ask follow-ups on your prior discussion or explore financial metrics directly:
+            </p>
+            <div class="briefing-cards-grid">
+              <div class="briefing-card" onclick="sendPrompt('What was our Q3 revenue growth YoY?')">
+                <span class="briefing-card-prompt">What was our Q3 revenue growth YoY?</span>
+                <span class="briefing-card-arrow">Ask →</span>
+              </div>
+              <div class="briefing-card" onclick="sendPrompt('Compare gross margins between software and logistics')">
+                <span class="briefing-card-prompt">Compare gross margins between software and logistics</span>
+                <span class="briefing-card-arrow">Ask →</span>
+              </div>
+              <div class="briefing-card" onclick="sendPrompt('Summarize operating cash flow trends for 2025')">
+                <span class="briefing-card-prompt">Summarize operating cash flow trends for 2025</span>
+                <span class="briefing-card-arrow">Ask →</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Scoped Follow-Up Interaction (Simulated Run) -->
+        <div id="scoped-response-block" style="display: none; flex-direction: column; gap: 20px;">
+          <!-- User Prompt -->
+          <div class="message-row user">
+            <div class="message-bubble user" id="user-sent-prompt-text">
+              What was our Q3 revenue growth YoY?
+            </div>
+          </div>
+          <!-- Scoped Assistant Answer -->
+          <div class="message-row">
+            <div class="avatar expert-avatar">✨</div>
+            <div class="message-bubble assistant">
+              <p style="margin-bottom: 10px;">
+                According to the Q3 2025 Form 10-Q filing, total consolidated revenue grew <strong>24.8% YoY</strong> to $412.6M (compared to $330.6M in Q3 2024) 
+                <span class="citation-tag">📄 10-Q_Q3_2025.pdf · Page 18</span>.
+              </p>
+              <ul style="padding-left: 18px; margin-bottom: 10px; font-size: 13px;">
+                <li><strong>Enterprise Software:</strong> $245.2M (+31.2% YoY) driven by expansion in recurring cloud subscriptions.</li>
+                <li><strong>Infrastructure:</strong> $112.4M (+18.5% YoY) with steady datacenter utilization.</li>
+                <li><strong>Logistics:</strong> $55.0M (+11.3% YoY).</li>
+              </ul>
+              <p style="font-size: 12px; color: var(--color-text-dim);">
+                <em>Search executed strictly within folder: SEC 10-K & 10-Q Filings (2024-2025). Tools invoked: ratio_calculator.</em>
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dismissed Notice (When Expert is dismissed) -->
+        <div id="dismissed-notice-block" class="dismissed-notice" style="display: none;">
+          <span>✕</span>
+          <span>Financial Analyzer dismissed from thread · Scope returned to general tools and knowledge</span>
+        </div>
+
+      </div>
+
+      <!-- ── Composer Area ─────────────────────────────────────── -->
+      <div class="composer-wrapper">
+        
+        <!-- Variant B: Floating Suggestion Strip Above Composer -->
+        <div id="var-b-floating-strip" class="floating-suggestions-bar" style="display: none;">
+          <span style="font-size: 11px; font-weight: 600; color: var(--color-text-dim); text-transform: uppercase;">Prompts:</span>
+          <button class="floating-pill" onclick="sendPrompt('What was our Q3 revenue growth YoY?')">Q3 Revenue Growth YoY</button>
+          <button class="floating-pill" onclick="sendPrompt('Compare gross margins between software and logistics')">Compare Margins</button>
+          <button class="floating-pill" onclick="sendPrompt('Summarize operating cash flow trends for 2025')">Cash Flow Trends</button>
+        </div>
+
+        <div class="composer-card">
+          
+          <!-- Hoisted Chips Row Container (Phase 244 Contract) -->
+          <div id="composer-chips-row" class="composer-chips-row" style="display: flex;">
+            <div class="chips-container" data-testid="active-connector-chips">
+              <span class="chips-label">Using:</span>
+              
+              <!-- Existing Shipped Connector Chip -->
+              <span class="connector-chip">
+                <span>⚡</span>
+                <span>Slack</span>
+                <button type="button" class="chip-close-btn" style="color: var(--color-text-dim);" title="Remove connector">✕</button>
+              </span>
+
+              <!-- ⭐ The Active Expert Chip (Renders as Sibling in Same Container) -->
+              <span id="active-expert-chip" class="expert-chip" style="display: inline-flex;">
+                <span>✨</span>
+                <span id="expert-chip-label">Financial Analyzer</span>
+                <span class="expert-chip-badge" id="expert-chip-mode-badge">Restricted</span>
+                <!-- Variant B Popover Trigger Caret -->
+                <button id="var-b-popover-caret" type="button" class="chip-close-btn" style="display: none; margin-left: 2px;" onclick="toggleChipPopover(event)">▾</button>
+                <button type="button" class="chip-close-btn" title="Dismiss Expert" onclick="setExpertState('dismissed')">✕</button>
+              </span>
+            </div>
+          </div>
+
+          <!-- Textarea Input -->
+          <textarea 
+            id="composer-input"
+            class="composer-textarea" 
+            placeholder="Ask anything or use an expert prompt..." 
+            rows="1"
+            onkeydown="handleKey(event)"
+          ></textarea>
+
+          <!-- Composer Bottom Toolbar -->
+          <div class="composer-toolbar">
+            <div class="toolbar-left">
+              
+              <!-- PLUS BUTTON MENU (Claude.ai style) -->
+              <button 
+                type="button" 
+                class="toolbar-btn plus-btn" 
+                id="plus-menu-btn" 
+                aria-label="Add tools or invite expert" 
+                onclick="togglePlusMenu()"
+              >
+                <span>＋</span>
+              </button>
+
+              <!-- Provider Picker -->
+              <button type="button" class="toolbar-btn">
+                <span>⚡ DeepSeek</span>
+                <span style="opacity: 0.5;">▾</span>
+              </button>
+
+              <!-- Model Picker -->
+              <button type="button" class="toolbar-btn">
+                <span>deepseek-chat</span>
+                <span style="opacity: 0.5;">▾</span>
+              </button>
+
+              <!-- Mode Picker -->
+              <button type="button" class="toolbar-btn">
+                <span>Agent</span>
+                <span style="opacity: 0.5;">▾</span>
+              </button>
+            </div>
+
+            <button type="button" class="send-btn" onclick="submitMessage()" title="Send prompt">
+              <span>↑</span>
+            </button>
+          </div>
+
+          <!-- ── PLUS MENU DROPDOWN (Inside Composer) ──────────── -->
+          <div id="plus-menu-dropdown" class="plus-menu-dropdown" style="display: none;">
+            
+            <!-- File Attachment Group (Existing) -->
+            <div class="menu-group">
+              <button type="button" class="menu-item" onclick="togglePlusMenu()">
+                <span class="menu-item-icon">📎</span>
+                <span>Attach local file</span>
+              </button>
+              <button type="button" class="menu-item" onclick="togglePlusMenu()">
+                <span class="menu-item-icon">🖴</span>
+                <span>Select connected file</span>
+              </button>
+            </div>
+
+            <!-- ⭐ The Expert Door (ZERO Top-Level Controls) -->
+            <!-- In Variant A & C: Clean Door Item -->
+            <div class="menu-group" id="menu-expert-door-item">
+              <button type="button" class="menu-item" onclick="openExpertPicker()">
+                <span class="menu-item-icon">✨</span>
+                <span>Invite Expert...</span>
+                <span class="menu-item-badge">1 available</span>
+              </button>
+            </div>
+
+            <!-- In Variant B: Inlined Flyout Section (like ConnectorsFlyout) -->
+            <div class="menu-group" id="menu-expert-flyout-section" style="display: none;">
+              <div class="menu-section-header">Experts</div>
+              <div class="flyout-expert-row">
+                <div class="flyout-expert-info">
+                  <div class="flyout-expert-name">
+                    <span>✨</span>
+                    <span>Financial Analyzer</span>
+                  </div>
+                  <div class="flyout-expert-scope">1 folder · 2 skills · Restricted</div>
+                </div>
+                <button type="button" class="flyout-invite-btn" onclick="inviteExpertFromFlyout()">
+                  Invite
+                </button>
+              </div>
+            </div>
+
+            <!-- Connectors Section (Existing) -->
+            <div style="padding: 4px;">
+              <div class="menu-section-header">Connectors</div>
+              <div style="padding: 6px 12px; font-size: 11.5px; color: var(--color-text-dim); display: flex; justify-content: space-between;">
+                <span>Slack (Connected)</span>
+                <span style="color: var(--color-success);">●</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Variant B Popover Scope Inspector on Chip Click -->
+          <div id="chip-scope-popover" class="chip-scope-popover" style="display: none;">
+            <div style="font-weight: 600; margin-bottom: 6px; display: flex; justify-content: space-between;">
+              <span>Active Scope: Financial Analyzer</span>
+              <span class="restricted-pill" style="font-size: 9px;">Restricted</span>
+            </div>
+            <div style="font-size: 11px; color: var(--color-text-muted); margin-bottom: 8px;">
+              Queries search only within these members:
+            </div>
+            <div style="background: rgba(0,0,0,0.25); padding: 8px; border-radius: 6px; margin-bottom: 8px;">
+              <div style="margin-bottom: 4px;">📁 SEC 10-K & 10-Q Filings</div>
+              <div style="margin-bottom: 4px;">🧰 ratio_calculator</div>
+              <div>🧰 financial_modeler</div>
+            </div>
+            <button type="button" style="width: 100%; padding: 4px; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); color: #f87171; border-radius: 5px; cursor: pointer; font-size: 11px;" onclick="setExpertState('dismissed')">
+              Dismiss Expert from Thread
+            </button>
+          </div>
+
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- ── Modal Dialog: Invite Domain Expert (Variant A & C) ──── -->
+  <div id="expert-picker-modal" class="modal-backdrop" style="display: none;" onclick="closeModalOnBackdrop(event)">
+    <div class="modal-card" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span>✨</span>
+          <span>Invite Domain Expert to Thread</span>
+        </div>
+        <button type="button" class="modal-close-btn" onclick="closeExpertPicker()">✕</button>
+      </div>
+
+      <div class="modal-search-bar">
+        <input 
+          type="text" 
+          class="modal-search-input" 
+          placeholder="Search experts by name, skills, or domain knowledge..." 
+          id="expert-search-input"
+        />
+      </div>
+
+      <div class="modal-expert-list">
+        
+        <!-- Expert 1: Financial Analyzer (First-Party Seed PACK-05) -->
+        <div class="expert-card-item">
+          <div class="expert-card-header">
+            <div class="expert-name-wrap">
+              <span style="font-size: 16px;">📊</span>
+              <span class="expert-card-name">Financial Analyzer</span>
+              <span class="system-pill">System</span>
+              <span class="restricted-pill">Restricted Scope</span>
+            </div>
+            <button type="button" class="invite-cta-btn" onclick="selectExpertAndInvite('Financial Analyzer', 'Restricted')">
+              Invite to Thread
+            </button>
+          </div>
+          <p class="expert-card-desc">
+            Analyzes corporate financial filings, 10-K/10-Q statements, balance sheets, and ratios. Answers strictly from documents or refuses if out of scope.
+          </p>
+          <div class="expert-card-scope-footer">
+            <span>📁 SEC 10-K & 10-Q Filings · 🧰 ratio_calculator, financial_modeler</span>
+            <span>PACK-05</span>
+          </div>
+        </div>
+
+        <!-- Expert 2: Legal Contract Reviewer (Future Org Expert) -->
+        <div class="expert-card-item" style="opacity: 0.7;">
+          <div class="expert-card-header">
+            <div class="expert-name-wrap">
+              <span style="font-size: 16px;">⚖️</span>
+              <span class="expert-card-name">Legal Contract Reviewer</span>
+              <span class="system-pill">Org Custom</span>
+              <span class="restricted-pill">Restricted Scope</span>
+            </div>
+            <button type="button" class="action-btn" style="font-size: 11px;" disabled>
+              Requires Legal Pack
+            </button>
+          </div>
+          <p class="expert-card-desc">
+            Audits master service agreements (MSAs) and NDAs against internal standard guidelines and liability caps.
+          </p>
+          <div class="expert-card-scope-footer">
+            <span>📁 Corporate Contracts (2025) · 🧰 clause_auditor</span>
+            <span>Enterprise</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Analysis & Variant Evaluation Section ────────────────── -->
+  <section class="analysis-section">
+    <div class="analysis-container">
+      <h2 class="analysis-heading">
+        <span>📐</span>
+        <span>Variant Comparison & Operator Evaluation Matrix</span>
+      </h2>
+
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th>Evaluation Axis</th>
+            <th>Variant A: In-Flow Consultant</th>
+            <th>Variant B: Flyout Specialist</th>
+            <th>Variant C: Specialist Briefing</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Discovery & Invite Door</strong></td>
+            <td>Clean item in <code>+</code> menu: opens centered modal with full search, metadata & scope tags.</td>
+            <td>Inlined section inside <code>+</code> menu: 1-click toggle with zero modal overhead.</td>
+            <td>Command item in <code>+</code> menu: opens fast command palette.</td>
+          </tr>
+          <tr>
+            <td><strong>Zero Top-Level Controls (D-259-07)</strong></td>
+            <td class="table-winner">100% compliant: Sits cleanly in <code>+</code> menu and existing chip row.</td>
+            <td class="table-winner">100% compliant: Sits cleanly in <code>+</code> menu and existing chip row.</td>
+            <td>Mostly compliant, but adds badge in topbar header.</td>
+          </tr>
+          <tr>
+            <td><strong>Thread Announcement & Context</strong></td>
+            <td>Calm inline divider with metadata tags and clickable <code>Try asking:</code> pills.</td>
+            <td>Structured card with collapsible "Scope Details" drawer.</td>
+            <td>Direct specialist message bubble with large prompt suggestion cards.</td>
+          </tr>
+          <tr>
+            <td><strong>Onboarding Prompt Affordance (PACK-03)</strong></td>
+            <td class="table-winner">Directly under the announcement in chat stream; click populates & sends prompt.</td>
+            <td>Floating suggestion strip docked above composer textarea until first message.</td>
+            <td>Large cards inside the briefing message bubble.</td>
+          </tr>
+          <tr>
+            <td><strong>History Preservation Legibility</strong></td>
+            <td>Explicit line: <em>"Model retains conversation history and now restricts retrieval/tools"</em>.</td>
+            <td>Drawer states scope enforcement rules without obscuring history.</td>
+            <td>Message acknowledges prior conversation while focusing forward.</td>
+          </tr>
+          <tr>
+            <td><strong>Dismissal & Scope Return</strong></td>
+            <td>Click <code>✕</code> on chip; chip animates away, timeline posts quiet return notice.</td>
+            <td>Click <code>✕</code> or use popover button; instant cleanup.</td>
+            <td>Click <code>✕</code> in composer or header badge.</td>
+          </tr>
+          <tr>
+            <td><strong>G-5 File Blast Radius</strong></td>
+            <td class="table-winner">Minimal: <code>MessageInput.tsx</code> (plus menu item), <code>ActiveConnectorChips.tsx</code> (or sibling <code>ActiveExpertChip.tsx</code>), <code>MessageList.tsx</code>.</td>
+            <td>Moderate: Complex flyout nesting inside <code>ConnectorsFlyout</code>.</td>
+            <td>Higher: Touches thread header, message rendering, and composer.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div style="font-size: 13px; color: var(--color-text-muted); line-height: 1.6;">
+        <p style="margin-bottom: 8px;">
+          ⭐ <strong>Recommended Direction: Synthesis of Variant A with Variant B's Scope Peek</strong>.
+        </p>
+        <p>
+          1. The <strong><code>+</code> menu door</strong> stays clean and uncluttered (<code>✨ Invite Expert...</code>), opening a focused modal that lets users inspect member folders, skills, and restrictions.<br>
+          2. The <strong>active chip</strong> sits alongside <code>ActiveConnectorChips</code> inside the hoisted <code>Using:</code> container in <code>MessageInput.tsx</code> with <code>[✨ Financial Analyzer · Restricted ✕]</code>.<br>
+          3. The <strong>thread announcement</strong> gives immediate confidence that conversation history is preserved while scoping retrieval, with interactive <code>Try asking:</code> pills (<code>PACK-03</code>).<br>
+          4. <strong>Dismissal</strong> is frictionless via the <code>✕</code> button on the chip, restoring standard thread capabilities immediately.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Interactive Logic ───────────────────────────────────── -->
+  <script>
+    let currentVariant = 'A';
+    let currentThreadMode = 'mid';
+    let currentExpertState = 'active';
+
+    function switchVariant(variant) {
+      currentVariant = variant;
+      document.getElementById('btn-var-a').classList.toggle('active', variant === 'A');
+      document.getElementById('btn-var-b').classList.toggle('active', variant === 'B');
+      document.getElementById('btn-var-c').classList.toggle('active', variant === 'C');
+      renderState();
+    }
+
+    function setThreadMode(mode) {
+      currentThreadMode = mode;
+      document.getElementById('btn-mode-mid').classList.toggle('active', mode === 'mid');
+      document.getElementById('btn-mode-new').classList.toggle('active', mode === 'new');
+      
+      const title = mode === 'mid' ? 'Q3 Financial Review & Structure' : 'New Thread';
+      document.getElementById('stage-thread-title').textContent = title;
+      document.getElementById('sidebar-thread-title').innerHTML = `<span>💬</span><span style="overflow:hidden; text-overflow:ellipsis;">${title}</span>`;
+      
+      renderState();
+    }
+
+    function setExpertState(state) {
+      currentExpertState = state;
+      document.getElementById('btn-state-active').classList.toggle('active', state === 'active');
+      document.getElementById('btn-state-none').classList.toggle('active', state === 'none');
+      document.getElementById('btn-state-dismissed').classList.toggle('active', state === 'dismissed');
+      
+      // Close popovers if open
+      document.getElementById('chip-scope-popover').style.display = 'none';
+      renderState();
+    }
+
+    function renderState() {
+      // Prior history visibility
+      const historyBlock = document.getElementById('prior-history-block');
+      const emptyHero = document.getElementById('empty-state-hero');
+      if (currentThreadMode === 'mid') {
+        historyBlock.style.display = 'flex';
+        emptyHero.style.display = 'none';
+      } else {
+        historyBlock.style.display = 'none';
+        emptyHero.style.display = (currentExpertState === 'none') ? 'flex' : 'none';
+      }
+
+      // Variant Blocks
+      const varA = document.getElementById('variant-a-block');
+      const varB = document.getElementById('variant-b-block');
+      const varC = document.getElementById('variant-c-block');
+      const varCTopbar = document.getElementById('var-c-topbar-badge');
+      const varBFloating = document.getElementById('var-b-floating-strip');
+      const varBCaret = document.getElementById('var-b-popover-caret');
+      const menuDoorItem = document.getElementById('menu-expert-door-item');
+      const menuFlyoutSection = document.getElementById('menu-expert-flyout-section');
+
+      varA.style.display = 'none';
+      varB.style.display = 'none';
+      varC.style.display = 'none';
+      varCTopbar.style.display = 'none';
+      varBFloating.style.display = 'none';
+      varBCaret.style.display = 'none';
+
+      // Plus menu content customization per variant
+      if (currentVariant === 'B') {
+        menuDoorItem.style.display = 'none';
+        menuFlyoutSection.style.display = 'block';
+      } else {
+        menuDoorItem.style.display = 'block';
+        menuFlyoutSection.style.display = 'none';
+      }
+
+      // Announcements according to active expert
+      if (currentExpertState === 'active') {
+        if (currentVariant === 'A') {
+          varA.style.display = 'block';
+        } else if (currentVariant === 'B') {
+          varB.style.display = 'block';
+          varBFloating.style.display = 'flex';
+          varBCaret.style.display = 'inline-flex';
+        } else if (currentVariant === 'C') {
+          varC.style.display = 'flex';
+          varCTopbar.style.display = 'inline-flex';
+        }
+      }
+
+      // Composer Chip visibility
+      const chip = document.getElementById('active-expert-chip');
+      if (currentExpertState === 'active') {
+        chip.style.display = 'inline-flex';
+        document.getElementById('expert-chip-label').textContent = (currentVariant === 'C') ? 'Finance' : 'Financial Analyzer';
+      } else {
+        chip.style.display = 'none';
+      }
+
+      // Dismissed notice
+      const dismissedBlock = document.getElementById('dismissed-notice-block');
+      dismissedBlock.style.display = (currentExpertState === 'dismissed') ? 'flex' : 'none';
+
+      // Scoped response visibility
+      const scopedResp = document.getElementById('scoped-response-block');
+      if (currentExpertState !== 'active') {
+        scopedResp.style.display = 'none';
+      }
+    }
+
+    function togglePlusMenu() {
+      const menu = document.getElementById('plus-menu-dropdown');
+      const btn = document.getElementById('plus-menu-btn');
+      const isOpen = menu.style.display === 'block';
+      menu.style.display = isOpen ? 'none' : 'block';
+      btn.classList.toggle('open', !isOpen);
+    }
+
+    function openExpertPicker() {
+      togglePlusMenu();
+      document.getElementById('expert-picker-modal').style.display = 'flex';
+    }
+
+    function closeExpertPicker() {
+      document.getElementById('expert-picker-modal').style.display = 'none';
+    }
+
+    function closeModalOnBackdrop(e) {
+      closeExpertPicker();
+    }
+
+    function selectExpertAndInvite(name, mode) {
+      closeExpertPicker();
+      setExpertState('active');
+    }
+
+    function inviteExpertFromFlyout() {
+      togglePlusMenu();
+      setExpertState('active');
+    }
+
+    function toggleScopeDrawer() {
+      const drawer = document.getElementById('scope-drawer-panel');
+      const text = document.getElementById('peek-toggle-text');
+      const isVisible = drawer.style.display === 'grid';
+      drawer.style.display = isVisible ? 'none' : 'grid';
+      text.textContent = isVisible ? 'Show Scope' : 'Hide Scope';
+    }
+
+    function toggleChipPopover(e) {
+      e.stopPropagation();
+      const popover = document.getElementById('chip-scope-popover');
+      popover.style.display = (popover.style.display === 'block') ? 'none' : 'block';
+    }
+
+    function sendPrompt(promptText) {
+      const input = document.getElementById('composer-input');
+      input.value = promptText;
+      submitMessage();
+    }
+
+    function submitMessage() {
+      const input = document.getElementById('composer-input');
+      const text = input.value.trim();
+      if (!text) return;
+
+      document.getElementById('user-sent-prompt-text').textContent = text;
+      document.getElementById('scoped-response-block').style.display = 'flex';
+      input.value = '';
+
+      // Scroll to bottom
+      const container = document.getElementById('chat-messages-container');
+      setTimeout(() => {
+        container.scrollTop = container.scrollHeight;
+      }, 50);
+    }
+
+    function handleKey(e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        submitMessage();
+      }
+    }
+
+    // Initialize
+    renderState();
+  </script>
+</body>
+</html>
