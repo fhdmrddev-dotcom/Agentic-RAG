@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v4.3
 milestone_name: What You Can Actually Sell
 status: executing
-last_updated: "2026-09-19T01:00:00.000Z"
-last_activity: 2026-09-19 -- Phase 257 discuss-phase complete; 257-CONTEXT.md created (16 decisions locked)
+last_updated: "2026-09-19T03:48:00.000Z"
+last_activity: 2026-09-19 -- Phase 257 planned (4 plans in 4 waves); G-2 sketch approved; ready for execution
 progress:
   total_phases: 13
   completed_phases: 2
-  total_plans: 8
+  total_plans: 12
   completed_plans: 5
-  percent: 15
+  percent: 17
 ---
 
 # Project State
@@ -34,16 +34,16 @@ See: `.planning/PROJECT.md` (updated 2026-09-18)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 257 (cost-in-dollars-and-what-it-cannot-see) — G-2 sketch & planning next
+**Current focus:** Phase 257 (cost-in-dollars-and-what-it-cannot-see) — Plan 257-01 execution next
 
 ---
 
 ## Current Position
 
-Phase: 257 (cost-in-dollars-and-what-it-cannot-see) — **DISCUSS COMPLETE**
-Plan: 0 of TBD complete
-Status: Phase 257 discuss complete. 16 decisions locked in 257-CONTEXT.md. Next: G-2 Component Sketch (`.planning/sketches/257-spend-and-metering.html`) before `/gsd:plan-phase 257`.
-Last activity: 2026-09-19 -- Phase 257 discuss-phase complete; 257-CONTEXT.md and 257-DISCUSSION-LOG.md created
+Phase: 257 (cost-in-dollars-and-what-it-cannot-see) — **PLANNED**
+Plan: 0 of 4 complete
+Status: Phase 257 planned across 4 plans in 4 waves (257-01 through 257-04). G-2 sketch approved at b6203cc5f. 257-RESEARCH.md and 257-UI-SPEC.md locked. Ready for execution.
+Last activity: 2026-09-19 -- Phase 257 plan-phase complete; 4 plans authored; hot-file ledger updated (301 rows)
 
 ### ⭐ PHASE 256 CLOSE — 2026-09-19, 4/4 SC (was 2/4)
 
