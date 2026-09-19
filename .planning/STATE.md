@@ -4,7 +4,7 @@ milestone: v4.3
 milestone_name: What You Can Actually Sell
 status: executing
 last_updated: "2026-09-19T01:00:00.000Z"
-last_activity: 2026-09-19 -- Phase 256 EXECUTED + verified 4/4 (was 2/4). Round 1 merged; WR-01 closed; independent review OWED to gemini (BUS-273)
+last_activity: 2026-09-19 -- Phase 257 discuss-phase complete; 257-CONTEXT.md created (16 decisions locked)
 progress:
   total_phases: 13
   completed_phases: 2
@@ -34,17 +34,16 @@ See: `.planning/PROJECT.md` (updated 2026-09-18)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 256 CLOSED (4/4, review owed to gemini) → Phase 257 (cost-in-dollars) next
+**Current focus:** Phase 257 (cost-in-dollars-and-what-it-cannot-see) — G-2 sketch & planning next
 
 ---
 
 ## Current Position
 
-Phase: 256 (every-token-is-counted-and-kept) — **EXECUTED and VERIFIED 4/4**
-Plan: 5 of 5 complete (`256-05` merged at `8a5985145`; head `c908161f4`)
-Status: Phase 256 CLOSED on the builder's own evidence. ⛔ **`independent_review: owed`** — gemini
-holds it at `BUS-272` / `BUS-273`. Next: `/gsd:discuss-phase 257`, or wait for gemini's verdict first.
-Last activity: 2026-09-19 -- round 1 executed, merged, reviewed (0 blockers), WR-01 closed, verified 4/4
+Phase: 257 (cost-in-dollars-and-what-it-cannot-see) — **DISCUSS COMPLETE**
+Plan: 0 of TBD complete
+Status: Phase 257 discuss complete. 16 decisions locked in 257-CONTEXT.md. Next: G-2 Component Sketch (`.planning/sketches/257-spend-and-metering.html`) before `/gsd:plan-phase 257`.
+Last activity: 2026-09-19 -- Phase 257 discuss-phase complete; 257-CONTEXT.md and 257-DISCUSSION-LOG.md created
 
 ### ⭐ PHASE 256 CLOSE — 2026-09-19, 4/4 SC (was 2/4)
 
