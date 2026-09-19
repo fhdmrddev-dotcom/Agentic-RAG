@@ -41,9 +41,9 @@ can be taught new behaviours (skills) that persist and can be shared.
 ## Current Position
 
 Phase: 258 (a-tier-becomes-enforceable)
-Plan: 0 of TBD (discuss complete, ready for planning)
-Status: ready for planning
-Last activity: 2026-09-19 -- Phase 258 context gathered; Operator Decision #1 resolved (Ascending Capability Bundles); TIER-01..05 locked
+Plan: 3 of 3 planned across 3 waves (ready for execution)
+Status: planned
+Last activity: 2026-09-19 -- Phase 258 planned (3 plans / 3 waves: 258-01, 258-02, 258-03); gates OK
 
 ### ⭐ PHASE 258 CONTEXT GATHERED — 2026-09-19
 - **Operator Decision #1**: Resolved as Ascending Capability Bundles (`standard` -> `pro` -> `enterprise`), with `organizations.add_ons` for modular overrides (`D-258-01`).
