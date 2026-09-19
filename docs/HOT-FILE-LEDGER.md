@@ -10571,8 +10571,8 @@ cells rot within days.
 
 | File | commits / phases / lines | G-5 | Disposition |
 |---|---|---|---|
-| [`backend/app/db/entitlements.py`](docs/HOT-FILE-LEDGER.md#backendappdbentitlementspy) | 0 / 0 / 0 | no (new) | young (created Phase 258). Row added AT CREATION — absent row is invisible to G-5 (TIER-01/02). |
-| [`backend/app/services/entitlement_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesentitlement_servicepy) | 0 / 0 / 0 | no (new) | young (created Phase 258). Row added AT CREATION. Single commercial boundary home (TIER-01/03/04/05). |
+| [`backend/app/db/entitlements.py`](docs/HOT-FILE-LEDGER.md#backendappdbentitlementspy) | 1 / 1 / 169 | no (new) | young (created Phase 258). Row added AT CREATION — absent row is invisible to G-5 (TIER-01/02). |
+| [`backend/app/services/entitlement_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesentitlement_servicepy) | 1 / 1 / 130 | no (new) | young (created Phase 258). Row added AT CREATION. Single commercial boundary home (TIER-01/03/04/05). |
 | [`frontend/src/components/chat/ToolCallPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattoolcallpaneltsx) | 51 / 23 / 351 | **FIRES** | ✅ **G-5 DISCHARGED (227-02)** — extracted ToolCallDetails, StepRow, toolStepDerivation (1019 → 351 lines) |
 | [`frontend/src/components/chat/MessageItem.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageitemtsx) | 75 / 34 / 1000 | **FIRES** | ⚠ row STALE a FOURTH time (`74/34/981`). honoured by construction (**244-14 / WR-01**): the Continue card reads the lock's MODE, like the composer beside it. State 3→3, effects 0→0, props 5→5 |
 | [`backend/app/api/threads.py`](docs/HOT-FILE-LEDGER.md#backendappapithreadspy) | 245 / 82 / 1617 | **FIRES** | ⚠ row was STALE at `243 / 80 / 1590`. honoured by construction (**244-03**): ONE existing pure-read query loses a WHERE predicate and gains a Python guard. ⛔ no writer added |
@@ -10590,7 +10590,7 @@ cells rot within days.
 | [`frontend/src/components/workflows/library/libraryRow.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibrarylibraryrowts) | 4 / 3 / 201 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent, on the boundary (added 192.2) |
 | [`frontend/src/components/workflows/WorkflowDoorSwitch.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsworkflowdoorswitchtsx) | 18 / 12 / 1075 | **FIRES** | honoured by construction (193 / 193.1 / 199 / **214**) — 214-13 added the service picker and its refusal as CHILDREN |
 | [`frontend/src/pages/WorkflowBuilderPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowbuilderpagetsx) | 56 / 21 / 2977 | **FIRES** | honoured by construction ×6 (193.1 / 193.2 / 197 / 200.3 / 214 / **214.1**) — 214.1 added one import + one gated node, zero `useState` |
-| [`backend/app/api/workflows.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkflowspy) | 42 / 22 / 2255 | **FIRES** | honoured by construction (192.2 / **258-03**: two route dependencies, no new branch/handler; ⚠ extraction still OWED) |
+| [`backend/app/api/workflows.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkflowspy) | 43 / 23 / 2261 | **FIRES** | honoured by construction (192.2 / **258-03**: two route dependencies, no new branch/handler; ⚠ extraction still OWED) |
 | [`backend/app/api/workflow_runs.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkflow_runspy) | 11 / 8 / 1003 | **FIRES** | honoured by construction (200 / 200.1 / **214**) — no longer *at threshold*: it measures **8** phases |
 | [`backend/app/models/thread.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsthreadpy) | 16 / 10 / 438 | ⚠ **FIRES** | honoured by construction (200.1 / **214**) |
 | [`frontend/src/components/workflows/canvasModel.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowscanvasmodelts) | 13 / 6 / 752 | ⚠ **FIRES** | ⚠ absent from BOTH at 6 phases (added 200) |
@@ -15366,14 +15366,14 @@ re-drive, `:1331` continuation), `publish_service.py`, `scheduler_service.py` an
 
 ## `backend/app/db/entitlements.py`
 
-**`0 / 0 / 0`** — created by Phase 258 (`258-01`). **Row added AT CREATION.** Precedent in `CLAUDE.md` is explicit: rows added at creation, since an absent row is invisible to G-5 at any count (`LibraryCloudImport.tsx` / `settingsSearchPayload.ts` precedent).
+**`1 / 1 / 169`** — created by Phase 258 (`258-01`). **Row added AT CREATION.** Precedent in `CLAUDE.md` is explicit: rows added at creation, since an absent row is invisible to G-5 at any count (`LibraryCloudImport.tsx` / `settingsSearchPayload.ts` precedent).
 
-**What it owns.** The database access layer for commercial capability matrix queries (`public.tier_capabilities`) and additive `organizations.add_ons` overrides. Provides `get_tier_capabilities()`, `is_capability_enabled_for_tier()`, and `resolve_org_entitlement()`. Strictly fails closed on database connectivity errors or unresolvable organizations (TIER-05).
+What it owns. The database access layer for commercial capability matrix queries (`public.tier_capabilities`) and additive `organizations.add_ons` overrides. Provides `get_tier_capabilities()`, `is_capability_enabled_for_tier()`, and `resolve_org_entitlement()`. Strictly fails closed on database connectivity errors or unresolvable organizations (TIER-05).
 
 ---
 
 ## `backend/app/services/entitlement_service.py`
 
-**`0 / 0 / 0`** — created by Phase 258 (`258-02`). **Row added AT CREATION.** Precedent in `CLAUDE.md` is explicit: rows added at creation, since an absent row is invisible to G-5 at any count. This module is about to become the single canonical home for every commercial boundary in the product (TIER-01) — the worst possible file to have invisible to G-5.
+**`1 / 1 / 130`** — created by Phase 258 (`258-02`). **Row added AT CREATION.** Precedent in `CLAUDE.md` is explicit: rows added at creation, since an absent row is invisible to G-5 at any count. This module is about to become the single canonical home for every commercial boundary in the product (TIER-01) — the worst possible file to have invisible to G-5.
 
-**What it owns.** The single canonical service home for entitlement evaluation across the product. Exposes `check_entitlement()`, `require_capability()`, and `EntitlementDeniedException` (HTTP 403 Forbidden with structured refusal JSON naming required tier, current tier, capability, and upgrade hint per TIER-03). Guarded by an AST single-home fence (`test_258_single_entitlement_home.py`, TIER-04). Fails closed on unreadable tiers or database blips (TIER-05).
+What it owns. The single canonical service home for entitlement evaluation across the product. Exposes `check_entitlement()`, `require_capability()`, and `EntitlementDeniedException` (HTTP 403 Forbidden with structured refusal JSON naming required tier, current tier, capability, and upgrade hint per TIER-03). Guarded by an AST single-home fence (`test_258_single_entitlement_home.py`, TIER-04). Fails closed on unreadable tiers or database blips (TIER-05).

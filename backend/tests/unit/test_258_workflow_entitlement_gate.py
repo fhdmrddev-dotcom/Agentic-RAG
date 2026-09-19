@@ -224,7 +224,7 @@ def test_dynamic_repackaging_admits_standard_org_without_code_changes(workflow_t
 
 
 def test_fail_closed_on_database_error(workflow_test_app, mock_user):
-    """Database connectivity failure fails closed with 403 refusal (TIER-05, D-258-06)."""
+    """Database connectivity failure fails closed with 503 Service Unavailable (TIER-05, D-258-06, F-4)."""
     org_id = str(uuid4())
 
     workflow_test_app.dependency_overrides[get_current_user] = lambda: mock_user
@@ -253,9 +253,48 @@ def test_fail_closed_on_database_error(workflow_test_app, mock_user):
             },
         )
 
+        assert resp.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+        data = resp.json()
+        assert data["detail"]["error"] == "entitlement_service_unavailable"
+        assert "temporarily unavailable" in data["detail"]["detail"]
+
+
+def test_fail_closed_on_unassigned_tier(workflow_test_app, mock_user):
+    """Unassigned subscription tier fails closed with 403 refusal naming required tier (TIER-05, F-1)."""
+    org_id = str(uuid4())
+
+    workflow_test_app.dependency_overrides[get_current_user] = lambda: mock_user
+    workflow_test_app.dependency_overrides[get_active_org_id] = lambda: org_id
+    workflow_test_app.dependency_overrides[get_pg_pool] = lambda: MagicMock()
+    workflow_test_app.dependency_overrides[require_visible("workflow_authoring")] = lambda: True
+
+    with patch(
+        "app.services.entitlement_service.check_entitlement",
+        new_callable=AsyncMock,
+        return_value=EntitlementResult(
+            allowed=False,
+            capability="workflows",
+            current_tier=None,
+            required_tier="enterprise",
+            reason="Organization has no subscription tier assigned (fail-closed)",
+            upgrade_hint="Upgrade to Enterprise to use workflows.",
+        ),
+    ):
+        client = TestClient(workflow_test_app)
+        resp = client.post(
+            "/workflows",
+            json={
+                "name": "Unassigned Tier Workflow",
+                "slug": "unassigned-tier-workflow",
+                "phases": [],
+            },
+        )
+
         assert resp.status_code == status.HTTP_403_FORBIDDEN
         data = resp.json()
         assert data["detail"]["error"] == "entitlement_required"
+        assert data["detail"]["current_tier"] is None
+        assert data["detail"]["required_tier"] == "enterprise"
 
 
 def test_publish_workflow_endpoint_entitlement_gate(workflow_test_app, mock_user):

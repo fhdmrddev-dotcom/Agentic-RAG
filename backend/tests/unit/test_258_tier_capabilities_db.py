@@ -53,12 +53,15 @@ async def test_is_capability_enabled_for_tier():
 @pytest.mark.asyncio
 async def test_get_minimum_tier_for_capability():
     mock_pool = MagicMock()
-    mock_pool.fetchval = AsyncMock(return_value="enterprise")
+    # Returns rows with multiple tiers; TIER_ORDER selects pro over enterprise
+    mock_pool.fetch = AsyncMock(
+        return_value=[{"tier": "enterprise"}, {"tier": "pro"}]
+    )
 
-    min_tier = await get_minimum_tier_for_capability(mock_pool, "workflows")
-    assert min_tier == "enterprise"
+    min_tier = await get_minimum_tier_for_capability(mock_pool, "skills")
+    assert min_tier == "pro"
 
-    mock_pool.fetchval = AsyncMock(return_value=None)
+    mock_pool.fetch = AsyncMock(return_value=[])
     assert await get_minimum_tier_for_capability(mock_pool, "unknown_cap") is None
     assert await get_minimum_tier_for_capability(mock_pool, "") is None
 
@@ -75,7 +78,7 @@ async def test_resolve_org_entitlement_granted_by_tier():
             "add_ons": {},
         }
     )
-    # is_capability_enabled_for_tier returns True
+    # is_capability_enabled_for_tier -> 1
     mock_pool.fetchval = AsyncMock(return_value=1)
 
     allowed, current_tier, req_tier, reason = await resolve_org_entitlement(
@@ -92,7 +95,7 @@ async def test_resolve_org_entitlement_denied_insufficient_tier():
     mock_pool = MagicMock()
     org_id = uuid4()
 
-    # Org is standard with no add_ons
+    # Org is standard, empty add-ons
     mock_pool.fetchrow = AsyncMock(
         return_value={
             "subscription_tier": "standard",
@@ -100,9 +103,10 @@ async def test_resolve_org_entitlement_denied_insufficient_tier():
         }
     )
 
-    # First fetchval is is_capability_enabled_for_tier -> None
-    # Second fetchval is get_minimum_tier_for_capability -> 'enterprise'
-    mock_pool.fetchval = AsyncMock(side_effect=[None, "enterprise"])
+    # is_capability_enabled_for_tier -> None
+    mock_pool.fetchval = AsyncMock(return_value=None)
+    # get_minimum_tier_for_capability -> 'enterprise'
+    mock_pool.fetch = AsyncMock(return_value=[{"tier": "enterprise"}])
 
     allowed, current_tier, req_tier, reason = await resolve_org_entitlement(
         mock_pool, org_id, "workflows"
@@ -111,6 +115,75 @@ async def test_resolve_org_entitlement_denied_insufficient_tier():
     assert current_tier == "standard"
     assert req_tier == "enterprise"
     assert reason == "Capability not enabled for tier"
+
+
+@pytest.mark.asyncio
+async def test_resolve_org_entitlement_refused_on_null_tier():
+    """F-1 / TIER-05 / D-258-06: Strict fail-closed refusal when subscription_tier is NULL."""
+    mock_pool = MagicMock()
+    org_id = uuid4()
+
+    # Production condition: org has NULL subscription_tier and no add-on override
+    mock_pool.fetchrow = AsyncMock(
+        return_value={
+            "subscription_tier": None,
+            "add_ons": None,
+        }
+    )
+    mock_pool.fetch = AsyncMock(return_value=[{"tier": "enterprise"}])
+
+    allowed, current_tier, req_tier, reason = await resolve_org_entitlement(
+        mock_pool, org_id, "workflows"
+    )
+    assert allowed is False
+    assert current_tier is None
+    assert req_tier == "enterprise"
+    assert "no subscription tier assigned" in (reason or "")
+
+
+@pytest.mark.asyncio
+async def test_resolve_org_entitlement_refused_on_empty_whitespace_tier():
+    """F-1: Empty or whitespace subscription_tier refuses access without fallback to standard."""
+    mock_pool = MagicMock()
+    org_id = uuid4()
+
+    mock_pool.fetchrow = AsyncMock(
+        return_value={
+            "subscription_tier": "   ",
+            "add_ons": {},
+        }
+    )
+    mock_pool.fetch = AsyncMock(return_value=[{"tier": "enterprise"}])
+
+    allowed, current_tier, req_tier, reason = await resolve_org_entitlement(
+        mock_pool, org_id, "workflows"
+    )
+    assert allowed is False
+    assert current_tier is None
+    assert req_tier == "enterprise"
+    assert "no subscription tier assigned" in (reason or "")
+
+
+@pytest.mark.asyncio
+async def test_resolve_org_entitlement_null_tier_with_addon_override():
+    """D-258-08: NULL tier org still gets access if specific capability is explicitly in add_ons."""
+    mock_pool = MagicMock()
+    org_id = uuid4()
+
+    mock_pool.fetchrow = AsyncMock(
+        return_value={
+            "subscription_tier": None,
+            "add_ons": {"workflows": True},
+        }
+    )
+
+    allowed, current_tier, req_tier, reason = await resolve_org_entitlement(
+        mock_pool, org_id, "workflows"
+    )
+    assert allowed is True
+    assert current_tier is None
+    assert req_tier is None
+    assert reason == "Granted via add_on override"
 
 
 @pytest.mark.asyncio

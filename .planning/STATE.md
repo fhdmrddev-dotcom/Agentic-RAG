@@ -4,7 +4,7 @@ milestone: v4.3
 milestone_name: What You Can Actually Sell
 status: ready_for_review
 last_updated: "2026-09-19T22:45:00.000Z"
-last_activity: 2026-09-19 -- Phase 258 execution complete across all 3 plans; gates OK
+last_activity: 2026-09-19 -- Phase 258 review handback resolved (F-1 NULL tier fail-closed, F-4 HTTP 503 on DB error, F-3 add_ons in AST fence, F-7 dynamic TIER_ORDER, F-6 ledger sync); 33 unit tests green
 progress:
   total_phases: 13
   completed_phases: 3
@@ -34,16 +34,16 @@ See: `.planning/PROJECT.md` (updated 2026-09-18)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 258 (A Tier Becomes Enforceable) -- Execution complete, ready for reviewer inspection.
+**Current focus:** Phase 258 (A Tier Becomes Enforceable) -- Review handback resolved, re-review ready.
 
 ---
 
 ## Current Position
 
 Phase: 258 (a-tier-becomes-enforceable)
-Plan: 3 of 3 (execution complete across all 3 plans)
+Plan: 3 of 3 (execution complete across all 3 plans, review handback resolved)
 Status: ready_for_review
-Last activity: 2026-09-19 -- Phase 258 execution complete across all 3 plans (entitlement_service.py, Migration 186, AST fence RED-driven, workflows.py gated); gates OK
+Last activity: 2026-09-19 -- Phase 258 review handback resolved (F-1 NULL tier fail-closed, F-4 HTTP 503 on DB error, F-3 add_ons in AST fence, F-7 dynamic TIER_ORDER, F-6 ledger sync); 33 unit tests green; gates OK
 
 ### ⭐ PHASE 258 CONTEXT GATHERED — 2026-09-19
 - **Operator Decision #1**: Resolved as Ascending Capability Bundles (`standard` -> `pro` -> `enterprise`), with `organizations.add_ons` for modular overrides (`D-258-01`).
@@ -52,8 +52,17 @@ Last activity: 2026-09-19 -- Phase 258 execution complete across all 3 plans (en
 - **TIER-04 Guard**: AST single-home fence `test_258_single_entitlement_home.py` driven RED against planted check (`D-258-04`).
 - **TIER-03 Refusal**: Structured HTTP 403 naming required tier and upgrade hint (`D-258-05`).
 - **TIER-05 Fail-Closed**: Strict fail-closed on unreadable tier/DB blips, recorded in contrast to `load_run_budget` (`D-258-06`).
-- **Proof Slice**: `POST /workflows` and `POST /workflow-runs` wired with `require_capability('workflows')` (`D-258-09`).
+- **Proof Slice**: `POST /workflows` and `POST /workflows/{id}/publish` wired with `require_capability('workflows')` (`D-258-09`).
 - **Folded Seeds**: `SEED-080` (folded), `SEED-083` (folded).
+
+### ⭐ PHASE 258 REVIEW HANDBACK RESOLUTION — 2026-09-19
+- **F-1 (Blocker Resolved)**: In `backend/app/db/entitlements.py`, NULL or empty `subscription_tier` strictly fails closed (`(False, None, required_tier, "Organization has no subscription tier assigned (fail-closed)")`). Fallback to "standard" eliminated per D-258-06. Automated unit tests added in `test_258_tier_capabilities_db.py` and `test_258_workflow_entitlement_gate.py`.
+- **F-4 (Resolved)**: In `backend/app/services/entitlement_service.py`, database/infrastructure errors fail closed with `EntitlementUnavailableException` (HTTP 503), preventing false upgrade prompts to paying customers during outages.
+- **F-3 (Resolved)**: AST single-home fence in `backend/tests/unit/test_258_single_entitlement_home.py` guards both `subscription_tier` and `add_ons` across attribute access, dictionary subscripts, SQL queries, and function calls/definitions. Non-vacuity verified with planted test cases.
+- **F-7 (Resolved)**: `TIER_ORDER` actively sorts matching tiers dynamically in Python in `get_minimum_tier_for_capability`, eliminating hardcoded SQL `CASE`.
+- **F-6 (Resolved)**: Re-derived hot-file ledger triples updated in `docs/HOT-FILE-LEDGER.md` and `CLAUDE.md` (`entitlements.py` 1/1/169, `entitlement_service.py` 1/1/130, `api/workflows.py` 43/23/2261).
+- **F-5 Deploy-Ordering Hazard**: Recorded in OWED TO THE OPERATOR (Migration 186 must be applied to production before or at backend deployment).
+- **F-2 Scope Disposition**: Workflow authoring proof slice (`POST /workflows`, `POST /workflows/{id}/publish`) gated as planned. Runtime kickoff gating via `threads.py` deferred to execution milestone/phase to preserve `threads.py` G-5 invariants and isolate general thread chat.
 
 ### ⭐ PHASE 257 CLOSE — 2026-09-19. Read the four verdicts, not the word "closed".
 
@@ -68,6 +77,10 @@ Last activity: 2026-09-19 -- Phase 258 execution complete across all 3 plans (en
 vitest `8464 · failed 0 · pinned 7723 · 293/293` · `tsc -p tsconfig.app.json` 65 = base.
 
 ⛔ **OWED TO THE OPERATOR, blocking nothing else:**
+- **Apply migration 186** (`supabase/migrations/186_tier_capabilities.sql`) by pasting it into the
+  Supabase SQL editor (never `db push`), then `bash scripts/regenerate-full-schema.sh`. F-5 deploy-ordering
+  hazard: must be applied before or at backend deployment to prevent transient 503 unavailability on missing
+  `public.tier_capabilities` table.
 - **Apply migration 185** by pasting it into the Supabase SQL editor (never `db push`), then
   `bash scripts/regenerate-full-schema.sh`. Verified idempotent in a rolled-back transaction
   (53 → 59 → 59 rows); the live DB is unchanged.

@@ -20,6 +20,7 @@ from fastapi.testclient import TestClient
 from app.services.entitlement_service import (
     EntitlementDeniedException,
     EntitlementResult,
+    EntitlementUnavailableException,
     check_entitlement,
     require_capability,
 )
@@ -151,6 +152,22 @@ def test_entitlement_denied_exception_handles_missing_tiers():
     assert "Upgrade to Enterprise" in exc.detail["upgrade_hint"]
 
 
+def test_entitlement_unavailable_exception_payload_structure():
+    """F-4: EntitlementUnavailableException emits 503 with honest infrastructure error."""
+    result = EntitlementResult(
+        allowed=False,
+        capability="workflows",
+        reason="Database error: connection timeout",
+    )
+    exc = EntitlementUnavailableException(result)
+
+    assert exc.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+    assert exc.detail["error"] == "entitlement_service_unavailable"
+    assert exc.detail["capability"] == "workflows"
+    assert "Database error: connection timeout" in exc.detail["reason"]
+    assert "temporarily unavailable" in exc.detail["detail"]
+
+
 @pytest.mark.asyncio
 async def test_require_capability_dependency_allowed():
     """require_capability dependency succeeds and returns active_org_id when entitled."""
@@ -209,8 +226,40 @@ async def test_require_capability_dependency_denied():
         assert exc.detail["current_tier"] == "standard"
 
 
+@pytest.mark.asyncio
+async def test_require_capability_dependency_raises_503_on_database_error():
+    """F-4: require_capability dependency raises EntitlementUnavailableException (503) on DB error."""
+    dep_func = require_capability("workflows")
+    mock_request = MagicMock()
+    mock_pool = MagicMock()
+    mock_org_id = str(uuid4())
+
+    error_res = EntitlementResult(
+        allowed=False,
+        capability="workflows",
+        reason="Database error: pool connection exhausted",
+    )
+
+    with patch(
+        "app.services.entitlement_service.check_entitlement",
+        new_callable=AsyncMock,
+        return_value=error_res,
+    ):
+        with pytest.raises(EntitlementUnavailableException) as exc_info:
+            await dep_func(
+                request=mock_request,
+                active_org_id=mock_org_id,
+                pool=mock_pool,
+            )
+
+        exc = exc_info.value
+        assert exc.status_code == 503
+        assert exc.detail["error"] == "entitlement_service_unavailable"
+        assert "temporarily unavailable" in exc.detail["detail"]
+
+
 def test_require_capability_fastapi_http_roundtrip():
-    """Test full HTTP roundtrip through FastAPI TestClient demonstrating structured 403 response."""
+    """Test full HTTP roundtrip through FastAPI TestClient demonstrating structured responses."""
     test_app = FastAPI()
     org_id = str(uuid4())
 
@@ -255,7 +304,6 @@ def test_require_capability_fastapi_http_roundtrip():
         assert resp.status_code == status.HTTP_403_FORBIDDEN
         data = resp.json()
 
-        # FastAPI wraps HTTPException detail in "detail" key
         assert "detail" in data
         detail = data["detail"]
         assert detail["error"] == "entitlement_required"
@@ -264,3 +312,30 @@ def test_require_capability_fastapi_http_roundtrip():
         assert detail["current_tier"] == "standard"
         assert detail["upgrade_hint"] == "Upgrade to Pro to use workflows."
         assert "Capability 'workflows' requires 'pro' tier" in detail["detail"]
+
+        # 3. Unassigned tier (F-1) -> 403 Forbidden with unassigned current_tier
+        mock_check.return_value = EntitlementResult(
+            allowed=False,
+            capability="workflows",
+            current_tier=None,
+            required_tier="enterprise",
+            reason="Organization has no subscription tier assigned (fail-closed)",
+        )
+        resp = client.post("/api/test-workflows")
+        assert resp.status_code == status.HTTP_403_FORBIDDEN
+        detail_unassigned = resp.json()["detail"]
+        assert detail_unassigned["error"] == "entitlement_required"
+        assert detail_unassigned["current_tier"] is None
+        assert "unassigned" in detail_unassigned["detail"]
+
+        # 4. Database outage (F-4) -> 503 Service Unavailable, NEVER 403 upgrade
+        mock_check.return_value = EntitlementResult(
+            allowed=False,
+            capability="workflows",
+            reason="Database error: connection dropped",
+        )
+        resp = client.post("/api/test-workflows")
+        assert resp.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+        detail_503 = resp.json()["detail"]
+        assert detail_503["error"] == "entitlement_service_unavailable"
+        assert "temporarily unavailable" in detail_503["detail"]

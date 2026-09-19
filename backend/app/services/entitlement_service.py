@@ -44,7 +44,7 @@ class EntitlementDeniedException(HTTPException):
 
     def __init__(self, result: EntitlementResult):
         req_tier = result.required_tier or "enterprise"
-        curr_tier = result.current_tier or "unknown"
+        curr_tier = result.current_tier or "unassigned"
         upgrade_hint = result.upgrade_hint or f"Upgrade to {str(req_tier).title()} to use {result.capability}."
         super().__init__(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -55,6 +55,26 @@ class EntitlementDeniedException(HTTPException):
                 "required_tier": result.required_tier,
                 "current_tier": result.current_tier,
                 "upgrade_hint": upgrade_hint,
+            },
+        )
+        self.result = result
+
+
+class EntitlementUnavailableException(HTTPException):
+    """Structured 503 Service Unavailable exception for infrastructure/DB failures (TIER-05 / D-258-06).
+
+    Ensures that paying customers hitting a transient database outage or connectivity
+    blip receive 503 Service Unavailable instead of being told to upgrade via 403 Forbidden.
+    """
+
+    def __init__(self, result: EntitlementResult):
+        super().__init__(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "detail": f"Entitlement service temporarily unavailable while checking capability '{result.capability}'",
+                "error": "entitlement_service_unavailable",
+                "capability": result.capability,
+                "reason": result.reason,
             },
         )
         self.result = result
@@ -102,6 +122,8 @@ def require_capability(capability: str):
     ) -> str:
         result = await check_entitlement(pool, active_org_id, capability)
         if not result.allowed:
+            if result.reason and ("database error" in result.reason.lower() or "connection" in result.reason.lower()):
+                raise EntitlementUnavailableException(result)
             raise EntitlementDeniedException(result)
         return active_org_id
 

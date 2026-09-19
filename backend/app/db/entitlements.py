@@ -63,7 +63,7 @@ async def get_minimum_tier_for_capability(
 ) -> str | None:
     """Return the lowest subscription tier that enables the requested capability.
 
-    Ordered by standard -> pro -> enterprise.
+    Ordered by standard -> pro -> enterprise via TIER_ORDER.
     """
     normalized_cap = (capability or "").strip().lower()
     if not normalized_cap:
@@ -72,18 +72,14 @@ async def get_minimum_tier_for_capability(
     query = """
         SELECT tier
         FROM public.tier_capabilities
-        WHERE capability = $1 AND enabled = true
-        ORDER BY
-            CASE tier
-                WHEN 'standard' THEN 1
-                WHEN 'pro' THEN 2
-                WHEN 'enterprise' THEN 3
-                ELSE 4
-            END ASC
-        LIMIT 1;
+        WHERE capability = $1 AND enabled = true;
     """
-    val = await pool.fetchval(query, normalized_cap)
-    return val
+    rows = await pool.fetch(query, normalized_cap)
+    if not rows:
+        return None
+
+    tiers = [r["tier"] for r in rows]
+    return min(tiers, key=lambda t: TIER_ORDER.get(t, 99))
 
 
 def _has_addon_capability(add_ons: Any, capability: str) -> bool:
@@ -146,21 +142,27 @@ async def resolve_org_entitlement(
             return False, None, None, "Organization not found"
 
         raw_tier = row["subscription_tier"]
-        current_tier = (raw_tier or "").strip().lower() or "standard"
+        normalized_tier = (raw_tier or "").strip().lower() or None
         add_ons = row["add_ons"]
 
         # Check additive add-ons override first (D-258-08)
         if _has_addon_capability(add_ons, normalized_cap):
-            return True, current_tier, None, "Granted via add_on override"
+            return True, normalized_tier, None, "Granted via add_on override"
+
+        # TIER-05 / D-258-06: Strict fail-closed when subscription_tier is NULL, empty, or unassigned.
+        # Fallback to a default tier is explicitly rejected.
+        if not normalized_tier:
+            required_tier = await get_minimum_tier_for_capability(pool, normalized_cap)
+            return False, None, required_tier or "enterprise", "Organization has no subscription tier assigned (fail-closed)"
 
         # Check base tier capabilities from relational table (TIER-02)
-        is_enabled = await is_capability_enabled_for_tier(pool, current_tier, normalized_cap)
+        is_enabled = await is_capability_enabled_for_tier(pool, normalized_tier, normalized_cap)
         if is_enabled:
-            return True, current_tier, None, None
+            return True, normalized_tier, None, None
 
         # Resolve lowest required tier for upgrade guidance (TIER-03)
         required_tier = await get_minimum_tier_for_capability(pool, normalized_cap)
-        return False, current_tier, required_tier or "enterprise", "Capability not enabled for tier"
+        return False, normalized_tier, required_tier or "enterprise", "Capability not enabled for tier"
 
     except Exception as err:
         logger.exception("Database error during entitlement resolution for org %s: %s", org_id, err)
