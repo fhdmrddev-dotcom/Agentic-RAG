@@ -3859,6 +3859,10 @@ const BASELINE = {
   // deleting them stayed green (driven). Re-pinned to the real count with the CR-06 cases.
   // 17 -> 18 in 257 WR-12: fence em-dash loading state so pre-fix fallback $0.0000 cannot return.
   "AdminSpendPage.test.tsx": 18,
+  // Added in 257 CR-06 follow-up. Exhaustive arithmetic: three independently-rounded
+  // gauge segments summed to 101 on 34 of the combinations swept, and gemini found it
+  // reviewing the CR-06 fix. Driven RED against the pre-fix arithmetic, 40 offenders named.
+  "apportion100.test.ts": 4,
   // 5 -> 7 in Phase 257.1: two cases added for the badge's THIRD state ("No tokens
   // recorded" for a rated model whose run measured nothing) and for the undefined-vs-null
   // coverage distinction. Both were introduced by the review's own fixes and covered by
@@ -5543,6 +5547,10 @@ const TARGETS = [
   //
   // Added in the SAME COMMIT that creates the two new files — an entry pointing at a path
   // that does not yet exist makes the gate ERROR (exit 2) rather than fail.
+  // ⚠ NAMED, because `src/components/admin/` has no DIRECTORY entry. A suite added under
+  // it and not named here runs nowhere and its pin can never fail. Phase 257 hit this
+  // trap three times: AdminSpendPage, RunCostBadge, and now apportion100.
+  "src/components/admin/spend/apportion100.test.ts",
   "src/components/admin/__tests__/ModelRegistryTab.test.tsx",
   "src/components/admin/__tests__/addProviderRoster.lockstep.test.ts",
   "src/components/admin/__tests__/hideControlLegibility.test.tsx",

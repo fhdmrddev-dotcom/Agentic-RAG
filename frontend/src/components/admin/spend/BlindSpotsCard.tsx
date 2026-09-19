@@ -20,6 +20,32 @@ interface BlindSpotsCardProps {
   onOpenRateRegistry: () => void
 }
 
+/**
+ * Split 100 across `parts` so the result ALWAYS sums to exactly 100 (largest remainder).
+ * An all-zero input returns [100, 0, 0, ...] so an empty window reads as fully priced rather
+ * than as a bare track. Exported for its own test: this is arithmetic, and arithmetic that
+ * only ever runs inside a component is arithmetic nobody checks.
+ */
+export function apportion100(parts: number[]): number[] {
+  const total = parts.reduce((a, b) => a + b, 0)
+  if (total <= 0) return parts.map((_, i) => (i === 0 ? 100 : 0))
+  const exact = parts.map((p) => (p / total) * 100)
+  const floors = exact.map((e) => Math.floor(e))
+  let remaining = 100 - floors.reduce((a, b) => a + b, 0)
+  // Biggest fractional part first; ties go to the earlier segment, which keeps the output
+  // deterministic rather than dependent on sort stability.
+  const order = exact
+    .map((e, i) => ({ i, frac: e - Math.floor(e) }))
+    .sort((a, b) => b.frac - a.frac || a.i - b.i)
+  const out = [...floors]
+  for (const { i } of order) {
+    if (remaining <= 0) break
+    out[i] += 1
+    remaining -= 1
+  }
+  return out
+}
+
 export const BlindSpotsCard: React.FC<BlindSpotsCardProps> = ({
   unratedRunsCount,
   unmeasuredRunsCount,
@@ -29,16 +55,28 @@ export const BlindSpotsCard: React.FC<BlindSpotsCardProps> = ({
   onFilterIncompleteCoverage,
   onOpenRateRegistry,
 }) => {
-  const totalRuns = ratedRunsCount + unratedRunsCount
   // THE GAUGE SAYS "PRICED", SO IT MUST COUNT PRICED. CR-06. Reading ratedRunsCount here
   // would render "72% Priced" on a window where 43% produced a figure - a brand new false
   // claim, on the card that exists to prevent false claims.
   const pricedCount = Math.max(0, ratedRunsCount - unmeasuredRunsCount)
-  const pricedPct = totalRuns > 0 ? Math.round((pricedCount / totalRuns) * 100) : 100
-  const unmeasuredPct = totalRuns > 0 ? Math.round((unmeasuredRunsCount / totalRuns) * 100) : 0
-  // The remainder, so the three segments always sum to exactly 100 and no rounding gap shows
-  // up as a sliver of bare track.
-  const unratedPct = Math.max(0, 100 - pricedPct - unmeasuredPct)
+  // ⛔ THREE INDEPENDENT Math.round CALLS DO NOT SUM TO 100, and the first version of this
+  // gauge shipped that bug. Found by gemini's review of this fix; driven before fixing.
+  //
+  // Rounding each share on its own and clamping only the LAST one leaves the first two free
+  // to overflow: 8 runs, 7 priced (87.5 -> 88) and 1 unmeasured (12.5 -> 13) gives 101, the
+  // track renders 101% of its own width, and the labels announce "88% Priced · 13% No
+  // tokens" over 8 runs. An exhaustive sweep of rated<=40 x unmeasured x unrated<=40 found
+  // 34 such combinations. Clamping the remainder hid the third segment; it never fixed the
+  // arithmetic, and a gauge on the honesty card must not be the thing that is wrong.
+  //
+  // Largest-remainder allocation: hand out the 100 whole units by integer share, then give
+  // the leftovers to the biggest fractional parts. Sums to exactly 100 by construction, for
+  // every input, and stays stable as the counts move.
+  const [pricedPct, unmeasuredPct, unratedPct] = apportion100([
+    pricedCount,
+    unmeasuredRunsCount,
+    unratedRunsCount,
+  ])
 
   return (
     <div className="rounded-xl border border-amber-500/30 bg-gradient-to-b from-amber-500/10 to-amber-500/5 p-5 shadow-sm">
