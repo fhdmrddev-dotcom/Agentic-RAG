@@ -203,6 +203,10 @@ router = APIRouter(
     dependencies=[Depends(require_operator)],
 )
 
+# Phase 257 (METER-07 / G-5 isolation): operator spend & metering sub-router
+from app.api.admin_spend import router as spend_router  # noqa: E402
+router.include_router(spend_router, prefix="/spend", tags=["admin-spend"])
+
 
 @router.get("/backpressure")
 async def get_backpressure():

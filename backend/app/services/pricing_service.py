@@ -27,13 +27,17 @@ QUANTIZE_FOUR_PLACES = Decimal("0.0001")
 @dataclass(frozen=True)
 class ModelRate:
     """Effective-dated rate definition for a model."""
-    id: UUID
     model_id: str
-    provider: Optional[str]
     input_cost_per_million: Decimal
     output_cost_per_million: Decimal
     effective_from: datetime
+    id: Optional[UUID] = None
+    provider: Optional[str] = None
     org_id: Optional[UUID] = None
+
+    @property
+    def model_name(self) -> str:
+        return self.model_id
 
 
 @dataclass(frozen=True)
