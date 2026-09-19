@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v4.3
 milestone_name: What You Can Actually Sell
 status: executing
-last_updated: "2026-09-19T00:00:00.000Z"
-last_activity: 2026-09-19 -- Phase 256 gap-closure round 1 PLANNED (256-05), plan-checker PASSED
+last_updated: "2026-09-19T01:00:00.000Z"
+last_activity: 2026-09-19 -- Phase 256 EXECUTED + verified 4/4 (was 2/4). Round 1 merged; WR-01 closed; independent review OWED to gemini (BUS-273)
 progress:
   total_phases: 13
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 8
-  completed_plans: 4
-  percent: 8
+  completed_plans: 5
+  percent: 15
 ---
 
 # Project State
@@ -34,16 +34,102 @@ See: `.planning/PROJECT.md` (updated 2026-09-18)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 256 — every-token-is-counted-and-kept
+**Current focus:** Phase 256 CLOSED (4/4, review owed to gemini) → Phase 257 (cost-in-dollars) next
 
 ---
 
 ## Current Position
 
-Phase: 256 (every-token-is-counted-and-kept) — GAP CLOSURE ROUND 1 PLANNED, ready to execute
-Plan: 5 of 5 (`256-05` — the only unexecuted plan; 01-04 are merged)
-Status: Phase 256 gap-closure round 1 planned and plan-checker PASSED. Next: `/gsd:execute-phase 256`
-Last activity: 2026-09-19 -- 256-05-PLAN.md written + verified (plan commit `6dbe7d50e`)
+Phase: 256 (every-token-is-counted-and-kept) — **EXECUTED and VERIFIED 4/4**
+Plan: 5 of 5 complete (`256-05` merged at `8a5985145`; head `c908161f4`)
+Status: Phase 256 CLOSED on the builder's own evidence. ⛔ **`independent_review: owed`** — gemini
+holds it at `BUS-272` / `BUS-273`. Next: `/gsd:discuss-phase 257`, or wait for gemini's verdict first.
+Last activity: 2026-09-19 -- round 1 executed, merged, reviewed (0 blockers), WR-01 closed, verified 4/4
+
+### ⭐ PHASE 256 CLOSE — 2026-09-19, 4/4 SC (was 2/4)
+
+**What round 1 closed, both re-verified against SOURCE by a different instrument than the review used.**
+SC#1 / METER-03: `harness_engine._flush_run_usage()` is the ONE home of the durable write, called by
+`_enforce_budget` **and** once unconditionally at `:2320` — statement-level in the `while` body, after
+the phase `Try` (`:2108-2282`) and **above every outcome arm** (`pause_run` `:2369`, `fail_run` `:2386`,
+`skip_to` `:2414`). The verifier AST-walked `run_workflow` rather than reading the comment that claims
+the placement, and enumerated every `Return`/`Continue`/`Break` in the loop body: only two precede the
+flush and both sit at the loop TOP, above `_enforce_budget("phase_boundary")`. ⭐ **Falsifiable, which
+is the point:** delete `:2320` and the pause arm returns at `:2383`, **297 lines above** the only other
+persist. SC#4 / METER-06 per **D-256-18 Option A**: both in-run judge shots COUNTED —
+`validator_kinds.py:629` above its failure arm at `:631`, `publish_service.py:458` onto `golden_run_id`
+above `_safe_audit` and above the `_block` return, so a **blocked** publish records its money. The
+4-leg marker became TRUE rather than lowered. ⛔ **NO MIGRATION** — mig 182's `COMMENT ON COLUMN`
+delegates the legs to `TOKEN_COVERAGE_LEGS` verbatim (`full-schema.sql:2783`), so growing what
+`"emit"` covers cannot falsify it.
+
+⭐ **THE ROUND'S REAL FINDING IS A RED DRIVE, NOT A FEATURE — and it is this phase's own currency.**
+Review finding WR-01: CR-02's publish half was guarded by **TEXT fences only** (`grep publish_workflow`
+in the new module returned NOTHING). Dropping the `usage_box=` kwarg at `publish_service.py:431` would
+have silently un-shipped the judge counting. Driven: under that plant, **22 tests stayed green —
+INCLUDING BOTH TEXT FENCES — and only the two new behavioural cases fired.** *Presence assertions
+cannot see content drift*, paid for again. Closed test-only at `c908161f4`; `persist_run_usage` left
+REAL with an `AsyncMock` pool as recorder, so what is pinned is the statement the DB would receive,
+arguments and all.
+
+⚠ **TWO UAT ROWS ARE OWED, recorded as a DECISION and not as a claim that everything ran.**
+1. **RUN THIS FIRST** — a real harness run that pauses on a human gate, **restart the backend**, then
+   `SELECT input_tokens, output_tokens, token_coverage FROM workflow_runs`. SC#1's *"after the process
+   restarts"* clause is unprovable by unit test, and the suite's own docstring disclaims it: it asserts
+   the statement the pool was **handed**, never the one Postgres **accepted** — in particular a Python
+   list binding to `token_coverage`'s `text[]` **has never run live**.
+2. One publish gauntlet to the QUAL-01 judge against a **real provider** (no `forced_emit` patch).
+   Every judge case patches `forced_emit`, so the wiring is proven and the number's fidelity is not.
+
+⚠ **FOUR REVIEW FINDINGS DEFERRED TO PHASE 257 UNDER G-7 — not fixed, not waived.** All four live in
+code written this round, and a round 2 of pure round-1 cleanup is the runaway G-7 exists to stop.
+Phase 257 is the phase that READS the `token_coverage` marker, so it is the one with the motive to make
+these fences load-bearing. **WR-02** the `forced_emit` disposition fence is FILE-scoped while its
+docstring claims SITE scope, so a second uncounted site in an already-listed file passes green.
+**WR-03** `_SHELL_FUNCTIONS` is hardcoded — a NEW shell in those three files gets zero coverage with no
+signal, and `assert shells` fires only when EVERY named shell in a file vanishes (coverage fell to
+34% / 13% / 26% of file lines). **WR-04** the judge validator's tokens now bind `max_tokens_per_run` —
+a shipped safety control tightened, named in no register and pinned by no test. **IN-01** a one-sided
+delta writes NULL→0 (*"measured as zero"*, contra D-256-06) while `persist_run_usage`'s own docstring
+claims it never does. ⛔ These are not the builder's to waive; if gemini judges any blocking, it goes to
+the operator.
+
+⚠ **A HOLE THAT WAS HUNTED AND MEASURED FALSE, recorded so nobody re-opens it from the docstring.**
+`phase_types._run_usage_box`'s docstring says a publish golden run reaches its executors with a ctx that
+has **no box** — if true, the validator judge shot during a golden run would be dropped while the row
+still carried a 4-leg marker, i.e. **CR-02 reopened**. Measured: `_drive_golden_run` drives
+`run_workflow` (`publish_service.py:1681`) and `run_workflow` sets `ctx.run_usage_box = {}`
+**unconditionally** (`harness_engine.py:1884`). ⭐ **The docstring is STALE; the behaviour is correct.**
+
+⚠ **ONE SHIPPED FENCE WAS NARROWED, and it is the judgement gemini is asked to ratify or overturn.**
+`test_256_producer_shells.py::test_no_shell_started_writing_the_workflow_grain` went FILE scope → AST
+SHELL-FUNCTION scope, because `publish_service.py` hosts BOTH a segment shell (`_drive_golden_run`) and
+the `workflow_runs`-grain owner (the QUAL-01 stage holding `golden_run_id`) — so the file-scoped form
+**forbade the write D-256-18 mandates**. The builder-run review RATIFIED it, having enumerated every
+`insert_run` / `finalize_run` / `create_workflow_run` caller in all three subject files and confirmed
+`_wake` (`api/runs.py:656-707`) and `_harness_continuation` (`:1295-1379`) — both METER-05 finalize
+sites — are nested inside the two named shells and fully covered. ⛔ **That review does not discharge
+the call**: it was run by the builder (AGENTS.md §6.3).
+
+**Gates on the merged tree, re-run by the orchestrator rather than inherited.** Backend unit
+**71 failed / 5064 passed / 2 xfailed / 2 xpassed / 0 collection errors**, failing **SET** `diff` exit 0
+against the committed baseline in both directions (5064 = the locked 5062 + WR-01's two cases; ⛔ the
+ceiling is the **failed** count, 71, and a growing passed count is the suite working).
+`test_200_human_gate_pause.py` **1 failed / 16 passed** — the one red proven **INHERITED by measurement,
+not by comparison to a number**: `_AUDIT_EVENT_TYPES` measures **26** at HEAD, **26** at the round-1 base
+`a9cc2fbc4` and **26** at `9cba267e8`, having grown at `16cba8e05` in **Phase 185**. ⚠ `BUS-272` told
+gemini it read 25; **that was wrong and `BUS-273` corrects it.** Both pause-arm source-slicing fences
+PASS. `check-hot-file-ledger` OK (`watched: 10`, non-vacuous) · `check-claude-md-size` OK (108,342
+chars, 72.2%) · `check-seeds-register` OK (308/308) · `check-gap-closure-rounds 256` **G-7 clear, 1
+round of 2** · `check-deploy-drift` PASS · **zero `supabase/` changes**, so no migration and no cloud
+parity owed · frontend untouched, so the vitest count gate is correctly N/A.
+
+⚠ **A `backend/tests/` SWEEP STALLED AND WAS KILLED, recorded rather than quietly dropped.**
+`pytest tests/ --ignore=tests/unit --ignore=tests/integration` sat at **5% for 25 minutes** with no
+output growth — something there waits on an external resource. The required fence file runs alone in
+**0.54s**. ⛔ Do not read the broad sweep's silence as a pass; run the named file.
+
+### PRIOR CONTEXT — round 1 planning (2026-09-19)
 
 ### ⭐ GAP-CLOSURE ROUND 1 — planned 2026-09-19, and the REVIEWER agreed the gaps were real
 
