@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v4.3
 milestone_name: What You Can Actually Sell
 status: in_progress
-last_updated: "2026-09-19T23:40:00.000Z"
-last_activity: 2026-09-19 -- Phase 259 plans authored (259-01..03); ready for execution.
+last_updated: "2026-09-19T23:48:00.000Z"
+last_activity: 2026-09-19 -- Phase 259-01 executed (Migration 187 applied, models + db layer + 11 tests green); proceeding to 259-02.
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 15
-  completed_plans: 12
-  percent: 80
+  completed_plans: 13
+  percent: 87
 ---
 
 # Project State
@@ -34,16 +34,22 @@ See: `.planning/PROJECT.md` (updated 2026-09-18)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 259 (An Expert Is a Bundle, Not a Runtime) — Plans authored, ready for execution.
+**Current focus:** Phase 259 (An Expert Is a Bundle, Not a Runtime) — Executing plan 259-02.
 
 ---
 
 ## Current Position
 
 Phase: 259 (an-expert-is-a-bundle-not-a-runtime)
-Plan: 0 of 3 (planned, ready for execution)
-Status: ready_for_execution
-Last activity: 2026-09-19 -- Phase 259 plans authored (259-01..03); ready for execution
+Plan: 1 of 3 (259-01 executed, ready for 259-02)
+Status: in_progress
+Last activity: 2026-09-19 -- 259-01 executed (Migration 187 applied, models + db layer + 11 tests green)
+
+### ⭐ PHASE 259-01 EXECUTED — 2026-09-19
+- **Migration 187 (`supabase/migrations/187_expert_bundles.sql`)**: `public.expert_bundles` table created with RLS, partial unique slug indexes, and Financial Analyzer seed row (`00000000-0000-0000-0000-000000000259`). Applied to local Postgres on port 54322, `full-schema.sql` regenerated (8367 lines).
+- **Models (`backend/app/models/expert.py`)**: `ExpertBundle`, `ExpertBundleCreate`, `ExpertBundleUpdate`, and `PromptSuggestion` models authored.
+- **DB Layer (`backend/app/db/experts.py`)**: Asyncpg CRUD and listing helpers authored, enforcing tenant segregation and system bundle immutability.
+- **Tests (`backend/tests/unit/test_259_expert_bundles_db.py`)**: 11 unit and live DB tests passing (100%).
 
 ### ⭐ PHASE 259 PLANS AUTHORED — 2026-09-19
 - **259-01-PLAN.md (Wave 1, autonomous: false)**: PACK-01 database foundation. Migration 187 (`expert_bundles` table, partial unique indexes for system templates vs tenant bundles, RLS policies, Financial Analyzer seed row), Pydantic schemas in `models/expert.py`, asyncpg database access layer in `db/experts.py`, unit test suite in `tests/unit/test_259_expert_bundles_db.py`. DB-MUTATING.

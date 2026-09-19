@@ -1729,6 +1729,138 @@ COMMENT ON COLUMN public.eval_runs.org_id IS 'Forward-compat (D-PRD-02/D-11): or
 
 
 --
+-- Name: expert_bundles; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.expert_bundles (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    org_id uuid,
+    created_by uuid NOT NULL,
+    name text NOT NULL,
+    slug text NOT NULL,
+    description text DEFAULT ''::text NOT NULL,
+    scope_mode text DEFAULT 'restricted'::text NOT NULL,
+    member_skills text[] DEFAULT '{}'::text[] NOT NULL,
+    required_connections text[] DEFAULT '{}'::text[] NOT NULL,
+    knowledge_folder_ids uuid[] DEFAULT '{}'::uuid[] NOT NULL,
+    prompt_suggestions jsonb DEFAULT '[]'::jsonb NOT NULL,
+    visibility text DEFAULT 'private'::text NOT NULL,
+    is_system boolean DEFAULT false NOT NULL,
+    is_enabled boolean DEFAULT true NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT check_org_or_system CHECK (((is_system = true) OR (org_id IS NOT NULL))),
+    CONSTRAINT expert_bundles_scope_mode_check CHECK ((scope_mode = ANY (ARRAY['restricted'::text, 'biased'::text]))),
+    CONSTRAINT expert_bundles_visibility_check CHECK ((visibility = ANY (ARRAY['private'::text, 'org'::text, 'public'::text])))
+);
+
+
+--
+-- Name: TABLE expert_bundles; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.expert_bundles IS 'Domain expert bundles over skills, connections, folders, and prompts (PACK-01, Phase 259). Data manifest only, zero execution path.';
+
+
+--
+-- Name: COLUMN expert_bundles.id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.expert_bundles.id IS 'Primary key UUID of the expert bundle.';
+
+
+--
+-- Name: COLUMN expert_bundles.org_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.expert_bundles.org_id IS 'Tenant organization that owns this bundle, or NULL for system bundles.';
+
+
+--
+-- Name: COLUMN expert_bundles.created_by; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.expert_bundles.created_by IS 'User UUID who created the bundle (or system user 00000000-0000-0000-0000-000000000001 for system templates).';
+
+
+--
+-- Name: COLUMN expert_bundles.name; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.expert_bundles.name IS 'Display name of the expert bundle.';
+
+
+--
+-- Name: COLUMN expert_bundles.slug; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.expert_bundles.slug IS 'URL-safe identifier, unique per org or globally unique for system bundles.';
+
+
+--
+-- Name: COLUMN expert_bundles.description; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.expert_bundles.description IS 'Detailed description of the expert capabilities.';
+
+
+--
+-- Name: COLUMN expert_bundles.scope_mode; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.expert_bundles.scope_mode IS 'Scope semantics: restricted (strict hard ceiling) or biased (soft priority). Defaults to restricted.';
+
+
+--
+-- Name: COLUMN expert_bundles.member_skills; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.expert_bundles.member_skills IS 'List of skill names/slugs included in this expert bundle.';
+
+
+--
+-- Name: COLUMN expert_bundles.required_connections; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.expert_bundles.required_connections IS 'List of connector types/slugs required by this expert bundle.';
+
+
+--
+-- Name: COLUMN expert_bundles.knowledge_folder_ids; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.expert_bundles.knowledge_folder_ids IS 'List of folder UUIDs bounding the knowledge scope for this expert bundle.';
+
+
+--
+-- Name: COLUMN expert_bundles.prompt_suggestions; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.expert_bundles.prompt_suggestions IS 'JSON array of starter prompt suggestions [{title, prompt}].';
+
+
+--
+-- Name: COLUMN expert_bundles.visibility; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.expert_bundles.visibility IS 'Sharing scope: private (creator only), org (organization members), public (all users).';
+
+
+--
+-- Name: COLUMN expert_bundles.is_system; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.expert_bundles.is_system IS 'True if this is a first-party built-in template/seed, False for tenant-authored bundles.';
+
+
+--
+-- Name: COLUMN expert_bundles.is_enabled; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.expert_bundles.is_enabled IS 'Administrative toggle to activate or deactivate this bundle.';
+
+
+--
 -- Name: folders; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -3210,6 +3342,14 @@ ALTER TABLE ONLY public.eval_runs
 
 
 --
+-- Name: expert_bundles expert_bundles_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.expert_bundles
+    ADD CONSTRAINT expert_bundles_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: folders folders_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -4090,6 +4230,34 @@ CREATE INDEX idx_eval_runs_skill_version_id ON public.eval_runs USING btree (ski
 --
 
 CREATE INDEX idx_eval_runs_user_id ON public.eval_runs USING btree (user_id);
+
+
+--
+-- Name: idx_expert_bundles_org_enabled; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_expert_bundles_org_enabled ON public.expert_bundles USING btree (org_id, is_enabled);
+
+
+--
+-- Name: idx_expert_bundles_org_slug; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_expert_bundles_org_slug ON public.expert_bundles USING btree (org_id, slug) WHERE (is_system = false);
+
+
+--
+-- Name: idx_expert_bundles_system_enabled; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_expert_bundles_system_enabled ON public.expert_bundles USING btree (is_enabled) WHERE (is_system = true);
+
+
+--
+-- Name: idx_expert_bundles_system_slug; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_expert_bundles_system_slug ON public.expert_bundles USING btree (slug) WHERE (is_system = true);
 
 
 --
@@ -5469,6 +5637,14 @@ ALTER TABLE ONLY public.eval_runs
 
 ALTER TABLE ONLY public.eval_runs
     ADD CONSTRAINT eval_runs_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: expert_bundles expert_bundles_org_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.expert_bundles
+    ADD CONSTRAINT expert_bundles_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
 
 
 --
@@ -6869,6 +7045,32 @@ ALTER TABLE public.eval_results ENABLE ROW LEVEL SECURITY;
 --
 
 ALTER TABLE public.eval_runs ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: expert_bundles; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.expert_bundles ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: expert_bundles expert_bundles_read_policy; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY expert_bundles_read_policy ON public.expert_bundles FOR SELECT TO authenticated, service_role USING (((auth.role() = 'service_role'::text) OR (is_system = true) OR ((org_id IN ( SELECT m.org_id
+   FROM public.org_members m
+  WHERE (m.user_id = auth.uid()))) AND ((visibility = ANY (ARRAY['org'::text, 'public'::text])) OR (created_by = auth.uid())))));
+
+
+--
+-- Name: expert_bundles expert_bundles_write_policy; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY expert_bundles_write_policy ON public.expert_bundles TO authenticated, service_role USING (((auth.role() = 'service_role'::text) OR ((is_system = false) AND (org_id IN ( SELECT m.org_id
+   FROM public.org_members m
+  WHERE (m.user_id = auth.uid())))))) WITH CHECK (((auth.role() = 'service_role'::text) OR ((is_system = false) AND (org_id IN ( SELECT m.org_id
+   FROM public.org_members m
+  WHERE (m.user_id = auth.uid()))))));
+
 
 --
 -- Name: folders; Type: ROW SECURITY; Schema: public; Owner: -
