@@ -2,12 +2,12 @@
 gsd_state_version: 1.0
 milestone: v4.3
 milestone_name: What You Can Actually Sell
-status: ready_for_review
-last_updated: "2026-09-19T22:45:00.000Z"
-last_activity: 2026-09-19 -- Phase 258 review handback resolved (F-1 NULL tier fail-closed, F-4 HTTP 503 on DB error, F-3 add_ons in AST fence, F-7 dynamic TIER_ORDER, F-6 ledger sync); 33 unit tests green
+status: phase_complete
+last_updated: "2026-09-19T23:30:00.000Z"
+last_activity: 2026-09-19 -- Phase 258 CLOSED with SC#1 PARTIAL, stated as a decision. Re-review PASS (258-REVIEW.md): 7 findings, 5 fixed and each RE-DRIVEN by the reviewer with plants removed md5-identical. F-2 (execution ungated) and F-5 (migration 186 not in production) OWED to the operator. Gates: backend 71/5133 with the failure SET byte-identical to the frozen baseline at da56c5436; vitest 8468/0/293-293 unchanged.
 progress:
   total_phases: 13
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 12
   completed_plans: 12
   percent: 100
@@ -34,7 +34,7 @@ See: `.planning/PROJECT.md` (updated 2026-09-18)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 258 (A Tier Becomes Enforceable) -- Review handback resolved, re-review ready.
+**Current focus:** Phase 258 CLOSED (SC#1 partial by decision). Next: Phase 259 (An Expert Is a Bundle, Not a Runtime).
 
 ---
 
@@ -64,6 +64,64 @@ Last activity: 2026-09-19 -- Phase 258 review handback resolved (F-1 NULL tier f
 - **F-5 Deploy-Ordering Hazard**: Recorded in OWED TO THE OPERATOR (Migration 186 must be applied to production before or at backend deployment).
 - **F-2 Scope Disposition**: Workflow authoring proof slice (`POST /workflows`, `POST /workflows/{id}/publish`) gated as planned. Runtime kickoff gating via `threads.py` deferred to execution milestone/phase to preserve `threads.py` G-5 invariants and isolate general thread chat.
 
+### ⭐ PHASE 258 CLOSE — 2026-09-19. SC#1 is PARTIAL and that is a DECISION, not a slip.
+
+**4 of 5 success criteria HOLD and are driven.** SC#2 (tier contents are data), SC#3 (a refusal
+names the tier), SC#4 (a second ad-hoc check fails a guard) and SC#5 (an unreadable tier is
+refused) all hold, and each was re-driven by the reviewer rather than read from a summary.
+
+⚠ **SC#1 is PARTIAL.** One entitlement home exists, and the AST fence now covers **both** columns
+the criterion names — but *"every gated capability calls it"* is **not true**: **authoring is
+gated, execution is not.** A Standard org cannot create or publish a workflow, yet can run any
+existing one through `POST /threads/{id}/messages`. **Running is the half that spends tokens.**
+Deferred by decision to an execution phase, to keep `threads.py`'s G-5 invariants intact.
+
+⛔ **D-258-09's premise was WRONG and nobody re-derived it.** It chose *"POST /workflows and POST
+/workflow-runs"*, but `workflow_runs.py` is **GET-only** (D-188-14) — the second named surface does
+not exist, and the plan quietly narrowed to the half that does. **A decision that names a surface
+should be checked against the router before it is encoded.**
+
+⭐ **The one-way door was asked before it was encoded.** `TIER-02`'s pricing metric went to the
+operator as four alternatives and returned as **D-258-01 Ascending Capability Bundles** —
+exactly what `SEED-294` demanded, and the first time in this milestone that a metric was chosen
+on purpose rather than by accident.
+
+⭐ **THE REUSABLE FINDING: the separation Phase 257 lost was HELD here.** The builder (gemini)
+fixed its own work and the reviewer (claude) re-drove every fix. Phase 257's override — *fix it
+directly* — had silently turned the reviewer into the builder, and an independent pass then found
+**14 of 17 findings were against the reviewer's own fixes**. Here the reviewer's only source edit
+was a two-cell ledger correction, declared in `207639dda`.
+
+⚠ **Both defects that mattered were things the EXISTING TESTS AGREED WITH.** `F-1`: an unreadable
+`subscription_tier` was coerced to `standard` — the option D-258-06 had **explicitly rejected** —
+under a docstring promising strict fail-closed, with a suite that never once passed a NULL tier.
+**Measured: 2 of 2 production orgs are NULL**, so this was 100% of production, not an edge case.
+`F-3`: the AST fence was real, substantive and had been driven RED by the builder — against **one
+of the two columns** its own criterion names; a planted module granting capabilities from a direct
+`add_ons` read walked straight through it. **Both were found by driving a plant, not by reading.**
+
+⚠ **A ledger row was written as a PREDICTION twice inside one phase** — first `0 / 0 / 0` for two
+files that existed, then `1 / 1 / …` in the very commit that made them `2`. Phases and lines were
+right both times, so G-5's trigger was never misled. Corrected in `207639dda` across both registers.
+
+⚠ **Two `.planning/ROADMAP.md` plan lines carried literal control characters** — a TAB
+byte where the letter *t* of `tier_capabilities` belonged, a BACKSPACE byte eating the *b* of
+`backend`, and a CARRIAGE RETURN eating the *r* of `require_capability`. Escape-sequence
+corruption in a tracked planning file, invisible to every gate because no gate reads planning
+prose for control bytes. Rewritten at close; **zero control characters remain** — verified with
+`grep -cP` over both registers. ⚠ **It recurred once while this very paragraph was being
+written**, which is the point: describing the bytes reintroduces them unless the description
+spells them as WORDS.
+
+**Gates at close:** backend `71 failed / 5133 passed` — the failure **SET** is byte-identical to
+the baseline frozen at `da56c5436` before the builder touched source (`comm` empty in both
+directions), **+33 passing** · vitest `8468 · failed 0 · pinned 7727 · 293/293` unchanged ·
+CLAUDE.md size gate 107,869 chars (71.9%). ⚠ Baselines were captured **during discuss-phase**,
+because one taken after source work starts measures the change against itself.
+
+**Owed:** `F-2` (execution ungated — operator call) · `F-5` (migration 186 not in production —
+rides the milestone-close batch; see the OWED block below for the two conditions that ride with it).
+
 ### ⭐ PHASE 257 CLOSE — 2026-09-19. Read the four verdicts, not the word "closed".
 
 | SC | verdict | evidence |
@@ -78,9 +136,17 @@ vitest `8464 · failed 0 · pinned 7723 · 293/293` · `tsc -p tsconfig.app.json
 
 ⛔ **OWED TO THE OPERATOR, blocking nothing else:**
 - **Apply migration 186** (`supabase/migrations/186_tier_capabilities.sql`) by pasting it into the
-  Supabase SQL editor (never `db push`), then `bash scripts/regenerate-full-schema.sh`. F-5 deploy-ordering
-  hazard: must be applied before or at backend deployment to prevent transient 503 unavailability on missing
-  `public.tier_capabilities` table.
+  Supabase SQL editor (never `db push`), then `bash scripts/regenerate-full-schema.sh`. **Operator
+  decision 2026-09-19: production migrations ride the v4.3 milestone-close batch**, so 186 is NOT
+  applied alone. ⛔ **Deploy order is migration-then-backend, never the reverse** — if the backend
+  ships first, every entitlement check throws on the missing `public.tier_capabilities`, fails
+  closed, and ALL workflow authoring 403s for every org. ⛔ **Two things must happen in that same
+  window:** (1) **both production orgs have `subscription_tier IS NULL`** — measured 2 of 2 — so
+  set a tier for each BEFORE the backend ships or authoring goes dark for your own tenants;
+  (2) 186 carries `GRANT SELECT … TO anon` on the pricing map, letting an unauthenticated reader
+  fetch the full packaging matrix — **revoke it in a FOLLOW-UP numbered migration, never by editing
+  186**, which is already applied locally and must not be re-executed. ⚠ `anon` over-grants are
+  this repo's most-repeated security finding (BUG-260911-01, mig 156, mig 177).
 - **Apply migration 185** by pasting it into the Supabase SQL editor (never `db push`), then
   `bash scripts/regenerate-full-schema.sh`. Verified idempotent in a rolled-back transaction
   (53 → 59 → 59 rows); the live DB is unchanged.
