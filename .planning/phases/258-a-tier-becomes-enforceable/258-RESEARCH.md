@@ -187,3 +187,26 @@
 - Adding `dependencies=[Depends(require_capability("workflows"))]` to `create_draft` and `publish_workflow`.
 - Standard org requests are rejected with the structured 403 payload naming `enterprise` (or `pro`).
 - Moving `'workflows'` to `'standard'` in `tier_capabilities` instantly admits the request with zero code modifications.
+
+### 7. G-5 Guardrail Analysis & Dispositions
+
+#### `backend/app/api/workflows.py`
+- **Re-derived Triple**: `42 commits / 22 phases / 2255 lines` (21 phases excluding quick task `260814`).
+- **G-5 Status**: **FIRES** (threshold is 3 phases).
+- **Ledger Verdict**: `⚠ extraction still OWED` (declined at BUG-260828-09).
+- **Analysis**:
+  - `workflows.py` is one of the hottest backend route modules. It hosts definition CRUD, validate/lint, grounding palette, publish gauntlet, run launcher, and template door. A five-way extraction has been owed since Phase 192.2 / Phase 214.
+  - Phase 258's modification in `258-03` is strictly compositional: adding `Depends(require_capability("workflows"))` to `create_draft` and `publish_workflow`.
+  - **Zero** new route endpoints are introduced.
+  - **Zero** branching or business logic is added inside the handlers.
+  - **Zero** new state or database queries are introduced into `workflows.py` (all capability evaluation is encapsulated in `entitlement_service`).
+  - Total file delta is minimal (~4 lines: 1 import + 2 decorator dependency parameters).
+- **Disposition**: **Honoured by construction**.
+  - Smuggling an architectural decomposition of `workflows.py` into a commercial security gating phase would introduce uncontrolled blast radius and risk.
+  - The change honours G-5 by adding only pure dependency injection while leaving the owed extraction seam completely intact and unobstructed.
+
+#### New Files Added to Ledger AT CREATION
+- `backend/app/db/entitlements.py` (0/0/0) — Row added AT CREATION.
+- `backend/app/services/entitlement_service.py` (0/0/0) — Row added AT CREATION.
+- **Rule & Precedent**: `CLAUDE.md` mandates rows added at creation (`LibraryCloudImport.tsx` / `settingsSearchPayload.ts` precedent) because an absent file is invisible to G-5 at any commit count. `entitlement_service.py` is the single home for every commercial boundary in the product; keeping it tracked from commit 0 ensures its growth and invariants are permanently visible.
+

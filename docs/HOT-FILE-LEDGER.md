@@ -1064,6 +1064,16 @@ carries the verdict — **extraction due** — and this is the cell it carried b
 
 **⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `38 / 19 / 2143` → `41 / 21 / 2211`.** ⚠ **THE OBLIGATION IS NOT DISCHARGED.** 214-05 added the argument-satisfiability gate and explicitly did NOT take the extraction. `extraction due` has now stood for three phases. Phase buckets gain `214`.
 
+**⚠ RE-DERIVED AT PHASE 258 (2026-09-19, plan `258-03`) — recorded BESIDE previous value: `41 / 22 / 2254` → `42 commits / 22 phases / 2255 L`** (quick-task bucket `260814` excluded: 21 phases). **G-5 FIRES.**
+**Disposition for Phase 258: HONOURED BY CONSTRUCTION; no override requested or recorded.**
+What it gains in `258-03`: exactly two route-level dependency bindings `Depends(require_capability("workflows"))` on `create_draft` (`POST /workflows`) and `publish_workflow` (`POST /workflows/{id}/publish`).
+- Zero new endpoints or route handlers added.
+- Zero new branches or conditional logic inside handlers.
+- Zero new state or database queries (delegates evaluation to `entitlement_service`).
+- Total file delta is strictly compositional (approx. 4 lines: 1 import + 2 decorator dependency arguments).
+⚠ **The extraction remains OWED and the named seam is unchanged** (modular decomposition across definition CRUD, validate/lint, grounding palette, publish gauntlet, run launcher, and template door). Taking that five-way refactor inside an entitlement enforcement phase would smuggle an architectural rewrite into a commercial security boundary; the change honours G-5 by adding only pure dependency wiring while leaving the owed extraction unobstructed.
+
+
 ## `backend/app/services/harness/grounding.py`
 
 **Re-derived 2026-08-17 (extraction):** `18 commits / 5 phases / 1252 L` · quick-task buckets excluded: `260814` · **G-5 FIRES** (5 phases vs threshold 3) — honoured by construction (193.1).
@@ -10561,8 +10571,8 @@ cells rot within days.
 
 | File | commits / phases / lines | G-5 | Disposition |
 |---|---|---|---|
-| [`backend/app/db/entitlements.py`](docs/HOT-FILE-LEDGER.md#backendappdbentitlementspy) | 0 / 0 / 0 | no (new) | young (created Phase 258). Row added AT CREATION. Entitlement database queries over tier_capabilities and organizations.add_ons (TIER-01/02). |
-| [`backend/app/services/entitlement_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesentitlement_servicepy) | 0 / 0 / 0 | no (new) | young (created Phase 258). Row added AT CREATION. Single home for entitlement evaluation and FastAPI require_capability dependency (TIER-01/03/04/05). |
+| [`backend/app/db/entitlements.py`](docs/HOT-FILE-LEDGER.md#backendappdbentitlementspy) | 0 / 0 / 0 | no (new) | young (created Phase 258). Row added AT CREATION — absent row is invisible to G-5 (TIER-01/02). |
+| [`backend/app/services/entitlement_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesentitlement_servicepy) | 0 / 0 / 0 | no (new) | young (created Phase 258). Row added AT CREATION. Single commercial boundary home (TIER-01/03/04/05). |
 | [`frontend/src/components/chat/ToolCallPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattoolcallpaneltsx) | 51 / 23 / 351 | **FIRES** | ✅ **G-5 DISCHARGED (227-02)** — extracted ToolCallDetails, StepRow, toolStepDerivation (1019 → 351 lines) |
 | [`frontend/src/components/chat/MessageItem.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageitemtsx) | 75 / 34 / 1000 | **FIRES** | ⚠ row STALE a FOURTH time (`74/34/981`). honoured by construction (**244-14 / WR-01**): the Continue card reads the lock's MODE, like the composer beside it. State 3→3, effects 0→0, props 5→5 |
 | [`backend/app/api/threads.py`](docs/HOT-FILE-LEDGER.md#backendappapithreadspy) | 245 / 82 / 1617 | **FIRES** | ⚠ row was STALE at `243 / 80 / 1590`. honoured by construction (**244-03**): ONE existing pure-read query loses a WHERE predicate and gains a Python guard. ⛔ no writer added |
@@ -10580,7 +10590,7 @@ cells rot within days.
 | [`frontend/src/components/workflows/library/libraryRow.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibrarylibraryrowts) | 4 / 3 / 201 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent, on the boundary (added 192.2) |
 | [`frontend/src/components/workflows/WorkflowDoorSwitch.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsworkflowdoorswitchtsx) | 18 / 12 / 1075 | **FIRES** | honoured by construction (193 / 193.1 / 199 / **214**) — 214-13 added the service picker and its refusal as CHILDREN |
 | [`frontend/src/pages/WorkflowBuilderPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowbuilderpagetsx) | 56 / 21 / 2977 | **FIRES** | honoured by construction ×6 (193.1 / 193.2 / 197 / 200.3 / 214 / **214.1**) — 214.1 added one import + one gated node, zero `useState` |
-| [`backend/app/api/workflows.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkflowspy) | 41 / 22 / 2254 | **FIRES** | ⚠ **extraction still OWED** — declined again at BUG-260828-09 (one response model added); the named seam is unchanged |
+| [`backend/app/api/workflows.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkflowspy) | 42 / 22 / 2255 | **FIRES** | honoured by construction (192.2 / **258-03**: two route dependencies, no new branch/handler; ⚠ extraction still OWED) |
 | [`backend/app/api/workflow_runs.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkflow_runspy) | 11 / 8 / 1003 | **FIRES** | honoured by construction (200 / 200.1 / **214**) — no longer *at threshold*: it measures **8** phases |
 | [`backend/app/models/thread.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsthreadpy) | 16 / 10 / 438 | ⚠ **FIRES** | honoured by construction (200.1 / **214**) |
 | [`frontend/src/components/workflows/canvasModel.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowscanvasmodelts) | 13 / 6 / 752 | ⚠ **FIRES** | ⚠ absent from BOTH at 6 phases (added 200) |
@@ -15354,16 +15364,16 @@ re-drive, `:1331` continuation), `publish_service.py`, `scheduler_service.py` an
 
 ---
 
-## `backend/app/db/entitlements.py` — row added 2026-09-19 (Phase 258)
+## `backend/app/db/entitlements.py`
 
-**`0 / 0 / 0`** — created by Phase 258 (`258-01`). Row added **at creation**.
+**`0 / 0 / 0`** — created by Phase 258 (`258-01`). **Row added AT CREATION.** Precedent in `CLAUDE.md` is explicit: rows added at creation, since an absent row is invisible to G-5 at any count (`LibraryCloudImport.tsx` / `settingsSearchPayload.ts` precedent).
 
-**What it owns.** The database access layer for commercial capability matrix queries (`public.tier_capabilities`) and additive `organizations.add_ons` overrides. Provides `get_tier_capabilities()`, `is_capability_enabled_for_tier()`, and `resolve_org_entitlement()`. Fails closed on database connectivity errors or unresolvable organizations.
+**What it owns.** The database access layer for commercial capability matrix queries (`public.tier_capabilities`) and additive `organizations.add_ons` overrides. Provides `get_tier_capabilities()`, `is_capability_enabled_for_tier()`, and `resolve_org_entitlement()`. Strictly fails closed on database connectivity errors or unresolvable organizations (TIER-05).
 
 ---
 
-## `backend/app/services/entitlement_service.py` — row added 2026-09-19 (Phase 258)
+## `backend/app/services/entitlement_service.py`
 
-**`0 / 0 / 0`** — created by Phase 258 (`258-02`). Row added **at creation**.
+**`0 / 0 / 0`** — created by Phase 258 (`258-02`). **Row added AT CREATION.** Precedent in `CLAUDE.md` is explicit: rows added at creation, since an absent row is invisible to G-5 at any count. This module is about to become the single canonical home for every commercial boundary in the product (TIER-01) — the worst possible file to have invisible to G-5.
 
-**What it owns.** The single canonical service home for entitlement evaluation across the backend (TIER-01). Exposes `check_entitlement()`, `require_capability()`, and `EntitlementDeniedException` (HTTP 403 Forbidden with structured refusal JSON naming the required tier, current tier, capability, and upgrade hint per TIER-03). Guarded by an AST single-home fence (`test_258_single_entitlement_home.py`, TIER-04). Fails closed on unreadable tiers or database blips (TIER-05).
+**What it owns.** The single canonical service home for entitlement evaluation across the product. Exposes `check_entitlement()`, `require_capability()`, and `EntitlementDeniedException` (HTTP 403 Forbidden with structured refusal JSON naming required tier, current tier, capability, and upgrade hint per TIER-03). Guarded by an AST single-home fence (`test_258_single_entitlement_home.py`, TIER-04). Fails closed on unreadable tiers or database blips (TIER-05).

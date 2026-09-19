@@ -130,6 +130,26 @@ What an org has paid for decides what it can do, from **one** place, and a refus
 
 </code_context>
 
+<guardrails>
+## Hot-File Ledger & Guardrail Dispositions (G-5)
+
+### 1. `backend/app/api/workflows.py` — G-5 FIRES (Honoured by Construction)
+- **Measured Triple**: `42 commits / 22 phases / 2255 lines` (21 phases excluding quick task `260814`).
+- **Ledger Status**: Prior verdict was `⚠ extraction still OWED` (declined at BUG-260828-09).
+- **Phase 258 Disposition**: **Honoured by construction**.
+  - `258-03` adds exactly two route-level dependency bindings: `Depends(require_capability("workflows"))` to `create_draft` (`POST /workflows`) and `publish_workflow` (`POST /workflows/{id}/publish`).
+  - Zero new route endpoints or handlers added.
+  - Zero new branches or conditional logic in `workflows.py`.
+  - Zero new state or database queries (delegates evaluation to `entitlement_service`).
+  - Total file delta is strictly compositional (~4 lines: 1 import + 2 decorator dependency parameters).
+  - ⚠ **The extraction remains OWED and unobstructed**: The modular decomposition seam (definition CRUD, validate/lint, grounding palette, publish gauntlet, run launcher, template door) is preserved without disturbance. Smuggling a major refactor of `workflows.py` into a commercial security gating phase would violate focus.
+
+### 2. New Source Files Added to Ledger AT CREATION
+- `backend/app/db/entitlements.py` (0/0/0) — Row added AT CREATION in `docs/HOT-FILE-LEDGER.md` and `CLAUDE.md`.
+- `backend/app/services/entitlement_service.py` (0/0/0) — Row added AT CREATION in `docs/HOT-FILE-LEDGER.md` and `CLAUDE.md`.
+- **Precedent & Rationale**: Per `CLAUDE.md`, an absent row is permanently invisible to G-5 at any commit count (`settingsSearchPayload.ts` / `LibraryCloudImport.tsx` precedent). As `entitlement_service.py` becomes the single commercial boundary home across the product, leaving it invisible is unacceptable.
+</guardrails>
+
 <specifics>
 ## Specific Ideas
 

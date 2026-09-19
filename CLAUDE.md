@@ -675,7 +675,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/library/libraryRow.ts` | 4 / 3 / 201 | ⚠ absent, on the boundary (added 192.2) |
 | `frontend/src/components/workflows/WorkflowDoorSwitch.tsx` | 18 / 12 / 1075 | honoured by construction (193 / 193.1 / 199 / **214**) |
 | `frontend/src/pages/WorkflowBuilderPage.tsx` | 56 / 21 / 2977 | honoured by construction ×6 (193.1 / 193.2 / 197 / 200.3 / 214 / **214 |
-| `backend/app/api/workflows.py` | 41 / 22 / 2254 | ⚠ **extraction still OWED** |
+| `backend/app/api/workflows.py` | 42 / 22 / 2255 | ⚠ **extraction still OWED** · honoured by construction (258-03: 2 Depends, no branch) |
 | `backend/app/api/workflow_runs.py` | 11 / 8 / 1089 | honoured by construction (200 / 200.1 / **214**) |
 | `backend/app/models/thread.py` | 16 / 10 / 438 | honoured by construction (200.1 / **214**) |
 | `frontend/src/components/workflows/canvasModel.ts` | 13 / 6 / 752 | ⚠ absent from BOTH at 6 phases (added 200) |
@@ -807,6 +807,8 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `scripts/full-schema-supplement.sql` | 11 / 6 / 653 | ⚠ **FIRES, and absent for its ENTIRE LIFE at 6 phases — row added 253-02.** ⛔ NO GATE COULD DEMAND IT: `scripts/` is EXEMPT in check-hot-file-ledger.cjs. The ONE hand-mirror of every migration ACL; its tail is byte-identical to `full-schema.sql` |
 | `.claude/settings.json` | 9 / 4 / 202 | ⚠ **FIRES, absent from BOTH registers its ENTIRE LIFE at 4 phases — rows added 253-03.** ⛔ `.claude/` is EXEMPT: no gate can ask. The ONE hook dispatch table; a dropped entry fires NEVER, in silence |
 | `backend/app/services/forced_emit.py` | 10 / 6 / 705 | ⚠ **FIRES, absent from BOTH registers its ENTIRE LIFE at 5 phases — row added 256-04, in its FIRST edit's commit.** ⛔ accumulators init `None` never `0`, ABOVE the rung loop so a FAILED rung counts |
+| `backend/app/db/entitlements.py` | 0 / 0 / 0 | young (created 258). Row added AT CREATION — an absent row is invisible to G-5 at any count |
+| `backend/app/services/entitlement_service.py` | 0 / 0 / 0 | young (created 258). Row added AT CREATION. Single commercial boundary home (TIER-01/04) |
 
 When a new phase enters discuss-phase, the orchestrator must scan PLAN.md `files_modified` against this ledger. Any match against a G-5-firing row means the discuss-phase produces a refactor recommendation as the first option, not the planned feature — and the phase reads that file's section in `docs/HOT-FILE-LEDGER.md` before planning, because that is where the named seam and the binding invariants live.
 
