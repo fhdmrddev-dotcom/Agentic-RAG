@@ -318,6 +318,21 @@ describe("AdminSpendPage (METER-07)", () => {
     expect(screen.queryByText("$0.0000")).not.toBeInTheDocument()
   })
 
+  it("renders an em-dash and never confident $0.0000 while spend summary is loading (WR-12)", async () => {
+    // Hang requests so summary is null and loadError is null
+    vi.mocked(spendApi.getSpendSummary).mockReturnValueOnce(new Promise(() => {}))
+    vi.mocked(spendApi.getSpendRuns).mockReturnValueOnce(new Promise(() => {}))
+    vi.mocked(spendApi.getModelRates).mockReturnValueOnce(new Promise(() => {}))
+
+    render(<AdminSpendPage />)
+
+    // The headline KPI must render em-dash "—" while loading, NEVER a confident "$0.0000"
+    const headlineCard = screen.getByText(/Total Org Spend/i).closest("div")
+    expect(headlineCard).toHaveTextContent("—")
+    expect(headlineCard).not.toHaveTextContent("$0.0000")
+    expect(screen.queryByText("$0.0000")).not.toBeInTheDocument()
+  })
+
   it("ignores stale load responses when a filter change or newer request races it (WR-02)", async () => {
     let resolveSlow!: (value: any) => void
     const slowPromise = new Promise((res) => {

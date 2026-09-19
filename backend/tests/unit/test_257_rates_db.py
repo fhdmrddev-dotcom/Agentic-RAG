@@ -12,6 +12,8 @@ import pytest
 
 from app.db.rates import (
     get_rate_for_model,
+    get_rate_history_for_models,
+    resolve_effective_rate,
     list_model_rates,
     reprice_model,
     get_org_spend_summary,
@@ -67,6 +69,170 @@ async def test_get_rate_for_model_not_found_returns_none():
 
     rate = await get_rate_for_model(pool, "unrated-model-xyz")
     assert rate is None
+
+
+@pytest.mark.asyncio
+async def test_get_rate_for_model_wr11_valid_string_coercion():
+    pool = _build_mock_pool()
+    now = datetime(2026, 6, 1, 12, 0, tzinfo=timezone.utc)
+    pool.fetchrow.return_value = {
+        "id": uuid4(),
+        "model_id": "gpt-4o",
+        "provider": "openai",
+        "input_cost_per_million": Decimal("0.300000"),
+        "output_cost_per_million": Decimal("1.200000"),
+        "effective_from": now,
+        "org_id": None,
+        "created_at": now,
+    }
+
+    # Valid ISO string with Z
+    rate = await get_rate_for_model(pool, "gpt-4o", provider="openai", effective_at="2026-06-01T12:00:00Z")
+    assert rate is not None
+    assert pool.fetchrow.await_count == 1
+    sql, model_id, org_id, provider, eff_ts = pool.fetchrow.call_args[0]
+    assert eff_ts == now
+
+
+@pytest.mark.asyncio
+async def test_get_rate_for_model_wr11_unparseable_effective_at_refuses():
+    """WR-11: unparseable effective_at must fail closed (return None), never fall back to now()."""
+    pool = _build_mock_pool()
+
+    # Unparseable string
+    rate = await get_rate_for_model(pool, "gpt-4o", effective_at="UNPARSEABLE_DATE")
+    assert rate is None
+    assert pool.fetchrow.await_count == 0, "Must not query DB or fall back to now() on unparseable date"
+
+    # Empty string
+    rate2 = await get_rate_for_model(pool, "gpt-4o", effective_at="")
+    assert rate2 is None
+    assert pool.fetchrow.await_count == 0
+
+
+@pytest.mark.asyncio
+async def test_get_rate_for_model_wr11_unparseable_org_id_refuses():
+    """WR-11: unparseable org_id must fail closed (return None), never silently widen to global."""
+    pool = _build_mock_pool()
+
+    rate = await get_rate_for_model(pool, "gpt-4o", org_id="not-a-valid-uuid")
+    assert rate is None
+    assert pool.fetchrow.await_count == 0, "Must not query DB or widen to global rates on garbage org_id"
+
+
+@pytest.mark.asyncio
+async def test_get_rate_history_for_models_batches():
+    """WR-09: fetch rate history in a single query using ANY($1::text[])."""
+    pool = _build_mock_pool()
+    now = datetime(2026, 9, 19, 12, 0, tzinfo=timezone.utc)
+    pool.fetch.return_value = [
+        {
+            "id": uuid4(),
+            "model_id": "gpt-4o",
+            "provider": "openai",
+            "input_cost_per_million": Decimal("2.500000"),
+            "output_cost_per_million": Decimal("10.000000"),
+            "effective_from": now,
+            "org_id": None,
+            "created_at": now,
+        },
+        {
+            "id": uuid4(),
+            "model_id": "claude-3-5-sonnet",
+            "provider": "anthropic",
+            "input_cost_per_million": Decimal("3.000000"),
+            "output_cost_per_million": Decimal("15.000000"),
+            "effective_from": now,
+            "org_id": None,
+            "created_at": now,
+        }
+    ]
+
+    rates = await get_rate_history_for_models(pool, ["gpt-4o", "claude-3-5-sonnet"])
+    assert len(rates) == 2
+    assert pool.fetch.await_count == 1
+    sql, models, org_ids = pool.fetch.call_args[0]
+    assert "model_id = ANY($1::text[])" in sql
+    assert models == ["gpt-4o", "claude-3-5-sonnet"]
+
+
+def test_resolve_effective_rate_historical_and_org_preference():
+    """WR-09: resolve effective rate in-memory respecting effective-date and org specificity."""
+    past_june = datetime(2026, 6, 1, tzinfo=timezone.utc)
+    recent_sept = datetime(2026, 9, 1, tzinfo=timezone.utc)
+    org_a = uuid4()
+    org_b = uuid4()
+
+    all_rates = [
+        # Global June rate: $0.30
+        ModelRate(
+            id=uuid4(),
+            model_id="gpt-4o",
+            provider="openai",
+            input_cost_per_million=Decimal("0.300000"),
+            output_cost_per_million=Decimal("1.200000"),
+            effective_from=past_june,
+            org_id=None,
+        ),
+        # Global Sept rate: $3.00
+        ModelRate(
+            id=uuid4(),
+            model_id="gpt-4o",
+            provider="openai",
+            input_cost_per_million=Decimal("3.000000"),
+            output_cost_per_million=Decimal("12.000000"),
+            effective_from=recent_sept,
+            org_id=None,
+        ),
+        # Org-A specific Sept rate: $2.00
+        ModelRate(
+            id=uuid4(),
+            model_id="gpt-4o",
+            provider="openai",
+            input_cost_per_million=Decimal("2.000000"),
+            output_cost_per_million=Decimal("8.000000"),
+            effective_from=recent_sept,
+            org_id=org_a,
+        ),
+    ]
+
+    # Past July run for org_a should get global June rate ($0.30) because Org-A rate only started in Sept
+    rate_july = resolve_effective_rate(
+        all_rates,
+        "gpt-4o",
+        provider="openai",
+        effective_at=datetime(2026, 7, 15, tzinfo=timezone.utc),
+        org_id=org_a,
+    )
+    assert rate_july is not None
+    assert rate_july.input_cost_per_million == Decimal("0.300000")
+
+    # Sept 10 run for org_a should get Org-A specific rate ($2.00) over global ($3.00)
+    rate_sept_org_a = resolve_effective_rate(
+        all_rates,
+        "gpt-4o",
+        provider="openai",
+        effective_at=datetime(2026, 9, 10, tzinfo=timezone.utc),
+        org_id=org_a,
+    )
+    assert rate_sept_org_a is not None
+    assert rate_sept_org_a.input_cost_per_million == Decimal("2.000000")
+
+    # Sept 10 run for org_b should get Global rate ($3.00)
+    rate_sept_org_b = resolve_effective_rate(
+        all_rates,
+        "gpt-4o",
+        provider="openai",
+        effective_at=datetime(2026, 9, 10, tzinfo=timezone.utc),
+        org_id=org_b,
+    )
+    assert rate_sept_org_b is not None
+    assert rate_sept_org_b.input_cost_per_million == Decimal("3.000000")
+
+    # Unparseable string date must return None (fail closed per WR-11)
+    assert resolve_effective_rate(all_rates, "gpt-4o", effective_at="BAD_DATE") is None
+    # Unparseable org_id must return None (fail closed per WR-11)
+    assert resolve_effective_rate(all_rates, "gpt-4o", org_id="NOT_UUID") is None
 
 
 @pytest.mark.asyncio

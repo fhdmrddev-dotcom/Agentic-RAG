@@ -3,6 +3,7 @@ import json
 import logging
 import os
 from datetime import datetime, timezone
+from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse
@@ -351,12 +352,13 @@ async def _enrich_messages_with_runs(
         m["started_at"] = run["started_at"] if run else None
         m["completed_at"] = run["completed_at"] if run else None
 
-    # ── Phase 257.1 (ROADMAP SC#4) — cost, resolved ONCE PER DISTINCT MODEL ─────────────
+    # ── Phase 257.1 (ROADMAP SC#4) — cost, resolved in batch ────────────────────────────
     #
-    # ⛔ THE LOOKUP IS BATCHED BY MODEL, NOT DONE PER MESSAGE. A thread is routinely 50+
+    # ⛔ THE LOOKUP IS BATCHED ACROSS MODELS, NOT DONE PER MESSAGE. A thread is routinely 50+
     # messages and CLAUDE.md's long-message UAT axis specifies ≥50; a per-message rate
-    # query would add one round trip per row to the hot `/messages` path. A thread uses a
-    # handful of distinct models, so this is O(models), not O(messages).
+    # query would add one round trip per row to the hot `/messages` path. Rate history for
+    # all models in the thread is fetched in a single query (WR-09), and effective rates are
+    # resolved in Python. This is O(1) DB queries, not O(messages).
     #
     # ⛔ ROUTED THROUGH THE ONE CONVERSION HOME (METER-02 / SC#3). `tokens * rate / 1e6`
     # written here would be an additional conversion site and the AST fence in
@@ -375,6 +377,26 @@ async def _enrich_messages_with_runs(
     if models_seen:
         try:
             pool = await get_pg_pool()
+            raw_org_ids = [
+                run.get("org_id")
+                for m in messages
+                if (run := runs_by_message.get(m.get("id"))) and run.get("org_id")
+            ]
+            org_ids: list[UUID] = []
+            for o in raw_org_ids:
+                if isinstance(o, UUID):
+                    org_ids.append(o)
+                elif isinstance(o, str) and o.strip():
+                    try:
+                        org_ids.append(UUID(o.strip()))
+                    except (ValueError, TypeError):
+                        pass
+            unique_org_ids = list(set(org_ids)) if org_ids else None
+            all_rates = await rates.get_rate_history_for_models(
+                pool,
+                list(models_seen),
+                org_ids=unique_org_ids,
+            )
             rate_cache: dict[tuple[str, str | None, Any, Any], rates.ModelRate | None] = {}
             for m in messages:
                 name = m.get("model")
@@ -388,8 +410,8 @@ async def _enrich_messages_with_runs(
                 r_org = run.get("org_id")
                 cache_key = (name, r_prov, r_effective, r_org)
                 if cache_key not in rate_cache:
-                    rate_cache[cache_key] = await rates.get_rate_for_model(
-                        pool,
+                    rate_cache[cache_key] = rates.resolve_effective_rate(
+                        all_rates,
                         name,
                         provider=r_prov,
                         effective_at=r_effective,

@@ -3857,7 +3857,8 @@ const BASELINE = {
   // 10 -> 17 in 257 CR-06. ⚠ The pin sat at 10 while the file ran 13: the gate's contract is
   // no per-file DECREASE, so the three cases covering CR-02/CR-04/WR-02 were UNGUARDED and
   // deleting them stayed green (driven). Re-pinned to the real count with the CR-06 cases.
-  "AdminSpendPage.test.tsx": 17,
+  // 17 -> 18 in 257 WR-12: fence em-dash loading state so pre-fix fallback $0.0000 cannot return.
+  "AdminSpendPage.test.tsx": 18,
   // 5 -> 7 in Phase 257.1: two cases added for the badge's THIRD state ("No tokens
   // recorded" for a rated model whose run measured nothing) and for the undefined-vs-null
   // coverage distinction. Both were introduced by the review's own fixes and covered by

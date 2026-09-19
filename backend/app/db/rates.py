@@ -4,6 +4,7 @@ Phase 257 (METER-01, METER-02, METER-07).
 All queries parameterised with $1..$N asyncpg binds.
 """
 
+import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -13,6 +14,8 @@ from uuid import UUID
 import asyncpg
 
 from app.services.pricing_service import ModelRate, compute_token_cost_usd
+
+logger = logging.getLogger(__name__)
 
 COMPLETE_COVERAGE_LEGS = frozenset({"agent", "single", "batch", "emit"})
 
@@ -55,15 +58,32 @@ async def get_rate_for_model(
     Orders by effective_from DESC to retrieve the latest rate active at effective_at.
     """
     if isinstance(effective_at, str):
+        effective_at_str = effective_at.strip()
+        if not effective_at_str:
+            logger.warning("rates: empty effective_at string; refusing to price at now()")
+            return None
         try:
-            effective_at = datetime.fromisoformat(effective_at.replace("Z", "+00:00"))
-        except Exception:
-            effective_at = None
+            effective_at = datetime.fromisoformat(effective_at_str.replace("Z", "+00:00"))
+        except (ValueError, TypeError):
+            logger.warning("rates: unparseable effective_at %r; refusing to price at now()", effective_at)
+            return None
+    elif effective_at is not None and not isinstance(effective_at, datetime):
+        logger.warning("rates: invalid effective_at type %r; refusing to price at now()", type(effective_at))
+        return None
+
     if isinstance(org_id, str):
-        try:
-            org_id = UUID(org_id)
-        except Exception:
+        org_id_str = org_id.strip()
+        if not org_id_str:
             org_id = None
+        else:
+            try:
+                org_id = UUID(org_id_str)
+            except (ValueError, TypeError):
+                logger.warning("rates: unparseable org_id %r; refusing to resolve rate", org_id)
+                return None
+    elif org_id is not None and not isinstance(org_id, UUID):
+        logger.warning("rates: invalid org_id type %r; refusing to resolve rate", type(org_id))
+        return None
 
     effective_ts = effective_at or datetime.now(timezone.utc)
 
@@ -94,6 +114,120 @@ async def get_rate_for_model(
         effective_from=row["effective_from"],
         org_id=row["org_id"],
     )
+
+
+async def get_rate_history_for_models(
+    pool: asyncpg.Pool,
+    model_ids: list[str],
+    org_ids: list[UUID] | None = None,
+) -> list[ModelRate]:
+    """Retrieve rate history for a batch of models.
+
+    Phase 257 (WR-09): enables O(1) database queries for long message threads
+    instead of 1 round-trip per message, preserving effective-dated resolution.
+    """
+    if not model_ids:
+        return []
+    query = """
+        SELECT id, model_id, provider, input_cost_per_million, output_cost_per_million,
+               effective_from, org_id, created_at
+        FROM public.model_rates
+        WHERE model_id = ANY($1::text[])
+          AND ($2::uuid[] IS NULL OR org_id = ANY($2::uuid[]) OR org_id IS NULL)
+        ORDER BY
+          effective_from DESC
+    """
+    rows = await pool.fetch(query, model_ids, org_ids)
+    return [
+        ModelRate(
+            id=r["id"],
+            model_id=r["model_id"],
+            provider=r["provider"],
+            input_cost_per_million=Decimal(str(r["input_cost_per_million"])),
+            output_cost_per_million=Decimal(str(r["output_cost_per_million"])),
+            effective_from=r["effective_from"],
+            org_id=r["org_id"],
+        )
+        for r in rows
+    ]
+
+
+def resolve_effective_rate(
+    rates: list[ModelRate],
+    model_id: str,
+    provider: str | None = None,
+    effective_at: datetime | str | None = None,
+    org_id: UUID | str | None = None,
+) -> ModelRate | None:
+    """Resolve the effective rate from in-memory rate history.
+
+    Mirrors the exact SQL resolution logic of get_rate_for_model (WR-11, CR-01):
+    - Rejects unparseable/empty effective_at or unparseable org_id (fails closed)
+    - Prioritizes org-specific rates over global rates
+    - Prioritizes provider-specific rates over provider-neutral rates
+    - Picks the latest rate with effective_from <= effective_at
+    """
+    if isinstance(effective_at, str):
+        effective_at_str = effective_at.strip()
+        if not effective_at_str:
+            logger.warning("rates: empty effective_at string; refusing to price at now()")
+            return None
+        try:
+            effective_at = datetime.fromisoformat(effective_at_str.replace("Z", "+00:00"))
+        except (ValueError, TypeError):
+            logger.warning("rates: unparseable effective_at %r; refusing to price at now()", effective_at)
+            return None
+    elif effective_at is not None and not isinstance(effective_at, datetime):
+        logger.warning("rates: invalid effective_at type %r; refusing to price at now()", type(effective_at))
+        return None
+
+    if isinstance(org_id, str):
+        org_id_str = org_id.strip()
+        if not org_id_str:
+            org_id = None
+        else:
+            try:
+                org_id = UUID(org_id_str)
+            except (ValueError, TypeError):
+                logger.warning("rates: unparseable org_id %r; refusing to resolve rate", org_id)
+                return None
+    elif org_id is not None and not isinstance(org_id, UUID):
+        logger.warning("rates: invalid org_id type %r; refusing to resolve rate", type(org_id))
+        return None
+
+    eff_ts = effective_at or datetime.now(timezone.utc)
+    if eff_ts.tzinfo is None:
+        eff_ts = eff_ts.replace(tzinfo=timezone.utc)
+
+    candidates: list[ModelRate] = []
+    for r in rates:
+        if r.model_id != model_id:
+            continue
+        if r.provider is not None and provider is not None and r.provider != provider:
+            continue
+        if r.org_id is not None and org_id is not None and r.org_id != org_id:
+            continue
+        if r.org_id is not None and org_id is None:
+            continue
+
+        r_eff = r.effective_from
+        if r_eff.tzinfo is None:
+            r_eff = r_eff.replace(tzinfo=timezone.utc)
+        if r_eff <= eff_ts:
+            candidates.append(r)
+
+    if not candidates:
+        return None
+
+    candidates.sort(
+        key=lambda r: (
+            r.org_id is not None,
+            r.provider is not None and r.provider == provider,
+            r.effective_from,
+        ),
+        reverse=True,
+    )
+    return candidates[0]
 
 
 async def list_model_rates(
