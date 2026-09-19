@@ -711,7 +711,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/panel/FilesSection.tsx` | 10 / 6 / 363 | ⚠ row was STALE at `8 / 5 / 334`. honoured by construction (**244-05**): TWO `export` keywords, zero body change — the chat chip IMPORTS `expiryCaption`, never re-derives its three readings |
 | `frontend/src/lib/api.ts` | 187 / 110 / 422 | ✅ **SPLIT TAKEN (207)** |
 | `frontend/src/types/index.ts` | 87 / 66 / 1412 | ⚠ row STALE again (`85/65/1380`). honoured by construction (**BUG-260912-01**): ONE optional client-only field, `narrationContent` — no column, because the loop discards this text by design. seam still OWED |
-| `backend/app/main.py` | 83 / 60 / 952 | ⚠ row was STALE by **FOURTEEN PHASES**. honoured by construction (**BUG-260902-06**, Phase 259) |
+| `backend/app/main.py` | 83 / 60 / 951 | ⚠ row was STALE by **FOURTEEN PHASES**. honoured by construction (**BUG-260902-06**, Phase 259) |
 | `backend/app/config.py` | 87 / 50 / 1593 | ⚠ STALE a 13th time. honoured by construction (**249-01**): ONE derived frozenset `ROUTING_PROVIDERS` + a Literal widened to the value the code already returned. ⛔ `MODEL_CAPABILITIES` seam OWED |
 | `backend/app/api/admin.py` | 38 / 14 / 1968 | honoured by construction (**249-01/03**): the add guard swaps its SOURCE LIST; 3 write seams gain a refusal catch. ⛔ order, 422 shape, every other guard byte-unchanged |
 | `backend/app/api/settings.py` | 41 / 21 / 1048 | honoured by construction (**249-02/03**): ONE `_verified_model_ids` helper, 2 callers; PUT gains a refusal arm → 400. ⛔ the 500 arm for an unreachable DB is unchanged |
@@ -809,10 +809,10 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/forced_emit.py` | 10 / 6 / 705 | ⚠ **FIRES, absent from BOTH registers its ENTIRE LIFE at 5 phases — row added 256-04, in its FIRST edit's commit.** ⛔ accumulators init `None` never `0`, ABOVE the rung loop so a FAILED rung counts |
 | `backend/app/db/entitlements.py` | 2 / 1 / 169 | young (created 258). Row added AT CREATION — an absent row is invisible to G-5 at any count |
 | `backend/app/services/entitlement_service.py` | 2 / 1 / 130 | young (created 258). Row added AT CREATION. Single commercial boundary home (TIER-01/04) |
-| `backend/app/db/experts.py` | 0 / 0 / 0 | young (created 259). Row added AT CREATION — absent row is invisible to G-5 (PACK-01) |
-| `backend/app/models/expert.py` | 0 / 0 / 0 | young (created 259). Row added AT CREATION — Pydantic domain models for expert bundles |
-| `backend/app/services/expert_service.py` | 0 / 0 / 0 | young (created 259). Row added AT CREATION — two-phase member boundary check (PACK-04) |
-| `backend/app/api/experts.py` | 0 / 0 / 0 | young (created 259). Row added AT CREATION — REST router with require_capability('experts') (PACK-06) |
+| `backend/app/db/experts.py` | 1 / 1 / 265 | young (created 259). Row added AT CREATION — absent row is invisible to G-5 (PACK-01) |
+| `backend/app/models/expert.py` | 1 / 1 / 52 | young (created 259). Row added AT CREATION — Pydantic domain models for expert bundles |
+| `backend/app/services/expert_service.py` | 2 / 1 / 274 | young (created 259). Row added AT CREATION — two-phase member boundary check (PACK-04) |
+| `backend/app/api/experts.py` | 1 / 1 / 175 | young (created 259). Row added AT CREATION — REST router with require_capability('experts') (PACK-06) |
 
 When a new phase enters discuss-phase, the orchestrator must scan PLAN.md `files_modified` against this ledger. Any match against a G-5-firing row means the discuss-phase produces a refactor recommendation as the first option, not the planned feature — and the phase reads that file's section in `docs/HOT-FILE-LEDGER.md` before planning, because that is where the named seam and the binding invariants live.
 

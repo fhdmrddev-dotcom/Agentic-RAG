@@ -10571,10 +10571,10 @@ cells rot within days.
 
 | File | commits / phases / lines | G-5 | Disposition |
 |---|---|---|---|
-| [`backend/app/db/experts.py`](docs/HOT-FILE-LEDGER.md#backendappdbexpertspy) | 0 / 0 / 0 | no (new) | young (created Phase 259). Row added AT CREATION — absent row is invisible to G-5 (PACK-01). |
-| [`backend/app/models/expert.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsexpertpy) | 0 / 0 / 0 | no (new) | young (created Phase 259). Row added AT CREATION — Pydantic domain models for expert bundles. |
-| [`backend/app/services/expert_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesexpert_servicepy) | 0 / 0 / 0 | no (new) | young (created Phase 259). Row added AT CREATION — two-phase member boundary check (PACK-04). |
-| [`backend/app/api/experts.py`](docs/HOT-FILE-LEDGER.md#backendappapiexpertspy) | 0 / 0 / 0 | no (new) | young (created Phase 259). Row added AT CREATION — REST router with require_capability('experts') (PACK-06). |
+| [`backend/app/db/experts.py`](docs/HOT-FILE-LEDGER.md#backendappdbexpertspy) | 1 / 1 / 265 | no (new) | young (created Phase 259). Row added AT CREATION — absent row is invisible to G-5 (PACK-01). |
+| [`backend/app/models/expert.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsexpertpy) | 1 / 1 / 52 | no (new) | young (created Phase 259). Row added AT CREATION — Pydantic domain models for expert bundles. |
+| [`backend/app/services/expert_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesexpert_servicepy) | 2 / 1 / 274 | no (new) | young (created Phase 259). Row added AT CREATION — two-phase member boundary check (PACK-04). |
+| [`backend/app/api/experts.py`](docs/HOT-FILE-LEDGER.md#backendappapiexpertspy) | 1 / 1 / 175 | no (new) | young (created Phase 259). Row added AT CREATION — REST router with require_capability('experts') (PACK-06). |
 | [`backend/app/db/entitlements.py`](docs/HOT-FILE-LEDGER.md#backendappdbentitlementspy) | 2 / 1 / 169 | no (new) | young (created Phase 258). Row added AT CREATION — absent row is invisible to G-5 (TIER-01/02). |
 | [`backend/app/services/entitlement_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesentitlement_servicepy) | 2 / 1 / 130 | no (new) | young (created Phase 258). Row added AT CREATION. Single commercial boundary home (TIER-01/03/04/05). |
 | [`frontend/src/components/chat/ToolCallPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattoolcallpaneltsx) | 51 / 23 / 351 | **FIRES** | ✅ **G-5 DISCHARGED (227-02)** — extracted ToolCallDetails, StepRow, toolStepDerivation (1019 → 351 lines) |
@@ -10629,7 +10629,7 @@ cells rot within days.
 | [`frontend/src/components/panel/FilesSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelfilessectiontsx) | 10 / 6 / 363 | **FIRES** | ⚠ row was STALE at `8 / 5 / 334`. honoured by construction (**244-05**): TWO `export` keywords, zero body change — the chat chip IMPORTS `expiryCaption` rather than re-deriving its three readings |
 | [`frontend/src/lib/api.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapits) | 187 / 110 / 422 | ⚠ **FIRES** | ✅ **SPLIT TAKEN (207)** — this path is the re-export BARREL. ⚠ **its 12 domain MODULES had no rows of their own until 214** |
 | [`frontend/src/types/index.ts`](docs/HOT-FILE-LEDGER.md#frontendsrctypesindexts) | 85 / 65 / 1380 | ⚠ **FIRES** | ⚠ row was STALE at `78/60/1331`. honoured by construction (**243-04**): one optional CLIENT-ONLY field whose ABSENCE is load-bearing. seam still OWED |
-| [`backend/app/main.py`](docs/HOT-FILE-LEDGER.md#backendappmainpy) | 83 / 60 / 952 | ⚠ **FIRES** | ⚠ row was STALE by **FOURTEEN PHASES** at `79 / 45 / 876`. honoured by construction (**BUG-260902-06**, Phase 259 router mount) |
+| [`backend/app/main.py`](docs/HOT-FILE-LEDGER.md#backendappmainpy) | 83 / 60 / 951 | ⚠ **FIRES** | ⚠ row was STALE by **FOURTEEN PHASES** at `79 / 45 / 876`. honoured by construction (**BUG-260902-06**, Phase 259 router mount) |
 | [`backend/app/config.py`](docs/HOT-FILE-LEDGER.md#backendappconfigpy) | 87 / 50 / 1593 | ⚠ **FIRES** | ⚠ STALE a 13th time (`83/48/1506`). honoured by construction (**249-01**): ONE derived frozenset + a Literal widened to the value the code already returned. ⛔ MODEL_CAPABILITIES seam OWED |
 | [`backend/app/api/admin.py`](docs/HOT-FILE-LEDGER.md#backendappapiadminpy) | 38 / 14 / 1968 | ⚠ **FIRES** | honoured by construction (**249-01/03**): the add guard swaps its SOURCE LIST; 3 write seams gain a refusal catch. ⛔ order, 422 shape and every other guard byte-unchanged |
 | [`backend/app/api/settings.py`](docs/HOT-FILE-LEDGER.md#backendappapisettingspy) | 41 / 21 / 1048 | ⚠ **FIRES** | honoured by construction (**249-02/03**): ONE `_verified_model_ids` helper w/ 2 callers; PUT gains a refusal arm → 400. ⛔ the 500 arm for an unreachable DB is unchanged |
@@ -15386,7 +15386,7 @@ What it owns. The single canonical service home for entitlement evaluation acros
 
 ## `backend/app/db/experts.py`
 
-**`0 / 0 / 0`** — created by Phase 259 (`259-01`). **Row added AT CREATION.** Precedent in `CLAUDE.md` is explicit: rows added at creation, since an absent row is invisible to G-5 at any count (`LibraryCloudImport.tsx` / `settingsSearchPayload.ts` precedent).
+**`1 / 1 / 265`** — created by Phase 259 (`259-01`). **Row added AT CREATION.** Precedent in `CLAUDE.md` is explicit: rows added at creation, since an absent row is invisible to G-5 at any count (`LibraryCloudImport.tsx` / `settingsSearchPayload.ts` precedent).
 
 What it owns. The database access layer for domain expert bundles (`public.expert_bundles`). Provides asyncpg queries for CRUD operations, partial unique slug enforcement, system seed querying, and tenant isolation.
 
@@ -15394,7 +15394,7 @@ What it owns. The database access layer for domain expert bundles (`public.exper
 
 ## `backend/app/models/expert.py`
 
-**`0 / 0 / 0`** — created by Phase 259 (`259-01`). **Row added AT CREATION.** Precedent in `CLAUDE.md` is explicit: rows added at creation, since an absent row is invisible to G-5 at any count.
+**`1 / 1 / 52`** — created by Phase 259 (`259-01`). **Row added AT CREATION.** Precedent in `CLAUDE.md` is explicit: rows added at creation, since an absent row is invisible to G-5 at any count.
 
 What it owns. Pydantic schemas for domain expert bundles: `PromptSuggestion`, `ExpertBundleBase`, `ExpertBundleCreate`, `ExpertBundleUpdate`, and `ExpertBundle`.
 
@@ -15402,7 +15402,7 @@ What it owns. Pydantic schemas for domain expert bundles: `PromptSuggestion`, `E
 
 ## `backend/app/services/expert_service.py`
 
-**`0 / 0 / 0`** — created by Phase 259 (`259-02`). **Row added AT CREATION.** Precedent in `CLAUDE.md` is explicit: rows added at creation, since an absent row is invisible to G-5 at any count.
+**`2 / 1 / 274`** — created by Phase 259 (`259-02`). **Row added AT CREATION.** Precedent in `CLAUDE.md` is explicit: rows added at creation, since an absent row is invisible to G-5 at any count.
 
 What it owns. The business logic layer for domain expert bundles, implementing two-phase member boundary evaluation (`resolve_expert_bundle`). Verifies that referenced member skills, knowledge folders, and connections belong to the caller's active org (or are system resources). Foreign org references are stripped and logged with an audit warning (`EXPERT_MEMBER_CROSS_ORG_STRIPPED`), strictly enforcing PACK-04 and preventing SEED-125 cross-org data leaks.
 
@@ -15410,6 +15410,6 @@ What it owns. The business logic layer for domain expert bundles, implementing t
 
 ## `backend/app/api/experts.py`
 
-**`0 / 0 / 0`** — created by Phase 259 (`259-03`). **Row added AT CREATION.** Precedent in `CLAUDE.md` is explicit: rows added at creation, since an absent row is invisible to G-5 at any count.
+**`1 / 1 / 175`** — created by Phase 259 (`259-03`). **Row added AT CREATION.** Precedent in `CLAUDE.md` is explicit: rows added at creation, since an absent row is invisible to G-5 at any count.
 
 What it owns. The REST API router for domain expert bundles, mounted at `/experts`. All endpoints are guarded with `require_capability('experts')` via Phase 258's canonical entitlement service, enforcing tier gating (PACK-06).

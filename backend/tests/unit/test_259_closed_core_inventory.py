@@ -26,13 +26,21 @@ def test_phase_type_registry_contains_zero_expert_executors():
 
 
 def test_emitter_registry_contains_zero_expert_emitters():
-    """PACK-01: EMITTER_REGISTRY contains zero expert emitters."""
+    """PACK-01: EMITTER_REGISTRY contains zero expert emitters and remains closed (exactly 1)."""
+    assert len(EMITTER_REGISTRY) == 1, (
+        f"Emitter registry drift: expected 1 emitter, got {len(EMITTER_REGISTRY)}: "
+        f"{list(EMITTER_REGISTRY.keys())}"
+    )
     for key in EMITTER_REGISTRY:
         assert "expert" not in key.lower(), f"Expert emitter detected: {key}"
 
 
 def test_tool_dispatcher_contains_zero_expert_tools_or_dispatchers():
-    """PACK-01: _TOOL_REGISTRY and tool_dispatcher have zero expert-specific tools."""
+    """PACK-01: _TOOL_REGISTRY and tool_dispatcher have zero expert-specific tools and registry is closed (exactly 29)."""
+    assert len(_TOOL_REGISTRY) == 29, (
+        f"Tool registry drift: expected 29 tools, got {len(_TOOL_REGISTRY)}: "
+        f"{sorted(list(_TOOL_REGISTRY.keys()))}"
+    )
     for tool_name in _TOOL_REGISTRY:
         assert "expert" not in tool_name.lower(), f"Expert tool registered in _TOOL_REGISTRY: {tool_name}"
 

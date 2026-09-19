@@ -196,14 +196,19 @@ async def resolve_expert_bundle(
 
     if raw_folder_ids:
         folder_query = """
-            SELECT id, org_id
+            SELECT id, org_id, user_id, is_org_shared
             FROM public.folders
             WHERE id = ANY($1::uuid[]);
         """
         folder_rows = await pool.fetch(folder_query, raw_folder_ids)
-        valid_folders: set[UUID] = {
-            r["id"] for r in folder_rows if r.get("org_id") == caller_org_id
-        }
+        valid_folders: set[UUID] = set()
+        for r in folder_rows:
+            f_id = r["id"]
+            f_org_id = r.get("org_id")
+            f_user_id = r.get("user_id")
+            f_shared = bool(r.get("is_org_shared"))
+            if f_org_id == caller_org_id and (f_user_id == caller_user_id or f_shared):
+                valid_folders.add(f_id)
 
         for f_id in raw_folder_ids:
             if f_id in valid_folders:
@@ -213,9 +218,10 @@ async def resolve_expert_bundle(
                 detail = f"folder:{f_id}"
                 stripped_details.append(detail)
                 logger.warning(
-                    "EXPERT_MEMBER_CROSS_ORG_STRIPPED: folder '%s' foreign to org '%s'",
+                    "EXPERT_MEMBER_CROSS_ORG_STRIPPED: folder '%s' foreign or inaccessible to org '%s' (user '%s')",
                     f_id,
                     caller_org_id,
+                    caller_user_id,
                 )
 
     # 3. Evaluate required_connections independently

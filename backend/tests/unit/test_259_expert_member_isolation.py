@@ -54,9 +54,9 @@ async def test_resolve_legitimate_bundle_all_members_admitted():
                 {"name": "system_calc", "is_system": True, "org_id": None, "user_id": None, "is_org_shared": True, "is_enabled": True},
                 {"name": "org_a_tool", "is_system": False, "org_id": org_a, "user_id": user_a, "is_org_shared": False, "is_enabled": True},
             ],
-            # folder_rows: folder_a belongs to org_a
+            # folder_rows: folder_a belongs to org_a and caller user_a
             [
-                {"id": folder_a, "org_id": org_a},
+                {"id": folder_a, "org_id": org_a, "user_id": user_a, "is_org_shared": False},
             ],
             # conn_rows: slack active in org_a
             [
@@ -157,10 +157,10 @@ async def test_resolve_strips_foreign_knowledge_folder(caplog):
 
     mock_pool.fetch = AsyncMock(
         side_effect=[
-            # folder_rows: folder_a is org_a, folder_b is org_b
+            # folder_rows: folder_a is org_a (caller user_a), folder_b is org_b
             [
-                {"id": folder_a, "org_id": org_a},
-                {"id": folder_b, "org_id": org_b},
+                {"id": folder_a, "org_id": org_a, "user_id": user_a, "is_org_shared": False},
+                {"id": folder_b, "org_id": org_b, "user_id": user_a, "is_org_shared": True},
             ],
         ]
     )
@@ -291,3 +291,63 @@ async def test_crud_service_wrappers():
     mock_pool.execute = AsyncMock(return_value="DELETE 1")
     deleted = await delete_expert_service(mock_pool, bundle_id, org_id)
     assert deleted is True
+
+
+@pytest.mark.asyncio
+async def test_resolve_strips_unshared_same_org_foreign_user_folder(caplog):
+    """F-1: In same org, another user's private unshared folder must be stripped.
+
+    Verifies:
+      - caller-owned private folder: admitted
+      - other user's org-shared folder: admitted
+      - other user's private unshared folder: stripped with EXPERT_MEMBER_CROSS_ORG_STRIPPED
+      - cross-org folder: stripped
+    """
+    mock_pool = MagicMock()
+    org_a = uuid4()
+    org_b = uuid4()
+    user_a = uuid4()
+    user_b = uuid4()
+    bundle_id = uuid4()
+
+    folder_owned = uuid4()
+    folder_shared = uuid4()
+    folder_private = uuid4()
+    folder_cross_org = uuid4()
+
+    bundle_row = {
+        "id": bundle_id,
+        "name": "Folder Test Expert",
+        "slug": "folder-test-expert",
+        "description": "Bundle testing folder tenancy boundaries",
+        "scope_mode": "restricted",
+        "is_system": False,
+        "org_id": org_a,
+        "member_skills": [],
+        "knowledge_folder_ids": [folder_owned, folder_shared, folder_private, folder_cross_org],
+        "required_connections": [],
+        "prompt_suggestions": [],
+    }
+
+    mock_pool.fetchrow = AsyncMock(return_value=bundle_row)
+    mock_pool.fetch = AsyncMock(
+        side_effect=[
+            # folder_rows
+            [
+                {"id": folder_owned, "org_id": org_a, "user_id": user_a, "is_org_shared": False},
+                {"id": folder_shared, "org_id": org_a, "user_id": user_b, "is_org_shared": True},
+                {"id": folder_private, "org_id": org_a, "user_id": user_b, "is_org_shared": False},
+                {"id": folder_cross_org, "org_id": org_b, "user_id": user_b, "is_org_shared": True},
+            ],
+        ]
+    )
+
+    with caplog.at_level(logging.WARNING):
+        resolved = await resolve_expert_bundle(mock_pool, bundle_id, org_a, user_a)
+
+    assert resolved is not None
+    assert resolved.effective_folder_ids == [folder_owned, folder_shared]
+    assert resolved.stripped_members_count == 2
+    assert f"folder:{folder_private}" in resolved.stripped_details
+    assert f"folder:{folder_cross_org}" in resolved.stripped_details
+    assert any("EXPERT_MEMBER_CROSS_ORG_STRIPPED" in record.message for record in caplog.records)
