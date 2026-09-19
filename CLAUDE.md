@@ -809,6 +809,10 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/forced_emit.py` | 10 / 6 / 705 | ⚠ **FIRES, absent from BOTH registers its ENTIRE LIFE at 5 phases — row added 256-04, in its FIRST edit's commit.** ⛔ accumulators init `None` never `0`, ABOVE the rung loop so a FAILED rung counts |
 | `backend/app/db/entitlements.py` | 2 / 1 / 169 | young (created 258). Row added AT CREATION — an absent row is invisible to G-5 at any count |
 | `backend/app/services/entitlement_service.py` | 2 / 1 / 130 | young (created 258). Row added AT CREATION. Single commercial boundary home (TIER-01/04) |
+| `backend/app/db/experts.py` | 0 / 0 / 0 | young (created 259). Row added AT CREATION — absent row is invisible to G-5 (PACK-01) |
+| `backend/app/models/expert.py` | 0 / 0 / 0 | young (created 259). Row added AT CREATION — Pydantic domain models for expert bundles |
+| `backend/app/services/expert_service.py` | 0 / 0 / 0 | young (created 259). Row added AT CREATION — two-phase member boundary check (PACK-04) |
+| `backend/app/api/experts.py` | 0 / 0 / 0 | young (created 259). Row added AT CREATION — REST router with require_capability('experts') (PACK-06) |
 
 When a new phase enters discuss-phase, the orchestrator must scan PLAN.md `files_modified` against this ledger. Any match against a G-5-firing row means the discuss-phase produces a refactor recommendation as the first option, not the planned feature — and the phase reads that file's section in `docs/HOT-FILE-LEDGER.md` before planning, because that is where the named seam and the binding invariants live.
 

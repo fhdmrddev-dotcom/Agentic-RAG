@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v4.3
 milestone_name: What You Can Actually Sell
 status: in_progress
-last_updated: "2026-09-19T23:35:00.000Z"
-last_activity: 2026-09-19 -- Phase 259 context gathered; decisions locked (D-259-01..08); ready for plan-phase 259.
+last_updated: "2026-09-19T23:40:00.000Z"
+last_activity: 2026-09-19 -- Phase 259 plans authored (259-01..03); ready for execution.
 progress:
   total_phases: 6
   completed_phases: 4
-  total_plans: 12
+  total_plans: 15
   completed_plans: 12
-  percent: 67
+  percent: 80
 ---
 
 # Project State
@@ -34,16 +34,21 @@ See: `.planning/PROJECT.md` (updated 2026-09-18)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 259 (An Expert Is a Bundle, Not a Runtime) — Context gathered, ready for planning.
+**Current focus:** Phase 259 (An Expert Is a Bundle, Not a Runtime) — Plans authored, ready for execution.
 
 ---
 
 ## Current Position
 
 Phase: 259 (an-expert-is-a-bundle-not-a-runtime)
-Plan: 0 of ? (context gathered, ready for planning)
-Status: ready_for_planning
-Last activity: 2026-09-19 -- Phase 259 context gathered; decisions locked (D-259-01..08); ready for plan-phase 259
+Plan: 0 of 3 (planned, ready for execution)
+Status: ready_for_execution
+Last activity: 2026-09-19 -- Phase 259 plans authored (259-01..03); ready for execution
+
+### ⭐ PHASE 259 PLANS AUTHORED — 2026-09-19
+- **259-01-PLAN.md (Wave 1, autonomous: false)**: PACK-01 database foundation. Migration 187 (`expert_bundles` table, partial unique indexes for system templates vs tenant bundles, RLS policies, Financial Analyzer seed row), Pydantic schemas in `models/expert.py`, asyncpg database access layer in `db/experts.py`, unit test suite in `tests/unit/test_259_expert_bundles_db.py`. DB-MUTATING.
+- **259-02-PLAN.md (Wave 2, autonomous: true)**: PACK-04 tenancy defense & member scrubbing. Business logic service in `services/expert_service.py` implementing two-phase resolution (`resolve_expert_bundle`), scrubbing foreign-org skills and folders with audit warning `EXPERT_MEMBER_CROSS_ORG_STRIPPED`, driven RED against planted bypass in `tests/unit/test_259_expert_member_isolation.py`.
+- **259-03-PLAN.md (Wave 3, autonomous: true)**: PACK-01 + PACK-06 API routing & AST fence. REST API router in `api/experts.py`, router mounted in `main.py` (2 lines added, G-5 honoured by construction), Phase 258 `require_capability('experts')` entitlement gate returning structured HTTP 403, and AST closed-core inventory fence in `tests/unit/test_259_closed_core_inventory.py` proving zero new executors/loops/dispatchers, driven RED against planted violation.
 
 ### ⭐ PHASE 259 CONTEXT GATHERED — 2026-09-19
 - **Operator Decision #3**: Declared per Expert (`scope_mode: 'restricted' | 'biased'`). Defaults to `restricted` for high-governance domains like Financial Analyzer (`D-259-01`).

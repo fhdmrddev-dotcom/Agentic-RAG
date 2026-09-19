@@ -10571,6 +10571,10 @@ cells rot within days.
 
 | File | commits / phases / lines | G-5 | Disposition |
 |---|---|---|---|
+| [`backend/app/db/experts.py`](docs/HOT-FILE-LEDGER.md#backendappdbexpertspy) | 0 / 0 / 0 | no (new) | young (created Phase 259). Row added AT CREATION — absent row is invisible to G-5 (PACK-01). |
+| [`backend/app/models/expert.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsexpertpy) | 0 / 0 / 0 | no (new) | young (created Phase 259). Row added AT CREATION — Pydantic domain models for expert bundles. |
+| [`backend/app/services/expert_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesexpert_servicepy) | 0 / 0 / 0 | no (new) | young (created Phase 259). Row added AT CREATION — two-phase member boundary check (PACK-04). |
+| [`backend/app/api/experts.py`](docs/HOT-FILE-LEDGER.md#backendappapiexpertspy) | 0 / 0 / 0 | no (new) | young (created Phase 259). Row added AT CREATION — REST router with require_capability('experts') (PACK-06). |
 | [`backend/app/db/entitlements.py`](docs/HOT-FILE-LEDGER.md#backendappdbentitlementspy) | 2 / 1 / 169 | no (new) | young (created Phase 258). Row added AT CREATION — absent row is invisible to G-5 (TIER-01/02). |
 | [`backend/app/services/entitlement_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesentitlement_servicepy) | 2 / 1 / 130 | no (new) | young (created Phase 258). Row added AT CREATION. Single commercial boundary home (TIER-01/03/04/05). |
 | [`frontend/src/components/chat/ToolCallPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattoolcallpaneltsx) | 51 / 23 / 351 | **FIRES** | ✅ **G-5 DISCHARGED (227-02)** — extracted ToolCallDetails, StepRow, toolStepDerivation (1019 → 351 lines) |
@@ -15377,3 +15381,35 @@ What it owns. The database access layer for commercial capability matrix queries
 **`1 / 1 / 130`** — created by Phase 258 (`258-02`). **Row added AT CREATION.** Precedent in `CLAUDE.md` is explicit: rows added at creation, since an absent row is invisible to G-5 at any count. This module is about to become the single canonical home for every commercial boundary in the product (TIER-01) — the worst possible file to have invisible to G-5.
 
 What it owns. The single canonical service home for entitlement evaluation across the product. Exposes `check_entitlement()`, `require_capability()`, and `EntitlementDeniedException` (HTTP 403 Forbidden with structured refusal JSON naming required tier, current tier, capability, and upgrade hint per TIER-03). Guarded by an AST single-home fence (`test_258_single_entitlement_home.py`, TIER-04). Fails closed on unreadable tiers or database blips (TIER-05).
+
+---
+
+## `backend/app/db/experts.py`
+
+**`0 / 0 / 0`** — created by Phase 259 (`259-01`). **Row added AT CREATION.** Precedent in `CLAUDE.md` is explicit: rows added at creation, since an absent row is invisible to G-5 at any count (`LibraryCloudImport.tsx` / `settingsSearchPayload.ts` precedent).
+
+What it owns. The database access layer for domain expert bundles (`public.expert_bundles`). Provides asyncpg queries for CRUD operations, partial unique slug enforcement, system seed querying, and tenant isolation.
+
+---
+
+## `backend/app/models/expert.py`
+
+**`0 / 0 / 0`** — created by Phase 259 (`259-01`). **Row added AT CREATION.** Precedent in `CLAUDE.md` is explicit: rows added at creation, since an absent row is invisible to G-5 at any count.
+
+What it owns. Pydantic schemas for domain expert bundles: `PromptSuggestion`, `ExpertBundleBase`, `ExpertBundleCreate`, `ExpertBundleUpdate`, and `ExpertBundle`.
+
+---
+
+## `backend/app/services/expert_service.py`
+
+**`0 / 0 / 0`** — created by Phase 259 (`259-02`). **Row added AT CREATION.** Precedent in `CLAUDE.md` is explicit: rows added at creation, since an absent row is invisible to G-5 at any count.
+
+What it owns. The business logic layer for domain expert bundles, implementing two-phase member boundary evaluation (`resolve_expert_bundle`). Verifies that referenced member skills, knowledge folders, and connections belong to the caller's active org (or are system resources). Foreign org references are stripped and logged with an audit warning (`EXPERT_MEMBER_CROSS_ORG_STRIPPED`), strictly enforcing PACK-04 and preventing SEED-125 cross-org data leaks.
+
+---
+
+## `backend/app/api/experts.py`
+
+**`0 / 0 / 0`** — created by Phase 259 (`259-03`). **Row added AT CREATION.** Precedent in `CLAUDE.md` is explicit: rows added at creation, since an absent row is invisible to G-5 at any count.
+
+What it owns. The REST API router for domain expert bundles, mounted at `/experts`. All endpoints are guarded with `require_capability('experts')` via Phase 258's canonical entitlement service, enforcing tier gating (PACK-06).
