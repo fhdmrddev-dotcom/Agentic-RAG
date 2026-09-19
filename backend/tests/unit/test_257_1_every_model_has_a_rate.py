@@ -55,6 +55,55 @@ UNRATED_BY_DESIGN: dict[str, str] = {
 }
 
 
+# ⛔ THE DB HALF OF THE ROSTER, AND THIS FENCE CANNOT ENFORCE IT. Phase 257.
+#
+# The product's real roster is MODEL_CAPABILITIES (61, in code, read below via `ast`)
+# UNION `model_capabilities_overrides` (51, in the DATABASE) = 82 models. Migration 185
+# priced the six first-party ids that live only in the DB half; these fourteen are the
+# rest, and each carries the verdict already reached.
+#
+# ⚠ THEY ARE DELIBERATELY NOT IN `UNRATED_BY_DESIGN`, and putting them there is the
+# WRONG fix. That dict is checked by `test_no_exemption_has_gone_stale`, which asserts
+# every exemption is a model the CODE roster can still run — a real invariant that stops
+# an allowlist rotting. A db-only id trips it, correctly. It fired when this was first
+# written that way, which is the fence doing its job.
+#
+# ⛔ SO THIS DICT IS DOCUMENTATION, NOT ENFORCEMENT, and saying so is the point. Nothing
+# checks it. Widening the fence to the DB roster means reading Postgres, and a test that
+# needs Postgres SKIPS in CI where a skip reads as "not failing" — the exact trap this
+# file was built static to avoid. The DB-roster gap wants an operator-visible check on
+# the spend page instead, driven from what actually RAN. See SEED for phase 186.
+DB_ROSTER_UNRATED_BY_DESIGN: dict[str, str] = {
+    # ── Added in Phase 257 after migration 185. ────────────────────────────────────
+    # ⛔ THESE FOURTEEN ARE DB-ONLY — they live in `model_capabilities_overrides`, not
+    # in MODEL_CAPABILITIES, so THIS FENCE CANNOT SEE THEM, and listing them here does
+    # not make it check them. They are recorded because a reason written down is the
+    # only thing separating a deliberate exemption from an oversight, and because the
+    # next person to widen this fence to the DB roster needs the verdicts already made.
+    #
+    # More OpenRouter. Same reason as the nine above: a router's price depends on which
+    # upstream serves the request, so one effective-dated row would be a fiction.
+    "deepseek/deepseek-v4.1-flash": "openrouter: price depends on upstream routing",
+    "meta/muse-spark-1.3": "openrouter: price depends on upstream routing",
+    "qwen/qwen3.8-27b": "openrouter: price depends on upstream routing",
+    "qwen/qwen3.8-flash": "openrouter: price depends on upstream routing",
+    "qwen/qwen3.8-max": "openrouter: price depends on upstream routing",
+    "stealth/ox-alpha": "openrouter: price depends on upstream routing",
+    "z-ai/glm-5.3-flash": "openrouter: price depends on upstream routing",
+    # Self-hosted. ⛔ NOT free — electricity, GPU amortisation and operator time are real
+    # costs. They are simply not API fees, and this table prices API fees. Seeding 0.00
+    # would say "free", a claim this page must not make; leaving them unrated says "we do
+    # not price this", which is true. 47 real runs sit in this group.
+    "glm-4.7-flash": "self-hosted (lmstudio): no API fee; compute cost is not metered here",
+    "nvidia_nvidia-nemotron-nano-9b-v2": "self-hosted (lmstudio): no API fee; compute cost is not metered here",
+    "openai/gpt-oss-20b": "self-hosted (lmstudio): no API fee; compute cost is not metered here",
+    "qwen-agentworld-35b-a3b": "self-hosted (lmstudio): no API fee; compute cost is not metered here",
+    "qwen3.5-9b-mtp": "self-hosted (lmstudio): no API fee; compute cost is not metered here",
+    "qwen3.6-35b-a3b-mtp": "self-hosted (lmstudio): no API fee; compute cost is not metered here",
+    "qwen3-coder:30b": "self-hosted (ollama): no API fee; compute cost is not metered here",
+}
+
+
 def _roster() -> dict[str, str]:
     """model_id -> provider, read from MODEL_CAPABILITIES via ast.
 
@@ -147,3 +196,24 @@ def test_every_exemption_states_a_reason():
     """A bare id is not an exemption, it is an oversight with an allowlist entry."""
     empty = sorted(m for m, why in UNRATED_BY_DESIGN.items() if not why or not why.strip())
     assert not empty, f"exempted with no reason given: {empty}"
+
+
+def test_every_db_roster_exemption_states_a_reason_and_is_not_double_listed():
+    """The DB-roster verdicts are documentation, so their ONLY guarantee is that they
+    say something — and this is the one property a static fence can actually hold.
+
+    ⛔ It does NOT check that these ids exist, are unrated, or are still registered.
+    Nothing here can: the roster half they belong to lives in Postgres. Claiming more
+    than this would be the "green fence over an unchecked property" failure this phase
+    has already paid for twice.
+    """
+    empty = sorted(m for m, why in DB_ROSTER_UNRATED_BY_DESIGN.items() if not why or not why.strip())
+    assert not empty, f"db-roster exemption with no reason given: {empty}"
+
+    # An id in BOTH dicts means someone moved it without deleting the old entry, and the
+    # two reasons can then disagree silently.
+    overlap = sorted(set(DB_ROSTER_UNRATED_BY_DESIGN) & set(UNRATED_BY_DESIGN))
+    assert not overlap, (
+        "these ids are listed in BOTH exemption dicts, so two reasons can drift apart: "
+        f"{overlap}"
+    )
