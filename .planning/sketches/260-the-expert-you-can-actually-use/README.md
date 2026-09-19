@@ -2,7 +2,7 @@
 sketch: 260
 name: the-expert-you-can-actually-use
 question: "How should a domain expert be invited mid-thread, visibly scope retrieval/tools while preserving conversation history, present 'Try asking...' onboarding suggestions, and be dismissed with zero new top-level composer controls?"
-winner: null
+winner: "Option 1 — Action Tiles (Hero Visual Spotlight + 3 Large Tappable Action Tiles)"
 tags: [experts, chat, composer, consultant-model, onboarding, scoping, pack-02, pack-03, pack-05, d-259-07]
 ---
 
@@ -63,13 +63,14 @@ How should this interaction feel in practice?
 
 ---
 
-## How to View
+## Operator Decision: Option 1 (Action Tiles) Selected
 
-```bash
-# Open in default browser:
-start .planning/sketches/260-the-expert-you-can-actually-use/index.html
-# or the flat convenience copy:
-start .planning/sketches/260-the-expert-you-can-actually-use.html
-```
+**Ratified 2026-09-20 (operator)**:
+- **Core mindset**: *"Less text, more visuals, simplicity, accuracy, and best user experience."*
+- **Winner**: **Option 1 — Action Tiles**:
+  1. **Zero lecturing prose**: No explanatory paragraphs lecturing the user about retention of chat history vs retrieval restrictions. Scope is self-evident via visual tags: `[📁 SEC Filings]`, `[🧰 ratio_calculator]`, `[Restricted]`.
+  2. **Hero visual spotlight card**: Rendered in the chat stream upon invitation with a glowing icon gem and clean identity.
+  3. **3 Large, tappable visual prompt action tiles** (`PACK-03`): Prominently rendered (`📈 Q3 Revenue Growth YoY`, `⚖️ Gross Margin Comparison`, `💵 Operating Cash Flow`) with one-click immediate run.
+  4. **Ambient composer state awareness**: Composer frame gains a subtle violet/indigo ambient glow when an Expert is active, plus the glowing consultant chip `[✨ Financial Analyzer ✕]` in the existing `Using:` row container.
+  5. **Frictionless dismissal**: Single click on `✕` on the chip fades out the consultant and returns the composer to neutral styling without disturbing the conversation flow.
 
-Use the top toolbar to switch between **Variant A**, **Variant B**, and **Variant C**, toggle between **New Empty Thread** and **Mid-Thread with History**, test the interactive `+` menu, invite/dismiss the Financial Analyzer, and click "Try asking..." suggestions to see composer auto-population.
