@@ -66,10 +66,10 @@ survives exactly zero exceptions, so a third-party executor does not weaken it �
 cheapest it will ever be: retrofitting cost attribution across a shipped plugin surface is materially
 harder than building it before one exists.
 
-- [ ] **METER-01**: A per-model cost-rate registry exists — input and output rate per model id,
+- [x] **METER-01**: A per-model cost-rate registry exists — input and output rate per model id,
       effective-dated so a repricing does not rewrite history. A model with **no** rate is
       **visible as unrated**, never silently free.
-- [ ] **METER-02**: One token→USD conversion function, in one home, and every caller uses it. ⛔ A
+- [x] **METER-02**: One token→USD conversion function, in one home, and every caller uses it. ⛔ A
       second conversion site anywhere is the fragmentation failure this requirement exists to prevent.
 - [ ] **METER-03**: A workflow / harness run **persists** its token totals — `workflow_runs` gains
       token columns and the harness's existing in-memory box is rolled up at finalize.
@@ -79,7 +79,7 @@ harder than building it before one exists.
 - [ ] **METER-06**: The `llm_emit` / `forced_emit` blind spot is **either counted or registered** —
       a named register entry with a re-open trigger. ⛔ It may not be left silently uncounted, because
       a spend figure with an unnamed hole in it is worse than no figure.
-- [ ] **METER-07**: An operator can see spend in dollars per run and per org, and the view states
+- [x] **METER-07**: An operator can see spend in dollars per run and per org, and the view states
       **what it cannot see** (unrated models, any gap left open by `METER-06`).
 
 ### Entitlement — a tier becomes enforceable
@@ -217,9 +217,9 @@ Per `SEED-294`, stated here because they get harder to unwind as the work compou
 | METER-04 | Phase 256 — Every Token Is Counted And Kept | Pending |
 | METER-05 | Phase 256 — Every Token Is Counted And Kept | Pending |
 | METER-06 | Phase 256 — Every Token Is Counted And Kept | Pending |
-| METER-01 | Phase 257 — Cost in Dollars, and What It Cannot See | Pending |
-| METER-02 | Phase 257 — Cost in Dollars, and What It Cannot See | Pending |
-| METER-07 | Phase 257 — Cost in Dollars, and What It Cannot See | Pending |
+| METER-01 | Phase 257 — Cost in Dollars, and What It Cannot See | Complete |
+| METER-02 | Phase 257 — Cost in Dollars, and What It Cannot See | Complete |
+| METER-07 | Phase 257 — Cost in Dollars, and What It Cannot See | Complete |
 | TIER-01 | Phase 258 — A Tier Becomes Enforceable | Pending |
 | TIER-02 | Phase 258 — A Tier Becomes Enforceable | Pending |
 | TIER-03 | Phase 258 — A Tier Becomes Enforceable | Pending |

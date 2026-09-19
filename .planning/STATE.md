@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v4.3
 milestone_name: What You Can Actually Sell
 status: executing
-last_updated: "2026-09-19T03:48:00.000Z"
-last_activity: 2026-09-19 -- Phase 257 planned (4 plans in 4 waves); G-2 sketch approved; ready for execution
+last_updated: "2026-09-19T08:50:00.000Z"
+last_activity: 2026-09-19 -- Phase 257 complete (4/4 plans executed, all 3 G-4 failure scenarios verified, rate registry, single-home pricing service, operator spend cockpit, run-level affordances)
 progress:
   total_phases: 13
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 12
-  completed_plans: 5
-  percent: 17
+  completed_plans: 9
+  percent: 25
 ---
 
 # Project State
@@ -34,16 +34,25 @@ See: `.planning/PROJECT.md` (updated 2026-09-18)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 257 (cost-in-dollars-and-what-it-cannot-see) — Plan 257-01 execution next
+**Current focus:** Phase 257 complete — ready for reviewer verification (BUS-275 / Claude)
 
 ---
 
 ## Current Position
 
-Phase: 257 (cost-in-dollars-and-what-it-cannot-see) — **PLANNED**
-Plan: 0 of 4 complete
-Status: Phase 257 planned across 4 plans in 4 waves (257-01 through 257-04). G-2 sketch approved at b6203cc5f. 257-RESEARCH.md and 257-UI-SPEC.md locked. Ready for execution.
-Last activity: 2026-09-19 -- Phase 257 plan-phase complete; 4 plans authored; hot-file ledger updated (301 rows)
+Phase: 257 (cost-in-dollars-and-what-it-cannot-see) — **COMPLETE**
+Plan: 4 of 4 complete
+Status: Phase 257 executed and verified across all 4 plans (257-01 through 257-04). G-4 failure scenarios verified against live Postgres (:54322). AST single-home fence green. Zero TypeScript errors introduced. Count gate preserved.
+Last activity: 2026-09-19 -- Phase 257 execution complete; all 4 plans committed; ready for reviewer review
+
+### ⭐ PHASE 257 CLOSE — 2026-09-19, 4/4 SC
+- **METER-01**: Migration 183 implemented `model_rates` table with effective-dated append-only pricing, compound index `idx_model_rates_lookup`, and org RLS. Unrated models strictly display as `▲ Unrated` with hover tooltip naming the model, never `$0.00`.
+- **METER-02**: Exactly one token→USD conversion function in one home (`backend/app/services/pricing_service.py` -> `compute_token_cost_usd`), returning `CostResult(cost_usd, is_rated)`. AST single-home fence `test_257_single_token_conversion_home.py` verifies no other AST file contains token-to-USD conversion functions. Python-SQL parity verified across 25 permutations in `test_257_rates_db.py`.
+- **METER-07**: Operator spend cockpit mounted at `/admin/spend` (`AdminSpendPage.tsx`), featuring pure SVG 14-day attributable spend chart with unrated volume overlay, model share donut ring, "What This View Cannot See" honesty disclosure card (`BlindSpotsCard.tsx`), and append-only reprice modal (`RepriceModal.tsx`). Run-level affordances mounted in `WorkflowRunPage.tsx` and `RunCard.tsx` via `RunCostBadge.tsx`.
+- **G-4 Lived-Experience UAT**: Automated in `backend/tests/uat_257_scenarios.py` and passed 3/3 against live local Supabase Postgres on port 54322:
+  1. *The Free Lie*: Unrated run with `qwen-2.5-72b` has `cost_usd=None` (never `$0.00`) and is excluded from org spend totals with honesty footnote.
+  2. *Historical Rewrite*: Fast-forward repricing at T1 preserves T0 run cost immutable at `$0.7500`.
+  3. *Blind Spot Amnesia*: Incomplete token coverage (`['agent', 'single']`) is counted in `incomplete_coverage_count` and surfaced under partial coverage filters.
 
 ### ⭐ PHASE 256 CLOSE — 2026-09-19, 4/4 SC (was 2/4)
 
