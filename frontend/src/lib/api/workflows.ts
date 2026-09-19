@@ -716,6 +716,11 @@ export interface WorkflowRunRead {
   definition: WorkflowDefinitionJSON | null
   phases: WorkflowRunPhase[]
   metadata?: Record<string, any> | null
+  /** Phase 257 (METER-07): Attributable cost and rating metadata */
+  cost_usd?: number | null
+  is_rated?: boolean
+  token_coverage?: string[] | null
+  model?: string | null
 }
 
 /**

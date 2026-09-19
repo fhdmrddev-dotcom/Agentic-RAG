@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
-import { render, screen, waitFor, cleanup, act } from "@testing-library/react"
+import { render, screen, waitFor, cleanup } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { AdminSpendPage } from "./AdminSpendPage"
 import * as spendApi from "@/api/spend"
@@ -28,8 +28,26 @@ const mockSummary: SpendSummaryData = {
     { date: "2026-09-19", dayLabel: "09/19", spendUsd: 8.20, unratedCount: 0 },
   ],
   modelBreakdown: [
-    { modelId: "gpt-4o", spendUsd: 80.5, percentage: 54, color: "hsl(142 71% 45%)" },
-    { modelId: "claude-3-5-sonnet", spendUsd: 42.0, percentage: 28, color: "hsl(25 95% 53%)" },
+    {
+      modelId: "gpt-4o",
+      spendUsd: 80.5,
+      percentage: 54,
+      color: "hsl(142 71% 45%)",
+      runCount: 50,
+      ratedCount: 50,
+      unratedCount: 0,
+      isRated: true,
+    },
+    {
+      modelId: "claude-3-5-sonnet",
+      spendUsd: 42.0,
+      percentage: 28,
+      color: "hsl(25 95% 53%)",
+      runCount: 30,
+      ratedCount: 30,
+      unratedCount: 0,
+      isRated: true,
+    },
   ],
 }
 
@@ -83,8 +101,6 @@ describe("AdminSpendPage (METER-07)", () => {
     vi.mocked(spendApi.getSpendRuns).mockResolvedValue({
       runs: mockRuns,
       totalCount: mockRuns.length,
-      limit: 50,
-      offset: 0,
     })
     vi.mocked(spendApi.getModelRates).mockResolvedValue(mockRates)
   })
@@ -173,9 +189,7 @@ describe("AdminSpendPage (METER-07)", () => {
     })
 
     const ratesButton = screen.getByRole("button", { name: /Active Rate Registry/i })
-    act(() => {
-      ratesButton.click()
-    })
+    await user.click(ratesButton)
 
     await waitFor(() => {
       expect(screen.getByText(/Prompt Rate/i)).toBeInTheDocument()

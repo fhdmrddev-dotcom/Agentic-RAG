@@ -45,14 +45,13 @@ async def get_rate_for_model(
     effective_ts = effective_at or datetime.now(timezone.utc)
 
     query = """
-        SELECT id, model_name, provider, input_cost_per_million, output_cost_per_million,
-               effective_from, effective_to, org_id, created_at
+        SELECT id, model_id, provider, input_cost_per_million, output_cost_per_million,
+               effective_from, org_id, created_at
         FROM public.model_rates
-        WHERE model_name = $1
+        WHERE model_id = $1
           AND (org_id = $2 OR org_id IS NULL)
           AND ($3::text IS NULL OR provider = $3 OR provider IS NULL)
           AND effective_from <= $4
-          AND (effective_to IS NULL OR effective_to > $4)
         ORDER BY
           (org_id IS NOT NULL) DESC,
           (provider IS NOT NULL AND provider = $3) DESC,
@@ -65,7 +64,7 @@ async def get_rate_for_model(
 
     return ModelRate(
         id=row["id"],
-        model_id=row["model_name"],
+        model_id=row["model_id"],
         provider=row["provider"],
         input_cost_per_million=Decimal(str(row["input_cost_per_million"])),
         output_cost_per_million=Decimal(str(row["output_cost_per_million"])),
@@ -80,22 +79,23 @@ async def list_model_rates(
 ) -> list[dict[str, Any]]:
     """List all registered rates for display in the admin rates tab."""
     query = """
-        SELECT id, model_name, provider, input_cost_per_million, output_cost_per_million,
-               effective_from, effective_to, org_id, created_at
+        SELECT id, model_id, provider, input_cost_per_million, output_cost_per_million,
+               effective_from, org_id, created_at
         FROM public.model_rates
         WHERE (org_id = $1 OR org_id IS NULL)
-        ORDER BY model_name ASC, effective_from DESC
+        ORDER BY model_id ASC, effective_from DESC
     """
     rows = await pool.fetch(query, org_id)
     return [
         {
             "id": str(r["id"]),
-            "model_name": r["model_name"],
+            "model_name": r["model_id"],
+            "model_id": r["model_id"],
             "provider": r["provider"],
             "input_cost_per_million": str(r["input_cost_per_million"]),
             "output_cost_per_million": str(r["output_cost_per_million"]),
             "effective_from": r["effective_from"].isoformat() if r["effective_from"] else None,
-            "effective_to": r["effective_to"].isoformat() if r["effective_to"] else None,
+            "effective_to": None,
             "org_id": str(r["org_id"]) if r["org_id"] else None,
             "created_at": r["created_at"].isoformat() if r["created_at"] else None,
         }
@@ -121,15 +121,15 @@ async def reprice_model(
 
     query = """
         INSERT INTO public.model_rates (
-            model_name,
+            model_id,
             provider,
             input_cost_per_million,
             output_cost_per_million,
             effective_from,
             org_id
         ) VALUES ($1, $2, $3, $4, $5, $6)
-        RETURNING id, model_name, provider, input_cost_per_million, output_cost_per_million,
-                  effective_from, effective_to, org_id, created_at
+        RETURNING id, model_id, provider, input_cost_per_million, output_cost_per_million,
+                  effective_from, org_id, created_at
     """
     row = await pool.fetchrow(
         query,
@@ -142,7 +142,7 @@ async def reprice_model(
     )
     return ModelRate(
         id=row["id"],
-        model_id=row["model_name"],
+        model_id=row["model_id"],
         provider=row["provider"],
         input_cost_per_million=Decimal(str(row["input_cost_per_million"])),
         output_cost_per_million=Decimal(str(row["output_cost_per_million"])),
@@ -190,11 +190,10 @@ async def get_org_spend_summary(
             LEFT JOIN LATERAL (
                 SELECT mr.input_cost_per_million, mr.output_cost_per_million
                 FROM public.model_rates mr
-                WHERE mr.model_name = r.model
+                WHERE mr.model_id = r.model
                   AND (mr.org_id = r.org_id OR mr.org_id IS NULL)
                   AND (mr.provider = r.provider OR mr.provider IS NULL)
                   AND mr.effective_from <= r.started_at
-                  AND (mr.effective_to IS NULL OR mr.effective_to > r.started_at)
                 ORDER BY
                   (mr.org_id IS NOT NULL) DESC,
                   (mr.provider IS NOT NULL AND mr.provider = r.provider) DESC,
@@ -255,11 +254,10 @@ async def get_org_spend_summary(
             LEFT JOIN LATERAL (
                 SELECT mr.input_cost_per_million, mr.output_cost_per_million
                 FROM public.model_rates mr
-                WHERE mr.model_name = r.model
+                WHERE mr.model_id = r.model
                   AND (mr.org_id = r.org_id OR mr.org_id IS NULL)
                   AND (mr.provider = r.provider OR mr.provider IS NULL)
                   AND mr.effective_from <= r.started_at
-                  AND (mr.effective_to IS NULL OR mr.effective_to > r.started_at)
                 ORDER BY
                   (mr.org_id IS NOT NULL) DESC,
                   (mr.provider IS NOT NULL AND mr.provider = r.provider) DESC,
@@ -313,11 +311,10 @@ async def get_org_spend_summary(
             LEFT JOIN LATERAL (
                 SELECT mr.input_cost_per_million, mr.output_cost_per_million
                 FROM public.model_rates mr
-                WHERE mr.model_name = r.model
+                WHERE mr.model_id = r.model
                   AND (mr.org_id = r.org_id OR mr.org_id IS NULL)
                   AND (mr.provider = r.provider OR mr.provider IS NULL)
                   AND mr.effective_from <= r.started_at
-                  AND (mr.effective_to IS NULL OR mr.effective_to > r.started_at)
                 ORDER BY
                   (mr.org_id IS NOT NULL) DESC,
                   (mr.provider IS NOT NULL AND mr.provider = r.provider) DESC,
@@ -398,11 +395,10 @@ async def get_spend_runs(
         LEFT JOIN LATERAL (
             SELECT mr.input_cost_per_million, mr.output_cost_per_million
             FROM public.model_rates mr
-            WHERE mr.model_name = r.model
+            WHERE mr.model_id = r.model
               AND (mr.org_id = r.org_id OR mr.org_id IS NULL)
               AND (mr.provider = r.provider OR mr.provider IS NULL)
               AND mr.effective_from <= r.started_at
-              AND (mr.effective_to IS NULL OR mr.effective_to > r.started_at)
             ORDER BY
               (mr.org_id IS NOT NULL) DESC,
               (mr.provider IS NOT NULL AND mr.provider = r.provider) DESC,

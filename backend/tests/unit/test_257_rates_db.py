@@ -36,12 +36,11 @@ async def test_get_rate_for_model_matches_and_maps():
     now = datetime(2026, 9, 19, 12, 0, tzinfo=timezone.utc)
     pool.fetchrow.return_value = {
         "id": uuid4(),
-        "model_name": "gpt-4o",
+        "model_id": "gpt-4o",
         "provider": "openai",
         "input_cost_per_million": Decimal("2.500000"),
         "output_cost_per_million": Decimal("10.000000"),
         "effective_from": now,
-        "effective_to": None,
         "org_id": None,
         "created_at": now,
     }
@@ -49,6 +48,7 @@ async def test_get_rate_for_model_matches_and_maps():
     rate = await get_rate_for_model(pool, "gpt-4o", provider="openai", effective_at=now)
     assert rate is not None
     assert rate.model_name == "gpt-4o"
+    assert rate.model_id == "gpt-4o"
     assert rate.input_cost_per_million == Decimal("2.500000")
     assert rate.output_cost_per_million == Decimal("10.000000")
 
@@ -75,12 +75,11 @@ async def test_reprice_model_inserts_and_returns_rate():
     now = datetime(2026, 9, 19, 12, 0, tzinfo=timezone.utc)
     pool.fetchrow.return_value = {
         "id": uuid4(),
-        "model_name": "gpt-4o",
+        "model_id": "gpt-4o",
         "provider": "openai",
         "input_cost_per_million": Decimal("3.000000"),
         "output_cost_per_million": Decimal("12.000000"),
         "effective_from": now,
-        "effective_to": None,
         "org_id": None,
         "created_at": now,
     }

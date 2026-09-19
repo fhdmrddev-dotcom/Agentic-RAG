@@ -199,6 +199,10 @@ export interface Message {
    * streamed runs (not backfilled from DB — runs.error is not yet in the
    * messages response). */
   runError?: string
+  /** Phase 257 (METER-07): Attributable cost and rating metadata for run */
+  costUsd?: number | null
+  isRated?: boolean
+  tokenCoverage?: string[] | null
   /** Phase 075.1 Plan 04 Atom E (B-260519-11 + BUG-260514-01): cumulative
    * sandbox-output file list emitted by the backend `final_output_files`
    * SSE event after the agent loop terminates. Drives the pinned

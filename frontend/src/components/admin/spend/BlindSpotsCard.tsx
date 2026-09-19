@@ -1,6 +1,5 @@
 import React from "react"
-import { AlertTriangle, ShieldCheck, ArrowRight, BookOpen, Layers } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { AlertTriangle, ShieldCheck, BookOpen, Layers } from "lucide-react"
 
 interface BlindSpotsCardProps {
   unratedRunsCount: number
@@ -22,8 +21,6 @@ export const BlindSpotsCard: React.FC<BlindSpotsCardProps> = ({
   const totalRuns = ratedRunsCount + unratedRunsCount
   const ratedPct = totalRuns > 0 ? Math.round((ratedRunsCount / totalRuns) * 100) : 100
   const unratedPct = 100 - ratedPct
-
-  const hasBlindSpots = unratedRunsCount > 0 || incompleteCoverageCount > 0
 
   return (
     <div className="rounded-xl border border-amber-500/30 bg-gradient-to-b from-amber-500/10 to-amber-500/5 p-5 shadow-sm">
