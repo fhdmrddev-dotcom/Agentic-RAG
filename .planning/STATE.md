@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v4.3
 milestone_name: What You Can Actually Sell
-status: phase_complete
-last_updated: "2026-09-19T23:30:00.000Z"
-last_activity: 2026-09-19 -- Phase 258 CLOSED with SC#1 PARTIAL, stated as a decision. Re-review PASS (258-REVIEW.md): 7 findings, 5 fixed and each RE-DRIVEN by the reviewer with plants removed md5-identical. F-2 (execution ungated) and F-5 (migration 186 not in production) OWED to the operator. Gates: backend 71/5133 with the failure SET byte-identical to the frozen baseline at da56c5436; vitest 8468/0/293-293 unchanged.
+status: in_progress
+last_updated: "2026-09-19T23:35:00.000Z"
+last_activity: 2026-09-19 -- Phase 259 context gathered; decisions locked (D-259-01..08); ready for plan-phase 259.
 progress:
   total_phases: 13
   completed_phases: 4
@@ -34,16 +34,27 @@ See: `.planning/PROJECT.md` (updated 2026-09-18)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 258 CLOSED (SC#1 partial by decision). Next: Phase 259 (An Expert Is a Bundle, Not a Runtime).
+**Current focus:** Phase 259 (An Expert Is a Bundle, Not a Runtime) — Context gathered, ready for planning.
 
 ---
 
 ## Current Position
 
-Phase: 258 (a-tier-becomes-enforceable)
-Plan: 3 of 3 (execution complete across all 3 plans, review handback resolved)
-Status: ready_for_review
-Last activity: 2026-09-19 -- Phase 258 review handback resolved (F-1 NULL tier fail-closed, F-4 HTTP 503 on DB error, F-3 add_ons in AST fence, F-7 dynamic TIER_ORDER, F-6 ledger sync); 33 unit tests green; gates OK
+Phase: 259 (an-expert-is-a-bundle-not-a-runtime)
+Plan: 0 of ? (context gathered, ready for planning)
+Status: ready_for_planning
+Last activity: 2026-09-19 -- Phase 259 context gathered; decisions locked (D-259-01..08); ready for plan-phase 259
+
+### ⭐ PHASE 259 CONTEXT GATHERED — 2026-09-19
+- **Operator Decision #3**: Declared per Expert (`scope_mode: 'restricted' | 'biased'`). Defaults to `restricted` for high-governance domains like Financial Analyzer (`D-259-01`).
+- **Operator Decision #4**: Strict Single Active Expert per Thread (`threads.expert_id uuid REFERENCES expert_bundles`) (`D-259-02`).
+- **PACK-01 & Migration 187**: Table `public.expert_bundles` storing name, slug, description, `scope_mode`, `member_skills text[]`, `required_connections text[]`, `knowledge_folder_ids uuid[]`, `prompt_suggestions jsonb`, `visibility`, `is_system`, `org_id`, and `created_by` with RLS (`D-259-03`).
+- **PACK-04 Member Tenancy Defense**: Two-phase boundary check. Resolving an Expert verifies the bundle under RLS, then independently checks each member reference against caller `org_id` (or `is_system=true`). Foreign member references stripped and audited (`D-259-04`).
+- **PACK-06 Entitlement Gate**: Phase 258 `entitlement_service.py::require_capability('experts')` wired on all Expert API endpoints (`D-259-05`).
+- **PACK-01 Red Line Fence**: AST inventory fence in `test_259_closed_core_inventory.py` asserts zero new executors, agent loops, or dispatchers (`D-259-06`).
+- **First-Party Builtin Seed**: Migration 187 seeds "Financial Analyzer" (`slug='financial-analyzer'`, `scope_mode='restricted'`, finance starter prompts) ready for Phase 260 proof slice (`D-259-07`).
+- **Operator Decision #5**: Dual support for installation (`is_system=true`, `visibility='public'`) and authoring (`is_system=false`, `org_id=caller_org_id`) (`D-259-08`).
+- **Folded Seeds**: `SEED-198` (folded into 259).
 
 ### ⭐ PHASE 258 CONTEXT GATHERED — 2026-09-19
 - **Operator Decision #1**: Resolved as Ascending Capability Bundles (`standard` -> `pro` -> `enterprise`), with `organizations.add_ons` for modular overrides (`D-258-01`).

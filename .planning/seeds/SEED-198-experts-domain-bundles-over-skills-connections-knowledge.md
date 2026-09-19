@@ -3,7 +3,8 @@ seed_id: SEED-198
 title: "Experts — a domain bundle over skills + connections + KNOWLEDGE SCOPE, not a new agent type. The idea the operator could not make mature; the maturing move is that it composes four subsystems we already shipped and adds no runtime."
 created: 2026-08-24
 planted_during: Operator direction, 2026-08-24 — "including experts that are expert in some domain, maybe financial analyzer, maybe a strategy writer… the idea is not mature enough in my head"
-status: planted
+status: folded
+folded_into: 259
 status_note: |
   ── 2026-09-16 · reviewed at `/gsd:discuss-phase 252`, LEFT PLANTED (REG-02 sweep).
   Fired on `backend/app/**` breadth only. Experts is a capability; 252 is scoped to the v4.2
@@ -18,6 +19,10 @@ status_note: |
   data and never engine code) is its PREREQUISITE DECISION, and SEED-294 (go-to-market) is the
   commercial umbrella that names what still blocks a sale. ⛔ An Expert is not sellable until
   SEED-080 / SEED-083 exist — without entitlement a pack is a folder anyone can copy.
+
+  ── 2026-09-19 · FOLDED at `/gsd:discuss-phase 259` (D-259-01..08).
+  Manifest schema, RLS, member isolation, and entitlement gating in Phase 259;
+  chat thread selection, Try Asking onboarding affordance, and Financial Analyzer proof slice in Phase 260.
 priority: high
 surface: Agentic-RAG
 relates_to:
