@@ -6,11 +6,11 @@ status: in_progress
 last_updated: "2026-09-19T23:35:00.000Z"
 last_activity: 2026-09-19 -- Phase 259 context gathered; decisions locked (D-259-01..08); ready for plan-phase 259.
 progress:
-  total_phases: 13
+  total_phases: 6
   completed_phases: 4
   total_plans: 12
   completed_plans: 12
-  percent: 100
+  percent: 67
 ---
 
 # Project State
