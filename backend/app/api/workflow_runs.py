@@ -754,7 +754,7 @@ async def read_workflow_run(
     run_resp = await aexec(
         supabase.table("workflow_runs")
         .select(
-            "id, thread_id, definition_id, status, created_at, updated_at, claimed_at, "
+            "id, thread_id, definition_id, status, org_id, created_at, updated_at, claimed_at, "
             "definition_snapshot, metadata, "
             # Phase 257.1 — the SECOND place of the lockstep (SC#4). Migration 182 added
             # these columns to `workflow_runs`; nothing read them here. An explicit column
@@ -971,7 +971,17 @@ async def read_workflow_run(
     if run_model:
         try:
             pool = await deps.get_pg_pool()
-            rate = await rates.get_rate_for_model(pool, run_model)
+            run_metadata = run.get("metadata")
+            run_provider = run.get("provider") or (
+                run_metadata.get("provider") if isinstance(run_metadata, dict) else None
+            )
+            rate = await rates.get_rate_for_model(
+                pool,
+                run_model,
+                provider=run_provider,
+                effective_at=run.get("started_at") or run.get("created_at"),
+                org_id=run.get("org_id"),
+            )
             result = compute_token_cost_usd(
                 run.get("input_tokens"),
                 run.get("output_tokens"),

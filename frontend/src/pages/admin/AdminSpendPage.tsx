@@ -86,8 +86,12 @@ export const AdminSpendPage: React.FC<AdminSpendPageProps> = ({ onBack }) => {
   const [rates, setRates] = useState<ModelRateItem[]>([])
   const [totalRunsCount, setTotalRunsCount] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [isRepriceModalOpen, setIsRepriceModalOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<"ledger" | "rates">("ledger")
+
+  // Generation counter to prevent stale request races (WR-02).
+  const reqId = React.useRef(0)
 
   // ── ONE place builds the three requests; TWO consumers run them. Phase 257.1. ────────
   //
@@ -125,34 +129,52 @@ export const AdminSpendPage: React.FC<AdminSpendPageProps> = ({ onBack }) => {
       setRuns(runsData.runs)
       setTotalRunsCount(runsData.totalCount)
       setRates(ratesData)
+      setLoadError(null)
     },
     [],
   )
 
   // The imperative door: the refresh control and RepriceModal's onSuccess.
   const fetchData = React.useCallback(async () => {
+    const mine = ++reqId.current
     setIsLoading(true)
     try {
-      applyAll(await loadAll())
+      const result = await loadAll()
+      if (mine === reqId.current) {
+        applyAll(result)
+      }
     } catch (err) {
       console.error("Failed to load spend data:", err)
+      if (mine === reqId.current) {
+        setLoadError(err instanceof Error ? err.message : String(err))
+      }
     } finally {
-      setIsLoading(false)
+      if (mine === reqId.current) {
+        setIsLoading(false)
+      }
     }
   }, [loadAll, applyAll])
 
   // The declarative door: mount, and every filter change.
   useEffect(() => {
     let alive = true
+    const mine = ++reqId.current
     setIsLoading(true)
     ;(async () => {
       try {
         const result = await loadAll()
-        if (alive) applyAll(result)
+        if (alive && mine === reqId.current) {
+          applyAll(result)
+        }
       } catch (err) {
-        if (alive) console.error("Failed to load spend data:", err)
+        console.error("Failed to load spend data:", err)
+        if (alive && mine === reqId.current) {
+          setLoadError(err instanceof Error ? err.message : String(err))
+        }
       } finally {
-        if (alive) setIsLoading(false)
+        if (alive && mine === reqId.current) {
+          setIsLoading(false)
+        }
       }
     })()
 
@@ -290,6 +312,29 @@ export const AdminSpendPage: React.FC<AdminSpendPageProps> = ({ onBack }) => {
         </div>
       </div>
 
+      {/* Error banner (CR-04) */}
+      {loadError && (
+        <div
+          className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 flex items-center justify-between text-xs"
+          data-testid="spend-load-error-banner"
+        >
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 flex-shrink-0 text-amber-400" />
+            <span data-testid="spend-load-error">Could not load spend — {loadError}</span>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={fetchData}
+            disabled={isLoading}
+            className="text-xs h-7 gap-1 border-amber-500/40 hover:bg-amber-500/20 text-amber-200"
+          >
+            <RefreshCw className={`h-3 w-3 ${isLoading ? "animate-spin" : ""}`} />
+            Retry
+          </Button>
+        </div>
+      )}
+
       {/* KPI Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* 1. Total Spend */}
@@ -299,23 +344,35 @@ export const AdminSpendPage: React.FC<AdminSpendPageProps> = ({ onBack }) => {
               Total Org Spend (Attributable)
             </span>
             <div className="mt-1 flex items-baseline gap-1">
-              <span className="text-2xl font-bold font-mono text-emerald-400">
-                ${summary ? summary.totalSpendUsd.toFixed(4) : "0.0000"}
-              </span>
-              {summary && summary.unratedRunsCount > 0 && (
+              {loadError ? (
+                <span className="text-xl font-bold font-mono text-amber-400" data-testid="spend-load-error-kpi">
+                  Unavailable
+                </span>
+              ) : (
+                <span className="text-2xl font-bold font-mono text-emerald-400">
+                  {summary ? `$${summary.totalSpendUsd.toFixed(4)}` : "—"}
+                </span>
+              )}
+              {!loadError && summary && summary.unratedRunsCount > 0 && (
                 <span className="text-sm font-mono text-amber-400" title="Excludes unrated runs">*</span>
               )}
             </div>
           </div>
           <div className="mt-3 pt-2 border-t border-border/30 text-[11px] font-mono text-muted-foreground">
-            {summary && summary.unratedRunsCount > 0 ? (
+            {loadError ? (
+              <span className="text-amber-400/90 flex items-center gap-1">
+                <AlertTriangle className="h-3 w-3" /> Data load failed
+              </span>
+            ) : summary && summary.unratedRunsCount > 0 ? (
               <span className="text-amber-400/90 flex items-center gap-1">
                 * {summary.ratedRunsCount} runs priced · {summary.unratedRunsCount} unrated excluded
               </span>
-            ) : (
+            ) : summary ? (
               <span className="text-emerald-400/90 flex items-center gap-1">
                 <CheckCircle2 className="h-3 w-3" /> 100% of runs in window priced
               </span>
+            ) : (
+              <span>—</span>
             )}
           </div>
         </div>
@@ -555,11 +612,21 @@ export const AdminSpendPage: React.FC<AdminSpendPageProps> = ({ onBack }) => {
                             <span className="text-emerald-400 font-semibold font-mono">
                               ${run.costUsd.toFixed(4)}
                             </span>
+                          ) : run.isRated && run.costUsd === null ? (
+                            <span
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-500/15 text-slate-300 border border-slate-400/30 text-[11px] font-semibold font-mono"
+                              title={`Model '${run.model}' has a registered rate, but this run recorded no token counts`}
+                              data-testid="unmeasured-cost-badge"
+                            >
+                              <AlertTriangle className="h-3 w-3 flex-shrink-0" />
+                              No tokens recorded
+                            </span>
                           ) : (
                             /* STRICT INVARIANT: unrated runs display ▲ Unrated badge, NEVER $0.00 */
                             <span
                               className="px-2 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/30 text-[11px] font-semibold"
                               title={`Model '${run.model}' has no registered rate`}
+                              data-testid="unrated-cost-badge"
                             >
                               ▲ Unrated
                             </span>

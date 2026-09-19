@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
-import { render, screen, waitFor, cleanup } from "@testing-library/react"
+import { render, screen, waitFor, cleanup, fireEvent } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { AdminSpendPage } from "./AdminSpendPage"
 import * as spendApi from "@/lib/api/spend"
@@ -301,4 +301,94 @@ describe("AdminSpendPage (METER-07)", () => {
     expect(root.className).toMatch(/\bh-full\b/)
     expect(root.className).toMatch(/\bmin-h-0\b/)
   })
+
+  it("renders an error banner and Unavailable when data load fails — NEVER a confident $0.0000 (CR-04)", async () => {
+    vi.mocked(spendApi.getSpendSummary).mockRejectedValueOnce(new Error("Network failure 500"))
+    render(<AdminSpendPage />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId("spend-load-error-banner")).toBeInTheDocument()
+      expect(screen.getByTestId("spend-load-error")).toHaveTextContent("Network failure 500")
+      expect(screen.getByTestId("spend-load-error-kpi")).toHaveTextContent("Unavailable")
+    })
+
+    // Strict assertion: the page must NOT display a confident "$0.0000" on failure
+    expect(screen.queryByText("$0.0000")).not.toBeInTheDocument()
+  })
+
+  it("ignores stale load responses when a filter change or newer request races it (WR-02)", async () => {
+    let resolveSlow!: (value: any) => void
+    const slowPromise = new Promise((res) => {
+      resolveSlow = res
+    })
+
+    // Initial mount: fast
+    render(<AdminSpendPage />)
+    await waitFor(() => expect(screen.getByText("$148.6200")).toBeInTheDocument())
+
+    // First: trigger a refresh with slow response (fireEvent avoids awaiting pending promise)
+    vi.mocked(spendApi.getSpendSummary).mockReturnValueOnce(slowPromise as any)
+    vi.mocked(spendApi.getSpendRuns).mockReturnValueOnce(slowPromise as any)
+    vi.mocked(spendApi.getModelRates).mockReturnValueOnce(slowPromise as any)
+    fireEvent.click(screen.getByRole("button", { name: /Refresh/i }))
+
+    // Now operator immediately switches chip to 7D, which resolves fast with $42.0000
+    const fastSummary: SpendSummaryData = {
+      ...mockSummary,
+      totalSpendUsd: 42.0,
+    }
+    vi.mocked(spendApi.getSpendSummary).mockResolvedValueOnce(fastSummary)
+    vi.mocked(spendApi.getSpendRuns).mockResolvedValueOnce({ runs: mockRuns, totalCount: 2 })
+    vi.mocked(spendApi.getModelRates).mockResolvedValueOnce(mockRates)
+
+    fireEvent.click(screen.getByRole("button", { name: /^7D$/ }))
+
+    // 7D lands and updates KPI to $42.0000
+    await waitFor(() => {
+      expect(screen.getAllByText(/\$42\.0000/).length).toBeGreaterThanOrEqual(1)
+    })
+
+    // Now the stale slow refresh lands with $999.9900
+    const staleSummary: SpendSummaryData = {
+      ...mockSummary,
+      totalSpendUsd: 999.99,
+    }
+    resolveSlow([staleSummary, { runs: mockRuns, totalCount: 2 }, mockRates])
+
+    // Wait a tick: the stale result must be discarded by reqId guard
+    await new Promise((r) => setTimeout(r, 50))
+    expect(screen.getAllByText(/\$42\.0000/).length).toBeGreaterThanOrEqual(1)
+    expect(screen.queryByText(/999\.99/)).not.toBeInTheDocument()
+  })
+
+  it("renders 'No tokens recorded' badge when a run has a registered rate but null tokens (CR-02)", async () => {
+    const unmeasuredRatedRun: SpendRunItem = {
+      id: "run-unmeasured-003",
+      name: "Rated But Unmeasured Run",
+      model: "deepseek-v4-flash",
+      provider: "deepseek",
+      status: "completed",
+      createdAt: "2026-09-19T02:20:00Z",
+      inputTokens: null,
+      outputTokens: null,
+      costUsd: null,
+      isRated: true,
+      tokenCoverage: null,
+    }
+    vi.mocked(spendApi.getSpendRuns).mockResolvedValueOnce({
+      runs: [unmeasuredRatedRun],
+      totalCount: 1,
+    })
+
+    render(<AdminSpendPage />)
+    await waitFor(() => {
+      expect(screen.getByTestId("unmeasured-cost-badge")).toBeInTheDocument()
+      expect(screen.getByTestId("unmeasured-cost-badge")).toHaveTextContent("No tokens recorded")
+    })
+
+    // STRICT INVARIANT: never render $0.0000 and never render Unrated badge for rated model
+    expect(screen.queryByText("$0.0000")).not.toBeInTheDocument()
+    expect(screen.queryByTestId("unrated-cost-badge")).not.toBeInTheDocument()
+  })
 })
+

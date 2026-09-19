@@ -307,7 +307,7 @@ async def _enrich_messages_with_runs(
         # persists both columns on `public.runs`.
         .select(
             "run_id, message_id, status, model, provider, started_at, completed_at, "
-            "input_tokens, output_tokens"
+            "org_id, input_tokens, output_tokens"
         )
         .eq("thread_id", thread_id)
         .eq("user_id", user_id)
@@ -375,20 +375,31 @@ async def _enrich_messages_with_runs(
     if models_seen:
         try:
             pool = await get_pg_pool()
-            rate_by_model = {
-                name: await rates.get_rate_for_model(pool, name) for name in models_seen
-            }
+            rate_cache: dict[tuple[str, str | None, Any, Any], rates.ModelRate | None] = {}
             for m in messages:
                 name = m.get("model")
                 if not name:
                     m["cost_usd"] = None
                     m["is_rated"] = None
                     continue
-                run = runs_by_message.get(m["id"])
+                run = runs_by_message.get(m["id"]) or {}
+                r_prov = run.get("provider") or m.get("provider")
+                r_effective = run.get("started_at") or m.get("started_at")
+                r_org = run.get("org_id")
+                cache_key = (name, r_prov, r_effective, r_org)
+                if cache_key not in rate_cache:
+                    rate_cache[cache_key] = await rates.get_rate_for_model(
+                        pool,
+                        name,
+                        provider=r_prov,
+                        effective_at=r_effective,
+                        org_id=r_org,
+                    )
+                rate = rate_cache[cache_key]
                 result = compute_token_cost_usd(
-                    (run or {}).get("input_tokens"),
-                    (run or {}).get("output_tokens"),
-                    rate_by_model.get(name),
+                    run.get("input_tokens"),
+                    run.get("output_tokens"),
+                    rate,
                     model_id=name,
                 )
                 m["is_rated"] = result.is_rated

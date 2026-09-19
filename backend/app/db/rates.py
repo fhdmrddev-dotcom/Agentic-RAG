@@ -33,8 +33,8 @@ async def get_rate_for_model(
     pool: asyncpg.Pool,
     model_id: str,
     provider: str | None = None,
-    effective_at: datetime | None = None,
-    org_id: UUID | None = None,
+    effective_at: datetime | str | None = None,
+    org_id: UUID | str | None = None,
 ) -> ModelRate | None:
     """Retrieve the effective rate for a model as of a given timestamp.
 
@@ -42,6 +42,17 @@ async def get_rate_for_model(
     and optional org_id with fallback to org_id IS NULL.
     Orders by effective_from DESC to retrieve the latest rate active at effective_at.
     """
+    if isinstance(effective_at, str):
+        try:
+            effective_at = datetime.fromisoformat(effective_at.replace("Z", "+00:00"))
+        except Exception:
+            effective_at = None
+    if isinstance(org_id, str):
+        try:
+            org_id = UUID(org_id)
+        except Exception:
+            org_id = None
+
     effective_ts = effective_at or datetime.now(timezone.utc)
 
     query = """
@@ -178,13 +189,14 @@ async def get_org_spend_summary(
                 rate.input_cost_per_million,
                 rate.output_cost_per_million,
                 CASE
-                    WHEN rate.input_cost_per_million IS NOT NULL THEN
+                    WHEN rate.input_cost_per_million IS NULL THEN NULL
+                    WHEN r.input_tokens IS NULL AND r.output_tokens IS NULL THEN NULL
+                    ELSE
                         ROUND(
                             (COALESCE(r.input_tokens, 0) * rate.input_cost_per_million / 1000000.0) +
                             (COALESCE(r.output_tokens, 0) * rate.output_cost_per_million / 1000000.0),
                             4
                         )
-                    ELSE NULL
                 END AS cost_usd
             FROM public.runs r
             LEFT JOIN LATERAL (
@@ -242,13 +254,14 @@ async def get_org_spend_summary(
             SELECT
                 DATE_TRUNC('day', r.started_at) AS day,
                 CASE
-                    WHEN rate.input_cost_per_million IS NOT NULL THEN
+                    WHEN rate.input_cost_per_million IS NULL THEN NULL
+                    WHEN r.input_tokens IS NULL AND r.output_tokens IS NULL THEN NULL
+                    ELSE
                         ROUND(
                             (COALESCE(r.input_tokens, 0) * rate.input_cost_per_million / 1000000.0) +
                             (COALESCE(r.output_tokens, 0) * rate.output_cost_per_million / 1000000.0),
                             4
                         )
-                    ELSE NULL
                 END AS cost_usd
             FROM public.runs r
             LEFT JOIN LATERAL (
@@ -299,13 +312,14 @@ async def get_org_spend_summary(
                 r.output_tokens,
                 rate.input_cost_per_million,
                 CASE
-                    WHEN rate.input_cost_per_million IS NOT NULL THEN
+                    WHEN rate.input_cost_per_million IS NULL THEN NULL
+                    WHEN r.input_tokens IS NULL AND r.output_tokens IS NULL THEN NULL
+                    ELSE
                         ROUND(
                             (COALESCE(r.input_tokens, 0) * rate.input_cost_per_million / 1000000.0) +
                             (COALESCE(r.output_tokens, 0) * rate.output_cost_per_million / 1000000.0),
                             4
                         )
-                    ELSE NULL
                 END AS cost_usd
             FROM public.runs r
             LEFT JOIN LATERAL (
@@ -462,13 +476,14 @@ async def get_spend_runs(
             rate.output_cost_per_million,
             wr.token_coverage,
             CASE
-                WHEN rate.input_cost_per_million IS NOT NULL THEN
+                WHEN rate.input_cost_per_million IS NULL THEN NULL
+                WHEN r.input_tokens IS NULL AND r.output_tokens IS NULL THEN NULL
+                ELSE
                     ROUND(
                         (COALESCE(r.input_tokens, 0) * rate.input_cost_per_million / 1000000.0) +
                         (COALESCE(r.output_tokens, 0) * rate.output_cost_per_million / 1000000.0),
                         4
                     )
-                ELSE NULL
             END AS cost_usd
         {base_query}
         {status_filter_clause}
@@ -479,8 +494,8 @@ async def get_spend_runs(
 
     items = []
     for r in rows:
-        is_rated = r["cost_usd"] is not None
-        cost_usd_str = str(r["cost_usd"]) if is_rated else None
+        is_rated = r["input_cost_per_million"] is not None
+        cost_usd_str = str(r["cost_usd"]) if r["cost_usd"] is not None else None
         coverage_list = list(r["token_coverage"]) if r["token_coverage"] is not None else None
         is_complete = (
             COMPLETE_COVERAGE_LEGS.issubset(set(coverage_list))
