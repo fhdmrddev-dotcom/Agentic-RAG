@@ -175,7 +175,8 @@ def test_all_expert_endpoints_gated_by_router_dependency(expert_test_app, mock_u
 
 def test_experts_api_single_home_ast_compliance():
     """Verify that backend/app/api/experts.py does not read subscription_tier directly (TIER-04)."""
-    api_path = pathlib.Path("backend/app/api/experts.py")
+    app_dir = pathlib.Path(__file__).resolve().parent.parent.parent / "app"
+    api_path = app_dir / "api" / "experts.py"
     tree = ast.parse(api_path.read_text(encoding="utf-8"), filename=str(api_path))
 
     for node in ast.walk(tree):

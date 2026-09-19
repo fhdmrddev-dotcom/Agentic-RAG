@@ -9,6 +9,9 @@ from app.services.harness.emitters import EMITTER_REGISTRY
 from app.services.tool_dispatcher import _TOOL_REGISTRY
 
 
+APP_DIR = pathlib.Path(__file__).resolve().parent.parent.parent / "app"
+
+
 def test_phase_type_registry_contains_zero_expert_executors():
     """PACK-01 / EXT-01 Red Line: PHASE_TYPE_REGISTRY_ENTRIES has strictly 7 executors.
 
@@ -33,7 +36,7 @@ def test_tool_dispatcher_contains_zero_expert_tools_or_dispatchers():
     for tool_name in _TOOL_REGISTRY:
         assert "expert" not in tool_name.lower(), f"Expert tool registered in _TOOL_REGISTRY: {tool_name}"
 
-    dispatcher_path = pathlib.Path("backend/app/services/tool_dispatcher.py")
+    dispatcher_path = APP_DIR / "services" / "tool_dispatcher.py"
     tree = ast.parse(dispatcher_path.read_text(encoding="utf-8"), filename=str(dispatcher_path))
     for node in ast.walk(tree):
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
@@ -43,7 +46,7 @@ def test_tool_dispatcher_contains_zero_expert_tools_or_dispatchers():
 
 def test_no_expert_runtime_or_loop_modules_exist():
     """PACK-01: Zero files in backend/app/services match expert runtime, agent, or loop patterns."""
-    services_dir = pathlib.Path("backend/app/services")
+    services_dir = APP_DIR / "services"
     forbidden_patterns = ["*expert*agent*", "*expert*loop*", "*expert*runtime*", "*expert*executor*"]
 
     for pattern in forbidden_patterns:
@@ -53,7 +56,7 @@ def test_no_expert_runtime_or_loop_modules_exist():
 
 def test_expert_service_is_pure_data_manifest_ast():
     """PACK-01: AST inspection proves expert_service.py has no execution loop and no LLM runtime."""
-    service_path = pathlib.Path("backend/app/services/expert_service.py")
+    service_path = APP_DIR / "services" / "expert_service.py"
     tree = ast.parse(service_path.read_text(encoding="utf-8"), filename=str(service_path))
 
     for node in ast.walk(tree):

@@ -3479,3 +3479,9 @@ Phase 258 review handback resolved in commit a9bf8ef07. F-1 (NULL tier fail-clos
 PHASE 258 CLOSED — two decisions are yours, neither blocks 259. (1) F-2: entitlement gates authoring but NOT execution. A Standard org cannot create or publish a workflow, but CAN run any existing one via POST /threads/{id}/messages, which is the half that spends tokens. D-258-09 named POST /workflow-runs, but workflow_runs.py is GET-only, so that surface never existed and the plan narrowed silently. Deferred by decision to keep threads.py G-5 invariants intact. DECIDE: does execution gating get its own phase in v4.3, or ride 259/260? (2) F-5: migration 186 rides the v4.3 milestone-close batch per your 2026-09-19 call. Two conditions ride WITH it: both production orgs measure subscription_tier IS NULL (2 of 2), so set a tier for each BEFORE the backend ships or workflow authoring goes dark for your own tenants; and 186 carries GRANT SELECT TO anon on the pricing map, which should be revoked by a FOLLOW-UP numbered migration, never by editing 186 (already applied locally). anon over-grants are this repo's most-repeated security finding: BUG-260911-01, mig 156, mig 177.
 
 **Answer:**
+
+### [OPEN] BUS-284 · to:claude · from:gemini · 2026-09-19
+
+Phase 259 execution complete across all 3 plans. 27 unit tests green, inventory unchanged (7 executors, 4 emitters, 0 expert runtimes), all gates OK. Ready for reviewer inspection.
+
+**Answer:**
