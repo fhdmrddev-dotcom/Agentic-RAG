@@ -467,3 +467,57 @@ describe("AdminSpendPage — CR-06: the cards and the ledger must count the same
     expect(footnote.textContent).toMatch(/8 unrated/)
   })
 })
+
+describe("AdminSpendPage — CR-07: a failed load answers nothing, not zero", () => {
+  // The error banner and KPI card 1 knew about the failure; four other regions did not, so a
+  // failed load still rendered "Tokens Counted 0.0k", "Pricing Coverage 0%", "Blind Spots 0 ·
+  // 0 unrated · 0 partial", two empty charts and "No runs matching current filters." Each is
+  // a CLAIM about the org made from data that never arrived — on the page whose premise is
+  // saying what it cannot see.
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(spendApi.getSpendSummary).mockRejectedValue(new Error("network down"))
+    vi.mocked(spendApi.getSpendRuns).mockRejectedValue(new Error("network down"))
+    vi.mocked(spendApi.getModelRates).mockRejectedValue(new Error("network down"))
+  })
+
+  it("renders no confident figure in any KPI card when the load fails", async () => {
+    render(<AdminSpendPage onBack={() => {}} />)
+    await screen.findByTestId("spend-load-error")
+
+    for (const id of ["tokens-counted-value", "pricing-coverage-value", "blind-spots-value"]) {
+      const el = screen.getByTestId(id)
+      expect(el.textContent).toBe("Unavailable")
+    }
+    // The specific false readings that shipped.
+    expect(screen.queryByText("0.0k")).not.toBeInTheDocument()
+    expect(screen.queryByText("0%")).not.toBeInTheDocument()
+    expect(screen.queryByText(/0 unrated/)).not.toBeInTheDocument()
+  })
+
+  it("does not draw an empty chart, which would read as a claim of no spend", async () => {
+    render(<AdminSpendPage onBack={() => {}} />)
+    await screen.findByTestId("spend-load-error")
+    expect(screen.getByTestId("daily-chart-unavailable")).toBeInTheDocument()
+    expect(screen.getByTestId("donut-unavailable")).toBeInTheDocument()
+  })
+
+  it("withholds the honesty card rather than rendering a false all-clear", async () => {
+    render(<AdminSpendPage onBack={() => {}} />)
+    await screen.findByTestId("spend-load-error")
+    expect(screen.getByTestId("blind-spots-card-unavailable")).toBeInTheDocument()
+    // Fed zeroes the card claims a fully-priced window. That is the exact sentence this
+    // page must never produce from data it does not have.
+    expect(screen.queryByText(/All models in window rated/)).not.toBeInTheDocument()
+    expect(screen.queryByText("100% Priced")).not.toBeInTheDocument()
+  })
+
+  it("says the ledger did not load, rather than that no runs matched", async () => {
+    render(<AdminSpendPage onBack={() => {}} />)
+    await screen.findByTestId("spend-load-error")
+    expect(screen.getByTestId("ledger-empty-state").textContent)
+      .toMatch(/Runs unavailable/)
+    expect(screen.queryByText(/No runs matching current filters/)).not.toBeInTheDocument()
+  })
+})

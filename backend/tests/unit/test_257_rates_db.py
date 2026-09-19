@@ -456,3 +456,40 @@ def test_python_sql_spend_parity_across_permutations():
             f"Parity mismatch for in={in_tok}, out={out_tok}, in_rate={in_rate}, out_rate={out_rate}: "
             f"Python={cost_res.cost_usd} vs SQL={sql_result}"
         )
+
+
+@pytest.mark.asyncio
+async def test_reprice_refuses_a_duplicate_effective_date_instead_of_500ing():
+    """CR-05: a repeat reprice at the same effective_from is a REFUSAL, never an upsert.
+
+    ⛔ Append-only is what SC#1 rests on. Overwriting a rate rewrites what a past run cost —
+    the same defect CR-01 was on the read side. Before this, migration 184's
+    `uq_model_rates_identity` turned the second attempt into an unhandled
+    `asyncpg.UniqueViolationError` and the route answered HTTP 500: an operator mistake
+    presented as a server fault, with nothing in the product to act on.
+    """
+    import asyncpg as _asyncpg
+    from app.db.rates import RateAlreadyEffectiveError
+
+    pool = _build_mock_pool()
+    when = datetime(2026, 9, 19, 12, 0, tzinfo=timezone.utc)
+    pool.fetchrow.side_effect = _asyncpg.UniqueViolationError(
+        "duplicate key value violates unique constraint \"uq_model_rates_identity\""
+    )
+
+    with pytest.raises(RateAlreadyEffectiveError) as excinfo:
+        await reprice_model(
+            pool,
+            model_id="gpt-4o",
+            input_cost_per_million=Decimal("3.000000"),
+            output_cost_per_million=Decimal("12.000000"),
+            provider="openai",
+            effective_from=when,
+        )
+
+    message = str(excinfo.value)
+    # The message has to be actionable, not merely present: it names the model, the clashing
+    # instant, and the one thing the operator can actually do about it.
+    assert "gpt-4o" in message
+    assert when.isoformat() in message
+    assert "different effective date" in message

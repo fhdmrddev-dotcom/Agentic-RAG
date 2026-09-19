@@ -23,6 +23,7 @@ from app.db.rates import (
     get_spend_runs,
     list_model_rates,
     reprice_model,
+    RateAlreadyEffectiveError,
 )
 
 logger = logging.getLogger(__name__)
@@ -180,16 +181,22 @@ async def create_rate_revision(
     request.state.audit_action = "spend.reprice_model"
     request.state.audit_is_write = True
 
-    new_rate = await reprice_model(
-        pool=pool,
-        model_id=payload.model_id,
-        input_cost_per_million=payload.input_cost_per_million,
-        output_cost_per_million=payload.output_cost_per_million,
-        provider=payload.provider,
-        effective_from=payload.effective_from or datetime.now(timezone.utc),
-        created_by=operator_id,
-        org_id=org_id,
-    )
+    try:
+        new_rate = await reprice_model(
+            pool=pool,
+            model_id=payload.model_id,
+            input_cost_per_million=payload.input_cost_per_million,
+            output_cost_per_million=payload.output_cost_per_million,
+            provider=payload.provider,
+            effective_from=payload.effective_from or datetime.now(timezone.utc),
+            created_by=operator_id,
+            org_id=org_id,
+        )
+    except RateAlreadyEffectiveError as exc:
+        # 409, not 500. CR-05: this is the operator asking for something the append-only
+        # rule forbids, not the server failing - and a 500 gives them nothing to act on.
+        # The message names the clash and the remedy; the frontend renders it verbatim.
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
     return {
         "status": "created",

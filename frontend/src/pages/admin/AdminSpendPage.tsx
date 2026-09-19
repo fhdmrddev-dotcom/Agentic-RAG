@@ -183,6 +183,19 @@ export const AdminSpendPage: React.FC<AdminSpendPageProps> = ({ onBack }) => {
     }
   }, [loadAll, applyAll])
 
+  // ⛔ A FAILED LOAD MUST NOT PRODUCE CONFIDENT NUMBERS ANYWHERE. Phase 257 CR-07.
+  //
+  // The error banner and KPI card 1 knew about `loadError`; the other four regions did not,
+  // so a failed load still rendered "Tokens Counted 0.0k", "Pricing Coverage 0%", "Blind
+  // Spots 0 · 0 unrated · 0 partial", two empty charts and "No runs matching current
+  // filters." Every one of those is a CLAIM about the org, made from data that never
+  // arrived — on the page whose whole premise is saying what it cannot see. A page that
+  // cannot answer must SAY so, not answer zero.
+  //
+  // ⚠ A failed REFRESH is the worse case: the panels held the PREVIOUS window's figures
+  // under an error banner, so the operator read stale numbers as current ones. `hasData`
+  // is false whenever the load failed, regardless of what state survives from before.
+  const hasData = !loadError && summary !== null
   const totalTokens = (summary?.totalInputTokens || 0) + (summary?.totalOutputTokens || 0)
   const inputTokenPct = totalTokens > 0
     ? Math.round(((summary?.totalInputTokens || 0) / totalTokens) * 100)
@@ -404,16 +417,21 @@ export const AdminSpendPage: React.FC<AdminSpendPageProps> = ({ onBack }) => {
             <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
               Tokens Counted
             </span>
-            <div className="mt-1 text-2xl font-bold font-mono text-foreground">
-              {totalTokens > 1_000_000
-                ? `${(totalTokens / 1_000_000).toFixed(2)}M`
-                : `${(totalTokens / 1_000).toFixed(1)}k`}
+            <div
+              className="mt-1 text-2xl font-bold font-mono text-foreground"
+              data-testid="tokens-counted-value"
+            >
+              {!hasData
+                ? <span className="text-amber-400/90">{loadError ? "Unavailable" : "—"}</span>
+                : totalTokens > 1_000_000
+                  ? `${(totalTokens / 1_000_000).toFixed(2)}M`
+                  : `${(totalTokens / 1_000).toFixed(1)}k`}
             </div>
           </div>
           <div className="mt-3 pt-2 border-t border-border/30">
             <div className="flex items-center justify-between text-[10px] font-mono text-muted-foreground mb-1">
-              <span className="text-cyan-400">In: {inputTokenPct}%</span>
-              <span className="text-purple-400">Out: {outputTokenPct}%</span>
+              <span className="text-cyan-400">In: {hasData ? `${inputTokenPct}%` : "—"}</span>
+              <span className="text-purple-400">Out: {hasData ? `${outputTokenPct}%` : "—"}</span>
             </div>
             <div className="w-full h-1.5 rounded-full bg-background overflow-hidden flex">
               <div className="bg-cyan-400 h-full" style={{ width: `${inputTokenPct}%` }} />
@@ -429,19 +447,28 @@ export const AdminSpendPage: React.FC<AdminSpendPageProps> = ({ onBack }) => {
               Pricing Coverage Ratio
             </span>
             <div className="mt-1 flex items-baseline gap-2">
-              <span className="text-2xl font-bold font-mono text-foreground">
-                {pricedRunsRatio}%
+              <span
+                className="text-2xl font-bold font-mono text-foreground"
+                data-testid="pricing-coverage-value"
+              >
+                {hasData
+                  ? `${pricedRunsRatio}%`
+                  : <span className="text-amber-400/90">{loadError ? "Unavailable" : "—"}</span>}
               </span>
               <span className="text-xs font-mono text-muted-foreground">
-                ({pricedRunsCount} / {totalRunsInWindow})
+                {hasData ? `(${pricedRunsCount} / ${totalRunsInWindow})` : ""}
               </span>
             </div>
           </div>
           <div className="mt-3 pt-2 border-t border-border/30">
             <div className="w-full h-1.5 rounded-full bg-background overflow-hidden flex">
-              <div className="bg-emerald-500 h-full" style={{ width: `${pricedRunsRatio}%` }} />
-              {pricedRunsRatio < 100 && (
-                <div className="bg-amber-500 h-full" style={{ width: `${100 - pricedRunsRatio}%` }} />
+              {hasData && (
+                <>
+                  <div className="bg-emerald-500 h-full" style={{ width: `${pricedRunsRatio}%` }} />
+                  {pricedRunsRatio < 100 && (
+                    <div className="bg-amber-500 h-full" style={{ width: `${100 - pricedRunsRatio}%` }} />
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -453,16 +480,21 @@ export const AdminSpendPage: React.FC<AdminSpendPageProps> = ({ onBack }) => {
             <span className="text-[10px] font-mono uppercase tracking-wider text-amber-400 flex items-center gap-1">
               <AlertTriangle className="h-3 w-3" /> Blind Spots & Residues
             </span>
-            <div className="mt-1 text-2xl font-bold font-mono text-amber-300">
-              {(summary?.unratedRunsCount || 0)
-                + (summary?.unmeasuredRunsCount || 0)
-                + (summary?.incompleteCoverageCount || 0)}
+            <div
+              className="mt-1 text-2xl font-bold font-mono text-amber-300"
+              data-testid="blind-spots-value"
+            >
+              {hasData
+                ? (summary!.unratedRunsCount || 0)
+                  + (summary!.unmeasuredRunsCount || 0)
+                  + (summary!.incompleteCoverageCount || 0)
+                : (loadError ? "Unavailable" : "—")}
             </div>
           </div>
           <div className="mt-3 pt-2 border-t border-amber-500/20 text-[11px] font-mono text-amber-400/90 flex items-center justify-between">
-            <span>{summary?.unratedRunsCount || 0} unrated</span>
-            <span>{summary?.unmeasuredRunsCount || 0} no tokens</span>
-            <span>{summary?.incompleteCoverageCount || 0} partial</span>
+            <span>{hasData ? `${summary!.unratedRunsCount || 0} unrated` : "—"}</span>
+            <span>{hasData ? `${summary!.unmeasuredRunsCount || 0} no tokens` : "—"}</span>
+            <span>{hasData ? `${summary!.incompleteCoverageCount || 0} partial` : "—"}</span>
           </div>
         </div>
       </div>
@@ -478,7 +510,16 @@ export const AdminSpendPage: React.FC<AdminSpendPageProps> = ({ onBack }) => {
             </h2>
             <span className="text-[10px] font-mono text-muted-foreground">Daily Attributable</span>
           </div>
-          <DailySpendChart data={summary?.dailySpend || []} height={190} />
+          {hasData ? (
+            <DailySpendChart data={summary!.dailySpend || []} height={190} />
+          ) : (
+            <div
+              className="h-[190px] flex items-center justify-center text-xs font-mono text-muted-foreground"
+              data-testid="daily-chart-unavailable"
+            >
+              {loadError ? "Chart unavailable — spend data did not load" : "Loading…"}
+            </div>
+          )}
         </div>
 
         {/* Model Market Share Donut Chart */}
@@ -490,15 +531,37 @@ export const AdminSpendPage: React.FC<AdminSpendPageProps> = ({ onBack }) => {
             </h2>
             <span className="text-[10px] font-mono text-muted-foreground">Volume & Rates</span>
           </div>
-          <SpendDonutChart
-            data={summary?.modelBreakdown || []}
-            totalSpendUsd={summary?.totalSpendUsd || 0}
-            size={180}
-          />
+          {hasData ? (
+            <SpendDonutChart
+              data={summary!.modelBreakdown || []}
+              totalSpendUsd={summary!.totalSpendUsd || 0}
+              size={180}
+            />
+          ) : (
+            <div
+              className="h-[180px] flex items-center justify-center text-xs font-mono text-muted-foreground"
+              data-testid="donut-unavailable"
+            >
+              {loadError ? "Chart unavailable — spend data did not load" : "Loading…"}
+            </div>
+          )}
         </div>
       </div>
 
       {/* "What This View Cannot See" Honesty Summary Card */}
+      {/* ⛔ NOT MOUNTED ON A FAILED LOAD. CR-07. Fed zeroes, this card renders a 100%-priced
+          gauge and "✓ All models in window rated" — a confident all-clear derived from data
+          that never arrived, on the one surface whose entire job is refusing to do that. */}
+      {!hasData ? (
+        <div
+          className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-5 text-xs font-mono text-amber-400/90"
+          data-testid="blind-spots-card-unavailable"
+        >
+          {loadError
+            ? "What this view cannot see is itself unavailable — spend data did not load."
+            : "Loading blind-spot disclosures…"}
+        </div>
+      ) : (
       <BlindSpotsCard
         unratedRunsCount={summary?.unratedRunsCount || 0}
         unmeasuredRunsCount={summary?.unmeasuredRunsCount || 0}
@@ -508,6 +571,7 @@ export const AdminSpendPage: React.FC<AdminSpendPageProps> = ({ onBack }) => {
         onFilterIncompleteCoverage={() => setCoverageFilter("incomplete_coverage")}
         onOpenRateRegistry={() => setActiveTab("rates")}
       />
+      )}
 
       {/* Main Ledger / Rates Tab Navigation */}
       <div className="rounded-xl border border-border bg-card overflow-hidden shadow-sm">
@@ -573,8 +637,16 @@ export const AdminSpendPage: React.FC<AdminSpendPageProps> = ({ onBack }) => {
               <tbody className="divide-y divide-border/20 font-mono">
                 {runs.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-8 text-center text-muted-foreground">
-                      No runs matching current filters.
+                    <td
+                      colSpan={6}
+                      className="py-8 text-center text-muted-foreground"
+                      data-testid="ledger-empty-state"
+                    >
+                      {/* ⛔ "No runs matching current filters" is a CLAIM about the org, and
+                          after a failed load it is a claim made from nothing. CR-07. */}
+                      {loadError
+                        ? "Runs unavailable — the ledger did not load."
+                        : "No runs matching current filters."}
                     </td>
                   </tr>
                 ) : (

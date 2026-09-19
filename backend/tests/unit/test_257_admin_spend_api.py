@@ -213,3 +213,43 @@ def test_get_and_post_rates(client, operator_user):
         assert res_bad.status_code == 422
 
     app.dependency_overrides.clear()
+
+
+def test_reprice_duplicate_answers_409_with_the_reason_not_500(client, operator_user):
+    """CR-05 at the HTTP boundary: the refusal must SURVIVE the route, as a 409 whose body
+    carries the reason verbatim.
+
+    ⚠ The DB-layer test proves the exception is raised; it says nothing about what the
+    operator sees. An unhandled raise here is a 500 with a generic body, and the frontend
+    renders `err.detail` — so if the detail is not the sentence, the modal shows nothing
+    useful. That gap is exactly how this phase shipped a dead badge: a thing that existed at
+    one layer and never reached the next.
+    """
+    from app.db.rates import RateAlreadyEffectiveError
+
+    app.dependency_overrides[require_operator] = lambda: operator_user
+
+    reason = (
+        "A rate for gpt-4o already takes effect at 2026-09-19T12:00:00+00:00. "
+        "Rates are append-only, so an existing effective date cannot be overwritten - "
+        "choose a different effective date."
+    )
+
+    with patch(
+        "app.api.admin_spend.reprice_model",
+        AsyncMock(side_effect=RateAlreadyEffectiveError(reason)),
+    ), patch("app.dependencies.get_pg_pool", AsyncMock()),          patch("app.dependencies.operator_audit_floor", AsyncMock()):
+        res = client.post(
+            "/admin/spend/rates",
+            json={
+                "model_id": "gpt-4o",
+                "input_cost_per_million": "3.000000",
+                "output_cost_per_million": "12.000000",
+                "provider": "openai",
+            },
+        )
+
+    assert res.status_code == 409, f"expected a refusal, got {res.status_code}"
+    assert res.json()["detail"] == reason
+
+    app.dependency_overrides.clear()

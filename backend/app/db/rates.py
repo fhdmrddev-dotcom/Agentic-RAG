@@ -20,6 +20,18 @@ logger = logging.getLogger(__name__)
 COMPLETE_COVERAGE_LEGS = frozenset({"agent", "single", "batch", "emit"})
 
 
+class RateAlreadyEffectiveError(Exception):
+    """A rate for this model already takes effect at that instant.
+
+    ⛔ APPEND-ONLY IS THE PROMISE SC#1 RESTS ON, so this is a REFUSAL and never an upsert.
+    Migration 184 added `uq_model_rates_identity` because 183 had none and a second paste
+    duplicated every seed (driven: gpt-4o 1 row -> 2), which makes rate resolution arbitrary.
+    With the index in place a repeat reprice raised asyncpg.UniqueViolationError and the
+    route answered HTTP 500 - an operator error presented as a server fault, with no
+    recourse in the product. Named here so the route can say what to do instead.
+    """
+
+
 @dataclass(frozen=True)
 class SpendSummary:
     total_spend_usd: Decimal
@@ -273,6 +285,10 @@ async def reprice_model(
     """Insert a new rate row for a model with effective_from (default now()).
 
     Append-only: preserves historical rates for past runs.
+
+    Raises:
+        RateAlreadyEffectiveError: a rate for this (model, provider, effective_from, org)
+            already exists. Phase 257 CR-05.
     """
     eff_from = effective_from or datetime.now(timezone.utc)
 
@@ -288,15 +304,25 @@ async def reprice_model(
         RETURNING id, model_id, provider, input_cost_per_million, output_cost_per_million,
                   effective_from, org_id, created_at
     """
-    row = await pool.fetchrow(
-        query,
-        model_id,
-        provider,
-        input_cost_per_million,
-        output_cost_per_million,
-        eff_from,
-        org_id,
-    )
+    try:
+        row = await pool.fetchrow(
+            query,
+            model_id,
+            provider,
+            input_cost_per_million,
+            output_cost_per_million,
+            eff_from,
+            org_id,
+        )
+    except asyncpg.UniqueViolationError as exc:
+        # ⛔ NEVER an upsert. Overwriting a rate rewrites what a past run cost, which is the
+        # exact thing SC#1's effective dating exists to prevent (CR-01 was that bug on the
+        # read side). Refuse, and name the date so the operator can pick another.
+        raise RateAlreadyEffectiveError(
+            f"A rate for {model_id} already takes effect at "
+            f"{eff_from.isoformat()}. Rates are append-only, so an existing effective date "
+            f"cannot be overwritten - choose a different effective date."
+        ) from exc
     return ModelRate(
         id=row["id"],
         model_id=row["model_id"],
