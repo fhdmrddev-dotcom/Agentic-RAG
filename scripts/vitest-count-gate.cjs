@@ -3466,7 +3466,7 @@ const BASELINE = {
   "MessageItem.retry.test.tsx": 4,
   "MessageItem.capPaused.test.tsx": 5,
   // ── Phase 228 (228-03 / DEBT-04) — Vercel subdomain routing suite ──
-  "vercelRouting.test.ts": 6,
+  "vercelRouting.test.ts": 8,  // 6 -> 8 in 257.1: the two /admin apex-redirect cases (deep links 404d on the apex).
   // ── Phase 232 (232-04 / SRC-02) — Source folder picker suite ──
   "SourceFolderPicker.test.tsx": 7,
   // ── Phase 233 (233-02 / PREV-01…03 / LIB-09) — THE PREVIEW. Two suites, and BOTH knobs ──
@@ -3849,8 +3849,19 @@ const BASELINE = {
   // repository. A total that cannot see a new suite is the gate telling you, in its own
   // numbers, that it never ran it. Adding a pin here imports NO rot: both suites were green
   // before adoption, so adoption cannot red the gate.
-  "AdminSpendPage.test.tsx": 6,
-  "RunCostBadge.test.tsx": 5,
+  // 6 -> 7 in Phase 257.1: the root-scroll fence. Driven RED against the exact class string
+  // that shipped (`flex-1 overflow-y-auto`, no `h-full`/`min-h-0`), file restored md5-identical.
+  "AdminSpendPage.test.tsx": 7,
+  // 5 -> 7 in Phase 257.1: two cases added for the badge's THIRD state ("No tokens
+  // recorded" for a rated model whose run measured nothing) and for the undefined-vs-null
+  // coverage distinction. Both were introduced by the review's own fixes and covered by
+  // nothing, which is the same gap the review raised about this phase. Measured `7 passed
+  // (7)`, and the third-state case was driven RED against a disabled branch (restored
+  // md5-identical). An EXTENSION, never a lowering — no deletion rides with it.
+  "RunCostBadge.test.tsx": 7,
+  // Phase 257.1 — adopted from NEITHER knob; see the TARGETS comment at the bottom of this
+  // file. Measured `14 passed (14)` before the phase's cases, `18 passed (18)` after.
+  "NavPanel.test.tsx": 18,
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -5569,6 +5580,17 @@ const TARGETS = [
   //     plural DIRECTORY entry covers it structurally and no named entry is needed.
   "src/pages/admin/AdminSpendPage.test.tsx",
   "src/components/workflow/RunCostBadge.test.tsx",
+  // ── Phase 257.1 — a THIRD invisible suite, found while fixing the first two. ──────────
+  // `src/components/layout/__tests__/NavPanel.test.tsx` has existed and passed for a long
+  // time in NEITHER knob: the array reaches `src/components/layout` by NAMED FILES ONLY
+  // (`NavPanel.badge.test.tsx`, the four ChatLayout/ChatHistoryColumn entries), and this
+  // sibling was never named. It is the suite that owns the operator rail's
+  // non-discoverability contract — the D-07 "nothing renders for a non-operator" rule —
+  // so it was guarding the leak of every operator surface while being deletable in silence.
+  // Measured GREEN at 14 BEFORE adoption (so adoption cannot red the gate), then 18 with
+  // the four spend-reachability cases; three of those four driven RED against a relabelled
+  // rail entry, file restored md5-identical.
+  "src/components/layout/__tests__/NavPanel.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")

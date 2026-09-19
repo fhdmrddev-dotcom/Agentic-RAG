@@ -199,9 +199,19 @@ export interface Message {
    * streamed runs (not backfilled from DB — runs.error is not yet in the
    * messages response). */
   runError?: string
-  /** Phase 257 (METER-07): Attributable cost and rating metadata for run */
+  /** Phase 257 (METER-07): attributable cost and rating metadata for the run.
+   *
+   * ⛔ 257.1 widened `isRated` to include `null`, and the null is LOAD-BEARING rather than
+   * laziness. These fields describe THREE states, not two:
+   *   is_rated true  + cost_usd number → priced; render the dollar figure
+   *   is_rated false + cost_usd null   → no rate for this model; render "Unrated"
+   *   is_rated true  + cost_usd null   → rate exists, tokens were never recorded;
+   *                                       render "No tokens recorded", NOT "Unrated"
+   *   is_rated null  + cost_usd null   → the run has no model recorded at all
+   * Narrowing this back to `boolean` forces the third state to masquerade as the second,
+   * which is how the shipped badge came to state a false cause. */
   costUsd?: number | null
-  isRated?: boolean
+  isRated?: boolean | null
   tokenCoverage?: string[] | null
   /** Phase 075.1 Plan 04 Atom E (B-260519-11 + BUG-260514-01): cumulative
    * sandbox-output file list emitted by the backend `final_output_files`

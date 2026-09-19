@@ -4,10 +4,10 @@ milestone: v4.3
 milestone_name: What You Can Actually Sell
 status: executing
 last_updated: "2026-09-19T08:50:00.000Z"
-last_activity: 2026-09-19 -- Phase 257 complete (4/4 plans executed, all 3 G-4 failure scenarios verified, rate registry, single-home pricing service, operator spend cockpit, run-level affordances)
+last_activity: 2026-09-19 -- Phase 257 executed 4/4 plans; independent review returned REVISE (257-REVIEW.md). 7 reviewer fixes landed at 469dd2826 and BOTH gates are green (backend 71, vitest 8426/0/7685). SC#2 and SC#3 hold; SC#1 and SC#4 do NOT -- 1 of 78 models in real runs has a rate, and the run-level badge never mounts because no route outside /admin/spend emits cost_usd. Phase 258 is BLOCKED on SC#1 by its own dependency line.
 progress:
   total_phases: 13
-  completed_phases: 3
+  completed_phases: 2
   total_plans: 12
   completed_plans: 9
   percent: 25

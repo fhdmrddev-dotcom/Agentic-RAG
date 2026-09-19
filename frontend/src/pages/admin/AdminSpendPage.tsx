@@ -112,7 +112,21 @@ export const AdminSpendPage: React.FC<AdminSpendPageProps> = ({ onBack }) => {
     : 100
 
   return (
-    <div className="flex-1 overflow-y-auto bg-background p-6 space-y-6">
+    // ⛔ `h-full min-h-0` IS THE SCROLL, AND `flex-1` ALONE WAS NOT. Phase 257.1.
+    // Operator, on the shipped page: *"I see a lot of information that's good but it is not
+    // scrolling down."* The root carried `flex-1 overflow-y-auto` — but this page is mounted
+    // into `ChatLayout`'s `<main className="flex-1 overflow-hidden">` (:846), and that main
+    // is NOT a flex container. `flex-1` on a child of a non-flex parent is inert, so the root
+    // had NO constrained height; `overflow-y-auto` on an element that is as tall as its own
+    // content never scrolls, and everything past the viewport was simply clipped by main's
+    // `overflow-hidden`. The content was rendering the whole time — it was unreachable.
+    //
+    // `h-full` gives it main's height (definite: main is `flex-1` inside a flex column), and
+    // `min-h-0` is the companion this repo has already paid for twice — ChatLayout:797 carries
+    // the same note, and a flex child's `min-height:auto` default is what stops it shrinking
+    // below its content. `flex-1` is kept so the root still behaves if a future mount puts it
+    // inside a flex column.
+    <div className="h-full min-h-0 flex-1 overflow-y-auto bg-background p-6 space-y-6">
       {/* Top Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-border/50">
         <div>

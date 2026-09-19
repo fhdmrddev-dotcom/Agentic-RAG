@@ -81,6 +81,14 @@ from app.dependencies import (
 # disagree about what a step even IS.
 from app.models.thread import declared_phase_measure, phase_output_object, step_identity
 from app.utils.db import aexec
+# 257.1 (SC#4) — cost is READ through the one conversion home and the one rate resolver,
+# never re-derived at this call site. `app.dependencies` is imported as a module here (not
+# `from ... import get_pg_pool`) to match `api/admin_spend.py`, whose `deps.get_pg_pool()`
+# call site is the shape this route copies; a from-import binds the singleton at import
+# time, when it is still None — the reason is written out at `api/admin.py:243`.
+from app import dependencies as deps
+from app.db import rates
+from app.services.pricing_service import compute_token_cost_usd
 
 logger = logging.getLogger(__name__)
 
@@ -316,6 +324,35 @@ class WorkflowRunRead(BaseModel):
     # while this field did not exist and the query never fetched the column, so the sentence
     # could not render on any run. Removing any ONE of the three restores that.
     metadata: dict[str, Any] | None = None
+    # ── Phase 257.1 (ROADMAP SC#4) — DECLARED, SELECTED AND POPULATED IN LOCKSTEP, and the
+    # ── docblock above is the reason this note exists rather than a bare field list. ─────
+    #
+    # ⛔ PHASE 257 SHIPPED THESE FIELDS ON THE FRONTEND WITH NO PRODUCER. `RunCostBadge` is
+    # mounted in `WorkflowRunPage.tsx` and twice in `RunCard.tsx`, each guarded by
+    # `(cost_usd !== undefined || is_rated !== undefined)`, and `lib/api/workflows.ts` +
+    # `types/index.ts` declared the fields as OPTIONAL. Measured at `c570922f4`:
+    #
+    #     grep -rn "cost_usd|is_rated" backend/app/ --include=*.py
+    #        minus {db/rates.py, api/admin_spend.py, services/pricing_service.py} -> ZERO
+    #
+    # No route outside `/admin/spend` emitted either key, so every guard was permanently
+    # false and the badge NEVER MOUNTED in the running product. `tsc` was satisfied and
+    # `RunCostBadge.test.tsx` passed, because it hands the component props directly.
+    # **An optional wire field with no producer typechecks perfectly and renders nothing.**
+    model: str | None = None
+    cost_usd: float | None = Field(
+        default=None,
+        description="Attributable USD cost for this run, or null when unrated OR unmeasured.",
+    )
+    is_rated: bool | None = Field(
+        default=None,
+        description=(
+            "True when a rate resolved for this run's model. ⛔ Read WITH cost_usd, never "
+            "instead of it: is_rated=True AND cost_usd=None is the third state (rate exists, "
+            "tokens were never recorded) and the badge must name that cause, not 'unrated'."
+        ),
+    )
+    token_coverage: list[str] | None = None
     phases: list[WorkflowRunPhaseRead] = Field(default_factory=list)
 
 
@@ -718,7 +755,20 @@ async def read_workflow_run(
         supabase.table("workflow_runs")
         .select(
             "id, thread_id, definition_id, status, created_at, updated_at, claimed_at, "
-            "definition_snapshot, metadata"
+            "definition_snapshot, metadata, "
+            # Phase 257.1 — the SECOND place of the lockstep (SC#4). Migration 182 added
+            # these columns to `workflow_runs`; nothing read them here. An explicit column
+            # list, never a star read — the argument against one is three paragraphs down.
+            #
+            # ⚠ THAT WORDING IS DELIBERATE AND THE PARAPHRASE IS THE POINT.
+            # `test_214_failure_reason_seam.py` counts occurrences of the star-select literal
+            # in this module and requires EXACTLY TWO, both inside comments, so the AST
+            # fence's own contrast case stays visible. Spelling that literal here — even in
+            # prose, even in order to forbid it — took the count to three and turned the
+            # fence red. ⭐ A fence that counts occurrences is a fence a COMMENT can break,
+            # which is the mirror image of this repo's other standing lesson that a text
+            # fence cannot tell code from a comment. Say "star read" in prose; never type it.
+            "model, input_tokens, output_tokens, token_coverage"
         )
         .eq("id", str(workflow_run_id))
         .eq("user_id", current_user["id"])
@@ -903,6 +953,46 @@ async def read_workflow_run(
             )
         )
 
+    # ── Phase 257.1 — the THIRD place of the lockstep (ROADMAP SC#4). ────────────────────
+    #
+    # ⛔ ROUTED THROUGH THE ONE CONVERSION HOME, NOT RE-IMPLEMENTED HERE. METER-02 / SC#3
+    # says exactly one token→USD conversion exists; `rates.get_rate_for_model` is also the
+    # one rate RESOLVER (its ORDER BY encodes org-over-global and provider-over-fallback).
+    # Writing `tokens * rate / 1e6` at this call site would be the sixth conversion site in
+    # the backend and the fence in `test_257_single_token_conversion_home.py` would fire —
+    # which is the fence doing its job, so the import is the correct answer, not a workaround.
+    #
+    # ⚠ FAILURE HERE MUST NOT 500 A PURE READ. This route's contract is "the run surface in
+    # ONE round trip"; cost is an ADDITIONAL affordance on it. If the rate lookup fails, the
+    # run still renders and the badge reads unrated — a degraded truth, never a broken page.
+    run_cost_usd: float | None = None
+    run_is_rated: bool | None = None
+    run_model = run.get("model")
+    if run_model:
+        try:
+            pool = await deps.get_pg_pool()
+            rate = await rates.get_rate_for_model(pool, run_model)
+            result = compute_token_cost_usd(
+                run.get("input_tokens"),
+                run.get("output_tokens"),
+                rate,
+                model_id=run_model,
+            )
+            run_is_rated = result.is_rated
+            run_cost_usd = float(result.cost_usd) if result.cost_usd is not None else None
+        except Exception:  # noqa: BLE001 — see the paragraph above; degrade, never 500.
+            logger.warning(
+                "workflow_run cost lookup failed for run %s (model %s); "
+                "rendering the run without a cost figure",
+                run["id"],
+                run_model,
+                exc_info=True,
+            )
+            run_is_rated = None
+            run_cost_usd = None
+
+    _coverage = run.get("token_coverage")
+
     return WorkflowRunRead(
         id=run["id"],
         thread_id=run["thread_id"],
@@ -919,6 +1009,11 @@ async def read_workflow_run(
         # back as a dict, but a string scalar has been measured on sibling columns in this
         # tree, so a non-dict is dropped rather than handed to the client as a bare string.
         metadata=run.get("metadata") if isinstance(run.get("metadata"), dict) else None,
+        # Phase 257.1 (SC#4) — the values computed just above.
+        model=run_model,
+        cost_usd=run_cost_usd,
+        is_rated=run_is_rated,
+        token_coverage=list(_coverage) if isinstance(_coverage, list) else None,
         phases=phases,
     )
 

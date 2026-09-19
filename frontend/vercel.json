@@ -67,6 +67,28 @@
       ],
       "destination": "https://app.:host/invite/$1",
       "permanent": true
+    },
+    {
+      "source": "/admin",
+      "has": [
+        {
+          "type": "host",
+          "value": "(?<host>^(?!app\\.).*)"
+        }
+      ],
+      "destination": "https://app.:host/admin",
+      "permanent": true
+    },
+    {
+      "source": "/admin/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "(?<host>^(?!app\\.).*)"
+        }
+      ],
+      "destination": "https://app.:host/admin/$1",
+      "permanent": true
     }
   ],
   "rewrites": [

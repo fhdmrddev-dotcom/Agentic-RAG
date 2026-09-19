@@ -96,6 +96,38 @@ describe("NavPanel rail — nav items + operator shield (D-07)", () => {
     expect(navItems.some((i) => i.view === "control-room")).toBe(false)
     expect(screen.getByRole("button", { name: /control room/i })).toBeInTheDocument()
   })
+
+  // ── Phase 257.1 (METER-07 reachability) ──────────────────────────────────────────────
+  // Phase 257 shipped the spend cockpit with its ActiveView and its ChatLayout mount and NO
+  // ENTRY ACTION, so the only way to reach it was to type `/admin/spend` into the address
+  // bar. That is the Phase-118 built-but-unreachable lesson recurring, and it is exactly the
+  // leg of the triad that no typecheck and no unit test can notice on its own — which is why
+  // these three cases exist rather than a comment.
+
+  it("renders a Spend entry when isOperator=true — the cockpit is reachable without typing a URL", () => {
+    renderRail({ isOperator: true })
+    expect(screen.getByRole("button", { name: /spend/i })).toBeInTheDocument()
+  })
+
+  it("renders NO Spend entry for a non-operator (the D-07 vanish, not a disabled control)", () => {
+    renderRail({ isOperator: false })
+    expect(screen.queryByRole("button", { name: /spend/i })).not.toBeInTheDocument()
+  })
+
+  it("navigates to admin-spend when the Spend entry is clicked", () => {
+    const onNavigate = vi.fn()
+    renderRail({ isOperator: true, onNavigate })
+    fireEvent.click(screen.getByRole("button", { name: /spend/i }))
+    expect(onNavigate).toHaveBeenCalledWith("admin-spend")
+  })
+
+  it("keeps Spend OUTSIDE navItems, like the shield — navItems also feeds the mobile drawer", () => {
+    // An entry in NAV_ITEMS would leak an operator surface to every member, because
+    // ChatLayout's mobile drawer consumes the same array. Same contract as control-room.
+    renderRail({ isOperator: true, navItems })
+    expect(navItems.some((i) => i.view === "admin-spend")).toBe(false)
+    expect(screen.getByRole("button", { name: /spend/i })).toBeInTheDocument()
+  })
 })
 
 describe("NavPanel rail — ☰ expand/collapse toggle (refinement 2026-07-16)", () => {

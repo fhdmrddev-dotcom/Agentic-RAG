@@ -899,19 +899,37 @@ def test_this_round_shipped_no_migration():
 
     Re-open trigger: a *gap-closure round* — not a phase — proposing a migration.
     """
+    # ⚠ SECOND CORRECTION, SAME DAY, AND THE SECOND ONE IS THE REAL FIX. The first pass
+    # simply moved the ceiling 182 -> 183. Phase 257.1 then shipped migration 184 and the
+    # fence fired AGAIN — which is the tell that a MOVING CEILING was never the property.
+    # Any fence that must be widened by every subsequent phase is a scheduled false alarm,
+    # and the third person to hit it widens it without reading why it exists.
+    #
+    # ⭐ THE PROPERTY IS HISTORICAL AND IMMUTABLE: *Phase 256 shipped exactly one migration,
+    # 182, and its gap-closure rounds shipped none.* Phase 256 is closed; that fact can
+    # never change, so asserting it can never be tripped by a later phase doing its job.
+    # Measured: the highest migration number named anywhere under `.planning/phases/256-*/`
+    # is 182 (the others referenced are 055, 118, 125, 129, 175 — all pre-existing).
     repo = _BACKEND_APP.parents[1]
-    # Phase 256 closed at migration 182; Phase 257 took 183. Pinned to "above 183" so the
-    # property that still binds stays enforced, instead of a ceiling no later phase can meet.
-    later = sorted(
-        p.name
-        for p in (repo / "supabase/migrations").glob("*.sql")
-        if re.match(r"^(18[4-9]|19\d|[2-9]\d{2})_", p.name)
-    )
-    assert later == [], (
-        "a migration numbered above 183 appeared. If this is a PHASE shipping a new "
-        "capability, widen this fence DELIBERATELY and record the widening in the "
-        "docstring above, exactly as the Phase 257 review did. If this is a GAP-CLOSURE "
-        f"ROUND, G-7 fires: a closure round may not ship a migration. Offending: {later}"
+    phase_dirs = sorted((repo / ".planning" / "phases").glob("256-*"))
+    assert phase_dirs, "phase 256's artifacts are missing — this fence lost its subject"
+
+    referenced: set[int] = set()
+    for d in phase_dirs:
+        for f in d.rglob("*.md"):
+            for m in re.finditer(
+                r"(?:supabase/migrations/|\bmigration\s+)(\d{3})\b",
+                f.read_text(encoding="utf-8", errors="replace"),
+                re.I,
+            ):
+                referenced.add(int(m.group(1)))
+
+    above = sorted(n for n in referenced if n > 182)
+    assert above == [], (
+        "Phase 256's artifacts now reference a migration numbered above 182. Phase 256 is "
+        "CLOSED, so this is either a retroactive edit to a shipped phase's record or a "
+        "gap-closure round smuggling in a new capability — G-7 forbids the second and the "
+        f"first needs saying out loud. Offending migration number(s): {above}"
     )
 
 

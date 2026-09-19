@@ -81,4 +81,35 @@ describe("RunCostBadge (METER-07)", () => {
     const asterisk = screen.getByTestId("incomplete-coverage-asterisk")
     expect(asterisk).toBeInTheDocument()
   })
+
+  // ── Phase 257.1 (reviewer) — the THIRD state, and the undefined/null distinction. ─────
+  // Both behaviours were introduced by the 257 review's fixes and NOTHING covered them,
+  // which is the same gap the review itself raised about this phase: a state you can see in
+  // the product and cannot see in a suite is a state that can be deleted silently.
+
+  it("renders 'No tokens recorded' — NOT 'Unrated' — when the model IS rated but no tokens were measured", () => {
+    // pricing_service returns is_rated=True, cost_usd=None when both token counts are None.
+    // Collapsing that into the unrated branch makes the tooltip state a FALSE cause: the
+    // model is priced, the RUN was not measured.
+    render(<RunCostBadge costUsd={null} isRated={true} unratedModel="gpt-4o" />)
+
+    const badge = screen.getByTestId("unmeasured-cost-badge")
+    expect(badge).toBeInTheDocument()
+    expect(badge).toHaveTextContent("No tokens recorded")
+    expect(screen.queryByTestId("unrated-cost-badge")).not.toBeInTheDocument()
+    expect(screen.queryByText(/no rate registered/i)).not.toBeInTheDocument()
+    expect(badge.getAttribute("title")).toMatch(/HAS a registered rate/)
+    // ⛔ and the invariant that outranks all of it
+    expect(screen.queryByText("$0.0000")).not.toBeInTheDocument()
+  })
+
+  it("renders NO coverage asterisk when tokenCoverage is undefined — absent is not incomplete", () => {
+    // The chat surface reads `public.runs`, which has no token_coverage column, so it passes
+    // nothing. Scoring that as "incomplete" would stamp a false lower-bound marker on every
+    // message in the product. Contrast with the `null` case above, which IS incomplete.
+    render(<RunCostBadge costUsd={0.075} isRated={true} />)
+
+    expect(screen.getByText("$0.0750")).toBeInTheDocument()
+    expect(screen.queryByTestId("incomplete-coverage-asterisk")).not.toBeInTheDocument()
+  })
 })

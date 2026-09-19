@@ -60,6 +60,10 @@ from app.services.audit_service import write_audit_entry
 from app.utils.db import aexec
 from app.dependencies import get_pg_pool
 from app.db.runs import finalize_run, insert_assistant_message
+# 257.1 (SC#4) — cost is READ through the one conversion home and the one rate resolver,
+# never re-derived here. See `_enrich_messages_with_runs` for why the lookup is batched.
+from app.db import rates
+from app.services.pricing_service import compute_token_cost_usd
 # Phase 145-03 (D-145-09) — the atomic run-lifecycle owner (Plan 02). The chat-run
 # START register + every TRUE terminal route through these co-writers so
 # runs.status and its runs:active/runs_by_thread mirrors move in ONE unit and can
@@ -295,9 +299,33 @@ async def _enrich_messages_with_runs(
     # finalize. Flows to BOTH /messages and /snapshot (shared helper).
     runs_resp = await aexec(
         supabase.table("runs")
-        .select("run_id, message_id, status, model, provider, started_at, completed_at")
+        # Phase 257.1 (ROADMAP SC#4): ADDITIVE-SELECT-ONLY, the SAME shape Phase 095.1-03
+        # argued for two paragraphs up. The SELECT gains 2 COLUMNS (input_tokens,
+        # output_tokens) so the chat `RunCostBadge` can show what a turn cost. The WHERE
+        # clause is UNCHANGED (.eq thread_id + .eq user_id + RLS runs_select_own) → no
+        # widened row set, no IDOR. No migration and no new write: Phase 256 already
+        # persists both columns on `public.runs`.
+        .select(
+            "run_id, message_id, status, model, provider, started_at, completed_at, "
+            "input_tokens, output_tokens"
+        )
         .eq("thread_id", thread_id)
         .eq("user_id", user_id)
+        # ⛔ D-256-02, and `test_256_token_sum_narrowing.py` FIRED ON THIS EXACT LINE when the
+        # two token columns were added above — correctly, and it is the reason this filter is
+        # here. A parent run's token totals are INCLUSIVE of its children (phase_types.py
+        # `_record_run_usage`), so any read of a runs-table token column that can see child
+        # rows double-counts a sub-agent's spend.
+        #
+        # ⭐ MEASURED BEFORE ADDING IT, because this SELECT also feeds the pre-existing
+        # run_id / run_status / model / provider / started_at / completed_at stamps and a
+        # narrowing that changed WHICH run matched a message would be a silent behaviour
+        # change to shipped fields:
+        #     runs with message_id NOT NULL                        : 713
+        #     ...of those, parent_run_id NOT NULL (i.e. children)  :   0
+        # No child run carries a message_id, so the matched set is unchanged on real data and
+        # this is purely the structural guarantee the fence asks for.
+        .is_("parent_run_id", "null")
         .order("started_at", desc=True)
     )
     runs_by_message: dict[str, dict] = {}
@@ -322,6 +350,55 @@ async def _enrich_messages_with_runs(
         m["provider"] = run["provider"] if run else None
         m["started_at"] = run["started_at"] if run else None
         m["completed_at"] = run["completed_at"] if run else None
+
+    # ── Phase 257.1 (ROADMAP SC#4) — cost, resolved ONCE PER DISTINCT MODEL ─────────────
+    #
+    # ⛔ THE LOOKUP IS BATCHED BY MODEL, NOT DONE PER MESSAGE. A thread is routinely 50+
+    # messages and CLAUDE.md's long-message UAT axis specifies ≥50; a per-message rate
+    # query would add one round trip per row to the hot `/messages` path. A thread uses a
+    # handful of distinct models, so this is O(models), not O(messages).
+    #
+    # ⛔ ROUTED THROUGH THE ONE CONVERSION HOME (METER-02 / SC#3). `tokens * rate / 1e6`
+    # written here would be an additional conversion site and the AST fence in
+    # `test_257_single_token_conversion_home.py` would fire — correctly.
+    #
+    # ⚠ `token_coverage` IS DELIBERATELY NOT STAMPED. It lives on `workflow_runs`; the chat
+    # surface reads `runs`, which has no such column. `RunCostBadge` distinguishes
+    # `undefined` (coverage not tracked → make no claim) from `null` (tracked and absent →
+    # incomplete), so leaving it off is what stops chat showing a false "incomplete
+    # coverage" marker on every message.
+    #
+    # ⚠ FAILURE DEGRADES, IT DOES NOT 500. `/messages` is the chat's primary read; a rate
+    # lookup is an affordance ON it. If pricing is unavailable the thread still loads and
+    # the badge reads unrated.
+    models_seen = {m["model"] for m in messages if m.get("model")}
+    if models_seen:
+        try:
+            pool = await get_pg_pool()
+            rate_by_model = {
+                name: await rates.get_rate_for_model(pool, name) for name in models_seen
+            }
+            for m in messages:
+                name = m.get("model")
+                if not name:
+                    m["cost_usd"] = None
+                    m["is_rated"] = None
+                    continue
+                run = runs_by_message.get(m["id"])
+                result = compute_token_cost_usd(
+                    (run or {}).get("input_tokens"),
+                    (run or {}).get("output_tokens"),
+                    rate_by_model.get(name),
+                    model_id=name,
+                )
+                m["is_rated"] = result.is_rated
+                m["cost_usd"] = float(result.cost_usd) if result.cost_usd is not None else None
+        except Exception:  # noqa: BLE001 — see the paragraph above; degrade, never 500.
+            logger.warning(
+                "thread %s: run cost enrichment failed; messages render without cost",
+                thread_id,
+                exc_info=True,
+            )
 
     return messages
 

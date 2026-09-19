@@ -3,7 +3,7 @@ import { AlertTriangle } from "lucide-react"
 
 export interface RunCostBadgeProps {
   costUsd?: number | null
-  isRated?: boolean
+  isRated?: boolean | null
   unratedModel?: string | null
   tokenCoverage?: string[] | null
   className?: string
@@ -81,10 +81,24 @@ export const RunCostBadge: React.FC<RunCostBadgeProps> = ({
     )
   }
 
-  // Check token coverage completeness
-  const isCoverageComplete =
-    Array.isArray(tokenCoverage) &&
-    REQUIRED_LEGS.every((leg) => tokenCoverage.includes(leg))
+  // ⛔ ABSENT COVERAGE IS NOT INCOMPLETE COVERAGE. Phase 257.1 (reviewer).
+  // This read `isCoverageComplete = Array.isArray(tokenCoverage) && every(...)`, so a caller
+  // that does not TRACK coverage was scored identically to one that tracks it and found it
+  // partial — and the badge appended its `*` "Incomplete token coverage: lower bound" marker
+  // to EVERY such cost. `token_coverage` lives on `workflow_runs`; the chat surface reads
+  // `runs`, which has no such column, so wiring chat cost without this change would have
+  // stamped a false incompleteness claim on every message in the product.
+  //
+  // ⛔ `undefined` and `null` are DIFFERENT ANSWERS HERE, and conflating them is the bug:
+  //   undefined -> the caller does not TRACK coverage (chat reads `runs`, which has no such
+  //                column) -> make NO claim, render no marker.
+  //   null / [] -> the caller DOES track coverage and recorded none -> genuinely incomplete
+  //                -> render the `*` lower-bound marker. (257-04's own case asserts this,
+  //                and it was right: `null` from `workflow_runs` means partial, not unknown.)
+  const coverageKnown = tokenCoverage !== undefined
+  const isCoverageIncomplete =
+    coverageKnown &&
+    !(Array.isArray(tokenCoverage) && REQUIRED_LEGS.every((leg) => tokenCoverage.includes(leg)))
 
   const formattedCost = `$${costUsd.toFixed(4)}`
 
@@ -94,7 +108,7 @@ export const RunCostBadge: React.FC<RunCostBadgeProps> = ({
       data-testid="rated-cost-badge"
     >
       <span>{formattedCost}</span>
-      {!isCoverageComplete && (
+      {isCoverageIncomplete && (
         <span
           className="text-amber-400 font-bold ml-0.5 cursor-help"
           title="Incomplete token coverage: lower bound"

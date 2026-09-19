@@ -120,5 +120,15 @@ class MessageResponse(BaseModel):
     provider: str | None = None
     started_at: datetime | None = None
     completed_at: datetime | None = None
+    # ── Phase 257.1 (ROADMAP SC#4) — THE THIRD PLACE OF A THREE-PLACE LOCKSTEP ──────────
+    # stamped in `_enrich_messages_with_runs`, selected from `public.runs`, DECLARED here.
+    # ⛔ `GET /{thread_id}/messages` is `response_model=list[MessageResponse]`, and a
+    # response_model DROPS every key the model does not name, SILENTLY. Deleting either
+    # field below does not break a test — it makes the chat cost badge stop rendering, with
+    # no error anywhere. That is not hypothetical: Phase 257 shipped `cost_usd`/`is_rated`
+    # on the FRONTEND with no backend producer at all, so `RunCostBadge` never mounted in
+    # the product while `tsc` and its own unit suite stayed green.
+    cost_usd: float | None = None
+    is_rated: bool | None = None
     # Phase 223 (BUG-260902-03 / D-223-06): armed connector IDs active when user message was sent
     active_connector_ids: list[UUID] | None = None

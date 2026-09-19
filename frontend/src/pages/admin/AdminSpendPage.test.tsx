@@ -214,4 +214,34 @@ describe("AdminSpendPage (METER-07)", () => {
       ).toBeInTheDocument()
     })
   })
+
+  // ── Phase 257.1 — the page must own its own scroll. ──────────────────────────────────
+  // Operator on the shipped page: *"I see a lot of information that's good but it is not
+  // scrolling down."* The root carried `flex-1 overflow-y-auto`, but ChatLayout mounts this
+  // into `<main className="flex-1 overflow-hidden">` which is NOT a flex container — so
+  // `flex-1` was inert, the root had no constrained height, and `overflow-y-auto` on an
+  // element as tall as its own content never scrolls. Everything below the fold was
+  // rendering and unreachable.
+  //
+  // ⛔ ASSERTING CLASSES IS NORMALLY WEAK — this repo's own rule is that a presence
+  // assertion cannot see content drift. Here the class IS the deliverable: there is no
+  // rendered text that differs between a page that scrolls and one that does not, and
+  // jsdom has no layout engine to measure a real scroll with. So the classes are the only
+  // honest thing to bind, and `h-full` + `min-h-0` are named individually rather than as a
+  // whole className string, so reordering or adding a utility does not false-fail.
+  it("gives its root a constrained height so the page can actually scroll", async () => {
+    const { container } = render(<AdminSpendPage />)
+    await waitFor(() => {
+      expect(screen.getByText("$148.6200")).toBeInTheDocument()
+    })
+
+    const root = container.firstElementChild as HTMLElement
+    expect(root).toBeTruthy()
+    // the scroller itself
+    expect(root.className).toMatch(/\boverflow-y-auto\b/)
+    // …and the two that give it something to scroll WITHIN. Dropping either one silently
+    // restores the unreachable-content bug, with no visible diff in any other assertion.
+    expect(root.className).toMatch(/\bh-full\b/)
+    expect(root.className).toMatch(/\bmin-h-0\b/)
+  })
 })

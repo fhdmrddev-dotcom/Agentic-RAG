@@ -659,7 +659,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 |---|---|---|
 | `frontend/src/components/chat/ToolCallPanel.tsx` | 51 / 23 / 351 | ✅ **G-5 DISCHARGED (227-02)** |
 | `frontend/src/components/chat/MessageItem.tsx` | 75 / 34 / 1004 | ⚠ row STALE a 5th time (`75/34/1000`). honoured by construction (**BUG-260912-01**): ONE prop added to the EXISTING fold mount — no new branch, the call site still decides nothing |
-| `backend/app/api/threads.py` | 245 / 82 / 1617 | ⚠ row was STALE at `243 / 80 / 1590`. honoured by construction (**244-03**): one pure-read query loses a WHERE predicate, gains a Python guard. ⛔ no writer added |
+| `backend/app/api/threads.py` | 245 / 82 / 1679 | ⚠ row was STALE at `243 / 80 / 1590`. honoured by construction (**244-03**): one pure-read query loses a WHERE predicate, gains a Python guard. ⛔ no writer added |
 | `frontend/src/providers/StreamsProvider.tsx` | 104 / 38 / 4948 | ⚠ row STALE an 8th time (`102/37/4880`). NOT modified by 253 — re-derived under CR-08. ⛔ `onTurnBoundary` FLUSHES before moving, or a turn's tail leaks into the next body |
 | `frontend/src/hooks/useMessages.ts` | 74 / 27 / 127 | extraction due |
 | `backend/app/services/anthropic_service.py` | 11 / 10 / 354 | adapter-pattern audit due |
@@ -676,7 +676,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/WorkflowDoorSwitch.tsx` | 18 / 12 / 1075 | honoured by construction (193 / 193.1 / 199 / **214**) |
 | `frontend/src/pages/WorkflowBuilderPage.tsx` | 56 / 21 / 2977 | honoured by construction ×6 (193.1 / 193.2 / 197 / 200.3 / 214 / **214 |
 | `backend/app/api/workflows.py` | 41 / 22 / 2254 | ⚠ **extraction still OWED** |
-| `backend/app/api/workflow_runs.py` | 11 / 8 / 1003 | honoured by construction (200 / 200.1 / **214**) |
+| `backend/app/api/workflow_runs.py` | 11 / 8 / 1089 | honoured by construction (200 / 200.1 / **214**) |
 | `backend/app/models/thread.py` | 16 / 10 / 438 | honoured by construction (200.1 / **214**) |
 | `frontend/src/components/workflows/canvasModel.ts` | 13 / 6 / 752 | ⚠ absent from BOTH at 6 phases (added 200) |
 | `frontend/src/components/layout/ChatLayout.tsx` | 51 / 26 / 1010 | ⚠ row was STALE at `46/24/921`. honoured by construction (**244-04**): ONE prop on an existing mount — a 4th renderer off the SAME one read; the registry is still resolved exactly once |
@@ -710,7 +710,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/chat/OutputFileCard.tsx` | 8 / 7 / 219 | honoured by construction (195) |
 | `frontend/src/components/panel/FilesSection.tsx` | 10 / 6 / 363 | ⚠ row was STALE at `8 / 5 / 334`. honoured by construction (**244-05**): TWO `export` keywords, zero body change — the chat chip IMPORTS `expiryCaption`, never re-derives its three readings |
 | `frontend/src/lib/api.ts` | 187 / 110 / 422 | ✅ **SPLIT TAKEN (207)** |
-| `frontend/src/types/index.ts` | 85 / 66 / 1398 | ⚠ row STALE again (`85/65/1380`). honoured by construction (**BUG-260912-01**): ONE optional client-only field, `narrationContent` — no column, because the loop discards this text by design. seam still OWED |
+| `frontend/src/types/index.ts` | 87 / 66 / 1412 | ⚠ row STALE again (`85/65/1380`). honoured by construction (**BUG-260912-01**): ONE optional client-only field, `narrationContent` — no column, because the loop discards this text by design. seam still OWED |
 | `backend/app/main.py` | 82 / 59 / 950 | ⚠ row was STALE by **FOURTEEN PHASES**. honoured by construction (**BUG-260902-06**) |
 | `backend/app/config.py` | 87 / 50 / 1593 | ⚠ STALE a 13th time. honoured by construction (**249-01**): ONE derived frozenset `ROUTING_PROVIDERS` + a Literal widened to the value the code already returned. ⛔ `MODEL_CAPABILITIES` seam OWED |
 | `backend/app/api/admin.py` | 38 / 14 / 1968 | honoured by construction (**249-01/03**): the add guard swaps its SOURCE LIST; 3 write seams gain a refusal catch. ⛔ order, 422 shape, every other guard byte-unchanged |
@@ -758,13 +758,13 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/sources/base.py` | 9 / 5 / 336 | ⚠ **absent while FIRING at 5 phases — row added 239-03.** honoured by construction (239): protocol resolution stayed DATA (two dicts), never a branch |
 | `backend/app/services/sources/__init__.py` | 5 / 3 / 40 | ⚠ **absent while FIRING — row added 239-03.** The ONE eager-import site: an adapter missing from this list is unregistered, so the list is load-bearing |
 | `backend/app/services/mcp_client.py` | 9 / 6 / 526 | ⚠ row STALE TWICE (`4/2/407` reading `no`, then `7/5/480`) — a row present and WRONG stops the audit. **SEED-258: the body cap is DERIVED; no envelope knob exists to disagree** |
-| `backend/app/models/message.py` | 17 / 10 / 124 | ⚠ absent from BOTH for its ENTIRE LIFE at **8 phases** |
+| `backend/app/models/message.py` | 17 / 10 / 134 | ⚠ absent from BOTH for its ENTIRE LIFE at **8 phases** |
 | `backend/app/models/user_settings.py` | 55 / 34 / 1723 | ⚠ STALE a 6th close running. honoured by construction (**249-03**): ONE `except` split into two arms + one typed exception. ⛔ the unreachable-DB arm is byte-identical |
 | `backend/app/services/harness/reachability.py` | 4 / 4 / 463 | ⚠ absent from BOTH for its ENTIRE LIFE at **4 phases** |
 | `backend/app/services/workflow_kickoff.py` | 8 / 6 / 554 | ⚠ absent for its ENTIRE LIFE at **6 phases** |
 | `frontend/src/components/workflows/WorkflowScheduleModal.tsx` | 3 / 3 / 601 | ⚠ absent for its entire life; it crossed the threshold in 214-09 on a  |
 | `frontend/src/components/workflows/nodePresentation.ts` | 8 / 7 / 221 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
-| `frontend/src/lib/api/threads.ts` | 9 / 5 / 1715 | ⚠ row was STALE at `7/3/1683`. honoured by construction (**BUG-260912-01**): ONE optional callback + ONE dispatch arm; ⛔ `turn_boundary` carries NO payload — a second copy could disagree with the first |
+| `frontend/src/lib/api/threads.ts` | 10 / 5 / 1734 | ⚠ row was STALE at `7/3/1683`. honoured by construction (**BUG-260912-01**): ONE optional callback + ONE dispatch arm; ⛔ `turn_boundary` carries NO payload — a second copy could disagree with the first |
 | `frontend/src/lib/api/connectors.ts` | 17 / 11 / 740 | honoured by construction (**244-06**): `importCloudFile` gains a REQUIRED body declared BESIDE `SourcePreviewRequest` — ⛔ never inline in a component |
 | `frontend/src/lib/api/workflows.ts` | 4 / 4 / 1081 | ⚠ absent until 214; the 207 split created it with NO row. **`lib/api.t |
 | `frontend/src/lib/connectionMark.tsx` | 7 / 4 / 313 | ✅ **the move IS the seam, and it was TAKEN (214-08)** |
@@ -785,7 +785,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/verdictModel.ts` | 6 / 3 / 355 | ⚠ absent for its ENTIRE LIFE |
 | `frontend/src/components/library/IngestionTab.tsx` | 17 / 6 / 512 | ⚠ row was STALE at `13 / 4 / 456` |
 | `frontend/src/components/ingestion/__tests__/IngestionStrip.test.tsx` | 3 / 3 / 516 | ⚠ absent; row added 233, which repaired the INHERITED red `229-03` cau |
-| `frontend/src/components/layout/NavPanel.tsx` | 23 / 12 / 381 | ⚠ row STALE at `22/12/370`. **244-14**: WR-05 — the docblock stopped being false about itself (`min-h-0` read 2); IN-01 — `overflow-x-hidden`, since one axis makes the other compute to `auto` |
+| `frontend/src/components/layout/NavPanel.tsx` | 23 / 12 / 417 | ⚠ row STALE at `22/12/370`. **244-14**: WR-05 — the docblock stopped being false about itself (`min-h-0` read 2); IN-01 — `overflow-x-hidden`, since one axis makes the other compute to `auto` |
 | `frontend/src/App.tsx` | 32 / 23 / 374 | ⚠ absent for its ENTIRE LIFE at **23 phases**; row then STALE at `31/23/351`. ⭐ **244-04 left it BYTE-UNCHANGED and FENCED it** — `setLibraryTab(` still 2, driven RED against a planted 3rd writer |
 | `frontend/src/components/library/LibraryCloudImport.tsx` | 1 / 1 / 194 | young (created 244-06). Row added AT CREATION. The Library's single-file cloud door — ⛔ it renders a REASON in every unavailable state; a silent grey-out is the same failure as a silent root write |
 | `frontend/src/components/library/LibraryHeaderBar.tsx` | 2 / 1 / 204 | ⚠ absent for its entire life — row added **244-04** at its SECOND touch. ⛔ the ONE set of tab triggers: a hidden duplicate broke 41 cases; `aria-hidden` on the count is load-bearing |
