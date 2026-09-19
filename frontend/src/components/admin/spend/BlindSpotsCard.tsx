@@ -1,9 +1,19 @@
 import React from "react"
-import { AlertTriangle, ShieldCheck, BookOpen, Layers } from "lucide-react"
+import { AlertTriangle, ShieldCheck, BookOpen, Layers, Gauge } from "lucide-react"
 
 interface BlindSpotsCardProps {
   unratedRunsCount: number
+  /**
+   * THE THIRD STATE. Phase 257 CR-06. Runs that HAVE a registered rate but recorded no
+   * tokens. Excluded from the dollar total exactly like an unrated run, but for a different
+   * reason and with a different remedy - so a card whose whole job is to say what the total
+   * cannot see must name them separately rather than fold them into "unrated". Folding them
+   * in is what made this card offer "View 675 Unrated Runs" and then show 332, under copy
+   * claiming none of them had a registered rate when 343 of them did.
+   */
+  unmeasuredRunsCount: number
   incompleteCoverageCount: number
+  /** A rate EXISTS - the same meaning as the ledger's is_rated. priced = rated - unmeasured. */
   ratedRunsCount: number
   onFilterUnrated: () => void
   onFilterIncompleteCoverage: () => void
@@ -12,6 +22,7 @@ interface BlindSpotsCardProps {
 
 export const BlindSpotsCard: React.FC<BlindSpotsCardProps> = ({
   unratedRunsCount,
+  unmeasuredRunsCount,
   incompleteCoverageCount,
   ratedRunsCount,
   onFilterUnrated,
@@ -19,8 +30,15 @@ export const BlindSpotsCard: React.FC<BlindSpotsCardProps> = ({
   onOpenRateRegistry,
 }) => {
   const totalRuns = ratedRunsCount + unratedRunsCount
-  const ratedPct = totalRuns > 0 ? Math.round((ratedRunsCount / totalRuns) * 100) : 100
-  const unratedPct = 100 - ratedPct
+  // THE GAUGE SAYS "PRICED", SO IT MUST COUNT PRICED. CR-06. Reading ratedRunsCount here
+  // would render "72% Priced" on a window where 43% produced a figure - a brand new false
+  // claim, on the card that exists to prevent false claims.
+  const pricedCount = Math.max(0, ratedRunsCount - unmeasuredRunsCount)
+  const pricedPct = totalRuns > 0 ? Math.round((pricedCount / totalRuns) * 100) : 100
+  const unmeasuredPct = totalRuns > 0 ? Math.round((unmeasuredRunsCount / totalRuns) * 100) : 0
+  // The remainder, so the three segments always sum to exactly 100 and no rounding gap shows
+  // up as a sliver of bare track.
+  const unratedPct = Math.max(0, 100 - pricedPct - unmeasuredPct)
 
   return (
     <div className="rounded-xl border border-amber-500/30 bg-gradient-to-b from-amber-500/10 to-amber-500/5 p-5 shadow-sm">
@@ -37,7 +55,7 @@ export const BlindSpotsCard: React.FC<BlindSpotsCardProps> = ({
               </span>
             </h3>
             <p className="text-xs text-muted-foreground mt-0.5">
-              The first number anyone quotes should state what it excludes. Totals above omit unrated and unmeasured usage.
+              The first number anyone quotes should state what it excludes. Totals above omit runs with no registered rate, and runs whose tokens were never recorded.
             </p>
           </div>
         </div>
@@ -47,8 +65,17 @@ export const BlindSpotsCard: React.FC<BlindSpotsCardProps> = ({
           <div className="flex items-center gap-3 text-xs">
             <span className="text-emerald-400 font-semibold flex items-center gap-1">
               <ShieldCheck className="h-3.5 w-3.5" />
-              {ratedPct}% Priced
+              {pricedPct}% Priced
             </span>
+            {unmeasuredPct > 0 && (
+              <span
+                className="text-slate-300 font-semibold flex items-center gap-1"
+                title="A rate is registered, but no tokens were recorded for these runs"
+              >
+                <Gauge className="h-3.5 w-3.5" />
+                {unmeasuredPct}% No tokens
+              </span>
+            )}
             {unratedPct > 0 && (
               <span className="text-amber-400 font-semibold flex items-center gap-1">
                 <AlertTriangle className="h-3.5 w-3.5" />
@@ -60,9 +87,16 @@ export const BlindSpotsCard: React.FC<BlindSpotsCardProps> = ({
           <div className="w-48 h-2 rounded-full bg-card overflow-hidden flex border border-border/40">
             <div
               className="bg-emerald-500 h-full transition-all duration-300"
-              style={{ width: `${ratedPct}%` }}
-              title={`${ratedPct}% Rated`}
+              style={{ width: `${pricedPct}%` }}
+              title={`${pricedPct}% Priced`}
             />
+            {unmeasuredPct > 0 && (
+              <div
+                className="bg-slate-400 h-full transition-all duration-300"
+                style={{ width: `${unmeasuredPct}%` }}
+                title={`${unmeasuredPct}% Rated but no tokens recorded`}
+              />
+            )}
             {unratedPct > 0 && (
               <div
                 className="bg-amber-500 h-full transition-all duration-300"
@@ -75,7 +109,7 @@ export const BlindSpotsCard: React.FC<BlindSpotsCardProps> = ({
       </div>
 
       {/* Disclosures Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 pt-4">
         {/* 1. Unrated Models */}
         <div className="rounded-lg bg-card/60 p-3 border border-border/50 flex flex-col justify-between gap-3">
           <div>
@@ -105,7 +139,41 @@ export const BlindSpotsCard: React.FC<BlindSpotsCardProps> = ({
           )}
         </div>
 
-        {/* 2. Incomplete Token Coverage */}
+        {/* 2. Rated, but nothing measured (CR-06) */}
+        <div
+          className="rounded-lg bg-card/60 p-3 border border-border/50 flex flex-col justify-between gap-3"
+          data-testid="unmeasured-disclosure"
+        >
+          <div>
+            <div className="flex items-center justify-between text-xs font-semibold text-foreground">
+              <span className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-slate-400" />
+                Rated, No Tokens
+              </span>
+              <span className="font-mono text-slate-300 font-bold">{unmeasuredRunsCount} runs</span>
+            </div>
+            <p className="text-[11px] text-muted-foreground mt-1.5 leading-relaxed">
+              These models <em>do</em> have a registered rate. Nothing was recorded to price, so
+              they are excluded from the total rather than counted as $0.00 spend.
+            </p>
+          </div>
+          {unmeasuredRunsCount > 0 ? (
+            // NO BUTTON, DELIBERATELY. /admin/spend/runs has rated / unrated /
+            // incomplete_coverage and no chip for this state, so any filter offered here would
+            // land the operator on a different population than the number promised - which is
+            // the exact defect (CR-06) this tile exists because of. The ledger already labels
+            // these rows "No tokens recorded"; say where to look instead.
+            <span className="text-[11px] text-muted-foreground">
+              Shown as <span className="text-slate-300">No tokens recorded</span> in the ledger below.
+            </span>
+          ) : (
+            <span className="text-[11px] text-emerald-400 flex items-center gap-1">
+              Every rated run measured
+            </span>
+          )}
+        </div>
+
+        {/* 3. Incomplete Token Coverage */}
         <div className="rounded-lg bg-card/60 p-3 border border-border/50 flex flex-col justify-between gap-3">
           <div>
             <div className="flex items-center justify-between text-xs font-semibold text-foreground">
@@ -134,7 +202,7 @@ export const BlindSpotsCard: React.FC<BlindSpotsCardProps> = ({
           )}
         </div>
 
-        {/* 3. Residual Disclosures (SEED-300) */}
+        {/* 4. Residual Disclosures (SEED-300) */}
         <div className="rounded-lg bg-card/60 p-3 border border-border/50 flex flex-col justify-between gap-3">
           <div>
             <div className="flex items-center justify-between text-xs font-semibold text-foreground">

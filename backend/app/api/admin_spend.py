@@ -106,6 +106,9 @@ async def get_spend_summary(
         "total_spend_usd": str(summary.total_spend_usd),
         "rated_runs_count": summary.rated_runs_count,
         "unrated_runs_count": summary.unrated_runs_count,
+        # CR-06: a rate exists but nothing was measured. Excluded from the total like an
+        # unrated run, but for a reason the operator can act on differently.
+        "unmeasured_runs_count": summary.unmeasured_runs_count,
         "incomplete_coverage_count": summary.incomplete_coverage_count,
         "total_input_tokens": summary.total_input_tokens,
         "total_output_tokens": summary.total_output_tokens,

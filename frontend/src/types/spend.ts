@@ -29,6 +29,14 @@ export interface SpendSummaryData {
   totalSpendUsd: number;
   ratedRunsCount: number;
   unratedRunsCount: number;
+  /**
+   * Runs that HAVE a registered rate but recorded no tokens — priceable in principle,
+   * unpriced in fact. Phase 257 CR-06: `cost_usd IS NULL` meant both "no rate" and "no
+   * tokens", so 343 runs were counted as unrated under copy saying they had no rate.
+   * `ratedRunsCount` now means a rate EXISTS (matching the ledger's `is_rated`), and this
+   * is the subset of it that produced no figure. priced = rated - unmeasured.
+   */
+  unmeasuredRunsCount: number;
   incompleteCoverageCount: number;
   totalInputTokens: number;
   totalOutputTokens: number;

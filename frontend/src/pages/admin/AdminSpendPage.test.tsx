@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
-import { render, screen, waitFor, cleanup, fireEvent } from "@testing-library/react"
+import { render, screen, waitFor, cleanup, fireEvent, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { AdminSpendPage } from "./AdminSpendPage"
 import * as spendApi from "@/lib/api/spend"
@@ -20,6 +20,8 @@ const mockSummary: SpendSummaryData = {
   totalSpendUsd: 148.62,
   ratedRunsCount: 92,
   unratedRunsCount: 8,
+  // 92 runs HAVE a rate; 12 of them recorded nothing. So 80 actually priced. CR-06.
+  unmeasuredRunsCount: 12,
   incompleteCoverageCount: 5,
   totalInputTokens: 41500000,
   totalOutputTokens: 6700000,
@@ -114,7 +116,7 @@ describe("AdminSpendPage (METER-07)", () => {
     })
 
     // Check footnote with strict anti-falsehood disclaimer
-    expect(screen.getByText(/\* 92 runs priced · 8 unrated excluded/i)).toBeInTheDocument()
+    expect(screen.getByText(/\* 80 priced · 8 unrated · 12 no tokens excluded/i)).toBeInTheDocument()
   })
 
   it("renders unrated runs with '▲ Unrated' badge and NEVER renders $0.00", async () => {
@@ -392,3 +394,61 @@ describe("AdminSpendPage (METER-07)", () => {
   })
 })
 
+describe("AdminSpendPage — CR-06: the cards and the ledger must count the same way", () => {
+  // The defect: `cost_usd IS NULL` meant BOTH "no registered rate" AND "a rate, but no
+  // tokens", so the summary counted 675 unrated while the ledger beneath it counted 332,
+  // and the blind-spots button offered "View 675 Unrated Runs" then showed 332 rows under
+  // copy claiming none of them had a rate. These three cases pin the three separate places
+  // that had to move together; each was driven RED against the pre-fix arithmetic.
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(spendApi.getSpendSummary).mockResolvedValue(mockSummary)
+    vi.mocked(spendApi.getSpendRuns).mockResolvedValue({ runs: [], totalCount: 100 })
+    vi.mocked(spendApi.getModelRates).mockResolvedValue([])
+  })
+
+  it("says PRICED about the runs that produced a figure, not about the runs that have a rate", async () => {
+    render(<AdminSpendPage onBack={() => {}} />)
+    // 92 rated - 12 unmeasured = 80 priced, out of 92 + 8 = 100 runs in window.
+    // Reading ratedRunsCount here would print 92% and "92 runs priced" over a total built
+    // from 80 of them.
+    expect(await screen.findByText("80%")).toBeInTheDocument()
+    expect(screen.getByText("(80 / 100)")).toBeInTheDocument()
+    expect(screen.queryByText("92%")).not.toBeInTheDocument()
+  })
+
+  it("names the unmeasured runs separately instead of folding them into unrated", async () => {
+    render(<AdminSpendPage onBack={() => {}} />)
+    const tile = await screen.findByTestId("unmeasured-disclosure")
+    expect(within(tile).getByText("12 runs")).toBeInTheDocument()
+    // The unrated tile must still offer its own, SMALLER number - the button and the
+    // population it filters to have to agree.
+    expect(screen.getByText("View 8 Unrated Runs →")).toBeInTheDocument()
+  })
+
+  it("makes the honesty gauge itself say PRICED about priced runs, not rated ones", async () => {
+    // This case exists because a plant proved the gauge was UNCOVERED. Reverting
+    // BlindSpotsCard's `pricedCount` to `ratedRunsCount` left all 15 other cases GREEN - the
+    // page-level "80%" assertion matches KPI-3 only, because the gauge's text node reads
+    // "80% Priced" and an exact matcher never reaches it. A card whose entire job is honesty
+    // needs its own claim pinned, not its neighbour's.
+    render(<AdminSpendPage onBack={() => {}} />)
+    const gauge = await screen.findByText(/% Priced$/)
+    expect(gauge.textContent).toBe("80% Priced")
+    expect(screen.getByText(/% No tokens$/).textContent).toBe("12% No tokens")
+    expect(screen.getByText(/% Unrated$/).textContent).toBe("8% Unrated")
+  })
+
+  it("counts an unmeasured run as excluded from the total, like an unrated one", async () => {
+    render(<AdminSpendPage onBack={() => {}} />)
+    // The footnote under the headline figure must account for BOTH exclusions: 80 priced,
+    // 8 unrated, 12 with no tokens. Before the fix it read "92 runs priced - 8 unrated".
+    const footnote = await screen.findByText(/80 priced/)
+    expect(footnote).toBeInTheDocument()
+    // Deliberately scoped: "12 no tokens" also appears in the Blind Spots KPI breakdown, and
+    // an unscoped matcher finds both. Both SHOULD render - this asserts the footnote one.
+    expect(footnote.textContent).toMatch(/12 no tokens/)
+    expect(footnote.textContent).toMatch(/8 unrated/)
+  })
+})

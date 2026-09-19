@@ -3854,7 +3854,10 @@ const BASELINE = {
   // 7 -> 10 in 257.1: the filter-scope cases. The time chip reached the ledger but NOT the
   // charts (`getSpendSummary()` was called bare, in TWO places). Two of the three driven RED
   // against that exact bare call; file restored md5-identical.
-  "AdminSpendPage.test.tsx": 10,
+  // 10 -> 17 in 257 CR-06. ⚠ The pin sat at 10 while the file ran 13: the gate's contract is
+  // no per-file DECREASE, so the three cases covering CR-02/CR-04/WR-02 were UNGUARDED and
+  // deleting them stayed green (driven). Re-pinned to the real count with the CR-06 cases.
+  "AdminSpendPage.test.tsx": 17,
   // 5 -> 7 in Phase 257.1: two cases added for the badge's THIRD state ("No tokens
   // recorded" for a rated model whose run measured nothing) and for the undefined-vs-null
   // coverage distinction. Both were introduced by the review's own fixes and covered by

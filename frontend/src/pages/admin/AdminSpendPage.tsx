@@ -189,9 +189,26 @@ export const AdminSpendPage: React.FC<AdminSpendPageProps> = ({ onBack }) => {
     : 50
   const outputTokenPct = 100 - inputTokenPct
 
-  const pricedRunsRatio = summary && (summary.ratedRunsCount + summary.unratedRunsCount > 0)
-    ? Math.round((summary.ratedRunsCount / (summary.ratedRunsCount + summary.unratedRunsCount)) * 100)
+  // ⛔ PRICED IS NOT RATED, AND THIS PAGE SAYS "PRICED". Phase 257 CR-06.
+  //
+  // `ratedRunsCount` used to mean "a cost came out", so every label below that says *priced*
+  // was accidentally correct. It now means "a rate EXISTS" — the same thing the ledger's
+  // `is_rated` means, which is the whole point of CR-06 — and 343 of those runs recorded no
+  // tokens and produced no figure. Reading `ratedRunsCount` here would put "851 runs priced"
+  // above a total built from 508 of them, which is the exact class of defect being fixed.
+  //
+  // priced = rated − unmeasured. Every "priced" word on this page reads THIS.
+  const pricedRunsCount = Math.max(
+    0,
+    (summary?.ratedRunsCount || 0) - (summary?.unmeasuredRunsCount || 0),
+  )
+  const totalRunsInWindow = (summary?.ratedRunsCount || 0) + (summary?.unratedRunsCount || 0)
+  const pricedRunsRatio = summary && totalRunsInWindow > 0
+    ? Math.round((pricedRunsCount / totalRunsInWindow) * 100)
     : 100
+  // Excluded from the dollar total, for either reason. The asterisk and the footnote below
+  // must fire when EITHER is non-zero — an unmeasured run is just as absent from the sum.
+  const excludedFromTotal = (summary?.unratedRunsCount || 0) + (summary?.unmeasuredRunsCount || 0)
 
   return (
     // ⛔ `h-full min-h-0` IS THE SCROLL, AND `flex-1` ALONE WAS NOT. Phase 257.1.
@@ -353,8 +370,11 @@ export const AdminSpendPage: React.FC<AdminSpendPageProps> = ({ onBack }) => {
                   {summary ? `$${summary.totalSpendUsd.toFixed(4)}` : "—"}
                 </span>
               )}
-              {!loadError && summary && summary.unratedRunsCount > 0 && (
-                <span className="text-sm font-mono text-amber-400" title="Excludes unrated runs">*</span>
+              {!loadError && summary && excludedFromTotal > 0 && (
+                <span
+                  className="text-sm font-mono text-amber-400"
+                  title="Excludes runs with no registered rate, and runs whose tokens were never recorded"
+                >*</span>
               )}
             </div>
           </div>
@@ -363,9 +383,10 @@ export const AdminSpendPage: React.FC<AdminSpendPageProps> = ({ onBack }) => {
               <span className="text-amber-400/90 flex items-center gap-1">
                 <AlertTriangle className="h-3 w-3" /> Data load failed
               </span>
-            ) : summary && summary.unratedRunsCount > 0 ? (
+            ) : summary && excludedFromTotal > 0 ? (
               <span className="text-amber-400/90 flex items-center gap-1">
-                * {summary.ratedRunsCount} runs priced · {summary.unratedRunsCount} unrated excluded
+                * {pricedRunsCount} priced · {summary.unratedRunsCount} unrated
+                {summary.unmeasuredRunsCount > 0 && <> · {summary.unmeasuredRunsCount} no tokens</>} excluded
               </span>
             ) : summary ? (
               <span className="text-emerald-400/90 flex items-center gap-1">
@@ -412,7 +433,7 @@ export const AdminSpendPage: React.FC<AdminSpendPageProps> = ({ onBack }) => {
                 {pricedRunsRatio}%
               </span>
               <span className="text-xs font-mono text-muted-foreground">
-                ({summary?.ratedRunsCount || 0} / {(summary?.ratedRunsCount || 0) + (summary?.unratedRunsCount || 0)})
+                ({pricedRunsCount} / {totalRunsInWindow})
               </span>
             </div>
           </div>
@@ -433,11 +454,14 @@ export const AdminSpendPage: React.FC<AdminSpendPageProps> = ({ onBack }) => {
               <AlertTriangle className="h-3 w-3" /> Blind Spots & Residues
             </span>
             <div className="mt-1 text-2xl font-bold font-mono text-amber-300">
-              {(summary?.unratedRunsCount || 0) + (summary?.incompleteCoverageCount || 0)}
+              {(summary?.unratedRunsCount || 0)
+                + (summary?.unmeasuredRunsCount || 0)
+                + (summary?.incompleteCoverageCount || 0)}
             </div>
           </div>
           <div className="mt-3 pt-2 border-t border-amber-500/20 text-[11px] font-mono text-amber-400/90 flex items-center justify-between">
             <span>{summary?.unratedRunsCount || 0} unrated</span>
+            <span>{summary?.unmeasuredRunsCount || 0} no tokens</span>
             <span>{summary?.incompleteCoverageCount || 0} partial</span>
           </div>
         </div>
@@ -477,6 +501,7 @@ export const AdminSpendPage: React.FC<AdminSpendPageProps> = ({ onBack }) => {
       {/* "What This View Cannot See" Honesty Summary Card */}
       <BlindSpotsCard
         unratedRunsCount={summary?.unratedRunsCount || 0}
+        unmeasuredRunsCount={summary?.unmeasuredRunsCount || 0}
         incompleteCoverageCount={summary?.incompleteCoverageCount || 0}
         ratedRunsCount={summary?.ratedRunsCount || 0}
         onFilterUnrated={() => setCoverageFilter("unrated")}

@@ -22,6 +22,18 @@ class SpendSummary:
     total_spend_usd: Decimal
     rated_runs_count: int
     unrated_runs_count: int
+    # ⛔ THE THIRD STATE, AND IT IS NOT OPTIONAL. Phase 257 CR-06.
+    #
+    # `cost_usd IS NULL` means TWO different things and this page must never conflate them:
+    #   • no registered rate  -> genuinely unpriceable, belongs in the blind-spots disclosure
+    #   • a rate, but no recorded tokens -> the model IS priced; we simply measured nothing
+    #
+    # Counting both as "unrated" is what made the KPI cards read 508/675 while the ledger
+    # directly beneath them read 851/332, and made the blind-spots button offer "View 675
+    # Unrated Runs" then show 332 — under copy claiming none of them had a registered rate,
+    # when 343 of them did. `rated_runs_count` / `unrated_runs_count` now mean exactly what
+    # the ledger's `is_rated` means (a rate EXISTS), and the unmeasured runs are named here.
+    unmeasured_runs_count: int
     incomplete_coverage_count: int
     total_input_tokens: int
     total_output_tokens: int
@@ -171,8 +183,11 @@ async def get_org_spend_summary(
     """Calculate aggregated spend for an organization within a time window.
 
     Strict blind-spot honesty:
-    - total_spend_usd sums only rated runs.
-    - unrated_runs_count explicitly counts unrated runs excluded from the sum.
+    - total_spend_usd sums only runs that actually PRICED (a rate AND recorded tokens).
+    - unrated_runs_count counts runs with NO registered rate.
+    - unmeasured_runs_count counts runs that HAVE a rate but recorded no tokens. These are
+      excluded from the sum too, but for a different reason, and saying so is the whole point
+      of this page (CR-06). rated + unrated = every run; unmeasured is a subset of rated.
     - incomplete_coverage_count queries workflow_runs using the partial index.
     - daily_spend provides a 14-day time series.
     - model_breakdown provides per-model spend, volume, and rate status.
@@ -219,8 +234,14 @@ async def get_org_spend_summary(
         )
         SELECT
             COALESCE(SUM(cost_usd), 0.0000) AS total_spend_usd,
-            COUNT(*) FILTER (WHERE cost_usd IS NOT NULL) AS rated_runs_count,
-            COUNT(*) FILTER (WHERE cost_usd IS NULL) AS unrated_runs_count,
+            -- ⛔ RATED means A RATE EXISTS, never "a cost came out". CR-06. The ledger derives
+            -- its `is_rated` from `input_cost_per_million IS NOT NULL`; these must agree or the
+            -- KPI cards and the rows beneath them describe different populations.
+            COUNT(*) FILTER (WHERE input_cost_per_million IS NOT NULL) AS rated_runs_count,
+            COUNT(*) FILTER (WHERE input_cost_per_million IS NULL) AS unrated_runs_count,
+            COUNT(*) FILTER (
+                WHERE input_cost_per_million IS NOT NULL AND cost_usd IS NULL
+            ) AS unmeasured_runs_count,
             COALESCE(SUM(input_tokens), 0) AS total_input_tokens,
             COALESCE(SUM(output_tokens), 0) AS total_output_tokens
         FROM rated_runs;
@@ -230,6 +251,7 @@ async def get_org_spend_summary(
     total_spend = Decimal(str(totals_row["total_spend_usd"] or "0.0000"))
     rated_count = int(totals_row["rated_runs_count"] or 0)
     unrated_count = int(totals_row["unrated_runs_count"] or 0)
+    unmeasured_count = int(totals_row["unmeasured_runs_count"] or 0)
     total_in = int(totals_row["total_input_tokens"] or 0)
     total_out = int(totals_row["total_output_tokens"] or 0)
 
@@ -253,6 +275,7 @@ async def get_org_spend_summary(
         WITH day_series AS (
             SELECT
                 DATE_TRUNC('day', r.started_at) AS day,
+                rate.input_cost_per_million,
                 CASE
                     WHEN rate.input_cost_per_million IS NULL THEN NULL
                     WHEN r.input_tokens IS NULL AND r.output_tokens IS NULL THEN NULL
@@ -285,8 +308,12 @@ async def get_org_spend_summary(
         SELECT
             TO_CHAR(day, 'YYYY-MM-DD') AS date_str,
             COALESCE(SUM(cost_usd), 0.0000) AS spend_usd,
-            COUNT(*) FILTER (WHERE cost_usd IS NOT NULL) AS rated_count,
-            COUNT(*) FILTER (WHERE cost_usd IS NULL) AS unrated_count
+            -- Same meaning as the summary and the ledger (CR-06): a rate EXISTS.
+            COUNT(*) FILTER (WHERE input_cost_per_million IS NOT NULL) AS rated_count,
+            COUNT(*) FILTER (WHERE input_cost_per_million IS NULL) AS unrated_count,
+            COUNT(*) FILTER (
+                WHERE input_cost_per_million IS NOT NULL AND cost_usd IS NULL
+            ) AS unmeasured_count
         FROM day_series
         GROUP BY day
         ORDER BY day ASC;
@@ -298,6 +325,7 @@ async def get_org_spend_summary(
             "spend_usd": str(r["spend_usd"]),
             "rated_runs": int(r["rated_count"]),
             "unrated_runs": int(r["unrated_count"]),
+            "unmeasured_runs": int(r["unmeasured_count"]),
         }
         for r in daily_rows
     ]
@@ -347,8 +375,13 @@ async def get_org_spend_summary(
             COALESCE(SUM(input_tokens), 0) AS input_tokens,
             COALESCE(SUM(output_tokens), 0) AS output_tokens,
             COUNT(*) AS run_count,
-            COUNT(*) FILTER (WHERE cost_usd IS NOT NULL) AS rated_count,
-            COUNT(*) FILTER (WHERE cost_usd IS NULL) AS unrated_count,
+            -- Same meaning as the summary and the ledger (CR-06): a rate EXISTS.
+            COUNT(*) FILTER (WHERE input_cost_per_million IS NOT NULL) AS rated_count,
+            COUNT(*) FILTER (WHERE input_cost_per_million IS NULL) AS unrated_count,
+            COUNT(*) FILTER (
+                WHERE input_cost_per_million IS NOT NULL AND cost_usd IS NULL
+            ) AS unmeasured_count,
+            COUNT(*) FILTER (WHERE cost_usd IS NOT NULL) AS priced_count,
             BOOL_AND(input_cost_per_million IS NOT NULL) AS is_fully_rated
         FROM model_runs
         GROUP BY model, provider
@@ -359,13 +392,17 @@ async def get_org_spend_summary(
         {
             "model_name": r["model"],
             "provider": r["provider"],
-            "spend_usd": str(r["spend_usd"]) if r["rated_count"] > 0 else None,
+            # ⚠ PRICED, not RATED (CR-06). `rated_count` now counts runs that merely HAVE a
+            # rate, so gating on it would print "$0.0000" for a model whose every run measured
+            # nothing. `priced_count` is the one that means a figure actually came out.
+            "spend_usd": str(r["spend_usd"]) if r["priced_count"] > 0 else None,
             "input_tokens": int(r["input_tokens"]),
             "output_tokens": int(r["output_tokens"]),
             "total_tokens": int(r["input_tokens"] + r["output_tokens"]),
             "run_count": int(r["run_count"]),
             "rated_count": int(r["rated_count"]),
             "unrated_count": int(r["unrated_count"]),
+            "unmeasured_count": int(r["unmeasured_count"]),
             "is_rated": bool(r["is_fully_rated"]),
         }
         for r in model_rows
@@ -375,6 +412,7 @@ async def get_org_spend_summary(
         total_spend_usd=total_spend,
         rated_runs_count=rated_count,
         unrated_runs_count=unrated_count,
+        unmeasured_runs_count=unmeasured_count,
         incomplete_coverage_count=incomplete_cov,
         total_input_tokens=total_in,
         total_output_tokens=total_out,

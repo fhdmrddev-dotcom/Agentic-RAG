@@ -72,6 +72,7 @@ export async function getSpendSummary(params?: {
     totalSpendUsd: totalSpend,
     ratedRunsCount: data.rated_runs_count || 0,
     unratedRunsCount: data.unrated_runs_count || 0,
+    unmeasuredRunsCount: data.unmeasured_runs_count || 0,
     incompleteCoverageCount: data.incomplete_coverage_count || 0,
     totalInputTokens: data.total_input_tokens || 0,
     totalOutputTokens: data.total_output_tokens || 0,

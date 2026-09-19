@@ -116,6 +116,8 @@ async def test_get_org_spend_summary_honesty():
             "total_spend_usd": Decimal("48.2050"),
             "rated_runs_count": 92,
             "unrated_runs_count": 8,
+            # CR-06: 92 have a rate, 12 of them measured nothing -> 80 actually priced.
+            "unmeasured_runs_count": 12,
             "total_input_tokens": 1500000,
             "total_output_tokens": 400000,
         },
@@ -124,8 +126,8 @@ async def test_get_org_spend_summary_honesty():
     pool.fetch.side_effect = [
         # Daily spend
         [
-            {"date_str": "2026-09-18", "spend_usd": Decimal("24.1025"), "rated_count": 46, "unrated_count": 4},
-            {"date_str": "2026-09-19", "spend_usd": Decimal("24.1025"), "rated_count": 46, "unrated_count": 4},
+            {"date_str": "2026-09-18", "spend_usd": Decimal("24.1025"), "rated_count": 46, "unrated_count": 4, "unmeasured_count": 6},
+            {"date_str": "2026-09-19", "spend_usd": Decimal("24.1025"), "rated_count": 46, "unrated_count": 4, "unmeasured_count": 6},
         ],
         # Model breakdown
         [
@@ -138,6 +140,8 @@ async def test_get_org_spend_summary_honesty():
                 "run_count": 92,
                 "rated_count": 92,
                 "unrated_count": 0,
+                "unmeasured_count": 12,
+                "priced_count": 80,
                 "is_fully_rated": True,
             },
             {
@@ -149,6 +153,11 @@ async def test_get_org_spend_summary_honesty():
                 "run_count": 8,
                 "rated_count": 0,
                 "unrated_count": 8,
+                "unmeasured_count": 0,
+                # ⛔ PRICED, not RATED. A model with a rate whose every run measured nothing
+                # has priced_count 0 too, and must also report spend_usd None rather than
+                # "$0.0000" — gating on rated_count would print a confident zero. CR-06.
+                "priced_count": 0,
                 "is_fully_rated": False,
             }
         ]
@@ -160,6 +169,12 @@ async def test_get_org_spend_summary_honesty():
     assert summary.total_spend_usd == Decimal("48.2050")
     assert summary.rated_runs_count == 92
     assert summary.unrated_runs_count == 8
+    # CR-06's whole point: "no rate" and "a rate but no tokens" are DIFFERENT exclusions and
+    # the summary must carry both, because the ledger beneath it already distinguishes them.
+    # ⚠ This test drives MOCKED rows, so it pins the plumbing, never the SQL. The SQL itself
+    # was driven against the live dev DB: summary rated/unrated came back 851/332, matching
+    # get_spend_runs' own filter counts exactly, with 343 unmeasured named separately.
+    assert summary.unmeasured_runs_count == 12
     assert summary.incomplete_coverage_count == 5
     assert len(summary.daily_spend) == 2
     assert len(summary.model_breakdown) == 2
@@ -168,6 +183,7 @@ async def test_get_org_spend_summary_honesty():
     unrated_item = [m for m in summary.model_breakdown if m["model_name"] == "qwen-2.5-72b"][0]
     assert unrated_item["spend_usd"] is None
     assert unrated_item["is_rated"] is False
+    assert unrated_item["unmeasured_count"] == 0
 
 
 @pytest.mark.asyncio

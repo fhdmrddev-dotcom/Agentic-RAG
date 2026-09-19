@@ -42,6 +42,8 @@ def test_get_spend_summary_honesty(client, operator_user, monkeypatch):
         total_spend_usd=Decimal("48.2050"),
         rated_runs_count=92,
         unrated_runs_count=8,
+        # CR-06: 92 runs HAVE a rate; 12 of them recorded nothing, so 80 actually priced.
+        unmeasured_runs_count=12,
         incomplete_coverage_count=5,
         total_input_tokens=1500000,
         total_output_tokens=400000,
@@ -89,6 +91,11 @@ def test_get_spend_summary_honesty(client, operator_user, monkeypatch):
         assert data["total_spend_usd"] == "48.2050"
         assert data["rated_runs_count"] == 92
         assert data["unrated_runs_count"] == 8
+        # CR-06: the third state must REACH THE WIRE, not merely exist on the dataclass.
+        # This phase has now shipped the declared-but-never-emitted bug twice (SC#4's dead
+        # badge, and the response_model that drops undeclared keys silently), so the count
+        # that distinguishes "no rate" from "no tokens" is pinned at the boundary.
+        assert data["unmeasured_runs_count"] == 12
         assert data["incomplete_coverage_count"] == 5
         assert data["has_unrated_runs"] is True
         assert data["has_incomplete_coverage"] is True
