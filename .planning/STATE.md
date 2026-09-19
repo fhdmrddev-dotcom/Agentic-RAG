@@ -95,6 +95,48 @@ Last activity: 2026-09-19 -- Phase 259 executed (Plan 03 complete: REST router, 
 - **F-5 Deploy-Ordering Hazard**: Recorded in OWED TO THE OPERATOR (Migration 186 must be applied to production before or at backend deployment).
 - **F-2 Scope Disposition**: Workflow authoring proof slice (`POST /workflows`, `POST /workflows/{id}/publish`) gated as planned. Runtime kickoff gating via `threads.py` deferred to execution milestone/phase to preserve `threads.py` G-5 invariants and isolate general thread chat.
 
+### ⭐ PHASE 259 CLOSE + D-259-07 — 2026-09-20. The UX was decided AFTER the data shipped.
+
+**Phase 259 CLOSED, 3 of 3 SC met.** Review PASS (`259-REVIEW.md`), 3 findings, all fixed and each
+RE-DRIVEN with every planted file restored md5-identical. ⭐ **The red line held and was MEASURED:**
+7 phase-type executors / 1 emitter / 29 tools, identical at the phase base and at HEAD.
+
+⚠ **F-1: the three member arms enforced three DIFFERENT rules** — skills honoured
+`user_id`/`is_org_shared`, folders checked org alone, so another user's PRIVATE folder in the same
+org was admitted; `resolve_expert_bundle` runs on a service-role pool, so RLS could not save it.
+Cross-org always held — **adjacent to SC#2, not a failure of it**, and latent until 260 consumes it.
+⭐ **The fix was then proven not to OVER-strip:** a negative-only probe cannot tell a fix from a
+lockout, so positive controls were added (4/4).
+
+⚠ **F-2: the closed-core fence could not see growth that was not NAMED "expert"** — a planted
+`bundle_emit` doubled the emitter registry and passed all five tests. All three registries are now
+count-pinned; a planted emitter AND a planted tool both turn it RED.
+
+⭐ **F-3's `0/0/0` rows returned one phase after being fixed — and the lesson finally landed:**
+`expert_service.py` reads `2 / 1 / 274`, counting its OWN fix commit.
+
+**Gates at close:** backend `71 failed / 5162 passed`, failure SET identical to the pre-259 baseline.
+
+---
+
+⛔ **D-259-07 SUPERSEDES D-259-02 — an Expert is a CONSULTANT YOU INVITE MID-THREAD, sticky until
+dismissed.** Full reasoning in `259-DISCUSSION-LOG.md`. ⭐ **The reversal cost NOTHING and that was
+measured, not hoped:** `D-259-02` claimed to be *"a schema shape"* but was never encoded —
+`public.threads` has no expert column and migration 187 has no thread↔expert link.
+
+⛔ **Binding for Phase 260:** an invited Expert scopes **retrieval and tools, never conversation
+history**, and the scope is **DATA HANDED TO the agent loop, never a branch inside it** — an
+`if expert:` in `agent_loop.py` fails `PACK-01` and `EXT-01` retroactively. **Invite lives in the
+existing `+` menu; the active chip lives in the existing chips row with a `×`. ZERO new composer
+controls** — the composer was measured first and already carries four pickers.
+
+⚠ **THE APP HAS NO ROUTER — MEASURED.** No router package at all; four literal
+`window.location.pathname` checks in `App.tsx` are the whole of URL handling. **Nothing is linkable:
+not a thread, not a run, not a document.** ⛔ **The router is ITS OWN PHASE and must NOT be smuggled
+into 260**; it lands in `App.tsx`, which is 23 phases deep and deliberately fenced. ⭐ Landing on
+`/experts/<slug>` is just *"a new thread with the Expert invited at message 0"* — one mechanism,
+two triggers.
+
 ### ⭐ PHASE 258 CLOSE — 2026-09-19. SC#1 is PARTIAL and that is a DECISION, not a slip.
 
 **4 of 5 success criteria HOLD and are driven.** SC#2 (tier contents are data), SC#3 (a refusal

@@ -1,0 +1,813 @@
+# Milestones
+
+## v4.1 Ship It & Feel It (Shipped: 2026-09-13)
+
+**Phases:** 5 (242-246) · **Plans:** 25 · **Commits:** 290 since `v4.0` · **Files:** 309
+(+75,417 / -4,808) · **Migrations:** 177-180 · **Timeline:** 2026-09-11 → 2026-09-13 (3 days)
+**Audit:** [`v4.1-MILESTONE-AUDIT.md`](milestones/v4.1-MILESTONE-AUDIT.md) — `gaps_found`,
+**18 / 19 requirements**, 5/5 seams wired.
+
+A deliberate **consolidation** milestone: no new capability axis, every requirement closing something
+already in a register. It did two things — proved v4.0 is running rather than merely written, and
+stopped the chat surface feeling busier than the bar it aims at.
+
+**Key accomplishments:**
+
+- **The ship claims stopped being claims.** All four `SHIP` requirements closed against the
+  **database and the branch**, not against the deploy record: 20/20 v4.0 migration checks measured in
+  cloud, `SHIP-04` confirmed already landed (`1f313670b`), `SHIP-02` **retired in writing** because
+  the pre-176 shape its drive needed exists nowhere. ⚠ The verifier script itself produced **two
+  FALSE FAILs and was repaired first** — `information_schema.column_privileges` shows only grants
+  visible to the connecting role, so a checker that fails closed on its own blind spot is worse than
+  no checker.
+- **The reasoning stream became a calm surface, and the scroll finally holds.** One unconditional
+  thinking renderer; a 60 ms leading-edge coalescer (60 deltas → 61 scrolls before, ≤14 after); and
+  `CHAT-03` driven with a **real wheel** on a 60-message thread — **0 px drift, 0 app scrolls**,
+  closing `BUG-260823-01` after two prior fixes that had measured clean on synthetic events and were
+  refuted by a real mouse.
+- **The chat shell stopped getting in the way.** All five `SHELL` criteria **driven in a browser**,
+  not asserted in jsdom — including `SHELL-03`, which was driven **FALSE** first (answering an
+  approval in one home left the other stale in both directions) and closed only on the second
+  attempt, on two real runs, server-verified.
+- **v4.0's verification debt got verdicts instead of silence.** Phase 245 discharged or retired
+  every owed row **in writing**, drove Phase 233's five rows live, and shipped a **greppable
+  `verification_mode` marker with zero prose deleted** — so a self-verification can no longer read as
+  a review. Its gate and PostToolUse hook were driven RED on both arms.
+- ⭐ **The recall cliff was measured, and the fix was REFUSED.** Phase 246 set out to raise
+  `hnsw_ef_search` to 200 and proved by `EXPLAIN (ANALYZE)` that no value fixes the cliff *through
+  the index*: 40/60/80 walk the index and return **ONE row** (~0.05 recall, ~4 ms); 100/150/200 reach
+  recall 1.000 by **sequential scan** (~1,100 ms). Shipping 200 would have cost **every** tenant
+  ~1.1 s a query to fix a cliff only small tenants have. Default reverted to 40.
+- ⭐ **The two-agent separation came back.** Phase 246 is the **first phase since `OV-SOLO-01` was
+  re-armed to carry `verification_mode: peer-reviewed`** — gemini built, claude reviewed at three
+  gates — and the one commit inside it that was the reviewer's own is **named** as self-verified
+  rather than folded into the headline.
+
+### Known gaps
+
+- ⛔ **`RECALL-01` — unmet, deliberately, and this is the milestone's best work rather than its
+  shortfall.** A tenant owning a small share of a large corpus still does not get honest recall out
+  of the box. The knob cannot deliver it; `SEED-273` (`hnsw.iterative_scan`) is the remaining path.
+  ⚠ Phase 241's contrary conclusion **never inspected an execution plan** — it measured recall alone
+  and was right about the number and wrong about the cause.
+- ⚠ **Migrations 179 and 180 are NOT in cloud** (measured at the close). v4.1 authored four
+  migrations; a promotion that carries the code without these two breaks on arrival.
+- ⚠ **`origin/production` is 287 commits behind `develop`** — v4.1's own output is undeployed, which
+  is the state v4.1 was opened to end for v4.0.
+- Carried with named triggers: `SEED-272` (a failed attachment copy never recovers), `SEED-273`,
+  `SEED-172` (**its trigger fired at this close** — local models still cannot be registered, timed
+  out or given a context window through the UI), and 245's four named residues including the
+  independent §6.3 review still owed by 238 / 240 / 241.
+
+### The finding the close itself produced
+
+⛔ **The ROADMAP Progress table read `0 / 5 phases complete · 0 / 19 requirements delivered` with all
+five phases closed** — and that is the register the close reads to build this archive. Four of five
+rows said *"Not started"*. **Drift ran in both directions**: `SHIP-02/03/04` sat unchecked while
+their traceability rows carried full closing evidence; `SHELL-04/05` and `RECALL-02` sat ticked while
+their rows read *"Pending"*. Repaired at the audit, originals preserved beside corrections.
+⚠ **This is the identical class the v4.1 roadmap OPENS by correcting in v4.0** (*"the requirement
+count is 19, not 17"*) — **a coverage check run against the wrong denominator**, twice in a row, in a
+different column each time.
+
+## v4.0 Connected Knowledge (Shipped: 2026-09-10)
+
+**Phases completed:** 14 phases (228-241, **no inserts** — the first milestone since v3.5 that needed none), **62 plans** · 6 days (`6ad68e1e0` → `37ae87873`) · migrations **153-156 / 166-176** (15 files; 157-165 unused, 171 reserved) · git tag `v4.0`. **33 ✅ delivered · 5 ⛔ not ticked, of 38 requirements.** 571 commits, 718 files, +170,353 / −4,411.
+
+**Delivered:** the knowledge base stopped depending on somebody remembering to upload. A source is connected **once**, previewed before it brings anything in, and then read on the **shipped** scheduler — Google Drive, OneDrive/SharePoint via Microsoft Graph, **any** MCP file server, and mail, all four as thin adapters over ONE `browse / list / read / check` contract.
+
+**Key accomplishments:**
+
+- **⭐ The contract was TESTED, not asserted — twice, and both times by hash** (239 / 240). Phase 239 bound **GitHub MCP** as a second file server entirely through the UI — a server whose vocabulary shares nothing with the reference and which needs **three** arguments where the contract sends one — and proved the zero-code claim by HASH: HEAD identical before and after, `git log <base>..HEAD -- backend frontend` = **0**. Tool-name variance *and* argument shapes live in `config["source_tools"]` as **data**. Phase 240 then proved **mail is a SHAPE, not a fourth adapter**: `sources/base.py` byte-identical (`3b3d8770…`), no registry key, delegation **+35/−0** in `google_drive.py`.
+- **⭐ A file arrived by itself** (234). A mapped Drive folder read on the shipped scheduler — `last_status=success`, items 0→6 — with a lifecycle diff that can **never delete on an incomplete listing** (`H-5`: a `missing` verdict may be written only from a listing whose final page asserted completeness), a disconnect that **freezes** rather than deletes, and the anti-injection trifecta fenced in the same phase as the first sync rather than after it. ⛔ **It did not work at first** — `watch_process_enabled` ships `False`, so the watch had never run once.
+- **Connection-scoped visibility, enforced in RLS at all four sites** (231), with provenance riding every row from the first write rather than retrofitted, and stated plainly on screen in the product's own words.
+- **⭐ The anti-injection discipline was ACTUALLY ATTACKED, and it held** (236). 13/13 taxonomy attacks refused offline against all 8 defence modules; **8/8 mutations caught loudly at the point of use** (a defence removed makes the suite fail, which is the only property that makes an attack suite worth anything); and the live drive planted the payload in a **really-synced Drive document** — refused by **8/8 native-roster providers with zero write-tool invocations**, three surfacing the injection to the user unprompted.
+- **A durable ingestion queue, proven on `/upload` before any connector touched it** (230). Cap, retry and resume replacing the in-process `BackgroundTask`; embedding calls batched inside real provider limits including the **300,000-tokens-per-request** ceiling a naive batcher misses; and an embedding failure that retries, fails over to a **same-vector-space** alternate, then **names itself** instead of saying your documents returned nothing.
+- **One ingest splice** (229) — one piece of code mints every document row, so the same bytes through any door produce the same row. A pure refactor that discharged G-5 on `documents.py`.
+- **The preview writes nothing** (233). Four honestly-labelled buckets, two-tier identity — a cheap `(source_system, external_id, source_version)` key at preview time over the existing `sha256` at ingest — and routing rules **evaluated with nothing written**, so a person sees where files would land before any row exists.
+- **One rule engine, not two** (237). Watch-routing and classification share ONE AST and ONE matcher discriminated by scope, with source facts as first-class filterable fields, and a visibility-widening rule still producing a **suggestion requiring human accept**, never an automatic move.
+- **⚠ 241 measured recall at customer scale and the defect was REAL.** At the shipped `hnsw.ef_search = 40`, a tenant owning 0.2% / 2% / 20% of a 100,000-chunk corpus scores `recall@20` **0.040 / 0.068 / 0.360**, and three named documents silently stop being found; `ef_search = 200` restores **1.000** at every selectivity. ⚠ **The degradation is a CLIFF, not a slope** — the "control" rows ran on a SEQ SCAN — so an install can cross it with **no deploy and no setting change**. ⚠ `iterative_scan` alone is **not** sufficient (0.494 / 0.564 / 0.684), reversing `SEED-076` §3's lever ordering.
+- **⭐ And 241's own premise was refuted before it began.** There was no Phase 230 baseline: `scripts/measure-recall.py` ran `content ILIKE`, never touched the vector path, scored every miss `rank = 1` and printed **`MRR 1.000`** on the live corpus. **A harness that could not report a failure had been reporting success.**
+
+### Known Gaps
+
+Recorded rather than smoothed. Full evidence: [`milestones/v4.0-MILESTONE-AUDIT.md`](milestones/v4.0-MILESTONE-AUDIT.md) (`status: resolved` — ⚠ two of its four gaps are **carried**, not fixed).
+
+- ⛔ **THREE PHASES CLOSED WITHOUT AN INDEPENDENT §6.3 REVIEW — 238, 240 and 241.** Gemini has been unavailable since 2026-09-09 and the operator has ruled out `/code-review ultra` on cost, so no independent reviewer existed. CLAUDE.md requires that whoever REVIEWS a phase must not have shaped the build; **these three verdicts are the builder's own, and the milestone audit is a self-audit for the same reason.** What that does not weaken is the mechanical evidence — a hash, a byte-identical file, a driven function. What it weakens is every judgement call about whether an owed item was acceptable.
+- ⛔ **`QUEUE-06` is NOT ticked even though the remedy shipped.** The two knobs ship as operator settings (migration 176) but **the DEFAULT is unchanged**, so out of the box the requirement is still not met — an operator must turn the knob. ⚠ Cloud has no columns at all until 176 is applied there.
+- ⛔ **`SRC-03` is structural-only.** Microsoft Graph ships and its fence caught a **fourth provider leak nobody had spotted** — `import_service` fell back to the Drive adapter on a connection's **display name** — but **all nine live UAT rows are blocked on one Azure app registration** (`MICROSOFT_OAUTH_CLIENT_ID/SECRET`; run M-1 first, it unblocks the other eight). SharePoint rows S-1/S-2 are separately blocked on `SEED-256` (no work/school tenant).
+  - ⭐⭐ **CORRECTED 2026-09-13 (Phase 245) — the bullet above is preserved, not deleted, and this is
+    THE STRONGEST CASE IN THE SET: this close record was FALSE ON THE DAY IT WAS WRITTEN.** The nine
+    M rows were **DRIVEN LIVE on 2026-09-07**; **v4.0 closed on 2026-09-10** — three days later —
+    and the close record still said *"all nine live UAT rows are blocked on one Azure app
+    registration"*. All nine of 238's M rows were **DRIVEN LIVE on 2026-09-07** (`238-VERIFICATION.md:213-231` — 7 full pass, 2 half at the time; **four defects found by driving and NONE by the 15-case unit suite**). The operator completed the Azure registration *hours after* `238-SUMMARY.md` was written. ⭐ `238-VERIFICATION.md:139` — the bottom
+    register — read *"The operator completed the Azure app registration, so the rows below stopped
+    being owed"* **at the moment this milestone was closed**. **Nobody opened it.** *Each register
+    only knows the one below it; the artifact is the bottom*
+    (`feedback_a_review_is_a_claim_about_code_not_the_code`). ✅ Phase 245 closed the set: 238's
+    eleven rows read **8 PASS · 1 ⛔ BLOCKED (M-9, `BUG-260913-01`) · 2 ⛔ RETIRED (S-1/S-2,
+    `SEED-256`) · 0 HALF**. ⛔ The *SharePoint separately blocked on `SEED-256`* half was **true**
+    and is now a **written retirement** rather than a block.
+
+- ⚠⚠ **241's UAT row 5 has a DEADLINE that must not be buried: it dies the moment migration 176 reaches cloud.** Five of its six rows are driven and passed; row 5 must run on **cloud, BEFORE 176 is applied there**, or it becomes unreproducible forever.
+- ⛔ **Cloud is 15 migrations behind** — `153-156` and `166-176` are all pending; v4.0 has not deployed. Operator decision 2026-09-10: they are applied immediately **before** the next push, in numeric order, once each (`bash scripts/pending-cloud-migrations.sh`).
+- ⛔ **`SURF-03`'s home is still an OPEN SCOPING DECISION.** There is no in-app notification surface in this product; the recommendation is an app-shell signal **plus** the Health-tab row, and **closing it against the Health tab alone does not satisfy the requirement.**
+- ⛔ **`DEBT-03` and `DEBT-04` are blocked by decision, not by work** — `/code-review ultra review-base-225` is ruled out on cost, and `app.<domain>` is gated on a production push (`SEED-242`).
+- ⚠ **`REQUIREMENTS.md` was stale from day one for the FOURTH consecutive milestone** — all 38 rows read `Pending` while every phase was shipped and verified. ⛔ **The cause is not a human forgetting to tick boxes:** `execute-phase.md:1619` claims `gsd-sdk query phase.complete` maintains the traceability table and it demonstrably does not. **A tool that claims work it does not perform is worse than one that claims nothing, because the claim is what stopped anyone checking.** One cell (`TRUST-02`) was additionally stale in the *safe* direction and was corrected at this close.
+- ⚠ **Two plans shipped with no SUMMARY.md** — `232-04` (landed `1ae6defbb`) and `235-17` (landed `29858f01f`). Both are in git; neither is in the phase record.
+- ⚠ **161 planted seeds of 275, and 34 open `surface: Agentic-RAG` reported bugs.** CLAUDE.md's own sweep rule says `/gsd:new-milestone` must read every `trigger_when` and surface the ones already true. **At 161 that sweep is a phase of work, not a step in a command** — and a `trigger_when` nobody reads is a deferral with no re-open, which is a deletion that looks like a decision.
+- ⚠ **`retrieval_service.py`'s G-5 extraction is owed since 231.** Phase 241 was the deliberate SECOND landing (11 non-comment lines, fence driven RED at 13); **a third must propose the extraction first.**
+- ⭐ **The method failure worth carrying forward, committed three times in one hour by the audit written to catch it.** The audit asked *"is a VERIFICATION file present?"* and never opened the review that was there; the correction opened the review and escalated its two CRITICALs to *"open, data loss"* and never opened the code — they had been fixed two days earlier, in an ancestor of the auditing commit. **Each register only knows the one below it, and the code is the bottom. Drive it, or do not report it.**
+- **Known deferred items at close: 48** (see `STATE.md` → Deferred Items) — 29 quick-task records whose files are gone, 14 dormant seeds, 1 todo, 2 UAT gaps (233, 241) and 2 verification gaps (239, 241, both `human_needed` with no code defects).
+
+## v3.9 Connections: Any Service, Any Tool (Shipped: 2026-09-04)
+
+**Phases completed:** 16 phases (210-217 CORE + inserts 214.1 / 217.1 + 220-227; **218 ABSORBED** into 217.1; **219 DEFERRED**), **111 plans** · 9 days (`162a25c7e` → `87ab493bf`) · migrations **127-129 / 140-141 / 150-152** · git tag `v3.9`. **34 ✅ delivered · 3 ⚠ partial · 2 ⛔ shipped-but-never-driven, of 39 requirements.** 695 commits.
+
+**Delivered:** a connection stopped being a verb we wrote code for and became `{service identity, auth, discovered tools, per-tool grants}` — so adding a service adds **rows, not code**. A person connects a service, sees every tool it offers, grants each one individually, and uses it by name in chat and as a specific step on the canvas.
+
+**Key accomplishments:**
+
+- **⭐ Nothing is per-vendor, and it was proven against the open internet rather than fixtures** (211 / 212 / 222). Migration 127 replaced the two-shape `CHECK` with `service_id` + mutually-exclusive shapes, and `connectors/descriptors.py` made a legacy capability advertise a descriptor **byte-compatible with a discovered MCP tool** — so one code path serves both. Phase 222 drove **four real servers live** and observed all four `kind` values: DeepWiki `open`, Notion `oauth` + RFC 7591 dynamic registration (no developer console, **41 tools for zero lines of tool code**), GitHub Copilot `oauth` + BYO, and a loopback URL correctly refused `scheme_not_tls`.
+- **Per-tool grants, and an approval moment that stops a real run** (213). GitHub renders **44 tri-state rows**; an override persists to `tool_grants` and *"Use the default"* removes the key (44 → 43) so the row falls back. Refusal was driven on **both shapes and both reasons** — and the headline is that a **Slack** step, the capability shape that before this phase consulted *no grant at all*, was stopped by Gate 5.5 after a person had already approved it at the armed checkpoint. Every outbound call writes a receipt carrying `connection_id`, `destination_host`, `tool_name`, `raw_status`.
+- **⛔ And 213's headline feature was ABSENT at HEAD when its summary said it shipped — kept in the record rather than overwritten, because the correction is the finding.** At `93fc2f521` Gate 5.5 refused on `deny` and **fell through on `ask`**, so a tool needing approval dispatched exactly like one set to Allow, and the entire ask/refusal vocabulary shipped consumed by nothing. `213-POSTFLIGHT.md` measured it four independent ways. Closed by one gap-closure round plus four operator-driven fixes.
+- **BYO OAuth, then a second pass that made the handshake hold no secret** (215 / 225). Authorization-code with a customer-registered client id/secret, AES-256-GCM `enc:v1:` at rest, migration 129 REVOKEing both ciphertext columns from `anon`/`authenticated`, and lease-locked refresh proven with **2 concurrent workers → exactly 1 provider refresh**. Phase 225 then converged the two state engines: the real `state` sent to Google is a **43-character opaque handle**, Redis holds the secret and PKCE verifier under it, the consent consumes it single-use, and a replay fails closed. Driven in a real browser against a live Google consent.
+- **Six applications under one token, with availability the server decides** (221). Gmail, Calendar, Drive, Docs, Sheets and Slides on one Google grant, **11/11 live writes**, with a per-application probe (`google/availability.py`) so a disabled API reads as *not available* instead of failing at call time. The probe imports the existing HTTP parser and writes no second one.
+- **Connections reached chat, and one file came in by hand** (216 / 224). Services are added to a thread by name, dismissible chips scope the session, tool calls render the service's own mark and the tool's real name, and a specific file is picked from a connected source and ingested. 224 then made the agent's mid-execution moment read like a sentence, and docked the approval card above the composer with **the deadline riding the wire** — one timeout constant feeding the `wait_for`, the `expires_at`, the emit and the audit string, so client clock skew cannot apply.
+- **⛔ 216 also shipped with its chat wiring dead inside an `except` arm — invisible to 6,929 green tests.** The second phase this milestone to pass every gate with its headline feature absent. Both were found by driving, neither by a suite.
+- **A step names its service and its action** (214 / 214.1). The hand-written-JSON surface was **deleted, not hidden**; arguments are authored in a form with a three-arm source picker; publish refuses an unsatisfiable step naming the step and the argument; and one `StepIdentity` element renders that identity at four sizes across the canvas, the spine and the run surface.
+- **The Library became one home for documents — after its first attempt was rejected on sight** (217 / 217.1). 217 shipped 12/12 plans, verified 5/5 of its own success criteria, and the operator compared it to the sketch and rejected it. ⭐ **The cause was structural, not careless:** `BUILD-CONTRACT.generated.md` carried **200 assertions about vocabulary, ordering and honesty and ZERO about composition** — grepping all twelve plans for the sketch's own composition strings returned **0 hits**. Every gate was green and every gate was blind. 217.1's SC#1 was therefore *the gate itself*: a `sketchComposition` fence captured **RED at 40 failed / 7 passed**, and green at **47/47** against the finished five-tab tree. Library Health and Governance retired into a Health tab and **both pages were deleted**.
+- **A drawing became quantities, and the spike said where the limit is** (220). A real `.dxf` and a real `.xlsx` end to end, with every ambiguous match escalated to a human rather than priced by list position, `$INSUNITS` resolved per file and a unitless drawing **refused rather than guessed at millimetres**.
+- **The public landing page shipped** (226) and **the run frame got one owner** (227) — `ToolCallPanel.tsx` decomposed 1019 → 351 lines and `MessageItem.tsx` 823 → 702, with SC#2 discharged by driving **all eight run states in a real browser** against a pre-227 worktree and comparing normalized DOM: byte-identical.
+
+### Known Gaps
+
+Recorded rather than smoothed. Full evidence: [`milestones/v3.9-MILESTONE-AUDIT.md`](milestones/v3.9-MILESTONE-AUDIT.md) (`status: gaps_resolved`).
+
+- ⚠ **Phase 219 is DEFERRED, not shipped**, with `LIB-08/09/10` and `SEED-209/210/211/212`, on an operator decision of 2026-09-04. Its SC#1 — *"watched on a schedule"* — is word for word this milestone's own binding re-open trigger for those four security seeds, whose scope text reads: shipping auto-ingest without them *"is not a gap, it is a security defect."* `SEED-210` measures that synced documents flatten source ACLs and that source deletions never propagate. **The trigger did not fire — it was kept from firing by moving the feature.** Phase 216's ATTACH-01 (a human picking ONE file) is unaffected: no ACL mirroring, no deletion propagation, no sync loop.
+- ⚠ **`LIB-08 / LIB-09 / LIB-10` never had rows in `REQUIREMENTS.md` at all** — they existed only in a roadmap heading, which is invisible to every coverage check. They must be written into the Connected Knowledge milestone's register.
+- ⛔ **Owed verification, stated rather than absorbed — this is the milestone's real risk.** Phase 210: **4 of 5 SC never driven** (the schedule door gates on `provenance === "published"` and `workflow_schedules` has 0 rows, so CONN-10 / CONN-11 are structurally undrivable on this install). Phase 211: UAT rows + schema regeneration. Phase 214: SC#10's **eight-row cross-provider roster**, the other three SC#10 axes, and **eight G-4 operator drives**. Phase 217: **16 UAT rows**. Phase 225: `/code-review ultra review-base-225` — skipped by decision (credits exhausted); **re-open trigger: credits available before the v3.9 production push.**
+- ⚠ **Three requirements are narrower than their wording.** `CAT-05` — the cloud half of Add-a-connection was never verified (`BUG-260810-01` still `folded`, `verified_closed_by: null`). `GRANT-03` — the run pauses and names the tool and the arguments, but **never the service**: an MCP row omits the clause and a capability row reads *"run post_message through post_message"*, a tautology. `CHAT-06` — the armed connector set is stored **nowhere**: no thread-connection table, no column on `threads`, `active_connector_ids` never persisted, so F5 silently disarms and no audit record of a turn's connectors exists.
+- ⚠ **`REQUIREMENTS.md` was stale from day one for the THIRD consecutive milestone** — 32 of 39 rows read `Planned` while their phases were shipped and closed. Re-derived cell by cell at this close, against phase artifacts rather than by inference. The ROADMAP progress table was stale by four rows in the same way and was corrected at the audit. **A per-phase-close gate is worth more than another warning paragraph.**
+- ⚠ **The backend unit baseline is currently unsound to quote.** `pytest tests/unit -q --continue-on-collection-errors` reads **95 failed / 3394 passed / 2 errors**; the `71` quoted all milestone was measured over a *different set*, because two collection errors from missing optional deps (`ezdxf`, `reportlab`) abort collection without that flag. Nothing in the failing set names oauth, connector, mcp or chat. **It needs one honest re-derivation before it can gate anything.**
+- ⚠ **`SEED-242` is armed** — the product moves to `app.<domain>` at the next production push (seven steps across Vercel / Coolify / Supabase Auth / CORS). Verify on a preview before promoting.
+- ⚠ **23 reported bugs remain open on `surface: Agentic-RAG`.** Six sit on one surface and are probably one root cause (`BUG-260818-01/02/03` — resume replays the prompt, drops the model, shows Stop instead of Continue — plus `BUG-260823-02/03/04`). Twenty were untriaged by the close audit and were deliberately not swept blind.
+- **Known deferred items at close: 47** (see `STATE.md` → Deferred Items) — 28 quick-task records whose files are gone, 14 dormant seeds, 1 todo, and the 214 / 217 UAT + verification gaps named above.
+
+## v3.8 Document Intelligence, Automations & Connectors (Shipped: 2026-08-26)
+
+**Phases completed:** 12 phases (CORE 201-206 + inserts 204.1, 206.1, 206.2, 206.3 + guardrail debt 207, 208 + 209), **17 plans** · 3 days (`0702f1d2` → close) · migrations 124-126 · git tag `v3.8`. **11/11 requirements delivered.**
+
+**Delivered:** ingestion stopped being prose-only, workflows stopped needing a human to start them, and the product reached outside itself for the first time — through other people's official servers rather than adapters we write.
+
+**Key accomplishments:**
+
+- **Structured data became first-class** (201 / 202). A CSV or spreadsheet becomes `document_tables` rows that `query_table` reads, and those cells are injected into `document_chunks` so semantic search can find a fact that only ever existed inside a table. ⚠ TAB-02 covers **newly ingested** documents only — `backfill_document_table_chunks()` has zero production callers, so every table ingested before Phase 202 is still invisible to search.
+- **Email became a document type** (203). `.msg` / `.eml` parse, headers extract, attachments link. ⚠ **The thread half of EML-02 is unwired**: `email_message_id` / `in_reply_to` / `references` are parsed at four sites, stored at three, and **read by none** — so the same `.msg` uploaded twice creates two documents. ⭐ This path is nonetheless the best-evidenced in the milestone, because real files broke it twice and both breaks were repaired (a NUL in a MAPI subject; a MIME door refusing `.docx`/`.pdf`).
+- **Workflows run themselves, and can be stopped** (204 / 204.1). Exactly-once claiming driven under genuine concurrency — **10 trials × 3 concurrent claimers on one due row → exactly 1 claim every time**. A 60s spend cap was **observed tripping a real run at 61.06s**, `cancelled`, with one `circuit_breaker_tripped` audit row. The library card says a workflow runs itself on the line a reader already scans.
+- ⚠ **And SCHED-02 was BROKEN when the phase first "passed" — the milestone's most important lesson.** `204-03` wrote the caps to `workflow_runs.inputs`; `204-02`'s reader read `workflow_runs.metadata`; the module contained **zero** occurrences of `metadata`. The read FAILS OPEN, so the breaker disarmed **silently** — measured at **3m20s against a 120s cap** — while **106 tests stayed green because each parallel wave mocked the other side.**
+- **A run can read its own previous run** (205). `{{prior_run.output}}` makes living registers and weekly deltas possible, with a resolver defended against the jsonb string-scalar trap that had already made one shipped feature unreachable. ⚠ It reaches **3 of 7 executors** and misses `llm_emit` — *"the only path that produces a typed deliverable"* — so on that step the literal `{{prior_run.output}}` is sent to the model.
+- **⭐ The product reaches outside, with per-tool consent and no per-vendor code** (206 / 206.1 / 206.2 / 206.3). Driven live end to end against a real MCP server: create → bind → discover → grant → run → publish, with **grant OFF ⇒ `tool_refused`** and grant ON returning real remote data. SSRF egress defence blocks loopback, RFC1918 and cloud metadata. ⚠ 206 shipped **three** gaps its three inserts then existed to repair — created, bound, published — and 206 is exactly the phase whose `VERIFICATION.md` was missing.
+- **Guardrail debt was paid, not deferred** (207 / 208). `api.ts` split 6,815 → 412 lines behind a barrel — **all 325 re-exports verified to resolve, 0 files importing a domain module directly**, so all 108 mock factories still bind. `CLAUDE.md` split 135,662 → 82,748 chars, and **this time the guard too**: the disposition column alone was 60,558 chars (45% of the file) and is now capped at 200 per cell, enforced in the turn the prose is authored.
+- **A step says what it actually does** (209). The node face names the bound service and tool instead of "Reach outside", and a read-only tool stops claiming it changes something outside. ⚠ **Its first draft shipped two blocking defects, both caught only by review, both the same shape — each half green and the JOIN dead**: read-ness inferred from a regex over the tool NAME (so `get_user_and_purge_records` rendered `ONLY READS` while deleting), and a mark resolved from a config field the model never declares.
+
+### Known Gaps
+
+- ⛔ **Seven of twelve phases had no `VERIFICATION.md`**, and `REQUIREMENTS.md` had been stale since day one — four requirements read `Planned` after their phases shipped. Both repaired at the close audit. **This is the SECOND consecutive milestone to close this way**; v3.6's own retrospective reads *"the paperwork was the problem, never the code."*
+- ⚠ **Phase 209 is gated behind `visual_workflow_canvas`, whose cold default is `off`.** Its 16/16 browser drive ran against a flag-flipped database, so it proves the behaviour on a flipped install, not a fresh one. Fail-closed, so honest — but a launch decision is owed.
+- ⚠ **209's node face is absent from the RUN surface** — the step that says what it does says it in the builder only (`SEED-206`).
+- ⚠ **209's final fix was authored by the reviewer** (the builder ran out of context). Self-assessed, no independent review — **owed**.
+- ⚠ **207 and 208 ran with no GSD ceremony and no independent verification**, audited under `STATE.md → Guardrail overrides`.
+- ⚠ **`D-207-06` has no guard**: a symbol exported from a `lib/api` module but forgotten in the barrel typechecks perfectly and is invisible to every consumer.
+- ⚠ **Blocking DNS inside an async handler** at `mcp_client.py:220` — violates D-v2.5-01, while the sibling capability path IS threadpooled.
+- ⚠ **Two ingestion bugs closed on LOCAL-only evidence** await cloud verification; the OpenRouter model id was never captured.
+- ⚠ **`SEED-203`**: the publish judge passed a golden run whose deliverable REFUSES the work, at score 100.
+- ⚠ **`outputSchema` is still discarded** by the MCP sanitizer — the competitor study's *"single cheapest actionable finding"*. `annotations` was recovered in 209; its sibling was left deliberately, as it was outside the ruling.
+
+## v3.7 Workflow Product Completion (Shipped: 2026-08-24)
+
+**Phases completed:** 17 phases (CORE 192-198 + inserts 192.1, 192.2, 193.1, 193.2, 194.1, 199, 200, 200.1, 200.2, 200.3), **145 plans** · 15 days (`5c3cdb05` → `2f513ff9`) · migrations 119-123 · git tag `v3.7`. ⚠ **The plan figure is 145 MEASURED** (`ls .planning/phases/<v3.7 dirs>/*-PLAN.md`); `v3.7-MILESTONE-AUDIT.md` says 147 and the difference is left visible rather than reconciled by picking one. ⚠ **The commit range is not clean**: 1,072 commits separate the two shas, and four of them are v3.8's — Phases 201 and 202 landed BEFORE this milestone's final three phases were committed (see Known Gaps).
+
+**Delivered:** the workflow product built across v2.8→v3.6 became usable end to end — find it, understand the door, build it with the right vocabulary, test run it, stop it, and see what it produced. 20/20 requirements satisfied.
+
+**Key accomplishments:**
+
+- **The library answers *which of these is worth running*, not just *which is which*** (192 / 192.1 / 192.2). Search + tag filter, lineage discrimination for identical names (`3 share this name · changed 2 days ago`), and a last-run outcome badge sourced from ONE owner-scoped `LEFT JOIN LATERAL` across all four feeds — no per-card fetch. `runFacts.ts` carries **four** arms plus an honest `unknown`, and the fourth (`not-by-you`) exists because the third was making a ROW-level claim from a CALLER-level fact and printing *“Never run”* about workflows that had really run.
+- **Authoring got doors, templates and a live model registry** (193 / 193.1 / 193.2 / 196 / 197). A template binds at AUTHORING time and the run fills it; the model picker reads the live `MODEL_CAPABILITIES` union rather than a hardcoded list; drafting from a description surfaces the decisions that change the result. ⚠ 193.1's own central assumption was measured FALSE mid-phase: the model must be told a template was **PROVIDED**, not merely handed placeholders.
+- **A run can be stopped, and it says so honestly** (194 / 194.1). `finish_run` carries a terminal-status guard and `complete_phase` an `IS DISTINCT FROM 'cancelled'` fence, so a later `completed` write can no longer replace a `cancelled` at either grain — which is exactly the defect 194's own verification had recorded as FAILED at `WORKER_COUNT=2`.
+- **The run surface says what it produced** (195 / 200 / 200.1 / 200.2). Files reuse the shipped file presentation; the deliverable is named BY TYPE across four arms; per-step timings and declared counts reach the page; and the centre column and the right spine stopped being two readings of one list — the centre says WHAT was yielded, the spine says WHEN and HOW LONG.
+- **The jsonb string-scalar trap was root-caused and repaired — and it had made a shipped, gated, green feature structurally unreachable.** `complete_phase` bound `json.dumps(output)` into a `$2::jsonb` parameter on a pool that ALREADY registers a jsonb codec with `encoder=json.dumps` (D-073-06), so `workflow_phases.output` was a STRING SCALAR on **484 of 484 `completed` rows** and the read side degraded to `(None, None)` **silently**. The absent-arm render is honest — nothing, never a `0` and never a dash — which is precisely why no test and no eye caught it. Fixed by stopping the pre-encoding, never by adding a cast; migrations 122/123 repaired the sibling column, verified `object` on 8 of 8 rows.
+- **Human-in-the-loop workflows became publishable and drafts became test-runnable** (198 / 200.3). A golden run auto-continues the human step with the first configured choice; a LIVE run still pauses for a real person, gated on a flag set at exactly one site. ⚠ Phase 198 SHIPPED NOTHING for NODE-01 and that was the correct answer: **0 of 264** phases across 119 real definitions exist only to reshape data — a count trustworthy only because it went through the unwrap above, since a naive `definition->'phases'` answers a confident, vacuous 0 on 90% of the corpus.
+- **G-5 debt was paid rather than deferred, in two places.** `WorkflowCard.tsx`'s lead/defer decision extracted to `cardFace.ts` — with the characterization pin committed ONE COMMIT BEFORE the seam existed, then passing with a numstat of nothing — and `phase_types.py`'s human-input executor extracted to `harness/human_input.py` as the vehicle for its own fix.
+
+### Known Gaps
+
+Recorded rather than smoothed. Full evidence: `.planning/milestones/v3.7-MILESTONE-AUDIT.md` (`status: passed_with_corrections`) — §6 of that file is an independent re-audit that **refuted two of the close audit's own five gate claims**.
+
+- ⚠ **The close audit's backend and typecheck gates were measured on the wrong thing, and one of them was hiding a real defect.** *“Backend pytest: 173 passed, 0 failed”* was a hand-picked subset; the real `pytest tests/unit` is **63 failed / 2421 passed** (the known rot set — `retrieval_service` 13, `sql_service` 12, `sandbox_service` 3, `streaming_reliability` 1 — **none in a v3.7 blast radius**, and the phase-scoped suites are 110/110 green). *“`npx tsc --noEmit` clean”* checks **ZERO files**; `-p tsconfig.app.json` reported **35**, and the 35th was NEW: `persistence.dirty` does not exist on `DraftPersistence`, so ▶ Test Run's draft flush **never ran** and a test run launched the last SAVED definition. `200.3-VERIFICATION.md` had scored that truth and that wiring row as VERIFIED. Fixed in `2ee40c52` with a DRIVEN counterfactual. The two gates that WERE reproduced exactly: count gate (`OK` · 110/110 · total 5438 · failed 0) and the CLAUDE.md size gate (115,859).
+- ⚠ **`BUG-260823-04` is a live, confirmed defect under a requirement recorded as Satisfied.** On the QBR run, `synthesize` holds **6,133** characters of narrative and `emit-qbr` holds **61**; `runAnswer` takes the LAST step with text, so the hero renders *“Produced the filled deliverable: /Northwind-QBR-Template.docx”* under **“The answer this run wrote”** and the synthesis renders nowhere. Deferred on purpose (D-17 — a naive `llm_emit` skip would wrongly drop an emit step whose text IS prose). `status: open`.
+- ⚠ **Phases 198, 200.2 and 200.3 were UNCOMMITTED when the close audit declared the milestone verified**, and v3.8's Phase 201 had already been committed on top of them. All three now carry commits (`161ba8af`, `0f263cdf`, `2ee40c52`). This is why the commit range above is not clean.
+- ⚠ **The run IDs in `200.2-UAT.md` resolve 0 of 4.** Their first eight characters DO resolve, to four real runs carrying exactly the claimed statuses — so the rows were driven and the evidence is credible — but every UUID tail was invented and the citations are unusable as written. The same defect appears in `BUG-260823-04`'s cited id.
+- **Owed manual UAT, closed as a DECISION under G-7 and never as a claim the rows ran:** 192.2 (0 of 10 driven), 197 (4 PASS · 2 PARTIAL · 5 not driven — drive U4 first, the requirement row on anthropic + openai), 199 (0 of 6 driven).
+- **Verification debt:** Phases 198 and 200.2 have no `VERIFICATION.md` (only 200.3 does), and **`/gsd:secure-phase 200.1` was never run**.
+- **Two Phase-194 residuals — and as of 2026-08-24 one of them has a HOME.** **L-01** (the far-worker producer KEEPS RUNNING; the run reports honestly, the work does not stop) is **FOLDED INTO PHASE 204** on an operator instruction. It belongs there because SCHED-02's *“hard spend-cap and duration circuit breaker”* is asked of runs with **nobody watching**, and a breaker that marks a run stopped while its producer keeps calling a provider is not a spend cap — it is a spend cap-shaped record. **WR-04 stays OPEN** (three non-owner callers drive `_cancel_run_internals`, so the UI says *“Stopped by you”* about a stop the reader did not make) — a vocabulary defect against the next workflow-surface phase, **re-open trigger: a scheduled run's cancel path becoming a fourth non-owner caller.**
+- **Two hot-file ledger obligations left open by the final phases.** `lib/api.ts`'s 197-decline re-open trigger (*“the next phase adding a RUNTIME export”*) **FIRED at 200.2** — `getWorkflowRunPhaseCitations` is a runtime export — and the row still reads *“the trigger DID NOT FIRE”*. `WorkflowBuilderPage.tsx` fires G-5 and its row was not re-derived at 200.3.
+- **`RunTranscript.tsx` is unmounted from production but retained with 44 passing tests** as A-variant regression control. Dead surface with a live guard; the next run-surface phase decides whether it earns its keep.
+- **`RUN-05` never existed in `REQUIREMENTS.md` during planning.** `STATE.md` carried a standing instruction to add it at plan time; it was added RETROACTIVELY at close and is present in the archive only.
+- ✅ **SHIPPED TO PRODUCTION 2026-08-24 — cloud parity DISCHARGED.** `production` moved `7dc53ffa` (v3.6) → **`9ee22ccf`**, and migrations **119 → 123** were applied to cloud in order (123 after 122 — it is a data repair on the column 122 creates). Email ingestion verified working live, and the v3.7 workflow surfaces are visible in production. ⚠ **The release is v3.7 PLUS v3.8's Phases 201–203, and that is deliberate** — Phase 201 was committed before v3.7's last three phases, so no clean v3.7 tip existed to promote (see the commit-range note above). ⚠ **UAT caught what the test suites could not:** a real `.msg` failed with `22P05` (a NUL in the SUBJECT, from extract-msg's NUL-terminated MAPI properties) — fixed in `024c86f3` and re-verified on the operator's own file BEFORE promotion. An `.xlsx` that appeared to fail alongside it was **not** a defect: the workbook was genuinely empty (`<sheetData/>` self-closed). That investigation produced `635cca06`, which makes the empty-file message describe the FILE's state rather than the extractor's.
+- ✅ **The `v3.7-phases/` directory archive is DONE (2026-08-24), and its re-open trigger is what fired.** It was deferred at close because `.planning/phases/` also held `201-…` and `202-…`, which are v3.8's and were being actively written by other sessions; the recorded trigger was *“the first moment no other session is working in that directory.”* That moment arrived, and all **17** v3.7 phase directories moved to `.planning/milestones/v3.7-phases/` by `git mv`, leaving `.planning/phases/` holding only v3.8's three. `/gsd:complete-milestone v3.7` was still NOT run — it archives the whole set and would have taken 201–203 with it. **A deferral with a trigger that actually fires is the only kind worth writing.**
+
+---
+## v3.6 Visual / No-Code Workflow Studio (Shipped: 2026-08-09)
+
+**Phases completed:** 13 phases (CORE 181-189 + STRETCH 190 + inserts 184.1/188.1/188.2), **151 plans** · 1,064 commits over 18 days (`7c85f9ec` → `bdd3e54b`) · 246 source files · migrations 114-118 · git tag `v3.6`
+
+**Delivered:** a drag-and-drop visual authoring + non-technical live-run-observability layer on top of the existing governed harness engine — with per-node **graded governance** as the category differentiator, and the D-14 red line intact throughout.
+
+**Key accomplishments:**
+
+- Shipped the milestone's headline differentiator — **graded per-node governance** (Phase 185): a node is *strict when grounded* (the immutable `citations_required` coverage gate auto-attaches at RUN time to any KB-reading phase, derived structurally from `available_tools ∩ KB_TOOLS`, regardless of how the phase was authored) and *flexible when open*, freely mixed in one workflow. A deep competitor crawl of Beam / Glean / n8n confirmed **none of them grade strictness by KB-grounding**. Because enforcement happens at run time rather than authoring time, the strict gate is not author-loosenable-away — governance became the shape of the artifact rather than a bolted-on check.
+- Delivered operator HARD gate #1 whole: one governed `visual_workflow_canvas` feature key turns the entire canvas layer on and off, with `test_revert_byte_identical` as a CI **and** live-close gate, and an ASGI-level `CanvasGateMiddleware` that returns a byte-identical 404 before route-existence can leak (Phase 181/182).
+- Built the canvas as a **pure projection** of `WorkflowDefinition` and kept it one across all 13 phases: node id = phase slug, layout computed and never persisted into the immutable JSONB, and — measured at close — **7 harness executors, exactly as at open**. No second runtime was ever created; the D-14 red line held.
+- Made the server the single source of validation truth (`POST /workflows/validate` reusing `lint_workflow` **verbatim** — the same function `publish_workflow` calls), so live per-node structural verdicts on the canvas structurally cannot drift from the publish gauntlet, and no severity is ever invented client-side (Phases 182/184).
+- Gave a workflow run and its deliverable **their own home** instead of dumping them into chat, painted from the same `usePhases(threadId)` stream the developer timeline uses — no new Redis events, no second demux — with node state as a total function over the full event set and reconcile-on-fetch at every reconnect (Phase 188, added mid-milestone from an operator call after 185's UAT).
+- Made the canvas approachable for non-technical users: plain-language node verbs with an ⌥ Technical-names reveal that swaps the subtitle rather than the title, a natural-language "describe it" seed whose response schema **is** the `extra="forbid"` union (so it structurally cannot emit an unsafe node), and start-from-template via the shipped Starter Workflow Library (Phase 187).
+- Shipped the governed **external-action node** (Phase 189) with zero new governance concepts — its capability *is* an `available_tools` whitelist entry (`available_tools` derived from `capability`), riding the same tool-whitelist path every other tool uses and reusing 185's action-risk approval checkpoint. Operator HARD gate #3's CORE half, delivered.
+- **A real Slack message left this application** through the full governed path (Phase 190) — approval gate → six ordered guards → live send → honest `completed` status → migration 117's `external_action_sent` audit receipt. Every outbound is secured by an SSRF/egress guard that runs unconditionally **before and independently of any credential**, inside the only two socket-opening functions in the tree, with org-scoped Fernet credentials resolved server-side by reference and a cross-org leak test that reproduced the leak before closing it.
+- Paid down G-5 hot-file debt with two dedicated refactor phases rather than deferring it: `WorkflowCanvas.tsx` 1593 → 1292 L (188.1) and `PhaseNodeCard.tsx` **797 → 274 L, −65.6%** (188.2), the latter proving the rendered DOM byte-identical via three whole-`innerHTML` baselines captured on the *unmoved* tree with zero re-capture — and stating honestly that the subtree itself grew +67% across five new sibling modules.
+- Closed the milestone with **zero security debt** — all nine threat-modelled phases at `threats_open: 0`. Phase 190's standard-depth code review earned its keep: it found a **real credential exposure** (both `anon` and `authenticated` holding column-level SELECT on `connector_connections.secret_ciphertext`) that nineteen plans of RED-first self-checking had missed, because the RLS shape was copied from `sso_configs` — a table with no secret column. Closed by migration 118.
+
+### Known Gaps
+
+Recorded rather than smoothed. Full evidence: `.planning/milestones/v3.6-MILESTONE-AUDIT.md` (`status: gaps_found`).
+
+- **CONN-02 — UNSATISFIED. The milestone's only unmet requirement, and it is STRETCH.** The requirement asks for *"2-3 first-party live connectors ... runnable from a workflow"*. Three adapters shipped; **one is reachable from a workflow, and it works by coincidence.** `_adapter_args` fills exactly one field — the capability's `body_arg`. Slack requires only `["text"]`, which *is* that arg. Jira requires `summary` and SMTP requires `to`/`subject`, and neither has an author-facing field in `ExternalActionPhaseConfig`; both raise, are caught, and report `failed`. Recorded `D-190-DEF-17`; **not patched at close because it is a phase** (schema + form + serializer), and its shape question — per-phase config vs. per-connection — is exactly what SEED-144/145/146 re-opened. → connections milestone. **Operator HARD gate #3's live half therefore closes at ⅓.**
+- **SCALE-01 — deferred, never built.** Phase 191's own ship condition (*"only if a real workflow or org fan-out exceeds the expected small scale"*) never fired: real workflows sit at 5-50 phases against ~100-150-node thresholds. → `.planning/v3.6-STRETCH-CARRYFORWARD.md`.
+- **VALID-01 and VOCAB-02 — partial, both named accepted risks.** SEED-134 (the two flag-gated single-segment `/workflows/<x>` paths are the only ones answering 404, which is an enumeration oracle) and SEED-133 (`POST /workflows/generate` never branches on `bundle.degraded`, so a registry outage yields a folder-blind draft presented as `ok:true` — caught downstream by `/validate` and the gauntlet, so nothing unsafe publishes).
+- **Verification debt — nine requirements ride on three missing `VERIFICATION.md` files** (184 → CANVAS-02/03/04 + VALID-02/03; 188 → RUNVIZ-01/02/03; 189 → **CONN-01**). All nine are wired in shipped source and carry passing UAT; CONN-01 additionally carries `189-SECURITY.md: threats_open: 0`. **This is documentation debt, not engineering debt**, and it is the cheapest outstanding item in the milestone. Phase 184 carries a standing instruction *not* to route to `/gsd:verify-work 184` — close it by retroactive documentation from the existing UAT results.
+- **Two records asserted more than happened, and are corrected rather than carried.** SEED-133's binding re-open trigger — *"Phase 189's discuss-phase MUST surface this row"* — **fired and was not honoured, for the second consecutive phase**; a trigger that fails silently twice is not a control. And seven Phase-190 summaries mark CONN-02/CONN-03 complete against that phase's own `D-190-DEF-02` convention, an assertion now measurably false for CONN-02.
+- **Nyquist:** 9 compliant · 4 partial (181, 182, 183, 184 — the milestone's earliest) · 0 missing.
+- ⚠ **Cloud parity owed at migrations 104 → 118, and 118 is SECURITY-BEARING.** Until it is applied, **cloud still carries the CR-01 credential exposure**. Migration 118 and the `connector_service.py` deploy must land in the **same** operation — the grant without the code breaks every connector read with `42501`.
+
+**Known deferred items at close:** 46 (see STATE.md → Deferred Items) — 25 legacy quick-task stubs, 11 dormant seeds, 1 todo, 4 UAT gaps, 5 verification gaps.
+
+---
+
+## v3.5 UX Consolidation & Chat Polish (Shipped: 2026-07-23)
+
+**Phases completed:** 4 phases, 17 plans, 37 tasks
+
+**Key accomplishments:**
+
+- Hardened the shipped DeepSeek DSML sanitizer with a deepseek-gated stream-end flush (no trailing content-loss) and turned a detected tool-markup leak into one honest `error` SSE event via an Option-B post-drain hook — additive, default-inert, D-14 byte-identical for every non-deepseek/clean-deepseek path.
+- A one-line `reasoning_first` STRUCTURED gate in `resolve_calling_mode` (above the native-tools read, so the hard OpenAI API constraint wins over an operator `native_tools=True`) routes gpt-5.6-class models with tools via XML injection — no `tools`/`reasoning_effort` param → no 400, reasoning stays on — plus a dedicated `reasoning_tools_unsupported` ErrorKind with fixed, actionable, non-interpolated copy for the specific gpt-5.6 reasoning-tools 400 (XPROV-01 / D-01 + D-04).
+- The shared provider-safe guard is now applied at both explicit utility-model sites (thread_title + suggestion) so a stale cross-provider `sub_agent_model` is dropped before the call — killing the false fallback banner at its root (XPROV-03/D-03/D-04) — and the title call injects a per-MODEL reasoning-off param driven generically off the Plan-01 `reasoning_off` marker so every docs-confirmed-SAFE reasoning provider produces a real 4-6 word title instead of the degenerate first-few-words fallback (XPROV-04/D-05), all additive with the tiny budget + inline-await ordering byte-identical.
+- Two additive StreamsProvider reconcile fixes: a content-supersede drop so a single send renders exactly one user bubble (RENDER-01), and a mount-path onTerminal content-reconcile keyed on run.run_id so a backgrounded parallel-thread run un-folds its final answer live with no reload (RENDER-02).
+- After approving a description proposal, the Skill Studio header `vN` and the Versions-tab LIVE badge now update with no reload — via a `refreshVersions` refetch (mirror of `refreshGate`) threaded as `onVersionPromoted`, plus a `refreshNonce` that re-runs VersionsTab's own fetch.
+- Declared `libraries` now install via `python -m pip` into the same interpreter that runs the code (retry x1, never swallowed), and an undeclared `ModuleNotFoundError` triggers a bounded, run-scoped auto-heal (install + one threadpool-wrapped re-run) with an honest `install_failed` result on persistent failure — entirely in `tool_dispatcher.py`, provider-uniform, Deep byte-identical.
+- A submitted general-chat message now always sends or surfaces an honest, recoverable failure: the sendMessage duplicate-guard's non-dispatch early-return stashes the dropped draft + a quiet retry hint through the existing recovery seam, and a sibling pending-send ref tightens fresh-thread ordering without dropping the real send.
+- Extracted the three shared org-zone primitives — one StatusChip COMPONENT (D-08), one RoleBadge/OrgAvatar identity element (D-04), and one severity-keyed HonestNotice (D-11) — as byte-identical-token extractions with co-located vitest, ZERO consumer wiring (Wave 2 wires them).
+- Rewired OrgBand + ProfileMenu to render the ONE shared `RoleBadge` (177-01) instead of two inline `◆ Org-admin / Member` copies (D-04), and audited-and-locked the honest-state matrix — per-org role (D-05), honest-absent affordances (D-06), and indigo/amber zone separation (D-07) — with the existing Phase-166 ProfileMenu suite EXTENDED (7→9 it()), never re-authored.
+- Rewired InvitationsTab + SsoTab onto the ONE shared `StatusChip` (177-01), retired each file's local `CHIP_TONE_CLASS` map AND SsoTab's documented UPPERCASE off-grid status fork (snapping the connection row to the `px-3.5 py-3` sibling grid), while keeping link-first resend, the victim-naming SSO remove confirm, and every honest-absent gate byte-identical (D-08/D-09/D-10).
+- Folded `OrgMembersTab` (roster) and `InviteMemberDialog` into the shared 177-01 org family — the roster now renders its role slot via `RoleBadge`, its adoption chip via the shared `StatusChip` COMPONENT (fed the roster's own `active→muted` adoption tone, kept as a documented domain exemption so it is not recolored to green), and both avatars via `OrgAvatar`; the invite dialog snaps to the shared 4px grid + org-zone micro-label style — all honest behaviors (pure-read-leaf, link-first) byte-identical.
+- Made "coming into an org" read as ONE calm, error-honest product surface: extracted the duplicated brand-card into a shared `AuthCardShell` (D-14), routed the `/invite` landing's six states + the sign-in error line through the shared `HonestNotice` (D-11), recolored every recoverable invite dead-end to CALM instead of alarming red (D-12), and made the sign-in fail-open a legible reassurance instead of a silent degrade (D-13) — all auth/route/accept logic byte-frozen.
+
+---
+
+## v3.4 Multi-Tenancy & Org Access (Shipped: 2026-07-22)
+
+**Phases completed:** 10 phases, 56 plans, 121 tasks
+
+**Key accomplishments:**
+
+- A ratify-not-relitigate Tenancy-Model ADR (160-ADR.md) that ratifies D-PRD-02's co-tenant + isolation-via-deployment posture, locks the is_system_global / is_org_shared / slot-104+ naming decisions for phases 161-168, and pins the binding 4-tier deployment-flexibility contract — recorded as D-v3.4-01 in both decision registers.
+- Authored `supabase/migrations/104_org_dept_role_schema.sql` — 8 membership-keyed org tables with correct-from-birth RLS, the `current_user_org_ids()` 42P17 recursion-break helper + a role-gate + a default-dept construction helper, a seeded 4-tier permission catalog, and a nullable `org_id` sweep across 23 user-facing tables (authored, not yet applied).
+- Migration 104 is now OWED at the next operator-gated production push
+- Idempotent migration 105 authored: personal-org provisioning loop + a defensive `handle_new_user` trigger that can never abort signup + a single batched-COMMIT procedure backfilling `org_id` across 35 user-facing tables in 3 ordered waves + 35 self-guarded NOT-NULL flips — HANDS-OFF `is_global`/`is_system`, machine-verified re-paste-safe, not yet applied.
+- Migration 105 applied to the local DB via psycopg2 autocommit — 8 users provisioned into 8 personal orgs (+ default depts + org-admin memberships), org_id backfilled and flipped NOT NULL across all 35 targets (only `operator_audit_log` stays nullable), a re-apply proven idempotent, and `full-schema.sql` regenerated so a greenfield bootstrap also provisions personal orgs. MIG-01 COMPLETE.
+- Migration 106 adds a transitional BEFORE-INSERT org_id auto-fill trigger across all 35 backfilled tables — 2 SECURITY-DEFINER pinned-search_path functions parameterised by TG_ARGV — so app-style INSERTs that omit org_id succeed again with the correctly-resolved org, closing the 162→163 NOT-NULL-vs-app-threading seam while org_id stays NOT NULL.
+- Extracted the LOAD-BEARING HEART — the inline `agent_runner` producer shell (a nested closure in `send_message`) and the near-duplicate module-level `spawn_continuation_run` — VERBATIM out of `threads.py` into a new `run_producer.py`, UNIFIED onto ONE shared `_finalize_producer_run` that preserves all 8 finalize-ordering invariants (D-A3) byte-identical on BOTH the Deep producer path AND the continuation path, with the two genuine divergences (harness-F2 terminalize; cap_paused re-pause keeping runs:active) handled by PARAMETERS rather than a forked step order. `threads.py` fell 2444 -> 1214 LOC; `agent_loop.py::run_agent_loop` is byte-unchanged; the acceptance suite is byte-identical to its pre-extraction baseline (19 failed / 55 passed, same set).
+- The `[BLOCKING]` D-A6 gate PASSED and the operator recorded "approved" (2026-07-19): the definitive old-vs-new differential proved the producer/finalize/continue/provider suite is `19 failed / 55 passed` IDENTICAL on both the phase-start baseline (`263d0b73`) and HEAD — ZERO net-new failures — while the live SC#10 4-axis scoreboard passed across the FULL native-7 cross-provider roster (OpenRouter's external 404 attributed upstream, not the refactor, and it bonus-proved the unified finalizer's failure path). `threads.py` landed at 1,214 LOC (down from 2,444) with `agent_loop.py::run_agent_loop` byte-unchanged and zero org_id/RLS content. Phase 163 (the RLS + user-JWT client-swap crux) is UNBLOCKED — the D-A1 phase boundary is satisfied.
+- Three additive, dead-until-wired `dependencies.py` factories — `get_user_pg_connection` (asyncpg `SET LOCAL ROLE authenticated` + both JWT-claim GUC forms), `get_user_supabase` (per-request ANON-key+Bearer client, no singleton mutation), `get_service_role_supabase` (refuses a missing org) — plus a reusable two-user/two-org live RLS harness proven on Postgres :54322.
+- Migration 107 lays a NOT-NULL, parent-FK-backfilled, btree-indexed `org_id` on the two pgvector hot tables (`document_chunks` + `skill_embeddings`) with the HNSW/GIN vector indexes untouched and the mig-106 autofill trigger wired — plus the RED-until-applied test that encodes the applied-state contract.
+- The chat/streaming cluster (threads.py + runs.py + workspace/panel/feedback/sandbox) now enforces RLS via the per-request user-JWT clients on BOTH DB paths — RLS becomes the real gate on the hottest request path — while the agent-loop producer/writer stays service-role (D-05) and `agent_loop.py`/the provider gateway/`run_producer.py` are byte-unchanged (Deep red line D-09 held).
+- The documents / document-management cluster now enforces RLS via the per-request user-JWT client on the request-scoped CRUD path — RLS becomes the real gate on document/folder CRUD — while the preserved global branches (folder-global, is_global) still serve non-owners, the detached ingestion pipeline stays service-role (pdf_extraction_runs has no authenticated INSERT policy), and the audit_log analytics / cross-user probe / operator-roster reads keep a classified service-role carve-out. Retrieval RPCs are untouched (Phase 164).
+- The skills cluster (skills/skill_test_cases/skill_tuner — 23 request handlers) now enforces RLS via the per-request user-JWT client with the is_global/is_system global branch preserved, and the eval-cluster PURE-READ surface (6 handlers) is RLS-gated — while a live-schema-driven carve-out map keeps the eval writes, the shared/Run-carve-out workflow cluster, the no-authenticated-SELECT audit_log reads, and the RLS-disabled app-level settings on the hardened service-role client (each a commented exception), and cleanly leaves the eval/harness/re-embed async writers to plan 09.
+- Every remaining fully-async / non-request service-role writer — the eval runner, the harness engine's resume path, the golden-run publish helper, the re-embed job, and the skill-vector backfill — now constructs its BYPASSRLS client via `get_service_role_supabase(org_id)` (the org-requiring wrapper that REFUSES a missing org) and widens its `.eq("user_id")` ownership filters to org-aware, closing the D-05 async-writer exception with NO bare, org-less `get_supabase()` call site surviving on any writer/publish path — while every `.eq("user_id")` filter is KEPT (D-14) and `org_id=None` keeps each path byte-identical.
+- Migration 109 lifts platform/`is_system` + seed-`is_global` content out of the mig-108 org-gate so the built-in skill-creator and seeded starter workflows are cross-org visible again, while user-self-served global content stays org-scoped — plus a badge-spoof WITH-CHECK hardening so `is_system=true` cannot be self-set.
+- Authored `test_v3_4_org_isolation.py` — the 18-test v3.4 cross-org isolation exit gate — as a Wave-0 red-then-green scaffold against the pre-164 DB: the spoofed-`match_user_id` red-anchor provably leaks user A's real chunk, and 10 secured invariants (every-table matrix on both DB paths, is_system universal, badge-spoof block, the text-to-SQL connection arbitration) hold GREEN.
+- Global/system-shared folders, skills, and views now null the seeding owner's `user_id` (and views' `folder_scope` UUID) for non-owner readers — one shared serialize rule, three model loosens, a DB-independent 6/6 unit proof.
+- Migration 110 org-scopes the four SECURITY DEFINER retrieval/sharing functions in-body (server-derived `current_user_org_ids()`/`auth.uid()`, never the spoofable `match_user_id`) + pins all four `search_path`s to `''` with `OPERATOR(public.<=>)`, keeps `is_system` universal (mig 109 FIX-A), and widens `document_chunks` SELECT RLS for PRAG-01 — applied live to :54322, all 18 exit-gate legs GREEN, CONCUR-01 15.0ms.
+- The producer's three retrieval RPCs + the text-to-SQL/grep `query_user_documents` path now run over the Phase-163 asyncpg user-context (shared `_call_as_user` seam), the two security-injection regexes are deleted, and migration 110's in-body org gate is LIVE on the app path — closing the two-halves crux (TEN-03 / TEN-05 / PRAG-01).
+- `_inject_folder_scope` now splices the folder filter into the WHERE before any trailing ORDER BY/LIMIT (fixing invalid SQL from the 164-04 `_inject_user_id` deletion), and the exit gate gains an `xfail(strict)` SEED-124 marker that exercises + documents the KB browse-tool service-role cross-org leak folded to Phase 165.
+- Authored `111_is_global_retirement_rename.sql` — the atomic, value-preserving DDL that retires `is_global` via the D-165-01 semantic split (6 RENAME COLUMN + 4 DEFINER-fn CREATE OR REPLACE + OID-preserving folder-fn rename + 2 trigger-fn rewrites + storage skill-files policy reconciliation), relying on RENAME-COLUMN auto-propagation to preserve mig-109 RLS semantics verbatim.
+- Org-scoped, fail-closed service-role folder-visibility helpers that close the SEED-124 CR-01 cross-org browse-tool leak and broaden owner-nulling to subtree descendants (WR-01), with folders/skills `is_global` renamed to `is_org_shared` across the three browse-path files.
+- Renamed `is_global` to its D-165-01 split target (is_org_shared vs is_system_global) across 6 Pydantic model files + 8 FastAPI route files, deriving each occurrence's target from the actual table it queries — documents.py MIXED — with skills.is_system and the platform write-lock preserved.
+- Renamed `is_global` across the 15 backend service/db/app files onto its per-table split target — `is_system_global` for the four write-locked platform tables and `is_org_shared` for folders/skills — each target verified against the actual `supabase.table()`/raw-SQL it queries, with the 4 checker-flagged misclassifications corrected and the shared Deep-mode path kept token-only.
+- Renamed `is_global` in the 15 highest-risk raw-SQL, multi-table security tests to their correct migration-111 split target per owning table (folders/skills -> `is_org_shared`; workflow/view/rule/metadata -> `is_system_global`) + `folder_is_globally_visible` -> `folder_is_org_shared`, preserving every `skills.is_system` marker.
+- Renamed the `is_global` share-flag literal to `is_org_shared` across all 19 skills/folders-domain backend tests (raw SQL, model kwargs, dict-key assertions, PostgREST `.or_()` filters), preserving `skills.is_system` and introducing zero `is_system_global` — the MIG-02 rename-regression coverage for the skills/folders test surface.
+- Renamed every frontend TEST reference to the six semantically-split table fields per its owning resource (folders/skills -> `is_org_shared`; views/rules/metadata/workflows -> `is_system_global`), retired the `onToggleGlobal`/`toggleSkillGlobal` mock identifiers, and updated the "Global" toggle-copy assertions — leaving ZERO `is_global` test tokens (the plan's three "UNRELATED" files were tsc-proven Folder fixtures, not thread-grouping flags) with no rename-induced tsc or vitest regressions.
+- The SEED-124 known-open leak test flipped xfail(strict) → live XPASS → marker removed (now a normal passing cross-org-isolation regression), the exit-gate literals were renamed to the mig-111 identifiers, and the two-org isolation suite is GREEN end-to-end (23 passed) — SC#4 arbitrated by the live two-org drive, not code inspection.
+- Closed the 30 phase-165-flagged integration-test failures via test-harness-only fixes — a table-name-keyed org_members mock dispatch for the kb/folders/documents suites, and co-org fixtures (116/117) plus a pre-existing-148-gate bypass (119) for the leak suites — with every masking assertion preserved and zero production-code change.
+- Net-new org enforcement layer: server-validated X-Org-Id active-org resolution, an org:manage router/endpoint gate over mig 104's current_user_has_permission SECDEF helper, and three member/manager reads (/org/me, /org/members, /org/audit) with an RLS-honest audit degrade — the first routes to ever call the permission helper (D-166-09).
+- The frontend org-context substrate — OrgProvider (active org + memberships + role + can_manage/can_audit_view + switchOrg) mounted OUTSIDE StreamsProvider, a fail-closed org-scoped permissions probe, X-Org-Id auto-injection on every authed call, and a G-5-safe org-switch stream teardown that reuses the shipped 067.5 clearThreadBucket guard.
+- The four presentational leaves the org-admin shell composes — OrgBand (org-indigo identity band), OrgMembersTab (read-only roster with absent write affordances), OrgAuditTab (lighter single-ledger audit list with the load-bearing RLS-honest scope='own' degrade banner), and OrgSettingsTab (light org-config home) — each cloned from its shipped operator analog with the amber→indigo re-tint and the writes stripped, all pure props-in/DOM-out.
+- The fetch-owning org-admin shell — OrgAdminShell — composes the four Plan-03 leaves (OrgBand + OrgMembersTab + OrgAuditTab + OrgSettingsTab) into the 080-A 7-tab shape: 3 LIVE tabs (Members read-only · Audit lighter · Settings org-config home) + 4 LockedTab "coming soon" placeholders (Invitations & Roles · SSO · Subscription · Retention, no roadmap numbers), reusing the shipped Control-Room band+tabs shell re-tinted org-indigo, owning the alive.current-guarded lazy per-tab fetch, and threading the server's audit `scope` flag straight through so the RLS-honest degrade renders from server truth.
+- The last mile of the tenancy surface — the 079-C merged rail-footer ProfileMenu popover (identity + ◆ Org-admin / Member role badge + the 2+-orgs-only switcher + theme + Sign out), the indigo canManage-gated org-admin Shield-mirror sitting parallel to the amber operator shield (desktop rail + mobile drawer, honestly absent for a member), the ChatLayout `org-admin` branch that mounts OrgAdminShell to close the reachability triad, and the D-166-08 second-half thread-list refetch keyed on activeOrgId — with the standalone theme RailItem retired so theme lives in exactly one home.
+- Stdlib one-way invite-token crypto + an idempotent token-gated JIT accept (advisory lock + ON CONFLICT DO NOTHING) + an env-switched none-log-default email provider + the `require_org_invite` gate — the contract layer every other 167 plan builds on, with ZERO migration.
+- Five invitation endpoints on the shipped `/org` router — org:invite-gated send/list/resend/revoke on the user-JWT/RLS connection + a token-gated idempotent accept (INV-02 JIT seam) — plus server-derived roster adoption state and the T-167-23 fix: an optional explicit `org_id` on `write_audit_entry` so a 2+-org caller's invitation audit rows land on the CORRECT org's audit tab. ZERO migration.
+- Generalized the binary feature-visibility (`{audience: everyone|operators}`) into per-feature role greenlists (`{audience: role, roles:[...]}`) by extending the ONE resolver — `feature_audience` + `resolve_feature_access` + `require_visible` + the `/features` map + `set_feature_visibility` + `PUT /admin/visibility` — with a fail-closed Glean precedence-merge and ZERO migration.
+- Revived the dead `user_settings.preferences` column under the SEED-116 two-layer pattern: a user picks a default AI model within the operator/org-allowed enabled set (honoring the `llm_model_locked` operator lock), overlaid onto the chat send path as a strict identity-preserving no-op when unset (Deep byte-identical, D-14) — ZERO migration.
+- The 166 "Invitations & Roles" LockedTab is now LIVE: an InviteMemberDialog (email + Member/Org-admin picker, Dept-admin greyed, link-first copy on send), a pure-leaf InvitationsTab (status chips + resend/revoke), server-derived Active/Pending adoption chips on the Members roster, and honest invitation-event labels on the org Audit tab — all reusing the shipped 166 design system with no new package.
+- The `/invite?token=…` accept landing is LIVE: an invitee arrives, signs in (existing account → additive 2nd org, D-167-01) or signs up (fresh → joins that org), and on their FIRST authenticated session the page idempotently calls `acceptInvitation(token)` — then redirects home so the shipped 166 OrgProvider re-probes and the org switcher shows both orgs, with NO new switcher code. The raw token is captured from the URL + mirrored into sessionStorage so it survives an email-confirm reload (RESEARCH OQ1); expired / revoked / invalid / already-a-member outcomes surface honest messages. Routing is a guarded `window.location.pathname === "/invite"` branch mirroring the shipped `/setup` precedent — no url router, non-/invite path byte-identical.
+- Shipped the two access-projection surfaces by cloning shipped idioms — the VIS-02 per-user default-model picker (registry-only `<select>` over the operator/org-allowed set + an always-on 🔒 footer that disables the control and names the governed default when the operator lock is on) in Settings, and the minimal VIS-01 greenlist admin surface (a 3rd "By role" audience + a 4-tier role-chip picker extending the shipped Control Room feature-visibility toggle) — zero new packages, no new design.
+- Flipped the org-admin `sso:manage` grant live to activate mig-104's dormant `sso_configs` RLS write policies, added the D-168-05 approval gate (status + lowercased-domain uniqueness + approval audit columns), and added the encrypted `app_settings.supabase_management_token` store — the load-bearing schema foundation the rest of the SSO phase stands on.
+- One env-switched, fully-async Supabase provider-CRUD proxy (Cloud Management API vs self-hosted GoTrue, ONE identical body) with a fail-closed contract, a public-domain anti-hijack blocklist, and a call-time-decrypted management token — plus the config + deploy-artifact parity foundation every SSO endpoint stands on.
+- `require_sso_manage` (strict, sso:manage-gated) and `provision_sso_membership` — an idempotent, member-only, duplicate-email-tolerant, join-additive JIT membership insert built as the token-free sibling of the Phase-167 invite accept.
+- The frontend contracts the Plan-06 SSO surfaces render on: six api.ts SSO client fns + the fail-closed `can_manage_sso` render flag threaded through the probe and OrgProvider in lockstep, `useAuth.signInWithSSO` with a manual IdP redirect, and the SIGNED_IN → silent JIT-provision → `/org/me` re-probe wiring so a first-time SSO user lands in the org switcher.
+- The SSO-01 payoff surfaces on the Plan-05 data layer: the Phase-166 SSO LockedTab flips LIVE as `SsoTab` (create form + server-truth status chip + victim-naming remove + copyable SP-metadata, render-gated on `canManageSso` with an honest-absent CTA), and `SignInForm` reworks to identifier-first — email → domain route → IdP redirect or password reveal, failing OPEN to the password field on any route-lookup failure so no user is ever locked out.
+
+---
+
+## v3.3 Operator UX (Shipped: 2026-07-18)
+
+**Phases completed:** 14 phases (146–159), 95 plans, 212 tasks
+**Git range:** `30714344` (2026-07-10) → close (2026-07-18) · ~8 days
+**Tag:** `v3.3`
+
+**Delivered:** A non-developer operator can now run and configure the platform from the UI — a gated `/admin` Control Room (health, active-runs + Kill, capability kill-switches, maintenance mode, audit browser, user management, feature visibility), dynamic model-registry + discovery curation, encrypted secrets at rest, agent/workflow file-input tools, per-claim inline citations, an app-wide plain-language layer, a WCAG-AA sweep, and deployment presets + a first-run install wizard.
+
+**Delivered by track:**
+
+- **Operator tier (146–148):** gated `/admin` with a byte-identical-404 `require_operator` gate (no RLS backstop — app-layer isolation), an append-only operator audit ledger, the Control Plane (dependency health, active-runs + Kill, fail-closed capability kill-switches, maintenance/read-only mode), and governance — audit browser + user roster + API-enforced feature visibility.
+- **Model & secrets (149–150, 159):** a dynamic model-capability registry + live propose-only discovery (no restart, no silently-guessed capabilities), add-model-by-ID + utility-filtered discovery curation (159), and app-layer Fernet secrets-at-rest with env-fallback precedence.
+- **Files & workflows (151–152):** `fetch_document_file` + `attach_skill_file` agent tools, and Run-modal file-input + per-run KB-folder scope + safe workflow delete-cascade.
+- **Trust & friendliness UX (153–156):** per-claim inline citations keyed to the run's real retrieval set, an app-wide plain-language layer behind an advanced reveal, a WCAG-AA accessibility sweep, and everyday nav/thread-list polish.
+- **Deployment (157–158):** Solo/Team/Enterprise presets + `docker-compose.prod.yml` + `OPERATOR.md`, and an idempotent, lock-after-finalize first-run install wizard at `/setup`.
+
+**Requirements:** 20/20 delivered (16 CORE + 4 STRETCH). WFIN-02 carries one operator-accepted OpenRouter cross-provider-axis limitation (external BUG-260714-02).
+
+**Security:** every phase touching a trust boundary was threat-secured (146–150, 153, 154, 158, 159 carry a verified SECURITY.md, `threats_open: 0`).
+
+**Known deferred at close:** 44 open artifact items acknowledged as deferred (see STATE.md → Deferred Items) — all noise or by-design v3.4+ backlog (9 dormant seeds, 22 stale/missing quick-task refs, 1 empty todo, 7 already-passed/accepted UAT items, 5 human-UAT-satisfied verification items). Open chat-surface bugs (BUG-260708-01/-02, 260714-01, 260718-02/-03/-04) roll forward to a planned post-v3.3 chat-polish phase. BUG-260718-01 closed (folded into 159). Cloud parity still owed at next production push: migrations 099–103 + `SECRETS_ENCRYPTION_KEY`.
+
+**Detailed per-plan accomplishments (auto-extracted; includes a few raw one-liner artifacts):**
+
+- Migrations 095 (operator_users + operator_audit_log with deny-all RLS + tamper-resistant plain-uuid audit actor) and 096 (org_id forward-compat stub on documents/folders/threads/skills) authored, operator-applied to the live local DB, and full-schema.sql regenerated
+- Router-level `require_operator` gate returning a byte-identical 404 on every `/admin` route (non-discoverable), a per-action append-only `operator_audit_floor` yield-dependency (probe-exempt), the `/admin/me` probe + `/admin/audit` feed, and the `OPERATOR_EMAILS`-for-`BACKPRESSURE_ADMIN_USER_IDS` config swap that deletes the dev fail-open — the v3.3 access-control keystone.
+- `seed_operators_from_env()` wired into the FastAPI `lifespan` startup after the asyncpg pool is ready — best-effort wrapped (logs + continues), concurrent-safe under `WORKER_COUNT=2` via `ON CONFLICT (user_id) DO NOTHING` — plus the idempotent multi-worker seed regression suite (5 tests) proving parameterized resolve + second-run idempotence + unmatched-email warn/defer.
+- The interface-first frontend data layer for the Control Room: `getOperatorProbe()` (the `getTunerLatest` 404→null idiom that drives the D-07 non-discoverable nav), `getBackpressure()` + `getOperatorAudit()` plain authed GETs, their three TypeScript types, and a one-shot `useOperatorProbe` hook exposing `{ isOperator, identity, loading }` — render-only, with the backend 404 gate documented as the sole authority (Pitfall 13).
+- The five sketch-locked Control Room leaf components — OperatorBand (amber 061-B zone band), HealthSignals (four plain-labeled backpressure signals + a ⌥ technical-names reveal), LockedTab (calm phase-number-free coming-soon refusal), TechnicalNamesToggle (the two-audience control), and RecentActionsCard (the 062-A ledger-is-receipt card with the ✎ write mark) — all pure prop-driven leaves typed against the Plan-04 api.ts contract, ready for the Plan-06 shell to compose.
+- The operator Control Room, assembled and reachable: `ControlRoomPage` composes the Plan-04 fetches + Plan-05 leaves into the 061-B shell (amber operator band over horizontal section tabs — Overview health+ledger, honest minimal Audit history, four honest locked tabs) with fetch-on-entry + the manual ↻ Refresh honesty beat that visibly prepends the operator's own 'Viewed system health' row; plus the reachability triad — the `"control-room"` ActiveView union entry with a single App-level probe host, the ChatLayout full-surface mount branch, and the probe-gated amber Shield (rail footer + mobile drawer) rendered OUTSIDE NAV_ITEMS so a non-operator's nav is byte-identical, regression-locked by `nav-items.test.ts`.
+- Three global `app_settings` operator flags (self_improve_enabled, workflows_enabled, maintenance_mode) wired through the 30s TTL cache with D-Q4 per-flag polarity and last-known-good fail-safety — migration 097 applied to the live DB and captured in full-schema.sql.
+- Additive Redis/Supabase/sandbox dependency-health on `/admin/backpressure`, a cross-user `GET /admin/runs` list with honest chat/workflow/eval/tuner kind badges + server-derived `not_responding`, and the D-07 poll-exempt / one-deliberate-row `POST /admin/control-plane/record` ledger discipline.
+- Factored the `cancel_run` zombie-heal internals into one shared `run_lifecycle._cancel_run_internals` helper and built the operator `POST /admin/runs/{id}/kill` (any user's run, no ownership filter, victim-named ledger, self-cancel for the victim) plus `PUT /admin/flags` on the code-constant allowlist — all on the sole-authority `/admin` router.
+- Two-layer fail-closed capability kill-switches (hide-from-schema + refuse-at-dispatch) for web/sandbox/self-improve plus the proposer entry, and a D-05 workflow-launch block at the kickoff seam — every gate a literal no-op when its flag is on, so Deep Mode stays byte-identical and enforcement is uniform across all providers.
+- 1. [Rule 1 - Bug] Corrected a test's HEAD-method expectation
+- Extended `lib/api.ts` with the Control Plane types + client fns every Wave-2/3 admin component consumes, and fixed BUG-260710-01/-02 so an operator-Kill victim sees exactly a self-cancel (D-03) — a persistent "Response stopped" indicator across reload and an honest "cancelled — no output yet" affordance on an empty early cancel — both render-only in the G-5 hot file.
+- Dependency-health dots (up/slow/down/off) on HealthSignals + the 064-B ActiveRunsSection — calm cross-provider run cards with live client-ticked elapsed, @lobehub provider marks, kind badges, a victim-naming confirm-sheet Kill, and honest Cancelling→Cancelled (no optimistic removal, stalled runs read "recovered a stuck run").
+- 2×2 armed-OFF CapabilityGrid (direct-flip kill-switches + count-honest impact copy) plus an amber arm-to-confirm MaintenancePanel with a present-tense consequence banner, built against the locked 065-A sketch.
+- Recomposed ControlRoomPage into the live five-tab Control Plane (D-08) — the 063-B pinned-vitals scroll wiring the plan-07/08 leaves with D-07 silent auto-poll + one visit-row — plus an app-wide end-user maintenance banner sourced from the public /health flag.
+- One-liner:
+- Made the `app_settings.feature_visibility` jsonb column real on the live local DB (operator-applied via SQL editor) and regenerated `supabase/full-schema.sql` (no reset) so the bootstrap artifact carries the column.
+- One-liner:
+- One-liner:
+- One-liner:
+- A per-session `useEffectiveFeatures` hook (mirroring `useOperatorProbe`) that hides governed nav items the caller can't use (the sketch 069-A vanish, never a locked badge) and gracefully bounces a mid-session audience tighten home with a plain refusal — render-only, with 148-05's `require_visible` API as the sole security wall.
+- The 067-A one-browser-two-sources audit surface — a locked Operator-actions | Platform-activity source switch over BOTH ledgers, driven by one 029-A chip-filter (action-type + date-preset + click-a-user) / pager / count-naming recorded-CSV grammar, with the cross-user read made legible ('Looking at user activity is itself recorded.') and the over-cap export refused, not truncated.
+- One-liner:
+- Added `deprecated`/`deprecated_reason` to `model_capabilities_overrides` and `llm_model_locked` to `app_settings` via idempotent migration 099, applied it live, and taught `get_model_capability_async` to overlay `deprecated` from the DB so a discovery-confirmed DB-only row carries its badge state with zero code edits.
+- Async httpx fan-out over the hardcoded 8-provider `/models` allowlist with honest per-provider outcomes, plus a pure compute_diff that partitions new/changed/vanished and fills capabilities propose-only (OpenRouter native_tools + limits, Google limits only, everyone else "unknown — you set it") — the SC#3 hero, fully unit-tested with all 8 providers mocked.
+- The `max_output_tokens` clamp now fires against the EFFECTIVE model actually sent and honors an operator's DB-edited cap — closing BUG-260620-01 (gpt-4o `32768 > 16384 → 400`) and making the registry's `max_output_tokens` edit honest, while preserving the Phase-074 single chokepoint and the targeted `:exacto` strip.
+- Typed api.ts model-registry seams (read / capability-PATCH / dedicated lock-PUT / discover) + ModelRegistryRow/ModelCapabilityPatch/DiscoveryResult types + a FullAppSettings.deprecated_models field, plus a visual-only picker pass adding @lobehub provider logos, a selectable amber `deprecated` badge, and demoted capability info in both the Settings and chat model pickers.
+- The registry hub: `GET /admin/models` renders the full union (built-in DEF ∪ DB override OVR ∪ DB-only rows with source/default/lock/overridden-field state), `PATCH /admin/models/{id}` is the SQLi-safe allowlist+parameterized capability write with null-clears-to-DEF Reset + cache invalidation + an honest ✎ receipt, and the picker becomes registry-driven — disabled models are hidden across both merge branches (`enabled` is now real) while `deprecated_models` surfaces the badge.
+- The registry now governs the request path: a two-part 409 guard makes a dead org default structurally impossible (can't disable the current default/locked model; can't lock a disabled one), the dedicated `PUT /admin/models/{id}/lock` pins the single ENABLED org default, `POST /admin/models/discover` runs the Plan-02 fan-out behind the operator gate (SSRF-validated, ephemeral diff, ✎ receipt), and a disabled model never breaks a conversation — the next message falls back to the org default with an honest inline SSE notice naming both models. The `threads.py` touch is the minimal single-seam guard the pre-approved G-5 override allows — no new endpoint, no per-provider fork.
+- The Model Registry tab is live: the 070-A capability instrument table edits every model's real columns inline (OVR-vs-DEF honesty + a null-clears Reset, a deprecated toggle that stays selectable, and the derived enabled→picker coupling chip with a lock gated on disabled rows), the 071-A discovery panel makes SC#3 propose-only the visible hero (un-returned capabilities are amber "unknown — you set it" inputs, a new model is never auto-enabled, vanished is flagged-not-deleted), the tab is unlocked + wired write-then-refetch in ControlRoomPage, and the SC#10 4-axis cross-provider UAT contract — including the D-149-16 gpt-5.6 "no restart" proof — is authored in 149-VALIDATION.md.
+- DB-aware `resolve_calling_mode` (an operator's native_tools toggle now changes the next request's tool-calling mode, sync warm-cache read) + `{model_id:path}` converter so all 9 namespaced OpenRouter rows route, edit, lock, and discovery-confirm-write — closing UAT Test-1 and Test-4/5.
+- Wired the already-emitted `model_disabled_fallback` SSE event through the frontend (api.ts → StreamsProvider → MessageItem) as an inline notice naming both models, and re-resolved `runs.provider` to the effective fallback model — closing the UAT Test-7 silent-swap + provider-bookkeeping gaps (D-149-10).
+- Truthful discovery per-model provenance labels (per-field counts, not `!anyUnknown`) + full inline-edit commit parity on the deprecated-reason input (Enter/Escape/one-shot guard) — the two remaining low-severity live-UAT UI-honesty gaps closed, UI-only and additive
+- Extended agent_loop's pre-injection gate so a DB-flipped `native_tools=False` compat-path model gets `TOOL_USAGE_INSTRUCTIONS` before the first stream — closing UAT Test-1's "still works" half where a STRUCTURED-routed model had no tool mechanism on iteration 0 and hallucinated a zero-tool non-answer.
+- Follow-up suggestion chips now strip `<think>` reasoning blocks (closed + unclosed-trailing) before the line-parse, so compat-path reasoning models (MiniMax/DeepSeek/GLM) can no longer leak chain-of-thought into clickable chips — round-2 UAT Test 7 gap closed.
+- secret_cipher module wrapping MultiFernet with an enc:v1: envelope + idempotent sweep + honest encryption_status, plus the SECRETS_ENCRYPTION_KEY env binding and declared cryptography dep — the interface-first contract Plans 02–05 import.
+- Migration 100 adds the 10 missing app_settings secret text columns (9 provider keys + tavily_api_key), applied to the live local DB so all 12 members of `_API_KEY_COLUMNS` exist — closing the DB divergence behind the D-150-07 silent provider-key save.
+- Encrypt-on-write in save_app_settings + decrypt-on-read in _build_settings_from_row (copy-based, fail-soft to env via the existing _val chain), with a live-DB raw-read proof that secrets are stored as enc:v1: ciphertext at rest (SC#1).
+- Lifespan now refuses startup on a malformed SECRETS_ENCRYPTION_KEY, warns + boots plaintext when it is missing, eager-sweeps existing plaintext secrets to enc:v1: idempotently on a keyed boot, and update_settings surfaces a failed save as HTTP 500 before any false audit row or spurious re-embed.
+- The D-150-02 operator-visible at-rest encryption signal wired onto the existing Phase-147 Control Plane board — an additive secrets_encryption block on GET /admin/backpressure (derived from the RAW ciphertext row) rendered as a three-state green/neutral/red tile.
+- `fetch_document_file` agent tool — streams a KB document's ORIGINAL bytes owner→global-scoped into `/sandbox/input/<file>` (size-capped PRE-download, path-traversal-sanitized, sandbox-gated, cross-provider-safe), plus the reusable `_fetch_owned_document_bytes` resolver that Plan 04's FILE-01 will consume.
+- Migration 101 adds an ADDITIVE `UNIQUE INDEX skill_files_skill_filename_uniq ON skill_files(skill_id, filename)` — live in the local DB and captured in the regenerated bootstrap artifact — so FILE-01's D-07 overwrite-in-place becomes an atomic, race-immune PostgREST `.upsert(on_conflict=skill_id,filename)` correct under `WORKER_COUNT=2`.
+- The mid-chat template upload gate generalized from OOXML-only to real skill assets (scripts, .md/.json/.csv/.txt, images) via a per-category magic-byte/content validator that preserves the size-guard DoS defense and the untrusted `template_input` provenance.
+- `attach_skill_file` — the agent WRITE tool that saves a file onto a skill the caller OWNS from all four sources (workspace file, sandbox output, inline text, KB document), owner-only-gated (refuses global/`is_system`/other-user skills), overwriting a colliding filename in place via a race-immune `on_conflict=skill_id,filename` upsert on Plan-02's unique index, always writing to the owner-prefixed `{uid}/{skill_id}/{filename}` path — dual-wired through the flat `_TOOL_REGISTRY` G-5 contract, self_improve-gated both ways, cross-provider-safe, reusing Plan-01's owner-scope resolver for source #4.
+- A client-selected `folder_id` now overrides a workflow run's retrieval scope — owner-reachability-gated, layered on the definition's `project_folder_id` author default, resolved server-side so the model cannot widen it, and honored identically at kickoff, resume, and Continue — with no migration.
+- Task 1 — db-layer helpers + live-PG tests (TDD).
+- The Run modal is now a real run-input channel — the read-only bound-folder chip became an inline native `<select>` (author default tagged "workflow default", per-run override selectable, A4-composition-guarded), a quiet Upload-template button stages a file with an honest provenance note, and `doRun` sequences createThread → `upload_template(newThread)` → `sendMessage(folder_id)` so the template is discovered by `kind` on the launched thread and the folder override rides into `create_workflow_run.inputs` — no new endpoint, no new scope path.
+- PublishedCard gains a net-new `⋯`-menu whose single "Delete workflow…" item opens a victim-naming confirm Sheet (the shipped 064-B primitive) that names EXACT server-sourced Removed vs Kept counts, shows an amber cancel-first banner only when a run is truly live, and transitions the card in place (Deleting… → Deleted · recorded) with no optimistic vanish and no undo — wired to the Plan-02 `DELETE /{id}/cascade` + `GET /{id}/delete-preview` routes via two new `api.ts` clients.
+- The workflow "Delete forever" now truly stops a live run before its rows vanish (cancel through the producer runs.run_id, not the workflow_runs id) and can no longer silently blast another user's runs on a shared workflow.
+- The per-run folder-scope resolver's A4 branch now resolves the OVERRIDE's own subtree and drops the override unless every declared per-phase `folder_scope` still intersects it — an in-subtree override can no longer silently empty a phase's retrieval.
+- Closed three shipped-Run-modal Warnings frontend-only: the KB-scope select now tells the truth (bound reads "Workflow default", only unbound reads "All documents"), the override list mirrors the backend A4 per-phase folder_scope guard, and a failed launch best-effort deletes its created thread instead of orphaning one per retry.
+- Restored the "override ⊆ author project subtree" NECESSARY check in resolve_run_scope_root's A4 branch (alongside the per-phase intersection), mirrored it in the Run modal's overrideOptions, and added strict-ancestor regression tests both sides — closing the same-account cross-project scope-widen BLOCKER 152-06's own WR-03 fix introduced.
+- Backend now the sole author of citation truth — a pure citation_markers module strips out-of-range/non-member `[n]` and aligns survivors to the finalized retrieval footer at the settle point, plus a retrieval-turns-only dual-channel instruction that prompts every provider uniformly while non-retrieval turns stay byte-identical.
+- The sources footer is now the numbered, click-through References footer the sketch locked (075-A): `CitationList` gains a `References · {N} source(s)` header, opens by default when valid inline markers exist via the canonical `defaultOpen` prop (D-06/D-07), and threads a 1-based `[n]` into each row (D-03); `CitationCard` gains the mono `[n]` chip, an owner-scoped `↗ Open document`, a keyboard-operable `data-citation-row` flash target wired to `flashCitationMarker`, and reuses the existing `is_full_doc` branch for full-doc rows (D-09/D-10) — a pure render layer over the 153-02 citation-nav contract.
+- The net-new hover-peek → click-to-pin popover the 075-A sketch locked: `CitationPeek` renders a positioned, portaled card that surfaces the retrieved passage for a chunk citation (head `[n] {filename}` + italic snippet + `{loc}` + `↗ Open document`) and a "Full document — no single passage" affordance for a full-doc citation (D-10, no snippet/score), degrades calmly on a null/short passage (D-04, never an error banner), routes Open-document through the owner-scoped `useCitationNav().openDocument`, and is fully keyboard/AT-operable — pinned = `role="dialog" aria-modal="false"` labelled by its head (non-blocking, no focus trap), Esc closes, and the icon-only pin toggle carries a state-toggled accessible name (`Pin`/`Unpin citation {n}`).
+- The inline-marker experience assembled on the G-5 hot file: `CitedMarkdown` reuses the shared marked+DOMPurify pipeline verbatim and upgrades only valid in-range `[n]` (skipping code/pre/a) into OWNED `document.createElement` `<sup>` markers that hover/focus-peek and click/Enter-pin+flash the matching footer row; `MessageItem` gains the ONE additive branch (CitedMarkdown only when `message.citations?.length`, every other path byte-identical) plus the mount of the quiet, non-blocking absence-as-signal `ⓘ` (`AbsenceHint`, 074-A) under cited answers — and `StreamsProvider.tsx` is verified UNCHANGED.
+- One app-wide shared reveal-state context (TechnicalNamesProvider, default plain, localStorage-persisted) + a single-source term-map (termMap.ts / usePlainLabel / PlainLabel) + the D-01a admin Control Room consolidation so the Settings and admin toggles are one switch — all frontend-only, zero backend files.
+- The two highest-jargon DOCUMENT surfaces now read plainly by default — the ingestion status badge (RESEARCH rank 1: every uploader sees it, formerly RAW "Chunking"/"Embedding"/enum text) and the document-detail "Metadata" header (rank 2) — both routed through the Wave-1 term-map so they flip plain⇄technical off the shared reveal context, with the underlying status/step enums and enum-keyed styling untouched.
+- The Settings page now HOSTS the app-wide "Show technical names" toggle (wired to the shipped shared context so every user can flip the reveal — SC#3), plus bounded display-only relabels of the Search tab + embedding/search-index picker label, and additive General/Explorer composer helpers — all frontend-only, zero backend files, G-5 hot files untouched.
+- Installed eslint-plugin-jsx-a11y@6.10.2, wired its recommended rule-set as app-wide ERRORS in the ESLint 9 flat config, added a `npm run lint` CI step to the vitest job, and captured the full 41-jsx-a11y-error inventory that Plan 03's fix sweep consumes — with @axe-core/playwright deliberately not added (D-01a).
+- Lifted the global dark `--muted-foreground-dim` token from ~3.6:1 (fails) to ~8:1 (220 16% 70%, AA) at the source, swept 40 admin-cluster opacity offenders onto full-opacity tokens, and got operator D-07 sign-off that Deep Midnight survives — locking the value for the 155-07 remainder sweep.
+- Every jsx-a11y lint error (41) fixed at the source with real fixes and zero suppressions, the CI gate retargeted to an accessibility-scoped lint:a11y, and every icon-only button app-wide given a safe-verb aria-label.
+- 1. [Rule 1 - Test authoring] ModelDiscoveryPanel provider-name query matched the icon's `<title>`
+- 1. [D-14 - Known/tracked tradeoff] `nested-interactive` on the 153 citation footer rows
+- Swept the 73 meaningful-text `text-muted-foreground/{40,50,60,70}` opacity offenders outside the admin cluster (27 files across chat / skills-studio / classification / settings / ingestion / layout / workflows / pages) onto full-opacity AA `text-muted-foreground`, completing the app-wide D-04 sweep begun in 155-02 — G-5 red line honored, all 20 app-wide residuals documented as WCAG-allowed exemptions.
+- The one shared date-bucketing + title-filter + XSS-safe match-highlight engine (`threadGroups.tsx`), fully unit-tested including an `<img onerror>` inert-text proof, plus four green `it.todo` component-test contracts that name every Wave-1/2 assertion.
+- The single collapsible NavPanel is split into a permanent ~58px icon rail (New Chat reachable on every view — SC#1) and a new dedicated full-height `ChatHistoryColumn` that owns the thread list with an inline "Filter this list…" box (SC#2 inline) and Today/Yesterday/…/Older date grouping (SC#3), composed in `ChatLayout` with the `loadThreads` bootstrap lifted app-wide — a MOVE-not-rewrite that preserves every A11Y-01 / SEED-064 row behavior and structurally relieves the BUG-260711-01 crowding (D-10).
+- The global ⌘K / Ctrl+K finder — a `ThreadCommandPalette` HAND-ROLLED on the existing Radix `ui/dialog.tsx` (NO `cmdk`, NO new dependency): Radix gives focus-trap + Esc + aria-modal + scroll-lock + focus-restore for free, and the component owns only the filtered `role=listbox`/`option` roving (↑↓ move / ↵ open → `selectThread` + navigate-to-chat / Esc close), reusing the Wave-0 `matchesTitle`+`groupByDate`+XSS-safe `HighlightTitle` engine; ChatLayout owns the `(meta||ctrl)+k` keydown and mounts the palette once at the root OUTSIDE the activeView switch so it opens over the whole loaded backlog from every view, and the ChatHistoryColumn filter-box ⌘K chip opens it too.
+- SC#2 reaches mobile — the drawer's flat thread list gains a 'Search chats…' box that narrows it through the SAME shared `matchesTitle` predicate the desktop column and ⌘K palette use (XSS-safe `HighlightTitle` titles, honest empty-state, drawer otherwise byte-identical incl. the probe-gated operator shield, NO mobile ⌘K) — and the OPTIONAL D-04 Date⇄Folder segmented toggle shipped in-budget: a single `groupByFolder` helper (folders-order, 'Unfiled' last, empty-fold, within-group DESC) + a `groupMode` state DEFAULTING to date (SC#3 untouched), folder mode swapping each row's folder chip for its date bucket via the existing `bucketFor`.
+- Net-new 2-stage frontend image (node:22-alpine `npx vite build` -> nginx:1.27-alpine serve) that static-serves the Vite `dist` and reverse-proxies `/api/` to the compose `backend:8000` with SSE passthrough and a secret-excluding build context.
+- 1. [Rule 2 - Missing critical functionality] Added an explicit shared user-defined network
+- Plan:
+- 1. [Rule 3 - Blocking / plan self-contradiction] Reworded a frontend todo to satisfy the acceptance grep
+- Authored migration 102 (`app_settings.setup_complete boolean NOT NULL DEFAULT false` + A6 global-row guarantee, 097 apply-header discipline) and added the fail-soft `setup_complete()` reader beside `maintenance_mode()` — the AUDITABLE DB half of the D-05 dual finalize marker; the live apply + full-schema regen are deliberately deferred to operator-gated plan 158-12.
+- The setup-mode backend seams every downstream 158 plan calls: a 0600 atomic `/data/setup.json` store with a monotonic sticky-True finalize latch + constant-time setup token, a pure-ASGI `SetupMiddleware` that no-ops byte-identically once finalized, and a store-wins-over-placeholder config overlay for the 8-key infra tier.
+- A `set -euo pipefail` 4-check drift gate (`scripts/check-deploy-drift.sh`) that fails CI when the Phase-157 one-box artifacts drift, plus the `setup_data:/data` compose volume, a CLAUDE.md same-commit parity rule, and OPERATOR.md wizard/volume notes — the folded D-16 + D-02 compose half of DEPLOY-02.
+- The pure setup-service logic layer for the first-run wizard: SSRF-sanitized throwaway submitted-value probes, light env-detect, the idempotent Auth-admin operator bootstrap + `operator_users` upsert, the encrypted provider-key save via `save_app_settings` reuse, the 5-way server-truth smoke checklist, and the schema-absent-gated transaction-wrapped schema auto-runner with a typed privilege-error guide fallback.
+- 1. [Rule 1 - Correctness] `/public-config` reads `supabase_anon_key` defensively (field absent from `Settings`)
+- Wired the first-run setup mechanism into the app entry: the lifespan now degrades (not crashes) on an unbound box by gating the sole un-guarded DB hard-fail + the four reconciler spawns behind a marker-derived `_setup_mode`, announces the setup token once, registers SetupMiddleware inside CORS, and mounts the setup router + open /public-config — a configured box is byte-identical.
+- 1. [Rule 1 - Bug] Corrected the setup/public-config fetch URLs to a single `/api` prefix
+- Five install-wizard leaf components composed from the shipped Deep Midnight primitives — the masked/last-4 setup-token gate, read-only env-detect tiles, the one-box-default arrow-key radiogroup preset picker, the masked Supabase/Redis bind form with per-group live validation gated to green, and the amber schema-missing OPERATOR.md Step-3 copy-guide.
+- The last four install-wizard leaves — gated operator bootstrap, ProviderPicker-reusing provider-key step, the 5-row server-truth smoke checklist that IS the finalize gate, and the SC#2 finalized lock-out — all composed from shipped Deep-Midnight primitives, build-clean, WCAG-AA, no XSS sink.
+- The install wizard is assembled: a full-page, no-router `SetupWizard.tsx` that composes the 8 shipped setup leaves on a 6-step state machine with a LifecycleStepper-ported click-to-revisit rail, plus the `App.tsx` pre-auth branch that probes `GET /setup/status`, hydrates runtime Supabase creds, renders the wizard on `needs_setup`/`/setup`, the lock-out on a finalized `/setup` visit (SC#2), and leaves the configured-box path byte-identical.
+- Plan:
+- Lifted the proven utility-exclude regex into ONE importable `UTILITY_MODEL_EXCLUDE` constant + `is_utility_model()` in the live discovery service (tuned so `chatgpt-4o-latest` survives), tagged each discovered `new` model with a display-only `utility` flag that never touches the confirmable diff, and DRY'd `curate_models.py` to the same source so the two can't drift.
+- A SQLi-safe operator-gated `POST /admin/models` add-by-ID endpoint that lands a DB-only `model_capabilities_overrides` row `enabled=false` (never auto-enabled), plus the one `_FLAG_HUMAN_NAMES` key that lets the persisted discovery-filter toggle ride `PUT /admin/flags` with zero new endpoint code.
+- Migration 103 adds a self-seeding `app_settings.model_discovery_filter_enabled boolean DEFAULT true`, and the full fail-soft readback chain (Settings field + `GET /settings` + `_DIRECT_COLUMNS`) gives the discovery filter a durable, multi-worker home that rides the existing 30s TTL settings cache — the code shipped ahead of the operator-applied migration and reads a safe `true` default when the column is absent.
+- One-liner:
+- One-liner:
+- The discovery-curation vertical: a default-on, persisted suitability filter in `ModelDiscoveryPanel` (hides utility `new` models behind an honest "N utility models hidden" count + a non-destructive "Show all"), source-labeled family-default pre-fills on the discovery hand-fill (amber "default — confirm", distinct from blank "unknown — you set it" and green provider-confirmed), and the `ControlRoomPage.handleSetDiscoveryFilter` wiring — delivering SC#1 end-to-end while holding the 149 propose-not-auto-enable red line (SC#3).
+
+---
+
+## v3.2 Skill Eval Studio + Self-Improving (Shipped: 2026-07-10)
+
+**Phases completed:** 16 phases (132, 133, 134, 134.1, 135, 136, 137, 137.1, 137.2, 138, 139, 140, 141, 142, 143, 145), 81 plans. Phase 144 (FILE-01) deferred → v3.3.
+
+**Delivered:** The Skill Trigger Tuner grew into a full Skill Eval Studio — persistent eval test cases + immutable versions, an eval runner (with-skill vs without-skill, dual-arm LLM judge, honest per-provider verdicts, human ratings), a publish gate, and the Evals·Triggering·Versions panel — plus a human-in-the-loop self-improvement loop, a built-in skill-creator, a run-lifecycle honesty foundation, and a curated Starter Workflow Library.
+
+**Key accomplishments:**
+
+- **Skill Eval Studio (CORE — EVAL-01..05, VER-01, PANEL-01):** persistent per-skill test cases + immutable version snapshots (mig 079), an eval runner that runs each case with-skill vs without-skill with an inline dual-arm LLM judge, honest per-provider PASS/FAIL/not-measured verdicts, human thumbs ratings, and the Skill Evals panel (Evals · Triggering · Versions) mounted in the Skills UI.
+- **Eval production-clean (137.1, EVAL-05):** automated cross-provider engine smoke sweep, one-click matrix runs (N providers in parallel + per-config mean±σ / Δ skill-lift aggregation + deterministic analyst notes), determinate run progress, advisory judge `case_feedback`, per-arm wall-clock duration, and a judge-model Settings knob.
+- **Built-in skill-creator (137.2, CREATE-01):** every user (local + cloud) gets a read-only, undeletable, "Built-in"-badged skill-creator whose platform-native instructions run the full loop — interview → RAG research → `save_skill` → eval cases → eval → proposals/Tuner → publish gate — and never claim capabilities the runtime lacks.
+- **Self-improvement loop (SI-01, SI-02, GATE-01):** eval results + Tuner signal propose an instruction-body (or description-only) diff → the human reviews and approves → a new immutable version is created and auto-re-evaled before promotion; publishing a skill is blocked until at least one eval has passed. Never auto-applied.
+- **STRETCH honesty + foundation:** run-end honesty (RUN-01/138 — no dead baseline cards, todos marked "ended with open todos"), smart-dispatch skill relevance pre-filter within a configurable token budget (TRIG-02/140, mig 091 `skill_embeddings` + `match_skills`), run-scoped `template_input` resolver (COLL-02/141, mig 092), non-Python skill-script honesty (SRH-01/142), and the FND-01 run-lifecycle foundation (145) — Postgres `runs.status` authoritative + a derived `runs:active` Redis mirror + the overdue `threads.py` G-5 extraction, with live SC#10 UAT 6/6.
+- **Starter Workflow Library (WF-01/143):** a curated `is_global` Starters shelf on the Workflows page with a fresh-copy fork (new slug + v1 draft), and 3 KB→document starters (Risk Register, Weekly Status Report, Compliance Gap Report) authored as trusted seed content (mig 094, strict citation gates) — proven live end-to-end (fork → judge-approved 8-stage publish gauntlet → cited `.docx` with 17 real citations, the strict gate rejecting uncited output).
+
+### Known Gaps
+
+- **FILE-01 (Phase 144, Agent-Driven Skill File Attachment)** — deferred → v3.3 (gated STRETCH, not executed). Rolls forward alongside the workflow-file cluster (SEED-110 run-time template upload, SEED-112 per-workflow folder-scope).
+- **Verification debt (code shipped, live UAT pending/partial):** 140 (blocked on an embed 429), 141 (cross-provider render smoke), 142 (held-partial), 143 (non-operator A1 + dedicated empty-folder tests).
+
+**Known deferred items at close:** 47 open artifacts per the pre-close audit — 9 seeds (intentional), 22 quick-tasks (mostly stale/"missing" artifacts), 10 UAT gaps, 5 verification gaps, 1 todo (see STATE.md → Deferred Items).
+
+---
+
+## v3.1 Workflow & Skill Studio — Trust, Clarity & Triggers (Shipped: 2026-06-28)
+
+**Phases completed:** 9 shipped phases (CORE: 120, 121, 122, 123, 123.1, 124; STRETCH: 127, 128, 129), 40 plans. STRETCH phases 125, 126, 130, 131 gated/not started → deferred to backlog.
+**Timeline:** 2026-06-21 → 2026-06-28 (7 days, 324 commits)
+**Files changed:** 569 files (+61,830 / −914 lines)
+**Requirements:** 12/12 CORE REQ-IDs delivered (COLL-01, CTX-01, IA-01, MP-01..03, TDP-01, TRIG-01, TRIG-03, CTX-03, WUX-01, WUX-02). STRETCH shipped: TDP-02, CTC-01..04, WUX-03 (code-verified/partial UAT), MP-04. Per-phase rigor substituted for formal audit (v2.9/v3.0 precedent — every CORE phase cleared verify + secure + validate with live evidence).
+
+**Key accomplishments:**
+
+- **Collision fix + context isolation (120)** — run-scoped the sandbox-output harvest baseline (closes the confirmed 2-files bug, Mechanism A); `messages.origin` column + asymmetric history filter so Deep/Harness never replay each other (migration 076)
+- **One front door (121)** — removed the composer Harness pill + in-chat workflow selector → clean 2-pill General/Explorer; workflows launch from Workflows page only; lock/409/reconcile preserved byte-identical
+- **Cross-provider trust & honesty parity (122)** — force→coerce→fail retry ladder in `forced_emit` (all 4 consumers); `emit_tier` doc-verified per provider (55 models, 14/2/34/5 tiers); per-provider scoreboard gates any tier flip; task labels concrete on all providers (ungated prompt nudge + frontend floor)
+- **Skill Trigger Tuner (123 + 123.1)** — held-out should/should-not benchmark (60/40 split, 3-repeat, background job over run-buffer/SSE); N-column ProviderScoreboard (server-derived, no fabricated providers); durable latest-result upsert (migration 077); seeded-case visibility + CandidateCard confirm flow; builder-model from configured models; description-quality lint at save_skill (warn-never-block); CTX-03 trim-pin keeps loaded skill in context
+- **Workflow Studio UX soul + strict↔loose (124)** — shared `soulData.ts` single source for tier-derivation + phase glyphs + soul atoms; `WorkflowSoul` in 3 sizes (card/run-header/publish all read the same object); two-door `WorkflowDoorSwitch` ("Describe & run" / "Author & govern") — nothing removed, advanced one click away
+- **Chat tool-card unification + provider logos (128)** — `@lobehub/icons` single-source logo map; RunCard shows live provider logo; ToolCallPanel carries live description before tool_start; StickyTimerBar removed (reclaims chat-area space); long prompts collapse to clamped Read-more
+- **MiniMax/OpenRouter arg repair (129)** — MiniMax-gated single-shot re-ask at adapter boundary (recover or honest-fail); OpenRouter `require_parameters` in quality strategy; BUG-260607-03 folded
+
+**Architectural decisions locked:**
+
+- **D-14 red line held:** every provider fix at the gateway/adapter boundary; shared Deep path byte-identical; no new runtime
+- **Icon convention (RDD-43):** provider/model = single-source `@lobehub/icons`; phase-type = shared 3D `PHASE_GLYPHS`
+- **Per-phase rigor suffices for audit:** SC#10 4-axis scoreboard on every streaming/provider/agent-loop phase
+
+**Known deferred items at close:** STRETCH phases 125 (SI-02), 126 (TRIG-02), 130 (COLL-02), 131 (SRH-01) — gated, never started, roll to backlog. Phase 127 UAT partial (2 BLOCKED by env, no regressions). threads.py extraction still due. LangSmith tracing still off (429 flood silenced).
+
+---
+
+## v3.0 Document Management (Shipped: 2026-06-21)
+
+**Phases completed:** 11 phases (110, 111, 111.1, 112–119; incl. inserted embeddings phase 111.1), 46 plans, 88 tasks.
+**Timeline:** 2026-06-15 → 2026-06-21 (7 days, 410 commits, 73 feat)
+**Files changed:** 699 files (+99,800 / −627 lines)
+**Requirements:** 24/24 functional REQ-IDs delivered + UX-01/UX-02 cross-cutting. No formal milestone audit run — substituted by per-phase rigor: **every phase passed `/gsd:verify-work` + `/gsd:secure-phase` + `/gsd:validate-phase`** (live cross-provider UAT on the agent-tool / upload-path phases).
+
+**Key accomplishments:**
+
+- **DM foundations (110)** — landed the shared backend substrate once (migration 071: 4 RLS tables + audit CHECK enum 11→19 + a default-ON `document_management_enabled` capability flag, with a boot/CI enum-drift hard-fail guard) so phases 111–119 add behavior, not schema. Every new table carries a nullable `org_id` for the v3.3 multi-tenancy re-key; `document_relationships` RLS corrected to user-scoped-only (DMF-01/02/03).
+- **Metadata enrichment (111/112)** — extraction is no longer pinned to `gpt-4o` (routes to the user/admin-configured model via `forced_emit` as its 4th caller), reads a larger head+tail window, and supports user-defined custom fields; the legacy OpenAI json_object path is preserved byte-identical as the reversible `legacy` mode. Per-field confidence renders as an honest `ConfidenceChip` in a net-new right-side `DocumentDetailPanel`; manual edits persist with a server-stamped `_source='user'` marker + a `metadata.update` audit row, and a re-extract precedence guard means a human correction is never wiped by a later degrade (META-01..05).
+- **Configurable multi-provider embeddings (111.1)** — retires the OpenAI embedding SPOF (SEED-048): a Settings provider picker (OpenAI / Google / Ollama / LM Studio / OpenAI-compatible) with a provider→model→dimensions auto-fill map, same-model parity across chunk + query embedding, and a guarded, RLS-scoped, destructive-change-confirmed re-embed background job (EMBED-01..06; migration 073).
+- **Virtual folders / metadata-driven views (113/114/115)** — a net-new closed-registry filter-AST → parameterized `metadata @> $1::jsonb` compiler (no raw end-user DSL), driven by a guided no-DSL chip-strip builder (equals / one-of / contains / is-empty / numeric / date + relative-date + AND + folder-subtree scope); saved views render as a live sidebar "Views" group and a viewer never sees documents they can't access (leak-safe global sharing, proven with live two-user tests). The agent can run a saved view or inline query as a `query_documents_by_view` tool (VIEW-01..07).
+- **Document relationships (116/117)** — typed links (supersedes / amends / references / attached-to) with an idempotent create + own-scoped delete, surfaced as a chip-led, grouped-by-direction relationships section inside the document detail panel (inverse labels, masked "no access" rows, a type-first typeahead create picker) and exposed to chat as a leak-safe `get_related_documents` tool (REL-01..04).
+- **Auto-classification (118)** — own + global enabled rules are evaluated first-match-wins in-Python on upload and write ONE never-silent `metadata._classification` suggestion (never a folder move); accept reversibly moves + audits-after-move + stamps the prior folder for Undo, dismiss clears it. An on-doc provenance card (rule + condition → folder, never a confidence %) + a one-glance row chip + a rules-authoring page with an Automation sidebar group (CLASS-01/02/03).
+- **Governance health (119)** — a light read-only `document_governance` surface with three owner-scoped signals (broken/dangling relationships, unclassified documents, low-confidence metadata) over the already-shipped DM tables, each row a pure link-out to the action that fixes it (open the document's detail panel); zero migration / write path / new package (DGOV-01/02).
+
+**Architectural decisions locked:**
+
+- **Document management is a metadata-driven Tier-A surface, not a full M-Files vault** — adopt the metadata / relationships / classification basics; reject object-types/classes/value-lists (fights the folder+metadata model) and silent autonomous auto-filing (fights the audit/honesty positioning). Classification is always suggest-then-confirm.
+- **Closed-registry filter compiler, never a raw DSL (D-v3.0-COMPILER)** — views compile a closed operator/field-registry AST to a parameterized jsonb containment query; a freeform end-user query language would be an injection + UX hazard.
+- **Share-don't-fork for leak-safe read cores (D-v3.0-SHARE-DONT-FORK)** — the saved-view resolve and the relationship traversal each live once (`document_view_resolver.py`, `document_relationship_service.py`) and are consumed by BOTH the agent tool and the REST route, so a forked second copy can't drift and re-open a cross-user leak.
+- **Gemini-safe tool schemas (D-v3.0-GEMINI-SCHEMA)** — agent-tool schemas avoid anyOf/oneOf AND multi-type `type:[...]` arrays; a 115 live-UAT run caught a multi-type array breaking all Gemini Deep tool use (no-anyOf is necessary but not sufficient). `threads.py` stayed byte-untouched across the entire milestone (G-5).
+- **Per-phase rigor substitutes for a formal milestone audit** — all 11 phases cleared verify + secure + validate with live evidence (e.g. 119: 12/12 threats closed; 117: 18/18; 116: 28/28; live two-user leak proofs on the agent-tool phases), so a formal audit adds ceremony without new signal (the v2.9 precedent).
+
+**Known deferred items at close:** 37 acknowledged (operator-approved — see STATE.md `## Deferred Items`). Triaged as **zero CORE blockers**: 4 UAT + 3 verification "gaps" are status-label lag on phases that were live-UAT'd after the file was stamped (116 SC#10 cross-provider rows carry forward; 119 has 0 open scenarios); 19 `[missing]` quick-task slugs are pre-GSD tracking cruft; 1 todo (the NL-authoring spike, satisfied by Phase 103); 10 dormant forward seeds (deployment / multi-tenancy / model-registry / compaction / modalities / sandbox-pkg / multi-language-skills / UI-polish / library-health / starter-workflows). Open `surface: Agentic-RAG` run-honesty / provider-polish reports roll forward into the next milestone's UAT blast radius.
+
+---
+
+## v2.9 Workflow Studio (Shipped: 2026-06-15)
+
+**Phases completed:** 9 CORE phases (097–104, incl. inserted emission-layer phase 101.1), 57 plans. STRETCH phases 105–109 deferred to backlog (never started).
+**Timeline:** 2026-06-08 → 2026-06-15 (8 days, 418 commits, 99 feat)
+**Files changed:** 678 files (+88,561 / −514 lines)
+**Requirements:** 14/14 CORE shipped + validated; 5/5 STRETCH deferred. No formal milestone audit run — substituted by per-phase rigor: **every CORE phase passed `/gsd:verify-work` + `/gsd:secure-phase` + live cross-provider UAT** (102: 34/34 threats + 7/7 SC#10; 103: 32 threats / 0 open; 104: 15 threats / 0 open + nyquist-compliant).
+
+**Key accomplishments:**
+
+- **Project binding + server-side KB scope governance (098)** — a workflow binds to a project (a folder + its subtree) via an additive-optional `project_folder_id`; retrieval scope is resolved **server-side from the user's RLS context at run start** and bound to every retrieval call as a parameter the model cannot widen (retrieved `folder_id`s asserted ⊆ scope, RLS as backstop). Scope-violation = clip + observable `scope_violation` run-log event; the ⊆ assert is a **gated no-op when scope is None** so the shared `search_documents` path stays Deep byte-identical (PROJ-01/02, GOV-01).
+- **Workflow ↔ skill composition (099)** — an `llm_agent`/`llm_single` phase references a project skill via an optional `skill_ref`; the skill's instructions + files compose into the phase framing with `read_skill_file` auto-whitelisted, and the skill version is **snapshotted into the locked definition** (migration 067 sibling column + CAS) so a later edit/delete can't break a published workflow. Proven on 6+ providers; immutability proven live (WFSKILL-01).
+- **Ephemeral template upload + template-fill + integrity (100 / 101 / 101.1)** — a user hands the workflow a template for **one run** (workspace-only, TTL + cron sweep, RLS-scoped, never KB-ingested, never searchable — also closes the upload-injection vector). The shared **guaranteed structured-emission `llm_emit` layer** FORCES the model to emit a **cited** field-map against a strict schema, which a pinned **deterministic no-model-code driver** renders into a real deliverable; every value carries a source chunk/page, and a corrupt file **can never reach the user as "done"** (re-open integrity gate + `SandboxedEnvironment` SSTI containment). Capability-tiered forcing at the gateway boundary + native narrated-JSON recovery makes it reliable across the native-7 (TMPL-01/02/03).
+- **Reusable validation-gate library + output-quality judge hard-wall (102)** — a closed registry of validator kinds (`citations_required`, `freshness` → `ask_user`, `structure_check`, `output_file_valid`, `llm_judge_rubric`) any phase can ride on the existing gate + bounded-retry loop; an `llm_judge` + a publish-time **golden run** are a **HARD publish blocker** — a structurally-lint-clean workflow that produces bad output **cannot publish**. Judge works cross-provider, grading prose AND template-fill (GATE-01, QUAL-01).
+- **Workflows page + authoring API + NL authoring (103)** — a user **describes a workflow in natural language** and gets a valid draft (one-shot structured generation over the strict `WorkflowDefinition` schema, grounded in the project folder tree + tool/skill registry + any uploaded template, auto-retrying against the validation error); a **read-only phase-spine graph** (view, not drag-to-build — a deliberate anti-feature for the domain-expert buyer); a project-filtered library; run-from-thread; and an 8-stage publish gauntlet with the judge hard-wall. ~90% reuse of the shipped `forced_emit` + the 092.5 gateway `force_tool_name` (WFAUTH-01/02/03/04).
+- **PM flagship content pack (104)** — charter / weekly-status-report / risk-register templates + 2 published workflow defs + a synthetic "Project Meridian" corpus authored **entirely on the generic primitives** (domain-author-driven, zero PM-hardcoded engine logic). Headline demo green live: a single template-fill status report from the project KB, cited + integrity-checked, across a 7-model cross-provider sweep with honesty on all 7 (PM-01).
+
+**Architectural decisions locked:**
+
+- **The red line held:** v2.9 is ~80–90% composition of shipped v2.8 harness primitives — Deep Mode stayed **byte-identical**, no new runtime, no re-implemented loop. Every engine addition was an additive seam (`phase_types.py` / `models/harness.py`), never a breaking change to the G-5 hot files.
+- **D-101.1 (emission layer):** one shared "guaranteed structured emission" engine layer (`llm_emit`) is the home for any typed-artifact workflow — FORCE a cited field-map → deterministic render — not a template-fill one-off. Capability-tiered forcing + narrated-JSON recovery keep it native-7-reliable; SEED-082 (emit-gate policy strict|flag|partial|draft + model-fit routing) carried forward.
+- **"Static would false-green" (102 → 104):** validation gates and judge walls MUST be driven against the REAL endpoint on a real golden run — mocks and static def-shape tests mask live failures. Proven repeatedly: 102's judge gate had never worked live until driven through the real publish endpoint (6 mock-masked blockers); 104 was the first def to attach 102's `citations_required`+`output_file_valid` to an `llm_emit` phase and live UAT found 2 blocking double-gate engine bugs static tests false-green'd. The lesson now extends to auditors and validation maps themselves (orchestrator hand-spot-checks; re-run, don't trust labels).
+- **NL authoring over visual builder:** describe + form + read-only graph, NOT a drag-to-build node editor (anti-feature for the domain-expert buyer; OpenAI sunsetting hosted Agent Builder confirmed the squeezed middle). Plugin Contract stayed OFF the critical path → STRETCH 108.
+- **Cross-provider as a first-class acceptance bar:** the SC#10 4-axis scoreboard (cross-provider × multi-tool × parallel-thread × long-message) gated every workflow-run-bearing phase; provider-specific handling stays at the gateway/service boundary, the shared fill path never branches.
+
+**Known deferred items at close:** 40 acknowledged (operator-approved — see STATE.md `## Deferred Items`). Triaged as **zero CORE blockers**: 5 UAT + 3 verification "gaps" are status-label lag on superseded/closed phases (101 → 101.1; 102/103 secured); 19 `[missing]` quick-task slugs are pre-GSD tracking cruft; 1 todo (NL-authoring spike) is satisfied by Phase 103; 12 dormant forward seeds (SEED-002/003/004/005/040–046/084, with SEED-005 Enhanced Document Structure = next-milestone). **STRETCH 105–109** (SCHED-01/GRID-01/GOV-02/PLUG-01/ROLE-01) rolled to backlog. 7 open `surface: Agentic-RAG` reports (BUG-260609-02/-04, -260610-01, -260615-01, silent-send-drop, minimax-400, setting-up-agent) roll forward — none folded into a v2.9 CORE phase; carried into the next milestone's UAT blast radius.
+
+## v2.8 Harness Engine & Workflow Mode (Shipped: 2026-06-07)
+
+**Phases completed:** 10 phases (089–096, incl. inserted refactor 092.5 + inserted live-UAT phase 095.1), 67 plans
+**Timeline:** 2026-05-30 → 2026-06-07 (9 days, 498 commits, 121 feat)
+**Files changed:** 578 files (+107,662 / −6,187 lines)
+**Audit:** `tech_debt` — 24/25 requirements satisfied + 1 partial (CONC-01 → SEED-065-B); 10/10 phases verified & closed; 6/6 E2E flows. See `milestones/v2.8-MILESTONE-AUDIT.md`.
+
+**Key accomplishments:**
+
+- **Harness Engine (091)** — a deterministic, locked-workflow runtime: `harness_engine.run_workflow` is a hand-rolled async transition loop over the Phase 090 tables with a strict 2-phase write (mark-active → execute → atomic complete-with-output), publish-time reachability lint, and a `PHASE_TYPE_REGISTRY` dispatch seam filled by 5 thin executors (`programmatic` / `llm_single` / `llm_agent` / `llm_batch_agents` / `llm_human_input`) that call `task_service` / `ask_user_service` / `tool_dispatcher` — never re-implementing loops. Validation gates (4 kinds, closed registries) + bounded retry ≤3 with consecutive-identical short-circuit + `on_failure` routing + per-phase step & wall-clock caps. ~80% composition of shipped substrate, **zero new dependencies**.
+- **Per-phase tool-whitelist + tool-count budget (091)** — enforced at the single `dispatch_tool()` guard + at the `get_tools()` composition site; both literal no-ops when no workflow is active, so **Deep Mode is byte-identical**. Workflow definitions are versioned + immutable-on-publish (UNIQUE(slug,version) + BEFORE UPDATE trigger + FK ON DELETE RESTRICT) with FK-chain RLS and an INSERT-only `harness_audit` trail (migrations 056–062).
+- **Agent-loop + provider-gateway extraction (089 + 092.5)** — the agent loop was lifted from the `threads.py` god file into a clean `agent_loop.py` (byte-identical native-7, G-5 satisfied), then its per-provider dispatch + chunk-normalization was extracted into a shared `provider_gateway/` package (events + dispatcher `open_stream` + 3 verbatim adapters + one unified `_on_chunk` consumer) that **Deep AND the harness consume** — Deep proven byte-identical in isolation (the red line). `calling_mode` surfaced through the seam was the structural fix for the harness-OpenAI-only bug.
+- **Dual-mode wiring + cross-provider parity (092 + 093)** — per-thread Deep/Harness toggle keyed on `threads.active_workflow_run_id`, server-enforced workflow lock (409 on illegal switch, lock cleared in the terminal-status transaction), and the SEED-029 Continue affordance (resume past a step cap, consume-not-drop). The harness reached **native-7 parity** by consuming the gateway: a shared model-resolver (resolve, never mutate saved settings), a fixed ask_user round-trip (workflow_run-id namespace), the 3 never-run phase-types completed (`split_topic` → real N-way `llm_batch_agents` fan-out), and Google `thought_signature` / Moonshot `reasoning_content` / GLM `max_steps` round-trips fixed — D-21 live re-UAT 8/8.
+- **Legibility + run honesty (094 + 095 + 095.1)** — a live, WCAG 2.1 AA phase-timeline + a harness RunCard in the v2.7 panel demuxed into a dedicated `phasesByThread` store (PANEL-06: zero chat re-renders); failed/gate-failed runs render as *failed with a reason* (no `done`-sentinel lie); chat tool-cards unified into one frame (auto-scroll, details-on-demand, no duplicates, working download); and cross-provider run-honesty — deterministic activity-derived workspace-panel fill (fills even for providers that never call `write_todos`), 429-vs-billing classified at the gateway boundary on structured status codes, true `completed_at − started_at` reload timer, model/provider attribution, and a deliverable-aware Resume gate.
+- **Eval gate + concurrency + resumability (096)** — `scripts/eval_cross_provider.py` extended to drive multi-phase workflows per provider and wired as the CI regression gate (SEED-034); an offline CI harness regression test that caught + fixed a live `phase_whitelist`-not-propagated security gap on first run; restart-mid-workflow smoke at 3 kill points (programmatic / llm_agent / ask_user) verified live incl. graceful-shutdown resumability (096-09); `llm_batch_agents` fan-out bounded by `max_parallel_agents` composing with the global Redis-Lua cap; a StreamsProvider thread-keyed LRU-3 live-stream pool closing the thread-switch saturation hang (BUG-260530-01); and an 8-provider, newest-first model curation pass.
+
+**Architectural decisions locked:**
+
+- **D-v2.8-01**: v2.8 = Harness Engine + dual-mode ONLY; the 6-type Plugin Contract + `super_admin`/operator role tier deferred to v2.9 (cross-milestone load-bearing — lock on harness telemetry, mirrors the v2.7 split).
+- **GATEWAY-01**: one shared provider gateway is the single home for all provider logic; the harness reaches parity by *consuming* it, never re-implementing — Deep byte-identical is the red line.
+- **PARITY-02 over PARITY-01**: the cross-provider parity the milestone needed was the *harness* path (093), not the Deep-mode Anthropic polish (re-deferred — Deep is provider-robust on all 7).
+- **D-094-UNIFY**: the workspace panel is the single live-execution surface for BOTH Deep and Harness (reverses the in-chat Run-Card for Deep).
+- **D-095.1**: run honesty is projection/classification over data that already exists (no migration, no new SSE event); provider-specific handling stays at the gateway boundary, never the shared path.
+- Migrations renumbered from the real head **056+** (the v2.7 PRD's 125-139 reservation was stale fiction); SC#10 4-axis UAT baked into every streaming/agent-loop/provider/UI-state phase.
+
+**Known deferred items at close:** 43 acknowledged (operator-approved accept-as-tech-debt — see STATE.md `## Deferred Items`). Headline: **CONC-01 partial → SEED-065-B** (cross-tab GET p95 2,958 ms, 2.9× better; residual ~3 s = sync stream-create at `provider_gateway/dispatcher.py:94-115`). Plus 11 dormant forward seeds (SEED-002/003/004/005/040/041/042/043/044/045/046), 18 pre-GSD micro-tickets (stale quick-task trackers, work long since shipped), 1 parked v2.9 spike todo (NL→workflow authoring), 8 swept UAT-status files + 5 `human_needed` VERIFICATION files (all exercised at the milestone audit), and SEED-048/050/057 (embeddings SPOF / kimi-MiniMax quality / Google-credit-as-rate-limit trade-off). PARITY-01 re-deferred. Plugin Contract (PLUGIN-01..03), `llm_judge` (HARNESS-JUDGE-01), visual builder (HARNESS-AUTHOR-01) → v2.9.
+
+## v2.7 Agent Workspace & Panel (Shipped: 2026-05-30)
+
+**Phases completed:** 6 phases (083–088), 28 plans, 50 tasks
+**Timeline:** 2026-05-27 → 2026-05-30 (3 days, 226 commits)
+**Files changed:** 673 files (+52,449 / −3,081 lines)
+
+**Key accomplishments:**
+
+- Provider-gated Kimi thinking content filter strips <think> tags from visible chat + title generation fixed for DeepSeek/Moonshot/MiniMax/GLM/Google with tier-aware model routing
+- Workspace filesystem schema landed -- workspace_files + workspace_file_versions tables, FK-chain RLS, and private storage bucket created in live local DB. Bootstrap full-schema.sql regenerated.
+- Workspace backend logic layer landed -- asyncpg helpers, response models, and a single workspace_service.py that hides hybrid storage routing (inline bytea <= 256KB / bucket > 256KB), enforces 10MB hard cap, 100-file soft warning, 8192-char read cap, path validation, and structured difflib diffing.
+- 5 workspace tools wired into the agent loop -- handlers in tool_dispatcher.py + LLM schemas in openai_service.get_tools(); write and delete emit SSE events for the Phase 086/087 panel UI.
+- 4 cold-path GET endpoints under /threads/{thread_id}/workspace -- list, content (inline or 60s signed URL), versions, diff. _verify_thread_ownership uses 404-not-403 to prevent existence leak. Router registered in main.py.
+- Three direct fixes that close the cross-provider UAT bandwidth blockers (Google ValidationError, OpenRouter list-empty, REST /content empty body) with 22 new unit tests pinning the behavior so future provider integrations can't silently regress.
+- The shared 087 foundation: 4 typed workspace api.ts client fns (content/versions/diff/answer), amber `--warning` + dim-text CSS tokens, a zero-dependency Radix-Dialog bottom-sheet primitive, and 7 GREEN-only panel test files (52 it.todo contracts) so every downstream wave builds against fixed signatures.
+- The PANEL-01 panel shell + PANEL-02 todos: `WorkspacePanel` hosts an open/rail/hidden grid-state machine (⌘./Ctrl+. toggle, <768px bottom-sheet, laptop-squeeze-aware), short-circuits to ONE calm `PanelEmpty` when idle, and composes the live Wave-1/2 sections (Todos · Files · Versions) into a fixed-order accordion with the `PendingAskStack` pinned at the very top — mounted as one additive sibling in `ChatLayout` (chat-view only) with the chat↔panel seam open-handlers wired via a module-level signal. The new `TodosSection` renders the reactive todo list with non-color-only status indicators. All 7 panel test files GREEN (67 live, 0 todo); full suite at the documented 17-failure baseline, no new failures.
+- The panel's file browser: `FilesSection` lists thread workspace files (icon + mono name + size·version meta, green flash on fresh write) and full-replaces into `FilePreview` — a per-type router that reuses MarkdownRenderer for md, ShikiCode for code, the new dependency-free `CsvTablePreview` `<table>` for csv, framed `<img>` for bucket images, and a calm "No preview available · Download" / "File too large to preview" fallback for null-url / binary / malformed / too-large content. All raw content is React-escaped or routed through sanitizing renderers — zero raw-HTML injection.
+- The PANEL-07 version-diff viewer: a pure client-side `parseUnifiedDiff` (no diff lib), a shared in-column `DiffLines` renderer (fixed 16px sign gutter, honest truncation notice), an opt-in `DiffExpandOverlay` in the existing Radix dialog (same payload, no second fetch), and `VersionDiff` with red-base/green-target accessible pills defaulting to Compare v{n-1}↔v{n} — 14 live tests GREEN (7 parser + 7 component).
+- The PANEL-04 answer surface (stacked amber `PendingAskCard`s with run_id-gated submit + resume-in-place) plus the three additive chat↔panel seam renderers (live `SeamPointer`, reload `SeamCard` that closes the `ask_user` reload gap, and the `PausedRunCue`), mounted strictly additively into the G-5 `MessageItem` with single-source-of-truth (D-05) and zero raw-JSON leak.
+- Hoisted the workspace-panel chat|panel split into a single ChatLayout-level CSS grid (1fr chat | clamp(300-420px)/52px/0 panel) so the panel resolves against the real row width — closing the overflow (gap 1), dead-band (gap 7), and per-thread-shift defects — lifted the open/rail/hidden state machine up to ChatLayout to host a persistent always-visible chat-header toggle (gap 3) with a pulsing-amber-dot ask_user-pending indicator (gap 4 / PANEL-01), and stripped the leaked DevTwoPaneMock debug overlay from the production tree (gap 2).
+- Dedicated `--panel-surface`/`--panel-border` tokens give the workspace panel + rail a distinct surface in both themes (gaps 5/6); Chrome-MCP gate verified the 004-panel-shell layout contract and routed the remaining feature contracts + cross-provider scoreboard to 087-08.
+- One nav-style in-panel workspace toggle (collapse-to-rail) replaces the two-control/hidden-state design; all four design contracts (004/005/006/007) + PANEL-02 + the cross-provider 4-axis scoreboard verified live — surfacing and fixing a real version-diff 500 and a todo-count bug.
+- WCAG 2.1 AA structural conformance closed on all 8 Phase 087 panel surfaces: vitest-axe wired as a durable regression gate, one global zero-specificity :focus-visible ring added, two targeted aria-live announcements (todo count + diff +N/−M), and the FilesSection always-false aria-selected fixed — all 89 panel tests green with zero regression past the 17-failure 086 baseline.
+- A reusable, localhost-gated `scripts/eval_cross_provider.py` that drives the REAL `POST /threads/{id}/messages` route per (provider × canonical-prompt) across OpenAI/Anthropic/Google-3.x/OpenRouter and asserts tool-invocation + arg-shape + DB persistence, emitting a greppable PASS/FAIL scoreboard as the SEED-034 fold-gate evidence source.
+- `scenario-13-workspace-deep-flow.spec.ts` — a provider-parameterized Playwright backstop that drives the full deep workspace flow (write -> see -> update -> diff -> ask_user -> respond -> resume) with NO page refresh on Anthropic AND Google, and asserts zero 400 INVALID_ARGUMENT on both (the D-17 gemini-3 thought-signature live re-verify at the network level).
+- SEED-034 resolved on evidence: a text-only universal `write_todos` + `ask_user` directive folded into the shared `SYSTEM_PROMPT` + tool descriptions — re-verified across an extended 6-provider × 4-prompt matrix to deliver 3 improvements (OpenAI/Anthropic/OpenRouter now invoke `write_todos` on multi-step work) with zero fold-attributable regression. VERDICT: FOLDED (kept at `2f6e2523`).
+- Live 4-axis cross-provider UAT (6 providers PASS) + WCAG 2.1 AA panel a11y re-verified in both themes (contrast fixed dark 7.21:1 / light 4.66:1) + Anthropic+Google deep-flow no-refresh pass + D-17 gemini-3 thought_signature closed-as-verified — recorded into 088-VALIDATION.md; Phase 088 verification gate complete.
+
+**Architectural decisions locked:**
+
+- FOUND-01: tool-dispatch chain extracted from `threads.py` (~3,800 LOC) into a registry-pattern `tool_dispatcher.py` — G-5 hot-file mandate satisfied; all new tools register here
+- 083-03: `_SINGLE_MODEL_PROVIDERS` frozenset drives tier-aware title-gen model routing; Kimi/Moonshot thinking filter is a provider-gated `<think>` state-machine (moonshot + deepseek only)
+- 084: per-thread workspace uses hybrid storage hidden behind `workspace_service.py` — inline bytea ≤256 KB / Supabase Storage bucket >256 KB; FK-chain RLS; owner endpoints return 404-not-403 to prevent existence leak
+- 085: first Redis pub/sub in the codebase (`ask_user`) — SUBSCRIBE-first ordering + cancel sentinel + uvicorn lifespan shutdown broadcast for cross-worker safety under `WORKER_COUNT=2`; sub-agent `task` capped at 1-level nesting + dual concurrency (per-run `Semaphore(3)` + global Redis Lua-atomic cap 20); tool registry 21→24 (migration 055)
+- PANEL-06: panel SSE events route to dedicated Zustand keys, never chat `bucketsBySurface` — a panel update triggers zero chat-message-list re-renders
+- 087: the chat|panel split is ONE `ChatLayout`-level CSS grid (1fr chat | clamp(300–420px) panel); G-2 sketch-before-plan honored; 087-08 consolidated to a single nav-style in-panel toggle (collapse-to-rail), dropping the redundant chat-header toggle + hidden state
+- 088 / SEED-034: the universal `write_todos`/`ask_user` tool-use directive is TEXT-ONLY — no `tool_choice` forcing, `TASK_TOOL` untouched; eval gate judged on the native providers via `scripts/eval_cross_provider.py`
+- D-17 (gemini-3 `thought_signature`): closed-as-verified — Google-axis deep-flow + multi-tool rounds clean (zero 400 INVALID_ARGUMENT); the 075.4 Stage-4 echo hotfix holds
+
+**Known deferred items at close:** 27 acknowledged (11 pre-GSD micro-tickets; 4 dormant seeds SEED-002/003/004/005; cosmetic UAT status fields; 083 + 085 verification `human_needed` gaps — operator-approved). Plus 087 panel deferrals **SEED-037** (in-panel office/PDF/PPTX viewing + working download), **SEED-038** (chat-vs-panel artifacts unification), **SEED-039** (panel reliability / fast-switch race). Plus v2.8 carry-forwards: title-gen live-verify on DeepSeek/Moonshot/Google (BUG-260527-01, rolled forward unverified), Google secondary-model 404 routing artifact, per-provider `task`/`ask_user` gaps a text-only directive did not close (eval script is the v2.8 harness seed, D-08), and chat-tool-card unification (BUG-260529-02, major — its own v2.8 phase). See STATE.md `## Deferred Items` for the full inventory.
+
+---
+
+## v2.6 Foundation: RAG Quality + Multi-Worker + Polish (Shipped: 2026-05-27)
+
+**Phases completed:** 35 phases (068–082 including inserts), 91 plans complete
+**Timeline:** 2026-05-12 → 2026-05-27 (16 days, 846 commits)
+**Files changed:** 771 source files (+183K lines)
+
+**Key accomplishments:**
+
+1. Per-aspect extraction dispatcher with swappable engines — `extract_composable()` routes text/tables/images/equations through independent registries; camelot tables (53.5x recall vs pdfplumber), pymupdf_full images, legacy text. Docling formally retired after 4 phases of diminishing returns; `PdfExtractor` ABC + per-call `?engines=` hints on `/upload` and `/reextract`. Migrations 039–047.
+2. Multi-worker uvicorn enabled (`WORKER_COUNT=2`) — D-PRD-12 ADR supersedes D-v2.5-02; 50-parallel-run validation harness (Phase 077); cross-worker cancel via Redis zombie-heal; sandbox re-attach; per-worker Redis singleton idempotent. `runs.spawned_by_worker` debug column (migration 052).
+3. StreamsProvider context lift — `useMessages` reduced from 1229 LOC to <100 LOC; Zustand store + `<StreamsProvider>` Context owns all run-stream subscriptions; Phase 067.5 Branch D-3 guard preserved verbatim; mocked second surface renders without state collision.
+4. 9 LLM providers integrated — OpenAI, Anthropic (native SDK), Google, DeepSeek (thinking mode), Kimi/Moonshot, MiniMax, GLM/Zhipu, OpenRouter (generic fallback), Ollama. Per-provider base URLs, API keys, sub-agent defaults, timeout profiles. DeepSeek reasoning_content round-trip + collapsible Thinking block.
+5. Live-execution UX refactor — RunCard per assistant turn (sticky header + timer + counter + fold-to-summary), Editor-Inset tool-call panel with per-tool inner-body components (execute_code editor + STDOUT/STDERR + file preview; search_documents ranked rows; read_file metadata), Focus Mode composition (past tools fold to result-summary, active step keeps full editor).
+6. Settings architecture unification — `settings_override.json` eliminated; 36 keys migrated to `app_settings` DB table; `model_capabilities_overrides` table for runtime model registration; 30s TTL hot-reload cache; 4-tier resolution (DB > env CSV > static dict > default). Migration 053.
+7. asyncpg pool in hot paths — 3 surgical flips in `threads.py` (runs INSERT, messages INSERT, runs UPDATE finalize); `runs.input_tokens`/`runs.output_tokens` forward-filled from LLM `usage` (TOKEN-COL-01). Two-gate strategy: test_058 (mock) + test_073 (real asyncpg).
+8. Confidence recalibration on post-071.3 defaults — N=121 queries; thresholds 0.55/0.40 → 0.54/0.38; bucket balance restored to D-04 targets (30.6%/45.5%/24.0%).
+9. Cross-cutting verification gate — 5/5 SCs GREEN, 24/24 REQ-IDs Validated, 7 seeds dispositioned (6 closed, 1 partial-consumed).
+
+**Architectural decisions locked:**
+
+- D-PRD-12: Multi-worker enablement — D-v2.5-02 formally superseded; WORKER_COUNT=2 default; revert via env var flip
+- D-v2.6-01: supabase-py 2.10 → 2.29.x upgrade (httpx conflict resolved)
+- D-v2.6-04: Opt-in re-extraction via `POST /documents/{id}/reextract`
+- D-v2.6-05 (D-PRD-15): Docling demotion + camelot default + PyMuPDF in-process; v2.6 PRD "Docling-first" thesis retired
+
+**Known deferred items at close:** 40 acknowledged (15 UAT status fields not flipped — cosmetic; 10 verification gaps with project-level approval; 11 quick tasks predating GSD; 4 dormant seeds — SEED-002/003/004/005). Phase 082.5 (Error Handler Foundation) deferred to v2.7. See STATE.md `## Deferred Items` for the full inventory.
+
+---
+
+## v2.5 Deployment Strategy (Shipped: 2026-05-09)
+
+**Phases completed:** 15 phases shipped + 1 deferred (064), 64/64 plans complete
+**Timeline:** 2026-04-30 → 2026-05-09 (10 days, 445 commits)
+**Files changed:** 531 source files (+107,682 / -3,715 lines)
+
+**Key accomplishments:**
+
+1. Backend SSE concurrency unblocked (Phase 058) — `aexec` async wrapper around supabase `.execute()` calls + AnyIO 200-token limiter; cross-tab GET drops from ~30s queued to <1s while a streaming agent runs (CONCUR-01 binding pytest gate).
+2. Run-backed streaming architecture (Phases 059 → 063 + 063.1) — `asyncio.Queue` producer + `sse-starlette` (059), Redis Streams `run:{run_id}` durable buffer (061), `GET /threads/{tid}/active-runs` + `GET /runs/{rid}/stream?since=N` replay-and-tail API (062), POST returns JSON `{message_id, run_id}` + frontend reattaches via separate subscription (063), multi-tab sync / refresh-mid-stream / navigate-away all work without manual refresh as a side-effect.
+3. Adaptive run timeouts + lifecycle states (Phase 066) — per-LLM-call budget that resets on tool-call boundaries replaces the 120s total-deadline; cancelled (user-Stop) vs timed_out (system limit) terminal distinction; "Agent reached time limit" UI banner with Resume button. Closes Gap-006.
+4. Streaming UX polish — Phase 067 fixed UX-067-01..05 (empty-paint, "Saving response…" thrash, refresh-required first-paint, redis-consumer log noise, tool-call iteration boundary). Phase 067.1 added context-aware in-flight copy ("Searching knowledge base…", "Setting up agent…"), multi-step-intent system-prompt section, skill-load tool-card copy.
+5. Streaming render & storage fixes (Phases 067.2 → 067.5, cross-phase chain) — per-thread message store via `messagesByThread` Map (cross-thread switch preserves render); sandbox-output download via JS blob fetch (no more 401 on `<a href>` click); model→provider router honors `MODEL_CAPABILITIES[model]['provider']` (Anthropic models actually route through Anthropic SDK); suggestions SSE emit at `threads.py:2487` always-emit-empty + reordered before `done`; code-execution `code_executing` heartbeat events with elapsed counter; empty-thread-until-refresh closed via `clearMessages` streaming-bucket guard (Branch D-3, 5/5 lived-experience cycles GREEN).
+6. Skills test infrastructure repair (Phase 065) — eradicated AttributeError on `app.api.threads.create_streaming_chat` across 11 patch sites + 19 tuple-wrapped fakes (065-01); 3 export-test assertion drifts fixed (065-02); 11 tests migrated to canonical Phase 063 POST→GET-stream pattern using `_build_mock_supabase()` (065-03). Combined skills test run: 26/26 pass. Foundation for Skill Studio milestone.
+
+**Architectural decisions locked:**
+
+- D-v2.5-01: blocking I/O in async handlers must be wrapped via `run_in_threadpool` / `aexec`
+- D-v2.5-02: single uvicorn worker (multi-worker masks concurrency bugs)
+- D-v2.5-03: Realtime is best-effort hint, not source of truth — always reconcile via fetch on (re)connect
+- D-v2.5-08/09/10: STREAM-04 run-backed streaming architecture (Redis Streams + replay-and-tail)
+- D-v2.5-11: 061 + 062 + 063 ship as a single feature branch, no feature flags, no dual code paths
+- D-066-11: `stream.close()` invariant under synthetic-timeout
+- D-067.3-N01: model→provider router resolution chain
+
+**Known deferred items at close:** 31 acknowledged (10 UAT status fields not flipped after cross-phase closure — cosmetic only, all show 0 pending scenarios; 4 verification gaps marked human_needed — project-level approved per Phase 063 precedent; 11 historical micro-tickets predating GSD; 6 dormant seeds intentional future work). Plus 3 carry-forward seeds for follow-on work: SEED-009 (claude-haiku max_tokens cap), SEED-010 (OpenRouter synthetic-timeout protocol), SEED-011 (test_059 fixture-teardown). Plus 3 forward-looking seeds for post-v2.5 strategic work: SEED-012 (admin/operator UI), SEED-013 (external integrations / API + MCP), SEED-014 (automations & routines). See STATE.md `## Deferred Items` for the full inventory.
+
+---
+
+## v2.4 Stability, Polish & UX Fixes (Shipped: 2026-04-30)
+
+**Phases completed:** 12 phases shipped + 2 deferred (55, 57), 42/44 plans complete
+**Timeline:** 2026-04-22 → 2026-04-30 (8 days, 278 commits)
+**Files changed:** 72 source files (+6,122 / -1,325 lines)
+
+**Key accomplishments:**
+
+1. Cross-provider tool calling reliability — MODEL_CAPABILITIES registry routes to native or structured mode; tool_parser.py deterministic JSON extraction for non-native models; 32+ tests
+2. Anthropic native SDK integration — anthropic_service.py with prompt caching; 20% token reduction removed; PROMPT-01 generation/Q&A disambiguation fix
+3. Context-aware sub-agent routing — keyword-based escalation to capable model tier for generation tasks; tiktoken estimation; per-model info cards with cost tier
+4. Multi-provider model routing — full user control over all agent model roles; 404 fallback with SSE event; resolved_sub_agent_model in Settings
+5. Agent real-time feedback — tool_preparing SSE eliminates 30–120s silence window; ElapsedTimer for running tools; iteration_start Step N counter; ingestion step badges
+6. UX polish shipped — thread delete confirmation, no ghost content, folder-scoped new chats, root document visibility, version-aware delete dialog, web search toggle, nav polish, paginated library health
+
+**Known deferred items at close:** 19 acknowledged (STREAM-02 partial, SKILL-01/02 to Skills Studio, 14 human UAT items, 12 quick tasks)
+
+---
+
+## v2.3 Memory, Multimodal & Experience (Shipped: 2026-04-19)
+
+**Phases completed:** 11 phases, 27 plans
+
+**Key accomplishments:**
+
+1. Cross-Thread Memory — remember/recall tools with automatic injection into General Mode system prompts, plus Settings UI for memory management
+2. Multi-Modal Document Intelligence — PDF/DOCX table extraction, vision-LLM image descriptions, query_tables tool, and document badges
+3. Knowledge Health Dashboard — four-signal library health API (most-retrieved, never-retrieved, low-confidence, stale) with action hooks and KPI stat bar
+4. User Feedback Loop — thumbs up/down with reason selector, immutable ratings, feedback stats in Library Health
+5. Deep Midnight UI Redesign — glassmorphic ToolCallPanel, gradient CitationCards, floating pill MessageInput, AppDock, 3-pane SkillsPage, gradient toggles
+6. Mobile & Responsive — collapsible NavPanel, frosted drawer, 5-tab Settings refactor, responsive breakpoints
+
+**Known deferred items at close:** 4 UAT gaps, 5 verification gaps (require live browser testing), 12 quick task status markers (already committed code)
+
+---
+
+## v2.2 Trust & Compliance (Shipped: 2026-04-16)
+
+**Phases completed:** 7 phases, 13 plans, 22 tasks
+
+**Key accomplishments:**
+
+- One-liner:
+- One-liner:
+- One-liner:
+- 1. [Rule 1 - Bug] Upload endpoint uses /documents/upload not /documents
+- Task 1 — Backend pipeline:
+- FastAPI document versioning endpoints — is_latest list filter, GET /{id}/versions, and POST /{id}/restore with NULL folder guard and 6 TDD-verified unit tests
+- React frontend — version badge, VersionHistoryPanel, and restore confirmation dialog in DocumentList
+- audit_log Postgres table with INSERT-only RLS, 8-action CHECK constraint, composite index, and write_audit_entry async coroutine with exception swallowing
+- All 8 auditable action types wired to write_audit_entry across documents.py, threads.py, and settings.py using BackgroundTasks (non-SSE) and asyncio.create_task (SSE generator)
+- One-liner:
+- Audit Log section added to Settings page with paginated table, date-range pills (All/7d/30d/90d), action-type dropdown filter, and CSV export button wired to /audit-logs and /audit-logs/export backend endpoints.
+- SSE stream timeline upgraded from literal [DONE] to JSON done -> suggestions (cheap model) -> stream_end, with suggestion failures isolated behind try/except
+- Glassmorphic suggestion pill buttons wired end-to-end: SSE done/suggestions/stream_end event parsing in api.ts, ephemeral questions stored on Message via useMessages, SuggestionPills component rendering below citations, gated on General mode and !isStreaming
+
+---
+
+## v2.1 Stability & RAG Correctness (Shipped: 2026-04-11)
+
+**Phases completed:** 8 phases, 8 plans, 3 tasks
+
+**Key accomplishments:**
+
+- One-liner:
+- Added similarity confidence hedging (< 0.4 threshold) and structured citation format guidance to SYSTEM_PROMPT, preventing fabricated answers from weak matches and standardizing document reference format
+
+---
+
+## v2.0 Agent Skills & Code Execution (Shipped: 2026-04-04)
+
+**Phases completed:** 9 phases, 22 plans, 30 tasks
+
+**Key accomplishments:**
+
+- tool_call_id persisted in JSONB and history reconstructed as OpenAI multi-turn sequences so the LLM can reference prior tool results across conversation turns
+- Supabase migration with skills + skill_files tables, RLS, private Storage bucket, Pydantic type contracts, and failing TDD scaffold covering all 10 Phase 10 requirements
+- FastAPI /skills router with 6 CRUD endpoints (list, create, update, delete, toggle-enabled, toggle-global) — all CRUD tests GREEN
+- 3 file management endpoints on /skills router using Supabase skill-files storage bucket with owner-only write, global-readable list, and 10 MB upload limit
+- Three skill tool definitions registered in General Mode, catalog injected into system prompt via .or_() query, test scaffold with catalog/gating tests GREEN and 7 dispatch stubs for Plan 02
+- Three skill tool dispatch handlers (load_skill, save_skill, read_skill_file) implemented in threads.py with skill_activated SSE event; all 8 test stubs fleshed out and GREEN
+- skill_activated SSE event wired through streamMessage() callback chain with no-op handler in useMessages.ts; TypeScript compiles cleanly; live E2E test deferred to Phase 12
+- Task 1 — Data Layer:
+- Task 1 — Skills UI Components:
+- ZIP-based skill export (GET /skills/{id}/export) and import (POST /skills/import) with SKILL.md frontmatter, MIME-type file categorization, bulk multi-skill support, and path traversal rejection
+- Export button on SkillCards (owner-only, Download icon with spinner) and Import Skill button in SkillsPage header (.zip file picker with inline feedback), wired to backend ZIP endpoints
+- Docker sandbox session manager with lazy llm-sandbox import, module-level TTL eviction, and Supabase tables (code_executions + sandbox_files) with RLS policies
+- One-liner:
+- 1. [Rule 1 - Bug] Fixed pre-existing test mock setup missing thread_folder_result
+- harvest_output_files() copies Docker container output to Supabase Storage sandbox-outputs bucket, inserts sandbox_files rows, and returns signed download URLs — enabling users to retrieve files generated by their code
+- FastAPI lifespan shutdown closes all Docker sandbox containers; thread-delete cleans up per-thread sessions; execute_code handler wires in harvest_output_files to deliver signed file URLs in SSE completion event
+- Four code execution SSE events (start/stdout/stderr/complete) wired through streamMessage() into interleaved outputLines accumulation on the running execute_code ToolCall in React state
+- ExecuteCodeBlock component with streaming terminal output and file download cards wired into ToolCallPanel dispatch for execute_code tool calls
+- SkillFile TypeScript type and three tested API functions (listSkillFiles, uploadSkillFile, deleteSkillFile) wired to backend /skills/{id}/files routes
+- File management section added to SkillFormDialog edit mode with upload/delete controls gated by ownership and optimistic state updates
+- System prompt tool count corrected to thirteen, all v2.0 requirements marked complete, and Phase 15 VERIFICATION.md confirming SAND-12 created from code inspection
+
+---
+
+## v1.0 Knowledge Base Explorer (Shipped: 2026-03-29)
+
+**Phases completed:** 8 phases, 18 plans, 22 tasks
+
+**Key accomplishments:**
+
+- Postgres adjacency-list folders table with RLS, cascade delete, and 5 FastAPI CRUD endpoints (create/list/children/rename/delete) with ownership enforcement
+- Document-folder integration: `folder_id` FK, `full_markdown` storage, and move endpoints for files and folders
+- Ingestion UI two-panel layout with folder tree, CRUD controls, and folder-targeted uploads (51 integration tests)
+- `ls` and `tree` KB navigation tools with in-memory path resolution, depth limits, and truncation indicators
+- `grep` (regex content search) and `glob` (filename pattern matching with `**` support) search tools
+- `read` tool for full document or line-range retrieval from stored markdown
+- Explorer sub-agent: backend mode branching on `agent_mode` with 6 KB-only tools and dedicated system prompt
+- General/Explorer mode selector dropdown in chat toolbar (Compass icon, agentMode state in ChatArea)
+- Global folder sharing via updated RLS (migration 015); folder-scoped chat threads with recursive subtree RAG scoping (migration 016)
+- FolderDetail info bar: doc count, total size, global badge, subfolder count, creation date
+
+## Post-v1.0 Enhancements (2026-03-29)
+
+**Aether Intelligence Design System** (visual-only, no functionality changes):
+
+- Complete CSS variable system with dark + light mode (`--background`, `--foreground`, `--primary`, `--card`, `--muted`, `--border`, `--success`, `--sidebar`, etc.)
+- Theme toggle (Sun/Moon) in Sidebar; `useTheme` hook persists to localStorage, respects `prefers-color-scheme`; FOUC prevention script in `index.html`
+- Google Fonts (Inter + Manrope), custom Tailwind font families (`sans`, `headline`, `mono`), keyframe animations (`fadeSlideUp`, `pulseGlow`)
+- Glassmorphism chat input, gradient user bubbles, animated thinking dots, color-coded tool call icons, gradient send button
+- AuthPage gradient orbs + glassmorphism card; IngestionPage/SettingsPage ghost-border cards
+
+**Backend bug fix:**
+
+- `folders.py` null-guard: `maybe_single().execute()` can return `None` when no row exists; added `if name_check and name_check.data` guard in both create and rename endpoints to prevent `AttributeError` on `None.data`
+
+---

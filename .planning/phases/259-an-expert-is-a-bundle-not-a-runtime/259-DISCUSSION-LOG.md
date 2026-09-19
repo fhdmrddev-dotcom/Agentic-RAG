@@ -91,6 +91,76 @@ plus provenance column), not a rewrite — recorded so a future phase does not t
 
 ---
 
+## ⭐ D-259-07 — AN EXPERT IS A CONSULTANT YOU INVITE, NOT A ROOM YOU ENTER (2026-09-20)
+
+⛔ **SUPERSEDES `D-259-02`** (*"Single Active Expert per Thread (Strict 1:1)"*). Operator
+decision, taken after the review surfaced that the UX had never been designed.
+
+**An Expert is INVITED MID-THREAD and stays until dismissed.** A user in an ordinary conversation
+brings the Expert in the way you pull a specialist into a meeting; it does not require starting a
+new thread, and it can be dismissed.
+
+⭐ **THE REVERSAL COSTS NOTHING, AND THIS WAS MEASURED BEFORE IT WAS PROMISED.** `D-259-02` was
+recorded as *"a schema shape, not a later discovery"*, but it was **never encoded**: `public.threads`
+has **no expert column**, and migration 187 contains **no thread↔expert link** (the link was always
+Phase 260's `PACK-02` work). **So there is no migration to undo and nothing to unwind** — checked
+directly rather than assumed.
+
+### Why the room model was rejected
+
+Starting a fresh thread to use an Expert forces the user to abandon the conversation they are
+already in. The operator's words: *"maybe we should have the ability to call it to comment or just
+to navigate to it."* Both, and the consultant model gives both from ONE mechanism.
+
+### Sticky, not per-turn
+
+| Model | Behaviour | Verdict |
+|---|---|---|
+| Per-turn | `@expert` scopes one answer only | rejected — re-summoning every message is friction disguised as flexibility |
+| **Sticky until dismissed** | invited once, scopes every following turn, `×` to dismiss | ✓ **chosen** — a consultant joins the meeting and stays; the real case is six follow-ups, not one |
+| Both | mention = once, invite = sticky | rejected for now — two mechanisms to build and explain |
+
+### ⛔ THE BINDING SEMANTIC
+
+**An invited Expert scopes RETRIEVAL and TOOLS — never conversation history.** The model still sees
+what was said before it was invited; it simply stops searching outside the Expert's folders, skills
+and connections.
+
+⛔ **And the scope is resolved as DATA HANDED TO the agent loop, never as a branch INSIDE it.**
+This is the Phase 259 red line reappearing exactly where ROADMAP Phase 260 predicted it would
+(*"prefer scoping resolved as data handed to the loop rather than a branch inside it"*). **An
+`if expert:` in `agent_loop.py` fails `PACK-01` and `EXT-01` retroactively.**
+
+### The UI costs ZERO new controls — which is why this model was chosen
+
+The composer was **measured** before the design was proposed: it already carries **four pickers**
+(`+` menu, provider, model, mode), two chip rows and send. A fifth top-level control was never
+acceptable.
+
+- **Invite** goes inside the **existing `+` menu**, which already holds upload / connected files.
+- **The active Expert** renders as a chip in the **existing chips row** beside `ActiveConnectorChips`,
+  carrying a `×` to dismiss.
+- Nothing new is added to the composer's top level.
+
+### ⭐ The URL requirement falls out of the same mechanism
+
+Landing on `/experts/<slug>` is simply *"a new thread with that Expert invited at message 0."*
+**One mechanism, two triggers** — the dedicated path does not need a second implementation.
+
+⚠ **BUT THE APP HAS NO ROUTER, AND THAT WAS MEASURED:** no `react-router`, `wouter` or any router
+in `frontend/package.json`, and the entire URL handling is **four literal
+`window.location.pathname` checks in `App.tsx`** (`/admin/spend`, `/setup`, `/invite`). **Nothing in
+this product is linkable today** — not a thread, not a run, not a document.
+
+⛔ **THE ROUTER IS ITS OWN PHASE AND MUST NOT BE SMUGGLED INTO 260.** It is how a UI phase becomes
+an infrastructure phase and misses its own success criteria. It also lands in `App.tsx` — **23
+phases deep and deliberately FENCED** (Phase 244 left it byte-unchanged and drove a test RED against
+a planted third writer). ⭐ **The business case is the link, not the polish:** an Expert reaches the
+person who needs it through a URL pasted into Slack, an SOP or an onboarding email. Without one it
+can only be found by someone already inside the app who already knows to look.
+
+---
+
 ## Claude's Discretion
 
 - First-party Financial Analyzer seed details: Prompt suggestions and schema parameters configured in Migration 187 (`is_system = true`).
