@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v4.3
 milestone_name: What You Can Actually Sell
 status: in_progress
-last_updated: "2026-09-19T23:51:00.000Z"
-last_activity: 2026-09-19 -- Phase 259-02 executed (expert_service.py two-phase resolution + RED-driven isolation tests green); proceeding to 259-03.
+last_updated: "2026-09-19T23:59:00.000Z"
+last_activity: 2026-09-19 -- Phase 259 executed (Plan 03 complete: REST router, entitlement gate, AST closed-core inventory fence; all 27 phase tests green). Ready for review.
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 15
-  completed_plans: 14
-  percent: 93
+  completed_plans: 15
+  percent: 100
 ---
 
 # Project State
@@ -34,16 +34,21 @@ See: `.planning/PROJECT.md` (updated 2026-09-18)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 259 (An Expert Is a Bundle, Not a Runtime) — Executing plan 259-03.
+**Current focus:** Phase 259 (An Expert Is a Bundle, Not a Runtime) — Executed all 3 plans, ready for review.
 
 ---
 
 ## Current Position
 
 Phase: 259 (an-expert-is-a-bundle-not-a-runtime)
-Plan: 2 of 3 (259-02 executed, ready for 259-03)
-Status: in_progress
-Last activity: 2026-09-19 -- 259-02 executed (expert_service.py two-phase resolution + RED-driven isolation tests green)
+Plan: 3 of 3 (all plans executed, ready for review)
+Status: ready_for_review
+Last activity: 2026-09-19 -- Phase 259 executed (Plan 03 complete: REST router, entitlement gate, AST closed-core inventory fence; all 27 phase tests green). Ready for review.
+
+### ⭐ PHASE 259-03 EXECUTED — 2026-09-19
+- **REST Router (`backend/app/api/experts.py`) & Mount (`backend/app/main.py`)**: Full CRUD and resolve endpoints authored under `/experts`, guarded router-wide with `Depends(require_capability('experts'))`. Mounted in `main.py` strictly honouring G-5 (2 lines added, 0 logic branching). Hot-file ledger updated: `backend/app/main.py` at `83 / 60 / 952`, `backend/app/api/experts.py` row added at creation (`0 / 0 / 0`).
+- **Entitlement Tests (`backend/tests/unit/test_259_expert_entitlement_gate.py`)**: 5 tests passing (100%). Structured HTTP 403 refusal tested on Standard tier with capability metadata and upgrade hint; Enterprise tier admission verified; additive add-on override verified; AST single-home scan verified (0 direct tier checks).
+- **Closed-Core Inventory Fence (`backend/tests/unit/test_259_closed_core_inventory.py`)**: 5 tests passing (100%). AST mechanically asserts `PHASE_TYPE_REGISTRY_ENTRIES` has strictly 7 executors, `EMITTER_REGISTRY` has strictly 4 emitters, `_TOOL_REGISTRY` has 0 expert tools/dispatchers, 0 runtime/agent loop modules exist in services, and `expert_service.py` is pure data transformation. Non-vacuity verified by planting an 8th mock executor in `phase_types.py`, driving test RED (`assert 8 == 7`), and restoring clean code verified via md5 (`cad3130276f7b60202ae1b8c08c00a47`).
 
 ### ⭐ PHASE 259-02 EXECUTED — 2026-09-19
 - **Service Layer (`backend/app/services/expert_service.py`)**: `ResolvedExpertBundle` schema and `resolve_expert_bundle` authored. Evaluates member skills, knowledge folders, and connections independently against caller org tenancy. Foreign members stripped and logged with audit warning `EXPERT_MEMBER_CROSS_ORG_STRIPPED` (SEED-125 defense).

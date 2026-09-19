@@ -711,7 +711,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/panel/FilesSection.tsx` | 10 / 6 / 363 | ⚠ row was STALE at `8 / 5 / 334`. honoured by construction (**244-05**): TWO `export` keywords, zero body change — the chat chip IMPORTS `expiryCaption`, never re-derives its three readings |
 | `frontend/src/lib/api.ts` | 187 / 110 / 422 | ✅ **SPLIT TAKEN (207)** |
 | `frontend/src/types/index.ts` | 87 / 66 / 1412 | ⚠ row STALE again (`85/65/1380`). honoured by construction (**BUG-260912-01**): ONE optional client-only field, `narrationContent` — no column, because the loop discards this text by design. seam still OWED |
-| `backend/app/main.py` | 82 / 59 / 950 | ⚠ row was STALE by **FOURTEEN PHASES**. honoured by construction (**BUG-260902-06**) |
+| `backend/app/main.py` | 83 / 60 / 952 | ⚠ row was STALE by **FOURTEEN PHASES**. honoured by construction (**BUG-260902-06**, Phase 259) |
 | `backend/app/config.py` | 87 / 50 / 1593 | ⚠ STALE a 13th time. honoured by construction (**249-01**): ONE derived frozenset `ROUTING_PROVIDERS` + a Literal widened to the value the code already returned. ⛔ `MODEL_CAPABILITIES` seam OWED |
 | `backend/app/api/admin.py` | 38 / 14 / 1968 | honoured by construction (**249-01/03**): the add guard swaps its SOURCE LIST; 3 write seams gain a refusal catch. ⛔ order, 422 shape, every other guard byte-unchanged |
 | `backend/app/api/settings.py` | 41 / 21 / 1048 | honoured by construction (**249-02/03**): ONE `_verified_model_ids` helper, 2 callers; PUT gains a refusal arm → 400. ⛔ the 500 arm for an unreachable DB is unchanged |
