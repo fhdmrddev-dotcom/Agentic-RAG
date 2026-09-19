@@ -10575,6 +10575,9 @@ cells rot within days.
 | [`backend/app/models/expert.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsexpertpy) | 1 / 1 / 52 | no (new) | young (created Phase 259). Row added AT CREATION — Pydantic domain models for expert bundles. |
 | [`backend/app/services/expert_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesexpert_servicepy) | 2 / 1 / 274 | no (new) | young (created Phase 259). Row added AT CREATION — two-phase member boundary check (PACK-04). |
 | [`backend/app/api/experts.py`](docs/HOT-FILE-LEDGER.md#backendappapiexpertspy) | 1 / 1 / 175 | no (new) | young (created Phase 259). Row added AT CREATION — REST router with require_capability('experts') (PACK-06). |
+| [`frontend/src/components/chat/ActiveExpertChip.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatactiveexpertchiptsx) | 0 / 0 / 0 | no (new) | young (created Phase 260). Row added AT CREATION — leaf component for active consultant chip. |
+| [`frontend/src/components/chat/ExpertSpotlightCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatexpertspotlightcardtsx) | 0 / 0 / 0 | no (new) | young (created Phase 260). Row added AT CREATION — leaf component for hero spotlight card and action tiles. |
+| [`frontend/src/components/chat/InviteExpertDialog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatinviteexpertdialogtsx) | 0 / 0 / 0 | no (new) | young (created Phase 260). Row added AT CREATION — leaf component for expert invitation modal. |
 | [`backend/app/db/entitlements.py`](docs/HOT-FILE-LEDGER.md#backendappdbentitlementspy) | 2 / 1 / 169 | no (new) | young (created Phase 258). Row added AT CREATION — absent row is invisible to G-5 (TIER-01/02). |
 | [`backend/app/services/entitlement_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesentitlement_servicepy) | 2 / 1 / 130 | no (new) | young (created Phase 258). Row added AT CREATION. Single commercial boundary home (TIER-01/03/04/05). |
 | [`frontend/src/components/chat/ToolCallPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattoolcallpaneltsx) | 51 / 23 / 351 | **FIRES** | ✅ **G-5 DISCHARGED (227-02)** — extracted ToolCallDetails, StepRow, toolStepDerivation (1019 → 351 lines) |
@@ -15413,3 +15416,28 @@ What it owns. The business logic layer for domain expert bundles, implementing t
 **`1 / 1 / 175`** — created by Phase 259 (`259-03`). **Row added AT CREATION.** Precedent in `CLAUDE.md` is explicit: rows added at creation, since an absent row is invisible to G-5 at any count.
 
 What it owns. The REST API router for domain expert bundles, mounted at `/experts`. All endpoints are guarded with `require_capability('experts')` via Phase 258's canonical entitlement service, enforcing tier gating (PACK-06).
+
+---
+
+## `frontend/src/components/chat/ActiveExpertChip.tsx`
+
+**`0 / 0 / 0`** — created by Phase 260 (`260-02`). **Row added AT CREATION.** Precedent in `CLAUDE.md` is explicit: rows added at creation, since an absent row is invisible to G-5 at any count.
+
+What it owns. Leaf component for rendering the active consultant chip inside the composer's existing `Using:` chips row container (`data-testid="active-connector-chips"`). Sibling to file attachment chips and `ActiveConnectorChips`.
+
+---
+
+## `frontend/src/components/chat/ExpertSpotlightCard.tsx`
+
+**`0 / 0 / 0`** — created by Phase 260 (`260-03`). **Row added AT CREATION.** Precedent in `CLAUDE.md` is explicit: rows added at creation, since an absent row is invisible to G-5 at any count.
+
+What it owns. Leaf component for rendering the hero visual spotlight card and 3 Action Tiles in the message stream upon expert invitation or thread start per ratified G-2 Option 1 (Action Tiles).
+
+---
+
+## `frontend/src/components/chat/InviteExpertDialog.tsx`
+
+**`0 / 0 / 0`** — created by Phase 260 (`260-02`). **Row added AT CREATION.** Precedent in `CLAUDE.md` is explicit: rows added at creation, since an absent row is invisible to G-5 at any count.
+
+What it owns. Leaf component modal dialog for browsing available domain expert bundles and inviting one to the active thread, triggered from the composer's `+` dropdown menu.
+

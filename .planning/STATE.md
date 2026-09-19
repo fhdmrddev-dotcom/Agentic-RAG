@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v4.3
 milestone_name: What You Can Actually Sell
 status: in_progress
-last_updated: "2026-09-20T03:36:00.000Z"
-last_activity: 2026-09-20 -- Phase 260 context gathered and decisions locked (D-260-01..09). Ready for planning.
+last_updated: "2026-09-20T03:40:00.000Z"
+last_activity: 2026-09-20 -- Phase 260 planned (3 plans authored across 3 waves, 260-UI-SPEC locked, hot-file ledger synced). Ready for preflight.
 progress:
   total_phases: 6
-  completed_phases: 5
-  total_plans: 15
+  completed_phases: 4
+  total_plans: 18
   completed_plans: 15
-  percent: 100
+  percent: 83
 ---
 
 # Project State
@@ -34,16 +34,21 @@ See: `.planning/PROJECT.md` (updated 2026-09-18)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 260 (The Expert You Can Actually Use) — Context gathered, ready for planning.
+**Current focus:** Phase 260 (The Expert You Can Actually Use) — Plans authored (3 plans across 3 waves), ready for reviewer preflight.
 
 ---
 
 ## Current Position
 
 Phase: 260 (the-expert-you-can-actually-use)
-Plan: 0 of TBD (discuss-phase complete, ready for plan-phase)
-Status: ready_for_planning
-Last activity: 2026-09-20 -- Phase 260 context gathered and decisions locked (D-260-01..09). Ready for planning.
+Plan: 0 of 3 (plans authored, ready for reviewer preflight)
+Status: planned
+Last activity: 2026-09-20 -- Phase 260 planned (3 plans authored across 3 waves, 260-UI-SPEC locked, hot-file ledger synced). Ready for preflight.
+
+### ⭐ PHASE 260 PLANS AUTHORED — 2026-09-20
+- **260-01-PLAN.md (Wave 1, autonomous: false)**: Backend scoping foundation & Migration 188. `public.threads.active_expert_id` column, system financial folder & 10-K document fixture seed, pre-loop scoping in `run_producer.py`, and data-driven `RunContext` injection into `agent_loop.py` with zero `if expert:` branches. DB-MUTATING.
+- **260-02-PLAN.md (Wave 2, autonomous: true)**: Frontend composer consultant integration. Modal expert picker (`InviteExpertDialog.tsx`), invite door inside existing `+` menu (`✨ Invite Expert...`), active consultant chip (`ActiveExpertChip.tsx`) in existing `Using:` row container (`data-testid="active-connector-chips"`), ambient violet glow, and dismiss flow. Strictly 0 new top-level controls.
+- **260-03-PLAN.md (Wave 3, autonomous: true)**: Onboarding affordance & live conversation proof. `ExpertSpotlightCard.tsx` with 3 visual Action Tiles (`📈 Q3 Revenue Growth YoY`, `⚖️ Gross Margin Comparison`, `💵 Operating Cash Flow`), 1-click execution in `ChatArea.tsx` (`PACK-03`), and live conversation test suite (`test_260_financial_analyzer_conversation.py`) verifying grounded citations, ratio calculations, and honest out-of-scope refusal (`PACK-05`).
 
 ### ⭐ PHASE 260 CONTEXT GATHERED — 2026-09-20
 - **D-259-07 Consultant Model Ratified**: Mid-thread invitation via existing `+` menu; sticky presence until dismissed via `✕` chip; scopes retrieval and tools only, preserving full prior chat history (`D-260-01..03`).

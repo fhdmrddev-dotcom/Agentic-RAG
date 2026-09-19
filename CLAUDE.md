@@ -813,6 +813,10 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/models/expert.py` | 1 / 1 / 52 | young (created 259). Row added AT CREATION — Pydantic domain models for expert bundles |
 | `backend/app/services/expert_service.py` | 2 / 1 / 274 | young (created 259). Row added AT CREATION — two-phase member boundary check (PACK-04) |
 | `backend/app/api/experts.py` | 1 / 1 / 175 | young (created 259). Row added AT CREATION — REST router with require_capability('experts') (PACK-06) |
+| `frontend/src/components/chat/ActiveExpertChip.tsx` | 0 / 0 / 0 | young (created 260). Row added AT CREATION — active consultant chip in composer (PACK-02) |
+| `frontend/src/components/chat/ExpertSpotlightCard.tsx` | 0 / 0 / 0 | young (created 260). Row added AT CREATION — spotlight card and action tiles (PACK-03) |
+| `frontend/src/components/chat/InviteExpertDialog.tsx` | 0 / 0 / 0 | young (created 260). Row added AT CREATION — expert invitation modal dialog (PACK-02) |
+
 
 When a new phase enters discuss-phase, the orchestrator must scan PLAN.md `files_modified` against this ledger. Any match against a G-5-firing row means the discuss-phase produces a refactor recommendation as the first option, not the planned feature — and the phase reads that file's section in `docs/HOT-FILE-LEDGER.md` before planning, because that is where the named seam and the binding invariants live.
 
