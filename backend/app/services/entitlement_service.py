@@ -1,0 +1,108 @@
+"""Canonical commercial entitlement and tier capability evaluation service (TIER-01).
+
+Phase 258: A Tier Becomes Enforceable.
+Design decisions:
+  - TIER-01 / D-258-03: Single commercial boundary home in backend/app/services/entitlement_service.py.
+  - TIER-02 / D-258-07: Queries public.tier_capabilities via app.db.entitlements without hardcoded branches.
+  - TIER-03 / D-258-05: EntitlementDeniedException emits structured 403 naming required tier and upgrade hint.
+  - TIER-04 / D-258-04: Guarded by AST single-home fence test_258_single_entitlement_home.py.
+  - TIER-05 / D-258-06: Strict fail-closed on missing org or DB error (in contrast to load_run_budget).
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+import logging
+from typing import Any
+from uuid import UUID
+
+import asyncpg
+from fastapi import Depends, HTTPException, Request, status
+
+from app.db.entitlements import resolve_org_entitlement
+from app.dependencies import get_active_org_id, get_pg_pool
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class EntitlementResult:
+    allowed: bool
+    capability: str
+    current_tier: str | None = None
+    required_tier: str | None = None
+    reason: str | None = None
+    upgrade_hint: str | None = None
+
+
+class EntitlementDeniedException(HTTPException):
+    """Structured 403 Forbidden exception for capability entitlement denials (TIER-03).
+
+    Never returns a bare 403. Emits structured JSON naming required tier,
+    current tier, capability key, and actionable upgrade guidance.
+    """
+
+    def __init__(self, result: EntitlementResult):
+        req_tier = result.required_tier or "enterprise"
+        curr_tier = result.current_tier or "unknown"
+        upgrade_hint = result.upgrade_hint or f"Upgrade to {str(req_tier).title()} to use {result.capability}."
+        super().__init__(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "detail": f"Capability '{result.capability}' requires '{req_tier}' tier (current tier: '{curr_tier}')",
+                "error": "entitlement_required",
+                "capability": result.capability,
+                "required_tier": result.required_tier,
+                "current_tier": result.current_tier,
+                "upgrade_hint": upgrade_hint,
+            },
+        )
+        self.result = result
+
+
+async def check_entitlement(
+    pool: asyncpg.Pool, org_id: str | UUID, capability: str
+) -> EntitlementResult:
+    """Canonical commercial entitlement check (TIER-01, TIER-05).
+
+    Resolves capability access for an organization using the tier_capabilities
+    data matrix and additive add_ons overrides. Fails closed on database
+    errors or missing organizations (D-258-06).
+    """
+    allowed, current_tier, required_tier, reason = await resolve_org_entitlement(
+        pool, org_id, capability
+    )
+
+    upgrade_hint = None
+    if not allowed and required_tier:
+        upgrade_hint = f"Upgrade to {str(required_tier).title()} to use {capability}."
+
+    return EntitlementResult(
+        allowed=allowed,
+        capability=capability,
+        current_tier=current_tier,
+        required_tier=required_tier,
+        reason=reason,
+        upgrade_hint=upgrade_hint,
+    )
+
+
+def require_capability(capability: str):
+    """FastAPI dependency factory enforcing capability entitlement (TIER-01, TIER-03, TIER-05).
+
+    Usage:
+        @router.post("/workflows", dependencies=[Depends(require_capability("workflows"))])
+        async def create_workflow(...): ...
+    """
+
+    async def _require_capability(
+        request: Request,
+        active_org_id: str = Depends(get_active_org_id),
+        pool: asyncpg.Pool = Depends(get_pg_pool),
+    ) -> str:
+        result = await check_entitlement(pool, active_org_id, capability)
+        if not result.allowed:
+            raise EntitlementDeniedException(result)
+        return active_org_id
+
+    return _require_capability

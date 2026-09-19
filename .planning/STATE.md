@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v4.3
 milestone_name: What You Can Actually Sell
 status: executing
-last_updated: "2026-09-19T21:45:00.000Z"
-last_activity: 2026-09-19 -- Phase 258 context gathered; Operator Decision #1 resolved (Ascending Capability Bundles); TIER-01..05 locked
+last_updated: "2026-09-19T22:20:00.000Z"
+last_activity: 2026-09-19 -- Phase 258 Plan 258-02 executed (entitlement_service.py, 403 refusal, AST fence driven RED); executing Plan 258-03
 progress:
   total_phases: 13
   completed_phases: 3
   total_plans: 12
-  completed_plans: 9
-  percent: 25
+  completed_plans: 11
+  percent: 66
 ---
 
 # Project State
@@ -34,16 +34,16 @@ See: `.planning/PROJECT.md` (updated 2026-09-18)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 258 (A Tier Becomes Enforceable) -- context gathered, decisions locked. Ready for planning.
+**Current focus:** Phase 258 (A Tier Becomes Enforceable) -- Wave 2 complete, executing Wave 3.
 
 ---
 
 ## Current Position
 
 Phase: 258 (a-tier-becomes-enforceable)
-Plan: 3 of 3 planned across 3 waves (ready for execution)
-Status: planned
-Last activity: 2026-09-19 -- Phase 258 planned (3 plans / 3 waves: 258-01, 258-02, 258-03); gates OK
+Plan: 3 of 3 (executing 258-03)
+Status: executing
+Last activity: 2026-09-19 -- Phase 258 Plan 02 complete (entitlement_service.py canonical home, EntitlementDeniedException, AST single-home fence RED-driven); executing Plan 258-03
 
 ### ⭐ PHASE 258 CONTEXT GATHERED — 2026-09-19
 - **Operator Decision #1**: Resolved as Ascending Capability Bundles (`standard` -> `pro` -> `enterprise`), with `organizations.add_ons` for modular overrides (`D-258-01`).
