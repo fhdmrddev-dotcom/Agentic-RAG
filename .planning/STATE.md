@@ -3,11 +3,11 @@ gsd_state_version: 1.0
 milestone: v4.3
 milestone_name: What You Can Actually Sell
 status: in_progress
-last_updated: "2026-09-19T23:59:00.000Z"
-last_activity: 2026-09-19 -- Phase 259 executed (Plan 03 complete: REST router, entitlement gate, AST closed-core inventory fence; all 27 phase tests green). Ready for review.
+last_updated: "2026-09-20T03:36:00.000Z"
+last_activity: 2026-09-20 -- Phase 260 context gathered and decisions locked (D-260-01..09). Ready for planning.
 progress:
   total_phases: 6
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 15
   completed_plans: 15
   percent: 100
@@ -34,16 +34,23 @@ See: `.planning/PROJECT.md` (updated 2026-09-18)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 259 (An Expert Is a Bundle, Not a Runtime) — Executed all 3 plans, ready for review.
+**Current focus:** Phase 260 (The Expert You Can Actually Use) — Context gathered, ready for planning.
 
 ---
 
 ## Current Position
 
-Phase: 259 (an-expert-is-a-bundle-not-a-runtime)
-Plan: 3 of 3 (all plans executed, ready for review)
-Status: ready_for_review
-Last activity: 2026-09-19 -- Phase 259 executed (Plan 03 complete: REST router, entitlement gate, AST closed-core inventory fence; all 27 phase tests green). Ready for review.
+Phase: 260 (the-expert-you-can-actually-use)
+Plan: 0 of TBD (discuss-phase complete, ready for plan-phase)
+Status: ready_for_planning
+Last activity: 2026-09-20 -- Phase 260 context gathered and decisions locked (D-260-01..09). Ready for planning.
+
+### ⭐ PHASE 260 CONTEXT GATHERED — 2026-09-20
+- **D-259-07 Consultant Model Ratified**: Mid-thread invitation via existing `+` menu; sticky presence until dismissed via `✕` chip; scopes retrieval and tools only, preserving full prior chat history (`D-260-01..03`).
+- **Thread Persistence & Closed-Core Seam (Area 1)**: Migration 188 adds `active_expert_id` to `public.threads`; scoping resolved as data passed into `RunContext` (`effective_folder_ids`, `effective_tools`) with zero `if expert:` branches in `agent_loop.py` (`D-260-04..05`).
+- **G-2 Option 1 (Action Tiles) Ratified (Area 2)**: Visual hero card with icon gem and identity tags; zero lecturing prose; 3 large visual Action Tiles (`📈 Q3 Revenue Growth YoY`, `⚖️ Gross Margin Comparison`, `💵 Operating Cash Flow`) with immediate 1-click execution (`D-260-06..07`).
+- **Financial Analyzer Seeding & PACK-05 Proof (Area 3)**: Migration 188 seeds a real sample financial folder & 10-K earnings filing and calculation skills, answering from documents or refusing out-of-scope inquiries in a real conversation (`D-260-08..09`).
+
 
 ### ⭐ PHASE 259-03 EXECUTED — 2026-09-19
 - **REST Router (`backend/app/api/experts.py`) & Mount (`backend/app/main.py`)**: Full CRUD and resolve endpoints authored under `/experts`, guarded router-wide with `Depends(require_capability('experts'))`. Mounted in `main.py` strictly honouring G-5 (2 lines added, 0 logic branching). Hot-file ledger updated: `backend/app/main.py` at `83 / 60 / 952`, `backend/app/api/experts.py` row added at creation (`0 / 0 / 0`).
