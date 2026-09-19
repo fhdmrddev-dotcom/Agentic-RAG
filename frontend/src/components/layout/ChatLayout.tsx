@@ -33,6 +33,8 @@ import { OrgAdminShell } from "@/components/org/OrgAdminShell"
 // Phase 188 Plan 09 (RUNVIZ-03): the run's own room mounts here as a full-surface
 // branch (the SkillStudioPage precedent — entered WITH an id, returned via callbacks).
 import { WorkflowRunPage } from "@/pages/WorkflowRunPage"
+// Phase 257 (METER-07): Operator Spend & Metering cockpit
+import { AdminSpendPage } from "@/pages/admin/AdminSpendPage"
 // Phase 214-12 (STEP-02 / D-214-04): chat's launch moment. The form resolves BEFORE
 // createThread, and the shared field renderer keeps the two-arm label rule in one place.
 // `launchInputFields` — never `entryInputFields`, whose fallback arm draws a box for a key
@@ -974,6 +976,8 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
                 onNavigate("chat")
               }}
             />
+          ) : activeView === "admin-spend" ? (
+            <AdminSpendPage onBack={() => onNavigate("control-room")} />
           ) : (
             <UnknownViewFallback view={activeView as never} />
           )}

@@ -104,7 +104,7 @@ import { visibleNavItems } from "@/lib/nav-items"
 // FALLBACK, not a `default:` that throws, so a union member with no branch silently
 // renders Knowledge Health (the Phase-118 built-but-unreachable lesson). The matching
 // branch ships in the same commit as this member.
-export type ActiveView = "chat" | "documents" | "skills" | "settings" | "workflows" | "classification-rules" | "connections" | "skill-studio" | "control-room" | "org-admin" | "workflow-run"
+export type ActiveView = "chat" | "documents" | "skills" | "settings" | "workflows" | "classification-rules" | "connections" | "skill-studio" | "control-room" | "org-admin" | "workflow-run" | "admin-spend"
 
 function App() {
   const { user, loading, signIn, signUp, signOut } = useAuth()
@@ -129,6 +129,10 @@ function App() {
     }
   }, [])
   const [activeView, setActiveView] = useState<ActiveView>(() => {
+    // Phase 257 (METER-07): /admin/spend route
+    if (typeof window !== "undefined" && (window.location.pathname === "/admin/spend" || window.location.pathname.startsWith("/admin/spend"))) {
+      return "admin-spend"
+    }
     // BUG-260903-01 / SEED-185: both OAuth callbacks land on `/app?connections=1&…`, and until
     // 2026-09-03 nothing read it — the person arrived on Chat with their result in the URL.
     // Read once, land on Connections, and drop the query so a reload does not re-route.
