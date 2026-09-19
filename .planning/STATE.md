@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v4.3
 milestone_name: What You Can Actually Sell
 status: in_progress
-last_updated: "2026-09-19T23:48:00.000Z"
-last_activity: 2026-09-19 -- Phase 259-01 executed (Migration 187 applied, models + db layer + 11 tests green); proceeding to 259-02.
+last_updated: "2026-09-19T23:51:00.000Z"
+last_activity: 2026-09-19 -- Phase 259-02 executed (expert_service.py two-phase resolution + RED-driven isolation tests green); proceeding to 259-03.
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 15
-  completed_plans: 13
-  percent: 87
+  completed_plans: 14
+  percent: 93
 ---
 
 # Project State
@@ -34,16 +34,20 @@ See: `.planning/PROJECT.md` (updated 2026-09-18)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 259 (An Expert Is a Bundle, Not a Runtime) — Executing plan 259-02.
+**Current focus:** Phase 259 (An Expert Is a Bundle, Not a Runtime) — Executing plan 259-03.
 
 ---
 
 ## Current Position
 
 Phase: 259 (an-expert-is-a-bundle-not-a-runtime)
-Plan: 1 of 3 (259-01 executed, ready for 259-02)
+Plan: 2 of 3 (259-02 executed, ready for 259-03)
 Status: in_progress
-Last activity: 2026-09-19 -- 259-01 executed (Migration 187 applied, models + db layer + 11 tests green)
+Last activity: 2026-09-19 -- 259-02 executed (expert_service.py two-phase resolution + RED-driven isolation tests green)
+
+### ⭐ PHASE 259-02 EXECUTED — 2026-09-19
+- **Service Layer (`backend/app/services/expert_service.py`)**: `ResolvedExpertBundle` schema and `resolve_expert_bundle` authored. Evaluates member skills, knowledge folders, and connections independently against caller org tenancy. Foreign members stripped and logged with audit warning `EXPERT_MEMBER_CROSS_ORG_STRIPPED` (SEED-125 defense).
+- **Isolation Tests (`backend/tests/unit/test_259_expert_member_isolation.py`)**: 6 tests passing (100%). Non-vacuity verified by driving RED against a planted bypass in `expert_service.py` (`effective_skills = list(raw_skills)`), observing AssertionError, and restoring md5-clean (`5b0de3ddfed5516de94ab8a996faaa36`).
 
 ### ⭐ PHASE 259-01 EXECUTED — 2026-09-19
 - **Migration 187 (`supabase/migrations/187_expert_bundles.sql`)**: `public.expert_bundles` table created with RLS, partial unique slug indexes, and Financial Analyzer seed row (`00000000-0000-0000-0000-000000000259`). Applied to local Postgres on port 54322, `full-schema.sql` regenerated (8367 lines).
