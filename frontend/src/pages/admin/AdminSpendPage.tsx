@@ -13,7 +13,7 @@ import {
   Clock,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { getSpendSummary, getSpendRuns, getModelRates } from "@/api/spend"
+import { getSpendSummary, getSpendRuns, getModelRates } from "@/lib/api/spend"
 import type { SpendSummaryData, SpendRunItem, ModelRateItem } from "@/types/spend"
 import { DailySpendChart } from "@/components/admin/spend/DailySpendChart"
 import { SpendDonutChart } from "@/components/admin/spend/SpendDonutChart"

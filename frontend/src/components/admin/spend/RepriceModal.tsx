@@ -1,7 +1,7 @@
 import React, { useState } from "react"
 import { X, DollarSign, Calendar, Info, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { repriceModel } from "@/api/spend"
+import { repriceModel } from "@/lib/api/spend"
 
 interface RepriceModalProps {
   isOpen: boolean

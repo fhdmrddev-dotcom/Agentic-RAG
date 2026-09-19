@@ -875,14 +875,44 @@ def test_the_durable_column_comment_still_delegates_to_the_constant():
 
 
 def test_this_round_shipped_no_migration():
-    """⭐ A CLOSURE ROUND INTRODUCES NO NEW CAPABILITY (G-7), and a migration is one."""
+    """⭐ A CLOSURE ROUND INTRODUCES NO NEW CAPABILITY (G-7), and a migration is one.
+
+    ⚠ SCOPE CORRECTED DELIBERATELY 2026-09-19 (Phase 257 review). The original assertion
+    is recorded here rather than deleted, because the way it failed is the finding:
+
+        if re.match(r"^(18[3-9]|19\\d|[2-9]\\d{2})_", p.name)
+        assert later == [], f"a migration numbered above 182 appeared: {later}"
+
+    It was SCOPED TO PHASE 256'S CLOSURE ROUND — G-7 forbids a *gap-closure round* from
+    smuggling in a new capability, and a migration is one. It was never a claim that the
+    repository may not exceed migration 182 forever, but that is what it ASSERTED, so the
+    first later phase to ship any migration trips it whether or not it did anything wrong.
+    **Phase 257 is a PHASE, not a closure round of 256**, and migration 183 (`model_rates`,
+    METER-01) is exactly the new capability a phase exists to ship.
+
+    ⛔ THIS IS THE `SEED-177` / `D-206-07` SHAPE, AND ITS RULE BINDS HERE: *retire or widen
+    a fence DELIBERATELY, never trip it by surprise.* It WAS tripped by surprise — the
+    backend gate went 71 -> 72 against a ceiling of 71 with zero headroom, and nothing in
+    Phase 257's four plans predicted it. What is corrected is the fence's SCOPE, not its
+    intent: 256's closure round still shipped no migration, and that is still asserted
+    below, now pinned at the number 257 legitimately took.
+
+    Re-open trigger: a *gap-closure round* — not a phase — proposing a migration.
+    """
     repo = _BACKEND_APP.parents[1]
+    # Phase 256 closed at migration 182; Phase 257 took 183. Pinned to "above 183" so the
+    # property that still binds stays enforced, instead of a ceiling no later phase can meet.
     later = sorted(
         p.name
         for p in (repo / "supabase/migrations").glob("*.sql")
-        if re.match(r"^(18[3-9]|19\d|[2-9]\d{2})_", p.name)
+        if re.match(r"^(18[4-9]|19\d|[2-9]\d{2})_", p.name)
     )
-    assert later == [], f"a migration numbered above 182 appeared: {later}"
+    assert later == [], (
+        "a migration numbered above 183 appeared. If this is a PHASE shipping a new "
+        "capability, widen this fence DELIBERATELY and record the widening in the "
+        "docstring above, exactly as the Phase 257 review did. If this is a GAP-CLOSURE "
+        f"ROUND, G-7 fires: a closure round may not ship a migration. Offending: {later}"
+    )
 
 
 # ===========================================================================

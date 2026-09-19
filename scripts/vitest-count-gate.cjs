@@ -3832,6 +3832,25 @@ const BASELINE = {
   // (that suite oscillates 16/33 ↔ 18/31 and is in neither knob BY DECISION, Phase 235).
   // ⚠ 14 MEASURED at GSD_VITEST_MAX_WORKERS=2 on 2026-09-17, not guessed: `14 passed (14)`.
   "bug260912AppCredentials.test.ts": 14,
+  // ── Phase 257 review (Claude, reviewer) — the BASELINE half of the TARGETS entries added
+  // ── at the bottom of this file. BOTH knobs, same commit: TARGETS decides what RUNS,
+  // ── BASELINE decides what is GUARDED, and a suite can sit on the wrong side of one.
+  //
+  // ⚠ MEASURED, NEVER HAND-COUNTED, and from TWO AGREEING RUNS as this file's own rule
+  // requires. Run 1 — the full gate, immediately after the TARGETS entries landed, which
+  // printed these as first sightings:
+  //     AdminSpendPage.test.tsx    —   6   new
+  //     RunCostBadge.test.tsx      —   5   new
+  //     total 8426  (up from 8415 with the two suites invisible: +11, exactly 6 + 5)
+  // Run 2 — the two suites alone at GSD_VITEST_MAX_WORKERS=2: `2 passed (2) · 11 passed (11)`.
+  //
+  // ⭐ THE +11 IS THE EVIDENCE THAT MATTERS. Across all four of Phase 257's plans the gate's
+  // grand total did not move at all (8415 -> 8415) while two new suites were added to the
+  // repository. A total that cannot see a new suite is the gate telling you, in its own
+  // numbers, that it never ran it. Adding a pin here imports NO rot: both suites were green
+  // before adoption, so adoption cannot red the gate.
+  "AdminSpendPage.test.tsx": 6,
+  "RunCostBadge.test.tsx": 5,
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -5524,6 +5543,32 @@ const TARGETS = [
   // deliberately so (Phase 235 kept the red `sourceComposition.test.tsx` out of both), so
   // this file must be NAMED or it executes nowhere.
   "src/components/sources/bug260912AppCredentials.test.ts",
+  // ── Phase 257 review (Claude, reviewer) — BOTH of this phase's frontend suites landed
+  // ── in NEITHER knob, and the gate's own printed command line is the proof. ───────────
+  //
+  // Measured at c570922f4, BEFORE these two entries existed:
+  //   grep -c AdminSpendPage scripts/vitest-count-gate.cjs  -> 0
+  //   grep -c RunCostBadge   scripts/vitest-count-gate.cjs  -> 0
+  // and neither path appeared in the `running: npx vitest run …` line the gate prints.
+  // So 257-03's 203-line page suite and 257-04's badge suite RAN NOWHERE and GUARDED
+  // NOTHING — every acceptance criterion resting on them would have passed whether or not
+  // the code worked. That is verbatim the Phase 214 `WorkflowScheduleModal` shape and the
+  // Phase 233 `src/components/sources` shape, both already recorded in this file.
+  //
+  // WHY EACH ONE NEEDED A NAMED ENTRY, measured rather than assumed:
+  //   • `src/pages/admin/AdminSpendPage.test.tsx` — there is NO `src/pages` DIRECTORY entry
+  //     anywhere in this array; `src/pages` is reached by NAMED FILES ONLY. A new
+  //     page-level suite is not executed at all until it is named here.
+  //   • `src/components/workflow/RunCostBadge.test.tsx` — note the SINGULAR `workflow`.
+  //     The directory entry near the top of this array is `src/components/workflowS`
+  //     (plural), which is a DIFFERENT DIRECTORY and does not reach this file. 257-04
+  //     created a new singular-named sibling directory; the near-miss is exactly why the
+  //     omission survived review inside the phase.
+  //     ⚠ RECOMMENDED SEPARATELY (operator's call, not done here): consolidate
+  //     `src/components/workflow/` into the existing `src/components/workflows/` so the
+  //     plural DIRECTORY entry covers it structurally and no named entry is needed.
+  "src/pages/admin/AdminSpendPage.test.tsx",
+  "src/components/workflow/RunCostBadge.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")

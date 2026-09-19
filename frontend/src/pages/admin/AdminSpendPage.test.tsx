@@ -2,14 +2,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, screen, waitFor, cleanup } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { AdminSpendPage } from "./AdminSpendPage"
-import * as spendApi from "@/api/spend"
+import * as spendApi from "@/lib/api/spend"
 import type { SpendSummaryData, SpendRunItem, ModelRateItem } from "@/types/spend"
 
 afterEach(() => {
   cleanup()
 })
 
-vi.mock("@/api/spend", () => ({
+vi.mock("@/lib/api/spend", () => ({
   getSpendSummary: vi.fn(),
   getSpendRuns: vi.fn(),
   getModelRates: vi.fn(),

@@ -405,7 +405,24 @@ async def get_spend_runs(
               mr.effective_from DESC
             LIMIT 1
         ) rate ON true
-        LEFT JOIN public.workflow_runs wr ON wr.thread_id = r.thread_id
+        -- ⛔ LATERAL … LIMIT 1, NOT a plain LEFT JOIN. Phase 257 review (Claude, reviewer).
+        -- A plain `LEFT JOIN public.workflow_runs wr ON wr.thread_id = r.thread_id`
+        -- MULTIPLIES a run row by the number of workflow_runs sharing its thread, because
+        -- thread_id is not unique in workflow_runs. MEASURED on the live dev DB, org
+        -- 22f9c615-0eec-440a-8804-ed4784d6f57f (1,595 runs):
+        --     get_org_spend_summary   rated 20 + unrated 1163 = 1183   (no such join)
+        --     get_spend_runs          total_count             = 1197   (with the join)
+        -- i.e. 14 PHANTOM ROWS, and the two panels of a page whose entire thesis is
+        -- honesty disagreed with each other about how many runs exist.
+        -- The LATERAL below picks at most ONE workflow_run per run, so the ledger and its
+        -- COUNT(*) now agree with the summary by construction rather than by luck.
+        LEFT JOIN LATERAL (
+            SELECT wr2.token_coverage
+            FROM public.workflow_runs wr2
+            WHERE wr2.thread_id = r.thread_id
+            ORDER BY wr2.created_at DESC
+            LIMIT 1
+        ) wr ON true
         WHERE r.org_id = $1
           AND r.parent_run_id IS NULL
           {time_clause}
