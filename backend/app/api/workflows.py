@@ -66,6 +66,7 @@ from app.services.harness import grounding, publish_service
 # ``LINT_CODES`` rides the SAME import (WR-05): the severity classifier below composes its
 # known-code set from the module that OWNS the codes rather than re-declaring the literals.
 from app.services.harness.reachability import LINT_CODES, lint_workflow
+from app.services.entitlement_service import require_capability
 # Phase 196 (AUTH-04 / SC#2 / D-09 / D-08) — the save-path model refusal. The LOGIC lives in
 # the leaf; this module contributes two call lines, which is a call-out and not a second
 # concern (see the G-5 note in 196-06-PLAN.md). Cycle-safe: model_registry imports app.config
@@ -1295,7 +1296,10 @@ class PublishVerdict(BaseModel):
 @router.post(
     "/{definition_id}/publish",
     response_model=PublishVerdict,
-    dependencies=[Depends(require_visible("workflow_authoring"))],  # Phase 148 (VIS-01) — authoring gate
+    dependencies=[
+        Depends(require_visible("workflow_authoring")),  # Phase 148 (VIS-01) — authoring gate
+        Depends(require_capability("workflows")),  # Phase 258 (TIER-01) — commercial tier gate
+    ],
 )
 async def publish_workflow(
     definition_id: UUID,
@@ -1392,7 +1396,10 @@ _ALREADY_PUBLISHED_DETAIL = {
     "",
     response_model=DraftCreateResponse,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_visible("workflow_authoring"))],  # Phase 148 (VIS-01) — authoring gate
+    dependencies=[
+        Depends(require_visible("workflow_authoring")),  # Phase 148 (VIS-01) — authoring gate
+        Depends(require_capability("workflows")),  # Phase 258 (TIER-01) — commercial tier gate
+    ],
 )
 async def create_draft(
     body: WorkflowDefinition,
