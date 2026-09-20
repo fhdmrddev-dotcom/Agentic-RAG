@@ -94,6 +94,7 @@ export function ExpertAuthoringStudio({
   const [category, setCategory] = useState(initialData?.category ?? "General")
   const [whenToUse, setWhenToUse] = useState(initialData?.when_to_use ?? "")
   const [description, setDescription] = useState(initialData?.description ?? "")
+  const [exampleOutput, setExampleOutput] = useState(initialData?.example_output ?? "")
   const [scopeMode, setScopeMode] = useState<"restricted" | "biased">(
     initialData?.scope_mode ?? "biased",
   )
@@ -103,6 +104,7 @@ export function ExpertAuthoringStudio({
   const [memberSkills, setMemberSkills] = useState<string[]>(
     initialData?.member_skills ?? [],
   )
+  const [customSkillInput, setCustomSkillInput] = useState("")
   const [requiredConnections, setRequiredConnections] = useState<string[]>(
     initialData?.required_connections ?? [],
   )
@@ -222,6 +224,7 @@ export function ExpertAuthoringStudio({
       setCategory(draft.category || "General")
       setWhenToUse(draft.when_to_use || "")
       setDescription(draft.description || "")
+      if (draft.example_output) setExampleOutput(draft.example_output)
       setScopeMode(draft.scope_mode || "biased")
       setToolFloorEnabled(draft.tool_floor_enabled ?? true)
       if (draft.member_skills) setMemberSkills(draft.member_skills)
@@ -236,6 +239,16 @@ export function ExpertAuthoringStudio({
     } finally {
       setIsDrafting(false)
     }
+  }
+
+  // Handle custom capability tag addition
+  const handleAddCustomSkill = () => {
+    const trimmed = customSkillInput.trim()
+    if (!trimmed) return
+    if (!memberSkills.includes(trimmed)) {
+      setMemberSkills((prev) => [...prev, trimmed])
+    }
+    setCustomSkillInput("")
   }
 
   // Handle Action Tiles change
@@ -292,6 +305,7 @@ export function ExpertAuthoringStudio({
           category,
           when_to_use: whenToUse,
           description,
+          example_output: exampleOutput,
           scope_mode: scopeMode,
           tool_floor_enabled: toolFloorEnabled,
           member_skills: memberSkills,
@@ -309,6 +323,7 @@ export function ExpertAuthoringStudio({
           category,
           when_to_use: whenToUse,
           description,
+          example_output: exampleOutput,
           scope_mode: scopeMode,
           tool_floor_enabled: toolFloorEnabled,
           member_skills: memberSkills,
@@ -540,7 +555,7 @@ export function ExpertAuthoringStudio({
                     onChange={(e) => setCategory(e.target.value)}
                     className="mt-1 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                   >
-                    {CATEGORY_PRESETS.map((cat) => (
+                    {Array.from(new Set([...CATEGORY_PRESETS, category, "Research & Academia", "Education"])).map((cat) => (
                       <option key={cat} value={cat}>
                         {cat}
                       </option>
@@ -563,13 +578,38 @@ export function ExpertAuthoringStudio({
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-foreground">Detailed Description</label>
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-medium text-foreground">
+                    Detailed Operational Blueprint & Methodology *
+                  </label>
+                  <span className="text-[11px] text-muted-foreground">
+                    Autonomous capabilities, analytical frameworks & standards
+                  </span>
+                </div>
                 <textarea
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  rows={2}
-                  placeholder="Explain what domain expertise this bundle brings..."
-                  className="mt-1 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  rows={5}
+                  placeholder="Define the expert's core mandate, analytical frameworks, quality rubrics, and deliverable standards..."
+                  className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-xs font-mono leading-relaxed placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-medium text-foreground">
+                    Sample Deliverable / Output Snippet
+                  </label>
+                  <span className="text-[11px] text-muted-foreground">
+                    Concrete deliverable template or sample matrix
+                  </span>
+                </div>
+                <textarea
+                  value={exampleOutput}
+                  onChange={(e) => setExampleOutput(e.target.value)}
+                  rows={4}
+                  placeholder="E.g. Markdown literature matrix with columns for Author/Year, Methodology, Findings, and Critical Critique..."
+                  className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-xs font-mono leading-relaxed placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 />
               </div>
             </div>
@@ -701,39 +741,97 @@ export function ExpertAuthoringStudio({
                 )}
               </div>
 
-              {/* Member Skills */}
-              <div>
-                <label className="block text-xs font-medium text-foreground mb-1">
-                  Member Skills ({memberSkills.length} selected)
-                </label>
-                {availableSkills.length > 0 ? (
-                  <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto rounded-md border border-input bg-background/50 p-2">
-                    {availableSkills.map((s) => {
-                      const isSelected = memberSkills.includes(s.name)
-                      return (
+              {/* Member Skills & Specialized Capabilities */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-medium text-foreground">
+                    Member Skills & Capabilities ({memberSkills.length} active)
+                  </label>
+                  <span className="text-[11px] text-muted-foreground">
+                    Specialized toolchains & capability tags
+                  </span>
+                </div>
+
+                {/* Active Skills Pills */}
+                {memberSkills.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 p-2 rounded-lg border border-primary/20 bg-primary/5">
+                    {memberSkills.map((skillName) => (
+                      <span
+                        key={skillName}
+                        className="inline-flex items-center gap-1 rounded-md bg-primary/20 border border-primary/40 px-2 py-0.5 text-xs font-medium text-primary"
+                      >
+                        <span>⚡ {skillName}</span>
                         <button
-                          key={s.name}
                           type="button"
-                          onClick={() => {
-                            setMemberSkills((prev) =>
-                              isSelected ? prev.filter((name) => name !== s.name) : [...prev, s.name],
-                            )
-                          }}
-                          className={cn(
-                            "inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs transition-colors",
-                            isSelected
-                              ? "bg-primary/20 text-primary font-medium border border-primary/40"
-                              : "bg-muted/40 text-muted-foreground hover:bg-muted",
-                          )}
+                          onClick={() => setMemberSkills((prev) => prev.filter((s) => s !== skillName))}
+                          className="hover:text-destructive ml-0.5 text-primary/70 hover:text-destructive transition-colors"
                         >
-                          {isSelected && <Check className="h-3 w-3" />}
-                          <span>{s.name}</span>
+                          <X className="h-3 w-3" />
                         </button>
-                      )
-                    })}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {/* Quick add custom skill input */}
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={customSkillInput}
+                    onChange={(e) => setCustomSkillInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault()
+                        handleAddCustomSkill()
+                      }
+                    }}
+                    placeholder="Type a capability tag (e.g. Thesis Structuring) and press Add..."
+                    className="flex-1 rounded-md border border-input bg-background px-2.5 py-1 text-xs placeholder:text-muted-foreground focus:border-primary focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddCustomSkill}
+                    className="inline-flex items-center gap-1 rounded-md bg-secondary px-2.5 py-1 text-xs font-medium text-secondary-foreground hover:bg-secondary/80"
+                  >
+                    <Plus className="h-3 w-3" />
+                    <span>Add</span>
+                  </button>
+                </div>
+
+                {/* Available System Skills Toggle/Picker */}
+                {availableSkills.length > 0 ? (
+                  <div>
+                    <span className="text-[11px] text-muted-foreground block mb-1">
+                      Or select from registered organization skills:
+                    </span>
+                    <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto rounded-md border border-input bg-background/50 p-2">
+                      {availableSkills.map((s) => {
+                        const isSelected = memberSkills.includes(s.name)
+                        return (
+                          <button
+                            key={s.name}
+                            type="button"
+                            onClick={() => {
+                              setMemberSkills((prev) =>
+                                isSelected ? prev.filter((name) => name !== s.name) : [...prev, s.name],
+                              )
+                            }}
+                            className={cn(
+                              "inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs transition-colors",
+                              isSelected
+                                ? "bg-primary/20 text-primary font-medium border border-primary/40"
+                                : "bg-muted/40 text-muted-foreground hover:bg-muted",
+                            )}
+                          >
+                            {isSelected && <Check className="h-3 w-3" />}
+                            <span>{s.name}</span>
+                          </button>
+                        )
+                      })}
+                    </div>
                   </div>
                 ) : (
-                  <p className="text-xs text-muted-foreground italic">No skills registered in organization.</p>
+                  <p className="text-xs text-muted-foreground italic">No registered skills found in organization.</p>
                 )}
               </div>
 
@@ -1070,6 +1168,21 @@ export function ExpertAuthoringStudio({
                   <span>
                     <strong className="text-foreground">Additive Tool Floor:</strong> Delivers code execution, file writes, and template rendering.
                   </span>
+                </div>
+              )}
+
+              {/* Sample Deliverable Preview */}
+              {exampleOutput.trim() && (
+                <div className="mt-4 rounded-lg border border-border/60 bg-muted/20 p-3 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Sample Deliverable Preview
+                    </span>
+                    <span className="text-[10px] text-primary font-medium">Turnkey Output</span>
+                  </div>
+                  <pre className="text-[11px] text-muted-foreground whitespace-pre-wrap font-mono line-clamp-4 bg-background/60 p-2 rounded border border-border/40 leading-relaxed overflow-hidden">
+                    {exampleOutput}
+                  </pre>
                 </div>
               )}
             </div>

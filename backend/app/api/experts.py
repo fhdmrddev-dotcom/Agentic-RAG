@@ -166,13 +166,23 @@ async def draft_expert(
         for r in conn_rows
     ]
 
-    # 3. Synthesize candidate draft row
+    # 3. Load caller user_settings for LLM provider credentials
+    user_id = _to_uuid(current_user["id"] if isinstance(current_user, dict) else getattr(current_user, "id"))
+    from app.models.user_settings import load_user_settings  # noqa: PLC0415
+    try:
+        user_settings = load_user_settings(user_id)
+    except Exception as exc:
+        logger.warning("Could not load user_settings for %s: %s", user_id, exc)
+        user_settings = None
+
+    # 4. Synthesize candidate draft row (PACK-09)
     return await generate_expert_draft(
         description=description,
         brainstorm_text=brainstorm_text,
         available_folders=available_folders,
         available_skills=available_skills,
         available_connections=available_connections,
+        user_settings=user_settings,
     )
 
 

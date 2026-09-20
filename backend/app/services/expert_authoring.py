@@ -7,7 +7,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from app.config import get_model_capability
+from app.config import get_model_capability, settings
 from app.models.expert import PromptSuggestion
 from app.services.forced_emit import forced_emit
 
@@ -19,7 +19,7 @@ ScopeMode = Literal["biased", "restricted"]
 class ExpertDraftOutput(BaseModel):
     name: str = Field(..., description="Display name for the expert")
     slug: str = Field(..., description="URL-safe slug for the expert")
-    icon: str = Field(default="chart", description="Lucide vector glyph name (e.g. chart, scale, shield, briefcase, truck, terminal)")
+    icon: str = Field(default="chart", description="Lucide vector glyph name (e.g. chart, scale, shield, briefcase, truck, terminal, book, cpu, database, file-text)")
     category: str = Field(default="General", description="Domain category classification")
     when_to_use: str = Field(default="", description="Short guidance on when to consult this expert")
     example_output: str = Field(default="", description="Representative answer or deliverable snippet")
@@ -60,17 +60,30 @@ def _emit_tool(emitter: str, schema_model: type[BaseModel]) -> list[dict]:
     ]
 
 
-_EXPERT_DRAFTER_SYSTEM_PROMPT = """You are an AI assistant helping an organization admin draft a Domain Expert bundle.
-An Expert bundles together skills, connections, knowledge folders, starter prompts, and presentation attributes.
+_EXPERT_DRAFTER_SYSTEM_PROMPT = """You are an elite AI Architect and Consultant specializing in authoring Domain Expert personas for an enterprise agentic platform.
+An Expert is NOT a simple tool or single-function skill; it is an autonomous, high-caliber specialist endowed with intensive capabilities, sophisticated domain frameworks, and rigorous analytical standards.
 
-Guidelines:
-1. Provide a professional, concise 'name' and URL-safe 'slug'.
-2. Select an appropriate vector glyph 'icon' from: chart, scale, shield, briefcase, truck, terminal, book, cpu, database, file-text.
-3. Classify into a relevant 'category' (e.g., Finance, Legal, HR, Operations, Engineering, General).
-4. Provide a punchy 'when_to_use' one-liner (under 120 chars) and a realistic 'example_output' snippet.
-5. Create exactly 3 starter Action Tiles in 'prompt_suggestions' [{title, prompt}] that users can click to immediately get value.
-6. For 'scope_mode', default to 'biased' (Union Scope) unless the description explicitly requests strict isolation.
-7. Select only valid IDs/names from the provided available knowledge folders, member skills, and required connections.
+When drafting an Expert from the user's high-level goal, you must synthesize and pre-populate an exhaustive, turnkey configuration from A to Z:
+
+1. 'name': Authoritative, professional domain title (e.g. 'Academic Literature & Thesis Reviewer', 'Senior M&A & Corporate Structuring Counsel', 'Enterprise Cloud & DevOps Architect'). Avoid generic names or copying user filler phrases.
+2. 'slug': Clean, URL-safe kebab-case slug matching the name (e.g. 'academic-thesis-reviewer').
+3. 'icon': Choose the most fitting vector glyph from: book, scale, chart, shield, briefcase, truck, terminal, cpu, database, file-text.
+4. 'category': Appropriate domain classification (e.g., 'Research & Academia', 'Legal & Compliance', 'Finance & Accounting', 'Human Resources', 'Engineering', 'Operations', 'General').
+5. 'when_to_use': A crisp, punchy guidance sentence (under 140 chars) stating exactly when and why users should summon this expert.
+6. 'example_output': A realistic, rich, and concrete sample excerpt of the expert's deliverable (e.g. a structured literature matrix, gap analysis, methodology audit, or policy memorandum).
+7. 'description': COMPREHENSIVE, INTENSIVE, AND DETAILED (2-3 rich paragraphs). Do NOT simply repeat the user's prompt. Formulate an in-depth operating blueprint detailing:
+   - The expert's core mandate, domain philosophy, and specialized competencies.
+   - Specific methodologies, analytical frameworks, and evaluation rubrics applied.
+   - Critical quality standards, fact-checking/citation rigor, and output expectations.
+   - Step-by-step procedures for handling complex user requests in this domain.
+8. 'prompt_suggestions': Exactly 3 high-impact Action Tiles [{title, prompt}] representing 1-click powerhouse tasks. Each tile must have:
+   - 'title': Crisp, action-oriented button label (e.g. 'Synthesize Literature Gap', 'Audit Research Methodology', 'Structure Thesis Outline').
+   - 'prompt': A detailed, multi-sentence starter prompt template (2-3 sentences) instructing the expert on how to execute that action with maximum academic/professional rigor.
+9. 'scope_mode': MUST be 'biased' (Union Scope) as the universal platform default. Never use 'restricted' unless the user prompt specifically commands strict isolation.
+10. 'tool_floor_enabled': Set to true so deliverable tools (code execution, file writing, template rendering) are active.
+11. 'member_skills': Select all matching skill names from the provided available skills, or include 3-5 recommended domain skill names.
+12. 'knowledge_folder_ids': Select relevant folder UUIDs from the provided available knowledge folders that align with this domain.
+13. 'required_connections': Select relevant connection slugs from the provided available connections.
 """
 
 
@@ -85,19 +98,37 @@ def _generate_fallback_draft(
     available_connections: list[dict[str, Any]] | None = None,
 ) -> ExpertDraftOutput:
     """Deterministic fallback draft when LLM emission is unavailable (e.g. offline/mock environments)."""
-    clean_desc = (description or "Specialized Domain Expert").strip()
-    words = clean_desc.split()
-    name = " ".join(words[:4]).title() if words else "Domain Expert"
-    slug = "-".join([w.lower() for w in words[:3] if w.isalnum()]) or "domain-expert"
+    raw_desc = (description or "Specialized Domain Expert").strip()
 
-    combined_text = f"{clean_desc} {brainstorm_text or ''}".lower()
+    # Clean out user prompt prefixes (e.g. "I want an expert that is specialised in...")
+    clean_core = raw_desc
+    patterns = [
+        r"^(?:please\s+)?(?:i\s+want|i\s+need|create|build|author|draft|generate)?\s*(?:an?\s+)?(?:expert|specialist|assistant|agent|consultant)?\s*(?:that\s+is|who\s+is)?\s*(?:speciali[sz]ed\s+in|focused\s+on|for|to\s+help\s+with|to)?\s*",
+    ]
+    for p in patterns:
+        clean_core = re.sub(p, "", clean_core, flags=re.IGNORECASE).strip()
+    if not clean_core:
+        clean_core = raw_desc
+
+    words = [w for w in re.findall(r"[A-Za-z0-9]+", clean_core) if w.lower() not in {"and", "or", "the", "a", "an", "in", "for", "with", "to"}]
+    if not words:
+        words = clean_core.split()
+
+    # Generate professional domain name & slug
+    name = f"{' '.join(words[:4]).title()} Specialist"
+    slug = "-".join([w.lower() for w in words[:3] if w.isalnum()]) or "domain-specialist"
+
+    combined_text = f"{raw_desc} {brainstorm_text or ''}".lower()
     search_words = set(re.findall(r"[a-z0-9]+", combined_text))
 
     # Category and icon heuristic
     lower = combined_text
     icon = "chart"
     category = "General"
-    if any(k in lower for k in ("hr", "people", "leave", "employee", "onboarding", "policy", "policies")):
+    if any(k in lower for k in ("academic", "thesis", "literature", "paper", "scholar", "dissertation", "research")):
+        icon = "book"
+        category = "Research & Academia"
+    elif any(k in lower for k in ("hr", "people", "leave", "employee", "onboarding", "policy", "policies")):
         icon = "shield"
         category = "Human Resources"
     elif any(k in lower for k in ("legal", "contract", "compliance", "law", "attorney")):
@@ -112,6 +143,42 @@ def _generate_fallback_draft(
     elif any(k in lower for k in ("logistics", "supply", "inventory", "shipping")):
         icon = "truck"
         category = "Operations"
+
+    # Rich, multi-paragraph operational blueprint
+    detailed_desc = (
+        f"The {name} is an autonomous domain specialist dedicated to {clean_core.lower()}.\n\n"
+        f"Operating with rigorous analytical methodologies and professional standards, this expert conducts deep-dive "
+        f"investigations, synthesizes complex source material, and produces structured deliverables tailored to strategic needs. "
+        f"Core capabilities include multi-step domain analysis, structured evidence extraction, critical review rubrics, "
+        f"and deliverable synthesis.\n\n"
+        f"When executing tasks, it enforces systematic quality checks, citation integrity, and actionable recommendations."
+    )
+
+    when_to_use = f"Consult when conducting deep analysis, critical reviews, or structured deliverables in {clean_core.lower()}."[:140]
+    example_output = (
+        f"## Comprehensive {name} Review Matrix\n\n"
+        f"| Domain Area | Key Findings / Methodology | Confidence | Strategic Impact |\n"
+        f"|---|---|---|---|\n"
+        f"| Core Subject | Evaluated across benchmark criteria with empirical validation | High | Significant |\n"
+        f"| Risk & Gaps | Identified critical variance points and synthesis opportunities | High | Actionable |\n\n"
+        f"**Synthesis**: Systematic evidence indicates robust feasibility with recommended focus on methodology rigor."
+    )
+
+    # Contextual 1-click Action Tiles
+    prompts = [
+        PromptSuggestion(
+            title=f"Analyze {words[0].title() if words else 'Topic'}",
+            prompt=f"Conduct a comprehensive, structured analysis of {clean_core}: identify seminal themes, evaluate critical evidence, and synthesize top takeaways.",
+        ),
+        PromptSuggestion(
+            title="Identify Key Gaps & Risks",
+            prompt=f"Perform a rigorous methodology and gap audit on {clean_core}: pinpoint vulnerabilities, conflicting findings, and recommended remediations.",
+        ),
+        PromptSuggestion(
+            title="Synthesize Deliverable",
+            prompt=f"Draft an executive-grade deliverable for {clean_core} formatted with structured sections, evidence tables, and actionable next steps.",
+        ),
+    ]
 
     # Match available assets
     matched_folder_ids: list[UUID] = []
@@ -147,16 +214,12 @@ def _generate_fallback_draft(
         slug=slug,
         icon=icon,
         category=category,
-        when_to_use=f"Consult when working with {name.lower()} questions.",
-        example_output=f"Analysis deliverable for {name.lower()}.",
-        description=clean_desc,
+        when_to_use=when_to_use,
+        example_output=example_output,
+        description=detailed_desc,
         scope_mode="biased",
         tool_floor_enabled=True,
-        prompt_suggestions=[
-            PromptSuggestion(title=f"Analyze {name}", prompt=f"Provide a comprehensive summary and analysis of {name}."),
-            PromptSuggestion(title="Identify Key Risks", prompt="Extract and assess the top 3 risks or anomalies."),
-            PromptSuggestion(title="Generate Action Items", prompt="Draft an executive summary and recommended next steps."),
-        ],
+        prompt_suggestions=prompts,
         member_skills=matched_skills,
         knowledge_folder_ids=matched_folder_ids,
         required_connections=matched_connections,
@@ -178,11 +241,16 @@ async def generate_expert_draft(
     Emits a draft row that the user can inspect, edit, and save.
     """
     if not model and user_settings:
-        model = getattr(user_settings, "builder_model", None) or getattr(user_settings, "llm_model", None)
+        model = (
+            getattr(user_settings, "builder_model", None)
+            or getattr(user_settings, "llm_model", None)
+            or getattr(settings, "llm_model", None)
+            or "gpt-4o"
+        )
     if not model:
-        model = "deepseek-v4-flash"
+        model = getattr(settings, "llm_model", None) or "gpt-4o"
 
-    provider = (get_model_capability(model) or {}).get("provider", "openai")
+    provider = getattr(user_settings, "active_provider", None) or (get_model_capability(model) or {}).get("provider", "openai")
 
     context_parts = [f"Goal / Desired Expert:\n{description}"]
     if brainstorm_text:
@@ -216,10 +284,13 @@ async def generate_expert_draft(
         )
         emitted = result.get("emitted")
         if emitted:
-            if isinstance(emitted, dict):
-                return ExpertDraftOutput(**emitted)
-            if isinstance(emitted, ExpertDraftOutput):
-                return emitted
+            draft_out = ExpertDraftOutput(**emitted) if isinstance(emitted, dict) else emitted
+            if isinstance(draft_out, ExpertDraftOutput):
+                # D-v4.3-01: Union Scope is universal platform default unless user explicitly demanded strict isolation
+                req_text = f"{description} {brainstorm_text or ''}".lower()
+                if "strict" not in req_text and "isolat" not in req_text and "restrict" not in req_text:
+                    draft_out.scope_mode = "biased"
+                return draft_out
     except Exception as exc:
         logger.warning("forced_emit expert draft failed (%s), using grounded fallback", exc)
 

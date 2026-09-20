@@ -126,11 +126,14 @@ describe("ExpertAuthoringStudio (Phase 261 / PACK-07 / PACK-09 / PACK-10)", () =
       expect(screen.getByDisplayValue("Tax Strategy Consultant")).toBeInTheDocument()
       expect(screen.getByDisplayValue("tax-strategy")).toBeInTheDocument()
       expect(screen.getByDisplayValue("When structuring corporate transactions for tax efficiency")).toBeInTheDocument()
+      expect(screen.getByDisplayValue("Tax benefit: $1.2M")).toBeInTheDocument()
     })
 
     // Live preview updated
     expect(screen.getByText("Tax Strategy Consultant")).toBeInTheDocument()
     expect(screen.getByText("Tax Exposure")).toBeInTheDocument()
+    expect(screen.getAllByText(/Tax benefit: \$1\.2M/).length).toBeGreaterThanOrEqual(1)
+    expect(screen.getByText(/⚡ ratio_calculator/)).toBeInTheDocument()
   })
 
   it("saves new expert and dispatches createExpert on submit (PACK-07)", async () => {
