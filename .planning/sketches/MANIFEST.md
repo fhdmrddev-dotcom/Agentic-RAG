@@ -2894,4 +2894,13 @@ G-2 sketch for Phase 260 (PACK-02, PACK-03, PACK-05). Tested at `.planning/sketc
 - **Variant B (Flyout Specialist & Scope Peek)** — Inlined flyout & peek drawer: `+` menu inlines an `EXPERTS` flyout section (mirroring `ConnectorsFlyout`) with a 1-click invite toggle; chat stream features a specialist banner with an expandable "Scope Details" drawer listing exact member folders and skills; composer chip has a caret opening a mini scope popover, with a floating suggestion strip docked above the textarea.
 - **Variant C (Specialist Briefing & Presence-Forward)** — Direct specialist message bubble: avatar with purple sparkle, explanatory briefing message, and large prompt action cards; thread header gains an active consultant badge; composer renders a compact pill `[✨ Finance ×]`.
 
+## 261-262 · The Expert Card, Authoring & Discovery Catalog
+
+G-2 sketch for Phase 261 (PACK-07..10) and Phase 262 (PACK-11..13). Tested at `.planning/sketches/261-262-expert-authoring-and-catalog/index.html` and `.planning/sketches/261-262-expert-authoring-and-catalog.html`. Grounded in G-8 plan proportion (designed together to lock the shared Expert Card; built apart to prevent plan runaway), Migration 187 (`expert_bundles`), Migration 188 (seed bundle), proposed Migration 189 (`icon`, `category`, `when_to_use`, `example_output`, `expert_grants`), `SEED-303`, and `BUS-291`.
+
+- **Visual-First Expert Card Anatomy** — 5-element shared card with zero lecturing prose: Glowing gem avatar with inline SVG glyph, disentangled badges (`+ Union Scope` / `🔒 Strict Isolation` on knowledge axis; `👥 Org-Wide` / `🛡️ Role-Gated` / `👤 Named Users` on grant axis), bounded resource pills, and 3 large visual Action Tiles (`PACK-03` / `D-260-06`) with 1-click immediate launch (`PACK-13`).
+- **Phase 262: Discovery Catalog & Detail Modal** — Normal-user browsable catalog (`PACK-11`): full-text search, domain category pills, Clone-on-Customise CTA for system templates (SEED-303 S8), and strict honesty enforcement (users see only granted experts; ungranted cards vanish). Pop-up detail modal (`PACK-12`): sidesteps lack of client-side router, displays functional scope, prompt tiles, additive deliverable tools (S6), and sample deliverable output.
+- **Phase 261: Authoring Studio & AI-Assisted Drafting** — Admin authoring studio (`PACK-07`): AI drafting from brainstorm file upload with explicit non-ingestion guarantee (`PACK-09`), live reactive preview of the shared Expert card, knowledge scope selector (`Union Scope` default vs `Strict Isolation` opt-in), additive tool floor toggle, and granular access grants (`PACK-10`) by role or named user. Zero `if expert:` runtime branches — scope resolved strictly as data handed to agent loop.
+
+
 
