@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v4.3
 milestone_name: What You Can Actually Sell
 status: in_progress
-last_updated: "2026-09-20T03:40:00.000Z"
-last_activity: 2026-09-20 -- Phase 260 planned (3 plans authored across 3 waves, 260-UI-SPEC locked, hot-file ledger synced). Ready for preflight.
+last_updated: "2026-09-20T05:15:00.000Z"
+last_activity: 2026-09-20 -- Phase 260 executed (all 3 plans complete, gates passed, Financial Analyzer proof verified). Ready for review.
 progress:
   total_phases: 6
-  completed_phases: 4
+  completed_phases: 6
   total_plans: 18
-  completed_plans: 15
-  percent: 83
+  completed_plans: 18
+  percent: 100
 ---
 
 # Project State
@@ -34,16 +34,21 @@ See: `.planning/PROJECT.md` (updated 2026-09-18)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 260 (The Expert You Can Actually Use) — Plans authored (3 plans across 3 waves), ready for reviewer preflight.
+**Current focus:** Phase 260 (The Expert You Can Actually Use) — Completed (3 of 3 plans executed), ready for reviewer preflight/audit.
 
 ---
 
 ## Current Position
 
 Phase: 260 (the-expert-you-can-actually-use)
-Plan: 0 of 3 (plans authored, ready for reviewer preflight)
-Status: planned
-Last activity: 2026-09-20 -- Phase 260 planned (3 plans authored across 3 waves, 260-UI-SPEC locked, hot-file ledger synced). Ready for preflight.
+Plan: 3 of 3 (plans executed, all gates passed)
+Status: complete
+Last activity: 2026-09-20 -- Phase 260 executed (all 3 plans complete, gates passed, Financial Analyzer proof verified). Ready for review.
+
+### ⭐ PHASE 260 EXECUTED — 2026-09-20
+- **Plan 260-01 (Backend Scoping Foundation)**: Migration 188 applied (`public.threads.active_expert_id` column and partial index). Seeded system folder `Financial Reports & Filings` (`00000000-0000-0000-0000-000000000260`), 10-K document fixture (`00000000-0000-0000-0000-000000000261`), and `financial_ratio_calculator` skill. Pre-loop scoping in `run_producer.py` resolved as pure data (`effective_folder_ids`, `effective_tools`) into `RunContext`. AST closed-core invariant verified (0 "expert" nodes in `agent_loop.py`).
+- **Plan 260-02 (Composer Consultant Integration)**: `ActiveExpertChip.tsx` (`[✨ {expert.name} · {scope_mode} ✕]`) & `InviteExpertDialog.tsx` modal authored. `MessageInput.tsx` doors inside `+` menu (`✨ Invite Expert...`) and chip inside existing `Using:` row container (`data-testid="active-connector-chips"`). Ambient violet glow active when consultant invited. Strictly zero new top-level controls. Vitest test coverage: 5/5 in `ComposerExpert.test.tsx`, 21/21 in `ComposerAttach.composition.test.tsx`.
+- **Plan 260-03 (Action Tiles Spotlight & Live Proof)**: `ExpertSpotlightCard.tsx` hero card with luminous gem, metadata badges (`SEC Filings & Reports`, `ratio_calculator`, `Restricted`), and 3 visual Action Tiles (`📈 Q3 Revenue Growth YoY`, `⚖️ Gross Margin Comparison`, `💵 Operating Cash Flow`). 1-click execution wired in `ChatArea.tsx` directly invoking `sendMessage(prompt)`. Live conversation driver in `test_260_financial_analyzer_conversation.py` passing 4/4 (grounded citations from seeded 10-K, ratio calculations 64.2% GM / 30.8% EBITDA, honest out-of-scope refusal on vacation policy, and multi-turn persistence).
 
 ### ⭐ PHASE 260 PLANS AUTHORED — 2026-09-20
 - **260-01-PLAN.md (Wave 1, autonomous: false)**: Backend scoping foundation & Migration 188. `public.threads.active_expert_id` column, system financial folder & 10-K document fixture seed, pre-loop scoping in `run_producer.py`, and data-driven `RunContext` injection into `agent_loop.py` with zero `if expert:` branches. DB-MUTATING.

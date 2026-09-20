@@ -588,12 +588,14 @@ async def get_snapshot(
     # work in this branch (e.g. cleanup probes) would otherwise re-introduce
     # the 503-on-empty-thread regression UAT B-260519-02 observed.
     if not active_runs:
-        return {
+        res = {
             "messages": messages,
             "active_runs": [],
             "since_cursors": {},
-            "active_expert_id": row.get("active_expert_id") if row else None,
         }
+        if row and row.get("active_expert_id") is not None:
+            res["active_expert_id"] = row["active_expert_id"]
+        return res
 
     # Step 4: per-active-run since_cursors via xinfo_stream (D-075-01).
     # On any Redis failure (RedisError / TimeoutError / OSError), the entire
@@ -647,12 +649,14 @@ async def get_snapshot(
         else:
             since_cursors[rid] = "0"
 
-    return {
+    res = {
         "messages": messages,
         "active_runs": active_runs,
         "since_cursors": since_cursors,
-        "active_expert_id": row.get("active_expert_id") if row else None,
     }
+    if row and row.get("active_expert_id") is not None:
+        res["active_expert_id"] = row["active_expert_id"]
+    return res
 
 
 @router.post("", response_model=ThreadResponse, status_code=status.HTTP_201_CREATED)
