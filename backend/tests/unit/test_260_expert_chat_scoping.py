@@ -78,7 +78,7 @@ async def test_resolve_thread_scoping_no_expert():
     mock_supabase.table.return_value.select.return_value.eq.return_value.maybe_single.return_value = mock_query
     mock_pool = MagicMock()
 
-    folders, tools, skills = await _resolve_thread_scoping(
+    folders, tools, skills, scoped_path = await _resolve_thread_scoping(
         supabase=mock_supabase,
         thread_id=str(uuid4()),
         current_user={"id": str(uuid4()), "org_id": str(uuid4())},
@@ -88,6 +88,7 @@ async def test_resolve_thread_scoping_no_expert():
     assert folders is None
     assert tools is None
     assert skills is None
+    assert scoped_path is None
 
 
 @pytest.mark.asyncio
@@ -118,7 +119,7 @@ async def test_resolve_thread_scoping_with_active_expert():
     with patch("app.services.expert_service.resolve_expert_bundle", new_callable=AsyncMock) as mock_resolve:
         mock_resolve.return_value = resolved_bundle
 
-        folders, tools, skills = await _resolve_thread_scoping(
+        folders, tools, skills, scoped_path = await _resolve_thread_scoping(
             supabase=mock_supabase,
             thread_id=str(uuid4()),
             current_user={"id": str(uuid4()), "org_id": str(uuid4())},

@@ -4600,6 +4600,19 @@ assert EXPERT_CORE_TOOLS.issubset(_TOOL_REGISTRY.keys()), (
     f"{EXPERT_CORE_TOOLS - set(_TOOL_REGISTRY.keys())}"
 )
 
+# Phase 261 (PACK-02 / D-v4.3-02 / SEED-303 S6) — Additive tool floor preserving deliverable-producing tools
+EXPERT_DELIVERABLE_TOOLS: frozenset[str] = frozenset({
+    "execute_code",
+    "workspace_write",
+    "render_template",
+    "ask_user",
+})
+
+assert EXPERT_DELIVERABLE_TOOLS.issubset(_TOOL_REGISTRY.keys()), (
+    f"EXPERT_DELIVERABLE_TOOLS contains tools not registered in _TOOL_REGISTRY: "
+    f"{EXPERT_DELIVERABLE_TOOLS - set(_TOOL_REGISTRY.keys())}"
+)
+
 
 
 def _spawn_tool_refused_audit(ctx: ToolContext, tool_name: str, allowed: list[str]) -> None:

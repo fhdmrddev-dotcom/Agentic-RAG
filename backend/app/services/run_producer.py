@@ -380,23 +380,25 @@ async def _resolve_thread_scoping(
     thread_id: str,
     current_user: dict,
     pool,
-) -> tuple[tuple[str, ...] | None, tuple[str, ...] | None, tuple[dict, ...] | None]:
-    """Phase 260 (PACK-02 / D-260-05) — Resolve thread-active consultant scoping prior to the loop.
+) -> tuple[tuple[str, ...] | None, tuple[str, ...] | None, tuple[dict, ...] | None, str | None]:
+    """Phase 260 (PACK-02 / D-260-05) & Phase 261 (PACK-02 / D-v4.3-01 / D-v4.3-02 / BUG-260920-01) —
+    Resolve thread-active consultant scoping prior to the loop.
 
-    Data-injected into RunContext: effective_folder_ids, effective_tools, skill_catalog_override.
-    Returns (None, None, None) when no expert is invited (preserving Deep Mode byte-identical).
+    Data-injected into RunContext: effective_folder_ids, effective_tools, skill_catalog_override, scoped_folder_path.
+    Returns (None, None, None, None) when no expert is invited (preserving Deep Mode byte-identical).
     """
     try:
         from app.utils.db import aexec  # noqa: PLC0415
         t_resp = await aexec(
             supabase.table("threads")
-            .select("active_expert_id")
+            .select("active_expert_id, folder_id")
             .eq("id", str(thread_id))
             .maybe_single()
         )
         active_expert_id = t_resp.data.get("active_expert_id") if (t_resp and t_resp.data) else None
+        thread_folder_id = t_resp.data.get("folder_id") if (t_resp and t_resp.data) else None
         if not active_expert_id:
-            return None, None, None
+            return None, None, None, None
 
         from app.services.expert_service import resolve_expert_bundle  # noqa: PLC0415
         caller_user_id = UUID(str(current_user["id"]))
@@ -422,11 +424,62 @@ async def _resolve_thread_scoping(
                 f"Active expert '{active_expert_id}' could not be resolved or is inaccessible; refusing run (fail-closed)"
             )
 
-        effective_folder_ids = tuple(str(f) for f in resolved.effective_folder_ids)
+        expert_folder_ids = [str(f) for f in resolved.effective_folder_ids]
+        scope_mode = getattr(resolved, "scope_mode", "biased")
+
+        all_folders: list[dict] = []
+        if thread_folder_id or expert_folder_ids:
+            try:
+                from app.utils.folder_utils import fetch_visible_folders  # noqa: PLC0415
+                all_folders = await fetch_visible_folders(supabase, str(current_user["id"]))
+            except Exception:
+                logger.warning("Failed to fetch visible folders for thread %s scoping", thread_id, exc_info=True)
+
+        folder_map = {str(f["id"]): f for f in all_folders}
+
+        def _get_subtree(root_id: str) -> list[str]:
+            res = [root_id]
+            for f in all_folders:
+                if str(f.get("parent_id") or "") == root_id:
+                    res.extend(_get_subtree(str(f["id"])))
+            return res
+
+        def _get_path(fid: str) -> str:
+            parts = []
+            curr: str | None = fid
+            while curr:
+                f = folder_map.get(curr)
+                if not f:
+                    break
+                parts.append(f.get("name", ""))
+                curr = str(f["parent_id"]) if f.get("parent_id") else None
+            return ("/" + "/".join(reversed(parts))) if parts else ""
+
+        scoped_folder_path: str | None = None
+
+        if scope_mode == "restricted":
+            # Strict isolation (S5 / D-v4.3-01): exclusive to expert folders
+            effective_folder_ids = tuple(sorted(set(expert_folder_ids)))
+            if expert_folder_ids:
+                scoped_folder_path = _get_path(expert_folder_ids[0]) or None
+        else:
+            # Union Scope (default, S4 / D-v4.3-01): thread folder + expert folders
+            if thread_folder_id:
+                thread_subfolder_ids = _get_subtree(str(thread_folder_id))
+                effective_folder_ids = tuple(sorted(set(thread_subfolder_ids).union(expert_folder_ids)))
+                scoped_folder_path = _get_path(str(thread_folder_id)) or None
+            else:
+                effective_folder_ids = tuple(sorted(set(expert_folder_ids)))
+                if expert_folder_ids:
+                    scoped_folder_path = _get_path(expert_folder_ids[0]) or None
 
         # Phase 260 F-3: derive core tools strictly from tool_dispatcher.EXPERT_CORE_TOOLS
-        from app.services.tool_dispatcher import EXPERT_CORE_TOOLS  # noqa: PLC0415
-        effective_tools = tuple(sorted(EXPERT_CORE_TOOLS) + list(resolved.effective_connections))
+        # Phase 261 D-v4.3-02 / S6: preserve deliverable tools when tool_floor_enabled is True
+        from app.services.tool_dispatcher import EXPERT_CORE_TOOLS, EXPERT_DELIVERABLE_TOOLS  # noqa: PLC0415
+        base_tools = set(EXPERT_CORE_TOOLS)
+        if getattr(resolved, "tool_floor_enabled", True):
+            base_tools = base_tools.union(EXPERT_DELIVERABLE_TOOLS)
+        effective_tools = tuple(sorted(base_tools) + list(resolved.effective_connections))
 
         skill_catalog_override = None
         if resolved.effective_skills:
@@ -435,7 +488,7 @@ async def _resolve_thread_scoping(
                 for s in resolved.effective_skills
             )
 
-        return effective_folder_ids, effective_tools, skill_catalog_override
+        return effective_folder_ids, effective_tools, skill_catalog_override, scoped_folder_path
     except Exception as exc:
         logger.error(
             "Failed to resolve consultant expert scoping for thread %s; refusing run (fail-closed): %s",
@@ -598,7 +651,7 @@ async def run_producer(
                 # run_agent_loop + the Deep `_result_sink` flow stay byte-identical (D-14).
             else:                                          # Deep — byte-identical
                 _wf_pool = await get_pg_pool()
-                _eff_folders, _eff_tools, _skill_cat_override = await _resolve_thread_scoping(
+                _eff_folders, _eff_tools, _skill_cat_override, _eff_folder_path = await _resolve_thread_scoping(
                     supabase=supabase,
                     thread_id=thread_id,
                     current_user=current_user,
@@ -617,6 +670,7 @@ async def run_producer(
                     effective_folder_ids=_eff_folders,
                     effective_tools=_eff_tools,
                     skill_catalog_override=_skill_cat_override,
+                    scoped_folder_path=_eff_folder_path,
                 )
                 _agent_loop_result = await run_agent_loop(
                     ctx,
@@ -765,7 +819,7 @@ async def spawn_continuation_run(
             # .agent_mode/.content; a continuation carries no new user content.
             body = MessageCreate(content="", model=resolved_model, provider=resolved_provider)
             _wf_pool = await get_pg_pool()
-            _eff_folders, _eff_tools, _skill_cat_override = await _resolve_thread_scoping(
+            _eff_folders, _eff_tools, _skill_cat_override, _eff_folder_path = await _resolve_thread_scoping(
                 supabase=supabase,
                 thread_id=thread_id,
                 current_user=current_user,
@@ -786,6 +840,7 @@ async def spawn_continuation_run(
                 effective_folder_ids=_eff_folders,
                 effective_tools=_eff_tools,
                 skill_catalog_override=_skill_cat_override,
+                scoped_folder_path=_eff_folder_path,
             )
             try:
                 await run_agent_loop(

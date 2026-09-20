@@ -266,6 +266,8 @@ class RunContext:
     # None = normal unrestricted chat (closed-core invariant).
     effective_folder_ids: tuple[str, ...] | None = None
     effective_tools: tuple[str, ...] | None = None
+    # Phase 261 (BUG-260920-01 / D-v4.3-01) — synchronized scoped folder path
+    scoped_folder_path: str | None = None
 
 
 
@@ -1376,6 +1378,9 @@ async def run_agent_loop(
     # Phase 260 (PACK-02 / D-260-05) — explicit scoping data from RunContext overrides folder subtree
     if ctx.effective_folder_ids is not None:
         folder_subtree_ids = list(ctx.effective_folder_ids)
+    # Phase 261 (BUG-260920-01 / D-v4.3-01) — synchronized scoped_folder_path eliminates prompt/retrieval desync
+    if ctx.scoped_folder_path is not None:
+        scoped_folder_path = ctx.scoped_folder_path
 
     # Load full message history (includes just-inserted user message).
     # CTX-01 (D-120-06): build the query, then apply the ASYMMETRIC origin pre-filter
