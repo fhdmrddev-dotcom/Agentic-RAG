@@ -6,11 +6,11 @@ status: in_progress
 last_updated: "2026-09-20T12:00:00.000Z"
 last_activity: 2026-09-20 -- Phase 260 CLOSED, 3/3 SC, review PASS (260-REVIEW.md). F-1 the scope FAILED OPEN while the UI kept showing the Expert chip -- the inverse of D-258-06, and invisible from the happy path the operator had already driven live. F-2 both new frontend suites ran in NO gate (the total sat byte-identical at 8468). F-3 found a phantom tool granted to every Expert. All fixed and RE-DRIVEN. ALL v4.3 phases 255-260 are CLOSED; migrations 186-188 owed to production, both prod orgs still NULL-tier.
 progress:
-  total_phases: 7
+  total_phases: 8
   completed_phases: 6
   total_plans: 18
   completed_plans: 18
-  percent: 86
+  percent: 75
 ---
 
 # Project State
@@ -111,6 +111,38 @@ Last activity: 2026-09-20 -- Phase 260 executed (all 3 plans complete, gates pas
 - **F-6 (Resolved)**: Re-derived hot-file ledger triples updated in `docs/HOT-FILE-LEDGER.md` and `CLAUDE.md` (`entitlements.py` 1/1/169, `entitlement_service.py` 1/1/130, `api/workflows.py` 43/23/2261).
 - **F-5 Deploy-Ordering Hazard**: Recorded in OWED TO THE OPERATOR (Migration 186 must be applied to production before or at backend deployment).
 - **F-2 Scope Disposition**: Workflow authoring proof slice (`POST /workflows`, `POST /workflows/{id}/publish`) gated as planned. Runtime kickoff gating via `threads.py` deferred to execution milestone/phase to preserve `threads.py` G-5 invariants and isolate general thread chat.
+
+### ⭐ PHASE 262 ADDED — 2026-09-20. A deferral that FIRED, recorded as such.
+
+**Operator direction:** normal users — not admins — need a page listing the Experts available to
+them, with a card each and a pop-up detail view saying **what it does and when to use it**.
+
+⭐ **THIS IS PHASE 260'S OWN DEFERRAL COMING DUE, AND THE CONDITION IS NOW MET.** 260's flag held
+the catalog back deliberately: *"if the slice is not valuable with ONE Expert, the feature is wrong
+and a directory of twelve will not save it."* **260 closed 3/3 and the operator has it working
+live.** Recorded explicitly, because a directory built BEFORE the slice proved itself would have
+been the exact mistake that flag named — and because this is the same orphaned line in
+`260-DISCUSSION-LOG.md` that also stranded the authoring half.
+
+⚠ **MEASURED GAP — the row cannot feed a rich card.** `expert_bundles` carries a one-line
+`description` and `prompt_suggestions`, and **no icon, no category, no when-to-use, no example
+output**. Presentation fields need a migration. ⛔ **They are PRESENTATION and nothing else** — no
+field added for the catalog may change what an Expert DOES, or `PACK-01`'s *"a manifest, not a
+runtime"* starts leaking through the catalog.
+
+⭐ **A MODAL IS WHAT MAKES THIS SHIPPABLE.** The operator asked for a pop-up, and the app **still
+has no router**, so a modal sidesteps the routing phase entirely. **A per-Expert URL stays owed.**
+
+⛔ **`PACK-11` IS THE HONESTY CRITERION AND THE ONE MOST LIKELY TO BE FAKED:** listing everything
+and greying out the rest is NOT the same as listing what the user may use. **A catalog advertising
+Experts a user cannot invite is a brochure for a locked door.** It therefore depends on 261's
+per-user grants — 262 cannot tell the truth before 261 ships.
+
+⚠ **A FOURTH NAV HOME CHANGES THE IA CONTRACT** (`nav-items.ts`, `NavPanel.tsx` encode three:
+Chat / Library / Workflows). Read the `sketch-findings-agentic-rag` navigation/IA section first.
+
+⭐ **SKETCH 261 AND 262 TOGETHER** — they share the Expert card and its vocabulary; building them
+together would breach G-8, but designing them apart would ship two different cards.
 
 ### ⭐ PHASE 261 ADDED — 2026-09-20. The authoring half had no home in any register.
 
