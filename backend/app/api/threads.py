@@ -725,6 +725,26 @@ async def rename_thread(
             ent = await check_entitlement(pool, active_org_id, "experts")
             if not ent.allowed:
                 raise EntitlementDeniedException(ent)
+
+            # PACK-10 / SC#5: Verify caller has access to the expert bundle (not ungranted/private)
+            from uuid import UUID  # noqa: PLC0415
+            from app.services.expert_service import get_expert_service  # noqa: PLC0415
+            c_uid = UUID(str(current_user["id"])) if isinstance(current_user, dict) else getattr(current_user, "id")
+            c_org_id = UUID(str(active_org_id))
+            caller_role = current_user.get("role") if isinstance(current_user, dict) else getattr(current_user, "role", None)
+            caller_roles = [caller_role] if caller_role else []
+            bundle = await get_expert_service(
+                pool=pool,
+                bundle_id=body.active_expert_id,
+                caller_org_id=c_org_id,
+                caller_user_id=c_uid,
+                caller_roles=caller_roles,
+            )
+            if not bundle:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Expert bundle not found or access denied",
+                )
         update_data["active_expert_id"] = str(body.active_expert_id)
 
     if update_data:

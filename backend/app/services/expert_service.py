@@ -64,18 +64,46 @@ async def get_expert_service(
     pool: asyncpg.Pool,
     bundle_id: UUID,
     caller_org_id: UUID | None,
+    caller_user_id: UUID | None = None,
+    caller_roles: list[str] | None = None,
 ) -> dict[str, Any] | None:
-    """Fetch raw expert bundle by ID."""
-    return await experts_db.get_expert_bundle_by_id(pool, bundle_id, caller_org_id)
+    """Fetch raw expert bundle by ID, verifying grant access if caller_user_id is provided."""
+    bundle = await experts_db.get_expert_bundle_by_id(pool, bundle_id, caller_org_id)
+    if not bundle:
+        return None
+    if caller_user_id is not None:
+        has_grant = await experts_db.check_expert_grant_access(
+            pool=pool,
+            bundle=bundle,
+            caller_user_id=caller_user_id,
+            caller_roles=caller_roles,
+        )
+        if not has_grant:
+            return None
+    return bundle
 
 
 async def get_expert_by_slug_service(
     pool: asyncpg.Pool,
     slug: str,
     caller_org_id: UUID | None,
+    caller_user_id: UUID | None = None,
+    caller_roles: list[str] | None = None,
 ) -> dict[str, Any] | None:
-    """Fetch raw expert bundle by slug."""
-    return await experts_db.get_expert_bundle_by_slug(pool, slug, caller_org_id)
+    """Fetch raw expert bundle by slug, verifying grant access if caller_user_id is provided."""
+    bundle = await experts_db.get_expert_bundle_by_slug(pool, slug, caller_org_id)
+    if not bundle:
+        return None
+    if caller_user_id is not None:
+        has_grant = await experts_db.check_expert_grant_access(
+            pool=pool,
+            bundle=bundle,
+            caller_user_id=caller_user_id,
+            caller_roles=caller_roles,
+        )
+        if not has_grant:
+            return None
+    return bundle
 
 
 async def list_experts_service(
@@ -179,12 +207,14 @@ async def resolve_expert_bundle(
     bundle_id: UUID,
     caller_org_id: UUID,
     caller_user_id: UUID,
+    caller_roles: list[str] | None = None,
 ) -> ResolvedExpertBundle | None:
     """Two-phase member boundary evaluation (PACK-04, SEED-125).
 
     Phase 1:
       Verify bundle exists and is accessible to caller_org_id (is_system = true OR org_id == caller_org_id).
-      If not found or cross-org, returns None.
+      Verify caller holds access grant if visibility is 'granted' or 'private' (PACK-10 / SC#5).
+      If not found, cross-org, or grant denied, returns None.
 
     Phase 2:
       Independently evaluate each referenced member (skills, folders, connections):
@@ -195,6 +225,22 @@ async def resolve_expert_bundle(
     """
     bundle = await experts_db.get_expert_bundle_by_id(pool, bundle_id, caller_org_id)
     if not bundle:
+        return None
+
+    # PACK-10 / SC#5: Verify caller holds grant access for granted/private bundles
+    has_grant = await experts_db.check_expert_grant_access(
+        pool=pool,
+        bundle=bundle,
+        caller_user_id=caller_user_id,
+        caller_roles=caller_roles,
+    )
+    if not has_grant:
+        logger.warning(
+            "EXPERT_GRANT_ACCESS_DENIED: user '%s' lacks grant to resolve expert '%s' (visibility '%s')",
+            caller_user_id,
+            bundle_id,
+            bundle.get("visibility"),
+        )
         return None
 
     stripped_count = 0

@@ -368,3 +368,159 @@ async def test_scenario_s8_clone_on_customise_system_template():
         assert cloned["org_id"] == str(tenant_org_id)
         assert cloned["is_system"] is False
         assert cloned["name"] == "Custom Financial Analyzer"
+
+
+# ── Scenario PACK-10: Ungranted User Refusal on All Surfaces ─────────────────
+
+@pytest.mark.asyncio
+async def test_scenario_pack10_ungranted_user_cannot_read_or_invite_expert():
+    """PACK-10 / SC#5: A user outside the grant set can neither see, read, resolve, nor invite the expert."""
+    mock_pool = MagicMock()
+    org_id = uuid4()
+    creator_id = uuid4()
+    ungranted_user_id = uuid4()
+    granted_user_id = uuid4()
+    bundle_id = uuid4()
+
+    # Raw bundle in DB is readable by org, but visibility='granted'
+    bundle_row = {
+        "id": str(bundle_id),
+        "org_id": str(org_id),
+        "name": "HR Advisor",
+        "slug": "hr-advisor",
+        "description": "Confidential HR advice",
+        "icon": "shield",
+        "category": "HR",
+        "when_to_use": "HR issues only",
+        "example_output": "Policy memo",
+        "scope_mode": "restricted",
+        "tool_floor_enabled": True,
+        "member_skills": [],
+        "required_connections": [],
+        "knowledge_folder_ids": [],
+        "prompt_suggestions": [],
+        "visibility": "granted",
+        "created_by": str(creator_id),
+        "is_system": False,
+        "is_enabled": True,
+    }
+
+    # check_expert_grant_access mock: True only for granted_user_id, False for ungranted_user_id
+    async def mock_check_grant(pool, bundle, caller_user_id, caller_roles=None, **kwargs):
+        if caller_user_id == granted_user_id:
+            return True
+        return False
+
+    with patch("app.db.experts.get_expert_bundle_by_id", AsyncMock(return_value=bundle_row)), \
+         patch("app.db.experts.check_expert_grant_access", AsyncMock(side_effect=mock_check_grant)):
+
+        # 1. Surface 1: get_expert_service
+        # Ungranted user -> must return None (refused)
+        ungranted_bundle = await get_expert_service(
+            mock_pool, bundle_id, org_id, caller_user_id=ungranted_user_id, caller_roles=["member"]
+        )
+        assert ungranted_bundle is None, "Surface 1 (get_expert_service) must refuse ungranted user"
+
+        # Granted user -> allowed
+        granted_bundle = await get_expert_service(
+            mock_pool, bundle_id, org_id, caller_user_id=granted_user_id, caller_roles=["member"]
+        )
+        assert granted_bundle is not None
+        assert granted_bundle["id"] == str(bundle_id)
+
+        # 2. Surface 2: resolve_expert_bundle
+        from app.services.expert_service import resolve_expert_bundle
+        # Ungranted user -> must return None (refused)
+        resolved_ungranted = await resolve_expert_bundle(
+            pool=mock_pool,
+            bundle_id=bundle_id,
+            caller_org_id=org_id,
+            caller_user_id=ungranted_user_id,
+            caller_roles=["member"],
+        )
+        assert resolved_ungranted is None, "Surface 2 (resolve_expert_bundle) must refuse ungranted user"
+
+        # Granted user -> allowed
+        resolved_granted = await resolve_expert_bundle(
+            pool=mock_pool,
+            bundle_id=bundle_id,
+            caller_org_id=org_id,
+            caller_user_id=granted_user_id,
+            caller_roles=["member"],
+        )
+        assert resolved_granted is not None
+        assert resolved_granted.bundle_id == bundle_id
+
+        # 3. Surface 3 (HTTP Endpoints): get_expert & resolve_expert
+        from app.api.experts import get_expert, resolve_expert
+
+        # Ungranted user calling GET /experts/{id} -> 404
+        with pytest.raises(HTTPException) as exc_info:
+            await get_expert(
+                bundle_id=bundle_id,
+                active_org=str(org_id),
+                current_user={"id": str(ungranted_user_id), "role": "member"},
+                pool=mock_pool,
+            )
+        assert exc_info.value.status_code == 404
+        assert exc_info.value.detail == "Expert bundle not found"
+
+        # Granted user calling GET /experts/{id} -> 200
+        ok_bundle = await get_expert(
+            bundle_id=bundle_id,
+            active_org=str(org_id),
+            current_user={"id": str(granted_user_id), "role": "member"},
+            pool=mock_pool,
+        )
+        assert ok_bundle["id"] == str(bundle_id)
+
+        # Ungranted user calling GET /experts/{id}/resolve -> 404
+        with pytest.raises(HTTPException) as exc_info:
+            await resolve_expert(
+                bundle_id=bundle_id,
+                active_org=str(org_id),
+                current_user={"id": str(ungranted_user_id), "role": "member"},
+                pool=mock_pool,
+            )
+        assert exc_info.value.status_code == 404
+
+        # Granted user calling GET /experts/{id}/resolve -> 200
+        ok_resolved = await resolve_expert(
+            bundle_id=bundle_id,
+            active_org=str(org_id),
+            current_user={"id": str(granted_user_id), "role": "member"},
+            pool=mock_pool,
+        )
+        assert ok_resolved.bundle_id == bundle_id
+
+        # 4. Surface 4: run_producer runtime thread scoping (cannot invite / execute turn)
+        mock_thread_resp = MagicMock()
+        mock_thread_resp.data = {"active_expert_id": str(bundle_id), "folder_id": None}
+        mock_supabase = MagicMock()
+        mock_table = MagicMock()
+        mock_supabase.table.return_value = mock_table
+        mock_table.select.return_value = mock_table
+        mock_table.eq.return_value = mock_table
+        mock_table.update.return_value = mock_table
+
+        call_count = 0
+        async def mock_thread_aexec(query):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                return mock_thread_resp
+            return MagicMock(data=[])
+
+        # Ungranted user executing thread -> fails closed with ValueError and resets active_expert_id
+        with patch("app.utils.db.aexec", side_effect=mock_thread_aexec):
+            with pytest.raises(ValueError) as val_err:
+                await _resolve_thread_scoping(
+                    supabase=mock_supabase,
+                    thread_id="test-thread-id",
+                    current_user={"id": str(ungranted_user_id), "org_id": str(org_id), "role": "member"},
+                    pool=mock_pool,
+                )
+            assert "refusing run (fail-closed)" in str(val_err.value)
+            mock_table.update.assert_called_with({"active_expert_id": None})
+
+

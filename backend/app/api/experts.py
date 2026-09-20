@@ -100,16 +100,44 @@ async def draft_expert(
     """
     org_id = _to_uuid(active_org)
 
-    # 1. Ephemeral in-memory text extraction
+    # 1. Ephemeral in-memory text extraction (PACK-09, F-2, F-3)
     brainstorm_snippets: list[str] = []
     if files:
         for f in files:
             if f and f.filename:
                 try:
-                    data = await f.read()
+                    # Bounded in-memory read (F-3: max 5MB per file)
+                    MAX_FILE_BYTES = 5 * 1024 * 1024
+                    data = await f.read(MAX_FILE_BYTES)
                     if data:
-                        text = data.decode("utf-8", errors="replace")[:30000]
-                        brainstorm_snippets.append(f"--- File: {f.filename} ---\n{text}")
+                        fname_lower = f.filename.lower()
+                        extracted_text = ""
+                        if fname_lower.endswith(".pdf"):
+                            try:
+                                import io  # noqa: PLC0415
+                                from pypdf import PdfReader  # noqa: PLC0415
+                                reader = PdfReader(io.BytesIO(data))
+                                extracted_text = "\n\n".join(
+                                    page.extract_text() or "" for page in reader.pages
+                                )
+                            except Exception as pdf_err:
+                                logger.warning("Failed to extract PDF text from %s: %s", f.filename, pdf_err)
+                        elif fname_lower.endswith(".docx"):
+                            try:
+                                import io  # noqa: PLC0415
+                                from docx import Document as DocxDocument  # noqa: PLC0415
+                                doc = DocxDocument(io.BytesIO(data))
+                                extracted_text = "\n\n".join(
+                                    p.text for p in doc.paragraphs if p.text.strip()
+                                )
+                            except Exception as docx_err:
+                                logger.warning("Failed to extract DOCX text from %s: %s", f.filename, docx_err)
+                        else:
+                            extracted_text = data.decode("utf-8", errors="replace")
+
+                        cleaned_text = extracted_text.strip()[:30000]
+                        if cleaned_text:
+                            brainstorm_snippets.append(f"--- File: {f.filename} ---\n{cleaned_text}")
                     del data
                 except Exception as exc:
                     logger.warning("Failed to extract ephemeral text from %s: %s", f.filename, exc)
@@ -196,14 +224,24 @@ async def list_experts(
 async def get_expert(
     bundle_id: UUID,
     active_org: str = Depends(get_active_org_id),
+    current_user: dict[str, Any] = Depends(get_current_user),
     pool: asyncpg.Pool = Depends(get_pg_pool),
 ) -> dict[str, Any]:
     """Fetch raw expert bundle manifest by ID.
 
-    Gated by require_capability('experts') (PACK-06).
+    Gated by require_capability('experts') (PACK-06) and expert grant access (PACK-10).
     """
     org_id = _to_uuid(active_org)
-    bundle = await get_expert_service(pool=pool, bundle_id=bundle_id, caller_org_id=org_id)
+    user_id = _to_uuid(current_user["id"] if isinstance(current_user, dict) else getattr(current_user, "id"))
+    caller_role = current_user.get("role")
+    caller_roles = [caller_role] if caller_role else []
+    bundle = await get_expert_service(
+        pool=pool,
+        bundle_id=bundle_id,
+        caller_org_id=org_id,
+        caller_user_id=user_id,
+        caller_roles=caller_roles,
+    )
     if not bundle:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -226,11 +264,14 @@ async def resolve_expert(
     """
     org_id = _to_uuid(active_org)
     user_id = _to_uuid(current_user["id"] if isinstance(current_user, dict) else getattr(current_user, "id"))
+    caller_role = current_user.get("role")
+    caller_roles = [caller_role] if caller_role else []
     resolved = await resolve_expert_bundle(
         pool=pool,
         bundle_id=bundle_id,
         caller_org_id=org_id,
         caller_user_id=user_id,
+        caller_roles=caller_roles,
     )
     if not resolved:
         raise HTTPException(

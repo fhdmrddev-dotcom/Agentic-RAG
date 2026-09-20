@@ -403,12 +403,15 @@ async def _resolve_thread_scoping(
         from app.services.expert_service import resolve_expert_bundle  # noqa: PLC0415
         caller_user_id = UUID(str(current_user["id"]))
         caller_org_id = UUID(str(current_user["org_id"])) if current_user.get("org_id") else None
+        caller_role = current_user.get("role") if isinstance(current_user, dict) else getattr(current_user, "role", None)
+        caller_roles = [caller_role] if caller_role else []
 
         resolved = await resolve_expert_bundle(
             pool=pool,
             bundle_id=UUID(str(active_expert_id)),
             caller_user_id=caller_user_id,
             caller_org_id=caller_org_id,
+            caller_roles=caller_roles,
         )
         if not resolved:
             # Phase 260 F-1 (Fail-Closed): Drop stale/inaccessible active_expert_id to keep DB/UI honest

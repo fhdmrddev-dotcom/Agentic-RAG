@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import io
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import UUID, uuid4
 
 import asyncpg
@@ -157,3 +157,71 @@ async def test_expert_draft_non_ingestion_guarantee():
         )
     finally:
         await conn.close()
+
+
+@pytest.mark.asyncio
+async def test_expert_draft_pdf_docx_extraction():
+    """Verify F-2: in-memory text extraction for PDF and DOCX brainstorm files in /experts/draft."""
+    from app.api.experts import draft_expert
+    from docx import Document as DocxDocument
+
+    # 1. Create in-memory DOCX
+    docx_io = io.BytesIO()
+    doc = DocxDocument()
+    doc.add_paragraph("Employee Leave Policy Document and Guidelines")
+    doc.save(docx_io)
+    docx_file = UploadFile(
+        file=io.BytesIO(docx_io.getvalue()),
+        filename="leave_policy.docx",
+    )
+
+    # 2. Mock pypdf reader for PDF extraction
+    mock_pdf_page = MagicMock()
+    mock_pdf_page.extract_text.return_value = "Quarterly Compliance and Risk Assessment Report"
+    mock_pdf_reader = MagicMock()
+    mock_pdf_reader.pages = [mock_pdf_page]
+
+    pdf_file = UploadFile(
+        file=io.BytesIO(b"%PDF-1.4 test mock pdf content"),
+        filename="compliance_report.pdf",
+    )
+
+    mock_pool = MagicMock()
+    mock_pool.fetch = AsyncMock(return_value=[])
+
+    with patch("pypdf.PdfReader", return_value=mock_pdf_reader), \
+         patch("app.services.expert_authoring.forced_emit", new_callable=AsyncMock) as mock_emit:
+        mock_emit.return_value = {
+            "emitted": {
+                "name": "Policy & Compliance Officer",
+                "slug": "policy-compliance-officer",
+                "icon": "shield",
+                "category": "Legal",
+                "when_to_use": "When reviewing HR and compliance policies",
+                "example_output": "Risk memo",
+                "description": "Extracts from PDF and DOCX",
+                "scope_mode": "biased",
+                "tool_floor_enabled": True,
+                "prompt_suggestions": [],
+                "member_skills": [],
+                "knowledge_folder_ids": [],
+                "required_connections": [],
+            }
+        }
+
+        res = await draft_expert(
+            description="Policy and compliance reviewer",
+            files=[docx_file, pdf_file],
+            active_org=str(uuid4()),
+            current_user={"id": str(uuid4()), "role": "org-admin"},
+            pool=mock_pool,
+        )
+
+        assert res.name == "Policy & Compliance Officer"
+        assert mock_emit.called
+        # Verify brainstorm_text received the extracted text from both docx and pdf
+        call_kwargs = mock_emit.call_args[1]
+        user_content = call_kwargs["messages"][0]["content"]
+        assert "Employee Leave Policy Document and Guidelines" in user_content
+        assert "Quarterly Compliance and Risk Assessment Report" in user_content
+
