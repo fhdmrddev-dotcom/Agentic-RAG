@@ -165,6 +165,9 @@ const BASELINE = {
   // ── Phase 260 (PACK-02 / PACK-03) — Consultant Expert UI & Action Tiles ──
   "ComposerExpert.test.tsx": 5,
   "ExpertSpotlightCard.test.tsx": 5,
+  // ── Phase 261 (PACK-07 / PACK-09 / PACK-10) — Expert Authoring Studio & Org Management ──
+  "OrgExpertsTab.test.tsx": 5,
+  "ExpertAuthoringStudio.test.tsx": 4,
   // ── Phase 237 (RULES-01 / SC#1 / SC#3) — Classification rules & arrival watch builder suites ──
   "ClassificationRulesPage.test.tsx": 8,
   "ClassificationSection.test.tsx": 13,
@@ -4323,6 +4326,9 @@ const TARGETS = [
   // ── Phase 260 (PACK-02 / PACK-03) — Consultant Expert UI & Action Tiles ──
   "src/components/chat/__tests__/ComposerExpert.test.tsx",
   "src/components/chat/__tests__/ExpertSpotlightCard.test.tsx",
+  // ── Phase 261 (PACK-07 / PACK-09 / PACK-10) — Expert Authoring Studio & Org Management ──
+  "src/components/experts/__tests__/OrgExpertsTab.test.tsx",
+  "src/components/experts/__tests__/ExpertAuthoringStudio.test.tsx",
   // ── BUG-260912-01 — narration renders in the fold, not the body ───────────────────────
   //
   // ⛔ `src/components/chat` has NO bare-directory TARGETS entry (this file says so in four

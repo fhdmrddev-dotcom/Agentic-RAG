@@ -27,6 +27,11 @@ export interface ExpertBundle {
   visibility: string
   is_system: boolean
   is_enabled: boolean
+  icon?: string
+  category?: string
+  when_to_use?: string
+  example_output?: string
+  tool_floor_enabled?: boolean
 }
 
 
