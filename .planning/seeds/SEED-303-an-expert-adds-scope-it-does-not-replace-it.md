@@ -27,7 +27,7 @@ An Expert declares **four** things, and Phase 260 gave all four the same semanti
 |---|---|---|---|
 | Knowledge | `knowledge_folder_ids` | replaces the thread's folder | **union by default**, replace only when declared |
 | Skills | `member_skills` | override catalog | additive — a skill is *method*, never a fence |
-| Tools | derived `EXPERT_CORE_TOOLS` (10) | **subtracts 21 of 31** | additive floor, never a ceiling |
+| Tools | derived `EXPERT_CORE_TOOLS` (10) | **subtracts 19 of 29** | additive floor, never a ceiling |
 | Connections | `required_connections` | added | added, **plus a precondition check** |
 | Who may use | `visibility` (+ 261 grants) | — | orthogonal to all of the above |
 
@@ -143,7 +143,7 @@ and per-Expert usage / spend attribution.
   the sketch uses "Restricted" for the **grant** axis (`Restricted Grant`, `Restricted (HR Only)`)
   while `scope_mode` uses it for the **knowledge** axis. One word, two axes, in the surface that
   teaches users the model.
-- Measured 2026-09-20: `_TOOL_REGISTRY` 31 entries (`tool_dispatcher.py:4544`),
+- Measured 2026-09-20: `_TOOL_REGISTRY` **29** entries (`tool_dispatcher.py:4544`) — ⚠ corrected 2026-09-20 from a mistaken 31 (grep lines, not AST); re-derived at base AND head, and 261's fence pins `== 29`,
   `EXPERT_CORE_TOOLS` 10 (`:4585`), `scope_mode` read by zero call sites.
 - Phase 259 operator decisions #3 (restrict or bias) and #4 (two at once) are the two this seed
   answers with evidence rather than suspicion.

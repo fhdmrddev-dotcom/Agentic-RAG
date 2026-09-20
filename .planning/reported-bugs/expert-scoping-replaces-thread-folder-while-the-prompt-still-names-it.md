@@ -49,10 +49,10 @@ disagreeing in one turn, and the model is told the wrong one.
 regardless of what its row says. Phase 259's operator decision #3 ("does an Expert RESTRICT or
 merely BIAS?") was answered with a column and never enforced.
 
-**3. Inviting an Expert silently removes 21 of 31 tools.** `run_producer.py:430-432` derives
+**3. Inviting an Expert silently removes ~~21 of 31~~ 19 of 29 tools.** ⚠ *Corrected 2026-09-20 at the 261 review: `_TOOL_REGISTRY` measures **29**, AST-counted at base and HEAD and confirmed by 261's own fence pinning `== 29`. The 31 came from counting grep output lines, which included comments. The finding is unchanged in kind — the four stripped tools are the same.* `run_producer.py:430-432` derives
 `effective_tools` from `EXPERT_CORE_TOOLS` (10 tools) plus the bundle's connections, and
 `agent_loop.py:1674-1680` filters `active_tools` down to that set. Measured against
-`_TOOL_REGISTRY` (31 entries, `tool_dispatcher.py:4544`), an Expert-scoped thread loses:
+`_TOOL_REGISTRY` (**29** entries, `tool_dispatcher.py:4544`), an Expert-scoped thread loses:
 
 `execute_code` · `workspace_write` / `_read` / `_list` / `_delete` / `_diff` ·
 `render_template` · `ask_user` · `write_todos` · `task` · `web_search` · `remember` / `recall` ·
@@ -69,7 +69,7 @@ expert to a folder and I injected this expert into a chat in a different folder 
 contradiction."* It is not a future contradiction — it ships today.
 
 The commercially worse half is finding 3. An Expert is the product's SKU. As built, inviting one
-is a **capability downgrade**: the user had 31 tools a second earlier and now has 10. The
+is a **capability downgrade**: the user had 29 tools a second earlier and now has 10. The
 "Financial Analyst" cannot render a chart, fill a template, or write a deliverable — the three
 things a buyer pictures when they hear the word *analyst*. Every competitor in this class
 (Custom GPTs, Claude Projects, Copilot Studio agents) produces artifacts.
