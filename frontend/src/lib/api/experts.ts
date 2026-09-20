@@ -81,6 +81,8 @@ async function handleResponse<T>(res: Response, fallbackError: string): Promise<
         msg = err.detail.detail
       } else if (err.detail?.upgrade_hint) {
         msg = err.detail.upgrade_hint
+      } else if (Array.isArray(err.detail) && err.detail.length > 0) {
+        msg = err.detail.map((e: any) => e.msg || e.message || JSON.stringify(e)).join(", ")
       } else if (err.message) {
         msg = err.message
       }
@@ -142,8 +144,13 @@ export async function deleteExpert(bundleId: string): Promise<{ deleted: boolean
   return handleResponse<{ deleted: boolean; id: string }>(res, "Failed to delete expert")
 }
 
-export async function draftExpert(description: string, files?: File[]): Promise<ExpertDraftOutput> {
-  const headers = await getAuthHeaders()
+export async function draftExpert(
+  description: string,
+  files?: File[],
+): Promise<ExpertDraftOutput> {
+  const authHeaders = (await getAuthHeaders()) as Record<string, string>
+  // Strip Content-Type so browser fetch sets multipart/form-data boundary automatically
+  const { "Content-Type": _, ...headers } = authHeaders
   const formData = new FormData()
   formData.append("description", description)
   if (files && files.length > 0) {

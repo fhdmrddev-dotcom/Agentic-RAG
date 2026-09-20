@@ -88,7 +88,7 @@ async def create_expert(
 @router.post("/draft", status_code=status.HTTP_200_OK, response_model=ExpertDraftOutput)
 async def draft_expert(
     description: str = Form(..., description="Description of the desired expert"),
-    files: list[UploadFile] = File(None, description="Ephemeral brainstorm files (never ingested into permanent documents)"),
+    files: list[UploadFile] | None = File(default=None, description="Ephemeral brainstorm files (never ingested into permanent documents)"),
     active_org: str = Depends(get_active_org_id),
     current_user: dict[str, Any] = Depends(require_expert_manage),
     pool: asyncpg.Pool = Depends(get_pg_pool),

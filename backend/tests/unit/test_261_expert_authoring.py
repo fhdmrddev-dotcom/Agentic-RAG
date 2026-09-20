@@ -225,3 +225,26 @@ async def test_expert_draft_pdf_docx_extraction():
         assert "Employee Leave Policy Document and Guidelines" in user_content
         assert "Quarterly Compliance and Risk Assessment Report" in user_content
 
+
+@pytest.mark.asyncio
+async def test_expert_draft_without_files():
+    """Verify draft_expert succeeds when no brainstorm files are attached (files=None)."""
+    from app.api.experts import draft_expert
+
+    mock_pool = MagicMock()
+    mock_pool.fetch = AsyncMock(return_value=[])
+
+    res = await draft_expert(
+        description="Academic review specialist for thesis review",
+        files=None,
+        active_org=str(uuid4()),
+        current_user={"id": str(uuid4()), "role": "org-admin"},
+        pool=mock_pool,
+    )
+
+    assert isinstance(res, ExpertDraftOutput)
+    assert res.name
+    assert res.slug
+    assert res.scope_mode == "biased"
+    assert res.tool_floor_enabled is True
+
