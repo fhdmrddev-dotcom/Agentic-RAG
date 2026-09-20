@@ -4,11 +4,11 @@ title: An invited Expert replaces the thread's folder scope while the system pro
 reported: 2026-09-20
 surface: Agentic-RAG
 severity: major
-status: open
+status: folded
 affected_areas: [backend/agent-loop, experts, RAG/retrieval, frontend/chat]
-folded_into: null
+folded_into: "261"
 verified_closed_by: null
-related_seeds: [SEED-303]
+related_seeds: [SEED-303]  # arms ratified as D-v4.3-01 / D-v4.3-02 on 2026-09-20
 re_open_trigger: null
 reproduces_on:
   branch: develop

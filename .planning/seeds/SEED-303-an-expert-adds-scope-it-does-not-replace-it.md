@@ -3,14 +3,14 @@ seed_id: SEED-303
 title: An Expert must ADD scope and capability, not replace them — binding is not usage, and four axes each need their own semantic
 created: 2026-09-20
 surface: Agentic-RAG
-status: planted
-partial: false
-status_note:
+status: partially-answered
+partial: true
+status_note: Two arms RATIFIED by the operator 2026-09-20 as D-v4.3-01 (union-by-default knowledge) and D-v4.3-02 (additive tool floor); the fixes are owed in Phase 261. The remaining arms - S3 (two Experts), S8 (clone-on-customise) and per-Expert spend attribution - are still open.
 trigger_when: Any phase that authors, lists, invites, scopes or prices an Expert — 261 and 262 both fire on it. Also fires on any phase that changes EXPERT_CORE_TOOLS, the thread scoping resolver, or the folder subtree override in the agent loop.
 trigger_paths: ["backend/app/models/expert.py", "backend/app/services/expert_service.py", "backend/app/db/experts.py", "backend/app/api/experts.py", "backend/app/services/run_producer.py", "**/agent_loop.py", "**/tool_dispatcher.py", "frontend/src/components/chat/InviteExpertDialog.tsx", "frontend/src/components/chat/ActiveExpertChip.tsx", "frontend/src/components/chat/ExpertSpotlightCard.tsx", "frontend/src/lib/api/experts.ts"]
 trigger_surfaces: [backend, frontend, chat]
 migration_note:
-relates_to: [BUG-260920-01, SEED-291, SEED-294, "259", "260", "261", "262"]
+relates_to: [BUG-260920-01, D-v4.3-01, D-v4.3-02, BUS-291, SEED-291, SEED-294, "259", "260", "261", "262"]
 folded_into: null
 renumbered_from: null
 renumbered_because: null
@@ -118,6 +118,23 @@ decision attached. S3 / S8 / the attribution join are each a phase's worth, and 
 tool floor are all resolved as **data handed to** the loop, exactly as `D-260-05` requires — so
 `EXT-01` and `PACK-01` stay intact. A phase that implements this by adding `if expert:` inside
 the loop has failed the contract, not satisfied this seed.
+
+## Operator ratification — 2026-09-20
+
+Two of this seed's arms are **settled**, recorded in `.planning/PROJECT.md` -> Key Decisions:
+
+- **`D-v4.3-01`** - knowledge composes by **UNION with the thread's folder** by default
+  (`scope_mode: biased`). `restricted` / *Strict Isolation* stays opt-in **and states its cost at
+  invite time**. S4 is the reason; S5 is why the other mode survives.
+- **`D-v4.3-02`** - tools are an **additive floor, never a ceiling**: `execute_code`,
+  `workspace_write`, `render_template` and `ask_user` are kept. A restricted Expert narrows
+  **knowledge**, not competence. S6 is the reason.
+
+Both fixes are owed in **Phase 261**, and `BUG-260920-01` is folded into it.
+
+STILL OPEN, and not ratified by the above: **S3** (two Experts at once -> one active, second as a
+handoff thread), **S8** (clone-on-customise for system Experts, which the pack business needs),
+and per-Expert usage / spend attribution.
 
 ## Breadcrumbs
 
