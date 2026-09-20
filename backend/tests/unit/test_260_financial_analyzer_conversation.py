@@ -241,3 +241,125 @@ async def test_multi_turn_financial_analyzer_conversation_integrity():
     # Out-of-scope tools (e.g. bash, terminal, mutate) are excluded
     assert "run_command" not in ctx.effective_tools
     assert "execute_bash" not in ctx.effective_tools
+
+
+@pytest.mark.asyncio
+async def test_resolve_thread_scoping_unresolvable_expert_fails_closed_and_resets_chip():
+    """Phase 260 F-1: Unresolvable active_expert_id raises ValueError and clears chip from thread."""
+    from app.services.run_producer import _resolve_thread_scoping
+
+    mock_supabase = MagicMock()
+    thread_row = MagicMock()
+    thread_row.data = {"active_expert_id": "00000000-0000-0000-0000-000000000999"}
+
+    # Mock supabase select returning active_expert_id
+    mock_table = MagicMock()
+    mock_supabase.table.return_value = mock_table
+    mock_table.select.return_value = mock_table
+    mock_table.eq.return_value = mock_table
+    mock_table.update.return_value = mock_table
+
+    call_count = 0
+
+    async def mock_aexec(query):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            return thread_row
+        return MagicMock(data=[])
+
+    with patch("app.utils.db.aexec", side_effect=mock_aexec), \
+         patch("app.services.expert_service.resolve_expert_bundle", new_callable=AsyncMock) as mock_resolve:
+        # Resolver returns None (missing or cross-org bundle)
+        mock_resolve.return_value = None
+
+        with pytest.raises(ValueError, match="could not be resolved or is inaccessible; refusing run \\(fail-closed\\)"):
+            await _resolve_thread_scoping(
+                supabase=mock_supabase,
+                thread_id="test-thread-fail-closed",
+                current_user={"id": "00000000-0000-0000-0000-000000000001", "org_id": "430bffc6-7275-499b-b307-d932b4750051"},
+                pool=MagicMock(),
+            )
+
+        # Verify threads table was updated with active_expert_id = None to keep UI honest
+        mock_table.update.assert_called_with({"active_expert_id": None})
+
+
+@pytest.mark.asyncio
+async def test_resolve_thread_scoping_exception_fails_closed():
+    """Phase 260 F-1: Any exception during resolution fails closed rather than falling back to unrestricted."""
+    from app.services.run_producer import _resolve_thread_scoping
+
+    mock_supabase = MagicMock()
+    thread_row = MagicMock()
+    thread_row.data = {"active_expert_id": "00000000-0000-0000-0000-000000000999"}
+
+    mock_table = MagicMock()
+    mock_supabase.table.return_value = mock_table
+    mock_table.select.return_value = mock_table
+    mock_table.eq.return_value = mock_table
+
+    async def mock_aexec(query):
+        return thread_row
+
+    with patch("app.utils.db.aexec", side_effect=mock_aexec), \
+         patch("app.services.expert_service.resolve_expert_bundle", new_callable=AsyncMock) as mock_resolve:
+        mock_resolve.side_effect = RuntimeError("Database timeout during bundle resolution")
+
+        with pytest.raises(RuntimeError, match="Database timeout"):
+            await _resolve_thread_scoping(
+                supabase=mock_supabase,
+                thread_id="test-thread-exc",
+                current_user={"id": "00000000-0000-0000-0000-000000000001"},
+                pool=MagicMock(),
+            )
+
+
+@pytest.mark.asyncio
+async def test_resolve_thread_scoping_derives_expert_core_tools():
+    """Phase 260 F-3: Successful resolution derives tools strictly from tool_dispatcher.EXPERT_CORE_TOOLS."""
+    from app.services.run_producer import _resolve_thread_scoping
+    from app.services.tool_dispatcher import EXPERT_CORE_TOOLS
+    from app.services.expert_service import ResolvedExpertBundle
+
+    mock_supabase = MagicMock()
+    thread_row = MagicMock()
+    thread_row.data = {"active_expert_id": "00000000-0000-0000-0000-000000000260"}
+
+    mock_table = MagicMock()
+    mock_supabase.table.return_value = mock_table
+    mock_table.select.return_value = mock_table
+    mock_table.eq.return_value = mock_table
+
+    async def mock_aexec(query):
+        return thread_row
+
+    resolved = ResolvedExpertBundle(
+        bundle_id=UUID("00000000-0000-0000-0000-000000000260"),
+        name="Financial Analyzer",
+        slug="financial-analyzer",
+        description="Financial analysis expert",
+        scope_mode="restricted",
+        is_system=True,
+        org_id=None,
+        effective_folder_ids=[UUID(FINANCIAL_FOLDER_ID)],
+        effective_skills=["financial_ratio_calculator"],
+        effective_connections=["slack_notify"],
+    )
+
+    with patch("app.utils.db.aexec", side_effect=mock_aexec), \
+         patch("app.services.expert_service.resolve_expert_bundle", new_callable=AsyncMock, return_value=resolved):
+        folders, tools, skills = await _resolve_thread_scoping(
+            supabase=mock_supabase,
+            thread_id="test-thread-ok",
+            current_user={"id": "00000000-0000-0000-0000-000000000001", "org_id": "430bffc6-7275-499b-b307-d932b4750051"},
+            pool=MagicMock(),
+        )
+
+        assert folders == (FINANCIAL_FOLDER_ID,)
+        assert set(EXPERT_CORE_TOOLS).issubset(set(tools))
+        assert "slack_notify" in tools
+        # Phantom tool is gone
+        assert "fetch_document_chunk" not in tools
+        assert skills == ({"name": "financial_ratio_calculator", "description": "Expert member skill: financial_ratio_calculator"},)
+

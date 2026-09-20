@@ -162,6 +162,9 @@ const BASELINE = {
   "RunCard.test.tsx": 29,
   "RunCard.timer.test.tsx": 7,
   "ChatArea.approval.test.tsx": 3,
+  // ── Phase 260 (PACK-02 / PACK-03) — Consultant Expert UI & Action Tiles ──
+  "ComposerExpert.test.tsx": 5,
+  "ExpertSpotlightCard.test.tsx": 5,
   // ── Phase 237 (RULES-01 / SC#1 / SC#3) — Classification rules & arrival watch builder suites ──
   "ClassificationRulesPage.test.tsx": 8,
   "ClassificationSection.test.tsx": 13,
@@ -4317,6 +4320,9 @@ const TARGETS = [
   "src/components/chat/RunCard.test.tsx",
   "src/components/chat/RunCard.timer.test.tsx",
   "src/components/chat/__tests__/ChatArea.approval.test.tsx",
+  // ── Phase 260 (PACK-02 / PACK-03) — Consultant Expert UI & Action Tiles ──
+  "src/components/chat/__tests__/ComposerExpert.test.tsx",
+  "src/components/chat/__tests__/ExpertSpotlightCard.test.tsx",
   // ── BUG-260912-01 — narration renders in the fold, not the body ───────────────────────
   //
   // ⛔ `src/components/chat` has NO bare-directory TARGETS entry (this file says so in four
@@ -5681,9 +5687,11 @@ function runVitest() {
   // on two concurrent runs whose serial baseline is `failed 0`. Capped at 4
   // workers each, two concurrent runs agree EXACTLY (9 files / 23 tests failing,
   // the known SEED-056 rot set, on both). Absent => unchanged single-run behaviour.
-  if (process.env.GSD_VITEST_MAX_WORKERS) {
-    args.push(`--maxWorkers=${process.env.GSD_VITEST_MAX_WORKERS}`)
+  const maxWorkers = process.env.GSD_VITEST_MAX_WORKERS || (process.platform === "win32" ? "2" : undefined)
+  if (maxWorkers) {
+    args.push(`--maxWorkers=${maxWorkers}`)
   }
+
 
   // ⛔ THE WINDOWS COMMAND-LENGTH LIMIT — measured 2026-09-10 (Phase 241-03), and it was
   //    ALREADY BROKEN at that phase's base commit, by nothing that phase changed.

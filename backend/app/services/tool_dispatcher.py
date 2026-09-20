@@ -4580,6 +4580,27 @@ _TOOL_REGISTRY: dict[str, Callable] = {
     "attach_skill_file": _handle_attach_skill_file,
 }
 
+# Phase 260 (PACK-02 / F-3) — Canonical core tools allowed for consultant experts
+# Derived strictly from _TOOL_REGISTRY keys to prevent second-registry drift.
+EXPERT_CORE_TOOLS: frozenset[str] = frozenset({
+    "search_documents",
+    "query_documents",
+    "read_document",
+    "analyze_document",
+    "ls",
+    "tree",
+    "grep",
+    "glob",
+    "load_skill",
+    "read_skill_file",
+})
+
+assert EXPERT_CORE_TOOLS.issubset(_TOOL_REGISTRY.keys()), (
+    f"EXPERT_CORE_TOOLS contains tools not registered in _TOOL_REGISTRY: "
+    f"{EXPERT_CORE_TOOLS - set(_TOOL_REGISTRY.keys())}"
+)
+
+
 
 def _spawn_tool_refused_audit(ctx: ToolContext, tool_name: str, allowed: list[str]) -> None:
     """D-06: fire-and-forget a harness_audit ``tool_refused`` row on a whitelist refusal.

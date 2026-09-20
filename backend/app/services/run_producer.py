@@ -409,24 +409,24 @@ async def _resolve_thread_scoping(
             caller_org_id=caller_org_id,
         )
         if not resolved:
-            return None, None, None
+            # Phase 260 F-1 (Fail-Closed): Drop stale/inaccessible active_expert_id to keep DB/UI honest
+            try:
+                await aexec(
+                    supabase.table("threads")
+                    .update({"active_expert_id": None})
+                    .eq("id", str(thread_id))
+                )
+            except Exception:
+                logger.warning("Failed to reset stale active_expert_id on thread %s", thread_id, exc_info=True)
+            raise ValueError(
+                f"Active expert '{active_expert_id}' could not be resolved or is inaccessible; refusing run (fail-closed)"
+            )
 
         effective_folder_ids = tuple(str(f) for f in resolved.effective_folder_ids)
 
-        core_tools = [
-            "search_documents",
-            "query_documents",
-            "fetch_document_chunk",
-            "read_document",
-            "analyze_document",
-            "ls",
-            "tree",
-            "grep",
-            "glob",
-            "load_skill",
-            "read_skill_file",
-        ]
-        effective_tools = tuple(core_tools + list(resolved.effective_connections))
+        # Phase 260 F-3: derive core tools strictly from tool_dispatcher.EXPERT_CORE_TOOLS
+        from app.services.tool_dispatcher import EXPERT_CORE_TOOLS  # noqa: PLC0415
+        effective_tools = tuple(sorted(EXPERT_CORE_TOOLS) + list(resolved.effective_connections))
 
         skill_catalog_override = None
         if resolved.effective_skills:
@@ -436,13 +436,14 @@ async def _resolve_thread_scoping(
             )
 
         return effective_folder_ids, effective_tools, skill_catalog_override
-    except Exception:
-        logger.warning(
-            "Failed to resolve consultant expert scoping for thread %s; falling back to unrestricted chat",
+    except Exception as exc:
+        logger.error(
+            "Failed to resolve consultant expert scoping for thread %s; refusing run (fail-closed): %s",
             thread_id,
+            exc,
             exc_info=True,
         )
-        return None, None, None
+        raise
 
 
 async def run_producer(

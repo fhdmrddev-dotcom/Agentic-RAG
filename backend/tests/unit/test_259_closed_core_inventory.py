@@ -80,3 +80,15 @@ def test_expert_service_is_pure_data_manifest_ast():
         if isinstance(node, ast.ImportFrom):
             if node.module and any(p in node.module for p in ("openai", "anthropic", "litellm", "agent_loop")):
                 pytest.fail(f"Forbidden LLM or agent loop import in expert_service.py:{node.lineno} ({node.module})")
+
+
+def test_expert_core_tools_is_strict_subset_of_tool_registry():
+    """PACK-02 / Phase 260 F-3: EXPERT_CORE_TOOLS is derived and fenced strictly against _TOOL_REGISTRY."""
+    from app.services.tool_dispatcher import EXPERT_CORE_TOOLS, _TOOL_REGISTRY
+
+    assert len(EXPERT_CORE_TOOLS) == 10, f"Expected 10 core tools for experts, got {len(EXPERT_CORE_TOOLS)}"
+    assert EXPERT_CORE_TOOLS.issubset(_TOOL_REGISTRY.keys()), (
+        f"Inventory drift: EXPERT_CORE_TOOLS has unregistered members: "
+        f"{EXPERT_CORE_TOOLS - set(_TOOL_REGISTRY.keys())}"
+    )
+
