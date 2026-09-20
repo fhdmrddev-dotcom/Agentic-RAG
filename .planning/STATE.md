@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v4.3
 milestone_name: What You Can Actually Sell
-status: in_progress
-last_updated: "2026-09-20T05:15:00.000Z"
-last_activity: 2026-09-20 -- Phase 260 executed (all 3 plans complete, gates passed, Financial Analyzer proof verified). Ready for review.
+status: milestone_phases_complete
+last_updated: "2026-09-20T12:00:00.000Z"
+last_activity: 2026-09-20 -- Phase 260 CLOSED, 3/3 SC, review PASS (260-REVIEW.md). F-1 the scope FAILED OPEN while the UI kept showing the Expert chip -- the inverse of D-258-06, and invisible from the happy path the operator had already driven live. F-2 both new frontend suites ran in NO gate (the total sat byte-identical at 8468). F-3 found a phantom tool granted to every Expert. All fixed and RE-DRIVEN. ALL v4.3 phases 255-260 are CLOSED; migrations 186-188 owed to production, both prod orgs still NULL-tier.
 progress:
   total_phases: 6
   completed_phases: 6
@@ -111,6 +111,51 @@ Last activity: 2026-09-20 -- Phase 260 executed (all 3 plans complete, gates pas
 - **F-6 (Resolved)**: Re-derived hot-file ledger triples updated in `docs/HOT-FILE-LEDGER.md` and `CLAUDE.md` (`entitlements.py` 1/1/169, `entitlement_service.py` 1/1/130, `api/workflows.py` 43/23/2261).
 - **F-5 Deploy-Ordering Hazard**: Recorded in OWED TO THE OPERATOR (Migration 186 must be applied to production before or at backend deployment).
 - **F-2 Scope Disposition**: Workflow authoring proof slice (`POST /workflows`, `POST /workflows/{id}/publish`) gated as planned. Runtime kickoff gating via `threads.py` deferred to execution milestone/phase to preserve `threads.py` G-5 invariants and isolate general thread chat.
+
+### ⭐ PHASE 260 CLOSE — 2026-09-20. It worked live, and the scope was failing OPEN the whole time.
+
+**Phase 260 CLOSED, 3 of 3 SC met.** Review PASS (`260-REVIEW.md`) — 3 findings, all fixed and each
+RE-DRIVEN with every planted file restored md5-identical. **The reviewer made no source edits.**
+
+⛔ **F-1 — THE SCOPE FAILED OPEN AND THE INTERFACE ASSERTED OTHERWISE.**
+`_resolve_thread_scoping` returned unrestricted on two driven paths: any exception (it literally
+logged *"falling back to unrestricted chat"*), and a thread whose `active_expert_id` was set but
+whose bundle was missing or cross-org. On the second, the chip kept rendering **Financial Analyzer**
+while the agent searched the entire corpus. ⚠ **This is the exact inverse of `D-258-06`, which had
+EXPLICITLY REJECTED fallback-to-permissive two phases earlier.** ⭐ **And it was invisible from the
+happy path — the operator had the feature working live before the review began.** Fixed fail-closed,
+with the stale id reset so the UI and the run agree; **then proven NOT to over-correct** — plain
+chat still allowed, a resolvable Expert still scopes.
+
+⚠ **F-2 — 323 LINES OF NEW TESTS RAN IN NO GATE.** Both new suites appeared zero times and the total
+sat byte-identical at 8468. **A total that does not move after a phase adds tests IS the tell.** The
+gate's own source comments had predicted exactly this (*"`src/components/chat` has no bare-directory
+TARGETS entry… guarded nothing for ~50 phases"*). Now `8478 · 7737 pinned · 295/295`.
+
+⭐ **F-3 FOUND A PHANTOM NOBODY WAS LOOKING FOR** — `fetch_document_chunk` was granted to every
+Expert and **does not exist in `_TOOL_REGISTRY`**. Now `EXPERT_CORE_TOOLS`, 10 members, fenced.
+
+⭐ **BOTH HANDOVER CONSTRAINTS HELD AND WERE CHECKED, NOT BELIEVED:** `grep -ci expert` in
+`agent_loop.py` = **0** — scope is generic data handed TO the loop, never a branch inside it — and
+the composer gained **no new top-level control**.
+
+⚠ **A REVIEWER ERROR IS RECORDED RATHER THAN HIDDEN:** the first probe reported two cases as
+failures, which would have been **two false findings**. The harness patched `aexec` on
+`run_producer`, but the function imports it **locally** from `app.utils.db`, so the patch did
+nothing. **A probe aimed at the wrong import proves nothing and looks exactly like a defect.**
+
+⚠ **Residual, recorded as a DECISION:** a transient `threads` read failure now refuses EVERY chat,
+not only Expert chats — defensible (a scope that cannot be read cannot be honoured) but app-wide.
+
+**Gates at close:** backend `71 failed / 5176 passed`, failure SET byte-identical to baseline ·
+vitest `8478 · failed 0 · 295/295`.
+
+⛔ **OWED BEFORE ANY PRODUCTION PUSH:** migrations **186, 187, 188** are applied locally only and
+ride the v4.3 close batch, **migration-then-backend, never the reverse**. **Both production orgs
+still measure `subscription_tier IS NULL`** — set a tier for each BEFORE the backend ships or
+workflow authoring and Experts go dark for your own tenants. 186's `GRANT SELECT … TO anon` on the
+pricing map should be revoked by a FOLLOW-UP migration. ⛔ **The app still has NO ROUTER** —
+`/experts/<slug>` is owed and is its own phase.
 
 ### ⭐ PHASE 259 CLOSE + D-259-07 — 2026-09-20. The UX was decided AFTER the data shipped.
 
