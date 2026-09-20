@@ -12,10 +12,13 @@ from app.models.run import ActiveRunResponse
 class ThreadCreate(BaseModel):
     title: str = "New Chat"
     folder_id: UUID | None = None
+    active_expert_id: UUID | None = None
 
 
 class ThreadUpdate(BaseModel):
-    title: str
+    title: str | None = None
+    active_expert_id: UUID | None = None
+    clear_active_expert: bool = False
 
 
 class ThreadResponse(BaseModel):
@@ -23,6 +26,7 @@ class ThreadResponse(BaseModel):
     user_id: UUID
     title: str
     folder_id: UUID | None = None
+    active_expert_id: UUID | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -37,6 +41,7 @@ class ThreadSnapshotResponse(BaseModel):
         (same shape as GET /threads/{id}/active-runs).
       - since_cursors: per-active-run Redis stream replay starting points
         (D-075-01 — server-derived from XINFO STREAM first-entry id).
+      - active_expert_id: Phase 260 consultant scoping anchor (PACK-02).
 
     Composes existing MessageResponse + ActiveRunResponse verbatim — no new
     field shapes introduced (Claude's Discretion section of 075-CONTEXT.md).
@@ -44,6 +49,7 @@ class ThreadSnapshotResponse(BaseModel):
     messages: list[MessageResponse]
     active_runs: list[ActiveRunResponse]
     since_cursors: dict[str, str]
+    active_expert_id: UUID | None = None
 
 
 def phase_output_object(raw: object) -> dict | None:

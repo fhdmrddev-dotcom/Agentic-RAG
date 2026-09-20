@@ -2658,7 +2658,8 @@ CREATE TABLE public.threads (
     folder_id uuid,
     active_workflow_run_id uuid,
     is_eval boolean DEFAULT false NOT NULL,
-    org_id uuid NOT NULL
+    org_id uuid NOT NULL,
+    active_expert_id uuid
 );
 
 
@@ -2667,6 +2668,13 @@ CREATE TABLE public.threads (
 --
 
 COMMENT ON COLUMN public.threads.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v3.3; no FK until org schema exists.';
+
+
+--
+-- Name: COLUMN threads.active_expert_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.threads.active_expert_id IS 'Active consultant expert bundle invited to this thread (PACK-02, Phase 260). Scopes retrieval and tools, preserves chat history. Cleared to NULL on dismissal.';
 
 
 --
@@ -4548,6 +4556,13 @@ CREATE INDEX idx_sso_configs_org_id ON public.sso_configs USING btree (org_id);
 
 
 --
+-- Name: idx_threads_active_expert; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_threads_active_expert ON public.threads USING btree (active_expert_id) WHERE (active_expert_id IS NOT NULL);
+
+
+--
 -- Name: idx_threads_active_workflow_run; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -6021,6 +6036,14 @@ ALTER TABLE ONLY public.skills
 
 ALTER TABLE ONLY public.sso_configs
     ADD CONSTRAINT sso_configs_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: threads threads_active_expert_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.threads
+    ADD CONSTRAINT threads_active_expert_id_fkey FOREIGN KEY (active_expert_id) REFERENCES public.expert_bundles(id) ON DELETE SET NULL;
 
 
 --

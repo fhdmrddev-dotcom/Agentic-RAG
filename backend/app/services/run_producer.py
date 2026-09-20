@@ -375,6 +375,76 @@ async def _finalize_producer_run(
         )
 
 
+async def _resolve_thread_scoping(
+    supabase,
+    thread_id: str,
+    current_user: dict,
+    pool,
+) -> tuple[tuple[str, ...] | None, tuple[str, ...] | None, tuple[dict, ...] | None]:
+    """Phase 260 (PACK-02 / D-260-05) — Resolve thread-active consultant scoping prior to the loop.
+
+    Data-injected into RunContext: effective_folder_ids, effective_tools, skill_catalog_override.
+    Returns (None, None, None) when no expert is invited (preserving Deep Mode byte-identical).
+    """
+    try:
+        from app.utils.db import aexec  # noqa: PLC0415
+        t_resp = await aexec(
+            supabase.table("threads")
+            .select("active_expert_id")
+            .eq("id", str(thread_id))
+            .maybe_single()
+        )
+        active_expert_id = t_resp.data.get("active_expert_id") if (t_resp and t_resp.data) else None
+        if not active_expert_id:
+            return None, None, None
+
+        from app.services.expert_service import resolve_expert_bundle  # noqa: PLC0415
+        caller_user_id = UUID(str(current_user["id"]))
+        caller_org_id = UUID(str(current_user["org_id"])) if current_user.get("org_id") else None
+
+        resolved = await resolve_expert_bundle(
+            pool=pool,
+            bundle_id=UUID(str(active_expert_id)),
+            caller_user_id=caller_user_id,
+            caller_org_id=caller_org_id,
+        )
+        if not resolved:
+            return None, None, None
+
+        effective_folder_ids = tuple(str(f) for f in resolved.effective_folder_ids)
+
+        core_tools = [
+            "search_documents",
+            "query_documents",
+            "fetch_document_chunk",
+            "read_document",
+            "analyze_document",
+            "ls",
+            "tree",
+            "grep",
+            "glob",
+            "load_skill",
+            "read_skill_file",
+        ]
+        effective_tools = tuple(core_tools + list(resolved.effective_connections))
+
+        skill_catalog_override = None
+        if resolved.effective_skills:
+            skill_catalog_override = tuple(
+                {"name": s, "description": f"Expert member skill: {s}"}
+                for s in resolved.effective_skills
+            )
+
+        return effective_folder_ids, effective_tools, skill_catalog_override
+    except Exception:
+        logger.warning(
+            "Failed to resolve consultant expert scoping for thread %s; falling back to unrestricted chat",
+            thread_id,
+            exc_info=True,
+        )
+        return None, None, None
+
+
 async def run_producer(
     run_id: _uuid_mod.UUID,
     *,
@@ -526,6 +596,13 @@ async def run_producer(
                 # a no-op when absent → no double-persist. The Deep `else` branch +
                 # run_agent_loop + the Deep `_result_sink` flow stay byte-identical (D-14).
             else:                                          # Deep — byte-identical
+                _wf_pool = await get_pg_pool()
+                _eff_folders, _eff_tools, _skill_cat_override = await _resolve_thread_scoping(
+                    supabase=supabase,
+                    thread_id=thread_id,
+                    current_user=current_user,
+                    pool=_wf_pool,
+                )
                 ctx = RunContext(
                     run_id=run_id,
                     thread_id=thread_id,
@@ -536,6 +613,9 @@ async def run_producer(
                     supabase=supabase,
                     resolved_model=resolved_model,
                     resolved_provider=resolved_provider,
+                    effective_folder_ids=_eff_folders,
+                    effective_tools=_eff_tools,
+                    skill_catalog_override=_skill_cat_override,
                 )
                 _agent_loop_result = await run_agent_loop(
                     ctx,
@@ -664,6 +744,7 @@ async def spawn_continuation_run(
             run_agent_loop,
             RunContext,
             load_user_settings,
+            get_pg_pool,
         )
 
         _terminal_status = "completed"
@@ -682,6 +763,13 @@ async def spawn_continuation_run(
             # Minimal MessageCreate carrier — the loop reads body.model/.provider/
             # .agent_mode/.content; a continuation carries no new user content.
             body = MessageCreate(content="", model=resolved_model, provider=resolved_provider)
+            _wf_pool = await get_pg_pool()
+            _eff_folders, _eff_tools, _skill_cat_override = await _resolve_thread_scoping(
+                supabase=supabase,
+                thread_id=thread_id,
+                current_user=current_user,
+                pool=_wf_pool,
+            )
             ctx = RunContext(
                 run_id=run_id,
                 thread_id=thread_id,
@@ -694,6 +782,9 @@ async def spawn_continuation_run(
                 resolved_provider=resolved_provider,
                 resume_dropped_tool_calls=True,
                 dropped_tool_calls=tuple(dropped_tool_calls),
+                effective_folder_ids=_eff_folders,
+                effective_tools=_eff_tools,
+                skill_catalog_override=_skill_cat_override,
             )
             try:
                 await run_agent_loop(

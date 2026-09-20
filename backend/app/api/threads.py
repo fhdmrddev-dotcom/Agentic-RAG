@@ -524,7 +524,7 @@ async def get_snapshot(
     # any messages/runs SELECT can leak data.
     thread_resp = await aexec(
         supabase.table("threads")
-        .select("id")
+        .select("id, active_expert_id")
         .eq("id", str(thread_id))
         .eq("user_id", current_user["id"])
         .maybe_single()
@@ -592,6 +592,7 @@ async def get_snapshot(
             "messages": messages,
             "active_runs": [],
             "since_cursors": {},
+            "active_expert_id": row.get("active_expert_id") if row else None,
         }
 
     # Step 4: per-active-run since_cursors via xinfo_stream (D-075-01).
@@ -650,6 +651,7 @@ async def get_snapshot(
         "messages": messages,
         "active_runs": active_runs,
         "since_cursors": since_cursors,
+        "active_expert_id": row.get("active_expert_id") if row else None,
     }
 
 
@@ -663,6 +665,8 @@ async def create_thread(
     insert_data: dict = {"user_id": current_user["id"], "title": body.title}
     if body.folder_id:
         insert_data["folder_id"] = str(body.folder_id)
+    if body.active_expert_id:
+        insert_data["active_expert_id"] = str(body.active_expert_id)
     # BL-01 fix: wrap sync .execute() with aexec so the event loop is not blocked
     # (D-v2.5-01 / Phase 058 D-058-09 — cross-tab unblocking invariant).
     response = await aexec(supabase.table("threads").insert(insert_data))
@@ -677,28 +681,64 @@ async def create_thread(
     return new_thread
 
 
-@router.patch("/{thread_id}", response_model=ThreadResponse)
-async def rename_thread(
+@router.get("/{thread_id}", response_model=ThreadResponse)
+async def get_thread(
     thread_id: str,
-    body: ThreadUpdate,
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_user_supabase_client),
 ):
-    # BL-01 fix: wrap sync .execute() with aexec (D-v2.5-01).
-    await aexec(
-        supabase.table("threads")
-        .update({"title": body.title.strip() or "New Chat"})
-        .eq("id", thread_id)
-        .eq("user_id", current_user["id"])
-    )
     result = await aexec(
         supabase.table("threads")
         .select("*")
         .eq("id", thread_id)
         .eq("user_id", current_user["id"])
-        .single()
+        .maybe_single()
     )
-    if not result.data:
+    if not result or not result.data:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Thread not found")
+    return result.data
+
+
+@router.patch("/{thread_id}", response_model=ThreadResponse)
+async def rename_thread(
+    thread_id: str,
+    body: ThreadUpdate,
+    request: Request,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_user_supabase_client),
+):
+    update_data: dict[str, Any] = {}
+    if body.title is not None:
+        update_data["title"] = body.title.strip() or "New Chat"
+
+    if body.clear_active_expert or ("active_expert_id" in body.model_fields_set and body.active_expert_id is None):
+        update_data["active_expert_id"] = None
+    elif body.active_expert_id is not None:
+        active_org_id = await resolve_active_org_or_none(request, current_user)
+        if active_org_id:
+            pool = await get_pg_pool()
+            from app.services.entitlement_service import check_entitlement, EntitlementDeniedException  # noqa: PLC0415
+            ent = await check_entitlement(pool, active_org_id, "experts")
+            if not ent.allowed:
+                raise EntitlementDeniedException(ent)
+        update_data["active_expert_id"] = str(body.active_expert_id)
+
+    if update_data:
+        # BL-01 fix: wrap sync .execute() with aexec (D-v2.5-01).
+        await aexec(
+            supabase.table("threads")
+            .update(update_data)
+            .eq("id", thread_id)
+            .eq("user_id", current_user["id"])
+        )
+    result = await aexec(
+        supabase.table("threads")
+        .select("*")
+        .eq("id", thread_id)
+        .eq("user_id", current_user["id"])
+        .maybe_single()
+    )
+    if not result or not result.data:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Thread not found")
     return result.data
 

@@ -262,6 +262,11 @@ class RunContext:
     # _handle_load_skill returns the DRAFT instructions for that skill (for the
     # re-eval) instead of the live skills-row body, WITHOUT touching the live skill.
     skill_instructions_override: dict[str, str] | None = None
+    # Phase 260 (PACK-02 / D-260-05) — ADDITIVE scoping inputs resolved prior to the loop.
+    # None = normal unrestricted chat (closed-core invariant).
+    effective_folder_ids: tuple[str, ...] | None = None
+    effective_tools: tuple[str, ...] | None = None
+
 
 
 @dataclass
@@ -1368,6 +1373,10 @@ async def run_agent_loop(
         # so the scope note is not injected with a confusing "/" root path.
         scoped_folder_path = ("/" + "/".join(reversed(path_parts))) if path_parts else None
 
+    # Phase 260 (PACK-02 / D-260-05) — explicit scoping data from RunContext overrides folder subtree
+    if ctx.effective_folder_ids is not None:
+        folder_subtree_ids = list(ctx.effective_folder_ids)
+
     # Load full message history (includes just-inserted user message).
     # CTX-01 (D-120-06): build the query, then apply the ASYMMETRIC origin pre-filter
     # so a Deep turn never replays a workflow's rows (and vice-versa). origin is a pure
@@ -1660,6 +1669,15 @@ async def run_agent_loop(
             pass
         except Exception:
             logger.warning("Failed to wire connector tools into chat agent loop", exc_info=True)
+
+        # Phase 260 (PACK-02 / D-260-05) — explicit tool restriction from RunContext data
+        if ctx.effective_tools is not None:
+            allowed_tool_names = set(ctx.effective_tools)
+            current_tools = list(active_tools) if active_tools is not None else list(get_tools(user_settings))
+            active_tools = [
+                t for t in current_tools
+                if isinstance(t, dict) and t.get("function", {}).get("name") in allowed_tool_names
+            ]
 
         # Phase 244 (SHELL-04 / D-244-02) — announce this thread's attached files.
         # The SIXTH conditional append, in the exact shape of `memory_note` above.

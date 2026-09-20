@@ -11,6 +11,7 @@ from app.db import experts as experts_db
 from app.models.expert import ExpertBundle, ExpertBundleCreate, ExpertBundleUpdate
 
 logger = logging.getLogger(__name__)
+SYSTEM_USER_ID = UUID("00000000-0000-0000-0000-000000000001")
 
 
 class ResolvedExpertBundle(BaseModel):
@@ -202,12 +203,15 @@ async def resolve_expert_bundle(
         """
         folder_rows = await pool.fetch(folder_query, raw_folder_ids)
         valid_folders: set[UUID] = set()
+
         for r in folder_rows:
             f_id = r["id"]
             f_org_id = r.get("org_id")
             f_user_id = r.get("user_id")
             f_shared = bool(r.get("is_org_shared"))
-            if f_org_id == caller_org_id and (f_user_id == caller_user_id or f_shared):
+            is_system_folder = bool(f_user_id == SYSTEM_USER_ID and f_shared)
+            is_tenant_folder = bool(f_org_id == caller_org_id and (f_user_id == caller_user_id or f_shared))
+            if is_system_folder or is_tenant_folder:
                 valid_folders.add(f_id)
 
         for f_id in raw_folder_ids:
