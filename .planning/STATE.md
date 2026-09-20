@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v4.3
 milestone_name: What You Can Actually Sell
-status: milestone_phases_complete
+status: in_progress
 last_updated: "2026-09-20T12:00:00.000Z"
 last_activity: 2026-09-20 -- Phase 260 CLOSED, 3/3 SC, review PASS (260-REVIEW.md). F-1 the scope FAILED OPEN while the UI kept showing the Expert chip -- the inverse of D-258-06, and invisible from the happy path the operator had already driven live. F-2 both new frontend suites ran in NO gate (the total sat byte-identical at 8468). F-3 found a phantom tool granted to every Expert. All fixed and RE-DRIVEN. ALL v4.3 phases 255-260 are CLOSED; migrations 186-188 owed to production, both prod orgs still NULL-tier.
 progress:
-  total_phases: 6
+  total_phases: 7
   completed_phases: 6
   total_plans: 18
   completed_plans: 18
-  percent: 100
+  percent: 86
 ---
 
 # Project State
@@ -111,6 +111,43 @@ Last activity: 2026-09-20 -- Phase 260 executed (all 3 plans complete, gates pas
 - **F-6 (Resolved)**: Re-derived hot-file ledger triples updated in `docs/HOT-FILE-LEDGER.md` and `CLAUDE.md` (`entitlements.py` 1/1/169, `entitlement_service.py` 1/1/130, `api/workflows.py` 43/23/2261).
 - **F-5 Deploy-Ordering Hazard**: Recorded in OWED TO THE OPERATOR (Migration 186 must be applied to production before or at backend deployment).
 - **F-2 Scope Disposition**: Workflow authoring proof slice (`POST /workflows`, `POST /workflows/{id}/publish`) gated as planned. Runtime kickoff gating via `threads.py` deferred to execution milestone/phase to preserve `threads.py` G-5 invariants and isolate general thread chat.
+
+### ⭐ PHASE 261 ADDED — 2026-09-20. The authoring half had no home in any register.
+
+**Operator question at the 260 close:** *"how should I modify or add new experts at least as an
+admin?"* ⭐ **Measured answer: the backend can already do it and the app cannot.** `/experts` ships
+full CRUD (`POST`/`PATCH`/`DELETE`, tier-gated), but `frontend/src/lib/api/experts.ts` exposes
+**only `listExperts` and `getExpert`**, and **no UI file references create, update or delete**. An
+Expert can be authored today only by SQL or a raw API client.
+
+⛔ **IT WAS DEFERRED, AND THE DEFERRAL POINTED AT NOTHING.** The only record was one line in
+`260-DISCUSSION-LOG.md` — *"deferred to Phase 261 / post-v4.3"* — and **Phase 261 did not exist**
+(`grep` returned 0). Worse, **`SEED-198` was marked `status: folded`**, so the seeds sweep would
+never have re-proposed it. **A deferral naming a phase nobody created, plus a seed marked done, is
+a deletion that looks like a decision** — this project's own recurring finding, fired again.
+→ Phase 261 now exists with `PACK-07..PACK-10`; `SEED-198` reopened to `partially-answered`.
+
+**What the operator asked for:** an admin-level authoring surface (higher-privilege users later),
+**AI-assisted** drafting, **file upload to brainstorm from**, and control over **which users may
+use each Expert**.
+
+⭐ **THREE SEAMS WERE MEASURED BEFORE THE CRITERIA WERE WRITTEN, so 261 reuses rather than invents:**
+- **AI-assisted authoring ALREADY SHIPS** for workflows — `generate_workflow` (`api/workflows.py:1872`)
+  + `services/workflow_authoring.py`. ⛔ **A second authoring engine is the thing to refuse.**
+- **The admin surface has a pattern** — `ModelRegistryTab.tsx` (list → add/edit/disable).
+- **WHO MAY AUTHOR IS ALREADY DATA** — `role_permissions(role, permission_key)` exists, roles are
+  `super-admin / org-admin / dept-admin / member`, so *"admins now, others later"* must be a ROW.
+
+⚠ **AND ONE REAL GAP:** `expert_bundles.visibility` is `private | org | public` and nothing finer,
+so **per-user access DOES NOT EXIST** and `PACK-10` needs **migration 189**. ⚠ Check the migration
+head before writing it — **the ROADMAP has named an already-taken number twice running** (184, 185).
+
+⛔ **The red line carries forward a third time:** an Expert is DATA, so AI-assisted authoring emits
+a **row a human approves**, never a runtime, and the closed-core inventory must be measurably
+unchanged. ⛔ **And `PACK-09`'s upload path is where this phase can quietly do harm** — brainstorm
+files are NOT Library ingestion; if nobody drives that, they pollute the knowledge base invisibly.
+
+**G-2 FIRES** — `/gsd:sketch` before planning.
 
 ### ⭐ PHASE 260 CLOSE — 2026-09-20. It worked live, and the scope was failing OPEN the whole time.
 

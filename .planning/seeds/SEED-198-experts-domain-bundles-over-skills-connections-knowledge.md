@@ -3,8 +3,8 @@ seed_id: SEED-198
 title: "Experts — a domain bundle over skills + connections + KNOWLEDGE SCOPE, not a new agent type. The idea the operator could not make mature; the maturing move is that it composes four subsystems we already shipped and adds no runtime."
 created: 2026-08-24
 planted_during: Operator direction, 2026-08-24 — "including experts that are expert in some domain, maybe financial analyzer, maybe a strategy writer… the idea is not mature enough in my head"
-status: folded
-folded_into: 259
+status: partially-answered
+folded_into: 259, 260 (data + usage); AUTHORING owed to 261
 status_note: |
   ── 2026-09-16 · reviewed at `/gsd:discuss-phase 252`, LEFT PLANTED (REG-02 sweep).
   Fired on `backend/app/**` breadth only. Experts is a capability; 252 is scoped to the v4.2
