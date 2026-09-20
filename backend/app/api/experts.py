@@ -5,17 +5,21 @@ from typing import Any
 from uuid import UUID
 
 import asyncpg
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile, status
 
-from app.dependencies import get_active_org_id, get_current_user, get_pg_pool
-from app.models.expert import ExpertBundleCreate, ExpertBundleUpdate
+from app.dependencies import _has_org_permission, get_active_org_id, get_current_user, get_pg_pool
+from app.models.expert import ExpertBundleCreate, ExpertBundleUpdate, ExpertGrant, ExpertGrantCreate
 from app.services.entitlement_service import require_capability
+from app.services.expert_authoring import ExpertDraftOutput, generate_expert_draft
 from app.services.expert_service import (
     ResolvedExpertBundle,
+    add_expert_grant_service,
     create_expert_service,
     delete_expert_service,
+    get_expert_grants_service,
     get_expert_service,
     list_experts_service,
+    remove_expert_grant_service,
     resolve_expert_bundle,
     update_expert_service,
 )
@@ -35,16 +39,34 @@ def _to_uuid(val: Any) -> UUID:
     return UUID(str(val))
 
 
+async def require_expert_manage(
+    request: Request,
+    current_user: dict[str, Any] = Depends(get_current_user),
+    active_org: str = Depends(get_active_org_id),
+) -> dict[str, Any]:
+    """experts:manage gate for Expert authoring mutations (PACK-08 / D-261-03).
+
+    Evaluates role_permissions(role, 'experts:manage') via _has_org_permission.
+    Seeded for super-admin and org-admin.
+    """
+    if not await _has_org_permission(request, current_user, active_org, "experts:manage"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to manage experts for this organization.",
+        )
+    return current_user
+
+
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def create_expert(
     payload: ExpertBundleCreate,
     active_org: str = Depends(get_active_org_id),
-    current_user: dict[str, Any] = Depends(get_current_user),
+    current_user: dict[str, Any] = Depends(require_expert_manage),
     pool: asyncpg.Pool = Depends(get_pg_pool),
 ) -> dict[str, Any]:
     """Create a new tenant expert bundle.
 
-    Gated by require_capability('experts') (PACK-06).
+    Gated by require_capability('experts') (PACK-06) and require_expert_manage (PACK-08).
     """
     org_id = _to_uuid(active_org)
     user_id = _to_uuid(current_user["id"] if isinstance(current_user, dict) else getattr(current_user, "id"))
@@ -63,21 +85,108 @@ async def create_expert(
         ) from exc
 
 
+@router.post("/draft", status_code=status.HTTP_200_OK, response_model=ExpertDraftOutput)
+async def draft_expert(
+    description: str = Form(..., description="Description of the desired expert"),
+    files: list[UploadFile] = File(None, description="Ephemeral brainstorm files (never ingested into permanent documents)"),
+    active_org: str = Depends(get_active_org_id),
+    current_user: dict[str, Any] = Depends(require_expert_manage),
+    pool: asyncpg.Pool = Depends(get_pg_pool),
+) -> ExpertDraftOutput:
+    """Draft an Expert bundle using AI synthesis from description and ephemeral brainstorm files (PACK-09).
+
+    Files are parsed in memory and strictly NEVER ingested into public.documents or public.chunks.
+    Returns a draft row for human review and editing.
+    """
+    org_id = _to_uuid(active_org)
+
+    # 1. Ephemeral in-memory text extraction
+    brainstorm_snippets: list[str] = []
+    if files:
+        for f in files:
+            if f and f.filename:
+                try:
+                    data = await f.read()
+                    if data:
+                        text = data.decode("utf-8", errors="replace")[:30000]
+                        brainstorm_snippets.append(f"--- File: {f.filename} ---\n{text}")
+                    del data
+                except Exception as exc:
+                    logger.warning("Failed to extract ephemeral text from %s: %s", f.filename, exc)
+
+    brainstorm_text = "\n\n".join(brainstorm_snippets) if brainstorm_snippets else None
+
+    # 2. Fetch available grounding assets for caller's org
+    folder_rows = await pool.fetch(
+        "SELECT id, name FROM public.folders WHERE org_id = $1 OR is_org_shared = true ORDER BY name ASC LIMIT 50;",
+        org_id,
+    )
+    available_folders = [dict(r) for r in folder_rows]
+
+    skill_rows = await pool.fetch(
+        "SELECT name, description FROM public.skills WHERE (org_id = $1 OR is_system = true) AND is_enabled = true ORDER BY name ASC LIMIT 50;",
+        org_id,
+    )
+    available_skills = [dict(r) for r in skill_rows]
+
+    conn_rows = await pool.fetch(
+        "SELECT id, name, capability, service_id FROM public.connector_connections WHERE org_id = $1 AND is_enabled = true ORDER BY name ASC LIMIT 50;",
+        org_id,
+    )
+    available_connections = [
+        {"slug": (r.get("service_id") or r.get("name") or str(r.get("id"))), "service_name": r.get("name") or ""}
+        for r in conn_rows
+    ]
+
+    # 3. Synthesize candidate draft row
+    return await generate_expert_draft(
+        description=description,
+        brainstorm_text=brainstorm_text,
+        available_folders=available_folders,
+        available_skills=available_skills,
+        available_connections=available_connections,
+    )
+
+
 @router.get("", status_code=status.HTTP_200_OK)
 async def list_experts(
+    request: Request,
     include_system: bool = Query(True, description="Include platform system templates"),
     enabled_only: bool = Query(True, description="Only return active enabled bundles"),
+    for_management: bool = Query(False, description="Return all org bundles for admin management"),
     active_org: str = Depends(get_active_org_id),
+    current_user: dict[str, Any] = Depends(get_current_user),
     pool: asyncpg.Pool = Depends(get_pg_pool),
 ) -> list[dict[str, Any]]:
     """List accessible expert bundles (system templates and org bundles).
 
     Gated by require_capability('experts') (PACK-06).
+    If for_management is False, filters by caller visibility & grants.
+    If for_management is True, verifies experts:manage permission and returns all bundles.
     """
     org_id = _to_uuid(active_org)
+    user_id = _to_uuid(current_user["id"] if isinstance(current_user, dict) else getattr(current_user, "id"))
+    caller_role = current_user.get("role")
+    caller_roles = [caller_role] if caller_role else []
+
+    if for_management:
+        if not await _has_org_permission(request, current_user, active_org, "experts:manage"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You do not have permission to manage experts for this organization.",
+            )
+        return await list_experts_service(
+            pool=pool,
+            caller_org_id=org_id,
+            include_system=include_system,
+            enabled_only=enabled_only,
+        )
+
     return await list_experts_service(
         pool=pool,
         caller_org_id=org_id,
+        caller_user_id=user_id,
+        caller_roles=caller_roles,
         include_system=include_system,
         enabled_only=enabled_only,
     )
@@ -136,6 +245,7 @@ async def update_expert(
     bundle_id: UUID,
     payload: ExpertBundleUpdate,
     active_org: str = Depends(get_active_org_id),
+    current_user: dict[str, Any] = Depends(require_expert_manage),
     pool: asyncpg.Pool = Depends(get_pg_pool),
 ) -> dict[str, Any]:
     """Update a tenant expert bundle. Refuses modifying system templates or foreign bundles."""
@@ -158,6 +268,7 @@ async def update_expert(
 async def delete_expert(
     bundle_id: UUID,
     active_org: str = Depends(get_active_org_id),
+    current_user: dict[str, Any] = Depends(require_expert_manage),
     pool: asyncpg.Pool = Depends(get_pg_pool),
 ) -> dict[str, Any]:
     """Delete a tenant expert bundle. Refuses deleting system templates or foreign bundles."""
@@ -173,3 +284,62 @@ async def delete_expert(
             detail="Expert bundle not found or cannot be deleted",
         )
     return {"deleted": True, "id": str(bundle_id)}
+
+
+# --- Granular Access Grants Endpoints (PACK-10) ---
+
+@router.get("/{bundle_id}/grants", status_code=status.HTTP_200_OK, response_model=list[ExpertGrant])
+async def get_expert_grants(
+    bundle_id: UUID,
+    active_org: str = Depends(get_active_org_id),
+    current_user: dict[str, Any] = Depends(require_expert_manage),
+    pool: asyncpg.Pool = Depends(get_pg_pool),
+) -> list[dict[str, Any]]:
+    """Fetch all granular access grants for an expert bundle (PACK-10)."""
+    org_id = _to_uuid(active_org)
+    bundle = await get_expert_service(pool=pool, bundle_id=bundle_id, caller_org_id=org_id)
+    if not bundle:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Expert bundle not found")
+    return await get_expert_grants_service(pool=pool, expert_id=bundle_id)
+
+
+@router.post("/{bundle_id}/grants", status_code=status.HTTP_201_CREATED, response_model=ExpertGrant)
+async def add_expert_grant(
+    bundle_id: UUID,
+    payload: ExpertGrantCreate,
+    active_org: str = Depends(get_active_org_id),
+    current_user: dict[str, Any] = Depends(require_expert_manage),
+    pool: asyncpg.Pool = Depends(get_pg_pool),
+) -> dict[str, Any]:
+    """Add a granular access grant (user or role) for an expert bundle (PACK-10)."""
+    org_id = _to_uuid(active_org)
+    bundle = await get_expert_service(pool=pool, bundle_id=bundle_id, caller_org_id=org_id)
+    if not bundle:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Expert bundle not found")
+    if bundle.get("is_system"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot add grants to system templates")
+    return await add_expert_grant_service(
+        pool=pool,
+        expert_id=bundle_id,
+        grantee_type=payload.grantee_type,
+        grantee_id=payload.grantee_id,
+    )
+
+
+@router.delete("/{bundle_id}/grants/{grant_id}", status_code=status.HTTP_200_OK)
+async def remove_expert_grant(
+    bundle_id: UUID,
+    grant_id: UUID,
+    active_org: str = Depends(get_active_org_id),
+    current_user: dict[str, Any] = Depends(require_expert_manage),
+    pool: asyncpg.Pool = Depends(get_pg_pool),
+) -> dict[str, Any]:
+    """Remove a granular access grant from an expert bundle (PACK-10)."""
+    org_id = _to_uuid(active_org)
+    bundle = await get_expert_service(pool=pool, bundle_id=bundle_id, caller_org_id=org_id)
+    if not bundle:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Expert bundle not found")
+    removed = await remove_expert_grant_service(pool=pool, grant_id=grant_id, expert_id=bundle_id)
+    if not removed:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Grant not found")
+    return {"deleted": True, "id": str(grant_id)}

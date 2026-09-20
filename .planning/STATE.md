@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v4.3
 milestone_name: What You Can Actually Sell
 status: in_progress
-last_updated: "2026-09-20T12:00:00.000Z"
-last_activity: 2026-09-20 -- Phase 260 CLOSED, 3/3 SC, review PASS (260-REVIEW.md). F-1 the scope FAILED OPEN while the UI kept showing the Expert chip -- the inverse of D-258-06, and invisible from the happy path the operator had already driven live. F-2 both new frontend suites ran in NO gate (the total sat byte-identical at 8468). F-3 found a phantom tool granted to every Expert. All fixed and RE-DRIVEN. ALL v4.3 phases 255-260 are CLOSED; migrations 186-188 owed to production, both prod orgs still NULL-tier.
+last_updated: "2026-09-20T12:55:00.000Z"
+last_activity: 2026-09-20 -- Phase 261 (An Expert You Can Author) COMPLETE across all 5 plans. Migration 189 applied locally, grant-axis visibility renamed 'granted' (BUS-293), AST single-home fence verified (driven RED and restored clean), AI drafting with non-ingestion guarantee live, Union Scope (D-v4.3-01) and Additive Tool Floor (D-v4.3-02) implemented, Authoring Studio mounted in OrgAdminShell with live 5-element reactive card preview. All 33 backend tests and 9 vitest tests green, count gate 297/297 OK, backend baseline <= 71 failed OK.
 progress:
   total_phases: 8
-  completed_phases: 6
-  total_plans: 18
-  completed_plans: 18
-  percent: 75
+  completed_phases: 7
+  total_plans: 28
+  completed_plans: 28
+  percent: 88
 ---
 
 # Project State
@@ -34,16 +34,30 @@ See: `.planning/PROJECT.md` (updated 2026-09-18)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 260 (The Expert You Can Actually Use) — Completed (3 of 3 plans executed), ready for reviewer preflight/audit.
+**Current focus:** Phase 261 (An Expert You Can Author) COMPLETE — ready for reviewer post-phase verification.
 
 ---
 
 ## Current Position
 
-Phase: 260 (the-expert-you-can-actually-use)
-Plan: 3 of 3 (plans executed, all gates passed)
+Phase: 261 (an-expert-you-can-author)
+Plan: 5 of 5 COMPLETE (Phase 261 fully executed and verified)
 Status: complete
-Last activity: 2026-09-20 -- Phase 260 executed (all 3 plans complete, gates passed, Financial Analyzer proof verified). Ready for review.
+Last activity: 2026-09-20 -- Phase 261 execution complete across all 5 plans (261-01 to 261-05). All governance gates green. Scoped review handoff ready for Claude (PACK-07, PACK-08, PACK-09, PACK-10, closed-core inventory) and Operator (live chat verification of D-v4.3-01 and D-v4.3-02 per BUS-294 / D-v4.3-03).
+
+### ⭐ PLAN 261-01 EXECUTED — 2026-09-20
+- **Database & Migration (PACK-08, PACK-10, D-261-07)**: Migration 189 applied to local Postgres (`127.0.0.1:54322`). Added `icon`, `category`, `when_to_use`, `example_output`, `tool_floor_enabled` to `public.expert_bundles`; widened visibility CHECK constraint to include `'restricted'`; created `public.expert_grants` table with unique constraint `(expert_id, grantee_type, grantee_id)`, lookup indices, and RLS enabled; seeded `experts:manage` into `public.role_permissions` for `super-admin` and `org-admin`; backfilled `financial-analyzer` seed template.
+- **Full Schema Regeneration & Parity**: `supabase/full-schema.sql` regenerated; table ACLs mirrored in `scripts/full-schema-supplement.sql` (155/155 tuples mirrored, `check-schema-acl-parity.cjs` green).
+- **Models & DB Layer**: `backend/app/models/expert.py` updated with `ExpertGrant`, `ExpertGrantCreate`, presentation fields on `ExpertBundleBase`/`Create`/`Update`. `backend/app/db/experts.py` extended with `get_expert_grants`, `add_expert_grant`, `remove_expert_grant`, `bulk_set_expert_grants`, `check_expert_grant_access`, and grant-aware `list_expert_bundles_for_caller`.
+- **API Gating**: `backend/app/api/experts.py` added `require_expert_manage` gating `POST`, `PATCH`, `DELETE` and grant sub-endpoints `GET /experts/{id}/grants`, `POST /experts/{id}/grants`, `DELETE /experts/{id}/grants/{grant_id}`.
+- **Tests & Governance**: `test_261_expert_grants_db.py` passing 9/9 unit and live DB tests; all 24 prior expert tests green (0 regressions); hot-file ledger OK (316 rows), seeds register OK (310/310), CLAUDE.md size OK (108.9k).
+
+### ⭐ PHASE 261 PLANS AUTHORED — 2026-09-20
+- **261-01-PLAN.md (Wave 1, autonomous: false, DB-mutating)**: Database foundation & access grants. Migration 189 (`expert_bundles` presentation columns, `expert_grants` table, `role_permissions` seed for `experts:manage`), Pydantic models in `models/expert.py`, database layer in `db/experts.py`, unit test suite in `test_261_expert_grants_db.py`.
+- **261-02-PLAN.md (Wave 2, autonomous: true)**: Ephemeral AI drafting & non-ingestion guarantee (`PACK-09`). `services/expert_authoring.py` using `forced_emit` substrate, `POST /experts/draft` endpoint parsing files in-memory without saving, non-ingestion test, closed-core inventory fence (7 phase types, 1 emitter, 29 tools, `EXPERT_CORE_TOOLS` 10).
+- **261-03-PLAN.md (Wave 2, autonomous: true)**: Runtime scoping & additive tool floor fixes (`BUG-260920-01` / `D-v4.3-01` / `D-v4.3-02`). Preserve deliverable tools in `tool_dispatcher.py` (`execute_code`, `workspace_write`, `render_template`, `ask_user`), implement Union scope default in `run_producer.py`, synchronize `scoped_folder_path` to avoid prompt desync, 0 `if expert:` branches in `agent_loop.py`.
+- **261-04-PLAN.md (Wave 3, autonomous: true)**: Frontend authoring studio & grants UI (`PACK-07` / `PACK-10`). Add `OrgExpertsTab.tsx` to `OrgAdminShell.tsx` under live tab `"experts"`, author `ExpertAuthoringStudio.tsx` with AI brainstorm dropzone, non-ingestion badge, form configurator, access grant selector, and live reactive 5-element card preview.
+- **261-05-PLAN.md (Wave 4, autonomous: true)**: Single-home governance fence & scenario verification (`PACK-08`). AST fence in `test_261_single_expert_authoring_gate.py` driven RED against planted check, scenario driver in `test_261_expert_authoring_scenarios.py` (S1 CRUD, S2 permissions, S4 union, S5 isolation, S6 deliverable tools, S8 clone-on-customise), hot-file ledger sync and gate re-derivation.
 
 ### ⭐ PHASE 260 EXECUTED — 2026-09-20
 - **Plan 260-01 (Backend Scoping Foundation)**: Migration 188 applied (`public.threads.active_expert_id` column and partial index). Seeded system folder `Financial Reports & Filings` (`00000000-0000-0000-0000-000000000260`), 10-K document fixture (`00000000-0000-0000-0000-000000000261`), and `financial_ratio_calculator` skill. Pre-loop scoping in `run_producer.py` resolved as pure data (`effective_folder_ids`, `effective_tools`) into `RunContext`. AST closed-core invariant verified (0 "expert" nodes in `agent_loop.py`).

@@ -22,6 +22,7 @@ class ResolvedExpertBundle(BaseModel):
     scope_mode: str
     is_system: bool
     org_id: UUID | None
+    tool_floor_enabled: bool = True
     effective_skills: list[str] = Field(default_factory=list)
     effective_folder_ids: list[UUID] = Field(default_factory=list)
     effective_connections: list[str] = Field(default_factory=list)
@@ -51,6 +52,11 @@ async def create_expert_service(
         prompt_suggestions=[s.model_dump() for s in bundle_in.prompt_suggestions],
         visibility=bundle_in.visibility,
         is_enabled=bundle_in.is_enabled,
+        icon=bundle_in.icon,
+        category=bundle_in.category,
+        when_to_use=bundle_in.when_to_use,
+        example_output=bundle_in.example_output,
+        tool_floor_enabled=bundle_in.tool_floor_enabled,
     )
 
 
@@ -75,16 +81,63 @@ async def get_expert_by_slug_service(
 async def list_experts_service(
     pool: asyncpg.Pool,
     caller_org_id: UUID | None,
+    caller_user_id: UUID | None = None,
+    caller_roles: list[str] | None = None,
     include_system: bool = True,
     enabled_only: bool = True,
 ) -> list[dict[str, Any]]:
     """List raw expert bundles accessible to caller."""
+    if caller_user_id is not None:
+        return await experts_db.list_expert_bundles_for_caller(
+            pool=pool,
+            caller_org_id=caller_org_id,
+            caller_user_id=caller_user_id,
+            caller_roles=caller_roles,
+            include_system=include_system,
+            enabled_only=enabled_only,
+        )
     return await experts_db.list_expert_bundles(
         pool=pool,
         caller_org_id=caller_org_id,
         include_system=include_system,
         enabled_only=enabled_only,
     )
+
+
+async def get_expert_grants_service(
+    pool: asyncpg.Pool,
+    expert_id: UUID,
+) -> list[dict[str, Any]]:
+    """Fetch all granular access grants for an expert bundle."""
+    return await experts_db.get_expert_grants(pool, expert_id)
+
+
+async def add_expert_grant_service(
+    pool: asyncpg.Pool,
+    expert_id: UUID,
+    grantee_type: str,
+    grantee_id: str,
+) -> dict[str, Any]:
+    """Add a granular access grant for an expert bundle."""
+    return await experts_db.add_expert_grant(pool, expert_id, grantee_type, grantee_id)
+
+
+async def remove_expert_grant_service(
+    pool: asyncpg.Pool,
+    grant_id: UUID,
+    expert_id: UUID | None = None,
+) -> bool:
+    """Remove an access grant."""
+    return await experts_db.remove_expert_grant(pool, grant_id, expert_id)
+
+
+async def bulk_set_expert_grants_service(
+    pool: asyncpg.Pool,
+    expert_id: UUID,
+    grants: list[tuple[str, str]],
+) -> list[dict[str, Any]]:
+    """Bulk set access grants for an expert bundle."""
+    return await experts_db.bulk_set_expert_grants(pool, expert_id, grants)
 
 
 async def update_expert_service(
@@ -269,6 +322,7 @@ async def resolve_expert_bundle(
         scope_mode=bundle.get("scope_mode", "restricted"),
         is_system=bundle.get("is_system", False),
         org_id=bundle.get("org_id"),
+        tool_floor_enabled=bool(bundle.get("tool_floor_enabled", True)),
         effective_skills=effective_skills,
         effective_folder_ids=effective_folder_ids,
         effective_connections=effective_connections,

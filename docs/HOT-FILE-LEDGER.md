@@ -10571,10 +10571,15 @@ cells rot within days.
 
 | File | commits / phases / lines | G-5 | Disposition |
 |---|---|---|---|
-| [`backend/app/db/experts.py`](docs/HOT-FILE-LEDGER.md#backendappdbexpertspy) | 1 / 1 / 265 | no (new) | young (created Phase 259). Row added AT CREATION — absent row is invisible to G-5 (PACK-01). |
-| [`backend/app/models/expert.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsexpertpy) | 1 / 1 / 52 | no (new) | young (created Phase 259). Row added AT CREATION — Pydantic domain models for expert bundles. |
-| [`backend/app/services/expert_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesexpert_servicepy) | 2 / 1 / 274 | no (new) | young (created Phase 259). Row added AT CREATION — two-phase member boundary check (PACK-04). |
-| [`backend/app/api/experts.py`](docs/HOT-FILE-LEDGER.md#backendappapiexpertspy) | 1 / 1 / 175 | no (new) | young (created Phase 259). Row added AT CREATION — REST router with require_capability('experts') (PACK-06). |
+| [`backend/app/services/expert_authoring.py`](docs/HOT-FILE-LEDGER.md#backendappservicesexpert_authoringpy) | 1 / 1 / 233 | no (new) | young (created Phase 261). Row added AT CREATION — AI-assisted drafting service reusing forced_emit (PACK-09). |
+| [`frontend/src/components/experts/ExpertAuthoringStudio.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertsexpertauthoringstudiotsx) | 1 / 1 / 1082 | no (new) | young (created Phase 261). Row added AT CREATION — leaf component for expert authoring studio and live preview. |
+| [`frontend/src/components/org/OrgAdminShell.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgadminshelltsx) | 3 / 5 / 442 | no | young (created Phase 166). The org-admin shell hosting live tabs (members, audit, settings, invitations, sso, experts). |
+| [`frontend/src/components/org/OrgExpertsTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgexpertstabtsx) | 1 / 1 / 347 | no (new) | young (created Phase 261). Row added AT CREATION — leaf component for org-admin expert listing and management. |
+| [`frontend/src/lib/api/experts.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiexpertsts) | 2 / 2 / 186 | no | young (created Phase 260). Client module for expert API CRUD, draft, and grant calls. |
+| [`backend/app/db/experts.py`](docs/HOT-FILE-LEDGER.md#backendappdbexpertspy) | 2 / 2 / 492 | no (new) | young (created Phase 259). Row added AT CREATION — absent row is invisible to G-5 (PACK-01). |
+| [`backend/app/models/expert.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsexpertpy) | 2 / 2 / 79 | no (new) | young (created Phase 259). Row added AT CREATION — Pydantic domain models for expert bundles. |
+| [`backend/app/services/expert_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesexpert_servicepy) | 3 / 2 / 333 | no (new) | young (created Phase 259). Row added AT CREATION — two-phase member boundary check (PACK-04). |
+| [`backend/app/api/experts.py`](docs/HOT-FILE-LEDGER.md#backendappapiexpertspy) | 2 / 2 / 346 | no (new) | young (created Phase 259). Row added AT CREATION — REST router with require_capability('experts') (PACK-06). |
 | [`frontend/src/components/chat/ActiveExpertChip.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatactiveexpertchiptsx) | 0 / 0 / 0 | no (new) | young (created Phase 260). Row added AT CREATION — leaf component for active consultant chip. |
 | [`frontend/src/components/chat/ExpertSpotlightCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatexpertspotlightcardtsx) | 0 / 0 / 0 | no (new) | young (created Phase 260). Row added AT CREATION — leaf component for hero spotlight card and action tiles. |
 | [`frontend/src/components/chat/InviteExpertDialog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatinviteexpertdialogtsx) | 0 / 0 / 0 | no (new) | young (created Phase 260). Row added AT CREATION — leaf component for expert invitation modal. |
@@ -15440,4 +15445,44 @@ What it owns. Leaf component for rendering the hero visual spotlight card and 3 
 **`0 / 0 / 0`** — created by Phase 260 (`260-02`). **Row added AT CREATION.** Precedent in `CLAUDE.md` is explicit: rows added at creation, since an absent row is invisible to G-5 at any count.
 
 What it owns. Leaf component modal dialog for browsing available domain expert bundles and inviting one to the active thread, triggered from the composer's `+` dropdown menu.
+
+---
+
+## `backend/app/services/expert_authoring.py`
+
+**`1 / 1 / 233`** — created by Phase 261 (`261-02`). **Row added AT CREATION.** Precedent in `CLAUDE.md` is explicit: rows added at creation, since an absent row is invisible to G-5 at any count.
+
+What it owns. AI-assisted drafting service reusing `forced_emit` substrate to synthesize structured `ExpertDraftOutput` candidate rows from natural language descriptions and ephemeral brainstorm text (PACK-09).
+
+---
+
+## `frontend/src/components/experts/ExpertAuthoringStudio.tsx`
+
+**`1 / 1 / 1082`** — created by Phase 261 (`261-04`). **Row added AT CREATION.** Precedent in `CLAUDE.md` is explicit: rows added at creation, since an absent row is invisible to G-5 at any count.
+
+What it owns. Leaf component for expert authoring studio, providing AI brainstorm file upload dropzone with non-ingestion badge, full form configurator, access grant selector, and live reactive 5-element card preview.
+
+---
+
+## `frontend/src/components/org/OrgAdminShell.tsx`
+
+**`3 / 5 / 442`** — created by Phase 166 (`166-04`). Re-derived 2026-09-20. Precedent in `CLAUDE.md` is explicit: rows added when touched by a phase plan.
+
+What it owns. The user-side org-admin shell reachable via the indigo shield, hosting live tabs (`members`, `audit`, `settings`, `invitations`, `sso`, and Phase 261 `experts`).
+
+---
+
+## `frontend/src/components/org/OrgExpertsTab.tsx`
+
+**`1 / 1 / 347`** — created by Phase 261 (`261-04`). **Row added AT CREATION.** Precedent in `CLAUDE.md` is explicit: rows added at creation, since an absent row is invisible to G-5 at any count.
+
+What it owns. Leaf component for the Org Admin Experts tab, rendering accessible tenant expert rows, access grant badges, action buttons, and launching the authoring studio.
+
+---
+
+## `frontend/src/lib/api/experts.ts`
+
+**`2 / 2 / 186`** — created by Phase 260 (`260-02`). Re-derived 2026-09-20. Precedent in `CLAUDE.md` is explicit: rows added when touched by a phase plan.
+
+What it owns. Client API module for expert operations, providing functions for CRUD (`createExpert`, `getExpert`, `listExperts`, `updateExpert`, `deleteExpert`), AI drafting (`draftExpert`), and grant management (`getExpertGrants`, `setExpertGrants`).
 
