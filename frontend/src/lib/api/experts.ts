@@ -15,13 +15,47 @@ export async function listExperts(
   if (!enabledOnly) params.set("enabled_only", "false")
   const qs = params.toString() ? `?${params.toString()}` : ""
   const res = await fetch(`${API_BASE}/experts${qs}`, { headers })
-  if (!res.ok) throw new Error("Failed to list experts")
+  if (!res.ok) {
+    let msg = "Failed to list experts"
+    try {
+      const err = await res.json()
+      if (typeof err.detail === "string") {
+        msg = err.detail
+      } else if (err.detail?.detail) {
+        msg = err.detail.detail
+      } else if (err.detail?.upgrade_hint) {
+        msg = err.detail.upgrade_hint
+      } else if (err.message) {
+        msg = err.message
+      }
+    } catch {
+      // Keep default
+    }
+    throw new Error(msg)
+  }
   return res.json() as Promise<ExpertBundle[]>
 }
 
 export async function getExpert(bundleId: string): Promise<ExpertBundle> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/experts/${bundleId}`, { headers })
-  if (!res.ok) throw new Error("Failed to get expert")
+  if (!res.ok) {
+    let msg = "Failed to get expert"
+    try {
+      const err = await res.json()
+      if (typeof err.detail === "string") {
+        msg = err.detail
+      } else if (err.detail?.detail) {
+        msg = err.detail.detail
+      } else if (err.detail?.upgrade_hint) {
+        msg = err.detail.upgrade_hint
+      } else if (err.message) {
+        msg = err.message
+      }
+    } catch {
+      // Keep default
+    }
+    throw new Error(msg)
+  }
   return res.json() as Promise<ExpertBundle>
 }
