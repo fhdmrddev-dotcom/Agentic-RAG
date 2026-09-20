@@ -473,6 +473,21 @@ REVOKE DELETE ON public.user_settings FROM authenticated;
 
 
 -- ============================================================
+-- 5e. Table privileges: tier_capabilities, expert_bundles, expert_grants
+--     (migrations 186, 187, 189 / Phases 258, 259, 261)
+-- ============================================================
+-- migration 186:30-31
+GRANT SELECT ON TABLE public.tier_capabilities TO anon, authenticated, service_role;
+GRANT INSERT, UPDATE, DELETE ON TABLE public.tier_capabilities TO service_role;
+
+-- migration 187:63
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.expert_bundles TO authenticated, service_role;
+
+-- migration 189:45
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.expert_grants TO authenticated, service_role;
+
+
+-- ============================================================
 -- 6. Function EXECUTE privileges (migration 181 / Phase 248, CRED-03)
 -- ============================================================
 -- ⚠ WHY THIS LIVES HERE RATHER THAN IN THE DUMP: regenerate-full-schema.sh runs

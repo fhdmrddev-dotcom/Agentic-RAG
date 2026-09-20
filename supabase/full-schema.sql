@@ -1749,9 +1749,14 @@ CREATE TABLE public.expert_bundles (
     is_enabled boolean DEFAULT true NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    icon text DEFAULT 'chart'::text NOT NULL,
+    category text DEFAULT 'General'::text NOT NULL,
+    when_to_use text DEFAULT ''::text NOT NULL,
+    example_output text DEFAULT ''::text NOT NULL,
+    tool_floor_enabled boolean DEFAULT true NOT NULL,
     CONSTRAINT check_org_or_system CHECK (((is_system = true) OR (org_id IS NOT NULL))),
     CONSTRAINT expert_bundles_scope_mode_check CHECK ((scope_mode = ANY (ARRAY['restricted'::text, 'biased'::text]))),
-    CONSTRAINT expert_bundles_visibility_check CHECK ((visibility = ANY (ARRAY['private'::text, 'org'::text, 'public'::text])))
+    CONSTRAINT expert_bundles_visibility_check CHECK ((visibility = ANY (ARRAY['private'::text, 'org'::text, 'public'::text, 'granted'::text])))
 );
 
 
@@ -1858,6 +1863,97 @@ COMMENT ON COLUMN public.expert_bundles.is_system IS 'True if this is a first-pa
 --
 
 COMMENT ON COLUMN public.expert_bundles.is_enabled IS 'Administrative toggle to activate or deactivate this bundle.';
+
+
+--
+-- Name: COLUMN expert_bundles.icon; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.expert_bundles.icon IS 'Lucide vector glyph name for visual card presentation (e.g. chart, scale, shield, briefcase).';
+
+
+--
+-- Name: COLUMN expert_bundles.category; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.expert_bundles.category IS 'Domain category label for catalog filtering and visual organization.';
+
+
+--
+-- Name: COLUMN expert_bundles.when_to_use; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.expert_bundles.when_to_use IS 'Short one-line contextual guidance on when to consult this expert.';
+
+
+--
+-- Name: COLUMN expert_bundles.example_output; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.expert_bundles.example_output IS 'Sample output or answer snippet showing expected deliverable format.';
+
+
+--
+-- Name: COLUMN expert_bundles.tool_floor_enabled; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.expert_bundles.tool_floor_enabled IS 'When true, deliverable-producing tools (code execution, file writing, templates, questions) are preserved as an additive floor.';
+
+
+--
+-- Name: expert_grants; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.expert_grants (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    expert_id uuid NOT NULL,
+    grantee_type text NOT NULL,
+    grantee_id text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT expert_grants_grantee_type_check CHECK ((grantee_type = ANY (ARRAY['user'::text, 'role'::text])))
+);
+
+
+--
+-- Name: TABLE expert_grants; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.expert_grants IS 'Granular role and user access grants for restricted expert bundles (PACK-10, Phase 261).';
+
+
+--
+-- Name: COLUMN expert_grants.id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.expert_grants.id IS 'Primary key UUID of the grant.';
+
+
+--
+-- Name: COLUMN expert_grants.expert_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.expert_grants.expert_id IS 'Foreign key referencing the target expert bundle.';
+
+
+--
+-- Name: COLUMN expert_grants.grantee_type; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.expert_grants.grantee_type IS 'Grantee category: user (specific user UUID) or role (role slug such as member, org-admin, or custom role).';
+
+
+--
+-- Name: COLUMN expert_grants.grantee_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.expert_grants.grantee_id IS 'Identifier string of the grantee (user UUID string or role slug).';
+
+
+--
+-- Name: COLUMN expert_grants.created_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.expert_grants.created_at IS 'Timestamp when the grant was issued.';
 
 
 --
@@ -3358,6 +3454,14 @@ ALTER TABLE ONLY public.expert_bundles
 
 
 --
+-- Name: expert_grants expert_grants_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.expert_grants
+    ADD CONSTRAINT expert_grants_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: folders folders_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3651,6 +3755,14 @@ ALTER TABLE ONLY public.tuner_runs
 
 ALTER TABLE ONLY public.tuner_runs
     ADD CONSTRAINT tuner_runs_skill_unique UNIQUE (skill_id);
+
+
+--
+-- Name: expert_grants uq_expert_grant; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.expert_grants
+    ADD CONSTRAINT uq_expert_grant UNIQUE (expert_id, grantee_type, grantee_id);
 
 
 --
@@ -4266,6 +4378,20 @@ CREATE INDEX idx_expert_bundles_system_enabled ON public.expert_bundles USING bt
 --
 
 CREATE UNIQUE INDEX idx_expert_bundles_system_slug ON public.expert_bundles USING btree (slug) WHERE (is_system = true);
+
+
+--
+-- Name: idx_expert_grants_expert; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_expert_grants_expert ON public.expert_grants USING btree (expert_id);
+
+
+--
+-- Name: idx_expert_grants_lookup; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_expert_grants_lookup ON public.expert_grants USING btree (grantee_type, grantee_id, expert_id);
 
 
 --
@@ -5660,6 +5786,14 @@ ALTER TABLE ONLY public.eval_runs
 
 ALTER TABLE ONLY public.expert_bundles
     ADD CONSTRAINT expert_bundles_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: expert_grants expert_grants_expert_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.expert_grants
+    ADD CONSTRAINT expert_grants_expert_id_fkey FOREIGN KEY (expert_id) REFERENCES public.expert_bundles(id) ON DELETE CASCADE;
 
 
 --
@@ -7096,6 +7230,35 @@ CREATE POLICY expert_bundles_write_policy ON public.expert_bundles TO authentica
 
 
 --
+-- Name: expert_grants; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.expert_grants ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: expert_grants expert_grants_read_policy; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY expert_grants_read_policy ON public.expert_grants FOR SELECT TO authenticated, service_role USING (((auth.role() = 'service_role'::text) OR (expert_id IN ( SELECT eb.id
+   FROM (public.expert_bundles eb
+     JOIN public.org_members m ON ((m.org_id = eb.org_id)))
+  WHERE (m.user_id = auth.uid())))));
+
+
+--
+-- Name: expert_grants expert_grants_write_policy; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY expert_grants_write_policy ON public.expert_grants TO authenticated, service_role USING (((auth.role() = 'service_role'::text) OR (expert_id IN ( SELECT eb.id
+   FROM (public.expert_bundles eb
+     JOIN public.org_members m ON ((m.org_id = eb.org_id)))
+  WHERE (m.user_id = auth.uid()))))) WITH CHECK (((auth.role() = 'service_role'::text) OR (expert_id IN ( SELECT eb.id
+   FROM (public.expert_bundles eb
+     JOIN public.org_members m ON ((m.org_id = eb.org_id)))
+  WHERE (m.user_id = auth.uid())))));
+
+
+--
 -- Name: folders; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
@@ -8207,6 +8370,21 @@ REVOKE ALL ON public.user_settings FROM anon;
 -- not granted a policy — a user does not delete their settings row, the service role does —
 -- so the privilege is taken away rather than left to a policy that does not exist.
 REVOKE DELETE ON public.user_settings FROM authenticated;
+
+
+-- ============================================================
+-- 5e. Table privileges: tier_capabilities, expert_bundles, expert_grants
+--     (migrations 186, 187, 189 / Phases 258, 259, 261)
+-- ============================================================
+-- migration 186:30-31
+GRANT SELECT ON TABLE public.tier_capabilities TO anon, authenticated, service_role;
+GRANT INSERT, UPDATE, DELETE ON TABLE public.tier_capabilities TO service_role;
+
+-- migration 187:63
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.expert_bundles TO authenticated, service_role;
+
+-- migration 189:45
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.expert_grants TO authenticated, service_role;
 
 
 -- ============================================================

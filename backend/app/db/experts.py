@@ -47,6 +47,11 @@ async def create_expert_bundle(
     prompt_suggestions: list[dict[str, Any]] | None = None,
     visibility: str = "private",
     is_enabled: bool = True,
+    icon: str = "chart",
+    category: str = "General",
+    when_to_use: str = "",
+    example_output: str = "",
+    tool_floor_enabled: bool = True,
 ) -> dict[str, Any]:
     """Create a new domain expert bundle for a tenant organization.
 
@@ -68,9 +73,14 @@ async def create_expert_bundle(
             prompt_suggestions,
             visibility,
             is_system,
-            is_enabled
+            is_enabled,
+            icon,
+            category,
+            when_to_use,
+            example_output,
+            tool_floor_enabled
         ) VALUES (
-            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11, false, $12
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11, false, $12, $13, $14, $15, $16, $17
         )
         RETURNING *;
     """
@@ -88,6 +98,11 @@ async def create_expert_bundle(
         suggestions_json,
         visibility,
         is_enabled,
+        icon,
+        category,
+        when_to_use,
+        example_output,
+        tool_floor_enabled,
     )
     result = _row_to_dict(row)
     if not result:
@@ -143,10 +158,10 @@ async def list_expert_bundles(
     include_system: bool = True,
     enabled_only: bool = True,
 ) -> list[dict[str, Any]]:
-    """List expert bundles accessible to the caller.
+    """List all expert bundles in the org (plus system templates).
 
-    Returns system templates (if include_system is True) and org-authored bundles.
-    Optionally filters by is_enabled = True.
+    Intended for administrative management surfaces (OrgAdminShell).
+    Returns all tenant-owned bundles regardless of visibility.
     """
     clauses: list[str] = []
     args: list[Any] = []
@@ -174,6 +189,121 @@ async def list_expert_bundles(
     """
     rows = await pool.fetch(query, *args)
     return [_row_to_dict(r) for r in rows if r is not None]  # type: ignore[misc]
+
+
+async def list_expert_bundles_for_caller(
+    pool: asyncpg.Pool,
+    caller_org_id: UUID | None,
+    caller_user_id: UUID | None = None,
+    caller_roles: list[str] | None = None,
+    include_system: bool = True,
+    enabled_only: bool = True,
+) -> list[dict[str, Any]]:
+    """List expert bundles accessible to a specific caller based on visibility and grants.
+
+    Enforces:
+      - System bundles: public catalog assets, visible to all.
+      - Org bundles with visibility 'public' or 'org': visible to any org member.
+      - Org bundles with visibility 'private': visible ONLY to creator (created_by == caller_user_id).
+      - Org bundles with visibility 'granted': visible if created_by == caller_user_id OR
+        caller has an active grant in public.expert_grants matching caller_user_id or caller_roles.
+    """
+    clauses: list[str] = []
+    args: list[Any] = []
+
+    if caller_org_id is None and not include_system:
+        return []
+
+    if enabled_only:
+        clauses.append("is_enabled = true")
+
+    # Base org or system boundary
+    if include_system and caller_org_id is not None:
+        args.append(caller_org_id)
+        org_filter = f"(is_system = true OR org_id = ${len(args)})"
+    elif include_system:
+        org_filter = "is_system = true"
+    elif caller_org_id is not None:
+        args.append(caller_org_id)
+        org_filter = f"(is_system = false AND org_id = ${len(args)})"
+    else:
+        return []
+
+    # Visibility & grant filtering clause for tenant bundles
+    user_str = str(caller_user_id) if caller_user_id else ""
+    roles = caller_roles or []
+
+    args.append(caller_user_id)
+    uid_param = f"${len(args)}"
+    args.append(user_str)
+    uid_str_param = f"${len(args)}"
+    args.append(roles)
+    roles_param = f"${len(args)}::text[]"
+
+    visibility_clause = f"""(
+        is_system = true
+        OR visibility IN ('org', 'public')
+        OR (visibility = 'private' AND created_by = {uid_param})
+        OR (visibility = 'granted' AND (
+            created_by = {uid_param}
+            OR EXISTS (
+                SELECT 1
+                FROM public.expert_grants eg
+                WHERE eg.expert_id = expert_bundles.id
+                  AND (
+                      (eg.grantee_type = 'user' AND eg.grantee_id = {uid_str_param})
+                      OR (eg.grantee_type = 'role' AND eg.grantee_id = ANY({roles_param}))
+                  )
+            )
+        ))
+    )"""
+
+    clauses.append(org_filter)
+    clauses.append(visibility_clause)
+
+    where_sql = " AND ".join(clauses)
+    query = f"""
+        SELECT *
+        FROM public.expert_bundles
+        WHERE {where_sql}
+        ORDER BY is_system DESC, name ASC;
+    """
+    rows = await pool.fetch(query, *args)
+    return [_row_to_dict(r) for r in rows if r is not None]  # type: ignore[misc]
+
+
+async def check_expert_grant_access(
+    pool: asyncpg.Pool,
+    bundle: dict[str, Any],
+    caller_user_id: UUID | None,
+    caller_roles: list[str] | None = None,
+) -> bool:
+    """Check if caller has access to a specific expert bundle based on visibility and grants."""
+    if bundle.get("is_system"):
+        return True
+    vis = bundle.get("visibility", "private")
+    if vis in ("org", "public"):
+        return True
+    if caller_user_id is None:
+        return False
+    if bundle.get("created_by") == caller_user_id:
+        return True
+    if vis == "granted":
+        user_str = str(caller_user_id)
+        roles = caller_roles or []
+        query = """
+            SELECT 1
+            FROM public.expert_grants
+            WHERE expert_id = $1
+              AND (
+                  (grantee_type = 'user' AND grantee_id = $2)
+                  OR (grantee_type = 'role' AND grantee_id = ANY($3::text[]))
+              )
+            LIMIT 1;
+        """
+        row = await pool.fetchrow(query, bundle["id"], user_str, roles)
+        return row is not None
+    return False
 
 
 async def update_expert_bundle(
@@ -205,6 +335,11 @@ async def update_expert_bundle(
         "prompt_suggestions",
         "visibility",
         "is_enabled",
+        "icon",
+        "category",
+        "when_to_use",
+        "example_output",
+        "tool_floor_enabled",
     }
 
     set_clauses: list[str] = []
@@ -263,3 +398,94 @@ async def delete_expert_bundle(
     """
     result = await pool.execute(query, bundle_id, caller_org_id)
     return result == "DELETE 1"
+
+
+# --- Expert Grants CRUD (PACK-10) ---
+
+async def get_expert_grants(
+    pool: asyncpg.Pool,
+    expert_id: UUID,
+) -> list[dict[str, Any]]:
+    """Fetch all granular access grants for a given expert bundle."""
+    query = """
+        SELECT *
+        FROM public.expert_grants
+        WHERE expert_id = $1
+        ORDER BY created_at ASC;
+    """
+    rows = await pool.fetch(query, expert_id)
+    return [dict(r) for r in rows if r is not None]
+
+
+async def add_expert_grant(
+    pool: asyncpg.Pool,
+    expert_id: UUID,
+    grantee_type: str,
+    grantee_id: str,
+) -> dict[str, Any]:
+    """Add a granular access grant (user or role) for an expert bundle.
+
+    Idempotent: on conflict returns existing grant.
+    """
+    query = """
+        INSERT INTO public.expert_grants (
+            expert_id,
+            grantee_type,
+            grantee_id
+        ) VALUES (
+            $1, $2, $3
+        )
+        ON CONFLICT (expert_id, grantee_type, grantee_id) DO UPDATE
+        SET expert_id = EXCLUDED.expert_id
+        RETURNING *;
+    """
+    row = await pool.fetchrow(query, expert_id, grantee_type, grantee_id)
+    if not row:
+        raise RuntimeError("Failed to add expert grant")
+    return dict(row)
+
+
+async def remove_expert_grant(
+    pool: asyncpg.Pool,
+    grant_id: UUID,
+    expert_id: UUID | None = None,
+) -> bool:
+    """Remove a granular access grant by its ID."""
+    if expert_id is not None:
+        query = """
+            DELETE FROM public.expert_grants
+            WHERE id = $1 AND expert_id = $2;
+        """
+        result = await pool.execute(query, grant_id, expert_id)
+    else:
+        query = """
+            DELETE FROM public.expert_grants
+            WHERE id = $1;
+        """
+        result = await pool.execute(query, grant_id)
+    return result == "DELETE 1"
+
+
+async def bulk_set_expert_grants(
+    pool: asyncpg.Pool,
+    expert_id: UUID,
+    grants: list[tuple[str, str]],
+) -> list[dict[str, Any]]:
+    """Synchronize expert grants in a transaction, replacing existing grants."""
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            await conn.execute("DELETE FROM public.expert_grants WHERE expert_id = $1;", expert_id)
+            if not grants:
+                return []
+            stmt = """
+                INSERT INTO public.expert_grants (expert_id, grantee_type, grantee_id)
+                VALUES ($1, $2, $3)
+                ON CONFLICT (expert_id, grantee_type, grantee_id) DO NOTHING
+                RETURNING *;
+            """
+            out = []
+            for g_type, g_id in grants:
+                r = await conn.fetchrow(stmt, expert_id, g_type, g_id)
+                if r:
+                    out.append(dict(r))
+            return out
