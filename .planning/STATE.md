@@ -112,6 +112,33 @@ Last activity: 2026-09-20 -- Phase 260 executed (all 3 plans complete, gates pas
 - **F-5 Deploy-Ordering Hazard**: Recorded in OWED TO THE OPERATOR (Migration 186 must be applied to production before or at backend deployment).
 - **F-2 Scope Disposition**: Workflow authoring proof slice (`POST /workflows`, `POST /workflows/{id}/publish`) gated as planned. Runtime kickoff gating via `threads.py` deferred to execution milestone/phase to preserve `threads.py` G-5 invariants and isolate general thread chat.
 
+### ⛔ FROZEN BASELINE FOR PHASES 261 / 262 — captured 2026-09-20, BEFORE any 261 work
+
+**Base SHA: `f3a1fe66fac830ff15ddc969c056ed86a7794380`** (`develop`). ⭐ **Verified valid, not
+assumed:** a path-filtered diff shows **zero source files changed** between `58fc88b6e` — where
+these gates were actually measured — and this commit; everything since is `.planning/` only.
+
+| gate | frozen value at the base | how to re-derive |
+|---|---|---|
+| backend pytest | **71 failed / 5176 passed / 2 xfailed / 2 xpassed** | `pytest tests/unit -q --continue-on-collection-errors --tb=no` in `backend/` with the venv |
+| vitest count gate | **8478 · failed 0 · pinned 7737 · 295/295** | `GSD_VITEST_MAX_WORKERS=2 node scripts/vitest-count-gate.cjs` from the repo ROOT |
+| tsc | **65 errors** = base | `npx tsc -p tsconfig.app.json --noEmit` in `frontend/` — ⛔ NEVER bare `--noEmit`, which checks ZERO files |
+
+⛔ **WHY THIS IS WRITTEN DOWN RATHER THAN LEFT IN A SESSION.** The reviewer's failing-test SETs live
+in a **session-scoped** scratchpad directory, which a new session cannot address. **A fresh reviewer
+that re-runs the gates AFTER the builder has started is measuring the change against itself**
+(AGENTS.md 6.1). With this row, a new session can prove new-vs-inherited red without a worktree
+checkout — provided it first re-runs `git diff --stat <base>..HEAD -- backend frontend supabase` and
+confirms the source tree at its own start still matches.
+
+⚠ **The COUNT is not the evidence — the SET is.** Capture failing test names with
+`grep -E "^FAILED "` into a file and diff the sets in BOTH directions (`comm -13` and `comm -23`).
+⚠ **Strip trailing warning text before diffing:** a `RuntimeWarning` glued onto a `FAILED` line made
+one test read as both *new* and *disappeared* during the Phase 260 review, and two normalisation
+attempts were wrong before the third was right.
+⚠ **A vitest total that does NOT move after a phase adds test files is the tell**, not the reassurance
+— that is exactly how Phase 260's `F-2` was found.
+
 ### ⭐ PHASE 262 ADDED — 2026-09-20. A deferral that FIRED, recorded as such.
 
 **Operator direction:** normal users — not admins — need a page listing the Experts available to
