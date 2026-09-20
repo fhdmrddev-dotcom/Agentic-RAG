@@ -23,13 +23,14 @@ nor **invite** it — driven against a bundle whose row is readable while the gr
 evaluates `visibility` and `expert_grants` correctly; an ungranted row is **absent** from the list,
 not greyed out.
 
-**The *invite* half is enforced nowhere.** Three reachable surfaces, all gated on **org only**:
+**The *invite* half is enforced nowhere.** **Four** reachable surfaces, all gated on **org only**:
 
 | Surface | Gate found | Grant check |
 |---|---|---|
 | `GET /experts/{bundle_id}` (`api/experts.py:195`) | `get_active_org_id` → `get_expert_service(caller_org_id=…)` — **takes no user id at all** | ❌ |
 | `GET /experts/{bundle_id}/resolve` (`api/experts.py:215`) | `resolve_expert_bundle` phase 1 = `is_system OR org_id == caller_org_id` (`expert_service.py:196`) | ❌ |
 | `PATCH /threads/{id}` setting `active_expert_id` (`api/threads.py:720-728`) | `check_entitlement(pool, org, "experts")` — **tier only** | ❌ |
+| `get_expert_by_slug` → `get_expert_bundle_by_slug(pool, slug, caller_org_id)` | org only — **no user id** | ❌ |
 
 ⭐ **The decisive evidence: `check_expert_grant_access` — the function written for exactly this —
 has ZERO production call sites.** Traced across `backend/`: 1 definition (`db/experts.py:275`) and
@@ -46,6 +47,8 @@ The list never showed it to them; nothing refused them.
 `PACK-04`'s member stripping both hold — a cross-org caller still gets `None`. RLS on
 `expert_grants` is present and correct (mig 189:43-70). The breach is *inside* one org, which is
 exactly the boundary `PACK-10` was added to create.
+
+⚠ **The slug surface is the worst of the four**, and it was found by an independent second trace rather than the first: a UUID must be obtained, a **slug can be guessed** (`financial-analyzer`, `hr-advisor`). Recorded because one search finding three surfaces and a second finding a fourth is the tell that a call-site sweep must be re-derived, never trusted at first pass.
 
 **Fix shape:** thread `caller_user_id` + `caller_roles` into all three surfaces and call the
 function that already exists. Drive it RED against a readable-row/absent-grant bundle, the way
