@@ -187,6 +187,17 @@ export async function renameThread(id: string, title: string): Promise<Thread> {
   return res.json() as Promise<Thread>
 }
 
+export async function setThreadActiveExpert(threadId: string, expertId: string | null): Promise<Thread> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/threads/${threadId}`, {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify({ active_expert_id: expertId }),
+  })
+  if (!res.ok) throw new Error("Failed to update thread active expert")
+  return res.json() as Promise<Thread>
+}
+
 // ── Phase 063: Run-backed streaming API ──────────────────────────────────────
 //
 // The legacy POST-and-stream-on-the-same-request orchestrator was physically

@@ -9,9 +9,26 @@ export interface Thread {
   user_id: string
   title: string
   folder_id: string | null
+  active_expert_id?: string | null
   created_at: string
   updated_at: string
 }
+
+export interface ExpertBundle {
+  id: string
+  name: string
+  slug: string
+  description: string
+  scope_mode: "restricted" | "biased"
+  member_skills: string[]
+  required_connections: string[]
+  knowledge_folder_ids: string[]
+  prompt_suggestions: Array<{ title: string; prompt: string }>
+  visibility: string
+  is_system: boolean
+  is_enabled: boolean
+}
+
 
 export interface SubAgentState {
   filename: string
