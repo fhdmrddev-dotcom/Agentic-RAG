@@ -745,6 +745,7 @@ async def test_publish_workflow_actually_issues_the_judge_usage_write_on_a_BLOCK
 _EXPECTED_FORCED_EMIT_SITES: dict[str, str] = {
     "services/embedding_service.py": "NO-RUN",
     "services/eval_runner_service.py": "REGISTERED (SEED-300 hole 3 — an eval `runs` row, no token_coverage marker)",
+    "services/expert_authoring.py": "NO-RUN",
     "services/harness/phase_types.py": "COUNTED-INTO-RUN-BOX",
     "services/harness/publish_service.py": "COUNTED-VIA-PERSIST",
     "services/harness/validator_kinds.py": "COUNTED-INTO-RUN-BOX",
