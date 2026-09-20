@@ -412,9 +412,10 @@ async def test_scenario_pack10_ungranted_user_cannot_read_or_invite_expert():
         return False
 
     with patch("app.db.experts.get_expert_bundle_by_id", AsyncMock(return_value=bundle_row)), \
+         patch("app.db.experts.get_expert_bundle_by_slug", AsyncMock(return_value=bundle_row)), \
          patch("app.db.experts.check_expert_grant_access", AsyncMock(side_effect=mock_check_grant)):
 
-        # 1. Surface 1: get_expert_service
+        # 1. Surface 1: get_expert_service & get_expert_by_slug_service
         # Ungranted user -> must return None (refused)
         ungranted_bundle = await get_expert_service(
             mock_pool, bundle_id, org_id, caller_user_id=ungranted_user_id, caller_roles=["member"]
@@ -427,6 +428,19 @@ async def test_scenario_pack10_ungranted_user_cannot_read_or_invite_expert():
         )
         assert granted_bundle is not None
         assert granted_bundle["id"] == str(bundle_id)
+
+        # Slug lookup (Surface 1b)
+        from app.services.expert_service import get_expert_by_slug_service
+        ungranted_slug = await get_expert_by_slug_service(
+            mock_pool, "hr-advisor", org_id, caller_user_id=ungranted_user_id, caller_roles=["member"]
+        )
+        assert ungranted_slug is None, "Slug lookup must refuse ungranted user"
+
+        granted_slug = await get_expert_by_slug_service(
+            mock_pool, "hr-advisor", org_id, caller_user_id=granted_user_id, caller_roles=["member"]
+        )
+        assert granted_slug is not None
+        assert granted_slug["slug"] == "hr-advisor"
 
         # 2. Surface 2: resolve_expert_bundle
         from app.services.expert_service import resolve_expert_bundle
@@ -522,5 +536,41 @@ async def test_scenario_pack10_ungranted_user_cannot_read_or_invite_expert():
                 )
             assert "refusing run (fail-closed)" in str(val_err.value)
             mock_table.update.assert_called_with({"active_expert_id": None})
+
+        # 5. Surface 5: PATCH /threads/{thread_id} active_expert_id invite
+        from app.api.threads import rename_thread
+        from app.models.thread import ThreadUpdate
+
+        thread_patch = ThreadUpdate(active_expert_id=bundle_id)
+        mock_req = MagicMock(spec=Request)
+
+        with patch("app.api.threads.resolve_active_org_or_none", AsyncMock(return_value=str(org_id))), \
+             patch("app.api.threads.get_pg_pool", AsyncMock(return_value=mock_pool)), \
+             patch("app.services.entitlement_service.check_entitlement", AsyncMock(return_value=MagicMock(allowed=True))):
+
+            # Ungranted user attempting to invite/set expert -> 404 HTTPException
+            with pytest.raises(HTTPException) as exc_info:
+                await rename_thread(
+                    thread_id="test-thread-id",
+                    body=thread_patch,
+                    request=mock_req,
+                    current_user={"id": str(ungranted_user_id), "role": "member"},
+                    supabase=mock_supabase,
+                )
+            assert exc_info.value.status_code == 404
+            assert "Expert bundle not found or access denied" in exc_info.value.detail
+
+            # Granted user attempting to invite/set expert -> succeeds
+            mock_table_select = MagicMock()
+            mock_table_select.data = {"id": "test-thread-id", "active_expert_id": str(bundle_id)}
+            with patch("app.api.threads.aexec", AsyncMock(return_value=mock_table_select)):
+                res = await rename_thread(
+                    thread_id="test-thread-id",
+                    body=thread_patch,
+                    request=mock_req,
+                    current_user={"id": str(granted_user_id), "role": "member"},
+                    supabase=mock_supabase,
+                )
+                assert res["active_expert_id"] == str(bundle_id)
 
 
