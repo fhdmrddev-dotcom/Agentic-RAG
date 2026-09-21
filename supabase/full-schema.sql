@@ -2704,7 +2704,8 @@ CREATE TABLE public.skills (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     is_system boolean DEFAULT false NOT NULL,
-    org_id uuid NOT NULL
+    org_id uuid NOT NULL,
+    born_for_expert_bundle_id uuid
 );
 
 
@@ -2713,6 +2714,13 @@ CREATE TABLE public.skills (
 --
 
 COMMENT ON COLUMN public.skills.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v3.3; no FK until org schema exists.';
+
+
+--
+-- Name: COLUMN skills.born_for_expert_bundle_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.skills.born_for_expert_bundle_id IS 'Provenance marker for the Expert bundle a skill was authored for (D-263-07, Phase 263). NULL for every skill not born from Expert authoring, INCLUDING an abandoned draft (D-263-08). Read as the THIRD disjunct of resolve_expert_bundle''s phase-2 visibility check; the org_id fence above it is UNCHANGED.';
 
 
 --
@@ -4675,6 +4683,13 @@ CREATE INDEX idx_skill_versions_user_id ON public.skill_versions USING btree (us
 
 
 --
+-- Name: idx_skills_born_for_expert; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_skills_born_for_expert ON public.skills USING btree (born_for_expert_bundle_id) WHERE (born_for_expert_bundle_id IS NOT NULL);
+
+
+--
 -- Name: idx_sso_configs_org_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -6154,6 +6169,14 @@ ALTER TABLE ONLY public.skill_versions
 
 ALTER TABLE ONLY public.skill_versions
     ADD CONSTRAINT skill_versions_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: skills skills_born_for_expert_bundle_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.skills
+    ADD CONSTRAINT skills_born_for_expert_bundle_id_fkey FOREIGN KEY (born_for_expert_bundle_id) REFERENCES public.expert_bundles(id) ON DELETE SET NULL;
 
 
 --
