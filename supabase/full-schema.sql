@@ -2166,7 +2166,16 @@ CREATE TABLE public.model_capabilities_overrides (
     deprecated_reason text,
     emit_tier text,
     removed boolean DEFAULT false NOT NULL,
-    CONSTRAINT model_capabilities_overrides_emit_tier_check CHECK (((emit_tier IS NULL) OR (emit_tier = ANY (ARRAY['force_strict'::text, 'force'::text, 'coerce'::text]))))
+    api_surface text,
+    reasoning_first boolean,
+    reasoning_off text,
+    uses_max_completion_tokens boolean,
+    supports_parallel_tools boolean,
+    max_tools integer,
+    CONSTRAINT model_capabilities_overrides_api_surface_check CHECK (((api_surface IS NULL) OR (api_surface = 'responses'::text))),
+    CONSTRAINT model_capabilities_overrides_emit_tier_check CHECK (((emit_tier IS NULL) OR (emit_tier = ANY (ARRAY['force_strict'::text, 'force'::text, 'coerce'::text])))),
+    CONSTRAINT model_capabilities_overrides_max_tools_check CHECK (((max_tools IS NULL) OR (max_tools > 0))),
+    CONSTRAINT model_capabilities_overrides_reasoning_off_check CHECK (((reasoning_off IS NULL) OR (reasoning_off = ANY (ARRAY['thinking_disabled'::text, 'effort_none'::text]))))
 );
 
 
@@ -2182,6 +2191,48 @@ COMMENT ON COLUMN public.model_capabilities_overrides.emit_tier IS 'Phase 196 (A
 --
 
 COMMENT ON COLUMN public.model_capabilities_overrides.removed IS 'Tombstone. TRUE means this model_id is removed from the registry — including a model declared in the built-in MODEL_CAPABILITIES dict, which cannot be deleted from the DB because it does not live there. Both override caches filter removed = false, so a tombstoned model is invisible to the picker, the capability resolver and the provider builder; build_model_registry_rows additionally skips the matching built-in. Re-adding the model clears the tombstone. A DB-only model is hard-DELETEd instead and never carries one.';
+
+
+--
+-- Name: COLUMN model_capabilities_overrides.api_surface; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.model_capabilities_overrides.api_surface IS 'Phase 262. The OpenAI API surface this model is called on. NULL = chat.completions (the shipped state for every pre-190 row, byte-identical). ''responses'' routes the model through provider_gateway/openai_responses.py, where reasoning and native tool calling are served together. CLOSED vocabulary, pinned EQUAL to config.API_SURFACES and to the surfaces the gateway dispatcher can route by test_262_capability_column_pin.py — a value with no adapter behind it is silently ignored, never an error.';
+
+
+--
+-- Name: COLUMN model_capabilities_overrides.reasoning_first; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.model_capabilities_overrides.reasoning_first IS 'Phase 262 (registry half of the Phase 175 XPROV-01 gate). TRUE => this model rejects a chat.completions call carrying BOTH a native tools param AND reasoning, so it is routed STRUCTURED unless api_surface names a surface that serves both. NULL = not asserted.';
+
+
+--
+-- Name: COLUMN model_capabilities_overrides.reasoning_off; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.model_capabilities_overrides.reasoning_off IS 'Phase 262 (registry half of Phase 175 XPROV-04 / D-05). The docs-confirmed mechanism for turning reasoning OFF on cheap side-calls such as thread titling: ''thinking_disabled'' (extra_body thinking.type=disabled) or ''effort_none'' (reasoning_effort=none). NULL = UNSAFE/unknown, which keeps today''s derived fallback. CLOSED vocabulary pinned to the config.ModelCapability Literal by test_262_capability_column_pin.py.';
+
+
+--
+-- Name: COLUMN model_capabilities_overrides.uses_max_completion_tokens; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.model_capabilities_overrides.uses_max_completion_tokens IS 'Phase 262. TRUE => send max_completion_tokens, not max_tokens (OpenAI o-series + GPT-5+). Sending the wrong parameter is a hard 400. NULL falls back to openai_service._uses_max_completion_tokens'' prefix heuristic, which is byte-identical to today.';
+
+
+--
+-- Name: COLUMN model_capabilities_overrides.supports_parallel_tools; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.model_capabilities_overrides.supports_parallel_tools IS 'Phase 262. FALSE => this endpoint REJECTS the parallel_tool_calls parameter, so it must not be sent. It is a claim about the API accepting the kwarg, NOT about whether parallel tools are wanted. NULL falls back to the provider-prefix inference (byte-identical).';
+
+
+--
+-- Name: COLUMN model_capabilities_overrides.max_tools; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.model_capabilities_overrides.max_tools IS 'Phase 262 (registry half of Phase 091 TOOL-05 / SEED-035). Soft ceiling on how many tool schemas are offered to this model — some models degrade past a modest count. NULL = no cap, which is the shipped default for every model without a registry entry.';
 
 
 --
