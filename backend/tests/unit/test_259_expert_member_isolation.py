@@ -35,6 +35,11 @@ async def test_resolve_legitimate_bundle_all_members_admitted():
         "scope_mode": "restricted",
         "is_system": False,
         "org_id": org_a,
+        # Phase 261 (F-1): expert_bundles.visibility is NOT NULL DEFAULT 'private' and
+        # created_by is NOT NULL — a row without them is unreachable in production. The
+        # grant gate reads visibility, so omitting it here modelled an impossible row.
+        "visibility": "org",
+        "created_by": user_a,
         "member_skills": ["system_calc", "org_a_tool"],
         "knowledge_folder_ids": [folder_a],
         "required_connections": ["slack"],
@@ -95,6 +100,11 @@ async def test_resolve_strips_foreign_skill_seed_125(caplog):
         "scope_mode": "restricted",
         "is_system": False,
         "org_id": org_a,
+        # Phase 261 (F-1): expert_bundles.visibility is NOT NULL DEFAULT 'private' and
+        # created_by is NOT NULL — a row without them is unreachable in production. The
+        # grant gate reads visibility, so omitting it here modelled an impossible row.
+        "visibility": "org",
+        "created_by": user_a,
         "member_skills": ["org_b_secret_skill", "org_a_safe_skill"],
         "knowledge_folder_ids": [],
         "required_connections": [],
@@ -147,6 +157,11 @@ async def test_resolve_strips_foreign_knowledge_folder(caplog):
         "scope_mode": "restricted",
         "is_system": False,
         "org_id": org_a,
+        # Phase 261 (F-1): expert_bundles.visibility is NOT NULL DEFAULT 'private' and
+        # created_by is NOT NULL — a row without them is unreachable in production. The
+        # grant gate reads visibility, so omitting it here modelled an impossible row.
+        "visibility": "org",
+        "created_by": user_a,
         "member_skills": [],
         "knowledge_folder_ids": [folder_a, folder_b],
         "required_connections": [],
@@ -193,6 +208,11 @@ async def test_resolve_strips_unconfigured_connection(caplog):
         "scope_mode": "restricted",
         "is_system": False,
         "org_id": org_a,
+        # Phase 261 (F-1): expert_bundles.visibility is NOT NULL DEFAULT 'private' and
+        # created_by is NOT NULL — a row without them is unreachable in production. The
+        # grant gate reads visibility, so omitting it here modelled an impossible row.
+        "visibility": "org",
+        "created_by": user_a,
         "member_skills": [],
         "knowledge_folder_ids": [],
         "required_connections": ["salesforce", "slack"],
@@ -323,6 +343,11 @@ async def test_resolve_strips_unshared_same_org_foreign_user_folder(caplog):
         "scope_mode": "restricted",
         "is_system": False,
         "org_id": org_a,
+        # Phase 261 (F-1): expert_bundles.visibility is NOT NULL DEFAULT 'private' and
+        # created_by is NOT NULL — a row without them is unreachable in production. The
+        # grant gate reads visibility, so omitting it here modelled an impossible row.
+        "visibility": "org",
+        "created_by": user_a,
         "member_skills": [],
         "knowledge_folder_ids": [folder_owned, folder_shared, folder_private, folder_cross_org],
         "required_connections": [],
