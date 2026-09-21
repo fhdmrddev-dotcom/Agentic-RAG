@@ -136,3 +136,92 @@ counting **grep output lines** over the registry block, which included comment l
 `execute_code`, `workspace_write`, `render_template` and `ask_user` were all stripped, which is why
 `D-v4.3-02` exists — but a register carrying a wrong measured number is how a wrong number gets
 quoted forward, so it is corrected in place with its origin named.
+
+
+---
+
+# ADDENDUM — RE-REVIEW OF THE FIXES, AND THE FIXES I THEN MADE MYSELF (2026-09-21)
+
+⚠ **ROLE NOTE, RECORDED RATHER THAN HIDDEN.** Gemini's quota was exhausted mid-phase and the
+operator directed claude to continue end to end. So this addendum has **two halves with different
+standing**, and they must not be read as one verdict:
+
+- **§A is a REVIEW.** Gemini built the F-1/F-2/F-3 fixes, so reviewing them is clean.
+- **§B is BUILD WORK BY THE REVIEWER.** claude authored `BUG-260921-01` and then fixed it. That is
+  the `257` failure mode inverted — *"fix it directly"* turning the reviewer into the builder,
+  where 14 of 17 later findings were against the reviewer's own fixes. **§B is UNREVIEWED and owes
+  an independent pass.**
+
+## §A — Gemini's fixes to F-1 / F-2 / F-3: **ACCEPTED**
+
+| Finding | Verdict | How it was established |
+|---|---|---|
+| **F-1** PACK-10 invite gate | ✅ **FIXED** | `check_expert_grant_access` now has production call sites in `expert_service.py` (×4), `api/experts.py` (×3), `api/threads.py` and `run_producer.py` — it previously had none outside its own test. **Driven RED:** planting `has_grant = True` at the resolve/invite site failed `test_scenario_pack10_ungranted_user_cannot_read_or_invite_expert`; restoring it went green, 36/36. |
+| **F-2** brainstorm upload decode | ✅ **FIXED** | `pypdf.PdfReader` for `.pdf`, `python-docx` for `.docx`, UTF-8 only as the fallback for other types. |
+| **F-3** unbounded read | ✅ **FIXED** | `await f.read(MAX_FILE_BYTES)` with a 5 MB cap, applied **before** the slice. |
+
+⚠ **Two residuals on F-2, neither blocking and neither a regression.** A failed extraction is still
+only a `logger.warning`, so the file silently contributes nothing and the admin is not told — the
+original finding asked for a *named reason*, and half of it stands. And `.doc`, `.pptx` and `.xlsx`
+still fall through to the UTF-8 branch, which produces the same replacement-character noise the fix
+removed for two formats.
+
+## §A2 — A REGRESSION THE FIX INTRODUCED, which `BUS-299` did not see
+
+`BUS-299` claimed *"All 35 Phase 261 tests pass"*. That was **true and insufficient**: the backend
+unit baseline went **71 → 76**, breaking the mandatory zero-headroom gate, and all five new
+failures were in **`test_259_expert_member_isolation.py`** — the suite F-1's own change broke.
+
+⭐ **Established inherited-vs-new by stashing, not by reasoning:** with claude's changes stashed,
+the five still failed at Gemini's HEAD. `71 + 5 = 76` exactly.
+
+⭐ **And the fix did NOT break the product — it broke five fixtures that modelled a row the schema
+forbids.** `expert_bundles.visibility` is `NOT NULL DEFAULT 'private'` and `created_by` is
+`NOT NULL`; the fixtures omitted both, so the grant gate read `visibility = None` and correctly
+denied. Those rows are unreachable in production and had only ever passed because **nothing read
+the column**. Repaired at `4c2428063`; baseline back to **71 failed / 5237 passed**, failing set
+otherwise identical.
+
+## §B — claude's own fixes to `BUG-260921-01` (a) and (b): **UNREVIEWED**
+
+**(a) The schema is the contract.** Every substantive `ExpertDraftOutput` field carried a Pydantic
+default, so a model returning one thin sentence validated perfectly and richness was a lottery
+(293 vs 2163 chars of `description` on one identical prompt). The fields are now **required with
+floors** — `description` 400, `example_output` 120, `when_to_use` 40-240, exactly 3 tiles with
+150-char prompt bodies — and the system prompt's `140`-char claim is aligned to the enforced 240,
+since prompt and schema disagreeing is the defect. Safe because `forced_emit`'s ladder **re-drives**
+a rung whose payload fails `model_validate` rather than going dark.
+
+⭐ **Driving the FALLBACK against the new floors caught a regression that would otherwise have
+shipped**, and this is the part worth keeping: the fallback constructed `PromptSuggestion` rather
+than the floored draft model, and a one-character prompt produced a one-character slug — either
+would have raised `ValidationError` in the **last rung under the ladder**, 500-ing the draft
+endpoint for exactly the request with nothing left to fall back to. Now total over 7 edge cases
+including empty and punctuation-only input.
+
+**(b) One home for the jsonb write.** `json.dumps` on an already-encoded string yields a JSON
+**string scalar**: measured live, `phd-lr` reads `jsonb_typeof = 'string'` and
+`financial-analyzer` `'array'` in the same column. `_suggestions_to_jsonb` is now the single
+serialiser for both write paths, with the invariant *the bind value parses to a list*. The read
+side still tolerates the legacy scalar, because the fix stops **new** ones and must not orphan rows
+already written.
+
+Both were **driven RED against planted regressions** (a default restored on `description`; the
+naive `json.dumps` restored) and green on removal. New fence:
+`backend/tests/unit/test_261_draft_contract_and_jsonb.py`, 25 cases.
+
+⚠ **Two of Gemini's existing tests failed on the tightened schema and their FIXTURES were
+aligned, not the schema weakened** — their mocked payloads were thin (`description` 27 chars), fell
+to the fallback, and their own name assertions caught it. That is the floors binding on mocked data,
+which is the desirable direction.
+
+## Still open after all of this
+
+1. ⛔ **The main finding of `BUG-260921-01` is UNFIXED and is the operator's routing call:** an
+   authored Expert's capabilities are whatever the skills library happens to hold — measured, the
+   drafter picked `docx`, `xlsx`, `pptx` for a doctoral literature reviewer because the library has
+   10 rows and nothing else matched. **That is a capability, not a gap-closure item**, and G-7
+   forbids smuggling one into a closure round.
+2. The two `D-v4.3-03` arms still owed to the operator as a live G-4 check — union composition and
+   the tool floor — plus the `restricted`-mode single-folder path and the subtree asymmetry.
+3. **§B owes an independent review.**
