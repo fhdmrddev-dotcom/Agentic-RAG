@@ -168,6 +168,12 @@ const BASELINE = {
   // ── Phase 261 (PACK-07 / PACK-09 / PACK-10) — Expert Authoring Studio & Org Management ──
   "OrgExpertsTab.test.tsx": 5,
   "ExpertAuthoringStudio.test.tsx": 4,
+  // ── Phase 263 (PACK-14/PACK-15) — the dialog an Expert proposal reuses ──────────────
+  // ⚠ ADOPTED, not raised: before 263-04 `grep -ic "skill" scripts/vitest-count-gate.cjs`
+  // returned 0 — NOT ONE skills suite was in either knob, so this file's 8 passing tests
+  // ran NOWHERE and guarded NOTHING. ⚠ It is NOT under a `__tests__/` directory (it sits
+  // beside its component), so the TARGETS entry below is the plain path, no `__tests__`.
+  "SkillFormDialog.test.tsx": 13,
   // ── Phase 237 (RULES-01 / SC#1 / SC#3) — Classification rules & arrival watch builder suites ──
   "ClassificationRulesPage.test.tsx": 8,
   "ClassificationSection.test.tsx": 13,
@@ -4329,6 +4335,12 @@ const TARGETS = [
   // ── Phase 261 (PACK-07 / PACK-09 / PACK-10) — Expert Authoring Studio & Org Management ──
   "src/components/experts/__tests__/OrgExpertsTab.test.tsx",
   "src/components/experts/__tests__/ExpertAuthoringStudio.test.tsx",
+  // ── Phase 263 (PACK-14/PACK-15) — the dialog an Expert proposal reuses ──────────────
+  // ⚠ `src/components/skills` has NO bare-directory TARGETS entry, and this file is NOT
+  // under a `__tests__/` directory — so before this line it ran in NO gate at all.
+  // TARGETS decides what RUNS; BASELINE decides what is GUARDED, and this suite sat on
+  // the wrong side of BOTH. Adopting it RAISES the grand total; that is the gate working.
+  "src/components/skills/SkillFormDialog.test.tsx",
   // ── BUG-260912-01 — narration renders in the fold, not the body ───────────────────────
   //
   // ⛔ `src/components/chat` has NO bare-directory TARGETS entry (this file says so in four
