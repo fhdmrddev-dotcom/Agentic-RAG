@@ -10635,6 +10635,7 @@ cells rot within days.
 | [`backend/app/models/expert.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsexpertpy) | 3 / 3 / 93 | ⚠ **NOW FIRES — 3 phases** | ⛔ row was STALE at `2/2/79` reading `no (new)` / `young`; it CROSSED the threshold here. honoured by construction (**263-03**): ONE new request model, zero existing model touched. |
 | [`backend/app/services/expert_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesexpert_servicepy) | 6 / 4 / 507 | ⛔ **FIRES — 4 phases** | ⚠ row STALE a 2nd time (`5/3/378`). honoured by construction (**263-01**): ONE disjunct INSIDE the existing inner parenthesis + one SELECT column; the `org_id` fence sits above it, RED-driven. |
 | [`backend/app/api/experts.py`](docs/HOT-FILE-LEDGER.md#backendappapiexpertspy) | 9 / 3 / 585 | ⛔ **FIRES — 3 phases** | ⚠ row STALE a 3rd time (`8/3/560`). **263-REVIEW CR-02/03**: both `/draft` asset queries leaked on the BYPASSRLS pool; now mirror the LIVE policies. ⛔ connections unchanged — org-only, MEASURED. |
+| [`backend/app/utils/skill_visibility.py`](docs/HOT-FILE-LEDGER.md#backendapputilsskill_visibilitypy) | 1 / 1 / 83 | no (1 phase) | ⚠ **absent its ENTIRE LIFE — row added at 264 PLANNING.** ⛔ ONE rule, TWO encodings that MUST agree; a widening nests INSIDE the org gate, never a 4th branch. |
 | [`frontend/src/components/chat/ActiveExpertChip.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatactiveexpertchiptsx) | 0 / 0 / 0 | no (new) | young (created Phase 260). Row added AT CREATION — leaf component for active consultant chip. |
 | [`frontend/src/components/chat/ExpertSpotlightCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatexpertspotlightcardtsx) | 0 / 0 / 0 | no (new) | young (created Phase 260). Row added AT CREATION — leaf component for hero spotlight card and action tiles. |
 | [`frontend/src/components/chat/InviteExpertDialog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatinviteexpertdialogtsx) | 0 / 0 / 0 | no (new) | young (created Phase 260). Row added AT CREATION — leaf component for expert invitation modal. |
@@ -16284,3 +16285,57 @@ field, what the system will do anyway.
 
 ⚠ `advancedSetCount` counts ASSERTED values, not truthy ones. An explicit `false` is an
 assertion and must count, or a deliberately-disabled capability looks untouched from outside.
+
+
+## `backend/app/utils/skill_visibility.py`
+
+**`1 / 1 / 83`** — created by Phase 182 (CR-01). **Row added at 264 PLANNING, before the first
+edit**, because the file had **no row for its entire life**: `backend/app/` is WATCHED and
+`app/utils/` is not EXEMPT (`scripts/check-hot-file-ledger.cjs:51-66`), so G-5 could never have
+fired on it at any count. The `settingsSearchPayload.ts` / `workspaceAllowedExt.ts` precedent —
+an absent row is invisible to its own guardrail, and the count is not what makes it invisible.
+
+**What it owns.** The ONE org-gated skill-visibility rule, for every skill read that runs on the
+**service-role (BYPASSRLS)** Supabase client — where `auth.uid()` and `current_user_org_ids()`
+never resolve, so the RLS policy on `public.skills` has to be re-implemented in app code. It
+exports **two encodings of one rule**: `build_skill_visibility_or` (pushed DOWN to PostgREST as an
+`.or_()` predicate string) and `skill_row_visible` (the same predicate in Python, for call sites
+that also post-filter fetched rows). Its consumers are `tool_dispatcher.py` (four
+`_resolve_skill_visibility_or` calls feeding six `.or_()` applications) and
+`services/harness/grounding.py`.
+
+**Binding invariants.**
+
+⛔ **Exactly ONE copy of the rule, TWO encodings, and they MUST agree.** The module docstring's
+*"change one, change both, in one commit"* is the contract. A post-filter looser than the query
+re-opens `SEED-125` the moment the query is bypassed, degraded or widened.
+
+⛔ **Any widening nests INSIDE the org gate — never as a fourth top-level `or` branch.** The
+predicate's shape is `is_system.eq.true,and(org_id.in.(…),or(…))`. A term added beside
+`is_system` lets a **foreign-org** row through, which is the exact `SEED-125` leak this module
+exists to prevent.
+
+⛔ **Fail-closed on an empty org set.** `build_skill_visibility_or(u, set())` returns exactly
+`is_system.eq.true`, and it must keep returning exactly that **even when an optional widening
+argument is supplied** — with no org gate there is nothing to nest inside.
+
+⛔ **Import-light, one direction only.** Its only import is `from app.utils.db import coerce_uid`.
+It must NOT import anything under `app.services.` — `tool_dispatcher` transitively pulls
+`harness.scope` → `task_service` → back to itself, a documented real cycle, and that cycle is
+*why* this module exists rather than a second copy inside the dispatcher. The dependency points
+`expert_service → skill_visibility`, never back.
+
+⛔ **`coerce_uid` on every runtime value spliced into the `.or_()` grammar.** `postgrest 2.29.0`'s
+`SyncFilterRequestBuilder.or_` is a pure passthrough — no escaping, no quoting, no validation
+happens in the client, so the grammar is entirely this module's responsibility. ⚠ `coerce_uid`
+does **not** cover `None`; a `None` guard must be structural, not a coercion.
+
+⛔ **`.get()`, never `row[...]`, in `skill_row_visible`.** Pre-263 mock fixtures are plain dicts
+without the newer columns, and a `KeyError` here surfaces as a handler crash rather than a
+visibility miss.
+
+⚠ **It deliberately does NOT check `is_enabled`** (docstring): enablement is a separate concern
+from visibility and only some call sites filter on it. Measured — `_handle_load_skill` adds
+`.eq("is_enabled", True)`; `_handle_read_skill_file` and `_handle_execute_code` add **no
+enablement term at all**. Any arm added here that has no such compensation at its call sites
+must carry its own enablement term, or a disabled skill's files become readable.

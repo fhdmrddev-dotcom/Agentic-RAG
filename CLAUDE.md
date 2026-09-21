@@ -838,6 +838,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/expert_authoring.py` | 5 / 2 / 393 | ⚠ absent from BOTH registers its ENTIRE LIFE — row added at WR-01, BELOW threshold, deliberately. ⛔ every string it emits is CAPPED to its consumer, or the app 422s on the Expert its own AI wrote |
 | `frontend/src/components/experts/ExpertAuthoringStudio.tsx` | 3 / 2 / 1550 | ⚠ absent its ENTIRE LIFE at 1550 L — row added at WR-03/04/05/08, BELOW threshold. ⛔ a failed grant REVOCATION is reported; an unread library is a THIRD banner state, never a clean one |
 | `backend/app/api/experts.py` | 9 / 3 / 605 | ⚠ row STALE a 4th time (`9/3/585`), SAME DAY. **CR-02/03 + WR-09**: the 2 leaky `/draft` queries mirror the live policies; the catch-all detail is a LITERAL, a taken slug 409s |
+| `backend/app/utils/skill_visibility.py` | 1 / 1 / 83 | ⚠ **absent its ENTIRE LIFE — row added at 264 PLANNING.** ⛔ ONE copy of the rule, TWO encodings that MUST agree; any widening nests INSIDE the org gate, never a 4th top-level branch |
 | `frontend/src/components/chat/ActiveExpertChip.tsx` | 0 / 0 / 0 | young (created 260). Row added AT CREATION — active consultant chip in composer (PACK-02) |
 | `frontend/src/components/chat/ExpertSpotlightCard.tsx` | 0 / 0 / 0 | young (created 260). Row added AT CREATION — spotlight card and action tiles (PACK-03) |
 | `frontend/src/components/chat/InviteExpertDialog.tsx` | 0 / 0 / 0 | young (created 260). Row added AT CREATION — expert invitation modal dialog (PACK-02) |
