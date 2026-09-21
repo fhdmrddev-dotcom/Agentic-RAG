@@ -10586,11 +10586,11 @@ cells rot within days.
 | [`frontend/src/components/experts/ExpertAuthoringStudio.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertsexpertauthoringstudiotsx) | 1 / 1 / 1082 | no (new) | young (created Phase 261). Row added AT CREATION — leaf component for expert authoring studio and live preview. |
 | [`frontend/src/components/org/OrgAdminShell.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgadminshelltsx) | 3 / 5 / 442 | no | young (created Phase 166). The org-admin shell hosting live tabs (members, audit, settings, invitations, sso, experts). |
 | [`frontend/src/components/org/OrgExpertsTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgexpertstabtsx) | 1 / 1 / 347 | no (new) | young (created Phase 261). Row added AT CREATION — leaf component for org-admin expert listing and management. |
-| [`frontend/src/lib/api/experts.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiexpertsts) | 2 / 2 / 186 | no | young (created Phase 260). Client module for expert API CRUD, draft, and grant calls. |
+| [`frontend/src/lib/api/experts.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiexpertsts) | 5 / 3 / 298 | ⚠ **NOW FIRES — 3 phases** | ⛔ row STALE at `2/2/186` reading `no`/`young`; CROSSED the threshold here. honoured by construction (**263-03**): the 422 arm is ONE helper at 2 call sites; `handleResponse` byte-unchanged. |
 | [`backend/app/db/experts.py`](docs/HOT-FILE-LEDGER.md#backendappdbexpertspy) | 4 / 3 / 567 | ⚠ **NOW FIRES — 3 phases** | ⛔ row was STALE at `2/2/492` reading `no (new)`; it CROSSED the threshold in this very commit. honoured by construction (**263-01**): ONE new UPDATE, no existing query touched. |
-| [`backend/app/models/expert.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsexpertpy) | 2 / 2 / 79 | no (new) | young (created Phase 259). Row added AT CREATION — Pydantic domain models for expert bundles. |
+| [`backend/app/models/expert.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsexpertpy) | 3 / 3 / 93 | ⚠ **NOW FIRES — 3 phases** | ⛔ row was STALE at `2/2/79` reading `no (new)` / `young`; it CROSSED the threshold here. honoured by construction (**263-03**): ONE new request model, zero existing model touched. |
 | [`backend/app/services/expert_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesexpert_servicepy) | 6 / 4 / 507 | ⛔ **FIRES — 4 phases** | ⚠ row STALE a 2nd time (`5/3/378`). honoured by construction (**263-01**): ONE disjunct INSIDE the existing inner parenthesis + one SELECT column; the `org_id` fence sits above it, RED-driven. |
-| [`backend/app/api/experts.py`](docs/HOT-FILE-LEDGER.md#backendappapiexpertspy) | 6 / 3 / 398 | ⚠ **NOW FIRES — 3 phases** | ⛔ row was STALE at `2/2/346` reading `no (new)`; it CROSSED the threshold here. honoured by construction (**263-01**): ONE optional kwarg + the extraction line already used at 5 sites in this file. |
+| [`backend/app/api/experts.py`](docs/HOT-FILE-LEDGER.md#backendappapiexpertspy) | 8 / 3 / 560 | ⛔ **FIRES — 3 phases** | ⚠ row STALE a 2nd time, ONE PLAN later (`6/3/398`). honoured by construction (**263-03**): ONE helper + 2 calls + 1 route; ⛔ the refusal sits ABOVE `create_expert`'s try or it degrades to a 400. |
 | [`frontend/src/components/chat/ActiveExpertChip.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatactiveexpertchiptsx) | 0 / 0 / 0 | no (new) | young (created Phase 260). Row added AT CREATION — leaf component for active consultant chip. |
 | [`frontend/src/components/chat/ExpertSpotlightCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatexpertspotlightcardtsx) | 0 / 0 / 0 | no (new) | young (created Phase 260). Row added AT CREATION — leaf component for hero spotlight card and action tiles. |
 | [`frontend/src/components/chat/InviteExpertDialog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatinviteexpertdialogtsx) | 0 / 0 / 0 | no (new) | young (created Phase 260). Row added AT CREATION — leaf component for expert invitation modal. |
@@ -15447,6 +15447,32 @@ de-facto skills DAL, and the extraction seam would then be *skills writes* — n
 
 What it owns. Pydantic schemas for domain expert bundles: `PromptSuggestion`, `ExpertBundleBase`, `ExpertBundleCreate`, `ExpertBundleUpdate`, and `ExpertBundle`.
 
+⚠ **CORRECTED 2026-09-21 (Phase 263, plan `263-03`) — THE ROW WAS STALE AT `2 / 2 / 79` AND READ
+`no (new)` / `young`. The original figures are kept above rather than overwritten.** Re-derived at
+this plan's close: **`3 / 3 / 93`** — **G-5 NOW FIRES, exactly at threshold**, in the commit that
+records it. ⛔ That is the second-worst state a ledger row can be in and it is worth naming: the row
+was PRESENT and said `young`, so an auditor reading it would have stopped. The scan-list row and this
+section were corrected together. **`frontend/src/lib/api/experts.ts` crossed in the SAME plan, also
+reading `no` / `young`** — two rows, one plan, both silently past threshold.
+
+**What `263-03` added, and why it is honoured by construction.** ONE new request model,
+`SkillBodyDraftRequest` (the wire shape of `POST /experts/draft-skill-body`), with **zero existing
+model touched** — `ExpertBundleCreate.member_skills` and `ExpertBundleUpdate.member_skills` are
+byte-unchanged, which is load-bearing: `ExpertBundleUpdate.member_skills` is `list[str] | None = None`
+and that `None` is what lets `_refuse_unknown_member_skills` distinguish *"not being changed"* from
+*"emptied"*. Widening it to a `default_factory=list` would make every unrelated PATCH run the check.
+
+⛔ **The binding invariant this module carries.** It is listed in `EXPERT_MODULE_PATHS`
+(`test_261_single_expert_authoring_gate.py`), so **zero hardcoded `org-admin` / `super-admin` /
+`admin` literals** may appear in it at any nesting depth — permission is data-driven through
+`role_permissions`. A role string in a `Literal[...]` or a default would fail that AST fence.
+
+**Named seam, for the next phase that lands here.** Nothing is owed yet at 93 lines. The seam to take
+when it grows is the **request-vs-domain split**: `ExpertBundle*` are DOMAIN models that mirror table
+columns, while `SkillBodyDraftRequest` is a pure REQUEST envelope for one route. A third request
+envelope is the moment to split them into `models/expert.py` and `models/expert_requests.py`, rather
+than the moment to add a fourth.
+
 ---
 
 ## `backend/app/services/expert_service.py`
@@ -15549,6 +15575,50 @@ from the plan's `files_modified`, `check-hot-file-ledger.cjs` would NOT have dem
 **The gate audits the plan's declared surface, not the commit's actual diff** — so a file edited as
 an unplanned deviation is invisible to G-5 unless its row is updated by hand, as it was here.
 
+⚠ **STALE A SECOND TIME, ONE PLAN LATER — 2026-09-21 (Phase 263, `263-03`).** The correction directly
+above read `6 / 3 / 398` and was written the same day. Re-derived at `263-03`'s close: **`8 / 3 / 560`**
+— **`+2` commits and `+162` lines inside one phase.** Both prior figures stand; the *rate* is the
+point, and it is the same rate `backend/app/api/workspace.py`'s row recorded as "the fastest rot".
+
+**What `263-03` added, and why it is honoured by construction.** ONE module-level helper
+(`_refuse_unknown_member_skills`), **two calls** to it, and **one new route**
+(`POST /experts/draft-skill-body`). ⛔ **No existing endpoint's error handling was changed** — in
+particular `create_expert`'s bare `except Exception` is byte-identical, deliberately: widening it is
+a separate concern that would touch every other failure path in that endpoint.
+
+⛔ **THE PLACEMENT INVARIANT, RED-DRIVEN AND NOT NEGOTIABLE.** `create_expert` wraps its service call
+in `except Exception`, and **`HTTPException` subclasses `Exception`**. A 422 raised *inside* that
+`try` is caught, logged as an error, and re-raised as a **400 whose detail is the stringified
+exception** — the named refusal destroyed and the client silently falling back to re-deriving the
+banner. Measured, not reasoned: moving the call one line down produced
+`400 {"detail":"Could not create expert bundle: 422: {...}"}`. Restored; file md5
+`e5fdd0a196e9a06c2843c0db616fe087` before and after. The placement is now asserted **mechanically**
+(`min(call lineno) < min(try lineno)`, by AST) in `test_263_expert_save_refuses_unknown_skills.py`,
+because an eyeball check cannot survive a future edit.
+
+⛔ **`update_expert` is ASYMMETRIC to `create_expert` — it has NO try/except at all.** So the same
+refusal propagates cleanly there. **Copy the placement, never the structure.** And it passes
+`bundle_id=<the path id>` while `create_expert` passes `None`: that difference is 263-01's born-for
+arm, and inverting it would either refuse a legitimately born-for skill or admit every other user's
+private skill in the org.
+
+⛔ **`draft_skill_body` declares NO keyword-only parameters, and that is structural.**
+`test_261_single_expert_authoring_gate.py::_has_expert_manage_dependency` walks `fn_node.args.defaults`
+**only** — a `Depends(require_expert_manage)` declared after a bare `*` lands in `kw_defaults`, the
+fence reads the route as UNPROTECTED, and the gate goes RED on correctly-guarded code. The router now
+carries **7** mutating endpoints, all guarded.
+
+⛔ **The two failure arms of `draft_skill_body` must never share a status code.** `409`
+`self_improve_disabled` is the operator's deliberate FLAG-01 flip; `503` `skill_body_unavailable` is
+an honest provider failure. Collapsing them renders a switch someone chose to flip as an outage, and
+the author's next action differs (write it by hand vs. try again later). Pinned by its own case.
+
+**Named seam, now that this router is 560 lines.** It holds three concerns: **CRUD** (5 routes),
+**AI authoring** (`draft`, `draft-skill-body`), and **grants** (3 routes). The authoring pair now
+duplicates the `load_user_settings` try/except verbatim — **that duplication is the seam**. A third
+authoring route is the trigger to extract `api/expert_authoring_routes.py` with one
+`_caller_user_settings(current_user)` dependency, not the trigger to paste the block a third time.
+
 ---
 
 ## `frontend/src/components/chat/ActiveExpertChip.tsx`
@@ -15650,6 +15720,40 @@ What it owns. Leaf component for the Org Admin Experts tab, rendering accessible
 **`2 / 2 / 186`** — created by Phase 260 (`260-02`). Re-derived 2026-09-20. Precedent in `CLAUDE.md` is explicit: rows added when touched by a phase plan.
 
 What it owns. Client API module for expert operations, providing functions for CRUD (`createExpert`, `getExpert`, `listExperts`, `updateExpert`, `deleteExpert`), AI drafting (`draftExpert`), and grant management (`getExpertGrants`, `setExpertGrants`).
+
+⚠ **CORRECTED 2026-09-21 (Phase 263, plan `263-03`) — THE ROW WAS STALE AT `2 / 2 / 186` AND READ
+`no` / `young`. The original figures are kept above rather than overwritten.** Re-derived at this
+plan's close: **`5 / 3 / 298`** — **G-5 NOW FIRES, exactly at threshold**, in the commit that records
+it. ⛔ The row was PRESENT and said `no`, which stops an audit harder than an absent row does.
+**`backend/app/models/expert.py` crossed in the SAME plan, also reading `young`.**
+
+**What `263-03` added.** `SuggestedNewSkill` and `AuthoredSkillBody` wire types; `suggested_new_skills`
+on `ExpertDraftOutput`; the typed carriers `ExpertMemberSkillsUnknownError` and
+`SkillBodyDisabledError`; `draftSkillBody`; and the 422 arm on `createExpert` + `updateExpert`.
+
+⛔ **THE INVARIANTS, all three measured rather than reasoned about.**
+
+1. **The 422 arm discriminates on `detail.error`, NEVER on the bare status.** FastAPI reserves 422 for
+   its own `RequestValidationError`, whose `detail` is an **ARRAY**; ours is an **OBJECT** carrying
+   `error`. A naive `res.status === 422` arm would swallow a genuine Pydantic failure and throw
+   `ExpertMemberSkillsUnknownError` with an empty name list. `readRefusalDetail` returns `undefined`
+   for an array body precisely so both call sites fall through to `handleResponse`.
+2. **`handleResponse`'s BODY is byte-unchanged, and must stay that way.** Nine functions route through
+   it; widening its throw type changes every catch site in the studio and in `OrgExpertsTab`.
+   `toggleSkillOrgShared` (`lib/api/skills.ts`) is this repo's precedent for the call-site arm.
+3. **Wire types live HERE, not in `frontend/src/types/index.ts`.** The studio already imports
+   `ExpertDraftOutput` from `@/lib/api/experts`; `types/index.ts` was left byte-unchanged (`Skill` and
+   `SkillCreate` already carry everything the create call needs).
+
+⚠ **A HAND-OFF THAT IS A KNOWN FAILURE SHAPE IN THIS REPO.** Two suites replace this whole module with
+a `vi.mock("@/lib/api/experts", () => ({...}))` **factory** — `ExpertAuthoringStudio.test.tsx` and
+`OrgExpertsTab.test.tsx`. Neither declares `draftSkillBody` or the two error classes. That is harmless
+**today** (no component imports them yet) and becomes nine-suites-red the moment `263-04` wires a
+consumer: Phase 196 measured exactly that, `failed 249` from mock factories missing a new export.
+
+**Named seam.** The module is 298 lines with **one** `handleResponse` and now **two** call-site arms.
+At a third refusal shape, extract the arms into a `expertRefusals.ts` the way `connectionMark.tsx` was
+extracted — do NOT keep adding `if (res.status === N)` blocks to individual functions.
 
 
 ---
