@@ -5,13 +5,13 @@ created: 2026-09-20
 surface: Agentic-RAG
 status: partially-answered
 partial: true
-status_note: Two arms RATIFIED by the operator 2026-09-20 as D-v4.3-01 (union-by-default knowledge) and D-v4.3-02 (additive tool floor); the fixes are owed in Phase 261. The remaining arms - S3 (two Experts), S8 (clone-on-customise) and per-Expert spend attribution - are still open.
+status_note: Two arms RATIFIED by the operator 2026-09-20 as D-v4.3-01 (union-by-default knowledge) and D-v4.3-02 (additive tool floor); the fixes are owed in Phase 261. S9 (an Expert is only as capable as the library it draws from) is FOLDED INTO PHASE 263 at its discuss-phase, 2026-09-21 - see 263-CONTEXT.md D-263-01..D-263-12. The remaining arms - S3 (two Experts), S8 (clone-on-customise) and per-Expert spend attribution - are still open.
 trigger_when: Any phase that authors, lists, invites, scopes or prices an Expert — 261 and 262 both fire on it. Also fires on any phase that changes EXPERT_CORE_TOOLS, the thread scoping resolver, or the folder subtree override in the agent loop.
 trigger_paths: ["backend/app/models/expert.py", "backend/app/services/expert_service.py", "backend/app/db/experts.py", "backend/app/api/experts.py", "backend/app/services/run_producer.py", "**/agent_loop.py", "**/tool_dispatcher.py", "frontend/src/components/chat/InviteExpertDialog.tsx", "frontend/src/components/chat/ActiveExpertChip.tsx", "frontend/src/components/chat/ExpertSpotlightCard.tsx", "frontend/src/lib/api/experts.ts"]
 trigger_surfaces: [backend, frontend, chat]
 migration_note:
-relates_to: [BUG-260920-01, D-v4.3-01, D-v4.3-02, BUS-291, SEED-291, SEED-294, "259", "260", "261", "262"]
-folded_into: null
+relates_to: [BUG-260920-01, BUG-260921-01, D-v4.3-01, D-v4.3-02, BUS-291, SEED-291, SEED-294, "259", "260", "261", "262", "263"]
+folded_into: "263 (S9 only - the other arms remain open)"
 renumbered_from: null
 renumbered_because: null
 ---
