@@ -38,7 +38,7 @@ async def create_expert_service(
     bundle_in: ExpertBundleCreate,
 ) -> dict[str, Any]:
     """Create a new tenant expert bundle via service layer."""
-    return await experts_db.create_expert_bundle(
+    created = await experts_db.create_expert_bundle(
         pool=pool,
         org_id=org_id,
         created_by=user_id,
@@ -58,6 +58,55 @@ async def create_expert_service(
         example_output=bundle_in.example_output,
         tool_floor_enabled=bundle_in.tool_floor_enabled,
     )
+    if created:
+        await _stamp_born_for(
+            pool,
+            bundle_id=created.get("id"),
+            skill_names=bundle_in.member_skills,
+            org_id=org_id,
+            user_id=user_id,
+        )
+    return created
+
+
+async def _stamp_born_for(
+    pool: asyncpg.Pool,
+    *,
+    bundle_id: Any,
+    skill_names: list[str] | None,
+    org_id: UUID,
+    user_id: UUID,
+) -> None:
+    """Best-effort D-263-08 provenance stamp on the Expert save path.
+
+    ⛔ A stamp failure must NOT fail the save (T-263-07). The Expert row is the deliverable;
+    the marker is an optimisation of resolution, and an unstamped skill degrades to exactly
+    today's behaviour (resolvable by its author, stripped for everyone else). Swallowing is
+    therefore correct here — but it is LOGGED at exception level, because a silently
+    permanently-unstamped skill would look to its author like the Expert is hollow.
+    """
+    if not bundle_id or not skill_names:
+        return
+    try:
+        stamped = await experts_db.stamp_skills_born_for_bundle(
+            pool,
+            bundle_id=bundle_id,
+            skill_names=list(skill_names),
+            org_id=org_id,
+            user_id=user_id,
+        )
+        if stamped:
+            logger.info(
+                "EXPERT_SKILLS_BORN_FOR_STAMPED: bundle '%s' claimed %d skill(s): %s",
+                bundle_id,
+                len(stamped),
+                ", ".join(stamped),
+            )
+    except Exception:
+        logger.exception(
+            "EXPERT_SKILLS_BORN_FOR_STAMP_FAILED: bundle '%s' saved but skills left unstamped",
+            bundle_id,
+        )
 
 
 async def get_expert_service(
@@ -173,20 +222,36 @@ async def update_expert_service(
     bundle_id: UUID,
     caller_org_id: UUID,
     bundle_update: ExpertBundleUpdate,
+    caller_user_id: UUID | None = None,
 ) -> dict[str, Any] | None:
-    """Update tenant expert bundle fields."""
+    """Update tenant expert bundle fields.
+
+    ``caller_user_id`` is optional so that the pre-263 four-argument call shape keeps working.
+    When supplied AND ``member_skills`` was explicitly set, the saver's own unstamped skills
+    are claimed for this bundle (D-263-08). Absent it, the update behaves exactly as before —
+    the stamp is an optimisation, never a precondition.
+    """
     update_data = bundle_update.model_dump(exclude_unset=True)
     if "prompt_suggestions" in update_data and update_data["prompt_suggestions"] is not None:
         update_data["prompt_suggestions"] = [
             s if isinstance(s, dict) else s.model_dump()
             for s in update_data["prompt_suggestions"]
         ]
-    return await experts_db.update_expert_bundle(
+    updated = await experts_db.update_expert_bundle(
         pool=pool,
         bundle_id=bundle_id,
         caller_org_id=caller_org_id,
         **update_data,
     )
+    if updated and caller_user_id is not None and update_data.get("member_skills") is not None:
+        await _stamp_born_for(
+            pool,
+            bundle_id=bundle_id,
+            skill_names=update_data["member_skills"],
+            org_id=caller_org_id,
+            user_id=caller_user_id,
+        )
+    return updated
 
 
 async def delete_expert_service(
@@ -200,6 +265,86 @@ async def delete_expert_service(
         bundle_id=bundle_id,
         caller_org_id=caller_org_id,
     )
+
+
+async def filter_visible_skill_names(
+    pool: asyncpg.Pool,
+    skill_names: list[str],
+    caller_org_id: UUID,
+    caller_user_id: UUID,
+    bundle_id: UUID | None = None,
+) -> set[str]:
+    """The ONE Expert-side skill-visibility predicate (PACK-16 / D-263-06).
+
+    Returns the subset of ``skill_names`` the caller may resolve. Two consumers: phase 2 of
+    ``resolve_expert_bundle`` (with a real ``bundle_id``) and the ``POST /experts`` save-time
+    refusal (with ``bundle_id=None``, because no bundle exists yet).
+
+    THE PREDICATE::
+
+        visible iff is_system
+                 OR (org_id == caller_org_id AND is_enabled
+                     AND (user_id == caller OR is_org_shared OR born-for-THIS-bundle))
+
+    The born-for disjunct is the Phase 263 addition and it lives INSIDE the inner
+    parenthesis, structurally beneath ``org_id == caller_org_id and is_enabled``. That
+    placement is what makes D-263-06's "the org fence is untouched" true BY CONSTRUCTION
+    rather than by assertion: a fourth top-level branch would let a foreign-org row carrying
+    the marker through, which is precisely the ``SEED-125`` shape PACK-17 exists to prevent.
+
+    ⛔ ``bundle_id is not None`` is a MEASURED TRAP, not a style preference (T-263-02). At
+    save time the caller passes ``bundle_id=None`` and every unstamped row carries
+    ``born_for_expert_bundle_id = None``; a bare ``==`` evaluates ``None == None`` to True and
+    admits every other user's private skill in the org.
+
+    ⛔ WHY THIS IS NOT IN ``app/utils/skill_visibility.py``, deliberately. That module is the
+    declared one home of the AGENT-side rule and is imported by ``tool_dispatcher`` (five call
+    sites) and ``harness/grounding.py``. Adding the born-for arm there would widen skill
+    resolution for the agent loop and for workflow grounding — two consumers this phase has no
+    business touching, and the exact shape of ``SEED-125``. The Expert arm therefore stays in
+    the Expert module. That is a decision, not an oversight.
+
+    ⛔ This helper does NOT log and does NOT count. ``resolve_expert_bundle`` keeps ownership of
+    the stripped counter, the ``skill:<name>`` details and the single
+    ``EXPERT_MEMBER_CROSS_ORG_STRIPPED`` warning verb — six existing tests match that literal
+    through ``caplog.text`` and a second verb would fragment the audit trail.
+    """
+    if not skill_names:
+        return set()
+
+    skill_query = """
+        SELECT name, is_system, org_id, user_id, is_org_shared, is_enabled,
+               born_for_expert_bundle_id
+        FROM public.skills
+        WHERE name = ANY($1::text[]);
+    """
+    skill_rows = await pool.fetch(skill_query, skill_names)
+
+    valid_skills: set[str] = set()
+    for row in skill_rows:
+        s_name = row["name"]
+        is_sys = bool(row.get("is_system"))
+        s_org_id = row.get("org_id")
+        s_user_id = row.get("user_id")
+        s_shared = bool(row.get("is_org_shared"))
+        s_enabled = bool(row.get("is_enabled", True))
+        # .get(), never [...]: every pre-263 mock fixture is a plain dict without this key.
+        s_born_for = row.get("born_for_expert_bundle_id")
+
+        if is_sys:
+            valid_skills.add(s_name)
+        elif (
+            s_org_id == caller_org_id
+            and s_enabled
+            and (
+                s_user_id == caller_user_id
+                or s_shared
+                or (bundle_id is not None and s_born_for == bundle_id)
+            )
+        ):
+            valid_skills.add(s_name)
+
+    return valid_skills
 
 
 async def resolve_expert_bundle(
@@ -218,7 +363,8 @@ async def resolve_expert_bundle(
 
     Phase 2:
       Independently evaluate each referenced member (skills, folders, connections):
-      - skills: must be is_system = true OR (org_id == caller_org_id AND is_enabled = true AND (user_id == caller_user_id OR is_org_shared = true))
+      - skills: must be is_system = true OR (org_id == caller_org_id AND is_enabled = true AND (user_id == caller_user_id OR is_org_shared = true OR born_for_expert_bundle_id == bundle_id))
+        The third disjunct is Phase 263 (D-263-06) and is evaluated by ``filter_visible_skill_names``.
       - folders: must belong to caller_org_id (org_id == caller_org_id)
       - connections: must be active and enabled in caller_org_id
       Foreign members are stripped and logged with an audit warning (EXPERT_MEMBER_CROSS_ORG_STRIPPED).
@@ -251,30 +397,13 @@ async def resolve_expert_bundle(
     effective_skills: list[str] = []
 
     if raw_skills:
-        skill_query = """
-            SELECT name, is_system, org_id, user_id, is_org_shared, is_enabled
-            FROM public.skills
-            WHERE name = ANY($1::text[]);
-        """
-        skill_rows = await pool.fetch(skill_query, raw_skills)
-        valid_skills: set[str] = set()
-
-        for row in skill_rows:
-            s_name = row["name"]
-            is_sys = bool(row.get("is_system"))
-            s_org_id = row.get("org_id")
-            s_user_id = row.get("user_id")
-            s_shared = bool(row.get("is_org_shared"))
-            s_enabled = bool(row.get("is_enabled", True))
-
-            if is_sys:
-                valid_skills.add(s_name)
-            elif (
-                s_org_id == caller_org_id
-                and s_enabled
-                and (s_user_id == caller_user_id or s_shared)
-            ):
-                valid_skills.add(s_name)
+        valid_skills = await filter_visible_skill_names(
+            pool,
+            raw_skills,
+            caller_org_id,
+            caller_user_id,
+            bundle_id=bundle_id,
+        )
 
         for s in raw_skills:
             if s in valid_skills:

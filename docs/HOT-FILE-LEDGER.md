@@ -10586,10 +10586,10 @@ cells rot within days.
 | [`frontend/src/components/org/OrgAdminShell.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgadminshelltsx) | 3 / 5 / 442 | no | young (created Phase 166). The org-admin shell hosting live tabs (members, audit, settings, invitations, sso, experts). |
 | [`frontend/src/components/org/OrgExpertsTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgexpertstabtsx) | 1 / 1 / 347 | no (new) | young (created Phase 261). Row added AT CREATION — leaf component for org-admin expert listing and management. |
 | [`frontend/src/lib/api/experts.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiexpertsts) | 2 / 2 / 186 | no | young (created Phase 260). Client module for expert API CRUD, draft, and grant calls. |
-| [`backend/app/db/experts.py`](docs/HOT-FILE-LEDGER.md#backendappdbexpertspy) | 2 / 2 / 492 | no (new) | young (created Phase 259). Row added AT CREATION — absent row is invisible to G-5 (PACK-01). |
+| [`backend/app/db/experts.py`](docs/HOT-FILE-LEDGER.md#backendappdbexpertspy) | 4 / 3 / 567 | ⚠ **NOW FIRES — 3 phases** | ⛔ row was STALE at `2/2/492` reading `no (new)`; it CROSSED the threshold in this very commit. honoured by construction (**263-01**): ONE new UPDATE, no existing query touched. |
 | [`backend/app/models/expert.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsexpertpy) | 2 / 2 / 79 | no (new) | young (created Phase 259). Row added AT CREATION — Pydantic domain models for expert bundles. |
-| [`backend/app/services/expert_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesexpert_servicepy) | 5 / 3 / 378 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⛔ row was STALE at `3/2/333` reading `no (new)` — re-derived 263 planning. D-263-06 amends ONE disjunct of the phase-2 predicate; the `org_id` fence is UNTOUCHED. |
-| [`backend/app/api/experts.py`](docs/HOT-FILE-LEDGER.md#backendappapiexpertspy) | 2 / 2 / 346 | no (new) | young (created Phase 259). Row added AT CREATION — REST router with require_capability('experts') (PACK-06). |
+| [`backend/app/services/expert_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesexpert_servicepy) | 6 / 4 / 507 | ⛔ **FIRES — 4 phases** | ⚠ row STALE a 2nd time (`5/3/378`). honoured by construction (**263-01**): ONE disjunct INSIDE the existing inner parenthesis + one SELECT column; the `org_id` fence sits above it, RED-driven. |
+| [`backend/app/api/experts.py`](docs/HOT-FILE-LEDGER.md#backendappapiexpertspy) | 6 / 3 / 398 | ⚠ **NOW FIRES — 3 phases** | ⛔ row was STALE at `2/2/346` reading `no (new)`; it CROSSED the threshold here. honoured by construction (**263-01**): ONE optional kwarg + the extraction line already used at 5 sites in this file. |
 | [`frontend/src/components/chat/ActiveExpertChip.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatactiveexpertchiptsx) | 0 / 0 / 0 | no (new) | young (created Phase 260). Row added AT CREATION — leaf component for active consultant chip. |
 | [`frontend/src/components/chat/ExpertSpotlightCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatexpertspotlightcardtsx) | 0 / 0 / 0 | no (new) | young (created Phase 260). Row added AT CREATION — leaf component for hero spotlight card and action tiles. |
 | [`frontend/src/components/chat/InviteExpertDialog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatinviteexpertdialogtsx) | 0 / 0 / 0 | no (new) | young (created Phase 260). Row added AT CREATION — leaf component for expert invitation modal. |
@@ -15410,6 +15410,34 @@ What it owns. The single canonical service home for entitlement evaluation acros
 
 What it owns. The database access layer for domain expert bundles (`public.expert_bundles`). Provides asyncpg queries for CRUD operations, partial unique slug enforcement, system seed querying, and tenant isolation.
 
+⚠ **CORRECTED 2026-09-21 (Phase 263, `263-01`) — THE ROW WAS STALE AT `2 / 2 / 492` AND READ
+`no (new)`. Both prior figures are kept above rather than overwritten.** Re-derived at this plan's
+head: **`4 / 3 / 567`** — phases `259`, `261`, `263`. **G-5 NOW FIRES**, and it crossed the threshold
+**in the same commit that records it**, which is the case the at-creation precedent exists to catch:
+had the row been absent, the crossing would have been invisible at any count.
+
+What `263-01` added, and why it is *honoured by construction* rather than owing a refactor:
+**one new function, `stamp_skills_born_for_bundle`, and no edit to any existing query.** It is a
+single `UPDATE public.skills` narrowed by four predicates, each load-bearing:
+
+- `name = ANY($2::text[])` — only the names the saver actually chose.
+- `org_id = $3` — a foreign-org row is unstampable. ⛔ **The stamp IS a privilege widening under
+  D-263-06** (it makes a private skill resolvable to every org member *through this bundle*), so it
+  must never cross tenancy.
+- `user_id = $4` — another author's pre-existing row cannot be silently conscripted into somebody
+  else's Expert.
+- `born_for_expert_bundle_id IS NULL` — D-263-07's rejection of re-stamping. Without it, adding a
+  skill to a SECOND Expert would MOVE the marker and the FIRST Expert would silently lose the skill.
+
+⛔ **Numbered `$n` parameters, never f-string interpolation** — matching `update_expert_bundle`'s
+existing idiom. The drive asserts the four predicates individually AND that the bound uuids do not
+appear as literals in the SQL text.
+
+⚠ **No seam proposed yet.** The module is still one flat set of asyncpg functions over two tables
+(`expert_bundles`, `expert_grants`) plus, now, one cross-table write into `public.skills`. **That
+third table is the thing to watch:** a second skills-touching writer here would make this module a
+de-facto skills DAL, and the extraction seam would then be *skills writes* — not *experts*.
+
 ---
 
 ## `backend/app/models/expert.py`
@@ -15443,6 +15471,52 @@ What it owns. The business logic layer for domain expert bundles, implementing t
 ⚠ The unknown-member **strip at run time** is what `PACK-16` front-runs: this service discards names
 silently, so **save time is the only moment a human can act** (D-263-09 / D-263-10).
 
+⚠ **CORRECTED 2026-09-21 (Phase 263, `263-01` execution) — TWO THINGS, and the originals above stand.**
+
+**(a) The row was STALE A SECOND TIME, one week after the first correction.** It read `5 / 3 / 378`;
+re-derived at this plan's head it is **`6 / 4 / 507`** — phases `259`, `260`, `261`, `263`. The prior
+correction called it *"EXACTLY AT THRESHOLD"*; it is now past it.
+
+**(b) ⛔ THE MIGRATION CITE ABOVE IS WRONG AND IS CORRECTED HERE RATHER THAN EDITED OUT.** Invariant 1
+reads *"migration 190"*. **`born_for_expert_bundle_id` is migration 191**
+(`supabase/migrations/191_skill_expert_provenance.sql`). Migration **190** is Phase 262's
+`model_capabilities_overrides` work — a different phase, a different table. This is the second
+migration-number drift this phase has recorded (D-263-13 corrected `087` → `089`), which is the tell
+that a migration number written into prose is a citation nobody re-derives.
+
+**What `263-01` actually built, and why the invariants hold BY CONSTRUCTION:**
+
+- The phase-2 predicate was **extracted** into `filter_visible_skill_names`, which is now the ONE
+  Expert-side visibility helper. `resolve_expert_bundle` keeps the stripped counter, the
+  `skill:<name>` details and the single `EXPERT_MEMBER_CROSS_ORG_STRIPPED` verb — **the helper
+  neither logs nor counts**, because six existing tests match that literal through `caplog.text` and
+  a second verb would fragment the audit trail.
+- The new disjunct sits **inside the existing `s_org_id == caller_org_id and s_enabled` parenthesis**.
+  ⭐ **The RED drive proved the PLACEMENT, not the presence**: planting the arm as a fourth
+  **top-level** `elif` turned **two** cases red —
+  `test_cross_org_row_with_matching_marker_is_still_stripped` (the org fence) **and**
+  `test_disabled_born_for_skill_is_stripped` (the `is_enabled` fence, which the plan did not predict
+  and which shares the same parenthesis). `expert_service.py` md5 `730b5cde8ee83fd7bc8476f56b22231a`
+  before and after the plant.
+- ⛔ **The arm is guarded on `bundle_id is not None`.** At save time (263-03) the helper is called
+  with `bundle_id=None` and every unstamped row carries `born_for_expert_bundle_id = None`; a bare
+  `==` evaluates `None == None` to True and admits **every other user's private skill in the org**.
+- ⛔ **`row.get(...)`, never `row[...]`** for the new key. Every pre-263 mock fixture is a plain dict
+  without it; `.get()` kept all six `test_259_expert_member_isolation.py` cases green with **zero
+  fixture edits** (`git diff --stat` on that file is empty).
+- ⛔ **The arm is deliberately NOT in `app/utils/skill_visibility.py`**, and the docstring says so.
+  That module is the declared one home of the **agent-side** rule and is imported by
+  `tool_dispatcher` (five call sites) and `harness/grounding.py`; widening it there would widen skill
+  resolution for the agent loop and for workflow grounding — the exact shape of `SEED-125`. The two
+  predicates may differ ONLY in this direction: **Expert-side wider, agent-side byte-unchanged.**
+
+⚠ **Named seam, now that this file is past threshold.** `resolve_expert_bundle` is three
+near-identical evaluate-then-strip-then-log blocks (skills, folders, connections). The skills block
+has just been extracted; **the folders and connections blocks are the same shape and are not.** The
+seam is *one `evaluate_members(kind, raw, validator)` helper owning the counter and the single log
+verb*, with three small predicates beside `filter_visible_skill_names`. ⛔ A fourth member kind
+landing before that extraction is the trigger.
+
 ---
 
 ## `backend/app/api/experts.py`
@@ -15450,6 +15524,29 @@ silently, so **save time is the only moment a human can act** (D-263-09 / D-263-
 **`1 / 1 / 175`** — created by Phase 259 (`259-03`). **Row added AT CREATION.** Precedent in `CLAUDE.md` is explicit: rows added at creation, since an absent row is invisible to G-5 at any count.
 
 What it owns. The REST API router for domain expert bundles, mounted at `/experts`. All endpoints are guarded with `require_capability('experts')` via Phase 258's canonical entitlement service, enforcing tier gating (PACK-06).
+
+⚠ **CORRECTED 2026-09-21 (Phase 263, `263-01`) — THE ROW WAS STALE AT `2 / 2 / 346` AND READ
+`no (new)`. Both prior figures stand above.** Re-derived: **`6 / 3 / 398`** — phases `259`, `261`,
+`263`. **G-5 NOW FIRES**, crossing the threshold in the commit that records it.
+
+⚠ **THIS FILE IS NOT IN `263-01-PLAN.md`'s `files_modified`, and was edited anyway — recorded as a
+Rule-3 deviation rather than left silent.** The plan's task 2(h) requires the born-for stamp to run
+from `update_expert_service` when `member_skills` is set, and the stamp needs the saving user's id to
+narrow its `user_id = $4` predicate. **`update_expert_service` had no `caller_user_id` parameter and
+the `PATCH /{bundle_id}` route never extracted one** — so the update-path half of D-263-08 was
+unreachable without touching this file. The plan named the requirement and not the file it lands in.
+
+What changed, and why it is *honoured by construction*: **one optional kwarg passed at the call
+site, plus the `current_user["id"]` extraction line that already appears verbatim at five other
+sites in this router.** ⛔ **No new endpoint, no new guard, no change to `require_capability`, no
+change to the route's 404 arm.** The kwarg is optional on the service side specifically so the
+pre-263 four-argument call shape keeps working — which is what kept
+`test_261_expert_authoring_scenarios.py`'s three positional call sites green without edits.
+
+⚠ **The `files_modified` ↔ ledger-gate interaction is worth naming**: because this file is absent
+from the plan's `files_modified`, `check-hot-file-ledger.cjs` would NOT have demanded a row for it.
+**The gate audits the plan's declared surface, not the commit's actual diff** — so a file edited as
+an unplanned deviation is invisible to G-5 unless its row is updated by hand, as it was here.
 
 ---
 
