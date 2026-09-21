@@ -182,6 +182,10 @@ async def draft_expert(
     Returns a draft row for human review and editing.
     """
     org_id = _to_uuid(active_org)
+    # 263-REVIEW.md CR-02/CR-03: the asset menu below is built on the BYPASSRLS pool, so
+    # the caller's identity must be spliced into the predicates by hand — the database
+    # will not re-check anything the query does not say.
+    user_id = _to_uuid(current_user["id"] if isinstance(current_user, dict) else getattr(current_user, "id"))
 
     # 1. Ephemeral in-memory text extraction (PACK-09, F-2, F-3)
     brainstorm_snippets: list[str] = []
@@ -228,15 +232,36 @@ async def draft_expert(
     brainstorm_text = "\n\n".join(brainstorm_snippets) if brainstorm_snippets else None
 
     # 2. Fetch available grounding assets for caller's org
+    # ⛔ 263-REVIEW.md CR-02 — this read `org_id = $1 OR is_org_shared = true`. The OR was
+    # UNBRACKETED, so on this BYPASSRLS pool it matched EVERY org's shared folders: their
+    # names went into the prompt and their UUIDs came back as `knowledge_folder_ids`.
+    # Now mirrors the live SELECT policy verbatim (`full-schema.sql`, "Users can view own
+    # and global folders"): org-gated AND (owner OR shared). `folder_is_org_shared(id)` and
+    # NOT the flat column — sharing is inherited down a subtree, so the column alone
+    # misses every child of a shared parent.
     folder_rows = await pool.fetch(
-        "SELECT id, name FROM public.folders WHERE org_id = $1 OR is_org_shared = true ORDER BY name ASC LIMIT 50;",
+        "SELECT id, name FROM public.folders "
+        "WHERE org_id = $1 AND (user_id = $2 OR public.folder_is_org_shared(id)) "
+        "ORDER BY name ASC LIMIT 50;",
         org_id,
+        user_id,
     )
     available_folders = [dict(r) for r in folder_rows]
 
+    # ⛔ 263-REVIEW.md CR-03 — this carried NO owner/shared term at all, so another user's
+    # PRIVATE skill in the same org reached the drafter and could be proposed as a
+    # `member_skills` entry. Worse in this phase than before it: PACK-16's save refusal then
+    # answers "…do not exist in your library: <name>" — a false sentence about a name the
+    # caller was never entitled to see, echoed back to them.
+    # Mirrors the live policy ("Users can view own and global skills") and the one shared
+    # rule in `app/utils/skill_visibility.py`: is_system escape OUTSIDE the org gate, then
+    # org-gated AND (owner OR org-shared).
     skill_rows = await pool.fetch(
-        "SELECT name, description FROM public.skills WHERE (org_id = $1 OR is_system = true) AND is_enabled = true ORDER BY name ASC LIMIT 50;",
+        "SELECT name, description FROM public.skills "
+        "WHERE (is_system = true OR (org_id = $1 AND (user_id = $2 OR is_org_shared = true))) "
+        "AND is_enabled = true ORDER BY name ASC LIMIT 50;",
         org_id,
+        user_id,
     )
     available_skills = [dict(r) for r in skill_rows]
 

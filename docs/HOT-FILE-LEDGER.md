@@ -10634,7 +10634,7 @@ cells rot within days.
 | [`backend/app/db/experts.py`](docs/HOT-FILE-LEDGER.md#backendappdbexpertspy) | 4 / 3 / 567 | ⚠ **NOW FIRES — 3 phases** | ⛔ row was STALE at `2/2/492` reading `no (new)`; it CROSSED the threshold in this very commit. honoured by construction (**263-01**): ONE new UPDATE, no existing query touched. |
 | [`backend/app/models/expert.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsexpertpy) | 3 / 3 / 93 | ⚠ **NOW FIRES — 3 phases** | ⛔ row was STALE at `2/2/79` reading `no (new)` / `young`; it CROSSED the threshold here. honoured by construction (**263-03**): ONE new request model, zero existing model touched. |
 | [`backend/app/services/expert_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesexpert_servicepy) | 6 / 4 / 507 | ⛔ **FIRES — 4 phases** | ⚠ row STALE a 2nd time (`5/3/378`). honoured by construction (**263-01**): ONE disjunct INSIDE the existing inner parenthesis + one SELECT column; the `org_id` fence sits above it, RED-driven. |
-| [`backend/app/api/experts.py`](docs/HOT-FILE-LEDGER.md#backendappapiexpertspy) | 8 / 3 / 560 | ⛔ **FIRES — 3 phases** | ⚠ row STALE a 2nd time, ONE PLAN later (`6/3/398`). honoured by construction (**263-03**): ONE helper + 2 calls + 1 route; ⛔ the refusal sits ABOVE `create_expert`'s try or it degrades to a 400. |
+| [`backend/app/api/experts.py`](docs/HOT-FILE-LEDGER.md#backendappapiexpertspy) | 9 / 3 / 585 | ⛔ **FIRES — 3 phases** | ⚠ row STALE a 3rd time (`8/3/560`). **263-REVIEW CR-02/03**: both `/draft` asset queries leaked on the BYPASSRLS pool; now mirror the LIVE policies. ⛔ connections unchanged — org-only, MEASURED. |
 | [`frontend/src/components/chat/ActiveExpertChip.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatactiveexpertchiptsx) | 0 / 0 / 0 | no (new) | young (created Phase 260). Row added AT CREATION — leaf component for active consultant chip. |
 | [`frontend/src/components/chat/ExpertSpotlightCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatexpertspotlightcardtsx) | 0 / 0 / 0 | no (new) | young (created Phase 260). Row added AT CREATION — leaf component for hero spotlight card and action tiles. |
 | [`frontend/src/components/chat/InviteExpertDialog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatinviteexpertdialogtsx) | 0 / 0 / 0 | no (new) | young (created Phase 260). Row added AT CREATION — leaf component for expert invitation modal. |
@@ -15632,6 +15632,62 @@ landing before that extraction is the trigger.
 ---
 
 ## `backend/app/api/experts.py`
+
+⚠ **CORRECTED 2026-09-22 (263-REVIEW.md CR-02 / CR-03) — THE ROW WAS STALE A THIRD TIME AT
+`8 / 3 / 560`. Re-derived: `9 / 3 / 585`.** Every prior figure above stands.
+
+### ⛔ CR-02 / CR-03: `POST /experts/draft` read past the caller, on a BYPASSRLS pool
+
+The draft endpoint builds the LLM's menu of grounding assets with three raw `pool.fetch` queries.
+**The asyncpg pool is BYPASSRLS: the database re-checks nothing the query does not say.** Two of the
+three said too little — verbatim, as shipped:
+
+| | Predicate as written | What it actually matched |
+|---|---|---|
+| folders | `WHERE org_id = $1 OR is_org_shared = true` | ⛔ **EVERY org's** shared folders — the OR is UNBRACKETED. Names into the prompt, UUIDs back out as `knowledge_folder_ids` |
+| skills | `WHERE (org_id = $1 OR is_system = true) AND is_enabled` | ⛔ **no owner/shared term at all** — another user's PRIVATE skill in the same org reached the drafter |
+| connections | `WHERE org_id = $1 AND is_enabled` | ✅ correct, and left byte-unchanged (below) |
+
+⚠ **INHERITED from Phase 261, but this phase made it worse** — which is why it was fixed here rather
+than merely noted. PACK-16's new save refusal answers *"…do not exist in your library: `<name>`"*. Fed
+a leaked name, that refusal **states something false about a skill the caller was never entitled to
+see, and echoes the name back while doing it.**
+
+**The fix mirrors the LIVE RLS policies term-for-term**, read out of `supabase/full-schema.sql`
+rather than reasoned about:
+
+- folders → `org_id = $1 AND (user_id = $2 OR public.folder_is_org_shared(id))`
+- skills → `(is_system = true OR (org_id = $1 AND (user_id = $2 OR is_org_shared = true))) AND is_enabled`
+
+⛔ **`folder_is_org_shared(id)`, NOT the flat `is_org_shared` column.** Sharing is inherited down a
+subtree; the column alone misses every child of a shared parent, so the flat form would have been a
+*different, tighter* rule wearing the policy's name.
+
+⛔ **`is_system` stays OUTSIDE the org gate.** It is the platform-universal escape — the built-in
+skill-creator is legitimately cross-org. Over-correcting here would have broken every org's built-ins.
+
+⛔ **The connections query was left alone, and that is MEASURED, not an oversight.**
+`connector_connections_select` is org-scoped with **no owner term**, so a connection genuinely is an
+org asset. Adding a `user_id` arm would have been a behaviour change dressed as a security fix — and
+`test_connections_query_is_left_alone_because_its_policy_is_org_only` now fails if that policy ever
+grows one and this query is left behind.
+
+**The fence binds the QUERY to the POLICY, not to a hardcoded string.**
+`tests/unit/test_263_draft_assets_are_owner_gated.py` reads the policy text out of
+`full-schema.sql`, so it fires if the query drifts **and** if the policy drifts and the query is left
+behind — the gap between the two registers being exactly what produced both defects. Its premise is
+checked rather than assumed (`test_policies_still_carry_the_owner_arm`), so it cannot pass vacuously
+by asserting a rule the database no longer has.
+
+⛔ **The extractor parses with `ast`, never a regex over the raw text.** The fixed predicates are
+written as implicitly-concatenated adjacent literals across three lines, and a regex sees only the
+FIRST fragment — which carries the table name and none of the gate. Driven: the fence went RED on
+the original (4 of 7), and RED again on a planted revert written as SPLIT literals, proving the `ast`
+path and not just the happy one. Source restored md5-identical (`b3b055c4…`) before the real fix.
+
+⚠ **Still OWED: the live two-user drive.** A source-level fence proves the SQL says the right thing;
+it cannot prove Postgres agrees. The honest test is two users in one org, one private skill, one
+foreign shared folder — and it is not written.
 
 **`1 / 1 / 175`** — created by Phase 259 (`259-03`). **Row added AT CREATION.** Precedent in `CLAUDE.md` is explicit: rows added at creation, since an absent row is invisible to G-5 at any count.
 
