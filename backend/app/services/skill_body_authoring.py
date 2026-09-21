@@ -129,15 +129,50 @@ def _strip_tool_choreography(line: str) -> str:
     return " ".join(kept)
 
 
+def _doctrine_bullets_only(block: str) -> str:
+    """Trim a sliced section down to its heading plus the run of doctrine BULLETS.
+
+    ⛔ WHY THE SECTION BOUND IS NOT ENOUGH, measured against the live row rather than reasoned.
+    Slicing from the heading to the next ``## `` yields **1466 characters, of which ~700 are
+    interactive-interview choreography**: *"Confirm the draft with the user, then save."*,
+    *"Tell the user the skill is now saved in their Skills tab"*, the eval-case handoff. None of
+    those lines names a tool, so ``_strip_tool_choreography`` is structurally blind to them.
+
+    And it is not merely noise — it is a **CONTRADICTION**. ``_compose_system_prompt``'s framing
+    tells the model *"do not tell anyone the skill has been saved — persisting it is a separate,
+    human-reviewed step"*, and the borrowed tail would tell it the opposite in the same prompt.
+    A sealed single-shot has no user to confirm with, saves nothing, and no Studio in the loop.
+
+    D-263-13 names the doctrine precisely — *"its §3 craft block (**the five bullets** under
+    'Apply this craft…')"* — so the bullet run is the DECISION's own boundary; the ``## `` bound
+    is only the looser approximation of it.
+    """
+    lines = block.split("\n")
+    kept = [lines[0]]  # the heading line (the slice starts mid-line, by design)
+    for line in lines[1:]:
+        stripped = line.strip()
+        if stripped.startswith(("- ", "* ")):
+            kept.append(line)
+            continue
+        # An indented continuation belongs to the bullet above it; anything else ends the run.
+        if len(kept) > 1 and stripped and line[:1] in (" ", "\t"):
+            kept.append(line)
+            continue
+        break
+    return "\n".join(kept)
+
+
 def _extract_craft_block(instructions: str) -> str:
     """Slice ``skill-creator``'s craft doctrine out of its instructions, choreography removed.
 
     ⛔ This has NO precedent in the repo — nothing under ``backend/app/`` parses a skill's
     instructions into sections — so it is new code with its own drive, not a helper.
 
-    Bounds: from ``_CRAFT_HEADING`` to the next markdown heading (``\\n## ``) or end of text.
-    An ABSENT heading returns ``""`` and never a partial slice: half a doctrine shipped as if it
-    were whole is worse than none, because nothing downstream can tell the difference.
+    Bounds, in order: from ``_CRAFT_HEADING`` to the next markdown heading (``\\n## ``) or end of
+    text, then tightened to the doctrine bullet run (see ``_doctrine_bullets_only``), then the
+    per-line tool strip. An ABSENT heading returns ``""`` and never a partial slice: half a
+    doctrine shipped as if it were whole is worse than none, because nothing downstream can tell
+    the difference.
     """
     if not instructions:
         return ""
@@ -147,7 +182,7 @@ def _extract_craft_block(instructions: str) -> str:
         return ""
 
     end = instructions.find("\n## ", start)
-    block = instructions[start:] if end == -1 else instructions[start:end]
+    block = _doctrine_bullets_only(instructions[start:] if end == -1 else instructions[start:end])
 
     kept: list[str] = []
     for line in block.split("\n"):
