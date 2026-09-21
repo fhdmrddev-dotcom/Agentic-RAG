@@ -74,18 +74,66 @@ deliberate. (`SEED-177` rule; precedent `D-206-07`, Phase 206's no-egress fence.
 
 ### D-264-03 — The bundle rides `RunContext` → `ToolContext`, additive and default-`None`
 `run_producer` already resolves the Expert and already builds `RunContext`. Add
-`expert_bundle_id: UUID | None = None` to `RunContext` (set where `skill_catalog_override` is set)
-and to `ToolContext` (threaded at **both** `agent_loop.py` builds). `None` on every unwired caller
-⇒ literal no-op. This is the exact idiom `skill_instructions_override` and `phase_whitelist` use.
+~~`expert_bundle_id: UUID | None = None`~~ to `RunContext` (set where `skill_catalog_override` is
+set) and to `ToolContext` (threaded at **both** `agent_loop.py` builds). `None` on every unwired
+caller ⇒ literal no-op. This is the exact idiom `skill_instructions_override` and `phase_whitelist`
+use.
+
+⛔ **AMENDED 2026-09-22 by RESEARCH §2.1 — the field name is REFUTED, and the original is struck
+through rather than deleted, because the reason is the finding.**
+`backend/tests/unit/test_260_expert_chat_scoping.py:155-176`
+(`test_agent_loop_closed_core_ast_invariant`, the PACK-01 Closed-Core Invariant) asserts that **no
+`ast.Name` or `ast.Attribute` in `agent_loop.py` contains the substring `"expert"`**. `RunContext`
+is *defined in* that file, so the field name IS an `ast.Name` and `ctx.<field>` IS an
+`ast.Attribute`. The researcher drove it with a real `ast.parse`: the probe hits on
+`expert_bundle_id` and `agent_loop.py` is at **zero hits today**. `test_261_expert_runtime_scoping.py:210`
+is a second, narrower fence on `ast.If`.
+⭐ **The fence is CORRECT and is NOT retired.** Its rule is precisely what D-264-03 claims to
+honour — the Deep loop must not learn the Expert concept. **The field is named
+`born_for_bundle_id`** on BOTH dataclasses: it names the mig-191 *column*, not the Expert concept,
+so the invariant stays green by construction rather than by exemption.
+
+### D-264-03a — `_resolve_thread_scoping` arity, and why it lands FIRST
+RESEARCH §2.3: widening that helper's return tuple touches **2 production sites**
+(`run_producer.py:657`, `:825`) and **10 unpack sites inside `tests/unit`** — which is the gate with
+zero headroom. All ten are named in RESEARCH. **The arity change plus its ten updates is the FIRST
+task of the phase**, so every following wave starts from a green 71.
+⚠ There are **three** `RunContext` build sites, not two: `run_producer.py:663`, `run_producer.py:831`
+and `eval_runner_service.py:570`. A field added at one of the two producer sites and not the other is
+a defect no existing test can see.
 
 ### D-264-04 — Per-call-site decision, not a blanket change (the ROADMAP demands one each)
-| Site | Decision |
-|---|---|
-| `tool_dispatcher.py:1315` `_handle_load_skill` | **WIDEN** — this is the defect. Both the primary query AND the `:1326` miss-branch "loadable names" listing. |
-| `tool_dispatcher.py:1459` sibling `read_skill_file` | **WIDEN** — a born-for skill whose body loads but whose bundled files 404 is the same defect one layer down. |
-| `tool_dispatcher.py:1589` | **decide during planning, from the reading** — widen only if it serves the same agent-facing skill fetch; record the reason either way. |
-| `tool_dispatcher.py:2197` `execute_code` skill_files | **decide during planning**; same rule. |
-| `harness/grounding.py:208/215` | ⛔ **UNCHANGED.** Workflow grounding is not an Expert surface; it passes no bundle and keeps the base predicate. Fence it. |
+⛔ **AMENDED 2026-09-22 by RESEARCH §2.2 — TWO ROWS WERE SWAPPED. The original table is struck
+through below rather than deleted.** `:1459` is `_sibling_filter` inside **`_handle_save_skill`**
+(def `:1435`) — the TRIG-03 description-lint corpus, a WRITE handler's helper. `read_skill_file` is
+**`:1589`** (def `:1563`). So the row this table locked as WIDEN was the one site that must NOT
+widen, and the site it left open was the one it meant to lock.
+
+~~`:1459` sibling `read_skill_file` → WIDEN · `:1589` → decide during planning~~
+
+**The decisive fact, measured** (`tool_dispatcher.py:4585-4609`): `load_skill` and `read_skill_file`
+are in `EXPERT_CORE_TOOLS`; `execute_code` is in `EXPERT_DELIVERABLE_TOOLS` (unioned by default);
+**`save_skill` is in NEITHER.** Membership in the Expert toolset is what decides each row.
+
+| Site | Handler | Decision |
+|---|---|---|
+| `tool_dispatcher.py:1315` | `_handle_load_skill` | **WIDEN** — the defect. The `:1347` miss branch reuses the same `_skill_filter` variable, so the "loadable names" listing is fixed **by construction**. |
+| `tool_dispatcher.py:1459` | `_handle_save_skill` lint siblings | ⛔ **DO NOT WIDEN** — not advertised to an Expert, produces no user-visible capability (a lint corpus), and is a write handler's helper. Fence it. |
+| `tool_dispatcher.py:1589` | `_handle_read_skill_file` | **WIDEN** — `load_skill` returns `files: [...]`, so the model is promised files it then cannot read. Same defect one layer down. |
+| `tool_dispatcher.py:2197` | `_handle_execute_code` skill-file injection | **WIDEN** — failure here is a `logger.warning` and a silently skipped file; the sandbox then runs without the helper. |
+| `harness/grounding.py:208/215` | workflow grounding | ⛔ **UNCHANGED**, and now VERIFIED unreachable from a chat Expert run: the full caller set of `assemble_grounding_bundle` is `api/workflows.py:1055,:1193`, `publish_service.py:1422`, `workflow_authoring.py:283`. Fence it. |
+| `harness/phase_types.py:637`, `eval_runner_service.py:570` | harness / eval ToolContext + RunContext builds | ⛔ **UNCHANGED**, fenced. |
+
+**The resolver carries the decision in its signature.** Use
+`_resolve_skill_visibility_or(ctx, *, born_for: bool = False)` so each site's choice is **readable
+in source** rather than implied — a future reader must not have to infer which sites opted in.
+
+### D-264-04a — `is_enabled` disagrees across the four paths (RESEARCH §2.4)
+`filter_visible_skill_names` requires `s_enabled`; `_handle_load_skill` has
+`.eq("is_enabled", True)`; **`_handle_read_skill_file` and `_handle_execute_code` have NO enablement
+filter at all.** A bare born-for disjunct at those two sites would admit a **disabled** born-for
+skill's files. The widened predicate form must close that without touching the default path — and
+the closure is driven, not asserted.
 
 ### D-264-05 — `task_service.py:585` sub-agent context
 A sub-agent of an Expert run is inside the same Expert. **Propagate** the bundle onto `sub_ctx`
@@ -111,8 +159,37 @@ end to end — a real run, a real `load_skill`, the instruction **body** returne
 the predicate. `263-UAT.md`'s R-7 passed on five arms and could not see this defect; the UAT rows
 here must touch `load_skill` as a non-author org member or they repeat that miss.
 
+### D-264-10 — What the 2026-09-22 research settled, and what it left as an obligation
+- **Baseline measured twice, identical:** `71 failed, 5423 passed, 2 xfailed, 2 xpassed` — exactly
+  the ceiling, **zero headroom, 0 collection errors**. ⭐ **ZERO of the 71 is in this phase's blast
+  radius**, so inherited-vs-new is settled before a line is written: **any red this phase produces
+  is NEW.**
+- **The PostgREST grammar is proven, not assumed** — both candidate predicate forms returned HTTP
+  200 against the live local PostgREST on the real `public.skills`, with **two negative controls at
+  400** (unknown column → `42703`; unbalanced paren → `PGRST100`). `postgrest 2.29.0`'s `or_` is a
+  pure passthrough, so **`coerce_uid` is the only guard** on every spliced UUID.
+- **`SEED-125`'s own fence, `test_seed125_skill_visibility_filter.py:126-142`** — D-264-02's
+  obligation is a **docstring rewrite plus a NEW sibling case**, *not* a changed assertion. The
+  existing assertion calls the DEFAULT path and **stays green**; what is refuted is its stated
+  *reason* (*"the agent loop has no such scope"*), which this phase makes false.
+- **`str(None) == str(None)` is `True`.** A `str()`-based comparison re-creates the `T-263-02` trap
+  in a new shape. Guard **both** operands.
+- ⚠ **`backend/tests/test_eval_runner.py:737` asserts `git diff --quiet backend/app/services/agent_loop.py`.**
+  An executor that edits `agent_loop.py` and runs that suite **before committing** sees a FALSE RED.
+  Outside `tests/unit`, but named here so nobody triages it as a real defect.
+- ⚠ **SC#5's existing pins use `startswith` / `in`, which cannot see an APPENDED term.** The
+  byte-identical proof must be an `==` against the frozen literal, or it proves nothing.
+- ⚠ **Ledger rows measured STALE** — `tool_dispatcher.py` **87/37/5082** (row says 85/35/5048),
+  `agent_loop.py` **51/25/3473** (48/22/3441), `run_producer.py` **9/5/899** (5/3/749),
+  `expert_service.py` **7/4/515** (6/4/507). `app/utils/skill_visibility.py` **1/1/83** and has
+  ⛔ **NO ROW AT ALL** — `check-hot-file-ledger.cjs` WILL fail `[no-row]` on it once plans exist
+  (`backend/app/` is WATCHED; `app/utils/` is not EXEMPT).
+- **Out of scope, but attached:** `agent_loop.py:1435` (the Deep skill catalog) is still org-blind —
+  `SEED-129`, `status: open`, high. **264 does not need to touch it** (an Expert run takes the
+  override branch). ⛔ If any plan edits those lines, SEED-129's trigger attaches and must be routed.
+
 ### Claude's Discretion
-- Whether sites `:1589` / `:2197` widen (D-264-04 requires a recorded reason, not a preference).
+- ~~Whether sites `:1589` / `:2197` widen~~ — **settled by D-264-04's amendment.**
 - Test file names/placement, fixture shapes, and how the frozen base-predicate literal is pinned.
 - Whether the `skill_visibility.py` ledger row lands in its own plan or the first plan touching it.
 
