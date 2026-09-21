@@ -152,6 +152,53 @@ publish gate is met or `{"override": true}` is passed (GATE-01 / D-07).
   ⚠ `SEED-125` was a **real** cross-org skill leak, and this phase creates skills programmatically,
   which is exactly how one would recur.
 
+### 6. AMENDED AT PLANNING — 2026-09-21, operator-ratified
+
+⚠ **D-263-04's LITERAL WORDING IS REFUTED BY MEASUREMENT. The original above is kept unchanged
+rather than rewritten, because the refutation is the finding.** It reads *"runs `skill-creator` to
+author the body"*. Measured at `/gsd:plan-phase` research, then spot-verified independently by the
+orchestrator against `supabase/migrations/087_skill_creator_reborn.sql:66-118` (row id
+`…0010`, confirmed live in the local DB):
+
+**`skill-creator`'s `instructions` are a SEVEN-STEP INTERACTIVE HUMAN INTERVIEW LOOP.** Verbatim:
+*"Move one step at a time and keep the user in control"* · *"Ask focused questions, one small batch
+at a time"*. It names five tools a sealed shot cannot expose (`search_documents`, `save_skill`,
+`load_skill`, `read_skill_file`, `execute_code`), **its step 3 tells the model to call
+`save_skill`** — which conflicts with the forced emitter *and* with **D-263-03** — and four of its
+seven steps are Skill-Studio navigation choreography. ⛔ **It cannot be driven verbatim as a
+`forced_emit` system prompt.** There is also **no programmatic driver for it anywhere** in
+`backend/app/` or `frontend/src/`: every grep hit is a migration filename or a comment.
+`_handle_save_skill` (`tool_dispatcher.py:1435`) is a **writer, not an author**.
+
+- **D-263-13: THE DRIVER READING. `skill-creator` is reused as DATA, not as an engine.**
+  The new module reads `skill-creator`'s **§3 craft block** (the five bullets under *"Apply this
+  craft (it is what makes skills work or fail)"* — imperative form · explain the why sparingly ·
+  generalize don't overfit · a pushy-but-honest description · progressive disclosure) **from the DB
+  at call time**, and **contributes ZERO authoring doctrine of its own**. D-263-04's *force* —
+  reuse, no second authoring engine — is preserved exactly; only its *mechanism* is corrected.
+  ⛔ **This is made FALSIFIABLE, never rhetorical, and the fence is the deliverable:** stub the DB
+  read to `""` and assert **none of the five craft bullets' tokens survive in the composed system
+  prompt**. ⛔ **Drive it RED by inlining one bullet** — a fence nobody has seen fire is not a fence.
+  ⚠ **The honest counter-argument, recorded rather than buried:** this codebase already has two
+  `forced_emit` skill-text authoring services — `skill_tuner_service.build_candidates`
+  (description) and **`skill_proposer_service.propose` (instruction BODY)**. The second is the
+  near-exact mirror, and its prompt lives as **module prose**, which is precisely the shape the
+  DB-read fence exists to refuse. It is **not directly callable** here (it needs an existing row +
+  version + eval run). Mirror its `forced_emit` *call shape*; do **not** inherit its prompt home.
+
+- **D-263-14: the body-authoring path is GATED by FLAG-01's `self_improve_enabled()`.**
+  Operator-ratified 2026-09-21. Authoring a skill body is **AI writing skill text**, which is what
+  that switch exists to stop; gating costs one `Depends` and keeps **one home per concern**.
+  ⛔ **Only GENERATION is gated.** Proposal *listing* (PACK-14) and manual creation through
+  `SkillFormDialog` stay ungated — a kill-switch that hides the proposals would make PACK-14
+  invisible rather than safe. ⚠ Verify the switch's real name and call shape at its existing call
+  sites before wiring; do not trust this paragraph's spelling of it.
+
+- **D-263-15: the body-authoring route is `POST /experts/draft-skill-body` in `api/experts.py`,
+  with `Depends(require_expert_manage)`.** ⛔ **Not optional and not a style choice:** a hidden
+  second AST fence, `backend/tests/unit/test_261_single_expert_authoring_gate.py:77-90`, goes RED
+  if an expert-authoring route omits that guard. Measured at research.
+
 ### Folded Todos
 
 None. One todo matched by keyword only and was reviewed, not folded — see `<deferred>`.
