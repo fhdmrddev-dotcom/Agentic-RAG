@@ -42,24 +42,52 @@ const mockExperts: ExpertBundle[] = [
   },
 ]
 
-vi.mock("@/lib/api/experts", () => ({
-  listExperts: vi.fn(),
-  deleteExpert: vi.fn(),
-  getExpertGrants: vi.fn().mockResolvedValue([]),
-  createExpert: vi.fn(),
-  updateExpert: vi.fn(),
-  draftExpert: vi.fn(),
-  addExpertGrant: vi.fn(),
-  removeExpertGrant: vi.fn(),
+// Phase 263-04: this tab mounts `ExpertAuthoringStudio`, which now mounts
+// `SkillFormDialog`, which imports the `@/lib/api` barrel and therefore `@/lib/supabase`.
+vi.mock("@/lib/supabase", () => ({
+  supabase: {
+    auth: {
+      getSession: vi.fn().mockResolvedValue({
+        data: { session: { user: { id: "user-1" }, access_token: "token" } },
+      }),
+    },
+    channel: vi.fn(),
+    removeChannel: vi.fn(),
+  },
 }))
+
+// ⛔ SHAPE B, converted from CLOSED literal factories in 263-04. This suite does not
+// render the studio directly and reds anyway the moment it mounts anything importing a
+// symbol the literal omits — the Phase-196 `failed 249` shape. `lib/api.ts` also
+// re-exports names BY NAME from both modules, so a literal breaks the barrel itself.
+vi.mock("@/lib/api/experts", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/api/experts")>("@/lib/api/experts")
+  return {
+    ...actual,
+    listExperts: vi.fn(),
+    deleteExpert: vi.fn(),
+    getExpertGrants: vi.fn().mockResolvedValue([]),
+    createExpert: vi.fn(),
+    updateExpert: vi.fn(),
+    draftExpert: vi.fn(),
+    addExpertGrant: vi.fn(),
+    removeExpertGrant: vi.fn(),
+    draftSkillBody: vi.fn(),
+  }
+})
 
 vi.mock("@/lib/api/documents", () => ({
   listFolders: vi.fn().mockResolvedValue([]),
 }))
 
-vi.mock("@/lib/api/skills", () => ({
-  listSkills: vi.fn().mockResolvedValue([]),
-}))
+vi.mock("@/lib/api/skills", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/api/skills")>("@/lib/api/skills")
+  return {
+    ...actual,
+    listSkills: vi.fn().mockResolvedValue([]),
+    createSkill: vi.fn(),
+  }
+})
 
 vi.mock("@/lib/api/connectors", () => ({
   listConnectorConnections: vi.fn().mockResolvedValue([]),

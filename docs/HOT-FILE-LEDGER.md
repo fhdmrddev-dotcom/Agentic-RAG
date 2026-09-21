@@ -2486,6 +2486,20 @@ carries the verdict — **⚠ absent at 56 phases (added 196)** — and this is 
 
 ### `scripts/vitest-count-gate.cjs`
 
+⚠ **RE-DERIVED 2026-09-21 (`263-04`): `235 / 55 / 5923`** — the row read `222 / 49 / 5787`, its
+**seventh** stale reading. ⚠ **The three six-digit DATED QUICK-TASK buckets (`260807` · `260808` ·
+`260814`) WERE subtracted**: the raw bucket list is 58 and the phase count is 55. That subtraction is
+the step two earlier passes skipped, and the cell above records why.
+
+⭐ **`263-04` is an ADOPTION, not a raise, and the measurement is the finding:
+`grep -ic "skill" scripts/vitest-count-gate.cjs` returned `0` at the phase base.** Not one skills
+suite was in either knob — `SkillFormDialog.test.tsx`'s **8 passing tests ran NOWHERE and guarded
+NOTHING**, so every test `263-04` added to that file would have falsified nothing. ⚠ It is **not**
+under a `__tests__/` directory (it sits beside its component) and `src/components/skills` has **no
+bare-directory TARGETS entry**, so it was on the wrong side of BOTH knobs — the state Phase 214
+found `WorkflowScheduleModal.test.tsx` in, one knob over. Adopted at the measured **13**;
+`ExpertAuthoringStudio.test.tsx` re-pinned `4 → 14`.
+
 ⚠ **RE-DERIVED 2026-09-05 (Phase 233): `159 / 36 / 4687`** — the row read `141 / 28 / 4514`.
 Honoured by construction: **2 BASELINE pins + 2 TARGETS lines + 1 re-pin**, and NO change to any
 logic, threshold or check.
@@ -10583,7 +10597,8 @@ cells rot within days.
 |---|---|---|---|
 | [`backend/app/services/expert_authoring.py`](docs/HOT-FILE-LEDGER.md#backendappservicesexpert_authoringpy) | 4 / 2 / 389 | no (2 phases) | ⚠ row was STALE at `1/1/233`. honoured by construction (**263-02**): ONE nested model, ONE required field, ONE fallback kwarg. ⛔ the PACK-16 hatch is DELETED, not softened. |
 | [`backend/app/services/skill_body_authoring.py`](docs/HOT-FILE-LEDGER.md#backendappservicesskill_body_authoringpy) | 2 / 1 / 373 | no (new) | young (created 263). Row added AT CREATION — an absent row is invisible to G-5 at any count. ⛔ The ONE home of the borrowed craft doctrine; doctrine inlined here makes it an ENGINE (D-263-13). |
-| [`frontend/src/components/experts/ExpertAuthoringStudio.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertsexpertauthoringstudiotsx) | 1 / 1 / 1082 | no (new) | young (created Phase 261). Row added AT CREATION — leaf component for expert authoring studio and live preview. |
+| [`frontend/src/components/experts/ExpertAuthoringStudio.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertsexpertauthoringstudiotsx) | 3 / 2 / 1475 | no (2 phases) | ⚠ row was STALE at `1/1/1082`. honoured by construction (**263-04**): the ONE skills sub-block gains a FOURTH inner part; Folders and Connections byte-unchanged. ⛔ the fence covers BOTH entry points. |
+| [`frontend/src/components/experts/ProposedSkillCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertsproposedskillcardtsx) | 1 / 1 / 86 | no (new) | young (created 263-04). Row added AT CREATION. ⛔ The ONE home of the "does not exist" mark — dashed+violet, never red (D-263-01); a second styling makes a proposal read as an error. |
 | [`frontend/src/components/org/OrgAdminShell.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgadminshelltsx) | 3 / 5 / 442 | no | young (created Phase 166). The org-admin shell hosting live tabs (members, audit, settings, invitations, sso, experts). |
 | [`frontend/src/components/org/OrgExpertsTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgexpertstabtsx) | 1 / 1 / 347 | no (new) | young (created Phase 261). Row added AT CREATION — leaf component for org-admin expert listing and management. |
 | [`frontend/src/lib/api/experts.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiexpertsts) | 5 / 3 / 298 | ⚠ **NOW FIRES — 3 phases** | ⛔ row STALE at `2/2/186` reading `no`/`young`; CROSSED the threshold here. honoured by construction (**263-03**): the 422 arm is ONE helper at 2 call sites; `handleResponse` byte-unchanged. |
@@ -10654,7 +10669,7 @@ cells rot within days.
 | [`backend/app/api/settings.py`](docs/HOT-FILE-LEDGER.md#backendappapisettingspy) | 41 / 21 / 1048 | ⚠ **FIRES** | honoured by construction (**249-02/03**): ONE `_verified_model_ids` helper w/ 2 callers; PUT gains a refusal arm → 400. ⛔ the 500 arm for an unreachable DB is unchanged |
 | [`backend/app/services/multimodal_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmultimodal_servicepy) | 14 / 7 / 984 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** — row added SEED-227, which is also where its silent truncation was found |
 | [`backend/app/api/documents.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentspy) | 87 / 34 / 2414 | ⚠ **FIRES** | ✅ **DISCHARGED AGAIN (240-03)** — the email-attachment loop extracted to `services/email_attachments.py`. 240-04 adds the conversation read |
-| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 222 / 49 / 5787 | ⚠ **FIRES** | ⚠ row STALE a 6th time (`215/47/5682`). **252-05**: `WatchRowCard.test.tsx` into BOTH knobs — it ran NOWHERE. W-7 slack CLOSED: a RED drive kept it green on a deleted case; pins were mostly SLACK |
+| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 235 / 55 / 5923 | ⚠ **FIRES** | ⚠ row STALE a 7th time (`222/49/5787`). **263-04**: `SkillFormDialog.test.tsx` ADOPTED into BOTH knobs — `grep -ic skill` read **0**, so every skills suite ran NOWHERE |
 | [`backend/app/services/eval_runner_service.py`](docs/HOT-FILE-LEDGER.md#backendappserviceseval_runner_servicepy) | 13 / 8 / 1040 | ⚠ **FIRES** | ⚠ STALE at `12/7/959`, and absent until 196 at 7 phases. **256-03**: its finalize stopped passing `input_tokens=None`. Re-derived by 256-04 |
 | [`frontend/src/components/panel/PhaseCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasecardtsx) | 17 / 11 / 788 | ⚠ **FIRES** | ⚠ row STALE (`16/10/755`) — 252 touched it. NOT modified by 253; re-derived under CR-08. honoured by construction (200 / 214) |
 | [`frontend/src/components/panel/PhaseTimeline.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasetimelinetsx) | 10 / 8 / 404 | ⚠ **FIRES** | ⚠ row STALE (`9/7/385`) — 252 touched it. NOT modified by 253; re-derived under CR-08. honoured by construction (**214**); absent from BOTH until 200 |
@@ -10898,7 +10913,7 @@ cells rot within days.
 | [`frontend/src/components/admin/spend/RepriceModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminspendrepricemodaltsx) | 1 / 1 / 212 | no (new) | young (created 257-03). Reprice dialog allowing append-only rate entry for models. |
 | [`frontend/src/components/workflow/RunCostBadge.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowruncostbadgetsx) | 1 / 1 / 101 | no (new) | young (created 257-04). Reusable run cost pill. ⛔ THREE states, not two: rated / unrated model / rated-but-unmeasured — collapsing the last two makes it state a FALSE cause. |
 | [`frontend/src/lib/api/spend.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapispendts) | 1 / 1 / 184 | no (new) | ⚠ row added by the 257 REVIEW, not the build — UNDECLARED, so the gate never asked. Created 257-03 as `src/api/spend.ts`, a SECOND api home; MOVED to the one `lib/api/` home. |
-| [`frontend/src/components/skills/SkillFormDialog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsskillsskillformdialogtsx) | 12 / 8 / 635 | ⚠ **FIRES** | ⛔ absent from BOTH registers its ENTIRE LIFE at 8 phases — row added at 263 PLANNING, before a plan named it. The ONE human skill-authoring dialog; D-263-01 reuses it pre-filled. |
+| [`frontend/src/components/skills/SkillFormDialog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsskillsskillformdialogtsx) | 13 / 9 / 657 | ⚠ **FIRES** | ⚠ row STALE at `12/8/635` one plan later. honoured by construction (**263-04**): ONE optional prop + three `??` + one dep-array entry. ⛔ callers pass a STABLE reference or the reset wipes typing. |
 | [`backend/app/api/skills.py`](docs/HOT-FILE-LEDGER.md#backendappapiskillspy) | 19 / 10 / 858 | ⚠ **FIRES** | ⛔ absent from BOTH registers its ENTIRE LIFE at 10 phases — row added at 263 PLANNING. ⛔ `is_org_shared` HARD-SET False at `:250`; D-263-06 routes around it by provenance, never through the gate. |
 
 
@@ -15693,9 +15708,35 @@ What it owns. AI-assisted drafting service reusing `forced_emit` substrate to sy
 
 ## `frontend/src/components/experts/ExpertAuthoringStudio.tsx`
 
-**`1 / 1 / 1082`** — created by Phase 261 (`261-04`). **Row added AT CREATION.** Precedent in `CLAUDE.md` is explicit: rows added at creation, since an absent row is invisible to G-5 at any count.
+**`3 / 2 / 1475`** — created by Phase 261 (`261-04`). **Row added AT CREATION.** Precedent in `CLAUDE.md` is explicit: rows added at creation, since an absent row is invisible to G-5 at any count.
+
+⚠ **RE-DERIVED 2026-09-21 (`263-04`): the cell read `1 / 1 / 1082` and is kept here beside the corrected figure.** `263-04` is this file's SECOND phase, so G-5 does not fire yet — but the row was wrong by **two commits and 393 lines**, and a cell that is present and wrong stops an audit harder than an absent one. ⚠ `263-04-PLAN.md` predicted `2 / 1 / 1194`; the measured line count at the time of the edit was **1475**, so even the plan's own correction was stale. **Run the recipe; never quote a planned figure.**
 
 What it owns. Leaf component for expert authoring studio, providing AI brainstorm file upload dropzone with non-ingestion badge, full form configurator, access grant selector, and live reactive 5-element card preview.
+
+**Phase 263-04 — sketch 263 variant A, honoured by construction.**
+
+- **The `Bound Knowledge & Capabilities` card holds THREE peer sub-blocks — Folders, Skills, Connections — and ONLY the middle one changed.** The `Proposed for this Expert` group is a FOURTH inner part of the skills sub-block, inserted between the active-pills block and the quick-add input. It replaces nothing and touches neither peer. ⛔ No new studio screen and no wizard step: sketch variants B (a provisioning step) and C (a refusal sheet) were the REJECTED alternatives.
+- ⛔ **THE CLIENT FENCE COVERS BOTH ENTRY POINTS, AND THE SECOND IS THE ONE THAT MATTERS.** `handleAddCustomSkill` pushes ANY free-text string into `memberSkills` with no library check — a live phantom-name door with no relation to the draft path. `unresolvedCapabilities` is the de-duplicated union of `suggestedNewSkills` and the `memberSkills` entries absent from `availableSkills`. A fence watching only the draft would have left that door wide open while reading green.
+- ⚠ **An UNREAD library and an EMPTY library are different facts, and only the first may not hold Save.** `listSkills()` now catches to `null` rather than `[]`, and the `memberSkills` arm is applied only when `availableSkillsLoaded`. Without that distinction a transient fetch failure would lock Save on an Expert whose every capability is real, with no recourse — the fence is ADVISORY (D-263-09); the server is the real one.
+- **The heading vouches for a RESOLVED count, not a selected one.** `In your library · N skills this Expert can actually use` reads `memberSkills.length − phantomMemberSkills.length`. Quoting the selected count there would have the heading vouch for a name the run-time member check will strip.
+- ⛔ **The violet banner and the destructive banner are two different claims and must never share tokens.** The count banner is `border-primary/30 bg-primary/5 text-primary` (a proposal is an opportunity, D-263-01); the destructive banner is reserved for the SERVER's 422 arriving after a stale-client save, and renders `err.unknownSkills` — the server's own names, as React text children, never a re-derived list and never `dangerouslySetInnerHTML` (D-263-10 / T-263-20).
+- ⛔ **`skillDialogInitial` is STATE, not a literal computed in render.** `SkillFormDialog`'s reset effect depends on that object's IDENTITY, so a fresh literal each render would re-run the reset and wipe what the author is typing.
+- **This is `SkillFormDialog`'s FIRST production mount.** Before 263-04 only `SkillDetailPanel` was imported anywhere in `src/`, so the modal's `open`/`onOpenChange`/`onSave` wiring was unproven outside its own test.
+
+---
+
+## `frontend/src/components/experts/ProposedSkillCard.tsx`
+
+**`1 / 1 / 86`** — created by Phase 263 (`263-04`). **Row added AT CREATION**, in the same commit that creates the file. Precedent in `CLAUDE.md` is explicit: an absent row is invisible to G-5 at any count, forever, silently — and this file was the ledger gate's LAST remaining `[no-row]` finding for Phase 263.
+
+What it owns. The dashed `⬡` card for one capability the draft named that the library does not have: the name, its one-line description, a ghost `Remove`, a violet `Create this skill →`, and the in-place generating state while `draftSkillBody` is in flight.
+
+- ⛔ **THE ONE HOME OF THE "does not exist" MARK.** The dashed border and the violet accent are the ONLY things carrying it. A second styling for the same idea makes a proposal read as an error, which is exactly what D-263-01 forbids: *a proposal is an opportunity, not a failure*. There is no red, no error styling and no `border-destructive` on this card — including on `Remove`, where the shipped `⚡` pill's `hover:text-destructive` was deliberately NOT copied.
+- ⭐ **The token string is copied VERBATIM from `components/org/OrgIdentity.tsx`'s `AVATAR_PENDING`** (`border border-dashed border-primary/40 bg-primary/[0.06] text-primary`). This design system already expresses *"real, but not yet"* exactly this way, and it already has a test pinning those tokens WITH a negative arm (`OrgIdentity.test.tsx:100-108`) — the shape that makes *"proposed ≠ real"* falsifiable rather than decorative.
+- ⛔ **Plain string concatenation, NOT `cn()`.** The class list is asserted token-by-token by a fence with a negative arm; running it through `tailwind-merge` would let a future conflicting class silently drop one of the four tokens that carry the whole meaning.
+- ⛔ **The busy state renders IN PLACE on the card**, never as an empty dialog that fills in later and never behind a separate "Generate instructions" button — both are explicitly forbidden by `263-CONTEXT.md`'s Claude's-discretion note.
+- **Render-only.** It fetches nothing and creates nothing; `onCreate` hands the proposal back to the studio, which owns the draft call and the dialog.
 
 ---
 
@@ -15779,6 +15820,33 @@ second one here would be the second engine wearing a different name.
 editing and file attachment in one component. The seam is the trigger/file sub-editors, which are
 independently testable and are what a ninth phase will push on. Phase 263 does **not** take it — it
 adds a caller, not a branch.
+
+⚠ **RE-DERIVED 2026-09-21 at `263-04`'s close: `13 / 9 / 657`.** The `12 / 8 / 635` above was
+written at this phase's own PLANNING and was stale ONE PLAN later — recorded beside it rather than
+over it, because the *rate* is the finding and this file has now rotted inside a single phase.
+
+**Phase 263-04 — honoured by construction, and the shape is the whole point.** The dialog gains
+**one optional prop and three `??`**, nothing else: `git diff` is three hunks, all inside
+`SkillFormDialog`'s `Props` / destructuring / reset effect. `SkillForm`'s body and
+`SkillDetailPanel` are byte-unchanged, which is possible only because `SkillFormProps` is a flat
+**controlled** set — the pre-fill lands entirely inside the modal's own reset effect.
+
+- ⛔ **DO NOT pre-fill by passing a synthetic object as `skill`.** `const isEdit = !!skill` would
+  flip: the title becomes *Edit Skill*, `listSkillFiles(skill.id)` fires against an id that does not
+  exist, and the save reads as an update. **Driven RED**: planting `isEdit = !!skill || !!initialValues`
+  turned the create-mode case red with *"Unable to find an element with the text: New Skill"*.
+- ⛔ **`skill` WINS over `initialValues`, and the `??` ORDER is what says so.** Planting the swapped
+  precedence turned the skill-wins case red. Both plants restored the file md5-identical
+  (`d1ed2f65d49a521d887e71eb7e549448`).
+- ⛔ **`initialValues` is load-bearing in the effect's dependency array, and therefore CALLERS MUST
+  PASS A STABLE REFERENCE.** Without the dep, a SECOND proposal opened in the same mounted dialog
+  shows the FIRST one's body under the second one's name. With the dep, a fresh object literal on
+  every parent render re-runs the reset and wipes what the author is typing. `ExpertAuthoringStudio`
+  holds it in state for exactly this reason.
+- ⭐ **`263-04` is also this dialog's FIRST PRODUCTION MOUNT.** Before it, `grep -rn "SkillFormDialog"`
+  outside its own test and module returned one line — `SkillsPage.tsx` importing `SkillDetailPanel`.
+  Its suite was likewise in NEITHER count-gate knob, so its 8 passing tests guarded nothing; `263-04`
+  adopted it into both and pinned it at the measured **13**.
 
 ---
 

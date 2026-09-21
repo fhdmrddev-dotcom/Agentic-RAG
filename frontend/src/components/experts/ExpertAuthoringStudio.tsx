@@ -31,17 +31,26 @@ import {
   addExpertGrant,
   createExpert,
   draftExpert,
+  draftSkillBody,
   getExpertGrants,
   removeExpertGrant,
   updateExpert,
+  ExpertMemberSkillsUnknownError,
+  SkillBodyDisabledError,
   type ExpertBundleCreate,
   type ExpertBundleUpdate,
   type ExpertGrant,
   type ExpertGrantCreate,
+  type SuggestedNewSkill,
 } from "@/lib/api/experts"
 import { listFolders } from "@/lib/api/documents"
-import { listSkills } from "@/lib/api/skills"
+// ⛔ `createSkill` is the EXISTING, unchanged human write path (D-263-03). This studio
+// adds NO second write path: `lib/api/skills.ts` is byte-identical after Phase 263.
+import { createSkill, listSkills } from "@/lib/api/skills"
 import { listConnectorConnections } from "@/lib/api/connectors"
+import { SkillFormDialog } from "@/components/skills/SkillFormDialog"
+import { ProposedSkillCard } from "./ProposedSkillCard"
+import type { Skill, SkillCreate, SkillUpdate } from "@/types"
 import { cn } from "@/lib/utils"
 
 export interface ExpertAuthoringStudioProps {
@@ -140,10 +149,34 @@ export function ExpertAuthoringStudio({
   // Submitting / Saving state
   const [isSaving, setIsSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  // Phase 263-04 (D-263-10): the names the SERVER refused, carried by the typed 422.
+  // ⛔ Rendered as-is — never a list this client re-derives from a stale library snapshot.
+  const [serverUnknownSkills, setServerUnknownSkills] = useState<string[]>([])
+
+  // Phase 263-04 (PACK-14 / PACK-15) — the proposed capabilities the draft named and the
+  // library does not have, plus the one-approval-at-a-time round trip through the
+  // EXISTING SkillFormDialog.
+  const [suggestedNewSkills, setSuggestedNewSkills] = useState<SuggestedNewSkill[]>([])
+  const [generatingSkillName, setGeneratingSkillName] = useState<string | null>(null)
+  const [proposalError, setProposalError] = useState<string | null>(null)
+  const [skillBodyDisabledNote, setSkillBodyDisabledNote] = useState<string | null>(null)
+  const [skillDialogOpen, setSkillDialogOpen] = useState(false)
+  // ⛔ STATE, not a literal computed in render: `SkillFormDialog`'s reset effect depends
+  // on this object's IDENTITY, so a fresh literal each render would wipe what the author
+  // is typing in the dialog.
+  const [skillDialogInitial, setSkillDialogInitial] = useState<{
+    name?: string
+    description?: string
+    instructions?: string
+  }>({})
 
   // Grounding options
   const [availableFolders, setAvailableFolders] = useState<Array<{ id: string; name: string }>>([])
   const [availableSkills, setAvailableSkills] = useState<Array<{ name: string; description?: string }>>([])
+  // ⚠ Only TRUE once the library list was genuinely read. If `listSkills` fails we must
+  // NOT conclude that every capability is phantom — that would lock Save with no recourse
+  // over a transient network fault. The fence is advisory (D-263-09); the server is real.
+  const [availableSkillsLoaded, setAvailableSkillsLoaded] = useState(false)
   const [availableConnections, setAvailableConnections] = useState<Array<{ id: string; name: string }>>([])
 
   // Auto-slug on name change if not manually edited
@@ -168,12 +201,17 @@ export function ExpertAuthoringStudio({
       try {
         const [folders, skills, connections] = await Promise.all([
           listFolders().catch(() => []),
-          listSkills().catch(() => []),
+          // ⚠ `null`, not `[]`, on failure (263-04): an empty library and an UNREAD
+          // library are different facts, and only the first one may hold Save.
+          listSkills().catch(() => null),
           listConnectorConnections().catch(() => []),
         ])
         if (alive) {
           setAvailableFolders(folders.map((f: any) => ({ id: f.id, name: f.name })))
-          setAvailableSkills(skills.map((s: any) => ({ name: s.name, description: s.description })))
+          if (skills) {
+            setAvailableSkills(skills.map((s: any) => ({ name: s.name, description: s.description })))
+            setAvailableSkillsLoaded(true)
+          }
           setAvailableConnections(connections.map((c: any) => ({ id: c.id, name: c.name })))
         }
       } catch {
@@ -228,6 +266,10 @@ export function ExpertAuthoringStudio({
       setScopeMode(draft.scope_mode || "biased")
       setToolFloorEnabled(draft.tool_floor_enabled ?? true)
       if (draft.member_skills) setMemberSkills(draft.member_skills)
+      // Phase 263-04 (PACK-14): the same guarded one-`if`-per-optional-field idiom.
+      // ⛔ No client-side derivation — the SERVER already decided which list each name
+      // belongs to, and re-splitting them here would be a second, disagreeing judgement.
+      if (draft.suggested_new_skills) setSuggestedNewSkills(draft.suggested_new_skills)
       if (draft.required_connections) setRequiredConnections(draft.required_connections)
       if (draft.knowledge_folder_ids) setKnowledgeFolderIds(draft.knowledge_folder_ids)
       if (draft.prompt_suggestions && draft.prompt_suggestions.length > 0) {
@@ -249,6 +291,86 @@ export function ExpertAuthoringStudio({
       setMemberSkills((prev) => [...prev, trimmed])
     }
     setCustomSkillInput("")
+  }
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // Phase 263-04 — the proposed-capability round trip (PACK-14 / PACK-15)
+  // ───────────────────────────────────────────────────────────────────────────
+
+  /** Re-read the library after a proposal became a real row, so the advisory fence and
+   *  the picker agree with `public.skills` rather than with a snapshot taken on mount. */
+  const refreshAvailableSkills = useCallback(async () => {
+    try {
+      const skills = await listSkills()
+      setAvailableSkills(skills.map((s: any) => ({ name: s.name, description: s.description })))
+      setAvailableSkillsLoaded(true)
+    } catch {
+      // Degrade gracefully — the server re-checks independently at save time (D-263-09).
+    }
+  }, [])
+
+  const handleRemoveProposal = (skillName: string) => {
+    setSuggestedNewSkills((prev) => prev.filter((p) => p.name !== skillName))
+    setProposalError(null)
+  }
+
+  /** `Create this skill →`. Drafts the body FIRST, in place on the card, then opens the
+   *  EXISTING dialog pre-filled. ⛔ Never an empty dialog that fills in later, and never
+   *  a second "Generate instructions" button. */
+  const handleCreateProposal = async (proposal: SuggestedNewSkill) => {
+    setGeneratingSkillName(proposal.name)
+    setProposalError(null)
+    setSkillBodyDisabledNote(null)
+
+    let instructions = ""
+    try {
+      const body = await draftSkillBody({
+        skill_name: proposal.name,
+        skill_description: proposal.description,
+        why_needed: proposal.why_needed,
+        expert_name: name,
+        expert_description: description,
+      })
+      instructions = body.instructions
+    } catch (err: any) {
+      if (err instanceof SkillBodyDisabledError) {
+        // ⛔ D-263-14 gates GENERATION only. Manual creation is never blocked — the
+        // dialog still opens, with an EMPTY body and the reason stated beside it.
+        setSkillBodyDisabledNote(err.message)
+      } else {
+        // ⛔ Never fabricate a body to keep the flow moving: surface the real failure.
+        setGeneratingSkillName(null)
+        setProposalError(err?.message || "Failed to draft skill instructions. Try again.")
+        return
+      }
+    }
+
+    setGeneratingSkillName(null)
+    setSkillDialogInitial({
+      name: proposal.name,
+      description: proposal.description,
+      instructions,
+    })
+    setSkillDialogOpen(true)
+  }
+
+  /** The dialog's save. ⛔ `createSkill` is the EXISTING `POST /skills` — the same human
+   *  write path `SkillsPage` uses (D-263-03), and the ONLY write this studio performs.
+   *  Returns the created `Skill` so the dialog can surface its `lint_warnings`. */
+  const handleSaveProposedSkill = async (body: SkillCreate | SkillUpdate): Promise<Skill> => {
+    const created = await createSkill(body as SkillCreate)
+    // D-263-05: the row is real NOW, so the fence must stop counting it as phantom.
+    setAvailableSkills((prev) =>
+      prev.some((s) => s.name === created.name)
+        ? prev
+        : [...prev, { name: created.name, description: created.description ?? undefined }],
+    )
+    setMemberSkills((prev) => (prev.includes(created.name) ? prev : [...prev, created.name]))
+    setSuggestedNewSkills((prev) =>
+      prev.filter((p) => p.name !== created.name && p.name !== skillDialogInitial.name),
+    )
+    void refreshAvailableSkills()
+    return created
   }
 
   // Handle Action Tiles change
@@ -294,6 +416,7 @@ export function ExpertAuthoringStudio({
     }
     setIsSaving(true)
     setSaveError(null)
+    setServerUnknownSkills([])
 
     try {
       let saved: ExpertBundle
@@ -357,7 +480,17 @@ export function ExpertAuthoringStudio({
       onSaved?.(saved)
       onClose()
     } catch (err: any) {
-      setSaveError(err.message || "Failed to save expert.")
+      // Phase 263-04 (D-263-10): the server refuses independently of the client fence,
+      // and it NAMES each capability it could not find. ⛔ Render the SERVER's list —
+      // re-deriving it here would answer with a stale client-side library snapshot,
+      // which is exactly the disagreement the typed 422 exists to prevent.
+      if (err instanceof ExpertMemberSkillsUnknownError) {
+        setServerUnknownSkills(err.unknownSkills)
+        setSaveError(err.message)
+      } else {
+        setServerUnknownSkills([])
+        setSaveError(err.message || "Failed to save expert.")
+      }
     } finally {
       setIsSaving(false)
     }
@@ -367,6 +500,23 @@ export function ExpertAuthoringStudio({
   const previewFoldersCount = knowledgeFolderIds.length
   const previewSkillsCount = memberSkills.length
   const previewConnectionsCount = requiredConnections.length
+
+  // ── PACK-16's client fence (D-263-09 — ADVISORY; the server is the real one) ──────
+  // ⛔ BOTH entry points. The draft path is the obvious one; `handleAddCustomSkill`
+  // pushes ANY free-text string into `memberSkills` with no library check, and a fence
+  // watching only the draft would leave that door wide open.
+  // ⚠ De-duplicated so a name reachable both ways is counted once — the banner states a
+  // COUNT, and a double-count would be a false claim about the blueprint.
+  const phantomMemberSkills = availableSkillsLoaded
+    ? memberSkills.filter((n) => !availableSkills.some((s) => s.name === n))
+    : []
+  const unresolvedCapabilities = Array.from(
+    new Set([...suggestedNewSkills.map((p) => p.name), ...phantomMemberSkills]),
+  )
+  const hasUnresolvedCapabilities = unresolvedCapabilities.length > 0
+  // The sketch's "N skills this Expert can actually use" — the RESOLVED count, not the
+  // selected count, or the heading would vouch for a name the member check will strip.
+  const resolvableSkillsCount = memberSkills.length - phantomMemberSkills.length
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
@@ -741,11 +891,21 @@ export function ExpertAuthoringStudio({
                 )}
               </div>
 
-              {/* Member Skills & Specialized Capabilities */}
+              {/* Member Skills & Specialized Capabilities.
+                  Phase 263-04 / sketch 263 variant A: this ONE sub-block now carries TWO
+                  headed groups — "In your library" (solid ⚡ pills, unchanged) and
+                  "Proposed for this Expert" (dashed ⬡ cards). ⛔ No new studio screen and
+                  no wizard step: B (a provisioning step) and C (a refusal sheet) were the
+                  REJECTED alternatives. The Folders and Connections peers are untouched. */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="block text-xs font-medium text-foreground">
-                    Member Skills & Capabilities ({memberSkills.length} active)
+                    In your library{" "}
+                    <span className="text-[11px] font-normal text-muted-foreground">
+                      · {resolvableSkillsCount}{" "}
+                      {resolvableSkillsCount === 1 ? "skill" : "skills"} this Expert can
+                      actually use
+                    </span>
                   </label>
                   <span className="text-[11px] text-muted-foreground">
                     Specialized toolchains & capability tags
@@ -770,6 +930,54 @@ export function ExpertAuthoringStudio({
                         </button>
                       </span>
                     ))}
+                  </div>
+                )}
+
+                {/* ── Proposed for this Expert (263-04 / PACK-14 / D-263-01) ──────────
+                    The capabilities the draft named that the library does not have.
+                    A FOURTH inner part of this sub-block, inserted between the active
+                    pills and the quick-add — it replaces nothing. */}
+                {suggestedNewSkills.length > 0 && (
+                  <div className="space-y-1.5 pt-1">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <label className="block text-xs font-medium text-foreground">
+                        Proposed for this Expert{" "}
+                        <span className="text-[11px] font-normal text-muted-foreground">
+                          · {suggestedNewSkills.length} named by the draft, none in your
+                          library yet
+                        </span>
+                      </label>
+                      <span className="font-mono text-[11px] text-primary">
+                        ⬡ = does not exist
+                      </span>
+                    </div>
+                    <div className="flex flex-col gap-1.5 rounded-lg border border-primary/20 bg-primary/5 p-2">
+                      {suggestedNewSkills.map((proposal) => (
+                        <ProposedSkillCard
+                          key={proposal.name}
+                          proposal={proposal}
+                          isGenerating={generatingSkillName === proposal.name}
+                          onCreate={handleCreateProposal}
+                          onRemove={handleRemoveProposal}
+                        />
+                      ))}
+                    </div>
+                    {proposalError && (
+                      <p
+                        data-testid="proposal-error"
+                        className="text-[11px] text-destructive"
+                      >
+                        {proposalError}
+                      </p>
+                    )}
+                    {skillBodyDisabledNote && (
+                      <p
+                        data-testid="skill-body-disabled-note"
+                        className="rounded-md border border-primary/30 bg-primary/5 px-2 py-1 text-[11px] text-primary"
+                      >
+                        {skillBodyDisabledNote}
+                      </p>
+                    )}
                   </div>
                 )}
 
@@ -1030,15 +1238,75 @@ export function ExpertAuthoringStudio({
               )}
             </div>
 
+            {/* ── PACK-16's honesty banner (263-04 / D-263-01 / D-263-09) ────────────
+                ⛔ VIOLET, not destructive: a proposal is an opportunity, not an error.
+                The destructive banner below stays, and belongs to the SERVER's 422. */}
+            <div
+              data-testid="unresolved-capabilities-banner"
+              className={cn(
+                "flex items-start gap-2 rounded-lg border p-3 text-xs",
+                "border-primary/30 bg-primary/5 text-primary",
+              )}
+            >
+              <span aria-hidden="true" className="flex-none font-mono leading-none">
+                {hasUnresolvedCapabilities ? "⬡" : "✓"}
+              </span>
+              {hasUnresolvedCapabilities ? (
+                <span>
+                  <b>
+                    {unresolvedCapabilities.length}{" "}
+                    {unresolvedCapabilities.length === 1
+                      ? "capability is not real yet."
+                      : "capabilities are not real yet."}
+                  </b>{" "}
+                  Saved as-is, {unresolvedCapabilities.length === 1 ? "it" : "they"} would
+                  be stripped at run time by the member check and this Expert would run
+                  without {unresolvedCapabilities.length === 1 ? "it" : "them"} — silently.
+                  Create or remove {unresolvedCapabilities.length === 1 ? "it" : "each one"}{" "}
+                  first.{" "}
+                  <span className="font-mono text-[11px]">
+                    {unresolvedCapabilities.join(", ")}
+                  </span>
+                </span>
+              ) : (
+                <span>
+                  <b>Every capability in this blueprint exists.</b> {resolvableSkillsCount}{" "}
+                  {resolvableSkillsCount === 1 ? "skill" : "skills"}, all resolvable by the
+                  member check at run time.
+                </span>
+              )}
+            </div>
+
             {saveError && (
-              <div className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">
+              <div
+                data-testid={serverUnknownSkills.length > 0 ? "server-refusal-banner" : "save-error-banner"}
+                className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive"
+              >
                 <AlertCircle className="h-4 w-4 flex-none" />
-                <span>{saveError}</span>
+                <div className="min-w-0">
+                  <span>{saveError}</span>
+                  {serverUnknownSkills.length > 0 && (
+                    // ⛔ The SERVER's own names (D-263-10), rendered as React text
+                    // children so they are auto-escaped (T-263-20). No re-derivation,
+                    // and no raw-HTML injection prop — deliberately not named here, so
+                    // `grep -c` on it stays a usable fence instead of matching prose.
+                    <ul className="mt-1 list-disc pl-4 font-mono text-[11px]">
+                      {serverUnknownSkills.map((n) => (
+                        <li key={n}>{n}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
               </div>
             )}
 
             {/* Actions */}
             <div className="flex items-center justify-end gap-3 pt-2">
+              {hasUnresolvedCapabilities && (
+                <span className="mr-auto text-[11px] text-muted-foreground">
+                  Save is held while proposed skills are unresolved.
+                </span>
+              )}
               <button
                 type="button"
                 onClick={onClose}
@@ -1048,7 +1316,7 @@ export function ExpertAuthoringStudio({
               </button>
               <button
                 type="submit"
-                disabled={isSaving}
+                disabled={isSaving || hasUnresolvedCapabilities}
                 className="inline-flex items-center gap-2 rounded-md bg-primary px-5 py-2 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90 disabled:opacity-50"
               >
                 {isSaving ? (
@@ -1189,6 +1457,20 @@ export function ExpertAuthoringStudio({
           </div>
         </div>
       </div>
+
+      {/* ── The approval moment (263-04 / PACK-15 / D-263-03/04/05) ──────────────────
+          The EXISTING SkillFormDialog, pre-filled. ⛔ Not a new dialog and not a new
+          write path: `handleSaveProposedSkill` calls the same `POST /skills` the
+          SkillsPage uses, and the row is written only on HUMAN approval. */}
+      <SkillFormDialog
+        open={skillDialogOpen}
+        onOpenChange={(next) => {
+          setSkillDialogOpen(next)
+          if (!next) setSkillBodyDisabledNote(null)
+        }}
+        onSave={handleSaveProposedSkill}
+        initialValues={skillDialogInitial}
+      />
     </div>
   )
 }
