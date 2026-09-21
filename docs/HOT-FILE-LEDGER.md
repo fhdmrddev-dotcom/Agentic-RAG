@@ -14629,6 +14629,47 @@ Saying so anyway is the same class of overclaim this phase exists to remove.
 **Files:** `scripts/vitest-count-gate.cjs` (sole writer for the phase, by design — three wave-1
 plans would otherwise have contended on this one file).
 
+### `scripts/vitest-count-gate.cjs` — `236 / 58 / 5988` (263-REVIEW.md WR-06)
+
+⚠ **RE-DERIVED, not incremented — STALE an 8th time.** The row read `235 / 55 / 5923`.
+Raw subject buckets counted, six-digit DATED QUICK-TASK buckets subtracted, per the recipe.
+
+### ⛔ WR-06: the LEAST-guarded directory in the frontend was the Control Room
+
+`src/components/admin/` has **no bare directory entry**, so every suite under it must be named or it
+runs nowhere. 263-REVIEW found `ModelAdvancedCapabilities.test.tsx` in TARGETS and **no** baseline.
+Sweeping the directory found that was the small half of the problem:
+
+| | Suites | Assertions | State before |
+|---|---|---|---|
+| In TARGETS only | 1 | 13 | RAN, guarded nothing |
+| In **neither** knob | **17** | **144** | ran nowhere, guarded nothing |
+| Already in both | 5 | — | fine |
+
+**23 suites in the directory; 18 of them were not doing their job.** The Control Room is where an
+operator flips kill-switches, disables users and reads the audit ledger — it was the least-guarded
+directory in the frontend, not the most.
+
+**How they were adopted, and the two rules that shaped it:**
+
+1. ⛔ **Measured GREEN before pinning, in one run: 16 files, 137 assertions, 0 failing.** Pinning a
+   red suite turns the shared gate red for everyone, and pinning it with an allowance makes a gate
+   that cannot fail (the Phase 235 rule). A red one would have been NAMED here, never pinned.
+2. ⛔ **Named individually, NOT via a new bare `src/components/admin/` directory entry.** A directory
+   entry would silently re-run whatever lands there next **without** a baseline — which is exactly the
+   half-adoption this sweep exists to end. Naming forces the pair.
+
+**The arithmetic closes with no residual, which is what separates GROWTH from DRIFT:**
+`7789 → 7926` pinned (**+137**), `8530 → 8667` grand total (**+137**), `300 → 316` pinned files
+(**+16**). An unexplained `+n` is the thing to worry about, never a bigger number.
+
+⚠ **The trap fired in the commit whose comment warns about it.** The TARGETS block above
+`ModelAdvancedCapabilities.test.tsx` reads *"a suite added under it and not listed here RUNS NOWHERE
+and its assertions can never fail… that trap has now fired four times in this directory alone"* —
+and that same commit (Phase 262) added the entry to one knob. **Naming a trap is not a guard against
+it**; only the BASELINE key is.
+
+
 ### `scripts/vitest-count-gate.cjs` — `222 / 49 / 5787`
 
 ⚠ **RE-DERIVED, not incremented.** The row read `215 / 47 / 5682` and was **STALE a 6th time**; the

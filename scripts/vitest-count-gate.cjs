@@ -191,6 +191,30 @@ const BASELINE = {
   // 6 → 7: the WR-07 case (the agent-subject arm + the measured-false negative arm),
   // driven RED against the original string before the copy was changed.
   "CapabilityGrid.test.tsx": 7,
+  // ── 263-REVIEW.md WR-06, completing the sweep ────────────────────────────────────
+  // ⚠ `src/components/admin/` has NO bare directory entry, and WR-06/WR-07 turned out to
+  // be TWO instances of a class of SIXTEEN. Every suite below existed, passed, and sat in
+  // NEITHER knob — 137 assertions about the Control Room running nowhere. The Control Room
+  // is where an operator flips kill-switches and disables people; it was the LEAST guarded
+  // directory in the frontend, not the most.
+  // ⛔ All 16 MEASURED GREEN in one run before adoption (0 failing) — a red suite gets
+  // NAMED, never pinned, or the shared gate goes red for everyone (the Phase 235 rule).
+  "ActiveRunsSection.test.tsx": 10,
+  "ActiveRunsSection.a11y.test.tsx": 7,
+  "ControlRoomPage.test.tsx": 7,
+  "CapabilityGrid.a11y.test.tsx": 6,
+  "MaintenancePanel.a11y.test.tsx": 7,
+  "HealthSignals.a11y.test.tsx": 5,
+  "OperatorBand.a11y.test.tsx": 6,
+  "TechnicalNamesToggle.a11y.test.tsx": 4,
+  "LockedTab.a11y.test.tsx": 4,
+  "AuditTab.a11y.test.tsx": 12,
+  "RecentActionsCard.a11y.test.tsx": 5,
+  "UsersAndAccess.a11y.test.tsx": 11,
+  "FeatureVisibility.a11y.test.tsx": 6,
+  "ModelDiscoveryPanel.test.tsx": 25,
+  "ModelDiscoveryPanel.a11y.test.tsx": 9,
+  "ModelRegistryTab.a11y.test.tsx": 13,
   // ── Phase 237 (RULES-01 / SC#1 / SC#3) — Classification rules & arrival watch builder suites ──
   "ClassificationRulesPage.test.tsx": 8,
   "ClassificationSection.test.tsx": 13,
@@ -5610,6 +5634,26 @@ const TARGETS = [
   // `CapabilityGrid.test.tsx` is worse and older — named in NEITHER knob since Phase 147.
   // ⛔ 15 more suites in this directory are still unlisted; see 263-REVIEW.md WR-06.
   "src/components/admin/__tests__/CapabilityGrid.test.tsx",
+  // ── 263-REVIEW.md WR-06, completing the sweep — the other 16 ─────────────────────
+  // ⛔ Named individually, NOT via a new bare `src/components/admin/` directory entry: a
+  // directory entry would silently re-run whatever lands there next WITHOUT a baseline,
+  // which is exactly the half-adoption this sweep exists to end. Naming forces the pair.
+  "src/components/admin/__tests__/ActiveRunsSection.test.tsx",
+  "src/components/admin/__tests__/ActiveRunsSection.a11y.test.tsx",
+  "src/components/admin/__tests__/ControlRoomPage.test.tsx",
+  "src/components/admin/__tests__/CapabilityGrid.a11y.test.tsx",
+  "src/components/admin/__tests__/MaintenancePanel.a11y.test.tsx",
+  "src/components/admin/__tests__/HealthSignals.a11y.test.tsx",
+  "src/components/admin/__tests__/OperatorBand.a11y.test.tsx",
+  "src/components/admin/__tests__/TechnicalNamesToggle.a11y.test.tsx",
+  "src/components/admin/__tests__/LockedTab.a11y.test.tsx",
+  "src/components/admin/__tests__/AuditTab.a11y.test.tsx",
+  "src/components/admin/__tests__/RecentActionsCard.a11y.test.tsx",
+  "src/components/admin/__tests__/UsersAndAccess.a11y.test.tsx",
+  "src/components/admin/__tests__/FeatureVisibility.a11y.test.tsx",
+  "src/components/admin/__tests__/ModelDiscoveryPanel.test.tsx",
+  "src/components/admin/__tests__/ModelDiscoveryPanel.a11y.test.tsx",
+  "src/components/admin/__tests__/ModelRegistryTab.a11y.test.tsx",
   // ── Phase 249 Plan 02 (MODEL-05) ──────────────────────────────────────────────────
   // ⚠ `src/components/chat` has NO bare-directory entry (BUG-260912-01 recorded the same
   // thing), so this suite must be named or it never executes under the gate.
