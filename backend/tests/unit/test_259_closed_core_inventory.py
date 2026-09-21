@@ -82,6 +82,24 @@ def test_expert_service_is_pure_data_manifest_ast():
                 pytest.fail(f"Forbidden LLM or agent loop import in expert_service.py:{node.lineno} ({node.module})")
 
 
+def test_skill_body_authoring_is_not_registered_as_a_tool():
+    """Phase 263 / D-263-11 / EXT-01: the ONE way this phase could break the red line.
+
+    ``author_skill_body`` is reachable ONLY through ``POST /experts/draft-skill-body``, behind
+    ``require_expert_manage``. Registering it in ``_TOOL_REGISTRY`` so the agent could author
+    skill bodies at will would take the registry to 30 and make body authoring ENGINE surface
+    rather than extension surface — the exact line ``docs/EXTENSION-CONTRACT.md`` draws.
+
+    ⚠ Named keys, deliberately, on top of the count above: the count alone would also fail if a
+    tool were simultaneously added and removed, and that failure message would not say why.
+    """
+    for forbidden in ("skill_body_authoring", "draft_skill_body", "author_skill_body"):
+        assert forbidden not in _TOOL_REGISTRY, (
+            f"'{forbidden}' is registered as an agent tool — body authoring must stay behind the "
+            f"guarded route, never callable from the agent loop. Registry: {sorted(_TOOL_REGISTRY)}"
+        )
+
+
 def test_expert_core_tools_is_strict_subset_of_tool_registry():
     """PACK-02 / Phase 260 F-3: EXPERT_CORE_TOOLS is derived and fenced strictly against _TOOL_REGISTRY."""
     from app.services.tool_dispatcher import EXPERT_CORE_TOOLS, _TOOL_REGISTRY
