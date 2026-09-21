@@ -847,6 +847,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/provider_gateway/dispatcher.py` | 6 / 2 / 153 | ⚠ absent its ENTIRE LIFE — row added 262 at 2 phases, BELOW threshold. The ONE provider→adapter fork; ⛔ `calling_mode` rides ALONGSIDE the stream, never as an event |
 | `backend/app/services/provider_gateway/openai_responses.py` | 0 / 0 / 563 | young (created 262). Row added AT CREATION. ⛔ emits `call_id`, NEVER `item.id` — the other id does not round-trip and round 2 of every multi-tool turn fails |
 | `frontend/src/lib/api/admin.ts` | 5 / 2 / 1098 | ⚠ absent from BOTH registers its ENTIRE LIFE — row added 262 at its 2nd phase. ⛔ `ModelRegistryRow` is OPERATOR-only; the author row is a STANDALONE interface, never a `Pick<>` of it, or an operator field travels to every author |
+| `frontend/src/components/admin/CapabilityGrid.tsx` | 3 / 3 / 264 | ⚠ **FIRES at 3 phases, absent from BOTH registers since 147 — row added 263-REVIEW WR-07.** ⛔ every consequence line names its SUBJECT; this one claimed people were blocked and UAT measured it FALSE |
 | `frontend/src/components/admin/ModelAdvancedCapabilities.tsx` | 0 / 0 / 290 | young (created 262). Row added AT CREATION. ⛔ every control is 3-state: `null` means NOT ASSERTED, never `false` — rendering null as off states a fact nobody measured |
 
 

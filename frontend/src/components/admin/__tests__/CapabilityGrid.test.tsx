@@ -96,6 +96,39 @@ describe("CapabilityGrid (065-A) — armed-OFF switches + concrete impact copy",
     expect(card.textContent ?? "").not.toMatch(/\d/)
   })
 
+  // ── 263-REVIEW.md WR-07 ────────────────────────────────────────────────────────────
+  // The self-improve card's consequence line claimed "No new skills can be saved until
+  // this is back on." 263's UAT R-8 measured that FALSE by driving it: generation is
+  // refused 409, but `POST /skills` has NO self_improve guard and returned 201. The flag
+  // gates the AGENT (`_CAPABILITY_FLAG_TOOLS`: save_skill / attach_skill_file, plus the
+  // two drafters) and nothing a person does by hand.
+  // ⛔ This fence asserts the rendered CONTENT, not the card's presence — a presence
+  // assertion cannot see copy drift, which is how the false sentence survived to UAT.
+  // The negative arm is the load-bearing half: it is the only thing stopping the
+  // subject-less claim coming back in a later "tightening" of this string.
+  it("the self-improve OFF card names the AGENT as the subject — it never claims people are blocked", () => {
+    const onToggle = vi.fn().mockResolvedValue(undefined)
+    const { container } = render(
+      <CapabilityGrid
+        flags={{ ...ALL_ON, self_improve_enabled: false }}
+        onToggle={onToggle}
+        showTechnical={false}
+      />,
+    )
+
+    const card = container.querySelector<HTMLElement>('[data-capability="self_improve_enabled"]')!
+    expect(card.getAttribute("data-armed")).toBe("true")
+    const body = card.textContent ?? ""
+
+    // The consequence line carries its subject and keeps the by-hand door open.
+    expect(within(card).getByText(/the agent can't write or save skills/i)).toBeInTheDocument()
+    expect(body).toMatch(/people still can, by hand/i)
+
+    // ⛔ The measured-false claim, and any subject-less restatement of it.
+    expect(body).not.toMatch(/no new skills can be saved/i)
+    expect(body).not.toMatch(/skills cannot be (saved|created)/i)
+  })
+
   it("an ON card is calm/neutral — no armed styling, no 'off for everyone' tag, no impact copy", () => {
     const onToggle = vi.fn().mockResolvedValue(undefined)
     const { container } = render(

@@ -2972,6 +2972,35 @@ carries the verdict — **⚠ absent at 7 phases (added 196)** — and this is t
 
 > ⚠ **was ABSENT at SEVEN phases** (196) — judge consumers 1 + 2, rewired off the env singleton
 
+### `frontend/src/components/admin/CapabilityGrid.tsx`
+
+**Derived 2026-09-22 (263-REVIEW.md WR-07): `3 commits / 3 phases / 264 L`** · six-digit dated quick-task
+buckets: **checked, none exist** · **G-5 FIRES** (3 phases vs threshold 3) — and it was **absent from both
+registers for its entire life**, from Phase 147 until this row. Row added in the commit that makes it fire.
+
+**What WR-07 did:** one string. `fallbackImpact` for `self_improve_enabled` read *"No new skills can be saved
+until this is back on."* — and 263's UAT **R-8 measured that FALSE by driving it**: generation refused `409
+self_improve_disabled`, then a manual `POST /skills` returned **201**. The flag gates the AGENT, not people.
+
+**What binds this file:**
+
+1. ⛔ **EVERY consequence line names its subject.** `sub` already said *"The agent can save new skills"*; the
+   `fallbackImpact` beneath it dropped the subject and became a claim about the whole product. The backend
+   fence is `_CAPABILITY_FLAG_TOOLS` (`tool_dispatcher.py:4664` — `save_skill`, `attach_skill_file`) plus the
+   two drafters (`skill_body_authoring.py:312`, `skill_proposer_service.py:360`). **`backend/app/api/skills.py`
+   carries no `self_improve` guard at all** — measured, not assumed. A line that omits *the agent* is false.
+2. ⛔ **A number is NEVER fabricated.** `countImpact` renders only where the shell can honestly derive a count
+   (workflows alone); every other card takes the count-free `fallbackImpact`. The existing fence asserts the
+   card body matches no digit — keep it.
+3. ⚠ **Its suite ran NOWHERE for fifteen milestones.** `CapabilityGrid.test.tsx` was in neither knob of
+   `scripts/vitest-count-gate.cjs` from Phase 147 until 263-REVIEW WR-07 adopted it (`7` pinned). The WR-07
+   fence asserts the rendered **CONTENT** and carries a **negative arm** against the measured-false sentence —
+   a presence assertion cannot see copy drift, which is exactly how that sentence survived to UAT.
+
+**Named seam for the next refactor:** `CAPABILITIES` is a 4-entry literal whose copy is the deliverable and
+whose truth lives in backend guards. The seam is a **copy module `?raw`-fenced against the backend's gate
+map**, so a flag that starts or stops gating a door cannot leave this card's sentence behind.
+
 ### `frontend/src/components/admin/ModelRegistryTab.tsx`
 
 **Re-derived 2026-08-18 (plan `196-09`): `10 commits / 4 phases / 1191 L`** · six-digit dated quick-task

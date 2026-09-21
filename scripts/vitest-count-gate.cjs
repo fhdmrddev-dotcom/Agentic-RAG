@@ -177,6 +177,20 @@ const BASELINE = {
   // ran NOWHERE and guarded NOTHING. ⚠ It is NOT under a `__tests__/` directory (it sits
   // beside its component), so the TARGETS entry below is the plain path, no `__tests__`.
   "SkillFormDialog.test.tsx": 13,
+  // ── Phase 262, adopted at 263-REVIEW.md WR-06 ──────────────────────────────────────
+  // ⚠ ADOPTED, not raised. 262 added this suite to TARGETS and to NEITHER baseline, so it
+  // RAN on every gate invocation and GUARDED NOTHING — the "wrong side of exactly one knob"
+  // trap the TARGETS comment four lines above its own entry warns about, fired in the commit
+  // that wrote the warning. TARGETS decides what RUNS; BASELINE decides what is GUARDED.
+  // 13 measured (`npx vitest run …/ModelAdvancedCapabilities.test.tsx` → 13 passed), not guessed.
+  "ModelAdvancedCapabilities.test.tsx": 13,
+  // ── 263-REVIEW.md WR-07 — adopted while fixing it ─────────────────────────────────
+  // ⚠ Found while checking WR-06: this suite has existed since Phase 147 and sat in
+  // NEITHER knob, so its six cases ran NOWHERE for fifteen milestones. It is where the
+  // WR-07 consequence-copy fence belongs, and a fence outside the gate is not a fence.
+  // 6 → 7: the WR-07 case (the agent-subject arm + the measured-false negative arm),
+  // driven RED against the original string before the copy was changed.
+  "CapabilityGrid.test.tsx": 7,
   // ── Phase 237 (RULES-01 / SC#1 / SC#3) — Classification rules & arrival watch builder suites ──
   "ClassificationRulesPage.test.tsx": 8,
   "ClassificationSection.test.tsx": 13,
@@ -5589,6 +5603,13 @@ const TARGETS = [
   // assertions can never fail. That trap has now fired four times in this directory alone
   // (AdminSpendPage, RunCostBadge, apportion100, WorkflowScheduleModal one dir over).
   "src/components/admin/__tests__/ModelAdvancedCapabilities.test.tsx",
+  // ── 263-REVIEW.md WR-06 / WR-07 ───────────────────────────────────────────────────
+  // ⚠ The trap this comment block warns about FIRED IN THE COMMIT THAT WROTE IT:
+  // `ModelAdvancedCapabilities.test.tsx` above was added here and to NEITHER baseline,
+  // so it ran and guarded nothing until 263-REVIEW WR-06. Its BASELINE key now exists.
+  // `CapabilityGrid.test.tsx` is worse and older — named in NEITHER knob since Phase 147.
+  // ⛔ 15 more suites in this directory are still unlisted; see 263-REVIEW.md WR-06.
+  "src/components/admin/__tests__/CapabilityGrid.test.tsx",
   // ── Phase 249 Plan 02 (MODEL-05) ──────────────────────────────────────────────────
   // ⚠ `src/components/chat` has NO bare-directory entry (BUG-260912-01 recorded the same
   // thing), so this suite must be named or it never executes under the gate.
