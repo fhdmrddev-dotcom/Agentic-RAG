@@ -166,6 +166,20 @@ def test_the_new_route_is_seen_as_guarded_by_the_real_ast_fence():
     )
 
 
+def test_the_new_route_takes_the_typed_brief_as_its_first_parameter():
+    """⚠ Replaces the plan's single-line `grep -cE "async def draft_skill_body\\(payload: ..."`.
+
+    That grep returns 0 against this module's MULTI-LINE signature style — the style the plan
+    itself said to copy from ``draft_expert`` — so it was a proxy that could not see the shape
+    it was written for. This asserts the PROPERTY instead: the first parameter is ``payload``,
+    typed ``SkillBodyDraftRequest``, which is what the grep was standing in for.
+    """
+    node = _draft_skill_body_node()
+    first = node.args.args[0]
+    assert first.arg == "payload"
+    assert getattr(first.annotation, "id", None) == "SkillBodyDraftRequest"
+
+
 def test_the_new_route_declares_no_keyword_only_parameters():
     """The structural reason the fence above can see it at all."""
     node = _draft_skill_body_node()
