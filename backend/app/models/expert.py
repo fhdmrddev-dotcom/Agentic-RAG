@@ -42,7 +42,7 @@ class SkillBodyDraftRequest(BaseModel):
     skill_description: str = Field(..., max_length=1000)
     why_needed: str = Field(default="", max_length=2000, description="Why the Expert needs it")
     expert_name: str = Field(default="", max_length=120)
-    expert_description: str = Field(default="", max_length=1000)
+    expert_description: str = Field(default="", max_length=8000)
 
 
 class ExpertBundleBase(BaseModel):
@@ -51,8 +51,8 @@ class ExpertBundleBase(BaseModel):
     icon: str = Field(default="chart", max_length=64, description="Icon identifier for expert card")
     category: str = Field(default="General", max_length=64, description="Domain category")
     when_to_use: str = Field(default="", max_length=500, description="Guidance on when to consult this expert")
-    example_output: str = Field(default="", max_length=1000, description="Sample deliverable or output snippet")
-    description: str = Field(default="", max_length=1000)
+    example_output: str = Field(default="", max_length=4000, description="Sample deliverable or output snippet")
+    description: str = Field(default="", max_length=8000)
     scope_mode: ScopeMode = Field(default="restricted")
     tool_floor_enabled: bool = Field(default=True, description="Whether deliverable tools are kept as additive floor")
     member_skills: list[str] = Field(default_factory=list)

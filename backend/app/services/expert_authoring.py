@@ -35,7 +35,7 @@ class SuggestedNewSkill(BaseModel):
 
     name: str = Field(..., min_length=3, max_length=80, description="kebab-case name of a domain skill that is NOT in the provided available skills")
     description: str = Field(..., min_length=40, max_length=240, description="one line saying what this skill would do")
-    why_needed: str = Field(..., min_length=40, description="why this Expert's blueprint requires it")
+    why_needed: str = Field(..., min_length=40, max_length=2000, description="why this Expert's blueprint requires it")
 from app.services.forced_emit import forced_emit
 
 logger = logging.getLogger(__name__)
@@ -63,8 +63,8 @@ class ExpertDraftOutput(BaseModel):
     icon: str = Field(..., description="Lucide vector glyph name (one of: book, scale, chart, shield, briefcase, truck, terminal, cpu, database, file-text)")
     category: str = Field(..., min_length=3, max_length=60, description="Domain category classification")
     when_to_use: str = Field(..., min_length=40, max_length=240, description="One or two sentences on when and why to summon this expert (max 240 chars — it renders as a one-liner on the Expert card)")
-    example_output: str = Field(..., min_length=120, description="Realistic, concrete sample excerpt of the expert's deliverable")
-    description: str = Field(..., min_length=400, description="COMPREHENSIVE operating blueprint: mandate, methodologies, rubrics, quality standards, procedures (2-3 rich paragraphs)")
+    example_output: str = Field(..., min_length=120, max_length=4000, description="Realistic, concrete sample excerpt of the expert's deliverable")
+    description: str = Field(..., min_length=400, max_length=8000, description="COMPREHENSIVE operating blueprint: mandate, methodologies, rubrics, quality standards, procedures (2-3 rich paragraphs)")
     scope_mode: ScopeMode = Field(default="biased", description="Knowledge composition mode (defaults to biased per D-v4.3-01)")
     tool_floor_enabled: bool = Field(default=True, description="Whether deliverable tools are kept as additive floor")
     prompt_suggestions: list[DraftPromptSuggestion] = Field(..., min_length=3, max_length=3, description="Exactly 3 starter Action Tiles")
