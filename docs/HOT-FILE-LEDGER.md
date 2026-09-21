@@ -10582,6 +10582,7 @@ cells rot within days.
 | File | commits / phases / lines | G-5 | Disposition |
 |---|---|---|---|
 | [`backend/app/services/expert_authoring.py`](docs/HOT-FILE-LEDGER.md#backendappservicesexpert_authoringpy) | 4 / 2 / 389 | no (2 phases) | ⚠ row was STALE at `1/1/233`. honoured by construction (**263-02**): ONE nested model, ONE required field, ONE fallback kwarg. ⛔ the PACK-16 hatch is DELETED, not softened. |
+| [`backend/app/services/skill_body_authoring.py`](docs/HOT-FILE-LEDGER.md#backendappservicesskill_body_authoringpy) | 1 / 1 / 338 | no (new) | young (created 263). Row added AT CREATION — an absent row is invisible to G-5 at any count. ⛔ The ONE home of the borrowed craft doctrine; doctrine inlined here makes it an ENGINE (D-263-13). |
 | [`frontend/src/components/experts/ExpertAuthoringStudio.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertsexpertauthoringstudiotsx) | 1 / 1 / 1082 | no (new) | young (created Phase 261). Row added AT CREATION — leaf component for expert authoring studio and live preview. |
 | [`frontend/src/components/org/OrgAdminShell.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgadminshelltsx) | 3 / 5 / 442 | no | young (created Phase 166). The org-admin shell hosting live tabs (members, audit, settings, invitations, sso, experts). |
 | [`frontend/src/components/org/OrgExpertsTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgexpertstabtsx) | 1 / 1 / 347 | no (new) | young (created Phase 261). Row added AT CREATION — leaf component for org-admin expert listing and management. |
@@ -15571,6 +15572,33 @@ What it owns. Leaf component for rendering the hero visual spotlight card and 3 
 **`0 / 0 / 0`** — created by Phase 260 (`260-02`). **Row added AT CREATION.** Precedent in `CLAUDE.md` is explicit: rows added at creation, since an absent row is invisible to G-5 at any count.
 
 What it owns. Leaf component modal dialog for browsing available domain expert bundles and inviting one to the active thread, triggered from the composer's `+` dropdown menu.
+
+---
+
+## `backend/app/services/skill_body_authoring.py`
+
+**`1 / 1 / 338`** — created by Phase 263 (`263-02`). **Row added AT CREATION**, in the commit that creates the file. Precedent in `CLAUDE.md` is explicit and the reason is structural: an absent row is invisible to G-5 at any count, forever, silently — `App.tsx` went 23 phases like that.
+
+What it owns. The DRIVER that authors a skill's INSTRUCTION BODY for a capability an Expert needs and the library does not have (PACK-15). One `forced_emit` shot on the resolved builder model, emitting the flat two-field `AuthoredSkillBody`.
+
+⛔ **The invariant this file exists to keep: it contributes ZERO authoring doctrine of its own.** PACK-15 asks for *reuse* of `skill-creator`, not a second authoring engine, and D-263-13 is the operator-ratified mechanism: `skill-creator` is reused as **DATA** — its craft block read from `public.skills` **at call time** — never as an engine. Doctrine inlined into this module's source makes it an engine, because the row can then be rewritten by a migration and the module will never notice.
+
+**Why D-263-04's literal wording was not built.** Measured: the row's `instructions` are a seven-step INTERACTIVE HUMAN INTERVIEW LOOP, they name tools a sealed forced-emit shot cannot expose, and step 3 tells the model to call the skill-saving tool — which conflicts with the forced emitter AND with D-263-03. There is no callable `skill-creator` anywhere under `backend/app/`.
+
+**The fences, and the plant that proved one can fire.** `tests/unit/test_263_craft_block_is_read.py` stubs the DB read to `""` and asserts none of the six doctrine tokens survive the composed system prompt; the positive arm (block supplied ⇒ all six present) is what stops it passing by asserting nothing. ⭐ Driven RED at `263-02` by inlining one bullet into `_compose_system_prompt`: `AssertionError: module contributed its own craft doctrine: ['Imperative form']`, then restored md5-identical (`ac1d8d6fee0f8ff42b71f6c487668e1e`). `tests/integration/test_263_craft_block_live_read.py` asks the other half against the real row — an ABSENT row is a HARD FAILURE, never a skip.
+
+⚠ **THE ROW HAS BEEN REWRITTEN FOUR TIMES AND THE PROSE TRAILED IT EVERY TIME.** 087 seeded it; 088, 089 and **093** each perform a full `SET instructions = …` rewrite. `263-RESEARCH.md` quotes 087; `263-CONTEXT.md` corrects that to 089; `263-02-PLAN.md` then wrote "⛔ **NOT 087 and NOT 088**" — and measured at `263-02` the live text is **093**'s, which added a SIXTH craft bullet that CONTEXT's "the five bullets" does not know about. ⛔ **Never transcribe the doctrine from a migration file.** A migration number in prose is a citation nobody re-derives; a `SELECT` is not.
+
+⛔ **`_strip_tool_choreography` is SENTENCE-granular, not line-granular, and that is measured rather than stylistic.** The live fifth bullet is ONE line mixing doctrine with choreography (`Progressive disclosure` sits on the same line as `workspace_write`, `read_skill_file` and `Skills page`), so a whole-line strip cannot satisfy "keeps all six doctrine tokens AND drops all seven tool tokens" at once. The **lead-sentence rule** completes it: when the first sentence carries the choreography the whole line goes, because the remainder is a fragment that has lost its heading — 093's sixth bullet otherwise degrades to a bare *"For PDFs use `reportlab`…"*.
+
+**What it must never become.**
+- **Not a registered tool.** `_TOOL_REGISTRY` stays at 29 (D-263-11). Registering it would let the agent author skill bodies at will — engine surface, not extension surface.
+- **Never a writer.** The row is created by `POST /skills` (D-263-03), which carries the guards. A module that authored AND persisted would be the second engine PACK-15 refuses and would bypass them. A source assertion pins the absence of any write.
+- **No auth of its own** (T-263-09). Plan `263-03` mounts it behind `Depends(require_expert_manage)` and the router-level `require_capability("experts")`.
+
+**D-263-14 — FLAG-01 gates GENERATION only**, and the gate is the FIRST statement, before model resolution and before the DB read, so a disabled platform spends no provider call and no query. ⛔ Proposal *listing* (PACK-14) and manual creation through `SkillFormDialog` stay ungated — a kill-switch that hid the proposals would make PACK-14 invisible rather than safe. ⚠ **Polarity trap for any future test:** `self_improve_enabled()` swallows read failures and returns `True` (default-ON, D-Q4), so a "disabled" case must PATCH THE FUNCTION — simulating a DB blip asserts the opposite of what it looks like it asserts. Refusal is an EXCEPTION, not `None`: `None` already means "the shot ran and produced nothing honest", and a route that cannot tell a refusal from a failure renders a deliberate kill-switch as a malfunction.
+
+⚠ **The honest cost of `strict=False`, recorded rather than glossed:** `forced_emit:490-491` skips the `strict_force` rung whenever `strict is False`, so on a `force_strict`-tier model the ladder is **two rungs, not three**.
 
 ---
 
