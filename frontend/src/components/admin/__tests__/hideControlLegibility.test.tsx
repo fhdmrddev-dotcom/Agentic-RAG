@@ -59,6 +59,13 @@ function makeRow(overrides: Partial<ModelRegistryRow> = {}): ModelRegistryRow {
     max_output_tokens: 128000,
     native_tools: true,
     llm_call_timeout_seconds: 600,
+    // Phase 262 (migration 190): `null` = not asserted, NOT `false`.
+    api_surface: null,
+    reasoning_first: null,
+    reasoning_off: null,
+    uses_max_completion_tokens: null,
+    supports_parallel_tools: null,
+    max_tools: null,
     is_default: false,
     is_locked: false,
     emit_tier: null,

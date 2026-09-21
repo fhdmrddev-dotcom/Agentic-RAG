@@ -40,6 +40,7 @@ self-assessment. Decisions go `--to operator`, never settled agent-to-agent.
 - External integrations / connectors follow the recorded MCP-first verdict — `docs/CONNECTOR-ARCHITECTURE.md` (MCP-first, first-party-thin, broad catalog sequenced with Open Platform; dated re-open trigger inside; pointer entry `D-v3.6-01`). ~~No MCP client exists in the backend today; live outbound egress is Phase 190 (STRETCH).~~
   ⚠ **CORRECTED 2026-09-07 — that sentence was FALSE for thirteen days, and the original is struck through rather than deleted.** Measured: **`backend/app/services/mcp_client.py` is 480 lines across 5 phases**, added at `a1aa25c48` (**Phase 206, 2026-08-25** — *"MCP connector client — workflow-scoped, driven against a real server"*), so it also **FIRES G-5** while ROADMAP Phase 239 still describes it as *"4/2/407 — young, no row owed yet"*. Live outbound egress ships too, guarded by `app.security.egress.validate_mcp_destination` plus per-tool grant enforcement. ⭐ **The retirement itself was done RIGHT and that is the point** — `backend/tests/unit/test_189_no_egress.py`'s Case A source fence was **consciously retired under `D-206-07`**, with the reason written into the test body, exactly as `SEED-177` demanded (*"retire the fence DELIBERATELY, never trip it by surprise"*). **What rotted was the PROSE, not the guard** — the fence, the seed and this bullet are three registers and only one of them was updated. ⚠ ~~`SEED-177` still reads `status: planted`.~~ **CORRECTED 2026-09-13 (Phase 245, D-15) — REFUTED, and the original is struck through rather than deleted, because the sentence before it just fired on itself.** Measured directly: the seed reads **`status: partially-answered`**, and its own frontmatter already records trigger #2 as *"ANSWERED by Phase 206 (2026-08-25)"*. **Both halves were wrong — the status, and the implication that a fired trigger went unhandled.** ⭐ **What rotted was the PROSE in two registers — this bullet and ROADMAP Phase 245's Flags — not the seed**, which is left byte-unchanged. Its remaining arms (#1, #4) are a capability decision, not bookkeeping; trigger: `SEED-013` / Open Platform getting a phase number.
 - **Provider-docs-first (evidence-based):** whenever work touches a specific provider (prompting, orchestration, context management, skill use, tool calls/tool use, streaming, structured output), research that provider's OWN official documentation first, then cross-check against our app's actual behavior with comparative analysis and real evidence (Supabase/DB, backend logs, LangSmith, live cross-provider UAT). Conventions do NOT transfer 1:1 between providers; keep provider-specific handling at the service boundary, never break the shared path. See `.planning/seeds/SEED-034-system-prompt-cross-provider-tool-use.md`.
+- **A model's capabilities are DATA, not code (Phase 262 / migration 190).** `MODEL_CAPABILITIES` in `config.py` is a *seed*, never the only home. **12 of `ModelCapability`'s 15 fields are settable per-model from the Model Registry**, including `api_surface`, `reasoning_first`, `reasoning_off`, `uses_max_completion_tokens`, `supports_parallel_tools` and `max_tools`. ⛔ **Adding a model, or a model QUIRK, must never need a commit.** A new *protocol* still needs an adapter — data selects from behaviours the code knows, it cannot invent one — and that path is the four-part contract in `provider_gateway/dispatcher.py`'s `_SURFACE_ADAPTERS`: adapter + map entry + `config.API_SURFACES` value + migration CHECK literal, **all four or none**, pinned by `test_262_capability_column_pin.py`. ⚠ Provider inference for an id matching none of the ten naming patterns reads the **provider block the operator configured it under**; before 262 it fell to `ollama`, silently disabling tool calling for every id a vendor had not shipped yet.
 - **The Extension Contract (Phase 255 / SEED-291):** *A plugin is DATA, an EXTERNAL PROCESS, or SANDBOXED CODE. Never engine code.* The workflow core (executors, emitters, validators, programmatic functions, tools) is strictly closed and never dynamically registered. Ecosystem extensions ship as skills/workflows (data), MCP servers (external process), or sandbox compute (Docker). Complete contract + worked examples: `docs/EXTENSION-CONTRACT.md`.
 
 ## CLAUDE.md context budget (MANDATORY)
@@ -300,6 +301,27 @@ fresh worktree false-failed every plan:
    **A growing number is still the gate WORKING.** Its contract is *no per-file DECREASE* and
    *zero failing*, never a fixed grand total. Re-derive rather than doubt it:
    `GSD_VITEST_MAX_WORKERS=2 node scripts/vitest-count-gate.cjs`, from the repo root.
+
+   ---
+
+   ### ⚠ CORRECTION 2026-09-21 (Phase 262) — THE SEVENTH ROT, AND IT TOOK FOURTEEN DAYS. Every prior set of figures is preserved above, never overwritten.
+
+   Re-derived on a quiet tree, `GSD_VITEST_MAX_WORKERS=2`, verdict line read **verbatim**:
+
+   ```
+     total 8500  ·  failed 0  ·  pinned total 7746
+   count gate OK — 297/297 pinned files present, no per-file decrease, 0 failing.
+   ```
+
+   | | correction of 2026-09-07 said | **measured 2026-09-21** |
+   |---|---|---|
+   | grand total | 7816 | **8500** |
+   | pinned total | 7020 | **7746** |
+   | pinned files | 241/241 | **297/297** |
+
+   **A growing number is still the gate WORKING** — the contract is *no per-file DECREASE*
+   and *zero failing*, never a fixed grand total. ⚠ **The cap was neither adjusted nor
+   needed, for the FOURTH consecutive close.**
 
    ⚠ **THE CAP WAS NEITHER ADJUSTED NOR NEEDED, for the third consecutive close** — `2`,
    `failed 0` on both invocations. ⚠ And a standing red that is NOT a cap problem and NOT this
@@ -712,7 +734,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/lib/api.ts` | 187 / 110 / 422 | ✅ **SPLIT TAKEN (207)** |
 | `frontend/src/types/index.ts` | 87 / 66 / 1412 | ⚠ row STALE again (`85/65/1380`). honoured by construction (**BUG-260912-01**): ONE optional client-only field, `narrationContent` — no column, because the loop discards this text by design. seam still OWED |
 | `backend/app/main.py` | 83 / 60 / 951 | ⚠ row was STALE by **FOURTEEN PHASES**. honoured by construction (**BUG-260902-06**, Phase 259) |
-| `backend/app/config.py` | 87 / 50 / 1593 | ⚠ STALE a 13th time. honoured by construction (**249-01**): ONE derived frozenset `ROUTING_PROVIDERS` + a Literal widened to the value the code already returned. ⛔ `MODEL_CAPABILITIES` seam OWED |
+| `backend/app/config.py` | 88 / 51 / 1695 | ⚠ STALE a 14th time (`87/50/1593`). **262**: `api_surface` + `API_SURFACES` + `provider_hint`. ⛔ `MODEL_CAPABILITIES` seam STILL OWED — 12 of 15 fields are now DB-settable, the dict is not |
 | `backend/app/api/admin.py` | 38 / 14 / 1968 | honoured by construction (**249-01/03**): the add guard swaps its SOURCE LIST; 3 write seams gain a refusal catch. ⛔ order, 422 shape, every other guard byte-unchanged |
 | `backend/app/api/settings.py` | 41 / 21 / 1048 | honoured by construction (**249-02/03**): ONE `_verified_model_ids` helper, 2 callers; PUT gains a refusal arm → 400. ⛔ the 500 arm for an unreachable DB is unchanged |
 | `backend/app/services/multimodal_service.py` | 14 / 7 / 984 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
@@ -823,6 +845,8 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/provider_gateway/openai_compat.py` | 6 / 4 / 525 | ⚠ **FIRES at 4 phases, absent from BOTH its ENTIRE LIFE — row added 262, which does NOT modify it.** ⛔ the entangled unit (D-04); its 5KB `emit_sse` cadence is what `openai_responses.py` mirrors |
 | `backend/app/services/provider_gateway/dispatcher.py` | 6 / 2 / 153 | ⚠ absent its ENTIRE LIFE — row added 262 at 2 phases, BELOW threshold. The ONE provider→adapter fork; ⛔ `calling_mode` rides ALONGSIDE the stream, never as an event |
 | `backend/app/services/provider_gateway/openai_responses.py` | 0 / 0 / 563 | young (created 262). Row added AT CREATION. ⛔ emits `call_id`, NEVER `item.id` — the other id does not round-trip and round 2 of every multi-tool turn fails |
+| `frontend/src/lib/api/admin.ts` | 5 / 2 / 1098 | ⚠ absent from BOTH registers its ENTIRE LIFE — row added 262 at its 2nd phase. ⛔ `ModelRegistryRow` is OPERATOR-only; the author row is a STANDALONE interface, never a `Pick<>` of it, or an operator field travels to every author |
+| `frontend/src/components/admin/ModelAdvancedCapabilities.tsx` | 0 / 0 / 290 | young (created 262). Row added AT CREATION. ⛔ every control is 3-state: `null` means NOT ASSERTED, never `false` — rendering null as off states a fact nobody measured |
 
 
 When a new phase enters discuss-phase, the orchestrator must scan PLAN.md `files_modified` against this ledger. Any match against a G-5-firing row means the discuss-phase produces a refactor recommendation as the first option, not the planned feature — and the phase reads that file's section in `docs/HOT-FILE-LEDGER.md` before planning, because that is where the named seam and the binding invariants live.

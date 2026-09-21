@@ -2448,7 +2448,16 @@ async def run_agent_loop(
                         # <think>/usage/boundary logic — VERBATIM from the
                         # pre-extraction agent_loop.py:1667-1668. Carried into the
                         # request so the adapter keys on it (byte-identical).
-                        _active_cap = await get_model_capability_async(_model_id) or {}
+                        # ⭐ Phase 262: pass the provider the operator SELECTED as the
+                        # inference hint. Without it a model id matching none of the ten
+                        # naming patterns resolved provider ``ollama`` here, which is not in
+                        # _NATIVE_TOOL_PROVIDERS — so the adapter was handed the wrong
+                        # provider for its <think>/usage/boundary logic AND tool calling was
+                        # silently off. Registered models and pattern-matching ids are
+                        # byte-identical (the hint is read only when nothing matched).
+                        _active_cap = await get_model_capability_async(
+                            _model_id, active_provider_name
+                        ) or {}
                         _adapter_provider = (_active_cap.get("provider") or "unknown").lower()
 
                         # Build the request envelope; the adapter wraps

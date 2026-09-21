@@ -15708,3 +15708,58 @@ afresh. Re-open when a measured multi-tool-turn quality gap justifies the schema
 a non-compliant schema is a REQUEST-time 400, which would turn this upgrade into an outage
 on the forced-emission path. **A row reading `emit_tier: "force_strict"` may therefore be
 served `force` here** — a deliberate, measured downgrade, never an assumed guarantee.
+
+
+## `frontend/src/lib/api/admin.ts`
+
+**Measured 2026-09-21 (Phase 262): `5 commits / 2 phases / 1098 lines`.**
+
+⚠ Absent from both registers for its entire life; the row was added at its second phase,
+deliberately below the G-5 threshold — an absent row is invisible to G-5 at any count.
+
+**What it owns.** The operator-facing Control Room API types, including `ModelRegistryRow`
+(what an operator sees for one model) and `ModelCapabilityPatch` (what a write may carry).
+
+⛔ **`ModelRegistryRow` IS OPERATOR-ONLY, AND THE AUTHOR ROW MUST STAY STANDALONE.** The
+author-facing projection is a separate interface — never a `Pick<ModelRegistryRow, …>`, a
+mapped type, or an `extends`. The operator row carries `deprecated_reason`, documented as
+*"operator context, never shown to end users"*, and a structural allowlist is what stops a
+field added to the operator row later from travelling to every author by inheritance. Phase
+262 added six fields to the operator row and none reached the author row, because the
+backend's `_AUTHOR_ROW_FIELDS` is an explicit tuple and the frontend interface is hand-written.
+**That is the property, and it held by construction rather than by anyone checking.**
+
+⚠ **`null` is NOT `false` on any capability field.** The backend overlays only non-null
+values, so `null` means *"not asserted — the built-in registry or the provider inference
+decides"*. A consumer that renders it as "off" states something about the model that nobody
+established.
+
+---
+
+## `frontend/src/components/admin/ModelAdvancedCapabilities.tsx`
+
+**Created 2026-09-21 (Phase 262): `0 / 0 / 290`. Row added AT CREATION.**
+
+**What it owns.** The operator UI for the six capability fields migration 190 made settable:
+`api_surface`, `reasoning_first`, `reasoning_off`, `uses_max_completion_tokens`,
+`supports_parallel_tools`, `max_tools`.
+
+⛔ **IT IS A SEPARATE FILE BECAUSE `ModelRegistryTab.tsx` IS 1640 LINES AND G-5 FIRING**, and
+because that table is `table-fixed` with every column width allocated — widening it by six
+would wreck every provider section. The tab gained ONE cell and one column header; the panel
+owns its own state and writes through the same `write` callback a Tools toggle uses, so an
+advanced edit takes the identical optimistic/refetch/audit path.
+
+⛔ **EVERY CONTROL IS THREE-STATE. `null` IS NOT `false`.** "Not set" is a real, selectable
+value that clears the override, and clearing sends an explicit `null` — an empty string would
+be stored as one and then fail the SQL CHECK, or pass a looser one and resolve to a surface
+the dispatcher silently ignores.
+
+⭐ **The `unset:` line on each field is the most useful text on the screen and must not be
+dropped as clutter.** Without it "Not set" reads as *"nothing happens"*, when in every case
+something specific happens — and it is usually **a guess derived from the model's NAME**,
+which is exactly the mechanism that silently broke newly released models. The panel says, per
+field, what the system will do anyway.
+
+⚠ `advancedSetCount` counts ASSERTED values, not truthy ones. An explicit `false` is an
+assertion and must count, or a deliberately-disabled capability looks untouched from outside.

@@ -41,6 +41,25 @@ _PROVIDER_BASE_URLS: dict[str, str] = {
 # `frontend/src/components/admin/__tests__/addProviderRoster.lockstep.test.ts` pins the UI to it.
 ROUTING_PROVIDERS: frozenset[str] = frozenset(_PROVIDER_BASE_URLS)
 
+# ⛔ THE CLOSED VOCABULARY OF API SURFACES — the single source of truth (Phase 262).
+#
+# A "surface" is a wire protocol we have an ADAPTER for, not a string an operator may invent.
+# Absent / NULL means ``chat.completions``, which is why it is not listed: it is the default,
+# not a choice. ``"responses"`` means OpenAI ``/v1/responses``, served by
+# ``provider_gateway/openai_responses.py``.
+#
+# ⚠ This is the line that makes the registry extensible WITHOUT making it dishonest. A new
+#   model needs no code. A new model QUIRK needs a column value. A new PROTOCOL needs an
+#   adapter — and adding the value here without the adapter would give the operator a
+#   dropdown option that silently does nothing, because the dispatcher's fork would fall
+#   through to chat.completions with no error. So a value lands here in the SAME commit as
+#   the adapter that serves it.
+#
+# Pinned EQUAL, in both directions, to the SQL CHECK (migration 190), to
+# ``admin._MODEL_CAP_ENUM_COLUMNS["api_surface"]`` and to the surfaces the gateway dispatcher
+# can actually route, by ``test_262_capability_column_pin.py``.
+API_SURFACES: frozenset[str] = frozenset({"responses"})
+
 
 # SEED-173 — providers whose endpoint is supplied by the OPERATOR, not fixed by a vendor.
 # Every one of them has an empty string in _PROVIDER_BASE_URLS above; this table says which
@@ -575,7 +594,25 @@ _INFERRED_DEFAULT_TIMEOUT_S: int = 300
 _WARNED_UNKNOWN_MODEL_IDS: set[str] = set()
 
 
-def _infer_provider_for(model_id: str) -> str:
+def _match_provider_pattern(model_id: str) -> str | None:
+    """The naming-convention half of provider inference. ``None`` when NOTHING matched.
+
+    ⛔ THE ``None`` IS THE WHOLE POINT, and it is why this function was split out of
+    ``_infer_provider_for``. That function answers a *"which bucket"* question and has no way
+    to say *"I do not know"* — it returns ``"ollama"`` for a genuine Ollama model and for a
+    model it has never heard of, and those two cases must be told apart. Conflating them is
+    what silently disabled tool calling for every model whose id does not start with one of
+    ten prefixes.
+    """
+    if not model_id or not str(model_id).strip():
+        return None
+    for pattern, provider in _INFERENCE_PATTERNS:
+        if pattern.search(model_id):
+            return provider
+    return None
+
+
+def _infer_provider_for(model_id: str, provider_hint: str | None = None) -> str:
     """Pure helper: classify a model_id into an inferred provider bucket.
 
     Phase 075.3 D-075.3-06. Boundary cases (None / empty / whitespace) degrade
@@ -583,12 +620,38 @@ def _infer_provider_for(model_id: str) -> str:
     ``backend/app/api/settings.py`` can populate the ``inferred_provider_for``
     dict for the frontend "unverified" tooltip without mirroring the inference
     table client-side (RESEARCH.md §6 Approach b).
+
+    ⭐ ``provider_hint`` (Phase 262) — READ ONLY WHEN NO PATTERN MATCHED, and it closes a
+    hole that was silently costing tool calling on every model this table has not heard of.
+
+    The ten patterns above encode a naming convention, and a naming convention is a guess
+    about the future. A model whose id matches none of them fell to ``"ollama"``, which is
+    NOT in ``_NATIVE_TOOL_PROVIDERS`` — so ``native_tools`` resolved False, the ``tools``
+    param was never sent, the model narrated its tool calls as prose the parser cannot read,
+    and the agent loop ended after one iteration **with no error shown anywhere**. Today
+    ``grok-``, ``mistral-``, ``command-``, ``qwen`` and every id a vendor has not shipped yet
+    all land in that hole.
+
+    ⛔ The hint is NOT a guess — it is the provider the caller already KNOWS, because the
+    operator told it. On the Settings surface it is the provider block the model is
+    configured under; on the request path it is ``active_provider``. **A known fact must
+    outrank a filename pattern's silence.** It stays BELOW the patterns, though: a
+    ``claude-`` id listed by mistake under an OpenAI block is still inferred Anthropic, which
+    is the behaviour that has been correct all along.
+
+    ⛔ An unrecognised hint is IGNORED rather than trusted. Only a member of
+    ``ROUTING_PROVIDERS`` may steer capability resolution — otherwise a typo in a settings
+    row would invent a provider, and ``_INFERRED_DEFAULT_MAX_TOKENS`` /
+    ``_NATIVE_TOOL_PROVIDERS`` would silently miss on it. ``None`` reproduces the old
+    behaviour EXACTLY (default-inert, D-14).
     """
-    if not model_id or not str(model_id).strip():
-        return _INFERENCE_FALLBACK_PROVIDER
-    for pattern, provider in _INFERENCE_PATTERNS:
-        if pattern.search(model_id):
-            return provider
+    matched = _match_provider_pattern(model_id)
+    if matched is not None:
+        return matched
+    if provider_hint:
+        hint = str(provider_hint).strip().lower()
+        if hint in ROUTING_PROVIDERS:
+            return hint
     return _INFERENCE_FALLBACK_PROVIDER
 
 
@@ -640,8 +703,14 @@ def _build_inferred_defaults(model_id: str, provider: str) -> ModelCapability:
     return cap
 
 
-def get_model_capability(model_id: str) -> ModelCapability:
+def get_model_capability(
+    model_id: str, provider_hint: str | None = None
+) -> ModelCapability:
     """Return capability for a ``model_id``.
+
+    ⭐ ``provider_hint`` (Phase 262) is consulted ONLY on a registry MISS, and only when the
+    id matched no naming pattern — see ``_infer_provider_for``. Omitting it reproduces the
+    previous behaviour exactly, so every existing call site is byte-identical (D-14).
 
     Phase 075.3 D-075.3-08: registry hit returns verified caps with
     ``capability_source="registry"``; registry miss falls back to pattern-based
@@ -662,7 +731,7 @@ def get_model_capability(model_id: str) -> ModelCapability:
     # bucket without warning noise (caller likely passed a missing setting).
     if not model_id or not str(model_id).strip():
         return _build_inferred_defaults(model_id or "", _INFERENCE_FALLBACK_PROVIDER)
-    return _build_inferred_defaults(model_id, _infer_provider_for(model_id))
+    return _build_inferred_defaults(model_id, _infer_provider_for(model_id, provider_hint))
 
 
 # ── Phase 066 D-066-03: per-LLM-call timeout resolution ─────────────────
@@ -811,7 +880,9 @@ async def get_per_call_timeout_async(
     return DEFAULT_LLM_CALL_TIMEOUT_SECONDS
 
 
-async def get_model_capability_async(model_id: str) -> "ModelCapability":
+async def get_model_capability_async(
+    model_id: str, provider_hint: str | None = None
+) -> "ModelCapability":
     """Async counterpart of :func:`get_model_capability` with DB tier.
 
     Checks ``model_capabilities_overrides`` first; if a row exists for
@@ -826,6 +897,8 @@ async def get_model_capability_async(model_id: str) -> "ModelCapability":
             # Start from static defaults (if any), then overlay DB values
             base = dict(MODEL_CAPABILITIES.get(model_id, {}))
             if not base:
+                # A DB row always carries its own provider, so the hint is not needed
+                # here — the operator named it explicitly when the row was written.
                 base = dict(_build_inferred_defaults(model_id, db_row.get("provider", _INFERENCE_FALLBACK_PROVIDER)))
             # Overlay non-None DB fields.
             # Phase 196 (AUTH-04 / D-14): ``emit_tier`` joins the copy list, backed by the
@@ -837,9 +910,20 @@ async def get_model_capability_async(model_id: str) -> "ModelCapability":
             # ``get_model_capability("glm-4.7-flash")`` still returns
             # ``capability_source="inferred"`` with NO emit_tier. Any surface that needs a
             # DB-only model's tier must use THIS async path or the registry union payload.
+            # ⭐ Phase 262 (migration 190) — SIX capability fields join the overlay, taking
+            # the registry from 6 of ModelCapability's 15 fields to 12. Before this, a model
+            # needing any of them could not be added from the UI AT ALL: the fact had nowhere
+            # to be data, so it had to be a code branch. That is exactly how the gpt-5.6
+            # family shipped for months with native tool calling silently off.
+            # ⛔ Each name here is backed by a real column in migration 190. A name without a
+            # column overlays NULL forever and reads as "not asserted" (RESEARCH Pitfall 1) —
+            # the list entry and the column ship together or not at all.
             for field in ("llm_call_timeout_seconds", "context_window_tokens",
                           "max_output_tokens", "native_tools", "deprecated",
-                          "emit_tier"):
+                          "emit_tier",
+                          "api_surface", "reasoning_first", "reasoning_off",
+                          "uses_max_completion_tokens", "supports_parallel_tools",
+                          "max_tools"):
                 db_val = db_row.get(field)
                 if db_val is not None:
                     base[field] = db_val
@@ -853,7 +937,10 @@ async def get_model_capability_async(model_id: str) -> "ModelCapability":
             exc_info=True,
         )
 
-    return get_model_capability(model_id)
+    # ⭐ Phase 262: the hint reaches the sync fallback, so a model with NO override row and
+    # an id matching no naming pattern is inferred from the provider the caller knows rather
+    # than dropped into the ``ollama`` bucket (which silently turns tool calling off).
+    return get_model_capability(model_id, provider_hint)
 
 
 # Sub-agent model defaults: cheapest stable model per provider.

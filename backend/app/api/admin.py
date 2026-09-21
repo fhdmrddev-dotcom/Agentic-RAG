@@ -36,6 +36,7 @@ import app.dependencies as deps
 from app.config import (
     _LLM_CALL_TIMEOUT_MAX_S,
     _LLM_CALL_TIMEOUT_MIN_S,
+    API_SURFACES,
     MODEL_CAPABILITIES,
     _infer_provider_for,
     settings,
@@ -148,6 +149,21 @@ _MODEL_CAP_COLUMNS = {
     # path is the correction knob D-14 asks for, and a newly added row can be PATCHed
     # immediately — so nothing is unreachable, and the add path keeps its narrower surface.
     "emit_tier",
+    # ⭐ Phase 262 (migration 190) — the six capability columns that were reachable only
+    # from Python (8 -> 14). The SAME scope line holds: these join the PATCH surface, not
+    # _ADD_MODEL_CAP_COLUMNS, so an added row is corrected immediately afterwards rather
+    # than the add form growing six more fields nobody fills in.
+    #
+    # ⚠ WHY THIS MATTERS AND NOT JUST "more knobs": a model quirk with no column has
+    # nowhere to live but a code branch. `api_surface` is the proof — gpt-5.6 needed a
+    # different endpoint to use tools at all, no field could say so, and the branch that
+    # landed answered the constraint by dropping native tool calling for months.
+    "api_surface",
+    "reasoning_first",
+    "reasoning_off",
+    "uses_max_completion_tokens",
+    "supports_parallel_tools",
+    "max_tools",
 }
 
 # Phase 149 (WR-01): the per-column value-type contract for the PATCH write. A wrong-typed
@@ -160,8 +176,18 @@ _MODEL_CAP_INT_COLUMNS = {
     "llm_call_timeout_seconds",
     "context_window_tokens",
     "max_output_tokens",
+    "max_tools",  # Phase 262
 }
-_MODEL_CAP_BOOL_COLUMNS = {"native_tools", "enabled", "deprecated"}
+_MODEL_CAP_BOOL_COLUMNS = {
+    "native_tools",
+    "enabled",
+    "deprecated",
+    # Phase 262 — each must be declared here or a wrong-typed value reaches asyncpg and
+    # returns a 500 instead of the 422 this guard exists to produce.
+    "reasoning_first",
+    "uses_max_completion_tokens",
+    "supports_parallel_tools",
+}
 
 # Phase 196 (AUTH-04 / T-196-IV2): the per-column CLOSED VOCABULARY for enum columns —
 # LAYER 3 of the A7 three-layer pin. The other two layers are the SQL CHECK
@@ -175,6 +201,14 @@ _MODEL_CAP_BOOL_COLUMNS = {"native_tools", "enabled", "deprecated"}
 # succeeds, and the run silently degrades to best-effort. Drift here is not loud.
 _MODEL_CAP_ENUM_COLUMNS = {
     "emit_tier": {"force_strict", "force", "coerce"},
+    # ⭐ Phase 262. ``api_surface`` is DERIVED from config.API_SURFACES rather than retyped,
+    # because this is the layer that most easily drifts: a hand-copied literal set here that
+    # accepts a surface the dispatcher cannot route produces NO error at all — the fork falls
+    # through to chat.completions and the operator's setting is silently ignored. Deriving it
+    # makes that particular drift impossible; the pin test still asserts the SQL CHECK and
+    # the dispatcher agree, which deriving cannot.
+    "api_surface": set(API_SURFACES),
+    "reasoning_off": {"thinking_disabled", "effort_none"},
 }
 
 # Phase 196 (T-196-IV2b — SEED-172 finding 3, folded by operator ratification): per-column
@@ -194,6 +228,11 @@ _MODEL_CAP_INT_BOUNDS: dict[str, tuple[int, int]] = {
     "llm_call_timeout_seconds": (_LLM_CALL_TIMEOUT_MIN_S, _LLM_CALL_TIMEOUT_MAX_S),
     "context_window_tokens": (1, 10_000_000),
     "max_output_tokens": (1, 1_000_000),
+    # Phase 262. A soft ceiling on how many tool schemas are offered. ⛔ The floor is 1, not
+    # 0: a `0` would silently offer NO tools and read as a capability setting rather than as
+    # the total disablement it is — `native_tools: false` is the control for that, and it says
+    # so on screen. The SQL CHECK (migration 190) carries the same `> 0`.
+    "max_tools": (1, 512),
 }
 
 # The single load-bearing security line: default-deny at the router (Pattern 1).

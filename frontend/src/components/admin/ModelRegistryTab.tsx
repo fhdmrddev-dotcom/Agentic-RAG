@@ -36,6 +36,7 @@ import { ApiError, type AddModelBody, type ModelCapabilityPatch, type ModelRegis
 import { familyDefaults } from "@/lib/model-defaults"
 import { providerLogo } from "@/lib/providerLogo"
 import { cn } from "@/lib/utils"
+import { ModelAdvancedCapabilities } from "@/components/admin/ModelAdvancedCapabilities"
 
 interface ModelRegistryTabProps {
   /** Every registry row the shell fetched; `null` while the fetch is in flight. */
@@ -311,11 +312,18 @@ export function ModelRegistryTab({
                           </span>
                         </span>
                       </Th>
+                      {/* ⭐ Phase 262. Six capability fields became settable with migration 190;
+                          they live behind ONE cell rather than six columns because this table is
+                          `table-fixed` with every width allocated, and because this file is
+                          1640 lines and G-5 firing. Width taken from the actions column. */}
+                      <Th className="w-[8%]">
+                        Advanced {showTechnical && <TechName>api_surface …</TechName>}
+                      </Th>
                       <Th className="w-[6%]">
                         Enabled {showTechnical && <TechName>enabled</TechName>}
                       </Th>
                       <Th className="w-[9%]">Users see</Th>
-                      <Th className="w-[13%]" aria-label="Row actions" />
+                      <Th className="w-[5%]" aria-label="Row actions" />
                     </tr>
                   </thead>
                   <tbody>
@@ -514,6 +522,19 @@ function ModelRow({
             row={row}
             busy={busy}
             overridden={overridden.has("emit_tier")}
+            showTechnical={showTechnical}
+            onWrite={write}
+          />
+        </td>
+
+        {/* ⭐ Phase 262 — the six capability fields that used to be reachable only from
+            Python. ONE mount, no new branch in this component: the panel owns its own state
+            and writes through the SAME `write` the rest of the row uses, so an advanced edit
+            gets the identical optimistic/refetch/audit path as a Tools toggle. */}
+        <td className="border-t border-border/40 px-3 py-2 align-middle">
+          <ModelAdvancedCapabilities
+            row={row}
+            busy={busy}
             showTechnical={showTechnical}
             onWrite={write}
           />

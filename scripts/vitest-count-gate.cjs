@@ -5568,6 +5568,12 @@ const TARGETS = [
   "src/components/admin/__tests__/ModelRegistryTab.test.tsx",
   "src/components/admin/__tests__/addProviderRoster.lockstep.test.ts",
   "src/components/admin/__tests__/hideControlLegibility.test.tsx",
+  // ── Phase 262 ─────────────────────────────────────────────────────────────────────
+  // ⚠ NAMED, for the same reason the three above are: `src/components/admin/` has NO bare
+  // directory entry, so a suite added under it and not listed here RUNS NOWHERE and its
+  // assertions can never fail. That trap has now fired four times in this directory alone
+  // (AdminSpendPage, RunCostBadge, apportion100, WorkflowScheduleModal one dir over).
+  "src/components/admin/__tests__/ModelAdvancedCapabilities.test.tsx",
   // ── Phase 249 Plan 02 (MODEL-05) ──────────────────────────────────────────────────
   // ⚠ `src/components/chat` has NO bare-directory entry (BUG-260912-01 recorded the same
   // thing), so this suite must be named or it never executes under the gate.

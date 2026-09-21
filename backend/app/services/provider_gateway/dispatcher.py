@@ -84,6 +84,50 @@ class GatewayRequest:
     strict_schema: bool = False
 
 
+# ⭐ THE EXTENSION CONTRACT FOR WIRE PROTOCOLS, made literal (Phase 262).
+#
+# ``resolve_api_surface`` answers WHICH protocol a model speaks; this map says WHO serves it.
+# Supporting a new one is therefore four things, none of them a new branch in routing logic:
+#
+#   1. write the adapter (canonical ``GatewayEvent`` out, ``(stream, calling_mode)`` back)
+#   2. add its entry here
+#   3. add its name to ``config.API_SURFACES``
+#   4. add its literal to the migration-190 CHECK
+#
+# ⛔ ALL FOUR OR NONE. A vocabulary value with no entry here is a dropdown option that does
+#   nothing — ``resolve_api_surface`` returns it, this lookup misses, and without the guard
+#   below the request would fall through to chat.completions in SILENCE. That is precisely
+#   the failure mode migration 120 recorded for ``emit_tier``, and
+#   ``test_262_capability_column_pin.py`` asserts the four layers equal in both directions.
+#
+# ⚠ A model WITHOUT a surface never reaches this map at all — the caller checks for ``None``
+#   first — so chat.completions stays the default by absence, not by an entry. Adding
+#   "chat_completions" here as a fifth value would make the default a choice, and every
+#   pre-262 row would then have to assert it.
+_SURFACE_ADAPTERS: dict[str, str] = {
+    "responses": "openai_responses",
+}
+
+
+def _open_surface_stream(surface: str, request: "GatewayRequest"):
+    """Dispatch to the adapter serving ``surface``. Lazy-imports it, as every branch here does.
+
+    ⛔ RAISES on an unknown surface rather than falling back. A silent fallback would let an
+    operator set a surface, see the write succeed, and get chat.completions anyway with
+    nothing anywhere saying so — the exact silence this project keeps paying for.
+    """
+    module_name = _SURFACE_ADAPTERS.get(surface)
+    if module_name is None:
+        raise ValueError(
+            f"No gateway adapter is registered for api_surface {surface!r}. "
+            f"Known surfaces: {sorted(_SURFACE_ADAPTERS)}."
+        )
+    from importlib import import_module
+
+    module = import_module(f".{module_name}", __package__)
+    return getattr(module, f"open_{module_name}_stream")(request)
+
+
 async def open_stream(
     provider: str,
     request: GatewayRequest,
@@ -136,17 +180,16 @@ async def open_stream(
         # the compat adapter and keep the STRUCTURED downgrade, which is still correct for
         # them. A model with no ``api_surface`` row is byte-identical to today (D-14).
         from app.config import settings as _settings
-        from app.services.openai_service import uses_responses_api
+        from app.services.openai_service import resolve_api_surface
 
         _effective_model = (
             request.model
             or (request.user_settings.llm_model if request.user_settings else None)
             or _settings.llm_model
         )
-        if uses_responses_api(_effective_model, request.user_settings):
-            from .openai_responses import open_openai_responses_stream
-
-            return open_openai_responses_stream(request)
+        _surface = resolve_api_surface(_effective_model, request.user_settings)
+        if _surface is not None:
+            return _open_surface_stream(_surface, request)
 
         from .openai_compat import open_openai_compat_stream
 
