@@ -8,14 +8,26 @@ import asyncpg
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile, status
 
 from app.dependencies import _has_org_permission, get_active_org_id, get_current_user, get_pg_pool
-from app.models.expert import ExpertBundleCreate, ExpertBundleUpdate, ExpertGrant, ExpertGrantCreate
+from app.models.expert import (
+    ExpertBundleCreate,
+    ExpertBundleUpdate,
+    ExpertGrant,
+    ExpertGrantCreate,
+    SkillBodyDraftRequest,
+)
 from app.services.entitlement_service import require_capability
 from app.services.expert_authoring import ExpertDraftOutput, generate_expert_draft
+from app.services.skill_body_authoring import (
+    AuthoredSkillBody,
+    SkillBodyAuthoringDisabled,
+    author_skill_body,
+)
 from app.services.expert_service import (
     ResolvedExpertBundle,
     add_expert_grant_service,
     create_expert_service,
     delete_expert_service,
+    filter_visible_skill_names,
     get_expert_grants_service,
     get_expert_service,
     list_experts_service,
@@ -37,6 +49,63 @@ def _to_uuid(val: Any) -> UUID:
     if isinstance(val, UUID):
         return val
     return UUID(str(val))
+
+
+async def _refuse_unknown_member_skills(
+    pool: asyncpg.Pool,
+    member_skills: list[str] | None,
+    org_id: UUID,
+    user_id: UUID,
+    bundle_id: UUID | None,
+) -> None:
+    """Refuse a save whose ``member_skills`` names a capability the author cannot resolve.
+
+    PACK-16 / D-263-09 / D-263-10. The UI's disabled Save is the courteous half; THIS is the
+    fence. A stale client or a direct API call walks straight past a UI-only check, which is
+    this project's recurring "a green fence coexisting with the shipped defect" shape.
+
+    ⛔ ``member_skills is None`` RETURNS IMMEDIATELY, and that is not defensive coding. On
+    ``PATCH`` a missing field means "not being changed"; collapsing ``None`` into ``[]`` would
+    run the check against an empty list on every unrelated rename.
+
+    ⛔ It does NOT reuse ``resolve_expert_bundle``: that resolves an EXISTING bundle by id, and
+    at ``POST`` time no bundle exists yet. ``filter_visible_skill_names`` (263-01) is the one
+    shared predicate precisely so this call site and phase 2 of the resolver cannot drift.
+
+    ⚠ ``unknown`` is derived by SUBTRACTION from the caller's own input (T-263-15) — the payload
+    echoes back only names the caller already submitted and never enumerates the library.
+    """
+    if member_skills is None or not member_skills:
+        return
+
+    visible = await filter_visible_skill_names(
+        pool,
+        skill_names=member_skills,
+        caller_org_id=org_id,
+        caller_user_id=user_id,
+        bundle_id=bundle_id,
+    )
+    unknown = [name for name in member_skills if name not in visible]
+    if not unknown:
+        return
+
+    names = ", ".join(unknown)
+    raise HTTPException(
+        # ⚠ FastAPI reserves 422 for its own RequestValidationError, whose detail is a LIST.
+        # Ours is a DICT and the client discriminates on ``detail.error`` — never on the bare
+        # status, which would swallow a genuine Pydantic failure into the wrong error type.
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        detail={
+            # ⭐ The "detail" key INSIDE detail is load-bearing, not decorative: the frontend's
+            # handleResponse reads exactly ``err.detail?.detail`` for its message.
+            "detail": (
+                f"{len(unknown)} of this Expert's capabilities do not exist in your library: "
+                f"{names}."
+            ),
+            "error": "expert_member_skills_unknown",
+            "unknown_skills": unknown,
+        },
+    )
 
 
 async def require_expert_manage(
@@ -70,6 +139,20 @@ async def create_expert(
     """
     org_id = _to_uuid(active_org)
     user_id = _to_uuid(current_user["id"] if isinstance(current_user, dict) else getattr(current_user, "id"))
+    # ⛔ ABOVE the `try:` on purpose (T-263-17). HTTPException subclasses Exception, so a 422
+    # raised inside it is caught below, logged as an error and re-raised as a 400 whose detail
+    # is the stringified exception — D-263-10's named refusal silently destroyed. The placement
+    # is asserted mechanically by test_263_expert_save_refuses_unknown_skills.py and was driven
+    # RED by moving this call one line down.
+    await _refuse_unknown_member_skills(
+        pool=pool,
+        member_skills=payload.member_skills,
+        org_id=org_id,
+        user_id=user_id,
+        # No bundle exists yet at save time. ⛔ Never `bundle_id=<anything>` here: 263-01's
+        # born-for arm is disabled by exactly this None.
+        bundle_id=None,
+    )
     try:
         return await create_expert_service(
             pool=pool,
@@ -184,6 +267,75 @@ async def draft_expert(
         available_connections=available_connections,
         user_settings=user_settings,
     )
+
+
+@router.post("/draft-skill-body", status_code=status.HTTP_200_OK, response_model=AuthoredSkillBody)
+async def draft_skill_body(
+    payload: SkillBodyDraftRequest,
+    active_org: str = Depends(get_active_org_id),
+    # ⛔ POSITIONAL-OR-KEYWORD, and there is NO bare `*` anywhere in this signature. That is not
+    # a style choice: test_261_single_expert_authoring_gate walks `fn_node.args.defaults`, which
+    # does NOT contain keyword-only defaults — a guard after a `*` lands in `kw_defaults`, the
+    # fence reads this route as UNPROTECTED, and the gate goes RED on correctly-guarded code.
+    current_user: dict[str, Any] = Depends(require_expert_manage),
+    pool: asyncpg.Pool = Depends(get_pg_pool),
+) -> AuthoredSkillBody:
+    """Author ONE proposed skill's instruction body (PACK-15 / D-263-13 / D-263-15).
+
+    This route is the whole auth story for ``author_skill_body``, which carries none of its own
+    (T-263-09): the router-level ``require_capability("experts")`` plus ``require_expert_manage``
+    here, and FLAG-01 inside the service.
+
+    ⛔ It NEVER persists a skill. The row is created by the existing ``POST /skills`` (D-263-03),
+    which carries the write guards; a path that both authored AND persisted would be the second
+    engine PACK-15 refuses and would bypass them.
+    """
+    user_id = _to_uuid(current_user["id"] if isinstance(current_user, dict) else getattr(current_user, "id"))
+    # Loaded in the ROUTE, not the service — the same shape as draft_expert, so provider
+    # credential resolution has exactly one home per surface.
+    from app.models.user_settings import load_user_settings  # noqa: PLC0415
+    try:
+        user_settings = load_user_settings(user_id)
+    except Exception as exc:
+        logger.warning("Could not load user_settings for %s: %s", user_id, exc)
+        user_settings = None
+
+    try:
+        authored = await author_skill_body(
+            pool,
+            skill_name=payload.skill_name,
+            skill_description=payload.skill_description,
+            why_needed=payload.why_needed,
+            expert_name=payload.expert_name,
+            expert_description=payload.expert_description,
+            user_settings=user_settings,
+        )
+    except SkillBodyAuthoringDisabled as exc:
+        # ⛔ A REFUSAL, not a failure — and it must NOT share a status code with the arm below.
+        # D-263-14 gates only GENERATION, so the UI has to be able to say "your operator turned
+        # drafting off, write it by hand" rather than "something broke, try again later".
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "detail": str(exc),
+                "error": "self_improve_disabled",
+            },
+        ) from exc
+
+    if authored is None:
+        # An honest failure. ⛔ Never a fabricated body: a plausible-looking instruction set
+        # nobody authored is worse than an error, because nothing downstream can tell.
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "detail": (
+                    "Could not draft instructions for this skill right now. You can still "
+                    "create it and write the instructions yourself."
+                ),
+                "error": "skill_body_unavailable",
+            },
+        )
+    return authored
 
 
 @router.get("", status_code=status.HTTP_200_OK)
@@ -302,6 +454,16 @@ async def update_expert(
     """Update a tenant expert bundle. Refuses modifying system templates or foreign bundles."""
     org_id = _to_uuid(active_org)
     user_id = _to_uuid(current_user["id"] if isinstance(current_user, dict) else getattr(current_user, "id"))
+    # Same rule, same home. ⚠ This endpoint has NO try/except, so a 422 propagates cleanly —
+    # copy the PLACEMENT from create_expert, not its structure. `bundle_id` is the path id so a
+    # skill born FOR this bundle (263-01's third disjunct) resolves rather than being refused.
+    await _refuse_unknown_member_skills(
+        pool=pool,
+        member_skills=payload.member_skills,
+        org_id=org_id,
+        user_id=user_id,
+        bundle_id=bundle_id,
+    )
     updated = await update_expert_service(
         pool=pool,
         bundle_id=bundle_id,

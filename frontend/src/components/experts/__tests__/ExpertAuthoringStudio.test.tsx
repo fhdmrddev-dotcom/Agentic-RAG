@@ -106,6 +106,11 @@ describe("ExpertAuthoringStudio (Phase 261 / PACK-07 / PACK-09 / PACK-10)", () =
         { title: "Tax Exposure", prompt: "Identify tax exposures" },
       ],
       tool_floor_enabled: true,
+      // Phase 263 (263-02): REQUIRED on ExpertDraftOutput now, and may be empty. ⚠ A mock
+      // omitting it does NOT surface as a ValidationError on the server path — the drafter
+      // builds ExpertDraftOutput(**emitted) inside a try whose except falls to the fallback,
+      // so what goes red is an unrelated *name* assertion. Here it is a plain TS2741.
+      suggested_new_skills: [],
     }
     vi.mocked(draftExpert).mockResolvedValue(mockDraft)
 

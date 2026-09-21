@@ -30,6 +30,21 @@ class ExpertGrant(ExpertGrantBase):
     created_at: datetime
 
 
+class SkillBodyDraftRequest(BaseModel):
+    """The brief for ONE proposed skill, sent to POST /experts/draft-skill-body (PACK-15).
+
+    ⛔ Every field is author-supplied text that is spliced into a provider prompt. The
+    anti-injection boundary is the service's job (``SKILL_BODY_BRIEF_DELIMITER`` quotes the whole
+    block as DATA); this model's job is only to make the shape explicit and typed at the wire.
+    """
+
+    skill_name: str = Field(..., min_length=1, max_length=120)
+    skill_description: str = Field(..., max_length=1000)
+    why_needed: str = Field(default="", max_length=2000, description="Why the Expert needs it")
+    expert_name: str = Field(default="", max_length=120)
+    expert_description: str = Field(default="", max_length=1000)
+
+
 class ExpertBundleBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=120)
     slug: str = Field(..., min_length=1, max_length=120)
