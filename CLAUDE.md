@@ -809,10 +809,10 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/forced_emit.py` | 10 / 6 / 705 | ⚠ **FIRES, absent from BOTH registers its ENTIRE LIFE at 5 phases — row added 256-04, in its FIRST edit's commit.** ⛔ accumulators init `None` never `0`, ABOVE the rung loop so a FAILED rung counts |
 | `backend/app/db/entitlements.py` | 2 / 1 / 169 | young (created 258). Row added AT CREATION — an absent row is invisible to G-5 at any count |
 | `backend/app/services/entitlement_service.py` | 2 / 1 / 130 | young (created 258). Row added AT CREATION. Single commercial boundary home (TIER-01/04) |
-| `backend/app/db/experts.py` | 1 / 1 / 265 | young (created 259). Row added AT CREATION — absent row is invisible to G-5 (PACK-01) |
+| `backend/app/db/experts.py` | 4 / 3 / 567 | ⚠ **NOW FIRES at 3 phases and the row read `1/1/265` / `young`** — it crossed the threshold in the commit recording it. honoured by construction (**263-01**): ONE new UPDATE; ⛔ no existing query touched |
 | `backend/app/models/expert.py` | 1 / 1 / 52 | young (created 259). Row added AT CREATION — Pydantic domain models for expert bundles |
-| `backend/app/services/expert_service.py` | 5 / 3 / 378 | ⛔ **NOW FIRES at 3 phases and the row read `2/1/274` / `young`** — re-derived 263 planning. D-263-06 adds ONE disjunct to the phase-2 predicate; ⛔ the `org_id` fence is UNTOUCHED, so PACK-17 is still driven independently |
-| `backend/app/api/experts.py` | 1 / 1 / 175 | young (created 259). Row added AT CREATION — REST router with require_capability('experts') (PACK-06) |
+| `backend/app/services/expert_service.py` | 6 / 4 / 507 | ⚠ row STALE a 2nd time (`5/3/378`), one week on. honoured by construction (**263-01**): ONE disjunct INSIDE the existing inner parenthesis + one SELECT column. ⛔ its section's `migration 190` cite is WRONG — it is 191 |
+| `backend/app/api/experts.py` | 6 / 3 / 398 | ⚠ **NOW FIRES at 3 phases and the row read `1/1/175` / `young`**. ⛔ NOT in 263-01's `files_modified` — edited as a Rule-3 deviation, so the gate could not have asked. ONE optional kwarg + an extraction line used at 5 sites |
 | `frontend/src/components/chat/ActiveExpertChip.tsx` | 0 / 0 / 0 | young (created 260). Row added AT CREATION — active consultant chip in composer (PACK-02) |
 | `frontend/src/components/chat/ExpertSpotlightCard.tsx` | 0 / 0 / 0 | young (created 260). Row added AT CREATION — spotlight card and action tiles (PACK-03) |
 | `frontend/src/components/chat/InviteExpertDialog.tsx` | 0 / 0 / 0 | young (created 260). Row added AT CREATION — expert invitation modal dialog (PACK-02) |
