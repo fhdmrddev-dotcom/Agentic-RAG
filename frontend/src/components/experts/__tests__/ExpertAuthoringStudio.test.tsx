@@ -350,7 +350,10 @@ describe("ExpertAuthoringStudio — proposed capabilities (263-04 / sketch 263-A
   it("keeps the solid ⚡ library rail beside it, under its own In your library heading", async () => {
     await renderAndDraft(mkDraft({ member_skills: ["ratio_calculator"] }))
 
-    expect(screen.getByText(/In your library/i)).toBeInTheDocument()
+    // ⭐ CONTENT: the heading vouches for a COUNT, so assert the words that carry it —
+    // "In your library" alone would still read true over a phantom pill.
+    const libraryHeading = screen.getAllByText(/In your library/i)[0]
+    expect(libraryHeading).toHaveTextContent(/1 skill this Expert can actually use/i)
     expect(screen.getByText(/⚡ ratio_calculator/)).toBeInTheDocument()
   })
 
