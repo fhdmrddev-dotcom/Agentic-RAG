@@ -306,7 +306,12 @@ over an empty shelf.
   4. A skill authored for one org is **never** visible or resolvable to another, driven against a
      cross-org caller the way `PACK-04` drove the member check (PACK-17).
 
-**Plans**: TBD
+**Plans**: 4 plans (4 waves — a strict dependency chain; wave 1 runs ALONE and is DB-mutating)
+Plans:
+- [ ] 263-01-PLAN.md — Migration 191, the provenance arm, the save-path stamp, PACK-17 driven
+- [ ] 263-02-PLAN.md — The draft names what does not exist; the body-authoring driver + Fence 1
+- [ ] 263-03-PLAN.md — The save-time 422, the draft-skill-body route, the closed-core proof
+- [ ] 263-04-PLAN.md — Variant A in the studio, and the G-4 UAT board
 **Flags**: ⛔ **THIS PHASE EXISTS BECAUSE THE FEATURE WAS MEASURED HOLLOW.** `BUG-260921-01`, driven
 live in Chrome on 2026-09-21: the drafter produced a 2163-char operating blueprint for a doctoral
 literature reviewer and gave it **`docx`, `xlsx`, `pptx`**. `SELECT count(*) FROM public.skills` =
