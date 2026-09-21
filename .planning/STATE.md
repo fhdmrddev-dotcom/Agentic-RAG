@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v4.3
 milestone_name: What You Can Actually Sell
 status: executing
-last_updated: "2026-09-21T16:56:34.336Z"
-last_activity: 2026-09-21 -- Phase 263 planning complete
+last_updated: "2026-09-22T00:00:00.000Z"
+last_activity: 2026-09-22 -- Phase 263 executed end to end; 9/9 UAT rows driven live
 progress:
   total_phases: 16
-  completed_phases: 7
+  completed_phases: 8
   total_plans: 30
-  completed_plans: 26
-  percent: 44
+  completed_plans: 30
+  percent: 50
 ---
 
 # Project State
@@ -34,16 +34,62 @@ See: `.planning/PROJECT.md` (updated 2026-09-18)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 261 (An Expert You Can Author) COMPLETE — ready for reviewer post-phase verification.
+**Current focus:** Phase 263 (An Expert Can Be Given Its Capabilities) COMPLETE — 4/4 plans, all 9 G-4 UAT rows driven live. Ready for reviewer post-phase verification.
 
 ---
 
 ## Current Position
 
-Phase: 261 (an-expert-you-can-author)
-Plan: 5 of 5 COMPLETE (Phase 261 fully executed and verified)
-Status: Ready to execute
-Last activity: 2026-09-21 -- Phase 263 planning complete
+Phase: 263 (an-expert-can-be-given-its-capabilities)
+Plan: 4 of 4 COMPLETE — executed, merged, and UAT-driven
+Status: Complete; awaiting independent review
+Last activity: 2026-09-22 -- Phase 263 executed end to end; 9/9 UAT rows driven live
+
+### ⭐ PHASE 263 CLOSED — 2026-09-22 (executed 2026-09-21/22)
+
+**4 plans, 4 waves, each in an isolated worktree, merged in order.** An Expert can now be given
+capabilities that do not exist yet: the drafter NAMES them, a human approves each one through the
+SkillFormDialog that already existed, and a skill authored for an Expert resolves through that
+Expert for every member of the org.
+
+**Gates at close** — ledger `exit 0` (263-04 closed the last `[no-row]`), CLAUDE.md size `exit 0`,
+seeds register `exit 0`, G-7 `exit 0`. vitest `8523 · failed 0 · pinned 7746 · 298/298`.
+Backend `71 failed` — exactly the ceiling, set-diffed both directions at every wave.
+
+⛔ **THE UAT FOUND A BLOCKING DEFECT THAT EVERY GREEN GATE MISSED — `BUG-260921-02`.**
+`ExpertDraftOutput.description` had `min_length=400` and **no maximum**; the drafter wrote **4,833
+chars**; both consumers capped at **1,000**. So `POST /experts` AND `POST /experts/draft-skill-body`
+each returned 422, and **the app refused to save the Expert its own AI had just written** — on the
+FIRST fresh Expert authored, the default path. ⭐ **The codebase already held the evidence and never
+connected it:** `expert_authoring.py`'s own docstring records *"description came back 293 chars on
+one run and 2163 on another"*. Backend suites built the consumer from short fixtures; frontend
+suites mocked `@/lib/api/experts`, so no payload ever met a Pydantic model. **Producer and consumer
+were each correct in isolation and nobody compared their CONSTRAINTS** — a cross-plan SEAM, 263-02
+owning one side and 263-03 the other. Fixed at `7a04e944e` with a fence that asserts the
+RELATIONSHIP (`test_263_drafter_output_fits_its_consumers.py`, driven RED at 4 pairs first), so
+widening a cap stays green and re-introducing an unbounded producer goes red.
+
+**UAT: 9/9 rows DRIVEN, not owed** (`263-UAT.md`). R-3 failed before the fix and passes after.
+R-6 returned **422, not 400** — the check is outside `create_expert`'s try, exactly as planted.
+R-7's five arms all hold, including cross-org `[]`. R-9 scored **8/8 providers** on a roster
+DERIVED from `MODEL_CAPABILITIES`; moonshot, the only `emit_tier=coerce` row, was slowest on both runs.
+
+⚠ **R-8 FINDING, behaviour correct / copy wrong:** the Control Room card claims *"No new skills can
+be saved until this is back on."* Manual `POST /skills` returns **201** while FLAG-01 is off, and the
+API's own 409 says *"The skill can still be created and written by hand."* The consequence line
+overstates the kill switch. Not fixed — logged.
+
+⚠ **Two backend tests were observed NON-DETERMINISTIC and are in no register:**
+`test_email_ingestion.py::test_ingest_email_populates_metadata_and_attachments` (red once at a
+wave-3 base, absent from three of my full-run sets, 3/3 green in isolation) and
+`test_261_expert_authoring.py::test_expert_draft_without_files` (red once in a full run; it drives a
+LIVE provider and asserts the model chose `tool_floor_enabled is True`; 5/5 green in isolation at
+BOTH the pre-fix and post-fix models, so it is not attributable to the cap change).
+
+⚠ **Data left in the operator's org deliberately:** the Expert *Doctoral Systematic Literature
+Review Methodologist* and the skill `search-strategy-builder` — they ARE R-1's bar and R-7's
+evidence. Everything else created during UAT was deleted and verified gone; the self-improvement
+kill switch was restored and re-read as `True`.
 
 ### ⭐ PLAN 261-01 EXECUTED — 2026-09-20
 
