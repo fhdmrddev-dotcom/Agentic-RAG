@@ -21,6 +21,21 @@ class DraftPromptSuggestion(BaseModel):
 
     title: str = Field(..., min_length=3, max_length=60, description="Crisp action-oriented button label")
     prompt: str = Field(..., min_length=150, description="Detailed multi-sentence starter prompt (2-3 sentences minimum)")
+
+
+class SuggestedNewSkill(BaseModel):
+    """Phase 263 (PACK-14 / D-263-02) — a domain skill the library does NOT have yet.
+
+    Mirrors ``DraftPromptSuggestion``'s reasoning, not just its shape: this is a DRAFT-only
+    model, deliberately NOT a persisted read shape. A proposal is CREATED here and then
+    handed to the existing ``POST /skills`` write path (D-263-03), so the floors belong
+    where the content is GENERATED — tightening a persisted model would make an older thin
+    row unreadable, which is the mistake BUG-260921-01a already paid for once.
+    """
+
+    name: str = Field(..., min_length=3, max_length=80, description="kebab-case name of a domain skill that is NOT in the provided available skills")
+    description: str = Field(..., min_length=40, max_length=240, description="one line saying what this skill would do")
+    why_needed: str = Field(..., min_length=40, description="why this Expert's blueprint requires it")
 from app.services.forced_emit import forced_emit
 
 logger = logging.getLogger(__name__)
@@ -56,6 +71,18 @@ class ExpertDraftOutput(BaseModel):
     member_skills: list[str] = Field(..., description="Skill names selected from the provided available skills (may be empty when none match)")
     knowledge_folder_ids: list[UUID] = Field(..., description="Folder UUIDs selected from the provided available folders (may be empty)")
     required_connections: list[str] = Field(..., description="Connection slugs selected from the provided available connections (may be empty)")
+    suggested_new_skills: list[SuggestedNewSkill] = Field(..., min_length=0, description="Domain skills this Expert needs that do NOT exist in the provided available skills. An EMPTY list is a real answer.")
+    # Phase 263 (D-263-02): REQUIRED, never ``Field(default=[])``. A default is the exact
+    # shape 757bb9e25 had to undo — with one, a model returning nothing validates perfectly
+    # and richness becomes a lottery. ``min_length=0`` enforces NOTHING; it is kept for what
+    # it DOCUMENTS ("empty is a real answer"), not for what it checks.
+    #
+    # ⚠ THE SAFETY ARGUMENT IS THINNER THAN CONTEXT.md IMPLIES, and it is recorded here
+    # rather than repeated in its stronger form. ``generate_expert_draft`` passes
+    # ``strict=False``, and ``forced_emit:490-491`` SKIPS the ``strict_force`` rung whenever
+    # ``strict is False``. So on a ``force_strict``-tier model the recovery ladder is TWO
+    # rungs, not three: a required field gets exactly ONE retry before the honest floor.
+    # ``_generate_fallback_draft`` is that floor, which is why it constructs this field too.
 
 
 def _flatten_nullable(node: Any) -> Any:
@@ -107,9 +134,10 @@ When drafting an Expert from the user's high-level goal, you must synthesize and
    - 'prompt': A detailed, multi-sentence starter prompt template (2-3 sentences) instructing the expert on how to execute that action with maximum academic/professional rigor.
 9. 'scope_mode': MUST be 'biased' (Union Scope) as the universal platform default. Never use 'restricted' unless the user prompt specifically commands strict isolation.
 10. 'tool_floor_enabled': Set to true so deliverable tools (code execution, file writing, template rendering) are active.
-11. 'member_skills': Select all matching skill names from the provided available skills, or include 3-5 recommended domain skill names.
+11. 'member_skills': Select all matching skill names from the provided available skills. ONLY names that appear verbatim in that list — never invent one.
 12. 'knowledge_folder_ids': Select relevant folder UUIDs from the provided available knowledge folders that align with this domain.
 13. 'required_connections': Select relevant connection slugs from the provided available connections.
+14. 'suggested_new_skills': For every domain capability this Expert's description requires that is NOT present in the provided available skills, emit one entry {name, description, why_needed}. Use kebab-case names. Emit an EMPTY list when the available skills already cover the domain — an empty list is a real answer, not a failure. NEVER put a name from this list into member_skills.
 """
 
 
@@ -276,6 +304,11 @@ def _generate_fallback_draft(
         member_skills=matched_skills,
         knowledge_folder_ids=matched_folder_ids,
         required_connections=matched_connections,
+        # Phase 263 (D-263-02): the floor NAMES NO GAP rather than inventing one. This
+        # constructor takes thirteen — now fourteen — explicit kwargs and no ``**extra``,
+        # and it is reached from inside ``except Exception`` when forced_emit fails. Omit
+        # this line and the draft endpoint 500s precisely when the fallback exists to help.
+        suggested_new_skills=[],
     )
 
 

@@ -10581,7 +10581,7 @@ cells rot within days.
 
 | File | commits / phases / lines | G-5 | Disposition |
 |---|---|---|---|
-| [`backend/app/services/expert_authoring.py`](docs/HOT-FILE-LEDGER.md#backendappservicesexpert_authoringpy) | 1 / 1 / 233 | no (new) | young (created Phase 261). Row added AT CREATION — AI-assisted drafting service reusing forced_emit (PACK-09). |
+| [`backend/app/services/expert_authoring.py`](docs/HOT-FILE-LEDGER.md#backendappservicesexpert_authoringpy) | 4 / 2 / 389 | no (2 phases) | ⚠ row was STALE at `1/1/233`. honoured by construction (**263-02**): ONE nested model, ONE required field, ONE fallback kwarg. ⛔ the PACK-16 hatch is DELETED, not softened. |
 | [`frontend/src/components/experts/ExpertAuthoringStudio.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertsexpertauthoringstudiotsx) | 1 / 1 / 1082 | no (new) | young (created Phase 261). Row added AT CREATION — leaf component for expert authoring studio and live preview. |
 | [`frontend/src/components/org/OrgAdminShell.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgadminshelltsx) | 3 / 5 / 442 | no | young (created Phase 166). The org-admin shell hosting live tabs (members, audit, settings, invitations, sso, experts). |
 | [`frontend/src/components/org/OrgExpertsTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgexpertstabtsx) | 1 / 1 / 347 | no (new) | young (created Phase 261). Row added AT CREATION — leaf component for org-admin expert listing and management. |
@@ -15576,9 +15576,18 @@ What it owns. Leaf component modal dialog for browsing available domain expert b
 
 ## `backend/app/services/expert_authoring.py`
 
-**`1 / 1 / 233`** — created by Phase 261 (`261-02`). **Row added AT CREATION.** Precedent in `CLAUDE.md` is explicit: rows added at creation, since an absent row is invisible to G-5 at any count.
+**`4 / 2 / 389`** — created by Phase 261 (`261-02`), re-derived at `263-02`. ⚠ **The row read `1 / 1 / 233` until then** — stale by 3 commits, a phase and 156 lines, on a file only two phases old. **Row added AT CREATION.** Precedent in `CLAUDE.md` is explicit: rows added at creation, since an absent row is invisible to G-5 at any count. Still BELOW the G-5 threshold at 2 phases.
 
 What it owns. AI-assisted drafting service reusing `forced_emit` substrate to synthesize structured `ExpertDraftOutput` candidate rows from natural language descriptions and ephemeral brainstorm text (PACK-09).
+
+**Phase 263 (`263-02`, D-263-02 / PACK-14 / PACK-16) — what changed and what was deliberately NOT changed.**
+
+- `SuggestedNewSkill` was added as a **draft-only** nested model above `ExpertDraftOutput`, mirroring `DraftPromptSuggestion`'s *reasoning* and not only its shape: a floor belongs where content is GENERATED, never where it is read. Tightening a persisted read model is the mistake `BUG-260921-01a` already paid for once.
+- `suggested_new_skills` is the 14th field and is `Field(..., min_length=0)` — **REQUIRED and empty-able.** ⛔ Never `Field(default=[])`: that is the exact shape `757bb9e25` had to undo, where a model returning nothing validated perfectly and richness became a lottery (293 chars on one run, 2163 on another).
+- ⚠ **`min_length=0` enforces nothing.** It is kept for what it DOCUMENTS — *an empty list is a real answer* — and the row says so rather than implying a constraint that does not exist.
+- ⛔ **`_generate_fallback_draft` was edited in the SAME task, and that is the load-bearing half.** It constructs the model with explicit kwargs and no `**extra`, and it is reached from inside `except Exception` when `forced_emit` fails. A 14th required field without the matching `suggested_new_skills=[]` means the LLM path degrades, the fallback then throws too, and `POST /experts/draft` 500s at exactly the moment the fallback exists to prevent that. A unit test that only exercises the `forced_emit` success path cannot see this — so `test_263_expert_draft_suggested_skills.py` calls the fallback DIRECTLY.
+- **The PACK-16 hatch is DELETED, not softened.** Prompt item 11 read *"…, or include 3-5 recommended domain skill names"*, which put invented names into `member_skills` where `expert_service.py` strips them at run time in silence. A new item 14 routes genuine gaps to the new field and carries an explicit *NEVER put a name from this list into member_skills*. ⚠ Leaving the hatch while adding the field would have shipped BOTH behaviours and made PACK-16 unfalsifiable — so the hatch's ABSENCE is asserted from the module source, not assumed.
+- ⚠ **The safety argument for a required field is THINNER than `263-CONTEXT.md` implies, and the module comment says so rather than repeating the stronger claim.** `generate_expert_draft` passes `strict=False`, and `forced_emit:490-491` skips the `strict_force` rung whenever `strict is False`. On a `force_strict`-tier model the recovery ladder is **two rungs, not three** — one retry, then the honest floor.
 
 ---
 
