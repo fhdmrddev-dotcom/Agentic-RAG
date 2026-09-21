@@ -10,6 +10,40 @@ import asyncpg
 logger = logging.getLogger(__name__)
 
 
+def _suggestions_to_jsonb(val: Any) -> str:
+    """Serialise prompt_suggestions for a ``::jsonb`` bind — ALWAYS as a JSON ARRAY.
+
+    BUG-260921-01b: the write path was a bare ``json.dumps(value or [])``. That is correct
+    for a list and silently WRONG for a string: ``json.dumps('[{"title":...}]')`` yields a
+    JSON *string scalar*, which Postgres stores happily and which reads back as
+    ``jsonb_typeof = 'string'`` rather than ``'array'``. Measured on a live row
+    (``phd-lr``) against a correct one (``financial-analyzer``) in the same column. Same
+    class as the ``workflow_definition`` jsonb-string-scalar trap already in this project's
+    record.
+
+    ⛔ The invariant is THE RETURN VALUE PARSES TO A LIST. A str input is parsed rather than
+    re-dumped; anything neither a list nor list-bearing JSON becomes an empty array,
+    because a malformed tile set must not be persisted as a scalar that every later reader
+    has to defend against.
+    """
+    if val is None:
+        return "[]"
+    if isinstance(val, str):
+        try:
+            parsed = json.loads(val)
+        except Exception:
+            return "[]"
+        return json.dumps(parsed) if isinstance(parsed, list) else "[]"
+    if isinstance(val, (list, tuple)):
+        return json.dumps([
+            (v if isinstance(v, dict) else (v.model_dump() if hasattr(v, "model_dump") else v))
+            for v in val
+        ])
+    if hasattr(val, "model_dump"):
+        return json.dumps([val.model_dump()])
+    return "[]"
+
+
 def _parse_prompt_suggestions(val: Any) -> list[dict[str, Any]]:
     if val is None:
         return []
@@ -58,7 +92,7 @@ async def create_expert_bundle(
     System bundles cannot be created via this function (enforced is_system = false).
     Slug uniqueness within the org is enforced by partial unique index idx_expert_bundles_org_slug.
     """
-    suggestions_json = json.dumps(prompt_suggestions or [])
+    suggestions_json = _suggestions_to_jsonb(prompt_suggestions)
     query = """
         INSERT INTO public.expert_bundles (
             org_id,
@@ -349,7 +383,7 @@ async def update_expert_bundle(
         if field not in allowed_fields:
             continue
         if field == "prompt_suggestions":
-            args.append(json.dumps(value or []))
+            args.append(_suggestions_to_jsonb(value))
             set_clauses.append(f"prompt_suggestions = ${len(args)}::jsonb")
         else:
             args.append(value)

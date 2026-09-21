@@ -77,13 +77,17 @@ async def test_generate_expert_draft_uses_forced_emit():
             "slug": "tax-synthesizer",
             "icon": "scale",
             "category": "Finance",
-            "when_to_use": "Tax queries",
-            "example_output": "Tax calculation table",
-            "description": "Synthesizes quarterly taxes",
+            "when_to_use": 'Consult for quarterly tax synthesis, provision roll-forwards, and reconciling estimates against filed returns.',
+            "example_output": '## Q3 Tax Provision\n\n| Component | Amount | Basis |\n|---|---|---|\n| Current federal | 412,000 | Taxable income x statutory rate |\n| Deferred | (38,000) | Timing differences |\n\n**Effective rate**: 21.4%.',
+            "description": 'Synthesises quarterly tax positions from source filings and ledgers. Synthesises quarterly tax positions from source filings and ledgers. Synthesises quarterly tax positions from source filings and ledgers. Synthesises quarterly tax positions from source filings and ledgers. Synthesises quarterly tax positions from source filings and ledgers. Synthesises quarterly tax positions from source filings and ledgers. Synthesises quarterly tax positions from source filings and ledgers. Synthesises quarterly tax positions from source filings and ledgers. ',
             "scope_mode": "biased",
             "tool_floor_enabled": True,
+            # BUG-260921-01a: the draft contract now requires EXACTLY 3 tiles whose
+            # prompt bodies clear 150 chars. A thin fixture falls to the fallback and this
+            # test's own name assertion is what catches it — the floors bind on mocked
+            # payloads too, which is the point.
             "prompt_suggestions": [
-                {"title": "Q3 Tax", "prompt": "Compute Q3 tax estimate"}
+                {"title": f"Q{i} Tax", "prompt": 'Compute the Q3 tax estimate from the filings in scope. Show the taxable-income build, the statutory and effective rates, and reconcile the result against the prior quarter, citing each figure to its source document.'} for i in range(1, 4)
             ],
             "member_skills": [],
             "knowledge_folder_ids": [],
@@ -197,12 +201,15 @@ async def test_expert_draft_pdf_docx_extraction():
                 "slug": "policy-compliance-officer",
                 "icon": "shield",
                 "category": "Legal",
-                "when_to_use": "When reviewing HR and compliance policies",
-                "example_output": "Risk memo",
-                "description": "Extracts from PDF and DOCX",
+                "when_to_use": 'When reviewing HR and compliance policies, auditing leave entitlements, or assessing regulatory exposure across filings.',
+                "example_output": '## Compliance Risk Memo\n\n| Area | Finding | Severity | Action |\n|---|---|---|---|\n| Leave accrual | Policy conflicts with statute in two regions | High | Amend clause 4.2 |\n| Retention | No stated schedule | Medium | Publish schedule |',
+                "description": 'Reviews HR and compliance policy source material, extracting obligations and flagging conflicts against statute. Reviews HR and compliance policy source material, extracting obligations and flagging conflicts against statute. Reviews HR and compliance policy source material, extracting obligations and flagging conflicts against statute. Reviews HR and compliance policy source material, extracting obligations and flagging conflicts against statute. Reviews HR and compliance policy source material, extracting obligations and flagging conflicts against statute. ',
                 "scope_mode": "biased",
                 "tool_floor_enabled": True,
-                "prompt_suggestions": [],
+                # BUG-260921-01a: 3 tiles with >=150-char prompts are now contractual.
+                "prompt_suggestions": [
+                    {"title": f"Audit {n}", "prompt": 'Review the attached policy material end to end. Extract every stated obligation, flag each conflict with statute or internal precedent, and rank the findings by severity, citing the clause and document behind each one.'} for n in ("Leave", "Retention", "Exposure")
+                ],
                 "member_skills": [],
                 "knowledge_folder_ids": [],
                 "required_connections": [],

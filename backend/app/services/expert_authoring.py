@@ -9,6 +9,18 @@ from pydantic import BaseModel, Field
 
 from app.config import get_model_capability, settings
 from app.models.expert import PromptSuggestion
+
+
+class DraftPromptSuggestion(BaseModel):
+    """Phase 261 (BUG-260921-01a) — a DRAFT tile, with a floor on the prompt body.
+
+    Deliberately NOT ``models.expert.PromptSuggestion``: that model is also the read
+    shape for every persisted bundle, and tightening it would make an older thin row
+    unreadable. The floor belongs where the content is GENERATED, not where it is read.
+    """
+
+    title: str = Field(..., min_length=3, max_length=60, description="Crisp action-oriented button label")
+    prompt: str = Field(..., min_length=150, description="Detailed multi-sentence starter prompt (2-3 sentences minimum)")
 from app.services.forced_emit import forced_emit
 
 logger = logging.getLogger(__name__)
@@ -17,19 +29,33 @@ ScopeMode = Literal["biased", "restricted"]
 
 
 class ExpertDraftOutput(BaseModel):
-    name: str = Field(..., description="Display name for the expert")
-    slug: str = Field(..., description="URL-safe slug for the expert")
-    icon: str = Field(default="chart", description="Lucide vector glyph name (e.g. chart, scale, shield, briefcase, truck, terminal, book, cpu, database, file-text)")
-    category: str = Field(default="General", description="Domain category classification")
-    when_to_use: str = Field(default="", description="Short guidance on when to consult this expert")
-    example_output: str = Field(default="", description="Representative answer or deliverable snippet")
-    description: str = Field(default="", description="Detailed description of expert capabilities")
+    """Phase 261 (BUG-260921-01a) — THE SCHEMA IS THE CONTRACT.
+
+    ⛔ Every substantive field used to carry a Pydantic default, so a model that returned
+    one thin sentence validated perfectly and richness was a lottery: measured on ONE
+    identical prompt, ``description`` came back 293 chars on one run and 2163 on another,
+    and ``example_output`` 164 chars then 6. The system prompt asked for richness; nothing
+    ever checked. These floors are what turns the ask into a requirement.
+
+    ⭐ A floor is SAFE here because ``forced_emit`` runs a recovery LADDER: a rung whose
+    payload fails ``model_validate`` re-drives the next rung rather than going dark, so a
+    thin first answer is re-asked instead of accepted. The honest floor below every rung
+    is ``_generate_fallback_draft``.
+    """
+
+    name: str = Field(..., min_length=3, max_length=120, description="Authoritative professional domain title")
+    slug: str = Field(..., min_length=3, max_length=120, description="URL-safe kebab-case slug for the expert")
+    icon: str = Field(..., description="Lucide vector glyph name (one of: book, scale, chart, shield, briefcase, truck, terminal, cpu, database, file-text)")
+    category: str = Field(..., min_length=3, max_length=60, description="Domain category classification")
+    when_to_use: str = Field(..., min_length=40, max_length=240, description="One or two sentences on when and why to summon this expert (max 240 chars — it renders as a one-liner on the Expert card)")
+    example_output: str = Field(..., min_length=120, description="Realistic, concrete sample excerpt of the expert's deliverable")
+    description: str = Field(..., min_length=400, description="COMPREHENSIVE operating blueprint: mandate, methodologies, rubrics, quality standards, procedures (2-3 rich paragraphs)")
     scope_mode: ScopeMode = Field(default="biased", description="Knowledge composition mode (defaults to biased per D-v4.3-01)")
     tool_floor_enabled: bool = Field(default=True, description="Whether deliverable tools are kept as additive floor")
-    prompt_suggestions: list[PromptSuggestion] = Field(default_factory=list, description="3 starter Action Tiles")
-    member_skills: list[str] = Field(default_factory=list, description="Selected skills from available skills")
-    knowledge_folder_ids: list[UUID] = Field(default_factory=list, description="Selected folder UUIDs from available folders")
-    required_connections: list[str] = Field(default_factory=list, description="Selected connection slugs from available connections")
+    prompt_suggestions: list[DraftPromptSuggestion] = Field(..., min_length=3, max_length=3, description="Exactly 3 starter Action Tiles")
+    member_skills: list[str] = Field(..., description="Skill names selected from the provided available skills (may be empty when none match)")
+    knowledge_folder_ids: list[UUID] = Field(..., description="Folder UUIDs selected from the provided available folders (may be empty)")
+    required_connections: list[str] = Field(..., description="Connection slugs selected from the provided available connections (may be empty)")
 
 
 def _flatten_nullable(node: Any) -> Any:
@@ -69,7 +95,7 @@ When drafting an Expert from the user's high-level goal, you must synthesize and
 2. 'slug': Clean, URL-safe kebab-case slug matching the name (e.g. 'academic-thesis-reviewer').
 3. 'icon': Choose the most fitting vector glyph from: book, scale, chart, shield, briefcase, truck, terminal, cpu, database, file-text.
 4. 'category': Appropriate domain classification (e.g., 'Research & Academia', 'Legal & Compliance', 'Finance & Accounting', 'Human Resources', 'Engineering', 'Operations', 'General').
-5. 'when_to_use': A crisp, punchy guidance sentence (under 140 chars) stating exactly when and why users should summon this expert.
+5. 'when_to_use': One or two crisp sentences (40-240 chars, HARD LIMIT 240 — it renders as a one-liner on the Expert card) stating exactly when and why users should summon this expert.
 6. 'example_output': A realistic, rich, and concrete sample excerpt of the expert's deliverable (e.g. a structured literature matrix, gap analysis, methodology audit, or policy memorandum).
 7. 'description': COMPREHENSIVE, INTENSIVE, AND DETAILED (2-3 rich paragraphs). Do NOT simply repeat the user's prompt. Formulate an in-depth operating blueprint detailing:
    - The expert's core mandate, domain philosophy, and specialized competencies.
@@ -114,9 +140,17 @@ def _generate_fallback_draft(
     if not words:
         words = clean_core.split()
 
-    # Generate professional domain name & slug
-    name = f"{' '.join(words[:4]).title()} Specialist"
-    slug = "-".join([w.lower() for w in words[:3] if w.isalnum()]) or "domain-specialist"
+    # Generate professional domain name & slug.
+    # BUG-260921-01a: both are FLOORED, because the fallback must be TOTAL — it is the
+    # last rung under forced_emit's ladder, so a ValidationError here 500s the draft
+    # endpoint for exactly the request that has nothing else left. Driven against a
+    # one-character prompt, which produced a 1-char slug and raised.
+    name = f"{' '.join(words[:4]).title()} Specialist".strip()
+    if len(name) < 3:
+        name = "Specialist Domain Expert"
+    slug = "-".join([w.lower() for w in words[:3] if w.isalnum()])
+    if len(slug) < 3:
+        slug = "domain-specialist"
 
     combined_text = f"{raw_desc} {brainstorm_text or ''}".lower()
     search_words = set(re.findall(r"[a-z0-9]+", combined_text))
@@ -165,18 +199,37 @@ def _generate_fallback_draft(
     )
 
     # Contextual 1-click Action Tiles
+    # BUG-260921-01a: these are DraftPromptSuggestion (min_length=150 on the prompt body),
+    # not models.expert.PromptSuggestion. Driving the fallback against the tightened schema
+    # is what caught that — the ValidationError would have 500'd the draft endpoint on every
+    # request that reached the floor, which is precisely the request least able to afford it.
     prompts = [
-        PromptSuggestion(
-            title=f"Analyze {words[0].title() if words else 'Topic'}",
-            prompt=f"Conduct a comprehensive, structured analysis of {clean_core}: identify seminal themes, evaluate critical evidence, and synthesize top takeaways.",
+        DraftPromptSuggestion(
+            title=f"Analyze {words[0].title() if words else 'Topic'}"[:60],
+            prompt=(
+                f"Conduct a comprehensive, structured analysis of {clean_core}. Identify the seminal themes and "
+                f"the current state of the art, evaluate the strength of the underlying evidence, and separate "
+                f"well-supported conclusions from contested ones. Present the synthesis with explicit citations "
+                f"to the source material and state plainly where the evidence does not support a conclusion."
+            ),
         ),
-        PromptSuggestion(
+        DraftPromptSuggestion(
             title="Identify Key Gaps & Risks",
-            prompt=f"Perform a rigorous methodology and gap audit on {clean_core}: pinpoint vulnerabilities, conflicting findings, and recommended remediations.",
+            prompt=(
+                f"Perform a rigorous methodology and gap audit on {clean_core}. Pinpoint the weakest links in the "
+                f"current evidence base, surface conflicting findings and explain why they conflict, and name the "
+                f"specific risks this creates for any decision taken on it. Finish with prioritised, concrete "
+                f"remediations rather than general advice."
+            ),
         ),
-        PromptSuggestion(
+        DraftPromptSuggestion(
             title="Synthesize Deliverable",
-            prompt=f"Draft an executive-grade deliverable for {clean_core} formatted with structured sections, evidence tables, and actionable next steps.",
+            prompt=(
+                f"Draft an executive-grade deliverable on {clean_core}. Use structured sections, an evidence table "
+                f"that cites each source, and a short recommendation set with actionable next steps. State the "
+                f"deliverable's own limitations — what it could not establish from the available material — rather "
+                f"than presenting partial coverage as complete."
+            ),
         ),
     ]
 
