@@ -407,6 +407,48 @@ async def update_expert_bundle(
     return _row_to_dict(row)
 
 
+async def stamp_skills_born_for_bundle(
+    pool: asyncpg.Pool,
+    *,
+    bundle_id: UUID,
+    skill_names: list[str],
+    org_id: UUID,
+    user_id: UUID,
+) -> list[str]:
+    """Mark the saver's own unstamped skills as born for this Expert bundle (D-263-08).
+
+    Returns the names actually stamped, which is a SUBSET of ``skill_names`` — a caller that
+    needs to know what did NOT get stamped must diff, because silence here means "already
+    claimed, foreign, or not yours" and those are different situations.
+
+    Each of the three narrowing predicates is load-bearing:
+
+      * ``org_id = $3`` — a foreign-org row cannot be stamped. The stamp IS a privilege
+        widening under D-263-06 (it makes a private skill resolvable to every org member
+        through this bundle), so it must never reach outside the caller's tenancy.
+      * ``user_id = $4`` — another author's pre-existing row cannot be silently conscripted
+        into somebody else's Expert.
+      * ``born_for_expert_bundle_id IS NULL`` — D-263-07's rejection of re-stamping on reuse.
+        Without it, adding a skill to a SECOND Expert would move the marker and the FIRST
+        Expert would silently lose the skill.
+    """
+    if not skill_names:
+        return []
+
+    query = """
+        UPDATE public.skills
+        SET born_for_expert_bundle_id = $1,
+            updated_at = now()
+        WHERE name = ANY($2::text[])
+          AND org_id = $3
+          AND user_id = $4
+          AND born_for_expert_bundle_id IS NULL
+        RETURNING name;
+    """
+    rows = await pool.fetch(query, bundle_id, skill_names, org_id, user_id)
+    return [r["name"] for r in rows]
+
+
 async def delete_expert_bundle(
     pool: asyncpg.Pool,
     bundle_id: UUID,

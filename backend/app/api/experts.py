@@ -301,11 +301,13 @@ async def update_expert(
 ) -> dict[str, Any]:
     """Update a tenant expert bundle. Refuses modifying system templates or foreign bundles."""
     org_id = _to_uuid(active_org)
+    user_id = _to_uuid(current_user["id"] if isinstance(current_user, dict) else getattr(current_user, "id"))
     updated = await update_expert_service(
         pool=pool,
         bundle_id=bundle_id,
         caller_org_id=org_id,
         bundle_update=payload,
+        caller_user_id=user_id,
     )
     if not updated:
         raise HTTPException(
