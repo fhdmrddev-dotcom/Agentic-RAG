@@ -1761,6 +1761,55 @@ class CallingMode(str, Enum):
     STRUCTURED = "structured"  # Tool schemas injected into system prompt
 
 
+def uses_responses_api(
+    model_id: str, user_settings: "UserEffectiveSettings | None" = None
+) -> bool:
+    """True when this model must be called on OpenAI's ``/v1/responses`` surface.
+
+    Two conditions, and BOTH are load-bearing:
+
+    1. the registry row carries ``api_surface: "responses"`` (capability-keyed, never an
+       id-list — D-122-04); and
+    2. the RESOLVED provider is native ``openai``.
+
+    ⛔ (2) is not belt-and-braces. ``/v1/responses`` is OpenAI's own surface — an
+    OpenRouter, Ollama or LM Studio endpoint serving a model with the same id does not
+    implement it, and a request there 404s. Those copies keep today's behaviour (the
+    ``reasoning_first`` STRUCTURED downgrade), which is correct for them.
+
+    Provider resolution mirrors ``create_adaptive_streaming_chat``'s own line VERBATIM
+    (``active_provider`` -> ``settings.llm_provider`` -> ""), with the registry provider as
+    a last resort so a bare unit-test call with no settings still resolves honestly.
+    """
+    cap = get_model_capability(model_id)
+    if cap.get("api_surface") != "responses":
+        return False
+    # ⭐ THE OPERATOR'S OFF-SWITCH FINALLY MEANS SOMETHING ON THESE ROWS, and wiring it here
+    #   is not a nicety — it is the OTHER half of the bug this change fixes.
+    #
+    #   Before Phase 262 the Model Registry showed ``native_tools: True`` for the gpt-5.6
+    #   family over a toggle that COULD NOT FIRE: the reasoning_first gate sat above the
+    #   ``db_native`` read, so whatever the operator chose, the answer was STRUCTURED. The UI
+    #   was stating a capability the system did not have and offering a control that did
+    #   nothing. Routing to /v1/responses without reading the override would repeat that
+    #   exactly, one surface over — the toggle would read False while the adapter sent tools.
+    #
+    # ⛔ So an explicit False sends the model back to the compat adapter, where
+    #   ``reasoning_first`` routes it STRUCTURED. Both registers then agree. ``None`` (no row,
+    #   or a row that never set it) is NOT False and must keep the Responses route — that is
+    #   the default-inert case, and conflating the two would disable the fix for everyone who
+    #   never touched the toggle.
+    if _resolve_db_native_tools(model_id) is False:
+        return False
+    provider = (
+        (user_settings.active_provider if user_settings else "")
+        or settings.llm_provider
+        or cap.get("provider", "")
+        or ""
+    )
+    return provider.lower() == "openai"
+
+
 def resolve_calling_mode(model_id: str, user_settings: "UserEffectiveSettings | None" = None) -> CallingMode:
     """Determine whether to use native API tools or structured JSON prompting."""
     cap = get_model_capability(model_id)
@@ -1776,7 +1825,19 @@ def resolve_calling_mode(model_id: str, user_settings: "UserEffectiveSettings | 
     # cannot re-trigger the 400. It also short-circuits before the OpenRouter strategy branch.
     # Capability-keyed, NEVER a hardcoded id-list (D-122-04); a model with no reasoning_first key
     # is byte-identical to today (default-inert, D-14).
-    if cap.get("reasoning_first"):
+    #
+    # ⚠ CORRECTED (Phase 262) — THE GATE IS NOW CONDITIONAL, and the reason is the SECOND
+    #   door that same 400 names. The error says *"Use /v1/responses **or** set
+    #   reasoning_effort to 'none'"*; XPROV-01 took neither and instead dropped the `tools`
+    #   param, which avoids the 400 by giving up the thing it was protecting — native tool
+    #   calling. A model marked ``api_surface: "responses"`` takes the FIRST door instead:
+    #   the dispatcher routes it to the Responses adapter, where reasoning AND native tools
+    #   are served together, so it must NOT be downgraded here.
+    # ⛔ The downgrade STAYS for every reasoning_first model NOT on that surface (an
+    #   OpenRouter-served or self-hosted copy of the same id) — those still hit the 400, and
+    #   STRUCTURED is still the only answer for them. `uses_responses_api` checks the
+    #   RESOLVED provider, not the flag alone, which is what keeps that true.
+    if cap.get("reasoning_first") and not uses_responses_api(model_id, user_settings):
         return CallingMode.STRUCTURED
 
     # Phase 149 (SC#1 / D-149-16): an operator's native_tools toggle must change the NEXT

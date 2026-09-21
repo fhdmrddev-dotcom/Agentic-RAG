@@ -309,6 +309,21 @@ class ModelCapability(TypedDict, total=False):
     # ABSENT => keep today's derived fallback (UNSAFE: accept-but-ignore / cannot-disable /
     # pre-4.6 / non-reasoning rows stay unmarked — no regression, default-inert, D-14).
     reasoning_off: Literal["thinking_disabled", "effort_none"]  # Phase 175 XPROV-04 D-05 — docs-confirmed reasoning-disable mechanism (default absent)
+    # ⚠ THE OPENAI API SURFACE THIS MODEL IS CALLED ON. ABSENT => ``chat.completions``
+    # (every model today — default-inert, D-14). ``"responses"`` => ``/v1/responses``.
+    #
+    # It exists because ``reasoning_first`` models HARD-400 on chat.completions the moment
+    # a native ``tools`` param rides with reasoning: *"Function tools with reasoning_effort
+    # are not supported with this model. Use /v1/responses or set reasoning_effort to
+    # 'none'."* Phase 175 (XPROV-01) answered that by routing them STRUCTURED — reasoning
+    # kept, native tool calls LOST. This field takes the other door the error names: the
+    # Responses surface serves reasoning AND native tools together, so the model keeps both.
+    #
+    # ⛔ Capability-keyed, NEVER an id-list (D-122-04). A row without it is byte-identical
+    # to today. ⛔ It is meaningful ONLY on ``provider: "openai"`` rows — the Responses API
+    # is OpenAI's own surface, and an OpenRouter/Ollama/compat endpoint does not serve it.
+    # The dispatcher gate checks the RESOLVED provider, not this field alone.
+    api_surface: Literal["responses"]  # Phase 262 — OpenAI /v1/responses routing (default absent = chat.completions)
 
 
 # Capability registry: which models support native API tool calling.
@@ -359,9 +374,9 @@ MODEL_CAPABILITIES: dict[str, ModelCapability] = {
     # reasoning effort + ultra mode); Terra=balanced everyday; Luna=lightweight/fastest.
     # Same OpenAI TIER-FORCE + verified strict json_schema as the rest of the gpt-5 line.
     # Re-verify ids + caps against live /models (scripts/curate_models.py) once GA.
-    "gpt-5.6-sol":   {"native_tools": True, "reasoning_first": True,"provider": "openai", "llm_call_timeout_seconds": 900, "max_output_tokens": 128000, "capability_source": "registry", "uses_max_completion_tokens": True, "forced_emission": True, "strict_json_schema": True, "emit_tier": "force_strict"},  # flagship + max reasoning/ultra — reasoning tier
-    "gpt-5.6-terra": {"native_tools": True, "reasoning_first": True,"provider": "openai", "llm_call_timeout_seconds": 600, "max_output_tokens": 128000, "capability_source": "registry", "uses_max_completion_tokens": True, "forced_emission": True, "strict_json_schema": True, "emit_tier": "force_strict"},  # balanced everyday — flagship tier (mirrors gpt-5.5)
-    "gpt-5.6-luna":  {"native_tools": True, "reasoning_first": True,"provider": "openai", "llm_call_timeout_seconds": 300, "max_output_tokens": 128000, "capability_source": "registry", "uses_max_completion_tokens": True, "forced_emission": True, "strict_json_schema": True, "emit_tier": "force_strict"},  # lightweight/fastest — standard tier
+    "gpt-5.6-sol":   {"native_tools": True, "reasoning_first": True,"provider": "openai", "llm_call_timeout_seconds": 900, "max_output_tokens": 128000, "api_surface": "responses", "capability_source": "registry", "uses_max_completion_tokens": True, "forced_emission": True, "strict_json_schema": True, "emit_tier": "force_strict"},  # flagship + max reasoning/ultra — reasoning tier
+    "gpt-5.6-terra": {"native_tools": True, "reasoning_first": True,"provider": "openai", "llm_call_timeout_seconds": 600, "max_output_tokens": 128000, "api_surface": "responses", "capability_source": "registry", "uses_max_completion_tokens": True, "forced_emission": True, "strict_json_schema": True, "emit_tier": "force_strict"},  # balanced everyday — flagship tier (mirrors gpt-5.5)
+    "gpt-5.6-luna":  {"native_tools": True, "reasoning_first": True,"provider": "openai", "llm_call_timeout_seconds": 300, "max_output_tokens": 128000, "api_surface": "responses", "capability_source": "registry", "uses_max_completion_tokens": True, "forced_emission": True, "strict_json_schema": True, "emit_tier": "force_strict"},  # lightweight/fastest — standard tier
     "o1":           {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 900, "max_output_tokens": 100000, "capability_source": "registry", "uses_max_completion_tokens": True, "forced_emission": True, "strict_json_schema": True, "emit_tier": "force_strict"},
     # o3 / o4 removed 2026-06-07 — no longer served by live /models (096 D-05 curation)
     # Anthropic direct — native tool_use

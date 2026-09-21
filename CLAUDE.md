@@ -816,6 +816,10 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/chat/ActiveExpertChip.tsx` | 0 / 0 / 0 | young (created 260). Row added AT CREATION — active consultant chip in composer (PACK-02) |
 | `frontend/src/components/chat/ExpertSpotlightCard.tsx` | 0 / 0 / 0 | young (created 260). Row added AT CREATION — spotlight card and action tiles (PACK-03) |
 | `frontend/src/components/chat/InviteExpertDialog.tsx` | 0 / 0 / 0 | young (created 260). Row added AT CREATION — expert invitation modal dialog (PACK-02) |
+| `backend/app/services/openai_service.py` | 72 / 36 / 2268 | ⛔ **FIRES at 36 phases and absent from BOTH registers its ENTIRE LIFE — row added 262, which DOES modify it.** ⛔ `resolve_calling_mode` is the ONE routing decision; its gate ORDER is the contract |
+| `backend/app/services/provider_gateway/openai_compat.py` | 6 / 4 / 525 | ⚠ **FIRES at 4 phases, absent from BOTH its ENTIRE LIFE — row added 262, which does NOT modify it.** ⛔ the entangled unit (D-04); its 5KB `emit_sse` cadence is what `openai_responses.py` mirrors |
+| `backend/app/services/provider_gateway/dispatcher.py` | 6 / 2 / 153 | ⚠ absent its ENTIRE LIFE — row added 262 at 2 phases, BELOW threshold. The ONE provider→adapter fork; ⛔ `calling_mode` rides ALONGSIDE the stream, never as an event |
+| `backend/app/services/provider_gateway/openai_responses.py` | 0 / 0 / 563 | young (created 262). Row added AT CREATION. ⛔ emits `call_id`, NEVER `item.id` — the other id does not round-trip and round 2 of every multi-tool turn fails |
 
 
 When a new phase enters discuss-phase, the orchestrator must scan PLAN.md `files_modified` against this ledger. Any match against a G-5-firing row means the discuss-phase produces a refactor recommendation as the first option, not the planned feature — and the phase reads that file's section in `docs/HOT-FILE-LEDGER.md` before planning, because that is where the named seam and the binding invariants live.

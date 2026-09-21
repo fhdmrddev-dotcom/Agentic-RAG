@@ -7299,6 +7299,16 @@ import surface and belongs in a refactor, not in a knob's plan.
 `_floor` / `_ceiling`) and one optional to `SettingsUpdate`. ⛔ **There is no `_floor` / `_ceiling`
 on the update type and there must never be: the bounds are the SERVER's, read-only on the response.**
 
+⚠ **CORRECTED 2026-09-21 (Phase 263 planning) — THE ROW WAS STALE AND ITS VERDICT WAS WRONG. The
+original is kept above rather than overwritten, because a row that is present and WRONG answers the
+auditor with `no` and STOPS the audit — which is strictly worse than an absent row.** Re-derived with
+the recipe: **`6 / 4 / 748`**, so **G-5 FIRES** where the cell read `no (2 phases)`.
+
+⛔ **Binding invariant for Phase 263 (D-263-03):** this module already carries the `POST /skills`
+caller that `SkillFormDialog` uses. The proposal flow REUSES that caller. **No new endpoint and no
+second client function** — a second write path here is the second authoring engine `PACK-15` refuses,
+one register down.
+
 ## frontend/src/components/settings/ModelPillRow.tsx
 
 **Added 2026-08-27, same pass, same reason.** Measured **4 commits / 3 phases / 141 lines** — fires
@@ -10578,7 +10588,7 @@ cells rot within days.
 | [`frontend/src/lib/api/experts.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiexpertsts) | 2 / 2 / 186 | no | young (created Phase 260). Client module for expert API CRUD, draft, and grant calls. |
 | [`backend/app/db/experts.py`](docs/HOT-FILE-LEDGER.md#backendappdbexpertspy) | 2 / 2 / 492 | no (new) | young (created Phase 259). Row added AT CREATION — absent row is invisible to G-5 (PACK-01). |
 | [`backend/app/models/expert.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsexpertpy) | 2 / 2 / 79 | no (new) | young (created Phase 259). Row added AT CREATION — Pydantic domain models for expert bundles. |
-| [`backend/app/services/expert_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesexpert_servicepy) | 3 / 2 / 333 | no (new) | young (created Phase 259). Row added AT CREATION — two-phase member boundary check (PACK-04). |
+| [`backend/app/services/expert_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesexpert_servicepy) | 5 / 3 / 378 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⛔ row was STALE at `3/2/333` reading `no (new)` — re-derived 263 planning. D-263-06 amends ONE disjunct of the phase-2 predicate; the `org_id` fence is UNTOUCHED. |
 | [`backend/app/api/experts.py`](docs/HOT-FILE-LEDGER.md#backendappapiexpertspy) | 2 / 2 / 346 | no (new) | young (created Phase 259). Row added AT CREATION — REST router with require_capability('experts') (PACK-06). |
 | [`frontend/src/components/chat/ActiveExpertChip.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatactiveexpertchiptsx) | 0 / 0 / 0 | no (new) | young (created Phase 260). Row added AT CREATION — leaf component for active consultant chip. |
 | [`frontend/src/components/chat/ExpertSpotlightCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatexpertspotlightcardtsx) | 0 / 0 / 0 | no (new) | young (created Phase 260). Row added AT CREATION — leaf component for hero spotlight card and action tiles. |
@@ -10764,7 +10774,7 @@ cells rot within days.
 | [`frontend/src/lib/api/knowledge.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiknowledgets) | 2 / 2 / 803 | no (2 phases) | young (207 split, 214) — ⚠ **NOT covered by `lib/api.ts`'s row: that row is the BARREL** |
 | [`frontend/src/lib/api/threads.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapithreadsts) | 7 / 3 / 1683 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | young (207 split, 214) — ⚠ **NOT covered by `lib/api.ts`'s row: that row is the BARREL** |
 | [`frontend/src/lib/api/connectors.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiconnectorsts) | 17 / 11 / 740 | ⚠ **FIRES** | ⚠ row was STALE at `16 / 10 / 718`. honoured by construction (**244-06**): `importCloudFile` gains a REQUIRED body declared BESIDE `SourcePreviewRequest` — ⛔ never inline in a component |
-| [`frontend/src/lib/api/skills.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiskillsts) | 4 / 2 / 715 | no (2 phases) | ⚠ **absent for its ENTIRE LIFE — row added 239-10**, the fifth 207-split module found with none. Holds `FullAppSettings`, not skills. **`lib/api.ts`'s row is the BARREL** |
+| [`frontend/src/lib/api/skills.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiskillsts) | 6 / 4 / 748 | ⚠ **FIRES** | ⛔ row was STALE at `4/2/715` reading `no (2 phases)` — re-derived 263 planning. Holds `FullAppSettings`, not only skills. D-263-03 reuses its `POST /skills` caller, adds no endpoint. |
 | [`frontend/src/lib/api/workflows.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiworkflowsts) | 4 / 4 / 1081 | ⚠ **FIRES** | ⚠ absent until 214; the 207 split created it with NO row. **`lib/api.ts`'s row is the BARREL, not these modules.** 214.1: docblock only, zero behaviour |
 | [`frontend/src/lib/connectionMark.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclibconnectionmarktsx) | 7 / 4 / 313 | ⚠ **FIRES** | ✅ **the move IS the seam, and it was TAKEN (214-08)** — `settings/` → `lib/`; four run + canvas surfaces now import ONE map |
 | [`frontend/src/components/ingestion/DocumentList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestiondocumentlisttsx) | 24 / 13 / 294 | ⚠ **FIRES** | ✅ **seam TAKEN (217.1-05)** — `DocumentRow.tsx` extracted with the sketch's five affordances (−315 L). ⚠ 7-column order still load-bearing: `LibraryPage` sheds cols 3–5 by `nth-child` |
@@ -10887,6 +10897,8 @@ cells rot within days.
 | [`frontend/src/components/admin/spend/RepriceModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminspendrepricemodaltsx) | 1 / 1 / 212 | no (new) | young (created 257-03). Reprice dialog allowing append-only rate entry for models. |
 | [`frontend/src/components/workflow/RunCostBadge.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowruncostbadgetsx) | 1 / 1 / 101 | no (new) | young (created 257-04). Reusable run cost pill. ⛔ THREE states, not two: rated / unrated model / rated-but-unmeasured — collapsing the last two makes it state a FALSE cause. |
 | [`frontend/src/lib/api/spend.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapispendts) | 1 / 1 / 184 | no (new) | ⚠ row added by the 257 REVIEW, not the build — UNDECLARED, so the gate never asked. Created 257-03 as `src/api/spend.ts`, a SECOND api home; MOVED to the one `lib/api/` home. |
+| [`frontend/src/components/skills/SkillFormDialog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsskillsskillformdialogtsx) | 12 / 8 / 635 | ⚠ **FIRES** | ⛔ absent from BOTH registers its ENTIRE LIFE at 8 phases — row added at 263 PLANNING, before a plan named it. The ONE human skill-authoring dialog; D-263-01 reuses it pre-filled. |
+| [`backend/app/api/skills.py`](docs/HOT-FILE-LEDGER.md#backendappapiskillspy) | 19 / 10 / 858 | ⚠ **FIRES** | ⛔ absent from BOTH registers its ENTIRE LIFE at 10 phases — row added at 263 PLANNING. ⛔ `is_org_shared` HARD-SET False at `:250`; D-263-06 routes around it by provenance, never through the gate. |
 
 
 
@@ -15414,6 +15426,23 @@ What it owns. Pydantic schemas for domain expert bundles: `PromptSuggestion`, `E
 
 What it owns. The business logic layer for domain expert bundles, implementing two-phase member boundary evaluation (`resolve_expert_bundle`). Verifies that referenced member skills, knowledge folders, and connections belong to the caller's active org (or are system resources). Foreign org references are stripped and logged with an audit warning (`EXPERT_MEMBER_CROSS_ORG_STRIPPED`), strictly enforcing PACK-04 and preventing SEED-125 cross-org data leaks.
 
+⚠ **CORRECTED 2026-09-21 (Phase 263 planning) — THE ROW WAS STALE AT `3 / 2 / 333` AND READ
+`no (new)`. The original line is kept above rather than overwritten.** Re-derived: **`5 / 3 / 378`** —
+**G-5 FIRES, exactly at threshold.** The file crossed the threshold in Phase 261 and nothing said so.
+
+⛔ **Binding invariants for Phase 263 (D-263-06):**
+
+1. `resolve_expert_bundle`'s phase-2 skill predicate gains **exactly ONE disjunct** —
+   `... OR (the skill was born for THIS bundle)`, read from `skills.born_for_expert_bundle_id`
+   (migration 190, D-263-07). ⛔ **The `org_id == caller_org_id` fence is UNTOUCHED**, which is why
+   `PACK-17` is unaffected by this change and must still be driven INDEPENDENTLY (D-263-12).
+2. This amends **D-259-04**, a prior locked decision, so it needs **its own RED drive against a
+   planted violation**, in the shape of `backend/tests/unit/test_259_expert_member_isolation.py`.
+   A predicate widened without a RED drive is a fence nobody has seen fire.
+
+⚠ The unknown-member **strip at run time** is what `PACK-16` front-runs: this service discards names
+silently, so **save time is the only moment a human can act** (D-263-09 / D-263-10).
+
 ---
 
 ## `backend/app/api/experts.py`
@@ -15486,3 +15515,196 @@ What it owns. Leaf component for the Org Admin Experts tab, rendering accessible
 
 What it owns. Client API module for expert operations, providing functions for CRUD (`createExpert`, `getExpert`, `listExperts`, `updateExpert`, `deleteExpert`), AI drafting (`draftExpert`), and grant management (`getExpertGrants`, `setExpertGrants`).
 
+
+---
+
+## `frontend/src/components/skills/SkillFormDialog.tsx`
+
+**`12 / 8 / 635`** — re-derived 2026-09-21 at Phase 263 **planning**, not at a plan's close. ⛔ **Absent
+from BOTH registers for its ENTIRE LIFE, at 8 phases** — so G-5 could never have fired on it at any
+commit count, silently, the way `App.tsx` went 23 phases and `config.py` went its whole life. The row
+is added **before** any PLAN.md names it, because `node scripts/check-hot-file-ledger.cjs 263` was
+driven RED against exactly this file and exits `1` while the row is missing.
+
+What it owns. The **one human skill-authoring dialog** — Name · Description · Instructions · Files ·
+Triggers — the surface `POST /skills` is reached from by a person rather than by the agent path
+(`tool_dispatcher.py:1435`, `_handle_save_skill`).
+
+⛔ **Binding invariant for Phase 263 (D-263-01 / D-263-03): this dialog is REUSED pre-filled, never
+duplicated.** Variant A's `Create this skill →` opens *this* component with the `skill-creator`-authored
+instructions already in it. A second authoring dialog is the thing `PACK-15` exists to refuse, and a
+second one here would be the second engine wearing a different name.
+
+⚠ **Named seam, OWED not taken:** at 635 lines the dialog carries form state, validation, trigger
+editing and file attachment in one component. The seam is the trigger/file sub-editors, which are
+independently testable and are what a ninth phase will push on. Phase 263 does **not** take it — it
+adds a caller, not a branch.
+
+---
+
+## `backend/app/api/skills.py`
+
+**`19 / 10 / 858`** — re-derived 2026-09-21 at Phase 263 **planning**. ⛔ **Absent from BOTH registers
+for its ENTIRE LIFE, at 10 phases.** ⚠ `263-CONTEXT.md` recorded this file at `19 / 9 / 858`; the
+measured phase count is **10**, and the cell is written from the measurement rather than from the
+prose — a row that is present and WRONG answers the auditor with `satisfied` and stops the audit,
+which is worse than an absent row.
+
+What it owns. The REST surface for skill rows: `POST /skills` (`:227`), the description lint against
+owner-scoped siblings pre-persist (TRIG-03 / D-09 / D-10) which **always saves and attaches warnings**,
+and `PATCH /skills/{id}/toggle-global` (`:540`).
+
+⛔ **Two binding invariants, both load-bearing for Phase 263:**
+
+1. **`is_org_shared` is HARD-SET `False` at `:250`** — *"HARD-SET — never from the caller
+   (D-08 / T-118-02-01)"*. It is **not** a default a caller may override. D-263-06/07 close the
+   org-visibility hollowness with a **provenance marker** (`born_for_expert_bundle_id`, migration 190)
+   that routes *around* this field, and **never by relaxing it**.
+2. **`toggle-global` refuses with `409` unless the `eval_runs` publish gate is met or
+   `{"override": true}` is passed** (GATE-01 / D-07). Phase 263 does **not** bypass that gate, and a
+   plan that reaches for it has chosen the wrong arm.
+
+⚠ **Org scoping on insert is STRUCTURAL and already ships** — `skills_autofill_org_id`, a BEFORE
+INSERT trigger running `autofill_org_id_by_owner('user_id')` (`supabase/full-schema.sql:5234`), over a
+`NOT NULL` `public.skills.org_id`. That is the structural half of `PACK-17`: this phase **drives** it
+against a cross-org caller (D-263-12), it does not build it. ⚠ `SEED-125` was a **real** cross-org
+skill leak, and this phase creates skills programmatically — the exact shape in which one would recur.
+
+⚠ **Named seam, OWED not taken:** at 858 lines the router mixes CRUD, the description linter, the
+publish gate and version handling. The linter is the clean extraction. Phase 263 adds **no new endpoint
+here at all** (D-263-03) — it is a pure caller.
+
+---
+
+
+## `backend/app/services/openai_service.py`
+
+**Measured 2026-09-21 (Phase 262): `72 commits / 36 phases / 2268 lines`.**
+
+⛔ **THIS FILE HAD NO ROW IN EITHER REGISTER FOR ITS ENTIRE LIFE, AT 36 PHASES.** It is the
+same failure `App.tsx` suffered for 23 phases, `config.py` for the project's whole life and
+`api.ts` — the actual hottest file — for 97: **G-5 could never have fired on it at any
+count**, because G-5 fires on rows, and there was no row. It was found by deriving the
+triple for a file a change touched, not by anyone reading a table.
+
+**What it owns.** The OpenAI-compatible request construction for seven of the nine
+providers: `get_llm_client`, `create_adaptive_streaming_chat`, the max-token clamp, the
+finish-reason normalisation map, and — the part every other file bends around —
+**`resolve_calling_mode`, the ONE decision about whether a model's tools go over the wire
+as a native `tools` param or as XML injected into a system prompt.**
+
+⛔ **THE BINDING INVARIANT IS THE ORDER OF THAT FUNCTION'S GATES, NOT THEIR CONTENT.**
+Each gate short-circuits, so a gate moved up or down silently changes which signal wins:
+
+1. `reasoning_first` **and not** `uses_responses_api` → STRUCTURED. A hard API constraint,
+   so it must outrank an operator override — a forced native toggle cannot be allowed to
+   re-trigger a 400 the API will always raise.
+2. `db_native is False` → STRUCTURED. The operator's explicit off-switch.
+3. the OpenRouter strategy branch.
+4. `effective_native` → NATIVE / STRUCTURED.
+
+⚠ **Phase 262 amended gate 1, and the amendment is this file's cautionary tale.** Phase 175
+wrote gate 1 to answer OpenAI's *"Function tools with reasoning_effort are not supported ...
+use /v1/responses or set reasoning_effort to 'none'"* 400. **That error names two remedies
+and gate 1 took neither** — it dropped the `tools` param instead, which avoids the error by
+surrendering the capability the error is about. The result ran for months: the `gpt-5.6`
+family had **no native tool calling at all**, tool calls were parsed back out of prose, and
+the Model Registry displayed `native_tools: True` over a control that could not fire,
+because gate 1 sat above gate 2 by design. **Nothing was wrong with the code; the cost was
+invisible because no register recorded it.**
+
+⭐ **`uses_responses_api` is the amendment, and it reads the RESOLVED provider, never the
+flag alone.** `/v1/responses` is OpenAI's own surface — an OpenRouter, Ollama or LM Studio
+endpoint serving the same model id does not implement it, so those routes keep the
+STRUCTURED downgrade, which is still correct for them. It also consults `db_native`, so the
+operator's off-switch finally means something on these rows: **both registers now agree, and
+the toggle that was inert is live.**
+
+**Named seam, still OWED.** `MODEL_CAPABILITIES` is imported here and read at six sites
+through wrapper predicates (`_uses_max_completion_tokens`, `uses_responses_api`,
+`_resolve_db_native_tools`, the parallel-tools gate, the clamp, the emit tier). A capability
+RESOLVER module — one place that answers *"how do I call this model"* — is the extraction. It
+is not taken yet, and a further phase on this file should propose it before adding a seventh
+predicate.
+
+---
+
+## `backend/app/services/provider_gateway/openai_compat.py`
+
+**Measured 2026-09-21 (Phase 262): `6 commits / 4 phases / 525 lines`. NOT modified by 262 —
+the triple was re-derived because the phase forked around it.**
+
+⚠ **FIRES at 4 phases and was absent from both registers for its entire life.**
+
+**What it owns.** The high-risk entangled unit (D-04): the `<think>` state machine, the
+DeepSeek `reasoning_content` split, `_accumulate_chunk_usage`'s two provider-aware branches,
+and the per-provider 5KB `tool_args_progress` boundary dicts.
+
+⛔ **Its `emit_sse` cadence is a CROSS-FILE contract now.** `openai_responses.py` mirrors the
+boundary arithmetic deliberately so the wire cadence the browser sees is identical on both
+OpenAI surfaces. Changing the boundary here without changing it there makes one surface
+stream visibly differently from the other for the same model family. Its module docstring's
+*"NO while-I'm-in-here cleanup"* warning stands unchanged.
+
+---
+
+## `backend/app/services/provider_gateway/dispatcher.py`
+
+**Measured 2026-09-21 (Phase 262): `6 commits / 2 phases / 153 lines`.** Below the G-5
+threshold; **the row was added anyway, at the touch that took it to 2 — an absent row is
+invisible to G-5 at any count, which is precisely how `openai_service.py` reached 36.**
+
+**What it owns.** `open_stream(provider, request)` — the single provider-to-adapter fork,
+and the `GatewayRequest` envelope every adapter destructures.
+
+⛔ **`calling_mode` rides ALONGSIDE the stream in the returned tuple, NEVER as an event.**
+Burying it in the event vocabulary is the exact bug that made the harness OpenAI-only
+(Pitfall 3 / L-3).
+
+⚠ **Phase 262 added a SECOND fork inside the OpenAI `else` branch** — `/v1/responses` vs
+chat.completions — gated on `uses_responses_api`, which checks the resolved provider. ⛔ The
+branch order matters: the Responses check runs BEFORE the compat adapter, and a model with
+no `api_surface` row falls through byte-identically (D-14).
+
+---
+
+## `backend/app/services/provider_gateway/openai_responses.py`
+
+**Created 2026-09-21 (Phase 262): `0 / 0 / 563`. Row added AT CREATION.**
+
+**What it owns.** The OpenAI `/v1/responses` adapter: chat-completions to Responses
+translation in both directions, and the canonical `GatewayEvent` stream over a Responses
+SSE stream. It exists because the `gpt-5.6` family cannot do native tool calling on
+chat.completions at all — see the `openai_service.py` section above for why that went
+unrecorded for months.
+
+⛔ **THE ID IT EMITS IS `call_id`, NEVER `item.id`.** A Responses function call carries two
+identifiers: `id` names the output ITEM, `call_id` is what a later `function_call_output`
+must reference. The agent loop stores the emitted id as `messages.tool_calls[].tool_call_id`
+and echoes it back on the next turn — so emitting `item.id` round-trips an identifier the
+API does not recognise and **round 2 of every multi-tool turn fails**. `_to_responses_input`
+is the other half of that contract, and the two were driven RED together against a planted
+`item_id` swap.
+
+⛔ **`output_index` is NOT a usable tool index.** It counts reasoning and message items too,
+so it is not dense over tool calls, while the consumer keys `tool_calls_buffer` by a dense
+0-based ordinal. Arrival order is assigned here instead.
+
+⛔ **`response.output_item.done` carries the AUTHORITATIVE arguments and must win over the
+accumulated deltas.** A dropped delta otherwise ships malformed JSON to the tool dispatcher,
+which reads to the user as the model getting it wrong.
+
+⛔ **`response.failed` RAISES; it never finishes quietly.** A failure that ends the turn as
+`stop` is indistinguishable from a complete answer.
+
+⚠ **Known gap, recorded rather than hidden: reasoning items are NOT round-tripped.** With
+`store=False` (the stateless-chat rule) OpenAI can return `reasoning.encrypted_content` for
+a later turn to replay. Carrying an opaque per-turn blob through `_reconstruct_history` is a
+schema change, not an adapter change. The loop is correct without it — each turn reasons
+afresh. Re-open when a measured multi-tool-turn quality gap justifies the schema work.
+
+⚠ **`strict` is requested only where the schema already satisfies OpenAI's strict rules**
+(`additionalProperties: false` plus every property in `required`, at every level). Strict on
+a non-compliant schema is a REQUEST-time 400, which would turn this upgrade into an outage
+on the forced-emission path. **A row reading `emit_tier: "force_strict"` may therefore be
+served `force` here** — a deliberate, measured downgrade, never an assumed guarantee.

@@ -122,6 +122,32 @@ async def open_stream(
         # <think>/usage/boundary logic on ``request.active_provider_name`` (the
         # consumer populates that with the registry-derived provider for this
         # branch — agent_loop.py:1667-1668 — so the move is byte-identical).
+        # ⚠ ONE FORK BEFORE THE COMPAT ADAPTER — the OpenAI ``/v1/responses`` surface.
+        #
+        # The ``gpt-5.6`` reasoning family CANNOT carry a native ``tools`` param on
+        # ``chat.completions``: OpenAI hard-400s the combination and names ``/v1/responses``
+        # as the fix. Phase 175 answered by routing them STRUCTURED (tools as XML prose),
+        # which avoided the 400 by giving up native tool calling entirely. This fork takes
+        # the door the error actually names, where reasoning AND native tools coexist.
+        #
+        # ⛔ The predicate checks the RESOLVED provider, not the registry flag alone —
+        # ``/v1/responses`` is OpenAI's own surface and an OpenRouter / Ollama / LM Studio
+        # endpoint serving the same model id does not implement it. Those copies stay on
+        # the compat adapter and keep the STRUCTURED downgrade, which is still correct for
+        # them. A model with no ``api_surface`` row is byte-identical to today (D-14).
+        from app.config import settings as _settings
+        from app.services.openai_service import uses_responses_api
+
+        _effective_model = (
+            request.model
+            or (request.user_settings.llm_model if request.user_settings else None)
+            or _settings.llm_model
+        )
+        if uses_responses_api(_effective_model, request.user_settings):
+            from .openai_responses import open_openai_responses_stream
+
+            return open_openai_responses_stream(request)
+
         from .openai_compat import open_openai_compat_stream
 
         return open_openai_compat_stream(request)
