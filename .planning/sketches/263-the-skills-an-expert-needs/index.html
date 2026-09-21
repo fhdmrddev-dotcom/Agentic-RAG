@@ -1,0 +1,1115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sketch 263: The Skills an Expert Needs</title>
+<link rel="stylesheet" href="../themes/default.css">
+<style>
+/* ─────────────────────────────────────────────────────────────
+   Sketch 263 — Phase 263: An Expert Can Be Given Its Capabilities
+   PACK-14 (name what does not exist) · PACK-15 (approve one by one,
+   through the EXISTING skill-creator) · PACK-16 (say so before save).
+
+   Grounded in BUG-260921-01, driven live 2026-09-21:
+     a PRISMA/doctoral-literature-review Expert was given docx, xlsx, pptx,
+     because public.skills holds 10 rows and those were the only lexical hits.
+
+   All data below is REAL: the 10 library rows are the measured library;
+   the blueprint text is the measured 2163-char draft (abridged in the
+   collapsed state, full text in the expanded one).
+   ───────────────────────────────────────────────────────────── */
+
+body { overflow-x: hidden; }
+
+/* ── page chrome ─────────────────────────────────────────────── */
+.sketch-head {
+  padding: var(--space-5) var(--space-6) var(--space-3);
+  border-bottom: 1px solid var(--color-border-soft);
+  background: var(--color-bg-elev1);
+}
+.sketch-head h1 {
+  font-family: var(--font-headline);
+  font-size: var(--text-xl);
+  margin: 0 0 4px;
+  letter-spacing: -0.01em;
+}
+.sketch-head .sub { color: var(--color-text-muted); font-size: var(--text-sm); max-width: 90ch; }
+.sketch-head .reqs { margin-top: 10px; display: flex; gap: 6px; flex-wrap: wrap; }
+.req {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.04em;
+  padding: 3px 8px; border-radius: var(--radius-full);
+  background: var(--color-primary-dim); color: var(--color-primary);
+  border: 1px solid var(--color-primary-glow);
+}
+.req.warn { background: var(--color-warning-dim); color: var(--color-warning); border-color: hsl(38 92% 60% / 0.35); }
+
+.stage { padding: var(--space-6); }
+.viewport-wrap { margin: 0 auto; transition: max-width var(--dur-slow) var(--ease-out); }
+
+.variant { display: none; animation: fadeSlideUp var(--dur-slow) var(--ease-out); }
+.variant.active { display: block; }
+
+.variant-head { margin-bottom: var(--space-5); }
+.variant-head h2 {
+  font-family: var(--font-headline); font-size: var(--text-lg);
+  margin: 0 0 4px; display: flex; align-items: center; gap: 10px;
+}
+.variant-head .tagline { color: var(--color-text-muted); font-size: var(--text-sm); max-width: 86ch; }
+.variant-key {
+  font-family: var(--font-mono); font-size: 10px; padding: 2px 7px;
+  border-radius: var(--radius-sm); background: var(--color-accent);
+  color: var(--color-text-muted); border: 1px solid var(--color-border);
+}
+
+/* ── the studio shell (mirrors ExpertAuthoringStudio.tsx) ────── */
+.studio {
+  display: grid; grid-template-columns: minmax(0, 1fr) 340px;
+  gap: var(--space-5); align-items: start;
+}
+@media (max-width: 1100px) { .studio { grid-template-columns: minmax(0,1fr); } }
+
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+}
+.card + .card { margin-top: var(--space-4); }
+.card h3 {
+  font-size: var(--text-sm); font-weight: 600; margin: 0 0 var(--space-4);
+  display: flex; align-items: center; gap: 8px;
+}
+.card h3 .ic { color: var(--color-primary); }
+.card h3 .count { color: var(--color-text-dim); font-weight: 400; }
+
+.field-label {
+  display: block; font-size: var(--text-xs); font-weight: 500;
+  margin-bottom: 6px; color: var(--color-text);
+}
+.field-hint { font-size: 11px; color: var(--color-text-muted); }
+.input, .textarea {
+  width: 100%; background: hsl(216 45% 4% / 0.7);
+  border: 1px solid var(--color-border); border-radius: var(--radius-md);
+  color: var(--color-text); padding: 8px 12px; font-size: var(--text-xs);
+  font-family: inherit; line-height: 1.6;
+}
+.textarea { resize: vertical; }
+.input:focus, .textarea:focus { outline: none; border-color: var(--color-primary); box-shadow: 0 0 0 1px var(--color-primary-glow); }
+.mono-block {
+  font-family: var(--font-mono); font-size: 11px; line-height: 1.7;
+  background: hsl(216 45% 4% / 0.8); border: 1px solid var(--color-border);
+  border-radius: var(--radius-md); padding: 12px; color: var(--color-text-muted);
+  max-height: 210px; overflow-y: auto; white-space: pre-wrap;
+}
+
+/* ── skill pills: the REAL ones ─────────────────────────────── */
+.pill-rail {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  padding: 10px; border-radius: var(--radius-md);
+  border: 1px solid var(--color-primary-glow); background: hsl(239 100% 82% / 0.05);
+}
+.pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px; border-radius: var(--radius-md);
+  font-size: var(--text-xs); font-weight: 500;
+  background: var(--color-primary-dim); color: var(--color-primary);
+  border: 1px solid var(--color-primary-glow);
+  animation: fadeSlideUp var(--dur-base) var(--ease-out);
+}
+.pill .x { cursor: pointer; opacity: 0.55; font-size: 13px; line-height: 1; }
+.pill .x:hover { opacity: 1; }
+.pill.just-created { animation: checkPop var(--dur-slow) var(--ease-bounce); }
+
+/* ── proposal cards: the ones that DO NOT EXIST ─────────────── */
+.proposal-rail { display: flex; flex-direction: column; gap: 8px; }
+.proposal {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 11px 12px; border-radius: var(--radius-md);
+  border: 1px dashed hsl(258 90% 66% / 0.45);
+  background: hsl(258 90% 66% / 0.06);
+  transition: all var(--dur-base) var(--ease-out);
+}
+.proposal:hover { border-color: hsl(258 90% 66% / 0.8); background: hsl(258 90% 66% / 0.11); }
+.proposal.gone { display: none; }
+.proposal .glyph {
+  flex: 0 0 auto; width: 26px; height: 26px; border-radius: 7px;
+  display: grid; place-items: center; font-size: 13px;
+  background: hsl(258 90% 66% / 0.16); color: var(--color-accent-violet);
+  border: 1px dashed hsl(258 90% 66% / 0.5);
+}
+.proposal .body { flex: 1 1 auto; min-width: 0; }
+.proposal .nm {
+  font-family: var(--font-mono); font-size: var(--text-xs);
+  color: var(--color-text); font-weight: 600;
+}
+.proposal .ds { font-size: 11px; color: var(--color-text-muted); margin-top: 2px; line-height: 1.5; }
+.proposal .acts { flex: 0 0 auto; display: flex; gap: 6px; align-items: center; }
+
+.btn {
+  font-family: inherit; font-size: var(--text-xs); font-weight: 500;
+  padding: 5px 11px; border-radius: var(--radius-md); cursor: pointer;
+  border: 1px solid var(--color-border); background: var(--color-accent);
+  color: var(--color-text); transition: all var(--dur-fast) var(--ease-out);
+  white-space: nowrap;
+}
+.btn:hover { background: var(--color-muted); border-color: var(--color-text-dim); }
+.btn.primary {
+  background: var(--color-primary-strong); border-color: var(--color-primary-strong);
+  color: hsl(216 45% 4%); font-weight: 600;
+}
+.btn.primary:hover { filter: brightness(1.12); }
+.btn.violet {
+  background: hsl(258 90% 66% / 0.18); border-color: hsl(258 90% 66% / 0.5);
+  color: hsl(258 90% 80%);
+}
+.btn.violet:hover { background: hsl(258 90% 66% / 0.3); }
+.btn.ghost { background: transparent; border-color: transparent; color: var(--color-text-dim); }
+.btn.ghost:hover { color: var(--color-text); background: var(--color-accent); }
+.btn.sm { font-size: 11px; padding: 4px 9px; }
+.btn[disabled] { opacity: 0.4; cursor: not-allowed; }
+.btn[disabled]:hover { background: var(--color-accent); border-color: var(--color-border); filter: none; }
+
+/* ── the honesty banner (PACK-16) ───────────────────────────── */
+.honesty {
+  display: flex; gap: 11px; align-items: flex-start;
+  padding: 12px 14px; border-radius: var(--radius-md);
+  background: var(--color-warning-dim); border: 1px solid hsl(38 92% 60% / 0.4);
+  font-size: var(--text-xs); line-height: 1.6;
+}
+.honesty .ic { flex: 0 0 auto; color: var(--color-warning); font-size: 15px; line-height: 1.2; }
+.honesty b { color: var(--color-warning); font-weight: 600; }
+.honesty.clear { background: var(--color-success-dim); border-color: hsl(142 71% 45% / 0.4); }
+.honesty.clear .ic, .honesty.clear b { color: var(--color-success); }
+
+/* ── preview card (the shared Expert card from sketch 261) ──── */
+.preview { position: sticky; top: 78px; }
+.expert-card {
+  background: linear-gradient(160deg, hsl(220 30% 8%), hsl(220 30% 6%));
+  border: 1px solid var(--color-border); border-radius: var(--radius-lg);
+  padding: var(--space-5); box-shadow: var(--shadow-md);
+}
+.gem {
+  width: 44px; height: 44px; border-radius: 13px; display: grid; place-items: center;
+  background: linear-gradient(140deg, hsl(239 84% 67% / 0.35), hsl(258 90% 66% / 0.35));
+  border: 1px solid var(--color-primary-glow);
+  box-shadow: var(--shadow-glow-primary); font-size: 20px;
+}
+.expert-card .nm { font-family: var(--font-headline); font-size: var(--text-md); font-weight: 700; }
+.expert-card .slug { font-family: var(--font-mono); font-size: 10px; color: var(--color-text-dim); }
+.badge-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: var(--space-4); }
+.badge {
+  font-size: 10px; padding: 3px 8px; border-radius: var(--radius-full);
+  border: 1px solid; display: inline-flex; gap: 4px; align-items: center;
+}
+.badge.union { background: hsl(142 71% 45% / 0.12); color: hsl(142 60% 65%); border-color: hsl(142 71% 45% / 0.4); }
+.badge.org { background: var(--color-primary-dim); color: var(--color-primary); border-color: var(--color-primary-glow); }
+
+.res-row {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 11px; padding: 7px 0; border-top: 1px solid var(--color-border-soft);
+}
+.res-row .k { color: var(--color-text-muted); display: flex; gap: 6px; align-items: center; }
+.res-row .v { font-family: var(--font-mono); color: var(--color-text); }
+.res-row .v.short { color: var(--color-warning); }
+
+/* ── the ledger (variant C) ─────────────────────────────────── */
+.ledger { margin-top: var(--space-4); border-top: 1px solid var(--color-border-soft); padding-top: var(--space-4); }
+.ledger-head {
+  font-size: 10px; text-transform: uppercase; letter-spacing: 0.09em;
+  color: var(--color-text-dim); margin-bottom: 8px; display: flex;
+  justify-content: space-between; align-items: center;
+}
+.ledger-head.has { color: hsl(142 60% 65%); }
+.ledger-head.lacks { color: var(--color-accent-violet); margin-top: var(--space-4); }
+.ghost-rail { display: flex; flex-wrap: wrap; gap: 6px; }
+.ghost-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 9px; border-radius: var(--radius-md);
+  font-family: var(--font-mono); font-size: 10px;
+  background: transparent; color: hsl(258 60% 74%);
+  border: 1px dashed hsl(258 90% 66% / 0.5); cursor: pointer;
+  transition: all var(--dur-fast) var(--ease-out);
+}
+.ghost-chip:hover { background: hsl(258 90% 66% / 0.14); border-style: solid; }
+.ghost-chip.gone { display: none; }
+.ghost-chip .hollow { font-size: 9px; opacity: 0.85; }
+
+.inline-approve {
+  margin-top: 10px; padding: 12px; border-radius: var(--radius-md);
+  border: 1px solid hsl(258 90% 66% / 0.45); background: hsl(258 90% 66% / 0.08);
+  animation: fadeSlideUp var(--dur-base) var(--ease-out);
+}
+.inline-approve .t { font-family: var(--font-mono); font-size: 11px; font-weight: 600; margin-bottom: 5px; }
+.inline-approve .d { font-size: 11px; color: var(--color-text-muted); line-height: 1.55; }
+
+/* ── step spine (variant B) ─────────────────────────────────── */
+.spine {
+  display: flex; align-items: center; gap: 0; margin-bottom: var(--space-5);
+  background: var(--color-surface); border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg); padding: 14px var(--space-5);
+}
+.step { display: flex; align-items: center; gap: 10px; }
+.step .dot {
+  width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center;
+  font-size: 11px; font-weight: 700; font-family: var(--font-mono);
+  background: var(--color-accent); color: var(--color-text-dim);
+  border: 1px solid var(--color-border);
+}
+.step .lbl { font-size: var(--text-xs); color: var(--color-text-dim); }
+.step.done .dot { background: var(--color-success-dim); color: var(--color-success); border-color: hsl(142 71% 45% / 0.5); }
+.step.done .lbl { color: var(--color-text-muted); }
+.step.now .dot {
+  background: var(--color-primary-strong); color: hsl(216 45% 4%);
+  border-color: var(--color-primary); animation: pulseGlow 2.4s ease-in-out infinite;
+}
+.step.now .lbl { color: var(--color-text); font-weight: 600; }
+.step.locked .dot::after { content: '🔒'; font-size: 9px; }
+.step.locked .dot { color: transparent; }
+.spine .rail { flex: 1 1 auto; height: 1px; background: var(--color-border); margin: 0 14px; }
+
+.prov-grid { display: grid; grid-template-columns: 300px minmax(0,1fr); gap: var(--space-4); align-items: start; }
+@media (max-width: 980px) { .prov-grid { grid-template-columns: minmax(0,1fr); } }
+
+.prov-row {
+  display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+  border-radius: var(--radius-md); border: 1px solid var(--color-border);
+  background: hsl(216 45% 4% / 0.5); cursor: pointer;
+  transition: all var(--dur-fast) var(--ease-out);
+}
+.prov-row + .prov-row { margin-top: 6px; }
+.prov-row:hover { border-color: var(--color-text-dim); }
+.prov-row.sel { border-color: var(--color-primary); background: var(--color-primary-dim); }
+.prov-row .st { flex: 0 0 auto; width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; font-size: 10px; }
+.prov-row .st.pending { border: 1px dashed hsl(258 90% 66% / 0.6); color: var(--color-accent-violet); }
+.prov-row .st.approved { background: var(--color-success-dim); color: var(--color-success); border: 1px solid hsl(142 71% 45% / 0.5); }
+.prov-row .st.skipped { background: var(--color-accent); color: var(--color-text-dim); border: 1px solid var(--color-border); }
+.prov-row .nm { font-family: var(--font-mono); font-size: 11px; flex: 1 1 auto; }
+.prov-row.skipped-row .nm { text-decoration: line-through; color: var(--color-text-dim); }
+.prov-row .tag { font-size: 9px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--color-text-dim); }
+
+.creator-pane {
+  border: 1px solid var(--color-border); border-radius: var(--radius-lg);
+  background: var(--color-surface-hi); overflow: hidden;
+}
+.creator-pane .hd {
+  padding: 11px var(--space-4); border-bottom: 1px solid var(--color-border);
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  background: hsl(220 30% 9%);
+}
+.creator-pane .hd .who {
+  font-family: var(--font-mono); font-size: 10px; color: var(--color-text-dim);
+  display: flex; align-items: center; gap: 6px;
+}
+.creator-pane .hd .who b { color: var(--color-primary); font-weight: 600; }
+.creator-pane .bd { padding: var(--space-4); }
+.creator-pane .ft {
+  padding: 11px var(--space-4); border-top: 1px solid var(--color-border);
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  background: hsl(220 30% 6%);
+}
+.field + .field { margin-top: 12px; }
+
+/* ── modal (variant A dialog + variant C refusal sheet) ─────── */
+.scrim {
+  position: fixed; inset: 0; background: hsl(216 45% 2% / 0.72);
+  backdrop-filter: blur(3px); z-index: 900; display: none;
+  align-items: center; justify-content: center; padding: var(--space-6);
+}
+.scrim.open { display: flex; animation: fadeSlideUp var(--dur-base) var(--ease-out); }
+.modal {
+  width: 100%; max-width: 620px; max-height: 86vh; overflow-y: auto;
+  background: var(--color-surface-hi); border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
+}
+.modal .hd { padding: var(--space-5); border-bottom: 1px solid var(--color-border); }
+.modal .hd h4 { margin: 0; font-family: var(--font-headline); font-size: var(--text-md); }
+.modal .hd .sub { font-size: 11px; color: var(--color-text-muted); margin-top: 4px; }
+.modal .bd { padding: var(--space-5); }
+.modal .ft {
+  padding: var(--space-4) var(--space-5); border-top: 1px solid var(--color-border);
+  display: flex; gap: 8px; justify-content: space-between; align-items: center;
+}
+.prefill-note {
+  font-size: 10px; font-family: var(--font-mono); color: var(--color-accent-violet);
+  display: inline-flex; align-items: center; gap: 5px; margin-bottom: 10px;
+  padding: 4px 8px; border-radius: var(--radius-sm);
+  background: hsl(258 90% 66% / 0.1); border: 1px solid hsl(258 90% 66% / 0.3);
+}
+
+.refusal-line {
+  font-family: var(--font-headline); font-size: var(--text-md); line-height: 1.5;
+  margin-bottom: var(--space-4);
+}
+.refusal-line em { color: var(--color-warning); font-style: normal; font-weight: 700; }
+.refusal-list { list-style: none; padding: 0; margin: 0 0 var(--space-4); }
+.refusal-list li {
+  font-family: var(--font-mono); font-size: 11px; padding: 7px 10px;
+  border-left: 2px solid hsl(258 90% 66% / 0.6); margin-bottom: 4px;
+  background: hsl(258 90% 66% / 0.06); color: var(--color-text-muted);
+}
+.refusal-list li b { color: var(--color-text); font-weight: 600; }
+
+/* ── footnote strip: where each requirement is answered ─────── */
+.answers {
+  margin-top: var(--space-5); padding: var(--space-4);
+  border: 1px dashed var(--color-border); border-radius: var(--radius-md);
+  font-size: 11px; color: var(--color-text-muted); line-height: 1.75;
+}
+.answers b { color: var(--color-text); font-weight: 600; font-family: var(--font-mono); font-size: 10px; }
+
+.save-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  margin-top: var(--space-4); padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border-soft);
+}
+.save-bar .why { font-size: 11px; color: var(--color-text-muted); }
+</style>
+</head>
+<body>
+
+<nav class="variant-nav">
+  <span class="label">Sketch 263</span>
+  <button class="variant-tab active" data-v="a">A · Inline Shelf Gap<span class="star">★</span></button>
+  <button class="variant-tab" data-v="b">B · Provisioning Step</button>
+  <button class="variant-tab" data-v="c">C · Capability Ledger</button>
+</nav>
+
+<header class="sketch-head">
+  <h1>The skills an Expert needs</h1>
+  <p class="sub">
+    A doctoral literature-review Expert was drafted with a 2163-character PRISMA blueprint and given
+    <span class="mono">docx</span>, <span class="mono">xlsx</span>, <span class="mono">pptx</span> as its capabilities —
+    because the library holds 10 rows and those were the only lexical matches. The studio is the one
+    place that knows what is missing, and the one place that cannot create it.
+  </p>
+  <div class="reqs">
+    <span class="req">PACK-14 · name what does not exist</span>
+    <span class="req">PACK-15 · approve one at a time, via skill-creator</span>
+    <span class="req warn">PACK-16 · say so BEFORE it is saved</span>
+    <span class="req">BUG-260921-01</span>
+  </div>
+</header>
+
+<div class="stage">
+<div class="viewport-wrap" id="vp">
+
+<!-- ════════════════════════════════════════════════════════════
+     VARIANT A — INLINE SHELF GAP
+     ════════════════════════════════════════════════════════════ -->
+<section class="variant active" id="v-a">
+  <div class="variant-head">
+    <h2><span class="variant-key">A</span> Inline Shelf Gap <span class="star" style="color:var(--color-warning)">★</span></h2>
+    <p class="tagline">
+      The existing <span class="mono">Bound Knowledge &amp; Capabilities</span> card splits in two —
+      what is in your library, and what this Expert needs that isn't. Each proposal opens the
+      <em>existing</em> skill-creator dialog, pre-filled. Nothing else in the studio moves.
+      <strong>Smallest diff to the shipped surface.</strong>
+    </p>
+  </div>
+
+  <div class="studio">
+    <div>
+      <div class="card">
+        <h3><span class="ic">✦</span> Identity &amp; Blueprint</h3>
+        <div class="field">
+          <label class="field-label">Name</label>
+          <input class="input" value="PhD Literature Review Expert">
+        </div>
+        <div class="field" style="margin-top:12px">
+          <label class="field-label">Operating blueprint <span class="field-hint">2163 chars · drafted</span></label>
+          <div class="mono-block">A doctoral-level systematic literature review specialist. Designs and executes reproducible search strategies across Scopus, Web of Science and PubMed; screens candidate records against pre-registered inclusion and exclusion criteria following PRISMA 2020; critically appraises methodology using CASP and AMSTAR-2 instruments; synthesises findings thematically with a traceable code-to-theme map; identifies gaps in the evidence base; and drafts the review chapter with citations that resolve.
+
+Capabilities:
+• Systematic search strategy construction, per-database, with Boolean strings and reported yields
+• PRISMA identification → screening → eligibility → inclusion, with flow-diagram counts
+• Critical methodological appraisal, scored per instrument item with written justification
+• Thematic synthesis from extracted findings into descriptive and analytical themes
+• Gap analysis against the synthesised themes
+• Chapter drafting with citation integrity checking …</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3><span class="ic">🔧</span> Bound Knowledge &amp; Capabilities</h3>
+
+        <div style="margin-bottom:var(--space-5)">
+          <label class="field-label">Knowledge Folders <span class="field-hint">3 selected</span></label>
+          <div class="pill-rail">
+            <span class="pill">📁 Doctoral Corpus</span>
+            <span class="pill">📁 Methodology References</span>
+            <span class="pill">📁 Citation Library</span>
+          </div>
+        </div>
+
+        <!-- ── in your library ── -->
+        <div>
+          <label class="field-label">
+            In your library <span class="count field-hint">· <span id="a-have-n">2</span> skills this Expert can actually use</span>
+          </label>
+          <div class="pill-rail" id="a-have">
+            <span class="pill">⚡ docx <span class="x">×</span></span>
+            <span class="pill">⚡ xlsx <span class="x">×</span></span>
+          </div>
+        </div>
+
+        <!-- ── proposed, not real ── -->
+        <div style="margin-top:var(--space-5)">
+          <label class="field-label" style="display:flex;justify-content:space-between;align-items:baseline">
+            <span>Proposed for this Expert
+              <span class="count field-hint">· <span id="a-want-n">5</span> named by the draft, none in your library yet</span>
+            </span>
+            <span class="field-hint" style="font-family:var(--font-mono);color:var(--color-accent-violet)">⬡ = does not exist</span>
+          </label>
+          <div class="proposal-rail" id="a-proposals"></div>
+        </div>
+
+        <div id="a-banner" style="margin-top:var(--space-4)"></div>
+
+        <div class="save-bar">
+          <span class="why" id="a-why">Save is held while proposed skills are unresolved.</span>
+          <div style="display:flex;gap:8px">
+            <button class="btn ghost">Cancel</button>
+            <button class="btn primary" id="a-save" disabled>Save Expert</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <aside class="preview">
+      <div class="expert-card">
+        <div style="display:flex;gap:12px;align-items:center">
+          <div class="gem">💎</div>
+          <div>
+            <div class="nm">PhD Literature Review Expert</div>
+            <div class="slug">phd-literature-review-expert</div>
+          </div>
+        </div>
+        <div class="badge-row">
+          <span class="badge union">+ Union Scope</span>
+          <span class="badge org">👥 Org-Wide</span>
+        </div>
+        <div style="margin-top:var(--space-4)">
+          <div class="res-row"><span class="k">📁 Knowledge folders</span><span class="v">3</span></div>
+          <div class="res-row"><span class="k">🔌 Connections</span><span class="v">3</span></div>
+          <div class="res-row"><span class="k">⚡ Skills it will have</span><span class="v short" id="a-prev-n">2 of 7</span></div>
+        </div>
+      </div>
+      <div class="answers">
+        <b>PACK-14</b> — two headed groups in one card; the dashed <span class="mono">⬡</span> border is the only
+        thing carrying "not real", so nothing needs a sentence to explain it.<br>
+        <b>PACK-15</b> — <span class="mono">Create this skill</span> opens <span class="mono">SkillFormDialog</span>,
+        pre-filled. One row, one dialog, one approval.<br>
+        <b>PACK-16</b> — Save is disabled, and the banner names the count. The author cannot reach save blind.
+      </div>
+    </aside>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════
+     VARIANT B — PROVISIONING STEP
+     ════════════════════════════════════════════════════════════ -->
+<section class="variant" id="v-b">
+  <div class="variant-head">
+    <h2><span class="variant-key">B</span> Provisioning Step</h2>
+    <p class="tagline">
+      A third studio step between drafting and saving. Each proposed skill shows
+      <em>exactly what skill-creator will write</em> before you approve it. The save guard stops being a
+      warning and becomes structural — step 3 is locked until step 2 has no pending rows.
+    </p>
+  </div>
+
+  <div class="spine">
+    <div class="step done"><span class="dot">✓</span><span class="lbl">Draft</span></div>
+    <div class="rail"></div>
+    <div class="step now"><span class="dot">2</span><span class="lbl">Provision capabilities</span></div>
+    <div class="rail"></div>
+    <div class="step locked" id="b-step3"><span class="dot">3</span><span class="lbl">Save &amp; grant</span></div>
+  </div>
+
+  <div class="card">
+    <h3>
+      <span class="ic">⬡</span> The draft named 7 capabilities. 2 exist.
+      <span class="count" style="margin-left:auto;font-family:var(--font-mono);font-size:11px">
+        <span id="b-approved">0</span> approved · <span id="b-pending">5</span> pending · <span id="b-skipped">0</span> skipped
+      </span>
+    </h3>
+
+    <div class="honesty" style="margin-bottom:var(--space-4)">
+      <span class="ic">⬡</span>
+      <span><b>Nothing is created until you approve it, one at a time.</b>
+      Approving writes one row through <span class="mono">skill-creator</span> → <span class="mono">save_skill</span>,
+      scoped to this organization. No new authoring engine, no bulk create, no silent write.</span>
+    </div>
+
+    <div class="prov-grid">
+      <div id="b-rows"></div>
+      <div class="creator-pane">
+        <div class="hd">
+          <div>
+            <div style="font-family:var(--font-mono);font-size:var(--text-xs);font-weight:600" id="b-pane-name">prisma-screening</div>
+            <div class="who">via <b>skill-creator</b> · <span class="mono">save_skill</span> · org-scoped</div>
+          </div>
+          <span class="badge" style="background:hsl(258 90% 66% / .14);color:hsl(258 60% 78%);border-color:hsl(258 90% 66% / .4)" id="b-pane-state">⬡ pending approval</span>
+        </div>
+        <div class="bd">
+          <div class="field">
+            <label class="field-label">Name</label>
+            <input class="input" id="b-f-name" value="prisma-screening">
+          </div>
+          <div class="field">
+            <label class="field-label">Description <span class="field-hint">one sentence</span></label>
+            <input class="input" id="b-f-desc" value="Runs a PRISMA 2020 screening pass over a candidate record set and emits flow-diagram counts.">
+          </div>
+          <div class="field">
+            <label class="field-label">Instructions <span class="field-hint">what the agent follows when this skill loads</span></label>
+            <div class="mono-block" id="b-f-inst"></div>
+          </div>
+          <div class="field">
+            <label class="field-label">Triggers</label>
+            <div style="display:flex;gap:6px;flex-wrap:wrap" id="b-f-trig"></div>
+          </div>
+        </div>
+        <div class="ft">
+          <button class="btn ghost sm" id="b-skip">Skip — the Expert goes without it</button>
+          <div style="display:flex;gap:8px">
+            <button class="btn sm">Edit first</button>
+            <button class="btn primary sm" id="b-approve">Approve &amp; create</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="b-banner" style="margin-top:var(--space-4)"></div>
+
+    <div class="save-bar">
+      <span class="why" id="b-why">Step 3 unlocks when no row is pending.</span>
+      <button class="btn primary" id="b-next" disabled>Continue to Save &amp; grant →</button>
+    </div>
+  </div>
+
+  <div class="answers">
+    <b>PACK-14</b> — the step exists <em>because</em> things are missing; the count is the step's own headline.<br>
+    <b>PACK-15</b> — the right pane is the skill-creator payload, readable before it is written. Approve is per row and never bulk.<br>
+    <b>PACK-16</b> — structural: you cannot walk past step 2 with a pending row, so there is no save to warn about.
+    <em>A skipped row is still honest</em> — it is recorded as skipped, and the Expert saves without it, knowingly.
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════
+     VARIANT C — CAPABILITY LEDGER
+     ════════════════════════════════════════════════════════════ -->
+<section class="variant" id="v-c">
+  <div class="variant-head">
+    <h2><span class="variant-key">C</span> Capability Ledger</h2>
+    <p class="tagline">
+      The preview card stops being a picture and becomes an account: <em>what this Expert will have</em>
+      against <em>what its blueprint claims</em>. Approval happens on the card. Save prints one plain sentence
+      naming every capability the Expert will not have. PACK-16 is the organizing idea, not a footnote.
+    </p>
+  </div>
+
+  <div class="studio">
+    <div>
+      <div class="card">
+        <h3><span class="ic">✦</span> Identity &amp; Blueprint</h3>
+        <div class="field">
+          <label class="field-label">Name</label>
+          <input class="input" value="PhD Literature Review Expert">
+        </div>
+        <div class="field" style="margin-top:12px">
+          <label class="field-label">When to use <span class="field-hint">397 chars · drafted</span></label>
+          <textarea class="textarea" rows="3">Consult for systematic literature reviews at doctoral level: search strategy design, PRISMA screening, methodological appraisal, thematic synthesis, gap analysis, and chapter drafting with resolvable citations.</textarea>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3><span class="ic">🔧</span> Bound Knowledge &amp; Capabilities</h3>
+        <div>
+          <label class="field-label">Knowledge Folders <span class="field-hint">3 selected</span></label>
+          <div class="pill-rail">
+            <span class="pill">📁 Doctoral Corpus</span>
+            <span class="pill">📁 Methodology References</span>
+            <span class="pill">📁 Citation Library</span>
+          </div>
+        </div>
+        <div style="margin-top:var(--space-5)">
+          <label class="field-label">Skills <span class="field-hint">selected from the library · 10 rows available</span></label>
+          <div class="pill-rail" style="border-color:var(--color-border);background:hsl(216 45% 4% / .5)">
+            <span class="pill">⚡ docx</span>
+            <span class="pill">⚡ xlsx</span>
+            <span class="btn ghost sm" style="opacity:.6">pptx</span>
+            <span class="btn ghost sm" style="opacity:.6">skill-creator</span>
+            <span class="btn ghost sm" style="opacity:.6">financial_ratio_calculator</span>
+            <span class="btn ghost sm" style="opacity:.6">project-brief-summarizer</span>
+            <span class="btn ghost sm" style="opacity:.6">weekly-report-writer</span>
+            <span class="btn ghost sm" style="opacity:.6">meridian-executive-report</span>
+            <span class="btn ghost sm" style="opacity:.6">arabic-tender-document</span>
+            <span class="btn ghost sm" style="opacity:.6">risk-lens_099uat</span>
+          </div>
+          <p class="field-hint" style="margin-top:7px">
+            That is the whole library. The ledger on the right is where the gap is stated.
+          </p>
+        </div>
+
+        <div class="save-bar">
+          <span class="why">Save always works — it tells you what it is saving.</span>
+          <div style="display:flex;gap:8px">
+            <button class="btn ghost">Cancel</button>
+            <button class="btn primary" id="c-save">Save Expert</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <aside class="preview">
+      <div class="expert-card">
+        <div style="display:flex;gap:12px;align-items:center">
+          <div class="gem">💎</div>
+          <div>
+            <div class="nm">PhD Literature Review Expert</div>
+            <div class="slug">phd-literature-review-expert</div>
+          </div>
+        </div>
+        <div class="badge-row">
+          <span class="badge union">+ Union Scope</span>
+          <span class="badge org">👥 Org-Wide</span>
+        </div>
+
+        <div class="ledger">
+          <div class="ledger-head has">
+            <span>Will have</span><span class="mono" id="c-has-n">2</span>
+          </div>
+          <div class="pill-rail" id="c-has" style="border-color:hsl(142 71% 45% / .35);background:hsl(142 71% 45% / .06)">
+            <span class="pill" style="background:hsl(142 71% 45% / .14);color:hsl(142 60% 68%);border-color:hsl(142 71% 45% / .4)">⚡ docx</span>
+            <span class="pill" style="background:hsl(142 71% 45% / .14);color:hsl(142 60% 68%);border-color:hsl(142 71% 45% / .4)">⚡ xlsx</span>
+          </div>
+
+          <div class="ledger-head lacks">
+            <span>Blueprint claims · not real</span><span class="mono" id="c-lacks-n">5</span>
+          </div>
+          <div class="ghost-rail" id="c-lacks"></div>
+          <div id="c-inline"></div>
+        </div>
+      </div>
+
+      <div class="answers">
+        <b>PACK-14</b> — the two ledger headings are the distinction; no badge, no colour beyond
+        solid-vs-dashed. The card cannot render a capability it does not have as though it has it.<br>
+        <b>PACK-15</b> — click a ghost chip → the approve panel opens <em>on the card</em>, routed to skill-creator.<br>
+        <b>PACK-16</b> — <span class="mono">Save Expert</span> is never blocked; it prints the sentence.
+        Try it.
+      </div>
+    </aside>
+  </div>
+</section>
+
+</div>
+</div>
+
+<!-- ── skill-creator dialog (variant A) ─────────────────────── -->
+<div class="scrim" id="dlg">
+  <div class="modal">
+    <div class="hd">
+      <h4 id="dlg-title">Create skill</h4>
+      <div class="sub">This is the existing skill-creator form. Nothing is written until you press Create.</div>
+    </div>
+    <div class="bd">
+      <span class="prefill-note">⬡ pre-filled from the Expert draft · edit anything</span>
+      <div class="field">
+        <label class="field-label">Name</label>
+        <input class="input" id="dlg-name">
+      </div>
+      <div class="field">
+        <label class="field-label">Description</label>
+        <input class="input" id="dlg-desc">
+      </div>
+      <div class="field">
+        <label class="field-label">Instructions</label>
+        <div class="mono-block" id="dlg-inst"></div>
+      </div>
+      <div class="field">
+        <label class="field-label">Triggers</label>
+        <div style="display:flex;gap:6px;flex-wrap:wrap" id="dlg-trig"></div>
+      </div>
+    </div>
+    <div class="ft">
+      <span class="field-hint mono">save_skill · org-scoped · never visible to another org</span>
+      <div style="display:flex;gap:8px">
+        <button class="btn ghost" onclick="closeDlg()">Cancel</button>
+        <button class="btn primary" id="dlg-create">Create skill</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── save refusal sheet (variant C) ───────────────────────── -->
+<div class="scrim" id="sheet">
+  <div class="modal" style="max-width:560px">
+    <div class="hd">
+      <h4>Before this Expert is saved</h4>
+    </div>
+    <div class="bd">
+      <p class="refusal-line" id="sheet-line"></p>
+      <ul class="refusal-list" id="sheet-list"></ul>
+      <p class="field-hint">
+        At run time these names are stripped by the member check and no one is told.
+        This is the last moment anyone can act on it.
+      </p>
+    </div>
+    <div class="ft">
+      <button class="btn ghost" onclick="closeSheet()">Cancel</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn" onclick="closeSheet()">Save without them</button>
+        <button class="btn primary" onclick="closeSheet()">Create them now</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="sketch-toolbar">
+  <span>263</span>
+  <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'">
+    <option value="default">default</option>
+    <option value="canvas-184">canvas-184</option>
+  </select>
+  <button onclick="setVp(375)">375</button>
+  <button onclick="setVp(768)">768</button>
+  <button onclick="setVp(1280)">1280</button>
+  <button onclick="setVp(0)">full</button>
+  <button onclick="resetAll()">reset</button>
+</div>
+
+<script>
+/* ─────────────────────────────────────────────────────────────
+   The five skills a doctoral literature-review Expert needs and
+   the library does not hold. Names, descriptions and instructions
+   are what the drafter would return alongside member_skills.
+   ───────────────────────────────────────────────────────────── */
+const PROPOSED = [
+  {
+    name: 'systematic-search-strategy',
+    desc: 'Builds a reproducible per-database Boolean search from a research question, with reported yields.',
+    inst: `Given a research question and inclusion/exclusion criteria:
+
+1. Decompose the question into PICO/SPIDER concept blocks.
+2. For each block, assemble controlled vocabulary (MeSH, Emtree) and free-text
+   synonyms, truncated per database syntax.
+3. Emit one search string per database — Scopus, Web of Science, PubMed —
+   using that database's own field tags and operators. Never reuse one
+   string across databases.
+4. Record the date run and the raw yield per database.
+5. Return a search-strategy table the reader could re-run verbatim.
+
+Refuse to proceed if the inclusion criteria are not stated; a search
+without criteria is not reproducible.`,
+    trig: ['search strategy', 'boolean', 'scopus', 'web of science', 'pubmed']
+  },
+  {
+    name: 'prisma-screening',
+    desc: 'Runs a PRISMA 2020 screening pass over a candidate record set and emits flow-diagram counts.',
+    inst: `Screen a candidate record set against pre-registered criteria, in PRISMA 2020 order:
+
+1. IDENTIFICATION — count records per source; count and remove duplicates.
+2. SCREENING — title/abstract pass. Each exclusion carries exactly one
+   reason drawn from the pre-registered list.
+3. ELIGIBILITY — full-text pass. Same rule: one named reason per exclusion.
+4. INCLUDED — final count, with the per-stage numbers that produce it.
+
+Emit the four stage counts so a flow diagram can be drawn from them
+without further arithmetic. Never silently drop a record: every record
+leaves the funnel at a named stage for a named reason.`,
+    trig: ['prisma', 'screening', 'inclusion criteria', 'flow diagram']
+  },
+  {
+    name: 'methodology-appraisal',
+    desc: 'Applies CASP or AMSTAR-2 to a study and returns a scored rubric with written justification per item.',
+    inst: `Appraise one study's methodology with a named instrument.
+
+1. Pick the instrument that fits the design — CASP (qualitative, RCT,
+   cohort) or AMSTAR-2 (systematic reviews). Name it and say why.
+2. Score every item. An unscored item is a gap, not a pass.
+3. Justify each score in one sentence citing the study's own text.
+4. State the overall confidence rating the instrument defines, and the
+   specific items that drove it.
+
+Do not aggregate scores across instruments — they are not commensurable.`,
+    trig: ['critical appraisal', 'CASP', 'AMSTAR', 'methodology quality']
+  },
+  {
+    name: 'thematic-synthesis',
+    desc: 'Codes extracted findings into descriptive themes, then analytical themes, keeping a code-to-theme map.',
+    inst: `Synthesise extracted findings thematically (Thomas & Harden, three stages):
+
+1. LINE-BY-LINE CODING of findings text. Codes stay close to the source
+   wording at this stage.
+2. DESCRIPTIVE THEMES — group codes; each theme names the codes it holds.
+3. ANALYTICAL THEMES — go beyond the primary studies, and say explicitly
+   where the interpretation exceeds the data.
+
+Carry a code → theme map through all three stages. A theme whose codes
+cannot be traced back to a study is not a finding; mark it as an
+interpretation and say so.`,
+    trig: ['thematic synthesis', 'coding', 'analytical themes']
+  },
+  {
+    name: 'citation-integrity-check',
+    desc: 'Verifies every in-text citation resolves to a reference entry, and flags retracted or dead DOIs.',
+    inst: `Check a draft chapter's citations before it is submitted:
+
+1. Every in-text citation resolves to exactly one reference entry.
+2. Every reference entry is cited at least once in text.
+3. Every DOI resolves. Report unresolvable DOIs by the citation that
+   carries them, not by the DOI alone.
+4. Flag any work listed in a retraction database, with the retraction
+   notice reference.
+
+Report failures as a list of citations, never as a count. A count tells
+the writer there is a problem and not where it is.`,
+    trig: ['citations', 'references', 'DOI', 'retraction']
+  }
+];
+
+/* ── variant tabs ───────────────────────────────────────────── */
+document.querySelectorAll('.variant-tab').forEach(t => {
+  t.addEventListener('click', () => {
+    document.querySelectorAll('.variant-tab').forEach(x => x.classList.remove('active'));
+    document.querySelectorAll('.variant').forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+    document.getElementById('v-' + t.dataset.v).classList.add('active');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+});
+
+function setVp(w) {
+  document.getElementById('vp').style.maxWidth = w ? w + 'px' : 'none';
+}
+
+/* ═══════════════ VARIANT A ═══════════════ */
+let aOpen = PROPOSED.map(p => p.name);
+let aDlgTarget = null;
+
+function renderA() {
+  const rail = document.getElementById('a-proposals');
+  rail.innerHTML = PROPOSED.map(p => {
+    if (!aOpen.includes(p.name)) return '';
+    return `<div class="proposal">
+      <div class="glyph">⬡</div>
+      <div class="body">
+        <div class="nm">${p.name}</div>
+        <div class="ds">${p.desc}</div>
+      </div>
+      <div class="acts">
+        <button class="btn ghost sm" onclick="aDismiss('${p.name}')">Remove</button>
+        <button class="btn violet sm" onclick="openDlg('${p.name}')">Create this skill →</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  const have = 2 + (PROPOSED.length - aOpen.length);
+  document.getElementById('a-have-n').textContent = have;
+  document.getElementById('a-want-n').textContent = aOpen.length;
+  document.getElementById('a-prev-n').textContent = have + ' of ' + (have + aOpen.length);
+  document.getElementById('a-prev-n').className = aOpen.length ? 'v short' : 'v';
+
+  const banner = document.getElementById('a-banner');
+  const save = document.getElementById('a-save');
+  const why = document.getElementById('a-why');
+  if (aOpen.length) {
+    banner.innerHTML = `<div class="honesty"><span class="ic">⬡</span>
+      <span><b>${aOpen.length} capabilit${aOpen.length === 1 ? 'y is' : 'ies are'} not real yet.</b>
+      Saved as-is, ${aOpen.length === 1 ? 'it' : 'they'} would be stripped at run time by the member check
+      and this Expert would run without ${aOpen.length === 1 ? 'it' : 'them'} — silently.
+      Create or remove ${aOpen.length === 1 ? 'it' : 'each one'} first.</span></div>`;
+    save.disabled = true;
+    why.textContent = 'Save is held while proposed skills are unresolved.';
+  } else {
+    banner.innerHTML = `<div class="honesty clear"><span class="ic">✓</span>
+      <span><b>Every capability in this blueprint exists.</b>
+      ${document.getElementById('a-have-n').textContent} skills, all resolvable by the member check at run time.</span></div>`;
+    save.disabled = false;
+    why.textContent = 'Nothing claimed that cannot be resolved.';
+  }
+}
+
+function aDismiss(name) { aOpen = aOpen.filter(n => n !== name); renderA(); }
+
+function openDlg(name) {
+  const p = PROPOSED.find(x => x.name === name);
+  aDlgTarget = name;
+  document.getElementById('dlg-title').textContent = 'Create skill · ' + name;
+  document.getElementById('dlg-name').value = p.name;
+  document.getElementById('dlg-desc').value = p.desc;
+  document.getElementById('dlg-inst').textContent = p.inst;
+  document.getElementById('dlg-trig').innerHTML =
+    p.trig.map(t => `<span class="pill" style="font-family:var(--font-mono);font-size:10px">${t}</span>`).join('');
+  document.getElementById('dlg').classList.add('open');
+}
+function closeDlg() { document.getElementById('dlg').classList.remove('open'); }
+
+document.getElementById('dlg-create').addEventListener('click', () => {
+  const name = aDlgTarget;
+  aOpen = aOpen.filter(n => n !== name);
+  const el = document.createElement('span');
+  el.className = 'pill just-created';
+  el.innerHTML = `⚡ ${name} <span class="x">×</span>`;
+  document.getElementById('a-have').appendChild(el);
+  closeDlg();
+  renderA();
+});
+
+/* ═══════════════ VARIANT B ═══════════════ */
+let bState = {};
+PROPOSED.forEach(p => bState[p.name] = 'pending');
+let bSel = PROPOSED[1].name; // prisma-screening selected first — the headline capability
+
+function renderB() {
+  const rows = document.getElementById('b-rows');
+  rows.innerHTML = PROPOSED.map(p => {
+    const st = bState[p.name];
+    const icon = st === 'approved' ? '✓' : st === 'skipped' ? '—' : '⬡';
+    return `<div class="prov-row ${bSel === p.name ? 'sel' : ''} ${st === 'skipped' ? 'skipped-row' : ''}"
+         onclick="bPick('${p.name}')">
+      <span class="st ${st}">${icon}</span>
+      <span class="nm">${p.name}</span>
+      <span class="tag">${st}</span>
+    </div>`;
+  }).join('');
+
+  const counts = { approved: 0, pending: 0, skipped: 0 };
+  Object.values(bState).forEach(s => counts[s]++);
+  document.getElementById('b-approved').textContent = counts.approved;
+  document.getElementById('b-pending').textContent = counts.pending;
+  document.getElementById('b-skipped').textContent = counts.skipped;
+
+  const p = PROPOSED.find(x => x.name === bSel);
+  document.getElementById('b-pane-name').textContent = p.name;
+  document.getElementById('b-f-name').value = p.name;
+  document.getElementById('b-f-desc').value = p.desc;
+  document.getElementById('b-f-inst').textContent = p.inst;
+  document.getElementById('b-f-trig').innerHTML =
+    p.trig.map(t => `<span class="pill" style="font-family:var(--font-mono);font-size:10px">${t}</span>`).join('');
+
+  const st = bState[bSel];
+  const badge = document.getElementById('b-pane-state');
+  badge.textContent = st === 'approved' ? '✓ created' : st === 'skipped' ? '— skipped' : '⬡ pending approval';
+  badge.style.background = st === 'approved' ? 'hsl(142 71% 45% / .14)' : st === 'skipped' ? 'var(--color-accent)' : 'hsl(258 90% 66% / .14)';
+  badge.style.color = st === 'approved' ? 'hsl(142 60% 68%)' : st === 'skipped' ? 'var(--color-text-dim)' : 'hsl(258 60% 78%)';
+  document.getElementById('b-approve').disabled = st !== 'pending';
+  document.getElementById('b-skip').disabled = st !== 'pending';
+
+  const banner = document.getElementById('b-banner');
+  const next = document.getElementById('b-next');
+  const step3 = document.getElementById('b-step3');
+  const why = document.getElementById('b-why');
+  if (counts.pending) {
+    banner.innerHTML = '';
+    next.disabled = true;
+    step3.className = 'step locked';
+    why.textContent = `Step 3 unlocks when no row is pending. ${counts.pending} left.`;
+  } else if (counts.skipped) {
+    banner.innerHTML = `<div class="honesty"><span class="ic">—</span>
+      <span><b>${counts.skipped} capabilit${counts.skipped === 1 ? 'y was' : 'ies were'} skipped.</b>
+      This Expert will be saved without ${counts.skipped === 1 ? 'it' : 'them'}, and its blueprint still describes
+      ${counts.skipped === 1 ? 'it' : 'them'}. That is a choice, recorded — not a silent loss.</span></div>`;
+    next.disabled = false;
+    step3.className = 'step';
+    why.textContent = 'Every row is resolved. Skipped rows are recorded as skipped.';
+  } else {
+    banner.innerHTML = `<div class="honesty clear"><span class="ic">✓</span>
+      <span><b>All ${counts.approved} proposed skills exist now.</b>
+      Every capability this blueprint describes will resolve at run time.</span></div>`;
+    next.disabled = false;
+    step3.className = 'step';
+    why.textContent = 'Nothing claimed that cannot be resolved.';
+  }
+}
+function bPick(n) { bSel = n; renderB(); }
+document.getElementById('b-approve').addEventListener('click', () => { bState[bSel] = 'approved'; bAdvance(); });
+document.getElementById('b-skip').addEventListener('click', () => { bState[bSel] = 'skipped'; bAdvance(); });
+function bAdvance() {
+  const nextPending = PROPOSED.find(p => bState[p.name] === 'pending');
+  if (nextPending) bSel = nextPending.name;
+  renderB();
+}
+
+/* ═══════════════ VARIANT C ═══════════════ */
+let cLacks = PROPOSED.map(p => p.name);
+let cHas = ['docx', 'xlsx'];
+let cInlineOpen = null;
+
+function renderC() {
+  document.getElementById('c-lacks').innerHTML = PROPOSED
+    .filter(p => cLacks.includes(p.name))
+    .map(p => `<span class="ghost-chip" onclick="cOpen('${p.name}')"><span class="hollow">⬡</span>${p.name}</span>`)
+    .join('');
+  document.getElementById('c-has-n').textContent = cHas.length;
+  document.getElementById('c-lacks-n').textContent = cLacks.length;
+
+  const box = document.getElementById('c-inline');
+  if (!cInlineOpen) { box.innerHTML = ''; return; }
+  const p = PROPOSED.find(x => x.name === cInlineOpen);
+  box.innerHTML = `<div class="inline-approve">
+    <div class="t">⬡ ${p.name}</div>
+    <div class="d">${p.desc}</div>
+    <div class="field-hint mono" style="margin-top:9px;color:var(--color-accent-violet)">
+      skill-creator will write this row · org-scoped · nothing is created until you press Create
+    </div>
+    <div style="display:flex;gap:7px;margin-top:11px;justify-content:flex-end">
+      <button class="btn ghost sm" onclick="cDismiss('${p.name}')">Drop the claim</button>
+      <button class="btn violet sm" onclick="cCreate('${p.name}')">Create it</button>
+    </div>
+  </div>`;
+}
+function cOpen(n) { cInlineOpen = cInlineOpen === n ? null : n; renderC(); }
+function cCreate(n) { cHas.push(n); cLacks = cLacks.filter(x => x !== n); cInlineOpen = null; cPaintHas(); renderC(); }
+function cDismiss(n) { cLacks = cLacks.filter(x => x !== n); cInlineOpen = null; renderC(); }
+function cPaintHas() {
+  document.getElementById('c-has').innerHTML = cHas.map(n =>
+    `<span class="pill ${n !== 'docx' && n !== 'xlsx' ? 'just-created' : ''}"
+       style="background:hsl(142 71% 45% / .14);color:hsl(142 60% 68%);border-color:hsl(142 71% 45% / .4)">⚡ ${n}</span>`
+  ).join('');
+}
+
+document.getElementById('c-save').addEventListener('click', () => {
+  const line = document.getElementById('sheet-line');
+  const list = document.getElementById('sheet-list');
+  if (!cLacks.length) {
+    line.innerHTML = `<em>PhD Literature Review Expert</em> will be saved with all
+      ${cHas.length} capabilities its blueprint describes.`;
+    list.innerHTML = '';
+  } else {
+    line.innerHTML = `<em>PhD Literature Review Expert</em> will be saved without
+      <em>${cLacks.length} of the ${cHas.length + cLacks.length}</em> capabilities its blueprint describes.`;
+    list.innerHTML = PROPOSED.filter(p => cLacks.includes(p.name))
+      .map(p => `<li><b>${p.name}</b> — ${p.desc}</li>`).join('');
+  }
+  document.getElementById('sheet').classList.add('open');
+});
+function closeSheet() { document.getElementById('sheet').classList.remove('open'); }
+
+/* ── scrim click-out + esc ──────────────────────────────────── */
+document.querySelectorAll('.scrim').forEach(s => {
+  s.addEventListener('click', e => { if (e.target === s) s.classList.remove('open'); });
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') document.querySelectorAll('.scrim').forEach(s => s.classList.remove('open'));
+});
+
+function resetAll() {
+  aOpen = PROPOSED.map(p => p.name);
+  document.getElementById('a-have').innerHTML =
+    '<span class="pill">⚡ docx <span class="x">×</span></span><span class="pill">⚡ xlsx <span class="x">×</span></span>';
+  PROPOSED.forEach(p => bState[p.name] = 'pending');
+  bSel = PROPOSED[1].name;
+  cLacks = PROPOSED.map(p => p.name);
+  cHas = ['docx', 'xlsx'];
+  cInlineOpen = null;
+  cPaintHas();
+  renderA(); renderB(); renderC();
+}
+
+renderA(); renderB(); renderC();
+</script>
+</body>
+</html>
