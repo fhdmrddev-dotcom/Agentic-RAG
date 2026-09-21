@@ -34,16 +34,47 @@ See: `.planning/PROJECT.md` (updated 2026-09-18)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 263 (An Expert Can Be Given Its Capabilities) COMPLETE — 4/4 plans, all 9 G-4 UAT rows driven live. Ready for reviewer post-phase verification.
+**Current focus:** Phase 264 (Born-For Skills Must LOAD, Not Just Resolve) PLANNED — 4 plans, 4 waves, plan-checker PASS. Executing.
 
 ---
 
 ## Current Position
 
-Phase: 263 (an-expert-can-be-given-its-capabilities)
-Plan: 4 of 4 COMPLETE — executed, merged, and UAT-driven
-Status: Complete; awaiting independent review
-Last activity: 2026-09-22 -- Phase 263 executed end to end; 9/9 UAT rows driven live
+Phase: 264 (born-for-skills-must-load-not-just-resolve)
+Plan: 0 of 4 — planned, plan-checker PASS, execution starting
+Status: Executing
+Last activity: 2026-09-22 -- Phase 264 planned; research refuted 4 CONTEXT claims, one blocking
+Base SHA: f04d9c406 (develop)
+
+### PHASE 264 PLANNED — 2026-09-22
+
+**Origin:** `263-REVIEW.md` CR-01, routed to a phase rather than a gap-closure round (G-7). Phase
+263 taught **resolve** time about `skills.born_for_expert_bundle_id`; the **load** path never heard
+of it, so an Expert's prompt advertises a skill the agent then cannot fetch for anyone but its
+author.
+
+**4 plans, 4 waves, fully serial** (one plan per wave — `tool_dispatcher.py`, `agent_loop.py` and
+`run_producer.py` are each single-writer; wave 4 mutates the local DB, which worktrees do not
+isolate). Gates at planning close: ledger `0` · CLAUDE.md size `0` (115,753 chars) · seeds `0` ·
+G-7 `0` · plan structure valid ×4.
+
+⭐ **THE RESEARCH REFUTED FOUR CONTEXT CLAIMS, AND ONE WOULD HAVE BROKEN THE BUILD.**
+`test_260_expert_chat_scoping.py:155-176` (the PACK-01 Closed-Core AST invariant) fails on any
+`ast.Name`/`ast.Attribute` in `agent_loop.py` containing `"expert"` — and `RunContext` is DEFINED in
+that file, so the planned `expert_bundle_id` field would have tripped it. Driven with a real
+`ast.parse` before a line was written. **The fence is CORRECT and is not retired**; the field is
+`born_for_bundle_id`, which names the mig-191 column rather than the Expert concept. The other
+three: D-264-04's site table had **two rows swapped** (`:1459` is `save_skill`'s lint corpus, NOT
+`read_skill_file`); the `_resolve_thread_scoping` arity change touches **10 unpack sites inside the
+zero-headroom gate**, so it lands FIRST; and **two of the four dispatcher sites have no
+`is_enabled` filter at all**, so a bare born-for disjunct there would admit a DISABLED skill's files.
+
+**Baseline measured twice, identical: `71 failed, 5423 passed, 2 xfailed, 2 xpassed`** — exactly the
+ceiling, zero headroom, 0 collection errors. ⭐ **ZERO of the 71 is in this phase's blast radius**,
+so inherited-vs-new is settled before execution: any red this phase produces is NEW.
+
+⛔ **`backend/app/utils/skill_visibility.py` had NO ledger row for its entire life** — added at
+planning to BOTH registers in the same commit, so the gate cannot fail `[no-row]` mid-phase.
 
 ### ⭐ PHASE 263 CLOSED — 2026-09-22 (executed 2026-09-21/22)
 
