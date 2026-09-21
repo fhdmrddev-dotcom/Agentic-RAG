@@ -155,6 +155,26 @@ async def test_extraction_over_the_live_text_strips_every_tool_token(pg_pool):
     assert survived == [], f"agent-tool choreography survived the strip: {survived}"
 
 
+async def test_the_live_extraction_carries_no_interview_choreography(pg_pool):
+    """⛔ The live row's §3 does not END with the doctrine — it continues into the interactive
+    interview loop, and those lines name NO tool, so the seven-token strip cannot see them.
+
+    Measured at `263-02`: slicing to the next `## ` heading yielded 1466 chars of which ~700
+    were *"Confirm the draft with the user, then save."*, *"Tell the user the skill is now saved
+    in their Skills tab"* and the eval-case handoff. In a sealed single-shot that is FALSE — and
+    it directly contradicts this module's own framing, which says persisting is a separate step.
+    """
+    block = _extract_craft_block(await _live_instructions(pg_pool))
+
+    for choreography in (
+        "Confirm the draft with the user",
+        "Tell the user the skill is now saved",
+        "realistic eval cases",
+        "the cases live in the Studio",
+    ):
+        assert choreography not in block, f"interview choreography leaked: {choreography!r}"
+
+
 async def test_load_craft_block_reads_the_row_through_the_real_pool(pg_pool):
     """The unit fence stubs `_load_craft_block`; this is the one place the real query runs, so
     a typo in the SQL or the id constant cannot hide behind a monkeypatch."""

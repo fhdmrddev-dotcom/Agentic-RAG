@@ -197,6 +197,45 @@ def test_extraction_strips_tool_choreography_but_keeps_the_doctrine():
     assert "## 4. Evaluate honestly" not in block, "the slice ran past the next heading"
 
 
+def test_extraction_stops_at_the_end_of_the_doctrine_BULLETS():
+    """⛔ THE SLICE ENDS WITH THE DOCTRINE, NOT WITH THE SECTION.
+
+    Measured against the LIVE row: slicing to the next `## ` heading carries ~700 of 1466
+    characters of INTERACTIVE-INTERVIEW choreography — *"Confirm the draft with the user, then
+    save."*, *"Tell the user the skill is now saved in their Skills tab"*, *"Suggest 2-3
+    realistic eval cases"*. None of those lines name a tool, so the seven-token strip cannot
+    see them.
+
+    That is not merely noise, it is a CONTRADICTION: this module's own framing tells the model
+    *"do not tell anyone the skill has been saved — persisting it is a separate step"*, and the
+    borrowed tail would tell it the opposite in the same prompt. A sealed single-shot has no
+    user to confirm with, saves nothing, and no Studio in the loop.
+
+    D-263-13 names the doctrine precisely — *"its §3 craft block (the five bullets under 'Apply
+    this craft…')"* — so the bullet run IS the decision's own boundary.
+    """
+    instructions = (
+        "## 3. Draft\n"
+        "Write the instructions. " + _FAKE_CRAFT_BLOCK
+        + "Confirm the draft with the user, then save.\n"
+        "\n"
+        "1. Tell the user the skill is now saved in their Skills tab.\n"
+        "2. Suggest 2-3 realistic eval cases as plain text.\n"
+        "\n## 4. Evaluate honestly\nPoint the user to run the eval.\n"
+    )
+
+    block = _extract_craft_block(instructions)
+
+    missing = [t for t in CRAFT_TOKENS if t not in block]
+    assert missing == [], f"the bullet-run bound ate the doctrine: {missing}"
+    for choreography in (
+        "Confirm the draft with the user",
+        "Tell the user the skill is now saved",
+        "realistic eval cases",
+    ):
+        assert choreography not in block, f"interview choreography leaked: {choreography!r}"
+
+
 def test_absent_heading_returns_empty_never_a_partial_slice():
     """A partial slice is worse than nothing: it would ship half a doctrine as if it were whole."""
     assert _extract_craft_block("## 1. Interview\nAsk focused questions.\n") == ""
