@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v4.3
 milestone_name: What You Can Actually Sell
-status: completed
-last_updated: "2026-09-21T14:25:54.564Z"
-last_activity: 2026-09-20 -- Phase 261 execution complete across all 5 plans (261-01 to 261-05). All governance gates green. Scoped review handoff ready for Claude (PACK-07, PACK-08, PACK-09, PACK-10, closed-core inventory) and Operator (live chat verification of D-v4.3-01 and D-v4.3-02 per BUS-294 / D-v4.3-03).
+status: in_progress
+last_updated: "2026-09-20T12:55:00.000Z"
+last_activity: 2026-09-20 -- Phase 261 (An Expert You Can Author) COMPLETE across all 5 plans. Migration 189 applied locally, grant-axis visibility renamed 'granted' (BUS-293), AST single-home fence verified (driven RED and restored clean), AI drafting with non-ingestion guarantee live, Union Scope (D-v4.3-01) and Additive Tool Floor (D-v4.3-02) implemented, Authoring Studio mounted in OrgAdminShell with live 5-element reactive card preview. All 33 backend tests and 9 vitest tests green, count gate 297/297 OK, backend baseline <= 71 failed OK.
 progress:
-  total_phases: 16
+  total_phases: 8
   completed_phases: 7
-  total_plans: 26
-  completed_plans: 26
-  percent: 44
+  total_plans: 28
+  completed_plans: 28
+  percent: 88
 ---
 
 # Project State
@@ -46,7 +46,6 @@ Status: complete
 Last activity: 2026-09-20 -- Phase 261 execution complete across all 5 plans (261-01 to 261-05). All governance gates green. Scoped review handoff ready for Claude (PACK-07, PACK-08, PACK-09, PACK-10, closed-core inventory) and Operator (live chat verification of D-v4.3-01 and D-v4.3-02 per BUS-294 / D-v4.3-03).
 
 ### ⭐ PLAN 261-01 EXECUTED — 2026-09-20
-
 - **Database & Migration (PACK-08, PACK-10, D-261-07)**: Migration 189 applied to local Postgres (`127.0.0.1:54322`). Added `icon`, `category`, `when_to_use`, `example_output`, `tool_floor_enabled` to `public.expert_bundles`; widened visibility CHECK constraint to include `'restricted'`; created `public.expert_grants` table with unique constraint `(expert_id, grantee_type, grantee_id)`, lookup indices, and RLS enabled; seeded `experts:manage` into `public.role_permissions` for `super-admin` and `org-admin`; backfilled `financial-analyzer` seed template.
 - **Full Schema Regeneration & Parity**: `supabase/full-schema.sql` regenerated; table ACLs mirrored in `scripts/full-schema-supplement.sql` (155/155 tuples mirrored, `check-schema-acl-parity.cjs` green).
 - **Models & DB Layer**: `backend/app/models/expert.py` updated with `ExpertGrant`, `ExpertGrantCreate`, presentation fields on `ExpertBundleBase`/`Create`/`Update`. `backend/app/db/experts.py` extended with `get_expert_grants`, `add_expert_grant`, `remove_expert_grant`, `bulk_set_expert_grants`, `check_expert_grant_access`, and grant-aware `list_expert_bundles_for_caller`.
@@ -54,7 +53,6 @@ Last activity: 2026-09-20 -- Phase 261 execution complete across all 5 plans (26
 - **Tests & Governance**: `test_261_expert_grants_db.py` passing 9/9 unit and live DB tests; all 24 prior expert tests green (0 regressions); hot-file ledger OK (316 rows), seeds register OK (310/310), CLAUDE.md size OK (108.9k).
 
 ### ⭐ PHASE 261 PLANS AUTHORED — 2026-09-20
-
 - **261-01-PLAN.md (Wave 1, autonomous: false, DB-mutating)**: Database foundation & access grants. Migration 189 (`expert_bundles` presentation columns, `expert_grants` table, `role_permissions` seed for `experts:manage`), Pydantic models in `models/expert.py`, database layer in `db/experts.py`, unit test suite in `test_261_expert_grants_db.py`.
 - **261-02-PLAN.md (Wave 2, autonomous: true)**: Ephemeral AI drafting & non-ingestion guarantee (`PACK-09`). `services/expert_authoring.py` using `forced_emit` substrate, `POST /experts/draft` endpoint parsing files in-memory without saving, non-ingestion test, closed-core inventory fence (7 phase types, 1 emitter, 29 tools, `EXPERT_CORE_TOOLS` 10).
 - **261-03-PLAN.md (Wave 2, autonomous: true)**: Runtime scoping & additive tool floor fixes (`BUG-260920-01` / `D-v4.3-01` / `D-v4.3-02`). Preserve deliverable tools in `tool_dispatcher.py` (`execute_code`, `workspace_write`, `render_template`, `ask_user`), implement Union scope default in `run_producer.py`, synchronize `scoped_folder_path` to avoid prompt desync, 0 `if expert:` branches in `agent_loop.py`.
@@ -62,50 +60,43 @@ Last activity: 2026-09-20 -- Phase 261 execution complete across all 5 plans (26
 - **261-05-PLAN.md (Wave 4, autonomous: true)**: Single-home governance fence & scenario verification (`PACK-08`). AST fence in `test_261_single_expert_authoring_gate.py` driven RED against planted check, scenario driver in `test_261_expert_authoring_scenarios.py` (S1 CRUD, S2 permissions, S4 union, S5 isolation, S6 deliverable tools, S8 clone-on-customise), hot-file ledger sync and gate re-derivation.
 
 ### ⭐ PHASE 260 EXECUTED — 2026-09-20
-
 - **Plan 260-01 (Backend Scoping Foundation)**: Migration 188 applied (`public.threads.active_expert_id` column and partial index). Seeded system folder `Financial Reports & Filings` (`00000000-0000-0000-0000-000000000260`), 10-K document fixture (`00000000-0000-0000-0000-000000000261`), and `financial_ratio_calculator` skill. Pre-loop scoping in `run_producer.py` resolved as pure data (`effective_folder_ids`, `effective_tools`) into `RunContext`. AST closed-core invariant verified (0 "expert" nodes in `agent_loop.py`).
 - **Plan 260-02 (Composer Consultant Integration)**: `ActiveExpertChip.tsx` (`[✨ {expert.name} · {scope_mode} ✕]`) & `InviteExpertDialog.tsx` modal authored. `MessageInput.tsx` doors inside `+` menu (`✨ Invite Expert...`) and chip inside existing `Using:` row container (`data-testid="active-connector-chips"`). Ambient violet glow active when consultant invited. Strictly zero new top-level controls. Vitest test coverage: 5/5 in `ComposerExpert.test.tsx`, 21/21 in `ComposerAttach.composition.test.tsx`.
 - **Plan 260-03 (Action Tiles Spotlight & Live Proof)**: `ExpertSpotlightCard.tsx` hero card with luminous gem, metadata badges (`SEC Filings & Reports`, `ratio_calculator`, `Restricted`), and 3 visual Action Tiles (`📈 Q3 Revenue Growth YoY`, `⚖️ Gross Margin Comparison`, `💵 Operating Cash Flow`). 1-click execution wired in `ChatArea.tsx` directly invoking `sendMessage(prompt)`. Live conversation driver in `test_260_financial_analyzer_conversation.py` passing 4/4 (grounded citations from seeded 10-K, ratio calculations 64.2% GM / 30.8% EBITDA, honest out-of-scope refusal on vacation policy, and multi-turn persistence).
 
 ### ⭐ PHASE 260 PLANS AUTHORED — 2026-09-20
-
 - **260-01-PLAN.md (Wave 1, autonomous: false)**: Backend scoping foundation & Migration 188. `public.threads.active_expert_id` column, system financial folder & 10-K document fixture seed, pre-loop scoping in `run_producer.py`, and data-driven `RunContext` injection into `agent_loop.py` with zero `if expert:` branches. DB-MUTATING.
 - **260-02-PLAN.md (Wave 2, autonomous: true)**: Frontend composer consultant integration. Modal expert picker (`InviteExpertDialog.tsx`), invite door inside existing `+` menu (`✨ Invite Expert...`), active consultant chip (`ActiveExpertChip.tsx`) in existing `Using:` row container (`data-testid="active-connector-chips"`), ambient violet glow, and dismiss flow. Strictly 0 new top-level controls.
 - **260-03-PLAN.md (Wave 3, autonomous: true)**: Onboarding affordance & live conversation proof. `ExpertSpotlightCard.tsx` with 3 visual Action Tiles (`📈 Q3 Revenue Growth YoY`, `⚖️ Gross Margin Comparison`, `💵 Operating Cash Flow`), 1-click execution in `ChatArea.tsx` (`PACK-03`), and live conversation test suite (`test_260_financial_analyzer_conversation.py`) verifying grounded citations, ratio calculations, and honest out-of-scope refusal (`PACK-05`).
 
 ### ⭐ PHASE 260 CONTEXT GATHERED — 2026-09-20
-
 - **D-259-07 Consultant Model Ratified**: Mid-thread invitation via existing `+` menu; sticky presence until dismissed via `✕` chip; scopes retrieval and tools only, preserving full prior chat history (`D-260-01..03`).
 - **Thread Persistence & Closed-Core Seam (Area 1)**: Migration 188 adds `active_expert_id` to `public.threads`; scoping resolved as data passed into `RunContext` (`effective_folder_ids`, `effective_tools`) with zero `if expert:` branches in `agent_loop.py` (`D-260-04..05`).
 - **G-2 Option 1 (Action Tiles) Ratified (Area 2)**: Visual hero card with icon gem and identity tags; zero lecturing prose; 3 large visual Action Tiles (`📈 Q3 Revenue Growth YoY`, `⚖️ Gross Margin Comparison`, `💵 Operating Cash Flow`) with immediate 1-click execution (`D-260-06..07`).
 - **Financial Analyzer Seeding & PACK-05 Proof (Area 3)**: Migration 188 seeds a real sample financial folder & 10-K earnings filing and calculation skills, answering from documents or refusing out-of-scope inquiries in a real conversation (`D-260-08..09`).
 
-### ⭐ PHASE 259-03 EXECUTED — 2026-09-19
 
+### ⭐ PHASE 259-03 EXECUTED — 2026-09-19
 - **REST Router (`backend/app/api/experts.py`) & Mount (`backend/app/main.py`)**: Full CRUD and resolve endpoints authored under `/experts`, guarded router-wide with `Depends(require_capability('experts'))`. Mounted in `main.py` strictly honouring G-5 (2 lines added, 0 logic branching). Hot-file ledger updated: `backend/app/main.py` at `83 / 60 / 952`, `backend/app/api/experts.py` row added at creation (`0 / 0 / 0`).
 - **Entitlement Tests (`backend/tests/unit/test_259_expert_entitlement_gate.py`)**: 5 tests passing (100%). Structured HTTP 403 refusal tested on Standard tier with capability metadata and upgrade hint; Enterprise tier admission verified; additive add-on override verified; AST single-home scan verified (0 direct tier checks).
 - **Closed-Core Inventory Fence (`backend/tests/unit/test_259_closed_core_inventory.py`)**: 5 tests passing (100%). AST mechanically asserts `PHASE_TYPE_REGISTRY_ENTRIES` has strictly 7 executors, `EMITTER_REGISTRY` has strictly 4 emitters, `_TOOL_REGISTRY` has 0 expert tools/dispatchers, 0 runtime/agent loop modules exist in services, and `expert_service.py` is pure data transformation. Non-vacuity verified by planting an 8th mock executor in `phase_types.py`, driving test RED (`assert 8 == 7`), and restoring clean code verified via md5 (`cad3130276f7b60202ae1b8c08c00a47`).
 
 ### ⭐ PHASE 259-02 EXECUTED — 2026-09-19
-
 - **Service Layer (`backend/app/services/expert_service.py`)**: `ResolvedExpertBundle` schema and `resolve_expert_bundle` authored. Evaluates member skills, knowledge folders, and connections independently against caller org tenancy. Foreign members stripped and logged with audit warning `EXPERT_MEMBER_CROSS_ORG_STRIPPED` (SEED-125 defense).
 - **Isolation Tests (`backend/tests/unit/test_259_expert_member_isolation.py`)**: 6 tests passing (100%). Non-vacuity verified by driving RED against a planted bypass in `expert_service.py` (`effective_skills = list(raw_skills)`), observing AssertionError, and restoring md5-clean (`5b0de3ddfed5516de94ab8a996faaa36`).
 
 ### ⭐ PHASE 259-01 EXECUTED — 2026-09-19
-
 - **Migration 187 (`supabase/migrations/187_expert_bundles.sql`)**: `public.expert_bundles` table created with RLS, partial unique slug indexes, and Financial Analyzer seed row (`00000000-0000-0000-0000-000000000259`). Applied to local Postgres on port 54322, `full-schema.sql` regenerated (8367 lines).
 - **Models (`backend/app/models/expert.py`)**: `ExpertBundle`, `ExpertBundleCreate`, `ExpertBundleUpdate`, and `PromptSuggestion` models authored.
 - **DB Layer (`backend/app/db/experts.py`)**: Asyncpg CRUD and listing helpers authored, enforcing tenant segregation and system bundle immutability.
 - **Tests (`backend/tests/unit/test_259_expert_bundles_db.py`)**: 11 unit and live DB tests passing (100%).
 
 ### ⭐ PHASE 259 PLANS AUTHORED — 2026-09-19
-
 - **259-01-PLAN.md (Wave 1, autonomous: false)**: PACK-01 database foundation. Migration 187 (`expert_bundles` table, partial unique indexes for system templates vs tenant bundles, RLS policies, Financial Analyzer seed row), Pydantic schemas in `models/expert.py`, asyncpg database access layer in `db/experts.py`, unit test suite in `tests/unit/test_259_expert_bundles_db.py`. DB-MUTATING.
 - **259-02-PLAN.md (Wave 2, autonomous: true)**: PACK-04 tenancy defense & member scrubbing. Business logic service in `services/expert_service.py` implementing two-phase resolution (`resolve_expert_bundle`), scrubbing foreign-org skills and folders with audit warning `EXPERT_MEMBER_CROSS_ORG_STRIPPED`, driven RED against planted bypass in `tests/unit/test_259_expert_member_isolation.py`.
 - **259-03-PLAN.md (Wave 3, autonomous: true)**: PACK-01 + PACK-06 API routing & AST fence. REST API router in `api/experts.py`, router mounted in `main.py` (2 lines added, G-5 honoured by construction), Phase 258 `require_capability('experts')` entitlement gate returning structured HTTP 403, and AST closed-core inventory fence in `tests/unit/test_259_closed_core_inventory.py` proving zero new executors/loops/dispatchers, driven RED against planted violation.
 
 ### ⭐ PHASE 259 CONTEXT GATHERED — 2026-09-19
-
 - **Operator Decision #3**: Declared per Expert (`scope_mode: 'restricted' | 'biased'`). Defaults to `restricted` for high-governance domains like Financial Analyzer (`D-259-01`).
 - **Operator Decision #4**: Strict Single Active Expert per Thread (`threads.expert_id uuid REFERENCES expert_bundles`) (`D-259-02`).
 - **PACK-01 & Migration 187**: Table `public.expert_bundles` storing name, slug, description, `scope_mode`, `member_skills text[]`, `required_connections text[]`, `knowledge_folder_ids uuid[]`, `prompt_suggestions jsonb`, `visibility`, `is_system`, `org_id`, and `created_by` with RLS (`D-259-03`).
@@ -117,7 +108,6 @@ Last activity: 2026-09-20 -- Phase 261 execution complete across all 5 plans (26
 - **Folded Seeds**: `SEED-198` (folded into 259).
 
 ### ⭐ PHASE 258 CONTEXT GATHERED — 2026-09-19
-
 - **Operator Decision #1**: Resolved as Ascending Capability Bundles (`standard` -> `pro` -> `enterprise`), with `organizations.add_ons` for modular overrides (`D-258-01`).
 - **TIER-02 Data Storage**: Migration 186 creates `tier_capabilities` table (`D-258-02`, `D-258-07`).
 - **TIER-01 Single Home**: Dedicated `backend/app/services/entitlement_service.py` (`D-258-03`).
@@ -128,7 +118,6 @@ Last activity: 2026-09-20 -- Phase 261 execution complete across all 5 plans (26
 - **Folded Seeds**: `SEED-080` (folded), `SEED-083` (folded).
 
 ### ⭐ PHASE 258 REVIEW HANDBACK RESOLUTION — 2026-09-19
-
 - **F-1 (Blocker Resolved)**: In `backend/app/db/entitlements.py`, NULL or empty `subscription_tier` strictly fails closed (`(False, None, required_tier, "Organization has no subscription tier assigned (fail-closed)")`). Fallback to "standard" eliminated per D-258-06. Automated unit tests added in `test_258_tier_capabilities_db.py` and `test_258_workflow_entitlement_gate.py`.
 - **F-4 (Resolved)**: In `backend/app/services/entitlement_service.py`, database/infrastructure errors fail closed with `EntitlementUnavailableException` (HTTP 503), preventing false upgrade prompts to paying customers during outages.
 - **F-3 (Resolved)**: AST single-home fence in `backend/tests/unit/test_258_single_entitlement_home.py` guards both `subscription_tier` and `add_ons` across attribute access, dictionary subscripts, SQL queries, and function calls/definitions. Non-vacuity verified with planted test cases.
@@ -216,7 +205,6 @@ a deletion that looks like a decision** — this project's own recurring finding
 use each Expert**.
 
 ⭐ **THREE SEAMS WERE MEASURED BEFORE THE CRITERIA WERE WRITTEN, so 261 reuses rather than invents:**
-
 - **AI-assisted authoring ALREADY SHIPS** for workflows — `generate_workflow` (`api/workflows.py:1872`)
   + `services/workflow_authoring.py`. ⛔ **A second authoring engine is the thing to refuse.**
 - **The admin surface has a pattern** — `ModelRegistryTab.tsx` (list → add/edit/disable).
@@ -392,7 +380,6 @@ rides the milestone-close batch; see the OWED block below for the two conditions
 vitest `8464 · failed 0 · pinned 7723 · 293/293` · `tsc -p tsconfig.app.json` 65 = base.
 
 ⛔ **OWED TO THE OPERATOR, blocking nothing else:**
-
 - **Apply migration 186** (`supabase/migrations/186_tier_capabilities.sql`) by pasting it into the
   Supabase SQL editor (never `db push`), then `bash scripts/regenerate-full-schema.sh`. **Operator
   decision 2026-09-19: production migrations ride the v4.3 milestone-close batch**, so 186 is NOT
@@ -405,16 +392,13 @@ vitest `8464 · failed 0 · pinned 7723 · 293/293` · `tsc -p tsconfig.app.json
   fetch the full packaging matrix — **revoke it in a FOLLOW-UP numbered migration, never by editing
   186**, which is already applied locally and must not be re-executed. ⚠ `anon` over-grants are
   this repo's most-repeated security finding (BUG-260911-01, mig 156, mig 177).
-
 - **Apply migration 185** by pasting it into the Supabase SQL editor (never `db push`), then
   `bash scripts/regenerate-full-schema.sh`. Verified idempotent in a rolled-back transaction
   (53 → 59 → 59 rows); the live DB is unchanged.
-
 - **SC#3 / F-13** — the conversion-site architecture decision.
 - **SEED-302** — void and end-date a rate from the product. ⚠ It also records a bug that
   exists today: `rates.py:267` emits `effective_to: None` as a hardcoded literal with no
   column behind it.
-
 - **The third roster.** Nothing checks **runs → rate**, only roster → rate. Two models appear
   in real runs and in neither roster (`deepseek-v4-pro-qwen3.5-9b-mtp`,
   `DeepSeek-V4-Flash-Vision-Exp`). Same class as the `claude-haiku-4-5` alias mismatch.
@@ -427,7 +411,6 @@ of claude's CR-06 fix immediately found a real defect (the 101% gauge). **Recipr
 paid for itself the first time it was actually run.**
 
 ### ⭐ PHASE 257 CLOSE — 2026-09-19, 4/4 SC
-
 - **METER-01**: Migration 183 implemented `model_rates` table with effective-dated append-only pricing, compound index `idx_model_rates_lookup`, and org RLS. Unrated models strictly display as `▲ Unrated` with hover tooltip naming the model, never `$0.00`.
 - **METER-02**: Exactly one token→USD conversion function in one home (`backend/app/services/pricing_service.py` -> `compute_token_cost_usd`), returning `CostResult(cost_usd, is_rated)`. AST single-home fence `test_257_single_token_conversion_home.py` verifies no other AST file contains token-to-USD conversion functions. Python-SQL parity verified across 25 permutations in `test_257_rates_db.py`.
 - **METER-07**: Operator spend cockpit mounted at `/admin/spend` (`AdminSpendPage.tsx`), featuring pure SVG 14-day attributable spend chart with unrated volume overlay, model share donut ring, "What This View Cannot See" honesty disclosure card (`BlindSpotsCard.tsx`), and append-only reprice modal (`RepriceModal.tsx`). Run-level affordances mounted in `WorkflowRunPage.tsx` and `RunCard.tsx` via `RunCostBadge.tsx`.
@@ -559,17 +542,14 @@ G-7 clear · ledger gate `watched: 10` (non-vacuous) · seeds 308/308 · plan-ch
 re-measured every claim against source rather than reading the plan's prose.
 
 **Three shapes decided, each with its reason in source:**
-
 1. **ONE flush site, not three, and NOT `try/finally`.** `_flush_run_usage()` keeps the persist at one
    home; the extra call sits at `:2246` — above the outcome dispatch, so all four arms *and any fifth
    arm nobody has written* flow through it. ⛔ `try/finally` REJECTED: a `finally` also runs on
    `asyncio.CancelledError` and would change which exception leaves the engine on a user Stop.
-
 2. ⭐ **NO NEW MIGRATION, measured not assumed.** Mig 182's `COMMENT ON COLUMN` delegates the legs to
    `db.workflows.TOKEN_COVERAGE_LEGS` **verbatim** (1 hit in the migration, 1 in `full-schema.sql`), so
    counting the judge spend makes the comment TRUE. ⛔ The tuple stays FOUR — a 5th `"judge"` leg is
    the REJECTED Option B by another name.
-
 3. **The two judge sites are NOT symmetric.** `validator_kinds.py:592` has a live `ctx`;
    `publish_service.py:1779` has none — `_drive_golden_run`'s `finally` closed and finalized the box
    before the judge shot runs — so it takes a caller-supplied `usage_box` persisted at `:424` against
