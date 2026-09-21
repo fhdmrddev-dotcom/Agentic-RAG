@@ -4,9 +4,9 @@ milestone: v4.3
 milestone_name: What You Can Actually Sell
 status: executing
 last_updated: "2026-09-22T00:00:00.000Z"
-last_activity: 2026-09-22 -- Phase 263 executed end to end; 9/9 UAT rows driven live
+last_activity: 2026-09-22 -- 263 code review: CR-02/03 + WR-06/07 fixed; CR-01 routed to Phase 264
 progress:
-  total_phases: 16
+  total_phases: 17
   completed_phases: 8
   total_plans: 30
   completed_plans: 30
@@ -966,7 +966,18 @@ work. They are listed rather than summarised because a count is not a set.
 - **2026-09-18** — the audit was **re-driven** before the close and moved to 25/26 · 19/19 · 3/3,
   with the 2026-09-16 reading preserved rather than overwritten.
 
-⚠ **`gsd-sdk query phase.add` wrote its ROADMAP entry into the WRONG SECTION twice in two days**
+- **2026-09-22** — Phase **264** added from 263's own code review (`263-REVIEW.md` **CR-01**). Routed
+  as a phase rather than a gap-closure round under **G-7**: the finding is a capability that stops one
+  layer short of the user, not a defect in a shipped line, and `ToolContext` carries no Expert bundle
+  today — so it is plumbing through the run path across two G-5-firing files, not a predicate edit.
+  The review's other two Criticals (**CR-02/CR-03**, the `/experts/draft` asset-query leaks) were
+  fixed directly instead — `45e21fca6`.
+
+⚠ **`gsd-sdk query phase.add` wrote its ROADMAP entry into the WRONG SECTION a THIRD time**
+(Phase 264, 2026-09-22 — into the archived **v2.9** `<details>` region, five milestones back, again as
+a `### Phase NNN:` stub). **The warning below was written after the second occurrence and did not
+prevent the third**, because nothing executable reads it. Detected by grepping the roadmap for the
+new number rather than by trusting the SDK's JSON, which reported success. Previously twice in two days:
 (Phase 252 on 2026-09-16, Phase 254 on 2026-09-17) — a `### Phase NNN:` block at the wrong heading
 level, appended after an archived milestone's `<details>` block, touching none of the live registers.
 Both were reverted from a pre-call backup and hand-edited. **Back up before calling an SDK write verb,

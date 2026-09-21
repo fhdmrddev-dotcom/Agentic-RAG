@@ -345,6 +345,60 @@ acceptance bar, and the approval-per-skill moment is the thing to draw.
 **G-4** — the operator's own bar, stated at scope time: *an Expert whose capabilities match its
 description*. **UI hint**: yes
 
+#### Phase 264: Born-For Skills Must LOAD, Not Just Resolve
+
+**Goal**: A skill born for an Expert is loadable by **everyone that Expert serves**, not only by the
+person who authored it. Today the born-for arm exists in exactly one of the two places a skill has to
+pass through, so the Expert's prompt advertises a capability the agent then fails to fetch.
+**Depends on**: Phase 263 (which shipped the provenance column and the resolve-time arm).
+**Requirements**: PACK-17 (completion — the run-time half of the same axis)
+**Origin**: `263-REVIEW.md` **CR-01**. Not a defect in a shipped line; a capability that stops one
+layer short of the user, which is why it is a phase and not a gap-closure round (G-7).
+
+**Success Criteria** (what must be TRUE):
+
+  1. A NON-AUTHOR member of the Expert's org can run that Expert and have the agent **load the
+     instruction body** of a born-for skill — driven end to end, not asserted at the predicate.
+  2. The born-for rule lives in **ONE** place. `app/utils/skill_visibility.py` is the single home by
+     its own charter (*"There is exactly ONE copy of this rule"*), and
+     `expert_service.filter_visible_skill_names` is a **third copy** that widened while the other two
+     did not. At close, a count of independent encodings of this predicate is **1**, measured.
+  3. Both encodings agree. `build_skill_visibility_or` (pushed to PostgREST) and `skill_row_visible`
+     (in Python) are driven against the SAME table of rows, including the born-for cases — the
+     module's own *"change one, change both"* rule made executable rather than documented.
+  4. The widening is **narrow**: a `NULL`/absent bundle never matches, a WRONG bundle never matches,
+     and a DIFFERENT org never matches — each driven, on the LOAD path, the way 263 drove them on the
+     resolve path.
+  5. Deep Mode and every non-Expert run are **byte-identical** in behaviour: with no Expert active
+     the predicate string is unchanged from base, proven by comparison, not by inspection.
+
+**Flags**:
+⛔ **THE MEASURED GAP, so it cannot be re-litigated.** `expert_service.py:342` admits a born-for
+skill at **resolve** time; that result becomes the **catalog only** (`run_producer.py:487-492`). The
+instruction **body** is fetched later by `load_skill` through `_resolve_skill_visibility_or`
+(`tool_dispatcher.py:1315`), which builds `is_system OR (org_id ∈ orgs AND (owner OR is_org_shared))`
+and has never heard of `born_for_expert_bundle_id`. For every org member but the author, the run
+falls into the miss branch at `:1326` and returns an error listing "loadable" names that **excludes
+the one the prompt just promised**.
+⚠ **263's UAT could not see it.** R-7 drove `filter_visible_skill_names` in isolation and passed on
+five arms. **No test in 263 drives `load_skill` as a non-author org member** — which is the whole
+lesson: a predicate proven correct in isolation says nothing about the layer that does not call it.
+⚠ **The asymmetry is currently DOCUMENTED AS DELIBERATE** in
+`tests/unit/test_seed125_skill_visibility_filter.py:126-142`. That comment must be **retired
+deliberately, with its reason rewritten** — never tripped by surprise (the `SEED-177` rule, and the
+precedent `D-206-07` set when Phase 206 retired the no-egress fence properly).
+⛔ **`ToolContext` carries no Expert bundle today** — measured: 30+ fields, none of them the bundle.
+So this is plumbing through the run path, not a predicate edit, and that is the honest reason it is a
+phase. The four `_resolve_skill_visibility_or` call sites (`:1315`, `:1459`, `:1589`, `:2197`) and the
+second consumer `services/harness/grounding.py:208` each need a decision, not a blanket change.
+⚠ **G-5 FIRES on two files in the blast radius**: `tool_dispatcher.py` (85 / 35 / 5048) and
+`agent_loop.py` (48 / 22 / 3441). Read their sections in `docs/HOT-FILE-LEDGER.md` before planning;
+`skill_visibility.py` has **no ledger row at all** and needs one at its first touch.
+⚠ **Out of scope:** cross-org skill sharing (PACK-17's fence stays), any change to what an Expert
+DOES once a skill loads, and the skill marketplace. This phase makes an existing promise true.
+**G-4** — the lived bar: *a second person in the org runs the Expert and gets the same capability the
+author gets*. **UI hint**: no — this is a run-path fix with no new surface.
+
 ### Coverage
 
 ✓ **All 21 v4.3 requirements mapped to exactly one phase. No orphans, no duplicates.**
@@ -385,6 +439,7 @@ unswept seeds (**134** carry no `trigger_when` at all · **114** carry prose the
 | 258. A Tier Becomes Enforceable | 0/? | Not started | - |
 | 259. An Expert Is a Bundle, Not a Runtime | 0/? | Not started | - |
 | 260. The Expert You Can Actually Use | 0/? | Not started | - |
+| 264. Born-For Skills Must LOAD, Not Just Resolve | 0/? | Not started | - |
 
 ---
 
@@ -1192,8 +1247,6 @@ Full detail archived → **`.planning/milestones/v2.9-ROADMAP.md`** · requireme
 CORE phases 097–104 (9 phases incl. inserted 101.1, 57 plans) shipped + validated — every CORE phase passed verify-work + secure-phase + live cross-provider UAT. Turned the v2.8 harness into an authorable capability: project/scope binding + server-side KB governance, workflow↔skill composition, ephemeral template upload + guaranteed cited template-fill with integrity gates, a reusable validation-gate library + an output-quality judge **hard-wall**, a Workflows page with NL authoring + read-only graph + 8-stage publish gauntlet, and a PM flagship content pack on the generic primitives.
 
 **STRETCH 105–109 deferred to backlog** (never started — roadmap gated them on "ship only if CORE lands clean and budget remains"): SCHED-01 (scheduled triggers + budget caps), GRID-01 (citation-traceable grid renderer), GOV-02 (per-run provenance receipt), PLUG-01 (plugin-contract lock), ROLE-01 (operator/admin role tier). They roll forward as next-milestone candidates.
-
----
 
 ## Shipped Milestones
 
