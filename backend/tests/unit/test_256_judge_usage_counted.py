@@ -749,6 +749,13 @@ _EXPECTED_FORCED_EMIT_SITES: dict[str, str] = {
     "services/harness/phase_types.py": "COUNTED-INTO-RUN-BOX",
     "services/harness/publish_service.py": "COUNTED-VIA-PERSIST",
     "services/harness/validator_kinds.py": "COUNTED-INTO-RUN-BOX",
+    # Phase 263 (PACK-15 / D-263-13). ⭐ THIS FENCE IS WHAT FOUND THE SITE: `263-02-PLAN.md`
+    # named `test_259_closed_core_inventory.py` as the registry a new service must not disturb
+    # and never mentioned this SECOND one, so the enrolment was discovered by the gate going
+    # red, not by the plan. NO-RUN is the same argument the two neighbours above carry — a
+    # plain service function called from a route, no `runs` row, no `workflow_runs` row, and
+    # `run_usage_box` absent from the source (driven by the test below, not asserted here).
+    "services/skill_body_authoring.py": "NO-RUN",
     "services/skill_proposer_service.py": "NO-RUN",
     "services/skill_tuner_service.py": "NO-RUN",
     "services/workflow_authoring.py": "NO-RUN",

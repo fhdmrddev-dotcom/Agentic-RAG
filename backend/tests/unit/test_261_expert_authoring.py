@@ -92,6 +92,12 @@ async def test_generate_expert_draft_uses_forced_emit():
             "member_skills": [],
             "knowledge_folder_ids": [],
             "required_connections": [],
+            # Phase 263 (D-263-02): REQUIRED on ExpertDraftOutput. ⛔ Omitting it here does
+            # NOT surface as a ValidationError — `generate_expert_draft` constructs the model
+            # inside a `try` whose `except Exception` reaches the fallback, so the assertion
+            # that fails is an unrelated one about the NAME ("… Specialist" instead of the
+            # emitted name). The success path validates the dict too, not just the fallback.
+            "suggested_new_skills": [],
         }
     })
 
@@ -213,6 +219,7 @@ async def test_expert_draft_pdf_docx_extraction():
                 "member_skills": [],
                 "knowledge_folder_ids": [],
                 "required_connections": [],
+                "suggested_new_skills": [],  # Phase 263 (D-263-02) — required
             }
         }
 
