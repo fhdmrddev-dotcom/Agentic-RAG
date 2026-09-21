@@ -4,9 +4,9 @@ title: An AI-drafted Expert gets docx/xlsx/pptx as its "capabilities" — the sk
 reported: 2026-09-21
 surface: Agentic-RAG
 severity: major
-status: open
+status: folded
 affected_areas: [experts, skills, backend/authoring, frontend/admin]
-folded_into: null
+folded_into: "263"
 verified_closed_by: null
 related_seeds: [SEED-303]
 re_open_trigger: null
@@ -145,6 +145,9 @@ against the local database.
 
 - **Fold into in-flight phase:** **261** for (a) and (b) — schema constraints and the jsonb write
   are small and belong with the authoring code.
+- **ROUTED — its own phase, ratified by the operator 2026-09-21: `Phase 263 — An Expert Can Be
+  Given Its Capabilities` (`PACK-14`..`PACK-17`).** The two secondary findings (a) and (b) were
+  fixed in 261 at `757bb9e25`. The main finding below is what 263 exists for.
 - **Its own phase / milestone candidate:** the **main finding**. "Author the skills an Expert
   needs" is a capability, not a gap-closure item — G-7 forbids smuggling a new capability into a
   closure round.

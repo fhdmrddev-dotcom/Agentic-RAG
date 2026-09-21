@@ -119,6 +119,36 @@ requirement has failed.
 - [ ] **PACK-06**: An Expert is gated by `TIER-01`. ⭐ **This is what makes a pack a SKU rather than a
       folder anyone can copy**, and it is why `TIER-*` sequences before `PACK-*`.
 
+⚠ **`PACK-07` … `PACK-13` are DEFINED IN `ROADMAP.md` AND NOT HERE.** Phases 261 and 262 were added
+directly to the roadmap without backfilling this register, so the requirement text for Expert
+authoring and discovery lives in one place only. Recorded rather than quietly fixed: the ids are
+real and mapped below, but **this file is not their home and a reader looking here will not find
+them.** Backfill belongs to whoever next edits 261/262 scope.
+
+### Giving an Expert its capabilities (Phase 263)
+
+⛔ **These four exist because the feature was MEASURED HOLLOW, not because someone wanted more.**
+`BUG-260921-01`, driven live 2026-09-21: a doctoral-literature-review Expert drafted a 2163-char
+operating blueprint and selected **`docx`, `xlsx`, `pptx`** as its capabilities, because
+`public.skills` holds **10 rows** and for an academic domain the only lexical matches are output
+file formats. ⭐ **An Expert is a manifest over assets that already exist; 259/260/261 built the
+manifest and nothing builds the assets.**
+
+- [ ] **PACK-14**: Drafting an Expert names the domain skills it needs that **do not exist yet** —
+      named, described, and visibly distinguished from the skills already in the library.
+- [ ] **PACK-15**: A proposed skill becomes real **only on human approval**, one at a time, created
+      through the **existing** `skill-creator` / `save_skill` path. ⛔ A second skill-authoring
+      engine is the thing to refuse, and the closed-core inventory must be measurably unchanged —
+      a skill is DATA, which is precisely why `EXT-01` permits this at all.
+- [ ] **PACK-16**: An Expert saved with a skill that does not exist **says so before it is saved**.
+      ⛔ Today the drafter's *"or recommend 3-5 skill names"* hatch produces names that
+      `expert_service.py`'s phase-2 member check strips at **run** time, so an author sees
+      capabilities the Expert will never have and nothing warns them. Save time is the only moment
+      a human can still act.
+- [ ] **PACK-17**: A skill authored for one org is **never** visible or resolvable to another, driven
+      against a cross-org caller. ⚠ `SEED-125` was a **real** cross-org skill leak, and this
+      requirement creates skills programmatically — which is exactly how one would recur.
+
 ---
 
 ## Open decisions — named here so they are not decided by accident
@@ -231,6 +261,17 @@ Per `SEED-294`, stated here because they get harder to unwind as the work compou
 | PACK-02 | Phase 260 — The Expert You Can Actually Use | Pending |
 | PACK-03 | Phase 260 — The Expert You Can Actually Use | Pending |
 | PACK-05 | Phase 260 — The Expert You Can Actually Use | Pending |
+| PACK-07 | Phase 261 — An Expert You Can Author | Pending |
+| PACK-08 | Phase 261 — An Expert You Can Author | Pending |
+| PACK-09 | Phase 261 — An Expert You Can Author | Pending |
+| PACK-10 | Phase 261 — An Expert You Can Author | Pending |
+| PACK-11 | Phase 262 — An Expert You Can Discover | Pending |
+| PACK-12 | Phase 262 — An Expert You Can Discover | Pending |
+| PACK-13 | Phase 262 — An Expert You Can Discover | Pending |
+| PACK-14 | Phase 263 — An Expert Can Be Given Its Capabilities | Pending |
+| PACK-15 | Phase 263 — An Expert Can Be Given Its Capabilities | Pending |
+| PACK-16 | Phase 263 — An Expert Can Be Given Its Capabilities | Pending |
+| PACK-17 | Phase 263 — An Expert Can Be Given Its Capabilities | Pending |
 
 ⚠ **The `METER-*` rows are NOT in id order, and that is deliberate.** `METER-03/04/05/06` are one
 delivery boundary — *a token that was spent is written down* — and `METER-01/02/07` are another — *a

@@ -122,6 +122,7 @@ permission to pitch.
 | 260 | The Expert You Can Actually Use | Selecting an Expert scopes a chat thread and tells a new user what to ask — and one first-party Expert proves the whole slice end to end | PACK-02, PACK-03, PACK-05 | 3 | ⛔ **`PACK-05` is the proof the slice is worth anything: if it is not valuable with ONE Expert, the feature is wrong and a directory of twelve will not save it.** Financial Analyzer, because finance is where *answer from the documents or refuse* is most obviously correct. ⛔ **Driven as a real conversation, not a fixture** — `feedback_uat_lived_experience_gap` and CLAUDE.md's *"presence assertions cannot see content drift"* both apply: assert the rendered **content**, not the presence of a block. **G-2 FIRES** — `/gsd:sketch` before `/gsd:plan-phase 260`; the operator-approved mockup is the acceptance bar. **G-4** lived-experience UAT. **Operator decision: #5 (install vs author — it decides the whole UI).** **G-5 likely:** `frontend/src/components/chat/MessageInput.tsx`, `frontend/src/components/chat/ChatArea.tsx`, `frontend/src/types/index.ts`, and `backend/app/services/agent_loop.py` **if** scoping is enforced in the loop — ⛔ which would be the red line, so propose the seam first. **UI hint: yes** |
 | 261 | An Expert You Can Author | An org-admin authors an Expert in the app — with AI help and uploaded files to brainstorm from — and decides who may use it | PACK-07, PACK-08, PACK-09, PACK-10 | TBD | ⛔ **THE EXTENSION CONTRACT IS THE RED LINE AGAIN: an Expert is DATA. AI-assisted authoring PRODUCES A ROW a human edits and saves — it never becomes a runtime, and it never auto-publishes.** The closed-core inventory must be measurably unchanged from this phase's own base (7 phase types / 1 emitter / 29 tools / `EXPERT_CORE_TOOLS` 10). ⭐ **REUSE, DO NOT INVENT: AI-assisted authoring ALREADY EXISTS for workflows** — `generate_workflow` (`api/workflows.py:1872`) + `services/workflow_authoring.py`. Mirror that seam; a second authoring engine is the thing to refuse. ⭐ **The admin surface has a pattern too:** `ModelRegistryTab.tsx` is the closest analog (list → add/edit/disable, operator-gated). ⚠ **MEASURED GAP — per-user access DOES NOT EXIST:** `expert_bundles.visibility` is only `private | org | public`, so *"which users can use it"* needs **migration 189**. ⭐ **But WHO MAY AUTHOR is already data:** `role_permissions(role, permission_key)` exists and the roles are `super-admin / org-admin / dept-admin / member`, so *"admins now, high-privilege users later"* must be a ROW CHANGE with no code edit — the `TIER-02` rule one subsystem over. ⚠ **Uploaded brainstorm files are NOT knowledge-base ingestion** — where they go is stated in the UI and driven, or this silently pollutes the Library. **G-2 FIRES** — `/gsd:sketch` before `/gsd:plan-phase 261`. **G-4** lived-experience UAT. **G-5 likely:** `frontend/src/components/admin/*`, `frontend/src/lib/api/experts.ts` (read-only today), `backend/app/api/experts.py`. **UI hint: yes** |
 | 262 | An Expert You Can Discover | A normal user browses the Experts available TO THEM, and each card opens a detail view saying what it does and **when to use it** | PACK-11, PACK-12, PACK-13 | TBD | ⭐ **THE DEFERRAL THAT FIRED:** Phase 260's flag said *"if the slice is not valuable with ONE Expert, a directory of twelve will not save it"* — so the catalog was held back ON PURPOSE until the slice proved itself. **260 closed 3/3 and works live, so the condition is met.** ⚠ **MEASURED GAP — the row cannot feed a rich card:** `expert_bundles` has a one-line `description` and `prompt_suggestions`, and **no icon, no category, no when-to-use, no example output**. Presentation fields need a migration, and ⛔ **they are PRESENTATION, not behaviour** — nothing here may change what an Expert DOES. ⭐ **A MODAL AVOIDS THE ROUTER:** the operator asked for a pop-up, and since the app still has **no router at all**, a modal is what makes this shippable without the routing phase. A per-Expert URL stays owed. ⛔ **"Available TO THEM" is the honesty test** — the list must reflect tier entitlement AND `PACK-10`'s per-user grants, so **262 depends on 261's migration**; a catalog showing Experts a user cannot invite is a brochure for a locked door. **G-2 FIRES**. **G-5 likely:** `frontend/src/lib/nav-items.ts`, `frontend/src/components/layout/NavPanel.tsx` (a FOURTH home changes the three-homes IA contract — read the sketch-findings skill first). **UI hint: yes** |
+| 263 | An Expert Can Be Given Its Capabilities | Authoring an Expert can AUTHOR THE SKILLS it needs — the studio proposes the missing ones, a human approves each, and they are created through the existing skill-creator | PACK-14, PACK-15, PACK-16, PACK-17 | TBD | ⛔ **THIS PHASE EXISTS BECAUSE THE FEATURE WAS MEASURED HOLLOW, NOT BECAUSE SOMEONE WANTED MORE.** Driven live 2026-09-21 (`BUG-260921-01`): a PhD-literature-review Expert drafted a 2163-char blueprint, three ~1000-char Action Tiles, 3 folders and 3 connections — and selected **`docx`, `xlsx`, `pptx`** as its capabilities, because `public.skills` holds **10 rows** and for an academic domain the only lexical matches are output file formats. ⭐ **An Expert is a MANIFEST over assets that already exist; 259/260/261 built the manifest and nothing builds the assets.** ⛔ **AND THE PROMPT'S ESCAPE HATCH MAKES IT WORSE SILENTLY:** item 11 says *"or include 3-5 recommended domain skill names"*, and an invented name is **stripped at run time** by `expert_service.py`'s phase-2 member check — the author sees skills the Expert will not have, with no warning. ⭐ **REUSE, DO NOT INVENT, FOR THE THIRD PHASE RUNNING:** `skill-creator` is already a system skill and `save_skill` is already in `_TOOL_REGISTRY`. A second skill-authoring engine is the thing to refuse. ⛔ **THE EXTENSION CONTRACT IS STILL THE RED LINE — and a skill is DATA, which is exactly why this is legal.** The closed-core inventory must be measurably unchanged from this phase's own base (7 phase types / 1 emitter / 29 tools). ⛔ **NEVER AUTO-CREATE:** a proposed skill is a row a human approves, the same rule `PACK-09` already binds drafting to. ⚠ **Cross-org leak is the live risk** — `SEED-125` was a REAL skill leak; a skill authored for one org must never become visible to another, and that arm is DRIVEN. **G-2 FIRES** — `/gsd:sketch` before planning. **G-4** lived-experience UAT: the operator's own bar is *an Expert whose capabilities match its description*. **G-5 likely:** `backend/app/services/expert_authoring.py`, `backend/app/api/experts.py`, `frontend/src/components/experts/ExpertAuthoringStudio.tsx`. **UI hint: yes** |
 
 ### Phase Checklist
 
@@ -134,6 +135,7 @@ permission to pitch.
 - [x] **Phase 260: The Expert You Can Actually Use** — selecting an Expert visibly scopes the thread and tells a new user what to ask, proven end to end by the Financial Analyzer (PACK-02, PACK-03, PACK-05). **CLOSED 2026-09-20 — 3 of 3 SC MET.** **One review round, PASS** (`260-REVIEW.md` — 3 findings, all fixed and each RE-DRIVEN, every planted file restored md5-identical). ⛔ **F-1: THE SCOPE FAILED OPEN AND THE UI LIED ABOUT IT** — `_resolve_thread_scoping` returned unrestricted on two driven paths, and on the worse one `threads.active_expert_id` stayed set, so the chip kept rendering *Financial Analyzer* while the agent searched the whole corpus. **The exact inverse of `D-258-06`, which had EXPLICITLY REJECTED fallback-to-permissive two phases earlier.** ⭐ **Invisible from the happy path — the operator had it working live before the review started.** Fixed fail-closed, the stale id reset so the UI and the run agree, **and then proven NOT to over-correct** (plain chat still allowed, a resolvable Expert still scopes). ⚠ **F-2: both new frontend suites ran in NO GATE** — 323 lines, zero occurrences, and the total sat byte-identical at 8468; **a total that does not move is the tell**. The gate's OWN source comments had predicted this (*"`src/components/chat` has no bare-directory TARGETS entry… guarded nothing for ~50 phases"*). Now `8478 · 7737 · 295/295`. ⭐ **F-3 found a phantom nobody was looking for:** `fetch_document_chunk` was granted to every Expert and **does not exist in `_TOOL_REGISTRY`**; the set is now `EXPERT_CORE_TOOLS`, 10 members, fenced as a strict subset. ⭐ **Both handover constraints held and were CHECKED, not believed:** `grep -ci expert` in `agent_loop.py` = **0** (scope is generic data handed TO the loop), and the composer gained **no new top-level control** — invite sits in the existing `+` menu. ⭐ **Migration 188 populated the Financial Analyzer** (folder, document, chunks, skills), closing the empty-bundle gap raised at handover — which is why `PACK-05` is demonstrable rather than aspirational. ⚠ **Residual, recorded as a DECISION:** a transient `threads` read failure now refuses EVERY chat, not just Expert chats — defensible, app-wide blast radius. Gates at close: backend `71 failed / 5176 passed` with the failure SET byte-identical to baseline · vitest `8478 · failed 0 · 295/295`. ⛔ **The app STILL has no router** — `/experts/<slug>` is owed and is its own phase. ⛔ **Migrations 186–188 are applied LOCALLY but NOT to production** — they ride the v4.3 close batch, and BOTH production orgs still measure `subscription_tier IS NULL`.
 - [ ] **Phase 261: An Expert You Can Author** — an authoring surface for Experts at admin level, with AI-assisted drafting from uploaded files, and per-user control over who may use each one (PACK-07, PACK-08, PACK-09, PACK-10)
 - [ ] **Phase 262: An Expert You Can Discover** — a browsable catalog of the Experts available to a normal user, each card opening a detail view that says what it does and when to use it (PACK-11, PACK-12, PACK-13)
+- [ ] **Phase 263: An Expert Can Be Given Its Capabilities** — the authoring studio proposes the domain skills an Expert is missing, a human approves each one, and they are created through the existing skill-creator so an Expert's capabilities finally match its description (PACK-14, PACK-15, PACK-16, PACK-17)
 
 ### Phase Details
 
@@ -283,6 +285,61 @@ Plans:
 **Flags**: ⭐ **THIS IS A DEFERRAL THAT FIRED, NOT A NEW IDEA.** Phase 260's flag deliberately held the catalog back: *"if the slice is not valuable with ONE Expert, the feature is wrong and a directory of twelve will not save it."* **260 closed 3/3 and the operator has it working live, so the condition is satisfied** — record that, because a directory built before the slice proved itself would have been the exact mistake the flag named. ⚠ **MEASURED GAP — the row cannot feed a rich card today:** `expert_bundles` carries a one-line `description` plus `prompt_suggestions`, and **no icon, no category, no when-to-use, no example output**. Presentation fields need a migration; ⛔ **check the head first — the ROADMAP has named an already-taken migration number twice running.** ⛔ **THEY ARE PRESENTATION FIELDS AND NOTHING ELSE** — no field added here may change what an Expert DOES, or `PACK-01`'s *"an Expert is a manifest, not a runtime"* starts leaking through the catalog. ⭐ **A MODAL IS WHAT MAKES THIS SHIPPABLE:** the operator asked for a pop-up, and the app **still has no router**, so a modal sidesteps the routing phase entirely. **A per-Expert URL stays owed** and belongs to the routing phase, not here. ⛔ **`PACK-11` IS THE HONESTY CRITERION and the one most likely to be faked** — listing everything and greying out the rest is NOT the same as listing what the user may use, and a catalog advertising Experts a user cannot invite is a brochure for a locked door. Drive it against a user with a visible row and no grant. ⚠ **A FOURTH HOME CHANGES THE IA CONTRACT** — `nav-items.ts` and `NavPanel.tsx` encode three homes (Chat / Library / Workflows); adding a fourth is a design decision, so **read the `sketch-findings-agentic-rag` skill's navigation/IA section before drawing it**. ⚠ **Operator decisions for the sketch:** (a) fourth nav home, or an entry point inside Chat? (b) does the catalog show Experts the user could get by upgrading, as an upsell, or only what they already have — this is a commercial choice, not a UI one. **G-2 FIRES** — `/gsd:sketch` before planning. **G-4** lived-experience UAT. **UI hint**: yes
 
 
+#### Phase 263: An Expert Can Be Given Its Capabilities
+
+**Goal**: An Expert's capabilities match its description, because authoring one can **author the
+skills it needs**. The studio names the domain skills that do not exist yet, a human approves each,
+and they are created through the **existing** `skill-creator` — so an Expert stops being a manifest
+over an empty shelf.
+**Depends on**: Phase 261 (the authoring studio is where the proposal surfaces). Independent of 262.
+**Requirements**: PACK-14, PACK-15, PACK-16, PACK-17
+**Success Criteria** (what must be TRUE):
+
+  1. Drafting an Expert returns, alongside `member_skills`, the domain skills it needs that **do not
+     exist** — named, described, and visibly distinguished from the ones already in the library
+     (PACK-14).
+  2. A proposed skill becomes real **only when a human approves it**, one by one, and is created
+     through the existing `skill-creator` / `save_skill` path — **no second authoring engine**, and
+     the closed-core inventory is measurably unchanged from this phase's own base commit (PACK-15).
+  3. An Expert saved with a skill that does not exist **says so before it is saved**, rather than
+     losing it silently to the phase-2 member check at run time (PACK-16).
+  4. A skill authored for one org is **never** visible or resolvable to another, driven against a
+     cross-org caller the way `PACK-04` drove the member check (PACK-17).
+
+**Plans**: TBD
+**Flags**: ⛔ **THIS PHASE EXISTS BECAUSE THE FEATURE WAS MEASURED HOLLOW.** `BUG-260921-01`, driven
+live in Chrome on 2026-09-21: the drafter produced a 2163-char operating blueprint for a doctoral
+literature reviewer and gave it **`docx`, `xlsx`, `pptx`**. `SELECT count(*) FROM public.skills` =
+**10**, two of them system, and for an academic domain the only lexical matches are output formats.
+⭐ **The prompt is not at fault and must not be "improved" as the fix** — it already demands an
+exhaustive A-to-Z configuration and already asks for domain skills. **The library is the ceiling.**
+⛔ **The silent half is the dangerous half:** item 11's *"or include 3-5 recommended domain skill
+names"* produces names that `expert_service.py`'s phase-2 member check **strips at run time**, so an
+author sees capabilities the Expert will never have and nothing says so. `PACK-16` closes that at
+**save** time, which is the only moment a human can act on it.
+⭐ **REUSE, DO NOT INVENT — third phase running:** `skill-creator` is a system skill row and
+`save_skill` is a registered tool. Mirror `generate_workflow` → `workflow_authoring.py` the way 261
+did. **A second skill-authoring engine is the thing to refuse.**
+⛔ **THE EXTENSION CONTRACT REMAINS THE RED LINE, and a skill being DATA is exactly why this is
+legal** (`EXT-01`). Prove 7 phase types / 1 emitter / 29 tools unchanged at close, **counted, never
+substring-matched** — Phase 260 paid for that lesson when a planted `bundle_emit` passed all five
+fence tests.
+⛔ **NEVER AUTO-CREATE.** A proposed skill is a row a human approves — the same rule `PACK-09`
+already binds AI-assisted drafting to, one subsystem over.
+⚠ **`SEED-125` WAS A REAL CROSS-ORG SKILL LEAK, not a hypothetical**, and this phase creates skills
+programmatically, which is precisely how one would recur. `PACK-17` is driven, not asserted.
+⚠ **Sequencing is a genuine choice, recorded rather than assumed:** 263 sits after 262 because 262
+is presentation-only and already sketched. **But 262 is a catalog, and a catalog of hollow Experts
+is the "brochure for a locked door" its own `PACK-11` warns about** — so if the operator wants the
+value first, 263 and 262 may be swapped at no cost: 262's only dependency is 261's migration, which
+is already applied.
+⚠ **Out of scope:** a skill marketplace, cross-org skill sharing, and any change to what an Expert
+DOES at run time. This phase fills the shelf; it does not change the manifest's meaning.
+**G-2 FIRES** — `/gsd:sketch` before `/gsd:plan-phase 263`; the operator-approved mockup is the
+acceptance bar, and the approval-per-skill moment is the thing to draw.
+**G-4** — the operator's own bar, stated at scope time: *an Expert whose capabilities match its
+description*. **UI hint**: yes
+
 ### Coverage
 
 ✓ **All 21 v4.3 requirements mapped to exactly one phase. No orphans, no duplicates.**
@@ -297,7 +354,8 @@ Plans:
 | 260 | PACK-02, PACK-03, PACK-05 | 3 |
 | 261 | PACK-07, PACK-08, PACK-09, PACK-10 | TBD |
 | 262 | PACK-11, PACK-12, PACK-13 | TBD |
-| **Total** | | **21 / 21** |
+| 263 | PACK-14, PACK-15, PACK-16, PACK-17 | TBD |
+| **Total** | | **25 / 25** |
 
 ⚠ **The `METER-*` split is by DELIVERY BOUNDARY, not by numbering.** `METER-03/04/05/06` are one
 capability — *a token that was spent is written down* — and `METER-01/02/07` are another — *a written-down

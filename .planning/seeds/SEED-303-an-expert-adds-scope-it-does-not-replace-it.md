@@ -46,8 +46,8 @@ mid-answer.
 
 ## Why it matters
 
-Eight scenarios, each of which breaks or is unreachable under replacement semantics. S4 and S6
-are the two that cost money.
+NINE scenarios, each of which breaks or is unreachable under replacement semantics. S4 and S6
+are the two that cost money; **S9 was added after it was measured** and is the one the operator hit.
 
 - **S1 — onboarding (highest volume).** A new employee does not know the folder tree or what the
   system can do. Picking an Expert and clicking a prompt tile is the whole time-to-value story
@@ -83,6 +83,14 @@ are the two that cost money.
   so without **clone-on-customise** every client needs a vendor-authored row — which does not
   scale and kills the pack business. *The seed Expert stays canonical; the clone carries the
   tenant's folder ids. This is how every template marketplace works, and it is a 261 decision.*
+
+- **S9 — an Expert is only as capable as the library it draws from. MEASURED, not predicted.**
+  `BUG-260921-01`, driven live 2026-09-21: a doctoral-literature-review Expert got a 2163-char
+  operating blueprint and **`docx`, `xlsx`, `pptx`** as its capabilities, because `public.skills`
+  holds **10 rows**. *The four axes above assume there is something to compose. S9 is the case where
+  there is not — and it is the one the operator hit first.* ⭐ **Routed to `Phase 263`
+  (`PACK-14`..`PACK-17`) by the operator on 2026-09-21**, because filling the shelf is a capability
+  and G-7 forbids smuggling one into a closure round.
 
 ## Competitive reading
 
