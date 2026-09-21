@@ -60,7 +60,11 @@ class ExpertDraftOutput(BaseModel):
 
     name: str = Field(..., min_length=3, max_length=120, description="Authoritative professional domain title")
     slug: str = Field(..., min_length=3, max_length=120, description="URL-safe kebab-case slug for the expert")
-    icon: str = Field(..., description="Lucide vector glyph name (one of: book, scale, chart, shield, briefcase, truck, terminal, cpu, database, file-text)")
+    # ⛔ 263-REVIEW.md WR-01 — `max_length` mirrors `ExpertBundleBase.icon`. Unbounded, a
+    # weaker model answers the enumerated list with "file-text (Document / General — best
+    # fit for a generic knowledge worker persona)" (71 chars): the draft returns 200 and
+    # the save 422s, so the app refuses the Expert its own AI just wrote.
+    icon: str = Field(..., max_length=64, description="Lucide vector glyph name (one of: book, scale, chart, shield, briefcase, truck, terminal, cpu, database, file-text)")
     category: str = Field(..., min_length=3, max_length=60, description="Domain category classification")
     when_to_use: str = Field(..., min_length=40, max_length=240, description="One or two sentences on when and why to summon this expert (max 240 chars — it renders as a one-liner on the Expert card)")
     example_output: str = Field(..., min_length=120, max_length=4000, description="Realistic, concrete sample excerpt of the expert's deliverable")

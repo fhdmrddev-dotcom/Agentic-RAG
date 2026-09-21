@@ -59,10 +59,14 @@ async def create_expert_service(
         tool_floor_enabled=bundle_in.tool_floor_enabled,
     )
     if created:
+        # ⛔ 263-REVIEW.md WR-08 — `born_skills`, NOT `member_skills`. The stamp is a
+        # privilege widening (D-263-06); claiming the whole selected set meant a
+        # long-standing private skill became readable by the whole org because its author
+        # ticked a checkbox. Only what this session CREATED is claimed.
         await _stamp_born_for(
             pool,
             bundle_id=created.get("id"),
-            skill_names=bundle_in.member_skills,
+            skill_names=bundle_in.born_skills,
             org_id=org_id,
             user_id=user_id,
         )
@@ -237,17 +241,21 @@ async def update_expert_service(
             s if isinstance(s, dict) else s.model_dump()
             for s in update_data["prompt_suggestions"]
         ]
+    # ⛔ 263-REVIEW.md WR-08 — `born_skills` is a REQUEST field, not a column. Popped here
+    # rather than left for `update_expert_bundle`'s `allowed_fields` to skip: a request
+    # field's safety must not depend on a list it is not named in.
+    born_skills = update_data.pop("born_skills", None)
     updated = await experts_db.update_expert_bundle(
         pool=pool,
         bundle_id=bundle_id,
         caller_org_id=caller_org_id,
         **update_data,
     )
-    if updated and caller_user_id is not None and update_data.get("member_skills") is not None:
+    if updated and caller_user_id is not None and born_skills:
         await _stamp_born_for(
             pool,
             bundle_id=bundle_id,
-            skill_names=update_data["member_skills"],
+            skill_names=born_skills,
             org_id=caller_org_id,
             user_id=caller_user_id,
         )

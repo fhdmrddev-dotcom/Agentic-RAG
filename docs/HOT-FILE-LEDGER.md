@@ -15631,6 +15631,93 @@ landing before that extraction is the trigger.
 
 ---
 
+## 263-REVIEW.md WR-01 … WR-09 — seven claims the Expert surfaces were making that were not true
+
+⚠ **RE-DERIVED 2026-09-22, and FOUR of the six rows were stale — one of them the same day it was
+written.** `models/expert.py` `3/3/93` → **`4/3/131`** · `services/expert_service.py` `6/4/507` →
+**`6/4/515`** · `api/experts.py` `9/3/585` → **`9/3/605`** · `lib/api/experts.ts` `5/3/298` →
+**`5/3/313`**. Two more had **no row at all**: `services/expert_authoring.py` (5/2/393) and
+`components/experts/ExpertAuthoringStudio.tsx` (**3/2/1550**) — both added here BELOW the G-5
+threshold, deliberately, because an absent row is invisible to G-5 at any count.
+
+### The one shape behind four of them
+
+`ExpertBundleBase` is the contract. Three other doors reach the same columns and each had drifted
+from it in its own direction, quietly:
+
+| | Door | Drift |
+|---|---|---|
+| WR-01 | `ExpertDraftOutput.icon` (producer) | no `max_length` against a consumer capped at 64 — the drafter could emit what its own save path refuses |
+| WR-02 | `ExpertBundleUpdate` (PATCH) | bare `str \| None` on every field, so `{"name": ""}` returned 200 and persisted |
+| WR-03 | `slug` | the studio let an author edit it, the server dropped it, both reported success |
+| WR-08 | the born-for stamp | claimed ANY unstamped skill of the saver's named in `member_skills` |
+
+⭐ **WR-01's fence existed and could not see the defect.** `test_263_drafter_output_fits_its_consumers.py`
+was written for exactly this class by BUG-260921-02 — and its `PRODUCER_CONSUMER_PAIRS` is a
+**hand-typed list** that omitted `icon`. That is this project's recurring *"a register nobody
+re-derives"* shape, inside the guard built to stop it. ⛔ **The replacement fence DERIVES its field
+set** from the intersection of the two models' string fields, so a new shared field is covered the
+day it is added rather than the day someone remembers.
+
+⛔ **`default=None` is load-bearing on every `ExpertBundleUpdate` field and must never become
+`Field(...)`.** `update_expert_service` reads the body with `exclude_unset=True` — *absent means
+unchanged*. A required field there breaks every partial PATCH in the product, so the tightening adds
+constraints and touches no default. `test_update_fields_all_still_optional` is the guard on the fix.
+
+### WR-08 — a checkbox was taking a decision the publish gate exists to mediate
+
+The stamp's only narrowing predicates were `org_id`, `user_id` and `born_for_expert_bundle_id IS
+NULL`. **Nothing tied a row to this authoring session.** So an author who merely *ticked* a
+long-standing private skill — never `is_org_shared`, never through `toggle-global`, which 409s
+without eval evidence — had it claimed, and every org member resolving that Expert then got it.
+
+⚠ Migration 191's own `COMMENT ON COLUMN` said the opposite (*"NULL for every skill not born from
+Expert authoring"*). **The comment was false for a merely-selected row, and nothing in the UI said
+otherwise.** ⚠ It was never a cross-org leak — `org_id = $3` and `s_org_id == caller_org_id` both
+hold and both are driven — so the defect is the SCOPE of an in-org widening and its silence.
+
+**OPERATOR DECISION 2026-09-22: narrow the claim.** The client now sends `born_skills` — the names
+it created in this session — and only those are stamped. ⛔ **`born_skills` is REQUEST-ONLY**, on
+`ExpertBundleCreate`/`Update` and never on `ExpertBundleBase`, because `ExpertBundle` (the response
+model) extends Base: a field there ships back to every caller and into the persisted row.
+⛔ **An absent field stamps NOTHING**, and the client sends `[]` rather than omitting it — the
+tempting *"fall back to `member_skills` for compatibility"* restores the exact defect.
+
+### WR-04 / WR-05 — the studio reported things it had not done
+
+- **WR-04:** the grant sync had **two** fail-open paths, both silent. A failed `getExpertGrants`
+  returned `[]`, so the removal loop never ran and **every grant the author deleted in the UI stayed
+  in the database**; a failed `removeExpertGrant` was swallowed. Either way the modal closed on a
+  success path. ⚠ **The additive direction fails CLOSED** (a dropped add is just less access), so
+  only the security-relevant direction was quiet. Now collected and surfaced as a **partial-success
+  report** — the save already succeeded, so this is never a rollback.
+- **WR-05:** `phantomMemberSkills` is `[]` when the library was never read, which folded **unknown**
+  into **clean**: on a failed `listSkills()` the phase's own honesty deliverable printed a green ✓
+  and *"all resolvable by the member check at run time"* over names that do not exist. Not holding
+  Save on a failed read stays correct; **vouching does not.** Unknown is now a third rendered state.
+
+### WR-09 — the driver's exception was being rendered in the browser
+
+`detail=f"Could not create expert bundle: {exc}"` put asyncpg's message — index names, the column
+tuple, another org's identifier, and on a driver fault the connection string — straight into the
+studio's error banner. The catch-all's detail is now a **literal**; the full exception still reaches
+the log with `exc_info=True`. ⛔ **ORDER IS THE CONTRACT:** the new `UniqueViolationError` arm (409,
+`error: expert_slug_taken`) must precede the catch-all, and both stay OUTSIDE the refusal above them
+— inside, an `HTTPException` is caught and a 422 ships as a 400.
+
+### What was driven, and what is owed
+
+Every fix went RED first: **10/13** on the model fence, **4/4** on the refusal fence, **7/8** on the
+stamp fence, **7/9** on the studio suite (the two green ones are positive controls — the create-mode
+slug and the banner's clean arm — and they are there so the negative arms cannot pass vacuously).
+⚠ **Two of the seven studio failures were FIXTURE errors, not code errors** (the submit button reads
+*"Save & Publish Expert"*, and the mount-time grants load populates the very state the save loop
+compares against). Both are recorded because a RED that fails for the wrong reason proves nothing.
+
+⚠ **OWED:** the live two-user drive for CR-02/CR-03, and a UAT row for WR-08 — a source-level fence
+proves the code says the right thing, never that Postgres agrees.
+
+
 ## `backend/app/api/experts.py`
 
 ⚠ **CORRECTED 2026-09-22 (263-REVIEW.md CR-02 / CR-03) — THE ROW WAS STALE A THIRD TIME AT

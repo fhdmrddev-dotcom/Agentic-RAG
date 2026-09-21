@@ -70,6 +70,8 @@ import {
   updateExpert,
   draftExpert,
   draftSkillBody,
+  getExpertGrants,
+  removeExpertGrant,
   ExpertMemberSkillsUnknownError,
   SkillBodyDisabledError,
 } from "@/lib/api/experts"
@@ -498,5 +500,179 @@ describe("ExpertAuthoringStudio — proposed capabilities (263-04 / sketch 263-A
     expect(banner).toHaveTextContent("prisma-screening")
     expect(banner).toHaveTextContent("thematic-synthesis")
     expect(banner.className).toContain("destructive")
+  })
+})
+
+
+// -------------------------------------------------------------------------------------
+// 263-REVIEW.md WR-03 / WR-04 / WR-05 / WR-08 - four claims the studio was making that
+// were not true of what it had just done. Every case below drives the rendered CONTENT,
+// never the presence of a container: this phase already shipped a defect behind a green
+// presence assertion, and on all four of these the WORDS are the deliverable.
+// -------------------------------------------------------------------------------------
+
+const EXISTING_EXPERT = {
+  id: "exp-1",
+  org_id: "org-1",
+  created_by: "user-1",
+  name: "Financial Analyzer",
+  slug: "finacial-analyzer",
+  icon: "chart",
+  category: "Finance",
+  when_to_use: "",
+  example_output: "",
+  description: "d",
+  scope_mode: "restricted" as const,
+  tool_floor_enabled: true,
+  member_skills: [] as string[],
+  required_connections: [] as string[],
+  knowledge_folder_ids: [] as string[],
+  prompt_suggestions: [] as { title: string; prompt: string }[],
+  visibility: "private" as const,
+  is_enabled: true,
+  is_system: false,
+  created_at: "2026-01-01T00:00:00Z",
+  updated_at: "2026-01-01T00:00:00Z",
+}
+
+describe("263-REVIEW WR-03 - slug is immutable after creation", () => {
+  beforeEach(() => vi.clearAllMocks())
+  afterEach(() => cleanup())
+
+  it("renders the slug readOnly in EDIT mode, with a reason the author can read", async () => {
+    render(<ExpertAuthoringStudio onClose={vi.fn()} onSaved={vi.fn()} initialData={EXISTING_EXPERT as never} />)
+    const input = await screen.findByDisplayValue("finacial-analyzer")
+
+    // readOnly, NOT disabled: the value must stay selectable and copyable.
+    expect(input).toHaveAttribute("readonly")
+    // A grey-out with no reason is the same failure as the silent discard it replaces.
+    expect(screen.getByText(/cannot change|set when it was created|saved references resolve/i)).toBeInTheDocument()
+  })
+
+  it("leaves the slug editable when CREATING - the field is required there", async () => {
+    render(<ExpertAuthoringStudio onClose={vi.fn()} onSaved={vi.fn()} />)
+    await screen.findByText("Author New Domain Expert")
+    expect(screen.getByPlaceholderText("financial-analyzer")).not.toHaveAttribute("readonly")
+  })
+
+  it("never sends slug on the UPDATE payload - the server discards it silently", async () => {
+    vi.mocked(updateExpert).mockResolvedValue({ ...EXISTING_EXPERT } as never)
+    render(<ExpertAuthoringStudio onClose={vi.fn()} onSaved={vi.fn()} initialData={EXISTING_EXPERT as never} />)
+    await screen.findByDisplayValue("finacial-analyzer")
+
+    fireEvent.click(screen.getByRole("button", { name: /update expert/i }))
+    await waitFor(() => expect(updateExpert).toHaveBeenCalled())
+    expect(vi.mocked(updateExpert).mock.calls[0][1]).not.toHaveProperty("slug")
+  })
+})
+
+describe("263-REVIEW WR-04 - a failed grant revocation is reported, never swallowed", () => {
+  beforeEach(() => vi.clearAllMocks())
+  afterEach(() => cleanup())
+
+  const granted = { ...EXISTING_EXPERT, visibility: "granted" as const }
+
+  it("surfaces the failure when removeExpertGrant rejects, instead of closing on success", async () => {
+    vi.mocked(updateExpert).mockResolvedValue({ ...granted } as never)
+    // The mount-time load returns [] (the author has since removed the grant in the UI),
+    // the save-time load returns the row still on the server. That is exactly the state
+    // the removal loop exists for: "on the server, not in my list".
+    vi.mocked(getExpertGrants)
+      .mockResolvedValueOnce([] as never)
+      .mockResolvedValue([
+        { id: "g1", grantee_type: "user", grantee_id: "departed-contractor" },
+      ] as never)
+    vi.mocked(removeExpertGrant).mockRejectedValue(new Error("boom"))
+    const onClose = vi.fn()
+
+    render(<ExpertAuthoringStudio onClose={onClose} onSaved={vi.fn()} initialData={granted as never} />)
+    await screen.findByDisplayValue("finacial-analyzer")
+    fireEvent.click(screen.getByRole("button", { name: /update expert/i }))
+
+    // The save itself succeeded, so this is a PARTIAL-SUCCESS report, not a rollback.
+    await waitFor(() => {
+      expect(screen.getByText(/could not revoke/i)).toBeInTheDocument()
+    })
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it("reports that NO revocation was applied when the grants read itself fails", async () => {
+    vi.mocked(updateExpert).mockResolvedValue({ ...granted } as never)
+    vi.mocked(getExpertGrants).mockRejectedValue(new Error("503"))
+    const onClose = vi.fn()
+
+    render(<ExpertAuthoringStudio onClose={onClose} onSaved={vi.fn()} initialData={granted as never} />)
+    await screen.findByDisplayValue("finacial-analyzer")
+    fireEvent.click(screen.getByRole("button", { name: /update expert/i }))
+
+    // The dangerous half: an empty read makes the removal loop a no-op, so every grant the
+    // author deleted in the UI stays in the database while the modal reports success.
+    await waitFor(() => {
+      expect(screen.getByText(/no revocation was applied/i)).toBeInTheDocument()
+    })
+    expect(onClose).not.toHaveBeenCalled()
+  })
+})
+
+describe("263-REVIEW WR-05 - an unread library is a THIRD state, not clean", () => {
+  beforeEach(() => vi.clearAllMocks())
+  afterEach(() => cleanup())
+
+  it("says the library could not be read, rather than vouching for what it never checked", async () => {
+    vi.mocked(listSkills).mockRejectedValue(new Error("503"))
+    render(<ExpertAuthoringStudio onClose={vi.fn()} onSaved={vi.fn()} />)
+    await screen.findByText("Author New Domain Expert")
+
+    const banner = await screen.findByTestId("unresolved-capabilities-banner")
+    await waitFor(() => {
+      expect(within(banner).getByText(/could not be read/i)).toBeInTheDocument()
+    })
+    // The claim that was false: the phase's own honesty deliverable asserting the opposite
+    // of the truth, because its INPUT was unknown rather than clean.
+    expect(within(banner).queryByText(/Every capability in this blueprint exists/i)).not.toBeInTheDocument()
+    expect(within(banner).queryByText(/all resolvable by the member check/i)).not.toBeInTheDocument()
+  })
+
+  it("still vouches when the library WAS read and nothing is phantom", async () => {
+    vi.mocked(listSkills).mockResolvedValue([{ name: "ratio_calculator", description: "x" }] as never)
+    render(<ExpertAuthoringStudio onClose={vi.fn()} onSaved={vi.fn()} />)
+    await screen.findByText("Author New Domain Expert")
+
+    const banner = await screen.findByTestId("unresolved-capabilities-banner")
+    await waitFor(() => {
+      expect(within(banner).getByText(/Every capability in this blueprint exists/i)).toBeInTheDocument()
+    })
+  })
+})
+
+describe("263-REVIEW WR-08 - only skills created in THIS session are claimed born-for", () => {
+  beforeEach(() => vi.clearAllMocks())
+  afterEach(() => cleanup())
+
+  it("sends born_skills as an EMPTY list when nothing was created this session", async () => {
+    vi.mocked(createExpert).mockResolvedValue({ ...EXISTING_EXPERT } as never)
+    render(<ExpertAuthoringStudio onClose={vi.fn()} onSaved={vi.fn()} />)
+    await screen.findByText("Author New Domain Expert")
+
+    fireEvent.change(screen.getByPlaceholderText("E.g. Financial Analyzer"), { target: { value: "X" } })
+    fireEvent.change(screen.getByPlaceholderText("financial-analyzer"), { target: { value: "x" } })
+    fireEvent.click(screen.getByRole("button", { name: /save & publish expert/i }))
+
+    await waitFor(() => expect(createExpert).toHaveBeenCalled())
+    const payload = vi.mocked(createExpert).mock.calls[0][0] as { born_skills?: string[] }
+    // NOT undefined-and-ignored: the field is present and empty, so a ticked long-standing
+    // private skill is provably not claimed rather than incidentally not claimed.
+    expect(payload.born_skills).toEqual([])
+  })
+
+  it("sends born_skills on the UPDATE payload too", async () => {
+    vi.mocked(updateExpert).mockResolvedValue({ ...EXISTING_EXPERT } as never)
+    render(<ExpertAuthoringStudio onClose={vi.fn()} onSaved={vi.fn()} initialData={EXISTING_EXPERT as never} />)
+    await screen.findByDisplayValue("finacial-analyzer")
+
+    fireEvent.click(screen.getByRole("button", { name: /update expert/i }))
+    await waitFor(() => expect(updateExpert).toHaveBeenCalled())
+    const payload = vi.mocked(updateExpert).mock.calls[0][1] as { born_skills?: string[] }
+    expect(payload.born_skills).toEqual([])
   })
 })

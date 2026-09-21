@@ -21,11 +21,21 @@ export interface ExpertBundleCreate {
   prompt_suggestions?: Array<{ title: string; prompt: string }>
   visibility?: "private" | "org" | "public" | "granted"
   is_enabled?: boolean
+  /** 263-REVIEW.md WR-08 - names CREATED in this authoring session, and only those.
+   *  The server stamps ONLY these born-for. Request-only: never persisted, never
+   *  on a response. Sent even when empty - an absent field means "this client said
+   *  nothing" and stamps nothing, so [] is the positive statement. */
+  born_skills?: string[]
 }
 
+/** ⛔ 263-REVIEW.md WR-03 - `slug` is ABSENT BY DECISION (operator, 2026-09-22), not by
+ *  omission. It is immutable after creation: `get_expert_by_slug_service` resolves by it,
+ *  so a rename silently invalidates anything holding the old value. The server model has
+ *  no `slug` field either, and the studio renders the input readOnly in edit mode. This
+ *  interface used to declare it, the studio used to send it, and it was DROPPED in silence
+ *  while the save reported success. */
 export interface ExpertBundleUpdate {
   name?: string
-  slug?: string
   icon?: string
   category?: string
   when_to_use?: string
@@ -39,6 +49,11 @@ export interface ExpertBundleUpdate {
   prompt_suggestions?: Array<{ title: string; prompt: string }>
   visibility?: "private" | "org" | "public" | "granted"
   is_enabled?: boolean
+  /** 263-REVIEW.md WR-08 - names CREATED in this authoring session, and only those.
+   *  The server stamps ONLY these born-for. Request-only: never persisted, never
+   *  on a response. Sent even when empty - an absent field means "this client said
+   *  nothing" and stamps nothing, so [] is the positive statement. */
+  born_skills?: string[]
 }
 
 export interface ExpertGrant {

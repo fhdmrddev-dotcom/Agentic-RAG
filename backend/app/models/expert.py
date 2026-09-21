@@ -64,16 +64,54 @@ class ExpertBundleBase(BaseModel):
 
 
 class ExpertBundleCreate(ExpertBundleBase):
-    pass
+    # ⛔ 263-REVIEW.md WR-08 — REQUEST-ONLY, and deliberately NOT on `ExpertBundleBase`:
+    # `ExpertBundle` (the response model) extends Base, so a field there would ship back to
+    # every caller and into the persisted row. The client names the skills IT CREATED in this
+    # authoring session; only those are stamped born-for. `None` means "this client said
+    # nothing" and must stamp NOTHING — falling back to `member_skills` is the defect itself,
+    # which claimed any long-standing private skill merely ticked in the picker.
+    born_skills: list[str] | None = Field(
+        default=None,
+        description="Skill names CREATED during this authoring session (WR-08). Never persisted.",
+    )
 
 
 class ExpertBundleUpdate(BaseModel):
-    name: str | None = None
-    icon: str | None = None
-    category: str | None = None
-    when_to_use: str | None = None
-    example_output: str | None = None
-    description: str | None = None
+    """⛔ 263-REVIEW.md WR-02 — every cap here MIRRORS ``ExpertBundleBase``.
+
+    These fields were bare ``str | None``, so ``PATCH`` accepted what ``POST`` refuses:
+    ``{"name": ""}`` returned 200 and ``update_expert_bundle`` persisted it, because
+    ``allowed_fields`` includes ``name``. A door that accepts what its sibling refuses is
+    not a second door.
+
+    ⛔ ``default=None`` IS LOAD-BEARING and must stay on every field.
+    ``update_expert_service`` reads this body with ``exclude_unset=True`` — "absent means
+    unchanged". A ``Field(...)`` without a default makes the field REQUIRED and breaks every
+    partial PATCH in the product. Pinned by ``test_update_fields_all_still_optional``.
+
+    ⛔ ``slug`` IS ABSENT BY DECISION, not by omission (WR-03, operator 2026-09-22): it is
+    how ``get_expert_by_slug_service`` resolves, so a rename silently invalidates anything
+    holding the old value. The studio renders it ``readOnly`` in edit mode. Pinned by
+    ``test_slug_is_not_updatable``.
+    """
+
+    # ⛔ 263-REVIEW.md WR-08 — REQUEST-ONLY, and deliberately NOT on `ExpertBundleBase`:
+    # `ExpertBundle` (the response model) extends Base, so a field there would ship back to
+    # every caller and into the persisted row. The client names the skills IT CREATED in this
+    # authoring session; only those are stamped born-for. `None` means "this client said
+    # nothing" and must stamp NOTHING — falling back to `member_skills` is the defect itself,
+    # which claimed any long-standing private skill merely ticked in the picker.
+    born_skills: list[str] | None = Field(
+        default=None,
+        description="Skill names CREATED during this authoring session (WR-08). Never persisted.",
+    )
+
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    icon: str | None = Field(default=None, max_length=64)
+    category: str | None = Field(default=None, max_length=64)
+    when_to_use: str | None = Field(default=None, max_length=500)
+    example_output: str | None = Field(default=None, max_length=4000)
+    description: str | None = Field(default=None, max_length=8000)
     scope_mode: ScopeMode | None = None
     tool_floor_enabled: bool | None = None
     member_skills: list[str] | None = None

@@ -160,11 +160,31 @@ async def create_expert(
             user_id=user_id,
             bundle_in=payload,
         )
+    # ⛔ 263-REVIEW.md WR-09 — ORDER IS THE CONTRACT. The named arm must precede the
+    # catch-all or it never runs, and both sit OUTSIDE the refusal above, where an
+    # HTTPException would be caught and its 422 re-raised as a 400.
+    except asyncpg.UniqueViolationError as exc:
+        # The one failure users actually hit. It used to render as the raw driver sentence,
+        # index name and all. `detail` is a DICT with an `error` key because the client
+        # discriminates on `detail.error` — FastAPI's own 422 body is a LIST, so a bare
+        # status is not something a caller can branch on (same shape as PACK-16).
+        logger.warning("Duplicate expert slug for org %s: %s", org_id, exc)
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "detail": f"An Expert with the slug '{payload.slug}' already exists in this organisation.",
+                "error": "expert_slug_taken",
+            },
+        ) from exc
     except Exception as exc:
+        # ⛔ The detail stays a LITERAL. It used to be f"…: {exc}", which put asyncpg's
+        # message — index names, column tuples, another org's identifiers, and on a driver
+        # fault the connection string — into the studio's error banner. The full exception
+        # still reaches the log with `exc_info=True`; it just stops reaching the browser.
         logger.error("Failed to create expert bundle: %s", exc, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Could not create expert bundle: {exc}",
+            detail="Could not create expert bundle.",
         ) from exc
 
 

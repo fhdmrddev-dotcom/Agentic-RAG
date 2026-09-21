@@ -170,7 +170,10 @@ const BASELINE = {
   // ⬆ 4 → 14 in 263-04: sketch 263 variant A's ten cases (both headed groups, the
   // token set with its negative arm, the held Save from BOTH entry points, the
   // in-place generating state, the dialog round trip, and the server's own 422).
-  "ExpertAuthoringStudio.test.tsx": 14,
+  // ⬆ 14 → 23 at 263-REVIEW.md WR-03/04/05/08: the slug readOnly + its reason + the
+  // payload omission, both grant-revocation fail-open arms, the unread-library THIRD
+  // banner state and its positive control, and born_skills on both payloads.
+  "ExpertAuthoringStudio.test.tsx": 23,
   // ── Phase 263 (PACK-14/PACK-15) — the dialog an Expert proposal reuses ──────────────
   // ⚠ ADOPTED, not raised: before 263-04 `grep -ic "skill" scripts/vitest-count-gate.cjs`
   // returned 0 — NOT ONE skills suite was in either knob, so this file's 8 passing tests

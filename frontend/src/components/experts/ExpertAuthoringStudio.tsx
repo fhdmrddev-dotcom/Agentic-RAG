@@ -181,6 +181,11 @@ export function ExpertAuthoringStudio({
 
   // Auto-slug on name change if not manually edited
   const [slugModified, setSlugModified] = useState(isEditing)
+  // 263-REVIEW.md WR-08 - the names this authoring session CREATED, and only those.
+  // The stamp is a privilege widening (D-263-06): claiming the whole `memberSkills` set
+  // meant a long-standing private skill became readable by the whole org because its
+  // author ticked a checkbox. This list is what the server stamps born-for.
+  const [bornSkills, setBornSkills] = useState<string[]>([])
   const handleNameChange = (val: string) => {
     setName(val)
     if (!slugModified) {
@@ -369,6 +374,8 @@ export function ExpertAuthoringStudio({
     setSuggestedNewSkills((prev) =>
       prev.filter((p) => p.name !== created.name && p.name !== skillDialogInitial.name),
     )
+    // WR-08: born HERE, so this is the one place a name may join the claim set.
+    setBornSkills((prev) => (prev.includes(created.name) ? prev : [...prev, created.name]))
     void refreshAvailableSkills()
     return created
   }
@@ -423,7 +430,10 @@ export function ExpertAuthoringStudio({
       if (isEditing && initialData) {
         const payload: ExpertBundleUpdate = {
           name,
-          slug,
+          // WR-03: `slug` is NOT sent. It is immutable after creation (operator decision
+          // 2026-09-22) - `get_expert_by_slug_service` resolves by it, so a rename silently
+          // invalidates anything holding the old value. It used to be sent and SILENTLY
+          // DROPPED by the server, and the studio reported success either way.
           icon,
           category,
           when_to_use: whenToUse,
@@ -436,6 +446,7 @@ export function ExpertAuthoringStudio({
           knowledge_folder_ids: knowledgeFolderIds,
           prompt_suggestions: promptSuggestions,
           visibility,
+          born_skills: bornSkills,
         }
         saved = await updateExpert(initialData.id, payload)
       } else {
@@ -455,29 +466,61 @@ export function ExpertAuthoringStudio({
           prompt_suggestions: promptSuggestions,
           visibility,
           is_enabled: true,
+          // WR-08: sent even when EMPTY. An absent field means "this client said nothing",
+          // and the server must then stamp nothing - so an empty list is the positive
+          // statement that nothing was created here, not the absence of one.
+          born_skills: bornSkills,
         }
         saved = await createExpert(payload)
       }
 
       // Sync grants if visibility is 'granted'
+      //
+      // 263-REVIEW.md WR-04 - this block had TWO fail-open paths and both were silent.
+      // A failed `getExpertGrants` returned [], so the removal loop never ran and every
+      // grant the author deleted in the UI STAYED IN THE DATABASE; a failed
+      // `removeExpertGrant` was swallowed outright. Either way the modal closed on a
+      // success path. The ADDITIVE direction fails closed (less access), so only the
+      // security-relevant direction was quiet - which is the asymmetry that matters.
+      //
+      // The save itself has already succeeded, so a failure here is a PARTIAL-SUCCESS
+      // report, never a rollback: the Expert exists and the author must be told exactly
+      // which access was not removed.
+      const grantErrors: string[] = []
       if (visibility === "granted" && saved.id) {
-        // Fetch current grants
-        const currentGrants = await getExpertGrants(saved.id).catch(() => [])
-        // Remove dropped grants
+        let currentGrants: Awaited<ReturnType<typeof getExpertGrants>> = []
+        try {
+          currentGrants = await getExpertGrants(saved.id)
+        } catch {
+          grantErrors.push("could not read current grants - no revocation was applied")
+        }
         for (const cg of currentGrants) {
           if (!grants.some((g) => g.grantee_type === cg.grantee_type && g.grantee_id === cg.grantee_id)) {
-            await removeExpertGrant(saved.id, cg.id).catch(() => {})
+            try {
+              await removeExpertGrant(saved.id, cg.id)
+            } catch {
+              grantErrors.push(`could not revoke ${cg.grantee_type}:${cg.grantee_id}`)
+            }
           }
         }
-        // Add new grants
+        // Additive failures are reported too, but they are not the dangerous direction.
         for (const g of grants) {
           if (!currentGrants.some((cg) => cg.grantee_type === g.grantee_type && cg.grantee_id === g.grantee_id)) {
-            await addExpertGrant(saved.id, g).catch(() => {})
+            try {
+              await addExpertGrant(saved.id, g)
+            } catch {
+              grantErrors.push(`could not grant ${g.grantee_type}:${g.grantee_id}`)
+            }
           }
         }
       }
 
       onSaved?.(saved)
+      if (grantErrors.length > 0) {
+        // Saved, but access is not what the author just saw. Hold the modal open.
+        setSaveError(`Expert saved, but: ${grantErrors.join("; ")}`)
+        return
+      }
       onClose()
     } catch (err: any) {
       // Phase 263-04 (D-263-10): the server refuses independently of the client fence,
@@ -654,17 +697,34 @@ export function ExpertAuthoringStudio({
 
                 <div>
                   <label className="block text-xs font-medium text-foreground">Slug *</label>
+                  {/* 263-REVIEW.md WR-03 - readOnly in EDIT mode, and NOT disabled: the
+                      value stays selectable and copyable. It used to be editable, and the
+                      server dropped the change without a word while the studio reported
+                      success. A grey-out with no reason is that same silence, so the
+                      sentence below is part of the fix, not decoration. */}
                   <input
                     type="text"
                     required
+                    readOnly={isEditing}
+                    aria-readonly={isEditing || undefined}
                     value={slug}
                     onChange={(e) => {
+                      if (isEditing) return
                       setSlugModified(true)
                       setSlug(e.target.value)
                     }}
                     placeholder="financial-analyzer"
-                    className="mt-1 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm font-mono placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                    className={cn(
+                      "mt-1 w-full rounded-md border border-input px-3 py-1.5 text-sm font-mono placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary",
+                      isEditing ? "cursor-not-allowed bg-muted/40 text-muted-foreground" : "bg-background",
+                    )}
                   />
+                  {isEditing && (
+                    <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+                      Set when it was created - it is how saved references resolve, so it
+                      cannot change.
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -1267,6 +1327,20 @@ export function ExpertAuthoringStudio({
                   <span className="font-mono text-[11px]">
                     {unresolvedCapabilities.join(", ")}
                   </span>
+                </span>
+              ) : !availableSkillsLoaded ? (
+                /* 263-REVIEW.md WR-05 - UNKNOWN is a third state, not a clean one.
+                   `phantomMemberSkills` is [] when the library was never read, which made
+                   the positive arm below assert a fact from an input it did not have: on a
+                   failed `listSkills()` the phase's own honesty deliverable printed a green
+                   tick and "all resolvable at run time" over names that do not exist.
+                   Not holding Save on a failed read stays correct - vouching does not. */
+                <span>
+                  <b>Your skill library could not be read.</b> This blueprint names{" "}
+                  {memberSkills.length}{" "}
+                  {memberSkills.length === 1 ? "capability" : "capabilities"} and none of
+                  them could be checked here - the server re-checks independently when you
+                  save.
                 </span>
               ) : (
                 <span>
