@@ -1,10 +1,10 @@
 ---
 gsd_state_version: 1.0
-milestone: none
-milestone_name: none — v4.3 shipped 2026-09-23
-status: between-milestones
+milestone: v4.4
+milestone_name: Experts That Actually Work
+status: planning
 last_updated: "2026-09-23T00:00:00.000Z"
-last_activity: 2026-09-23 -- v4.3 What You Can Actually Sell CLOSED (git tag v4.3); re-audit tech_debt, 31/32
+last_activity: 2026-09-23 -- Milestone v4.4 Experts That Actually Work started
 progress:
   total_phases: 0
   completed_phases: 0
@@ -32,21 +32,22 @@ See: `.planning/PROJECT.md` (updated 2026-09-23)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** between milestones. Next: `/gsd:new-milestone` — phase numbering resumes at **265**,
-migrations at **193**.
+**Current focus:** v4.4 Experts That Actually Work — defining requirements. Phase numbering resumes at
+**265**, migrations at **193**.
 
 ---
 
 ## Current Position
 
-Milestone: none active (v4.3 shipped 2026-09-23, tag `v4.3`)
-Phase: —
-Status: Ready to scope the next milestone
-Last activity: 2026-09-23 -- v4.3 audited, gaps closed, re-audited `tech_debt`, archived and tagged
+Milestone: v4.4 Experts That Actually Work
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-09-23 — Milestone v4.4 started (SEED-304 tenancy decided: per-org copy)
 
 ---
 
-## Carried into the next milestone's scoping
+## Carried into v4.4 scoping (routing decided at intake 2026-09-23)
 
 | Item | Where |
 |---|---|

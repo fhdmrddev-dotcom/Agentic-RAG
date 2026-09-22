@@ -10,6 +10,21 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 
 ---
 
+## Current Milestone: v4.4 Experts That Actually Work
+
+**Goal:** A client can install an Expert and get grounded answers from its own knowledge, in their own org — verified live, not by mocked tests.
+
+**Target features:**
+- **Owed v4.3 verification first** — live UAT for 257 / 258 / 261 / 263 and independent review of 255 / 256 / 262 / 264 plus the audit fix commits `c28853142`..`cdf3a308a`.
+- **PACK-05 closed (`SEED-304`)** — an Expert's sample corpus is **copied into the installing org and embedded there** (per-org provisioning; operator decision 2026-09-23 — no cross-tenant read path). Plus the blocking drafter bug: a ~4.8k-char blueprint into 1000-char fields.
+- **An Expert adds scope, it does not replace it (`SEED-303` open arms)** — two Experts in one chat (S3), the additive tool floor (S6), per-Expert spend attribution. S8 clone-and-customise stays deferred.
+- **A starter Expert library (`SEED-244`)** — a new org does not open an empty product.
+- **A thread's scope can change after it starts (`SEED-286`).**
+
+**Key context:** Phase numbering resumes at **265**, migrations at **193**. Tenancy decision for SEED-304 = **per-org copy** (operator, at intake). ⛔ Carried, not in scope: `SEED-013` Open Platform (next after this), `SEED-294` commercial blockers (non-engineering).
+
+---
+
 ## Last Shipped: v4.3 What You Can Actually Sell (2026-09-23)
 
 **Started:** 2026-09-18 · **Shipped:** 2026-09-23, git tag `v4.3` · 10 phases (255-260 scoped,
@@ -1116,7 +1131,14 @@ All 20 v3.3 requirements delivered (16 CORE + 4 STRETCH).
 
 ### Active (current milestone)
 
+*v4.4 Experts That Actually Work **STARTED 2026-09-23** via `/gsd:new-milestone`. Phase numbering resumes at **265**, migrations at **193**. Scope set by the operator at intake: owed v4.3 UAT + independent review as the FIRST phase; `SEED-304` (PACK-05) via **per-org provisioning**; the blocking Expert-drafter field-cap bug; `SEED-303` open arms (S3 two Experts, S6 additive tool floor, per-Expert spend; S8 stays deferred); `SEED-244` starter Expert library; `SEED-286` mid-thread scope change. Requirements: `.planning/REQUIREMENTS.md`.*
+
+<details>
+<summary>Superseded Active note (v4.3-close, preserved)</summary>
+
 *v4.3 What You Can Actually Sell SHIPPED (2026-09-23; git tag `v4.3`). **No milestone active.** Next: `/gsd:new-milestone`, resuming phase numbering at **265**. ⚠ **Carried into scoping:** `SEED-304` (PACK-05 tenancy decision) · owed live UAT for 257/258/261/263 · independent review owed on 255/256/262/264 and on every audit fix commit · the production deploy checklist above · `SEED-013` Open Platform sequencing and `OV-248-01` (`BUS-263`) · the two non-engineering commercial blockers in `SEED-294`.*
+
+</details>
 
 <details>
 <summary>Superseded Active note (v4.3-era, preserved)</summary>
@@ -1377,3 +1399,5 @@ This document evolves at phase transitions and milestone boundaries.
 
 
 </details>
+
+*Last updated: 2026-09-23 — **milestone v4.4 Experts That Actually Work STARTED** via /gsd:new-milestone. Phase numbering continues at **265**, migrations at **193**. SEED-304 tenancy decided: per-org copy.*
