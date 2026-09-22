@@ -258,6 +258,15 @@ $$;
 
 
 --
+-- Name: dummy_test_fn(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.dummy_test_fn() RETURNS text
+    LANGUAGE sql
+    AS $$SELECT 'hello'::text$$;
+
+
+--
 -- Name: folder_is_org_shared(uuid); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -1720,6 +1729,234 @@ COMMENT ON COLUMN public.eval_runs.org_id IS 'Forward-compat (D-PRD-02/D-11): or
 
 
 --
+-- Name: expert_bundles; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.expert_bundles (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    org_id uuid,
+    created_by uuid NOT NULL,
+    name text NOT NULL,
+    slug text NOT NULL,
+    description text DEFAULT ''::text NOT NULL,
+    scope_mode text DEFAULT 'restricted'::text NOT NULL,
+    member_skills text[] DEFAULT '{}'::text[] NOT NULL,
+    required_connections text[] DEFAULT '{}'::text[] NOT NULL,
+    knowledge_folder_ids uuid[] DEFAULT '{}'::uuid[] NOT NULL,
+    prompt_suggestions jsonb DEFAULT '[]'::jsonb NOT NULL,
+    visibility text DEFAULT 'private'::text NOT NULL,
+    is_system boolean DEFAULT false NOT NULL,
+    is_enabled boolean DEFAULT true NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    icon text DEFAULT 'chart'::text NOT NULL,
+    category text DEFAULT 'General'::text NOT NULL,
+    when_to_use text DEFAULT ''::text NOT NULL,
+    example_output text DEFAULT ''::text NOT NULL,
+    tool_floor_enabled boolean DEFAULT true NOT NULL,
+    CONSTRAINT check_org_or_system CHECK (((is_system = true) OR (org_id IS NOT NULL))),
+    CONSTRAINT expert_bundles_scope_mode_check CHECK ((scope_mode = ANY (ARRAY['restricted'::text, 'biased'::text]))),
+    CONSTRAINT expert_bundles_visibility_check CHECK ((visibility = ANY (ARRAY['private'::text, 'org'::text, 'public'::text, 'granted'::text])))
+);
+
+
+--
+-- Name: TABLE expert_bundles; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.expert_bundles IS 'Domain expert bundles over skills, connections, folders, and prompts (PACK-01, Phase 259). Data manifest only, zero execution path.';
+
+
+--
+-- Name: COLUMN expert_bundles.id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.expert_bundles.id IS 'Primary key UUID of the expert bundle.';
+
+
+--
+-- Name: COLUMN expert_bundles.org_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.expert_bundles.org_id IS 'Tenant organization that owns this bundle, or NULL for system bundles.';
+
+
+--
+-- Name: COLUMN expert_bundles.created_by; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.expert_bundles.created_by IS 'User UUID who created the bundle (or system user 00000000-0000-0000-0000-000000000001 for system templates).';
+
+
+--
+-- Name: COLUMN expert_bundles.name; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.expert_bundles.name IS 'Display name of the expert bundle.';
+
+
+--
+-- Name: COLUMN expert_bundles.slug; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.expert_bundles.slug IS 'URL-safe identifier, unique per org or globally unique for system bundles.';
+
+
+--
+-- Name: COLUMN expert_bundles.description; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.expert_bundles.description IS 'Detailed description of the expert capabilities.';
+
+
+--
+-- Name: COLUMN expert_bundles.scope_mode; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.expert_bundles.scope_mode IS 'Scope semantics: restricted (strict hard ceiling) or biased (soft priority). Defaults to restricted.';
+
+
+--
+-- Name: COLUMN expert_bundles.member_skills; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.expert_bundles.member_skills IS 'List of skill names/slugs included in this expert bundle.';
+
+
+--
+-- Name: COLUMN expert_bundles.required_connections; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.expert_bundles.required_connections IS 'List of connector types/slugs required by this expert bundle.';
+
+
+--
+-- Name: COLUMN expert_bundles.knowledge_folder_ids; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.expert_bundles.knowledge_folder_ids IS 'List of folder UUIDs bounding the knowledge scope for this expert bundle.';
+
+
+--
+-- Name: COLUMN expert_bundles.prompt_suggestions; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.expert_bundles.prompt_suggestions IS 'JSON array of starter prompt suggestions [{title, prompt}].';
+
+
+--
+-- Name: COLUMN expert_bundles.visibility; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.expert_bundles.visibility IS 'Sharing scope: private (creator only), org (organization members), public (all users).';
+
+
+--
+-- Name: COLUMN expert_bundles.is_system; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.expert_bundles.is_system IS 'True if this is a first-party built-in template/seed, False for tenant-authored bundles.';
+
+
+--
+-- Name: COLUMN expert_bundles.is_enabled; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.expert_bundles.is_enabled IS 'Administrative toggle to activate or deactivate this bundle.';
+
+
+--
+-- Name: COLUMN expert_bundles.icon; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.expert_bundles.icon IS 'Lucide vector glyph name for visual card presentation (e.g. chart, scale, shield, briefcase).';
+
+
+--
+-- Name: COLUMN expert_bundles.category; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.expert_bundles.category IS 'Domain category label for catalog filtering and visual organization.';
+
+
+--
+-- Name: COLUMN expert_bundles.when_to_use; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.expert_bundles.when_to_use IS 'Short one-line contextual guidance on when to consult this expert.';
+
+
+--
+-- Name: COLUMN expert_bundles.example_output; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.expert_bundles.example_output IS 'Sample output or answer snippet showing expected deliverable format.';
+
+
+--
+-- Name: COLUMN expert_bundles.tool_floor_enabled; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.expert_bundles.tool_floor_enabled IS 'When true, deliverable-producing tools (code execution, file writing, templates, questions) are preserved as an additive floor.';
+
+
+--
+-- Name: expert_grants; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.expert_grants (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    expert_id uuid NOT NULL,
+    grantee_type text NOT NULL,
+    grantee_id text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT expert_grants_grantee_type_check CHECK ((grantee_type = ANY (ARRAY['user'::text, 'role'::text])))
+);
+
+
+--
+-- Name: TABLE expert_grants; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.expert_grants IS 'Granular role and user access grants for restricted expert bundles (PACK-10, Phase 261).';
+
+
+--
+-- Name: COLUMN expert_grants.id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.expert_grants.id IS 'Primary key UUID of the grant.';
+
+
+--
+-- Name: COLUMN expert_grants.expert_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.expert_grants.expert_id IS 'Foreign key referencing the target expert bundle.';
+
+
+--
+-- Name: COLUMN expert_grants.grantee_type; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.expert_grants.grantee_type IS 'Grantee category: user (specific user UUID) or role (role slug such as member, org-admin, or custom role).';
+
+
+--
+-- Name: COLUMN expert_grants.grantee_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.expert_grants.grantee_id IS 'Identifier string of the grantee (user UUID string or role slug).';
+
+
+--
+-- Name: COLUMN expert_grants.created_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.expert_grants.created_at IS 'Timestamp when the grant was issued.';
+
+
+--
 -- Name: folders; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1929,7 +2166,16 @@ CREATE TABLE public.model_capabilities_overrides (
     deprecated_reason text,
     emit_tier text,
     removed boolean DEFAULT false NOT NULL,
-    CONSTRAINT model_capabilities_overrides_emit_tier_check CHECK (((emit_tier IS NULL) OR (emit_tier = ANY (ARRAY['force_strict'::text, 'force'::text, 'coerce'::text]))))
+    api_surface text,
+    reasoning_first boolean,
+    reasoning_off text,
+    uses_max_completion_tokens boolean,
+    supports_parallel_tools boolean,
+    max_tools integer,
+    CONSTRAINT model_capabilities_overrides_api_surface_check CHECK (((api_surface IS NULL) OR (api_surface = 'responses'::text))),
+    CONSTRAINT model_capabilities_overrides_emit_tier_check CHECK (((emit_tier IS NULL) OR (emit_tier = ANY (ARRAY['force_strict'::text, 'force'::text, 'coerce'::text])))),
+    CONSTRAINT model_capabilities_overrides_max_tools_check CHECK (((max_tools IS NULL) OR (max_tools > 0))),
+    CONSTRAINT model_capabilities_overrides_reasoning_off_check CHECK (((reasoning_off IS NULL) OR (reasoning_off = ANY (ARRAY['thinking_disabled'::text, 'effort_none'::text]))))
 );
 
 
@@ -1945,6 +2191,93 @@ COMMENT ON COLUMN public.model_capabilities_overrides.emit_tier IS 'Phase 196 (A
 --
 
 COMMENT ON COLUMN public.model_capabilities_overrides.removed IS 'Tombstone. TRUE means this model_id is removed from the registry — including a model declared in the built-in MODEL_CAPABILITIES dict, which cannot be deleted from the DB because it does not live there. Both override caches filter removed = false, so a tombstoned model is invisible to the picker, the capability resolver and the provider builder; build_model_registry_rows additionally skips the matching built-in. Re-adding the model clears the tombstone. A DB-only model is hard-DELETEd instead and never carries one.';
+
+
+--
+-- Name: COLUMN model_capabilities_overrides.api_surface; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.model_capabilities_overrides.api_surface IS 'Phase 262. The OpenAI API surface this model is called on. NULL = chat.completions (the shipped state for every pre-190 row, byte-identical). ''responses'' routes the model through provider_gateway/openai_responses.py, where reasoning and native tool calling are served together. CLOSED vocabulary, pinned EQUAL to config.API_SURFACES and to the surfaces the gateway dispatcher can route by test_262_capability_column_pin.py — a value with no adapter behind it is silently ignored, never an error.';
+
+
+--
+-- Name: COLUMN model_capabilities_overrides.reasoning_first; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.model_capabilities_overrides.reasoning_first IS 'Phase 262 (registry half of the Phase 175 XPROV-01 gate). TRUE => this model rejects a chat.completions call carrying BOTH a native tools param AND reasoning, so it is routed STRUCTURED unless api_surface names a surface that serves both. NULL = not asserted.';
+
+
+--
+-- Name: COLUMN model_capabilities_overrides.reasoning_off; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.model_capabilities_overrides.reasoning_off IS 'Phase 262 (registry half of Phase 175 XPROV-04 / D-05). The docs-confirmed mechanism for turning reasoning OFF on cheap side-calls such as thread titling: ''thinking_disabled'' (extra_body thinking.type=disabled) or ''effort_none'' (reasoning_effort=none). NULL = UNSAFE/unknown, which keeps today''s derived fallback. CLOSED vocabulary pinned to the config.ModelCapability Literal by test_262_capability_column_pin.py.';
+
+
+--
+-- Name: COLUMN model_capabilities_overrides.uses_max_completion_tokens; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.model_capabilities_overrides.uses_max_completion_tokens IS 'Phase 262. TRUE => send max_completion_tokens, not max_tokens (OpenAI o-series + GPT-5+). Sending the wrong parameter is a hard 400. NULL falls back to openai_service._uses_max_completion_tokens'' prefix heuristic, which is byte-identical to today.';
+
+
+--
+-- Name: COLUMN model_capabilities_overrides.supports_parallel_tools; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.model_capabilities_overrides.supports_parallel_tools IS 'Phase 262. FALSE => this endpoint REJECTS the parallel_tool_calls parameter, so it must not be sent. It is a claim about the API accepting the kwarg, NOT about whether parallel tools are wanted. NULL falls back to the provider-prefix inference (byte-identical).';
+
+
+--
+-- Name: COLUMN model_capabilities_overrides.max_tools; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.model_capabilities_overrides.max_tools IS 'Phase 262 (registry half of Phase 091 TOOL-05 / SEED-035). Soft ceiling on how many tool schemas are offered to this model — some models degrade past a modest count. NULL = no cap, which is the shipped default for every model without a registry entry.';
+
+
+--
+-- Name: model_rates; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.model_rates (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    model_id text NOT NULL,
+    provider text,
+    input_cost_per_million numeric(12,6) NOT NULL,
+    output_cost_per_million numeric(12,6) NOT NULL,
+    effective_from timestamp with time zone DEFAULT now() NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    created_by uuid,
+    org_id uuid
+);
+
+
+--
+-- Name: TABLE model_rates; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.model_rates IS 'Effective-dated token prices. Append-only: a past run is priced by the row in force at its started_at, so repricing never rewrites history (METER-01). Seeded by migrations 183 (5 rows), 184 (48, the MODEL_CAPABILITIES roster) and 185 (6, the model_capabilities_overrides roster). NOTE: no effective_to column exists yet - see SEED for phase 186 (void and end-date a rate from the product).';
+
+
+--
+-- Name: COLUMN model_rates.input_cost_per_million; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.model_rates.input_cost_per_million IS 'Cost in USD per 1,000,000 input prompt tokens (numeric(12, 6)).';
+
+
+--
+-- Name: COLUMN model_rates.output_cost_per_million; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.model_rates.output_cost_per_million IS 'Cost in USD per 1,000,000 output completion tokens (numeric(12, 6)).';
+
+
+--
+-- Name: COLUMN model_rates.effective_from; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.model_rates.effective_from IS 'Timestamp from which this rate applies. Past runs match effective_from <= run.created_at.';
 
 
 --
@@ -2422,7 +2755,8 @@ CREATE TABLE public.skills (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     is_system boolean DEFAULT false NOT NULL,
-    org_id uuid NOT NULL
+    org_id uuid NOT NULL,
+    born_for_expert_bundle_id uuid
 );
 
 
@@ -2431,6 +2765,13 @@ CREATE TABLE public.skills (
 --
 
 COMMENT ON COLUMN public.skills.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v3.3; no FK until org schema exists.';
+
+
+--
+-- Name: COLUMN skills.born_for_expert_bundle_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.skills.born_for_expert_bundle_id IS 'Provenance marker for the Expert bundle a skill was authored for (D-263-07, Phase 263). NULL for every skill not born from Expert authoring, INCLUDING an abandoned draft (D-263-08). Read as the THIRD disjunct of resolve_expert_bundle''s phase-2 visibility check; the org_id fence above it is UNCHANGED.';
 
 
 --
@@ -2472,7 +2813,8 @@ CREATE TABLE public.threads (
     folder_id uuid,
     active_workflow_run_id uuid,
     is_eval boolean DEFAULT false NOT NULL,
-    org_id uuid NOT NULL
+    org_id uuid NOT NULL,
+    active_expert_id uuid
 );
 
 
@@ -2481,6 +2823,68 @@ CREATE TABLE public.threads (
 --
 
 COMMENT ON COLUMN public.threads.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v3.3; no FK until org schema exists.';
+
+
+--
+-- Name: COLUMN threads.active_expert_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.threads.active_expert_id IS 'Active consultant expert bundle invited to this thread (PACK-02, Phase 260). Scopes retrieval and tools, preserves chat history. Cleared to NULL on dismissal.';
+
+
+--
+-- Name: tier_capabilities; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.tier_capabilities (
+    tier text NOT NULL,
+    capability text NOT NULL,
+    enabled boolean DEFAULT true NOT NULL,
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: TABLE tier_capabilities; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.tier_capabilities IS 'Relational capability matrix declaring which functional capabilities belong to each subscription tier (TIER-02, Phase 258).';
+
+
+--
+-- Name: COLUMN tier_capabilities.tier; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.tier_capabilities.tier IS 'Subscription tier slug (e.g. standard, pro, enterprise).';
+
+
+--
+-- Name: COLUMN tier_capabilities.capability; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.tier_capabilities.capability IS 'Functional capability slug (e.g. basic_rag, chat, skills, code_execution, custom_models, workflows, connectors, experts, audit_export).';
+
+
+--
+-- Name: COLUMN tier_capabilities.enabled; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.tier_capabilities.enabled IS 'Whether this capability is currently active for this tier.';
+
+
+--
+-- Name: COLUMN tier_capabilities.metadata; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.tier_capabilities.metadata IS 'Optional configuration or entitlement parameters for this capability in this tier.';
+
+
+--
+-- Name: COLUMN tier_capabilities.created_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.tier_capabilities.created_at IS 'Timestamp when the tier-capability mapping was created.';
 
 
 --
@@ -2682,6 +3086,9 @@ CREATE TABLE public.workflow_runs (
     is_golden_run boolean DEFAULT false,
     definition_snapshot jsonb,
     metadata jsonb,
+    input_tokens integer,
+    output_tokens integer,
+    token_coverage text[],
     CONSTRAINT workflow_runs_status_check CHECK ((status = ANY (ARRAY['active'::text, 'paused'::text, 'cap_paused'::text, 'completed'::text, 'failed'::text, 'cancelled'::text])))
 );
 
@@ -2748,6 +3155,27 @@ COMMENT ON COLUMN public.workflow_runs.definition_snapshot IS 'Phase 200 follow-
 --
 
 COMMENT ON COLUMN public.workflow_runs.metadata IS 'Phase 204 (SCHED-02): run-level operational metadata. Today it carries exactly one key, "circuit_breaker", written by CircuitBreaker.trip_breaker with the trip reason and the exact token/timing measurements. Merged with ||, never replaced.';
+
+
+--
+-- Name: COLUMN workflow_runs.input_tokens; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.workflow_runs.input_tokens IS 'Phase 256 (METER-03). Cumulative input tokens for this harness run, ACCUMULATED BY ADDITION at every phase boundary by db.workflows.persist_run_usage — never SET, because ctx.run_usage_box is reset per run SEGMENT at harness_engine.py:1844 and a SET would make the last segment''s spend the whole run''s total (D-256-09). Nullable, deliberately: NULL means never measured, 0 means measured as zero, and the two are different facts — do not coalesce (D-256-06). This is the WORKFLOW grain; runs.input_tokens on the per-segment producer shell is the SEGMENT grain — NEVER SUM ACROSS public.runs AND public.workflow_runs (D-256-03). Read rule for public.runs (D-256-01): any org-level or thread-level total sums only rows WHERE parent_run_id IS NULL, because a parent row is INCLUSIVE of its descendants.';
+
+
+--
+-- Name: COLUMN workflow_runs.output_tokens; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.workflow_runs.output_tokens IS 'Phase 256 (METER-03). See input_tokens: same writer (db.workflows.persist_run_usage), same ADD-not-SET accumulation and the same reason for it (D-256-09), same WORKFLOW grain with the same prohibition on summing across public.runs and public.workflow_runs (D-256-03), same NULL-means-never-measured / 0-means-measured-as-zero rule (D-256-06), and the same read rule over public.runs — sum only rows WHERE parent_run_id IS NULL (D-256-01).';
+
+
+--
+-- Name: COLUMN workflow_runs.token_coverage; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.workflow_runs.token_coverage IS 'Phase 256 (D-256-07 / SC#4). WHICH COUNTING LEGS this run''s totals actually include, e.g. {agent,single,batch,emit}. Written from ONE module-level constant, db.workflows.TOKEN_COVERAGE_LEGS, in the same commit as the leg it names — so a run persisted before a leg shipped reads honestly as NOT covering it, forever, with no memory required. Coverage is RECORDED, never INFERRED: deriving it from created_at against a ship date is "someone''s memory" encoded as a comparison, which SC#4 forbids. Phase 257''s METER-07 "what it cannot see" view reads THIS COLUMN, never hand-written prose. THREE states and all three are distinct: NULL = no instrumented leg ever reported usage for this run (a pre-182 row, or a run whose every leg was silent) · {} = reported, but covering nothing · a populated array = exactly the legs listed. Same grain rule as input_tokens (D-256-03) and same read rule over public.runs — sum only rows WHERE parent_run_id IS NULL (D-256-01).';
 
 
 --
@@ -3077,6 +3505,22 @@ ALTER TABLE ONLY public.eval_runs
 
 
 --
+-- Name: expert_bundles expert_bundles_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.expert_bundles
+    ADD CONSTRAINT expert_bundles_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: expert_grants expert_grants_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.expert_grants
+    ADD CONSTRAINT expert_grants_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: folders folders_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3138,6 +3582,14 @@ ALTER TABLE ONLY public.metadata_field_definitions
 
 ALTER TABLE ONLY public.model_capabilities_overrides
     ADD CONSTRAINT model_capabilities_overrides_pkey PRIMARY KEY (model_id);
+
+
+--
+-- Name: model_rates model_rates_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.model_rates
+    ADD CONSTRAINT model_rates_pkey PRIMARY KEY (id);
 
 
 --
@@ -3325,6 +3777,14 @@ ALTER TABLE ONLY public.threads
 
 
 --
+-- Name: tier_capabilities tier_capabilities_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.tier_capabilities
+    ADD CONSTRAINT tier_capabilities_pkey PRIMARY KEY (tier, capability);
+
+
+--
 -- Name: todos todos_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3354,6 +3814,14 @@ ALTER TABLE ONLY public.tuner_runs
 
 ALTER TABLE ONLY public.tuner_runs
     ADD CONSTRAINT tuner_runs_skill_unique UNIQUE (skill_id);
+
+
+--
+-- Name: expert_grants uq_expert_grant; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.expert_grants
+    ADD CONSTRAINT uq_expert_grant UNIQUE (expert_id, grantee_type, grantee_id);
 
 
 --
@@ -3944,6 +4412,48 @@ CREATE INDEX idx_eval_runs_user_id ON public.eval_runs USING btree (user_id);
 
 
 --
+-- Name: idx_expert_bundles_org_enabled; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_expert_bundles_org_enabled ON public.expert_bundles USING btree (org_id, is_enabled);
+
+
+--
+-- Name: idx_expert_bundles_org_slug; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_expert_bundles_org_slug ON public.expert_bundles USING btree (org_id, slug) WHERE (is_system = false);
+
+
+--
+-- Name: idx_expert_bundles_system_enabled; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_expert_bundles_system_enabled ON public.expert_bundles USING btree (is_enabled) WHERE (is_system = true);
+
+
+--
+-- Name: idx_expert_bundles_system_slug; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_expert_bundles_system_slug ON public.expert_bundles USING btree (slug) WHERE (is_system = true);
+
+
+--
+-- Name: idx_expert_grants_expert; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_expert_grants_expert ON public.expert_grants USING btree (expert_id);
+
+
+--
+-- Name: idx_expert_grants_lookup; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_expert_grants_lookup ON public.expert_grants USING btree (grantee_type, grantee_id, expert_id);
+
+
+--
 -- Name: idx_harness_audit_run; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4011,6 +4521,27 @@ CREATE INDEX idx_metadata_field_definitions_org_id ON public.metadata_field_defi
 --
 
 CREATE INDEX idx_metadata_field_definitions_user_id ON public.metadata_field_definitions USING btree (user_id);
+
+
+--
+-- Name: idx_model_rates_fallback; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_model_rates_fallback ON public.model_rates USING btree (model_id, effective_from DESC) WHERE (provider IS NULL);
+
+
+--
+-- Name: idx_model_rates_lookup; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_model_rates_lookup ON public.model_rates USING btree (model_id, provider, effective_from DESC);
+
+
+--
+-- Name: idx_model_rates_org; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_model_rates_org ON public.model_rates USING btree (org_id, model_id, effective_from DESC);
 
 
 --
@@ -4203,10 +4734,24 @@ CREATE INDEX idx_skill_versions_user_id ON public.skill_versions USING btree (us
 
 
 --
+-- Name: idx_skills_born_for_expert; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_skills_born_for_expert ON public.skills USING btree (born_for_expert_bundle_id) WHERE (born_for_expert_bundle_id IS NOT NULL);
+
+
+--
 -- Name: idx_sso_configs_org_id; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_sso_configs_org_id ON public.sso_configs USING btree (org_id);
+
+
+--
+-- Name: idx_threads_active_expert; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_threads_active_expert ON public.threads USING btree (active_expert_id) WHERE (active_expert_id IS NOT NULL);
 
 
 --
@@ -4221,6 +4766,13 @@ CREATE INDEX idx_threads_active_workflow_run ON public.threads USING btree (acti
 --
 
 CREATE INDEX idx_threads_user_visible ON public.threads USING btree (user_id, updated_at DESC) WHERE (is_eval = false);
+
+
+--
+-- Name: idx_tier_capabilities_lookup; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_tier_capabilities_lookup ON public.tier_capabilities USING btree (tier, capability) WHERE (enabled = true);
 
 
 --
@@ -4284,6 +4836,13 @@ CREATE INDEX idx_workflow_definitions_slug ON public.workflow_definitions USING 
 --
 
 CREATE INDEX idx_workflow_phases_run ON public.workflow_phases USING btree (workflow_run_id, phase_index);
+
+
+--
+-- Name: idx_workflow_runs_org_coverage_incomplete; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_runs_org_coverage_incomplete ON public.workflow_runs USING btree (org_id, created_at DESC) WHERE ((token_coverage IS NULL) OR (NOT (token_coverage @> ARRAY['agent'::text, 'single'::text, 'batch'::text, 'emit'::text])));
 
 
 --
@@ -4410,6 +4969,20 @@ CREATE UNIQUE INDEX sso_configs_email_domain_lower_unique ON public.sso_configs 
 --
 
 CREATE INDEX threads_folder_id_idx ON public.threads USING btree (folder_id);
+
+
+--
+-- Name: uq_model_rates_identity; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_model_rates_identity ON public.model_rates USING btree (model_id, COALESCE(provider, ''::text), effective_from);
+
+
+--
+-- Name: INDEX uq_model_rates_identity; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON INDEX public.uq_model_rates_identity IS 'Phase 257.1. Makes ON CONFLICT DO NOTHING actually fire. Migration 183 had no unique constraint, so re-pasting it duplicated every seed rate (driven: gpt-4o 1 -> 2).';
 
 
 --
@@ -5274,6 +5847,22 @@ ALTER TABLE ONLY public.eval_runs
 
 
 --
+-- Name: expert_bundles expert_bundles_org_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.expert_bundles
+    ADD CONSTRAINT expert_bundles_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: expert_grants expert_grants_expert_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.expert_grants
+    ADD CONSTRAINT expert_grants_expert_id_fkey FOREIGN KEY (expert_id) REFERENCES public.expert_bundles(id) ON DELETE CASCADE;
+
+
+--
 -- Name: folders folders_parent_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -5359,6 +5948,22 @@ ALTER TABLE ONLY public.messages
 
 ALTER TABLE ONLY public.metadata_field_definitions
     ADD CONSTRAINT metadata_field_definitions_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: model_rates model_rates_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.model_rates
+    ADD CONSTRAINT model_rates_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL;
+
+
+--
+-- Name: model_rates model_rates_org_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.model_rates
+    ADD CONSTRAINT model_rates_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
 
 
 --
@@ -5618,6 +6223,14 @@ ALTER TABLE ONLY public.skill_versions
 
 
 --
+-- Name: skills skills_born_for_expert_bundle_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.skills
+    ADD CONSTRAINT skills_born_for_expert_bundle_id_fkey FOREIGN KEY (born_for_expert_bundle_id) REFERENCES public.expert_bundles(id) ON DELETE SET NULL;
+
+
+--
 -- Name: skills skills_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -5631,6 +6244,14 @@ ALTER TABLE ONLY public.skills
 
 ALTER TABLE ONLY public.sso_configs
     ADD CONSTRAINT sso_configs_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: threads threads_active_expert_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.threads
+    ADD CONSTRAINT threads_active_expert_id_fkey FOREIGN KEY (active_expert_id) REFERENCES public.expert_bundles(id) ON DELETE SET NULL;
 
 
 --
@@ -6657,6 +7278,61 @@ ALTER TABLE public.eval_results ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.eval_runs ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: expert_bundles; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.expert_bundles ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: expert_bundles expert_bundles_read_policy; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY expert_bundles_read_policy ON public.expert_bundles FOR SELECT TO authenticated, service_role USING (((auth.role() = 'service_role'::text) OR (is_system = true) OR ((org_id IN ( SELECT m.org_id
+   FROM public.org_members m
+  WHERE (m.user_id = auth.uid()))) AND ((visibility = ANY (ARRAY['org'::text, 'public'::text])) OR (created_by = auth.uid())))));
+
+
+--
+-- Name: expert_bundles expert_bundles_write_policy; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY expert_bundles_write_policy ON public.expert_bundles TO authenticated, service_role USING (((auth.role() = 'service_role'::text) OR ((is_system = false) AND (org_id IN ( SELECT m.org_id
+   FROM public.org_members m
+  WHERE (m.user_id = auth.uid())))))) WITH CHECK (((auth.role() = 'service_role'::text) OR ((is_system = false) AND (org_id IN ( SELECT m.org_id
+   FROM public.org_members m
+  WHERE (m.user_id = auth.uid()))))));
+
+
+--
+-- Name: expert_grants; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.expert_grants ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: expert_grants expert_grants_read_policy; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY expert_grants_read_policy ON public.expert_grants FOR SELECT TO authenticated, service_role USING (((auth.role() = 'service_role'::text) OR (expert_id IN ( SELECT eb.id
+   FROM (public.expert_bundles eb
+     JOIN public.org_members m ON ((m.org_id = eb.org_id)))
+  WHERE (m.user_id = auth.uid())))));
+
+
+--
+-- Name: expert_grants expert_grants_write_policy; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY expert_grants_write_policy ON public.expert_grants TO authenticated, service_role USING (((auth.role() = 'service_role'::text) OR (expert_id IN ( SELECT eb.id
+   FROM (public.expert_bundles eb
+     JOIN public.org_members m ON ((m.org_id = eb.org_id)))
+  WHERE (m.user_id = auth.uid()))))) WITH CHECK (((auth.role() = 'service_role'::text) OR (expert_id IN ( SELECT eb.id
+   FROM (public.expert_bundles eb
+     JOIN public.org_members m ON ((m.org_id = eb.org_id)))
+  WHERE (m.user_id = auth.uid())))));
+
+
+--
 -- Name: folders; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
@@ -6703,6 +7379,30 @@ ALTER TABLE public.model_capabilities_overrides ENABLE ROW LEVEL SECURITY;
 --
 
 CREATE POLICY model_overrides_read_all ON public.model_capabilities_overrides FOR SELECT TO authenticated USING (true);
+
+
+--
+-- Name: model_rates; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.model_rates ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: model_rates model_rates_insert_policy; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY model_rates_insert_policy ON public.model_rates FOR INSERT TO authenticated, service_role WITH CHECK (((auth.role() = 'service_role'::text) OR ((org_id IS NOT NULL) AND (org_id IN ( SELECT m.org_id
+   FROM public.org_members m
+  WHERE ((m.user_id = auth.uid()) AND (m.role = ANY (ARRAY['admin'::text, 'owner'::text]))))))));
+
+
+--
+-- Name: model_rates model_rates_select_policy; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY model_rates_select_policy ON public.model_rates FOR SELECT TO authenticated, service_role USING (((org_id IS NULL) OR (org_id IN ( SELECT m.org_id
+   FROM public.org_members m
+  WHERE (m.user_id = auth.uid())))));
 
 
 --
@@ -6957,6 +7657,26 @@ CREATE POLICY sso_configs_update ON public.sso_configs FOR UPDATE TO authenticat
 --
 
 ALTER TABLE public.threads ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: tier_capabilities; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.tier_capabilities ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: tier_capabilities tier_capabilities_read_all; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY tier_capabilities_read_all ON public.tier_capabilities FOR SELECT TO authenticated, service_role USING (true);
+
+
+--
+-- Name: tier_capabilities tier_capabilities_service_write; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY tier_capabilities_service_write ON public.tier_capabilities TO service_role USING (true) WITH CHECK (true);
+
 
 --
 -- Name: todos; Type: ROW SECURITY; Schema: public; Owner: -
@@ -7724,6 +8444,24 @@ REVOKE ALL ON public.user_settings FROM anon;
 -- not granted a policy — a user does not delete their settings row, the service role does —
 -- so the privilege is taken away rather than left to a policy that does not exist.
 REVOKE DELETE ON public.user_settings FROM authenticated;
+
+
+-- ============================================================
+-- 5e. Table privileges: tier_capabilities, expert_bundles, expert_grants
+--     (migrations 186, 187, 189 / Phases 258, 259, 261)
+-- ============================================================
+-- migration 186:30-31
+GRANT SELECT ON TABLE public.tier_capabilities TO anon, authenticated, service_role;
+GRANT INSERT, UPDATE, DELETE ON TABLE public.tier_capabilities TO service_role;
+-- migration 192 — anon read of the pricing map withdrawn (order matters: after 186)
+REVOKE ALL ON TABLE public.tier_capabilities FROM anon;
+REVOKE ALL ON TABLE public.tier_capabilities FROM PUBLIC;
+
+-- migration 187:63
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.expert_bundles TO authenticated, service_role;
+
+-- migration 189:45
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.expert_grants TO authenticated, service_role;
 
 
 -- ============================================================

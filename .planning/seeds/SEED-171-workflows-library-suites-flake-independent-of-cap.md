@@ -4,6 +4,29 @@ title: SEVEN suites flake non-deterministically (was FOUR at planting, then five
 created: 2026-08-17
 planted_during: Phase 195 Wave 1 post-merge gate (orchestrator)
 status: planted
+status_note: |
+  ── 2026-09-22 · Phase 262 plan 05 — AN EIGHTH SUITE, and it is a shape the seven do not cover:
+  `frontend/src/pages/__tests__/LibraryPage.initialTab.test.tsx` fails ONLY in a WIDE run.
+  Measured at `GSD_VITEST_MAX_WORKERS=2`, one byte-identical tree, four invocations:
+    · alone (1 file / 15 cases)                      → 15 passed
+    · 16-file group (167 cases)                      → 167 passed
+    · full `vitest-count-gate.cjs` (8745 cases)      → `count gate OK`, 0 failing
+    · 100-file `src/lib src/components/{layout,chat,experts} …` → RED, 3 times, SET VARIED:
+        run A `1 failed` · run B `2 failed` · run C `1 failed`
+  The two case names that appear are *"lands on Documents with NO prop"* and *"⭐ lands on Health
+  when the CALLER asks for it"* — both `LibraryPage` MOUNT cases, never the suite's `App.tsx?raw`
+  source-text cases.
+  ⭐ **PROVEN INHERITED BY MEASUREMENT, NOT BY UNCHANGEDNESS.** The suite file is byte-unchanged by
+  262-05, but that proves nothing on its own — the suite reads `App.tsx?raw` and 262-05 edits
+  `App.tsx`. So the eight files this plan changed were checked out at the phase base `1623a4654`
+  (explicit paths only — no blanket reset, no `git clean`), the SAME wide command was re-run, and it
+  read `2 failed` with the SAME two case names. Restored afterwards; all eight `git hash-object`
+  digests identical and `git diff --quiet -- frontend/` clean. ⛔ No gate was running during the
+  swap.
+  ⚠ **THE NEW FACT FOR THIS SEED: the count gate is NOT the worst case.** The gate was green on the
+  same tree in the same session, so "the gate reached 0 failing" does not mean a wide ad-hoc vitest
+  invocation will. A plan whose acceptance criterion is any green run — gate or not — has written a
+  criterion it does not control.
 priority: high
 relates_to:
   - SEED-056 (vitest unit baseline cluster triage) — ⚠ **THIS IS THE SAME FAMILY, BUT THE DIAGNOSIS

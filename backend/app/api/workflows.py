@@ -66,6 +66,7 @@ from app.services.harness import grounding, publish_service
 # ``LINT_CODES`` rides the SAME import (WR-05): the severity classifier below composes its
 # known-code set from the module that OWNS the codes rather than re-declaring the literals.
 from app.services.harness.reachability import LINT_CODES, lint_workflow
+from app.services.entitlement_service import require_capability
 # Phase 196 (AUTH-04 / SC#2 / D-09 / D-08) — the save-path model refusal. The LOGIC lives in
 # the leaf; this module contributes two call lines, which is a call-out and not a second
 # concern (see the G-5 note in 196-06-PLAN.md). Cycle-safe: model_registry imports app.config
@@ -1295,7 +1296,10 @@ class PublishVerdict(BaseModel):
 @router.post(
     "/{definition_id}/publish",
     response_model=PublishVerdict,
-    dependencies=[Depends(require_visible("workflow_authoring"))],  # Phase 148 (VIS-01) — authoring gate
+    dependencies=[
+        Depends(require_visible("workflow_authoring")),  # Phase 148 (VIS-01) — authoring gate
+        Depends(require_capability("workflows")),  # Phase 258 (TIER-01) — commercial tier gate
+    ],
 )
 async def publish_workflow(
     definition_id: UUID,
@@ -1392,7 +1396,10 @@ _ALREADY_PUBLISHED_DETAIL = {
     "",
     response_model=DraftCreateResponse,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_visible("workflow_authoring"))],  # Phase 148 (VIS-01) — authoring gate
+    dependencies=[
+        Depends(require_visible("workflow_authoring")),  # Phase 148 (VIS-01) — authoring gate
+        Depends(require_capability("workflows")),  # Phase 258 (TIER-01) — commercial tier gate
+    ],
 )
 async def create_draft(
     body: WorkflowDefinition,
@@ -1479,7 +1486,10 @@ async def list_drafts(
 @router.patch(
     "/{definition_id}",
     response_model=DraftCreateResponse,
-    dependencies=[Depends(require_visible("workflow_authoring"))],  # Phase 148 (VIS-01) — authoring gate
+    dependencies=[
+        Depends(require_visible("workflow_authoring")),  # Phase 148 (VIS-01) — authoring gate
+        Depends(require_capability("workflows")),  # v4.3 audit (TIER-01) — every authoring write, not two
+    ],
 )
 async def update_draft(
     definition_id: UUID,
@@ -1860,7 +1870,10 @@ class GenerateRequest(BaseModel):
 
 @router.post(
     "/generate",
-    dependencies=[Depends(require_visible("workflow_authoring"))],  # Phase 148 (VIS-01) — authoring gate
+    dependencies=[
+        Depends(require_visible("workflow_authoring")),  # Phase 148 (VIS-01) — authoring gate
+        Depends(require_capability("workflows")),  # v4.3 audit (TIER-01) — every authoring write, not two
+    ],
 )
 async def generate_workflow(
     body: GenerateRequest,
@@ -1975,7 +1988,10 @@ _TEMPLATE_MAX_UNCOMPRESSED_BYTES = 50 * 1024 * 1024
 @router.post(
     "/template/placeholders",
     response_model=TemplatePlaceholdersResponse,
-    dependencies=[Depends(require_visible("workflow_authoring"))],  # Phase 148 (VIS-01) — authoring gate
+    dependencies=[
+        Depends(require_visible("workflow_authoring")),  # Phase 148 (VIS-01) — authoring gate
+        Depends(require_capability("workflows")),  # v4.3 audit (TIER-01) — every authoring write, not two
+    ],
 )
 async def read_template_placeholders(
     file: UploadFile = File(...),
@@ -2093,7 +2109,10 @@ async def read_template_placeholders(
     "/{definition_id}/template",
     response_model=TemplateAssetRef,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_visible("workflow_authoring"))],  # Phase 148 (VIS-01) — authoring gate
+    dependencies=[
+        Depends(require_visible("workflow_authoring")),  # Phase 148 (VIS-01) — authoring gate
+        Depends(require_capability("workflows")),  # v4.3 audit (TIER-01) — every authoring write, not two
+    ],
 )
 async def upload_workflow_template(
     definition_id: UUID,

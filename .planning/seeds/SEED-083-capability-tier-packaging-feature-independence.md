@@ -1,7 +1,8 @@
 ---
 seed_id: SEED-083
 title: Capability-tier packaging + feature-independence discipline — keep RAG / skills / code-exec / workflows separable so the product CAN be sold as ascending capability bundles
-status: planted
+status: folded
+status_note: "Folded into Phase 258 (A Tier Becomes Enforceable) on 2026-09-19. Capability map stored as data in table tier_capabilities (TIER-02, Migration 186)."
 planted: 2026-06-13
 phase_origin: "Operator question during /gsd:secure-phase 102 close-out (2026-06-13) — 'this workflow feature is separated; later if we tier the product, Tier 1 = basic RAG, Tier 2 = + skills, Tier 3 = + workflows ... is that possible, and should we keep features independent for other things too?'"
 category: product packaging / monetization architecture — a build-time DISCIPLINE (keep capability boundaries clean + toggleable) + a future product-design decision (how capabilities map to sellable tiers), NOT a new feature

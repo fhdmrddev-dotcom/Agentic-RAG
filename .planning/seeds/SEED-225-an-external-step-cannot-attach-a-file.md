@@ -2,6 +2,15 @@
 seed_id: SEED-225
 title: An external step cannot attach a file — and an attachment needs two facts the model must not conflate
 status: planted
+status_note: |
+  ── 2026-09-18 · RE-CONFIRMED BY MEASUREMENT and RE-PRIORITISED. Still true in the tree:
+  `backend/app/services/connectors/smtp_adapter.py:289` reads "No CC, no BCC, no attachment,
+  no HTML part" (D-32), and `slack_adapter.py:404` refuses `blocks` and `attachments` the same
+  way. ⚠ SEVERITY IS UNDERSTATED AT `minor` FOR A COMMERCIAL OFFERING: a workflow that produces
+  a deliverable cannot DELIVER it, which leaves several sellable shapes with no ending. Named
+  by an outside architecture read as P14, blocking a finance-close pack and an RFP pack; see
+  SEED-294 (go-to-market) and SEED-198 (the pack SKU). Left `minor` rather than raised, because
+  the rating is honest about the ENGINEERING and the commercial weight belongs in SEED-294.
 planted: 2026-08-28
 planted_by: operator, during Phase 214's G-4 drive — raised as a gap while testing send_email
 surface: Agentic-RAG

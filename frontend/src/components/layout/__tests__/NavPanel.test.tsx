@@ -17,7 +17,7 @@ import { describe, it, expect, vi, afterEach } from "vitest"
 import { render, screen, fireEvent, cleanup } from "@testing-library/react"
 import { MessageSquare, FileText } from "lucide-react"
 import { TooltipProvider } from "@/components/ui/tooltip"
-import type { NavItem } from "@/lib/nav-items"
+import { NAV_ITEMS, type NavItem } from "@/lib/nav-items"
 import type { ActiveView } from "@/App"
 import { NavPanel } from "../NavPanel"
 
@@ -95,6 +95,57 @@ describe("NavPanel rail — nav items + operator shield (D-07)", () => {
     renderRail({ isOperator: true, navItems })
     expect(navItems.some((i) => i.view === "control-room")).toBe(false)
     expect(screen.getByRole("button", { name: /control room/i })).toBeInTheDocument()
+  })
+
+  // ── Phase 257.1 (METER-07 reachability) ──────────────────────────────────────────────
+  // Phase 257 shipped the spend cockpit with its ActiveView and its ChatLayout mount and NO
+  // ENTRY ACTION, so the only way to reach it was to type `/admin/spend` into the address
+  // bar. That is the Phase-118 built-but-unreachable lesson recurring, and it is exactly the
+  // leg of the triad that no typecheck and no unit test can notice on its own — which is why
+  // these three cases exist rather than a comment.
+
+  it("renders a Spend entry when isOperator=true — the cockpit is reachable without typing a URL", () => {
+    renderRail({ isOperator: true })
+    expect(screen.getByRole("button", { name: /spend/i })).toBeInTheDocument()
+  })
+
+  it("renders NO Spend entry for a non-operator (the D-07 vanish, not a disabled control)", () => {
+    renderRail({ isOperator: false })
+    expect(screen.queryByRole("button", { name: /spend/i })).not.toBeInTheDocument()
+  })
+
+  it("navigates to admin-spend when the Spend entry is clicked", () => {
+    const onNavigate = vi.fn()
+    renderRail({ isOperator: true, onNavigate })
+    fireEvent.click(screen.getByRole("button", { name: /spend/i }))
+    expect(onNavigate).toHaveBeenCalledWith("admin-spend")
+  })
+
+  // ── Phase 262 plan 05 (PACK-11 / D-262-03) ───────────────────────────────────────────
+  // The catalog's entry action, in the Phase-257.1 shape one describe over. ⛔ These two
+  // render the SHIPPED `NAV_ITEMS`, never the two-item fixture at the top of this file — a
+  // rail proven against a fixture proves the rail, and the leg that goes missing is the
+  // ARRAY ENTRY. `activeViewReachability` covers the member and the branch and is blind to
+  // this one, which is why it is a rendered click and not a comment.
+
+  it("renders an Experts entry from the SHIPPED NAV_ITEMS — the catalog is reachable without typing a URL", () => {
+    renderRail({ navItems: NAV_ITEMS })
+    expect(screen.getByRole("button", { name: "Experts" })).toBeInTheDocument()
+  })
+
+  it("navigates to the catalog when the Experts entry is clicked", () => {
+    const onNavigate = vi.fn()
+    renderRail({ navItems: NAV_ITEMS, onNavigate })
+    fireEvent.click(screen.getByRole("button", { name: "Experts" }))
+    expect(onNavigate).toHaveBeenCalledWith("experts")
+  })
+
+  it("keeps Spend OUTSIDE navItems, like the shield — navItems also feeds the mobile drawer", () => {
+    // An entry in NAV_ITEMS would leak an operator surface to every member, because
+    // ChatLayout's mobile drawer consumes the same array. Same contract as control-room.
+    renderRail({ isOperator: true, navItems })
+    expect(navItems.some((i) => i.view === "admin-spend")).toBe(false)
+    expect(screen.getByRole("button", { name: /spend/i })).toBeInTheDocument()
   })
 })
 

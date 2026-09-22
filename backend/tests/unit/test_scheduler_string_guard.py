@@ -16,6 +16,20 @@ from app.models.schedule import ScheduleTriggerResult, WorkflowScheduleCreate
 from app.services.scheduler_service import launch_scheduled_run
 
 
+@pytest.fixture(autouse=True)
+def _entitled_org():
+    """258 F-2: launch_scheduled_run now checks the workflows entitlement first; these
+    tests exercise what happens AFTER an entitled launch, so the org is entitled here.
+    The refusal arm is covered by test_258_workflow_execution_entitlement.py."""
+    from app.services.entitlement_service import EntitlementResult
+    with patch(
+        "app.services.entitlement_service.check_entitlement",
+        new_callable=AsyncMock,
+        return_value=EntitlementResult(allowed=True, capability="workflows"),
+    ):
+        yield
+
+
 def test_schedule_create_default_budgets():
     """WorkflowScheduleCreate defaults to 500k tokens and 1800s."""
     sched = WorkflowScheduleCreate(
@@ -112,7 +126,7 @@ async def test_launch_scheduled_run_preserves_custom_low_budgets():
         "id": schedule_id,
         "user_id": str(owner_id),
         "workflow_id": str(workflow_id),
-        "org_id": None,
+        "org_id": str(uuid4()),  # workflow_schedules.org_id is NOT NULL; the 258 gate reads it
         "name": "Nightly Run",
         "inputs": {},
         "max_tokens_per_run": 10_000,   # Deliberate custom budget

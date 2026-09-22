@@ -11,7 +11,7 @@
  */
 
 import type { AskUserAnswerBody, Citation, EmitFailure, EmitSubStep, Message, OutputFile, PendingAsk, SourceReference, TaskRunIndexItem, Thread, Todo, WorkspaceDiff, WorkspaceFile, WorkspaceFileContent, WorkspaceVersion } from "../../types"
-import { API_BASE, ApiError, getAuthHeaders } from "./_core"
+import { API_BASE, ApiError, entitlementRefusalMessage, getAuthHeaders } from "./_core"
 import type { WorkflowDefinitionJSON } from "./knowledge"
 export async function listThreads(): Promise<Thread[]> {
   const headers = await getAuthHeaders()
@@ -52,6 +52,11 @@ type MessageResponseDTO = Message & {
   completed_at?: string | null
   // Phase 223 (BUG-260902-03 / D-223-06): armed connector IDs active when user message was sent
   active_connector_ids?: string[] | null
+  // Phase 257.1 (SC#4): stamped by `_enrich_messages_with_runs` and declared on the backend
+  // `MessageResponse`. ⛔ `null` is MEANINGFUL and is NOT coerced away by the mapper —
+  // is_rated:true + cost_usd:null is "rated model, tokens never recorded".
+  cost_usd?: number | null
+  is_rated?: boolean | null
 }
 
 function _mapMessageResponse(m: MessageResponseDTO): Message {
@@ -82,6 +87,10 @@ function _mapMessageResponse(m: MessageResponseDTO): Message {
     started_at,
     completed_at,
     active_connector_ids,
+    // Phase 257.1 (SC#4): destructure so the snake cost_usd/is_rated do NOT leak through
+    // ...rest, exactly as 095.1-03 argued for started_at/completed_at above.
+    cost_usd,
+    is_rated,
     ...rest
   } = m
   const mapped: Message = {
@@ -97,6 +106,16 @@ function _mapMessageResponse(m: MessageResponseDTO): Message {
     completedAt: completed_at ?? undefined,
     // Phase 223 (BUG-260902-03 / D-223-06 / D-223-07): preserve [] as [] and null/undefined as undefined
     activeConnectorIds: active_connector_ids != null ? active_connector_ids : undefined,
+    // ── Phase 257.1 (SC#4) — and the `?? undefined` idiom above is DELIBERATELY NOT used.
+    // `RunCostBadge` reads THREE states and `null` is a real one: `is_rated: true` with
+    // `cost_usd: null` means "the model has a rate but this run recorded no tokens", which
+    // renders "No tokens recorded" rather than the false "no rate registered". Coercing
+    // null → undefined would erase that distinction and hand the badge back the two-state
+    // world the review found shipping a wrong cause. `tokenCoverage` is intentionally NOT
+    // mapped: chat reads `public.runs`, which has no such column, and the badge treats
+    // undefined as "coverage not tracked" rather than "coverage incomplete".
+    costUsd: cost_usd,
+    isRated: is_rated,
   }
   if (confidence_level) {
     mapped.confidence = {
@@ -165,6 +184,17 @@ export async function renameThread(id: string, title: string): Promise<Thread> {
     body: JSON.stringify({ title }),
   })
   if (!res.ok) throw new Error("Failed to rename thread")
+  return res.json() as Promise<Thread>
+}
+
+export async function setThreadActiveExpert(threadId: string, expertId: string | null): Promise<Thread> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/threads/${threadId}`, {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify({ active_expert_id: expertId }),
+  })
+  if (!res.ok) throw new Error("Failed to update thread active expert")
   return res.json() as Promise<Thread>
 }
 
@@ -552,7 +582,8 @@ export async function postMessage(
   if (!res.ok) {
     const body = (await res.json().catch(() => null)) as { detail?: unknown } | null
     throw new ApiError(
-      typeof body?.detail === "string" ? body.detail : "Failed to send message",
+      entitlementRefusalMessage(body) ??
+        (typeof body?.detail === "string" ? body.detail : "Failed to send message"),
       res.status,
     )
   }

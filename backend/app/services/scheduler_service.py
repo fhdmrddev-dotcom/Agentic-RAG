@@ -127,6 +127,23 @@ async def launch_scheduled_run(
     from app.dependencies import get_service_role_supabase
 
     org_id = schedule.get("org_id") or row.get("org_id")
+
+    # ── 258 F-2 / TIER-01 — a scheduled run is EXECUTION too ─────────────────────────
+    # Same one entitlement home as the chat kickoff. Refused BEFORE the thread insert, so
+    # an unentitled (or unresolvable) org's schedule writes nothing and is recorded by the
+    # caller as launch_failed — one refused schedule never stops the tick.
+    from app.services.entitlement_service import check_entitlement
+
+    ent = await check_entitlement(pool, org_id, "workflows") if org_id else None
+    if ent is None or not ent.allowed:
+        logger.warning(
+            "schedule %s not launched: org %s is not entitled to workflows (%s)",
+            schedule.get("id"),
+            org_id,
+            ent.reason if ent else "no org",
+        )
+        return None
+
     supabase = get_service_role_supabase(org_id)
     title = f"[scheduled] {schedule.get('name') or definition.name}"
     thread_resp = await run_in_threadpool(
@@ -284,6 +301,28 @@ async def _drive_run(
                 # finished scheduled run as permanently active with a live Kill button —
                 # a GHOST. Registering without finalizing through the co-writer would have
                 # made the visibility fix worse than the gap it closed.
+                #
+                # METER-05 site 5 (Phase 256 / D-256-08). An UNATTENDED run is exactly the
+                # one nobody notices is uncounted: this shell hardcoded a NULL usage, so
+                # every scheduled run's segment read as "never measured" while the box on
+                # `ctx` had been measuring it all along (harness_engine.py:1864).
+                # ⚠ This read sits INSIDE the existing `pid is not None` guard, which is
+                # itself inside `ctx is not None` — a failed ctx build still records the
+                # schedule outcome and still must not raise here.
+                # ⚠ GRAIN (D-256-03): segment box onto a per-segment `runs` row.
+                # ⛔ No default and no `or 0` (D-256-06).
+                # ⛔ The writer stays `finalize_run_terminal` — see the paragraph above.
+                _box = getattr(ctx, "run_usage_box", None) or {}
+                _in_tok = _box.get("input_tokens")
+                _out_tok = _box.get("output_tokens")
+                if _in_tok is None and _out_tok is None:
+                    # db/runs.py:93-99's contract. IDENTIFIERS ONLY (T-073-04).
+                    logger.warning(
+                        "runs.usage missing for run=%s provider=%s model=%s",
+                        pid,
+                        getattr(ctx, "provider", None),
+                        getattr(ctx, "model", None),
+                    )
                 await finalize_run_terminal(
                     pool=pool,
                     redis=redis,
@@ -293,8 +332,8 @@ async def _drive_run(
                     error="scheduled run failed" if failed else None,
                     completed_at=datetime.now(timezone.utc),
                     message_id=None,
-                    input_tokens=None,
-                    output_tokens=None,
+                    input_tokens=_in_tok,
+                    output_tokens=_out_tok,
                 )
             except Exception:  # noqa: BLE001
                 logger.exception("scheduled-run producer-shell finalize failed for %s", pid)

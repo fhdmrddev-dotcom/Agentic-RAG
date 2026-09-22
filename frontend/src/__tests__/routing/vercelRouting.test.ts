@@ -113,4 +113,24 @@ describe("vercel.json routing configuration (DEBT-04 / SEED-242)", () => {
     )
     expect(unconditionalRootRewrite).toBeUndefined()
   })
+
+  // ── Phase 257.1 — /admin/* needed the same apex redirect the other deep paths have. ──
+  // Phase 257 added an `/admin/spend` surface read by a literal `window.location.pathname`
+  // check in App.tsx. On `app.<domain>` the host-scoped `/(.*)` rewrite already catches it,
+  // but on the APEX there was no redirect entry and no file on disk — so a deep link or a
+  // bookmark to `<domain>/admin/spend` 404s, while `<domain>/setup` and `<domain>/invite`
+  // both work. Every path-bearing surface needs BOTH halves; this pins the missing one.
+  it.each(["/admin", "/admin/(.*)"])(
+    "redirects %s on the apex to the app subdomain, like /app, /setup and /invite",
+    (source) => {
+      const redirects = config.redirects || []
+      const entry = redirects.find((r) => r.source === source)
+      expect(entry).toBeDefined()
+      expect(entry?.permanent).toBe(true)
+      expect(entry?.destination).toMatch(/^https:\/\/app\.:host\/admin/)
+      // the negative lookahead is what stops an infinite loop once already on app.*
+      const hostRule = entry?.has?.find((h) => h.type === "host")
+      expect(hostRule?.value).toContain("?!app\\.")
+    },
+  )
 })

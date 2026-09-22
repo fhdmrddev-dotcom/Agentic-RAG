@@ -54,6 +54,7 @@ import { OrgAuditTab } from "./OrgAuditTab"
 import { OrgSettingsTab } from "./OrgSettingsTab"
 import { InvitationsTab } from "./InvitationsTab"
 import { SsoTab } from "./SsoTab"
+import { OrgExpertsTab } from "./OrgExpertsTab"
 
 interface OrgAdminShellProps {
   /** Return to the ordinary app surface (navigates to "chat"). */
@@ -62,6 +63,7 @@ interface OrgAdminShellProps {
 
 type OrgAdminTab =
   | "members"
+  | "experts"
   | "audit"
   | "settings"
   | "invitations"
@@ -83,6 +85,8 @@ interface TabDef {
 // this is the indigo zone.
 const TABS: readonly TabDef[] = [
   { id: "members", label: "Members", locked: false },
+  // Phase 261 (PACK-07): In-App Expert Management & Authoring Tab
+  { id: "experts", label: "Experts", locked: false },
   { id: "audit", label: "Audit", locked: false },
   { id: "settings", label: "Settings", locked: false },
   // Phase 167 (D-167-07): the invitations home is LIVE — the org shell owns the
@@ -391,6 +395,8 @@ export function OrgAdminShell({ onBack }: OrgAdminShellProps) {
             query={memberQuery}
             onQueryChange={setMemberQuery}
           />
+        ) : activeTab === "experts" ? (
+          <OrgExpertsTab />
         ) : activeTab === "invitations" ? (
           // Phase 167 (D-167-07): the live invitations home. The shell owns the fetch +
           // mutations; InvitationsTab is a pure leaf. canManage is the render-only invite

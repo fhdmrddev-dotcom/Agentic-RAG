@@ -83,7 +83,14 @@ const CAPABILITIES: ReadonlyArray<CapabilityDef> = [
     key: "self_improve_enabled",
     label: "Self-improvement",
     sub: "The agent can save new skills for later.",
-    fallbackImpact: "No new skills can be saved until this is back on.",
+    // ⚠ 263-REVIEW.md WR-07 — this line read "No new skills can be saved until this is
+    // back on." and 263's UAT R-8 measured that FALSE: the flag gates the AGENT only.
+    // `_CAPABILITY_FLAG_TOOLS` (tool_dispatcher.py) refuses `save_skill` /
+    // `attach_skill_file`, and the two drafters refuse generation — but `POST /skills`,
+    // the Skills page's own door, carries NO self_improve guard and still returns 201.
+    // The subject is load-bearing: `sub` above says "The agent", so must this.
+    fallbackImpact:
+      "The agent can't write or save skills; people still can, by hand.",
   },
   {
     key: "workflows_enabled",

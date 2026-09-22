@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { ArrowUp, ChevronDown, Compass, Cpu, HardDrive, Layers, Paperclip, Plus } from "lucide-react"
+import { ArrowUp, ChevronDown, Compass, Cpu, GraduationCap, HardDrive, Layers, Paperclip, Plus } from "lucide-react"
 // Phase 194.1 Plan 04 (RUN-01 / R1) — the composer's Stop is now the ONE shared
 // `StopControl` every mount renders. The lucide `Square` moved WITH it (it is
 // still the Stop control's mark on every variant, D-18); it is dropped from this
@@ -11,7 +11,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { MODEL_INFO } from "@/lib/model-info"
@@ -25,9 +24,11 @@ import { cn } from "@/lib/utils"
 import { TERM_MAP, usePlainLabel } from "@/lib/termMap"
 import { ConnectorsFlyout } from "./ConnectorsFlyout"
 import { ActiveConnectorChips } from "./ActiveConnectorChips"
+import { ActiveExpertChip } from "./ActiveExpertChip"
+import { InviteExpertDialog } from "./InviteExpertDialog"
 import { ConnectedFilePickerModal } from "./ConnectedFilePickerModal"
-import { listConnectorConnections, type ConnectorConnection } from "@/lib/api"
-import type { Message } from "@/types"
+import { listConnectorConnections, setThreadActiveExpert, type ConnectorConnection } from "@/lib/api"
+import type { Message, ExpertBundle } from "@/types"
 // ── Phase 244 (244-05 T2 / SHELL-04) — the composer's LOCAL attach door ──────────────────
 // Sketch 236's winner is A — Scope on the chip (operator, 2026-09-11): the `+` menu stays PLAIN
 // and the CHIP carries `this chat only · 24h`. Every word below comes from the port; ⛔ nothing
@@ -80,6 +81,20 @@ interface Props {
   /** Take the person to the connections surface — see `ConnectorsFlyout`. */
   onOpenConnections?: () => void
   workflowLocked?: boolean
+  /** Phase 260 (PACK-02): Active expert consultant bound to the thread. */
+  activeExpert?: ExpertBundle | null
+  onActiveExpertChange?: (expert: ExpertBundle | null) => void
+  /**
+   * Phase 262 plan 05 (PACK-11): take the person to the Expert catalog — the
+   * `onOpenConnections` precedent two entries up, copied line for line.
+   *
+   * ⛔ OPTIONAL AT EVERY HOP, AND THAT IS MEASURED RATHER THAN cautious: four shipped suites
+   * mount this component from their own prop objects, so a required prop would redden `tsc`
+   * in files Phase 262 does not own. Optional keeps the measured baseline and costs nothing.
+   * ⛔ And absent means the door does NOT render — a control with no navigator is a dead
+   * affordance, which is what D-262-02 refuses a whole requirement over.
+   */
+  onBrowseExperts?: () => void
 }
 
 const PROVIDER_LABELS: Record<string, string> = {
@@ -141,9 +156,46 @@ export function MessageInput({
   onClearPrefill,
   onOpenConnections,
   workflowLocked = false,
+  activeExpert: propActiveExpert,
+  onActiveExpertChange,
+  onBrowseExperts,
 }: Props) {
   const [value, setValue] = useState("")
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // Phase 260 (PACK-02 / D-260-02): active expert consultant state
+  const [internalActiveExpert, setInternalActiveExpert] = useState<ExpertBundle | null>(null)
+  const activeExpert = propActiveExpert !== undefined ? propActiveExpert : internalActiveExpert
+  const [inviteExpertOpen, setInviteExpertOpen] = useState(false)
+
+  const handleSelectExpert = async (expert: ExpertBundle) => {
+    setInternalActiveExpert(expert)
+    setInviteExpertOpen(false)
+    if (onActiveExpertChange) {
+      onActiveExpertChange(expert)
+    }
+    if (threadId) {
+      try {
+        await setThreadActiveExpert(threadId, expert.id)
+      } catch (err) {
+        console.error("Failed to set thread active expert:", err)
+      }
+    }
+  }
+
+  const handleDismissExpert = async () => {
+    setInternalActiveExpert(null)
+    if (onActiveExpertChange) {
+      onActiveExpertChange(null)
+    }
+    if (threadId) {
+      try {
+        await setThreadActiveExpert(threadId, null)
+      } catch (err) {
+        console.error("Failed to clear thread active expert:", err)
+      }
+    }
+  }
 
   // Phase 216 (CHAT-05 / CHAT-06): active connectors per thread
   const [connections, setConnections] = useState<ConnectorConnection[]>([])
@@ -386,7 +438,7 @@ export function MessageInput({
   // Phase 244 (244-05 T2 / D-244-26) — the ROW exists when EITHER an attachment or a connector
   // does, and not at all when neither does (S-2: no reserved empty space, the shipped behaviour).
   const armedConnectors = connections.filter((c) => activeConnectorIds.includes(c.id))
-  const showChipsRow = pendingAttachments.length > 0 || armedConnectors.length > 0
+  const showChipsRow = pendingAttachments.length > 0 || armedConnectors.length > 0 || activeExpert != null
 
   return (
     <div className="px-4 pb-3 bg-transparent">
@@ -431,6 +483,7 @@ export function MessageInput({
           className={cn(
             "rounded-2xl ghost-border bg-card/80 backdrop-blur-sm shadow-lg shadow-primary/5 transition-all duration-200",
             "focus-within:ring-2 focus-within:ring-primary/30 focus-within:shadow-lg focus-within:shadow-primary/5",
+            activeExpert && "ring-1 ring-violet-500/30 border-violet-500/40 shadow-[0_0_20px_rgba(139,92,246,0.12)]",
           )}
         >
           {/* ── The chips row — HOISTED (Phase 244 / 244-05 T2 / D-244-26) ─────────────────
@@ -448,10 +501,16 @@ export function MessageInput({
                 data-testid="active-connector-chips"
                 className="flex flex-wrap items-center gap-1.5 px-3 py-1.5 mb-1 bg-muted/40 rounded-lg border border-border/40"
               >
-                {armedConnectors.length > 0 && (
+                {(armedConnectors.length > 0 || activeExpert != null) && (
                   <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider mr-1">
                     Using:
                   </span>
+                )}
+                {activeExpert && (
+                  <ActiveExpertChip
+                    expert={activeExpert}
+                    onDismiss={handleDismissExpert}
+                  />
                 )}
                 {pendingAttachments.map((f) => (
                   <ChatAttachmentChip
@@ -537,6 +596,40 @@ export function MessageInput({
                       >
                         <HardDrive className="h-4 w-4 text-primary" />
                         <span>{COPY.a.itemCloud}</span>
+                      </DropdownMenuItem>
+                    )}
+                  </div>
+                  <div className="p-1 border-b border-border/50">
+                    <DropdownMenuItem
+                      data-testid="invite-expert-door"
+                      onSelect={() => {
+                        setPlusMenuOpen(false)
+                        setInviteExpertOpen(true)
+                      }}
+                      className="text-xs cursor-pointer gap-2 py-1.5"
+                    >
+                      <GraduationCap className="h-4 w-4 text-violet-400" />
+                      <span>Invite Expert...</span>
+                    </DropdownMenuItem>
+                    {/* Phase 262 plan 05 (PACK-11) — the SECOND door into the Expert catalog.
+                        ⭐ DELIBERATE REDUNDANCY, NOT THE TRIAD'S THIRD LEG. The nav-rail entry
+                        already discharges D-262-03; this exists because the operator's BUS-303
+                        ruling named BOTH doors, and because the mid-thread moment — "I want an
+                        Expert for this" — is where a person actually is when they want one.
+                        ⛔ It is a menu item, never a toolbar control: the composer's top-level
+                        budget is unchanged, and this suite's first case measures that rather
+                        than trusting it. ⛔ No navigator, no item — see the Props docblock. */}
+                    {onBrowseExperts && (
+                      <DropdownMenuItem
+                        data-testid="browse-experts-door"
+                        onSelect={() => {
+                          setPlusMenuOpen(false)
+                          onBrowseExperts()
+                        }}
+                        className="text-xs cursor-pointer gap-2 py-1.5"
+                      >
+                        <GraduationCap className="h-4 w-4 text-violet-400" />
+                        <span>Browse Expert Catalog…</span>
                       </DropdownMenuItem>
                     )}
                   </div>
@@ -869,6 +962,13 @@ export function MessageInput({
         onOpenChange={setFilePickerOpen}
         connections={connections}
         onConfirm={handleAttachCloudFile}
+      />
+
+      <InviteExpertDialog
+        open={inviteExpertOpen}
+        onOpenChange={setInviteExpertOpen}
+        onSelectExpert={handleSelectExpert}
+        currentExpertId={activeExpert?.id}
       />
     </div>
   )

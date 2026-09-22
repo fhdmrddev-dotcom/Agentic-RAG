@@ -162,6 +162,100 @@ const BASELINE = {
   "RunCard.test.tsx": 29,
   "RunCard.timer.test.tsx": 7,
   "ChatArea.approval.test.tsx": 3,
+  // ── Phase 260 (PACK-02 / PACK-03) — Consultant Expert UI & Action Tiles ──
+  // ⬆ RAISED 5 → 8 at `262-05`: the composer's catalog door (renders beside the invite door,
+  //   fires its navigator once, and does NOT render when no navigator is wired). ⛔ An
+  //   EXTENSION — Phase 260's five cases, including the UI-budget case, are untouched.
+  "ComposerExpert.test.tsx": 8,
+  // ⬆ 5 → 9 at 262-02 (D-262-06 / RESEARCH P-7). RAISED to the gate's own printed figure,
+  // never lowered: the four hardcoded demo-Expert sites this suite pinned were RETIRED, and
+  // the rewrite lands four cases MORE than the floor it replaced — the honest-empty tile, the
+  // icon read from the column, the iconless fallback, and the count/first-skill arms.
+  "ExpertSpotlightCard.test.tsx": 9,
+  // ── Phase 262 plan 02 (D-262-06) — the ONE home of expert-icon resolution ──
+  // ⛔ BOTH KNOBS, SAME COMMIT. `src/components/experts` has NO bare-directory TARGETS
+  // entry — its two existing suites are both named FILE-LEVEL just below — so a suite
+  // dropped into `src/components/experts/__tests__/` runs in NO gate until it is NAMED
+  // in TARGETS *and* pinned here. Case (5) pins the eleven-key map set; without this
+  // pin, dropping a key would silently degrade every Expert whose author chose it.
+  "expertIcon.test.tsx": 6,
+  // ── Phase 261 (PACK-07 / PACK-09 / PACK-10) — Expert Authoring Studio & Org Management ──
+  "OrgExpertsTab.test.tsx": 8, // +3 v4.3 audit (PACK-07 enable/disable)
+  // ⬆ 4 → 14 in 263-04: sketch 263 variant A's ten cases (both headed groups, the
+  // token set with its negative arm, the held Save from BOTH entry points, the
+  // in-place generating state, the dialog round trip, and the server's own 422).
+  // ⬆ 14 → 23 at 263-REVIEW.md WR-03/04/05/08: the slug readOnly + its reason + the
+  // payload omission, both grant-revocation fail-open arms, the unread-library THIRD
+  // banner state and its positive control, and born_skills on both payloads.
+  "ExpertAuthoringStudio.test.tsx": 23,
+  // ── Phase 262 plan 03 (PACK-11) — the Expert catalog ───────────────────────────────
+  // ⚠ ADOPTED, not raised — both figures taken from the gate's OWN printed `— N new`
+  // column on the run that first named them in TARGETS, never from a local vitest tail.
+  // `src/components/experts` has no bare-directory TARGETS entry, so without these two
+  // pins the catalog suites would RUN and GUARD NOTHING (TARGETS decides what runs;
+  // BASELINE decides what is guarded, and a suite can sit on the wrong side of one).
+  // ⛔ `ExpertCatalogPage.test.tsx` carries PACK-11's vanish, its POSITIVE CONTROL and
+  // the no-consolation-prize arm; dropping any of them would let a catalog advertising
+  // an Expert the caller cannot use ship green.
+  "expertCatalog.test.ts": 10,
+  "ExpertCatalogPage.test.tsx": 8,
+  // ── Phase 262 plan 04 (PACK-12) — the detail view ──────────────────────────────────
+  // ⚠ ADOPTED, not raised — `8` is the gate's OWN printed `— N new` figure on the run that
+  // first named this file in TARGETS, never a local vitest tail.
+  // ⛔ THIS PIN GUARDS THE ONLY PLACE FOUR MIGRATION-189 COLUMNS REACH A PERSON. Case (2) is
+  // the one that cannot be faked: it asserts the sample deliverable is ABSENT before the
+  // disclosure and PRESENT after, so a renderer that leaves it in the DOM while hidden fails.
+  "ExpertDetailModal.test.tsx": 8,
+  // ── Phase 262 plan 04 (PACK-13) — the ordered handoff ──────────────────────────────
+  // ⚠ ADOPTED, not raised — `6` is the gate's OWN printed `— N new` figure.
+  // ⛔ TWO of these six are the ORDER itself, and one is an identity comparison. Five seams
+  // called in the wrong order still call every seam, so an every-mock-was-called suite would
+  // guard nothing; dropping a case here would let a silently un-scoping thread row ship green.
+  "startScopedChat.test.ts": 6,
+  // ── Phase 263 (PACK-14/PACK-15) — the dialog an Expert proposal reuses ──────────────
+  // ⚠ ADOPTED, not raised: before 263-04 `grep -ic "skill" scripts/vitest-count-gate.cjs`
+  // returned 0 — NOT ONE skills suite was in either knob, so this file's 8 passing tests
+  // ran NOWHERE and guarded NOTHING. ⚠ It is NOT under a `__tests__/` directory (it sits
+  // beside its component), so the TARGETS entry below is the plain path, no `__tests__`.
+  "SkillFormDialog.test.tsx": 13,
+  // ── Phase 262, adopted at 263-REVIEW.md WR-06 ──────────────────────────────────────
+  // ⚠ ADOPTED, not raised. 262 added this suite to TARGETS and to NEITHER baseline, so it
+  // RAN on every gate invocation and GUARDED NOTHING — the "wrong side of exactly one knob"
+  // trap the TARGETS comment four lines above its own entry warns about, fired in the commit
+  // that wrote the warning. TARGETS decides what RUNS; BASELINE decides what is GUARDED.
+  // 13 measured (`npx vitest run …/ModelAdvancedCapabilities.test.tsx` → 13 passed), not guessed.
+  "ModelAdvancedCapabilities.test.tsx": 13,
+  // ── 263-REVIEW.md WR-07 — adopted while fixing it ─────────────────────────────────
+  // ⚠ Found while checking WR-06: this suite has existed since Phase 147 and sat in
+  // NEITHER knob, so its six cases ran NOWHERE for fifteen milestones. It is where the
+  // WR-07 consequence-copy fence belongs, and a fence outside the gate is not a fence.
+  // 6 → 7: the WR-07 case (the agent-subject arm + the measured-false negative arm),
+  // driven RED against the original string before the copy was changed.
+  "CapabilityGrid.test.tsx": 7,
+  // ── 263-REVIEW.md WR-06, completing the sweep ────────────────────────────────────
+  // ⚠ `src/components/admin/` has NO bare directory entry, and WR-06/WR-07 turned out to
+  // be TWO instances of a class of SIXTEEN. Every suite below existed, passed, and sat in
+  // NEITHER knob — 137 assertions about the Control Room running nowhere. The Control Room
+  // is where an operator flips kill-switches and disables people; it was the LEAST guarded
+  // directory in the frontend, not the most.
+  // ⛔ All 16 MEASURED GREEN in one run before adoption (0 failing) — a red suite gets
+  // NAMED, never pinned, or the shared gate goes red for everyone (the Phase 235 rule).
+  "ActiveRunsSection.test.tsx": 10,
+  "ActiveRunsSection.a11y.test.tsx": 7,
+  "ControlRoomPage.test.tsx": 7,
+  "CapabilityGrid.a11y.test.tsx": 6,
+  "MaintenancePanel.a11y.test.tsx": 7,
+  "HealthSignals.a11y.test.tsx": 5,
+  "OperatorBand.a11y.test.tsx": 6,
+  "TechnicalNamesToggle.a11y.test.tsx": 4,
+  "LockedTab.a11y.test.tsx": 4,
+  "AuditTab.a11y.test.tsx": 12,
+  "RecentActionsCard.a11y.test.tsx": 5,
+  "UsersAndAccess.a11y.test.tsx": 11,
+  "FeatureVisibility.a11y.test.tsx": 6,
+  "ModelDiscoveryPanel.test.tsx": 25,
+  "ModelDiscoveryPanel.a11y.test.tsx": 9,
+  "ModelRegistryTab.a11y.test.tsx": 13,
   // ── Phase 237 (RULES-01 / SC#1 / SC#3) — Classification rules & arrival watch builder suites ──
   "ClassificationRulesPage.test.tsx": 8,
   "ClassificationSection.test.tsx": 13,
@@ -2963,6 +3057,20 @@ const BASELINE = {
   "watchProductMark.test.ts": 7,
   "navItemsUnknownIsNotDenied.test.ts": 4,
 
+  // ── Phase 262 (262-01 / PACK-11) — the two nav-items siblings that ran in NEITHER knob,
+  // ── plus the reachability fence this plan creates. Pinned in the SAME COMMIT as their
+  // ── TARGETS entries. Counts measured from an explicit GREEN run of the three files
+  // ── BEFORE adoption, then confirmed against the gate's own `— N new` column.
+  // ⚠ The gate is RED at this phase's base — `failed 2`, both in
+  // `library/__tests__/sketchComposition.test.tsx`, proven inherited by an empty
+  // `git diff --stat HEAD -- frontend/`. These three were green in that same run, so the
+  // "never pin from a red run" rule is honoured where it binds: on the files being pinned.
+  // ⬆ RAISED 2 → 5 at `262-05`: the catalog's entry action (present / ungoverned / the
+  //   eighth-entry count). ⛔ An EXTENSION, never a lowering — the D-07 pair above is intact.
+  "nav-items.test.ts": 5,
+  "navItemsConnections.test.ts": 6,
+  "activeViewReachability.test.ts": 11,
+
   // ── Phase 243 (243-01 / CHAT-01 / CHAT-04 / D-243-16) — the thinking block's
   // ── PRE-EXTRACTION characterization net. Pinned in the SAME COMMIT that creates the file
   // ── and its TARGETS line, because a BASELINE key naming a path that does not yet exist
@@ -3406,6 +3514,8 @@ const BASELINE = {
   "DocumentStatusBadge.a11y.test.tsx": 19,
   // ── Phase 222 (222-05 / D-222-09) — Door half OAuth & probe-auth discovery ──
   "connectors.mcp_auth.test.ts": 8,
+  "entitlementRefusal.test.ts": 4, // v4.3 audit (TIER-03)
+  "noFrontendTokenPricing.fence.test.ts": 3, // v4.3 audit (257 SC#3)
   "connectionFormCopy.mcp.test.ts": 6,
   "McpAuthDoor.test.tsx": 9,
   "McpAuthDoor.byo.test.tsx": 3,
@@ -3466,7 +3576,7 @@ const BASELINE = {
   "MessageItem.retry.test.tsx": 4,
   "MessageItem.capPaused.test.tsx": 5,
   // ── Phase 228 (228-03 / DEBT-04) — Vercel subdomain routing suite ──
-  "vercelRouting.test.ts": 6,
+  "vercelRouting.test.ts": 8,  // 6 -> 8 in 257.1: the two /admin apex-redirect cases (deep links 404d on the apex).
   // ── Phase 232 (232-04 / SRC-02) — Source folder picker suite ──
   "SourceFolderPicker.test.tsx": 7,
   // ── Phase 233 (233-02 / PREV-01…03 / LIB-09) — THE PREVIEW. Two suites, and BOTH knobs ──
@@ -3832,6 +3942,51 @@ const BASELINE = {
   // (that suite oscillates 16/33 ↔ 18/31 and is in neither knob BY DECISION, Phase 235).
   // ⚠ 14 MEASURED at GSD_VITEST_MAX_WORKERS=2 on 2026-09-17, not guessed: `14 passed (14)`.
   "bug260912AppCredentials.test.ts": 14,
+  // ── Phase 257 review (Claude, reviewer) — the BASELINE half of the TARGETS entries added
+  // ── at the bottom of this file. BOTH knobs, same commit: TARGETS decides what RUNS,
+  // ── BASELINE decides what is GUARDED, and a suite can sit on the wrong side of one.
+  //
+  // ⚠ MEASURED, NEVER HAND-COUNTED, and from TWO AGREEING RUNS as this file's own rule
+  // requires. Run 1 — the full gate, immediately after the TARGETS entries landed, which
+  // printed these as first sightings:
+  //     AdminSpendPage.test.tsx    —   6   new
+  //     RunCostBadge.test.tsx      —   5   new
+  //     total 8426  (up from 8415 with the two suites invisible: +11, exactly 6 + 5)
+  // Run 2 — the two suites alone at GSD_VITEST_MAX_WORKERS=2: `2 passed (2) · 11 passed (11)`.
+  //
+  // ⭐ THE +11 IS THE EVIDENCE THAT MATTERS. Across all four of Phase 257's plans the gate's
+  // grand total did not move at all (8415 -> 8415) while two new suites were added to the
+  // repository. A total that cannot see a new suite is the gate telling you, in its own
+  // numbers, that it never ran it. Adding a pin here imports NO rot: both suites were green
+  // before adoption, so adoption cannot red the gate.
+  // 6 -> 7 in Phase 257.1: the root-scroll fence. Driven RED against the exact class string
+  // that shipped (`flex-1 overflow-y-auto`, no `h-full`/`min-h-0`), file restored md5-identical.
+  // 7 -> 10 in 257.1: the filter-scope cases. The time chip reached the ledger but NOT the
+  // charts (`getSpendSummary()` was called bare, in TWO places). Two of the three driven RED
+  // against that exact bare call; file restored md5-identical.
+  // 10 -> 17 in 257 CR-06. ⚠ The pin sat at 10 while the file ran 13: the gate's contract is
+  // no per-file DECREASE, so the three cases covering CR-02/CR-04/WR-02 were UNGUARDED and
+  // deleting them stayed green (driven). Re-pinned to the real count with the CR-06 cases.
+  // 17 -> 18 in 257 WR-12: fence em-dash loading state so pre-fix fallback $0.0000 cannot return.
+  // 18 -> 22 in 257 CR-05/CR-07: four cases pinning that a FAILED LOAD answers nothing
+  // rather than zero. Driven RED against the shipped zero-fallback (Received: "0.0k").
+  "AdminSpendPage.test.tsx": 22,
+  // Added in 257 CR-06 follow-up. Exhaustive arithmetic: three independently-rounded
+  // gauge segments summed to 101 on 34 of the combinations swept, and gemini found it
+  // reviewing the CR-06 fix. Driven RED against the pre-fix arithmetic, 40 offenders named.
+  "apportion100.test.ts": 4,
+  // 5 -> 7 in Phase 257.1: two cases added for the badge's THIRD state ("No tokens
+  // recorded" for a rated model whose run measured nothing) and for the undefined-vs-null
+  // coverage distinction. Both were introduced by the review's own fixes and covered by
+  // nothing, which is the same gap the review raised about this phase. Measured `7 passed
+  // (7)`, and the third-state case was driven RED against a disabled branch (restored
+  // md5-identical). An EXTENSION, never a lowering — no deletion rides with it.
+  "RunCostBadge.test.tsx": 7,
+  // Phase 257.1 — adopted from NEITHER knob; see the TARGETS comment at the bottom of this
+  // file. Measured `14 passed (14)` before the phase's cases, `18 passed (18)` after.
+  // ⬆ RAISED 18 → 20 at `262-05`: the Experts entry renders from the SHIPPED NAV_ITEMS and
+  //   clicking it navigates. The leg `activeViewReachability` structurally cannot see.
+  "NavPanel.test.tsx": 20,
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -4274,6 +4429,41 @@ const TARGETS = [
   "src/components/chat/RunCard.test.tsx",
   "src/components/chat/RunCard.timer.test.tsx",
   "src/components/chat/__tests__/ChatArea.approval.test.tsx",
+  // ── Phase 260 (PACK-02 / PACK-03) — Consultant Expert UI & Action Tiles ──
+  "src/components/chat/__tests__/ComposerExpert.test.tsx",
+  "src/components/chat/__tests__/ExpertSpotlightCard.test.tsx",
+  // ── Phase 262 plan 02 (D-262-06) — the ONE home of expert-icon resolution ──
+  // Named FILE-LEVEL, deliberately NOT the bare directory `src/components/experts`,
+  // matching how its two siblings below are already reached. Both knobs, same commit.
+  "src/components/experts/__tests__/expertIcon.test.tsx",
+  // ── Phase 261 (PACK-07 / PACK-09 / PACK-10) — Expert Authoring Studio & Org Management ──
+  "src/components/experts/__tests__/OrgExpertsTab.test.tsx",
+  "src/components/experts/__tests__/ExpertAuthoringStudio.test.tsx",
+  // ── Phase 262 plan 03 (PACK-11) — the Expert catalog ───────────────────────────────
+  // ⛔ BOTH KNOBS, SAME COMMIT, and the directory trap is the reason: `src/components/experts`
+  // has NO bare-directory entry — every sibling above is named FILE-LEVEL — so a suite dropped
+  // into `src/components/experts/catalog/__tests__/` runs in NO gate until it is NAMED here
+  // *and* pinned in BASELINE. The comment four lines above the expertIcon entry records this
+  // exact trap firing in the commit that wrote the warning; these two are named so it does not
+  // fire a third time. They carry PACK-11's vanish, its positive control and its
+  // no-consolation-prize arm — the criterion ROADMAP calls "the one most likely to be faked".
+  "src/components/experts/catalog/__tests__/expertCatalog.test.ts",
+  "src/components/experts/catalog/__tests__/ExpertCatalogPage.test.tsx",
+  // ── Phase 262 plan 04 (PACK-12) — the detail view ─────────────────────────────────
+  // Same directory trap, same commit: TARGETS here, BASELINE pin below. This suite carries
+  // the four presentation columns' ONLY rendered-content assertions, including the first
+  // assertion in this repository that `example_output` reaches a human at all.
+  "src/components/experts/catalog/__tests__/ExpertDetailModal.test.tsx",
+  // ── Phase 262 plan 04 (PACK-13) — the ordered handoff ─────────────────────────────
+  // Pure module, no mount. Named here and pinned below in the same commit, for the same
+  // directory reason: nothing under this path is reached by a bare-directory entry.
+  "src/components/experts/catalog/__tests__/startScopedChat.test.ts",
+  // ── Phase 263 (PACK-14/PACK-15) — the dialog an Expert proposal reuses ──────────────
+  // ⚠ `src/components/skills` has NO bare-directory TARGETS entry, and this file is NOT
+  // under a `__tests__/` directory — so before this line it ran in NO gate at all.
+  // TARGETS decides what RUNS; BASELINE decides what is GUARDED, and this suite sat on
+  // the wrong side of BOTH. Adopting it RAISES the grand total; that is the gate working.
+  "src/components/skills/SkillFormDialog.test.tsx",
   // ── BUG-260912-01 — narration renders in the fold, not the body ───────────────────────
   //
   // ⛔ `src/components/chat` has NO bare-directory TARGETS entry (this file says so in four
@@ -5136,6 +5326,9 @@ const TARGETS = [
   "src/components/ingestion/__tests__/DocumentStatusBadge.a11y.test.tsx",
   // ── Phase 222 (222-05 / D-222-09) — Door half OAuth & probe-auth discovery ──
   "src/lib/api/__tests__/connectors.mcp_auth.test.ts",
+  // ── v4.3 milestone audit (TIER-03) — a tier refusal names the plan; both knobs, same commit
+  "src/lib/api/__tests__/entitlementRefusal.test.ts",
+  "src/lib/api/__tests__/noFrontendTokenPricing.fence.test.ts", // v4.3 audit (257 SC#3)
   "src/components/settings/__tests__/connectionFormCopy.mcp.test.ts",
   "src/components/settings/McpAuthDoor.test.tsx",
   "src/components/settings/McpAuthDoor.byo.test.tsx",
@@ -5506,9 +5699,46 @@ const TARGETS = [
   //
   // Added in the SAME COMMIT that creates the two new files — an entry pointing at a path
   // that does not yet exist makes the gate ERROR (exit 2) rather than fail.
+  // ⚠ NAMED, because `src/components/admin/` has no DIRECTORY entry. A suite added under
+  // it and not named here runs nowhere and its pin can never fail. Phase 257 hit this
+  // trap three times: AdminSpendPage, RunCostBadge, and now apportion100.
+  "src/components/admin/spend/apportion100.test.ts",
   "src/components/admin/__tests__/ModelRegistryTab.test.tsx",
   "src/components/admin/__tests__/addProviderRoster.lockstep.test.ts",
   "src/components/admin/__tests__/hideControlLegibility.test.tsx",
+  // ── Phase 262 ─────────────────────────────────────────────────────────────────────
+  // ⚠ NAMED, for the same reason the three above are: `src/components/admin/` has NO bare
+  // directory entry, so a suite added under it and not listed here RUNS NOWHERE and its
+  // assertions can never fail. That trap has now fired four times in this directory alone
+  // (AdminSpendPage, RunCostBadge, apportion100, WorkflowScheduleModal one dir over).
+  "src/components/admin/__tests__/ModelAdvancedCapabilities.test.tsx",
+  // ── 263-REVIEW.md WR-06 / WR-07 ───────────────────────────────────────────────────
+  // ⚠ The trap this comment block warns about FIRED IN THE COMMIT THAT WROTE IT:
+  // `ModelAdvancedCapabilities.test.tsx` above was added here and to NEITHER baseline,
+  // so it ran and guarded nothing until 263-REVIEW WR-06. Its BASELINE key now exists.
+  // `CapabilityGrid.test.tsx` is worse and older — named in NEITHER knob since Phase 147.
+  // ⛔ 15 more suites in this directory are still unlisted; see 263-REVIEW.md WR-06.
+  "src/components/admin/__tests__/CapabilityGrid.test.tsx",
+  // ── 263-REVIEW.md WR-06, completing the sweep — the other 16 ─────────────────────
+  // ⛔ Named individually, NOT via a new bare `src/components/admin/` directory entry: a
+  // directory entry would silently re-run whatever lands there next WITHOUT a baseline,
+  // which is exactly the half-adoption this sweep exists to end. Naming forces the pair.
+  "src/components/admin/__tests__/ActiveRunsSection.test.tsx",
+  "src/components/admin/__tests__/ActiveRunsSection.a11y.test.tsx",
+  "src/components/admin/__tests__/ControlRoomPage.test.tsx",
+  "src/components/admin/__tests__/CapabilityGrid.a11y.test.tsx",
+  "src/components/admin/__tests__/MaintenancePanel.a11y.test.tsx",
+  "src/components/admin/__tests__/HealthSignals.a11y.test.tsx",
+  "src/components/admin/__tests__/OperatorBand.a11y.test.tsx",
+  "src/components/admin/__tests__/TechnicalNamesToggle.a11y.test.tsx",
+  "src/components/admin/__tests__/LockedTab.a11y.test.tsx",
+  "src/components/admin/__tests__/AuditTab.a11y.test.tsx",
+  "src/components/admin/__tests__/RecentActionsCard.a11y.test.tsx",
+  "src/components/admin/__tests__/UsersAndAccess.a11y.test.tsx",
+  "src/components/admin/__tests__/FeatureVisibility.a11y.test.tsx",
+  "src/components/admin/__tests__/ModelDiscoveryPanel.test.tsx",
+  "src/components/admin/__tests__/ModelDiscoveryPanel.a11y.test.tsx",
+  "src/components/admin/__tests__/ModelRegistryTab.a11y.test.tsx",
   // ── Phase 249 Plan 02 (MODEL-05) ──────────────────────────────────────────────────
   // ⚠ `src/components/chat` has NO bare-directory entry (BUG-260912-01 recorded the same
   // thing), so this suite must be named or it never executes under the gate.
@@ -5524,6 +5754,60 @@ const TARGETS = [
   // deliberately so (Phase 235 kept the red `sourceComposition.test.tsx` out of both), so
   // this file must be NAMED or it executes nowhere.
   "src/components/sources/bug260912AppCredentials.test.ts",
+  // ── Phase 257 review (Claude, reviewer) — BOTH of this phase's frontend suites landed
+  // ── in NEITHER knob, and the gate's own printed command line is the proof. ───────────
+  //
+  // Measured at c570922f4, BEFORE these two entries existed:
+  //   grep -c AdminSpendPage scripts/vitest-count-gate.cjs  -> 0
+  //   grep -c RunCostBadge   scripts/vitest-count-gate.cjs  -> 0
+  // and neither path appeared in the `running: npx vitest run …` line the gate prints.
+  // So 257-03's 203-line page suite and 257-04's badge suite RAN NOWHERE and GUARDED
+  // NOTHING — every acceptance criterion resting on them would have passed whether or not
+  // the code worked. That is verbatim the Phase 214 `WorkflowScheduleModal` shape and the
+  // Phase 233 `src/components/sources` shape, both already recorded in this file.
+  //
+  // WHY EACH ONE NEEDED A NAMED ENTRY, measured rather than assumed:
+  //   • `src/pages/admin/AdminSpendPage.test.tsx` — there is NO `src/pages` DIRECTORY entry
+  //     anywhere in this array; `src/pages` is reached by NAMED FILES ONLY. A new
+  //     page-level suite is not executed at all until it is named here.
+  //   • `src/components/workflow/RunCostBadge.test.tsx` — note the SINGULAR `workflow`.
+  //     The directory entry near the top of this array is `src/components/workflowS`
+  //     (plural), which is a DIFFERENT DIRECTORY and does not reach this file. 257-04
+  //     created a new singular-named sibling directory; the near-miss is exactly why the
+  //     omission survived review inside the phase.
+  //     ⚠ RECOMMENDED SEPARATELY (operator's call, not done here): consolidate
+  //     `src/components/workflow/` into the existing `src/components/workflows/` so the
+  //     plural DIRECTORY entry covers it structurally and no named entry is needed.
+  "src/pages/admin/AdminSpendPage.test.tsx",
+  "src/components/workflow/RunCostBadge.test.tsx",
+  // ── Phase 257.1 — a THIRD invisible suite, found while fixing the first two. ──────────
+  // `src/components/layout/__tests__/NavPanel.test.tsx` has existed and passed for a long
+  // time in NEITHER knob: the array reaches `src/components/layout` by NAMED FILES ONLY
+  // (`NavPanel.badge.test.tsx`, the four ChatLayout/ChatHistoryColumn entries), and this
+  // sibling was never named. It is the suite that owns the operator rail's
+  // non-discoverability contract — the D-07 "nothing renders for a non-operator" rule —
+  // so it was guarding the leak of every operator surface while being deletable in silence.
+  // Measured GREEN at 14 BEFORE adoption (so adoption cannot red the gate), then 18 with
+  // the four spend-reachability cases; three of those four driven RED against a relabelled
+  // rail entry, file restored md5-identical.
+  "src/components/layout/__tests__/NavPanel.test.tsx",
+  // ── Phase 262 (262-01 / PACK-11) — the nav-items knob gap, and the reachability fence. ──
+  // `frontend/src/lib/nav-items.ts` FIRES G-5 at 6 phases and TWO of its THREE suites ran in
+  // NEITHER knob: only `navItemsUnknownIsNotDenied.test.ts` was ever named. The array reaches
+  // `src/lib` by NAMED FILES ONLY — there is no `src/lib` and no `src/lib/__tests__` directory
+  // entry anywhere here (this script records that decision beside its own chat/layout/panel
+  // entries) — so these two were deletable in silence while owning the D-07
+  // non-discoverability lock and the connections-reachability pin. Same find as 257.1's
+  // `NavPanel.test.tsx`, one directory over.
+  // Measured GREEN before adoption (2 and 6), so adoption cannot red the gate.
+  "src/lib/nav-items.test.ts",
+  "src/lib/__tests__/navItemsConnections.test.ts",
+  // And the fence 262-01 creates: the ActiveView↔ChatLayout-branch correspondence, which was
+  // carried by PROSE in three comment blocks and by nothing executable — a branchless 13th
+  // union member shipped GREEN before this. Named in the SAME COMMIT that creates it, and
+  // pinned in BASELINE in that commit too: a suite in TARGETS and not in BASELINE RUNS and
+  // guards nothing, which is the trap this array's own comment at :184 records firing.
+  "src/lib/__tests__/activeViewReachability.test.ts",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
@@ -5597,9 +5881,11 @@ function runVitest() {
   // on two concurrent runs whose serial baseline is `failed 0`. Capped at 4
   // workers each, two concurrent runs agree EXACTLY (9 files / 23 tests failing,
   // the known SEED-056 rot set, on both). Absent => unchanged single-run behaviour.
-  if (process.env.GSD_VITEST_MAX_WORKERS) {
-    args.push(`--maxWorkers=${process.env.GSD_VITEST_MAX_WORKERS}`)
+  const maxWorkers = process.env.GSD_VITEST_MAX_WORKERS || (process.platform === "win32" ? "2" : undefined)
+  if (maxWorkers) {
+    args.push(`--maxWorkers=${maxWorkers}`)
   }
+
 
   // ⛔ THE WINDOWS COMMAND-LENGTH LIMIT — measured 2026-09-10 (Phase 241-03), and it was
   //    ALREADY BROKEN at that phase's base commit, by nothing that phase changed.

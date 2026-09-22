@@ -28,6 +28,7 @@ import { outerBannerLabel, toolLabel } from "@/lib/toolMeta"
 import { StepIdentity } from "@/components/workflows/StepIdentity"
 import { unifiedStepCount } from "@/lib/stepCount"
 import { categorizeError } from "@/lib/errorCategories"
+import { RunCostBadge } from "@/components/workflow/RunCostBadge"
 
 interface RunCardProps {
   message: Message
@@ -405,6 +406,16 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
               }
             />
           )}
+          {(message.costUsd !== undefined || message.isRated !== undefined) && (
+            <div className="mt-1">
+              <RunCostBadge
+                costUsd={message.costUsd}
+                isRated={message.isRated}
+                unratedModel={message.model}
+                tokenCoverage={message.tokenCoverage}
+              />
+            </div>
+          )}
         </div>
 
         {/* Phase 076.1-04: Cumulative file count badge — grows during multi-batch runs. */}
@@ -437,24 +448,17 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
           aria-label="Expand run details"
         >
           <Bot className="w-4 h-4 text-primary/60 flex-shrink-0" />
-          {/* ── ⚠ NOISE AUDIT 2026-08-31 (operator, items A2 + A3) ──────────────────
-                 This row used to read `Run · 2 steps · ✓ done · 18.3s` while sitting DIRECTLY
-                 BELOW a header already saying `Run · 2 steps` and `18.3s`. Measured in the
-                 running app, a collapsed card read:
-
-                   Run · 2 steps / anthropic · claude-sonnet-4-5 · turn 1 / ⏱ 18.3s / Step 2
-                   Run · 2 steps · ✓ done · 18.3s
-
-                 — the step count three times and the duration twice, in nine lines.
-
-                 ⚠ THE COUNT AND THE DURATION STAY IN THE HEADER, NOT HERE, because the
-                 header is present in BOTH states and this row is collapsed-only. Deleting
-                 the header copy instead would make an expanded run lose its duration
-                 entirely. What this row keeps is the one fact the header cannot carry: the
-                 VERDICT, which is also the reason a person would open it. */}
           <span title={message.runError || undefined}>
             {statusGlyph(message.runStatus)} {statusWord(message.runStatus, message.runError)}
           </span>
+          {(message.costUsd !== undefined || message.isRated !== undefined) && (
+            <RunCostBadge
+              costUsd={message.costUsd}
+              isRated={message.isRated}
+              unratedModel={message.model}
+              tokenCoverage={message.tokenCoverage}
+            />
+          )}
           <ChevronDown className="w-4 h-4 ml-auto flex-shrink-0" />
         </button>
       )}

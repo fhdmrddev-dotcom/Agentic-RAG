@@ -88,6 +88,7 @@ import { type PhaseTimingRow } from "@/components/workflows/phaseDuration"
 // Phase 200.2 (RUN-05 / D-01 / D-02 / D-04) — The deliverable hero and process trace components
 import { RunHero } from "@/components/workflows/RunHero"
 import { RunStepList } from "@/components/workflows/RunStepList"
+import { RunCostBadge } from "@/components/workflow/RunCostBadge"
 // Phase 194.1 Plan 07 (R3) — the FOURTH and last mount of the ONE shared Stop. It owns its
 // own dispatch and its own pressed state; this page hands it a thread id and nothing else.
 import { StopControl } from "@/components/chat/StopControl"
@@ -1389,6 +1390,14 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
             {elapsed.number ? <span>{elapsed.number} </span> : null}
             {elapsed.text}
           </span>
+          {run && (run.cost_usd !== undefined || run.is_rated !== undefined) && (
+            <RunCostBadge
+              costUsd={run.cost_usd}
+              isRated={run.is_rated}
+              unratedModel={run.model}
+              tokenCoverage={run.token_coverage}
+            />
+          )}
           {showTechnical ? (
             <span className="font-mono text-[11px] text-muted-foreground" data-testid="run-elapsed-technical">
               {/* F3: the reveal must name the field the number ACTUALLY came from. Printing

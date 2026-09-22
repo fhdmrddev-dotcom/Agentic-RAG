@@ -33,6 +33,14 @@ import { OrgAdminShell } from "@/components/org/OrgAdminShell"
 // Phase 188 Plan 09 (RUNVIZ-03): the run's own room mounts here as a full-surface
 // branch (the SkillStudioPage precedent — entered WITH an id, returned via callbacks).
 import { WorkflowRunPage } from "@/pages/WorkflowRunPage"
+// Phase 257 (METER-07): Operator Spend & Metering cockpit
+import { AdminSpendPage } from "@/pages/admin/AdminSpendPage"
+// Phase 262 plan 05 (PACK-11 / PACK-13 / D-262-03): the Expert catalog, and the ordered
+// handoff that turns one control on it into a chat the SERVER already knows is scoped.
+// `startScopedChat` takes every seam as a parameter, so the four this component already
+// holds are injected at the mount below rather than imported by the catalog itself.
+import { ExpertCatalogPage } from "@/components/experts/catalog/ExpertCatalogPage"
+import { startScopedChat } from "@/components/experts/catalog/startScopedChat"
 // Phase 214-12 (STEP-02 / D-214-04): chat's launch moment. The form resolves BEFORE
 // createThread, and the shared field renderer keeps the two-arm label rule in one place.
 // `launchInputFields` — never `entryInputFields`, whose fallback arm draws a box for a key
@@ -52,7 +60,7 @@ import { cn } from "@/lib/utils"
 // SAME way the desktop ChatHistoryColumn does — SC#2 reaches mobile.
 import { matchesTitle, HighlightTitle } from "@/lib/threadGroups"
 import { Button } from "@/components/ui/button"
-import { MessageSquare, Plus, Search, Shield } from "lucide-react"
+import { Menu, MessageSquare, Plus, Search, Shield } from "lucide-react"
 // Phase 103-06 (REQ-7 / sketch 023-A): the mobile drawer consumes the SINGLE
 // shared nav list (incl. the Workflows home + its distinct icon) — the local
 // NAV_ITEMS_MOBILE triplicate is gone (NavPanel consumes the same list). Phase 148
@@ -74,6 +82,10 @@ import {
   uploadWorkspaceTemplate,
   deleteThread as deleteLaunchThread,
   getThreadWorkflow,
+  // Phase 262 plan 05 (PACK-13 / D-262-08): the SHIPPED PATCH the composer's invite door
+  // already issues — the same mechanism, reached one register lower so a surface outside the
+  // chat branch can use it. ⛔ Not a second way to scope a thread.
+  setThreadActiveExpert,
   type PublishedWorkflow,
 } from "@/lib/api"
 
@@ -824,6 +836,11 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
               // one called an undefined `navigate` and threw ReferenceError. It goes to the
               // UNGOVERNED connections door, never to `settings`, which is operator-only.
               onOpenConnections={() => onNavigate("connections")}
+              // Phase 262 plan 05 (PACK-11): the composer's second door into the catalog,
+              // wired exactly like the connections door above. ⭐ Deliberate redundancy —
+              // the rail entry is the triad's third leg; this one exists because BUS-303
+              // named both, and because a person wanting an Expert is usually mid-thread.
+              onBrowseExperts={() => onNavigate("experts")}
               // Phase 156 REFINEMENT: the ▷ reopen handle shows only while collapsed.
               onReopenHistory={historyCollapsed ? () => setHistoryCollapsedPersisted(false) : undefined}
             />
@@ -841,6 +858,20 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
           />
         </div>
       ) : (
+        // 262-UAT 1.2: the ONLY mobile drawer trigger lived in ChatArea, so every view on this
+        // side stranded a phone user. One md:hidden bar, reusing the drawer this file owns —
+        // no new state. `<main>`'s class string is pinned by ChatLayout.launch.test.tsx.
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <div className="md:hidden flex shrink-0 items-center border-b border-border/30 px-4 py-2">
+          <button
+            type="button"
+            aria-label="Open navigation"
+            onClick={() => setDrawerOpen(true)}
+            className="flex h-11 w-11 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-accent/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+        </div>
         <main className="flex-1 overflow-hidden">
           {/* ⚠ NOTHING GOES BETWEEN THE BRANCH BELOW AND ITS MOUNT. `renameFence.test.ts`
               asserts that key link inside a 120-character window, so a comment in the gap
@@ -974,10 +1005,71 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
                 onNavigate("chat")
               }}
             />
+          ) : activeView === "admin-spend" ? (
+            <AdminSpendPage onBack={() => onNavigate("control-room")} />
+          ) : activeView === "experts" ? (
+            // Phase 262 plan 05 (PACK-11 / PACK-13 / D-262-03): the Expert catalog — the
+            // LAST-BUT-ONE arm, deliberately, so the trailing positional fallback stays last.
+            //
+            // ⛔ THAT POSITION IS THE WHOLE LEG. The trailing element is a POSITIONAL
+            // fallback, not a `default:` that throws, and `as never` is always a legal
+            // assertion — so a member whose branch landed AFTER it would be dead code that
+            // compiles and typechecks clean. Two independent fences now measure this:
+            // `lib/activeViewReachability.ts` (AST: every member has a branch, and the
+            // fallback is last) and `ChatLayout.launch.test.tsx`'s positional index check.
+            //
+            // ⭐ `folders` is `useFolders()`'s ONE read, already threaded to three mounts
+            // above — this is a fourth consumer and ZERO new fetches. The page itself makes
+            // exactly one list call and reaches for no other client function.
+            //
+            // The start control's five seams are this component's own: the thread creator,
+            // the shipped expert PATCH, the list refetch, the selection, and the navigation.
+            // ⛔ The refetch BEFORE the selection is load-bearing, not tidiness — the created
+            // row's expert column is null and the thread hook exposes no updater for it, so
+            // without it the history list would disagree with the server the moment the
+            // person clicks that thread again. `startScopedChat`'s docblock owns that rule.
+            <ExpertCatalogPage
+              folders={folders}
+              onStartChat={async (expert) => {
+                // ⛔ THE CATCH IS NOT DECORATION, AND IT IS NOT A SWALLOW EITHER. `startScopedChat`
+                // REJECTS when the PATCH is refused, precisely so a failed start never dresses
+                // itself as a scoped chat (T-262-15) — and the page's handler discards the
+                // returned promise, so an uncaught rejection here would surface as an unhandled
+                // rejection and nothing else. The refusal already did its job by the time this
+                // runs: no navigation happened and no thread was selected, so the person stays
+                // on the catalog looking at the control they pressed.
+                // ⚠ RECORDED AS A GAP RATHER THAN GLOSSED: this app ships no toast surface and
+                // the catalog page's props are fixed at `{ folders, onStartChat, onInspect? }`,
+                // so the only honest report available at this seam is the console — which is
+                // exactly what the composer's own invite door does one register over
+                // (`MessageInput.handleSelectExpert`). A visible failure state needs a prop the
+                // page does not have; that is a contract change, not a line here.
+                try {
+                  await startScopedChat(
+                    {
+                      createThread: newThread,
+                      setExpert: setThreadActiveExpert,
+                      refreshThreads: loadThreads,
+                      selectThread,
+                      navigate: () => onNavigate("chat"),
+                      // 262-UAT 3.6: a refused scoping PATCH no longer leaves an empty thread.
+                      discardThread: deleteThread,
+                    },
+                    expert,
+                  )
+                } catch (err) {
+                  console.error("Failed to start a scoped chat with this Expert:", err)
+                  // 262-UAT 3.6: re-thrown so the catalog can SHOW the failure (the gap
+                  // recorded above is closed by the page, not by a toast surface).
+                  throw err
+                }
+              }}
+            />
           ) : (
             <UnknownViewFallback view={activeView as never} />
           )}
         </main>
+        </div>
       )}
 
       {/* ── Phase 214-12 (STEP-02 / D-214-04): chat's launch moment. ───────────────────────

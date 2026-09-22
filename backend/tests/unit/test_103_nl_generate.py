@@ -254,6 +254,11 @@ async def test_generate_route_delegates_and_does_not_persist(monkeypatch):
     app = FastAPI()
     app.dependency_overrides[wf_api.get_current_user] = lambda: {"id": "u1"}
     app.dependency_overrides[wf_api.get_supabase] = lambda: object()
+    # v4.3 audit: /generate now carries require_capability("workflows") — entitled org here.
+    import app.services.entitlement_service as _ent
+    from app.dependencies import get_active_org_id as _gaoi
+    monkeypatch.setattr(_ent, "enforce_entitlement", AsyncMock(return_value=None))
+    app.dependency_overrides[_gaoi] = lambda: "00000000-0000-0000-0000-00000000a0d1"
     app.include_router(wf_api.router)
     client = TestClient(app)
 

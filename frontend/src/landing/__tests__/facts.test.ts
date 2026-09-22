@@ -54,7 +54,7 @@ describe("Landing Page Facts (SEED-241 / D-226-04 / F-2)", () => {
     expect(SURFACE_TABS.library).toHaveLength(5)
     expect(SURFACE_TABS.settings).toHaveLength(5)
     expect(SURFACE_TABS.controlRoom).toHaveLength(5)
-    expect(SURFACE_TABS.orgAdmin).toHaveLength(7)
+    expect(SURFACE_TABS.orgAdmin).toHaveLength(8) // 8 since 261 added the Experts tab (synced at the v4.3 audit)
     expect(VERBATIM_QUOTES).toHaveLength(6)
   })
 

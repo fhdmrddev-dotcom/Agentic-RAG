@@ -315,3 +315,173 @@ describe("SkillDetailPanel — slimmed panel: shared stepper + Open studio, sect
     expect(screen.queryByRole("button", { name: /open studio/i })).not.toBeInTheDocument()
   })
 })
+
+/**
+ * Phase 263-04 Task 1 (PACK-14 / PACK-15 · D-263-01 / D-263-04) — the `initialValues`
+ * pre-fill that lets an Expert proposal open THIS dialog already filled in.
+ *
+ * ⛔ The load-bearing property is that pre-filling must NOT turn the dialog into an EDIT
+ * dialog. Passing a synthetic object as `skill` would flip `const isEdit = !!skill`,
+ * change the title, fire `listSkillFiles(skill.id)` against an id that does not exist,
+ * and make the save read as an update. The three `??` reads inside the EXISTING reset
+ * effect are the whole change — and the cases below are what make that falsifiable
+ * rather than merely asserted.
+ *
+ * ⭐ Content, not presence: every case asserts the RENDERED VALUE of each field, because
+ * the words in the box ARE the deliverable here. A fence asserting only that a textbox
+ * exists cannot see a pre-fill that silently lands empty (Phase 235's finding).
+ */
+describe("SkillFormDialog — initialValues pre-fill (263-04 / D-263-04)", () => {
+  beforeEach(() => {
+    listSkillFiles.mockClear()
+    listSkillFiles.mockResolvedValue([])
+  })
+
+  const PROPOSAL = {
+    name: "prisma-screening",
+    description: "Screen titles and abstracts against PRISMA inclusion criteria.",
+    instructions: "1. Read the protocol.\n2. Apply the inclusion criteria.\n3. Record exclusions.",
+  }
+
+  const descBox = () => screen.getByPlaceholderText(/one sentence describing what this skill does/i)
+  const instBox = () => screen.getByPlaceholderText(/step-by-step instructions/i)
+
+  it("pre-fills name, description and instructions from initialValues when there is no skill", () => {
+    render(
+      <SkillFormDialog
+        open
+        onOpenChange={() => {}}
+        onSave={vi.fn(async (): Promise<Skill> => mkSkill())}
+        initialValues={PROPOSAL}
+      />,
+    )
+
+    expect(screen.getByLabelText("Name")).toHaveValue("prisma-screening")
+    expect(descBox()).toHaveValue(PROPOSAL.description)
+    expect(instBox()).toHaveValue(PROPOSAL.instructions)
+  })
+
+  it("stays in CREATE mode when pre-filled — create wording, and listSkillFiles is never called", async () => {
+    render(
+      <SkillFormDialog
+        open
+        onOpenChange={() => {}}
+        onSave={vi.fn(async (): Promise<Skill> => mkSkill())}
+        initialValues={PROPOSAL}
+      />,
+    )
+
+    // The title and the primary button carry the CREATE wording, not the edit wording.
+    expect(screen.getByText("New Skill")).toBeInTheDocument()
+    expect(screen.queryByText("Edit Skill")).not.toBeInTheDocument()
+    expect(screen.getByRole("button", { name: /save skill/i })).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: /update skill/i })).not.toBeInTheDocument()
+
+    // ⛔ The synthetic-`skill` shortcut would have fired this against an id that does not exist.
+    await waitFor(() => expect(listSkillFiles).toHaveBeenCalledTimes(0))
+  })
+
+  it("lets a real skill WIN over initialValues when both are supplied", () => {
+    render(
+      <SkillFormDialog
+        open
+        onOpenChange={() => {}}
+        skill={mkSkill()}
+        onSave={vi.fn(async (): Promise<Skill> => mkSkill())}
+        currentUserId="user-1"
+        initialValues={PROPOSAL}
+      />,
+    )
+
+    expect(screen.getByLabelText("Name")).toHaveValue("Risk Register")
+    expect(descBox()).toHaveValue("Risk register.")
+    expect(instBox()).toHaveValue("Build a spreadsheet…")
+  })
+
+  it("behaves exactly as today when neither skill nor initialValues is given", () => {
+    render(
+      <SkillFormDialog
+        open
+        onOpenChange={() => {}}
+        onSave={vi.fn(async (): Promise<Skill> => mkSkill())}
+      />,
+    )
+
+    expect(screen.getByLabelText("Name")).toHaveValue("")
+    expect(descBox()).toHaveValue("")
+    expect(instBox()).toHaveValue("")
+  })
+
+  it("shows the SECOND proposal's values when initialValues changes without unmounting", async () => {
+    const { rerender } = render(
+      <SkillFormDialog
+        open
+        onOpenChange={() => {}}
+        onSave={vi.fn(async (): Promise<Skill> => mkSkill())}
+        initialValues={PROPOSAL}
+      />,
+    )
+    expect(screen.getByLabelText("Name")).toHaveValue("prisma-screening")
+
+    // The studio opens a DIFFERENT proposal in the SAME mounted dialog. Without
+    // `initialValues` in the reset effect's dependency array this still reads the first one.
+    const second = {
+      name: "thematic-synthesis",
+      description: "Synthesise findings into themes across the included studies.",
+      instructions: "1. Code the extracts.\n2. Cluster the codes into themes.",
+    }
+    rerender(
+      <SkillFormDialog
+        open
+        onOpenChange={() => {}}
+        onSave={vi.fn(async (): Promise<Skill> => mkSkill())}
+        initialValues={second}
+      />,
+    )
+
+    await waitFor(() => expect(screen.getByLabelText("Name")).toHaveValue("thematic-synthesis"))
+    expect(descBox()).toHaveValue(second.description)
+    expect(instBox()).toHaveValue(second.instructions)
+  })
+})
+
+// 262-UAT follow-up (operator read the backend log): opening a built-in skill logged
+// `GET /publish-gate|/test-cases|/versions → 403` every time. Those three reads are OWNER-ONLY
+// server-side, so a non-owner request can only ever be refused — the panel must not issue it.
+describe("SkillDetailPanel — owner-only lifecycle reads", () => {
+  beforeEach(() => {
+    listSkillFiles.mockResolvedValue([])
+    getPublishGate.mockReset().mockResolvedValue(mkGate())
+    listTestCases.mockReset().mockResolvedValue([])
+    listSkillVersions.mockReset().mockResolvedValue([])
+  })
+
+  it("a skill the caller does NOT own issues none of the three owner-only reads", async () => {
+    render(
+      <SkillDetailPanel
+        skill={mkSkill({ id: "sys-1", user_id: "system-user", is_system: true })}
+        onSave={vi.fn(async (): Promise<Skill> => mkSkill())}
+        onDiscard={vi.fn()}
+        currentUserId="user-1"
+      />,
+    )
+    await waitFor(() => expect(listSkillFiles).toHaveBeenCalled())
+    expect(getPublishGate).not.toHaveBeenCalled()
+    expect(listTestCases).not.toHaveBeenCalled()
+    expect(listSkillVersions).not.toHaveBeenCalled()
+  })
+
+  it("POSITIVE CONTROL — the owner's skill still issues all three", async () => {
+    render(
+      <SkillDetailPanel
+        skill={mkSkill()}
+        onSave={vi.fn(async (): Promise<Skill> => mkSkill())}
+        onDiscard={vi.fn()}
+        currentUserId="user-1"
+      />,
+    )
+    await waitFor(() => expect(getPublishGate).toHaveBeenCalledWith("skill-1"))
+    expect(listTestCases).toHaveBeenCalledWith("skill-1")
+    expect(listSkillVersions).toHaveBeenCalledWith("skill-1")
+  })
+})

@@ -126,19 +126,71 @@ def test_tools_lost_names_only_models_that_actually_lose_tools(client, auth_head
             assert mid not in body["tools_lost_models"]
 
 
+# The same unknown model, configured under a LOCAL provider block. ⚠ The shared
+# ``_SETTINGS_ROW`` lists it under ``openai`` only because that block is the one carrying an
+# api_key — a fixture convenience, never a statement about where the model is served.
+_LOCAL_BLOCK_SETTINGS_ROW = {
+    **_SETTINGS_ROW,
+    "provider_model_lists": {
+        "openai": ["gpt-4o", "my-db-only-model"],
+        "ollama": ["llama-4-scout-local"],
+    },
+}
+
+
 def test_a_local_model_is_flagged_as_losing_tools(client, auth_headers, mock_asyncpg_pool, monkeypatch):
     """The case the whole field exists for.
 
-    ``llama-4-scout-local`` matches no inference pattern, so it falls to the ``ollama`` bucket,
-    which is deliberately OUTSIDE ``_NATIVE_TOOL_PROVIDERS``. The run then goes to STRUCTURED
-    mode, the ``tools`` param is never sent, and any tool call arrives as unparseable prose —
-    the failure that stayed invisible for a day on 2026-08-18.
+    ``llama-4-scout-local`` matches no inference pattern, so it is inferred to a provider
+    OUTSIDE ``_NATIVE_TOOL_PROVIDERS``. The run then goes to STRUCTURED mode, the ``tools``
+    param is never sent, and any tool call arrives as unparseable prose — the failure that
+    stayed invisible for a day on 2026-08-18.
+
+    ⚠ RE-DRIVEN 2026-09-21 (Phase 262), and the original input is described rather than
+    silently swapped, because WHY it had to move is the finding.
+
+    This case used to drive the model through the shared ``_SETTINGS_ROW``, where it sits in
+    the **openai** block — and it passed for a reason that had nothing to do with the
+    operator's configuration: every id matching none of the ten naming patterns fell to the
+    ``ollama`` bucket no matter which provider it was listed under. **That fallback was the
+    defect, not the mechanism.** It silently disabled tool calling for `grok-`, `mistral-`,
+    `command-`, `qwen` and every id a vendor has not shipped yet.
+
+    Phase 262 makes the unmatched case read the provider block the operator actually chose,
+    so the model above is now correctly inferred ``openai``. The property THIS case exists to
+    prove — *an unknown model on a tool-less provider is flagged* — is untouched, and it is
+    proven here on an input where it still holds: the same id, listed under ``ollama``.
+    """
+    _prime(monkeypatch, mock_asyncpg_pool, [], settings_row=_LOCAL_BLOCK_SETTINGS_ROW)
+
+    body = _get_providers(client, auth_headers)
+
+    assert "llama-4-scout-local" in body["tools_lost_models"]
+
+
+def test_an_unknown_model_on_a_native_provider_is_NOT_flagged(client, auth_headers, mock_asyncpg_pool, monkeypatch):
+    """⭐ THE RETIREMENT, ASSERTED POSITIVELY — a retired fence that leaves nothing behind is
+    indistinguishable from a deleted one.
+
+    The same id, in the **openai** block of the shared fixture. Before Phase 262 this was
+    flagged as losing tools, and the flag was TRUE: the runtime really did route it
+    STRUCTURED. Both halves changed together, which is what makes this correct rather than
+    merely quieter — ``resolve_calling_mode`` now returns NATIVE for it too.
+
+    ⛔ THIS SURFACE AND THE RUNTIME MUST AGREE. They compute the inference separately —
+    ``settings.py`` for the chip, ``openai_service`` for the request — so a change applied to
+    one and not the other makes the warning a claim about nothing. That is precisely why the
+    provider hint is passed at all three inference sites in ``settings.py``.
     """
     _prime(monkeypatch, mock_asyncpg_pool, [])
 
     body = _get_providers(client, auth_headers)
 
-    assert "llama-4-scout-local" in body["tools_lost_models"]
+    assert "llama-4-scout-local" not in body["tools_lost_models"]
+    assert body["inferred_provider_for"]["llama-4-scout-local"] == "openai"
+    # Still UNVERIFIED — registered and calls-tools are two different questions, and this
+    # phase changes only the second. The amber chip stays; its consequence line does not.
+    assert "llama-4-scout-local" not in body["verified_models"]
 
 
 # ── ⭐ the union: an operator-added model is VERIFIED, not unverified ───────────

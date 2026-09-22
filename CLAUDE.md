@@ -40,6 +40,8 @@ self-assessment. Decisions go `--to operator`, never settled agent-to-agent.
 - External integrations / connectors follow the recorded MCP-first verdict — `docs/CONNECTOR-ARCHITECTURE.md` (MCP-first, first-party-thin, broad catalog sequenced with Open Platform; dated re-open trigger inside; pointer entry `D-v3.6-01`). ~~No MCP client exists in the backend today; live outbound egress is Phase 190 (STRETCH).~~
   ⚠ **CORRECTED 2026-09-07 — that sentence was FALSE for thirteen days, and the original is struck through rather than deleted.** Measured: **`backend/app/services/mcp_client.py` is 480 lines across 5 phases**, added at `a1aa25c48` (**Phase 206, 2026-08-25** — *"MCP connector client — workflow-scoped, driven against a real server"*), so it also **FIRES G-5** while ROADMAP Phase 239 still describes it as *"4/2/407 — young, no row owed yet"*. Live outbound egress ships too, guarded by `app.security.egress.validate_mcp_destination` plus per-tool grant enforcement. ⭐ **The retirement itself was done RIGHT and that is the point** — `backend/tests/unit/test_189_no_egress.py`'s Case A source fence was **consciously retired under `D-206-07`**, with the reason written into the test body, exactly as `SEED-177` demanded (*"retire the fence DELIBERATELY, never trip it by surprise"*). **What rotted was the PROSE, not the guard** — the fence, the seed and this bullet are three registers and only one of them was updated. ⚠ ~~`SEED-177` still reads `status: planted`.~~ **CORRECTED 2026-09-13 (Phase 245, D-15) — REFUTED, and the original is struck through rather than deleted, because the sentence before it just fired on itself.** Measured directly: the seed reads **`status: partially-answered`**, and its own frontmatter already records trigger #2 as *"ANSWERED by Phase 206 (2026-08-25)"*. **Both halves were wrong — the status, and the implication that a fired trigger went unhandled.** ⭐ **What rotted was the PROSE in two registers — this bullet and ROADMAP Phase 245's Flags — not the seed**, which is left byte-unchanged. Its remaining arms (#1, #4) are a capability decision, not bookkeeping; trigger: `SEED-013` / Open Platform getting a phase number.
 - **Provider-docs-first (evidence-based):** whenever work touches a specific provider (prompting, orchestration, context management, skill use, tool calls/tool use, streaming, structured output), research that provider's OWN official documentation first, then cross-check against our app's actual behavior with comparative analysis and real evidence (Supabase/DB, backend logs, LangSmith, live cross-provider UAT). Conventions do NOT transfer 1:1 between providers; keep provider-specific handling at the service boundary, never break the shared path. See `.planning/seeds/SEED-034-system-prompt-cross-provider-tool-use.md`.
+- **A model's capabilities are DATA, not code (Phase 262 / migration 190).** `MODEL_CAPABILITIES` in `config.py` is a *seed*, never the only home. **12 of `ModelCapability`'s 15 fields are settable per-model from the Model Registry**, including `api_surface`, `reasoning_first`, `reasoning_off`, `uses_max_completion_tokens`, `supports_parallel_tools` and `max_tools`. ⛔ **Adding a model, or a model QUIRK, must never need a commit.** A new *protocol* still needs an adapter — data selects from behaviours the code knows, it cannot invent one — and that path is the four-part contract in `provider_gateway/dispatcher.py`'s `_SURFACE_ADAPTERS`: adapter + map entry + `config.API_SURFACES` value + migration CHECK literal, **all four or none**, pinned by `test_262_capability_column_pin.py`. ⚠ Provider inference for an id matching none of the ten naming patterns reads the **provider block the operator configured it under**; before 262 it fell to `ollama`, silently disabling tool calling for every id a vendor had not shipped yet.
+- **The Extension Contract (Phase 255 / SEED-291):** *A plugin is DATA, an EXTERNAL PROCESS, or SANDBOXED CODE. Never engine code.* The workflow core (executors, emitters, validators, programmatic functions, tools) is strictly closed and never dynamically registered. Ecosystem extensions ship as skills/workflows (data), MCP servers (external process), or sandbox compute (Docker). Complete contract + worked examples: `docs/EXTENSION-CONTRACT.md`.
 
 ## CLAUDE.md context budget (MANDATORY)
 
@@ -299,6 +301,49 @@ fresh worktree false-failed every plan:
    **A growing number is still the gate WORKING.** Its contract is *no per-file DECREASE* and
    *zero failing*, never a fixed grand total. Re-derive rather than doubt it:
    `GSD_VITEST_MAX_WORKERS=2 node scripts/vitest-count-gate.cjs`, from the repo root.
+
+   ---
+
+   ### ⚠ CORRECTION 2026-09-21 (Phase 262) — THE SEVENTH ROT, AND IT TOOK FOURTEEN DAYS. Every prior set of figures is preserved above, never overwritten.
+
+   Re-derived on a quiet tree, `GSD_VITEST_MAX_WORKERS=2`, verdict line read **verbatim**:
+
+   ```
+     total 8500  ·  failed 0  ·  pinned total 7746
+   count gate OK — 297/297 pinned files present, no per-file decrease, 0 failing.
+   ```
+
+   | | correction of 2026-09-07 said | **measured 2026-09-21** |
+   |---|---|---|
+   | grand total | 7816 | **8500** |
+   | pinned total | 7020 | **7746** |
+   | pinned files | 241/241 | **297/297** |
+
+   **A growing number is still the gate WORKING** — the contract is *no per-file DECREASE*
+   and *zero failing*, never a fixed grand total. ⚠ **The cap was neither adjusted nor
+   needed, for the FOURTH consecutive close.**
+
+   ---
+
+   ### ⚠ CORRECTION 2026-09-22 (Phase 264, plan `264-04`) — THE EIGHTH ROT, AND IT TOOK ONE DAY. Every prior set of figures is preserved above, never overwritten.
+
+   ```
+     total 8676  ·  failed 0  ·  pinned total 7935
+   count gate OK — 316/316 pinned files present, no per-file decrease, 0 failing.
+   ```
+
+   | | correction of 2026-09-21 said | **measured 2026-09-22** |
+   |---|---|---|
+   | grand total | 8500 | **8676** |
+   | pinned total | 7746 | **7935** |
+   | pinned files | 297/297 | **316/316** |
+
+   ⛔ **READ THIS ONE DIFFERENTLY FROM THE SEVEN ABOVE: Phase 264 touched ZERO frontend source**
+   (`git diff --stat e9d6a9410..HEAD -- frontend/` is EMPTY, measured). So `+176 / +189 / +19` is
+   **not this phase's growth** — it is 263's landing, and the number was already stale when 264
+   started. ⭐ **A figure can rot without anybody editing the thing it measures**, which is why the
+   rule is *re-derive*, never *check whether you changed anything first*. `GSD_VITEST_MAX_WORKERS=2`
+   held at `2` with `failed 0` first try, for the FIFTH consecutive close.
 
    ⚠ **THE CAP WAS NEITHER ADJUSTED NOR NEEDED, for the third consecutive close** — `2`,
    `failed 0` on both invocations. ⚠ And a standing red that is NOT a cap problem and NOT this
@@ -658,7 +703,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 |---|---|---|
 | `frontend/src/components/chat/ToolCallPanel.tsx` | 51 / 23 / 351 | ✅ **G-5 DISCHARGED (227-02)** |
 | `frontend/src/components/chat/MessageItem.tsx` | 75 / 34 / 1004 | ⚠ row STALE a 5th time (`75/34/1000`). honoured by construction (**BUG-260912-01**): ONE prop added to the EXISTING fold mount — no new branch, the call site still decides nothing |
-| `backend/app/api/threads.py` | 245 / 82 / 1617 | ⚠ row was STALE at `243 / 80 / 1590`. honoured by construction (**244-03**): one pure-read query loses a WHERE predicate, gains a Python guard. ⛔ no writer added |
+| `backend/app/api/threads.py` | 245 / 82 / 1679 | ⚠ row was STALE at `243 / 80 / 1590`. honoured by construction (**244-03**): one pure-read query loses a WHERE predicate, gains a Python guard. ⛔ no writer added |
 | `frontend/src/providers/StreamsProvider.tsx` | 104 / 38 / 4948 | ⚠ row STALE an 8th time (`102/37/4880`). NOT modified by 253 — re-derived under CR-08. ⛔ `onTurnBoundary` FLUSHES before moving, or a turn's tail leaks into the next body |
 | `frontend/src/hooks/useMessages.ts` | 74 / 27 / 127 | extraction due |
 | `backend/app/services/anthropic_service.py` | 11 / 10 / 354 | adapter-pattern audit due |
@@ -666,7 +711,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/WorkflowCanvas.tsx` | 31 / 9 / 1708 | honoured by construction (199 / 200 / **214**) |
 | `frontend/src/components/workflows/FlowEdge.tsx` | 3 / 3 / 462 | honoured by construction (200) |
 | `frontend/src/components/workflows/PhaseNodeCard.tsx` | 17 / 8 / 489 | honoured by construction (199) |
-| `backend/app/services/harness/phase_types.py` | 51 / 24 / 2925 | extraction TAKEN (200-03) · honoured by construction (211 / 214 / **21 |
+| `backend/app/services/harness/phase_types.py` | 54 / 27 / 2954 | ⚠ row was STALE at `53/26/2937` and **256-05 does NOT modify it** — re-derived as an observation. extraction TAKEN (200-03). Its `:1586` recording is the shape 256-05 mirrored |
 | `frontend/src/pages/WorkflowsPage.tsx` | 43 / 17 / 1415 | the 192 / 192.1 extraction is TAKEN |
 | `frontend/src/components/workflows/library/WorkflowCard.tsx` | 19 / 6 / 1616 | ✅ **G-5 DISCHARGED (192.2-02)** |
 | `frontend/src/components/workflows/library/libraryVocabulary.ts` | 10 / 4 / 727 | no seam proposed |
@@ -674,30 +719,34 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/library/libraryRow.ts` | 4 / 3 / 201 | ⚠ absent, on the boundary (added 192.2) |
 | `frontend/src/components/workflows/WorkflowDoorSwitch.tsx` | 18 / 12 / 1075 | honoured by construction (193 / 193.1 / 199 / **214**) |
 | `frontend/src/pages/WorkflowBuilderPage.tsx` | 56 / 21 / 2977 | honoured by construction ×6 (193.1 / 193.2 / 197 / 200.3 / 214 / **214 |
-| `backend/app/api/workflows.py` | 41 / 22 / 2254 | ⚠ **extraction still OWED** |
-| `backend/app/api/workflow_runs.py` | 11 / 8 / 1003 | honoured by construction (200 / 200.1 / **214**) |
+| `backend/app/api/workflows.py` | 43 / 23 / 2261 | ⚠ **extraction still OWED** · honoured by construction (258-03: 2 Depends, no branch) |
+| `backend/app/api/workflow_runs.py` | 11 / 8 / 1089 | honoured by construction (200 / 200.1 / **214**) |
 | `backend/app/models/thread.py` | 16 / 10 / 438 | honoured by construction (200.1 / **214**) |
 | `frontend/src/components/workflows/canvasModel.ts` | 13 / 6 / 752 | ⚠ absent from BOTH at 6 phases (added 200) |
-| `frontend/src/components/layout/ChatLayout.tsx` | 51 / 26 / 1010 | ⚠ row was STALE at `46/24/921`. honoured by construction (**244-04**): ONE prop on an existing mount — a 4th renderer off the SAME one read; the registry is still resolved exactly once |
+| `frontend/src/components/layout/ChatLayout.tsx` | 54 / 28 / 1082 | ⚠ the line figure written one commit ago (`1095`) was WRONG — corrected, see the detail file. honoured by construction (**262-05**): 3 imports + ONE last-but-one branch + ONE prop forward |
 | `frontend/src/components/layout/ChatHistoryColumn.tsx` | 7 / 2 / 513 | ⚠ absent from BOTH for its ENTIRE LIFE — row added 244-01 at its SECOND phase (the `settingsSearchPayload.ts` precedent); D-244-20 claimed a row existed and the gate refuted it |
 | `frontend/src/hooks/useThreads.ts` | 4 / 2 / 64 | ⚠ absent from BOTH for its ENTIRE LIFE — row added 244-01. The app's ONE thread-selection owner; `selectThread` is a bare `setState`, so BUG-260911-02 cannot originate here |
 | `backend/app/services/harness/grounding.py` | 21 / 8 / 1414 | honoured by construction (193.1 / 211 / **214**) |
 | `frontend/src/components/workflows/PhaseFormPanel.tsx` | 30 / 14 / 1566 | honoured by construction ×6 (185 / 193 / 193.1 / 199 / 200 / **214**) |
-| `backend/app/db/workflows.py` | 48 / 25 / 2585 | honoured by construction (193.2 / 194 / 192.2 / 200.1 / **214**) |
-| `backend/app/services/harness/publish_service.py` | 25 / 11 / 1810 | honoured by construction (193.2 / 214 / **BUG-260828-09**) |
+| `backend/app/db/workflows.py` | 52 / 26 / 2724 | ⚠ row was STALE at `48/25/2585`. honoured by construction (**256-05**): **COMMENT-ONLY** — `persist_run_usage`'s body and `TOKEN_COVERAGE_LEGS` byte-unchanged; 3 stale pins corrected beside originals |
+| `backend/app/services/harness/publish_service.py` | 28 / 12 / 1939 | ⚠ row STALE a 4th time (`27/12/1830`). honoured by construction (**256-05**): ONE additive kw-only `usage_box=None`, 2 accumulators above an existing loop, 1 persist at an existing call site; no new stage word |
 | `backend/app/services/workflow_authoring.py` | 15 / 9 / 989 | honoured by construction (193.2 / 197 / 214 / **214.1**) |
 | `backend/app/models/harness.py` | 20 / 19 / 766 | honoured by construction (193.2 / **214**) |
 | `frontend/src/components/workflows/builderStore.ts` | 14 / 8 / 968 | honoured by construction (193.2 / 197 / **214.1**) |
 | `frontend/src/components/panel/WorkspacePanel.tsx` | 16 / 10 / 646 | honoured by construction (194 / 194.1) |
-| `backend/app/services/run_lifecycle.py` | 6 / 3 / 459 | honoured by construction (194) |
-| `backend/app/api/runs.py` | 35 / 16 / 1430 | honoured by construction (194) |
-| `backend/app/services/harness_engine.py` | 54 / 20 / 3135 | honoured by construction (194 / **214**) |
+| `backend/app/services/run_lifecycle.py` | 8 / 4 / 748 | ⚠ row STALE at `6/3/459` — re-derived 256-02; +289 L unrecorded. NOT modified by 256 and ⛔ NOT the shape to copy (C-5): its `input_tokens=None` is a DEFAULT PARAM, not a site |
+| `backend/app/services/run_producer.py` | 11 / 6 / 932 | ⚠ row STALE at `5/3/749` — by THREE phases, on a row already carrying a "verdict WRONG" correction. honoured by construction (**264-01**): the 4-tuple widens to 5; ⛔ the 5th value is ACCESS-CHECKED |
+| `backend/app/services/task_service.py` | 20 / 11 / 970 | ⚠ the row was ACCURATE at 264 research (`19/10/958`) and **264-01 made it stale inside the same phase**. honoured by construction: ONE `sub_ctx` kwarg, read from `parent_ctx`, never re-derived |
+| `backend/app/services/run_reconciler.py` | 3 / 2 / 325 | ⚠ absent its ENTIRE LIFE — row added 256-02; NOT modified by 256 (D-256-08 site #7 is REGISTERED, not fixed). ⛔ its BOOT sweep NULLs a `cap_paused` run's real totals — `SEED-297` |
+| `backend/app/services/circuit_breaker.py` | 1 / 1 / 331 | ⚠ absent its ENTIRE LIFE — row added 256-02 at 256-01's touch, BELOW threshold. ⛔ the `max(0,…)` clamp stays on the RETURNED delta, or a reset box SUBTRACTS real spend |
+| `backend/app/api/runs.py` | 39 / 18 / 1736 | ⚠ row STALE a 3rd time (`38/17/1695`). **256-03 closed METER-05 here** — the two `input_tokens=None` finalize sites (`:677` ask_user re-drive, `:1331` continuation) now carry real totals |
+| `backend/app/services/harness_engine.py` | 58 / 21 / 3290 | ⚠ row was STALE at `54/20/3135`. honoured by construction (**256-05**): ONE nested `_flush_run_usage` + ONE unconditional loop call; `_enforce_budget` if/try/loop **2/0/0 → 2/0/0**. ⛔ `try`/`finally` REJECTED |
 | `frontend/src/components/chat/ThinkingBlock.tsx` | 6 / 2 / 320 | ⚠ row STALE (`4/1/313`) and it does NOT fire yet — 2 phases, not 1. NOT modified by 253. ⛔ the ONE renderer of the model's process prose, now from TWO sources |
 | `frontend/src/components/chat/RunCard.tsx` | 29 / 14 / 723 | ⭐ G-5 DISCHARGED (243-02). ⚠ row STALE at `28/14/710`. **BUG-260912-01**: its state-2 guard asked `!reasoningContent` ALONE and shipped a VISIBLE mid-stream double once the fold gained a 2nd input |
-| `frontend/src/components/chat/MessageInput.tsx` | 32 / 16 / 863 | honoured by construction (**249-02**): ONE chip beside the EXISTING `deprecated` badge, 3 optional props, no state. ⛔ the `ComposerChipsRow` half of the seam stays OWED |
+| `frontend/src/components/chat/MessageInput.tsx` | 36 / 18 / 975 | honoured by construction (**262-05**): ONE optional prop + ONE guarded menu item beside the shipped invite door. ⛔ 0 new top-level controls — a menu item is not a toolbar button (P-9, measured) |
 | `frontend/src/components/chat/ActiveConnectorChips.tsx` | 2 / 2 / 82 | ⚠ absent for its ENTIRE LIFE — row added 244-05 at its SECOND phase. **244**: the row container HOISTED out; bare chips now, `null` on empty (D-244-26) |
 | `frontend/src/components/chat/MessageList.tsx` | 23 / 10 / 366 | ⚠ row STALE a FOURTH time (`21/9/307`). **244-12**: its SECOND list-level mount — `PendingAskStack` beside `ThreadRunLine`, both above `bottomRef`. ⛔ unconditional, measured +4 fetches/thread-open |
-| `frontend/src/components/chat/ChatArea.tsx` | 76 / 37 / 796 | honoured by construction (**249-02**), proven by ARITHMETIC: state hooks 9→9, effect hooks 10→10. Pure pass-through; ⛔ zero derivation added here |
+| `frontend/src/components/chat/ChatArea.tsx` | 78 / 39 / 889 | honoured by construction (**262-05**): ONE optional prop — declared, destructured, forwarded. ⛔ pure pass-through: 0 new state, 0 new effect, 0 new branch, 0 new read |
 | `frontend/src/stores/streamsStore.ts` | 22 / 14 / 572 | ⚠ row STALE (`21/13/546`) — 252 touched it. NOT modified by 253. **244-15**: ONE action type + ONE bare no-op stub; ⛔ `void`, never `Promise<void>` |
 | `frontend/src/lib/toolMeta.ts` | 10 / 6 / 218 | ⚠ **absent for its ENTIRE LIFE at 6 phases — row added 244-13, which does NOT modify it.** ⛔ the ONE home of the harness activity string; a literal copied elsewhere makes its pin vacuous |
 | `frontend/src/components/panel/PendingAskCard.tsx` | 15 / 8 / 836 | ⚠ row was STALE at `14/7/765`; G-5 FIRES at 8 phases. honoured by construction (**244-15**): ONE optional prop, ONE composed callback in the STACK, `useState` 9→9 — no new state on a 3-home shell |
@@ -705,19 +754,22 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/chat/OutputFileCard.tsx` | 8 / 7 / 219 | honoured by construction (195) |
 | `frontend/src/components/panel/FilesSection.tsx` | 10 / 6 / 363 | ⚠ row was STALE at `8 / 5 / 334`. honoured by construction (**244-05**): TWO `export` keywords, zero body change — the chat chip IMPORTS `expiryCaption`, never re-derives its three readings |
 | `frontend/src/lib/api.ts` | 187 / 110 / 422 | ✅ **SPLIT TAKEN (207)** |
-| `frontend/src/types/index.ts` | 85 / 66 / 1398 | ⚠ row STALE again (`85/65/1380`). honoured by construction (**BUG-260912-01**): ONE optional client-only field, `narrationContent` — no column, because the loop discards this text by design. seam still OWED |
-| `backend/app/main.py` | 82 / 59 / 950 | ⚠ row was STALE by **FOURTEEN PHASES**. honoured by construction (**BUG-260902-06**) |
-| `backend/app/config.py` | 87 / 50 / 1593 | ⚠ STALE a 13th time. honoured by construction (**249-01**): ONE derived frozenset `ROUTING_PROVIDERS` + a Literal widened to the value the code already returned. ⛔ `MODEL_CAPABILITIES` seam OWED |
+| `frontend/src/types/index.ts` | 90 / 70 / 1434 | ⚠ STALE a 3rd time (was `87/66/1412`, `85/65/1380`) — **+4 phases in one correction**. 262-01: INHERITED rot only. BUG-260912-01's `narrationContent` stands; seam still OWED |
+| `backend/app/main.py` | 83 / 60 / 951 | ⚠ row was STALE by **FOURTEEN PHASES**. honoured by construction (**BUG-260902-06**, Phase 259) |
+| `backend/app/config.py` | 88 / 51 / 1695 | ⚠ STALE a 14th time (`87/50/1593`). **262**: `api_surface` + `API_SURFACES` + `provider_hint`. ⛔ `MODEL_CAPABILITIES` seam STILL OWED — 12 of 15 fields are now DB-settable, the dict is not |
 | `backend/app/api/admin.py` | 38 / 14 / 1968 | honoured by construction (**249-01/03**): the add guard swaps its SOURCE LIST; 3 write seams gain a refusal catch. ⛔ order, 422 shape, every other guard byte-unchanged |
 | `backend/app/api/settings.py` | 41 / 21 / 1048 | honoured by construction (**249-02/03**): ONE `_verified_model_ids` helper, 2 callers; PUT gains a refusal arm → 400. ⛔ the 500 arm for an unreachable DB is unchanged |
 | `backend/app/services/multimodal_service.py` | 14 / 7 / 984 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
 | `backend/app/api/documents.py` | 85 / 33 / 2437 | ✅ **DISCHARGED (229)** |
-| `scripts/vitest-count-gate.cjs` | 222 / 49 / 5787 | ⚠ STALE a 6th time (`215/47/5682`). **252-05**: `WatchRowCard.test.tsx` into BOTH knobs — it ran NOWHERE. W-7 slack CLOSED: a RED drive kept it green on a deleted case; pins were mostly SLACK |
-| `backend/app/services/eval_runner_service.py` | 12 / 7 / 959 | ⚠ absent at 7 phases (added 196) |
+| `scripts/vitest-count-gate.cjs` | 244 / 55 / 6078 | ⚠ STALE a 10th time (`242/55/6056`). **262-04** adopts the 2 plan-04 suites into BOTH knobs (pins 8 and 6, the gate's own `— N new`) — `components/experts` still has no bare dir entry |
+| `backend/app/services/eval_runner_service.py` | 13 / 8 / 1040 | ⚠ STALE at `12/7/959`, and absent until 196 at 7 phases. **256-03**: its finalize stopped passing `input_tokens=None`. Re-derived by 256-04 at 256-03's head |
+| `backend/app/services/scheduler_service.py` | 6 / 3 / 421 | ⚠ **NOW FIRES at 3 phases, and its detail row still read `no (2 phases)` — present and WRONG, which stops an audit harder than absent.** Promoted here by 256-04; **256-03** closed its `None` finalize |
 | `frontend/src/components/panel/PhaseCard.tsx` | 17 / 11 / 788 | ⚠ row STALE (`16/10/755`) — 252 touched it. NOT modified by 253. honoured by construction (200 / **214**) |
 | `frontend/src/components/panel/PhaseTimeline.tsx` | 10 / 8 / 404 | ⚠ row STALE (`9/7/385`) — 252 touched it. NOT modified by 253. honoured by construction (**214**) |
 | `frontend/src/components/panel/phaseStatusMeta.ts` | 4 / 4 / 291 | ⚠ row STALE (`3/3/236`) — 252 touched it. NOT modified by 253. It crossed the threshold in the commit that added its row (200) |
-| `backend/app/services/harness/validator_kinds.py` | 12 / 5 / 749 | ⚠ absent at 5 phases (added 196) |
+| `backend/app/services/harness/validator_kinds.py` | 15 / 7 / 791 | ⚠ row STALE a 2nd time (`14/6/762`, and `12/5/749` before). honoured by construction (**256-05**): ONE function-local import + ONE call above the failure arm; branches 0 new; registries untouched |
+| `backend/app/services/harness/programmatic.py` | 3 / 3 / 137 | ⚠ **FIRES, and absent from BOTH registers its ENTIRE LIFE — row added 255.** ⛔ The closed `PROGRAMMATIC_PHASE_REGISTRY` (2 fns). Its idempotency contract is load-bearing: a crashed phase re-runs from the top |
+| `backend/app/services/harness/emitters.py` | 4 / 2 / 188 | ⚠ absent its ENTIRE LIFE — row added 255 AT 2 PHASES, before it fires, deliberately. ⛔ The closed `EMITTER_REGISTRY`; `llm_emit` is the ONLY path producing a typed deliverable |
 | `frontend/src/components/admin/ModelRegistryTab.tsx` | 15 / 5 / 1640 | ⚠ **FIRES**. honoured by construction (**249-01**): roster widened 8→11 + words on 2 EXISTING controls. ⛔ `deprecated` semantics unchanged (D-149-04); `AddModelForm` seam OWED |
 | `frontend/src/components/workflows/soulData.ts` | 12 / 10 / 499 | honoured by construction (214 / **214.1**); ⚠ absent until 197, at 7 p |
 | `frontend/src/components/workflows/PublishGauntlet.tsx` | 17 / 9 / 1289 | honoured by construction (214 / **BUG-260828-09**) |
@@ -750,13 +802,13 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/sources/base.py` | 9 / 5 / 336 | ⚠ **absent while FIRING at 5 phases — row added 239-03.** honoured by construction (239): protocol resolution stayed DATA (two dicts), never a branch |
 | `backend/app/services/sources/__init__.py` | 5 / 3 / 40 | ⚠ **absent while FIRING — row added 239-03.** The ONE eager-import site: an adapter missing from this list is unregistered, so the list is load-bearing |
 | `backend/app/services/mcp_client.py` | 9 / 6 / 526 | ⚠ row STALE TWICE (`4/2/407` reading `no`, then `7/5/480`) — a row present and WRONG stops the audit. **SEED-258: the body cap is DERIVED; no envelope knob exists to disagree** |
-| `backend/app/models/message.py` | 17 / 10 / 124 | ⚠ absent from BOTH for its ENTIRE LIFE at **8 phases** |
+| `backend/app/models/message.py` | 17 / 10 / 134 | ⚠ absent from BOTH for its ENTIRE LIFE at **8 phases** |
 | `backend/app/models/user_settings.py` | 55 / 34 / 1723 | ⚠ STALE a 6th close running. honoured by construction (**249-03**): ONE `except` split into two arms + one typed exception. ⛔ the unreachable-DB arm is byte-identical |
 | `backend/app/services/harness/reachability.py` | 4 / 4 / 463 | ⚠ absent from BOTH for its ENTIRE LIFE at **4 phases** |
 | `backend/app/services/workflow_kickoff.py` | 8 / 6 / 554 | ⚠ absent for its ENTIRE LIFE at **6 phases** |
 | `frontend/src/components/workflows/WorkflowScheduleModal.tsx` | 3 / 3 / 601 | ⚠ absent for its entire life; it crossed the threshold in 214-09 on a  |
 | `frontend/src/components/workflows/nodePresentation.ts` | 8 / 7 / 221 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
-| `frontend/src/lib/api/threads.ts` | 9 / 5 / 1715 | ⚠ row was STALE at `7/3/1683`. honoured by construction (**BUG-260912-01**): ONE optional callback + ONE dispatch arm; ⛔ `turn_boundary` carries NO payload — a second copy could disagree with the first |
+| `frontend/src/lib/api/threads.ts` | 10 / 5 / 1734 | ⚠ row was STALE at `7/3/1683`. honoured by construction (**BUG-260912-01**): ONE optional callback + ONE dispatch arm; ⛔ `turn_boundary` carries NO payload — a second copy could disagree with the first |
 | `frontend/src/lib/api/connectors.ts` | 17 / 11 / 740 | honoured by construction (**244-06**): `importCloudFile` gains a REQUIRED body declared BESIDE `SourcePreviewRequest` — ⛔ never inline in a component |
 | `frontend/src/lib/api/workflows.ts` | 4 / 4 / 1081 | ⚠ absent until 214; the 207 split created it with NO row. **`lib/api.t |
 | `frontend/src/lib/connectionMark.tsx` | 7 / 4 / 313 | ✅ **the move IS the seam, and it was TAKEN (214-08)** |
@@ -768,8 +820,8 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/hooks/useDocuments.ts` | 8 / 3 / 120 | ⚠ absent at 3 phases. Realtime is a hint, not truth |
 | `frontend/src/pages/KnowledgeHealthPage.tsx` | 12 / 6 / **DELETED** | **RETIRED (217.1-14)** |
 | `backend/app/api/knowledge_health.py` | 11 / 6 / 737 | honoured by construction (**217.1-11**) |
-| `backend/app/services/agent_loop.py` | 44 / 21 / 3326 | ⚠ row was STALE at `44/21/3303`. honoured by construction (**BUG-260912-01**): ONE guarded `_emit` beside the reset that already knew. ⛔ emit BEFORE the reset, never after |
-| `backend/app/services/tool_dispatcher.py` | 85 / 35 / 5048 | ⚠ row STALE again (`84/35/4966`). honoured by construction (**244-14/WR-03**): `already` is written on SUCCESS or after a CAPPED give-up; the failure is named on EVERY attempt. Traversal fence byte-unchanged |
+| `backend/app/services/agent_loop.py` | 52 / 26 / 3501 | ⚠ row STALE at `48/22/3441` — by FOUR phases. honoured by construction (**264-01**): ONE default-None field, one bind, two build kwargs, ZERO branches. ⛔ prompt-assembly seam UNTOUCHED, still OWED |
+| `backend/app/services/tool_dispatcher.py` | 89 / 38 / 5169 | ⚠ THREE figures wrong at once: the row `85/35/5048`, the plan `87/37/5082`, 264-03 `88/38/5093`. honoured by construction (**264-03**): 1 kw-only param, 3 sites opt IN, 1 refuses IN SOURCE. seam OWED |
 | `backend/app/api/document_governance.py` | 5 / 3 / 416 | ⚠ absent at 3 phases. ⚠ Its low-confidence cutoff is the ConfidenceChi |
 | `frontend/src/components/ingestion/ViewsGroup.tsx` | 5 / 3 / 259 | ⚠ absent for its ENTIRE LIFE at **3 phases** |
 | `frontend/src/components/ui/tabs.tsx` | 3 / 3 / 78 | ⚠ absent for its ENTIRE LIFE |
@@ -777,11 +829,11 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/verdictModel.ts` | 6 / 3 / 355 | ⚠ absent for its ENTIRE LIFE |
 | `frontend/src/components/library/IngestionTab.tsx` | 17 / 6 / 512 | ⚠ row was STALE at `13 / 4 / 456` |
 | `frontend/src/components/ingestion/__tests__/IngestionStrip.test.tsx` | 3 / 3 / 516 | ⚠ absent; row added 233, which repaired the INHERITED red `229-03` cau |
-| `frontend/src/components/layout/NavPanel.tsx` | 23 / 12 / 381 | ⚠ row STALE at `22/12/370`. **244-14**: WR-05 — the docblock stopped being false about itself (`min-h-0` read 2); IN-01 — `overflow-x-hidden`, since one axis makes the other compute to `auto` |
-| `frontend/src/App.tsx` | 32 / 23 / 374 | ⚠ absent for its ENTIRE LIFE at **23 phases**; row then STALE at `31/23/351`. ⭐ **244-04 left it BYTE-UNCHANGED and FENCED it** — `setLibraryTab(` still 2, driven RED against a planted 3rd writer |
+| `frontend/src/components/layout/NavPanel.tsx` | 24 / 13 / 417 | ⛔ STALE a 3rd time (was `23/12/417` here, `23/12/381` in the ledger — **the 2 registers disagreed on LINES**; 262-01 reconciles). 244-14's `overflow-x-hidden` stands |
+| `frontend/src/App.tsx` | 34 / 25 / 410 | honoured by construction (**262-05**): ONE union member + 2 corrected comments, 0 new branches. ⛔ the member's literal is in NO comment (D-262-04); `NO TWELFTH` stays — another suite's non-vacuity token |
 | `frontend/src/components/library/LibraryCloudImport.tsx` | 1 / 1 / 194 | young (created 244-06). Row added AT CREATION. The Library's single-file cloud door — ⛔ it renders a REASON in every unavailable state; a silent grey-out is the same failure as a silent root write |
 | `frontend/src/components/library/LibraryHeaderBar.tsx` | 2 / 1 / 204 | ⚠ absent for its entire life — row added **244-04** at its SECOND touch. ⛔ the ONE set of tab triggers: a hidden duplicate broke 41 cases; `aria-hidden` on the count is load-bearing |
-| `frontend/src/lib/nav-items.ts` | 8 / 6 / 95 | ⚠ absent at 6 phases |
+| `frontend/src/lib/nav-items.ts` | 10 / 7 / 141 | honoured by construction (**262-05**): ONE array entry + ONE lucide import — the EIGHTH entry, tenth rail affordance. ⛔ UNGOVERNED by measurement: `experts` is a TIER axis, not a `GovernedFeature` |
 | `backend/app/api/classification_rules.py` | 3 / 3 / 226 | row added 237 at threshold. Validates rule_scope and enforces WATCH_ALLOWED_FIELDS refusal (422) for arrival watch rules. |
 | `frontend/src/components/classification/RuleBuilderPanel.tsx` | 4 / 3 / 502 | row added 237 at threshold. Adds scope selector segmented control; filters out-of-scope conditions on scope switch. |
 | `backend/app/api/workspace.py` | 13 / 7 / 757 | ⚠ row was STALE at `11/6/654` ONE PLAN later — the fastest rot recorded here. honoured by construction (**244-06**): the persist tail EXTRACTED to ONE writer both doors call |
@@ -798,6 +850,38 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/sources/failure_cause.py` | 3 / 2 / 227 | ⚠ absent for its entire life — row added **BUG-260912-01**. ⛔ its `Cause` union must stay ONE plain-text line: a frontend suite binds it by `?raw` and a computed union is invisible to that fence |
 | `scripts/full-schema-supplement.sql` | 11 / 6 / 653 | ⚠ **FIRES, and absent for its ENTIRE LIFE at 6 phases — row added 253-02.** ⛔ NO GATE COULD DEMAND IT: `scripts/` is EXEMPT in check-hot-file-ledger.cjs. The ONE hand-mirror of every migration ACL; its tail is byte-identical to `full-schema.sql` |
 | `.claude/settings.json` | 9 / 4 / 202 | ⚠ **FIRES, absent from BOTH registers its ENTIRE LIFE at 4 phases — rows added 253-03.** ⛔ `.claude/` is EXEMPT: no gate can ask. The ONE hook dispatch table; a dropped entry fires NEVER, in silence |
+| `backend/app/services/forced_emit.py` | 10 / 6 / 705 | ⚠ **FIRES, absent from BOTH registers its ENTIRE LIFE at 5 phases — row added 256-04, in its FIRST edit's commit.** ⛔ accumulators init `None` never `0`, ABOVE the rung loop so a FAILED rung counts |
+| `backend/app/db/entitlements.py` | 2 / 1 / 169 | young (created 258). Row added AT CREATION — an absent row is invisible to G-5 at any count |
+| `backend/app/services/entitlement_service.py` | 2 / 1 / 130 | young (created 258). Row added AT CREATION. Single commercial boundary home (TIER-01/04) |
+| `backend/app/db/experts.py` | 4 / 3 / 567 | ⚠ **NOW FIRES at 3 phases and the row read `1/1/265` / `young`** — it crossed the threshold in the commit recording it. honoured by construction (**263-01**): ONE new UPDATE; ⛔ no existing query touched |
+| `backend/app/models/expert.py` | 4 / 3 / 131 | ⚠ row STALE (`3/3/93`). **WR-01/02/08**: create's caps MIRRORED onto `ExpertBundleUpdate`; `born_skills` on the REQUEST models only. ⛔ `default=None` stays — `exclude_unset` IS the partial PATCH | None` untouched — that None is the PATCH distinction |
+| `frontend/src/lib/api/experts.ts` | 6 / 3 / 313 | ⚠ STALE a 3rd time (was `5/3/313`, `5/3/298`). 262-01: INHERITED rot only. WR-03/08 stand — `slug` immutable, `born_skills` on both requests; ⛔ 422 arm reads `detail.error` |
+| `backend/app/services/expert_service.py` | 8 / 5 / 551 | ⚠ row STALE a 4th time (`6/4/515`). honoured by construction (**264-02**): the hand-rolled 4th disjunct DELETED, delegating to `skill_row_visible`. ⛔ independent encodings of the rule must stay **1** |
+| `backend/app/services/expert_authoring.py` | 5 / 2 / 393 | ⚠ absent from BOTH registers its ENTIRE LIFE — row added at WR-01, BELOW threshold, deliberately. ⛔ every string it emits is CAPPED to its consumer, or the app 422s on the Expert its own AI wrote |
+| `frontend/src/components/experts/ExpertAuthoringStudio.tsx` | 3 / 2 / 1550 | ⚠ absent its ENTIRE LIFE at 1550 L — row added at WR-03/04/05/08, BELOW threshold. ⛔ a failed grant REVOCATION is reported; an unread library is a THIRD banner state, never a clean one |
+| `backend/app/api/experts.py` | 9 / 3 / 605 | ⚠ row STALE a 4th time (`9/3/585`), SAME DAY. **CR-02/03 + WR-09**: the 2 leaky `/draft` queries mirror the live policies; the catch-all detail is a LITERAL, a taken slug 409s |
+| `backend/app/utils/skill_visibility.py` | 3 / 2 / 209 | ⚠ the row added at 264 PLANNING read `1/1/83` and was stale by that phase's own close. **264-02/04**: optional `expert_bundle_id` on both encodings; ⛔ the default arm is pinned byte-identical by `==` |
+| `frontend/src/components/chat/ActiveExpertChip.tsx` | 0 / 0 / 0 | young (created 260). Row added AT CREATION — active consultant chip in composer (PACK-02) |
+| `frontend/src/components/chat/ExpertSpotlightCard.tsx` | 2 / 2 / 205 | ⚠ row was STALE at `0 / 0 / 0`. **262-02**: FOUR demo-Expert hardcodes retired as rewrites. ⛔ no fallback here may inspect `slug` or `name` — that match IS the retired artefact |
+| `frontend/src/components/chat/InviteExpertDialog.tsx` | 2 / 2 / 218 | ⚠ row was STALE at `0 / 0 / 0`. **262-02**: the VERBATIM-duplicated icon guesser retired; the gem renders `<ExpertIcon icon={expert.icon} />`. ⛔ its `expert-card-${slug}` testids are untouched |
+| `frontend/src/components/skills/SkillFormDialog.tsx` | 13 / 9 / 657 | ⚠ row STALE at `12/8/635` ONE PLAN after 263 planning wrote it. honoured by construction (**263-04**): ONE optional prop + three `??` + one dep entry; ⛔ callers pass a STABLE reference or the reset wipes typing |
+| `backend/app/api/skills.py` | 19 / 10 / 858 | ⛔ **FIRES, absent from BOTH registers its ENTIRE LIFE at 10 phases — row added at 263 PLANNING.** ⛔ `is_org_shared` is HARD-SET False at `:250` and `toggle-global` 409s on the publish gate: D-263-06/07 route AROUND both by provenance, never through |
+| `frontend/src/lib/api/skills.ts` | 6 / 4 / 748 | ⛔ **NOW FIRES at 4 phases and the row read `4/2/715` / `no`** — re-derived 263 planning. It already carries the `POST /skills` caller D-263-03 reuses; ⛔ no new endpoint, no second client function |
+| `backend/app/services/openai_service.py` | 72 / 36 / 2268 | ⛔ **FIRES at 36 phases and absent from BOTH registers its ENTIRE LIFE — row added 262, which DOES modify it.** ⛔ `resolve_calling_mode` is the ONE routing decision; its gate ORDER is the contract |
+| `backend/app/services/provider_gateway/openai_compat.py` | 6 / 4 / 525 | ⚠ **FIRES at 4 phases, absent from BOTH its ENTIRE LIFE — row added 262, which does NOT modify it.** ⛔ the entangled unit (D-04); its 5KB `emit_sse` cadence is what `openai_responses.py` mirrors |
+| `backend/app/services/provider_gateway/dispatcher.py` | 6 / 2 / 153 | ⚠ absent its ENTIRE LIFE — row added 262 at 2 phases, BELOW threshold. The ONE provider→adapter fork; ⛔ `calling_mode` rides ALONGSIDE the stream, never as an event |
+| `backend/app/services/provider_gateway/openai_responses.py` | 0 / 0 / 563 | young (created 262). Row added AT CREATION. ⛔ emits `call_id`, NEVER `item.id` — the other id does not round-trip and round 2 of every multi-tool turn fails |
+| `frontend/src/lib/api/admin.ts` | 5 / 2 / 1098 | ⚠ absent from BOTH registers its ENTIRE LIFE — row added 262 at its 2nd phase. ⛔ `ModelRegistryRow` is OPERATOR-only; the author row is a STANDALONE interface, never a `Pick<>` of it, or an operator field travels to every author |
+| `frontend/src/components/admin/CapabilityGrid.tsx` | 3 / 3 / 264 | ⚠ **FIRES at 3 phases, absent from BOTH registers since 147 — row added 263-REVIEW WR-07.** ⛔ every consequence line names its SUBJECT; this one claimed people were blocked and UAT measured it FALSE |
+| `frontend/src/components/admin/ModelAdvancedCapabilities.tsx` | 0 / 0 / 290 | young (created 262). Row added AT CREATION. ⛔ every control is 3-state: `null` means NOT ASSERTED, never `false` — rendering null as off states a fact nobody measured |
+| `frontend/src/lib/activeViewReachability.ts` | 1 / 1 / 159 | ⚠ the AT-PLANNING row read `0/0/0`; measured 262-01 in its own creating commit. ⛔ The ONE ActiveView↔ChatLayout fence — AST, never grep; it THROWS on a vacuous parse |
+| `frontend/src/components/experts/expertIcon.tsx` | 1 / 1 / 72 | ⚠ `0/0/0` AT PLANNING; **measured `1/1/72` at 262-02**. ⛔ The ONE home of expert-icon resolution — a CLOSED 11-key lucide map. Reads `icon`, never `slug`/`name`: that match IS the retired artefact |
+| `frontend/src/components/experts/catalog/expertCatalog.ts` | 1 / 1 / 96 | ⚠ `0/0/0` AT PLANNING; measured at **262-03**. Pure search/category/folder-name resolution. ⛔ An unresolvable folder id returns an UNKNOWN marker, never a drop — a blank is a claim nobody made |
+| `frontend/src/components/experts/catalog/ExpertCard.tsx` | 1 / 1 / 159 | ⚠ `0/0/0` AT PLANNING; measured at **262-03**. The 5-element face, folders as a COUNT. ⛔ Zero lecturing prose on it (sketch 261-262) — the NAMES belong to the detail modal |
+| `frontend/src/components/experts/catalog/ExpertCatalogPage.tsx` | 2 / 1 / 216 | ⚠ row STALE at `1/1/189` ONE WAVE later. **262-04**: `folders` finally BOUND, detail view mounted here. ⛔ still exactly ONE `listExperts()`, still no second card variant |
+| `frontend/src/components/experts/catalog/ExpertDetailModal.tsx` | 1 / 1 / 349 | ⚠ `0/0/0` AT PLANNING; measured at **262-04**. The FIRST component anywhere to render `example_output`. ⛔ It NAMES, never counts; an unnameable folder says so; the disclosure is state, not hidden DOM |
+| `frontend/src/components/experts/catalog/startScopedChat.ts` | 1 / 1 / 70 | ⚠ `0/0/0` AT PLANNING; measured at **262-04**. ⛔ refresh BEFORE select — the created row is pre-patch and its hook has no updater for that column. A rejected patch does NOT navigate |
+
 
 When a new phase enters discuss-phase, the orchestrator must scan PLAN.md `files_modified` against this ledger. Any match against a G-5-firing row means the discuss-phase produces a refactor recommendation as the first option, not the planned feature — and the phase reads that file's section in `docs/HOT-FILE-LEDGER.md` before planning, because that is where the named seam and the binding invariants live.
 

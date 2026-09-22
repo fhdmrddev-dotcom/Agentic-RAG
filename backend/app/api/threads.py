@@ -3,6 +3,7 @@ import json
 import logging
 import os
 from datetime import datetime, timezone
+from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse
@@ -60,6 +61,10 @@ from app.services.audit_service import write_audit_entry
 from app.utils.db import aexec
 from app.dependencies import get_pg_pool
 from app.db.runs import finalize_run, insert_assistant_message
+# 257.1 (SC#4) — cost is READ through the one conversion home and the one rate resolver,
+# never re-derived here. See `_enrich_messages_with_runs` for why the lookup is batched.
+from app.db import rates
+from app.services.pricing_service import compute_token_cost_usd
 # Phase 145-03 (D-145-09) — the atomic run-lifecycle owner (Plan 02). The chat-run
 # START register + every TRUE terminal route through these co-writers so
 # runs.status and its runs:active/runs_by_thread mirrors move in ONE unit and can
@@ -295,9 +300,33 @@ async def _enrich_messages_with_runs(
     # finalize. Flows to BOTH /messages and /snapshot (shared helper).
     runs_resp = await aexec(
         supabase.table("runs")
-        .select("run_id, message_id, status, model, provider, started_at, completed_at")
+        # Phase 257.1 (ROADMAP SC#4): ADDITIVE-SELECT-ONLY, the SAME shape Phase 095.1-03
+        # argued for two paragraphs up. The SELECT gains 2 COLUMNS (input_tokens,
+        # output_tokens) so the chat `RunCostBadge` can show what a turn cost. The WHERE
+        # clause is UNCHANGED (.eq thread_id + .eq user_id + RLS runs_select_own) → no
+        # widened row set, no IDOR. No migration and no new write: Phase 256 already
+        # persists both columns on `public.runs`.
+        .select(
+            "run_id, message_id, status, model, provider, started_at, completed_at, "
+            "org_id, input_tokens, output_tokens"
+        )
         .eq("thread_id", thread_id)
         .eq("user_id", user_id)
+        # ⛔ D-256-02, and `test_256_token_sum_narrowing.py` FIRED ON THIS EXACT LINE when the
+        # two token columns were added above — correctly, and it is the reason this filter is
+        # here. A parent run's token totals are INCLUSIVE of its children (phase_types.py
+        # `_record_run_usage`), so any read of a runs-table token column that can see child
+        # rows double-counts a sub-agent's spend.
+        #
+        # ⭐ MEASURED BEFORE ADDING IT, because this SELECT also feeds the pre-existing
+        # run_id / run_status / model / provider / started_at / completed_at stamps and a
+        # narrowing that changed WHICH run matched a message would be a silent behaviour
+        # change to shipped fields:
+        #     runs with message_id NOT NULL                        : 713
+        #     ...of those, parent_run_id NOT NULL (i.e. children)  :   0
+        # No child run carries a message_id, so the matched set is unchanged on real data and
+        # this is purely the structural guarantee the fence asks for.
+        .is_("parent_run_id", "null")
         .order("started_at", desc=True)
     )
     runs_by_message: dict[str, dict] = {}
@@ -322,6 +351,87 @@ async def _enrich_messages_with_runs(
         m["provider"] = run["provider"] if run else None
         m["started_at"] = run["started_at"] if run else None
         m["completed_at"] = run["completed_at"] if run else None
+
+    # ── Phase 257.1 (ROADMAP SC#4) — cost, resolved in batch ────────────────────────────
+    #
+    # ⛔ THE LOOKUP IS BATCHED ACROSS MODELS, NOT DONE PER MESSAGE. A thread is routinely 50+
+    # messages and CLAUDE.md's long-message UAT axis specifies ≥50; a per-message rate
+    # query would add one round trip per row to the hot `/messages` path. Rate history for
+    # all models in the thread is fetched in a single query (WR-09), and effective rates are
+    # resolved in Python. This is O(1) DB queries, not O(messages).
+    #
+    # ⛔ ROUTED THROUGH THE ONE CONVERSION HOME (METER-02 / SC#3). `tokens * rate / 1e6`
+    # written here would be an additional conversion site and the AST fence in
+    # `test_257_single_token_conversion_home.py` would fire — correctly.
+    #
+    # ⚠ `token_coverage` IS DELIBERATELY NOT STAMPED. It lives on `workflow_runs`; the chat
+    # surface reads `runs`, which has no such column. `RunCostBadge` distinguishes
+    # `undefined` (coverage not tracked → make no claim) from `null` (tracked and absent →
+    # incomplete), so leaving it off is what stops chat showing a false "incomplete
+    # coverage" marker on every message.
+    #
+    # ⚠ FAILURE DEGRADES, IT DOES NOT 500. `/messages` is the chat's primary read; a rate
+    # lookup is an affordance ON it. If pricing is unavailable the thread still loads and
+    # the badge reads unrated.
+    models_seen = {m["model"] for m in messages if m.get("model")}
+    if models_seen:
+        try:
+            pool = await get_pg_pool()
+            raw_org_ids = [
+                run.get("org_id")
+                for m in messages
+                if (run := runs_by_message.get(m.get("id"))) and run.get("org_id")
+            ]
+            org_ids: list[UUID] = []
+            for o in raw_org_ids:
+                if isinstance(o, UUID):
+                    org_ids.append(o)
+                elif isinstance(o, str) and o.strip():
+                    try:
+                        org_ids.append(UUID(o.strip()))
+                    except (ValueError, TypeError):
+                        pass
+            unique_org_ids = list(set(org_ids)) if org_ids else None
+            all_rates = await rates.get_rate_history_for_models(
+                pool,
+                list(models_seen),
+                org_ids=unique_org_ids,
+            )
+            rate_cache: dict[tuple[str, str | None, Any, Any], rates.ModelRate | None] = {}
+            for m in messages:
+                name = m.get("model")
+                if not name:
+                    m["cost_usd"] = None
+                    m["is_rated"] = None
+                    continue
+                run = runs_by_message.get(m["id"]) or {}
+                r_prov = run.get("provider") or m.get("provider")
+                r_effective = run.get("started_at") or m.get("started_at")
+                r_org = run.get("org_id")
+                cache_key = (name, r_prov, r_effective, r_org)
+                if cache_key not in rate_cache:
+                    rate_cache[cache_key] = rates.resolve_effective_rate(
+                        all_rates,
+                        name,
+                        provider=r_prov,
+                        effective_at=r_effective,
+                        org_id=r_org,
+                    )
+                rate = rate_cache[cache_key]
+                result = compute_token_cost_usd(
+                    run.get("input_tokens"),
+                    run.get("output_tokens"),
+                    rate,
+                    model_id=name,
+                )
+                m["is_rated"] = result.is_rated
+                m["cost_usd"] = float(result.cost_usd) if result.cost_usd is not None else None
+        except Exception:  # noqa: BLE001 — see the paragraph above; degrade, never 500.
+            logger.warning(
+                "thread %s: run cost enrichment failed; messages render without cost",
+                thread_id,
+                exc_info=True,
+            )
 
     return messages
 
@@ -414,7 +524,7 @@ async def get_snapshot(
     # any messages/runs SELECT can leak data.
     thread_resp = await aexec(
         supabase.table("threads")
-        .select("id")
+        .select("id, active_expert_id")
         .eq("id", str(thread_id))
         .eq("user_id", current_user["id"])
         .maybe_single()
@@ -478,11 +588,14 @@ async def get_snapshot(
     # work in this branch (e.g. cleanup probes) would otherwise re-introduce
     # the 503-on-empty-thread regression UAT B-260519-02 observed.
     if not active_runs:
-        return {
+        res = {
             "messages": messages,
             "active_runs": [],
             "since_cursors": {},
         }
+        if row and row.get("active_expert_id") is not None:
+            res["active_expert_id"] = row["active_expert_id"]
+        return res
 
     # Step 4: per-active-run since_cursors via xinfo_stream (D-075-01).
     # On any Redis failure (RedisError / TimeoutError / OSError), the entire
@@ -536,11 +649,14 @@ async def get_snapshot(
         else:
             since_cursors[rid] = "0"
 
-    return {
+    res = {
         "messages": messages,
         "active_runs": active_runs,
         "since_cursors": since_cursors,
     }
+    if row and row.get("active_expert_id") is not None:
+        res["active_expert_id"] = row["active_expert_id"]
+    return res
 
 
 @router.post("", response_model=ThreadResponse, status_code=status.HTTP_201_CREATED)
@@ -553,6 +669,8 @@ async def create_thread(
     insert_data: dict = {"user_id": current_user["id"], "title": body.title}
     if body.folder_id:
         insert_data["folder_id"] = str(body.folder_id)
+    if body.active_expert_id:
+        insert_data["active_expert_id"] = str(body.active_expert_id)
     # BL-01 fix: wrap sync .execute() with aexec so the event loop is not blocked
     # (D-v2.5-01 / Phase 058 D-058-09 — cross-tab unblocking invariant).
     response = await aexec(supabase.table("threads").insert(insert_data))
@@ -567,28 +685,87 @@ async def create_thread(
     return new_thread
 
 
-@router.patch("/{thread_id}", response_model=ThreadResponse)
-async def rename_thread(
+@router.get("/{thread_id}", response_model=ThreadResponse)
+async def get_thread(
     thread_id: str,
-    body: ThreadUpdate,
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_user_supabase_client),
 ):
-    # BL-01 fix: wrap sync .execute() with aexec (D-v2.5-01).
-    await aexec(
-        supabase.table("threads")
-        .update({"title": body.title.strip() or "New Chat"})
-        .eq("id", thread_id)
-        .eq("user_id", current_user["id"])
-    )
     result = await aexec(
         supabase.table("threads")
         .select("*")
         .eq("id", thread_id)
         .eq("user_id", current_user["id"])
-        .single()
+        .maybe_single()
     )
-    if not result.data:
+    if not result or not result.data:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Thread not found")
+    return result.data
+
+
+@router.patch("/{thread_id}", response_model=ThreadResponse)
+async def rename_thread(
+    thread_id: str,
+    body: ThreadUpdate,
+    request: Request,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_user_supabase_client),
+):
+    update_data: dict[str, Any] = {}
+    if body.title is not None:
+        update_data["title"] = body.title.strip() or "New Chat"
+
+    if body.clear_active_expert or ("active_expert_id" in body.model_fields_set and body.active_expert_id is None):
+        update_data["active_expert_id"] = None
+    elif body.active_expert_id is not None:
+        active_org_id = await resolve_active_org_or_none(request, current_user)
+        if active_org_id:
+            pool = await get_pg_pool()
+            from app.services.entitlement_service import check_entitlement, EntitlementDeniedException  # noqa: PLC0415
+            ent = await check_entitlement(pool, active_org_id, "experts")
+            if not ent.allowed:
+                raise EntitlementDeniedException(ent)
+
+            # PACK-10 / SC#5: Verify caller has access to the expert bundle (not ungranted/private)
+            from uuid import UUID  # noqa: PLC0415
+            from app.services.expert_service import get_expert_service  # noqa: PLC0415
+            c_uid = UUID(str(current_user["id"])) if isinstance(current_user, dict) else getattr(current_user, "id")
+            c_org_id = UUID(str(active_org_id))
+            # PACK-10 (v4.3 verification): the org role is resolved, never read off current_user
+            # (get_current_user returns {id, email} only).
+            from app.dependencies import resolve_caller_role  # noqa: PLC0415
+            _role, _groups = await resolve_caller_role(request, current_user)
+            caller_roles = [_role] if _role else []
+            bundle = await get_expert_service(
+                pool=pool,
+                bundle_id=body.active_expert_id,
+                caller_org_id=c_org_id,
+                caller_user_id=c_uid,
+                caller_roles=caller_roles,
+            )
+            if not bundle:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Expert bundle not found or access denied",
+                )
+        update_data["active_expert_id"] = str(body.active_expert_id)
+
+    if update_data:
+        # BL-01 fix: wrap sync .execute() with aexec (D-v2.5-01).
+        await aexec(
+            supabase.table("threads")
+            .update(update_data)
+            .eq("id", thread_id)
+            .eq("user_id", current_user["id"])
+        )
+    result = await aexec(
+        supabase.table("threads")
+        .select("*")
+        .eq("id", thread_id)
+        .eq("user_id", current_user["id"])
+        .maybe_single()
+    )
+    if not result or not result.data:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Thread not found")
     return result.data
 

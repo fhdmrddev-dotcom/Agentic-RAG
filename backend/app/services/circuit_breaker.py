@@ -147,7 +147,7 @@ class CircuitBreaker:
         self.input_tokens += max(0, int(input_tokens or 0))
         self.output_tokens += max(0, int(output_tokens or 0))
 
-    def absorb_usage_box(self, box: dict | None) -> None:
+    def absorb_usage_box(self, box: dict | None) -> tuple[int, int]:
         """Sync from a CUMULATIVE ``usage_box`` — the shipped accumulator idiom.
 
         ``task_service._stream_one_iteration`` SUMS each turn's usage into a
@@ -156,12 +156,27 @@ class CircuitBreaker:
         RUN-CUMULATIVE totals while ``record_tokens`` is ADDITIVE. This does the
         subtraction in ONE place — the breaker — rather than making the hot engine file
         carry delta bookkeeping it would have to get right.
+
+        RETURNS the clamped ``(d_in, d_out)`` it just handed to ``record_tokens``
+        (Phase 256 / D-256-09). That return is what lets the durable write be a DELTA
+        without a second delta bookkeeper: the caller ADDs it at the database, and
+        because the delta is derived from this object's own watermark, calling again on
+        an unchanged box yields ``(0, 0)`` and the write becomes a no-op. THAT is what
+        makes the persist idempotent against repetition — ``_enforce_budget`` runs twice
+        per phase iteration.
+
+        ⚠ The ``max(0, …)`` clamp is on the RETURNED delta, not only inside
+        ``record_tokens``. A box that went BACKWARDS was reset under us, and handing a
+        negative to an accumulating column would SUBTRACT real spend.
         """
         if not box:
-            return
+            return (0, 0)
         total_in = max(0, int(box.get("input_tokens") or 0))
         total_out = max(0, int(box.get("output_tokens") or 0))
-        self.record_tokens(total_in - self.input_tokens, total_out - self.output_tokens)
+        d_in = max(0, total_in - self.input_tokens)
+        d_out = max(0, total_out - self.output_tokens)
+        self.record_tokens(d_in, d_out)
+        return (d_in, d_out)
 
     def elapsed_seconds(self, now: datetime | None = None) -> float:
         return max(0.0, ((now or _now()) - self.started_at).total_seconds())

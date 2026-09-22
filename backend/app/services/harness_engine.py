@@ -1811,7 +1811,12 @@ async def run_workflow(
     # ⚠ THE READ FAILS OPEN. See ``load_run_budget``'s docstring: a database blip must not
     # kill every in-flight run on every worker at once. The named cost is that an
     # unapplied migration 125 silently disarms the cap.
-    from app.db.workflows import load_run_budget  # noqa: PLC0415 — module load-path rule
+    # ``persist_run_usage`` (Phase 256 / METER-03) rides the same local import: it is the
+    # ONE home of the token write (D-256-05), so this file gains a CALL and no SQL.
+    from app.db.workflows import (  # noqa: PLC0415 — module load-path rule
+        load_run_budget,
+        persist_run_usage,
+    )
 
     _budget = await load_run_budget(pool, run_id)
     breaker = CircuitBreaker(
@@ -1821,9 +1826,24 @@ async def run_workflow(
         or _budget["max_duration_seconds"],
         started_at=_budget["started_at"],
     )
-    # THE TOKEN SOURCE, AND IT IS THE HALF THAT DID NOT EXIST BEFORE THIS PHASE. The
-    # harness had NO per-call token counts at all: ``harness/`` contained two ``usage``
-    # references in total, both ``input_tokens=None``. The counts were being measured the
+    # THE TOKEN SOURCE, AND IT IS THE HALF THAT DID NOT EXIST BEFORE PHASE 204. The
+    # harness had NO per-call token counts at all.
+    #
+    # ⚠ CORRECTED (Phase 256 / D-256-08). This sentence previously read, verbatim apart
+    # from the spaces added around the ``=`` so the literal itself is no longer in this
+    # file:
+    #   "``harness/`` contained two ``usage`` references in total, both
+    #    ``input_tokens = None``."
+    # It is quoted here rather than deleted, because the FIGURE was wrong and a reader
+    # who trusted it would have believed METER-05 had two holes to close. MEASURED with
+    # ``grep -rn "input_tokens=" backend/app | grep None``: SEVEN argument sites plus one
+    # default parameter — api/runs.py:677 and :1331, this module's resume shell,
+    # harness/publish_service.py, scheduler_service.py, eval_runner_service.py and
+    # run_reconciler.py. Phase 256 closes this module's; the others belong to its other
+    # plans, and run_reconciler's is REGISTERED rather than fixed (the process is gone, so
+    # a stranded run's count is genuinely unknowable in memory).
+    #
+    # The counts were being measured the
     # whole time one layer down — ``task_service._stream_one_iteration`` has SUMMED every
     # turn's usage into a caller-supplied box since Phase 093 (D-17) — but nothing handed
     # a box to the harness and ``run_task_sub_agent`` did not return its total. Setting
@@ -1834,16 +1854,69 @@ async def run_workflow(
     # ⚠ THE BOX IS CUMULATIVE AND ``record_tokens`` IS ADDITIVE — the breaker's
     # ``absorb_usage_box`` owns the subtraction so this file carries no delta bookkeeping.
     #
-    # ⚠ ``llm_emit`` PHASES ARE NOT COUNTED, AND THAT IS NAMED RATHER THAN HIDDEN.
-    # ``forced_emit`` measures no usage anywhere in its own module, so its spend is
-    # invisible to any box. Wiring it means instrumenting the forcing seam, which is a
-    # different file and a different plan. The three counted types are the three that
-    # loop (``llm_agent``, ``llm_batch_agents``) or stream (``llm_single``); a sealed
-    # single shot is the one that cannot run away.
+    # ⚠ CORRECTED (Phase 256 / METER-06 / plan 256-04 / F-4). ``llm_emit`` PHASES ARE
+    # NOW COUNTED. The original text is QUOTED rather than deleted, because it was a
+    # hole NAMED rather than hidden — and it named its own re-open condition, which
+    # then came true:
+    #
+    #   "⚠ ``llm_emit`` PHASES ARE NOT COUNTED, AND THAT IS NAMED RATHER THAN HIDDEN.
+    #    ``forced_emit`` measures no usage anywhere in its own module, so its spend is
+    #    invisible to any box. Wiring it means instrumenting the forcing seam, which
+    #    is a different file and a different plan. The three counted types are the
+    #    three that loop (``llm_agent``, ``llm_batch_agents``) or stream
+    #    (``llm_single``); a sealed single shot is the one that cannot run away."
+    #
+    # THAT DIFFERENT PLAN WAS 256-04, and the leg now counts end to end:
+    #   ``forced_emit._drain``'s two usage arms (mirrored from ``task_service``)
+    #     → ``forced_emit``'s LADDER accumulator, declared above the rung loop so a
+    #       FAILED rung's spend counts too — you were billed for every shot served
+    #     → the token keys on BOTH exits (the success return and the honest-fail floor)
+    #     → ``harness/phase_types._exec_llm_emit``'s ``_record_run_usage`` call
+    #     → ``ctx.run_usage_box`` (set below)
+    #     → the breaker's ``absorb_usage_box`` → ``persist_run_usage``.
+    #
+    # ⚠ THE ORIGINAL'S CLOSING REASONING STILL HOLDS AND IS NOT RETIRED WITH IT: a
+    # sealed single shot is indeed the phase type that cannot RUN AWAY. What it could
+    # do — and did — is spend real money invisibly, which is a different failure and
+    # the one METER-06 closes. ⛔ ``TOKEN_COVERAGE_LEGS`` in ``db/workflows.py`` gained
+    # ``"emit"`` in the SAME commit as those drain arms (O-4).
     try:
         ctx.run_usage_box = {}
     except (AttributeError, TypeError):
         pass  # immutable stub ctx in some unit tests — the breaker simply sees no tokens
+
+    async def _flush_run_usage() -> None:
+        """THE ONE HOME of the durable token write (Phase 256 round 1 / CR-01).
+
+        ⭐ IT EXISTS SO THE ABSORB AND THE PERSIST CANNOT DRIFT APART. ``_enforce_budget``
+        used to carry both lines inline, which made them reachable from exactly the two
+        loop-boundary sites that function is called from — and ``256-VERIFICATION.md``
+        scored SC#1 at 2/4 because THREE ordinary returns sit between those two sites and
+        reach neither: the ``pause_run`` arm (a human gate elapsed unanswered), the
+        ``fail_run`` arm (gates exhausted / wall-clock timeout) and the dangling
+        ``skip_to`` target. Extracting the pair lets the third caller be one line.
+
+        ⚠ IT IS SAFE TO CALL MORE THAN ONCE, AND THAT PROPERTY IS BORROWED, NOT ASSUMED.
+        ``CircuitBreaker.absorb_usage_box`` derives its ``(d_in, d_out)`` from the
+        breaker's OWN watermark and mutates it, so a second call on an unchanged box
+        returns ``(0, 0)``; ``persist_run_usage`` then returns before touching the
+        database on a falsy delta. That is why N phases still produce N writes with a
+        THIRD call site in the loop — driven in
+        ``tests/unit/test_256_run_exit_usage_flush.py``, not asserted here.
+
+        ⚠ IT WRITES NOTHING WHEN THE CTX CARRIES NO BOX. ``getattr(..., None)`` →
+        ``absorb_usage_box(None)`` → ``(0, 0)`` → no statement. A ``(0, 0)`` write would
+        read as *"measured as zero"* and make an uninstrumented run look free (D-256-06).
+
+        ⛔ NO ``try`` HERE, for the same reason ``_enforce_budget``'s docstring gives
+        below: a failure of the durable write must propagate exactly as every other
+        writer in ``db/workflows.py`` does, and a swallow would report a run as metered
+        when it is not.
+        """
+        _d_in, _d_out = breaker.absorb_usage_box(getattr(ctx, "run_usage_box", None))
+        await persist_run_usage(
+            pool, run_id, input_delta=_d_in, output_delta=_d_out
+        )
 
     async def _enforce_budget(where: str) -> None:
         """Absorb the run's spend, and raise if either ceiling is now breached.
@@ -1869,10 +1942,32 @@ async def run_workflow(
         ⚠ THE TRIP RECORD AND THE CANCEL HAPPEN BEFORE THE RAISE, inside ``trip_breaker``.
         By the time this propagates the run is already durably ``cancelled`` with its
         audit row written, so no handler upstream has to know what a breaker is.
+
+        ⚠ THE ABSORB AND THE DURABLE WRITE SIT **ABOVE** THE ``armed`` GUARD, AND THAT
+        ORDER IS THE WHOLE OF METER-03 (Phase 256, D-256-04 as corrected). ``armed`` is
+        *"is either ceiling configured?"* — an INTERACTIVE harness run configures
+        neither, so a persist written below this guard would run for scheduled runs only
+        and measure nearly every harness run in the product at zero.
+        ⛔ IT IS BEHAVIOUR-PRESERVING FOR THE TRIP, and the proof is arithmetic rather
+        than empirical: on a disarmed breaker ``max_tokens`` and ``max_duration_seconds``
+        are both ``None``, and BOTH arms of ``check_limits`` guard on ``is not None``, so
+        it returns ``(False, None)`` unconditionally. The guard is a SHORT-CIRCUIT, never
+        a semantic. ``absorb_usage_box`` mutates only the breaker's own counters, which a
+        disarmed breaker never reads.
+        ⛔ NO ``try`` AROUND THE PERSIST. This function's contract above is that it
+        raises ``CircuitBreakerTrippedError`` and not ``CancelledError``; a ``try/except``
+        here would add a branch to a function whose branch count is itself fenced.
+
+        ⚠ THE ABSORB+PERSIST PAIR MOVED INTO ``_flush_run_usage`` ABOVE (Phase 256
+        round 1 / CR-01) AND IS CALLED AS THIS FUNCTION'S FIRST STATEMENT. Nothing about
+        the ordering changed — the flush is still ABOVE the ``armed`` guard — and no
+        branch was added here: ``if`` count 2 before, 2 after,
+        ``tests/unit/test_256_run_exit_usage_flush.py::test_enforce_budget_gained_no_branch``
+        pins it.
         """
+        await _flush_run_usage()
         if not breaker.armed:
             return
-        breaker.absorb_usage_box(getattr(ctx, "run_usage_box", None))
         _tripped, _reason = breaker.check_limits()
         if not _tripped:
             return
@@ -2185,6 +2280,44 @@ async def run_workflow(
                             phase_id,
                         )
             raise
+
+        # ── the run's spend becomes durable HERE, before any outcome arm ────────
+        #
+        # ⭐ THE PLACEMENT IS THE WHOLE POINT, and it is the ``phase_types.py:1586``
+        # precedent applied one layer up. EVERY outcome arm below this line flows
+        # THROUGH here — ``pause_run``, ``fail_run``, the dangling-``skip_to`` guard, a
+        # taken ``skip_to`` and the ordinary completed path — so the recording needs no
+        # branch of its own, and a FIFTH arm added later is covered by construction
+        # rather than by whoever writes it remembering.
+        #
+        # ⚠ CR-01 (Phase 256 round 1) found the three arms this covers that
+        # ``_enforce_budget`` could not reach: the pause arm and the ``fail_run`` arm
+        # both ``return`` before ``_enforce_budget("phase_completed")``, and the
+        # missing-skip-target guard terminalizes the run inside the ``skip_to`` arm. The
+        # loss was PERMANENT — the next segment starts with ``ctx.run_usage_box = {}``
+        # and a breaker at zero, and D-256-03 forbids recovering the figure by summing
+        # across ``runs`` and ``workflow_runs`` (different grains).
+        #
+        # ⚠ IT DOES NOT DOUBLE-BOOK, and the reason is the breaker's watermark rather
+        # than a guard here: ``absorb_usage_box`` returns a DELTA derived from its own
+        # mutated counters, so on the completed path — where
+        # ``_enforce_budget("phase_completed")`` has already absorbed the box — this
+        # yields ``(0, 0)`` and ``persist_run_usage`` returns before the database. N
+        # phases still produce N writes.
+        #
+        # ⛔ A ``try:``/``finally:`` AROUND THE ``while`` LOOP WAS CONSIDERED AND
+        # REJECTED, and the rejection is recorded here rather than left silent. A
+        # ``finally`` also runs on ``asyncio.CancelledError``, where an UNSHIELDED
+        # ``await`` is itself cancelled — that would change which exception leaves this
+        # engine on a user Stop, which is precisely what ``_enforce_budget``'s docstring
+        # and the Phase-194 ``cancel_phase`` single-call-site fence exist to protect (the
+        # escape arm's own cleanup is ``asyncio.shield``-wrapped for exactly this
+        # reason). ⚠ THE CONSEQUENCE IS A RESIDUAL AND IT IS NAMED, NOT HIDDEN: a phase
+        # that CRASHES or is CANCELLED mid-work still loses its delta from
+        # ``workflow_runs``. That is outside CR-01's three ORDINARY returns and outside
+        # SC#1's *"after the process restarts"* wording; it is registered in
+        # ``SEED-300`` with a concrete trigger.
+        await _flush_run_usage()
 
         # ── pause_run: a human gate elapsed unanswered (200 / D-10) ─────────────
         #
@@ -3041,6 +3174,28 @@ async def resume_stranded_workflows(*, pool, redis) -> int:
             if _pid is not None:
                 try:
                     from app.db.runs import finalize_run
+                    # METER-05 site 3 (Phase 256 / D-256-08). This shell used to hardcode
+                    # a NULL usage, so EVERY resumed run's segment read as "never
+                    # measured" even when the box on ctx had been measuring it all along.
+                    # ⚠ GRAIN (D-256-03): the box carries THIS SEGMENT's spend and this is
+                    # a per-segment ``runs`` row, so segment-onto-segment is correct here.
+                    # ⛔ The cumulative ``workflow_runs`` figure is NOT written from this
+                    # site — ``persist_run_usage`` owns it, at the phase boundary.
+                    # ⛔ ``.get()`` with NO default and NO ``or 0``: an absent key stays
+                    # ``None`` all the way to the column, because NULL means never
+                    # measured and 0 means measured as zero (D-256-06).
+                    _box = getattr(ctx, "run_usage_box", None) or {}
+                    _in_tok = _box.get("input_tokens")
+                    _out_tok = _box.get("output_tokens")
+                    if _in_tok is None and _out_tok is None:
+                        # The warning CONTRACT from db/runs.py:93-99, honoured here.
+                        # IDENTIFIERS ONLY — never token values (T-073-04 / T-256-07).
+                        logger.warning(
+                            "runs.usage missing for run=%s provider=%s model=%s",
+                            _pid,
+                            getattr(ctx, "provider", None),
+                            getattr(ctx, "model", None),
+                        )
                     await finalize_run(
                         pool,
                         run_id=_pid,
@@ -3048,8 +3203,8 @@ async def resume_stranded_workflows(*, pool, redis) -> int:
                         error="resume re-drive failed" if _redrive_failed else None,
                         completed_at=datetime.now(timezone.utc),
                         message_id=None,
-                        input_tokens=None,
-                        output_tokens=None,
+                        input_tokens=_in_tok,
+                        output_tokens=_out_tok,
                     )
                 except Exception:
                     logger.exception(

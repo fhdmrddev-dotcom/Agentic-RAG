@@ -3,11 +3,26 @@ seed_id: SEED-198
 title: "Experts — a domain bundle over skills + connections + KNOWLEDGE SCOPE, not a new agent type. The idea the operator could not make mature; the maturing move is that it composes four subsystems we already shipped and adds no runtime."
 created: 2026-08-24
 planted_during: Operator direction, 2026-08-24 — "including experts that are expert in some domain, maybe financial analyzer, maybe a strategy writer… the idea is not mature enough in my head"
-status: planted
+status: partially-answered
+folded_into: 259, 260 (data + usage); AUTHORING owed to 261
 status_note: |
   ── 2026-09-16 · reviewed at `/gsd:discuss-phase 252`, LEFT PLANTED (REG-02 sweep).
   Fired on `backend/app/**` breadth only. Experts is a capability; 252 is scoped to the v4.2
   milestone audit §8 and adds no requirement id.
+
+  ── 2026-09-18 · RE-READ against operator direction, STILL PLANTED — but its STANDING CHANGED.
+  ⭐ THIS SEED IS THE SKU. Operator direction the same day ("an ecosystem that has plugins …
+  that could be sold to clients on a commercial basis") makes an Expert the unit of sale, not
+  just a capability. An outside architecture read independently proposed a "vertical pack
+  format" as "the SKU everything else hangs from" — that is this seed, planted 25 days earlier.
+  Two seeds now sit around it: SEED-291 (the extension contract — WHY a pack is allowed to be
+  data and never engine code) is its PREREQUISITE DECISION, and SEED-294 (go-to-market) is the
+  commercial umbrella that names what still blocks a sale. ⛔ An Expert is not sellable until
+  SEED-080 / SEED-083 exist — without entitlement a pack is a folder anyone can copy.
+
+  ── 2026-09-19 · FOLDED at `/gsd:discuss-phase 259` (D-259-01..08).
+  Manifest schema, RLS, member isolation, and entitlement gating in Phase 259;
+  chat thread selection, Try Asking onboarding affordance, and Financial Analyzer proof slice in Phase 260.
 priority: high
 surface: Agentic-RAG
 relates_to:

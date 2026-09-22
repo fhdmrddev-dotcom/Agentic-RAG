@@ -149,6 +149,16 @@
             "timeout": 120
           }
         ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"C:/Program Files/nodejs/node.exe\" \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/extension-contract-guard.js",
+            "timeout": 15
+          }
+        ]
       }
     ],
     "PreToolUse": [

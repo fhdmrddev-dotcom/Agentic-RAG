@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { Plus, Sparkles, Shield, Menu, type LucideIcon } from "lucide-react"
+import { Plus, Sparkles, Shield, Menu, Receipt, type LucideIcon } from "lucide-react"
 import { ProfileMenu } from "./ProfileMenu"
 // Phase 166 Plan 05 (ADMIN-01 / D-166-05): NavPanel is inside OrgProvider in the app,
 // so the indigo org-admin shield reads `canManage` via the non-throwing useOrgOptional()
@@ -148,6 +148,8 @@ export function NavPanel({
   onOpenLibraryHealth,
 }: Props) {
   const isControlRoom = activeView === "control-room"
+  // Phase 257.1 — mirrors the isControlRoom/isOrgAdmin actives above; see the rail entry below.
+  const isAdminSpend = activeView === "admin-spend"
   const isOrgAdmin = activeView === "org-admin"
   // Phase 166 (ADMIN-01 / D-166-05): the render-only org-manage flag from OrgProvider.
   // useOrgOptional is non-throwing → null (canManage=false) where no provider is mounted.
@@ -361,6 +363,40 @@ export function NavPanel({
               isControlRoom
                 ? "bg-amber-500/15 text-amber-400"
                 : "text-amber-400/80 hover:text-amber-400 hover:bg-amber-500/10"
+            }
+          />
+        )}
+
+        {/* ── Phase 257.1 (METER-07 reachability) — THE THIRD LEG OF THE TRIAD ───────────
+            Phase 257 shipped the `admin-spend` ActiveView (App.tsx:107) and its ChatLayout
+            mount branch (:979) and NO ENTRY ACTION, so the only way to reach the spend
+            cockpit was to TYPE `/admin/spend` into the address bar. Operator, on seeing it:
+            *"this page is not available to navigate from the app, I have to navigate
+            manually to /admin/spend."* That is verbatim the Phase-118 built-but-unreachable
+            lesson this file's sibling comment already names, recurring one surface over.
+
+            ⛔ OUTSIDE `navItems`, BESIDE Control Room, and that placement is not cosmetic.
+            `nav-items.test.ts` LOCKS `NAV_ITEMS` to carry no operator view (D-07's
+            non-discoverable contract: nothing is rendered at all for a non-operator, never a
+            disabled or badged placeholder), and `NAV_ITEMS` also feeds ChatLayout's mobile
+            drawer — an entry there would leak an operator surface to every member.
+            `isOperator` is the same probe that gates the two shields above.
+
+            The glyph is `Receipt` — distinct from both Shields (Control Room / Org admin)
+            and from Governance's ShieldCheck, per the icon convention: a rail glyph is not
+            reused across two homes. Emerald matches the spend surface's own rated-cost
+            colour rather than borrowing the amber that means "operator" on the shield. */}
+        {isOperator && (
+          <RailItem
+            expanded={expanded}
+            icon={Receipt}
+            label="Spend"
+            active={isAdminSpend}
+            onClick={() => onNavigate("admin-spend")}
+            className={
+              isAdminSpend
+                ? "bg-emerald-500/15 text-emerald-400"
+                : "text-emerald-400/80 hover:text-emerald-400 hover:bg-emerald-500/10"
             }
           />
         )}
