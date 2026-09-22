@@ -6,6 +6,7 @@
 
 import { useEffect, useState } from "react"
 import { Sparkles, Check, Loader2, Folder, Wrench, Shield } from "lucide-react"
+import { ExpertIcon } from "@/components/experts/expertIcon"
 import {
   Dialog,
   DialogContent,
@@ -24,18 +25,19 @@ interface InviteExpertDialogProps {
   currentExpertId?: string | null
 }
 
-function getExpertIcon(expert: ExpertBundle): string {
-  if (expert.slug === "financial-analyzer" || expert.name.toLowerCase().includes("financial")) {
-    return "📊"
-  }
-  if (expert.name.toLowerCase().includes("legal")) {
-    return "⚖️"
-  }
-  if (expert.name.toLowerCase().includes("code") || expert.name.toLowerCase().includes("developer")) {
-    return "💻"
-  }
-  return "✨"
-}
+// ⚠ RETIRED (262-02 / D-262-06 / RESEARCH R-7): the per-Expert icon guesser that lived here
+// — a `slug`/`name` string-match returning one of four emoji, duplicated VERBATIM into
+// `ExpertSpotlightCard.tsx`. Two copies of one decision is a one-home-per-concern violation on
+// its own, and neither copy read the `icon` column.
+//
+// ⭐ IT SHIPPED FOR A REAL REASON. At Phase 260 there was one seeded demo Expert (migration
+// 188) and no read path for the presentation columns — migration 189 had not landed — so a
+// guess from the name was the only way this list could show more than a single glyph.
+//
+// ⛔ IT IS NOW A LIE. `ExpertAuthoringStudio` writes `icon`, and an author who chose one got
+// the guess anyway; an Expert merely NAMED "Financial …" inherited the demo Expert's face.
+// Resolution now has exactly one home: `@/components/experts/expertIcon`, which reads the
+// column and falls back to a neutral glyph — never to a name.
 
 export function InviteExpertDialog({
   open,
@@ -116,7 +118,6 @@ export function InviteExpertDialog({
             !error &&
             experts.map((expert) => {
               const isCurrent = expert.id === currentExpertId
-              const iconEmoji = getExpertIcon(expert)
               const isRestricted = expert.scope_mode === "restricted"
 
               return (
@@ -132,7 +133,7 @@ export function InviteExpertDialog({
                 >
                   <div className="flex items-start gap-3">
                     <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-violet-500/20 to-indigo-500/20 border border-violet-500/30 flex items-center justify-center text-lg shrink-0">
-                      {iconEmoji}
+                      <ExpertIcon icon={expert.icon} className="h-4 w-4 text-violet-200" />
                     </div>
 
                     <div className="flex-1 min-w-0">

@@ -10629,7 +10629,7 @@ cells rot within days.
 | [`frontend/src/components/experts/ExpertAuthoringStudio.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertsexpertauthoringstudiotsx) | 3 / 2 / 1475 | no (2 phases) | ⚠ row was STALE at `1/1/1082`. honoured by construction (**263-04**): the ONE skills sub-block gains a FOURTH inner part; Folders and Connections byte-unchanged. ⛔ the fence covers BOTH entry points. |
 | [`frontend/src/components/experts/ProposedSkillCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertsproposedskillcardtsx) | 1 / 1 / 86 | no (new) | young (created 263-04). Row added AT CREATION. ⛔ The ONE home of the "does not exist" mark — dashed+violet, never red (D-263-01); a second styling makes a proposal read as an error. |
 | [`frontend/src/components/org/OrgAdminShell.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgadminshelltsx) | 3 / 5 / 442 | no | young (created Phase 166). The org-admin shell hosting live tabs (members, audit, settings, invitations, sso, experts). |
-| [`frontend/src/components/org/OrgExpertsTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgexpertstabtsx) | 1 / 1 / 347 | no (new) | young (created Phase 261). Row added AT CREATION — leaf component for org-admin expert listing and management. |
+| [`frontend/src/components/org/OrgExpertsTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgexpertstabtsx) | 2 / 2 / 324 | no (2 phases) | ⚠ row was STALE at `1 / 1 / 347`. honoured by construction (**262-02**): its `ICON_MAP` + `renderExpertIcon` MOVED OUT verbatim — a PURE move; its pinned suite is byte-unchanged and green |
 | [`frontend/src/lib/api/experts.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiexpertsts) | 6 / 3 / 313 | ⚠ **FIRES — 3 phases** | ⚠ STALE a 3rd time (was `5/3/298`, `2/2/186` before). 262-01 re-derives INHERITED rot only — it does not edit this file. 263-03's ONE-helper 422 arm stands. |
 | [`backend/app/db/experts.py`](docs/HOT-FILE-LEDGER.md#backendappdbexpertspy) | 4 / 3 / 567 | ⚠ **NOW FIRES — 3 phases** | ⛔ row was STALE at `2/2/492` reading `no (new)`; it CROSSED the threshold in this very commit. honoured by construction (**263-01**): ONE new UPDATE, no existing query touched. |
 | [`backend/app/models/expert.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsexpertpy) | 3 / 3 / 93 | ⚠ **NOW FIRES — 3 phases** | ⛔ row was STALE at `2/2/79` reading `no (new)` / `young`; it CROSSED the threshold here. honoured by construction (**263-03**): ONE new request model, zero existing model touched. |
@@ -10637,8 +10637,8 @@ cells rot within days.
 | [`backend/app/api/experts.py`](docs/HOT-FILE-LEDGER.md#backendappapiexpertspy) | 9 / 3 / 585 | ⛔ **FIRES — 3 phases** | ⚠ row STALE a 3rd time (`8/3/560`). **263-REVIEW CR-02/03**: both `/draft` asset queries leaked on the BYPASSRLS pool; now mirror the LIVE policies. ⛔ connections unchanged — org-only, MEASURED. |
 | [`backend/app/utils/skill_visibility.py`](docs/HOT-FILE-LEDGER.md#backendapputilsskill_visibilitypy) | 3 / 2 / 209 | no (2 phases) | ⚠ the row added at 264 PLANNING read `1/1/83` and was stale by that phase's own close. **264-02/04**: optional `expert_bundle_id` on both encodings; ⛔ the default arm is pinned byte-identical by `==` |
 | [`frontend/src/components/chat/ActiveExpertChip.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatactiveexpertchiptsx) | 0 / 0 / 0 | no (new) | young (created Phase 260). Row added AT CREATION — leaf component for active consultant chip. |
-| [`frontend/src/components/chat/ExpertSpotlightCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatexpertspotlightcardtsx) | 0 / 0 / 0 | no (new) | young (created Phase 260). Row added AT CREATION — leaf component for hero spotlight card and action tiles. |
-| [`frontend/src/components/chat/InviteExpertDialog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatinviteexpertdialogtsx) | 0 / 0 / 0 | no (new) | young (created Phase 260). Row added AT CREATION — leaf component for expert invitation modal. |
+| [`frontend/src/components/chat/ExpertSpotlightCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatexpertspotlightcardtsx) | 2 / 2 / 205 | no (2 phases) | ⚠ row was STALE at `0 / 0 / 0`. **262-02**: FOUR demo-Expert hardcodes retired as rewrites. ⛔ no fallback here may inspect `slug` or `name` — that match IS the retired artefact |
+| [`frontend/src/components/chat/InviteExpertDialog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatinviteexpertdialogtsx) | 2 / 2 / 218 | no (2 phases) | ⚠ row was STALE at `0 / 0 / 0`. **262-02**: the VERBATIM-duplicated icon guesser retired; the list gem renders `<ExpertIcon icon={expert.icon} />`. ⛔ its `expert-card-${slug}` testids are untouched |
 | [`backend/app/db/entitlements.py`](docs/HOT-FILE-LEDGER.md#backendappdbentitlementspy) | 2 / 1 / 169 | no (new) | young (created Phase 258). Row added AT CREATION — absent row is invisible to G-5 (TIER-01/02). |
 | [`backend/app/services/entitlement_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesentitlement_servicepy) | 2 / 1 / 130 | no (new) | young (created Phase 258). Row added AT CREATION. Single commercial boundary home (TIER-01/03/04/05). |
 | [`frontend/src/components/chat/ToolCallPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattoolcallpaneltsx) | 51 / 23 / 351 | **FIRES** | ✅ **G-5 DISCHARGED (227-02)** — extracted ToolCallDetails, StepRow, toolStepDerivation (1019 → 351 lines) |
@@ -10946,7 +10946,7 @@ cells rot within days.
 | [`frontend/src/components/skills/SkillFormDialog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsskillsskillformdialogtsx) | 13 / 9 / 657 | ⚠ **FIRES** | ⚠ row STALE at `12/8/635` one plan later. honoured by construction (**263-04**): ONE optional prop + three `??` + one dep-array entry. ⛔ callers pass a STABLE reference or the reset wipes typing. |
 | [`backend/app/api/skills.py`](docs/HOT-FILE-LEDGER.md#backendappapiskillspy) | 19 / 10 / 858 | ⚠ **FIRES** | ⛔ absent from BOTH registers its ENTIRE LIFE at 10 phases — row added at 263 PLANNING. ⛔ `is_org_shared` HARD-SET False at `:250`; D-263-06 routes around it by provenance, never through the gate. |
 | [`frontend/src/lib/activeViewReachability.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibactiveviewreachabilityts) | 1 / 1 / 159 | no (created 262-01) | ⚠ the AT-PLANNING row read `0/0/0`; measured in its own creating commit. ⛔ The ONE ActiveView↔ChatLayout-branch fence — AST, never grep; it THROWS on a vacuous parse |
-| [`frontend/src/components/experts/expertIcon.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertsexperticontsx) | 0 / 0 / 0 | no (new) | young (created 262). Row added AT PLANNING. ⛔ The ONE home of expert-icon resolution, a CLOSED 11-key lucide map. It reads `icon` and never `slug`/`name` — that match IS the retired artefact |
+| [`frontend/src/components/experts/expertIcon.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertsexperticontsx) | 1 / 1 / 72 | no (new) | ⚠ `0/0/0` AT PLANNING; **measured `1/1/72` at 262-02**. ⛔ The ONE home of expert-icon resolution — a CLOSED 11-key lucide map. Reads `icon`, never `slug`/`name`: that match IS the retired artefact |
 | [`frontend/src/components/experts/catalog/expertCatalog.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogexpertcatalogts) | 0 / 0 / 0 | no (new) | young (created 262). Row added AT PLANNING. Pure search/category/folder-name resolution. ⛔ An unresolvable folder id returns an UNKNOWN marker, never a drop — a blank is a claim nobody made |
 | [`frontend/src/components/experts/catalog/ExpertCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogexpertcardtsx) | 0 / 0 / 0 | no (new) | young (created 262). Row added AT PLANNING. The catalog's 5-element card face, COUNTS only. ⛔ Zero lecturing prose on the face (sketch 261-262) — the NAMES belong to the detail modal |
 | [`frontend/src/components/experts/catalog/ExpertCatalogPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogexpertcatalogpagetsx) | 0 / 0 / 0 | no (new) | young (created 262). Row added AT PLANNING. Renders EXACTLY what `listExperts()` returned. ⛔ No grey-out, no locked row: PACK-11's vanish is the server's list, never a filter here |
@@ -15869,7 +15869,27 @@ What it owns. Leaf component for rendering the active consultant chip inside the
 
 **`0 / 0 / 0`** — created by Phase 260 (`260-03`). **Row added AT CREATION.** Precedent in `CLAUDE.md` is explicit: rows added at creation, since an absent row is invisible to G-5 at any count.
 
+⚠ **RE-DERIVED AT `262-02`: `2 commits / 2 phases / 205 L`.** The `0 / 0 / 0` is kept above rather than overwritten. G-5 does NOT fire (2 phases); the next phase to touch this file is the third and must propose a seam first.
+
 What it owns. Leaf component for rendering the hero visual spotlight card and 3 Action Tiles in the message stream upon expert invitation or thread start per ratified G-2 Option 1 (Action Tiles).
+
+**⚠ 262-02 — FOUR hardcoded demo-Expert sites RETIRED (D-262-06 / RESEARCH R-7), as rewrites, not deletions.** They were, at the lines RESEARCH measured them:
+
+| Site | Was | Now |
+|---|---|---|
+| `DEFAULT_FINANCIAL_TILES` (`:26-42`), used at `:58-59` | three verbatim SEC-filing prompt titles returned to any Expert whose slug was `financial-analyzer` **or whose NAME merely contained "financial"** | falls to the single "Explore Scope" tile the function already had for every other Expert |
+| `getExpertIcon` (`:70-81`) | a `slug`/`name` string-match returning one of four emoji — **duplicated VERBATIM** from `InviteExpertDialog.tsx:27-37` | `<ExpertIcon icon={expert.icon} />` — `@/components/experts/expertIcon`, the one home |
+| `folderLabel` (`:93-96`) | the literal `"SEC Filings & Reports"` | the folder COUNT arm it already had |
+| `skillLabel` (`:98-103`) | the literal `"ratio_calculator"` | `member_skills[0] ?? "domain_tools"` |
+
+⭐ **They shipped for a real reason and the reason is preserved in the source.** At Phase 260 there was one seeded Expert (migration 188) and **no read path for the presentation columns at all** — migration 189 had not landed. Hardcoding was the only way the hero card could render. Migration 189 plus `ExpertAuthoringStudio` made it a lie: a customer's Expert merely NAMED "Financial …" wore the demo Expert's face, three prompts it never authored, a folder label naming documents it cannot see, and a skill it does not carry.
+
+**Binding invariants.**
+- ⛔ **No fallback in this file may inspect `slug` or `name` CONTENT.** That match is the retired artefact; re-introducing it anywhere moves the defect rather than ends it.
+- ⛔ **The folder pill stays a COUNT.** This is a hero summary; folder NAMES are PACK-12's job in the detail modal (plan 04), where an unresolvable id needs an honest "a folder you cannot see" state rather than a blank (RESEARCH P-6).
+- ⛔ The exact retired identifiers and literals are recorded **here and in `262-02-SUMMARY.md`, never in the source** — spelling them in the component would satisfy the very greps that prove they are gone.
+
+**Driven, not asserted (RESEARCH P-7).** `ExpertSpotlightCard.test.tsx` pinned all four hardcodes and was GREEN at `5 passed` before the change; the component change alone took it to **`3 failed | 2 passed`**. The suite was then REWRITTEN with each case naming the assertion it replaces and why that assertion existed (`SEED-177`, precedent `D-206-07`), landing at **9 cases** — the count-gate pin was RAISED `5 → 9`, never lowered.
 
 ---
 
@@ -15877,7 +15897,15 @@ What it owns. Leaf component for rendering the hero visual spotlight card and 3 
 
 **`0 / 0 / 0`** — created by Phase 260 (`260-02`). **Row added AT CREATION.** Precedent in `CLAUDE.md` is explicit: rows added at creation, since an absent row is invisible to G-5 at any count.
 
+⚠ **RE-DERIVED AT `262-02`: `2 commits / 2 phases / 218 L`.** The `0 / 0 / 0` is kept above rather than overwritten. G-5 does NOT fire (2 phases).
+
 What it owns. Leaf component modal dialog for browsing available domain expert bundles and inviting one to the active thread, triggered from the composer's `+` dropdown menu.
+
+**⚠ 262-02 — the fifth of RESEARCH R-7's five sites retired here.** `getExpertIcon` (`:27-37`) was a **verbatim duplicate** of the function in `ExpertSpotlightCard.tsx:70-81`: two copies of one decision, neither of which read the `icon` column. Both call sites now render `<ExpertIcon icon={expert.icon} />`. The retirement comment in place keeps the original reason readable — at Phase 260 there was no read path for `icon` at all, so guessing from the name was the only way this list could show more than one glyph.
+
+**Binding invariants.**
+- ⛔ The `data-testid={`expert-card-${expert.slug}`}` and `invite-expert-btn-${expert.slug}` hooks are derived from `slug` and are **untouched** by the icon retirement — `ComposerExpert.test.tsx` (count-gate pin 5) reaches this dialog through them. That suite was confirmed green and byte-unchanged rather than assumed to be safe.
+- ⚠ `:102-106` renders `upgrade_hint` ("Upgrade to Enterprise…"), which sits against D-262-02's no-upsell spirit. **Left alone BY DECISION (D-262-10)**: it is an error string at a failed invite, not a brochure entry. Out of scope for 262-02; raise at phase close.
 
 ---
 
@@ -15973,7 +16001,13 @@ What it owns. The user-side org-admin shell reachable via the indigo shield, hos
 
 **`1 / 1 / 347`** — created by Phase 261 (`261-04`). **Row added AT CREATION.** Precedent in `CLAUDE.md` is explicit: rows added at creation, since an absent row is invisible to G-5 at any count.
 
+⚠ **RE-DERIVED AT `262-02`: `2 commits / 2 phases / 324 L`** (the −23 lines are the extraction below). The `1 / 1 / 347` is kept above rather than overwritten. G-5 does NOT fire (2 phases).
+
 What it owns. Leaf component for the Org Admin Experts tab, rendering accessible tenant expert rows, access grant badges, action buttons, and launching the authoring studio.
+
+**⭐ 262-02 — this file held the ONE CORRECT READER and it was extracted, not copied.** Its module-level `ICON_MAP` (eleven lucide glyphs) + `renderExpertIcon` at `:30-46` were the only code in the repository that resolved an Expert's `icon` COLUMN; two chat surfaces guessed from `slug`/`name` instead (RESEARCH R-3, R-7). The map MOVED verbatim to `@/components/experts/expertIcon` and this file now imports `ExpertIcon`.
+
+**Binding invariant.** ⛔ **That move is a PURE MOVE** — rendered output identical, one call site, and `OrgExpertsTab.test.tsx` (count-gate pin 5) must stay green **without being edited**. It was: `git diff --stat` shows the suite absent, 5 passing. If it ever reds on this seam, the move was not pure — fix the move, never the pin.
 
 ---
 
@@ -16552,9 +16586,35 @@ inherited. Copying the neighbouring line's shape would have been exactly wrong.
 
 **Row added AT PLANNING, 2026-09-22 (Phase 262).** Triple at creation `0 commits / 0 phases / 0 L` — re-derive at the phase close with the CLAUDE.md recipe.
 
+⚠ **MEASURED AT `262-02` task 1: `1 commit / 1 phase / 72 L`.** The AT-PLANNING `0 / 0 / 0` is
+kept above rather than overwritten — a figure that was already false when written is the exact
+failure this ledger exists to stop, and `262-01` recorded the same correction one file over.
+
+**What it owns, and what it ENDED.** Phase 260 shipped `getExpertIcon(expert)` **twice, verbatim**
+(`InviteExpertDialog.tsx:27-37` and `ExpertSpotlightCard.tsx:70-81`), each guessing an emoji by
+string-matching `slug`/`name`. `OrgExpertsTab.tsx:30-46` independently held an eleven-key lucide
+`ICON_MAP` that read the `icon` COLUMN correctly. Three deciders, one of them right. RESEARCH R-7
+measured the duplication; this file is the surviving home and `OrgExpertsTab` now imports it.
+
+**Binding invariants.**
+- ⛔ Resolution reads the `icon` field and **nothing else** — no `slug`, no `name`, no string
+  content. Re-implementing the guess one file over would move the defect rather than end it. Pinned
+  by case (4) of `__tests__/expertIcon.test.tsx`, which passes a name the retired function WOULD
+  have matched and demands the neutral fallback.
+- ⛔ **T-262-05** — `icon` is author-controlled free text that selects a rendered component. It is
+  a LOOKUP IN A CLOSED MAP with a `Sparkles` fallback: never `React.createElement(userString)`,
+  never a dynamic import, never an `<img src>`.
+- The eleven-key SET is pinned, not a count — dropping or renaming a key silently degrades every
+  Expert whose author chose it, so case (5) compares the sorted key list.
+
+**Driven, not asserted.** The file was first committed as a stub that still guessed from `name`;
+case (4) failed with `lucide-chart-column` where it demanded `lucide-sparkles`. Its suite is adopted
+into **both** count-gate knobs in the same commit (`src/components/experts` has no bare-directory
+TARGETS entry).
+
 ⭐ **The row goes in at creation, not at the third phase.** An absent row is invisible to G-5 at any commit count, and this repository has paid for that four times (`App.tsx` 23 phases, `NavPanel.tsx` 11, `backend/app/config.py` its entire life, `frontend/src/lib/api.ts` — the hottest file in the repo, whose absence made a SUPERLATIVE in CLAUDE.md wrong for a structural reason). Precedent for adding at creation: `frontend/src/lib/workspaceAllowedExt.ts`.
 
-**Binding invariant:** young (created 262). Row added AT PLANNING. ⛔ The ONE home of expert-icon resolution, a CLOSED 11-key lucide map. It reads `icon` and never `slug`/`name` — that match IS the retired artefact
+**Binding invariant:** ⚠ `0/0/0` AT PLANNING; **measured `1/1/72` at 262-02**. ⛔ The ONE home of expert-icon resolution — a CLOSED 11-key lucide map. Reads `icon`, never `slug`/`name`: that match IS the retired artefact
 
 
 ---

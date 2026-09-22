@@ -164,7 +164,18 @@ const BASELINE = {
   "ChatArea.approval.test.tsx": 3,
   // ── Phase 260 (PACK-02 / PACK-03) — Consultant Expert UI & Action Tiles ──
   "ComposerExpert.test.tsx": 5,
-  "ExpertSpotlightCard.test.tsx": 5,
+  // ⬆ 5 → 9 at 262-02 (D-262-06 / RESEARCH P-7). RAISED to the gate's own printed figure,
+  // never lowered: the four hardcoded demo-Expert sites this suite pinned were RETIRED, and
+  // the rewrite lands four cases MORE than the floor it replaced — the honest-empty tile, the
+  // icon read from the column, the iconless fallback, and the count/first-skill arms.
+  "ExpertSpotlightCard.test.tsx": 9,
+  // ── Phase 262 plan 02 (D-262-06) — the ONE home of expert-icon resolution ──
+  // ⛔ BOTH KNOBS, SAME COMMIT. `src/components/experts` has NO bare-directory TARGETS
+  // entry — its two existing suites are both named FILE-LEVEL just below — so a suite
+  // dropped into `src/components/experts/__tests__/` runs in NO gate until it is NAMED
+  // in TARGETS *and* pinned here. Case (5) pins the eleven-key map set; without this
+  // pin, dropping a key would silently degrade every Expert whose author chose it.
+  "expertIcon.test.tsx": 6,
   // ── Phase 261 (PACK-07 / PACK-09 / PACK-10) — Expert Authoring Studio & Org Management ──
   "OrgExpertsTab.test.tsx": 5,
   // ⬆ 4 → 14 in 263-04: sketch 263 variant A's ten cases (both headed groups, the
@@ -4388,6 +4399,10 @@ const TARGETS = [
   // ── Phase 260 (PACK-02 / PACK-03) — Consultant Expert UI & Action Tiles ──
   "src/components/chat/__tests__/ComposerExpert.test.tsx",
   "src/components/chat/__tests__/ExpertSpotlightCard.test.tsx",
+  // ── Phase 262 plan 02 (D-262-06) — the ONE home of expert-icon resolution ──
+  // Named FILE-LEVEL, deliberately NOT the bare directory `src/components/experts`,
+  // matching how its two siblings below are already reached. Both knobs, same commit.
+  "src/components/experts/__tests__/expertIcon.test.tsx",
   // ── Phase 261 (PACK-07 / PACK-09 / PACK-10) — Expert Authoring Studio & Org Management ──
   "src/components/experts/__tests__/OrgExpertsTab.test.tsx",
   "src/components/experts/__tests__/ExpertAuthoringStudio.test.tsx",
