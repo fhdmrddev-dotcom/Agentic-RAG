@@ -170,19 +170,45 @@ def _top_level_branches(predicate: str) -> list[str]:
 # ---------------------------------------------------------------------------
 # Phase 263 (PACK-17) — the NEGATIVE half of the born-for-Expert provenance arm.
 #
-# Migration 191 adds ``public.skills.born_for_expert_bundle_id``. The Expert-side
-# resolver reads it as a third disjunct (D-263-06), and that arm lives in
-# ``expert_service.filter_visible_skill_names`` — deliberately NOT here, because
-# THIS module is the one home of the AGENT-side rule, imported by
-# ``tool_dispatcher`` (five call sites) and ``harness/grounding.py``. Widening it
-# here would widen skill resolution for the agent loop and for workflow grounding,
-# which is the exact shape of SEED-125.
+# ⛔ RETIRED DELIBERATELY BY PHASE 264 (D-264-02 / SEED-177; precedent D-206-07).
+# The original paragraph is kept VERBATIM below rather than deleted, because a
+# fence whose reason quietly changes is how a project stops knowing what its
+# guards mean. What follows it is what is now true, and why.
 #
-# So the property these cases pin is an ABSENCE: a row carrying the new column,
-# even with the most privileged value it can hold, must be exactly as invisible
-# cross-org as it was before the column existed. BOTH encodings are driven, because
-# this module's own docstring says they MUST agree and a post-filter looser than the
-# query re-opens the leak the moment the query is bypassed, degraded, or widened.
+# THE ORIGINAL, as written at Phase 263:
+#
+#   "Migration 191 adds ``public.skills.born_for_expert_bundle_id``. The
+#   Expert-side resolver reads it as a third disjunct (D-263-06), and that arm
+#   lives in ``expert_service.filter_visible_skill_names`` — deliberately NOT
+#   here, because THIS module is the one home of the AGENT-side rule, imported by
+#   ``tool_dispatcher`` (five call sites) and ``harness/grounding.py``. Widening
+#   it here would widen skill resolution for the agent loop and for workflow
+#   grounding, which is the exact shape of SEED-125."
+#
+# WHAT CHANGED. The arm DID move here in Phase 264 — and the paragraph above was
+# right about an UNCONDITIONAL arm and wrong only about the shape it assumed.
+# ``build_skill_visibility_or`` / ``skill_row_visible`` now take an OPTIONAL
+# keyword-only ``expert_bundle_id``, defaulting to ``None``. An optional keyword
+# cannot widen a caller that does not pass it, so ``harness/grounding.py`` and
+# every dispatcher call site without an active Expert keep a predicate that is
+# byte-identical to its pre-264 self — and that is PROVABLE by the three frozen
+# literals above under ``==``, which is why this file's weak containment pins were
+# replaced. The argument is retired because a measurement replaced it, not because
+# anyone stopped believing it.
+#
+# ⚠ ``(five call sites)`` in the quoted original is ALSO wrong, measured
+# 2026-09-22: ``tool_dispatcher`` makes FOUR ``_resolve_skill_visibility_or``
+# calls feeding SIX ``.or_()`` applications. It is left standing inside the quote
+# and corrected here, never edited inside the quotation.
+#
+# So the property the DEFAULT-PATH cases below pin is still an ABSENCE: a row
+# carrying the new column, even with the most privileged value it can hold, must
+# be exactly as invisible cross-org as it was before the column existed WHEN NO
+# BUNDLE IS SUPPLIED. BOTH encodings are driven, because this module's own
+# docstring says they MUST agree and a post-filter looser than the query re-opens
+# the leak the moment the query is bypassed, degraded, or widened. The opt-in
+# direction — what the SAME rows do when a bundle IS supplied — is driven in
+# tests/unit/test_264_one_home_born_for_predicate.py against one shared table.
 # ---------------------------------------------------------------------------
 
 _BUNDLE = "33333333-3333-3333-3333-333333333333"
@@ -223,13 +249,30 @@ def test_born_for_marker_does_not_widen_cross_org_visibility_row_encoding():
 
 
 def test_born_for_marker_does_not_admit_another_users_private_same_org_skill():
-    """Same org, another author, not shared, marker set -> still invisible HERE.
+    """Same org, another author, not shared, marker set -> still invisible ON THE DEFAULT PATH.
 
-    ⛔ A DELIBERATE ASYMMETRY, and the reason it is safe: the Expert resolver DOES
-    admit this row (D-263-06), because an Expert is a scope its author opted the skill
-    into. The agent loop has no such scope, so admitting it here would hand every
-    Expert-authored skill in the org to every user's ordinary chat. The two predicates
-    may differ ONLY in this direction — Expert-side wider, agent-side byte-unchanged.
+    ⛔ RETIRED DELIBERATELY BY PHASE 264 (D-264-02 / SEED-177; precedent D-206-07).
+    The assertion below is BYTE-UNCHANGED and still passes: it calls
+    `skill_row_visible` with no `expert_bundle_id`, which is the default path. It is
+    the stated REASON that was refuted, not the result — so the original reason is
+    kept verbatim and answered, never edited away.
+
+    THE ORIGINAL, as written at Phase 263:
+
+      "⛔ A DELIBERATE ASYMMETRY, and the reason it is safe: the Expert resolver DOES
+      admit this row (D-263-06), because an Expert is a scope its author opted the skill
+      into. The agent loop has no such scope, so admitting it here would hand every
+      Expert-authored skill in the org to every user's ordinary chat. The two predicates
+      may differ ONLY in this direction — Expert-side wider, agent-side byte-unchanged."
+
+    WHAT CHANGED. "The agent loop has no such scope" became FALSE the moment an Expert
+    is active on a run: Phase 264-01 gave `RunContext`/`ToolContext` a
+    `born_for_bundle_id` carrying the access-checked bundle, so the loop DOES have the
+    scope — for exactly as long as that Expert is the active consultant. What survives
+    intact is the consequence the paragraph cared about: an ordinary chat with NO Expert
+    active still sees nothing new, because the keyword is not passed. The asymmetry
+    moved from "different modules" to "different arguments to the same function", and
+    the sibling case below is the opt-in half of this same row.
     """
     same_org_private_marked = {
         "is_system": False,
@@ -239,3 +282,41 @@ def test_born_for_marker_does_not_admit_another_users_private_same_org_skill():
         "born_for_expert_bundle_id": _BUNDLE,
     }
     assert _skill_row_visible(same_org_private_marked, caller_id=_UID, org_ids={_ORG_A}) is False
+
+
+def test_born_for_marker_DOES_admit_that_row_once_the_bundle_is_supplied():
+    """The opt-in half of the case above — the same row, the same caller, one kwarg.
+
+    D-264-01: the Expert-side widening that Phase 263 put in `expert_service` now lives
+    in the shared module as an OPTIONAL argument, so this row's visibility is decided by
+    whether the caller has an active Expert rather than by which module is asking. A
+    green here plus a green above is the whole safety argument, executable: the rule got
+    wider in exactly one direction and only for callers who opted in.
+    """
+    same_org_private_marked = {
+        "is_system": False,
+        "org_id": _ORG_A,
+        "user_id": _OTHER_USER,
+        "is_org_shared": False,
+        "is_enabled": True,
+        "born_for_expert_bundle_id": _BUNDLE,
+    }
+    assert (
+        _skill_row_visible(
+            same_org_private_marked,
+            caller_id=_UID,
+            org_ids={_ORG_A},
+            expert_bundle_id=_BUNDLE,
+        )
+        is True
+    )
+    # ...and a DIFFERENT active Expert still does not reach it.
+    assert (
+        _skill_row_visible(
+            same_org_private_marked,
+            caller_id=_UID,
+            org_ids={_ORG_A},
+            expert_bundle_id="44444444-4444-4444-4444-444444444444",
+        )
+        is False
+    )
