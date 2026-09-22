@@ -77,3 +77,12 @@ existing seam and no new branch structure:
 ⚠ **Owed:** the hot-file ledger triples for these files (and `api/experts.py`, `api/schedules.py`,
 `db/rates.py`, `pricing_service.py`) were not re-derived in the same commits — the same-commit sync
 rule was not met. Re-derive at the next phase that touches any of them.
+
+---
+
+## Post-close deploys
+
+| When | production | What | Verified |
+|---|---|---|---|
+| 2026-09-23 02:50 | `805360fef` | BUG-260923-02 pagination — Spend ledger, Library Health stale docs, Ingestion History, checked queries (frontend only) | new bundle live (unique string probe); backend /health 200. Browser check by operator owed |
+
