@@ -10633,9 +10633,9 @@ cells rot within days.
 | [`frontend/src/lib/api/experts.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiexpertsts) | 5 / 3 / 298 | ⚠ **NOW FIRES — 3 phases** | ⛔ row STALE at `2/2/186` reading `no`/`young`; CROSSED the threshold here. honoured by construction (**263-03**): the 422 arm is ONE helper at 2 call sites; `handleResponse` byte-unchanged. |
 | [`backend/app/db/experts.py`](docs/HOT-FILE-LEDGER.md#backendappdbexpertspy) | 4 / 3 / 567 | ⚠ **NOW FIRES — 3 phases** | ⛔ row was STALE at `2/2/492` reading `no (new)`; it CROSSED the threshold in this very commit. honoured by construction (**263-01**): ONE new UPDATE, no existing query touched. |
 | [`backend/app/models/expert.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsexpertpy) | 3 / 3 / 93 | ⚠ **NOW FIRES — 3 phases** | ⛔ row was STALE at `2/2/79` reading `no (new)` / `young`; it CROSSED the threshold here. honoured by construction (**263-03**): ONE new request model, zero existing model touched. |
-| [`backend/app/services/expert_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesexpert_servicepy) | 6 / 4 / 507 | ⛔ **FIRES — 4 phases** | ⚠ row STALE a 2nd time (`5/3/378`). honoured by construction (**263-01**): ONE disjunct INSIDE the existing inner parenthesis + one SELECT column; the `org_id` fence sits above it, RED-driven. |
+| [`backend/app/services/expert_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesexpert_servicepy) | 8 / 5 / 551 | ⛔ **FIRES — 5 phases** | ⚠ row STALE a 4th time (`6/4/515`). honoured by construction (**264-02**): the hand-rolled 4th disjunct DELETED, delegating to `skill_row_visible`. ⛔ independent encodings of the rule must stay **1** |
 | [`backend/app/api/experts.py`](docs/HOT-FILE-LEDGER.md#backendappapiexpertspy) | 9 / 3 / 585 | ⛔ **FIRES — 3 phases** | ⚠ row STALE a 3rd time (`8/3/560`). **263-REVIEW CR-02/03**: both `/draft` asset queries leaked on the BYPASSRLS pool; now mirror the LIVE policies. ⛔ connections unchanged — org-only, MEASURED. |
-| [`backend/app/utils/skill_visibility.py`](docs/HOT-FILE-LEDGER.md#backendapputilsskill_visibilitypy) | 1 / 1 / 83 | no (1 phase) | ⚠ **absent its ENTIRE LIFE — row added at 264 PLANNING.** ⛔ ONE rule, TWO encodings that MUST agree; a widening nests INSIDE the org gate, never a 4th branch. |
+| [`backend/app/utils/skill_visibility.py`](docs/HOT-FILE-LEDGER.md#backendapputilsskill_visibilitypy) | 3 / 2 / 209 | no (2 phases) | ⚠ the row added at 264 PLANNING read `1/1/83` and was stale by that phase's own close. **264-02/04**: optional `expert_bundle_id` on both encodings; ⛔ the default arm is pinned byte-identical by `==` |
 | [`frontend/src/components/chat/ActiveExpertChip.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatactiveexpertchiptsx) | 0 / 0 / 0 | no (new) | young (created Phase 260). Row added AT CREATION — leaf component for active consultant chip. |
 | [`frontend/src/components/chat/ExpertSpotlightCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatexpertspotlightcardtsx) | 0 / 0 / 0 | no (new) | young (created Phase 260). Row added AT CREATION — leaf component for hero spotlight card and action tiles. |
 | [`frontend/src/components/chat/InviteExpertDialog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatinviteexpertdialogtsx) | 0 / 0 / 0 | no (new) | young (created Phase 260). Row added AT CREATION — leaf component for expert invitation modal. |
@@ -10835,13 +10835,13 @@ cells rot within days.
 | [`frontend/src/hooks/useDocuments.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusedocumentsts) | 8 / 3 / 120 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent at 3 phases. Realtime is a hint, not truth — it reconciles by fetch (D-v2.5-03), and `table_count`/`image_count`/`chunk_count` are server-side |
 | [`frontend/src/pages/KnowledgeHealthPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesknowledgehealthpagetsx) | 12 / 6 / **DELETED** | ⚠ **FIRES** | **RETIRED (217.1-14)** — the Library's Health tab absorbed it; `ChatLayout`'s fallback replaced by `UnknownViewFallback` (`:871`). ⚠ absent for its ENTIRE LIFE |
 | [`backend/app/api/knowledge_health.py`](docs/HOT-FILE-LEDGER.md#backendappapiknowledgehealthpy) | 11 / 6 / 737 | ⚠ **FIRES** | honoured by construction (**217.1-11**) — adds `could_not_search`; `retrieval_count` byte-unchanged. ⚠ absent at **6 phases**. Audit-analytics from `audit_log`. Service-role by exception |
-| [`backend/app/services/agent_loop.py`](docs/HOT-FILE-LEDGER.md#backendappservicesagent_looppy) | 45 / 21 / 3326 | ⚠ **FIRES** | ⚠ row STALE again (`44/21/3303`). honoured by construction (**250-01**): the empty-output branch gains a 4-arm taxonomy + ONE never-reset counter beside the existing reset. ⛔ no provider branch |
+| [`backend/app/services/agent_loop.py`](docs/HOT-FILE-LEDGER.md#backendappservicesagent_looppy) | 52 / 26 / 3501 | ⚠ **FIRES** | ⚠ row STALE at `45/21/3326` — by FIVE phases. honoured by construction (**264-01**): ONE default-None field, one bind, two build kwargs, ZERO branches. ⛔ prompt-assembly seam UNTOUCHED, still OWED |
 | [`backend/app/services/context_window.py`](docs/HOT-FILE-LEDGER.md#backendappservicescontext_windowpy) | 10 / 5 / 602 | ⚠ **FIRES** | ⚠ absent for its ENTIRE LIFE at 5 phases — row added 250-01. honoured by construction: ONE removal-ORDER rule inside one private helper. ⛔ `_build_candidate` byte-unchanged |
-| [`backend/app/services/run_producer.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_producerpy) | 5 / 3 / 749 | ⚠ **FIRES — STATE CHANGE** | ⛔ row STALE at `3/2/693` AND its verdict `below` is now WRONG: 3 phases, so G-5 FIRES. Re-derived 256-02; NOT modified by 256-02 — it is the shape METER-03 COPIES |
+| [`backend/app/services/run_producer.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_producerpy) | 11 / 6 / 932 | ⚠ **FIRES** | ⚠ row STALE at `5/3/749` — by THREE phases, on a row already carrying a "verdict WRONG" correction. honoured by construction (**264-01**): the 4-tuple widens to 5; ⛔ the 5th value is ACCESS-CHECKED |
 | [`backend/app/services/todos_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicestodos_servicepy) | 4 / 3 / 187 | ⚠ **FIRES** | ⚠ absent for its ENTIRE LIFE at 3 phases — row added 250-02, which leaves the file BYTE-UNCHANGED. ⛔ `_RUN_ENDED_MARKER` is now bound by a frontend `?raw` fence |
 | [`frontend/src/components/panel/TodosSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspaneltodossectiontsx) | 11 / 6 / 337 | ⚠ **FIRES** | ⚠ row STALE (`6/4/210`) — 250 and 252 touched it, +127 L. NOT modified by 253; re-derived under CR-08. Absent for its entire life until 250-03 |
 | [`frontend/src/components/panel/todoRunHonesty.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspaneltodorunhonestyts) | 1 / 1 / 104 | new | young (created 250-03). Row added AT CREATION. ⛔ the ONE home of *is this row still honest?*; its marker copy is `?raw`-fenced to `todos_service.py` or the strip silently no-ops |
-| [`backend/app/services/tool_dispatcher.py`](docs/HOT-FILE-LEDGER.md#backendappservicestool_dispatcherpy) | 85 / 35 / 5048 | ⚠ **FIRES** | ⚠ row STALE again (`84/35/4966`). honoured by construction (**244-14/WR-03**): `already` is written on SUCCESS or after a CAPPED give-up; every attempt is NAMED. Traversal fence byte-unchanged |
+| [`backend/app/services/tool_dispatcher.py`](docs/HOT-FILE-LEDGER.md#backendappservicestool_dispatcherpy) | 89 / 38 / 5169 | ⚠ **FIRES** | ⚠ THREE figures wrong at once: the row `85/35/5048`, the plan `87/37/5082`, 264-03 `88/38/5093`. honoured by construction (**264-03**): 1 kw-only param, 3 sites opt IN, 1 refuses IN SOURCE. seam OWED |
 | [`backend/app/api/document_governance.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentgovernancepy) | 5 / 3 / 416 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent at 3 phases. ⚠ Its low-confidence cutoff is the ConfidenceChip tier (**0.5**) — a DIFFERENT measure from `knowledge_health`'s **0.38** retrieval similarity |
 | [`frontend/src/pages/GovernancePage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesgovernancepagetsx) | 4 / 1 / 355 | no (1 phase) | young (119) — ⚠ row added because it is being MERGED into the Library (operator, 2026-08-28); it is feature-gated while Documents is not, so the gate must move with it |
 | [`frontend/src/components/ingestion/DocumentUpload.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestiondocumentuploadtsx) | 10 / 1 / 144 | no (1 phase) | young (056) — ⚠ absent for its entire life. ⛔ It reports NO byte progress (`onUploadProgress` absent), so any upload percentage is unknowable |
@@ -10929,7 +10929,7 @@ cells rot within days.
 | [`.github/workflows/backend-tests.yml`](docs/HOT-FILE-LEDGER.md#githubworkflowsbackend-testsyml) | 4 / 2 / 84 | no (2 phases) | ⚠ absent for its ENTIRE LIFE — row added 253-03. `.github/` is EXEMPT. ⛔ its `paths:` decide which fences a change is measured by; two `scripts/` files were read by unit tests and matched by none |
 | [`.claude/settings.json`](docs/HOT-FILE-LEDGER.md#claudesettingsjson) | 9 / 4 / 202 | ⚠ **FIRES** | ⚠ **absent from BOTH registers its ENTIRE LIFE at 4 phases — rows added 253-03.** `.claude/` is EXEMPT: no gate could ask. The ONE hook dispatch table; a too-narrow `matcher` fires NEVER, in silence |
 | [`backend/app/services/circuit_breaker.py`](docs/HOT-FILE-LEDGER.md#backendappservicescircuit_breakerpy) | 1 / 1 / 331 | no (1 phase) | ⚠ absent its ENTIRE LIFE — row added 256-02 at 256-01's touch, BELOW threshold. ⛔ the `max(0,…)` clamp stays on the RETURNED delta, or a reset box hands the DB a negative and SUBTRACTS real spend |
-| [`backend/app/services/task_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicestask_servicepy) | 19 / 10 / 958 | ⚠ **FIRES** | ⛔ **FIRES at 10 phases and absent from BOTH registers its ENTIRE LIFE — row added 256-02, which does NOT modify it.** The canonical two-arm usage reader METER-06 mirrors; no gate could demand it |
+| [`backend/app/services/task_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicestask_servicepy) | 20 / 11 / 970 | ⚠ **FIRES** | ⚠ the row was ACCURATE at 264 research (`19/10/958`) and **264-01 made it stale inside the same phase**. honoured by construction: ONE `sub_ctx` kwarg, read from `parent_ctx`, never re-derived |
 | [`backend/app/services/run_reconciler.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_reconcilerpy) | 3 / 2 / 325 | no (2 phases) | ⚠ absent its ENTIRE LIFE — row added 256-02; NOT modified by 256 (D-256-08 site #7 is REGISTERED, not fixed). ⛔ its BOOT sweep NULLs a `cap_paused` run's real totals — `SEED-297` |
 | [`backend/app/services/forced_emit.py`](docs/HOT-FILE-LEDGER.md#backendappservicesforced_emitpy) | 10 / 6 / 705 | ⚠ **FIRES** | ⚠ **FIRES at 5 phases, absent from BOTH registers its ENTIRE LIFE — row added 256-04, in its FIRST edit's commit (O-6).** honoured by construction. ⛔ accumulators init `None` never `0`, above the loop |
 | [`backend/app/services/pricing_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicespricing_servicepy) | 2 / 1 / 103 | no (new) | young (created 257-01). The single home of token-to-USD conversion (METER-02 / D-257-13). CostResult with Decimal arithmetic and None on unrated. |
@@ -16289,11 +16289,40 @@ assertion and must count, or a deliberately-disabled capability looks untouched 
 
 ## `backend/app/utils/skill_visibility.py`
 
-**`1 / 1 / 83`** — created by Phase 182 (CR-01). **Row added at 264 PLANNING, before the first
-edit**, because the file had **no row for its entire life**: `backend/app/` is WATCHED and
-`app/utils/` is not EXEMPT (`scripts/check-hot-file-ledger.cjs:51-66`), so G-5 could never have
-fired on it at any count. The `settingsSearchPayload.ts` / `workspaceAllowedExt.ts` precedent —
-an absent row is invisible to its own guardrail, and the count is not what makes it invisible.
+**`3 / 2 / 209`** — re-derived at Phase 264's CLOSE (`264-04`, after all four plans merged).
+⚠ **The row added at 264 PLANNING read `1 / 1 / 83`, and it was STALE before that same phase
+finished** — `264-02` widened the module (`+126` lines, its SECOND phase) and `264-04` corrected
+its docstring. The original figure is recorded here rather than overwritten, because a row going
+stale INSIDE the phase that created it is the sharpest possible illustration of this ledger's own
+most-repeated finding. **G-5 does NOT fire (2 phases)**; the row exists anyway, and that is the
+point — an absent row is invisible to its own guardrail at any count.
+
+**Shipped disposition (`264-02` / `264-04`), honoured by construction.** Both encodings gained one
+**optional keyword-only** `expert_bundle_id: str | None = None`. `build_skill_visibility_or` emits
+`,and(born_for_expert_bundle_id.eq.<bundle>,is_enabled.is.true)` as a THIRD disjunct **inside** the
+existing inner `or(...)`; `skill_row_visible` gained the same keyword with the matching three
+conjuncts. Zero new imports. No new branch in either function beyond the one guarded disjunct.
+`expert_service.filter_visible_skill_names` now **delegates** here instead of hand-rolling a fourth
+disjunct, so independent encodings of the rule across `backend/app` measure **1** (AST-counted; it
+read **2** before the delegation).
+
+**Invariants this phase ADDED to the list below, each RED-driven:**
+
+⛔ **The DEFAULT arm is pinned byte-identical by `==` against three frozen literals.** With
+`expert_bundle_id` omitted the emitted predicate must be the same STRING it was pre-264 — that is a
+claim about a string, so it is asserted as a string, not by containment. ⚠ `264-02` measured a
+containment pin firing *by luck* (an appended term displaced the trailing `)`): **a closing paren is
+not a safety property.**
+
+⛔ **The born-for disjunct carries its OWN `is_enabled.is.true`** (Form 2 / T-264-15), because two
+of the four dispatcher call sites — `_handle_read_skill_file` and `_handle_execute_code` — filter
+enablement **nowhere**. A bare arm here would make a DISABLED born-for skill's bundled bytes
+readable. Driven by deleting the term: both disabled-refusal cases go red and a planted sandbox
+injection prints the file.
+
+⛔ **The empty-org arm returns BEFORE the bundle is read**, so `build_skill_visibility_or(u, set())`
+is still exactly `is_system.eq.true` **even when a widening argument is supplied** — with no org gate
+there is nothing to nest inside.
 
 **What it owns.** The ONE org-gated skill-visibility rule, for every skill read that runs on the
 **service-role (BYPASSRLS)** Supabase client — where `auth.uid()` and `current_user_org_ids()`
@@ -16339,3 +16368,159 @@ from visibility and only some call sites filter on it. Measured — `_handle_loa
 `.eq("is_enabled", True)`; `_handle_read_skill_file` and `_handle_execute_code` add **no
 enablement term at all**. Any arm added here that has no such compensation at its call sites
 must carry its own enablement term, or a disabled skill's files become readable.
+
+
+## ⚠ PHASE 264 CLOSE (`264-04`) — SIX TRIPLES RE-DERIVED AFTER THE LAST MERGE, FIVE OF THEM STALE
+
+Measured 2026-09-22 at `a34372f76`, **after all four plans merged**, with the CLAUDE.md recipe
+(six-digit dated quick-task buckets subtracted — `tool_dispatcher.py` alone drops `260529` and
+`260705`, so its 40 numeric buckets are 38 phases). ⛔ A triple measured mid-phase is stale by the
+close, which is why this section exists and why none of these figures was copied forward from
+`264-RESEARCH.md §7`.
+
+| File | CLAUDE.md row SAID | RESEARCH §7 measured (mid-phase) | **re-derived at CLOSE** |
+|---|---|---|---|
+| `backend/app/services/tool_dispatcher.py` | 85 / 35 / 5048 | 87 / 37 / 5082 | **89 / 38 / 5169** |
+| `backend/app/services/agent_loop.py` | 48 / 22 / 3441 | 51 / 25 / 3473 | **52 / 26 / 3501** |
+| `backend/app/services/run_producer.py` | 5 / 3 / 749 | 9 / 5 / 899 | **11 / 6 / 932** |
+| `backend/app/services/expert_service.py` | 6 / 4 / 515 | 7 / 4 / 515 | **8 / 5 / 551** |
+| `backend/app/services/task_service.py` | 19 / 10 / 958 | 19 / 10 / 958 *(accurate then)* | **20 / 11 / 970** |
+| `backend/app/utils/skill_visibility.py` | 1 / 1 / 83 *(added at PLANNING)* | 1 / 1 / 83 | **3 / 2 / 209** |
+
+⭐ **THE MOST USEFUL COLUMN IS THE MIDDLE ONE.** `tool_dispatcher.py` had **three** published
+figures and all three were wrong by the close — the row's `85/37/5048`, the plan's `87/37/5082` and
+`264-03`'s own `88/38/5093` (taken at its base, before its edits landed). `task_service.py` is the
+sharper case: its row was **ACCURATE** when RESEARCH measured it, and `264-01` made it stale inside
+the same phase. **"The row matches what I measured" is a statement with a timestamp on it.**
+
+⛔ **NO NAMED SEAM IS DISCHARGED BY THIS PHASE, AND NONE IS CLAIMED.** `agent_loop.py`'s standing
+seam (the prompt-assembly block — six conditional appends deep inside one 400-line branch) is
+**untouched**: the whole-phase diff on that file is four hunks totalling 28 insertions, none of them
+in prompt assembly. `tool_dispatcher.py`'s seam (a `skills`-resolution module, if a FIFTH resolution
+site ever appears) is likewise still OWED — the count is still four. `expert_service.py` got
+**tighter**, not extracted.
+
+### `backend/app/services/tool_dispatcher.py` — Phase 264 (`264-03`), honoured by construction
+
+**`89 / 38 / 5169`** · **G-5 FIRES at 38 phases.**
+
+`_resolve_skill_visibility_or` gained ONE keyword-only parameter, `born_for: bool = False`. Three of
+its four call sites pass `born_for=True`; the fourth states its refusal **in source**. Nothing else:
+no new handler, no new query, no new branch inside any handler, and **no `.or_()` application line
+moved** (`git diff -U0 | grep "^[-+].*\.or_("` is empty across the phase).
+
+⛔ **`born_for` IS THE DECISION, and that is why it is a keyword rather than an unconditional read.**
+A resolver that simply read `ctx.born_for_bundle_id` would have widened **all four** sites by
+OMISSION — including `_handle_save_skill`'s lint corpus, which D-264-04 deliberately refuses. The
+explicit keyword makes each site's decision readable AT the site, so a widening cannot happen by
+silence. Fenced at exactly three opting-in sites by an **AST `ast.keyword` count**, never a grep: the
+resolver's own docstring quotes the token, so `grep -c "born_for=True"` reads 5 against correct code.
+
+⛔ **The bundle is passed THROUGH, never re-derived here.** `str(...)` coercion happens at this seam
+(`ToolContext` types the field `UUID | None`; `app.utils.skill_visibility` annotates `str | None`).
+A term composed here would make the one-home count fence in
+`tests/unit/test_264_one_home_born_for_predicate.py` name this module.
+
+⛔ **The read is `getattr(ctx, "born_for_bundle_id", None)`, never a bare attribute.** Three existing
+suites build duck-typed `ToolContext`-shaped stubs that predate the field, and an `AttributeError`
+here is swallowed by the `save_skill` lint wrapper and the `execute_code` outer guard rather than
+surfacing.
+
+⛔ **`_handle_load_skill` resolves the filter ONCE and reuses it on the miss branch.** That is what
+keeps `available_skills` built from the SAME filter as the primary query, so it can never name a set
+the query would not admit. Re-deriving it there would silently re-open half the defect while every
+outcome test stayed green (T-264-14).
+
+⚠ **Applications, re-measured at the close: SEVEN, not six** — `:1373`, `:1401`, `:1533`, `:1671`,
+`:1683`, `:2293`, `:2305`, from **four** call sites at `:1369`, `:1529`, `:1666`, `:2283`. The
+enumeration in `RESEARCH §2.3` (and, quoting it, this module's neighbour docstring) omitted
+`_handle_save_skill`'s `.or_(_sibling_filter)`. The `four call sites` figure is CORRECT and every
+D-264-04 decision rests on it. Pinned at 7 by `test_no_or_application_line_moved`.
+
+⚠ **The file is CRLF in a worktree and `cat -A` under Git Bash prints a bare `$`.** A
+`read_bytes().decode()` plant pattern written with `\n` matched ZERO times against correct code.
+**Read the bytes; do not trust `cat -A` here.**
+
+### `backend/app/services/agent_loop.py` — Phase 264 (`264-01`), honoured by construction
+
+**`52 / 26 / 3501`** · **G-5 FIRES at 26 phases.** ⚠ The CLAUDE.md row was stale at `48 / 22 / 3441`
+and this file's own scan row at `45 / 21 / 3326` — **the two registers disagreed with each other**,
+which is worse than either being merely old.
+
+`RunContext` gained ONE additive `born_for_bundle_id: UUID | None = None` after `scoped_folder_path`;
+it is bound ONCE beside `skill_instructions_override` and passed into **both** `ToolContext` builds
+(resume + primary per-iteration). 28 insertions, 0 deletions, 4 hunks. **Zero branches read it here.**
+
+⛔ **BOTH builds or neither.** A field set at the primary build and not the resume build yields a run
+whose scope depends on whether it resumed (T-264-02). Driven RED by deleting one of the two.
+
+⛔ **The field is named for the mig-191 COLUMN, not for the Expert.** The PACK-01 Closed-Core
+Invariant AST fence forbids the `ast.Name` `expert_bundle_id` anywhere in this module, and it was
+re-driven (not inherited) against a planted violation. ⚠ It also forbids the name in a **grep**
+criterion that a comment can satisfy: a comment naming the column verbatim read as a violation while
+the AST fence was green.
+
+⛔ **The prompt-assembly seam is UNTOUCHED and STILL OWED.** Say so explicitly, or a reader takes an
+absent note for a discharge.
+
+⚠ **`SEED-129` (open, high) does NOT attach.** Its third re-open trigger fires on any phase touching
+the Deep skill-catalog block (base `:1435`, now `:1445` after this phase's +18 line shift), which
+still carries the pre-SEED-125 flat predicate on the service-role client. **Proven, not assumed:**
+the 161-line region base `1400-1560` and HEAD `1418-1578` are md5-identical (`20cc514d…`).
+
+### `backend/app/services/run_producer.py` — Phase 264 (`264-01`), honoured by construction
+
+**`11 / 6 / 932`** · **G-5 FIRES at 6 phases.** ⚠ Row stale at `5 / 3 / 749` — by THREE phases, on a
+row that ALREADY carried a *"the verdict `below` is now WRONG"* correction. A row can be corrected
+and go stale again in the same year.
+
+`_resolve_thread_scoping` widened from a 4-tuple to a 5-tuple. The no-consultant arm returns five
+`None`s; the `except` arm still re-raises, so **no 4-tuple path survives**. Both `RunContext` builds
+— Deep **and** continuation — pass `born_for_bundle_id=_born_for`.
+
+⛔ **The fifth value is `resolved.bundle_id` — the id `resolve_expert_bundle` already ACCESS-CHECKED
+— never the raw `active_expert_id` read off the thread row** (T-264-01). The two are easy to confuse
+and only one of them has been through the org/visibility check. Pinned by source assertion.
+
+⚠ **The arity change is the BASELINE risk, not the predicate.** TWELVE sites unpack this tuple; ten
+are in `tests/unit`. The RED moved the gate `71 → 80`, not the predicted `81`, because one test
+function unpacks TWICE — **the count of SITES and the count of NODE IDS are different numbers.**
+
+### `backend/app/services/expert_service.py` — Phase 264 (`264-02`), honoured by construction
+
+**`8 / 5 / 551`** · **G-5 FIRES at 5 phases.** ⚠ Row stale a FOURTH time (`6 / 4 / 515`; `6/4/507`
+and `5/3/378` before that).
+
+`filter_visible_skill_names`'s hand-rolled fourth disjunct is **gone**, delegating to
+`skill_row_visible`. This is a TIGHTENING, not an extraction — the named seam is not discharged.
+
+⛔ **Independent encodings of the visibility rule across `backend/app` must stay at 1.** An AST walk
+counts structural encoding shapes (f-string DSL operand / row `.get()`); it read **2** before the
+delegation and reads **1** after. A second copy is the drift `app/utils/skill_visibility.py` exists
+to prevent.
+
+⛔ **The `is_sys` arm stays a separate `if`, and the `elif` still requires `s_enabled` before
+consulting the delegate** — that is what preserves the 263 semantics (a DISABLED born-for skill never
+reaches the catalog) by construction rather than by re-assertion.
+
+⛔ **Coercion happens ONCE at the seam, not per row.** This function reads via asyncpg (UUID objects)
+while `skill_row_visible` compares canonical strings; coercing inside the loop would be both slower
+and a second place for the `None == None` trap (T-263-02) to live.
+
+### `backend/app/services/task_service.py` — Phase 264 (`264-01`), honoured by construction
+
+**`20 / 11 / 970`** · **G-5 FIRES at 11 phases.** ⭐ **This row was ACCURATE when `264-RESEARCH.md §7`
+measured it (`19 / 10 / 958`) and `264-01` made it stale inside the same phase.** Recorded because it
+is the cleanest counter-example to *"the row agrees with my measurement, so it is current"*.
+
+ONE line: `born_for_bundle_id=parent_ctx.born_for_bundle_id`, beside the existing
+`skill_instructions_override` propagation, carrying the same structural-unreachability reason the
+096-02 / 099 CR-02 comments above it give.
+
+⛔ **The value comes from `parent_ctx`, never re-resolved.** A sub-agent inherits the parent's scope;
+resolving it again here would let a sub-agent's scope diverge from the run it belongs to. Driven RED
+by sourcing it from anywhere else.
+
+⛔ **NOT the `dead_gap_tokens_in_run=set()` fresh-per-sub-agent shape.** That field is a *mutable
+accumulator* deliberately reset for a sub-agent; this is an *immutable scope id* that must be
+inherited. Copying the neighbouring line's shape would have been exactly wrong.

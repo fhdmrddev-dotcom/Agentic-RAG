@@ -713,8 +713,8 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/builderStore.ts` | 14 / 8 / 968 | honoured by construction (193.2 / 197 / **214.1**) |
 | `frontend/src/components/panel/WorkspacePanel.tsx` | 16 / 10 / 646 | honoured by construction (194 / 194.1) |
 | `backend/app/services/run_lifecycle.py` | 8 / 4 / 748 | ⚠ row STALE at `6/3/459` — re-derived 256-02; +289 L unrecorded. NOT modified by 256 and ⛔ NOT the shape to copy (C-5): its `input_tokens=None` is a DEFAULT PARAM, not a site |
-| `backend/app/services/run_producer.py` | 5 / 3 / 749 | ⛔ row STALE at `3/2/693` AND its verdict `below` is now WRONG: 3 phases, so G-5 FIRES. Re-derived 256-02; NOT modified by it — it is the shape METER-03 COPIES |
-| `backend/app/services/task_service.py` | 19 / 10 / 958 | ⛔ **FIRES at 10 phases and absent from BOTH registers its ENTIRE LIFE — row added 256-02, which does NOT modify it.** The canonical two-arm usage reader METER-06 mirrors |
+| `backend/app/services/run_producer.py` | 11 / 6 / 932 | ⚠ row STALE at `5/3/749` — by THREE phases, on a row already carrying a "verdict WRONG" correction. honoured by construction (**264-01**): the 4-tuple widens to 5; ⛔ the 5th value is ACCESS-CHECKED |
+| `backend/app/services/task_service.py` | 20 / 11 / 970 | ⚠ the row was ACCURATE at 264 research (`19/10/958`) and **264-01 made it stale inside the same phase**. honoured by construction: ONE `sub_ctx` kwarg, read from `parent_ctx`, never re-derived |
 | `backend/app/services/run_reconciler.py` | 3 / 2 / 325 | ⚠ absent its ENTIRE LIFE — row added 256-02; NOT modified by 256 (D-256-08 site #7 is REGISTERED, not fixed). ⛔ its BOOT sweep NULLs a `cap_paused` run's real totals — `SEED-297` |
 | `backend/app/services/circuit_breaker.py` | 1 / 1 / 331 | ⚠ absent its ENTIRE LIFE — row added 256-02 at 256-01's touch, BELOW threshold. ⛔ the `max(0,…)` clamp stays on the RETURNED delta, or a reset box SUBTRACTS real spend |
 | `backend/app/api/runs.py` | 39 / 18 / 1736 | ⚠ row STALE a 3rd time (`38/17/1695`). **256-03 closed METER-05 here** — the two `input_tokens=None` finalize sites (`:677` ask_user re-drive, `:1331` continuation) now carry real totals |
@@ -798,8 +798,8 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/hooks/useDocuments.ts` | 8 / 3 / 120 | ⚠ absent at 3 phases. Realtime is a hint, not truth |
 | `frontend/src/pages/KnowledgeHealthPage.tsx` | 12 / 6 / **DELETED** | **RETIRED (217.1-14)** |
 | `backend/app/api/knowledge_health.py` | 11 / 6 / 737 | honoured by construction (**217.1-11**) |
-| `backend/app/services/agent_loop.py` | 48 / 22 / 3441 | ⚠ row was STALE at `44/21/3303`. honoured by construction (**BUG-260912-01**): ONE guarded `_emit` beside the reset that already knew. ⛔ emit BEFORE the reset, never after |
-| `backend/app/services/tool_dispatcher.py` | 85 / 35 / 5048 | ⚠ row STALE again (`84/35/4966`). honoured by construction (**244-14/WR-03**): `already` is written on SUCCESS or after a CAPPED give-up; the failure is named on EVERY attempt. Traversal fence byte-unchanged |
+| `backend/app/services/agent_loop.py` | 52 / 26 / 3501 | ⚠ row STALE at `48/22/3441` — by FOUR phases. honoured by construction (**264-01**): ONE default-None field, one bind, two build kwargs, ZERO branches. ⛔ prompt-assembly seam UNTOUCHED, still OWED |
+| `backend/app/services/tool_dispatcher.py` | 89 / 38 / 5169 | ⚠ THREE figures wrong at once: the row `85/35/5048`, the plan `87/37/5082`, 264-03 `88/38/5093`. honoured by construction (**264-03**): 1 kw-only param, 3 sites opt IN, 1 refuses IN SOURCE. seam OWED |
 | `backend/app/api/document_governance.py` | 5 / 3 / 416 | ⚠ absent at 3 phases. ⚠ Its low-confidence cutoff is the ConfidenceChi |
 | `frontend/src/components/ingestion/ViewsGroup.tsx` | 5 / 3 / 259 | ⚠ absent for its ENTIRE LIFE at **3 phases** |
 | `frontend/src/components/ui/tabs.tsx` | 3 / 3 / 78 | ⚠ absent for its ENTIRE LIFE |
@@ -834,11 +834,11 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/db/experts.py` | 4 / 3 / 567 | ⚠ **NOW FIRES at 3 phases and the row read `1/1/265` / `young`** — it crossed the threshold in the commit recording it. honoured by construction (**263-01**): ONE new UPDATE; ⛔ no existing query touched |
 | `backend/app/models/expert.py` | 4 / 3 / 131 | ⚠ row STALE (`3/3/93`). **WR-01/02/08**: create's caps MIRRORED onto `ExpertBundleUpdate`; `born_skills` on the REQUEST models only. ⛔ `default=None` stays — `exclude_unset` IS the partial PATCH | None` untouched — that None is the PATCH distinction |
 | `frontend/src/lib/api/experts.ts` | 5 / 3 / 313 | ⚠ row STALE (`5/3/298`). **WR-03/08**: `slug` REMOVED from `ExpertBundleUpdate` (immutable — operator 2026-09-22); `born_skills` on both request types. ⛔ the 422 arm still reads `detail.error` |
-| `backend/app/services/expert_service.py` | 6 / 4 / 515 | ⚠ row STALE a 3rd time (`6/4/507`). **WR-08**: both stamp sites read `born_skills`, never `member_skills` — ticking a long-standing PRIVATE skill used to share it org-wide |
+| `backend/app/services/expert_service.py` | 8 / 5 / 551 | ⚠ row STALE a 4th time (`6/4/515`). honoured by construction (**264-02**): the hand-rolled 4th disjunct DELETED, delegating to `skill_row_visible`. ⛔ independent encodings of the rule must stay **1** |
 | `backend/app/services/expert_authoring.py` | 5 / 2 / 393 | ⚠ absent from BOTH registers its ENTIRE LIFE — row added at WR-01, BELOW threshold, deliberately. ⛔ every string it emits is CAPPED to its consumer, or the app 422s on the Expert its own AI wrote |
 | `frontend/src/components/experts/ExpertAuthoringStudio.tsx` | 3 / 2 / 1550 | ⚠ absent its ENTIRE LIFE at 1550 L — row added at WR-03/04/05/08, BELOW threshold. ⛔ a failed grant REVOCATION is reported; an unread library is a THIRD banner state, never a clean one |
 | `backend/app/api/experts.py` | 9 / 3 / 605 | ⚠ row STALE a 4th time (`9/3/585`), SAME DAY. **CR-02/03 + WR-09**: the 2 leaky `/draft` queries mirror the live policies; the catch-all detail is a LITERAL, a taken slug 409s |
-| `backend/app/utils/skill_visibility.py` | 1 / 1 / 83 | ⚠ **absent its ENTIRE LIFE — row added at 264 PLANNING.** ⛔ ONE copy of the rule, TWO encodings that MUST agree; any widening nests INSIDE the org gate, never a 4th top-level branch |
+| `backend/app/utils/skill_visibility.py` | 3 / 2 / 209 | ⚠ the row added at 264 PLANNING read `1/1/83` and was stale by that phase's own close. **264-02/04**: optional `expert_bundle_id` on both encodings; ⛔ the default arm is pinned byte-identical by `==` |
 | `frontend/src/components/chat/ActiveExpertChip.tsx` | 0 / 0 / 0 | young (created 260). Row added AT CREATION — active consultant chip in composer (PACK-02) |
 | `frontend/src/components/chat/ExpertSpotlightCard.tsx` | 0 / 0 / 0 | young (created 260). Row added AT CREATION — spotlight card and action tiles (PACK-03) |
 | `frontend/src/components/chat/InviteExpertDialog.tsx` | 0 / 0 / 0 | young (created 260). Row added AT CREATION — expert invitation modal dialog (PACK-02) |
