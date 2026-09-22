@@ -14,7 +14,8 @@ builds a `_PassthroughQuery` whose `__getattr__` turns `select`/`or_`/`eq`/`orde
 correct predicate, a widened one and an absent one all return the same rows. That is exactly how
 the PACK-17 defect survived Phase 263. The fake here therefore **records AND filters**: `.or_()`
 stores its argument and narrows the seeded rows by evaluating it, and `.eq()` narrows too. A
-`grep -c "def __getattr__"` of this file must read `0`.
+A grep for a catch-all attribute-hook definition in this file must read `0` — and the token is
+never spelled out here, because a fence that trips on the sentence describing it is not a fence.
 
 The evaluator is IMPORTED from `tests/unit/test_264_one_home_born_for_predicate.py`, never copied:
 a second evaluator would be a second encoding of the rule, which is precisely what that file's
@@ -144,6 +145,8 @@ class _FakeSupabase:
 
 def _skill_row(
     *,
+    skill_id: str = "skill-1",
+    name: str = SKILL_NAME,
     user_id: str = _AUTHOR,
     is_org_shared: bool = False,
     is_enabled: bool = True,
@@ -156,8 +159,8 @@ def _skill_row(
     the org gate reads are added because this fake actually evaluates the gate.
     """
     return {
-        "id": "skill-1",
-        "name": SKILL_NAME,
+        "id": skill_id,
+        "name": name,
         "description": "writes the quarterly margin brief",
         "instructions": instructions,
         "user_id": user_id,
@@ -415,3 +418,300 @@ def test_no_or_application_line_moved():
     assert applications.count("_sibling_filter") == 1    # save_skill — NOT widened
     # and no application inlines a resolver call, which would break the one-await contract
     assert ".or_(await " not in src
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SC#1 — `load_skill` driven as a SAME-ORG NON-AUTHOR, against a real predicate
+# ─────────────────────────────────────────────────────────────────────────────
+_SHARED_NAME = "shared-helper"
+_SHARED_BODY = "Anyone in the org may use this one."
+
+
+def _two_skill_supabase() -> _FakeSupabase:
+    """One born-for PRIVATE skill by the author, one ORG-SHARED skill, one shared org.
+
+    The second row is what makes the miss-branch listing meaningful: a caller who is refused
+    the born-for skill must still be offered the one they CAN load, so an empty list would
+    pass a weaker assertion for the wrong reason.
+    """
+    return _FakeSupabase(
+        skills=[
+            _skill_row(),  # private, born for _BUNDLE, authored by _AUTHOR
+            _skill_row(
+                skill_id="skill-2",
+                name=_SHARED_NAME,
+                is_org_shared=True,
+                born_for_expert_bundle_id=None,
+                instructions=_SHARED_BODY,
+            ),
+        ],
+        skill_files=[{"filename": "margin.xlsx", "skill_id": "skill-1"}],
+        org_members=[
+            {"user_id": _AUTHOR, "org_id": _ORG},
+            {"user_id": _COLLEAGUE, "org_id": _ORG},
+        ],
+    )
+
+
+@pytest.mark.asyncio
+async def test_a_same_org_non_author_gets_the_instruction_BODY_of_a_born_for_skill():
+    """⭐ SC#1 — THE DEFECT, CLOSED. Positive control FIRST, then the target.
+
+    Phase 263 already admits this row at RESOLVE time, so the Expert's prompt NAMES the skill.
+    Before 264 the BODY was fetched through a predicate that had never heard of
+    `born_for_expert_bundle_id`, so every org member but the author fell into the miss branch
+    and was handed an error listing "loadable" names that EXCLUDED the one just promised.
+
+    The assertion is on the parsed `instructions` value — the full body string, by equality.
+    Never a status word, never a substring, never the name (RESEARCH §8.9).
+    """
+    # ── positive control: the AUTHOR can load its own skill. If this fails, nothing below
+    #    means anything — a fake that admits nothing would pass the target vacuously.
+    author_out = json.loads(
+        (
+            await td._handle_load_skill(
+                {"skill_name": SKILL_NAME},
+                _make_ctx(_two_skill_supabase(), caller=_AUTHOR, bundle=_BUNDLE),
+            )
+        ).result
+    )
+    assert author_out.get("instructions") == SKILL_BODY, (
+        f"positive-control failure: the author cannot load its OWN skill — {author_out}"
+    )
+
+    # ── the target: a same-org NON-AUTHOR, on a run with that Expert active.
+    sb = _two_skill_supabase()
+    colleague_out = json.loads(
+        (
+            await td._handle_load_skill(
+                {"skill_name": SKILL_NAME},
+                _make_ctx(sb, caller=_COLLEAGUE, bundle=_BUNDLE),
+            )
+        ).result
+    )
+
+    assert "error" not in colleague_out, (
+        f"PACK-17 is OPEN: a same-org non-author was refused the body of a skill the Expert's "
+        f"prompt already named — {colleague_out}"
+    )
+    assert colleague_out["instructions"] == SKILL_BODY
+    assert colleague_out["name"] == SKILL_NAME
+    # `load_skill` promises the bundled files by name — which is why read_skill_file widened too.
+    assert colleague_out["files"] == ["margin.xlsx"]
+
+    # ── and the predicate actually sent carries the born-for term NESTED in the org gate,
+    #    never as a fourth top-level branch (T-264-06).
+    sent = sb.predicates[0]
+    assert f"and(org_id.in.({_ORG})," in sent, sent
+    assert f"and(born_for_expert_bundle_id.eq.{_BUNDLE},is_enabled.is.true)" in sent, sent
+    assert sent.split("and(org_id.in.", 1)[1].count("born_for_expert_bundle_id") == 1, sent
+
+
+@pytest.mark.asyncio
+async def test_the_same_non_author_without_the_bundle_hits_the_miss_branch():
+    """No active Expert ⇒ no widening ⇒ the colleague's own private skill stays private.
+
+    This is the narrowness half of SC#1: the arm opens only while that Expert is the active
+    scope, and closes the moment it is not.
+    """
+    sb = _two_skill_supabase()
+    out = json.loads(
+        (
+            await td._handle_load_skill(
+                {"skill_name": SKILL_NAME},
+                _make_ctx(sb, caller=_COLLEAGUE, bundle=None),
+            )
+        ).result
+    )
+
+    assert "instructions" not in out, out
+    assert out["error"].startswith(f"Skill '{SKILL_NAME}' not found")
+    assert SKILL_NAME not in out["available_skills"], (
+        "the miss branch OFFERED the very skill the predicate refused"
+    )
+    assert out["available_skills"] == [_SHARED_NAME]
+
+
+@pytest.mark.asyncio
+async def test_the_miss_branch_listing_moves_with_the_SAME_filter_as_the_primary_query():
+    """T-264-14, behaviourally: `available_skills` can never name a different set.
+
+    Asked for a name that does not exist at all, the listing is exactly what the caller's
+    predicate admits — so it GROWS by the born-for row when the Expert is active and shrinks
+    back when it is not. Both directions, one test, because either alone is satisfiable by a
+    listing that ignores the bundle in the convenient direction.
+    """
+    sb_without = _two_skill_supabase()
+    without = json.loads(
+        (
+            await td._handle_load_skill(
+                {"skill_name": "no-such-skill"},
+                _make_ctx(sb_without, caller=_COLLEAGUE, bundle=None),
+            )
+        ).result
+    )
+    sb_with = _two_skill_supabase()
+    with_bundle = json.loads(
+        (
+            await td._handle_load_skill(
+                {"skill_name": "no-such-skill"},
+                _make_ctx(sb_with, caller=_COLLEAGUE, bundle=_BUNDLE),
+            )
+        ).result
+    )
+
+    # the handler `sorted(...)`s the names, so the born-for slug sorts FIRST here
+    assert without["available_skills"] == [_SHARED_NAME]
+    assert with_bundle["available_skills"] == sorted([_SHARED_NAME, SKILL_NAME])
+    assert SKILL_NAME in with_bundle["available_skills"]
+
+    # …and both branches inside ONE invocation applied the IDENTICAL predicate string.
+    assert len(sb_with.predicates) == 2, sb_with.predicates
+    assert sb_with.predicates[0] == sb_with.predicates[1]
+
+
+@pytest.mark.asyncio
+async def test_a_disabled_born_for_skill_is_refused_on_the_load_path():
+    """The born-for disjunct carries its own `is_enabled.is.true` (264-02, Form 2).
+
+    `load_skill` also applies `.eq("is_enabled", True)` of its own, so this case is belt AND
+    braces here — it is the two handlers that filter enablement NOWHERE that need the term,
+    and they are driven in `test_264_unchanged_sites_fenced.py`.
+    """
+    sb = _FakeSupabase(
+        skills=[_skill_row(is_enabled=False)],
+        skill_files=[],
+        org_members=[{"user_id": _COLLEAGUE, "org_id": _ORG}],
+    )
+    out = json.loads(
+        (
+            await td._handle_load_skill(
+                {"skill_name": SKILL_NAME},
+                _make_ctx(sb, caller=_COLLEAGUE, bundle=_BUNDLE),
+            )
+        ).result
+    )
+
+    assert "instructions" not in out, out
+    assert out["available_skills"] == []
+
+
+@pytest.mark.asyncio
+async def test_a_foreign_org_row_carrying_the_marker_is_still_refused():
+    """SEED-125 stands. The born-for arm is nested UNDER the org gate, so a disjoint-org row
+    with the same marker is invisible however the Expert is scoped."""
+    foreign = _skill_row()
+    foreign["org_id"] = "22222222-2222-2222-2222-222222222222"
+    sb = _FakeSupabase(
+        skills=[foreign],
+        skill_files=[],
+        org_members=[{"user_id": _COLLEAGUE, "org_id": _ORG}],
+    )
+    out = json.loads(
+        (
+            await td._handle_load_skill(
+                {"skill_name": SKILL_NAME},
+                _make_ctx(sb, caller=_COLLEAGUE, bundle=_BUNDLE),
+            )
+        ).result
+    )
+
+    assert "instructions" not in out, out
+
+
+@pytest.mark.asyncio
+async def test_the_handler_resolves_the_filter_exactly_ONCE_per_invocation(monkeypatch):
+    """RESEARCH §8.8 — the reuse, measured at runtime rather than inferred.
+
+    Two `.or_()` applications, ONE resolver await. An implementation that re-resolved at the
+    miss branch would still pass every outcome test above while firing a second `org_members`
+    round-trip per miss — and, worse, could resolve a DIFFERENT string.
+    """
+    calls: list[bool] = []
+    real = td._resolve_skill_visibility_or
+
+    async def _counting(ctx, *, born_for=False):
+        calls.append(born_for)
+        return await real(ctx, born_for=born_for)
+
+    monkeypatch.setattr(td, "_resolve_skill_visibility_or", _counting)
+
+    sb = _two_skill_supabase()
+    await td._handle_load_skill(
+        {"skill_name": "no-such-skill"}, _make_ctx(sb, caller=_COLLEAGUE, bundle=_BUNDLE)
+    )
+
+    assert calls == [True], f"expected ONE opted-in resolver call, got {calls}"
+    assert len(sb.predicates) == 2  # both branches, one resolution
+
+
+def test_the_miss_branch_reads_the_SAME_variable_the_primary_query_applied():
+    """⛔ STRUCTURAL, not outcome-based — this is the assertion the outcome tests cannot make.
+
+    A future refactor that re-derived the filter at the miss branch would keep every green
+    above (the two derivations would agree, today) and silently re-open half the defect the
+    moment they stopped agreeing. So: inside `_handle_load_skill` there is exactly ONE
+    assignment to `_skill_filter`, exactly ONE resolver call, and BOTH `.or_()` applications
+    read that same Name.
+    """
+    tree = ast.parse(_DISPATCHER_SRC.read_text(encoding="utf-8"))
+    handler = next(
+        n
+        for n in ast.walk(tree)
+        if isinstance(n, ast.AsyncFunctionDef) and n.name == "_handle_load_skill"
+    )
+
+    assignments = [
+        n
+        for n in ast.walk(handler)
+        if isinstance(n, ast.Assign)
+        and any(isinstance(t, ast.Name) and t.id == "_skill_filter" for t in n.targets)
+    ]
+    assert len(assignments) == 1, (
+        f"_handle_load_skill assigns _skill_filter {len(assignments)} times — the miss branch "
+        "must REUSE the primary query's filter, never re-derive it (RESEARCH §8.8)"
+    )
+
+    resolver_calls = [
+        n
+        for n in ast.walk(handler)
+        if isinstance(n, ast.Call)
+        and isinstance(n.func, ast.Name)
+        and n.func.id == "_resolve_skill_visibility_or"
+    ]
+    assert len(resolver_calls) == 1
+
+    or_calls = [
+        n
+        for n in ast.walk(handler)
+        if isinstance(n, ast.Call)
+        and isinstance(n.func, ast.Attribute)
+        and n.func.attr == "or_"
+    ]
+    assert len(or_calls) == 2, f"expected the primary + miss-branch applications, got {len(or_calls)}"
+    for call in or_calls:
+        assert len(call.args) == 1
+        assert isinstance(call.args[0], ast.Name) and call.args[0].id == "_skill_filter", (
+            "an .or_() application inside _handle_load_skill does not read _skill_filter — "
+            "the available_skills listing could then name a set the primary query would refuse"
+        )
+
+
+def test_this_file_contains_no_universal_no_op_getattr():
+    """The single property that separates this suite from every prior `load_skill` test.
+
+    `_PassthroughQuery`'s catch-all attribute hook (test_142) makes `.or_()` a chainable no-op,
+    so a correct predicate, a widened one and an absent one all return the same rows. Copying
+    that shape here would make every green above meaningless.
+
+    ⚠ The forbidden token is BUILT, never written out, so this file satisfies its own
+    `grep -c` criterion — the third time in this phase a text fence tripped on its own prose.
+    """
+    src = Path(__file__).read_text(encoding="utf-8")
+    hook = "__getattr__"
+    tree = ast.parse(src)
+    dunder_getattrs = [
+        n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == hook
+    ]
+    assert dunder_getattrs == []
+    assert src.count("def " + hook) == 0
