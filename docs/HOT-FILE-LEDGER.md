@@ -10946,7 +10946,7 @@ cells rot within days.
 | [`frontend/src/components/skills/SkillFormDialog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsskillsskillformdialogtsx) | 13 / 9 / 657 | ⚠ **FIRES** | ⚠ row STALE at `12/8/635` one plan later. honoured by construction (**263-04**): ONE optional prop + three `??` + one dep-array entry. ⛔ callers pass a STABLE reference or the reset wipes typing. |
 | [`backend/app/api/skills.py`](docs/HOT-FILE-LEDGER.md#backendappapiskillspy) | 19 / 10 / 858 | ⚠ **FIRES** | ⛔ absent from BOTH registers its ENTIRE LIFE at 10 phases — row added at 263 PLANNING. ⛔ `is_org_shared` HARD-SET False at `:250`; D-263-06 routes around it by provenance, never through the gate. |
 | [`frontend/src/lib/activeViewReachability.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibactiveviewreachabilityts) | 1 / 1 / 159 | no (created 262-01) | ⚠ the AT-PLANNING row read `0/0/0`; measured in its own creating commit. ⛔ The ONE ActiveView↔ChatLayout-branch fence — AST, never grep; it THROWS on a vacuous parse |
-| [`frontend/src/components/experts/expertIcon.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertsexperticontsx) | 0 / 0 / 0 | no (new) | young (created 262). Row added AT PLANNING. ⛔ The ONE home of expert-icon resolution, a CLOSED 11-key lucide map. It reads `icon` and never `slug`/`name` — that match IS the retired artefact |
+| [`frontend/src/components/experts/expertIcon.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertsexperticontsx) | 1 / 1 / 72 | no (new) | ⚠ `0/0/0` AT PLANNING; **measured `1/1/72` at 262-02**. ⛔ The ONE home of expert-icon resolution — a CLOSED 11-key lucide map. Reads `icon`, never `slug`/`name`: that match IS the retired artefact |
 | [`frontend/src/components/experts/catalog/expertCatalog.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogexpertcatalogts) | 0 / 0 / 0 | no (new) | young (created 262). Row added AT PLANNING. Pure search/category/folder-name resolution. ⛔ An unresolvable folder id returns an UNKNOWN marker, never a drop — a blank is a claim nobody made |
 | [`frontend/src/components/experts/catalog/ExpertCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogexpertcardtsx) | 0 / 0 / 0 | no (new) | young (created 262). Row added AT PLANNING. The catalog's 5-element card face, COUNTS only. ⛔ Zero lecturing prose on the face (sketch 261-262) — the NAMES belong to the detail modal |
 | [`frontend/src/components/experts/catalog/ExpertCatalogPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogexpertcatalogpagetsx) | 0 / 0 / 0 | no (new) | young (created 262). Row added AT PLANNING. Renders EXACTLY what `listExperts()` returned. ⛔ No grey-out, no locked row: PACK-11's vanish is the server's list, never a filter here |
@@ -16552,9 +16552,35 @@ inherited. Copying the neighbouring line's shape would have been exactly wrong.
 
 **Row added AT PLANNING, 2026-09-22 (Phase 262).** Triple at creation `0 commits / 0 phases / 0 L` — re-derive at the phase close with the CLAUDE.md recipe.
 
+⚠ **MEASURED AT `262-02` task 1: `1 commit / 1 phase / 72 L`.** The AT-PLANNING `0 / 0 / 0` is
+kept above rather than overwritten — a figure that was already false when written is the exact
+failure this ledger exists to stop, and `262-01` recorded the same correction one file over.
+
+**What it owns, and what it ENDED.** Phase 260 shipped `getExpertIcon(expert)` **twice, verbatim**
+(`InviteExpertDialog.tsx:27-37` and `ExpertSpotlightCard.tsx:70-81`), each guessing an emoji by
+string-matching `slug`/`name`. `OrgExpertsTab.tsx:30-46` independently held an eleven-key lucide
+`ICON_MAP` that read the `icon` COLUMN correctly. Three deciders, one of them right. RESEARCH R-7
+measured the duplication; this file is the surviving home and `OrgExpertsTab` now imports it.
+
+**Binding invariants.**
+- ⛔ Resolution reads the `icon` field and **nothing else** — no `slug`, no `name`, no string
+  content. Re-implementing the guess one file over would move the defect rather than end it. Pinned
+  by case (4) of `__tests__/expertIcon.test.tsx`, which passes a name the retired function WOULD
+  have matched and demands the neutral fallback.
+- ⛔ **T-262-05** — `icon` is author-controlled free text that selects a rendered component. It is
+  a LOOKUP IN A CLOSED MAP with a `Sparkles` fallback: never `React.createElement(userString)`,
+  never a dynamic import, never an `<img src>`.
+- The eleven-key SET is pinned, not a count — dropping or renaming a key silently degrades every
+  Expert whose author chose it, so case (5) compares the sorted key list.
+
+**Driven, not asserted.** The file was first committed as a stub that still guessed from `name`;
+case (4) failed with `lucide-chart-column` where it demanded `lucide-sparkles`. Its suite is adopted
+into **both** count-gate knobs in the same commit (`src/components/experts` has no bare-directory
+TARGETS entry).
+
 ⭐ **The row goes in at creation, not at the third phase.** An absent row is invisible to G-5 at any commit count, and this repository has paid for that four times (`App.tsx` 23 phases, `NavPanel.tsx` 11, `backend/app/config.py` its entire life, `frontend/src/lib/api.ts` — the hottest file in the repo, whose absence made a SUPERLATIVE in CLAUDE.md wrong for a structural reason). Precedent for adding at creation: `frontend/src/lib/workspaceAllowedExt.ts`.
 
-**Binding invariant:** young (created 262). Row added AT PLANNING. ⛔ The ONE home of expert-icon resolution, a CLOSED 11-key lucide map. It reads `icon` and never `slug`/`name` — that match IS the retired artefact
+**Binding invariant:** ⚠ `0/0/0` AT PLANNING; **measured `1/1/72` at 262-02**. ⛔ The ONE home of expert-icon resolution — a CLOSED 11-key lucide map. Reads `icon`, never `slug`/`name`: that match IS the retired artefact
 
 
 ---
