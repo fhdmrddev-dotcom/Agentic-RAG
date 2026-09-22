@@ -24,6 +24,14 @@
 
 ## From 264-03 — a PROSE correction owed in two registers (`.or_()` applications: six → SEVEN)
 
+> ✅ **TAKEN by `264-04` (commit `docs(264-04)`), in both registers, in one commit.** The
+> correction is recorded BESIDE each original rather than over it, and the `four call sites`
+> figure is explicitly affirmed in both. ⚠ The line lists in the entry below have themselves
+> moved since `53ece799f`: re-measured at 264's close the applications are at
+> `1373 / 1401 / 1533 / 1671 / 1683 / 2293 / 2305` and the four call sites at
+> `1369 / 1529 / 1666 / 2283`. **Three different line lists now exist for one file; re-derive,
+> never quote one.** The count itself is unchanged and stays pinned at `7`.
+
 - **`RESEARCH §2.3` and, quoting it verbatim, `app/utils/skill_visibility.py`'s own module
   docstring both say the four resolver calls feed "six `.or_(...)` applications" and enumerate
   them (`:1319, :1347, :1594, :1606, :2204, :2219`). There are SEVEN.** The enumeration omits

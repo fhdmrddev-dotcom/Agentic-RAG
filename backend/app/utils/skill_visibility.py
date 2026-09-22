@@ -42,6 +42,25 @@ that quoted it. Measured 2026-09-22 (RESEARCH §2.3): there are **four**
 ``:1589``, ``:2197``) feeding **six** ``.or_(...)`` applications. Call sites and applications
 are different numbers and the old prose conflated them.
 
+⛔ **AND THE REPLACEMENT NUMBER WAS WRONG TOO — THE APPLICATIONS ARE SEVEN, NOT SIX.** Found by
+264-03, corrected here by 264-04; the sentence above stands unedited rather than being fixed in
+place, because *"the second wrong number inside one already-corrected sentence"* is the finding.
+The enumeration omitted ``_handle_save_skill``'s single ``.or_(_sibling_filter)`` — which the
+same paragraph's own prose already says exists. Re-measured at 264's close with
+``grep -n "^\\s*\\.or_(" app/services/tool_dispatcher.py``: **SEVEN** applications, at ``:1373``,
+``:1401``, ``:1533``, ``:1671``, ``:1683``, ``:2293``, ``:2305`` — ``_skill_filter`` ×4,
+``_sf_filter`` ×2, ``_sibling_filter`` ×1 — fed by **four** call sites at ``:1369``, ``:1529``,
+``:1666``, ``:2283``. ⚠ The ``:1315``/``:1459``/``:1589``/``:2197`` above are PRE-264-03 line
+numbers and have all moved; re-derive rather than trust either list.
+
+⭐ **The ``four call sites`` figure is CORRECT and UNAFFECTED — say so, because a reader who finds
+half a sentence wrong will distrust the other half.** Four is the number every D-264-04 per-site
+decision rests on: three sites pass ``born_for=True`` (``load_skill``, ``read_skill_file``, the
+``execute_code`` skill-file injection) and the fourth, ``_handle_save_skill``'s lint corpus,
+refuses IN SOURCE. Only the APPLICATIONS count was ever wrong, and it is now pinned executably at
+**7** by ``tests/unit/test_264_load_skill_born_for.py::test_no_or_application_line_moved`` — so
+the figure is defended by a test even when this prose next rots.
+
 ⛔ **IMPORT-LIGHT IS A CONSTRAINT, NOT A PREFERENCE.** This module must not import anything
 under ``app.services.`` (nor ``app.models.expert``), or the cycle above closes and every
 consumer of the rule breaks at import time. The only import here is ``coerce_uid``.

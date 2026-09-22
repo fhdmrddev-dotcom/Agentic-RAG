@@ -175,6 +175,30 @@ The *intent* of D-264-04 is unchanged and is honoured by §4 below; only the lin
 in both docstrings should be corrected in the same commit that edits them (D-264-02 already opens
 `expert_service.py`'s block).
 
+> ⛔ **CORRECTED AGAIN AT 264's CLOSE (plan `264-04`) — THE APPLICATIONS ARE SEVEN, NOT SIX.** The
+> paragraph above is left byte-unchanged rather than fixed in place, because **this is the second
+> wrong number inside one already-corrected sentence** (264-02 wrote it to retire an earlier *"five
+> call sites"* claim) and that recurrence is the finding, not an embarrassment. The enumeration omits
+> `_handle_save_skill`'s single `.or_(_sibling_filter)` — which the same paragraph's own prose says
+> exists ("applied once"), so the two halves of one sentence disagreed. Found by `264-03` and
+> registered in `deferred-items.md` with `264-04` as owner.
+>
+> Measured at 264's close (`grep -n "^\s*\.or_(" backend/app/services/tool_dispatcher.py`):
+> **SEVEN** applications at **`:1373`, `:1401`, `:1533`, `:1671`, `:1683`, `:2293`, `:2305`** —
+> `_skill_filter` ×4, `_sf_filter` ×2, `_sibling_filter` ×1 — fed by **four** call sites at
+> **`:1369`, `:1529`, `:1666`, `:2283`**. ⚠ Both line lists above (`:1315`… and `:1319`…) are
+> pre-264-03 and have moved; `264-03`'s own reading (`1330/1358/1474/1605/1617/2217/2229`) was taken
+> at `53ece799f`, before its comment blocks landed, so it has moved too. **Re-derive; do not trust
+> any of the three lists.**
+>
+> ⭐ **The `four call sites` figure is CORRECT and UNAFFECTED, and that must be said explicitly** —
+> a reader who finds half a sentence wrong will distrust the other half. Four is the number every
+> `D-264-04` per-site decision rests on. Only the applications count was ever wrong, and it is now
+> pinned executably at **7** by
+> `backend/tests/unit/test_264_load_skill_born_for.py::test_no_or_application_line_moved`, so the
+> figure survives the next time this prose rots. The mirrored correction landed in
+> `backend/app/utils/skill_visibility.py`'s module docstring in the same commit.
+
 ### 2.4 ⚠ CORRECTED — CONTEXT's line references for the run-path carrier
 
 | CONTEXT says | Measured |
