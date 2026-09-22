@@ -92,6 +92,13 @@ union member with **no branch silently renders Knowledge Health**. A new branch 
 additively before it, exactly as `classification-rules`, `skill-studio`, `control-room`,
 `org-admin` and `admin-spend` each were.
 
+⚠ **CORRECTED — see R-1 at the foot of this file, and the original above is left standing.** The
+trailing arm has been `UnknownViewFallback` since 217.1-14, so a branchless member renders *"This
+view has no screen"*, never Knowledge Health. **The DISCIPLINE in this paragraph is right and was
+followed to the letter; only the consequence was wrong.** ⭐ All three registers carrying this rot
+— this one, `App.tsx`'s union comment (its SOURCE) and the IA skill's D6 — were corrected beside
+their originals in plan 05's triad commit.
+
 ⚠ **`App.tsx:171`'s `⛔ NO TWELFTH ActiveView MEMBER` is NOT a blanket ban and must not be read as
 one.** It is Phase 235-08's *plan-scoped* refusal — *"the Library already has one"* — and a 12th
 (`admin-spend`) landed afterwards at Phase 257. **Do not delete it.** Leave it addressed to its own

@@ -35,6 +35,12 @@ import { OrgAdminShell } from "@/components/org/OrgAdminShell"
 import { WorkflowRunPage } from "@/pages/WorkflowRunPage"
 // Phase 257 (METER-07): Operator Spend & Metering cockpit
 import { AdminSpendPage } from "@/pages/admin/AdminSpendPage"
+// Phase 262 plan 05 (PACK-11 / PACK-13 / D-262-03): the Expert catalog, and the ordered
+// handoff that turns one control on it into a chat the SERVER already knows is scoped.
+// `startScopedChat` takes every seam as a parameter, so the four this component already
+// holds are injected at the mount below rather than imported by the catalog itself.
+import { ExpertCatalogPage } from "@/components/experts/catalog/ExpertCatalogPage"
+import { startScopedChat } from "@/components/experts/catalog/startScopedChat"
 // Phase 214-12 (STEP-02 / D-214-04): chat's launch moment. The form resolves BEFORE
 // createThread, and the shared field renderer keeps the two-arm label rule in one place.
 // `launchInputFields` — never `entryInputFields`, whose fallback arm draws a box for a key
@@ -76,6 +82,10 @@ import {
   uploadWorkspaceTemplate,
   deleteThread as deleteLaunchThread,
   getThreadWorkflow,
+  // Phase 262 plan 05 (PACK-13 / D-262-08): the SHIPPED PATCH the composer's invite door
+  // already issues — the same mechanism, reached one register lower so a surface outside the
+  // chat branch can use it. ⛔ Not a second way to scope a thread.
+  setThreadActiveExpert,
   type PublishedWorkflow,
 } from "@/lib/api"
 
@@ -978,6 +988,59 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
             />
           ) : activeView === "admin-spend" ? (
             <AdminSpendPage onBack={() => onNavigate("control-room")} />
+          ) : activeView === "experts" ? (
+            // Phase 262 plan 05 (PACK-11 / PACK-13 / D-262-03): the Expert catalog — the
+            // LAST-BUT-ONE arm, deliberately, so the trailing positional fallback stays last.
+            //
+            // ⛔ THAT POSITION IS THE WHOLE LEG. The trailing element is a POSITIONAL
+            // fallback, not a `default:` that throws, and `as never` is always a legal
+            // assertion — so a member whose branch landed AFTER it would be dead code that
+            // compiles and typechecks clean. Two independent fences now measure this:
+            // `lib/activeViewReachability.ts` (AST: every member has a branch, and the
+            // fallback is last) and `ChatLayout.launch.test.tsx`'s positional index check.
+            //
+            // ⭐ `folders` is `useFolders()`'s ONE read, already threaded to three mounts
+            // above — this is a fourth consumer and ZERO new fetches. The page itself makes
+            // exactly one list call and reaches for no other client function.
+            //
+            // The start control's five seams are this component's own: the thread creator,
+            // the shipped expert PATCH, the list refetch, the selection, and the navigation.
+            // ⛔ The refetch BEFORE the selection is load-bearing, not tidiness — the created
+            // row's expert column is null and the thread hook exposes no updater for it, so
+            // without it the history list would disagree with the server the moment the
+            // person clicks that thread again. `startScopedChat`'s docblock owns that rule.
+            <ExpertCatalogPage
+              folders={folders}
+              onStartChat={async (expert) => {
+                // ⛔ THE CATCH IS NOT DECORATION, AND IT IS NOT A SWALLOW EITHER. `startScopedChat`
+                // REJECTS when the PATCH is refused, precisely so a failed start never dresses
+                // itself as a scoped chat (T-262-15) — and the page's handler discards the
+                // returned promise, so an uncaught rejection here would surface as an unhandled
+                // rejection and nothing else. The refusal already did its job by the time this
+                // runs: no navigation happened and no thread was selected, so the person stays
+                // on the catalog looking at the control they pressed.
+                // ⚠ RECORDED AS A GAP RATHER THAN GLOSSED: this app ships no toast surface and
+                // the catalog page's props are fixed at `{ folders, onStartChat, onInspect? }`,
+                // so the only honest report available at this seam is the console — which is
+                // exactly what the composer's own invite door does one register over
+                // (`MessageInput.handleSelectExpert`). A visible failure state needs a prop the
+                // page does not have; that is a contract change, not a line here.
+                try {
+                  await startScopedChat(
+                    {
+                      createThread: newThread,
+                      setExpert: setThreadActiveExpert,
+                      refreshThreads: loadThreads,
+                      selectThread,
+                      navigate: () => onNavigate("chat"),
+                    },
+                    expert,
+                  )
+                } catch (err) {
+                  console.error("Failed to start a scoped chat with this Expert:", err)
+                }
+              }}
+            />
           ) : (
             <UnknownViewFallback view={activeView as never} />
           )}

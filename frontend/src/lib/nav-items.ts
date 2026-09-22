@@ -12,7 +12,7 @@
  * is a `useState<ActiveView>` switch (App.tsx). The Workflows icon is a
  * DISTINCT non-gear lucide glyph (`Workflow`, NOT `Settings`) per REQ-7.
  */
-import { MessageSquare, FileText, Zap, Settings, Workflow, Wand2, Plug } from "lucide-react"
+import { MessageSquare, FileText, Zap, Settings, Workflow, Wand2, Plug, Sparkles } from "lucide-react"
 import type { ActiveView } from "@/App"
 import type { GovernedFeature, EffectiveFeatures } from "@/lib/api"
 
@@ -74,6 +74,29 @@ export const NAV_ITEMS: readonly NavItem[] = [
   // entry point on `SkillsPage` (`onOpenStudio`), which is a separate `ActiveView` and is
   // deliberately NOT in this array.
   { view: "skills", icon: Zap, label: "Skills" },
+  // ── Phase 262 plan 05 (PACK-11 / D-262-03) — the EIGHTH entry, and the app's newest home.
+  //
+  // ⭐ IT BELONGS IN THIS ARRAY, unlike `control-room` and `admin-spend`, which are outside it
+  // by a recorded contract (`nav-items.test.ts`, `NavPanel.test.tsx`). Those two are operator
+  // surfaces whose EXISTENCE is withheld; this one is for everyone. And the array is what
+  // `ChatLayout`'s mobile drawer maps, so an entry rendered anywhere else would make the
+  // catalog desktop-only — the mistake D-235-01 already rejected once for the Health tab.
+  //
+  // ⚠ UNGOVERNED, AND THE REASON IS MEASURED RATHER THAN ASSUMED — D-262-09 was re-aimed
+  // because it asked the right question of the wrong system. `experts` is NOT a
+  // `GovernedFeature`: that union is closed at six members (`lib/api/_core.ts`, mirrored in
+  // `user_settings.py`) and governs the operator's per-AUDIENCE visibility map. The catalog's
+  // real gate is `require_capability("experts")`, a per-ORG TIER entitlement read through
+  // `tier_capabilities` with NO frontend read path at all. ⛔ So a `feature:` key here could
+  // not prevent the 403 it would appear to prevent; it would add a second, unrelated axis
+  // controlled by the wrong party. The precedent is `connections` four lines up — ungoverned
+  // by design, pinned by `navItemsConnections.test.ts` — and `visibleNavItems` below has been
+  // fail-OPEN since 2026-09-09 for exactly this reason: the API is the wall, and the catalog
+  // renders the server's own refusal sentence rather than vanishing its own door.
+  //
+  // ⚠ The glyph is `Sparkles`, the same one the composer's invite door and the Expert card
+  // face already carry, so one mark means one thing across every surface an Expert appears on.
+  { view: "experts", icon: Sparkles, label: "Experts" },
   // Phase 148 (VIS-01): governed by `model_management` (Operators-only on the day-one
   // map) — vanishes for a non-operator; the chat model picker (GET /settings/providers)
   // is an ungated Run carve-out (148-05), so chat/run never breaks by hiding Settings.
