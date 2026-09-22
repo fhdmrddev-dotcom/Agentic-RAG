@@ -203,6 +203,12 @@ const BASELINE = {
   // the one that cannot be faked: it asserts the sample deliverable is ABSENT before the
   // disclosure and PRESENT after, so a renderer that leaves it in the DOM while hidden fails.
   "ExpertDetailModal.test.tsx": 8,
+  // ── Phase 262 plan 04 (PACK-13) — the ordered handoff ──────────────────────────────
+  // ⚠ ADOPTED, not raised — `6` is the gate's OWN printed `— N new` figure.
+  // ⛔ TWO of these six are the ORDER itself, and one is an identity comparison. Five seams
+  // called in the wrong order still call every seam, so an every-mock-was-called suite would
+  // guard nothing; dropping a case here would let a silently un-scoping thread row ship green.
+  "startScopedChat.test.ts": 6,
   // ── Phase 263 (PACK-14/PACK-15) — the dialog an Expert proposal reuses ──────────────
   // ⚠ ADOPTED, not raised: before 263-04 `grep -ic "skill" scripts/vitest-count-gate.cjs`
   // returned 0 — NOT ONE skills suite was in either knob, so this file's 8 passing tests
@@ -4439,6 +4445,10 @@ const TARGETS = [
   // the four presentation columns' ONLY rendered-content assertions, including the first
   // assertion in this repository that `example_output` reaches a human at all.
   "src/components/experts/catalog/__tests__/ExpertDetailModal.test.tsx",
+  // ── Phase 262 plan 04 (PACK-13) — the ordered handoff ─────────────────────────────
+  // Pure module, no mount. Named here and pinned below in the same commit, for the same
+  // directory reason: nothing under this path is reached by a bare-directory entry.
+  "src/components/experts/catalog/__tests__/startScopedChat.test.ts",
   // ── Phase 263 (PACK-14/PACK-15) — the dialog an Expert proposal reuses ──────────────
   // ⚠ `src/components/skills` has NO bare-directory TARGETS entry, and this file is NOT
   // under a `__tests__/` directory — so before this line it ran in NO gate at all.

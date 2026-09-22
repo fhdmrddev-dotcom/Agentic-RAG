@@ -24,10 +24,16 @@
  * second refusal vocabulary here would make two surfaces disagree about one fact. Raised at
  * phase close; cheap to reverse.
  *
- * ⚠ `folders` is declared on the props interface HERE so plans 04 and 05 wire against a stated
- * contract rather than guessing — but it is deliberately NOT destructured, because its first
- * CONSUMER is the detail modal in plan 04. `tsconfig.app.json` sets `noUnusedParameters`, and an
- * unused destructured binding raises `TS6133`. The prop ships; only the binding waits.
+ * ⚠ `folders` SHIPPED UNBOUND IN PLAN 03 AND IS CONSUMED HERE. Plan 03 declared it on the props
+ * interface and deliberately did not destructure it, because `tsconfig.app.json` sets
+ * `noUnusedParameters` and the typecheck base has zero headroom. Its consumer is the detail
+ * view, which resolves an Expert's knowledge-folder ids against the CALLER'S OWN visible
+ * folders — so nothing on this surface can name a folder the caller has no access to.
+ *
+ * ⚠ THE DETAIL VIEW IS OWNED HERE, NOT ABOVE. The app has no client-side router, so a modal is
+ * what a "detail page" is on this surface; holding the inspected Expert in page state keeps the
+ * whole catalog reachable through one mount. `onInspect` stays on the contract as a
+ * NOTIFICATION for the host — it no longer decides whether anything opens.
  */
 
 import { useEffect, useState } from "react"
@@ -36,6 +42,7 @@ import { listExperts } from "@/lib/api"
 import type { ExpertBundle, Folder } from "@/types"
 import { cn } from "@/lib/utils"
 import { ExpertCard } from "./ExpertCard"
+import { ExpertDetailModal } from "./ExpertDetailModal"
 import { ALL_CATEGORIES, categoriesOf, filterExperts } from "./expertCatalog"
 
 export interface ExpertCatalogPageProps {
@@ -46,12 +53,16 @@ export interface ExpertCatalogPageProps {
   folders: Folder[]
   /** Start a scoped conversation with this Expert (PACK-13, wired in plan 05). */
   onStartChat: (expert: ExpertBundle) => void | Promise<void>
-  /** Open the Expert's detail view (PACK-12, built in plan 04). */
+  /**
+   * Notified when an Expert's detail view is opened. ⛔ The view opens either way — this is a
+   * hook for the host, never the gate that decides.
+   */
   onInspect?: (expert: ExpertBundle) => void
 }
 
 export function ExpertCatalogPage(props: ExpertCatalogPageProps) {
   const [experts, setExperts] = useState<ExpertBundle[]>([])
+  const [inspected, setInspected] = useState<ExpertBundle | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [query, setQuery] = useState("")
@@ -81,7 +92,10 @@ export function ExpertCatalogPage(props: ExpertCatalogPageProps) {
 
   const categories = categoriesOf(experts)
   const visible = filterExperts(experts, { query, category })
-  const handleInspect = (expert: ExpertBundle) => props.onInspect?.(expert)
+  const handleInspect = (expert: ExpertBundle) => {
+    setInspected(expert)
+    props.onInspect?.(expert)
+  }
   const handleStartChat = (expert: ExpertBundle) => {
     void props.onStartChat(expert)
   }
@@ -184,6 +198,19 @@ export function ExpertCatalogPage(props: ExpertCatalogPageProps) {
           ))}
         </div>
       )}
+
+      {/* ⛔ ONE mount, fed from page state. The detail view reads NOTHING of its own — the rows
+          came from the single grant-aware list read above, and the folder names come from the
+          caller's own visible folders, passed straight through. */}
+      <ExpertDetailModal
+        expert={inspected}
+        folders={props.folders}
+        open={inspected !== null}
+        onOpenChange={(open) => {
+          if (!open) setInspected(null)
+        }}
+        onStartChat={handleStartChat}
+      />
     </div>
   )
 }
