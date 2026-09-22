@@ -84,5 +84,5 @@ rule was not met. Re-derive at the next phase that touches any of them.
 
 | When | production | What | Verified |
 |---|---|---|---|
-| 2026-09-23 02:50 | `805360fef` | BUG-260923-02 pagination — Spend ledger, Library Health stale docs, Ingestion History, checked queries (frontend only) | new bundle live (unique string probe); backend /health 200. Browser check by operator owed |
+| 2026-09-23 02:50 | `805360fef` | BUG-260923-02 pagination — Spend ledger, Library Health stale docs, Ingestion History, checked queries (frontend only) | new bundle live (unique string probe); backend /health 200. Operator browser check PASSED 3/3 |
 
