@@ -380,12 +380,26 @@ async def _resolve_thread_scoping(
     thread_id: str,
     current_user: dict,
     pool,
-) -> tuple[tuple[str, ...] | None, tuple[str, ...] | None, tuple[dict, ...] | None, str | None]:
+) -> tuple[
+    tuple[str, ...] | None,
+    tuple[str, ...] | None,
+    tuple[dict, ...] | None,
+    str | None,
+    UUID | None,
+]:
     """Phase 260 (PACK-02 / D-260-05) & Phase 261 (PACK-02 / D-v4.3-01 / D-v4.3-02 / BUG-260920-01) —
     Resolve thread-active consultant scoping prior to the loop.
 
-    Data-injected into RunContext: effective_folder_ids, effective_tools, skill_catalog_override, scoped_folder_path.
-    Returns (None, None, None, None) when no expert is invited (preserving Deep Mode byte-identical).
+    Data-injected into RunContext: effective_folder_ids, effective_tools, skill_catalog_override,
+    scoped_folder_path, born_for_bundle_id.
+    Returns (None, None, None, None, None) when no expert is invited (preserving Deep Mode byte-identical).
+
+    Phase 264 (PACK-17 / D-264-03 / D-264-03a) — the FIFTH element is the ACCESS-CHECKED bundle id
+    (``ResolvedExpertBundle.bundle_id``), never the raw ``active_expert_id`` read off the thread row:
+    ``resolve_expert_bundle`` returning non-``None`` is what makes the value honest (T-264-01). It
+    rides ``RunContext`` → ``ToolContext`` → sub-agent ``sub_ctx`` as an additive default-``None``
+    field so the LOAD path can one day see which Expert is active. ``None`` on every non-Expert run
+    => literal no-op.
     """
     try:
         from app.utils.db import aexec  # noqa: PLC0415
@@ -398,7 +412,7 @@ async def _resolve_thread_scoping(
         active_expert_id = t_resp.data.get("active_expert_id") if (t_resp and t_resp.data) else None
         thread_folder_id = t_resp.data.get("folder_id") if (t_resp and t_resp.data) else None
         if not active_expert_id:
-            return None, None, None, None
+            return None, None, None, None, None
 
         from app.services.expert_service import resolve_expert_bundle  # noqa: PLC0415
         caller_user_id = UUID(str(current_user["id"]))
@@ -491,7 +505,17 @@ async def _resolve_thread_scoping(
                 for s in resolved.effective_skills
             )
 
-        return effective_folder_ids, effective_tools, skill_catalog_override, scoped_folder_path
+        # Phase 264 (PACK-17 / D-264-03a / T-264-01) — the fifth element is
+        # `resolved.bundle_id`, the value `resolve_expert_bundle` already
+        # access-checked, NOT the raw `active_expert_id` read off the thread row
+        # above. `resolved` being non-None is the whole honesty of the id.
+        return (
+            effective_folder_ids,
+            effective_tools,
+            skill_catalog_override,
+            scoped_folder_path,
+            resolved.bundle_id,
+        )
     except Exception as exc:
         logger.error(
             "Failed to resolve consultant expert scoping for thread %s; refusing run (fail-closed): %s",
@@ -654,7 +678,7 @@ async def run_producer(
                 # run_agent_loop + the Deep `_result_sink` flow stay byte-identical (D-14).
             else:                                          # Deep — byte-identical
                 _wf_pool = await get_pg_pool()
-                _eff_folders, _eff_tools, _skill_cat_override, _eff_folder_path = await _resolve_thread_scoping(
+                _eff_folders, _eff_tools, _skill_cat_override, _eff_folder_path, _born_for = await _resolve_thread_scoping(
                     supabase=supabase,
                     thread_id=thread_id,
                     current_user=current_user,
@@ -822,7 +846,7 @@ async def spawn_continuation_run(
             # .agent_mode/.content; a continuation carries no new user content.
             body = MessageCreate(content="", model=resolved_model, provider=resolved_provider)
             _wf_pool = await get_pg_pool()
-            _eff_folders, _eff_tools, _skill_cat_override, _eff_folder_path = await _resolve_thread_scoping(
+            _eff_folders, _eff_tools, _skill_cat_override, _eff_folder_path, _born_for = await _resolve_thread_scoping(
                 supabase=supabase,
                 thread_id=thread_id,
                 current_user=current_user,
