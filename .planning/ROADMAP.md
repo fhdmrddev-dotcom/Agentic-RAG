@@ -93,7 +93,7 @@ path is built, in any phase.
   5. 255, 256, 262, 264 and commits `c28853142`..`cdf3a308a` each have a review written by an agent that **did not build them**, and every finding is triaged fix / defer / accept in writing — none left silent (VERIFY-05).
 
 **How we'd know this failed**: a VERIFY row is ticked with a screenshot but no backing DB/transcript evidence; the tier refusals are driven in the enterprise org and pass vacuously; the reviewer of a phase also shaped its build; or a "fix" finding is fixed by the reviewer, turning the review into self-assessment (the 257.1 lesson).
-**Plans**: TBD
+**Plans**: 5 plans / 4 waves — 01 reviews (wave 1, per-reviewer worktrees, ≤2 live) ∥ 02 tier+spend UAT (wave 1) → 03 256+261 UAT → 04 263 re-drive → 05 triage + flags
 **Flags**: ⛔ **Independent-review rule** (CLAUDE.md, AGENTS.md): whoever REVIEWS a phase must not have shaped its build — route VERIFY-05 across the `.agent-bus`, decisions `--to operator`. ⛔ **Let the builder fix its own work**; the reviewer drives each finding before reporting it OPEN. **G-7** applies to any fix rounds the findings spawn — fixes ≤ 1 file / ≤ 10 lines go `/gsd:fast`. Fixes that turn out to be a capability are a phase, not a finding. No migration expected; no new UI. UI-touching UAT rows use Chrome MCP (the user drives browser UAT where asked).
 
 #### Phase 266: Expert Knowledge in a Real Org

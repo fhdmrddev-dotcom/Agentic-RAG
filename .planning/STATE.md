@@ -8,7 +8,7 @@ last_activity: 2026-09-23 -- Milestone v4.4 Experts That Actually Work started
 progress:
   total_phases: 5
   completed_phases: 0
-  total_plans: 0
+  total_plans: 5
   completed_plans: 0
   percent: 0
 ---
@@ -42,7 +42,7 @@ can be taught new behaviours (skills) that persist and can be shared.
 Milestone: v4.4 Experts That Actually Work
 Phase: 265 — Owed v4.3 Verification (not started; 5 phases 265-269)
 Plan: —
-Status: Phase 265 context gathered — ready to plan
+Status: Phase 265 planned — 5 plans / 4 waves, plan-checker passed after 1 revision round (0 blockers; 1 warning accepted: 265-03 has 5 tasks, 2 trivial) — ready to execute
 Resume file: .planning/phases/265-owed-v4-3-verification/265-CONTEXT.md
 Last activity: 2026-09-23 — Milestone v4.4 started (SEED-304 tenancy decided: per-org copy)
 
