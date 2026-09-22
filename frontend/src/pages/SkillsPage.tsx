@@ -1,5 +1,5 @@
 import { useState, useRef } from "react"
-import { Plus, Zap, Upload, Loader2, FlaskConical } from "lucide-react"
+import { Plus, Zap, Upload, Loader2, FlaskConical, ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useSkills } from "@/hooks/useSkills"
 import { useAuth } from "@/hooks/useAuth"
@@ -104,12 +104,17 @@ export function SkillsPage({ onTryInChat, onTuneSkill, onOpenStudio, onReviewEva
     setTimeout(() => setImportMessage(null), 5000)
   }
 
+  // 262-UAT follow-up: below `md` the page is ONE pane at a time — the list, or the open
+  // skill's details with a way back. Driven at 500px, the list got 154px beside an EMPTY
+  // 340px rail. `md:` and up is unchanged.
+  const detailOpen = selectedSkill !== null || isCreatingNew
+
   return (
     <div className={cn("flex h-full overflow-hidden", isResizing && "select-none")}>
       {/* Center — page header + scrollable skill list (sits flush against the real NavPanel) */}
-      <div className="flex flex-col flex-1 min-w-0 overflow-hidden border-r border-border/10">
+      <div className={cn("flex-col flex-1 min-w-0 overflow-hidden border-r border-border/10", detailOpen ? "hidden md:flex" : "flex")}>
         {/* Page header */}
-        <div className="px-8 pt-8 pb-6 flex items-center justify-between shrink-0">
+        <div className="px-4 pt-6 pb-4 md:px-8 md:pt-8 md:pb-6 flex flex-wrap items-center justify-between gap-3 shrink-0">
           <div>
             <h1 className="text-2xl font-headline font-semibold text-foreground">Skills</h1>
             <p className="text-muted-foreground mt-1.5 text-sm">
@@ -135,7 +140,7 @@ export function SkillsPage({ onTryInChat, onTuneSkill, onOpenStudio, onReviewEva
         <input ref={fileInputRef} type="file" accept=".zip" className="hidden" onChange={handleImport} />
 
         {/* Scrollable skill list */}
-        <div className="flex-1 overflow-y-auto px-8 pb-8">
+        <div className="flex-1 overflow-y-auto px-4 pb-6 md:px-8 md:pb-8">
           {importMessage && (
             <p className={cn("text-sm mb-4", importMessage.isError ? "text-destructive" : "text-muted-foreground")}>
               {importMessage.text}
@@ -189,7 +194,7 @@ export function SkillsPage({ onTryInChat, onTuneSkill, onOpenStudio, onReviewEva
         {...separatorProps}
         aria-label="Resize skill details panel"
         className={cn(
-          "w-1.5 shrink-0 cursor-col-resize touch-none bg-border/10 transition-colors",
+          "hidden md:block w-1.5 shrink-0 cursor-col-resize touch-none bg-border/10 transition-colors",
           "hover:bg-primary/40 focus-visible:bg-primary/60 focus-visible:outline-none",
           isResizing && "bg-primary/60",
         )}
@@ -197,14 +202,25 @@ export function SkillsPage({ onTryInChat, onTuneSkill, onOpenStudio, onReviewEva
 
       {/* Pane 3: Right — resizable inline detail/create panel */}
       <div
-        className="shrink-0 overflow-y-auto bg-card/30"
+        className={cn("shrink-0 overflow-y-auto bg-card/30 max-md:!w-full", !detailOpen && "hidden md:block")}
         style={{ width: panelWidth }}
         role="region"
         aria-label="Skill details"
         aria-live="polite"
       >
-        {selectedSkill || isCreatingNew ? (
+        {detailOpen ? (
           <div className="flex flex-col h-full">
+            <div className="md:hidden px-4 pt-3 shrink-0">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="gap-1.5 px-2"
+                onClick={() => { setSelectedSkill(null); setIsCreatingNew(false) }}
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back to skills
+              </Button>
+            </div>
             {/* Phase 123-05 (TRIG-01 / sketch 041-A): the "Tune triggers" entry
                 action — opens the focused Trigger Tuner for THIS skill (only on a
                 saved skill, never while creating). This is the reachability entry
