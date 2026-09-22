@@ -479,13 +479,18 @@ async def test_scenario_pack10_ungranted_user_cannot_read_or_invite_expert():
 
         # 3. Surface 3 (HTTP Endpoints): get_expert & resolve_expert
         from app.api.experts import get_expert, resolve_expert
+        from types import SimpleNamespace as _NS
+        # v4.3 verification: the org role comes from the request (get_active_org_id sets it),
+        # never from current_user, which get_current_user returns as {id, email} only.
+        _REQ_MEMBER = _NS(state=_NS(org_role="member"), headers={})
 
         # Ungranted user calling GET /experts/{id} -> 404
         with pytest.raises(HTTPException) as exc_info:
             await get_expert(
                 bundle_id=bundle_id,
+                request=_REQ_MEMBER,
                 active_org=str(org_id),
-                current_user={"id": str(ungranted_user_id), "role": "member"},
+                current_user={"id": str(ungranted_user_id), "email": "u@example.com"},  # the REAL get_current_user shape
                 pool=mock_pool,
             )
         assert exc_info.value.status_code == 404
@@ -494,8 +499,9 @@ async def test_scenario_pack10_ungranted_user_cannot_read_or_invite_expert():
         # Granted user calling GET /experts/{id} -> 200
         ok_bundle = await get_expert(
             bundle_id=bundle_id,
+            request=_REQ_MEMBER,
             active_org=str(org_id),
-            current_user={"id": str(granted_user_id), "role": "member"},
+            current_user={"id": str(granted_user_id), "email": "u@example.com"},  # the REAL get_current_user shape
             pool=mock_pool,
         )
         assert ok_bundle["id"] == str(bundle_id)
@@ -504,8 +510,9 @@ async def test_scenario_pack10_ungranted_user_cannot_read_or_invite_expert():
         with pytest.raises(HTTPException) as exc_info:
             await resolve_expert(
                 bundle_id=bundle_id,
+                request=_REQ_MEMBER,
                 active_org=str(org_id),
-                current_user={"id": str(ungranted_user_id), "role": "member"},
+                current_user={"id": str(ungranted_user_id), "email": "u@example.com"},  # the REAL get_current_user shape
                 pool=mock_pool,
             )
         assert exc_info.value.status_code == 404
@@ -513,8 +520,9 @@ async def test_scenario_pack10_ungranted_user_cannot_read_or_invite_expert():
         # Granted user calling GET /experts/{id}/resolve -> 200
         ok_resolved = await resolve_expert(
             bundle_id=bundle_id,
+            request=_REQ_MEMBER,
             active_org=str(org_id),
-            current_user={"id": str(granted_user_id), "role": "member"},
+            current_user={"id": str(granted_user_id), "email": "u@example.com"},  # the REAL get_current_user shape
             pool=mock_pool,
         )
         assert ok_resolved.bundle_id == bundle_id

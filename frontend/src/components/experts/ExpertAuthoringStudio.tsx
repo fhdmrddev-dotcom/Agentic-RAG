@@ -1239,9 +1239,7 @@ export function ExpertAuthoringStudio({
                     >
                       <option value="org-admin">Role: org-admin</option>
                       <option value="member">Role: member</option>
-                      <option value="hr">Role: hr</option>
-                      <option value="finance">Role: finance</option>
-                      <option value="legal">Role: legal</option>
+                      <option value="dept-admin">Role: dept-admin</option>
                     </select>
                     <button
                       type="button"

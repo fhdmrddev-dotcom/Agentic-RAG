@@ -180,7 +180,7 @@ const BASELINE = {
   // pin, dropping a key would silently degrade every Expert whose author chose it.
   "expertIcon.test.tsx": 6,
   // ── Phase 261 (PACK-07 / PACK-09 / PACK-10) — Expert Authoring Studio & Org Management ──
-  "OrgExpertsTab.test.tsx": 5,
+  "OrgExpertsTab.test.tsx": 8, // +3 v4.3 audit (PACK-07 enable/disable)
   // ⬆ 4 → 14 in 263-04: sketch 263 variant A's ten cases (both headed groups, the
   // token set with its negative arm, the held Save from BOTH entry points, the
   // in-place generating state, the dialog round trip, and the server's own 422).

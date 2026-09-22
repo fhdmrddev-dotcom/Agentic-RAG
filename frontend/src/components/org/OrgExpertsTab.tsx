@@ -14,7 +14,7 @@ import {
 } from "lucide-react"
 
 import type { ExpertBundle } from "@/types"
-import { deleteExpert, listExperts } from "@/lib/api/experts"
+import { deleteExpert, listExperts, updateExpert } from "@/lib/api/experts"
 import { ExpertAuthoringStudio } from "@/components/experts/ExpertAuthoringStudio"
 import { ExpertIcon } from "@/components/experts/expertIcon"
 import { cn } from "@/lib/utils"
@@ -54,6 +54,23 @@ export function OrgExpertsTab() {
   useEffect(() => {
     void fetchList()
   }, [fetchList])
+
+  // PACK-07 (v4.3 verification): "disable" had no surface — only SQL or an API client could
+  // turn an Expert off. The toggle PATCHes is_enabled through the existing /experts route and
+  // re-reads the list rather than trusting an optimistic flip.
+  const [togglingId, setTogglingId] = useState<string | null>(null)
+  const handleToggleEnabled = async (exp: ExpertBundle) => {
+    setTogglingId(exp.id)
+    setError(null)
+    try {
+      await updateExpert(exp.id, { is_enabled: !exp.is_enabled })
+      await fetchList()
+    } catch (err: any) {
+      setError(err.message || "Failed to update expert")
+    } finally {
+      setTogglingId(null)
+    }
+  }
 
   const handleDelete = async (id: string) => {
     setIsDeleting(true)
@@ -259,6 +276,7 @@ export function OrgExpertsTab() {
                 <div className="mt-4 flex items-center justify-between pt-3 border-t border-border/50">
                   <span className="text-[11px] text-muted-foreground font-mono">
                     /{exp.slug}
+                    {!exp.is_enabled && <span className="ml-2 font-sans text-amber-500">Disabled</span>}
                   </span>
 
                   <div className="flex items-center gap-1">
@@ -270,6 +288,18 @@ export function OrgExpertsTab() {
                       <Edit2 className="h-3.5 w-3.5" />
                       <span>Edit</span>
                     </button>
+
+                    {!exp.is_system && (
+                      <button
+                        type="button"
+                        onClick={() => void handleToggleEnabled(exp)}
+                        disabled={togglingId === exp.id}
+                        aria-pressed={!exp.is_enabled}
+                        className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50"
+                      >
+                        {exp.is_enabled ? "Disable" : "Enable"}
+                      </button>
+                    )}
 
                     {!exp.is_system && (
                       <button

@@ -417,8 +417,19 @@ async def _resolve_thread_scoping(
         from app.services.expert_service import resolve_expert_bundle  # noqa: PLC0415
         caller_user_id = UUID(str(current_user["id"]))
         caller_org_id = UUID(str(current_user["org_id"])) if current_user.get("org_id") else None
-        caller_role = current_user.get("role") if isinstance(current_user, dict) else getattr(current_user, "role", None)
-        caller_roles = [caller_role] if caller_role else []
+        # PACK-10 (v4.3 verification): the detached producer has no request, and current_user
+        # is {id, email, org_id} — it never carried a role, so role grants never matched here.
+        # Read the caller's role IN THE RUN'S ORG; any failure fails closed to no role.
+        caller_roles: list[str] = []
+        if caller_org_id is not None:
+            try:
+                _role = await pool.fetchval(
+                    "SELECT role FROM public.org_members WHERE org_id = $1 AND user_id = $2",
+                    caller_org_id, caller_user_id,
+                )
+                caller_roles = [_role] if _role else []
+            except Exception:  # noqa: BLE001 — fail closed: no role, grants by user id only
+                caller_roles = []
 
         resolved = await resolve_expert_bundle(
             pool=pool,

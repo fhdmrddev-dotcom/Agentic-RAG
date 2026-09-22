@@ -93,7 +93,7 @@ vi.mock("@/lib/api/connectors", () => ({
   listConnectorConnections: vi.fn().mockResolvedValue([]),
 }))
 
-import { listExperts, deleteExpert } from "@/lib/api/experts"
+import { listExperts, deleteExpert, updateExpert } from "@/lib/api/experts"
 
 describe("OrgExpertsTab (Phase 261 / PACK-07)", () => {
   beforeEach(() => {
@@ -192,5 +192,41 @@ describe("OrgExpertsTab (Phase 261 / PACK-07)", () => {
     await waitFor(() => {
       expect(deleteExpert).toHaveBeenCalledWith("00000000-0000-0000-0000-000000000002")
     })
+  })
+})
+
+// PACK-07 (v4.3 verification): "disable" had no surface. The toggle PATCHes is_enabled
+// through the existing /experts route; a system Expert has no toggle.
+describe("OrgExpertsTab — enable / disable (PACK-07)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(listExperts).mockResolvedValue(mockExperts)
+    vi.mocked(updateExpert).mockResolvedValue({ ...mockExperts[1], is_enabled: false })
+  })
+
+  it("Disable sends is_enabled=false for that expert and re-reads the list", async () => {
+    render(<OrgExpertsTab />)
+    const btn = await screen.findByRole("button", { name: "Disable" })
+    fireEvent.click(btn)
+    await waitFor(() => {
+      expect(updateExpert).toHaveBeenCalledWith("00000000-0000-0000-0000-000000000002", { is_enabled: false })
+    })
+    await waitFor(() => expect(listExperts).toHaveBeenCalledTimes(2))
+  })
+
+  it("a disabled expert is labelled and offers Enable", async () => {
+    vi.mocked(listExperts).mockResolvedValue([mockExperts[0], { ...mockExperts[1], is_enabled: false }])
+    render(<OrgExpertsTab />)
+    expect(await screen.findByText("Disabled")).toBeInTheDocument()
+    fireEvent.click(screen.getByRole("button", { name: "Enable" }))
+    await waitFor(() => {
+      expect(updateExpert).toHaveBeenCalledWith("00000000-0000-0000-0000-000000000002", { is_enabled: true })
+    })
+  })
+
+  it("the system expert has no toggle", async () => {
+    render(<OrgExpertsTab />)
+    await screen.findByText("Financial Analyzer")
+    expect(screen.getAllByRole("button", { name: /^(Disable|Enable)$/ })).toHaveLength(1)
   })
 })

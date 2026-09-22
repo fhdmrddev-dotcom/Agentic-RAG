@@ -731,8 +731,11 @@ async def rename_thread(
             from app.services.expert_service import get_expert_service  # noqa: PLC0415
             c_uid = UUID(str(current_user["id"])) if isinstance(current_user, dict) else getattr(current_user, "id")
             c_org_id = UUID(str(active_org_id))
-            caller_role = current_user.get("role") if isinstance(current_user, dict) else getattr(current_user, "role", None)
-            caller_roles = [caller_role] if caller_role else []
+            # PACK-10 (v4.3 verification): the org role is resolved, never read off current_user
+            # (get_current_user returns {id, email} only).
+            from app.dependencies import resolve_caller_role  # noqa: PLC0415
+            _role, _groups = await resolve_caller_role(request, current_user)
+            caller_roles = [_role] if _role else []
             bundle = await get_expert_service(
                 pool=pool,
                 bundle_id=body.active_expert_id,

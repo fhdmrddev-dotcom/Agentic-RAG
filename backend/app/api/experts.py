@@ -7,7 +7,7 @@ from uuid import UUID
 import asyncpg
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile, status
 
-from app.dependencies import _has_org_permission, get_active_org_id, get_current_user, get_pg_pool
+from app.dependencies import _has_org_permission, get_active_org_id, get_current_user, get_pg_pool, resolve_caller_role
 from app.models.expert import (
     ExpertBundleCreate,
     ExpertBundleUpdate,
@@ -383,6 +383,13 @@ async def draft_skill_body(
     return authored
 
 
+async def _caller_roles(request: Request, current_user: dict[str, Any]) -> list[str]:
+    """The caller's org role as a grant-matching list (PACK-10). Never raises; fails closed to
+    the least-privileged real role via resolve_caller_role."""
+    role, _groups = await resolve_caller_role(request, current_user)
+    return [role] if role else []
+
+
 @router.get("", status_code=status.HTTP_200_OK)
 async def list_experts(
     request: Request,
@@ -401,8 +408,10 @@ async def list_experts(
     """
     org_id = _to_uuid(active_org)
     user_id = _to_uuid(current_user["id"] if isinstance(current_user, dict) else getattr(current_user, "id"))
-    caller_role = current_user.get("role")
-    caller_roles = [caller_role] if caller_role else []
+    # PACK-10 (v4.3 verification): get_current_user returns {id, email} — it never carries a
+    # role, so reading current_user["role"] made every role grant unmatchable. The org role is
+    # resolved for the ACTIVE org (request.state.org_role, set by get_active_org_id).
+    caller_roles = await _caller_roles(request, current_user)
 
     if for_management:
         if not await _has_org_permission(request, current_user, active_org, "experts:manage"):
@@ -430,6 +439,7 @@ async def list_experts(
 @router.get("/{bundle_id}", status_code=status.HTTP_200_OK)
 async def get_expert(
     bundle_id: UUID,
+    request: Request,
     active_org: str = Depends(get_active_org_id),
     current_user: dict[str, Any] = Depends(get_current_user),
     pool: asyncpg.Pool = Depends(get_pg_pool),
@@ -440,8 +450,10 @@ async def get_expert(
     """
     org_id = _to_uuid(active_org)
     user_id = _to_uuid(current_user["id"] if isinstance(current_user, dict) else getattr(current_user, "id"))
-    caller_role = current_user.get("role")
-    caller_roles = [caller_role] if caller_role else []
+    # PACK-10 (v4.3 verification): get_current_user returns {id, email} — it never carries a
+    # role, so reading current_user["role"] made every role grant unmatchable. The org role is
+    # resolved for the ACTIVE org (request.state.org_role, set by get_active_org_id).
+    caller_roles = await _caller_roles(request, current_user)
     bundle = await get_expert_service(
         pool=pool,
         bundle_id=bundle_id,
@@ -460,6 +472,7 @@ async def get_expert(
 @router.get("/{bundle_id}/resolve", status_code=status.HTTP_200_OK, response_model=ResolvedExpertBundle)
 async def resolve_expert(
     bundle_id: UUID,
+    request: Request,
     active_org: str = Depends(get_active_org_id),
     current_user: dict[str, Any] = Depends(get_current_user),
     pool: asyncpg.Pool = Depends(get_pg_pool),
@@ -471,8 +484,10 @@ async def resolve_expert(
     """
     org_id = _to_uuid(active_org)
     user_id = _to_uuid(current_user["id"] if isinstance(current_user, dict) else getattr(current_user, "id"))
-    caller_role = current_user.get("role")
-    caller_roles = [caller_role] if caller_role else []
+    # PACK-10 (v4.3 verification): get_current_user returns {id, email} — it never carries a
+    # role, so reading current_user["role"] made every role grant unmatchable. The org role is
+    # resolved for the ACTIVE org (request.state.org_role, set by get_active_org_id).
+    caller_roles = await _caller_roles(request, current_user)
     resolved = await resolve_expert_bundle(
         pool=pool,
         bundle_id=bundle_id,

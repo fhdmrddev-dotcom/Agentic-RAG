@@ -188,5 +188,7 @@ def test_a_caller_with_no_role_yields_an_empty_role_list_not_a_null_entry(expert
 
     assert resp.status_code == status.HTTP_200_OK
     roles = mock_list.await_args.kwargs["caller_roles"]
-    assert roles == []
+    # v4.3 verification: the role is now RESOLVED (resolve_caller_role), and an unresolvable one
+    # fails closed to the least-privileged REAL role — never None, never a fabricated role.
+    assert roles == ["member"]
     assert None not in roles
