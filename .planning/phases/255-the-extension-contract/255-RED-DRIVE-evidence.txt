@@ -1,0 +1,70 @@
+EXT-02 RED DRIVE — all six SEED-291 trigger_paths, driven in ISOLATION
+Driven: 2026-09-18T14:27:08Z · base ee834d81b
+Method: md5 before -> plant one violation -> run guard -> git checkout -- <file> -> md5 after.
+A drive only counts if (a) the guard exits 1 WITH the plant, (b) exits 0 WITHOUT it, (c) md5 matches.
+
+CLEAN-TREE PRECONDITION: guard exit=0 (expect 0)
+
+[FAIL] backend/app/services/harness/phase_types.py
+      plant : PHASE_TYPE_REGISTRY_ENTRIES["custom_step"] = _exec_custom
+      guard WITH plant  : exit 1  (1 line(s) naming this file)
+      guard AFTER restore: exit 0
+      ⛔ MD5 MISMATCH  (55cabda10220d7a5ecbdd3d99b94643f)
+[PASS] backend/app/services/harness/validator_kinds.py
+      plant : PROGRAMMATIC_VALIDATOR_REGISTRY["custom_rule"] = _v
+      guard WITH plant  : exit 1  (1 line(s) naming this file)
+      guard AFTER restore: exit 0
+      RESTORED md5-identical  (ce441d9360ea1aefcf417a1fa524d230)
+[PASS] backend/app/services/harness/emitters.py
+      plant : EMITTER_REGISTRY["custom_emitter"] = _e
+      guard WITH plant  : exit 1  (1 line(s) naming this file)
+      guard AFTER restore: exit 0
+      RESTORED md5-identical  (5d7d227c42b96942bfa56f28852890ad)
+[PASS] backend/app/services/harness/programmatic.py
+      plant : PROGRAMMATIC_PHASE_REGISTRY["custom_fn"] = _f
+      guard WITH plant  : exit 1  (1 line(s) naming this file)
+      guard AFTER restore: exit 0
+      RESTORED md5-identical  (3259c38d1cf61023bda450ee1dbb1703)
+[PASS] backend/app/services/tool_dispatcher.py
+      plant : _TOOL_REGISTRY["custom_tool"] = _t
+      guard WITH plant  : exit 1  (1 line(s) naming this file)
+      guard AFTER restore: exit 0
+      RESTORED md5-identical  (717a28a47cf3c314ea21ca18feb6f341)
+[PASS] backend/app/services/agent_loop.py
+      plant : handler = getattr(plugin_mod, tool_name)()
+      guard WITH plant  : exit 1  (1 line(s) naming this file)
+      guard AFTER restore: exit 0
+      RESTORED md5-identical  (5d510533399bda206b21e2f59c5edfa7)
+
+POST-DRIVE TREE CHECK:
+  (blank above = every file restored, no plant left behind)
+
+--------------------------------------------------------------------------
+⚠ CORRECTION — THE ONE [FAIL] IS AN EOL ARTEFACT, NOT A FAILED DRIVE, AND IT
+   IS RECORDED RATHER THAN RE-RUN INTO A PASS.
+
+`phase_types.py` fired RED (exit 1) and returned GREEN (exit 0) exactly like the
+other five. What failed was the strictest arm of the check: md5 before != md5
+after.
+
+Measured immediately afterwards:
+  * on disk  : 2937 CRLF, 0 lone LF, 172211 bytes
+  * `git status --short`                  -> clean
+  * `git diff --ignore-all-space --stat`  -> empty
+
+So `git checkout --` RESTORED THE CONTENT AND REWROTE THE LINE ENDINGS. The
+pre-plant working-tree copy carried LF (it had been written by an editor, not by
+git); checkout wrote it back under autocrlf as CRLF. Content identical, bytes
+not.
+
+⛔ This is the hazard this project has already paid for once and recorded:
+   *"`git checkout -- <dir>` is NOT a restore here — autocrlf moved 224 body
+   digests while `git status` read clean."*
+
+VERDICT FOR THIS FILE: **content-identical, NOT md5-identical.** That is a weaker
+claim than the other five and is stated as the weaker claim. The drive itself
+(exit 1 with the plant, exit 0 without) is unaffected and stands.
+
+FINAL: 6 / 6 trigger paths driven RED and returned GREEN.
+       5 / 6 restored md5-identical; 1 / 6 restored content-identical (EOL only).
+       Post-drive `git status` over all six: clean. No plant left behind.

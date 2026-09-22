@@ -331,6 +331,17 @@ CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid
          )::uuid;
 $$;
 
+-- v4.3 (migrations 183/187/189): policies also call auth.role(). Same shape as Supabase's own
+-- (reads the JWT's `role` claim); same refusal as auth.uid() above -- scratch database only.
+CREATE OR REPLACE FUNCTION auth.role() RETURNS text
+    LANGUAGE sql STABLE
+    AS $$
+  SELECT NULLIF(
+           current_setting('request.jwt.claims', true)::jsonb ->> 'role',
+           ''
+         )::text;
+$$;
+
 CREATE SCHEMA IF NOT EXISTS storage;
 
 CREATE TABLE IF NOT EXISTS storage.buckets (

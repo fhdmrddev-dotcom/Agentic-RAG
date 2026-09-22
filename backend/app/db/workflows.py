@@ -58,6 +58,82 @@ from app.models.harness import WorkflowDefinition
 
 logger = logging.getLogger(__name__)
 
+# ── Phase 256 (D-256-07 / SC#4) — the coverage marker ─────────────────────────
+# WHICH COUNTING LEGS the instrumentation covers — NOT which legs a given run
+# happened to use. Written verbatim into ``workflow_runs.token_coverage`` by
+# ``persist_run_usage`` below, so a run persisted before a leg shipped reads
+# honestly as not covering it, FOREVER, with no date arithmetic and no memory.
+# ⛔ This is a DATA VALUE written into a column. It never resolves a writer,
+#    emitter, executor or validator — the Phase 255 Extension Contract is
+#    untouched by it.
+#
+# ⭐ ``"emit"`` LANDED IN PLAN 256-04 (METER-06 / O-4), in the SAME COMMIT as the
+#    ``forced_emit._drain`` usage arms that earn it. Before that commit the
+#    ``llm_emit`` leg was a real, billed provider call that no column could see;
+#    claiming it one commit early would have been a lie in a column built
+#    specifically to prevent lies.
+#
+# ⚠ WHAT THIS COLUMN MEANS, STATED HERE SO PHASE 257 DOES NOT HAVE TO GUESS (U-5).
+# ``token_coverage`` records what the INSTRUMENTATION covers, and it is written
+# ONLY when a real, non-zero delta is persisted. Consequences, all four of them
+# deliberate:
+#   · A run whose LLM phases ran but whose provider emitted no usage payload, AND
+#     an all-``programmatic`` run with no LLM phase at all, BOTH read
+#     ``input_tokens IS NULL · output_tokens IS NULL · token_coverage IS NULL``.
+#   · ⛔ PHASE 257 MUST READ THAT NULL TRIPLE AS "no instrumented leg reported
+#     usage for this run" — NEVER as ``$0.00``, and never as "unrated". A run that
+#     was never measured did not cost nothing; it cost an unknown amount, and the
+#     two must not render the same.
+#   · WHY THIS READING RATHER THAN WRITING A FULL MARKER WITH A REAL 0/0: it
+#     preserves the delta-derived idempotency that makes ``persist_run_usage`` safe
+#     with NO key, NO lock and NO upsert, and it adds ZERO branches. ``NULL`` is
+#     already the "never measured" state under D-256-06, and a run with nothing to
+#     measure genuinely measured nothing.
+#   · The migration-182 partial index treats a NULL marker as NOT fully covered,
+#     which is correct under this reading.
+#
+# ⭐ WHAT ``"emit"`` COVERS, WRITTEN HERE BECAUSE THIS IS WHERE THE DURABLE COLUMN
+# COMMENT POINTS (Phase 256 round 1 / CR-02 / SC#4). The leg covers EVERY
+# ``forced_emit``-borne shot inside a harness run — which, as of this round, includes
+# BOTH in-run judge shots:
+#   · ``harness/phase_types.py``'s emit ladder (the leg's original earner, 256-04);
+#   · ``harness/validator_kinds.py``'s in-run ``llm_judge_rubric`` judge shot, folded
+#     into ``ctx.run_usage_box`` and persisted by the engine's ``_flush_run_usage``;
+#   · ``harness/publish_service.py``'s publish-gauntlet judge shot, accumulated across
+#     ALL served attempts into a caller-supplied box and persisted by the QUAL-01 stage
+#     onto the GOLDEN RUN's ``workflow_runs`` row — including on the blocked path.
+# Before this round those two were real, billed provider calls whose reported tokens
+# were dropped on the floor while this array claimed to cover them.
+#
+# ⚠ OPTION A WAS TAKEN (D-256-18, operator ruling): COUNT the judge spend, so the
+# four-leg claim stops over-claiming by becoming TRUE. ⛔ OPTION B WAS CONSIDERED AND
+# **REJECTED** — narrowing this tuple and shipping a second migration to alter
+# ``idx_workflow_runs_org_coverage_incomplete``'s predicate. Do not silently revisit it.
+# The operator's reason is the phase's own premise, *every token is counted*: a marker
+# that is HONEST ABOUT NOT COUNTING is a weaker deliverable than a marker with nothing
+# left to omit.
+#
+# ⛔ NO FIFTH LEG AND NO SECOND MIGRATION SHIP, and both are measured answers rather
+# than conveniences. A ``"judge"`` leg would be Option B's index-predicate migration by
+# another name: the judge shot is NOT a fifth instrumentation mechanism, it is the SAME
+# ``forced_emit`` drain the ``"emit"`` leg already names. And migration 182's durable
+# ``COMMENT ON COLUMN public.workflow_runs.token_coverage`` delegates the legs' meaning
+# to THIS constant verbatim — *"Written from ONE module-level constant,
+# db.workflows.TOKEN_COVERAGE_LEGS"* — so growing what a leg COVERS cannot falsify the
+# durable comment, because the comment never spelled the coverage out itself.
+# ⚠ Verify that phrase with the SQL literals normalised, not with a bare grep: the
+# migration splits the sentence across two adjacent string literals which Postgres
+# concatenates on apply, so a naive grep reads 0 hits there and 1 in
+# ``supabase/full-schema.sql``. Pinned in
+# ``tests/unit/test_256_judge_usage_counted.py::test_the_durable_column_comment_still_delegates_to_the_constant``.
+#
+# ⚠ ONE RESIDUAL IS NAMED RATHER THAN HIDDEN: a ``forced_emit`` shot that RAISES
+# (``publish_service.py``'s ``except Exception … continue``) returns no dict, so the
+# tokens the provider may already have billed are unreachable — IN-03, registered in
+# ``SEED-300`` with a concrete trigger. The leg therefore covers every shot that was
+# SERVED AND RETURNED, which is every shot whose usage is observable at all.
+TOKEN_COVERAGE_LEGS: tuple[str, ...] = ("agent", "single", "batch", "emit")
+
 # ── Phase 186 (CONCUR-02 / D-186-07) — the optimistic concurrency token ───────
 # ONE canonical expression, referenced by every read AND by the guard, so the value the
 # client is handed and the value the WHERE clause compares can never drift apart.
@@ -2031,6 +2107,69 @@ async def advance_current_phase(
         "UPDATE workflow_runs SET current_phase_id = $2 WHERE id = $1",
         run_id,
         next_phase_id,
+    )
+
+
+async def persist_run_usage(
+    pool: asyncpg.Pool,
+    run_id: UUID,
+    *,
+    input_delta: int | None,
+    output_delta: int | None,
+) -> None:
+    """ADD a phase's token DELTA to a run's durable totals (Phase 256 / METER-03).
+
+    workflow_runs table, keyed by its own ``id``. The ONE home of the token write
+    (D-256-05) — ``finish_run`` is deliberately left byte-unchanged.
+
+    ⛔ ADD, NEVER SET (D-256-09). ``ctx.run_usage_box`` is reset to ``{}`` on every
+    ``_resume_run`` (~~``harness_engine.py:1844``~~ → measured ``:1884`` at Phase 256
+    round 1; the original is kept beside the correction, never over it, per S-5), so the
+    box only ever carries ONE run SEGMENT's spend. A SET would report the last segment's
+    spend as the whole run's total, and a run resumed five times would read as costing a
+    fifth of what it did.
+
+    ⛔ A ``(0, 0)`` or ``(None, None)`` delta writes NOTHING, and that guard is
+    LOAD-BEARING rather than an optimisation. ``_enforce_budget`` is invoked twice per
+    phase iteration (~~``harness_engine.py:1978`` and ``:2547``~~ → measured ``:2073``
+    and ``:2680``), and — SINCE PHASE 256 ROUND 1 — a THIRD caller reaches this writer
+    through ``_flush_run_usage`` once per loop iteration, unconditionally, above every
+    outcome arm. So the idempotency guard below carries three callers, not two, and
+    unlike ``finish_run``
+    — whose cross-worker interleave is benign BY VALUE-IDENTITY
+    (``db/workflows.py`` ``finish_run``'s own docstring) — a second ADD of the same
+    number is not the same write, it is double the money. The delta is derived from
+    ``CircuitBreaker``'s watermark, so an unchanged box yields ``(0, 0)`` and this
+    returns before touching the database.
+
+    ⭐ Under a GENUINE double-drive — two producers that each really ran the phase —
+    BOTH paid the provider, so two ADDs of two real deltas is the TRUTHFUL total. A SET
+    would report half the money actually spent. The write is shaped for the honest case,
+    not the convenient one.
+
+    ⛔ NO RETRY LOOP HERE. A retry after an ``UPDATE`` that already committed would
+    re-add. Let the exception propagate, exactly as every other writer in this module
+    does.
+
+    ⛔ Parameterised ``$1..$4`` only (T-091-03), and ``WHERE id = $1`` is the ENTIRE
+    access boundary — this runs on the service-role pool, which bypasses RLS. Never add
+    an org-less ``WHERE thread_id`` variant.
+
+    ``NULL`` means never measured and ``0`` means measured as zero (D-256-06); the two
+    are different facts and this writer never coalesces one into the other.
+    """
+    if not input_delta and not output_delta:
+        return
+    await pool.execute(
+        "UPDATE workflow_runs SET "
+        "input_tokens = COALESCE(input_tokens, 0) + $2, "
+        "output_tokens = COALESCE(output_tokens, 0) + $3, "
+        "token_coverage = $4 "
+        "WHERE id = $1",
+        run_id,
+        int(input_delta or 0),
+        int(output_delta or 0),
+        list(TOKEN_COVERAGE_LEGS),
     )
 
 

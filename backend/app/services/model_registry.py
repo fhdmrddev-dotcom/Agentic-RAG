@@ -144,6 +144,19 @@ def _registry_row(model_id, cap, ovr, default_model, model_locked):
         # fields above — the RAW effective value or None, never a coalesced "coerce". The
         # read-time default belongs to the consumer (forced_emit.py:376), not to the row.
         "emit_tier": _eff("emit_tier"),
+        # ⭐ Phase 262 (migration 190) — the six capability fields that previously existed ONLY
+        # as literals in config.py's hardcoded dict, so no screen could show or set them. The
+        # SAME WR-04 rule as every field above: the RAW effective value or None, never a
+        # coalesced default. ⛔ `None` means NOT ASSERTED and must not be rendered as `false` —
+        # the consumer's read-time default is the consumer's to apply, and a row claiming
+        # "reasoning_first: off" for a model nobody has classified would be a false statement
+        # about the model, not a blank field.
+        "api_surface": _eff("api_surface"),
+        "reasoning_first": _eff("reasoning_first"),
+        "reasoning_off": _eff("reasoning_off"),
+        "uses_max_completion_tokens": _eff("uses_max_completion_tokens"),
+        "supports_parallel_tools": _eff("supports_parallel_tools"),
+        "max_tools": _eff("max_tools"),
         "is_default": model_id == default_model,
         "is_locked": bool(model_locked) and model_id == default_model,
         # Additive (Plan 07 extends the ModelRegistryRow type): per-field OVR-vs-DEF for Reset.

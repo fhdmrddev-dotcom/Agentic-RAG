@@ -183,6 +183,17 @@ class ToolContext:
     # Phase 234 TRUST-03: Run-scoped tracking flag indicating external connection-sourced
     # knowledge was retrieved in this run's context (disarms write tools without explicit confirmation).
     has_connection_retrieval: bool = False
+    # Phase 264 (264-01 / PACK-17 / D-264-03) — ADDITIVE default-off born-for scope id.
+    # None on EVERY Deep-mode / harness / eval / normal caller => the skill-visibility
+    # predicate this dispatcher builds is byte-identical to base. A UUID (set ONLY by
+    # the two agent_loop ToolContext builds, off a RunContext whose value came from
+    # `_resolve_thread_scoping`'s ACCESS-CHECKED `ResolvedExpertBundle.bundle_id`, plus
+    # the task_service sub_ctx propagation) => the run has a consultant active and the
+    # load path may additionally admit the skills born for it (mig 191's
+    # `skills.born_for_expert_bundle_id`). Same additive-default-off discipline as
+    # phase_whitelist / workflow_run_id / skill_snapshot / skill_instructions_override
+    # above. ⛔ NOTHING reads this in 264-01 — the consumer lands in 264-03.
+    born_for_bundle_id: UUID | None = None
 
 
 @dataclass
@@ -235,21 +246,80 @@ def _ensure_resolver() -> None:
 # Tool handlers -- one async function per tool
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# 262-UAT 3.5 — THE FOLDER WALL. `folder_subtree_ids` is the one scope channel every
+# folder-limited run shares (Restricted + Union Experts, folder-pinned chats). search and
+# glob already honoured it; ls / tree / grep / read_document / analyze_document did not,
+# and a model-supplied `path: "/"` or document id walked straight past the default path.
+# Operator ruling 2026-09-23: the wall applies to EVERY folder-limited run.
+# ⛔ `folder_subtree_ids is None` (an unscoped chat) must stay byte-identical — every helper
+# below returns early on None and issues no query.
+# ---------------------------------------------------------------------------
+_OUT_OF_SCOPE = "is outside the folders this chat is limited to"
+
+
+def _scope_set(ctx: ToolContext) -> set[str] | None:
+    ids = ctx.folder_subtree_ids
+    return None if ids is None else {str(f) for f in ids}
+
+
+async def _document_folder_ids(ctx: ToolContext, doc_ids: list[str]) -> dict[str, str | None]:
+    """One RLS-scoped read: document id -> folder id, for ids the caller can see."""
+    if not doc_ids:
+        return {}
+    resp = await aexec(
+        ctx.supabase.table("documents").select("id, folder_id").in_("id", list(doc_ids))
+    )
+    return {str(r["id"]): (str(r["folder_id"]) if r.get("folder_id") else None) for r in (resp.data or [])}
+
+
+async def _doc_out_of_scope(ctx: ToolContext, doc_id: str) -> bool:
+    scope = _scope_set(ctx)
+    if scope is None:
+        return False
+    folders = await _document_folder_ids(ctx, [doc_id])
+    if doc_id not in folders:
+        return False  # unknown to the caller — the normal path reports not-found
+    return folders[doc_id] not in scope
+
+
+def _prune_tree(node: dict, scope: set[str]) -> dict | None:
+    children = [c for c in (_prune_tree(ch, scope) for ch in node.get("children", [])) if c]
+    in_scope = str(node.get("id")) in scope
+    if not in_scope and not children:
+        return None
+    # An ancestor survives only as the PATH to an in-scope folder; its own documents do not.
+    return {**node, "children": children, "documents": node.get("documents", []) if in_scope else []}
+
+
 async def _handle_ls(args: dict, ctx: ToolContext) -> ToolResult:
     path = args.get("path") or (ctx.scoped_folder_path if ctx.scoped_folder_path else "/")
     result = await ls_path(path, ctx.current_user["id"], ctx.supabase)
+    scope = _scope_set(ctx)
+    if scope is not None and "error" not in result:
+        result["folders"] = [f for f in result.get("folders", []) if str(f.get("id")) in scope]
+        docs = result.get("documents") or []
+        folders = await _document_folder_ids(ctx, [str(d["id"]) for d in docs])
+        result["documents"] = [d for d in docs if folders.get(str(d["id"])) in scope]
     return ToolResult(result=json.dumps(result))
 
 
 async def _handle_tree(args: dict, ctx: ToolContext) -> ToolResult:
     path = args.get("path") or (ctx.scoped_folder_path if ctx.scoped_folder_path else "/")
     result = await tree_path(path, args.get("depth"), ctx.current_user["id"], ctx.supabase)
+    scope = _scope_set(ctx)
+    if scope is not None and "tree" in result:
+        result["tree"] = [n for n in (_prune_tree(t, scope) for t in result["tree"]) if n]
     return ToolResult(result=json.dumps(result))
 
 
 async def _handle_grep(args: dict, ctx: ToolContext) -> ToolResult:
     path = args.get("path") or ctx.scoped_folder_path
     result = await grep_path(args.get("pattern", ""), path, ctx.current_user["id"], ctx.supabase)
+    scope = _scope_set(ctx)
+    if scope is not None and "matches" in result:
+        result["matches"] = [m for m in result["matches"] if str(m.get("folder_id")) in scope]
+        result["total"] = len(result["matches"])
     return ToolResult(result=json.dumps(result))
 
 
@@ -266,6 +336,11 @@ async def _handle_glob(args: dict, ctx: ToolContext) -> ToolResult:
 
 
 async def _handle_read_document(args: dict, ctx: ToolContext) -> ToolResult:
+    if await _doc_out_of_scope(ctx, str(args["document_id"])):
+        return ToolResult(result=json.dumps({
+            "error": f"Document {args['document_id']} {_OUT_OF_SCOPE}.",
+            "error_kind": "out_of_scope",
+        }))
     result = await read_path(
         args["document_id"],
         ctx.current_user["id"],
@@ -299,6 +374,14 @@ async def _fetch_owned_document_bytes(
     owned KB document's original bytes onto a skill. Keep the ``(filename, bytes, mime)``
     tuple / ``{"error": ...}`` dict return shape stable for that reuse.
     """
+    # The folder wall (262-UAT 3.5 ruling) — BEFORE any owner/global lookup, so both callers
+    # (fetch_document_file, attach_skill_file) refuse an out-of-scope id. Found by the v4.3
+    # milestone audit: this byte path was the one document read the 3.5 fix did not reach.
+    if await _doc_out_of_scope(ctx, str(document_id)):
+        return {
+            "error": f"Document {document_id} {_OUT_OF_SCOPE}.",
+            "error_kind": "out_of_scope",
+        }
     uid = ctx.current_user["id"]
     _cols = "id, filename, file_path, file_size, mime_type"
 
@@ -1159,6 +1242,8 @@ async def _handle_analyze_document(args: dict, ctx: ToolContext) -> ToolResult:
     doc_id = await resolve_document_id(args["filename"], ctx.current_user["id"], ctx.supabase)
     if not doc_id:
         return ToolResult(result=f"Document '{args['filename']}' not found.")
+    if await _doc_out_of_scope(ctx, str(doc_id)):
+        return ToolResult(result=f"Document '{args['filename']}' {_OUT_OF_SCOPE}.")
 
     doc = await fetch_full_document(doc_id, ctx.current_user["id"], ctx.supabase)
     if not doc:
@@ -1288,7 +1373,7 @@ def _skill_runtime_note(file_names: list[str]) -> str | None:
 # ToolContext-shaped resolver below.
 # ─────────────────────────────────────────────────────────────────────────────
 
-async def _resolve_skill_visibility_or(ctx: ToolContext) -> str:
+async def _resolve_skill_visibility_or(ctx: ToolContext, *, born_for: bool = False) -> str:
     """Resolve the caller's org set + build the org-gated skill-visibility ``.or_()``.
 
     The service-role client bypasses RLS so ``auth.uid()`` / ``current_user_org_ids()``
@@ -1297,9 +1382,41 @@ async def _resolve_skill_visibility_or(ctx: ToolContext) -> str:
     for the folder analog (SEED-124). One await per handler; handlers with two resolution
     sites (read_skill_file / execute_code) resolve ONCE and reuse the returned string so
     the injection loop never fires N membership round-trips.
+
+    ⭐ **Phase 264 (PACK-17 / D-264-04) — ``born_for`` IS THE DECISION, NOT A CONVENIENCE.**
+    When true, the caller's ACTIVE Expert bundle (the ``born_for_bundle_id`` field on ``ctx``,
+    set only by the agent-loop ToolContext builds off an ACCESS-CHECKED
+    ``ResolvedExpertBundle.bundle_id``) is
+    forwarded to ``build_skill_visibility_or``, which nests a
+    ``born_for_expert_bundle_id = <bundle> AND is_enabled`` disjunct INSIDE the org gate. A
+    resolver that simply read ``ctx`` unconditionally would have widened **all four** call
+    sites by OMISSION — including ``_handle_save_skill``'s lint corpus, which D-264-04
+    deliberately refuses. The explicit keyword makes every site's decision readable at the
+    site, and a widening therefore cannot happen by silence. The per-site reasons are written
+    beside each of the four calls below; the count is fenced at exactly three opting-in call
+    sites by ``tests/unit/test_264_load_skill_born_for.py`` — as an AST count, because a
+    comment quoting the keyword satisfies a grep and wires nothing.
+
+    ⛔ The field is read through ``getattr`` with a ``None`` default, never as a bare attribute
+    on ``ctx`` (the one read in this module is the line below) — three
+    existing suites build duck-typed ``ToolContext``-shaped stubs that predate this field, and
+    an ``AttributeError`` here would be swallowed by the ``save_skill`` lint wrapper and the
+    ``execute_code`` outer guard rather than surfacing. The same ``getattr`` precedent guards
+    ``skill_instructions_override`` and ``skill_snapshot`` in this module.
+
+    ⛔ The bundle is coerced with ``str(...)`` at THIS seam: ``ToolContext`` types the field
+    ``UUID | None`` while ``app.utils.skill_visibility`` annotates its parameter ``str | None``
+    (264-02's zero-new-imports convention — that module imports nothing but ``coerce_uid``).
+    Never re-derive the predicate term here; pass the bundle THROUGH, or the one-home count
+    fence in ``tests/unit/test_264_one_home_born_for_predicate.py`` names this module.
     """
     org_ids = await _resolve_caller_org_ids(ctx.supabase, ctx.current_user["id"])
-    return build_skill_visibility_or(ctx.current_user["id"], org_ids)
+    _bundle = getattr(ctx, "born_for_bundle_id", None) if born_for else None
+    return build_skill_visibility_or(
+        ctx.current_user["id"],
+        org_ids,
+        expert_bundle_id=str(_bundle) if _bundle is not None else None,
+    )
 
 
 async def _handle_load_skill(args: dict, ctx: ToolContext) -> ToolResult:
@@ -1312,7 +1429,18 @@ async def _handle_load_skill(args: dict, ctx: ToolContext) -> ToolResult:
     # SEED-125 (CR-01): the visibility filter is org-gated (is_system universal escape
     # OR org_id ∈ caller_org_ids AND (owner OR is_org_shared)) — a disjoint-org caller no
     # longer resolves another org's is_org_shared skill on the BYPASSRLS service client.
-    _skill_filter = await _resolve_skill_visibility_or(ctx)
+    #
+    # Phase 264 (PACK-17 / D-264-04) — ⭐ WIDEN. THIS SITE IS THE DEFECT. `load_skill` is in
+    # `EXPERT_CORE_TOOLS`, and Phase 263 already admits a colleague's born-for skill at
+    # RESOLVE time — but that result is the CATALOG only (names + descriptions). The
+    # instruction BODY is fetched here, through a predicate that had never heard of
+    # `born_for_expert_bundle_id`, so for every org member but the author the prompt promised
+    # a skill the load path then refused. The opt-in below closes exactly that.
+    # ⛔ Resolved ONCE and reused at the miss branch below, which is what keeps the
+    # `available_skills` listing built from the SAME filter as the primary query — it can
+    # never name a set the query would not admit (RESEARCH §8.8 / T-264-14). Re-deriving the
+    # filter there would silently re-open half the defect while every outcome test stayed green.
+    _skill_filter = await _resolve_skill_visibility_or(ctx, born_for=True)
     _skill_resp = await aexec(
         ctx.supabase.table("skills")
         .select("id, name, description, instructions, user_id")
@@ -1456,6 +1584,22 @@ async def _handle_save_skill(args: dict, ctx: ToolContext) -> ToolResult:
     try:
         # SEED-125 (CR-01): org-gate the sibling set so the lint never reads (or echoes
         # the description of) another org's is_org_shared skill on the service client.
+        #
+        # Phase 264 (PACK-17 / D-264-04) — ⛔ DELIBERATELY **NOT** WIDENED. This is the one
+        # resolver call in this module that keeps the default `born_for=False`, and the
+        # decision is written here rather than left as an omission. Three measured reasons:
+        #   1. `save_skill` is in NEITHER `EXPERT_CORE_TOOLS` nor `EXPERT_DELIVERABLE_TOOLS`
+        #      (:4585-4609), so it is **not advertised** to an Expert run. ⚠ "not advertised",
+        #      NOT "unreachable" — `effective_tools` is a SCHEMA filter, and `dispatch_tool`'s
+        #      only refusal backstop is `ctx.phase_whitelist`, which is `None` on a chat run,
+        #      so a hallucinated call could still dispatch here.
+        #   2. The read feeds a non-blocking description **lint** corpus and produces NO
+        #      user-visible capability. Widening it would only let an Expert's borrowed skills
+        #      influence another user's save-time warnings — a widening with no upside.
+        #   3. It is a WRITE handler's helper, while PACK-17's axis is *read the body you were
+        #      promised*.
+        # Driven, not merely asserted: `tests/unit/test_264_unchanged_sites_fenced.py` resolves
+        # this filter on a ctx that DOES carry a bundle and pins it to the base literal.
         _sibling_filter = await _resolve_skill_visibility_or(ctx)
         siblings_resp = await aexec(
             ctx.supabase.table("skills")
@@ -1586,7 +1730,14 @@ async def _handle_read_skill_file(args: dict, ctx: ToolContext) -> ToolResult:
     #    visibility filter is org-gated per SEED-125 (CR-01). Resolve the caller's org
     #    set ONCE and reuse it for the normalized-name retry (no double round-trip). ──
     skill_name = args.get("skill_name", "")
-    _skill_filter = await _resolve_skill_visibility_or(ctx)
+    # Phase 264 (PACK-17 / D-264-04) — ⭐ WIDEN. `read_skill_file` is in `EXPERT_CORE_TOOLS`,
+    # and `load_skill` returns `files: [...]` (:1405) — so a body that loads while its bundled
+    # files 404 is the SAME defect one layer down: the model is told the files exist and then
+    # cannot read them. ⚠ This handler applies NO `is_enabled` filter of its own, which is why
+    # the born-for disjunct carries its own `is_enabled.is.true` term (264-02, Form 2 /
+    # T-264-15) — a bare arm here would admit a DISABLED born-for skill's bundled bytes.
+    # Resolved ONCE and reused by the normalised-name retry below.
+    _skill_filter = await _resolve_skill_visibility_or(ctx, born_for=True)
     # Resolve skill to get owner's user_id for storage path
     _sr_resp = await aexec(
         ctx.supabase.table("skills")
@@ -2194,7 +2345,17 @@ async def _handle_execute_code(args: dict, ctx: ToolContext) -> ToolResult:
         # SEED-125 (CR-01): resolve the caller's org-gated skill-visibility filter ONCE
         # before the injection loop (not per file) so a disjoint-org caller cannot pull
         # another org's is_org_shared skill files into the sandbox on the service client.
-        _sf_filter = await _resolve_skill_visibility_or(ctx) if skill_files_req else None
+        #
+        # Phase 264 (PACK-17 / D-264-04) — ⭐ WIDEN. `execute_code` is in
+        # `EXPERT_DELIVERABLE_TOOLS`, unioned in whenever `tool_floor_enabled` (the default).
+        # Same class as `read_skill_file`, one layer further out, and the failure is QUIETER:
+        # an unresolved skill here is a `logger.warning` plus a silently-skipped file below, so
+        # the sandbox runs WITHOUT the helper and the model reasons on from a false premise.
+        # ⚠ This handler applies no `is_enabled` filter either — see the born-for disjunct's
+        # own enablement term (T-264-15). Resolved ONCE, before the loop, never per file.
+        _sf_filter = (
+            await _resolve_skill_visibility_or(ctx, born_for=True) if skill_files_req else None
+        )
         for sf in skill_files_req:
             sf_skill_name = sf.get("skill_name", "")
             sf_filename = sf.get("filename", "")
@@ -4579,6 +4740,40 @@ _TOOL_REGISTRY: dict[str, Callable] = {
     # Phase 151 (FILE-01) — registry + get_tools BOTH (self_improve-gated); G-5: handler + one line, threads.py untouched
     "attach_skill_file": _handle_attach_skill_file,
 }
+
+# Phase 260 (PACK-02 / F-3) — Canonical core tools allowed for consultant experts
+# Derived strictly from _TOOL_REGISTRY keys to prevent second-registry drift.
+EXPERT_CORE_TOOLS: frozenset[str] = frozenset({
+    "search_documents",
+    "query_documents",
+    "read_document",
+    "analyze_document",
+    "ls",
+    "tree",
+    "grep",
+    "glob",
+    "load_skill",
+    "read_skill_file",
+})
+
+assert EXPERT_CORE_TOOLS.issubset(_TOOL_REGISTRY.keys()), (
+    f"EXPERT_CORE_TOOLS contains tools not registered in _TOOL_REGISTRY: "
+    f"{EXPERT_CORE_TOOLS - set(_TOOL_REGISTRY.keys())}"
+)
+
+# Phase 261 (PACK-02 / D-v4.3-02 / SEED-303 S6) — Additive tool floor preserving deliverable-producing tools
+EXPERT_DELIVERABLE_TOOLS: frozenset[str] = frozenset({
+    "execute_code",
+    "workspace_write",
+    "render_template",
+    "ask_user",
+})
+
+assert EXPERT_DELIVERABLE_TOOLS.issubset(_TOOL_REGISTRY.keys()), (
+    f"EXPERT_DELIVERABLE_TOOLS contains tools not registered in _TOOL_REGISTRY: "
+    f"{EXPERT_DELIVERABLE_TOOLS - set(_TOOL_REGISTRY.keys())}"
+)
+
 
 
 def _spawn_tool_refused_audit(ctx: ToolContext, tool_name: str, allowed: list[str]) -> None:

@@ -599,6 +599,35 @@ async def _validate_llm_judge_rubric(output: dict, config: dict, ctx) -> GateRes
         system_prompt=system_prompt,
         schema_model=JudgeVerdict,
     )
+    # Phase 256 round 1 (METER-06 / SC#4, D-256-18 Option A): fold THIS judge shot's
+    # ladder totals into the run-level box. Same shape as ``phase_types.py:1586``, the
+    # one call site that was already wired.
+    #
+    # ⛔ THE IMPORT IS FUNCTION-LOCAL FOR TWO INDEPENDENT REASONS, and either alone
+    # would be sufficient: (i) ``phase_types.py:84`` imports THIS module
+    # (``CITATION_MARKER_GUIDANCE``), so a module-level import back is an import CYCLE;
+    # (ii) this module's own Pitfall 4 contract already makes ``forced_emit``,
+    # ``template_render_service`` and ``docxtpl`` function-local.
+    #
+    # ⚠ PLACED IMMEDIATELY AFTER THE CALL AND **ABOVE** THE FAILURE ARM BELOW, AND THE
+    # PLACEMENT IS THE WHOLE POINT. A judge shot that produced no verdict was still
+    # SERVED and BILLED — it is the EXPENSIVE outcome. Recording below the
+    # ``if result.get("failure") ...: return GateResult(False, …)`` two lines down would
+    # count the cheap outcomes and skip that one, and the bias would be invisible
+    # downstream because a biased total still looks like a total.
+    #
+    # ⚠ NEW BRANCHES: 0. ``_record_run_usage`` is a no-op when the ctx carries no box
+    # (the Deep / unit-stub / golden-run shape → ``_run_usage_box`` returns ``None``),
+    # and ``None``/``0`` token counts add nothing — ``NULL`` means never measured and
+    # ``0`` means measured as zero, and the two stay different facts (D-256-06).
+    #
+    # ⚠ IT IS BELOW THE PRE-COMPUTED-VERDICT SEAM AT THE TOP OF THIS FUNCTION, which is
+    # correct: that seam returns before any provider call, so nothing was served and
+    # nothing may be recorded.
+    from app.services.harness.phase_types import _record_run_usage  # function-local (cycle)
+
+    _record_run_usage(ctx, result.get("input_tokens"), result.get("output_tokens"))
+
     if result.get("failure") or result.get("emitted") is None:
         return GateResult(
             False,

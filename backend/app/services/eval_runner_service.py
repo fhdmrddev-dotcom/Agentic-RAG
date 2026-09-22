@@ -494,6 +494,7 @@ async def _run_arm(
     user_settings,
     skill_instructions_override: dict[str, str] | None = None,  # Phase 135 (SI-01) — Pitfall #1 carrier; None on 133/134 => unchanged
     org_id: str | None = None,  # Phase 163 (D-05) — widens the tool-evidence read to org-aware; None => byte-identical
+    usage_acc: dict | None = None,  # Phase 256 (METER-05) — run-LOCAL spend accumulator; None => byte-identical
 ) -> tuple[str, str, bool | None]:
     """Drive ONE completion (WITH or WITHOUT arm) for one case, grade it, then persist its
     eval_results row (verdict in the SAME insert) + emit progress. A per-arm exception
@@ -523,6 +524,7 @@ async def _run_arm(
             user_settings=user_settings, user_id=user_id, test_case_id=test_case_id,
             skill_instructions_override=skill_instructions_override,
             org_id=org_id,
+            usage_acc=usage_acc,
         )
     finally:
         pulse.cancel()
@@ -545,10 +547,17 @@ async def _run_arm_body(
     test_case_id,
     skill_instructions_override: dict[str, str] | None = None,  # Phase 135 (SI-01) — Pitfall #1 carrier; None on 133/134 => unchanged
     org_id: str | None = None,  # Phase 163 (D-05) — org-aware tool-evidence read; None => byte-identical
+    usage_acc: dict | None = None,  # Phase 256 (METER-05) — run-LOCAL spend accumulator; None => unchanged
 ) -> tuple[str, str, bool | None]:
     """The original ``_run_arm`` body (loop → D-04 grading gate → persist → emits),
     extracted verbatim so the heartbeat pulse can wrap it with try/finally without
-    re-indenting the load-bearing logic. Called ONLY by ``_run_arm``."""
+    re-indenting the load-bearing logic. Called ONLY by ``_run_arm``.
+
+    ``usage_acc`` (Phase 256 / METER-05) is the job's run-LOCAL token accumulator. It is
+    threaded down rather than returned because widening the 3-tuple would either fuse
+    this arm's SPEND into ``with_outcomes`` — a list whose comment at ``:852-855`` exists
+    precisely to keep the verdict denominator WITH-arm-only — or force every caller to
+    unpack and re-split it. ``None`` leaves this function byte-identical."""
     body = MessageCreate(
         content=case.get("prompt", ""),
         model=model,
@@ -602,6 +611,32 @@ async def _run_arm_body(
         logger.exception("eval arm failed (run %s, case %s, %s)", run_id, test_case_id, variant)
     finally:
         duration_ms = int((time.monotonic() - _t0) * 1000)
+
+    # ── METER-05 (Phase 256 / D-256-08) — fold THIS arm's spend into the job's total ──
+    # Placed above the grading gate on purpose: the provider billed for this arm whether
+    # or not the judge could grade it, so an errored or empty arm's measured tokens still
+    # belong in the run's spend.
+    # ⚠ ``None`` ADDS NOTHING (``phase_types._record_run_usage``'s rule): a provider that
+    # emitted no usage is not a zero, and an unmeasured arm must not erase a measured one.
+    # ⛔ THIS IS A LOCAL ACCUMULATOR AND NOT THE HARNESS'S RUN-LEVEL USAGE BOX. That box's
+    # ONLY writer is ``harness_engine.py:1864``, inside ``run_workflow``, and this service
+    # calls ``run_agent_loop`` directly (``_run_arm_body`` builds its own ``RunContext``).
+    # Reaching for it here would read ``None`` forever while looking correct — the
+    # quietest possible way to fail METER-05, which is why a fence in
+    # ``test_256_eval_usage_rollup.py`` asserts its identifier appears nowhere in this file.
+    # ⛔ Written WITHOUT the `(box.get(k) or 0) + n` idiom on purpose. That idiom is
+    # correct here (it only runs when the arm measured something), but D-256-06 bans
+    # `or 0` on a token read across this phase's files so the rule can be checked by one
+    # grep rather than by reading each guard — and a rule that needs a case-by-case
+    # exemption is a rule nobody can audit. The explicit form says the same thing louder:
+    # an absent key STAYS ABSENT until an arm measures something.
+    if usage_acc is not None:
+        if in_tok is not None:
+            _prev_in = usage_acc.get("input_tokens")
+            usage_acc["input_tokens"] = int(in_tok) if _prev_in is None else _prev_in + int(in_tok)
+        if out_tok is not None:
+            _prev_out = usage_acc.get("output_tokens")
+            usage_acc["output_tokens"] = int(out_tok) if _prev_out is None else _prev_out + int(out_tok)
 
     # ── D-04 honest-verdict gate ──────────────────────────────────────────────────────
     # Grade ONLY a completed, non-empty arm. An errored / empty arm stays not_measured
@@ -825,6 +860,32 @@ async def run_eval_job(
         supabase = get_service_role_supabase(org_id)
     final_status = "completed"
     run_error: str | None = None
+    # ── METER-05 (Phase 256 / D-256-08) — the job's run-LOCAL token accumulator ────────
+    # Declared HERE, above the outer `try`, because the companion `runs` row is finalized
+    # in this function's `finally`, and that finalize used to hardcode a NULL usage while
+    # every arm's totals were being measured two frames away.
+    #
+    # ⛔ RUN-LOCAL, NEVER A MODULE GLOBAL — `WORKER_COUNT=2` is the shipped default and
+    # the `with_outcomes` comment below already cites D-PRD-12 for exactly this. Two
+    # concurrent jobs must not see each other's spend (T-256-17).
+    #
+    # ⭐ BOTH GRADED ARMS ARE COUNTED, and that is a decision rather than an oversight:
+    # the provider billed for the WITH arm AND the WITHOUT arm (D-256-12's logic). ⚠ The
+    # WITHOUT arm's deliberate exclusion from `with_outcomes` is a VERDICT-denominator
+    # narrowing (OQ3); a SPEND rollup does not inherit it. Two rollups, two accumulators.
+    #
+    # ⛔ THE JUDGE SHOT IS NOT COUNTED — DECIDED, NOT FORGOTTEN. `_judge_eval_answer` is
+    # a third paid call per graded arm whose usage is measured NOWHERE in the codebase,
+    # so counting it would mean instrumenting the forced-emit seam, which is a different
+    # file and a different requirement. It is registered in **SEED-300** with a concrete
+    # re-open trigger. Silently folding it in and silently omitting it are the same
+    # failure: a spend figure with an unnamed hole in it is worse than no figure.
+    #
+    # ⛔ NOT the harness's run-level usage box: its only writer is `harness_engine.py:1864`,
+    # inside `run_workflow`, which this service never calls (see `_run_arm_body`).
+    # ⚠ Keys stay ABSENT until something is measured, so an unmeasured job reaches the
+    # column as NULL rather than 0 (D-256-06).
+    usage_acc: dict = {}
     try:
         # D-01 / V5: resolve + validate the provider from the model. An unknown model
         # is rejected (no fabricated capability) — single provider per run.
@@ -876,6 +937,7 @@ async def run_eval_job(
                     # proposed instructions (Pitfall #1). None on 133/134 => unchanged.
                     skill_instructions_override=skill_instructions_override,
                     org_id=org_id,  # Phase 163 (D-05) — org-aware tool-evidence read
+                    usage_acc=usage_acc,  # Phase 256 (METER-05) — this arm's spend
                 )
             )
 
@@ -895,13 +957,18 @@ async def run_eval_job(
             )
 
             # WITHOUT arm — inject NOTHING (empty catalog). Its verdict is persisted +
-            # streamed but does NOT count toward the rollup (OQ3) — return intentionally ignored.
+            # streamed but does NOT count toward the VERDICT rollup (OQ3) — return
+            # intentionally ignored.
+            # ⭐ METER-05: its SPEND does count. The return is still discarded, but the
+            # accumulator rides down as an argument, so this arm's tokens land in the
+            # job's total without the verdict narrowing above leaking into a spend figure.
             await _run_arm(
                 redis=redis, supabase=supabase, run_id=run_id, thread_id=eval_thread_id,
                 case=case, variant=VARIANT_WITHOUT, catalog_override=(),
                 provider=provider, model=model, current_user=current_user,
                 user_settings=user_settings,
                 org_id=org_id,  # Phase 163 (D-05) — org-aware tool-evidence read
+                usage_acc=usage_acc,  # Phase 256 (METER-05) — you were billed for this arm too
             )
 
         # With-skill rollup (D-07 / OQ3), written ONLY on a clean completion. A cancelled /
@@ -935,6 +1002,20 @@ async def run_eval_job(
         await _emit_terminal(redis, run_id, TERMINAL_ERROR, error=run_error)
     finally:
         # Finalize the companion runs row (reattach/cancel parity — db/runs.py).
+        # METER-05 (Phase 256 / D-256-08): with the job's real spend, summed across every
+        # arm of every case. ⛔ `.get()` with NO default and NO `or 0` — an absent key
+        # means nothing was ever measured and must reach the column as NULL (D-256-06).
+        _in_tok = usage_acc.get("input_tokens")
+        _out_tok = usage_acc.get("output_tokens")
+        if _in_tok is None and _out_tok is None:
+            # The warning CONTRACT from db/runs.py:93-99, honoured here. IDENTIFIERS
+            # ONLY — never token values (T-073-04 / T-256-14).
+            logger.warning(
+                "runs.usage missing for run=%s provider=%s model=%s",
+                run_id,
+                provider,
+                model,
+            )
         try:
             await finalize_run(
                 pool,
@@ -943,8 +1024,8 @@ async def run_eval_job(
                 error=run_error,
                 completed_at=datetime.now(timezone.utc),
                 message_id=None,
-                input_tokens=None,
-                output_tokens=None,
+                input_tokens=_in_tok,
+                output_tokens=_out_tok,
             )
         except Exception:
             logger.exception("eval finalize_run failed for run %s", run_id)

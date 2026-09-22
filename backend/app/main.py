@@ -857,7 +857,7 @@ async def list_models():
     return {"models": models, "default": settings.llm_model}
 
 
-from app.api import threads, runs, documents, settings as settings_api, folders, kb, skills, audit, knowledge_health, feedback, sandbox_outputs, workspace, admin, panel, workflows, workflow_runs, metadata_fields, document_views, document_relationships, classification_rules, document_governance, skill_tuner, skill_test_cases, evals, features, setup as setup_api, org, me_preferences, connectors, model_registry, schedules, document_queries, library, checked_queries, takeoff, sources  # noqa: E402
+from app.api import threads, runs, documents, settings as settings_api, folders, kb, skills, audit, knowledge_health, feedback, sandbox_outputs, workspace, admin, panel, workflows, workflow_runs, metadata_fields, document_views, document_relationships, classification_rules, document_governance, skill_tuner, skill_test_cases, evals, features, setup as setup_api, org, me_preferences, connectors, model_registry, schedules, document_queries, library, checked_queries, takeoff, sources, experts  # noqa: E402
 
 app.include_router(threads.router)
 app.include_router(runs.router)
@@ -899,6 +899,7 @@ app.include_router(takeoff.router)  # Phase 220 (TAKEOFF-02/03) — CAD takeoff 
 app.include_router(schedules.workflow_router)  # Phase 204 SCHED-01 — the workflow-anchored half (/workflows/{id}/schedules: create + list). Shares the /workflows prefix with api/workflows.py; no path collides. Registered AFTER workflows.router so the older, more specific routes keep their precedence
 app.include_router(sources.router)  # Phase 234 (LIB-08 / SURF-01 / VIS-05) — folder watches & source sync (/sources)
 app.include_router(sources.router, prefix="/api")  # Phase 234 alias (/api/sources)
+app.include_router(experts.router)  # Phase 259 (PACK-01 / PACK-06) — expert bundles manifest (/experts)
 # Phase 182 (D-182-04): the TEMPORARY Phase-181 "/canvas/ping" canary router was RETIRED here.
 # The real require_canvas-gated routes (POST /workflows/validate + GET /workflows/grounding-bundle,
 # mounted on workflows.router above) now carry the byte-identical 404-when-off gate, so the

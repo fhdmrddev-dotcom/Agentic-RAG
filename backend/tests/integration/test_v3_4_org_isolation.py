@@ -1139,3 +1139,318 @@ async def test_skill_file_storage_read_cross_org_refused_seed125(pg_pool, two_or
             storage_name,
         )
         await _cleanup(pg_pool, "DELETE FROM public.skills WHERE id = $1", str(sid))
+
+
+# ══════════════════════════════════════════════════════════════════════════════════
+# PACK-17 / Phase 264 (264-04, SC#1's REAL-DB HALF) — the SAME-ORG NON-AUTHOR axis.
+#
+#   The SEED-125 legs above drive the DISJOINT-ORG axis, which must keep FAILING and
+#   is the case the org gate exists for. 264's case is its INVERSE and must now PASS:
+#   Phase 263 stamps `skills.born_for_expert_bundle_id` and admits a colleague's
+#   born-for skill at RESOLVE time (the catalog: names + descriptions), but the
+#   instruction BODY was fetched through a predicate that had never heard of that
+#   column — so for every org member BUT the author, the Expert's prompt promised a
+#   skill the load path then refused, and the miss branch handed the model an
+#   `available_skills` list that EXCLUDED it.
+#
+#   ⛔ WHAT THESE TWO TESTS PROVE THAT `tests/unit/test_264_load_skill_born_for.py`
+#   CANNOT, AND VICE VERSA. 264-03's unit proof drives the real handler against a
+#   RECORDING+FILTERING in-process fake: it proves the query this process would send
+#   and the rows that query would admit, evaluated in Python. It touches no database.
+#   These two prove the other half — a REAL service-role (BYPASSRLS) supabase client,
+#   real PostgREST parsing the `.or_()` grammar, real `public.skills` rows, real
+#   `org_members` membership resolution: Postgres AGREES with the predicate. Neither
+#   claims what the other proves, and neither alone is the evidence.
+#
+#   ⛔ AND WHAT NEITHER DEFENDS: this module is OUTSIDE `pytest tests/unit`, so it does
+#   NOT hold the backend ceiling and may never be quoted as a gate. It is UAT-adjacent
+#   evidence for D-264-09.
+# ══════════════════════════════════════════════════════════════════════════════════
+
+
+def _make_born_for_tool_ctx(sb, caller_uid: str, born_for_bundle_id):
+    """The 264 sibling of ``_make_seed125_tool_ctx`` — the SAME ctx, plus the run's
+    access-checked Expert bundle id on ``ToolContext.born_for_bundle_id`` (264-01's carrier).
+
+    ⛔ Built by ``dataclasses.replace`` over the neighbour's helper rather than by a second
+    ``ToolContext(...)`` literal, so the two ctx shapes CANNOT drift — and so the neighbour's
+    own default stays untouched (a changed default would silently make
+    ``test_load_skill_cross_org_refused_seed125`` measure a different configuration than it
+    did before this commit)."""
+    import dataclasses  # noqa: PLC0415
+
+    return dataclasses.replace(
+        _make_seed125_tool_ctx(sb, caller_uid), born_for_bundle_id=born_for_bundle_id,
+    )
+
+
+async def _seed_born_for_private_skill(pool, owner_uid: str, org_id: str):
+    """Seed the 264 shape: a **PRIVATE** (``is_org_shared=False``), enabled skill owned by
+    ``owner_uid`` in ``org_id``, stamped ``born_for_expert_bundle_id`` -> a REAL
+    ``public.expert_bundles`` row in the same org, plus one bundled ``skill_files`` row.
+
+    Returns ``(skill_id, skill_name, instructions_body, bundle_id)``.
+
+    ⚠ The bundle row is NOT optional and a bare fresh UUID will NOT do: mig 191 declares
+    ``born_for_expert_bundle_id uuid REFERENCES public.expert_bundles(id) ON DELETE SET NULL``,
+    so an unbacked id is rejected by the foreign key. (264-04's plan text said "a fresh UUID" —
+    measured wrong against the shipped migration; recorded in 264-04-SUMMARY.md.)
+    ``expert_bundles`` also carries ``CHECK (is_system = true OR org_id IS NOT NULL)``
+    (mig 187), so ``org_id`` is explicit here.
+
+    ``org_id`` explicit on the skill -> the mig-106 autofill trigger no-ops; the ``skill_files``
+    row cascade-deletes with the skill."""
+    bundle_id = uuid4()
+    await pool.execute(
+        "INSERT INTO public.expert_bundles (id, org_id, created_by, name, slug) "
+        "VALUES ($1, $2, $3, $4, $5)",
+        bundle_id, org_id, owner_uid, f"264 born-for expert {bundle_id}",
+        f"pack17-born-for-{bundle_id}",
+    )
+    sid = uuid4()
+    name = f"pack17-born-for-{sid}"
+    body = f"PACK-17 born-for PRIVATE instructions {sid}"
+    await pool.execute(
+        "INSERT INTO public.skills "
+        "(id, user_id, org_id, name, description, instructions, is_org_shared, is_enabled, "
+        " born_for_expert_bundle_id) "
+        "VALUES ($1, $2, $3, $4, $5, $6, false, true, $7)",
+        sid, owner_uid, org_id, name, "born for the 264 expert", body, bundle_id,
+    )
+    await pool.execute(
+        "INSERT INTO public.skill_files "
+        "(id, skill_id, user_id, org_id, filename, file_path, file_size, mime_type) "
+        "VALUES ($1, $2, $3, $4, 'margin.md', $5, 12, 'text/markdown')",
+        uuid4(), sid, owner_uid, org_id, f"{owner_uid}/{sid}/margin.md",
+    )
+    return str(sid), name, body, str(bundle_id)
+
+
+async def _seed_second_member_of_org(pool, org_id: str):
+    """Create a SECOND member of ``org_id`` — a real ``auth.users`` row plus an ``org_members``
+    row — and return ``(uid, personal_org_ids)``.
+
+    The ``two_orgs_two_users`` fixture deliberately gives two users in two DISJOINT orgs, so
+    264's axis (same org, different person) has no fixture. Membership is created exactly the
+    way that fixture's fallback arm creates it. ⚠ The mig-105 ``handle_new_user`` trigger may
+    also auto-provision a PERSONAL org for this user; those org ids are returned so teardown can
+    delete them. A second membership is harmless to the predicate (the org gate is an
+    ``org_id.in.(…)`` over the caller's WHOLE set) but it is still seeded state we own."""
+    uid = uuid4()
+    await pool.execute(
+        "INSERT INTO auth.users (id, email) VALUES ($1, $2)",
+        uid, f"pack17-member-{uid}@test.local",
+    )
+    personal = [
+        str(r["org_id"]) for r in await pool.fetch(
+            "SELECT org_id FROM public.org_members WHERE user_id = $1", uid
+        )
+    ]
+    await pool.execute(
+        "INSERT INTO public.org_members (org_id, user_id, role) VALUES ($1, $2, 'member') "
+        "ON CONFLICT DO NOTHING",
+        org_id, uid,
+    )
+    return str(uid), personal
+
+
+async def _teardown_born_for_seed(pool, skill_id, bundle_id, member_uid, personal_orgs):
+    """Delete every row the 264 legs seeded and RETURN the post-delete counts, so the caller can
+    ASSERT the teardown rather than trust it (the ``263-UAT.md`` "Data left behind, deliberately"
+    standard: anything kept is named and justified, anything else is deleted and the deletion
+    VERIFIED)."""
+    await _cleanup(pool, "DELETE FROM public.skills WHERE id = $1", skill_id)
+    await _cleanup(pool, "DELETE FROM public.expert_bundles WHERE id = $1", bundle_id)
+    await _cleanup(pool, "DELETE FROM public.org_members WHERE user_id = $1", member_uid)
+    for oid in personal_orgs:
+        await _cleanup(pool, "DELETE FROM public.organizations WHERE id = $1", oid)
+    await _cleanup(pool, "DELETE FROM public.profiles WHERE id = $1", member_uid)
+    await _cleanup(pool, "DELETE FROM auth.users WHERE id = $1", member_uid)
+    return {
+        "skills": await pool.fetchval(
+            "SELECT count(*) FROM public.skills WHERE id = $1", skill_id),
+        "skill_files": await pool.fetchval(
+            "SELECT count(*) FROM public.skill_files WHERE skill_id = $1", skill_id),
+        "expert_bundles": await pool.fetchval(
+            "SELECT count(*) FROM public.expert_bundles WHERE id = $1", bundle_id),
+        "org_members": await pool.fetchval(
+            "SELECT count(*) FROM public.org_members WHERE user_id = $1", member_uid),
+        "auth_users": await pool.fetchval(
+            "SELECT count(*) FROM auth.users WHERE id = $1", member_uid),
+    }
+
+
+_TEARDOWN_CLEAN = {
+    "skills": 0, "skill_files": 0, "expert_bundles": 0, "org_members": 0, "auth_users": 0,
+}
+
+
+@pytest.mark.asyncio
+async def test_load_skill_born_for_same_org_non_author_pack17(pg_pool, two_orgs_two_users):
+    """PACK-17 / SC#1 on a REAL database — a SAME-ORG NON-AUTHOR, on a run with the Expert
+    active, loads the instruction BODY of a PRIVATE born-for skill; and the widening is proven
+    NARROW on Postgres, not only in the predicate.
+
+    Five cases, in order, each asserting on the instruction BODY STRING (never a status word — a
+    status word cannot tell "resolved the right row" from "resolved something"):
+
+      1. positive control — the AUTHOR (A) loads its own private born-for skill. Without it, a
+         0-for-everyone seeding or permission bug would false-green every refusal below.
+      2. ⭐ THE TARGET — a SECOND member of A's org, carrying the stamped bundle, gets the SAME
+         body back from a real Postgres round-trip. This is the case that was broken.
+      3. narrowness — the same member with ``born_for_bundle_id=None`` (no Expert active) is
+         REFUSED. The widening is opt-in per RUN, not a standing grant.
+      4. narrowness — the same member with a WRONG bundle is REFUSED. The marker must MATCH.
+      5. ⛔ T-264-19 tenancy — a DISJOINT-ORG caller (B) holding the CORRECT bundle id is STILL
+         refused, because the born-for disjunct nests INSIDE the org gate rather than beside
+         ``is_system``. That is the SEED-125 shape this phase must not re-open, measured on the
+         real database rather than inferred from the predicate string.
+
+    ⛔ Outside ``pytest tests/unit``: UAT-adjacent evidence for D-264-09, never a gate.
+    ⛔ 264-03's ``tests/unit/test_264_load_skill_born_for.py`` proves the QUERY this process would
+    send and the rows it would admit, evaluated in-process against a recording fake; THIS proves
+    what Postgres returns. Neither claims what the other proves."""
+    from app.services.tool_dispatcher import _handle_load_skill  # noqa: PLC0415
+
+    a, b = two_orgs_two_users["a"], two_orgs_two_users["b"]
+    sb = _service_role_supabase_or_skip()
+    sid, name, body, bundle_id = await _seed_born_for_private_skill(
+        pg_pool, a["uid"], a["org_id"])
+    member_uid, personal_orgs = await _seed_second_member_of_org(pg_pool, a["org_id"])
+    refusal = f"Skill '{name}' not found or not enabled."
+
+    try:
+        async def _load(ctx):
+            return json.loads((await _handle_load_skill({"skill_name": name}, ctx)).result)
+
+        # 1. Positive control — the AUTHOR loads its own private born-for skill.
+        out_author = await _load(_make_born_for_tool_ctx(sb, a["uid"], bundle_id))
+        assert out_author.get("instructions") == body, (
+            "positive-control failure: the AUTHOR cannot load its OWN private born-for skill "
+            f"(got {out_author!r}) — every refusal below would then false-green on a seeding or "
+            "permission bug rather than on the org/born-for gate."
+        )
+
+        # 2. ⭐ THE TARGET — a same-org NON-AUTHOR with the Expert active gets the BODY.
+        out_member = await _load(_make_born_for_tool_ctx(sb, member_uid, bundle_id))
+        assert out_member.get("instructions") == body, (
+            "PACK-17 (SC#1) REAL-DB failure: a same-org NON-AUTHOR on a run with the born-for "
+            f"Expert active did NOT receive the instruction body — got {out_member!r}. Phase 263 "
+            "admits this row at RESOLVE time, so the Expert's prompt promises a skill the LOAD "
+            "path then refuses. The born-for disjunct must be nested inside the org gate in the "
+            "predicate `_handle_load_skill` actually sends to PostgREST."
+        )
+        assert "margin.md" in (out_member.get("files") or []), (
+            "the non-author's load must also list the skill's bundled files — that `files: [...]` "
+            "promise is what the `read_skill_file` / `execute_code` widenings rest on "
+            f"(RESEARCH §8.11). Got {out_member.get('files')!r}."
+        )
+
+        # 3. Narrowness — no Expert active on the run => refused.
+        out_no_bundle = await _load(_make_born_for_tool_ctx(sb, member_uid, None))
+        assert "instructions" not in out_no_bundle, (
+            "over-widening: a same-org non-author with NO Expert active loaded another user's "
+            f"PRIVATE skill — got {out_no_bundle!r}. The born-for arm is opt-in per RUN."
+        )
+        assert out_no_bundle.get("error") == refusal, (
+            f"expected the honest not-found refusal with no bundle, got {out_no_bundle!r}"
+        )
+
+        # 4. Narrowness — a WRONG bundle => refused (the marker must MATCH, not merely exist).
+        out_wrong = await _load(_make_born_for_tool_ctx(sb, member_uid, str(uuid4())))
+        assert "instructions" not in out_wrong, (
+            "over-widening: a WRONG born-for bundle id admitted another user's PRIVATE skill — "
+            f"got {out_wrong!r}. A marker that matches any bundle is not a scope."
+        )
+        assert out_wrong.get("error") == refusal, (
+            f"expected the honest not-found refusal for a wrong bundle, got {out_wrong!r}"
+        )
+
+        # 5. ⛔ T-264-19 — a DISJOINT-ORG caller holding the CORRECT bundle is still refused.
+        out_cross_org = await _load(_make_born_for_tool_ctx(sb, b["uid"], bundle_id))
+        assert "instructions" not in out_cross_org, (
+            "SEED-125 RE-OPENED by the 264 widening: a DISJOINT-ORG caller carrying the correct "
+            f"born-for bundle id loaded org A's private skill — got {out_cross_org!r}. The "
+            "born-for disjunct must nest INSIDE `and(org_id.in.(…), …)`; placed beside "
+            "`is_system` it lets a foreign org through, which is the exact leak this module's "
+            "org gate exists to prevent."
+        )
+        assert out_cross_org.get("error") == refusal, (
+            f"expected the honest not-found refusal for a cross-org caller, got {out_cross_org!r}"
+        )
+    finally:
+        remaining = await _teardown_born_for_seed(
+            pg_pool, sid, bundle_id, member_uid, personal_orgs)
+        assert remaining == _TEARDOWN_CLEAN, (
+            f"teardown left rows behind on the shared local DB: {remaining!r}"
+        )
+
+
+@pytest.mark.asyncio
+async def test_read_skill_file_born_for_same_org_non_author_pack17(pg_pool, two_orgs_two_users):
+    """PACK-17 on a REAL database, one layer down — the SAME-ORG NON-AUTHOR gets PAST skill
+    RESOLUTION in ``_handle_read_skill_file``, where before 264 it was refused at the skill level.
+
+    ⛔ The two error strings arbitrate, exactly as the cross-org sibling above arbitrates them:
+
+      * refused at RESOLUTION -> ``Skill '<name>' not found.``  (the skill-level refusal)
+      * past RESOLUTION       -> ``File 'margin.md' not found: …`` (a FILE-level miss — this leg
+        seeds the ``skill_files`` ROW but no storage object, so the download legitimately fails)
+
+    A file-level error is therefore the PROOF that resolution widened; a skill-level error is the
+    pre-264 defect. The cross-org caller must still get the SKILL-level one — narrowness on the
+    real database, at the second of the three widened sites.
+
+    ⛔ Outside ``pytest tests/unit``: UAT-adjacent evidence for D-264-09, never a gate."""
+    from app.services.tool_dispatcher import _handle_read_skill_file  # noqa: PLC0415
+
+    a, b = two_orgs_two_users["a"], two_orgs_two_users["b"]
+    sb = _service_role_supabase_or_skip()
+    sid, name, _body, bundle_id = await _seed_born_for_private_skill(
+        pg_pool, a["uid"], a["org_id"])
+    member_uid, personal_orgs = await _seed_second_member_of_org(pg_pool, a["org_id"])
+    skill_refusal = f"Skill '{name}' not found."
+
+    try:
+        async def _read(ctx):
+            return json.loads((await _handle_read_skill_file(
+                {"skill_name": name, "filename": "margin.md"}, ctx)).result)
+
+        # Positive control — the AUTHOR gets past resolution (a file-level miss, not skill-level).
+        out_author = await _read(_make_born_for_tool_ctx(sb, a["uid"], bundle_id))
+        assert out_author.get("error") != skill_refusal, (
+            "positive-control failure: the AUTHOR is refused at SKILL resolution for its own "
+            f"born-for skill (got {out_author!r}) — the member leg below could not then mean "
+            "anything."
+        )
+
+        # ⭐ THE TARGET — a same-org NON-AUTHOR gets past resolution too.
+        out_member = await _read(_make_born_for_tool_ctx(sb, member_uid, bundle_id))
+        assert out_member.get("error") != skill_refusal, (
+            "PACK-17 failure one layer down: a same-org NON-AUTHOR on a run with the born-for "
+            f"Expert active is refused at SKILL resolution in read_skill_file — got "
+            f"{out_member!r}. `load_skill` returns `files: [...]`, so a loadable body whose "
+            "bundled files 404 is the same defect: the model is told the files exist and then "
+            "cannot read them."
+        )
+
+        # Narrowness — no Expert active => refused at the SKILL level, exactly as before 264.
+        out_no_bundle = await _read(_make_born_for_tool_ctx(sb, member_uid, None))
+        assert out_no_bundle.get("error") == skill_refusal, (
+            "over-widening: a same-org non-author with NO Expert active resolved another user's "
+            f"PRIVATE skill in read_skill_file — got {out_no_bundle!r}."
+        )
+
+        # ⛔ T-264-19 — a DISJOINT-ORG caller with the CORRECT bundle stays refused at the SKILL
+        # level, so it never even learns the file exists.
+        out_cross_org = await _read(_make_born_for_tool_ctx(sb, b["uid"], bundle_id))
+        assert out_cross_org.get("error") == skill_refusal, (
+            "SEED-125 RE-OPENED at read_skill_file: a DISJOINT-ORG caller carrying the correct "
+            f"born-for bundle id resolved org A's private skill — got {out_cross_org!r}."
+        )
+    finally:
+        remaining = await _teardown_born_for_seed(
+            pg_pool, sid, bundle_id, member_uid, personal_orgs)
+        assert remaining == _TEARDOWN_CLEAN, (
+            f"teardown left rows behind on the shared local DB: {remaining!r}"
+        )

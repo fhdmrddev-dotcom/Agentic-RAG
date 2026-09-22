@@ -50,6 +50,16 @@ function makeRow(overrides: Partial<ModelRegistryRow> = {}): ModelRegistryRow {
     max_output_tokens: 128000,
     native_tools: true,
     llm_call_timeout_seconds: 600,
+    // ⭐ Phase 262 (migration 190). `null` is the shipped state for every pre-190 row, and
+    // `null` is NOT `false` — it means the built-in registry or the provider inference
+    // decides. A fixture that omitted these would be claiming to be a registry row while
+    // missing six of its fields, which is how a fixture stops modelling the thing it tests.
+    api_surface: null,
+    reasoning_first: null,
+    reasoning_off: null,
+    uses_max_completion_tokens: null,
+    supports_parallel_tools: null,
+    max_tools: null,
     is_default: false,
     is_locked: false,
     // Phase 196 (AUTH-04): `null` = the shipped state for every pre-migration-120 row.

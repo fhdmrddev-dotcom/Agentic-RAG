@@ -195,7 +195,14 @@ def probe_client(monkeypatch):
     probe = FastAPI()
     probe.include_router(schedules_api.router)
     probe.include_router(schedules_api.workflow_router)
-    probe.dependency_overrides = real_app.dependency_overrides
+    # v4.3 audit: schedule writes now also carry require_capability("workflows"). This file
+    # is about cadence + ownership, so the org is entitled here; the tier arm is fenced by
+    # test_258_every_authoring_write_is_tier_gated.py. A COPY of the overrides dict, so the
+    # org override cannot leak into the shared app.
+    import app.services.entitlement_service as _ent
+    monkeypatch.setattr(_ent, "enforce_entitlement", AsyncMock(return_value=None))
+    probe.dependency_overrides = {**real_app.dependency_overrides,
+                                  deps.get_active_org_id: lambda: "00000000-0000-0000-0000-00000000a0d1"}
     return TestClient(probe)
 
 

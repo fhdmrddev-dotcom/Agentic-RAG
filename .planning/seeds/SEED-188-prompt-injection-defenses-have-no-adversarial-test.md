@@ -18,6 +18,19 @@ status_note: |
   drives it with a real case, but it does NOT build the adversarial suite this seed asks for, and the
   gate on SEED-186 stands unchanged.
 
+  ── 2026-09-22 · Phase 262, LEFT OPEN — AND THE SEED'S SURFACE INVENTORY WIDENS, WHICH IS THE
+  UPDATE. Fired on `backend/tests/**` via 262-02's new API test. ⛔ 262 builds no adversarial suite.
+  ⚠ **What it DOES build is a new member-to-member content channel**: `ExpertDetailModal` (262-04)
+  is the first component anywhere in this repository to render `example_output`, which is the
+  LONGEST author-controlled string the app shows to other members of an org — and an org-shared
+  Expert's author is not necessarily its reader. T-262-13 handles the rendering half by
+  construction (a React text child in a pre-formatted block; `grep -ciE "dangerouslySetInnerHTML"`
+  → 0, no markdown pass, no raw-HTML escape hatch), so this is NOT an XSS hole. ⛔ **But the
+  prompt-injection half is untested, exactly as this seed says.** `when_to_use`, `description` and
+  `prompt_suggestions[].prompt` are author-controlled strings that a person reads and then acts on,
+  and `prompt_suggestions` is written expressly to be pasted into a composer. Add these four columns
+  to the seed's channel inventory when the adversarial suite is finally built.
+
 folded_into: 236
 priority: high
 surface: Agentic-RAG

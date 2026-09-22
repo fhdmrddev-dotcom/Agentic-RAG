@@ -9,9 +9,31 @@ export interface Thread {
   user_id: string
   title: string
   folder_id: string | null
+  active_expert_id?: string | null
   created_at: string
   updated_at: string
 }
+
+export interface ExpertBundle {
+  id: string
+  name: string
+  slug: string
+  description: string
+  scope_mode: "restricted" | "biased"
+  member_skills: string[]
+  required_connections: string[]
+  knowledge_folder_ids: string[]
+  prompt_suggestions: Array<{ title: string; prompt: string }>
+  visibility: string
+  is_system: boolean
+  is_enabled: boolean
+  icon?: string
+  category?: string
+  when_to_use?: string
+  example_output?: string
+  tool_floor_enabled?: boolean
+}
+
 
 export interface SubAgentState {
   filename: string
@@ -199,6 +221,20 @@ export interface Message {
    * streamed runs (not backfilled from DB — runs.error is not yet in the
    * messages response). */
   runError?: string
+  /** Phase 257 (METER-07): attributable cost and rating metadata for the run.
+   *
+   * ⛔ 257.1 widened `isRated` to include `null`, and the null is LOAD-BEARING rather than
+   * laziness. These fields describe THREE states, not two:
+   *   is_rated true  + cost_usd number → priced; render the dollar figure
+   *   is_rated false + cost_usd null   → no rate for this model; render "Unrated"
+   *   is_rated true  + cost_usd null   → rate exists, tokens were never recorded;
+   *                                       render "No tokens recorded", NOT "Unrated"
+   *   is_rated null  + cost_usd null   → the run has no model recorded at all
+   * Narrowing this back to `boolean` forces the third state to masquerade as the second,
+   * which is how the shipped badge came to state a false cause. */
+  costUsd?: number | null
+  isRated?: boolean | null
+  tokenCoverage?: string[] | null
   /** Phase 075.1 Plan 04 Atom E (B-260519-11 + BUG-260514-01): cumulative
    * sandbox-output file list emitted by the backend `final_output_files`
    * SSE event after the agent loop terminates. Drives the pinned

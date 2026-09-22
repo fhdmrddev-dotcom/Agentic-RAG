@@ -525,6 +525,22 @@ export interface ModelRegistryRow {
    *  `coerce`, so a model showing "—" here would already be behaving as best-effort. All 37
    *  rows shipping before migration 120 read `null`. */
   emit_tier: "force_strict" | "force" | "coerce" | null
+  /** ⭐ Phase 262 (migration 190) — the six capability fields that used to exist ONLY as
+   *  literals in a hardcoded Python dict. A model needing any of them could not be added
+   *  from this screen at all, so the fact had to be a code branch: that is precisely how the
+   *  gpt-5.6 family shipped for months with native tool calling silently off, because no
+   *  field anywhere could say "call this one on a different endpoint".
+   *
+   *  ⚠ `null` here means NOT ASSERTED, never `false`. The backend overlays only non-null
+   *  values, so a null leaves the built-in registry (or the provider inference) in charge.
+   *  Rendering a null as "off" would be the same lie the `emit_tier` comment above warns
+   *  about, one column over. */
+  api_surface: "responses" | null
+  reasoning_first: boolean | null
+  reasoning_off: "thinking_disabled" | "effort_none" | null
+  uses_max_completion_tokens: boolean | null
+  supports_parallel_tools: boolean | null
+  max_tools: number | null
   /** The editable columns actually STORED as a DB override (OVR) vs inherited from the
    *  built-in registry (DEF). The tab renders per-field OVR/DEF and shows a Reset only on
    *  overridden fields; a Reset sends an explicit `null` for that field (clears to DEF, Plan
@@ -561,6 +577,13 @@ export interface ModelCapabilityPatch {
   /** AUTH-04: an explicit `null` is a Reset (clears the override to DEF) — the same
    *  explicit-null semantics every other column here carries. */
   emit_tier?: "force_strict" | "force" | "coerce" | null
+  /** Phase 262. Same explicit-null Reset semantics as every column above. */
+  api_surface?: "responses" | null
+  reasoning_first?: boolean | null
+  reasoning_off?: "thinking_disabled" | "effort_none" | null
+  uses_max_completion_tokens?: boolean | null
+  supports_parallel_tools?: boolean | null
+  max_tools?: number | null
 }
 
 /** The server's accepted range for each integer capability column, MIRRORED from

@@ -42,6 +42,7 @@ export {
   listModels,
   deleteThread,
   renameThread,
+  setThreadActiveExpert,
   postMessage,
   subscribeToRun,
   getActiveRuns,
@@ -500,4 +501,10 @@ export type {
   TakeoffBOQ,
   DocumentTakeoffPayload,
 } from "./api/takeoff"
+
+// ── experts ───────────────────────────────────────────────────────────
+export {
+  listExperts,
+  getExpert,
+} from "./api/experts"
 

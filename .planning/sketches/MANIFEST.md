@@ -2799,6 +2799,9 @@ already approved. `SHELL-01/02/03` are bug fixes on shipped surfaces with named 
 |---|------|----------------|--------|------|
 | 236 | the-file-that-belongs-to-this-chat | How does a person know a file is HERE, not in the Library? | ✅ **A — Scope on the chip** ★ (operator, 2026-09-11) · the `+` menu stays plain; the chip is the only place that says *"this chat only · 24h"*, and it rides into the sent message | phase-244, shell-04, chat, composer, attach, scope, g2-sketch-gate |
 | 247 | sources-and-watches | How does a watched-source card honestly report its connection health separately from its run outcome, and where does 'Sync now' put its answer without destroying the screen? | ✅ **A — Two-Tier Status Pill + Inline Sync** ★ (operator, 2026-09-14) · dual connection/run status pills + row-level non-collapsing sync tag | phase-247, watch-03, watch-04, watch-05, watch-06, watch-07, g2-sketch-gate, sources-and-watches |
+| 248 | the-calmer-phase-card | Can the canvas feel calmer without re-opening UAT row U-2 — is the tension ORNAMENT or DENSITY? | ⛔ **C picked then measured VOID** (breaks the Phase 188 ring) · live candidates **C2 / C3** | phase-tbd, canvas, node-anatomy, density, u-2, g2-sketch-gate |
+| 257 | spend-and-metering | How should the /admin/spend view present dollar spend while maintaining radical honesty about unrated models and uncounted token blind spots? | Awaiting operator review · live candidates **A (Instrument Cockpit) / B (Deep Formula Inspector) / C (Rate Registry & Reprice)** | phase-257, meter-01, meter-02, meter-07, spend, rate-registry, blind-spots, g2-sketch-gate |
+| 260 | the-expert-you-can-actually-use | How should a domain expert be invited mid-thread, visibly scope retrieval/tools while preserving conversation history, present 'Try asking...' onboarding suggestions, and be dismissed with zero new top-level composer controls? | ✅ **Option 1 — Action Tiles** ★ (operator, 2026-09-20) · Hero visual spotlight card with glowing icon gem, 3 visual prompt action tiles (PACK-03), and subtle composer ambient glow; zero prose fluff | phase-260, pack-02, pack-03, pack-05, d-259-07, chat, composer, expert, onboarding, g2-sketch-gate |
 
 - **Why A over B** — a menu is read once and closed; **a chip is still on screen while the person types
   and survives into the transcript.** Reopening the chat tomorrow, A still says `this chat only`;
@@ -2828,3 +2831,86 @@ already approved. `SHELL-01/02/03` are bug fixes on shipped surfaces with named 
   chip, not a new region.
 - **Scenario deliberately authored** (*Q4 supplier pricing review*, Meridian) per the
   realistic-not-fixture rule; every engine fact in `COPY.engine` is read from shipped source.
+
+## 248 · The calmer phase card — the tension is ornament, or it costs U-2
+
+Raised by the operator (2026-09-18) as *"nodes feel heavy, the canvas feels tense"*, and prompted by an
+outside comparison document that blamed the **linear phase model**. ⚠ **That diagnosis was measured and is
+wrong about the canvas:** config already lives in a side panel (`PhaseFormPanel.tsx`, 1,566 L), cards are
+already 260/248px rather than full-width, and `SKIP_LANE_Y: 200` already draws a second lane.
+
+⭐ **The card is not accidentally heavy — it is heavy by a chain of individually-correct decisions.** Every
+slot has a recorded owner: badge slot 1 is deliberately empty for Phase 188, a third badge will not compile
+(max-2 tuple union), the top-right corner is permanently the governance seal. **The measurable cost is the
+mark:** 62px floating at `top: -26px` is why every card carries `padding: 42px 20px 20px`, running or not.
+
+⛔ **The load-bearing constraint is UAT row U-2**, stated in `canvasModel.ts:67` — `PITCH_X` is chosen so the
+5-phase maximum spans `4*320 + 260 = 1540px` inside sketch 136-B's ~1600px budget. **Density is an accepted
+criterion, not an accident**, so all three faces are drawn at **3 AND 5 phases** with the 1600px ceiling
+rendered on the plane — the trade is shown, never asserted.
+
+- **A** as shipped (137-B) — 1540px, U-2 passes, background ~23%.
+- **B** byte-identical card at pitch 400 — calmer, **1860px, U-2 fails by 260px**, 5th step off-screen.
+- **C** the mark survives at 44px in a left gutter but stops overflowing upward, so the 42px top padding is
+  repaid — **pitch never moves, U-2 still passes**, vertical footprint 130px → 76px, card gap 72 → 84.
+
+⚠ **`NodeIconWell` is never deleted in any variant.** It was cut once by the Phase 200 port and the operator
+**restored it verbatim**, naming the ring and the silhouette. C keeps the disc, tint well and contact shadow
+but sits it *in* the card rather than *over* it — **if that float is the point, C is wrong and the honest
+answer is B plus a DELIBERATE U-2 retirement**, recorded as a decision rather than tripped by a stylesheet.
+
+⛔ Branching / named outcomes is **out of scope here** and is explicitly not what makes this canvas tense.
+
+⛔ **CORRECTION — C WAS PICKED, THEN MEASURED VOID (same day).** The operator picked C on the numbers, then
+asked whether the accretion audit had actually happened, since C relocates the mark and removes nothing. **It
+had not**, and running it refuted this sketch's own brief: (1) there is **no ornament to remove at rest** —
+`NodeRunOverlay` is *"completely still"* with no reading and `NodeCornerMarks` returns `null` when not
+grounded, so the tension is GEOMETRY not accumulation; (2) **badge slot 1 is NOT reserved — Phase 188 SHIPPED**
+and `PhaseNode.tsx:352` passes `status={run?.reading}`, so the findings file's *"do not fill"* is stale prose;
+(3) ⛔ **C breaks the shipped run ring** — `NodeRunOverlay` is `left-1/2 top-[-31px] h-[72px] w-[72px]` and its
+own comment derives that from the mark (*"(72 − 62) / 2 = 5"*), so **the ring is concentric with the
+overhang**. C is kept in the sketch marked ✗ VOID; the failure is the finding.
+
+⭐ **The surviving insight is real** — 42px of top padding is rent for the overhang — so **C2** (trim below the
+line only; mark/ring/seal byte-identical; 130 → 110px, −15%) and **C3** (mark 62→52, ring 72→62 with the 5px
+clearance reproduced exactly, plus the trim; 130 → 98px, −25%) collect it without detaching the ring.
+⚠ **Horizontal is the wrong axis, by arithmetic:** B buys 80px/gap and breaks U-2 by 260px, and any
+compromise under 1600px leaves ~15px/gap, which nobody perceives. ⛔ **U-2 is not retired to make a card look
+nicer** — only after C2 and C3 are rejected on their merits, and then as a recorded decision.
+
+## 257 · Spend in dollars, and what it cannot see — the Free Lie vs Radical Honesty
+
+G-2 sketch for Phase 257 (METER-01, METER-02, METER-07). Tested at `.planning/sketches/257-spend-and-metering/index.html` and `.planning/sketches/257-spend-and-metering.html`. Grounded in Migration 182 (`workflow_runs.input_tokens`, `output_tokens`, `token_coverage text[]`, `idx_workflow_runs_org_coverage_incomplete`), Migration 183 (`model_rates` table), and the 16 locked decisions in `257-CONTEXT.md`.
+
+- **Variant A (Instrument Cockpit)** — High density dashboard: metrics cards (Total Spend with unrated footnote, Total Tokens, Priced Ratio, Blind Spot count), prominent amber honesty card (`D-257-07`) stating *"What This View Cannot See"*, and runs table featuring the `⚠️ Unrated` chip (D-257-05) and `Incomplete Coverage` tag (D-257-08).
+- **Variant B (Deep Formula Inspector)** — Master-detail split drawer: clicking any run shows exact canonical conversion formula (`METER-02`: `input_tokens * rate_in + output_tokens * rate_out`), effective date active for that run, and accounting breakdown across the four counting legs (`agent, single, batch, emit`).
+- **Variant C (Rate Registry & Repricing View)** — Dedicated `model_rates` management view (`D-257-11`): displays active and historical rates per 1,000,000 tokens (`numeric(12, 6)` per `D-257-01`), and includes interactive "Reprice Model" modal dialog inserting a new effective-dated row without altering historical run costs (`D-257-03`).
+
+## 260 · The expert you can actually use — the consultant model
+
+G-2 sketch for Phase 260 (PACK-02, PACK-03, PACK-05). Tested at `.planning/sketches/260-the-expert-you-can-actually-use/index.html` and `.planning/sketches/260-the-expert-you-can-actually-use.html`. Grounded in operator decision `D-259-07` (ratified 2026-09-20), Migration 187 (`expert_bundles`), and Phase 259's closed-core and member-resolution architecture.
+
+- **Variant A (In-Flow Consultant)** — Clean discovery & focused modal: `+` menu carries `✨ Invite Expert...` opening a centered search & inspection dialog; chat stream renders a calm system announcement with interactive `Try asking:` pills; composer renders `[✨ Financial Analyzer · Restricted ×]` as a sibling inside the hoisted `Using:` container; dismisses cleanly with a timeline return notice.
+- **Variant B (Flyout Specialist & Scope Peek)** — Inlined flyout & peek drawer: `+` menu inlines an `EXPERTS` flyout section (mirroring `ConnectorsFlyout`) with a 1-click invite toggle; chat stream features a specialist banner with an expandable "Scope Details" drawer listing exact member folders and skills; composer chip has a caret opening a mini scope popover, with a floating suggestion strip docked above the textarea.
+- **Variant C (Specialist Briefing & Presence-Forward)** — Direct specialist message bubble: avatar with purple sparkle, explanatory briefing message, and large prompt action cards; thread header gains an active consultant badge; composer renders a compact pill `[✨ Finance ×]`.
+
+## 261-262 · The Expert Card, Authoring & Discovery Catalog
+
+G-2 sketch for Phase 261 (PACK-07..10) and Phase 262 (PACK-11..13). Tested at `.planning/sketches/261-262-expert-authoring-and-catalog/index.html` and `.planning/sketches/261-262-expert-authoring-and-catalog.html`. Grounded in G-8 plan proportion (designed together to lock the shared Expert Card; built apart to prevent plan runaway), Migration 187 (`expert_bundles`), Migration 188 (seed bundle), proposed Migration 189 (`icon`, `category`, `when_to_use`, `example_output`, `expert_grants`), `SEED-303`, and `BUS-291`.
+
+- **Visual-First Expert Card Anatomy** — 5-element shared card with zero lecturing prose: Glowing gem avatar with inline SVG glyph, disentangled badges (`+ Union Scope` / `🔒 Strict Isolation` on knowledge axis; `👥 Org-Wide` / `🛡️ Role-Gated` / `👤 Named Users` on grant axis), bounded resource pills, and 3 large visual Action Tiles (`PACK-03` / `D-260-06`) with 1-click immediate launch (`PACK-13`).
+- **Phase 262: Discovery Catalog & Detail Modal** — Normal-user browsable catalog (`PACK-11`): full-text search, domain category pills, Clone-on-Customise CTA for system templates (SEED-303 S8), and strict honesty enforcement (users see only granted experts; ungranted cards vanish). Pop-up detail modal (`PACK-12`): sidesteps lack of client-side router, displays functional scope, prompt tiles, additive deliverable tools (S6), and sample deliverable output.
+- **Phase 261: Authoring Studio & AI-Assisted Drafting** — Admin authoring studio (`PACK-07`): AI drafting from brainstorm file upload with explicit non-ingestion guarantee (`PACK-09`), live reactive preview of the shared Expert card, knowledge scope selector (`Union Scope` default vs `Strict Isolation` opt-in), additive tool floor toggle, and granular access grants (`PACK-10`) by role or named user. Zero `if expert:` runtime branches — scope resolved strictly as data handed to agent loop.
+
+
+
+
+## 263 · The skills an Expert needs — naming what does not exist, and approving it one at a time
+
+G-2 sketch for Phase 263 (PACK-14, PACK-15, PACK-16). Tested at `.planning/sketches/263-the-skills-an-expert-needs/index.html`, driven in Chrome with zero console errors. Grounded in `BUG-260921-01` (driven live 2026-09-21 — a 2163-char PRISMA blueprint given `docx`/`xlsx`/`pptx` because `public.skills` holds 10 rows), `SEED-303` S9, `ExpertAuthoringStudio.tsx:744-834` (the shipped Skills section), `SkillFormDialog.tsx` (Name · Description · Instructions · Files · Triggers) and `save_skill` at `tool_dispatcher.py:1435`. ⚠ `PACK-17` (cross-org isolation) has **no UI surface** and is deliberately not sketched.
+
+- **Variant A (Inline Shelf Gap)** ★ **WINNER — operator, 2026-09-21** — the existing `Bound Knowledge & Capabilities` card splits into *In your library* (solid pills) and *Proposed for this Expert* (dashed `⬡` cards). `Create this skill →` opens the **existing** `SkillFormDialog` pre-filled; Save is **disabled** behind a banner naming the count. Smallest diff to the shipped studio.
+- **Variant B (Provisioning Step)** — a third step (`① Draft · ② Provision · ③ Save & grant`) with a per-row approval list and a pane showing **exactly what `skill-creator` will write** before approval. `Approve & create` / `Edit first` / `Skip`; step 3 is **locked** while any row is pending, so the save guard is structural rather than advisory. A skipped row is recorded as skipped.
+- **Variant C (Capability Ledger)** — the preview card becomes an account: *Will have* vs *Blueprint claims · not real* (ghost chips, approve inline on the card). `Save Expert` is **never blocked**; it prints one sentence — *"…will be saved without 5 of the 7 capabilities its blueprint describes"* — and names each one.
+
+⭐ **A WON, and the decision it settles is that Save IS blocked.** B and C were the opposite answers to `PACK-16` and both were defensible; the operator chose the one that holds Save shut behind a banner naming the count, inside the card the author is already looking at. ⛔ **The consequence for planning: `PACK-16` lands as a DISABLED save + an inline banner, not as a wizard step and not as a refusal sheet** — so no new studio step is authored and the shipped `Bound Knowledge & Capabilities` card grows a second group rather than the studio growing a third screen. ⚠ **B and C are opposite answers to PACK-16 and both are defensible** — B makes blocking unnecessary, C refuses to block and states the consequence. That is the real decision this sketch exists to settle. ⛔ **Nothing in any variant rewrites the blueprint prose** when a claimed capability is dropped, so an Expert can still *describe* a capability it knowingly lacks — a named gap, not an oversight.

@@ -8,6 +8,16 @@ status_note: |
   ── 2026-09-16 · reviewed at `/gsd:discuss-phase 252`, LEFT PLANTED (REG-02 sweep).
   Fired on `frontend/src/**` breadth only. 252 is scoped to the v4.2 milestone audit §8; a router is
   a capability, and G-7 forbids one in a gap-closure phase.
+
+  ── 2026-09-22 · Phase 262 (plan 05), LEFT PLANTED — AND THE COUNT IN THIS SEED'S OWN TITLE IS NOW
+  WRONG, WHICH IS THE UPDATE. `ActiveView` gained a THIRTEENTH member (the Expert catalog), so the
+  title's "twelve views" reads one short; the "zero addressable" half is unchanged and is the half
+  that matters. ⛔ 262 ADDS to this seed rather than eroding it: the catalog's per-Expert detail view
+  is a MODAL held in page state precisely BECAUSE there is no router, so the phase shipped a second
+  unlinkable surface inside an unlinkable one. A per-Expert URL stays owed and belongs to the routing
+  phase. ⭐ One thing did get cheaper: `frontend/src/lib/activeViewReachability.ts` (262-01) now
+  parses the union and the layout and reports any member with no render branch — so whoever does
+  build the router has an executable inventory of what has to become addressable, instead of a grep.
 priority: high
 surface: Agentic-RAG
 relates_to:

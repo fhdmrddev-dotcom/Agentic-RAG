@@ -1,7 +1,10 @@
 ---
 seed_id: SEED-074
 title: Workflow/harness + sub-agent token-usage rollup to the producer run — the metering primitive Phase 105 silently assumes (workflow runs record NULL tokens today)
-status: planted
+status: partially-answered
+partial: true
+folded_into: "256"
+status_note: "Flipped from `planted` at Phase 256 (plan 256-02, R-5). METER-03/04/05/06 close the persistence + rollup arms; ⛔ step 4 (cross-provider parity, full native roster) is NOT discharged — nothing in Phase 256 drives a live provider. NOT `answered`, NOT `shipped`."
 planted: 2026-06-10
 phase_origin: "Phase 101 plan-phase — future-milestone alignment sweep 2026-06-10 (workflow wf_13ed5033)"
 category: licensing / billing / cost — a run-finalization metering seam, NOT a new feature; the missing rollup that turns harness/sub-agent token usage into a per-workflow number
@@ -22,6 +25,50 @@ surface: Agentic-RAG
 ---
 
 # SEED-074 — Workflow/harness + sub-agent token-usage rollup to the producer run
+
+---
+
+## ⚠ STATUS 2026-09-18 — PARTIALLY ANSWERED by Phase 256, and THREE BODY CLAIMS BELOW ARE MEASURABLY STALE
+
+**Nothing below this block is deleted or rewritten.** The originals stand verbatim, because this
+register's own recurring finding is that a corrected claim recorded *beside* its original teaches
+the next reader something a silent overwrite does not.
+
+### What Phase 256 closes
+
+`METER-03/04/05/06` — the workflow producer run now **persists** its token totals, sub-agent usage
+**rolls up** into the run-level box, and the `input_tokens=None` finalize sites are either closed or
+**named in the register** (`SEED-297`, `SEED-299`).
+
+### ⛔ What Phase 256 does NOT close — the reason this is `partially-answered` and not `answered`
+
+**Step 4, the cross-provider parity check.** This seed asks for verification against the full native
+roster with *real cross-provider workflow runs*. **Nothing in Phase 256 drives a live provider at
+all.** The rollup is proven by unit fences over fake event streams, which is the right proof for the
+arithmetic and **no proof whatsoever** for per-provider usage-emission quirks. ⛔ Do not read this
+seed's status as covering step 4. Step 5 (the missing-usage warning on the workflow path) is added
+by `METER-05`.
+
+### The three stale claims, corrected beside the originals
+
+| What the body below says | Measured 2026-09-18 |
+|---|---|
+| *"`harness_engine.py:1413-1421` … the only `finalize_run` call in the engine"* | ⚠ **The line numbers have MOVED.** The producer-shell finalize is now at **`harness_engine.py:3044-3053`**. The claim was true when written; the file has grown to 3135 lines across 20 phases. |
+| *"`sub_agent_service.py` (no rollup of per-sub-agent usage into the producer/workflow run)"* | ⛔ **FALSE, and it has been false since Phase 093/204 — long before Phase 256.** `backend/app/services/harness/phase_types.py:768 `_record_run_usage`` sums each completed sub-agent into the run-level box, and `:829` threads that box into the sub-agent spawn. Flagged independently by `256-PREFLIGHT.md` §3 and re-confirmed here. ⭐ **A seed can rot into being wrong about the DEFECT, not merely about a line number** — this one under-stated how much was already built, for roughly a year. |
+| *"Decide the storage shape … (b) add a per-phase usage table"* | **Resolved as option (a)** — columns on `workflow_runs` — by **D-256-06**. ⚠ **The per-phase table is NOT built.** The body below calls (b) *"the more future-proof shape"*; that is a **preference, not a decision**, and a future reader must not cite it as one. |
+
+### Siblings this phase planted
+
+`SEED-297` (the boot reconciler NULLing a `cap_paused` run's real totals) · `SEED-298`
+(`max_tokens_per_run` is really per-SEGMENT, and only exists on a schedule) · `SEED-299` (a stranded
+Deep chat run's count is genuinely unknowable) · `SEED-300` (three token holes surviving Phase 256,
+including an eval **judge shot** counted nowhere).
+
+⛔ **`SEED-073` is deliberately UNTOUCHED** — it is the price table (METER-01/02, Phase 257), and
+nothing in Phase 256 builds a rate. The triad's *count* half is what moved here; the *rate* half has
+not.
+
+---
 
 ## The gap (grounded in current code)
 

@@ -5,7 +5,15 @@ created: 2026-09-16
 surface: Agentic-RAG
 status: planted
 partial: false
-status_note:
+status_note: |
+  ── 2026-09-22 · Phase 262 (plan 05), LEFT PLANTED. Fired on `ChatArea.tsx` + `MessageInput.tsx`,
+  both of which 262-05 edits — but the edit is ONE optional pass-through callback opening the Expert
+  catalog, and it changes nothing about scope. ⛔ ADJACENT AND DELIBERATELY NOT FOLDED: an Expert
+  does change what a thread reads, so the temptation is real, and CONTEXT's boundary is explicit —
+  *"no change to what an Expert DOES"*. `PACK-01`'s manifest-not-a-runtime rule must not start
+  leaking in through the catalog. ⚠ AND 262 MADE THIS SEED SHARPER: `startScopedChat` creates a
+  thread and PATCHes an Expert onto it, so a person can now acquire a thread-level scope decision
+  from a surface OUTSIDE the composer — while the composer still offers no way to revise it.
 trigger_when: any phase touching `frontend/src/components/chat/ChatArea.tsx`, the composer's scope affordance, or thread-level retrieval scope
 trigger_paths: ["frontend/src/components/chat/ChatArea.tsx", "frontend/src/components/chat/MessageInput.tsx", "frontend/src/components/chat/composerCopy.ts"]
 trigger_surfaces: ["chat", "retrieval"]

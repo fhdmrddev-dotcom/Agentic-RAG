@@ -230,10 +230,15 @@ async def test_preflight_workflow_kickoff_permits_draft_for_author(monkeypatch):
     mock_or.maybe_single.return_value = mock_query
 
     body = SimpleNamespace(workflow_definition_id=def_id)
-    current_user = {"id": user_id}
+    # 258 F-2: kickoff now checks the workflows entitlement; this fixture is an entitled org
+    current_user = {"id": user_id, "org_id": "00000000-0000-0000-0000-000000000198"}
 
     import app.api.threads as threads_mod
     monkeypatch.setattr(threads_mod, "workflows_enabled", lambda: True)
+    monkeypatch.setattr(threads_mod, "get_pg_pool", AsyncMock(return_value=MagicMock()))
+    import app.services.entitlement_service as ent_mod
+    from app.services.entitlement_service import EntitlementResult
+    monkeypatch.setattr(ent_mod, "check_entitlement", AsyncMock(return_value=EntitlementResult(allowed=True, capability="workflows")))
     monkeypatch.setattr(threads_mod, "get_pg_pool", AsyncMock(return_value=MagicMock()))
 
     import app.services.workflow_kickoff as kickoff_mod
@@ -263,7 +268,7 @@ async def test_preflight_workflow_kickoff_permits_draft_for_author(monkeypatch):
 async def test_preflight_workflow_kickoff_refuses_draft_for_non_author(monkeypatch):
     """SEED-164: Draft workflows cannot be run by someone who is not the author."""
     from types import SimpleNamespace
-    from unittest.mock import MagicMock
+    from unittest.mock import AsyncMock, MagicMock
     from fastapi import HTTPException
     from app.services.workflow_kickoff import preflight_workflow_kickoff
 
@@ -296,10 +301,15 @@ async def test_preflight_workflow_kickoff_refuses_draft_for_non_author(monkeypat
     mock_or.maybe_single.return_value = mock_query
 
     body = SimpleNamespace(workflow_definition_id=def_id)
-    current_user = {"id": user_id}
+    # 258 F-2: kickoff now checks the workflows entitlement; this fixture is an entitled org
+    current_user = {"id": user_id, "org_id": "00000000-0000-0000-0000-000000000198"}
 
     import app.api.threads as threads_mod
     monkeypatch.setattr(threads_mod, "workflows_enabled", lambda: True)
+    monkeypatch.setattr(threads_mod, "get_pg_pool", AsyncMock(return_value=MagicMock()))
+    import app.services.entitlement_service as ent_mod
+    from app.services.entitlement_service import EntitlementResult
+    monkeypatch.setattr(ent_mod, "check_entitlement", AsyncMock(return_value=EntitlementResult(allowed=True, capability="workflows")))
 
     with pytest.raises(HTTPException) as exc_info:
         await preflight_workflow_kickoff(
@@ -311,6 +321,7 @@ async def test_preflight_workflow_kickoff_refuses_draft_for_non_author(monkeypat
             current_user=current_user,
         )
     assert exc_info.value.status_code == 403
+    assert exc_info.value.detail == "Draft workflows can only be run by their author"
 
 
 

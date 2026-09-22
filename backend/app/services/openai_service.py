@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 from openai import OpenAI
 
-from app.config import settings, get_model_capability, MODEL_CAPABILITIES
+from app.config import settings, get_model_capability, API_SURFACES, MODEL_CAPABILITIES
 
 logger = logging.getLogger(__name__)
 
@@ -1618,6 +1618,47 @@ def _resolve_max_tokens(
     return resolved
 
 
+def _resolve_db_capability(model_id: str | None, field: str):
+    """Best-effort SYNC read of ONE operator-set capability column for ``model_id``.
+
+    ⭐ Phase 262. This is the seam ``_resolve_db_max_output_cap`` and
+    ``_resolve_db_native_tools`` had already duplicated twice; migration 190 would have made
+    it six times. Both keep their names and their exact behaviour and delegate here.
+
+    ⛔ WHY A SYNC CACHE READ AND NOT AN AWAIT. ``resolve_calling_mode`` and the openai-compat
+    stream construction are SYNC by design (the D-14 byte-identical boundary), so the async
+    DB overlay cannot be awaited on the hot path. Instead this reads the SAME 30s-TTL
+    ``_model_overrides_cache`` that the request path warms: ``agent_loop`` calls
+    ``get_model_capability_async(effective_model)`` immediately before opening the stream,
+    and ``_load_model_overrides`` issues ``SELECT *`` — so every column migration 190 adds
+    arrives in the cache with no query change, and an operator's edit is visible within the
+    TTL window without an await.
+
+    Returns ``None`` for a cold cache, an absent row, an absent column or a NULL value —
+    every one of which means *"not asserted here"*, so the caller falls back to the static
+    registry. ⛔ ``None`` is never conflated with ``False``: a NULL ``reasoning_first``
+    means the code registry decides, while an explicit ``False`` means the operator said no.
+    """
+    if not model_id:
+        return None
+    try:
+        # Lazy import mirrors config.get_model_capability_async's own lazy import
+        # (avoids the openai_service <-> user_settings import cycle).
+        from app.models.user_settings import _model_overrides_cache
+        row = _model_overrides_cache.get(model_id)
+        if row is not None:
+            return row.get(field)
+    except Exception:
+        logger.warning(
+            "_resolve_db_capability: sync cache read failed for model=%s field=%s; "
+            "falling back to the static registry",
+            model_id,
+            field,
+            exc_info=True,
+        )
+    return None
+
+
 def _resolve_db_max_output_cap(model_id: str | None) -> int | None:
     """Best-effort SYNC read of an operator's DB-edited ``max_output_tokens`` for
     ``model_id`` (Phase 149 D-149-15 — the DB overlay for the clamp ceiling).
@@ -1711,6 +1752,12 @@ def _uses_max_completion_tokens(model: str) -> bool:
     new model like ``gpt-5.5-future`` works without touching this file (or until
     the new model lands in MODEL_CAPABILITIES with an explicit flag).
     """
+    # Phase 262: the operator's column wins. Sending the wrong token parameter is a hard
+    # 400, and the fallback below is a startswith() guess about future model names — so a
+    # stated fact must outrank it.
+    _db = _resolve_db_capability(model, "uses_max_completion_tokens")
+    if _db is not None:
+        return bool(_db)
     cap = get_model_capability(model)
     if cap.get("uses_max_completion_tokens") is not None:
         return bool(cap["uses_max_completion_tokens"])
@@ -1761,9 +1808,103 @@ class CallingMode(str, Enum):
     STRUCTURED = "structured"  # Tool schemas injected into system prompt
 
 
+def _provider_hint_from(user_settings: "UserEffectiveSettings | None") -> str | None:
+    """The provider the caller ALREADY KNOWS, for capability inference on an unknown model.
+
+    ⛔ This is not a guess and must never become one. It is the operator's own configuration:
+    ``active_provider`` first, then the process-level ``LLM_PROVIDER``. It is consulted ONLY
+    when a model id matches no naming pattern — see ``config._infer_provider_for``, which is
+    where the reason lives. Returning ``None`` reproduces the pre-262 behaviour exactly.
+    """
+    return (user_settings.active_provider if user_settings else None) or settings.llm_provider or None
+
+
+def resolve_api_surface(
+    model_id: str, user_settings: "UserEffectiveSettings | None" = None
+) -> str | None:
+    """Which wire protocol this model is called on — ``None`` means ``chat.completions``.
+
+    ⭐ Phase 262. This is the ONE place that answers the question, and it is a string rather
+    than a bool ON PURPOSE: the gateway dispatcher looks the result up in its surface ->
+    adapter map, so supporting a NEW protocol is *an adapter + a map entry + a vocabulary
+    value + a migration CHECK value*, with no new branch in routing logic. A bool would have
+    forced the next protocol to be another ``if``, which is the shape that let gpt-5.6 lose
+    native tool calling inside a branch nobody re-read.
+
+    Precedence, and each step is load-bearing:
+
+    1. the operator's ``api_surface`` column (migration 190) — a stated fact;
+    2. else the static ``MODEL_CAPABILITIES`` row;
+    3. and either way, ONLY if the RESOLVED provider is native ``openai``.
+
+    ⛔ (3) is not belt-and-braces. ``/v1/responses`` is OpenAI's own surface — an OpenRouter,
+    Ollama or LM Studio endpoint serving a model with the same id does not implement it, and
+    a request there fails. Those copies keep chat.completions, which is correct for them.
+
+    ⛔ An unrecognised value is IGNORED, never passed through. A surface with no adapter
+    behind it would fall through the dispatcher's fork to chat.completions in silence; the
+    explicit membership check turns that into "not asserted" instead of a mystery.
+
+    Provider resolution mirrors ``create_adaptive_streaming_chat``'s own line VERBATIM
+    (``active_provider`` -> ``settings.llm_provider`` -> ""), with the registry provider as a
+    last resort so a bare unit-test call with no settings still resolves honestly.
+    """
+    db_surface = _resolve_db_capability(model_id, "api_surface")
+    cap = get_model_capability(model_id, _provider_hint_from(user_settings))
+    surface = db_surface if db_surface is not None else cap.get("api_surface")
+    if surface not in API_SURFACES:
+        return None
+    # ⭐ THE OPERATOR'S OFF-SWITCH FINALLY MEANS SOMETHING ON THESE ROWS, and wiring it here
+    #   is not a nicety — it is the OTHER half of the bug this change fixes.
+    #
+    #   Before Phase 262 the Model Registry showed ``native_tools: True`` for the gpt-5.6
+    #   family over a toggle that COULD NOT FIRE: the reasoning_first gate sat above the
+    #   ``db_native`` read, so whatever the operator chose, the answer was STRUCTURED. The UI
+    #   was stating a capability the system did not have and offering a control that did
+    #   nothing. Routing to a different surface without reading the override would repeat that
+    #   exactly, one surface over — the toggle would read False while the adapter sent tools.
+    #
+    # ⛔ So an explicit False sends the model back to the compat adapter, where
+    #   ``reasoning_first`` routes it STRUCTURED. Both registers then agree. ``None`` (no row,
+    #   or a row that never set it) is NOT False and must keep the alternate surface — that is
+    #   the default-inert case, and conflating the two would disable the fix for everyone who
+    #   never touched the toggle.
+    if _resolve_db_native_tools(model_id) is False:
+        return None
+    provider = (
+        (user_settings.active_provider if user_settings else "")
+        or settings.llm_provider
+        or cap.get("provider", "")
+        or ""
+    )
+    if provider.lower() != "openai":
+        return None
+    return surface
+
+
+def uses_responses_api(
+    model_id: str, user_settings: "UserEffectiveSettings | None" = None
+) -> bool:
+    """True when this model must be called on OpenAI's ``/v1/responses`` surface.
+
+    ⛔ A THIN WRAPPER ON PURPOSE — ``resolve_api_surface`` holds the one implementation.
+    This used to carry its own copy of the precedence and provider rules, and two copies of
+    a rule is how the two registers that describe a model drift apart. It exists because
+    ``resolve_calling_mode`` asks a yes/no question ("must I downgrade this to STRUCTURED?")
+    while the dispatcher asks a which-one question, and a caller should not have to compare
+    a string to answer the former.
+    """
+    return resolve_api_surface(model_id, user_settings) == "responses"
+
+
 def resolve_calling_mode(model_id: str, user_settings: "UserEffectiveSettings | None" = None) -> CallingMode:
     """Determine whether to use native API tools or structured JSON prompting."""
-    cap = get_model_capability(model_id)
+    # ⭐ Phase 262: the hint is what stops an unrecognised model id silently losing tool
+    # calling. An id matching none of the ten naming patterns used to infer ``ollama`` —
+    # native_tools False, tools param never sent, tool calls narrated as unparseable prose,
+    # loop dead after one iteration with nothing on screen. The operator already told us
+    # which provider they are on; this reads it.
+    cap = get_model_capability(model_id, _provider_hint_from(user_settings))
 
     # Phase 175 XPROV-01 (D-01): reasoning-first OpenAI models (gpt-5.6-class) reject a
     # chat.completions call that carries BOTH a native `tools` param AND reasoning with a hard
@@ -1776,7 +1917,26 @@ def resolve_calling_mode(model_id: str, user_settings: "UserEffectiveSettings | 
     # cannot re-trigger the 400. It also short-circuits before the OpenRouter strategy branch.
     # Capability-keyed, NEVER a hardcoded id-list (D-122-04); a model with no reasoning_first key
     # is byte-identical to today (default-inert, D-14).
-    if cap.get("reasoning_first"):
+    #
+    # ⚠ CORRECTED (Phase 262) — THE GATE IS NOW CONDITIONAL, and the reason is the SECOND
+    #   door that same 400 names. The error says *"Use /v1/responses **or** set
+    #   reasoning_effort to 'none'"*; XPROV-01 took neither and instead dropped the `tools`
+    #   param, which avoids the 400 by giving up the thing it was protecting — native tool
+    #   calling. A model marked ``api_surface: "responses"`` takes the FIRST door instead:
+    #   the dispatcher routes it to the Responses adapter, where reasoning AND native tools
+    #   are served together, so it must NOT be downgraded here.
+    # ⛔ The downgrade STAYS for every reasoning_first model NOT on that surface (an
+    #   OpenRouter-served or self-hosted copy of the same id) — those still hit the 400, and
+    #   STRUCTURED is still the only answer for them. `uses_responses_api` checks the
+    #   RESOLVED provider, not the flag alone, which is what keeps that true.
+    # Phase 262: an operator-set ``reasoning_first`` overlays the static registry, so a
+    # newly released reasoning model can be marked from the UI instead of waiting for a
+    # commit. NULL falls through to the code registry (byte-identical).
+    _db_reasoning_first = _resolve_db_capability(model_id, "reasoning_first")
+    _reasoning_first = (
+        _db_reasoning_first if _db_reasoning_first is not None else cap.get("reasoning_first")
+    )
+    if _reasoning_first and not uses_responses_api(model_id, user_settings):
         return CallingMode.STRUCTURED
 
     # Phase 149 (SC#1 / D-149-16): an operator's native_tools toggle must change the NEXT
@@ -1992,8 +2152,13 @@ def create_adaptive_streaming_chat(
             # registry ``supports_parallel_tools`` populated False on google rows.
             # Unregistered models infer support via legacy frozenset fallback so
             # adding a future ``foo-provider`` is registry-only.
-            cap = get_model_capability(effective_model)
-            supports_parallel = cap.get("supports_parallel_tools")
+            cap = get_model_capability(effective_model, _provider_hint_from(user_settings))
+            # Phase 262: operator column first — it is a claim about whether the ENDPOINT
+            # accepts the kwarg, and sending it where it is rejected is a 400.
+            _db_parallel = _resolve_db_capability(effective_model, "supports_parallel_tools")
+            supports_parallel = (
+                _db_parallel if _db_parallel is not None else cap.get("supports_parallel_tools")
+            )
             if supports_parallel is None:
                 # Inferred fallback: provider-prefix check (legacy behavior).
                 supports_parallel = (

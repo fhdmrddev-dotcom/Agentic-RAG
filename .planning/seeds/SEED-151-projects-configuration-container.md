@@ -219,3 +219,46 @@ supports (`harness.py:337,354`).
 [[SEED-004]] (tenancy) · [[SEED-136]] (library IA) · [[SEED-147]] (the doors — deliberately excluded) ·
 [[SEED-084]] (starters pre-bound) · [[SEED-080]] / [[SEED-083]] (tiering) · [[SEED-013]] (API scoping) ·
 [[SEED-085]] (terminology)
+
+---
+
+## ⭐ THE NAVIGATION DIMENSION — added 2026-09-18 (operator, from a competitor screenshot)
+
+**This seed has a navigation consequence it did not record, and it is probably the strongest
+argument for it.**
+
+A competitor's Studio was observed running **two navigation axes**: a left rail for *where you
+work* (Overview, Projects, Lifecycle, Evaluations, Components, Knowledge) and a top row for *what
+the selected project contains* (Agents, Models, Data Sources, Prompts, User Prompts, Memories,
+Knowledge Graphs, MCP & Tools, Skills, **Budget**, **Admins**). ⭐ **The second row only works
+because a Project is a real container** — pick a project on the left and the top row is that
+project's models, data sources, skills and budget.
+
+**Ours is ONE axis.** Measured in `frontend/src/lib/nav-items.ts` on 2026-09-18: seven peers —
+Chat · Workflows · Library · Classification · Connections · Skills · Settings — plus **three
+separate admin entries** (Settings in the array; Organization admin and Control Room rendered
+outside it in `NavPanel.tsx`).
+
+⭐ **AND `nav-items.ts` ARGUES THIS SEED'S CASE IN ITS OWN COMMENTS, WITHOUT KNOWING IT.** Two
+entries exist purely as workarounds for a scope collision:
+
+- **Connections** exists *only* because Settings could not carry it — Settings is tagged
+  `model_management`, which is Operators-only, so tagging it hid the entire connections surface
+  from every member.
+- **Skills** was un-tagged for the same reason: `skill_studio` gated a whole home whose scope had
+  grown past the feature.
+
+Both comments land on one sentence — ***"one feature key gating a whole HOME whose scope grew past
+the feature."*** ⛔ **With a single axis, a HOME and a PERMISSION SCOPE are forced to be the same
+object.** A second axis decouples them: the rail carries the scope, the tabs carry the contents.
+
+⛔ **The navigation is a SYMPTOM, not separate work** — operator direction, 2026-09-18: *"I think
+it's a symptom and it resolves when Projects exist, so I don't want it treated as standalone
+work."* **Do not scope a nav redesign on its own.** It has no second axis to be about until this
+seed ships. See `SEED-196` and `SEED-166` for the configuration-homes half.
+
+⚠ **AND A CONTAINER COLLISION WORTH SETTLING EARLY:** `SEED-198` (Experts — a bundle over skills +
+connections + knowledge scope + prompt suggestions) describes **very nearly this container's
+shape**. Two containers with the same members is how a product grows two navigations. **Decide
+whether a Project and an Expert are one object or two BEFORE either ships** — v4.3 Phase 259 builds
+the Expert bundle row, which is the cheapest moment to ask.

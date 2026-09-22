@@ -41,6 +41,26 @@ export const FEATURE_FORBIDDEN_EVENT = "agentic:feature-forbidden"
  *  all agree on THIS one literal — keep them in lockstep. */
 export const VISIBILITY_REFUSAL = "This feature is available to administrators only."
 
+/** v4.3 audit (TIER-03) — the ONE reader of the backend's structured tier refusal.
+ *  `EntitlementDeniedException` answers `{detail: {error: "entitlement_required",
+ *  capability, required_tier, current_tier, upgrade_hint}}`; every workflow surface used
+ *  to throw a generic "Failed … (status 403)" over it, so the tier the refusal NAMES never
+ *  reached the person. Returns a plain sentence naming the plan, or null when the body is
+ *  not a tier refusal (callers keep their own fallback). */
+export function entitlementRefusalMessage(body: unknown): string | null {
+  const d = (body as { detail?: unknown } | null)?.detail as
+    | { error?: unknown; capability?: unknown; required_tier?: unknown; upgrade_hint?: unknown }
+    | undefined
+  if (!d || typeof d !== "object" || d.error !== "entitlement_required") return null
+  const cap = typeof d.capability === "string" ? d.capability : "this feature"
+  const tier = typeof d.required_tier === "string" && d.required_tier
+    ? d.required_tier.charAt(0).toUpperCase() + d.required_tier.slice(1)
+    : null
+  return tier
+    ? `Your plan doesn't include ${cap}. It is part of the ${tier} plan.`
+    : typeof d.upgrade_hint === "string" ? d.upgrade_hint : `Your plan doesn't include ${cap}.`
+}
+
 /** Phase 092 (092-06 / F3): a status-carrying error so the send path can
  *  distinguish a 409 lock-refusal (MODE-02 server-side Harness→Deep refusal)
  *  from a generic failure. Mirrors the existing DownloadError idiom (status +

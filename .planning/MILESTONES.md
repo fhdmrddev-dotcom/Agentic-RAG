@@ -1,5 +1,53 @@
 # Milestones
 
+## v4.3 What You Can Actually Sell (Shipped: 2026-09-23)
+
+**Phases:** 10 (255-264; 255-260 scoped, 261-264 added in-milestone) · **Plans:** 39 · **Commits:** 332
+since `v4.2` · **Files:** 450 (+111,658 / −3,244; product code 124 files, +18,517 / −217) ·
+**Migrations:** 182-192 · **Timeline:** 2026-09-18 → 2026-09-23 (6 days)
+**Audit:** [`v4.3-MILESTONE-AUDIT.md`](milestones/v4.3-MILESTONE-AUDIT.md) — **re-audited 2026-09-23**,
+`tech_debt` · **31 / 32** satisfied · integration **6/6**.
+
+The milestone that turned a product that works into one that can be **packaged, priced and shipped
+to a client — without touching the trust boundary.**
+
+**Key accomplishments:**
+
+- **A plugin is DATA, an EXTERNAL PROCESS or SANDBOXED CODE — never engine code** (255). Written as
+  binding law in `docs/EXTENSION-CONTRACT.md` before the first exception was argued, with a guard
+  driven RED on all six trigger paths. ⭐ The closed core measured **7 phase types / 1 emitter /
+  29 tools at open and at close**, through four Expert phases.
+- **Every token is counted, kept and priced** (256 + 257). Harness runs persist their totals,
+  sub-agent usage rolls up, a paused or continued chat keeps its count, and the `forced_emit` blind
+  spot is counted or registered. An effective-dated rate registry and **one** token→USD home — its
+  SQL spelling now generated beside the Python — feed `/admin/spend`, which states what it cannot see.
+- **A tier is enforceable from one place** (258). A capability map as data, a refusal that names the
+  plan, a fence against a second tier check, fail-closed on an unreadable tier — and, closed at the
+  audit, **execution and every authoring write**, not just two routes.
+- **An Expert is a bundle, not a runtime** (259-262). RLS on the bundle and every member, scoping
+  that fails closed, "Try asking…" tiles, admin authoring with AI drafting from uploads, per-user
+  and per-role grants, Enable/Disable, and a catalog + detail view + one-click scoped chat.
+- **An Expert can be given the skills it needs** (263 + 264). The studio proposes missing skills, a
+  human approves each, save refuses unknown ones — and a born-for skill now **loads** for every org
+  member, not just its author, proven on 8/8 providers.
+
+### Known Gaps — accepted at close
+
+- **`PACK-05`** (the only unmet requirement): the Financial Analyzer scopes and prompts correctly but
+  its only document sits in a seed-only org, un-embedded; folder sharing is org-scoped by design, so
+  no real org can retrieve it. Needs a **tenancy decision** — cross-org system knowledge vs per-org
+  provisioning → **`SEED-304`**.
+- **Owed live UAT:** 257 `/admin/spend` browser pass · 258 three refusals as a standard-tier org ·
+  261 G-4 authoring UAT and a grant drive · 263 post-WR-08 born-skill re-drive.
+- **Unreviewed:** 255/256/262/264 are self-verified; every fix commit made at the audit
+  (`c28853142`..`cdf3a308a`) was driven RED-first but has had no independent review cycle.
+- **Deploy checklist (production):** migrations 183-192 via the SQL editor, and a
+  `subscription_tier` on **both** production orgs before the backend ships (both measured NULL).
+- **Pre-close open-artifact scan:** 42 items, almost all inherited (29 legacy quick-task dirs, 6
+  dormant seeds, v4.2 UAT/verification files, one stale todo) — acknowledged, not v4.3 scope.
+
+---
+
 ## v4.2 The Connected Knowledge You Can Actually Run (Shipped: 2026-09-18)
 
 **Phases:** 8 (247-254) · **Plans:** 31 · **Commits:** 237 since `v4.1` · **Files:** 559

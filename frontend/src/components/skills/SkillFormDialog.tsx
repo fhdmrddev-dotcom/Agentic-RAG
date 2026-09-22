@@ -282,9 +282,25 @@ interface Props {
    *  Trigger Tuner for a skill. The inline lint's "Tune this" button reuses THIS
    *  exact seam (App → ChatLayout → "skill-tuner" view), never a parallel path. */
   onTuneSkill?: (skillId: string) => void
+  /** Phase 263-04 (D-263-01 / D-263-04): seed values for a brand-NEW skill, so an
+   *  Expert proposal can open this dialog already filled in with the body
+   *  `skill-creator` authored. ⛔ Read ONLY when `skill` is ABSENT — a real `skill`
+   *  always wins, because this must never turn a create into an edit. ⛔ Do NOT
+   *  pre-fill by passing a synthetic object as `skill`: `isEdit = !!skill` would flip,
+   *  the title would read "Edit Skill", `listSkillFiles` would fire against an id that
+   *  does not exist, and the save would read as an update. */
+  initialValues?: { name?: string; description?: string; instructions?: string }
 }
 
-export function SkillFormDialog({ open, onOpenChange, skill, onSave, currentUserId, onTuneSkill }: Props) {
+export function SkillFormDialog({
+  open,
+  onOpenChange,
+  skill,
+  onSave,
+  currentUserId,
+  onTuneSkill,
+  initialValues,
+}: Props) {
   const isEdit = !!skill
   const isOwner = !!(skill && currentUserId && skill.user_id === currentUserId)
 
@@ -304,9 +320,9 @@ export function SkillFormDialog({ open, onOpenChange, skill, onSave, currentUser
   // Reset fields whenever dialog opens/closes or skill changes
   useEffect(() => {
     if (open) {
-      setName(skill?.name ?? "")
-      setDescription(skill?.description ?? "")
-      setInstructions(skill?.instructions ?? "")
+      setName(skill?.name ?? initialValues?.name ?? "")
+      setDescription(skill?.description ?? initialValues?.description ?? "")
+      setInstructions(skill?.instructions ?? initialValues?.instructions ?? "")
       setError(null)
       setSaving(false)
       setFiles([])
@@ -319,7 +335,13 @@ export function SkillFormDialog({ open, onOpenChange, skill, onSave, currentUser
           .catch(() => setFileError("Failed to load files. Close and reopen to retry."))
       }
     }
-  }, [open, skill])
+    // ⛔ `initialValues` is load-bearing in this dependency array: the studio opens a
+    // SECOND proposal in the SAME mounted dialog, and without it the reset never re-runs
+    // so the author reviews the FIRST proposal's body under the second one's name.
+    // ⛔ CONSEQUENCE FOR CALLERS: pass a STABLE reference (state or `useMemo`). A fresh
+    // object literal on every parent render re-runs this reset and wipes what the author
+    // is typing. `ExpertAuthoringStudio` holds it in state for exactly this reason.
+  }, [open, skill, initialValues])
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -480,8 +502,12 @@ export function SkillDetailPanel({ skill, onSave, onDiscard, currentUserId, onTu
   // Phase 137-07: fetch the panel status data on skill switch. The `cancelled` guard
   // (T-137-02) ensures a late fetch never renders under a different skill. The version
   // derivation reads only the owner-scoped listSkillVersions rows via the shared helper.
+  //
+  // ⚠ OWNER-ONLY (262-UAT follow-up): all three endpoints 403 for a non-owner, so for a
+  // built-in or shared skill the reads could only ever be refused — and the operator saw
+  // three 403s logged per click. A non-owner gets the same defaults the `.catch`es produced.
   useEffect(() => {
-    if (!skill) {
+    if (!skill || !isOwner) {
       setGate(null)
       setCaseCount(0)
       setLiveVersion(1)
@@ -502,7 +528,7 @@ export function SkillDetailPanel({ skill, onSave, onDiscard, currentUserId, onTu
     return () => {
       cancelled = true
     }
-  }, [skill])
+  }, [skill, isOwner])
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]

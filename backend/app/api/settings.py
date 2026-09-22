@@ -456,7 +456,7 @@ async def _build_response(s=None) -> FullSettingsResponse:
         tools_lost_models=_tools_lost_model_ids(
             {m for p in s.providers for m in p.models if m},
             _all_overrides,
-            {m: _infer_provider_for(m) for p in s.providers for m in p.models
+            {m: _infer_provider_for(m, p.id) for p in s.providers for m in p.models
              if m and m not in _verified_set},
         ),
         # Phase 075.3 D-075.3-13 + D-075.3-12: build the inferred-provider map
@@ -465,7 +465,13 @@ async def _build_response(s=None) -> FullSettingsResponse:
         # unknown). Iterates providers[*].models because that's the canonical
         # source of truth for the Settings dropdown surface.
         inferred_provider_for={
-            m: _infer_provider_for(m)
+            # ⭐ Phase 262: ``p.id`` is the provider block this model is CONFIGURED UNDER —
+            # a fact the operator supplied, not a guess from the id's spelling. It is read
+            # only when no naming pattern matches. Passing it here is what keeps the amber
+            # "no tools" chip AGREEING with what the runtime will actually do; without it
+            # this surface and ``resolve_calling_mode`` would infer different providers for
+            # the same model, and the chip would be a claim about nothing.
+            m: _infer_provider_for(m, p.id)
             for p in s.providers
             for m in p.models
             # Phase 249: keyed off the UNION, so an operator-added model has no inferred
@@ -1105,7 +1111,12 @@ async def get_providers(current_user: dict = Depends(get_current_user)):
     # payload stays small. `_infer_provider_for` is the SERVER's inference; the client never
     # mirrors the pattern table (RESEARCH §6 Approach b).
     _inferred = {
-        m: _infer_provider_for(m)
+        # ⭐ Phase 262: ``p.id`` — the provider block the operator put this model under. Read
+        # only when no naming pattern matches. It MUST be passed at all three inference sites
+        # in this file or they disagree with each other, and the two that feed
+        # `_tools_lost_model_ids` would then compute the warning from a different provider
+        # than the one the runtime resolves.
+        m: _infer_provider_for(m, p.id)
         for p in s.providers
         for m in p.models
         if m and m not in _verified_set

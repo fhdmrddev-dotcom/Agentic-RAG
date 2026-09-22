@@ -15,10 +15,13 @@ import {
 } from "@/providers/StreamsProvider"
 import {
   getThreadWorkflow,
+  getExpert,
+  setThreadActiveExpert,
   ApiError,
 } from "@/lib/api"
 import { useComposerModel } from "@/hooks/useComposerModel"
-import type { Folder, Thread } from "@/types"
+import { ExpertSpotlightCard } from "./ExpertSpotlightCard"
+import type { Folder, Thread, ExpertBundle } from "@/types"
 import { Folder as FolderIcon, Menu, Sparkles, PanelLeftOpen } from "lucide-react"
 
 interface Props {
@@ -31,6 +34,12 @@ interface Props {
   onOpenDrawer?: () => void
   /** Take the person to the connections surface — see `ConnectorsFlyout`. */
   onOpenConnections?: () => void
+  // Phase 262 plan 05 (PACK-11): the composer's second door into the Expert catalog. Pure
+  // pass-through — this component decides nothing about it. Optional at every hop, for the
+  // reason `MessageInput`'s own Props docblock gives: four shipped suites mount these
+  // components from their own prop objects and a required prop would redden a typecheck
+  // baseline that has zero headroom.
+  onBrowseExperts?: () => void
   // Phase 156 REFINEMENT (operator 2026-07-16): reopens the folded-away chat-history
   // column (sketch Variant A #reopenA — the ▷ handle in the chat top-bar). Provided by
   // ChatLayout ONLY while the history is collapsed; undefined otherwise, so the handle
@@ -52,7 +61,7 @@ interface Props {
   attentionCount?: number
 }
 
-export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefillMessage, onClearPrefill, onOpenDrawer, onOpenConnections, onReopenHistory, attentionCount }: Props) {
+export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefillMessage, onClearPrefill, onOpenDrawer, onOpenConnections, onBrowseExperts, onReopenHistory, attentionCount }: Props) {
   // Plan 075.4-01 D-075.4-A1: useMessages still exposes the viewed-thread
   // values (isStreaming, fallbackNotice) for back-compat — but the composer
   // disabled prop and per-thread surfaces go through the direct selectors
@@ -101,6 +110,9 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
   } = useComposerModel(thread?.id ?? null, messages)
   const [agentMode, setAgentMode] = useState<"default" | "explorer">("default")
   const [scopeFolderId, setScopeFolderId] = useState<string | null>(null)
+  // Phase 260 (PACK-02 / PACK-03): active expert consultant state
+  const [activeExpert, setActiveExpert] = useState<ExpertBundle | null>(null)
+  const [expertInvited, setExpertInvited] = useState(false)
   const justCreatedThreadRef = useRef<string | null>(null)
 
   // Plan 075.4-01 D-075.4-A1: thread-scoped reads. The composer disable
@@ -224,6 +236,26 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
     setAgentMode("default")
     setScopeFolderId(null)
   }, [thread?.id])
+
+  // Phase 260 (PACK-02 / PACK-03): sync active expert consultant with thread
+  useEffect(() => {
+    const expertId = thread?.active_expert_id
+    if (!expertId) {
+      setActiveExpert(null)
+      return
+    }
+    let cancelled = false
+    getExpert(expertId)
+      .then((exp) => {
+        if (!cancelled) setActiveExpert(exp)
+      })
+      .catch((err) => {
+        console.error("Failed to load active expert:", err)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [thread?.id, thread?.active_expert_id])
 
   // Phase 092 (SC#5 / D-v2.5-03): mount-time reconcile of the workflow lock +
   // Continue state from GET /threads/{id}/workflow — the SOURCE OF TRUTH, never
@@ -399,6 +431,7 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
   // pill onSelect). onResume mirrors the same useCallback-stabilization
   // pattern for the Resume button on failed/timed_out assistant messages.
   const handleSend = useCallback(async (content: string, activeConnectorIds?: string[]) => {
+    setExpertInvited(false)
     let activeThread = thread
     if (!activeThread) {
       activeThread = await onCreateThread(scopeFolderId)
@@ -433,6 +466,27 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
       activeConnectorIds,
     )
   }, [thread, scopeFolderId, onCreateThread, selectedModel, onTitleUpdate, agentMode, selectedProvider, sendMessage, setViewingThread, streamActions])
+
+  // Phase 260 (PACK-03 / D-260-07): 1-click execution for action tiles
+  const handlePromptSelect = useCallback(
+    (prompt: string) => {
+      setExpertInvited(false)
+      void handleSend(prompt)
+    },
+    [handleSend],
+  )
+
+  const handleDismissExpert = useCallback(async () => {
+    setActiveExpert(null)
+    setExpertInvited(false)
+    if (thread?.id) {
+      try {
+        await setThreadActiveExpert(thread.id, null)
+      } catch (err) {
+        console.error("Failed to clear thread active expert:", err)
+      }
+    }
+  }, [thread?.id])
 
   // Plan 075.4-04 D-075.4-SC#6 — onSendMessage is the stable identity passed
   // to MessageList → MessageItem (SuggestionPills onSelect). Wraps handleSend
@@ -484,7 +538,13 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
   // composer.
   const inputBar = (
     <MessageInput
+      activeExpert={activeExpert}
+      onActiveExpertChange={(exp) => {
+        setActiveExpert(exp)
+        if (exp) setExpertInvited(true)
+      }}
       onOpenConnections={onOpenConnections}
+      onBrowseExperts={onBrowseExperts}
       onSend={handleSend}
       /* Phase 194.1 Plan 04 (RUN-01 / D-05/D-22) — THE STOP-DISPATCHER PROP IS GONE
          from this element. The composer's Stop is `StopControl` (written WITHOUT its
@@ -592,55 +652,65 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
             {attentionDot}
           </button>
         </div>
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center space-y-5 max-w-md px-6 animate-fadeSlideUp">
-            <div className="flex justify-center">
-              <div className="w-16 h-16 rounded-2xl gradient-primary flex items-center justify-center shadow-lg shadow-primary/20">
-                <Sparkles className="w-8 h-8 text-white" />
+        <div className="flex-1 flex items-center justify-center p-4 overflow-y-auto">
+          {activeExpert ? (
+            <div className="w-full max-w-2xl animate-fadeSlideUp">
+              <ExpertSpotlightCard
+                expert={activeExpert}
+                onSelectPrompt={handlePromptSelect}
+                onDismiss={handleDismissExpert}
+              />
+            </div>
+          ) : (
+            <div className="text-center space-y-5 max-w-md px-6 animate-fadeSlideUp">
+              <div className="flex justify-center">
+                <div className="w-16 h-16 rounded-2xl gradient-primary flex items-center justify-center shadow-lg shadow-primary/20">
+                  <Sparkles className="w-8 h-8 text-white" />
+                </div>
               </div>
-            </div>
-            <div className="space-y-2">
-              <h2 className="font-headline font-bold text-xl text-foreground">How can I help you?</h2>
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                Ask me anything, or upload documents and I'll answer based on their content.
-              </p>
-            </div>
-            {folders.length > 0 && (
-              <div className="mt-3">
-                <select
-                  value={scopeFolderId ?? ""}
-                  onChange={(e) => setScopeFolderId(e.target.value || null)}
-                  className="text-sm rounded-lg px-4 py-2 bg-card text-foreground ghost-border focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
-                >
-                  <option value="">All documents</option>
-                  {folders.map((f) => (
-                    <option key={f.id} value={f.id}>{f.name}</option>
-                  ))}
-                </select>
-                <p className="text-xs text-muted-foreground mt-1.5">
-                  Scope this conversation to a specific folder
+              <div className="space-y-2">
+                <h2 className="font-headline font-bold text-xl text-foreground">How can I help you?</h2>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  Ask me anything, or upload documents and I'll answer based on their content.
                 </p>
               </div>
-            )}
+              {folders.length > 0 && (
+                <div className="mt-3">
+                  <select
+                    value={scopeFolderId ?? ""}
+                    onChange={(e) => setScopeFolderId(e.target.value || null)}
+                    className="text-sm rounded-lg px-4 py-2 bg-card text-foreground ghost-border focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
+                  >
+                    <option value="">All documents</option>
+                    {folders.map((f) => (
+                      <option key={f.id} value={f.id}>{f.name}</option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-muted-foreground mt-1.5">
+                    Scope this conversation to a specific folder
+                  </p>
+                </div>
+              )}
 
-            {/* Phase 216 (CAT-04): Starter Prompts */}
-            <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => void handleSend("Search recent files in connected cloud storage and summarize key points")}
-                className="text-xs bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground px-3 py-1.5 rounded-full border border-border/50 transition-colors"
-              >
-                📁 Search connected files
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleSend("Draft a team status update")}
-                className="text-xs bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground px-3 py-1.5 rounded-full border border-border/50 transition-colors"
-              >
-                💬 Draft a team update
-              </button>
+              {/* Phase 216 (CAT-04): Starter Prompts */}
+              <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => void handleSend("Search recent files in connected cloud storage and summarize key points")}
+                  className="text-xs bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground px-3 py-1.5 rounded-full border border-border/50 transition-colors"
+                >
+                  📁 Search connected files
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleSend("Draft a team status update")}
+                  className="text-xs bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground px-3 py-1.5 rounded-full border border-border/50 transition-colors"
+                >
+                  💬 Draft a team update
+                </button>
+              </div>
             </div>
-          </div>
+          )}
         </div>
         {inputBar}
       </div>
@@ -769,15 +839,38 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
           that was true once and stops the audit. Phase 196-07 took the composer's
           provider/model machine out to a leaf hook, so the counts are now `useState` 2 and
           `useEffect` 3. Re-derive them, never copy them forward. */}
-      <MessageList
-        messages={messages}
-        isStreaming={isStreaming}
-        isLoading={isLoadingThisThread}
-        onSendMessage={onSendMessage}
-        showSuggestions={agentMode !== "explorer"}
-        onResume={onResume}
-        threadId={thread?.id ?? null}
-      />
+      {activeExpert && messages.length === 0 ? (
+        <div className="flex-1 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="w-full max-w-2xl animate-fadeSlideUp">
+            <ExpertSpotlightCard
+              expert={activeExpert}
+              onSelectPrompt={handlePromptSelect}
+              onDismiss={handleDismissExpert}
+            />
+          </div>
+        </div>
+      ) : (
+        <>
+          <MessageList
+            messages={messages}
+            isStreaming={isStreaming}
+            isLoading={isLoadingThisThread}
+            onSendMessage={onSendMessage}
+            showSuggestions={agentMode !== "explorer"}
+            onResume={onResume}
+            threadId={thread?.id ?? null}
+          />
+          {activeExpert && expertInvited && (
+            <div className="px-4 pb-2">
+              <ExpertSpotlightCard
+                expert={activeExpert}
+                onSelectPrompt={handlePromptSelect}
+                onDismiss={handleDismissExpert}
+              />
+            </div>
+          )}
+        </>
+      )}
       {pendingApproval && (
         <div
           data-testid="docked-tool-approval"

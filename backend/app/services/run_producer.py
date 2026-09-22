@@ -375,6 +375,168 @@ async def _finalize_producer_run(
         )
 
 
+async def _resolve_thread_scoping(
+    supabase,
+    thread_id: str,
+    current_user: dict,
+    pool,
+) -> tuple[
+    tuple[str, ...] | None,
+    tuple[str, ...] | None,
+    tuple[dict, ...] | None,
+    str | None,
+    UUID | None,
+]:
+    """Phase 260 (PACK-02 / D-260-05) & Phase 261 (PACK-02 / D-v4.3-01 / D-v4.3-02 / BUG-260920-01) —
+    Resolve thread-active consultant scoping prior to the loop.
+
+    Data-injected into RunContext: effective_folder_ids, effective_tools, skill_catalog_override,
+    scoped_folder_path, born_for_bundle_id.
+    Returns (None, None, None, None, None) when no expert is invited (preserving Deep Mode byte-identical).
+
+    Phase 264 (PACK-17 / D-264-03 / D-264-03a) — the FIFTH element is the ACCESS-CHECKED bundle id
+    (``ResolvedExpertBundle.bundle_id``), never the raw ``active_expert_id`` read off the thread row:
+    ``resolve_expert_bundle`` returning non-``None`` is what makes the value honest (T-264-01). It
+    rides ``RunContext`` → ``ToolContext`` → sub-agent ``sub_ctx`` as an additive default-``None``
+    field so the LOAD path can one day see which Expert is active. ``None`` on every non-Expert run
+    => literal no-op.
+    """
+    try:
+        from app.utils.db import aexec  # noqa: PLC0415
+        t_resp = await aexec(
+            supabase.table("threads")
+            .select("active_expert_id, folder_id")
+            .eq("id", str(thread_id))
+            .maybe_single()
+        )
+        active_expert_id = t_resp.data.get("active_expert_id") if (t_resp and t_resp.data) else None
+        thread_folder_id = t_resp.data.get("folder_id") if (t_resp and t_resp.data) else None
+        if not active_expert_id:
+            return None, None, None, None, None
+
+        from app.services.expert_service import resolve_expert_bundle  # noqa: PLC0415
+        caller_user_id = UUID(str(current_user["id"]))
+        caller_org_id = UUID(str(current_user["org_id"])) if current_user.get("org_id") else None
+        # PACK-10 (v4.3 verification): the detached producer has no request, and current_user
+        # is {id, email, org_id} — it never carried a role, so role grants never matched here.
+        # Read the caller's role IN THE RUN'S ORG; any failure fails closed to no role.
+        caller_roles: list[str] = []
+        if caller_org_id is not None:
+            try:
+                _role = await pool.fetchval(
+                    "SELECT role FROM public.org_members WHERE org_id = $1 AND user_id = $2",
+                    caller_org_id, caller_user_id,
+                )
+                caller_roles = [_role] if _role else []
+            except Exception:  # noqa: BLE001 — fail closed: no role, grants by user id only
+                caller_roles = []
+
+        resolved = await resolve_expert_bundle(
+            pool=pool,
+            bundle_id=UUID(str(active_expert_id)),
+            caller_user_id=caller_user_id,
+            caller_org_id=caller_org_id,
+            caller_roles=caller_roles,
+        )
+        if not resolved:
+            # Phase 260 F-1 (Fail-Closed): Drop stale/inaccessible active_expert_id to keep DB/UI honest
+            try:
+                await aexec(
+                    supabase.table("threads")
+                    .update({"active_expert_id": None})
+                    .eq("id", str(thread_id))
+                )
+            except Exception:
+                logger.warning("Failed to reset stale active_expert_id on thread %s", thread_id, exc_info=True)
+            raise ValueError(
+                f"Active expert '{active_expert_id}' could not be resolved or is inaccessible; refusing run (fail-closed)"
+            )
+
+        expert_folder_ids = [str(f) for f in resolved.effective_folder_ids]
+        scope_mode = getattr(resolved, "scope_mode", "biased")
+
+        all_folders: list[dict] = []
+        if thread_folder_id or expert_folder_ids:
+            try:
+                from app.utils.folder_utils import fetch_visible_folders  # noqa: PLC0415
+                all_folders = await fetch_visible_folders(supabase, str(current_user["id"]))
+            except Exception:
+                logger.warning("Failed to fetch visible folders for thread %s scoping", thread_id, exc_info=True)
+
+        folder_map = {str(f["id"]): f for f in all_folders}
+
+        def _get_subtree(root_id: str) -> list[str]:
+            res = [root_id]
+            for f in all_folders:
+                if str(f.get("parent_id") or "") == root_id:
+                    res.extend(_get_subtree(str(f["id"])))
+            return res
+
+        def _get_path(fid: str) -> str:
+            parts = []
+            curr: str | None = fid
+            while curr:
+                f = folder_map.get(curr)
+                if not f:
+                    break
+                parts.append(f.get("name", ""))
+                curr = str(f["parent_id"]) if f.get("parent_id") else None
+            return ("/" + "/".join(reversed(parts))) if parts else ""
+
+        scoped_folder_path: str | None = None
+
+        if scope_mode == "restricted":
+            # Strict isolation (S5 / D-v4.3-01): exclusive to expert folders
+            effective_folder_ids = tuple(sorted(set(expert_folder_ids)))
+            if expert_folder_ids:
+                scoped_folder_path = _get_path(expert_folder_ids[0]) or None
+        else:
+            # Union Scope (default, S4 / D-v4.3-01): thread folder + expert folders
+            if thread_folder_id:
+                thread_subfolder_ids = _get_subtree(str(thread_folder_id))
+                effective_folder_ids = tuple(sorted(set(thread_subfolder_ids).union(expert_folder_ids)))
+                scoped_folder_path = _get_path(str(thread_folder_id)) or None
+            else:
+                effective_folder_ids = tuple(sorted(set(expert_folder_ids)))
+                if expert_folder_ids:
+                    scoped_folder_path = _get_path(expert_folder_ids[0]) or None
+
+        # Phase 260 F-3: derive core tools strictly from tool_dispatcher.EXPERT_CORE_TOOLS
+        # Phase 261 D-v4.3-02 / S6: preserve deliverable tools when tool_floor_enabled is True
+        from app.services.tool_dispatcher import EXPERT_CORE_TOOLS, EXPERT_DELIVERABLE_TOOLS  # noqa: PLC0415
+        base_tools = set(EXPERT_CORE_TOOLS)
+        if getattr(resolved, "tool_floor_enabled", True):
+            base_tools = base_tools.union(EXPERT_DELIVERABLE_TOOLS)
+        effective_tools = tuple(sorted(base_tools) + list(resolved.effective_connections))
+
+        skill_catalog_override = None
+        if resolved.effective_skills:
+            skill_catalog_override = tuple(
+                {"name": s, "description": f"Expert member skill: {s}"}
+                for s in resolved.effective_skills
+            )
+
+        # Phase 264 (PACK-17 / D-264-03a / T-264-01) — the fifth element is
+        # `resolved.bundle_id`, the value `resolve_expert_bundle` already
+        # access-checked, NOT the raw `active_expert_id` read off the thread row
+        # above. `resolved` being non-None is the whole honesty of the id.
+        return (
+            effective_folder_ids,
+            effective_tools,
+            skill_catalog_override,
+            scoped_folder_path,
+            resolved.bundle_id,
+        )
+    except Exception as exc:
+        logger.error(
+            "Failed to resolve consultant expert scoping for thread %s; refusing run (fail-closed): %s",
+            thread_id,
+            exc,
+            exc_info=True,
+        )
+        raise
+
+
 async def run_producer(
     run_id: _uuid_mod.UUID,
     *,
@@ -526,6 +688,13 @@ async def run_producer(
                 # a no-op when absent → no double-persist. The Deep `else` branch +
                 # run_agent_loop + the Deep `_result_sink` flow stay byte-identical (D-14).
             else:                                          # Deep — byte-identical
+                _wf_pool = await get_pg_pool()
+                _eff_folders, _eff_tools, _skill_cat_override, _eff_folder_path, _born_for = await _resolve_thread_scoping(
+                    supabase=supabase,
+                    thread_id=thread_id,
+                    current_user=current_user,
+                    pool=_wf_pool,
+                )
                 ctx = RunContext(
                     run_id=run_id,
                     thread_id=thread_id,
@@ -536,6 +705,15 @@ async def run_producer(
                     supabase=supabase,
                     resolved_model=resolved_model,
                     resolved_provider=resolved_provider,
+                    effective_folder_ids=_eff_folders,
+                    effective_tools=_eff_tools,
+                    skill_catalog_override=_skill_cat_override,
+                    scoped_folder_path=_eff_folder_path,
+                    # Phase 264 (PACK-17 / D-264-03 / 8.6) — the Deep build. Paired
+                    # with the continuation build below; a field set at one and not
+                    # the other is a defect every existing test would miss. None on
+                    # every run without a consultant => literal no-op.
+                    born_for_bundle_id=_born_for,
                 )
                 _agent_loop_result = await run_agent_loop(
                     ctx,
@@ -664,6 +842,7 @@ async def spawn_continuation_run(
             run_agent_loop,
             RunContext,
             load_user_settings,
+            get_pg_pool,
         )
 
         _terminal_status = "completed"
@@ -682,6 +861,13 @@ async def spawn_continuation_run(
             # Minimal MessageCreate carrier — the loop reads body.model/.provider/
             # .agent_mode/.content; a continuation carries no new user content.
             body = MessageCreate(content="", model=resolved_model, provider=resolved_provider)
+            _wf_pool = await get_pg_pool()
+            _eff_folders, _eff_tools, _skill_cat_override, _eff_folder_path, _born_for = await _resolve_thread_scoping(
+                supabase=supabase,
+                thread_id=thread_id,
+                current_user=current_user,
+                pool=_wf_pool,
+            )
             ctx = RunContext(
                 run_id=run_id,
                 thread_id=thread_id,
@@ -694,6 +880,14 @@ async def spawn_continuation_run(
                 resolved_provider=resolved_provider,
                 resume_dropped_tool_calls=True,
                 dropped_tool_calls=tuple(dropped_tool_calls),
+                effective_folder_ids=_eff_folders,
+                effective_tools=_eff_tools,
+                skill_catalog_override=_skill_cat_override,
+                scoped_folder_path=_eff_folder_path,
+                # Phase 264 (PACK-17 / D-264-03 / 8.6) — the CONTINUATION build, the
+                # site a one-site fix misses: no test exercises this path's scoping.
+                # A resumed run is the same run and carries the same scope.
+                born_for_bundle_id=_born_for,
             )
             try:
                 await run_agent_loop(

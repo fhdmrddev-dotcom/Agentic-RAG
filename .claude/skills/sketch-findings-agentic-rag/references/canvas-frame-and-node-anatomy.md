@@ -54,6 +54,18 @@ superseded by 137-B; the **topology findings stand**:
 - Only linear `i → i+1` edges plus dashed `skip_to_phase` failure branches.
 - **No `depends_on`, no parallel lanes** — the canvas is a projection of a LINEAR spine, not a free
   DAG. The harness engine runs it linearly; the canvas must not imply otherwise.
+
+> ⛔ **THIS FINDING IS A CANDIDATE FOR DELIBERATE RETIREMENT — `SEED-295`, noted 2026-09-18.**
+> It is **correct today** and stays in force. But `SEED-295` (named outcomes + forward-only edges)
+> would retire it, and the note is placed here so the retirement can only ever be a **decision**,
+> never a surprise — the `D-206-07` precedent, where `test_189_no_egress.py`'s Case A source fence
+> was consciously retired when the MCP client landed, with the reason written into the test body.
+>
+> ⚠ **Do not soften this finding in advance.** Until `SEED-295` is scoped AND its two gates are
+> answered (`D1` `INPUT_UNSATISFIED` path-dependency · `D2` what "published" certifies — **an open
+> operator decision**), a canvas that implies a DAG is still drawing a lie about the engine.
+> ⛔ `SEED-295` is itself planted as **UNJUSTIFIED** pending one real workflow authored and recorded
+> as blocked, so this fence may outlive the seed.
 - No dropped phase and no phantom edge — faithfulness to the definition is the acceptance bar.
 - `llm_batch_agents` fan-out is a *phase type*, not a branching layout. (`elkjs` stays deferred to
   Phase 191 only if a real branching layout is ever needed.)
