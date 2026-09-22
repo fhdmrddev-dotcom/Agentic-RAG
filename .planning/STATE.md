@@ -4,7 +4,7 @@ milestone: v4.3
 milestone_name: What You Can Actually Sell
 status: executing
 last_updated: "2026-09-22T00:00:00.000Z"
-last_activity: 2026-09-22 -- 264 closed: 4/4 plans, 5/5 SC verified, 13/13 UAT rows driven
+last_activity: 2026-09-22 -- v4.3 record repaired: Phase 262 was NEVER BUILT (BUS-303); cannot report 25/25
 progress:
   total_phases: 17
   completed_phases: 9
@@ -34,7 +34,7 @@ See: `.planning/PROJECT.md` (updated 2026-09-18)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 264 (Born-For Skills Must LOAD, Not Just Resolve) COMPLETE — 4/4 plans, 5/5 success criteria verified, **13/13 UAT rows DRIVEN (13 PASS)**. Independent review still owed.
+**Current focus:** v4.3 record repaired 2026-09-22. Phase 264 COMPLETE (4/4 plans, 5/5 SC, 13/13 UAT driven). ⛔ **The milestone CANNOT report 25/25 — Phase 262 was never built** (`BUS-303`). Seven operator rulings open.
 
 ---
 
@@ -45,6 +45,56 @@ Plan: 4 of 4 COMPLETE — executed, merged, verified
 Status: Complete; UAT driven 13/13; independent review owed
 Last activity: 2026-09-22 -- Phase 264 UAT driven: 13/13 rows PASS, defect reproduced on the pre-264 tree
 Phase range: e9d6a9410 (base) → e1192b462 (close), on develop
+
+### ⛔ v4.3 RECORD REPAIR — 2026-09-22 · THE MILESTONE CANNOT REPORT 25/25
+
+Triggered by a plain "what is next?". The answer turned out to be *"the record is wrong"*.
+
+**The progress table read `0/? · Not started` for phases 255–260** while every one of them had a
+complete summary set on disk and its commits in git — and **261, 262 and 263 had no row at all.**
+Re-derived from disk and git; all ten rows rewritten. ⭐ **A progress row that says "Not started"
+about shipped work is worse than a missing one**, because it answers the reader confidently and
+stops the check — the hot-file ledger's own recurring finding, one register up.
+
+⛔ **PHASE 262 WAS NEVER BUILT, AND THE COVERAGE TABLE DOES NOT KNOW IT.** `PACK-11/12/13` are
+credited to *"An Expert You Can Discover"*, which has **no directory, no plan, no summary, no
+verification**. The three commits tagged `(262)` — `16b4d41d5`, `45adc0e3c`, `5e91fc649` — deliver
+**model-capability routing, `api_surface` and migration 190**. ⭐ **That work is real, fenced and
+correctly described in `CLAUDE.md`; only the NUMBER it was filed under is wrong** — and the
+coverage claim rests on it.
+
+⭐ **THE SHARPEST PART IS MEASURED, NOT INFERRED.** Migration **189** already shipped `icon`,
+`category`, `when_to_use` and `example_output` on `expert_bundles`, and `ExpertAuthoringStudio`
+writes all four. A grep across `frontend/src` finds them rendered in **`ExpertAuthoringStudio`,
+`OrgExpertsTab` (inside `OrgAdminShell` — admin only), `api/experts.ts` and `types` — and nowhere
+else.** ⛔ **Neither `InviteExpertDialog` nor `ExpertSpotlightCard` reads one of them**, and those
+are the only two Expert surfaces a normal user sees, against a goal that opens *"A normal user —
+not an admin"*. Two artefacts of it in shipped code: `InviteExpertDialog.tsx:26`'s `getExpertIcon`
+**hardcodes emoji by slug string-match while the `icon` column sits unread**, and
+`ExpertSpotlightCard` ships `DEFAULT_FINANCIAL_TILES` and never reads `example_output`.
+⭐ **A value can be migrated, authored and typed and still reach nobody** — this project records the
+neighbouring lesson as *"presence assertions cannot see content drift"*; here the content does not
+drift, **it is never rendered at all**.
+
+**Status, measured:** `PACK-12` **NOT MET** on the user path · `PACK-11` **UNVERIFIED** (nobody drove
+the visible-row / no-grant user, which the ROADMAP itself calls *"the honesty criterion and the one
+most likely to be faked"*) · `PACK-13` arguably met by 260's invite path, but its subject — the
+detail view — does not exist.
+
+⛔ **SIX PHASES HAVE NO `VERIFICATION.md` AT ALL** (257, 258, 259, 260, 261, 263) — closed on
+summaries. Seven carry `independent_review: owed`. 264 was planned, executed **and** verified inside
+one session, which the standing separation rule exists to prevent.
+
+⛔ **SEVEN OPERATOR RULINGS ARE OPEN AND TWO ARE HARD BLOCKERS**, on `BUS-246`, `BUS-248`, `BUS-263`,
+`BUS-280`, `BUS-283` and the new **`BUS-303`** (the 262 finding). The two that bite:
+**migration 185 is NOT applied to the live DB**, so six approved prices are not live; and **both
+production orgs measure `subscription_tier IS NULL` (2 of 2)** — set a tier for each **before** the
+backend ships, or workflow authoring goes dark for your own tenants.
+
+⛔ **I ruled on none of it.** Renumbering the shipped work, giving PACK-11/12/13 a real phase, or
+descoping them with a written reason are operator decisions. ⭐ The catalog **sketch already exists**
+(`.planning/sketches/261-262-expert-authoring-and-catalog/`), so **G-2 is already satisfied** if it
+is built.
 
 ### ⭐ PHASE 264 CLOSED — 2026-09-22
 
