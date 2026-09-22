@@ -172,3 +172,48 @@ async def test_analyze_document_refuses_an_out_of_scope_file():
         res = await td._handle_analyze_document({"filename": "out.md", "query": "q"}, _ctx([IN]))
     assert "outside the folders this chat is limited to" in res.result
     fetch.assert_not_awaited()
+
+
+# ── fetch_document_file / attach_skill_file — the byte path (v4.3 audit) ─────────────
+# Both reach a document's ORIGINAL bytes through `_fetch_owned_document_bytes`, which was
+# owner→global scoped only and never consulted the folder wall. The wall now sits at the
+# top of that ONE helper, so both callers (and any future one) inherit it.
+
+class _NoStorage:
+    """Any storage/table read means the wall let the id through."""
+    def table(self, *_a, **_k):
+        raise AssertionError("document bytes were resolved for an out-of-scope id")
+
+
+def _byte_ctx(scope):
+    return SimpleNamespace(
+        folder_subtree_ids=scope, scoped_folder_path=None,
+        current_user={"id": "user-1"}, supabase=_NoStorage(), thread_id="t-1",
+    )
+
+
+@pytest.mark.asyncio
+async def test_fetch_owned_bytes_refuses_an_out_of_scope_document():
+    with _doc_folders({"d-out": OUT}):
+        res = await td._fetch_owned_document_bytes(_byte_ctx([IN]), "d-out")
+    assert isinstance(res, dict) and res.get("error_kind") == "out_of_scope"
+
+
+@pytest.mark.asyncio
+async def test_fetch_document_file_tool_refuses_an_out_of_scope_document():
+    with _doc_folders({"d-out": OUT}):
+        out = await td._handle_fetch_document_file({"document_id": "d-out"}, _byte_ctx([IN]))
+    assert json.loads(out.result).get("error_kind") == "out_of_scope"
+
+
+@pytest.mark.asyncio
+async def test_fetch_owned_bytes_unscoped_never_consults_the_wall():
+    lookup = AsyncMock(return_value={})
+    with patch.object(td, "_document_folder_ids", lookup):
+        try:
+            await td._fetch_owned_document_bytes(_byte_ctx(None), "d-any")
+        except AssertionError:
+            pass  # reached storage — the normal (unscoped) path, as intended
+        except Exception:
+            pass
+    lookup.assert_not_called()

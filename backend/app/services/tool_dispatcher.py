@@ -374,6 +374,14 @@ async def _fetch_owned_document_bytes(
     owned KB document's original bytes onto a skill. Keep the ``(filename, bytes, mime)``
     tuple / ``{"error": ...}`` dict return shape stable for that reuse.
     """
+    # The folder wall (262-UAT 3.5 ruling) — BEFORE any owner/global lookup, so both callers
+    # (fetch_document_file, attach_skill_file) refuse an out-of-scope id. Found by the v4.3
+    # milestone audit: this byte path was the one document read the 3.5 fix did not reach.
+    if await _doc_out_of_scope(ctx, str(document_id)):
+        return {
+            "error": f"Document {document_id} {_OUT_OF_SCOPE}.",
+            "error_kind": "out_of_scope",
+        }
     uid = ctx.current_user["id"]
     _cols = "id, filename, file_path, file_size, mime_type"
 
