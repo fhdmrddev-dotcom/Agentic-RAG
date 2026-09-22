@@ -502,8 +502,12 @@ export function SkillDetailPanel({ skill, onSave, onDiscard, currentUserId, onTu
   // Phase 137-07: fetch the panel status data on skill switch. The `cancelled` guard
   // (T-137-02) ensures a late fetch never renders under a different skill. The version
   // derivation reads only the owner-scoped listSkillVersions rows via the shared helper.
+  //
+  // ⚠ OWNER-ONLY (262-UAT follow-up): all three endpoints 403 for a non-owner, so for a
+  // built-in or shared skill the reads could only ever be refused — and the operator saw
+  // three 403s logged per click. A non-owner gets the same defaults the `.catch`es produced.
   useEffect(() => {
-    if (!skill) {
+    if (!skill || !isOwner) {
       setGate(null)
       setCaseCount(0)
       setLiveVersion(1)
@@ -524,7 +528,7 @@ export function SkillDetailPanel({ skill, onSave, onDiscard, currentUserId, onTu
     return () => {
       cancelled = true
     }
-  }, [skill])
+  }, [skill, isOwner])
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]

@@ -444,3 +444,44 @@ describe("SkillFormDialog — initialValues pre-fill (263-04 / D-263-04)", () =>
     expect(instBox()).toHaveValue(second.instructions)
   })
 })
+
+// 262-UAT follow-up (operator read the backend log): opening a built-in skill logged
+// `GET /publish-gate|/test-cases|/versions → 403` every time. Those three reads are OWNER-ONLY
+// server-side, so a non-owner request can only ever be refused — the panel must not issue it.
+describe("SkillDetailPanel — owner-only lifecycle reads", () => {
+  beforeEach(() => {
+    listSkillFiles.mockResolvedValue([])
+    getPublishGate.mockReset().mockResolvedValue(mkGate())
+    listTestCases.mockReset().mockResolvedValue([])
+    listSkillVersions.mockReset().mockResolvedValue([])
+  })
+
+  it("a skill the caller does NOT own issues none of the three owner-only reads", async () => {
+    render(
+      <SkillDetailPanel
+        skill={mkSkill({ id: "sys-1", user_id: "system-user", is_system: true })}
+        onSave={vi.fn(async (): Promise<Skill> => mkSkill())}
+        onDiscard={vi.fn()}
+        currentUserId="user-1"
+      />,
+    )
+    await waitFor(() => expect(listSkillFiles).toHaveBeenCalled())
+    expect(getPublishGate).not.toHaveBeenCalled()
+    expect(listTestCases).not.toHaveBeenCalled()
+    expect(listSkillVersions).not.toHaveBeenCalled()
+  })
+
+  it("POSITIVE CONTROL — the owner's skill still issues all three", async () => {
+    render(
+      <SkillDetailPanel
+        skill={mkSkill()}
+        onSave={vi.fn(async (): Promise<Skill> => mkSkill())}
+        onDiscard={vi.fn()}
+        currentUserId="user-1"
+      />,
+    )
+    await waitFor(() => expect(getPublishGate).toHaveBeenCalledWith("skill-1"))
+    expect(listTestCases).toHaveBeenCalledWith("skill-1")
+    expect(listSkillVersions).toHaveBeenCalledWith("skill-1")
+  })
+})
