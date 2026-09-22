@@ -203,6 +203,17 @@ async def preflight_workflow_kickoff(*, request, body, thread_id, thread_row, su
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Workflows are currently disabled by the administrator",
             )
+        # ── 258 F-2 / TIER-01 — EXECUTION is gated, not only authoring ──────────
+        # Phase 258 gated create_draft/publish; a Standard org could still RUN any
+        # published workflow here, the half that spends tokens. Same one entitlement
+        # home, same fail-closed-before-insert discipline: refused before the
+        # definition resolve, so nothing is written. current_user["org_id"] is the
+        # validated X-Org-Id send_message stamps; absent → fail closed.
+        from app.api.threads import get_pg_pool
+        from app.services.entitlement_service import enforce_entitlement
+        await enforce_entitlement(
+            await get_pg_pool(), (current_user or {}).get("org_id"), "workflows",
+        )
         # Resolve+parse the published definition UNDER THE USER'S RLS (T-092-05 IDOR
         # mitigation): only a published, owned-or-global definition may be kicked
         # off. A non-owned / private / unpublished id is refused 404 (never leaks

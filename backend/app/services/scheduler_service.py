@@ -127,6 +127,23 @@ async def launch_scheduled_run(
     from app.dependencies import get_service_role_supabase
 
     org_id = schedule.get("org_id") or row.get("org_id")
+
+    # ── 258 F-2 / TIER-01 — a scheduled run is EXECUTION too ─────────────────────────
+    # Same one entitlement home as the chat kickoff. Refused BEFORE the thread insert, so
+    # an unentitled (or unresolvable) org's schedule writes nothing and is recorded by the
+    # caller as launch_failed — one refused schedule never stops the tick.
+    from app.services.entitlement_service import check_entitlement
+
+    ent = await check_entitlement(pool, org_id, "workflows") if org_id else None
+    if ent is None or not ent.allowed:
+        logger.warning(
+            "schedule %s not launched: org %s is not entitled to workflows (%s)",
+            schedule.get("id"),
+            org_id,
+            ent.reason if ent else "no org",
+        )
+        return None
+
     supabase = get_service_role_supabase(org_id)
     title = f"[scheduled] {schedule.get('name') or definition.name}"
     thread_resp = await run_in_threadpool(

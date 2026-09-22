@@ -107,6 +107,28 @@ async def check_entitlement(
     )
 
 
+async def enforce_entitlement(
+    pool: asyncpg.Pool, org_id: str | UUID | None, capability: str
+) -> EntitlementResult:
+    """Raise unless ``org_id`` is entitled to ``capability`` (TIER-01, TIER-03, TIER-05).
+
+    The raising form of ``check_entitlement`` for call sites that are not a FastAPI
+    dependency (e.g. the workflow kickoff preflight). ``org_id=None`` fails closed with
+    a structured 403 — an unresolvable org is never admitted. A DB/connection failure
+    is a 503, never an upgrade prompt.
+    """
+    if not org_id:
+        raise EntitlementDeniedException(EntitlementResult(
+            allowed=False, capability=capability, reason="No active organization",
+        ))
+    result = await check_entitlement(pool, org_id, capability)
+    if not result.allowed:
+        if result.reason and ("database error" in result.reason.lower() or "connection" in result.reason.lower()):
+            raise EntitlementUnavailableException(result)
+        raise EntitlementDeniedException(result)
+    return result
+
+
 def require_capability(capability: str):
     """FastAPI dependency factory enforcing capability entitlement (TIER-01, TIER-03, TIER-05).
 
@@ -120,11 +142,7 @@ def require_capability(capability: str):
         active_org_id: str = Depends(get_active_org_id),
         pool: asyncpg.Pool = Depends(get_pg_pool),
     ) -> str:
-        result = await check_entitlement(pool, active_org_id, capability)
-        if not result.allowed:
-            if result.reason and ("database error" in result.reason.lower() or "connection" in result.reason.lower()):
-                raise EntitlementUnavailableException(result)
-            raise EntitlementDeniedException(result)
+        await enforce_entitlement(pool, active_org_id, capability)
         return active_org_id
 
     return _require_capability
