@@ -521,3 +521,67 @@ describe("AdminSpendPage — CR-07: a failed load answers nothing, not zero", ()
     expect(screen.queryByText(/No runs matching current filters/)).not.toBeInTheDocument()
   })
 })
+
+// ── BUG-260923-02 — the ledger was TRUNCATED at 50 rows ──────────────────────────────────
+// The header said "Attributable Runs Ledger (1183)" while the page only ever fetched
+// `limit: 50` with no offset, so rows 51+ were unreachable although the API pages.
+describe("AdminSpendPage — BUG-260923-02: every ledger row is reachable", () => {
+  const TOTAL = 120
+  const page = (offset: number) =>
+    Array.from({ length: Math.min(50, TOTAL - offset) }, (_, i) => ({
+      ...mockRuns[0],
+      id: `run-${String(offset + i).padStart(4, "0")}-xxxxxxxx`,
+    }))
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(spendApi.getSpendSummary).mockResolvedValue(mockSummary)
+    vi.mocked(spendApi.getModelRates).mockResolvedValue(mockRates)
+    vi.mocked(spendApi.getSpendRuns).mockImplementation(async (p) => ({
+      runs: page(p?.offset ?? 0),
+      totalCount: TOTAL,
+    }))
+  })
+
+  it("shows where you are in the ledger and can move to the next page", async () => {
+    render(<AdminSpendPage />)
+    expect(await screen.findByText("Showing 1–50 of 120")).toBeInTheDocument()
+    fireEvent.click(screen.getByRole("button", { name: /Next/ }))
+    expect(await screen.findByText("Showing 51–100 of 120")).toBeInTheDocument()
+    expect(screen.getByText(/run-0050/)).toBeInTheDocument()
+    expect(vi.mocked(spendApi.getSpendRuns)).toHaveBeenLastCalledWith(
+      expect.objectContaining({ offset: 50, limit: 50 }),
+    )
+  })
+
+  it("reaches the last partial page and cannot go past it", async () => {
+    render(<AdminSpendPage />)
+    await screen.findByText("Showing 1–50 of 120")
+    fireEvent.click(screen.getByRole("button", { name: /Next/ }))
+    await screen.findByText("Showing 51–100 of 120")
+    fireEvent.click(screen.getByRole("button", { name: /Next/ }))
+    expect(await screen.findByText("Showing 101–120 of 120")).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: /Next/ })).toBeDisabled()
+  })
+
+  it("a paging click does not reload the summary cards", async () => {
+    render(<AdminSpendPage />)
+    await screen.findByText("Showing 1–50 of 120")
+    const summaryCalls = vi.mocked(spendApi.getSpendSummary).mock.calls.length
+    fireEvent.click(screen.getByRole("button", { name: /Next/ }))
+    await screen.findByText("Showing 51–100 of 120")
+    expect(vi.mocked(spendApi.getSpendSummary).mock.calls.length).toBe(summaryCalls)
+  })
+
+  it("changing a filter goes back to page 1", async () => {
+    render(<AdminSpendPage />)
+    await screen.findByText("Showing 1–50 of 120")
+    fireEvent.click(screen.getByRole("button", { name: /Next/ }))
+    await screen.findByText("Showing 51–100 of 120")
+    fireEvent.click(screen.getByRole("button", { name: "7D" }))
+    expect(await screen.findByText("Showing 1–50 of 120")).toBeInTheDocument()
+    expect(vi.mocked(spendApi.getSpendRuns)).toHaveBeenLastCalledWith(
+      expect.objectContaining({ offset: 0 }),
+    )
+  })
+})

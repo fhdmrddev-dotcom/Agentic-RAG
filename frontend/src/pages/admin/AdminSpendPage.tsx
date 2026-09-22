@@ -19,12 +19,16 @@ import { DailySpendChart } from "@/components/admin/spend/DailySpendChart"
 import { SpendDonutChart } from "@/components/admin/spend/SpendDonutChart"
 import { BlindSpotsCard } from "@/components/admin/spend/BlindSpotsCard"
 import { RepriceModal } from "@/components/admin/spend/RepriceModal"
+import { PaginationControls } from "@/components/health/PaginationControls"
 
 interface AdminSpendPageProps {
   onBack?: () => void
 }
 
 type TimeRangeFilter = "today" | "7d" | "30d" | "all"
+
+/** BUG-260923-02 — one ledger page. The API caps `limit` at 200. */
+const LEDGER_PAGE_SIZE = 50
 type CoverageFilter = "all" | "rated" | "unrated" | "incomplete_coverage"
 
 const PROVIDER_BADGES: Record<string, { label: string; className: string }> = {
@@ -85,6 +89,14 @@ export const AdminSpendPage: React.FC<AdminSpendPageProps> = ({ onBack }) => {
   const [runs, setRuns] = useState<SpendRunItem[]>([])
   const [rates, setRates] = useState<ModelRateItem[]>([])
   const [totalRunsCount, setTotalRunsCount] = useState(0)
+  // ── BUG-260923-02 — the ledger PAGES. It used to fetch `limit: 50` with no offset, ever,
+  // under a header naming the full count, so rows 51+ were unreachable though the API pages.
+  // The offset lives in a ref too so the refresh/reprice door (`fetchData`) reloads the page
+  // the operator is ON, while a filter change (the declarative effect) goes back to page 1.
+  const [ledgerOffset, setLedgerOffset] = useState(0)
+  const ledgerOffsetRef = React.useRef(0)
+  const [isLedgerPaging, setIsLedgerPaging] = useState(false)
+  const ledgerReqId = React.useRef(0)
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [isRepriceModalOpen, setIsRepriceModalOpen] = useState(false)
@@ -117,7 +129,8 @@ export const AdminSpendPage: React.FC<AdminSpendPageProps> = ({ onBack }) => {
       getSpendRuns({
         timeRange: timeRange === "all" ? undefined : timeRange,
         filterStatus: coverageFilter === "all" ? undefined : coverageFilter,
-        limit: 50,
+        limit: LEDGER_PAGE_SIZE,
+        offset: ledgerOffsetRef.current,
       }),
       getModelRates(),
     ] as const)
@@ -155,9 +168,11 @@ export const AdminSpendPage: React.FC<AdminSpendPageProps> = ({ onBack }) => {
     }
   }, [loadAll, applyAll])
 
-  // The declarative door: mount, and every filter change.
+  // The declarative door: mount, and every filter change — which always starts at page 1.
   useEffect(() => {
     let alive = true
+    ledgerOffsetRef.current = 0
+    setLedgerOffset(0)
     const mine = ++reqId.current
     setIsLoading(true)
     ;(async () => {
@@ -182,6 +197,38 @@ export const AdminSpendPage: React.FC<AdminSpendPageProps> = ({ onBack }) => {
       alive = false
     }
   }, [loadAll, applyAll])
+
+  // The paging door: the LEDGER only. The summary cards and charts answer about the whole
+  // time window, not about a page of it, so a page click must not refetch them.
+  const goToLedgerOffset = React.useCallback(
+    async (offset: number) => {
+      const mine = ++ledgerReqId.current
+      const filtersGen = reqId.current // a filter change after this click wins
+      setIsLedgerPaging(true)
+      try {
+        const data = await getSpendRuns({
+          timeRange: timeRange === "all" ? undefined : timeRange,
+          filterStatus: coverageFilter === "all" ? undefined : coverageFilter,
+          limit: LEDGER_PAGE_SIZE,
+          offset,
+        })
+        if (mine === ledgerReqId.current && filtersGen === reqId.current) {
+          ledgerOffsetRef.current = offset
+          setLedgerOffset(offset)
+          setRuns(data.runs)
+          setTotalRunsCount(data.totalCount)
+        }
+      } catch (err) {
+        console.error("Failed to load ledger page:", err)
+        if (mine === ledgerReqId.current) {
+          setLoadError(err instanceof Error ? err.message : String(err))
+        }
+      } finally {
+        if (mine === ledgerReqId.current) setIsLedgerPaging(false)
+      }
+    },
+    [timeRange, coverageFilter],
+  )
 
   // ⛔ A FAILED LOAD MUST NOT PRODUCE CONFIDENT NUMBERS ANYWHERE. Phase 257 CR-07.
   //
@@ -755,6 +802,18 @@ export const AdminSpendPage: React.FC<AdminSpendPageProps> = ({ onBack }) => {
                 )}
               </tbody>
             </table>
+            {/* BUG-260923-02 — the rows past the first page are reachable. Reuses the shared
+                PaginationControls (no third pager); hidden only when there is nothing to page. */}
+            {!loadError && (
+              <div className={isLedgerPaging ? "opacity-60 pointer-events-none" : undefined}>
+                <PaginationControls
+                  offset={ledgerOffset}
+                  limit={LEDGER_PAGE_SIZE}
+                  total={totalRunsCount}
+                  onChange={(o) => void goToLedgerOffset(o)}
+                />
+              </div>
+            )}
           </div>
         )}
 

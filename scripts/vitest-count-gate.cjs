@@ -3970,7 +3970,7 @@ const BASELINE = {
   // 17 -> 18 in 257 WR-12: fence em-dash loading state so pre-fix fallback $0.0000 cannot return.
   // 18 -> 22 in 257 CR-05/CR-07: four cases pinning that a FAILED LOAD answers nothing
   // rather than zero. Driven RED against the shipped zero-fallback (Received: "0.0k").
-  "AdminSpendPage.test.tsx": 22,
+  "AdminSpendPage.test.tsx": 26, // +4 BUG-260923-02 ledger paging
   // Added in 257 CR-06 follow-up. Exhaustive arithmetic: three independently-rounded
   // gauge segments summed to 101 on 34 of the combinations swept, and gemini found it
   // reviewing the CR-06 fix. Driven RED against the pre-fix arithmetic, 40 offenders named.
