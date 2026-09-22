@@ -1130,6 +1130,16 @@ ChatLayout's share is two lines at the existing `startScopedChat` mount — pass
 state / effects / branches; the cleanup and the visible error live in `startScopedChat.ts`
 and `ExpertCatalogPage.tsx`.
 
+**OV-262-G5-03 (2026-09-23) — G-5 on `backend/app/services/tool_dispatcher.py` (89/38/5169, seam
+OWED); operator approved ("fix 3.5") and RULED the scope: the folder wall applies to EVERY
+folder-limited run (Restricted + Union Experts, folder-pinned chats).** 262-UAT 3.5 (inherited
+from 260): `grep`, `ls`, `tree`, `read_document`, `analyze_document` ignored
+`folder_subtree_ids` while `search_documents`/`glob` honoured it. Fix: one module-level wall
+(`_scope_set`, `_document_folder_ids`, `_doc_out_of_scope`, `_prune_tree`) called from those 5
+handlers; `folder_subtree_ids is None` stays byte-identical (no query). Backend gate: node-id
+set-diff EMPTY both ways at 71 failed (5495 → 5506 passed, +11 = the new suite). The owed
+dispatcher refactor is NOT discharged by this.
+
 OV-SOLO-01-status: retired-2026-09-13   # RE-ARMED — Gemini returned 2026-09-13, the trigger's first arm. Flip back to `live` ONLY with a dated entry naming why. ⛔ do not delete it — an absent marker reads as an absent decision.
 
 ---

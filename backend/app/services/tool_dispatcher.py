@@ -246,21 +246,80 @@ def _ensure_resolver() -> None:
 # Tool handlers -- one async function per tool
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# 262-UAT 3.5 — THE FOLDER WALL. `folder_subtree_ids` is the one scope channel every
+# folder-limited run shares (Restricted + Union Experts, folder-pinned chats). search and
+# glob already honoured it; ls / tree / grep / read_document / analyze_document did not,
+# and a model-supplied `path: "/"` or document id walked straight past the default path.
+# Operator ruling 2026-09-23: the wall applies to EVERY folder-limited run.
+# ⛔ `folder_subtree_ids is None` (an unscoped chat) must stay byte-identical — every helper
+# below returns early on None and issues no query.
+# ---------------------------------------------------------------------------
+_OUT_OF_SCOPE = "is outside the folders this chat is limited to"
+
+
+def _scope_set(ctx: ToolContext) -> set[str] | None:
+    ids = ctx.folder_subtree_ids
+    return None if ids is None else {str(f) for f in ids}
+
+
+async def _document_folder_ids(ctx: ToolContext, doc_ids: list[str]) -> dict[str, str | None]:
+    """One RLS-scoped read: document id -> folder id, for ids the caller can see."""
+    if not doc_ids:
+        return {}
+    resp = await aexec(
+        ctx.supabase.table("documents").select("id, folder_id").in_("id", list(doc_ids))
+    )
+    return {str(r["id"]): (str(r["folder_id"]) if r.get("folder_id") else None) for r in (resp.data or [])}
+
+
+async def _doc_out_of_scope(ctx: ToolContext, doc_id: str) -> bool:
+    scope = _scope_set(ctx)
+    if scope is None:
+        return False
+    folders = await _document_folder_ids(ctx, [doc_id])
+    if doc_id not in folders:
+        return False  # unknown to the caller — the normal path reports not-found
+    return folders[doc_id] not in scope
+
+
+def _prune_tree(node: dict, scope: set[str]) -> dict | None:
+    children = [c for c in (_prune_tree(ch, scope) for ch in node.get("children", [])) if c]
+    in_scope = str(node.get("id")) in scope
+    if not in_scope and not children:
+        return None
+    # An ancestor survives only as the PATH to an in-scope folder; its own documents do not.
+    return {**node, "children": children, "documents": node.get("documents", []) if in_scope else []}
+
+
 async def _handle_ls(args: dict, ctx: ToolContext) -> ToolResult:
     path = args.get("path") or (ctx.scoped_folder_path if ctx.scoped_folder_path else "/")
     result = await ls_path(path, ctx.current_user["id"], ctx.supabase)
+    scope = _scope_set(ctx)
+    if scope is not None and "error" not in result:
+        result["folders"] = [f for f in result.get("folders", []) if str(f.get("id")) in scope]
+        docs = result.get("documents") or []
+        folders = await _document_folder_ids(ctx, [str(d["id"]) for d in docs])
+        result["documents"] = [d for d in docs if folders.get(str(d["id"])) in scope]
     return ToolResult(result=json.dumps(result))
 
 
 async def _handle_tree(args: dict, ctx: ToolContext) -> ToolResult:
     path = args.get("path") or (ctx.scoped_folder_path if ctx.scoped_folder_path else "/")
     result = await tree_path(path, args.get("depth"), ctx.current_user["id"], ctx.supabase)
+    scope = _scope_set(ctx)
+    if scope is not None and "tree" in result:
+        result["tree"] = [n for n in (_prune_tree(t, scope) for t in result["tree"]) if n]
     return ToolResult(result=json.dumps(result))
 
 
 async def _handle_grep(args: dict, ctx: ToolContext) -> ToolResult:
     path = args.get("path") or ctx.scoped_folder_path
     result = await grep_path(args.get("pattern", ""), path, ctx.current_user["id"], ctx.supabase)
+    scope = _scope_set(ctx)
+    if scope is not None and "matches" in result:
+        result["matches"] = [m for m in result["matches"] if str(m.get("folder_id")) in scope]
+        result["total"] = len(result["matches"])
     return ToolResult(result=json.dumps(result))
 
 
@@ -277,6 +336,11 @@ async def _handle_glob(args: dict, ctx: ToolContext) -> ToolResult:
 
 
 async def _handle_read_document(args: dict, ctx: ToolContext) -> ToolResult:
+    if await _doc_out_of_scope(ctx, str(args["document_id"])):
+        return ToolResult(result=json.dumps({
+            "error": f"Document {args['document_id']} {_OUT_OF_SCOPE}.",
+            "error_kind": "out_of_scope",
+        }))
     result = await read_path(
         args["document_id"],
         ctx.current_user["id"],
@@ -1170,6 +1234,8 @@ async def _handle_analyze_document(args: dict, ctx: ToolContext) -> ToolResult:
     doc_id = await resolve_document_id(args["filename"], ctx.current_user["id"], ctx.supabase)
     if not doc_id:
         return ToolResult(result=f"Document '{args['filename']}' not found.")
+    if await _doc_out_of_scope(ctx, str(doc_id)):
+        return ToolResult(result=f"Document '{args['filename']}' {_OUT_OF_SCOPE}.")
 
     doc = await fetch_full_document(doc_id, ctx.current_user["id"], ctx.supabase)
     if not doc:
