@@ -12,6 +12,20 @@ status_note: |
   not about whether anyone can reach evaluation at all. Nothing else fits, so this is planted
   rather than appended. Its three siblings from the same observation WERE appended, to `SEED-151`,
   `SEED-166` and `SEED-196`.
+
+  ── 2026-09-22 · Phase 262 (plan 05), LEFT PLANTED — WITH A USEFUL NOTE, because 262 is the worked
+  example of exactly what this seed will have to do. It gave a capability a top-level home, and the
+  whole cost is legible: ONE `ActiveView` member, ONE `ChatLayout` branch placed last-but-one, ONE
+  `NAV_ITEMS` entry (the eighth — the array also feeds the mobile drawer, so the rail alone would
+  ship a desktop-only home), all in ONE commit by D-262-03.
+  ⭐ **AND THE MOST DANGEROUS LEG IS NOW FENCED, WHICH IT WAS NOT WHEN THIS SEED WAS PLANTED.**
+  `frontend/src/lib/activeViewReachability.ts` (262-01) parses `App.tsx` and `ChatLayout.tsx` with
+  the TypeScript AST and reports any member with no render branch, plus whether the positional
+  fallback is still last. Before it, a branchless member compiled and shipped GREEN — `as never` is
+  always a legal assertion, `ChatLayout.fallback.test.tsx` mounts nothing, and `renameFence.test.ts`
+  asserts only a member-count floor. ⛔ The leg the fence CANNOT see is the entry action: pin that
+  with a rendered click over the shipped `NAV_ITEMS`, the way `NavPanel.test.tsx` now does. Phase 257
+  shipped a home with a member and a mount and NO door, and typing a URL was the only way in.
 trigger_when: >
   Fire at any milestone that scopes a commercial, procurement, pilot or buyer-facing surface —
   evaluation is the strongest differentiator this product owns and it is currently unreachable, so

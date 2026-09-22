@@ -104,7 +104,27 @@ import { visibleNavItems } from "@/lib/nav-items"
 // FALLBACK, not a `default:` that throws, so a union member with no branch silently
 // renders Knowledge Health (the Phase-118 built-but-unreachable lesson). The matching
 // branch ships in the same commit as this member.
-export type ActiveView = "chat" | "documents" | "skills" | "settings" | "workflows" | "classification-rules" | "connections" | "skill-studio" | "control-room" | "org-admin" | "workflow-run" | "admin-spend"
+//
+// ⚠ CORRECTED 2026-09-22 (Phase 262 / RESEARCH R-1) — THE PARAGRAPH ABOVE IS KEPT RATHER THAN
+// OVERWRITTEN, BECAUSE THE CLAIM THAT ROTTED IS THE FINDING, AND THIS COMMENT WAS ITS SOURCE
+// IN TWO FURTHER REGISTERS (262-CONTEXT.md and the IA skill's D6, both corrected in the same
+// commit as this line). Two of its sentences are now false and one was never enforced:
+//   1. That trailing element has been `<UnknownViewFallback view={activeView as never} />`
+//      since Phase 217.1-14. A member with no branch renders "This view has no screen: …",
+//      never Knowledge Health. The DISCIPLINE survives exactly as written; only the
+//      CONSEQUENCE was wrong — which is why the wrong consequence is easy to keep repeating.
+//   2. "the three-homes contract holds" is TRUE and is NOT a count of rail entries. It names
+//      the WORKFLOW concern triad (Builder authoring / Workflows-page library+launch /
+//      Chat-thread execution), locked 2026-06-14. `NAV_ITEMS` already carried SEVEN entries
+//      before this phase; the member appended below is the EIGHTH entry and the TENTH rail
+//      affordance (the operator shield and the Spend entry render outside the array).
+//   3. "The matching branch ships in the same commit" was carried by PROSE and by nothing
+//      executable: `as never` is always a legal assertion, `ChatLayout.fallback.test.tsx`
+//      mounts nothing, and `renameFence.test.ts` asserts only a member-count FLOOR — so a
+//      branchless member compiled and shipped green. `lib/activeViewReachability.ts`
+//      (Phase 262 plan 01) is that sentence's executable half, and it is what makes the
+//      claim provable for the member below rather than merely intended.
+export type ActiveView = "chat" | "documents" | "skills" | "settings" | "workflows" | "classification-rules" | "connections" | "skill-studio" | "control-room" | "org-admin" | "workflow-run" | "admin-spend" | "experts"
 
 function App() {
   const { user, loading, signIn, signUp, signOut } = useAuth()
@@ -172,6 +192,18 @@ function App() {
   // the union records that a member is not reachability. What was missing was never a view:
   // `LibraryPage`'s only prop was `onNavigate`, so the Health TAB had no external door at
   // all, and SURF-03's route (rail badge → popover → Health → source card) was impossible.
+  //
+  // ⚠ THIS REFUSAL IS PLAN-SCOPED AND STANDS UNCHANGED; Phase 262's member is NOT the thing
+  // it refuses. 235-08 was refused a member because the surface it wanted ALREADY HAD ONE and
+  // only lacked a door into one of its tabs. Phase 262's is a net-new top-level home with no
+  // existing surface to enter — the `skill-studio` / `control-room` case, not this one — and
+  // it ships with its ChatLayout branch and its rail entry in the same commit. ⛔ ITS LITERAL
+  // IS DELIBERATELY NOT SPELLED HERE (D-262-04), for the identical reason the line below gives
+  // about the URL API: an acceptance fence counts occurrences in this file, so prose naming it
+  // would make a code measurement satisfiable by a comment (the 187-24 lesson). ⛔ AND DO NOT
+  // DELETE THIS BLOCK TO "TIDY" IT: `LibraryPage.initialTab.test.tsx:502-503` uses the phrase
+  // three lines up as its comment-stripper NON-VACUITY CONTROL — the pair that reds when the
+  // stripper starts returning "" and silently turns every absence assertion in that suite green.
   //
   // ⛔ AND NO URL. This app has no router (`SEED-185`), so assigning the browser's location
   // here would be a full page reload onto a path that renders the chat home. ⚠ THAT API IS

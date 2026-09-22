@@ -163,7 +163,10 @@ const BASELINE = {
   "RunCard.timer.test.tsx": 7,
   "ChatArea.approval.test.tsx": 3,
   // ── Phase 260 (PACK-02 / PACK-03) — Consultant Expert UI & Action Tiles ──
-  "ComposerExpert.test.tsx": 5,
+  // ⬆ RAISED 5 → 8 at `262-05`: the composer's catalog door (renders beside the invite door,
+  //   fires its navigator once, and does NOT render when no navigator is wired). ⛔ An
+  //   EXTENSION — Phase 260's five cases, including the UI-budget case, are untouched.
+  "ComposerExpert.test.tsx": 8,
   // ⬆ 5 → 9 at 262-02 (D-262-06 / RESEARCH P-7). RAISED to the gate's own printed figure,
   // never lowered: the four hardcoded demo-Expert sites this suite pinned were RETIRED, and
   // the rewrite lands four cases MORE than the floor it replaced — the honest-empty tile, the
@@ -3062,7 +3065,9 @@ const BASELINE = {
   // `library/__tests__/sketchComposition.test.tsx`, proven inherited by an empty
   // `git diff --stat HEAD -- frontend/`. These three were green in that same run, so the
   // "never pin from a red run" rule is honoured where it binds: on the files being pinned.
-  "nav-items.test.ts": 2,
+  // ⬆ RAISED 2 → 5 at `262-05`: the catalog's entry action (present / ungoverned / the
+  //   eighth-entry count). ⛔ An EXTENSION, never a lowering — the D-07 pair above is intact.
+  "nav-items.test.ts": 5,
   "navItemsConnections.test.ts": 6,
   "activeViewReachability.test.ts": 11,
 
@@ -3977,7 +3982,9 @@ const BASELINE = {
   "RunCostBadge.test.tsx": 7,
   // Phase 257.1 — adopted from NEITHER knob; see the TARGETS comment at the bottom of this
   // file. Measured `14 passed (14)` before the phase's cases, `18 passed (18)` after.
-  "NavPanel.test.tsx": 18,
+  // ⬆ RAISED 18 → 20 at `262-05`: the Experts entry renders from the SHIPPED NAV_ITEMS and
+  //   clicking it navigates. The leg `activeViewReachability` structurally cannot see.
+  "NavPanel.test.tsx": 20,
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the

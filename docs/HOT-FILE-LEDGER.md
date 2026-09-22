@@ -9333,6 +9333,40 @@ twelfth nav member would have shipped a second entry point to a page that alread
 is added because the file was considered and deliberately left alone** — a decision that is invisible
 unless it is written down.
 
+### `frontend/src/lib/nav-items.ts` — `262-05` (the eighth entry)
+
+**10 / 7 / 141** · re-derived at plan 05's commit. Previous readings, kept: `9 / 6 / 118` (262-01,
+which adopted two of its three suites into the count gate) · `8 / 6 / 95` (235).
+
+**G-5 disposition: honoured by construction.** `NAV_ITEMS` gains **one** object literal; the import
+line gains **one** lucide glyph. `visibleNavItems` is **byte-unchanged**; the `NavItem` interface is
+**byte-unchanged**; no new export, no new predicate, no second array.
+
+⚠ **THE NUMBER MATTERS, BECAUSE A REGISTER CORRECTED WITH A WRONG NUMBER IS THE ROT REPEATING.**
+RESEARCH R-6 measured **seven** entries before this phase, and the rail renders two further
+affordances from outside the array (the probe-gated operator shield, and the Spend entry). So this is
+the **eighth `NAV_ITEMS` entry** and the **tenth rail affordance** — ⛔ *not* "three homes → four".
+
+⭐ **IT BELONGS IN THE ARRAY, unlike `control-room` and `admin-spend`.** Those two are kept out by a
+recorded contract (`nav-items.test.ts`, `NavPanel.test.tsx`) because they are operator surfaces whose
+**existence** is withheld. This one is for everyone — and the array is what `ChatLayout`'s **mobile
+drawer** maps, so an entry rendered anywhere else would have made the catalog desktop-only, which is
+the mistake D-235-01 already rejected once for the Health tab.
+
+⛔ **UNGOVERNED BY MEASUREMENT, NOT BY OMISSION — D-262-09 asked the right question of the wrong
+system.** `experts` is **not** a `GovernedFeature`: that union is closed at six members
+(`lib/api/_core.ts`, mirrored in `user_settings.py`) and governs the operator's per-AUDIENCE
+visibility map. The catalog's real gate is `require_capability("experts")`, a **per-ORG TIER**
+entitlement read through `tier_capabilities`, with **no frontend read path at all**. A `feature:` key
+here could therefore not prevent the 403 it would appear to prevent; it would add a second, unrelated
+governance axis controlled by the wrong party. Precedent: `connections`, ungoverned by design and
+pinned by `navItemsConnections.test.ts`. And `visibleNavItems` has been **fail-OPEN since
+2026-09-09** for exactly this reason — *the API is the wall* — so the catalog renders the server's own
+refusal sentence rather than vanishing its own door.
+
+**Named seam:** none proposed. The file is still one array, one interface and one filter; the entry
+count grew, the shape did not.
+
 ---
 
 ## frontend/src/App.tsx
@@ -9378,6 +9412,45 @@ deliberately does not spell the location API**, because an acceptance criterion 
 
 **Named seam:** the view/tab state is now four `useState`s and four navigators. At the fifth, extract
 an `useAppNavigation()` hook rather than adding a fifth pair here.
+
+### `frontend/src/App.tsx` — `262-05` (the reachability triad)
+
+**34 / 25 / 410** · re-derived at plan 05's commit. Previous readings, kept rather than overwritten:
+`33 / 24 / 378` (262-01, inherited-rot correction only) · `32 / 23 / 374` (244-04) · `31 / 23 / 351`.
+
+**G-5 disposition: honoured by construction, and here is the arithmetic rather than the argument.**
+`ActiveView` gains **one** string-literal member. Two existing comment blocks are corrected **in
+place**. `useState` count **4 → 4**; navigator count **4 → 4**; branches **0 new**. The named seam
+above (`useAppNavigation()` at the fifth pair) is **not** crossed and stays owed.
+
+⛔ **THE MEMBER'S LITERAL APPEARS IN NO COMMENT IN THIS FILE (D-262-04)**, and that is deliberate
+rather than terse: an acceptance fence counts occurrences in this file, so prose repeating the member
+would make a code measurement satisfiable by a comment. This is the 187-24 lesson, which this file's
+own union docblock already records twice and which Phase 262 paid for three times in waves 2-4.
+
+⛔ **`NO TWELFTH` STAYS, AND IT IS NOT MERELY IMPOLITE TO REMOVE IT.**
+`LibraryPage.initialTab.test.tsx:502-503` uses that phrase as its comment-stripper **non-vacuity
+control** — the pair that reds when `codeOf` starts returning `""` and silently turns every
+`not.toContain` arm in that suite green. Deleting it would red a pinned suite for a reason with
+nothing to do with it. Plan 05 instead added a line **beside** it recording why this phase's member
+is not the thing it refuses: 235-08 was refused a member because its surface already had one; this
+is a net-new top-level home with no existing surface to enter — the `skill-studio` / `control-room`
+case, not the Library's.
+
+⚠ **AND THE STALE PROSE THAT ROTTED IN THREE REGISTERS WAS CORRECTED HERE, AT ITS SOURCE.** The union
+docblock claimed the trailing `ChatLayout` arm was `<KnowledgeHealthPage />` and that a branchless
+member *"silently renders Knowledge Health"*. It has been `UnknownViewFallback` since **217.1-14**.
+The original is left standing with the correction beneath it, because in this repository a claim that
+rots is the finding — and this comment was the source the other two registers (`262-CONTEXT.md`, the
+IA skill's D6) inherited it from. ⭐ **The DISCIPLINE the paragraph teaches is untouched and was
+followed to the letter; only the CONSEQUENCE was wrong**, which is exactly why a wrong consequence
+survives four years of re-reading.
+
+⛔ **P-11 handled deliberately, not discovered from a red run.** `renameFence.test.ts:121-127` greps
+the literal `"the three-homes contract holds"`, and that exact string is in this file's union
+docblock — the prose D-262-01 mandates changing. The substring was **preserved verbatim** and the
+correction appended as a new paragraph, so the fence keeps its needle and the register still records
+that "three homes" names the WORKFLOW concern triad rather than a count of rail entries.
 
 ---
 
@@ -12384,6 +12457,106 @@ appears exactly once, which this plan's suite asserts from source.
 AFTER `initialTab`, where the fence deliberately stopped claiming the mount's signature at `235-08`.
 A comment in the gap would have broken a fence about the Documents→Library rename, which has nothing
 to do with attention badges.
+
+### `frontend/src/components/layout/ChatLayout.tsx` — `262-05` (the branch)
+
+**54 / 28 / 1082** after plan 05's second commit.
+
+⚠ **AND THE FIRST FIGURE THIS SECTION PUBLISHED WAS WRONG — `53 / 28 / 1095`, written at the triad
+commit, where the file actually measured `53 / 28 / 1077`.** Kept visible rather than silently
+overwritten, because it is this ledger's own recurring finding happening to the person writing the
+warning: **the line count was TYPED from an estimate instead of read from `wc -l` after the last
+edit of the commit**, and `git show 917d79a7b:…ChatLayout.tsx | wc -l` refutes it in one command.
+⛔ **A row that is present and WRONG answers the auditor and stops the audit** — which is exactly the
+sentence the scan-list header carries. Re-derive; never transcribe.
+
+Previous readings, kept rather than overwritten:
+`52 / 27 / 1014` (262-01, inherited-rot correction only) · `51 / 26 / 1010` (244-04) ·
+`50 / 26 / 1005` · `46 / 24 / 921`.
+
+**G-5 FIRES (28 phases) — honoured BY CONSTRUCTION, with the arithmetic rather than an argument.**
+Three imports (the catalog page, the ordered handoff, and the **already-shipped** expert PATCH added
+to the existing `@/lib/api` block) and **one** render arm appended to the existing ternary ladder.
+`useState` **unchanged**, `useEffect` **unchanged**, no new hook, no new prop on the component, no
+second read of anything. `folders` is `useFolders()`'s ONE call, already threaded to three mounts —
+this is a **fourth consumer and zero new fetches**.
+
+⛔ **THE POSITION IS THE LEG, NOT A STYLE CHOICE.** The branch is inserted between the `admin-spend`
+arm and the trailing `<UnknownViewFallback view={activeView as never} />`, so it is last-but-one and
+the fallback stays last. That arm is a **POSITIONAL** fallback, not a `default:` that throws, and
+`as never` is always a legal assertion — so a branch placed after it would be dead code that
+compiles, typechecks and ships green. **Two independent fences now measure the order**:
+`lib/activeViewReachability.ts` (AST — every member has a branch, `fallbackIsLast`), added by this
+phase, and `ChatLayout.launch.test.tsx:547-556`'s inherited `indexOf` check.
+
+⭐ **THE RED WAS DRIVEN AGAINST THE REAL PAIR, NOT A FIXTURE.** With the member added and this branch
+absent, `activeViewReachability.test.ts` case (3) read
+`AssertionError: expected [ 'experts' ] to deeply equal []`. That is what makes the mount's claim
+provable; before Phase 262 a branchless member shipped green and nothing said so.
+
+⛔ **P-10 OBSERVED: no new comment in this file names `<ChatArea` or `<WorkspacePanel` as JSX tags.**
+`ChatLayout.launch.test.tsx:558-576` measures that those two tags appear only BEFORE the `<main>`
+split, so prose spelling a tag breaks a real structural measurement — the 187-24 lesson, which this
+file's own `:962-965` docblock already records. The new block names the seams in words instead.
+
+⛔ **THE START CONTROL'S CATCH IS NOT DECORATION AND NOT A SWALLOW.** `startScopedChat` REJECTS when
+the PATCH is refused (T-262-15) precisely so a failed start never dresses itself as a scoped chat,
+and by then it has already refused to navigate or select. But `ExpertCatalogPage`'s handler does
+`void props.onStartChat(expert)`, so an uncaught rejection would surface as an unhandled rejection
+and nothing else. ⚠ **Recorded as a GAP rather than glossed:** this app ships no toast surface and
+the catalog's props are fixed at `{ folders, onStartChat, onInspect? }`, so the only honest report
+available at this seam is the console — which is exactly what the composer's own invite door does one
+register over (`MessageInput.handleSelectExpert`). **A visible failure state needs a prop the page
+does not have; that is a contract change, not a line here.** Re-open trigger: the first plan that
+gives this surface an error-reporting seam.
+
+**Named seam:** unchanged and still OWED — the view ladder is now **thirteen** arms in one component.
+The extraction to take is the ladder itself (a `ViewSwitch` that receives the already-held hook
+values), never a second layout.
+
+**Plan 05's SECOND commit adds ONE more line to this file**: `onBrowseExperts={() => onNavigate("experts")}`
+on the existing chat-surface mount, immediately beneath the `onOpenConnections` line it copies. No
+new import, no new state, no new branch.
+
+### `frontend/src/components/chat/MessageInput.tsx` — `262-05` (the composer's second door)
+
+**36 / 18 / 975** after plan 05's second commit. Previous readings, kept: `35 / 17 / 942` (262-01,
+inherited-rot correction only) · `34 / 17 / 942`.
+
+**G-5 FIRES (18 phases) — honoured BY CONSTRUCTION.** One optional prop declared on `Props`, one
+name added to the destructure, and one `DropdownMenuItem` inside the `+` menu's **existing** expert
+section, guarded on the callback. `useState` **unchanged**; no new handler function; no new import
+(the `Sparkles` glyph the invite door already uses is reused, so one mark still means one thing).
+
+⛔ **THE COMPOSER'S TOP-LEVEL CONTROL BUDGET IS UNCHANGED, AND THAT IS MEASURED RATHER THAN CLAIMED.**
+`ComposerExpert.test.tsx`'s first case counts `<button>` elements inside the toolbar container and
+asserts none of them names an Expert; research P-9 measured that a `DropdownMenuItem` does not
+register there. **Phase 260's five cases, that one included, are untouched** — the pin went 5 → 8,
+an extension, never a lowering.
+
+⛔ **NO NAVIGATOR, NO ITEM — and the negative arm is a real case, not an inference.** A menu entry
+rendered without a callback is a dead affordance, which is the thing D-262-02 refuses a whole
+requirement over, and it would also have surfaced in the four shipped suites that mount this
+component from their own prop objects. ⚠ **Recorded honestly: that third case PASSED at RED**, before
+the feature existed, because an absent element is absent for either reason. It earns its place as a
+regression fence for the guard, not as evidence the guard was built.
+
+⚠ **THE PROP IS OPTIONAL AT EVERY HOP, FOR A MEASURED REASON.** A required prop would redden `tsc` in
+files this plan does not own, against a `tsconfig.app.json` baseline with **zero headroom** (70
+errors at base, and the set diff after both commits is EMPTY).
+
+### `frontend/src/components/chat/ChatArea.tsx` — `262-05`
+
+**78 / 39 / 889** after plan 05's second commit. Previous reading, kept: `77 / 38 / 882` (262-01,
+which re-derived it and found it HELD — the only one of eight that did).
+
+**G-5 FIRES (39 phases) — honoured BY CONSTRUCTION, and the arithmetic is three lines.** One optional
+prop on `Props`, one name in the destructure, one forward onto the existing `MessageInput` mount.
+`useState` **unchanged**, `useEffect` **unchanged**, **zero** new branches, **zero** new reads. This
+component decides nothing about the new door; it is a waypoint on the shipped `onOpenConnections`
+chain, copied line for line.
+
+**Named seam:** unchanged and still owed — this component's prop list, not this prop.
 
 ### `frontend/src/components/library/LibraryHeaderBar.tsx` — row added `244-04`
 

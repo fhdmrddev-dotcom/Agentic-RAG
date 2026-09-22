@@ -117,6 +117,67 @@ describe("Composer Expert Consultant Integration (Phase 260)", () => {
     expect(onActiveExpertChange).toHaveBeenCalledWith(mockExpert)
   })
 
+  // ── Phase 262 plan 05 (PACK-11) — the SECOND door into the catalog ───────────────────────
+  // ⭐ DELIBERATE REDUNDANCY, NOT PART OF THE TRIAD. The nav entry already discharges
+  // D-262-03's third leg; this one exists because BUS-303 named both, and because the
+  // mid-thread moment — "I want an Expert for this" — is where a person actually is when they
+  // want one. ⛔ The composer's control BUDGET is unchanged: a dropdown item is not a toolbar
+  // button, which the first case in this suite measures rather than assumes.
+
+  it("reveals a catalog door inside the '+' menu, beside the shipped invite door", async () => {
+    const user = userEvent.setup()
+    render(
+      <MessageInput
+        onSend={vi.fn()}
+        disabled={false}
+        threadId="test-thread"
+        onBrowseExperts={vi.fn()}
+      />,
+    )
+
+    await user.click(screen.getByTestId("composer-plus-btn"))
+
+    const browseDoor = screen.getByTestId("browse-experts-door")
+    expect(browseDoor).toBeDefined()
+    expect(browseDoor.textContent).toContain("Browse Expert Catalog")
+    // Both doors live in the same section — the invite door is NOT replaced by this one.
+    expect(screen.getByTestId("invite-expert-door")).toBeDefined()
+  })
+
+  it("selecting the catalog door invokes onBrowseExperts exactly once and closes the menu", async () => {
+    const user = userEvent.setup()
+    const onBrowseExperts = vi.fn()
+    render(
+      <MessageInput
+        onSend={vi.fn()}
+        disabled={false}
+        threadId="test-thread"
+        onBrowseExperts={onBrowseExperts}
+      />,
+    )
+
+    await user.click(screen.getByTestId("composer-plus-btn"))
+    await user.click(screen.getByTestId("browse-experts-door"))
+
+    expect(onBrowseExperts).toHaveBeenCalledTimes(1)
+    await waitFor(() => {
+      expect(screen.queryByTestId("browse-experts-door")).toBeNull()
+    })
+  })
+
+  it("renders NO catalog door when the host wires no navigator — a door to nowhere is worse than none", async () => {
+    // ⛔ This is why the callback is optional at every hop. Four shipped suites mount this
+    // component from their own prop objects; a required prop would redden `tsc` in files this
+    // plan does not own, and an item rendered without a navigator would be a dead control.
+    const user = userEvent.setup()
+    render(<MessageInput onSend={vi.fn()} disabled={false} threadId="test-thread" />)
+
+    await user.click(screen.getByTestId("composer-plus-btn"))
+
+    expect(screen.getByTestId("invite-expert-door")).toBeDefined()
+    expect(screen.queryByTestId("browse-experts-door")).toBeNull()
+  })
+
   it("applies ambient violet glow to composer container when an expert is active", () => {
     const { container, rerender } = render(
       <MessageInput onSend={vi.fn()} disabled={false} threadId="test-thread" activeExpert={null} />,
