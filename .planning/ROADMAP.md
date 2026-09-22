@@ -359,10 +359,10 @@ layer short of the user, which is why it is a phase and not a gap-closure round 
 mutates the local database)
 
 Plans:
-- [ ] `264-01-PLAN.md` — the carrier: `_resolve_thread_scoping` arity FIRST (ten test unpacks), then `born_for_bundle_id` default-`None` through `RunContext` → `ToolContext` → `sub_ctx`
-- [ ] `264-02-PLAN.md` — ONE home: the optional keyword on both encodings, `expert_service` delegates, the frozen base literals, the one-table dual-encoding fence, both D-264-02 prose retirements
-- [ ] `264-03-PLAN.md` — the four dispatcher sites, each stating its decision in source; SC#1's gate-facing proof; the unchanged sites fenced
-- [ ] `264-04-PLAN.md` — the real-DB same-org non-author driver, the six re-derived ledger rows in both registers, the closing gate sweep
+- [x] `264-01-PLAN.md` — the carrier: `_resolve_thread_scoping` arity FIRST (ten test unpacks), then `born_for_bundle_id` default-`None` through `RunContext` → `ToolContext` → `sub_ctx`
+- [x] `264-02-PLAN.md` — ONE home: the optional keyword on both encodings, `expert_service` delegates, the frozen base literals, the one-table dual-encoding fence, both D-264-02 prose retirements
+- [x] `264-03-PLAN.md` — the four dispatcher sites, each stating its decision in source; SC#1's gate-facing proof; the unchanged sites fenced
+- [x] `264-04-PLAN.md` — the real-DB same-org non-author driver, the six re-derived ledger rows in both registers, the closing gate sweep
 
 **Success Criteria** (what must be TRUE):
 
@@ -448,7 +448,7 @@ unswept seeds (**134** carry no `trigger_when` at all · **114** carry prose the
 | 258. A Tier Becomes Enforceable | 0/? | Not started | - |
 | 259. An Expert Is a Bundle, Not a Runtime | 0/? | Not started | - |
 | 260. The Expert You Can Actually Use | 0/? | Not started | - |
-| 264. Born-For Skills Must LOAD, Not Just Resolve | 0/4 | Planned | - |
+| 264. Born-For Skills Must LOAD, Not Just Resolve | 4/4 | Complete — 5/5 SC verified; manual UAT owed | 2026-09-22 |
 
 ---
 

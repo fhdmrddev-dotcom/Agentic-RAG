@@ -4,13 +4,13 @@ milestone: v4.3
 milestone_name: What You Can Actually Sell
 status: executing
 last_updated: "2026-09-22T00:00:00.000Z"
-last_activity: 2026-09-22 -- 263 code review: CR-02/03 + WR-06/07 fixed; CR-01 routed to Phase 264
+last_activity: 2026-09-22 -- 264 closed: 4/4 plans, 5/5 SC verified, manual UAT owed
 progress:
   total_phases: 17
-  completed_phases: 8
-  total_plans: 30
-  completed_plans: 30
-  percent: 50
+  completed_phases: 9
+  total_plans: 34
+  completed_plans: 34
+  percent: 53
 ---
 
 # Project State
@@ -34,17 +34,104 @@ See: `.planning/PROJECT.md` (updated 2026-09-18)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 264 (Born-For Skills Must LOAD, Not Just Resolve) PLANNED — 4 plans, 4 waves, plan-checker PASS. Executing.
+**Current focus:** Phase 264 (Born-For Skills Must LOAD, Not Just Resolve) COMPLETE — 4/4 plans, 5/5 success criteria verified. **Manual UAT owed** (13 rows, none driven).
 
 ---
 
 ## Current Position
 
 Phase: 264 (born-for-skills-must-load-not-just-resolve)
-Plan: 0 of 4 — planned, plan-checker PASS, execution starting
-Status: Executing
-Last activity: 2026-09-22 -- Phase 264 planned; research refuted 4 CONTEXT claims, one blocking
-Base SHA: f04d9c406 (develop)
+Plan: 4 of 4 COMPLETE — executed, merged, verified
+Status: Complete; manual UAT owed and independent review owed
+Last activity: 2026-09-22 -- Phase 264 executed end to end; verifier scored 5/5, status human_needed
+Phase range: e9d6a9410 (base) → e1192b462 (close), on develop
+
+### ⭐ PHASE 264 CLOSED — 2026-09-22
+
+**4 plans, 4 waves, serial.** Waves 1-3 ran in isolated worktrees and merged in order; **wave 4 ran
+on the main tree deliberately, because it mutates the local Postgres and worktrees isolate files,
+not Postgres** (CLAUDE.md worktree rule 4).
+
+**The promise 263 made is now true.** A skill born for an Expert loads — the instruction BODY, not
+just the catalog name — for every member of the org that Expert serves, not only its author.
+`born_for_bundle_id` rides `RunContext` → both `ToolContext` builds → the sub-agent context; the
+predicate collapsed back to ONE home in `app/utils/skill_visibility.py` as an optional keyword that
+leaves the default path byte-identical; three dispatcher sites opt in and `_handle_save_skill`'s
+lint corpus **refuses in source**, with its three reasons written down.
+
+**Gates at close, each re-run by the verifier rather than quoted:** backend
+`71 failed, 5490 passed, 2 xfailed, 2 xpassed` — exactly the ceiling, **node-id set-diff empty in
+BOTH directions at every wave**. ledger `0` · CLAUDE.md size `0` · seeds `0` · G-7 `0` · frontend
+count gate `8676 · failed 0 · pinned 7935 · 316/316` over an **empty** frontend diff.
+
+⭐ **THE RESEARCH PAID FOR ITSELF BEFORE A LINE WAS WRITTEN.** Four CONTEXT claims were measured
+FALSE, one of them blocking: `test_260_expert_chat_scoping.py:155-176` (the PACK-01 Closed-Core AST
+invariant) fails on any `ast.Name`/`ast.Attribute` in `agent_loop.py` containing `"expert"` — and
+`RunContext` is DEFINED in that file, so the planned `expert_bundle_id` field would have tripped it.
+**The fence was correct and was NOT retired**; the field is `born_for_bundle_id`, naming the mig-191
+column rather than the Expert concept. The other three: the site table had **two rows swapped**; the
+arity change touches **10 unpack sites inside the zero-headroom gate**, so it landed first; and two
+of the four dispatcher sites apply **no `is_enabled` filter at all**.
+
+⭐ **THE HEADLINE RED REPRODUCED PACK-17 VERBATIM.** Reverting wave 3's three keywords brings back
+`"Skill 'quarterly-margin-brief' not found or not enabled."` beside an `available_skills` list that
+omits the very skill the prompt promised — which is the defect, in the error message, exactly as
+263-REVIEW CR-01 described it.
+
+⭐ **RESEARCH §8.11's `[ASSUMED]` IS ANSWERED — YES, born-for skills really do bundle files.**
+Measured on the live local DB: 3 born-for skills, of which `xlsx` bundles **53** files and `docx`
+**64** — 117 of that deployment's 175 `skill_files` rows. So the `read_skill_file` / `execute_code`
+widenings now rest on inspected rows rather than on the `files: [...]` promise. ⚠ **LOCAL only;
+production was not re-measured.**
+
+⚠ **FINDINGS THAT OUTLIVE THE PHASE, because each is a measurement discipline, not a fix:**
+- ⛔ **Never mutate a source file while a gate is running**, even a plant you will revert. Wave 1
+  measured a phantom `72 failed`: a plant inserted a line above a target and `inspect.getsource` in
+  `test_256_llm_emit_rollup.py` re-read the wrong function body.
+- ⛔ **Diff the node ID, never the printed line.** Interleaved stderr appended text to a `FAILED`
+  line in **every** wave, making one test read as both NEW and GONE. And a bare `[A-Za-z0-9_]+`
+  regex absorbs the `C` of `C:\` — cut each line at the first Windows drive-letter path first.
+- ⛔ **Prove a plant's restoration with `git diff --quiet` + `git hash-object`, never a raw md5.**
+  `pathlib.write_text` emits CRLF on Windows while the Write tool emits LF, so the digest moves
+  without the content moving.
+- ⚠ **`ast.walk` descends INTO a `JoinedStr`** — an AST-count fence must ignore f-string children
+  alongside docstrings, or it double-counts.
+- ⚠ **A text fence can trip on its own prose.** Three `grep -c` criteria in wave 3 were satisfiable
+  by a comment; they were replaced with AST forms.
+- ⭐ **Neither `is not None` guard on the born-for arm fires alone** — with `str()` comparison a real
+  UUID never stringifies to `"None"`, so the assumed `T-263-02` trap needed a purpose-built input to
+  become load-bearing. Driven, not reasoned.
+- ⭐ **The grounding fence's OUTCOME half would not have caught its own plant** — with the predicate
+  fully widened the post-filter still returned 0 rows, because the encodings disagree in the SAFE
+  direction. **The predicate read is the load-bearing half of that fence.**
+
+⚠ **SIX LEDGER TRIPLES RE-DERIVED AT CLOSE AND FIVE WERE STALE**, each recorded beside its original:
+`tool_dispatcher.py` **89/38/5169** (the row said 85/35/5048 — and *three* different published
+figures were all wrong); `agent_loop.py` **52/26/3501** (its two registers disagreed with each
+other); `run_producer.py` **11/6/932**; `expert_service.py` **8/5/551**; `task_service.py`
+**20/11/970** (accurate at research, staled by 264-01 **inside the same phase**);
+`skill_visibility.py` **3/2/209** — **a row that rotted inside the phase that created it.**
+⛔ **No seam is claimed discharged.** `agent_loop.py`'s and `tool_dispatcher.py`'s named seams stay
+OWED. ⚠ `.or_()` applications are **SEVEN**, not the six two registers claimed — from **four** call
+sites, and that four is what every D-264-04 decision rests on.
+
+⚠ **CLAUDE.md's frontend count-gate figures were the EIGHTH rot and it took ONE DAY** (`8500/7746/297`
+at Phase 262 → `8676/7935/316`) — **on a phase that touched zero frontend source.** ⭐ *A figure can
+rot without anyone editing the thing it measures*, which is why the rule is re-derive, never "check
+whether you changed anything first".
+
+⛔ **OWED, and not to be read as done:** `264-VALIDATION.md` holds **10 G-4 lived rows (L-1..L-10)**
+and the SC#10 4-axis board (**P-1..P-8** cross-provider, **M-1**, **T-1**, **G-1**) — **every verdict
+cell is blank.** The verifier scored 5/5 automated and returned `human_needed` for exactly this
+reason. Run **L-1** first: a second person in the org runs the Expert and gets the author's capability.
+
+⚠ **Inherited red, NOT this phase's:** `node scripts/check-landing-drift.cjs` fails at the phase base
+(`SURFACE_TABS.orgAdmin` carries an `Experts` tab `facts.ts` lacks), from 261/263. Proven inherited
+by measurement — the phase's whole-range frontend diff is **empty**. Owner + trigger in
+`deferred-items.md`.
+
+⛔ **Independent review still owed**, per the standing separation rule — this phase was planned,
+executed and verified inside one session.
 
 ### PHASE 264 PLANNED — 2026-09-22
 
