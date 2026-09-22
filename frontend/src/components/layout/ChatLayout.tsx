@@ -60,7 +60,7 @@ import { cn } from "@/lib/utils"
 // SAME way the desktop ChatHistoryColumn does — SC#2 reaches mobile.
 import { matchesTitle, HighlightTitle } from "@/lib/threadGroups"
 import { Button } from "@/components/ui/button"
-import { MessageSquare, Plus, Search, Shield } from "lucide-react"
+import { Menu, MessageSquare, Plus, Search, Shield } from "lucide-react"
 // Phase 103-06 (REQ-7 / sketch 023-A): the mobile drawer consumes the SINGLE
 // shared nav list (incl. the Workflows home + its distinct icon) — the local
 // NAV_ITEMS_MOBILE triplicate is gone (NavPanel consumes the same list). Phase 148
@@ -858,6 +858,20 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
           />
         </div>
       ) : (
+        // 262-UAT 1.2: the ONLY mobile drawer trigger lived in ChatArea, so every view on this
+        // side stranded a phone user. One md:hidden bar, reusing the drawer this file owns —
+        // no new state. `<main>`'s class string is pinned by ChatLayout.launch.test.tsx.
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <div className="md:hidden flex shrink-0 items-center border-b border-border/30 px-4 py-2">
+          <button
+            type="button"
+            aria-label="Open navigation"
+            onClick={() => setDrawerOpen(true)}
+            className="flex h-11 w-11 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-accent/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+        </div>
         <main className="flex-1 overflow-hidden">
           {/* ⚠ NOTHING GOES BETWEEN THE BRANCH BELOW AND ITS MOUNT. `renameFence.test.ts`
               asserts that key link inside a 120-character window, so a comment in the gap
@@ -1050,6 +1064,7 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
             <UnknownViewFallback view={activeView as never} />
           )}
         </main>
+        </div>
       )}
 
       {/* ── Phase 214-12 (STEP-02 / D-214-04): chat's launch moment. ───────────────────────

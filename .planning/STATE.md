@@ -1115,6 +1115,14 @@ closes, this override lapses and the review is taken"*) appears to have **fired 
 ⛔ Flipping a governance marker on my own reading is the thing this project's registers exist to
 prevent. **Operator decision:** retire it (`retired-2026-09-18`) or record why it stays live.
 
+**OV-262-G5-01 (2026-09-23) — G-5 fired on `frontend/src/components/layout/ChatLayout.tsx`
+(54 commits / 28 phases) and the OPERATOR chose to fix anyway** ("fix mobile nav"). Scope: a
+bug fix, not a feature — 262-UAT row 1.2 found that the only mobile drawer trigger lived in
+`ChatArea`, so every non-chat view stranded a phone user (inherited from Phase 043). Honoured
+by construction: one `md:hidden` bar + a wrapper div around the non-chat `<main>` (whose pinned
+class string is unchanged), reusing the existing `setDrawerOpen`; 0 new state, 0 new effects,
+0 new branches. The owed ChatLayout refactor phase is NOT discharged by this.
+
 OV-SOLO-01-status: retired-2026-09-13   # RE-ARMED — Gemini returned 2026-09-13, the trigger's first arm. Flip back to `live` ONLY with a dated entry naming why. ⛔ do not delete it — an absent marker reads as an absent decision.
 
 ---

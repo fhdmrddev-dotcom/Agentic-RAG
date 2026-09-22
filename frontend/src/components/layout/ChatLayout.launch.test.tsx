@@ -76,6 +76,8 @@ vi.mock("@/lib/api", () => ({
   // six. They resolve to empty/no-op answers because no case here opens the schedules dialog —
   // their job is to EXIST.
   listSchedules: () => Promise.resolve([]),
+  // 262-UAT 1.2: the mobile-trigger case mounts the Experts catalog, which reads this once.
+  listExperts: () => Promise.resolve([]),
   listWorkflowSchedules: () => Promise.resolve([]),
   createWorkflowSchedule: () => Promise.resolve({}),
   updateSchedule: () => Promise.resolve({}),
@@ -858,4 +860,19 @@ describe("ChatLayout — source fence: the second gate term, and no bespoke rout
     expect(create).toBeGreaterThan(-1)
     expect(gate).toBeLessThan(create)
   })
+})
+
+// 262-UAT row 1.2 — driven at 500px: the ONLY mobile drawer trigger lived in ChatArea, so every
+// non-chat view (Experts, Library, Skills, Settings…) stranded a phone user with no way back.
+describe("ChatLayout — the mobile drawer trigger exists on every non-chat view (262-UAT 1.2)", () => {
+  // The trigger is ChatLayout-owned and view-independent: one stubbed page and the real catalog
+  // prove the non-chat branch carries it without mocking every page's API surface.
+  it.each(["workflows", "experts"] as ActiveView[])(
+    "%s renders an 'Open navigation' button that opens the drawer",
+    (view) => {
+      render(withCanvas(true, <ChatLayout {...baseProps(view)} />))
+      fireEvent.click(screen.getByRole("button", { name: "Open navigation" }))
+      expect(screen.getByRole("button", { name: "Close navigation" })).toBeInTheDocument()
+    },
+  )
 })
