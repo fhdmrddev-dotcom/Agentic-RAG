@@ -48,6 +48,9 @@ export interface StartScopedChatDeps {
   selectThread: (thread: Thread) => void
   /** Moves the app to the chat surface. */
   navigate: () => void
+  /** 262-UAT 3.6: best-effort removal of the created thread when scoping it fails, so no
+   *  empty unscoped "New Chat" is left behind (the doRun WR-04 pattern). */
+  discardThread?: (threadId: string) => Promise<void>
 }
 
 export async function startScopedChat(
@@ -58,7 +61,14 @@ export async function startScopedChat(
 
   // ⛔ The patched row, never `created` — `created.active_expert_id` is null, and selecting it
   // would hand chat a thread that says it has no Expert while the server says it does.
-  const scoped = await deps.setExpert(created.id, expert.id)
+  let scoped: Thread
+  try {
+    scoped = await deps.setExpert(created.id, expert.id)
+  } catch (err) {
+    // ⛔ The ORIGINAL error is what the caller reports; a failed cleanup must not replace it.
+    await deps.discardThread?.(created.id).catch(() => {})
+    throw err
+  }
 
   // ⛔ BEFORE the selection, always. See the docblock: the list row is stale until this runs.
   await deps.refreshThreads()

@@ -1052,11 +1052,16 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
                       refreshThreads: loadThreads,
                       selectThread,
                       navigate: () => onNavigate("chat"),
+                      // 262-UAT 3.6: a refused scoping PATCH no longer leaves an empty thread.
+                      discardThread: deleteThread,
                     },
                     expert,
                   )
                 } catch (err) {
                   console.error("Failed to start a scoped chat with this Expert:", err)
+                  // 262-UAT 3.6: re-thrown so the catalog can SHOW the failure (the gap
+                  // recorded above is closed by the page, not by a toast surface).
+                  throw err
                 }
               }}
             />

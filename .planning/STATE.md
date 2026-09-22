@@ -1123,6 +1123,13 @@ by construction: one `md:hidden` bar + a wrapper div around the non-chat `<main>
 class string is unchanged), reusing the existing `setDrawerOpen`; 0 new state, 0 new effects,
 0 new branches. The owed ChatLayout refactor phase is NOT discharged by this.
 
+**OV-262-G5-02 (2026-09-23) — G-5 on `ChatLayout.tsx` again; operator approved ("fix 3.6").**
+262-UAT 3.6: a failed Start Scoped Chat was silent and could leave an empty unscoped thread.
+ChatLayout's share is two lines at the existing `startScopedChat` mount — pass `discardThread`
+(the hook's existing `deleteThread`) and re-throw after the existing `console.error`. 0 new
+state / effects / branches; the cleanup and the visible error live in `startScopedChat.ts`
+and `ExpertCatalogPage.tsx`.
+
 OV-SOLO-01-status: retired-2026-09-13   # RE-ARMED — Gemini returned 2026-09-13, the trigger's first arm. Flip back to `live` ONLY with a dated entry naming why. ⛔ do not delete it — an absent marker reads as an absent decision.
 
 ---

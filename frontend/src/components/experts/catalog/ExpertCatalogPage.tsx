@@ -96,8 +96,16 @@ export function ExpertCatalogPage(props: ExpertCatalogPageProps) {
     setInspected(expert)
     props.onInspect?.(expert)
   }
-  const handleStartChat = (expert: ExpertBundle) => {
-    void props.onStartChat(expert)
+  // 262-UAT 3.6: a failed start used to close the modal and say nothing. The handoff now
+  // rejects to here, and the catalog says so beside the control that was pressed.
+  const [startError, setStartError] = useState<string | null>(null)
+  const handleStartChat = async (expert: ExpertBundle) => {
+    setStartError(null)
+    try {
+      await props.onStartChat(expert)
+    } catch {
+      setStartError(`Couldn't start a chat with ${expert.name}. Check your connection and try again.`)
+    }
   }
 
   return (
@@ -161,6 +169,16 @@ export function ExpertCatalogPage(props: ExpertCatalogPageProps) {
         <div className="flex items-center justify-center gap-2 py-16 text-xs text-muted-foreground">
           <Sparkles className="h-4 w-4 animate-spin text-primary" />
           Loading the expert catalog...
+        </div>
+      )}
+
+      {startError && (
+        <div
+          role="alert"
+          className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive"
+        >
+          <AlertCircle className="h-4 w-4 flex-none" />
+          <span>{startError}</span>
         </div>
       )}
 

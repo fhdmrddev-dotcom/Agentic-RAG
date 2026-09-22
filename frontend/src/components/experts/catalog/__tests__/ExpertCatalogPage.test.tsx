@@ -172,3 +172,19 @@ describe("ExpertCatalogPage · PACK-11 honesty", () => {
     expect(vi.mocked(api.listExperts).mock.calls[0]).toEqual([])
   })
 })
+
+// 262-UAT 3.6: a failed start used to close the modal and say nothing (console.error only).
+describe("ExpertCatalogPage — a failed start is VISIBLE (262-UAT 3.6)", () => {
+  it("shows an error on the catalog when onStartChat rejects", async () => {
+    vi.mocked(api.listExperts).mockResolvedValue([A])
+    const onStartChat = vi.fn().mockRejectedValue(new TypeError("Failed to fetch"))
+    render(<ExpertCatalogPage folders={[]} onStartChat={onStartChat} onInspect={vi.fn()} />)
+
+    await userEvent.click(await screen.findByRole("button", { name: /start chat/i }))
+
+    expect(onStartChat).toHaveBeenCalledTimes(1)
+    expect(await screen.findByRole("alert")).toHaveTextContent(/couldn.t start a chat with Contract Reviewer/i)
+    // The grid is still there — the error does not replace the catalog.
+    expect(screen.getByText("Contract Reviewer")).toBeInTheDocument()
+  })
+})

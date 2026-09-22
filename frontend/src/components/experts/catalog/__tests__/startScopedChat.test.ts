@@ -145,3 +145,38 @@ describe("startScopedChat — PACK-13's ordered handoff", () => {
     expect(log).toEqual(["createThread"])
   })
 })
+
+// 262-UAT 3.6, driven with the scoping PATCH refused: the created thread was left behind as an
+// empty, unscoped "New Chat" in the person's history.
+describe("startScopedChat — a refused patch cleans up the thread it created (262-UAT 3.6)", () => {
+  it("(7) discards the created thread, then re-throws the ORIGINAL error", async () => {
+    const boom = new Error("Failed to update thread active expert")
+    const discardThread = vi.fn(async (id: string) => {
+      log.push(`discardThread:${id}`)
+    })
+    const d = deps({
+      setExpert: vi.fn(async () => {
+        log.push("setExpert")
+        throw boom
+      }),
+      discardThread,
+    })
+
+    await expect(startScopedChat(d, EXPERT)).rejects.toBe(boom)
+    expect(log).toEqual(["createThread", "setExpert", "discardThread:thread-1"])
+    expect(d.navigate).not.toHaveBeenCalled()
+  })
+
+  it("(8) a FAILED discard still surfaces the original error, never the cleanup's", async () => {
+    const boom = new Error("patch refused")
+    const d = deps({
+      setExpert: vi.fn(async () => {
+        throw boom
+      }),
+      discardThread: vi.fn(async () => {
+        throw new Error("delete also refused")
+      }),
+    })
+    await expect(startScopedChat(d, EXPERT)).rejects.toBe(boom)
+  })
+})
