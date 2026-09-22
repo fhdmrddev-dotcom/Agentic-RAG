@@ -323,6 +323,28 @@ fresh worktree false-failed every plan:
    and *zero failing*, never a fixed grand total. ⚠ **The cap was neither adjusted nor
    needed, for the FOURTH consecutive close.**
 
+   ---
+
+   ### ⚠ CORRECTION 2026-09-22 (Phase 264, plan `264-04`) — THE EIGHTH ROT, AND IT TOOK ONE DAY. Every prior set of figures is preserved above, never overwritten.
+
+   ```
+     total 8676  ·  failed 0  ·  pinned total 7935
+   count gate OK — 316/316 pinned files present, no per-file decrease, 0 failing.
+   ```
+
+   | | correction of 2026-09-21 said | **measured 2026-09-22** |
+   |---|---|---|
+   | grand total | 8500 | **8676** |
+   | pinned total | 7746 | **7935** |
+   | pinned files | 297/297 | **316/316** |
+
+   ⛔ **READ THIS ONE DIFFERENTLY FROM THE SEVEN ABOVE: Phase 264 touched ZERO frontend source**
+   (`git diff --stat e9d6a9410..HEAD -- frontend/` is EMPTY, measured). So `+176 / +189 / +19` is
+   **not this phase's growth** — it is 263's landing, and the number was already stale when 264
+   started. ⭐ **A figure can rot without anybody editing the thing it measures**, which is why the
+   rule is *re-derive*, never *check whether you changed anything first*. `GSD_VITEST_MAX_WORKERS=2`
+   held at `2` with `failed 0` first try, for the FIFTH consecutive close.
+
    ⚠ **THE CAP WAS NEITHER ADJUSTED NOR NEEDED, for the third consecutive close** — `2`,
    `failed 0` on both invocations. ⚠ And a standing red that is NOT a cap problem and NOT this
    phase's: **`src/components/sources/sourceComposition.test.tsx` sits at ~~`16 failed | 33 passed`~~
