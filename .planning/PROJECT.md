@@ -10,7 +10,24 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 
 ---
 
-## Current Milestone: v4.3 What You Can Actually Sell
+## Last Shipped: v4.3 What You Can Actually Sell (2026-09-23)
+
+**Started:** 2026-09-18 · **Shipped:** 2026-09-23, git tag `v4.3` · 10 phases (255-260 scoped,
+**261-264 added in-milestone**), 39 plans, migrations 182-192, 6 days.
+**31 / 32 requirements satisfied · 1 ⛔ carried forward (`PACK-05` → `SEED-304`).** Integration 6/6.
+Phase numbering continues at **265**.
+
+⚠⚠ **THE CLOSING FINDING: six phases had closed on reviews and summaries, and six fresh independent
+verifiers found six real gaps in them** — ungated workflow execution and authoring writes, a cost
+formula written in five places, role grants that could never match (the user object carries no
+role), no Disable in the app, and the folder wall's byte path. All were fixed at close, RED-first.
+The seventh — the Financial Analyzer's knowledge unreachable from any real org — needs a tenancy
+decision and was carried forward rather than hacked.
+
+⛔ **Deploy checklist before the next production push:** migrations 183-192 via the SQL editor, and a
+`subscription_tier` on BOTH production orgs **before** the backend ships (both measured NULL).
+
+### v4.3 scoping record (as written at the start of the milestone)
 
 **Goal:** Turn a product that works into a product that can be packaged, priced and shipped to a client — without touching the trust boundary.
 
@@ -1084,9 +1101,29 @@ All 20 v3.3 requirements delivered (16 CORE + 4 STRETCH).
 - ✓ `BUS-171`'s operator queue is a decision list — REG-03, v4.2 (251)
 - ⛔ `DEBT-06` — **8 of 14 rows unmet** (239, 241, 242, 244, 245, 251, 252, 253). Accepted as documented debt at close by operator decision; `done` needs Gemini, `refused` needs an operator ruling (`REG-03`). **A refusal is not a pass.**
 
+### Validated (v4.3 — What You Can Actually Sell)
+
+- ✓ The extension contract is binding law, guarded, with three worked examples — EXT-01..03, v4.3 (255)
+- ✓ Harness totals persisted, sub-agent usage rolled up, paused/continued chat keeps its count, `forced_emit` counted or registered — METER-03..06, v4.3 (256)
+- ✓ Effective-dated rate registry; ONE token→USD home incl. its generated SQL spelling; spend per run and per org that names its blind spots — METER-01/02/07, v4.3 (257; SC#1 PARTIAL by decision — 26 models unrated by design)
+- ✓ ONE entitlement check over data, refusal names the plan, second-check fence, fail-closed — and gating covers execution + every authoring write — TIER-01..05, v4.3 (258 + audit fixes)
+- ✓ An Expert is a bundle row with RLS on bundle and members, tier-gated, closed core unchanged — PACK-01/04/06, v4.3 (259)
+- ✓ An Expert scopes a thread (fail-closed) and offers "Try asking…" tiles — PACK-02/03, v4.3 (260)
+- ✓ Admin authoring with AI drafting from uploads, role-as-data, per-user/role grants, Enable/Disable — PACK-07..10, v4.3 (261 + audit fixes)
+- ✓ Catalog, detail view, one-action scoped chat — PACK-11..13, v4.3 (262; lived UAT 29 pass)
+- ✓ Missing skills proposed, human-approved, save refuses unknown, cross-org isolated; born-for skills LOAD for every org member — PACK-14..17, v4.3 (263 + 264)
+- ⛔ `PACK-05` — Financial Analyzer never answers from its documents for a real org → `SEED-304` (tenancy decision)
+
 ### Active (current milestone)
 
+*v4.3 What You Can Actually Sell SHIPPED (2026-09-23; git tag `v4.3`). **No milestone active.** Next: `/gsd:new-milestone`, resuming phase numbering at **265**. ⚠ **Carried into scoping:** `SEED-304` (PACK-05 tenancy decision) · owed live UAT for 257/258/261/263 · independent review owed on 255/256/262/264 and on every audit fix commit · the production deploy checklist above · `SEED-013` Open Platform sequencing and `OV-248-01` (`BUS-263`) · the two non-engineering commercial blockers in `SEED-294`.*
+
+<details>
+<summary>Superseded Active note (v4.3-era, preserved)</summary>
+
 *v4.3 What You Can Actually Sell **STARTED 2026-09-18** via `/gsd:new-milestone`. Phase numbering resumes at **255**. Scope set by the operator at intake, on the ecosystem + commercial direction given the same day: the **extension contract** (`SEED-291`) written FIRST and cheaply as binding law plus a mechanical guard; **cost made attributable** (`SEED-073` + `SEED-074`); **a tier made enforceable** (`SEED-080` + `SEED-083`) against the migration-104 columns that have sat unread for a milestone; and **a pack made a thing** (`SEED-198` Experts, the SKU). ⛔ **Carried OPEN as an operator decision, not resolved:** `PRDs/SEQUENCE.md`'s next unbuilt slot is **Open Platform** (`SEED-013`) — the external-process arm of this milestone's own contract. ⛔ **Two operator blockers gate every commercial route and neither is engineering** (`SEED-294`): no legal entity, and an unsettled employment / IP position. Both block *approaching anyone*; neither blocks a requirement here. ⚠ **Carried in, and none of it is feature work:** `DEBT-06`'s three drafted refusals await an operator ruling or a Gemini review by **2026-09-24** · four one-line register repairs (`F-1`..`F-4`), including `254`'s own unparseable verification frontmatter and two duplicate-id clusters in a register **no gate sweeps** · two live criticals in `251-REVIEW.md`, both guards that cannot fail · `SEED-290` · `SEED-287` · the unswept seeds, reported as two figures **never summed**: **134 carry no `trigger_when` at all, 114 carry prose the sweep cannot match** (register gate green at 301/301 parsed, 0 duplicate ids). ⚠ Declined at intake with triggers intact: `SEED-292` (assurance export) and `SEED-293` (the competitive record missed **Airia**).*
+
+</details>
 
 <details>
 <summary>Superseded Active note (v4.2-era, preserved)</summary>
@@ -1327,7 +1364,7 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-09-18 — **milestone v4.3 What You Can Actually Sell STARTED** via `/gsd:new-milestone`. Phase numbering resumes at **255**. Scope set by the operator at intake on the ecosystem + commercial direction given the same day: the extension contract (`SEED-291`) FIRST, then cost attribution (`SEED-073`/`074`), then enforceable tiers (`SEED-080`/`083`), then the pack format (`SEED-198`). ⭐ **The scope was MEASURED before it was written, and one claim was corrected mid-measurement**: `max_tokens_per_run` was about to be recorded as a cap that cannot bind, and it can — `harness_engine.py:1818` wires a real token source into it. **The gap is persistence and USD, not counting**; `workflow_runs` carries zero token columns and 0 files match `cost_usd` / `token_to_usd` / `spend_ledger`. ⛔ `PRDs/SEQUENCE.md`'s Open Platform slot (`SEED-013`) is carried OPEN as an operator decision rather than resolved silently — it is the external-process arm of this milestone's own contract. ⛔ Two operator blockers gate every commercial route and neither is engineering (`SEED-294`): no legal entity, and an unsettled employment / IP position — both block approaching anyone, neither blocks a requirement. ⚠ `STATE.md` was **hand-edited, frontmatter AND body**, and `state.milestone-switch` was NOT called, against this workflow's own instruction: eight false-write occurrences are on record, the most recent being `milestone.complete` at the v4.2 close. A pre-call backup was taken first. Prior entry follows.*
+*Last updated: 2026-09-23 — **milestone v4.3 What You Can Actually Sell COMPLETED** (git tag `v4.3`; 10 phases, 39 plans, 31/32 requirements; PACK-05 → SEED-304). Prior entry: 2026-09-18 — **milestone v4.3 What You Can Actually Sell STARTED** via `/gsd:new-milestone`. Phase numbering resumes at **255**. Scope set by the operator at intake on the ecosystem + commercial direction given the same day: the extension contract (`SEED-291`) FIRST, then cost attribution (`SEED-073`/`074`), then enforceable tiers (`SEED-080`/`083`), then the pack format (`SEED-198`). ⭐ **The scope was MEASURED before it was written, and one claim was corrected mid-measurement**: `max_tokens_per_run` was about to be recorded as a cap that cannot bind, and it can — `harness_engine.py:1818` wires a real token source into it. **The gap is persistence and USD, not counting**; `workflow_runs` carries zero token columns and 0 files match `cost_usd` / `token_to_usd` / `spend_ledger`. ⛔ `PRDs/SEQUENCE.md`'s Open Platform slot (`SEED-013`) is carried OPEN as an operator decision rather than resolved silently — it is the external-process arm of this milestone's own contract. ⛔ Two operator blockers gate every commercial route and neither is engineering (`SEED-294`): no legal entity, and an unsettled employment / IP position — both block approaching anyone, neither blocks a requirement. ⚠ `STATE.md` was **hand-edited, frontmatter AND body**, and `state.milestone-switch` was NOT called, against this workflow's own instruction: eight false-write occurrences are on record, the most recent being `milestone.complete` at the v4.2 close. A pre-call backup was taken first. Prior entry follows.*
 
 *Last updated: 2026-09-18 — **milestone v4.2 The Connected Knowledge You Can Actually Run COMPLETED** via /gsd:complete-milestone (git tag `v4.2`; 8 phases 247-254, 31 plans, 25/26 requirements, integration 19/19, flows 3/3). ⭐ **The close RE-AUDITED first**: the on-disk audit read `gaps_found` over a tree 124 commits and three phases old, and re-driving it moved its four blockers to **zero** — an audit is a claim about a tree, and it goes stale the moment the tree moves. ⛔ `DEBT-06` closed **UNSATISFIED by operator decision** — 8 of 14 rows read neither `independent_review: done` nor a written refusal, re-derived with `yaml.safe_load` rather than from a hand-typed list; no plan can close it (`done` needs Gemini, `refused` needs an operator ruling under `REG-03`), and **a refusal is not a pass**. Also carried: **migration 181 not in cloud** (promotes as ONE operation, security-bearing), four one-line register repairs `F-1`..`F-4` — one of them `254`'s **own** unparseable verification frontmatter, the exact defect `254` reported against `244` in the same week — two duplicate-id clusters in `.planning/reported-bugs/`, a register **no gate sweeps**, two live criticals in `251-REVIEW.md` (both guards with no RED arm for themselves), and 41 open artifacts acknowledged as deferred. ⚠ The close's own finding, the eighth of its kind: `gsd-sdk query milestone.complete` archived correctly and then wrote **false records** — thirteen garbage "accomplishments" harvested from section LABELS, a progress block wrong in four different ways, and the deletion of `STATE.md`'s entire narrative — while reporting success in JSON. Restored from a pre-call backup and hand-written. **Back up before an SDK write verb; verify what it did on disk, never its JSON.** Prior entry follows.*
 
