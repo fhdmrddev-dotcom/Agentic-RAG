@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 from app.db import experts as experts_db
 from app.models.expert import ExpertBundle, ExpertBundleCreate, ExpertBundleUpdate
+from app.utils.skill_visibility import skill_row_visible
 
 logger = logging.getLogger(__name__)
 SYSTEM_USER_ID = UUID("00000000-0000-0000-0000-000000000001")
@@ -300,17 +301,47 @@ async def filter_visible_skill_names(
     rather than by assertion: a fourth top-level branch would let a foreign-org row carrying
     the marker through, which is precisely the ``SEED-125`` shape PACK-17 exists to prevent.
 
-    ⛔ ``bundle_id is not None`` is a MEASURED TRAP, not a style preference (T-263-02). At
-    save time the caller passes ``bundle_id=None`` and every unstamped row carries
-    ``born_for_expert_bundle_id = None``; a bare ``==`` evaluates ``None == None`` to True and
-    admits every other user's private skill in the org.
+    ⛔ THIS FUNCTION NO LONGER IMPLEMENTS THAT PREDICATE — it DELEGATES to
+    ``app.utils.skill_visibility.skill_row_visible`` (Phase 264 / D-264-01). The ``is_sys``
+    arm and the ``is_enabled`` requirement stay here, structurally unchanged; everything
+    inside the inner parenthesis is the shared rule's business now. The ``T-263-02``
+    ``None == None`` trap warning MOVED WITH THE ARM and lives in that function's docstring,
+    because a warning left behind in a module that no longer implements the rule is worse
+    than no warning at all.
 
-    ⛔ WHY THIS IS NOT IN ``app/utils/skill_visibility.py``, deliberately. That module is the
-    declared one home of the AGENT-side rule and is imported by ``tool_dispatcher`` (five call
-    sites) and ``harness/grounding.py``. Adding the born-for arm there would widen skill
-    resolution for the agent loop and for workflow grounding — two consumers this phase has no
-    business touching, and the exact shape of ``SEED-125``. The Expert arm therefore stays in
-    the Expert module. That is a decision, not an oversight.
+    ⛔ RETIRED DELIBERATELY BY PHASE 264 (D-264-02 / SEED-177; precedent D-206-07) — the
+    original block is quoted verbatim rather than deleted, because a reason that changes
+    silently is how a codebase forgets what its decisions meant:
+
+      "⛔ WHY THIS IS NOT IN ``app/utils/skill_visibility.py``, deliberately. That module is
+      the declared one home of the AGENT-side rule and is imported by ``tool_dispatcher``
+      (~~five~~ FOUR call sites) and ``harness/grounding.py``. Adding the born-for arm there
+      would widen skill resolution for the agent loop and for workflow grounding — two
+      consumers this phase has no business touching, and the exact shape of ``SEED-125``. The
+      Expert arm therefore stays in the Expert module. That is a decision, not an oversight."
+
+    WHAT CHANGED, AND WHY IT IS A MEASUREMENT RATHER THAN A CHANGE OF MIND. That reasoning is
+    correct for an UNCONDITIONAL arm, and the arm Phase 263 wrote was unconditional. Phase 264
+    moved it as an OPTIONAL keyword-only ``expert_bundle_id`` defaulting to ``None``, and an
+    optional keyword cannot widen a caller that does not pass it. So ``harness/grounding.py``
+    and every dispatcher call site without an active Expert keep a predicate that is
+    BYTE-IDENTICAL to its pre-264 self — proved by ``==`` against three frozen literals in
+    ``tests/unit/test_seed125_skill_visibility_filter.py``, not by this argument. The count of
+    independent encodings is likewise measured, by an AST walk, in
+    ``tests/unit/test_264_one_home_born_for_predicate.py``.
+
+    ⚠ The struck-through ``five`` inside the quote is corrected here rather than edited inside
+    the quotation: ``tool_dispatcher`` makes FOUR ``_resolve_skill_visibility_or`` calls
+    feeding SIX ``.or_()`` applications (measured 2026-09-22).
+
+    ⚠ THE DEGENERATE ORG CASE SHIPS STRICTLY TIGHTER, deliberately (RESEARCH §8.10). Before
+    the delegation, a caller with ``caller_org_id=None`` matched a row whose ``org_id`` is
+    ``NULL``, because ``None == None``. The delegation builds an EMPTY org set for a ``None``
+    caller org, so such a row is now refused. ``run_producer.py:404`` can construct a ``None``
+    caller org for a user with no org, so the case is reachable rather than theoretical; the
+    fail-closed direction is the only safe one for a BYPASSRLS read, and it matches the
+    shared rule's own "an unknown / foreign / NULL org is never visible" line. It is DRIVEN,
+    not reasoned about, in ``tests/unit/test_264_one_home_born_for_predicate.py``.
 
     ⛔ This helper does NOT log and does NOT count. ``resolve_expert_bundle`` keeps ownership of
     the stripped counter, the ``skill:<name>`` details and the single
@@ -328,28 +359,33 @@ async def filter_visible_skill_names(
     """
     skill_rows = await pool.fetch(skill_query, skill_names)
 
+    # Coerce ONCE at the seam, not per row. This function reads via asyncpg, so `org_id`,
+    # `user_id` and `born_for_expert_bundle_id` arrive as `UUID` objects, while
+    # `skill_row_visible` compares canonical UUID STRINGS (it was written for the
+    # supabase-py/PostgREST path, where every value is already a string).
+    # ⛔ A `None` caller org becomes an EMPTY org set, never `{"None"}` — see the degenerate
+    # case in the docstring above.
+    caller_org_ids = {str(caller_org_id)} if caller_org_id is not None else set()
+    caller_id_str = str(caller_user_id)
+    bundle_str = str(bundle_id) if bundle_id is not None else None
+
     valid_skills: set[str] = set()
     for row in skill_rows:
         s_name = row["name"]
         is_sys = bool(row.get("is_system"))
-        s_org_id = row.get("org_id")
-        s_user_id = row.get("user_id")
-        s_shared = bool(row.get("is_org_shared"))
-        s_enabled = bool(row.get("is_enabled", True))
         # .get(), never [...]: every pre-263 mock fixture is a plain dict without this key.
-        s_born_for = row.get("born_for_expert_bundle_id")
+        s_enabled = bool(row.get("is_enabled", True))
 
         if is_sys:
             valid_skills.add(s_name)
-        elif (
-            s_org_id == caller_org_id
-            and s_enabled
-            and (
-                s_user_id == caller_user_id
-                or s_shared
-                or (bundle_id is not None and s_born_for == bundle_id)
-            )
+        elif s_enabled and skill_row_visible(
+            row,
+            caller_id=caller_id_str,
+            org_ids=caller_org_ids,
+            expert_bundle_id=bundle_str,
         ):
+            # `skill_row_visible`'s own is_system escape is unreachable from here — `is_sys`
+            # is False in this arm — so the two-arm split above is preserved exactly.
             valid_skills.add(s_name)
 
     return valid_skills
