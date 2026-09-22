@@ -6,7 +6,7 @@ status: planning
 last_updated: "2026-09-23T00:00:00.000Z"
 last_activity: 2026-09-23 -- Milestone v4.4 Experts That Actually Work started
 progress:
-  total_phases: 0
+  total_phases: 5
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -33,16 +33,16 @@ See: `.planning/PROJECT.md` (updated 2026-09-23)
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
 **Current focus:** v4.4 Experts That Actually Work — defining requirements. Phase numbering resumes at
-**265**, migrations at **193**.
+**265**, migrations at **194** (193 was already taken by `193_expert_seed_org_portable.sql`).
 
 ---
 
 ## Current Position
 
 Milestone: v4.4 Experts That Actually Work
-Phase: Not started (defining requirements)
+Phase: 265 — Owed v4.3 Verification (not started; 5 phases 265-269)
 Plan: —
-Status: Defining requirements
+Status: Roadmap approved — ready to discuss Phase 265
 Last activity: 2026-09-23 — Milestone v4.4 started (SEED-304 tenancy decided: per-org copy)
 
 ---

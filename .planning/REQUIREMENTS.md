@@ -89,4 +89,22 @@ read path is built.**
 
 | Requirement | Phase | Status |
 |---|---|---|
-| (filled by roadmap) | | |
+| VERIFY-01 | Phase 265 | Pending |
+| VERIFY-02 | Phase 265 | Pending |
+| VERIFY-03 | Phase 265 | Pending |
+| VERIFY-04 | Phase 265 | Pending |
+| VERIFY-05 | Phase 265 | Pending |
+| PACK-18 | Phase 266 | Pending |
+| PACK-19 | Phase 266 | Pending |
+| PACK-20 | Phase 266 | Pending |
+| PACK-21 | Phase 267 | Pending |
+| PACK-22 | Phase 267 | Pending |
+| PACK-23 | Phase 267 | Pending |
+| PACK-24 | Phase 267 | Pending |
+| PACK-25 | Phase 267 | Pending |
+| METER-08 | Phase 268 | Pending |
+| CHAT-08 | Phase 268 | Pending |
+| PACK-26 | Phase 269 | Pending |
+| PACK-27 | Phase 269 | Pending |
+
+**Coverage:** 17/17 v1 requirements mapped · 0 orphans · 0 duplicates (roadmap 2026-09-23).

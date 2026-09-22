@@ -27,6 +27,160 @@
 - ✅ **v4.1 Ship It & Feel It** — Phases **242-246** (shipped 2026-09-13, git tag `v4.1`). 5 phases, **25 plans**, migrations **177-180**, 3 days. **18/19 requirements delivered · 1 ⛔ unmet BY MEASUREMENT.** A deliberate **CONSOLIDATION** milestone — no new capability axis; every requirement closed something already in a register. The ship claims closed against the **database and the branch** rather than the deploy record; the chat surface stopped getting in the way (follow-scroll driven with a **real wheel** — 0 px drift, closing `BUG-260823-01` after two fixes that had passed on synthetic events; all five `SHELL` criteria driven in a browser); and v4.0's verification debt got **written verdicts** plus a greppable marker so a self-verification can no longer read as a review. ⭐ **Its best work is the requirement it did NOT deliver:** 246 proved by `EXPLAIN (ANALYZE)` that no `hnsw_ef_search` value fixes the small-tenant recall cliff through the index — every index walk returns **ONE row**, every good recall figure is a **~1.1 s sequential scan** — so the 200 default was **refused and reverted to 40**, with `RECALL-01` left open on `SEED-273`. ⭐ 246 is also the **first peer-reviewed phase since `OV-SOLO-01` was re-armed**. ⚠ Migrations **179/180 are not in cloud** and `production` is **287 commits behind**, so v4.1's own output is undeployed ([`audit`](milestones/v4.1-MILESTONE-AUDIT.md)).
 - ✅ **v4.2 The Connected Knowledge You Can Actually Run** — Phases **247-254** (shipped 2026-09-18, git tag `v4.2`). 8 phases (247-251 scoped; **252 / 253 / 254 inserted by audit**), **31 plans**, migration **181**, 6 days. **25/26 requirements satisfied · 1 ⛔ unsatisfied (`DEBT-06`).** Integration **19/19** · flows **3/3**. **26 requirements in 6 categories**, 25 mapped to the five scoped phases and `DEBT-06` held as a **milestone-wide standing gate** that ends the milestone **unmet, by measurement**. ⚠ **The bullet above is CORRECTED, not rewritten: its closing claim — *"migrations 179/180 are not in cloud and `production` is 287 commits behind, so v4.1's own output is undeployed"* — was true when written and is now FALSE.** Measured at this scoping: `production` moved `e65610ac2 → eebc4c42f` (**292 commits**), `production..develop` is **0**, migrations **179 and 180 are applied and verified in cloud** (177/178 measured **already present** — `scripts/pending-cloud-migrations.sh` diffs git refs, not the live database, and over-reported by two), and `get_advisors(security)` returns **zero ERROR findings**. **v4.1 IS deployed.** v4.2 is therefore the SECOND consecutive **consolidation** milestone — no new capability axis, every requirement closes something already in a register, and each was **DRIVEN against the tree on 2026-09-13 rather than read from a `status:` field**, a method that caught three wrong register entries (two stale toward *"still broken"*, one toward *"fine"*). Watch-loop honesty (247) · the credential boundary (248) · the model you actually run (249) · run-honesty residue (250) · register integrity (251) — then **three phases the audit added**: the four blockers five green verifications could not see (252) · the bootstrap artifact that shipped every function wide open (253) · the independent review of 249-253 (254). **v4.2 opened on deployed code for the first time in three milestones, and closed on it.**
 - ✅ **v4.3 What You Can Actually Sell** — Phases **255-264** (shipped 2026-09-23, git tag `v4.3`). 10 phases (255-260 scoped; 261-264 added in-milestone), **39 plans**, migrations **182-192**, 6 days. **31/32 requirements delivered · PACK-05 carried to SEED-304 by decision.** Extension contract, token metering + USD, enforceable tiers, Experts as data.
+- 🚧 **v4.4 Experts That Actually Work** — Phases **265-269** (in progress, started 2026-09-23). A client can install an Expert and get grounded answers from its own knowledge, in their own org — proven by live drives, never by a mocked test. Migrations resume at **194** (193 is taken).
+
+---
+
+## v4.4 Experts That Actually Work — 🚧 IN PROGRESS
+
+**Started:** 2026-09-23. **Roadmap created:** 2026-09-23.
+Requirements: [`REQUIREMENTS.md`](REQUIREMENTS.md) — **17 v1 requirements, 17 mapped, 0 orphans.**
+
+**Goal:** A client can install an Expert and get **grounded answers from its own knowledge, in their own
+org** — proven by live drives as a real user, never by a mocked test.
+
+**Milestone rule (every phase):** a success criterion here is met by a **live drive as a real user in a
+real org**, with the evidence recorded (DB row, transcript, screenshot) — never by a mocked or fixture
+test alone. Tests still ship; they are not the proof. ⛔ *Presence assertions cannot see content drift*:
+where the words are the deliverable (a cited figure, a refusal, a consequence line), assert the rendered
+**content**.
+
+**Red line (every phase — the Extension Contract, `docs/EXTENSION-CONTRACT.md`):** an Expert is DATA.
+No phase adds an executor, emitter, programmatic function or tool. The closed-core inventory
+(**7 phase types / 1 emitter / 29 tools** at v4.3 close) is re-counted against each phase's own base
+commit — counted, never substring-matched.
+
+**Numbering:** Phases **265-269**. ⚠ **Migrations resume at `194`, NOT `193`** — measured at roadmap
+creation: `supabase/migrations/193_expert_seed_org_portable.sql` already exists (`26026b21d`, the
+Phase 260 fix that re-points 188's seed rows). This is the third time a ROADMAP has named an
+already-taken number (184, 185, now 193); **check `ls supabase/migrations | tail` before writing one.**
+
+**Tenancy decision (operator, 2026-09-23):** `SEED-304` is resolved by **per-org provisioning** — an
+Expert's sample corpus is COPIED into the installing org and embedded there. ⛔ No cross-tenant read
+path is built, in any phase.
+
+### Phase Table
+
+| Phase | Name | Goal | Requirements | SC# | Flags |
+|-------|------|------|--------------|-----|-------|
+| 265 | Owed v4.3 Verification | Every v4.3 phase that shipped on self-verification gets its live UAT or its independent review, and every finding a written verdict | VERIFY-01..05 | 5 | **FIRST by operator mandate**; independent-reviewer rule; G-7 applies to findings; no build; no migration expected |
+| 266 | Expert Knowledge in a Real Org | Installing a first-party Expert copies its corpus into the installing org, embeds it there, and the Financial Analyzer answers from it for a real user | PACK-18, PACK-19, PACK-20 | 4 | migration **194** likely; tenancy fence; G-5 (`run_producer.py`, `db/experts.py`, `expert_service.py`); security_enforcement; closes v4.3 `PACK-05` |
+| 267 | An Expert Adds Scope | Inviting an Expert only ever ADDS to what the thread can do, and every cost or change of scope is stated to the user before or as it happens | PACK-21..25 | 5 | **G-2 sketch** · **G-4** · **SC#10 cross-provider** (tool set changes); G-5 (`tool_dispatcher.py`, `agent_loop.py`, `run_producer.py`, `ChatArea.tsx`, `MessageInput.tsx`, `MessageItem.tsx`); UI hint |
+| 268 | Expert Spend & Mid-Thread Scope | Spend is attributable per Expert, and a thread's folder scope can change after it starts, visibly and effective next turn | METER-08, CHAT-08 | 4 | **G-2 sketch** · **G-4**; migration likely; G-5 (`run_producer.py`, `db/workflows.py`/usage writers, `threads.py`, `ChatArea.tsx`); UI hint |
+| 269 | Starter Expert Library | A new org opens the catalog to a set of installable first-party Experts, each proven by one live grounded conversation | PACK-26, PACK-27 | 4 | **G-2 sketch** (catalog empty/installed states) · **G-4**; count + domains decided at discuss; content-heavy; migration(s) for seeds; UI hint |
+
+### Phase Checklist
+
+- [ ] **Phase 265: Owed v4.3 Verification** — live UAT for 257 / 258 / 261 / 263, independent review of 255 / 256 / 262 / 264 + audit fix commits, `BUG-260921-02` closed on evidence (VERIFY-01..05)
+- [ ] **Phase 266: Expert Knowledge in a Real Org** — per-org copy + ingest of an Expert's corpus, idempotent and org-contained; Financial Analyzer answers from its report live (PACK-18..20)
+- [ ] **Phase 267: An Expert Adds Scope** — additive tool floor, required-connection honesty, swap/remove transcript event, "ask a second Expert", restricted-cost statement (PACK-21..25)
+- [ ] **Phase 268: Expert Spend & Mid-Thread Scope** — per-Expert token/USD attribution in `/admin/spend`, change a thread's folder scope mid-thread (METER-08, CHAT-08)
+- [ ] **Phase 269: Starter Expert Library** — a starter set of first-party Experts installable through the 266 path, each with a recorded live conversation (PACK-26, PACK-27)
+
+### Phase Details
+
+#### Phase 265: Owed v4.3 Verification
+
+**Goal**: Every piece of v4.3 that closed on self-verification or with owed UAT is **driven live or independently reviewed**, and every finding carries a written verdict — so v4.4 builds on measured ground rather than on v4.3's own say-so.
+**Depends on**: Nothing (first phase — operator-mandated to go before any v4.4 build).
+**Requirements**: VERIFY-01, VERIFY-02, VERIFY-03, VERIFY-04, VERIFY-05
+**Success Criteria** (what must be TRUE):
+
+  1. The 257 `/admin/spend` page is driven live in a browser and each owed UAT row is recorded with its own evidence (screenshot + the DB rows it claims to show) (VERIFY-01).
+  2. Signed in as a member of a **standard-tier** org — proven active by the org switcher, not assumed (the dev account is in two orgs) — all three 258 tier refusals fire, and each refusal names the plan (VERIFY-02).
+  3. The 261 G-4 authoring scenarios are driven live, and a user **outside** a per-user and a per-role grant can neither see nor invite that Expert while a user inside can (VERIFY-03).
+  4. A drafted Expert with a **>1000-char blueprint** saves and drafts its skill proposals live; 263 rows R-1..R-9 are re-driven post-WR-08, and `BUG-260921-02` is flipped to `closed` citing that drive (VERIFY-04).
+  5. 255, 256, 262, 264 and commits `c28853142`..`cdf3a308a` each have a review written by an agent that **did not build them**, and every finding is triaged fix / defer / accept in writing — none left silent (VERIFY-05).
+
+**How we'd know this failed**: a VERIFY row is ticked with a screenshot but no backing DB/transcript evidence; the tier refusals are driven in the enterprise org and pass vacuously; the reviewer of a phase also shaped its build; or a "fix" finding is fixed by the reviewer, turning the review into self-assessment (the 257.1 lesson).
+**Plans**: TBD
+**Flags**: ⛔ **Independent-review rule** (CLAUDE.md, AGENTS.md): whoever REVIEWS a phase must not have shaped its build — route VERIFY-05 across the `.agent-bus`, decisions `--to operator`. ⛔ **Let the builder fix its own work**; the reviewer drives each finding before reporting it OPEN. **G-7** applies to any fix rounds the findings spawn — fixes ≤ 1 file / ≤ 10 lines go `/gsd:fast`. Fixes that turn out to be a capability are a phase, not a finding. No migration expected; no new UI. UI-touching UAT rows use Chrome MCP (the user drives browser UAT where asked).
+
+#### Phase 266: Expert Knowledge in a Real Org
+
+**Goal**: When an org installs, or is entitled to, a first-party Expert, **that Expert's knowledge exists inside that org** — copied, ingested and embedded there — so the Financial Analyzer answers from its report for a real user in a real org. This closes v4.3's `PACK-05` / `SEED-304`.
+**Depends on**: Phase 265 (verification first, by mandate; 258's tier refusal and 261's grants must be proven before an install path rides on them).
+**Requirements**: PACK-18, PACK-19, PACK-20
+**Success Criteria** (what must be TRUE):
+
+  1. A user in a fresh org that has never seen the Financial Analyzer installs it, and the Expert's sample corpus appears **in that org's** Library and reaches a terminal success status with real embeddings (non-null vectors, chunk count > 0) (PACK-18).
+  2. Installing the same Expert a second time into the same org creates **no duplicate** documents, chunks or folders — the counts are identical before and after (PACK-19).
+  3. A driven two-org fence proves org A cannot retrieve org B's provisioned copy — through search, through chat retrieval, and through the Expert's own scope (PACK-19).
+  4. In a real org, as a real user, the Financial Analyzer answers a revenue question **citing `$124.5M` / `+18.2%` from the org's own copy**, and refuses one out-of-scope question — both recorded as live transcripts (PACK-20).
+
+**How we'd know this failed**: the answer cites the figures but retrieval reads the seed org's rows (a cross-tenant path by accident); a re-install doubles the chunks; the corpus lands "complete" with zero embeddings; or the only proof is `test_260_*` against the seed org.
+**Plans**: TBD
+**Flags**: ⛔ **No cross-tenant read path** — per-org copy is the operator decision. **Migration `194`** (not 193 — taken) if provisioning needs an install/provenance marker; apply via the SQL editor, regenerate `full-schema.sql`, check `get_advisors(security)`. **security_enforcement**: the provisioning writer runs as whom, and into which org, is the threat model — the source rows sit in a seed-only org. **Deploy parity**: prod needs the same provisioning path (two prod orgs; `subscription_tier` set). **G-5 audit at discuss:** `backend/app/services/run_producer.py` (FIRES), `backend/app/db/experts.py` (FIRES), `backend/app/services/expert_service.py`, the ingestion pipeline (`backend/app/api/documents.py` — prefer reusing the existing ingest path over a second one). Small install affordance only; if the install moment is a new surface, **G-2** applies. **UI hint**: yes
+
+#### Phase 267: An Expert Adds Scope
+
+**Goal**: Inviting an Expert **only ever adds** to what a thread can do, and whenever an Expert costs the user something or changes the thread's scope, the product **says so before or as it happens** — never at run time as a failure.
+**Depends on**: Phase 266 (a real, org-provisioned Expert to drive against).
+**Requirements**: PACK-21, PACK-22, PACK-23, PACK-24, PACK-25
+**Success Criteria** (what must be TRUE):
+
+  1. In a thread with an Expert active, the agent can still call every registered tool the user had without it (`web_search`, `workspace_read`, `query_tables`, `recall`, `task`, …) **plus** the Expert's own — driven by a live prompt that needs a stripped-today tool and succeeds, across the native provider roster (PACK-21).
+  2. An Expert whose `required_connections` are not connected shows "Requires <Service> — not connected" on its card **and** at invite, and offers the connect flow; it never reaches a run that fails on the missing connection (PACK-22).
+  3. Swapping or removing the active Expert mid-thread writes a transcript event that names its consequence (what the next turn will and will not use), and that event survives reload (PACK-23).
+  4. From a thread, "ask a second Expert" opens a **new** thread scoped to that Expert with a handoff summary of the first — the original thread keeps its one active Expert (PACK-24).
+  5. Inviting a `restricted` Expert states, before the first run, which of the thread's documents it will not read — by name or count — and the next run's retrieval matches the statement (PACK-25).
+
+**How we'd know this failed**: the tool floor is widened by listing tools in an Expert-specific set (a second encoding) rather than by union; a model loses tool calling on one provider only; the "requires" state is a disabled button with no reason; a swap changes scope silently or only in the wire format; the handoff thread silently loses the first thread's context.
+**Plans**: TBD (G-8: 5 requirements is not 5 plans — target 3-5 wave-sized plans)
+**Flags**: ⛔ **Red line — the Extension Contract:** PACK-21 is a **union**, not a new tool; the 29-tool inventory is unchanged. ⛔ **SC#10 cross-provider scoreboard FIRES** (tool set + agent loop): full native roster + OpenRouter, derived from `MODEL_CAPABILITIES`, rows blocked never omitted. **G-2 FIRES** — `/gsd:sketch` before plan (card "requires" state, invite cost statement, swap event, second-Expert handoff); operator-approved mockup is the bar. **G-4** — three "I'd recognize failure here" scenarios at scope time. **G-5 audit at discuss (all FIRING):** `backend/app/services/tool_dispatcher.py`, `backend/app/services/agent_loop.py`, `backend/app/services/run_producer.py`, `frontend/src/components/chat/ChatArea.tsx`, `MessageInput.tsx`, `MessageItem.tsx`, `ExpertSpotlightCard.tsx`, `InviteExpertDialog.tsx`, `frontend/src/types/index.ts` — ⛔ `tool_dispatcher.py` and `agent_loop.py` both carry OWED seams; propose the refactor as the first option. Scoping stays **data handed to the loop**, never a branch inside it. **UI hint**: yes
+
+#### Phase 268: Expert Spend & Mid-Thread Scope
+
+**Goal**: An operator can see what each Expert **costs**, and a user can **change a thread's folder scope after it starts** — both visible where the person looks, and both true in the data.
+**Depends on**: Phase 267 (the transcript scope-change event from PACK-23 is the same shape CHAT-08 needs — one mechanism, not two).
+**Requirements**: METER-08, CHAT-08
+**Success Criteria** (what must be TRUE):
+
+  1. After live runs with two different Experts and one with none, `/admin/spend` groups and filters by Expert, and each Expert's token and USD totals equal the sum of its runs' persisted usage — including sub-agent and paused/continued runs (METER-08).
+  2. Runs with no Expert are shown as their own line, never dropped and never mis-attributed (METER-08).
+  3. A user changes a live thread's folder scope; the change appears in the transcript as an event, survives reload, and the **next** turn's retrieval draws only from the new scope — verified against the run's retrieved-chunk records (CHAT-08).
+  4. Changing scope mid-thread with an Expert active respects the Expert's `restricted` / `biased` mode and says so when the two interact (CHAT-08).
+
+**How we'd know this failed**: the Expert id is attached at one of the usage finalize sites but not the others (the 5-site lesson from 257); spend per Expert does not reconcile with run totals; the scope change applies to the in-flight turn or only after a reload; the transcript event exists but retrieval still reads the old subtree.
+**Plans**: TBD
+**Flags**: **Migration** likely (an Expert id on the usage/run rows — `194+`, after 266's). ⛔ Cost stays in its **one** token→USD home (257); attribution is a column, not a second formula. **G-2 FIRES** (scope-change control + transcript event; spend grouping). **G-4** scenarios at scope time. **SC#10** for CHAT-08 (retrieval per turn, streaming UI state). **G-5 audit at discuss:** `backend/app/services/run_producer.py`, `backend/app/db/workflows.py` / every usage finalize site (`api/runs.py`, `harness_engine.py`, `forced_emit.py`, `task_service.py`), `backend/app/api/threads.py`, `backend/app/services/retrieval_service.py` (extraction OWED — SEED-224), `ChatArea.tsx`, the `/admin/spend` surface. Seed `SEED-286`. **UI hint**: yes
+
+#### Phase 269: Starter Expert Library
+
+**Goal**: A new org **does not open an empty product** — the catalog offers a starter library of first-party Experts, each installable through Phase 266's provisioning path and each proven to answer from its own corpus.
+**Depends on**: Phase 266 (the install path), Phase 267 (starter Experts should ship with the additive-scope semantics the user will actually get).
+**Requirements**: PACK-26, PACK-27
+**Success Criteria** (what must be TRUE):
+
+  1. A newly created org opens the Expert catalog and sees the starter library (count and domains as decided at discuss), each Expert with a working detail view (PACK-26).
+  2. Each starter Expert installs into that org through the **same** 266 path — its corpus copied, ingested and embedded there — with no Expert-specific install code (PACK-26).
+  3. Every starter Expert has **one recorded live conversation** in a real org that answers from its own corpus with a cited figure and refuses one out-of-scope question (PACK-27).
+  4. No starter Expert ships whose only evidence is a mocked or fixture test — an Expert without its live transcript is held back, not shipped (PACK-27).
+
+**How we'd know this failed**: an Expert needs a bespoke seed script or code branch to install; a starter Expert's live answer is generic model knowledge with no citation from its corpus; the catalog in a new org is empty until someone runs a migration by hand; the library count is chosen before the domains are validated against real corpora.
+**Plans**: TBD
+**Flags**: ⚠ **Operator decision at discuss:** count and domains of the starter set, and the source/licence of each sample corpus. Seed data ships as numbered migrations (`194+`) and must be **org-portable** — the lesson of migration 193 (188 hardcoded a local org id). **G-2 FIRES** (catalog first-run / installed states). **G-4** scenarios at scope time. **G-5 audit at discuss:** `frontend/src/components/experts/catalog/*` (young rows), `backend/app/db/experts.py` (FIRES), `backend/app/services/expert_service.py`. Seed `SEED-244`. **UI hint**: yes
+
+### Progress
+
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 265. Owed v4.3 Verification | 0/? | Not started | - |
+| 266. Expert Knowledge in a Real Org | 0/? | Not started | - |
+| 267. An Expert Adds Scope | 0/? | Not started | - |
+| 268. Expert Spend & Mid-Thread Scope | 0/? | Not started | - |
+| 269. Starter Expert Library | 0/? | Not started | - |
+
+**Guardrails firing (v4.4):**
+
+- **G-2 sketch-first:** 267, 268, 269 (and 266 only if the install moment becomes a new surface). 265 builds no UI.
+- **G-4 lived-experience UAT:** 266, 267, 268, 269 — the milestone rule makes every success criterion a live drive.
+- **G-5 hot files (audit at discuss-phase, run `node scripts/check-hot-file-ledger.cjs <phase>`):** `run_producer.py` (266, 267, 268), `tool_dispatcher.py` + `agent_loop.py` (267 — both with OWED seams), `db/experts.py` (266, 269), `ChatArea.tsx` / `MessageInput.tsx` / `MessageItem.tsx` (267, 268), `threads.py` + `retrieval_service.py` (268).
+- **G-6:** every phase above carries a `How we'd know this failed` line.
+- **G-7:** applies to 265's findings as much as to any build phase.
+- **G-8:** target 3-5 plans per phase; 267 is the phase most at risk of fragmenting.
+- **SC#10 cross-provider:** 267 (tool floor, agent loop) and 268 (per-turn retrieval scope). Full native roster + OpenRouter.
+- **Migrations:** resume at **194** (193 is taken). Apply via the SQL editor, regenerate `full-schema.sql`, and add each to the production deploy checklist with `get_advisors(security)`.
 
 ---
 

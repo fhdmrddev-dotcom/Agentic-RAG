@@ -21,7 +21,7 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 - **A starter Expert library (`SEED-244`)** — a new org does not open an empty product.
 - **A thread's scope can change after it starts (`SEED-286`).**
 
-**Key context:** Phase numbering resumes at **265**, migrations at **193**. Tenancy decision for SEED-304 = **per-org copy** (operator, at intake). ⛔ Carried, not in scope: `SEED-013` Open Platform (next after this), `SEED-294` commercial blockers (non-engineering).
+**Key context:** Phase numbering resumes at **265**, migrations at **194** (193 was already taken by `193_expert_seed_org_portable.sql`). Tenancy decision for SEED-304 = **per-org copy** (operator, at intake). ⛔ Carried, not in scope: `SEED-013` Open Platform (next after this), `SEED-294` commercial blockers (non-engineering).
 
 ---
 
@@ -1131,7 +1131,7 @@ All 20 v3.3 requirements delivered (16 CORE + 4 STRETCH).
 
 ### Active (current milestone)
 
-*v4.4 Experts That Actually Work **STARTED 2026-09-23** via `/gsd:new-milestone`. Phase numbering resumes at **265**, migrations at **193**. Scope set by the operator at intake: owed v4.3 UAT + independent review as the FIRST phase; `SEED-304` (PACK-05) via **per-org provisioning**; the blocking Expert-drafter field-cap bug; `SEED-303` open arms (S3 two Experts, S6 additive tool floor, per-Expert spend; S8 stays deferred); `SEED-244` starter Expert library; `SEED-286` mid-thread scope change. Requirements: `.planning/REQUIREMENTS.md`.*
+*v4.4 Experts That Actually Work **STARTED 2026-09-23** via `/gsd:new-milestone`. Phase numbering resumes at **265**, migrations at **194** (193 was already taken by `193_expert_seed_org_portable.sql`). Scope set by the operator at intake: owed v4.3 UAT + independent review as the FIRST phase; `SEED-304` (PACK-05) via **per-org provisioning**; the Expert-drafter field-cap bug (already fixed at `7a04e944e` — live-verify and close); `SEED-303` open arms (S3 two Experts, S6 additive tool floor, per-Expert spend; S8 stays deferred); `SEED-244` starter Expert library; `SEED-286` mid-thread scope change. Requirements: `.planning/REQUIREMENTS.md`.*
 
 <details>
 <summary>Superseded Active note (v4.3-close, preserved)</summary>
@@ -1400,4 +1400,4 @@ This document evolves at phase transitions and milestone boundaries.
 
 </details>
 
-*Last updated: 2026-09-23 — **milestone v4.4 Experts That Actually Work STARTED** via /gsd:new-milestone. Phase numbering continues at **265**, migrations at **193**. SEED-304 tenancy decided: per-org copy.*
+*Last updated: 2026-09-23 — **milestone v4.4 Experts That Actually Work STARTED** via /gsd:new-milestone. Phase numbering continues at **265**, migrations at **194** (193 was already taken by `193_expert_seed_org_portable.sql`). SEED-304 tenancy decided: per-org copy.*
