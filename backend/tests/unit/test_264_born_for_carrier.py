@@ -15,15 +15,30 @@ What these tests measure:
   inherited: the field is named for the mig-191 COLUMN, not for the Expert concept, so the
   invariant stays green by CONSTRUCTION and not by exemption.
 
-⛔ What a green here does NOT prove: nothing about what any consumer does with the field.
-No consumer reads it in this plan; `_resolve_skill_visibility_or` is 264-03's subject.
+* The harness (`phase_types.py`), the eval harness (`eval_runner_service.py`) and workflow
+  grounding (`harness/grounding.py`) stay UNWIRED — asserted as a NEGATIVE, because
+  D-264-04's discipline is "a recorded decision, not an omission". Each of those fences was
+  driven RED against a planted keyword and the file restored md5-identical.
+* Both arms of `_resolve_thread_scoping` are driven against the real function: the
+  no-consultant arm yields a five-wide all-`None` tuple, and the failure arm re-raises
+  instead of short-returning a tuple of the old arity.
+
+⛔ What a green here does NOT prove — read this before quoting it:
+
+* **Nothing about what any consumer does with the field.** No consumer reads it in 264-01;
+  `_resolve_skill_visibility_or` and the four dispatcher call sites are 264-03's subject.
+* **Nothing about which skill rows Postgres would return.** These are source-structure and
+  object-shape assertions plus two resolver arms with mocked fakes — not a visibility test.
+  A green here says the harness, eval and grounding paths carry no consultant scope; it says
+  nothing about whether a born-for skill LOADS, which is the phase's actual goal.
 """
 from __future__ import annotations
 
 import ast
 import pathlib
 from dataclasses import FrozenInstanceError, fields
-from unittest.mock import MagicMock
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
@@ -235,4 +250,148 @@ def test_the_carrier_adds_no_branch_anywhere():
 
     assert offenders == [], (
         "264-01 lays an INERT carrier; a consumer belongs in 264-03. Found: " + "; ".join(offenders)
+    )
+
+
+# ── The sites that stay UNCHANGED — asserted NEGATIVELY, never by silence ─────
+#
+# D-264-04's discipline is "a recorded decision, not an omission". RESEARCH §3.G/H/I
+# names three modules that must NOT learn about the born-for scope: the harness phase
+# ctx builder, the eval RunContext build, and workflow grounding. A comment saying so
+# is not executable; these are.
+#
+# ⛔ Each of the three fences below was driven RED by PLANTING the keyword at the site,
+# watching it fire, reverting, and confirming the file md5-identical (see 264-01-SUMMARY).
+
+UNWIRED_MODULES = (
+    "services/harness/phase_types.py",
+    "services/eval_runner_service.py",
+    "services/harness/grounding.py",
+)
+
+
+def test_harness_and_eval_and_grounding_pass_no_born_for_keyword():
+    """G/H/I: the three modules with no Expert must pass NEITHER spelling of the id.
+
+    `born_for_bundle_id` is what 264 adds; `expert_bundle_id` is the name D-264-03
+    originally proposed and RESEARCH §2.1 refuted. Both are excluded so a future edit
+    cannot reintroduce the concept here under the older name either.
+    """
+    for rel in UNWIRED_MODULES:
+        for kw in (FIELD, "expert_bundle_id"):
+            n = _keyword_count(rel, kw)
+            assert n == 0, (
+                f"{rel} passes `{kw}=` {n} time(s) — this path has no consultant. "
+                f"The harness is governed by phase_whitelist, the eval harness has no "
+                f"Expert, and grounding is unreachable from a chat Expert run (RESEARCH §2.5)."
+            )
+
+
+def test_grounding_predicate_never_mentions_the_born_for_column():
+    """§2.5: workflow grounding builds the UNWIDENED visibility predicate.
+
+    Mirrors `test_seed125_skill_visibility_filter.py:96`'s own
+    `"born_for_expert_bundle_id" not in out` shape, one layer up: the grounding module
+    must not name the mig-191 provenance column at all.
+    """
+    src = (APP_DIR / "services" / "harness" / "grounding.py").read_text(encoding="utf-8")
+    assert "born_for_expert_bundle_id" not in src, (
+        "grounding.py names the born-for provenance column — the workflow grounding path "
+        "is fenced UNCHANGED by D-264-04 and must stay org+owner+shared only"
+    )
+
+
+def test_build_phase_tool_context_yields_a_none_born_for_tool_context():
+    """H: the harness ToolContext takes the dataclass DEFAULT — driven, not read.
+
+    An AST count of zero says the keyword is absent from the source; this says the
+    object the harness actually hands to `dispatch_tool` carries no consultant scope.
+    """
+    from app.services.harness.phase_types import _build_phase_tool_context  # noqa: PLC0415
+
+    phase = SimpleNamespace(
+        config=SimpleNamespace(
+            folder_scope=None,
+            available_tools=["search_documents"],
+            model=None,
+        )
+    )
+    harness_ctx = SimpleNamespace(
+        producer_run_id=uuid4(),
+        run_id=uuid4(),
+        folder_subtree_ids=None,
+        model="m",
+    )
+    tc = _build_phase_tool_context(phase, harness_ctx)
+    assert isinstance(tc, ToolContext)
+    assert getattr(tc, FIELD) is None, (
+        "the harness phase ToolContext must carry NO consultant scope — the harness has "
+        "no Expert and is governed by phase_whitelist instead"
+    )
+
+
+# ── The two arms of the resolver, driven against the real function ────────────
+
+@pytest.mark.asyncio
+async def test_resolve_thread_scoping_no_expert_yields_a_none_fifth_element():
+    """D-264-03a: the no-consultant arm returns five values, the fifth `None`.
+
+    Driven against the real `_resolve_thread_scoping` with the thread-row fake
+    `test_260_expert_chat_scoping.py::test_resolve_thread_scoping_no_expert` builds —
+    not asserted from source.
+    """
+    from app.services.run_producer import _resolve_thread_scoping  # noqa: PLC0415
+
+    mock_supabase = MagicMock()
+    mock_query = MagicMock()
+    mock_query.execute.return_value = MagicMock(data={"active_expert_id": None})
+    mock_supabase.table.return_value.select.return_value.eq.return_value.maybe_single.return_value = mock_query
+
+    result = await _resolve_thread_scoping(
+        supabase=mock_supabase,
+        thread_id=str(uuid4()),
+        current_user={"id": str(uuid4()), "org_id": str(uuid4())},
+        pool=MagicMock(),
+    )
+    assert len(result) == 5, f"expected a 5-tuple, got {len(result)}"
+    assert result == (None, None, None, None, None)
+
+
+@pytest.mark.asyncio
+async def test_resolve_thread_scoping_failure_arm_raises_and_returns_no_tuple():
+    """E6: the `except` arm re-raises (fail-closed) — the widening added no 4-tuple path.
+
+    A silent short return here would hand the caller a tuple of the OLD arity and
+    resurrect the `ValueError: too many values to unpack` the arity change just closed,
+    on the failure path only — where no test would look.
+    """
+    from app.services.run_producer import _resolve_thread_scoping  # noqa: PLC0415
+
+    mock_supabase = MagicMock()
+    thread_row = MagicMock()
+    thread_row.data = {"active_expert_id": str(uuid4())}
+    mock_table = MagicMock()
+    mock_supabase.table.return_value = mock_table
+    mock_table.select.return_value = mock_table
+    mock_table.eq.return_value = mock_table
+
+    async def _aexec(_query):
+        return thread_row
+
+    with patch("app.utils.db.aexec", side_effect=_aexec), patch(
+        "app.services.expert_service.resolve_expert_bundle", new_callable=AsyncMock
+    ) as mock_resolve:
+        mock_resolve.side_effect = RuntimeError("boom")
+        with pytest.raises(RuntimeError, match="boom"):
+            await _resolve_thread_scoping(
+                supabase=mock_supabase,
+                thread_id=str(uuid4()),
+                current_user={"id": str(uuid4()), "org_id": str(uuid4())},
+                pool=MagicMock(),
+            )
+
+    # And the source carries no short 4-tuple return that could bypass the raise.
+    src = (APP_DIR / "services" / "run_producer.py").read_text(encoding="utf-8")
+    assert "return None, None, None, None\n" not in src.replace("\r\n", "\n"), (
+        "a 4-tuple return survives in run_producer.py — every arm must be five wide"
     )
