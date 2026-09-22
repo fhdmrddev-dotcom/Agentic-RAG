@@ -1,50 +1,28 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import {
   AlertCircle,
-  BarChart3,
-  BookOpen,
-  Briefcase,
   Check,
-  Cpu,
-  Database,
   Edit2,
   FileCode,
-  FileText,
   Lock,
   Plus,
-  Scale,
   Search,
   Shield,
   Sparkles,
-  Terminal,
   Trash2,
-  Truck,
   Users,
 } from "lucide-react"
 
 import type { ExpertBundle } from "@/types"
 import { deleteExpert, listExperts } from "@/lib/api/experts"
 import { ExpertAuthoringStudio } from "@/components/experts/ExpertAuthoringStudio"
+import { ExpertIcon } from "@/components/experts/expertIcon"
 import { cn } from "@/lib/utils"
 
-const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
-  chart: BarChart3,
-  scale: Scale,
-  shield: Shield,
-  briefcase: Briefcase,
-  truck: Truck,
-  terminal: Terminal,
-  cpu: Cpu,
-  database: Database,
-  book: BookOpen,
-  "file-text": FileText,
-  sparkles: Sparkles,
-}
-
-function renderExpertIcon(iconName?: string, className = "h-5 w-5") {
-  const IconComp = (iconName && ICON_MAP[iconName]) ? ICON_MAP[iconName] : Sparkles
-  return <IconComp className={className} />
-}
+// Phase 262 (D-262-06): `ICON_MAP` + `renderExpertIcon` MOVED VERBATIM to
+// `@/components/experts/expertIcon`. This was the only correct reader of the `icon` column in
+// the repository, and two chat surfaces were guessing from `slug`/`name` instead — so the map
+// became the one home rather than being deleted. Rendered output here is unchanged.
 
 export function OrgExpertsTab() {
   const [experts, setExperts] = useState<ExpertBundle[]>([])
@@ -212,7 +190,7 @@ export function OrgExpertsTab() {
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-3">
                       <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary ring-1 ring-primary/20">
-                        {renderExpertIcon(exp.icon, "h-5 w-5")}
+                        <ExpertIcon icon={exp.icon} className="h-5 w-5" />
                       </div>
                       <div>
                         <h3 className="font-semibold text-foreground text-sm leading-snug">
