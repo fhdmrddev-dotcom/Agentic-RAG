@@ -12,7 +12,7 @@
  * is a `useState<ActiveView>` switch (App.tsx). The Workflows icon is a
  * DISTINCT non-gear lucide glyph (`Workflow`, NOT `Settings`) per REQ-7.
  */
-import { MessageSquare, FileText, Zap, Settings, Workflow, Wand2, Plug, Sparkles } from "lucide-react"
+import { MessageSquare, FileText, Zap, Settings, Workflow, Wand2, Plug, GraduationCap } from "lucide-react"
 import type { ActiveView } from "@/App"
 import type { GovernedFeature, EffectiveFeatures } from "@/lib/api"
 
@@ -94,9 +94,21 @@ export const NAV_ITEMS: readonly NavItem[] = [
   // fail-OPEN since 2026-09-09 for exactly this reason: the API is the wall, and the catalog
   // renders the server's own refusal sentence rather than vanishing its own door.
   //
-  // ⚠ The glyph is `Sparkles`, the same one the composer's invite door and the Expert card
-  // face already carry, so one mark means one thing across every surface an Expert appears on.
-  { view: "experts", icon: Sparkles, label: "Experts" },
+  // ⚠ THE GLYPH WAS `Sparkles` AND THAT REASONING IS RETIRED DELIBERATELY, not dropped. It read:
+  // "the same one the composer's invite door and the Expert card face already carry, so one mark
+  // means one thing across every surface an Expert appears on." The PRINCIPLE was right and is
+  // kept — what was wrong is that `Sparkles` could not carry it, because it means two things at
+  // once: it is ALSO `ExpertIcon`'s fallback (`expertIcon.tsx`), so an Expert that never chose an
+  // icon wore the identical mark to the HOME that contains it. A container and its least-specific
+  // member are not one thing.
+  //
+  // `GraduationCap` is the mark for "Experts, the place" — a credentialed domain specialist,
+  // unused by the other seven entries and ⛔ deliberately NOT one of `EXPERT_ICON_MAP`'s eleven
+  // keys, so a card can never collide with the door that leads to it. The composer's two Expert
+  // doors move WITH it (`MessageInput.tsx`); one mark still means one thing.
+  // ⛔ `Sparkles` stays in two places ON PURPOSE: `ExpertIcon`'s fallback (an Expert with no icon
+  // of its own) and `ExpertCard`'s "Start Chat" button, where it marks an ACTION, not an Expert.
+  { view: "experts", icon: GraduationCap, label: "Experts" },
   // Phase 148 (VIS-01): governed by `model_management` (Operators-only on the day-one
   // map) — vanishes for a non-operator; the chat model picker (GET /settings/providers)
   // is an ungated Run carve-out (148-05), so chat/run never breaks by hiding Settings.

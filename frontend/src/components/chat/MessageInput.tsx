@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { ArrowUp, ChevronDown, Compass, Cpu, HardDrive, Layers, Paperclip, Plus, Sparkles } from "lucide-react"
+import { ArrowUp, ChevronDown, Compass, Cpu, GraduationCap, HardDrive, Layers, Paperclip, Plus } from "lucide-react"
 // Phase 194.1 Plan 04 (RUN-01 / R1) — the composer's Stop is now the ONE shared
 // `StopControl` every mount renders. The lucide `Square` moved WITH it (it is
 // still the Stop control's mark on every variant, D-18); it is dropped from this
@@ -608,7 +608,7 @@ export function MessageInput({
                       }}
                       className="text-xs cursor-pointer gap-2 py-1.5"
                     >
-                      <Sparkles className="h-4 w-4 text-violet-400" />
+                      <GraduationCap className="h-4 w-4 text-violet-400" />
                       <span>Invite Expert...</span>
                     </DropdownMenuItem>
                     {/* Phase 262 plan 05 (PACK-11) — the SECOND door into the Expert catalog.
@@ -628,7 +628,7 @@ export function MessageInput({
                         }}
                         className="text-xs cursor-pointer gap-2 py-1.5"
                       >
-                        <Sparkles className="h-4 w-4 text-violet-400" />
+                        <GraduationCap className="h-4 w-4 text-violet-400" />
                         <span>Browse Expert Catalog…</span>
                       </DropdownMenuItem>
                     )}
