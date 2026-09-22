@@ -22,6 +22,24 @@
   file was `backend/app/services/tool_dispatcher.py`. The PostToolUse hook fires on every edit
   in this worktree. Not this plan's; unchanged from 264-01's finding.
 
+  ⛔ **CONFIRMED AT THE PHASE'S CLOSE (`264-04`) AND PROVEN INHERITED BY MEASUREMENT, NOT BY
+  REPETITION.** `git diff --stat e9d6a9410..HEAD -- frontend/` over the phase's WHOLE range is
+  **EMPTY** — Phase 264 modified zero frontend source in four plans — and the drift output is
+  byte-for-byte the one 264-01 recorded. **Owner:** whoever owns the landing canvas (261 / 263
+  shipped the `Experts` tab; `facts.ts` was never mirrored). **Trigger:** the next phase whose
+  `files_modified` names `frontend/src/lib/landing/facts.ts` or `OrgAdminShell.tsx`.
+
+## From 264-04 — the frontend count gate's figures in CLAUDE.md are the EIGHTH rot
+
+- **Re-derived at 264's close** (repo root, `GSD_VITEST_MAX_WORKERS=2`, verdict line verbatim):
+  `total 8676 · failed 0 · pinned total 7935`, `316/316 pinned files present`. CLAUDE.md read
+  `8500 / 7746 / 297`, measured **one day earlier** at Phase 262.
+
+  ✅ **RECORDED IN CLAUDE.md by `264-04`, beside the original**, per that file's own standing rule.
+  ⛔ Registered here too because of the unusual part: **Phase 264 touched ZERO frontend source**,
+  so this rot belongs to 263's landing and the figure was already stale when 264 started. *A figure
+  can rot without anybody editing the thing it measures.* Nothing further is owed by this phase.
+
 ## From 264-03 — a PROSE correction owed in two registers (`.or_()` applications: six → SEVEN)
 
 > ✅ **TAKEN by `264-04` (commit `docs(264-04)`), in both registers, in one commit.** The
