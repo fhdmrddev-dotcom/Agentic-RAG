@@ -56,12 +56,16 @@ async def test_union_scope_composition_default_biased():
          patch("app.services.expert_service.resolve_expert_bundle", AsyncMock(return_value=resolved_bundle)), \
          patch("app.utils.folder_utils.fetch_visible_folders", AsyncMock(return_value=all_folders)):
 
-        eff_folders, eff_tools, skill_cat, scoped_path = await _resolve_thread_scoping(
+        eff_folders, eff_tools, skill_cat, scoped_path, born_for = await _resolve_thread_scoping(
             supabase=mock_supabase,
             thread_id=thread_id,
             current_user={"id": user_id, "org_id": org_id},
             pool=MagicMock(),
         )
+
+        # Phase 264 (PACK-17 / T-264-01) - the fifth element is the ACCESS-CHECKED
+        # ResolvedExpertBundle.bundle_id, never the thread row's raw active_expert_id.
+        assert born_for == expert_id
 
         assert eff_folders is not None
         # Must contain both thread subfolders AND expert folder
@@ -110,12 +114,16 @@ async def test_strict_isolation_restricted_mode():
          patch("app.services.expert_service.resolve_expert_bundle", AsyncMock(return_value=resolved_bundle)), \
          patch("app.utils.folder_utils.fetch_visible_folders", AsyncMock(return_value=all_folders)):
 
-        eff_folders, eff_tools, skill_cat, scoped_path = await _resolve_thread_scoping(
+        eff_folders, eff_tools, skill_cat, scoped_path, born_for = await _resolve_thread_scoping(
             supabase=mock_supabase,
             thread_id=thread_id,
             current_user={"id": user_id, "org_id": org_id},
             pool=MagicMock(),
         )
+
+        # Phase 264 (PACK-17 / T-264-01) - the fifth element is the ACCESS-CHECKED
+        # ResolvedExpertBundle.bundle_id, never the thread row's raw active_expert_id.
+        assert born_for == expert_id
 
         assert eff_folders is not None
         # Thread folder is strictly EXCLUDED
@@ -155,12 +163,16 @@ async def test_additive_tool_floor_preserves_deliverable_tools():
     with patch("app.utils.db.aexec", AsyncMock(return_value=mock_t_resp)), \
          patch("app.services.expert_service.resolve_expert_bundle", AsyncMock(return_value=resolved_with_floor)):
 
-        eff_folders, eff_tools, skill_cat, scoped_path = await _resolve_thread_scoping(
+        eff_folders, eff_tools, skill_cat, scoped_path, born_for = await _resolve_thread_scoping(
             supabase=mock_supabase,
             thread_id=thread_id,
             current_user={"id": user_id, "org_id": org_id},
             pool=MagicMock(),
         )
+
+        # Phase 264 (PACK-17 / T-264-01) - the fifth element is the ACCESS-CHECKED
+        # ResolvedExpertBundle.bundle_id, never the thread row's raw active_expert_id.
+        assert born_for == expert_id
 
         assert eff_tools is not None
         tool_set = set(eff_tools)
@@ -194,12 +206,16 @@ async def test_additive_tool_floor_preserves_deliverable_tools():
     with patch("app.utils.db.aexec", AsyncMock(return_value=mock_t_resp)), \
          patch("app.services.expert_service.resolve_expert_bundle", AsyncMock(return_value=resolved_without_floor)):
 
-        eff_folders, eff_tools, skill_cat, scoped_path = await _resolve_thread_scoping(
+        eff_folders, eff_tools, skill_cat, scoped_path, born_for = await _resolve_thread_scoping(
             supabase=mock_supabase,
             thread_id=thread_id,
             current_user={"id": user_id, "org_id": org_id},
             pool=MagicMock(),
         )
+
+        # Phase 264 (PACK-17 / T-264-01) - the fifth element is the ACCESS-CHECKED
+        # ResolvedExpertBundle.bundle_id, never the thread row's raw active_expert_id.
+        assert born_for == expert_id
 
         assert eff_tools is not None
         tool_set = set(eff_tools)

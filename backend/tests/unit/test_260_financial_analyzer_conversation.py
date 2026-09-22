@@ -349,13 +349,15 @@ async def test_resolve_thread_scoping_derives_expert_core_tools():
 
     with patch("app.utils.db.aexec", side_effect=mock_aexec), \
          patch("app.services.expert_service.resolve_expert_bundle", new_callable=AsyncMock, return_value=resolved):
-        folders, tools, skills, _scoped_path = await _resolve_thread_scoping(
+        # Phase 264 (PACK-17 / D-264-03a) — five-wide since the born-for carrier landed.
+        folders, tools, skills, _scoped_path, born_for = await _resolve_thread_scoping(
             supabase=mock_supabase,
             thread_id="test-thread-ok",
             current_user={"id": "00000000-0000-0000-0000-000000000001", "org_id": "430bffc6-7275-499b-b307-d932b4750051"},
             pool=MagicMock(),
         )
 
+        assert born_for == UUID("00000000-0000-0000-0000-000000000260")
         assert folders == (FINANCIAL_FOLDER_ID,)
         assert set(EXPERT_CORE_TOOLS).issubset(set(tools))
         assert "slack_notify" in tools

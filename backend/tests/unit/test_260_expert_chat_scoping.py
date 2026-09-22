@@ -71,14 +71,18 @@ def test_thread_models_carry_active_expert_id():
 
 @pytest.mark.asyncio
 async def test_resolve_thread_scoping_no_expert():
-    """PACK-02 / EXT-01: When thread has no active_expert_id, scoping returns (None, None, None)."""
+    """PACK-02 / EXT-01: When thread has no active_expert_id, scoping returns all-None.
+
+    Phase 264 (PACK-17 / D-264-03a): the tuple is five wide since the born-for carrier landed;
+    the fifth element is the access-checked Expert bundle id and is None on the no-expert arm.
+    """
     mock_supabase = MagicMock()
     mock_query = MagicMock()
     mock_query.execute.return_value = MagicMock(data={"active_expert_id": None})
     mock_supabase.table.return_value.select.return_value.eq.return_value.maybe_single.return_value = mock_query
     mock_pool = MagicMock()
 
-    folders, tools, skills, scoped_path = await _resolve_thread_scoping(
+    folders, tools, skills, scoped_path, born_for = await _resolve_thread_scoping(
         supabase=mock_supabase,
         thread_id=str(uuid4()),
         current_user={"id": str(uuid4()), "org_id": str(uuid4())},
@@ -89,6 +93,9 @@ async def test_resolve_thread_scoping_no_expert():
     assert tools is None
     assert skills is None
     assert scoped_path is None
+    # Phase 264 (PACK-17 / D-264-03a) — the no-expert arm yields a None born-for
+    # bundle id, so the carrier is a literal no-op on every Deep run.
+    assert born_for is None
 
 
 @pytest.mark.asyncio
@@ -119,13 +126,16 @@ async def test_resolve_thread_scoping_with_active_expert():
     with patch("app.services.expert_service.resolve_expert_bundle", new_callable=AsyncMock) as mock_resolve:
         mock_resolve.return_value = resolved_bundle
 
-        folders, tools, skills, scoped_path = await _resolve_thread_scoping(
+        folders, tools, skills, scoped_path, born_for = await _resolve_thread_scoping(
             supabase=mock_supabase,
             thread_id=str(uuid4()),
             current_user={"id": str(uuid4()), "org_id": str(uuid4())},
             pool=mock_pool,
         )
 
+        # Phase 264 (PACK-17 / T-264-01) — the fifth element is the ACCESS-CHECKED
+        # ResolvedExpertBundle.bundle_id, not the raw thread row's active_expert_id.
+        assert born_for == expert_id
         assert folders == (str(folder_id),)
         assert "search_documents" in tools
         assert "load_skill" in tools
