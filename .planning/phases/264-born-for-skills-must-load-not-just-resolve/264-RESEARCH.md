@@ -888,3 +888,35 @@ filter than the primary query. §8.8's reuse fence is the control.
 **Research date:** 2026-09-22
 **Valid until:** ~7 days. Three of the six triples were already stale when this was written; the two
 `run_producer` line numbers moved between 261 and 263. **Re-derive, do not quote.**
+
+---
+
+## ⚠ CORRECTED AT WAVE 1's CLOSE (2026-09-22, plan `264-01`) — two §-level claims measured wrong
+
+Both originals are left in place above rather than overwritten, because in this project a figure
+that rots is the finding, not an embarrassment.
+
+**§2.8's arity prediction is OFF BY ONE.** The ten unpack sites are only **NINE node ids** —
+`test_261_expert_runtime_scoping.py::test_additive_tool_floor_preserves_deliverable_tools` unpacks
+**twice inside one test**. So the RED moved the gate `71 → 80`, not the predicted `81`. **All ten
+sites were real and all ten were updated**; only the count was wrong. A later plan quoting `81` as
+a target would chase a number that cannot occur.
+
+**§8.3 is REFUTED, measured at the base.** It argues the new field "must be hashable" because
+`RunContext` is frozen. ⛔ **`RunContext` instances have been UNHASHABLE since Phase 260** —
+`current_user: dict`. Driven against the base copy of `agent_loop.py`: `hash(ctx)` raises
+`TypeError: unhashable type: 'dict'`. ⭐ **No code change was needed: the premise was wrong, not the
+implementation.** The *discipline* survives — the fence now pins frozen-ness (+`FrozenInstanceError`)
+and field-type hashability, and §8.3's original wording is preserved in that test's docstring.
+
+**⛔ A PROCESS FINDING WORTH MORE THAN EITHER.** Wave 1's Task-2 gate read **`72 failed`** with one
+new id in `test_256_llm_emit_rollup.py`. Cause: a planted defect was written into `phase_types.py`
+**while that gate was already running.** That test uses `inspect.getsource`, which re-reads the file
+by recorded line number — a plant inserting a line *above* the target shifted what it read and
+returned an unrelated function body. **Never mutate source while a gate runs, even for a plant you
+intend to revert.** Smaller sibling: interleaved stderr can append text to a `FAILED` line
+mid-capture, so a raw `comm` reports one test as both NEW and GONE — **diff the node id, never the
+printed line.**
+
+**Wave 1's closing measurement:** `71 failed, 5436 passed, 2 xfailed, 2 xpassed`; FAILED node-id
+set-diff **empty in both directions** (71/71).
