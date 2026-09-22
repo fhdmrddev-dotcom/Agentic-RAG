@@ -47,6 +47,10 @@ import { useSourceAttention } from "@/hooks/useSourceAttention"
 import { IngestionPauseBanner } from "@/components/ingestion/IngestionPauseBanner"
 import { IngestionBatchLane } from "@/components/ingestion/IngestionBatchLane"
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber"
+import { PaginationControls } from "@/components/health/PaginationControls"
+
+/** BUG-260923-02 — History rows per page. The list is already client-side; this pages it. */
+const HISTORY_PAGE_SIZE = 25
 import {
   cardForStage,
   PIPELINE_CARDS,
@@ -155,6 +159,17 @@ export function IngestionTab({
 
   // Completed + failed for the History tab.
   const historyDocs = documents.filter((d) => d.status === "completed" || d.status === "failed")
+  // BUG-260923-02 — History paged, newest first. Sorted into a COPY (the old code sorted the
+  // filtered array in place during render). A shrinking list clamps the page back into range.
+  const [historyOffset, setHistoryOffset] = useState(0)
+  const historySorted = [...historyDocs].sort(
+    (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
+  )
+  const historyStart =
+    historyOffset >= historySorted.length
+      ? Math.max(0, Math.floor((historySorted.length - 1) / HISTORY_PAGE_SIZE) * HISTORY_PAGE_SIZE)
+      : historyOffset
+  const historyPage = historySorted.slice(historyStart, historyStart + HISTORY_PAGE_SIZE)
   const inFlight = documents.filter((d) => d.status === "pending" || d.status === "processing" || d.status === "paused")
   const completedDocs = documents.filter((d) => d.status === "completed")
   const failed = documents.filter((d) => d.status === "failed")
@@ -415,11 +430,7 @@ export function IngestionTab({
                     </tr>
                   </thead>
                   <tbody>
-                    {historyDocs
-                      .sort(
-                        (a, b) =>
-                          new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
-                      )
+                    {historyPage
                       .map((doc) => (
                         <tr key={doc.id} className="border-b border-border/50">
                           <td className="px-4 py-3 max-w-[300px] truncate" title={doc.filename}>
@@ -446,6 +457,14 @@ export function IngestionTab({
                       ))}
                   </tbody>
                 </table>
+                {historySorted.length > HISTORY_PAGE_SIZE && (
+                  <PaginationControls
+                    offset={historyStart}
+                    limit={HISTORY_PAGE_SIZE}
+                    total={historySorted.length}
+                    onChange={setHistoryOffset}
+                  />
+                )}
               </div>
             )}
           </div>

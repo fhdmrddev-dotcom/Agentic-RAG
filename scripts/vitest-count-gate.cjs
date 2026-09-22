@@ -3497,7 +3497,7 @@ const BASELINE = {
   // trailing orphans close 217's deferred-§3 re-open trigger.
   "sketchComposition.test.tsx": 47,
   "ingestionFailureCopy.test.ts": 25,
-  "IngestionTab.test.tsx": 40,
+  "IngestionTab.test.tsx": 42, // +2 BUG-260923-02 History paging
   "pipelineGroups.test.ts": 7,
   "LibraryStatTiles.test.tsx": 13,
   "viewRulePhrase.test.ts": 4,
@@ -3505,8 +3505,8 @@ const BASELINE = {
   "IndexFoldersTable.test.tsx": 6,
   "IndexingTab.gate.test.tsx": 6,
   "HealthTiles.test.tsx": 6,
-  "HealthSignalChips.test.tsx": 13,
-  "CheckedQueriesSection.test.tsx": 11,
+  "HealthSignalChips.test.tsx": 14, // +1 BUG-260923-02 stale paging
+  "CheckedQueriesSection.test.tsx": 12, // +1 BUG-260923-02 paging
   "ChatLayout.fallback.test.tsx": 4,
   "DocumentQueriesSection.test.tsx": 8,
   "FilterBar.test.tsx": 10,
