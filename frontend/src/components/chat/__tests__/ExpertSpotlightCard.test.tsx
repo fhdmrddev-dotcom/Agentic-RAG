@@ -117,10 +117,10 @@ describe("ExpertSpotlightCard (Phase 260 / PACK-03 / D-260-06 — retired at 262
     expect(screen.queryByText("ratio_calculator")).toBeNull()
   })
 
-  it("THE RETIREMENT — two folders read \"2 Folders\" and a skill-less Expert reads \"domain_tools\"", () => {
-    // REPLACES: nothing directly — it proves the arms the retirement now ALWAYS takes are the
-    // ones that were previously unreachable for any Expert the string-match caught. Without
-    // this, the count/first-skill branches would be pinned on one shape only.
+  it("THE RETIREMENT — two folders read \"2 Folders\" and a skill-less Expert shows NO skill chip", () => {
+    // ⚠ CORRECTED (262-UAT R.3): this case used to assert `getByText("domain_tools")` — it
+    // PINNED an invented skill name as correct behaviour. Driven live, an Expert with no skills
+    // showed a `domain_tools` chip while the detail modal and the admin tab said 0 skills.
     const twoFolders: ExpertBundle = {
       ...mockFinancialExpert,
       knowledge_folder_ids: ["a", "b"],
@@ -129,7 +129,22 @@ describe("ExpertSpotlightCard (Phase 260 / PACK-03 / D-260-06 — retired at 262
     render(<ExpertSpotlightCard expert={twoFolders} onSelectPrompt={vi.fn()} />)
 
     expect(screen.getByText("2 Folders")).toBeInTheDocument()
-    expect(screen.getByText("domain_tools")).toBeInTheDocument()
+    expect(screen.queryByText("domain_tools")).toBeNull()
+    expect(screen.queryByTestId("expert-spotlight-skill-chip")).toBeNull()
+  })
+
+  it("262-UAT R.3 — an Expert with ZERO folders and ZERO skills states neither, and never '1 Folders'", () => {
+    // Driven live: `knowledge_folder_ids?.length || 1` turned 0 into "1 Folders".
+    const bare: ExpertBundle = {
+      ...mockFinancialExpert,
+      knowledge_folder_ids: [],
+      member_skills: [],
+    }
+    render(<ExpertSpotlightCard expert={bare} onSelectPrompt={vi.fn()} />)
+
+    expect(screen.queryByText(/\d+ Folders?/)).toBeNull()
+    expect(screen.queryByTestId("expert-spotlight-folder-chip")).toBeNull()
+    expect(screen.queryByTestId("expert-spotlight-skill-chip")).toBeNull()
   })
 
   it("THE RETIREMENT — an Expert that authored no prompts gets ONE honest tile, not three invented ones", () => {

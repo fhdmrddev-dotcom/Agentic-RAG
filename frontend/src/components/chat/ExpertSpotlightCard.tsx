@@ -99,12 +99,16 @@ export function ExpertSpotlightCard({
   // ⛔ The folder pill stays a COUNT on purpose. This is a hero summary; the folder NAMES are
   // PACK-12's job in the detail modal (plan 04), where an id that cannot be resolved needs an
   // honest "a folder you cannot see" state rather than a blank.
-  const folderLabel = `${expert.knowledge_folder_ids?.length || 1} Folder${expert.knowledge_folder_ids?.length === 1 ? "" : "s"}`
+  //
+  // ⚠ CORRECTED (262-UAT R.3): both labels still had a FALLBACK that invented a fact —
+  // `length || 1` turned zero folders into "1 Folders", and a skill-less Expert got a
+  // `domain_tools` chip. An absent binding now renders no chip at all.
+  const folderCount = expert.knowledge_folder_ids?.length ?? 0
+  const folderLabel =
+    folderCount > 0 ? `${folderCount} Folder${folderCount === 1 ? "" : "s"}` : null
 
   const skillLabel =
-    expert.member_skills && expert.member_skills.length > 0
-      ? expert.member_skills[0]
-      : "domain_tools"
+    expert.member_skills && expert.member_skills.length > 0 ? expert.member_skills[0] : null
 
   return (
     <div
@@ -140,16 +144,28 @@ export function ExpertSpotlightCard({
             </div>
 
             {/* Visual scope badges without lecturing prose */}
-            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-              <span className="inline-flex items-center gap-1 bg-white/5 border border-white/10 text-muted-foreground text-[11px] rounded-full px-2.5 py-0.5 font-medium">
-                <Folder className="h-3 w-3 text-violet-400" />
-                {folderLabel}
-              </span>
-              <span className="inline-flex items-center gap-1 bg-white/5 border border-white/10 text-muted-foreground text-[11px] rounded-full px-2.5 py-0.5 font-medium font-mono">
-                <Wrench className="h-3 w-3 text-violet-400" />
-                {skillLabel}
-              </span>
-            </div>
+            {(folderLabel || skillLabel) && (
+              <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                {folderLabel && (
+                  <span
+                    data-testid="expert-spotlight-folder-chip"
+                    className="inline-flex items-center gap-1 bg-white/5 border border-white/10 text-muted-foreground text-[11px] rounded-full px-2.5 py-0.5 font-medium"
+                  >
+                    <Folder className="h-3 w-3 text-violet-400" />
+                    {folderLabel}
+                  </span>
+                )}
+                {skillLabel && (
+                  <span
+                    data-testid="expert-spotlight-skill-chip"
+                    className="inline-flex items-center gap-1 bg-white/5 border border-white/10 text-muted-foreground text-[11px] rounded-full px-2.5 py-0.5 font-medium font-mono"
+                  >
+                    <Wrench className="h-3 w-3 text-violet-400" />
+                    {skillLabel}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         </div>
 

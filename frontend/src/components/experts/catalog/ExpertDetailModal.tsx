@@ -145,9 +145,9 @@ export function ExpertDetailModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl gap-0 rounded-2xl border-border/80 bg-card/95 p-0 shadow-2xl backdrop-blur-md">
+      <DialogContent className="flex max-h-[90vh] max-w-2xl flex-col gap-0 rounded-2xl border-border/80 bg-card/95 p-0 shadow-2xl backdrop-blur-md">
         {/* ── header: gem · name · scope badge · meta line ── */}
-        <DialogHeader className="space-y-2 border-b border-border/60 p-6 pb-5">
+        <DialogHeader className="shrink-0 space-y-2 border-b border-border/60 p-6 pb-5">
           <div className="flex items-start gap-3.5 pr-8">
             <div className="flex h-12 w-12 flex-none items-center justify-center rounded-xl bg-gradient-to-br from-violet-500/20 to-indigo-500/20 text-violet-200 ring-1 ring-violet-500/30">
               <ExpertIcon icon={expert.icon} className="h-6 w-6" />
@@ -177,12 +177,12 @@ export function ExpertDetailModal({
               </p>
             </div>
           </div>
-          <DialogDescription className="text-left text-xs text-muted-foreground">
+          <DialogDescription className="max-h-[20vh] overflow-y-auto text-left text-xs text-muted-foreground">
             {description || HONEST.noDescription}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="max-h-[60vh] space-y-5 overflow-y-auto p-6">
+        <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-6">
           {/* ── 1 · what the scope mode MEANS for this Expert, in plain words ── */}
           <section>
             <SectionTitle>Knowledge Composition</SectionTitle>
@@ -323,7 +323,7 @@ export function ExpertDetailModal({
         </div>
 
         {/* ── footer: exactly two controls ── */}
-        <div className="flex items-center justify-end gap-2 border-t border-border/60 p-4">
+        <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border/60 p-4">
           <button
             type="button"
             onClick={() => onOpenChange(false)}
