@@ -24,6 +24,34 @@ ONE_MILLION = Decimal("1000000")
 QUANTIZE_FOUR_PLACES = Decimal("0.0001")
 
 
+def cost_usd_sql(runs_alias: str = "r", rate_alias: str = "rate") -> str:
+    """The SQL spelling of ``compute_token_cost_usd`` — generated HERE, beside the Python one.
+
+    257 F-13 / METER-02: aggregate queries in ``db/rates.py`` must price rows inside
+    Postgres, so the conversion has two spellings. They used to be two HOMES — the
+    expression was hand-written four times in ``rates.py`` — so a change to one could not
+    reach the others. Now both spellings live in this module, built from the same
+    ``ONE_MILLION`` / ``QUANTIZE_FOUR_PLACES`` constants, and
+    ``test_257_single_token_conversion_home.py`` fails if the arithmetic reappears in any
+    other file. Semantics match the Python arms exactly: no rate → NULL (unrated, never
+    $0.00); no tokens recorded → NULL; else ROUND(total, 4) — Postgres numeric ROUND is
+    half-up, like ``ROUND_HALF_UP``.
+    """
+    places = -QUANTIZE_FOUR_PLACES.as_tuple().exponent
+    divisor = f"{ONE_MILLION}.0"
+    r, rt = runs_alias, rate_alias
+    return (
+        f"CASE"
+        f" WHEN {rt}.input_cost_per_million IS NULL THEN NULL"
+        f" WHEN {r}.input_tokens IS NULL AND {r}.output_tokens IS NULL THEN NULL"
+        f" ELSE ROUND("
+        f"(COALESCE({r}.input_tokens, 0) * {rt}.input_cost_per_million / {divisor}) + "
+        f"(COALESCE({r}.output_tokens, 0) * {rt}.output_cost_per_million / {divisor}), "
+        f"{places})"
+        f" END"
+    )
+
+
 @dataclass(frozen=True)
 class ModelRate:
     """Effective-dated rate definition for a model."""

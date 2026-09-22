@@ -15,9 +15,11 @@ import pytest
 
 APP_DIR = pathlib.Path(__file__).resolve().parent.parent.parent / "app"
 
+# ⚠ `db/rates.py` WAS ALSO ALLOWLISTED HERE until 2026-09-23, and that allowlist is how F-13
+# hid: the SQL expression was hand-written FOUR times inside it and nothing could fire. It now
+# interpolates `pricing_service.cost_usd_sql()` and holds no arithmetic, so it is no longer a home.
 ALLOWED_HOMES = {
     pathlib.Path("services") / "pricing_service.py",
-    pathlib.Path("db") / "rates.py",
 }
 
 FORBIDDEN_FUNCTION_NAMES = {
@@ -174,3 +176,75 @@ def test_no_external_token_to_usd_conversion_homes():
                             )
 
     assert not violations, "METER-02 AST single-home fence violated:\n" + "\n".join(violations)
+
+
+# ── 257 F-13 — the SQL spelling has ONE home too ──────────────────────────────────────
+# The AST detector above cannot see SQL inside a string, which is exactly why four copies
+# of the conversion lived in db/rates.py while this file stayed green. This scan reads
+# every .py under app/ as TEXT and fails on the SQL arithmetic anywhere but its home.
+import re as _re
+
+_SQL_CONVERSION = _re.compile(r"_cost_per_million\s*/\s*[0-9]")
+
+
+def test_sql_token_conversion_is_written_only_in_pricing_service():
+    offenders = []
+    for path in APP_DIR.rglob("*.py"):
+        rel = path.relative_to(APP_DIR)
+        if rel in ALLOWED_HOMES:
+            continue
+        for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            if _SQL_CONVERSION.search(line):
+                offenders.append(f"{rel}:{n}: {line.strip()}")
+    assert not offenders, "SQL token->USD conversion outside pricing_service: " + " | ".join(offenders)
+
+
+def test_sql_spelling_is_built_from_the_python_constants():
+    from app.services import pricing_service as ps
+
+    sql = ps.cost_usd_sql()
+    assert f"/ {ps.ONE_MILLION}.0" in sql
+    assert sql.rstrip().endswith(f"{-ps.QUANTIZE_FOUR_PLACES.as_tuple().exponent}) END")
+    assert "IS NULL THEN NULL" in sql  # unrated / unmeasured are NULL, never 0
+
+
+_PARITY_CASES = [
+    (1234, 5678, "2.50", "10.00"),
+    (0, 0, "3.00", "15.00"),
+    (None, 999_999, "0.15", "0.60"),
+    (7, None, "1.25", "5.00"),
+    (None, None, "3.00", "15.00"),       # unmeasured -> NULL
+    (50, 50, None, None),                # unrated -> NULL
+    (333_333, 1, "0.0015", "0.0045"),    # rounding boundary
+]
+
+
+@pytest.mark.asyncio
+async def test_sql_and_python_spellings_agree_in_postgres():
+    """Parity bridge: evaluate the generated SQL in real Postgres against the Python arm."""
+    asyncpg = pytest.importorskip("asyncpg")
+    from decimal import Decimal
+    from datetime import datetime, timezone
+    from app.services import pricing_service as ps
+
+    try:
+        conn = await asyncpg.connect("postgresql://postgres:postgres@127.0.0.1:54322/postgres", timeout=3)
+    except Exception:  # noqa: BLE001
+        pytest.skip("local Postgres not reachable on :54322")
+    try:
+        for it, ot, ir, orr in _PARITY_CASES:
+            sql = (
+                "SELECT " + ps.cost_usd_sql() + " FROM (SELECT $1::bigint AS input_tokens, "
+                "$2::bigint AS output_tokens) r, (SELECT $3::numeric AS input_cost_per_million, "
+                "$4::numeric AS output_cost_per_million) rate"
+            )
+            got = await conn.fetchval(sql, it, ot, ir, orr)
+            rate = None if ir is None else ps.ModelRate(
+                model_id="m", input_cost_per_million=Decimal(ir),
+                output_cost_per_million=Decimal(orr),
+                effective_from=datetime.now(timezone.utc),
+            )
+            want = ps.compute_token_cost_usd(it, ot, rate).cost_usd
+            assert (got is None and want is None) or Decimal(got) == want, (it, ot, ir, orr, got, want)
+    finally:
+        await conn.close()
