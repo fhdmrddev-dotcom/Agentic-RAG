@@ -196,3 +196,24 @@ describe("HealthDocumentBars", () => {
     expect(text.toLowerCase()).not.toContain("reindex")
   })
 })
+// ── BUG-260923-02 — stale documents were TRUNCATED at 50 under the full count ────────────
+describe("HealthDocumentBars — paged through the server (BUG-260923-02)", () => {
+  it("fetches the next page from the server and says where you are", async () => {
+    const TOTAL = 45
+    mockStaleDocs.mockImplementation(async (offset: number, limit: number) => ({
+      items: Array.from({ length: Math.min(limit, TOTAL - offset) }, (_, i) => ({
+        document_id: `d-${offset + i}`,
+        filename: `stale-${String(offset + i).padStart(2, "0")}.pdf`,
+        folder_id: null,
+      })),
+      total: TOTAL,
+    }))
+    const { fireEvent } = await import("@testing-library/react")
+    render(<HealthDocumentBars />)
+    expect(await screen.findByText("Showing 1–20 of 45")).toBeInTheDocument()
+    fireEvent.click(screen.getByRole("button", { name: /Next/ }))
+    expect(await screen.findByText("Showing 21–40 of 45")).toBeInTheDocument()
+    expect(screen.getByText("stale-20.pdf")).toBeInTheDocument()
+    expect(mockStaleDocs).toHaveBeenLastCalledWith(20, 20)
+  })
+})

@@ -11,6 +11,10 @@ import { useEffect, useState } from "react"
 import { HealthDocumentRow } from "@/components/health/HealthDocumentRow"
 import { getStaleDocs } from "@/lib/api"
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber"
+import { PaginationControls } from "@/components/health/PaginationControls"
+
+/** BUG-260923-02 — one page of stale documents (the endpoint pages; it used to be read once, 50 rows). */
+const STALE_PAGE_SIZE = 20
 
 interface DocumentHealthItem {
   document_id: string
@@ -46,11 +50,14 @@ export function HealthDocumentBars() {
   const [items, setItems] = useState<DocumentHealthItem[]>([])
   const [loading, setLoading] = useState(true)
   const [total, setTotal] = useState(0)
+  // BUG-260923-02 — the list used to fetch (0, 50) once and render at most 50 under a header
+  // naming the full total, so documents past the 50th were unreachable. It now pages through
+  // the server. `loading` is the FIRST load only (the skeleton); a page change keeps the list.
+  const [offset, setOffset] = useState(0)
 
   useEffect(() => {
     let cancelled = false
-    setLoading(true)
-    getStaleDocs(0, 50)
+    getStaleDocs(offset, STALE_PAGE_SIZE)
       .then((res) => {
         if (cancelled) return
         // Build the list from the stale response
@@ -69,7 +76,7 @@ export function HealthDocumentBars() {
         if (!cancelled) setLoading(false)
       })
     return () => { cancelled = true }
-  }, [])
+  }, [offset])
 
   if (loading) {
     return (
@@ -103,7 +110,7 @@ export function HealthDocumentBars() {
         </p>
       ) : (
         <div className="divide-y divide-border/30">
-          {staleItems.slice(0, 50).map((doc) => (
+          {staleItems.map((doc) => (
             <HealthDocumentRow
               key={doc.document_id}
               doc={doc}
@@ -112,6 +119,9 @@ export function HealthDocumentBars() {
             />
           ))}
         </div>
+      )}
+      {total > STALE_PAGE_SIZE && (
+        <PaginationControls offset={offset} limit={STALE_PAGE_SIZE} total={total} onChange={setOffset} />
       )}
     </div>
   )

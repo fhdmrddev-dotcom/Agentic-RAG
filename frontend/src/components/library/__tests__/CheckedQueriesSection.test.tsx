@@ -150,3 +150,19 @@ describe("CheckedQueriesSection", () => {
     await waitFor(() => expect(screen.queryByText("What is the retention policy?")).toBeNull())
   })
 })
+// ── BUG-260923-02 — checked queries page past 25 ─────────────────────────────────────────
+describe("CheckedQueriesSection — paged (BUG-260923-02)", () => {
+  it("shows 25 at a time and pages forward", async () => {
+    mockList.mockResolvedValue(
+      Array.from({ length: 30 }, (_, i) =>
+        makeRow({ id: `cq-${i}`, question: `Question number ${String(i).padStart(2, "0")}?` }),
+      ),
+    )
+    render(<CheckedQueriesSection />)
+    expect(await screen.findByText("Showing 1–25 of 30")).toBeInTheDocument()
+    expect(screen.queryByText("Question number 25?")).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole("button", { name: /Next/ }))
+    expect(await screen.findByText("Showing 26–30 of 30")).toBeInTheDocument()
+    expect(screen.getByText("Question number 25?")).toBeInTheDocument()
+  })
+})
