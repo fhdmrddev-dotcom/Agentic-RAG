@@ -82,8 +82,8 @@ _EXPECTED_CALL_COUNTS = {
 # and confirm (a) is green BEFORE touching the set below.
 _EXPECTED_CALL_SITES = {
     # ⚠ RE-DERIVED at Phase 258 Plan 03: +7 line shift in api/workflows.py (import + decorators)
-    #   api/workflows.py:1802 → 1809
-    "api/workflows.py:1809",
+    #   api/workflows.py:1802 → 1809 → 1812 (v4.3 audit: +3 lines, require_capability on authoring writes; the call itself unchanged)
+    "api/workflows.py:1812",
     # ⚠ RE-DERIVED at Phase 256 round 1 (plan 256-05), and the originals are recorded
     # beside the new values rather than over them, because this fence's own docstring
     # asks for exactly that: check (a) — the per-file COUNTS — stayed identical, so no
