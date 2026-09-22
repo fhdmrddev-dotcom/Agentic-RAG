@@ -265,9 +265,9 @@ Per `SEED-294`, stated here because they get harder to unwind as the work compou
 | PACK-08 | Phase 261 — An Expert You Can Author | Pending |
 | PACK-09 | Phase 261 — An Expert You Can Author | Pending |
 | PACK-10 | Phase 261 — An Expert You Can Author | Pending |
-| PACK-11 | Phase 262 — An Expert You Can Discover | Built — verified in code; lived UAT owed |
-| PACK-12 | Phase 262 — An Expert You Can Discover | Built — verified in code; lived UAT owed |
-| PACK-13 | Phase 262 — An Expert You Can Discover | Built — verified in code; lived UAT owed |
+| PACK-11 | Phase 262 — An Expert You Can Discover | Complete — lived UAT 1.4/1.5/1.6 driven with two real sign-ins |
+| PACK-12 | Phase 262 — An Expert You Can Discover | Complete — lived UAT 2.1-2.10 pass |
+| PACK-13 | Phase 262 — An Expert You Can Discover | Complete — lived UAT 3.1-3.6 pass (3.1/3.6 after in-session fixes) |
 | PACK-14 | Phase 263 — An Expert Can Be Given Its Capabilities | Pending |
 | PACK-15 | Phase 263 — An Expert Can Be Given Its Capabilities | Pending |
 | PACK-16 | Phase 263 — An Expert Can Be Given Its Capabilities | Pending |

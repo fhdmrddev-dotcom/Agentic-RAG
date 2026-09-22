@@ -4,7 +4,7 @@ milestone: v4.3
 milestone_name: What You Can Actually Sell
 status: executing
 last_updated: "2026-09-22T00:00:00.000Z"
-last_activity: 2026-09-22 -- Phase 262 BUILT (5/5 plans, 3/3 SC in code); 26 lived-UAT rows owed
+last_activity: 2026-09-23 -- Phase 262 CLOSED: lived UAT 29 pass / 0 open / 1 skipped; 7 defects fixed in-session
 progress:
   total_phases: 17
   completed_phases: 10
@@ -34,7 +34,9 @@ See: `.planning/PROJECT.md` (updated 2026-09-18)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** v4.3 — every phase 255-264 now has code on disk. **Phase 262 was BUILT later on 2026-09-22** (5/5 plans, 3/3 SC verified in code, self-verified); its **26 G-4 lived-UAT rows are owed** before PACK-11/12/13 count as met. Seven operator rulings open.
+**Current focus:** v4.3 — every phase 255-264 is built. **Phase 262 CLOSED 2026-09-23** (lived UAT complete, PACK-11/12/13 met). Next: `/gsd:audit-milestone`. Seven operator rulings still open, plus D-262-10.
+
+~~**Current focus:** v4.3 — every phase 255-264 now has code on disk. **Phase 262 was BUILT later on 2026-09-22** (5/5 plans, 3/3 SC verified in code, self-verified); its **26 G-4 lived-UAT rows are owed** before PACK-11/12/13 count as met. Seven operator rulings open.~~ *(superseded 2026-09-23)*
 
 ~~**Current focus:** v4.3 record repaired 2026-09-22. Phase 264 COMPLETE (4/4 plans, 5/5 SC, 13/13 UAT driven). ⛔ **The milestone CANNOT report 25/25 — Phase 262 was never built** (`BUS-303`). Seven operator rulings open.~~ *(true when written; superseded the same day)*
 
@@ -47,6 +49,24 @@ Plan: 4 of 4 COMPLETE — executed, merged, verified
 Status: Complete; UAT driven 13/13; independent review owed
 Last activity: 2026-09-22 -- Phase 264 UAT driven: 13/13 rows PASS, defect reproduced on the pre-264 tree
 Phase range: e9d6a9410 (base) → e1192b462 (close), on develop
+
+### ⭐ PHASE 262 CLOSED — 2026-09-23
+
+Lived UAT driven (agent via Chrome MCP + DB reads; operator for the member sign-in): **29 pass / 0 open / 1 skipped** (`262-UAT.md`). Every UAT defect was fixed, RED-first, and re-driven live:
+
+| Row | Defect | Commit |
+|---|---|---|
+| 3.1 | detail modal overflowed the viewport; Start Scoped Chat unreachable | `22cc43e7f` |
+| R.3 | spotlight invented "1 Folders" + `domain_tools` (a test PINNED the invention) | `22cc43e7f` |
+| 1.2 | no mobile drawer trigger off the chat view (since Phase 043) | `d0dda94e7` |
+| — | Skills page: 154px list beside an empty 340px rail at phone width | `a525ed3e7` |
+| — | built-in skills logged 3× owner-only 403 per click | `59355f958` |
+| 3.6 | failed start was silent and leaked an empty thread | `43c84e4e7` |
+| 3.5 | folder-limited runs: grep/ls/tree/read/analyze ignored the folder set (from 260) | `e783a30f9` |
+
+⭐ **1.4 first 'passed' VACUOUSLY** — the member session was in its OWN org, where the fixture cannot exist. 1.5 failing with the grant present is what exposed it; re-driven in the right org. Kept in `262-UAT.md`.
+
+⚠ Still owed: independent review (self-verified); D-262-10 (tier refusal renders the raw server sentence in error red); three G-5 overrides recorded below (`OV-262-G5-01..03`) discharge NO owed refactor. Local fixture left in place: `Financial Contracts Reviewer (UAT-262)` (`670479b1…`, granted to the author only).
 
 ### ⭐ PHASE 262 BUILT — 2026-09-22 (supersedes the "never built" finding below, which was TRUE when written)
 

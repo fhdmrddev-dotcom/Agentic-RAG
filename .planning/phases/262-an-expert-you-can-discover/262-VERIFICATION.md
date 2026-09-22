@@ -2,8 +2,8 @@
 phase: 262-an-expert-you-can-discover
 verified: 2026-09-22T22:55:00Z
 verification_mode: self-verified   # OV-SOLO-01 — no independent §6.3 reviewer exists
-status: human_needed
-score: 3/3 success criteria VERIFIED in code; 3 axes of manual G-4 UAT owed
+status: passed
+score: 3/3 success criteria VERIFIED in code AND lived (262-UAT.md 29 pass / 0 open / 1 skipped, 2026-09-23)
 overrides_applied: 0
 human_verification:
   - test: "262-VALIDATION.md rows 1.1-1.8 (PACK-11 lived UAT: rail entry, mobile drawer, composer door, the vanish with two real sign-ins, positive control, no-consolation-prize, honest refusal with tier temporarily changed, search/category)"
