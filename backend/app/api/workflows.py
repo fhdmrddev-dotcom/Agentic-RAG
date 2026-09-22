@@ -1486,7 +1486,10 @@ async def list_drafts(
 @router.patch(
     "/{definition_id}",
     response_model=DraftCreateResponse,
-    dependencies=[Depends(require_visible("workflow_authoring"))],  # Phase 148 (VIS-01) — authoring gate
+    dependencies=[
+        Depends(require_visible("workflow_authoring")),  # Phase 148 (VIS-01) — authoring gate
+        Depends(require_capability("workflows")),  # v4.3 audit (TIER-01) — every authoring write, not two
+    ],
 )
 async def update_draft(
     definition_id: UUID,
@@ -1867,7 +1870,10 @@ class GenerateRequest(BaseModel):
 
 @router.post(
     "/generate",
-    dependencies=[Depends(require_visible("workflow_authoring"))],  # Phase 148 (VIS-01) — authoring gate
+    dependencies=[
+        Depends(require_visible("workflow_authoring")),  # Phase 148 (VIS-01) — authoring gate
+        Depends(require_capability("workflows")),  # v4.3 audit (TIER-01) — every authoring write, not two
+    ],
 )
 async def generate_workflow(
     body: GenerateRequest,
@@ -1982,7 +1988,10 @@ _TEMPLATE_MAX_UNCOMPRESSED_BYTES = 50 * 1024 * 1024
 @router.post(
     "/template/placeholders",
     response_model=TemplatePlaceholdersResponse,
-    dependencies=[Depends(require_visible("workflow_authoring"))],  # Phase 148 (VIS-01) — authoring gate
+    dependencies=[
+        Depends(require_visible("workflow_authoring")),  # Phase 148 (VIS-01) — authoring gate
+        Depends(require_capability("workflows")),  # v4.3 audit (TIER-01) — every authoring write, not two
+    ],
 )
 async def read_template_placeholders(
     file: UploadFile = File(...),
@@ -2100,7 +2109,10 @@ async def read_template_placeholders(
     "/{definition_id}/template",
     response_model=TemplateAssetRef,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_visible("workflow_authoring"))],  # Phase 148 (VIS-01) — authoring gate
+    dependencies=[
+        Depends(require_visible("workflow_authoring")),  # Phase 148 (VIS-01) — authoring gate
+        Depends(require_capability("workflows")),  # v4.3 audit (TIER-01) — every authoring write, not two
+    ],
 )
 async def upload_workflow_template(
     definition_id: UUID,

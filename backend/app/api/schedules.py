@@ -51,6 +51,7 @@ from app.db.schedules import (
 )
 from app.db.workflows import get_definition
 from app.dependencies import get_current_user, get_pg_pool, get_redis, require_visible
+from app.services.entitlement_service import require_capability
 from app.models.schedule import (
     ScheduleTriggerResult,
     WorkflowScheduleCreate,
@@ -89,7 +90,10 @@ def _serialize(row: dict) -> WorkflowScheduleRead:
     "/{workflow_id}/schedules",
     response_model=WorkflowScheduleRead,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_visible("workflow_authoring"))],
+    dependencies=[
+        Depends(require_visible("workflow_authoring")),
+        Depends(require_capability("workflows")),  # v4.3 audit (TIER-01)
+    ],
 )
 async def create_workflow_schedule(
     workflow_id: UUID,
@@ -173,7 +177,10 @@ async def list_schedules(
 @router.patch(
     "/{schedule_id}",
     response_model=WorkflowScheduleRead,
-    dependencies=[Depends(require_visible("workflow_authoring"))],
+    dependencies=[
+        Depends(require_visible("workflow_authoring")),
+        Depends(require_capability("workflows")),  # v4.3 audit (TIER-01)
+    ],
 )
 async def patch_schedule(
     schedule_id: UUID,
@@ -227,7 +234,10 @@ async def remove_schedule(
 @router.post(
     "/{schedule_id}/trigger",
     response_model=ScheduleTriggerResult,
-    dependencies=[Depends(require_visible("workflow_authoring"))],
+    dependencies=[
+        Depends(require_visible("workflow_authoring")),
+        Depends(require_capability("workflows")),  # v4.3 audit (TIER-01)
+    ],
 )
 async def trigger_schedule(
     schedule_id: UUID,

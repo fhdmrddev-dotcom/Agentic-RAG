@@ -11,7 +11,7 @@
  */
 
 import type { AskUserAnswerBody, Citation, EmitFailure, EmitSubStep, Message, OutputFile, PendingAsk, SourceReference, TaskRunIndexItem, Thread, Todo, WorkspaceDiff, WorkspaceFile, WorkspaceFileContent, WorkspaceVersion } from "../../types"
-import { API_BASE, ApiError, getAuthHeaders } from "./_core"
+import { API_BASE, ApiError, entitlementRefusalMessage, getAuthHeaders } from "./_core"
 import type { WorkflowDefinitionJSON } from "./knowledge"
 export async function listThreads(): Promise<Thread[]> {
   const headers = await getAuthHeaders()
@@ -582,7 +582,8 @@ export async function postMessage(
   if (!res.ok) {
     const body = (await res.json().catch(() => null)) as { detail?: unknown } | null
     throw new ApiError(
-      typeof body?.detail === "string" ? body.detail : "Failed to send message",
+      entitlementRefusalMessage(body) ??
+        (typeof body?.detail === "string" ? body.detail : "Failed to send message"),
       res.status,
     )
   }

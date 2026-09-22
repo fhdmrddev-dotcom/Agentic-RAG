@@ -10,7 +10,7 @@
  * count it is supposed to hold still (the 187-24 trap — measured here, not feared).
  */
 
-import { API_BASE, ApiError, getAuthHeaders, getAuthToken } from "./_core"
+import { API_BASE, ApiError, entitlementRefusalMessage, getAuthHeaders, getAuthToken } from "./_core"
 import type { GenerateResult, GenerateWorkflowBody, PublishOutcome, PublishVerdict, WorkflowDefinitionJSON, WorkflowDraftRow, WorkflowDraftWriteResult } from "./knowledge"
 export class WorkflowConflictError extends Error {
   constructor(message = "workflow is published and cannot be modified") {
@@ -276,7 +276,10 @@ export async function createWorkflowDraft(
     body: JSON.stringify(def),
     signal,
   })
-  if (!res.ok) throw new Error(`Failed to create workflow draft (status ${res.status})`)
+  if (!res.ok) {
+    const body = await res.json().catch(() => null)
+    throw new Error(entitlementRefusalMessage(body) ?? `Failed to create workflow draft (status ${res.status})`)
+  }
   return (await res.json()) as WorkflowDraftWriteResult
 }
 
@@ -1000,6 +1003,10 @@ export async function publishWorkflow(
   }
   if (res.status === 404) return { kind: "not_found" }
   if (res.status === 409) return { kind: "already_published" }
+  if (res.status === 403) {
+    const tierMsg = entitlementRefusalMessage(await res.json().catch(() => null))
+    if (tierMsg) throw new Error(tierMsg)
+  }
   throw new Error(`Failed to publish workflow (status ${res.status})`)
 }
 
