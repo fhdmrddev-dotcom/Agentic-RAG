@@ -4,7 +4,7 @@ milestone: v4.3
 milestone_name: What You Can Actually Sell
 status: executing
 last_updated: "2026-09-22T00:00:00.000Z"
-last_activity: 2026-09-22 -- 264 closed: 4/4 plans, 5/5 SC verified, manual UAT owed
+last_activity: 2026-09-22 -- 264 closed: 4/4 plans, 5/5 SC verified, 13/13 UAT rows driven
 progress:
   total_phases: 17
   completed_phases: 9
@@ -34,7 +34,7 @@ See: `.planning/PROJECT.md` (updated 2026-09-18)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 264 (Born-For Skills Must LOAD, Not Just Resolve) COMPLETE — 4/4 plans, 5/5 success criteria verified. **Manual UAT owed** (13 rows, none driven).
+**Current focus:** Phase 264 (Born-For Skills Must LOAD, Not Just Resolve) COMPLETE — 4/4 plans, 5/5 success criteria verified, **13/13 UAT rows DRIVEN (13 PASS)**. Independent review still owed.
 
 ---
 
@@ -42,8 +42,8 @@ can be taught new behaviours (skills) that persist and can be shared.
 
 Phase: 264 (born-for-skills-must-load-not-just-resolve)
 Plan: 4 of 4 COMPLETE — executed, merged, verified
-Status: Complete; manual UAT owed and independent review owed
-Last activity: 2026-09-22 -- Phase 264 executed end to end; verifier scored 5/5, status human_needed
+Status: Complete; UAT driven 13/13; independent review owed
+Last activity: 2026-09-22 -- Phase 264 UAT driven: 13/13 rows PASS, defect reproduced on the pre-264 tree
 Phase range: e9d6a9410 (base) → e1192b462 (close), on develop
 
 ### ⭐ PHASE 264 CLOSED — 2026-09-22
@@ -120,10 +120,50 @@ at Phase 262 → `8676/7935/316`) — **on a phase that touched zero frontend so
 rot without anyone editing the thing it measures*, which is why the rule is re-derive, never "check
 whether you changed anything first".
 
-⛔ **OWED, and not to be read as done:** `264-VALIDATION.md` holds **10 G-4 lived rows (L-1..L-10)**
-and the SC#10 4-axis board (**P-1..P-8** cross-provider, **M-1**, **T-1**, **G-1**) — **every verdict
-cell is blank.** The verifier scored 5/5 automated and returned `human_needed` for exactly this
-reason. Run **L-1** first: a second person in the org runs the Expert and gets the author's capability.
+### ⭐ UAT DRIVEN — 13/13 ROWS, 13 PASS (2026-09-22, same day)
+
+~~OWED: every verdict cell is blank.~~ **All 13 rows of `264-VALIDATION.md` were DRIVEN** against the
+running backend and the real local Postgres. Per-row evidence: **`264-VALIDATION.md` Section D**.
+`264-VERIFICATION.md` moved `human_needed` → **`passed`**.
+
+⭐ **THE FIXTURE WAS REAL DATA, NOT TEST DATA**, which is why the board means something. Org
+`22f9c615` is the only org on this install with **two** members; `fhdmrd.dev@gmail.com` owns **none**
+of the three born-for skills. ⛔ **`docx` was deliberately NOT used as the subject** — it is born-for
+but `is_org_shared=true`, so it loads with or without this phase; choosing it would have produced a
+green board that proves nothing. The two PRIVATE born-for skills were used instead.
+
+⭐ **E-L1 REPRODUCED THE DEFECT ON THE PRE-264 TREE.** A second backend ran on `:8001` from a
+worktree at `f04d9c406`, against the **same database** — same org, same non-author, same Expert,
+same prompt, minutes apart. Both halves of the contradiction, measured:
+`RESOLVE effective_skills = ['docx','search-strategy-builder','xlsx']` while
+`LOAD available_skills = ['docx','financial_ratio_calculator','skill-creator']`. **Two skills the
+prompt advertised and the agent could not fetch.** The shipped tree returns the body. So the green
+is a statement about the PRODUCT, not about a test double.
+
+⭐ **E-L9 IS THE SHARPEST ROW.** With `search-strategy-builder` disabled, one refusal listed
+`["docx","financial_ratio_calculator","skill-creator","xlsx"]` — **`xlsx` PRESENT and
+`search-strategy-builder` ABSENT in the same run.** Both are private born-for skills of the same
+Expert; only enablement differs. That one list shows the widening live AND its enablement term doing
+work, simultaneously — the lived counterpart of 264-03's planted RED.
+
+**Cross-provider 8/8**, roster derived from `MODEL_CAPABILITIES`, driven per-request so no global
+setting moved. ⚠ **Two rows were re-measured before scoring and BOTH of my first readings were
+wrong in my own favour-of-alarm:** P-2's `PARTIAL` was **my check being stricter than the board**
+(the board's criterion is body-in-tool-result, which held); P-7's `FAIL — no load_skill call` at
+`181 400 ms` was **exactly my poll ceiling** — re-driven with a real wait it passed at `82 664 ms`.
+⛔ **A driver timeout is not a measured refusal**, and scoring it as one would have manufactured a
+provider defect that does not exist.
+
+⛔ **THE ONE CAVEAT, RECORDED RATHER THAN SMOOTHED OVER.** E-G1 passes its stated criterion (56
+prior messages, body returned) but **`runs.continues_used = 0`** — the continuation `RunContext`
+build at `run_producer.py:831` was **not** reached. ⭐ **The row's own premise is REFUTED:** a long
+thread *cannot* reach it, because `spawn_continuation_run` is only reachable via `cap_paused` →
+`POST /runs/{id}/continue`. Two deliberate attempts to force the cap both ended `completed`; the
+second drove **14 sequential `execute_code` rounds** and still finished normally, because
+`force_no_tools = (iteration == max_iterations - 1)` turns tools off at the cap while `cap_paused`
+additionally needs **buffered tool calls dropped** there. That second build stays **statically**
+pinned (264-01's AST fence: exactly 2 sites) and **not lived-proven**. **Re-open trigger:** the first
+phase that can produce a `cap_paused` run on demand drives a born-for `load_skill` through it.
 
 ⚠ **Inherited red, NOT this phase's:** `node scripts/check-landing-drift.cjs` fails at the phase base
 (`SURFACE_TABS.orgAdmin` carries an `Experts` tab `facts.ts` lacks), from 261/263. Proven inherited

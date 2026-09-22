@@ -448,7 +448,7 @@ unswept seeds (**134** carry no `trigger_when` at all · **114** carry prose the
 | 258. A Tier Becomes Enforceable | 0/? | Not started | - |
 | 259. An Expert Is a Bundle, Not a Runtime | 0/? | Not started | - |
 | 260. The Expert You Can Actually Use | 0/? | Not started | - |
-| 264. Born-For Skills Must LOAD, Not Just Resolve | 4/4 | Complete — 5/5 SC verified; manual UAT owed | 2026-09-22 |
+| 264. Born-For Skills Must LOAD, Not Just Resolve | 4/4 | Complete — 5/5 SC verified; 13/13 UAT rows driven, 13 PASS | 2026-09-22 |
 
 ---
 

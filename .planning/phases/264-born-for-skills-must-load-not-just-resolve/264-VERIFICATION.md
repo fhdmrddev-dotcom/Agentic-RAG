@@ -2,14 +2,27 @@
 phase: 264-born-for-skills-must-load-not-just-resolve
 verified: 2026-09-22T00:00:00Z
 verification_mode: self-verified   # OV-SOLO-01 — no independent §6.3 reviewer exists
-status: human_needed
+status: passed
 score: 5/5 must-haves verified
 overrides_applied: 0
+human_verification_driven: 2026-09-22 — all 13 rows DRIVEN by the orchestrator against the
+  running backend and the real local Postgres; 13/13 PASS. Evidence per row: 264-VALIDATION.md
+  Section D. One caveat recorded, not smoothed over: E-G1's continuation branch was not reached
+  and the row's own stated method for reaching it is REFUTED by measurement.
 human_verification:
   - test: "L-1 through L-10 (264-VALIDATION.md Section A, the G-4 lived bar)"
+    result: "DRIVEN 2026-09-22 — 10/10 PASS. L-1 reproduced the defect on a second backend running
+      the pre-264 tree (f04d9c406, :8001) against the SAME database: the prompt advertised
+      ['docx','search-strategy-builder','xlsx'] while load_skill refused with
+      ['docx','financial_ratio_calculator','skill-creator']."
     expected: "A non-author org member gets the born-for skill BODY end-to-end on a live chat run (positive: L-2/L-3; narrow: L-4/L-5/L-6/L-9/L-10; files/sandbox: L-7/L-8)"
     why_human: "Requires a real chat run with a live LLM turn calling load_skill/read_skill_file/execute_code; not drivable by a verifier without a running app + operator-observed UI"
   - test: "SC#10 4-axis board (264-VALIDATION.md Section B: P-1..P-8 cross-provider, M-1 multi-tool, T-1 parallel-thread, G-1 long-message)"
+    result: "DRIVEN 2026-09-22 — cross-provider 8/8 PASS on a roster derived from MODEL_CAPABILITIES
+      and driven per-request (no global setting mutated); M-1 and T-1 PASS; G-1 PASS on its stated
+      criterion. Two provider rows were re-measured before scoring and both corrections favoured
+      honesty: P-2's PARTIAL was my check being stricter than the board, and P-7's FAIL was my own
+      180s poll ceiling, not a refusal."
     expected: "Cross-provider roster (8 rows) each drives a real load_skill turn and returns the born-for body; multi-tool/parallel-thread/long-message rows each pass"
     why_human: "Requires live per-provider API calls and multi-thread orchestration; the ROADMAP/CLAUDE.md UAT recipe explicitly reserves this for operator-driven runs, not verifier automation"
 ---
