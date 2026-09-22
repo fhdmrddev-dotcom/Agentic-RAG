@@ -3514,6 +3514,8 @@ const BASELINE = {
   "DocumentStatusBadge.a11y.test.tsx": 19,
   // ── Phase 222 (222-05 / D-222-09) — Door half OAuth & probe-auth discovery ──
   "connectors.mcp_auth.test.ts": 8,
+  "entitlementRefusal.test.ts": 4, // v4.3 audit (TIER-03)
+  "noFrontendTokenPricing.fence.test.ts": 3, // v4.3 audit (257 SC#3)
   "connectionFormCopy.mcp.test.ts": 6,
   "McpAuthDoor.test.tsx": 9,
   "McpAuthDoor.byo.test.tsx": 3,
@@ -5324,6 +5326,9 @@ const TARGETS = [
   "src/components/ingestion/__tests__/DocumentStatusBadge.a11y.test.tsx",
   // ── Phase 222 (222-05 / D-222-09) — Door half OAuth & probe-auth discovery ──
   "src/lib/api/__tests__/connectors.mcp_auth.test.ts",
+  // ── v4.3 milestone audit (TIER-03) — a tier refusal names the plan; both knobs, same commit
+  "src/lib/api/__tests__/entitlementRefusal.test.ts",
+  "src/lib/api/__tests__/noFrontendTokenPricing.fence.test.ts", // v4.3 audit (257 SC#3)
   "src/components/settings/__tests__/connectionFormCopy.mcp.test.ts",
   "src/components/settings/McpAuthDoor.test.tsx",
   "src/components/settings/McpAuthDoor.byo.test.tsx",
