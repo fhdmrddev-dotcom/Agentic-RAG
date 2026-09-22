@@ -225,3 +225,164 @@ D-262-02 refuses.
 
 *Phase: 262-an-expert-you-can-discover*
 *Context gathered: 2026-09-22 — ROADMAP + existing sketch + BUS-303 operator ruling + measurement*
+
+---
+
+# ⛔ AMENDED 2026-09-22 BY RESEARCH — six claims refuted, two decisions re-aimed
+
+Every original above is left standing rather than overwritten. In this project a claim that rots is
+the finding, and **four of these were load-bearing.**
+
+## R-1 — the trailing fallback is NOT `KnowledgeHealthPage`
+
+`ChatLayout.tsx:981-983` renders `<UnknownViewFallback view={activeView as never} />`, retired at
+Phase **217.1-14** and fenced by `ChatLayout.fallback.test.tsx:18-22` + `renameFence.test.ts:146-153`.
+A branchless member renders **"This view has no screen: experts"** — not Knowledge Health.
+⭐ **CONTEXT inherited that from stale prose still sitting at `App.tsx:103-105`.** That comment is
+the rot's source; correct it in-phase, **beside** the original.
+
+## R-2 — ⛔ THERE IS NO READYMADE RED. The triad is guarded by NOTHING automatic
+
+`ChatLayout.fallback.test.tsx` is four **source-text** assertions — nothing mounts, nothing
+enumerates `ActiveView`. Its own fourth case is titled *"the compile-time exhaustiveness check is
+**bypassed** via as never"*. `UnknownViewFallback.tsx:9-10`'s docstring claims a `satisfies never`
+guarantee **the code does not ship** (`as never` is always a legal assertion), and
+`renameFence.test.ts:142` only asserts `members.length >= 10`.
+⛔ **So a branchless member ships green.** This phase must BUILD the guard, not inherit one.
+
+## R-3 — `OrgExpertsTab` is a weaker analog than CONTEXT claimed
+
+It renders **3 of 4** fields and shows **counts, not names** (`:274-276` — `📁 N folders / ⚡ N
+skills / 🔌 N conns`). **`example_output` renders in ZERO components, admin included.**
+⭐ Its `ICON_MAP` + `renderExpertIcon` (`:30-46`) **is** the ready-made replacement for D-262-06.
+
+## R-4 — the ROADMAP's "no test drives the no-grant user" is FALSE
+
+`test_261_expert_grants_db.py:354-364` drives `list_expert_bundles_for_caller` against real PG with
+a plain-member no-grant user and asserts the bundle is absent. ⚠ It `pytest.skip`s without `:54322`.
+**The genuine gap is the API layer and the frontend** — narrow the claim, do not repeat it.
+
+## R-7 — FIVE hardcoded sites, not two (D-262-06 widens)
+
+`getExpertIcon` is duplicated **verbatim** in `InviteExpertDialog.tsx:27-37` **and**
+`ExpertSpotlightCard.tsx:70-81`; plus `DEFAULT_FINANCIAL_TILES` (`:26-42`), `folderLabel` →
+`"SEC Filings & Reports"` (`:93-96`), `skillLabel` → `"ratio_calculator"` (`:98-103`).
+
+## R-6 — `NAV_ITEMS` already carries seven entries; this is the eighth
+
+---
+
+# The two "is it frontend-only?" answers — BOTH YES
+
+**The type + serializer are clean.** `types/index.ts:17-35` carries all four fields (optional);
+`api/experts.py:385` `list_experts` has **no `response_model`** and the chain ends in `SELECT *` +
+`_row_to_dict`. Everything reaches the client.
+⛔ **The one endpoint that WOULD strip them is `/resolve`** — `ResolvedExpertBundle` has none of the
+four. **Do not use it for the modal.**
+
+**Only FOLDERS need id→name.** `member_skills` are already skill NAMES; `required_connections` are
+already display names. ⭐ **`ChatLayout.tsx:142` already holds `folders` from `useFolders()`** and
+threads it to three mounts — pass a fourth.
+⛔ **A folder id can legitimately fail to resolve** (the one system Expert binds a folder seeded into
+org `430bffc6` alone, `mig 188:29-37`), so the modal needs an **honest "a folder you cannot see"
+state** — never a blank.
+
+---
+
+# D-262-09 RE-AIMED — CONTEXT asked the right question of the wrong system
+
+⛔ **`experts` is NOT a `GovernedFeature`.** That union is closed at six members
+(`lib/api/_core.ts:104-110`, mirrored `user_settings.py:1578-1606`).
+`require_capability("experts")` is a **per-org TIER entitlement** through `tier_capabilities` — a
+different axis with **no frontend read path at all**. ⭐ **Tagging the nav entry would not prevent
+the 403.**
+
+**DECISION: leave the nav entry UNGOVERNED**, precedent `connections` (`nav-items.ts:59`, pinned by
+`navItemsConnections.test.ts:44-49`), and `visibleNavItems` has been **fail-OPEN since 2026-09-09**
+(`:118`). The catalog instead renders an **honest refusal** if the API 403s.
+
+⛔ **AND THE REAL HAZARD, which is a UAT blocker not a build one:** `mig 186:72` grants `experts` to
+**enterprise only**, and `db/entitlements.py:152-156` **fails closed on a NULL tier**. This is the
+same condition `BUS-283` raises for production. **Verify the local org's `subscription_tier` before
+G-4**, or the catalog 403s and reads as a build defect.
+
+---
+
+# ⛔ D-262-08 RE-AIMED — PACK-13's seam is not the one it named
+
+`onSelectExpert` → `handleSelectExpert` at **`MessageInput.tsx:159-172`** is local and
+`threadId`-dependent, and `ChatLayout.launch.test.tsx:558-576` structurally fences `<ChatArea` out
+of the non-chat branch. **The catalog cannot call it.**
+
+⭐ **The seam that works is one register lower and already shipped:** `ChatArea.tsx:234-252`
+hydrates the spotlight from `thread.active_expert_id`. So PACK-13 is
+`setThreadActiveExpert` + `selectThread` + `onNavigate("chat")` — **the same mechanism, not a second
+one**, which is what the criterion actually requires.
+
+⚠ Two traps: `useThreads.newThread()` returns a Thread whose `active_expert_id` is `null` and there
+is **no updater for that field**; and the clean alternative — mirroring `prefillMessage`
+(`App.tsx:144/358-359` → `ChatLayout.tsx:96-97/817-818` → `ChatArea.tsx:573-586`, already used for
+skills) — **must apply `libraryTabAfterNavigate`'s one-shot clearing lesson (`App.tsx:178-190`) or
+it re-fires forever.** The `prefillMessage` mirror is the recommended shape: it has precedent.
+
+---
+
+# ⛔ THREE PITFALLS THAT WILL RED AN UNRELATED SUITE
+
+**P-3 — `App.tsx:171`'s `NO TWELFTH` comment is a FENCE'S NON-VACUITY TOKEN.**
+`LibraryPage.initialTab.test.tsx:502-503` asserts `APP` contains that string and `APP_CODE` does
+not. ⛔ **Delete it and an unrelated pinned suite goes red.** That is the measured reason D-262-03
+lacked — it is not merely impolite to remove, it is load-bearing.
+
+**P-7 — retiring `DEFAULT_FINANCIAL_TILES` reds a pinned suite.**
+`ExpertSpotlightCard.test.tsx:47-69` asserts all three tiles verbatim with `prompt_suggestions: []`.
+Pin is **5**, so the rewrite must land **≥5** cases.
+
+**P-11 — `renameFence.test.ts:121-127` greps the literal `"the three-homes contract holds"`, and
+that exact string is `App.tsx:100` — the prose D-262-01 mandates changing.** Change the surrounding
+text or update the fence **in the same commit**.
+
+---
+
+# Gates at base, measured on a quiet tree (NOT to be quoted later — re-derive)
+
+| Gate | Result |
+|---|---|
+| vitest count gate | ⛔ **`COUNT GATE VIOLATED` · total 8676 · failed 2 · pinned 7935** |
+| `tsc -p tsconfig.app.json --noEmit` | **70** errors (CLAUDE.md says 67 — stale) |
+| backend baseline harness | ✅ `71 failed, 5490 passed` — the ceiling, **zero headroom** |
+| ledger (`--files`) | ✅ all 12 have rows |
+| CLAUDE.md size | ✅ 116,991 — ⚠ only **3,009** to the warn band |
+
+⛔ **THE COUNT GATE IS RED AT BASE AND IT IS INHERITED.** Both failures are in
+`frontend/src/components/library/__tests__/sketchComposition.test.tsx` (pinned 47, in BOTH knobs) —
+one `STACK_TRACE_ERROR`, one **real** `TestingLibraryElementError: Found multiple elements with the
+role "tab" and name "Documents"`. Proven inherited by an **empty** `git diff --stat HEAD --
+frontend/`. **Not** in SEED-171's flaky five. ⭐ Captured from the gate's own persisted JSON
+**before** any re-run, per the standing rule.
+
+⛔ **`source venv/Scripts/activate` under Git Bash does NOT activate this venv** — that route reports
+a bogus `96 failed … 3 errors`. **Always use `node scripts/check-backend-unit-baseline.cjs`.**
+
+**Ledger, re-derived — all eight FIRE G-5 and every triple except `ChatArea.tsx` was STALE:**
+`App.tsx` 33/24/378 · `ChatLayout.tsx` 52/27/1014 · `NavPanel.tsx` 24/13/417 · `nav-items.ts`
+9/6/118 · `MessageInput.tsx` 35/17/942 · `ChatArea.tsx` 77/38/882 · `types/index.ts` 90/70/1434 ·
+`lib/api/experts.ts` 6/3/313. No file is missing a row.
+
+**Knob coverage:** only **two** bare-directory entries exist in TARGETS (`src/landing`,
+`src/components/workflows`). ⛔ **`lib/nav-items.test.ts` and `lib/__tests__/navItemsConnections.test.ts`
+run in NEITHER knob** while `nav-items.ts` fires G-5 — **adopt both**. ⛔ **A new catalog suite will
+be in NEITHER unless the plan adds it.**
+
+---
+
+# D-262-10 — the `upgrade_hint` question, decided by me and flagged, not silently
+
+`InviteExpertDialog.tsx:102-106` **already renders `upgrade_hint`** ("Upgrade to Enterprise…"),
+shipped at Phase 260 — which sits against D-262-02's spirit.
+
+**ASSUMPTION TAKEN, so the phase is not blocked:** D-262-02 governs **what the catalog LISTS** — a
+locked Expert does not appear. The `upgrade_hint` is an **error string at a different moment** (an
+invite attempt that failed), not a brochure entry, so it is **left alone and out of scope**.
+⚠ **This is my call, not the operator's**, and it is the one place this phase touches the no-upsell
+ruling's edge. Raise it at close; reverse cheaply if the operator disagrees.
