@@ -12,6 +12,20 @@ status_note: |
   including `sourceComposition.test.tsx`, which is deliberately red by a Phase 235 decision and
   would turn the shared gate red for every other phase. That decline is recorded in
   `252-CONTEXT.md` and in `252-05-SUMMARY.md`; this seed is the obligation it creates.
+
+  ── 2026-09-22 · Phase 262, LEFT PLANTED AND STRENGTHENED — A FOURTH DATA POINT, PAID BY ONE PHASE
+  IN THREE SEPARATE PLANS. `src/components/experts/` and `src/components/experts/catalog/__tests__/`
+  have no TARGETS **directory** entry, so every suite the phase created had to be hand-added to BOTH
+  knobs by the plan that wrote it, or it would have run nowhere:
+    · 262-01 — `activeViewReachability.test.ts` (11), plus `nav-items.test.ts` and
+      `navItemsConnections.test.ts` adopted from TARGETS-only (see SEED-280's eighth case)
+    · 262-03 — `expertCatalog.test.ts`, `ExpertCatalogPage.test.tsx`
+    · 262-04 — `ExpertDetailModal.test.tsx` (8), `startScopedChat.test.ts` (6)
+  ⭐ **Every one of them landed in both knobs in the commit that created it**, so the discipline
+  held — which is precisely the point: it held because four separate executors each remembered, not
+  because anything would have stopped them. ⚠ 262-05 raised three EXISTING pins
+  (`nav-items.test.ts` 2→5, `NavPanel.test.tsx` 18→20, `ComposerExpert.test.tsx` 5→8), which is the
+  easy half; the hard half is the adoption nobody is reminded to do.
 priority: medium
 surface: Agentic-RAG
 severity: major

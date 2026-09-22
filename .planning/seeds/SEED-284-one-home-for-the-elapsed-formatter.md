@@ -10,6 +10,15 @@ status_note: |
   non-existent path `SEED-269-one-home-for-the-elapsed-formatter.md`; it now cites THIS file, as of
   commit `4e982fe7b`.
 
+  ── 2026-09-22 · Phase 262 (plan 05), LEFT PLANTED — PATH-ONLY MATCH, NO DOMAIN OVERLAP, and that
+  is recorded rather than silently skipped because a match dismissed without a reason is
+  indistinguishable from one nobody looked at. This seed fired on `docs/HOT-FILE-LEDGER.md`, which
+  262 edits in every plan for G-5 bookkeeping. ⛔ 262 touches no elapsed formatter and writes no
+  fourth one; the extraction stays exactly as owed as it was. ⚠ The trigger itself is the finding:
+  a `trigger_paths` entry naming a REGISTER rather than a SOURCE file fires on every phase that does
+  its ledger homework, which is every phase — so this seed will keep firing for no reason until that
+  path is narrowed to the three formatter sites.
+
   ⚠ CORRECTED THE SAME DAY, and the original clause is kept above rather than overwritten, because
   the slip is the finding. When this note was first written — at `/gsd:discuss-phase 252`, hours
   before 252-04 ran — the words *"it now cites THIS file"* were **FALSE**: the citation was still

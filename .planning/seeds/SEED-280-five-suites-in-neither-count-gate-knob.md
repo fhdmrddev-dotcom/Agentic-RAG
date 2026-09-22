@@ -31,6 +31,18 @@ status_note: |
   so the omission reads as a decision.
   ⛔ A `src/components/sources` directory entry remains DECLINED (it would adopt ~10 unpinned suites,
   one of them the deliberately-red `sourceComposition.test.tsx`) — that is owed a seed of its own.
+
+  ── 2026-09-22 · Phase 262 (plan 05), STAYS PLANTED — AND THE ROUTING'S "CHECK, DO NOT ASSUME" WAS
+  CHECKED AND CAME BACK **NO**. `262-SEEDS-ROUTING.md` proposed this seed might be partially answered
+  because 262-01 adopted `lib/nav-items.test.ts` and `lib/__tests__/navItemsConnections.test.ts` into
+  BOTH knobs. ⛔ **Neither is among this seed's named five.** The five are `PromptVariableChips`,
+  `RunHero`, `automationFacts`, `nodeEffectBanner`, `toolReadOnlyMap` — and 262-05's own gate run
+  printed all five, verbatim, still in the `— N new` column: `3 · 18 · 11 · 8 · 7`. ⭐ **Every count
+  is IDENTICAL to the 2026-08-31 table and to 252's 2026-09-16 re-read — twenty-two days and two
+  phases later.** The seed has neither drifted nor decayed; it has still simply not been acted on.
+  ⚠ **What 262-01 actually closed is an EIGHTH case of the same class, not one of the five**: two
+  more TARGETS-only suites, found and adopted by a phase that happened to be reading that file.
+  That is the mechanism this seed exists to replace — adoption by coincidence.
 surface: Agentic-RAG
 relates_to:
   - scripts/vitest-count-gate.cjs
