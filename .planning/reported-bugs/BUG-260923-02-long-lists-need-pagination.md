@@ -61,6 +61,17 @@ returns to page 1. 4 new tests, RED without the fix. **Not yet deployed to produ
 app-wide half (one pager, one backend convention, the unpaged `/threads` `/skills` `/experts`)
 remains open — this report stays `open` for it.
 
+## Update 2026-09-23 (2) — Library Health + History paged (`1659d4c46`)
+
+Operator follow-up: *"pagination should also be implemented in the Library page — the Health
+section and the History section."* Done on `develop`, same shared `PaginationControls`:
+- **Health → Document status** had the SAME truncation as Spend — `getStaleDocs(0, 50)` once,
+  under a header naming the full total. Now server-paged, 20 per page.
+- **Ingestion → History** — 25 per page, newest first (client-side; the list is already loaded).
+- **Health → Checked queries** — 25 per page.
+Not yet deployed. Still open: `/threads`, `/skills`, `/experts` return everything; two pager
+components and two backend conventions remain.
+
 ## Why it matters
 
 - **Spend:** an operator reading the ledger to reconcile cost sees 50 of 1,183 runs with no way to
