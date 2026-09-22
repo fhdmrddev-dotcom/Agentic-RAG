@@ -7668,7 +7668,7 @@ ALTER TABLE public.tier_capabilities ENABLE ROW LEVEL SECURITY;
 -- Name: tier_capabilities tier_capabilities_read_all; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY tier_capabilities_read_all ON public.tier_capabilities FOR SELECT TO authenticated, anon, service_role USING (true);
+CREATE POLICY tier_capabilities_read_all ON public.tier_capabilities FOR SELECT TO authenticated, service_role USING (true);
 
 
 --
@@ -8453,6 +8453,9 @@ REVOKE DELETE ON public.user_settings FROM authenticated;
 -- migration 186:30-31
 GRANT SELECT ON TABLE public.tier_capabilities TO anon, authenticated, service_role;
 GRANT INSERT, UPDATE, DELETE ON TABLE public.tier_capabilities TO service_role;
+-- migration 192 — anon read of the pricing map withdrawn (order matters: after 186)
+REVOKE ALL ON TABLE public.tier_capabilities FROM anon;
+REVOKE ALL ON TABLE public.tier_capabilities FROM PUBLIC;
 
 -- migration 187:63
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.expert_bundles TO authenticated, service_role;

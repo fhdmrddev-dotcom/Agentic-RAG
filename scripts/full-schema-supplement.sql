@@ -479,6 +479,9 @@ REVOKE DELETE ON public.user_settings FROM authenticated;
 -- migration 186:30-31
 GRANT SELECT ON TABLE public.tier_capabilities TO anon, authenticated, service_role;
 GRANT INSERT, UPDATE, DELETE ON TABLE public.tier_capabilities TO service_role;
+-- migration 192 — anon read of the pricing map withdrawn (order matters: after 186)
+REVOKE ALL ON TABLE public.tier_capabilities FROM anon;
+REVOKE ALL ON TABLE public.tier_capabilities FROM PUBLIC;
 
 -- migration 187:63
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.expert_bundles TO authenticated, service_role;
