@@ -23,6 +23,10 @@ import {
   type CheckedQueryRow,
 } from "@/lib/api"
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber"
+import { PaginationControls } from "@/components/health/PaginationControls"
+
+/** BUG-260923-02 — checked queries per page (the list is fetched whole; this pages it). */
+const CHECKED_PAGE_SIZE = 25
 
 export interface CheckedQueriesSectionProps {
   /** Lift the live count so the parent's stat tile can show it (one fetch, two consumers). */
@@ -85,6 +89,7 @@ function VerdictBadge({ row }: { row: CheckedQueryRow }) {
 
 export function CheckedQueriesSection({ onTotalChange }: CheckedQueriesSectionProps) {
   const [rows, setRows] = useState<CheckedQueryRow[]>([])
+  const [pageOffset, setPageOffset] = useState(0)
   const [loading, setLoading] = useState(true)
   const [formOpen, setFormOpen] = useState(false)
   const [question, setQuestion] = useState("")
@@ -149,6 +154,12 @@ export function CheckedQueriesSection({ onTotalChange }: CheckedQueriesSectionPr
       setError("Failed to delete this query")
     }
   }
+
+  // A deleted row can leave the page past the end — clamp back to the last real page.
+  const pageStart =
+    pageOffset >= rows.length
+      ? Math.max(0, Math.floor((rows.length - 1) / CHECKED_PAGE_SIZE) * CHECKED_PAGE_SIZE)
+      : pageOffset
 
   if (loading) {
     return (
@@ -221,7 +232,7 @@ export function CheckedQueriesSection({ onTotalChange }: CheckedQueriesSectionPr
               </tr>
             </thead>
             <tbody className="divide-y divide-border/30">
-              {rows.map((row) => (
+              {rows.slice(pageStart, pageStart + CHECKED_PAGE_SIZE).map((row) => (
                 <tr key={row.id}>
                   <td className="py-2 pr-3 min-w-0">
                     <span className="block truncate max-w-[240px]">{row.question}</span>
@@ -257,6 +268,14 @@ export function CheckedQueriesSection({ onTotalChange }: CheckedQueriesSectionPr
               ))}
             </tbody>
           </table>
+          {rows.length > CHECKED_PAGE_SIZE && (
+            <PaginationControls
+              offset={pageStart}
+              limit={CHECKED_PAGE_SIZE}
+              total={rows.length}
+              onChange={setPageOffset}
+            />
+          )}
         </div>
       )}
     </div>

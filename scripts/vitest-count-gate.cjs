@@ -3497,7 +3497,7 @@ const BASELINE = {
   // trailing orphans close 217's deferred-§3 re-open trigger.
   "sketchComposition.test.tsx": 47,
   "ingestionFailureCopy.test.ts": 25,
-  "IngestionTab.test.tsx": 40,
+  "IngestionTab.test.tsx": 42, // +2 BUG-260923-02 History paging
   "pipelineGroups.test.ts": 7,
   "LibraryStatTiles.test.tsx": 13,
   "viewRulePhrase.test.ts": 4,
@@ -3505,8 +3505,8 @@ const BASELINE = {
   "IndexFoldersTable.test.tsx": 6,
   "IndexingTab.gate.test.tsx": 6,
   "HealthTiles.test.tsx": 6,
-  "HealthSignalChips.test.tsx": 13,
-  "CheckedQueriesSection.test.tsx": 11,
+  "HealthSignalChips.test.tsx": 14, // +1 BUG-260923-02 stale paging
+  "CheckedQueriesSection.test.tsx": 12, // +1 BUG-260923-02 paging
   "ChatLayout.fallback.test.tsx": 4,
   "DocumentQueriesSection.test.tsx": 8,
   "FilterBar.test.tsx": 10,
@@ -3970,7 +3970,7 @@ const BASELINE = {
   // 17 -> 18 in 257 WR-12: fence em-dash loading state so pre-fix fallback $0.0000 cannot return.
   // 18 -> 22 in 257 CR-05/CR-07: four cases pinning that a FAILED LOAD answers nothing
   // rather than zero. Driven RED against the shipped zero-fallback (Received: "0.0k").
-  "AdminSpendPage.test.tsx": 22,
+  "AdminSpendPage.test.tsx": 26, // +4 BUG-260923-02 ledger paging
   // Added in 257 CR-06 follow-up. Exhaustive arithmetic: three independently-rounded
   // gauge segments summed to 101 on 34 of the combinations swept, and gemini found it
   // reviewing the CR-06 fix. Driven RED against the pre-fix arithmetic, 40 offenders named.

@@ -600,3 +600,36 @@ describe("IngestionTab — the History sub-tab (D-217.1-07)", () => {
     expect(screen.getByText("Nothing has been ingested yet.")).toBeInTheDocument()
   })
 })
+// ── BUG-260923-02 — History pages instead of scrolling forever ──────────────────────────
+describe("IngestionTab — History is paged (BUG-260923-02)", () => {
+  const many = (n: number) =>
+    Array.from({ length: n }, (_, i) =>
+      doc({
+        id: `h${i}`,
+        status: "completed",
+        filename: `file-${String(i).padStart(3, "0")}.pdf`,
+        // newest first: file-000 is the most recent
+        updated_at: new Date(Date.UTC(2026, 8, 1) - i * 60_000).toISOString(),
+      }),
+    )
+
+  it("shows 25 rows at a time, newest first, and pages forward", async () => {
+    const user = userEvent.setup()
+    renderPlain({ documents: many(60) })
+    await user.click(screen.getByRole("tab", { name: "History" }))
+    expect(screen.getByText("Showing 1–25 of 60")).toBeInTheDocument()
+    expect(screen.getByText("file-000.pdf")).toBeInTheDocument()
+    expect(screen.queryByText("file-025.pdf")).not.toBeInTheDocument()
+    await user.click(screen.getByRole("button", { name: /Next/ }))
+    expect(screen.getByText("Showing 26–50 of 60")).toBeInTheDocument()
+    expect(screen.getByText("file-025.pdf")).toBeInTheDocument()
+    expect(screen.queryByText("file-000.pdf")).not.toBeInTheDocument()
+  })
+
+  it("no pager when everything fits on one page", async () => {
+    const user = userEvent.setup()
+    renderPlain({ documents: many(3) })
+    await user.click(screen.getByRole("tab", { name: "History" }))
+    expect(screen.queryByRole("button", { name: /Next/ })).not.toBeInTheDocument()
+  })
+})
