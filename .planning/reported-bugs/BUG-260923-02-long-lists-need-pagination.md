@@ -4,10 +4,10 @@ title: Long lists scroll endlessly or silently truncate — pagination is missin
 reported: 2026-09-23
 surface: Agentic-RAG
 severity: major
-status: open
+status: closed
 affected_areas: [frontend/admin-spend, frontend/lists, frontend/library, frontend/navigation, backend/api-list-endpoints]
-folded_into: null
-verified_closed_by: null
+folded_into: "265"
+verified_closed_by: "Phase 265 plan 265-02 live drive 2026-09-23 — Spend ledger pagination re-checked; see .planning/phases/265-owed-v4-3-verification/265-UAT-LOG.md#d-09"
 related_seeds: []
 re_open_trigger: null
 reproduces_on:
@@ -112,3 +112,14 @@ half — the same built-but-unreachable pattern Phase 257.1 fixed for the Spend 
 
 Spend: filter by time range or coverage chip to bring a subset under 50 rows. No workaround for
 reading the full ledger in the UI today.
+
+## Closed
+
+**2026-09-23 — closed by Phase 265 (plan 265-02, D-09).** The fix deployed at `805360fef`, and the operator's browser
+check passed 3/3 (Spend ledger, Library Health, Ingestion History). Phase 265 then re-drove the Spend ledger on the
+local stack over Chrome MCP. On the unrated filter (N = 87) page 1 reads `Showing 1–50 of 87` with first row
+`fca551d0…`. Next sends `offset=50` and reads `Showing 51–87 of 87`, 37 rows, first row `43fecdce…`. Previous goes back
+to `fca551d0…`. The unfiltered ledger reads `Showing 1–50 of 244`, equal to `count(*)`. SQL independently places those
+two runs at positions 1 and 51. Every row is reachable, and the total is stated rather than silently truncated.
+Evidence: `.planning/phases/265-owed-v4-3-verification/265-UAT-LOG.md` § "D-09".
+Library Health and Ingestion History were NOT re-driven in 265. They rest on the operator's 3/3 check at `805360fef`.
