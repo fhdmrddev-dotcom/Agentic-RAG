@@ -919,7 +919,10 @@ def test_this_round_shipped_no_migration():
     # Measured: the highest migration number named anywhere under `.planning/phases/256-*/`
     # is 182 (the others referenced are 055, 118, 125, 129, 175 — all pre-existing).
     repo = _BACKEND_APP.parents[1]
-    phase_dirs = sorted((repo / ".planning" / "phases").glob("256-*"))
+    # The phase dir MOVES to .planning/milestones/<ver>-phases/ at archive time — look in both.
+    phase_dirs = sorted((repo / ".planning" / "phases").glob("256-*")) + sorted(
+        (repo / ".planning" / "milestones").glob("*-phases/256-*")
+    )
     assert phase_dirs, "phase 256's artifacts are missing — this fence lost its subject"
 
     referenced: set[int] = set()

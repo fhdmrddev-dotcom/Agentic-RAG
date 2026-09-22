@@ -3,6 +3,7 @@
 Attacks the 8 defense modules using payloads from adversarial_corpus.py and renders
 the SC#3 human-legible attack report on every run.
 """
+import tempfile
 import asyncio
 from pathlib import Path
 import re
@@ -26,7 +27,10 @@ from tests.unit.security.adversarial_corpus import (
 )
 
 
-_REPORT_PATH = Path("c:/Vibe Apps/Agentic RAG/.planning/phases/236-the-corpus-under-attack/236-ATTACK-REPORT.md")
+# Written to the temp dir, NOT into .planning/: a test run must never rewrite a tracked planning
+# file (it dirtied git on every run and resurrected the phase dir after archiving). The report
+# committed at .planning/milestones/v4.0-phases/236-the-corpus-under-attack/ is the historical record.
+_REPORT_PATH = Path(tempfile.gettempdir()) / "agentic-rag-reports" / "236-ATTACK-REPORT.md"
 _ATTACK_RESULTS: list[dict] = []
 
 
@@ -36,6 +40,7 @@ def attack_report_generator():
     _ATTACK_RESULTS.clear()
     yield
     if _ATTACK_RESULTS:
+        _REPORT_PATH.parent.mkdir(parents=True, exist_ok=True)
         render_attack_report(_ATTACK_RESULTS, output_path=_REPORT_PATH)
 
 

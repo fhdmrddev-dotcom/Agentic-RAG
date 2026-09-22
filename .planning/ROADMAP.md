@@ -40,7 +40,7 @@ Full detail: [`milestones/v4.3-ROADMAP.md`](milestones/v4.3-ROADMAP.md) ·
 requirements: [`milestones/v4.3-REQUIREMENTS.md`](milestones/v4.3-REQUIREMENTS.md) ·
 audit: [`milestones/v4.3-MILESTONE-AUDIT.md`](milestones/v4.3-MILESTONE-AUDIT.md) ·
 state at close: [`milestones/v4.3-STATE-at-close.md`](milestones/v4.3-STATE-at-close.md) ·
-phases: `.planning/phases/25{5..9}-*`, `.planning/phases/26{0..4}-*`
+phases: [`milestones/v4.3-phases/`](milestones/v4.3-phases/) (archived 2026-09-23)
 
 The milestone that turned a product that works into one that can be **packaged, priced and
 shipped**: a written extension contract with a guard, every token persisted and priced in dollars,
@@ -63,7 +63,7 @@ requirements: [`milestones/v4.2-REQUIREMENTS.md`](milestones/v4.2-REQUIREMENTS.m
 audit: [`milestones/v4.2-MILESTONE-AUDIT.md`](milestones/v4.2-MILESTONE-AUDIT.md)
 (the superseded 2026-09-16 reading is preserved beside it at
 [`v4.2-MILESTONE-AUDIT-260916.md`](milestones/v4.2-MILESTONE-AUDIT-260916.md)) ·
-phases: `.planning/phases/25{1,2,3,4}-*`, `.planning/phases/24{7,8,9}-*`
+phases: [`milestones/v4.2-phases/`](milestones/v4.2-phases/) (archived 2026-09-23)
 
 The **second consecutive consolidation** milestone, and the one that turned v4.0's capability and
 v4.1's deployment into a surface you can **live on**. Every requirement closed something already in a
@@ -135,7 +135,7 @@ plan inflation inside one, which is the failure mode the governor was written ag
 Full detail: [`milestones/v4.1-ROADMAP.md`](milestones/v4.1-ROADMAP.md) ·
 requirements: [`milestones/v4.1-REQUIREMENTS.md`](milestones/v4.1-REQUIREMENTS.md) ·
 audit: [`milestones/v4.1-MILESTONE-AUDIT.md`](milestones/v4.1-MILESTONE-AUDIT.md) ·
-phases: `.planning/phases/24{2,3,4,5,6}-*`
+phases: [`milestones/v4.1-phases/`](milestones/v4.1-phases/)
 
 A deliberate **consolidation** milestone — no new capability axis; every requirement closed something
 already sitting in a register. **The ship claims stopped being claims**: all four `SHIP` items closed
