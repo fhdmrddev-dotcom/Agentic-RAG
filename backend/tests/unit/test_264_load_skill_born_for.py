@@ -91,6 +91,7 @@ class _RecordingQuery:
         self._rows = [dict(r) for r in rows]
         self._recorder = recorder
         self._single = False
+        self._writes: list[tuple[str, dict]] = []
 
     # -- projection / ordering: shape-only, deliberately inert -----------------
     def select(self, *_a, **_k):
@@ -122,25 +123,65 @@ class _RecordingQuery:
         self._rows = [r for r in self._rows if _match(r)]
         return self
 
+    # -- writes: shape-only, recorded so a caller can assert they happened ----
+    def insert(self, payload, **_k):
+        self._writes.append(("insert", payload))
+        self._rows = [{"id": "written-row"}]
+        return self
+
+    def update(self, payload, **_k):
+        self._writes.append(("update", payload))
+        self._rows = [{"id": "written-row"}]
+        return self
+
     def execute(self):
         if self._single:
             return _FakeResult(self._rows[0] if self._rows else None)
         return _FakeResult(list(self._rows))
 
 
+class _FakeStorageBucket:
+    def __init__(self, blobs: dict[str, bytes]):
+        self._blobs = blobs
+
+    def download(self, path: str) -> bytes:
+        if path not in self._blobs:
+            raise FileNotFoundError(path)
+        return self._blobs[path]
+
+
+class _FakeStorage:
+    def __init__(self, blobs: dict[str, bytes]):
+        self._blobs = blobs
+
+    def from_(self, _bucket: str):
+        return _FakeStorageBucket(self._blobs)
+
+
 class _FakeSupabase:
     """Per-table fake. `table()` mirrors `test_142_load_skill_flag.py:69-79` in shape."""
 
-    def __init__(self, *, skills: list[dict], skill_files: list[dict], org_members: list[dict]):
+    def __init__(
+        self,
+        *,
+        skills: list[dict],
+        skill_files: list[dict],
+        org_members: list[dict],
+        blobs: dict[str, bytes] | None = None,
+    ):
         self._tables = {
             "skills": skills,
             "skill_files": skill_files,
             "org_members": org_members,
         }
         self.predicates: list[str] = []
+        self.writes: list[tuple[str, dict]] = []
+        self.storage = _FakeStorage(blobs or {})
 
     def table(self, name: str):
-        return _RecordingQuery(self._tables.get(name, []), self.predicates)
+        q = _RecordingQuery(self._tables.get(name, []), self.predicates)
+        q._writes = self.writes
+        return q
 
 
 def _skill_row(
