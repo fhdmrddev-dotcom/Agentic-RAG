@@ -836,6 +836,11 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
               // one called an undefined `navigate` and threw ReferenceError. It goes to the
               // UNGOVERNED connections door, never to `settings`, which is operator-only.
               onOpenConnections={() => onNavigate("connections")}
+              // Phase 262 plan 05 (PACK-11): the composer's second door into the catalog,
+              // wired exactly like the connections door above. ⭐ Deliberate redundancy —
+              // the rail entry is the triad's third leg; this one exists because BUS-303
+              // named both, and because a person wanting an Expert is usually mid-thread.
+              onBrowseExperts={() => onNavigate("experts")}
               // Phase 156 REFINEMENT: the ▷ reopen handle shows only while collapsed.
               onReopenHistory={historyCollapsed ? () => setHistoryCollapsedPersisted(false) : undefined}
             />

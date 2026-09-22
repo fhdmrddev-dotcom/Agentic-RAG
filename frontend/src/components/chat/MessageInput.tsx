@@ -84,6 +84,17 @@ interface Props {
   /** Phase 260 (PACK-02): Active expert consultant bound to the thread. */
   activeExpert?: ExpertBundle | null
   onActiveExpertChange?: (expert: ExpertBundle | null) => void
+  /**
+   * Phase 262 plan 05 (PACK-11): take the person to the Expert catalog — the
+   * `onOpenConnections` precedent two entries up, copied line for line.
+   *
+   * ⛔ OPTIONAL AT EVERY HOP, AND THAT IS MEASURED RATHER THAN cautious: four shipped suites
+   * mount this component from their own prop objects, so a required prop would redden `tsc`
+   * in files Phase 262 does not own. Optional keeps the measured baseline and costs nothing.
+   * ⛔ And absent means the door does NOT render — a control with no navigator is a dead
+   * affordance, which is what D-262-02 refuses a whole requirement over.
+   */
+  onBrowseExperts?: () => void
 }
 
 const PROVIDER_LABELS: Record<string, string> = {
@@ -147,6 +158,7 @@ export function MessageInput({
   workflowLocked = false,
   activeExpert: propActiveExpert,
   onActiveExpertChange,
+  onBrowseExperts,
 }: Props) {
   const [value, setValue] = useState("")
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -599,6 +611,27 @@ export function MessageInput({
                       <Sparkles className="h-4 w-4 text-violet-400" />
                       <span>Invite Expert...</span>
                     </DropdownMenuItem>
+                    {/* Phase 262 plan 05 (PACK-11) — the SECOND door into the Expert catalog.
+                        ⭐ DELIBERATE REDUNDANCY, NOT THE TRIAD'S THIRD LEG. The nav-rail entry
+                        already discharges D-262-03; this exists because the operator's BUS-303
+                        ruling named BOTH doors, and because the mid-thread moment — "I want an
+                        Expert for this" — is where a person actually is when they want one.
+                        ⛔ It is a menu item, never a toolbar control: the composer's top-level
+                        budget is unchanged, and this suite's first case measures that rather
+                        than trusting it. ⛔ No navigator, no item — see the Props docblock. */}
+                    {onBrowseExperts && (
+                      <DropdownMenuItem
+                        data-testid="browse-experts-door"
+                        onSelect={() => {
+                          setPlusMenuOpen(false)
+                          onBrowseExperts()
+                        }}
+                        className="text-xs cursor-pointer gap-2 py-1.5"
+                      >
+                        <Sparkles className="h-4 w-4 text-violet-400" />
+                        <span>Browse Expert Catalog…</span>
+                      </DropdownMenuItem>
+                    )}
                   </div>
                   {/* The third item in the contract's order. ⚠ The shipped `ConnectorsFlyout`
                       inlines the whole connectors panel rather than being a door, so this names

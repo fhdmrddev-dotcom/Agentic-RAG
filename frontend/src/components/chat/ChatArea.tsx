@@ -34,6 +34,12 @@ interface Props {
   onOpenDrawer?: () => void
   /** Take the person to the connections surface — see `ConnectorsFlyout`. */
   onOpenConnections?: () => void
+  // Phase 262 plan 05 (PACK-11): the composer's second door into the Expert catalog. Pure
+  // pass-through — this component decides nothing about it. Optional at every hop, for the
+  // reason `MessageInput`'s own Props docblock gives: four shipped suites mount these
+  // components from their own prop objects and a required prop would redden a typecheck
+  // baseline that has zero headroom.
+  onBrowseExperts?: () => void
   // Phase 156 REFINEMENT (operator 2026-07-16): reopens the folded-away chat-history
   // column (sketch Variant A #reopenA — the ▷ handle in the chat top-bar). Provided by
   // ChatLayout ONLY while the history is collapsed; undefined otherwise, so the handle
@@ -55,7 +61,7 @@ interface Props {
   attentionCount?: number
 }
 
-export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefillMessage, onClearPrefill, onOpenDrawer, onOpenConnections, onReopenHistory, attentionCount }: Props) {
+export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefillMessage, onClearPrefill, onOpenDrawer, onOpenConnections, onBrowseExperts, onReopenHistory, attentionCount }: Props) {
   // Plan 075.4-01 D-075.4-A1: useMessages still exposes the viewed-thread
   // values (isStreaming, fallbackNotice) for back-compat — but the composer
   // disabled prop and per-thread surfaces go through the direct selectors
@@ -538,6 +544,7 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
         if (exp) setExpertInvited(true)
       }}
       onOpenConnections={onOpenConnections}
+      onBrowseExperts={onBrowseExperts}
       onSend={handleSend}
       /* Phase 194.1 Plan 04 (RUN-01 / D-05/D-22) — THE STOP-DISPATCHER PROP IS GONE
          from this element. The composer's Stop is `StopControl` (written WITHOUT its

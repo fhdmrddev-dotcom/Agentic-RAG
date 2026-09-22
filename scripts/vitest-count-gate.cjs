@@ -163,7 +163,10 @@ const BASELINE = {
   "RunCard.timer.test.tsx": 7,
   "ChatArea.approval.test.tsx": 3,
   // ── Phase 260 (PACK-02 / PACK-03) — Consultant Expert UI & Action Tiles ──
-  "ComposerExpert.test.tsx": 5,
+  // ⬆ RAISED 5 → 8 at `262-05`: the composer's catalog door (renders beside the invite door,
+  //   fires its navigator once, and does NOT render when no navigator is wired). ⛔ An
+  //   EXTENSION — Phase 260's five cases, including the UI-budget case, are untouched.
+  "ComposerExpert.test.tsx": 8,
   // ⬆ 5 → 9 at 262-02 (D-262-06 / RESEARCH P-7). RAISED to the gate's own printed figure,
   // never lowered: the four hardcoded demo-Expert sites this suite pinned were RETIRED, and
   // the rewrite lands four cases MORE than the floor it replaced — the honest-empty tile, the

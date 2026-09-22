@@ -12460,7 +12460,17 @@ to do with attention badges.
 
 ### `frontend/src/components/layout/ChatLayout.tsx` — `262-05` (the branch)
 
-**53 / 28 / 1095** at this plan's commit. Previous readings, kept rather than overwritten:
+**54 / 28 / 1082** after plan 05's second commit.
+
+⚠ **AND THE FIRST FIGURE THIS SECTION PUBLISHED WAS WRONG — `53 / 28 / 1095`, written at the triad
+commit, where the file actually measured `53 / 28 / 1077`.** Kept visible rather than silently
+overwritten, because it is this ledger's own recurring finding happening to the person writing the
+warning: **the line count was TYPED from an estimate instead of read from `wc -l` after the last
+edit of the commit**, and `git show 917d79a7b:…ChatLayout.tsx | wc -l` refutes it in one command.
+⛔ **A row that is present and WRONG answers the auditor and stops the audit** — which is exactly the
+sentence the scan-list header carries. Re-derive; never transcribe.
+
+Previous readings, kept rather than overwritten:
 `52 / 27 / 1014` (262-01, inherited-rot correction only) · `51 / 26 / 1010` (244-04) ·
 `50 / 26 / 1005` · `46 / 24 / 921`.
 
@@ -12503,6 +12513,50 @@ gives this surface an error-reporting seam.
 **Named seam:** unchanged and still OWED — the view ladder is now **thirteen** arms in one component.
 The extraction to take is the ladder itself (a `ViewSwitch` that receives the already-held hook
 values), never a second layout.
+
+**Plan 05's SECOND commit adds ONE more line to this file**: `onBrowseExperts={() => onNavigate("experts")}`
+on the existing chat-surface mount, immediately beneath the `onOpenConnections` line it copies. No
+new import, no new state, no new branch.
+
+### `frontend/src/components/chat/MessageInput.tsx` — `262-05` (the composer's second door)
+
+**36 / 18 / 975** after plan 05's second commit. Previous readings, kept: `35 / 17 / 942` (262-01,
+inherited-rot correction only) · `34 / 17 / 942`.
+
+**G-5 FIRES (18 phases) — honoured BY CONSTRUCTION.** One optional prop declared on `Props`, one
+name added to the destructure, and one `DropdownMenuItem` inside the `+` menu's **existing** expert
+section, guarded on the callback. `useState` **unchanged**; no new handler function; no new import
+(the `Sparkles` glyph the invite door already uses is reused, so one mark still means one thing).
+
+⛔ **THE COMPOSER'S TOP-LEVEL CONTROL BUDGET IS UNCHANGED, AND THAT IS MEASURED RATHER THAN CLAIMED.**
+`ComposerExpert.test.tsx`'s first case counts `<button>` elements inside the toolbar container and
+asserts none of them names an Expert; research P-9 measured that a `DropdownMenuItem` does not
+register there. **Phase 260's five cases, that one included, are untouched** — the pin went 5 → 8,
+an extension, never a lowering.
+
+⛔ **NO NAVIGATOR, NO ITEM — and the negative arm is a real case, not an inference.** A menu entry
+rendered without a callback is a dead affordance, which is the thing D-262-02 refuses a whole
+requirement over, and it would also have surfaced in the four shipped suites that mount this
+component from their own prop objects. ⚠ **Recorded honestly: that third case PASSED at RED**, before
+the feature existed, because an absent element is absent for either reason. It earns its place as a
+regression fence for the guard, not as evidence the guard was built.
+
+⚠ **THE PROP IS OPTIONAL AT EVERY HOP, FOR A MEASURED REASON.** A required prop would redden `tsc` in
+files this plan does not own, against a `tsconfig.app.json` baseline with **zero headroom** (70
+errors at base, and the set diff after both commits is EMPTY).
+
+### `frontend/src/components/chat/ChatArea.tsx` — `262-05`
+
+**78 / 39 / 889** after plan 05's second commit. Previous reading, kept: `77 / 38 / 882` (262-01,
+which re-derived it and found it HELD — the only one of eight that did).
+
+**G-5 FIRES (39 phases) — honoured BY CONSTRUCTION, and the arithmetic is three lines.** One optional
+prop on `Props`, one name in the destructure, one forward onto the existing `MessageInput` mount.
+`useState` **unchanged**, `useEffect` **unchanged**, **zero** new branches, **zero** new reads. This
+component decides nothing about the new door; it is a waypoint on the shipped `onOpenConnections`
+chain, copied line for line.
+
+**Named seam:** unchanged and still owed — this component's prop list, not this prop.
 
 ### `frontend/src/components/library/LibraryHeaderBar.tsx` — row added `244-04`
 
