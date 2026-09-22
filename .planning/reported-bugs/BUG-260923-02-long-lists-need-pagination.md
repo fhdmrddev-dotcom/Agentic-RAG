@@ -53,6 +53,14 @@ failure mode to avoid.
 (`experts.py:393`) — each returns a full `list[...]`. They are short today; the chat-history
 column and the Skills / Experts catalogs grow without bound per user or org.
 
+## Update 2026-09-23 — Spend ledger FIXED (`43360c9bc`)
+
+The truncation is fixed on `develop`: the ledger pages with the shared `PaginationControls`
+("Showing 1–50 of N", Previous / Next); page clicks refetch the ledger only; a filter change
+returns to page 1. 4 new tests, RED without the fix. **Not yet deployed to production.** The
+app-wide half (one pager, one backend convention, the unpaged `/threads` `/skills` `/experts`)
+remains open — this report stays `open` for it.
+
 ## Why it matters
 
 - **Spend:** an operator reading the ledger to reconcile cost sees 50 of 1,183 runs with no way to
