@@ -10699,7 +10699,7 @@ cells rot within days.
 | [`backend/app/api/settings.py`](docs/HOT-FILE-LEDGER.md#backendappapisettingspy) | 41 / 21 / 1048 | ⚠ **FIRES** | honoured by construction (**249-02/03**): ONE `_verified_model_ids` helper w/ 2 callers; PUT gains a refusal arm → 400. ⛔ the 500 arm for an unreachable DB is unchanged |
 | [`backend/app/services/multimodal_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmultimodal_servicepy) | 14 / 7 / 984 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** — row added SEED-227, which is also where its silent truncation was found |
 | [`backend/app/api/documents.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentspy) | 87 / 34 / 2414 | ⚠ **FIRES** | ✅ **DISCHARGED AGAIN (240-03)** — the email-attachment loop extracted to `services/email_attachments.py`. 240-04 adds the conversation read |
-| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 235 / 55 / 5923 | ⚠ **FIRES** | ⚠ row STALE a 7th time (`222/49/5787`). **263-04**: `SkillFormDialog.test.tsx` ADOPTED into BOTH knobs — `grep -ic skill` read **0**, so every skills suite ran NOWHERE |
+| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 242 / 55 / 6056 | ⚠ **FIRES** | ⚠ STALE a 9th time, and the 2 registers DISAGREED (CLAUDE.md read `236/58/5988`, whose `58` counted 3 dated quick tasks). **262-03** adopts both catalog suites into BOTH knobs |
 | [`backend/app/services/eval_runner_service.py`](docs/HOT-FILE-LEDGER.md#backendappserviceseval_runner_servicepy) | 13 / 8 / 1040 | ⚠ **FIRES** | ⚠ STALE at `12/7/959`, and absent until 196 at 7 phases. **256-03**: its finalize stopped passing `input_tokens=None`. Re-derived by 256-04 |
 | [`frontend/src/components/panel/PhaseCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasecardtsx) | 17 / 11 / 788 | ⚠ **FIRES** | ⚠ row STALE (`16/10/755`) — 252 touched it. NOT modified by 253; re-derived under CR-08. honoured by construction (200 / 214) |
 | [`frontend/src/components/panel/PhaseTimeline.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasetimelinetsx) | 10 / 8 / 404 | ⚠ **FIRES** | ⚠ row STALE (`9/7/385`) — 252 touched it. NOT modified by 253; re-derived under CR-08. honoured by construction (**214**); absent from BOTH until 200 |
@@ -10947,9 +10947,9 @@ cells rot within days.
 | [`backend/app/api/skills.py`](docs/HOT-FILE-LEDGER.md#backendappapiskillspy) | 19 / 10 / 858 | ⚠ **FIRES** | ⛔ absent from BOTH registers its ENTIRE LIFE at 10 phases — row added at 263 PLANNING. ⛔ `is_org_shared` HARD-SET False at `:250`; D-263-06 routes around it by provenance, never through the gate. |
 | [`frontend/src/lib/activeViewReachability.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibactiveviewreachabilityts) | 1 / 1 / 159 | no (created 262-01) | ⚠ the AT-PLANNING row read `0/0/0`; measured in its own creating commit. ⛔ The ONE ActiveView↔ChatLayout-branch fence — AST, never grep; it THROWS on a vacuous parse |
 | [`frontend/src/components/experts/expertIcon.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertsexperticontsx) | 1 / 1 / 72 | no (new) | ⚠ `0/0/0` AT PLANNING; **measured `1/1/72` at 262-02**. ⛔ The ONE home of expert-icon resolution — a CLOSED 11-key lucide map. Reads `icon`, never `slug`/`name`: that match IS the retired artefact |
-| [`frontend/src/components/experts/catalog/expertCatalog.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogexpertcatalogts) | 0 / 0 / 0 | no (new) | young (created 262). Row added AT PLANNING. Pure search/category/folder-name resolution. ⛔ An unresolvable folder id returns an UNKNOWN marker, never a drop — a blank is a claim nobody made |
-| [`frontend/src/components/experts/catalog/ExpertCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogexpertcardtsx) | 0 / 0 / 0 | no (new) | young (created 262). Row added AT PLANNING. The catalog's 5-element card face, COUNTS only. ⛔ Zero lecturing prose on the face (sketch 261-262) — the NAMES belong to the detail modal |
-| [`frontend/src/components/experts/catalog/ExpertCatalogPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogexpertcatalogpagetsx) | 0 / 0 / 0 | no (new) | young (created 262). Row added AT PLANNING. Renders EXACTLY what `listExperts()` returned. ⛔ No grey-out, no locked row: PACK-11's vanish is the server's list, never a filter here |
+| [`frontend/src/components/experts/catalog/expertCatalog.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogexpertcatalogts) | 1 / 1 / 96 | no | ⚠ `0/0/0` AT PLANNING; measured at **262-03**. Pure search/category/folder-name resolution. ⛔ An unresolvable folder id returns an UNKNOWN marker, never a drop — a blank is a claim nobody made |
+| [`frontend/src/components/experts/catalog/ExpertCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogexpertcardtsx) | 1 / 1 / 159 | no | ⚠ `0/0/0` AT PLANNING; measured at **262-03**. The 5-element face, folders as a COUNT. ⛔ Zero lecturing prose on it (sketch 261-262) — the NAMES belong to the detail modal |
+| [`frontend/src/components/experts/catalog/ExpertCatalogPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogexpertcatalogpagetsx) | 1 / 1 / 189 | no | ⚠ `0/0/0` AT PLANNING; measured at **262-03**. Renders EXACTLY what the grant-aware read returned. ⛔ No grey-out, no second card variant: PACK-11's vanish is the server's list, never a filter here |
 | [`frontend/src/components/experts/catalog/ExpertDetailModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogexpertdetailmodaltsx) | 0 / 0 / 0 | no (new) | young (created 262). Row added AT PLANNING. PACK-12's only renderer of `when_to_use`/`example_output` and of folder NAMES. ⛔ The CONTENT is asserted, never a `data-testid` |
 | [`frontend/src/components/experts/catalog/startScopedChat.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogstartscopedchatts) | 0 / 0 / 0 | no (new) | young (created 262). Row added AT PLANNING. PACK-13's ONE ordered handoff: create → setThreadActiveExpert → refresh → select → navigate. ⛔ A failed patch does NOT navigate |
 
@@ -16625,7 +16625,13 @@ TARGETS entry).
 
 ⭐ **The row goes in at creation, not at the third phase.** An absent row is invisible to G-5 at any commit count, and this repository has paid for that four times (`App.tsx` 23 phases, `NavPanel.tsx` 11, `backend/app/config.py` its entire life, `frontend/src/lib/api.ts` — the hottest file in the repo, whose absence made a SUPERLATIVE in CLAUDE.md wrong for a structural reason). Precedent for adding at creation: `frontend/src/lib/workspaceAllowedExt.ts`.
 
-**Binding invariant:** young (created 262). Row added AT PLANNING. Pure search/category/folder-name resolution. ⛔ An unresolvable folder id returns an UNKNOWN marker, never a drop — a blank is a claim nobody made
+⚠ **MEASURED `1 / 1 / 96` AT 262-03**, in the commit that created it. The `0 / 0 / 0` planning triple is kept above rather than overwritten: it was already false the moment the file landed, which is the exact rot this ledger exists to stop.
+
+**Binding invariant:** Pure search/category/folder-name resolution — no React, no fetch, no module-level state (`grep -cE "useState|useEffect|fetch\(|import .*react"` → **0**).
+
+⛔ **THE CATEGORY PILLS ARE DERIVED, NEVER LISTED.** Sketch 261-262 draws five named pills and `category` is free text defaulting to `'General'` (mig 189), so a hardcoded menu would advertise categories nobody authored — a SIXTH demo-Expert-class artefact in the very phase that retired five (RESEARCH R-7 / plan 02). `grep -cE "Finance & Accounting|Legal & Compliance|Platform & Dev|HR & Ops"` → **0**, and `categoriesOf([])` returns `[]`.
+
+⛔ **AN UNRESOLVABLE FOLDER ID IS A REAL STATE, NOT DEFENSIVE PADDING**, and the one seeded system Expert proves it: mig `188:29-37` seeds its knowledge folder into a SINGLE org, so every other org's `listFolders()` resolves nothing for it. `ResolvedFolder` is a discriminated union with no optional `name`, so a caller can distinguish *"binds no folders"* from *"binds folders I cannot see"* and can never render `undefined` as a label. **Driven RED first** against a stub that filtered unresolvable ids out — the silent drop is the defect the union prevents. A folder resolving to a BLANK name is likewise `known: false`: a blank is the same failure as a drop.
 
 
 ---
@@ -16636,7 +16642,17 @@ TARGETS entry).
 
 ⭐ **The row goes in at creation, not at the third phase.** An absent row is invisible to G-5 at any commit count, and this repository has paid for that four times (`App.tsx` 23 phases, `NavPanel.tsx` 11, `backend/app/config.py` its entire life, `frontend/src/lib/api.ts` — the hottest file in the repo, whose absence made a SUPERLATIVE in CLAUDE.md wrong for a structural reason). Precedent for adding at creation: `frontend/src/lib/workspaceAllowedExt.ts`.
 
-**Binding invariant:** young (created 262). Row added AT PLANNING. The catalog's 5-element card face, COUNTS only. ⛔ Zero lecturing prose on the face (sketch 261-262) — the NAMES belong to the detail modal
+⚠ **MEASURED `1 / 1 / 159` AT 262-03**, in the commit that created it. The `0 / 0 / 0` planning triple is kept above rather than overwritten.
+
+**Binding invariant:** the five-element anatomy from sketch 261-262 §1 — identity gem (`ExpertIcon`, reading the `icon` column), name, `category · provenance` meta line, scope-mode badge; a scope envelope of pills (folder COUNT + skill NAMES + connection NAMES); up to three tiles from the Expert's own `prompt_suggestions`; a `Details` / `Start Chat` footer.
+
+⛔ **ELEMENT 2 IS A PROHIBITION AND IT IS LOAD-BEARING:** no lecturing paragraph on the face. `grep -c "when_to_use"` → **0**. That prose is the detail modal's job (PACK-12, plan 04), and the sketch removes it from the face deliberately ("less text, more visuals").
+
+⛔ **THERE IS NO SECOND VARIANT OF THIS CARD** — no greyed row, no disabled row, no badge offering a paid door. `grep -ciE "clone|upgrade to|locked|unlock"` → **0**. D-262-02: an Expert the caller may not use does not appear at all.
+
+⚠ **THE TILES ARE DISPLAY, NOT TRIGGERS, AS SHIPPED IN 262-03.** One-click execution is PACK-13 (plan 05) and this card's declared props carry no prompt-bearing callback; a tile wired to anything other than running its own prompt would be a control that lies about itself. When plan 05 lands, the tile gains its own callback — it does not get quietly pointed at `onStartChat`.
+
+⛔ **The retired identifiers this card must never re-grow** are recorded under `frontend/src/components/chat/ExpertSpotlightCard.tsx` (262-02's per-site table). They are deliberately not spelled here: a comment naming them satisfies the very greps that prove they are gone.
 
 
 ---
@@ -16647,7 +16663,13 @@ TARGETS entry).
 
 ⭐ **The row goes in at creation, not at the third phase.** An absent row is invisible to G-5 at any commit count, and this repository has paid for that four times (`App.tsx` 23 phases, `NavPanel.tsx` 11, `backend/app/config.py` its entire life, `frontend/src/lib/api.ts` — the hottest file in the repo, whose absence made a SUPERLATIVE in CLAUDE.md wrong for a structural reason). Precedent for adding at creation: `frontend/src/lib/workspaceAllowedExt.ts`.
 
-**Binding invariant:** young (created 262). Row added AT PLANNING. Renders EXACTLY what `listExperts()` returned. ⛔ No grey-out, no locked row: PACK-11's vanish is the server's list, never a filter here
+⚠ **MEASURED `1 / 1 / 189` AT 262-03**, in the commit that created it. The `0 / 0 / 0` planning triple is kept above rather than overwritten.
+
+**Binding invariant:** the page owns NO visibility opinion. It renders `filterExperts(experts, …)` over exactly what the grant-aware list read returned and nothing else — no second card variant, no disabled row, no second list of Experts-you-could-have. **PACK-11's vanish IS the server's list arriving shorter**, so the page must have no mechanism by which a row could be re-added. `grep -cE "listExperts\("` → **exactly 1**; `grep -cE "for_management|forManagement|/resolve"` → **0**, so neither the management arm (which needs `experts:manage` and returns the unfiltered roster) nor the resolver endpoint (whose shape carries none of mig 189's four presentation columns) is reachable from this surface. **The two are named in `262-03-SUMMARY.md` rather than in the source**, because a comment spelling them satisfies the greps that prove they are unreachable — the tension 262-02 recorded, resolved the same way.
+
+⛔ **`folders` SHIPS ON THE PROPS INTERFACE BUT IS NOT DESTRUCTURED** in 262-03. Its first consumer is the detail modal in plan 04; `tsconfig.app.json` sets `noUnusedParameters`, so an unused destructured binding raises `TS6133` against a tsc base of 70 with no headroom. The component takes `props` and reads `props.onStartChat` / `props.onInspect`. **The prop is the contract; only the binding waits.**
+
+⚠ **THE REFUSAL STATE RENDERS THE SERVER'S OWN SENTENCE** verbatim beside ZERO cards, because `handleResponse` already folds `detail.upgrade_hint` into the thrown message. This is **D-262-10's flagged edge**, taken deliberately rather than silently: D-262-02 governs what the catalog LISTS, and the shipped `InviteExpertDialog.tsx:102-106` renders the same string in the same situation, so a second refusal vocabulary would make two surfaces disagree about one fact. **Cheap to reverse if the operator rules otherwise.**
 
 
 ---

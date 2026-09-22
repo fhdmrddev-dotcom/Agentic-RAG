@@ -185,6 +185,17 @@ const BASELINE = {
   // payload omission, both grant-revocation fail-open arms, the unread-library THIRD
   // banner state and its positive control, and born_skills on both payloads.
   "ExpertAuthoringStudio.test.tsx": 23,
+  // ── Phase 262 plan 03 (PACK-11) — the Expert catalog ───────────────────────────────
+  // ⚠ ADOPTED, not raised — both figures taken from the gate's OWN printed `— N new`
+  // column on the run that first named them in TARGETS, never from a local vitest tail.
+  // `src/components/experts` has no bare-directory TARGETS entry, so without these two
+  // pins the catalog suites would RUN and GUARD NOTHING (TARGETS decides what runs;
+  // BASELINE decides what is guarded, and a suite can sit on the wrong side of one).
+  // ⛔ `ExpertCatalogPage.test.tsx` carries PACK-11's vanish, its POSITIVE CONTROL and
+  // the no-consolation-prize arm; dropping any of them would let a catalog advertising
+  // an Expert the caller cannot use ship green.
+  "expertCatalog.test.ts": 10,
+  "ExpertCatalogPage.test.tsx": 8,
   // ── Phase 263 (PACK-14/PACK-15) — the dialog an Expert proposal reuses ──────────────
   // ⚠ ADOPTED, not raised: before 263-04 `grep -ic "skill" scripts/vitest-count-gate.cjs`
   // returned 0 — NOT ONE skills suite was in either knob, so this file's 8 passing tests
@@ -4406,6 +4417,16 @@ const TARGETS = [
   // ── Phase 261 (PACK-07 / PACK-09 / PACK-10) — Expert Authoring Studio & Org Management ──
   "src/components/experts/__tests__/OrgExpertsTab.test.tsx",
   "src/components/experts/__tests__/ExpertAuthoringStudio.test.tsx",
+  // ── Phase 262 plan 03 (PACK-11) — the Expert catalog ───────────────────────────────
+  // ⛔ BOTH KNOBS, SAME COMMIT, and the directory trap is the reason: `src/components/experts`
+  // has NO bare-directory entry — every sibling above is named FILE-LEVEL — so a suite dropped
+  // into `src/components/experts/catalog/__tests__/` runs in NO gate until it is NAMED here
+  // *and* pinned in BASELINE. The comment four lines above the expertIcon entry records this
+  // exact trap firing in the commit that wrote the warning; these two are named so it does not
+  // fire a third time. They carry PACK-11's vanish, its positive control and its
+  // no-consolation-prize arm — the criterion ROADMAP calls "the one most likely to be faked".
+  "src/components/experts/catalog/__tests__/expertCatalog.test.ts",
+  "src/components/experts/catalog/__tests__/ExpertCatalogPage.test.tsx",
   // ── Phase 263 (PACK-14/PACK-15) — the dialog an Expert proposal reuses ──────────────
   // ⚠ `src/components/skills` has NO bare-directory TARGETS entry, and this file is NOT
   // under a `__tests__/` directory — so before this line it ran in NO gate at all.
