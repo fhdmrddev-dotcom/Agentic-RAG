@@ -445,7 +445,7 @@ unread. **So the milestone cannot report 25/25.** Full derivation:
 | 261 | PACK-07, PACK-08, PACK-09, PACK-10 | TBD |
 | 262 | PACK-11, PACK-12, PACK-13 | 3 |
 | 263 | PACK-14, PACK-15, PACK-16, PACK-17 | TBD |
-| **Total** | | **25 / 25** |
+| **Total** | | **32** (~~25 / 25~~ — mis-summed; corrected at the v4.3 audit 2026-09-23) |
 
 ⚠ **The `METER-*` split is by DELIVERY BOUNDARY, not by numbering.** `METER-03/04/05/06` are one
 capability — *a token that was spent is written down* — and `METER-01/02/07` are another — *a written-down
@@ -472,14 +472,14 @@ stops the check — the same failure class this project's hot-file ledger keeps 
 |-------|----------------|--------|-----------|
 | 255. The Extension Contract | 3/3 | Complete — verified | 2026-09-18 |
 | 256. Every Token Is Counted And Kept | 5/5 | Complete — verified | 2026-09-19 |
-| 257. Cost in Dollars, and What It Cannot See | 4/4 | Closed — **2 of 4 SC fully met** (SC#1 PARTIAL, **SC#3 NOT MET — F-13**); ⛔ **mig 185 NOT applied to live DB**; ⛔ no VERIFICATION.md · `BUS-280` | 2026-09-19 |
-| 258. A Tier Becomes Enforceable | 3/3 | Closed — ⚠ entitlement gates **authoring, not execution** (F-2); ⛔ mig 186 rides the milestone-close batch; ⛔ no VERIFICATION.md · `BUS-283` | 2026-09-19 |
-| 259. An Expert Is a Bundle, Not a Runtime | 3/3 | Closed — ⛔ no VERIFICATION.md | 2026-09-19 |
-| 260. The Expert You Can Actually Use | 3/3 | Closed — ⛔ no VERIFICATION.md | 2026-09-20 |
-| 261. An Expert You Can Author | 5/5 | Closed — reviewed (addendum: F-1/F-2/F-3 accepted, one regression found and fixed); ⛔ no VERIFICATION.md | 2026-09-21 |
+| 257. Cost in Dollars, and What It Cannot See | 4/4 | Complete — `257-VERIFICATION.md` (independent, 2026-09-23); SC#3 closed (`f34106d5a`, `856c09ea0`); SC#1 PARTIAL by decision; mig 185 applied locally; /admin/spend browser pass owed | 2026-09-19 |
+| 258. A Tier Becomes Enforceable | 3/3 | Complete — `258-VERIFICATION.md` (independent); F-2 closed: execution + every authoring write gated (`c28853142`, `124dc444b`); anon grant revoked by mig 192; prod tiers owed at deploy | 2026-09-19 |
+| 259. An Expert Is a Bundle, Not a Runtime | 3/3 | Complete — `259-VERIFICATION.md` passed (independent) | 2026-09-19 |
+| 260. The Expert You Can Actually Use | 3/3 | Closed — `260-VERIFICATION.md` (independent): PACK-02/03 met; ⛔ **PACK-05 NOT MET**, carried forward to `SEED-304` (tenancy decision) | 2026-09-20 |
+| 261. An Expert You Can Author | 5/5 | Complete — `261-VERIFICATION.md` (independent); Disable + role grants fixed (`cdf3a308a`); G-4 UAT owed | 2026-09-21 |
 | 262. An Expert You Can Discover | 5/5 | Complete — 3/3 SC verified; lived UAT `262-UAT.md`: 29 pass / 0 open / 1 skipped (R.6); 7 defects found and fixed in-session (3.1, R.3, 1.2, 3.6, 3.5 + Skills mobile + skill 403 noise); ⚠ self-verified, independent review owed; D-262-10 ruling owed | 2026-09-23 |
 <!-- superseded row, kept: | 262. An Expert You Can Discover | **0/0** | ⛔ **NEVER BUILT — and the three commits tagged `(262)` are DIFFERENT WORK** (model-capability routing + mig 190). PACK-12 **NOT MET** on the user path, PACK-11 **UNVERIFIED**. Reconstructed record: `262-RECORD.md` | — | -->
-| 263. An Expert Can Be Given Its Capabilities | 4/4 | Closed — code-reviewed (CR-01 routed to 264; CR-02/03 + 7 warnings fixed); ⛔ no VERIFICATION.md | 2026-09-22 |
+| 263. An Expert Can Be Given Its Capabilities | 4/4 | Complete — `263-VERIFICATION.md` (independent, human_needed: post-WR-08 live re-drive owed) | 2026-09-22 |
 | 264. Born-For Skills Must LOAD, Not Just Resolve | 4/4 | Complete — 5/5 SC verified; 13/13 UAT rows driven, 13 PASS | 2026-09-22 |
 
 ⛔ **THE MILESTONE CANNOT CLOSE CLEANLY YET, and the reasons are operator rulings, not build work.**
@@ -494,6 +494,24 @@ stops the check — the same failure class this project's hot-file ledger keeps 
 | 6 | `SEED-013` Open Platform sequencing · `OV-248-01` register ruling | operator | `BUS-263` |
 | 7 | Owed manual UAT + the `todoRunHonesty` wording ruling | operator | `BUS-246`, `BUS-248` |
 
+⭐ **RESOLVED AT THE v4.3 AUDIT, 2026-09-23 — the table above is kept as it was when written.** The
+operator delegated closure ("do anything needed so we can close this milestone"):
+
+| # | Resolution |
+|---|---|
+| 1 | Mig 185 **applied locally** at `3a4520498` (2026-09-19). Production application rides the milestone deploy batch (183–192) |
+| 2 | **Still owed at DEPLOY time, not at close** — set a tier on both production orgs before the backend ships. Recorded in the audit's deploy checklist |
+| 3 | Decided **one home, two spellings**: `pricing_service.cost_usd_sql()` generates the SQL beside the Python; a text fence + a Postgres parity test (`f34106d5a`) |
+| 4 | Decided **fold into close**: execution gated at the chat kickoff and the scheduled launch (`c28853142`), and every authoring write (`124dc444b`) |
+| 5 | **Done**: migration 192 revokes anon (`e4ac67ff9`) |
+| 6, 7 | Not v4.3 requirements — carried forward on their own bus items |
+
+⭐ **Six independent VERIFICATION.md files now exist** for 257–261 and 263 (fresh verifier agents that
+did not build them). They found real gaps — six ungated authoring writes, a false refusal reason,
+role grants that could never match, no Disable in the app, and PACK-05's knowledge unreachable from
+any real org. All but PACK-05 were fixed; PACK-05 is carried to `SEED-304` by decision.
+
+⚠ *(The paragraph below was true when written; the six missing VERIFICATION files it names now exist.)*
 ⚠ **SEVEN of the ten phases carry `independent_review: owed`** (257–263). 264 was planned, executed
 **and** verified inside one session, which the standing separation rule exists to prevent. ⛔ Six
 phases (257–261, 263) have **no VERIFICATION.md at all** — they were closed on summaries.

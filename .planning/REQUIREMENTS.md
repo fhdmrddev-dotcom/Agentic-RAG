@@ -47,16 +47,16 @@ exception is proposed, and it costs a page.
 tools) **is** the graded-governance product claim. A claim about what is *structurally impossible*
 survives exactly zero exceptions, so a third-party executor does not weaken it — it deletes it.
 
-- [ ] **EXT-01**: The extension contract is written down as binding project law — *a plugin is DATA,
+- [x] **EXT-01**: The extension contract is written down as binding project law — *a plugin is DATA,
       an EXTERNAL PROCESS, or SANDBOXED CODE, and never engine code* — in one durable home, naming
       the three permitted mechanisms and, explicitly, the things it **refuses**: third-party
       executors / emitters / validators, a generic HTTP egress node, and branching-or-looping
       workflow graphs as a plugin concern.
-- [ ] **EXT-02**: A mechanical guard **fails** when an executor, emitter, validator, programmatic
+- [x] **EXT-02**: A mechanical guard **fails** when an executor, emitter, validator, programmatic
       function or agent tool becomes resolvable from data, config, a database row or a user-supplied
       name — over the six `trigger_paths` `SEED-291` names. ⛔ Driven **RED against a planted
       violation** before it is trusted; a guard nobody has seen fire is not a guard.
-- [ ] **EXT-03**: Each of the three permitted mechanisms has a named home and one worked example a
+- [x] **EXT-03**: Each of the three permitted mechanisms has a named home and one worked example a
       third party could follow **without seeing engine code** (data → a skill / workflow definition /
       template; external process → `mcp_client.py`; sandboxed code → `sandbox_service.py`).
 
@@ -71,12 +71,12 @@ harder than building it before one exists.
       **visible as unrated**, never silently free.
 - [x] **METER-02**: One token→USD conversion function, in one home, and every caller uses it. ⛔ A
       second conversion site anywhere is the fragmentation failure this requirement exists to prevent.
-- [ ] **METER-03**: A workflow / harness run **persists** its token totals — `workflow_runs` gains
+- [x] **METER-03**: A workflow / harness run **persists** its token totals — `workflow_runs` gains
       token columns and the harness's existing in-memory box is rolled up at finalize.
-- [ ] **METER-04**: Sub-agent token usage rolls up to the producer run instead of vanishing.
-- [ ] **METER-05**: A chat run that paused for `ask_user` or was continued **keeps its token count** —
+- [x] **METER-04**: Sub-agent token usage rolls up to the producer run instead of vanishing.
+- [x] **METER-05**: A chat run that paused for `ask_user` or was continued **keeps its token count** —
       the two `input_tokens=None` finalize sites at `api/runs.py:677` and `:1331` write real totals.
-- [ ] **METER-06**: The `llm_emit` / `forced_emit` blind spot is **either counted or registered** —
+- [x] **METER-06**: The `llm_emit` / `forced_emit` blind spot is **either counted or registered** —
       a named register entry with a re-open trigger. ⛔ It may not be left silently uncounted, because
       a spend figure with an unnamed hole in it is worse than no figure.
 - [x] **METER-07**: An operator can see spend in dollars per run and per org, and the view states
@@ -86,15 +86,15 @@ harder than building it before one exists.
 
 `SEED-080` + `SEED-083`. The columns have existed since migration 104 and **nothing reads them**.
 
-- [ ] **TIER-01**: ONE reusable entitlement check exists, in one home, reading
+- [x] **TIER-01**: ONE reusable entitlement check exists, in one home, reading
       `organizations.subscription_tier` + `add_ons`. Greenfield — there is no stub to replace.
-- [ ] **TIER-02**: A capability map declares what each tier contains, **as data, not as branches** —
+- [x] **TIER-02**: A capability map declares what each tier contains, **as data, not as branches** —
       so re-packaging is a row change and not a deploy.
-- [ ] **TIER-03**: An entitlement refusal **names the tier that would allow it**. ⛔ Never a bare 403;
+- [x] **TIER-03**: An entitlement refusal **names the tier that would allow it**. ⛔ Never a bare 403;
       a refusal a buyer cannot act on is a support ticket.
-- [ ] **TIER-04**: A guard fails on a **second ad-hoc tier check** anywhere in the backend — the
+- [x] **TIER-04**: A guard fails on a **second ad-hoc tier check** anywhere in the backend — the
       one-home rule enforced rather than asked for, before two implementations exist.
-- [ ] **TIER-05**: The entitlement check **fails closed on an unreadable tier**, and that arm is
+- [x] **TIER-05**: The entitlement check **fails closed on an unreadable tier**, and that arm is
       driven. ⚠ Contrast `load_run_budget`, which fails **open** deliberately; these are opposite
       choices for opposite reasons and the difference is recorded, not inherited.
 
@@ -105,18 +105,18 @@ new agent type. ⛔ **No new executor. No expert-specific agent loop. No paralle
 `v3.6 D-14` verbatim, one subsystem over, and the moment an Expert has its own execution path this
 requirement has failed.
 
-- [ ] **PACK-01**: An Expert is a bundle row — name, description, member skills, required
+- [x] **PACK-01**: An Expert is a bundle row — name, description, member skills, required
       connections, knowledge scope, prompt suggestions, visibility — and **nothing executes it**. The
       existing agent loop executes; the Expert only decides what is in scope.
-- [ ] **PACK-02**: An Expert is selectable in a chat thread and scopes that thread.
-- [ ] **PACK-03**: An Expert ships its *"Try asking…"* prompts as the onboarding affordance.
-- [ ] **PACK-04**: RLS applies to the **bundle AND to every member**, and the member check is **not**
+- [x] **PACK-02**: An Expert is selectable in a chat thread and scopes that thread.
+- [x] **PACK-03**: An Expert ships its *"Try asking…"* prompts as the onboarding affordance.
+- [x] **PACK-04**: RLS applies to the **bundle AND to every member**, and the member check is **not**
       skipped because the bundle passed. ⚠ `SEED-125` was a **real** cross-org skill leak, not a
       hypothetical, and a bundle can leak a *folder reference* even when every skill in it is clean.
 - [ ] **PACK-05**: One first-party Expert ships **end to end** — Financial Analyzer, because finance
       is where *answer from the documents or refuse* is most obviously correct. ⛔ If the slice is not
       valuable with one Expert, the feature is wrong and a directory of twelve will not save it.
-- [ ] **PACK-06**: An Expert is gated by `TIER-01`. ⭐ **This is what makes a pack a SKU rather than a
+- [x] **PACK-06**: An Expert is gated by `TIER-01`. ⭐ **This is what makes a pack a SKU rather than a
       folder anyone can copy**, and it is why `TIER-*` sequences before `PACK-*`.
 
 ⚠ **`PACK-07` … `PACK-13` are DEFINED IN `ROADMAP.md` AND NOT HERE.** Phases 261 and 262 were added
@@ -124,6 +124,31 @@ directly to the roadmap without backfilling this register, so the requirement te
 authoring and discovery lives in one place only. Recorded rather than quietly fixed: the ids are
 real and mapped below, but **this file is not their home and a reader looking here will not find
 them.** Backfill belongs to whoever next edits 261/262 scope.
+
+⭐ **BACKFILLED 2026-09-23 at the v4.3 milestone audit** — the paragraph above was true when written
+and is kept. Text below is taken from each phase's ROADMAP success criteria, condensed; the ROADMAP
+criteria remain the acceptance bar.
+
+### Authoring an Expert (Phase 261)
+
+- [x] **PACK-07**: An org-admin creates, edits, disables and deletes an Expert from a surface in the
+      app — no SQL, no API client — calling the existing `/experts` endpoints.
+- [x] **PACK-08**: Who may author is DATA (`role_permissions`), not a branch; a second hardcoded role
+      check fails a fence.
+- [x] **PACK-09**: AI-assisted authoring produces a DRAFT row a human edits and saves — never
+      auto-published, closed core unchanged — and brainstorm uploads are NOT silently ingested into
+      the knowledge base.
+- [x] **PACK-10**: An Expert can be restricted to named users or roles; a user outside the set can
+      neither see it nor invite it.
+
+### Discovering an Expert (Phase 262)
+
+- [x] **PACK-11**: A catalog shows every Expert the caller may use and none they may not (tier AND
+      grants).
+- [x] **PACK-12**: Each card opens a detail view — what it does, when to use it, knowledge, connections,
+      example prompts — with rendered content asserted.
+- [x] **PACK-13**: From the detail view the user starts a scoped conversation in one action, reusing
+      Phase 260's invite path.
 
 ### Giving an Expert its capabilities (Phase 263)
 
@@ -134,18 +159,18 @@ operating blueprint and selected **`docx`, `xlsx`, `pptx`** as its capabilities,
 file formats. ⭐ **An Expert is a manifest over assets that already exist; 259/260/261 built the
 manifest and nothing builds the assets.**
 
-- [ ] **PACK-14**: Drafting an Expert names the domain skills it needs that **do not exist yet** —
+- [x] **PACK-14**: Drafting an Expert names the domain skills it needs that **do not exist yet** —
       named, described, and visibly distinguished from the skills already in the library.
-- [ ] **PACK-15**: A proposed skill becomes real **only on human approval**, one at a time, created
+- [x] **PACK-15**: A proposed skill becomes real **only on human approval**, one at a time, created
       through the **existing** `skill-creator` / `save_skill` path. ⛔ A second skill-authoring
       engine is the thing to refuse, and the closed-core inventory must be measurably unchanged —
       a skill is DATA, which is precisely why `EXT-01` permits this at all.
-- [ ] **PACK-16**: An Expert saved with a skill that does not exist **says so before it is saved**.
+- [x] **PACK-16**: An Expert saved with a skill that does not exist **says so before it is saved**.
       ⛔ Today the drafter's *"or recommend 3-5 skill names"* hatch produces names that
       `expert_service.py`'s phase-2 member check strips at **run** time, so an author sees
       capabilities the Expert will never have and nothing warns them. Save time is the only moment
       a human can still act.
-- [ ] **PACK-17**: A skill authored for one org is **never** visible or resolvable to another, driven
+- [x] **PACK-17**: A skill authored for one org is **never** visible or resolvable to another, driven
       against a cross-org caller. ⚠ `SEED-125` was a **real** cross-org skill leak, and this
       requirement creates skills programmatically — which is exactly how one would recur.
 
@@ -240,38 +265,38 @@ Per `SEED-294`, stated here because they get harder to unwind as the work compou
 
 | REQ-ID | Phase | Status |
 |---|---|---|
-| EXT-01 | Phase 255 — The Extension Contract | Pending |
-| EXT-02 | Phase 255 — The Extension Contract | Pending |
-| EXT-03 | Phase 255 — The Extension Contract | Pending |
-| METER-03 | Phase 256 — Every Token Is Counted And Kept | Pending |
-| METER-04 | Phase 256 — Every Token Is Counted And Kept | Pending |
-| METER-05 | Phase 256 — Every Token Is Counted And Kept | Pending |
-| METER-06 | Phase 256 — Every Token Is Counted And Kept | Pending |
-| METER-01 | Phase 257 — Cost in Dollars, and What It Cannot See | Complete |
-| METER-02 | Phase 257 — Cost in Dollars, and What It Cannot See | Complete |
-| METER-07 | Phase 257 — Cost in Dollars, and What It Cannot See | Complete |
-| TIER-01 | Phase 258 — A Tier Becomes Enforceable | Pending |
-| TIER-02 | Phase 258 — A Tier Becomes Enforceable | Pending |
-| TIER-03 | Phase 258 — A Tier Becomes Enforceable | Pending |
-| TIER-04 | Phase 258 — A Tier Becomes Enforceable | Pending |
-| TIER-05 | Phase 258 — A Tier Becomes Enforceable | Pending |
-| PACK-01 | Phase 259 — An Expert Is a Bundle, Not a Runtime | Pending |
-| PACK-04 | Phase 259 — An Expert Is a Bundle, Not a Runtime | Pending |
-| PACK-06 | Phase 259 — An Expert Is a Bundle, Not a Runtime | Pending |
-| PACK-02 | Phase 260 — The Expert You Can Actually Use | Pending |
-| PACK-03 | Phase 260 — The Expert You Can Actually Use | Pending |
-| PACK-05 | Phase 260 — The Expert You Can Actually Use | Pending |
-| PACK-07 | Phase 261 — An Expert You Can Author | Pending |
-| PACK-08 | Phase 261 — An Expert You Can Author | Pending |
-| PACK-09 | Phase 261 — An Expert You Can Author | Pending |
-| PACK-10 | Phase 261 — An Expert You Can Author | Pending |
+| EXT-01 | Phase 255 — The Extension Contract | Complete — 255-VERIFICATION passed |
+| EXT-02 | Phase 255 — The Extension Contract | Complete — 255-VERIFICATION passed |
+| EXT-03 | Phase 255 — The Extension Contract | Complete — 255-VERIFICATION passed |
+| METER-03 | Phase 256 — Every Token Is Counted And Kept | Complete — 256-VERIFICATION verified |
+| METER-04 | Phase 256 — Every Token Is Counted And Kept | Complete — 256-VERIFICATION verified |
+| METER-05 | Phase 256 — Every Token Is Counted And Kept | Complete — 256-VERIFICATION verified |
+| METER-06 | Phase 256 — Every Token Is Counted And Kept | Complete — 256-VERIFICATION verified |
+| METER-01 | Phase 257 — Cost in Dollars, and What It Cannot See | Complete — SC#1 PARTIAL accepted by operator decision (26 models unrated by design) |
+| METER-02 | Phase 257 — Cost in Dollars, and What It Cannot See | Complete — one home incl. SQL spelling (f34106d5a) + frontend fence (856c09ea0) |
+| METER-07 | Phase 257 — Cost in Dollars, and What It Cannot See | Complete — /admin/spend browser pass owed (human) |
+| TIER-01 | Phase 258 — A Tier Becomes Enforceable | Complete — execution + every authoring write gated (c28853142, 124dc444b) |
+| TIER-02 | Phase 258 — A Tier Becomes Enforceable | Complete — 258-VERIFICATION |
+| TIER-03 | Phase 258 — A Tier Becomes Enforceable | Complete — refusals name the plan in the UI (124dc444b) |
+| TIER-04 | Phase 258 — A Tier Becomes Enforceable | Complete — 258-VERIFICATION |
+| TIER-05 | Phase 258 — A Tier Becomes Enforceable | Complete — 258-VERIFICATION |
+| PACK-01 | Phase 259 — An Expert Is a Bundle, Not a Runtime | Complete — 259-VERIFICATION passed |
+| PACK-04 | Phase 259 — An Expert Is a Bundle, Not a Runtime | Complete — 259-VERIFICATION passed |
+| PACK-06 | Phase 259 — An Expert Is a Bundle, Not a Runtime | Complete — 259-VERIFICATION passed |
+| PACK-02 | Phase 260 — The Expert You Can Actually Use | Complete — 260-VERIFICATION |
+| PACK-03 | Phase 260 — The Expert You Can Actually Use | Complete — 260-VERIFICATION |
+| PACK-05 | Phase 260 — The Expert You Can Actually Use | ⛔ NOT MET — carried forward by decision to SEED-304 (knowledge unreachable cross-org; tenancy decision) |
+| PACK-07 | Phase 261 — An Expert You Can Author | Complete — Disable added (cdf3a308a); G-4 UAT owed |
+| PACK-08 | Phase 261 — An Expert You Can Author | Complete — 261-VERIFICATION |
+| PACK-09 | Phase 261 — An Expert You Can Author | Complete — 261-VERIFICATION |
+| PACK-10 | Phase 261 — An Expert You Can Author | Complete — role grants now match (cdf3a308a); live grant drive owed |
 | PACK-11 | Phase 262 — An Expert You Can Discover | Complete — lived UAT 1.4/1.5/1.6 driven with two real sign-ins |
 | PACK-12 | Phase 262 — An Expert You Can Discover | Complete — lived UAT 2.1-2.10 pass |
 | PACK-13 | Phase 262 — An Expert You Can Discover | Complete — lived UAT 3.1-3.6 pass (3.1/3.6 after in-session fixes) |
-| PACK-14 | Phase 263 — An Expert Can Be Given Its Capabilities | Pending |
-| PACK-15 | Phase 263 — An Expert Can Be Given Its Capabilities | Pending |
-| PACK-16 | Phase 263 — An Expert Can Be Given Its Capabilities | Pending |
-| PACK-17 | Phase 263 — An Expert Can Be Given Its Capabilities | Pending |
+| PACK-14 | Phase 263 — An Expert Can Be Given Its Capabilities | Complete — 263-VERIFICATION (+264 for load); post-WR-08 live re-drive owed |
+| PACK-15 | Phase 263 — An Expert Can Be Given Its Capabilities | Complete — 263-VERIFICATION (+264 for load); post-WR-08 live re-drive owed |
+| PACK-16 | Phase 263 — An Expert Can Be Given Its Capabilities | Complete — 263-VERIFICATION (+264 for load); post-WR-08 live re-drive owed |
+| PACK-17 | Phase 263 — An Expert Can Be Given Its Capabilities | Complete — 263-VERIFICATION (+264 for load); post-WR-08 live re-drive owed |
 
 ⚠ **The `METER-*` rows are NOT in id order, and that is deliberate.** `METER-03/04/05/06` are one
 delivery boundary — *a token that was spent is written down* — and `METER-01/02/07` are another — *a
