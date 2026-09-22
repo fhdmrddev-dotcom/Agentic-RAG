@@ -196,6 +196,13 @@ const BASELINE = {
   // an Expert the caller cannot use ship green.
   "expertCatalog.test.ts": 10,
   "ExpertCatalogPage.test.tsx": 8,
+  // ── Phase 262 plan 04 (PACK-12) — the detail view ──────────────────────────────────
+  // ⚠ ADOPTED, not raised — `8` is the gate's OWN printed `— N new` figure on the run that
+  // first named this file in TARGETS, never a local vitest tail.
+  // ⛔ THIS PIN GUARDS THE ONLY PLACE FOUR MIGRATION-189 COLUMNS REACH A PERSON. Case (2) is
+  // the one that cannot be faked: it asserts the sample deliverable is ABSENT before the
+  // disclosure and PRESENT after, so a renderer that leaves it in the DOM while hidden fails.
+  "ExpertDetailModal.test.tsx": 8,
   // ── Phase 263 (PACK-14/PACK-15) — the dialog an Expert proposal reuses ──────────────
   // ⚠ ADOPTED, not raised: before 263-04 `grep -ic "skill" scripts/vitest-count-gate.cjs`
   // returned 0 — NOT ONE skills suite was in either knob, so this file's 8 passing tests
@@ -4427,6 +4434,11 @@ const TARGETS = [
   // no-consolation-prize arm — the criterion ROADMAP calls "the one most likely to be faked".
   "src/components/experts/catalog/__tests__/expertCatalog.test.ts",
   "src/components/experts/catalog/__tests__/ExpertCatalogPage.test.tsx",
+  // ── Phase 262 plan 04 (PACK-12) — the detail view ─────────────────────────────────
+  // Same directory trap, same commit: TARGETS here, BASELINE pin below. This suite carries
+  // the four presentation columns' ONLY rendered-content assertions, including the first
+  // assertion in this repository that `example_output` reaches a human at all.
+  "src/components/experts/catalog/__tests__/ExpertDetailModal.test.tsx",
   // ── Phase 263 (PACK-14/PACK-15) — the dialog an Expert proposal reuses ──────────────
   // ⚠ `src/components/skills` has NO bare-directory TARGETS entry, and this file is NOT
   // under a `__tests__/` directory — so before this line it ran in NO gate at all.
