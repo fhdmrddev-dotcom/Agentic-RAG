@@ -281,7 +281,17 @@ Plans:
   2. Each card opens a detail view carrying **what it does, when to use it, what knowledge it reads, which connections it needs, and its example prompts** — and the **rendered content** is asserted, never the presence of a block (PACK-12).
   3. From the detail view the user **starts a scoped conversation in one action**, reusing Phase 260's invite path rather than a second mechanism (PACK-13).
 
-**Plans**: TBD
+**Plans**: 5 plans (5 waves — serial by file ownership, see note)
+Plans:
+- [ ] 262-01-PLAN.md — the ActiveView reachability guard this phase must BUILD; the eight stale ledger triples; the tier precondition measured
+- [ ] 262-02-PLAN.md — one expert-icon home; the five hardcoded `financial-analyzer` sites retired; PACK-11's API-layer no-grant proof
+- [ ] 262-03-PLAN.md — the catalog: derived category pills, search, and the vanish driven with a positive control
+- [ ] 262-04-PLAN.md — the detail modal (content asserted, never a testid) + PACK-13's ordered handoff
+- [ ] 262-05-PLAN.md — the reachability triad in ONE commit, both entry actions, and the IA contract on the record
+⚠ **Serial by file ownership, not by choice.** Every plan adds a suite and every suite must be
+adopted into `scripts/vitest-count-gate.cjs`'s two knobs in the commit that creates it, so no two
+plans can share a wave. `App.tsx`, `ChatLayout.tsx`, `MessageInput.tsx` and the catalog page are
+each single-writer besides.
 **Flags**: ⭐ **THIS IS A DEFERRAL THAT FIRED, NOT A NEW IDEA.** Phase 260's flag deliberately held the catalog back: *"if the slice is not valuable with ONE Expert, the feature is wrong and a directory of twelve will not save it."* **260 closed 3/3 and the operator has it working live, so the condition is satisfied** — record that, because a directory built before the slice proved itself would have been the exact mistake the flag named. ⚠ **MEASURED GAP — the row cannot feed a rich card today:** `expert_bundles` carries a one-line `description` plus `prompt_suggestions`, and **no icon, no category, no when-to-use, no example output**. Presentation fields need a migration; ⛔ **check the head first — the ROADMAP has named an already-taken migration number twice running.** ⛔ **THEY ARE PRESENTATION FIELDS AND NOTHING ELSE** — no field added here may change what an Expert DOES, or `PACK-01`'s *"an Expert is a manifest, not a runtime"* starts leaking through the catalog. ⭐ **A MODAL IS WHAT MAKES THIS SHIPPABLE:** the operator asked for a pop-up, and the app **still has no router**, so a modal sidesteps the routing phase entirely. **A per-Expert URL stays owed** and belongs to the routing phase, not here. ⛔ **`PACK-11` IS THE HONESTY CRITERION and the one most likely to be faked** — listing everything and greying out the rest is NOT the same as listing what the user may use, and a catalog advertising Experts a user cannot invite is a brochure for a locked door. Drive it against a user with a visible row and no grant. ⚠ **A FOURTH HOME CHANGES THE IA CONTRACT** — `nav-items.ts` and `NavPanel.tsx` encode three homes (Chat / Library / Workflows); adding a fourth is a design decision, so **read the `sketch-findings-agentic-rag` skill's navigation/IA section before drawing it**. ⚠ **Operator decisions for the sketch:** (a) fourth nav home, or an entry point inside Chat? (b) does the catalog show Experts the user could get by upgrading, as an upsell, or only what they already have — this is a commercial choice, not a UI one. **G-2 FIRES** — `/gsd:sketch` before planning. **G-4** lived-experience UAT. **UI hint**: yes
 
 

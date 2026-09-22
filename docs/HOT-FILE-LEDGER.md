@@ -10945,6 +10945,13 @@ cells rot within days.
 | [`frontend/src/lib/api/spend.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapispendts) | 1 / 1 / 184 | no (new) | ⚠ row added by the 257 REVIEW, not the build — UNDECLARED, so the gate never asked. Created 257-03 as `src/api/spend.ts`, a SECOND api home; MOVED to the one `lib/api/` home. |
 | [`frontend/src/components/skills/SkillFormDialog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsskillsskillformdialogtsx) | 13 / 9 / 657 | ⚠ **FIRES** | ⚠ row STALE at `12/8/635` one plan later. honoured by construction (**263-04**): ONE optional prop + three `??` + one dep-array entry. ⛔ callers pass a STABLE reference or the reset wipes typing. |
 | [`backend/app/api/skills.py`](docs/HOT-FILE-LEDGER.md#backendappapiskillspy) | 19 / 10 / 858 | ⚠ **FIRES** | ⛔ absent from BOTH registers its ENTIRE LIFE at 10 phases — row added at 263 PLANNING. ⛔ `is_org_shared` HARD-SET False at `:250`; D-263-06 routes around it by provenance, never through the gate. |
+| [`frontend/src/lib/activeViewReachability.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibactiveviewreachabilityts) | 0 / 0 / 0 | no (new) | young (created 262). Row added AT PLANNING. ⛔ The ONE automated ActiveView↔ChatLayout-branch fence — AST, never grep; it THROWS on a vacuous parse rather than passing over nothing |
+| [`frontend/src/components/experts/expertIcon.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertsexperticontsx) | 0 / 0 / 0 | no (new) | young (created 262). Row added AT PLANNING. ⛔ The ONE home of expert-icon resolution, a CLOSED 11-key lucide map. It reads `icon` and never `slug`/`name` — that match IS the retired artefact |
+| [`frontend/src/components/experts/catalog/expertCatalog.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogexpertcatalogts) | 0 / 0 / 0 | no (new) | young (created 262). Row added AT PLANNING. Pure search/category/folder-name resolution. ⛔ An unresolvable folder id returns an UNKNOWN marker, never a drop — a blank is a claim nobody made |
+| [`frontend/src/components/experts/catalog/ExpertCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogexpertcardtsx) | 0 / 0 / 0 | no (new) | young (created 262). Row added AT PLANNING. The catalog's 5-element card face, COUNTS only. ⛔ Zero lecturing prose on the face (sketch 261-262) — the NAMES belong to the detail modal |
+| [`frontend/src/components/experts/catalog/ExpertCatalogPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogexpertcatalogpagetsx) | 0 / 0 / 0 | no (new) | young (created 262). Row added AT PLANNING. Renders EXACTLY what `listExperts()` returned. ⛔ No grey-out, no locked row: PACK-11's vanish is the server's list, never a filter here |
+| [`frontend/src/components/experts/catalog/ExpertDetailModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogexpertdetailmodaltsx) | 0 / 0 / 0 | no (new) | young (created 262). Row added AT PLANNING. PACK-12's only renderer of `when_to_use`/`example_output` and of folder NAMES. ⛔ The CONTENT is asserted, never a `data-testid` |
+| [`frontend/src/components/experts/catalog/startScopedChat.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogstartscopedchatts) | 0 / 0 / 0 | no (new) | young (created 262). Row added AT PLANNING. PACK-13's ONE ordered handoff: create → setThreadActiveExpert → refresh → select → navigate. ⛔ A failed patch does NOT navigate |
 
 
 
@@ -16524,3 +16531,80 @@ by sourcing it from anywhere else.
 ⛔ **NOT the `dead_gap_tokens_in_run=set()` fresh-per-sub-agent shape.** That field is a *mutable
 accumulator* deliberately reset for a sub-agent; this is an *immutable scope id* that must be
 inherited. Copying the neighbouring line's shape would have been exactly wrong.
+
+
+---
+
+### `frontend/src/lib/activeViewReachability.ts`
+
+**Row added AT PLANNING, 2026-09-22 (Phase 262).** Triple at creation `0 commits / 0 phases / 0 L` — re-derive at the phase close with the CLAUDE.md recipe.
+
+⭐ **The row goes in at creation, not at the third phase.** An absent row is invisible to G-5 at any commit count, and this repository has paid for that four times (`App.tsx` 23 phases, `NavPanel.tsx` 11, `backend/app/config.py` its entire life, `frontend/src/lib/api.ts` — the hottest file in the repo, whose absence made a SUPERLATIVE in CLAUDE.md wrong for a structural reason). Precedent for adding at creation: `frontend/src/lib/workspaceAllowedExt.ts`.
+
+**Binding invariant:** young (created 262). Row added AT PLANNING. ⛔ The ONE automated ActiveView↔ChatLayout-branch fence — AST, never grep; it THROWS on a vacuous parse rather than passing over nothing
+
+
+---
+
+### `frontend/src/components/experts/expertIcon.tsx`
+
+**Row added AT PLANNING, 2026-09-22 (Phase 262).** Triple at creation `0 commits / 0 phases / 0 L` — re-derive at the phase close with the CLAUDE.md recipe.
+
+⭐ **The row goes in at creation, not at the third phase.** An absent row is invisible to G-5 at any commit count, and this repository has paid for that four times (`App.tsx` 23 phases, `NavPanel.tsx` 11, `backend/app/config.py` its entire life, `frontend/src/lib/api.ts` — the hottest file in the repo, whose absence made a SUPERLATIVE in CLAUDE.md wrong for a structural reason). Precedent for adding at creation: `frontend/src/lib/workspaceAllowedExt.ts`.
+
+**Binding invariant:** young (created 262). Row added AT PLANNING. ⛔ The ONE home of expert-icon resolution, a CLOSED 11-key lucide map. It reads `icon` and never `slug`/`name` — that match IS the retired artefact
+
+
+---
+
+### `frontend/src/components/experts/catalog/expertCatalog.ts`
+
+**Row added AT PLANNING, 2026-09-22 (Phase 262).** Triple at creation `0 commits / 0 phases / 0 L` — re-derive at the phase close with the CLAUDE.md recipe.
+
+⭐ **The row goes in at creation, not at the third phase.** An absent row is invisible to G-5 at any commit count, and this repository has paid for that four times (`App.tsx` 23 phases, `NavPanel.tsx` 11, `backend/app/config.py` its entire life, `frontend/src/lib/api.ts` — the hottest file in the repo, whose absence made a SUPERLATIVE in CLAUDE.md wrong for a structural reason). Precedent for adding at creation: `frontend/src/lib/workspaceAllowedExt.ts`.
+
+**Binding invariant:** young (created 262). Row added AT PLANNING. Pure search/category/folder-name resolution. ⛔ An unresolvable folder id returns an UNKNOWN marker, never a drop — a blank is a claim nobody made
+
+
+---
+
+### `frontend/src/components/experts/catalog/ExpertCard.tsx`
+
+**Row added AT PLANNING, 2026-09-22 (Phase 262).** Triple at creation `0 commits / 0 phases / 0 L` — re-derive at the phase close with the CLAUDE.md recipe.
+
+⭐ **The row goes in at creation, not at the third phase.** An absent row is invisible to G-5 at any commit count, and this repository has paid for that four times (`App.tsx` 23 phases, `NavPanel.tsx` 11, `backend/app/config.py` its entire life, `frontend/src/lib/api.ts` — the hottest file in the repo, whose absence made a SUPERLATIVE in CLAUDE.md wrong for a structural reason). Precedent for adding at creation: `frontend/src/lib/workspaceAllowedExt.ts`.
+
+**Binding invariant:** young (created 262). Row added AT PLANNING. The catalog's 5-element card face, COUNTS only. ⛔ Zero lecturing prose on the face (sketch 261-262) — the NAMES belong to the detail modal
+
+
+---
+
+### `frontend/src/components/experts/catalog/ExpertCatalogPage.tsx`
+
+**Row added AT PLANNING, 2026-09-22 (Phase 262).** Triple at creation `0 commits / 0 phases / 0 L` — re-derive at the phase close with the CLAUDE.md recipe.
+
+⭐ **The row goes in at creation, not at the third phase.** An absent row is invisible to G-5 at any commit count, and this repository has paid for that four times (`App.tsx` 23 phases, `NavPanel.tsx` 11, `backend/app/config.py` its entire life, `frontend/src/lib/api.ts` — the hottest file in the repo, whose absence made a SUPERLATIVE in CLAUDE.md wrong for a structural reason). Precedent for adding at creation: `frontend/src/lib/workspaceAllowedExt.ts`.
+
+**Binding invariant:** young (created 262). Row added AT PLANNING. Renders EXACTLY what `listExperts()` returned. ⛔ No grey-out, no locked row: PACK-11's vanish is the server's list, never a filter here
+
+
+---
+
+### `frontend/src/components/experts/catalog/ExpertDetailModal.tsx`
+
+**Row added AT PLANNING, 2026-09-22 (Phase 262).** Triple at creation `0 commits / 0 phases / 0 L` — re-derive at the phase close with the CLAUDE.md recipe.
+
+⭐ **The row goes in at creation, not at the third phase.** An absent row is invisible to G-5 at any commit count, and this repository has paid for that four times (`App.tsx` 23 phases, `NavPanel.tsx` 11, `backend/app/config.py` its entire life, `frontend/src/lib/api.ts` — the hottest file in the repo, whose absence made a SUPERLATIVE in CLAUDE.md wrong for a structural reason). Precedent for adding at creation: `frontend/src/lib/workspaceAllowedExt.ts`.
+
+**Binding invariant:** young (created 262). Row added AT PLANNING. PACK-12's only renderer of `when_to_use`/`example_output` and of folder NAMES. ⛔ The CONTENT is asserted, never a `data-testid`
+
+
+---
+
+### `frontend/src/components/experts/catalog/startScopedChat.ts`
+
+**Row added AT PLANNING, 2026-09-22 (Phase 262).** Triple at creation `0 commits / 0 phases / 0 L` — re-derive at the phase close with the CLAUDE.md recipe.
+
+⭐ **The row goes in at creation, not at the third phase.** An absent row is invisible to G-5 at any commit count, and this repository has paid for that four times (`App.tsx` 23 phases, `NavPanel.tsx` 11, `backend/app/config.py` its entire life, `frontend/src/lib/api.ts` — the hottest file in the repo, whose absence made a SUPERLATIVE in CLAUDE.md wrong for a structural reason). Precedent for adding at creation: `frontend/src/lib/workspaceAllowedExt.ts`.
+
+**Binding invariant:** young (created 262). Row added AT PLANNING. PACK-13's ONE ordered handoff: create → setThreadActiveExpert → refresh → select → navigate. ⛔ A failed patch does NOT navigate
