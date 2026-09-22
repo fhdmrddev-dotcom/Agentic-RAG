@@ -1299,7 +1299,7 @@ def _skill_runtime_note(file_names: list[str]) -> str | None:
 # ToolContext-shaped resolver below.
 # ─────────────────────────────────────────────────────────────────────────────
 
-async def _resolve_skill_visibility_or(ctx: ToolContext) -> str:
+async def _resolve_skill_visibility_or(ctx: ToolContext, *, born_for: bool = False) -> str:
     """Resolve the caller's org set + build the org-gated skill-visibility ``.or_()``.
 
     The service-role client bypasses RLS so ``auth.uid()`` / ``current_user_org_ids()``
@@ -1308,9 +1308,41 @@ async def _resolve_skill_visibility_or(ctx: ToolContext) -> str:
     for the folder analog (SEED-124). One await per handler; handlers with two resolution
     sites (read_skill_file / execute_code) resolve ONCE and reuse the returned string so
     the injection loop never fires N membership round-trips.
+
+    ⭐ **Phase 264 (PACK-17 / D-264-04) — ``born_for`` IS THE DECISION, NOT A CONVENIENCE.**
+    When true, the caller's ACTIVE Expert bundle (the ``born_for_bundle_id`` field on ``ctx``,
+    set only by the agent-loop ToolContext builds off an ACCESS-CHECKED
+    ``ResolvedExpertBundle.bundle_id``) is
+    forwarded to ``build_skill_visibility_or``, which nests a
+    ``born_for_expert_bundle_id = <bundle> AND is_enabled`` disjunct INSIDE the org gate. A
+    resolver that simply read ``ctx`` unconditionally would have widened **all four** call
+    sites by OMISSION — including ``_handle_save_skill``'s lint corpus, which D-264-04
+    deliberately refuses. The explicit keyword makes every site's decision readable at the
+    site, and a widening therefore cannot happen by silence. The per-site reasons are written
+    beside each of the four calls below; the count is fenced at exactly three opting-in call
+    sites by ``tests/unit/test_264_load_skill_born_for.py`` — as an AST count, because a
+    comment quoting the keyword satisfies a grep and wires nothing.
+
+    ⛔ The field is read through ``getattr`` with a ``None`` default, never as a bare attribute
+    on ``ctx`` (the one read in this module is the line below) — three
+    existing suites build duck-typed ``ToolContext``-shaped stubs that predate this field, and
+    an ``AttributeError`` here would be swallowed by the ``save_skill`` lint wrapper and the
+    ``execute_code`` outer guard rather than surfacing. The same ``getattr`` precedent guards
+    ``skill_instructions_override`` and ``skill_snapshot`` in this module.
+
+    ⛔ The bundle is coerced with ``str(...)`` at THIS seam: ``ToolContext`` types the field
+    ``UUID | None`` while ``app.utils.skill_visibility`` annotates its parameter ``str | None``
+    (264-02's zero-new-imports convention — that module imports nothing but ``coerce_uid``).
+    Never re-derive the predicate term here; pass the bundle THROUGH, or the one-home count
+    fence in ``tests/unit/test_264_one_home_born_for_predicate.py`` names this module.
     """
     org_ids = await _resolve_caller_org_ids(ctx.supabase, ctx.current_user["id"])
-    return build_skill_visibility_or(ctx.current_user["id"], org_ids)
+    _bundle = getattr(ctx, "born_for_bundle_id", None) if born_for else None
+    return build_skill_visibility_or(
+        ctx.current_user["id"],
+        org_ids,
+        expert_bundle_id=str(_bundle) if _bundle is not None else None,
+    )
 
 
 async def _handle_load_skill(args: dict, ctx: ToolContext) -> ToolResult:
@@ -1323,7 +1355,18 @@ async def _handle_load_skill(args: dict, ctx: ToolContext) -> ToolResult:
     # SEED-125 (CR-01): the visibility filter is org-gated (is_system universal escape
     # OR org_id ∈ caller_org_ids AND (owner OR is_org_shared)) — a disjoint-org caller no
     # longer resolves another org's is_org_shared skill on the BYPASSRLS service client.
-    _skill_filter = await _resolve_skill_visibility_or(ctx)
+    #
+    # Phase 264 (PACK-17 / D-264-04) — ⭐ WIDEN. THIS SITE IS THE DEFECT. `load_skill` is in
+    # `EXPERT_CORE_TOOLS`, and Phase 263 already admits a colleague's born-for skill at
+    # RESOLVE time — but that result is the CATALOG only (names + descriptions). The
+    # instruction BODY is fetched here, through a predicate that had never heard of
+    # `born_for_expert_bundle_id`, so for every org member but the author the prompt promised
+    # a skill the load path then refused. The opt-in below closes exactly that.
+    # ⛔ Resolved ONCE and reused at the miss branch below, which is what keeps the
+    # `available_skills` listing built from the SAME filter as the primary query — it can
+    # never name a set the query would not admit (RESEARCH §8.8 / T-264-14). Re-deriving the
+    # filter there would silently re-open half the defect while every outcome test stayed green.
+    _skill_filter = await _resolve_skill_visibility_or(ctx, born_for=True)
     _skill_resp = await aexec(
         ctx.supabase.table("skills")
         .select("id, name, description, instructions, user_id")
@@ -1467,6 +1510,22 @@ async def _handle_save_skill(args: dict, ctx: ToolContext) -> ToolResult:
     try:
         # SEED-125 (CR-01): org-gate the sibling set so the lint never reads (or echoes
         # the description of) another org's is_org_shared skill on the service client.
+        #
+        # Phase 264 (PACK-17 / D-264-04) — ⛔ DELIBERATELY **NOT** WIDENED. This is the one
+        # resolver call in this module that keeps the default `born_for=False`, and the
+        # decision is written here rather than left as an omission. Three measured reasons:
+        #   1. `save_skill` is in NEITHER `EXPERT_CORE_TOOLS` nor `EXPERT_DELIVERABLE_TOOLS`
+        #      (:4585-4609), so it is **not advertised** to an Expert run. ⚠ "not advertised",
+        #      NOT "unreachable" — `effective_tools` is a SCHEMA filter, and `dispatch_tool`'s
+        #      only refusal backstop is `ctx.phase_whitelist`, which is `None` on a chat run,
+        #      so a hallucinated call could still dispatch here.
+        #   2. The read feeds a non-blocking description **lint** corpus and produces NO
+        #      user-visible capability. Widening it would only let an Expert's borrowed skills
+        #      influence another user's save-time warnings — a widening with no upside.
+        #   3. It is a WRITE handler's helper, while PACK-17's axis is *read the body you were
+        #      promised*.
+        # Driven, not merely asserted: `tests/unit/test_264_unchanged_sites_fenced.py` resolves
+        # this filter on a ctx that DOES carry a bundle and pins it to the base literal.
         _sibling_filter = await _resolve_skill_visibility_or(ctx)
         siblings_resp = await aexec(
             ctx.supabase.table("skills")
@@ -1597,7 +1656,14 @@ async def _handle_read_skill_file(args: dict, ctx: ToolContext) -> ToolResult:
     #    visibility filter is org-gated per SEED-125 (CR-01). Resolve the caller's org
     #    set ONCE and reuse it for the normalized-name retry (no double round-trip). ──
     skill_name = args.get("skill_name", "")
-    _skill_filter = await _resolve_skill_visibility_or(ctx)
+    # Phase 264 (PACK-17 / D-264-04) — ⭐ WIDEN. `read_skill_file` is in `EXPERT_CORE_TOOLS`,
+    # and `load_skill` returns `files: [...]` (:1405) — so a body that loads while its bundled
+    # files 404 is the SAME defect one layer down: the model is told the files exist and then
+    # cannot read them. ⚠ This handler applies NO `is_enabled` filter of its own, which is why
+    # the born-for disjunct carries its own `is_enabled.is.true` term (264-02, Form 2 /
+    # T-264-15) — a bare arm here would admit a DISABLED born-for skill's bundled bytes.
+    # Resolved ONCE and reused by the normalised-name retry below.
+    _skill_filter = await _resolve_skill_visibility_or(ctx, born_for=True)
     # Resolve skill to get owner's user_id for storage path
     _sr_resp = await aexec(
         ctx.supabase.table("skills")
@@ -2205,7 +2271,17 @@ async def _handle_execute_code(args: dict, ctx: ToolContext) -> ToolResult:
         # SEED-125 (CR-01): resolve the caller's org-gated skill-visibility filter ONCE
         # before the injection loop (not per file) so a disjoint-org caller cannot pull
         # another org's is_org_shared skill files into the sandbox on the service client.
-        _sf_filter = await _resolve_skill_visibility_or(ctx) if skill_files_req else None
+        #
+        # Phase 264 (PACK-17 / D-264-04) — ⭐ WIDEN. `execute_code` is in
+        # `EXPERT_DELIVERABLE_TOOLS`, unioned in whenever `tool_floor_enabled` (the default).
+        # Same class as `read_skill_file`, one layer further out, and the failure is QUIETER:
+        # an unresolved skill here is a `logger.warning` plus a silently-skipped file below, so
+        # the sandbox runs WITHOUT the helper and the model reasons on from a false premise.
+        # ⚠ This handler applies no `is_enabled` filter either — see the born-for disjunct's
+        # own enablement term (T-264-15). Resolved ONCE, before the loop, never per file.
+        _sf_filter = (
+            await _resolve_skill_visibility_or(ctx, born_for=True) if skill_files_req else None
+        )
         for sf in skill_files_req:
             sf_skill_name = sf.get("skill_name", "")
             sf_filename = sf.get("filename", "")

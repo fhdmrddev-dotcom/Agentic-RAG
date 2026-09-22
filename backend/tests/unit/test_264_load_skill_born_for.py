@@ -329,9 +329,34 @@ def test_the_born_for_bundle_id_is_read_through_getattr_never_as_an_attribute():
         'getattr(ctx, "born_for_bundle_id", None) so a duck-typed stub cannot raise'
     )
 
-    src = _DISPATCHER_SRC.read_text(encoding="utf-8")
-    assert src.count('getattr(ctx, "born_for_bundle_id", None)') == 1, (
-        "the born-for read must live at exactly ONE place — the resolver"
+    # ⛔ COUNTED AS CALLS, NOT AS TEXT. The resolver's own docstring quotes this exact
+    # expression (deliberately — the reason it is a `getattr` belongs where the read is), so a
+    # `src.count(...)` fence reads 2 against correct code and would be "fixed" by deleting the
+    # documentation. Measured: this is exactly what the first version of this assertion did.
+    getattr_reads = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "getattr"
+        and len(node.args) >= 2
+        and isinstance(node.args[1], ast.Constant)
+        and node.args[1].value == "born_for_bundle_id"
+    ]
+    assert len(getattr_reads) == 1, (
+        f"the born-for read must live at exactly ONE place — the resolver — "
+        f"found {len(getattr_reads)} getattr call(s)"
+    )
+
+    # …and that one place is the resolver, not a handler that bypassed it.
+    resolver = next(
+        n
+        for n in ast.walk(tree)
+        if isinstance(n, ast.AsyncFunctionDef) and n.name == "_resolve_skill_visibility_or"
+    )
+    assert getattr_reads[0] in set(ast.walk(resolver)), (
+        "the born-for read is outside _resolve_skill_visibility_or — a handler reading the "
+        "field directly is a fifth encoding of the decision"
     )
 
 
