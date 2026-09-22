@@ -32,40 +32,139 @@ _UID = "00000000-0000-0000-0000-000000000042"
 _ORG_A = "11111111-1111-1111-1111-111111111111"
 _ORG_B = "22222222-2222-2222-2222-222222222222"
 
+# ---------------------------------------------------------------------------
+# SC#5 (Phase 264) — THE FROZEN BASE LITERALS.
+#
+# Spelled out in full, deliberately, rather than re-derived from the constants
+# above by an f-string: a pin that is built the same way the implementation is
+# built moves with the implementation. These three strings were MEASURED by
+# executing the real function on 2026-09-22 (264-RESEARCH §5.1) and they are the
+# contract `expert_bundle_id=None` must keep byte for byte, forever.
+#
+# ⛔ WHY `==` AND NOT `startswith` / `in`. Phase 264 replaced the earlier
+# `assert out.startswith("is_system.eq.true,")` + `assert "..." in out` shape
+# here, and proved why in one measurement rather than arguing it: with a term
+# APPENDED to the predicate the old assertions all stayed GREEN and only these
+# `==` pins fired. A containment assertion cannot see an added term, and an
+# added term is exactly the failure mode a widened predicate has.
+# ---------------------------------------------------------------------------
+_BASE_NO_ORG = "is_system.eq.true"
+_BASE_ONE_ORG = (
+    "is_system.eq.true,"
+    "and(org_id.in.(11111111-1111-1111-1111-111111111111),"
+    "or(user_id.eq.00000000-0000-0000-0000-000000000042,is_org_shared.eq.true))"
+)
+_BASE_TWO_ORGS = (
+    "is_system.eq.true,"
+    "and(org_id.in.(11111111-1111-1111-1111-111111111111,"
+    "22222222-2222-2222-2222-222222222222),"
+    "or(user_id.eq.00000000-0000-0000-0000-000000000042,is_org_shared.eq.true))"
+)
+
 
 def test_empty_org_set_is_fail_closed_system_only():
-    """No resolvable caller org → ONLY is_system resolves (fail-closed, no empty in())."""
-    out = _build_skill_visibility_or(_UID, set())
-    assert out == "is_system.eq.true"
-    assert "in.()" not in out  # never an empty IN → never a PostgREST syntax error
-    assert "org_id" not in out  # no org branch at all when the caller has no org
+    """No resolvable caller org → ONLY is_system resolves (fail-closed, no empty in()).
+
+    SC#5 arm 1, pinned by `==` against `_BASE_NO_ORG` (Phase 264). The two
+    containment assertions that used to stand here — `"in.()" not in out` and
+    `"org_id" not in out` — are implied by the equality and were removed: a weak
+    pin standing beside a strong one teaches the next reader that the weak one
+    was adequate, and the measurement above says it is not.
+    """
+    assert _build_skill_visibility_or(_UID, set()) == _BASE_NO_ORG
 
 
 def test_org_gated_shape_preserves_is_system_and_scopes_shared_branch():
-    """Non-empty org set → is_system universal OR (org_id ∈ orgs AND (owner OR is_org_shared))."""
-    out = _build_skill_visibility_or(_UID, {_ORG_A})
-    # is_system escape stays OUTSIDE the org gate (leading top-level term).
-    assert out.startswith("is_system.eq.true,")
-    # the owner/is_org_shared disjunction is nested INSIDE the org gate.
-    assert f"and(org_id.in.({_ORG_A})," in out
-    assert f"or(user_id.eq.{_UID},is_org_shared.eq.true)" in out
-    # a bare is_org_shared term must NOT appear outside the and(...) org gate — i.e. the
-    # only is_org_shared token is the org-gated one (guards against a regressed flat filter).
-    assert out.count("is_org_shared.eq.true") == 1
+    """Non-empty org set → is_system universal OR (org_id ∈ orgs AND (owner OR is_org_shared)).
+
+    SC#5 arm 2. The shape this test is named for is now asserted as the WHOLE
+    string rather than as four containments: `is_system` outside the gate, the
+    owner/shared disjunction nested inside `and(org_id.in.(...), ...)`, and no
+    fifth term anywhere. ⛔ The four containments were MEASURED green against a
+    planted fourth top-level branch — the literal SEED-125 shape — while this
+    one line went red. That is why they are gone.
+    """
+    assert _build_skill_visibility_or(_UID, {_ORG_A}) == _BASE_ONE_ORG
 
 
 def test_multiple_orgs_are_sorted_and_comma_joined():
-    """All of the caller's orgs are included in the in.() list (deterministic sorted order)."""
-    out = _build_skill_visibility_or(_UID, {_ORG_B, _ORG_A})
-    assert f"org_id.in.({_ORG_A},{_ORG_B})" in out  # sorted → A before B, deterministic
+    """All of the caller's orgs are in the in.() list, sorted → A before B, deterministic.
+
+    SC#5 arm 3, pinned by `==` for the same reason as the two arms above.
+    """
+    assert _build_skill_visibility_or(_UID, {_ORG_B, _ORG_A}) == _BASE_TWO_ORGS
+
+
+def test_empty_org_set_stays_fail_closed_even_when_a_bundle_is_supplied():
+    """T-264-07 — opting in cannot create an org branch where there was none.
+
+    The born-for term nests INSIDE `and(org_id.in.(...), or(...))`. With no org
+    gate there is nothing to nest inside, so the ONLY safe output is the bare
+    `is_system.eq.true`. A top-level `born_for_expert_bundle_id.eq.<b>` here
+    would admit a FOREIGN-ORG row carrying the marker — the exact SEED-125 shape
+    this module exists to prevent.
+    """
+    assert (
+        _build_skill_visibility_or(_UID, set(), expert_bundle_id=_BUNDLE)
+        == _BASE_NO_ORG
+    )
+
+
+def test_bundle_term_nests_inside_the_org_gate_and_adds_no_top_level_branch():
+    """T-264-06 — the widened predicate still has exactly TWO top-level branches.
+
+    `is_system.eq.true` and `and(org_id.in.(...),...)`, and the born-for term
+    lives after the `or(` that follows `org_id.in.`. Measured structurally, not
+    by eye: split the string on commas at paren depth 0 and count.
+    """
+    out = _build_skill_visibility_or(_UID, {_ORG_A}, expert_bundle_id=_BUNDLE)
+    assert out == (
+        "is_system.eq.true,"
+        "and(org_id.in.(11111111-1111-1111-1111-111111111111),"
+        "or(user_id.eq.00000000-0000-0000-0000-000000000042,is_org_shared.eq.true,"
+        "and(born_for_expert_bundle_id.eq.33333333-3333-3333-3333-333333333333,"
+        "is_enabled.is.true)))"
+    )
+    assert _top_level_branches(out) == [
+        "is_system.eq.true",
+        out.split(",", 1)[1],
+    ]
+    assert out.index("born_for_expert_bundle_id") > out.index("or(user_id.eq.")
 
 
 def test_malformed_ids_raise_not_inject():
-    """A non-UUID caller id or org id RAISES (coerce_uid) rather than breaking the DSL."""
+    """A non-UUID caller id, org id OR BUNDLE ID raises rather than breaking the DSL.
+
+    ⚠ `postgrest 2.29.0`'s `SyncFilterRequestBuilder.or_` is a pure passthrough —
+    no escaping, no quoting, no validation — so this splice is the whole defence.
+    The bundle arm is Phase 264's addition (T-264-09): before it, `coerce_uid`
+    covered the caller and the orgs and nothing covered the new value.
+    """
     with pytest.raises(ValueError):
         _build_skill_visibility_or("not-a-uuid", {_ORG_A})
     with pytest.raises(ValueError):
         _build_skill_visibility_or(_UID, {"'; drop table skills;--"})
+    with pytest.raises(ValueError):
+        _build_skill_visibility_or(
+            _UID, {_ORG_A}, expert_bundle_id="1),or(is_system.eq.true"
+        )
+
+
+def _top_level_branches(predicate: str) -> list[str]:
+    """Split a PostgREST `or=` body on commas at paren depth 0. Grammar, not rule."""
+    out: list[str] = []
+    depth = 0
+    start = 0
+    for i, ch in enumerate(predicate):
+        if ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth -= 1
+        elif ch == "," and depth == 0:
+            out.append(predicate[start:i])
+            start = i + 1
+    out.append(predicate[start:])
+    return out
 
 
 # ---------------------------------------------------------------------------
