@@ -268,6 +268,18 @@ class RunContext:
     effective_tools: tuple[str, ...] | None = None
     # Phase 261 (BUG-260920-01 / D-v4.3-01) — synchronized scoped folder path
     scoped_folder_path: str | None = None
+    # Phase 264 (264-01 / PACK-17 / D-264-03) — ADDITIVE default-off born-for scope id,
+    # resolved alongside the fields above and carried to the LOAD path. OFF by default
+    # (None) at EVERY existing call site → Deep Mode byte-identical (the 092/133/135
+    # default-off discipline above). None => the run has no consultant active and the
+    # skill-visibility predicate stays byte-identical to base; a real value => the run
+    # HAS one active and the load path may additionally consider the skills that were
+    # born for it (the mig-191 born-for provenance column on `skills` — this field is
+    # named for that COLUMN, which is why the closed-core invariant stays green). Kept
+    # a UUID because the dataclass is frozen and therefore must stay hashable (a dict
+    # or set could not live here — same constraint skill_catalog_override's frozen
+    # tuple already satisfies). NOTHING reads it in 264-01; the consumer is 264-03.
+    born_for_bundle_id: UUID | None = None
 
 
 
@@ -1332,6 +1344,12 @@ async def run_agent_loop(
     # DB live / Deep byte-identical; {skill_name: instructions} = the DRAFT re-eval,
     # Pitfall #1). Passed into BOTH ToolContext builds below (primary + resume).
     skill_instructions_override = ctx.skill_instructions_override
+    # Phase 264 (264-01 / PACK-17 / D-264-03) — additive default-off born-for scope id
+    # (None = no consultant on this run / byte-identical load_skill; a UUID = the run's
+    # resolved, access-checked bundle). Bound ONCE here and passed into BOTH ToolContext
+    # builds below (resume + primary) — a field set at one build and not the other yields
+    # a run whose scope depends on whether it resumed (T-264-02). Inert in 264-01.
+    born_for_bundle_id = ctx.born_for_bundle_id
     # --- Category C callables (passed, not imported) ---
     # The moved body calls _emit / _spawn by those names; alias the params.
     _emit = emit
@@ -2055,6 +2073,11 @@ async def run_agent_loop(
                 # DRAFT, not silently revert to the live skill (Pitfall #1 / D-05).
                 # None on every Deep/normal resume => byte-identical load_skill.
                 skill_instructions_override=skill_instructions_override,
+                # Phase 264 (PACK-17 / D-264-03 / T-264-02) — a RESUMED run is the
+                # SAME run and must carry the SAME born-for scope; set here and not
+                # at the primary build below, a run's scope would depend on whether
+                # it resumed. None on every Deep/normal resume => no-op.
+                born_for_bundle_id=born_for_bundle_id,
             )
             for _ti, rc in enumerate(_resume_calls):
                 _tool_name = rc["name"]
@@ -2937,6 +2960,11 @@ async def run_agent_loop(
                 # re-eval WITH arm measures the draft's instructions (Pitfall #1).
                 # None on every Deep/normal caller => byte-identical load_skill.
                 skill_instructions_override=skill_instructions_override,
+                # Phase 264 (PACK-17 / D-264-03 / T-264-02) — carry the born-for scope
+                # id to the dispatcher so the load path can see which consultant (if
+                # any) this run is inside. Paired with the resume build above; both or
+                # neither. None on every Deep/normal caller => no-op.
+                born_for_bundle_id=born_for_bundle_id,
             )
 
             for tool_index, tc in enumerate(tool_calls):

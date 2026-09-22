@@ -648,6 +648,18 @@ async def run_task_sub_agent(
         # tasks caller — the dataclass default) keeps it a literal no-op => byte-identical
         # Deep dispatch.
         skill_instructions_override=parent_ctx.skill_instructions_override,
+        # Phase 264 (264-01 / PACK-17 / D-264-05) — propagate the born-for scope id onto
+        # the SUB-agent ctx (the SAME structural-unreachability class as the 096-02
+        # phase_whitelist + 099 skill_snapshot + 135 skill_instructions_override fixes
+        # above): a sub-agent of a consultant run is inside the SAME consultant, and
+        # every tool call dispatches with sub_ctx, never parent_ctx — so an
+        # unpropagated field is structurally dead on the live path. Planning found no
+        # measured reason to deviate. ⛔ Deliberately NOT the fresh-per-sub-agent shape
+        # of dead_gap_tokens_in_run=set() / previous_files_in_run={}: those are
+        # run-scoped MUTABLE accumulators, this is an immutable scope id. None (every
+        # Deep-Mode / tasks caller — the dataclass default) keeps it a literal no-op
+        # => byte-identical Deep dispatch.
+        born_for_bundle_id=parent_ctx.born_for_bundle_id,
     )
 
     # 4. Build the constrained tool-schema list once (subset of parent's tool schemas).

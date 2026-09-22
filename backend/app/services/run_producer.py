@@ -698,6 +698,11 @@ async def run_producer(
                     effective_tools=_eff_tools,
                     skill_catalog_override=_skill_cat_override,
                     scoped_folder_path=_eff_folder_path,
+                    # Phase 264 (PACK-17 / D-264-03 / 8.6) — the Deep build. Paired
+                    # with the continuation build below; a field set at one and not
+                    # the other is a defect every existing test would miss. None on
+                    # every run without a consultant => literal no-op.
+                    born_for_bundle_id=_born_for,
                 )
                 _agent_loop_result = await run_agent_loop(
                     ctx,
@@ -868,6 +873,10 @@ async def spawn_continuation_run(
                 effective_tools=_eff_tools,
                 skill_catalog_override=_skill_cat_override,
                 scoped_folder_path=_eff_folder_path,
+                # Phase 264 (PACK-17 / D-264-03 / 8.6) — the CONTINUATION build, the
+                # site a one-site fix misses: no test exercises this path's scoping.
+                # A resumed run is the same run and carries the same scope.
+                born_for_bundle_id=_born_for,
             )
             try:
                 await run_agent_loop(

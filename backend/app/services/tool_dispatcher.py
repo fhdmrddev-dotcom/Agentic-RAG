@@ -183,6 +183,17 @@ class ToolContext:
     # Phase 234 TRUST-03: Run-scoped tracking flag indicating external connection-sourced
     # knowledge was retrieved in this run's context (disarms write tools without explicit confirmation).
     has_connection_retrieval: bool = False
+    # Phase 264 (264-01 / PACK-17 / D-264-03) — ADDITIVE default-off born-for scope id.
+    # None on EVERY Deep-mode / harness / eval / normal caller => the skill-visibility
+    # predicate this dispatcher builds is byte-identical to base. A UUID (set ONLY by
+    # the two agent_loop ToolContext builds, off a RunContext whose value came from
+    # `_resolve_thread_scoping`'s ACCESS-CHECKED `ResolvedExpertBundle.bundle_id`, plus
+    # the task_service sub_ctx propagation) => the run has a consultant active and the
+    # load path may additionally admit the skills born for it (mig 191's
+    # `skills.born_for_expert_bundle_id`). Same additive-default-off discipline as
+    # phase_whitelist / workflow_run_id / skill_snapshot / skill_instructions_override
+    # above. ⛔ NOTHING reads this in 264-01 — the consumer lands in 264-03.
+    born_for_bundle_id: UUID | None = None
 
 
 @dataclass
