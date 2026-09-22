@@ -3019,6 +3019,18 @@ const BASELINE = {
   "watchProductMark.test.ts": 7,
   "navItemsUnknownIsNotDenied.test.ts": 4,
 
+  // ── Phase 262 (262-01 / PACK-11) — the two nav-items siblings that ran in NEITHER knob,
+  // ── plus the reachability fence this plan creates. Pinned in the SAME COMMIT as their
+  // ── TARGETS entries. Counts measured from an explicit GREEN run of the three files
+  // ── BEFORE adoption, then confirmed against the gate's own `— N new` column.
+  // ⚠ The gate is RED at this phase's base — `failed 2`, both in
+  // `library/__tests__/sketchComposition.test.tsx`, proven inherited by an empty
+  // `git diff --stat HEAD -- frontend/`. These three were green in that same run, so the
+  // "never pin from a red run" rule is honoured where it binds: on the files being pinned.
+  "nav-items.test.ts": 2,
+  "navItemsConnections.test.ts": 6,
+  "activeViewReachability.test.ts": 11,
+
   // ── Phase 243 (243-01 / CHAT-01 / CHAT-04 / D-243-16) — the thinking block's
   // ── PRE-EXTRACTION characterization net. Pinned in the SAME COMMIT that creates the file
   // ── and its TARGETS line, because a BASELINE key naming a path that does not yet exist
@@ -5709,6 +5721,23 @@ const TARGETS = [
   // the four spend-reachability cases; three of those four driven RED against a relabelled
   // rail entry, file restored md5-identical.
   "src/components/layout/__tests__/NavPanel.test.tsx",
+  // ── Phase 262 (262-01 / PACK-11) — the nav-items knob gap, and the reachability fence. ──
+  // `frontend/src/lib/nav-items.ts` FIRES G-5 at 6 phases and TWO of its THREE suites ran in
+  // NEITHER knob: only `navItemsUnknownIsNotDenied.test.ts` was ever named. The array reaches
+  // `src/lib` by NAMED FILES ONLY — there is no `src/lib` and no `src/lib/__tests__` directory
+  // entry anywhere here (this script records that decision beside its own chat/layout/panel
+  // entries) — so these two were deletable in silence while owning the D-07
+  // non-discoverability lock and the connections-reachability pin. Same find as 257.1's
+  // `NavPanel.test.tsx`, one directory over.
+  // Measured GREEN before adoption (2 and 6), so adoption cannot red the gate.
+  "src/lib/nav-items.test.ts",
+  "src/lib/__tests__/navItemsConnections.test.ts",
+  // And the fence 262-01 creates: the ActiveView↔ChatLayout-branch correspondence, which was
+  // carried by PROSE in three comment blocks and by nothing executable — a branchless 13th
+  // union member shipped GREEN before this. Named in the SAME COMMIT that creates it, and
+  // pinned in BASELINE in that commit too: a suite in TARGETS and not in BASELINE RUNS and
+  // guards nothing, which is the trap this array's own comment at :184 records firing.
+  "src/lib/__tests__/activeViewReachability.test.ts",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")

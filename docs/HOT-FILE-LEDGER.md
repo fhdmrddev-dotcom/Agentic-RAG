@@ -10630,7 +10630,7 @@ cells rot within days.
 | [`frontend/src/components/experts/ProposedSkillCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertsproposedskillcardtsx) | 1 / 1 / 86 | no (new) | young (created 263-04). Row added AT CREATION. ⛔ The ONE home of the "does not exist" mark — dashed+violet, never red (D-263-01); a second styling makes a proposal read as an error. |
 | [`frontend/src/components/org/OrgAdminShell.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgadminshelltsx) | 3 / 5 / 442 | no | young (created Phase 166). The org-admin shell hosting live tabs (members, audit, settings, invitations, sso, experts). |
 | [`frontend/src/components/org/OrgExpertsTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgexpertstabtsx) | 1 / 1 / 347 | no (new) | young (created Phase 261). Row added AT CREATION — leaf component for org-admin expert listing and management. |
-| [`frontend/src/lib/api/experts.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiexpertsts) | 5 / 3 / 298 | ⚠ **NOW FIRES — 3 phases** | ⛔ row STALE at `2/2/186` reading `no`/`young`; CROSSED the threshold here. honoured by construction (**263-03**): the 422 arm is ONE helper at 2 call sites; `handleResponse` byte-unchanged. |
+| [`frontend/src/lib/api/experts.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiexpertsts) | 6 / 3 / 313 | ⚠ **FIRES — 3 phases** | ⚠ STALE a 3rd time (was `5/3/298`, `2/2/186` before). 262-01 re-derives INHERITED rot only — it does not edit this file. 263-03's ONE-helper 422 arm stands. |
 | [`backend/app/db/experts.py`](docs/HOT-FILE-LEDGER.md#backendappdbexpertspy) | 4 / 3 / 567 | ⚠ **NOW FIRES — 3 phases** | ⛔ row was STALE at `2/2/492` reading `no (new)`; it CROSSED the threshold in this very commit. honoured by construction (**263-01**): ONE new UPDATE, no existing query touched. |
 | [`backend/app/models/expert.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsexpertpy) | 3 / 3 / 93 | ⚠ **NOW FIRES — 3 phases** | ⛔ row was STALE at `2/2/79` reading `no (new)` / `young`; it CROSSED the threshold here. honoured by construction (**263-03**): ONE new request model, zero existing model touched. |
 | [`backend/app/services/expert_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesexpert_servicepy) | 8 / 5 / 551 | ⛔ **FIRES — 5 phases** | ⚠ row STALE a 4th time (`6/4/515`). honoured by construction (**264-02**): the hand-rolled 4th disjunct DELETED, delegating to `skill_row_visible`. ⛔ independent encodings of the rule must stay **1** |
@@ -10662,7 +10662,7 @@ cells rot within days.
 | [`backend/app/api/workflow_runs.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkflow_runspy) | 11 / 8 / 1003 | **FIRES** | honoured by construction (200 / 200.1 / **214**) — no longer *at threshold*: it measures **8** phases |
 | [`backend/app/models/thread.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsthreadpy) | 16 / 10 / 438 | ⚠ **FIRES** | honoured by construction (200.1 / **214**) |
 | [`frontend/src/components/workflows/canvasModel.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowscanvasmodelts) | 13 / 6 / 752 | ⚠ **FIRES** | ⚠ absent from BOTH at 6 phases (added 200) |
-| [`frontend/src/components/layout/ChatLayout.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutchatlayouttsx) | 51 / 26 / 1010 | ⚠ **FIRES** | ⚠ row was STALE at `46 / 24 / 921`. honoured by construction (**244-04**): ONE prop on an existing mount — a 4th renderer off the SAME one read; `ATTENTION_PRODUCERS.flatMap` still appears once |
+| [`frontend/src/components/layout/ChatLayout.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutchatlayouttsx) | 52 / 27 / 1014 | ⚠ **FIRES** | ⚠ STALE a 3rd time (was `51/26/1010`, `46/24/921` before). 262-01 re-derives INHERITED rot only; plan 05 adds the branch. ⛔ the trailing fallback is POSITIONAL — order IS the guard |
 | [`frontend/src/components/library/LibraryCloudImport.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibrarylibrarycloudimporttsx) | 1 / 1 / 194 | no (new) | young (created 244-06). Row added AT CREATION. The Library's single-file cloud door — ⛔ it renders a REASON in every unavailable state; a silent grey-out is the same failure as a silent root write |
 | [`frontend/src/components/library/LibraryHeaderBar.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibrarylibraryheaderbartsx--row-added-244-04) | 2 / 1 / 204 | no (1 phase) | ⚠ absent for its entire life — row added 244-04 at its SECOND touch. ⛔ the ONE set of tab triggers: a hidden duplicate broke 41 cases. `aria-hidden` on the count is load-bearing |
 | [`frontend/src/components/layout/ChatHistoryColumn.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutchathistorycolumntsx) | 7 / 2 / 513 | below threshold | ⚠ **ABSENT from BOTH for its ENTIRE LIFE — row added 244-01 at its SECOND phase** (`settingsSearchPayload.ts` precedent). D-244-20 claimed a row existed; the gate refuted it |
@@ -10682,17 +10682,17 @@ cells rot within days.
 | [`backend/app/services/harness_engine.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharness_enginepy) | 58 / 21 / 3290 | **FIRES** | ⚠ row was STALE at `54 / 20 / 3135`. honoured by construction (194 / 214 / **256-05**) — 214-06 resolved the pause's service at ONE call site; 256-05 added ONE nested helper + ONE loop call |
 | [`frontend/src/components/chat/RunCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatruncardtsx) | 28 / 14 / 710 | **FIRES** | ⭐ **G-5 DISCHARGED (243-02)** — the reasoning fold left for `ThinkingBlock.tsx`, `-39/+20`, one `useState` fewer. ⚠ row was STALE at `26/12/728`. State 2 stayed, by decision |
 | [`frontend/src/components/chat/ThinkingBlock.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatthinkingblocktsx) | 6 / 2 / 320 | no (2 phases) | ⚠ row STALE (`4/1/283`; CLAUDE.md read `4/1/313`). NOT modified by 253 — re-derived under CR-08. Still ONE reasoning renderer; no duration derived from length |
-| [`frontend/src/components/chat/MessageInput.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageinputtsx) | 34 / 17 / 942 | **FIRES** | honoured by construction (**260-02**): invite expert door inside '+' menu, active expert chip in chips container, ambient violet glow; ⛔ 0 new top-level controls |
+| [`frontend/src/components/chat/MessageInput.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageinputtsx) | 35 / 17 / 942 | **FIRES** | ⚠ STALE (was `34/17/942` — commits moved, lines did not). 262-01 re-derives INHERITED rot only; plan 05 edits. 260-02 stands: the invite door lives inside '+', ⛔ 0 new top-level controls |
 | [`frontend/src/components/chat/MessageList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessagelisttsx) | 21 / 9 / 307 | **FIRES** | ⚠ row STALE a THIRD time (`19/8/267` → `20/8/292` → `20/8/300`). honoured by construction (**244-01**): `min-h-0` added to the ONE `<ScrollArea>` call site — a class token, no state, no prop |
 | [`frontend/src/hooks/useFollowScroll.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusefollowscrollts) | 4 / 2 / 314 | does not fire | ⛔ **NO ROW FOR ITS ENTIRE LIFE — added 243-03**, then STALE at `3/2/265` one phase on. **243-06:** the re-arm now asks whether the reader is STILL leaving, not what they last did |
 | [`frontend/src/lib/throttle.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibthrottlets) | 2 / 2 / 108 | does not fire | ⛔ **NO ROW FOR ITS ENTIRE LIFE — added 243-03.** TWO opposite primitives on purpose; ⛔ never unify them — one of the two call sites breaks silently |
-| [`frontend/src/components/chat/ChatArea.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatchatareatsx) | 77 / 38 / 882 | **FIRES** | honoured by construction (**260-03**): activeExpert sync via getExpert, 1-click prompt execution, mounts ExpertSpotlightCard with 3 action tiles |
+| [`frontend/src/components/chat/ChatArea.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatchatareatsx) | 77 / 38 / 882 | **FIRES** | ⭐ re-derived 262-01 and **HELD** — the only 1 of 8 that did. 260-03 stands: activeExpert sync via getExpert, mounts ExpertSpotlightCard. plan 05 edits and re-derives |
 | [`frontend/src/components/panel/PendingAskCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelpendingaskcardtsx) | 15 / 8 / 836 | **FIRES** | ⚠ row was STALE at `13 / 7 / 736`. UNTOUCHED by 244-03 (`0 0`) — the chat approval MOUNTS its shipped `PendingAskStack`, never edits the shell. ⚠ `SEED-219` still open |
 | [`frontend/src/pages/WorkflowRunPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowrunpagetsx) | 28 / 9 / 1670 | **FIRES** | honoured by construction (200 / 200.1 / 200.2 / **214**) — it resolves the step identity ONCE and its children render it |
 | [`frontend/src/components/chat/OutputFileCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatoutputfilecardtsx) | 8 / 7 / 219 | **FIRES** | honoured by construction (195) |
 | [`frontend/src/components/panel/FilesSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelfilessectiontsx) | 10 / 6 / 363 | **FIRES** | ⚠ row was STALE at `8 / 5 / 334`. honoured by construction (**244-05**): TWO `export` keywords, zero body change — the chat chip IMPORTS `expiryCaption` rather than re-deriving its three readings |
 | [`frontend/src/lib/api.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapits) | 187 / 110 / 422 | ⚠ **FIRES** | ✅ **SPLIT TAKEN (207)** — this path is the re-export BARREL. ⚠ **its 12 domain MODULES had no rows of their own until 214** |
-| [`frontend/src/types/index.ts`](docs/HOT-FILE-LEDGER.md#frontendsrctypesindexts) | 85 / 65 / 1380 | ⚠ **FIRES** | ⚠ row was STALE at `78/60/1331`. honoured by construction (**243-04**): one optional CLIENT-ONLY field whose ABSENCE is load-bearing. seam still OWED |
+| [`frontend/src/types/index.ts`](docs/HOT-FILE-LEDGER.md#frontendsrctypesindexts) | 90 / 70 / 1434 | ⚠ **FIRES** | ⚠ STALE a 3rd time (was `85/65/1380`, `78/60/1331`) — **+5 PHASES in one correction**. 262-01 re-derives INHERITED rot only. 243-04's optional client-only field stands; seam still OWED |
 | [`backend/app/main.py`](docs/HOT-FILE-LEDGER.md#backendappmainpy) | 83 / 60 / 951 | ⚠ **FIRES** | ⚠ row was STALE by **FOURTEEN PHASES** at `79 / 45 / 876`. honoured by construction (**BUG-260902-06**, Phase 259 router mount) |
 | [`backend/app/config.py`](docs/HOT-FILE-LEDGER.md#backendappconfigpy) | 87 / 50 / 1593 | ⚠ **FIRES** | ⚠ STALE a 13th time (`83/48/1506`). honoured by construction (**249-01**): ONE derived frozenset + a Literal widened to the value the code already returned. ⛔ MODEL_CAPABILITIES seam OWED |
 | [`backend/app/api/admin.py`](docs/HOT-FILE-LEDGER.md#backendappapiadminpy) | 38 / 14 / 1968 | ⚠ **FIRES** | honoured by construction (**249-01/03**): the add guard swaps its SOURCE LIST; 3 write seams gain a refusal catch. ⛔ order, 422 shape and every other guard byte-unchanged |
@@ -10869,9 +10869,9 @@ cells rot within days.
 | [`frontend/src/components/sources/WatchRowCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourceswatchrowcardtsx) | 3 / 2 / 770 | no (2 phases) | ⚠ row STALE (`2/1/649`) — 252-05 touched it (+121 L) and put it into BOTH count-gate knobs; it had run NOWHERE. NOT modified by 253; re-derived under CR-08 |
 | [`frontend/src/components/sources/watchProductMark.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourceswatchproductmarkts) | 0 / 0 / 38 | no (new) | young (240) — which PRODUCT a watched folder came from, read from its ADDRESS. ⛔ Never from `service_id`: Gmail and Drive share one connection |
 | [`frontend/src/components/sources/CreateWatchModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcescreatewatchmodaltsx) | 4 / 1 / 283 | no (1 phase) | honoured by construction (**240**): byte-unchanged. ⛔ Its auto-select of `capable[0]` is why BUG-260908-02 mattered most here |
-| [`frontend/src/components/layout/NavPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutnavpaneltsx) | 23 / 12 / 381 | ⚠ **FIRES** | ⚠ row STALE at `22/12/370`. **244-14**: WR-05 — the docblock stopped being false about itself (`min-h-0` read 2); IN-01 — `overflow-x-hidden`, since one axis makes the other compute to `auto` |
-| [`frontend/src/App.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcapptsx) | 32 / 23 / 374 | ⚠ **FIRES** | ⚠ absent for its ENTIRE LIFE at **23 phases**; row then STALE. ⭐ **244-04 left it BYTE-UNCHANGED and FENCED it**: `setLibraryTab(` still 2, driven RED against a planted 3rd writer |
-| [`frontend/src/lib/nav-items.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibnav-itemsts) | 8 / 6 / 95 | ⚠ **FIRES** | ⚠ absent at 6 phases — row added 235, which CONSIDERED it and deliberately left it alone: no twelfth `ActiveView` member; the Library already has one |
+| [`frontend/src/components/layout/NavPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutnavpaneltsx) | 24 / 13 / 417 | ⚠ **FIRES** | ⛔ STALE a 3rd time (was `23/12/381` HERE and `23/12/417` in CLAUDE.md — **the 2 registers disagreed on LINES**, 262-01 reconciles). 244-14's `overflow-x-hidden` stands |
+| [`frontend/src/App.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcapptsx) | 33 / 24 / 378 | ⚠ **FIRES** | ⚠ STALE a 3rd time (was `32/23/374`, `31/23/351`); absent its ENTIRE LIFE at 23 phases before that. 262-01 re-derives INHERITED rot only; plan 05 adds the member. 244-04's fence stands |
+| [`frontend/src/lib/nav-items.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibnav-itemsts) | 9 / 6 / 118 | ⚠ **FIRES** | ⚠ STALE (was `8/6/95`). ⛔ 2 of its 3 suites ran in **NEITHER** count-gate knob — 262-01 adopts both. Row added 235 when absent at 6 phases; plan 05 edits `NAV_ITEMS` |
 | [`frontend/src/components/library/HealthTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibraryhealthtabtsx) | 9 / 2 / 199 | no (2 phases) | row added 235 BELOW threshold on purpose. One import, one optional prop, one mount, ZERO branches; the handler lives at the page boundary |
 | [`frontend/src/pages/librarySelection.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcpageslibraryselectionts) | 2 / 2 / 312 | no (2 phases) | ⚠ absent for its entire life — row added 235, which did NOT modify it but made `App.tsx` import `LibraryTab` from it rather than re-declare it |
 | [`frontend/src/lib/api/sources.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapisourcests) | 5 / 1 / 312 | no (1 phase) | ⚠ **NOT covered by `lib/api.ts`'s row: that row is the BARREL.** ⛔ 235-13: it held TWO hand-written copies of the cause union the `?raw` fence is blind to; both now import the type |
@@ -10945,7 +10945,7 @@ cells rot within days.
 | [`frontend/src/lib/api/spend.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapispendts) | 1 / 1 / 184 | no (new) | ⚠ row added by the 257 REVIEW, not the build — UNDECLARED, so the gate never asked. Created 257-03 as `src/api/spend.ts`, a SECOND api home; MOVED to the one `lib/api/` home. |
 | [`frontend/src/components/skills/SkillFormDialog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsskillsskillformdialogtsx) | 13 / 9 / 657 | ⚠ **FIRES** | ⚠ row STALE at `12/8/635` one plan later. honoured by construction (**263-04**): ONE optional prop + three `??` + one dep-array entry. ⛔ callers pass a STABLE reference or the reset wipes typing. |
 | [`backend/app/api/skills.py`](docs/HOT-FILE-LEDGER.md#backendappapiskillspy) | 19 / 10 / 858 | ⚠ **FIRES** | ⛔ absent from BOTH registers its ENTIRE LIFE at 10 phases — row added at 263 PLANNING. ⛔ `is_org_shared` HARD-SET False at `:250`; D-263-06 routes around it by provenance, never through the gate. |
-| [`frontend/src/lib/activeViewReachability.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibactiveviewreachabilityts) | 0 / 0 / 0 | no (new) | young (created 262). Row added AT PLANNING. ⛔ The ONE automated ActiveView↔ChatLayout-branch fence — AST, never grep; it THROWS on a vacuous parse rather than passing over nothing |
+| [`frontend/src/lib/activeViewReachability.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibactiveviewreachabilityts) | 1 / 1 / 159 | no (created 262-01) | ⚠ the AT-PLANNING row read `0/0/0`; measured in its own creating commit. ⛔ The ONE ActiveView↔ChatLayout-branch fence — AST, never grep; it THROWS on a vacuous parse |
 | [`frontend/src/components/experts/expertIcon.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertsexperticontsx) | 0 / 0 / 0 | no (new) | young (created 262). Row added AT PLANNING. ⛔ The ONE home of expert-icon resolution, a CLOSED 11-key lucide map. It reads `icon` and never `slug`/`name` — that match IS the retired artefact |
 | [`frontend/src/components/experts/catalog/expertCatalog.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogexpertcatalogts) | 0 / 0 / 0 | no (new) | young (created 262). Row added AT PLANNING. Pure search/category/folder-name resolution. ⛔ An unresolvable folder id returns an UNKNOWN marker, never a drop — a blank is a claim nobody made |
 | [`frontend/src/components/experts/catalog/ExpertCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogexpertcardtsx) | 0 / 0 / 0 | no (new) | young (created 262). Row added AT PLANNING. The catalog's 5-element card face, COUNTS only. ⛔ Zero lecturing prose on the face (sketch 261-262) — the NAMES belong to the detail modal |
@@ -16543,6 +16543,8 @@ inherited. Copying the neighbouring line's shape would have been exactly wrong.
 
 **Binding invariant:** young (created 262). Row added AT PLANNING. ⛔ The ONE automated ActiveView↔ChatLayout-branch fence — AST, never grep; it THROWS on a vacuous parse rather than passing over nothing
 
+⚠ **MEASURED AT `262-01`'s close: `1 commit / 1 phase / 159 L`.** The AT-PLANNING triple `0 / 0 / 0` is kept above rather than overwritten. Full narrative — what it owns, why it exists, its four binding invariants, and the RED it was driven against — is in the `262-01` section at the end of this file.
+
 
 ---
 
@@ -16608,3 +16610,52 @@ inherited. Copying the neighbouring line's shape would have been exactly wrong.
 ⭐ **The row goes in at creation, not at the third phase.** An absent row is invisible to G-5 at any commit count, and this repository has paid for that four times (`App.tsx` 23 phases, `NavPanel.tsx` 11, `backend/app/config.py` its entire life, `frontend/src/lib/api.ts` — the hottest file in the repo, whose absence made a SUPERLATIVE in CLAUDE.md wrong for a structural reason). Precedent for adding at creation: `frontend/src/lib/workspaceAllowedExt.ts`.
 
 **Binding invariant:** young (created 262). Row added AT PLANNING. PACK-13's ONE ordered handoff: create → setThreadActiveExpert → refresh → select → navigate. ⛔ A failed patch does NOT navigate
+
+
+---
+
+### `frontend/src/lib/activeViewReachability.ts` — the `262-01` build detail
+
+**Its scan-list row and its own section already existed, added AT PLANNING with `0 / 0 / 0`.** Measured in its creating commit: **`1 commit / 1 phase / 159 L`**. ⭐ **The duplicate row this plan first wrote was caught by `check-claude-md-size.cjs` in the same turn it was authored** — `[duplicate-row] lines 10875 + 10949` — which is exactly the "fires in the turn the prose is written" property CLAUDE.md claims for that hook, observed working.
+
+**What it owns.** The executable half of leg 2 of the **reachability triad** (App union member ↔ ChatLayout render branch ↔ a navigator). It parses `App.tsx` and `ChatLayout.tsx` with `ts.createSourceFile` and reports `{ members, branched, unbranched, fallbackIsLast }`.
+
+⛔ **Why it exists.** `262-RESEARCH.md` R-2 measured that **a branchless 13th `ActiveView` member ships GREEN today**. `ChatLayout.fallback.test.tsx` is four *source-text* assertions that mount nothing and enumerate nothing — its own fourth case is titled *"the compile-time exhaustiveness check is bypassed via as never"* — and `renameFence.test.ts:142` asserts only `members.length >= 10`, a FLOOR, not a correspondence. ChatLayout's trailing `<UnknownViewFallback view={activeView as never} />` is a **POSITIONAL** fallback, not a `default:` that throws, and a ternary chain does not narrow to `never`. So the correspondence was carried by prose in three comment blocks and by **nothing executable**. Waves 3-5 of this phase add a member; this file is what makes that provable.
+
+**Binding invariants:**
+
+1. ⛔ **AST, never grep.** A `grep`-shaped check over `App.tsx` counts the member name wherever prose repeats it — which is exactly why `App.tsx:96` deliberately *refuses* to spell its own twelfth member in a comment (the 187-24 lesson, and D-262-04). `createSourceFile` sees declarations only, so a comment can neither satisfy nor break the measurement.
+2. ⛔ **It THROWS rather than reporting over nothing.** Zero members parsed, no `ActiveView` alias, or zero `activeView === "…"` comparisons each raise `ActiveViewReachabilityError`. A checker that silently parses zero members passes everything — the vacuous pass is the failure mode this whole file exists to prevent, and cases (6a)/(6b)/(6c) of its suite drive all three refusals.
+3. ⛔ **`fallbackIsLast` is `false` when the fallback element is ABSENT** — never true-by-absence.
+4. ⚠ **Nothing in the app bundle imports it.** Its only consumer is its own suite, which is what makes importing the `typescript` devDependency from `src/` safe. A future app-side import would pull a compiler into the bundle.
+
+**Driven RED before it existed.** Against a stub returning an empty `unbranched`, case (2) read verbatim:
+
+```
+AssertionError: expected [] to deeply equal [ 'expert-catalog-synthetic' ]
+```
+
+A guard nobody has seen fire is not a guard.
+
+---
+
+### ⚠ Phase 262 plan `262-01` — EIGHT triples re-derived, SEVEN were stale
+
+Re-derived 2026-09-22 at `e996d3248` with the CLAUDE.md three-command recipe (six-digit dated-quick-task buckets subtracted). **Every original figure is kept beside its correction in both registers**; none was overwritten.
+
+| File | was (CLAUDE.md / ledger) | **measured 2026-09-22** | drift |
+|---|---|---|---|
+| `frontend/src/App.tsx` | `32 / 23 / 374` | **33 / 24 / 378** | +1 phase |
+| `frontend/src/components/layout/ChatLayout.tsx` | `51 / 26 / 1010` | **52 / 27 / 1014** | +1 phase |
+| `frontend/src/components/layout/NavPanel.tsx` | `23 / 12 / 417` (CLAUDE.md) / `23 / 12 / 381` (here) | **24 / 13 / 417** | +1 phase; **the two registers disagreed on LINES** |
+| `frontend/src/lib/nav-items.ts` | `8 / 6 / 95` | **9 / 6 / 118** | +23 L |
+| `frontend/src/components/chat/MessageInput.tsx` | `34 / 17 / 942` | **35 / 17 / 942** | +1 commit |
+| `frontend/src/components/chat/ChatArea.tsx` | `77 / 38 / 882` | **77 / 38 / 882** | ⭐ **HELD** — 1 of 8 |
+| `frontend/src/types/index.ts` | `85 / 65 / 1380` | **90 / 70 / 1434** | **+5 phases** |
+| `frontend/src/lib/api/experts.ts` | `5 / 3 / 298` | **6 / 3 / 313** | +1 commit |
+
+⛔ **`262-01` does NOT modify any of the eight.** This is an **INHERITED**-staleness correction only; the phase's own G-5 dispositions for `App.tsx`, `ChatLayout.tsx`, `nav-items.ts`, `MessageInput.tsx` and `ChatArea.tsx` are written by plan 05, which edits them and re-derives again.
+
+⚠ **`NavPanel.tsx` is the finding worth keeping.** Its two registers carried *different line counts* for the same file — `417` in CLAUDE.md, `381` here. **A row that is present and wrong stops an audit harder than an absent row**, and two rows that are present and *disagree* let an auditor pick whichever supports the answer they already have. The same-commit sync rule exists for exactly this; it had silently lapsed.
+
+⚠ **And the knob gap, closed in the same commit.** `nav-items.ts` FIRES G-5 at 6 phases while **two of its three suites — `lib/nav-items.test.ts` and `lib/__tests__/navItemsConnections.test.ts` — ran in NEITHER count-gate knob.** The D-07 non-discoverability lock and the connections-reachability pin were both invisible to the gate. `262-01` adopts both, plus `lib/__tests__/activeViewReachability.test.ts`, into **TARGETS and BASELINE together**. TARGETS decides what RUNS; BASELINE decides what is GUARDED; a suite can sit on the wrong side of exactly one.
