@@ -347,3 +347,213 @@ def test_the_evaluator_can_actually_refuse_a_row():
         _eval_term("is_org_shared.gte.true", _row())
     with pytest.raises(AssertionError):
         _eval_term("no_such_column.eq.1", _row())
+
+@pytest.mark.asyncio
+async def test_a_none_caller_org_no_longer_matches_a_null_org_row():
+    """RESEARCH §8.10 — the ONE behaviour the delegation changes, driven not assumed.
+
+    Before Phase 264, `filter_visible_skill_names` compared `s_org_id == caller_org_id`
+    directly. With BOTH sides `None` that is `True`, so a caller with no resolvable org
+    could see a row whose `org_id` is `NULL`. The delegation builds an EMPTY org set for a
+    `None` caller org — never `{"None"}` — so the row is now refused.
+
+    ⭐ WHAT SHIPS AND WHY: the strictly TIGHTER behaviour. This function runs on a
+    BYPASSRLS read where the predicate IS the tenancy boundary, and the shared rule's own
+    line is "an unknown / foreign / NULL org is never visible". `run_producer.py:404`
+    builds `caller_org_id` as `None` for a user with no org, so the case is reachable on
+    the chat path rather than theoretical — which is exactly why it is a recorded decision
+    with a driven case instead of a silent side effect of a refactor.
+    """
+    from unittest.mock import AsyncMock, MagicMock  # noqa: PLC0415
+
+    from app.services.expert_service import filter_visible_skill_names  # noqa: PLC0415
+
+    pool = MagicMock()
+    pool.fetch = AsyncMock(
+        return_value=[
+            {
+                "name": "orphan_row",
+                "is_system": False,
+                "org_id": None,
+                "user_id": None,
+                "is_org_shared": True,
+                "is_enabled": True,
+                "born_for_expert_bundle_id": None,
+            }
+        ]
+    )
+
+    visible = await filter_visible_skill_names(
+        pool,
+        ["orphan_row"],
+        caller_org_id=None,
+        caller_user_id=None,
+    )
+    assert visible == set(), (
+        "a caller with no org must not reach a NULL-org row — the delegation is "
+        "deliberately tighter here than the pre-264 `None == None` comparison"
+    )
+
+
+# ---------------------------------------------------------------------------
+# SC#2 — "exactly ONE independent encoding" measured by an AST walk, not by grep.
+#
+# ⛔ A GREP CANNOT DO THIS JOB, and the proof is in this repo: `expert_service.py`
+# still SELECTs `born_for_expert_bundle_id` as a column, so `grep -c` there is
+# non-zero forever. A comment, a docstring and a SQL column list all satisfy a
+# grep and none of them is an encoding of the rule. The walk below counts two
+# STRUCTURAL shapes instead, and `test_the_count_fence_discriminates_a_select_from_an_encoding`
+# proves the distinction is real rather than asserted.
+#
+# Shape 1 — the PUSHED-DOWN encoding: a string (plain or f-string) whose literal
+#           text names the column followed by a PostgREST operator, e.g.
+#           `born_for_expert_bundle_id.eq.`. Docstrings are excluded.
+# Shape 2 — the IN-PYTHON encoding: reading the column off a row, i.e.
+#           `<expr>.get("born_for_expert_bundle_id")` or `<expr>["born_for_..."]`.
+#
+# A module with either shape is a HOME of the rule. After D-264-01 there must be
+# exactly one home in all of `backend/app`, and it must carry exactly one of each
+# shape — the "TWO ENCODINGS, ONE RULE" contract, counted.
+# ---------------------------------------------------------------------------
+
+import ast  # noqa: E402
+import re  # noqa: E402
+from pathlib import Path  # noqa: E402
+
+APP_DIR = Path(__file__).resolve().parents[2] / "app"
+
+_COLUMN = "born_for_expert_bundle_id"
+_DSL_OPERAND = re.compile(re.escape(_COLUMN) + r"\.(eq|neq|is|in|gt|lt|gte|lte|like|ilike)\.")
+
+_MUST_BE_SILENT = (
+    "services/expert_service.py",
+    "services/tool_dispatcher.py",
+    "services/agent_loop.py",
+    "services/harness/grounding.py",
+)
+
+
+def _ignored_constants(tree: ast.AST) -> set[int]:
+    """Ids of Constant nodes that must not be counted as a standalone DSL string.
+
+    Two kinds, and the second is a MEASURED trap rather than caution: `ast.walk`
+    descends INTO a JoinedStr, so an f-string's literal fragments are visited a
+    second time as bare Constants. Without this the one f-string in
+    `skill_visibility.py` counted as TWO encodings and the fence read `dsl=2` for
+    a module carrying exactly one.
+    """
+    out: set[int] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
+            body = getattr(node, "body", None)
+            if (
+                body
+                and isinstance(body[0], ast.Expr)
+                and isinstance(body[0].value, ast.Constant)
+                and isinstance(body[0].value.value, str)
+            ):
+                out.add(id(body[0].value))
+        elif isinstance(node, ast.JoinedStr):
+            for part in node.values:
+                if isinstance(part, ast.Constant):
+                    out.add(id(part))
+    return out
+
+
+def _encoding_sites(path: Path) -> tuple[int, int]:
+    """(pushed-down DSL sites, in-Python row-read sites) for one module."""
+    source = path.read_text(encoding="utf-8")
+    if _COLUMN not in source:
+        return (0, 0)
+    tree = ast.parse(source, filename=str(path))
+    skip = _ignored_constants(tree)
+
+    dsl = 0
+    rows = 0
+    for node in ast.walk(tree):
+        if isinstance(node, ast.JoinedStr):
+            literal = "".join(
+                v.value
+                for v in node.values
+                if isinstance(v, ast.Constant) and isinstance(v.value, str)
+            )
+            if _DSL_OPERAND.search(literal):
+                dsl += 1
+        elif isinstance(node, ast.Constant) and isinstance(node.value, str):
+            if id(node) not in skip and _DSL_OPERAND.search(node.value):
+                dsl += 1
+        elif isinstance(node, ast.Call):
+            func = node.func
+            if (
+                isinstance(func, ast.Attribute)
+                and func.attr == "get"
+                and node.args
+                and isinstance(node.args[0], ast.Constant)
+                and node.args[0].value == _COLUMN
+            ):
+                rows += 1
+        elif isinstance(node, ast.Subscript):
+            index = node.slice
+            if isinstance(index, ast.Constant) and index.value == _COLUMN:
+                rows += 1
+    return (dsl, rows)
+
+
+def _homes() -> dict[str, tuple[int, int]]:
+    found: dict[str, tuple[int, int]] = {}
+    for path in sorted(APP_DIR.rglob("*.py")):
+        dsl, rows = _encoding_sites(path)
+        if dsl or rows:
+            found[path.relative_to(APP_DIR).as_posix()] = (dsl, rows)
+    return found
+
+
+def test_the_born_for_rule_has_exactly_one_home_in_the_whole_app():
+    """SC#2 / D-264-01 — independent encodings of the born-for predicate == 1.
+
+    The scan set is DERIVED (`rglob` over `app/`), never a hand-written list, so a
+    fourth copy in a module nobody thought to name still fires this. Before the
+    Phase 264 delegation this read TWO homes — `utils/skill_visibility.py` and
+    `services/expert_service.py`, which hand-rolled the arm at D-263-06.
+    """
+    homes = _homes()
+    assert set(homes) == {"utils/skill_visibility.py"}, (
+        f"expected exactly ONE home for the born-for rule, found {len(homes)}: "
+        f"{ {k: {'dsl': v[0], 'row': v[1]} for k, v in homes.items()} }"
+    )
+
+
+def test_the_one_home_carries_exactly_one_of_each_encoding():
+    """TWO ENCODINGS, ONE RULE — counted, so a third copy inside the home also fires."""
+    dsl, rows = _encoding_sites(APP_DIR / "utils" / "skill_visibility.py")
+    assert (dsl, rows) == (1, 1), (
+        f"skill_visibility.py must carry exactly one pushed-down encoding and one "
+        f"in-Python encoding; measured dsl={dsl} row={rows}"
+    )
+
+
+@pytest.mark.parametrize("rel", _MUST_BE_SILENT)
+def test_the_four_consumer_modules_encode_the_rule_nowhere(rel: str):
+    """Named explicitly so a failure says WHICH consumer grew a second copy."""
+    dsl, rows = _encoding_sites(APP_DIR / rel)
+    assert (dsl, rows) == (0, 0), (
+        f"{rel} encodes the born-for rule (dsl={dsl}, row={rows}) — it must delegate "
+        f"to app/utils/skill_visibility.py instead (D-264-01)"
+    )
+
+
+def test_the_count_fence_discriminates_a_select_from_an_encoding():
+    """The fence's own positive control: a SELECT column list must NOT count.
+
+    `expert_service.py` still names the column in its `SELECT` and in prose, so a
+    grep there is non-zero — and its AST count must still be zero. A fence that
+    could not tell those apart would be satisfied by deleting a comment.
+    """
+    source = (APP_DIR / "services" / "expert_service.py").read_text(encoding="utf-8")
+    assert source.count(_COLUMN) > 0, "the SELECT column list is expected to remain"
+    assert _encoding_sites(APP_DIR / "services" / "expert_service.py") == (0, 0)
+
+    # ...and the walk must genuinely see BOTH shapes when they are present.
+    assert _DSL_OPERAND.search(f"and({_COLUMN}.eq.x,is_enabled.is.true)")
+    assert not _DSL_OPERAND.search(f"SELECT {_COLUMN} FROM public.skills")
+    assert not _DSL_OPERAND.search(f"-- {_COLUMN} is the mig-191 provenance column")
