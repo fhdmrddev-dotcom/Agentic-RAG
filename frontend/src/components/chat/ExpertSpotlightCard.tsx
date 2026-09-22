@@ -4,10 +4,32 @@
  * Hero visual onboarding card rendered in the chat stream when an expert consultant is active.
  * Features glowing identity gem, clean scope badges (zero lecturing text), and 3 visual Action Tiles
  * with 1-click execution.
+ *
+ * ⚠ Phase 262 (D-262-06 / RESEARCH R-7) — FOUR hardcoded demo-Expert sites RETIRED here, as
+ * rewrites with their original reason preserved (the `SEED-177` rule, precedent `D-206-07`).
+ * They were: a default action-tile array and the branch that returned it; a per-Expert icon
+ * guesser duplicated VERBATIM into `InviteExpertDialog.tsx`; and a leading arm in each of the
+ * two badge labels returning the seeded Expert's own folder name and skill name as literals.
+ * ⛔ The exact identifiers, line numbers and retired strings are recorded in
+ * `docs/HOT-FILE-LEDGER.md` and `262-02-SUMMARY.md` — spelling them here would satisfy the very
+ * greps that prove they are gone.
+ *
+ * ⭐ THEY SHIPPED FOR A REAL REASON AND IT IS WORTH KEEPING READABLE. At Phase 260 there was
+ * one seeded demo Expert (migration 188) and no read path for the presentation columns at all
+ * — migration 189 had not landed. Hardcoding that Expert's face, its three prompts, its folder
+ * name and its skill name was the only way the hero card could look like the sketch it was
+ * built from.
+ *
+ * ⛔ IT IS NOW A LIE, AND THAT IS WHY IT GOES. `ExpertAuthoringStudio` writes `icon` and
+ * `prompt_suggestions`, so an Expert authored by a customer — one that merely had the word
+ * "financial" in its NAME — rendered the demo Expert's glyph, three prompts it never authored,
+ * a folder label naming documents it cannot see, and a skill it does not carry. Every branch
+ * below now reads the Expert's OWN row, and no fallback anywhere inspects `slug` or `name`.
  */
 
 import { X, ArrowRight, Folder, Wrench } from "lucide-react"
 import type { ExpertBundle } from "@/types"
+import { ExpertIcon } from "@/components/experts/expertIcon"
 import { cn } from "@/lib/utils"
 
 interface ExpertSpotlightCardProps {
@@ -23,24 +45,12 @@ interface ActionTile {
   prompt: string
 }
 
-const DEFAULT_FINANCIAL_TILES: ActionTile[] = [
-  {
-    icon: "📈",
-    title: "Q3 Revenue Growth YoY",
-    prompt: "Compare Q3 revenue growth and YoY trajectory from the latest filings.",
-  },
-  {
-    icon: "⚖️",
-    title: "Gross Margin Comparison",
-    prompt: "Calculate gross margin and EBITDA breakdown based on reported figures.",
-  },
-  {
-    icon: "💵",
-    title: "Operating Cash Flow",
-    prompt: "Analyze operating cash flow changes and liquidity position.",
-  },
-]
-
+// ⚠ RETIRED (262-02): the default action-tile array — three verbatim revenue / margin /
+// cash-flow prompts that were returned to ANY Expert whose slug matched the seeded demo Expert
+// or whose name merely CONTAINED the word "financial". It was the only way to fill the hero
+// grid before `prompt_suggestions` had an author-facing writer. An Expert that authored no
+// suggestions now gets the honest single "Explore Scope" tile this function always had for
+// everyone else — one true tile beats three invented ones.
 function getTilesForExpert(expert: ExpertBundle): ActionTile[] {
   if (expert.prompt_suggestions && expert.prompt_suggestions.length > 0) {
     return expert.prompt_suggestions.map((ps, idx) => {
@@ -55,9 +65,6 @@ function getTilesForExpert(expert: ExpertBundle): ActionTile[] {
       }
     })
   }
-  if (expert.slug === "financial-analyzer" || expert.name.toLowerCase().includes("financial")) {
-    return DEFAULT_FINANCIAL_TILES
-  }
   return [
     {
       icon: "✨",
@@ -67,18 +74,11 @@ function getTilesForExpert(expert: ExpertBundle): ActionTile[] {
   ]
 }
 
-function getExpertIcon(expert: ExpertBundle): string {
-  if (expert.slug === "financial-analyzer" || expert.name.toLowerCase().includes("financial")) {
-    return "📊"
-  }
-  if (expert.name.toLowerCase().includes("legal")) {
-    return "⚖️"
-  }
-  if (expert.name.toLowerCase().includes("code") || expert.name.toLowerCase().includes("developer")) {
-    return "💻"
-  }
-  return "✨"
-}
+// ⚠ RETIRED (262-02): the per-Expert icon guesser — a slug/name string-match returning one of
+// four emoji, duplicated VERBATIM into `InviteExpertDialog.tsx`. Two copies of one decision is a
+// one-home-per-concern violation on its own, and neither copy read the `icon` column migration
+// 189 added and the authoring studio writes. Both call sites now render
+// `<ExpertIcon icon={expert.icon} />` — see `@/components/experts/expertIcon`.
 
 export function ExpertSpotlightCard({
   expert,
@@ -86,22 +86,25 @@ export function ExpertSpotlightCard({
   onDismiss,
   className,
 }: ExpertSpotlightCardProps) {
-  const iconEmoji = getExpertIcon(expert)
   const isRestricted = expert.scope_mode === "restricted"
   const tiles = getTilesForExpert(expert)
 
-  // Domain badge names
-  const folderLabel =
-    expert.slug === "financial-analyzer" || expert.name.toLowerCase().includes("financial")
-      ? "SEC Filings & Reports"
-      : `${expert.knowledge_folder_ids?.length || 1} Folder${expert.knowledge_folder_ids?.length === 1 ? "" : "s"}`
+  // Domain badge names.
+  // ⚠ RETIRED (262-02): both labels carried a leading demo-Expert arm returning a literal
+  // folder name and a literal skill name. Those named the SEEDED Expert's own folder and skill
+  // — true for it at Phase 260, a fabrication for every Expert authored since. Each label now
+  // falls to the arm it already had for every other Expert, so the card states only what the
+  // row says.
+  //
+  // ⛔ The folder pill stays a COUNT on purpose. This is a hero summary; the folder NAMES are
+  // PACK-12's job in the detail modal (plan 04), where an id that cannot be resolved needs an
+  // honest "a folder you cannot see" state rather than a blank.
+  const folderLabel = `${expert.knowledge_folder_ids?.length || 1} Folder${expert.knowledge_folder_ids?.length === 1 ? "" : "s"}`
 
   const skillLabel =
-    expert.slug === "financial-analyzer" || expert.name.toLowerCase().includes("financial")
-      ? "ratio_calculator"
-      : expert.member_skills && expert.member_skills.length > 0
-        ? expert.member_skills[0]
-        : "domain_tools"
+    expert.member_skills && expert.member_skills.length > 0
+      ? expert.member_skills[0]
+      : "domain_tools"
 
   return (
     <div
@@ -115,7 +118,7 @@ export function ExpertSpotlightCard({
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-3.5">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500/30 to-violet-500/30 border border-violet-400/40 flex items-center justify-center text-xl shadow-[0_0_15px_rgba(168,85,247,0.3)] shrink-0">
-            {iconEmoji}
+            <ExpertIcon icon={expert.icon} className="h-5 w-5 text-violet-200" />
           </div>
 
           <div>

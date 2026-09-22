@@ -164,7 +164,11 @@ const BASELINE = {
   "ChatArea.approval.test.tsx": 3,
   // ── Phase 260 (PACK-02 / PACK-03) — Consultant Expert UI & Action Tiles ──
   "ComposerExpert.test.tsx": 5,
-  "ExpertSpotlightCard.test.tsx": 5,
+  // ⬆ 5 → 9 at 262-02 (D-262-06 / RESEARCH P-7). RAISED to the gate's own printed figure,
+  // never lowered: the four hardcoded demo-Expert sites this suite pinned were RETIRED, and
+  // the rewrite lands four cases MORE than the floor it replaced — the honest-empty tile, the
+  // icon read from the column, the iconless fallback, and the count/first-skill arms.
+  "ExpertSpotlightCard.test.tsx": 9,
   // ── Phase 262 plan 02 (D-262-06) — the ONE home of expert-icon resolution ──
   // ⛔ BOTH KNOBS, SAME COMMIT. `src/components/experts` has NO bare-directory TARGETS
   // entry — its two existing suites are both named FILE-LEVEL just below — so a suite
