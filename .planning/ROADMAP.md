@@ -410,7 +410,17 @@ author gets*. **UI hint**: no — this is a run-path fix with no new surface.
 
 ### Coverage
 
-✓ **All 21 v4.3 requirements mapped to exactly one phase. No orphans, no duplicates.**
+~~✓ **All 21 v4.3 requirements mapped to exactly one phase. No orphans, no duplicates.**~~
+
+⛔ **CORRECTED 2026-09-22 — the mapping is sound, the COVERAGE is not, and the original is struck
+through rather than deleted because the table answered confidently and stopped the check.**
+`PACK-11 / PACK-12 / PACK-13` are attributed to Phase 262, and **Phase 262 was never built**. The
+three commits carrying a `(262)` tag deliver model-capability routing and migration 190 — real,
+verified work that shares nothing with an Expert catalog but the number. Measured: `when_to_use`,
+`example_output`, `category` and `icon` ship in migration 189 and render in **no user-facing
+component**; `InviteExpertDialog` hardcodes its emoji by slug while that `icon` column sits
+unread. **So the milestone cannot report 25/25.** Full derivation:
+`.planning/phases/262-an-expert-you-can-discover/262-RECORD.md`.
 
 | Phase | Requirements | Count |
 |-------|--------------|-------|
@@ -440,15 +450,40 @@ unswept seeds (**134** carry no `trigger_when` at all · **114** carry prose the
 
 ### Progress
 
+⚠ **This table read `0/? · Not started` for phases 255–260 until 2026-09-22, while every one of them
+had a complete summary set on disk and its commits in git — and 261, 262 and 263 had no row at all.**
+Re-derived from disk and git rather than from the table. **A progress row that says "Not started"
+about shipped work is worse than a missing one**, because it answers the reader confidently and
+stops the check — the same failure class this project's hot-file ledger keeps recording.
+
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 255. The Extension Contract | 0/? | Not started | - |
-| 256. Every Token Is Counted And Kept | 0/? | Not started | - |
-| 257. Cost in Dollars, and What It Cannot See | 0/? | Not started | - |
-| 258. A Tier Becomes Enforceable | 0/? | Not started | - |
-| 259. An Expert Is a Bundle, Not a Runtime | 0/? | Not started | - |
-| 260. The Expert You Can Actually Use | 0/? | Not started | - |
+| 255. The Extension Contract | 3/3 | Complete — verified | 2026-09-18 |
+| 256. Every Token Is Counted And Kept | 5/5 | Complete — verified | 2026-09-19 |
+| 257. Cost in Dollars, and What It Cannot See | 4/4 | Closed — **2 of 4 SC fully met** (SC#1 PARTIAL, **SC#3 NOT MET — F-13**); ⛔ **mig 185 NOT applied to live DB**; ⛔ no VERIFICATION.md · `BUS-280` | 2026-09-19 |
+| 258. A Tier Becomes Enforceable | 3/3 | Closed — ⚠ entitlement gates **authoring, not execution** (F-2); ⛔ mig 186 rides the milestone-close batch; ⛔ no VERIFICATION.md · `BUS-283` | 2026-09-19 |
+| 259. An Expert Is a Bundle, Not a Runtime | 3/3 | Closed — ⛔ no VERIFICATION.md | 2026-09-19 |
+| 260. The Expert You Can Actually Use | 3/3 | Closed — ⛔ no VERIFICATION.md | 2026-09-20 |
+| 261. An Expert You Can Author | 5/5 | Closed — reviewed (addendum: F-1/F-2/F-3 accepted, one regression found and fixed); ⛔ no VERIFICATION.md | 2026-09-21 |
+| 262. An Expert You Can Discover | **0/0** | ⛔ **NEVER BUILT — and the three commits tagged `(262)` are DIFFERENT WORK** (model-capability routing + mig 190). PACK-12 **NOT MET** on the user path, PACK-11 **UNVERIFIED**. Reconstructed record: `262-RECORD.md` | — |
+| 263. An Expert Can Be Given Its Capabilities | 4/4 | Closed — code-reviewed (CR-01 routed to 264; CR-02/03 + 7 warnings fixed); ⛔ no VERIFICATION.md | 2026-09-22 |
 | 264. Born-For Skills Must LOAD, Not Just Resolve | 4/4 | Complete — 5/5 SC verified; 13/13 UAT rows driven, 13 PASS | 2026-09-22 |
+
+⛔ **THE MILESTONE CANNOT CLOSE CLEANLY YET, and the reasons are operator rulings, not build work.**
+
+| # | Blocker | Owner | Bus |
+|---|---|---|---|
+| 1 | **Migration 185 is NOT applied to the live DB** — the six approved prices are not live | operator | `BUS-280` |
+| 2 | **Both production orgs measure `subscription_tier IS NULL` (2 of 2).** Set a tier for each **BEFORE** the backend ships, or workflow authoring goes dark for your own tenants | operator | `BUS-283` |
+| 3 | **SC#3 / F-13** — one-home vs two-plus-a-parity-bridge for the conversion expression is an ARCHITECTURE decision | operator | `BUS-280` |
+| 4 | **F-2** — does execution gating get its own v4.3 phase, or ride 259/260? | operator | `BUS-283` |
+| 5 | Mig 186 carries `GRANT SELECT TO anon`; revoke via a **follow-up numbered migration**, never by editing 186 | operator | `BUS-283` |
+| 6 | `SEED-013` Open Platform sequencing · `OV-248-01` register ruling | operator | `BUS-263` |
+| 7 | Owed manual UAT + the `todoRunHonesty` wording ruling | operator | `BUS-246`, `BUS-248` |
+
+⚠ **SEVEN of the ten phases carry `independent_review: owed`** (257–263). 264 was planned, executed
+**and** verified inside one session, which the standing separation rule exists to prevent. ⛔ Six
+phases (257–261, 263) have **no VERIFICATION.md at all** — they were closed on summaries.
 
 ---
 
