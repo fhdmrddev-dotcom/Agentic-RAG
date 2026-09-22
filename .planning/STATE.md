@@ -4,12 +4,12 @@ milestone: v4.3
 milestone_name: What You Can Actually Sell
 status: executing
 last_updated: "2026-09-22T00:00:00.000Z"
-last_activity: 2026-09-22 -- v4.3 record repaired: Phase 262 was NEVER BUILT (BUS-303); cannot report 25/25
+last_activity: 2026-09-22 -- Phase 262 BUILT (5/5 plans, 3/3 SC in code); 26 lived-UAT rows owed
 progress:
   total_phases: 17
-  completed_phases: 9
-  total_plans: 34
-  completed_plans: 34
+  completed_phases: 10
+  total_plans: 39
+  completed_plans: 39
   percent: 53
 ---
 
@@ -34,7 +34,9 @@ See: `.planning/PROJECT.md` (updated 2026-09-18)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** v4.3 record repaired 2026-09-22. Phase 264 COMPLETE (4/4 plans, 5/5 SC, 13/13 UAT driven). ⛔ **The milestone CANNOT report 25/25 — Phase 262 was never built** (`BUS-303`). Seven operator rulings open.
+**Current focus:** v4.3 — every phase 255-264 now has code on disk. **Phase 262 was BUILT later on 2026-09-22** (5/5 plans, 3/3 SC verified in code, self-verified); its **26 G-4 lived-UAT rows are owed** before PACK-11/12/13 count as met. Seven operator rulings open.
+
+~~**Current focus:** v4.3 record repaired 2026-09-22. Phase 264 COMPLETE (4/4 plans, 5/5 SC, 13/13 UAT driven). ⛔ **The milestone CANNOT report 25/25 — Phase 262 was never built** (`BUS-303`). Seven operator rulings open.~~ *(true when written; superseded the same day)*
 
 ---
 
@@ -45,6 +47,14 @@ Plan: 4 of 4 COMPLETE — executed, merged, verified
 Status: Complete; UAT driven 13/13; independent review owed
 Last activity: 2026-09-22 -- Phase 264 UAT driven: 13/13 rows PASS, defect reproduced on the pre-264 tree
 Phase range: e9d6a9410 (base) → e1192b462 (close), on develop
+
+### ⭐ PHASE 262 BUILT — 2026-09-22 (supersedes the "never built" finding below, which was TRUE when written)
+
+5 plans, 5 serial waves, `a0c2f833e` → `f2dad9c86`, plus `60712a83f` (Experts mark is `GraduationCap`). Delivers the Experts catalog (rail entry + composer door), the detail modal that finally RENDERS `icon` / `category` / `when_to_use` / `example_output`, and the one-action scoped-chat handoff reusing 260's invite path. The slug-matched emoji guesser and `DEFAULT_FINANCIAL_TILES` hardcodes are retired (262-02).
+
+- `262-VERIFICATION.md`: **3/3 SC VERIFIED in code and suites**, `status: human_needed`, ⚠ `verification_mode: self-verified`.
+- ⛔ **Owed:** 26 G-4 lived-UAT rows in `262-VALIDATION.md` (two real sign-ins, a temporary tier change + reversal, one backend-stopped row). Run first: row 1.4 — the vanish with two real sign-ins (PACK-11's honesty criterion).
+- `BUS-303` ("262 never built") is **answered by the build** — the operator still owns whether the mislabeled `(262)` model-routing commits get renumbered.
 
 ### ⛔ v4.3 RECORD REPAIR — 2026-09-22 · THE MILESTONE CANNOT REPORT 25/25
 
