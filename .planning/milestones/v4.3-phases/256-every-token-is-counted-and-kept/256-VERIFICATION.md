@@ -2,7 +2,7 @@
 phase: 256-every-token-is-counted-and-kept
 verified: 2026-09-19T00:47:54Z
 verification_mode: self-verified   # ⛔ AGENTS.md §6.3 — this session BUILT phase 256. NOT the independent review.
-independent_review: owed           # reviewer = gemini; evidence posted at BUS-272
+independent_review: partial — fresh-context claude subagent (operator decision D-265-01)   # 265-REVIEW-256.md; NOT a §6.3 review — upgradeable to a full §6.3 review by Gemini (its evidence packet: BUS-272)
 status: verified
 score: 4/4 success criteria verified
 overrides_applied: 0

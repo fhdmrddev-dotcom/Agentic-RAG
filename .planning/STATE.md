@@ -54,8 +54,8 @@ Last activity: 2026-09-22 -- Phase 265 execution started
 |---|---|
 | ⛔ `PACK-05` — Financial Analyzer's knowledge unreachable from any real org (tenancy decision) | `SEED-304` |
 | ✅ ~~Production deploy checklist — migrations **183-192** via SQL editor; `subscription_tier` on BOTH prod orgs **before** the backend ships~~ — **DONE 2026-09-23**: migrations **182-193** (12, one more than first counted: 182 was also missing, 193 written for prod) applied to production via the Supabase MCP on the operator's per-batch approval; both prod orgs set `enterprise`; verified per migration; `get_advisors(security)` shows no v4.3 table; `read_only=true` restored. **Code DEPLOYED 2026-09-23 02:32** — `production` at `dea7f5539` (master `98aef21fb`); backend /health 200 and `/experts` 403 (new route, auth-gated); frontend bundle carries the v4.3 tier message. Operator smoke test PASSED 4/4 (login + chat stream · Experts catalog · code execution in a NEW chat · /admin/spend) | `milestones/v4.3-MILESTONE-AUDIT.md` |
-| Owed live UAT — 257 `/admin/spend` · 258 refusals as a standard-tier org · 261 G-4 authoring + grant drive · 263 post-WR-08 re-drive | each phase's `VERIFICATION.md` |
-| Independent review owed — 255, 256, 262, 264, and every audit fix commit `c28853142`..`cdf3a308a` | — |
+| ~~Owed live UAT — 257 `/admin/spend` · 258 refusals as a standard-tier org · 261 G-4 authoring + grant drive · 263 post-WR-08 re-drive~~ **DRIVEN by Phase 265** (plus 256 rows 2-3). Record: `.planning/phases/265-owed-v4-3-verification/265-UAT-LOG.md`. Non-PASS rows (257 row 3, 258 b/c, 263 R-7) are triaged in `265-TRIAGE.md` | each phase's `VERIFICATION.md` `result:` lines |
+| Independent review — 255, 256, 262, 264, and every audit fix commit `c28853142`..`cdf3a308a`: **PARTIALLY discharged by Phase 265** (fresh-context Claude subagents, D-265-01, recorded as `partial`, OV-265-02). A Gemini §6.3 review is still available per the deferred idea and would upgrade it. Findings are triaged in `265-TRIAGE.md`; operator rulings are in BUS-304 | `265-REVIEW-*.md` |
 | Operator bus items still open: `BUS-246`, `BUS-248`, `BUS-263` (SEED-013 / OV-248-01), `BUS-280`, `BUS-283`, `BUS-303` (262 renumber) — `BUS-280`/`283` substantively resolved at close, see ROADMAP v4.3 archive | `.agent-bus/OPEN.md` |
 | Two non-engineering commercial blockers (no legal entity; employment / IP position) | `SEED-294` |
 
@@ -66,7 +66,7 @@ Last activity: 2026-09-22 -- Phase 265 execution started
 | Id | Rule | Override | Evidence |
 |---|---|---|---|
 | OV-265-01 | D-04 (fixes inside 265 are ≤1 file / ≤10 lines, no schema surface) | Operator ordered R265-audit-fixes-01, a **blocker** (org admin can self-upgrade `subscription_tier`), fixed now as migration 194. It was applied locally and pasted into prod by the operator. | `.planning/phases/265-owed-v4-3-verification/265-HOTFIX-194.md` · `8a01889de` (RED) · `9890ebd19` (fix) |
-| OV-265-02 | Independent review (AGENTS.md §6.3) | VERIFY-05 reviews done by fresh-context Claude subagents: **partial independence** (D-265-01 / D-02), never recorded as `done` | `265-01-SUMMARY.md` |
+| OV-265-02 | Independent review (CLAUDE.md / AGENTS.md §6.3) | VERIFY-05 reviews of **255, 256, 262, 264** and the audit-fix commits **`c28853142`..`cdf3a308a`** were done by fresh-context Claude subagents, operator decision **D-265-01** (2026-09-23): recorded as **partial independence** (D-02), never `done`. The four VERIFICATION.md files now read `independent_review: partial — fresh-context claude subagent (operator decision D-265-01)`. (The plan text calls this row OV-265-01; that id was already taken by the 194 hotfix, so it lives here.) | `265-REVIEW-255.md` · `265-REVIEW-256.md` · `265-REVIEW-262.md` · `265-REVIEW-264.md` · `265-REVIEW-audit-fixes.md` · `265-01-SUMMARY.md` · triage `265-TRIAGE.md` |
 
 ## Guardrail overrides — v4.3 close (2026-09-23)
 

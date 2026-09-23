@@ -181,3 +181,48 @@ B - C: []
 C - (A|B) (extra triage rows, allowed): ['UAT-265-CATALOG-SCROLL']
 triage-check OK
 ```
+
+## Phase completeness
+
+Every owed row this phase covered. The `result` column is read back from its file: the `result:` frontmatter of each VERIFICATION.md, and the `## Re-drive post-WR-08` section of 263-UAT.md. A row that is not PASS names the 265-TRIAGE.md row, by the same id, that holds its verdict.
+
+| owed row | result (read back) | UAT-265 id(s) | excerpt | triage row (non-PASS) |
+|---|---|---|---|---|
+| 256 row 2 (restart) | PASS | UAT-265-256-2 | UAT-265-256-2 PASS — a REAL process restart this time. Pre-stop the backend was PID 56412 (StartTime 9/20/2026 | — |
+| 256 row 3 (judge fidelity) | PASS | UAT-265-256-3 | PASS — UAT-265-256-3. Golden run persisted 155564 / 5142 when it completed; after the QUAL-01 judge it reads 1 | UAT-265-256-3 (first pass BLOCKED, accept) · UAT-265-256-3-OBS (defer SEED-307) |
+| 257 row 1 | PASS | UAT-265-257-1, UAT-265-257-1-OBS | UAT-265-257-1 PASS — every on-screen figure equals an independent SQL read at drive time ($4.2553, 244 runs, 1 | UAT-265-257-1-OBS (observation, defer 268) |
+| 257 row 2 | PASS | UAT-265-257-2, UAT-265-257-2-OBS | UAT-265-257-2 PASS — the banner reads 'Could not load spend — Failed to fetch' with Retry; every KPI reads 'Un | UAT-265-257-2-OBS (observation, fix candidate) |
+| 257 row 3 | FAIL | UAT-265-257-3, UAT-265-257-3-NOCARD | UAT-265-257-3 FAIL — on tool-using RunCards rated runs render $x.xxxx in emerald (computed rgb(52,211,153)) an | UAT-265-257-3 (+ UAT-265-257-3-NOCARD, UAT-265-257-3-UNMEASURED) |
+| 258 row (a/b/c) | FAIL | UAT-265-258-a, UAT-265-258-b, UAT-265-258-c | FAIL — (b) and (c) refused but not named. UAT-265-258-a PASS: POST /threads/{id}/messages -> 403 {required_tie | UAT-265-258-b, UAT-265-258-c (UAT-265-258-a PASS, accept) |
+| 261 row 1 (authoring) | PASS | UAT-265-261-1 | PASS — UAT-265-261-1 — operator: "pass | — |
+| 261 row 2 (grant fence) | PASS | UAT-265-261-2-user, UAT-265-261-2-role | PASS — UAT-265-261-2-user and UAT-265-261-2-role both hold, created_by != caller on every line. User grant (in | — |
+| 261 row 3 (union + tool floor) | PASS | UAT-265-261-3 | PASS — UAT-265-261-3 — operator: "pass | UAT-265-261-3-ACCESS (observation, defer 266) |
+| 263 approval round trip | PASS | UAT-265-263-APPROVAL | PASS — UAT-265-263-APPROVAL — operator: "pass | — |
+| 263 R-1 | PASS | UAT-265-263-R1 | fresh "UAT-265 Doctoral Literature Review Methodologist" draft (POST /experts/draft 200) names 5 domain skills | — |
+| 263 R-2 | PASS | UAT-265-263-R2 | groups read "In your library · 3 skills this Expert can actually use" / "Proposed for this Expert · 5 named by | — |
+| 263 R-3 | PASS | UAT-265-263-R3 | "Create this skill →" on prisma-2020-protocol-builder → POST /experts/draft-skill-body 200 with expert_descrip | — |
+| 263 R-4 | PASS | UAT-265-263-R4 | skills 11 → 12 (+1 for the one approval); nothing else created | — |
+| 263 R-5 | PASS | UAT-265-263-R5 | studio Save disabled with "5 capabilities are not real yet … Save is held while proposed skills are unresolved | — |
+| 263 R-6 | PASS | UAT-265-263-R6 | POST /experts member_skills [docx, zzz-265-phantom-skill] → 422 {"error":"expert_member_skills_unknown","unkno | — |
+| 263 R-7 | FAIL | UAT-265-263-R7 | non-author member's live run on Expert a3cbcb0c: load_skill loads prisma-2020-protocol-builder (born-for), doc | UAT-265-263-R7 |
+| 263 R-8 | PASS | UAT-265-263-R8 | self_improve OFF → POST /experts/draft-skill-body 409 self_improve_disabled ("The skill can still be created a | — |
+| 263 R-9 | PASS | UAT-265-263-R9 | 8/8 providers emitted a valid AuthoredSkillBody through the REAL author_skill_body (skill_builder_model set in | UAT-265-263-R9-OBS (observation, defer SEED-308) |
+| 263 R-9 openai | PASS | UAT-265-263-R9-openai | gpt-5.6-sol | — |
+| 263 R-9 anthropic | PASS | UAT-265-263-R9-anthropic | claude-opus-5 | — |
+| 263 R-9 google | PASS | UAT-265-263-R9-google | gemini-3.8-flash | — |
+| 263 R-9 deepseek | FAIL → PASS (retry) | UAT-265-263-R9-deepseek | deepseek-v4-pro | UAT-265-263-R9-deepseek |
+| 263 R-9 zhipu | PASS | UAT-265-263-R9-zhipu | glm-5.3 | — |
+| 263 R-9 minimax | PASS | UAT-265-263-R9-minimax | MiniMax-M3 | — |
+| 263 R-9 moonshot | PASS | UAT-265-263-R9-moonshot | kimi-k2.6 | — |
+| 263 R-9 openrouter | PASS | UAT-265-263-R9-openrouter | deepseek/deepseek-v4.1-flash | — |
+| bug BUG-260923-02 | status: closed (frontmatter) | UAT-265-D09 | read back from `.planning/reported-bugs/BUG-260923-02-long-lists-need-pagination.md` | — |
+| bug BUG-260921-02 | status: closed (frontmatter) | UAT-265-BUG-260921-02 | read back from `.planning/reported-bugs/expert-description-cap-1000-blocks-save-and-skill-body-draft.md` | — |
+
+All 29 owed rows carry a non-empty `result` and an id. A PASS row that raised an observation also names that observation's triage row.
+
+### Final checker run (Task 3)
+
+```
+$ backend/venv/Scripts/python .planning/phases/265-owed-v4-3-verification/265-triage-check.py   # exit 0
+triage-check OK
+```
