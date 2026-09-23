@@ -2,11 +2,11 @@
 gsd_state_version: 1.0
 milestone: v4.4
 milestone_name: Experts That Actually Work
-status: planning
-last_updated: "2026-09-23T00:00:00.000Z"
-last_activity: 2026-09-23 -- Milestone v4.4 Experts That Actually Work started
+status: executing
+last_updated: "2026-09-22T23:47:14.877Z"
+last_activity: 2026-09-22 -- Phase 265 execution started
 progress:
-  total_phases: 5
+  total_phases: 12
   completed_phases: 0
   total_plans: 5
   completed_plans: 0
@@ -32,7 +32,7 @@ See: `.planning/PROJECT.md` (updated 2026-09-23)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** v4.4 Experts That Actually Work — defining requirements. Phase numbering resumes at
+**Current focus:** Phase 265 — owed-v4-3-verification
 **265**, migrations at **194** (193 was already taken by `193_expert_seed_org_portable.sql`).
 
 ---
@@ -40,11 +40,11 @@ can be taught new behaviours (skills) that persist and can be shared.
 ## Current Position
 
 Milestone: v4.4 Experts That Actually Work
-Phase: 265 — Owed v4.3 Verification (not started; 5 phases 265-269)
-Plan: —
-Status: Phase 265 planned — 5 plans / 4 waves, plan-checker passed after 1 revision round (0 blockers; 1 warning accepted: 265-03 has 5 tasks, 2 trivial) — ready to execute
+Phase: 265 (owed-v4-3-verification) — EXECUTING
+Plan: 1 of 5
+Status: Executing Phase 265
 Resume file: .planning/phases/265-owed-v4-3-verification/265-CONTEXT.md
-Last activity: 2026-09-23 — Milestone v4.4 started (SEED-304 tenancy decided: per-org copy)
+Last activity: 2026-09-22 -- Phase 265 execution started
 
 ---
 
@@ -60,6 +60,13 @@ Last activity: 2026-09-23 — Milestone v4.4 started (SEED-304 tenancy decided: 
 | Two non-engineering commercial blockers (no legal entity; employment / IP position) | `SEED-294` |
 
 ---
+
+## Guardrail overrides — Phase 265 (2026-09-24)
+
+| Id | Rule | Override | Evidence |
+|---|---|---|---|
+| OV-265-01 | D-04 (fixes inside 265 are ≤1 file / ≤10 lines, no schema surface) | Operator ordered R265-audit-fixes-01, a **blocker** (org admin can self-upgrade `subscription_tier`), fixed now as migration 194. It was applied locally and pasted into prod by the operator. | `.planning/phases/265-owed-v4-3-verification/265-HOTFIX-194.md` · `8a01889de` (RED) · `9890ebd19` (fix) |
+| OV-265-02 | Independent review (AGENTS.md §6.3) | VERIFY-05 reviews done by fresh-context Claude subagents: **partial independence** (D-265-01 / D-02), never recorded as `done` | `265-01-SUMMARY.md` |
 
 ## Guardrail overrides — v4.3 close (2026-09-23)
 
@@ -87,4 +94,3 @@ rule was not met. Re-derive at the next phase that touches any of them.
 | When | production | What | Verified |
 |---|---|---|---|
 | 2026-09-23 02:50 | `805360fef` | BUG-260923-02 pagination — Spend ledger, Library Health stale docs, Ingestion History, checked queries (frontend only) | new bundle live (unique string probe); backend /health 200. Operator browser check PASSED 3/3 |
-
