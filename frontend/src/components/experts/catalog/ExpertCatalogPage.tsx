@@ -109,6 +109,9 @@ export function ExpertCatalogPage(props: ExpertCatalogPageProps) {
   }
 
   return (
+    // The app's <main> is `overflow-hidden`, so the page must own its scroll (the WorkflowsPage
+    // shape). Without this wrapper a catalog taller than the window could not be scrolled at all.
+    <div className="h-full min-h-0 overflow-y-auto">
     <div className="mx-auto max-w-6xl space-y-6 px-6 py-6">
       <div className="border-b border-border/60 pb-5">
         <h2 className="flex items-center gap-2 text-xl font-semibold tracking-tight text-foreground">
@@ -229,6 +232,7 @@ export function ExpertCatalogPage(props: ExpertCatalogPageProps) {
         }}
         onStartChat={handleStartChat}
       />
+    </div>
     </div>
   )
 }
