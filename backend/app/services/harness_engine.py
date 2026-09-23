@@ -2300,10 +2300,10 @@ async def run_workflow(
         #
         # ⚠ IT DOES NOT DOUBLE-BOOK, and the reason is the breaker's watermark rather
         # than a guard here: ``absorb_usage_box`` returns a DELTA derived from its own
-        # mutated counters, so on the completed path — where
-        # ``_enforce_budget("phase_completed")`` has already absorbed the box — this
-        # yields ``(0, 0)`` and ``persist_run_usage`` returns before the database. N
-        # phases still produce N writes.
+        # mutated counters. On the completed path THIS call runs first and does the
+        # write; the later ``_enforce_budget("phase_completed")`` flush then yields
+        # ``(0, 0)`` and ``persist_run_usage`` returns before the database. N phases
+        # still produce N writes.
         #
         # ⛔ A ``try:``/``finally:`` AROUND THE ``while`` LOOP WAS CONSIDERED AND
         # REJECTED, and the rejection is recorded here rather than left silent. A
