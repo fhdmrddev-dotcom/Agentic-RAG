@@ -4,10 +4,10 @@ title: The drafter emits a ~4.8k-char blueprint into two fields capped at 1000, 
 reported: 2026-09-21
 surface: Agentic-RAG
 severity: blocking
-status: open
+status: closed
 affected_areas: [backend/experts, frontend/experts, expert-authoring, PACK-14, PACK-15, PACK-16]
-folded_into: null
-verified_closed_by: null
+folded_into: "265"
+verified_closed_by: "Phase 265 plan 265-04 live drive 2026-09-24 at d24586ce2 — 4432-char description saved (POST /experts 201, length(description)=4432), proposal drafted HTTP 200 (POST /experts/draft-skill-body with a 4432-char expert_description); see 263-UAT.md Re-drive post-WR-08"
 related_seeds: [SEED-303]
 re_open_trigger: null
 reproduces_on:
@@ -87,3 +87,7 @@ Raise both caps to match what the producer actually emits (~8000 gives real head
 measured and the 2,163 the comment records), OR bound the producer and truncate at the client with a
 visible notice. Add a fence that asserts the drafter's output satisfies the consumer's model —
 the absence of that assertion is the actual hole.
+
+## Closed
+
+**2026-09-24 — closed by Phase 265 (plan 265-04).** The fix is `7a04e944e`. Re-driven live post-WR-08: a fresh doctoral-literature-review draft produced a **4432-char** description; "Create this skill →" sent it as `expert_description` and `POST /experts/draft-skill-body` returned **200** with a pre-filled dialog; Save Expert (`POST /experts` 201) persisted `length(description) = 4432`. Evidence: `UAT-265-BUG-260921-02` in `.planning/phases/265-owed-v4-3-verification/265-UAT-LOG.md` and R-1/R-3 in `263-UAT.md`.
