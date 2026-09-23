@@ -42,8 +42,9 @@ can be taught new behaviours (skills) that persist and can be shared.
 Milestone: v4.4 Experts That Actually Work
 Phase: 265 (owed-v4-3-verification) — COMPLETE
 Plan: 5 of 5
-Status: Phase 265 complete; next is Phase 266 (discuss)
-Resume file: None
+Status: Phase 266 context gathered (266-CONTEXT.md); next is /gsd:plan-phase 266
+G-2 for 266 skipped BY OPERATOR DECISION at discuss (D-266-16) — install button + 3 states on shipped ExpertDetailModal/ExpertCard
+Resume file: .planning/phases/266-expert-knowledge-in-a-real-org/266-CONTEXT.md
 Last activity: 2026-09-24 -- Phase 265 complete
 
 ---

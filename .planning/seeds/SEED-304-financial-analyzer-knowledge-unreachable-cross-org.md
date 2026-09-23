@@ -3,15 +3,15 @@ seed_id: SEED-304
 title: PACK-05 — the Financial Analyzer's knowledge is unreachable from any real org
 created: 2026-09-23
 surface: Agentic-RAG
-status: planted
+status: folded
 partial: false
-status_note:
+status_note: Folded into Phase 266 at discuss (2026-09-23) — option 2, per-org provisioning via explicit Install + expert_installs (mig 195); see 266-CONTEXT.md D-266-01..17
 trigger_when: The next milestone's scoping (/gsd:new-milestone) — PACK-05 is an unmet v4.3 requirement carried forward by decision; also any phase touching expert knowledge scoping, folder sharing, or org provisioning.
 trigger_paths: ["supabase/migrations/188_expert_chat_scoping.sql", "backend/app/utils/folder_utils.py", "backend/app/services/run_producer.py", "backend/app/services/expert_service.py", "backend/tests/unit/test_260_financial_analyzer_conversation.py"]
 trigger_surfaces: []
 migration_note:
 relates_to: ["Phase 260", "PACK-05", ".planning/v4.3-MILESTONE-AUDIT.md", ".planning/phases/260-the-expert-you-can-actually-use/260-VERIFICATION.md"]
-folded_into: null
+folded_into: "266"
 renumbered_from: null
 renumbered_because: null
 ---
