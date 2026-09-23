@@ -362,13 +362,43 @@ available and the file was written). **The verdict is the operator's (D-06).**
 
 ## 256 row 3 — judge-usage fidelity (UAT-265-256-3)
 
-⛔ **BLOCKED UAT-265-256-3: no independent record of provider-reported usage is reachable from this session.**
-Per-call provider usage is stored nowhere in the DB: the only token columns are `runs`, `workflow_runs` and
-`eval_results`. The LangSmith MCP server failed to connect at session start (`CONNECTION_CLOSED`), and its API key
-is in `backend/.env`, which a deny rule blocks. The backend's per-call usage lines, if any, are in the operator's
-uvicorn terminal. The comparison "persisted delta = provider-reported judge usage" therefore cannot be computed
-without inventing one side. The gauntlet was not driven, because the result could not be scored.
-Unblock: reconnect the LangSmith MCP (`/mcp`) and re-run this row.
+First pass: ⛔ BLOCKED (LangSmith MCP not connected). Unblocked on 2026-09-24: `langsmith-mcp-server` had never been
+installed, so the launcher exited. It now runs from an isolated `.tools/langsmith-mcp-venv` (commit `b7f510447`), and
+the operator reconnected it.
+
+**Drive (real provider, no `forced_emit` patch, no harness):** as the dev account (`fhdmrd@gmail.com`, org
+`22f9c615`), a copy of the draft "KB Cited Answer (3–5 Bullets)" was created as `2f39686b-6b23-44ad-a41b-a1fd793341f3`
+("UAT-265 judge probe"). Its `send_email` external-action step was removed so the golden run could neither send mail
+nor stop at a human gate. The operator's own draft was untouched. Then
+`POST /workflows/2f39686b…/publish {golden_input: "What do the documents in this project say about project management
+best practices?"}` was sent from the page with the operator bearer; this is the same request the Builder's Publish
+sends. It started 06:57:46Z and returned at 06:58:46Z:
+`200 {published: false, blocked_stage: "judge", golden_run_id: "b9fd2baf-9dc1-4f3b-99c3-0b3b88109b5f"}` with judge
+evidence "No answer to the underlying question is available from the provided materials." The judge shot ran, which
+is all this row needs.
+
+| reading | input_tokens | output_tokens | source |
+|---|---|---|---|
+| golden run at completion (06:58:42Z, before the judge) | 155564 | 5142 | `SELECT … FROM workflow_runs WHERE id = 'b9fd2baf…'` (polled) |
+| golden run after the judge (06:58:46Z) | 156070 | 5392 | same SELECT |
+| **persisted judge delta** | **+506** | **+250** | difference |
+| **provider-reported, judge shot** (LangSmith run `4a68bae7-ce46-4f63-8dab-1aad7eadab2b`, `ls_model_name = gpt-5.4-mini`, `ls_provider = openai`, 06:58:42 → 06:58:46) | **506** | **250** | FQL `and(eq(id, "4a68bae7…"), eq(prompt_tokens, 506), eq(completion_tokens, 250))` → returns the run |
+
+Controls:
+- `and(eq(id, "4a68bae7…"), eq(total_tokens, 757))` → **0 runs** (the filter discriminates).
+- Every `gpt-5.4-mini` LLM run from 06:57:40 to 07:05:00 → exactly `4a68bae7`. The same filter with that id excluded
+  → **0 runs**, so there was ONE judge shot and no retry was missed.
+
+Why the delta method rather than persisted − Σ(non-judge): LangSmith's page budget (30k chars) cannot return the
+golden run's streamed calls with their usage fields. The before/after reading of the same row isolates the judge's
+contribution directly, which is what the row asks about.
+
+⚠ Observation `UAT-265-256-3-OBS` (info): LangSmith names the OpenAI `gpt-5.4-mini` judge call **"ChatDeepseek"**.
+The trace run name is mislabeled across providers, and only the metadata carries the true model.
+
+**Result `UAT-265-256-3`: PASS**: persisted judge delta = provider-reported usage, exact for input (506) and output (250).
+
+Leftover: draft `2f39686b…` "UAT-265 judge probe" remains in the dev org as an unpublished draft (removable at will).
 
 ## 261 — operator verdicts (D-06)
 
