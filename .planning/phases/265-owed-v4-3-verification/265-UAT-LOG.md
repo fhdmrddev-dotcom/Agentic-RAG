@@ -162,3 +162,23 @@ rendered text above.
 **Result `UAT-265-257-2`: PASS** (CR-07 contract holds for a stopped backend).
 
 row 2 recorded — restart the backend now
+
+## 256 row 2 — post-restart (UAT-265-256-2)
+
+| reading | when | input_tokens | output_tokens | token_coverage | uvicorn |
+|---|---|---|---|---|---|
+| pre-stop (DB) | before the stop | 135142 | 10317 | agent,single,batch,emit | PID 56412, StartTime 9/20/2026 9:00:48 AM |
+| post-restart (DB, direct asyncpg 54322) | after the operator's restart | 135142 | 10317 | agent,single,batch,emit | PID **54832**, StartTime **9/23/2026 8:24:51 AM**, strictly later |
+| post-restart (API `GET /workflow-runs/a77ed2c0…`, dev bearer in-page, `X-Org-Id: 22f9c615…`) | same | — (not exposed) | — (not exposed) | agent,single,batch,emit | 200 |
+
+The API returns `cost_usd = 0.0529`. Recomputed from the persisted tokens with the resolved rate (deepseek-v4-flash,
+global, `$0.30` in / `$1.20` out per M, effective 2024-01-01): 135142 × 0.30/1e6 + 10317 × 1.20/1e6 = 0.05292 → **0.0529**.
+The API is therefore pricing exactly the persisted tokens.
+
+Process boundary: the stop was real. `Get-NetTCPConnection -LocalPort 8000 -State Listen` → 0, and curl returned exit
+7 (connection refused) before the restart.
+
+`updated_at` moved from `2026-09-22 21:50:13` to `2026-09-23 00:39:44` UTC between readings on 09-22 and 09-23, with
+the tokens unchanged. Some writer touched the row. Recorded, not investigated.
+
+**Result `UAT-265-256-2`: PASS.**
