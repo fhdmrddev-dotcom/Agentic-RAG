@@ -941,7 +941,8 @@ export interface SetupStatus {
 
 export async function getSetupStatus(): Promise<SetupStatus> {
   try {
-    const res = await fetch(`${API_BASE}/setup/status`)
+    // UAT-265-257-2-OBS: a hung backend must fall through (the catch below), never spin forever.
+    const res = await fetch(`${API_BASE}/setup/status`, { signal: AbortSignal.timeout(10_000) })
     if (!res.ok) return { needs_setup: false, finalized: false, has_token: false }
     const body = (await res.json()) as Partial<SetupStatus>
     return {
