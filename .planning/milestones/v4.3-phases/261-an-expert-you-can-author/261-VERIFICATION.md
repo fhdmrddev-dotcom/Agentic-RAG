@@ -47,12 +47,21 @@ human_verification:
   - test: "G-4 lived-experience UAT for authoring: as an org-admin, open Org Admin > Experts, draft an Expert from an uploaded PDF, edit the draft, save, then edit and delete it"
     expected: "Nothing is saved until Save is clicked. The uploaded PDF appears nowhere in the Library. The saved Expert appears in the list and the delete removes it."
     why_human: "No 261-UAT.md exists. The G-4 scenarios were never run for this phase."
+    driven: 2026-09-24 (Phase 265, plan 265-03, author fixture uat265-author (org-admin) in org 22f9c615)
+    result: pending operator confirmation (D-06) — UAT-265-261-1
+    evidence: ".planning/phases/265-owed-v4-3-verification/265-UAT-LOG.md#261-row-1 (expert_bundles 3 -> 3 pre-Save -> 4 Save -> 3 delete; documents 165 throughout; no reference document; each step API call captured)"
   - test: "Named-user grant, driven live: set an Expert to visibility 'granted' with one named user; sign in as a different member of the same org"
     expected: "The Expert is absent from the list, and GET /experts/{id} and PATCH /threads/{id} active_expert_id both return 404"
     why_human: "Automated coverage mocks check_expert_grant_access in the scenario suite. The live predicate is only exercised in test_261_expert_grants_db.py."
+    driven: 2026-09-24 (Phase 265, plan 265-03, Expert 253ba288 created_by=author 1f13dc7b; inside cdaa02a1 dept-admin, outside d9e4f4e7 member)
+    result: "PASS — UAT-265-261-2-user and UAT-265-261-2-role both hold, created_by != caller on every line. User grant (inside only): outside not listed, GET /experts/{id} 404, PATCH /threads/{own} active_expert_id 404; inside listed, GET 200, invite 200. Role grant (dept-admin only, user grant removed): outside not listed, 404, 404; inside listed, 200, 200."
+    evidence: ".planning/phases/265-owed-v4-3-verification/265-UAT-LOG.md#261-row-2"
   - test: "D-v4.3-03 operator arms: invite an Expert into a folder-scoped thread"
     expected: "Both the thread folder and the Expert's folders are readable (union), and the Expert can still write a file (tool floor)"
     why_human: "The operator ruling reserves this for the operator, live"
+    driven: 2026-09-24 (Phase 265, plan 265-03; owner thread 1746c825, run bc90b61b; first attempt as the author fixture, thread bcc3a269, had no folder access — see log)
+    result: pending operator confirmation (D-06) — UAT-265-261-3
+    evidence: ".planning/phases/265-owed-v4-3-verification/265-UAT-LOG.md#261-row-3"
 ---
 
 # Phase 261: An Expert You Can Author — Verification Report

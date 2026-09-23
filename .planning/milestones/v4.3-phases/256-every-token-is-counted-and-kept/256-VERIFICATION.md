@@ -58,6 +58,9 @@ human_verification:   # ROW 1 CLOSED live 2026-09-19. Row 2 still OWED, and clos
   - test: "Drive ONE publish gauntlet to the QUAL-01 judge stage against a REAL provider (no forced_emit patch), and compare the provider's reported usage for that shot against the delta persisted onto the golden run's workflow_runs row."
     expected: "The persisted delta equals the provider's reported input/output tokens for the served shot(s)."
     why_human: "Round 1 shipped NO live cross-provider UAT of a judge shot's reported usage — every case in test_256_judge_usage_counted.py patches forced_emit and supplies its own numbers. So the wiring is proven end-to-end but the FIDELITY of the number to what the provider actually reported is not, and CLAUDE.md's cross-provider rule says conventions do not transfer 1:1 between providers."
+    driven: 2026-09-24 (Phase 265, plan 265-03) — NOT driven to a verdict
+    result: "⛔ BLOCKED UAT-265-256-3 — no independent record of provider-reported usage is reachable: per-call usage is stored nowhere in the DB, the LangSmith MCP failed to connect this session, its API key sits in backend/.env (read-blocked), and backend usage logs are in the operator terminal. The gauntlet was not driven, because its result could not be scored. Unblock: reconnect LangSmith (/mcp) and re-run."
+    evidence: ".planning/phases/265-owed-v4-3-verification/265-UAT-LOG.md#256-row-3"
 ---
 
 # Phase 256: Every Token Is Counted And Kept — Verification Report (round 1)

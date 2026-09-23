@@ -241,3 +241,131 @@ last_run_at=NULL, last_status=NULL`. Every refusal refused. Nothing ran and noth
 **Result (258 row): FAIL.** `UAT-265-258-a` PASS; `UAT-265-258-b` and `UAT-265-258-c` FAIL: the server names the
 plan in every body, but two of the three UI doors discard it and print a raw status code. This matches the audit-fix
 review's R265-audit-fixes-05 (five of six gated authoring doors still show "Failed … (status 403)").
+
+## 261 — fixtures (VERIFY-03)
+
+Drive org: the dev enterprise org `22f9c615-0eec-440a-8804-ed4784d6f57f`. Three LOCAL fixture users, created through the
+GoTrue admin API. Passwords are kept only in the session scratchpad, never in `.planning`. Each fixture's
+trigger-provisioned personal-org membership was **detached**, so each has exactly ONE membership (in the drive org).
+
+| user | id | role in drive org | why this role |
+|---|---|---|---|
+| `uat265-author@example.test` | `1f13dc7b-746f-41f3-9318-d921ea94d5b2` | `org-admin` | lowest role that can author: `require_expert_manage` (`api/experts.py:111`) checks `experts:manage`, and `role_permissions` grants it only to `super-admin` and `org-admin` |
+| `uat265-inside@example.test` | `cdaa02a1-b1b4-4ee8-b8b8-fbf9fae8021f` | `dept-admin` | a real `org_members.role` value (CHECK: super-admin / org-admin / dept-admin / member), resolved by `resolve_caller_role` (per `cdf3a308a`) |
+| `uat265-outside@example.test` | `d9e4f4e7-bf88-46c8-a4ce-2af03bca9de7` | `member` | distinct from inside |
+
+`SELECT u.email, m.org_id, m.role FROM org_members m JOIN auth.users u ON u.id = m.user_id WHERE u.email LIKE 'uat265-%'`
+→ author, inside and outside each have ONE row in `22f9c615`. The standard-tier fixture has one row in `29851b83`.
+The Org Admin > Members list, rendered as the author, shows all three with these roles.
+
+**Removal SQL (for the operator, at will):**
+```sql
+DELETE FROM public.org_members WHERE user_id IN ('1f13dc7b-746f-41f3-9318-d921ea94d5b2','cdaa02a1-b1b4-4ee8-b8b8-fbf9fae8021f','d9e4f4e7-bf88-46c8-a4ce-2af03bca9de7');
+DELETE FROM public.expert_grants WHERE expert_id = '253ba288-7483-4af7-9979-e88f8c54cc98';
+DELETE FROM public.expert_bundles WHERE id = '253ba288-7483-4af7-9979-e88f8c54cc98';
+DELETE FROM auth.users WHERE id IN ('1f13dc7b-746f-41f3-9318-d921ea94d5b2','cdaa02a1-b1b4-4ee8-b8b8-fbf9fae8021f','d9e4f4e7-bf88-46c8-a4ce-2af03bca9de7');
+-- detached personal orgs (now memberless): 534245dc-946f-4b2c-851e-7f87d0eca29f, 23ca2a2e-ab2d-47bf-a763-cb289f3f323c, 823a8a30-c866-4804-8cbf-75ff980e0bbb
+```
+
+Sign-in used the same session-swap method as the 258 section: the operator's session was backed up and restored, and
+no password was typed into a page. The API-only arms used each fixture's session inside a shell process.
+
+## 261 row 1 — authoring mechanics (UAT-265-261-1)
+
+Driven as the author: the sidebar reads `uat265-author@example.test` and every call carries `X-Org-Id: 22f9c615…`.
+Surface: Org Admin > Experts. Counts are `SELECT count(*) FROM expert_bundles WHERE org_id = <org>` and the same query
+on `documents`.
+
+| step | UI / API | expert_bundles | documents | notes |
+|---|---|---|---|---|
+| BEFORE | — | **3** | **165** | UI reads "Showing 4 of 4 experts" (3 org + 1 system) |
+| attach `reference.pdf` (3 KB) + brainstorm → **Generate Candidate Draft** | `POST /experts/draft` 200 | — | — | draft built from the PDF: name "Technical Reference Briefing Analyst", sample output "Kestrel HTTP Server Limits — v2.4 Reference · Brief" |
+| edit the draft (rename to "… (UAT-265)") | — | — | — | — |
+| **pre-Save** | — | **3** | **165** | nothing saved; `documents WHERE filename ILIKE '%reference%'` = 0 |
+| Save held | UI | — | — | "3 capabilities are not real yet … Create or remove each one first … Save is held while proposed skills are unresolved." Claude removed the 3 proposed skills, because creating skills is plan 04's scope |
+| **Save & Publish Expert** | `POST /experts` 201 | **4** | **165** | listed; row `44b9d5b0…`, created_by = author, description of **3090 chars** saved (the old 1000-char cap did not block it) |
+| edit + **Update Expert** | `PATCH /experts/44b9d5b0…` 200 | 4 | 165 | listed as "(UAT-265 edited)" |
+| trash → "Delete Expert Bundle?" → **Delete Expert** | `DELETE /experts/44b9d5b0…` 200 | **3** | **165** | gone from the list ("Showing 4 of 4") and from the DB |
+
+The PDF never reached the Library: the org's `documents` count stayed at 165 at every step, and no document named like
+`reference` exists. Claude's reading is that every mechanic this row names held. **The verdict is the operator's
+(D-06).** Evidence is API captures, rendered text and SQL, because screenshots were not possible (the tab was hidden).
+
+## 261 row 2 — grant fence, creator bypass excluded (UAT-265-261-2-user / UAT-265-261-2-role)
+
+Expert `253ba288-7483-4af7-9979-e88f8c54cc98` "UAT-265 Billing SOP Advisor", `visibility = granted`, was created by the
+author via `POST /experts` (201). **`created_by = 1f13dc7b` (author), which differs from inside `cdaa02a1` and from
+outside `d9e4f4e7`**, so the creator bypass (`experts.py:281-282 / :323`) is not in play for either caller. Each
+caller drove against a thread it created itself (outside `09f7ec0d…`, inside `5933c897…`).
+
+**UAT-265-261-2-user.** `expert_grants` = `[user:cdaa02a1]` (grant `d1d0d98e…`).
+
+| caller | id | role | created_by | GET /experts (listed?) | GET /experts/{id} | PATCH /threads/{own} active_expert_id |
+|---|---|---|---|---|---|---|
+| outside | d9e4f4e7 | member | 1f13dc7b | 200, **absent** | **404** `Expert bundle not found` | **404** `Expert bundle not found or access denied` |
+| inside | cdaa02a1 | dept-admin | 1f13dc7b | 200, **present** | **200** | **200** (invite applied) |
+
+**UAT-265-261-2-role.** The user grant was removed (200) and a role grant added (201, `7f91b47f…`), so
+`expert_grants` = `[role:dept-admin]`.
+
+| caller | id | role | created_by | listed? | GET | PATCH invite |
+|---|---|---|---|---|---|---|
+| outside | d9e4f4e7 | member | 1f13dc7b | **absent** | **404** | **404** |
+| inside | cdaa02a1 | dept-admin | 1f13dc7b | **present** | **200** | **200** |
+
+⚠ Method note: between arms Claude sent `active_expert_id: null` to reset the inside thread. `ThreadUpdate` clears
+with `clear_active_expert`, not with null, so the inside thread still held the Expert and the role-arm 200 re-applied
+it. The access check runs on every PATCH (the outside 404 on the same request shape proves this), so the positive
+control still holds. The list and picker evidence is the API list, not a screenshot.
+
+**Result: PASS.** All four negatives and both positive controls hold, with `created_by ≠ caller` on every line.
+
+## 261 row 3 — D-v4.3-03 union + tool floor (UAT-265-261-3)
+
+Expert folder: **SOPs** `1fce5dee…` (document `ac8e1abd…` "CS SOPs final_29 Oct 2025_Billing Team Comments.pptx").
+Thread folder: **ToT** `e400e289…` (document `9f0af715…` "Train-the-Trainer.pptx").
+Expert settings: `scope_mode = biased` (union), `tool_floor_enabled = true`.
+
+**Attempt 1 — as the author fixture** (thread `bcc3a269…`, run `e340ddc5…`). The UI showed `USING: UAT-265 Billing
+SOP Advisor · BIASED`. After 19 steps the agent paused on `ask_user`, saying *"your document library currently
+contains 0 documents and 0 folders."* Cause (SQL): both folders are the operator's **private** folders
+(`is_org_shared = false`, owner `fhdmrd@gmail.com`), so retrieval correctly returns nothing to another user. Claude
+answered the pause ("test, stop") to end the run.
+
+⚠ **Observation `UAT-265-261-3-ACCESS` (triage input):**
+- (i) `POST /experts` accepted `knowledge_folder_ids` naming a folder the author cannot read, and `POST /threads`
+  accepted a `folder_id` the author cannot read. Both returned 201 with no refusal.
+- (ii) An Expert granted to users carries no read access to its own folders. A granted user whose own permissions
+  exclude those folders gets an Expert with no knowledge, and is not told so up front.
+
+**Attempt 2 — as the folders' owner** (the operator dev account `fhdmrd@gmail.com`; a user grant `14a19546…` was
+added so it may use the Expert). Thread `1746c825-c354-4d4f-b774-050f4771ae94` has folder ToT and the Expert invited;
+the UI shows `USING: UAT-265 Billing SOP Advisor`. Run `bc90b61b-8650-4c04-bbb7-ef5c92cceea7` got the same three-part
+prompt and completed in about 80 s.
+
+| tool call | argument | documents hit (folder) |
+|---|---|---|
+| `ls` | `/ToT` | Train-the-Trainer.pptx (**ToT**, the thread folder) |
+| `search_documents` ×4 | training and billing queries | the billing SOP doc (**SOPs**, the Expert folder) |
+| `read_document` | `9f0af715…` | Train-the-Trainer.pptx (**ToT**) |
+| `read_document` | `ac8e1abd…` | CS SOPs … Billing Team Comments.pptx (**SOPs**) |
+| `analyze_document` | training programme summary | — |
+| `execute_code` | writes `uat265-summary.md` | output file of **2547 bytes** at `/sandbox-outputs/d8a54002…/4378043c…/uat265-summary.md`; a `code_executions` row exists for the thread |
+
+The answer covers both folders. From ToT: the 2-day / 16-hour Train-the-Trainer programme and its 8 sessions. From
+SOPs: IBT billing tickets resolved within 48 working hours, with a 24h / 48h / 72h escalation ladder. It ends
+"I've created uat265-summary.md". `workspace_files` has no row for the thread; the file is a sandbox output, not a
+workspace file.
+
+Claude's reading: the union holds (both folders read in one run), and so does the tool floor (`execute_code` stayed
+available and the file was written). **The verdict is the operator's (D-06).**
+
+## 256 row 3 — judge-usage fidelity (UAT-265-256-3)
+
+⛔ **BLOCKED UAT-265-256-3: no independent record of provider-reported usage is reachable from this session.**
+Per-call provider usage is stored nowhere in the DB: the only token columns are `runs`, `workflow_runs` and
+`eval_results`. The LangSmith MCP server failed to connect at session start (`CONNECTION_CLOSED`), and its API key
+is in `backend/.env`, which a deny rule blocks. The backend's per-call usage lines, if any, are in the operator's
+uvicorn terminal. The comparison "persisted delta = provider-reported judge usage" therefore cannot be computed
+without inventing one side. The gauntlet was not driven, because the result could not be scored.
+Unblock: reconnect the LangSmith MCP (`/mcp`) and re-run this row.
