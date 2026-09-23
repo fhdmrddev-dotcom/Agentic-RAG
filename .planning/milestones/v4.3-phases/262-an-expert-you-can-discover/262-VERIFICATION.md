@@ -171,7 +171,7 @@ a sketch-only category name does NOT appear as a pill). The production module
 | Gate | Command | Verdict |
 |---|---|---|
 | Frontend count gate | `GSD_VITEST_MAX_WORKERS=2 node scripts/vitest-count-gate.cjs` (repo root) | `total 8745 · pinned total 8004 · failed 0` — **`count gate OK` — 324/324 pinned files present, no per-file decrease, 0 failing.** (SEED-171's known flaky suites did not appear as failures in this run.) |
-| `tsc` app config | `npx tsc -p tsconfig.app.json --noEmit` (frontend/) | **70 errors** — matches the documented base exactly (CLAUDE.md/RESEARCH both record base 70; "zero" is not a reachable criterion here per project convention) |
+| `tsc` app config | `npx tsc -p tsconfig.app.json --noEmit` (frontend/) | **70 errors** — ~~matches the documented base exactly (CLAUDE.md/RESEARCH both record base 70; "zero" is not a reachable criterion here per project convention)~~ ⚠ CORRECTED 2026-09-24 (Phase 265, R265-262-08): CLAUDE.md records **67 errors at base**, not 70, so this reading is 3 above the documented base and does NOT "match exactly". The 3-error delta was not attributed at the time. "Zero" is still not a reachable criterion. |
 | Backend unit baseline | `node scripts/check-backend-unit-baseline.cjs` (backend/) | **71 failed, 5495 passed, 2 xfailed, 2 xpassed, 0 errors — `[GATE PASSED]`** (ceiling 71, zero headroom — held exactly, not exceeded) |
 | Backend API-layer PACK-11 test | `pytest tests/unit/test_262_expert_list_grants_api.py -q` | **5 passed** |
 | Hot-file ledger | `node scripts/check-hot-file-ledger.cjs .planning/phases/262-an-expert-you-can-discover` | **ledger gate OK** — 328 rows, 15/15 watched files present |
