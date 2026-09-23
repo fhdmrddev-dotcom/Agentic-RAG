@@ -192,3 +192,25 @@ def test_a_caller_with_no_role_yields_an_empty_role_list_not_a_null_entry(expert
     # fails closed to the least-privileged REAL role — never None, never a fabricated role.
     assert roles == ["member"]
     assert None not in roles
+
+
+def test_a_member_cannot_widen_the_list_to_disabled_experts_with_enabled_only_false(expert_test_app):
+    """R265-262-07 / PACK-11 — the non-management arm FORCES `enabled_only=True`.
+
+    A client-supplied `enabled_only=false` must not reach the service for a plain member, or a
+    disabled Expert is listed to someone who may not see it.
+    """
+    _wire(expert_test_app)
+
+    with patch(
+        "app.services.entitlement_service.check_entitlement", new_callable=AsyncMock
+    ) as mock_check, patch(
+        "app.api.experts.list_experts_service", new_callable=AsyncMock
+    ) as mock_list:
+        mock_check.return_value = ALLOWED
+        mock_list.return_value = []
+
+        resp = TestClient(expert_test_app).get("/experts?enabled_only=false")
+
+    assert resp.status_code == status.HTTP_200_OK
+    assert mock_list.await_args.kwargs["enabled_only"] is True

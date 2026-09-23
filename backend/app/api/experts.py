@@ -432,7 +432,8 @@ async def list_experts(
         caller_user_id=user_id,
         caller_roles=caller_roles,
         include_system=include_system,
-        enabled_only=enabled_only,
+        # R265-262-07 / PACK-11: only the management arm may list disabled Experts.
+        enabled_only=True,
     )
 
 
