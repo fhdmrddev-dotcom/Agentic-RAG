@@ -489,6 +489,18 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.expert_bundles TO authentic
 -- migration 189:45
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.expert_grants TO authenticated, service_role;
 
+-- migration 194 — an org admin must not raise their own plan (R265-audit-fixes-01).
+-- Table-level INSERT/UPDATE revoked from the client roles; UPDATE granted back column by
+-- column. A column-only revoke would be a no-op against the table-level default grant.
+REVOKE INSERT, UPDATE ON TABLE public.organizations FROM anon;
+REVOKE INSERT, UPDATE ON TABLE public.organizations FROM authenticated;
+REVOKE INSERT, UPDATE ON TABLE public.organizations FROM PUBLIC;
+REVOKE UPDATE (id, name, slug, subscription_tier, add_ons, settings, created_at, updated_at)
+    ON public.organizations FROM anon;
+REVOKE UPDATE (id, name, slug, subscription_tier, add_ons, settings, created_at, updated_at)
+    ON public.organizations FROM authenticated;
+GRANT UPDATE (name, slug, settings, updated_at) ON public.organizations TO authenticated;
+
 
 -- ============================================================
 -- 6. Function EXECUTE privileges (migration 181 / Phase 248, CRED-03)
