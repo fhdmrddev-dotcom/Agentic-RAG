@@ -193,8 +193,8 @@ tab was hidden.
 |---|---|---|---|---|
 | chat, rated, tool-using | `644ac824` "Document fetch and sandbox operation task" | 5 completed rated runs with tokens | `$0.0225` `$0.0155` `$0.1639` `$0.0389` `$0.0081` (each rendered twice: header + collapsed row) | `rgb(52, 211, 153)` = emerald-400 ✅ |
 | chat, unrated, tool-using | `fa964e0d` "list my folders" | 3 × `openai/gpt-oss-20b` (ollama, no rate), 18341/190 · 18877/200 · 19660/426 tokens | `Unrated` × 3 runs (×2 renders) | `rgb(251, 191, 36)` = amber-400 ✅ |
-| chat, **rated, tool-LESS** | `fa964e0d`, message `9b6a5002` | `ee6e5412` deepseek-v4-flash, 12170/592 tokens; API returns `cost_usd: 0.0044, is_rated: true` | **nothing**: no model, no cost, not on hover either | — ❌ |
-| chat, rated-but-unmeasured | — | ⛔ none observable: 0 completed rated no-token runs in the org have a tool-using reply (SQL); Meridian's `af905f64` has no `message_id` | — | ⛔ |
+| chat, **rated, tool-LESS** (`UAT-265-257-3-NOCARD`) | `fa964e0d`, message `9b6a5002` | `ee6e5412` deepseek-v4-flash, 12170/592 tokens; API returns `cost_usd: 0.0044, is_rated: true` | **nothing**: no model, no cost, not on hover either | — ❌ |
+| chat, rated-but-unmeasured (`UAT-265-257-3-UNMEASURED`) | — | ⛔ none observable: 0 completed rated no-token runs in the org have a tool-using reply (SQL); Meridian's `af905f64` has no `message_id` | — | ⛔ |
 | chat asterisk | all of the above | — | `$x.xxxx *` pattern count = **0** | ✅ |
 | workflow run page | `a77ed2c0` (via "Open the run") | deepseek-v4-flash 135142/10317 | `$0.0529` | `rgb(52, 211, 153)` emerald ✅ |
 
@@ -226,7 +226,7 @@ POSTs below. The sidebar identity read `uat265-standard@example.test`. The fixtu
 LOCAL-only fixture org, which is the behavioural proof that the backend is on the local DB.
 
 **Visibility:** the Workflows nav entry, the library (4 ready-to-run, including `UAT-265 Essay Writer`), the Builder,
-and the schedule dialog's `Run now` are all SHOWN to the standard tier. No door is hidden, so no `-HIDDEN` rows.
+and the schedule dialog's `Run now` are all SHOWN to the standard tier. No door is hidden, so no `-HIDDEN` rows (`UAT-265-258-VIS`: every door shown).
 
 | id | action | request | status | response body (verbatim) | on-screen text (verbatim) | names the plan? |
 |---|---|---|---|---|---|---|
@@ -362,7 +362,7 @@ available and the file was written). **The verdict is the operator's (D-06).**
 
 ## 256 row 3 — judge-usage fidelity (UAT-265-256-3)
 
-First pass: ⛔ BLOCKED (LangSmith MCP not connected). Unblocked on 2026-09-24: `langsmith-mcp-server` had never been
+First pass (`UAT-265-256-3`): ⛔ BLOCKED (LangSmith MCP not connected). Unblocked on 2026-09-24: `langsmith-mcp-server` had never been
 installed, so the launcher exited. It now runs from an isolated `.tools/langsmith-mcp-venv` (commit `b7f510447`), and
 the operator reconnected it.
 
@@ -413,7 +413,7 @@ Full per-row lines and the R-9 board are in `263-UAT.md` § "Re-drive post-WR-08
 (`f04d9c406` is an ancestor). BEFORE: skills 11, expert_bundles (org) 4, `self_improve_enabled = true`.
 AFTER: skills 12 (+1, the one approval), expert_bundles 5 (+1, the saved Expert), `self_improve_enabled = true`,
 `zzz-265%` skills = 0.
-Verdicts: R-1 through R-6 PASS, **R-7 FAIL**, R-8 PASS, R-9 PASS (8/8; DeepSeek on retry).
+Verdicts: R-1 through R-6 PASS, **R-7 FAIL** (`UAT-265-263-R7`), R-8 PASS, R-9 PASS (8/8; DeepSeek on retry).
 
 `UAT-265-BUG-260921-02 PASS 4432 chars saved, draft-skill-body HTTP 200`. The fresh doctoral draft's description is
 4432 chars. `POST /experts/draft-skill-body` carried `expert_description` of 4432 chars and returned 200.
@@ -436,7 +436,7 @@ Verdicts: R-1 through R-6 PASS, **R-7 FAIL**, R-8 PASS, R-9 PASS (8/8; DeepSeek 
     `load_skill` returned `{"name": "prisma-2020-protocol-builder", "instructions": "When given a review question, …"}`,
     and the answer followed its five-step method ("built per the skill's five-step method").
   - A follow-up run `3eeeecc2…` asked for the other four skills. `docx` and `financial_ratio_calculator` loaded;
-    `search-strategy-builder` and `xlsx` returned "not found or not enabled". This is the R-7 FAIL.
+    `search-strategy-builder` and `xlsx` returned "not found or not enabled". This is the R-7 FAIL (`UAT-265-263-R7`).
 - Claude's reading: WR-08's non-empty `born_skills` path works end to end. **The verdict is the operator's (D-06).**
 
 ## 263 approval — operator verdict (D-06)

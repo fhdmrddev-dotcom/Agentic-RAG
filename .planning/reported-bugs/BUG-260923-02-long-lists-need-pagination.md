@@ -26,7 +26,7 @@ through pages, same as the documents page, instead of scrolling down endlessly."
 
 Measured in code at `dea7f5539`:
 
-### ⛔ The Spend ledger is TRUNCATED, not just long (the severity driver)
+### ⛔ The Spend ledger is TRUNCATED, not just long (the severity driver) — closed by `UAT-265-D09`
 
 `frontend/src/pages/admin/AdminSpendPage.tsx:117-121` fetches the ledger with `limit: 50` and
 **no offset, ever**. The header renders the full count — *"Attributable Runs Ledger
