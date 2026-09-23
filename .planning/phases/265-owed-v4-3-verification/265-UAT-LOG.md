@@ -119,3 +119,18 @@ token_coverage=['agent','single','batch','emit']  updated_at=2026-09-22 21:50:13
 (Tokens identical to the 2026-09-19 reading. Note `status` reads `active`, not a paused literal.)
 
 uvicorn on :8000: `Get-NetTCPConnection -LocalPort 8000 -State Listen` → PID **56412** `python`, StartTime **9/20/2026 9:00:48 AM** (local).
+
+## Incident — backend wedged by a `--reload` restart (2026-09-24, ~04:28 local)
+
+- The operator's backend runs `python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload` (master PID 56412,
+  started 9/20 9:00 AM). Its worker was **respawned at 9/23 04:28:31 local (PID 75208)**. That was the moment Claude
+  created `backend/tests/integration/test_265_org_tier_self_upgrade.py` inside the watched tree (the migration 194
+  hotfix; see `265-HOTFIX-194.md`).
+- After the respawn, `curl --max-time 10 http://localhost:8000/health` → `000` after 10.0 s. Same for `/setup/status`:
+  the socket accepts, and nothing answers. `pg_stat_activity` shows no stuck query. The app shell hangs on its boot
+  spinner on every route, because `App.tsx:295` waits on `GET /setup/status`.
+- Lesson (restates an existing memory): **never write files into `backend/` while the operator's `--reload` backend is
+  serving a UAT**. Claude does not restart the backend (the user owns it), so the drive is paused for the operator.
+- ⚠ Observation `UAT-265-257-2-OBS` (triage input): with the backend **hung** (accepting sockets but never answering),
+  the app shows an infinite spinner with no reason and no Retry, because `getSetupStatus` has no timeout. 257 row 2
+  covers a STOPPED backend (connection refused). The hung case is a separate failure path.
