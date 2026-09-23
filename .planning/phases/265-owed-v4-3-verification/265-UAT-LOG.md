@@ -369,3 +369,10 @@ is in `backend/.env`, which a deny rule blocks. The backend's per-call usage lin
 uvicorn terminal. The comparison "persisted delta = provider-reported judge usage" therefore cannot be computed
 without inventing one side. The gauntlet was not driven, because the result could not be scored.
 Unblock: reconnect the LangSmith MCP (`/mcp`) and re-run this row.
+
+## 261 — operator verdicts (D-06)
+
+2026-09-24, operator reply: **"pass"**, covering both human-judgement rows.
+
+- `UAT-265-261-1`: **PASS** (operator)
+- `UAT-265-261-3`: **PASS** (operator)

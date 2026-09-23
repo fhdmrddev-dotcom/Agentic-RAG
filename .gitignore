@@ -101,3 +101,6 @@ LLM_SWITCHING_GUIDE.md
 
 # agent-bus watcher seen-sets (per-agent, machine-local)
 .agent-bus/.watch-seen-*
+
+# Phase 265 — isolated venv for the LangSmith MCP server (kept out of backend/venv; see scripts/launch-langsmith-mcp.py)
+.tools/

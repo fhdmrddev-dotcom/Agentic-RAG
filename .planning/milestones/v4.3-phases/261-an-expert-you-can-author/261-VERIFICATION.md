@@ -48,7 +48,8 @@ human_verification:
     expected: "Nothing is saved until Save is clicked. The uploaded PDF appears nowhere in the Library. The saved Expert appears in the list and the delete removes it."
     why_human: "No 261-UAT.md exists. The G-4 scenarios were never run for this phase."
     driven: 2026-09-24 (Phase 265, plan 265-03, author fixture uat265-author (org-admin) in org 22f9c615)
-    result: pending operator confirmation (D-06) — UAT-265-261-1
+    result: PASS — UAT-265-261-1 — operator: "pass"
+    operator_confirmed: 2026-09-24 — "pass" (operator reply covering rows 1 and 3)
     evidence: ".planning/phases/265-owed-v4-3-verification/265-UAT-LOG.md#261-row-1 (expert_bundles 3 -> 3 pre-Save -> 4 Save -> 3 delete; documents 165 throughout; no reference document; each step API call captured)"
   - test: "Named-user grant, driven live: set an Expert to visibility 'granted' with one named user; sign in as a different member of the same org"
     expected: "The Expert is absent from the list, and GET /experts/{id} and PATCH /threads/{id} active_expert_id both return 404"
@@ -60,7 +61,8 @@ human_verification:
     expected: "Both the thread folder and the Expert's folders are readable (union), and the Expert can still write a file (tool floor)"
     why_human: "The operator ruling reserves this for the operator, live"
     driven: 2026-09-24 (Phase 265, plan 265-03; owner thread 1746c825, run bc90b61b; first attempt as the author fixture, thread bcc3a269, had no folder access — see log)
-    result: pending operator confirmation (D-06) — UAT-265-261-3
+    result: PASS — UAT-265-261-3 — operator: "pass"
+    operator_confirmed: 2026-09-24 — "pass" (operator reply covering rows 1 and 3)
     evidence: ".planning/phases/265-owed-v4-3-verification/265-UAT-LOG.md#261-row-3"
 ---
 
