@@ -28,7 +28,7 @@ conversation to it. Discovery is a read surface over rows that already exist.
 
 **Verified:** 2026-09-22T22:55:00Z
 **Base → HEAD:** `a0c2f833e` → `f2dad9c86` (develop), 29 commits, 5 plans / 5 waves
-**Status:** human_needed — all three success criteria are VERIFIED **in the shipped code and its own
+**Status:** passed (matches frontmatter; was ~~human_needed~~ until the lived UAT ran — 262-UAT.md 29 pass / 0 open / 1 skipped, 2026-09-23). At verification time: all three success criteria are VERIFIED **in the shipped code and its own
 test suites**, driven by commands I ran myself. What remains is the G-4 **lived** UAT in
 `262-VALIDATION.md`, whose 26 rows are all unfilled (no `Result` recorded) — that is manual UAT owed
 to the operator, not a code gap.
@@ -96,7 +96,7 @@ Then I verified each leg by hand, directly on the shipped files:
 |---|---|---|
 | 1 · the `ActiveView` member | `grep -n '"experts"' frontend/src/App.tsx` | line 127, inside the union declaration — the literal appears **nowhere else** in the file (`grep -cin "experts" App.tsx` → 1) |
 | 2 · the `ChatLayout` branch | `grep -n 'activeView === ' ChatLayout.tsx` + `grep -n UnknownViewFallback ChatLayout.tsx` | `experts` branch at **line 996**; `<UnknownViewFallback>` at **line 1050** — branch precedes fallback, confirmed positionally, not asserted |
-| 3 · the entry action(s) | `grep -n 'experts' frontend/src/lib/nav-items.ts` | `{ view: "experts", icon: Sparkles, label: "Experts" }` at line 99 — **no `feature` key**, i.e. ungoverned and not behind any admin/operator gate |
+| 3 · the entry action(s) | `grep -n 'experts' frontend/src/lib/nav-items.ts` | `{ view: "experts", icon: GraduationCap, label: "Experts" }` at line 111 (corrected by R265-262-08; originally quoted as `Sparkles` at :99) — **no `feature` key**, i.e. ungoverned and not behind any admin/operator gate |
 
 **All three legs land in one commit** (`917d79a7b`) — confirmed by the SUMMARY's `git show --stat`
 claim and independently by `git log --oneline a0c2f833e..f2dad9c86` showing the triad's commit as a
@@ -121,7 +121,7 @@ Confirmed the `experts` nav entry carries no `feature` governance key and sits i
 `NAV_ITEMS` array `NavPanel`/mobile drawer both consume — not `OrgExpertsTab` (which remains
 mounted only inside `OrgAdminShell.tsx`, unchanged by this phase). The real gate is a **per-org tier
 entitlement** at the API (`require_capability("experts")`), which 403s honestly rather than hiding
-the nav entry — confirmed the entry has no `GovernedFeature` value by reading `nav-items.ts:99` and
+the nav entry — confirmed the entry has no `GovernedFeature` value by reading `nav-items.ts:111` and
 its type (`GovernedFeature` is a closed 6-member union; `experts` is not one of them, so no
 `NavItem.feature` claim was even possible here).
 
