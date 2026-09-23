@@ -53,6 +53,9 @@ human_verification:
   - test: "Open a chat thread whose runs mix a rated model, an unrated model (e.g. qwen3-coder:30b) and a rated-but-unmeasured run. Then open a workflow run page."
     expected: "Rated shows $x.xxxx in emerald. Unrated shows an amber 'Unrated' badge. Unmeasured shows 'No tokens recorded'. No coverage asterisk on chat messages."
     why_human: "The RunCard mounts (RunCard.tsx:409-457) have no rendering test. Only RunCostBadge in isolation is tested."
+    driven: 2026-09-24 (Phase 265, plan 265-02, org 22f9c615; threads 644ac824 + fa964e0d, run a77ed2c0)
+    result: "UAT-265-257-3 FAIL — on tool-using RunCards rated runs render $x.xxxx in emerald (computed rgb(52,211,153)) and unrated runs render an amber 'Unrated' badge (rgb(251,191,36)); no chat asterisk; the workflow run page shows $0.0529 in emerald. BUT a reply with no tool calls never mounts RunCard (MessageItem.tsx:528), and the badge lives only in RunCard, so its cost is never shown although the API returns it (deepseek reply 9b6a5002: cost_usd 0.0044, page shows nothing). 148 of 596 completed chat runs in the org are tool-less. Triage id UAT-265-257-3-NOCARD. The 'No tokens recorded' chat state was not observable with existing data."
+    evidence: ".planning/phases/265-owed-v4-3-verification/265-UAT-LOG.md#257-row-3 (rendered text + computed colours + API body + SQL; no screenshot — the tab was hidden)"
 ---
 
 # Phase 257: Cost in Dollars, and What It Cannot See — Verification Report

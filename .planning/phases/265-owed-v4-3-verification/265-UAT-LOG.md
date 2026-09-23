@@ -182,3 +182,30 @@ Process boundary: the stop was real. `Get-NetTCPConnection -LocalPort 8000 -Stat
 the tokens unchanged. Some writer touched the row. Recorded, not investigated.
 
 **Result `UAT-265-256-2`: PASS.**
+
+## 257 row 3 — cost on chat RunCards and the workflow run page (UAT-265-257-3)
+
+Signed in as the dev account, org `22f9c615`. Evidence: rendered text plus the **computed `color`** of each badge
+element (`getComputedStyle`), the API `/threads/{id}/messages` body read in-page, and SQL. No screenshot, because the
+tab was hidden.
+
+| surface | thread / run | run(s) (SQL) | rendered | color |
+|---|---|---|---|---|
+| chat, rated, tool-using | `644ac824` "Document fetch and sandbox operation task" | 5 completed rated runs with tokens | `$0.0225` `$0.0155` `$0.1639` `$0.0389` `$0.0081` (each rendered twice: header + collapsed row) | `rgb(52, 211, 153)` = emerald-400 ✅ |
+| chat, unrated, tool-using | `fa964e0d` "list my folders" | 3 × `openai/gpt-oss-20b` (ollama, no rate), 18341/190 · 18877/200 · 19660/426 tokens | `Unrated` × 3 runs (×2 renders) | `rgb(251, 191, 36)` = amber-400 ✅ |
+| chat, **rated, tool-LESS** | `fa964e0d`, message `9b6a5002` | `ee6e5412` deepseek-v4-flash, 12170/592 tokens; API returns `cost_usd: 0.0044, is_rated: true` | **nothing**: no model, no cost, not on hover either | — ❌ |
+| chat, rated-but-unmeasured | — | ⛔ none observable: 0 completed rated no-token runs in the org have a tool-using reply (SQL); Meridian's `af905f64` has no `message_id` | — | ⛔ |
+| chat asterisk | all of the above | — | `$x.xxxx *` pattern count = **0** | ✅ |
+| workflow run page | `a77ed2c0` (via "Open the run") | deepseek-v4-flash 135142/10317 | `$0.0529` | `rgb(52, 211, 153)` emerald ✅ |
+
+⛔ **Finding `UAT-265-257-3-NOCARD` (major, triage input):** `MessageItem.tsx:528` mounts `RunCard` only when
+`message.tool_calls` is non-empty, and `RunCostBadge` is mounted only inside `RunCard` (`RunCard.tsx:409-417, 453-460`).
+So **a chat reply that used no tools never shows its cost**, whether rated, unrated or unmeasured, even though
+`GET /threads/{id}/messages` returns `cost_usd` / `is_rated` for it. Size, measured in the dev org: **148 of 596**
+completed chat runs with a linked reply are tool-less (25%). SC#4 "an operator sees spend in dollars per run" does not
+hold for a quarter of chat runs. The `No tokens recorded` chat state could not be observed with existing data (it does
+render on the /admin/spend ledger, row 1).
+
+**Result `UAT-265-257-3`: FAIL.** Rated (emerald), unrated (amber) and no-asterisk pass on tool-using cards and on
+the run page. Tool-less replies show no cost at all (`UAT-265-257-3-NOCARD`). The unmeasured chat state is ⛔ not
+observable.
