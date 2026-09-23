@@ -33,7 +33,7 @@ human_verification:
 **Phase Goal:** A skill born for an Expert is loadable by everyone that Expert serves, not only
 the person who authored it.
 **Verified:** 2026-09-22
-**Status:** human_needed (all 5 automated ROADMAP success criteria VERIFIED; 2 human-verification items owed — see below)
+**Status:** passed (matches frontmatter; was ~~human_needed~~ until the 13 owed rows were driven 2026-09-22, 13/13 PASS — see `human_verification_driven`). At verification time: (all 5 automated ROADMAP success criteria VERIFIED; 2 human-verification items owed — see below)
 **Re-verification:** No — initial verification
 
 ## Method
@@ -110,14 +110,14 @@ in this session, not a citation of a summary.
 
 ### Owed Manual UAT (NOT scored as gaps)
 
-`264-VALIDATION.md` (`status: authored`, `driven_by: TBD`) contains:
+`264-VALIDATION.md` (now `status: driven`, `driven_by: orchestrator, 2026-09-22` — corrected by R265-264-07; at verification it read ~~`status: authored`, `driven_by: TBD`~~) contains:
 
 - **Section A — 10 G-4 lived rows (L-1 through L-10):** the defect reproduced on the pre-264 tree,
   the bar met for a non-author, the author unaffected, and 7 narrow/negative rows (no-Expert,
   wrong-Expert, different-org, files, sandbox, disabled, Deep-Mode-untouched). All verdict cells
-  are blank.
+  are blank (at verification time; now filled — Section D).
 - **Section B — the SC#10 4-axis board:** P-1 through P-8 (the 8-provider cross-provider roster），
-  M-1 (multi-tool), T-1 (parallel-thread), G-1 (long-message). All verdict cells are blank.
+  M-1 (multi-tool), T-1 (parallel-thread), G-1 (long-message). All verdict cells are blank (at verification time; now filled — Section D).
 
 These require a live chat run, a real LLM turn, and (for Section B) per-provider API calls — none
 of which this verifier can drive. They are listed here by row id, as instructed, and are NOT
