@@ -41,9 +41,15 @@ human_verification:
   - test: "Open /admin/spend from the operator rail and read the KPI row, the 'What This View Cannot See' card and the ledger for org 22f9c615"
     expected: "Total $28.3697. Rated 865, Unrated 321, No-tokens 345. The three gauge segments sum to 100%. 'View 321 Unrated Runs' filters the ledger to 321 rows. No figure reads $0.0000 for an unrated or unmeasured run."
     why_human: "The CR-06 / CR-07 / gauge / WR-08..12 fixes (2026-09-19), mig 185 and the F-13 SQL refactor (2026-09-23) all changed what this page renders. The only lived-experience pass on it was the operator's 257.1 session, BEFORE those changes. G-4 asks for a browser drive, and uat_257_scenarios.py drives the DB layer, not the page."
+    driven: 2026-09-23 (Phase 265, plan 265-02, org 22f9c615, Last 30D)
+    result: "UAT-265-257-1 PASS — every on-screen figure equals an independent SQL read at drive time ($4.2553, 244 runs, 121 priced / 87 unrated / 36 no-tokens, 15.07M tokens, 32 partial, 155 blind spots); gauge 49/15/36 sums to 100; 'View 87 Unrated Runs' filters to exactly 87 over 2 pages; 0 x $0.0000. The expected figures above are from 2026-09-19 and have moved; the bar was page == SQL. Minor observation UAT-265-257-1-OBS: the KPI reads 50% and the gauge reads 49% for the same 121/244 ratio."
+    evidence: ".planning/phases/265-owed-v4-3-verification/265-UAT-LOG.md#257-row-1 (page text + in-page fetch capture showing X-Org-Id + SQL; a full-page screenshot was not possible because the tab was hidden)"
   - test: "Force a failed load (stop the backend) and open /admin/spend"
     expected: "An 'Unavailable' banner with Retry. No 'Tokens 0.0k', no 'Coverage 0%', no empty charts, no 100%-priced honesty card (CR-07)."
     why_human: "Visual state. The vitest cases mount it with a rejecting mock, not the real app."
+    driven: 2026-09-24 (Phase 265, plan 265-02; backend really stopped — curl exit 7 / connection refused)
+    result: "UAT-265-257-2 PASS — the banner reads 'Could not load spend — Failed to fetch' with Retry; every KPI reads 'Unavailable'; both charts read 'Chart unavailable — spend data did not load'; the honesty card reads 'What this view cannot see is itself unavailable'; the ledger reads 'Runs unavailable — the ledger did not load.' Rendered-text counts: 0.0k = 0, 0% = 0, $0.0000 = 0, 100% = 0, chart surfaces = 0. Retry keeps it unavailable. Separate observation UAT-265-257-2-OBS: a HUNG (not stopped) backend leaves the whole app on an infinite boot spinner."
+    evidence: ".planning/phases/265-owed-v4-3-verification/265-UAT-LOG.md#257-row-2 (page text via Chrome MCP; no screenshot — the tab was hidden)"
   - test: "Open a chat thread whose runs mix a rated model, an unrated model (e.g. qwen3-coder:30b) and a rated-but-unmeasured run. Then open a workflow run page."
     expected: "Rated shows $x.xxxx in emerald. Unrated shows an amber 'Unrated' badge. Unmeasured shows 'No tokens recorded'. No coverage asterisk on chat messages."
     why_human: "The RunCard mounts (RunCard.tsx:409-457) have no rendering test. Only RunCostBadge in isolation is tested."

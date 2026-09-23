@@ -134,3 +134,31 @@ uvicorn on :8000: `Get-NetTCPConnection -LocalPort 8000 -State Listen` → PID *
 - ⚠ Observation `UAT-265-257-2-OBS` (triage input): with the backend **hung** (accepting sockets but never answering),
   the app shows an infinite spinner with no reason and no Retry, because `getSetupStatus` has no timeout. 257 row 2
   covers a STOPPED backend (connection refused). The hung case is a separate failure path.
+
+## 257 row 2 — /admin/spend against a stopped backend (UAT-265-257-2)
+
+Backend stop: the operator pressed Ctrl+C, which stopped only the `--reload` worker. The parent (PID 56412) and then
+the orphaned worker (PID 75208, which had inherited the listening socket) were ended by Claude **at the operator's
+explicit instruction ("kill it")**. After that: `Get-NetTCPConnection -LocalPort 8000 -State Listen` → 0, and
+`curl http://localhost:8000/health` → `000`, curl exit **7** (connection refused).
+
+Hard navigation to `http://localhost:5173/admin/spend`. The app shell booted: `/setup/status` fails fast when the
+connection is refused. Rendered text, verbatim excerpts:
+
+- `Could not load spend — Failed to fetch` · `Retry`
+- `TOTAL ORG SPEND (ATTRIBUTABLE)` `Unavailable` `Data load failed` · `TOKENS COUNTED` `Unavailable` `In: —` `Out: —` ·
+  `PRICING COVERAGE RATIO` `Unavailable` · `BLIND SPOTS & RESIDUES` `Unavailable` `— — —`
+- `Chart unavailable — spend data did not load` (both charts)
+- `What this view cannot see is itself unavailable — spend data did not load.`
+- `Attributable Runs Ledger (0)` … `Runs unavailable — the ledger did not load.`
+
+Counts in the rendered text: `0.0k` = **0**, standalone `0%` = **0**, `$0.0000` = **0**, `100%` = **0**; recharts
+surfaces = **0** (no empty charts). Clicked Retry once: the banner still reads `Could not load spend — Failed to fetch`,
+the 4 `Unavailable` KPIs remain, and there is still no `0.0k` or `$0.0000`.
+
+Screenshot: not captured. `Page.captureScreenshot` timed out again while the tab stayed `hidden`. Evidence is the
+rendered text above.
+
+**Result `UAT-265-257-2`: PASS** (CR-07 contract holds for a stopped backend).
+
+row 2 recorded — restart the backend now
