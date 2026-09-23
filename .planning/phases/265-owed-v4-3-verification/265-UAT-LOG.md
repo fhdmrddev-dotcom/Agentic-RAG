@@ -209,3 +209,35 @@ render on the /admin/spend ledger, row 1).
 **Result `UAT-265-257-3`: FAIL.** Rated (emerald), unrated (amber) and no-asterisk pass on tool-using cards and on
 the run page. Tool-less replies show no cost at all (`UAT-265-257-3-NOCARD`). The unmeasured chat state is ⛔ not
 observable.
+
+## 258 — the three refusals as a standard-tier org (UAT-265-258-a/b/c)
+
+**Sign-in method (deviation, stated):** Claude does not type passwords into page fields. It obtained a session for
+the LOCAL fixture user `uat265-standard@example.test` from the local GoTrue token endpoint (shell, password from the
+session scratchpad), backed up the operator's browser session to a separate localStorage key, swapped in the fixture
+session plus `active-org-id = 29851b83…`, drove the three rows, then restored the operator's session. Restoration was
+verified: the page shows `fhdmrd@gmail.com` and `active-org-id = 22f9c615…`. The session file was deleted from the
+scratchpad afterwards. No token or password is written in `.planning`.
+
+**Active org proof:** every API call the pages made carried **`X-Org-Id: 29851b83-7ab7-400d-aa90-65dc369dbba6`**
+(in-page fetch capture), e.g. `GET /workflows/published`, `GET /workflows/dfa0d728…/schedules`, and the three refused
+POSTs below. The sidebar identity read `uat265-standard@example.test`. The fixture user has exactly ONE membership
+(`SELECT org_id FROM org_members WHERE user_id='8913beee-…'` → 1 row, `29851b83…`). The running backend served this
+LOCAL-only fixture org, which is the behavioural proof that the backend is on the local DB.
+
+**Visibility:** the Workflows nav entry, the library (4 ready-to-run, including `UAT-265 Essay Writer`), the Builder,
+and the schedule dialog's `Run now` are all SHOWN to the standard tier. No door is hidden, so no `-HIDDEN` rows.
+
+| id | action | request | status | response body (verbatim) | on-screen text (verbatim) | names the plan? |
+|---|---|---|---|---|---|---|
+| **UAT-265-258-a** | run the published workflow into a thread (card `Run` → modal `▶ Run workflow`) | `POST /threads` 201 → `POST /threads/fe3c413b…/messages` → `DELETE /threads/fe3c413b…` 204 (cleanup) | **403** | `{"error":"entitlement_required","capability":"workflows","required_tier":"enterprise","current_tier":"standard","upgrade_hint":"Upgrade to Enterprise to use workflows."}` | `Your plan doesn't include workflows. It is part of the Enterprise plan.` (modal + toast) | ✅ **PASS** |
+| **UAT-265-258-b** | create a draft (`Build a workflow` → `Build it myself` → goal → `Write the first draft`) | `POST /workflows/generate` | **403** | same shape, `required_tier: enterprise` | `Couldn't generate — Couldn't generate the workflow.` · `Failed to generate workflow (status 403)` · `Nothing was saved.` | ❌ **FAIL** |
+| UAT-265-258-b (API arm) | plain draft create | `POST /workflows` `{}` (fixture bearer, in-page) | **403** | same shape, `required_tier: enterprise` (the gate fires before body validation) | — | (API only) |
+| **UAT-265-258-c** | `Workflow actions` → `Schedules…` → `Run now` on `UAT-265 schedule (never fires)` | `POST /schedules/52b6631d…/trigger` | **403** | same shape, `required_tier: enterprise` | toast: `The request was refused (status 403)` | ❌ **FAIL** |
+
+Afterwards (SQL, test org): `workflow_runs` 0 · `runs` 0 · threads 0 · schedule `is_active=false,
+last_run_at=NULL, last_status=NULL`. Every refusal refused. Nothing ran and nothing was kept.
+
+**Result (258 row): FAIL.** `UAT-265-258-a` PASS; `UAT-265-258-b` and `UAT-265-258-c` FAIL: the server names the
+plan in every body, but two of the three UI doors discard it and print a raw status code. This matches the audit-fix
+review's R265-audit-fixes-05 (five of six gated authoring doors still show "Failed … (status 403)").

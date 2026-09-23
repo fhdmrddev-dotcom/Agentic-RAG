@@ -74,6 +74,9 @@ human_verification:
   - test: "In the running app, with an org set to subscription_tier='standard' (rolled back afterwards), try to (a) run a published workflow from chat, (b) create a workflow draft, (c) press Run now on a schedule"
     expected: "Each is refused and the person is told which tier would allow it"
     why_human: "Only a lived run shows what the buyer actually reads; code inspection shows (a)/(b) render generic errors and (c) renders a false reason, so this row is expected to FAIL until gaps 1-2 are closed"
+    driven: 2026-09-24 (Phase 265, plan 265-02, org 29851b83-7ab7-400d-aa90-65dc369dbba6 'UAT-265 Standard Tier', a dedicated local fixture org, NOT a rolled-back real org — D-07)
+    result: "FAIL — (b) and (c) refused but not named. UAT-265-258-a PASS: POST /threads/{id}/messages -> 403 {required_tier: enterprise}; the Run modal and toast read 'Your plan doesn't include workflows. It is part of the Enterprise plan.' UAT-265-258-b FAIL: POST /workflows/generate -> 403 and POST /workflows -> 403, both {required_tier: enterprise, upgrade_hint: 'Upgrade to Enterprise to use workflows.'}, but the Builder shows only 'Failed to generate workflow (status 403)'. UAT-265-258-c FAIL: POST /schedules/{id}/trigger -> 403 {required_tier: enterprise}, but the toast reads only 'The request was refused (status 403)'. All three were refused: 0 runs, 0 threads kept, and the schedule never fired. The Workflows door is NOT hidden from the standard tier."
+    evidence: ".planning/phases/265-owed-v4-3-verification/265-UAT-LOG.md#258 (captured X-Org-Id + 403 bodies + verbatim on-screen text + SQL; no screenshot — the tab was hidden)"
 ---
 
 # Phase 258: A Tier Becomes Enforceable — Verification Report
