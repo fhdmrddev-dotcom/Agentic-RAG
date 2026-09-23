@@ -442,3 +442,23 @@ Verdicts: R-1 through R-6 PASS, **R-7 FAIL** (`UAT-265-263-R7`), R-8 PASS, R-9 P
 ## 263 approval — operator verdict (D-06)
 
 2026-09-24: operator **"pass"**, so `UAT-265-263-APPROVAL` is **PASS**. BUG-260921-02 is closed on the R-1/R-3 evidence.
+
+## 258 b/c — live re-drive after the fixes (UAT-265-258-b-REDRIVE, UAT-265-258-c-REDRIVE)
+
+Driven 2026-09-24 at `f2d78377e` (fixes `268bbe9a5`, `1cfacbe74`), by the operator's instruction ("yes to all") at phase
+close, because the verifier found the only live record for (b) and (c) was the pre-fix result (UAT-265-258-b, UAT-265-258-c). Same method as above:
+the fixture `uat265-standard@example.test` got a fresh local GoTrue session (password reset via the local admin API,
+never written to `.planning`). The operator session was backed up, swapped, then restored and verified (`fhdmrd@gmail.com`,
+`active-org-id = 22f9c615…`). The session files were deleted. Every captured call carried `X-Org-Id: 29851b83-7ab7-400d-aa90-65dc369dbba6`.
+Org tier read back `standard` before the drive.
+
+| id | action | request | status | on-screen text (verbatim) | `status 403` in page? | names the plan? |
+|---|---|---|---|---|---|---|
+| **UAT-265-258-b-REDRIVE** | Workflows → `Build a workflow` → `Build it myself` → goal → `Write the first draft` | `POST /workflows/generate` | **403** `entitlement_required`, `required_tier: enterprise` | `Couldn't generate — Couldn't generate the workflow.` · `Your plan doesn't include workflows. It is part of the Enterprise plan.` · `Nothing was saved.` | no | ✅ **PASS** |
+| **UAT-265-258-c-REDRIVE** | `Workflow actions` → `Schedules…` → `Run now` on `UAT-265 schedule (never fires)` | `POST /schedules/52b6631d…/trigger` | **403** `entitlement_required`, `required_tier: enterprise` | toast: `Your plan doesn't include workflows. It is part of the Enterprise plan.` | no | ✅ **PASS** |
+
+Afterwards (REST with the local service role, test org): `workflow_runs` 0 · `threads` 0 · schedule `is_active=false,
+last_run_at=NULL, last_status=NULL`. Nothing ran and nothing was kept. No screenshot, because the tab was hidden. The
+evidence is the in-page fetch capture plus rendered text plus the DB read.
+
+**Result (258 row after the fixes): PASS.** (a) PASS as before; (b) and (c) now PASS live.

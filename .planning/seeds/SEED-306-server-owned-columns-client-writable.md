@@ -40,3 +40,10 @@ Small in code: one revoke migration, following the 194 pattern. It is still a sc
 ## Breadcrumbs
 
 265-REVIEW-256.md · 265-REVIEW-audit-fixes.md · 265-HOTFIX-194.md (the precedent).
+
+## Added at Phase 265 close — 265-REVIEW.md WR-02
+
+- **WR-02 (warning).** Migration 194 grants org admins column-level UPDATE on `organizations.settings`. No app code writes
+  it today, but the schema names it as the future home for per-org provider config and BYO keys. Once the backend reads it,
+  an admin could write through PostgREST values the backend API would reject. Suggested fix: grant back only
+  `(name, slug, updated_at)`. Operator decision at 265 close: defer here with the other client-write revokes, no new migration now.

@@ -71,7 +71,7 @@ path is built, in any phase.
 
 ### Phase Checklist
 
-- [ ] **Phase 265: Owed v4.3 Verification** — live UAT for 257 / 258 / 261 / 263, independent review of 255 / 256 / 262 / 264 + audit fix commits, `BUG-260921-02` closed on evidence (VERIFY-01..05)
+- [x] **Phase 265: Owed v4.3 Verification** — live UAT for 257 / 258 / 261 / 263, independent review of 255 / 256 / 262 / 264 + audit fix commits, `BUG-260921-02` closed on evidence (VERIFY-01..05)
 - [ ] **Phase 266: Expert Knowledge in a Real Org** — per-org copy + ingest of an Expert's corpus, idempotent and org-contained; Financial Analyzer answers from its report live (PACK-18..20)
 - [ ] **Phase 267: An Expert Adds Scope** — additive tool floor, required-connection honesty, swap/remove transcript event, "ask a second Expert", restricted-cost statement (PACK-21..25)
 - [ ] **Phase 268: Expert Spend & Mid-Thread Scope** — per-Expert token/USD attribution in `/admin/spend`, change a thread's folder scope mid-thread (METER-08, CHAT-08)
@@ -165,7 +165,7 @@ path is built, in any phase.
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 265. Owed v4.3 Verification | 0/? | Not started | - |
+| 265. Owed v4.3 Verification | 5/5 | Complete (overrides OV-265-01..04; BUS-304 rulings open, non-blocking) | 2026-09-24 |
 | 266. Expert Knowledge in a Real Org | 0/? | Not started | - |
 | 267. An Expert Adds Scope | 0/? | Not started | - |
 | 268. Expert Spend & Mid-Thread Scope | 0/? | Not started | - |

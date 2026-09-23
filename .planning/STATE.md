@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
 milestone: v4.4
-milestone_name: Experts That Actually Work
+milestone_name: Experts That Actually Work — 🚧 IN PROGRESS
 status: executing
-last_updated: "2026-09-22T23:47:14.877Z"
-last_activity: 2026-09-22 -- Phase 265 execution started
+last_updated: "2026-09-24T12:00:00.000Z"
+last_activity: 2026-09-24 -- Phase 265 complete (5/5 plans, verified with overrides OV-265-03/04)
 progress:
-  total_phases: 12
-  completed_phases: 0
+  total_phases: 5
+  completed_phases: 1
   total_plans: 5
-  completed_plans: 0
-  percent: 0
+  completed_plans: 5
+  percent: 20
 ---
 
 # Project State
@@ -32,7 +32,7 @@ See: `.planning/PROJECT.md` (updated 2026-09-23)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 265 — owed-v4-3-verification
+**Current focus:** Phase 266 — next (265 complete 2026-09-24)
 **265**, migrations at **194** (193 was already taken by `193_expert_seed_org_portable.sql`).
 
 ---
@@ -40,11 +40,11 @@ can be taught new behaviours (skills) that persist and can be shared.
 ## Current Position
 
 Milestone: v4.4 Experts That Actually Work
-Phase: 265 (owed-v4-3-verification) — EXECUTING
-Plan: 1 of 5
-Status: Executing Phase 265
-Resume file: .planning/phases/265-owed-v4-3-verification/265-CONTEXT.md
-Last activity: 2026-09-22 -- Phase 265 execution started
+Phase: 265 (owed-v4-3-verification) — COMPLETE
+Plan: 5 of 5
+Status: Phase 265 complete; next is Phase 266 (discuss)
+Resume file: None
+Last activity: 2026-09-24 -- Phase 265 complete
 
 ---
 
@@ -67,6 +67,8 @@ Last activity: 2026-09-22 -- Phase 265 execution started
 |---|---|---|---|
 | OV-265-01 | D-04 (fixes inside 265 are ≤1 file / ≤10 lines, no schema surface) | Operator ordered R265-audit-fixes-01, a **blocker** (org admin can self-upgrade `subscription_tier`), fixed now as migration 194. It was applied locally and pasted into prod by the operator. | `.planning/phases/265-owed-v4-3-verification/265-HOTFIX-194.md` · `8a01889de` (RED) · `9890ebd19` (fix) |
 | OV-265-02 | Independent review (CLAUDE.md / AGENTS.md §6.3) | VERIFY-05 reviews of **255, 256, 262, 264** and the audit-fix commits **`c28853142`..`cdf3a308a`** were done by fresh-context Claude subagents, operator decision **D-265-01** (2026-09-23): recorded as **partial independence** (D-02), never `done`. The four VERIFICATION.md files now read `independent_review: partial — fresh-context claude subagent (operator decision D-265-01)`. (The plan text calls this row OV-265-01; that id was already taken by the 194 hotfix, so it lives here.) | `265-REVIEW-255.md` · `265-REVIEW-256.md` · `265-REVIEW-262.md` · `265-REVIEW-264.md` · `265-REVIEW-audit-fixes.md` · `265-01-SUMMARY.md` · triage `265-TRIAGE.md` |
+| OV-265-03 | VERIFY-01 / SC#1 wording ("screenshot + the DB rows") | Operator accepted ("yes to all", phase close): 257 rows are evidenced by rendered page text, the in-page API capture and independent SQL, not screenshots, because the Chrome MCP tab stayed hidden and screenshots timed out. Only one partial crop exists (`evidence/257-row1-kpi-crop.png`). The DB half is complete for every row. | `265-UAT-LOG.md` § 257 · `265-VERIFICATION.md` |
+| OV-265-04 | 265-05 must_have "every fix was made by the builder" | Operator accepted ("yes to all", phase close): R265-255-05 (`39eec609f`) and R265-255-09 (`210b70a42`) fix 255-01 code, which Gemini built, but Claude (the 265 builder) made the fixes. This was disclosed in the triage rows, and a fresh re-drive resolved both. It was not sent back to Gemini. | `265-TRIAGE.md` rows R265-255-05 / -09 · `265-REDRIVE.md` |
 
 ## Guardrail overrides — v4.3 close (2026-09-23)
 

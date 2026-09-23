@@ -77,3 +77,16 @@ reverted with `git checkout HEAD -- <path>` and scratch test files deleted; `git
   sibling `hot-file-ledger-guard.js` pattern is the reference.
 - No DB writes, no Supabase MCP, only targeted tests. Every backend test file was grepped for DB tokens before it
   ran. The only hit was the `get_pg_pool` override to `MagicMock` in `test_262_expert_list_grants_api.py`.
+
+## Second batch (WR-01)
+
+| id | fix sha | original drive | re-drive command | observed | RESOLVED/NOT RESOLVED |
+|---|---|---|---|---|---|
+| WR-01 | f2d78377e | At `f2d78377e^`, `supabase.ts:63` reads `fetch(\`${apiBase}/public-config\`)` with no init and no signal. `App.tsx`'s boot effect runs `await hydrateSupabaseFromRuntime(API_BASE)` before `getSetupStatus()`, and the spinner holds while `setupStatus === null` (`App.tsx:295`). So a hung backend blocked boot before getSetupStatus's 10s timeout could ever start. | `npx vitest run src/lib/__tests__/supabase.test.ts src/pages/__tests__/SetupWizard.test.tsx`, then plant `git show f2d78377e^:frontend/src/lib/supabase.ts > frontend/src/lib/supabase.ts`, re-run the supabase test, restore with `git checkout HEAD -- frontend/src/lib/supabase.ts` | Fixed tree: `supabase.ts:64` passes `{ signal: AbortSignal.timeout(10_000) }`. The whole body, including `r.json()`, sits in the function's existing `try { … } catch {}`, so an abort resolves hydrate to `undefined` and boot moves on to `getSetupStatus`. GREEN: 2 files, 11/11 passed. PLANT: RED, 2 failed, 4 passed, with `expected undefined to be an instance of AbortSignal` plus the overlay case's `toHaveBeenCalledWith(..., expect.anything())`. Restored: `git status --porcelain frontend/src/lib` is empty. Note: the test simulates the abort with a manual reject. It does not advance a real 10s timer, so it proves the signal exists and that a rejection falls through. It does not check the duration. | RESOLVED |
+
+- **Residual boot-path hang (PLAUSIBLE, not driven, not fixed):** the spinner at `App.tsx:295` also waits on
+  `useAuth().loading`. That only turns false inside `supabase.auth.getSession().then(...)` (`hooks/useAuth.ts`, `bind()`).
+  There is no `.catch` and no timeout. When the stored session has an expired access token, supabase-js refreshes it
+  against GoTrue with no default fetch timeout. So a hung Supabase Auth, or a rejected `getSession`, would hold the
+  boot spinner forever the same way. No other un-timed awaited fetch sits in the App boot effect.
+  `useEffectiveFeatures` does not gate the spinner.
