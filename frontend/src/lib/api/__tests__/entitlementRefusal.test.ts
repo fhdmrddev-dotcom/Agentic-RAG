@@ -15,7 +15,7 @@ vi.mock("../../supabase", () => ({
 }))
 
 import { entitlementRefusalMessage } from "../_core"
-import { createWorkflowDraft, publishWorkflow } from "../workflows"
+import { createWorkflowDraft, generateWorkflow, publishWorkflow, updateWorkflowDraft } from "../workflows"
 
 const REFUSAL = {
   detail: {
@@ -55,5 +55,14 @@ describe("workflow surfaces carry the plan, not a status code", () => {
   it("publish", async () => {
     reply403()
     await expect(publishWorkflow("wf-1", "golden input")).rejects.toThrow("It is part of the Enterprise plan.")
+  })
+  // UAT-265-258-b: the draft PATCH and /generate refused but did not name the plan.
+  it("draft update (PATCH)", async () => {
+    reply403()
+    await expect(updateWorkflowDraft("wf-1", {} as never)).rejects.toThrow("It is part of the Enterprise plan.")
+  })
+  it("generate", async () => {
+    reply403()
+    await expect(generateWorkflow({} as never)).rejects.toThrow("It is part of the Enterprise plan.")
   })
 })
