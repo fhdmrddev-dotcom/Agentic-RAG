@@ -20,6 +20,9 @@ human_verification:
   - test: "Post-review re-drive of the approval round trip: in the Expert studio draft an org-visibility Expert, click 'Create this skill ->' on one proposal, save the pre-filled SkillFormDialog, then Save Expert. Read public.skills.born_for_expert_bundle_id for the new row, then as a SECOND org member (not the author) start a thread with that Expert and have the agent load the skill."
     expected: "The newly created skill row is stamped with the bundle id; a skill that was merely ticked from the existing library is NOT stamped; the second member's run lists and loads the skill body."
     why_human: "263-UAT.md R-3/R-4/R-7 were driven 2026-09-21/22 BEFORE commit f04d9c406 (WR-08), which changed the stamp contract from member_skills to a client-sent born_skills list. The frontend's NON-EMPTY born_skills path (setBornSkills in handleSaveProposedSkill, ExpertAuthoringStudio.tsx:381) has no automated test — the two WR-08 vitest cases assert only born_skills == [] — and 264's live integration drive inserts born-for rows directly rather than through the studio. Code reading shows it is wired; no run has exercised it since the change."
+    driven: 2026-09-24 (Phase 265, plan 265-04; Expert a3cbcb0c-7d7a-4dee-97a1-318c3e3b8500 by the dev account; second member uat265-outside d9e4f4e7, thread 13fb6a40, run 1813ba6b)
+    result: pending operator confirmation (D-06) — UAT-265-263-APPROVAL
+    evidence: ".planning/phases/265-owed-v4-3-verification/265-UAT-LOG.md#263-approval (Save Expert request born_skills=[prisma-2020-protocol-builder]; skills: created stamped a3cbcb0c, ticked financial_ratio_calculator NULL; second member load_skill returned the created skill body)"
 ---
 
 # Phase 263: An Expert Can Be Given Its Capabilities — Verification Report

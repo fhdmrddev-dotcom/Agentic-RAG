@@ -406,3 +406,35 @@ Leftover: draft `2f39686b…` "UAT-265 judge probe" remains in the dev org as an
 
 - `UAT-265-261-1`: **PASS** (operator)
 - `UAT-265-261-3`: **PASS** (operator)
+
+## 263 re-drive post-WR-08 (UAT-265-263-R1 … R9)
+
+Full per-row lines and the R-9 board are in `263-UAT.md` § "Re-drive post-WR-08 — Phase 265". HEAD `d24586ce2`
+(`f04d9c406` is an ancestor). BEFORE: skills 11, expert_bundles (org) 4, `self_improve_enabled = true`.
+AFTER: skills 12 (+1, the one approval), expert_bundles 5 (+1, the saved Expert), `self_improve_enabled = true`,
+`zzz-265%` skills = 0.
+Verdicts: R-1 through R-6 PASS, **R-7 FAIL**, R-8 PASS, R-9 PASS (8/8; DeepSeek on retry).
+
+`UAT-265-BUG-260921-02 PASS 4432 chars saved, draft-skill-body HTTP 200`. The fresh doctoral draft's description is
+4432 chars. `POST /experts/draft-skill-body` carried `expert_description` of 4432 chars and returned 200.
+`POST /experts` saved the Expert with `length(description) = 4432`.
+
+## 263 approval round trip (UAT-265-263-APPROVAL)
+
+- Expert **`a3cbcb0c-7d7a-4dee-97a1-318c3e3b8500`** "UAT-265 Doctoral Literature Review Methodologist". Created by
+  the dev account (`d8a54002`) with `visibility = org`.
+- Approved ONE proposal through "Create this skill →": `prisma-2020-protocol-builder` → `POST /skills` 201.
+- Ticked ONE existing library skill: `financial_ratio_calculator`.
+- Captured Save Expert request (`POST /experts` 201) → **`born_skills: ["prisma-2020-protocol-builder"]`**.
+  `member_skills: [search-strategy-builder, docx, xlsx, prisma-2020-protocol-builder, financial_ratio_calculator]`.
+- `SELECT name, born_for_expert_bundle_id FROM skills WHERE name IN (…)`:
+  - `prisma-2020-protocol-builder` → **`a3cbcb0c…`** (stamped)
+  - `financial_ratio_calculator` → **NULL** (not stamped)
+- Second member: `uat265-outside@example.test` (`d9e4f4e7`, member). Active org is `22f9c615` (`X-Org-Id`).
+  `created_by` (`d8a54002`) ≠ caller. `GET /experts/a3cbcb0c` → 200.
+  - Thread **`13fb6a40-1a48-4f16-922c-c201593ad36b`**, run **`1813ba6b-f802-471b-9069-bc81027d3b0f`** (completed):
+    `load_skill` returned `{"name": "prisma-2020-protocol-builder", "instructions": "When given a review question, …"}`,
+    and the answer followed its five-step method ("built per the skill's five-step method").
+  - A follow-up run `3eeeecc2…` asked for the other four skills. `docx` and `financial_ratio_calculator` loaded;
+    `search-strategy-builder` and `xlsx` returned "not found or not enabled". This is the R-7 FAIL.
+- Claude's reading: WR-08's non-empty `born_skills` path works end to end. **The verdict is the operator's (D-06).**
