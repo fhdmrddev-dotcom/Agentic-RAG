@@ -16,6 +16,7 @@ vi.mock("../../supabase", () => ({
 
 import { entitlementRefusalMessage } from "../_core"
 import { createWorkflowDraft, generateWorkflow, publishWorkflow, updateWorkflowDraft } from "../workflows"
+import { triggerSchedule } from "../schedules"
 
 const REFUSAL = {
   detail: {
@@ -64,5 +65,10 @@ describe("workflow surfaces carry the plan, not a status code", () => {
   it("generate", async () => {
     reply403()
     await expect(generateWorkflow({} as never)).rejects.toThrow("It is part of the Enterprise plan.")
+  })
+  // UAT-265-258-c: schedule create / patch / run-now share readScheduleFailure.
+  it("schedule run-now", async () => {
+    reply403()
+    await expect(triggerSchedule("sch-1")).rejects.toThrow("It is part of the Enterprise plan.")
   })
 })
