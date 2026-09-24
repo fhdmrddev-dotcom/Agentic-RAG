@@ -261,6 +261,33 @@ describe("FolderNode", () => {
     expect(container.textContent).not.toContain("Financial Analyzer")
   })
 
+  // ── 266-05 UAT fix (operator, 2026-09-25): the note was tooltip-only on the "G" pill, and the
+  // operator did not see it in the Library. The four tests above pass ONLY after a simulated hover,
+  // which is why they stayed green over an invisible note. The note must be VISIBLE at rest.
+  it("266 UAT: the provenance note is visible on the row WITHOUT hovering", () => {
+    renderWithTooltip(
+      <FolderNodeComponent
+        node={makeNode({ is_org_shared: true })}
+        {...defaultProps}
+        folderProvenance={{ "node-1": "from Financial Analyzer" }}
+      />,
+    )
+    const caption = screen.getByTestId("navrow-caption")
+    expect(caption).toHaveTextContent("from Financial Analyzer")
+    expect(caption).toBeVisible()
+  })
+
+  it("266 UAT: a folder with no provenance entry renders no caption line", () => {
+    renderWithTooltip(
+      <FolderNodeComponent
+        node={makeNode({ is_org_shared: true })}
+        {...defaultProps}
+        folderProvenance={{ "other-folder": "from Financial Analyzer" }}
+      />,
+    )
+    expect(screen.queryByTestId("navrow-caption")).toBeNull()
+  })
+
   it("266: the provenance map is forwarded to recursive children", async () => {
     const parent = makeNode({
       id: "node-1",
