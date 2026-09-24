@@ -20,6 +20,10 @@
  */
 
 import type { ExpertBundle, Folder } from "@/types"
+import {
+  classifyIngestionError,
+  UNKNOWN_FAILURE_SENTENCE,
+} from "@/components/library/ingestionErrorVocabulary"
 
 /**
  * A knowledge folder id, resolved or honestly not. ⛔ There is no third shape and no `name?:` —
@@ -93,4 +97,97 @@ export function resolveFolderNames(
     }
     return { id, known: false as const }
   })
+}
+
+// ── Phase 266 plan 04 (PACK-18 / PACK-19 · D-266-01 / D-266-03) — THE INSTALL ──────────────
+//
+// ⭐ THE ONE HOME of install wording and of the state → control mapping. The modal, the card and
+// the composer's invite dialog all ask `installView` / `inviteGate`; none of them branches on
+// `install.state` itself, and none of them spells a literal below. `expertCatalog.test.ts` pins
+// the literals.
+//
+// ⛔ The UI never decides readiness: `state` and `can_install` are server facts (T-266-26 — a
+// forged click is still refused by `require_expert_manage`). ⛔ A failure cause is NEVER shown raw:
+// a document cause goes through `classifyIngestionError`, the Library's own vocabulary, so a
+// driver dict cannot reach a person (T-266-25).
+
+export const INSTALL_COPY = {
+  installAction: "Install",
+  retryAction: "Retry install",
+  failedHeadline: "Install failed — retry",
+  installing:
+    "Installing… copying this Expert's documents into your Library and indexing them. It can join a chat once every document is ready.",
+  needsAdmin:
+    "An org admin needs to install this Expert before it can answer from its documents.",
+  failedNeedsAdmin: "Install failed. An org admin can retry it.",
+  starting: "Starting the install…",
+  inviteNotInstalled:
+    "Install this Expert from the Experts catalog first — until then it has no documents to answer from.",
+  inviteInstalling: "Still installing — it can join a chat once its documents are indexed.",
+  inviteFailed: "Its install failed — an org admin can retry it from the Experts catalog.",
+  /** The Library folder's provenance note, appended to NavRow's existing "Shared with org". */
+  provenance: (expertName: string) => `from ${expertName}`,
+} as const
+
+/**
+ * What an Expert's primary control is, given its org's install. ⛔ No arm is a disabled button:
+ * a state that cannot act renders a `status` LINE with the reason instead (D-262-02).
+ *
+ *   • `legacy` — no `install` key (org-authored) or `install: null` (first-party, no corpus):
+ *                behave exactly as before 266.
+ *   • `chat`   — installed and ready: the existing Start Chat control.
+ */
+export type InstallView =
+  | { kind: "legacy" }
+  | { kind: "chat" }
+  | { kind: "install"; action: string }
+  | { kind: "retry"; action: string; headline: string; cause: string }
+  | { kind: "status"; line: string; cause?: string }
+
+/** A failure cause, as ONE sentence a person can read. Never "null", never a driver dict. */
+function installCause(install: NonNullable<ExpertBundle["install"]>): string {
+  const raw = (install.cause ?? "").trim()
+  if (!raw) return UNKNOWN_FAILURE_SENTENCE
+  // The installer's own refusals are authored sentences; everything else (a document's
+  // `error_message`, or an unlabelled cause) goes through the Library's classifier.
+  if (install.cause_source === "install") return raw
+  return classifyIngestionError(raw)
+}
+
+export function installView(expert: ExpertBundle): InstallView {
+  const install = expert.install
+  if (!install) return { kind: "legacy" }
+  switch (install.state) {
+    case "ready":
+      return { kind: "chat" }
+    case "installing":
+      return { kind: "status", line: INSTALL_COPY.installing }
+    case "failed":
+      return install.can_install
+        ? {
+            kind: "retry",
+            action: INSTALL_COPY.retryAction,
+            headline: INSTALL_COPY.failedHeadline,
+            cause: installCause(install),
+          }
+        : { kind: "status", line: INSTALL_COPY.failedNeedsAdmin, cause: installCause(install) }
+    case "not_installed":
+    default:
+      return install.can_install
+        ? { kind: "install", action: INSTALL_COPY.installAction }
+        : { kind: "status", line: INSTALL_COPY.needsAdmin }
+  }
+}
+
+/**
+ * The composer's invite gate (D-266-01): `null` means invite as before; a string is the reason
+ * the Expert cannot join a chat yet. ⛔ A first-party Expert whose knowledge is not installed
+ * never starts a run against an empty scope.
+ */
+export function inviteGate(expert: ExpertBundle): string | null {
+  const install = expert.install
+  if (!install || install.state === "ready") return null
+  if (install.state === "installing") return INSTALL_COPY.inviteInstalling
+  if (install.state === "failed") return INSTALL_COPY.inviteFailed
+  return INSTALL_COPY.inviteNotInstalled
 }
