@@ -20,6 +20,7 @@
  */
 
 import type { ExpertBundle, Folder } from "@/types"
+import type { ExpertInstallSummary } from "@/lib/api/experts"
 import {
   classifyIngestionError,
   UNKNOWN_FAILURE_SENTENCE,
@@ -195,6 +196,18 @@ export function installCardLine(expert: ExpertBundle): string | null {
   if (state === "installing") return INSTALL_COPY.cardInstalling
   if (state === "failed") return INSTALL_COPY.cardFailedNeedsAdmin
   return INSTALL_COPY.cardNeedsAdmin
+}
+
+/**
+ * The Library's provenance map (D-266-13): folder id → "from <Expert name>", one entry per
+ * install that has a folder. Decided here so the page reads no install field itself.
+ */
+export function provenanceByFolder(installs: ExpertInstallSummary[]): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const i of installs) {
+    if (i.folder_id) out[i.folder_id] = INSTALL_COPY.provenance(i.expert_name)
+  }
+  return out
 }
 
 /**

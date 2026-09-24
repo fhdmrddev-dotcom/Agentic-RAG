@@ -27,7 +27,7 @@ vi.mock("@/lib/api/_core", async (importOriginal) => {
 
 import type { ExpertBundle } from "@/types"
 import { filterExperts, categoriesOf, resolveFolderNames } from "../expertCatalog"
-import { INSTALL_COPY, installView, inviteGate } from "../expertCatalog"
+import { INSTALL_COPY, installView, inviteGate, provenanceByFolder } from "../expertCatalog"
 import { UNKNOWN_FAILURE_SENTENCE, SENTENCE_FOR_KIND } from "@/components/library/ingestionErrorVocabulary"
 import { installExpert, listExpertInstalls } from "@/lib/api/experts"
 
@@ -299,6 +299,16 @@ describe("expertCatalog · inviteGate (266-04)", () => {
 
   it("(22) the provenance label names the Expert", () => {
     expect(INSTALL_COPY.provenance("Financial Analyzer")).toBe("from Financial Analyzer")
+  })
+
+  it("(27) provenanceByFolder maps each installed folder to its Expert, and an empty list to {}", () => {
+    expect(provenanceByFolder([])).toEqual({})
+    expect(
+      provenanceByFolder([
+        { expert_bundle_id: "b-1", expert_name: "Financial Analyzer", folder_id: "f-1", state: "ready" },
+        { expert_bundle_id: "b-2", expert_name: "Contract Reviewer", folder_id: "f-2", state: "installing" },
+      ]),
+    ).toEqual({ "f-1": "from Financial Analyzer", "f-2": "from Contract Reviewer" })
   })
 })
 
