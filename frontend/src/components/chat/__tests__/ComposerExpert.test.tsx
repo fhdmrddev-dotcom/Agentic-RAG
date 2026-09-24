@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { MessageInput, _resetComposerDraftsForTest } from "../MessageInput"
 import * as api from "@/lib/api"
 import type { ExpertBundle } from "@/types"
+import { INSTALL_COPY } from "@/components/experts/catalog/expertCatalog"
 
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<any>("@/lib/api")
@@ -244,5 +245,95 @@ describe("Composer Expert Consultant Integration (Phase 260)", () => {
     // Composer returns to neutral
     const composerBox = container.querySelector(".rounded-2xl.ghost-border")
     expect(composerBox?.className).not.toContain("ring-violet-500/30")
+  })
+})
+
+// ── Phase 266-04 (D-266-01) — the invite door refuses a first-party Expert whose knowledge is ──
+// not installed, and says why. ⛔ No run may start against an empty scope. The cases above use an
+// Expert with NO `install` key (the legacy path) and stay byte-unchanged.
+
+describe("Composer invite gate on install state (266-04)", () => {
+  type InstallStateName = "not_installed" | "installing" | "ready" | "failed"
+
+  function firstParty(state: InstallStateName): ExpertBundle {
+    return {
+      ...mockExpert,
+      knowledge_folder_ids: state === "ready" ? ["f-installed"] : [],
+      install: {
+        state,
+        folder_id: state === "ready" ? "f-installed" : null,
+        cause: null,
+        cause_source: null,
+        can_install: true,
+        updated_at: "2026-09-24T00:00:00Z",
+      },
+    }
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    _resetComposerDraftsForTest()
+    if (!Element.prototype.hasPointerCapture) Element.prototype.hasPointerCapture = () => false
+    if (!Element.prototype.setPointerCapture) Element.prototype.setPointerCapture = () => {}
+    if (!Element.prototype.releasePointerCapture) Element.prototype.releasePointerCapture = () => {}
+    if (!Element.prototype.scrollIntoView) Element.prototype.scrollIntoView = () => {}
+    vi.mocked(api.listConnectorConnections).mockResolvedValue([])
+    vi.mocked(api.setThreadActiveExpert).mockResolvedValue({} as any)
+  })
+
+  async function openInvite(expert: ExpertBundle) {
+    vi.mocked(api.listExperts).mockResolvedValue([expert])
+    const user = userEvent.setup()
+    const onActiveExpertChange = vi.fn()
+    render(
+      <MessageInput
+        onSend={vi.fn()}
+        disabled={false}
+        threadId="test-thread"
+        onActiveExpertChange={onActiveExpertChange}
+      />,
+    )
+    await user.click(screen.getByTestId("composer-plus-btn"))
+    await user.click(screen.getByTestId("invite-expert-door"))
+    const row = await screen.findByTestId(`expert-card-${expert.slug}`)
+    return { user, row, onActiveExpertChange }
+  }
+
+  it("not_installed → the row names the reason and NO click on it invites", async () => {
+    const { user, row, onActiveExpertChange } = await openInvite(firstParty("not_installed"))
+    expect(row.textContent).toContain(INSTALL_COPY.inviteNotInstalled)
+    expect(screen.queryByTestId("invite-expert-btn-financial-analyzer")).toBeNull()
+
+    // Anywhere on the row: the card itself, the reason line, the name.
+    await user.click(row)
+    await user.click(screen.getByText(INSTALL_COPY.inviteNotInstalled))
+    await user.click(screen.getByText("Financial Analyzer"))
+
+    expect(api.setThreadActiveExpert).not.toHaveBeenCalled()
+    expect(onActiveExpertChange).not.toHaveBeenCalled()
+    expect(screen.queryByTestId("active-expert-chip")).toBeNull()
+  })
+
+  it("installing → the still-installing reason, and no invite", async () => {
+    const { row } = await openInvite(firstParty("installing"))
+    expect(row.textContent).toContain(INSTALL_COPY.inviteInstalling)
+    expect(screen.queryByTestId("invite-expert-btn-financial-analyzer")).toBeNull()
+    expect(api.setThreadActiveExpert).not.toHaveBeenCalled()
+  })
+
+  it("ready → invites exactly as before", async () => {
+    const ready = firstParty("ready")
+    const { user, onActiveExpertChange } = await openInvite(ready)
+    await user.click(screen.getByTestId("invite-expert-btn-financial-analyzer"))
+    await waitFor(() => expect(api.setThreadActiveExpert).toHaveBeenCalledTimes(1))
+    expect(api.setThreadActiveExpert).toHaveBeenCalledWith("test-thread", ready.id)
+    expect(onActiveExpertChange).toHaveBeenCalledWith(ready)
+  })
+
+  it("an org-authored Expert (no install key) invites exactly as before", async () => {
+    const orgAuthored: ExpertBundle = { ...mockExpert, is_system: false, slug: "org-analyst", id: "org-1" }
+    const { user } = await openInvite(orgAuthored)
+    await user.click(screen.getByTestId("invite-expert-btn-org-analyst"))
+    await waitFor(() => expect(api.setThreadActiveExpert).toHaveBeenCalledWith("test-thread", "org-1"))
   })
 })
