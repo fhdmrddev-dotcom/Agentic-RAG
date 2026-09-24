@@ -460,6 +460,15 @@ async def _resolve_thread_scoping(
         expert_folder_ids = [str(f) for f in resolved.effective_folder_ids]
         scope_mode = getattr(resolved, "scope_mode", "biased")
 
+        # Phase 266 CR-01: a restricted Expert with zero folders would hand retrieval an empty scope,
+        # which it treats as "no folder filter". Refuse instead; the thread keeps its Expert.
+        if scope_mode == "restricted" and not expert_folder_ids:
+            if getattr(resolved, "is_system", False):
+                reason = "has no knowledge installed in this organization yet. Install it from Experts first."
+            else:
+                reason = "has no knowledge folders this organization can read."
+            raise ExpertScopeUnavailable(f"{resolved.name} {reason}")
+
         all_folders: list[dict] = []
         if thread_folder_id or expert_folder_ids:
             try:
