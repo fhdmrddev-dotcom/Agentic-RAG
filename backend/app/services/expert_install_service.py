@@ -75,6 +75,8 @@ REDRIVE_NOT_OWNER = (
     "Ask them to retry the install."
 )
 DOC_FAILED_FALLBACK = "A sample document could not be processed."
+STALE_INSTALL = "The install did not finish. Retry to continue it."
+NO_SEARCHABLE_TEXT = "A document finished with no searchable text."
 
 
 # ── Wire models (FROZEN — plan 266-04 builds against exactly these field names) ─────────────
@@ -136,14 +138,43 @@ def derive_install_state(
     can_install: bool,
     now: datetime | None = None,
 ) -> ExpertInstallState:
-    """Not installed / Installing / Ready / Failed, derived from the documents (D-266-03)."""
+    """Not installed / Installing / Ready / Failed, derived at READ time (D-266-03).
+
+    ⛔ Readiness has ONE source of truth: the corpus documents' own ``status`` /
+    ``chunk_count`` / ``error_message``, written by the ingest worker — which never learns about
+    installs. The install row contributes only what the INSTALLER knows about the copy step
+    (``installing`` / ``installed`` / ``failed`` + its fixed-sentence ``error``). A stored
+    ``ready`` would need a second writer racing the worker, so there is none.
+
+    Order (each arm returns):
+      1. no install row → not_installed;
+      2. a fresh ``installing`` claim (< 10 min) → installing;
+      3. a ``failed`` copy step → failed, cause from the install row (even with no folder yet —
+         a copy that died before its folder existed is a failure with a cause, never a silent
+         "not installed");
+      4. the folder is gone → a stale claim is failed(retry), anything else is not_installed so
+         Install can recreate it (D-266-14);
+      5. a stale ``installing`` claim with no corpus document in flight → failed(retry)
+         (RESEARCH Pitfall 4 — never "Installing…" forever);
+      6. a present corpus document failed → failed, cause from THAT document;
+      7. a present corpus document still in flight → installing;
+      8. no present corpus document → not_installed (a person deleted them; Install restores);
+      9. a completed document with no chunks → failed (nothing searchable);
+     10. otherwise every present corpus document completed with chunks → ready.
+    """
     if install is None:
         return ExpertInstallState(state="not_installed", can_install=can_install)
 
+    now = now or datetime.now(timezone.utc)
     updated_at = install.get("updated_at")
-    folder_id = install.get("folder_id")
-    wanted = set(filenames)
-    present = [d for d in docs if d.get("filename") in wanted]
+    status = install.get("status")
+    folder_ok = bool(install.get("folder_id")) and install.get("folder_exists", True) is not False
+    folder_id = install.get("folder_id") if folder_ok else None
+
+    fresh = False
+    if isinstance(updated_at, datetime):
+        stamp = updated_at if updated_at.tzinfo else updated_at.replace(tzinfo=timezone.utc)
+        fresh = now - stamp < STALE_CLAIM_AFTER
 
     def _state(state: InstallStateName, cause: str | None = None, source: Any = None) -> ExpertInstallState:
         return ExpertInstallState(
@@ -155,14 +186,38 @@ def derive_install_state(
             updated_at=updated_at,
         )
 
+    if status == "installing" and fresh:
+        return _state("installing")
+    if status == "failed":
+        return _state("failed", install.get("error") or COPY_FAILED, "install")
+    if not folder_ok:
+        if status == "installing":
+            return _state("failed", STALE_INSTALL, "install")
+        return _state("not_installed")
+
+    wanted = set(filenames)
+    present = [d for d in docs if d.get("filename") in wanted and _same_folder(d, folder_id)]
+    in_flight = [d for d in present if d.get("status") not in ("completed", "failed")]
+
+    if status == "installing" and not in_flight:
+        return _state("failed", STALE_INSTALL, "install")
     failed = [d for d in present if d.get("status") == "failed"]
     if failed:
         return _state("failed", failed[0].get("error_message") or DOC_FAILED_FALLBACK, "document")
-    if any(d.get("status") not in ("completed", "failed") for d in present):
+    if in_flight:
         return _state("installing")
     if not present:
         return _state("not_installed")
+    if any(not (d.get("chunk_count") or 0) > 0 for d in present):
+        return _state("failed", NO_SEARCHABLE_TEXT, "install")
     return _state("ready")
+
+
+def _same_folder(doc: dict[str, Any], folder_id: Any) -> bool:
+    """A doc without a folder key is trusted (the caller already filtered by folder)."""
+    if "folder_id" not in doc or folder_id is None:
+        return True
+    return str(doc.get("folder_id")) == str(folder_id)
 
 
 async def _corpus_filenames(slug: str | None) -> list[str] | None:
@@ -197,6 +252,145 @@ async def _read_state(
             pool, org_id=org_id, folder_ids=[install["folder_id"]], filenames=filenames
         )
     return derive_install_state(install, docs, filenames=filenames, can_install=can_install)
+
+
+async def _states_for_installs(
+    pool: Any,
+    *,
+    org_id: UUID,
+    installs: list[dict[str, Any]],
+    filenames_by_bundle: dict[str, list[str]],
+    can_install: bool,
+) -> dict[str, ExpertInstallState]:
+    """Derive the state of many installs with AT MOST ONE document read for the whole set."""
+    folder_ids: list[UUID] = []
+    all_names: set[str] = set()
+    for inst in installs:
+        key = str(inst.get("expert_bundle_id"))
+        if key in filenames_by_bundle and inst.get("folder_id") and inst.get("folder_exists", True) is not False:
+            fid = inst["folder_id"]
+            folder_ids.append(fid if isinstance(fid, UUID) else UUID(str(fid)))
+            all_names.update(filenames_by_bundle[key])
+
+    docs: list[dict[str, Any]] = []
+    if folder_ids and all_names:
+        docs = await experts_db.list_install_corpus_documents(
+            pool, org_id=org_id, folder_ids=folder_ids, filenames=sorted(all_names)
+        )
+
+    out: dict[str, ExpertInstallState] = {}
+    for inst in installs:
+        key = str(inst.get("expert_bundle_id"))
+        if key not in filenames_by_bundle:
+            continue
+        mine = [d for d in docs if str(d.get("folder_id")) == str(inst.get("folder_id"))]
+        out[key] = derive_install_state(
+            inst, mine, filenames=filenames_by_bundle[key], can_install=can_install
+        )
+    return out
+
+
+async def overlay_install_state(
+    pool: Any,
+    rows: list[dict[str, Any]],
+    *,
+    org_id: UUID,
+    can_install: bool,
+) -> list[dict[str, Any]]:
+    """Tell every first-party Expert row its org's install state (D-266-09, Pattern 5).
+
+    - A list with NO ``is_system`` row is returned as-is with ZERO queries.
+    - Otherwise: ONE install read for the org and AT MOST ONE document read for the whole list;
+      each distinct slug's manifest is read once per call (file I/O in the threadpool).
+    - A first-party row with a corpus gains ``install`` and has ``knowledge_folder_ids``
+      REPLACED by ``[install folder]`` (installing / ready / failed with a folder) or ``[]`` —
+      so the five surfaces that count folders tell the truth with no edit, and the retired
+      global seed id (migration 188's …0260) can never survive into a response.
+    - A first-party row with no corpus gains ``install: None`` and ``knowledge_folder_ids: []``.
+    - Org-authored rows are returned untouched, with no ``install`` key.
+
+    Every row is COPIED before it is changed. System bundles are not tenant-writable
+    (``expert_bundles_write_policy``), so the overlaid ids can never round-trip into an update.
+    """
+    if not any(r.get("is_system") for r in rows):
+        return rows
+
+    filenames_by_slug: dict[str, list[str] | None] = {}
+    for r in rows:
+        slug = r.get("slug")
+        if r.get("is_system") and slug not in filenames_by_slug:
+            filenames_by_slug[slug] = await _corpus_filenames(slug)
+
+    installs = await experts_db.list_expert_installs_for_org(pool, org_id=org_id)
+    by_bundle = {str(i.get("expert_bundle_id")): i for i in installs}
+
+    filenames_by_bundle: dict[str, list[str]] = {}
+    for r in rows:
+        names = filenames_by_slug.get(r.get("slug")) if r.get("is_system") else None
+        if names is not None:
+            filenames_by_bundle[str(r.get("id"))] = names
+
+    states = await _states_for_installs(
+        pool,
+        org_id=org_id,
+        installs=[by_bundle[k] for k in filenames_by_bundle if k in by_bundle],
+        filenames_by_bundle=filenames_by_bundle,
+        can_install=can_install,
+    )
+
+    out: list[dict[str, Any]] = []
+    for r in rows:
+        if not r.get("is_system"):
+            out.append(r)
+            continue
+        row = dict(r)
+        key = str(r.get("id"))
+        if key not in filenames_by_bundle:
+            row["install"] = None
+            row["knowledge_folder_ids"] = []
+            out.append(row)
+            continue
+        state = states.get(key) or ExpertInstallState(state="not_installed", can_install=can_install)
+        row["install"] = state.model_dump()
+        row["knowledge_folder_ids"] = (
+            [state.folder_id] if state.state != "not_installed" and state.folder_id is not None else []
+        )
+        out.append(row)
+    return out
+
+
+async def list_install_summaries(pool: Any, *, org_id: UUID) -> list[ExpertInstallSummary]:
+    """One summary per install in the org whose folder still exists (the Library provenance note).
+
+    ``org_id`` is the caller's validated active org; the read is bound to it in SQL.
+    """
+    installs = [
+        i for i in await experts_db.list_expert_installs_for_org(pool, org_id=org_id)
+        if i.get("folder_id") and i.get("folder_exists", True) is not False
+    ]
+    filenames_by_bundle: dict[str, list[str]] = {}
+    for inst in installs:
+        names = await _corpus_filenames(inst.get("expert_slug"))
+        # An install whose Expert no longer ships a corpus still owns a real folder, so it is
+        # listed (the Library note stays true) with no manifest to derive against.
+        filenames_by_bundle[str(inst.get("expert_bundle_id"))] = names or []
+
+    states = await _states_for_installs(
+        pool, org_id=org_id, installs=installs, filenames_by_bundle=filenames_by_bundle, can_install=False
+    )
+    out: list[ExpertInstallSummary] = []
+    for inst in installs:
+        key = str(inst.get("expert_bundle_id"))
+        state = states.get(key)
+        out.append(
+            ExpertInstallSummary(
+                expert_bundle_id=inst["expert_bundle_id"],
+                expert_name=inst.get("expert_name") or "",
+                folder_id=inst["folder_id"],
+                state=state.state if state else "not_installed",
+            )
+        )
+    return out
 
 
 # ── The installer ────────────────────────────────────────────────────────────────────────────
