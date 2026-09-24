@@ -375,6 +375,11 @@ async def _finalize_producer_run(
         )
 
 
+class ExpertScopeUnavailable(ValueError):
+    """Phase 266 CR-01: a RESTRICTED Expert resolved to zero folders. The run is refused, because an
+    empty scope reaches retrieval as "no folder filter" and would search every org the user is in."""
+
+
 async def _resolve_thread_scoping(
     supabase,
     thread_id: str,
