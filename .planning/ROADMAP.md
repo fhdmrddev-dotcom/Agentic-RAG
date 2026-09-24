@@ -114,8 +114,8 @@ path is built, in any phase.
 Plans:
 **Wave 1**
 
-- [ ] 266-01-PLAN.md — migration 195 (expert_installs, org-scoped hash index, 188 retirement) + resolve_expert_bundle reads the caller org's install; is_system_folder bypass deleted (RED fence)
-- [ ] 266-02-PLAN.md — Financial Analyzer corpus as repo data + path-contained loader; mint dedup/versioning org-scoped when org_id is passed (D-266-18); seed for /upload org defect
+- [x] 266-01-PLAN.md — migration 195 (expert_installs, org-scoped hash index, 188 retirement) + resolve_expert_bundle reads the caller org's install; is_system_folder bypass deleted (RED fence)
+- [x] 266-02-PLAN.md — Financial Analyzer corpus as repo data + path-contained loader; mint dedup/versioning org-scoped when org_id is passed (D-266-18); seed for /upload org defect
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
