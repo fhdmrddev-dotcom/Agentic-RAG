@@ -1,0 +1,9 @@
+== Task 4 prep — 2026-09-24T20:05:16.273915+00:00
+signup u3: HTTP 200 user_id=7942ce75-73ca-46f3-883b-89e9ae96876c
+signup u4: HTTP 200 user_id=31f2a48d-b3e3-4746-bdd4-545bbc66448b
+U3 org 7ac499e1-ece8-4641-8315-248e4d5a9a23: tier None -> enterprise (LOCAL)
+{"user_id": "7942ce75-73ca-46f3-883b-89e9ae96876c", "email": "uat266-u3-5b694d@example.test", "org_id": "7ac499e1-ece8-4641-8315-248e4d5a9a23", "role": "org-admin", "subscription_tier": "enterprise"}
+{"user_id": "31f2a48d-b3e3-4746-bdd4-545bbc66448b", "email": "uat266-u4-5b694d@example.test", "org_id": "7ac499e1-ece8-4641-8315-248e4d5a9a23", "role": "member", "subscription_tier": "enterprise"}
+expert_installs for U3's org: [{'installs': 0}]
+u3 GET /experts/00000000-0000-0000-0000-000000000259 -> 200 install={'state': 'not_installed', 'folder_id': None, 'cause': None, 'cause_source': None, 'can_install': True, 'updated_at': None}
+u4 GET /experts/00000000-0000-0000-0000-000000000259 -> 200 install={'state': 'not_installed', 'folder_id': None, 'cause': None, 'cause_source': None, 'can_install': False, 'updated_at': None}

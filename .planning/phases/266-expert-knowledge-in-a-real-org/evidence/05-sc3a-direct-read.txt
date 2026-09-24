@@ -1,0 +1,11 @@
+== SC#3a direct document read — 2026-09-24T19:57:26.978125+00:00
+NOTE: there is no GET /documents/{id} route (405 Method Not Allowed, measured); the direct
+single-document reads that exist are /content and /chunks, plus the list GET /documents.
+U1 (org A only) GET /documents/06f16045-f301-4ca4-826d-4e9c86a6cf1d/content [org B's copy] headers={'X-Org-Id': '0eb0cb6d-2858-46fa-ac92-1a2a99b9bfcf'} -> 404 {"detail":"Document not found"}
+U1 (org A only) GET /documents/06f16045-f301-4ca4-826d-4e9c86a6cf1d/chunks [org B's copy] headers={'X-Org-Id': '0eb0cb6d-2858-46fa-ac92-1a2a99b9bfcf'} -> 404 {"detail":"Document not found"}
+U2 (org B, control) GET /documents/06f16045-f301-4ca4-826d-4e9c86a6cf1d/content [org B's copy] headers={'X-Org-Id': '1fd7000d-adc2-477a-89d8-877d0e367376'} -> 200 has_$124.5=True 
+U2 (org B, control) GET /documents/06f16045-f301-4ca4-826d-4e9c86a6cf1d/chunks [org B's copy] headers={'X-Org-Id': '1fd7000d-adc2-477a-89d8-877d0e367376'} -> 200 n_chunks=3 has_$124.5=True 
+U1 (org A only) GET /documents/731bfa9a-74bb-4f6f-9d15-891f94fabb48/content [org A's own copy (non-vacuity)] headers={'X-Org-Id': '0eb0cb6d-2858-46fa-ac92-1a2a99b9bfcf'} -> 200 has_$124.5=True 
+U1 (org A only) GET /documents/731bfa9a-74bb-4f6f-9d15-891f94fabb48/chunks [org A's own copy (non-vacuity)] headers={'X-Org-Id': '0eb0cb6d-2858-46fa-ac92-1a2a99b9bfcf'} -> 200 n_chunks=3 has_$124.5=True 
+U1 GET /documents -> 200 n=1 contains_B_doc=False contains_A_doc=True
+U2 GET /documents -> 200 n=1 contains_B_doc=True contains_A_doc=False

@@ -1,0 +1,6 @@
+== in-process Retry with the FIXED installer — 2026-09-24T20:03:32.425096+00:00
+doc BEFORE: {"status": "failed", "chunk_count": 3, "error_message": "Object of type UUID is not JSON serializable", "org_id": "1fd7000d-adc2-477a-89d8-877d0e367376", "chunks": 0, "embedded": 0, "chunk_orgs": 0}
+install_expert -> {"expert_bundle_id":"00000000-0000-0000-0000-000000000259","corpus_version":"9bbb510c6038217f57deb84ea9265559a3e4180fe40a00fcb73619ece4c8e757","install":{"state":"installing","folder_id":"e6601dfc-7b54-4555-9e93-dc2ee94795bd","cause":null,"cause_source":null,"can_install":true,"updated_at":"2026-09-24T20:03:34.208564Z"}}
+background tasks scheduled: ['splice_document']
+jobs AFTER: {"id": "103c04c8-b385-4ef3-a179-8b627438cd54", "status": "completed", "org_id": "1fd7000d-adc2-477a-89d8-877d0e367376", "created_at": "2026-09-24 19:54:14.489712+00:00"}
+doc AFTER:  {"status": "completed", "chunk_count": 3, "error_message": null, "org_id": "1fd7000d-adc2-477a-89d8-877d0e367376", "chunks": 3, "embedded": 3, "chunk_orgs": 1}

@@ -1,0 +1,65 @@
+== SC#4 — 2026-09-24T19:58:19.373417+00:00  model=deepseek-v4-flash provider=deepseek
+--- SC#4-revenue (thread 6ee8750b-d0c7-49ab-839b-4ee86e0ad520, X-Org-Id 0eb0cb6d-2858-46fa-ac92-1a2a99b9bfcf, Financial Analyzer active)
+assistant text (full):
+ACME Corp reported **Q3 2026 total revenue of $124.5 million**, up **+18.2% year-over-year** from $105.3 million in Q3 2025 [2].
+
+A few related highlights from the same statement of operations [2]:
+- **Gross Profit:** $79.9M, +21.4% YoY (gross margin expanded to 64.2%)
+- **Operating Income (EBIT):** $31.7M, +40.9% YoY
+- **Net Income:** $24.8M, +40.9% YoY
+- **Operating Cash Flow:** $29.1M, +36.6% YoY
+
+Source: **acme_q3_2026_financial_report.md** — Condensed Consolidated Statement of Operations (Unaudited)
+re.search(r'\$124\.5\s*(M\b|million)') -> '$124.5 million'
+re.search(r'\+?18\.2\s*%') -> '+18.2%'
+SQL (search.query document_ids -> documents.org_id), window = thread (c) turn 1 .. now:
+SELECT a.created_at, a.metadata->>'query_text' AS query_text, d.id AS doc_id, d.org_id AS doc_org, d.filename FROM audit_log a CROSS JOIN LATERAL jsonb_array_elements_text(a.metadata->'document_ids') x(doc) JOIN documents d ON d.id = x.doc::uuid WHERE a.action_type='search.query' AND a.user_id = '7b43cd2c-21e7-4a66-8a36-2fa3793551b0' AND a.created_at > '2026-09-24T19:56:36.145729+00:00' AND a.created_at <= '2026-09-24T19:58:22.206129+00:00' ORDER BY a.created_at
+{"created_at": "2026-09-24 19:56:42.030827+00:00", "query_text": "ACME Corp Q3 2026 revenue year-over-year growth", "doc_id": "731bfa9a-74bb-4f6f-9d15-891f94fabb48", "doc_org": "0eb0cb6d-2858-46fa-ac92-1a2a99b9bfcf", "filename": "acme_q3_2026_financial_report.md"}
+SQL (retrieved doc's chunk carrying both figures): SELECT c.document_id, c.org_id, c.chunk_index, c.content FROM document_chunks c WHERE c.document_id = ANY(ARRAY['731bfa9a-74bb-4f6f-9d15-891f94fabb48']::uuid[]) AND c.content LIKE '%$124.5%' AND c.content LIKE '%+18.2%%' ORDER BY c.chunk_index
+document_id=731bfa9a-74bb-4f6f-9d15-891f94fabb48 org_id=0eb0cb6d-2858-46fa-ac92-1a2a99b9bfcf chunk_index=0 matching lines:
+    | Financial Metric | Q3 2026 ($M) | Q3 2025 ($M) | YoY Change (%) |
+    | **Total Revenue** | **$124.5** | $105.3 | **+18.2%** |
+--- SC#4-refusal (same thread 6ee8750b-d0c7-49ab-839b-4ee86e0ad520)
+POST /threads/6ee8750b-d0c7-49ab-839b-4ee86e0ad520/messages headers={'X-Org-Id': '0eb0cb6d-2858-46fa-ac92-1a2a99b9bfcf'} body={"content": "What is the employee vacation policy?", "model": "deepseek-v4-flash", "provider": "deepseek"} -> 201 {"message_id":"f8f61724-263a-4abf-84b3-4eb92d3ef176","run_id":"e2f85a41-6cc2-40b1-a473-ce26d757f8c5","model":"deepseek-v4-flash","provider":"deepseek"}
+run row: {"run_id": "e2f85a41-6cc2-40b1-a473-ce26d757f8c5", "status": "completed", "model": "deepseek-v4-flash", "provider": "deepseek", "org_id": "0eb0cb6d-2858-46fa-ac92-1a2a99b9bfcf", "error": null, "started_at": "2026-09-24 19:58:25.509613+00:00", "completed_at": "2026-09-24 19:58:38.311619+00:00"}
+assistant text (full):
+I couldn't find any information about an employee vacation policy in your documents. The only document in this folder and its subfolders is:
+
+- **acme_q3_2026_financial_report.md** — ACME Corporation's Q3 2026 financial results and Form 10-K report
+
+That document covers financial statements (statement of operations, balance sheet, cash flow) and risk factors — it does not contain HR or employee-benefit content. Searches for "vacation," "paid time off," "PTO," and "annual leave" returned no matches in this scope.
+
+If you have an HR policy document elsewhere, you'd need to add it to this folder or ask about it in a scope that includes it.
+SQL:
+SELECT a.created_at, a.metadata->>'query_text' AS query_text, d.id AS doc_id, d.org_id AS doc_org, d.filename FROM audit_log a CROSS JOIN LATERAL jsonb_array_elements_text(a.metadata->'document_ids') x(doc) JOIN documents d ON d.id = x.doc::uuid WHERE a.action_type='search.query' AND a.user_id = '7b43cd2c-21e7-4a66-8a36-2fa3793551b0' AND a.created_at > '2026-09-24T19:58:22.607152+00:00' ORDER BY a.created_at
+(no joined rows)
+search.query rows in window (incl. zero-id rows):
+{"created_at": "2026-09-24 19:58:29.019335+00:00", "query_text": "employee vacation policy paid time off", "n_ids": 0}
+{"created_at": "2026-09-24 19:58:32.118766+00:00", "query_text": "human resources employee benefits vacation days annual leave", "n_ids": 0}
+--- SC#4-flip
+after INSERT (LOCAL): SELECT user_id, org_id, role FROM org_members WHERE user_id='7b43cd2c-21e7-4a66-8a36-2fa3793551b0' ORDER BY org_id
+{"user_id": "7b43cd2c-21e7-4a66-8a36-2fa3793551b0", "org_id": "0eb0cb6d-2858-46fa-ac92-1a2a99b9bfcf", "role": "org-admin"}
+{"user_id": "7b43cd2c-21e7-4a66-8a36-2fa3793551b0", "org_id": "1fd7000d-adc2-477a-89d8-877d0e367376", "role": "member"}
+POST /threads headers={'X-Org-Id': '1fd7000d-adc2-477a-89d8-877d0e367376'} body={'title': '266 SC#4 flip'} -> 201 id=3bbde354-4940-4888-811d-4d416f98dd68
+PATCH /threads/3bbde354-4940-4888-811d-4d416f98dd68 body={'active_expert_id': '00000000-0000-0000-0000-000000000259'} -> 200 active_expert_id=00000000-0000-0000-0000-000000000259
+POST /threads/3bbde354-4940-4888-811d-4d416f98dd68/messages headers={'X-Org-Id': '1fd7000d-adc2-477a-89d8-877d0e367376'} body={"content": "What was ACME Corp's Q3 2026 revenue and its year-over-year growth?", "model": "deepseek-v4-flash", "provider": "deepseek"} -> 201 {"message_id":"ea181c0b-2e0a-4db0-87eb-5a9766b3a461","run_id":"c350e0aa-7d24-4e6f-bc98-4873be04067f","model":"deepseek-v4-flash","provider":"deepseek"}
+run row: {"run_id": "c350e0aa-7d24-4e6f-bc98-4873be04067f", "status": "completed", "model": "deepseek-v4-flash", "provider": "deepseek", "org_id": "0eb0cb6d-2858-46fa-ac92-1a2a99b9bfcf", "error": null, "started_at": "2026-09-24 19:59:00.028427+00:00", "completed_at": "2026-09-24 19:59:07.292556+00:00"}
+assistant text (full):
+For Q3 2026, ACME Corporation reported **total revenue of $124.5 million**, up **+18.2% year-over-year** (from $105.3 million in Q3 2025) [2].
+
+**[acme_q3_2026_financial_report.md]** — Condensed Consolidated Statement of Operations
+
+A few related figures from the same statement [2]:
+- Gross profit: $79.9M, +21.4% YoY (gross margin 64.2%)
+- Operating income (EBIT): $31.7M, +40.9% YoY
+- EBITDA: $38.4M, +35.2% YoY
+- Net income: $24.8M, +40.9% YoY
+regex revenue -> '$124.5 million'; regex yoy -> '+18.2%'
+SQL:
+SELECT a.created_at, a.metadata->>'query_text' AS query_text, d.id AS doc_id, d.org_id AS doc_org, d.filename FROM audit_log a CROSS JOIN LATERAL jsonb_array_elements_text(a.metadata->'document_ids') x(doc) JOIN documents d ON d.id = x.doc::uuid WHERE a.action_type='search.query' AND a.user_id = '7b43cd2c-21e7-4a66-8a36-2fa3793551b0' AND a.created_at > '2026-09-24T19:58:57.167838+00:00' ORDER BY a.created_at
+{"created_at": "2026-09-24 19:59:03.410766+00:00", "query_text": "ACME Corp Q3 2026 revenue year-over-year growth", "doc_id": "06f16045-f301-4ca4-826d-4e9c86a6cf1d", "doc_org": "1fd7000d-adc2-477a-89d8-877d0e367376", "filename": "acme_q3_2026_financial_report.md"}
+search.query rows in window:
+{"created_at": "2026-09-24 19:59:03.410766+00:00", "query_text": "ACME Corp Q3 2026 revenue year-over-year growth", "n_ids": 1}
+distinct cited doc orgs = ['1fd7000d-adc2-477a-89d8-877d0e367376'] (active org sent = 1fd7000d-adc2-477a-89d8-877d0e367376)
+after DELETE (LOCAL): SELECT user_id, org_id, role FROM org_members WHERE user_id='7b43cd2c-21e7-4a66-8a36-2fa3793551b0' ORDER BY org_id
+{"user_id": "7b43cd2c-21e7-4a66-8a36-2fa3793551b0", "org_id": "0eb0cb6d-2858-46fa-ac92-1a2a99b9bfcf", "role": "org-admin"}
