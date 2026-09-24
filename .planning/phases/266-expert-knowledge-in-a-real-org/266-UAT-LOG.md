@@ -305,3 +305,7 @@ were invisible at rest, which is exactly what the operator reported. **Lesson: w
 deliverable, assert what is visible at rest, not what a tooltip can reveal.** The RED test in `c5b5fdaa9`
 asserts the caption without any hover. It is the same class of defect as "presence assertions cannot see content
 drift", one register over.
+
+## UI-2 / UI-4 (not-installed) — driven live 2026-09-25
+
+The test org was reset to not-installed (local SQL, 1 install / 1 folder / 1 doc / 3 chunks). Then: a regular member saw "An org admin needs to install…" with no button, and the invite showed an install-first reason (UI-4, PASS); an admin pressed Install and, within the install window, the invite showed a still-installing reason and did not activate (UI-2, PASS). Operator: **"both passed"**. No owed UI rows remain.

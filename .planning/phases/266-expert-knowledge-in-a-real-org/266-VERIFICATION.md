@@ -2,7 +2,7 @@
 phase: 266-expert-knowledge-in-a-real-org
 verified: 2026-09-25T00:00:00Z
 verification_mode: self-verified   # ⛔ OV-SOLO-01 — NEVER "reviewed". No independent §6.3 reviewer exists.
-status: human_needed
+status: passed
 score: 9/9 must-haves verified
 overrides_applied: 1
 overrides:
@@ -139,3 +139,7 @@ What remains is two explicitly-owed live UI checks (UI-2, UI-4 not-installed lin
 
 _Verified: 2026-09-25_
 _Verifier: Claude (gsd-verifier)_
+
+## Human verification — resolved (2026-09-25)
+
+Both owed live rows were driven by the operator after the verifier wrote `human_needed`: UI-4 (not-installed, non-manager: "An org admin needs to install…", no button; invite shows an install-first reason) and UI-2 (invite blocked while installing). Operator: **"both passed"**. See `266-HUMAN-UAT.md`. Status moved `human_needed` → `passed` on that evidence.
