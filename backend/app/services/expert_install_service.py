@@ -486,8 +486,11 @@ async def _redrive_failed(
         .eq("user_id", str(user_id))
         .execute()
     )
+    # ⚠ ``row`` is an asyncpg record: its ``id`` is a UUID. A real retry's storage PUT to the
+    # existing key fails, so the fallback hands ``doc["id"]`` to ``splice_document``, where a UUID
+    # reached a JSON payload ("Object of type UUID is not JSON serializable", measured live 266-05).
     await _enqueue_or_splice(
-        doc=row,
+        doc={**row, "id": doc_id},
         raw=raw,
         mime_type=mime_type,
         filename=filename,
