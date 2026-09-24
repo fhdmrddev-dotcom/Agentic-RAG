@@ -242,7 +242,20 @@ Evidence: `evidence/06-sc4-answer-refusal-flip.txt`.
   → re-driven IN-PROCESS with the fixed installer against the same local DB/storage/embeddings (the live
   server does not reload, see Preflight): storage PUT `409 Duplicate` → direct splice → `completed`,
   chunks 3, embedded 3, one chunk org (`evidence/08-retry-fixed-inprocess.txt`). Org B's copy is restored.
-  ⚠ The running server still has the pre-fix installer until the operator restarts it.
+  ~~⚠ The running server still has the pre-fix installer until the operator restarts it.~~
+  **UPDATE 2026-09-25 — re-driven THROUGH THE SERVER: PASS.** The operator restarted the backend. The single
+  `:8000` listener is pid `89432`, started `2026-09-24T21:21:59Z`, which is after the fix commit `a0c1b0ea6`
+  (`2026-09-24T20:03:56Z`). Both times were measured with `Get-Process` and `git log`. Planted
+  `UPDATE documents SET status='failed', error_message='266-05 planted failure (server re-drive)' WHERE
+  id='06f16045-f301-4ca4-826d-4e9c86a6cf1d'` (LOCAL). `GET /experts/…0259` then read `state failed`, with the cause
+  equal to the planted message. As U2, `POST /experts/…0259/install` `{'X-Org-Id': '1fd7000d-…' (B)}` returned
+  `202 {"install":{"state":"installing",…}}`, and the poll then read `state ready`. The doc AFTER was `status
+  completed`, `chunk_count 3`, `error_message null`, chunks 3, embedded 3. All three chunks have `org_id` B and
+  `created_at 2026-09-24 21:33:15Z`, 5 s after the POST at 21:33:10Z, so they were rebuilt rather than left
+  over. ⚠ `documents.updated_at` did not move (19:54:14Z), because neither the plant nor the splice touches it.
+  That is why the chunk `created_at` is the proof and `updated_at` is not. The job list is unchanged: only the
+  first install's `103c04c8-…` exists. The server Retry, too, took the direct-splice fallback (F-2 / SEED-315,
+  now confirmed on the live server). Evidence: `evidence/10-retry-through-server.txt`.
 - **F-2 → SEED-315 — a Retry never reaches the ingest queue.** Measured in both probes: the re-drive's
   storage PUT to the existing key returns `409 Duplicate`, so it takes the no-job direct-splice fallback
   (no queue retries, no lease recovery, nothing in the Ingestion tab). The first install uses the queue
@@ -268,4 +281,27 @@ token.
 
 ## UI rows (Task 4 — operator)
 
-Pending the operator's browser check (Task 4). Recorded verbatim here by Task 5 as UI-1..UI-4.
+~~Pending the operator's browser check (Task 4). Recorded verbatim here by Task 5 as UI-1..UI-4.~~
+
+The operator ran the check on 2026-09-25, at `http://localhost:5173`. ⚠ **The orchestrator simplified the plan's four
+steps into three action-based tests before handing them to the operator.** So this section records exactly what
+was run and what was not. A step that was not run is marked **OWED**, never PASS.
+
+Operator's words, verbatim: first reply *"all passed except for I did not see from Financial Analyzer if i am
+not mistaken"*; after the fix, *"shows now"*.
+
+| Row | Plan step | Verdict | What was seen |
+|---|---|---|---|
+| **UI-1** | 1. As an org-admin whose org had not installed: Install → Installing… → Start Scoped Chat with Expert, without reloading | **PASS** | Operator: "all passed". The footer moved through the states with no reload. |
+| **UI-2** | 2. The invite is blocked while installing (the reason line shows and the Expert does not activate) | **OWED — NOT RUN** | This step was left out of the simplified steps. The behaviour is covered only by unit tests (the ComposerExpert / inviteGate suites). It was never checked live, so it is recorded as owed, not passed. |
+| **UI-3** | 3. The Library folder shows "from Financial Analyzer" | **FAIL → FIXED → PASS** | First check: the operator did not see the note. The orchestrator measured the cause: the note lived ONLY in the tooltip of the small "G" pill in `NavRow.tsx`. The operator chose "a small grey line under the folder name". RED `c5b5fdaa9` (`FolderNode.test.tsx`: the note is visible without hover): 1 failed / 19 passed. GREEN `2c2c09540`: `NavRow` gains one optional `caption` prop, and omitting it leaves the row unchanged; `FolderNode` passes the caption on shared folders. FolderNode + ingestion + LibraryPage suites: 195/195. Operator re-check: **"shows now"**. |
+| **UI-4** | 4. Non-manager member | **PASS (ready-org case) · OWED (not-installed case)** | A regular member saw **Start Scoped Chat with Expert** and no Install button, because the org had already been installed by UI-1. The not-installed line for a non-manager ("An org admin needs to install…") was **not checked live**. It is unit-tested only, so it is owed. |
+
+No disabled button, blank, "undefined" or raw error string was reported in any state.
+
+**Finding (UI-3): hover and presence assertions stayed green over a note nobody could see.** The four `FolderNode`
+tests that 266-04 shipped found the provenance text only after a simulated hover. So they passed while the words
+were invisible at rest, which is exactly what the operator reported. **Lesson: where the words are the
+deliverable, assert what is visible at rest, not what a tooltip can reveal.** The RED test in `c5b5fdaa9`
+asserts the caption without any hover. It is the same class of defect as "presence assertions cannot see content
+drift", one register over.
