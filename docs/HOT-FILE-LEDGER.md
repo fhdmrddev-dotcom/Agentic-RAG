@@ -2434,6 +2434,8 @@ as nothing, which on a run surface is a silent lie rather than a visible gap. `1
 together and pinned the whole union with an `it.each` over `SUBSTEPS`, so a future member with no meta entry
 fails a test rather than a user.
 
+**Phase 266 (2026-09-25) — re-derived `91 / 71 / 1436`** (the row read `90 / 70 / 1434`, a 4th staleness). Honoured by construction (**266-04**): ONE optional `install?: ExpertInstallState | null` field on the Expert type, plus ONE `import type` line. The declaration lives in `lib/api/experts.ts`, so it is not duplicated. The seam is still OWED.
+
 
 ---
 
@@ -7663,6 +7665,8 @@ no `folder_id:` body KEY, plus a pin on the seven field reads. ⚠ The pin was f
 **5**, taken from `grep -n`'s LINE count when one line carries three occurrences — **a line count
 is not an occurrence count**, and this file is where that was paid for.
 
+**Phase 266 (2026-09-25) — re-derived `48 / 16 / 993` with `--follow`** (the file was renamed from `IngestionPage.tsx` at `dbd9b8c0b`, and without `--follow` the recipe reads `22 / 7`). The row read `46 / 15 / 970`. **266-04** added ONE state and ONE effect: `listExpertInstalls()` → `provenanceByFolder` → `folderProvenance`, forwarded to FolderTree. A refusal or any failure becomes an empty map, so the tree renders exactly as before. ⚠ **That REFUTES 244-06's "the page gained no effect" as a standing description.** `useEffect(` sites went 6 → 7 (measured at `522e7b4fc` vs HEAD). The `.folder_id` count held at 5, because the provenance map is built in `expertCatalog.ts`, not here.
+
 ---
 
 ### Prior entries
@@ -10703,15 +10707,15 @@ cells rot within days.
 | [`frontend/src/components/experts/ProposedSkillCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertsproposedskillcardtsx) | 1 / 1 / 86 | no (new) | young (created 263-04). Row added AT CREATION. ⛔ The ONE home of the "does not exist" mark — dashed+violet, never red (D-263-01); a second styling makes a proposal read as an error. |
 | [`frontend/src/components/org/OrgAdminShell.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgadminshelltsx) | 3 / 5 / 442 | no | young (created Phase 166). The org-admin shell hosting live tabs (members, audit, settings, invitations, sso, experts). |
 | [`frontend/src/components/org/OrgExpertsTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgexpertstabtsx) | 2 / 2 / 324 | no (2 phases) | ⚠ row was STALE at `1 / 1 / 347`. honoured by construction (**262-02**): its `ICON_MAP` + `renderExpertIcon` MOVED OUT verbatim — a PURE move; its pinned suite is byte-unchanged and green |
-| [`frontend/src/lib/api/experts.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiexpertsts) | 6 / 3 / 313 | ⚠ **FIRES — 3 phases** | ⚠ STALE a 3rd time (was `5/3/298`, `2/2/186` before). 262-01 re-derives INHERITED rot only — it does not edit this file. 263-03's ONE-helper 422 arm stands. |
-| [`backend/app/db/experts.py`](docs/HOT-FILE-LEDGER.md#backendappdbexpertspy) | 4 / 3 / 567 | ⚠ **NOW FIRES — 3 phases** | ⛔ row was STALE at `2/2/492` reading `no (new)`; it CROSSED the threshold in this very commit. honoured by construction (**263-01**): ONE new UPDATE, no existing query touched. |
+| [`frontend/src/lib/api/experts.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiexpertsts) | 7 / 4 / 367 | ⚠ **FIRES — 4 phases** | ⚠ row STALE at `6/3/313`. honoured by construction (**266-04**): 3 install wire types + `installExpert` + `listExpertInstalls`; a 403 tier refusal becomes `[]` at the call site |
+| [`backend/app/db/experts.py`](docs/HOT-FILE-LEDGER.md#backendappdbexpertspy) | 5 / 4 / 749 | ⚠ **FIRES — 4 phases** | ⚠ row STALE at `4/3/567`. honoured by construction (**266-01**): SIX install queries ADDED (guarded-upsert claim). ⛔ no existing query touched |
 | [`backend/app/models/expert.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsexpertpy) | 3 / 3 / 93 | ⚠ **NOW FIRES — 3 phases** | ⛔ row was STALE at `2/2/79` reading `no (new)` / `young`; it CROSSED the threshold here. honoured by construction (**263-03**): ONE new request model, zero existing model touched. |
-| [`backend/app/services/expert_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesexpert_servicepy) | 8 / 5 / 551 | ⛔ **FIRES — 5 phases** | ⚠ row STALE a 4th time (`6/4/515`). honoured by construction (**264-02**): the hand-rolled 4th disjunct DELETED, delegating to `skill_row_visible`. ⛔ independent encodings of the rule must stay **1** |
-| [`backend/app/api/experts.py`](docs/HOT-FILE-LEDGER.md#backendappapiexpertspy) | 9 / 3 / 585 | ⛔ **FIRES — 3 phases** | ⚠ row STALE a 3rd time (`8/3/560`). **263-REVIEW CR-02/03**: both `/draft` asset queries leaked on the BYPASSRLS pool; now mirror the LIVE policies. ⛔ connections unchanged — org-only, MEASURED. |
+| [`backend/app/services/expert_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesexpert_servicepy) | 9 / 6 / 575 | ⛔ **FIRES — 6 phases** | ⚠ row STALE at `8/5/551`. **266-01**: `is_system` bundles read folders ONLY from the caller org's install; SYSTEM_USER_ID bypass RETIRED, quoted verbatim. ⛔ the strict org loop is the boundary |
+| [`backend/app/api/experts.py`](docs/HOT-FILE-LEDGER.md#backendappapiexpertspy) | 13 / 5 / 764 | ⛔ **FIRES — 5 phases** | ⚠ row STALE at `9/3/585`. honoured by construction (**266-03**): 2 install routes (`/installs` declared FIRST) + an `install` overlay. ⛔ org ONLY from the active-org dep; extraction OWED |
 | [`backend/app/utils/skill_visibility.py`](docs/HOT-FILE-LEDGER.md#backendapputilsskill_visibilitypy) | 3 / 2 / 209 | no (2 phases) | ⚠ the row added at 264 PLANNING read `1/1/83` and was stale by that phase's own close. **264-02/04**: optional `expert_bundle_id` on both encodings; ⛔ the default arm is pinned byte-identical by `==` |
 | [`frontend/src/components/chat/ActiveExpertChip.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatactiveexpertchiptsx) | 0 / 0 / 0 | no (new) | young (created Phase 260). Row added AT CREATION — leaf component for active consultant chip. |
 | [`frontend/src/components/chat/ExpertSpotlightCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatexpertspotlightcardtsx) | 2 / 2 / 205 | no (2 phases) | ⚠ row was STALE at `0 / 0 / 0`. **262-02**: FOUR demo-Expert hardcodes retired as rewrites. ⛔ no fallback here may inspect `slug` or `name` — that match IS the retired artefact |
-| [`frontend/src/components/chat/InviteExpertDialog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatinviteexpertdialogtsx) | 2 / 2 / 218 | no (2 phases) | ⚠ row was STALE at `0 / 0 / 0`. **262-02**: the VERBATIM-duplicated icon guesser retired; the list gem renders `<ExpertIcon icon={expert.icon} />`. ⛔ its `expert-card-${slug}` testids are untouched |
+| [`frontend/src/components/chat/InviteExpertDialog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatinviteexpertdialogtsx) | 3 / 3 / 231 | ⚠ **NOW FIRES — 3 phases** | ⚠ row read `2/2/218`. honoured by construction (**266-04**): ONE `inviteGate` read; a gated row shows its REASON; the invite button is byte-unchanged. ⚠ UI-2 live check OWED |
 | [`backend/app/db/entitlements.py`](docs/HOT-FILE-LEDGER.md#backendappdbentitlementspy) | 2 / 1 / 169 | no (new) | young (created Phase 258). Row added AT CREATION — absent row is invisible to G-5 (TIER-01/02). |
 | [`backend/app/services/entitlement_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesentitlement_servicepy) | 2 / 1 / 130 | no (new) | young (created Phase 258). Row added AT CREATION. Single commercial boundary home (TIER-01/03/04/05). |
 | [`frontend/src/components/chat/ToolCallPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattoolcallpaneltsx) | 51 / 23 / 351 | **FIRES** | ✅ **G-5 DISCHARGED (227-02)** — extracted ToolCallDetails, StepRow, toolStepDerivation (1019 → 351 lines) |
@@ -10765,7 +10769,7 @@ cells rot within days.
 | [`frontend/src/components/chat/OutputFileCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatoutputfilecardtsx) | 8 / 7 / 219 | **FIRES** | honoured by construction (195) |
 | [`frontend/src/components/panel/FilesSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelfilessectiontsx) | 10 / 6 / 363 | **FIRES** | ⚠ row was STALE at `8 / 5 / 334`. honoured by construction (**244-05**): TWO `export` keywords, zero body change — the chat chip IMPORTS `expiryCaption` rather than re-deriving its three readings |
 | [`frontend/src/lib/api.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapits) | 187 / 110 / 422 | ⚠ **FIRES** | ✅ **SPLIT TAKEN (207)** — this path is the re-export BARREL. ⚠ **its 12 domain MODULES had no rows of their own until 214** |
-| [`frontend/src/types/index.ts`](docs/HOT-FILE-LEDGER.md#frontendsrctypesindexts) | 90 / 70 / 1434 | ⚠ **FIRES** | ⚠ STALE a 3rd time (was `85/65/1380`, `78/60/1331`) — **+5 PHASES in one correction**. 262-01 re-derives INHERITED rot only. 243-04's optional client-only field stands; seam still OWED |
+| [`frontend/src/types/index.ts`](docs/HOT-FILE-LEDGER.md#frontendsrctypesindexts) | 91 / 71 / 1436 | ⚠ **FIRES** | ⚠ STALE a 4th time (`90/70/1434`). honoured by construction (**266-04**): ONE optional `install` field via `import type`, so there is one declaration. Seam still OWED |
 | [`backend/app/main.py`](docs/HOT-FILE-LEDGER.md#backendappmainpy) | 83 / 60 / 951 | ⚠ **FIRES** | ⚠ row was STALE by **FOURTEEN PHASES** at `79 / 45 / 876`. honoured by construction (**BUG-260902-06**, Phase 259 router mount) |
 | [`backend/app/config.py`](docs/HOT-FILE-LEDGER.md#backendappconfigpy) | 87 / 50 / 1593 | ⚠ **FIRES** | ⚠ STALE a 13th time (`83/48/1506`). honoured by construction (**249-01**): ONE derived frozenset + a Literal widened to the value the code already returned. ⛔ MODEL_CAPABILITIES seam OWED |
 | [`backend/app/api/admin.py`](docs/HOT-FILE-LEDGER.md#backendappapiadminpy) | 38 / 14 / 1968 | ⚠ **FIRES** | honoured by construction (**249-01/03**): the add guard swaps its SOURCE LIST; 3 write seams gain a refusal catch. ⛔ order, 422 shape and every other guard byte-unchanged |
@@ -10897,7 +10901,7 @@ cells rot within days.
 | [`frontend/src/lib/api/workflows.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiworkflowsts) | 4 / 4 / 1081 | ⚠ **FIRES** | ⚠ absent until 214; the 207 split created it with NO row. **`lib/api.ts`'s row is the BARREL, not these modules.** 214.1: docblock only, zero behaviour |
 | [`frontend/src/lib/connectionMark.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclibconnectionmarktsx) | 7 / 4 / 313 | ⚠ **FIRES** | ✅ **the move IS the seam, and it was TAKEN (214-08)** — `settings/` → `lib/`; four run + canvas surfaces now import ONE map |
 | [`frontend/src/components/ingestion/DocumentList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestiondocumentlisttsx) | 24 / 13 / 294 | ⚠ **FIRES** | ✅ **seam TAKEN (217.1-05)** — `DocumentRow.tsx` extracted with the sketch's five affordances (−315 L). ⚠ 7-column order still load-bearing: `LibraryPage` sheds cols 3–5 by `nth-child` |
-| [`frontend/src/pages/LibraryPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpageslibrarypagetsx) | 46 / 15 / 970 | ⚠ **FIRES** | ⚠ row STALE a FOURTH time, ONE PLAN later. honoured by construction (**244-06**): ONE mount + 3 EXISTING props; the door owns its connections read, so the page gained no effect |
+| [`frontend/src/pages/LibraryPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpageslibrarypagetsx) | 48 / 16 / 993 | ⚠ **FIRES** | ⚠ row STALE at `46/15/970`. **266-04**: ONE state + ONE effect (the install read), which refutes 244-06's "gained no effect". `.folder_id` count held at 5 |
 | [`backend/app/services/retrieval_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrievalservicepy) | 19 / 11 / 456 | ⚠ **FIRES** | ⛔ **extraction still OWED** (`SEED-224`, since 231) — 241 is the SECOND landing, capped at 11 lines by a fence; a THIRD must propose the extraction FIRST |
 | [`backend/app/services/recall_eval.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrecallevalpy) | 4 / 3 / 1070 | ⚠ **FIRES** | Phase 246 landing: safe as-is (offline test/eval harness, zero request-path side effects, clean 2-layer design). Added `inspect_execution_plan` (EXPLAIN + `idx_scan > 0`) & latency p50/p95 |
 | [`scripts/build-recall-bench.py`](docs/HOT-FILE-LEDGER.md#scriptsbuild-recall-benchpy) | 4 / 1 / 1088 | no (1 phase) | ⚠ row ADDED at 241-04 — the only `DROP DATABASE` in the repo. Guard + constant-interpolation + AST fence, all driven RED. It built GREEN and unreadable; assert the READ |
@@ -10910,7 +10914,7 @@ cells rot within days.
 | [`backend/app/api/knowledge_health.py`](docs/HOT-FILE-LEDGER.md#backendappapiknowledgehealthpy) | 11 / 6 / 737 | ⚠ **FIRES** | honoured by construction (**217.1-11**) — adds `could_not_search`; `retrieval_count` byte-unchanged. ⚠ absent at **6 phases**. Audit-analytics from `audit_log`. Service-role by exception |
 | [`backend/app/services/agent_loop.py`](docs/HOT-FILE-LEDGER.md#backendappservicesagent_looppy) | 52 / 26 / 3501 | ⚠ **FIRES** | ⚠ row STALE at `45/21/3326` — by FIVE phases. honoured by construction (**264-01**): ONE default-None field, one bind, two build kwargs, ZERO branches. ⛔ prompt-assembly seam UNTOUCHED, still OWED |
 | [`backend/app/services/context_window.py`](docs/HOT-FILE-LEDGER.md#backendappservicescontext_windowpy) | 10 / 5 / 602 | ⚠ **FIRES** | ⚠ absent for its ENTIRE LIFE at 5 phases — row added 250-01. honoured by construction: ONE removal-ORDER rule inside one private helper. ⛔ `_build_candidate` byte-unchanged |
-| [`backend/app/services/run_producer.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_producerpy) | 11 / 6 / 932 | ⚠ **FIRES** | ⚠ row STALE at `5/3/749` — by THREE phases, on a row already carrying a "verdict WRONG" correction. honoured by construction (**264-01**): the 4-tuple widens to 5; ⛔ the 5th value is ACCESS-CHECKED |
+| [`backend/app/services/run_producer.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_producerpy) | 12 / 6 / 943 | ⚠ **FIRES** | ⚠ row STALE at `11/6/932` (pre-266 rot). **Byte-unchanged across 266 (D-266-11)**: the resolver change reaches it as DATA via `resolved.effective_folder_ids` |
 | [`backend/app/services/todos_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicestodos_servicepy) | 4 / 3 / 187 | ⚠ **FIRES** | ⚠ absent for its ENTIRE LIFE at 3 phases — row added 250-02, which leaves the file BYTE-UNCHANGED. ⛔ `_RUN_ENDED_MARKER` is now bound by a frontend `?raw` fence |
 | [`frontend/src/components/panel/TodosSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspaneltodossectiontsx) | 11 / 6 / 337 | ⚠ **FIRES** | ⚠ row STALE (`6/4/210`) — 250 and 252 touched it, +127 L. NOT modified by 253; re-derived under CR-08. Absent for its entire life until 250-03 |
 | [`frontend/src/components/panel/todoRunHonesty.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspaneltodorunhonestyts) | 1 / 1 / 104 | new | young (created 250-03). Row added AT CREATION. ⛔ the ONE home of *is this row still honest?*; its marker copy is `?raw`-fenced to `todos_service.py` or the strip silently no-ops |
@@ -10950,7 +10954,7 @@ cells rot within days.
 | [`frontend/src/lib/api/sources.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapisourcests) | 5 / 1 / 312 | no (1 phase) | ⚠ **NOT covered by `lib/api.ts`'s row: that row is the BARREL.** ⛔ 235-13: it held TWO hand-written copies of the cause union the `?raw` fence is blind to; both now import the type |
 | [`backend/app/models/source.py`](docs/HOT-FILE-LEDGER.md#backendappmodelssourcepy) | 5 / 1 / 196 | no (1 phase) | ⚠ absent — row added 235 (+117 L). `cause`/`status` are `Literal`s, so an unknown value is a ValidationError, never a string that renders |
 | [`backend/app/services/ingest_enrich.py`](docs/HOT-FILE-LEDGER.md#backendappservicesingest_enrichpy) | 7 / 2 / 623 | no (2 phases) | ⚠ absent for its entire life — row added 235. ⚠ its `0 phases` is real: all three commits are DATED QUICK TASKS. `BUG-260906-01` closed here by `260906-5qd` |
-| [`backend/app/services/ingest_splice.py`](docs/HOT-FILE-LEDGER.md#backendappservicesingest_splicepy) | 11 / 4 / 827 | ⚠ **FIRES** | ⚠ **absent for its ENTIRE LIFE — row added 240.** ⭐ Phase 229's own G-5 DISCHARGE created it, so the extraction moved code OUT of the guardrail's sight |
+| [`backend/app/services/ingest_splice.py`](docs/HOT-FILE-LEDGER.md#backendappservicesingest_splicepy) | 15 / 6 / 877 | ⚠ **FIRES** | ⚠ row STALE at `11/4/827`. honoured by construction (**266-02**): an `org_id` arm at 4 mint sites (build-then-branch); the `org_id=None` sequence is identical to base |
 | [`backend/app/services/email_attachments.py`](docs/HOT-FILE-LEDGER.md#backendappservicesemail_attachmentspy) | 0 / 0 / 226 | no (new) | young (240) — the shared email-attachment child loop. ⛔ Closed the FOURTH two-paths disagreement: a watched mailbox ingested messages and zero attachments |
 | [`backend/app/services/email_extraction_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesemail_extraction_servicepy) | 4 / 1 / 511 | no (1 phase) | ⚠ **absent for its ENTIRE LIFE — row added 240.** Home of `parse_eml_bytes`, `strip_quoted_replies` and now `thread_key_for`. ⛔ Subject is never a thread input |
 | [`backend/app/services/sources/failure_cause.py`](docs/HOT-FILE-LEDGER.md#backendappservicessourcesfailure_causepy) | 2 / 1 / 196 | no (1 phase) | young (235) — **THE ONE classifier of why a source stopped.** ⛔ 235-13: `connection_disabled` is WRITTEN by one seam and inferred by NOTHING — no matcher, no status row |
@@ -10995,7 +10999,7 @@ cells rot within days.
 | [`frontend/src/components/chat/ActiveConnectorChips.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatactiveconnectorchipstsx) | 2 / 2 / 82 | no (2 phases) | ⚠ absent for its entire life — row added 244-05 at its SECOND phase. **244**: the row container HOISTED out; it is bare chips now, `null` on empty (D-244-26) |
 | [`frontend/src/stores/streamsStore.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcstoresstreamsstorets) | 22 / 14 / 572 | **FIRES** | ⚠ row STALE (`21/13/546`) — 252 touched it. NOT modified by 253; re-derived under CR-08. **244-13**: `WorkflowLock.mode` becomes a REAL discriminator |
 | [`frontend/src/lib/toolMeta.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibtoolmetats) | 10 / 6 / 218 | **FIRES** | ⚠ **absent for its ENTIRE LIFE at 6 phases — row added 244-13, which does NOT modify it.** ⛔ the ONE home of the harness activity string: a literal copied elsewhere makes its byte-pin vacuous |
-| [`scripts/full-schema-supplement.sql`](docs/HOT-FILE-LEDGER.md#scriptsfull-schema-supplementsql) | 11 / 6 / 653 | ⚠ **FIRES** | ⚠ absent for its ENTIRE LIFE at 6 phases — row added 253-02, and ⛔ NO GATE COULD EVER HAVE DEMANDED IT: `scripts/` is EXEMPT in check-hot-file-ledger.cjs. The ONE hand-mirror of every migration ACL |
+| [`scripts/full-schema-supplement.sql`](docs/HOT-FILE-LEDGER.md#scriptsfull-schema-supplementsql) | 15 / 10 / 690 | ⚠ **FIRES** | ⚠ row STALE at `11/6/653`. **266-01**: mig 195's `expert_installs` ACL mirrored (REVOKE PUBLIC/anon/authenticated, GRANT SELECT). ⛔ `scripts/` is gate-EXEMPT: kept by hand |
 | [`scripts/check-schema-acl-parity.cjs`](docs/HOT-FILE-LEDGER.md#scriptscheck-schema-acl-paritycjs) | 4 / 2 / 1156 | no (2 phases) | ⚠ row STALE at `3/2/883` ONE PLAN LATER, same day — lines rot faster than phases. **253-03**: it finally READS `full-schema.sql` (`assertTailIdentity`); 29 → 35 self-test arms |
 | [`scripts/check-greenfield-privileges.py`](docs/HOT-FILE-LEDGER.md#scriptscheck-greenfield-privilegespy) | 2 / 1 / 1312 | no (1 phase) | ⚠ row STALE at `1/1/1157` the same day it was written. **253-03**: `_statements` replaces `line.find("--")`; ⛔ a SKIP is exit 2, never 0 |
 | [`.claude/hooks/schema-acl-parity-guard.js`](docs/HOT-FILE-LEDGER.md#claudehooksschema-acl-parity-guardjs) | 2 / 1 / 145 | no (1 phase) | young (created 253-02). Row added AT CREATION — `.claude/` is EXEMPT, so no gate can ever demand it. ⛔ its SILENCE reads as "clear": every path a payload can carry must be extracted |
@@ -11020,15 +11024,16 @@ cells rot within days.
 | [`backend/app/api/skills.py`](docs/HOT-FILE-LEDGER.md#backendappapiskillspy) | 19 / 10 / 858 | ⚠ **FIRES** | ⛔ absent from BOTH registers its ENTIRE LIFE at 10 phases — row added at 263 PLANNING. ⛔ `is_org_shared` HARD-SET False at `:250`; D-263-06 routes around it by provenance, never through the gate. |
 | [`frontend/src/lib/activeViewReachability.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibactiveviewreachabilityts) | 1 / 1 / 159 | no (created 262-01) | ⚠ the AT-PLANNING row read `0/0/0`; measured in its own creating commit. ⛔ The ONE ActiveView↔ChatLayout-branch fence — AST, never grep; it THROWS on a vacuous parse |
 | [`frontend/src/components/experts/expertIcon.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertsexperticontsx) | 1 / 1 / 72 | no (new) | ⚠ `0/0/0` AT PLANNING; **measured `1/1/72` at 262-02**. ⛔ The ONE home of expert-icon resolution — a CLOSED 11-key lucide map. Reads `icon`, never `slug`/`name`: that match IS the retired artefact |
-| [`frontend/src/components/experts/catalog/expertCatalog.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogexpertcatalogts) | 1 / 1 / 96 | no | ⚠ `0/0/0` AT PLANNING; measured at **262-03**. Pure search/category/folder-name resolution. ⛔ An unresolvable folder id returns an UNKNOWN marker, never a drop — a blank is a claim nobody made |
-| [`frontend/src/components/experts/catalog/ExpertCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogexpertcardtsx) | 1 / 1 / 159 | no | ⚠ `0/0/0` AT PLANNING; measured at **262-03**. The 5-element face, folders as a COUNT. ⛔ Zero lecturing prose on it (sketch 261-262) — the NAMES belong to the detail modal |
-| [`frontend/src/components/experts/catalog/ExpertCatalogPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogexpertcatalogpagetsx) | 2 / 1 / 216 | no | ⚠ row STALE at `1/1/189` ONE WAVE later. **262-04**: `folders` finally BOUND, detail view mounted here. ⛔ still exactly ONE `listExperts()`, still no second card variant |
-| [`frontend/src/components/experts/catalog/ExpertDetailModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogexpertdetailmodaltsx) | 1 / 1 / 349 | no (new) | ⚠ `0/0/0` AT PLANNING; measured at **262-04**. The FIRST component anywhere to render `example_output`. ⛔ It NAMES, never counts; an unnameable folder says so; the disclosure is state, not hidden DOM |
+| [`frontend/src/components/experts/catalog/expertCatalog.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogexpertcatalogts) | 4 / 2 / 224 | no (2 phases) | ⚠ row STALE at `1/1/96`. **266-04**: now the ONE home of install wording: `INSTALL_COPY` + pure `installView`/`inviteGate`/`installCardLine`/`provenanceByFolder` |
+| [`frontend/src/components/experts/catalog/ExpertCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogexpertcardtsx) | 2 / 2 / 213 | no (2 phases) | ⚠ row STALE at `1/1/159`. **266-04**: the primary control swaps on `installView(...).kind`, SHORT words from `INSTALL_COPY`. ⛔ never branch on `install.state` here |
+| [`frontend/src/components/experts/catalog/ExpertCatalogPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogexpertcatalogpagetsx) | 5 / 3 / 330 | ⚠ **NOW FIRES — 3 phases** | ⚠ row read `2/1/216`. **266-04**: install flow + a poll keyed on a BOOLEAN. ⚠ `listExperts()` call sites 1→3, one endpoint; the 262-04 "exactly ONE" pin is SUPERSEDED |
+| [`frontend/src/components/experts/catalog/ExpertDetailModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogexpertdetailmodaltsx) | 3 / 2 / 438 | no (2 phases) | ⚠ row STALE at `1/1/349`. **266-04**: the footer control swaps on `installView(...).kind`; words only from `INSTALL_COPY`. UI-1 PASS live; the non-manager line is OWED |
 | [`frontend/src/components/experts/catalog/startScopedChat.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogstartscopedchatts) | 1 / 1 / 70 | no (new) | ⚠ `0/0/0` AT PLANNING; measured at **262-04**. ⛔ refresh BEFORE select — the created row is pre-patch and its hook has no updater for that column. A rejected patch does NOT navigate |
-| [`backend/app/services/expert_install_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesexpert_install_servicepy) | 0 / 0 / 0 | no (new) | young (created 266-03). Row added AT PLANNING. The ONE per-org install writer: org from the validated active org, rows via the user-JWT client. ⛔ never a SYSTEM_USER_ID row |
-| [`backend/app/services/expert_corpus.py`](docs/HOT-FILE-LEDGER.md#backendappservicesexpert_corpuspy) | 0 / 0 / 0 | no (new) | young (created 266-02). Row added AT PLANNING. First-party corpora are DATA: slug regex + path containment, CRLF→LF before any hash. ⛔ nothing is imported from the corpus dir |
-| [`frontend/src/components/ingestion/FolderTree.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestionfoldertreetsx) | 11 / 6 / 202 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE at 6 phases — row added at 266 PLANNING. 266-04 threads ONE optional prop (the `folderDocumentCounts` precedent). ⛔ no fetch here |
-| [`frontend/src/components/ingestion/FolderNode.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestionfoldernodetsx) | 9 / 5 / 259 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE at 5 phases — row added at 266 PLANNING. 266-04: ONE optional prop + ONE label conditional via NavRow's existing `sharedLabel`; 0 new state |
+| [`backend/app/services/expert_install_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesexpert_install_servicepy) | 3 / 1 / 648 | no (1 phase) | planning triple `0/0/0`. **266-05 F-1**: Retry hands on a STRING id (an asyncpg UUID crashed live). ⛔ org only from the active-org dep; never a SYSTEM_USER_ID row |
+| [`backend/app/services/expert_corpus.py`](docs/HOT-FILE-LEDGER.md#backendappservicesexpert_corpuspy) | 1 / 1 / 174 | no (1 phase) | planning triple `0/0/0`. First-party corpora are DATA: slug `fullmatch` + path containment, CRLF→LF before any hash. ⛔ nothing is imported from the corpus dir |
+| [`frontend/src/components/ingestion/FolderTree.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestionfoldertreetsx) | 12 / 7 / 207 | ⚠ **FIRES** | planning triple `11/6/202`. honoured by construction (**266-04**): ONE optional `folderProvenance` prop threaded to FolderNode. ⛔ no fetch here; seam `folderDecorations` |
+| [`frontend/src/components/ingestion/FolderNode.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestionfoldernodetsx) | 12 / 6 / 272 | ⚠ **FIRES** | planning triple `9/5/259`. **266-04** + **266-05 UI-3**: the note is ALSO NavRow's `caption`, because tooltip-only was invisible. ⛔ its "zero NavRow edits" claim is REFUTED |
+| [`frontend/src/components/ingestion/NavRow.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestionnavrowtsx) | 6 / 4 / 269 | ⚠ **FIRES — 4 phases** | ⚠ absent its ENTIRE LIFE — row added 266-05. **UI-3**: ONE optional `caption` (omitted → row unchanged). ⛔ words that are the deliverable render at rest, never tooltip-only |
 
 
 
@@ -11076,6 +11081,8 @@ rather than grow a copy of one.
 path in four recorded places, and the divergence is discovered rather than prevented. The
 extraction worth taking is a single ordered pipeline both paths execute — at which point "did this
 path run step N" stops being a question a comment answers.
+
+**Phase 266 (2026-09-25) — re-derived `15 / 6 / 877`** (the row read `11 / 4 / 827`). Honoured by construction (**266-02**, D-266-18): when `org_id` is passed, `mint_document_row` is org-scoped at 4 sites through a build-then-branch `if org_id:` arm (the `link_query` folder-arm idiom). The version lookup was restructured to build its filters, add the org arm, then order, limit and execute, so the `org_id=None` query sequence is identical to base (`test_266_mint_org_scope.py`). ⚠ `import_service.py` and `watch_service.py` already pass `org_id`, so they became org-scoped without being edited. SEED-313 records the upload path, which never stamps the active org.
 
 
 
@@ -14996,6 +15003,8 @@ Widening `WATCHED` / `EXEMPT` or adding the line-count check is a change to a **
 affecting every phase** and is outside Phase 253's fixed scope. **Re-open trigger: the next phase
 whose `files_modified` names a `scripts/` file.**
 
+**Phase 266 (2026-09-25) — re-derived `15 / 10 / 690`** (the row read `11 / 6 / 653`). **266-01:** migration 195's `expert_installs` ACL is mirrored: REVOKE ALL from PUBLIC, anon and authenticated; GRANT SELECT to authenticated; full DML to service_role (D-266-08: members read, only the backend writes). The 5e header now names migrations 186-195. ⛔ `scripts/` is EXEMPT from `check-hot-file-ledger.cjs`, so no gate would have demanded this row. It is kept by hand.
+
 ## scripts/check-schema-acl-parity.cjs
 
 ~~**Re-derived 2026-09-17 (Phase 253-02, D-23):** `3 / 2 / 883`. Phase buckets: `252, 253`.~~
@@ -15709,6 +15718,8 @@ appear as literals in the SQL text.
 third table is the thing to watch:** a second skills-touching writer here would make this module a
 de-facto skills DAL, and the extraction seam would then be *skills writes* — not *experts*.
 
+**Phase 266 (2026-09-25) — re-derived `5 / 4 / 749`** (the row read `4 / 3 / 567`). Honoured by construction (**266-01**): SIX install queries were ADDED for `expert_installs` (migration 195). The claim is a guarded upsert, `INSERT … ON CONFLICT DO UPDATE … WHERE status <> 'installing' OR stale … RETURNING *`. ⛔ No existing query was touched. `claim_expert_install` never overwrites `installed_by` on conflict; `set_expert_install_folder` records the repairer instead.
+
 ---
 
 ## `backend/app/models/expert.py`
@@ -15813,6 +15824,8 @@ has just been extracted; **the folders and connections blocks are the same shape
 seam is *one `evaluate_members(kind, raw, validator)` helper owning the counter and the single log
 verb*, with three small predicates beside `filter_visible_skill_names`. ⛔ A fourth member kind
 landing before that extraction is the trigger.
+
+**Phase 266 (2026-09-25) — re-derived `9 / 6 / 575`** (the row read `8 / 5 / 551`). **266-01:** in `resolve_expert_bundle`, an `is_system` (first-party) bundle now reads its folder ids ONLY from the caller org's `expert_installs` row (D-266-09). No install means no folders, and the bundle's global `knowledge_folder_ids` is ignored. The `is_system_folder` SYSTEM_USER_ID bypass is **RETIRED DELIBERATELY** (D-266-10 / SEED-304, under rule SEED-177 / D-206-07), and the retired line is quoted verbatim in a comment. ⛔ **The strict caller-org loop is the boundary, not the install lookup.** The install-sourced id still runs through it. The 266-05 fence's plant, an install row pointing at org B, is stripped with `EXPERT_MEMBER_CROSS_ORG_STRIPPED`, and the base resolver fails 3 of the 6 fence cases (`266-05-SUMMARY.md`). Org-authored bundles behave exactly as before.
 
 ---
 
@@ -16032,6 +16045,8 @@ duplicates the `load_user_settings` try/except verbatim — **that duplication i
 authoring route is the trigger to extract `api/expert_authoring_routes.py` with one
 `_caller_user_settings(current_user)` dependency, not the trigger to paste the block a third time.
 
+**Phase 266 (2026-09-25) — re-derived `13 / 5 / 764`** (the row read `9 / 3 / 585`). Honoured by construction (**266-03**): two routes were ADDED. `POST /experts/{bundle_id}/install` returns 202 with `ExpertInstallResult`, and `GET /experts/installs` is declared BEFORE `/{bundle_id}` so the path parameter cannot swallow it. `GET /experts` and `GET /experts/{id}` gain an `install` overlay on first-party rows only, where `knowledge_folder_ids` is replaced by the org's install folder. The service is imported as `install_expert_service`, because the route function keeps the name `install_expert`. ⛔ The org comes ONLY from the validated active-org dependency, never from a body field, and every existing route's gate is unchanged. **Named seam, OWED before a 6th phase:** the install routes are the natural first extraction (`api/expert_installs.py`).
+
 ---
 
 ## `frontend/src/components/chat/ActiveExpertChip.tsx`
@@ -16083,6 +16098,8 @@ What it owns. Leaf component modal dialog for browsing available domain expert b
 **Binding invariants.**
 - ⛔ The `data-testid={`expert-card-${expert.slug}`}` and `invite-expert-btn-${expert.slug}` hooks are derived from `slug` and are **untouched** by the icon retirement — `ComposerExpert.test.tsx` (count-gate pin 5) reaches this dialog through them. That suite was confirmed green and byte-unchanged rather than assumed to be safe.
 - ⚠ `:102-106` renders `upgrade_hint` ("Upgrade to Enterprise…"), which sits against D-262-02's no-upsell spirit. **Left alone BY DECISION (D-262-10)**: it is an error string at a failed invite, not a brochure entry. Out of scope for 262-02; raise at phase close.
+
+**Phase 266 (2026-09-25) — re-derived `3 / 3 / 231`, and G-5 NOW FIRES** (the row read `2 / 2 / 218`). Honoured by construction (**266-04**, D-266-01): each row makes ONE `inviteGate(expert)` read. `null` invites as before. A string is the REASON the Expert cannot join yet, and it renders in place of the invite button. The button itself is byte-unchanged. ⚠ **Never checked live:** UI-2 was left out of the operator's simplified browser steps, so this gate is proven by unit tests only (`ComposerExpert.test.tsx`), and the live row is OWED. **Named seam before a 4th phase:** the per-row action block (gate + invite) as one component.
 
 ---
 
@@ -16227,6 +16244,8 @@ consumer: Phase 196 measured exactly that, `failed 249` from mock factories miss
 **Named seam.** The module is 298 lines with **one** `handleResponse` and now **two** call-site arms.
 At a third refusal shape, extract the arms into a `expertRefusals.ts` the way `connectionMark.tsx` was
 extracted — do NOT keep adding `if (res.status === N)` blocks to individual functions.
+
+**Phase 266 (2026-09-25) — re-derived `7 / 4 / 367`** (the row read `6 / 3 / 313`). Honoured by construction (**266-04**): `ExpertInstallState`, `ExpertInstallResult` and `ExpertInstallSummary` are declared here, with `installExpert` and `listExpertInstalls` beside them. A 403 tier refusal is turned into `[]` at the call site, before `handleResponse` (the `draftSkillBody` precedent). `types/index.ts` imports the state with `import type`, so there is ONE declaration.
 
 
 ---
@@ -16704,6 +16723,10 @@ and only one of them has been through the org/visibility check. Pinned by source
 are in `tests/unit`. The RED moved the gate `71 → 80`, not the predicted `81`, because one test
 function unpacks TWICE — **the count of SITES and the count of NODE IDS are different numbers.**
 
+### `backend/app/services/run_producer.py` — Phase 266, byte-unchanged (D-266-11)
+
+**Re-derived 2026-09-25 as `12 / 6 / 943`.** The scan row read `11 / 6 / 932`, which is pre-266 rot: the last touch is `cdf3a308a`, `fix(261)`. **The file is byte-unchanged across the whole of Phase 266 (D-266-11):** `git diff --quiet 522e7b4fc HEAD -- backend/app/services/run_producer.py` exits 0 (`run_producer-unchanged`). The resolver change reaches it as DATA through `resolved.effective_folder_ids`, which is exactly what D-266-11 was meant to buy. ⚠ **Residual, SEED-314:** in the 266-05 flip, retrieval honoured `X-Org-Id: B`, yet `threads`, `messages` and `runs.org_id` were stamped A by the `autofill_org_id_by_owner` triggers. The fix belongs to the stamping path, not to this file.
+
 ### `backend/app/services/expert_service.py` — Phase 264 (`264-02`), honoured by construction
 
 **`8 / 5 / 551`** · **G-5 FIRES at 5 phases.** ⚠ Row stale a FOURTH time (`6 / 4 / 515`; `6/4/507`
@@ -16810,6 +16833,8 @@ TARGETS entry).
 
 ⛔ **AN UNRESOLVABLE FOLDER ID IS A REAL STATE, NOT DEFENSIVE PADDING**, and the one seeded system Expert proves it: mig `188:29-37` seeds its knowledge folder into a SINGLE org, so every other org's `listFolders()` resolves nothing for it. `ResolvedFolder` is a discriminated union with no optional `name`, so a caller can distinguish *"binds no folders"* from *"binds folders I cannot see"* and can never render `undefined` as a label. **Driven RED first** against a stub that filtered unresolvable ids out — the silent drop is the defect the union prevents. A folder resolving to a BLANK name is likewise `known: false`: a blank is the same failure as a drop.
 
+**Phase 266 (2026-09-25) — re-derived `4 / 2 / 224`** (the row read `1 / 1 / 96`). **266-04** makes this the ONE home of install wording and state mapping: `INSTALL_COPY` plus the pure `installView`, `inviteGate`, `installCardLine` and `provenanceByFolder`. ⛔ Components branch on `view.kind`, never on `install.state`. A second copy of an install sentence anywhere else is the drift this file exists to prevent.
+
 
 ---
 
@@ -16831,6 +16856,8 @@ TARGETS entry).
 
 ⛔ **The retired identifiers this card must never re-grow** are recorded under `frontend/src/components/chat/ExpertSpotlightCard.tsx` (262-02's per-site table). They are deliberately not spelled here: a comment naming them satisfies the very greps that prove they are gone.
 
+**Phase 266 (2026-09-25) — re-derived `2 / 2 / 213`** (the row read `1 / 1 / 159`). **266-04:** the primary control swaps on `installView(expert).kind`, never on `install.state` directly. The card shows SHORT status words (`INSTALL_COPY.card*`), with the full sentence as the pill's `title`. ⛔ The 5-element face and the zero-prose rule are unchanged.
+
 
 ---
 
@@ -16851,6 +16878,8 @@ TARGETS entry).
 ⛔ **`folders` SHIPS ON THE PROPS INTERFACE BUT IS NOT DESTRUCTURED** in 262-03. Its first consumer is the detail modal in plan 04; `tsconfig.app.json` sets `noUnusedParameters`, so an unused destructured binding raises `TS6133` against a tsc base of 70 with no headroom. The component takes `props` and reads `props.onStartChat` / `props.onInspect`. **The prop is the contract; only the binding waits.**
 
 ⚠ **THE REFUSAL STATE RENDERS THE SERVER'S OWN SENTENCE** verbatim beside ZERO cards, because `handleResponse` already folds `detail.upgrade_hint` into the thrown message. This is **D-262-10's flagged edge**, taken deliberately rather than silently: D-262-02 governs what the catalog LISTS, and the shipped `InviteExpertDialog.tsx:102-106` renders the same string in the same situation, so a second refusal vocabulary would make two surfaces disagree about one fact. **Cheap to reverse if the operator rules otherwise.**
+
+**Phase 266 (2026-09-25) — re-derived `5 / 3 / 330`, and G-5 NOW FIRES** (the row read `2 / 1 / 216`). **266-04** adds the fetch-reconciled install flow. The install result's state is applied to the row immediately, THEN the list is re-read, so the poll starts even if the re-read fails. The poll is keyed on a BOOLEAN (`anyInstalling`), so the interval exists only while something is installing. ⚠ **The 262-04 claim "still exactly ONE `listExperts()`" is SUPERSEDED, not deleted:** measured, there are now three call sites (mount, the post-install re-read, the poll), all on the one read endpoint. There is still no second card variant. **Named seam before a 4th phase:** a `useExpertCatalog` hook that owns the list, the install verb and the poll.
 
 
 ---
@@ -16876,6 +16905,8 @@ TARGETS entry).
 **Binding invariant — the footer carries TWO controls.** The sketch draws a third, deferred by CONTEXT (`SEED-303 S8` — a write on a read surface). It is not rendered in any form, including a disabled or coming-soon one: a control that cannot act is the dead affordance D-262-02 refuses a whole requirement over. ⚠ **Its literal is named in `262-04-SUMMARY.md`, not in the source**, because the acceptance grep proving it absent would be satisfied by a comment spelling it — the self-tripping-grep trap plans 02 and 03 each recorded, one wave apart.
 
 ⚠ **THE ACTION PROMPTS RENDER AS CONTENT, NOT AS TRIGGERS, AND THAT IS A STATED SCOPE CALL.** PACK-12 requires the example prompts to be READABLE, and each tile renders its title AND the prompt it would run. One-click execution needs a callback that carries the prompt it names, and **no props contract in this phase declares one** — pointing a tile at the footer's action would start a conversation WITHOUT the prompt the tile advertises, which is a control that lies about itself. Plan 03 handed this forward with the same reasoning and the same refusal to re-point an existing callback. **Re-open trigger:** the first plan that declares a prompt-bearing callback on this surface.
+
+**Phase 266 (2026-09-25) — re-derived `3 / 2 / 438`** (the row read `1 / 1 / 349`). **266-04:** the footer's primary control swaps on `installView(...).kind`: Install / Installing… (a sentence, no button) / Start Scoped Chat with Expert / Install failed — retry. The sentences come from `INSTALL_COPY`. An install-sourced cause is the server's own sentence and passes through; every other cause goes through `classifyIngestionError`. **UI-1 PASSED live** (operator, 2026-09-25): Install → Installing… → Start Scoped Chat with Expert, with no reload. ⚠ The not-installed line a non-manager sees was never checked live and is OWED (UI-4).
 
 
 ---
@@ -16959,6 +16990,8 @@ Re-derived 2026-09-22 at `e996d3248` with the CLAUDE.md three-command recipe (si
 
 **Binding invariants (planned, D-266-02/04/12/14):** the org comes ONLY from the validated active-org dependency, never a body field; folder + document rows are written with the caller's user-JWT client so RLS proves org and owner; service role only for the storage PUT and the job; a re-install restores what is missing and never overwrites; readiness is DERIVED from the corpus documents' own status, never stored a second time.
 
+**Phase 266 close (2026-09-25) — measured `3 / 1 / 648`** (the planning triple `0 / 0 / 0` stays above). It shipped as planned (**266-03**). **266-05 F-1 (Rule 1, RED `30ea8fc8a` → fix `a0c1b0ea6`):** the Retry re-drive handed an asyncpg row, whose `id` is a `UUID`, to the ingest path. The direct-splice fallback's JSON payload refused it, and the live run left the document `failed` with its chunks already deleted. The fix hands on `doc={**row, "id": doc_id}`, a string. It was re-proved in-process and then THROUGH THE RESTARTED SERVER (`266-UAT-LOG.md` F-1, `evidence/10`). ⚠ **The unit fixture used string ids, so the suite could not see it: fixture ids must have the type the real driver returns.** ⚠ A Retry still never reaches the ingest queue, because the storage PUT 409s and it falls back to the direct splice (SEED-315).
+
 ---
 
 ### `backend/app/services/expert_corpus.py`
@@ -16966,6 +16999,8 @@ Re-derived 2026-09-22 at `e996d3248` with the CLAUDE.md three-command recipe (si
 **Row added AT PLANNING, 2026-09-24 (Phase 266).** Triple at creation `0 / 0 / 0`.
 
 **What it owns.** Reading `backend/app/experts/corpora/<slug>/manifest.json` and its files as bytes (D-266-05). ⛔ **Extension Contract:** a corpus is DATA — the directory has no `__init__.py` and nothing in it is ever imported or executed. The slug must match `^[a-z0-9-]+$` and every resolved path must stay inside the corpora root. Bytes are CRLF→LF normalised before hashing, because `core.autocrlf=true` and there was no `.gitattributes` (RESEARCH Pitfall 5): without it `content_hash` and `corpus_version` differ between a Windows checkout and the Linux image.
+
+**Phase 266 close (2026-09-25) — measured `1 / 1 / 174`** (the planning triple stays above). It shipped as planned (**266-02**). ⭐ The slug and filename regexes use `fullmatch`, not `match`: `$` also matches before a trailing newline, so `financial-analyzer\n` would otherwise have passed (tested). `.gitattributes` landed in the same plan.
 
 ---
 
@@ -16975,10 +17010,22 @@ Re-derived 2026-09-22 at `e996d3248` with the CLAUDE.md three-command recipe (si
 
 **Planned touch (266-04), honoured by construction:** ONE optional prop (`folderProvenance?: Record<string, string>`) destructured and forwarded to `FolderNode`, exactly the shape `folderDocumentCounts` already takes (`:15-17`, `:30`, `:184`). ⛔ No fetch, no state, no effect is added here — the page owns the read. **Named seam if a fourth threaded prop arrives:** a single `folderDecorations` object prop replacing the per-concern props.
 
+**Phase 266 close (2026-09-25) — re-derived `12 / 7 / 207`** (the planning triple `11 / 6 / 202` stays above). It shipped exactly as planned (**266-04**): ONE optional `folderProvenance` prop, destructured and forwarded, with no fetch, state or effect. The named `folderDecorations` seam still stands.
+
 ---
 
 ### `frontend/src/components/ingestion/FolderNode.tsx`
 
 **Derived 2026-09-24 at `a29949402` (Phase 266 planning):** `9 commits / 5 phases / 259 L` (buckets `03 08 114 155 165`). ⚠ **FIRES G-5 and had NO row for its entire life** (266-RESEARCH C-9).
 
-**Planned touch (266-04), honoured by construction:** ONE optional prop, ONE conditional on the existing `sharedLabel` string it hands `NavRow` (`:95-96`), and the same prop forwarded in the recursive child render (`:242`). ⛔ **Zero `NavRow.tsx` edits** — its `sharedLabel` prop already carries free text. The provenance note is a string, not a lock (D-266-13).
+**Planned touch (266-04), honoured by construction:** ONE optional prop, ONE conditional on the existing `sharedLabel` string it hands `NavRow` (`:95-96`), and the same prop forwarded in the recursive child render (`:242`). ~~⛔ **Zero `NavRow.tsx` edits** — its `sharedLabel` prop already carries free text.~~ ⚠ **CORRECTED 2026-09-25 (266-05, UAT row UI-3): REFUTED. The claim is struck through rather than deleted.** 266-04 did ship with zero NavRow edits, and that is exactly why the note was invisible: `sharedLabel` is the TOOLTIP of the small `G` pill. The operator did not see "from Financial Analyzer", so NavRow gained an optional `caption` (`2c2c09540`). The provenance note is a string, not a lock (D-266-13).
+
+**Phase 266 close (2026-09-25) — re-derived `12 / 6 / 272`** (the planning triple `9 / 5 / 259` stays above). 266-04 shipped as planned. **The live check then failed it (UI-3):** the note existed only in a tooltip. **The four 266-04 `FolderNode` tests reached the text only after a simulated hover, so they stayed green over a note nobody could see.** The fix: RED `c5b5fdaa9` (the note is visible WITHOUT hover; 1 failed / 19 passed) → GREEN `2c2c09540`, where FolderNode passes the note as NavRow's `caption` on org-shared folders only. `805a467ff` then corrected the component's own stale "NavRow is not changed" comment beside the original. The operator re-checked: "shows now". ⛔ **Where the words are the deliverable, assert what is visible at rest, not what a hover reveals.**
+
+---
+
+### `frontend/src/components/ingestion/NavRow.tsx`
+
+**Row added 2026-09-25 by 266-05. Measured `6 commits / 4 phases / 269 L`** (buckets `114 155 165 266`; one untagged `style(library)` commit is not a phase). Before the UI-3 fix it measured `5 / 3 / 250`, so **the fix is the commit that took it over the G-5 threshold.** ⚠ **It had NO row in either register for its entire life**, although it is the shared row primitive under `FolderTree`, `FolderNode`, `ViewsGroup` and `AutomationGroup` (extracted in `114-04`). ⚠ **And no gate could have asked for one:** no 266 PLAN named it in `files_modified`, because the fix was an unplanned UAT deviation, and `check-hot-file-ledger.cjs` reads only `files_modified`. A file edited by a deviation is invisible to that gate.
+
+**Phase 266 (266-05, UI-3), honoured by construction:** ONE optional `caption` prop adds a small grey second line under the name (`data-testid="navrow-caption"`) that is visible at rest. Omit it and the row renders exactly as before. The change is a third arm of the name ternary (editing / caption / plain), and the plain arm is byte-unchanged. ⛔ **Binding invariant:** words a user must see render at rest, never tooltip-only. The `G` pill's `sharedLabel` tooltip is an affordance, not a place for information. **Named seam before a 5th phase:** the caption arm repeats the plain arm's name-and-tooltip block verbatim, so extract a `NavRowName` component that both arms render.
