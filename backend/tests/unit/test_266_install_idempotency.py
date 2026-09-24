@@ -17,6 +17,7 @@ an in-memory recorder, so "no write" below means no call reached either one.
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 from datetime import datetime, timezone
 from types import SimpleNamespace
@@ -296,3 +297,23 @@ async def test_vii_an_edited_document_is_left_untouched():
     mint.assert_not_awaited()
     enq.assert_not_awaited()
     assert supa.writes() == []
+
+
+async def test_iv_b_a_real_asyncpg_row_with_uuid_ids_is_handed_on_with_a_string_id():
+    """266-05 live finding: asyncpg returns ``id`` / ``user_id`` / ``folder_id`` as ``UUID``,
+    not ``str`` (this suite's ``_doc`` fixture used strings, which is how the defect hid).
+    A real Retry's storage PUT to the existing key fails (no upsert), so ``_enqueue_or_splice``
+    falls back to ``splice_document(document_id=doc["id"])`` — and a ``UUID`` there reached a
+    JSON payload: ``Object of type UUID is not JSON serializable``, measured live, leaving the
+    document ``failed`` with its chunks already deleted. The id handed on must be a string."""
+    failed = _doc(F1, status="failed")
+    failed["id"] = UUID(failed["id"])  # the asyncpg shape
+    db = _db(claim=_claim(FOLDER), docs=[failed])
+    supa, mint, enq = FakeSupabase(folder_present=True), _mint(), AsyncMock()
+    await _run(db, supa, mint, enq, _corpus([(F1, RAW1)]))
+
+    enq.assert_awaited_once()
+    handed = enq.await_args.kwargs["doc"]["id"]
+    assert isinstance(handed, str), f"re-drive handed a {type(handed).__name__} id to the ingest path"
+    assert handed == str(failed["id"])
+    json.dumps({"document_id": handed})  # the payload shape that failed live
