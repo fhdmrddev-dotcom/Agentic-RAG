@@ -103,6 +103,7 @@ export function FolderNode({
             ? `Shared with org · ${folderProvenance[node.id]}`
             : "Shared with org"
         }
+        caption={node.is_org_shared ? folderProvenance?.[node.id] : undefined}
         onSelect={() => onSelect(node.id)}
         isEditing={isEditing}
         onCommitRename={(newName) => onCommitRename(node.id, newName)}
