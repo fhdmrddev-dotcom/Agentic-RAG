@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v4.4
 milestone_name: Experts That Actually Work — 🚧 IN PROGRESS
 status: executing
-last_updated: "2026-09-24T18:27:46.022Z"
-last_activity: 2026-09-24 -- Phase 266 planning complete
+last_updated: "2026-09-24T18:36:03.908Z"
+last_activity: 2026-09-24 -- Phase 266 execution started
 progress:
   total_phases: 12
   completed_phases: 1
@@ -32,7 +32,7 @@ See: `.planning/PROJECT.md` (updated 2026-09-23)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 266 — next (265 complete 2026-09-24)
+**Current focus:** Phase 266 — expert-knowledge-in-a-real-org
 **265**, migrations at **194** (193 was already taken by `193_expert_seed_org_portable.sql`).
 
 ---
@@ -40,12 +40,12 @@ can be taught new behaviours (skills) that persist and can be shared.
 ## Current Position
 
 Milestone: v4.4 Experts That Actually Work
-Phase: 265 (owed-v4-3-verification) — COMPLETE
-Plan: 5 of 5
-Status: Ready to execute
+Phase: 266 (expert-knowledge-in-a-real-org) — EXECUTING
+Plan: 1 of 5
+Status: Executing Phase 266
 G-2 for 266 skipped BY OPERATOR DECISION at discuss (D-266-16) — install button + 3 states on shipped ExpertDetailModal/ExpertCard
 Resume file: .planning/phases/266-expert-knowledge-in-a-real-org/266-CONTEXT.md
-Last activity: 2026-09-24 -- Phase 266 planning complete
+Last activity: 2026-09-24 -- Phase 266 execution started
 
 ---
 
