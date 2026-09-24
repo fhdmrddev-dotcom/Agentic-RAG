@@ -16,10 +16,18 @@ from app.services.entitlement_service import EntitlementResult
 
 @pytest.fixture
 def expert_test_app():
-    """Create test FastAPI application mounting the experts router."""
+    """Create test FastAPI application mounting the experts router.
+
+    Phase 266-03: ``GET /experts`` now hands its rows to ``overlay_install_state``, which reads
+    the pool; this suite's pool is a bare ``MagicMock``. The overlay is patched to IDENTITY so
+    these cases keep testing exactly what they tested — the tier gate — and nothing about
+    installs (that is ``test_266_install_route_gates.py``'s job).
+    """
     app = FastAPI()
     app.include_router(experts_router)
-    return app
+    identity = AsyncMock(side_effect=lambda pool, rows, **_kw: rows)
+    with patch("app.api.experts.overlay_install_state", identity):
+        yield app
 
 
 @pytest.fixture
@@ -171,6 +179,18 @@ def test_all_expert_endpoints_gated_by_router_dependency(expert_test_app, mock_u
 
         # DELETE /experts/{id}
         assert client.delete(f"/experts/{bundle_id}").status_code == status.HTTP_403_FORBIDDEN
+
+        # Phase 266 (D-266-04): the install routes ride the SAME router gate — no second tier
+        # check. The body is asserted, not just the status: POST /install also depends on the
+        # user-JWT client, whose bearer check would 403 on its own and make a bare status
+        # assertion vacuous.
+        install = client.post(f"/experts/{bundle_id}/install")
+        assert install.status_code == status.HTTP_403_FORBIDDEN
+        assert install.json()["detail"]["error"] == "entitlement_required"
+
+        installs = client.get("/experts/installs")
+        assert installs.status_code == status.HTTP_403_FORBIDDEN
+        assert installs.json()["detail"]["error"] == "entitlement_required"
 
 
 def test_experts_api_single_home_ast_compliance():
