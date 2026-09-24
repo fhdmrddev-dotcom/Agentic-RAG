@@ -229,7 +229,10 @@ const BASELINE = {
   // ⚠ ADOPTED at 266-04: this suite sat in NEITHER knob before (measured by grep). 14 cases at
   // base + 4 new: "Shared with org · from <Expert>" through NavRow's existing sharedLabel, the
   // exact base label without an entry, NO label on a non-shared folder, and the recursive forward.
-  "FolderNode.test.tsx": 18,
+  // ⚠ RAISED 18 → 20 at 266-05 by the gate's own printed "+2" (UAT row UI-3). The four 266-04 cases
+  // found the note only after a simulated HOVER, so they stayed green while the operator could not
+  // see it. The 2 new cases assert the caption is visible AT REST (RED c5b5fdaa9 → GREEN 2c2c09540).
+  "FolderNode.test.tsx": 20,
   // ── Phase 263 (PACK-14/PACK-15) — the dialog an Expert proposal reuses ──────────────
   // ⚠ ADOPTED, not raised: before 263-04 `grep -ic "skill" scripts/vitest-count-gate.cjs`
   // returned 0 — NOT ONE skills suite was in either knob, so this file's 8 passing tests
