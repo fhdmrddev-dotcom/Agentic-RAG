@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dialog"
 import { listExperts } from "@/lib/api"
 import type { ExpertBundle } from "@/types"
+import { inviteGate } from "@/components/experts/catalog/expertCatalog"
 import { cn } from "@/lib/utils"
 
 interface InviteExpertDialogProps {
@@ -119,6 +120,8 @@ export function InviteExpertDialog({
             experts.map((expert) => {
               const isCurrent = expert.id === currentExpertId
               const isRestricted = expert.scope_mode === "restricted"
+              // Phase 266: null → invite as before; a string → the reason it cannot join yet.
+              const gateReason = inviteGate(expert)
 
               return (
                 <div
@@ -181,6 +184,15 @@ export function InviteExpertDialog({
                   </div>
 
                   <div className="mt-3 flex justify-end">
+                    {/* ⛔ Phase 266 (D-266-01): a first-party Expert whose knowledge is not
+                        installed in this org cannot join a chat — it would run against an
+                        empty scope. The row stays and says WHY; nothing on it invites. The
+                        invite button below is byte-unchanged (hence its indentation). */}
+                    {gateReason !== null ? (
+                      <p className="text-right text-[11px] italic text-muted-foreground">
+                        {gateReason}
+                      </p>
+                    ) : (
                     <button
                       type="button"
                       data-testid={`invite-expert-btn-${expert.slug}`}
@@ -207,6 +219,7 @@ export function InviteExpertDialog({
                         </>
                       )}
                     </button>
+                    )}
                   </div>
                 </div>
               )

@@ -166,7 +166,10 @@ const BASELINE = {
   // ⬆ RAISED 5 → 8 at `262-05`: the composer's catalog door (renders beside the invite door,
   //   fires its navigator once, and does NOT render when no navigator is wired). ⛔ An
   //   EXTENSION — Phase 260's five cases, including the UI-budget case, are untouched.
-  "ComposerExpert.test.tsx": 8,
+  // ⬆ RAISED 8 → 12 at 266-04: the invite gate (D-266-01) — a not-installed and an installing
+  //   first-party Expert name their reason and NO click on the row invites; a ready one and an
+  //   org-authored one (no install key) invite exactly as before. The eight above are untouched.
+  "ComposerExpert.test.tsx": 12,
   // ⬆ 5 → 9 at 262-02 (D-262-06 / RESEARCH P-7). RAISED to the gate's own printed figure,
   // never lowered: the four hardcoded demo-Expert sites this suite pinned were RETIRED, and
   // the rewrite lands four cases MORE than the floor it replaced — the honest-empty tile, the
@@ -197,21 +200,36 @@ const BASELINE = {
   // ⛔ `ExpertCatalogPage.test.tsx` carries PACK-11's vanish, its POSITIVE CONTROL and
   // the no-consolation-prize arm; dropping any of them would let a catalog advertising
   // an Expert the caller cannot use ship green.
-  "expertCatalog.test.ts": 10,
-  "ExpertCatalogPage.test.tsx": 8,
+  // ⬆ RAISED 10 → 27 at 266-04: installView's seven state→control arms (a driver-dict cause
+  //   CLASSIFIED, never rendered raw; a null cause the honest fallback), inviteGate's refusals,
+  //   provenanceByFolder, and the install client (no body; 409 → the server's sentence; 403 → []).
+  "expertCatalog.test.ts": 27,
+  // ⬆ RAISED 8 → 13 at 266-04 (the file carried 9 at base — the 262-UAT 3.6 case sat above the
+  //   pin): the card's control swap with no dead button, install → re-read → fresh modal state,
+  //   the fetch poll that STOPS once nothing is installing (driven RED against a leaked
+  //   interval: 2 calls expected, 5 received), and a 409's sentence in the modal.
+  "ExpertCatalogPage.test.tsx": 13,
   // ── Phase 262 plan 04 (PACK-12) — the detail view ──────────────────────────────────
   // ⚠ ADOPTED, not raised — `8` is the gate's OWN printed `— N new` figure on the run that
   // first named this file in TARGETS, never a local vitest tail.
   // ⛔ THIS PIN GUARDS THE ONLY PLACE FOUR MIGRATION-189 COLUMNS REACH A PERSON. Case (2) is
   // the one that cannot be faked: it asserts the sample deliverable is ABSENT before the
   // disclosure and PRESENT after, so a renderer that leaves it in the DOM while hidden fails.
-  "ExpertDetailModal.test.tsx": 8,
+  // ⬆ RAISED 8 → 15 at 266-04: the primary control swapped by install state — ready / Install /
+  //   installing / needs-an-admin / Install failed — retry with a CLASSIFIED cause / Starting /
+  //   the server's refusal — each asserting zero disabled buttons and no literal "undefined".
+  "ExpertDetailModal.test.tsx": 15,
   // ── Phase 262 plan 04 (PACK-13) — the ordered handoff ──────────────────────────────
   // ⚠ ADOPTED, not raised — `6` is the gate's OWN printed `— N new` figure.
   // ⛔ TWO of these six are the ORDER itself, and one is an identity comparison. Five seams
   // called in the wrong order still call every seam, so an every-mock-was-called suite would
   // guard nothing; dropping a case here would let a silently un-scoping thread row ship green.
   "startScopedChat.test.ts": 6,
+  // ── Phase 266 plan 04 (D-266-13) — the Library folder names its Expert ─────────────
+  // ⚠ ADOPTED at 266-04: this suite sat in NEITHER knob before (measured by grep). 14 cases at
+  // base + 4 new: "Shared with org · from <Expert>" through NavRow's existing sharedLabel, the
+  // exact base label without an entry, NO label on a non-shared folder, and the recursive forward.
+  "FolderNode.test.tsx": 18,
   // ── Phase 263 (PACK-14/PACK-15) — the dialog an Expert proposal reuses ──────────────
   // ⚠ ADOPTED, not raised: before 263-04 `grep -ic "skill" scripts/vitest-count-gate.cjs`
   // returned 0 — NOT ONE skills suite was in either knob, so this file's 8 passing tests
@@ -4458,6 +4476,10 @@ const TARGETS = [
   // Pure module, no mount. Named here and pinned below in the same commit, for the same
   // directory reason: nothing under this path is reached by a bare-directory entry.
   "src/components/experts/catalog/__tests__/startScopedChat.test.ts",
+  // ── Phase 266 plan 04 (D-266-13) — the Library folder's provenance label ──────────
+  // `src/__tests__/components` has no bare-directory entry, so this suite RAN IN NO GATE until
+  // named here. Both knobs, same commit: the BASELINE pin is beside the experts pins above.
+  "src/__tests__/components/FolderNode.test.tsx",
   // ── Phase 263 (PACK-14/PACK-15) — the dialog an Expert proposal reuses ──────────────
   // ⚠ `src/components/skills` has NO bare-directory TARGETS entry, and this file is NOT
   // under a `__tests__/` directory — so before this line it ran in NO gate at all.

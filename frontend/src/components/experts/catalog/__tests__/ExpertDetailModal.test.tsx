@@ -27,6 +27,8 @@ import userEvent from "@testing-library/user-event"
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { ExpertDetailModal, HONEST, UNNAMEABLE_FOLDER } from "../ExpertDetailModal"
 import type { ExpertBundle, Folder } from "@/types"
+import { INSTALL_COPY } from "../expertCatalog"
+import { SENTENCE_FOR_KIND } from "@/components/library/ingestionErrorVocabulary"
 
 function bundle(over: Partial<ExpertBundle> & { name: string; slug: string }): ExpertBundle {
   return {
@@ -197,5 +199,133 @@ describe("ExpertDetailModal — PACK-12's content, asserted as content", () => {
     // absence of any control that cannot act.
     expect(rendered().toLowerCase()).not.toContain("customise")
     expect(screen.queryAllByRole("button").filter((b) => (b as HTMLButtonElement).disabled)).toHaveLength(0)
+  })
+})
+
+// ── Phase 266-04 (D-266-01 / D-266-03) — the primary control is SWAPPED by install state ──────
+//
+// ⛔ Every case asserts rendered CONTENT, zero disabled buttons and no literal "undefined". The
+// eight cases above are untouched: an Expert with no `install` key is the legacy path and keeps
+// the Start Scoped Chat control exactly as it shipped.
+
+type InstallStateName = "not_installed" | "installing" | "ready" | "failed"
+
+function withInstall(
+  state: InstallStateName,
+  over: Partial<NonNullable<ExpertBundle["install"]>> = {},
+): ExpertBundle {
+  return bundle({
+    name: "Financial Analyzer",
+    slug: "financial-analyzer",
+    is_system: true,
+    knowledge_folder_ids: state === "ready" ? ["known-id"] : [],
+    install: {
+      state,
+      folder_id: state === "ready" ? "known-id" : null,
+      cause: null,
+      cause_source: null,
+      can_install: true,
+      updated_at: "2026-09-24T00:00:00Z",
+      ...over,
+    },
+  })
+}
+
+function mountInstall(
+  expert: ExpertBundle,
+  extra: { installBusy?: boolean; installError?: string | null } = {},
+) {
+  const onStartChat = vi.fn()
+  const onOpenChange = vi.fn()
+  const onInstall = vi.fn()
+  render(
+    <ExpertDetailModal
+      expert={expert}
+      folders={VISIBLE_FOLDERS}
+      open
+      onOpenChange={onOpenChange}
+      onStartChat={onStartChat}
+      onInstall={onInstall}
+      {...extra}
+    />,
+  )
+  return { onStartChat, onOpenChange, onInstall }
+}
+
+function noDeadControls() {
+  expect(screen.queryAllByRole("button").filter((b) => (b as HTMLButtonElement).disabled)).toHaveLength(0)
+  expect(rendered()).not.toContain("undefined")
+}
+
+const DRIVER_DICT =
+  "{'code': '23505', 'details': None, 'hint': None, 'message': 'duplicate key value violates unique constraint \"documents_completed_hash_unique_idx\"'}"
+
+describe("ExpertDetailModal — install states (266-04)", () => {
+  it("(9) ready → the existing Start Scoped Chat control, handing off once", async () => {
+    const user = userEvent.setup()
+    const ready = withInstall("ready")
+    const { onStartChat, onInstall } = mountInstall(ready)
+    await user.click(screen.getByRole("button", { name: /start scoped chat with expert/i }))
+    expect(onStartChat).toHaveBeenCalledTimes(1)
+    expect(onStartChat).toHaveBeenCalledWith(ready)
+    expect(onInstall).not.toHaveBeenCalled()
+    expect(screen.queryByRole("button", { name: /^install$/i })).toBeNull()
+    noDeadControls()
+  })
+
+  it("(10) not_installed + can_install → an Install button; clicking installs and does NOT start a chat", async () => {
+    const user = userEvent.setup()
+    const e = withInstall("not_installed")
+    const { onStartChat, onInstall } = mountInstall(e)
+    expect(screen.queryByRole("button", { name: /start scoped chat/i })).toBeNull()
+    await user.click(screen.getByRole("button", { name: INSTALL_COPY.installAction }))
+    expect(onInstall).toHaveBeenCalledTimes(1)
+    expect(onInstall).toHaveBeenCalledWith(e)
+    expect(onStartChat).not.toHaveBeenCalled()
+    noDeadControls()
+  })
+
+  it("(11) installing → the Installing… sentence and NO start or install button", () => {
+    mountInstall(withInstall("installing"))
+    expect(rendered()).toContain(INSTALL_COPY.installing)
+    expect(screen.queryByRole("button", { name: /start scoped chat/i })).toBeNull()
+    expect(screen.queryByRole("button", { name: /install/i })).toBeNull()
+    noDeadControls()
+  })
+
+  it("(12) not_installed + !can_install → the needs-an-admin sentence and no install button", () => {
+    mountInstall(withInstall("not_installed", { can_install: false }))
+    expect(rendered()).toContain(INSTALL_COPY.needsAdmin)
+    expect(screen.queryByRole("button", { name: /install/i })).toBeNull()
+    expect(screen.queryByRole("button", { name: /start scoped chat/i })).toBeNull()
+    noDeadControls()
+  })
+
+  it("(13) failed + can_install → 'Install failed — retry', the CLASSIFIED cause, and a Retry install button", async () => {
+    const user = userEvent.setup()
+    const e = withInstall("failed", { cause: DRIVER_DICT, cause_source: "document" })
+    const { onInstall } = mountInstall(e)
+    expect(rendered()).toContain("Install failed — retry")
+    expect(rendered()).toContain(SENTENCE_FOR_KIND.duplicate)
+    // T-266-25: the raw driver dict never reaches the DOM.
+    expect(rendered()).not.toContain("23505")
+    expect(rendered()).not.toContain("'code'")
+    await user.click(screen.getByRole("button", { name: "Retry install" }))
+    expect(onInstall).toHaveBeenCalledTimes(1)
+    noDeadControls()
+  })
+
+  it("(14) installBusy → the Starting line INSTEAD of the install button", () => {
+    mountInstall(withInstall("not_installed"), { installBusy: true })
+    expect(rendered()).toContain(INSTALL_COPY.starting)
+    expect(screen.queryByRole("button", { name: INSTALL_COPY.installAction })).toBeNull()
+    noDeadControls()
+  })
+
+  it("(15) installError renders the server's sentence", () => {
+    const sentence = "This Expert is already being installed in this organisation."
+    mountInstall(withInstall("not_installed"), { installError: sentence })
+    expect(rendered()).toContain(sentence)
+    noDeadControls()
   })
 })

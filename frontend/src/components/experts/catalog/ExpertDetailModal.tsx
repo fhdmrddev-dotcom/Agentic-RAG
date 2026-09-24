@@ -46,10 +46,29 @@
  * at the footer's action would start a conversation WITHOUT the prompt the tile advertises — a
  * control that lies about itself, which is the dishonesty this phase exists to remove. Reasoning
  * and the re-open trigger are in `262-04-SUMMARY.md`.
+ *
+ * ⚠ PHASE 266 (D-266-01 / D-266-03) — THE PRIMARY CONTROL IS NOW SWAPPED BY INSTALL STATE, AND THE
+ * "TWO CONTROLS" RULE ABOVE STILL HOLDS. A first-party Expert's corpus reaches an org only when a
+ * manager installs it, so the footer's primary control is chosen by `installView`: Start Scoped
+ * Chat (ready, or an Expert with no install at all — the legacy path, byte-identical), Install /
+ * Retry install (a manager), or a status LINE with the reason (installing, or a non-manager). ⛔ It
+ * is never a dead button: a state that cannot act says why instead. ⛔ A failure cause is
+ * never rendered raw — `installView` classifies it through the Library's own vocabulary.
  */
 
 import { useEffect, useState } from "react"
-import { ChevronDown, ChevronRight, EyeOff, FolderClosed, Plug, Sparkles, Wrench } from "lucide-react"
+import {
+  AlertCircle,
+  ChevronDown,
+  ChevronRight,
+  Download,
+  EyeOff,
+  FolderClosed,
+  Plug,
+  RotateCcw,
+  Sparkles,
+  Wrench,
+} from "lucide-react"
 import { ExpertIcon } from "@/components/experts/expertIcon"
 import {
   Dialog,
@@ -60,7 +79,7 @@ import {
 } from "@/components/ui/dialog"
 import type { ExpertBundle, Folder } from "@/types"
 import { cn } from "@/lib/utils"
-import { resolveFolderNames } from "./expertCatalog"
+import { INSTALL_COPY, installView, resolveFolderNames } from "./expertCatalog"
 
 /**
  * ⛔ THE WORDING IS THE DELIVERABLE, so it lives in one place and its suite pins the literal.
@@ -92,6 +111,11 @@ function HonestLine({ children }: { children: React.ReactNode }) {
   return <p className="text-xs italic text-muted-foreground/80">{children}</p>
 }
 
+/** The footer's status line — the `HonestLine` voice, in the place a control would sit. */
+function FooterLine({ children }: { children: React.ReactNode }) {
+  return <p className="max-w-md text-right text-xs italic text-muted-foreground/90">{children}</p>
+}
+
 function NamePill({ icon, label, dim }: { icon: React.ReactNode; label: string; dim?: boolean }) {
   return (
     <span
@@ -115,6 +139,13 @@ export interface ExpertDetailModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onStartChat: (expert: ExpertBundle) => void
+  /** Phase 266: install this Expert's corpus into the active org. Optional so every existing
+   *  mount compiles; without it an installable Expert shows the needs-an-admin line instead. */
+  onInstall?: (expert: ExpertBundle) => void
+  /** An install request is in flight — the install control becomes the Starting line. */
+  installBusy?: boolean
+  /** The server's refusal sentence from the last install attempt, if any. */
+  installError?: string | null
 }
 
 export function ExpertDetailModal({
@@ -123,6 +154,9 @@ export function ExpertDetailModal({
   open,
   onOpenChange,
   onStartChat,
+  onInstall,
+  installBusy = false,
+  installError = null,
 }: ExpertDetailModalProps) {
   const [sampleShown, setSampleShown] = useState(false)
 
@@ -142,6 +176,16 @@ export function ExpertDetailModal({
   const whenToUse = expert.when_to_use?.trim() ?? ""
   const sample = expert.example_output?.trim() ?? ""
   const description = expert.description?.trim() ?? ""
+  const view = installView(expert)
+  // A failed install names its cause above the footer, whichever control the footer draws. For a
+  // non-manager the footer's own status line already says "Install failed", so only the cause
+  // is added here — the same sentence is never printed twice.
+  const failure: { headline: string | null; cause: string } | null =
+    view.kind === "retry"
+      ? { headline: view.headline, cause: view.cause }
+      : view.kind === "status" && view.cause
+        ? { headline: null, cause: view.cause }
+        : null
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -322,7 +366,29 @@ export function ExpertDetailModal({
           </section>
         </div>
 
-        {/* ── footer: exactly two controls ── */}
+        {/* ── 266: a failed install names its cause; a refused request says why ── */}
+        {(failure || installError) && (
+          <div className="shrink-0 space-y-1.5 border-t border-border/60 px-6 py-3">
+            {failure && (
+              <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs">
+                <AlertCircle className="mt-0.5 h-3.5 w-3.5 flex-none text-destructive" />
+                <div className="min-w-0 space-y-0.5">
+                  {failure.headline && (
+                    <p className="font-medium text-destructive">{failure.headline}</p>
+                  )}
+                  <p className="text-muted-foreground">{failure.cause}</p>
+                </div>
+              </div>
+            )}
+            {installError && (
+              <p role="alert" className="text-xs text-destructive">
+                {installError}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* ── footer: exactly two controls — the primary one swapped by install state ── */}
         <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border/60 p-4">
           <button
             type="button"
@@ -331,17 +397,40 @@ export function ExpertDetailModal({
           >
             Close
           </button>
-          <button
-            type="button"
-            onClick={() => {
-              onStartChat(expert)
-              onOpenChange(false)
-            }}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-1.5 text-xs font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
-          >
-            <Sparkles className="h-3.5 w-3.5" />
-            Start Scoped Chat with Expert
-          </button>
+          {view.kind === "legacy" || view.kind === "chat" ? (
+            <button
+              type="button"
+              onClick={() => {
+                onStartChat(expert)
+                onOpenChange(false)
+              }}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-1.5 text-xs font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+              Start Scoped Chat with Expert
+            </button>
+          ) : view.kind === "install" || view.kind === "retry" ? (
+            installBusy ? (
+              <FooterLine>{INSTALL_COPY.starting}</FooterLine>
+            ) : onInstall ? (
+              <button
+                type="button"
+                onClick={() => onInstall(expert)}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-1.5 text-xs font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
+              >
+                {view.kind === "retry" ? (
+                  <RotateCcw className="h-3.5 w-3.5" />
+                ) : (
+                  <Download className="h-3.5 w-3.5" />
+                )}
+                {view.action}
+              </button>
+            ) : (
+              <FooterLine>{INSTALL_COPY.needsAdmin}</FooterLine>
+            )
+          ) : (
+            <FooterLine>{view.line}</FooterLine>
+          )}
         </div>
       </DialogContent>
     </Dialog>

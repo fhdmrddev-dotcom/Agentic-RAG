@@ -212,4 +212,70 @@ describe("FolderNode", () => {
     // Recursion preserved: the child row renders when the parent is expanded.
     expect(screen.getByText("Nested child")).toBeInTheDocument()
   })
+
+  // ── Phase 266-04 (D-266-13) — an installed Expert's folder names where it came from ─────────
+  // The provenance rides NavRow's EXISTING `sharedLabel` tooltip; NavRow itself is not edited.
+
+  async function revealSharedLabel(): Promise<string[]> {
+    const pill = screen.getByText("G")
+    fireEvent.mouseEnter(pill)
+    fireEvent.focus(pill)
+    const labels = await screen.findAllByText(/^Shared with org/)
+    return labels.map((l) => l.textContent ?? "")
+  }
+
+  it("266: a shared folder with provenance reads 'Shared with org · from Financial Analyzer'", async () => {
+    renderWithTooltip(
+      <FolderNodeComponent
+        node={makeNode({ is_org_shared: true })}
+        {...defaultProps}
+        folderProvenance={{ "node-1": "from Financial Analyzer" }}
+      />,
+    )
+    const labels = await revealSharedLabel()
+    expect(labels).toContain("Shared with org · from Financial Analyzer")
+  })
+
+  it("266: without a provenance entry the label is exactly 'Shared with org'", async () => {
+    renderWithTooltip(
+      <FolderNodeComponent
+        node={makeNode({ is_org_shared: true })}
+        {...defaultProps}
+        folderProvenance={{ "other-folder": "from Financial Analyzer" }}
+      />,
+    )
+    const labels = await revealSharedLabel()
+    expect(labels).toContain("Shared with org")
+    expect(labels.join("|")).not.toContain("Financial Analyzer")
+  })
+
+  it("266: a provenance entry on a NON-shared folder renders no shared label at all", () => {
+    const { container } = renderWithTooltip(
+      <FolderNodeComponent
+        node={makeNode({ is_org_shared: false })}
+        {...defaultProps}
+        folderProvenance={{ "node-1": "from Financial Analyzer" }}
+      />,
+    )
+    expect(screen.queryByText("G")).toBeNull()
+    expect(container.textContent).not.toContain("Financial Analyzer")
+  })
+
+  it("266: the provenance map is forwarded to recursive children", async () => {
+    const parent = makeNode({
+      id: "node-1",
+      name: "Parent",
+      children: [makeNode({ id: "child-1", name: "Installed", is_org_shared: true })],
+    })
+    renderWithTooltip(
+      <FolderNodeComponent
+        node={parent}
+        {...defaultProps}
+        expandedIds={new Set(["node-1"])}
+        folderProvenance={{ "child-1": "from Financial Analyzer" }}
+      />,
+    )
+    const labels = await revealSharedLabel()
+    expect(labels).toContain("Shared with org · from Financial Analyzer")
+  })
 })

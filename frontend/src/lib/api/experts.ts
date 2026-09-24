@@ -69,6 +69,35 @@ export interface ExpertGrantCreate {
   grantee_id: string
 }
 
+/** Phase 266 (PACK-18 / PACK-19): the active org's install of a first-party Expert, as the
+ *  server derives it. Wire type — declared HERE beside its siblings and imported by `@/types`
+ *  with `import type` (elided at compile, so no runtime cycle).
+ *  ⛔ The UI never decides readiness: `state` and `can_install` are server facts. `cause` is a
+ *  raw string and is NEVER rendered as-is — `installView` (expertCatalog.ts) classifies it. */
+export interface ExpertInstallState {
+  state: "not_installed" | "installing" | "ready" | "failed"
+  folder_id: string | null
+  cause: string | null
+  cause_source: "document" | "install" | null
+  can_install: boolean
+  updated_at: string | null
+}
+
+/** `POST /experts/{id}/install` → 202. */
+export interface ExpertInstallResult {
+  expert_bundle_id: string
+  corpus_version: string
+  install: ExpertInstallState
+}
+
+/** One row of `GET /experts/installs` — the active org's installs, for Library provenance. */
+export interface ExpertInstallSummary {
+  expert_bundle_id: string
+  expert_name: string
+  folder_id: string
+  state: ExpertInstallState["state"]
+}
+
 /** Phase 263 (PACK-14): one capability the drafter judged the Expert needs and the
  *  library does not have. Wire type — it lives HERE, beside `ExpertDraftOutput`, because
  *  the studio already imports that from `@/lib/api/experts` rather than from `@/types`. */
@@ -195,6 +224,31 @@ export async function getExpert(bundleId: string): Promise<ExpertBundle> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/experts/${bundleId}`, { headers })
   return handleResponse<ExpertBundle>(res, "Failed to get expert")
+}
+
+/** Phase 266 (D-266-01 / D-266-02): install a first-party Expert's corpus into the ACTIVE org.
+ *  ⛔ No body at all (T-266-24) — the org travels only in the `X-Org-Id` header, which the
+ *  server re-validates against membership. A 409 (`expert_not_installable` / `install_conflict`
+ *  / `install_folder_not_owned`) and a 403 surface as an Error carrying the server's sentence
+ *  through `handleResponse`'s `detail.detail` arm. */
+export async function installExpert(bundleId: string): Promise<ExpertInstallResult> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/experts/${bundleId}/install`, {
+    method: "POST",
+    headers,
+  })
+  return handleResponse<ExpertInstallResult>(res, "Failed to install expert")
+}
+
+/** Phase 266 (D-266-13): the active org's installs, read for the Library's provenance label.
+ *  ⚠ A 403 is the TIER refusal (the whole `/experts` router is capability-gated), and for a
+ *  standard-tier org it is the expected answer, not an error — so it becomes `[]` BEFORE
+ *  `handleResponse`, the `draftSkillBody` call-site-arm precedent (RESEARCH Pitfall 10). */
+export async function listExpertInstalls(): Promise<ExpertInstallSummary[]> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/experts/installs`, { headers })
+  if (res.status === 403) return []
+  return handleResponse<ExpertInstallSummary[]>(res, "Failed to list expert installs")
 }
 
 export async function createExpert(payload: ExpertBundleCreate): Promise<ExpertBundle> {
