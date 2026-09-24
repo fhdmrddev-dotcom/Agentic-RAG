@@ -25,13 +25,20 @@
  * in plan 05; this card's declared props carry no prompt-bearing callback. A tile wired to
  * anything other than running its own prompt would be a control that lies about itself, so the
  * tiles carry no button affordance and the two footer controls own every interaction.
+ *
+ * ⚠ PHASE 266 (D-266-01 / D-266-03): the SECOND control is chosen by the org's install state —
+ * Start Chat (ready, or no install at all), Install / Retry install (a manager), or a short status
+ * pill with the full reason as its title (installing, or a non-manager). Still ONE variant, still
+ * at most two controls, and never a dead one. An install state is a fact about THIS org's
+ * copy of the knowledge, not a tier badge; the decision is `installView`'s, not this card's.
  */
 
 import type { ReactNode } from "react"
-import { ArrowUpRight, FolderClosed, Plug, Sparkles, Wrench } from "lucide-react"
+import { ArrowUpRight, Download, FolderClosed, Plug, RotateCcw, Sparkles, Wrench } from "lucide-react"
 import { ExpertIcon } from "@/components/experts/expertIcon"
 import type { ExpertBundle } from "@/types"
 import { cn } from "@/lib/utils"
+import { INSTALL_COPY, installCardLine, installView } from "./expertCatalog"
 
 export interface ExpertCardProps {
   expert: ExpertBundle
@@ -39,6 +46,23 @@ export interface ExpertCardProps {
   onInspect: (expert: ExpertBundle) => void
   /** Starts a scoped conversation with this Expert (plan 05). */
   onStartChat: (expert: ExpertBundle) => void
+  /** Phase 266: install this Expert's corpus into the active org. Optional — absent, an
+   *  installable Expert shows the needs-an-admin pill instead of a control. */
+  onInstall?: (expert: ExpertBundle) => void
+  /** An install request for THIS Expert is in flight. */
+  installBusy?: boolean
+}
+
+/** Phase 266 — the footer's status pill, in the ScopePill idiom, with the full reason as title. */
+function StatusPill({ label, reason }: { label: string; reason: string }) {
+  return (
+    <span
+      title={reason}
+      className="inline-flex items-center rounded-full border border-border/70 bg-muted/40 px-2.5 py-1 text-[10px] font-medium text-muted-foreground"
+    >
+      {label}
+    </span>
+  )
 }
 
 /** Element 3 — one muted pill, used for every envelope entry so no resource type outranks another. */
@@ -51,7 +75,14 @@ function ScopePill({ icon, label }: { icon: ReactNode; label: string }) {
   )
 }
 
-export function ExpertCard({ expert, onInspect, onStartChat }: ExpertCardProps) {
+export function ExpertCard({
+  expert,
+  onInspect,
+  onStartChat,
+  onInstall,
+  installBusy = false,
+}: ExpertCardProps) {
+  const view = installView(expert)
   const isRestricted = expert.scope_mode === "restricted"
   const folderCount = expert.knowledge_folder_ids?.length ?? 0
   const skills = expert.member_skills ?? []
@@ -145,14 +176,37 @@ export function ExpertCard({ expert, onInspect, onStartChat }: ExpertCardProps) 
         >
           Details
         </button>
-        <button
-          type="button"
-          onClick={() => onStartChat(expert)}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
-        >
-          <Sparkles className="h-3.5 w-3.5" />
-          Start Chat
-        </button>
+        {view.kind === "legacy" || view.kind === "chat" ? (
+          <button
+            type="button"
+            onClick={() => onStartChat(expert)}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+            Start Chat
+          </button>
+        ) : view.kind === "install" || view.kind === "retry" ? (
+          installBusy ? (
+            <StatusPill label={INSTALL_COPY.starting} reason={INSTALL_COPY.starting} />
+          ) : onInstall ? (
+            <button
+              type="button"
+              onClick={() => onInstall(expert)}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
+            >
+              {view.kind === "retry" ? (
+                <RotateCcw className="h-3.5 w-3.5" />
+              ) : (
+                <Download className="h-3.5 w-3.5" />
+              )}
+              {view.action}
+            </button>
+          ) : (
+            <StatusPill label={INSTALL_COPY.cardNeedsAdmin} reason={INSTALL_COPY.needsAdmin} />
+          )
+        ) : (
+          <StatusPill label={installCardLine(expert) ?? view.line} reason={view.line} />
+        )}
       </div>
     </div>
   )

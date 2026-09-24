@@ -125,6 +125,12 @@ export const INSTALL_COPY = {
     "Install this Expert from the Experts catalog first — until then it has no documents to answer from.",
   inviteInstalling: "Still installing — it can join a chat once its documents are indexed.",
   inviteFailed: "Its install failed — an org admin can retry it from the Experts catalog.",
+  // The CARD's short forms of the three status lines. The card face carries no paragraph
+  // (sketch 261-262 §1), so it states the reason in a few words and keeps the full sentence as
+  // the pill's title; the detail modal carries the full sentence.
+  cardInstalling: "Installing…",
+  cardNeedsAdmin: "An admin must install it",
+  cardFailedNeedsAdmin: "Install failed — an admin can retry",
   /** The Library folder's provenance note, appended to NavRow's existing "Shared with org". */
   provenance: (expertName: string) => `from ${expertName}`,
 } as const
@@ -177,6 +183,18 @@ export function installView(expert: ExpertBundle): InstallView {
         ? { kind: "install", action: INSTALL_COPY.installAction }
         : { kind: "status", line: INSTALL_COPY.needsAdmin }
   }
+}
+
+/**
+ * The card's short status words for a `status` view, or `null` when the card has a control to
+ * draw instead. Same decision as `installView` — this only picks the shorter wording.
+ */
+export function installCardLine(expert: ExpertBundle): string | null {
+  if (installView(expert).kind !== "status") return null
+  const state = expert.install?.state
+  if (state === "installing") return INSTALL_COPY.cardInstalling
+  if (state === "failed") return INSTALL_COPY.cardFailedNeedsAdmin
+  return INSTALL_COPY.cardNeedsAdmin
 }
 
 /**

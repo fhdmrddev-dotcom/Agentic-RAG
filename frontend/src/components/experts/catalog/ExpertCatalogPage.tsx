@@ -34,16 +34,38 @@
  * what a "detail page" is on this surface; holding the inspected Expert in page state keeps the
  * whole catalog reachable through one mount. `onInspect` stays on the contract as a
  * NOTIFICATION for the host — it no longer decides whether anything opens.
+ *
+ * ⚠ CORRECTED BY PHASE 266 (D-266-01 / D-266-03) — "exactly ONE read … reaches for no other client
+ * function" above is kept, not deleted, and is now TRUE ONLY WHILE NOTHING IS INSTALLING. Two
+ * things changed, deliberately:
+ *   1. ONE write: a manager's Install calls the install endpoint (imported from the domain module,
+ *      not the barrel), then re-reads the same grant-aware list with the same defaults.
+ *   2. A POLL, but only while some row's install is `installing`. It is a FETCH of the same list,
+ *      never a Realtime subscription (D-v2.5-03: Realtime is a hint, fetch is the truth), and it
+ *      stops the moment the list comes back with nothing installing. With nothing installing the
+ *      page still makes exactly ONE read — the suite's case (8) still pins that.
+ * The list read is still the only READ, still with no arguments, so the management arm stays
+ * unreachable from here.
  */
 
 import { useEffect, useState } from "react"
 import { AlertCircle, Search, Sparkles } from "lucide-react"
 import { listExperts } from "@/lib/api"
+import { installExpert } from "@/lib/api/experts"
 import type { ExpertBundle, Folder } from "@/types"
 import { cn } from "@/lib/utils"
 import { ExpertCard } from "./ExpertCard"
 import { ExpertDetailModal } from "./ExpertDetailModal"
 import { ALL_CATEGORIES, categoriesOf, filterExperts } from "./expertCatalog"
+
+/** How often the page re-reads the list while an install is running (T-266-28: only then). */
+export const INSTALL_POLL_MS = 4000
+
+/** The inspected Expert, re-read from a fresh list so the modal never shows a stale state. */
+function freshInspected(prev: ExpertBundle | null, rows: ExpertBundle[]): ExpertBundle | null {
+  if (!prev) return prev
+  return rows.find((r) => r.id === prev.id) ?? prev
+}
 
 export interface ExpertCatalogPageProps {
   /**
@@ -107,6 +129,58 @@ export function ExpertCatalogPage(props: ExpertCatalogPageProps) {
       setStartError(`Couldn't start a chat with ${expert.name}. Check your connection and try again.`)
     }
   }
+
+  // ── Phase 266: install, then reconcile by fetch ──
+  const [installingId, setInstallingId] = useState<string | null>(null)
+  const [installError, setInstallError] = useState<{ id: string; message: string } | null>(null)
+  const handleInstall = async (expert: ExpertBundle) => {
+    setInstallingId(expert.id)
+    setInstallError(null)
+    try {
+      const result = await installExpert(expert.id)
+      // The 202 already carries this org's install state — apply it at once, so the poll starts
+      // even if the re-read below fails.
+      setExperts((prev) =>
+        prev.map((e) => (e.id === expert.id ? { ...e, install: result.install } : e)),
+      )
+      setInspected((prev) =>
+        prev && prev.id === expert.id ? { ...prev, install: result.install } : prev,
+      )
+      const rows = await listExperts()
+      setExperts(rows)
+      setInspected((prev) => freshInspected(prev, rows))
+    } catch (err) {
+      setInstallError({
+        id: expert.id,
+        message: err instanceof Error ? err.message : "The install could not be started.",
+      })
+    } finally {
+      setInstallingId(null)
+    }
+  }
+
+  // ⛔ Keyed on a BOOLEAN, so the interval is created once per installing stretch and cleared the
+  // moment the list stops reporting an install in flight (or the page unmounts).
+  const anyInstalling = experts.some((e) => e.install?.state === "installing")
+  useEffect(() => {
+    if (!anyInstalling) return
+    let mounted = true
+    const timer = setInterval(() => {
+      listExperts()
+        .then((rows) => {
+          if (!mounted) return
+          setExperts(rows)
+          setInspected((prev) => freshInspected(prev, rows))
+        })
+        .catch(() => {
+          // A missed poll is a missed hint, not an error: the next tick reconciles.
+        })
+    }, INSTALL_POLL_MS)
+    return () => {
+      mounted = false
+      clearInterval(timer)
+    }
+  }, [anyInstalling])
 
   return (
     // The app's <main> is `overflow-hidden`, so the page must own its scroll (the WorkflowsPage
@@ -185,6 +259,17 @@ export function ExpertCatalogPage(props: ExpertCatalogPageProps) {
         </div>
       )}
 
+      {/* An install refused from a CARD (no modal open) is said here, beside the grid. */}
+      {installError && !inspected && (
+        <div
+          role="alert"
+          className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive"
+        >
+          <AlertCircle className="h-4 w-4 flex-none" />
+          <span>{installError.message}</span>
+        </div>
+      )}
+
       {!loading && error && (
         <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">
           <AlertCircle className="h-4 w-4 flex-none" />
@@ -215,6 +300,8 @@ export function ExpertCatalogPage(props: ExpertCatalogPageProps) {
               expert={expert}
               onInspect={handleInspect}
               onStartChat={handleStartChat}
+              onInstall={handleInstall}
+              installBusy={installingId === expert.id}
             />
           ))}
         </div>
@@ -231,6 +318,11 @@ export function ExpertCatalogPage(props: ExpertCatalogPageProps) {
           if (!open) setInspected(null)
         }}
         onStartChat={handleStartChat}
+        onInstall={handleInstall}
+        installBusy={inspected !== null && installingId === inspected.id}
+        installError={
+          inspected !== null && installError?.id === inspected.id ? installError.message : null
+        }
       />
     </div>
     </div>
