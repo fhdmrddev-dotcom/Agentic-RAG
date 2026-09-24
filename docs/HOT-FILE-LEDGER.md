@@ -11025,6 +11025,10 @@ cells rot within days.
 | [`frontend/src/components/experts/catalog/ExpertCatalogPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogexpertcatalogpagetsx) | 2 / 1 / 216 | no | ⚠ row STALE at `1/1/189` ONE WAVE later. **262-04**: `folders` finally BOUND, detail view mounted here. ⛔ still exactly ONE `listExperts()`, still no second card variant |
 | [`frontend/src/components/experts/catalog/ExpertDetailModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogexpertdetailmodaltsx) | 1 / 1 / 349 | no (new) | ⚠ `0/0/0` AT PLANNING; measured at **262-04**. The FIRST component anywhere to render `example_output`. ⛔ It NAMES, never counts; an unnameable folder says so; the disclosure is state, not hidden DOM |
 | [`frontend/src/components/experts/catalog/startScopedChat.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogstartscopedchatts) | 1 / 1 / 70 | no (new) | ⚠ `0/0/0` AT PLANNING; measured at **262-04**. ⛔ refresh BEFORE select — the created row is pre-patch and its hook has no updater for that column. A rejected patch does NOT navigate |
+| [`backend/app/services/expert_install_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesexpert_install_servicepy) | 0 / 0 / 0 | no (new) | young (created 266-03). Row added AT PLANNING. The ONE per-org install writer: org from the validated active org, rows via the user-JWT client. ⛔ never a SYSTEM_USER_ID row |
+| [`backend/app/services/expert_corpus.py`](docs/HOT-FILE-LEDGER.md#backendappservicesexpert_corpuspy) | 0 / 0 / 0 | no (new) | young (created 266-02). Row added AT PLANNING. First-party corpora are DATA: slug regex + path containment, CRLF→LF before any hash. ⛔ nothing is imported from the corpus dir |
+| [`frontend/src/components/ingestion/FolderTree.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestionfoldertreetsx) | 11 / 6 / 202 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE at 6 phases — row added at 266 PLANNING. 266-04 threads ONE optional prop (the `folderDocumentCounts` precedent). ⛔ no fetch here |
+| [`frontend/src/components/ingestion/FolderNode.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestionfoldernodetsx) | 9 / 5 / 259 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE at 5 phases — row added at 266 PLANNING. 266-04: ONE optional prop + ONE label conditional via NavRow's existing `sharedLabel`; 0 new state |
 
 
 
@@ -16944,3 +16948,37 @@ Re-derived 2026-09-22 at `e996d3248` with the CLAUDE.md three-command recipe (si
 ⚠ **`NavPanel.tsx` is the finding worth keeping.** Its two registers carried *different line counts* for the same file — `417` in CLAUDE.md, `381` here. **A row that is present and wrong stops an audit harder than an absent row**, and two rows that are present and *disagree* let an auditor pick whichever supports the answer they already have. The same-commit sync rule exists for exactly this; it had silently lapsed.
 
 ⚠ **And the knob gap, closed in the same commit.** `nav-items.ts` FIRES G-5 at 6 phases while **two of its three suites — `lib/nav-items.test.ts` and `lib/__tests__/navItemsConnections.test.ts` — ran in NEITHER count-gate knob.** The D-07 non-discoverability lock and the connections-reachability pin were both invisible to the gate. `262-01` adopts both, plus `lib/__tests__/activeViewReachability.test.ts`, into **TARGETS and BASELINE together**. TARGETS decides what RUNS; BASELINE decides what is GUARDED; a suite can sit on the wrong side of exactly one.
+
+---
+
+### `backend/app/services/expert_install_service.py`
+
+**Row added AT PLANNING, 2026-09-24 (Phase 266).** Triple at creation `0 commits / 0 phases / 0 L` — re-derive at the phase close with the CLAUDE.md recipe; keep this planning triple beside the measured one.
+
+**What it owns.** The per-org install of a first-party Expert's corpus (PACK-18/19): the `expert_installs` claim, the Library folder, the per-file mint through `ingest_splice.async_mint_document_row(org_id=<active org>)` and the enqueue through `import_service._enqueue_or_splice` — the one ingest path (D-266-07), never a second one.
+
+**Binding invariants (planned, D-266-02/04/12/14):** the org comes ONLY from the validated active-org dependency, never a body field; folder + document rows are written with the caller's user-JWT client so RLS proves org and owner; service role only for the storage PUT and the job; a re-install restores what is missing and never overwrites; readiness is DERIVED from the corpus documents' own status, never stored a second time.
+
+---
+
+### `backend/app/services/expert_corpus.py`
+
+**Row added AT PLANNING, 2026-09-24 (Phase 266).** Triple at creation `0 / 0 / 0`.
+
+**What it owns.** Reading `backend/app/experts/corpora/<slug>/manifest.json` and its files as bytes (D-266-05). ⛔ **Extension Contract:** a corpus is DATA — the directory has no `__init__.py` and nothing in it is ever imported or executed. The slug must match `^[a-z0-9-]+$` and every resolved path must stay inside the corpora root. Bytes are CRLF→LF normalised before hashing, because `core.autocrlf=true` and there was no `.gitattributes` (RESEARCH Pitfall 5): without it `content_hash` and `corpus_version` differ between a Windows checkout and the Linux image.
+
+---
+
+### `frontend/src/components/ingestion/FolderTree.tsx`
+
+**Derived 2026-09-24 at `a29949402` (Phase 266 planning):** `11 commits / 6 phases / 202 L` (phase buckets `03 08 47 114 155 165`; the two-digit ones are ambiguous and are counted, per the recipe). ⚠ **FIRES G-5 and had NO row for its entire life** — found by `266-RESEARCH.md` C-9 running `check-hot-file-ledger.cjs`, not by reading a table.
+
+**Planned touch (266-04), honoured by construction:** ONE optional prop (`folderProvenance?: Record<string, string>`) destructured and forwarded to `FolderNode`, exactly the shape `folderDocumentCounts` already takes (`:15-17`, `:30`, `:184`). ⛔ No fetch, no state, no effect is added here — the page owns the read. **Named seam if a fourth threaded prop arrives:** a single `folderDecorations` object prop replacing the per-concern props.
+
+---
+
+### `frontend/src/components/ingestion/FolderNode.tsx`
+
+**Derived 2026-09-24 at `a29949402` (Phase 266 planning):** `9 commits / 5 phases / 259 L` (buckets `03 08 114 155 165`). ⚠ **FIRES G-5 and had NO row for its entire life** (266-RESEARCH C-9).
+
+**Planned touch (266-04), honoured by construction:** ONE optional prop, ONE conditional on the existing `sharedLabel` string it hands `NavRow` (`:95-96`), and the same prop forwarded in the recursive child render (`:242`). ⛔ **Zero `NavRow.tsx` edits** — its `sharedLabel` prop already carries free text. The provenance note is a string, not a lock (D-266-13).

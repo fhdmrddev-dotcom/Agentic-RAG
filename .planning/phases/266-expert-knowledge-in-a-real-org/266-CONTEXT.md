@@ -115,6 +115,22 @@ path is built.**
   refused out-of-scope question. Evidence must include the retrieved chunks' `org_id`, so a run that
   reads the seed org's rows cannot pass.
 
+### Ingest dedup scope (added at plan-phase, 2026-09-24, operator)
+- **D-266-18: Dedup and versioning become per-org when the caller passes an org.** Research measured
+  `mint_document_row`'s duplicate check `(user_id, content_hash)` and its version retirement
+  `(user_id, filename)` (`ingest_splice.py:194-226`), plus the matching unique index
+  (`full-schema.sql:3991`), as **per user**. So a two-org admin installing in org B gets org A's
+  document back as a "duplicate", and may flip A's in-flight copy to `is_latest = false`. Operator
+  chose: when `org_id` is passed explicitly, add `org_id` to both checks, and widen the unique index to
+  include `org_id` in migration 195. `/upload` passes no `org_id` and stays behaviourally unchanged.
+  `ingest_splice.py` joins the phase's files (G-5: honour by construction, and update its ledger row).
+  - Rejected: refusing a colliding install, because a two-org admin could then never install in their
+    second org.
+- **Research defaults accepted (RESEARCH.md Open Questions 2-4):** gating invite on an uninstalled
+  Expert happens in the UI only (`threads.py` untouched); first-party Experts read folders from
+  `expert_installs` only, with no union with `knowledge_folder_ids`; non-managers see a status line,
+  not a button.
+
 ### Claude's Discretion
 - The exact repo path and layout of the corpus directory, and how `corpus_version` is derived (for
   example a content hash).
