@@ -21,12 +21,27 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { ExpertCatalogPage } from "../ExpertCatalogPage"
 import * as api from "@/lib/api"
 import type { ExpertBundle } from "@/types"
+import { within, act } from "@testing-library/react"
+import { afterEach } from "vitest"
+import * as expertsApi from "@/lib/api/experts"
+import { INSTALL_COPY } from "../expertCatalog"
+import { INSTALL_POLL_MS } from "../ExpertCatalogPage"
 
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<any>("@/lib/api")
   return {
     ...actual,
     listExperts: vi.fn(),
+  }
+})
+
+// Phase 266-04: the install call is imported from the domain module, not the barrel (the barrel
+// is deliberately not widened). Same importActual shape as the block above.
+vi.mock("@/lib/api/experts", async () => {
+  const actual = await vi.importActual<any>("@/lib/api/experts")
+  return {
+    ...actual,
+    installExpert: vi.fn(),
   }
 })
 
@@ -186,5 +201,140 @@ describe("ExpertCatalogPage — a failed start is VISIBLE (262-UAT 3.6)", () => 
     expect(await screen.findByRole("alert")).toHaveTextContent(/couldn.t start a chat with Contract Reviewer/i)
     // The grid is still there — the error does not replace the catalog.
     expect(screen.getByText("Contract Reviewer")).toBeInTheDocument()
+  })
+})
+
+// ── Phase 266-04 (D-266-01 / D-266-03 · D-v2.5-03) — install from the catalog, reconciled by FETCH ──
+
+type InstallStateName = "not_installed" | "installing" | "ready" | "failed"
+
+function fa(state: InstallStateName, can_install = true): ExpertBundle {
+  return bundle({
+    name: "Financial Analyzer",
+    slug: "financial-analyzer",
+    description: "Reads quarterly filings",
+    category: "Finance",
+    is_system: true,
+    knowledge_folder_ids: state === "ready" ? ["f-installed"] : [],
+    install: {
+      state,
+      folder_id: state === "ready" ? "f-installed" : null,
+      cause: null,
+      cause_source: null,
+      can_install,
+      updated_at: "2026-09-24T00:00:00Z",
+    },
+  })
+}
+
+function cardOf(container: HTMLElement, slug: string): HTMLElement {
+  const el = container.querySelector(`[data-testid="expert-card-${slug}"]`)
+  if (!el) throw new Error(`no card for ${slug}`)
+  return el as HTMLElement
+}
+
+beforeEach(() => {
+  // The four Radix jsdom shims — the detail modal is a Radix dialog.
+  if (!Element.prototype.hasPointerCapture) Element.prototype.hasPointerCapture = () => false
+  if (!Element.prototype.setPointerCapture) Element.prototype.setPointerCapture = () => {}
+  if (!Element.prototype.releasePointerCapture) Element.prototype.releasePointerCapture = () => {}
+  if (!Element.prototype.scrollIntoView) Element.prototype.scrollIntoView = () => {}
+})
+
+describe("ExpertCatalogPage — install (266-04)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it("(9) the CARD swaps its primary control: Install for a manager, a status line for a non-manager — never a dead button", async () => {
+    const other = { ...fa("not_installed", false), id: "fa-2", slug: "fa-viewer", name: "Viewer Copy" }
+    vi.mocked(api.listExperts).mockResolvedValue([fa("not_installed"), other])
+    const { container } = renderCatalog()
+    await screen.findByText("Viewer Copy")
+
+    const manager = within(cardOf(container, "financial-analyzer"))
+    expect(manager.getByRole("button", { name: INSTALL_COPY.installAction })).toBeInTheDocument()
+    expect(manager.queryByRole("button", { name: /start chat/i })).toBeNull()
+    expect(manager.getAllByRole("button")).toHaveLength(2) // Details + Install — one variant, two controls
+
+    const viewer = within(cardOf(container, "fa-viewer"))
+    expect(viewer.queryByRole("button", { name: /install/i })).toBeNull()
+    expect(viewer.queryByRole("button", { name: /start chat/i })).toBeNull()
+    expect(cardOf(container, "fa-viewer").textContent).toContain(INSTALL_COPY.cardNeedsAdmin)
+    expect(container.querySelectorAll("button:disabled")).toHaveLength(0)
+  })
+
+  it("(10) Install calls installExpert ONCE with the id, then re-reads the list and the modal shows the fresh row", async () => {
+    const user = userEvent.setup()
+    vi.mocked(api.listExperts)
+      .mockResolvedValueOnce([fa("not_installed")])
+      .mockResolvedValue([fa("installing")])
+    vi.mocked(expertsApi.installExpert).mockResolvedValue({
+      expert_bundle_id: "financial-analyzer",
+      corpus_version: "sha256:abc",
+      install: fa("installing").install!,
+    })
+    const { container } = renderCatalog()
+    await screen.findByText("Financial Analyzer")
+
+    await user.click(within(cardOf(container, "financial-analyzer")).getByRole("button", { name: "Details" }))
+    const dialog = await screen.findByRole("dialog")
+    await user.click(within(dialog).getByRole("button", { name: INSTALL_COPY.installAction }))
+
+    expect(expertsApi.installExpert).toHaveBeenCalledTimes(1)
+    expect(expertsApi.installExpert).toHaveBeenCalledWith("financial-analyzer")
+    await waitFor(() => expect(api.listExperts).toHaveBeenCalledTimes(2))
+    await waitFor(() =>
+      expect(within(screen.getByRole("dialog")).getByText(INSTALL_COPY.installing)).toBeInTheDocument(),
+    )
+    expect(within(screen.getByRole("dialog")).queryByRole("button", { name: /install/i })).toBeNull()
+  })
+
+  it("(11) while a row is INSTALLING the page polls by fetch, and stops once nothing is installing", async () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] })
+    vi.mocked(api.listExperts)
+      .mockResolvedValueOnce([fa("installing")])
+      .mockResolvedValueOnce([fa("ready")])
+      // Anything after that would be a poll that was never cleared — it keeps returning
+      // `installing`, so a leaked interval shows up as a rising call count.
+      .mockResolvedValue([fa("installing")])
+    const { container } = renderCatalog()
+    await screen.findByText("Financial Analyzer")
+    expect(api.listExperts).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      vi.advanceTimersByTime(INSTALL_POLL_MS)
+    })
+    await waitFor(() => expect(api.listExperts).toHaveBeenCalledTimes(2))
+    // The ready row brings Start Chat back to the card.
+    await waitFor(() =>
+      expect(
+        within(cardOf(container, "financial-analyzer")).getByRole("button", { name: /start chat/i }),
+      ).toBeInTheDocument(),
+    )
+
+    await act(async () => {
+      vi.advanceTimersByTime(INSTALL_POLL_MS * 3)
+    })
+    expect(api.listExperts).toHaveBeenCalledTimes(2)
+  })
+
+  it("(12) a 409 from installExpert renders its sentence in the modal", async () => {
+    const user = userEvent.setup()
+    const sentence = "This Expert is already being installed in this organisation."
+    vi.mocked(api.listExperts).mockResolvedValue([fa("not_installed")])
+    vi.mocked(expertsApi.installExpert).mockRejectedValue(new Error(sentence))
+    const { container } = renderCatalog()
+    await screen.findByText("Financial Analyzer")
+
+    await user.click(within(cardOf(container, "financial-analyzer")).getByRole("button", { name: "Details" }))
+    const dialog = await screen.findByRole("dialog")
+    await user.click(within(dialog).getByRole("button", { name: INSTALL_COPY.installAction }))
+
+    await waitFor(() => expect(within(screen.getByRole("dialog")).getByText(sentence)).toBeInTheDocument())
+    expect(screen.queryAllByRole("button").filter((b) => (b as HTMLButtonElement).disabled)).toHaveLength(0)
   })
 })
