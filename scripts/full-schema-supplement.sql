@@ -473,8 +473,8 @@ REVOKE DELETE ON public.user_settings FROM authenticated;
 
 
 -- ============================================================
--- 5e. Table privileges: tier_capabilities, expert_bundles, expert_grants
---     (migrations 186, 187, 189 / Phases 258, 259, 261)
+-- 5e. Table privileges: tier_capabilities, expert_bundles, expert_grants, organizations,
+--     expert_installs (migrations 186, 187, 189, 192, 194, 195 / Phases 258, 259, 261, 265, 266)
 -- ============================================================
 -- migration 186:30-31
 GRANT SELECT ON TABLE public.tier_capabilities TO anon, authenticated, service_role;
@@ -500,6 +500,13 @@ REVOKE UPDATE (id, name, slug, subscription_tier, add_ons, settings, created_at,
 REVOKE UPDATE (id, name, slug, subscription_tier, add_ons, settings, created_at, updated_at)
     ON public.organizations FROM authenticated;
 GRANT UPDATE (name, slug, settings, updated_at) ON public.organizations TO authenticated;
+
+-- migration 195 — expert_installs: members READ their org's installs; only the backend writes (D-266-08)
+REVOKE ALL ON TABLE public.expert_installs FROM PUBLIC;
+REVOKE ALL ON TABLE public.expert_installs FROM anon;
+REVOKE ALL ON TABLE public.expert_installs FROM authenticated;
+GRANT SELECT ON TABLE public.expert_installs TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.expert_installs TO service_role;
 
 
 -- ============================================================
