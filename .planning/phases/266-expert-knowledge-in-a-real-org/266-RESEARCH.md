@@ -553,14 +553,14 @@ Record the plant: check out `expert_service.py` at the base, run it (1 failed), 
 | A5 | The ingest worker is enabled in dev and prod (`ingest_worker_enabled` default `True`, `documents.py:711`). Runtime value not read. | Pattern 2 | `_enqueue_or_splice` falls back to a direct splice. Still one pipeline, but no job row. |
 | A6 | A fresh org can be created by signing up a new user (`handle_new_user` creates a personal org, per mig 105 naming). Not re-verified this session. | Live drive SC#1 | The executor needs another route to a "fresh org". |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Org-scoped dedup in `ingest_splice.py` (Pitfall 2): fix, or refuse?**
+1. **Org-scoped dedup in `ingest_splice.py` (Pitfall 2): fix, or refuse?** RESOLVED: fix it, per CONTEXT.md D-266-18 (operator, 2026-09-24).
    - What we know: without the fix, a two-org admin cannot install in both orgs, and can silently un-latest org A's copy. The fix touches a FIRING file (14/5/856, row exists) and changes `import_service` / `watch_service` dedup to per-org.
    - Recommendation: **fix it** (two `.eq("org_id")` arms gated on `org_id is not None`, plus the index in 195). PACK-19 says "org-contained", and this is the one path by which an install changes another org's retrieval. Confirm with the operator at plan review, since it widens scope beyond the literal CONTEXT seams.
-2. **Backend refusal of inviting an uninstalled Expert.** D-266-01 is satisfied in the UI. A stale or direct `PATCH /threads/{id}` can still set `active_expert_id`. That is harmless (empty scope → the clip returns nothing), but it would "start a run against an empty scope". Recommendation: UI gating only this phase. `threads.py` FIRES at 82 phases, and the failure is fail-closed. Record the residual.
-3. **`is_system` bundles and `knowledge_folder_ids`.** After 195 the column is `{}`. Recommendation: for `is_system`, read installs **only** (D-266-09 literal). Do not union with the column.
-4. **Where the Install CTA sits for non-managers.** Recommendation: server `can_install=false` → a status line such as "An org admin needs to install this Expert before it can answer from its documents." No button.
+2. **Backend refusal of inviting an uninstalled Expert.** RESOLVED: UI gating only, operator-accepted default (CONTEXT.md). D-266-01 is satisfied in the UI. A stale or direct `PATCH /threads/{id}` can still set `active_expert_id`. That is harmless (empty scope → the clip returns nothing), but it would "start a run against an empty scope". Recommendation: UI gating only this phase. `threads.py` FIRES at 82 phases, and the failure is fail-closed. Record the residual.
+3. **`is_system` bundles and `knowledge_folder_ids`.** RESOLVED: installs only, no union, operator-accepted default (CONTEXT.md). After 195 the column is `{}`. Recommendation: for `is_system`, read installs **only** (D-266-09 literal). Do not union with the column.
+4. **Where the Install CTA sits for non-managers.** RESOLVED: status line for non-managers, operator-accepted default (CONTEXT.md). Recommendation: server `can_install=false` → a status line such as "An org admin needs to install this Expert before it can answer from its documents." No button.
 
 ## Environment Availability
 

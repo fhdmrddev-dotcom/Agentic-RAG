@@ -3,15 +3,15 @@ seed_id: SEED-309
 title: Expert catalog and Expert API guards that cannot fail, plus start-chat and role-picker robustness
 created: 2026-09-24
 surface: Agentic-RAG
-status: planted
+status: deferred
 partial: false
-status_note:
+status_note: "Phase 266 plan-phase (2026-09-24): operator deferred to Phase 267. 266 is already 5 plans (G-8 ceiling) and most items (ChatLayout wiring, rename_thread, chat-send refusal, role picker) sit outside 266 install scope."
 trigger_when: Any phase touching the Expert catalog, startScopedChat, ChatLayout's onStartChat wiring, api/experts.py, api/threads.py rename_thread, the entitlement refusal helpers, or the authoring route fence. Phases 266 and 267 fire on it.
 trigger_paths: ["frontend/src/components/experts/**", "frontend/src/components/layout/ChatLayout.tsx", "backend/app/api/experts.py", "backend/app/api/threads.py", "backend/tests/unit/test_262_expert_list_grants_api.py", "backend/tests/unit/test_258_every_authoring_write_is_tier_gated.py", "frontend/src/lib/api/threads.ts"]
 trigger_surfaces: [chat, admin, workflow]
 migration_note:
 relates_to: ["258", "261", "262", R265-262-03, R265-262-04, R265-262-06, R265-audit-fixes-03, R265-audit-fixes-06, R265-audit-fixes-10, R265-audit-fixes-13]
-folded_into: null
+folded_into: "267"
 renumbered_from: null
 renumbered_because: null
 ---

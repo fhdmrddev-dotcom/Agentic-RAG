@@ -112,11 +112,20 @@ path is built, in any phase.
 **Plans**: 5 plans / 3 waves — 01 schema 195 + resolver reads installs (wave 1, operator paste) ∥ 02 corpus as data + per-org mint (wave 1) → 03 install service + API ∥ 04 UI states + invite gate + Library provenance (wave 2) → 05 two-org fence + live SC#1-4 + closeout (wave 3)
 
 Plans:
+**Wave 1**
+
 - [ ] 266-01-PLAN.md — migration 195 (expert_installs, org-scoped hash index, 188 retirement) + resolve_expert_bundle reads the caller org's install; is_system_folder bypass deleted (RED fence)
 - [ ] 266-02-PLAN.md — Financial Analyzer corpus as repo data + path-contained loader; mint dedup/versioning org-scoped when org_id is passed (D-266-18); seed for /upload org defect
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 266-03-PLAN.md — install service (claim, folder, mint → queue, re-drive, recreate), derived install state, POST /experts/{id}/install + GET /experts/installs + list/get overlay
 - [ ] 266-04-PLAN.md — Install / Installing… / Ready / Install failed — retry on ExpertDetailModal + ExpertCard, fetch poll, invite-dialog gate, Library provenance label
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 266-05-PLAN.md — real-RLS two-org fence, live SC#1-SC#4 with org-joined evidence, operator UI check, D-266-16 override, registers, prod parity checklist
+
 **Flags**: ⛔ **No cross-tenant read path** — per-org copy is the operator decision. ~~**Migration `194`** (not 193 — taken)~~ ⚠ **CORRECTED 2026-09-23 at 266 discuss: `195`** — 194 was taken by Phase 265 (`194_org_plan_columns_not_client_writable.sql`, `9890ebd19`); original struck, not deleted if provisioning needs an install/provenance marker; apply via the SQL editor, regenerate `full-schema.sql`, check `get_advisors(security)`. **security_enforcement**: the provisioning writer runs as whom, and into which org, is the threat model — the source rows sit in a seed-only org. **Deploy parity**: prod needs the same provisioning path (two prod orgs; `subscription_tier` set). **G-5 audit at discuss:** `backend/app/services/run_producer.py` (FIRES), `backend/app/db/experts.py` (FIRES), `backend/app/services/expert_service.py`, the ingestion pipeline (`backend/app/api/documents.py` — prefer reusing the existing ingest path over a second one). Small install affordance only; if the install moment is a new surface, **G-2** applies. **UI hint**: yes
 
 #### Phase 267: An Expert Adds Scope
@@ -270,15 +279,18 @@ regexes printed `mirrored: 0/0 … OK`, exit 0.
   answering `BUS-249`/`BUS-256`/`BUS-257`, `refused` needs an operator ruling (`REG-03`). Three
   refusal drafts are written and pending. ⛔ **A refusal is not a pass:** the accepted risk is that a
   builder read its own work, six closes running.
+
 - **Four one-line register repairs** (`F-1`..`F-4`): `254`'s own verification frontmatter is
   **unparseable YAML** — *the exact defect `254` reported against `244`, the same week, caught by no
   gate* · two duplicate-id clusters in `.planning/reported-bugs/`, a register **no gate sweeps** ·
   `BUG-260915-01` fixed in code but never flipped to `closed` · `253-VERIFICATION.md` still reading
   `gaps_found` over a gap that is closed.
+
 - **Undriven, not passing:** migration **181 is not in cloud** — `CRED-04` discharges at the next
   promotion, and its code half and SQL half must reach cloud in **one operation** · `MODEL-04`
   end-to-end needs a live self-hosted endpoint · 248's G-4 scenario **S2** (live BYO-OAuth) · the
   `schema-acl-parity` CI job.
+
 - **Two live criticals triaged and unfixed** (`251-REVIEW.md` CR-01/CR-02): the seeds gate's own
   self-test has **no RED arm** for its missing-key check, and the `status:` enum's
   change-all-three rule has **zero executable enforcement**.
