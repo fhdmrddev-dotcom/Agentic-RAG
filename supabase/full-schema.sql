@@ -1957,6 +1957,102 @@ COMMENT ON COLUMN public.expert_grants.created_at IS 'Timestamp when the grant w
 
 
 --
+-- Name: expert_installs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.expert_installs (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    org_id uuid NOT NULL,
+    expert_bundle_id uuid NOT NULL,
+    folder_id uuid,
+    status text DEFAULT 'installing'::text NOT NULL,
+    error text,
+    installed_by uuid,
+    corpus_version text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT expert_installs_status_check CHECK ((status = ANY (ARRAY['installing'::text, 'installed'::text, 'failed'::text])))
+);
+
+
+--
+-- Name: TABLE expert_installs; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.expert_installs IS 'Per-org install of a first-party (is_system) Expert''s knowledge (PACK-18, Phase 266). One row per (org, expert). resolve_expert_bundle reads the caller org''s row for an is_system bundle; no row means no folders (D-266-09). Written only by the backend pool.';
+
+
+--
+-- Name: COLUMN expert_installs.id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.expert_installs.id IS 'Surrogate key.';
+
+
+--
+-- Name: COLUMN expert_installs.org_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.expert_installs.org_id IS 'The org this install belongs to. The tenancy boundary: every backend query binds it from the validated active org.';
+
+
+--
+-- Name: COLUMN expert_installs.expert_bundle_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.expert_installs.expert_bundle_id IS 'The first-party Expert bundle installed.';
+
+
+--
+-- Name: COLUMN expert_installs.folder_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.expert_installs.folder_id IS 'The org''s installed knowledge folder. ON DELETE SET NULL: a deleted folder is recreated and re-pointed on the next install, never left dangling.';
+
+
+--
+-- Name: COLUMN expert_installs.status; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.expert_installs.status IS 'What the installer knows about the COPY step: installing | installed | failed. Readiness of the corpus documents is derived at read time from documents.status, never stored twice.';
+
+
+--
+-- Name: COLUMN expert_installs.error; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.expert_installs.error IS 'Why the copy step failed, when status = failed. NULL otherwise.';
+
+
+--
+-- Name: COLUMN expert_installs.installed_by; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.expert_installs.installed_by IS 'The user who last installed or repaired. No FK by design.';
+
+
+--
+-- Name: COLUMN expert_installs.corpus_version; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.expert_installs.corpus_version IS 'sha256 over the LF-normalised corpus the install copied, so a newer shipped corpus is detectable.';
+
+
+--
+-- Name: COLUMN expert_installs.created_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.expert_installs.created_at IS 'First install time.';
+
+
+--
+-- Name: COLUMN expert_installs.updated_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.expert_installs.updated_at IS 'Last claim/status change. A claim older than 10 minutes in status installing is treated as stale and may be re-claimed.';
+
+
+--
 -- Name: folders; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -3521,6 +3617,14 @@ ALTER TABLE ONLY public.expert_grants
 
 
 --
+-- Name: expert_installs expert_installs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.expert_installs
+    ADD CONSTRAINT expert_installs_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: folders folders_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3825,6 +3929,14 @@ ALTER TABLE ONLY public.expert_grants
 
 
 --
+-- Name: expert_installs uq_expert_install; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.expert_installs
+    ADD CONSTRAINT uq_expert_install UNIQUE (org_id, expert_bundle_id);
+
+
+--
 -- Name: connector_watch_items uq_watch_item_watch_external; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3988,7 +4100,7 @@ CREATE INDEX document_tables_document_idx ON public.document_tables USING btree 
 -- Name: documents_completed_hash_unique_idx; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX documents_completed_hash_unique_idx ON public.documents USING btree (user_id, content_hash) WHERE ((content_hash IS NOT NULL) AND (status = 'completed'::text));
+CREATE UNIQUE INDEX documents_completed_hash_unique_idx ON public.documents USING btree (org_id, user_id, content_hash) WHERE ((content_hash IS NOT NULL) AND (status = 'completed'::text));
 
 
 --
@@ -4451,6 +4563,13 @@ CREATE INDEX idx_expert_grants_expert ON public.expert_grants USING btree (exper
 --
 
 CREATE INDEX idx_expert_grants_lookup ON public.expert_grants USING btree (grantee_type, grantee_id, expert_id);
+
+
+--
+-- Name: idx_expert_installs_folder; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_expert_installs_folder ON public.expert_installs USING btree (folder_id);
 
 
 --
@@ -5860,6 +5979,30 @@ ALTER TABLE ONLY public.expert_bundles
 
 ALTER TABLE ONLY public.expert_grants
     ADD CONSTRAINT expert_grants_expert_id_fkey FOREIGN KEY (expert_id) REFERENCES public.expert_bundles(id) ON DELETE CASCADE;
+
+
+--
+-- Name: expert_installs expert_installs_expert_bundle_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.expert_installs
+    ADD CONSTRAINT expert_installs_expert_bundle_id_fkey FOREIGN KEY (expert_bundle_id) REFERENCES public.expert_bundles(id) ON DELETE CASCADE;
+
+
+--
+-- Name: expert_installs expert_installs_folder_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.expert_installs
+    ADD CONSTRAINT expert_installs_folder_id_fkey FOREIGN KEY (folder_id) REFERENCES public.folders(id) ON DELETE SET NULL;
+
+
+--
+-- Name: expert_installs expert_installs_org_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.expert_installs
+    ADD CONSTRAINT expert_installs_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
 
 
 --
@@ -7333,6 +7476,19 @@ CREATE POLICY expert_grants_write_policy ON public.expert_grants TO authenticate
 
 
 --
+-- Name: expert_installs; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.expert_installs ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: expert_installs expert_installs_member_read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY expert_installs_member_read ON public.expert_installs FOR SELECT TO authenticated USING ((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)));
+
+
+--
 -- Name: folders; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
@@ -8447,8 +8603,8 @@ REVOKE DELETE ON public.user_settings FROM authenticated;
 
 
 -- ============================================================
--- 5e. Table privileges: tier_capabilities, expert_bundles, expert_grants
---     (migrations 186, 187, 189 / Phases 258, 259, 261)
+-- 5e. Table privileges: tier_capabilities, expert_bundles, expert_grants, organizations,
+--     expert_installs (migrations 186, 187, 189, 192, 194, 195 / Phases 258, 259, 261, 265, 266)
 -- ============================================================
 -- migration 186:30-31
 GRANT SELECT ON TABLE public.tier_capabilities TO anon, authenticated, service_role;
@@ -8474,6 +8630,13 @@ REVOKE UPDATE (id, name, slug, subscription_tier, add_ons, settings, created_at,
 REVOKE UPDATE (id, name, slug, subscription_tier, add_ons, settings, created_at, updated_at)
     ON public.organizations FROM authenticated;
 GRANT UPDATE (name, slug, settings, updated_at) ON public.organizations TO authenticated;
+
+-- migration 195 — expert_installs: members READ their org's installs; only the backend writes (D-266-08)
+REVOKE ALL ON TABLE public.expert_installs FROM PUBLIC;
+REVOKE ALL ON TABLE public.expert_installs FROM anon;
+REVOKE ALL ON TABLE public.expert_installs FROM authenticated;
+GRANT SELECT ON TABLE public.expert_installs TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.expert_installs TO service_role;
 
 
 -- ============================================================
