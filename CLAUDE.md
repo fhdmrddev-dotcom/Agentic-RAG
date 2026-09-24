@@ -735,7 +735,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/builderStore.ts` | 14 / 8 / 968 | honoured by construction (193.2 / 197 / **214.1**) |
 | `frontend/src/components/panel/WorkspacePanel.tsx` | 16 / 10 / 646 | honoured by construction (194 / 194.1) |
 | `backend/app/services/run_lifecycle.py` | 8 / 4 / 748 | ⚠ row STALE at `6/3/459` — re-derived 256-02; +289 L unrecorded. NOT modified by 256 and ⛔ NOT the shape to copy (C-5): its `input_tokens=None` is a DEFAULT PARAM, not a site |
-| `backend/app/services/run_producer.py` | 12 / 6 / 943 | ⚠ row STALE (`11/6/932`). **Byte-unchanged across 266 (D-266-11)**: the resolver change arrives as DATA |
+| `backend/app/services/run_producer.py` | 14 / 7 / 957 | ~~Byte-unchanged across 266 (D-266-11)~~ ⚠ REFUTED by CR-01: ONE restricted-empty-scope guard + 1 exception class (OV-266-02). ⛔ empty scope = no filter |
 | `backend/app/services/task_service.py` | 20 / 11 / 970 | ⚠ the row was ACCURATE at 264 research (`19/10/958`) and **264-01 made it stale inside the same phase**. honoured by construction: ONE `sub_ctx` kwarg, read from `parent_ctx`, never re-derived |
 | `backend/app/services/run_reconciler.py` | 3 / 2 / 325 | ⚠ absent its ENTIRE LIFE — row added 256-02; NOT modified by 256 (D-256-08 site #7 is REGISTERED, not fixed). ⛔ its BOOT sweep NULLs a `cap_paused` run's real totals — `SEED-297` |
 | `backend/app/services/circuit_breaker.py` | 1 / 1 / 331 | ⚠ absent its ENTIRE LIFE — row added 256-02 at 256-01's touch, BELOW threshold. ⛔ the `max(0,…)` clamp stays on the RETURNED delta, or a reset box SUBTRACTS real spend |

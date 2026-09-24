@@ -70,6 +70,7 @@ Last activity: 2026-09-25 -- Phase 266 plan 05 complete (live proof + closeout)
 | Id | Rule | Override | Evidence |
 |---|---|---|---|
 | OV-266-01 | G-2 (sketch before plan for UX) | **A DECISION, not a skip.** Decision **D-266-16**: there was no `/gsd:sketch`, by operator decision at discuss. The UI change is one Install control plus three states (Installing… / Ready / Install failed — retry) on the shipped `ExpertDetailModal` / `ExpertCard`, and a provenance note on an existing Library folder. All of it reuses the shipped vocabulary. ⚠ The live check then found the note INVISIBLE, because it existed only in a tooltip (UI-3). It was fixed in `c5b5fdaa9`/`2c2c09540` and re-checked by the operator ("shows now"). A sketch would have put that note on the page at rest. | `266-CONTEXT.md` D-266-16 · `266-04-SUMMARY.md` · `266-UAT-LOG.md` UI-3 |
+| OV-266-02 | D-266-11 (`run_producer.py` byte-unchanged) | **Overridden by operator decision (2026-09-25) as a SECURITY fix.** Code review CR-01, confirmed by code trace: a restricted Expert with zero folders searched every org the user belongs to (empty scope = no folder filter). `run_producer.py` gained one guard + one exception class; the run is refused and the thread keeps its Expert. Rejected: resolver-returns-None (clears the Expert, misleading message, first-party only); defer to 267 (live on every org right after deploy). | `266-REVIEW.md` CR-01 · `73cb9726a` / `2c4102070` · HOT-FILE-LEDGER run_producer §266 |
 
 ## Guardrail overrides — Phase 265 (2026-09-24)
 
