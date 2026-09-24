@@ -119,8 +119,8 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 266-03-PLAN.md — install service (claim, folder, mint → queue, re-drive, recreate), derived install state, POST /experts/{id}/install + GET /experts/installs + list/get overlay
-- [ ] 266-04-PLAN.md — Install / Installing… / Ready / Install failed — retry on ExpertDetailModal + ExpertCard, fetch poll, invite-dialog gate, Library provenance label
+- [x] 266-03-PLAN.md — install service (claim, folder, mint → queue, re-drive, recreate), derived install state, POST /experts/{id}/install + GET /experts/installs + list/get overlay
+- [x] 266-04-PLAN.md — Install / Installing… / Ready / Install failed — retry on ExpertDetailModal + ExpertCard, fetch poll, invite-dialog gate, Library provenance label
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
