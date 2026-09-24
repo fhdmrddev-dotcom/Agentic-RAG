@@ -138,10 +138,11 @@ def mint_document_row(
     Strictly preserves upload-path semantics:
     1. Folder ownership: folder_id must exist and belong to user_id (403 on mismatch).
     2. Hashing: SHA-256 of raw bytes.
-    3. Deduplication: folder-scoped check for status='completed' AND is_latest=True.
+    3. Deduplication: user-scoped, and org-scoped when org_id is passed, check for
+       status='completed' on the content hash (the unique index's predicate).
        If match found, returns MintResult(is_duplicate=True) without inserting.
-    4. Versioning: user-scoped by filename. If prior versions exist, retires them
-       (is_latest=False) and increments version_number.
+    4. Versioning: user-scoped, and org-scoped when org_id is passed, by filename. If prior
+       versions exist, retires them (is_latest=False) and increments version_number.
     5. Storage path: canonical f"{user_id}/{document_id}/{filename}".
     6. Row creation: inserts status='pending', omitting created_at/updated_at to
        preserve Postgres column clock defaults.
@@ -191,6 +192,19 @@ def mint_document_row(
     # ⚠ DELIBERATE BEHAVIOUR CHANGE: the same bytes uploaded to a second folder are now reported
     #   as a duplicate instead of appearing to succeed and then failing. The database already
     #   forbade the second copy — this only moves the refusal to where a person can act on it.
+    #
+    # ⚠ D-266-18 (Phase 266). When an org is passed, duplicate detection and versioning are
+    #   ORG-scoped as well as user-scoped — at all four sites: this dedup check, the version
+    #   lookup, the is_latest retirement and the on_conflict="link" re-query. Without it a person
+    #   in two orgs installing an Expert in org B got org A's copy back as "already here" (so org B
+    #   received nothing), and minting org B's copy retired org A's is_latest flag — retrieval
+    #   requires is_latest, so that retirement silently removed org A's knowledge from search.
+    #   This matches migration 195's widened
+    #     documents_completed_hash_unique_idx ON documents (org_id, user_id, content_hash)
+    #   so the check is again exactly the constraint's predicate (BUG-260905-02's rule above).
+    #   /upload passes no org_id and issues byte-unchanged queries. import_service and
+    #   watch_service DO pass org_id and become org-scoped, which is the correct meaning of
+    #   "already here" for a document that belongs to an org.
     dedup_query = (
         supabase.table("documents")
         .select("*")
@@ -198,6 +212,8 @@ def mint_document_row(
         .eq("content_hash", content_hash)
         .eq("status", "completed")
     )
+    if org_id:
+        dedup_query = dedup_query.eq("org_id", org_id)
 
     existing = dedup_query.limit(1).execute()
     if existing.data:
@@ -209,19 +225,22 @@ def mint_document_row(
             version_number=existing_doc.get("version_number", 1),
         )
 
-    # 4. Versioning (user-scoped, filename matching)
-    existing_versions = (
+    # 4. Versioning (user-scoped, and org-scoped when org_id is passed — D-266-18; filename matching)
+    versions_query = (
         supabase.table("documents")
         .select("id, version_number")
         .eq("user_id", user_id)
         .eq("filename", filename)
-        .order("version_number", desc=True)
-        .limit(1)
-        .execute()
     )
+    if org_id:
+        versions_query = versions_query.eq("org_id", org_id)
+    existing_versions = versions_query.order("version_number", desc=True).limit(1).execute()
     if existing_versions.data:
         next_version = existing_versions.data[0]["version_number"] + 1
-        supabase.table("documents").update({"is_latest": False}).eq("user_id", user_id).eq("filename", filename).execute()
+        retire_query = supabase.table("documents").update({"is_latest": False}).eq("user_id", user_id).eq("filename", filename)
+        if org_id:
+            retire_query = retire_query.eq("org_id", org_id)
+        retire_query.execute()
     else:
         next_version = 1
 
@@ -281,6 +300,8 @@ def mint_document_row(
                     .eq("content_hash", content_hash)
                     .neq("status", "failed")
                 )
+                if org_id:
+                    link_query = link_query.eq("org_id", org_id)
                 if folder_id:
                     link_query = link_query.eq("folder_id", folder_id)
                 else:

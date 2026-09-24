@@ -1,0 +1,2 @@
+# Phase 266 Pitfall 5: Expert corpora are hashed into corpus_version, so they must be LF in every checkout.
+backend/app/experts/corpora/** text eol=lf
