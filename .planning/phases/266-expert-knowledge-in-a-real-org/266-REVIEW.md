@@ -229,3 +229,10 @@ Separately, if the installer toggles `is_org_shared` off, the `_ensure_folder` p
 _Reviewed: 2026-09-24T22:12:09Z_
 _Reviewer: Claude (gsd-code-reviewer)_
 _Depth: standard_
+
+## Resolution log (orchestrator, 2026-09-25)
+
+| Finding | Outcome | Evidence |
+|---|---|---|
+| CR-01 | **FIXED** — confirmed by code trace first (`run_producer.py` restricted branch → `()`; `retrieval_service.py:121,153` sends `None` = no folder filter; Financial Analyzer is `scope_mode='restricted'` locally). Operator chose "refuse the run" (OV-266-02, overrides D-266-11). | RED `73cb9726a` (3 × DID NOT RAISE) · GREEN `2c4102070` · 608 passed across Expert/run_producer/scoping suites |
+| WR-01..WR-08, IN-01..IN-05 | **OPEN — triage pending with the operator** after phase verification. | — |
