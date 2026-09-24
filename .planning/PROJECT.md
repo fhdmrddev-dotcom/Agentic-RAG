@@ -17,6 +17,7 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 **Target features:**
 - **Owed v4.3 verification first** — live UAT for 257 / 258 / 261 / 263 and independent review of 255 / 256 / 262 / 264 plus the audit fix commits `c28853142`..`cdf3a308a`.
 - **PACK-05 closed (`SEED-304`)** — an Expert's sample corpus is **copied into the installing org and embedded there** (per-org provisioning; operator decision 2026-09-23 — no cross-tenant read path). Plus the blocking drafter bug: a ~4.8k-char blueprint into 1000-char fields.
+  - ✅ **Validated in Phase 266: Expert Knowledge in a Real Org (2026-09-25)** — PACK-18/19/20. Install copies the Financial Analyzer corpus into the installing org through the one ingest path; re-install adds only what is missing; a real-RLS two-org fence and live drives cite `$124.5 million` / `+18.2%` from the org's own copy. Migration **195** applied locally (prod = checklist only, 195 BEFORE backend deploy). CR-01 fixed: a restricted Expert with no folders now refuses the run (OV-266-02). ⚠ Before prod: new orgs get `subscription_tier` NULL and cannot install (F-4, operator decision owed).
 - **An Expert adds scope, it does not replace it (`SEED-303` open arms)** — two Experts in one chat (S3), the additive tool floor (S6), per-Expert spend attribution. S8 clone-and-customise stays deferred.
 - **A starter Expert library (`SEED-244`)** — a new org does not open an empty product.
 - **A thread's scope can change after it starts (`SEED-286`).**
