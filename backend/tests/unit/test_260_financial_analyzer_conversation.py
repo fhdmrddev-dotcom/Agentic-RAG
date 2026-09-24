@@ -1,4 +1,28 @@
-"""End-to-end conversation proof for Financial Analyzer (Phase 260, PACK-05, D-260-08).
+"""DISPATCHER WIRING ONLY — relabelled by Phase 266 (D-266-17). This file is NOT proof of PACK-05.
+
+⚠ CORRECTION 2026-09-24 (Phase 266, plan 266-05). The original docstring is kept verbatim below
+rather than overwritten, because the gap between what it CLAIMED and what it TESTS is the finding.
+
+What this module actually tests: that ``_handle_search_documents`` / ``dispatch_tool`` /
+``_handle_load_skill`` pass a folder scope and a skill name through the tool dispatcher, with
+``search_documents`` MOCKED to return hand-written chunk dicts. Every "$124.5M" / "+18.2%" /
+refusal assertion below reads text this file itself put into the mock, so it would pass with the
+Financial Analyzer's knowledge unreachable in every org — which is exactly the state 260 shipped
+(SEED-304, 260-VERIFICATION PACK-05 gap). It proves NOTHING about whether the Expert's corpus is
+reachable, embedded, or org-contained in any real org. The ids ``…0260`` / ``…0261`` below are
+mock ids; migration 195 retired the seed rows they once named.
+
+Where the PACK-05 / PACK-18..20 proof lives instead:
+  * ``tests/integration/test_266_two_org_fence.py`` — real-RLS two-org fence (single-org subject,
+    positive control, resolver plant driven RED against the base resolver).
+  * ``.planning/phases/266-expert-knowledge-in-a-real-org/266-UAT-LOG.md`` — live drives SC#1-SC#4
+    with SQL evidence joining retrieved document ids to ``documents.org_id``.
+
+No assertion or test name in this file was changed by the relabel; its pinned cases stay.
+
+--- ORIGINAL DOCSTRING (Phase 260), preserved verbatim ---
+
+End-to-end conversation proof for Financial Analyzer (Phase 260, PACK-05, D-260-08).
 
 Verifies the 3-turn live conversation proof against the seeded 10-K document fixture:
 1. Turn 1 (Document Citation Grounding):
