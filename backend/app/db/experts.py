@@ -565,3 +565,185 @@ async def bulk_set_expert_grants(
                 if r:
                     out.append(dict(r))
             return out
+
+
+# --- Expert Installs (PACK-18/19, Phase 266) ---
+#
+# ⛔ EVERY statement below is bound to the VALIDATED ACTIVE ORG as ``org_id = $1``. This pool
+# BYPASSES RLS, so that predicate is not a filter — it IS the tenancy boundary. The
+# ``expert_installs`` RLS policy (migration 195) only governs PostgREST reads by members; it
+# never runs here. A query in this section without its org predicate would read or write
+# another tenant's install.
+
+_INSTALL_COLUMNS = """
+            i.id, i.org_id, i.expert_bundle_id, i.folder_id, i.status, i.error,
+            i.installed_by, i.corpus_version, i.created_at, i.updated_at,
+            (f.id IS NOT NULL) AS folder_exists
+"""
+
+
+async def get_expert_install(
+    pool: asyncpg.Pool,
+    *,
+    org_id: UUID,
+    bundle_id: UUID,
+) -> dict[str, Any] | None:
+    """The caller org's install row for one Expert, or ``None`` (D-266-09).
+
+    ``folder_exists`` comes from a LEFT JOIN that also requires ``f.org_id = i.org_id``: a
+    folder id that was deleted (the FK sets it NULL) or that somehow names another org's
+    folder reads ``False``, so a caller can tell "installed, folder gone" from "installed".
+    ``org_id = $1`` is load-bearing — see the section header.
+    """
+    query = f"""
+        SELECT {_INSTALL_COLUMNS}
+        FROM public.expert_installs i
+        LEFT JOIN public.folders f ON f.id = i.folder_id AND f.org_id = i.org_id
+        WHERE i.org_id = $1
+          AND i.expert_bundle_id = $2;
+    """
+    row = await pool.fetchrow(query, org_id, bundle_id)
+    return dict(row) if row is not None else None
+
+
+async def list_expert_installs_for_org(
+    pool: asyncpg.Pool,
+    *,
+    org_id: UUID,
+) -> list[dict[str, Any]]:
+    """Every install in ONE org, with the Expert's name and slug.
+
+    One query per list call, so surfaces that show many Experts never fan out per bundle.
+    ``org_id = $1`` is load-bearing — see the section header.
+    """
+    query = f"""
+        SELECT {_INSTALL_COLUMNS},
+            b.name AS expert_name,
+            b.slug AS expert_slug
+        FROM public.expert_installs i
+        JOIN public.expert_bundles b ON b.id = i.expert_bundle_id
+        LEFT JOIN public.folders f ON f.id = i.folder_id AND f.org_id = i.org_id
+        WHERE i.org_id = $1
+        ORDER BY i.created_at ASC;
+    """
+    rows = await pool.fetch(query, org_id)
+    return [dict(r) for r in rows if r is not None]
+
+
+async def claim_expert_install(
+    pool: asyncpg.Pool,
+    *,
+    org_id: UUID,
+    bundle_id: UUID,
+    installed_by: UUID,
+    corpus_version: str,
+) -> dict[str, Any] | None:
+    """Race-safe claim of the install for (org, Expert) — returns the row, or ``None``.
+
+    ``None`` means another install currently holds the claim. That is NOT an error: the
+    caller reports the current state and mints nothing. The upsert only takes over a row
+    that is not ``installing``, or one whose claim is stale (older than 10 minutes — a
+    crashed worker), so two workers (``WORKER_COUNT=2``) cannot both copy.
+
+    ``installed_by`` is deliberately NOT overwritten on conflict: it records who first
+    installed; ``set_expert_install_folder`` records the repairer when a folder is recreated.
+    ``org_id = $1`` is load-bearing — see the section header.
+    """
+    query = """
+        INSERT INTO public.expert_installs (
+            org_id, expert_bundle_id, installed_by, corpus_version, status
+        ) VALUES (
+            $1, $2, $3, $4, 'installing'
+        )
+        ON CONFLICT (org_id, expert_bundle_id) DO UPDATE
+        SET status = 'installing',
+            corpus_version = EXCLUDED.corpus_version,
+            error = NULL,
+            updated_at = now()
+        WHERE public.expert_installs.status <> 'installing'
+           OR public.expert_installs.updated_at < now() - interval '10 minutes'
+        RETURNING *;
+    """
+    row = await pool.fetchrow(query, org_id, bundle_id, installed_by, corpus_version)
+    return dict(row) if row is not None else None
+
+
+async def set_expert_install_folder(
+    pool: asyncpg.Pool,
+    *,
+    org_id: UUID,
+    bundle_id: UUID,
+    folder_id: UUID,
+    installed_by: UUID,
+) -> dict[str, Any] | None:
+    """Point the org's install at its (new or recreated) knowledge folder.
+
+    The org predicate means an install can only ever be pointed from inside its own org;
+    the resolver still re-proves the folder's org on every read (defence in depth).
+    ``org_id = $1`` is load-bearing — see the section header.
+    """
+    query = """
+        UPDATE public.expert_installs
+        SET folder_id = $3,
+            installed_by = $4,
+            updated_at = now()
+        WHERE org_id = $1
+          AND expert_bundle_id = $2
+        RETURNING *;
+    """
+    row = await pool.fetchrow(query, org_id, bundle_id, folder_id, installed_by)
+    return dict(row) if row is not None else None
+
+
+async def set_expert_install_status(
+    pool: asyncpg.Pool,
+    *,
+    org_id: UUID,
+    bundle_id: UUID,
+    status: str,
+    error: str | None,
+) -> dict[str, Any] | None:
+    """Record what the installer knows about the COPY step (installing | installed | failed).
+
+    Corpus readiness is derived at read time from the documents, never stored here twice.
+    The status CHECK lives in migration 195. ``org_id = $1`` is load-bearing — see the
+    section header.
+    """
+    query = """
+        UPDATE public.expert_installs
+        SET status = $3,
+            error = $4,
+            updated_at = now()
+        WHERE org_id = $1
+          AND expert_bundle_id = $2
+        RETURNING *;
+    """
+    row = await pool.fetchrow(query, org_id, bundle_id, status, error)
+    return dict(row) if row is not None else None
+
+
+async def list_install_corpus_documents(
+    pool: asyncpg.Pool,
+    *,
+    org_id: UUID,
+    folder_ids: list[UUID],
+    filenames: list[str],
+) -> list[dict[str, Any]]:
+    """The org's LATEST documents for a corpus, matched by folder and filename.
+
+    Drives idempotent re-install (present and not failed → left untouched; failed → re-driven
+    in place; absent → minted) and derived readiness. ``is_latest = true`` mirrors retrieval,
+    which reads only latest versions. ``org_id = $1`` is load-bearing — a two-org admin's
+    same-named document in ANOTHER org must never count as this org's copy.
+    """
+    query = """
+        SELECT id, folder_id, filename, status, chunk_count, error_message,
+               user_id, file_path, mime_type
+        FROM public.documents
+        WHERE org_id = $1
+          AND folder_id = ANY($2::uuid[])
+          AND is_latest = true
+          AND filename = ANY($3::text[]);
+    """
+    rows = await pool.fetch(query, org_id, folder_ids, filenames)
+    return [dict(r) for r in rows if r is not None]
