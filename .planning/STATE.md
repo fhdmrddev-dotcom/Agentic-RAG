@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v4.4
 milestone_name: Experts That Actually Work — 🚧 IN PROGRESS
-status: executing
-last_updated: "2026-09-25T00:00:00.000Z"
+status: ready_to_plan
+last_updated: 2026-09-24T22:44:04.060Z
 last_activity: 2026-09-25 -- Phase 266 plan 05 complete; verification next
 progress:
   total_phases: 12
@@ -11,6 +11,7 @@ progress:
   total_plans: 10
   completed_plans: 10
   percent: 8
+stopped_at: Phase 266 complete (5/5) — ready to discuss Phase 267
 ---
 
 # Project State
@@ -32,7 +33,7 @@ See: `.planning/PROJECT.md` (updated 2026-09-23)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 266 — expert-knowledge-in-a-real-org
+**Current focus:** Phase 267 — an expert adds scope
 **265**, migrations at **194** (193 was already taken by `193_expert_seed_org_portable.sql`).
 
 ---
@@ -40,15 +41,15 @@ can be taught new behaviours (skills) that persist and can be shared.
 ## Current Position
 
 Milestone: v4.4 Experts That Actually Work
-Phase: 266 (expert-knowledge-in-a-real-org) — EXECUTED
-Plan: 5 of 5
-Status: Phase 266 executed — verification next
+Phase: 267
+Plan: Not started
+Status: Ready to plan
 G-2 for 266 NOT RUN BY OPERATOR DECISION at discuss (D-266-16), recorded as OV-266-01 below: a DECISION, not a skip
 Owed from 266: UI-2 (the invite is blocked while installing) and UI-4's not-installed non-manager line were never checked live, only by unit tests (`266-UAT-LOG.md` § UI rows). `independent_review` is owed: the review must be done by an agent that did not build 266 (AGENTS.md)
 Production: nothing applied. The ordered checklist is `266-PROD-PARITY.md` (migration 195 BEFORE the backend deploy; F-4 tier decision; SEED-314/315 residuals)
 Open item: none from the CLAUDE.md budget. It measured 118,746 chars after 266-05's register edits (`check-claude-md-size.cjs` OK). The edits SHORTENED 13 cells, so it is 1,254 chars under the 120,000 warn band. The next phase that adds rows will likely cross it: schedule the split then, not at 150k
 Resume file: .planning/phases/266-expert-knowledge-in-a-real-org/266-05-SUMMARY.md
-Last activity: 2026-09-25 -- Phase 266 plan 05 complete (live proof + closeout)
+Last activity: 2026-09-25 -- Phase 266 complete (5/5, verification passed, CR-01 fixed, UI-1..4 passed live)
 
 ---
 

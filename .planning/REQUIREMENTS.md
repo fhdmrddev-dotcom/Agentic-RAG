@@ -40,9 +40,9 @@ read path is built.**
 
 ### Expert knowledge that reaches a real org (SEED-304 / PACK-05)
 
-- [ ] **PACK-18**: When an org installs (or is entitled to) a first-party Expert, the Expert's sample corpus is copied into that org and ingested there, reaching a terminal success status with real embeddings.
-- [ ] **PACK-19**: Provisioning is idempotent and org-contained — re-installing does not duplicate, and a driven fence proves org A cannot retrieve org B's copy.
-- [ ] **PACK-20**: The Financial Analyzer answers **from its report** for a real user in a real org (cites `$124.5M` / `+18.2%`) and refuses one out-of-scope question — recorded live. This closes v4.3's `PACK-05`.
+- [x] **PACK-18**: When an org installs (or is entitled to) a first-party Expert, the Expert's sample corpus is copied into that org and ingested there, reaching a terminal success status with real embeddings.
+- [x] **PACK-19**: Provisioning is idempotent and org-contained — re-installing does not duplicate, and a driven fence proves org A cannot retrieve org B's copy.
+- [x] **PACK-20**: The Financial Analyzer answers **from its report** for a real user in a real org (cites `$124.5M` / `+18.2%`) and refuses one out-of-scope question — recorded live. This closes v4.3's `PACK-05`.
 
 ### An Expert adds scope, it does not replace it (SEED-303 open arms)
 
@@ -94,9 +94,9 @@ read path is built.**
 | VERIFY-03 | Phase 265 | Pending |
 | VERIFY-04 | Phase 265 | Pending |
 | VERIFY-05 | Phase 265 | Pending |
-| PACK-18 | Phase 266 | Pending |
-| PACK-19 | Phase 266 | Pending |
-| PACK-20 | Phase 266 | Pending |
+| PACK-18 | Phase 266 | Complete |
+| PACK-19 | Phase 266 | Complete |
+| PACK-20 | Phase 266 | Complete |
 | PACK-21 | Phase 267 | Pending |
 | PACK-22 | Phase 267 | Pending |
 | PACK-23 | Phase 267 | Pending |
