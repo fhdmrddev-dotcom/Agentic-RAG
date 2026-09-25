@@ -766,6 +766,8 @@ export function ChatArea({ thread, onCreateThread, onThreadUpdated, onTitleUpdat
                 expert={activeExpert}
                 onSelectPrompt={handlePromptSelect}
                 onDismiss={handleDismissExpert}
+                // 267-REVIEW WR-06 (D-267-35): no folder picked → state the biased narrowing.
+                unscopedChat={!scopeFolderId}
               />
             </div>
           ) : (
@@ -953,6 +955,9 @@ export function ChatArea({ thread, onCreateThread, onThreadUpdated, onTitleUpdat
               expert={activeExpert}
               onSelectPrompt={handlePromptSelect}
               onDismiss={handleDismissExpert}
+              // 267-REVIEW WR-06 (D-267-35): an empty thread with no folder (e.g. a catalog Start
+              // Chat) gets no event (D-267-12), so the spotlight states the biased narrowing.
+              unscopedChat={!thread?.folder_id}
             />
           </div>
         </div>

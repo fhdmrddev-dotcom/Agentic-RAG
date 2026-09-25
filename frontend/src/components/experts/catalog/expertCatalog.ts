@@ -188,6 +188,8 @@ export const LEDGER_COPY = {
   wontUse: (n: number): string => `Won't use · ${n}`,
   /** Always readable, whatever the scope (D-267-19) — listed last in the Will use column. */
   chatAttachments: "Chat attachments",
+  /** 267-REVIEW WR-06 (D-267-35): the no-count heading over `All your documents`. */
+  wontUseAll: "Won't use",
 } as const
 
 export interface ConnectionGate {
@@ -454,4 +456,21 @@ export function previewLedgerColumns(preview: ExpertScopePreview): LedgerColumn[
     })
   }
   return columns
+}
+
+/**
+ * 267-REVIEW WR-06 (D-267-35) — a BIASED Expert on a chat with NO folder reads only its own folders
+ * (kept, and STATED — never silent). `Will use` = the same column `previewLedgerColumns` builds;
+ * `Won't use` = `All your documents`. `null` when the preview shows no narrowing: a restricted
+ * Expert (its own ledger), a chat with a folder (thread ∪ Expert), or an Expert with no folders
+ * (an empty composition reaches retrieval as no filter). ⛔ Built from the ONE preview payload.
+ */
+export function narrowingLedgerColumns(preview: ExpertScopePreview): LedgerColumn[] | null {
+  if (preview.mode !== "biased" || preview.thread_folder) return null
+  if ((preview.expert_folders ?? []).length === 0) return null
+  const [will] = previewLedgerColumns({ ...preview, excluded_count: 0, excluded_names: [] })
+  return [
+    will,
+    { tone: "no", heading: LEDGER_COPY.wontUseAll, items: [{ label: PREVIEW_COPY.contextAll }] },
+  ]
 }

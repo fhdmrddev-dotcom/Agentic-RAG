@@ -42,6 +42,7 @@ import {
   PREVIEW_COPY,
   connectionLedgerColumns,
   inviteBlock,
+  narrowingLedgerColumns,
   previewLedgerColumns,
   type InviteBlock,
 } from "@/components/experts/catalog/expertCatalog"
@@ -157,7 +158,13 @@ function ExpertRowActions({
 
   /** What the preview says about a restricted row, in its four states. */
   const previewStatement = (): { node: ReactNode; canInvite: boolean } => {
-    if (!restricted) return { node: null, canInvite: true }
+    if (!restricted) {
+      // 267-REVIEW WR-06 (D-267-35): on a chat with no folder a biased Expert reads only its own
+      // folders — stated when the preview says so. It never blocks the invite (biased adds its
+      // folders' focus; nothing the person asked for is refused), so loading/failure add nothing.
+      const cols = preview?.status === "ready" ? narrowingLedgerColumns(preview.preview) : null
+      return { node: cols ? <ScopeLedger columns={cols} /> : null, canInvite: true }
+    }
     if (!preview || preview.status === "loading") {
       return {
         node: (
@@ -401,7 +408,9 @@ export function InviteExpertDialog({
         // restricted row (R1) — in parallel, on open. Not cached across openings: the thread's
         // folder contents can change.
         for (const e of data) {
-          if (e.scope_mode !== "restricted") continue
+          // 267-REVIEW WR-06 (D-267-35): a BIASED row is previewed only on a chat with no folder —
+          // the one place it narrows (to its own folders), which must be stated.
+          if (e.scope_mode !== "restricted" && threadFolderName) continue
           if (e.id === currentExpertId || inviteBlock(e) === null) loadPreview(e.id, generation)
         }
       })
