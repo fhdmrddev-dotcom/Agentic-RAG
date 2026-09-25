@@ -76,6 +76,7 @@ import {
   SkillBodyDisabledError,
 } from "@/lib/api/experts"
 import { listSkills, createSkill } from "@/lib/api/skills"
+import { listConnectorConnections } from "@/lib/api/connectors"
 
 describe("ExpertAuthoringStudio (Phase 261 / PACK-07 / PACK-09 / PACK-10)", () => {
   const onClose = vi.fn()
@@ -674,5 +675,110 @@ describe("263-REVIEW WR-08 - only skills created in THIS session are claimed bor
     await waitFor(() => expect(updateExpert).toHaveBeenCalled())
     const payload = vi.mocked(updateExpert).mock.calls[0][1] as { born_skills?: string[] }
     expect(payload.born_skills).toEqual([])
+  })
+})
+
+// ── Phase 267-03 (D-267-02 / D-267-30) — the dead toggle is gone; the picker stores SERVICE IDS ──
+//
+// ⛔ D-267-01 made an Expert ADD tools, so the tool-floor switch no longer does anything; a control
+// that does nothing is removed, not relabelled. ⛔ `required_connections` is matched by the
+// resolver against a connection's `service_id` (267-01 `connection_states`); the picker used to
+// store the connection's NAME, which no resolver can ever match, so every such Expert would have
+// read as missing its connection forever. Every case asserts the SAVED BODY, not the chip.
+
+const CONNS = [
+  { id: "c1", service_id: "hubspot", name: "HubSpot CRM" },
+  { id: "c2", service_id: "google", name: "Google Drive (Sales)" },
+  { id: "c3", service_id: "google", name: "Google Drive (Ops)" },
+]
+
+describe("267-03 — the studio offers no dead switch and saves matchable connection ids", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(listConnectorConnections).mockResolvedValue(CONNS as never)
+  })
+  afterEach(() => {
+    cleanup()
+    vi.mocked(listConnectorConnections).mockResolvedValue([{ id: "c1", name: "Quickbooks" }] as never)
+  })
+
+  it("(D-267-02) neither the tool-floor toggle nor its preview indicator is rendered", async () => {
+    render(<ExpertAuthoringStudio onClose={vi.fn()} onSaved={vi.fn()} />)
+    await screen.findByText("Author New Domain Expert")
+    const text = document.body.textContent ?? ""
+    expect(text).not.toContain("Preserve Deliverable Tool Floor")
+    expect(text).not.toContain("Additive Tool Floor")
+    expect(text).not.toMatch(/tool floor/i)
+  })
+
+  it("(D-267-30) selecting 'HubSpot CRM' saves required_connections ['hubspot'] — the service id", async () => {
+    vi.mocked(createExpert).mockResolvedValue({ ...EXISTING_EXPERT } as never)
+    render(<ExpertAuthoringStudio onClose={vi.fn()} onSaved={vi.fn()} />)
+    await screen.findByText("Author New Domain Expert")
+    fireEvent.click(await screen.findByRole("button", { name: /HubSpot CRM/ }))
+    fireEvent.change(screen.getByPlaceholderText("E.g. Financial Analyzer"), { target: { value: "X" } })
+    fireEvent.change(screen.getByPlaceholderText("financial-analyzer"), { target: { value: "x" } })
+    fireEvent.click(screen.getByRole("button", { name: /save & publish expert/i }))
+    await waitFor(() => expect(createExpert).toHaveBeenCalled())
+    const payload = vi.mocked(createExpert).mock.calls[0][0] as { required_connections: string[] }
+    expect(payload.required_connections).toEqual(["hubspot"])
+  })
+
+  it("(D-267-30) two connections sharing a service id are ONE selectable chip", async () => {
+    render(<ExpertAuthoringStudio onClose={vi.fn()} onSaved={vi.fn()} />)
+    await screen.findByRole("button", { name: /HubSpot CRM/ })
+    expect(screen.getAllByRole("button", { name: /Google Drive/ })).toHaveLength(1)
+  })
+
+  it("(D-267-30) an Expert saved with ['hubspot'] shows the 'HubSpot CRM' chip SELECTED; deselect saves []", async () => {
+    vi.mocked(updateExpert).mockResolvedValue({ ...EXISTING_EXPERT } as never)
+    render(
+      <ExpertAuthoringStudio
+        onClose={vi.fn()}
+        onSaved={vi.fn()}
+        initialData={{ ...EXISTING_EXPERT, required_connections: ["hubspot"] } as never}
+      />,
+    )
+    const chip = await screen.findByRole("button", { name: /HubSpot CRM/ })
+    await waitFor(() => expect(chip).toHaveAttribute("aria-pressed", "true"))
+    expect(screen.getByText(/External Connections \(1 selected\)/)).toBeInTheDocument()
+    fireEvent.click(chip)
+    fireEvent.click(screen.getByRole("button", { name: /update expert/i }))
+    await waitFor(() => expect(updateExpert).toHaveBeenCalled())
+    const payload = vi.mocked(updateExpert).mock.calls[0][1] as { required_connections: string[] }
+    expect(payload.required_connections).toEqual([])
+  })
+
+  it("(D-267-30) a saved id no loaded connection matches is kept as its own chip — never silently dropped", async () => {
+    vi.mocked(updateExpert).mockResolvedValue({ ...EXISTING_EXPERT } as never)
+    render(
+      <ExpertAuthoringStudio
+        onClose={vi.fn()}
+        onSaved={vi.fn()}
+        initialData={{ ...EXISTING_EXPERT, required_connections: ["salesforce"] } as never}
+      />,
+    )
+    await screen.findByRole("button", { name: /HubSpot CRM/ })
+    expect(screen.getByRole("button", { name: /salesforce/ })).toHaveAttribute("aria-pressed", "true")
+    fireEvent.click(screen.getByRole("button", { name: /update expert/i }))
+    await waitFor(() => expect(updateExpert).toHaveBeenCalled())
+    const payload = vi.mocked(updateExpert).mock.calls[0][1] as { required_connections: string[] }
+    expect(payload.required_connections).toEqual(["salesforce"])
+  })
+
+  it("(D-267-02) tool_floor_enabled, still on the wire for compatibility, is sent UNCHANGED", async () => {
+    vi.mocked(updateExpert).mockResolvedValue({ ...EXISTING_EXPERT } as never)
+    render(
+      <ExpertAuthoringStudio
+        onClose={vi.fn()}
+        onSaved={vi.fn()}
+        initialData={{ ...EXISTING_EXPERT, tool_floor_enabled: false } as never}
+      />,
+    )
+    await screen.findByDisplayValue("finacial-analyzer")
+    fireEvent.click(screen.getByRole("button", { name: /update expert/i }))
+    await waitFor(() => expect(updateExpert).toHaveBeenCalled())
+    const payload = vi.mocked(updateExpert).mock.calls[0][1] as { tool_floor_enabled?: boolean }
+    expect(payload.tool_floor_enabled).toBe(false)
   })
 })
