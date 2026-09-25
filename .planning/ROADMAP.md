@@ -142,7 +142,25 @@ Plans:
   5. Inviting a `restricted` Expert states, before the first run, which of the thread's documents it will not read — by name or count — and the next run's retrieval matches the statement (PACK-25).
 
 **How we'd know this failed**: the tool floor is widened by listing tools in an Expert-specific set (a second encoding) rather than by union; a model loses tool calling on one provider only; the "requires" state is a disabled button with no reason; a swap changes scope silently or only in the wire format; the handoff thread silently loses the first thread's context.
-**Plans**: TBD (G-8: 5 requirements is not 5 plans — target 3-5 wave-sized plans)
+**Plans**: 5 plans / 4 waves — 01 backend run seam + connection overlay (wave 1) → 02 backend thread surfaces ∥ 03 catalog + gate UI (wave 2) → 04 chat surfaces (wave 3) → 05 live proof + closeout (wave 4)
+
+Plans:
+**Wave 1**
+
+- [ ] 267-01-PLAN.md — tool floor deleted (Expert ⊇ plain), Expert connections + skills unioned as neutral RunContext data, compose_expert_scope, TRANSCRIPT_EVENT_KINDS + history skip, connection_states + list/get overlay
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 267-02-PLAN.md — one fail-closed Expert-binding gate (PATCH/POST/handoff), expert_changed event with the PATCH, snapshot allowlist, scope preview, one-request handoff service
+- [ ] 267-03-PLAN.md — CONNECTION_COPY + connectionGate + ScopeLedger, card/modal requires-state + Connect/ask, Start Chat in-flight guard, studio toggle removed + picker stores service_id, ChatLayout wiring test
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 267-04-PLAN.md — ExpertEventCard + HandoffCard + vocabulary, InviteExpertDialog R1-R10, one PATCH home + event refetch, new-chat invite fix, handoff flow, chat-send refusal test
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 267-05-PLAN.md — real-RLS org fence, live SC#1-5 + 8-row SC#10 board + G-4 ×3 in Chrome, registers (ledger, CLAUDE.md, STATE, ROADMAP, SEED-309, SEED-303)
 **Flags**: ⛔ **Red line — the Extension Contract:** PACK-21 is a **union**, not a new tool; the 29-tool inventory is unchanged. ⛔ **SC#10 cross-provider scoreboard FIRES** (tool set + agent loop): full native roster + OpenRouter, derived from `MODEL_CAPABILITIES`, rows blocked never omitted. **G-2 FIRES** — `/gsd:sketch` before plan (card "requires" state, invite cost statement, swap event, second-Expert handoff); operator-approved mockup is the bar. **G-4** — three "I'd recognize failure here" scenarios at scope time. **G-5 audit at discuss (all FIRING):** `backend/app/services/tool_dispatcher.py`, `backend/app/services/agent_loop.py`, `backend/app/services/run_producer.py`, `frontend/src/components/chat/ChatArea.tsx`, `MessageInput.tsx`, `MessageItem.tsx`, `ExpertSpotlightCard.tsx`, `InviteExpertDialog.tsx`, `frontend/src/types/index.ts` — ⛔ `tool_dispatcher.py` and `agent_loop.py` both carry OWED seams; propose the refactor as the first option. Scoping stays **data handed to the loop**, never a branch inside it. **UI hint**: yes
 
 #### Phase 268: Expert Spend & Mid-Thread Scope

@@ -11034,6 +11034,14 @@ cells rot within days.
 | [`frontend/src/components/ingestion/FolderTree.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestionfoldertreetsx) | 12 / 7 / 207 | ⚠ **FIRES** | planning triple `11/6/202`. honoured by construction (**266-04**): ONE optional `folderProvenance` prop threaded to FolderNode. ⛔ no fetch here; seam `folderDecorations` |
 | [`frontend/src/components/ingestion/FolderNode.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestionfoldernodetsx) | 12 / 6 / 272 | ⚠ **FIRES** | planning triple `9/5/259`. **266-04** + **266-05 UI-3**: the note is ALSO NavRow's `caption`, because tooltip-only was invisible. ⛔ its "zero NavRow edits" claim is REFUTED |
 | [`frontend/src/components/ingestion/NavRow.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestionnavrowtsx) | 6 / 4 / 269 | ⚠ **FIRES — 4 phases** | ⚠ absent its ENTIRE LIFE — row added 266-05. **UI-3**: ONE optional `caption` (omitted → row unchanged). ⛔ words that are the deliverable render at rest, never tooltip-only |
+| [`backend/app/dependencies.py`](docs/HOT-FILE-LEDGER.md#backendappdependenciespy) | 22 / 11 / 1125 | ⚠ **FIRES — 11 phases** | ⚠ absent its ENTIRE LIFE at 11 phases — row added at 267 PLANNING. 267-01 factors `feature_visible` out of `require_visible`; ⛔ the 403 text stays byte-unchanged |
+| [`backend/app/services/expert_scope.py`](docs/HOT-FILE-LEDGER.md#backendappservicesexpert_scopepy) | 0 / 0 / 0 | no (young) | young (created 267-01). Row added AT PLANNING. ⛔ the ONE composition of an Expert's knowledge scope — the run and the statement both read it, so they cannot disagree |
+| [`backend/app/services/thread_handoff.py`](docs/HOT-FILE-LEDGER.md#backendappservicesthread_handoffpy) | 0 / 0 / 0 | no (young) | young (created 267-02). Row added AT PLANNING. ⛔ a failed summary REFUSES the handoff — no thread, no rows; never the `thread_title` fallback |
+| [`frontend/src/components/experts/ScopeLedger.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertsscopeledgertsx) | 0 / 0 / 0 | no (young) | young (created 267-03). Row added AT PLANNING. ⛔ Will/Won't lists render from ONE server payload, visible at rest (sketch 267-B) |
+| [`frontend/src/components/chat/ExpertEventCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatexperteventcardtsx) | 0 / 0 / 0 | no (young) | young (created 267-04). Row added AT PLANNING. The transcript event card (Now / Dropped); ⛔ its words come from `expertEventCopy.ts`, never inline |
+| [`frontend/src/components/chat/HandoffCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschathandoffcardtsx) | 0 / 0 / 0 | no (young) | young (created 267-04). Row added AT PLANNING. Renders the handoff user row as a card, never a user bubble |
+| [`frontend/src/components/chat/expertEventCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatexperteventcopyts) | 0 / 0 / 0 | no (young) | young (created 267-04). Row added AT PLANNING. ⛔ the ONE home of event/handoff wording; its kind list is cross-pinned to `TRANSCRIPT_EVENT_KINDS` by `?raw` |
+| [`frontend/src/components/chat/threadNavigation.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatthreadnavigationtsx) | 0 / 0 / 0 | no (young) | young (created 267-04). Row added AT PLANNING. The event card's `Open →` door; no router exists, so it selects the thread |
 
 
 
@@ -17031,3 +17039,39 @@ Re-derived 2026-09-22 at `e996d3248` with the CLAUDE.md three-command recipe (si
 **Row added 2026-09-25 by 266-05. Measured `6 commits / 4 phases / 269 L`** (buckets `114 155 165 266`; one untagged `style(library)` commit is not a phase). Before the UI-3 fix it measured `5 / 3 / 250`, so **the fix is the commit that took it over the G-5 threshold.** ⚠ **It had NO row in either register for its entire life**, although it is the shared row primitive under `FolderTree`, `FolderNode`, `ViewsGroup` and `AutomationGroup` (extracted in `114-04`). ⚠ **And no gate could have asked for one:** no 266 PLAN named it in `files_modified`, because the fix was an unplanned UAT deviation, and `check-hot-file-ledger.cjs` reads only `files_modified`. A file edited by a deviation is invisible to that gate.
 
 **Phase 266 (266-05, UI-3), honoured by construction:** ONE optional `caption` prop adds a small grey second line under the name (`data-testid="navrow-caption"`) that is visible at rest. Omit it and the row renders exactly as before. The change is a third arm of the name ternary (editing / caption / plain), and the plain arm is byte-unchanged. ⛔ **Binding invariant:** words a user must see render at rest, never tooltip-only. The `G` pill's `sharedLabel` tooltip is an affordance, not a place for information. **Named seam before a 5th phase:** the caption arm repeats the plain arm's name-and-tooltip block verbatim, so extract a `NavRowName` component that both arms render.
+
+## Phase 267 rows — added AT PLANNING (2026-09-25)
+
+The G-5 gate (`scripts/check-hot-file-ledger.cjs`) found **8 files with no row** when the 267 plans were written. Seven are **new files** this phase creates, and their rows are added at planning (the `264`/`266` precedent). The eighth is an **existing file that fires**: `backend/app/dependencies.py`, at **22 commits / 11 phases / 1125 lines**, has had no row for its entire life (phase buckets `061 073 146 148 163 166 167 168 181 182 184`). The executor of each creating plan re-measures its triple in the same commit that creates the file.
+
+### `backend/app/dependencies.py`
+
+**`22 / 11 / 1125`** at 267 planning. ⚠ absent its ENTIRE LIFE at 11 phases — row added at 267 PLANNING. 267-01 factors `feature_visible` out of `require_visible`; ⛔ the 403 text stays byte-unchanged
+
+### `backend/app/services/expert_scope.py`
+
+**`0 / 0 / 0`** at 267 planning. young (created 267-01). Row added AT PLANNING. ⛔ the ONE composition of an Expert's knowledge scope — the run and the statement both read it, so they cannot disagree
+
+### `backend/app/services/thread_handoff.py`
+
+**`0 / 0 / 0`** at 267 planning. young (created 267-02). Row added AT PLANNING. ⛔ a failed summary REFUSES the handoff — no thread, no rows; never the `thread_title` fallback
+
+### `frontend/src/components/experts/ScopeLedger.tsx`
+
+**`0 / 0 / 0`** at 267 planning. young (created 267-03). Row added AT PLANNING. ⛔ Will/Won't lists render from ONE server payload, visible at rest (sketch 267-B)
+
+### `frontend/src/components/chat/ExpertEventCard.tsx`
+
+**`0 / 0 / 0`** at 267 planning. young (created 267-04). Row added AT PLANNING. The transcript event card (Now / Dropped); ⛔ its words come from `expertEventCopy.ts`, never inline
+
+### `frontend/src/components/chat/HandoffCard.tsx`
+
+**`0 / 0 / 0`** at 267 planning. young (created 267-04). Row added AT PLANNING. Renders the handoff user row as a card, never a user bubble
+
+### `frontend/src/components/chat/expertEventCopy.ts`
+
+**`0 / 0 / 0`** at 267 planning. young (created 267-04). Row added AT PLANNING. ⛔ the ONE home of event/handoff wording; its kind list is cross-pinned to `TRANSCRIPT_EVENT_KINDS` by `?raw`
+
+### `frontend/src/components/chat/threadNavigation.tsx`
+
+**`0 / 0 / 0`** at 267 planning. young (created 267-04). Row added AT PLANNING. The event card's `Open →` door; no router exists, so it selects the thread

@@ -216,6 +216,16 @@ and SEED-303 S8 clone-on-customise.
 - **D-267-34: every `messages` row this phase writes (event, handoff) sets `org_id` explicitly from `threads.org_id`.**
   The autofill trigger picks `org_members … LIMIT 1`, which is wrong for a two-org user.
 
+- **D-267-35 (planner finding, operator 2026-09-25): a BIASED Expert on a thread with NO folder keeps narrowing
+  retrieval to the Expert's folders, and this is STATED, not fixed.** Examples of such threads: a catalog Start Chat, or
+  a handoff from an unscoped thread.
+  - Why it is kept: 266's live proof (a fresh catalog chat citing `$124.5M`) depends on this focus.
+  - How it is stated: the event card and the ledger say `Dropped: All your documents`.
+  - It is routed to SEED-303 as an open arm with a re-open trigger: the first phase that gives "biased" real ranking
+    semantics (a boost, not a filter), after the SEED-224 `retrieval_service.py` extraction.
+  - Rejected: "search everything", because the Expert loses focus and 266's grounded answer may regress. Rejected:
+    "all documents plus a boost", because it is a retrieval change that is bigger than 267.
+
 ### Claude's Discretion
 - The exact route shapes and response models (preview, handoff, overlay field names).
 - The model and prompt used for the handoff summary (`thread_title.py` precedent), and its length cap.

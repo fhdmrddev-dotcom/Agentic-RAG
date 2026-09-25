@@ -601,7 +601,7 @@ def _visible_rows(rows: list[dict]) -> list[dict]:
 | A4 | `forced_emit` with `strict=False` produces a valid 3-6 item list on all 8 roster rows | Handoff | A provider row may refuse every handoff. The SC#10 board catches this |
 | A5 | "Newest" model picks in the roster table | SC#10 | Board coverage choice only. Record the chosen id per row |
 
-## Open Questions
+## Open Questions (RESOLVED — operator rulings D-267-29..34, 2026-09-25; OQ-6 = D-267-07)
 
 1. **OQ-1: How do an Expert's own connections reach the run?** Known: the normal path adds only chip-armed connections. Recommendation: (a) a server union of `effective_connections` via a neutrally named `RunContext` field, plus a visible statement (ledger `Brings` / event `Now`). Confirm with the operator before 267-01 is planned.
 2. **OQ-2: The studio writes names.** Recommendation: fix the picker to `service_id` in 267-04. Decide legacy-name tolerance after a read-only prod query.
