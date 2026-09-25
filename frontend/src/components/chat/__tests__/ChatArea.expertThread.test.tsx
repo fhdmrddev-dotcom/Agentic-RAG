@@ -180,6 +180,30 @@ describe("(A) D-267-21 — an invite on a brand-new chat reaches the created thr
   })
 })
 
+// 267-REVIEW WR-01 — POST /threads now runs the binding gate, so a create can be refused by an
+// ordinary gate outcome (no org, tier, revoked access). The composer used to fire `onSend` without
+// awaiting it and then clear the textbox, the attachments and the draft: the rejection went
+// unhandled, the typed message was gone and the server's sentence was shown nowhere.
+describe("(A2) WR-01 — a refused create keeps the message and states the reason", () => {
+  it("(1b) the refusal is shown, the typed text is back in the composer, and nothing is sent", async () => {
+    const onCreateThread = vi
+      .fn()
+      .mockRejectedValue(new ApiError("Choose an organization before inviting an Expert.", 403))
+    const user = userEvent.setup()
+    render(shell(<ChatArea thread={null} onCreateThread={onCreateThread} folders={[]} />))
+    await openInvite(user)
+    await user.click(await screen.findByTestId("invite-expert-btn-contract-reviewer"))
+    await user.type(screen.getByRole("textbox"), "Review the MSA{Enter}")
+    await waitFor(() => expect(onCreateThread).toHaveBeenCalledTimes(1))
+    const alert = await screen.findByTestId("expert-change-error")
+    expect(alert).toHaveAttribute("role", "alert")
+    expect(alert.textContent).toBe("Choose an organization before inviting an Expert.")
+    expect(alert).toBeVisible()
+    await waitFor(() => expect(screen.getByRole("textbox")).toHaveValue("Review the MSA"))
+    expect(h.sendMessage).not.toHaveBeenCalled()
+  })
+})
+
 describe("(B) one PATCH home", () => {
   it("(2) the composer never PATCHes — MessageInput.tsx no longer imports the call", async () => {
     const src = (await import("../MessageInput.tsx?raw")).default as string
