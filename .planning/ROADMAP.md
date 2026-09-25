@@ -147,20 +147,20 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 267-01-PLAN.md — tool floor deleted (Expert ⊇ plain), Expert connections + skills unioned as neutral RunContext data, compose_expert_scope, TRANSCRIPT_EVENT_KINDS + history skip, connection_states + list/get overlay
+- [x] 267-01-PLAN.md — tool floor deleted (Expert ⊇ plain), Expert connections + skills unioned as neutral RunContext data, compose_expert_scope, TRANSCRIPT_EVENT_KINDS + history skip, connection_states + list/get overlay
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 267-02-PLAN.md — one fail-closed Expert-binding gate (PATCH/POST/handoff), expert_changed event with the PATCH, snapshot allowlist, scope preview, one-request handoff service
-- [ ] 267-03-PLAN.md — CONNECTION_COPY + connectionGate + ScopeLedger, card/modal requires-state + Connect/ask, Start Chat in-flight guard, studio toggle removed + picker stores service_id, ChatLayout wiring test
+- [x] 267-02-PLAN.md — one fail-closed Expert-binding gate (PATCH/POST/handoff), expert_changed event with the PATCH, snapshot allowlist, scope preview, one-request handoff service
+- [x] 267-03-PLAN.md — CONNECTION_COPY + connectionGate + ScopeLedger, card/modal requires-state + Connect/ask, Start Chat in-flight guard, studio toggle removed + picker stores service_id, ChatLayout wiring test
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 267-04-PLAN.md — ExpertEventCard + HandoffCard + vocabulary, InviteExpertDialog R1-R10, one PATCH home + event refetch, new-chat invite fix, handoff flow, chat-send refusal test
+- [x] 267-04-PLAN.md — ExpertEventCard + HandoffCard + vocabulary, InviteExpertDialog R1-R10, one PATCH home + event refetch, new-chat invite fix, handoff flow, chat-send refusal test
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 267-05-PLAN.md — real-RLS org fence, live SC#1-5 + 8-row SC#10 board + G-4 ×3 in Chrome, registers (ledger, CLAUDE.md, STATE, ROADMAP, SEED-309, SEED-303)
+- [x] 267-05-PLAN.md — real-RLS org fence, live SC#1-5 + 8-row SC#10 board + G-4 ×3 in Chrome, registers (ledger, CLAUDE.md, STATE, ROADMAP, SEED-309, SEED-303)
 **Flags**: ⛔ **Red line — the Extension Contract:** PACK-21 is a **union**, not a new tool; the 29-tool inventory is unchanged. ⛔ **SC#10 cross-provider scoreboard FIRES** (tool set + agent loop): full native roster + OpenRouter, derived from `MODEL_CAPABILITIES`, rows blocked never omitted. **G-2 FIRES** — `/gsd:sketch` before plan (card "requires" state, invite cost statement, swap event, second-Expert handoff); operator-approved mockup is the bar. **G-4** — three "I'd recognize failure here" scenarios at scope time. **G-5 audit at discuss (all FIRING):** `backend/app/services/tool_dispatcher.py`, `backend/app/services/agent_loop.py`, `backend/app/services/run_producer.py`, `frontend/src/components/chat/ChatArea.tsx`, `MessageInput.tsx`, `MessageItem.tsx`, `ExpertSpotlightCard.tsx`, `InviteExpertDialog.tsx`, `frontend/src/types/index.ts` — ⛔ `tool_dispatcher.py` and `agent_loop.py` both carry OWED seams; propose the refactor as the first option. Scoping stays **data handed to the loop**, never a branch inside it. **UI hint**: yes
 
 #### Phase 268: Expert Spend & Mid-Thread Scope
@@ -201,7 +201,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 265. Owed v4.3 Verification | 5/5 | Complete (overrides OV-265-01..04; BUS-304 rulings open, non-blocking) | 2026-09-24 |
 | 266. Expert Knowledge in a Real Org | 0/? | Not started | - |
-| 267. An Expert Adds Scope | 0/? | Not started | - |
+| 267. An Expert Adds Scope | 5/5 | Executed — verification next (independent review + operator G-4 confirmation owed) | - |
 | 268. Expert Spend & Mid-Thread Scope | 0/? | Not started | - |
 | 269. Starter Expert Library | 0/? | Not started | - |
 

@@ -58,3 +58,7 @@ work; any report of a chat or run appearing under the wrong organisation.
 Medium. Pass the already-validated active org explicitly into the thread insert, the message inserts
 and `insert_run`, pinned by a two-org test that reads the rows back. ⚠ `run_producer.py` FIRES G-5 and
 was held byte-unchanged by Phase 266 (D-266-11), so the fix belongs to a phase that owns that file.
+
+## Evidence — Phase 267 live UAT (2026-09-26, local)
+
+Measured again, and NOT a 267 regression (267 finding F-3). U2 `uat267-u2-7ef2ae@example.test` belongs to its personal org C `e3c47417-…` (the `LIMIT 1` trigger pick) and to org A `e8c567c2-…` (member). Driving with `X-Org-Id` = A: the threads, the `expert_changed` row and all three handoff rows are org **A** — 267 sets `org_id` explicitly (D-267-34). But every `runs` row (`13e55d14-…`, `bfbc1682-…`) and every user/assistant `messages` row on those threads is org **C**. The send path still relies on the trigger. Evidence: `.planning/phases/267-an-expert-adds-scope/evidence/05b-f3-send-path-org.txt`; the explicit-org pattern that fixes it is proven under real RLS by `backend/tests/integration/test_267_transcript_rows_rls.py`.

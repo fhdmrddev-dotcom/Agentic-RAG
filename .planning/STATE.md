@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v4.4
 milestone_name: Experts That Actually Work — 🚧 IN PROGRESS
-status: ready_to_execute
-last_updated: 2026-09-24T22:44:04.060Z
-last_activity: 2026-09-25 -- Phase 266 plan 05 complete; verification next
+status: executed_verification_next
+last_updated: 2026-09-26T00:00:00.000Z
+last_activity: 2026-09-26 -- Phase 267 executed (5/5 plans); verification next
 progress:
   total_phases: 12
   completed_phases: 1
   total_plans: 10
   completed_plans: 10
   percent: 8
-stopped_at: Phase 267 planned (5 plans / 4 waves) — executing
+stopped_at: Phase 267 executed — verification next
 ---
 
 # Project State
@@ -43,7 +43,7 @@ can be taught new behaviours (skills) that persist and can be shared.
 Milestone: v4.4 Experts That Actually Work
 Phase: 267 (An Expert Adds Scope, PACK-21..25)
 Plan: 5 plans / 4 waves, checker PASSED (01 → 02 ∥ 03 → 04 → 05)
-Status: Ready to execute (autonomous run, operator-driven, 2026-09-25)
+Status: **Phase 267 executed — verification next** (5/5 plans, 2026-09-26). Live UAT: `267-UAT-LOG.md` (SC#1-SC#5 PASS, SC#10 board 8/8 PASS, 4 axes PASS, G-4 ×3 PASS driven by the orchestrator in Chrome, operator confirmation OWED)
 G-2 honoured: sketch 267 Variant B "Will / won't ledger", picked by the operator (D-267-27). G-4 scenarios locked (D-267-28)
 Operator rulings at research: D-267-29..35. The rulings are: a server union of the Expert's connections; the picker stores `service_id`; a fail-closed binding gate; skills add; the handoff inherits the folder; `org_id` is set explicitly; the biased narrowing on a no-folder thread is kept and stated
 Baselines at `92b5476be`:
@@ -51,8 +51,8 @@ Baselines at `92b5476be`:
 - `tsc -p tsconfig.app.json`: 70 errors
 - vitest gate: 8828 total · 3 failed (inherited) · 8075 pinned
 Still owed from 266: UI-2 and UI-4 (not-installed, non-manager) live checks; `independent_review`; the prod parity checklist `266-PROD-PARITY.md`
-Resume file: .planning/phases/267-an-expert-adds-scope/267-01-PLAN.md
-Last activity: 2026-09-25 -- Phase 267 discussed, sketched, researched and planned
+Resume file: .planning/phases/267-an-expert-adds-scope/267-05-SUMMARY.md
+Last activity: 2026-09-26 -- Phase 267 executed; registers updated; verification next
 
 ---
 
@@ -68,6 +68,29 @@ Last activity: 2026-09-25 -- Phase 267 discussed, sketched, researched and plann
 | Two non-engineering commercial blockers (no legal entity; employment / IP position) | `SEED-294` |
 
 ---
+
+## Guardrail records — Phase 267 (2026-09-26)
+
+**No guardrail was overridden in 267.** Each row below records a rule that was honoured, or a decision that was made on purpose.
+
+| Rule / item | Record | Evidence |
+|---|---|---|
+| G-2 (sketch before plan) | **HONOURED, not an override.** Sketch 267 was run before planning; the operator picked Variant B, "Will / won't ledger" (**D-267-22 / D-267-27**). It was the acceptance bar for the G-4 drive | `.planning/sketches/267-an-expert-adds-scope/` · `267-UAT-LOG.md` G4-2 |
+| G-5 (refactor between feature waves) | **Honoured by construction, NO override (D-267-23).** Every firing-file change is a removal, an additive default-off field, a pure extraction or one early return. **Owed seams, named and not taken:** the `tool_dispatcher.py` registry/handler split; the `agent_loop.py` prompt-assembly extraction; the chat dispatch-side whitelist (SEED-303); a `dependencies.py` access-gate module. **Crossed the threshold in 267** (the next phase proposes a refactor first): `expert_authoring.py`, `ExpertAuthoringStudio.tsx`, `ExpertCard.tsx`, `ExpertDetailModal.tsx`, `expertCatalog.ts`, `useThreads.ts` | `docs/HOT-FILE-LEDGER.md` § Phase 267 CLOSE |
+| G-8 (plan-count proportion) | **5 plans / 4 waves (D-267-25)** | `267-0{1..5}-PLAN.md` |
+| D-267-31 | **Consciously retired**: `test_260_expert_chat_scoping.py` expected a PATCH with no validated org to SUCCEED (fail-open). It now expects a 403 with a reason, and the gate is fail-closed | `267-02-SUMMARY.md` |
+| Open questions | OQ-1..OQ-5 were ruled as **D-267-29..D-267-33** (plus D-267-34 org_id explicit, D-267-35 the biased narrowing is kept and stated) | `267-CONTEXT.md` |
+| UAT findings | **F-1** (`can_connect` read a cold settings cache) FIXED `13856a7e9`/`cdb173609`. **F-2** (an absent connection named by its slug) FIXED in the same commits. **F-3** = **SEED-314** (a two-org user's chat rows are stamped with the trigger org), measured again live, not a 267 regression. **F-4** (handoff 502 on `deepseek-v4-flash`, first SC#4 attempt; did not reproduce) OWED/observed. **F-5** (Financial Analyzer restricted) is BY DESIGN (mig 187). **O-1** (Dropped over-states a restricted → restricted swap) routed to SEED-303 | `267-UAT-LOG.md` § Resolutions |
+
+**Owed from 267, and which to run first:**
+1. **The independent review**, by an agent that did not build 267 (AGENTS.md). Run this first.
+2. **Operator confirmation of the G-4 rows.** They were driven in Chrome by the orchestrator under an autonomous run, so there is no operator reply on record.
+3. The member-view catalog check in Chrome (skipped; the API member case is SC#2).
+4. F-4's cause, which needs the backend log.
+
+**Routed to the operator:** the biased-no-folder narrowing finding (D-267-35). A biased Expert on a thread with no folder narrows retrieval from all documents to its own folders; the event card states this as "Dropped: All your documents". It is recorded in SEED-303 and was not fixed here.
+
+**CLAUDE.md size:** 116,523 chars after 267's cells were shortened. This is under the 120,000 warn band, so no split is scheduled.
 
 ## Guardrail overrides — Phase 266 (2026-09-25)
 
