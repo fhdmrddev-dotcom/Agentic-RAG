@@ -148,6 +148,7 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
     deleteThread,
     renameThread,
     updateThreadTitle,
+    patchThread,
   } = useThreads()
 
   const { folders } = useFolders()
@@ -840,6 +841,8 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
             <ChatArea
               thread={selectedThread}
               onCreateThread={newThread}
+              // 267-REVIEW CR-01: an Expert change writes the server's thread back into this list.
+              onThreadUpdated={patchThread}
               onTitleUpdate={handleTitleUpdate}
               folders={folders}
               prefillMessage={prefillMessage}

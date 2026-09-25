@@ -32,6 +32,9 @@ interface Props {
   /** Phase 267 (D-267-21): the second argument creates the thread WITH its Expert, so an Expert
    *  invited on a brand-new chat scopes the first run instead of being cleared by hydration. */
   onCreateThread: (folderId?: string | null, activeExpertId?: string | null) => Promise<Thread>
+  /** 267-REVIEW CR-01: the server's thread after an Expert change, for the owner of the thread list.
+   *  Optional: suites that mount ChatArea from their own props keep compiling. */
+  onThreadUpdated?: (thread: Thread) => void
   onTitleUpdate?: (threadId: string, title: string) => void
   folders: Folder[]
   prefillMessage?: string | null
@@ -66,7 +69,7 @@ interface Props {
   attentionCount?: number
 }
 
-export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefillMessage, onClearPrefill, onOpenDrawer, onOpenConnections, onBrowseExperts, onReopenHistory, attentionCount }: Props) {
+export function ChatArea({ thread, onCreateThread, onThreadUpdated, onTitleUpdate, folders, prefillMessage, onClearPrefill, onOpenDrawer, onOpenConnections, onBrowseExperts, onReopenHistory, attentionCount }: Props) {
   // Plan 075.4-01 D-075.4-A1: useMessages still exposes the viewed-thread
   // values (isStreaming, fallbackNotice) for back-compat — but the composer
   // disabled prop and per-thread surfaces go through the direct selectors
@@ -528,7 +531,10 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
       setExpertInvited(next !== null)
       if (!tid) return
       try {
-        await setThreadActiveExpert(tid, next?.id ?? null)
+        // 267-REVIEW CR-01: the answer is the thread as the server now holds it. It goes back to
+        // the list owner, or returning to this thread would hydrate the Expert it no longer has.
+        const updated = await setThreadActiveExpert(tid, next?.id ?? null)
+        onThreadUpdated?.(updated)
       } catch (err) {
         setActiveExpert(previous)
         setExpertInvited(false)
@@ -541,7 +547,7 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
         loadMessages(tid).catch(console.error)
       }
     },
-    [activeExpert, thread?.id, loadMessages],
+    [activeExpert, thread?.id, loadMessages, onThreadUpdated],
   )
 
   const handleDismissExpert = useCallback(() => {

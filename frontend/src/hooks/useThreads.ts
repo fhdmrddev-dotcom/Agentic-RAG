@@ -16,6 +16,9 @@ interface UseThreads {
   deleteThread: (id: string) => Promise<void>
   renameThread: (id: string, title: string) => Promise<void>
   updateThreadTitle: (id: string, title: string) => void
+  /** 267-REVIEW CR-01: write the SERVER's answer for a thread (e.g. after an Expert change) into the
+   *  list and the selection, so coming back to the thread never hydrates a stale `active_expert_id`. */
+  patchThread: (updated: Thread) => void
 }
 
 export function useThreads(): UseThreads {
@@ -61,5 +64,10 @@ export function useThreads(): UseThreads {
     setSelectedThread((prev) => (prev?.id === id ? { ...prev, title } : prev))
   }, [])
 
-  return { threads, selectedThread, loading, loadThreads, selectThread, newThread, deleteThread, renameThread, updateThreadTitle }
+  const patchThread = useCallback((updated: Thread) => {
+    setThreads((prev) => prev.map((t) => (t.id === updated.id ? { ...t, ...updated } : t)))
+    setSelectedThread((prev) => (prev?.id === updated.id ? { ...prev, ...updated } : prev))
+  }, [])
+
+  return { threads, selectedThread, loading, loadThreads, selectThread, newThread, deleteThread, renameThread, updateThreadTitle, patchThread }
 }
