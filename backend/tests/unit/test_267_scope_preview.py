@@ -368,3 +368,90 @@ async def test_the_preview_route_gates_then_describes_the_threads_folder():
     assert kw["org_id"] == ORG_ID
     assert isinstance(out, ExpertScopePreview)
     assert out.excluded_count == 4
+
+
+# ── 267-REVIEW WR-07: a brand-new chat's picked folder reaches the preview ──────────────────────────
+#
+# Before the first message the dialog's context line reads "This chat · /Client ACME", but the preview
+# had no way to learn that folder (no thread yet, no folder parameter), so it described a chat with no
+# folder: no `Won't use`. The thread `handleSend` then creates DOES carry the folder, and the restricted
+# run excludes its documents — a cost stated as zero. `folder_id` is read ONLY when there is no thread,
+# and only for a folder the caller can see (404 otherwise, before the gate or any statement).
+
+
+def _route_patches(gate, desc, visible):
+    from app.api import threads as threads_mod
+
+    return (
+        patch.object(threads_mod, "assert_expert_bindable", gate),
+        patch.object(threads_mod, "describe_expert_scope", desc),
+        patch.object(threads_mod, "get_pg_pool", AsyncMock(return_value=MagicMock())),
+        patch("app.dependencies.resolve_caller_role", AsyncMock(return_value=("member", set()))),
+        patch("app.utils.folder_utils.fetch_visible_folders", AsyncMock(return_value=list(visible))),
+    )
+
+
+@pytest.mark.asyncio
+async def test_WR07_a_new_chats_visible_folder_is_the_statements_thread_folder():
+    from app.api import threads as threads_mod
+
+    statement = await describe(FakeSupabase(), HR_ID, ACME_FOLDER)
+    gate = AsyncMock(return_value=({"id": HR_ID}, ORG_ID))
+    desc = AsyncMock(return_value=statement)
+    p = _route_patches(gate, desc, VISIBLE_FOLDERS)
+    with p[0], p[1], p[2], p[3], p[4], patch.object(threads_mod, "aexec", AsyncMock(side_effect=AssertionError("no thread read"))):
+        out = await threads_mod.get_expert_scope_preview(
+            request=MagicMock(),
+            expert_id=UUID(HR_ID),
+            thread_id=None,
+            folder_id=UUID(ACME_FOLDER),
+            current_user={"id": USER_ID},
+            supabase=MagicMock(),
+        )
+    assert desc.await_args.kwargs["thread_folder_id"] == ACME_FOLDER
+    assert out.excluded_count == 4
+
+
+@pytest.mark.asyncio
+async def test_WR07_a_folder_the_caller_cannot_see_is_a_404_before_the_gate():
+    from app.api import threads as threads_mod
+
+    gate = AsyncMock()
+    desc = AsyncMock()
+    p = _route_patches(gate, desc, VISIBLE_FOLDERS)
+    with p[0], p[1], p[2], p[3], p[4]:
+        with pytest.raises(HTTPException) as exc:
+            await threads_mod.get_expert_scope_preview(
+                request=MagicMock(),
+                expert_id=UUID(HR_ID),
+                thread_id=None,
+                folder_id=UUID(HIDDEN_FOLDER),
+                current_user={"id": USER_ID},
+                supabase=MagicMock(),
+            )
+    assert exc.value.status_code == 404
+    assert exc.value.detail == "Folder not found"
+    gate.assert_not_awaited()
+    desc.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_WR07_with_a_thread_the_threads_own_folder_wins_over_folder_id():
+    from app.api import threads as threads_mod
+
+    statement = await describe(FakeSupabase(), HR_ID, ACME_FOLDER)
+    gate = AsyncMock(return_value=({"id": HR_ID}, ORG_ID))
+    desc = AsyncMock(return_value=statement)
+    thread_id = uuid4()
+    p = _route_patches(gate, desc, VISIBLE_FOLDERS)
+    with p[0], p[1], p[2], p[3], p[4], \
+         patch.object(threads_mod, "aexec", AsyncMock(return_value=MagicMock(data={"id": str(thread_id), "folder_id": None}))):
+        await threads_mod.get_expert_scope_preview(
+            request=MagicMock(),
+            expert_id=UUID(HR_ID),
+            thread_id=thread_id,
+            folder_id=UUID(ACME_FOLDER),
+            current_user={"id": USER_ID},
+            supabase=MagicMock(),
+        )
+    assert desc.await_args.kwargs["thread_folder_id"] is None

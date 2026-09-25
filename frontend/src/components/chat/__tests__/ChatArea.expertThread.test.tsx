@@ -19,7 +19,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { useEffect, type ReactNode } from "react"
-import type { ExpertBundle, Message, Thread } from "@/types"
+import type { ExpertBundle, Folder, Message, Thread } from "@/types"
 
 const h = vi.hoisted(() => ({
   messages: [] as unknown[],
@@ -515,5 +515,23 @@ describe("(E) WR-06 — the empty unscoped thread's spotlight states D-267-35", 
     expect(wont.textContent).toContain("All your documents")
     expect(wont).toBeVisible()
     expect(h.getExpertScopePreview).toHaveBeenCalledWith(CR.id, null)
+  })
+})
+
+// 267-REVIEW WR-07 — before the first message the dialog says "This chat · /Client ACME", but the
+// preview was asked with no thread and no folder, so a restricted row stated nothing excluded; the
+// thread handleSend then creates carries the folder and the run excludes its documents. The picked
+// folder now travels with the preview request when there is no thread yet.
+describe("(F) WR-07 — a brand-new chat's picked folder reaches the restricted preview", () => {
+  it("(12) pick a folder, open the invite: the restricted row's preview is asked about THAT folder", async () => {
+    const HR = expert({ id: "e-hr", name: "HR Advisor", slug: "hr-advisor", scope_mode: "restricted" })
+    h.listExperts.mockResolvedValue([HR])
+    const ACME = { id: "f-acme", name: "Client ACME" } as Folder
+    const user = userEvent.setup()
+    render(shell(<ChatArea thread={null} onCreateThread={vi.fn()} folders={[ACME]} />))
+    await user.selectOptions(screen.getByRole("combobox"), "f-acme")
+    await openInvite(user)
+    await waitFor(() => expect(h.getExpertScopePreview).toHaveBeenCalled())
+    expect(h.getExpertScopePreview).toHaveBeenCalledWith(HR.id, null, "f-acme")
   })
 })
