@@ -72,6 +72,11 @@ def normalise_bytes(raw: bytes) -> bytes:
     return raw.replace(b"\r\n", b"\n")
 
 
+def _is_text_mime(mime_type: str) -> bool:
+    mime = mime_type.strip().lower()
+    return mime.startswith("text/") or mime == "application/json"
+
+
 def _validate_slug(slug: object) -> str:
     # fullmatch, never match: `$` also matches before a trailing newline.
     if not isinstance(slug, str) or not SLUG_RE.fullmatch(slug):
@@ -146,6 +151,10 @@ def load_corpus(slug: str) -> ExpertCorpus:
             raise CorpusRefused(f"invalid corpus filename for {slug!r}: {filename!r}")
         if not isinstance(mime_type, str) or not mime_type.strip():
             raise CorpusRefused(f"corpus file {filename!r} has no mime_type")
+        # WR-07: normalise_bytes and .gitattributes both rewrite line endings, which would corrupt
+        # a binary sample twice. Corpora are text until binary corpora are designed for.
+        if not _is_text_mime(mime_type):
+            raise CorpusRefused(f"corpus file {filename!r} is {mime_type!r}; corpora must be text")
         if filename in seen:
             raise CorpusRefused(f"corpus file {filename!r} is listed twice")
         seen.add(filename)
